@@ -12,6 +12,7 @@ import (
 	billingmodels "github.com/superplanehq/superplane/ee/billing/models"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/test/support"
@@ -978,7 +979,7 @@ func TestDescribeFactoryVelocity_CountsTasksApartFromPullRequests(t *testing.T) 
 	require.NoError(t, err)
 	for _, url := range []string{
 		"https://github.com/example/repo/pull/1",
-		"https://github.com/example/repo/pull/2",
+		"https://github.com/example/other/pull/1",
 	} {
 		_, err = merged.CreatePullRequest(db, models.FactoryPullRequestParams{
 			URL:      url,
@@ -1008,6 +1009,21 @@ func TestDescribeFactoryVelocity_CountsTasksApartFromPullRequests(t *testing.T) 
 	assert.Equal(t, int32(1), resp.Totals.Waste)
 	assert.Equal(t, int32(2), resp.Totals.TasksClosed, "the merged order counts once, however many pull requests it opened")
 	assert.Equal(t, int32(1), resp.Totals.TasksWaste)
+
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryMultiRepoTasks))
+	primary := "example/repo"
+	require.NoError(t, factoryModel.UpdateOnboarding(db, models.FactoryOnboardingPatch{AppRepository: &primary}))
+	_, err = factoryModel.CreateAgentResource(db, models.FactoryAgentResourceKindContextRepo, "", true, models.FactoryAgentResourceConfig{Repository: "example/other", Access: models.FactoryContextRepoAccessWrite})
+	require.NoError(t, err)
+	selected, err := DescribeFactoryVelocity(ctx, r.Organization.ID.String(), &pb.DescribeFactoryVelocityRequest{FactoryId: factoryModel.ID.String(), PeriodDays: 7, Repository: "example/other"})
+	require.NoError(t, err)
+	assert.Equal(t, int32(1), selected.Totals.SuperplaneMerged)
+	assert.Equal(t, resp.Totals.TasksClosed, selected.Totals.TasksClosed, "a task spanning repositories counts once in workspace totals")
+	assert.Equal(t, resp.Totals.TasksWaste, selected.Totals.TasksWaste)
+	assert.Equal(t, resp.Totals.CostCents, selected.Totals.CostCents)
+	assert.ElementsMatch(t, []string{primary, "example/other"}, selected.Repositories)
+	require.Len(t, selected.People, 1)
+	assert.Equal(t, int32(1), selected.People[0].FactoryMerged, "task-related people metrics remain workspace-wide")
 }
 
 func TestDescribeFactoryVelocity_ReportsSpendPerBandAndMedianTask(t *testing.T) {

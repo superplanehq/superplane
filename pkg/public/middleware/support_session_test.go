@@ -115,7 +115,7 @@ func TestOrganizationAuthMiddleware_SupportSessionIsReadOnly(t *testing.T) {
 		token, err := f.signer.GenerateScopedToken(jwt.ScopedTokenClaims{
 			Subject: f.registry.User.String(),
 			OrgID:   f.registry.Organization.ID.String(),
-			Purpose: "agent-builder",
+			Purpose: "test-scope",
 			Scopes:  []string{"canvases:update"},
 		}, time.Minute)
 		require.NoError(t, err)

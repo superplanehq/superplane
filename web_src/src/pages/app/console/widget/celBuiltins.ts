@@ -2,6 +2,8 @@
 // for the dashboard's expression environment. Split out of `celExpr.ts` so
 // the adapter surface stays focused on parse / eval / coercion.
 import type { Environment } from "@marcbachmann/cel-js";
+import { githubPersonAvatarUrl } from "@/lib/githubAvatar";
+import { githubHostFromHint } from "@/lib/githubHost";
 
 import { coerceWidgetTimestamp } from "./widgetFormat";
 
@@ -156,6 +158,10 @@ function registerAvatarHelpers(env: Environment): void {
   env.registerFunction("githubAvatarOrInitial(dyn): string", (author: unknown) => githubAvatar(author, undefined));
   env.registerFunction("githubAvatarOrInitial(dyn, dyn): string", (author: unknown, committer: unknown) =>
     githubAvatar(author, committer),
+  );
+  env.registerFunction(
+    "githubAvatarOrInitial(dyn, dyn, dyn): string",
+    (author: unknown, committer: unknown, host: unknown) => githubAvatar(author, committer, host),
   );
 }
 
@@ -348,13 +354,13 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 // Uses the GitHub avatar image when `author.username` is present;
 // otherwise falls back to an initial-letter badge derived from the
 // available names.
-function githubAvatar(author: unknown, committer: unknown): string {
+function githubAvatar(author: unknown, committer: unknown, host?: unknown): string {
+  const src = githubPersonAvatarUrl(author, githubHostFromHint(host));
+  if (src) {
+    return `<img class="avatar avatar-image" src="${src}" alt="" />`;
+  }
   const authorRecord = asRecord(author);
   const committerRecord = asRecord(committer);
-  const username = coerceToString(authorRecord?.username).trim();
-  if (username) {
-    return `<img class="avatar avatar-image" src="https://github.com/${username}.png" alt="" />`;
-  }
   const letter = firstInitialFromValues(
     authorRecord?.name,
     committerRecord?.name,

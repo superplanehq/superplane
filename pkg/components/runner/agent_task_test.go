@@ -112,8 +112,10 @@ func TestAppendPublishLinkProtocolAddsCommandToFirstPromptOnly(t *testing.T) {
 	require.Len(t, got, len(steps))
 	assert.Equal(t, firstPrompt, *steps[1].Prompt, "the original prompt must not change")
 	assert.Contains(t, *got[1].Prompt, firstPrompt)
-	assert.Contains(t, *got[1].Prompt, "superplane task artifact add")
-	assert.Contains(t, *got[1].Prompt, "publish_link")
+	assert.Contains(t, *got[1].Prompt, "superplane task artifact add-link")
+	assert.Contains(t, *got[1].Prompt, "superplane task artifact add-markdown")
+	assert.Contains(t, *got[1].Prompt, "superplane task artifact add-file")
+	assert.Contains(t, *got[1].Prompt, "add_artifact")
 	assert.Equal(t, secondPrompt, *got[2].Prompt)
 	assert.Equal(t, command, *got[0].Command)
 	twice := AppendPublishLinkProtocol(got, true)
@@ -175,6 +177,25 @@ func TestBuildAgentTaskAppliesStepWorkingDirectory(t *testing.T) {
 	assert.Equal(t, LLMUsageScript, requireBrokerFile(t, files, "llm_usage.js").Content)
 	assert.Equal(t, TurnTelemetryScript, requireBrokerFile(t, files, "turn_telemetry.js").Content)
 	assert.Equal(t, ActivityStreamScript, requireBrokerFile(t, files, "activity_stream.js").Content)
+}
+
+func TestBuildAgentTaskDeliversBrowserGuidanceWithoutVisualEvidence(t *testing.T) {
+	t.Parallel()
+
+	prompt := "Use the browser to open the UI and inspect its rendered content."
+	commands, files := BuildAgentTask(AgentTaskInput{
+		Steps: []AgentStep{{Name: "Navigate", Type: AgentStepPrompt, Prompt: &prompt}},
+		PromptCommand: func(promptName, model string) string {
+			return "node run.js " + promptName
+		},
+	})
+
+	file := requireBrokerFile(t, files, "prompts/01-navigate.txt")
+	assert.Contains(t, file.Content, "Run the installed `playwright cli` on the runner host, not in the repository container.")
+	assert.Contains(t, file.Content, "snapshot")
+	assert.NotContains(t, file.Content, "## Visual evidence protocol")
+	assert.NotContains(t, file.Content, "upload at least one screenshot")
+	assert.Equal(t, prompt, commands[1].Preview)
 }
 
 func TestBuildAgentTaskPreviewKeepsFullMultilineBody(t *testing.T) {
@@ -284,10 +305,10 @@ func TestBuildAgentTaskAppliesIntegrationUsageAndSetup(t *testing.T) {
 	assert.Contains(t, commands[2].Command, `export PATH="$SUPERPLANE_TASK_DIR/bin:$PATH"`)
 
 	assert.Equal(t, "echo install-sem-ai", requireBrokerFile(t, files, "setup/01-set-up-semaphore.sh").Content)
-	assert.Equal(
+	assert.Contains(
 		t,
-		"The gh CLI is already installed. Use GITHUB_TOKEN.\n\nimplement the change",
 		requireBrokerFile(t, files, "prompts/01-implement.txt").Content,
+		"The gh CLI is already installed. Use GITHUB_TOKEN.\n\nimplement the change",
 	)
 }
 
@@ -336,7 +357,7 @@ func TestBuildAgentTaskFetchesSignedAttachments(t *testing.T) {
 	promptFile := requireBrokerFile(t, files, "prompts/01-implement.txt").Content
 	assert.Contains(t, promptFile, AttachmentAgentInstructions)
 	assert.Contains(t, promptFile, "sp_file=1")
-	assert.NotContains(t, promptFile, "inspect_attachment")
+	assert.NotContains(t, promptFile, "get_artifact")
 	assert.Equal(t, "Implement", commands[3].Name)
 }
 
@@ -412,7 +433,7 @@ func TestBuildAgentTaskMintsFileRefsInPromptFiles(t *testing.T) {
 	assert.Contains(t, prompt, signed)
 	assert.Contains(t, prompt, AttachmentAgentInstructions)
 	assert.NotContains(t, prompt, "$SUPERPLANE_TASK_DIR/attachments/01-bug.png")
-	assert.NotContains(t, prompt, "inspect_attachment")
+	assert.NotContains(t, prompt, "get_artifact")
 	assert.NotContains(t, prompt, "sp-file://")
 	assert.Contains(t, requireBrokerFile(t, files, "attachments/manifest.json").Content, "sp_file=1")
 	assert.Contains(t, requireBrokerFile(t, files, "attachments/manifest.json").Content, "01-bug.png")
@@ -461,7 +482,7 @@ func TestBuildAgentTaskRewritesPlanningImagePaths(t *testing.T) {
 
 	prompt := requireBrokerFile(t, files, "prompts/01-implement.txt").Content
 	assert.Contains(t, prompt, "$SUPERPLANE_TASK_DIR/attachments/01-bug.png")
-	assert.Contains(t, prompt, "inspect_attachment")
+	assert.Contains(t, prompt, "get_artifact")
 	assert.Contains(t, prompt, AttachmentAgentInstructions)
 	assert.NotContains(t, prompt, signed)
 	assert.NotContains(t, prompt, "sp-file://")

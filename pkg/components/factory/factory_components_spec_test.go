@@ -61,10 +61,19 @@ type fakeFactoryContext struct {
 
 	vcsProvider    string
 	vcsProviderErr error
+	githubHost     string
 }
 
 func (f *fakeFactoryContext) VCSProvider() (string, error) {
 	return f.vcsProvider, f.vcsProviderErr
+}
+
+func (f *fakeFactoryContext) GitHubHost() (string, error) {
+	return f.githubHost, f.vcsProviderErr
+}
+
+func (f *fakeFactoryContext) ListRepositories() ([]string, error) {
+	return nil, nil
 }
 
 func (f *fakeFactoryContext) CreateWorkOrder(params core.WorkOrderParams) (*core.WorkOrder, bool, error) {
@@ -973,7 +982,7 @@ func TestBuildArtifactData_SkipsBlankTypedInputs(t *testing.T) {
 
 func mustBuildArtifactData(t *testing.T, config AddWorkOrderArtifactConfiguration) map[string]any {
 	t.Helper()
-	data, err := buildArtifactData(config, "")
+	data, err := buildArtifactData(config, "", "")
 	require.NoError(t, err)
 	return data
 }

@@ -16,20 +16,33 @@ type LiveStatus = {
   elapsedSeconds?: number;
 };
 
+type LiveStatusInput = {
+  activity?: AgentActivity;
+  elapsedMs: number;
+  startingLabel: string;
+  progressLabel?: string;
+  error?: string;
+  collapseReasoning: boolean;
+};
+
 export function AnalysisLiveWork({
   machineStatus,
-  queueReason,
+  runnerState,
+  blockedByParallelismLimit,
   organizationId,
   canvasId,
   executionId,
   activities,
+  progressLabel,
 }: {
   machineStatus: CreateWithAgentMachineStatus;
-  queueReason?: string;
+  runnerState?: string;
+  blockedByParallelismLimit?: boolean;
   organizationId?: string;
   canvasId?: string;
   executionId?: string;
   activities?: AgentActivity[];
+  progressLabel?: string;
 }) {
   if (machineStatus === "queued") {
     return (
@@ -42,8 +55,12 @@ export function AnalysisLiveWork({
         <div>
           <p className="font-medium text-foreground">Queued for planning</p>
           <p className="text-muted-foreground">
-            {queueReason === "parallelism_limit" ? "Parallelism limit reached." : "Waiting for a runner."} Planning
-            starts automatically when a slot is free.
+            {blockedByParallelismLimit
+              ? "Parallelism limit reached."
+              : runnerState === "pending"
+                ? "Waiting for scheduling."
+                : "Waiting for a runner."}{" "}
+            Planning starts automatically when a slot is free.
           </p>
         </div>
       </div>
@@ -57,6 +74,7 @@ export function AnalysisLiveWork({
       executionId={executionId}
       activities={activities}
       startingLabel="Starting analysis…"
+      progressLabel={progressLabel}
       className="mt-3"
       testId="split-run-intent-live-work"
     />
@@ -75,6 +93,7 @@ export function AgentLiveActivity({
   executionId,
   activities,
   startingLabel,
+  progressLabel,
   className,
   testId = "agent-live-activity",
 }: {
@@ -86,6 +105,7 @@ export function AgentLiveActivity({
   activities?: AgentActivity[];
   /** Shimmer text before the first activity arrives. */
   startingLabel: string;
+  progressLabel?: string;
   className?: string;
   testId?: string;
 }) {
@@ -95,6 +115,7 @@ export function AgentLiveActivity({
       active={active}
       activity={currentLiveActivity(activities, stream.activities)}
       startingLabel={startingLabel}
+      progressLabel={progressLabel}
       error={stream.hasConnectedOnce ? stream.error : undefined}
       className={className}
       testId={testId}
@@ -107,6 +128,7 @@ export function AgentLiveActivityFeed({
   active,
   activity,
   startingLabel,
+  progressLabel,
   error,
   className,
   testId = "agent-live-activity",
@@ -115,6 +137,7 @@ export function AgentLiveActivityFeed({
   active: boolean;
   activity?: AgentActivity;
   startingLabel: string;
+  progressLabel?: string;
   error?: string;
   className?: string;
   testId?: string;
@@ -128,6 +151,7 @@ export function AgentLiveActivityFeed({
         active
         activity={activity}
         startingLabel={startingLabel}
+        progressLabel={progressLabel}
         error={error}
         collapseReasoning={collapseReasoning}
       />
@@ -140,18 +164,20 @@ export function AgentLiveStatus({
   active,
   activity,
   startingLabel,
+  progressLabel,
   error,
   collapseReasoning = true,
 }: {
   active: boolean;
   activity?: AgentActivity;
   startingLabel: string;
+  progressLabel?: string;
   error?: string;
   /** Console hides an empty Thinking row, so the shimmer must keep that label. */
   collapseReasoning?: boolean;
 }) {
   const elapsedMs = useActivityElapsed(activity?.sequence ?? 0, active);
-  const status = liveStatus(activity, elapsedMs, startingLabel, error, collapseReasoning);
+  const status = liveStatus({ activity, elapsedMs, startingLabel, progressLabel, error, collapseReasoning });
   if (!active || !status) return null;
   return (
     <p
@@ -179,22 +205,23 @@ function useActivityElapsed(sequence: number, active: boolean): number {
   return elapsedMs;
 }
 
-function liveStatus(
-  activity: AgentActivity | undefined,
-  elapsedMs: number,
-  startingLabel: string,
-  error?: string,
-  collapseReasoning = true,
-): LiveStatus | undefined {
+function liveStatus({
+  activity,
+  elapsedMs,
+  startingLabel,
+  progressLabel,
+  error,
+  collapseReasoning,
+}: LiveStatusInput): LiveStatus | undefined {
   if (error) return { label: "Live activity disconnected. Reconnecting…" };
   if (elapsedMs >= STALE_ACTIVITY_MS) {
-    return { label: "Still working", elapsedSeconds: Math.floor(elapsedMs / 1000) };
+    return staleStatus(elapsedMs, progressLabel);
   }
-  if (!activity || activity.items.length === 0) return { label: startingLabel };
+  if (!activity || activity.items.length === 0) return pendingStatus(progressLabel, startingLabel);
 
   const latest = lastActionItem(activity.items);
   if (!latest || latest.status !== "running") {
-    return { label: "Planning next step…" };
+    return pendingStatus(progressLabel, "Planning next step…");
   }
   if (latest.type === "content") {
     if (latest.kind === "reasoning") {
@@ -207,7 +234,16 @@ function liveStatus(
     return { label: "Writing response…" };
   }
   if (latest.type === "tool") return undefined;
-  return { label: "Planning next step…" };
+  return pendingStatus(progressLabel, "Planning next step…");
+}
+
+function pendingStatus(progressLabel: string | undefined, fallbackLabel: string): LiveStatus {
+  return { label: progressLabel ?? fallbackLabel };
+}
+
+function staleStatus(elapsedMs: number, progressLabel?: string): LiveStatus {
+  if (progressLabel) return { label: progressLabel };
+  return { label: "Still working", elapsedSeconds: Math.floor(elapsedMs / 1000) };
 }
 
 function lastActionItem(items: AgentActivityItem[]): Exclude<AgentActivityItem, { type: "notice" }> | undefined {

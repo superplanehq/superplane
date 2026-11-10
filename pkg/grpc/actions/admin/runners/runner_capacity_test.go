@@ -2,12 +2,15 @@ package runners
 
 import (
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	billingmodels "github.com/superplanehq/superplane/ee/billing/models"
+	"github.com/superplanehq/superplane/pkg/billing"
 	"github.com/superplanehq/superplane/pkg/database"
+	runneractions "github.com/superplanehq/superplane/pkg/grpc/actions/runners"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/admin/runners"
@@ -15,7 +18,7 @@ import (
 	"google.golang.org/grpc/codes"
 )
 
-func TestCreateRunnerAtOrganizationCapacityRollsBackAndCanRetry(t *testing.T) {
+func TestCreateRunnerForPendingTaskRollsBackAndCanRetryAfterScheduling(t *testing.T) {
 	resource := support.Setup(t)
 	t.Setenv(billingmodels.BillingEnabledEnv, "true")
 	db := database.DB(t.Context())
@@ -30,6 +33,7 @@ func TestCreateRunnerAtOrganizationCapacityRollsBackAndCanRetry(t *testing.T) {
 	otherFleet := createTestFleetWithSlug(t, "other-capacity-fleet")
 	firstTask := createTestTask(t, resource.Organization.ID, fleet.ID, []byte("encrypted"))
 	secondTask := createTestTask(t, resource.Organization.ID, otherFleet.ID, []byte("encrypted"))
+	require.NoError(t, db.Model(secondTask).Update("state", models.RunnerTaskStatePending).Error)
 	service := newTestRunnerService()
 	firstRequest := &pb.CreateRunnerRequest{
 		FleetId: fleet.Slug, TaskId: stringPointer(firstTask.ID.String()),
@@ -42,7 +46,7 @@ func TestCreateRunnerAtOrganizationCapacityRollsBackAndCanRetry(t *testing.T) {
 		IdempotencyKey: "denied-slot", Ephemeral: true,
 	}
 	_, err = service.CreateRunner(t.Context(), secondRequest)
-	require.Equal(t, codes.ResourceExhausted, grpcerrors.Code(err))
+	require.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
 
 	var runners, registrations int64
 	require.NoError(t, db.Model(&models.Runner{}).Count(&runners).Error)
@@ -51,7 +55,7 @@ func TestCreateRunnerAtOrganizationCapacityRollsBackAndCanRetry(t *testing.T) {
 	assert.Equal(t, int64(1), registrations)
 	queued, err := models.FindRunnerTask(db, secondTask.ID)
 	require.NoError(t, err)
-	assert.Equal(t, models.RunnerTaskStateQueued, queued.State)
+	assert.Equal(t, models.RunnerTaskStatePending, queued.State)
 	assert.Nil(t, queued.RunnerID)
 
 	// Retries reuse an existing slot, and generic provisioning uses no slot.
@@ -64,7 +68,58 @@ func TestCreateRunnerAtOrganizationCapacityRollsBackAndCanRetry(t *testing.T) {
 	runner, err := models.FindRunner(db, uuid.MustParse(first.Runner.Id))
 	require.NoError(t, err)
 	require.NoError(t, runner.Terminate(db, models.RunnerTerminationProvisioningFailed))
+	// Returning a reservation to queued retains its slot. Cancel it before scheduling another task.
+	storedFirst, err := models.FindRunnerTask(db, firstTask.ID)
+	require.NoError(t, err)
+	require.NoError(t, storedFirst.RequestCancel(db, time.Now()))
+	_, err = models.ScheduleOrganizationRunnerTasks(db, resource.Organization.ID, 100)
+	require.NoError(t, err)
 	admitted, err := service.CreateRunner(t.Context(), secondRequest)
 	require.NoError(t, err)
 	assert.Equal(t, models.RunnerStatePending, admitted.Runner.State)
+}
+
+func TestFleetCapacityCountsOnlyTasksWithOrganizationSlots(t *testing.T) {
+	resource := support.Setup(t)
+	db := database.DB(t.Context())
+	fleet := createTestFleet(t, models.RunnerFleetScopeInstallation, nil)
+	for range 3 {
+		task := createTestTask(t, resource.Organization.ID, fleet.ID, []byte("encrypted"))
+		require.NoError(t, db.Model(task).Update("state", models.RunnerTaskStatePending).Error)
+	}
+	ready := createTestTask(t, resource.Organization.ID, fleet.ID, []byte("encrypted"))
+	capacity, err := newTestRunnerService().manager.GetFleetCapacity(t.Context(), fleet, runneractions.CapacityOptions{})
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), capacity.RunnableTasks)
+	require.NoError(t, ready.RequestCancel(db, time.Now()))
+	capacity, err = newTestRunnerService().manager.GetFleetCapacity(t.Context(), fleet, runneractions.CapacityOptions{})
+	require.NoError(t, err)
+	assert.Zero(t, capacity.RunnableTasks)
+}
+
+func TestCreateRunnerForPaidTaskWithoutCreditFailsTask(t *testing.T) {
+	t.Setenv(billingmodels.BillingEnabledEnv, "true")
+	resource := support.Setup(t)
+	db := database.DB(t.Context())
+	support.AssignOpenSystemTrial(t, resource.Organization.ID)
+	require.NoError(t, db.Model(&billingmodels.OrganizationLLMCreditGrant{}).
+		Where("organization_id = ?", resource.Organization.ID).
+		Update("expires_at", time.Now().Add(-time.Minute)).Error)
+	fleet := createTestFleetWithSlug(t, models.RunnerFleetE1LargeAMD64)
+	task := createTestTask(t, resource.Organization.ID, fleet.ID, []byte("encrypted"))
+
+	_, err := newTestRunnerService().CreateRunner(t.Context(), &pb.CreateRunnerRequest{
+		FleetId: fleet.Slug, TaskId: stringPointer(task.ID.String()),
+		IdempotencyKey: "no-credit", Ephemeral: true,
+	})
+	require.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
+
+	var runners int64
+	require.NoError(t, db.Model(&models.Runner{}).Count(&runners).Error)
+	assert.Zero(t, runners)
+	stored, err := models.FindRunnerTask(db, task.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.RunnerTaskStateFailed, stored.State)
+	require.NotNil(t, stored.ErrorMessage)
+	assert.Contains(t, *stored.ErrorMessage, billing.ErrHostedCreditEmpty.Error())
 }

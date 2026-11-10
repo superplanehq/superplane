@@ -1,5 +1,15 @@
 import { vi } from "bun:test";
 
+vi.mock("./useFirstRunGitHubEnterprise", () => ({
+  useFirstRunGitHubEnterprise: () => ({
+    connect: vi.fn(),
+    submitOwner: vi.fn(),
+    resume: vi.fn(),
+    ready: false,
+    currentStepName: "",
+  }),
+}));
+
 vi.mock("./useBitbucketOnboarding", () => ({
   useBitbucketOnboarding: () => ({
     data: { providerConfigured: false, identity: undefined, repositories: [], installUrl: "" },
@@ -42,4 +52,9 @@ vi.mock("@/hooks/useOrganizationWorkspaceUsage", () => ({
     isError: false,
     refetch: async () => ({ data: workspaceUsage }),
   }),
+}));
+
+// The Linear scope step lists teams, projects, and labels.
+vi.mock("@/hooks/useIntegrations", () => ({
+  useIntegrationResources: () => ({ data: [], isLoading: false, isPending: false, isError: false, refetch: vi.fn() }),
 }));

@@ -469,6 +469,33 @@ func ListGitHubFactoryPullRequestsForWebhook(
 	return pullRequests, nil
 }
 
+// ListWorkOrdersByPullRequestNumbers resolves imported tasks in one query.
+// Numbers are scoped to this factory, provider, and repository.
+func (f *Factory) ListWorkOrdersByPullRequestNumbers(tx *gorm.DB, provider, repository string, numbers []int64) (map[int64]FactoryWorkOrder, error) {
+	ordersByNumber := make(map[int64]FactoryWorkOrder, len(numbers))
+	if len(numbers) == 0 {
+		return ordersByNumber, nil
+	}
+	var matches []struct {
+		FactoryWorkOrder  `gorm:"embedded"`
+		PullRequestNumber int64
+	}
+	err := f.workOrdersQuery(tx, ListFactoryWorkOrdersFilters{}).
+		Select("factory_work_orders.*, factory_pull_requests.number AS pull_request_number").
+		Joins("JOIN factory_pull_requests ON factory_pull_requests.work_order_id = factory_work_orders.id").
+		Where("factory_pull_requests.organization_id = ? AND factory_pull_requests.factory_id = ?", f.OrganizationID, f.ID).
+		Where("factory_pull_requests.provider = ? AND lower(factory_pull_requests.repository) = lower(?)", strings.TrimSpace(provider), strings.TrimSpace(repository)).
+		Where("factory_pull_requests.number IN ?", numbers).
+		Find(&matches).Error
+	if err != nil {
+		return nil, err
+	}
+	for _, match := range matches {
+		ordersByNumber[match.PullRequestNumber] = match.FactoryWorkOrder
+	}
+	return ordersByNumber, nil
+}
+
 func (f *Factory) FindPullRequest(tx *gorm.DB, filter FactoryPullRequestLookup) (*FactoryPullRequest, error) {
 	query := tx.Where("organization_id = ? AND factory_id = ?", f.OrganizationID, f.ID)
 
@@ -479,7 +506,7 @@ func (f *Factory) FindPullRequest(tx *gorm.DB, filter FactoryPullRequestLookup) 
 		query = query.Where("provider = ? AND external_id = ?", strings.TrimSpace(filter.Provider), strings.TrimSpace(filter.ExternalID))
 	case strings.TrimSpace(filter.Provider) != "" && strings.TrimSpace(filter.Repository) != "" && filter.Number > 0:
 		query = query.Where(
-			"provider = ? AND repository = ? AND number = ?",
+			"provider = ? AND lower(repository) = lower(?) AND number = ?",
 			strings.TrimSpace(filter.Provider),
 			strings.TrimSpace(filter.Repository),
 			filter.Number,
@@ -710,6 +737,39 @@ func ListPullRequestsByWorkOrderIDs(tx *gorm.DB, workOrderIDs []uuid.UUID) (map[
 		result[pullRequest.WorkOrderID] = append(result[pullRequest.WorkOrderID], pullRequest)
 	}
 	return result, nil
+}
+
+// PullRequestCloseOutcome reports how the task closes from its pull
+// requests. A task stays open while any pull request is open or draft.
+func (o *FactoryWorkOrder) PullRequestCloseOutcome(tx *gorm.DB) (string, bool, error) {
+	grouped, err := ListPullRequestsByWorkOrderIDs(tx, []uuid.UUID{o.ID})
+	if err != nil {
+		return "", false, err
+	}
+	result, done := PullRequestsCloseResult(grouped[o.ID])
+	return result, done, nil
+}
+
+// PullRequestsCloseResult returns completed when every pull request is done
+// and at least one merged, and pr_closed when all closed without a merge.
+func PullRequestsCloseResult(pullRequests []FactoryPullRequest) (string, bool) {
+	if len(pullRequests) == 0 {
+		return "", false
+	}
+	merged := false
+	for _, pullRequest := range pullRequests {
+		switch pullRequest.State {
+		case FactoryPullRequestStateMerged:
+			merged = true
+		case FactoryPullRequestStateClosed:
+		default:
+			return "", false
+		}
+	}
+	if merged {
+		return FactoryWorkOrderResultCompleted, true
+	}
+	return FactoryWorkOrderResultPRClosed, true
 }
 
 func ListFactoryPullRequests(tx *gorm.DB, factoryID uuid.UUID, filter FactoryPullRequestFilter) ([]FactoryPullRequest, error) {

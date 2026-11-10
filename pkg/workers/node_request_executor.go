@@ -10,6 +10,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/superplanehq/superplane/pkg/authorization"
+	factorycomponent "github.com/superplanehq/superplane/pkg/components/factory"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -65,6 +66,19 @@ func (e *NodeRequestExecutor) execute(
 	lockRequest func(*gorm.DB, uuid.UUID) (*models.CanvasNodeRequest, error),
 ) error {
 	defer e.publishExecution(request)
+	if request.Type == models.NodeRequestTypeInvokeAction && request.Spec.Data().InvokeAction != nil &&
+		request.Spec.Data().InvokeAction.ActionName == factorycomponent.UpdatePullRequestBodySectionHook {
+		events, err := factoryactions.ProcessBodySectionPublicationRequest(context.Background(), e.factoryIntakeDeps(), request.ID, lockRequest)
+		if err != nil {
+			return err
+		}
+		for i := range events {
+			if err := messages.PublishCanvasEventCreatedMessage(&events[i]); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
 
 	if request.Type == models.NodeRequestTypePullRequestChecksStart {
 		events, err := factoryactions.ProcessPullRequestChecksStartRequest(context.Background(), e.factoryIntakeDeps(), request.ID)
@@ -496,11 +510,12 @@ func (e *NodeRequestExecutor) invokeExecutionComponentHook(
 		HTTP:           e.registry.HTTPContextInTransaction(tx),
 		Metadata:       contexts.NewExecutionMetadataContext(tx, execution),
 		ExecutionState: contexts.NewExecutionStateContext(tx, execution, onNewEvents),
-		Requests:       contexts.NewExecutionRequestContext(tx, execution),
+		Requests:       contexts.NewExecutionRequestContext(tx, execution).WithCurrentRequest(request),
 		Auth:           contexts.NewAuthReader(tx, workflow.OrganizationID, e.authService, nil),
 		Secrets:        contexts.NewSecretsContext(tx, e.registry, workflow.OrganizationID, e.encryptor),
 		Runs:           runCancellations.Bind(contexts.NewRunExecutionContext(tx, workflow, node, execution)),
 		Factory: contexts.NewFactoryContext(tx, workflow, execution).
+			WithNewEvents(onNewEvents).
 			WithWorkOrderUpdated(onFactoryWorkOrderUpdated).
 			WithRunsCancelled(runCancellations.RecordRuns).
 			WithGitHubPullRequestRecorded(onGitHubPullRequestRecorded).

@@ -1,9 +1,12 @@
 package models
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
+	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -31,7 +34,7 @@ var (
 	ErrCodexConnectionNotReady    = newSubscriptionAdmissionError("connect ChatGPT before this task can run")
 	ErrCodexConnectionStale       = newSubscriptionAdmissionError("the ChatGPT sign-in update is out of date")
 	ErrCodexConnectionActive      = errors.New("stop the running tasks before you disconnect ChatGPT")
-	ErrCodexConnectionUnavailable = newSubscriptionAdmissionError("ChatGPT subscription is not available for this organization")
+	ErrCodexConnectionUnavailable = newSubscriptionAdmissionError("ChatGPT subscription requires factories access for this organization")
 )
 
 // CodexConnectionBusyError names the task that holds the subscription.
@@ -46,12 +49,11 @@ func (e *CodexConnectionBusyError) Error() string {
 	return fmt.Sprintf("ChatGPT subscription is in use by task %s.", e.TaskID)
 }
 
-// FactoryCodexConnection is one member’s ChatGPT subscription in a workspace.
+// FactoryCodexConnection is one member’s ChatGPT subscription in an organization.
 // The ciphertext is the native Codex auth bundle, bound to this row ID.
 type FactoryCodexConnection struct {
 	ID                         uuid.UUID
 	OrganizationID             uuid.UUID
-	FactoryID                  uuid.UUID
 	OwnerUserID                uuid.UUID
 	Status                     string
 	ResumeStatus               string
@@ -73,11 +75,26 @@ type FactoryCodexConnection struct {
 }
 
 type CodexUsageLimit struct {
-	LimitID   string            `json:"limitId"`
-	LimitName string            `json:"limitName"`
-	PlanType  string            `json:"planType"`
-	Primary   *CodexUsageWindow `json:"primary"`
-	Secondary *CodexUsageWindow `json:"secondary"`
+	LimitID         string                     `json:"limitId"`
+	LimitName       string                     `json:"limitName"`
+	PlanType        string                     `json:"planType"`
+	Primary         *CodexUsageWindow          `json:"primary"`
+	Secondary       *CodexUsageWindow          `json:"secondary"`
+	Credits         *CodexUsageCredits         `json:"credits,omitempty"`
+	IndividualLimit *CodexUsageIndividualLimit `json:"individualLimit,omitempty"`
+}
+
+type CodexUsageIndividualLimit struct {
+	Limit            string   `json:"limit"`
+	Used             string   `json:"used"`
+	RemainingPercent *float64 `json:"remainingPercent"`
+	ResetsAt         *int64   `json:"resetsAt"`
+}
+
+type CodexUsageCredits struct {
+	HasCredits bool    `json:"hasCredits"`
+	Unlimited  bool    `json:"unlimited"`
+	Balance    *string `json:"balance"`
 }
 
 type CodexUsageWindow struct {
@@ -110,10 +127,10 @@ func (c *FactoryCodexConnection) Reserved() bool {
 	return c != nil && c.LoginLease != nil
 }
 
-func FindFactoryCodexConnection(tx *gorm.DB, organizationID, factoryID, ownerID uuid.UUID) (*FactoryCodexConnection, error) {
+func FindCodexConnection(tx *gorm.DB, organizationID, ownerID uuid.UUID) (*FactoryCodexConnection, error) {
 	var connection FactoryCodexConnection
 	err := tx.
-		Where("organization_id = ? AND factory_id = ? AND owner_user_id = ?", organizationID, factoryID, ownerID).
+		Where("organization_id = ? AND owner_user_id = ?", organizationID, ownerID).
 		First(&connection).
 		Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -125,10 +142,10 @@ func FindFactoryCodexConnection(tx *gorm.DB, organizationID, factoryID, ownerID 
 	return &connection, nil
 }
 
-func LockFactoryCodexConnection(tx *gorm.DB, organizationID, factoryID, ownerID uuid.UUID) (*FactoryCodexConnection, error) {
+func LockCodexConnection(tx *gorm.DB, organizationID, ownerID uuid.UUID) (*FactoryCodexConnection, error) {
 	var connection FactoryCodexConnection
 	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
-		Where("organization_id = ? AND factory_id = ? AND owner_user_id = ?", organizationID, factoryID, ownerID).
+		Where("organization_id = ? AND owner_user_id = ?", organizationID, ownerID).
 		First(&connection).
 		Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -153,29 +170,35 @@ func FindFactoryCodexConnectionByID(tx *gorm.DB, id uuid.UUID) (*FactoryCodexCon
 }
 
 // LockScopedFactoryCodexConnection locks the exact connection in a signed scope.
-func LockScopedFactoryCodexConnection(tx *gorm.DB, organizationID, factoryID, connectionID uuid.UUID) (*FactoryCodexConnection, error) {
-	if err := requireCodexSubscriptionEligible(tx, organizationID); err != nil {
+func LockScopedFactoryCodexConnection(tx *gorm.DB, organizationID, connectionID uuid.UUID) (*FactoryCodexConnection, error) {
+	snapshot, err := FindFactoryCodexConnectionByID(tx, connectionID)
+	if err != nil {
+		return nil, err
+	}
+	if snapshot.OrganizationID != organizationID {
+		return nil, ErrCodexConnectionStale
+	}
+	if _, err := ActiveCodexMember(tx, organizationID, snapshot.OwnerUserID); err != nil {
 		return nil, err
 	}
 	c, err := FindFactoryCodexConnectionByID(tx.Clauses(clause.Locking{Strength: "UPDATE"}), connectionID)
 	if err != nil {
 		return nil, err
 	}
-	if c.OrganizationID != organizationID || c.FactoryID != factoryID || c.RevocationPendingAt != nil {
+	if c.OrganizationID != organizationID || c.RevocationPendingAt != nil {
 		return nil, ErrCodexConnectionStale
 	}
 	return c, nil
 }
 
-func CreateFactoryCodexConnection(
+func CreateCodexConnection(
 	tx *gorm.DB,
-	organizationID, factoryID, ownerUserID uuid.UUID,
+	organizationID, ownerUserID uuid.UUID,
 	now time.Time,
 ) (*FactoryCodexConnection, error) {
 	connection := &FactoryCodexConnection{
 		ID:             uuid.New(),
 		OrganizationID: organizationID,
-		FactoryID:      factoryID,
 		OwnerUserID:    ownerUserID,
 		Status:         CodexConnectionStatusDisconnected,
 		CreatedAt:      now,
@@ -191,6 +214,9 @@ func CreateFactoryCodexConnection(
 // The login lease stays until the login runner VM is confirmed deleted.
 func (c *FactoryCodexConnection) BeginLogin(tx *gorm.DB, taskID uuid.UUID, now time.Time) error {
 	return tx.Transaction(func(tx *gorm.DB) error {
+		if err := requireCodexFactoriesAccess(tx, c.OrganizationID); err != nil {
+			return err
+		}
 		if err := c.relock(tx); err != nil {
 			return err
 		}
@@ -210,7 +236,7 @@ func (c *FactoryCodexConnection) BeginLogin(tx *gorm.DB, taskID uuid.UUID, now t
 		}
 
 		resume := c.Status
-		if _, err := c.createLease(tx, taskID, CodexLeasePurposeLogin, nil, now); err != nil {
+		if _, err := c.createLease(tx, taskID, CodexLeasePurposeLogin, nil, nil, now); err != nil {
 			return err
 		}
 		result := tx.Model(c).
@@ -247,6 +273,9 @@ func (c *FactoryCodexConnection) BeginLogin(tx *gorm.DB, taskID uuid.UUID, now t
 // The task checkpoints the real auth bundle, so it stays exclusive.
 func (c *FactoryCodexConnection) BeginCatalogRefresh(tx *gorm.DB, taskID uuid.UUID, now time.Time) error {
 	return tx.Transaction(func(tx *gorm.DB) error {
+		if err := requireCodexFactoriesAccess(tx, c.OrganizationID); err != nil {
+			return err
+		}
 		if err := c.relock(tx); err != nil {
 			return err
 		}
@@ -263,7 +292,7 @@ func (c *FactoryCodexConnection) BeginCatalogRefresh(tx *gorm.DB, taskID uuid.UU
 		} else if busy != nil {
 			return &CodexConnectionBusyError{TaskID: busy.TaskID}
 		}
-		if _, err := c.createLease(tx, taskID, CodexLeasePurposeLogin, nil, now); err != nil {
+		if _, err := c.createLease(tx, taskID, CodexLeasePurposeLogin, nil, nil, now); err != nil {
 			return err
 		}
 		if err := tx.Model(c).Updates(map[string]any{"resume_status": c.Status, "updated_at": now}).Error; err != nil {
@@ -308,7 +337,7 @@ func (c *FactoryCodexConnection) RecordDeviceCode(
 }
 
 // StoreBundle saves a newer auth bundle for the active reservation.
-// Login stays in finishing until the runner VM is confirmed deleted.
+// Login stays exclusive until setup confirms local cleanup or the VM is deleted.
 func (c *FactoryCodexConnection) StoreBundle(
 	tx *gorm.DB,
 	taskID uuid.UUID,
@@ -372,15 +401,14 @@ func ReserveFactoryCodexConnection(
 ) (*FactoryCodexConnection, error) {
 	var connection *FactoryCodexConnection
 	err := tx.Transaction(func(tx *gorm.DB) error {
-		order, err := FindSubscriptionWorkOrderForRun(tx, organizationID, factoryID, runID)
+		if err := requireCodexFactoriesAccess(tx, organizationID); err != nil {
+			return err
+		}
+		ownerID, err := RequireSubscriptionRunOwner(tx, organizationID, factoryID, runID)
 		if err != nil {
 			return err
 		}
-		ownerID, err := order.RequireSubscriptionOwner(tx, true)
-		if err != nil {
-			return err
-		}
-		locked, err := LockFactoryCodexConnection(tx, organizationID, factoryID, ownerID)
+		locked, err := LockCodexConnection(tx, organizationID, ownerID)
 		if err != nil {
 			return err
 		}
@@ -400,23 +428,21 @@ func ReserveFactoryCodexConnection(
 		if login != nil {
 			return &CodexConnectionBusyError{TaskID: login.TaskID}
 		}
+		if len(selectedModels) == 0 {
+			selectedModels = []string{""}
+		}
 		for _, selected := range selectedModels {
-			model := strings.TrimSpace(selected)
-			if model == "" {
-				continue
+			resolved, err := locked.resolvePermittedModel(tx, factoryID, selected)
+			if err != nil {
+				return err
 			}
-			available := false
-			for _, candidate := range locked.AvailableModels {
-				if candidate.Model == model {
-					available = true
-					break
-				}
-			}
-			if !available {
+			// The model is fixed in the execution snapshot. A blank model must
+			// not delegate a restricted choice to the native default.
+			if strings.TrimSpace(selected) == "" && resolved != "" {
 				return ErrSubscriptionModelUnavailable
 			}
 		}
-		if _, err := locked.createLease(tx, taskID, CodexLeasePurposeRun, encryptor, now); err != nil {
+		if _, err := locked.createLease(tx, taskID, CodexLeasePurposeRun, &factoryID, encryptor, now); err != nil {
 			return err
 		}
 		locked.UpdatedAt = now
@@ -499,8 +525,8 @@ func MarkCodexConnectionUncertain(tx *gorm.DB, taskID uuid.UUID, now time.Time) 
 }
 
 // ReleaseCodexReservationForTask releases the lease for one runner task.
-// A run lease ends when the task is terminal. A login lease also waits until
-// its VM is confirmed deleted.
+// A run lease ends when the task is terminal. A successful login can also end
+// after confirmed local cleanup; other logins wait for VM deletion.
 func ReleaseCodexReservationForTask(tx *gorm.DB, taskID uuid.UUID, now time.Time) error {
 	lease, err := FindCodexLeaseByTask(tx, taskID)
 	if err != nil || lease == nil {
@@ -594,6 +620,12 @@ func releaseConfirmedCodexLease(tx *gorm.DB, id uuid.UUID, now time.Time) error 
 	if !lease.Login() && lease.RevokedAt == nil {
 		return deleteCodexLease(tx, &lease)
 	}
+	if lease.Login() && lease.RevokedAt == nil && connection.RevocationPendingAt == nil &&
+		(connection.Status == CodexConnectionStatusFinishing || connection.Status == CodexConnectionStatusReady) &&
+		task.State == RunnerTaskStateSucceeded && task.CancelRequestedAt == nil &&
+		codexSetupCleaned(task) && codexFinalCheckpointSaved(&connection, &lease) {
+		return connection.finishLoginLease(tx, &lease, CodexConnectionStatusReady, now)
+	}
 	if task.RunnerID != nil {
 		runner, runnerErr := FindRunner(tx, *task.RunnerID)
 		if runnerErr != nil && !errors.Is(runnerErr, ErrRunnerNotFound) {
@@ -612,10 +644,20 @@ func releaseConfirmedCodexLease(tx *gorm.DB, id uuid.UUID, now time.Time) error 
 	return connection.finishLoginLease(tx, &lease, codexLoginLeaseOutcome(&connection, &lease, task), now)
 }
 
-func codexLoginLeaseOutcome(connection *FactoryCodexConnection, lease *FactoryCodexLease, task *RunnerTask) string {
-	checkpointSaved := connection.FinalCheckpointVersion > lease.StartedVersion &&
+func codexSetupCleaned(task *RunnerTask) bool {
+	var result struct {
+		Cleaned bool `json:"codexSubscriptionSetupCleaned"`
+	}
+	return json.Unmarshal(task.Result, &result) == nil && result.Cleaned
+}
+
+func codexFinalCheckpointSaved(connection *FactoryCodexConnection, lease *FactoryCodexLease) bool {
+	return connection.FinalCheckpointVersion > lease.StartedVersion &&
 		connection.FinalCheckpointVersion == connection.CredentialVersion
-	if checkpointSaved {
+}
+
+func codexLoginLeaseOutcome(connection *FactoryCodexConnection, lease *FactoryCodexLease, task *RunnerTask) string {
+	if codexFinalCheckpointSaved(connection, lease) {
 		return CodexConnectionStatusReady
 	}
 	if connection.CredentialVersion > lease.StartedVersion {
@@ -719,39 +761,47 @@ func (c *FactoryCodexConnection) StoreRefreshedBundle(tx *gorm.DB, ciphertext []
 }
 
 // MarkReconnectRequired records that the stored refresh token can no longer be used.
+// An active login or catalog lease must not restore its saved status later.
 func (c *FactoryCodexConnection) MarkReconnectRequired(tx *gorm.DB, now time.Time) error {
+	updates := map[string]any{
+		"status":     CodexConnectionStatusReconnectRequired,
+		"updated_at": now,
+	}
+	if c.ResumeStatus != "" {
+		updates["resume_status"] = CodexConnectionStatusReconnectRequired
+	}
 	result := tx.Model(c).
 		Where("id = ?", c.ID).
-		Updates(map[string]any{
-			"status":     CodexConnectionStatusReconnectRequired,
-			"updated_at": now,
-		})
+		Updates(updates)
 	if result.Error != nil {
 		return result.Error
 	}
 	c.Status = CodexConnectionStatusReconnectRequired
+	if c.ResumeStatus != "" {
+		c.ResumeStatus = CodexConnectionStatusReconnectRequired
+	}
 	c.UpdatedAt = now
 	return nil
 }
 
-func requireCodexSubscriptionEligible(tx *gorm.DB, organizationID uuid.UUID) error {
-	organization, err := FindOrganizationByIDInTransaction(tx, organizationID.String())
-	if err != nil {
-		return err
-	}
-	if !organization.HasExperimentalFeature(features.FeatureCodexSubscriptions) {
-		return ErrCodexConnectionUnavailable
-	}
-	return nil
-}
-
-// ActiveCodexMember locks membership before connection mutation. Removal uses
-// the same order, so it cannot race sign-in or subscription admission.
+// ActiveCodexMember requires an active organization and locks membership before
+// connection mutation. Member removal takes the same lock before revocation.
 func ActiveCodexMember(tx *gorm.DB, organizationID, userID uuid.UUID) (*User, error) {
-	if err := requireCodexSubscriptionEligible(tx, organizationID); err != nil {
+	_, err := FindOrganizationByIDInTransaction(tx, organizationID.String())
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrCodexConnectionNotEligible
+	}
+	if err != nil {
 		return nil, err
 	}
-	return activeHumanCodexMember(tx, organizationID, userID)
+	var user User
+	err = tx.Clauses(clause.Locking{Strength: "SHARE"}).
+		Where("organization_id = ? AND id = ? AND type = ?", organizationID, userID, UserTypeHuman).
+		First(&user).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrCodexConnectionNotEligible
+	}
+	return &user, err
 }
 
 func ValidateCodexUsageLimits(limits []CodexUsageLimit) error {
@@ -764,6 +814,23 @@ func ValidateCodexUsageLimits(limits []CodexUsageLimit) error {
 			return errors.New("invalid Codex usage bucket")
 		}
 		seen[limit.LimitID] = true
+		if limit.Credits != nil && limit.Credits.Balance != nil {
+			if !validCodexCreditAmount(*limit.Credits.Balance) {
+				return errors.New("invalid Codex credit balance")
+			}
+		}
+		if individual := limit.IndividualLimit; individual != nil {
+			if !validCodexCreditAmount(individual.Limit) || !validCodexCreditAmount(individual.Used) {
+				return errors.New("invalid Codex monthly credit allowance")
+			}
+			remaining := individual.RemainingPercent
+			if remaining == nil || math.IsNaN(*remaining) || math.IsInf(*remaining, 0) || *remaining < 0 || *remaining > 100 {
+				return errors.New("invalid Codex monthly credit percentage")
+			}
+			if err := validateCodexUsageReset(individual.ResetsAt); err != nil {
+				return err
+			}
+		}
 		for _, window := range []*CodexUsageWindow{limit.Primary, limit.Secondary} {
 			if window == nil {
 				continue
@@ -771,11 +838,11 @@ func ValidateCodexUsageLimits(limits []CodexUsageLimit) error {
 			if window.UsedPercent == nil || math.IsNaN(*window.UsedPercent) || math.IsInf(*window.UsedPercent, 0) || *window.UsedPercent < 0 {
 				return errors.New("invalid Codex usage percentage")
 			}
-			if window.WindowDurationMins != nil && *window.WindowDurationMins <= 0 || window.ResetsAt != nil && *window.ResetsAt <= 0 {
+			if window.WindowDurationMins != nil && *window.WindowDurationMins <= 0 {
 				return errors.New("invalid Codex usage window")
 			}
-			if window.ResetsAt != nil && time.Unix(*window.ResetsAt, 0).UTC().Year() > 9999 {
-				return errors.New("Codex usage reset exceeds the API timestamp range")
+			if err := validateCodexUsageReset(window.ResetsAt); err != nil {
+				return err
 			}
 		}
 	}
@@ -784,7 +851,7 @@ func ValidateCodexUsageLimits(limits []CodexUsageLimit) error {
 
 func ListOwnedFactoryCodexConnections(tx *gorm.DB, organizationID, ownerUserID uuid.UUID) ([]FactoryCodexConnection, error) {
 	var connections []FactoryCodexConnection
-	err := tx.Select("id", "factory_id", "status", "account_label", "usage_limits", "usage_observed_at").
+	err := tx.Select("id", "status", "account_label", "usage_limits", "usage_observed_at").
 		Where("organization_id = ? AND owner_user_id = ? AND status <> ?", organizationID, ownerUserID, CodexConnectionStatusDisconnected).
 		Order("created_at, id").Find(&connections).Error
 	return connections, err
@@ -821,7 +888,17 @@ func (c *FactoryCodexConnection) StoreUsage(tx *gorm.DB, limits []CodexUsageLimi
 }
 
 func FactoryCodexSubscriptionModels(tx *gorm.DB, organizationID, factoryID, ownerID uuid.UUID) ([]string, error) {
-	connection, err := FindFactoryCodexConnection(tx, organizationID, factoryID, ownerID)
+	available, err := FactoryCodexAvailableSubscriptionModels(tx, organizationID, factoryID, ownerID)
+	if err != nil {
+		return nil, err
+	}
+	return ApplyFactoryLLMModelPolicy(tx, factoryID, UsageProviderOpenAI, UsageFundingSourceSubscription, available)
+}
+
+// FactoryCodexAvailableSubscriptionModels returns the owner's native catalog
+// before the workspace policy is applied.
+func FactoryCodexAvailableSubscriptionModels(tx *gorm.DB, organizationID, factoryID, ownerID uuid.UUID) ([]string, error) {
+	connection, err := FindCodexConnection(tx, organizationID, ownerID)
 	if errors.Is(err, ErrCodexConnectionNotFound) {
 		return nil, nil
 	}
@@ -838,13 +915,110 @@ func FactoryCodexSubscriptionModels(tx *gorm.DB, organizationID, factoryID, owne
 	return CompactModelIDs(models), nil
 }
 
-func activeHumanCodexMember(tx *gorm.DB, organizationID, userID uuid.UUID) (*User, error) {
-	var user User
-	err := tx.Clauses(clause.Locking{Strength: "SHARE"}).
-		Where("organization_id = ? AND id = ? AND type = ?", organizationID, userID, UserTypeHuman).
-		First(&user).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, ErrCodexConnectionNotEligible
+// ResolveFactoryCodexSubscriptionModel preserves the native default while
+// inheriting. Restricted workspaces always dispatch a permitted native ID.
+func ResolveFactoryCodexSubscriptionModel(tx *gorm.DB, organizationID, factoryID, ownerID uuid.UUID, requested string) (string, error) {
+	connection, err := FindCodexConnection(tx, organizationID, ownerID)
+	if err != nil {
+		return "", err
 	}
-	return &user, err
+	return connection.resolvePermittedModel(tx, factoryID, requested)
+}
+
+func (c *FactoryCodexConnection) resolvePermittedModel(tx *gorm.DB, factoryID uuid.UUID, requested string) (string, error) {
+	model := strings.TrimSpace(requested)
+	policy, err := FindFactoryLLMModelAllowlist(tx, factoryID, UsageProviderOpenAI, UsageFundingSourceSubscription)
+	if err != nil {
+		return "", err
+	}
+	if model == "" && policy.InheritsParent() {
+		return "", nil
+	}
+	available := make([]string, 0, len(c.AvailableModels))
+	for _, candidate := range c.AvailableModels {
+		available = append(available, candidate.Model)
+	}
+	permitted, err := ApplyFactoryLLMModelPolicy(tx, factoryID, UsageProviderOpenAI, UsageFundingSourceSubscription, CompactModelIDs(available))
+	if err != nil {
+		return "", err
+	}
+	if model != "" {
+		if !slices.Contains(permitted, model) {
+			return "", SubscriptionModelUnavailableError(model)
+		}
+		return model, nil
+	}
+	if len(permitted) == 0 {
+		return "", fmt.Errorf("No ChatGPT models are enabled for this task owner. Update Models in workspace settings: %w", ErrSubscriptionModelUnavailable)
+	}
+	for _, candidate := range c.AvailableModels {
+		if candidate.IsDefault && slices.Contains(permitted, candidate.Model) {
+			return candidate.Model, nil
+		}
+	}
+	slices.Sort(permitted)
+	return permitted[0], nil
+}
+
+func requireCodexFactoriesAccess(tx *gorm.DB, organizationID uuid.UUID) error {
+	enabled, err := OrganizationHasExperimentalFeatures(tx, organizationID, features.FeatureFactories)
+	if err != nil {
+		return err
+	}
+	if !enabled {
+		return ErrCodexConnectionUnavailable
+	}
+	return nil
+}
+
+// ListEligibleCodexConnections supplies the combined workspace policy catalog.
+// Task admission still checks the actual owner's connection and native catalog.
+func ListEligibleCodexConnections(tx *gorm.DB, organizationID uuid.UUID) ([]FactoryCodexConnection, error) {
+	var connections []FactoryCodexConnection
+	err := tx.Model(&FactoryCodexConnection{}).Select("factory_codex_connections.*").
+		Joins("JOIN users ON users.id = factory_codex_connections.owner_user_id AND users.organization_id = factory_codex_connections.organization_id").
+		Where("factory_codex_connections.organization_id = ? AND users.deleted_at IS NULL AND users.type = ?", organizationID, UserTypeHuman).
+		Where("factory_codex_connections.status = ? AND revocation_pending_at IS NULL AND credential_version > 0 AND octet_length(bundle_ciphertext) > 0", CodexConnectionStatusReady).
+		Order("factory_codex_connections.id").Find(&connections).Error
+	return connections, err
+}
+
+// DeleteDrainedOrganizationCodexConnections must run before organization users
+// are removed. Leases retain evidence until their runners finish cleanup.
+func DeleteDrainedOrganizationCodexConnections(tx *gorm.DB, organizationID uuid.UUID) (bool, error) {
+	var connections []FactoryCodexConnection
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("organization_id = ?", organizationID).Order("id").Find(&connections).Error; err != nil {
+		return false, err
+	}
+	for _, connection := range connections {
+		count, err := CountCodexLeases(tx, connection.ID)
+		if err != nil {
+			return false, err
+		}
+		if count > 0 {
+			return false, nil
+		}
+	}
+	return true, tx.Where("organization_id = ?", organizationID).Delete(&FactoryCodexConnection{}).Error
+}
+
+func validCodexCreditAmount(amount string) bool {
+	if len(amount) > 64 {
+		return false
+	}
+	value, err := strconv.ParseFloat(amount, 64)
+	return err == nil && !math.IsNaN(value) && !math.IsInf(value, 0) && value >= 0
+}
+
+func validateCodexUsageReset(resetsAt *int64) error {
+	if resetsAt == nil {
+		return nil
+	}
+	if *resetsAt <= 0 {
+		return errors.New("invalid Codex usage reset time")
+	}
+	if time.Unix(*resetsAt, 0).UTC().Year() > 9999 {
+		return errors.New("Codex usage reset exceeds the API timestamp range")
+	}
+	return nil
 }

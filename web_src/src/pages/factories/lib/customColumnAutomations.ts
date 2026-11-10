@@ -12,6 +12,8 @@ export type ColumnAutomationApp = {
   templateId?: string;
   customAutomationMode?: CustomAutomationMode;
   customAutomationIcon?: string;
+  customAutomationCronExpression?: string;
+  customAutomationTriggers?: Array<{ mode: CustomAutomationMode; cronExpression?: string }>;
 };
 
 export function customColumnAutomations(
@@ -26,7 +28,7 @@ export function customColumnAutomations(
     if (!id || skipIds.has(id) || app.columnKey !== columnKey) {
       return [];
     }
-    if (columnKey === "verify" && app.templateId === CUSTOM_AUTOMATION_TEMPLATE_ID) {
+    if (app.templateId === CUSTOM_AUTOMATION_TEMPLATE_ID) {
       const automation = customAutomationColumnAutomation(app, workOrders, runningCountForApp);
       return automation ? [automation] : [];
     }
@@ -34,7 +36,7 @@ export function customColumnAutomations(
       {
         id: `custom-${id}`,
         kind: "custom",
-        name: app.name?.trim() || EVENT_CUSTOM_ENTRY.name,
+        name: app.name?.trim() || "Custom automation",
         iconName: columnKey === "backlog" ? "alarm-clock" : undefined,
         trigger: columnKey === "backlog" ? "On schedule" : EVENT_CUSTOM_ENTRY.trigger,
         action: columnKey === "backlog" ? "Proposes a task" : EVENT_CUSTOM_ENTRY.action,

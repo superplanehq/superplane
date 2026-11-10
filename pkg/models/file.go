@@ -139,6 +139,9 @@ type CreateFileParams struct {
 	ContentType    string
 	CreatedByID    uuid.UUID
 	Purpose        string
+	// ReplacesFileID is the file this upload will remove after it is ready.
+	// Quota checks ignore that file. The caller keeps it until the upload succeeds.
+	ReplacesFileID uuid.UUID
 }
 
 func IsAllowedFileContentType(contentType string) bool {
@@ -445,6 +448,10 @@ func SumReadyOrganizationFileBytes(tx *gorm.DB, organizationID uuid.UUID) (int64
 }
 
 func (f *File) MarkReady(tx *gorm.DB, sizeBytes int64, checksum string) error {
+	return f.MarkReadyReplacing(tx, sizeBytes, checksum, uuid.Nil)
+}
+
+func (f *File) MarkReadyReplacing(tx *gorm.DB, sizeBytes int64, checksum string, replacesFileID uuid.UUID) error {
 	if sizeBytes <= 0 {
 		return fmt.Errorf("%w: size must be greater than zero", ErrFileInvalid)
 	}
@@ -463,7 +470,7 @@ func (f *File) MarkReady(tx *gorm.DB, sizeBytes int64, checksum string) error {
 	}
 
 	err := tx.Transaction(func(inner *gorm.DB) error {
-		if err := ensureReadyFileQuota(inner, f, sizeBytes); err != nil {
+		if err := ensureReadyFileQuota(inner, f, sizeBytes, replacesFileID); err != nil {
 			return err
 		}
 		return inner.Model(f).Updates(updates).Error
@@ -557,28 +564,36 @@ func ensureFileQuota(tx *gorm.DB, params CreateFileParams) error {
 	if err := lockFileQuotaRows(tx, params.OrganizationID, params.WorkOrderID); err != nil {
 		return err
 	}
+	var total int64
 	if params.OrganizationID != uuid.Nil {
-		total, err := SumReadyOrganizationFileBytes(tx, params.OrganizationID)
+		var err error
+		total, err = SumReadyOrganizationFileBytes(tx, params.OrganizationID)
 		if err != nil {
 			return err
-		}
-		if total >= MaxOrganizationFileBytes {
-			return fmt.Errorf("%w: organization storage limit reached", ErrFileQuotaExceeded)
 		}
 	}
+	var count int64
 	if params.WorkOrderID != uuid.Nil {
-		count, err := CountOpenTaskFiles(tx, params.WorkOrderID)
+		var err error
+		count, err = CountOpenTaskFiles(tx, params.WorkOrderID)
 		if err != nil {
 			return err
 		}
-		if count >= MaxFilesPerWorkOrder {
-			return fmt.Errorf("%w: task file limit is %d", ErrFileQuotaExceeded, MaxFilesPerWorkOrder)
-		}
+	}
+	credit, err := replacementQuotaCredit(tx, params.ReplacesFileID, params.OrganizationID, params.WorkOrderID)
+	if err != nil {
+		return err
+	}
+	if params.OrganizationID != uuid.Nil && total-credit.readyBytes >= MaxOrganizationFileBytes {
+		return fmt.Errorf("%w: organization storage limit reached", ErrFileQuotaExceeded)
+	}
+	if params.WorkOrderID != uuid.Nil && count-credit.openFile >= MaxFilesPerWorkOrder {
+		return fmt.Errorf("%w: task file limit is %d", ErrFileQuotaExceeded, MaxFilesPerWorkOrder)
 	}
 	return nil
 }
 
-func ensureReadyFileQuota(tx *gorm.DB, file *File, sizeBytes int64) error {
+func ensureReadyFileQuota(tx *gorm.DB, file *File, sizeBytes int64, replacesFileID uuid.UUID) error {
 	orgID := uuid.Nil
 	if file.OrganizationID != nil {
 		orgID = *file.OrganizationID
@@ -591,27 +606,71 @@ func ensureReadyFileQuota(tx *gorm.DB, file *File, sizeBytes int64) error {
 		return err
 	}
 
+	var total int64
 	if file.OrganizationID != nil {
-		total, err := SumReadyOrganizationFileBytes(tx, *file.OrganizationID)
+		var err error
+		total, err = SumReadyOrganizationFileBytes(tx, *file.OrganizationID)
 		if err != nil {
 			return err
 		}
-		if total+sizeBytes > MaxOrganizationFileBytes {
-			return fmt.Errorf("%w: organization storage limit reached", ErrFileQuotaExceeded)
+	}
+	var count int64
+	if file.WorkOrderID != nil && file.Scope == blob.ScopeTask {
+		var err error
+		count, err = CountReadyTaskFiles(tx, *file.WorkOrderID)
+		if err != nil {
+			return err
 		}
+	}
+	credit, err := replacementQuotaCredit(tx, replacesFileID, orgID, workOrderID)
+	if err != nil {
+		return err
+	}
+	if file.OrganizationID != nil && total+sizeBytes-credit.readyBytes > MaxOrganizationFileBytes {
+		return fmt.Errorf("%w: organization storage limit reached", ErrFileQuotaExceeded)
 	}
 	if file.WorkOrderID == nil || file.Scope != blob.ScopeTask {
 		return nil
 	}
-
-	count, err := CountReadyTaskFiles(tx, *file.WorkOrderID)
-	if err != nil {
-		return err
-	}
-	if count >= MaxFilesPerWorkOrder {
+	if count-credit.readyFile >= MaxFilesPerWorkOrder {
 		return fmt.Errorf("%w: task file limit is %d", ErrFileQuotaExceeded, MaxFilesPerWorkOrder)
 	}
 	return nil
+}
+
+type replacementQuota struct {
+	readyBytes int64
+	openFile   int64
+	readyFile  int64
+}
+
+func replacementQuotaCredit(tx *gorm.DB, replacesFileID, organizationID, workOrderID uuid.UUID) (replacementQuota, error) {
+	var credit replacementQuota
+	if replacesFileID == uuid.Nil || organizationID == uuid.Nil || workOrderID == uuid.Nil {
+		return credit, nil
+	}
+	file, err := FindFile(tx, replacesFileID)
+	if errors.Is(err, ErrFileNotFound) {
+		return credit, nil
+	}
+	if err != nil {
+		return credit, err
+	}
+	if file.OrganizationID == nil || *file.OrganizationID != organizationID {
+		return credit, nil
+	}
+	if file.WorkOrderID == nil || *file.WorkOrderID != workOrderID || file.Scope != blob.ScopeTask {
+		return credit, nil
+	}
+	if file.State != FileStatePending && file.State != FileStateReady {
+		return credit, nil
+	}
+	credit.openFile = 1
+	if file.State == FileStateReady {
+		credit.readyBytes = file.SizeBytes
+		credit.readyFile = 1
+	}
+	return credit, nil
 }
 
 func lockFileQuotaRows(tx *gorm.DB, organizationID, workOrderID uuid.UUID) error {

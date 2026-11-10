@@ -16,6 +16,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/integrations/datadog"
 	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
@@ -53,6 +54,7 @@ type FactoryContext struct {
 	onRunsCancelled         func([]*models.RunCancellationResult)
 	onFileBindCleanup       func(FileBindCleanup)
 	onProductAnalytics      func(productanalytics.Event)
+	onNewEvents             func([]models.CanvasEvent)
 
 	encryptor crypto.Encryptor
 	registry  *registry.Registry
@@ -86,6 +88,12 @@ func NewFactoryContext(tx *gorm.DB, canvas *models.Canvas, execution *models.Can
 		canvas:    canvas,
 		execution: execution,
 	}
+}
+
+// WithNewEvents collects events for publication after the transaction commits.
+func (c *FactoryContext) WithNewEvents(callback func([]models.CanvasEvent)) *FactoryContext {
+	c.onNewEvents = callback
+	return c
 }
 
 func (c *FactoryContext) WithWorkOrderUpdated(callback func(factoryID, orderID, reason string)) *FactoryContext {
@@ -241,7 +249,13 @@ func (c *FactoryContext) CreateWorkOrder(params core.WorkOrderParams) (*core.Wor
 	c.recordSentryWebhookTask(order)
 	c.recordDatadogWebhookTask(order)
 	c.recordLinearWebhookTask(order)
-	EmitWorkOrderCreated(c.tx, f, order)
+	events, err := emitWorkOrderCreated(c.tx, f, order, uuid.Nil, nil, false)
+	if err != nil {
+		log.WithError(err).Warnf("failed to emit onWorkOrder for work order %s", order.ID)
+	}
+	if c.onNewEvents != nil {
+		c.onNewEvents(events)
+	}
 	c.captureProductAnalytics(productanalytics.Event{
 		Name:           productanalytics.EventFactoryTaskCreated,
 		EventID:        productanalytics.StableEventID(productanalytics.EventFactoryTaskCreated, order.ID.String()),
@@ -436,6 +450,21 @@ func (c *FactoryContext) createFactoryWorkOrder(
 	params core.WorkOrderParams,
 	sourceRunID uuid.UUID,
 ) (*models.FactoryWorkOrder, error) {
+	if factoryModel.OnboardingConfigValue().CodexSubscription {
+		order, err := factoryModel.CreateIntakeWorkOrder(c.tx, params.Title, params.Description, sourceRunID, c.originFromSourceRun(sourceRunID))
+		if !errors.Is(err, models.ErrSubscriptionOwnerRequired) {
+			return order, err
+		}
+		// A run that started before the switch to subscriptions has no saved
+		// default owner. Create its task as before the switch.
+		superseded, supersededErr := models.RunUsesSupersededVersion(c.tx, sourceRunID)
+		if supersededErr != nil {
+			return nil, supersededErr
+		}
+		if !superseded {
+			return nil, err
+		}
+	}
 	assigneeIDs := []uuid.UUID{}
 	if params.DefaultOwnerID != "" {
 		user, err := models.FindActiveUserByIDInTransaction(c.tx, factoryModel.OrganizationID.String(), params.DefaultOwnerID)
@@ -667,6 +696,19 @@ func (c *FactoryContext) githubClientForCanvas() *githubcommon.Client {
 	return nil
 }
 
+// waitsForAllPullRequests keeps a task open until its last pull request is
+// done. Only organizations with multi-repo tasks open more than one.
+func (c *FactoryContext) waitsForAllPullRequests(params core.UpdateWorkOrderStatusParams) (bool, error) {
+	if params.State != models.FactoryWorkOrderStateClosed || !params.WhenAllPullRequestsDone {
+		return false, nil
+	}
+	organization, err := models.FindOrganizationByIDInTransaction(c.tx, c.canvas.OrganizationID.String())
+	if err != nil {
+		return false, err
+	}
+	return organization.HasExperimentalFeature(features.FeatureFactoryMultiRepoTasks), nil
+}
+
 func (c *FactoryContext) UpdateWorkOrderStatus(params core.UpdateWorkOrderStatusParams) (*core.WorkOrder, bool, error) {
 	order, err := c.resolveWorkOrder(params.OrderID)
 	if err != nil {
@@ -679,6 +721,20 @@ func (c *FactoryContext) UpdateWorkOrderStatus(params core.UpdateWorkOrderStatus
 	result := params.Result
 	if params.State == models.FactoryWorkOrderStateClosed && result == models.FactoryWorkOrderResultRejected {
 		result = models.FactoryWorkOrderResultManualRejected
+	}
+	waitForPullRequests, err := c.waitsForAllPullRequests(params)
+	if err != nil {
+		return nil, false, err
+	}
+	if waitForPullRequests {
+		pullRequestResult, done, err := order.PullRequestCloseOutcome(c.tx)
+		if err != nil {
+			return nil, false, err
+		}
+		if !done {
+			return workOrderToCore(order), false, nil
+		}
+		result = pullRequestResult
 	}
 	changed, err := order.UpdateStatus(c.tx, models.FactoryWorkOrderStatusUpdate{
 		ToState:         params.State,
@@ -1172,13 +1228,48 @@ func (c *FactoryContext) VCSProvider() (string, error) {
 	return factory.OnboardingConfigValue().VCSProvider, nil
 }
 
+// GitHubHost returns the hostname of the workspace GitHub integration.
+// Empty means github.com, or that the workspace does not use GitHub.
+func (c *FactoryContext) GitHubHost() (string, error) {
+	if c.canvas == nil || c.canvas.FactoryID == nil {
+		return "", nil
+	}
+	factory, err := c.currentFactory()
+	if err != nil {
+		return "", err
+	}
+	host, err := githubcommon.HostFromFactoryOnboarding(c.tx, c.canvas.OrganizationID, factory.OnboardingConfigValue())
+	if err != nil {
+		return "", err
+	}
+	if host.IsDotCom() {
+		return "", nil
+	}
+	return host.WebHostname(), nil
+}
+
+func (c *FactoryContext) ListRepositories() ([]string, error) {
+	if c.canvas == nil || c.canvas.FactoryID == nil {
+		return nil, nil
+	}
+	factory, err := c.currentFactory()
+	if err != nil {
+		return nil, err
+	}
+	return factory.WorkspaceRepositories(c.tx)
+}
+
 func (c *FactoryContext) AddPullRequest(params core.AddPullRequestParams) (*core.PullRequest, error) {
 	order, err := c.resolveWorkOrder(params.OrderID)
 	if err != nil {
 		return nil, err
 	}
+	factoryModel, err := c.currentFactory()
+	if err != nil {
+		return nil, err
+	}
 
-	pullRequest, err := order.CreatePullRequest(c.tx, models.FactoryPullRequestParams{
+	pullRequestParams := models.FactoryPullRequestParams{
 		Provider:   params.Provider,
 		ExternalID: params.ExternalID,
 		Repository: params.Repository,
@@ -1190,7 +1281,11 @@ func (c *FactoryContext) AddPullRequest(params core.AddPullRequestParams) (*core
 		ClosedAt:   params.ClosedAt,
 		Automation: c.automationRef(),
 		Run:        c.runRef(),
-	})
+	}
+	if err := factoryModel.RequireTaskPullRequest(c.tx, order, pullRequestParams); err != nil {
+		return nil, err
+	}
+	pullRequest, err := order.CreatePullRequest(c.tx, pullRequestParams)
 	if err != nil {
 		return nil, err
 	}

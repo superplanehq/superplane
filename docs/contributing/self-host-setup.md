@@ -22,8 +22,6 @@ invitation link and send it to the invited person. This replaces delivery of the
 invitation email only. New invited users who create password accounts still need
 email delivery to receive a verification code.
 
-Before an upgrade, read the [shared invite links release note](../release-notes/invite-links.md).
-
 ## 3. Configure Fleet Manager (optional)
 
 SuperPlane does not call Fleet Manager. Owner setup creates the
@@ -50,6 +48,10 @@ Owner setup then opens workspace setup.
 Do not set `GITHUB_CLIENT_ID`. A self-hosted GitHub App does not offer
 Sign in with GitHub. Linear, Jira, and Sentry hosted apps are not part
 of this flow.
+
+For GitHub Enterprise Cloud (`ghe.com`), install an Enterprise license that
+grants `github_enterprise` and set the hostname allowlist. See
+[GitHub Enterprise](../self-hosting/github-enterprise.md).
 
 ## 5. Confirm the installation
 

@@ -7,6 +7,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/billing"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -91,6 +92,10 @@ func (s *Server) setupOwner(w http.ResponseWriter, r *http.Request) {
 
 		organization, err = models.CreateOrganizationInTransaction(tx, "Demo", "")
 		if err != nil {
+			return err
+		}
+
+		if err := billing.InitializeDemoOrganization(tx, organization.ID, account.ID); err != nil {
 			return err
 		}
 

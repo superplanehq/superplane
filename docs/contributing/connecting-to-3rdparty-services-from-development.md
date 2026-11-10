@@ -71,6 +71,17 @@ The AWS integration uses OpenID Connect. When running locally, AWS IAM needs an 
 3. **Verify:** Open `https://<tunnel-url>/.well-known/openid-configuration` in a browser; the JSON `issuer` must match the tunnel URL.
 4. **IAM:** In AWS IAM → Identity providers → Add provider (OpenID Connect), set **Provider URL** to the tunnel URL and **Audience** to your SuperPlane AWS integration ID (shown in the app when configuring the integration).
 
+## GitHub Enterprise Cloud (local)
+
+GitHub Enterprise Cloud needs a SuperPlane Enterprise license that grants
+`github_enterprise`. Local development grants every Enterprise feature by
+default. Set `SUPERPLANE_GITHUB_ENTERPRISE_ALLOWED_HOSTS` in `.env` if you
+want to limit hostnames. Empty allows any hostname that SuperPlane accepts.
+
+First-run then offers GitHub Enterprise Cloud. Create a GitHub App on the
+enterprise organization. SuperPlane does not use the hosted GitHub App for
+that host. The local tunnel must still reach GitHub webhooks.
+
 ## Factory GitHub App (local workspace setup)
 
 Factory workspace setup installs a GitHub App. Cloud holds the public
@@ -147,17 +158,18 @@ installation row.
    repositories in SuperPlane.
 
    Subscribe the app to the **Member**, **Membership**, **Organization**,
-   **Team**, and **Team add** events. SuperPlane uses these events to
-   refresh cached push access after a collaborator, team, or organization
-   membership change. Do not subscribe to installation or
+   **Team**, **Team add**, **Repository**, and **Create** events.
+   SuperPlane uses the membership events to refresh cached push access.
+   SuperPlane uses the repository and create events to keep the default
+   branch current. Do not subscribe to installation or
    installation_repositories events.
 
-   An app that you created before these events existed receives only the
-   **Member** event. Open the app settings, select **Permissions & events**,
-   select the four other events, and save. The Members permission is
+   An app that you created before these events existed can receive only
+   the **Member** event. Open the app settings, select **Permissions &
+   events**, select the other events, and save. The Members permission is
    already granted, so installations do not have to approve a change.
-   Without these events, SuperPlane refreshes team access only during the
-   periodic catalog refresh.
+   Without the membership events, SuperPlane refreshes team access only
+   during the periodic catalog refresh.
 
 6. Create the app.
 7. Make the app public. Other GitHub accounts can then install it.

@@ -1,11 +1,10 @@
-import { Button } from "@/components/ui/button";
+import { MultiCombobox, MultiComboboxLabel } from "@/components/MultiCombobox/multi-combobox";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
-import { Plus, X } from "lucide-react";
-import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
+import { Label } from "@/components/ui/label";
+import { useId, type Dispatch, type SetStateAction } from "react";
 
-import { addIntakeLabel, INTAKE_SETTINGS_COPY, type IntakeSourceSettings } from "./intakeSourceSettingsModel";
+import { IntakeSettingsRadioOption } from "./IntakeSettingsRadioOption";
+import type { IntakeSourceSettings } from "./intakeSourceSettingsModel";
 import type { LineIntakeSourceId } from "./lineIntakeModel";
 
 /** The GitHub label SuperPlane uses as the primary intake label. */
@@ -17,6 +16,7 @@ export function GitHubIntakeFilterFields({
   onSettingsChange,
   labelOptions = [],
   labelOptionsLoading = false,
+  disabled = false,
 }: {
   sourceId: LineIntakeSourceId;
   settings: IntakeSourceSettings;
@@ -24,335 +24,154 @@ export function GitHubIntakeFilterFields({
   /** Labels that exist in the connected repository. */
   labelOptions?: string[];
   labelOptionsLoading?: boolean;
+  disabled?: boolean;
 }) {
-  if (sourceId !== "github-issues") {
-    return null;
-  }
+  const id = useId();
+  if (sourceId !== "github-issues") return null;
 
-  function update<K extends keyof IntakeSourceSettings>(key: K, value: IntakeSourceSettings[K]) {
-    onSettingsChange((current) => ({ ...current, [key]: value }));
-  }
+  return (
+    <fieldset className="min-w-0">
+      <legend className="workspace-section-title">Which issues to include</legend>
+      <div className="mt-4 flex flex-col gap-5">
+        <GitHubIntakeLabels
+          settings={settings}
+          onSettingsChange={onSettingsChange}
+          options={labelOptions}
+          loading={labelOptionsLoading}
+          disabled={disabled}
+        />
+        <div className="flex items-start gap-3">
+          <Checkbox
+            id={`${id}-authors`}
+            className="mt-0.5"
+            checked={settings.authorsWithAccess}
+            aria-describedby={`${id}-authors-help`}
+            onChange={(event) => {
+              const authorsWithAccess = event.target.checked;
+              onSettingsChange((current) => ({ ...current, authorsWithAccess }));
+            }}
+          />
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor={`${id}-authors`} className="text-sm font-normal leading-5">
+              Only authors with repository access
+            </Label>
+            <p id={`${id}-authors-help`} className="text-xs text-muted-foreground">
+              When off, issues from anyone can create tasks.
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <Checkbox
+            id={`${id}-reopened`}
+            checked={settings.reopenedIssues}
+            onChange={(event) => {
+              const reopenedIssues = event.target.checked;
+              onSettingsChange((current) => ({ ...current, reopenedIssues }));
+            }}
+          />
+          <Label htmlFor={`${id}-reopened`} className="text-sm font-normal">
+            Include reopened issues
+          </Label>
+        </div>
+      </div>
+    </fieldset>
+  );
+}
 
-  function setLabels(labels: string[]) {
+function GitHubIntakeLabels({
+  settings,
+  onSettingsChange,
+  options,
+  loading,
+  disabled,
+}: {
+  settings: IntakeSourceSettings;
+  onSettingsChange: Dispatch<SetStateAction<IntakeSourceSettings>>;
+  options: string[];
+  loading: boolean;
+  disabled: boolean;
+}) {
+  const id = useId();
+  const filterByLabel = settings.filterByLabel || settings.labels.length > 0;
+  const choices = Array.from(new Set([GITHUB_INTAKE_MAIN_LABEL, ...options, ...settings.labels]));
+  const selected = choices.filter((label) => settings.labels.includes(label));
+
+  function setFilterByLabel(enabled: boolean) {
     onSettingsChange((current) => ({
       ...current,
-      labels,
-      filterByLabel: labels.length > 0 ? true : current.filterByLabel,
+      filterByLabel: enabled,
+      labels: enabled ? current.labels : [],
       labelFilterMode: "include",
     }));
   }
 
-  function toggleFilterByLabel() {
-    onSettingsChange((current) => {
-      const filterByLabel = !current.filterByLabel;
-      if (filterByLabel) {
-        return { ...current, filterByLabel, labelFilterMode: "include" };
-      }
-      return { ...current, filterByLabel, labels: [], labelFilterMode: "include" };
-    });
-  }
-
   return (
-    <div className="flex flex-col gap-6">
-      <fieldset className="min-w-0">
-        <legend className="workspace-section-title">{INTAKE_SETTINGS_COPY.intakeSection}</legend>
-        <div className="mt-2 flex flex-col gap-2">
-          <IntakeSettingsCheckbox
-            title={INTAKE_SETTINGS_COPY.reopenedIssues}
-            checked={settings.reopenedIssues}
-            onChange={() => update("reopenedIssues", !settings.reopenedIssues)}
-          />
-        </div>
-      </fieldset>
-      <fieldset className="min-w-0">
-        <legend className="workspace-section-title">{INTAKE_SETTINGS_COPY.filtersLabel}</legend>
-        <div className="mt-2 flex flex-col gap-4">
-          <div className="flex flex-col gap-1.5">
-            <IntakeSettingsCheckbox
-              title={INTAKE_SETTINGS_COPY.filterByLabel}
-              checked={settings.filterByLabel}
-              onChange={() => toggleFilterByLabel()}
-            />
-            {settings.filterByLabel || settings.labels.length > 0 ? (
-              <div className="flex flex-col gap-2">
-                <IntakeLabelField
-                  labels={settings.labels}
-                  options={labelOptions}
-                  loading={labelOptionsLoading}
-                  onChange={(labels) => setLabels(labels)}
-                />
-                {settings.labels.length > 0 ? (
-                  <p className="ml-6 text-[12px] leading-5 text-muted-foreground">
-                    {INTAKE_SETTINGS_COPY.labelAddedHelper}
-                  </p>
-                ) : null}
-              </div>
-            ) : null}
-          </div>
-          <IntakeSettingsCheckbox
-            title={INTAKE_SETTINGS_COPY.authorsWithAccess}
-            checked={settings.authorsWithAccess}
-            onChange={() => update("authorsWithAccess", !settings.authorsWithAccess)}
-          />
-        </div>
-      </fieldset>
-    </div>
-  );
-}
-
-interface IntakeLabelFieldProps {
-  labels: string[];
-  options: string[];
-  loading: boolean;
-  onChange: (labels: string[]) => void;
-}
-
-function IntakeLabelField({ labels, options, loading, onChange }: IntakeLabelFieldProps) {
-  const [query, setQuery] = useState("");
-  const [addingLabel, setAddingLabel] = useState(false);
-  const view = intakeLabelView(labels, options, query, loading);
-  const showSearch = !view.allSelected || addingLabel;
-
-  useEffect(() => {
-    if (view.allSelected && !addingLabel) {
-      setQuery("");
-    }
-  }, [view.allSelected, addingLabel]);
-
-  function addQuery() {
-    onChange(labelsAfterQuery(labels, view.choices, query));
-    setQuery("");
-    setAddingLabel(false);
-  }
-
-  return (
-    <div className="mb-1 flex flex-col gap-2" data-testid="intake-label-options">
-      <IntakeSelectedLabels
-        labels={view.selected}
-        onRemove={(label) => onChange(labels.filter((entry) => entry !== label))}
-      />
-      {showSearch ? (
-        <IntakeLabelQuery
-          query={query}
-          placeholder={
-            view.allSelected ? INTAKE_SETTINGS_COPY.labelNamePlaceholder : INTAKE_SETTINGS_COPY.labelPlaceholder
-          }
-          onQueryChange={setQuery}
-          onCancel={() => {
-            setQuery("");
-            setAddingLabel(false);
-          }}
-          onSubmit={() => addQuery()}
+    <fieldset className="min-w-0">
+      <legend className="mb-3 text-sm font-medium">Labels</legend>
+      <div className="flex flex-col gap-3">
+        <IntakeSettingsRadioOption
+          variant="plain"
+          name={`${id}-labels`}
+          value="all"
+          title="All issues"
+          checked={!filterByLabel}
+          onChange={() => setFilterByLabel(false)}
         />
-      ) : (
-        <IntakeLabelsAllSelected onAdd={() => setAddingLabel(true)} />
-      )}
-      {loading ? <p className="text-[12px] text-muted-foreground">{INTAKE_SETTINGS_COPY.labelsLoading}</p> : null}
-      {view.available.length > 0 ? (
-        <ul className="flex max-h-44 flex-col gap-0.5 overflow-y-auto rounded-lg border border-border bg-card p-1">
-          {view.available.map((label) => (
-            <IntakeLabelOption key={label} label={label} onSelect={() => onChange([...labels, label])} />
-          ))}
-        </ul>
-      ) : null}
-      {view.showNoMatch ? (
-        <p className="text-[12px] text-muted-foreground">{INTAKE_SETTINGS_COPY.labelsNoMatch}</p>
-      ) : null}
-      {view.canCreate ? <IntakeCreateLabel label={view.trimmedQuery} onCreate={() => addQuery()} /> : null}
-    </div>
-  );
-}
-
-interface IntakeLabelView {
-  choices: string[];
-  selected: string[];
-  available: string[];
-  allSelected: boolean;
-  canCreate: boolean;
-  showNoMatch: boolean;
-  trimmedQuery: string;
-}
-
-function intakeLabelView(labels: string[], options: string[], query: string, loading: boolean): IntakeLabelView {
-  const choices = intakeLabelChoices(labels, options);
-  const trimmedQuery = query.trim();
-  const available = loading
-    ? []
-    : choices.filter((label) => !labels.includes(label) && label.toLowerCase().includes(trimmedQuery.toLowerCase()));
-  const allSelected = !loading && choices.length > 0 && choices.every((label) => labels.includes(label));
-  const canCreate =
-    trimmedQuery.length > 0 && !choices.some((label) => label.toLowerCase() === trimmedQuery.toLowerCase());
-
-  return {
-    choices,
-    selected: intakeSelectedLabels(labels),
-    available,
-    allSelected,
-    canCreate,
-    showNoMatch: !loading && !allSelected && trimmedQuery.length > 0 && available.length === 0 && !canCreate,
-    trimmedQuery,
-  };
-}
-
-function labelsAfterQuery(labels: string[], choices: string[], query: string): string[] {
-  const trimmedQuery = query.trim();
-  if (trimmedQuery.length === 0) {
-    return labels;
-  }
-  const exactChoice = choices.find((label) => label.toLowerCase() === trimmedQuery.toLowerCase());
-  if (exactChoice) {
-    return labels.includes(exactChoice) ? labels : [...labels, exactChoice];
-  }
-  return addIntakeLabel(labels, trimmedQuery);
-}
-
-function intakeLabelChoices(labels: string[], options: string[]): string[] {
-  return [
-    GITHUB_INTAKE_MAIN_LABEL,
-    ...options.filter((label) => label !== GITHUB_INTAKE_MAIN_LABEL),
-    ...labels.filter((label) => label !== GITHUB_INTAKE_MAIN_LABEL && !options.includes(label)),
-  ];
-}
-
-function intakeSelectedLabels(labels: string[]): string[] {
-  return [
-    ...(labels.includes(GITHUB_INTAKE_MAIN_LABEL) ? [GITHUB_INTAKE_MAIN_LABEL] : []),
-    ...labels.filter((label) => label !== GITHUB_INTAKE_MAIN_LABEL),
-  ];
-}
-
-function IntakeSelectedLabels({ labels, onRemove }: { labels: string[]; onRemove: (label: string) => void }) {
-  if (labels.length === 0) {
-    return null;
-  }
-
-  return (
-    <ul className="flex flex-wrap items-center gap-1.5" aria-label="Selected labels">
-      {labels.map((label) => (
-        <IntakeSelectedLabel key={label} label={label} onRemove={onRemove} />
-      ))}
-    </ul>
-  );
-}
-
-function IntakeSelectedLabel({ label, onRemove }: { label: string; onRemove: (label: string) => void }) {
-  return (
-    <li className="inline-flex max-w-full items-center gap-1 rounded-md border border-foreground/20 bg-accent/50 py-1 pr-1 pl-2 text-[13px] text-foreground">
-      <span className="min-w-0 truncate">{label}</span>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon-xs"
-        className="size-5"
-        aria-label={`Remove ${label}`}
-        onClick={() => onRemove(label)}
-      >
-        <X className="size-3.5" aria-hidden />
-      </Button>
-    </li>
-  );
-}
-
-function IntakeLabelQuery({
-  query,
-  placeholder,
-  onQueryChange,
-  onCancel,
-  onSubmit,
-}: {
-  query: string;
-  placeholder: string;
-  onQueryChange: (query: string) => void;
-  onCancel: () => void;
-  onSubmit: () => void;
-}) {
-  return (
-    <Input
-      value={query}
-      aria-label={INTAKE_SETTINGS_COPY.labelInput}
-      placeholder={placeholder}
-      onChange={(event) => onQueryChange(event.target.value)}
-      onKeyDown={(event) => {
-        if (event.key === "Escape") {
-          event.preventDefault();
-          onCancel();
-          return;
-        }
-        if (event.key === "Enter") {
-          event.preventDefault();
-          onSubmit();
-        }
-      }}
-      data-testid="intake-label-input"
-    />
-  );
-}
-
-function IntakeLabelsAllSelected({ onAdd }: { onAdd: () => void }) {
-  return (
-    <div className="flex items-center justify-between gap-3">
-      <p className="text-[12px] text-muted-foreground">{INTAKE_SETTINGS_COPY.labelsAllSelected}</p>
-      <Button type="button" variant="outline" size="sm" onClick={onAdd}>
-        <Plus className="size-3.5" aria-hidden />
-        {INTAKE_SETTINGS_COPY.labelAdd}
-      </Button>
-    </div>
-  );
-}
-
-function IntakeCreateLabel({ label, onCreate }: { label: string; onCreate: () => void }) {
-  return (
-    <div>
-      <Button type="button" variant="outline" size="sm" onClick={onCreate} data-testid="intake-label-create">
-        <Plus className="size-3.5" aria-hidden />
-        {`Add label "${label}"`}
-      </Button>
-    </div>
-  );
-}
-
-function IntakeLabelOption({ label, onSelect }: { label: string; onSelect: () => void }) {
-  return (
-    <li>
-      <div
-        role="checkbox"
-        aria-checked={false}
-        aria-label={label}
-        tabIndex={0}
-        className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-[13px] text-muted-foreground hover:bg-accent/50 hover:text-foreground"
-        onClick={onSelect}
-        onKeyDown={(event) => {
-          if (event.key === "Enter" || event.key === " ") {
-            event.preventDefault();
-            onSelect();
-          }
-        }}
-      >
-        <Checkbox checked={false} readOnly tabIndex={-1} aria-hidden className="pointer-events-none" />
-        <span className="min-w-0 truncate">{label}</span>
+        <IntakeSettingsRadioOption
+          variant="plain"
+          name={`${id}-labels`}
+          value="selected"
+          title="Only issues with selected labels"
+          checked={filterByLabel}
+          onChange={() => setFilterByLabel(true)}
+        />
+        {filterByLabel ? (
+          <div className="ml-7 flex min-w-0 flex-col gap-2">
+            <MultiCombobox
+              disabled={disabled}
+              aria-label="Search or add a label"
+              placeholder="Search or add a label"
+              options={choices.map((label) => ({ id: label }))}
+              value={selected.map((label) => ({ id: label }))}
+              displayValue={(option) => option.id}
+              filter={(option, query) => option.id.toLowerCase().includes(query.trim().toLowerCase())}
+              allowCustomValues
+              createCustomValue={(query) => ({ id: query.trim() })}
+              validateInput={(query) =>
+                query.trim().length > 0 && !choices.some((label) => label.toLowerCase() === query.trim().toLowerCase())
+              }
+              onChange={(options) =>
+                onSettingsChange((current) => ({
+                  ...current,
+                  labels: options.map((option) => option.id),
+                  filterByLabel: true,
+                  labelFilterMode: "include",
+                }))
+              }
+            >
+              {(option, isSelected) => (
+                <MultiComboboxLabel>
+                  {isSelected || choices.includes(option.id) ? option.id : `Add label "${option.id}"`}
+                </MultiComboboxLabel>
+              )}
+            </MultiCombobox>
+            {loading ? (
+              <p role="status" className="text-xs text-muted-foreground">
+                Loading repository labels…
+              </p>
+            ) : null}
+            {settings.labels.length === 0 ? (
+              <p className="text-xs leading-5 text-muted-foreground">
+                Select at least one label, or choose All issues.
+              </p>
+            ) : (
+              <p className="text-xs leading-5 text-muted-foreground">
+                Match any selected label. Adding a selected label to an open issue also creates a task.
+              </p>
+            )}
+          </div>
+        ) : null}
       </div>
-    </li>
-  );
-}
-
-function IntakeSettingsCheckbox({
-  title,
-  checked,
-  onChange,
-}: {
-  title: string;
-  checked: boolean;
-  onChange: () => void;
-}) {
-  return (
-    <label
-      className={cn(
-        "flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors",
-        checked ? "border-foreground/20 bg-accent/50" : "border-border bg-card hover:border-foreground/15",
-      )}
-    >
-      <Checkbox checked={checked} onChange={onChange} aria-label={title} />
-      <span className="min-w-0 text-[13px] font-medium tracking-[-0.01em] text-foreground">{title}</span>
-    </label>
+    </fieldset>
   );
 }

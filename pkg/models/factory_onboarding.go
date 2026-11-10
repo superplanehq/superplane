@@ -12,6 +12,8 @@ import (
 )
 
 const (
+	gitHubDotComWebURL = "https://github.com"
+
 	FactoryOnboardingIssuesSourceVCS    = "vcs"
 	FactoryOnboardingIssuesSourceLinear = "linear"
 	FactoryOnboardingIssuesSourceJira   = "jira"
@@ -61,6 +63,7 @@ type FactoryOnboardingConfig struct {
 	DefaultBranch           string `json:"default_branch,omitempty"`
 	IssuesSource            string `json:"issues_source,omitempty"`
 	AgentHarness            string `json:"agent_harness,omitempty"`
+	CodexDefaultOwnerID     string `json:"codex_default_owner_id,omitempty"`
 	CodexSubscription       bool   `json:"codex_subscription,omitempty"`
 	ProvisionedAppID        string `json:"provisioned_app_id,omitempty"`
 	ProvisionedLineID       string `json:"provisioned_line_id,omitempty"`
@@ -82,6 +85,7 @@ type FactoryOnboardingPatch struct {
 	DefaultBranch           *string
 	IssuesSource            *string
 	AgentHarness            *string
+	CodexDefaultOwnerID     *string
 	CodexSubscription       *bool
 	ProvisionedAppID        *string
 	ProvisionedLineID       *string
@@ -130,12 +134,16 @@ func VCSProviderForIntegrationApp(appName string) (string, bool) {
 
 // VCSRepositoryCloneURL returns the HTTPS clone URL for an owner/name
 // repository on the provider. An empty provider means GitHub.
-func VCSRepositoryCloneURL(provider, repository string) string {
+func VCSRepositoryCloneURL(provider, repository, serverURL string) string {
 	repository = strings.TrimSuffix(strings.TrimSpace(repository), ".git")
 	if provider == ProviderBitbucket {
 		return "https://bitbucket.org/" + repository + ".git"
 	}
-	return "https://github.com/" + repository + ".git"
+	base := strings.TrimSuffix(strings.TrimSpace(serverURL), "/")
+	if base == "" {
+		base = gitHubDotComWebURL
+	}
+	return base + "/" + repository + ".git"
 }
 
 // FactoryVCSCapabilities is the set of factory automations a Git host can run.
@@ -355,6 +363,9 @@ func mergeFactoryOnboardingConfig(current FactoryOnboardingConfig, patch Factory
 			return FactoryOnboardingConfig{}, err
 		}
 		next.AgentHarness = value
+	}
+	if patch.CodexDefaultOwnerID != nil {
+		next.CodexDefaultOwnerID = *patch.CodexDefaultOwnerID
 	}
 	if patch.CodexSubscription != nil {
 		next.CodexSubscription = *patch.CodexSubscription

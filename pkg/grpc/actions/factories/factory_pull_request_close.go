@@ -5,6 +5,7 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
+	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/models"
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
 	"github.com/superplanehq/superplane/pkg/productanalytics"
@@ -96,7 +97,7 @@ func closeFactoryWorkOrdersFromGitHubPullRequestClosed(
 		if outcome == nil || !outcome.closed {
 			continue
 		}
-		if !merged {
+		if outcome.result == models.FactoryWorkOrderResultPRClosed {
 			captureExternalFactoryProductEvent(
 				db,
 				factory,
@@ -130,6 +131,13 @@ func applyGitHubPullRequestClosed(
 ) (*factoryPullRequestCloseResult, error) {
 	var outcome *factoryPullRequestCloseResult
 	err := db.Transaction(func(tx *gorm.DB) error {
+		// Startup and merge lock the task before the PR.
+		if err := models.LockFactoryWorkOrder(tx, pullRequest.WorkOrderID); err != nil {
+			return err
+		}
+		if err := pullRequest.LockForUpdate(tx); err != nil {
+			return err
+		}
 		if err := stampFactoryPullRequestClosed(tx, pullRequest, merged, mergedAt, closedAt); err != nil {
 			return err
 		}
@@ -196,6 +204,21 @@ func closeFactoryWorkOrderForPullRequest(
 		return outcome, nil
 	}
 
+	multiRepo, err := factory.MultiRepoTasksEnabled(tx)
+	if err != nil {
+		return nil, err
+	}
+	if multiRepo {
+		result, done, err := order.PullRequestCloseOutcome(tx)
+		if err != nil {
+			return nil, err
+		}
+		if !done {
+			return outcome, nil
+		}
+		outcome.result = result
+	}
+
 	if _, err := order.UpdateStatus(tx, models.FactoryWorkOrderStatusUpdate{
 		ToState:    models.FactoryWorkOrderStateClosed,
 		Result:     outcome.result,
@@ -233,7 +256,7 @@ func githubUserAutomation(user *githubWebhookUser) *factoryevents.AutomationRef 
 	}
 	htmlURL := strings.TrimSpace(user.HTMLURL)
 	if htmlURL == "" {
-		htmlURL = "https://github.com/" + login
+		htmlURL = githubcommon.DotCom().ProfileURL(login)
 	}
 	return &factoryevents.AutomationRef{
 		AppName:  login,

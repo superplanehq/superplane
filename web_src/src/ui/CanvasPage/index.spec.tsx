@@ -79,28 +79,6 @@ vi.mock("../componentSidebar", () => ({
   ComponentSidebar: () => <aside data-testid="component-sidebar" />,
 }));
 
-vi.mock("@/components/CanvasToolSidebar", () => ({
-  CanvasToolSidebar: () => null,
-}));
-
-vi.mock("@/pages/factories/agent/FactoryCanvasToolSidebar", () => ({
-  FactoryCanvasToolSidebar: () => null,
-}));
-
-vi.mock("@/components/CanvasToolSidebar/useCanvasToolSidebarState", () => ({
-  useCanvasToolSidebarState: () => ({
-    canvasId: undefined,
-    organizationId: undefined,
-    isEditing: false,
-    readOnly: false,
-    isToolSidebarOpen: false,
-    showToolSidebarToggle: false,
-    handleToolSidebarToggle: vi.fn(),
-    openToolSidebar: vi.fn(),
-    closeToolSidebar: vi.fn(),
-  }),
-}));
-
 vi.mock("./Header", () => ({
   Header: () => <header data-testid="canvas-header" />,
 }));
@@ -219,7 +197,6 @@ describe("CanvasPage connection drop", () => {
           edges={[]}
           buildingBlocks={[]}
           isEditing={true}
-          activeCanvasVersionId="draft-version"
           onEdgeCreate={vi.fn()}
         />
       </MemoryRouter>,
@@ -237,7 +214,6 @@ describe("CanvasPage connection drop", () => {
           edges={[]}
           buildingBlocks={[]}
           isEditing
-          activeCanvasVersionId="version-live"
           layoutMode="factory-auto"
         />
       </MemoryRouter>,
@@ -247,15 +223,7 @@ describe("CanvasPage connection drop", () => {
 
     rerender(
       <MemoryRouter>
-        <CanvasPage
-          title="Canvas"
-          nodes={[]}
-          edges={[]}
-          buildingBlocks={[]}
-          isEditing
-          activeCanvasVersionId="version-live"
-          layoutMode="manual"
-        />
+        <CanvasPage title="Canvas" nodes={[]} edges={[]} buildingBlocks={[]} isEditing layoutMode="manual" />
       </MemoryRouter>,
     );
 
@@ -269,7 +237,6 @@ describe("CanvasPage connection drop", () => {
       edges: [],
       buildingBlocks: [],
       isEditing: true,
-      activeCanvasVersionId: "version-live",
       isAutoLayoutOnUpdateEnabled: true,
       onToggleAutoLayoutOnUpdate: vi.fn(),
     };
@@ -301,7 +268,6 @@ describe("CanvasPage connection drop", () => {
           buildingBlocks={[]}
           isEditing={true}
           isEditSessionActive={true}
-          activeCanvasVersionId="draft-version"
           toolSidebarVersionsContent={<div>Version history</div>}
         />
       </MemoryRouter>,
@@ -323,7 +289,6 @@ describe("CanvasPage connection drop", () => {
           edges={[]}
           buildingBlocks={[]}
           isEditing={true}
-          activeCanvasVersionId="draft-version"
           onEdgeCreate={vi.fn()}
           onPlaceholderAdd={onPlaceholderAdd}
         />
@@ -379,7 +344,6 @@ describe("CanvasPage connection drop", () => {
           edges={[]}
           buildingBlocks={[]}
           isEditing={true}
-          activeCanvasVersionId="draft-version"
           onEdgeCreate={vi.fn()}
           onPlaceholderAdd={onPlaceholderAdd}
         />
@@ -422,7 +386,6 @@ describe("CanvasPage connection drop", () => {
           edges={[]}
           buildingBlocks={[]}
           isEditing={true}
-          activeCanvasVersionId="draft-version"
           onEdgeCreate={vi.fn()}
           onPlaceholderAdd={onPlaceholderAdd}
         />
@@ -467,7 +430,6 @@ describe("CanvasPage connection drop", () => {
           edges={[]}
           buildingBlocks={[]}
           isEditing={true}
-          activeCanvasVersionId="draft-version"
           initialSidebar={{ isOpen: true, nodeId: "node-1" }}
           getSidebarData={getSidebarData}
           loadSidebarData={loadSidebarData}
@@ -499,7 +461,6 @@ describe("CanvasPage connection drop", () => {
           edges={[]}
           buildingBlocks={[]}
           isEditing={false}
-          activeCanvasVersionId=""
           initialSidebar={{ isOpen: true, nodeId: "node-1" }}
           getSidebarData={getSidebarData}
           loadSidebarData={loadSidebarData}
@@ -542,7 +503,6 @@ describe("CanvasPage connection drop", () => {
           edges={[]}
           buildingBlocks={[]}
           isEditing={false}
-          activeCanvasVersionId="live-version"
           initialSidebar={{ isOpen: true, nodeId: "node-1" }}
           getSidebarData={getSidebarData}
           workflowNodes={[{ id: "node-1", type: "TYPE_ACTION", name: "Node" }]}
@@ -585,7 +545,6 @@ describe("CanvasPage connection drop", () => {
           edges={[]}
           buildingBlocks={[]}
           isEditing={true}
-          activeCanvasVersionId="draft-version"
           initialSidebar={{ isOpen: true, nodeId: "node-1" }}
           getSidebarData={getSidebarData}
           workflowNodes={[{ id: "node-1", type: "TYPE_ACTION", name: "Node" }]}
@@ -628,7 +587,6 @@ describe("CanvasPage connection drop", () => {
           edges={[]}
           buildingBlocks={[]}
           isEditing={true}
-          activeCanvasVersionId="draft-version"
           initialSidebar={{ isOpen: true, nodeId: "node-1" }}
           getSidebarData={getSidebarData}
           workflowNodes={[{ id: "node-1", type: "TYPE_ACTION", name: "Node" }]}
@@ -673,7 +631,6 @@ describe("CanvasPage connection drop", () => {
           edges={[]}
           buildingBlocks={[]}
           isEditing={false}
-          activeCanvasVersionId="live-version"
           initialSidebar={{ isOpen: true, nodeId: "node-1" }}
           onSidebarChange={onSidebarChange}
           getSidebarData={getSidebarData}
@@ -734,7 +691,6 @@ describe("CanvasPage fit-to-view on canvas/version switch", () => {
           edges={[]}
           buildingBlocks={[]}
           isEditing={false}
-          activeCanvasVersionId="v1"
           {...overrides}
         />
       </MemoryRouter>,
@@ -835,7 +791,6 @@ describe("CanvasPage fit-to-view on canvas/version switch", () => {
           edges={[]}
           buildingBlocks={[]}
           isEditing={false}
-          activeCanvasVersionId="v2"
           fitViewContentKey="canvas-1:v2"
           hasFitToViewRef={hasFitToViewRef}
           lastFittedContentKeyRef={lastFittedContentKeyRef}
@@ -864,7 +819,6 @@ describe("CanvasPage fit-to-view on canvas/version switch", () => {
           edges={[]}
           buildingBlocks={[]}
           isEditing={false}
-          activeCanvasVersionId="v1"
           initialFocusNodeId="node-1"
           fitViewContentKey={fitViewContentKey}
           hasFitToViewRef={hasFitToViewRef}
@@ -906,7 +860,6 @@ describe("CanvasPage fit-to-view on canvas/version switch", () => {
             edges={[]}
             buildingBlocks={[]}
             isEditing={false}
-            activeCanvasVersionId="v1"
             fitViewContentKey={fitViewContentKey}
             hasFitToViewRef={hasFitToViewRef}
             lastFittedContentKeyRef={lastFittedContentKeyRef}
@@ -950,7 +903,6 @@ describe("CanvasPage fit-to-view on canvas/version switch", () => {
           edges={[]}
           buildingBlocks={[]}
           isEditing={true}
-          activeCanvasVersionId="draft-1"
           fitViewContentKey={fitViewContentKey}
           hasFitToViewRef={hasFitToViewRef}
           lastFittedContentKeyRef={lastFittedContentKeyRef}

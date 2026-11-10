@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Run inside the build container. The host creates the output directory first.
+# Keep compiler caches under the container user, but return build outputs to
+# their original owner even when the command fails.
+set -euo pipefail
+
+output="$1"
+shift
+owner="$(stat -c '%u:%g' "$output")"
+trap 'chown -R "$owner" "$output"' EXIT
+"$@"

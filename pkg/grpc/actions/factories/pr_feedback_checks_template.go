@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/components/runner"
+	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/yaml"
 )
@@ -24,6 +25,8 @@ const (
 	prFeedbackChecksDefaultName        = "Fix pull request checks"
 	prFeedbackChecksDefaultDescription = "Wait for pull request checks and start one agent run when selected checks fail."
 	prFeedbackWaitChecksNodeName       = "Wait For Pull Request Checks"
+
+	prFeedbackEventRepositoryExpression = "{{ root().data.repository.full_name }}"
 )
 
 func buildChecksPRFeedbackCanvas(request prFeedbackBuildRequest) *yaml.Canvas {
@@ -50,17 +53,13 @@ func buildChecksPRFeedbackCanvas(request prFeedbackBuildRequest) *yaml.Canvas {
 			},
 			Nodes: []yaml.Node{
 				request.TriggerSettings[prFeedbackPullRequestTriggerNodeID].configure(yaml.Node{
-					ID:        prFeedbackPullRequestTriggerNodeID,
-					Name:      "On Pull Request",
-					Type:      yaml.NodeTypeTrigger,
-					Component: prFeedbackTriggerComponent(provider),
-					Configuration: map[string]any{
-						"repository":              request.Repository,
-						"actions":                 prFeedbackTriggerActions(provider),
-						"onlyFactoryPullRequests": true,
-					},
-					Integration: request.Binding.integrationRef(),
-					Position:    yaml.Position{X: 80, Y: 260},
+					ID:            prFeedbackPullRequestTriggerNodeID,
+					Name:          "On Pull Request",
+					Type:          yaml.NodeTypeTrigger,
+					Component:     prFeedbackTriggerComponent(provider),
+					Configuration: prFeedbackPullRequestTriggerConfiguration(request),
+					Integration:   request.Binding.integrationRef(),
+					Position:      yaml.Position{X: 80, Y: 260},
 				}),
 				{
 					ID:        prFeedbackActivityNodeID,
@@ -178,15 +177,24 @@ func isPrFeedbackWaitComponent(component string) bool {
 func prFeedbackWaitChecksConfiguration(request prFeedbackBuildRequest) map[string]any {
 	if prFeedbackVCSProvider(request) == models.ProviderBitbucket {
 		return map[string]any{
-			"repository": request.Repository,
+			"repository": prFeedbackEventRepositoryExpression,
 			"ref":        prFeedbackPRHeadSHAExpression(),
 			"buildKeys":  checkNamesNodeValue(request.CheckNames),
 		}
 	}
 	return map[string]any{
-		"repository": request.Repository,
+		"repository": prFeedbackEventRepositoryExpression,
 		"ref":        prFeedbackPRHeadSHAExpression(),
 		"checkNames": checkNamesNodeValue(request.CheckNames),
+	}
+}
+
+func prFeedbackPullRequestTriggerConfiguration(request prFeedbackBuildRequest) map[string]any {
+	provider := prFeedbackVCSProvider(request)
+	return map[string]any{
+		"repository":              models.WorkspaceRepositoriesExpression,
+		"actions":                 prFeedbackTriggerActions(provider),
+		"onlyFactoryPullRequests": true,
 	}
 }
 
@@ -243,10 +251,7 @@ func prFeedbackChecksRunnerConfiguration(request prFeedbackBuildRequest) map[str
 }
 
 func prFeedbackChecksRunnerSteps(request prFeedbackBuildRequest) []any {
-	steps := []any{}
-	if !request.OmitCommitIdentity {
-		steps = append(steps, prFeedbackCommitIdentitySteps()...)
-	}
+	steps := prFeedbackCommitIdentitySteps()
 	if prFeedbackVCSProvider(request) == models.ProviderBitbucket {
 		return append(steps,
 			map[string]any{
@@ -274,9 +279,9 @@ func prFeedbackGitHubCommitPushStep() map[string]any {
 		"name":             "Commit and Push",
 		"type":             "bash",
 		"workingDirectory": "repo",
-		"command": strings.Join([]string{
+		"command": strings.Join(append([]string{
 			"set -euo pipefail",
-			`REMOTE_HEAD=$(curl -fsSL -H "Authorization: Bearer ${GITHUB_TOKEN}" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/${REPO}/pulls/${PR_NUMBER}" | jq -r .head.sha)`,
+			`REMOTE_HEAD=$(curl -fsSL -H "Authorization: Bearer ${GITHUB_TOKEN}" -H "Accept: application/vnd.github+json" "${GITHUB_API_URL:-` + githubcommon.DotCom().APIURLEnv() + `}/repos/${REPO}/pulls/${PR_NUMBER}" | jq -r .head.sha)`,
 			`if [ -z "${REMOTE_HEAD}" ] || [ "${REMOTE_HEAD}" = "null" ]; then`,
 			`  echo "Could not read the remote pull request head." >&2`,
 			"  exit 1",
@@ -285,12 +290,7 @@ func prFeedbackGitHubCommitPushStep() map[string]any {
 			`  echo "Remote pull request head changed. Stop without pushing."`,
 			"  exit 0",
 			"fi",
-			"git add -A",
-			"if ! git diff --cached --quiet; then",
-			`  git commit -s -m "fix: repair failing checks on PR #${PR_NUMBER}"`,
-			"  git push origin HEAD",
-			"fi",
-		}, "\n"),
+		}, prFeedbackCommitPushLines("fix: repair failing checks on PR #${PR_NUMBER}", "git push origin HEAD")...), "\n"),
 	}
 }
 
@@ -395,7 +395,7 @@ func prFeedbackCommitURLSourceFor(provider string) string {
 		return `(root().data.repository.links?.html.href ?? ("https://bitbucket.org/" + root().data.repository.full_name))` +
 			` + "/commits/" + root().data.pull_request.head.sha`
 	}
-	return `(root().data.repository.html_url ?? ("https://github.com/" + root().data.repository.full_name))` +
+	return `(root().data.repository.html_url ?? ("` + githubcommon.DotCom().WebURL() + `/" + root().data.repository.full_name))` +
 		` + "/commit/" + root().data.pull_request.head.sha`
 }
 

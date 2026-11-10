@@ -1,5 +1,6 @@
 import { renderHook } from "@testing-library/react";
 import { vi } from "bun:test";
+import { EMPTY_LINEAR_INTAKE_SCOPE } from "../linearIntakeScope";
 
 import { useOnboardingSetupState, type OnboardingSetupApi } from "./useOnboardingSetupState";
 import type { useOnboardingPageModel } from "./useOnboardingPageModel";
@@ -25,14 +26,6 @@ export function pageModel(overrides: Partial<OnboardingPageModel> = {}): Onboard
     hostedModelsAvailableLoading: false,
     bringYourOwnKey: false,
     bringYourOwnKeyLoading: false,
-    codexSubscriptionOffered: false,
-    codexSubscriptionLoading: false,
-    codexConnection: undefined,
-    codexSubscriptionReady: false,
-    startCodexConnection: vi.fn(),
-    cancelCodexConnection: vi.fn(),
-    codexStarting: false,
-    codexCanceling: false,
     customProvider: false,
     agentCredentialChoice: null,
     setAgentCredentialChoice: vi.fn(),
@@ -44,7 +37,18 @@ export function pageModel(overrides: Partial<OnboardingPageModel> = {}): Onboard
     selectCatalogRepository: vi.fn().mockResolvedValue(true),
     selectBitbucketRepository: vi.fn().mockResolvedValue(true),
     selectBitbucketForgeRepository: vi.fn().mockResolvedValue(true),
+    selectGitHubEnterpriseRepository: vi.fn().mockResolvedValue(true),
+    bindGitHubEnterpriseIntegration: vi.fn(),
+    githubIntegrationId: "",
+    githubHost: "",
     bitbucketIntegrationId: "",
+    branchIntegrationId: "",
+    defaultBranchRequired: false,
+    chosenDefaultBranch: "",
+    setChosenDefaultBranch: vi.fn(),
+    requireDefaultBranch: vi.fn(),
+    clearDefaultBranchRequirement: vi.fn(),
+    saveChosenDefaultBranch: vi.fn().mockResolvedValue(true),
     integrationDialogs: <></>,
     canConfigureWorkspace: true,
     saving: false,
@@ -63,12 +67,8 @@ export function pageModel(overrides: Partial<OnboardingPageModel> = {}): Onboard
     jiraProjectsError: false,
     retryJiraProjects: vi.fn(),
     linearIntegrationId: "",
-    linearProjectIds: [],
-    toggleLinearProject: vi.fn(),
-    linearProjects: [],
-    linearProjectsLoading: false,
-    linearProjectsError: false,
-    retryLinearProjects: vi.fn(),
+    linearScope: EMPTY_LINEAR_INTAKE_SCOPE,
+    changeLinearScope: vi.fn(),
     ...overrides,
   };
 }

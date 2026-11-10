@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -84,11 +83,9 @@ func Test__OrganizationCleanupWorker_GracePeriod(t *testing.T) {
 		r2 := support.Setup(t)
 		defer r2.Close()
 
-		cleaner := &cleanupProvider{}
-		canvasWorker := NewCanvasCleanupWorker(cleaner)
-		worker := NewOrganizationCleanupWorker(cleaner)
+		canvasWorker := NewCanvasCleanupWorker()
+		worker := NewOrganizationCleanupWorker()
 		canvas, _ := support.CreateCanvas(t, r2.Organization.ID, r2.User, []models.CanvasNode{}, []models.Edge{})
-		orphanSession := createAgentSessionWithMessage(t, r2.Organization.ID, r2.User, uuid.New())
 
 		require.NoError(t, models.SoftDeleteOrganization(r2.Organization.ID.String()))
 		deletedAtOutsideGracePeriod := time.Now().AddDate(0, 0, -31)
@@ -118,8 +115,5 @@ func Test__OrganizationCleanupWorker_GracePeriod(t *testing.T) {
 		require.NoError(t, database.Conn().Unscoped().Model(&models.User{}).Where("organization_id = ?", r2.Organization.ID).Count(&userCount).Error)
 		assert.Equal(t, int64(0), userCount)
 
-		assert.Equal(t, int64(0), countAgentSessions(t, orphanSession.ID))
-		assert.Equal(t, int64(0), countAgentSessionMessages(t, orphanSession.ID))
-		assert.Contains(t, cleaner.deleted, orphanSession.ProviderSessionID)
 	})
 }

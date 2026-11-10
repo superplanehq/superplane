@@ -1,5 +1,6 @@
 import type {
   CanvasesCanvas,
+  CanvasesCanvasNodeExecution,
   CanvasesCanvasNodeExecutionRef,
   CanvasesCanvasRun,
   FactoriesFactoryPullRequest,
@@ -23,6 +24,7 @@ import {
 } from "./splitRunCanvases";
 import { clockLabel } from "./splitRunFormat";
 import type { SplitRunPhase, SplitRunPhaseStatus, SplitRunStreamLine } from "./splitRunMocks";
+import { isRunnerComponent } from "./streamNotesFromLiveLog";
 
 export function nodeStatusFromExecution(
   execution: CanvasesCanvasNodeExecutionRef | undefined,
@@ -273,26 +275,52 @@ export function orderCanvasNodesTopologically<T extends { id: string; type?: str
 function streamLineForNode(
   node: ComponentsNode & { id: string },
   execution: CanvasesCanvasNodeExecutionRef | undefined,
+  fullExecution?: CanvasesCanvasNodeExecution,
 ): SplitRunStreamLine {
   const presentation = componentPresentation(node.component);
   const status = nodeStatusFromExecution(execution, node.type === "TYPE_TRIGGER");
   const duration = metricFromExecution(execution);
+  const runnerError =
+    isRunnerComponent(node.component) && execution?.state === "STATE_FINISHED" && status !== "cancelled"
+      ? runnerOutputError(fullExecution?.outputs)
+      : undefined;
+  const displayStatus = runnerError ? "failed" : status;
   return {
     id: node.id,
     nodeId: node.id,
     at: clockLabel(execution?.createdAt),
     componentName: node.name ?? presentation.title,
-    status: streamStatusFromNode(status),
+    status: streamStatusFromNode(displayStatus),
     duration: duration === "—" ? undefined : duration,
     kind: streamKindForNode(node),
     componentType: componentTypeLabel(node.component),
-    action: liveStreamAction(status, Boolean(execution)),
+    action: liveStreamAction(displayStatus, Boolean(execution)),
     iconSlug: presentation.iconSlug,
     iconSrc: presentation.iconSrc,
     component: node.component,
     executionId: execution?.id,
-    detail: execution?.resultMessage?.trim() || undefined,
+    detail: execution?.resultMessage?.trim() || runnerError,
   };
+}
+
+function runnerOutputError(outputs: CanvasesCanvasNodeExecution["outputs"]): string | undefined {
+  const failed = outputs?.failed;
+  if (!Array.isArray(failed) || failed.length === 0) {
+    return undefined;
+  }
+  for (const output of [...failed].reverse()) {
+    if (!output || typeof output !== "object" || !("data" in output)) {
+      continue;
+    }
+    const payload = output.data;
+    if (!payload || typeof payload !== "object" || !("error" in payload)) {
+      continue;
+    }
+    if (typeof payload.error === "string" && payload.error.trim()) {
+      return payload.error.trim();
+    }
+  }
+  return "The agent failed without an error message.";
 }
 
 export function splitRunCanvasFromLive(input: {
@@ -331,15 +359,20 @@ export function splitRunCanvasFromLive(input: {
 export function streamFromLiveRun(
   canvas: CanvasesCanvas | undefined,
   run: CanvasesCanvasRun | undefined,
+  fullExecutions: CanvasesCanvasNodeExecution[] = [],
 ): SplitRunStreamLine[] {
   const { nodes, latest } = liveExecutionsByNode(canvas, run);
   if (nodes.length === 0 && latest.size === 0) {
     return [];
   }
+  const fullById = new Map(
+    fullExecutions.filter((execution) => execution.id).map((execution) => [execution.id, execution]),
+  );
   const seen = new Set<string>();
   const lines = orderCanvasNodesTopologically(nodes, canvas?.spec?.edges).map((node) => {
     seen.add(node.id);
-    return streamLineForNode(node, latest.get(node.id));
+    const execution = latest.get(node.id);
+    return streamLineForNode(node, execution, execution?.id ? fullById.get(execution.id) : undefined);
   });
   for (const execution of latest.values()) {
     if (!execution.nodeId || seen.has(execution.nodeId)) {

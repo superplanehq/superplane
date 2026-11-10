@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useLocation, useSearchParams } from "react-router";
-import { beforeAll, beforeEach, describe, expect, it, vi } from "bun:test";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "bun:test";
 
 import type { FactoriesFactory, FactoriesWorkOrder } from "@/api-client";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
@@ -32,7 +32,6 @@ const {
   onDispatch,
   dispatchingIds,
   canUpdateWorkOrder,
-  runnerModelCalls,
   updateAssignees,
   findPlanningSession,
   sendPlanningMessage,
@@ -42,7 +41,6 @@ const {
   onDispatch: vi.fn(),
   dispatchingIds: { current: new Set<string>() },
   canUpdateWorkOrder: { current: true },
-  runnerModelCalls: [] as unknown[][],
   updateAssignees: vi.fn(),
   findPlanningSession: vi.fn(),
   sendPlanningMessage: vi.fn(),
@@ -57,7 +55,7 @@ vi.mock("../pages/planningSessionClient", () => ({
 }));
 
 vi.mock("../pages/usePlanningSessionLiveRun", () => ({
-  usePlanningSessionLiveRun: (_organizationId: string, view: unknown) => view,
+  usePlanningSessionLiveRun: (_organizationId: string, view: unknown) => ({ view, run: undefined }),
 }));
 
 vi.mock("../pages/work-order-split-run/useSplitRunLiveCanvas", () => ({
@@ -94,21 +92,6 @@ vi.mock("@/contexts/usePermissions", () => ({
   usePermissions: () => ({ canAct: () => canUpdateWorkOrder.current, currentUserId: "user-1", isLoading: false }),
 }));
 
-vi.mock("@/hooks/useFactoryLineRunnerModels", () => ({
-  useFactoryLineRunnerModels: (...args: unknown[]) => {
-    runnerModelCalls.push(args);
-    return {
-      data: {
-        models: [
-          { id: "claude-opus-4-6", name: "claude-opus-4-6" },
-          { id: "long-model", name: "Anthropic Claude Opus 4.6 with extended context" },
-        ],
-      },
-      isLoading: false,
-    };
-  },
-}));
-
 vi.mock("@/lib/toast", () => ({
   showSuccessToast: vi.fn(),
   showErrorToast: vi.fn(),
@@ -136,6 +119,25 @@ beforeAll(() => {
   Element.prototype.releasePointerCapture ??= () => {};
   Element.prototype.scrollIntoView ??= () => {};
 });
+
+const originalFetch = globalThis.fetch.bind(globalThis);
+
+beforeEach(() => {
+  vi.stubGlobal("fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
+    const request = input instanceof Request ? input : new Request(input, init);
+    if (new URL(request.url).pathname.endsWith("/line-runner-models")) {
+      return Response.json({
+        models: [
+          { id: "claude-opus-4-6", name: "claude-opus-4-6" },
+          { id: "long-model", name: "Anthropic Claude Opus 4.6 with extended context" },
+        ],
+      });
+    }
+    return originalFetch(input, init);
+  });
+});
+
+afterEach(() => vi.unstubAllGlobals());
 
 function LocationProbe() {
   const location = useLocation();
@@ -204,7 +206,6 @@ describe("MobileTaskDetailPage back link", () => {
     onDispatch.mockReset();
     dispatchingIds.current = new Set();
     canUpdateWorkOrder.current = true;
-    runnerModelCalls.length = 0;
     updateAssignees.mockReset();
     updateAssignees.mockResolvedValue({ assignees: [] });
   });
@@ -340,7 +341,6 @@ describe("MobileTaskDetailPage model select", () => {
     onDispatch.mockReset();
     dispatchingIds.current = new Set();
     canUpdateWorkOrder.current = true;
-    runnerModelCalls.length = 0;
     updateAssignees.mockReset();
     updateAssignees.mockResolvedValue({ assignees: [] });
   });
@@ -350,6 +350,31 @@ describe("MobileTaskDetailPage model select", () => {
 
     expect(screen.getByRole("button", { name: "Model: Auto Medium" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Start" })).toBeEnabled();
+  });
+
+  it.each([true, false])("offers and starts with the execution owner's models when assigned=%s", async (assigned) => {
+    const order = { ...DRAFT_WORK_ORDER, assignees: assigned ? [{ id: "owner", name: "Task Owner" }] : [] };
+    useWorkOrder.mockReturnValue({ data: order, isLoading: false, isError: false });
+    vi.stubGlobal("fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
+      const request = input instanceof Request ? input : new Request(input, init);
+      const url = new URL(request.url);
+      if (url.pathname.endsWith("/line-runner-models")) {
+        const model = url.searchParams.get("orderId") === order.id ? "owner-model" : "caller-model";
+        return Response.json({ models: [{ id: model, name: model }] });
+      }
+      return originalFetch(input, init);
+    });
+    const user = userEvent.setup();
+    renderTask(`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/task/${order.number}?lineId=${REFUND_LINE_PLAN_ID}`);
+    await user.click(screen.getByRole("button", { name: "Model: Auto Medium" }));
+    const expectedModel = assigned ? "owner-model" : "caller-model";
+    await user.click(await screen.findByRole("menuitem", { name: expectedModel }));
+    await user.click(screen.getByRole("button", { name: "Start" }));
+    expect(onDispatch).toHaveBeenCalledWith(order.id, {
+      lineName: PLAN_LINE_NAME,
+      model: expectedModel,
+      thinkingLevel: "medium",
+    });
   });
 
   it("opens model and thinking choices in one menu and updates the closed label", async () => {
@@ -462,7 +487,7 @@ describe("MobileTaskDetailPage model select", () => {
     expect(screen.getByRole("button", { name: "Start" })).toBeDisabled();
   });
 
-  it("keeps Start disabled and does not list models from another line when the start line has no name", () => {
+  it("keeps Start disabled and does not list models from another line when the start line has no name", async () => {
     renderDraft(
       {
         ...REFUND_FACTORY,
@@ -475,7 +500,7 @@ describe("MobileTaskDetailPage model select", () => {
     );
 
     expect(screen.getByRole("button", { name: "Start" })).toBeDisabled();
-    expect(runnerModelCalls.map((call) => call[2])).not.toContain("hotfix");
-    expect(runnerModelCalls.every((call) => call[2] == null || call[2] === "")).toBe(true);
+    await userEvent.setup().click(screen.getByRole("button", { name: "Model: Auto Medium" }));
+    expect(screen.queryByRole("menuitem", { name: "claude-opus-4-6" })).not.toBeInTheDocument();
   });
 });

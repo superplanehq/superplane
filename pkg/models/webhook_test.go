@@ -169,3 +169,37 @@ func createCanvasNodeWithWebhook(t *testing.T, r *support.ResourceRegistry, webh
 	nodes[0].WebhookID = &webhookID
 	return canvas, nodes[0]
 }
+
+func Test__ListBitbucketForgeWebhooks(t *testing.T) {
+	r := support.Setup(t)
+	installationID := uuid.NewString()
+	integration, err := models.CreateIntegration(uuid.New(), r.Organization.ID, "bitbucket", uuid.NewString(), nil)
+	require.NoError(t, err)
+	require.NoError(t, database.Conn().Model(integration).Updates(map[string]any{
+		"state":    models.IntegrationStateReady,
+		"metadata": datatypes.NewJSONType(map[string]any{"authType": "forgeApp", "forgeInstallationId": installationID}),
+	}).Error)
+	webhookID := uuid.New()
+	require.NoError(t, database.Conn().Create(&models.Webhook{
+		ID: webhookID, State: models.WebhookStateReady, Secret: []byte("secret"), AppInstallationID: &integration.ID,
+		Configuration: datatypes.NewJSONType[any](map[string]any{"repositorySlug": "api"}),
+		Metadata: datatypes.NewJSONType[any](map[string]any{
+			"repositoryUUID": "{repo-api}", "repositoryFullName": "acme/api",
+			"hooks": []map[string]any{
+				{"repository": "acme/api", "repositoryUUID": "{repo-api}", "repositoryFullName": "acme/api"},
+				{"repository": "acme/web", "repositoryUUID": "{repo-web}", "repositoryFullName": "acme/web"},
+			},
+		}),
+	}).Error)
+
+	for _, repositoryUUID := range []string{"repo-api", "repo-web"} {
+		webhooks, err := models.ListBitbucketForgeWebhooks(database.Conn(), installationID, repositoryUUID)
+		require.NoError(t, err)
+		require.Len(t, webhooks, 1, repositoryUUID)
+		assert.Equal(t, webhookID, webhooks[0].ID)
+	}
+
+	webhooks, err := models.ListBitbucketForgeWebhooks(database.Conn(), installationID, "repo-other")
+	require.NoError(t, err)
+	assert.Empty(t, webhooks)
+}

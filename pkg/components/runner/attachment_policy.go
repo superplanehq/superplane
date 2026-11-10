@@ -68,7 +68,8 @@ func FormatAgentPrompt(prompt, usage string, attachments []TaskAttachment, inspe
 	if inspectImages {
 		next = RewritePromptLocalAttachmentPaths(next, attachments)
 	}
-	return ApplyAttachmentInstructions(next, attachments)
+	next = ApplyAttachmentInstructions(next, attachments)
+	return next + "\n\n" + strings.TrimSpace(toolExecutionProtocol) + "\n"
 }
 
 func LocalAttachmentPath(dest string) string {
@@ -99,5 +100,5 @@ func FormatInspectAttachmentInstruction(paths []string) string {
 	if len(paths) == 0 {
 		return ""
 	}
-	return fmt.Sprintf("Call inspect_attachment on %s and review the returned image.", strings.Join(paths, ", "))
+	return fmt.Sprintf("Call get_artifact with each of these paths and review the returned images: %s.", strings.Join(paths, ", "))
 }

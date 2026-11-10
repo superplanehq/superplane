@@ -17,6 +17,9 @@ const TOOL_RESULT_MAX_LINES = 24;
 const DEFAULT_WAIT_CAP_MS = 3_600_000;
 const MODEL_CATALOG_REFRESH_TIMEOUT_MS = 30_000;
 const MODEL_CATALOG_REFRESH_MAX_BUFFER = 32 * 1024 * 1024;
+const MODEL_ENDPOINT_LOOKUP_TIMEOUT_MS = 5_000;
+const DEFAULT_OPENROUTER_API_BASE = "https://openrouter.ai/api/v1";
+const AVAILABLE_ENDPOINT_STATUS = 0;
 const SESSION_FILE = "opencode_session";
 
 function loadActivityStreamModule() {
@@ -111,6 +114,10 @@ function planningEnabled(env = process.env) {
   );
 }
 
+// The global runner MCP server lists only the tools that the run token
+// allows, and the backend checks the scope on every call.
+const GLOBAL_MCP_SERVER = "superplane_global";
+
 function workspaceMCPConfigPath(env = process.env) {
   const taskDir = String((env && env.SUPERPLANE_TASK_DIR) || "").trim();
   const configured = String((env && env.SUPERPLANE_WORKSPACE_MCP_CONFIG) || "").trim();
@@ -143,7 +150,7 @@ function workspaceMCPServers(env = process.env) {
     for (const server of servers) {
       const name = String((server && server.name) || "").trim();
       const url = String((server && server.url) || "").trim();
-      if (!name || name === "superplane" || !url) {
+      if (!name || name === "superplane" || name === GLOBAL_MCP_SERVER || !url) {
         continue;
       }
       const headers = server.headers && typeof server.headers === "object" ? server.headers : {};
@@ -202,20 +209,6 @@ function visualEvidenceEnabled(env = process.env) {
   return artifactEnabled(env) && !envFlag(env, "SUPERPLANE_PUBLISH_LINKS");
 }
 
-function mergeConfidenceEnabled(env = process.env) {
-  return envFlag(env, "SUPERPLANE_MERGE_CONFIDENCE_TOKEN");
-}
-
-function superplaneMCPScript(taskDir, env = process.env, planning = planningEnabled(env)) {
-  if (planning) {
-    return path.join(taskDir, "planning_session_mcp.js");
-  }
-  if (mergeConfidenceEnabled(env)) {
-    return path.join(taskDir, "merge_confidence_mcp.js");
-  }
-  return path.join(taskDir, "task_artifact_mcp.js");
-}
-
 function planningSystemPrompt(env = process.env) {
   return planningAnalysisEnabled(env) ? loadAnalysisProtocol(env) : "";
 }
@@ -269,6 +262,13 @@ function agentModelId(model, env) {
 function classifyOpenRouterError(text) {
   const raw = String(text || "");
   const lower = raw.toLowerCase();
+  if (
+    /configinvaliderror|configjsonerror|configuration is invalid|config file at .* is not valid json|v2 permissions are not supported/.test(
+      lower,
+    )
+  ) {
+    return "configuration";
+  }
   if (
     /invalid api key|incorrect api key|unauthorized|authentication|insufficient credit|insufficient credits|unknown model|model not found|context (length|window|overflow)|maximum context|prompt is too long/.test(
       lower,
@@ -336,6 +336,229 @@ function uniqueCatalogModels(ids) {
     out.push(id);
   }
   return out;
+}
+
+function uniqueNonEmptyStrings(values) {
+  const seen = new Set();
+  const out = [];
+  const list = Array.isArray(values) ? values : [];
+  for (const raw of list) {
+    const value = String(raw || "").trim();
+    if (!value || seen.has(value)) {
+      continue;
+    }
+    seen.add(value);
+    out.push(value);
+  }
+  return out;
+}
+
+function openRouterAPIBaseURL(env) {
+  const configured = String((env && env.OPENROUTER_BASE_URL) || "").trim();
+  if (configured) {
+    return configured.replace(/\/+$/, "");
+  }
+  return DEFAULT_OPENROUTER_API_BASE;
+}
+
+function modelEndpointsPath(model) {
+  const id = catalogModelId(model);
+  if (!id) {
+    return "";
+  }
+  return id
+    .split("/")
+    .map((part) => encodeURIComponent(part))
+    .join("/");
+}
+
+function numericPrice(value) {
+  const amount = Number(value);
+  return Number.isFinite(amount) ? amount : null;
+}
+
+function recentUptime(endpoint) {
+  for (const key of ["uptime_last_5m", "uptime_last_30m", "uptime_last_1d"]) {
+    const value = Number(endpoint && endpoint[key]);
+    if (Number.isFinite(value)) {
+      return value;
+    }
+  }
+  return 0;
+}
+
+function recentThroughput(endpoint) {
+  const stats = endpoint && endpoint.throughput_last_30m;
+  const value = Number(stats && stats.p50);
+  return Number.isFinite(value) ? value : 0;
+}
+
+function isAvailableEndpoint(endpoint) {
+  if (!endpoint || endpoint.status == null || endpoint.status === "") {
+    return true;
+  }
+  return Number(endpoint.status) === AVAILABLE_ENDPOINT_STATUS;
+}
+
+function hasServiceTier(endpoint) {
+  const tier = endpoint && endpoint.service_tier;
+  if (tier == null) {
+    return false;
+  }
+  return String(tier).trim() !== "";
+}
+
+function shuffleTagList(tags) {
+  const out = [...tags];
+  for (let i = out.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
+function isSurchargeEndpoint(item, minPrompt, minCompletion) {
+  if (item.promptPrice == null) {
+    return false;
+  }
+  if (item.promptPrice > minPrompt) {
+    return true;
+  }
+  if (item.promptPrice < minPrompt) {
+    return false;
+  }
+  if (item.completionPrice == null || minCompletion == null) {
+    return false;
+  }
+  return item.completionPrice > minCompletion;
+}
+
+function splitSurchargeEndpoints(members) {
+  const priced = members.filter((item) => item.promptPrice != null);
+  if (!priced.length) {
+    return { surcharge: [], standard: members };
+  }
+  const minPrompt = Math.min(...priced.map((item) => item.promptPrice));
+  const cheapestPrompt = priced.filter((item) => item.promptPrice === minPrompt);
+  const completions = cheapestPrompt
+    .map((item) => item.completionPrice)
+    .filter((price) => price != null);
+  const minCompletion = completions.length ? Math.min(...completions) : null;
+  const surcharge = [];
+  const standard = [];
+  for (const item of members) {
+    if (isSurchargeEndpoint(item, minPrompt, minCompletion)) {
+      surcharge.push(item);
+    } else {
+      standard.push(item);
+    }
+  }
+  return { surcharge, standard };
+}
+
+function orderProviderTags(endpoints, shuffleTags = shuffleTagList) {
+  const usable = [];
+  const seen = new Set();
+  const list = Array.isArray(endpoints) ? endpoints : [];
+  for (const endpoint of list) {
+    const tag = String((endpoint && endpoint.tag) || "").trim();
+    if (!tag || seen.has(tag) || !isAvailableEndpoint(endpoint) || hasServiceTier(endpoint)) {
+      continue;
+    }
+    seen.add(tag);
+    usable.push({
+      tag,
+      provider: tag.split("/")[0],
+      promptPrice: numericPrice(endpoint.pricing && endpoint.pricing.prompt),
+      completionPrice: numericPrice(endpoint.pricing && endpoint.pricing.completion),
+      uptime: recentUptime(endpoint),
+      throughput: recentThroughput(endpoint),
+    });
+  }
+  if (!usable.length) {
+    return [];
+  }
+
+  const groups = new Map();
+  for (const endpoint of usable) {
+    const members = groups.get(endpoint.provider) || [];
+    members.push(endpoint);
+    groups.set(endpoint.provider, members);
+  }
+
+  const rankedGroups = [...groups.entries()].sort((left, right) => {
+    const leftBest = Math.max(...left[1].map((item) => item.uptime));
+    const rightBest = Math.max(...right[1].map((item) => item.uptime));
+    if (rightBest !== leftBest) {
+      return rightBest - leftBest;
+    }
+    return left[0].localeCompare(right[0]);
+  });
+
+  const shuffle = typeof shuffleTags === "function" ? shuffleTags : shuffleTagList;
+  const order = [];
+  for (const [, members] of rankedGroups) {
+    const { surcharge, standard } = splitSurchargeEndpoints(members);
+    order.push(...shuffle(surcharge.map((item) => item.tag)));
+    const standardTags = [...standard]
+      .sort((left, right) => {
+        if (right.uptime !== left.uptime) {
+          return right.uptime - left.uptime;
+        }
+        return right.throughput - left.throughput;
+      })
+      .map((item) => item.tag);
+    order.push(...standardTags);
+  }
+  return order;
+}
+
+function openRouterProviderRouting(providerOrder) {
+  const routing = { allow_fallbacks: true };
+  const order = uniqueNonEmptyStrings(providerOrder);
+  if (order.length) {
+    routing.order = order;
+    return routing;
+  }
+  routing.sort = "throughput";
+  return routing;
+}
+
+function providerOrderLogLine(order) {
+  const tags = uniqueNonEmptyStrings(order);
+  if (!tags.length) {
+    return "";
+  }
+  return `OpenRouter provider order: ${tags.join(", ")}`;
+}
+
+async function listModelEndpoints(model, env, fetchImpl) {
+  const apiKey = String((env && env.OPENROUTER_API_KEY) || "").trim();
+  const encodedModel = modelEndpointsPath(model);
+  const request = fetchImpl || globalThis.fetch;
+  if (!apiKey || !encodedModel || typeof request !== "function") {
+    return [];
+  }
+  const url = `${openRouterAPIBaseURL(env)}/models/${encodedModel}/endpoints`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), MODEL_ENDPOINT_LOOKUP_TIMEOUT_MS);
+  try {
+    const response = await request(url, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+      signal: controller.signal,
+    });
+    if (!response || !response.ok) {
+      return [];
+    }
+    const body = await response.json();
+    return body && body.data && Array.isArray(body.data.endpoints)
+      ? body.data.endpoints
+      : [];
+  } catch (_err) {
+    return [];
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function clearSession(taskDir) {
@@ -442,11 +665,36 @@ function opencodeRunArgs({ model, sessionID, prompt, cwd, thinking, env }) {
   return args;
 }
 
+// Match V1 instruction selection: AGENTS.md wins over CONTEXT.md, and all
+// ancestors of that name are included up to the repository boundary. Claude
+// compatibility stays disabled. OpenCode still loads nested instructions on read.
+function repositoryInstructions(cwd) {
+  if (!cwd) return [];
+  const directories = [];
+  let current = path.resolve(cwd);
+  while (true) {
+    directories.push(current);
+    if (fs.existsSync(path.join(current, ".git"))) break;
+    const parent = path.dirname(current);
+    if (parent === current) break;
+    current = parent;
+  }
+  for (const name of ["AGENTS.md", "CONTEXT.md"]) {
+    const matches = directories
+      .map((dir) => path.join(dir, name))
+      .filter((file) => fs.existsSync(file));
+    if (matches.length) return matches;
+  }
+  return [];
+}
+
 function buildOpenCodeConfig({
   taskDir,
+  cwd,
   env = process.env,
   planning = false,
   models = [],
+  providerOrder = [],
 } = {}) {
   const config = {
     $schema: "https://opencode.ai/config.json",
@@ -496,10 +744,7 @@ function buildOpenCodeConfig({
           input: ["text", "image"],
         },
         options: {
-          provider: {
-            allow_fallbacks: true,
-            sort: "throughput",
-          },
+          provider: openRouterProviderRouting(providerOrder),
         },
       };
     }
@@ -513,22 +758,17 @@ function buildOpenCodeConfig({
       }
     }
   }
-  if (
-    (planning ||
-      artifactEnabled(env) ||
-      mergeConfidenceEnabled(env) ||
-      envFlag(env, "SUPERPLANE_OWNER_TOKEN")) &&
-    taskDir
-  ) {
+  if (envFlag(env, "SUPERPLANE_RUNNER_TOKEN") && taskDir) {
     config.mcp = {
-      superplane: {
+      [GLOBAL_MCP_SERVER]: {
         type: "local",
-        command: ["node", superplaneMCPScript(taskDir, env, planning)],
+        command: ["node", path.join(taskDir, "superplane_mcp", "server.js")],
         enabled: true,
       },
     };
   }
   applyWorkspaceMCPDenylist(config, workspaceMCPServers(env));
+  const instructions = repositoryInstructions(cwd);
   const protocol = planningSystemPrompt(env);
   if (protocol && taskDir) {
     const protocolPath = path.join(taskDir, "analysis_protocol.md");
@@ -537,17 +777,20 @@ function buildOpenCodeConfig({
     } catch (_err) {
       // Tests pass a fake task dir. The runner writes this file when the dir exists.
     }
-    config.instructions = [protocolPath];
+    instructions.push(protocolPath);
   }
+  if (instructions.length) config.instructions = instructions;
   return config;
 }
 
-function writeOpenCodeConfig(taskDir, env, models) {
+function writeOpenCodeConfig(taskDir, env, models, cwd, providerOrder) {
   const config = buildOpenCodeConfig({
     taskDir,
+    cwd,
     env,
     planning: planningEnabled(env),
     models,
+    providerOrder,
   });
   fs.writeFileSync(
     path.join(taskDir, "opencode.json"),
@@ -557,9 +800,10 @@ function writeOpenCodeConfig(taskDir, env, models) {
 
 function openCodeProcessEnv(taskDir, baseEnv = process.env) {
   const xdg = path.join(taskDir, "xdg");
-  return {
+  const env = {
     ...baseEnv,
     OPENCODE_CONFIG: path.join(taskDir, "opencode.json"),
+    OPENCODE_DISABLE_PROJECT_CONFIG: "1",
     OPENCODE_DISABLE_AUTOUPDATE: "1",
     OPENCODE_DISABLE_MODELS_FETCH: "1",
     OPENCODE_DISABLE_LSP_DOWNLOAD: "1",
@@ -569,6 +813,14 @@ function openCodeProcessEnv(taskDir, baseEnv = process.env) {
     XDG_CONFIG_HOME: path.join(xdg, "config"),
     XDG_CACHE_HOME: path.join(xdg, "cache"),
   };
+  for (const key of [
+    "OPENCODE_CONFIG_CONTENT",
+    "OPENCODE_CONFIG_DIR",
+    "OPENCODE_PERMISSION",
+  ]) {
+    delete env[key];
+  }
+  return env;
 }
 
 function openCodeModelCatalogPath(taskDir) {
@@ -735,7 +987,7 @@ async function runPrompt(promptFile, model, helpers = {}) {
   const recordAgentMessage =
     helpers.recordAgentMessage ||
     ((text) =>
-      require(path.join(sp, "planning_session_mcp.js")).recordAgentMessage(
+      require(path.join(sp, "agent_message.js")).recordAgentMessage(
         text,
       ));
   const planning = planningEnabled(env);
@@ -767,12 +1019,13 @@ async function runPrompt(promptFile, model, helpers = {}) {
       `Model catalog refresh unavailable. Using bundled metadata for ${currentModel}.`,
     );
   }
-  if (catalogSource === "unavailable") {
-    printLiveLogLine(
-      `Model catalog refresh unavailable. Continuing with OpenCode configuration for ${currentModel}.`,
-    );
+  let providerOrder = [];
+  if (!customLLMFromEnv(env) && currentModel) {
+    const endpoints = await listModelEndpoints(currentModel, env, helpers.fetch);
+    providerOrder = orderProviderTags(endpoints);
+    printLiveLogLine(providerOrderLogLine(providerOrder));
   }
-  writeOpenCodeConfig(sp, env, currentModel ? [currentModel] : []);
+  writeOpenCodeConfig(sp, env, currentModel ? [currentModel] : [], cwd, providerOrder);
 
   const deadline = waitDeadlineMs(env, now);
   let lastResult = {};
@@ -1010,7 +1263,12 @@ function spawnTurnFailed(spawnResult, formatter, allowSoftExitWithReply) {
     return false;
   }
   const kind = classifyOpenRouterError(spawnResult.errorText || "");
-  if (kind === "rate_limit" || kind === "hard" || kind === "retryable") {
+  if (
+    kind === "configuration" ||
+    kind === "rate_limit" ||
+    kind === "hard" ||
+    kind === "retryable"
+  ) {
     return true;
   }
   if (!allowSoftExitWithReply) {
@@ -1604,6 +1862,19 @@ function collectErrorText(value, parts, depth) {
 }
 
 function errorTextFromEvent(event) {
+  const error = event && event.error;
+  if (error && ["ConfigInvalidError", "ConfigJsonError"].includes(error.name)) {
+    const details = error.data || {};
+    const source = details.path ? ` at ${details.path}` : "";
+    const issues = Array.isArray(details.issues) ? details.issues : [];
+    const reasons = issues.map((issue) => {
+      const field = Array.isArray(issue.path) ? issue.path.join(".") : "";
+      return `${issue.message || "Invalid setting"}${field ? ` (${field})` : ""}`;
+    });
+    return [`Configuration is invalid${source}`, details.message, ...reasons]
+      .filter(Boolean)
+      .join("\n");
+  }
   const parts = [];
   collectErrorText(event, parts, 0);
   return [...new Set(parts)].join(" ");
@@ -1857,7 +2128,9 @@ function createOpenCodeFormatter(telemetry, onSession, activityOverride) {
         case "error": {
           const text = errorTextFromEvent(event);
           errorText = text;
-          if (classifyOpenRouterError(text) === "hard") {
+          if (
+            ["hard", "configuration"].includes(classifyOpenRouterError(text))
+          ) {
             resultFailed = true;
           }
           break;
@@ -2211,6 +2484,8 @@ module.exports = {
   classifyOpenRouterError,
   openRouterModelId,
   buildOpenCodeConfig,
+  orderProviderTags,
+  listModelEndpoints,
   retryWaitMs,
   waitDeadlineMs,
   openCodeProcessEnv,

@@ -139,19 +139,44 @@ func (w *NodeExecutor) StartRabbitMQConsumer(ctx context.Context) {
 	consumer := tackle.NewConsumer()
 	consumer.SetLogger(logging.NewTackleLogger(w.logger))
 	w.consumer = consumer
+	go func() {
+		<-ctx.Done()
+		consumer.Stop()
+	}()
 
 	for {
+		if ctx.Err() != nil {
+			return
+		}
 		log.Infof("Connecting to RabbitMQ queue for %s events", messages.ExecutionPendingRoutingKey)
 
 		err := w.consumer.Start(&options, w.Consume)
+		if ctx.Err() != nil {
+			return
+		}
 		if err != nil {
 			w.logger.Errorf("Error consuming messages from %s: %v", messages.ExecutionPendingRoutingKey, err)
-			time.Sleep(5 * time.Second)
+			if !waitForConsumerRetry(ctx) {
+				return
+			}
 			continue
 		}
 
 		w.logger.Warnf("Connection to RabbitMQ closed for %s, reconnecting...", messages.ExecutionPendingRoutingKey)
-		time.Sleep(5 * time.Second)
+		if !waitForConsumerRetry(ctx) {
+			return
+		}
+	}
+}
+
+func waitForConsumerRetry(ctx context.Context) bool {
+	timer := time.NewTimer(5 * time.Second)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return false
+	case <-timer.C:
+		return true
 	}
 }
 
@@ -514,6 +539,7 @@ func (w *NodeExecutor) executeActionNode(
 		Apps:        contexts.NewAppExecutionContext(tx, workflow, node, execution),
 		Runs:        contexts.NewRunExecutionContext(tx, workflow, node, execution).WithPendingRunCreated(onPendingRunCreated),
 		Factory: contexts.NewFactoryContext(tx, workflow, execution).
+			WithNewEvents(onNewEvents).
 			WithWorkOrderUpdated(onFactoryWorkOrderUpdated).
 			WithWorkOrderNotification(onFactoryWorkOrderNotification).
 			WithRunsCancelled(runCancellations.RecordRuns).

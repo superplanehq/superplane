@@ -15,6 +15,7 @@ import (
 )
 
 func TestListResourcesHostedBindingReturnsOnlyGrantedRepositories(t *testing.T) {
+	t.Cleanup(withGitHubEnterpriseFlagForTest(func(uuid.UUID) bool { return false }))
 	require.NoError(t, database.TruncateTables())
 	organization, err := models.CreateOrganization("resources-"+uuid.NewString(), "")
 	require.NoError(t, err)
@@ -35,6 +36,9 @@ func TestListResourcesHostedBindingReturnsOnlyGrantedRepositories(t *testing.T) 
 		Integration: &contexts.IntegrationContext{
 			IntegrationID: integration.ID.String(),
 			Metadata:      common.Metadata{HostedApp: true},
+			CurrentProperties: map[string]any{
+				common.PropertyHost: "acme.ghe.com",
+			},
 		},
 	})
 
@@ -83,12 +87,9 @@ func Test__toDefaultBranchResources__usesRepositoryDefaultBranch(t *testing.T) {
 	}
 }
 
-func Test__toDefaultBranchResources__fallsBackToMainWhenEmpty(t *testing.T) {
-	resources := toDefaultBranchResources(&github.Repository{})
-
-	require.Len(t, resources, 1)
-	assert.Equal(t, "main", resources[0].Name)
-	assert.Equal(t, "main", resources[0].ID)
+func Test__toDefaultBranchResources__omitsAnEmptyDefaultBranch(t *testing.T) {
+	assert.Empty(t, toDefaultBranchResources(&github.Repository{}))
+	assert.Empty(t, toDefaultBranchResources(nil))
 }
 
 func Test__toLabelResources__usesLabelName(t *testing.T) {

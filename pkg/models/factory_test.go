@@ -1,6 +1,7 @@
 package models
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -91,6 +92,32 @@ func TestFactory_ListWorkOrders_PagesByUpdatedAt(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, next, 1)
 	assert.Equal(t, first.ID, next[0].ID)
+}
+
+func TestFactory_ListWorkOrderSummaries_BoundsThePage(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+
+	_, callerID, factoryModel := setupFactoryWithUser(t, "summary-page")
+	db := database.Conn()
+	secret := strings.Repeat("secret-description ", 20)
+	marked, err := factoryModel.CreateWorkOrder(db, "Marked", secret, &callerID, nil, nil)
+	require.NoError(t, err)
+	for i := 0; i < DefaultFactoryWorkOrderListLimit; i++ {
+		_, err := factoryModel.CreateWorkOrder(db, "Extra", "", &callerID, nil, nil)
+		require.NoError(t, err)
+	}
+	require.NoError(t, db.Model(&FactoryWorkOrder{}).Where("id = ?", marked.ID).UpdateColumn("updated_at", time.Now().UTC().Add(time.Hour)).Error)
+
+	orders, err := factoryModel.ListWorkOrderSummaries(db, ListFactoryWorkOrdersFilters{Limit: 10000})
+	require.NoError(t, err)
+	require.Len(t, orders, DefaultFactoryWorkOrderListLimit)
+	assert.Equal(t, marked.ID, orders[0].ID)
+	assert.Equal(t, "Marked", orders[0].Title)
+	assert.Empty(t, orders[0].Description)
+
+	stored, err := factoryModel.FindWorkOrder(db, marked.ID)
+	require.NoError(t, err)
+	assert.Equal(t, secret, stored.Description)
 }
 
 func TestFactory_ListWorkOrders_UsesDefaultLimit(t *testing.T) {

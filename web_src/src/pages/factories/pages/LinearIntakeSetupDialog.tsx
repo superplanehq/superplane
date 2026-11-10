@@ -1,3 +1,4 @@
+import { IntakeSetupDefaultOwner } from "./IntakeDefaultOwnerField";
 import type { OrganizationsIntegration } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -7,7 +8,7 @@ import { useLocation } from "react-router";
 
 import { IntakeSetupWizard } from "./IntakeSetupWizard";
 import { IntakeSkipInitialImportField } from "./IntakeSkipInitialImportField";
-import { LinearProjectPicker } from "./LinearProjectPicker";
+import { LinearIntakeScopeFields } from "./LinearIntakeScopeFields";
 import { LINEAR_INTAKE_SETUP_COPY } from "./linearIntakeSetupCopy";
 import { useLinearIntakeSetup, type LinearIntakeSetupModel } from "./useLinearIntakeSetup";
 
@@ -23,13 +24,11 @@ export function LinearIntakeSetupDialog(props: LinearIntakeSetupDialogProps) {
   const location = useLocation();
   const setup = useLinearIntakeSetup(props.organizationId, props.factoryId, props.selectIntegrationId);
   const title =
-    setup.step === "connection"
-      ? LINEAR_INTAKE_SETUP_COPY.wizardStepConnect
-      : LINEAR_INTAKE_SETUP_COPY.wizardStepProject;
+    setup.step === "connection" ? LINEAR_INTAKE_SETUP_COPY.wizardStepConnect : LINEAR_INTAKE_SETUP_COPY.wizardStepTeam;
   const helper =
     setup.step === "connection"
       ? LINEAR_INTAKE_SETUP_COPY.wizardStepConnectHelper
-      : LINEAR_INTAKE_SETUP_COPY.wizardStepProjectHelper;
+      : LINEAR_INTAKE_SETUP_COPY.wizardStepTeamHelper;
   const showConnectAction =
     setup.step === "connection" && !setup.connectedQuery.isLoading && setup.linearIntegrations.length === 0;
 
@@ -41,8 +40,8 @@ export function LinearIntakeSetupDialog(props: LinearIntakeSetupDialogProps) {
         step={setup.step}
         title={title}
         helper={helper}
-        resourceStepLabel="Choose projects"
-        resourceStepCaption="Awaiting projects"
+        resourceStepLabel="Choose team"
+        resourceStepCaption="Awaiting team"
         stepAction={
           showConnectAction ? (
             <Button
@@ -74,6 +73,7 @@ export function LinearIntakeSetupDialog(props: LinearIntakeSetupDialogProps) {
             ) : null}
           </div>
         )}
+        <IntakeSetupDefaultOwner owner={setup.owner} disabled={setup.createIntake.isPending} />
       </IntakeSetupWizard>
       <IntegrationCreateDialog
         open={setup.connectOpen}
@@ -107,13 +107,12 @@ function SetupStepBody({ setup }: { setup: LinearIntakeSetupModel }) {
   }
 
   return (
-    <LinearProjectPicker
-      projects={setup.projectsQuery.data ?? []}
-      selectedIds={setup.projectIds}
-      loading={setup.projectsQuery.isLoading}
-      error={setup.projectsQuery.isError}
-      onToggle={setup.toggleProject}
-      onRetry={() => void setup.projectsQuery.refetch()}
+    <LinearIntakeScopeFields
+      organizationId={setup.organizationId}
+      integrationId={setup.integrationId}
+      scope={setup.scope}
+      onChange={setup.setScope}
+      showLabels={false}
     />
   );
 }
@@ -200,7 +199,7 @@ function SetupFooter({ setup, onCreated }: { setup: LinearIntakeSetupModel; onCr
       <Button
         type="button"
         className="w-full"
-        disabled={setup.projectIds.length === 0 || setup.createIntake.isPending}
+        disabled={!setup.scope.teamId || setup.createIntake.isPending}
         onClick={() => {
           void setup.createBoundIntake().then((created) => {
             if (created) {

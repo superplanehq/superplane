@@ -2,29 +2,38 @@
 
 const assert = require("node:assert/strict");
 const { spawnSync } = require("node:child_process");
+const fs = require("node:fs");
+const os = require("node:os");
 const path = require("node:path");
 const test = require("node:test");
 
-const { main } = require("./task_cli");
+const { createClient } = require("./superplane_mcp/client");
+const registry = require("./superplane_mcp/registry");
+const { main, parseCommand } = require("./task_cli");
+
+async function recordScreenshot(file, taskEnv) {
+  await registry.findTool("get_artifact").handler(
+    { path: file },
+    createClient(taskEnv, async () => {
+      throw new Error("fetch must not run");
+    }),
+  );
+}
+
+async function readUpload(options) {
+  const chunks = [];
+  for await (const chunk of options.body) chunks.push(chunk);
+  return Buffer.concat(chunks);
+}
 
 const env = {
   SUPERPLANE_BASE_URL: "https://app.example",
-  SUPERPLANE_ARTIFACT_TOKEN: "token",
+  SUPERPLANE_RUNNER_TOKEN: "token",
 };
 
-const placeholders = [
-  ["task", "artifact", "remove", "--name", "Staging"],
-  ["task", "check", "add", "--name", "Tests pass"],
-  ["task", "check", "remove", "--name", "Tests pass"],
-  ["task", "create", "--title", "Slow query", "--description", "The daily report query."],
-  ["task", "close"],
-  ["task", "list", "--state", "open", "--column", "verify"],
-  ["task", "assign", "--assignee", "alice@example.com"],
-  ["task", "plan", "--file", "./PLAN.md"],
-  ["task", "move", "--column", "done"],
-];
+const placeholders = [["task", "move", "--column", "done"]];
 
-test("superplane task artifact add attaches the url and label", async () => {
+test("superplane task artifact add-link attaches the url and label", async () => {
   const requests = [];
   const fetchImpl = async (_url, options) => {
     const body = JSON.parse(options.body);
@@ -40,7 +49,7 @@ test("superplane task artifact add attaches the url and label", async () => {
   const err = { write() {} };
 
   let code = await main(
-    ["task", "artifact", "add", "--url", "https://staging.example.com", "--name", "Staging", "--key", "staging"],
+    ["task", "artifact", "add-link", "--url", "https://staging.example.com", "--name", "Staging", "--key", "staging"],
     env,
     fetchImpl,
     out,
@@ -50,7 +59,7 @@ test("superplane task artifact add attaches the url and label", async () => {
   assert.equal(stdout, "https://staging.example.com\n");
 
   code = await main(
-    ["task", "artifact", "add", "--url", "https://preview.example.com", "--title", "Preview"],
+    ["task", "artifact", "add-link", "--url", "https://preview.example.com", "--title", "Preview"],
     env,
     fetchImpl,
     out,
@@ -63,12 +72,215 @@ test("superplane task artifact add attaches the url and label", async () => {
   ]);
 });
 
-test("superplane task artifact add requires a url", () => {
+test("superplane task artifact add-markdown attaches a markdown file", async () => {
+  const file = path.join(os.tmpdir(), `preview-login-${process.pid}.md`);
+  fs.writeFileSync(file, "Email: demo@operately.dev\n\nPassword: preview-demo-1\n");
+  const requests = [];
+  let stdout = "";
+  const code = await main(
+    ["task", "artifact", "add-markdown", "--file", file, "--name", "Preview login", "--key", "preview-login"],
+    env,
+    async (url, options) => {
+      requests.push({ url, body: JSON.parse(options.body) });
+      return {
+        ok: true,
+        status: 201,
+        text: async () => JSON.stringify({ title: "Preview login" }),
+      };
+    },
+    { write: (chunk) => { stdout += chunk; } },
+    { write() {} },
+  );
+  fs.unlinkSync(file);
+  assert.equal(code, 0);
+  assert.equal(stdout, "Preview login\n");
+  assert.equal(requests[0].url, "https://app.example/api/v1/runner/task/markdown");
+  assert.deepEqual(requests[0].body, {
+    body: "Email: demo@operately.dev\n\nPassword: preview-demo-1",
+    title: "Preview login",
+    key: "preview-login",
+  });
+});
+
+test("superplane task artifact add-markdown reports a missing file", async () => {
+  let stderr = "";
+  const code = await main(
+    ["task", "artifact", "add-markdown", "--file", "missing-preview-login.md"],
+    env,
+    async () => {
+      throw new Error("fetch must not run");
+    },
+    { write() {} },
+    { write: (chunk) => { stderr += chunk; } },
+  );
+  assert.equal(code, 1);
+  assert.match(stderr, /cannot read missing-preview-login.md/);
+});
+
+test("superplane task artifact add-file uploads an image from the evidence directory", async () => {
+  const taskDir = fs.mkdtempSync(path.join(os.tmpdir(), "task-artifact-"));
+  const evidence = path.join(taskDir, "evidence");
+  fs.mkdirSync(evidence);
+  const file = path.join(evidence, "login.png");
+  fs.writeFileSync(file, "png-bytes");
+  const taskEnv = { ...env, SUPERPLANE_TASK_DIR: taskDir };
+  let blocked = "";
+  const blockedCode = await main(
+    ["task", "artifact", "add-file", "--file", file, "--name", "Login"],
+    taskEnv,
+    async () => {
+      throw new Error("fetch must not run");
+    },
+    { write() {} },
+    { write: (chunk) => { blocked += chunk; } },
+  );
+  assert.equal(blockedCode, 1);
+  assert.match(blocked, /call get_artifact before add_artifact/);
+
+  let inspected = "";
+  const inspectCode = await main(
+    ["task", "artifact", "get", "--path", file],
+    taskEnv,
+    async () => {
+      throw new Error("fetch must not run");
+    },
+    { write: (chunk) => { inspected += chunk; } },
+    { write() {} },
+  );
+  assert.equal(inspectCode, 0);
+  assert.equal(JSON.parse(inspected).filename, "login.png");
+  assert.equal(fs.existsSync(path.join(taskDir, "visual-evidence-inspections.json")), false);
+
+  const stillBlocked = await main(
+    ["task", "artifact", "add-file", "--file", file, "--name", "Login"],
+    taskEnv,
+    async () => {
+      throw new Error("fetch must not run");
+    },
+    { write() {} },
+    { write() {} },
+  );
+  assert.equal(stillBlocked, 1);
+  await recordScreenshot(file, taskEnv);
+
+  const requests = [];
+  let stdout = "";
+  const code = await main(
+    ["task", "artifact", "add-file", "--file", file, "--name", "Login"],
+    taskEnv,
+    async (url, options) => {
+      await readUpload(options);
+      requests.push({ url, headers: options.headers });
+      return {
+        ok: true,
+        status: 201,
+        text: async () => JSON.stringify({ title: "Login", file_id: "file-1" }),
+      };
+    },
+    { write: (chunk) => { stdout += chunk; } },
+    { write() {} },
+  );
+  fs.rmSync(taskDir, { recursive: true, force: true });
+  assert.equal(code, 0);
+  assert.equal(stdout, "Login\n");
+  assert.equal(requests[0].url, "https://app.example/api/v1/runner/task/artifacts");
+  assert.equal(requests[0].headers["Content-Type"], "image/png");
+  assert.equal(requests[0].headers["X-SuperPlane-Artifact-Title"], "Login");
+  assert.equal(requests[0].headers.Authorization, "Bearer token");
+  assert.equal(requests[0].headers["X-SuperPlane-Artifact-Key"], undefined);
+});
+
+test("superplane task artifact add-file uploads a video poster and the video", async () => {
+  const taskDir = fs.mkdtempSync(path.join(os.tmpdir(), "task-artifact-"));
+  const evidence = path.join(taskDir, "evidence");
+  fs.mkdirSync(evidence);
+  const poster = path.join(evidence, "login.png");
+  const video = path.join(evidence, "login.webm");
+  fs.writeFileSync(poster, "png-bytes");
+  fs.writeFileSync(video, "webm-bytes");
+  const taskEnv = { ...env, SUPERPLANE_TASK_DIR: taskDir };
+  await recordScreenshot(poster, taskEnv);
+
+  const requests = [];
+  let stdout = "";
+  const code = await main(
+    ["task", "artifact", "add-file", "--file", video, "--poster", poster, "--name", "Login"],
+    taskEnv,
+    async (_url, options) => {
+      await readUpload(options);
+      requests.push(options.headers);
+      const title = decodeURIComponent(options.headers["X-SuperPlane-Artifact-Title"]);
+      return {
+        ok: true,
+        status: 201,
+        text: async () => JSON.stringify({ title }),
+      };
+    },
+    { write: (chunk) => { stdout += chunk; } },
+    { write() {} },
+  );
+  fs.rmSync(taskDir, { recursive: true, force: true });
+  assert.equal(code, 0);
+  assert.equal(stdout, "Login\n");
+  assert.equal(requests.length, 2);
+  assert.equal(requests[0]["Content-Type"], "image/png");
+  assert.equal(requests[0]["X-SuperPlane-Artifact-Title"], "Login%20poster");
+  assert.equal(requests[1]["Content-Type"], "video/webm");
+  assert.equal(requests[1]["X-SuperPlane-Artifact-Title"], "Login");
+  assert.equal(requests[1]["X-SuperPlane-Artifact-Key"], undefined);
+});
+
+test("superplane task artifact add-file rejects a poster for an image", async () => {
+  const taskDir = fs.mkdtempSync(path.join(os.tmpdir(), "task-artifact-"));
+  const evidence = path.join(taskDir, "evidence");
+  fs.mkdirSync(evidence);
+  const file = path.join(evidence, "login.png");
+  const poster = path.join(evidence, "other.png");
+  fs.writeFileSync(file, "png-bytes");
+  fs.writeFileSync(poster, "png-bytes");
+  let stderr = "";
+  const code = await main(
+    ["task", "artifact", "add-file", "--file", file, "--poster", poster],
+    { ...env, SUPERPLANE_TASK_DIR: taskDir },
+    async () => {
+      throw new Error("fetch must not run");
+    },
+    { write() {} },
+    { write: (chunk) => { stderr += chunk; } },
+  );
+  fs.rmSync(taskDir, { recursive: true, force: true });
+  assert.equal(code, 1);
+  assert.match(stderr, /posterPath is only supported for video artifacts/);
+});
+
+test("superplane task artifact add-file rejects a file outside the task directory", async () => {
+  const taskDir = fs.mkdtempSync(path.join(os.tmpdir(), "task-artifact-"));
+  const outside = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "outside-")), "login.png");
+  fs.writeFileSync(outside, "png-bytes");
+  let stderr = "";
+  const code = await main(
+    ["task", "artifact", "add-file", "--file", outside],
+    { ...env, SUPERPLANE_TASK_DIR: taskDir },
+    async () => {
+      throw new Error("fetch must not run");
+    },
+    { write() {} },
+    { write: (chunk) => { stderr += chunk; } },
+  );
+  fs.rmSync(taskDir, { recursive: true, force: true });
+  assert.equal(code, 1);
+  assert.match(stderr, /path must be inside the task directory/);
+});
+
+test("superplane task artifact add is not a command", () => {
   const result = spawnSync(process.execPath, [path.join(__dirname, "task_cli.js"), "task", "artifact", "add"], {
     encoding: "utf8",
   });
   assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /url is required/);
+  assert.match(result.stderr, /add-link/);
+  assert.match(result.stderr, /add-markdown/);
+  assert.match(result.stderr, /add-file/);
+  assert.doesNotMatch(result.stderr, /task artifact add --url/);
 });
 
 test("other task commands are recognized and do no work", async () => {
@@ -90,10 +302,265 @@ test("other task commands are recognized and do no work", async () => {
   }
 });
 
+test("task help lists a command for every global tool", async () => {
+  let stdout = "";
+  const code = await main(["task", "--help"], env, fetch, { write: (chunk) => { stdout += chunk; } }, { write() {} });
+  assert.equal(code, 0);
+  for (const line of [
+    "superplane task members",
+    "superplane task owner suggest",
+    "superplane task owner assign",
+    "superplane task list",
+    "superplane task create",
+    "superplane task close",
+    "superplane task plan",
+    "superplane task evidence unavailable",
+    "superplane task artifact list",
+    "superplane task artifact get",
+    "superplane task artifact add-link",
+    "superplane task artifact add-markdown",
+    "superplane task artifact add-file",
+    "superplane task artifact remove",
+    "superplane task check report",
+    "superplane task check list",
+    "superplane task check add",
+    "superplane task check remove",
+    "superplane task pr open",
+    "superplane task pr list",
+  ]) {
+    assert.match(stdout, new RegExp(line));
+  }
+});
+
+test("each global tool command calls that tool", async () => {
+  const taskDir = fs.mkdtempSync(path.join(os.tmpdir(), "task-cli-"));
+  const specFile = path.join(taskDir, "spec.md");
+  const scoresFile = path.join(taskDir, "scores.json");
+  const attemptsFile = path.join(taskDir, "attempts.json");
+  const attachment = path.join(taskDir, "attachments", "shot.png");
+  fs.writeFileSync(specFile, "# Spec\n");
+  fs.writeFileSync(
+    scoresFile,
+    JSON.stringify({
+      clarity: { score: 2, summary: "Clear enough." },
+      complexity: { score: 2, summary: "Small change." },
+      verifiability: { score: 2, summary: "A test covers it." },
+    }),
+  );
+  fs.writeFileSync(
+    attemptsFile,
+    JSON.stringify([
+      { type: "preview", command: "open preview", outcome: "no preview" },
+      { type: "playwright", command: "npx playwright", outcome: "no browser" },
+    ]),
+  );
+  fs.mkdirSync(path.dirname(attachment), { recursive: true });
+  fs.writeFileSync(
+    attachment,
+    Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+      "base64",
+    ),
+  );
+  const taskEnv = {
+    ...env,
+    SUPERPLANE_TASK_DIR: taskDir,
+    SUPERPLANE_ANALYSIS_SPEC_FILE: path.join(taskDir, "written-spec.md"),
+  };
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    calls.push({
+      url,
+      method: options.method,
+      authorization: options.headers.Authorization,
+      body: options.body ? JSON.parse(options.body) : undefined,
+    });
+    return { ok: true, status: 200, text: async () => "{}" };
+  };
+  const cases = [
+    {
+      argv: ["task", "members"],
+      method: "GET",
+      url: "https://app.example/api/v1/runner/members",
+    },
+    {
+      argv: ["task", "owner", "suggest", "--path", "pkg/a", "--path", "pkg/b"],
+      method: "POST",
+      url: "https://app.example/api/v1/runner/task/suggest-owners",
+      body: { paths: ["pkg/a", "pkg/b"] },
+    },
+    {
+      argv: ["task", "owner", "assign", "--user", "ada", "--reason", "Owns payments.", "--only-if-unassigned"],
+      method: "PUT",
+      url: "https://app.example/api/v1/runner/task/owner",
+      body: { user: "ada", reason: "Owns payments.", only_if_unassigned: true },
+    },
+    {
+      argv: ["task", "list", "--state", "open", "--state", "draft", "--limit", "5"],
+      method: "GET",
+      url: "https://app.example/api/v1/runner/tasks?state=open&state=draft&limit=5",
+    },
+    {
+      argv: ["task", "create", "--title", "Slow query", "--description", "The daily report query."],
+      method: "POST",
+      url: "https://app.example/api/v1/runner/tasks",
+      body: { title: "Slow query", description: "The daily report query." },
+    },
+    {
+      argv: ["task", "close", "--result", "rejected"],
+      method: "POST",
+      url: "https://app.example/api/v1/runner/task/close",
+      body: { result: "rejected" },
+    },
+    {
+      argv: ["task", "plan", "--file", specFile, "--scores", scoresFile],
+      method: "PUT",
+      url: "https://app.example/api/v1/runner/task/plan",
+      body: {
+        spec: "# Spec",
+        scores: {
+          clarity: { score: 2, summary: "Clear enough." },
+          complexity: { score: 2, summary: "Small change." },
+          verifiability: { score: 2, summary: "A test covers it." },
+        },
+      },
+    },
+    {
+      argv: ["task", "artifact", "remove", "--name", "Staging"],
+      method: "DELETE",
+      url: "https://app.example/api/v1/runner/task/artifacts",
+      body: { title: "Staging" },
+    },
+    {
+      argv: ["task", "artifact", "list", "--type", "link"],
+      method: "GET",
+      url: "https://app.example/api/v1/runner/task/artifacts?type=link",
+    },
+    {
+      argv: ["task", "artifact", "get", "--key", "staging"],
+      method: "GET",
+      url: "https://app.example/api/v1/runner/task/artifact?key=staging",
+    },
+    {
+      argv: ["task", "check", "report", "--check", "Risk", "--score", "4", "--summary", "The change is small."],
+      method: "POST",
+      url: "https://app.example/api/v1/runner/task/merge-checks",
+      body: { check: "risk", score: 4, summary: "The change is small." },
+    },
+    {
+      argv: ["task", "check", "list", "--task", "SP-1"],
+      method: "GET",
+      url: "https://app.example/api/v1/runner/checks?task=SP-1",
+    },
+    {
+      argv: [
+        "task", "check", "add", "--key", "coverage", "--name", "Coverage", "--score", "4",
+        "--max-score", "5", "--level", "positive", "--reason", "Tests cover the change.",
+      ],
+      method: "POST",
+      url: "https://app.example/api/v1/runner/task/checks",
+      body: {
+        checks: [{ key: "coverage", name: "Coverage", score: 4, max_score: 5, level: "positive", reason: "Tests cover the change." }],
+      },
+    },
+    {
+      argv: ["task", "check", "remove", "--key", "coverage", "--key", "latency"],
+      method: "DELETE",
+      url: "https://app.example/api/v1/runner/task/checks",
+      body: { keys: ["coverage", "latency"] },
+    },
+    {
+      argv: ["task", "pr", "list"],
+      method: "GET",
+      url: "https://app.example/api/v1/runner/task/pull-requests",
+    },
+  ];
+
+  for (const item of cases) {
+    calls.length = 0;
+    let stderr = "";
+    const code = await main(item.argv, taskEnv, fetchImpl, { write() {} }, { write: (chunk) => { stderr += chunk; } });
+    assert.equal(code, 0, `${item.argv.join(" ")}\n${stderr}`);
+    assert.equal(calls.length, 1, item.argv.join(" "));
+    assert.equal(calls[0].method, item.method);
+    assert.equal(calls[0].url, item.url);
+    assert.equal(calls[0].authorization, "Bearer token");
+    assert.deepEqual(calls[0].body, item.body);
+  }
+
+  calls.length = 0;
+  let local = "";
+  const unavailable = await main(
+    ["task", "evidence", "unavailable", "--reason", "No browser.", "--attempts", attemptsFile],
+    taskEnv,
+    fetchImpl,
+    { write: (chunk) => { local += chunk; } },
+    { write() {} },
+  );
+  assert.equal(unavailable, 0);
+  assert.equal(calls.length, 0);
+  assert.equal(JSON.parse(local).status, "unavailable");
+
+  local = "";
+  const attachmentCode = await main(
+    ["task", "artifact", "get", "--path", attachment],
+    taskEnv,
+    fetchImpl,
+    { write: (chunk) => { local += chunk; } },
+    { write() {} },
+  );
+  fs.rmSync(taskDir, { recursive: true, force: true });
+  assert.equal(attachmentCode, 0);
+  assert.equal(calls.length, 0);
+  assert.equal(JSON.parse(local).mimeType, "image/png");
+});
+
+test("superplane task pr open reads the body file and resolves the directory", () => {
+  const bodyFile = path.join(os.tmpdir(), `pr-body-${process.pid}.md`);
+  fs.writeFileSync(bodyFile, "Why the change exists.\n");
+  const { command, input } = parseCommand([
+    "task", "pr", "open", "--title", "Change web", "--body-file", bodyFile, "--directory", "context/acme/web", "--draft",
+  ]);
+  const prepared = command.prepare(input);
+  fs.rmSync(bodyFile, { force: true });
+
+  assert.equal(command.tool, "open_pull_request");
+  assert.deepEqual(prepared, {
+    title: "Change web",
+    body: "Why the change exists.\n",
+    directory: path.resolve("context/acme/web"),
+    draft: true,
+  });
+});
+
+test("superplane task check list uses SUPERPLANE_TASK_ID when --task is omitted", async () => {
+  const urls = [];
+  const fetchImpl = async (url) => {
+    urls.push(url);
+    return { ok: true, status: 200, text: async () => "{}" };
+  };
+  const quiet = { write() {} };
+
+  assert.equal(await main(["task", "check", "list"], { ...env, SUPERPLANE_TASK_ID: "12" }, fetchImpl, quiet, quiet), 0);
+  assert.equal(
+    await main(["task", "check", "list", "--task", "SP-3"], { ...env, SUPERPLANE_TASK_ID: "12" }, fetchImpl, quiet, quiet),
+    0,
+  );
+  assert.deepEqual(urls, [
+    "https://app.example/api/v1/runner/checks?task=12",
+    "https://app.example/api/v1/runner/checks?task=SP-3",
+  ]);
+
+  let stderr = "";
+  const code = await main(["task", "check", "list"], env, fetchImpl, quiet, { write: (chunk) => { stderr += chunk; } });
+  assert.equal(code, 1);
+  assert.match(stderr, /usage: superplane task check list \[--task TASK\]/);
+});
+
 test("a placeholder with a missing flag does not claim to run", async () => {
   let stderr = "";
   const code = await main(
-    ["task", "check", "add"],
+    ["task", "move"],
     env,
     async () => {
       throw new Error("fetch must not run");
@@ -102,6 +569,6 @@ test("a placeholder with a missing flag does not claim to run", async () => {
     { write: (chunk) => { stderr += chunk; } },
   );
   assert.equal(code, 1);
-  assert.match(stderr, /usage: superplane task check add --name NAME/);
+  assert.match(stderr, /usage: superplane task move --column COLUMN/);
   assert.doesNotMatch(stderr, /not available yet/);
 });

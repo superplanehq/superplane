@@ -1,7 +1,10 @@
 import type { FactoriesWorkOrder } from "@/api-client";
-import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
+import { useRef, useState } from "react";
+import { useNavigate } from "react-router";
+import { useAutoLoadMoreOnScroll } from "@/hooks/useAutoLoadMoreOnScroll";
 import { usePermissions } from "@/contexts/usePermissions";
 import { factoryBoardLaneScrollKey, useFactoryBoardLaneScroll } from "@/hooks/useFactoryBoardLaneScroll";
+import { useRunFactoryCustomAutomation } from "@/hooks/useFactoryCustomAutomationData";
 import { type RefreshBacklogResult, useFactoryIntakes, useRefreshBacklog } from "@/hooks/useFactoryIntakeData";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast, showInfoToast, showSuccessToast } from "@/lib/toast";
@@ -23,6 +26,7 @@ import { isFirstRunOnboardingFactory, type ConfiguredLineIntakeSource } from "./
 import { BacklogOnboardingCard } from "./onboarding/first-run/BacklogOnboardingCard";
 import { useBacklogCreateMenu } from "./useBacklogCreateMenu";
 import { BACKLOG_REFRESH_COPY, backlogRefreshToast, canRefreshBacklog } from "./backlogRefresh";
+import { factoryCustomAutomationRunPath } from "../lib/customAutomationPaths";
 
 export type BacklogColumnProps = {
   organizationId: string;
@@ -111,6 +115,7 @@ export function BacklogColumn({
   const createMenu = useBacklogCreateMenu(organizationId, factoryId, onOpenWorkOrder);
   const { canAct } = usePermissions();
   const canUpdateWorkOrders = canAct("work_orders", "update");
+  const scheduleRun = useBacklogScheduleRun(organizationId, factoryId, factoryKey, lineId);
   const intakesQuery = useFactoryIntakes(organizationId, factoryId);
   const refreshBacklog = useRefreshBacklog(organizationId, factoryId);
   const createPopover = backlogCreatePopoverProps({
@@ -161,6 +166,9 @@ export function BacklogColumn({
           automations,
           rowCount: automationRowCount,
           onRowAction: onAutomationRowAction,
+          onRun: canUpdateWorkOrders ? scheduleRun.onRun : undefined,
+          runPending: scheduleRun.runPending,
+          runningAutomationId: scheduleRun.runningAutomationId,
           testId: "lines-backlog-automation-rows",
         })}
         banner={<BacklogColumnBanner panel={intakePanel} />}
@@ -188,6 +196,41 @@ export function BacklogColumn({
       />
     </>
   );
+}
+
+function useBacklogScheduleRun(organizationId: string, factoryId: string, factoryKey: string, lineId?: string) {
+  const navigate = useNavigate();
+  const runAutomation = useRunFactoryCustomAutomation(organizationId, factoryId);
+  const [runningAutomationId, setRunningAutomationId] = useState<string | null>(null);
+  const runningAutomationIdRef = useRef<string | null>(null);
+  const onRun = async (automation: ColumnAutomation) => {
+    if (!automation.canvasId || !lineId || runningAutomationIdRef.current) {
+      return;
+    }
+    runningAutomationIdRef.current = automation.canvasId;
+    setRunningAutomationId(automation.canvasId);
+    try {
+      const started = await runAutomation.mutateAsync({
+        automationId: automation.canvasId,
+        workOrderId: "",
+      });
+      if (started.runId) {
+        navigate(
+          factoryCustomAutomationRunPath(organizationId, factoryKey, lineId, automation.canvasId, started.runId),
+        );
+      }
+    } catch (error: unknown) {
+      showErrorToast(getApiErrorMessage(error, "SuperPlane could not start the automation."));
+    } finally {
+      runningAutomationIdRef.current = null;
+      setRunningAutomationId(null);
+    }
+  };
+  return {
+    onRun,
+    runPending: runningAutomationId !== null,
+    runningAutomationId: runningAutomationId ?? undefined,
+  };
 }
 
 function BacklogColumnHeaderActions({

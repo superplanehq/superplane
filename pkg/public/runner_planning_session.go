@@ -36,10 +36,6 @@ const (
 	minPlanningHoldSeconds   = 1
 	maxPlanningHoldSeconds   = 60
 	maxPlanningActivityBytes = 256 * 1024
-
-	// statusClientClosedRequest mirrors the codes.Canceled mapping described in
-	// pkg/grpc/errors/grpcerrors.go.
-	statusClientClosedRequest = 499
 )
 
 type planningSurveyRequest struct {
@@ -268,6 +264,10 @@ func (s *Server) handleRunnerPlanningUpdate(w http.ResponseWriter, r *http.Reque
 	if !ok {
 		return
 	}
+	s.runnerPlanningUpdate(w, r, scope)
+}
+
+func (s *Server) runnerPlanningUpdate(w http.ResponseWriter, r *http.Request, scope *runneraction.PlanningSessionScope) {
 	var req planningUpdateRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
@@ -627,16 +627,6 @@ func writeJSON(w http.ResponseWriter, status int, body any) error {
 	return nil
 }
 
-func isPlanningRequestCanceled(r *http.Request, err error) bool {
-	if r == nil {
-		return false
-	}
-	if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
-		return false
-	}
-	return errors.Is(r.Context().Err(), context.Canceled)
-}
-
 func isTransientPlanningWaitDBError(err error) bool {
 	if err == nil {
 		return false
@@ -661,7 +651,7 @@ func isDroppedConnectionError(err error) bool {
 }
 
 func writePlanningWaitError(w http.ResponseWriter, r *http.Request, session *models.FactoryPlanningSession, err error) {
-	if isPlanningRequestCanceled(r, err) || isTransientPlanningWaitDBError(err) {
+	if isRunnerRequestCanceled(r, err) || isTransientPlanningWaitDBError(err) {
 		writeJSON(w, http.StatusOK, map[string]any{"status": "pending"})
 		return
 	}
@@ -680,7 +670,7 @@ func writeRunnerPlanningError(w http.ResponseWriter, r *http.Request, session *m
 		http.Error(w, err.Error(), http.StatusNotFound)
 	case errors.Is(err, models.ErrFactoryPlanningSessionEnded):
 		http.Error(w, "planning session has ended", http.StatusConflict)
-	case isPlanningRequestCanceled(r, err):
+	case isRunnerRequestCanceled(r, err):
 		log.WithError(err).WithField("route", resolveCriticalHTTPRoute(r)).Info("runner planning session client disconnected")
 		w.WriteHeader(statusClientClosedRequest)
 	default:

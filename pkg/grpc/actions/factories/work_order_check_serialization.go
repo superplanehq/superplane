@@ -41,6 +41,7 @@ func serializeCheck(check *models.FactoryWorkOrderCheck) (*pb.WorkOrderCheck, er
 	serialized := &pb.WorkOrderCheck{
 		Id:            check.ID.String(),
 		Key:           check.Key,
+		Repository:    check.Repository,
 		Name:          check.Name,
 		Score:         check.Score,
 		MaxScore:      check.MaxScore,
@@ -53,6 +54,7 @@ func serializeCheck(check *models.FactoryWorkOrderCheck) (*pb.WorkOrderCheck, er
 		CreatedAt:     timestamppb.New(check.CreatedAt),
 		UpdatedAt:     timestamppb.New(check.UpdatedAt),
 		Automation:    serializeAutomationRef(automation),
+		Source:        check.Source,
 	}
 
 	if check.RunID != nil {
@@ -87,5 +89,22 @@ func checkLevelToProto(level string) pb.WorkOrderCheck_Level {
 		return pb.WorkOrderCheck_LEVEL_CRITICAL
 	default:
 		return pb.WorkOrderCheck_LEVEL_UNSPECIFIED
+	}
+}
+
+// checkLevelFromProto returns "" for a level that is not set, so check
+// validation can reject it.
+func checkLevelFromProto(level pb.WorkOrderCheck_Level) string {
+	switch level {
+	case pb.WorkOrderCheck_LEVEL_POSITIVE:
+		return models.FactoryWorkOrderCheckLevelPositive
+	case pb.WorkOrderCheck_LEVEL_NEUTRAL:
+		return models.FactoryWorkOrderCheckLevelNeutral
+	case pb.WorkOrderCheck_LEVEL_CAUTION:
+		return models.FactoryWorkOrderCheckLevelCaution
+	case pb.WorkOrderCheck_LEVEL_CRITICAL:
+		return models.FactoryWorkOrderCheckLevelCritical
+	default:
+		return ""
 	}
 }

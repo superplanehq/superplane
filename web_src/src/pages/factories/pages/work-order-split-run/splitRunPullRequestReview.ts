@@ -64,6 +64,22 @@ export function trackedPullRequestReviewNote(
   };
 }
 
+/** Tracked pull requests that wait for review: open, with a link. */
+export function openReviewPullRequests(
+  pullRequests: FactoriesFactoryPullRequest[] | undefined,
+): FactoriesFactoryPullRequest[] {
+  return (pullRequests ?? []).filter(
+    (pullRequest) => pullRequestState(pullRequest.state) === "open" && Boolean(pullRequest.url?.trim()),
+  );
+}
+
+export function multiplePullRequestReviewCopy(count: number): PullRequestReviewCopy {
+  return {
+    headline: `${count} pull requests are ready for review`,
+    closing: "This task closes when all pull requests are merged or closed.",
+  };
+}
+
 export function pullRequestForReviewHref(
   pullRequests: FactoriesFactoryPullRequest[] | undefined,
   href: string,

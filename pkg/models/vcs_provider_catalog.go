@@ -221,7 +221,16 @@ func FindVCSProviderInstallation(tx *gorm.DB, provider string, installationID in
 }
 
 func DeleteVCSProviderInstallation(tx *gorm.DB, provider string, installationID int64) error {
-	return tx.Where("provider = ? AND installation_id = ?", provider, installationID).Delete(&VCSProviderInstallation{}).Error
+	return tx.Transaction(func(tx *gorm.DB) error {
+		_, err := FindVCSProviderInstallation(tx.Clauses(clause.Locking{Strength: "UPDATE"}), provider, installationID)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		return deleteLockedVCSProviderInstallations(tx, provider, []int64{installationID})
+	})
 }
 
 func DeleteVCSProviderInstallationsMissingFromSnapshot(
@@ -235,11 +244,22 @@ func DeleteVCSProviderInstallationsMissingFromSnapshot(
 		return err
 	}
 
-	query := tx.Where("provider = ? AND updated_at <= ?", provider, observedBefore)
-	if len(installationIDs) > 0 {
-		query = query.Where("installation_id NOT IN ?", installationIDs)
-	}
-	return query.Delete(&VCSProviderInstallation{}).Error
+	return tx.Transaction(func(tx *gorm.DB) error {
+		query := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("provider = ? AND updated_at <= ?", provider, observedBefore)
+		if len(installationIDs) > 0 {
+			query = query.Where("installation_id NOT IN ?", installationIDs)
+		}
+		var missing []VCSProviderInstallation
+		if err := query.Order("installation_id").Find(&missing).Error; err != nil {
+			return err
+		}
+		missingIDs := make([]int64, 0, len(missing))
+		for _, installation := range missing {
+			missingIDs = append(missingIDs, installation.InstallationID)
+		}
+		return deleteLockedVCSProviderInstallations(tx, provider, missingIDs)
+	})
 }
 
 func ReplaceVCSProviderRepositories(
@@ -1461,6 +1481,11 @@ func FindOrCreateVCSProviderBinding(
 	}
 	var integration *Integration
 	err = tx.Transaction(func(tx *gorm.DB) error {
+		// Deletion locks the installation before reading its bindings. Hold a
+		// compatible read lock until selection commits, or reject a removed app.
+		if _, err := FindVCSProviderInstallation(tx.Clauses(clause.Locking{Strength: "KEY SHARE"}), provider, installationID); err != nil {
+			return err
+		}
 		// Keep every completed historical integration during cutover, but
 		// serialize all new selections so that they reuse one existing binding.
 		lockKey := fmt.Sprintf("vcs-provider-binding:%s:%s:%d", organizationID, provider, installationID)
@@ -1540,12 +1565,44 @@ func ListVCSProviderIntegrationBindings(
 	return bindings, err
 }
 
+// MatchBindingContextRepositoryIDs returns the catalog IDs of the enabled
+// write-access GitHub context repositories that use the integration, and the names that
+// the installation catalog does not have yet.
+func MatchBindingContextRepositoryIDs(tx *gorm.DB, integrationID uuid.UUID, installationID int64) ([]int64, []string, error) {
+	names, err := ListEnabledGitHubContextRepositoryNames(tx, integrationID, FactoryContextRepoAccessWrite)
+	if err != nil || len(names) == 0 {
+		return nil, nil, err
+	}
+	return MatchVCSProviderRepositoryIDs(tx, ProviderGitHub, installationID, names)
+}
+
 func normalizeVCSProvider(provider string) (string, error) {
 	provider = strings.ToLower(strings.TrimSpace(provider))
 	if provider == "" {
 		return "", errors.New("VCS provider is required")
 	}
 	return provider, nil
+}
+
+// The caller holds installation row locks until status updates and catalog
+// deletion commit, preventing new bindings from missing the status update.
+func deleteLockedVCSProviderInstallations(tx *gorm.DB, provider string, installationIDs []int64) error {
+	if len(installationIDs) == 0 {
+		return nil
+	}
+	bindings := tx.Model(&VCSProviderIntegrationBinding{}).
+		Select("integration_id").
+		Where("provider = ? AND installation_id IN ?", provider, installationIDs)
+	if err := tx.Model(&Integration{}).
+		Where("id IN (?)", bindings).
+		Updates(map[string]any{
+			"state":             IntegrationStateError,
+			"state_description": "App was uninstalled",
+			"updated_at":        time.Now(),
+		}).Error; err != nil {
+		return err
+	}
+	return tx.Where("provider = ? AND installation_id IN ?", provider, installationIDs).Delete(&VCSProviderInstallation{}).Error
 }
 
 func findVCSProviderBinding(

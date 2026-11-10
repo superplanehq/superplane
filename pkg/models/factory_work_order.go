@@ -352,13 +352,19 @@ func (o *FactoryWorkOrder) UpdateAssignees(tx *gorm.DB, assigneeIDs []uuid.UUID,
 	return tx.Transaction(func(tx *gorm.DB) error { return o.updateAssignees(tx, assigneeIDs, updatedBy) })
 }
 
+// AssignStarter applies the draft Start exception without changing manual
+// owner edits or handoffs.
+func (o *FactoryWorkOrder) AssignStarter(tx *gorm.DB, userID uuid.UUID) error {
+	return o.updateAssigneesWithStart(tx, []uuid.UUID{userID}, userID, true)
+}
+
 // UpdateStatus is the single writer for the work order lifecycle: it
 // validates the transition, updates the row, and records an
 // `order.status.updated` event enriched with the caller's attribution
 // (actor / automation / run + app). On the initial `draft → open` we also
 // snapshot the originating run/app from `o.SourceRunID`, so the timeline
 // can always trace an order back to the run that created it. When a
-// person opens the draft, they become the owner.
+// person opens an unassigned draft, they become the owner.
 //
 // The bool return reports whether a transition was actually recorded:
 // `true` on a real state change, `false` when SkipSame swallowed a no-op
@@ -434,7 +440,7 @@ func (o *FactoryWorkOrder) UpdateStatus(db *gorm.DB, update FactoryWorkOrderStat
 		}
 
 		if fromState == FactoryWorkOrderStateDraft {
-			if err := o.endAnalysisSessionForTransition(tx, update.Actor, toState); err != nil {
+			if err := o.endAnalysisSessionForTransition(tx, update.Actor, update.Run, toState); err != nil {
 				return err
 			}
 		}
@@ -451,7 +457,7 @@ func (o *FactoryWorkOrder) UpdateStatus(db *gorm.DB, update FactoryWorkOrderStat
 		}
 
 		if fromState == FactoryWorkOrderStateDraft && toState == FactoryWorkOrderStateOpen && update.Actor != nil {
-			if err := o.assignPersonWhoOpened(tx, *update.Actor); err != nil {
+			if err := o.assignStarterIfUnassigned(tx, *update.Actor); err != nil {
 				return err
 			}
 		}
@@ -490,7 +496,7 @@ func (o *FactoryWorkOrder) UpdateStatus(db *gorm.DB, update FactoryWorkOrderStat
 	return true, nil
 }
 
-func (o *FactoryWorkOrder) endAnalysisSessionForTransition(tx *gorm.DB, actor *uuid.UUID, toState string) error {
+func (o *FactoryWorkOrder) endAnalysisSessionForTransition(tx *gorm.DB, actor *uuid.UUID, caller *factory.RunRef, toState string) error {
 	var session FactoryPlanningSession
 	err := tx.
 		Where("organization_id = ? AND factory_id = ? AND draft_work_order_id = ?", o.OrganizationID, o.FactoryID, o.ID).
@@ -519,6 +525,10 @@ func (o *FactoryWorkOrder) endAnalysisSessionForTransition(tx *gorm.DB, actor *u
 	if toState == FactoryWorkOrderStateOpen {
 		_, err = run.RequestCompletion(tx, actor)
 		return err
+	}
+	// The run that closed the draft must finish its own step.
+	if caller != nil && run.ID == caller.ID {
+		return nil
 	}
 
 	_, err = run.RequestCancellation(tx, actor)
@@ -664,7 +674,7 @@ func (o *FactoryWorkOrder) AddAssignee(tx *gorm.DB, userID uuid.UUID, actor uuid
 	return true, nil
 }
 
-func (o *FactoryWorkOrder) assignPersonWhoOpened(tx *gorm.DB, actor uuid.UUID) error {
+func (o *FactoryWorkOrder) assignStarterIfUnassigned(tx *gorm.DB, actor uuid.UUID) error {
 	subscription, err := o.UsesCodexSubscription(tx)
 	if err != nil || subscription {
 		return err
@@ -672,7 +682,7 @@ func (o *FactoryWorkOrder) assignPersonWhoOpened(tx *gorm.DB, actor uuid.UUID) e
 	if err := tx.Preload("User").Where("work_order_id = ?", o.ID).Find(&o.Assignees).Error; err != nil {
 		return err
 	}
-	if len(o.Assignees) == 1 && o.Assignees[0].UserID == actor {
+	if len(o.Assignees) > 0 {
 		return nil
 	}
 	if err := o.UpdateAssignees(tx, []uuid.UUID{actor}, actor); err != nil {
@@ -764,6 +774,20 @@ func (o *FactoryWorkOrder) CountEvents(tx *gorm.DB) (int64, error) {
 	}
 
 	return count, nil
+}
+
+// BacklogEntryID identifies the latest transition into Backlog, not later edits.
+func (o *FactoryWorkOrder) BacklogEntryID(tx *gorm.DB) (string, error) {
+	var event FactoryWorkOrderEvent
+	err := tx.Where("work_order_id = ? AND type = ? AND data->>'toState' = ?", o.ID, factory.EventTypeOrderStatusUpdated, FactoryWorkOrderStateDraft).
+		Order("created_at DESC, id DESC").First(&event).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return o.ID.String(), nil
+	}
+	if err != nil {
+		return "", err
+	}
+	return event.ID.String(), nil
 }
 
 func (o *FactoryWorkOrder) Ref() *factory.WorkOrderRef {
@@ -895,7 +919,11 @@ func (o *FactoryWorkOrder) AssigneeIDs() []uuid.UUID {
 }
 
 func (o *FactoryWorkOrder) updateAssignees(tx *gorm.DB, assigneeIDs []uuid.UUID, updatedBy uuid.UUID) error {
-	if err := o.validateSubscriptionAssignment(tx, assigneeIDs); err != nil {
+	return o.updateAssigneesWithStart(tx, assigneeIDs, updatedBy, false)
+}
+
+func (o *FactoryWorkOrder) updateAssigneesWithStart(tx *gorm.DB, assigneeIDs []uuid.UUID, updatedBy uuid.UUID, start bool) error {
+	if err := o.validateSubscriptionAssignmentWithStart(tx, assigneeIDs, start); err != nil {
 		return err
 	}
 	previous, err := o.ListAssignees(tx)

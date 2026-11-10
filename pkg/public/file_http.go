@@ -1,6 +1,7 @@
 package public
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
@@ -73,17 +74,28 @@ func (s *Server) handleFileContentUpload(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	if r.ContentLength > models.MaxFileBytes {
-		http.Error(w, fmt.Sprintf("file exceeds %d bytes", models.MaxFileBytes), http.StatusRequestEntityTooLarge)
+	if r.ContentLength > file.MaxBytes() {
+		http.Error(w, fmt.Sprintf("file exceeds %d bytes", file.MaxBytes()), http.StatusRequestEntityTooLarge)
 		return
 	}
 
 	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Minute)
 	defer cancel()
 	r = r.WithContext(ctx)
-	r.Body = http.MaxBytesReader(w, r.Body, models.MaxFileBytes)
+	var body io.Reader = http.MaxBytesReader(w, r.Body, file.MaxBytes())
+	if file.Purpose == models.FilePurposeArtifact {
+		// Anyone with the link can download an artifact file, so its bytes
+		// must match the content type that the task shows.
+		reader := bufio.NewReader(body)
+		prefix, _ := reader.Peek(16)
+		if !artifactFilenameMatchesContentType(file.Filename, file.ContentType) || !artifactSignatureMatches(file.ContentType, prefix) {
+			http.Error(w, "Artifact content does not match its content type", http.StatusUnsupportedMediaType)
+			return
+		}
+		body = reader
+	}
 
-	if err := storedfiles.CompleteUpload(r.Context(), db, blob.Current(), file, r.Body); err != nil {
+	if err := storedfiles.CompleteUpload(r.Context(), db, blob.Current(), file, body); err != nil {
 		status := http.StatusBadRequest
 		if errors.Is(err, models.ErrFileQuotaExceeded) || isMaxBytesError(err) {
 			status = http.StatusRequestEntityTooLarge

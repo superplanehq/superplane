@@ -3,7 +3,6 @@ package tasks
 import (
 	"fmt"
 	"io"
-	"strings"
 
 	"github.com/superplanehq/superplane/pkg/cli/core"
 )
@@ -14,10 +13,10 @@ type artifactListCommand struct {
 }
 
 func (c *artifactListCommand) Execute(ctx core.CommandContext) error {
-	rawTaskID := strings.TrimSpace(stringValue(c.taskID))
+	rawTaskID := taskRef(c.taskID)
 
 	if rawTaskID == "" {
-		return fmt.Errorf("--task is required")
+		return errTaskRequired
 	}
 
 	workspaceID, err := resolveWorkspace(ctx, c.workspace)

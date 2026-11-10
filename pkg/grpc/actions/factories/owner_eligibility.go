@@ -3,6 +3,7 @@ package factories
 import (
 	"context"
 	"errors"
+	"slices"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -10,6 +11,75 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"gorm.io/gorm"
 )
+
+func requireCodexConnection(tx *gorm.DB, factory *models.Factory, callerID uuid.UUID) error {
+	if _, err := models.ActiveCodexMember(tx, factory.OrganizationID, callerID); err != nil {
+		return err
+	}
+	eligible, err := models.SubscriptionOwnerEligible(tx, factory.OrganizationID, factory.ID, callerID)
+	if err != nil {
+		return err
+	}
+	if !eligible {
+		return errCodexConnectionRequired
+	}
+	return nil
+}
+
+func requireCallerCodexConnection(tx *gorm.DB, factory *models.Factory, callerID uuid.UUID) error {
+	if !factory.OnboardingConfigValue().CodexSubscription {
+		return nil
+	}
+	return requireCodexConnection(tx, factory, callerID)
+}
+
+// Check ownership restrictions before offering connection setup. A reconnect
+// must never allow a member to take a task from an active runner.
+func updateInteractiveWorkOrderAssignees(tx *gorm.DB, factory *models.Factory, order *models.FactoryWorkOrder, ids []uuid.UUID, callerID uuid.UUID) error {
+	err := order.UpdateAssignees(tx, ids, callerID)
+	if err != nil && !errors.Is(err, models.ErrSubscriptionOwnerInvalid) {
+		return err
+	}
+	if slices.Contains(ids, callerID) {
+		if connectionErr := requireCallerCodexConnection(tx, factory, callerID); connectionErr != nil {
+			return connectionErr
+		}
+	}
+	return err
+}
+
+// assignWorkOrderStarter fills missing ownership in subscription workspaces.
+// Start still checks the caller's connection, while execution uses the saved owner.
+func assignWorkOrderStarter(tx *gorm.DB, factory *models.Factory, order *models.FactoryWorkOrder, actor *uuid.UUID) error {
+	if actor == nil || !factory.OnboardingConfigValue().CodexSubscription {
+		return nil
+	}
+	owners, err := order.ListAssignees(tx)
+	if err != nil {
+		return err
+	}
+	if len(owners) == 1 && owners[0].UserID == *actor {
+		return requireCallerCodexConnection(tx, factory, *actor)
+	}
+	if len(owners) > 0 {
+		blocked, err := order.SubscriptionOwnershipBlockedForStart(tx)
+		if err != nil {
+			return err
+		}
+		if blocked {
+			return models.ErrSubscriptionOwnerBusy
+		}
+		return requireCallerCodexConnection(tx, factory, *actor)
+	}
+	err = order.AssignStarter(tx, *actor)
+	if err != nil && !errors.Is(err, models.ErrSubscriptionOwnerInvalid) {
+		return err
+	}
+	if connectionErr := requireCallerCodexConnection(tx, factory, *actor); connectionErr != nil {
+		return connectionErr
+	}
+	return err
+}
 
 func resolveModelCatalogOwner(ctx context.Context, tx *gorm.DB, f *models.Factory, orderRef string) (uuid.UUID, error) {
 	if !f.OnboardingConfigValue().CodexSubscription {
@@ -40,7 +110,7 @@ func ListFactoryOwnerEligibility(ctx context.Context, organizationID string, req
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to load owner eligibility")
 	}
-	response := &pb.ListFactoryOwnerEligibilityResponse{Subscription: factory.OnboardingConfigValue().CodexSubscription, OwnershipChangeAllowed: true}
+	response := &pb.ListFactoryOwnerEligibilityResponse{Subscription: (factory.OnboardingConfigValue().CodexSubscription || req.GetProspectiveSubscription()), OwnershipChangeAllowed: true}
 	if req.GetOrderId() != "" && response.Subscription {
 		order, err := findWorkOrder(db, factory, req.GetOrderId())
 		if err != nil {
@@ -63,11 +133,11 @@ func ListFactoryOwnerEligibility(ctx context.Context, organizationID string, req
 		member := &pb.FactoryOwnerEligibility{UserId: user.ID.String(), Eligible: true}
 		if response.Subscription {
 			member.Eligible, err = models.SubscriptionOwnerEligible(db, orgID, factory.ID, user.ID)
-			if err != nil && !errors.Is(err, models.ErrCodexConnectionUnavailable) {
+			if err != nil {
 				return nil, factoryErrorToStatus(err, "failed to load owner eligibility")
 			}
 			if !member.Eligible {
-				member.Reason = "Connect a ChatGPT subscription in this workspace."
+				member.Reason = "Connect Codex in this organization."
 			}
 		}
 		response.Members = append(response.Members, member)

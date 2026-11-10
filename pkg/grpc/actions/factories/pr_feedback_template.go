@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/components/runner"
+	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/yaml"
 )
@@ -86,9 +87,6 @@ type prFeedbackBuildRequest struct {
 	TriggerSettings        map[string]*factoryTriggerSettings
 	// VCSProvider selects the Git host. Empty means GitHub.
 	VCSProvider string
-	// OmitCommitIdentity drops the git user and DCO steps. The factory git
-	// wrapper already sets the agent identity and the sign-off hook.
-	OmitCommitIdentity bool
 }
 
 // prFeedbackVCSProvider normalizes the request host. Bitbucket canvases use
@@ -126,7 +124,7 @@ func buildDiscussionPRFeedbackCanvas(request prFeedbackBuildRequest) *yaml.Canva
 			Name:          "On PR Comment",
 			Type:          yaml.NodeTypeTrigger,
 			Component:     "github.onPRComment",
-			Configuration: prFeedbackTriggerConfiguration(request.Repository, mention, request.IgnoreBots, request.AllowedBots, request.AddressAllBots),
+			Configuration: prFeedbackTriggerConfiguration(mention, request.IgnoreBots, request.AllowedBots, request.AddressAllBots),
 			Integration:   request.Binding.integrationRef(),
 		},
 		FindID:       prFeedbackFindNodeID,
@@ -152,7 +150,7 @@ func buildDiscussionPRFeedbackCanvas(request prFeedbackBuildRequest) *yaml.Canva
 			Name:          "On PR Review",
 			Type:          yaml.NodeTypeTrigger,
 			Component:     "github.onPRReview",
-			Configuration: prFeedbackTriggerConfiguration(request.Repository, mention, request.IgnoreBots, request.AllowedBots, request.AddressAllBots),
+			Configuration: prFeedbackTriggerConfiguration(mention, request.IgnoreBots, request.AllowedBots, request.AddressAllBots),
 			Integration:   request.Binding.integrationRef(),
 		},
 		FindID:       prFeedbackReviewFindNodeID,
@@ -179,7 +177,6 @@ func buildDiscussionPRFeedbackCanvas(request prFeedbackBuildRequest) *yaml.Canva
 			Type:      yaml.NodeTypeTrigger,
 			Component: "github.onPRReviewComment",
 			Configuration: prFeedbackReplyTriggerConfiguration(
-				request.Repository,
 				mention,
 				request.IgnoreBots,
 				request.AllowedBots,
@@ -455,20 +452,18 @@ func prFeedbackDiscussionFlowNodes(
 	}
 }
 
-func prFeedbackReplyTriggerConfiguration(repository, mention string, ignoreBots bool, allowedBots []string, addressAllBots bool, includeReviewSubmissions bool) map[string]any {
-	configuration := prFeedbackTriggerConfiguration(repository, mention, ignoreBots, allowedBots, addressAllBots)
+func prFeedbackReplyTriggerConfiguration(mention string, ignoreBots bool, allowedBots []string, addressAllBots bool, includeReviewSubmissions bool) map[string]any {
+	configuration := prFeedbackTriggerConfiguration(mention, ignoreBots, allowedBots, addressAllBots)
 	configuration["includeReviewSubmissions"] = includeReviewSubmissions
 	configuration["commentScope"] = prFeedbackCommentScopeReplies
 	return configuration
 }
 
-func prFeedbackTriggerConfiguration(repository, mention string, ignoreBots bool, allowedBots []string, addressAllBots bool) map[string]any {
+func prFeedbackTriggerConfiguration(mention string, ignoreBots bool, allowedBots []string, addressAllBots bool) map[string]any {
 	configuration := map[string]any{
+		"repository":    models.WorkspaceRepositoriesExpression,
 		"contentFilter": mention,
 		"ignoreBots":    ignoreBots,
-	}
-	if strings.TrimSpace(repository) != "" {
-		configuration["repository"] = repository
 	}
 	if len(allowedBots) > 0 {
 		configuration["allowedBots"] = allowedBotsNodeValue(allowedBots)
@@ -477,6 +472,14 @@ func prFeedbackTriggerConfiguration(repository, mention string, ignoreBots bool,
 		configuration["addressAllBots"] = true
 	}
 	return configuration
+}
+
+// prFeedbackWorkspaceScope reports whether a node listens on every
+// workspace repository: a trigger uses the workspace expression and a wait
+// node takes its repository from the event.
+func prFeedbackWorkspaceScope(configuration map[string]any) bool {
+	repository, _ := configuration["repository"].(string)
+	return githubcommon.IsExpression(repository)
 }
 
 func prFeedbackCommentAcknowledgeCommentIDExpression() string {
@@ -655,10 +658,7 @@ func prFeedbackCommitIdentitySteps() []any {
 }
 
 func prFeedbackRunnerStepsFor(request prFeedbackBuildRequest) []any {
-	steps := []any{}
-	if !request.OmitCommitIdentity {
-		steps = append(steps, prFeedbackCommitIdentitySteps()...)
-	}
+	steps := prFeedbackCommitIdentitySteps()
 	if prFeedbackVCSProvider(request) == models.ProviderBitbucket {
 		return append(steps, prFeedbackBitbucketWorkSteps(request)...)
 	}
@@ -673,16 +673,23 @@ func prFeedbackRunnerStepsFor(request prFeedbackBuildRequest) []any {
 			"name":             "Commit and Push",
 			"type":             "bash",
 			"workingDirectory": "repo",
-			"command": strings.Join([]string{
-				"set -euo pipefail",
-				"git add -A",
-				"if ! git diff --cached --quiet; then",
-				`  git commit -s -m "fix: address PR #${PR_NUMBER} feedback"`,
-				"  git push origin HEAD",
-				"fi",
-			}, "\n"),
+			"command": strings.Join(append([]string{"set -euo pipefail"},
+				prFeedbackCommitPushLines("fix: address PR #${PR_NUMBER} feedback", "git push origin HEAD")...), "\n"),
 		},
 	)
+}
+
+func prFeedbackCommitPushLines(message, push string) []string {
+	return []string{
+		"git add -A",
+		"if ! git diff --cached --quiet; then",
+		`  git commit -s -m "` + message + `"`,
+		"fi",
+		`FACTORY_CHECKOUT_HEAD=$(cat "$(git rev-parse --git-path superplane-checkout-head)")`,
+		`if [ "$(git rev-parse HEAD)" != "${FACTORY_CHECKOUT_HEAD}" ]; then`,
+		"  " + push,
+		"fi",
+	}
 }
 
 // prFeedbackBitbucketWorkSteps pushes to the pull request source

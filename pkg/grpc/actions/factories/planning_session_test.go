@@ -10,9 +10,12 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/components/factory"
+	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
+	testconsumer "github.com/superplanehq/superplane/test/consumer"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/metadata"
 	"gorm.io/datatypes"
@@ -154,12 +157,19 @@ func Test__SendPlanningSessionMessage__RestartsEndedAnalysis(t *testing.T) {
 	require.NoError(t, session.RecordAgentMessage(db, "I updated the plan with the current form."))
 	require.NoError(t, session.End(db))
 
+	amqpURL, err := config.RabbitMQURL()
+	require.NoError(t, err)
+	consumer := testconsumer.NewForExchange(amqpURL, messages.EventsExchange, messages.EventCreatedRoutingKey)
+	consumer.Start()
+	defer consumer.Stop()
+
 	sent, err := SendPlanningSessionMessage(ctx, r.Organization.ID.String(), &pb.SendPlanningSessionMessageRequest{
 		FactoryId: factoryModel.ID.String(),
 		SessionId: session.ID.String(),
 		Text:      "Keep the existing retry helper.",
 	})
 	require.NoError(t, err)
+	assert.True(t, consumer.HasReceivedMessage(), "the restarted analysis must notify the event router")
 	require.NotNil(t, sent.Session)
 	assert.Equal(t, models.PlanningSessionStateRunning, sent.Session.State)
 	assert.Empty(t, sent.Session.CanvasRunId)

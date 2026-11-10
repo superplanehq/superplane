@@ -35,12 +35,16 @@ const (
 
 type runnerArtifactResponse struct {
 	ArtifactID  string `json:"artifact_id"`
+	Type        string `json:"type"`
+	Key         string `json:"key"`
+	URL         string `json:"url"`
 	FileID      string `json:"file_id"`
 	Filename    string `json:"filename"`
 	ContentType string `json:"content_type"`
 	SizeBytes   int64  `json:"size_bytes"`
 	PublicURL   string `json:"public_url"`
 	Markdown    string `json:"markdown"`
+	Title       string `json:"title"`
 }
 
 type runnerArtifactContext struct {
@@ -53,11 +57,37 @@ type runnerArtifactContext struct {
 	NodeExecution *models.CanvasNodeExecution
 }
 
+// runnerArtifactTarget is the task that receives a runner artifact. load
+// checks the run and returns the attribution of the artifact.
+type runnerArtifactTarget struct {
+	OrganizationID uuid.UUID
+	FactoryID      uuid.UUID
+	WorkOrderID    uuid.UUID
+	CanvasRunID    uuid.UUID
+	load           func(db *gorm.DB) (*runnerArtifactContext, error)
+}
+
+func artifactUploadTarget(scope *runneraction.ArtifactUploadScope) *runnerArtifactTarget {
+	return &runnerArtifactTarget{
+		OrganizationID: scope.OrganizationID,
+		FactoryID:      scope.FactoryID,
+		WorkOrderID:    scope.WorkOrderID,
+		CanvasRunID:    scope.CanvasRunID,
+		load: func(db *gorm.DB) (*runnerArtifactContext, error) {
+			return loadRunnerArtifactContext(db, scope)
+		},
+	}
+}
+
 func (s *Server) handleRunnerArtifactUpload(w http.ResponseWriter, r *http.Request) {
 	scope, ok := s.authenticateArtifactRunner(w, r)
 	if !ok {
 		return
 	}
+	s.uploadRunnerArtifact(w, r, artifactUploadTarget(scope))
+}
+
+func (s *Server) uploadRunnerArtifact(w http.ResponseWriter, r *http.Request, scope *runnerArtifactTarget) {
 	logger := log.WithFields(log.Fields{
 		"artifact_type": "file",
 		"work_order_id": scope.WorkOrderID,
@@ -71,10 +101,22 @@ func (s *Server) handleRunnerArtifactUpload(w http.ResponseWriter, r *http.Reque
 	}
 
 	db := database.DB(r.Context())
-	artifactContext, err := loadRunnerArtifactContext(db, scope)
+	artifactContext, err := scope.load(db)
 	if err != nil {
 		logger.WithError(err).Warn("rejected runner artifact scope")
 		http.Error(w, "Artifact upload scope is invalid", http.StatusForbidden)
+		return
+	}
+	key := decodeArtifactTitle(r.Header.Get("X-SuperPlane-Artifact-Key"))
+	storedKey := scopedArtifactLinkKey(scope.WorkOrderID, key)
+	if len(storedKey) > models.MaxFactoryWorkOrderArtifactKeyBytes {
+		http.Error(w, "key is too long", http.StatusBadRequest)
+		return
+	}
+	replacedFileID, err := existingRunnerArtifactFileID(db, artifactContext.Order, storedKey)
+	if err != nil {
+		logger.WithError(err).Warn("rejected runner artifact key")
+		http.Error(w, "Artifact key is already used", http.StatusBadRequest)
 		return
 	}
 
@@ -86,6 +128,7 @@ func (s *Server) handleRunnerArtifactUpload(w http.ResponseWriter, r *http.Reque
 		Filename:       filename,
 		ContentType:    contentType,
 		Purpose:        models.FilePurposeArtifact,
+		ReplacesFileID: replacedFileID,
 	})
 	if err != nil {
 		logger.WithError(err).Warn("failed to create runner artifact file")
@@ -113,7 +156,7 @@ func (s *Server) handleRunnerArtifactUpload(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	publicURL, err := artifactPublicURL(file)
+	publicURL, err := storedfiles.ArtifactPublicURL(file)
 	if err != nil {
 		cleanupRunnerArtifact(provider, file, logger)
 		logger.WithError(err).Error("failed to create runner artifact URL")
@@ -133,44 +176,81 @@ func (s *Server) handleRunnerArtifactUpload(w http.ResponseWriter, r *http.Reque
 		"url":         publicURL,
 	}
 	var artifact *models.FactoryWorkOrderArtifact
+	var created bool
 	err = db.Transaction(func(tx *gorm.DB) error {
-		if readyErr := file.MarkReady(tx, upload.SizeBytes, upload.Checksum); readyErr != nil {
+		if _, lockErr := models.LockOrganization(tx, scope.OrganizationID); lockErr != nil {
+			return lockErr
+		}
+		if lockErr := models.LockFactoryWorkOrder(tx, artifactContext.Order.ID); lockErr != nil {
+			return lockErr
+		}
+		previousID, findErr := existingRunnerArtifactFileID(tx, artifactContext.Order, storedKey)
+		if findErr != nil {
+			return findErr
+		}
+		replacedFileID = previousID
+		if readyErr := file.MarkReadyReplacing(tx, upload.SizeBytes, upload.Checksum, replacedFileID); readyErr != nil {
 			return readyErr
 		}
-		artifact, err = artifactContext.Order.CreateArtifact(tx, models.FactoryWorkOrderArtifactParams{
+		var upsertErr error
+		artifact, created, upsertErr = artifactContext.Order.UpsertArtifact(tx, models.FactoryWorkOrderArtifactParams{
 			Type:       models.FactoryWorkOrderArtifactTypeFile,
 			Data:       data,
+			Key:        storedKey,
 			Automation: artifactAutomationRef(artifactContext),
 			Run:        &factory.RunRef{ID: scope.CanvasRunID},
 		})
-		return err
+		return upsertErr
 	})
 	if err != nil {
 		cleanupRunnerArtifact(provider, file, logger)
 		logger.WithError(err).Error("failed to attach runner artifact")
+		if errors.Is(err, models.ErrFactoryWorkOrderArtifactInvalid) {
+			http.Error(w, "Artifact key is already used", http.StatusBadRequest)
+			return
+		}
+		if errors.Is(err, models.ErrFileQuotaExceeded) {
+			writeArtifactUploadError(w, err)
+			return
+		}
 		http.Error(w, "Failed to attach artifact", http.StatusInternalServerError)
 		return
 	}
+	if !created && replacedFileID != uuid.Nil && replacedFileID != file.ID {
+		removeReplacedArtifactFile(r.Context(), provider, replacedFileID, logger)
+	}
 
-	if err := messages.PublishFactoryWorkOrderUpdated(scope.FactoryID.String(), scope.WorkOrderID.String(), factory.EventTypeOrderArtifactAdded); err != nil {
+	reason := factory.EventTypeOrderArtifactUpdated
+	if created {
+		reason = factory.EventTypeOrderArtifactAdded
+	}
+	if err := messages.PublishFactoryWorkOrderUpdated(scope.FactoryID.String(), scope.WorkOrderID.String(), reason); err != nil {
 		log.WithError(err).Warn("failed to publish runner artifact update")
 	}
 	response := runnerArtifactResponse{
 		ArtifactID:  artifact.ID.String(),
+		Type:        models.FactoryWorkOrderArtifactTypeFile,
+		Key:         strings.TrimSpace(key),
+		URL:         publicURL,
 		FileID:      file.ID.String(),
 		Filename:    file.Filename,
 		ContentType: file.ContentType,
 		SizeBytes:   file.SizeBytes,
 		PublicURL:   publicURL,
 		Markdown:    artifactMarkdown(title, file.ContentType, publicURL),
+		Title:       title,
 	}
 	logger.WithFields(log.Fields{
 		"content_type": contentType,
 		"file_id":      file.ID,
 		"artifact_id":  artifact.ID,
 	}).Info("stored runner artifact")
+	status := http.StatusOK
+	if created {
+		status = http.StatusCreated
+	}
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
+	w.WriteHeader(status)
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		log.WithError(err).Warn("failed to encode runner artifact response")
 	}
@@ -184,6 +264,7 @@ type runnerArtifactLinkRequest struct {
 
 type runnerArtifactLinkResponse struct {
 	ArtifactID string `json:"artifact_id"`
+	Type       string `json:"type"`
 	URL        string `json:"url"`
 	Title      string `json:"title"`
 	Key        string `json:"key"`
@@ -194,6 +275,10 @@ func (s *Server) handleRunnerArtifactLink(w http.ResponseWriter, r *http.Request
 	if !ok {
 		return
 	}
+	s.attachRunnerArtifactLink(w, r, artifactUploadTarget(scope))
+}
+
+func (s *Server) attachRunnerArtifactLink(w http.ResponseWriter, r *http.Request, scope *runnerArtifactTarget) {
 	logger := log.WithFields(log.Fields{
 		"artifact_type": "link",
 		"work_order_id": scope.WorkOrderID,
@@ -220,7 +305,7 @@ func (s *Server) handleRunnerArtifactLink(w http.ResponseWriter, r *http.Request
 	}
 
 	db := database.DB(r.Context())
-	artifactContext, err := loadRunnerArtifactContext(db, scope)
+	artifactContext, err := scope.load(db)
 	if err != nil {
 		logger.WithError(err).Warn("rejected runner link artifact scope")
 		http.Error(w, "Artifact upload scope is invalid", http.StatusForbidden)
@@ -259,11 +344,107 @@ func (s *Server) handleRunnerArtifactLink(w http.ResponseWriter, r *http.Request
 	w.WriteHeader(status)
 	if err := json.NewEncoder(w).Encode(runnerArtifactLinkResponse{
 		ArtifactID: artifact.ID.String(),
+		Type:       models.FactoryWorkOrderArtifactTypeLink,
 		URL:        linkURL,
 		Title:      title,
 		Key:        key,
 	}); err != nil {
 		log.WithError(err).Warn("failed to encode runner link artifact response")
+	}
+}
+
+type runnerArtifactMarkdownRequest struct {
+	Body  string `json:"body"`
+	Title string `json:"title"`
+	Key   string `json:"key"`
+}
+
+type runnerArtifactMarkdownResponse struct {
+	ArtifactID string `json:"artifact_id"`
+	Type       string `json:"type"`
+	Title      string `json:"title"`
+	Key        string `json:"key"`
+}
+
+func (s *Server) handleRunnerArtifactMarkdown(w http.ResponseWriter, r *http.Request) {
+	scope, ok := s.authenticateArtifactRunner(w, r)
+	if !ok {
+		return
+	}
+	s.attachRunnerArtifactMarkdown(w, r, artifactUploadTarget(scope))
+}
+
+func (s *Server) attachRunnerArtifactMarkdown(w http.ResponseWriter, r *http.Request, scope *runnerArtifactTarget) {
+	logger := log.WithFields(log.Fields{
+		"artifact_type": "markdown",
+		"work_order_id": scope.WorkOrderID,
+		"run_id":        scope.CanvasRunID,
+	})
+	r.Body = http.MaxBytesReader(w, r.Body, 96<<10)
+	var body runnerArtifactMarkdownRequest
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		logger.WithError(err).Warn("rejected runner markdown artifact")
+		http.Error(w, "Invalid markdown", http.StatusBadRequest)
+		return
+	}
+	markdown := strings.TrimSpace(body.Body)
+	title := strings.TrimSpace(body.Title)
+	key := strings.TrimSpace(body.Key)
+	if markdown == "" {
+		http.Error(w, "body is required", http.StatusBadRequest)
+		return
+	}
+	storedKey := scopedArtifactLinkKey(scope.WorkOrderID, key)
+	if len(storedKey) > models.MaxFactoryWorkOrderArtifactKeyBytes {
+		http.Error(w, "key is too long", http.StatusBadRequest)
+		return
+	}
+
+	db := database.DB(r.Context())
+	artifactContext, err := scope.load(db)
+	if err != nil {
+		logger.WithError(err).Warn("rejected runner markdown artifact scope")
+		http.Error(w, "Artifact upload scope is invalid", http.StatusForbidden)
+		return
+	}
+	data := map[string]any{"body": markdown}
+	if title != "" {
+		data["title"] = title
+	}
+	params := models.FactoryWorkOrderArtifactParams{
+		Type:       models.FactoryWorkOrderArtifactTypeMarkdown,
+		Data:       data,
+		Key:        storedKey,
+		Automation: artifactAutomationRef(artifactContext),
+		Run:        &factory.RunRef{ID: scope.CanvasRunID},
+	}
+	artifact, created, err := artifactContext.Order.UpsertArtifact(db, params)
+	if err != nil {
+		logger.WithError(err).Warn("failed to attach runner markdown artifact")
+		writeArtifactMarkdownError(w, err)
+		return
+	}
+	reason := factory.EventTypeOrderArtifactUpdated
+	if created {
+		reason = factory.EventTypeOrderArtifactAdded
+	}
+	if err := messages.PublishFactoryWorkOrderUpdated(scope.FactoryID.String(), scope.WorkOrderID.String(), reason); err != nil {
+		log.WithError(err).Warn("failed to publish runner markdown artifact update")
+	}
+	logger.WithField("artifact_id", artifact.ID).Info("stored runner markdown artifact")
+	status := http.StatusOK
+	if created {
+		status = http.StatusCreated
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	if err := json.NewEncoder(w).Encode(runnerArtifactMarkdownResponse{
+		ArtifactID: artifact.ID.String(),
+		Type:       models.FactoryWorkOrderArtifactTypeMarkdown,
+		Title:      title,
+		Key:        key,
+	}); err != nil {
+		log.WithError(err).Warn("failed to encode runner markdown artifact response")
 	}
 }
 
@@ -273,6 +454,66 @@ func scopedArtifactLinkKey(workOrderID uuid.UUID, key string) string {
 		return ""
 	}
 	return workOrderID.String() + ":" + key
+}
+
+func existingRunnerArtifactFileID(db *gorm.DB, order *models.FactoryWorkOrder, storedKey string) (uuid.UUID, error) {
+	if storedKey == "" {
+		return uuid.Nil, nil
+	}
+	existing, err := order.FindArtifactByKey(db, storedKey)
+	if errors.Is(err, models.ErrFactoryWorkOrderArtifactNotFound) {
+		return uuid.Nil, nil
+	}
+	if err != nil {
+		return uuid.Nil, err
+	}
+	if existing.Type != models.FactoryWorkOrderArtifactTypeFile {
+		return uuid.Nil, fmt.Errorf("%w: artifact key is already used", models.ErrFactoryWorkOrderArtifactInvalid)
+	}
+	return artifactStoredFileID(existing), nil
+}
+
+func artifactStoredFileID(artifact *models.FactoryWorkOrderArtifact) uuid.UUID {
+	if artifact == nil || len(artifact.Data) == 0 {
+		return uuid.Nil
+	}
+	var data map[string]any
+	if err := json.Unmarshal(artifact.Data, &data); err != nil {
+		return uuid.Nil
+	}
+	raw, _ := data["fileId"].(string)
+	id, err := uuid.Parse(strings.TrimSpace(raw))
+	if err != nil {
+		return uuid.Nil
+	}
+	return id
+}
+
+func removeReplacedArtifactFile(ctx context.Context, provider blob.Provider, fileID uuid.UUID, logger *log.Entry) {
+	previous, err := models.FindFile(database.DB(ctx), fileID)
+	if err != nil {
+		logger.WithError(err).Warn("failed to load replaced runner artifact file")
+		return
+	}
+	if err := storedfiles.DeleteObjectAndRow(ctx, database.DB(ctx), provider, previous); err != nil {
+		logger.WithError(err).Warn("failed to delete replaced runner artifact file")
+	}
+}
+
+func writeArtifactMarkdownError(w http.ResponseWriter, err error) {
+	if errors.Is(err, models.ErrFactoryWorkOrderArtifactInvalid) {
+		if strings.Contains(err.Error(), "body") {
+			http.Error(w, "body is required", http.StatusBadRequest)
+			return
+		}
+		http.Error(w, "Invalid markdown", http.StatusBadRequest)
+		return
+	}
+	if errors.Is(err, models.ErrFactoryWorkOrderArtifactKeyAlreadyExists) {
+		http.Error(w, "Markdown key is already used", http.StatusConflict)
+		return
+	}
+	http.Error(w, "Failed to attach markdown", http.StatusInternalServerError)
 }
 
 func writeArtifactLinkError(w http.ResponseWriter, err error) {
@@ -458,13 +699,6 @@ func artifactAutomationRef(context *runnerArtifactContext) *factory.AutomationRe
 	return ref
 }
 
-func artifactPublicURL(file *models.File) (string, error) {
-	if file.PublicID == nil || *file.PublicID == uuid.Nil {
-		return "", fmt.Errorf("artifact public id is missing")
-	}
-	return fmt.Sprintf("%s/api/v1/public/artifacts/%s/%s", blob.PublicBaseURL(), file.PublicID, url.PathEscape(file.Filename)), nil
-}
-
 func artifactMarkdown(title, contentType, publicURL string) string {
 	label := strings.NewReplacer("\\", "\\\\", "[", "\\[", "]", "\\]").Replace(title)
 	if strings.HasPrefix(contentType, "image/") {
@@ -525,7 +759,7 @@ func servePublicArtifact(w http.ResponseWriter, r *http.Request, provider blob.P
 			http.Error(w, "Failed to download artifact", http.StatusInternalServerError)
 			return
 		}
-		http.Redirect(w, r, signedURL, http.StatusTemporaryRedirect)
+		http.Redirect(w, r, signedURL, http.StatusTemporaryRedirect) // #nosec G710 -- the storage provider generates this short-lived signed artifact URL.
 		return
 	}
 	reader, err := provider.Get(r.Context(), file.StorageKey)

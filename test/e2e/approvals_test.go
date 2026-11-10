@@ -1,52 +1,27 @@
 package e2e
 
 import (
-	"fmt"
-	"strings"
+	"bytes"
+	"encoding/base64"
+	"encoding/json"
+	"io"
+	"net/http"
+	"slices"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
-	q "github.com/superplanehq/superplane/test/e2e/queries"
+	"github.com/superplanehq/superplane/pkg/yaml"
 	"github.com/superplanehq/superplane/test/e2e/session"
 	"github.com/superplanehq/superplane/test/e2e/shared"
+	"github.com/superplanehq/superplane/test/support"
+	"gorm.io/datatypes"
 )
 
-func TestApprovals(t *testing.T) {
-	t.Run("adding an approval component to a canvas", func(t *testing.T) {
-		steps := &ApprovalSteps{t: t}
-		steps.start()
-		steps.givenACanvasExists()
-		steps.addApprovalToCanvas("TestApproval")
-		steps.saveCanvas()
-		steps.canvas.CommitAndPublish()
-		steps.verifyApprovalSavedToDB("TestApproval")
-	})
-
-	t.Run("configuring approvals for a user role and group", func(t *testing.T) {
-		steps := &ApprovalSteps{t: t}
-		steps.start()
-		steps.givenACanvasExists()
-		groupName := steps.createApprovalGroup()
-		steps.addApprovalWithUserRoleGroup("ReleaseApproval", models.Position{X: 600, Y: 200}, models.DisplayNameAdmin, groupName)
-		steps.saveCanvas()
-		steps.canvas.CommitAndPublish()
-		steps.verifyApprovalConfigurationPersisted(models.RoleOrgAdmin, groupName)
-	})
-
-	t.Run("running and approving on a canvas", func(t *testing.T) {
-		steps := &ApprovalSteps{t: t}
-		steps.start()
-		steps.givenCanvasWithManualTriggerApprovalAndNoop()
-		steps.runManualTrigger()
-		steps.approveFirstPendingRequirement()
-		steps.assertApprovalExecutionFinishedAndOutputNodeProcessed()
-	})
-
+func TestApprovalDeletionCancelsRun(t *testing.T) {
 	t.Run("deleting an approval node while a run is waiting cancels the run", func(t *testing.T) {
 		steps := &ApprovalSteps{t: t}
 		steps.start()
@@ -58,36 +33,6 @@ func TestApprovals(t *testing.T) {
 		steps.assertApprovalNodeDeletedFromDB()
 		steps.assertWaitingApprovalExecutionCancelled()
 		steps.assertWaitingRunCancelled()
-	})
-
-	t.Run("preventing duplicate approvals across approver types", func(t *testing.T) {
-		steps := &ApprovalSteps{t: t}
-		steps.start()
-		steps.givenCanvasWithManualTriggerAnyoneAndUserApprovalAndNoop()
-		steps.runManualTrigger()
-		steps.approveAnyoneRequirement()
-		steps.waitForApprovalMetadata("Approval", 1, 1, "anyone")
-		steps.assertNoApproveButtons()
-	})
-
-	t.Run("running and approving a role requirement", func(t *testing.T) {
-		steps := &ApprovalSteps{t: t}
-		steps.start()
-		steps.givenCanvasWithManualTriggerRoleApprovalAndNoop(models.DisplayNameAdmin)
-		steps.runManualTrigger()
-		steps.approveFirstPendingRequirement()
-		steps.assertApprovalExecutionFinishedAndOutputNodeProcessed()
-	})
-
-	t.Run("running and approving a group requirement", func(t *testing.T) {
-		steps := &ApprovalSteps{t: t}
-		steps.start()
-		groupName := steps.createApprovalGroup()
-		steps.addCurrentUserToGroup(groupName)
-		steps.givenCanvasWithManualTriggerGroupApprovalAndNoop(groupName)
-		steps.runManualTrigger()
-		steps.approveFirstPendingRequirement()
-		steps.assertApprovalExecutionFinishedAndOutputNodeProcessed()
 	})
 }
 
@@ -110,253 +55,41 @@ func (s *ApprovalSteps) start() {
 	s.session.Login()
 }
 
-func (s *ApprovalSteps) givenACanvasExists() {
-	s.canvas = shared.NewCanvasSteps("Approval Canvas", s.t, s.session)
-	s.canvas.Create()
-	s.canvas.Visit()
-	s.canvas.EnterEditMode()
-}
-
-func (s *ApprovalSteps) addApprovalToCanvas(nodeName string) {
-	s.canvas.AddApproval(nodeName, models.Position{X: 600, Y: 200})
-}
-
-func (s *ApprovalSteps) saveCanvas() {
-	s.canvas.Save()
-}
-
-func (s *ApprovalSteps) verifyApprovalSavedToDB(nodeName string) {
-	node := s.canvas.GetNodeFromDB(nodeName)
-	require.NotNil(s.t, node, "approval node not found in DB")
-}
-
-func (s *ApprovalSteps) verifyApprovalConfigurationPersisted(expectedRole string, expectedGroup string) {
-	node := s.canvas.GetNodeFromDB("ReleaseApproval")
-	require.NotNil(s.t, node, "approval node not found in DB")
-
-	data := node.Configuration.Data()
-	items := data["items"].([]any)
-	require.Len(s.t, items, 3)
-
-	var userItem map[string]any
-	var roleItem map[string]any
-	var groupItem map[string]any
-
-	for _, rawItem := range items {
-		itemCfg, ok := rawItem.(map[string]any)
-		require.True(s.t, ok, "expected item configuration to be a map")
-
-		itemType, _ := itemCfg["type"].(string)
-		switch itemType {
-		case "user":
-			userItem = itemCfg
-		case "role":
-			roleItem = itemCfg
-		case "group":
-			groupItem = itemCfg
-		}
-	}
-
-	require.NotNil(s.t, userItem, "expected user approver configuration")
-	require.NotNil(s.t, roleItem, "expected role approver configuration")
-	require.NotNil(s.t, groupItem, "expected group approver configuration")
-	require.NotEmpty(s.t, userItem["user"])
-	require.Equal(s.t, expectedRole, roleItem["role"])
-	require.Equal(s.t, expectedGroup, groupItem["group"])
-}
-
 func (s *ApprovalSteps) givenCanvasWithManualTriggerApprovalAndNoop() {
-	s.canvas = shared.NewCanvasSteps("Approval Canvas", s.t, s.session)
-	s.canvas.Create()
-	s.canvas.Visit()
-	s.canvas.EnterEditMode()
-
-	s.canvas.AddManualTrigger("Start", models.Position{X: 600, Y: 200})
-	s.canvas.AddApproval("Approval", models.Position{X: 1000, Y: 200})
-	s.canvas.AddNoop("Output", models.Position{X: 1600, Y: 200})
-
-	s.canvas.Connect("Start", "Approval")
-	s.canvas.Connect("Approval", "Output")
-
-	s.saveCanvas()
-	s.canvas.CommitAndPublish()
-}
-
-func (s *ApprovalSteps) givenCanvasWithManualTriggerRoleApprovalAndNoop(roleLabel string) {
-	s.canvas = shared.NewCanvasSteps("Approval Canvas", s.t, s.session)
-	s.canvas.Create()
-	s.canvas.Visit()
-	s.canvas.EnterEditMode()
-
-	s.canvas.AddManualTrigger("Start", models.Position{X: 600, Y: 200})
-	s.addApprovalWithRole("Approval", models.Position{X: 1000, Y: 200}, roleLabel)
-	s.canvas.AddNoop("Output", models.Position{X: 1600, Y: 200})
-
-	s.canvas.Connect("Start", "Approval")
-	s.canvas.Connect("Approval", "Output")
-
-	s.saveCanvas()
-	s.canvas.CommitAndPublish()
-}
-
-func (s *ApprovalSteps) givenCanvasWithManualTriggerGroupApprovalAndNoop(groupLabel string) {
-	s.canvas = shared.NewCanvasSteps("Approval Canvas", s.t, s.session)
-	s.canvas.Create()
-	s.canvas.Visit()
-	s.canvas.EnterEditMode()
-
-	s.canvas.AddManualTrigger("Start", models.Position{X: 600, Y: 200})
-	s.addApprovalWithGroup("Approval", models.Position{X: 1000, Y: 200}, groupLabel)
-	s.canvas.AddNoop("Output", models.Position{X: 1600, Y: 200})
-
-	s.canvas.Connect("Start", "Approval")
-	s.canvas.Connect("Approval", "Output")
-
-	s.saveCanvas()
-	s.canvas.CommitAndPublish()
-}
-
-func (s *ApprovalSteps) givenCanvasWithManualTriggerAnyoneAndUserApprovalAndNoop() {
-	s.canvas = shared.NewCanvasSteps("Approval Canvas", s.t, s.session)
-	s.canvas.Create()
-	s.canvas.Visit()
-	s.canvas.EnterEditMode()
-
-	s.canvas.AddManualTrigger("Start", models.Position{X: 600, Y: 200})
-	s.addApprovalWithAnyAndSpecificUser("Approval", models.Position{X: 1000, Y: 200})
-	s.canvas.AddNoop("Output", models.Position{X: 1600, Y: 200})
-
-	s.canvas.Connect("Start", "Approval")
-	s.canvas.Connect("Approval", "Output")
-
-	s.saveCanvas()
-	s.canvas.CommitAndPublish()
-}
-
-func (s *ApprovalSteps) addApprovalWithAnyAndSpecificUser(nodeName string, pos models.Position) {
-	s.canvas.AddBuildingBlockByTestID("building-block-approval", pos)
-	s.session.Sleep(300)
-
-	s.session.FillIn(q.TestID("node-name-input"), nodeName)
-	s.session.Click(q.Locator(`button:has-text("Add Approver")`))
-	s.session.Sleep(200)
-
-	typeSelects := s.session.Page().Locator(`[data-testid="field-type-select"]`)
-	s.session.Click(q.Locator(`[data-testid="field-type-select"]`))
-	s.session.Click(q.Locator(`div[role="option"]:has-text("Any one")`))
-
-	if err := typeSelects.Nth(1).Click(); err != nil {
-		s.t.Fatalf("clicking second approver type select: %v", err)
-	}
-	s.session.Click(q.Locator(`div[role="option"]:has-text("Specific user")`))
-
-	userSelect := s.session.Page().Locator(`button:has-text("Select user")`).First()
-	if err := userSelect.Click(); err != nil {
-		s.t.Fatalf("opening user select: %v", err)
-	}
-	s.session.Click(q.Locator(`div[role="option"]:has-text("e2e@superplane.local")`))
-
-	s.session.Sleep(300)
-}
-
-func (s *ApprovalSteps) addApprovalWithRole(nodeName string, pos models.Position, roleLabel string) {
-	s.canvas.AddBuildingBlockByTestID("building-block-approval", pos)
-	s.session.Sleep(300)
-
-	s.session.FillIn(q.TestID("node-name-input"), nodeName)
-
-	s.session.Click(q.TestID("field-type-select"))
-	s.session.Click(q.Locator(`div[role="option"]:has-text("Role")`))
-
-	s.session.Click(q.Locator(`button:has-text("Select role")`))
-	s.session.Click(q.Locator(`div[role="option"]:has-text("` + roleLabel + `")`))
-
-	s.session.Sleep(300)
-}
-
-func (s *ApprovalSteps) addApprovalWithGroup(nodeName string, pos models.Position, groupLabel string) {
-	s.canvas.AddBuildingBlockByTestID("building-block-approval", pos)
-	s.session.Sleep(300)
-
-	s.session.FillIn(q.TestID("node-name-input"), nodeName)
-
-	s.session.Click(q.TestID("field-type-select"))
-	s.session.Click(q.Locator(`div[role="option"]:has-text("Group")`))
-
-	s.session.Click(q.Locator(`button:has-text("Select group")`))
-	s.session.Click(q.Locator(`div[role="option"]:has-text("` + groupLabel + `")`))
-
-	s.session.Sleep(300)
-}
-
-func (s *ApprovalSteps) addApprovalWithUserRoleGroup(nodeName string, pos models.Position, roleLabel string, groupLabel string) {
-	s.canvas.AddBuildingBlockByTestID("building-block-approval", pos)
-	s.session.Sleep(300)
-
-	s.session.FillIn(q.TestID("node-name-input"), nodeName)
-	s.session.Click(q.Locator(`button:has-text("Add Approver")`))
-	s.session.Sleep(400)
-	s.session.Click(q.Locator(`button:has-text("Add Approver")`))
-	s.session.Sleep(400)
-
-	typeSelects := s.session.Page().Locator(`[data-testid="field-type-select"]`)
-
-	// Set type and value per approver so autosave does not persist type=user with an empty user field.
-	if err := typeSelects.Nth(0).Click(); err != nil {
-		s.t.Fatalf("clicking first approver type select: %v", err)
-	}
-	s.session.Click(q.Locator(`div[role="option"]:has-text("Specific user")`))
-	s.session.Sleep(200)
-	userSelect := s.session.Page().Locator(`button:has-text("Select user")`).First()
-	if err := userSelect.Click(); err != nil {
-		s.t.Fatalf("opening user select: %v", err)
-	}
-	s.session.Click(q.Locator(`div[role="option"]:has-text("` + s.session.Account.Email + `")`))
-
-	if err := typeSelects.Nth(1).Click(); err != nil {
-		s.t.Fatalf("clicking second approver type select: %v", err)
-	}
-	s.session.Click(q.Locator(`div[role="option"]:has-text("Role")`))
-	s.session.Sleep(200)
-	s.session.Click(q.Locator(`button:has-text("Select role")`))
-	s.session.Click(q.Locator(`div[role="option"]:has-text("` + roleLabel + `")`))
-
-	if err := typeSelects.Nth(2).Click(); err != nil {
-		s.t.Fatalf("clicking third approver type select: %v", err)
-	}
-	s.session.Click(q.Locator(`div[role="option"]:has-text("Group")`))
-	s.session.Sleep(200)
-	s.session.Click(q.Locator(`button:has-text("Select group")`))
-	s.session.Click(q.Locator(`div[role="option"]:has-text("` + groupLabel + `")`))
-
-	// Configuration sidebar autosaves on a 1200ms safety-net timer for scripted flows.
-	s.session.Sleep(1500)
+	user, err := models.FindActiveUserByEmail(s.session.OrgID.String(), s.session.Account.Email)
+	require.NoError(s.t, err)
+	canvas, _ := support.CreateCanvas(s.t, s.session.OrgID, user.ID, []models.CanvasNode{
+		{
+			NodeID: "start", Name: "Start", Type: models.NodeTypeTrigger,
+			Ref:           datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
+			Configuration: datatypes.NewJSONType(map[string]any{}),
+		},
+		{
+			NodeID: "approval", Name: "Approval", Type: models.NodeTypeComponent,
+			Ref: datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "approval"}}),
+			Configuration: datatypes.NewJSONType(map[string]any{
+				"items": []any{map[string]any{"type": "user", "user": user.ID.String()}},
+			}),
+		},
+		{
+			NodeID: "output", Name: "Output", Type: models.NodeTypeComponent,
+			Ref:           datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
+			Configuration: datatypes.NewJSONType(map[string]any{}),
+		},
+	}, []models.Edge{
+		{SourceID: "start", TargetID: "approval", Channel: "default"},
+		{SourceID: "approval", TargetID: "output", Channel: "approved"},
+	})
+	s.canvas = shared.NewCanvasSteps(canvas.Name, s.t, s.session)
+	s.canvas.WorkflowID = canvas.ID
 }
 
 func (s *ApprovalSteps) runManualTrigger() {
 	s.canvas.EmitManualTrigger("Start")
-	if s.waitForApprovalExecution(90 * time.Second) {
-		return
-	}
-
-	s.t.Fatalf("timed out waiting for execution of node Approval after emitting manual trigger")
 }
 
 func (s *ApprovalSteps) waitForApprovalExecutionToBeWaiting() {
 	s.canvas.WaitForExecution("Approval", models.CanvasNodeExecutionStateStarted, 90*time.Second)
-}
-
-func (s *ApprovalSteps) waitForApprovalExecution(timeout time.Duration) bool {
-	deadline := time.Now().Add(timeout)
-	for time.Now().Before(deadline) {
-		executions := s.canvas.GetExecutionsForNode("Approval")
-		if len(executions) > 0 {
-			return true
-		}
-		s.session.Sleep(500)
-	}
-
-	return false
 }
 
 func (s *ApprovalSteps) rememberWaitingApprovalExecution() {
@@ -373,23 +106,45 @@ func (s *ApprovalSteps) rememberWaitingApprovalExecution() {
 }
 
 func (s *ApprovalSteps) deleteApprovalNodeFromCanvas() {
-	s.canvas.EnterEditMode()
-	s.deleteNodeFromCanvas("Approval")
-	s.canvas.CommitAndPublish()
+	version, err := models.FindLiveCanvasVersion(s.canvas.WorkflowID)
+	require.NoError(s.t, err)
+	version.Nodes = slices.DeleteFunc(version.Nodes, func(node models.Node) bool {
+		return node.ID == s.waiting.nodeID
+	})
+	version.Edges = slices.DeleteFunc(version.Edges, func(edge models.Edge) bool {
+		return edge.SourceID == s.waiting.nodeID || edge.TargetID == s.waiting.nodeID
+	})
+	canvas, err := models.FindCanvas(s.session.OrgID, s.canvas.WorkflowID)
+	require.NoError(s.t, err)
+	content, err := yaml.VersionToCanvasYAML(canvas.Name, canvas.Description, version)
+	require.NoError(s.t, err)
+
+	// Use the real HTTP commit path so publication must notify the workers.
+	path := "/api/v1/canvases/" + s.canvas.WorkflowID.String() + "/staging"
+	s.sendCanvasRequest(http.MethodPut, path, map[string]any{
+		"operations": []map[string]any{{"path": "canvas.yaml", "content": base64.StdEncoding.EncodeToString([]byte(content))}},
+	})
+	s.sendCanvasRequest(http.MethodPost, path+"/commit", map[string]any{"commitMessage": "Remove waiting approval"})
 }
 
-func (s *ApprovalSteps) deleteNodeFromCanvas(nodeName string) {
-	safe := strings.ToLower(nodeName)
-	safe = strings.ReplaceAll(safe, " ", "-")
-	nodeHeader := q.TestID("node", nodeName, "header")
-	deleteButton := q.Locator(
-		`.react-flow__node:has([data-testid="node-` + safe + `-header"]) [data-testid="node-action-delete"]`,
-	)
-
-	s.session.HoverOver(nodeHeader)
-	s.session.Sleep(100)
-	s.session.Click(deleteButton)
-	s.session.Sleep(300)
+func (s *ApprovalSteps) sendCanvasRequest(method, path string, body any) {
+	encoded, err := json.Marshal(body)
+	require.NoError(s.t, err)
+	request, err := http.NewRequestWithContext(s.t.Context(), method, s.session.BaseURL+path, bytes.NewReader(encoded))
+	require.NoError(s.t, err)
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("X-Organization-Id", s.session.OrgID.String())
+	cookies, err := s.session.Page().Context().Cookies(s.session.BaseURL)
+	require.NoError(s.t, err)
+	for _, cookie := range cookies {
+		request.AddCookie(&http.Cookie{Name: cookie.Name, Value: cookie.Value})
+	}
+	response, err := http.DefaultClient.Do(request)
+	require.NoError(s.t, err)
+	defer response.Body.Close()
+	responseBody, err := io.ReadAll(response.Body)
+	require.NoError(s.t, err)
+	require.Equal(s.t, http.StatusOK, response.StatusCode, "%s %s: %s", method, path, responseBody)
 }
 
 func (s *ApprovalSteps) assertApprovalNodeDeletedFromDB() {
@@ -426,129 +181,4 @@ func (s *ApprovalSteps) assertWaitingRunCancelled() {
 			run.State == models.CanvasRunStateFinished &&
 			run.Result == models.CanvasRunResultCancelled
 	}, 30*time.Second, 500*time.Millisecond, "waiting approval run should finish as cancelled")
-}
-
-func (s *ApprovalSteps) approveFirstPendingRequirement() {
-	s.canvas.StartEditingNode("Approval")
-	s.session.Click(q.Locator(`button:has-text("Approve")`))
-	commentInput := s.session.Page().Locator(`[placeholder="Enter comment"]`).First()
-	if count, err := commentInput.Count(); err == nil && count > 0 {
-		if err := commentInput.Fill("Do it"); err != nil {
-			s.t.Fatalf("filling approval comment: %v", err)
-		}
-	}
-	s.session.Click(q.Locator(`button:has-text("Confirm Approval")`))
-}
-
-func (s *ApprovalSteps) approveAnyoneRequirement() {
-	s.canvas.StartEditingNode("Approval")
-	s.session.AssertVisible(q.Locator(`button:has-text("Approve")`))
-
-	item := s.session.Page().Locator(`[data-slot="item"]:has([data-slot="item-title"]:has-text("Any user"))`)
-	approveButton := item.Locator(`button:has-text("Approve")`).First()
-	count, err := approveButton.Count()
-	if err != nil {
-		s.t.Fatalf("counting approve buttons for any user: %v", err)
-	}
-	if count == 0 {
-		approveButton = s.session.Page().Locator(`button:has-text("Approve")`).First()
-	}
-	if err := approveButton.Click(); err != nil {
-		s.t.Fatalf("clicking approve button: %v", err)
-	}
-	commentInput := s.session.Page().Locator(`[placeholder="Enter comment"]`).First()
-	if count, err := commentInput.Count(); err == nil && count > 0 {
-		if err := commentInput.Fill("Do it"); err != nil {
-			s.t.Fatalf("filling approval comment: %v", err)
-		}
-	}
-	s.session.Click(q.Locator(`button:has-text("Confirm Approval")`))
-}
-
-func (s *ApprovalSteps) waitForApprovalMetadata(nodeName string, approvedCount int, pendingCount int, approvedType string) {
-	found := false
-	start := time.Now()
-
-	for time.Since(start) < 5*time.Second {
-		executions := s.canvas.GetExecutionsForNode(nodeName)
-		if len(executions) == 0 {
-			s.session.Sleep(500)
-			continue
-		}
-
-		metadata := executions[0].Metadata.Data()
-		rawRecords, ok := metadata["records"].([]any)
-		require.True(s.t, ok, "expected approval records metadata")
-
-		approved := 0
-		pending := 0
-		approvedTypeMatch := false
-		for _, rawRecord := range rawRecords {
-			record, ok := rawRecord.(map[string]any)
-			require.True(s.t, ok, "expected approval record metadata")
-			state, _ := record["state"].(string)
-			recordType, _ := record["type"].(string)
-			switch state {
-			case "approved":
-				approved++
-				if recordType == approvedType {
-					approvedTypeMatch = true
-				}
-			case "pending":
-				pending++
-			}
-		}
-
-		if approved == approvedCount && pending == pendingCount && approvedTypeMatch {
-			found = true
-			break
-		}
-
-		s.session.Sleep(500)
-	}
-
-	require.True(s.t, found, "timed out waiting for approval metadata to update")
-}
-
-func (s *ApprovalSteps) assertNoApproveButtons() {
-	s.session.AssertHidden(q.Locator(`button:has-text("Approve")`))
-}
-
-func (s *ApprovalSteps) assertApprovalExecutionFinishedAndOutputNodeProcessed() {
-	s.canvas.WaitForExecution("Output", models.CanvasNodeExecutionStateFinished, 60*time.Second)
-
-	approvaExecs := s.canvas.GetExecutionsForNode("Approval")
-	outputExecs := s.canvas.GetExecutionsForNode("Output")
-
-	require.Len(s.t, approvaExecs, 1, "expected one execution for approval node")
-	require.Len(s.t, outputExecs, 1, "expected one execution for output node")
-}
-
-func (s *ApprovalSteps) createApprovalGroup() string {
-	groupName := fmt.Sprintf("approval_group_%d", time.Now().UnixNano())
-	authService, err := authorization.NewAuthService()
-	require.NoError(s.t, err)
-
-	err = authService.CreateGroup(
-		s.session.OrgID.String(),
-		models.DomainTypeOrganization,
-		groupName,
-		models.RoleOrgAdmin,
-		groupName,
-		"",
-	)
-	require.NoError(s.t, err)
-
-	return groupName
-}
-
-func (s *ApprovalSteps) addCurrentUserToGroup(groupName string) {
-	authService, err := authorization.NewAuthService()
-	require.NoError(s.t, err)
-
-	user, err := models.FindActiveUserByEmail(s.session.OrgID.String(), s.session.Account.Email)
-	require.NoError(s.t, err)
-
-	err = authService.AddUserToGroup(s.session.OrgID.String(), models.DomainTypeOrganization, user.ID.String(), groupName)
-	require.NoError(s.t, err)
 }

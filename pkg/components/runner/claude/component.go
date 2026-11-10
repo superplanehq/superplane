@@ -7,6 +7,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
@@ -78,7 +79,7 @@ Example:
 - **Machine type**: Runner fleet available to the organization (required).
 - **Steps**: One or more ordered bash commands or agent prompts.
 - **Anthropic API Key**: SuperPlane secret or Claude integration used as ` + "`ANTHROPIC_API_KEY`" + `.
-- **Model**: Select a model from Organization LLM Models.
+- **Model**: Select a model from Workspace Models.
 - **Working directory**: Optional starting directory.
 - **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour).
 
@@ -105,7 +106,7 @@ func (c *RunClaudeCode) Configuration() []configuration.Field {
 		runner.AgentStepsField(
 			"Ordered bash commands and Claude Code prompts. Add, reorder, and mix freely.",
 			"Fix the failing tests and commit the changes.",
-			"git clone https://github.com/org/repo.git /tmp/repo",
+			"git clone "+githubcommon.DotCom().CloneURL("org/repo")+" /tmp/repo",
 		),
 		runner.AgentWorkingDirectoryField(),
 		runner.AgentAdditionalInstructionsField(),
@@ -158,7 +159,8 @@ func (c *RunClaudeCode) Execute(ctx core.ExecutionContext) error {
 
 	environment = runner.AttachPlanningSessionEnv(ctx, environment, spec.ExecutionTimeoutSeconds)
 	environment = runner.AttachArtifactUploadEnv(ctx, environment, spec.ExecutionTimeoutSeconds, spec.IncludeVisualEvidence)
-	environment, err = runner.AttachMergeConfidenceEnv(ctx, environment, spec.Steps, spec.ExecutionTimeoutSeconds)
+	var merge *runner.MergeConfidenceScope
+	environment, merge, err = runner.AttachMergeConfidenceEnv(ctx, environment, spec.Steps)
 	if err != nil {
 		return err
 	}
@@ -170,14 +172,14 @@ func (c *RunClaudeCode) Execute(ctx core.ExecutionContext) error {
 	dispatched.Steps = runner.AppendVisualEvidenceProtocol(dispatched.Steps, runner.HasVisualEvidence(environment))
 	dispatched.Steps = runner.AppendPublishLinkProtocol(dispatched.Steps, runner.HasPublishLinks(environment))
 	dispatched.Steps = runner.AppendFactoryImaginedLimitPrompt(ctx, dispatched.Steps)
-	environment = runner.AttachTaskOwnerEnv(ctx, environment, spec.ExecutionTimeoutSeconds)
+	environment = runner.AttachRunnerEnv(ctx, environment, spec.ExecutionTimeoutSeconds, merge)
 	task := buildClaudeCodeTask(spec, resolved.Usage, resolved.Setups, dispatched.Steps, dispatched.Attachments, runner.HasPlanningSessionToken(environment))
 	task = applyPlanningFollowUp(task, environment, spec)
 	if runner.HasPlanningSessionToken(environment) {
 		task.Files = runner.AppendPlanningSessionMCPFiles(task.Files)
 	}
 	task.Files = runner.AppendTaskArtifactMCP(environment, task.Files)
-	task.Files = runner.AppendMergeConfidenceMCP(environment, task.Files)
+	task.Files = runner.AppendGlobalMCP(environment, task.Files)
 	task.Files = runner.AppendPlanningSessionContinuation(ctx, environment, task.Files)
 	environment, task.Files = runner.AttachWorkspaceAgentResources(ctx, environment, task.Files)
 	task.Commands = runner.ApplyFactoryCheckout(task.Files, task.Commands, spec.Steps)

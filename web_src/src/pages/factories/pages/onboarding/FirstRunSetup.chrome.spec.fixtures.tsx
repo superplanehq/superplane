@@ -1,8 +1,10 @@
 import { renderHook } from "@testing-library/react";
-import { pageModel } from "./firstRunSetup.test-support";
 
 import type { OnboardingPageModel } from "./useFirstRunSetupFlow";
+import { pageModel } from "./firstRunSetup.test-support";
 import { useOnboardingSetupState, type OnboardingSetupApi } from "./useOnboardingSetupState";
+
+export { pageModel };
 
 export function setupState(): OnboardingSetupApi {
   const { result } = renderHook(() =>
@@ -14,8 +16,6 @@ export function setupState(): OnboardingSetupApi {
   );
   return result.current;
 }
-
-export { pageModel } from "./firstRunSetup.test-support";
 
 export function hostedVcsModel(overrides: Partial<OnboardingPageModel> = {}) {
   return pageModel({

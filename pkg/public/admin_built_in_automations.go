@@ -17,18 +17,47 @@ import (
 	"gorm.io/gorm"
 )
 
+func (s *Server) builtInAutomationDependencies() factoryactions.IntakeDependencies {
+	return factoryactions.IntakeDependencies{
+		Registry:       s.registry,
+		Encryptor:      s.encryptor,
+		AuthService:    s.authService,
+		WebhookBaseURL: s.WebhooksBaseURL,
+	}
+}
+
+// adminSetMultiRepoTasks changes the multi-repo tasks flag together with the
+// Implement automations of the organization.
+func (s *Server) adminSetMultiRepoTasks(w http.ResponseWriter, r *http.Request, orgID uuid.UUID, enabled bool) {
+	result, err := factoryactions.SetOrganizationMultiRepoTasks(r.Context(), orgID, enabled, s.builtInAutomationDependencies())
+	if err != nil {
+		log.Errorf("admin: failed to set multi-repo tasks=%t for org %s: %v", enabled, orgID, err)
+		var settingsError *factoryactions.BuiltInAutomationSettingsError
+		if errors.As(err, &settingsError) {
+			http.Error(w, fmt.Sprintf("Update stopped: %v. The feature and the automations were not changed. Correct these settings and try again.", err), http.StatusBadRequest)
+			return
+		}
+		http.Error(w, "Could not update the Implement automations. The feature was not changed.", http.StatusInternalServerError)
+		return
+	}
+
+	status := "disabled"
+	if enabled {
+		status = "enabled"
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(map[string]any{"status": status, "reset": result.Reset}); err != nil {
+		log.Errorf("admin: failed to encode multi-repo tasks update: %v", err)
+	}
+}
+
 func (s *Server) adminResetBuiltInAutomations(w http.ResponseWriter, r *http.Request) {
 	orgID, ok := parseAdminOrgID(w, r)
 	if !ok {
 		return
 	}
 
-	result, err := factoryactions.ResetOrganizationBuiltInAutomations(r.Context(), orgID, factoryactions.IntakeDependencies{
-		Registry:       s.registry,
-		Encryptor:      s.encryptor,
-		AuthService:    s.authService,
-		WebhookBaseURL: s.WebhooksBaseURL,
-	})
+	result, err := factoryactions.ResetOrganizationBuiltInAutomations(r.Context(), orgID, s.builtInAutomationDependencies())
 	if err != nil {
 		log.Errorf("admin: failed to reset built-in automations for org %s: %v", orgID, err)
 		var settingsError *factoryactions.BuiltInAutomationSettingsError
@@ -86,12 +115,7 @@ func (s *Server) adminResetBuiltInAutomation(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	result, err := factoryactions.ResetBuiltInAutomationInAllOrganizations(r.Context(), templateID, factoryactions.IntakeDependencies{
-		Registry:       s.registry,
-		Encryptor:      s.encryptor,
-		AuthService:    s.authService,
-		WebhookBaseURL: s.WebhooksBaseURL,
-	})
+	result, err := factoryactions.ResetBuiltInAutomationInAllOrganizations(r.Context(), templateID, s.builtInAutomationDependencies())
 	if err != nil {
 		if errors.Is(err, factoryactions.ErrUnknownBuiltInAutomation) {
 			http.Error(w, "This automation is not built in.", http.StatusBadRequest)

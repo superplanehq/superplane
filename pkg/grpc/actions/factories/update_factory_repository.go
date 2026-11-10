@@ -5,11 +5,13 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"reflect"
 	"slices"
 	"strings"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
@@ -24,12 +26,19 @@ const (
 	legacyDefaultBranchExpression = "{{ install_params.defaultBranch }}"
 	orderRepositoryExpression     = "{{ task().repository }}"
 	orderDefaultBranchExpression  = "{{ task().default_branch }}"
+	// Exact token baked into older Implement commands. Replace the token only.
+	// A substring replace of "main" would change unrelated text.
+	legacyCheckoutBaseToken = "${BASE:-main}"
+	remoteHeadCheckoutBase  = "${BASE:-$(git symbolic-ref -q --short refs/remotes/origin/HEAD | sed 's#^origin/##' || true)}"
 )
 
 // UpdateFactoryRepository changes the repository that factory-managed
-// automations use. It snapshots active work orders before publishing the
-// generated canvas changes, so an in-progress order stays on its original
-// repository and branch.
+// automations use. It snapshots work orders before publishing canvas changes.
+// Closed tasks keep that snapshot. When retarget_tasks is unset or true,
+// unfinished tasks that still use the previous repository, and have no
+// branch or the previous branch, move to the saved repository and branch.
+// A false value keeps those tasks unchanged. A task with a running line
+// stays unchanged.
 func UpdateFactoryRepository(
 	ctx context.Context,
 	deps IntakeDependencies,
@@ -191,6 +200,7 @@ func UpdateFactoryRepository(
 			previous.BacklogRepository,
 			previousBranch,
 			selectedRepository,
+			retargetTasksRequested(req.RetargetTasks),
 		)
 	})
 	if err != nil {
@@ -199,6 +209,9 @@ func UpdateFactoryRepository(
 		}
 		return nil, factoryErrorToStatus(err, "failed to update factory repository")
 	}
+	// Workspace-scope triggers keep the same expression, so only a new Setup
+	// moves their webhooks to the new primary repository.
+	refreshWorkspaceRepositoryAutomations(ctx, deps, factory)
 
 	lines, err := factory.ListLines(db)
 	if err != nil {
@@ -249,6 +262,13 @@ func factoryDefaultBranchFromNodes(nodes []models.Node) string {
 	return defaultBranch
 }
 
+func retargetTasksRequested(flag *bool) bool {
+	if flag == nil {
+		return true
+	}
+	return *flag
+}
+
 func reconcileFactoryRepository(
 	ctx context.Context,
 	tx *gorm.DB,
@@ -257,6 +277,7 @@ func reconcileFactoryRepository(
 	actorID uuid.UUID,
 	previousVCSIntegrationID, vcsIntegrationID string,
 	previousAppRepository, previousBacklogRepository, previousDefaultBranch, repository string,
+	retargetTasks bool,
 ) error {
 	canvasesForFactory, err := factory.ListCanvases(tx)
 	if err != nil {
@@ -269,6 +290,22 @@ func reconcileFactoryRepository(
 	handlers, err := factory.ListPRFeedbackHandlers(tx)
 	if err != nil {
 		return err
+	}
+	config := factory.OnboardingConfigValue()
+	nextBranch := strings.TrimSpace(config.DefaultBranch)
+	previousGitHubHost := githubHostForVCSIntegration(tx, factory.OrganizationID, previousVCSIntegrationID)
+	nextGitHubHost := githubHostForVCSIntegration(tx, factory.OrganizationID, vcsIntegrationID)
+	if retargetTasks {
+		if err := factory.RetargetUnfinishedWorkOrderBranches(
+			tx,
+			previousAppRepository,
+			repository,
+			previousDefaultBranch,
+			nextBranch,
+			config.EffectiveVCSProvider(),
+		); err != nil {
+			return err
+		}
 	}
 	previousIntegrationName, integrationName := "", ""
 	if previousVCSIntegrationID != "" && previousVCSIntegrationID != vcsIntegrationID {
@@ -336,6 +373,24 @@ func reconcileFactoryRepository(
 			case "visual-evidence":
 				managedRunnerNodeIDs["capture-visual-evidence"] = true
 				changed = replaceNodeConfigurationValues(nodes, []configurationReplacement{{from: previousAppRepository, to: repository}}) || changed
+			case scheduledIntakeTemplateID:
+				changed = replaceWorkspaceCheckoutTarget(nodes, config.EffectiveVCSProvider(), previousAppRepository, repository, previousDefaultBranch, nextBranch, previousGitHubHost, nextGitHubHost) || changed
+			}
+			if template.id == "line-implementation" {
+				changed = replaceLegacyCheckoutBaseToken(nodes, managedRunnerNodeIDs) || changed
+			}
+		}
+		if models.FactoryAppTemplateID(nodes) == models.FactoryAppTemplateCustomAutomationID {
+			changed = replaceWorkspaceCheckoutTarget(nodes, config.EffectiveVCSProvider(), previousAppRepository, repository, previousDefaultBranch, nextBranch, previousGitHubHost, nextGitHubHost) || changed
+		}
+		if models.FactoryAppTemplateID(nodes) == models.FactoryAppTemplateCustomAutomationID &&
+			slices.ContainsFunc(nodes, func(node models.Node) bool { return node.ComponentName() == "schedule" }) {
+			for i := range nodes {
+				if !isFactoryAgentHarness(nodes[i].ComponentName()) {
+					continue
+				}
+				managedRunnerNodeIDs[nodes[i].ID] = true
+				changed = refreshCustomAutomationCheckout(&nodes[i], factory, nextGitHubHost) || changed
 			}
 		}
 		if _, ok := intakeCanvasIDs[canvas.ID]; ok {
@@ -398,6 +453,54 @@ func reconcileFactoryRepository(
 	}
 
 	return ensureFactoryMergeabilityWebhook(ctx, tx, deps, factory)
+}
+
+func sharedTaskCheckout(environment []any) bool {
+	for _, value := range environment {
+		entry, ok := value.(map[string]any)
+		if ok && configString(entry, "name") == "REPO" && strings.Contains(configString(entry, "value"), "workOrder?.repository") {
+			return true
+		}
+	}
+	return false
+}
+
+func checkoutNamesUseExpressions(environment []any, names ...string) bool {
+	for _, value := range environment {
+		entry, ok := value.(map[string]any)
+		if !ok || !slices.Contains(names, configString(entry, "name")) {
+			continue
+		}
+		if strings.Contains(configString(entry, "value"), "{{") {
+			return true
+		}
+	}
+	return false
+}
+
+func refreshCustomAutomationCheckout(node *models.Node, factory *models.Factory, githubHost string) bool {
+	current, _ := node.Configuration["environment"].([]any)
+	shared := sharedTaskCheckout(current)
+	// A task trigger checks out the task repository. Keep those expressions.
+	if checkoutNamesUseExpressions(current, "REPO", "BASE") && !shared {
+		return false
+	}
+	checkout := customAutomationCheckoutEnvironment(factory, pb.FactoryCustomAutomation_START_MODE_SCHEDULED, githubHost, false)
+	if shared {
+		checkout = backlogSharedCheckoutEnvironment(factory, githubHost)
+	}
+	// Only checkout variables belong to the workspace. Preserve user-added values.
+	updated := slices.DeleteFunc(slices.Clone(current), func(value any) bool {
+		entry, ok := value.(map[string]any)
+		return ok && slices.Contains([]string{"REPO", "REPO_URL", "SOURCE_REPO", "BASE"}, configString(entry, "name"))
+	})
+	updated = append(updated, checkout...)
+	if reflect.DeepEqual(current, updated) {
+		return false
+	}
+	node.Configuration = maps.Clone(node.Configuration)
+	node.Configuration["environment"] = updated
+	return true
 }
 
 func factoryTemplateVCSNodeIDs(templateID string) []string {
@@ -609,6 +712,114 @@ func replaceConfigurationValues(value any, replacements []configurationReplaceme
 			}
 		}
 		return current, false
+	default:
+		return value, false
+	}
+}
+
+// replaceWorkspaceCheckoutTarget keeps a baked checkout on the workspace
+// repository and branch together. A repository change rewrites the repository
+// slug and its clone URL. A branch change rewrites only BASE.
+func replaceWorkspaceCheckoutTarget(nodes []models.Node, provider, previousRepository, nextRepository, previousBranch, nextBranch, previousGitHubHost, nextGitHubHost string) bool {
+	changed := replaceLiteralCheckoutBase(nodes, previousBranch, nextBranch)
+	previousRepository = strings.TrimSpace(previousRepository)
+	nextRepository = strings.TrimSpace(nextRepository)
+	if previousRepository == "" || nextRepository == "" || sameRepository(previousRepository, nextRepository) {
+		return changed
+	}
+	return replaceNodeConfigurationValues(nodes, []configurationReplacement{
+		{from: previousRepository, to: nextRepository},
+		{from: runner.WorkspaceContextRepoURL(provider, previousRepository, previousGitHubHost), to: runner.WorkspaceContextRepoURL(provider, nextRepository, nextGitHubHost)},
+	}) || changed
+}
+
+// replaceLiteralCheckoutBase rewrites a BASE value that is exactly the previous
+// workspace branch. It leaves every other scalar unchanged.
+func replaceLiteralCheckoutBase(nodes []models.Node, previousBranch, nextBranch string) bool {
+	previousBranch = strings.TrimSpace(previousBranch)
+	nextBranch = strings.TrimSpace(nextBranch)
+	if nextBranch == "" || previousBranch == nextBranch {
+		return false
+	}
+
+	changed := false
+	for i := range nodes {
+		environment, ok := nodes[i].Configuration["environment"].([]any)
+		if !ok {
+			continue
+		}
+		nextEnvironment := slices.Clone(environment)
+		updated := false
+		for j, item := range nextEnvironment {
+			entry, ok := item.(map[string]any)
+			if !ok || entry["name"] != "BASE" {
+				continue
+			}
+			value, _ := entry["value"].(string)
+			if strings.TrimSpace(value) != previousBranch {
+				continue
+			}
+			cloned := maps.Clone(entry)
+			cloned["value"] = nextBranch
+			nextEnvironment[j] = cloned
+			updated = true
+		}
+		if !updated {
+			continue
+		}
+		nodes[i].Configuration = maps.Clone(nodes[i].Configuration)
+		nodes[i].Configuration["environment"] = nextEnvironment
+		changed = true
+	}
+	return changed
+}
+
+// replaceLegacyCheckoutBaseToken rewrites the exact ${BASE:-main} token inside
+// managed Implement commands. It does not replace the word main.
+func replaceLegacyCheckoutBaseToken(nodes []models.Node, managedNodeIDs map[string]bool) bool {
+	changed := false
+	for i := range nodes {
+		if !managedNodeIDs[nodes[i].ID] {
+			continue
+		}
+		configuration, nodeChanged := replaceCommandToken(nodes[i].Configuration, legacyCheckoutBaseToken, remoteHeadCheckoutBase)
+		if !nodeChanged {
+			continue
+		}
+		nodes[i].Configuration = configuration.(map[string]any)
+		changed = true
+	}
+	return changed
+}
+
+func replaceCommandToken(value any, token, replacement string) (any, bool) {
+	switch current := value.(type) {
+	case map[string]any:
+		cloned := maps.Clone(current)
+		changed := false
+		for key, child := range cloned {
+			if key == "command" {
+				text, ok := child.(string)
+				if ok && strings.Contains(text, token) {
+					cloned[key] = strings.ReplaceAll(text, token, replacement)
+					changed = true
+					continue
+				}
+			}
+			next, childChanged := replaceCommandToken(child, token, replacement)
+			cloned[key] = next
+			changed = changed || childChanged
+		}
+		return cloned, changed
+	case []any:
+		cloned := slices.Clone(current)
+		changed := false
+		for i, child := range cloned {
+			next, childChanged := replaceCommandToken(child, token, replacement)
+			cloned[i] = next
+			changed = changed || childChanged
+		}
+		return cloned, changed
 	default:
 		return value, false
 	}

@@ -117,7 +117,7 @@ func TestBuildOpenRouterTaskOmitsMaxTurnsArgv(t *testing.T) {
 	require.GreaterOrEqual(t, len(task.Commands), 2)
 	require.Contains(t, task.Commands[1].Command, `node "$SUPERPLANE_TASK_DIR/run.js" "$SUPERPLANE_TASK_DIR/prompts/01-prompt.txt" 'anthropic/claude-sonnet-4-6'`)
 	require.NotContains(t, task.Commands[1].Command, " 64")
-	require.Equal(t, "fix tests", requireTaskFile(t, task.Files, "prompts/01-prompt.txt").Content)
+	require.Contains(t, requireTaskFile(t, task.Files, "prompts/01-prompt.txt").Content, "fix tests")
 }
 
 func TestBuildOpenRouterTaskPassesThinking(t *testing.T) {
@@ -201,8 +201,7 @@ func TestAttachPlanningSessionFilesShipsMCP(t *testing.T) {
 		Name:  runner.EnvSuperplanePlanningID,
 		Value: "session-1",
 	}})
-	require.Equal(t, runner.PlanningSessionMCPScript(), requireTaskFile(t, got.Files, "planning_session_mcp.js").Content)
-	require.Equal(t, runner.PlanningSessionMCPConfigJSON(), requireTaskFile(t, got.Files, "mcp.json").Content)
+	require.Equal(t, runner.AgentMessageFile().Content, requireTaskFile(t, got.Files, "agent_message.js").Content)
 	require.Equal(t, runner.PlanningSessionProtocolFile().Content, requireTaskFile(t, got.Files, "analysis_protocol.js").Content)
 	require.Equal(t, runner.PlanningSessionProtocolMarkdownFile().Content, requireTaskFile(t, got.Files, "analysis_protocol_review.md").Content)
 	for _, file := range got.Files {

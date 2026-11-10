@@ -1,8 +1,8 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
-import { describe, expect, it, vi } from "bun:test";
+import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { TooltipProvider } from "@/ui/tooltip";
@@ -13,6 +13,22 @@ import {
   DEFAULT_SENTRY_INTAKE_SETTINGS,
   type IntakeSourceSettings,
 } from "./intakeSourceSettingsModel";
+
+const ownerMode = vi.hoisted(() => ({ subscription: false }));
+vi.mock("../layout/factoriesLayoutContext", () => ({
+  useOptionalFactoriesLayout: () =>
+    ownerMode.subscription ? { factoryId: "factory", factory: { onboarding: { codexSubscription: true } } } : null,
+}));
+vi.mock("@/hooks/useFactoryOwnerEligibility", () => ({
+  useFactoryOwnerEligibility: () => ({
+    data: { members: [{ userId: "alice", eligible: true }] },
+    isPending: false,
+    isError: false,
+  }),
+}));
+beforeEach(() => {
+  ownerMode.subscription = false;
+});
 
 vi.mock("@/contexts/usePermissions", () => ({ usePermissions: () => ({ currentUserId: "alice" }) }));
 
@@ -32,6 +48,8 @@ function popup(
           <TooltipProvider>
             <IntakeSourceSettingsPopup
               settings={settings}
+              canEdit
+              accessLoading={false}
               organizationId={organizationId}
               sourceId={sourceId}
               labelOptions={labelOptions}
@@ -48,8 +66,9 @@ function popup(
 
 async function pickLabel(name: string) {
   const user = userEvent.setup();
-  await user.click(screen.getByRole("checkbox", { name: "Issue has one of these labels" }));
-  await user.click(within(screen.getByTestId("intake-label-options")).getByRole("checkbox", { name }));
+  await user.click(screen.getByRole("radio", { name: "Only issues with selected labels" }));
+  await user.click(screen.getByRole("combobox", { name: "Search or add a label" }));
+  await user.click(screen.getByRole("option", { name }));
   return user;
 }
 
@@ -59,6 +78,7 @@ describe("IntakeSourceSettingsPopup draft", () => {
     expect(screen.queryByRole("button", { name: "Default task owner" })).not.toBeInTheDocument();
   });
   it("keeps the selected Sentry owner in the draft until Save", async () => {
+    ownerMode.subscription = true;
     queryClient.setQueryData(["organization", "users", "org-owner"], {
       users: [{ metadata: { id: "alice" }, spec: { displayName: "Alice" } }],
     });
@@ -74,20 +94,21 @@ describe("IntakeSourceSettingsPopup draft", () => {
     );
     const user = userEvent.setup();
     expect(screen.getByRole("tab", { name: "General" })).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Default task owner" }));
+    await user.click(screen.getByRole("combobox", { name: /Default task owner/ }));
     await user.click(await screen.findByRole("option", { name: "Alice" }));
     expect(onSave).not.toHaveBeenCalled();
     await user.click(screen.getByTestId("intake-source-settings-save"));
     await waitFor(() => expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ defaultOwnerId: "alice" })));
   });
   it("keeps the selected owner in the draft until Save", async () => {
+    ownerMode.subscription = true;
     queryClient.setQueryData(["organization", "users", "org-owner"], {
       users: [{ metadata: { id: "alice" }, spec: { displayName: "Alice" } }],
     });
     const onSave = vi.fn();
     render(popup(DEFAULT_GITHUB_INTAKE_SETTINGS, [], onSave, "org-owner"));
     const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: "Default task owner" }));
+    await user.click(screen.getByRole("combobox", { name: /Default task owner/ }));
     await user.click(await screen.findByRole("option", { name: "Alice" }));
     expect(onSave).not.toHaveBeenCalled();
     await user.click(screen.getByTestId("intake-source-settings-save"));

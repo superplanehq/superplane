@@ -77,7 +77,7 @@ func TestSelectBitbucketRepositoryUsesTheForgeInstallation(t *testing.T) {
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-	response, err := SelectFactoryVCSProviderRepository(ctx, r.Organization.ID.String(), &pb.SelectFactoryVCSProviderRepositoryRequest{
+	response, err := SelectFactoryVCSProviderRepository(ctx, IntakeDependencies{}, r.Organization.ID.String(), &pb.SelectFactoryVCSProviderRepositoryRequest{
 		Id:         factory.ID.String(),
 		Provider:   models.ProviderBitbucket,
 		Repository: "acme/api",
@@ -193,7 +193,7 @@ func TestUpdateFactoryRepositoryBitbucketKeepsRequestedCatalogBranch(t *testing.
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-	selected, err := SelectFactoryVCSProviderRepository(ctx, r.Organization.ID.String(), &pb.SelectFactoryVCSProviderRepositoryRequest{
+	selected, err := SelectFactoryVCSProviderRepository(ctx, IntakeDependencies{}, r.Organization.ID.String(), &pb.SelectFactoryVCSProviderRepositoryRequest{
 		Id: factory.ID.String(), Provider: models.ProviderBitbucket, Repository: "acme/api",
 	})
 	require.NoError(t, err)
@@ -233,7 +233,7 @@ func TestUpdateFactoryRepositoryBitbucketRejectsUnknownBranch(t *testing.T) {
 	assert.Equal(t, "main", reloaded.OnboardingConfigValue().DefaultBranch)
 }
 
-func TestUpdateFactoryRepositoryBitbucketBranchSaveKeepsStartedTasks(t *testing.T) {
+func TestUpdateFactoryRepositoryBitbucketBranchSaveMovesUnfinishedTasks(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 	factory := tokenBitbucketFactory(t, r, "main")
@@ -258,7 +258,7 @@ func TestUpdateFactoryRepositoryBitbucketBranchSaveKeepsStartedTasks(t *testing.
 	var kept models.FactoryWorkOrder
 	require.NoError(t, db.First(&kept, "id = ?", started.ID).Error)
 	require.NotNil(t, kept.DefaultBranch)
-	assert.Equal(t, "main", *kept.DefaultBranch)
+	assert.Equal(t, "develop", *kept.DefaultBranch)
 	reloaded, err := models.FindFactory(db, r.Organization.ID, factory.ID)
 	require.NoError(t, err)
 	created, err := reloaded.CreateWorkOrder(db, "Next", "", &r.User, nil, nil)

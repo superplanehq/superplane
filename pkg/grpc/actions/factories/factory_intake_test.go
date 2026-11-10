@@ -13,7 +13,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/components/factory"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
@@ -54,27 +53,24 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		return response.GetIntake()
 	}
 
-	t.Run("subscription intake defaults only a new intake to its eligible creator", func(t *testing.T) {
+	t.Run("subscription intake requires a connected default and retains it after disconnection", func(t *testing.T) {
 		db := database.DB(t.Context())
-		require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureCodexSubscriptions))
 		f := newFactory(t)
 		subscription := true
 		require.NoError(t, f.UpdateOnboarding(db, models.FactoryOnboardingPatch{CodexSubscription: &subscription}))
-		// Existing empty defaults must stay empty when a connection is added.
-		existing := create(t, f, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES})
-		assert.Empty(t, existing.Settings.GetDefaultOwnerId())
-		connection, err := models.CreateFactoryCodexConnection(db, r.Organization.ID, f.ID, r.User, time.Now())
+		_, err := CreateFactoryIntake(ctx, deps, orgID, &pb.CreateFactoryIntakeRequest{FactoryId: f.ID.String(), Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES})
+		require.Error(t, err)
+		connection, err := models.CreateCodexConnection(db, r.Organization.ID, r.User, time.Now())
 		require.NoError(t, err)
 		require.NoError(t, db.Model(connection).Updates(map[string]any{"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("bundle")}).Error)
-		implicit := create(t, f, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES})
-		assert.Equal(t, r.User.String(), implicit.Settings.GetDefaultOwnerId())
-		// The published graph carries the owner before initial events can run.
-		assert.Equal(t, r.User.String(), liveIntakeNode(t, r.Organization.ID, implicit, "create-work-order").Configuration["defaultOwnerId"])
-		cleared := create(t, f, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES, Settings: &pb.FactoryIntake_Settings{DefaultOwnerId: proto.String("")}})
-		assert.Empty(t, cleared.Settings.GetDefaultOwnerId())
-		updated, err := UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{FactoryId: f.ID.String(), IntakeId: existing.Id, Settings: &pb.FactoryIntake_Settings{Labels: []string{"urgent"}}})
+		intake := create(t, f, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES, Settings: &pb.FactoryIntake_Settings{DefaultOwnerId: proto.String(r.User.String())}})
+		require.Equal(t, r.User.String(), intake.Settings.GetDefaultOwnerId())
+		_, err = UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{FactoryId: f.ID.String(), IntakeId: intake.Id, Settings: &pb.FactoryIntake_Settings{DefaultOwnerId: proto.String("")}})
+		require.Error(t, err)
+		require.NoError(t, db.Model(connection).Update("status", models.CodexConnectionStatusDisconnected).Error)
+		updated, err := UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{FactoryId: f.ID.String(), IntakeId: intake.Id, Settings: &pb.FactoryIntake_Settings{Labels: []string{"urgent"}, DefaultOwnerId: proto.String(r.User.String())}})
 		require.NoError(t, err)
-		assert.Empty(t, updated.Intake.Settings.GetDefaultOwnerId())
+		assert.Equal(t, r.User.String(), updated.Intake.Settings.GetDefaultOwnerId())
 	})
 
 	t.Run("default owner survives API saves and explicit clearing", func(t *testing.T) {
@@ -166,8 +162,6 @@ func Test__FactoryIntakeActions(t *testing.T) {
 			require.True(t, ok)
 			assert.Equal(t, codes.InvalidArgument, code)
 		}
-		_, err = CreateFactoryIntake(ctx, deps, orgID, &pb.CreateFactoryIntakeRequest{FactoryId: f.ID.String(), Source: pb.FactoryIntake_SOURCE_PRODUCTIVE_TASKS, Settings: &pb.FactoryIntake_Settings{DefaultOwnerId: proto.String("")}})
-		require.Error(t, err)
 	})
 
 	t.Run("Sentry default owner survives API saves and explicit clearing", func(t *testing.T) {
@@ -412,7 +406,112 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		}
 	})
 
-	t.Run("a Linear intake rejects a connection without a project", func(t *testing.T) {
+	createLinearTeamIntegration := func(t *testing.T) string {
+		t.Helper()
+		integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "linear")
+		require.NoError(t, database.DB(t.Context()).
+			Model(&models.Integration{}).
+			Where("id = ?", integrationID).
+			Update("metadata", datatypes.NewJSONType(map[string]any{
+				"teams": []any{map[string]any{"id": "team-1", "key": "ENG", "name": "Engineering"}},
+			})).Error)
+		return integrationID
+	}
+
+	t.Run("a Linear intake can listen to a team without projects", func(t *testing.T) {
+		factory := newFactory(t)
+		integrationID := createLinearTeamIntegration(t)
+
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{
+			Source:        pb.FactoryIntake_SOURCE_LINEAR_ISSUES,
+			IntegrationId: integrationID,
+			Settings:      &pb.FactoryIntake_Settings{LinearTeamId: "team-1", LinearLabels: []string{"bug"}},
+		})
+
+		trigger := liveIntakeTrigger(t, r.Organization.ID, intake)
+		assert.Equal(t, "team-1", trigger.Configuration["team"])
+		assert.Equal(t, []any{}, trigger.Configuration["projects"])
+		assert.Empty(t, nodeErrorMessage(trigger))
+		settings := intake.GetSettings()
+		assert.Equal(t, "team-1", settings.GetLinearTeamId())
+		assert.Empty(t, settings.GetLinearProjectIds())
+		assert.True(t, settings.GetLinearIncludeIssuesWithoutProject())
+		assert.Equal(t, []string{"bug"}, settings.GetLinearLabels())
+	})
+
+	t.Run("a Linear team intake keeps its project filter when it saves a new connection", func(t *testing.T) {
+		factory := newFactory(t)
+		integrationID := createLinearTeamIntegration(t)
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{
+			Source:        pb.FactoryIntake_SOURCE_LINEAR_ISSUES,
+			IntegrationId: integrationID,
+			Settings:      &pb.FactoryIntake_Settings{LinearTeamId: "team-1"},
+		})
+
+		resourceID := "project-1"
+		response, err := UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{
+			FactoryId:     factory.ID.String(),
+			IntakeId:      intake.GetId(),
+			IntegrationId: &integrationID,
+			ResourceId:    &resourceID,
+			Settings: &pb.FactoryIntake_Settings{
+				LinearProjectIds:                  []string{"project-1"},
+				LinearIncludeIssuesWithoutProject: proto.Bool(false),
+			},
+		})
+		require.NoError(t, err)
+
+		trigger := liveIntakeTrigger(t, r.Organization.ID, response.GetIntake())
+		assert.Equal(t, "team-1", trigger.Configuration["team"])
+		assert.Equal(t, []any{}, trigger.Configuration["projects"])
+		settings := response.GetIntake().GetSettings()
+		assert.Equal(t, "team-1", settings.GetLinearTeamId())
+		assert.Equal(t, []string{"project-1"}, settings.GetLinearProjectIds())
+		assert.False(t, settings.GetLinearIncludeIssuesWithoutProject())
+	})
+
+	t.Run("a Linear intake with projects and no team saves without a team", func(t *testing.T) {
+		factory := newFactory(t)
+		integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "linear")
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{
+			Source:        pb.FactoryIntake_SOURCE_LINEAR_ISSUES,
+			IntegrationId: integrationID,
+			ResourceId:    "project-1",
+		})
+		assert.Empty(t, intake.GetSettings().GetLinearTeamId())
+
+		response, err := UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{
+			FactoryId: factory.ID.String(),
+			IntakeId:  intake.GetId(),
+			Settings:  &pb.FactoryIntake_Settings{LinearProjectIds: []string{"project-1"}, ConfidencePct: 70},
+		})
+		require.NoError(t, err)
+
+		trigger := liveIntakeTrigger(t, r.Organization.ID, response.GetIntake())
+		assert.Equal(t, []any{"project-1"}, trigger.Configuration["projects"])
+		assert.NotContains(t, trigger.Configuration, "team")
+	})
+
+	t.Run("a Linear intake cannot save without a team or projects", func(t *testing.T) {
+		factory := newFactory(t)
+		integrationID := createLinearTeamIntegration(t)
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{
+			Source:        pb.FactoryIntake_SOURCE_LINEAR_ISSUES,
+			IntegrationId: integrationID,
+			ResourceId:    "project-1",
+		})
+
+		_, err := UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{
+			FactoryId: factory.ID.String(),
+			IntakeId:  intake.GetId(),
+			Settings:  &pb.FactoryIntake_Settings{},
+		})
+		require.Error(t, err)
+		assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
+		assert.Contains(t, err.Error(), "a Linear team is required")
+	})
+
+	t.Run("a Linear intake rejects a connection without a team or project", func(t *testing.T) {
 		factory := newFactory(t)
 		integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "linear")
 

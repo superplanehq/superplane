@@ -2,7 +2,9 @@ import { useState, type ReactNode } from "react";
 import { AlertCircle, Loader2, MoreHorizontal, RefreshCw } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { usePageTitle } from "@/hooks/usePageTitle";
+import { segmentedNavClassName } from "@/lib/segmentedNav";
 import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { SegmentedNav } from "@/ui/SegmentedNav";
@@ -138,6 +140,21 @@ function VelocityHeader({ model }: { model: VelocityPageModel }) {
   return (
     <>
       <VelocityHeaderBar model={model} />
+      {model.repositoryFilter.enabled ? (
+        <div className={cn(factoryCenteredSectionBodyClassName, "pb-4")}>
+          <p className="text-xs text-muted-foreground">
+            {model.repositoryFilter.selected
+              ? "Delivery and manual authorship use the selected repository. "
+              : "Delivery covers all workspace repositories. "}
+            Tasks, task time, costs, and automations cover the workspace.
+          </p>
+          {model.velocity.peopleSyncPending ? (
+            <p className="mt-1 text-xs text-muted-foreground">
+              SuperPlane is collecting repository merges. Manual work is available after collection completes.
+            </p>
+          ) : null}
+        </div>
+      ) : null}
       {model.sync.isSyncing ? (
         <div className={cn(factoryCenteredSectionBodyClassName, "pt-1 pb-4")}>
           <VelocitySyncProgress />
@@ -153,12 +170,36 @@ function VelocityHeaderBar({ model }: { model: VelocityPageModel }) {
       className={factoryCenteredSectionHeaderClassName}
       title="Velocity"
       subtitle={
-        model.repository
+        model.repository && !model.repositoryFilter.enabled
           ? `What ${model.repository} ships, how long the work takes, and what it costs.`
           : "What this workspace ships, how long the work takes, and what it costs."
       }
       actions={
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {model.repositoryFilter.enabled ? (
+            <Select
+              value={model.repositoryFilter.selected || "all"}
+              onValueChange={(value) => model.repositoryFilter.select(value === "all" ? "" : value)}
+            >
+              <SelectTrigger
+                aria-label="Repository"
+                className={cn(
+                  segmentedNavClassName("xs"),
+                  "w-44 justify-between border-0 bg-slate-100! px-2 text-xs font-medium text-slate-500! shadow-none data-[size=default]:h-6 dark:bg-gray-800! dark:text-gray-400!",
+                )}
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All repositories</SelectItem>
+                {model.repositoryFilter.choices.map((repository) => (
+                  <SelectItem key={repository} value={repository}>
+                    {repository}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : null}
           <SegmentedNav
             ariaLabel="Velocity period in days"
             size="xs"

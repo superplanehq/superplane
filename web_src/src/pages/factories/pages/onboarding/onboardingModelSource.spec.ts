@@ -20,6 +20,12 @@ describe("onboardingModelSource", () => {
     expect(readOnboardingModelSource("factory-1")).toBeNull();
   });
 
+  it("ignores a saved subscription choice from older onboarding", () => {
+    localStorage.setItem("superplane:onboarding-model-source:factory-1", "subscription");
+
+    expect(readOnboardingModelSource("factory-1")).toBeNull();
+  });
+
   it("does nothing without a factory", () => {
     writeOnboardingModelSource("", "own-key");
 

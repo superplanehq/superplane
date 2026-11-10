@@ -19,14 +19,19 @@ type artifactAddCommand struct {
 	file      *string
 	url       *string
 	name      *string
+	fileID    *string
 }
 
+// An uploaded file stays on the task when the artifact is rejected, so the
+// CLI rejects a title that is too long before it uploads.
+const maxFileArtifactTitleBytes = 1024
+
 func (c *artifactAddCommand) Execute(ctx core.CommandContext) error {
-	rawTaskID := strings.TrimSpace(stringValue(c.taskID))
+	rawTaskID := taskRef(c.taskID)
 	artifactType := strings.ToLower(strings.TrimSpace(stringValue(c.typ)))
 
 	if rawTaskID == "" {
-		return fmt.Errorf("--task is required")
+		return errTaskRequired
 	}
 
 	workspaceID, err := resolveWorkspace(ctx, c.workspace)
@@ -39,7 +44,17 @@ func (c *artifactAddCommand) Execute(ctx core.CommandContext) error {
 		return err
 	}
 
-	data, protoType, err := c.buildData(ctx, artifactType)
+	var (
+		data       map[string]any
+		protoType  openapi_client.FactoriesWorkOrderArtifactType
+		uploadedID string
+	)
+	if artifactType == "file" {
+		data, uploadedID, err = c.fileData(ctx, workspaceID, taskID)
+		protoType = openapi_client.FACTORIESWORKORDERARTIFACTTYPE_TYPE_FILE
+	} else {
+		data, protoType, err = c.buildData(ctx, artifactType)
+	}
 	if err != nil {
 		return err
 	}
@@ -52,6 +67,9 @@ func (c *artifactAddCommand) Execute(ctx core.CommandContext) error {
 		FactoriesCreateWorkOrderArtifact(ctx.Context, workspaceID, taskID).
 		Body(*body).
 		Execute()
+	if err != nil && uploadedID != "" {
+		return fmt.Errorf("attach uploaded file %s: %w (retry with --file-id %s to skip the upload)", uploadedID, err, uploadedID)
+	}
 	if err != nil {
 		return err
 	}
@@ -110,8 +128,37 @@ func (c *artifactAddCommand) buildData(
 		return data, openapi_client.FACTORIESWORKORDERARTIFACTTYPE_TYPE_LINK, nil
 
 	default:
-		return nil, "", fmt.Errorf("unknown artifact type %q (expected markdown, branch, or link)", artifactType)
+		return nil, "", fmt.Errorf("unknown artifact type %q (expected markdown, branch, link, or file)", artifactType)
 	}
+}
+
+// fileData returns the data of a file artifact. It uploads --file, or uses
+// the file that --file-id names. uploadedID is set only after an upload.
+func (c *artifactAddCommand) fileData(
+	ctx core.CommandContext,
+	workspaceID, taskID string,
+) (data map[string]any, uploadedID string, err error) {
+	path := strings.TrimSpace(stringValue(c.file))
+	fileID := strings.TrimSpace(stringValue(c.fileID))
+	if (path == "") == (fileID == "") || path == "-" {
+		return nil, "", fmt.Errorf("pass --file or --file-id for type file")
+	}
+	title := strings.TrimSpace(stringValue(c.title))
+	if len(title) > maxFileArtifactTitleBytes {
+		return nil, "", fmt.Errorf("--title must be at most %d bytes", maxFileArtifactTitleBytes)
+	}
+	if fileID == "" {
+		fileID, err = uploadTaskArtifactFile(ctx, workspaceID, taskID, path)
+		if err != nil {
+			return nil, "", err
+		}
+		uploadedID = fileID
+	}
+	data = map[string]any{"fileId": fileID}
+	if title != "" {
+		data["title"] = title
+	}
+	return data, uploadedID, nil
 }
 
 func (c *artifactAddCommand) resolveMarkdownBody(ctx core.CommandContext) (string, error) {

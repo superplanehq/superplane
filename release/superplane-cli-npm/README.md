@@ -23,8 +23,8 @@ Windows is not yet supported through this package.
 ## Alternatives
 
 - Direct download: `curl -fsSL https://install.superplane.com/install.sh | sh`
-- Debian / Ubuntu: see the
-  [APT install instructions](https://docs.superplane.com/installation/cli).
+
+Public APT publishing is retired. Use npm or direct download on Debian and Ubuntu.
 
 ## Links
 

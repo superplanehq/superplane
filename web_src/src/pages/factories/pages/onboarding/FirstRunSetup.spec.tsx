@@ -4,6 +4,7 @@ import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 import { FIRST_RUN_COPY } from "./first-run/firstRunCopy";
+import { EMPTY_LINEAR_INTAKE_SCOPE } from "../linearIntakeScope";
 import { FirstRunSetup } from "./FirstRunSetup";
 import {
   clearGitHubConnectReturnVisit,
@@ -46,6 +47,16 @@ vi.mock("@/lib/toast", () => ({
 
 vi.mock("@/lib/githubAppManifest", () => ({
   startPublicGitHubAppCreate: (...args: unknown[]) => startPublicGitHubAppCreate(...args),
+}));
+
+vi.mock("./useFirstRunGitHubEnterprise", () => ({
+  useFirstRunGitHubEnterprise: () => ({
+    connect: vi.fn(),
+    submitOwner: vi.fn(),
+    resume: vi.fn(),
+    ready: false,
+    currentStepName: "",
+  }),
 }));
 
 vi.mock("./useBitbucketOnboarding", () => ({
@@ -128,14 +139,6 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
     hostedModelsAvailableLoading: false,
     bringYourOwnKey: false,
     bringYourOwnKeyLoading: false,
-    codexSubscriptionOffered: false,
-    codexSubscriptionLoading: false,
-    codexConnection: undefined,
-    codexSubscriptionReady: false,
-    startCodexConnection: vi.fn(),
-    cancelCodexConnection: vi.fn(),
-    codexStarting: false,
-    codexCanceling: false,
     customProvider: false,
     agentCredentialChoice: null,
     setAgentCredentialChoice: vi.fn(),
@@ -147,7 +150,18 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
     selectCatalogRepository: vi.fn().mockResolvedValue(true),
     selectBitbucketRepository: vi.fn().mockResolvedValue(true),
     selectBitbucketForgeRepository: vi.fn().mockResolvedValue(true),
+    selectGitHubEnterpriseRepository: vi.fn().mockResolvedValue(true),
+    bindGitHubEnterpriseIntegration: vi.fn(),
+    githubIntegrationId: "",
+    githubHost: "",
     bitbucketIntegrationId: "",
+    branchIntegrationId: "",
+    defaultBranchRequired: false,
+    chosenDefaultBranch: "",
+    setChosenDefaultBranch: vi.fn(),
+    requireDefaultBranch: vi.fn(),
+    clearDefaultBranchRequirement: vi.fn(),
+    saveChosenDefaultBranch: vi.fn().mockResolvedValue(true),
     integrationDialogs: <></>,
     canConfigureWorkspace: true,
     saving: false,
@@ -166,12 +180,8 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
     jiraProjectsError: false,
     retryJiraProjects: vi.fn(),
     linearIntegrationId: "",
-    linearProjectIds: [],
-    toggleLinearProject: vi.fn(),
-    linearProjects: [],
-    linearProjectsLoading: false,
-    linearProjectsError: false,
-    retryLinearProjects: vi.fn(),
+    linearScope: EMPTY_LINEAR_INTAKE_SCOPE,
+    changeLinearScope: vi.fn(),
     ...overrides,
   };
 }

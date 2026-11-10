@@ -45,6 +45,12 @@ func TestNewCommand_Hierarchy(t *testing.T) {
 	require.NotNil(t, assignCmd.Flags().Lookup("assignee"))
 	require.NotNil(t, assignCmd.Flags().Lookup("task"))
 
+	suggestCmd, _, err := root.Find([]string{"suggest-owners"})
+	require.NoError(t, err)
+	require.NotNil(t, suggestCmd.Flags().Lookup("workspace"))
+	require.NotNil(t, suggestCmd.Flags().Lookup("task"))
+	require.NotNil(t, suggestCmd.Flags().Lookup("path"))
+
 	artifactCmd, _, err := root.Find([]string{"artifacts"})
 	require.NoError(t, err)
 	assert.Contains(t, artifactCmd.Aliases, "artifact")
@@ -59,6 +65,19 @@ func TestNewCommand_Hierarchy(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, artifactListCmd.Flags().Lookup("workspace"))
 	require.NotNil(t, artifactListCmd.Flags().Lookup("task"))
+
+	closeCmd, _, err := root.Find([]string{"close"})
+	require.NoError(t, err)
+	require.NotNil(t, closeCmd.Flags().Lookup("workspace"))
+	require.NotNil(t, closeCmd.Flags().Lookup("task"))
+	require.NotNil(t, closeCmd.Flags().Lookup("result"))
+
+	artifactRemoveCmd, _, err := root.Find([]string{"artifacts", "remove"})
+	require.NoError(t, err)
+	require.NotNil(t, artifactRemoveCmd.Flags().Lookup("workspace"))
+	require.NotNil(t, artifactRemoveCmd.Flags().Lookup("task"))
+	require.NotNil(t, artifactRemoveCmd.Flags().Lookup("key"))
+	require.NotNil(t, artifactRemoveCmd.Flags().Lookup("title"))
 }
 
 func TestNewCommand_Aliases(t *testing.T) {
