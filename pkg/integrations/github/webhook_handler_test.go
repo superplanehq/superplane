@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
+	"encoding/json"
 	"encoding/pem"
 	"net/http"
 	"testing"
@@ -41,6 +42,51 @@ func Test__GitHubWebhookHandler__Setup(t *testing.T) {
 		assert.Equal(t, http.MethodPost, httpCtx.Requests[0].Method)
 		assert.Equal(t, "/repos/testhq/hello/hooks", httpCtx.Requests[0].URL.Path)
 	})
+
+	for _, testCase := range []struct {
+		name   string
+		status int
+		body   string
+	}{
+		{name: "updates the saved repository hook", status: http.StatusOK, body: `{"id":456,"name":"web"}`},
+		{name: "returns repository hook update failures", status: http.StatusForbidden, body: `{"message":"Forbidden"}`},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			httpCtx := &contexts.HTTPContext{
+				Responses: []*http.Response{mocks.GitHubResponse(testCase.status, testCase.body)},
+			}
+			metadata, err := (&GitHubWebhookHandler{}).Setup(core.WebhookHandlerContext{
+				HTTP:        httpCtx,
+				Integration: mocks.IntegrationContextForNewSetupFlow(),
+				Webhook: &contexts.WebhookContext{
+					URL:      "https://app.example/api/v1/webhooks/webhook-id",
+					Secret:   []byte("local-webhook-secret"),
+					Metadata: map[string]any{"id": float64(456), "name": "web"},
+					Configuration: common.WebhookConfiguration{
+						Repository: "testhq/hello",
+						EventTypes: []string{"pull_request", "pull_request_review"},
+					},
+				},
+			})
+
+			require.Len(t, httpCtx.Requests, 1)
+			request := httpCtx.Requests[0]
+			assert.Equal(t, http.MethodPatch, request.Method)
+			assert.Equal(t, "/repos/testhq/hello/hooks/456", request.URL.Path)
+			var payload struct {
+				Events []string `json:"events"`
+			}
+			require.NoError(t, json.NewDecoder(request.Body).Decode(&payload))
+			assert.ElementsMatch(t, []string{"pull_request", "pull_request_review"}, payload.Events)
+			if testCase.status != http.StatusOK {
+				require.Error(t, err)
+				assert.Nil(t, metadata)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, &Webhook{ID: 456, WebhookName: "web"}, metadata)
+		})
+	}
 
 	t.Run("registers one hook per workspace repository", func(t *testing.T) {
 		httpCtx := &contexts.HTTPContext{

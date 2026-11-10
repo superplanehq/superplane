@@ -83,15 +83,25 @@ func (s *ExecutionStateContext) prepareMergeConfidenceOutput(channel, payloadTyp
 		return nil, fmt.Errorf("assessment has no reviewed commit")
 	}
 	assessment.Passed = channel == "passed" && len(run.Errors) == 0
-	if channel == "failed" {
-		// A successful downstream publisher must not turn a failed assessment into a passed run.
-		if err := run.AddError(s.tx, "Merge confidence assessment failed.", config.MaxPayloadSize()); err != nil {
-			return nil, err
-		}
-	}
 	assessment.TaskURL = strings.TrimRight(uiBaseURL(), "/") + order.URLPath(workspace.RouteSegment())
 	report := assessment.ReportData()
 	report.PullRequestID = pr.ID.String()
+	if !report.Complete {
+		// Publishing the report must not turn an incomplete assessment into a passed run.
+		message := "Merge confidence assessment failed."
+		var missing []string
+		for _, check := range report.Checks {
+			if check.Missing {
+				missing = append(missing, check.Label)
+			}
+		}
+		if len(missing) > 0 {
+			message = "Merge confidence did not report these checks: " + strings.Join(missing, ", ") + ". Run merge confidence again."
+		}
+		if err := run.AddError(s.tx, message, config.MaxPayloadSize()); err != nil {
+			return nil, err
+		}
+	}
 	outputs := make([]any, len(payloads))
 	for i, payload := range payloads {
 		data, ok := payload.(map[string]any)
