@@ -91,6 +91,7 @@ Run these three steps once, in order:
    `release/runner/Dockerfile`, run `make dev.up` again.
    Local startup requires 15 GB free on the Docker filesystem. If space is
    low, it removes unused build cache and checks again before building.
+   It also attempts this cleanup if the disk probe reports a full disk.
    This cleanup never removes images, containers, or database volumes.
    If space is still low, increase Docker disk space or remove unused images
    manually. CI skips this cleanup. Run `make test.dev.disk` to test recovery.

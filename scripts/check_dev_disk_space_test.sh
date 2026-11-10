@@ -18,7 +18,13 @@ for argument in "$@"; do
 done
 case "$1" in
   run)
-    [ "${PROBE_FAIL:-0}" -eq 0 ] || exit 1
+    error="${BEFORE_ERROR:-}"
+    [ ! -f "$STATE/pruned" ] || error="${AFTER_ERROR:-}"
+    if [ -n "$error" ]; then
+      echo "$error" >&2
+      exit 1
+    fi
+    [ "${PULL_PROGRESS:-0}" -eq 0 ] || echo 'Pull complete' >&2
     available="$BEFORE_KB"
     [ ! -f "$STATE/pruned" ] || available="$AFTER_KB"
     printf 'Filesystem 1024-blocks Used Available Capacity Mounted on\n'
@@ -32,6 +38,7 @@ case "$1" in
     [ "$2" = prune ] || exit 90
     # A separately selected builder must not redirect recovery to another disk.
     case " $* " in *' --builder disk-test-context '*) ;; *) exit 90 ;; esac
+    echo prune >> "$STATE/prune_attempts"
     [ "${PRUNE_FAIL:-0}" -eq 0 ] || exit 1
     touch "$STATE/pruned"
     ;;
@@ -47,7 +54,7 @@ export PATH="$fixture/bin:$PATH" STATE="$fixture" BUILDX_BUILDER=unrelated-build
 run_case() {
   local name="$1" expected_status="$2" expected_cleanup="$3"
   shift 3
-  rm -f "$STATE/pruned" "$STATE/started"
+  rm -f "$STATE/pruned" "$STATE/started" "$STATE/prune_attempts"
   local status=0
   env "$@" bash "$repo_root/scripts/check_dev_disk_space.sh" >"$STATE/output" 2>&1 || status=$?
   if [ "$status" -ne "$expected_status" ]; then
@@ -57,6 +64,7 @@ run_case() {
   fi
   if [ "$expected_cleanup" = yes ]; then
     test -f "$STATE/pruned"
+    test "$(wc -l < "$STATE/prune_attempts")" -eq 1
   else
     test ! -f "$STATE/pruned"
   fi
@@ -68,7 +76,13 @@ run_case 'enough space skips cleanup' 0 no BEFORE_KB=20000000 AFTER_KB=20000000
 run_case 'low space recovers' 0 yes BEFORE_KB=100000 AFTER_KB=20000000
 run_case 'insufficient recovery stops startup' 1 yes BEFORE_KB=100000 AFTER_KB=200000
 grep -q 'Increase Docker disk space' "$STATE/output"
-run_case 'failed measurement does not prune' 1 no BEFORE_KB=0 AFTER_KB=0 PROBE_FAIL=1
+run_case 'failed measurement does not prune' 1 no BEFORE_KB=0 AFTER_KB=0 BEFORE_ERROR='Cannot connect to the Docker daemon'
+grep -q 'Increase Docker disk space' "$STATE/output"
+run_case 'full disk during image pull recovers' 0 yes BEFORE_KB=0 AFTER_KB=20000000 BEFORE_ERROR='failed to register layer: no space left on device'
+run_case 'persistent full disk stops after one cleanup' 1 yes BEFORE_KB=0 AFTER_KB=0 BEFORE_ERROR='no space left on device' AFTER_ERROR='no space left on device'
+grep -q 'Increase Docker disk space' "$STATE/output"
+run_case 'registry errors do not prune' 1 no BEFORE_KB=0 AFTER_KB=0 BEFORE_ERROR='pull access denied'
+run_case 'pull progress does not affect measurement' 0 no BEFORE_KB=20000000 AFTER_KB=20000000 PULL_PROGRESS=1
 run_case 'invalid measurement does not prune' 1 no BEFORE_KB=unknown AFTER_KB=0
 run_case 'failed cleanup stops startup' 1 no BEFORE_KB=100000 AFTER_KB=20000000 PRUNE_FAIL=1
 
