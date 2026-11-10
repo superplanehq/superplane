@@ -83,10 +83,12 @@ func initConfig() {
 
 		path := fmt.Sprintf("%s/.superplane.yaml", home)
 
-		// #nosec
-		_, err = os.OpenFile(path, os.O_RDONLY|os.O_CREATE, 0644)
+		// #nosec G304 -- the path is fixed beneath the current user's home directory.
+		file, err := os.OpenFile(path, os.O_RDONLY|os.O_CREATE, 0o600)
 		if err != nil {
 			fmt.Println("Warning: could not ensure config file exists:", err)
+		} else if err := file.Close(); err != nil {
+			fmt.Println("Warning: could not close config file:", err)
 		}
 	}
 

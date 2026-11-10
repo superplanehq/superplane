@@ -96,6 +96,13 @@ blocks:
       when: "change_in('/', {exclude: ['/docs/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
     task:
       jobs:
+        - name: Go SAST (gosec)
+          commands:
+            - "cache restore go-mod-$(checksum go.sum),go-mod"
+            - "cache restore go-build-$(awk '/^go / {print $2}' go.mod)-$(checksum go.sum),go-build-$(awk '/^go / {print $2}' go.mod)"
+            - make ci.setup.go
+            - make check.gosec
+
         - name: Tool configs
           commands:
             - make check.tool.configs
@@ -129,6 +136,11 @@ blocks:
           commands:
             - make ci.app.up
             - make check.npm.audit.critical
+
+      epilogue:
+        always:
+          commands:
+            - "if [ -f tmp/gosec/report.json ]; then artifact push job tmp/gosec/report.json; fi"
 
   - name: "Frontend Tests"
     dependencies: []

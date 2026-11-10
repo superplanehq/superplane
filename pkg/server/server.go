@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	// Registers pprof handlers on http.DefaultServeMux, served by startPprofServer.
-	_ "net/http/pprof"
+	_ "net/http/pprof" // #nosec G108 -- pprof is served only by the explicitly enabled development profiling server.
 	"os"
 	"os/signal"
 	"runtime"
@@ -680,7 +680,7 @@ func startPprofServer() {
 
 	go func() {
 		log.Infof("pprof server listening on :%s", port)
-		if err := http.ListenAndServe("0.0.0.0:"+port, nil); err != nil {
+		if err := http.ListenAndServe("0.0.0.0:"+port, nil); err != nil { // #nosec G114 -- profiling requests can be long-running and the server is opt-in.
 			log.Warnf("pprof server stopped: %v", err)
 		}
 	}()

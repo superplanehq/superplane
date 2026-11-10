@@ -49,6 +49,7 @@ RUN export GOMODCACHE=/tmp/go-mod GOCACHE=/tmp/go-build && \
   go install github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2@v2.26.3 && \
   go install github.com/air-verse/air@latest && \
   go install github.com/mgechev/revive@v1.8.0 && \
+  GOBIN=/usr/local/bin go install github.com/securego/gosec/v2/cmd/gosec@v2.30.0 && \
   GOBIN=/usr/local/bin go install github.com/google/osv-scanner/v2/cmd/osv-scanner@v2.7.0 && \
   go install gotest.tools/gotestsum@v1.12.3 && \
   go install github.com/mxschmitt/playwright-go/cmd/playwright@"${PLAYWRIGHT_GO_VERSION}" && \

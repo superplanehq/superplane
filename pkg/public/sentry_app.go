@@ -255,6 +255,7 @@ func setSentryAppSetupStateCookie(w http.ResponseWriter, state string) {
 		Path:     "/",
 		MaxAge:   1200,
 		HttpOnly: true,
+		Secure:   true,
 		SameSite: http.SameSiteLaxMode,
 	})
 }

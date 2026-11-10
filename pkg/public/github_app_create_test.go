@@ -144,6 +144,37 @@ func TestHandleGitHubAppCreatedReturnsToWorkspaceSetup(t *testing.T) {
 	assert.Equal(t, int64(44), stored.GitHubAppID)
 }
 
+func TestHandleGitHubAppCreatedRejectsExternalReturnPath(t *testing.T) {
+	t.Setenv(config.EnvGitHubAppID, "")
+	t.Setenv(config.EnvGitHubAppSlug, "")
+	t.Setenv(config.EnvGitHubAppPrivateKey, "")
+	t.Setenv(config.EnvGitHubAppWebhookSecret, "")
+	r := support.Setup(t)
+	server, account, _ := setupTestServer(r, t)
+	t.Setenv("GITHUB_CLIENT_ID", "")
+	t.Setenv("GITHUB_CLIENT_SECRET", "")
+	require.NoError(t, models.PromoteToInstallationAdmin(account.ID.String()))
+	require.NoError(t, githubapp.Save(t.Context(), database.DB(t.Context()), r.Encryptor, config.GitHubHostedAppConfig{
+		ID:            44,
+		Slug:          "superplane-self",
+		PrivateKey:    "pem",
+		WebhookSecret: "whsec",
+	}))
+
+	for _, returnPath := range []string{"https://attacker.example/workspace", "//attacker.example/workspace", `/%2f%2fattacker.example`, `/\attacker.example`, "://bad"} {
+		state, err := githubapp.SignCreateState("test-client-secret", returnPath, account.ID)
+		require.NoError(t, err)
+
+		response := execRequest(server, requestParams{
+			method: http.MethodGet,
+			path:   "/github/app/created?code=abc&state=" + state,
+		})
+
+		require.Equal(t, http.StatusFound, response.Code)
+		assert.Equal(t, "/", response.Header().Get("Location"))
+	}
+}
+
 func TestHandleGitHubAppCreatedRejectsInvalidState(t *testing.T) {
 	r := support.Setup(t)
 	server, _, _ := setupTestServer(r, t)
