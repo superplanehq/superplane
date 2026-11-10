@@ -244,9 +244,10 @@ boundary. Name each suppressed rule and add a justification after `--`. The
 check rejects suppressions without both fields and records suppressions in the
 JSON report.
 
-Two accepted exceptions require operational care. The SSH component does not
+One accepted exception requires operational care. The SSH component does not
 verify server host keys, so it is vulnerable to an on-path server impersonation.
-The pprof server has no authentication and must remain disabled in production.
+The development pprof server uses a dedicated HTTP server and is published on
+`127.0.0.1` only.
 
 The Semaphore Go SAST job runs the same check after Go setup. Findings appear
 in the job log. The job uploads `tmp/gosec/report.json` as an artifact, including
