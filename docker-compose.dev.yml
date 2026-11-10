@@ -174,7 +174,7 @@ services:
       - ${VITE_PREVIEW_PORT:-4173}:${VITE_PREVIEW_PORT:-4173}
       - ${STORYBOOK_PORT:-6006}:${STORYBOOK_PORT:-6006}
       - ${PUBLIC_API_PORT:-8000}:${PUBLIC_API_PORT:-8000}
-      - ${PPROF_PORT:-6060}:${PPROF_PORT:-6060}
+      - 127.0.0.1:${PPROF_PORT:-6060}:${PPROF_PORT:-6060}
 
     extra_hosts:
       - "host.docker.internal:host-gateway"
