@@ -1,9 +1,9 @@
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ChevronDown } from "lucide-react";
-import { useId, useState } from "react";
+import { useContext, useId, useState } from "react";
 
-import { MERGE_CONFIDENCE_SCORE_NAME } from "../../../lib/mergeConfidenceScore";
+import { MERGE_CONFIDENCE_SCORE_NAME, pullRequestChecksKey } from "../../../lib/mergeConfidenceScore";
 import {
   workOrderCheckDisplayName,
   workOrderCheckLevelLabel,
@@ -11,7 +11,7 @@ import {
 } from "../../../lib/workOrderChecks";
 import { CheckStatusBars } from "../../../workOrders/ConfidenceMeter";
 import { CheckStatusIcon } from "../../../workOrders/CheckStatusIcon";
-import { usePullRequestMergeChecks } from "./pullRequestChecksContext";
+import { PullRequestAssessmentFailuresContext, usePullRequestMergeChecks } from "./pullRequestChecksContext";
 
 /** Each header bar represents one check. Expanded rows show status and evidence. */
 export function ConsoleCheckRows({
@@ -20,6 +20,7 @@ export function ConsoleCheckRows({
   testId = "redesign-console-checks",
   defaultOpen = false,
   groupByRepository = false,
+  summary,
 }: {
   checks: WorkOrderCheckPresentation[];
   title?: string;
@@ -27,6 +28,7 @@ export function ConsoleCheckRows({
   defaultOpen?: boolean;
   /** Multi-repo tasks list the checks of each repository apart. */
   groupByRepository?: boolean;
+  summary?: string;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   if (checks.length === 0) {
@@ -43,7 +45,7 @@ export function ConsoleCheckRows({
       >
         <span className="min-w-0 flex-1">
           <span className="block truncate text-[14px] font-semibold leading-5 text-foreground">{title}</span>
-          <span className="block text-[12px] leading-4 text-muted-foreground">{checksSummary(checks)}</span>
+          <span className="block text-[12px] leading-4 text-muted-foreground">{summary ?? checksSummary(checks)}</span>
         </span>
         <CheckStatusBars checks={checks} testId={`${testId}-meter`} className="shrink-0" />
         <ChevronDown
@@ -68,6 +70,7 @@ export function PullRequestConfidence({
   className?: string;
 }) {
   const checks = usePullRequestMergeChecks(repository);
+  const assessmentFailed = useContext(PullRequestAssessmentFailuresContext).has(pullRequestChecksKey(repository));
   const [toggled, setToggled] = useState<boolean | null>(null);
   const summaryId = useId();
   if (checks.length === 0) {
@@ -95,7 +98,7 @@ export function PullRequestConfidence({
           <span className="font-medium text-foreground">{MERGE_CONFIDENCE_SCORE_NAME}</span>
           <span id={summaryId} className={attention ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground"}>
             {" · "}
-            {checksSummary(checks)}
+            {assessmentFailed ? "Assessment failed" : checksSummary(checks)}
           </span>
         </span>
         <ChevronDown

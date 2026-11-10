@@ -5,6 +5,7 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "bun:test";
 
 import type { FactoriesFactoryPullRequest, FactoriesFactoryPullRequestMergeability } from "@/api-client";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { FEATURE_FACTORY_STEP_ACTIONS } from "@/lib/experimentalFeatures";
 
 const mergeability = { current: undefined as FactoriesFactoryPullRequestMergeability | undefined };
 const mergePending = { current: false };
@@ -25,6 +26,8 @@ vi.mock("@/hooks/useExperimentalFeature", () => ({
 }));
 
 import { SplitRunAttentionNote } from "./SplitRunAttentionNote";
+import { PullRequestChecksContext } from "./redesign/pullRequestChecksContext";
+import { SplitRunPullRequestReviewNote } from "./SplitRunPullRequestReviewNote";
 import type { SplitRunFooterAction, SplitRunFooterNote } from "./splitRunFooter";
 
 const PR_NOTE: SplitRunFooterNote = {
@@ -97,6 +100,37 @@ function renderNote(props: Partial<Parameters<typeof SplitRunAttentionNote>[0]> 
 }
 
 describe("SplitRunAttentionNote for a pull request", () => {
+  it.each(
+    [{ compact: false }, { compact: true }, { ctaOnly: true }].flatMap((variant) =>
+      [false, true].map((actionsEnabled) => ({ ...variant, actionsEnabled })),
+    ),
+  )("keeps review evidence available until step Actions is enabled (%p)", async ({ actionsEnabled, ...variant }) => {
+    experimentalFeatureHas.current = (id) => id !== FEATURE_FACTORY_STEP_ACTIONS || actionsEnabled;
+    renderNote({
+      ...variant,
+      pullRequests: [
+        {
+          ...GITHUB_PR,
+          humanReview: {
+            status: "decided",
+            reviewRequired: true,
+            rationale: "A security finding requires review.",
+            selectedReviewers: [{ login: "alex", reason: "Owns the affected files." }],
+          },
+        },
+      ],
+    });
+    expect(screen.getByTestId("split-run-pull-request-cta")).toHaveAttribute("href", GITHUB_PR.url);
+    if (actionsEnabled) {
+      expect(screen.queryByRole("region", { name: "Human review" })).not.toBeInTheDocument();
+      return;
+    }
+    expect(screen.getByRole("region", { name: "Human review" })).toBeVisible();
+    await userEvent.setup().click(screen.getByRole("button", { name: /Human review/ }));
+    expect(screen.getByText("A security finding requires review.")).toBeVisible();
+    expect(screen.getByText(/Owns the affected files/)).toBeVisible();
+  });
+
   it("says the pull request is ready without a numbered guide", () => {
     renderNote();
 
@@ -176,6 +210,39 @@ describe("SplitRunAttentionNote for a pull request", () => {
     expect(note).toHaveAttribute("data-variant", "pull-request");
     expect(note.className || "").not.toContain("rounded-lg");
     expect(note.className || "").not.toContain("border");
+  });
+
+  it("keeps repository merge confidence available in the compact summary", async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <TooltipProvider>
+          <PullRequestChecksContext.Provider
+            value={
+              new Map([
+                ["acme/payments", [{ id: "security", name: "Security", score: 60, maxScore: 100, level: "caution" }]],
+              ])
+            }
+          >
+            <SplitRunPullRequestReviewNote
+              ctaLabel={PR_NOTE.cta!.label}
+              pullRequest={{ href: GITHUB_PR.url!, number: 6812 }}
+              trackedPullRequest={{
+                ...GITHUB_PR,
+                repository: "acme/payments",
+                humanReview: { status: "decided", reviewRequired: true, rationale: "Review the payment changes." },
+              }}
+              compact
+            />
+          </PullRequestChecksContext.Provider>
+        </TooltipProvider>
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("button", { name: "Merge confidence" })).toBeVisible();
+    expect(screen.getByText("Security")).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Merge confidence" }));
+    expect(screen.queryByText("Security")).not.toBeInTheDocument();
   });
 
   it("says the pull request waits for checks while checks run", () => {

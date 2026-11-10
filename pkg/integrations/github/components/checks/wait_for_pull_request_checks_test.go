@@ -233,6 +233,161 @@ func Test__WaitForPullRequestChecks__Execute(t *testing.T) {
 	})
 }
 
+func Test__WaitForPullRequestChecks__GitHubErrors(t *testing.T) {
+	sha := "abc123"
+	for _, endpoint := range []string{"check-runs", "status"} {
+		for _, statusCode := range []int{
+			http.StatusInternalServerError,
+			http.StatusBadGateway,
+			http.StatusServiceUnavailable,
+			http.StatusGatewayTimeout,
+			http.StatusUnauthorized,
+			http.StatusForbidden,
+			http.StatusNotFound,
+		} {
+			t.Run(fmt.Sprintf("%s/%d", endpoint, statusCode), func(t *testing.T) {
+				component := &WaitForPullRequestChecks{}
+				config := WaitForPullRequestChecksConfiguration{
+					Repository: "TestHQ/hello",
+					Ref:        sha,
+					CheckNames: []string{"DCO", "ci/semaphore"},
+				}
+				basePath := "/repos/TestHQ/hello/commits/" + sha + "/"
+				httpCtx := &contexts.HTTPContext{ResponsesByPath: map[string][]*http.Response{
+					basePath + "check-runs": {
+						mocks.GitHubResponse(http.StatusOK, passingCheckRunsBody(sha)),
+						mocks.GitHubResponse(http.StatusOK, passingCheckRunsBody(sha)),
+					},
+					basePath + "status": {
+						mocks.GitHubResponse(http.StatusOK, passingStatusesBody(sha)),
+						mocks.GitHubResponse(http.StatusOK, passingStatusesBody(sha)),
+					},
+				}}
+				httpCtx.ResponsesByPath[basePath+endpoint][0] = mocks.GitHubResponse(statusCode, `{"message":"GitHub API error"}`)
+				executionState := &contexts.ExecutionStateContext{}
+				requests := &contexts.RequestContext{}
+				metadata := &contexts.MetadataContext{}
+				integration := mocks.IntegrationContextForNewSetupFlow()
+
+				err := component.Execute(core.ExecutionContext{
+					Configuration:  config,
+					HTTP:           httpCtx,
+					Integration:    integration,
+					ExecutionState: executionState,
+					Requests:       requests,
+					Metadata:       metadata,
+				})
+				if statusCode < 500 {
+					require.Error(t, err)
+					assert.Empty(t, requests.Action)
+					assert.False(t, executionState.Finished)
+					return
+				}
+
+				require.NoError(t, err)
+				assert.False(t, executionState.Finished)
+				assert.Equal(t, waitChecksEvaluateHook, requests.Action)
+				assert.Equal(t, 30*time.Second, requests.Duration)
+				assert.Equal(t, "testhq/hello@"+sha, executionState.KVs[waitChecksRefKV])
+				beforeRetry := metadata.Metadata.(WaitForPullRequestChecksMetadata)
+
+				err = component.HandleHook(core.ActionHookContext{
+					Name:           requests.Action,
+					Configuration:  config,
+					HTTP:           httpCtx,
+					Integration:    integration,
+					ExecutionState: executionState,
+					Requests:       &contexts.RequestContext{},
+					Metadata:       metadata,
+				})
+				require.NoError(t, err)
+				assert.Equal(t, waitChecksPassedChannel, executionState.Channel)
+				afterRetry := metadata.Metadata.(WaitForPullRequestChecksMetadata)
+				assert.Equal(t, beforeRetry.StartedAt, afterRetry.StartedAt)
+				assert.Equal(t, beforeRetry.TimeoutAt, afterRetry.TimeoutAt)
+			})
+		}
+	}
+}
+
+func Test__WaitForPullRequestChecks__PollingDeadline(t *testing.T) {
+	for _, test := range []struct {
+		name      string
+		remaining time.Duration
+		delay     time.Duration
+		pending   bool
+	}{
+		{name: "retries a later poll", remaining: time.Minute, delay: 30 * time.Second},
+		{name: "caps a retry at the deadline", remaining: 10 * time.Second, delay: 10 * time.Second},
+		{name: "rounds up a retry near the deadline", remaining: 500 * time.Millisecond, delay: time.Second},
+		{name: "rounds up a pending poll near the deadline", remaining: 500 * time.Millisecond, delay: time.Second, pending: true},
+		{name: "stops at the deadline", remaining: -time.Second},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			now := time.Now()
+			snapshot := WaitForPullRequestChecksMetadata{
+				Repository:   "testhq/hello",
+				SHA:          "abc123",
+				StartedAt:    now.Add(-time.Minute),
+				LastChangeAt: now.Add(-time.Minute),
+				TimeoutAt:    now.Add(test.remaining),
+				Outcome:      waitChecksOutcomePending,
+				Checks:       []PullRequestCheck{{Name: "build", Status: checkStatusPending}},
+				SelectedChecks: []PullRequestCheck{{
+					Name: "build", Status: checkStatusPending,
+				}},
+			}
+			metadata := &contexts.MetadataContext{Metadata: snapshot}
+			executionState := &contexts.ExecutionStateContext{}
+			requests := &contexts.RequestContext{}
+			checkRuns := mocks.GitHubResponse(http.StatusServiceUnavailable, `{"message":"unavailable"}`)
+			if test.pending {
+				checkRuns = mocks.GitHubResponse(http.StatusOK, passingCheckRunsBody("abc123"))
+			}
+			httpCtx := &contexts.HTTPContext{ResponsesByPath: map[string][]*http.Response{
+				"/repos/testhq/hello/commits/abc123/check-runs": {checkRuns},
+				"/repos/testhq/hello/commits/abc123/status": {
+					mocks.GitHubResponse(http.StatusOK, passingStatusesBody("abc123")),
+				},
+			}}
+
+			err := evaluateWaitForPullRequestChecks(waitChecksRuntime{
+				Configuration: WaitForPullRequestChecksConfiguration{
+					Repository: snapshot.Repository,
+					Ref:        snapshot.SHA,
+					CheckNames: []string{"build"},
+				},
+				HTTP:           httpCtx,
+				Integration:    mocks.IntegrationContextForNewSetupFlow(),
+				ExecutionState: executionState,
+				Requests:       requests,
+				Metadata:       metadata,
+			}, now)
+			require.NoError(t, err)
+			if test.delay > 0 {
+				assert.False(t, executionState.Finished)
+				assert.Equal(t, waitChecksEvaluateHook, requests.Action)
+				assert.Equal(t, test.delay, requests.Duration)
+				if !test.pending {
+					assert.Equal(t, snapshot, metadata.Metadata)
+				}
+				return
+			}
+
+			assert.Equal(t, waitChecksTimedOutChannel, executionState.Channel)
+			assert.Empty(t, requests.Action)
+			completed := metadata.Metadata.(WaitForPullRequestChecksMetadata)
+			assert.NotNil(t, completed.CompletedAt)
+			assert.Equal(t, waitChecksOutcomeTimedOut, completed.Outcome)
+			assert.Equal(t, snapshot.TimeoutAt, completed.TimeoutAt)
+			require.Len(t, executionState.Payloads, 1)
+			payload := executionState.Payloads[0].(map[string]any)["data"].(WaitForPullRequestChecksOutput)
+			assert.Equal(t, snapshot.Checks, payload.Checks)
+			assert.Equal(t, snapshot.SelectedChecks, payload.SelectedChecks)
+		})
+	}
+}
+
 func Test__WaitForPullRequestChecks__HandleWebhook(t *testing.T) {
 	component := &WaitForPullRequestChecks{}
 	sha := "d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44"
