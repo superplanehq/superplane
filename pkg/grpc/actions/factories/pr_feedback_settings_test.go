@@ -66,6 +66,12 @@ func Test__PRFeedbackSettings__SerializeAndParseAllowedBots(t *testing.T) {
 }
 
 func Test__PRFeedbackSettings__Checks(t *testing.T) {
+	t.Run("rejects human approval gate as a code repair target", func(t *testing.T) {
+		err := validatePRFeedbackSettingsForSource(nil, uuid.Nil, models.FactoryPRFeedbackHandlerSourcePullRequestChecks,
+			prFeedbackSettings{CheckNames: []string{"merge-confidence/merge-gate"}, MaximumAttempts: 3}, nil)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "Human review")
+	})
 	t.Run("trims and de-duplicates check names", func(t *testing.T) {
 		settings := prFeedbackSettings{
 			CheckNames:      []string{" lint ", "lint", "unit", "", "  "},
