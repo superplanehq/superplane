@@ -1961,6 +1961,7 @@ Choose **SSH key** or **Password**, then select the organization Secret and the 
 ### Configuration
 
 - **Host**, **Port** (default 22), **Username**: Connection details.
+- **Host key fingerprint**: Optional OpenSSH SHA-256 fingerprint used to verify the server. Obtain it from a trusted administrator or infrastructure console.
 - **Commands**: One or more commands to run, one per line (supports expressions). Each non-empty line becomes a command joined with &&. The output payload is based on the last command.
 - **Working directory**: Optional; Changes to this directory before running the command.
 - **Environment variables**: Optional list of key/value pairs available during command execution.

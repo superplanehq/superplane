@@ -1,6 +1,8 @@
 package ssh
 
 import (
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -57,18 +59,19 @@ type EnvironmentVariable struct {
 }
 
 type Spec struct {
-	Host             string                `json:"host" mapstructure:"host"`
-	Port             int                   `json:"port" mapstructure:"port"`
-	User             string                `json:"username" mapstructure:"username"`
-	Authentication   AuthSpec              `json:"authentication" mapstructure:"authentication"`
-	CommandSource    string                `json:"commandSource,omitempty" mapstructure:"commandSource"`
-	Commands         string                `json:"commands" mapstructure:"commands"`
-	CommandFile      string                `json:"commandFile,omitempty" mapstructure:"commandFile"`
-	WorkingDirectory string                `json:"workingDirectory,omitempty" mapstructure:"workingDirectory"`
-	Environment      []EnvironmentVariable `json:"environment,omitempty" mapstructure:"environment"`
-	Timeout          int                   `json:"timeout" mapstructure:"timeout"`
-	ConnectionRetry  *ConnectionRetrySpec  `json:"connectionRetry,omitempty" mapstructure:"connectionRetry"`
-	ExecutionRetry   *ExecutionRetrySpec   `json:"executionRetry,omitempty" mapstructure:"executionRetry"`
+	Host               string                `json:"host" mapstructure:"host"`
+	Port               int                   `json:"port" mapstructure:"port"`
+	HostKeyFingerprint string                `json:"hostKeyFingerprint,omitempty" mapstructure:"hostKeyFingerprint"`
+	User               string                `json:"username" mapstructure:"username"`
+	Authentication     AuthSpec              `json:"authentication" mapstructure:"authentication"`
+	CommandSource      string                `json:"commandSource,omitempty" mapstructure:"commandSource"`
+	Commands           string                `json:"commands" mapstructure:"commands"`
+	CommandFile        string                `json:"commandFile,omitempty" mapstructure:"commandFile"`
+	WorkingDirectory   string                `json:"workingDirectory,omitempty" mapstructure:"workingDirectory"`
+	Environment        []EnvironmentVariable `json:"environment,omitempty" mapstructure:"environment"`
+	Timeout            int                   `json:"timeout" mapstructure:"timeout"`
+	ConnectionRetry    *ConnectionRetrySpec  `json:"connectionRetry,omitempty" mapstructure:"connectionRetry"`
+	ExecutionRetry     *ExecutionRetrySpec   `json:"executionRetry,omitempty" mapstructure:"executionRetry"`
 }
 
 // commandSourceOrDefault returns the command source for the spec. A truly
@@ -88,23 +91,24 @@ func (s Spec) usesRemovedRepositoryCommandFile() bool {
 }
 
 type ExecutionMetadata struct {
-	Result           *CommandResult        `json:"result" mapstructure:"result"`
-	Host             string                `json:"host" mapstructure:"host"`
-	Port             int                   `json:"port" mapstructure:"port"`
-	User             string                `json:"user" mapstructure:"user"`
-	CommandSource    string                `json:"commandSource" mapstructure:"commandSource"`
-	Commands         string                `json:"commands" mapstructure:"commands"`
-	CommandFile      string                `json:"commandFile" mapstructure:"commandFile"`
-	WorkingDirectory string                `json:"workingDirectory" mapstructure:"workingDirectory"`
-	Environment      []EnvironmentVariable `json:"environment" mapstructure:"environment"`
-	Timeout          int                   `json:"timeout" mapstructure:"timeout"`
-	ConnectionRetry  *ConnectionRetrySpec  `json:"connectionRetry" mapstructure:"connectionRetry"`
-	ExecutionRetry   *ExecutionRetrySpec   `json:"executionRetry" mapstructure:"executionRetry"`
-	Attempt          int                   `json:"attempt" mapstructure:"attempt"`
-	ExecutionAttempt int                   `json:"executionAttempt" mapstructure:"executionAttempt"`
-	MaxRetries       int                   `json:"maxRetries" mapstructure:"maxRetries"`
-	IntervalSeconds  int                   `json:"intervalSeconds" mapstructure:"intervalSeconds"`
-	Authentication   AuthSpec              `json:"authentication" mapstructure:"authentication"`
+	Result             *CommandResult        `json:"result" mapstructure:"result"`
+	Host               string                `json:"host" mapstructure:"host"`
+	Port               int                   `json:"port" mapstructure:"port"`
+	HostKeyFingerprint string                `json:"hostKeyFingerprint" mapstructure:"hostKeyFingerprint"`
+	User               string                `json:"user" mapstructure:"user"`
+	CommandSource      string                `json:"commandSource" mapstructure:"commandSource"`
+	Commands           string                `json:"commands" mapstructure:"commands"`
+	CommandFile        string                `json:"commandFile" mapstructure:"commandFile"`
+	WorkingDirectory   string                `json:"workingDirectory" mapstructure:"workingDirectory"`
+	Environment        []EnvironmentVariable `json:"environment" mapstructure:"environment"`
+	Timeout            int                   `json:"timeout" mapstructure:"timeout"`
+	ConnectionRetry    *ConnectionRetrySpec  `json:"connectionRetry" mapstructure:"connectionRetry"`
+	ExecutionRetry     *ExecutionRetrySpec   `json:"executionRetry" mapstructure:"executionRetry"`
+	Attempt            int                   `json:"attempt" mapstructure:"attempt"`
+	ExecutionAttempt   int                   `json:"executionAttempt" mapstructure:"executionAttempt"`
+	MaxRetries         int                   `json:"maxRetries" mapstructure:"maxRetries"`
+	IntervalSeconds    int                   `json:"intervalSeconds" mapstructure:"intervalSeconds"`
+	Authentication     AuthSpec              `json:"authentication" mapstructure:"authentication"`
 }
 
 type ConnectionRetryState struct {
@@ -131,6 +135,7 @@ Choose **SSH key** or **Password**, then select the organization Secret and the 
 ## Configuration
 
 - **Host**, **Port** (default 22), **Username**: Connection details.
+- **Host key fingerprint**: Optional OpenSSH SHA-256 fingerprint used to verify the server. Obtain it from a trusted administrator or infrastructure console.
 - **Commands**: One or more commands to run, one per line (supports expressions). Each non-empty line becomes a command joined with &&. The output payload is based on the last command.
 - **Working directory**: Optional; Changes to this directory before running the command.
 - **Environment variables**: Optional list of key/value pairs available during command execution.
@@ -174,6 +179,14 @@ func (c *SSHCommand) Configuration() []configuration.Field {
 			Description: "SSH port",
 			Placeholder: "22",
 			Default:     22,
+			Required:    false,
+		},
+		{
+			Name:        "hostKeyFingerprint",
+			Label:       "Host key fingerprint",
+			Type:        configuration.FieldTypeString,
+			Description: "Verify the server with its SHA-256 host key fingerprint. This will become required.",
+			Placeholder: "SHA256:...",
 			Required:    false,
 		},
 		{
@@ -412,6 +425,9 @@ func (c *SSHCommand) Setup(ctx core.SetupContext) error {
 	if spec.Port != 0 && (spec.Port < 1 || spec.Port > 65535) {
 		return fmt.Errorf("invalid port: %d", spec.Port)
 	}
+	if err := validateHostKeyFingerprint(spec.HostKeyFingerprint); err != nil {
+		return err
+	}
 	if spec.Timeout < 1 {
 		return errors.New("timeout is required and must be at least 1 second")
 	}
@@ -482,21 +498,22 @@ func (c *SSHCommand) Execute(ctx core.ExecutionContext) error {
 	}
 
 	metadata := ExecutionMetadata{
-		Host:             spec.Host,
-		Port:             spec.Port,
-		User:             spec.User,
-		CommandSource:    source,
-		Commands:         resolvedCommands,
-		WorkingDirectory: spec.WorkingDirectory,
-		Environment:      spec.Environment,
-		Timeout:          spec.Timeout,
-		ConnectionRetry:  spec.ConnectionRetry,
-		ExecutionRetry:   spec.ExecutionRetry,
-		Attempt:          0,
-		ExecutionAttempt: 0,
-		MaxRetries:       0,
-		IntervalSeconds:  0,
-		Authentication:   spec.Authentication,
+		Host:               spec.Host,
+		Port:               spec.Port,
+		HostKeyFingerprint: spec.HostKeyFingerprint,
+		User:               spec.User,
+		CommandSource:      source,
+		Commands:           resolvedCommands,
+		WorkingDirectory:   spec.WorkingDirectory,
+		Environment:        spec.Environment,
+		Timeout:            spec.Timeout,
+		ConnectionRetry:    spec.ConnectionRetry,
+		ExecutionRetry:     spec.ExecutionRetry,
+		Attempt:            0,
+		ExecutionAttempt:   0,
+		MaxRetries:         0,
+		IntervalSeconds:    0,
+		Authentication:     spec.Authentication,
 	}
 	if spec.ConnectionRetry != nil {
 		metadata.MaxRetries = spec.ConnectionRetry.Retries
@@ -716,6 +733,9 @@ func (c *SSHCommand) isConnectError(err error) bool {
 	if err == nil {
 		return false
 	}
+	if errors.Is(err, errHostKeyFingerprintMismatch) {
+		return false
+	}
 
 	s := strings.ToLower(err.Error())
 
@@ -896,7 +916,9 @@ func (c *SSHCommand) createClientForPassword(secrets core.SecretsContext, metada
 	if err != nil {
 		return nil, fmt.Errorf("cannot get password: %w", err)
 	}
-	return NewClientPassword(metadata.Host, metadata.Port, metadata.User, password), nil
+	client := NewClientPassword(metadata.Host, metadata.Port, metadata.User, password)
+	client.HostKeyFingerprint = metadata.HostKeyFingerprint
+	return client, nil
 }
 
 func (c *SSHCommand) createClientSSHKey(secrets core.SecretsContext, metadata ExecutionMetadata) (*Client, error) {
@@ -905,5 +927,25 @@ func (c *SSHCommand) createClientSSHKey(secrets core.SecretsContext, metadata Ex
 		return nil, fmt.Errorf("cannot get private key: %w", err)
 	}
 
-	return NewClientKey(metadata.Host, metadata.Port, metadata.User, privateKey, nil), nil
+	client := NewClientKey(metadata.Host, metadata.Port, metadata.User, privateKey, nil)
+	client.HostKeyFingerprint = metadata.HostKeyFingerprint
+	return client, nil
+}
+
+func validateHostKeyFingerprint(fingerprint string) error {
+	if fingerprint == "" {
+		return nil
+	}
+
+	encoded, found := strings.CutPrefix(fingerprint, "SHA256:")
+	if !found {
+		return errors.New("host key fingerprint must use SHA256:<base64> format")
+	}
+
+	digest, err := base64.RawStdEncoding.Strict().DecodeString(encoded)
+	if err != nil || len(digest) != sha256.Size {
+		return errors.New("host key fingerprint must use SHA256:<base64> format")
+	}
+
+	return nil
 }
