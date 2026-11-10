@@ -9,6 +9,7 @@ ARG ARTIFACTS_STAGE=builder
 # the empty stages and download modules as before.
 FROM scratch AS ci-go-mod
 FROM scratch AS ci-go-build
+FROM ghcr.io/securego/gosec@sha256:7bcf1edbab3e80d8006a28d53e7031a9c9775be8eec30679e4adc1f51d272121 AS gosec
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Development stage with tools installed.
@@ -49,7 +50,6 @@ RUN export GOMODCACHE=/tmp/go-mod GOCACHE=/tmp/go-build && \
   go install github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2@v2.26.3 && \
   go install github.com/air-verse/air@latest && \
   go install github.com/mgechev/revive@v1.8.0 && \
-  GOBIN=/usr/local/bin go install github.com/securego/gosec/v2/cmd/gosec@v2.30.0 && \
   GOBIN=/usr/local/bin go install github.com/google/osv-scanner/v2/cmd/osv-scanner@v2.7.0 && \
   go install gotest.tools/gotestsum@v1.12.3 && \
   go install github.com/mxschmitt/playwright-go/cmd/playwright@"${PLAYWRIGHT_GO_VERSION}" && \
@@ -63,6 +63,8 @@ RUN rm -rf /opt/install /opt/install-scripts /tmp/*
 
 COPY scripts/docker/install-bun.sh /tmp/install-bun.sh
 RUN bash /tmp/install-bun.sh && rm /tmp/install-bun.sh
+
+COPY --from=gosec /bin/gosec /usr/local/bin/gosec
 
 CMD [ "/bin/bash",  "-c", "sleep infinity" ]
 
