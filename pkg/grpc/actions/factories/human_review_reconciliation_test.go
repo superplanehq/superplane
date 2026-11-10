@@ -137,6 +137,31 @@ func TestHumanReviewRetentionOfNewerAssessmentKeepsCompletedGate(t *testing.T) {
 	require.Equal(t, humanReviewPublication{Status: "completed", Conclusion: "success"}, f.client.publications[len(f.client.publications)-1])
 }
 
+// Retention can delete the assessment run of a decision whose agent did not
+// start. An older run for the same head must then become the new source.
+func TestHumanReviewRetentionOfStartupFailureUsesOlderAssessment(t *testing.T) {
+	f := newHumanReviewReconciliationFixture(t)
+	older := f.addAssessmentRun(t)
+	require.NoError(t, f.db.Model(&models.CanvasRun{}).Where("id = ?", older.ID).Update("created_at", f.source.CreatedAt.Add(-time.Minute)).Error)
+	f.reconcile(t)
+	failed, err := f.pr.CurrentHumanReview(f.db)
+	require.NoError(t, err)
+	require.Equal(t, f.source.ID, *failed.SourceRunID)
+	require.NoError(t, f.db.Model(failed).Updates(map[string]any{"run_id": nil, "state": models.FactoryHumanReviewStateFailed, "blocking_reason": "Request review could not start."}).Error)
+
+	require.NoError(t, f.db.Transaction(func(tx *gorm.DB) error {
+		_, err := f.source.DeleteChain(tx)
+		return err
+	}))
+	f.reconcile(t)
+	stored, err := f.pr.CurrentHumanReview(f.db)
+	require.NoError(t, err)
+	require.NotEqual(t, failed.ID, stored.ID)
+	require.NotNil(t, stored.SourceRunID)
+	require.Equal(t, older.ID, *stored.SourceRunID)
+	require.NotNil(t, stored.RunID)
+}
+
 func (f humanReviewReconciliationFixture) addAssessmentRun(t *testing.T) *models.CanvasRun {
 	t.Helper()
 	root := &models.CanvasEvent{WorkflowID: f.source.WorkflowID, NodeID: "on-pr-risk", Data: models.NewJSONValue(map[string]any{"type": "github.pullRequest", "data": map[string]any{"pull_request": map[string]any{"head": map[string]any{"sha": "current-head"}}}})}

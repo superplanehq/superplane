@@ -312,9 +312,10 @@ func equalHumanReviewRun(left, right *uuid.UUID) bool {
 // Run retention clears SourceRunID through the foreign key. An older run for the
 // same head can then become the latest assessment. Runs can finish out of
 // creation order, so only a run created after the saved decision replaces the
-// saved assessment.
+// saved assessment. Only a completed decision keeps its saved assessment. A
+// decision without a result must start an agent, and the agent needs a source run.
 func retentionClearedHumanReviewSource(decision *models.FactoryHumanReviewDecision, source *models.CanvasRun) bool {
-	if decision.SourceRunID != nil || len(decision.Assessment) == 0 || source == nil || source.CreatedAt == nil {
+	if decision.SourceRunID != nil || len(decision.Assessment) == 0 || len(decision.Result) == 0 || source == nil || source.CreatedAt == nil {
 		return false
 	}
 	return !source.CreatedAt.After(decision.CreatedAt)
@@ -339,6 +340,9 @@ func validHumanReviewAssessment(report mergeconfidence.ReportData, prID uuid.UUI
 }
 
 func startHumanReviewAgent(ctx context.Context, db *gorm.DB, factory *models.Factory, pr *models.FactoryPullRequest, automation *humanReviewAutomation, client humanReviewGitHub, current *github.PullRequest, decision *models.FactoryHumanReviewDecision, report mergeconfidence.ReportData) error {
+	if decision.SourceRunID == nil {
+		return errors.New("Request review has no merge confidence run")
+	}
 	contextData, err := gatherHumanReviewContext(ctx, client, pr, current, automation.settings)
 	if err != nil {
 		return err
