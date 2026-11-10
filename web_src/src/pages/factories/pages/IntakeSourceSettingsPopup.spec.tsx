@@ -373,7 +373,11 @@ describe("IntakeSourceSettingsPopup", () => {
     await user.click(screen.getByRole("combobox", { name: "Search or add a label" }));
     await user.click(screen.getByRole("option", { name: "bug" }));
     await user.click(screen.getByRole("checkbox", { name: "Include reopened issues" }));
-    await user.click(screen.getByRole("checkbox", { name: "Only authors with repository access" }));
+    const authorRestriction = screen.getByRole("checkbox", { name: "Only authors with repository access" });
+    expect(authorRestriction).toHaveAccessibleDescription(
+      "Authors need repository access. Someone with repository access can also approve an issue by labeling or reopening it. When off, issues from anyone can create tasks. Turning this off checks up to 20 recent skipped issues again. Recovery scans up to 200 issue events from the last 30 days. Other filters still apply.",
+    );
+    await user.click(authorRestriction);
     await user.click(screen.getByTestId("intake-source-settings-save"));
 
     await waitFor(() =>
