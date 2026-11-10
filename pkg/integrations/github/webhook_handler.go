@@ -119,10 +119,12 @@ func (h *GitHubWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error
 		}
 		if webhook.ID > 0 {
 			updatedHook, _, err := client.EditHook(context.Background(), config.Repository, webhook.ID, hook)
-			if err != nil {
+			if err == nil {
+				return &Webhook{ID: updatedHook.GetID(), WebhookName: updatedHook.GetName()}, nil
+			}
+			if !common.IsNotFoundError(err) {
 				return nil, fmt.Errorf("error updating webhook: %w", err)
 			}
-			return &Webhook{ID: updatedHook.GetID(), WebhookName: updatedHook.GetName()}, nil
 		}
 
 		newHook, _, err := client.CreateHook(context.Background(), config.Repository, hook)
