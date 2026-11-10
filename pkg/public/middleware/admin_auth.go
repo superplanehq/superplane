@@ -11,6 +11,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/jwt"
+	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 )
 
@@ -35,6 +36,9 @@ func AdminAuthMiddleware(jwtSigner *jwt.Signer, fleetManagerToken string) mux.Mi
 				return
 			}
 			if fleetManagerTokenMatches(r, rawToken, fleetManagerToken) {
+				if identity := logging.SecurityIdentityFrom(r.Context()); identity != nil {
+					identity.ServiceID = "fleet_manager"
+				}
 				ctx := context.WithValue(r.Context(), fleetManagerContextKey, true)
 				next.ServeHTTP(w, r.WithContext(ctx))
 				return
@@ -61,6 +65,8 @@ func AdminAuthMiddleware(jwtSigner *jwt.Signer, fleetManagerToken string) mux.Mi
 			}
 
 			ctx := context.WithValue(r.Context(), AccountContextKey, account)
+			SetRequestLogUser(ctx, user)
+			SetRequestLogAccount(ctx, account)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}

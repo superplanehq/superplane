@@ -52,22 +52,26 @@ func (s *OrganizationService) DescribeOrganization(ctx context.Context, req *pb.
 	return organizations.DescribeOrganization(ctx, orgID)
 }
 
-func (s *OrganizationService) UpdateOrganization(ctx context.Context, req *pb.UpdateOrganizationRequest) (*pb.UpdateOrganizationResponse, error) {
+func (s *OrganizationService) UpdateOrganization(ctx context.Context, req *pb.UpdateOrganizationRequest) (response *pb.UpdateOrganizationResponse, err error) {
+	defer func() { securityChange(ctx, "organization.update", "organization", req, response, err) }()
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
 	return organizations.UpdateOrganization(ctx, orgID, req.Organization)
 }
 
-func (s *OrganizationService) RemoveUser(ctx context.Context, req *pb.RemoveUserRequest) (*pb.RemoveUserResponse, error) {
+func (s *OrganizationService) RemoveUser(ctx context.Context, req *pb.RemoveUserRequest) (response *pb.RemoveUserResponse, err error) {
+	defer func() { securityChange(ctx, "organization.member_remove", "user", req, response, err) }()
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
 	return organizations.RemoveUser(ctx, s.authorizationService, orgID, req.UserId)
 }
 
-func (s *OrganizationService) SetUserOwner(ctx context.Context, req *pb.SetUserOwnerRequest) (*pb.SetUserOwnerResponse, error) {
+func (s *OrganizationService) SetUserOwner(ctx context.Context, req *pb.SetUserOwnerRequest) (response *pb.SetUserOwnerResponse, err error) {
+	defer func() { securityChange(ctx, "organization.ownership_set", "user", req, response, err) }()
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
 	return organizations.SetUserOwner(ctx, orgID, req.UserId, req.IsOwner)
 }
 
-func (s *OrganizationService) DeleteOrganization(ctx context.Context, req *pb.DeleteOrganizationRequest) (*pb.DeleteOrganizationResponse, error) {
+func (s *OrganizationService) DeleteOrganization(ctx context.Context, req *pb.DeleteOrganizationRequest) (response *pb.DeleteOrganizationResponse, err error) {
+	defer func() { securityChange(ctx, "organization.delete", "organization", req, response, err) }()
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
 	return organizations.DeleteOrganization(ctx, s.authorizationService, orgID)
 }
@@ -287,7 +291,8 @@ func (s *OrganizationService) ResumeOrganizationSubscription(
 	return s.billing.ResumeOrganizationSubscription(ctx, orgID, req)
 }
 
-func (s *OrganizationService) AcceptInviteLink(ctx context.Context, req *pb.InviteLink) (*structpb.Struct, error) {
+func (s *OrganizationService) AcceptInviteLink(ctx context.Context, req *pb.InviteLink) (response *structpb.Struct, err error) {
+	defer func() { securityChange(ctx, "invitation.link_accept", "organization", req, response, err) }()
 	accountID, err := accountIDFromContext(ctx)
 	if err != nil {
 		return nil, err
@@ -296,7 +301,8 @@ func (s *OrganizationService) AcceptInviteLink(ctx context.Context, req *pb.Invi
 	return organizations.AcceptInviteLink(ctx, s.authorizationService, accountID, req.Token)
 }
 
-func (s *OrganizationService) AcceptInvitation(ctx context.Context, req *pb.AcceptInvitationRequest) (*structpb.Struct, error) {
+func (s *OrganizationService) AcceptInvitation(ctx context.Context, req *pb.AcceptInvitationRequest) (response *structpb.Struct, err error) {
+	defer func() { securityChange(ctx, "invitation.accept", "organization", req, response, err) }()
 	accountID, err := accountIDFromContext(ctx)
 	if err != nil {
 		return nil, err
@@ -319,7 +325,8 @@ func (s *OrganizationService) ListIntegrationResources(ctx context.Context, req 
 	return organizations.ListIntegrationResources(ctx, s.registry, orgID, req.IntegrationId, req.Parameters)
 }
 
-func (s *OrganizationService) CreateIntegration(ctx context.Context, req *pb.CreateIntegrationRequest) (*pb.CreateIntegrationResponse, error) {
+func (s *OrganizationService) CreateIntegration(ctx context.Context, req *pb.CreateIntegrationRequest) (response *pb.CreateIntegrationResponse, err error) {
+	defer func() { securityChange(ctx, "integration.create", "integration", req, response, err) }()
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
 	return organizations.CreateIntegration(
 		ctx,
@@ -334,7 +341,8 @@ func (s *OrganizationService) CreateIntegration(ctx context.Context, req *pb.Cre
 	)
 }
 
-func (s *OrganizationService) UpdateIntegration(ctx context.Context, req *pb.UpdateIntegrationRequest) (*pb.UpdateIntegrationResponse, error) {
+func (s *OrganizationService) UpdateIntegration(ctx context.Context, req *pb.UpdateIntegrationRequest) (response *pb.UpdateIntegrationResponse, err error) {
+	defer func() { securityChange(ctx, "integration.update", "integration", req, response, err) }()
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
 	configuration := map[string]any{}
 	if req.Configuration != nil {
@@ -354,32 +362,38 @@ func (s *OrganizationService) UpdateIntegration(ctx context.Context, req *pb.Upd
 	)
 }
 
-func (s *OrganizationService) DeleteIntegration(ctx context.Context, req *pb.DeleteIntegrationRequest) (*pb.DeleteIntegrationResponse, error) {
+func (s *OrganizationService) DeleteIntegration(ctx context.Context, req *pb.DeleteIntegrationRequest) (response *pb.DeleteIntegrationResponse, err error) {
+	defer func() { securityChange(ctx, "integration.delete", "integration", req, response, err) }()
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
 	return organizations.DeleteIntegration(ctx, orgID, req.IntegrationId)
 }
 
-func (s *OrganizationService) NextIntegrationSetupStep(ctx context.Context, req *pb.NextIntegrationSetupStepRequest) (*pb.NextIntegrationSetupStepResponse, error) {
+func (s *OrganizationService) NextIntegrationSetupStep(ctx context.Context, req *pb.NextIntegrationSetupStepRequest) (response *pb.NextIntegrationSetupStepResponse, err error) {
+	defer func() { securityChange(ctx, "integration.setup_advance", "integration", req, response, err) }()
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
 	return organizations.NextIntegrationSetupStep(ctx, s.registry, s.baseURL, s.webhooksBaseURL, orgID, req.IntegrationId, req.Inputs, req.Capabilities)
 }
 
-func (s *OrganizationService) PreviousIntegrationSetupStep(ctx context.Context, req *pb.PreviousIntegrationSetupStepRequest) (*pb.PreviousIntegrationSetupStepResponse, error) {
+func (s *OrganizationService) PreviousIntegrationSetupStep(ctx context.Context, req *pb.PreviousIntegrationSetupStepRequest) (response *pb.PreviousIntegrationSetupStepResponse, err error) {
+	defer func() { securityChange(ctx, "integration.setup_back", "integration", req, response, err) }()
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
 	return organizations.PreviousIntegrationSetupStep(ctx, s.registry, orgID, req.IntegrationId)
 }
 
-func (s *OrganizationService) UpdateIntegrationCapabilities(ctx context.Context, req *pb.UpdateIntegrationCapabilitiesRequest) (*pb.UpdateIntegrationCapabilitiesResponse, error) {
+func (s *OrganizationService) UpdateIntegrationCapabilities(ctx context.Context, req *pb.UpdateIntegrationCapabilitiesRequest) (response *pb.UpdateIntegrationCapabilitiesResponse, err error) {
+	defer func() { securityChange(ctx, "integration.capabilities_update", "integration", req, response, err) }()
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
 	return organizations.UpdateIntegrationCapabilities(ctx, s.registry, orgID, req.IntegrationId, req.Capabilities)
 }
 
-func (s *OrganizationService) UpdateIntegrationProperty(ctx context.Context, req *pb.UpdateIntegrationPropertyRequest) (*pb.UpdateIntegrationPropertyResponse, error) {
+func (s *OrganizationService) UpdateIntegrationProperty(ctx context.Context, req *pb.UpdateIntegrationPropertyRequest) (response *pb.UpdateIntegrationPropertyResponse, err error) {
+	defer func() { securityChange(ctx, "integration.property_update", "integration", req, response, err) }()
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
 	return organizations.UpdateIntegrationProperty(ctx, s.registry, orgID, req.IntegrationId, req.PropertyName, req.Value)
 }
 
-func (s *OrganizationService) UpdateIntegrationSecret(ctx context.Context, req *pb.UpdateIntegrationSecretRequest) (*pb.UpdateIntegrationSecretResponse, error) {
+func (s *OrganizationService) UpdateIntegrationSecret(ctx context.Context, req *pb.UpdateIntegrationSecretRequest) (response *pb.UpdateIntegrationSecretResponse, err error) {
+	defer func() { securityChange(ctx, "integration.credential_update", "integration", req, response, err) }()
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
 	return organizations.UpdateIntegrationSecret(ctx, s.registry, orgID, req.IntegrationId, req.SecretName, req.Value)
 }
@@ -412,7 +426,8 @@ func userIDFromContext(ctx context.Context) (string, error) {
 	return userMeta[0], nil
 }
 
-func (s *OrganizationService) CreateInvitation(ctx context.Context, req *pb.CreateInvitationRequest) (*pb.CreateInvitationResponse, error) {
+func (s *OrganizationService) CreateInvitation(ctx context.Context, req *pb.CreateInvitationRequest) (response *pb.CreateInvitationResponse, err error) {
+	defer func() { securityChange(ctx, "invitation.create", "invitation", req, response, err) }()
 	inviterID, err := userIDFromContext(ctx)
 	if err != nil {
 		return nil, err
@@ -424,7 +439,8 @@ func (s *OrganizationService) ListInvitations(ctx context.Context, req *pb.ListI
 	return s.invitations.List(ctx, ctx.Value(authorization.DomainIdContextKey).(string))
 }
 
-func (s *OrganizationService) ResendInvitation(ctx context.Context, req *pb.ResendInvitationRequest) (*pb.ResendInvitationResponse, error) {
+func (s *OrganizationService) ResendInvitation(ctx context.Context, req *pb.ResendInvitationRequest) (response *pb.ResendInvitationResponse, err error) {
+	defer func() { securityChange(ctx, "invitation.resend", "invitation", req, response, err) }()
 	actorID, err := userIDFromContext(ctx)
 	if err != nil {
 		return nil, err
@@ -432,6 +448,7 @@ func (s *OrganizationService) ResendInvitation(ctx context.Context, req *pb.Rese
 	return s.invitations.Resend(ctx, ctx.Value(authorization.DomainIdContextKey).(string), actorID, req.InvitationId)
 }
 
-func (s *OrganizationService) CancelInvitation(ctx context.Context, req *pb.CancelInvitationRequest) (*pb.CancelInvitationResponse, error) {
+func (s *OrganizationService) CancelInvitation(ctx context.Context, req *pb.CancelInvitationRequest) (response *pb.CancelInvitationResponse, err error) {
+	defer func() { securityChange(ctx, "invitation.cancel", "invitation", req, response, err) }()
 	return s.invitations.Cancel(ctx, ctx.Value(authorization.DomainIdContextKey).(string), req.InvitationId)
 }

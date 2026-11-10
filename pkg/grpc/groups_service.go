@@ -29,20 +29,23 @@ func NewGroupsService(authService authorization.Authorization, registry *enterpr
 	}, nil
 }
 
-func (s *GroupsService) CreateGroup(ctx context.Context, req *pb.CreateGroupRequest) (*pb.CreateGroupResponse, error) {
+func (s *GroupsService) CreateGroup(ctx context.Context, req *pb.CreateGroupRequest) (response *pb.CreateGroupResponse, err error) {
+	defer func() { securityChange(ctx, "group.create", "group", req, response, err) }()
 	domainType := ctx.Value(authorization.DomainTypeContextKey).(string)
 	domainID := ctx.Value(authorization.DomainIdContextKey).(string)
 	return s.rbac.CreateGroup(ctx, domainType, domainID, req.Group)
 }
 
-func (s *GroupsService) AddUserToGroup(ctx context.Context, req *pb.AddUserToGroupRequest) (*pb.AddUserToGroupResponse, error) {
+func (s *GroupsService) AddUserToGroup(ctx context.Context, req *pb.AddUserToGroupRequest) (response *pb.AddUserToGroupResponse, err error) {
+	defer func() { securityChange(ctx, "group.member_add", "user", req, response, err) }()
 	orgID := ctx.Value(authorization.OrganizationContextKey).(string)
 	domainType := ctx.Value(authorization.DomainTypeContextKey).(string)
 	domainID := ctx.Value(authorization.DomainIdContextKey).(string)
 	return s.rbac.AddUserToGroup(ctx, orgID, domainType, domainID, req.UserId, req.UserEmail, req.GroupName)
 }
 
-func (s *GroupsService) RemoveUserFromGroup(ctx context.Context, req *pb.RemoveUserFromGroupRequest) (*pb.RemoveUserFromGroupResponse, error) {
+func (s *GroupsService) RemoveUserFromGroup(ctx context.Context, req *pb.RemoveUserFromGroupRequest) (response *pb.RemoveUserFromGroupResponse, err error) {
+	defer func() { securityChange(ctx, "group.member_remove", "user", req, response, err) }()
 	orgID := ctx.Value(authorization.OrganizationContextKey).(string)
 	domainType := ctx.Value(authorization.DomainTypeContextKey).(string)
 	domainID := ctx.Value(authorization.DomainIdContextKey).(string)
@@ -67,7 +70,8 @@ func (s *GroupsService) ListGroupUsers(ctx context.Context, req *pb.ListGroupUse
 	return auth.ListGroupUsers(ctx, domainType, domainID, req.GroupName, s.authService)
 }
 
-func (s *GroupsService) UpdateGroup(ctx context.Context, req *pb.UpdateGroupRequest) (*pb.UpdateGroupResponse, error) {
+func (s *GroupsService) UpdateGroup(ctx context.Context, req *pb.UpdateGroupRequest) (response *pb.UpdateGroupResponse, err error) {
+	defer func() { securityChange(ctx, "group.update", "group", req, response, err) }()
 	domainType := ctx.Value(authorization.DomainTypeContextKey).(string)
 	domainID := ctx.Value(authorization.DomainIdContextKey).(string)
 
@@ -78,7 +82,8 @@ func (s *GroupsService) UpdateGroup(ctx context.Context, req *pb.UpdateGroupRequ
 	return s.rbac.UpdateGroup(ctx, domainType, domainID, req.GroupName, req.Group.Spec)
 }
 
-func (s *GroupsService) DeleteGroup(ctx context.Context, req *pb.DeleteGroupRequest) (*pb.DeleteGroupResponse, error) {
+func (s *GroupsService) DeleteGroup(ctx context.Context, req *pb.DeleteGroupRequest) (response *pb.DeleteGroupResponse, err error) {
+	defer func() { securityChange(ctx, "group.delete", "group", req, response, err) }()
 	domainType := ctx.Value(authorization.DomainTypeContextKey).(string)
 	domainID := ctx.Value(authorization.DomainIdContextKey).(string)
 	return auth.DeleteGroup(ctx, domainType, domainID, req.GroupName, s.authService)

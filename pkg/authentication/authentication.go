@@ -380,7 +380,7 @@ func (a *Handler) handleAuthCallback(w http.ResponseWriter, r *http.Request) {
 
 	gothUser, err := gothic.CompleteUserAuth(w, r)
 	if err != nil {
-		log.WithError(err).Warn("provider authentication failed")
+		logAuthentication(r, "authentication.login", "denied", nil)
 		if a.isDev {
 			http.Error(w, "Authentication failed: "+err.Error(), http.StatusUnauthorized)
 			return
@@ -427,12 +427,14 @@ func (a *Handler) completeProviderAuth(w http.ResponseWriter, r *http.Request, g
 
 	err = updateAccountProviders(account, gothUser)
 	if err != nil {
+		logAuthentication(r, "authentication.login", "error", nil)
 		log.Errorf("Error updating account providers for %s: %v", gothUser.Email, err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
 	if err := saveConnectedProviderIdentity(database.DB(r.Context()), account, gothUser); err != nil {
+		logAuthentication(r, "authentication.login", "error", nil)
 		log.Errorf("Error saving connected identity for %s: %v", gothUser.Email, err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
@@ -442,6 +444,7 @@ func (a *Handler) completeProviderAuth(w http.ResponseWriter, r *http.Request, g
 }
 
 func (a *Handler) handleProviderAuthError(w http.ResponseWriter, r *http.Request, gothUser goth.User, err error) {
+	logAuthentication(r, "authentication.login", "denied", nil)
 	if errors.Is(err, models.ErrAccountBlocked) {
 		redirectAccountBlocked(w, r)
 		return
@@ -462,6 +465,8 @@ func (a *Handler) handleProviderAuthError(w http.ResponseWriter, r *http.Request
 }
 
 func (a *Handler) handleSuccessfulAuth(w http.ResponseWriter, r *http.Request, account *models.Account, wasCreated bool) {
+	outcome := "denied"
+	defer func() { logAuthentication(r, "authentication.login", outcome, account) }()
 	if account.IsBlocked() {
 		redirectAccountBlocked(w, r)
 		return
@@ -473,14 +478,30 @@ func (a *Handler) handleSuccessfulAuth(w http.ResponseWriter, r *http.Request, a
 	}
 
 	redirectURL := a.getPostAuthRedirectURL(r, wasCreated)
+	outcome = "success"
 	http.Redirect(w, r, redirectURL, http.StatusTemporaryRedirect) // #nosec G710 -- getPostAuthRedirectURL returns a validated internal path.
 }
 
 func (a *Handler) handleLogout(w http.ResponseWriter, r *http.Request) {
+	account, err := a.sessionAccountFromCookie(r)
+	outcome := "success"
+	if err == nil {
+		cookie, _ := r.Cookie("account_token")
+		claims, validationErr := a.jwtSigner.ValidateAndGetClaims(cookie.Value)
+		if validationErr != nil || !IsAccountSessionWithinMaxAge(claims) {
+			account = nil
+			outcome = "denied"
+		}
+	}
+	if err != nil {
+		account = nil
+		outcome = "denied"
+	}
 	gothic.Logout(w, r)
 
 	ClearAccountCookie(w, r)
 	supportsession.ClearCookie(w, r)
+	logAuthentication(r, "authentication.logout", outcome, account)
 
 	http.Redirect(w, r, getPostLogoutRedirectURL(r), http.StatusTemporaryRedirect) // #nosec G710 -- getPostLogoutRedirectURL returns a validated internal path.
 }
@@ -530,6 +551,9 @@ func (a *Handler) handleAuthConfig(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *Handler) handlePasswordLogin(w http.ResponseWriter, r *http.Request) {
+	outcome := "denied"
+	var actor *models.Account
+	defer func() { logAuthentication(r, "authentication.login", outcome, actor) }()
 	if !a.passwordLoginEnabled {
 		http.Error(w, "Password login is not enabled", http.StatusForbidden)
 		return
@@ -583,6 +607,8 @@ func (a *Handler) handlePasswordLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Redirect
+	actor = account
+	outcome = "success"
 	redirectURL := getRedirectURL(r)
 	// Use StatusSeeOther (303) instead of StatusTemporaryRedirect (307) for POST requests
 	// This ensures the browser uses GET for the redirect, not POST
@@ -590,6 +616,9 @@ func (a *Handler) handlePasswordLogin(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *Handler) handlePasswordSignup(w http.ResponseWriter, r *http.Request) {
+	outcome := "denied"
+	var actor *models.Account
+	defer func() { logAuthentication(r, "authentication.login", outcome, actor) }()
 	if !a.passwordLoginEnabled {
 		http.Error(w, "Password login is not enabled", http.StatusForbidden)
 		return
@@ -672,6 +701,8 @@ func (a *Handler) handlePasswordSignup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	redirectURL := a.getPostAuthRedirectURL(r, true)
+	actor = account
+	outcome = "success"
 	http.Redirect(w, r, redirectURL, http.StatusSeeOther) // #nosec G710 -- getPostAuthRedirectURL returns a validated internal path.
 }
 
@@ -772,6 +803,12 @@ func (a *Handler) handleMagicCodeRequest(w http.ResponseWriter, r *http.Request)
 }
 
 func (a *Handler) handleMagicCodeVerify(w http.ResponseWriter, r *http.Request) {
+	completed := false
+	defer func() {
+		if !completed {
+			logAuthentication(r, "authentication.login", "denied", nil)
+		}
+	}()
 	if !a.magicCodeEnabled {
 		http.Error(w, "Magic code login is not enabled", http.StatusForbidden)
 		return
@@ -826,6 +863,7 @@ func (a *Handler) handleMagicCodeVerify(w http.ResponseWriter, r *http.Request) 
 	}
 
 	a.issueSessionAndRedirect(w, r, account, wasCreated)
+	completed = true
 }
 
 func (a *Handler) parseMagicCodeInput(r *http.Request) (string, string, error) {
@@ -971,6 +1009,8 @@ func errorStatusForAccountError(err error) int {
 }
 
 func (a *Handler) issueSessionAndRedirect(w http.ResponseWriter, r *http.Request, account *models.Account, wasCreated bool) {
+	outcome := "denied"
+	defer func() { logAuthentication(r, "authentication.login", outcome, account) }()
 	if account.IsBlocked() {
 		if strings.Contains(r.Header.Get("Accept"), jsonContentType) {
 			http.Error(w, models.AccountBlockedMessage, http.StatusForbidden)
@@ -988,6 +1028,7 @@ func (a *Handler) issueSessionAndRedirect(w http.ResponseWriter, r *http.Request
 
 	redirectURL := a.getPostAuthRedirectURL(r, wasCreated)
 	writePostAuthRedirect(w, r, redirectURL)
+	outcome = "success"
 }
 
 func redirectAccountBlocked(w http.ResponseWriter, r *http.Request) {

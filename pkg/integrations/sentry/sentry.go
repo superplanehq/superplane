@@ -824,14 +824,17 @@ func (s *Sentry) handleWebhook(ctx core.HTTPRequestContext) {
 		return
 	}
 
-	// The hosted app handler logs the body before it calls this handler.
+	// The hosted app handler records receipt metadata before this handler.
 	// A receipt header on a direct webhook is not that call.
 	if !hostedSentryWebhookLogged(ctx.Request.Context()) {
-		logging.LogSentryWebhookInfo("Sentry webhook received", logging.WithWebhookPayload(logrus.Fields{
+		logging.LogSentryWebhookInfo("Sentry webhook received", logrus.Fields{
 			"hook_resource":     parsed.Resource,
 			"action":            parsed.Action,
 			"installation_uuid": parsed.Installation.UUID,
-		}, body))
+			"integration_id":    ctx.Integration.ID().String(),
+			"organization_id":   ctx.OrganizationID,
+			"receipt_id":        strings.TrimSpace(ctx.Request.Header.Get(HeaderWebhookReceipt)),
+		})
 	}
 
 	message := parsed

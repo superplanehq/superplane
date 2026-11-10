@@ -8,6 +8,7 @@ import (
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
 	"gorm.io/gorm"
@@ -62,4 +63,5 @@ func (s *Server) disconnectLinkedAccount(w http.ResponseWriter, r *http.Request)
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+	logging.SecurityEvent(r.Context(), "account.linked_account_disconnect", "success", "account", account.ID.String(), log.Fields{"provider": provider})
 }

@@ -295,6 +295,13 @@ func applySentryWebhookErrorTags(scope *sentry.Scope, r *http.Request, tags []st
 		if resource := r.Header.Get("Sentry-Hook-Resource"); resource != "" {
 			scope.SetTag("hook_resource", resource)
 		}
-		scope.SetRequest(r)
+		request := r.Clone(r.Context())
+		request.Body = http.NoBody
+		request.GetBody = nil
+		request.ContentLength = 0
+		request.Form = nil
+		request.PostForm = nil
+		request.MultipartForm = nil
+		scope.SetRequest(request)
 	}
 }

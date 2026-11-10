@@ -12,6 +12,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
 	factoryactions "github.com/superplanehq/superplane/pkg/grpc/actions/factories"
+	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
 	"gorm.io/gorm"
@@ -42,6 +43,7 @@ func (s *Server) adminSetMultiRepoTasks(w http.ResponseWriter, r *http.Request, 
 	}
 
 	status := "disabled"
+	logging.SecurityEvent(r.Context(), "organization.feature_set", "success", "organization", orgID.String(), log.Fields{"feature_id": "factory-multi-repo-tasks", "enabled": enabled})
 	if enabled {
 		status = "enabled"
 	}
@@ -70,6 +72,7 @@ func (s *Server) adminResetBuiltInAutomations(w http.ResponseWriter, r *http.Req
 	}
 
 	w.Header().Set("Content-Type", "application/json")
+	logging.SecurityEvent(r.Context(), "automation.organization_reset", "success", "organization", orgID.String(), nil)
 	if err := json.NewEncoder(w).Encode(result); err != nil {
 		log.Errorf("admin: failed to encode built-in automation reset: %v", err)
 	}

@@ -51,12 +51,14 @@ func (s *FactoryService) DescribeFactory(ctx context.Context, req *pb.DescribeFa
 	return actions.DescribeFactory(ctx, s.intakeDeps, organizationID, req.GetId())
 }
 
-func (s *FactoryService) UpdateFactory(ctx context.Context, req *pb.UpdateFactoryRequest) (*pb.UpdateFactoryResponse, error) {
+func (s *FactoryService) UpdateFactory(ctx context.Context, req *pb.UpdateFactoryRequest) (response *pb.UpdateFactoryResponse, err error) {
+	defer func() { securityChange(ctx, "workspace.settings_update", "workspace", req, response, err) }()
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.UpdateFactory(ctx, organizationID, req)
 }
 
-func (s *FactoryService) SetFactoryVisibility(ctx context.Context, req *pb.SetFactoryVisibilityRequest) (*pb.SetFactoryVisibilityResponse, error) {
+func (s *FactoryService) SetFactoryVisibility(ctx context.Context, req *pb.SetFactoryVisibilityRequest) (response *pb.SetFactoryVisibilityResponse, err error) {
+	defer func() { securityChange(ctx, "workspace.visibility_set", "workspace", req, response, err) }()
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.SetFactoryVisibility(ctx, organizationID, req)
 }
@@ -116,7 +118,8 @@ func (s *FactoryService) CreateFactoryLine(ctx context.Context, req *pb.CreateFa
 	return actions.CreateFactoryLine(ctx, organizationID, req)
 }
 
-func (s *FactoryService) UpdateFactoryLine(ctx context.Context, req *pb.UpdateFactoryLineRequest) (*pb.UpdateFactoryLineResponse, error) {
+func (s *FactoryService) UpdateFactoryLine(ctx context.Context, req *pb.UpdateFactoryLineRequest) (response *pb.UpdateFactoryLineResponse, err error) {
+	defer func() { securityChange(ctx, "workspace.line_update", "workspace", req, response, err) }()
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.UpdateFactoryLine(ctx, organizationID, req)
 }
@@ -126,12 +129,14 @@ func (s *FactoryService) ListFactoryAutomations(ctx context.Context, req *pb.Lis
 	return actions.ListFactoryAutomations(ctx, organizationID, req)
 }
 
-func (s *FactoryService) CreateFactoryAutomation(ctx context.Context, req *pb.CreateFactoryAutomationRequest) (*pb.CreateFactoryAutomationResponse, error) {
+func (s *FactoryService) CreateFactoryAutomation(ctx context.Context, req *pb.CreateFactoryAutomationRequest) (response *pb.CreateFactoryAutomationResponse, err error) {
+	defer func() { securityChange(ctx, "automation.create", "automation", req, response, err) }()
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.CreateFactoryAutomation(ctx, s.intakeDeps, organizationID, req)
 }
 
-func (s *FactoryService) CreateFactoryCustomAutomation(ctx context.Context, req *pb.CreateFactoryCustomAutomationRequest) (*pb.CreateFactoryCustomAutomationResponse, error) {
+func (s *FactoryService) CreateFactoryCustomAutomation(ctx context.Context, req *pb.CreateFactoryCustomAutomationRequest) (response *pb.CreateFactoryCustomAutomationResponse, err error) {
+	defer func() { securityChange(ctx, "automation.create_custom", "automation", req, response, err) }()
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.CreateFactoryCustomAutomation(ctx, s.intakeDeps, organizationID, req)
 }
@@ -141,7 +146,8 @@ func (s *FactoryService) DescribeFactoryCustomAutomation(ctx context.Context, re
 	return actions.DescribeFactoryCustomAutomation(ctx, organizationID, req)
 }
 
-func (s *FactoryService) UpdateFactoryCustomAutomation(ctx context.Context, req *pb.UpdateFactoryCustomAutomationRequest) (*pb.UpdateFactoryCustomAutomationResponse, error) {
+func (s *FactoryService) UpdateFactoryCustomAutomation(ctx context.Context, req *pb.UpdateFactoryCustomAutomationRequest) (response *pb.UpdateFactoryCustomAutomationResponse, err error) {
+	defer func() { securityChange(ctx, "automation.update_custom", "automation", req, response, err) }()
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.UpdateFactoryCustomAutomation(ctx, s.intakeDeps, organizationID, req)
 }
@@ -156,7 +162,8 @@ func (s *FactoryService) PreviewFactorySchedule(ctx context.Context, req *pb.Pre
 	return actions.PreviewFactorySchedule(ctx, organizationID, req)
 }
 
-func (s *FactoryService) DeleteFactoryAutomation(ctx context.Context, req *pb.DeleteFactoryAutomationRequest) (*pb.DeleteFactoryAutomationResponse, error) {
+func (s *FactoryService) DeleteFactoryAutomation(ctx context.Context, req *pb.DeleteFactoryAutomationRequest) (response *pb.DeleteFactoryAutomationResponse, err error) {
+	defer func() { securityChange(ctx, "automation.delete", "automation", req, response, err) }()
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.DeleteFactoryAutomation(ctx, organizationID, req)
 }
@@ -166,7 +173,8 @@ func (s *FactoryService) MaterializeFactoryAppTemplate(ctx context.Context, req 
 	return actions.MaterializeFactoryAppTemplate(ctx, organizationID, req)
 }
 
-func (s *FactoryService) MaterializeFactoryAutomationDefaults(ctx context.Context, req *pb.MaterializeFactoryAutomationDefaultsRequest) (*pb.MaterializeFactoryAutomationDefaultsResponse, error) {
+func (s *FactoryService) MaterializeFactoryAutomationDefaults(ctx context.Context, req *pb.MaterializeFactoryAutomationDefaultsRequest) (response *pb.MaterializeFactoryAutomationDefaultsResponse, err error) {
+	defer func() { securityChange(ctx, "automation.defaults_restore", "automation", req, response, err) }()
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.MaterializeFactoryAutomationDefaults(ctx, organizationID, req)
 }
@@ -181,7 +189,8 @@ func (s *FactoryService) CreateFactoryIntake(ctx context.Context, req *pb.Create
 	return actions.CreateFactoryIntake(ctx, s.intakeDeps, organizationID, req)
 }
 
-func (s *FactoryService) UpdateFactoryIntake(ctx context.Context, req *pb.UpdateFactoryIntakeRequest) (*pb.UpdateFactoryIntakeResponse, error) {
+func (s *FactoryService) UpdateFactoryIntake(ctx context.Context, req *pb.UpdateFactoryIntakeRequest) (response *pb.UpdateFactoryIntakeResponse, err error) {
+	defer func() { securityChange(ctx, "automation.intake_update", "automation", req, response, err) }()
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.UpdateFactoryIntake(ctx, s.intakeDeps, organizationID, req)
 }
@@ -206,7 +215,8 @@ func (s *FactoryService) CreateFactoryPRFeedbackHandler(ctx context.Context, req
 	return actions.CreateFactoryPRFeedbackHandler(ctx, s.intakeDeps, organizationID, req)
 }
 
-func (s *FactoryService) UpdateFactoryPRFeedbackHandler(ctx context.Context, req *pb.UpdateFactoryPRFeedbackHandlerRequest) (*pb.UpdateFactoryPRFeedbackHandlerResponse, error) {
+func (s *FactoryService) UpdateFactoryPRFeedbackHandler(ctx context.Context, req *pb.UpdateFactoryPRFeedbackHandlerRequest) (response *pb.UpdateFactoryPRFeedbackHandlerResponse, err error) {
+	defer func() { securityChange(ctx, "automation.pr_feedback_update", "automation", req, response, err) }()
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.UpdateFactoryPRFeedbackHandler(ctx, s.intakeDeps, organizationID, req)
 }
@@ -470,7 +480,8 @@ func (s *FactoryService) ListFactoryMCPClients(ctx context.Context, req *pb.List
 	return actions.ListFactoryMCPClients(ctx, organizationID, req)
 }
 
-func (s *FactoryService) RevokeFactoryMCPClient(ctx context.Context, req *pb.RevokeFactoryMCPClientRequest) (*pb.RevokeFactoryMCPClientResponse, error) {
+func (s *FactoryService) RevokeFactoryMCPClient(ctx context.Context, req *pb.RevokeFactoryMCPClientRequest) (response *pb.RevokeFactoryMCPClientResponse, err error) {
+	defer func() { securityChange(ctx, "mcp_client.revoke", "mcp_client", req, response, err) }()
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.RevokeFactoryMCPClient(ctx, organizationID, req)
 }

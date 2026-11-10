@@ -450,7 +450,8 @@ func (s *CanvasService) DeleteCanvasStaging(ctx context.Context, req *pb.DeleteC
 	return &pb.DeleteCanvasStagingResponse{StagingSummary: state}, nil
 }
 
-func (s *CanvasService) CommitCanvasStaging(ctx context.Context, req *pb.CommitCanvasStagingRequest) (*pb.CommitCanvasStagingResponse, error) {
+func (s *CanvasService) CommitCanvasStaging(ctx context.Context, req *pb.CommitCanvasStagingRequest) (response *pb.CommitCanvasStagingResponse, err error) {
+	defer func() { securityChange(ctx, "automation.configuration_commit", "automation", req, response, err) }()
 	db := database.DB(ctx)
 	canvas, err := s.findCanvas(ctx, db, req.CanvasId)
 	if err != nil {
