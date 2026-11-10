@@ -73,7 +73,40 @@ func maybeLinkBacklogCustomAutomationRun(tx *gorm.DB, canvas *Canvas, event *Can
 
 // MaybeLinkMergeConfidenceRun records task authority before agent admission.
 func MaybeLinkMergeConfidenceRun(tx *gorm.DB, canvas *Canvas, event *CanvasEvent, run *CanvasRun) error {
-	return maybeLinkFactoryColumnAppRun(tx, canvas, event, run, "risk-score", "Merge confidence")
+	if canvas == nil || event == nil || run == nil || canvas.FactoryID == nil || event.WorkflowID != canvas.ID || run.WorkflowID != canvas.ID {
+		return nil
+	}
+	matches, err := CanvasHasFactoryAppTemplate(tx, canvas.ID, "risk-score")
+	if err != nil || !matches {
+		return err
+	}
+	prID := visualEvidencePullRequestID(event.Data.Data())
+	if prID == uuid.Nil {
+		return nil
+	}
+	if err := maybeLinkFactoryColumnAppRun(tx, canvas, event, run, "risk-score", "Merge confidence"); err != nil {
+		return err
+	}
+	activity, err := FindPullRequestActivityByRunID(tx, run.ID)
+	if err != nil {
+		return err
+	}
+	payload, _ := objectMap(RootEventSourcePayload(event.Data.Data()))
+	providerPR, _ := objectMap(payload["pull_request"])
+	head, _ := objectMap(providerPR["head"])
+	sha, _ := head["sha"].(string)
+	if sha = strings.TrimSpace(sha); sha != "" && activity.RevisionID == nil {
+		// The event identifies the assessed commit, not an observation of the
+		// live head. Delayed admission must not move the current revision back.
+		revision, _, err := findOrCreatePullRequestRevision(tx, activity.PullRequestID, sha)
+		if err != nil {
+			return err
+		}
+		if err := tx.Model(activity).Update("revision_id", revision.ID).Error; err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func maybeLinkFactoryColumnAppRun(
