@@ -73,7 +73,7 @@ func (a *Handler) parseConnectState(state string) (*connectState, error) {
 	provider, _ := claims["provider"].(string)
 	redirect, _ := claims["redirect"].(string)
 	nonce, _ := claims["jti"].(string)
-	if accountID == "" || provider == "" || nonce == "" {
+	if accountID == "" || provider == "" || nonce == "" || !isValidRedirectURL(redirect) {
 		return nil, errors.New("invalid connect state")
 	}
 	if _, err := uuid.Parse(accountID); err != nil {
@@ -128,7 +128,7 @@ func (a *Handler) completeAccountConnection(w http.ResponseWriter, r *http.Reque
 
 	err = models.SaveAccountLinkedAccount(database.DB(r.Context()), linked)
 	if errors.Is(err, models.ErrLinkedAccountInUse) {
-		http.Redirect(w, r, connectErrorRedirectURL(state.Redirect, authErrorConnectInUse, gothUser.Provider), http.StatusSeeOther)
+		http.Redirect(w, r, connectErrorRedirectURL(state.Redirect, authErrorConnectInUse, gothUser.Provider), http.StatusSeeOther) // #nosec G710 -- parseConnectState validates the internal redirect path.
 		return
 	}
 	if err != nil {
@@ -137,7 +137,7 @@ func (a *Handler) completeAccountConnection(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	http.Redirect(w, r, connectSuccessRedirectURL(state.Redirect, gothUser.Provider), http.StatusSeeOther)
+	http.Redirect(w, r, connectSuccessRedirectURL(state.Redirect, gothUser.Provider), http.StatusSeeOther) // #nosec G710 -- parseConnectState validates the internal redirect path.
 }
 
 // finishAccountConnection handles a connect request that already carries a

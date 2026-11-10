@@ -49,7 +49,7 @@ func (e *VersionedEncryptor) Encrypt(ctx context.Context, plain, associatedData 
 	header := make([]byte, 0, len(envelopeMarker)+len(key.ID))
 	header = append(header, envelopeMarker...)
 	header = append(header, key.ID[:]...)
-	ciphertext := aead.Seal(nil, nil, plain, envelopeAssociatedData(header, associatedData))
+	ciphertext := aead.Seal(nil, nil, plain, envelopeAssociatedData(header, associatedData)) // #nosec G407 -- NewGCMWithRandomNonce generates and prepends a random nonce.
 	return append(header, ciphertext...), nil
 }
 

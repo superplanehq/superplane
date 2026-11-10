@@ -1336,10 +1336,13 @@ func clearIntegrationSetupReturnCookie(response http.ResponseWriter) {
 	}
 
 	http.SetCookie(response, &http.Cookie{
-		Name:   integrationSetupReturnCookie,
-		Value:  "",
-		Path:   "/",
-		MaxAge: -1,
+		Name:     integrationSetupReturnCookie,
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteLaxMode,
 	})
 }
 
