@@ -104,7 +104,7 @@ func (s *Server) HandleGitHubAppSetup(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "failed to queue GitHub App reconciliation", http.StatusInternalServerError)
 			return
 		}
-		http.Redirect(w, r, redirectPath, http.StatusFound)
+		http.Redirect(w, r, redirectPath, http.StatusFound) // #nosec G710 -- redirectPath is an internal workspace setup route built by the server.
 	default:
 		http.Error(w, "invalid setup action", http.StatusBadRequest)
 	}

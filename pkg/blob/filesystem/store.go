@@ -30,7 +30,7 @@ func New(root string) (*Store, error) {
 	if root == "" {
 		return nil, fmt.Errorf("blob filesystem root is required")
 	}
-	if err := os.MkdirAll(root, 0o755); err != nil {
+	if err := os.MkdirAll(root, 0o750); err != nil { // #nosec G703 -- the root comes from trusted storage configuration.
 		return nil, fmt.Errorf("create blob filesystem root: %w", err)
 	}
 	return &Store{root: root}, nil
@@ -45,11 +45,11 @@ func (s *Store) Put(_ context.Context, key string, r io.Reader, _ blob.PutOption
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
 		return fmt.Errorf("create blob directory: %w", err)
 	}
 
-	file, err := os.Create(path)
+	file, err := os.Create(path) // #nosec G304 -- pathFor confines validated object keys to the configured root.
 	if err != nil {
 		return fmt.Errorf("create blob file: %w", err)
 	}
@@ -74,7 +74,7 @@ func (s *Store) open(key string, offset, length int64) (io.ReadCloser, error) {
 	if err != nil {
 		return nil, err
 	}
-	file, err := os.Open(path)
+	file, err := os.Open(path) // #nosec G304 -- pathFor confines validated object keys to the configured root.
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return nil, blob.ErrNotFound
