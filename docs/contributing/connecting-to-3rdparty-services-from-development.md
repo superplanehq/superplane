@@ -250,6 +250,12 @@ configuration. This repository does not verify live installation permissions.
 The check uses the existing worker integration credentials. No new environment
 variables, Secret keys, or Helm values are required.
 
+Hosted API and workers use the existing `SUPERPLANE_GITHUB_APP_*` configuration.
+Workers must retain `START_NODE_REQUEST_WORKER=yes`. The hosted chart references
+the GitHub App Secret for workers. Launchpad references `superplane-github-app`
+in production and `superplane-github-app-staging` in staging. These source
+references do not verify deployed Secret contents or accepted App permissions.
+
 ## Bitbucket Forge local development
 
 Create a separate Forge app for your local instance. Keep the shared manifest unchanged when you configure your app and tunnel.

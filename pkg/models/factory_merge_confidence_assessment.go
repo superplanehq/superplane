@@ -1,9 +1,9 @@
 package models
 
 import (
- "encoding/json"
- "gorm.io/datatypes"
- "gorm.io/gorm"
+	"encoding/json"
+	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
 // LatestMergeConfidenceAssessment includes an unfinished newer run. A rerun
@@ -116,4 +116,3 @@ func mergeConfidenceAssessmentNode(nodes []Node) *Node {
 	}
 	return nil
 }
-

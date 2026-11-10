@@ -55,8 +55,8 @@ func TestMergeConfidenceActivityKeepsItsAssessedRevision(t *testing.T) {
 
 func TestMergeConfidenceStartQueuesOneDurableCheck(t *testing.T) {
 	for _, scenario := range []struct {
-		name          string
-		provider      string
+		name     string
+		provider string
 	}{
 		{name: "GitHub queues one durable check"},
 		{name: "Bitbucket skips GitHub check publication", provider: models.FactoryPullRequestProviderBitbucket},
