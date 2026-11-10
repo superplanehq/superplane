@@ -44,16 +44,46 @@ func Test__GitHubWebhookHandler__Setup(t *testing.T) {
 	})
 
 	for _, testCase := range []struct {
-		name   string
-		status int
-		body   string
+		name          string
+		responses     []*http.Response
+		expectedID    int64
+		expectedError string
 	}{
-		{name: "updates the saved repository hook", status: http.StatusOK, body: `{"id":456,"name":"web"}`},
-		{name: "returns repository hook update failures", status: http.StatusForbidden, body: `{"message":"Forbidden"}`},
+		{
+			name:       "updates the saved repository hook",
+			responses:  []*http.Response{mocks.GitHubResponse(http.StatusOK, `{"id":456,"name":"web"}`)},
+			expectedID: 456,
+		},
+		{
+			name:          "returns repository hook permission errors without creating a hook",
+			responses:     []*http.Response{mocks.GitHubResponse(http.StatusForbidden, `{"message":"Forbidden"}`)},
+			expectedError: "error updating webhook",
+		},
+		{
+			name:          "returns repository hook server errors without creating a hook",
+			responses:     []*http.Response{mocks.GitHubResponse(http.StatusInternalServerError, `{"message":"Internal Server Error"}`)},
+			expectedError: "error updating webhook",
+		},
+		{
+			name: "recreates a deleted repository hook",
+			responses: []*http.Response{
+				mocks.GitHubResponse(http.StatusNotFound, `{"message":"Not Found"}`),
+				mocks.GitHubResponse(http.StatusCreated, `{"id":789,"name":"web"}`),
+			},
+			expectedID: 789,
+		},
+		{
+			name: "returns replacement hook creation errors",
+			responses: []*http.Response{
+				mocks.GitHubResponse(http.StatusNotFound, `{"message":"Not Found"}`),
+				mocks.GitHubResponse(http.StatusForbidden, `{"message":"Forbidden"}`),
+			},
+			expectedError: "error creating webhook",
+		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
 			httpCtx := &contexts.HTTPContext{
-				Responses: []*http.Response{mocks.GitHubResponse(testCase.status, testCase.body)},
+				Responses: testCase.responses,
 			}
 			metadata, err := (&GitHubWebhookHandler{}).Setup(core.WebhookHandlerContext{
 				HTTP:        httpCtx,
@@ -69,22 +99,30 @@ func Test__GitHubWebhookHandler__Setup(t *testing.T) {
 				},
 			})
 
-			require.Len(t, httpCtx.Requests, 1)
-			request := httpCtx.Requests[0]
-			assert.Equal(t, http.MethodPatch, request.Method)
-			assert.Equal(t, "/repos/testhq/hello/hooks/456", request.URL.Path)
-			var payload struct {
-				Events []string `json:"events"`
+			require.Len(t, httpCtx.Requests, len(testCase.responses))
+			assert.Equal(t, http.MethodPatch, httpCtx.Requests[0].Method)
+			assert.Equal(t, "/repos/testhq/hello/hooks/456", httpCtx.Requests[0].URL.Path)
+			if len(httpCtx.Requests) == 2 {
+				assert.Equal(t, http.MethodPost, httpCtx.Requests[1].Method)
+				assert.Equal(t, "/repos/testhq/hello/hooks", httpCtx.Requests[1].URL.Path)
 			}
-			require.NoError(t, json.NewDecoder(request.Body).Decode(&payload))
-			assert.ElementsMatch(t, []string{"pull_request", "pull_request_review"}, payload.Events)
-			if testCase.status != http.StatusOK {
-				require.Error(t, err)
+			for _, request := range httpCtx.Requests {
+				var payload struct {
+					Events []string          `json:"events"`
+					Config map[string]string `json:"config"`
+				}
+				require.NoError(t, json.NewDecoder(request.Body).Decode(&payload))
+				assert.ElementsMatch(t, []string{"pull_request", "pull_request_review"}, payload.Events)
+				assert.Equal(t, "https://app.example/api/v1/webhooks/webhook-id", payload.Config["url"])
+				assert.Equal(t, "local-webhook-secret", payload.Config["secret"])
+			}
+			if testCase.expectedError != "" {
+				require.ErrorContains(t, err, testCase.expectedError)
 				assert.Nil(t, metadata)
 				return
 			}
 			require.NoError(t, err)
-			assert.Equal(t, &Webhook{ID: 456, WebhookName: "web"}, metadata)
+			assert.Equal(t, &Webhook{ID: testCase.expectedID, WebhookName: "web"}, metadata)
 		})
 	}
 
