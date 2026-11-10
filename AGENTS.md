@@ -89,6 +89,11 @@ Run these three steps once, in order:
    containers (app shell, db, rabbitmq). The first run builds the images
    (~3-5 min); later runs reuse them. After you change
    `release/runner/Dockerfile`, run `make dev.up` again.
+   Local startup requires 15 GB free on the Docker filesystem. If space is
+   low, it removes unused build cache and checks again before building.
+   This cleanup never removes images, containers, or database volumes.
+   If space is still low, increase Docker disk space or remove unused images
+   manually. CI skips this cleanup. Run `make test.dev.disk` to test recovery.
 2. `make dev.setup` — installs npm deps, downloads Go modules, runs protobuf
    codegen, and creates + migrates `superplane_dev`. Re-run when protos, Go
    modules, or frontend deps change. By

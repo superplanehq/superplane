@@ -70,6 +70,7 @@ blocks:
             - make test.release
             - make test.image
             - make test.sharding
+            - make test.dev.disk
             - make check.db.structure
             - make check.db.migrations
             - make check.components.docs
