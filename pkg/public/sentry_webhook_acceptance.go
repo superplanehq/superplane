@@ -85,6 +85,7 @@ func (s *Server) acceptSentryWebhook(w http.ResponseWriter, r *http.Request, bod
 	w.Header().Set(sentryintegration.HeaderWebhookReceipt, receiptID.String())
 	w.WriteHeader(http.StatusOK)
 	logging.LogSentryWebhookInfo("Sentry webhook recorded", log.Fields{
+		"receipt_id":        receiptID.String(),
 		"hook_resource":     message.Resource,
 		"action":            message.Action,
 		"outcome":           outcome,

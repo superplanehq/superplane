@@ -21,13 +21,15 @@ func NewSecretService(encryptor crypto.Encryptor, authService authorization.Auth
 	}
 }
 
-func (s *SecretService) CreateSecret(ctx context.Context, req *pb.CreateSecretRequest) (*pb.CreateSecretResponse, error) {
+func (s *SecretService) CreateSecret(ctx context.Context, req *pb.CreateSecretRequest) (response *pb.CreateSecretResponse, err error) {
+	defer func() { securityChange(ctx, "secret.create", "secret", req, response, err) }()
 	domainType := ctx.Value(authorization.DomainTypeContextKey).(string)
 	domainId := ctx.Value(authorization.DomainIdContextKey).(string)
 	return secrets.CreateSecret(ctx, s.encryptor, domainType, domainId, req.Secret)
 }
 
-func (s *SecretService) UpdateSecret(ctx context.Context, req *pb.UpdateSecretRequest) (*pb.UpdateSecretResponse, error) {
+func (s *SecretService) UpdateSecret(ctx context.Context, req *pb.UpdateSecretRequest) (response *pb.UpdateSecretResponse, err error) {
+	defer func() { securityChange(ctx, "secret.update", "secret", req, response, err) }()
 	domainType := ctx.Value(authorization.DomainTypeContextKey).(string)
 	domainId := ctx.Value(authorization.DomainIdContextKey).(string)
 	return secrets.UpdateSecret(ctx, s.encryptor, domainType, domainId, req.IdOrName, req.Secret)
@@ -45,25 +47,29 @@ func (s *SecretService) ListSecrets(ctx context.Context, req *pb.ListSecretsRequ
 	return secrets.ListSecrets(ctx, s.encryptor, domainType, domainId)
 }
 
-func (s *SecretService) DeleteSecret(ctx context.Context, req *pb.DeleteSecretRequest) (*pb.DeleteSecretResponse, error) {
+func (s *SecretService) DeleteSecret(ctx context.Context, req *pb.DeleteSecretRequest) (response *pb.DeleteSecretResponse, err error) {
+	defer func() { securityChange(ctx, "secret.delete", "secret", req, response, err) }()
 	domainType := ctx.Value(authorization.DomainTypeContextKey).(string)
 	domainId := ctx.Value(authorization.DomainIdContextKey).(string)
 	return secrets.DeleteSecret(ctx, domainType, domainId, req.IdOrName)
 }
 
-func (s *SecretService) SetSecretKey(ctx context.Context, req *pb.SetSecretKeyRequest) (*pb.SetSecretKeyResponse, error) {
+func (s *SecretService) SetSecretKey(ctx context.Context, req *pb.SetSecretKeyRequest) (response *pb.SetSecretKeyResponse, err error) {
+	defer func() { securityChange(ctx, "secret.key_set", "secret", req, response, err) }()
 	domainType := ctx.Value(authorization.DomainTypeContextKey).(string)
 	domainId := ctx.Value(authorization.DomainIdContextKey).(string)
 	return secrets.SetSecretKey(ctx, s.encryptor, domainType, domainId, req.IdOrName, req.KeyName, req.Value)
 }
 
-func (s *SecretService) DeleteSecretKey(ctx context.Context, req *pb.DeleteSecretKeyRequest) (*pb.DeleteSecretKeyResponse, error) {
+func (s *SecretService) DeleteSecretKey(ctx context.Context, req *pb.DeleteSecretKeyRequest) (response *pb.DeleteSecretKeyResponse, err error) {
+	defer func() { securityChange(ctx, "secret.key_delete", "secret", req, response, err) }()
 	domainType := ctx.Value(authorization.DomainTypeContextKey).(string)
 	domainId := ctx.Value(authorization.DomainIdContextKey).(string)
 	return secrets.DeleteSecretKey(ctx, s.encryptor, domainType, domainId, req.IdOrName, req.KeyName)
 }
 
-func (s *SecretService) UpdateSecretName(ctx context.Context, req *pb.UpdateSecretNameRequest) (*pb.UpdateSecretNameResponse, error) {
+func (s *SecretService) UpdateSecretName(ctx context.Context, req *pb.UpdateSecretNameRequest) (response *pb.UpdateSecretNameResponse, err error) {
+	defer func() { securityChange(ctx, "secret.rename", "secret", req, response, err) }()
 	domainType := ctx.Value(authorization.DomainTypeContextKey).(string)
 	domainId := ctx.Value(authorization.DomainIdContextKey).(string)
 	return secrets.UpdateSecretName(ctx, s.encryptor, domainType, domainId, req.IdOrName, req.Name)

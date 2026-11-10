@@ -7,6 +7,10 @@ import (
 	"io"
 	"slices"
 	"strings"
+
+	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/logging"
 )
 
 const maxJSONRPCBytes = 1 << 20
@@ -110,7 +114,22 @@ func initializeResult(params json.RawMessage) map[string]any {
 	}
 }
 
-func callTool(ctx context.Context, runtime *Runtime, claims *AccessClaims, message *JSONRPCRequest) *JSONRPCResponse {
+func callTool(ctx context.Context, runtime *Runtime, claims *AccessClaims, message *JSONRPCRequest) (response *JSONRPCResponse) {
+	toolName := "unknown"
+	targetType, targetID := "", ""
+	defer func() {
+		outcome := "error"
+		if response != nil && response.Error == nil {
+			if result, ok := response.Result.(ToolResult); ok && !result.IsError {
+				outcome = "success"
+			}
+		}
+		identity := logging.SecurityIdentity{UserID: claims.UserID.String(), OrganizationID: claims.OrgID.String()}
+		if known := logging.SecurityIdentityFrom(ctx); known != nil {
+			identity = *known
+		}
+		logging.SecurityEvent(logging.WithSecurityIdentity(ctx, &identity), "mcp.tool_call", outcome, targetType, targetID, log.Fields{"tool_name": toolName})
+	}()
 	var params struct {
 		Name      string          `json:"name"`
 		Arguments json.RawMessage `json:"arguments"`
@@ -118,10 +137,25 @@ func callTool(ctx context.Context, runtime *Runtime, claims *AccessClaims, messa
 	if err := json.Unmarshal(message.Params, &params); err != nil || strings.TrimSpace(params.Name) == "" {
 		return rpcError(message.ID, -32602, "tool name is required")
 	}
+	for _, tool := range Tools() {
+		if tool.Name == params.Name {
+			toolName = tool.Name
+			break
+		}
+	}
 	args := map[string]any{}
 	if len(params.Arguments) > 0 {
 		if err := json.Unmarshal(params.Arguments, &args); err != nil {
 			return rpcError(message.ID, -32602, "tool arguments must be an object")
+		}
+	}
+	// Only UUID targets are logged. Task URLs, keys, and other argument text stay private.
+	for _, key := range []string{"task", "workspace"} {
+		if value, ok := args[key].(string); ok {
+			if id, err := uuid.Parse(value); err == nil {
+				targetType, targetID = key, id.String()
+				break
+			}
 		}
 	}
 	result, err := runtime.CallTool(ctx, claims, params.Name, args)

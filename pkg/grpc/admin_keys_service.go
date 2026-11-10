@@ -9,6 +9,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/encryption"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/admin/keys"
 	"google.golang.org/grpc/codes"
@@ -56,6 +57,7 @@ func (s *AdminKeysService) CreateDataKey(ctx context.Context, _ *pb.CreateDataKe
 	if err != nil {
 		return nil, status.Error(codes.Internal, "could not create data key")
 	}
+	logging.SecurityEvent(ctx, "encryption.data_key_activate", "success", "data_key", id.String(), nil)
 	return &pb.CreateDataKeyResponse{ActiveKeyId: id.String()}, nil
 }
 
@@ -66,6 +68,7 @@ func (s *AdminKeysService) RewrapKeys(ctx context.Context, _ *pb.RewrapKeysReque
 	if err := s.store.Rewrap(ctx); err != nil {
 		return nil, status.Error(codes.Internal, "could not rewrap encryption keys")
 	}
+	logging.SecurityEvent(ctx, "encryption.keys_rewrap", "success", "data_keys", "", nil)
 	return &pb.RewrapKeysResponse{}, nil
 }
 
@@ -105,6 +108,7 @@ func (s *AdminKeysService) StartMigration(ctx context.Context, _ *pb.StartMigrat
 		"target_key_id":    job.TargetKeyID,
 		"storage_location": job.StorageLocation,
 	}).Info("application encryption migration started")
+	logging.SecurityEvent(ctx, "encryption.migration_start", "success", "encryption_migration", job.ID.String(), log.Fields{"target_key_id": job.TargetKeyID.String()})
 	if err := messages.PublishApplicationEncryptionMigrationRequested(); err != nil {
 		log.WithError(err).WithField("migration_id", job.ID).Warn("application encryption migration wake-up failed; recovery scan will start the job")
 	}
