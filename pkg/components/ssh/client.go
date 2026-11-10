@@ -3,8 +3,10 @@ package ssh
 import (
 	"bytes"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
+	"net"
 	"strings"
 	"time"
 
@@ -14,12 +16,16 @@ import (
 const AuthMethodSSHKey = "ssh_key"
 const AuthMethodPassword = "password"
 
+var errHostKeyFingerprintMismatch = errors.New("ssh host key fingerprint mismatch")
+
 // Client connects to an SSH server and runs commands.
 // Supports either SSH key or password authentication.
 type Client struct {
 	Host     string
 	Port     int
 	Username string
+
+	HostKeyFingerprint string
 
 	// For key auth
 	PrivateKey []byte
@@ -86,7 +92,7 @@ func (c *Client) Connect() (*ssh.Client, error) {
 	config := &ssh.ClientConfig{
 		User:            c.Username,
 		Auth:            auth,
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(), // #nosec G106 -- existing SSH workflows do not provide a host-key trust anchor.
+		HostKeyCallback: c.hostKeyCallback(),
 		Timeout:         10 * time.Second,
 	}
 
@@ -98,6 +104,20 @@ func (c *Client) Connect() (*ssh.Client, error) {
 
 	c.conn = conn
 	return conn, nil
+}
+
+func (c *Client) hostKeyCallback() ssh.HostKeyCallback {
+	if c.HostKeyFingerprint == "" {
+		return ssh.InsecureIgnoreHostKey() // #nosec G106 -- compatibility fallback for saved SSH components without a host-key fingerprint.
+	}
+
+	return func(_ string, _ net.Addr, key ssh.PublicKey) error {
+		fingerprint := ssh.FingerprintSHA256(key)
+		if fingerprint != c.HostKeyFingerprint {
+			return fmt.Errorf("%w: expected %s, got %s", errHostKeyFingerprintMismatch, c.HostKeyFingerprint, fingerprint)
+		}
+		return nil
+	}
 }
 
 func (c *Client) getSigner() (ssh.Signer, error) {
