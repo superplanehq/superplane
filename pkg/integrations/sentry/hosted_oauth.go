@@ -655,6 +655,8 @@ func clearIntegrationSetupReturnCookie(w http.ResponseWriter) {
 		Path:     "/",
 		MaxAge:   -1,
 		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteLaxMode,
 	})
 }
 
@@ -665,6 +667,8 @@ func clearSentryAppSetupStateCookie(w http.ResponseWriter) {
 		Path:     "/",
 		MaxAge:   -1,
 		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteLaxMode,
 	})
 }
 
@@ -675,6 +679,7 @@ func setSentryAppSetupStateCookie(w http.ResponseWriter, state string) {
 		Path:     "/",
 		MaxAge:   int((20 * time.Minute).Seconds()),
 		HttpOnly: true,
+		Secure:   true,
 		SameSite: http.SameSiteLaxMode,
 	})
 }

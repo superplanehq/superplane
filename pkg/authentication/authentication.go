@@ -199,7 +199,7 @@ func (a *Handler) beginProviderAuth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	http.Redirect(w, r, withAccountPicker(authURL), http.StatusTemporaryRedirect)
+	http.Redirect(w, r, withAccountPicker(authURL), http.StatusTemporaryRedirect) // #nosec G710 -- authURL comes from the configured Goth provider.
 }
 
 // Cloud registers GitHub at startup from GITHUB_CLIENT_ID and
@@ -473,7 +473,7 @@ func (a *Handler) handleSuccessfulAuth(w http.ResponseWriter, r *http.Request, a
 	}
 
 	redirectURL := a.getPostAuthRedirectURL(r, wasCreated)
-	http.Redirect(w, r, redirectURL, http.StatusTemporaryRedirect)
+	http.Redirect(w, r, redirectURL, http.StatusTemporaryRedirect) // #nosec G710 -- getPostAuthRedirectURL returns a validated internal path.
 }
 
 func (a *Handler) handleLogout(w http.ResponseWriter, r *http.Request) {
@@ -482,7 +482,7 @@ func (a *Handler) handleLogout(w http.ResponseWriter, r *http.Request) {
 	ClearAccountCookie(w, r)
 	supportsession.ClearCookie(w, r)
 
-	http.Redirect(w, r, getPostLogoutRedirectURL(r), http.StatusTemporaryRedirect)
+	http.Redirect(w, r, getPostLogoutRedirectURL(r), http.StatusTemporaryRedirect) // #nosec G710 -- getPostLogoutRedirectURL returns a validated internal path.
 }
 
 func getPostLogoutRedirectURL(r *http.Request) string {
@@ -586,7 +586,7 @@ func (a *Handler) handlePasswordLogin(w http.ResponseWriter, r *http.Request) {
 	redirectURL := getRedirectURL(r)
 	// Use StatusSeeOther (303) instead of StatusTemporaryRedirect (307) for POST requests
 	// This ensures the browser uses GET for the redirect, not POST
-	http.Redirect(w, r, redirectURL, http.StatusSeeOther)
+	http.Redirect(w, r, redirectURL, http.StatusSeeOther) // #nosec G710 -- getRedirectURL returns a validated internal path.
 }
 
 func (a *Handler) handlePasswordSignup(w http.ResponseWriter, r *http.Request) {
@@ -672,7 +672,7 @@ func (a *Handler) handlePasswordSignup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	redirectURL := a.getPostAuthRedirectURL(r, true)
-	http.Redirect(w, r, redirectURL, http.StatusSeeOther)
+	http.Redirect(w, r, redirectURL, http.StatusSeeOther) // #nosec G710 -- getPostAuthRedirectURL returns a validated internal path.
 }
 
 func (a *Handler) handleMagicCodeRequest(w http.ResponseWriter, r *http.Request) {
@@ -1005,7 +1005,7 @@ func writePostAuthRedirect(w http.ResponseWriter, r *http.Request, redirectURL s
 		return
 	}
 
-	http.Redirect(w, r, redirectURL, http.StatusSeeOther)
+	http.Redirect(w, r, redirectURL, http.StatusSeeOther) // #nosec G710 -- getPostAuthRedirectURL returns a validated internal path.
 }
 
 func (a *Handler) getPostAuthRedirectURL(r *http.Request, wasCreated bool) string {
@@ -1481,25 +1481,26 @@ func getRedirectURL(r *http.Request) string {
 // Validates that the redirect URL is a valid internal URL.
 // It rejects external URLs and URLs with multiple slashes.
 func isValidRedirectURL(redirectURL string) bool {
-	if redirectURL == "" || redirectURL[0] != '/' {
+	if redirectURL == "" || redirectURL[0] != '/' || strings.Contains(redirectURL, `\`) {
 		return false
 	}
 
-	if len(redirectURL) > 1 && redirectURL[1] == '/' {
+	target, err := url.Parse(redirectURL)
+	if err != nil || target.IsAbs() || target.Host != "" || target.User != nil {
 		return false
 	}
 
-	return true
+	return !strings.HasPrefix(target.Path, "//")
 }
 
 func ClearAccountCookie(w http.ResponseWriter, r *http.Request) {
-	http.SetCookie(w, &http.Cookie{
+	http.SetCookie(w, &http.Cookie{ // #nosec G124 -- local HTTP development must accept the cookie; forwarded HTTPS is detected.
 		Name:     "account_token",
 		Value:    "",
 		Path:     "/",
 		MaxAge:   -1,
 		HttpOnly: true,
-		Secure:   r.TLS != nil,
+		Secure:   requestUsesHTTPS(r),
 		SameSite: http.SameSiteLaxMode,
 	})
 }
@@ -1508,13 +1509,17 @@ func ClearAccountCookie(w http.ResponseWriter, r *http.Request) {
 // used by every login path. Centralized so callers (login, signup, magic
 // code, change-password reissue) cannot drift on cookie attributes.
 func SetAccountCookie(w http.ResponseWriter, r *http.Request, token string, ttl time.Duration) {
-	http.SetCookie(w, &http.Cookie{
+	http.SetCookie(w, &http.Cookie{ // #nosec G124 -- local HTTP development must accept the cookie; forwarded HTTPS is detected.
 		Name:     "account_token",
 		Value:    token,
 		Path:     "/",
 		MaxAge:   int(ttl.Seconds()),
 		HttpOnly: true,
-		Secure:   r.TLS != nil,
+		Secure:   requestUsesHTTPS(r),
 		SameSite: http.SameSiteLaxMode,
 	})
+}
+
+func requestUsesHTTPS(r *http.Request) bool {
+	return r.TLS != nil || strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https")
 }

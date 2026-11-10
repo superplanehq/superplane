@@ -107,7 +107,7 @@ func runPythonHost(
 	}
 	defer os.RemoveAll(scriptDir)
 
-	cmd := exec.CommandContext(ctx, python, programPath)
+	cmd := exec.CommandContext(ctx, python, programPath) // #nosec G204 -- the runner intentionally executes the selected Python interpreter and generated program.
 	cmd.Dir = workDir
 	prepareTaskProcessGroup(cmd)
 	defer killTaskProcessGroup(cmd)

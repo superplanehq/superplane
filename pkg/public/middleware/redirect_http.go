@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"net/http"
+	"net/url"
 	"strings"
 )
 
@@ -12,15 +13,22 @@ import (
 // Encrypt HTTP-01 uses that same port, so the load balancer redirect stays
 // off for cert-manager. This wrapper redirects the application instead.
 // Health checks and the ACME challenge path are left on HTTP.
-func RedirectInsecureForwardedHTTP(next http.Handler) http.Handler {
+func RedirectInsecureForwardedHTTP(next http.Handler, baseURL string) http.Handler {
+	canonicalURL, err := url.Parse(baseURL)
+	if err != nil || canonicalURL.Host == "" {
+		canonicalURL = nil
+	}
+
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !insecureForwardedHTTP(r) || skipHTTPRedirect(r.URL.Path) || r.Host == "" {
+		if !insecureForwardedHTTP(r) || skipHTTPRedirect(r.URL.Path) || canonicalURL == nil {
 			next.ServeHTTP(w, r)
 			return
 		}
 
-		target := "https://" + r.Host + r.URL.RequestURI()
-		http.Redirect(w, r, target, http.StatusPermanentRedirect)
+		target := *r.URL
+		target.Scheme = "https"
+		target.Host = canonicalURL.Host
+		http.Redirect(w, r, target.String(), http.StatusPermanentRedirect) // #nosec G710 -- the host comes from the configured canonical base URL.
 	})
 }
 

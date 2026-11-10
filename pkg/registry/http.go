@@ -255,7 +255,7 @@ func (c *HTTPContext) do(request *http.Request, tx *gorm.DB) (*http.Response, er
 		client = c.clientInTransaction(request, tx)
 	}
 
-	resp, err := client.Do(request)
+	resp, err := client.Do(request) // #nosec G704 -- validateURLWithPolicy rejects disallowed destinations and DNS rebinding above.
 	if err != nil {
 		return nil, err
 	}
