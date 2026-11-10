@@ -1,6 +1,7 @@
 package factories
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -168,4 +169,54 @@ func Test__DescribeWorkOrder_IncludesPlanningSessionSummary(t *testing.T) {
 	assert.Equal(t, session.ID.String(), resp.Order.GetPlanningSession().GetId())
 	assert.Equal(t, session.State, resp.Order.GetPlanningSession().GetState())
 	assert.Empty(t, resp.Order.GetPlanningSession().GetSurvey().GetQuestions())
+}
+
+func TestDescribeWorkOrderKeepsOriginalStarterAfterOwnerChanges(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	f, err := models.CreateFactory(db, r.Organization.ID, "Start attribution", "", "")
+	require.NoError(t, err)
+	starter := support.CreateUser(t, r, r.Organization.ID)
+	owner := support.CreateUser(t, r, r.Organization.ID)
+	for _, automated := range []bool{false, true} {
+		t.Run(fmt.Sprintf("automated=%t", automated), func(t *testing.T) {
+			order, err := f.CreateWorkOrder(db, "Keep starter", "", &owner.ID, []uuid.UUID{owner.ID}, nil)
+			require.NoError(t, err)
+			describe := func() *pb.WorkOrder {
+				response, err := DescribeWorkOrder(t.Context(), r.Organization.ID.String(), &pb.DescribeWorkOrderRequest{FactoryId: f.ID.String(), OrderId: order.ID.String()})
+				require.NoError(t, err)
+				return response.Order
+			}
+			beforeStart := describe()
+			assert.Nil(t, beforeStart.StartedBy)
+			assert.False(t, beforeStart.AutoStarted)
+			assert.Nil(t, beforeStart.StartedAt)
+			var actor *uuid.UUID
+			if !automated {
+				actor = &starter.ID
+			}
+			_, err = order.UpdateStatus(db, models.FactoryWorkOrderStatusUpdate{ToState: models.FactoryWorkOrderStateOpen, Actor: actor})
+			require.NoError(t, err)
+			firstStart := describe().GetStartedAt()
+			require.NotNil(t, firstStart)
+			require.NoError(t, order.UpdateAssignees(db, []uuid.UUID{r.User}, r.User))
+			// A later trip through Backlog must not replace the original attribution.
+			_, err = order.UpdateStatus(db, models.FactoryWorkOrderStatusUpdate{ToState: models.FactoryWorkOrderStateDraft, Actor: &r.User})
+			require.NoError(t, err)
+			_, err = order.UpdateStatus(db, models.FactoryWorkOrderStatusUpdate{ToState: models.FactoryWorkOrderStateOpen, Actor: &r.User})
+			require.NoError(t, err)
+			described := describe()
+			assert.Equal(t, automated, described.AutoStarted)
+			assert.Equal(t, firstStart.AsTime(), described.GetStartedAt().AsTime())
+			if automated {
+				assert.Nil(t, described.StartedBy)
+				return
+			}
+			require.NotNil(t, described.StartedBy)
+			assert.Equal(t, starter.ID.String(), described.StartedBy.Id)
+			assert.Equal(t, starter.Name, described.StartedBy.Name)
+			require.Len(t, described.Assignees, 1)
+			assert.Equal(t, r.User.String(), described.Assignees[0].Id)
+		})
+	}
 }

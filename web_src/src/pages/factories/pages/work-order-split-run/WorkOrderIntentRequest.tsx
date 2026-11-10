@@ -22,6 +22,7 @@ import { FALLBACK_COLLAPSED_MAX_HEIGHT_PX } from "../../workOrderDescriptionOver
 import { REQUEST_CARD_CLASSNAME, REQUEST_CARD_FADE_CLASSNAME } from "./chatBubbleStyle";
 import { AnalysisPlanControls } from "./AnalysisPlanControls";
 import { PlanningImplementationControls } from "./PlanningImplementationControls";
+import { PlanningFailureAlert } from "./PlanningFailureAlert";
 import { AnalysisLiveWork } from "./IntentAnalysisLiveWork";
 import type { IntentAnalysisChat } from "./intentAnalysisChat";
 import { JumpToLatestPill } from "./JumpToLatestPill";
@@ -84,6 +85,7 @@ function analysisRequestChatState(analysis: IntentAnalysisChat) {
     followKey: analysis.view.executionId || analysis.view.canvasId || "analysis",
     active,
     showSurvey: hasPendingPlanningQuestions(analysis.view),
+    progressLabel: analysis.canTogglePlan ? undefined : "Creating the first plan…",
     placeholder:
       !analysis.canSend && stopped ? ANALYSIS_PLANNING_COPY.stopped : ANALYSIS_PLANNING_COPY.composerPlaceholder,
   };
@@ -102,6 +104,7 @@ function AnalysisRequestChat({
     resumeOnBottom: true,
   });
   const chipsWorking =
+    !analysis.planningFailure &&
     !analysis.creditVerdict &&
     composerChipsWorking({
       isAnalyzing: analysis.isAnalyzing,
@@ -139,13 +142,21 @@ function AnalysisRequestChat({
             {state.active || analysis.view.machineStatus === "queued" ? (
               <AnalysisLiveWork
                 machineStatus={analysis.view.machineStatus}
-                queueReason={analysis.view.queueReason}
+                runnerState={analysis.view.runnerState}
+                blockedByParallelismLimit={analysis.view.blockedByParallelismLimit}
                 organizationId={analysis.organizationId}
                 canvasId={analysis.view.canvasId}
                 executionId={analysis.view.executionId}
                 activities={analysis.view.activities}
+                progressLabel={state.progressLabel}
               />
             ) : null}
+            <PlanningFailureAlert
+              failure={analysis.planningFailure}
+              organizationId={analysis.organizationId}
+              canEditModel={analysis.canEditPlanningModel}
+              hasSession={analysis.planningSessionExists}
+            />
             <AnalysisPlanControls analysis={analysis} chipsWorking={chipsWorking} position="conversation" />
             {state.showSurvey && analysis.view.survey ? (
               <WorkOrderIntentSurvey

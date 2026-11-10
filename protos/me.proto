@@ -7,6 +7,7 @@ import "google/protobuf/empty.proto";
 import "google/protobuf/timestamp.proto";
 import "protoc-gen-openapiv2/options/annotations.proto";
 import "authorization.proto";
+import "factories.proto";
 
 option go_package = "github.com/superplanehq/superplane/pkg/protos/me";
 
@@ -26,6 +27,22 @@ option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
 };
 
 service Me {
+  rpc DescribeCodexConnection(DescribeCodexConnectionRequest) returns (DescribeCodexConnectionResponse) {
+    option (google.api.http) = { get: "/api/v1/me/codex-connection" };
+  }
+
+  rpc StartCodexConnection(StartCodexConnectionRequest) returns (StartCodexConnectionResponse) {
+    option (google.api.http) = { post: "/api/v1/me/codex-connection" body: "*" };
+  }
+
+  rpc CancelCodexConnection(CancelCodexConnectionRequest) returns (CancelCodexConnectionResponse) {
+    option (google.api.http) = { post: "/api/v1/me/codex-connection:cancel" body: "*" };
+  }
+
+  rpc DisconnectCodexConnection(DisconnectCodexConnectionRequest) returns (DisconnectCodexConnectionResponse) {
+    option (google.api.http) = { delete: "/api/v1/me/codex-connection" };
+  }
+
 
   rpc ListCodexUsage(ListCodexUsageRequest) returns (ListCodexUsageResponse) {
     option (google.api.http) = {
@@ -242,21 +259,7 @@ message CodexUsageConnection {
   string account_label = 3;
   string status = 4;
   google.protobuf.Timestamp observed_at = 5;
-  repeated CodexUsageLimit limits = 6;
-}
-
-message CodexUsageLimit {
-  string limit_id = 1;
-  string limit_name = 2;
-  string plan_type = 3;
-  CodexUsageWindow primary = 4;
-  CodexUsageWindow secondary = 5;
-}
-
-message CodexUsageWindow {
-  double used_percent = 1;
-  optional int64 window_duration_mins = 2;
-  google.protobuf.Timestamp resets_at = 3;
+  repeated Superplane.Factories.CodexUsageLimit limits = 6;
 }
 
 message MeResponse {
@@ -484,3 +487,15 @@ message SaveLastLocationRequest {
 message SaveLastLocationResponse {
   LastLocation last_location = 1;
 }
+
+message DescribeCodexConnectionRequest { }
+message DescribeCodexConnectionResponse { Superplane.Factories.FactoryCodexConnection connection = 1; }
+
+message StartCodexConnectionRequest { bool refresh_catalog = 1; }
+message StartCodexConnectionResponse { Superplane.Factories.FactoryCodexConnection connection = 1; }
+
+message CancelCodexConnectionRequest { }
+message CancelCodexConnectionResponse { Superplane.Factories.FactoryCodexConnection connection = 1; }
+
+message DisconnectCodexConnectionRequest { }
+message DisconnectCodexConnectionResponse { Superplane.Factories.FactoryCodexConnection connection = 1; }

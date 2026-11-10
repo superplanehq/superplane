@@ -1,6 +1,7 @@
 package models
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -8,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
+	"gorm.io/gorm"
 )
 
 func TestVCSProviderCatalogListsRepositoriesByCollaborator(t *testing.T) {
@@ -159,6 +161,136 @@ func TestVCSProviderBindingListsOnlyGrantedRepositories(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, repositories, 1)
 	assert.Equal(t, int64(201), repositories[0].RepositoryID)
+}
+
+func TestDeleteVCSProviderInstallationsMissingFromSnapshotMarksIntegrations(t *testing.T) {
+	for _, snapshot := range [][]int64{nil, {102}} {
+		t.Run(fmt.Sprintf("snapshot %v", snapshot), func(t *testing.T) {
+			require.NoError(t, database.TruncateTables())
+			db := database.DB(t.Context())
+			observedBefore := time.Now()
+			organization, err := CreateOrganization("Snapshot "+uuid.NewString(), "")
+			require.NoError(t, err)
+			otherOrganization, err := CreateOrganization("Other "+uuid.NewString(), "")
+			require.NoError(t, err)
+			var affected, unaffected []*Integration
+			for _, installation := range []VCSProviderInstallation{
+				{Provider: ProviderGitHub, InstallationID: 101, UpdatedAt: observedBefore.Add(-time.Minute)},
+				{Provider: ProviderGitHub, InstallationID: 102, UpdatedAt: observedBefore.Add(-time.Minute)},
+				{Provider: ProviderGitHub, InstallationID: 103, UpdatedAt: observedBefore.Add(time.Minute)},
+				{Provider: "gitlab", InstallationID: 101, UpdatedAt: observedBefore.Add(-time.Minute)},
+			} {
+				require.NoError(t, UpsertVCSProviderInstallation(db, &installation))
+				integration, err := FindOrCreateVCSProviderBinding(db, organization.ID, installation.Provider, installation.InstallationID, "acme")
+				require.NoError(t, err)
+				if installation.Provider == ProviderGitHub && (installation.InstallationID == 101 || installation.InstallationID == 102 && len(snapshot) == 0) {
+					affected = append(affected, integration)
+					continue
+				}
+				unaffected = append(unaffected, integration)
+			}
+			other, err := FindOrCreateVCSProviderBinding(db, otherOrganization.ID, ProviderGitHub, 101, "acme")
+			require.NoError(t, err)
+			affected = append(affected, other)
+
+			require.NoError(t, DeleteVCSProviderInstallationsMissingFromSnapshot(db, ProviderGitHub, snapshot, observedBefore))
+			// A later uninstall webhook cannot find the deleted bindings.
+			require.NoError(t, DeleteVCSProviderInstallation(db, ProviderGitHub, 101))
+			for _, integration := range affected {
+				var stored Integration
+				require.NoError(t, db.First(&stored, "id = ?", integration.ID).Error)
+				assert.Equal(t, IntegrationStateError, stored.State)
+				assert.Equal(t, "App was uninstalled", stored.StateDescription)
+				_, err := FindVCSProviderIntegrationBinding(db, integration.ID)
+				assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
+			}
+			for _, integration := range unaffected {
+				var stored Integration
+				require.NoError(t, db.First(&stored, "id = ?", integration.ID).Error)
+				assert.Equal(t, IntegrationStateReady, stored.State)
+				_, err := FindVCSProviderIntegrationBinding(db, integration.ID)
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestVCSProviderInstallationDeletionSerializesNewBindings(t *testing.T) {
+	for _, deletion := range []struct {
+		name string
+		run  func(*gorm.DB) error
+	}{
+		{"webhook", func(tx *gorm.DB) error { return DeleteVCSProviderInstallation(tx, ProviderGitHub, 101) }},
+		{"snapshot", func(tx *gorm.DB) error {
+			return DeleteVCSProviderInstallationsMissingFromSnapshot(tx, ProviderGitHub, nil, time.Now())
+		}},
+	} {
+		t.Run(deletion.name, func(t *testing.T) {
+			require.NoError(t, database.TruncateTables())
+			db := database.DB(t.Context())
+			require.NoError(t, UpsertVCSProviderInstallation(db, &VCSProviderInstallation{Provider: ProviderGitHub, InstallationID: 101}))
+			organization, err := CreateOrganization("Existing "+uuid.NewString(), "")
+			require.NoError(t, err)
+			otherOrganization, err := CreateOrganization("Concurrent "+uuid.NewString(), "")
+			require.NoError(t, err)
+			existing, err := FindOrCreateVCSProviderBinding(db, organization.ID, ProviderGitHub, 101, "acme")
+			require.NoError(t, err)
+
+			// Pause deletion at its status update so a new selection can race it.
+			blocker := db.Begin()
+			require.NoError(t, blocker.Error)
+			defer blocker.Rollback()
+			require.NoError(t, blocker.Exec("SELECT id FROM app_installations WHERE id = ? FOR UPDATE", existing.ID).Error)
+			removal := db.Begin()
+			require.NoError(t, removal.Error)
+			defer removal.Rollback()
+			require.NoError(t, removal.Exec("SET LOCAL lock_timeout = '5s'").Error)
+			var removalPID int
+			require.NoError(t, removal.Raw("SELECT pg_backend_pid()").Scan(&removalPID).Error)
+			removed := make(chan error, 1)
+			go func() {
+				if err := deletion.run(removal); err != nil {
+					removal.Rollback()
+					removed <- err
+					return
+				}
+				removed <- removal.Commit().Error
+			}()
+			waiting := func(pid int) bool {
+				var locked bool
+				err := db.Raw("SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE pid = ? AND wait_event_type = 'Lock')", pid).Scan(&locked).Error
+				return err == nil && locked
+			}
+			require.Eventually(t, func() bool { return waiting(removalPID) }, 2*time.Second, 10*time.Millisecond)
+
+			selection := db.Begin()
+			require.NoError(t, selection.Error)
+			defer selection.Rollback()
+			require.NoError(t, selection.Exec("SET LOCAL lock_timeout = '5s'").Error)
+			var selectionPID int
+			require.NoError(t, selection.Raw("SELECT pg_backend_pid()").Scan(&selectionPID).Error)
+			selected := make(chan error, 1)
+			go func() {
+				_, err := FindOrCreateVCSProviderBinding(selection, otherOrganization.ID, ProviderGitHub, 101, "acme")
+				if err != nil {
+					selection.Rollback()
+					selected <- err
+					return
+				}
+				selected <- selection.Commit().Error
+			}()
+			assert.Eventually(t, func() bool { return waiting(selectionPID) }, 2*time.Second, 10*time.Millisecond)
+			require.NoError(t, blocker.Commit().Error)
+			require.NoError(t, <-removed)
+			assert.ErrorIs(t, <-selected, gorm.ErrRecordNotFound)
+			var count int64
+			require.NoError(t, db.Model(&Integration{}).Where("organization_id = ?", otherOrganization.ID).Count(&count).Error)
+			assert.Zero(t, count, "failed selection must not leave a ready integration")
+			var stored Integration
+			require.NoError(t, db.First(&stored, "id = ?", existing.ID).Error)
+			assert.Equal(t, IntegrationStateError, stored.State)
+		})
+	}
 }
 
 func TestSuspendedVCSProviderInstallationHidesEveryRepository(t *testing.T) {

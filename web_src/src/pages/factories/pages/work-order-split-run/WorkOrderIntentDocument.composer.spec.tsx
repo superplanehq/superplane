@@ -151,7 +151,7 @@ describe("WorkOrderIntentDocument composer", () => {
     expect(screen.getByRole("button", { name: "Open plan" })).toBeInTheDocument();
   });
 
-  it("hides the plan toggle until a spec exists", () => {
+  it("shows one progress status while the first plan is created", () => {
     renderIntentDocument(
       <WorkOrderIntentDocument
         {...INTENT_DOC}
@@ -168,13 +168,8 @@ describe("WorkOrderIntentDocument composer", () => {
       />,
     );
 
-    const chips = screen.getByTestId("split-run-intent-composer-chips");
-    expect(within(chips).queryByRole("button", { name: /^(Open|Hide) plan$/ })).not.toBeInTheDocument();
-    const analyzing = screen.getByTestId("split-run-intent-verdict-analyzing");
-    expect(analyzing.querySelector(".t-matrix")).not.toBeNull();
-    expect(analyzing).not.toHaveTextContent("Analyzing");
-    expect(screen.getByTestId("split-run-intent-verdict")).toHaveTextContent("Analyzing task…");
-    expect(screen.queryByTestId("split-run-intent-composer-score")).not.toBeInTheDocument();
+    expect(within(screen.getByTestId("split-run-intent-chat-log")).getAllByRole("status")).toHaveLength(1);
+    expect(screen.queryByTestId("split-run-intent-status-card")).not.toBeInTheDocument();
   });
 
   it("stops the matrix when analysis ends without a score", () => {
@@ -251,7 +246,7 @@ describe("WorkOrderIntentDocument composer", () => {
     renderIntentDocument(
       <WorkOrderIntentDocument
         {...INTENT_DOC}
-        artifacts={[]}
+        artifacts={[INTENT]}
         analysis={analysisChat({
           view: {
             machineStatus: "running",

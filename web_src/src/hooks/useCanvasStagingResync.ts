@@ -21,7 +21,7 @@ interface UseCanvasStagingResyncOptions {
 }
 
 export type ResyncStagedOptions = {
-  /** Bumps stagingResetNonce so file/console baselines reset. Avoid when entering edit from agent staging — it remounts CanvasPage and can loop auto-open. */
+  /** Bumps stagingResetNonce so file and console baselines reset. */
   bumpResetNonce?: boolean;
   /** When true, reuse a warm stagedCanvasSpec cache instead of forcing a refetch. */
   preferCachedStagedSpec?: boolean;

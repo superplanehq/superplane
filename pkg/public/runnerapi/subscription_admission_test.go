@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	runnerlogs "github.com/superplanehq/superplane/pkg/runners/logs"
@@ -46,10 +45,9 @@ func TestRunnerReservationFailureProcessesSavedErrorAfterCommit(t *testing.T) {
 		QueuedAt: time.Now(), PayloadCiphertext: []byte(`{}`)}
 	require.NoError(t, db.Create(task).Error)
 	execution, request := createRunnerTaskPoll(t, resource, task)
-	require.NoError(t, models.EnableExperimentalFeature(resource.Organization.ID, features.FeatureCodexSubscriptions))
-	factory, err := models.CreateFactory(db, resource.Organization.ID, support.RandomName("factory"), "", "")
+	_, err := models.CreateFactory(db, resource.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
-	connection, err := models.CreateFactoryCodexConnection(db, resource.Organization.ID, factory.ID, resource.User, time.Now())
+	connection, err := models.CreateCodexConnection(db, resource.Organization.ID, resource.User, time.Now())
 	require.NoError(t, err)
 	require.NoError(t, connection.BeginLogin(db, task.ID, time.Now()))
 	require.NoError(t, db.Model(&models.FactoryCodexLease{}).Where("task_id = ?", task.ID).Update("revoked_at", time.Now()).Error)

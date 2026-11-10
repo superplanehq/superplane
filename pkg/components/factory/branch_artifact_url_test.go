@@ -16,6 +16,7 @@ func TestBranchTreeURL(t *testing.T) {
 	cases := []struct {
 		name       string
 		provider   string
+		githubHost string
 		repository string
 		branch     string
 		want       string
@@ -32,6 +33,14 @@ func TestBranchTreeURL(t *testing.T) {
 			repository: "example/repo",
 			branch:     "feature/refund-retry",
 			want:       "https://github.com/example/repo/tree/feature/refund-retry",
+		},
+		{
+			name:       "GitHub Enterprise owner/repo uses the workspace host",
+			provider:   "github",
+			githubHost: "acme.ghe.com",
+			repository: "example/repo",
+			branch:     "feature/refund-retry",
+			want:       "https://acme.ghe.com/example/repo/tree/feature/refund-retry",
 		},
 		{
 			name:       "Bitbucket workspace/repo",
@@ -119,7 +128,7 @@ func TestBranchTreeURL(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			assert.Equal(t, tc.want, branchTreeURL(tc.provider, tc.repository, tc.branch))
+			assert.Equal(t, tc.want, branchTreeURL(tc.provider, tc.githubHost, tc.repository, tc.branch))
 		})
 	}
 }
@@ -141,6 +150,25 @@ func TestAddWorkOrderArtifact_Execute_WritesBitbucketBranchURL(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "https://bitbucket.org/acme/app/src/feature/refund-retry", factoryCtx.addArtifactParams.Data["url"])
+}
+
+func TestAddWorkOrderArtifact_Execute_WritesGitHubEnterpriseBranchURL(t *testing.T) {
+	component := &AddWorkOrderArtifact{}
+	factoryCtx := &fakeFactoryContext{vcsProvider: "github", githubHost: "acme.ghe.com"}
+	stateCtx := &contexts.ExecutionStateContext{}
+
+	err := component.Execute(core.ExecutionContext{
+		Configuration: map[string]any{
+			"orderId":      "wo-1",
+			"artifactType": "branch",
+			"name":         "feature/refund-retry",
+			"repository":   "acme/app",
+		},
+		ExecutionState: stateCtx,
+		Factory:        factoryCtx,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "https://acme.ghe.com/acme/app/tree/feature/refund-retry", factoryCtx.addArtifactParams.Data["url"])
 }
 
 func TestBuildArtifactData_WritesBranchTreeURLFromRepository(t *testing.T) {
@@ -218,7 +246,7 @@ func TestBuildArtifactData_DropsUnparseableRepositoryURLWithCredentials(t *testi
 		ArtifactType: "branch",
 		Name:         "hotfix",
 		Repository:   "https://oauth2:token@",
-	}, "")
+	}, "", "")
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "branch artifact requires a url or a repository")
@@ -243,7 +271,7 @@ func TestBuildArtifactData_RejectsBranchWithoutReachableURL(t *testing.T) {
 	_, err := buildArtifactData(AddWorkOrderArtifactConfiguration{
 		ArtifactType: "branch",
 		Name:         "feature/refund-retry",
-	}, "")
+	}, "", "")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "branch artifact requires a url or a repository")
 }

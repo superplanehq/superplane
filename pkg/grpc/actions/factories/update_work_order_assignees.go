@@ -69,7 +69,7 @@ func UpdateWorkOrderAssignees(
 			return err
 		}
 
-		return order.UpdateAssignees(tx, assigneeIDs, updatedBy)
+		return updateInteractiveWorkOrderAssignees(tx, factory, order, assigneeIDs, updatedBy)
 	})
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update work order assignees")

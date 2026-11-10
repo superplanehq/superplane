@@ -1,0 +1,121 @@
+// Package mergeconfidence builds run assessment data owned by SuperPlane.
+package mergeconfidence
+
+import (
+	"math"
+	"strings"
+
+	"github.com/superplanehq/superplane/pkg/models/factory"
+)
+
+type Assessment struct {
+	Passed         bool
+	Enabled        []string
+	Labels         map[string]string
+	Checks         map[string]factory.CheckRef
+	ReviewedCommit string
+	TaskURL        string
+}
+
+type ReportData struct {
+	PullRequestID  string        `json:"pullRequestId"`
+	Complete       bool          `json:"complete"`
+	OverallScore   *float64      `json:"overallScore"`
+	OverallLevel   string        `json:"overallLevel"`
+	Checks         []ReportCheck `json:"checks"`
+	ReviewedCommit string        `json:"reviewedCommit"`
+	TaskURL        string        `json:"taskUrl"`
+}
+
+type ReportCheck struct {
+	ID       string  `json:"id"`
+	Label    string  `json:"label"`
+	Score    float64 `json:"score"`
+	MaxScore float64 `json:"maxScore"`
+	Summary  string  `json:"summary"`
+	Level    string  `json:"level"`
+	Missing  bool    `json:"missing"`
+}
+
+// ReportData includes only checks selected in the saved run configuration.
+func (a Assessment) ReportData() ReportData {
+	report := ReportData{Complete: a.Passed, Checks: []ReportCheck{}, ReviewedCommit: a.ReviewedCommit, TaskURL: a.TaskURL}
+	for _, id := range a.Enabled {
+		label := a.Labels[id]
+		if label == "" {
+			label = checkLabel(id)
+		}
+		check := a.Checks[id+"-review"]
+		missing := !validCheck(check)
+		if missing {
+			report.Complete = false
+		}
+		report.Checks = append(report.Checks, ReportCheck{ID: id, Label: label, Score: check.Score, MaxScore: check.MaxScore, Summary: check.Summary, Level: check.Level, Missing: missing})
+	}
+	if report.Complete {
+		if score, level, ok := a.overallRating(); ok {
+			report.OverallScore = &score
+			report.OverallLevel = level
+		}
+	}
+	return report
+}
+
+// Match the UI headline: invert risk and drift, then take the weakest built-in
+// score and the most severe reported level. Custom checks do not contribute.
+func (a Assessment) overallRating() (float64, string, bool) {
+	weakest, found := 1.0, false
+	level := factory.CheckLevelPositive
+	severity := map[string]int{
+		factory.CheckLevelPositive: 0,
+		factory.CheckLevelNeutral:  1,
+		factory.CheckLevelCaution:  2,
+		factory.CheckLevelCritical: 3,
+	}
+	for _, id := range a.Enabled {
+		switch id {
+		case "risk", "performance", "security", "drift", "reversibility":
+		default:
+			continue
+		}
+		check := a.Checks[id+"-review"]
+		if !validCheck(check) {
+			continue
+		}
+		points := check.Score
+		if id == "risk" || id == "drift" {
+			points = check.MaxScore + 1 - points
+		}
+		weakest = math.Min(weakest, math.Max(0, math.Min(check.MaxScore, points))/check.MaxScore)
+		checkLevel := check.Level
+		if _, known := severity[checkLevel]; !known {
+			checkLevel = factory.CheckLevelNeutral
+		}
+		if severity[checkLevel] > severity[level] {
+			level = checkLevel
+		}
+		found = true
+	}
+	return math.Round(weakest * 5), level, found
+}
+
+func validCheck(check factory.CheckRef) bool {
+	return check.MaxScore == 5 && check.Score >= 1 && check.Score <= 5 && math.Trunc(check.Score) == check.Score && strings.TrimSpace(check.Summary) != ""
+}
+
+func checkLabel(id string) string {
+	switch id {
+	case "risk":
+		return "Blast radius"
+	case "performance":
+		return "Performance"
+	case "security":
+		return "Security"
+	case "drift":
+		return "Drift from Specification"
+	case "reversibility":
+		return "Reversibility"
+	default:
+		return id
+	}
+}

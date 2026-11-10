@@ -10,7 +10,6 @@ import (
 	"golang.org/x/sync/semaphore"
 	"gorm.io/gorm"
 
-	"github.com/superplanehq/superplane/pkg/agents"
 	"github.com/superplanehq/superplane/pkg/blob"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -18,16 +17,14 @@ import (
 )
 
 type OrganizationCleanupWorker struct {
-	semaphore    *semaphore.Weighted
-	logger       *log.Entry
-	canvasWorker *CanvasCleanupWorker
+	semaphore *semaphore.Weighted
+	logger    *log.Entry
 }
 
-func NewOrganizationCleanupWorker(providers ...agents.Provider) *OrganizationCleanupWorker {
+func NewOrganizationCleanupWorker() *OrganizationCleanupWorker {
 	return &OrganizationCleanupWorker{
-		semaphore:    semaphore.NewWeighted(10),
-		logger:       log.WithFields(log.Fields{"worker": "OrganizationCleanupWorker"}),
-		canvasWorker: NewCanvasCleanupWorker(providers...),
+		semaphore: semaphore.NewWeighted(10),
+		logger:    log.WithFields(log.Fields{"worker": "OrganizationCleanupWorker"}),
 	}
 }
 
@@ -73,48 +70,35 @@ func (w *OrganizationCleanupWorker) LockAndProcessOrganization(organization mode
 		return nil
 	}
 
-	var sessionsToClean []models.AgentSession
-	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+	return database.Conn().Transaction(func(tx *gorm.DB) error {
 		lockedOrganization, err := models.LockDeletedOrganization(tx, organization.ID)
 		if err != nil {
 			w.logger.Infof("Organization %s already being processed - skipping", organization.ID)
 			return nil
 		}
 
-		sessions, err := w.processOrganization(tx, *lockedOrganization)
-		if err != nil {
-			return err
-		}
-
-		sessionsToClean = sessions
-		return nil
+		return w.processOrganization(tx, *lockedOrganization)
 	})
-	if err != nil {
-		return err
-	}
-
-	w.canvasWorker.cleanupProviderSessions(context.Background(), sessionsToClean)
-	return nil
 }
 
-func (w *OrganizationCleanupWorker) processOrganization(tx *gorm.DB, organization models.Organization) ([]models.AgentSession, error) {
+func (w *OrganizationCleanupWorker) processOrganization(tx *gorm.DB, organization models.Organization) error {
 	if !organization.DeletedAt.Valid {
-		return nil, nil
+		return nil
 	}
 
 	var remainingCanvases int64
 	err := tx.Unscoped().Model(&models.Canvas{}).Where("organization_id = ?", organization.ID).Count(&remainingCanvases).Error
 	if err != nil {
-		return nil, fmt.Errorf("count remaining canvases: %w", err)
+		return fmt.Errorf("count remaining canvases: %w", err)
 	}
 
 	if remainingCanvases > 0 {
-		return nil, nil
+		return nil
 	}
 
 	integrations, err := models.ListMaybeDeletedIntegrationsByOrganizationInTransaction(tx, organization.ID)
 	if err != nil {
-		return nil, fmt.Errorf("list organization integrations: %w", err)
+		return fmt.Errorf("list organization integrations: %w", err)
 	}
 
 	for _, integration := range integrations {
@@ -124,81 +108,79 @@ func (w *OrganizationCleanupWorker) processOrganization(tx *gorm.DB, organizatio
 
 		webhooks, err := models.ListIntegrationWebhooks(tx, integration.ID)
 		if err != nil {
-			return nil, fmt.Errorf("list integration webhooks for %s: %w", integration.ID, err)
+			return fmt.Errorf("list integration webhooks for %s: %w", integration.ID, err)
 		}
 
 		for _, webhook := range webhooks {
 			if err := tx.Delete(&webhook).Error; err != nil {
-				return nil, fmt.Errorf("soft delete webhook %s: %w", webhook.ID, err)
+				return fmt.Errorf("soft delete webhook %s: %w", webhook.ID, err)
 			}
 		}
 
 		if err := integration.SoftDeleteInTransaction(tx); err != nil {
-			return nil, fmt.Errorf("soft delete integration %s: %w", integration.ID, err)
+			return fmt.Errorf("soft delete integration %s: %w", integration.ID, err)
 		}
 	}
 
 	var remainingIntegrations int64
 	err = tx.Unscoped().Model(&models.Integration{}).Where("organization_id = ?", organization.ID).Count(&remainingIntegrations).Error
 	if err != nil {
-		return nil, fmt.Errorf("count remaining integrations: %w", err)
+		return fmt.Errorf("count remaining integrations: %w", err)
 	}
 
 	if remainingIntegrations > 0 {
-		return nil, nil
+		return nil
 	}
 
 	if err := models.SoftDeleteOrganizationFactories(tx, organization.ID); err != nil {
-		return nil, fmt.Errorf("soft delete organization factories: %w", err)
+		return fmt.Errorf("soft delete organization factories: %w", err)
 	}
 
 	remainingFactories, err := models.CountFactoriesByOrganization(tx, organization.ID)
 	if err != nil {
-		return nil, fmt.Errorf("count remaining factories: %w", err)
+		return fmt.Errorf("count remaining factories: %w", err)
 	}
 	if remainingFactories > 0 {
-		return nil, nil
+		return nil
 	}
 
 	if err := deleteOrganizationFileObjects(tx, organization.ID); err != nil {
-		return nil, fmt.Errorf("delete organization files: %w", err)
+		return fmt.Errorf("delete organization files: %w", err)
 	}
 
 	var remainingFiles int64
 	if err := tx.Model(&models.File{}).Where("organization_id = ?", organization.ID).Limit(1).Count(&remainingFiles).Error; err != nil {
-		return nil, fmt.Errorf("count remaining organization files: %w", err)
+		return fmt.Errorf("count remaining organization files: %w", err)
 	}
 	if remainingFiles > 0 {
-		return nil, nil
-	}
-
-	organizationSessions, err := models.ListAgentSessionsForOrganizationInTransaction(tx, organization.ID)
-	if err != nil {
-		return nil, fmt.Errorf("list organization agent sessions: %w", err)
-	}
-
-	if err := models.DeleteAgentSessionsForOrganizationInTransaction(tx, organization.ID); err != nil {
-		return nil, fmt.Errorf("delete organization agent sessions: %w", err)
+		return nil
 	}
 
 	if err := models.DeleteMetadataForOrganization(tx, models.DomainTypeOrganization, organization.ID.String()); err != nil {
-		return nil, fmt.Errorf("delete organization role metadata: %w", err)
+		return fmt.Errorf("delete organization role metadata: %w", err)
 	}
 
 	if err := tx.Where("domain_type = ?", models.DomainTypeOrganization).Where("domain_id = ?", organization.ID).Delete(&models.Secret{}).Error; err != nil {
-		return nil, fmt.Errorf("delete organization secrets: %w", err)
+		return fmt.Errorf("delete organization secrets: %w", err)
 	}
 
+	drained, err := models.DeleteDrainedOrganizationCodexConnections(tx, organization.ID)
+	if err != nil {
+		return fmt.Errorf("delete organization Codex connections: %w", err)
+	}
+	if !drained {
+		return nil
+	}
 	if err := tx.Unscoped().Where("organization_id = ?", organization.ID).Delete(&models.User{}).Error; err != nil {
-		return nil, fmt.Errorf("delete organization users: %w", err)
+		return fmt.Errorf("delete organization users: %w", err)
 	}
 
 	if err := tx.Unscoped().Delete(&organization).Error; err != nil {
-		return nil, fmt.Errorf("hard delete organization: %w", err)
+		return fmt.Errorf("hard delete organization: %w", err)
 	}
 
 	w.logger.Infof("Successfully cleaned up organization %s", organization.ID)
-	return organizationSessions, nil
+	return nil
 }
 
 func deleteOrganizationFileObjects(tx *gorm.DB, organizationID uuid.UUID) error {

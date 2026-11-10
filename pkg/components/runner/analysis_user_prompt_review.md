@@ -29,9 +29,12 @@ On a plan turn, read the task and the code it touches so the plan names real beh
 - Who owns this behavior in the code and what happens today.
 - Two or three plausible implementations and which one a competent engineer would pick.
 - Whether a similar change already exists to copy.
-- Which tests or commands prove the work is done.
+- Which existing tests or checks cover the behavior, and which gaps need new coverage.
+- Which workspace repositories the task changes, when the prompt lists other workspace repositories.
 
 The scores and the plan come from what you found in the repository, not from the task text alone.
+
+Choose the smallest coherent change that meets the user's outcome. Reuse existing behavior and shared components where appropriate. Do not expand a bounded fix into a subsystem redesign or a coverage project. Add work only when the requested outcome or a concrete risk requires it.
 
 On a first plan turn, say one finding in chat. Do not list findings. The user wants to know you understood the task, not to read a tour of the repository. Then say how to update the plan or the scores.
 
@@ -51,6 +54,11 @@ Ask only about missing information or unresolved decisions:
 - Whether this task includes a behavior.
 - Two real implementations with different trade-offs that require a user decision.
 - What done means, when that changes the work.
+- Which workspace repositories the task changes, when the task and the code do not show it.
+
+### Workspace repositories
+
+The prompt can list other workspace repositories next to repo/. Then the task can apply to all of them or only to some. Do not assume repo/ alone. Use the task text, its source, and the code in each repository to decide. If the task names repositories or the change only fits some of them, decide yourself. If the repository scope is still open, Clarity is 2. Ask in the survey. Offer all repositories, repo/ only, and other likely subsets. Use at most 4 options. Name each repository the task changes in Scope.
 
 Decide yourself:
 - Names, copy nits, which helper to reuse, the obvious file.
@@ -121,6 +129,10 @@ Missing existing tests alone do not lower the score. Consider tests that the imp
 
 Follow the repository's testing requirements. Other checks can support verification, but must not replace required tests.
 
+Keep verification proportional to the change and its risks. Use existing coverage where sufficient. Add focused regression tests for uncovered behavior, rather than a suite for every affected file, layer, or combination. Add separate cases only when they catch distinct failures. Shared behavior needs representative coverage; differences need their own checks only when they can fail independently.
+
+High Verifiability means the outcome can be checked reliably, not that the plan requires more tests or evidence artifacts.
+
 Identify checks that the implementation agent can perform with the available tools and access. Put these checks in Acceptance. Assess what the checks can verify after implementation, not whether the planned change passes them now.
 
 ### Raise the scores through refinement
@@ -165,6 +177,8 @@ Do not start the new task. Do not copy comments or run history.
 
 Add '## Diagram' after Constraints only when one Mermaid diagram makes a UI flow or architecture easier to understand.
 
-Follow the spec summary with the build spec. Do not repeat the goal, Problem, Proposed outcome, or Constraints. Use these headings in this order: '## Scope', '## Approach', '## Acceptance', and '## Risks'. Scope states what is in and what is out. Approach tells the implementer what to do, in order, and names existing files and seams. Acceptance includes tests and known commands. Skip Risks only when every score is 3. For Clarity 2, Risks must state what is uncertain and why. When Complexity or Verifiability is below 3, Risks must name where the implementer will need a human decision or review, and the narrower scope you proposed.
+Follow the spec summary with the build spec. Do not repeat the goal, Problem, Proposed outcome, or Constraints. Use these headings in this order: '## Scope', '## Approach', '## Acceptance', and '## Risks'. Scope states what is in and what is out. Approach describes the recommended solution and names relevant existing files and seams. Acceptance includes checks and known commands. Skip Risks only when every score is 3. For Clarity 2, Risks must state what is uncertain and why. When Complexity or Verifiability is below 3, Risks must name where the implementer will need a human decision or review, and the narrower scope you proposed.
+
+Keep the build spec proportional to the task. Distinguish required outcomes and constraints from suggested implementation details. Name useful starting points without turning every affected file into a separate deliverable. Acceptance states observable outcomes and the smallest sufficient checks. Require screenshots, reports, or other artifacts only when the task, repository guidance, or a verification gap calls for them.
 
 Use American English. Do not explain the repository or product. Do not write I or you in the specification.

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"slices"
 	"strings"
 	"time"
 
@@ -22,13 +23,21 @@ const (
 	FactoryWorkOrderCheckLevelCaution  = factory.CheckLevelCaution
 	FactoryWorkOrderCheckLevelCritical = factory.CheckLevelCritical
 
+	// FactoryWorkOrderCheckSourceAutomation marks a check from a plan,
+	// a merge confidence run, or a canvas component. An agent cannot
+	// replace or remove it.
+	FactoryWorkOrderCheckSourceAutomation = "automation"
+	// FactoryWorkOrderCheckSourceAgent marks a check from add_checks.
+	FactoryWorkOrderCheckSourceAgent = "agent"
+
 	FactoryWorkOrderCheckFormatFraction = factory.CheckFormatFraction
 	FactoryWorkOrderCheckFormatPercent  = factory.CheckFormatPercent
 	FactoryWorkOrderCheckFormatBoolean  = factory.CheckFormatBoolean
 
-	// MaxFactoryWorkOrderCheckKeyBytes and name match the column widths.
-	MaxFactoryWorkOrderCheckKeyBytes  = 255
-	MaxFactoryWorkOrderCheckNameBytes = 255
+	// MaxFactoryWorkOrderCheckKeyBytes, name, and repository match the column widths.
+	MaxFactoryWorkOrderCheckKeyBytes        = 255
+	MaxFactoryWorkOrderCheckNameBytes       = 255
+	MaxFactoryWorkOrderCheckRepositoryBytes = 255
 
 	// MaxFactoryWorkOrderCheckAnalysisBytes caps the markdown analysis,
 	// mirroring the artifact data cap.
@@ -40,12 +49,36 @@ const (
 	MaxFactoryWorkOrderCheckRecentScores = 10
 )
 
-var ErrFactoryWorkOrderCheckInvalid = errors.New("invalid work order check")
+var (
+	ErrFactoryWorkOrderCheckInvalid = errors.New("invalid work order check")
+	// ErrFactoryWorkOrderCheckOwned rejects an agent check whose key
+	// belongs to a check that an agent did not add.
+	ErrFactoryWorkOrderCheckOwned = errors.New("check key belongs to SuperPlane")
+)
 
-const factoryWorkOrderCheckKeyUniqueConstraint = "idx_factory_work_order_checks_order_key_unique"
+const factoryWorkOrderCheckKeyUniqueConstraint = "idx_factory_work_order_checks_order_repository_key_unique"
+
+// mergeConfidenceCheckKeySuffix ends every merge confidence check key.
+const mergeConfidenceCheckKeySuffix = "-review"
+
+// IsReservedWorkOrderCheckKey reports whether a key belongs to a plan score
+// or a merge confidence check. Planning reads those keys to decide whether
+// a task is ready, so an agent check cannot use them, even before the first
+// plan or merge confidence report.
+func IsReservedWorkOrderCheckKey(key string) bool {
+	key = strings.TrimSpace(key)
+	return slices.Contains(planningReviewCheckKeys, key) || strings.HasSuffix(key, mergeConfidenceCheckKeySuffix)
+}
+
+var planningReviewCheckKeys = []string{
+	PlanningClarityCheckKey,
+	PlanningConfidenceCheckKey,
+	PlanningComplexityCheckKey,
+	PlanningVerifiabilityCheckKey,
+}
 
 // FactoryWorkOrderCheck is latest-only state: one row per (work order,
-// key), updated in place on every report. History lives in
+// repository, key), updated in place on every report. History lives in
 // `order.check.reported` timeline events, not in extra rows.
 type FactoryWorkOrderCheck struct {
 	ID             uuid.UUID
@@ -53,12 +86,15 @@ type FactoryWorkOrderCheck struct {
 	FactoryID      uuid.UUID
 	WorkOrderID    uuid.UUID
 	Key            string
-	Name           string
-	Score          float64
-	MaxScore       float64
-	Format         string
-	Level          string
-	PreviousScore  *float64
+	// Repository is the pull request repository of a merge confidence
+	// check. It is empty for a check of the whole task.
+	Repository    string
+	Name          string
+	Score         float64
+	MaxScore      float64
+	Format        string
+	Level         string
+	PreviousScore *float64
 	// RecentScores holds the latest report scores, oldest first and
 	// ending with Score, capped at MaxFactoryWorkOrderCheckRecentScores.
 	RecentScores datatypes.JSONSlice[float64]
@@ -66,6 +102,7 @@ type FactoryWorkOrderCheck struct {
 	Analysis     string
 	Automation   datatypes.JSON
 	RunID        *uuid.UUID
+	Source       string
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
 }
@@ -76,6 +113,7 @@ func (FactoryWorkOrderCheck) TableName() string {
 
 type FactoryWorkOrderCheckParams struct {
 	Key        string
+	Repository string
 	Name       string
 	Score      float64
 	MaxScore   float64
@@ -85,6 +123,8 @@ type FactoryWorkOrderCheckParams struct {
 	Analysis   string
 	Automation *factory.AutomationRef
 	Run        *factory.RunRef
+	// Source defaults to FactoryWorkOrderCheckSourceAutomation.
+	Source string
 }
 
 // AutomationRef decodes the automation snapshot stored on the row.
@@ -102,7 +142,7 @@ func (c *FactoryWorkOrderCheck) AutomationRef() (*factory.AutomationRef, error) 
 	return &ref, nil
 }
 
-// ReportCheck upserts the check row keyed by (work order, key) and
+// ReportCheck upserts the check row keyed by (work order, repository, key) and
 // records an `order.check.reported` event in the same transaction. A
 // re-report of an existing key keeps that report's score as
 // PreviousScore so the UI can show the movement.
@@ -139,6 +179,61 @@ func (o *FactoryWorkOrder) ReportCheck(
 	}
 
 	return check, nil
+}
+
+// ReportAgentChecks saves the checks of one add_checks call. All checks
+// save, or none do. A reserved key or the key of a non-agent check returns
+// ErrFactoryWorkOrderCheckOwned.
+func (o *FactoryWorkOrder) ReportAgentChecks(
+	db *gorm.DB,
+	params []FactoryWorkOrderCheckParams,
+) ([]FactoryWorkOrderCheck, error) {
+	checks := make([]FactoryWorkOrderCheck, 0, len(params))
+	err := db.Transaction(func(tx *gorm.DB) error {
+		for _, param := range params {
+			if IsReservedWorkOrderCheckKey(param.Key) {
+				return fmt.Errorf("%w: %s", ErrFactoryWorkOrderCheckOwned, strings.TrimSpace(param.Key))
+			}
+			if isPlanningScoreCheckName(param.Name) {
+				return fmt.Errorf("%w: name %q belongs to SuperPlane; use another name", ErrFactoryWorkOrderCheckInvalid, strings.TrimSpace(param.Name))
+			}
+			param.Source = FactoryWorkOrderCheckSourceAgent
+			check, err := o.ReportCheck(tx, param)
+			if err != nil {
+				return err
+			}
+			checks = append(checks, *check)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return checks, nil
+}
+
+// RemoveAgentChecks deletes the agent checks with the given keys and
+// returns the removed keys. Other checks stay.
+func (o *FactoryWorkOrder) RemoveAgentChecks(db *gorm.DB, keys []string) ([]string, error) {
+	removed := []string{}
+	if len(keys) == 0 {
+		return removed, nil
+	}
+
+	var deleted []FactoryWorkOrderCheck
+	err := db.
+		Clauses(clause.Returning{Columns: []clause.Column{{Name: "key"}}}).
+		Where("work_order_id = ? AND source = ? AND key IN ?", o.ID, FactoryWorkOrderCheckSourceAgent, keys).
+		Delete(&deleted).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	for _, check := range deleted {
+		removed = append(removed, check.Key)
+	}
+	return removed, nil
 }
 
 func (o *FactoryWorkOrder) ListChecks(tx *gorm.DB) ([]FactoryWorkOrderCheck, error) {
@@ -206,14 +301,19 @@ func (o *FactoryWorkOrder) reportCheck(
 ) (*FactoryWorkOrderCheck, error) {
 	var check *FactoryWorkOrderCheck
 	err := db.Transaction(func(tx *gorm.DB) error {
-		existing, findErr := o.findCheckByKey(tx, normalized.Key)
-		if findErr != nil && !errors.Is(findErr, gorm.ErrRecordNotFound) {
+		existing, findErr := o.findCheck(tx, normalized.Repository, normalized.Key)
+		if findErr != nil {
 			return findErr
+		}
+
+		if existing != nil && normalized.Source == FactoryWorkOrderCheckSourceAgent && existing.Source != FactoryWorkOrderCheckSourceAgent {
+			return fmt.Errorf("%w: %s", ErrFactoryWorkOrderCheckOwned, normalized.Key)
 		}
 
 		now := time.Now()
 		if existing != nil {
 			previousScore := existing.Score
+			existing.Repository = normalized.Repository
 			existing.Name = normalized.Name
 			existing.Score = normalized.Score
 			existing.MaxScore = normalized.MaxScore
@@ -225,6 +325,7 @@ func (o *FactoryWorkOrder) reportCheck(
 			existing.Analysis = normalized.Analysis
 			existing.Automation = automationJSON
 			existing.RunID = runID
+			existing.Source = normalized.Source
 			existing.UpdatedAt = now
 			if saveErr := tx.Save(existing).Error; saveErr != nil {
 				return saveErr
@@ -237,6 +338,7 @@ func (o *FactoryWorkOrder) reportCheck(
 				FactoryID:      o.FactoryID,
 				WorkOrderID:    o.ID,
 				Key:            normalized.Key,
+				Repository:     normalized.Repository,
 				Name:           normalized.Name,
 				Score:          normalized.Score,
 				MaxScore:       normalized.MaxScore,
@@ -247,6 +349,7 @@ func (o *FactoryWorkOrder) reportCheck(
 				Analysis:       normalized.Analysis,
 				Automation:     automationJSON,
 				RunID:          runID,
+				Source:         normalized.Source,
 				CreatedAt:      now,
 				UpdatedAt:      now,
 			}
@@ -265,12 +368,33 @@ func (o *FactoryWorkOrder) reportCheck(
 	return check, nil
 }
 
-func (o *FactoryWorkOrder) findCheckByKey(tx *gorm.DB, key string) (*FactoryWorkOrderCheck, error) {
+// findCheck returns the row a report updates, or nil for a first report.
+// A row without a repository is from before checks had one. The first
+// report with a repository takes it over, so the old score does not stay
+// beside the new one.
+func (o *FactoryWorkOrder) findCheck(tx *gorm.DB, repository, key string) (*FactoryWorkOrderCheck, error) {
+	check, err := o.lockCheck(tx, repository, key)
+	if err != nil || check != nil || repository == "" {
+		return check, err
+	}
+
+	legacy, err := o.lockCheck(tx, "", key)
+	if err != nil || legacy == nil || legacy.Source != FactoryWorkOrderCheckSourceAutomation {
+		return nil, err
+	}
+	return legacy, nil
+}
+
+func (o *FactoryWorkOrder) lockCheck(tx *gorm.DB, repository, key string) (*FactoryWorkOrderCheck, error) {
 	var check FactoryWorkOrderCheck
 	err := tx.
-		Where("work_order_id = ? AND key = ?", o.ID, key).
+		Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("work_order_id = ? AND repository = ? AND key = ?", o.ID, repository, key).
 		First(&check).
 		Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -289,12 +413,14 @@ func (o *FactoryWorkOrder) recordCheckReported(
 		Check: &factory.CheckRef{
 			ID:            check.ID,
 			Key:           check.Key,
+			Repository:    check.Repository,
 			Name:          check.Name,
 			Score:         check.Score,
 			MaxScore:      check.MaxScore,
 			Format:        check.Format,
 			Level:         check.Level,
 			PreviousScore: check.PreviousScore,
+			Summary:       check.Summary,
 		},
 		Automation: automation,
 		Run:        run,
@@ -308,6 +434,7 @@ func (o *FactoryWorkOrder) recordCheckReported(
 // instead of landing a half-formed check.
 func normalizeCheckParams(params FactoryWorkOrderCheckParams) (FactoryWorkOrderCheckParams, error) {
 	params.Key = strings.TrimSpace(params.Key)
+	params.Repository = strings.TrimSpace(params.Repository)
 	params.Name = strings.TrimSpace(params.Name)
 	params.Summary = strings.TrimSpace(params.Summary)
 	params.Analysis = strings.TrimSpace(params.Analysis)
@@ -317,6 +444,9 @@ func normalizeCheckParams(params FactoryWorkOrderCheckParams) (FactoryWorkOrderC
 	}
 	if len(params.Key) > MaxFactoryWorkOrderCheckKeyBytes {
 		return params, fmt.Errorf("%w: key exceeds %d bytes", ErrFactoryWorkOrderCheckInvalid, MaxFactoryWorkOrderCheckKeyBytes)
+	}
+	if len(params.Repository) > MaxFactoryWorkOrderCheckRepositoryBytes {
+		return params, fmt.Errorf("%w: repository exceeds %d bytes", ErrFactoryWorkOrderCheckInvalid, MaxFactoryWorkOrderCheckRepositoryBytes)
 	}
 	if params.Name == "" {
 		return params, fmt.Errorf("%w: name is required", ErrFactoryWorkOrderCheckInvalid)
@@ -348,6 +478,12 @@ func normalizeCheckParams(params FactoryWorkOrderCheckParams) (FactoryWorkOrderC
 
 	if params.Level == "" {
 		params.Level = FactoryWorkOrderCheckLevelNeutral
+	}
+	if params.Source == "" {
+		params.Source = FactoryWorkOrderCheckSourceAutomation
+	}
+	if params.Source != FactoryWorkOrderCheckSourceAutomation && params.Source != FactoryWorkOrderCheckSourceAgent {
+		return params, fmt.Errorf("%w: unknown source %q", ErrFactoryWorkOrderCheckInvalid, params.Source)
 	}
 	if !IsValidWorkOrderCheckLevel(params.Level) {
 		return params, fmt.Errorf("%w: unknown level %q", ErrFactoryWorkOrderCheckInvalid, params.Level)
@@ -394,7 +530,7 @@ func isFiniteCheckNumber(value float64) bool {
 }
 
 // isFactoryWorkOrderCheckKeyConflict reports whether err is a violation
-// of the per-order unique `key` index, mirroring
+// of the per-order unique (repository, key) index, mirroring
 // MapFactoryWorkOrderArtifactKeyUniqueConstraintError.
 func isFactoryWorkOrderCheckKeyConflict(err error) bool {
 	var pgErr *pgconn.PgError
@@ -412,4 +548,11 @@ func encodeCheckAutomation(ref *factory.AutomationRef) (datatypes.JSON, error) {
 	}
 
 	return datatypes.JSON(encoded), nil
+}
+
+// isPlanningScoreCheckName reports whether a name is a plan score name. The
+// UI finds plan scores by name, so an agent check cannot use these names.
+func isPlanningScoreCheckName(name string) bool {
+	name = strings.TrimSpace(name)
+	return strings.EqualFold(name, PlanningClarityCheckName) || strings.EqualFold(name, PlanningConfidenceCheckName)
 }

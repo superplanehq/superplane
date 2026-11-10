@@ -148,11 +148,32 @@ func NewCapabilityMapper() *CapabilityMapper {
 					{ReadOnly: false, Action: &pulls.MarkPullRequestReadyForReview{}},
 					{ReadOnly: false, Action: &pulls.AddPullRequestReviewers{}},
 					{ReadOnly: false, Action: &pulls.UpdatePullRequest{}},
+					{ReadOnly: false, Action: &pulls.UpdatePullRequestBodySection{}},
 					{ReadOnly: true, Action: &pulls.FindPullRequest{}},
 				},
 			},
 		},
 	}
+}
+
+func (m *CapabilityMapper) NamesForPermissions(permissions ...string) []string {
+	out := []string{}
+	seen := map[string]bool{}
+	for _, permission := range permissions {
+		group, ok := m.Groups[permission]
+		if !ok {
+			continue
+		}
+		for _, capability := range group.Capabilities {
+			name := m.capabilityName(capability)
+			if name == "" || seen[name] {
+				continue
+			}
+			seen[name] = true
+			out = append(out, name)
+		}
+	}
+	return out
 }
 
 func (m *CapabilityMapper) AllNames() []string {

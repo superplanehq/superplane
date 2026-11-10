@@ -2,6 +2,7 @@ package factories
 
 import (
 	"context"
+	"slices"
 	"strings"
 
 	"github.com/google/uuid"
@@ -130,7 +131,10 @@ func workOrderCreationOwners(tx *gorm.DB, factory *models.Factory, creatorID uui
 		return nil, nil
 	}
 	if len(req.GetAssigneeIds()) == 0 {
-		return factory.DefaultSubscriptionAssignees(tx, &creatorID)
+		if err := requireCallerCodexConnection(tx, factory, creatorID); err != nil {
+			return nil, err
+		}
+		return []uuid.UUID{creatorID}, nil
 	}
 	owners := make([]uuid.UUID, 0, len(req.GetAssigneeIds()))
 	for _, raw := range req.GetAssigneeIds() {
@@ -139,6 +143,11 @@ func workOrderCreationOwners(tx *gorm.DB, factory *models.Factory, creatorID uui
 			return nil, invalidArgument("The owner ID is invalid.")
 		}
 		owners = append(owners, id)
+	}
+	if slices.Contains(owners, creatorID) {
+		if err := requireCallerCodexConnection(tx, factory, creatorID); err != nil {
+			return nil, err
+		}
 	}
 	return owners, nil
 }

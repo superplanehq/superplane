@@ -138,6 +138,7 @@ func submitStep(
 			Properties:      contexts.NewIntegrationPropertyStorage(integration),
 			Secrets:         contexts.NewIntegrationSecretStorage(tx, registry.Encryptor, integration),
 			Capabilities:    capabilityCtx,
+			Configuration:   integration.Configuration.Data(),
 		})
 
 		if err != nil {
@@ -175,6 +176,9 @@ func submitStep(
 	})
 
 	if err != nil {
+		if isGitHubEnterpriseClientError(err) {
+			return nil, err
+		}
 		logrus.WithError(err).Error("failed to submit integration setup step")
 		return nil, grpcerrors.Internal(err, "failed to submit integration setup step")
 	}

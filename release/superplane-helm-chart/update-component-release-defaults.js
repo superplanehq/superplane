@@ -9,6 +9,7 @@ const path = require("node:path");
 
 const { parseVersion } = require("../component-release");
 
+const FLEET_MANAGER_CHART_REPOSITORY = "superplanehq/fleet-manager-chart";
 const API_VERSION = "2022-11-28";
 const USER_AGENT = "superplane-component-release";
 const RELEASE_REQUEST_TIMEOUT_SECONDS = 20;
@@ -26,6 +27,7 @@ const COMPONENTS = [
     label: "Fleet Manager",
     tagPrefix: "fleet-manager/",
     missingMessage: "no stable Fleet Manager release",
+    select: latestPublishedFleetManagerVersion,
     apply: setFleetManagerDefault,
   },
 ];
@@ -189,6 +191,143 @@ function compareVersions(left, right) {
   return 0;
 }
 
+function fleetManagerRegistry() {
+  return (process.env.FLEET_MANAGER_CHART_REGISTRY || "https://ghcr.io").replace(
+    /\/+$/,
+    "",
+  );
+}
+
+function captureCurl(pageURL, requestHeaders, method) {
+  const directory = fs.mkdtempSync(
+    path.join(os.tmpdir(), "chart-component-releases-"),
+  );
+  const bodyPath = path.join(directory, "body");
+  const headerPath = path.join(directory, "headers");
+  try {
+    const requestHeaderPath = path.join(directory, "request-headers");
+    fs.writeFileSync(requestHeaderPath, `${requestHeaders.join("\n")}\n`, {
+      mode: 0o600,
+    });
+    const args = [
+      "--silent",
+      "--show-error",
+      "--max-time",
+      String(RELEASE_REQUEST_TIMEOUT_SECONDS),
+      "--output",
+      bodyPath,
+      "--dump-header",
+      headerPath,
+      "--write-out",
+      "%{http_code}",
+      "--header",
+      `@${requestHeaderPath}`,
+    ];
+    if (method === "HEAD") {
+      args.push("--head");
+    }
+    args.push("--", pageURL);
+
+    let statusCode;
+    try {
+      statusCode = execFileSync("curl", args, {
+        encoding: "utf8",
+        timeout:
+          RELEASE_REQUEST_TIMEOUT_SECONDS * 1000 +
+          RELEASE_REQUEST_TIMEOUT_GRACE_MS,
+        killSignal: "SIGKILL",
+      }).trim();
+    } catch (error) {
+      if (error && (error.code === "ETIMEDOUT" || error.status === 28)) {
+        throw new Error("Fleet Manager chart registry request timed out");
+      }
+      throw new Error("failed to read the Fleet Manager chart registry");
+    }
+
+    const status = Number(statusCode);
+    if (!Number.isInteger(status)) {
+      throw new Error("failed to read the Fleet Manager chart registry");
+    }
+    return {
+      status,
+      body: fs.existsSync(bodyPath) ? fs.readFileSync(bodyPath, "utf8") : "",
+    };
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+}
+
+function fetchFleetManagerRegistryToken(registry) {
+  const result = captureCurl(
+    `${registry}/token?scope=repository:${FLEET_MANAGER_CHART_REPOSITORY}:pull`,
+    ["Accept: application/json", `User-Agent: ${USER_AGENT}`],
+  );
+  if (result.status !== 200) {
+    throw new Error(`registry token status ${result.status}`);
+  }
+  let payload;
+  try {
+    payload = JSON.parse(result.body);
+  } catch {
+    throw new Error("registry token response was invalid");
+  }
+  if (!payload || typeof payload.token !== "string" || payload.token === "") {
+    throw new Error("registry token is empty");
+  }
+  return payload.token;
+}
+
+function fleetManagerChartStatus(registry, token, version) {
+  const result = captureCurl(
+    `${registry}/v2/${FLEET_MANAGER_CHART_REPOSITORY}/manifests/${encodeURIComponent(version.slice(1))}`,
+    [
+      `Authorization: Bearer ${token}`,
+      "Accept: application/vnd.oci.image.manifest.v1+json",
+      `User-Agent: ${USER_AGENT}`,
+    ],
+    "HEAD",
+  );
+  return result.status;
+}
+
+function latestPublishedFleetManagerVersion(releases) {
+  const versions = [];
+  for (const release of releases) {
+    const version = stableVersion(release, "fleet-manager/");
+    if (version) {
+      versions.push(version);
+    }
+  }
+  versions.sort((left, right) => compareVersions(right, left));
+  if (versions.length === 0) {
+    return undefined;
+  }
+
+  const registry = fleetManagerRegistry();
+  const token = fetchFleetManagerRegistryToken(registry);
+  let unverified = false;
+  for (const version of versions) {
+    let status;
+    try {
+      status = fleetManagerChartStatus(registry, token, version);
+    } catch {
+      unverified = true;
+      continue;
+    }
+    if (status === 200) {
+      return version;
+    }
+    if (status === 404) {
+      continue;
+    }
+    unverified = true;
+  }
+  if (unverified) {
+    throw new Error("could not verify a Fleet Manager chart");
+  }
+  throw new Error("no published Fleet Manager chart");
+}
+
 function latestStableVersion(releases, tagPrefix) {
   let selected;
   for (const release of releases) {
@@ -326,7 +465,9 @@ function applySelectedReleases(text, releases) {
   let changed = false;
   for (const component of COMPONENTS) {
     try {
-      const version = latestStableVersion(releases, component.tagPrefix);
+      const version = component.select
+        ? component.select(releases)
+        : latestStableVersion(releases, component.tagPrefix);
       if (!version) {
         throw new Error(component.missingMessage);
       }

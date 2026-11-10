@@ -5,28 +5,41 @@ import { overlayHeaderSpend } from "@/lib/overlayHeaderSpend";
 import type { OrgUserDisplay } from "@/lib/orgUserDisplay";
 import { safeExternalUrl } from "@/lib/safeExternalUrl";
 import { cn } from "@/lib/utils";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/ui/tooltip";
 import { type ReactNode } from "react";
 
 import type { FactoriesFactoryPullRequest, FactoriesWorkOrderArtifact } from "@/api-client";
+import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
+import { FEATURE_FACTORY_MULTI_REPO_TASKS } from "@/lib/experimentalFeatures";
 
 import { CONFIDENCE_CHECK_KEY, CONFIDENCE_CHECK_NAME, isScoreCheckName } from "../../../lib/confidenceScore";
-import { consoleCheckList, isMergeConfidenceMetric } from "../../../lib/mergeConfidenceScore";
+import {
+  checksForRepository,
+  consoleCheckList,
+  isMergeConfidenceMetric,
+  splitMergeChecksByPullRequest,
+} from "../../../lib/mergeConfidenceScore";
 import { isPlanningReviewMetric } from "../../../lib/planningReviewScore";
 import { workOrderCardPullRequestShowsMergeable } from "../../../lib/workOrderCardPullRequest";
 import { splitRunDecisionTone } from "../splitRunFooter";
 import { attentionToneClassName } from "../splitRunNoteActionStyle";
 import { toArtifactDataRecord } from "../../../lib/workOrderArtifact";
-import { pullRequestLabel } from "../../../lib/workOrderPullRequest";
+import {
+  pullRequestLabel,
+  pullRequestRepositoryLabel,
+  pullRequestsSpanRepositories,
+} from "../../../lib/workOrderPullRequest";
 import { OrgUserReference, EmptyOwnerMark } from "../../../OrgUserReference";
 import { OwnerAssignTrigger } from "../../../WorkOrderAssigneesPopover";
 import { WorkOrderArtifactInline } from "../../../WorkOrderArtifactInline";
 import { WorkOrderMergeableChip, WorkOrderPullRequestChip } from "../../../workOrders/WorkOrderPullRequestChip";
 import { OwnerSpendValue } from "../../work-order-popup-redesign/popupShared";
 import { useLiveHeaderSpendOverlay } from "../liveHeaderSpendContext";
-import { ConsoleCheckRows } from "./consoleCheckRows";
+import { ConsoleCheckRows, PullRequestConfidence } from "./consoleCheckRows";
+import { PullRequestChecksContext } from "./pullRequestChecksContext";
 import type { SplitRunFixture } from "../splitRunMocks";
 import { splitRunPanelArtifacts } from "../splitRunPopupModel";
-import { isPullRequestReviewFooter, pullRequestReviewNote } from "../splitRunPullRequestReview";
+import { isPullRequestReviewFooter, openReviewPullRequests, pullRequestReviewNote } from "../splitRunPullRequestReview";
 import type { SplitRunSource } from "../splitRunSource";
 import type { AutomationStage, outcomeSummary } from "./automationsViewModel";
 import { StaticStatusGlyph } from "./redesignShared";
@@ -76,93 +89,146 @@ export function ConsoleSummaryPanel({
 }: ConsoleSummaryPanelProps) {
   const liveSpend = useLiveHeaderSpendOverlay();
   const spend = overlayHeaderSpend(outcome.spend, outcome.tokens, liveSpend);
-  const panel = consolePanelFacts({ fixture, outcome, stages, pullRequests, artifacts, source, panelReview });
+  const multiRepo = useExperimentalFeature(organizationId).has(FEATURE_FACTORY_MULTI_REPO_TASKS);
+  const panel = consolePanelFacts({
+    fixture,
+    outcome,
+    stages,
+    pullRequests,
+    artifacts,
+    source,
+    panelReview,
+    multiRepo,
+  });
   const shownOwner = owner ?? outcome.owner;
   const shownAssigneeIds = assigneeIds ?? fixture.assigneeIds;
   return (
     <aside className="lg:sticky lg:top-0 lg:self-start" data-testid="redesign-console-summary">
-      <Frame variant="default" spacing="sm" stacked className="[--frame-radius:var(--radius-lg)]">
-        <FrameHeader>
-          <FrameTitle className="flex items-center gap-2">
-            <StaticStatusGlyph status={outcome.status} />
-            {outcome.statusLabel}
-          </FrameTitle>
-          {panel.showsStrip ? null : <FrameDescription className="text-[12.5px]">{outcome.headline}</FrameDescription>}
-        </FrameHeader>
-        <SummaryDecisionStrip
-          hasDecision={panel.hasDecision}
-          panelReview={panelReview}
-          decisionClassName={panel.decisionClassName}
-          isLive={panel.isLive}
-          liveStage={panel.liveStage}
-          footer={fixture.footer}
-          actionBusy={actionBusy}
-          onStop={onStopLiveRun}
-        />
-        {panel.panelPullRequests.length > 0 ? (
-          <FramePanel className="flex flex-col gap-2.5 py-3" data-testid="redesign-console-pull-requests">
-            <span className="text-[12px] font-medium text-muted-foreground">
-              {panel.panelPullRequests.length === 1 ? "Pull request" : "Pull requests"}
-            </span>
-            {panel.panelPullRequests.map((pullRequest, index) => (
-              <PanelPullRequest
-                key={pullRequest.id ?? pullRequest.url ?? index}
-                pullRequest={pullRequest}
-                checks={fixture.checks}
+      <PullRequestChecksContext.Provider value={panel.pullRequestChecks}>
+        <Frame variant="default" spacing="sm" stacked className="[--frame-radius:var(--radius-lg)]">
+          <FrameHeader>
+            <FrameTitle className="flex items-center gap-2">
+              <StaticStatusGlyph status={outcome.status} />
+              {outcome.statusLabel}
+            </FrameTitle>
+            {panel.showsStrip ? null : (
+              <FrameDescription className="text-[12.5px]">{outcome.headline}</FrameDescription>
+            )}
+          </FrameHeader>
+          <SummaryDecisionStrip
+            hasDecision={panel.hasDecision}
+            panelReview={panelReview}
+            decisionClassName={panel.decisionClassName}
+            isLive={panel.isLive}
+            liveStage={panel.liveStage}
+            footer={fixture.footer}
+            actionBusy={actionBusy}
+            onStop={onStopLiveRun}
+          />
+          <PanelPullRequests
+            pullRequests={panel.panelPullRequests}
+            checks={fixture.checks}
+            showRepository={panel.showsPullRequestRepository}
+            multiRepo={multiRepo}
+          />
+          {panel.mergeChecks.length > 0 ? (
+            <FramePanel className="py-3">
+              <ConsoleCheckRows checks={panel.mergeChecks} groupByRepository={multiRepo} />
+            </FramePanel>
+          ) : null}
+          {panel.otherChecks.length > 0 ? (
+            <FramePanel className="py-3">
+              <ConsoleCheckRows
+                checks={panel.otherChecks}
+                title="Checks"
+                testId="redesign-console-other-checks"
+                defaultOpen
               />
-            ))}
-          </FramePanel>
-        ) : null}
-        {panel.mergeChecks.length > 0 ? (
-          <FramePanel className="py-3">
-            <ConsoleCheckRows checks={panel.mergeChecks} />
-          </FramePanel>
-        ) : null}
-        {panel.otherChecks.length > 0 ? (
-          <FramePanel className="py-3">
-            <ConsoleCheckRows
-              checks={panel.otherChecks}
-              title="Checks"
-              testId="redesign-console-other-checks"
-              defaultOpen
-            />
-          </FramePanel>
-        ) : null}
-        {panel.panelArtifacts.length > 0 ? (
-          <FramePanel className="flex flex-col gap-2 py-3" data-testid="redesign-console-artifacts">
-            <span className="text-[12px] font-medium text-muted-foreground">Artifacts</span>
-            {panel.panelArtifacts.map((artifact) => (
-              <WorkOrderArtifactInline
-                key={artifact.id}
-                artifact={{ id: artifact.id, type: artifact.type ?? "", data: toArtifactDataRecord(artifact.data) }}
+            </FramePanel>
+          ) : null}
+          {panel.panelArtifacts.length > 0 ? (
+            <FramePanel className="flex flex-col gap-2 py-3" data-testid="redesign-console-artifacts">
+              <span className="text-[12px] font-medium text-muted-foreground">Artifacts</span>
+              {panel.panelArtifacts.map((artifact) => (
+                <WorkOrderArtifactInline
+                  key={artifact.id}
+                  artifact={{ id: artifact.id, type: artifact.type ?? "", data: toArtifactDataRecord(artifact.data) }}
+                />
+              ))}
+            </FramePanel>
+          ) : null}
+          <FramePanel className="flex flex-col gap-2 py-3" data-testid="redesign-console-context">
+            <SummaryRow label="Owner" truncate={false}>
+              <OwnerSummaryValue
+                organizationId={organizationId}
+                assigneeIds={shownAssigneeIds}
+                owner={shownOwner}
+                canEditOwner={canEditOwner}
+                ownerBusy={ownerBusy}
+                onOwnerSave={onOwnerSave}
               />
-            ))}
+            </SummaryRow>
+            <StartSummaryRow fixture={fixture} />
+            {panel.duration ? <SummaryRow label="Duration">{panel.duration}</SummaryRow> : null}
+            <SummaryRow label="Spend">
+              <OwnerSpendValue
+                costUsd={spend.costUsd}
+                usageByModel={fixture.usageByModel}
+                usageByMachineType={fixture.usageByMachineType}
+              />{" "}
+              <span className="text-muted-foreground">· {spend.tokensLabel}</span>
+            </SummaryRow>
           </FramePanel>
-        ) : null}
-        <FramePanel className="flex flex-col gap-2 py-3" data-testid="redesign-console-context">
-          <SummaryRow label="Owner" truncate={false}>
-            <OwnerSummaryValue
-              organizationId={organizationId}
-              assigneeIds={shownAssigneeIds}
-              owner={shownOwner}
-              canEditOwner={canEditOwner}
-              ownerBusy={ownerBusy}
-              onOwnerSave={onOwnerSave}
-            />
-          </SummaryRow>
-          <SummaryRow label="Started">{outcome.startedLabel.replace(/^Started\s+/i, "")}</SummaryRow>
-          {panel.duration ? <SummaryRow label="Duration">{panel.duration}</SummaryRow> : null}
-          <SummaryRow label="Spend">
-            <OwnerSpendValue
-              costUsd={spend.costUsd}
-              usageByModel={fixture.usageByModel}
-              usageByMachineType={fixture.usageByMachineType}
-            />{" "}
-            <span className="text-muted-foreground">· {spend.tokensLabel}</span>
-          </SummaryRow>
-        </FramePanel>
-      </Frame>
+        </Frame>
+      </PullRequestChecksContext.Provider>
     </aside>
+  );
+}
+
+function PanelPullRequests({
+  pullRequests,
+  ...row
+}: {
+  pullRequests: FactoriesFactoryPullRequest[];
+  checks: SplitRunFixture["checks"];
+  showRepository: boolean;
+  multiRepo: boolean;
+}) {
+  if (pullRequests.length === 0) return null;
+  return (
+    <FramePanel className="flex flex-col gap-2.5 py-3" data-testid="redesign-console-pull-requests">
+      <span className="text-[12px] font-medium text-muted-foreground">
+        {pullRequests.length === 1 ? "Pull request" : "Pull requests"}
+      </span>
+      {pullRequests.map((pullRequest, index) => (
+        <PanelPullRequest key={pullRequest.id ?? pullRequest.url ?? index} pullRequest={pullRequest} {...row} />
+      ))}
+    </FramePanel>
+  );
+}
+
+function StartSummaryRow({ fixture }: { fixture: SplitRunFixture }) {
+  return (
+    <SummaryRow label={fixture.autoStarted ? "Auto-started" : "Started"} truncate={false}>
+      <span className="inline-flex items-center gap-1.5 tabular-nums">
+        {fixture.startedBy && !fixture.autoStarted ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span
+                tabIndex={0}
+                role="img"
+                aria-label={`Started by ${fixture.startedBy.name}`}
+                className="inline-flex shrink-0"
+              >
+                <OrgUserReference display={fixture.startedBy} size="xs" showName={false} />
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>Started by {fixture.startedBy.name}</TooltipContent>
+          </Tooltip>
+        ) : null}
+        {fixture.startedLabel.replace(/^Started\s+/i, "")}
+      </span>
+    </SummaryRow>
   );
 }
 
@@ -174,6 +240,7 @@ function consolePanelFacts({
   artifacts,
   source,
   panelReview,
+  multiRepo,
 }: {
   fixture: SplitRunFixture;
   outcome: ReturnType<typeof outcomeSummary>;
@@ -182,16 +249,16 @@ function consolePanelFacts({
   artifacts?: FactoriesWorkOrderArtifact[];
   source?: SplitRunSource;
   panelReview?: ReactNode;
+  multiRepo: boolean;
 }) {
   const hasDecision = Boolean(fixture.footer.attentionCard && fixture.footer.note);
   const liveStage = stages.find((stage) => stage.status === "running");
   const isLive = fixture.footer.kind === "running" || Boolean(liveStage);
-  const reviewedHref = panelReview ? reviewStripPullRequestHref(fixture) : undefined;
-  const panelPullRequests = withoutPullRequest(
-    pullRequests?.length ? pullRequests : outcome.pullRequests,
-    reviewedHref,
-  );
-  const hasPullRequest = panelPullRequests.length > 0 || Boolean(reviewedHref);
+  const taskPullRequests = pullRequests?.length ? pullRequests : outcome.pullRequests;
+  const repositories = repositoryPanelFacts(fixture.checks, taskPullRequests, multiRepo);
+  const reviewedHrefs = panelReview ? reviewStripPullRequestHrefs(fixture, repositories.reviewPullRequests) : [];
+  const panelPullRequests = withoutPullRequests(taskPullRequests, reviewedHrefs);
+  const hasPullRequest = panelPullRequests.length > 0 || reviewedHrefs.length > 0;
   const taskArtifacts = artifacts ?? [];
   const taskArtifactIds = new Set(taskArtifacts.map((artifact) => artifact.id).filter(Boolean));
   const stageArtifacts = stages
@@ -211,10 +278,13 @@ function consolePanelFacts({
         )
       : undefined,
     panelPullRequests,
+    showsPullRequestRepository: repositories.showsPullRequestRepository,
     panelArtifacts,
-    // Merge confidence stays on its own list. Other non-planning checks stay
-    // reachable here when no verify card copied them.
-    mergeChecks: consoleCheckList(fixture.checks)?.metrics ?? [],
+    // Each pull request row shows its own merge checks. The list keeps the
+    // rest. Other non-planning checks stay reachable here when no verify
+    // card copied them.
+    pullRequestChecks: repositories.mergeChecks.byRepository,
+    mergeChecks: repositories.mergeChecks.unattached,
     otherChecks: fixture.checks.filter(
       (check) =>
         !isMergeConfidenceMetric(check) &&
@@ -224,6 +294,30 @@ function consolePanelFacts({
         check.name !== CONFIDENCE_CHECK_NAME,
     ),
     duration: /\d/.test(outcome.duration) ? outcome.duration : undefined,
+  };
+}
+
+// Without multi-repo tasks, the panel keeps one review link and one merge
+// confidence list.
+function repositoryPanelFacts(
+  checks: SplitRunFixture["checks"],
+  pullRequests: FactoriesFactoryPullRequest[],
+  multiRepo: boolean,
+) {
+  if (!multiRepo) {
+    return {
+      reviewPullRequests: [],
+      mergeChecks: { byRepository: null, unattached: consoleCheckList(checks)?.metrics ?? [] },
+      showsPullRequestRepository: false,
+    };
+  }
+  return {
+    reviewPullRequests: pullRequests,
+    mergeChecks: splitMergeChecksByPullRequest(
+      checks,
+      pullRequests.map((pullRequest) => pullRequest.repository),
+    ),
+    showsPullRequestRepository: pullRequestsSpanRepositories(pullRequests),
   };
 }
 
@@ -313,23 +407,32 @@ function ConsoleWaitingNote() {
   );
 }
 
-/** The pull request the decision strip already shows. The panel lists it only once. */
-function reviewStripPullRequestHref(fixture: SplitRunFixture): string | undefined {
+/** The pull requests the decision strip already shows. The panel lists each only once. */
+function reviewStripPullRequestHrefs(fixture: SplitRunFixture, pullRequests: FactoriesFactoryPullRequest[]): string[] {
   if (!fixture.footer.note || !isPullRequestReviewFooter(fixture.footer)) {
-    return undefined;
+    return [];
   }
-  return pullRequestReviewNote(fixture.footer.note)?.href;
+  const open = openReviewPullRequests(pullRequests);
+  if (open.length > 1) {
+    return open.map((pullRequest) => pullRequest.url ?? "");
+  }
+  const href = pullRequestReviewNote(fixture.footer.note)?.href;
+  return href ? [href] : [];
 }
 
-function withoutPullRequest(
+function withoutPullRequests(
   pullRequests: FactoriesFactoryPullRequest[],
-  href: string | undefined,
+  hrefs: string[],
 ): FactoriesFactoryPullRequest[] {
-  if (!href) {
+  if (hrefs.length === 0) {
     return pullRequests;
   }
-  const normalized = href.replace(/\/$/, "");
-  return pullRequests.filter((pullRequest) => (pullRequest.url ?? "").replace(/\/$/, "") !== normalized);
+  const shown = new Set(hrefs.map(normalizedPullRequestUrl));
+  return pullRequests.filter((pullRequest) => !shown.has(normalizedPullRequestUrl(pullRequest.url ?? "")));
+}
+
+function normalizedPullRequestUrl(url: string): string {
+  return url.replace(/\/$/, "");
 }
 
 /** The pull request supersedes its branch, so a listed branch would repeat it. */
@@ -344,14 +447,23 @@ function isBranchArtifact(artifact: FactoriesWorkOrderArtifact): boolean {
 function PanelPullRequest({
   pullRequest,
   checks,
+  showRepository,
+  multiRepo,
 }: {
   pullRequest: FactoriesFactoryPullRequest;
   checks: SplitRunFixture["checks"];
+  showRepository: boolean;
+  multiRepo: boolean;
 }) {
   const href = safeExternalUrl(pullRequest.url);
   const title = pullRequest.title?.trim() || pullRequestLabel(pullRequest);
   return (
     <div className="flex min-w-0 flex-col gap-1.5">
+      {showRepository ? (
+        <span className="truncate text-[12px] leading-4 text-muted-foreground">
+          {pullRequestRepositoryLabel(pullRequest)}
+        </span>
+      ) : null}
       {href ? (
         <a
           href={href}
@@ -366,8 +478,14 @@ function PanelPullRequest({
       )}
       <div className="flex flex-wrap items-center gap-1.5">
         <WorkOrderPullRequestChip pullRequest={pullRequest} />
-        {workOrderCardPullRequestShowsMergeable(pullRequest, checks) ? <WorkOrderMergeableChip /> : null}
+        {workOrderCardPullRequestShowsMergeable(
+          pullRequest,
+          multiRepo ? checksForRepository(checks, pullRequest.repository) : checks,
+        ) ? (
+          <WorkOrderMergeableChip />
+        ) : null}
       </div>
+      <PullRequestConfidence repository={pullRequest.repository} />
     </div>
   );
 }

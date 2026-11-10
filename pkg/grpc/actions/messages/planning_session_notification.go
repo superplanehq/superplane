@@ -230,3 +230,21 @@ func planningAgentQuestionDetail(session *models.FactoryPlanningSession) string 
 func planningSpecArtifactKey(orderID uuid.UUID) string {
 	return models.PlanningSpecArtifactKey + ":" + orderID.String()
 }
+
+// PublishRunnerTaskRejections sends committed admission failures: one status
+// refresh per failed task and one ChatGPT connection refresh per organization.
+func PublishRunnerTaskRejections(tx *gorm.DB, result models.RunnerTaskReservationResult) {
+	for _, failedTask := range result.FailedTasks {
+		PublishPlanningRunnerStatus(tx, failedTask)
+	}
+	published := map[uuid.UUID]bool{}
+	for _, connection := range result.LoginConnections {
+		if published[connection.OrganizationID] {
+			continue
+		}
+		if err := PublishOrganizationCodexConnectionUpdated(tx, connection.OrganizationID); err != nil {
+			log.WithError(err).Warn("Failed to publish ChatGPT connection change")
+		}
+		published[connection.OrganizationID] = true
+	}
+}

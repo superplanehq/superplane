@@ -112,6 +112,7 @@ type WorkOrderAssigneesUpdated struct {
 	Unassigned []UserRef     `json:"unassigned,omitempty"`
 	Source     string        `json:"source,omitempty"`
 	Reason     string        `json:"reason,omitempty"`
+	Run        *RunRef       `json:"run,omitempty"`
 }
 
 // WorkOrderStatusUpdated is the authoritative lifecycle event: emitted for
@@ -276,10 +277,12 @@ type PullRequestRef struct {
 type CheckRef struct {
 	ID            uuid.UUID `json:"id"`
 	Key           string    `json:"key"`
+	Repository    string    `json:"repository,omitempty"`
 	Name          string    `json:"name"`
 	Score         float64   `json:"score"`
 	MaxScore      float64   `json:"maxScore"`
 	Format        string    `json:"format"`
 	Level         string    `json:"level"`
 	PreviousScore *float64  `json:"previousScore,omitempty"`
+	Summary       string    `json:"summary,omitempty"`
 }

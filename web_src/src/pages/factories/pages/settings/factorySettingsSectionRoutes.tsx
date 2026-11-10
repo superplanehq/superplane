@@ -11,7 +11,6 @@ import {
   FactorySettingsConnectPage,
   FactorySettingsMCPPage,
   FactorySettingsSkillsPage,
-  FactorySettingsRepositoryPage,
   OrganizationSettingsOverviewPage,
 } from "@/pages/factories";
 import {
@@ -24,6 +23,7 @@ import { OrganizationSettingsBillingPage } from "@/pages/factories/pages/organiz
 import { OrganizationSettingsUsagePage } from "@/pages/factories/pages/organizationSettings/OrganizationSettingsUsagePage";
 import {
   FactoryOrganizationApiKeyDetailPage,
+  FactoryOrganizationFleetsPage,
   FactoryOrganizationApiKeysPage,
   FactoryOrganizationLLMModelsPage,
   FactoryOrganizationMembersPage,
@@ -34,6 +34,7 @@ import {
   AccountLinkedAccountsRedirect,
   LegacyFactorySettingsRedirect,
   OrganizationUsageRedirect,
+  OrganizationModelsRedirect,
   WorkspaceAgentMcpConnectionRedirect,
   WorkspaceAgentSettingsRedirect,
   WorkspaceAgentSkillRedirect,
@@ -44,17 +45,38 @@ import { BillingProductSettingsRoute } from "@/pages/factories/pages/settings/Bi
 import { LegacyAgentResourcesRedirect } from "@/pages/factories/pages/settings/LegacyAgentResourcesRedirect";
 import { FactorySettingsIndexRoute } from "@/pages/factories/pages/settings/MobileSettingsIndexPage";
 import { FactorySettingsAccountCodexUsagePage } from "./FactorySettingsAccountCodexUsagePage";
-import { FEATURE_CODEX_SUBSCRIPTIONS } from "@/lib/experimentalFeatures";
+import { LegacyRepositorySettingsRoute } from "./LegacyRepositorySettingsRoute";
 
 export const factorySettingsSectionRoutes = [
+  ...(
+    [
+      ["organization/fleets", "catalog"],
+      ["organization/fleets/:fleetId", "fleet"],
+    ] as const
+  ).map(([path, detail]) => (
+    <Route
+      key={path}
+      path={path}
+      element={
+        <RequirePermission resource="org" action="read">
+          <FactoryOrganizationFleetsPage detail={detail} />
+        </RequirePermission>
+      }
+    />
+  )),
+  <Route
+    key="factory-settings-runner-redirect"
+    path="organization/fleets/:fleetId/runners/:runnerId"
+    element={
+      <RequirePermission resource="org" action="read">
+        <Navigate to="../.." relative="path" replace />
+      </RequirePermission>
+    }
+  />,
   <Route
     key="factory-settings-account-codex-usage"
     path="account/codex-usage"
-    element={
-      <RequireExperimentalFeature featureId={FEATURE_CODEX_SUBSCRIPTIONS}>
-        <FactorySettingsAccountCodexUsagePage />
-      </RequireExperimentalFeature>
-    }
+    element={<FactorySettingsAccountCodexUsagePage />}
   />,
   <Route key="factory-settings-index" index element={<FactorySettingsIndexRoute />} />,
   <Route
@@ -96,7 +118,7 @@ export const factorySettingsSectionRoutes = [
     path="workspace/repository"
     element={
       <RequirePermission resource="factories" action="update">
-        <FactorySettingsRepositoryPage />
+        <LegacyRepositorySettingsRoute />
       </RequirePermission>
     }
   />,
@@ -199,13 +221,18 @@ export const factorySettingsSectionRoutes = [
     }
   />,
   <Route
-    key="factory-settings-organization-models"
-    path="organization/models"
+    key="factory-settings-workspace-models"
+    path="workspace/models"
     element={
-      <RequirePermission resource="org" action="read">
+      <RequirePermission resource="factories" action="read">
         <FactoryOrganizationLLMModelsPage />
       </RequirePermission>
     }
+  />,
+  <Route
+    key="factory-settings-organization-models"
+    path="organization/models"
+    element={<OrganizationModelsRedirect />}
   />,
   <Route
     key="factory-settings-organization-integration-setup"

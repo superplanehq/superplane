@@ -1,14 +1,18 @@
 package public
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	billingmodels "github.com/superplanehq/superplane/ee/billing/models"
@@ -17,10 +21,93 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/public/middleware"
 	"github.com/superplanehq/superplane/test/support"
+	sentrytest "github.com/superplanehq/superplane/test/support/sentry"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
+
+func TestWriteRunnerLiveLogSessionError(t *testing.T) {
+	for _, tt := range []struct {
+		name          string
+		err           error
+		cancelRequest bool
+		expireRequest bool
+		status        int
+	}{
+		{
+			name: "plain cancellation on canceled request",
+			err:  context.Canceled, cancelRequest: true, status: statusClientClosedRequest,
+		},
+		{
+			name:          "wrapped cancellation on canceled request",
+			err:           fmt.Errorf("timeout: context already done: %w", context.Canceled),
+			cancelRequest: true, status: statusClientClosedRequest,
+		},
+		{
+			name:          "wrapped deadline on canceled request",
+			err:           fmt.Errorf("lookup: %w", context.DeadlineExceeded),
+			cancelRequest: true, status: statusClientClosedRequest,
+		},
+		{
+			name: "plain cancellation on live request",
+			err:  context.Canceled, status: http.StatusInternalServerError,
+		},
+		{
+			name: "wrapped cancellation on live request",
+			err:  fmt.Errorf("lookup: %w", context.Canceled), status: http.StatusInternalServerError,
+		},
+		{
+			name: "plain deadline on live request",
+			err:  context.DeadlineExceeded, status: http.StatusInternalServerError,
+		},
+		{
+			name: "wrapped deadline on live request",
+			err:  fmt.Errorf("lookup: %w", context.DeadlineExceeded), status: http.StatusInternalServerError,
+		},
+		{
+			name: "database failure on canceled request",
+			err:  errors.New("database unavailable"), cancelRequest: true, status: http.StatusInternalServerError,
+		},
+		{
+			name: "deadline on expired incoming request",
+			err:  context.DeadlineExceeded, expireRequest: true, status: http.StatusInternalServerError,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			transport := sentrytest.BindHub(t)
+			req := httptest.NewRequest(http.MethodGet, "/api/v1/canvases/canvas/node-executions/execution/runner-live-logs/session", nil)
+			if tt.cancelRequest {
+				ctx, cancel := context.WithCancel(req.Context())
+				cancel()
+				req = req.WithContext(ctx)
+			}
+			if tt.expireRequest {
+				ctx, cancel := context.WithDeadline(req.Context(), time.Now().Add(-time.Second))
+				defer cancel()
+				req = req.WithContext(ctx)
+			}
+			logger := log.New()
+			logger.SetOutput(io.Discard)
+			handler := middleware.LoggingMiddleware(logger)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				writeRunnerLiveLogSessionError(w, r, tt.err)
+			}))
+			rec := httptest.NewRecorder()
+			handler.ServeHTTP(rec, req)
+
+			assert.Equal(t, tt.status, rec.Code)
+			events := transport.Events()
+			if tt.status == statusClientClosedRequest {
+				assert.Empty(t, events)
+				return
+			}
+			require.Len(t, events, 1)
+			assert.Equal(t, "500", events[0].Tags["status"])
+			assert.Contains(t, sentrytest.ExceptionText(events[0]), tt.err.Error())
+		})
+	}
+}
 
 func mustRunnerLiveLogServer(t *testing.T, r *support.ResourceRegistry) (*Server, *jwt.Signer) {
 	t.Helper()
@@ -151,8 +238,9 @@ func TestHandleRunnerLiveLogSession(t *testing.T) {
 			{"BYOK", "runnerCodex", "integration", false},
 		} {
 			t.Run(item.name, func(t *testing.T) {
+				task := createSessionRunnerTask(t, r)
 				canvasID, execID := createCanvasWithComponentExecution(t, r, item.component, "pricing-"+item.name, map[string]any{
-					runneraction.ExecutionMetadataBrokerTaskID: "task-pricing",
+					runneraction.ExecutionMetadataBrokerTaskID: task.ID.String(),
 					runneraction.ExecutionMetadataTaskBackend:  "integrated",
 				})
 				require.NoError(t, database.Conn().Model(&models.CanvasNodeExecution{}).Where("id = ?", execID).
@@ -165,6 +253,8 @@ func TestHandleRunnerLiveLogSession(t *testing.T) {
 				require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 				var session runneraction.LiveLogSession
 				require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &session))
+				assert.Equal(t, models.RunnerTaskBackendIntegrated, session.Backend)
+				assert.Equal(t, fmt.Sprintf("/api/v1/canvases/%s/node-executions/%s/runner-logs", canvasID, execID), session.StreamURL)
 				if item.priced {
 					require.NotNil(t, session.HostedPricing)
 					assert.Equal(t, int64(250), session.HostedPricing.Rate.Input)
@@ -235,135 +325,14 @@ func TestHandleRunnerLiveLogSession(t *testing.T) {
 		)
 		assert.Contains(t, rec.Body.String(), "not available for this execution")
 	})
+}
 
-	t.Run("live logs not configured", func(t *testing.T) {
-		t.Setenv("TASK_BROKER_BASE_URL", "")
-		t.Setenv("TASK_BROKER_AUTH_TOKEN", "")
-		canvasID, execID := createCanvasWithComponentExecution(t, r, "runner", "runner-1", map[string]any{
-			runneraction.ExecutionMetadataBrokerTaskID: "tb-x",
-		})
-		rec := runnerLiveLogSessionGET(t, server, signer, r, canvasID.String(), execID.String())
-		assert.Equal(t, http.StatusServiceUnavailable, rec.Code)
-		assert.Contains(t, rec.Body.String(), "not configured")
-	})
-
-	t.Run("returns stream session with public broker URL", func(t *testing.T) {
-		t.Setenv("TASK_BROKER_BASE_URL", "http://task-broker:8081")
-		t.Setenv("TASK_BROKER_PUBLIC_URL", "http://localhost:8091")
-		t.Setenv("TASK_BROKER_AUTH_TOKEN", "live-log-secret")
-
-		canvasID, execID := createCanvasWithComponentExecution(t, r, "runner", "runner-public-1", map[string]any{
-			runneraction.ExecutionMetadataBrokerTaskID: "task-public-ok",
-		})
-		rec := runnerLiveLogSessionGET(t, server, signer, r, canvasID.String(), execID.String())
-		assert.Equal(t, http.StatusOK, rec.Code)
-
-		var session runneraction.LiveLogSession
-		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &session))
-		assert.Equal(t, "http://localhost:8091/v1/tasks/task-public-ok/live-logs", session.StreamURL)
-	})
-
-	t.Run("returns organization-authorized integrated stream", func(t *testing.T) {
-		canvasID, execID := createCanvasWithComponentExecution(t, r, "runner", "runner-integrated-1", map[string]any{
-			runneraction.ExecutionMetadataBrokerTaskID: "task-integrated",
-			runneraction.ExecutionMetadataTaskBackend:  "integrated",
-		})
-		rec := runnerLiveLogSessionGET(t, server, signer, r, canvasID.String(), execID.String())
-		assert.Equal(t, http.StatusOK, rec.Code)
-
-		var session runneraction.LiveLogSession
-		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &session))
-		assert.Equal(t, "integrated", session.Backend)
-		assert.Equal(
-			t,
-			fmt.Sprintf(
-				"/api/v1/canvases/%s/node-executions/%s/runner-logs",
-				canvasID,
-				execID,
-			),
-			session.StreamURL,
-		)
-		assert.Empty(t, session.Token)
-	})
-
-	t.Run("returns stream session for runnerBash", func(t *testing.T) {
-		t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
-		t.Setenv("TASK_BROKER_AUTH_TOKEN", "live-log-secret")
-
-		canvasID, execID := createCanvasWithComponentExecution(t, r, "runnerBash", "runner-runbash-1", map[string]any{
-			runneraction.ExecutionMetadataBrokerTaskID: "task-runbash-ok",
-		})
-		rec := runnerLiveLogSessionGET(t, server, signer, r, canvasID.String(), execID.String())
-		assert.Equal(t, http.StatusOK, rec.Code)
-
-		var session runneraction.LiveLogSession
-		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &session))
-		assert.Equal(t, "https://broker.example/v1/tasks/task-runbash-ok/live-logs", session.StreamURL)
-	})
-
-	t.Run("returns stream session for runnerJS", func(t *testing.T) {
-		t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
-		t.Setenv("TASK_BROKER_AUTH_TOKEN", "live-log-secret")
-
-		canvasID, execID := createCanvasWithComponentExecution(t, r, "runnerJS", "runner-runjs-1", map[string]any{
-			runneraction.ExecutionMetadataBrokerTaskID: "task-runjs-ok",
-		})
-		rec := runnerLiveLogSessionGET(t, server, signer, r, canvasID.String(), execID.String())
-		assert.Equal(t, http.StatusOK, rec.Code)
-
-		var session runneraction.LiveLogSession
-		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &session))
-		assert.Equal(t, "https://broker.example/v1/tasks/task-runjs-ok/live-logs", session.StreamURL)
-	})
-
-	t.Run("returns stream session for runnerPython", func(t *testing.T) {
-		t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
-		t.Setenv("TASK_BROKER_AUTH_TOKEN", "live-log-secret")
-
-		canvasID, execID := createCanvasWithComponentExecution(t, r, "runnerPython", "runner-runpy-1", map[string]any{
-			runneraction.ExecutionMetadataBrokerTaskID: "task-runpy-ok",
-		})
-		rec := runnerLiveLogSessionGET(t, server, signer, r, canvasID.String(), execID.String())
-		assert.Equal(t, http.StatusOK, rec.Code)
-
-		var session runneraction.LiveLogSession
-		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &session))
-		assert.Equal(t, "https://broker.example/v1/tasks/task-runpy-ok/live-logs", session.StreamURL)
-	})
-
-	t.Run("returns stream session for runnerClaudeCode", func(t *testing.T) {
-		t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
-		t.Setenv("TASK_BROKER_AUTH_TOKEN", "live-log-secret")
-
-		canvasID, execID := createCanvasWithComponentExecution(t, r, "runnerClaudeCode", "runner-claude-1", map[string]any{
-			runneraction.ExecutionMetadataBrokerTaskID: "task-claude-ok",
-		})
-		rec := runnerLiveLogSessionGET(t, server, signer, r, canvasID.String(), execID.String())
-		assert.Equal(t, http.StatusOK, rec.Code)
-
-		var session runneraction.LiveLogSession
-		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &session))
-		assert.Equal(t, "https://broker.example/v1/tasks/task-claude-ok/live-logs", session.StreamURL)
-	})
-
-	t.Run("returns stream session", func(t *testing.T) {
-		t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
-		t.Setenv("TASK_BROKER_AUTH_TOKEN", "live-log-secret")
-
-		canvasID, execID := createCanvasWithComponentExecution(t, r, "runner", "runner-1", map[string]any{
-			runneraction.ExecutionMetadataBrokerTaskID: "task-ok",
-		})
-		rec := runnerLiveLogSessionGET(t, server, signer, r, canvasID.String(), execID.String())
-		assert.Equal(t, http.StatusOK, rec.Code)
-		assert.Equal(t, "no-store", rec.Header().Get("Cache-Control"))
-
-		var session runneraction.LiveLogSession
-		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &session))
-		assert.Equal(t, "https://broker.example/v1/tasks/task-ok/live-logs", session.StreamURL)
-		assert.NotEmpty(t, session.Token)
-		assert.False(t, session.ExpiresAt.IsZero())
-
-		err := runneraction.ValidateLiveLogStreamToken(session.Token, "task-ok", "live-log-secret")
-		require.NoError(t, err)
-	})
+func createSessionRunnerTask(t *testing.T, r *support.ResourceRegistry) models.RunnerTask {
+	t.Helper()
+	fleet := models.RunnerFleet{
+		ID: uuid.New(), Slug: "session-" + uuid.NewString(), ScopeType: models.RunnerFleetScopeInstallation,
+		Enabled: true, Spec: datatypes.NewJSONType(models.RunnerFleetSpec{}), RunnerVersion: "0.1.0",
+	}
+	require.NoError(t, fleet.Create(database.DB(t.Context())))
+	return createRunnerTaskForLogTest(t, r, fleet.ID, models.RunnerTaskStateSucceeded)
 }

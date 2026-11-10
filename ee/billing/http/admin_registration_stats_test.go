@@ -114,7 +114,28 @@ func TestAdminRegistrationStats(t *testing.T) {
 	require.NoError(t, json.Unmarshal(second["items"], &rows))
 	require.Len(t, rows, 1)
 	require.Equal(t, ids[0], rows[0].ID)
-	for _, query := range []string{"", "?start=invalid&end=invalid", "?start=" + end.Format(time.RFC3339) + "&end=" + start.Format(time.RFC3339)} {
+	// Filter the cohort before pagination and credit aggregation. Match the
+	// exact domain without treating non-owner members as internal owners.
+	for i, email := range []string{"test+stats@SUPERPLANE.COM", "owner@superplane.com.example", "owner@example.com", "owner@example.com", "owner@example.com", "owner@example.com"} {
+		require.NoError(t, db.Model(&models.User{}).Where("organization_id = ? AND is_owner = ?", ids[i], true).Update("email", email).Error)
+	}
+	member, err := models.CreateUserInTransaction(db, ids[1], r.Account.ID, "member@superplane.com", "Internal member")
+	require.NoError(t, err)
+	require.False(t, member.IsOwner)
+	query.Set("exclude_internal", "true")
+	filtered := request("0")
+	require.JSONEq(t, `5`, string(filtered["total"]))
+	require.JSONEq(t, `5000`, string(filtered["trial_granted_cents"]))
+	require.JSONEq(t, `2200`, string(filtered["trial_spent_cents"]))
+	require.NoError(t, json.Unmarshal(filtered["items"], &rows))
+	require.Len(t, rows, 5)
+	for _, row := range rows {
+		require.NotEqual(t, ids[0], row.ID)
+	}
+	require.JSONEq(t, `[]`, string(request("5")["items"]))
+	query.Set("exclude_internal", "false")
+	require.JSONEq(t, `6`, string(request("0")["total"]))
+	for _, query := range []string{"", "?start=invalid&end=invalid", "?start=" + start.Format(time.RFC3339) + "&end=" + end.Format(time.RFC3339) + "&exclude_internal=invalid", "?start=" + end.Format(time.RFC3339) + "&end=" + start.Format(time.RFC3339)} {
 		response := execRequest(server, requestParams{method: "GET", path: "/admin/api/stats" + query, authCookie: token})
 		require.Equal(t, http.StatusBadRequest, response.Code)
 	}

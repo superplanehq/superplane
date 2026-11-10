@@ -3,14 +3,29 @@ package polar
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
+	"net/http"
 	"net/url"
+	"syscall"
 	"time"
 
 	"github.com/google/uuid"
 	billingmodels "github.com/superplanehq/superplane/ee/billing/models"
 	"gorm.io/gorm"
 )
+
+type paymentMethodPage struct {
+	Items []struct {
+		ID       string          `json:"id"`
+		Type     string          `json:"type"`
+		Metadata json.RawMessage `json:"method_metadata"`
+	} `json:"items"`
+	Pagination struct {
+		MaxPage *int `json:"max_page"`
+	} `json:"pagination"`
+}
 
 // PaymentMethodSnapshot contains only fields needed to assess availability.
 // Complete is false for a missing customer. Failed lists return an error.
@@ -46,6 +61,10 @@ func (c *Client) HasPaymentMethod(ctx context.Context, externalID string) (bool,
 }
 
 func (c *Client) hasPaymentMethod(ctx context.Context, externalID string) (bool, error) {
+	// Pagination and retry waits share one budget, bounded by the caller's deadline.
+	ctx, cancel := context.WithTimeout(ctx, httpTimeout)
+	defer cancel()
+
 	now := time.Now().UTC()
 	for page := 1; ; page++ {
 		methods, maxPage, err := c.paymentMethodsPage(ctx, externalID, page, now)
@@ -63,8 +82,40 @@ func (c *Client) hasPaymentMethod(ctx context.Context, externalID string) (bool,
 	}
 }
 
+func (c *Client) readPaymentMethodPage(ctx context.Context, path string) (paymentMethodPage, error) {
+	for attempt := 1; ; attempt++ {
+		if err := ctx.Err(); err != nil {
+			return paymentMethodPage{}, classified(err, ErrOutcomeUnknown)
+		}
+		// Never carry state from an interrupted response into a later attempt.
+		var result paymentMethodPage
+		err := c.get(ctx, path, &result)
+		if ctx.Err() != nil {
+			return paymentMethodPage{}, classified(errors.Join(err, ctx.Err()), ErrOutcomeUnknown)
+		}
+		if err == nil {
+			return result, nil
+		}
+		if attempt >= 3 || !isDroppedPaymentMethodConnection(err) {
+			return paymentMethodPage{}, err
+		}
+
+		timer := time.NewTimer(time.Duration(attempt) * 100 * time.Millisecond)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return paymentMethodPage{}, classified(errors.Join(err, ctx.Err()), ErrOutcomeUnknown)
+		case <-timer.C:
+		}
+	}
+}
+
 // PaymentMethods reads every page before accepting a complete observation.
 func (c *Client) PaymentMethods(ctx context.Context, externalID string) (PaymentMethodSnapshot, error) {
+	// Complete observations use the same bounded read policy as availability checks.
+	ctx, cancel := context.WithTimeout(ctx, httpTimeout)
+	defer cancel()
+
 	snapshot := PaymentMethodSnapshot{ReadStartedAt: time.Now().UTC()}
 	for page := 1; ; page++ {
 		methods, maxPage, err := c.paymentMethodsPage(ctx, externalID, page, snapshot.ReadStartedAt)
@@ -83,19 +134,19 @@ func (c *Client) PaymentMethods(ctx context.Context, externalID string) (Payment
 	}
 }
 
-func (c *Client) paymentMethodsPage(ctx context.Context, externalID string, page int, now time.Time) ([]PaymentMethodAvailability, int, error) {
-	var result struct {
-		Items []struct {
-			ID       string          `json:"id"`
-			Type     string          `json:"type"`
-			Metadata json.RawMessage `json:"method_metadata"`
-		} `json:"items"`
-		Pagination struct {
-			MaxPage *int `json:"max_page"`
-		} `json:"pagination"`
+func isDroppedPaymentMethodConnection(err error) bool {
+	var bodyErr *responseBodyReadError
+	if errors.As(err, &bodyErr) && (bodyErr.statusCode < http.StatusOK || bodyErr.statusCode >= http.StatusMultipleChoices) {
+		return false
 	}
+	return errors.Is(err, syscall.ECONNRESET) || errors.Is(err, syscall.EPIPE) ||
+		errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF)
+}
+
+func (c *Client) paymentMethodsPage(ctx context.Context, externalID string, page int, now time.Time) ([]PaymentMethodAvailability, int, error) {
 	path := fmt.Sprintf("/customers/external/%s/payment-methods?limit=100&page=%d", url.PathEscape(externalID), page)
-	if err := c.get(ctx, path, &result); err != nil {
+	result, err := c.readPaymentMethodPage(ctx, path)
+	if err != nil {
 		return nil, 0, err
 	}
 	if result.Items == nil {

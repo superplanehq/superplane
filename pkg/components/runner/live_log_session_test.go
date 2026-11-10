@@ -1,76 +1,9 @@
 package runner
 
 import (
-	"testing"
-	"time"
-
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"testing"
 )
-
-func TestMintAndValidateLiveLogStreamToken(t *testing.T) {
-	t.Setenv("TASK_BROKER_AUTH_TOKEN", "live-log-secret")
-	now := time.Now()
-
-	token, expiresAt, err := MintLiveLogStreamToken("task-123", now)
-	require.NoError(t, err)
-	assert.Equal(t, now.Add(liveLogStreamTokenTTL), expiresAt)
-
-	err = ValidateLiveLogStreamToken(token, "task-123", "live-log-secret")
-	require.NoError(t, err)
-
-	err = ValidateLiveLogStreamToken(token, "other-task", "live-log-secret")
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "task id mismatch")
-}
-
-func TestNewLiveLogSession(t *testing.T) {
-	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
-	t.Setenv("TASK_BROKER_PUBLIC_URL", "")
-	t.Setenv("TASK_BROKER_AUTH_TOKEN", "live-log-secret")
-
-	session, err := NewLiveLogSession("task-abc", time.Now())
-	require.NoError(t, err)
-	assert.Equal(t, "https://broker.example/v1/tasks/task-abc/live-logs", session.StreamURL)
-	assert.NotEmpty(t, session.Token)
-	assert.False(t, session.ExpiresAt.IsZero())
-}
-
-func TestLiveLogStreamURLPrefersPublicURL(t *testing.T) {
-	t.Setenv("TASK_BROKER_BASE_URL", "http://task-broker:8081")
-	t.Setenv("TASK_BROKER_PUBLIC_URL", "http://localhost:8091")
-
-	got, err := LiveLogStreamURL("task-1")
-	require.NoError(t, err)
-	assert.Equal(t, "http://localhost:8091/v1/tasks/task-1/live-logs", got)
-}
-
-func TestLiveLogStreamURLFallsBackToBaseURL(t *testing.T) {
-	t.Setenv("TASK_BROKER_BASE_URL", "http://task-broker:8081")
-	t.Setenv("TASK_BROKER_PUBLIC_URL", "")
-
-	got, err := LiveLogStreamURL("task-1")
-	require.NoError(t, err)
-	assert.Equal(t, "http://localhost:8091/v1/tasks/task-1/live-logs", got)
-}
-
-func TestLiveLogStreamURLRewritesDockerInternalHost(t *testing.T) {
-	t.Setenv("TASK_BROKER_BASE_URL", "http://host.docker.internal:8091")
-	t.Setenv("TASK_BROKER_PUBLIC_URL", "")
-
-	got, err := LiveLogStreamURL("task-1")
-	require.NoError(t, err)
-	assert.Equal(t, "http://localhost:8091/v1/tasks/task-1/live-logs", got)
-}
-
-func TestLiveLogInternalStreamURLUsesBaseURL(t *testing.T) {
-	t.Setenv("TASK_BROKER_BASE_URL", "http://host.docker.internal:8091")
-	t.Setenv("TASK_BROKER_PUBLIC_URL", "http://localhost:8091")
-
-	got, err := liveLogInternalStreamURL("task-1")
-	require.NoError(t, err)
-	assert.Equal(t, "http://host.docker.internal:8091/v1/tasks/task-1/live-logs", got)
-}
 
 func TestBrokerTaskIDFromExecutionMetadata(t *testing.T) {
 	assert.Equal(t, "tb-1", BrokerTaskIDFromExecutionMetadata(map[string]any{

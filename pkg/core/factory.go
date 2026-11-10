@@ -57,6 +57,12 @@ type FactoryContext interface {
 	// An empty value means GitHub. A caller that has no factory gets an
 	// empty value and keeps GitHub branch links.
 	VCSProvider() (string, error)
+	// GitHubHost returns the workspace GitHub hostname from the saved
+	// GitHub integration. Empty means github.com, or a Bitbucket workspace.
+	GitHubHost() (string, error)
+	// ListRepositories returns the repositories the workspace may change,
+	// primary repository first. A caller that has no factory gets nil.
+	ListRepositories() ([]string, error)
 }
 
 type WorkOrderParams struct {
@@ -82,6 +88,10 @@ type UpdateWorkOrderStatusParams struct {
 	OrderID string
 	State   string
 	Result  string
+	// WhenAllPullRequestsDone keeps the task open while any attached pull
+	// request is open or draft. When all are done, the result is completed
+	// if one merged and pr_closed otherwise.
+	WhenAllPullRequestsDone bool
 }
 
 type AddWorkOrderCommentParams struct {

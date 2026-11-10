@@ -115,21 +115,18 @@ export const useIntegration = (organizationId: string, integrationId: string) =>
   });
 };
 
-const DEFAULT_BRANCH_FALLBACK = "main";
-
 /**
- * Imperative lookup of a single repository's default branch (main, master,
- * staging, ...), used by onboarding finish before installing the generated
- * automations. Falls back to "main" when the integration or repository is
- * missing, or the lookup returns nothing, so callers never block on this.
+ * Reads the default branch a repository reports. Missing inputs and an empty
+ * resource list return "". A failed request rejects so the caller can keep a
+ * saved branch.
  */
-export async function resolveGithubDefaultBranch(
+export async function resolveRepositoryDefaultBranch(
   organizationId: string,
   integrationId: string,
   repository: string,
 ): Promise<string> {
   if (!organizationId || !integrationId || !repository) {
-    return DEFAULT_BRANCH_FALLBACK;
+    return "";
   }
 
   const response = await organizationsListIntegrationResources(
@@ -139,8 +136,7 @@ export async function resolveGithubDefaultBranch(
       query: { type: "default_branch", repository },
     }),
   );
-  const branch = response.data?.resources?.[0]?.name;
-  return branch || DEFAULT_BRANCH_FALLBACK;
+  return response.data?.resources?.[0]?.name?.trim() ?? "";
 }
 
 export const useIntegrationResources = (
@@ -217,6 +213,7 @@ export const useNextIntegrationSetupStep = (organizationId: string) => {
     mutationFn: async (data: { integrationId: string; inputs?: Record<string, unknown>; capabilities?: string[] }) => {
       return await organizationsNextIntegrationSetupStep(
         withOrganizationHeader({
+          organizationId,
           path: { id: organizationId, integrationId: data.integrationId },
           body: {
             inputs: data.inputs,
@@ -246,6 +243,7 @@ export const usePreviousIntegrationSetupStep = (organizationId: string) => {
     mutationFn: async (data: { integrationId: string }) => {
       return await organizationsPreviousIntegrationSetupStep(
         withOrganizationHeader({
+          organizationId,
           path: { id: organizationId, integrationId: data.integrationId },
           body: {},
         }),
@@ -300,6 +298,7 @@ export const useUpdateIntegrationCapabilities = (organizationId: string, integra
     mutationFn: async (capabilities: IntegrationCapabilityState[]) => {
       return await organizationsUpdateIntegrationCapabilities(
         withOrganizationHeader({
+          organizationId,
           path: { id: organizationId, integrationId },
           body: { capabilities },
         }),
@@ -348,6 +347,7 @@ export const useUpdateIntegrationProperty = (organizationId: string, integration
     mutationFn: async (body: { propertyName: string; value: string }) => {
       const response = await organizationsUpdateIntegrationProperty(
         withOrganizationHeader({
+          organizationId,
           path: { id: organizationId, integrationId },
           body: { propertyName: body.propertyName, value: body.value },
         }),
@@ -367,6 +367,7 @@ export const useUpdateIntegrationSecret = (organizationId: string, integrationId
     mutationFn: async (body: { secretName: string; value: string }) => {
       const response = await organizationsUpdateIntegrationSecret(
         withOrganizationHeader({
+          organizationId,
           path: { id: organizationId, integrationId },
           body: { secretName: body.secretName, value: body.value },
         }),
@@ -402,6 +403,7 @@ export const useDeleteIntegration = (organizationId: string, integrationId: stri
     mutationFn: async (data: { integrationName: string }) => {
       await organizationsDeleteIntegration(
         withOrganizationHeader({
+          organizationId,
           path: { id: organizationId, integrationId },
         }),
       );

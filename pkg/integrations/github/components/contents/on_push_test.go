@@ -291,6 +291,31 @@ func Test__OnPush__Setup(t *testing.T) {
 		assert.Equal(t, webhookRequest.EventType, "push")
 		assert.Equal(t, webhookRequest.Repository, "hello")
 	})
+
+	t.Run("workspace expression requests a webhook on every workspace repository", func(t *testing.T) {
+		integrationCtx := mocks.IntegrationContextForNewSetupFlow()
+		require.NoError(t, trigger.Setup(core.TriggerContext{
+			Integration:   integrationCtx,
+			Metadata:      &contexts.MetadataContext{},
+			HTTP:          &contexts.HTTPContext{},
+			Factory:       &workspaceFactory{repositories: []string{"testhq/hello", "testhq/world"}},
+			Configuration: map[string]any{"repository": "{{ workspace().repositories }}"},
+		}))
+
+		require.Len(t, integrationCtx.WebhookRequests, 1)
+		webhookRequest := integrationCtx.WebhookRequests[0].(common.WebhookConfiguration)
+		assert.Equal(t, "push", webhookRequest.EventType)
+		assert.Equal(t, []string{"testhq/hello", "testhq/world"}, webhookRequest.Repositories)
+	})
+}
+
+type workspaceFactory struct {
+	core.FactoryContext
+	repositories []string
+}
+
+func (f *workspaceFactory) ListRepositories() ([]string, error) {
+	return f.repositories, nil
 }
 
 func Test__IsBranchDeletionEvent(t *testing.T) {

@@ -11,6 +11,7 @@ import type {
 import { formatMinutesSecondsDuration } from "@/lib/duration";
 import {
   UNKNOWN_ORG_USER_NAME,
+  createOrgUserDisplayLookup,
   getUserInitials,
   type OrgUserDisplay,
   type OrgUserDisplayLookup,
@@ -232,6 +233,8 @@ export interface SplitRunFixture {
   assigneeIds?: string[];
   elapsed: string;
   startedLabel: string;
+  startedBy?: OrgUserDisplay;
+  autoStarted?: boolean;
   costUsd: string;
   tokensLabel: string;
   savedTokens?: number;
@@ -241,6 +244,8 @@ export interface SplitRunFixture {
   lineName: string;
   currentStepIndex: number;
   lineStatus: SplitRunPhaseStatus;
+  /** Verify eligibility remains independent of the review strip. */
+  canRunVerifyCustomAutomation?: boolean;
   currentPhaseId: SplitRunPhaseId;
   /** When set, the popup opens this phase even if it already passed. */
   openPhaseId?: SplitRunPhaseId | null;
@@ -259,6 +264,15 @@ const UNKNOWN_OWNER: OrgUserDisplay = {
   name: UNKNOWN_ORG_USER_NAME,
   initials: getUserInitials(UNKNOWN_ORG_USER_NAME) || "U",
 };
+
+function splitRunStarterDisplay(
+  order: FactoriesWorkOrder,
+  resolveUser?: OrgUserDisplayLookup,
+): OrgUserDisplay | undefined {
+  const starter = order.startedBy;
+  const lookup = resolveUser ?? createOrgUserDisplayLookup(new Map());
+  return lookup(starter?.id, starter?.name, starter?.deleted, starter?.formerMember) ?? undefined;
+}
 
 function splitRunOwnerDisplay(order: FactoriesWorkOrder, resolveUser?: OrgUserDisplayLookup): OrgUserDisplay {
   const assignee = order.assignees?.[0];
@@ -425,6 +439,8 @@ export type SplitRunFixtureOptions = {
   closer?: SplitRunFooterCloser;
   /** Backlog analysis runs for this task, shown as extra Log phases. */
   analysisRuns?: BacklogAnalysisRun[];
+  /** Custom task-entry runs, independent of Backlog score analysis. */
+  backlogCustomRuns?: BacklogAnalysisRun[];
   /**
    * Factory apps on board columns. A related run becomes a console card
    * in that column, under the app name.
@@ -513,6 +529,8 @@ function mappedWorkOrderFixture(order: FactoriesWorkOrder, options?: SplitRunFix
     assigneeIds: (order.assignees ?? []).map((assignee) => assignee.id).filter((id): id is string => Boolean(id)),
     elapsed: elapsedForDisplay(displayStatus, order),
     startedLabel: startedLabelForOrder(order),
+    startedBy: splitRunStarterDisplay(order, options?.resolveUser),
+    autoStarted: order.autoStarted,
     costUsd: costUsdForDisplay(order),
     tokensLabel: tokensLabelForDisplay(order),
     savedTokens: parseWorkOrderMetric(order.totalTokens),
@@ -525,6 +543,11 @@ function mappedWorkOrderFixture(order: FactoriesWorkOrder, options?: SplitRunFix
       SPLIT_RUN_RUNNING.lineName,
     currentStepIndex: current?.stepIndex ?? 0,
     lineStatus: lineStatusForDisplay(displayStatus),
+    canRunVerifyCustomAutomation:
+      displayStatus === "waiting" &&
+      current?.state === "STATE_FINISHED" &&
+      current.result === "RESULT_PASSED" &&
+      Boolean(trackedPullRequestReviewNote(order.pullRequests, order.id)),
     currentPhaseId: activeAutomationId ?? (current ? phaseIdForExecution(current, executions) : (phases[0]?.id ?? "")),
     openPhaseId: activeAutomationId,
     phases,
@@ -797,23 +820,23 @@ function phasesForOrder(
   options: SplitRunFixtureOptions | undefined,
   demoArtifacts: boolean,
 ): SplitRunPhase[] {
-  const apiChecks = options?.checks;
+  const { checks: apiChecks, artifacts, analysisRuns = [], prFeedbackRuns = [], columnApps = [] } = options ?? {};
   const prior = priorLineExecutions(order, options?.lineId, executions);
   const peers = [...prior, ...executions];
-  const columnApps = options?.columnApps ?? [];
   const knownPhases = [
     ...sourcePhasesForOrder(order, executions.length > 0, demoArtifacts),
-    ...phasesForAnalysisRuns(options?.analysisRuns ?? [], apiChecks, options?.artifacts),
+    ...phasesForAnalysisRuns(analysisRuns, apiChecks, artifacts),
+    ...phasesForBacklogCustomRuns(options, columnApps),
     ...prior.map((execution) => ({
       ...executionToPhase(order, execution, apiChecks, demoArtifacts, peers),
       historyRun: true,
     })),
     ...executions.map((execution) => executionToPhase(order, execution, apiChecks, demoArtifacts, executions)),
-    ...phasesForPRFeedbackRuns(options?.prFeedbackRuns ?? [], columnApps),
+    ...phasesForPRFeedbackRuns(prFeedbackRuns, columnApps),
   ];
   return [
     ...knownPhases,
-    ...phasesForColumnAppChecks(columnApps, apiChecks, options?.artifacts, knownPhases, {
+    ...phasesForColumnAppChecks(columnApps, apiChecks, artifacts, knownPhases, {
       pullRequests: options?.pullRequests ?? order.pullRequests,
       canvasRuns: options?.columnAppRuns,
     }),
@@ -894,6 +917,42 @@ function priorLineExecutions(
 }
 
 const ANALYSIS_PHASE_ID_PREFIX = "backlog-analysis-";
+
+function phasesForBacklogCustomRuns(
+  options: SplitRunFixtureOptions | undefined,
+  apps: SplitRunColumnApp[],
+): SplitRunPhase[] {
+  return [...(options?.backlogCustomRuns ?? [])]
+    .sort((left, right) => Date.parse(left.run.createdAt ?? "") - Date.parse(right.run.createdAt ?? ""))
+    .flatMap(({ canvasId, run }) => {
+      const app = apps.find((entry) => entry.id === canvasId);
+      if (!app || !run.id) return [];
+      const componentName = app.name?.trim() || "Custom automation";
+      const status = statusForCanvasRun(run);
+      const duration = durationForCanvasRun(run, status);
+      const line = columnAppCheckLine(run.id, componentName, run.createdAt, { run, status, duration });
+      return [
+        {
+          id: `backlog-custom-${run.id}`,
+          name: "Backlog",
+          componentName,
+          columnKey: "backlog" as const,
+          status,
+          duration,
+          durationRunning: status === "running",
+          startedAt: run.createdAt,
+          endedAt: run.finishedAt,
+          appId: canvasId,
+          runId: run.id,
+          artifacts: artifactsForCanvasRun(options?.artifacts, run.id),
+          checks: presentWorkOrderChecks((options?.checks ?? []).filter((check) => check.runId === run.id)),
+          stream: [line],
+          canvasSteps: [streamLineToCanvasStep(line, providerForName(componentName))],
+          ...recordedRunLedger(run),
+        },
+      ];
+    });
+}
 
 /** One task analysis can span multiple canvas runs. Present those attempts as one phase. */
 function phasesForAnalysisRuns(
@@ -1783,13 +1842,22 @@ function checksForLineExecution(
   demoArtifacts = true,
 ): WorkOrderCheckPresentation[] | undefined {
   if (!(execution.step ?? "").toLowerCase().includes("verify")) {
-    return undefined;
+    return checksReportedByRun(execution.run?.id, apiChecks);
   }
   const source = demoArtifacts ? (apiChecks ?? VERIFY_STEP_CHECKS) : (apiChecks ?? []);
   const verifyChecks = demoArtifacts
     ? source.filter((check) => VERIFY_STEP_KEYS.has(check.key ?? ""))
     : source.filter((check) => !isScoreCheckName(check.name));
   return presentWorkOrderChecks(verifyChecks);
+}
+
+/** Checks that the agent of a step reported with add_checks carry its run id. */
+function checksReportedByRun(
+  runId: string | undefined,
+  apiChecks?: FactoriesWorkOrderCheck[],
+): WorkOrderCheckPresentation[] | undefined {
+  const reported = runId ? (apiChecks ?? []).filter((check) => check.runId === runId) : [];
+  return reported.length > 0 ? presentWorkOrderChecks(reported) : undefined;
 }
 
 function artifactsForLineExecution(

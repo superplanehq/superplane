@@ -9,7 +9,6 @@ import (
 
 const (
 	WebSocketKindCanvas = "canvas"
-	WebSocketKindAgent  = "agent"
 
 	WebSocketConnectionOutcomeOpened       = "opened"
 	WebSocketConnectionOutcomeClosed       = "closed"

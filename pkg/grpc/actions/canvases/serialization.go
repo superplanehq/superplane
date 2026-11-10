@@ -55,16 +55,15 @@ func serializePreparedCanvas(
 
 	return &pb.Canvas{
 		Metadata: &pb.Canvas_Metadata{
-			Id:                          canvas.ID.String(),
-			OrganizationId:              canvas.OrganizationID.String(),
-			Name:                        canvas.Name,
-			Description:                 canvas.Description,
-			CreatedAt:                   timestamppb.New(*canvas.CreatedAt),
-			UpdatedAt:                   timestamppb.New(*canvas.UpdatedAt),
-			CreatedBy:                   createdBy,
-			LiveVersionId:               liveVersionID,
-			FactoryId:                   factoryID,
-			DismissedAgentSuggestionIds: append([]string(nil), canvas.DismissedAgentSuggestionIDs...),
+			Id:             canvas.ID.String(),
+			OrganizationId: canvas.OrganizationID.String(),
+			Name:           canvas.Name,
+			Description:    canvas.Description,
+			CreatedAt:      timestamppb.New(*canvas.CreatedAt),
+			UpdatedAt:      timestamppb.New(*canvas.UpdatedAt),
+			CreatedBy:      createdBy,
+			LiveVersionId:  liveVersionID,
+			FactoryId:      factoryID,
 		},
 		Spec: &pb.Canvas_Spec{
 			Nodes: actions.NodesToProto(prepared.Nodes),

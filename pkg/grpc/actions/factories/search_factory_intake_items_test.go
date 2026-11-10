@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -45,14 +46,21 @@ func Test__ProductiveTaskItem(t *testing.T) {
 }
 
 func TestParseGitHubIssueURL(t *testing.T) {
-	repository, number, ok := parseGitHubIssueURL("https://github.com/acme/payments/issues/12#issuecomment-1")
+	host, repository, number, ok := parseGitHubIssueURL("https://github.com/acme/payments/issues/12#issuecomment-1")
 	assert.True(t, ok)
+	assert.Equal(t, "github.com", host.WebHostname())
 	assert.Equal(t, "acme/payments", repository)
 	assert.Equal(t, 12, number)
 
-	_, _, ok = parseGitHubIssueURL("https://github.com/acme/payments/pull/12")
+	host, repository, number, ok = parseGitHubIssueURL("https://acme.ghe.com/acme/payments/issues/12")
+	assert.True(t, ok)
+	assert.Equal(t, "acme.ghe.com", host.WebHostname())
+	assert.Equal(t, "acme/payments", repository)
+	assert.Equal(t, 12, number)
+
+	_, _, _, ok = parseGitHubIssueURL("https://github.com/acme/payments/pull/12")
 	assert.False(t, ok)
-	_, _, ok = parseGitHubIssueURL("https://example.com/acme/payments/issues/12")
+	_, _, _, ok = parseGitHubIssueURL("https://example.com/acme/payments/issues/12")
 	assert.False(t, ok)
 }
 
@@ -342,6 +350,28 @@ func Test__ImportFactoryIntakeItem(t *testing.T) {
 			return stubIntakeItemSource{items: []IntakeItem{item}}, nil
 		},
 	}
+
+	t.Run("subscription import requires the caller connection and preserves the retry", func(t *testing.T) {
+		factory := newFactory(t)
+		intake := createIntake(t, factory)
+		db := database.DB(t.Context())
+		subscription := true
+		require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{CodexSubscription: &subscription}))
+		req := &pb.ImportFactoryIntakeItemRequest{FactoryId: factory.ID.String(), IntakeId: intake.ID.String(), ItemId: item.ID}
+		_, err := ImportFactoryIntakeItem(ctx, deps, orgID, req)
+		requireCodexConnectionRequired(t, err)
+		orders, err := factory.ListWorkOrders(db, models.ListFactoryWorkOrdersFilters{})
+		require.NoError(t, err)
+		assert.Empty(t, orders)
+		connection, err := models.CreateCodexConnection(db, r.Organization.ID, r.User, time.Now())
+		require.NoError(t, err)
+		require.NoError(t, db.Model(connection).Updates(map[string]any{"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("bundle")}).Error)
+		response, err := ImportFactoryIntakeItem(ctx, deps, orgID, req)
+		require.NoError(t, err)
+		require.Len(t, response.Order.Assignees, 1)
+		assert.Equal(t, r.User.String(), response.Order.Assignees[0].Id)
+		assert.Equal(t, item.Body, response.Order.Description)
+	})
 
 	t.Run("creates a draft work order with the ticket origin", func(t *testing.T) {
 		factory := newFactory(t)

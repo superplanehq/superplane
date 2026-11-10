@@ -14,7 +14,7 @@ export type PlanningSessionPayload = {
   waitState?: string;
   executionId?: string;
   runnerState?: string;
-  queueReason?: string;
+  blockedByParallelismLimit?: boolean;
   selectableModelKey?: string;
   kind?: "PLANNING_SESSION_KIND_TASK_CREATION" | "PLANNING_SESSION_KIND_WORK_ORDER_ANALYSIS";
   messages?: PlanningSessionMessagePayload[];
@@ -156,7 +156,8 @@ export function createWithAgentViewFromSession(
   return {
     repository: session.repository ?? "",
     machineStatus: createWithAgentMachineStatus(session),
-    ...(session.queueReason ? { queueReason: session.queueReason } : {}),
+    runnerState: session.runnerState,
+    blockedByParallelismLimit: session.blockedByParallelismLimit,
     turnEnded: session.state === "ended",
     canvasId: session.canvasId ?? "",
     canvasRunId: session.canvasRunId ?? "",
@@ -246,7 +247,11 @@ export function planningSessionIsWorking(
   session: Pick<PlanningSessionPayload, "state" | "waitState" | "runnerState"> | null | undefined,
 ): boolean {
   return Boolean(
-    session && session.state !== "ended" && session.waitState !== "pending" && session.runnerState !== "queued",
+    session &&
+      session.state !== "ended" &&
+      session.waitState !== "pending" &&
+      session.runnerState !== "queued" &&
+      session.runnerState !== "pending",
   );
 }
 
@@ -308,7 +313,7 @@ function createWithAgentMachineStatus(session: PlanningSessionMachineInput): Cre
   if (session.state === "ended") {
     return "waiting";
   }
-  if (session.runnerState === "queued") {
+  if (session.runnerState === "queued" || session.runnerState === "pending") {
     return "queued";
   }
   if (session.runnerState === "reserved") {

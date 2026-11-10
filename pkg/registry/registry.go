@@ -2,6 +2,7 @@ package registry
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -255,6 +256,20 @@ func (r *Registry) GetTrigger(name string) (core.Trigger, error) {
 	return r.GetIntegrationTrigger(parts[0], name)
 }
 
+// retiredActionNames lists core actions that new canvases must not use.
+// Saved canvases can still contain these nodes, so the API keeps their
+// definitions. Without a definition, the UI cannot show or keep their
+// configuration. The UI hides these actions from the component picker.
+var retiredActionNames = []string{
+	"updatePullRequestBodySection",
+}
+
+func isRetiredAction(name string) bool {
+	return slices.Contains(retiredActionNames, name)
+}
+
+// ListActions returns all core actions, including retired actions that saved
+// canvases still use.
 func (r *Registry) ListActions() []core.Action {
 	actions := make([]core.Action, 0, len(r.Actions))
 	for _, action := range r.Actions {
@@ -266,6 +281,14 @@ func (r *Registry) ListActions() []core.Action {
 	})
 
 	return actions
+}
+
+// ListSelectableActions returns the core actions that new canvases can use.
+func (r *Registry) ListSelectableActions() []core.Action {
+	actions := r.ListActions()
+	return slices.DeleteFunc(actions, func(action core.Action) bool {
+		return isRetiredAction(action.Name())
+	})
 }
 
 func (r *Registry) GetAction(name string) (core.Action, error) {

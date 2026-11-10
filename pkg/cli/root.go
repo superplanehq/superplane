@@ -11,11 +11,13 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	automations "github.com/superplanehq/superplane/pkg/cli/commands/automations"
+	"github.com/superplanehq/superplane/pkg/cli/commands/fleets"
 	index "github.com/superplanehq/superplane/pkg/cli/commands/index"
 	integrations "github.com/superplanehq/superplane/pkg/cli/commands/integrations"
 	members "github.com/superplanehq/superplane/pkg/cli/commands/members"
 	oidc "github.com/superplanehq/superplane/pkg/cli/commands/oidc"
 	organizations "github.com/superplanehq/superplane/pkg/cli/commands/organizations"
+	"github.com/superplanehq/superplane/pkg/cli/commands/runners"
 	runs "github.com/superplanehq/superplane/pkg/cli/commands/runs"
 	secrets "github.com/superplanehq/superplane/pkg/cli/commands/secrets"
 	tasks "github.com/superplanehq/superplane/pkg/cli/commands/tasks"
@@ -55,6 +57,8 @@ func init() {
 	RootCmd.PersistentFlags().StringVarP(&OutputFormat, "output", "o", "", "output format: text|json|yaml (overrides config output)")
 
 	options := defaultBindOptions()
+	RootCmd.AddCommand(fleets.NewCommand(options))
+	RootCmd.AddCommand(runners.NewCommand(options))
 	RootCmd.AddCommand(automations.NewCommand(options))
 	RootCmd.AddCommand(runs.NewCommand(options))
 	RootCmd.AddCommand(index.NewCommand(options))
@@ -79,10 +83,12 @@ func initConfig() {
 
 		path := fmt.Sprintf("%s/.superplane.yaml", home)
 
-		// #nosec
-		_, err = os.OpenFile(path, os.O_RDONLY|os.O_CREATE, 0644)
+		// #nosec G304 -- the path is fixed beneath the current user's home directory.
+		file, err := os.OpenFile(path, os.O_RDONLY|os.O_CREATE, 0o600)
 		if err != nil {
 			fmt.Println("Warning: could not ensure config file exists:", err)
+		} else if err := file.Close(); err != nil {
+			fmt.Println("Warning: could not close config file:", err)
 		}
 	}
 
@@ -102,6 +108,9 @@ func defaultBindOptions() core.BindOptions {
 		DefaultOutputFormat: GetOutputFormat,
 		NewConfigContext: func() core.ConfigContext {
 			if context, ok := GetEnvironmentContext(); ok {
+				if selected, ok := GetCurrentContext(); ok && selected.URL == context.URL {
+					context.OrganizationID = selected.OrganizationID
+				}
 				return NewEnvironmentContext(context)
 			}
 

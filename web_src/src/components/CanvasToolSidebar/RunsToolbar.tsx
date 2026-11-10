@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { Search, X } from "lucide-react";
 import { RunFiltersPopover, type TriggerOption } from "./RunFiltersPopover";
-import { RUNS_SIDEBAR_ROW_CLASS } from "./runsSidebarRowLayout";
+import { RUNS_SIDEBAR_ROW_CLASS } from "@/lib/runsSidebarRowLayout";
 
 interface RunsToolbarProps {
   selectedStatuses: Set<RunStatusFilter>;

@@ -3,7 +3,7 @@ import { describe, expect, it } from "bun:test";
 import claudeIcon from "@/assets/icons/integrations/claude.svg";
 import cursorIcon from "@/assets/icons/integrations/cursor.svg";
 import dependabotIcon from "@/assets/icons/integrations/dependabot.svg";
-import superplaneIcon from "@/assets/superplane.svg";
+import superplaneMark from "@/assets/superplane-mark.svg";
 
 import { PRIMARY_FACTORY_ID, STORYBOOK_ME_USER_ID } from "../../__fixtures__/factoryPageIds";
 import {
@@ -23,6 +23,9 @@ import { addedByForSource, sourceTicketLabel, splitRunSourceForOrder } from "./s
 describe("sourceTicketLabel", () => {
   it("uses owner/repo#number for GitHub issues", () => {
     expect(sourceTicketLabel("https://github.com/acme/payments-service/issues/842")).toBe("acme/payments-service#842");
+    expect(sourceTicketLabel("https://acme.ghe.com/acme/payments-service/issues/842")).toBe(
+      "acme/payments-service#842",
+    );
   });
 
   it("uses org#id for Sentry, PagerDuty, and Slack hosts", () => {
@@ -351,7 +354,7 @@ describe("splitRunSourceForOrder", () => {
       expect.objectContaining({
         kind: "mcp",
         name: "Codex",
-        iconSrc: superplaneIcon,
+        iconSrc: superplaneMark,
         iconAlt: "SuperPlane",
       }),
     );

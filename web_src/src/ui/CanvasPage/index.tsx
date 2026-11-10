@@ -58,12 +58,6 @@ import { useCanvasRunsSidebarState } from "@/components/CanvasRunsSidebar/useCan
 import { CanvasVersionsSidebar } from "@/components/CanvasVersionsSidebar";
 import type { CanvasVersionsSidebarState } from "@/components/CanvasVersionsSidebar/useCanvasVersionsSidebarState";
 import { useCanvasVersionsSidebarState } from "@/components/CanvasVersionsSidebar/useCanvasVersionsSidebarState";
-import { CanvasToolSidebar } from "@/components/CanvasToolSidebar";
-import {
-  useCanvasToolSidebarState,
-  type CanvasToolSidebarState,
-} from "@/components/CanvasToolSidebar/useCanvasToolSidebarState";
-import { FactoryCanvasToolSidebar } from "@/pages/factories/agent/FactoryCanvasToolSidebar";
 import { buildSidebarComponentDocsPayload } from "@/lib/componentDocsUrl";
 import { parseDefaultValues } from "@/lib/components";
 import { countUnacknowledgedErrors } from "@/pages/app/lib/canvas-runs";
@@ -106,7 +100,6 @@ import "./canvas-reset.css";
 import { CustomEdge } from "./CustomEdge";
 import { CanvasPageLoadingOverlay } from "./CanvasPageLoadingOverlay";
 import { Header } from "./Header";
-import type { AgentSuggestion } from "./components/AgentSuggestionsHoverCard";
 import { isComponentSidebarVisibleMode } from "./canvasTabHeaderMode";
 import { enrichCanvasNodes, type EnrichedCanvasNodeCacheEntry } from "./enrichCanvasNodes";
 import { buildStyledCanvasEdges } from "./factoryCanvasEdgeStyle";
@@ -280,19 +273,12 @@ export interface CanvasPageProps {
   showCanvasFindControls?: boolean;
   readOnly?: boolean;
   hideAddControls?: boolean;
-  /** Hide the Agent / Versions left panel toggle (templates only). */
-  hideCanvasToolSidebar?: boolean;
   /** Hide the + / note rail. Factory edit mode uses header workspace toggles instead. */
   hideRightSideControls?: boolean;
   /** Overlay on the canvas column (factory YAML workspace). */
   canvasOverlay?: ReactNode;
   /** Hide the top PageHeader / SecondaryHeader chrome (factory embed shell owns the header). */
   hidePageChrome?: boolean;
-  /** Enables managed agent chat controls when the user has the required RBAC permissions. */
-  canUseAgents?: boolean;
-  /** Optional Agent improvement suggestions shown on the Agent header control. */
-  agentSuggestions?: AgentSuggestion[];
-  onSelectAgentSuggestion?: (suggestion: AgentSuggestion) => void;
   canReadIntegrations?: boolean;
   canCreateIntegrations?: boolean;
   canUpdateIntegrations?: boolean;
@@ -353,14 +339,6 @@ export interface CanvasPageProps {
   isEditing: boolean;
   /** True while an edit session is active (editing a draft or previewing a version from the versions sidebar). Drives the permanent versions sidebar and the Edit/Exit header affordance. */
   isEditSessionActive?: boolean;
-  /** Active canvas version id (draft when editing); drives agent build mode. */
-  activeCanvasVersionId: string;
-  /** Live canvas version id; used by the agent staging bar to enter edit mode. */
-  liveCanvasVersionId?: string;
-  /** Enter edit mode when the agent finishes staging changes. */
-  onAgentStagingReady?: () => boolean | Promise<boolean>;
-  /** Commit staged agent changes from the agent sidebar bar. */
-  onAgentStagingCommit?: (commitMessage: string) => Promise<boolean>;
   onNodeAdd?: (newNodeData: NewNodeData) => Promise<string>;
   onPlaceholderAdd?: (data: {
     position: { x: number; y: number };
@@ -464,7 +442,7 @@ export interface CanvasPageProps {
    * so the enter cover does not lift on live positions.
    */
   factoryConfigureLayoutReady?: boolean;
-  /** Factory-shell edit workspace. Enables factory agent sidebar and edit-grid dots. */
+  /** Factory-shell edit workspace with edit-grid dots. */
   factoryEditWorkspace?: boolean;
 }
 
@@ -861,20 +839,6 @@ function CanvasPage(props: CanvasPageProps) {
     return props.nodes.length === 0;
   });
 
-  const toolSidebarState = useCanvasToolSidebarState({
-    isEditing: props.isEditing,
-    hideCanvasToolSidebar: props.hideCanvasToolSidebar ?? false,
-    canUseAgents: props.canUseAgents ?? true,
-    readOnly,
-    canvasId: props.canvasId,
-    organizationId: props.organizationId,
-    liveCanvasVersionId: props.liveCanvasVersionId,
-    headerMode: props.headerMode,
-    isRunInspectionMode: props.isRunInspectionMode,
-    isAutoLayoutOnUpdateEnabled: props.isAutoLayoutOnUpdateEnabled ?? false,
-    onAgentStagingReady: props.onAgentStagingReady,
-    onAgentStagingCommit: props.onAgentStagingCommit,
-  });
   const runsSidebarBaseState = useCanvasRunsSidebarState(props.canvasId);
   const showRunsSidebar = allowsRunsSidebar(props.headerMode) && props.toolSidebarRunsContent != null;
   const runningRunsCount = useMemo(
@@ -1499,11 +1463,8 @@ function CanvasPage(props: CanvasPageProps) {
             activeDraftBranchLabel={props.activeDraftBranchLabel}
             activeDraftBranchShortSha={props.activeDraftBranchShortSha}
             showCanvasSettingsMenu={props.showCanvasSettingsMenu}
-            toolSidebarState={toolSidebarState}
             runsSidebarState={runsSidebarState}
             versionsSidebarState={versionsSidebarState}
-            agentSuggestions={props.agentSuggestions}
-            onSelectAgentSuggestion={props.onSelectAgentSuggestion}
           />
           {props.headerBanner ? <div className="border-b border-black/20">{props.headerBanner}</div> : null}
         </div>
@@ -1511,12 +1472,6 @@ function CanvasPage(props: CanvasPageProps) {
 
       {/* Main content area with sidebar and canvas */}
       <div className="relative flex min-h-0 flex-1 overflow-hidden">
-        {props.factoryEmbed && props.factoryEditWorkspace ? (
-          <FactoryCanvasToolSidebar toolSidebarState={toolSidebarState} />
-        ) : (
-          <CanvasToolSidebar toolSidebarState={toolSidebarState} />
-        )}
-
         <CanvasRunsSidebar isOpen={isRunsSidebarOpen}>{props.toolSidebarRunsContent ?? null}</CanvasRunsSidebar>
 
         <CanvasVersionsSidebar isOpen={isVersionsSidebarOpen}>
@@ -2036,11 +1991,8 @@ function CanvasContentHeader({
   activeDraftBranchLabel,
   activeDraftBranchShortSha,
   showCanvasSettingsMenu,
-  toolSidebarState,
   runsSidebarState,
   versionsSidebarState,
-  agentSuggestions,
-  onSelectAgentSuggestion,
 }: {
   canvasName: string;
   organizationId?: string;
@@ -2099,11 +2051,8 @@ function CanvasContentHeader({
   activeDraftBranchLabel?: string;
   activeDraftBranchShortSha?: string;
   showCanvasSettingsMenu?: boolean;
-  toolSidebarState: CanvasToolSidebarState;
   runsSidebarState: CanvasRunsSidebarState;
   versionsSidebarState: CanvasVersionsSidebarState;
-  agentSuggestions?: AgentSuggestion[];
-  onSelectAgentSuggestion?: (suggestion: AgentSuggestion) => void;
 }) {
   return (
     <Header
@@ -2153,11 +2102,8 @@ function CanvasContentHeader({
       activeDraftBranchLabel={activeDraftBranchLabel}
       activeDraftBranchShortSha={activeDraftBranchShortSha}
       showCanvasSettingsMenu={showCanvasSettingsMenu}
-      toolSidebarState={toolSidebarState}
       runsSidebarState={runsSidebarState}
       versionsSidebarState={versionsSidebarState}
-      agentSuggestions={agentSuggestions}
-      onSelectAgentSuggestion={onSelectAgentSuggestion}
     />
   );
 }
@@ -3730,5 +3676,4 @@ function CanvasContent({
 
 export type { BuildingBlock } from "../BuildingBlocksSidebar";
 export type { MissingIntegration } from "../IntegrationStatusIndicator";
-export type { AgentSuggestion } from "./components/AgentSuggestionsHoverCard";
 export { CanvasPage };

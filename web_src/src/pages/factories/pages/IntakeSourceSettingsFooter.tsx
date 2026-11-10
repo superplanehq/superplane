@@ -1,3 +1,5 @@
+import { useOptionalFactoriesLayout } from "../layout/factoriesLayoutContext";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -14,6 +16,7 @@ import { useState } from "react";
 import {
   INTAKE_SETTINGS_COPY,
   intakeSupportsDelete,
+  linearIntakeScopeMissing,
   normalizeIntakeSourceSettings,
   type IntakeSourceSettings,
 } from "./intakeSourceSettingsModel";
@@ -21,20 +24,12 @@ import { LINEAR_INTAKE_SETUP_COPY } from "./linearIntakeSetupCopy";
 import { SENTRY_INTAKE_SETUP_COPY } from "./sentryIntakeSetupCopy";
 import type { LineIntakeSourceId } from "./lineIntakeModel";
 
-export function IntakeSourceSettingsFooter({
-  sourceId,
-  draft,
-  savePending,
-  saveError,
-  deletePending,
-  deleteError,
-  onDelete,
-  getDraft,
-  onSave,
-  onClose,
-}: {
+type IntakeSourceSettingsFooterProps = {
   sourceId: LineIntakeSourceId;
   draft: IntakeSourceSettings;
+  linearLabelsRequired?: boolean;
+  linearProjectsRequired?: boolean;
+  canEdit?: boolean;
   getDraft: () => IntakeSourceSettings;
   savePending?: boolean;
   saveError?: string;
@@ -43,22 +38,44 @@ export function IntakeSourceSettingsFooter({
   onDelete?: () => Promise<void> | void;
   onSave: (next: IntakeSourceSettings) => Promise<void> | void;
   onClose: () => void;
-}) {
-  const deleteControls = intakeSupportsDelete(sourceId);
+};
+
+export function IntakeSourceSettingsFooter({
+  sourceId,
+  draft,
+  linearLabelsRequired = false,
+  linearProjectsRequired = false,
+  canEdit = true,
+  savePending,
+  saveError,
+  deletePending,
+  deleteError,
+  onDelete,
+  getDraft,
+  onSave,
+  onClose,
+}: IntakeSourceSettingsFooterProps) {
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const linearProjectsMissing = sourceId === "linear-issues" && draft.linearProjectIds.length === 0;
+  if (!canEdit) {
+    return (
+      <footer className="flex shrink-0 justify-end border-t border-border px-5 py-3">
+        <Button type="button" variant="outline" onClick={onClose}>
+          Close
+        </Button>
+      </footer>
+    );
+  }
+
+  const deleteControls = intakeSupportsDelete(sourceId);
+  const linearScopeMissing = sourceId === "linear-issues" && linearIntakeScopeMissing(draft);
   const sentryProjectsMissing = sourceId === "sentry-exceptions" && draft.sentryProjectIds.length === 0;
-  const projectsMissing = linearProjectsMissing || sentryProjectsMissing;
-  const footerError =
-    saveError ??
-    (deleteOpen ? undefined : deleteError) ??
-    (linearProjectsMissing ? LINEAR_INTAKE_SETUP_COPY.projectsRequired : undefined) ??
-    (sentryProjectsMissing ? SENTRY_INTAKE_SETUP_COPY.projectsRequired : undefined);
+  const scopeMissing = linearScopeMissing || sentryProjectsMissing;
+  const footerError = intakeFooterError(saveError, deleteError, deleteOpen, linearScopeMissing, sentryProjectsMissing);
 
   return (
     <>
-      <footer className="flex shrink-0 items-center justify-between gap-3 border-t border-border px-5 py-3">
-        <div className="flex min-w-0 flex-1 items-center gap-2">
+      <footer className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-3">
+        <div className={cn("flex min-w-0 flex-1 items-center gap-2", sourceId === "github-issues" && "min-w-[7rem]")}>
           {deleteControls ? (
             <Button
               type="button"
@@ -78,21 +95,18 @@ export function IntakeSourceSettingsFooter({
             </p>
           ) : null}
         </div>
-        <Button
-          type="button"
-          disabled={savePending || projectsMissing}
-          onClick={async () => {
-            try {
-              await onSave(normalizeIntakeSourceSettings(getDraft(), sourceId));
-              onClose();
-            } catch {
-              // The parent supplies the actionable error message.
-            }
-          }}
-          data-testid="intake-source-settings-save"
-        >
-          {savePending ? INTAKE_SETTINGS_COPY.saving : INTAKE_SETTINGS_COPY.save}
-        </Button>
+        <IntakeSaveButtons
+          sourceId={sourceId}
+          draft={draft}
+          linearLabelsRequired={linearLabelsRequired}
+          linearProjectsRequired={linearProjectsRequired}
+          savePending={savePending}
+          deletePending={deletePending}
+          scopeMissing={scopeMissing}
+          getDraft={getDraft}
+          onSave={onSave}
+          onClose={onClose}
+        />
       </footer>
       {deleteControls ? (
         <IntakeDeleteConfirmDialog
@@ -104,6 +118,85 @@ export function IntakeSourceSettingsFooter({
         />
       ) : null}
     </>
+  );
+}
+
+function intakeFooterError(
+  saveError: string | undefined,
+  deleteError: string | undefined,
+  deleteOpen: boolean,
+  linearScopeMissing: boolean,
+  sentryProjectsMissing: boolean,
+): string | undefined {
+  return (
+    saveError ??
+    (deleteOpen ? undefined : deleteError) ??
+    (linearScopeMissing ? LINEAR_INTAKE_SETUP_COPY.teamRequired : undefined) ??
+    (sentryProjectsMissing ? SENTRY_INTAKE_SETUP_COPY.projectsRequired : undefined)
+  );
+}
+
+function IntakeSaveButtons({
+  sourceId,
+  draft,
+  linearLabelsRequired,
+  linearProjectsRequired,
+  savePending,
+  deletePending,
+  scopeMissing,
+  getDraft,
+  onSave,
+  onClose,
+}: Pick<
+  IntakeSourceSettingsFooterProps,
+  | "sourceId"
+  | "draft"
+  | "linearLabelsRequired"
+  | "linearProjectsRequired"
+  | "savePending"
+  | "deletePending"
+  | "getDraft"
+  | "onSave"
+  | "onClose"
+> & { scopeMissing: boolean }) {
+  const layout = useOptionalFactoriesLayout();
+  const ownerMissing = layout?.factory?.onboarding?.codexSubscription === true && !draft.defaultOwnerId;
+  const labelsMissing = sourceId === "github-issues" && draft.filterByLabel && draft.labels.length === 0;
+  const saveDisabled = [
+    savePending,
+    scopeMissing,
+    labelsMissing,
+    linearLabelsRequired,
+    linearProjectsRequired,
+    ownerMissing,
+  ].some(Boolean);
+  return (
+    <div className="ml-auto flex shrink-0 items-center gap-3">
+      {sourceId === "github-issues" ? (
+        <Button type="button" variant="outline" disabled={savePending || deletePending} onClick={onClose}>
+          Cancel
+        </Button>
+      ) : null}
+      <Button
+        type="button"
+        disabled={saveDisabled}
+        onClick={async () => {
+          try {
+            await onSave(normalizeIntakeSourceSettings(getDraft(), sourceId));
+            onClose();
+          } catch {
+            // The parent supplies the actionable error message.
+          }
+        }}
+        data-testid="intake-source-settings-save"
+      >
+        {savePending
+          ? INTAKE_SETTINGS_COPY.saving
+          : sourceId === "github-issues"
+            ? "Save changes"
+            : INTAKE_SETTINGS_COPY.save}
+      </Button>
+    </div>
   );
 }
 

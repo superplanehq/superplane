@@ -248,8 +248,6 @@ func TruncateTables() error {
 			workflow_node_queue_items,
 			workflow_node_requests,
 			webhooks,
-			agent_sessions,
-			agent_session_messages,
 			factory_planning_sessions,
 			factory_planning_session_messages,
 			factory_planning_session_work_orders,
@@ -259,7 +257,9 @@ func TruncateTables() error {
 			hosted_llm_providers,
 			mcp_oauth_clients,
 			mcp_oauth_codes,
-			mcp_oauth_refresh_tokens
+			mcp_oauth_refresh_tokens,
+			sentry_webhook_receipts,
+			sentry_app_install_grants
 		restart identity cascade;
 	`).Error
 }

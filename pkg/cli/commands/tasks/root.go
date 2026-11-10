@@ -7,8 +7,12 @@ import (
 
 func NewCommand(options core.BindOptions) *cobra.Command {
 	root := &cobra.Command{
-		Use:     "tasks",
-		Short:   "Create, inspect, and manage tasks",
+		Use:   "tasks",
+		Short: "Create, inspect, and manage tasks",
+		Long: `Create, inspect, and manage tasks.
+
+Commands that take --task use $` + TaskIDEnv + ` when --task is empty.
+SuperPlane sets ` + TaskIDEnv + ` in each task run.`,
 		Aliases: []string{"task"},
 	}
 
@@ -197,6 +201,69 @@ Example:
 		assignees: &taskAssignAssignees,
 	}, options)
 
+	var (
+		taskSuggestWorkspace string
+		taskSuggestTaskID    string
+		taskSuggestPaths     []string
+	)
+
+	taskSuggestCmd := &cobra.Command{
+		Use:   "suggest-owners",
+		Short: "List people who can own a task",
+		Long: `List the people who can own a task.
+
+--workspace is a workspace key or UUID. When omitted, the active workspace
+from "superplane workspace active" is used. --task is the task number, key, or UUID
+(for example 1823 or SUPER-1823).
+
+--path is a repository path. Repeat it for each path the change touches.
+SuperPlane uses the first 10 paths and ranks members who changed them.
+Without --path, the command lists members only.
+
+Example:
+  superplane tasks suggest-owners --workspace super --task 1823 --path pkg/payments`,
+		Args: cobra.NoArgs,
+	}
+	taskSuggestCmd.Flags().StringVar(&taskSuggestWorkspace, "workspace", "", "workspace key or UUID (default: active workspace)")
+	bindTaskIDFlag(taskSuggestCmd, &taskSuggestTaskID)
+	taskSuggestCmd.Flags().StringArrayVar(&taskSuggestPaths, "path", nil, "repository path (repeatable, at most 10)")
+	core.Bind(taskSuggestCmd, &taskSuggestOwnersCommand{
+		workspace: &taskSuggestWorkspace,
+		taskID:    &taskSuggestTaskID,
+		paths:     &taskSuggestPaths,
+	}, options)
+
+	var (
+		taskCloseWorkspace string
+		taskCloseTaskID    string
+		taskCloseResult    string
+	)
+
+	taskCloseCmd := &cobra.Command{
+		Use:   "close",
+		Short: "Close a task",
+		Long: `Close a task.
+
+--workspace is a workspace key or UUID. When omitted, the active workspace
+from "superplane workspace active" is used. --task is the task number, key, or UUID
+(for example 1823 or SUPER-1823).
+
+--result is completed, rejected, or failed. The default is completed.
+A draft task can be rejected. An open task can be completed, rejected, or failed.
+
+Example:
+  superplane tasks close --workspace super --task 1823 --result rejected`,
+		Args: cobra.NoArgs,
+	}
+	taskCloseCmd.Flags().StringVar(&taskCloseWorkspace, "workspace", "", "workspace key or UUID (default: active workspace)")
+	bindTaskIDFlag(taskCloseCmd, &taskCloseTaskID)
+	taskCloseCmd.Flags().StringVar(&taskCloseResult, "result", "completed", "completed, rejected, or failed")
+	core.Bind(taskCloseCmd, &taskCloseCommand{
+		workspace: &taskCloseWorkspace,
+		taskID:    &taskCloseTaskID,
+		result:    &taskCloseResult,
+	}, options)
+
 	artifactCmd := &cobra.Command{
 		Use:     "artifacts",
 		Short:   "Manage task artifacts",
@@ -212,6 +279,7 @@ Example:
 		artifactAddFile      string
 		artifactAddURL       string
 		artifactAddName      string
+		artifactAddFileID    string
 	)
 
 	artifactAddCmd := &cobra.Command{
@@ -221,7 +289,11 @@ Example:
 
 --workspace is a workspace key or UUID. When omitted, the active workspace
 from "superplane workspace active" is used. --task is the task number, key, or UUID.
---type is one of: markdown, branch, link.
+--type is one of: markdown, branch, link, file.
+
+For type file, -f is the file to upload (PNG, JPEG, WebP, WebM, or MP4).
+If the upload succeeds but the attach fails, pass --file-id to attach that
+file without a new upload.
 
 Examples:
   superplane tasks artifacts list --workspace super --task 1823
@@ -249,18 +321,24 @@ Examples:
     --task 1823 \
     --type link \
     --url https://preview.example.com/pr-42 \
-    --title Preview`,
+    --title Preview
+
+  superplane tasks artifacts add \
+    --task 1823 \
+    --type file \
+    --title "Login screen" \
+    -f ./login.png`,
 		Args: cobra.NoArgs,
 	}
 	artifactAddCmd.Flags().StringVar(&artifactAddWorkspace, "workspace", "", "workspace key or UUID (default: active workspace)")
-	artifactAddCmd.Flags().StringVar(&artifactAddTaskID, "task", "", "task number, key, or UUID (for example 1823 or SUPER-1823)")
-	artifactAddCmd.Flags().StringVar(&artifactAddTypeName, "type", "", "artifact type: markdown, branch, or link")
+	bindTaskIDFlag(artifactAddCmd, &artifactAddTaskID)
+	artifactAddCmd.Flags().StringVar(&artifactAddTypeName, "type", "", "artifact type: markdown, branch, link, or file")
 	artifactAddCmd.Flags().StringVar(&artifactAddTitle, "title", "", "artifact title")
 	artifactAddCmd.Flags().StringVar(&artifactAddBody, "body", "", "markdown body (inline)")
-	artifactAddCmd.Flags().StringVarP(&artifactAddFile, "file", "f", "", "read markdown body from file (or - for stdin)")
+	artifactAddCmd.Flags().StringVarP(&artifactAddFile, "file", "f", "", "markdown body file (or - for stdin), or the file to upload for type file")
 	artifactAddCmd.Flags().StringVar(&artifactAddURL, "url", "", "artifact URL (required for link)")
 	artifactAddCmd.Flags().StringVar(&artifactAddName, "name", "", "branch name (required for branch)")
-	_ = artifactAddCmd.MarkFlagRequired("task")
+	artifactAddCmd.Flags().StringVar(&artifactAddFileID, "file-id", "", "id of an uploaded file to attach (type file)")
 	_ = artifactAddCmd.MarkFlagRequired("type")
 	core.Bind(artifactAddCmd, &artifactAddCommand{
 		workspace: &artifactAddWorkspace,
@@ -271,6 +349,7 @@ Examples:
 		file:      &artifactAddFile,
 		url:       &artifactAddURL,
 		name:      &artifactAddName,
+		fileID:    &artifactAddFileID,
 	}, options)
 
 	var (
@@ -290,26 +369,93 @@ Example:
 		Args: cobra.NoArgs,
 	}
 	artifactListCmd.Flags().StringVar(&artifactListWorkspace, "workspace", "", "workspace key or UUID (default: active workspace)")
-	artifactListCmd.Flags().StringVar(&artifactListTaskID, "task", "", "task number, key, or UUID (for example 1823 or SUPER-1823)")
-	_ = artifactListCmd.MarkFlagRequired("task")
+	bindTaskIDFlag(artifactListCmd, &artifactListTaskID)
 	core.Bind(artifactListCmd, &artifactListCommand{
 		workspace: &artifactListWorkspace,
 		taskID:    &artifactListTaskID,
 	}, options)
 
+	var (
+		artifactRemoveWorkspace string
+		artifactRemoveTaskID    string
+		artifactRemoveKey       string
+		artifactRemoveTitle     string
+	)
+	artifactRemoveCmd := &cobra.Command{
+		Use:   "remove",
+		Short: "Remove one artifact from a task",
+		Long: `Remove one artifact from a task.
+
+--workspace is a workspace key or UUID. When omitted, the active workspace
+from "superplane workspace active" is used. --task is the task number, key, or UUID
+(for example 1823 or SUPER-1823).
+
+Pass --key or --title. --key selects that artifact. --title selects the newest
+artifact with that title and no key.
+
+Example:
+  superplane tasks artifacts remove --workspace super --task 1823 --title PLAN.md`,
+		Args: cobra.NoArgs,
+	}
+	artifactRemoveCmd.Flags().StringVar(&artifactRemoveWorkspace, "workspace", "", "workspace key or UUID (default: active workspace)")
+	bindTaskIDFlag(artifactRemoveCmd, &artifactRemoveTaskID)
+	artifactRemoveCmd.Flags().StringVar(&artifactRemoveKey, "key", "", "artifact key")
+	artifactRemoveCmd.Flags().StringVar(&artifactRemoveTitle, "title", "", "artifact title, when the artifact has no key")
+	core.Bind(artifactRemoveCmd, &artifactRemoveCommand{
+		workspace: &artifactRemoveWorkspace,
+		taskID:    &artifactRemoveTaskID,
+		key:       &artifactRemoveKey,
+		title:     &artifactRemoveTitle,
+	}, options)
+
+	var (
+		artifactGetWorkspace string
+		artifactGetTaskID    string
+		artifactGetID        string
+		artifactGetKey       string
+	)
+	artifactGetCmd := &cobra.Command{
+		Use:   "get",
+		Short: "Show one artifact on a task",
+		Long: `Show one artifact on a task. Markdown artifacts print their body.
+Link and file artifacts print their URL.
+
+Pass --id or --key.
+
+Example:
+  superplane tasks artifacts get --task 1823 --key plan`,
+		Args: cobra.NoArgs,
+	}
+	artifactGetCmd.Flags().StringVar(&artifactGetWorkspace, "workspace", "", "workspace key or UUID (default: active workspace)")
+	bindTaskIDFlag(artifactGetCmd, &artifactGetTaskID)
+	artifactGetCmd.Flags().StringVar(&artifactGetID, "id", "", "artifact id")
+	artifactGetCmd.Flags().StringVar(&artifactGetKey, "key", "", "artifact key")
+	core.Bind(artifactGetCmd, &artifactGetCommand{
+		workspace: &artifactGetWorkspace,
+		taskID:    &artifactGetTaskID,
+		id:        &artifactGetID,
+		key:       &artifactGetKey,
+	}, options)
+
 	artifactCmd.AddCommand(artifactAddCmd)
+	artifactCmd.AddCommand(artifactGetCmd)
 	artifactCmd.AddCommand(artifactListCmd)
+	artifactCmd.AddCommand(artifactRemoveCmd)
+
+	root.AddCommand(newChecksCommand(options))
 
 	root.AddCommand(taskListCmd)
 	root.AddCommand(taskDescribeCmd)
 	root.AddCommand(taskCreateCmd)
 	root.AddCommand(taskDispatchCmd)
 	root.AddCommand(taskAssignCmd)
+	root.AddCommand(taskSuggestCmd)
+	root.AddCommand(taskCloseCmd)
 	root.AddCommand(artifactCmd)
 
 	return root
 }
 
 func bindTaskIDFlag(cmd *cobra.Command, dest *string) {
-	cmd.Flags().StringVar(dest, "task", "", "task number, key, or UUID (for example 1823 or SUPER-1823)")
+	cmd.Flags().StringVar(dest, "task", "", "task number, key, or UUID (for example 1823 or SUPER-1823; default: $"+TaskIDEnv+")")
 }

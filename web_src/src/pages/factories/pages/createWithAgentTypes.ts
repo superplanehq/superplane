@@ -59,7 +59,8 @@ export type CreateWithAgentSurvey = {
 export type CreateWithAgentView = {
   repository: string;
   machineStatus: CreateWithAgentMachineStatus;
-  queueReason?: string;
+  runnerState?: string;
+  blockedByParallelismLimit?: boolean;
   /**
    * True when the agent run for this turn has finished. The chat still waits
    * for the next user message, which starts a new run with the rewind.

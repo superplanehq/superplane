@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
+
 	runneraction "github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
@@ -16,7 +18,12 @@ import (
 	"gorm.io/gorm"
 )
 
-const maxCodexSubscriptionBodyBytes = 256*1024 + 4096
+const (
+	maxCodexSubscriptionBodyBytes  = 256*1024 + 4096
+	codexRefreshOperationTimeout   = 30 * time.Second
+	codexRefreshExchangeTimeout    = 15 * time.Second
+	codexRefreshPersistenceReserve = 5 * time.Second
+)
 
 var errInvalidCodexBundle = errors.New("chatgpt subscription credentials are invalid")
 
@@ -33,7 +40,8 @@ type codexProgressRequest struct {
 }
 
 type codexRefreshProxyRequest struct {
-	RefreshToken string `json:"refresh_token"`
+	RefreshToken        string `json:"refresh_token"`
+	RejectedAccessToken string `json:"rejected_access_token"`
 }
 
 func (s *Server) handleRunnerCodexSubscriptionCredentials(w http.ResponseWriter, r *http.Request) {
@@ -41,10 +49,14 @@ func (s *Server) handleRunnerCodexSubscriptionCredentials(w http.ResponseWriter,
 	if !ok {
 		return
 	}
+	operation, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), codexRefreshOperationTimeout)
+	defer cancel()
 	var bundle any
 	var version int64
-	err := database.DB(r.Context()).Transaction(func(tx *gorm.DB) error {
-		connection, lockErr := models.LockScopedFactoryCodexConnection(tx, scope.OrganizationID, scope.FactoryID, scope.ConnectionID)
+	var permanent *runneraction.CodexTokenRefreshError
+	var changedOrganizationID uuid.UUID
+	err := database.DB(operation).Transaction(func(tx *gorm.DB) error {
+		connection, lockErr := models.LockScopedFactoryCodexConnection(tx, scope.OrganizationID, scope.ConnectionID)
 		if lockErr != nil {
 			return lockErr
 		}
@@ -55,18 +67,28 @@ func (s *Server) handleRunnerCodexSubscriptionCredentials(w http.ResponseWriter,
 		if len(connection.BundleCiphertext) == 0 {
 			return models.ErrCodexConnectionNotReady
 		}
-		plain, decryptErr := s.encryptor.Decrypt(r.Context(), connection.BundleCiphertext, []byte(connection.ID.String()))
-		if decryptErr != nil {
-			return decryptErr
+		plain, failure, changed, refreshErr := s.refreshStoredCodexBundle(operation, tx, connection, "")
+		if refreshErr != nil {
+			return refreshErr
+		}
+		if failure != nil {
+			permanent = failure
+			if changed {
+				changedOrganizationID = connection.OrganizationID
+			}
+			return nil
+		}
+		if changed {
+			changedOrganizationID = connection.OrganizationID
 		}
 		if lease.Purpose == models.CodexLeasePurposeRun {
-			secret, secretErr := s.encryptor.Decrypt(r.Context(), lease.SecretCiphertext, []byte(connection.ID.String()))
+			secret, secretErr := s.encryptor.Decrypt(operation, lease.SecretCiphertext, []byte(connection.ID.String()))
 			if secretErr != nil {
 				return secretErr
 			}
-			plain, decryptErr = runneraction.CodexRunnerAuthBundle(plain, string(secret), time.Now())
-			if decryptErr != nil {
-				return decryptErr
+			plain, err = runneraction.CodexRunnerAuthBundle(plain, string(secret))
+			if err != nil {
+				return err
 			}
 		}
 		if unmarshalErr := json.Unmarshal(plain, &bundle); unmarshalErr != nil || bundle == nil {
@@ -75,8 +97,19 @@ func (s *Server) handleRunnerCodexSubscriptionCredentials(w http.ResponseWriter,
 		version = connection.CredentialVersion
 		return nil
 	})
+	if err == nil && changedOrganizationID != uuid.Nil {
+		_ = messages.PublishOrganizationCodexConnectionUpdated(database.DB(operation), changedOrganizationID)
+	}
+	if permanent != nil {
+		writeCodexRefreshFailure(w, permanent)
+		return
+	}
 	if err != nil {
-		writeCodexSubscriptionError(w, err)
+		if operation.Err() != nil {
+			writeCodexRefreshFailure(w, operation.Err())
+		} else {
+			writeCodexRefreshFailure(w, err)
+		}
 		return
 	}
 	_ = writeJSON(w, http.StatusOK, map[string]any{"bundle": bundle, "version": version})
@@ -111,7 +144,7 @@ func (s *Server) handleRunnerCodexSubscriptionCheckpoint(w http.ResponseWriter, 
 	}
 	var version int64
 	err = database.DB(r.Context()).Transaction(func(tx *gorm.DB) error {
-		connection, lockErr := models.LockScopedFactoryCodexConnection(tx, scope.OrganizationID, scope.FactoryID, scope.ConnectionID)
+		connection, lockErr := models.LockScopedFactoryCodexConnection(tx, scope.OrganizationID, scope.ConnectionID)
 		if lockErr != nil {
 			return lockErr
 		}
@@ -156,7 +189,7 @@ func (s *Server) handleRunnerCodexSubscriptionCheckpoint(w http.ResponseWriter, 
 		writeCodexSubscriptionError(w, err)
 		return
 	}
-	_ = messages.PublishFactoryCodexConnectionUpdated(scope.FactoryID.String())
+	_ = messages.PublishOrganizationCodexConnectionUpdated(database.DB(r.Context()), scope.OrganizationID)
 	_ = writeJSON(w, http.StatusOK, map[string]any{"accepted": true, "version": version})
 }
 
@@ -181,7 +214,7 @@ func (s *Server) handleRunnerCodexSubscriptionProgress(w http.ResponseWriter, r 
 		return
 	}
 	err = database.DB(r.Context()).Transaction(func(tx *gorm.DB) error {
-		connection, lockErr := models.LockScopedFactoryCodexConnection(tx, scope.OrganizationID, scope.FactoryID, scope.ConnectionID)
+		connection, lockErr := models.LockScopedFactoryCodexConnection(tx, scope.OrganizationID, scope.ConnectionID)
 		if lockErr != nil {
 			return lockErr
 		}
@@ -212,10 +245,15 @@ func (s *Server) handleRunnerCodexSubscriptionRefresh(w http.ResponseWriter, r *
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
+	// The provider can rotate its refresh token before the client disconnects.
+	// Finish this bounded operation so a disconnect cannot discard the new token.
+	operation, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), codexRefreshOperationTimeout)
+	defer cancel()
 	var accessToken string
 	var idToken string
 	var permanent *runneraction.CodexTokenRefreshError
-	err = database.DB(r.Context()).Transaction(func(tx *gorm.DB) error {
+	var changedOrganizationID uuid.UUID
+	err = database.DB(operation).Transaction(func(tx *gorm.DB) error {
 		lease, err := models.FindCodexRunLeaseBySecret(tx, secret)
 		if err != nil {
 			return err
@@ -224,84 +262,54 @@ func (s *Server) handleRunnerCodexSubscriptionRefresh(w http.ResponseWriter, r *
 		if err != nil {
 			return err
 		}
-		locked, err := models.LockScopedFactoryCodexConnection(tx, connection.OrganizationID, connection.FactoryID, lease.ConnectionID)
+		if lease.FactoryID == nil {
+			return models.ErrCodexConnectionStale
+		}
+		locked, err := models.LockScopedFactoryCodexConnection(tx, connection.OrganizationID, lease.ConnectionID)
 		if err != nil {
 			return err
 		}
-		if _, err := models.FindCodexLeaseForTask(tx, locked.ID, lease.TaskID, lease.Generation); err != nil {
+		if _, err := scopedCodexLease(tx, locked, &runneraction.CodexSubscriptionScope{OrganizationID: locked.OrganizationID, FactoryID: *lease.FactoryID, ConnectionID: locked.ID, TaskID: lease.TaskID, Generation: lease.Generation}); err != nil {
 			return err
-		}
-		if locked.Status == models.CodexConnectionStatusReconnectRequired {
-			permanent = &runneraction.CodexTokenRefreshError{Permanent: true, Code: "refresh_token_invalidated"}
-			return nil
 		}
 		if len(locked.BundleCiphertext) == 0 {
 			return models.ErrCodexConnectionNotReady
 		}
-		plain, err := s.encryptor.Decrypt(r.Context(), locked.BundleCiphertext, []byte(locked.ID.String()))
+		plain, failure, changed, err := s.refreshStoredCodexBundle(operation, tx, locked, request.RejectedAccessToken)
 		if err != nil {
 			return err
+		}
+		if failure != nil {
+			permanent = failure
+			if changed {
+				changedOrganizationID = locked.OrganizationID
+			}
+			return nil
+		}
+		if changed {
+			changedOrganizationID = locked.OrganizationID
 		}
 		accessToken = runneraction.CodexAuthToken(plain, "access_token")
 		idToken = runneraction.CodexAuthToken(plain, "id_token")
-		if !runneraction.CodexAccessTokenNeedsRefresh(accessToken, time.Now()) {
-			return nil
-		}
-		refreshed, refreshErr := s.refreshCodexToken(r.Context(), runneraction.CodexAuthToken(plain, "refresh_token"))
-		var tokenErr *runneraction.CodexTokenRefreshError
-		if errors.As(refreshErr, &tokenErr) && tokenErr.Permanent {
-			if err := locked.MarkReconnectRequired(tx, time.Now()); err != nil {
-				return err
-			}
-			permanent = tokenErr
-			return nil
-		}
-		if refreshErr != nil {
-			return refreshErr
-		}
-		if refreshed.RefreshToken == "" {
-			refreshed.RefreshToken = runneraction.CodexAuthToken(plain, "refresh_token")
-		}
-		updated, err := runneraction.ReplaceCodexAuthTokens(plain, refreshed.AccessToken, refreshed.RefreshToken, refreshed.IDToken)
-		if err != nil {
-			return err
-		}
-		prepared, label, err := runneraction.PrepareCodexAuthBundle(updated)
-		if err != nil {
-			return err
-		}
-		ciphertext, err := s.encryptor.Encrypt(context.Background(), prepared, []byte(locked.ID.String()))
-		if err != nil {
-			return err
-		}
-		if err := locked.StoreRefreshedBundle(tx, ciphertext, label, time.Now()); err != nil {
-			return err
-		}
-		accessToken = refreshed.AccessToken
-		if refreshed.IDToken != "" {
-			idToken = refreshed.IDToken
-		}
 		return nil
 	})
-	if permanent != nil {
-		code := permanent.Code
-		if code == "" {
-			code = "refresh_token_invalidated"
-		}
-		_ = writeJSON(w, http.StatusUnauthorized, map[string]any{"error": code})
-		return
+	if err == nil && changedOrganizationID != uuid.Nil {
+		_ = messages.PublishOrganizationCodexConnectionUpdated(database.DB(operation), changedOrganizationID)
 	}
 	if err != nil {
-		var tokenErr *runneraction.CodexTokenRefreshError
-		if errors.As(err, &tokenErr) {
-			_ = writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "temporarily_unavailable"})
-			return
-		}
 		if errors.Is(err, models.ErrCodexConnectionStale) {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
-		writeCodexSubscriptionError(w, err)
+		if operation.Err() != nil {
+			writeCodexRefreshFailure(w, operation.Err())
+		} else {
+			writeCodexRefreshFailure(w, err)
+		}
+		return
+	}
+	if permanent != nil {
+		writeCodexRefreshFailure(w, permanent)
 		return
 	}
 	_ = writeJSON(w, http.StatusOK, map[string]any{
@@ -311,7 +319,88 @@ func (s *Server) handleRunnerCodexSubscriptionRefresh(w http.ResponseWriter, r *
 	})
 }
 
+// The connection row is locked by the caller. Keep the provider exchange and
+// encrypted persistence in the same transaction so parallel runs share a token.
+func (s *Server) refreshStoredCodexBundle(ctx context.Context, tx *gorm.DB, connection *models.FactoryCodexConnection, rejectedAccessToken string) ([]byte, *runneraction.CodexTokenRefreshError, bool, error) {
+	if connection.Status == models.CodexConnectionStatusReconnectRequired {
+		return nil, &runneraction.CodexTokenRefreshError{Permanent: true, Code: "refresh_token_invalidated"}, false, nil
+	}
+	plain, err := s.encryptor.Decrypt(ctx, connection.BundleCiphertext, []byte(connection.ID.String()))
+	if err != nil {
+		return nil, nil, false, err
+	}
+	accessToken := runneraction.CodexAuthToken(plain, "access_token")
+	if rejectedAccessToken != "" && rejectedAccessToken != accessToken {
+		return plain, nil, false, nil
+	}
+	if rejectedAccessToken == "" && !runneraction.CodexAccessTokenNeedsRefresh(accessToken, time.Now()) {
+		return plain, nil, false, nil
+	}
+	refreshed, err := s.refreshCodexToken(ctx, runneraction.CodexAuthToken(plain, "refresh_token"))
+	var tokenErr *runneraction.CodexTokenRefreshError
+	if errors.As(err, &tokenErr) && tokenErr.Permanent {
+		if markErr := connection.MarkReconnectRequired(tx, time.Now()); markErr != nil {
+			return nil, nil, false, markErr
+		}
+		return nil, tokenErr, true, nil
+	}
+	if err != nil {
+		return nil, nil, false, err
+	}
+	if refreshed.RefreshToken == "" {
+		refreshed.RefreshToken = runneraction.CodexAuthToken(plain, "refresh_token")
+	}
+	updated, err := runneraction.ReplaceCodexAuthTokens(plain, refreshed.AccessToken, refreshed.RefreshToken, refreshed.IDToken)
+	if err != nil {
+		return nil, nil, false, err
+	}
+	prepared, label, err := runneraction.PrepareCodexAuthBundle(updated)
+	if err != nil {
+		return nil, nil, false, err
+	}
+	ciphertext, err := s.encryptor.Encrypt(ctx, prepared, []byte(connection.ID.String()))
+	if err != nil {
+		return nil, nil, false, err
+	}
+	if err := connection.StoreRefreshedBundle(tx, ciphertext, label, time.Now()); err != nil {
+		return nil, nil, false, err
+	}
+	return prepared, nil, true, nil
+}
+
+func writeCodexRefreshFailure(w http.ResponseWriter, err error) {
+	var tokenErr *runneraction.CodexTokenRefreshError
+	if errors.As(err, &tokenErr) {
+		if tokenErr.Permanent {
+			code := tokenErr.Code
+			if code == "" {
+				code = "refresh_token_invalidated"
+			}
+			_ = writeJSON(w, http.StatusUnauthorized, map[string]any{"error": code})
+			return
+		}
+		_ = writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "temporarily_unavailable"})
+		return
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		_ = writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "connection_busy"})
+		return
+	}
+	writeCodexSubscriptionError(w, err)
+}
+
 func (s *Server) refreshCodexToken(ctx context.Context, refreshToken string) (runneraction.CodexTokenSet, error) {
+	// Leave a persistence reserve even if row-lock acquisition used part of the
+	// operation deadline. A depleted reserve prevents a new exchange from starting.
+	deadline := time.Now().Add(codexRefreshExchangeTimeout)
+	if operationDeadline, ok := ctx.Deadline(); ok && operationDeadline.Add(-codexRefreshPersistenceReserve).Before(deadline) {
+		deadline = operationDeadline.Add(-codexRefreshPersistenceReserve)
+	}
+	ctx, cancel := context.WithDeadline(ctx, deadline)
+	defer cancel()
+	if err := ctx.Err(); err != nil {
+		return runneraction.CodexTokenSet{}, &runneraction.CodexTokenRefreshError{}
+	}
 	if s.codexTokenRefresh != nil {
 		return s.codexTokenRefresh(ctx, refreshToken)
 	}
@@ -343,10 +432,31 @@ func readCodexSubscriptionBody(w http.ResponseWriter, r *http.Request) ([]byte, 
 }
 
 func scopedCodexLease(tx *gorm.DB, connection *models.FactoryCodexConnection, scope *runneraction.CodexSubscriptionScope) (*models.FactoryCodexLease, error) {
-	if connection.ID != scope.ConnectionID || connection.OrganizationID != scope.OrganizationID || connection.FactoryID != scope.FactoryID || connection.RevocationPendingAt != nil {
+	if connection.ID != scope.ConnectionID || connection.OrganizationID != scope.OrganizationID || connection.RevocationPendingAt != nil {
 		return nil, models.ErrCodexConnectionStale
 	}
-	return models.FindCodexLeaseForTask(tx, connection.ID, scope.TaskID, scope.Generation)
+	lease, err := models.FindCodexLeaseForTask(tx, connection.ID, scope.TaskID, scope.Generation)
+	if err != nil {
+		return nil, err
+	}
+	if lease.Login() {
+		if scope.FactoryID != uuid.Nil || lease.FactoryID != nil {
+			return nil, models.ErrCodexConnectionStale
+		}
+	} else if lease.FactoryID == nil || *lease.FactoryID != scope.FactoryID {
+		return nil, models.ErrCodexConnectionStale
+	}
+	if lease.Login() {
+		return lease, nil
+	}
+	task, err := models.FindRunnerTask(tx, lease.TaskID)
+	if err != nil {
+		return nil, err
+	}
+	if err := task.RequireSubscriptionLeaseContinuation(tx); err != nil {
+		return nil, err
+	}
+	return lease, nil
 }
 
 func writeCodexSubscriptionError(w http.ResponseWriter, err error) {
@@ -357,8 +467,10 @@ func writeCodexSubscriptionError(w http.ResponseWriter, err error) {
 		http.Error(w, "The ChatGPT sign-in update is out of date", http.StatusConflict)
 	case errors.Is(err, models.ErrCodexConnectionNotReady):
 		http.Error(w, "Connect ChatGPT before this task can run", http.StatusConflict)
-	case errors.Is(err, models.ErrCodexConnectionNotEligible), errors.Is(err, models.ErrCodexConnectionUnavailable):
+	case errors.Is(err, models.ErrCodexConnectionNotEligible):
 		http.Error(w, "Connect a ChatGPT subscription as an active workspace member", http.StatusForbidden)
+	case errors.Is(err, models.ErrCodexConnectionUnavailable):
+		http.Error(w, err.Error(), http.StatusForbidden)
 	default:
 		http.Error(w, "ChatGPT subscription request failed", http.StatusInternalServerError)
 	}

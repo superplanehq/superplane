@@ -8,27 +8,35 @@
  */
 
 const fs = require("fs");
+const { constants } = require("os");
 const path = require("path");
 const readline = require("readline");
 const { spawn } = require("child_process");
 
 const SESSION_FILE = "codex_session";
 
-// Codex starts stdio MCP servers with a minimal environment. Forward by name,
-// not with mcp_servers.<id>.env, so tokens stay out of the codex argv.
-const SUPERPLANE_MCP_ENV_VARS = [
+// Codex starts stdio MCP servers with a minimal environment. The global server
+// pushes branches with the task's git credentials and reads task settings such
+// as BASE, so it must see the same environment as the agent, as it does under
+// Claude Code and OpenCode. Forward by name, not with mcp_servers.<id>.env, so
+// values stay out of the codex argv. The model credentials stay with Codex.
+const GLOBAL_MCP_SERVER = "superplane_global";
+const GLOBAL_MCP_ENV_VARS = [
   "SUPERPLANE_BASE_URL",
-  "SUPERPLANE_RUN_TOKEN",
+  "SUPERPLANE_RUNNER_TOKEN",
   "SUPERPLANE_TASK_DIR",
-  "SUPERPLANE_ACTIVITY_ID",
   "SUPERPLANE_ANALYSIS_SPEC_FILE",
-  "SUPERPLANE_ANALYSIS_SCORE_FILE",
-  "SUPERPLANE_ARTIFACT_TOKEN",
-  "SUPERPLANE_MERGE_CONFIDENCE_TOKEN",
-  "SUPERPLANE_OWNER_TOKEN",
-  "SUPERPLANE_VISUAL_EVIDENCE",
-  "SUPERPLANE_PUBLISH_LINKS",
 ];
+const ENV_VAR_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
+const CODEX_CREDENTIAL_ENV_VAR = /^(CODEX_|OPENAI_|SUPERPLANE_CODEX_)/;
+
+function globalMCPEnvVars(env) {
+  const names = new Set(GLOBAL_MCP_ENV_VARS);
+  for (const name of Object.keys(env || {}).sort()) {
+    if (ENV_VAR_NAME.test(name) && !CODEX_CREDENTIAL_ENV_VAR.test(name)) names.add(name);
+  }
+  return [...names];
+}
 
 function loadActivityStreamModule() {
   const taskDir = process.env.SUPERPLANE_TASK_DIR || "";
@@ -155,27 +163,10 @@ function visualEvidenceEnabled(env = process.env) {
   return artifactEnabled(env) && !envFlag(env, "SUPERPLANE_PUBLISH_LINKS");
 }
 
-function mergeConfidenceEnabled(env = process.env) {
-  return envFlag(env, "SUPERPLANE_MERGE_CONFIDENCE_TOKEN");
-}
-
-function superplaneMCPScript(taskDir, env = process.env) {
-  if (planningEnabled(env)) {
-    return path.join(taskDir, "planning_session_mcp.js");
-  }
-  if (mergeConfidenceEnabled(env)) {
-    return path.join(taskDir, "merge_confidence_mcp.js");
-  }
-  return path.join(taskDir, "task_artifact_mcp.js");
-}
-
 function planningSystemPrompt(env = process.env) {
   return planningAnalysisEnabled(env) ? loadAnalysisProtocol(env) : "";
 }
 
-// Codex `exec` has no --ask-for-approval flag, and `exec resume` has no
-// --sandbox flag. Config overrides keep both new and resumed analysis turns
-// read-only without disabling shell commands and file reads.
 function thinkingArgs(thinking) {
   const level = String(thinking || "")
     .trim()
@@ -197,31 +188,15 @@ function codexExecArgs(
   if (sessionID) {
     args.push("resume", sessionID);
   }
-  args.push("--json", "--skip-git-repo-check");
+  args.push("--json", "--skip-git-repo-check", "--dangerously-bypass-approvals-and-sandbox");
+  args.push(...workspaceMCPConfigOverrides(env));
   if (planningEnabled(env)) {
-    args.push(
-      "-c",
-      'sandbox_mode="read-only"',
-      "-c",
-      'approval_policy="never"',
-    );
-    args.push(...mcpConfigOverrides(mcpScriptPath, env));
     args.push(
       "-c",
       `developer_instructions=${tomlString(loadAnalysisProtocol(env))}`,
     );
-  } else {
-    args.push("--dangerously-bypass-approvals-and-sandbox");
-    if (
-      artifactEnabled(env) ||
-      mergeConfidenceEnabled(env) ||
-      envFlag(env, "SUPERPLANE_OWNER_TOKEN")
-    ) {
-      args.push(...mcpConfigOverrides(mcpScriptPath, env));
-    } else {
-      args.push(...workspaceMCPConfigOverrides(env));
-    }
   }
+  args.push(...globalMCPConfigOverrides(taskDirFromMCPPath(mcpScriptPath), env));
   if (model) {
     args.push("-m", model);
   }
@@ -268,37 +243,44 @@ function codexSessionIDFromEvent(event) {
   ).trim();
 }
 
-function mcpConfigOverrides(mcpScriptPath, env = process.env) {
+function taskDirFromMCPPath(value) {
+  const candidate = String(value || "");
+  return candidate.endsWith(".js") ? path.dirname(candidate) : candidate;
+}
+
+function loadGlobalMCPRegistry(taskDir) {
+  const candidates = [
+    path.join(taskDir, "superplane_mcp", "registry.js"),
+    path.join(__dirname, "..", "superplane_mcp", "registry.js"),
+  ];
+  for (const file of candidates) {
+    if (fs.existsSync(file)) {
+      return require(file);
+    }
+  }
+  return null;
+}
+
+// The global server lists only the tools that the run token allows. Approve
+// every known global tool: Codex exec cannot answer an approval prompt, and the
+// backend rejects a call outside the token scope.
+function globalMCPConfigOverrides(taskDir, env = process.env) {
+  if (!envFlag(env, "SUPERPLANE_RUNNER_TOKEN")) {
+    return [];
+  }
+  const registry = loadGlobalMCPRegistry(taskDir);
+  const toolNames = registry ? registry.allTools().map((tool) => tool.definition.name) : [];
   return [
     "-c",
-    `mcp_servers.superplane.command=${tomlString("node")}`,
+    `mcp_servers.${GLOBAL_MCP_SERVER}.command=${tomlString("node")}`,
     "-c",
-    `mcp_servers.superplane.args=${tomlStringArray([mcpScriptPath])}`,
+    `mcp_servers.${GLOBAL_MCP_SERVER}.args=${tomlStringArray([path.join(taskDir, "superplane_mcp", "server.js")])}`,
     "-c",
-    `mcp_servers.superplane.env_vars=${tomlStringArray(SUPERPLANE_MCP_ENV_VARS)}`,
-    ...(envFlag(env, "SUPERPLANE_OWNER_TOKEN")
-      ? [
-          "-c",
-          'mcp_servers.superplane.tools.suggest_owners.approval_mode="approve"',
-          "-c",
-          'mcp_servers.superplane.tools.assign_owner.approval_mode="approve"',
-        ]
-      : []),
-    // Codex 0.144.5 requests MCP approval for unannotated tools. Exec cannot
-    // answer that prompt, so approve only these planning tools, not shell writes.
-    ...(planningEnabled(env)
-      ? [
-          "-c",
-          'mcp_servers.superplane.tools.propose_update.approval_mode="approve"',
-          "-c",
-          'mcp_servers.superplane.tools.inspect_attachment.approval_mode="approve"',
-          "-c",
-          'mcp_servers.superplane.tools.suggest_owners.approval_mode="approve"',
-          "-c",
-          'mcp_servers.superplane.tools.assign_owner.approval_mode="approve"',
-        ]
-      : []),
-    ...workspaceMCPConfigOverrides(env),
+    `mcp_servers.${GLOBAL_MCP_SERVER}.env_vars=${tomlStringArray(globalMCPEnvVars(env))}`,
+    ...toolNames.flatMap((name) => [
+      "-c",
+      `mcp_servers.${GLOBAL_MCP_SERVER}.tools.${tomlKey(name)}.approval_mode="approve"`,
+    ]),
   ];
 }
 
@@ -340,7 +322,7 @@ function workspaceMCPConfigOverrides(env = process.env) {
   for (const server of workspaceMCPServers(env)) {
     const name = String((server && server.name) || "").trim();
     const url = String((server && server.url) || "").trim();
-    if (!name || name === "superplane" || !url) {
+    if (!name || name === "superplane" || name === GLOBAL_MCP_SERVER || !url) {
       continue;
     }
     const serverKey = tomlKey(name);
@@ -391,9 +373,166 @@ function main() {
   runPrompt(args[0], args[1] || "", args[2] || "")
     .then((code) => process.exit(code))
     .catch((err) => {
-      writeStderr(`${err && err.message ? err.message : err}\n`);
+      const message = safeLogText(err && err.message ? err.message : err).slice(0, 8192);
+      writeStderr(`Codex error: ${message}\n`);
+      saveFailureResult(message);
       process.exit(1);
     });
+}
+
+function saveFailureResult(message) {
+  const resultFile = process.env.SUPERPLANE_RESULT_FILE;
+  if (!resultFile) {
+    return;
+  }
+  let previous = {};
+  try {
+    const saved = JSON.parse(fs.readFileSync(resultFile, "utf8"));
+    if (saved && typeof saved === "object" && !Array.isArray(saved)) {
+      previous = saved;
+    }
+  } catch (_err) {
+    // A failure before the first turn may not have a saved result.
+  }
+  const payload = {
+    ...previous,
+    type: "result",
+    is_error: true,
+    error: previous.is_error && previous.error ? previous.error : message,
+    result: previous.result || "",
+  };
+  try {
+    fs.writeFileSync(resultFile, `${safeLogText(JSON.stringify(payload))}\n`);
+  } catch (err) {
+    writeStderr(`Codex error result could not be saved: ${err.message}\n`);
+  }
+}
+
+function superviseCodexProcessGroup(child) {
+  let running = true;
+  const stop = () => {
+    if (!running || !child.pid) return;
+    running = false;
+    try {
+      process.kill(-child.pid, "SIGKILL");
+    } catch (_error) {
+      child.kill("SIGKILL");
+    }
+  };
+  // Host runners terminate the task group before escalating to SIGKILL.
+  // Codex has its own group so credential failures can stop its native child.
+  const handlers = new Map();
+  for (const signal of ["SIGTERM", "SIGINT", "SIGHUP"]) {
+    const handler = () => {
+      stop();
+      process.exit(128 + constants.signals[signal]);
+    };
+    handlers.set(signal, handler);
+    process.once(signal, handler);
+  }
+  process.once("exit", stop);
+  child.once("close", () => {
+    running = false;
+    process.removeListener("exit", stop);
+    for (const [signal, handler] of handlers) {
+      process.removeListener(signal, handler);
+    }
+  });
+  return stop;
+}
+
+function isChatGPTAuthenticationError(value) {
+  const message = String(value || "");
+  return /(?:chatgpt|codex).*(?:session (?:has )?expired|credentials? (?:expired|refresh failed|could not be refreshed)|authentication failed|unauthorized)|(?:failed|could not) to refresh.*chatgpt credentials|(?:access|auth(?:entication)?) token.*expired|(?:401|unauthorized).*(?:workspace.routing|chatgpt|codex)|workspace.routing.*(?:401|unauthorized)|^(?:refresh_token_expired|token_expired)$/i.test(message);
+}
+
+async function runCodexAttempt({ codexArgs, childEnv, sp, telemetry, activity, subscription, onStop }) {
+  const child = spawn("codex", codexArgs, {
+    env: childEnv,
+    stdio: ["ignore", "pipe", "pipe"],
+    detached: Boolean(subscription?.setCredentialFailureHandler),
+  });
+  const stop = child.pid && subscription?.setCredentialFailureHandler
+    ? superviseCodexProcessGroup(child)
+    : () => child.kill("SIGKILL");
+  onStop(stop);
+  const formatter = createCodexFormatter(telemetry, activity);
+  let lastResult = {};
+  let workStarted = false;
+  let authenticationFailed = false;
+  let authenticationFailedAt = 0;
+  const detectAuthentication = (message) => {
+    if (authenticationFailed || !subscription?.subscriptionEnabled?.() || !isChatGPTAuthenticationError(message)) return;
+    authenticationFailed = true;
+    authenticationFailedAt = Date.now();
+    stop();
+  };
+  const stderrDone = pipeRedactedStderr(child.stderr, detectAuthentication);
+  const rl = readline.createInterface({ input: child.stdout, crlfDelay: Infinity });
+  rl.on("line", (raw) => {
+    const line = raw.trim();
+    if (!line) return;
+    try {
+      const event = JSON.parse(line);
+      if (!event || typeof event !== "object") return;
+      if (event.item && /^(item.started|item.updated|item.completed)$/.test(event.type)) {
+        workStarted = true;
+      }
+      if (authenticationFailed) return;
+      if (event.type === "error" || event.type === "turn.failed") {
+        detectAuthentication(event.message || event.error?.message || event.error?.code);
+        if (authenticationFailed) return;
+      }
+      const nextSessionID = codexSessionIDFromEvent(event);
+      if (nextSessionID) writeSessionID(sp, nextSessionID);
+      if (event.usage || (event.item && event.item.usage)) lastResult = event;
+      if (["item.completed", "turn.completed", "result"].includes(event.type) &&
+          !lastResult.usage && !(lastResult.item && lastResult.item.usage)) lastResult = event;
+      formatter.handleEvent(event);
+    } catch (_err) {
+      writeStdout(`${line}\n`);
+    }
+  });
+  const [processExitCode, , stderr] = await Promise.all([
+    new Promise((resolve, reject) => {
+      child.on("error", reject);
+      child.on("close", (code) => resolve(code == null ? 1 : code));
+    }),
+    new Promise((resolve) => rl.on("close", resolve)),
+    stderrDone,
+  ]);
+  return { processExitCode, stderr, lastResult, formatter, authenticationFailed, authenticationFailedAt, workStarted };
+}
+
+async function recoverChatGPTAuthentication(subscription, deadline, activity) {
+  activity.notice("chatgpt_refreshing", "Refreshing your ChatGPT connection…");
+  const remaining = () => Math.max(1, deadline - Date.now());
+  try {
+    const rejected = subscription.readAccessToken?.() || "";
+    await subscription.refreshRejectedCredentials(rejected, remaining());
+    if (Date.now() >= deadline) throw new Error("ChatGPT recovery timed out");
+    await subscription.restore(process.env, remaining());
+    if (Date.now() >= deadline) throw new Error("ChatGPT recovery timed out");
+    return null;
+  } catch (error) {
+    if (["refresh_token_invalidated", "refresh_token_expired", "refresh_token_reused", "invalid_grant", "invalid_refresh_token", "token_expired"].includes(error?.code)) {
+      return "chatgpt_reconnect_required";
+    }
+    return error?.code === "connection_busy" ? "chatgpt_connection_busy" : "chatgpt_refresh_failed";
+  }
+}
+
+function chatGPTAuthenticationMessage(code) {
+  if (code === "chatgpt_reconnect_required") {
+    return "SuperPlane could not refresh your ChatGPT connection. Reconnect ChatGPT to continue.";
+  }
+  if (code === "chatgpt_refresh_failed") {
+    return "SuperPlane could not refresh your ChatGPT connection. Try again.";
+  }
+  if (code === "chatgpt_connection_busy") {
+    return "Your ChatGPT connection is busy. Try again.";
+  }
+  return "SuperPlane could not authorize your ChatGPT connection. Try again or reconnect ChatGPT.";
 }
 
 async function runPrompt(promptFile, model, thinking) {
@@ -405,7 +544,24 @@ async function runPrompt(promptFile, model, thinking) {
   if (!resultFile) {
     throw new Error("SUPERPLANE_RESULT_FILE is required");
   }
+  let stopChild = () => {};
+  const subscription = loadSubscriptionModule();
+  subscription?.setCredentialFailureHandler?.((error) => {
+    // No untrusted output is safe after losing sight of credential rotation.
+    // Stop the npm launcher and its native child, and save only a fixed error.
+    stopChild();
+    process.stderr.write(`${error.message}\n`);
+    try {
+      fs.writeFileSync(resultFile, `${JSON.stringify({ type: "result", is_error: true, error: error.message, result: "" })}\n`);
+    } catch (_error) {
+      process.stderr.write("The credential protection error could not be saved.\n");
+    }
+    process.exit(1);
+  });
   const childEnv = codexExecEnv(process.env);
+  // Restore runs in a separate process. Observe credentials here before Codex
+  // can replace or remove the auth file.
+  redactSubscription("");
 
   const promptCountPath = path.join(sp, "prompt_count");
   const promptCount =
@@ -434,79 +590,60 @@ async function runPrompt(promptFile, model, thinking) {
     turn: promptCount + 1,
   });
   activity.start();
-  const mcpScript = superplaneMCPScript(sp);
+  if (subscription?.subscriptionEnabled?.() && subscription.restore) {
+    if (subscription.accessTokenNeedsRefresh?.()) {
+      activity.notice("chatgpt_refreshing", "Refreshing your ChatGPT connection…");
+    }
+    try {
+      await subscription.restore(process.env, 30000);
+    } catch (error) {
+      const failure = subscription.authenticationFailure?.(error) || {
+        code: "chatgpt_refresh_failed",
+        message: "SuperPlane could not refresh your ChatGPT connection. Try again.",
+      };
+      activity.notice(failure.code, failure.message);
+      activity.end("failed");
+      await activity.flush();
+      fs.writeFileSync(resultFile, `${JSON.stringify({ type: "result", is_error: true, error: failure.message, authentication_code: failure.code, result: "" })}\n`);
+      return 1;
+    }
+  }
   const codexArgs = codexExecArgs(
     process.env,
     model,
-    mcpScript,
+    sp,
     sessionID,
     thinking,
   );
   if (planning) {
     writeStdout("Planning session tools enabled\n");
-    writeStdout("sandbox: read-only\n");
   }
   if (sessionID) {
     writeStdout("Continuing Codex session in the current directory\n");
   }
   codexArgs.push(prompt);
 
-  const child = spawn("codex", codexArgs, {
-    env: childEnv,
-    stdio: ["ignore", "pipe", "pipe"],
-  });
-  const stderrDone = pipeRedactedStderr(child.stderr);
-
-  let lastResult = {};
   const telemetry = loadTurnTelemetry();
-  const formatter = createCodexFormatter(telemetry, activity);
-  const rl = readline.createInterface({
-    input: child.stdout,
-    crlfDelay: Infinity,
-  });
-  rl.on("line", (raw) => {
-    const line = raw.trim();
-    if (!line) {
-      return;
+  let attempt = await runCodexAttempt({ codexArgs, childEnv, sp, telemetry, activity, subscription, onStop: (stop) => { stopChild = stop; } });
+  let authenticationCode = "";
+  if (attempt.authenticationFailed && !attempt.workStarted) {
+    const deadline = attempt.authenticationFailedAt + 30000;
+    authenticationCode = await recoverChatGPTAuthentication(subscription, deadline, activity) || "";
+    if (!authenticationCode) {
+      attempt = await runCodexAttempt({ codexArgs, childEnv, sp, telemetry, activity, subscription, onStop: (stop) => { stopChild = stop; } });
+      if (attempt.authenticationFailed) authenticationCode = "chatgpt_unauthorized";
     }
-    try {
-      const event = JSON.parse(line);
-      if (event && typeof event === "object") {
-        const nextSessionID = codexSessionIDFromEvent(event);
-        if (nextSessionID) {
-          writeSessionID(sp, nextSessionID);
-        }
-        if (event.usage || (event.item && event.item.usage)) {
-          lastResult = event;
-        }
-        if (
-          event.type === "item.completed" ||
-          event.type === "turn.completed" ||
-          event.type === "result"
-        ) {
-          if (
-            !lastResult.usage &&
-            !(lastResult.item && lastResult.item.usage)
-          ) {
-            lastResult = event;
-          }
-        }
-        formatter.handleEvent(event);
-        return;
-      }
-    } catch (_err) {
-      writeStdout(`${line}\n`);
-    }
-  });
-
-  const exitCode = await Promise.all([
-    new Promise((resolve, reject) => {
-      child.on("error", reject);
-      child.on("close", (code) => resolve(code == null ? 1 : code));
-    }),
-    new Promise((resolve) => rl.on("close", resolve)),
-    stderrDone,
-  ]).then(([code]) => code);
+  } else if (attempt.authenticationFailed) {
+    authenticationCode = "chatgpt_unauthorized";
+  }
+  const { formatter, stderr, lastResult, processExitCode } = attempt;
+  const exitCode = authenticationCode ? 1 : formatter.errorMessage() && processExitCode === 0 ? 1 : processExitCode;
+  if (authenticationCode) {
+    formatter.reportAuthenticationFailure(chatGPTAuthenticationMessage(authenticationCode), authenticationCode);
+  } else if (exitCode !== 0 && !formatter.errorMessage()) {
+    const message = `Codex failed with exit code ${exitCode}.`;
+    formatter.reportError(stderr ? `${message}\n${stderr}` : message);
+  }
 
   formatter.flush(exitCode !== 0);
   activity.end(exitCode === 0 ? "passed" : "failed");
@@ -518,6 +655,9 @@ async function runPrompt(promptFile, model, thinking) {
   const rollout = readRolloutContext(childEnv.CODEX_HOME, readSessionID(sp));
   const payload = {
     type: "result",
+    is_error: exitCode !== 0,
+    ...(exitCode !== 0 ? { error: formatter.errorMessage() } : {}),
+    ...(authenticationCode ? { authentication_code: authenticationCode } : {}),
     result: formatter.lastText() || lastResult.result || lastResult.text || "",
     model: rollout.model || lastResult.model || model,
     thinkingLevel: rollout.effort || thinking,
@@ -533,7 +673,7 @@ async function runPrompt(promptFile, model, thinking) {
   accumulateLLMUsage(safePayload);
   fs.writeFileSync(promptCountPath, `${promptCount + 1}\n`);
   if (planning) {
-    await require(path.join(sp, "planning_session_mcp.js")).recordAgentMessage(
+    await require(path.join(sp, "agent_message.js")).recordAgentMessage(
       safePayload.result,
     );
   }
@@ -545,7 +685,6 @@ async function runPrompt(promptFile, model, thinking) {
         : 1,
     duration_ms: Date.now() - startedAt,
   });
-  const subscription = loadSubscriptionModule();
   if (exitCode === 0 && subscription && subscription.subscriptionEnabled()) {
     try {
       await subscription.reportUsage();
@@ -668,32 +807,38 @@ function loadSubscriptionModule(env = process.env) {
   return require(file);
 }
 
-function redactSubscription(value) {
+function redactSubscription(value, options = {}) {
   const helper = loadSubscriptionModule();
   if (!helper || !helper.redactSecrets) {
     return String(value);
   }
-  return helper.redactSecrets(String(value));
+  return helper.redactSecrets(String(value), process.env, options);
 }
 
 function writeStdout(value) {
-  const activity = loadActivityStreamModule();
-  const safe = activity.sanitizeLogText ? activity.sanitizeLogText(value) : String(value);
-  process.stdout.write(redactSubscription(safe));
+  process.stdout.write(safeLogText(value));
 }
 
 function writeStderr(value) {
-  const activity = loadActivityStreamModule();
-  const safe = activity.sanitizeLogText ? activity.sanitizeLogText(value) : String(value);
-  process.stderr.write(redactSubscription(safe));
+  process.stderr.write(safeLogText(value));
 }
 
-function pipeRedactedStderr(stream) {
+function safeLogText(value) {
+  const activity = loadActivityStreamModule();
+  const safe = activity.sanitizeLogText ? activity.sanitizeLogText(value) : String(value);
+  return redactSubscription(safe);
+}
+
+function pipeRedactedStderr(stream, onLine = () => {}) {
+  let tail = "";
   const lines = readline.createInterface({ input: stream, crlfDelay: Infinity });
   lines.on("line", (line) => {
-    writeStderr(`${line}\n`);
+    const safe = safeLogText(line);
+    tail = `${tail}${safe}\n`.slice(-8192);
+    writeStderr(`${safe}\n`);
+    onLine(safe);
   });
-  return new Promise((resolve) => lines.on("close", resolve));
+  return new Promise((resolve) => lines.on("close", () => resolve(tail.trim())));
 }
 
 function createCodexFormatter(telemetry, activityOverride) {
@@ -709,6 +854,24 @@ function createCodexFormatter(telemetry, activityOverride) {
   let contentSeq = 0;
   let roundOpen = false;
   let lastText = "";
+  let lastError = "";
+
+  function reportError(message) {
+    const safe = safeLogText(message).trim().slice(0, 8192) || "Codex failed without an error message.";
+    if (safe === lastError) {
+      return;
+    }
+    lastError = safe;
+    writeStderr(`Codex error: ${safe}\n`);
+    activity.notice("codex_error", safe);
+  }
+
+  function reportAuthenticationFailure(message, code) {
+    const safe = safeLogText(message);
+    lastError = safe;
+    writeStderr(`Codex error: ${safe}\n`);
+    activity.notice(code, safe);
+  }
 
   function itemType(item) {
     return String((item && (item.type || item.item_type)) || "").toLowerCase();
@@ -744,16 +907,17 @@ function createCodexFormatter(telemetry, activityOverride) {
     return queue.shift() || `${type}-${contentSeq++}`;
   }
 
-  function appendContentDelta(contentKind, id, text) {
+  function appendContentDelta(contentKind, id, text, options = {}) {
     if (typeof text !== "string" || !text) {
       return;
     }
+    const safe = safeLogText(redactSubscription(text, options));
     const previous = contentText.get(id) || "";
-    const delta = text.startsWith(previous)
-      ? text.slice(previous.length)
-      : text;
+    const delta = safe.startsWith(previous)
+      ? safe.slice(previous.length)
+      : safe;
     activity.appendContent(contentKind, id, delta);
-    contentText.set(id, text);
+    contentText.set(id, safe);
   }
 
   function rememberTool(item) {
@@ -843,6 +1007,11 @@ function createCodexFormatter(telemetry, activityOverride) {
 
   return {
     handleEvent(event) {
+      if (event.type === "error" || event.type === "turn.failed") {
+        reportError(event.message || (event.error && event.error.message) || "");
+        roundOpen = false;
+        return;
+      }
       if (event.type === "turn.completed" || event.type === "result") {
         tracker.updateCurrentUsage(extractUsage(event));
         roundOpen = false;
@@ -859,7 +1028,7 @@ function createCodexFormatter(telemetry, activityOverride) {
         if (event.type === "item.started") {
           activity.startContent(contentKind, id);
           const initialText = item.text || item.result || "";
-          appendContentDelta(contentKind, id, initialText);
+          appendContentDelta(contentKind, id, initialText, { incomplete: true });
           return;
         }
         if (event.type === "item.completed") {
@@ -929,6 +1098,11 @@ function createCodexFormatter(telemetry, activityOverride) {
     lastText() {
       return lastText;
     },
+    errorMessage() {
+      return lastError;
+    },
+    reportError,
+    reportAuthenticationFailure,
   };
 }
 
@@ -1109,7 +1283,6 @@ module.exports = {
   codexSessionForPrompt,
   codexSessionIDFromEvent,
   planningEnabled,
-  superplaneMCPScript,
   planningSystemPrompt,
   planningAnalysisEnabled,
   workspaceMCPConfigOverrides,

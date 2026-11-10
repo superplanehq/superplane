@@ -39,6 +39,10 @@
 {{- end }}
 {{- end }}
 
+{{- define "secrets.sentryApp.name" }}
+{{- .Values.sentryApp.secretName }}
+{{- end }}
+
 {{- define "secrets.dash0Web.name" }}
 {{- if eq .Values.dash0Web.secretName "" }}
 {{- printf "%s-dash0-web" .Release.Name }}
@@ -125,6 +129,7 @@ affinity:
   "START_RUNNER_API"
   "START_RUNNER_LOG_COMPACTOR"
   "START_RUNNER_CLEANUP_WORKER"
+  "START_RUNNER_TASK_SCHEDULER"
   "START_CONSUMERS"
   "START_EVENT_ROUTER"
   "START_RUN_FINALIZER"

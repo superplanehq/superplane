@@ -1,4 +1,3 @@
-import { useFactoryTaskIdentity } from "../../factoryTaskContext";
 import { Bot, ChevronDown } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -36,7 +35,9 @@ const START_THINKING_LEVELS = [
 ];
 
 /**
- * Picks the runner model and thinking for Start. `icon` is the chevron fused to Start,
+ * Picks the runner model and thinking for Start. Use the saved owner's
+ * catalog, or the caller's catalog when the task has no owner.
+ * `icon` is the chevron fused to Start,
  * `labeled` the capsule segment, `ghost` the quiet control on the refine
  * strip settings row. Closed labeled and ghost triggers show the model name
  * and the thinking word when one is chosen.
@@ -44,8 +45,8 @@ const START_THINKING_LEVELS = [
 export function DraftStartModelSelect({
   organizationId,
   factoryId,
-  orderId,
   lineName,
+  orderId,
   model,
   thinkingLevel,
   onChange,
@@ -54,20 +55,20 @@ export function DraftStartModelSelect({
 }: {
   organizationId?: string;
   factoryId?: string;
-  orderId?: string;
   lineName?: string;
+  orderId?: string;
   model: string;
   thinkingLevel: string;
   onChange: (next: { model: string; thinkingLevel: string }) => void;
   disabled?: boolean;
   appearance?: Appearance;
 }) {
-  const task = useFactoryTaskIdentity();
-  const models = useFactoryLineRunnerModels(organizationId, factoryId, lineName, true, orderId ?? task.orderId);
+  const models = useFactoryLineRunnerModels(organizationId, factoryId, lineName, true, orderId);
   const selectedName =
     model === DRAFT_START_MODEL_AUTO
       ? "Auto"
-      : (models.data?.models ?? []).find((item) => item.id === model)?.name || model;
+      : (models.data?.models ?? []).find((item) => item.id === model)?.name ||
+        (models.isLoading ? model : `${model} (unavailable)`);
   const closedLabel = modelNameWithThinking(selectedName, thinkingLevel);
   const showName = appearance !== "icon";
 

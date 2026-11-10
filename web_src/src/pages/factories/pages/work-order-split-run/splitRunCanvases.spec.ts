@@ -74,14 +74,10 @@ describe("splitRunCanvasForPhase", () => {
     const canvas = splitRunCanvasForPhase(implement!);
     expect(canvas.title).toBe("Implement");
     expect(canvas.nodes.map((node) => node.name)).toContain("Implement From Task Description");
-    expect(canvas.nodes.map((node) => node.name)).toContain("Add Branch Artifact");
-    expect(canvas.nodes.map((node) => node.name)).toContain("Create Pull Request");
-    expect(canvas.nodes.map((node) => node.name)).toContain("Attach PR to Task");
     expect(canvas.statuses["implementation-agent-no-issue"]).toBe("running");
-    expect(canvas.statuses["add-branch-artifact"]).toBe("did_not_run");
-    expect(canvas.statuses["create-pr"]).toBe("did_not_run");
-    expect(canvas.statuses["attach-pr-artifact"]).toBe("did_not_run");
     expect(canvas.statuses["add-run-error"]).toBe("did_not_run");
+    const stream = richStreamForCanvas(canvas);
+    expect(stream.find((line) => line.id === "implementation-agent-no-issue")?.pullRequest).toBeUndefined();
   });
 
   it("opens a pull request after a finished implement run", () => {
@@ -97,17 +93,10 @@ describe("splitRunCanvasForPhase", () => {
     });
 
     expect(canvas.statuses["implementation-agent-no-issue"]).toBe("passed");
-    expect(canvas.statuses["create-pr"]).toBe("passed");
-    expect(canvas.statuses["attach-pr-artifact"]).toBe("passed");
     expect(canvas.statuses["add-run-error"]).toBe("did_not_run");
 
     const stream = richStreamForCanvas(canvas);
-    expect(stream.find((line) => line.id === "create-pr")).toMatchObject({
-      componentType: "github.createPullRequest",
-      componentName: "Create Pull Request",
-      action: "passed",
-    });
-    expect(stream.find((line) => line.id === "attach-pr-artifact")?.pullRequest?.number).toBe("482");
+    expect(stream.find((line) => line.id === "implementation-agent-no-issue")?.pullRequest?.number).toBe("482");
   });
 
   it("writes one log line per canvas node and extra Claude Code notes", () => {
@@ -320,7 +309,26 @@ describe("splitRunCanvasForPhase", () => {
     });
 
     expect(sentry.title).toBe("Sentry");
-    expect(sentry.nodes.map((node) => node.name)).toEqual(["On Issue", "Factory project?", "Create Task"]);
+    expect(sentry.nodes.map((node) => node.name)).toEqual([
+      "On Issue",
+      "Factory project?",
+      "Get Sentry Issue",
+      "Get Sentry Event",
+      "Latest event has a stack?",
+      "Get Recommended Sentry Event",
+      "Create Task",
+    ]);
+    const gate = sentry.nodes.find((node) => node.name === "Latest event has a stack?")!;
+    expect(gate.component).toBe("if");
+    expect(gate.configuration?.expression).toBe('sentryEventHasStack($["Get Sentry Event"].data?.body)');
+    expect(sentry.edges.filter((edge) => edge.targetId === gate.id)).toEqual([
+      { channel: "success", sourceId: "get-sentry-event", targetId: gate.id },
+      { channel: "failure", sourceId: "get-sentry-event", targetId: gate.id },
+    ]);
+    expect(sentry.edges.filter((edge) => edge.sourceId === gate.id)).toEqual([
+      { channel: "true", sourceId: gate.id, targetId: "create-work-order" },
+      { channel: "false", sourceId: gate.id, targetId: "get-recommended-sentry-event" },
+    ]);
     expect(slack.title).toBe("Slack");
     expect(slack.nodes.map((node) => node.name)).toEqual(["On Mention", "Mentioned the agent?", "Create Task"]);
   });

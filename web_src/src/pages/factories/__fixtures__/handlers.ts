@@ -1,3 +1,5 @@
+import { factoryModelSettingsRoutes } from "./factoryModelSettingsHandlers";
+import { organizationFleetRoutes } from "./organizationFleetHandlers";
 import {
   ACTIVE_BILLING_PERIOD_ENDS_AT,
   ACTIVE_TRIAL_ENDS_AT,
@@ -73,7 +75,7 @@ function velocitySynced(factoryId: string): void {
   velocitySyncedAt.set(factoryId, new Date().toISOString());
 }
 
-interface FactoriesRoute {
+export interface FactoriesRoute {
   pattern: RegExp;
   resolve: (match: RegExpExecArray, method: string, body: Record<string, unknown> | null, url: URL) => FixtureResult;
 }
@@ -450,25 +452,7 @@ function factoryDetailRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
         },
       }),
     },
-    {
-      pattern: re("/api/v1/factories/([^/]+)/llm-models"),
-      resolve: (_match, method, body, url) => {
-        const request = (body ?? {}) as { provider?: string; fundingSource?: string; allowedModels?: unknown };
-        const provider =
-          url.searchParams.get("provider") || (typeof request.provider === "string" ? request.provider : "");
-        const models = storybookHostedLlmModels(provider).models;
-        if (method === "PUT") {
-          const allowed = stringArrayOrEmpty(request.allowedModels);
-          return {
-            json: {
-              selected: allowed.map((id) => ({ id, name: id })),
-              inheritParent: allowed.length === 0,
-            },
-          };
-        }
-        return { json: { parent: models, selected: models, inheritParent: true } };
-      },
-    },
+    ...factoryModelSettingsRoutes(fixture),
   ];
 }
 
@@ -566,6 +550,12 @@ function patchAgentResourceSetupContext(resource: FactoriesFactoryAgentResource,
   }
   if (typeof request.vcsProvider === "string") {
     resource.vcsProvider = request.vcsProvider;
+  }
+  if (typeof request.ref === "string") {
+    resource.ref = request.ref;
+  }
+  if (typeof request.access === "string") {
+    resource.access = request.access;
   }
   if (request.replaceCommands || Array.isArray(request.commands)) {
     resource.commands = Array.isArray(request.commands) ? request.commands : [];
@@ -709,6 +699,8 @@ function createPostedContextRepoResource(
     enabled: request.enabled !== false,
     repository,
     vcsProvider: typeof request.vcsProvider === "string" ? request.vcsProvider : "github",
+    ref: typeof request.ref === "string" ? request.ref.trim() : "",
+    access: request.access === "write" ? "write" : "read",
     createdAt: now,
     updatedAt: now,
   };
@@ -1711,7 +1703,7 @@ const STORYBOOK_ME_MEMBER_PERMISSIONS = ["members"].flatMap((resource) =>
 );
 
 /** Serves `/api/v1/me` so factory stories resolve `useMe` without the Home harness. */
-function meRoute(organizationId: string): FactoriesRoute {
+function meRoute(organizationId: string, readOnly = false): FactoriesRoute {
   return {
     pattern: re("/api/v1/me"),
     resolve: () => {
@@ -1723,7 +1715,9 @@ function meRoute(organizationId: string): FactoriesRoute {
             id: STORYBOOK_ME_USER_ID,
             name: STORYBOOK_ME_USER_NAME,
             email: STORYBOOK_ME_USER_EMAIL,
-            permissions: [...user.permissions, ...STORYBOOK_ME_MEMBER_PERMISSIONS],
+            permissions: [...user.permissions, ...STORYBOOK_ME_MEMBER_PERMISSIONS].filter(
+              (permission) => !readOnly || permission.action === "read",
+            ),
           },
         },
       };
@@ -1785,7 +1779,8 @@ function buildRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
   return [
     factoriesCollectionRoute(fixture),
     ...githubOnboardingRoutes(fixture),
-    meRoute(fixture.organizationId),
+    meRoute(fixture.organizationId, fixture.organizationFleetManagement?.readOnly),
+    ...organizationFleetRoutes(fixture),
     notificationSettingsRoute(fixture),
     ...factoryDetailRoutes(fixture),
     factoryVCSProviderRepositoryRoute(fixture),

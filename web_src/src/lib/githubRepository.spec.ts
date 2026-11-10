@@ -7,6 +7,9 @@ describe("githubRepositorySecurityAnalysisUrl", () => {
     expect(githubRepositorySecurityAnalysisUrl("operately/website")).toBe(
       "https://github.com/operately/website/settings/security_analysis",
     );
+    expect(githubRepositorySecurityAnalysisUrl("operately/website", "acme.ghe.com")).toBe(
+      "https://acme.ghe.com/operately/website/settings/security_analysis",
+    );
   });
 
   it("returns undefined for non-owner/repo values", () => {

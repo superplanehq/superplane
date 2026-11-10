@@ -321,6 +321,41 @@ func TestAdminListOrganizationPlans(t *testing.T) {
 	assert.Equal(t, twins[1], page.Items[0].ID)
 	assert.Equal(t, int64(2), page.Total)
 	request(t, "search=PlanSort&sort_by=name&sort_direction=asc&limit=2")
+	t.Run("filters by current plan before pagination and counts", func(t *testing.T) {
+		for _, test := range []struct {
+			key       string
+			ids       []string
+			pinnedIDs []string
+		}{
+			{custom.Key, []string{twinA.ID.String(), zebra.ID.String()}, []string{pinCustom.ID.String()}},
+			{other.Key, []string{alpha.ID.String(), twinB.ID.String()}, []string{}},
+			{"trial", []string{trial.ID.String()}, []string{pinTrial.ID.String()}},
+			{"none", noneIDs, []string{}},
+			{"unknown-plan", []string{}, []string{}},
+		} {
+			t.Run(test.key, func(t *testing.T) {
+				for _, sortBy := range []string{"name", "plan_name", "remaining_credit_cents"} {
+					ids := []string{}
+					for offset := 0; offset < max(1, len(test.ids)); offset++ {
+						page := request(t, fmt.Sprintf("search=PlanSort&plan_key=%s&sort_by=%s&sort_direction=asc&limit=1&offset=%d", test.key, sortBy, offset))
+						assert.Equal(t, int64(len(test.ids)), page.Total)
+						assert.Equal(t, int64(len(test.ids)+len(test.pinnedIDs)), page.MatchTotal)
+						assert.ElementsMatch(t, test.pinnedIDs, adminOrganizationIDs(page.Pinned))
+						assert.LessOrEqual(t, len(page.Items), 1)
+						ids = append(ids, adminOrganizationIDs(page.Items)...)
+					}
+					assert.ElementsMatch(t, test.ids, ids)
+				}
+			})
+		}
+		page := request(t, "search=PlanSort%20Twin&plan_key="+custom.Key)
+		assert.Equal(t, []string{twinA.ID.String()}, adminOrganizationIDs(page.Items))
+		assert.Equal(t, int64(1), page.MatchTotal)
+		// Pins remain visible during text search, but must match the selected plan.
+		assert.Equal(t, []string{pinCustom.ID.String()}, adminOrganizationIDs(page.Pinned))
+		page = request(t, "search="+zebra.ID.String()+"&plan_key="+custom.Key)
+		assert.Equal(t, []string{zebra.ID.String()}, adminOrganizationIDs(page.Items))
+	})
 	for _, org := range []*models.Organization{none, expired, ended} {
 		stored, err := billingmodels.FindOrganizationBillingPlan(db, org.ID)
 		require.NoError(t, err)
@@ -339,7 +374,7 @@ func TestAdminListOrganizationPlanResolutionErrors(t *testing.T) {
 		}
 	}))
 	t.Cleanup(func() { require.NoError(t, db.Callback().Query().Remove(callback)) })
-	for _, query := range []string{"sort_by=name", "sort_by=plan_name"} {
+	for _, query := range []string{"sort_by=name", "sort_by=plan_name", "plan_key=trial"} {
 		response := execRequest(server, requestParams{method: http.MethodGet, path: "/admin/api/organizations?" + query, authCookie: token})
 		assert.Equal(t, http.StatusInternalServerError, response.Code)
 		assert.Equal(t, "Failed to list organizations\n", response.Body.String())
@@ -1597,6 +1632,8 @@ func TestAdminListOrgExperimentalFeatures(t *testing.T) {
 			ids = append(ids, id)
 		}
 		assert.Contains(t, ids, features.FeatureFactories)
+		assert.Contains(t, ids, features.FeatureGitHubEnterprise)
+		assert.NotContains(t, ids, features.FeatureGitHubEnterpriseServer)
 	})
 
 	t.Run("returns an empty enabled list when none are on", func(t *testing.T) {
@@ -1631,20 +1668,20 @@ func TestAdminEnableOrgExperimentalFeature(t *testing.T) {
 	server, r, token := setupAdminTestServer(t)
 
 	t.Cleanup(func() {
-		_ = models.DisableExperimentalFeature(r.Organization.ID, features.FeatureClaudeManagedAgents)
+		_ = models.DisableExperimentalFeature(r.Organization.ID, features.FeatureFactories)
 	})
 
 	t.Run("enables a known feature", func(t *testing.T) {
 		response := execRequest(server, requestParams{
 			method:     "POST",
-			path:       "/admin/api/organizations/" + r.Organization.ID.String() + "/experimental-features/" + features.FeatureClaudeManagedAgents,
+			path:       "/admin/api/organizations/" + r.Organization.ID.String() + "/experimental-features/" + features.FeatureFactories,
 			authCookie: token,
 		})
 		assert.Equal(t, http.StatusOK, response.Code)
 
 		reloaded, err := models.FindOrganizationByID(r.Organization.ID.String())
 		require.NoError(t, err)
-		assert.Contains(t, []string(reloaded.EnabledExperimentalFeatures), features.FeatureClaudeManagedAgents)
+		assert.Contains(t, []string(reloaded.EnabledExperimentalFeatures), features.FeatureFactories)
 	})
 
 	t.Run("rejects unknown feature ids", func(t *testing.T) {
@@ -1656,10 +1693,23 @@ func TestAdminEnableOrgExperimentalFeature(t *testing.T) {
 		assert.Equal(t, http.StatusBadRequest, response.Code)
 	})
 
+	t.Run("rejects hidden GitHub Enterprise Server", func(t *testing.T) {
+		response := execRequest(server, requestParams{
+			method:     "POST",
+			path:       "/admin/api/organizations/" + r.Organization.ID.String() + "/experimental-features/" + features.FeatureGitHubEnterpriseServer,
+			authCookie: token,
+		})
+		assert.Equal(t, http.StatusBadRequest, response.Code)
+
+		reloaded, err := models.FindOrganizationByID(r.Organization.ID.String())
+		require.NoError(t, err)
+		assert.NotContains(t, []string(reloaded.EnabledExperimentalFeatures), features.FeatureGitHubEnterpriseServer)
+	})
+
 	t.Run("returns 404 for non-existent org", func(t *testing.T) {
 		response := execRequest(server, requestParams{
 			method:     "POST",
-			path:       "/admin/api/organizations/00000000-0000-0000-0000-000000000000/experimental-features/" + features.FeatureClaudeManagedAgents,
+			path:       "/admin/api/organizations/00000000-0000-0000-0000-000000000000/experimental-features/" + features.FeatureFactories,
 			authCookie: token,
 		})
 		assert.Equal(t, http.StatusNotFound, response.Code)
@@ -1670,18 +1720,18 @@ func TestAdminDisableOrgExperimentalFeature(t *testing.T) {
 	server, r, token := setupAdminTestServer(t)
 
 	t.Run("disables a previously enabled feature", func(t *testing.T) {
-		require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureClaudeManagedAgents))
+		require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactories))
 
 		response := execRequest(server, requestParams{
 			method:     "DELETE",
-			path:       "/admin/api/organizations/" + r.Organization.ID.String() + "/experimental-features/" + features.FeatureClaudeManagedAgents,
+			path:       "/admin/api/organizations/" + r.Organization.ID.String() + "/experimental-features/" + features.FeatureFactories,
 			authCookie: token,
 		})
 		assert.Equal(t, http.StatusOK, response.Code)
 
 		reloaded, err := models.FindOrganizationByID(r.Organization.ID.String())
 		require.NoError(t, err)
-		assert.NotContains(t, []string(reloaded.EnabledExperimentalFeatures), features.FeatureClaudeManagedAgents)
+		assert.NotContains(t, []string(reloaded.EnabledExperimentalFeatures), features.FeatureFactories)
 	})
 
 	t.Run("is idempotent for ids not currently enabled", func(t *testing.T) {
@@ -1696,11 +1746,33 @@ func TestAdminDisableOrgExperimentalFeature(t *testing.T) {
 	t.Run("returns 404 for non-existent org", func(t *testing.T) {
 		response := execRequest(server, requestParams{
 			method:     "DELETE",
-			path:       "/admin/api/organizations/00000000-0000-0000-0000-000000000000/experimental-features/" + features.FeatureClaudeManagedAgents,
+			path:       "/admin/api/organizations/00000000-0000-0000-0000-000000000000/experimental-features/" + features.FeatureFactories,
 			authCookie: token,
 		})
 		assert.Equal(t, http.StatusNotFound, response.Code)
 	})
+}
+
+func TestAdminToggleMultiRepoTasksReportsRepublishedAutomations(t *testing.T) {
+	server, r, token := setupAdminTestServer(t)
+	path := "/admin/api/organizations/" + r.Organization.ID.String() + "/experimental-features/" + features.FeatureFactoryMultiRepoTasks
+
+	for _, method := range []string{"POST", "DELETE"} {
+		response := execRequest(server, requestParams{method: method, path: path, authCookie: token})
+		require.Equal(t, http.StatusOK, response.Code)
+
+		var body struct {
+			Status string `json:"status"`
+			Reset  *int   `json:"reset"`
+		}
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body))
+		require.NotNil(t, body.Reset)
+		assert.Zero(t, *body.Reset, "the organization has no Implement automation")
+
+		reloaded, err := models.FindOrganizationByID(r.Organization.ID.String())
+		require.NoError(t, err)
+		assert.Equal(t, method == "POST", slices.Contains(reloaded.EnabledExperimentalFeatures, features.FeatureFactoryMultiRepoTasks))
+	}
 }
 
 func TestAdminBlockAndUnblockAccount(t *testing.T) {

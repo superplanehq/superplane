@@ -58,6 +58,11 @@ func (s *ExecutionStateContext) Emit(channel, payloadType string, payloads []any
 		return fmt.Errorf("cannot emit %d events (max %d per execution)", len(payloads), config.MaxEmitCount())
 	}
 
+	payloads, err := s.prepareMergeConfidenceOutput(channel, payloadType, payloads)
+	if err != nil {
+		return err
+	}
+
 	outputs := map[string][]any{
 		channel: {},
 	}
@@ -75,7 +80,7 @@ func (s *ExecutionStateContext) Emit(channel, payloadType string, payloads []any
 		}
 
 		if len(data) > s.maxPayloadSize {
-			return fmt.Errorf("event payload too large: %d bytes (max %d)", len(data), s.maxPayloadSize)
+			return fmt.Errorf("%w: %d bytes (max %d)", core.ErrEventPayloadTooLarge, len(data), s.maxPayloadSize)
 		}
 
 		outputs[channel] = append(outputs[channel], json.RawMessage(data))
@@ -115,7 +120,7 @@ func (s *ExecutionStateContext) EmitAndContinue(channel, payloadType string, pay
 		}
 
 		if len(data) > s.maxPayloadSize {
-			return fmt.Errorf("event payload too large: %d bytes (max %d)", len(data), s.maxPayloadSize)
+			return fmt.Errorf("%w: %d bytes (max %d)", core.ErrEventPayloadTooLarge, len(data), s.maxPayloadSize)
 		}
 
 		outputs[channel] = append(outputs[channel], json.RawMessage(data))

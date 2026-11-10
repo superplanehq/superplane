@@ -14,6 +14,8 @@ var (
 	ErrSecretKeyNotFound   = errors.New("secret or key not found")
 	ErrExecutionKVNotFound = errors.New("execution kv not found")
 	ErrQueueItemDeferred   = errors.New("queue item deferred")
+	// ErrEventPayloadTooLarge rejects an emission before any output is stored.
+	ErrEventPayloadTooLarge = errors.New("event payload too large")
 )
 
 /*
@@ -100,6 +102,8 @@ type SetupContext struct {
 	Integration   IntegrationContext
 	Webhook       NodeWebhookContext
 	Apps          AppContext
+	// Factory is set only for apps that a factory owns.
+	Factory FactoryContext
 }
 
 type CanvasMemoryContext interface {
@@ -124,6 +128,7 @@ type ExecutionStateContext interface {
 
 	/*
 	 * Pass the execution, emitting a payload to the specified channel.
+	 * Returns ErrEventPayloadTooLarge without emitting if an event exceeds the size limit.
 	 */
 	Emit(channel, payloadType string, payloads []any) error
 

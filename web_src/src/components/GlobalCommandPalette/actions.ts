@@ -1,16 +1,4 @@
-import {
-  BookOpen,
-  CircleUser,
-  LogOut,
-  MemoryStick,
-  Palette,
-  PanelTop,
-  PlayCircle,
-  Plus,
-  Settings,
-  Sparkles,
-} from "lucide-react";
-import type { CanvasToolSidebarTab } from "@/components/CanvasToolSidebar/events";
+import { BookOpen, CircleUser, LogOut, MemoryStick, Palette, PanelTop, PlayCircle, Plus, Settings } from "lucide-react";
 import { ADMIN_LINKS, DOCS_URL, ORGANIZATION_SETTINGS_LINKS } from "./constants";
 import { appSettingsPath } from "@/lib/appPaths";
 import type { PaletteAction } from "./types";
@@ -29,15 +17,12 @@ type RootActionParams = {
 };
 
 type CurrentCanvasActionParams = {
-  agentEnabled: boolean;
   canUpdateCanvas: boolean;
   canvasId: string | null;
   currentCanvasName: string;
   goTo: (href: string) => void;
   goToCurrentCanvasView: (view?: "console" | "memory") => void;
-  openCurrentCanvasToolTab: (tab: CanvasToolSidebarTab) => void;
   organizationId: string | null;
-  showToolTabCommands: boolean;
 };
 
 export function buildRootActions({
@@ -84,15 +69,12 @@ export function buildRootActions({
 }
 
 export function buildCurrentCanvasActions({
-  agentEnabled,
   canUpdateCanvas,
   canvasId,
   currentCanvasName,
   goTo,
   goToCurrentCanvasView,
-  openCurrentCanvasToolTab,
   organizationId,
-  showToolTabCommands,
 }: CurrentCanvasActionParams): PaletteAction[] {
   if (!organizationId || !canvasId) return [];
 
@@ -139,17 +121,6 @@ export function buildCurrentCanvasActions({
       keywords: ["canvas", "settings"],
     },
   ];
-
-  if (agentEnabled && showToolTabCommands) {
-    actions.splice(1, 0, {
-      id: "current-canvas-agent",
-      label: "Agent",
-      description: currentCanvasName,
-      icon: Sparkles,
-      onSelect: () => openCurrentCanvasToolTab("agent"),
-      keywords: ["agent", "assistant", "build", "chat"],
-    });
-  }
 
   return actions;
 }

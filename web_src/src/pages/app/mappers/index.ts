@@ -170,11 +170,6 @@ import {
   eventStateRegistry as discordEventStateRegistry,
 } from "./discord";
 import {
-  componentMappers as telegramComponentMappers,
-  triggerRenderers as telegramTriggerRenderers,
-  eventStateRegistry as telegramEventStateRegistry,
-} from "./telegram";
-import {
   componentMappers as octopusComponentMappers,
   triggerRenderers as octopusTriggerRenderers,
   eventStateRegistry as octopusEventStateRegistry,
@@ -290,6 +285,7 @@ import { DEFAULT_STATE_REGISTRY } from "./stateRegistry";
 import { startTriggerRenderer } from "./start";
 import { onBroadcastTriggerRenderer } from "./messages/on_broadcast";
 import { onRunTriggerRenderer } from "./messages/on_run";
+import { updatePullRequestBodySectionMapper } from "./updatePullRequestBodySection";
 import { buildExecutionInfo, buildNodeInfo } from "../utils";
 import { createSafeComponentMapper, createSafeCustomFieldRenderer, createSafeTriggerRenderer } from "./safeMappers";
 import { registerMapperLookups } from "./mapperLookup";
@@ -335,6 +331,7 @@ const componentBaseMappers: Record<string, ComponentBaseMapper> = {
   merge: mergeMapper,
   runApp: runAppMapper,
   addRunError: addRunErrorMapper,
+  updatePullRequestBodySection: updatePullRequestBodySectionMapper,
 };
 
 const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
@@ -366,7 +363,6 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   aws: awsComponentMappers,
   azure: azureComponentMappers,
   discord: discordComponentMappers,
-  telegram: telegramComponentMappers,
   octopus: octopusComponentMappers,
   teams: teamsComponentMappers,
   openai: openaiComponentMappers,
@@ -417,7 +413,6 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   aws: awsTriggerRenderers,
   azure: azureTriggerRenderers,
   discord: discordTriggerRenderers,
-  telegram: telegramTriggerRenderers,
   octopus: octopusTriggerRenderers,
   teams: teamsTriggerRenderers,
   openai: openaiTriggerRenderers,
@@ -459,7 +454,6 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   sentry: sentryEventStateRegistry,
   render: renderEventStateRegistry,
   discord: discordEventStateRegistry,
-  telegram: telegramEventStateRegistry,
   teams: teamsEventStateRegistry,
   rootly: rootlyEventStateRegistry,
   incident: incidentEventStateRegistry,

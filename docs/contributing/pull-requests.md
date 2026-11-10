@@ -186,9 +186,9 @@ responses.
 ## Dependency License Checks
 
 Run `make test.license.check` before you submit dependency changes.
-The Semaphore Licenses job runs the same check with a pinned OSV-Scanner container.
-Docker and network access to OSV and deps.dev are required.
-Go and Node.js installations are not required for this check.
+The Semaphore Licenses job runs the same check in the development container.
+The development image installs OSV-Scanner v2.7.0 as a native Go tool.
+Docker and network access to OSV and deps.dev are required for the Make targets.
 
 The check reads `go.mod` and `web_src/package-lock.json`, including development
 and transitive dependencies. Unknown or unapproved licenses fail the check.
@@ -200,9 +200,55 @@ Review each violation before you change the policy:
 - Use `license.override` to correct missing or incorrect license metadata.
 - Use `license.ignore` only for a package with an approved license exception.
 
-Run `bash scripts/license-check-test.sh` to check the scanner integration.
+Run `make test.license.scanner` to check the scanner integration.
 For a focused scan, pass lockfile paths to `bash scripts/license-check.sh`.
 
 This command suppresses vulnerability findings through a temporary configuration.
 The shared `osv-scanner.toml` does not suppress vulnerabilities.
-Vulnerability checks for dependencies and release images are a separate follow-up.
+
+The Semaphore Dependency vulnerabilities job scans the same dependency files
+with `make check.vulnerabilities`. It uses the shared configuration without
+the temporary vulnerability suppression. High and critical vulnerabilities
+(CVSS 7.0 or higher) and vulnerabilities with unknown severity fail this job.
+Lower severities are reported without blocking. Scan errors also fail the job.
+Both checks invoke the native `osv-scanner` command.
+Semaphore prepares the project Go compiler and generated clients before the
+vulnerability scan. Go call analysis remains enabled.
+Release image vulnerability scanning remains a separate follow-up.
+
+To run the scripts directly on your host, install the same scanner version:
+
+```bash
+go install github.com/google/osv-scanner/v2/cmd/osv-scanner@v2.7.0
+```
+
+Add the Go binary directory to your `PATH`.
+Use the Go version from `go.mod` and generate the API clients before Go call analysis.
+The vulnerability script also requires Node.js to apply the severity policy.
+Run `bash scripts/vulnerability-check.sh` or `bash scripts/license-check.sh`.
+
+## Go Security Checks
+
+Run `make check.gosec` after development setup to scan Go application code.
+After a tooling update, run `make dev.up` to rebuild the development image.
+The image installs gosec v2.30.0 in `/usr/local/bin`, outside the persistent Go
+cache volume.
+
+The scan covers `cmd/`, `pkg/`, and `ee/`. It excludes generated code and test
+files. Findings and scan errors fail the check. The scan excludes G101, G104,
+G115, and G117 because these rules produce high-volume legacy findings. Secret
+scanning remains the control for committed credentials.
+
+Use `#nosec` only for a reviewed false positive or an intentional trust
+boundary. Name each suppressed rule and add a justification after `--`. The
+check rejects suppressions without both fields and records suppressions in the
+JSON report.
+
+One accepted exception requires operational care. The SSH component does not
+verify server host keys, so it is vulnerable to an on-path server impersonation.
+The development pprof server uses a dedicated HTTP server and is published on
+`127.0.0.1` only.
+
+The Semaphore Go SAST job runs the same check after Go setup. Findings appear
+in the job log. The job uploads `tmp/gosec/report.json` as an artifact, including
+when findings fail the job.

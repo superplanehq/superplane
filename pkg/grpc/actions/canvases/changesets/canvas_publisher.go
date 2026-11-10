@@ -150,6 +150,9 @@ func NewCanvasPublisher(tx *gorm.DB, canvas *models.Canvas, draft *models.Canvas
 }
 
 func (p *CanvasPublisher) Publish(ctx context.Context) error {
+	if err := models.ValidateSubscriptionIntakeOwners(p.tx, p.canvas, p.draft, p.live); err != nil {
+		return err
+	}
 	for _, change := range p.changeset.Changes {
 		if err := p.processChange(ctx, change); err != nil {
 			return err
@@ -411,14 +414,22 @@ func (p *CanvasPublisher) updateNode(ctx context.Context, change *Change) error 
 	// Persist field updates now so later Setups see the new configuration.
 	// Setup itself is deferred with AddNode setups (see runPendingSetups).
 	//
+	wasDeleted := existingNode.DeletedAt.Valid
+	if wasDeleted {
+		existingNode.DeletedAt = gorm.DeletedAt{}
+	}
+	save := p.tx
+	if wasDeleted {
+		save = p.tx.Unscoped()
+	}
 	if existingNode.State == models.CanvasNodeStateError {
 		updatedNode.Metadata = existingNode.Metadata.Data()
 		p.finalNodes[existingNode.NodeID] = updatedNode
 		p.allNodes[existingNode.NodeID] = existingNode
-		return p.tx.Save(&existingNode).Error
+		return save.Save(&existingNode).Error
 	}
 
-	if err := p.tx.Save(&existingNode).Error; err != nil {
+	if err := save.Save(&existingNode).Error; err != nil {
 		return err
 	}
 
@@ -596,6 +607,7 @@ func (p *CanvasPublisher) triggerContext(ctx context.Context, node *models.Canva
 		Events:        contexts.NewEventContext(p.tx, node, nil, nil),
 		Webhook:       contexts.NewNodeWebhookContext(ctx, p.tx, p.options.Encryptor, node, p.options.WebhookBaseURL),
 		Apps:          contexts.NewAppContext(p.tx, p.canvas, node),
+		Factory:       p.factoryContext(),
 	}
 
 	if node.AppInstallationID != nil {
@@ -619,6 +631,13 @@ func (p *CanvasPublisher) triggerContext(ctx context.Context, node *models.Canva
 	return triggerCtx, nil
 }
 
+func (p *CanvasPublisher) factoryContext() core.FactoryContext {
+	if p.canvas == nil || p.canvas.FactoryID == nil {
+		return nil
+	}
+	return contexts.NewFactoryContext(p.tx, p.canvas, nil)
+}
+
 func (p *CanvasPublisher) setupAction(ctx context.Context, node *models.CanvasNode) error {
 	ref := node.Ref.Data()
 	action, err := p.options.Registry.GetAction(ref.Component.Name)
@@ -635,6 +654,7 @@ func (p *CanvasPublisher) setupAction(ctx context.Context, node *models.CanvasNo
 		Webhook:       contexts.NewNodeWebhookContext(ctx, p.tx, p.options.Encryptor, node, p.options.WebhookBaseURL),
 		Auth:          contexts.NewAuthReader(p.tx, p.options.OrgID, p.options.AuthService, nil),
 		Apps:          contexts.NewAppContext(p.tx, p.canvas, node),
+		Factory:       p.factoryContext(),
 	}
 
 	if node.AppInstallationID != nil {

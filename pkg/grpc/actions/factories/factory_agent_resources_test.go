@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -17,11 +18,14 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
+	bitbucketintegration "github.com/superplanehq/superplane/pkg/integrations/bitbucket"
 	"github.com/superplanehq/superplane/pkg/mcp"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/test/support"
+	contexts "github.com/superplanehq/superplane/test/support/contexts"
 	"google.golang.org/grpc/codes"
+	"gorm.io/gorm"
 
 	_ "github.com/superplanehq/superplane/pkg/registryimports"
 )
@@ -460,6 +464,124 @@ func Test__CreateFactoryAgentResourceCreatesContextRepo(t *testing.T) {
 	require.NotNil(t, response.GetResource())
 	assert.Equal(t, pb.FactoryAgentResource_KIND_CONTEXT_REPO, response.GetResource().GetKind())
 	assert.Equal(t, "superplanehq/suss", response.GetResource().GetRepository())
+}
+
+func Test__ContextRepoWriteAccessNeedsMultiRepoTasks(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	create := func(repository string) (*pb.CreateFactoryAgentResourceResponse, error) {
+		return CreateFactoryAgentResource(t.Context(), IntakeDependencies{}, r.Organization.ID.String(), &pb.CreateFactoryAgentResourceRequest{
+			FactoryId: factory.ID.String(), Kind: pb.FactoryAgentResource_KIND_CONTEXT_REPO, Enabled: true,
+			Repository: repository, VcsProvider: "github", Access: models.FactoryContextRepoAccessWrite,
+		})
+	}
+
+	_, err = create("acme/web")
+	code, _, ok := grpcerrors.HandlerStatus(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.FailedPrecondition, code)
+
+	readOnly, err := factory.CreateAgentResource(db, models.FactoryAgentResourceKindContextRepo, "", true, models.FactoryAgentResourceConfig{Repository: "acme/docs"})
+	require.NoError(t, err)
+	write := models.FactoryContextRepoAccessWrite
+	_, err = UpdateFactoryAgentResource(t.Context(), IntakeDependencies{}, r.Organization.ID.String(), &pb.UpdateFactoryAgentResourceRequest{
+		FactoryId: factory.ID.String(), ResourceId: readOnly.ID.String(), Access: &write,
+	})
+	code, _, ok = grpcerrors.HandlerStatus(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.FailedPrecondition, code)
+
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryMultiRepoTasks))
+	response, err := create("acme/web")
+	require.NoError(t, err)
+	assert.Equal(t, models.FactoryContextRepoAccessWrite, response.GetResource().GetAccess())
+}
+
+func Test__BitbucketContextRepoWriteAccess(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory := bitbucketFactory(t, r)
+	integrationID := uuid.NewString()
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSIntegrationID: &integrationID}))
+
+	stubBitbucket := func(t *testing.T, authType string, responses ...*http.Response) *contexts.HTTPContext {
+		t.Helper()
+		httpCtx := &contexts.HTTPContext{Responses: responses}
+		restore := newFactoryBitbucketAPI
+		t.Cleanup(func() { newFactoryBitbucketAPI = restore })
+		newFactoryBitbucketAPI = func(*gorm.DB, IntakeDependencies, *models.Factory) (*bitbucketintegration.Client, error) {
+			return &bitbucketintegration.Client{HTTP: httpCtx, Token: "token", AuthType: authType}, nil
+		}
+		return httpCtx
+	}
+	create := func(repository, access string) (*pb.CreateFactoryAgentResourceResponse, error) {
+		return CreateFactoryAgentResource(t.Context(), IntakeDependencies{}, r.Organization.ID.String(), &pb.CreateFactoryAgentResourceRequest{
+			FactoryId: factory.ID.String(), Kind: pb.FactoryAgentResource_KIND_CONTEXT_REPO, Enabled: true,
+			Repository: repository, VcsProvider: models.ProviderBitbucket, Access: access,
+		})
+	}
+	requireCode := func(t *testing.T, err error, expected codes.Code) {
+		t.Helper()
+		code, _, ok := grpcerrors.HandlerStatus(err)
+		require.True(t, ok, err)
+		assert.Equal(t, expected, code)
+	}
+
+	t.Run("rejects write access without multi-repo tasks", func(t *testing.T) {
+		httpCtx := stubBitbucket(t, bitbucketintegration.AuthTypeWorkspaceAccessToken)
+		_, err := create("acme/flag-off", models.FactoryContextRepoAccessWrite)
+		requireCode(t, err, codes.FailedPrecondition)
+		assert.Empty(t, httpCtx.Requests)
+	})
+
+	t.Run("keeps read access without a repository check", func(t *testing.T) {
+		httpCtx := stubBitbucket(t, bitbucketintegration.AuthTypeWorkspaceAccessToken)
+		response, err := create("other/docs", models.FactoryContextRepoAccessRead)
+		require.NoError(t, err)
+		assert.Equal(t, models.FactoryContextRepoAccessRead, response.GetResource().GetAccess())
+		assert.Empty(t, httpCtx.Requests)
+	})
+
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryMultiRepoTasks))
+
+	t.Run("accepts write access to a repository the token reaches", func(t *testing.T) {
+		httpCtx := stubBitbucket(t, bitbucketintegration.AuthTypeWorkspaceAccessToken, okBitbucketResponse(`{"full_name": "acme/web"}`))
+		response, err := create("acme/web", models.FactoryContextRepoAccessWrite)
+		require.NoError(t, err)
+		assert.Equal(t, models.FactoryContextRepoAccessWrite, response.GetResource().GetAccess())
+		require.Len(t, httpCtx.Requests, 1)
+		assert.Equal(t, "/2.0/repositories/acme/web", httpCtx.Requests[0].URL.Path)
+	})
+
+	t.Run("rejects write access to a repository the token cannot reach", func(t *testing.T) {
+		for _, status := range []int{http.StatusNotFound, http.StatusForbidden} {
+			stubBitbucket(t, bitbucketintegration.AuthTypeWorkspaceAccessToken, &http.Response{StatusCode: status, Body: io.NopCloser(strings.NewReader(`{}`))})
+			_, err := create("other/web", models.FactoryContextRepoAccessWrite)
+			requireCode(t, err, codes.PermissionDenied)
+		}
+	})
+
+	t.Run("rejects write access with a repository access token", func(t *testing.T) {
+		httpCtx := stubBitbucket(t, bitbucketintegration.AuthTypeRepositoryAccessToken)
+		_, err := create("acme/api", models.FactoryContextRepoAccessWrite)
+		requireCode(t, err, codes.PermissionDenied)
+		assert.Empty(t, httpCtx.Requests)
+	})
+
+	t.Run("checks the repository when access changes to write", func(t *testing.T) {
+		readOnly, err := factory.CreateAgentResource(db, models.FactoryAgentResourceKindContextRepo, "", true, models.FactoryAgentResourceConfig{
+			Repository: "other/lib", VCSProvider: models.ProviderBitbucket,
+		})
+		require.NoError(t, err)
+		stubBitbucket(t, bitbucketintegration.AuthTypeWorkspaceAccessToken, &http.Response{StatusCode: http.StatusNotFound, Body: io.NopCloser(strings.NewReader(`{}`))})
+		write := models.FactoryContextRepoAccessWrite
+		_, err = UpdateFactoryAgentResource(t.Context(), IntakeDependencies{}, r.Organization.ID.String(), &pb.UpdateFactoryAgentResourceRequest{
+			FactoryId: factory.ID.String(), ResourceId: readOnly.ID.String(), Access: &write,
+		})
+		requireCode(t, err, codes.PermissionDenied)
+	})
 }
 
 func Test__CreateFactoryAgentResourceRejectsInaccessibleContextRepo(t *testing.T) {

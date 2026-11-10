@@ -1,4 +1,4 @@
-.PHONY: lint test test.release test.coverage test.coverage.autoparallel test.license.check check.generated.artifacts dev.up dev.setup dev.setup.app dev.setup.go dev.clean.go.cache dev.server dev.server.fg dev.runners dev.logs.runners runner.new doctor-local profile.cpu profile.heap profile.goroutines check.grpc.actions.status check.ee.imports simulate.usage simulate-usage db.reset.billing.trial db.reset.after.onboarding db.snapshot db.restore ensure.bun check.test.ui check.test.ui.shard check.test.ui.browser
+.PHONY: lint test test.release test.coverage test.coverage.autoparallel test.license.check check.generated.artifacts dev.up dev.setup dev.setup.app dev.setup.go dev.clean.go.cache dev.server dev.server.fg dev.runners dev.logs.runners doctor-local profile.cpu profile.heap profile.goroutines check.grpc.actions.status check.ee.imports simulate.usage simulate-usage db.reset.billing.trial db.reset.after.onboarding db.snapshot db.restore ensure.bun check.test.ui check.test.ui.shard check.test.ui.browser
 
 MAKE=make
 MAKEFLAGS+=--no-print-directory
@@ -47,10 +47,6 @@ COMPOSE_RUNNER=$(COMPOSE) --profile local-runner --profile local-runner-image
 GENERATED_ARTIFACT_PATHS := pkg/protos pkg/openapi_client web_src/src/api-client api/swagger/superplane.swagger.json
 OPENAPI_GENERATOR_IMAGE := openapitools/openapi-generator-cli:v7.13.0
 
-# Tests must not inherit compose local-broker defaults. Empty values
-# override docker-compose.dev.yml for this command only.
-TEST_TASK_BROKER_ENV := -e TASK_BROKER_BASE_URL= -e TASK_BROKER_AUTH_TOKEN= -e TASK_BROKER_FLEET_ID= -e TASK_BROKER_PUBLIC_URL=
-
 #
 # Long sausage command to run tests with gotestsum
 #
@@ -59,7 +55,7 @@ TEST_TASK_BROKER_ENV := -e TASK_BROKER_BASE_URL= -e TASK_BROKER_AUTH_TOKEN= -e T
 # - exports junit report
 # - sets parallelism to 1
 #
-GOTESTSUM=$(COMPOSE) run --rm -e DB_NAME=superplane_test $(TEST_TASK_BROKER_ENV) -v $(PWD)/tmp/screenshots:/app/test/screenshots app gotestsum --format short --junitfile junit-report.xml
+GOTESTSUM=$(COMPOSE) run --rm -e DB_NAME=superplane_test -v $(PWD)/tmp/screenshots:/app/test/screenshots app gotestsum --format short --junitfile junit-report.xml
 
 #
 # Targets for test environment
@@ -68,14 +64,24 @@ GOTESTSUM=$(COMPOSE) run --rm -e DB_NAME=superplane_test $(TEST_TASK_BROKER_ENV)
 lint:
 	$(COMPOSE) exec app revive -formatter friendly -config lint.toml -exclude ./tmp/... ./...
 
+.PHONY: check.gosec
+check.gosec: dev.test.is.running
+	mkdir -p tmp/gosec
+	$(COMPOSE) exec -T app bash /app/scripts/with-host-owned-output tmp/gosec gosec \
+		-exclude-generated -exclude-dir=pkg/protos -exclude-dir=pkg/openapi_client \
+		-exclude=G101,G104,G115,G117 \
+		-nosec-require-rules -nosec-require-justification -track-suppressions \
+		-fmt=json -out=tmp/gosec/report.json -stdout -verbose=text \
+		./cmd/... ./pkg/... ./ee/...
+
 tidy:
 	$(COMPOSE) exec app go mod tidy
 
 test.e2e:
-	$(COMPOSE) exec -e DB_NAME=superplane_test $(TEST_TASK_BROKER_ENV) app gotestsum --format short --junitfile junit-report.xml --rerun-fails=3 --rerun-fails-max-failures=1 --packages="$(E2E_TEST_PACKAGES)" -- -p 1 -timeout 30m
+	$(COMPOSE) exec -e DB_NAME=superplane_test app gotestsum --format short --junitfile junit-report.xml --rerun-fails=3 --rerun-fails-max-failures=1 --packages="$(E2E_TEST_PACKAGES)" -- -p 1 -timeout 30m
 
 test.e2e.autoparallel:
-	$(COMPOSE) exec -e DB_NAME=superplane_test $(TEST_TASK_BROKER_ENV) -e SHARD_INDEX -e SHARD_COUNT app bash -lc "cd /app && bash scripts/test_e2e_autoparallel.sh"
+	$(COMPOSE) exec -e DB_NAME=superplane_test -e SHARD_INDEX -e SHARD_COUNT app bash -lc "cd /app && bash scripts/test_e2e_autoparallel.sh"
 
 test.e2e.single:
 	bash ./scripts/vscode_run_tests.sh line $(FILE) $(LINE)
@@ -95,20 +101,28 @@ test.coverage.check:
 	$(MAKE) check.coverage.go
 
 test.coverage.autoparallel:
-	$(COMPOSE) run --rm -e DB_NAME=superplane_test $(TEST_TASK_BROKER_ENV) -e SHARD_INDEX -e SHARD_COUNT -v $(PWD)/tmp/screenshots:/app/test/screenshots app bash -lc "cd /app && bash scripts/test_unit_autoparallel.sh"
+	$(COMPOSE) run --rm -e DB_NAME=superplane_test -e SHARD_INDEX -e SHARD_COUNT -v $(PWD)/tmp/screenshots:/app/test/screenshots app bash -lc "cd /app && bash scripts/test_unit_autoparallel.sh"
 
 test.coverage.baseline.update:
 	$(MAKE) test.coverage
 	$(MAKE) check.coverage.go.baseline.update
 
 test.license.check:
-	bash ./scripts/license-check.sh
+	$(COMPOSE) exec -T app bash ./scripts/license-check.sh
+
+.PHONY: test.license.scanner
+test.license.scanner:
+	$(COMPOSE) exec -T app bash ./scripts/license-check-test.sh
+
+.PHONY: check.vulnerabilities
+check.vulnerabilities:
+	$(COMPOSE) exec -T app bash ./scripts/vulnerability-check.sh
 
 test.watch:
 	$(GOTESTSUM) --packages="$(PKG_TEST_PACKAGES)" --watch -- -p 1
 
 test.shell:
-	$(COMPOSE) run --rm -e DB_NAME=superplane_test $(TEST_TASK_BROKER_ENV) -v $(PWD)/tmp/screenshots:/app/test/screenshots app /bin/bash
+	$(COMPOSE) run --rm -e DB_NAME=superplane_test -v $(PWD)/tmp/screenshots:/app/test/screenshots app /bin/bash
 
 #
 # Code formatting
@@ -130,6 +144,9 @@ dev.test.is.running:
 	@test -n "$$($(COMPOSE) ps --status running -q app 2>/dev/null)" || { echo "Run \`make dev.up\` first (app container is not running)." >&2; exit 1; }
 
 dev.up:
+ifeq ($(strip $(CI)),)
+	@bash ./scripts/check_dev_disk_space.sh
+endif
 	@mkdir -p tmp/screenshots $(GO_CACHE_DIRS)
 	@echo "Starting development containers..."
 	$(COMPOSE) --progress $(COMPOSE_PROGRESS) up -d --wait --build --pull always --quiet-pull $(COMPOSE_UP_EXTRA)
@@ -159,6 +176,52 @@ dev.setup.npm:
 dev.setup.go:
 	@$(COMPOSE) exec app bash /app/scripts/go-mod-download
 	@$(COMPOSE) exec app go build cmd/server/main.go
+
+# CI jobs prepare only the tools, generated code, and services they use.
+# Keep local development setup above unchanged.
+.PHONY: ci.app.up ci.setup.modules ci.setup.go ci.setup.ui ci.setup.test-db ci.setup.unit ci.setup.e2e test.sharding
+ci.app.up:
+	@mkdir -p $(GO_CACHE_DIRS) tmp/screenshots
+	$(COMPOSE) --progress plain up -d --no-deps --wait --build --pull always app
+
+ci.setup.modules:
+	$(COMPOSE) exec -T app bash /app/scripts/go-mod-download
+
+ci.setup.go:
+	$(MAKE) ci.app.up
+	$(MAKE) pb.gen.go
+	$(MAKE) openapi.spec.gen
+	$(MAKE) openapi.client.gen
+	$(MAKE) ci.setup.modules
+
+ci.setup.ui:
+	$(MAKE) ci.app.up
+	$(MAKE) dev.setup.npm
+	$(MAKE) openapi.spec.gen
+	$(MAKE) openapi.web.client.gen
+
+ci.setup.test-db:
+	$(COMPOSE) up -d --wait db rabbitmq
+	$(MAKE) db.create DB_NAME=superplane_test
+	$(MAKE) db.migrate DB_NAME=superplane_test
+
+ci.setup.unit:
+	$(MAKE) ci.setup.go
+	$(MAKE) ci.setup.test-db
+
+ci.setup.e2e:
+	$(MAKE) ci.setup.ui
+	$(MAKE) pb.gen.go
+	$(MAKE) openapi.client.gen
+	$(MAKE) ci.setup.modules
+	$(MAKE) ci.setup.test-db
+
+test.sharding:
+	$(COMPOSE) exec -T app bash scripts/test_sharding_test.sh
+
+.PHONY: test.dev.disk
+test.dev.disk:
+	bash scripts/check_dev_disk_space_test.sh
 
 .PHONY: dev.setup.runner.fleet
 dev.setup.runner.fleet:
@@ -200,9 +263,6 @@ dev.runners:
 	@$(MAKE) dev.setup.runner.fleet
 	$(COMPOSE_RUNNER) up -d --no-build --no-deps fleet-manager
 	@echo "Fleet Manager is running with ephemeral Docker runners."
-
-runner.new:
-	@bash ./scripts/runner-new
 
 dev.start.ephemeral:
 	bash ./scripts/ephemeral/start-caddy.sh $(BASE_URL)
@@ -326,6 +386,10 @@ check.models.tx.debt:
 check.models.tx.debt.baseline.update:
 	@$(COMPOSE) exec app go run ./scripts/check_models_tx_debt.go --update-baseline
 
+.PHONY: check.admin.routes
+check.admin.routes:
+	@$(COMPOSE) exec app go run ./scripts/check_admin_routes.go
+
 # Core workflows depend on billing contracts; server binds Enterprise code.
 check.ee.imports:
 	@$(COMPOSE) exec app go run ./scripts/check_ee_imports.go
@@ -377,7 +441,7 @@ check.lint.ui:
 	$(COMPOSE) exec app bash -c "cd web_src && npm run lint:budget"
 
 check.lint.ui.knip:
-	$(COMPOSE) exec app bash -c "cd web_src && npm ci && npm run lint:knip"
+	$(COMPOSE) exec app bash -c "cd web_src && npm run lint:knip"
 
 check.lint.ui.baseline.update:
 	$(COMPOSE) exec app bash -c "cd web_src && npm run lint:baseline:update"
@@ -527,26 +591,69 @@ check.components.docs:
 	$(COMPOSE) run --rm app bash -c "go run scripts/generate_components_docs.go"
 	git diff --exit-code docs/components
 
-MODULES := authorization,organizations,integrations,factories,secrets,users,groups,roles,me,configuration,components,actions,triggers,widgets,canvases,api_keys,agents,files,admin/fleets,admin/keys
-REST_API_MODULES := authorization,organizations,integrations,factories,secrets,users,groups,roles,me,configuration,actions,triggers,widgets,canvases,api_keys,agents,files,admin/fleets,admin/keys
+MODULES := \
+	authorization, \
+	organizations, \
+	integrations, \
+	factories, \
+	secrets, \
+	users, \
+	groups, \
+	roles, \
+	me, \
+	configuration, \
+	components, \
+	actions, \
+	triggers, \
+	widgets, \
+	canvases, \
+	api_keys, \
+	files, \
+	admin/fleets, \
+	admin/keys, \
+	admin/organizations
+REST_API_MODULES := \
+	authorization, \
+	organizations, \
+	integrations, \
+	factories, \
+	secrets, \
+	users, \
+	groups, \
+	roles, \
+	me, \
+	configuration, \
+	actions, \
+	triggers, \
+	widgets, \
+	canvases, \
+	api_keys, \
+	files, \
+	admin/fleets, \
+	admin/keys, \
+	admin/organizations
 
 pb.gen: dev.test.is.running
-	$(MAKE) pb.gen.models
-	$(MAKE) pb.gen.gateway
-	@$(COMPOSE) exec --user $(shell id -u):$(shell id -g) app bash -lc "find pkg/protos -name '*.go' -print0 | xargs -0 gofmt -s -w"
+	$(MAKE) pb.gen.go
 	$(MAKE) openapi.spec.gen
 	$(MAKE) openapi.client.gen
 	$(MAKE) openapi.web.client.gen
 	@$(COMPOSE) exec --user $(shell id -u):$(shell id -g) app bash -lc 'date +%s%N > /app/.air-rebuild'
 
+.PHONY: pb.gen.go
+pb.gen.go: dev.test.is.running
+	$(MAKE) pb.gen.models
+	$(MAKE) pb.gen.gateway
+	@$(COMPOSE) exec --user $(shell id -u):$(shell id -g) app bash -lc "find pkg/protos -name '*.go' -print0 | xargs -0 gofmt -s -w"
+
 pb.gen.models:
-	@$(COMPOSE) exec app /app/scripts/protoc.sh $(MODULES)
+	@$(COMPOSE) exec app /app/scripts/protoc.sh "$(MODULES)"
 
 pb.gen.gateway:
-	@$(COMPOSE) exec app /app/scripts/protoc_gateway.sh $(REST_API_MODULES)
+	@$(COMPOSE) exec app /app/scripts/protoc_gateway.sh "$(REST_API_MODULES)"
 
 openapi.spec.gen: dev.test.is.running
-	@$(COMPOSE) exec app /app/scripts/protoc_openapi_spec.sh $(REST_API_MODULES)
+	@$(COMPOSE) exec app /app/scripts/protoc_openapi_spec.sh "$(REST_API_MODULES)"
 
 # Recreate the output directory in the app container. A host rm and mkdir
 # leaves Docker Desktop with a stale directory, and the generator cannot write.
@@ -590,15 +697,8 @@ cli.build.binary:
 cli.build: cli.build.prepare
 	$(MAKE) cli.build.binary
 
-admincli.build:
-	$(MAKE) pb.gen
-	$(COMPOSE) exec -e GOOS=$(OS) -e GOARCH=$(ARCH) app bash -c 'go build -o build/admin cmd/admin/main.go'
-
 cli.build.m1:
 	$(MAKE) cli.build OS=darwin ARCH=arm64
-
-admincli.build.m1:
-	$(MAKE) admincli.build OS=darwin ARCH=arm64
 
 IMAGE?=superplane
 IMAGE_TAG?=$(shell git rev-list -1 HEAD -- .)
@@ -619,6 +719,35 @@ image.build:
 	  --build-arg VITE_ASSET_BASE_URL=$(VITE_ASSET_BASE_URL) \
 	  --build-arg FRONTEND_PREBUILT=$(FRONTEND_PREBUILT) \
 	  --progress plain -t $(IMAGE):$(IMAGE_TAG) .
+
+# CI builds in the app container so Go can use its mounted caches directly.
+# Select arm64 explicitly when validating this path on an ARM development host.
+IMAGE_PLATFORM?=linux/amd64
+IMAGE_BUILD_DIR?=tmp/image-artifacts
+
+.PHONY: image.ci.up image.prepare image.package test.image
+image.ci.up: ci.app.up
+
+image.prepare:
+	$(MAKE) pb.gen
+	mkdir -p "$(IMAGE_BUILD_DIR)"
+	$(COMPOSE) exec -T app bash /app/scripts/with-host-owned-output "$(IMAGE_BUILD_DIR)" bash -lec '\
+	  test "$$(go env GOOS)/$$(go env GOARCH)" = "$(IMAGE_PLATFORM)" || { \
+	    echo "Build container must match IMAGE_PLATFORM=$(IMAGE_PLATFORM)" >&2; exit 1; \
+	  }; \
+	  go build -o "$(IMAGE_BUILD_DIR)/app/build/superplane" cmd/server/main.go; \
+	  mkdir -p "$(IMAGE_BUILD_DIR)/usr/bin"; \
+	  cp /usr/bin/createdb /usr/bin/migrate "$(IMAGE_BUILD_DIR)/usr/bin/"'
+	$(COMPOSE) exec -T app bash -lc 'cd web_src && NODE_OPTIONS=--max-old-space-size=4096 npx tsc -b'
+
+image.package:
+	docker build -f Dockerfile --target runner --platform $(IMAGE_PLATFORM) \
+	  --build-arg ARTIFACTS_STAGE=prebuilt \
+	  --progress plain -t $(IMAGE):$(IMAGE_TAG) "$(IMAGE_BUILD_DIR)"
+
+test.image:
+	bash scripts/build_image_test.sh
+	$(COMPOSE) exec -T app bash /app/scripts/build_image_ownership_test.sh
 
 image.auth:
 	@test -n "$$GHCR_PUSH_TOKEN" || (echo "GHCR_PUSH_TOKEN is empty" >&2; exit 1)

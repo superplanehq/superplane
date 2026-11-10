@@ -4,6 +4,7 @@ import { Heading } from "@/components/Heading/heading";
 import { Table, TableHead, TableBody, TableRow, TableHeader, TableCell } from "@/components/Table/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
@@ -37,7 +38,7 @@ function dateInputValue(date: Date): string {
 }
 
 export function RegistrationStats() {
-  const [query, setQuery] = useState(() => ({ ...registrationPeriod("today"), offset: 0 }));
+  const [query, setQuery] = useState(() => ({ ...registrationPeriod("today"), offset: 0, excludeInternal: true }));
   const [report, setReport] = useState<RegistrationReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -50,12 +51,17 @@ export function RegistrationStats() {
     const controller = new AbortController();
     setLoading(true);
     setError(false);
-    const params = new URLSearchParams({ start: query.start, end: query.end, offset: String(query.offset) });
+    const params = new URLSearchParams({
+      start: query.start,
+      end: query.end,
+      offset: String(query.offset),
+      exclude_internal: String(query.excludeInternal),
+    });
     void fetch(`/admin/api/stats?${params}`, { credentials: "include", signal: controller.signal })
       .then(async (response) => {
         if (!response.ok) throw new Error("Failed to load statistics");
         const result: RegistrationResponse = await response.json();
-        const key = `${query.start}|${query.end}`;
+        const key = `${query.start}|${query.end}|${query.excludeInternal}`;
         if (result.trial_granted_cents !== undefined && result.trial_spent_cents !== undefined) {
           totals.current = { key, granted: result.trial_granted_cents, spent: result.trial_spent_cents };
         }
@@ -83,7 +89,14 @@ export function RegistrationStats() {
         <Heading level={1}>Statistics</Heading>
         <p className="text-sm text-gray-500 dark:text-gray-400">Track new organizations and their trial credits.</p>
       </header>
-      <RegistrationDateFilter period={query} onChange={(period) => setQuery({ ...period, offset: 0 })} />
+      <RegistrationDateFilter
+        period={query}
+        onChange={(period) => setQuery((current) => ({ ...current, ...period, offset: 0 }))}
+        excludeInternal={query.excludeInternal}
+        onExcludeInternalChange={(excludeInternal) =>
+          setQuery((current) => ({ ...current, excludeInternal, offset: 0 }))
+        }
+      />
       {loading ? (
         <p role="status" className="py-8 text-sm text-gray-500 dark:text-gray-400">
           Loading statistics...
@@ -114,7 +127,11 @@ export function RegistrationStats() {
 function RegistrationDateFilter({
   period,
   onChange,
+  excludeInternal,
+  onExcludeInternalChange,
 }: {
+  excludeInternal: boolean;
+  onExcludeInternalChange: (excludeInternal: boolean) => void;
   period: RegistrationPeriod;
   onChange: (period: RegistrationPeriod) => void;
 }) {
@@ -163,6 +180,14 @@ function RegistrationDateFilter({
           {new Date(period.start).toLocaleDateString()} –{" "}
           {new Date(new Date(period.end).getTime() - 1).toLocaleDateString()}
         </p>
+      </div>
+      <div className="flex items-center gap-2">
+        <Checkbox
+          id="exclude-internal"
+          checked={excludeInternal}
+          onChange={(event) => onExcludeInternalChange(event.target.checked)}
+        />
+        <Label htmlFor="exclude-internal">Exclude @superplane.com owners</Label>
       </div>
       {preset === "custom" && (
         <form
@@ -245,8 +270,8 @@ export function RegistrationStatsReport({
           Newly registered organizations
         </h2>
         <p className="mt-1 mb-4 text-sm text-gray-500 dark:text-gray-400">
-          Credit totals cover all organizations registered in this period, through today. Plans and available credits
-          show current values.
+          Credit totals cover organizations that match these filters, through today. Plans and available credits show
+          current values.
         </p>
         <Table dense>
           <TableHead>

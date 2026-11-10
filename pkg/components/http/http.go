@@ -33,9 +33,10 @@ const (
 	SuccessOutputChannel = "success"
 	FailureOutputChannel = "failure"
 
-	AuthorizationTypeBearer       = "bearer"
-	AuthorizationTypeBasicAuth    = "basic_auth"
-	AuthorizationTypeCustomHeader = "custom_header"
+	AuthorizationTypeBearer            = "bearer"
+	AuthorizationTypeIntegrationBearer = "integration_bearer"
+	AuthorizationTypeBasicAuth         = "basic_auth"
+	AuthorizationTypeCustomHeader      = "custom_header"
 )
 
 func init() {
@@ -53,28 +54,31 @@ type KeyValue struct {
 }
 
 type AuthorizationSpec struct {
-	Type       string                     `json:"type" mapstructure:"type"`
-	Credential configuration.SecretKeyRef `json:"credential,omitempty" mapstructure:"credential"`
-	Username   string                     `json:"username,omitempty" mapstructure:"username"`
-	Password   configuration.SecretKeyRef `json:"password,omitempty" mapstructure:"password"`
-	HeaderName string                     `json:"headerName,omitempty" mapstructure:"headerName"`
-	Value      configuration.SecretKeyRef `json:"value,omitempty" mapstructure:"value"`
+	Type           string                       `json:"type" mapstructure:"type"`
+	Credential     configuration.SecretKeyRef   `json:"credential,omitempty" mapstructure:"credential"`
+	Integration    configuration.IntegrationRef `json:"integration,omitempty" mapstructure:"integration"`
+	IntegrationKey string                       `json:"integrationKey,omitempty" mapstructure:"integrationKey"`
+	Username       string                       `json:"username,omitempty" mapstructure:"username"`
+	Password       configuration.SecretKeyRef   `json:"password,omitempty" mapstructure:"password"`
+	HeaderName     string                       `json:"headerName,omitempty" mapstructure:"headerName"`
+	Value          configuration.SecretKeyRef   `json:"value,omitempty" mapstructure:"value"`
 }
 
 type Spec struct {
-	Method         string             `json:"method"`
-	URL            string             `json:"url"`
-	QueryParams    *[]KeyValue        `json:"queryParams,omitempty"`
-	Headers        *[]Header          `json:"headers,omitempty"`
-	ContentType    *string            `json:"contentType,omitempty"`
-	JSON           *any               `json:"json,omitempty"`
-	XML            *string            `json:"xml,omitempty"`
-	Text           *string            `json:"text,omitempty"`
-	FormData       *[]KeyValue        `json:"formData,omitempty"`
-	TimeoutSeconds *int               `json:"timeoutSeconds,omitempty"`
-	Retry          *RetrySpec         `json:"retry,omitempty"`
-	SuccessCodes   *string            `json:"successCodes,omitempty"`
-	Authorization  *AuthorizationSpec `json:"authorization,omitempty" mapstructure:"authorization"`
+	Method                 string             `json:"method"`
+	URL                    string             `json:"url"`
+	QueryParams            *[]KeyValue        `json:"queryParams,omitempty"`
+	Headers                *[]Header          `json:"headers,omitempty"`
+	ContentType            *string            `json:"contentType,omitempty"`
+	JSON                   *any               `json:"json,omitempty"`
+	XML                    *string            `json:"xml,omitempty"`
+	Text                   *string            `json:"text,omitempty"`
+	FormData               *[]KeyValue        `json:"formData,omitempty"`
+	TimeoutSeconds         *int               `json:"timeoutSeconds,omitempty"`
+	Retry                  *RetrySpec         `json:"retry,omitempty"`
+	SuccessCodes           *string            `json:"successCodes,omitempty"`
+	Authorization          *AuthorizationSpec `json:"authorization,omitempty" mapstructure:"authorization"`
+	RedactSensitiveHeaders bool               `json:"redactSensitiveHeaders,omitempty" mapstructure:"redactSensitiveHeaders"`
 }
 
 func (s *Spec) Timeout() time.Duration {
@@ -154,7 +158,7 @@ and status without downloading the full response payload.
 - **Method**: HTTP method to use
 - **Query Parameters**: Optional URL query parameters
 - **Headers**: Custom HTTP headers (header names cannot use expressions)
-- **Authorization** (optional): Bearer Token, Basic Auth password, or custom header value
+- **Authorization** (optional): Bearer token from an organization secret or connected integration, Basic Auth password, or custom header value. For a connected integration, select its name and enter the exported token key.
 - **Body**: Request body in various formats:
   - **JSON**: Structured JSON payload
   - **Form Data**: URL-encoded form data
@@ -168,6 +172,13 @@ The component emits the response with:
 - **status**: HTTP status code
 - **headers**: Response headers
 - **body**: Parsed response body (JSON if possible, otherwise string)
+
+If the response exceeds the event size limit, the component emits a failure event with the status and error.
+The body and headers are omitted.
+
+Enable **Remove sensitive headers** to remove authorization, cookie, token, secret, password, and API key headers before outputs or retry metadata are stored.
+This also filters nested JSON headers and removes cookie fields. Non-JSON bodies and unsupported header formats are omitted.
+Other response fields are unchanged. This option is disabled by default.
 `
 }
 
@@ -265,6 +276,11 @@ func validateAuthorizationSpec(a *AuthorizationSpec) error {
 		return fmt.Errorf("authorization: type is required when authorization is set")
 	case AuthorizationTypeBearer:
 		return validateSecretKeyRef("authorization bearer credential", a.Credential)
+	case AuthorizationTypeIntegrationBearer:
+		if !a.Integration.IsSet() || strings.TrimSpace(a.IntegrationKey) == "" {
+			return fmt.Errorf("authorization integration bearer: integration and key are required")
+		}
+		return nil
 	case AuthorizationTypeBasicAuth:
 		if a.Username == "" {
 			return fmt.Errorf("authorization basic auth: username is required")
@@ -303,6 +319,16 @@ func applyAuthorizationHeader(secrets core.SecretsContext, spec Spec, req *http.
 		value, err := resolveAuthorizationSecret(secrets, "bearer credential", spec.Authorization.Credential)
 		if err != nil {
 			return err
+		}
+		req.Header.Set("Authorization", "Bearer "+string(value))
+	case AuthorizationTypeIntegrationBearer:
+		integration, err := secrets.GetIntegrationSecrets(spec.Authorization.Integration.Name)
+		if err != nil {
+			return fmt.Errorf("authorization integration bearer: resolve integration: %w", err)
+		}
+		value := integration.Values[spec.Authorization.IntegrationKey]
+		if len(value) == 0 {
+			return fmt.Errorf("authorization integration bearer: key %q is unavailable", spec.Authorization.IntegrationKey)
 		}
 		req.Header.Set("Authorization", "Bearer "+string(value))
 	case AuthorizationTypeBasicAuth:
@@ -392,6 +418,7 @@ func (e *HTTP) Configuration() []configuration.Field {
 								Select: &configuration.SelectTypeOptions{
 									Options: []configuration.FieldOption{
 										{Label: "Bearer Token", Value: AuthorizationTypeBearer},
+										{Label: "Connected integration token", Value: AuthorizationTypeIntegrationBearer},
 										{Label: "Basic Auth", Value: AuthorizationTypeBasicAuth},
 										{Label: "Custom Header", Value: AuthorizationTypeCustomHeader},
 									},
@@ -409,6 +436,22 @@ func (e *HTTP) Configuration() []configuration.Field {
 							RequiredConditions: []configuration.RequiredCondition{
 								{Field: "type", Values: []string{AuthorizationTypeBearer}},
 							},
+						},
+						{
+							Name:                 "integration",
+							Label:                "Integration",
+							Type:                 configuration.FieldTypeIntegration,
+							Description:          "Name of the connected integration",
+							VisibilityConditions: []configuration.VisibilityCondition{{Field: "type", Values: []string{AuthorizationTypeIntegrationBearer}}},
+							RequiredConditions:   []configuration.RequiredCondition{{Field: "type", Values: []string{AuthorizationTypeIntegrationBearer}}},
+						},
+						{
+							Name:                 "integrationKey",
+							Label:                "Token key",
+							Type:                 configuration.FieldTypeString,
+							Description:          "Key exported by the connected integration",
+							VisibilityConditions: []configuration.VisibilityCondition{{Field: "type", Values: []string{AuthorizationTypeIntegrationBearer}}},
+							RequiredConditions:   []configuration.RequiredCondition{{Field: "type", Values: []string{AuthorizationTypeIntegrationBearer}}},
 						},
 						{
 							Name:        "username",
@@ -635,6 +678,13 @@ func (e *HTTP) Configuration() []configuration.Field {
 			Placeholder: "<?xml version=\"1.0\"?>\n<root>\n  <element>value</element>\n</root>",
 		},
 		{
+			Name:        "redactSensitiveHeaders",
+			Type:        configuration.FieldTypeBool,
+			Label:       "Remove sensitive headers",
+			Default:     false,
+			Description: "Remove sensitive headers and cookies before storage. Filter JSON header fields and omit non-JSON bodies.",
+		},
+		{
 			Name:        "successCodes",
 			Type:        configuration.FieldTypeString,
 			Label:       "Overwrite success definition",
@@ -819,7 +869,7 @@ func (e *HTTP) executeRequestWithoutRetry(ctx core.ExecutionContext, spec Spec) 
 	}
 
 	if e.isSuccessfulResponse(response.StatusCode, spec.GetSuccessCodes()) {
-		return ctx.ExecutionState.Emit(
+		err := ctx.ExecutionState.Emit(
 			SuccessOutputChannel,
 			"http.request.finished",
 			[]any{map[string]any{
@@ -828,9 +878,10 @@ func (e *HTTP) executeRequestWithoutRetry(ctx core.ExecutionContext, spec Spec) 
 				"body":    bodyData,
 			}},
 		)
+		return handleResponseEmitError(ctx.ExecutionState, response.StatusCode, err)
 	}
 
-	return ctx.ExecutionState.Emit(
+	err = ctx.ExecutionState.Emit(
 		FailureOutputChannel,
 		"http.request.failed",
 		[]any{map[string]any{
@@ -839,6 +890,7 @@ func (e *HTTP) executeRequestWithoutRetry(ctx core.ExecutionContext, spec Spec) 
 			"body":    bodyData,
 		}},
 	)
+	return handleResponseEmitError(ctx.ExecutionState, response.StatusCode, err)
 }
 
 func (e *HTTP) executeRequest(logger *log.Entry, secrets core.SecretsContext, httpCtx core.HTTPContext, spec Spec) (*http.Response, error) {
@@ -906,7 +958,7 @@ func (e *HTTP) executeRequest(logger *log.Entry, secrets core.SecretsContext, ht
 	// We replace resp.Body with the buffered content so callers (processResponse)
 	// can read it without hitting "context canceled" errors.
 	//
-	// See: https://github.com/superplanehq/superplane/issues/3141
+	// See SuperPlane issue 3141.
 	//
 	bodyBytes, err := io.ReadAll(resp.Body)
 	resp.Body.Close()
@@ -914,6 +966,9 @@ func (e *HTTP) executeRequest(logger *log.Entry, secrets core.SecretsContext, ht
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
 
+	if spec.RedactSensitiveHeaders {
+		resp.Header, bodyBytes = redactResponse(resp.Header, bodyBytes)
+	}
 	resp.Body = io.NopCloser(bytes.NewReader(bodyBytes))
 	return resp, nil
 }
@@ -958,11 +1013,12 @@ func (e *HTTP) handleRequestFailure(metadataCtx core.MetadataWriter, executionSt
 		errorResponse["error"] = reqErr.Error()
 	}
 
-	return executionStateCtx.Emit(
+	err := executionStateCtx.Emit(
 		FailureOutputChannel,
 		"http.request.failure",
 		[]any{errorResponse},
 	)
+	return handleResponseEmitError(executionStateCtx, resp.StatusCode, err)
 }
 
 func (e *HTTP) processResponse(metadataCtx core.MetadataWriter, executionStateCtx core.ExecutionStateContext, resp *http.Response, spec Spec) error {
@@ -988,7 +1044,7 @@ func (e *HTTP) processResponse(metadataCtx core.MetadataWriter, executionStateCt
 	}
 
 	if e.isSuccessfulResponse(resp.StatusCode, spec.GetSuccessCodes()) {
-		return executionStateCtx.Emit(
+		err := executionStateCtx.Emit(
 			SuccessOutputChannel,
 			"http.request.finished",
 			[]any{map[string]any{
@@ -997,9 +1053,10 @@ func (e *HTTP) processResponse(metadataCtx core.MetadataWriter, executionStateCt
 				"body":    bodyData,
 			}},
 		)
+		return handleResponseEmitError(executionStateCtx, resp.StatusCode, err)
 	}
 
-	return executionStateCtx.Emit(
+	err = executionStateCtx.Emit(
 		FailureOutputChannel,
 		"http.request.failed",
 		[]any{map[string]any{
@@ -1008,6 +1065,18 @@ func (e *HTTP) processResponse(metadataCtx core.MetadataWriter, executionStateCt
 			"body":    bodyData,
 		}},
 	)
+	return handleResponseEmitError(executionStateCtx, resp.StatusCode, err)
+}
+
+func handleResponseEmitError(state core.ExecutionStateContext, status int, err error) error {
+	if !errors.Is(err, core.ErrEventPayloadTooLarge) {
+		return err
+	}
+
+	return state.Emit(FailureOutputChannel, "http.request.failed", []any{map[string]any{
+		"status": status,
+		"error":  fmt.Sprintf("response omitted: %v", err),
+	}})
 }
 
 func (e *HTTP) isSuccessfulResponse(statusCode int, successCodes string) bool {

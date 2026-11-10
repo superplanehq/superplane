@@ -187,6 +187,8 @@ func compileWithStubEnv(body string, knownNodeNames map[string]struct{}, extraEn
 		expr.WithContext("ctx"),
 		expr.Timezone(time.UTC.String()),
 		exprruntime.DateFunctionOption(),
+		exprruntime.SentryIssueDescriptionOption(),
+		exprruntime.SentryEventHasStackOption(),
 		expr.Function("root", func(params ...any) (any, error) { return nil, nil }),
 		expr.Function("previous", func(params ...any) (any, error) { return nil, nil }),
 		expr.Function("run", func(params ...any) (any, error) { return nil, nil }),
@@ -196,6 +198,7 @@ func compileWithStubEnv(body string, knownNodeNames map[string]struct{}, extraEn
 		expr.Function("workspace", func(params ...any) (any, error) { return nil, nil }),
 	}
 
+	opts = append(opts, exprruntime.MarkdownFunctionOptions()...)
 	if _, err := expr.Compile(body, opts...); err != nil {
 		return fmt.Errorf("compile error: %s", firstLine(err.Error()))
 	}

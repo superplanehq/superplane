@@ -3,7 +3,8 @@ import { LoadingButton } from "@/components/ui/loading-button";
 import { Loader2 } from "lucide-react";
 import { useMemo, useState } from "react";
 
-import { RepositoryPicker } from "../onboardingSteps";
+import { RepositoryDefaultBranchPicker, RepositoryPicker } from "../onboardingSteps";
+import { repositoryBranchChosen, type RepositoryBranchPrompt } from "../repositoryBranchPrompt";
 import { FIRST_RUN_COPY } from "./firstRunCopy";
 import { FirstRunGithubStepper } from "./FirstRunGithubStepper";
 import { FirstRunMissingAccessLine } from "./FirstRunMissingAccessLine";
@@ -61,6 +62,7 @@ export function FirstRunChooseScreen({
   onConnectAnotherGitHubAccount,
   onGrantAccess,
   onContinue,
+  branchPrompt,
 }: {
   repositories: string[];
   selectedRepository: string | null;
@@ -83,6 +85,7 @@ export function FirstRunChooseScreen({
   onConnectAnotherGitHubAccount?: () => void;
   onGrantAccess: () => void;
   onContinue: () => void;
+  branchPrompt?: RepositoryBranchPrompt;
 }) {
   const busy = Boolean(loading || saving || grantingAccess || switchingGitHubAccount);
   const organizationChoice = useOrganizationChoice(repositories, selectedRepository, onClearRepository);
@@ -104,25 +107,15 @@ export function FirstRunChooseScreen({
       sphere={displaySphere}
       visual="preview"
     >
-      <FirstRunHeading headline={organization ? copy.headline : copy.organizationHeadline}>
-        <p className="text-[13px] text-muted-foreground">
-          {organization ? copy.repositoryHelper : copy.organizationHelper}
-        </p>
-        {githubLogin ? (
-          <FirstRunSignedInAsLine
-            login={githubLogin}
-            activeKey={githubUserId}
-            identities={githubLinkedIdentities(githubIdentities)}
-            disabled={busy}
-            signedInPrefix={FIRST_RUN_COPY.connect.signedInAsPrefix}
-            signedInSuffix={FIRST_RUN_COPY.connect.signedInAsSuffix}
-            connectAnotherLabel={copy.connectAnotherAccount}
-            testIds={githubSignedInTestIds}
-            onSelectIdentity={onSelectGitHubIdentity}
-            onConnectAnotherAccount={onConnectAnotherGitHubAccount}
-          />
-        ) : null}
-      </FirstRunHeading>
+      <ChooseHeading
+        organization={organization}
+        githubLogin={githubLogin}
+        githubUserId={githubUserId}
+        githubIdentities={githubIdentities}
+        busy={busy}
+        onSelectGitHubIdentity={onSelectGitHubIdentity}
+        onConnectAnotherGitHubAccount={onConnectAnotherGitHubAccount}
+      />
 
       <div className="mt-8 space-y-4">
         {organization ? (
@@ -135,11 +128,13 @@ export function FirstRunChooseScreen({
               grantingAccess={grantingAccess}
               onSelectRepository={onSelectRepository}
               onGrantAccess={onGrantAccess}
+              branchPrompt={branchPrompt}
             />
             <ChooseContinue
               selectedRepository={selectedRepository}
               saving={saving}
               busy={busy}
+              branchPrompt={branchPrompt}
               onContinue={onContinue}
             />
           </FirstRunGithubStepper>
@@ -189,6 +184,46 @@ function useOrganizationChoice(
   };
 }
 
+function ChooseHeading({
+  organization,
+  githubLogin,
+  githubUserId,
+  githubIdentities,
+  busy,
+  onSelectGitHubIdentity,
+  onConnectAnotherGitHubAccount,
+}: {
+  organization: string | null;
+  githubLogin: string;
+  githubUserId: string;
+  githubIdentities: MeVcsProviderIdentity[];
+  busy: boolean;
+  onSelectGitHubIdentity?: (userId: string) => void;
+  onConnectAnotherGitHubAccount?: () => void;
+}) {
+  return (
+    <FirstRunHeading headline={organization ? copy.headline : copy.organizationHeadline}>
+      <p className="text-[13px] text-muted-foreground">
+        {organization ? copy.repositoryHelper : copy.organizationHelper}
+      </p>
+      {githubLogin ? (
+        <FirstRunSignedInAsLine
+          login={githubLogin}
+          activeKey={githubUserId}
+          identities={githubLinkedIdentities(githubIdentities)}
+          disabled={busy}
+          signedInPrefix={FIRST_RUN_COPY.connect.signedInAsPrefix}
+          signedInSuffix={FIRST_RUN_COPY.connect.signedInAsSuffix}
+          connectAnotherLabel={copy.connectAnotherAccount}
+          testIds={githubSignedInTestIds}
+          onSelectIdentity={onSelectGitHubIdentity}
+          onConnectAnotherAccount={onConnectAnotherGitHubAccount}
+        />
+      ) : null}
+    </FirstRunHeading>
+  );
+}
+
 function RepositoryStepBody({
   repositories,
   selectedRepository,
@@ -197,6 +232,7 @@ function RepositoryStepBody({
   grantingAccess,
   onSelectRepository,
   onGrantAccess,
+  branchPrompt,
 }: {
   repositories: string[];
   selectedRepository: string | null;
@@ -205,6 +241,7 @@ function RepositoryStepBody({
   grantingAccess: boolean;
   onSelectRepository: (repository: string) => void;
   onGrantAccess: () => void;
+  branchPrompt?: RepositoryBranchPrompt;
 }) {
   return (
     <>
@@ -216,6 +253,7 @@ function RepositoryStepBody({
         listClassName="max-h-48"
         onSelect={onSelectRepository}
       />
+      {branchPrompt ? <RepositoryDefaultBranchPicker prompt={branchPrompt} /> : null}
       <FirstRunMissingAccessLine
         hint={copy.writeAccessHint}
         question={copy.missingRepository}
@@ -247,11 +285,13 @@ function ChooseContinue({
   selectedRepository,
   saving,
   busy,
+  branchPrompt,
   onContinue,
 }: {
   selectedRepository: string | null;
   saving: boolean;
   busy: boolean;
+  branchPrompt?: RepositoryBranchPrompt;
   onContinue: () => void;
 }) {
   return (
@@ -259,7 +299,7 @@ function ChooseContinue({
       <LoadingButton
         type="button"
         className="w-full"
-        disabled={!selectedRepository || busy}
+        disabled={!selectedRepository || busy || !repositoryBranchChosen(branchPrompt)}
         loading={saving}
         loadingText={copy.saving}
         onClick={onContinue}

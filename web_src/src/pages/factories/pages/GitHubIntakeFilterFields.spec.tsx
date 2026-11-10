@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { describe, expect, it } from "bun:test";
@@ -55,8 +55,7 @@ describe("GitHubIntakeFilterFields", () => {
       />,
     );
 
-    expect(screen.queryByRole("radio")).not.toBeInTheDocument();
-    expect(screen.getByRole("checkbox", { name: "Issue has one of these labels" })).toBeChecked();
+    expect(screen.getByRole("radio", { name: "Only issues with selected labels" })).toBeChecked();
     expect(screen.getByRole("button", { name: "Remove bug" })).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Save" }));
@@ -82,9 +81,10 @@ describe("GitHubIntakeFilterFields", () => {
       />,
     );
 
-    const options = within(screen.getByTestId("intake-label-options"));
-    await user.click(options.getByRole("checkbox", { name: "docs" }));
-    await user.click(options.getByRole("checkbox", { name: "superplane" }));
+    await user.click(screen.getByRole("combobox", { name: "Search or add a label" }));
+    await user.click(screen.getByRole("option", { name: "docs" }));
+    await user.click(screen.getByRole("combobox", { name: "Search or add a label" }));
+    await user.click(screen.getByRole("option", { name: "superplane" }));
     await user.click(screen.getByRole("button", { name: "Save" }));
 
     expect(saved?.labels).toEqual(["bug", "docs", "superplane"]);
@@ -103,7 +103,7 @@ describe("GitHubIntakeFilterFields", () => {
       />,
     );
 
-    await user.click(screen.getByRole("checkbox", { name: "Issue has one of these labels" }));
+    await user.click(screen.getByRole("radio", { name: "All issues" }));
     await user.click(screen.getByRole("button", { name: "Save" }));
 
     expect(saved?.filterByLabel).toBe(false);
@@ -115,11 +115,14 @@ describe("GitHubIntakeFilterFields", () => {
     const user = userEvent.setup();
     render(<FilterHarness initial={excludeSettings()} onSave={() => undefined} />);
 
-    const options = within(screen.getByTestId("intake-label-options"));
-    const list = () => options.getAllByRole("checkbox").map((checkbox) => checkbox.getAttribute("aria-label"));
+    const list = () => screen.getAllByRole("option").map((option) => option.textContent);
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("combobox", { name: "Search or add a label" }));
     expect(list()).toEqual(["superplane", "docs"]);
 
-    await user.click(options.getByRole("checkbox", { name: "docs" }));
+    await user.click(screen.getByRole("combobox", { name: "Search or add a label" }));
+    await user.click(screen.getByRole("option", { name: "docs" }));
+    await user.click(screen.getByRole("combobox", { name: "Search or add a label" }));
     expect(list()).toEqual(["superplane"]);
     expect(screen.getByRole("button", { name: "Remove docs" })).toBeInTheDocument();
 
@@ -131,45 +134,42 @@ describe("GitHubIntakeFilterFields", () => {
     const user = userEvent.setup();
     render(<FilterHarness initial={excludeSettings()} onSave={() => undefined} />);
 
-    await user.type(screen.getByRole("textbox", { name: "Search or add a label" }), "doc");
+    await user.type(screen.getByRole("combobox", { name: "Search or add a label" }), "doc");
 
-    const options = within(screen.getByTestId("intake-label-options"));
-    expect(options.getByRole("checkbox", { name: "docs" })).toBeInTheDocument();
-    expect(options.queryByRole("checkbox", { name: "superplane" })).not.toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "docs" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "superplane" })).not.toBeInTheDocument();
   });
 
   it("creates a label that does not exist in the repository", async () => {
     const user = userEvent.setup();
     render(<FilterHarness initial={excludeSettings()} onSave={() => undefined} />);
 
-    await user.type(screen.getByRole("textbox", { name: "Search or add a label" }), "needs-triage");
-    await user.click(screen.getByRole("button", { name: 'Add label "needs-triage"' }));
+    await user.type(screen.getByRole("combobox", { name: "Search or add a label" }), "needs-triage");
+    await user.click(screen.getByRole("option", { name: 'Add label "needs-triage"' }));
 
     expect(screen.getByRole("button", { name: "Remove needs-triage" })).toBeInTheDocument();
-    expect(screen.getByRole("textbox", { name: "Search or add a label" })).toHaveValue("");
+    expect(screen.getByRole("combobox", { name: "Search or add a label" })).toHaveValue("");
+    await user.type(
+      screen.getByRole("combobox", { name: "Search or add a label" }),
+      " NEEDS-TRIAGE {ArrowDown}{Enter}{Escape}",
+    );
+    expect(screen.getAllByRole("button", { name: /Remove needs-triage/i })).toHaveLength(1);
   });
 
-  it("replaces the search with a manual add when every label is selected", async () => {
+  it("accepts a custom label after all repository labels have been selected", async () => {
     const user = userEvent.setup();
-    render(<FilterHarness initial={excludeSettings()} onSave={() => undefined} />);
+    render(
+      <FilterHarness
+        initial={{ ...excludeSettings(), labels: ["superplane", "bug", "docs"] }}
+        onSave={() => undefined}
+      />,
+    );
 
-    const options = within(screen.getByTestId("intake-label-options"));
-    await user.click(options.getByRole("checkbox", { name: "superplane" }));
-    await user.click(options.getByRole("checkbox", { name: "docs" }));
-
-    expect(screen.queryByRole("textbox", { name: "Search or add a label" })).not.toBeInTheDocument();
-    expect(screen.getByText("All labels selected")).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "Add label" }));
-    await user.type(screen.getByRole("textbox", { name: "Search or add a label" }), "needs-triage{Enter}");
-
+    await user.type(screen.getByRole("combobox", { name: "Search or add a label" }), "needs-triage{ArrowDown}{Enter}");
     expect(screen.getByRole("button", { name: "Remove needs-triage" })).toBeInTheDocument();
-    expect(screen.getByText("All labels selected")).toBeInTheDocument();
-    expect(screen.queryByRole("textbox", { name: "Search or add a label" })).not.toBeInTheDocument();
-
     await user.click(screen.getByRole("button", { name: "Remove docs" }));
-    expect(screen.getByRole("textbox", { name: "Search or add a label" })).toBeInTheDocument();
-    expect(screen.queryByText("All labels selected")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("combobox", { name: "Search or add a label" }));
+    expect(screen.getByRole("option", { name: "docs" })).toBeInTheDocument();
   });
 
   it("keeps the re-opened toggle apart from the label filter", async () => {
@@ -184,7 +184,7 @@ describe("GitHubIntakeFilterFields", () => {
       />,
     );
 
-    await user.click(screen.getByRole("checkbox", { name: "A closed issue is re-opened" }));
+    await user.click(screen.getByRole("checkbox", { name: "Include reopened issues" }));
     await user.click(screen.getByRole("button", { name: "Save" }));
 
     expect(saved?.reopenedIssues).toBe(false);

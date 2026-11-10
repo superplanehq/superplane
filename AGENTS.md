@@ -69,7 +69,7 @@ approvals, and an operational UI.
   integrated runner and Fleet Manager. Local development uses this stack.
 - Legacy runner source lives in
   [superplanehq/runner](https://github.com/superplanehq/runner). The application
-  retains broker access only for historical logs.
+  reads historical task records and archived logs from SuperPlane storage.
 - `Makefile` — the entrypoint for all common tasks.
 - `.semaphore/` — CI pipelines. There is no `.github/workflows/` directory.
 
@@ -79,7 +79,7 @@ The development environment is **entirely Docker-based**: build, lint, test, and
 run commands execute inside containers via `docker compose`. You do not need Go
 or Node installed on the host, only Docker.
 
-- Go `1.26.10` (pinned in `go.mod`; provided by the dev container).
+- Go `1.27.3` (pinned in `go.mod`; provided by the dev container).
 - Node.js, npm, and Bun (provided by the dev container; used by Vite/frontend).
 - Docker with a working `docker compose`.
 
@@ -89,6 +89,12 @@ Run these three steps once, in order:
    containers (app shell, db, rabbitmq). The first run builds the images
    (~3-5 min); later runs reuse them. After you change
    `release/runner/Dockerfile`, run `make dev.up` again.
+   Local startup requires 15 GB free on the Docker filesystem. If space is
+   low, it removes unused build cache and checks again before building.
+   It also attempts this cleanup if the disk probe reports a full disk.
+   This cleanup never removes images, containers, or database volumes.
+   If space is still low, increase Docker disk space or remove unused images
+   manually. CI skips this cleanup. Run `make test.dev.disk` to test recovery.
 2. `make dev.setup` — installs npm deps, downloads Go modules, runs protobuf
    codegen, and creates + migrates `superplane_dev`. Re-run when protos, Go
    modules, or frontend deps change. By
@@ -112,8 +118,8 @@ token. See
 [docs/contributing/connecting-to-3rdparty-services-from-development.md](docs/contributing/connecting-to-3rdparty-services-from-development.md).
 
 `make dev.up`, `make dev.setup`, and `make dev.server` use the integrated
-runner API and Docker Fleet Manager. Keep `TASK_BROKER_*` in `.env` only
-when historical execution logs remain on the legacy broker (see `.env.example`).
+runner API and Docker Fleet Manager. Historical tasks use the same task
+database and blob storage as integrated tasks.
 
 The local worker image includes Claude Code, Codex, OpenCode, git, `gh`,
 `jq`, ffmpeg, ffprobe, whisper-cli, yt-dlp, and the Whisper tiny model. Factory
@@ -146,6 +152,7 @@ after a disk-full or interrupted download), run `make dev.clean.go.cache` then
 - Targeted backend tests: `make test PKG_TEST_PACKAGES=./pkg/workers`
 - Targeted E2E tests: `E2E_TEST_PACKAGES=./test/e2e/workflows make test.e2e`
   (or `make test.e2e.single FILE=test/e2e/foo_test.go LINE=19` for a single test).
+  Semaphore runs E2E tests only on `main`. Local E2E commands work on all branches.
 - UI unit tests: `make check.test.ui` (Bun + Happy DOM).
   Targeted UI tests: `make check.test.ui FILES=src/lib/duration.spec.ts`.
   Paths in `FILES` are relative to `web_src/`.
@@ -181,10 +188,16 @@ Cross-cutting rules when extending the backend:
   constants in `pkg/models`. Check the `Proto*` and `*ToProto` functions in
   `pkg/grpc/actions/common.go`.
 - When adding a new worker in `pkg/workers`, add its startup to
-  `cmd/server/main.go` and update the docker compose files with any new
-  environment variables.
+  `pkg/server/server.go` and update the docker compose files with any new
+  environment variables. `cmd/server/main.go` calls `server.Start()`.
 - After adding new API endpoints, ensure they are covered in
   `pkg/authorization/interceptor.go`.
+- Define all new admin API endpoints in `protos/admin/`. Register them with
+  the admin gRPC gateway behind the existing admin authentication middleware.
+  Do not add manual admin HTTP handlers in core or `ee/`. Existing handlers
+  remain until they migrate. Run `make check.admin.routes` to check this rule.
+  Remove migrated routes from `.admin-http-routes-baseline.txt`. Do not add
+  new routes to the baseline.
 
 Further reading:
 
@@ -230,14 +243,19 @@ from published charts and verified deployed configuration.
   [pkg/grpc/actions/factories/AGENTS.md](pkg/grpc/actions/factories/AGENTS.md).
 - Before adding a test, identify the observable behavior and a credible
   regression that existing coverage does not catch.
-- Do not pin cosmetic CSS classes, wrapper structure, or copied display
-  constants without an explicit product contract. Preserve checks for
-  visibility, accessibility, theme behavior, and other functional requirements.
+- Test observable behavior, not incidental presentation. Prefer accessible
+  roles and stable test IDs. Assert exact UI text only when its wording is the
+  behavior under test. Avoid repeated assertions about copy, CSS classes,
+  layout, or DOM structure. Preserve checks for visibility, accessibility,
+  theme behavior, and other functional requirements.
 - Prefer tests that execute the real behavior over duplicate private-helper
   or generated-source assertions. Before removing overlapping coverage,
   confirm that the retained test exercises the same regression and runs in CI.
 - Tests end with `_test.go`.
 - Always prefer early returns over else blocks when possible.
+- Name non-obvious UI state rules. If a condition combines several states or
+  exceptions, extract it into a function that names the decision. Add a short
+  comment when the product reason is not clear from the code.
 - Go: prefer `any` over `interface{}`.
 - Go: to check membership in a slice, use `slices.Contains` or `slices.ContainsFunc`.
 - Avoid variable names like `*Str` or `*UUID`; Go is typed, so types don't belong
