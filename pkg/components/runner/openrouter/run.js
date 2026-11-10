@@ -17,6 +17,9 @@ const TOOL_RESULT_MAX_LINES = 24;
 const DEFAULT_WAIT_CAP_MS = 3_600_000;
 const MODEL_CATALOG_REFRESH_TIMEOUT_MS = 30_000;
 const MODEL_CATALOG_REFRESH_MAX_BUFFER = 32 * 1024 * 1024;
+const MODEL_ENDPOINT_LOOKUP_TIMEOUT_MS = 5_000;
+const DEFAULT_OPENROUTER_API_BASE = "https://openrouter.ai/api/v1";
+const AVAILABLE_ENDPOINT_STATUS = 0;
 const SESSION_FILE = "opencode_session";
 const OPENROUTER_EFFORT_VARIANT = "superplane_effort";
 
@@ -336,6 +339,229 @@ function uniqueCatalogModels(ids) {
   return out;
 }
 
+function uniqueNonEmptyStrings(values) {
+  const seen = new Set();
+  const out = [];
+  const list = Array.isArray(values) ? values : [];
+  for (const raw of list) {
+    const value = String(raw || "").trim();
+    if (!value || seen.has(value)) {
+      continue;
+    }
+    seen.add(value);
+    out.push(value);
+  }
+  return out;
+}
+
+function openRouterAPIBaseURL(env) {
+  const configured = String((env && env.OPENROUTER_BASE_URL) || "").trim();
+  if (configured) {
+    return configured.replace(/\/+$/, "");
+  }
+  return DEFAULT_OPENROUTER_API_BASE;
+}
+
+function modelEndpointsPath(model) {
+  const id = catalogModelId(model);
+  if (!id) {
+    return "";
+  }
+  return id
+    .split("/")
+    .map((part) => encodeURIComponent(part))
+    .join("/");
+}
+
+function numericPrice(value) {
+  const amount = Number(value);
+  return Number.isFinite(amount) ? amount : null;
+}
+
+function recentUptime(endpoint) {
+  for (const key of ["uptime_last_5m", "uptime_last_30m", "uptime_last_1d"]) {
+    const value = Number(endpoint && endpoint[key]);
+    if (Number.isFinite(value)) {
+      return value;
+    }
+  }
+  return 0;
+}
+
+function recentThroughput(endpoint) {
+  const stats = endpoint && endpoint.throughput_last_30m;
+  const value = Number(stats && stats.p50);
+  return Number.isFinite(value) ? value : 0;
+}
+
+function isAvailableEndpoint(endpoint) {
+  if (!endpoint || endpoint.status == null || endpoint.status === "") {
+    return true;
+  }
+  return Number(endpoint.status) === AVAILABLE_ENDPOINT_STATUS;
+}
+
+function hasServiceTier(endpoint) {
+  const tier = endpoint && endpoint.service_tier;
+  if (tier == null) {
+    return false;
+  }
+  return String(tier).trim() !== "";
+}
+
+function shuffleTagList(tags) {
+  const out = [...tags];
+  for (let i = out.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
+function isSurchargeEndpoint(item, minPrompt, minCompletion) {
+  if (item.promptPrice == null) {
+    return false;
+  }
+  if (item.promptPrice > minPrompt) {
+    return true;
+  }
+  if (item.promptPrice < minPrompt) {
+    return false;
+  }
+  if (item.completionPrice == null || minCompletion == null) {
+    return false;
+  }
+  return item.completionPrice > minCompletion;
+}
+
+function splitSurchargeEndpoints(members) {
+  const priced = members.filter((item) => item.promptPrice != null);
+  if (!priced.length) {
+    return { surcharge: [], standard: members };
+  }
+  const minPrompt = Math.min(...priced.map((item) => item.promptPrice));
+  const cheapestPrompt = priced.filter((item) => item.promptPrice === minPrompt);
+  const completions = cheapestPrompt
+    .map((item) => item.completionPrice)
+    .filter((price) => price != null);
+  const minCompletion = completions.length ? Math.min(...completions) : null;
+  const surcharge = [];
+  const standard = [];
+  for (const item of members) {
+    if (isSurchargeEndpoint(item, minPrompt, minCompletion)) {
+      surcharge.push(item);
+    } else {
+      standard.push(item);
+    }
+  }
+  return { surcharge, standard };
+}
+
+function orderProviderTags(endpoints, shuffleTags = shuffleTagList) {
+  const usable = [];
+  const seen = new Set();
+  const list = Array.isArray(endpoints) ? endpoints : [];
+  for (const endpoint of list) {
+    const tag = String((endpoint && endpoint.tag) || "").trim();
+    if (!tag || seen.has(tag) || !isAvailableEndpoint(endpoint) || hasServiceTier(endpoint)) {
+      continue;
+    }
+    seen.add(tag);
+    usable.push({
+      tag,
+      provider: tag.split("/")[0],
+      promptPrice: numericPrice(endpoint.pricing && endpoint.pricing.prompt),
+      completionPrice: numericPrice(endpoint.pricing && endpoint.pricing.completion),
+      uptime: recentUptime(endpoint),
+      throughput: recentThroughput(endpoint),
+    });
+  }
+  if (!usable.length) {
+    return [];
+  }
+
+  const groups = new Map();
+  for (const endpoint of usable) {
+    const members = groups.get(endpoint.provider) || [];
+    members.push(endpoint);
+    groups.set(endpoint.provider, members);
+  }
+
+  const rankedGroups = [...groups.entries()].sort((left, right) => {
+    const leftBest = Math.max(...left[1].map((item) => item.uptime));
+    const rightBest = Math.max(...right[1].map((item) => item.uptime));
+    if (rightBest !== leftBest) {
+      return rightBest - leftBest;
+    }
+    return left[0].localeCompare(right[0]);
+  });
+
+  const shuffle = typeof shuffleTags === "function" ? shuffleTags : shuffleTagList;
+  const order = [];
+  for (const [, members] of rankedGroups) {
+    const { surcharge, standard } = splitSurchargeEndpoints(members);
+    order.push(...shuffle(surcharge.map((item) => item.tag)));
+    const standardTags = [...standard]
+      .sort((left, right) => {
+        if (right.uptime !== left.uptime) {
+          return right.uptime - left.uptime;
+        }
+        return right.throughput - left.throughput;
+      })
+      .map((item) => item.tag);
+    order.push(...standardTags);
+  }
+  return order;
+}
+
+function openRouterProviderRouting(providerOrder) {
+  const routing = { allow_fallbacks: true };
+  const order = uniqueNonEmptyStrings(providerOrder);
+  if (order.length) {
+    routing.order = order;
+    return routing;
+  }
+  routing.sort = "throughput";
+  return routing;
+}
+
+function providerOrderLogLine(order) {
+  const tags = uniqueNonEmptyStrings(order);
+  if (!tags.length) {
+    return "";
+  }
+  return `OpenRouter provider order: ${tags.join(", ")}`;
+}
+
+async function listModelEndpoints(model, env, fetchImpl) {
+  const apiKey = String((env && env.OPENROUTER_API_KEY) || "").trim();
+  const encodedModel = modelEndpointsPath(model);
+  const request = fetchImpl || globalThis.fetch;
+  if (!apiKey || !encodedModel || typeof request !== "function") {
+    return [];
+  }
+  const url = `${openRouterAPIBaseURL(env)}/models/${encodedModel}/endpoints`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), MODEL_ENDPOINT_LOOKUP_TIMEOUT_MS);
+  try {
+    const response = await request(url, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+      signal: controller.signal,
+    });
+    if (!response || !response.ok) {
+      return [];
+    }
+    const body = await response.json();
+    return body && body.data && Array.isArray(body.data.endpoints)
+      ? body.data.endpoints
+      : [];
+  } catch (_err) {
+    return [];
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function clearSession(taskDir) {
   const file = path.join(taskDir, SESSION_FILE);
   if (fs.existsSync(file)) {
@@ -479,6 +705,7 @@ function buildOpenCodeConfig({
   planning = false,
   models = [],
   thinking = "",
+  providerOrder = [],
 } = {}) {
   const config = {
     $schema: "https://opencode.ai/config.json",
@@ -529,10 +756,7 @@ function buildOpenCodeConfig({
           input: ["text", "image"],
         },
         options: {
-          provider: {
-            allow_fallbacks: true,
-            sort: "throughput",
-          },
+          provider: openRouterProviderRouting(providerOrder),
         },
       };
       if (effort) {
@@ -577,7 +801,7 @@ function buildOpenCodeConfig({
   return config;
 }
 
-function writeOpenCodeConfig(taskDir, { cwd, env, models, thinking }) {
+function writeOpenCodeConfig(taskDir, { cwd, env, models, thinking, providerOrder }) {
   const config = buildOpenCodeConfig({
     taskDir,
     cwd,
@@ -585,6 +809,7 @@ function writeOpenCodeConfig(taskDir, { cwd, env, models, thinking }) {
     planning: planningEnabled(env),
     models,
     thinking,
+    providerOrder,
   });
   fs.writeFileSync(
     path.join(taskDir, "opencode.json"),
@@ -813,11 +1038,18 @@ async function runPrompt(promptFile, model, helpers = {}) {
       `Model catalog refresh unavailable. Using bundled metadata for ${currentModel}.`,
     );
   }
+  let providerOrder = [];
+  if (!customLLMFromEnv(env) && currentModel) {
+    const endpoints = await listModelEndpoints(currentModel, env, helpers.fetch);
+    providerOrder = orderProviderTags(endpoints);
+    printLiveLogLine(providerOrderLogLine(providerOrder));
+  }
   writeOpenCodeConfig(sp, {
     cwd,
     env,
     models: currentModel ? [currentModel] : [],
     thinking,
+    providerOrder,
   });
 
   const deadline = waitDeadlineMs(env, now);
@@ -2277,6 +2509,8 @@ module.exports = {
   classifyOpenRouterError,
   openRouterModelId,
   buildOpenCodeConfig,
+  orderProviderTags,
+  listModelEndpoints,
   retryWaitMs,
   waitDeadlineMs,
   openCodeProcessEnv,

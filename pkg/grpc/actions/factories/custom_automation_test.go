@@ -698,6 +698,33 @@ func TestCustomAutomationGraphUsesProviderAndFocusedSettings(t *testing.T) {
 	}
 }
 
+func TestBitbucketCustomAutomationListensOnEveryRepositoryWithMultiRepoTasks(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory := seedHandOffFactory(t, r, db)
+	provider := models.ProviderBitbucket
+	integrationID := uuid.NewString()
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSProvider: &provider, VCSIntegrationID: &integrationID}))
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryMultiRepoTasks))
+	settings, err := parseCustomAutomationSettings(db, factory, &pb.FactoryCustomAutomation_Settings{
+		StartMode: pb.FactoryCustomAutomation_START_MODE_AUTOMATIC,
+		Agent:     &pb.FactoryAppTemplateAgent{Component: "runnerClaudeCode"},
+		Steps: []*pb.FactoryCustomAutomation_Step{
+			{Name: "Test", Type: pb.FactoryCustomAutomation_Step_TYPE_BASH, Command: "make test", WorkingDirectory: "repo"},
+		},
+	})
+	require.NoError(t, err)
+
+	doc, err := buildCustomAutomationCanvas(db, factory, "Verify changes", settings)
+	require.NoError(t, err)
+
+	assert.Equal(t, models.WorkspaceRepositoriesExpression, doc.Spec.Nodes[0].Configuration["repository"])
+	got := environmentVars(t, doc.Spec.Nodes[1].Configuration["environment"])
+	assert.Equal(t, prFeedbackEventRepositoryExpression, got["REPO"], "the run must check out the repository of its pull request")
+	assert.Equal(t, runner.WorkspaceContextRepoURL(provider, prFeedbackEventRepositoryExpression, ""), got["REPO_URL"])
+	assert.NotContains(t, got, "BASE")
+}
+
 func TestCustomAutomationOmitsBaseWhenWorkspaceBranchIsEmpty(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())

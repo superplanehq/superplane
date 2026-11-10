@@ -78,6 +78,39 @@ func Test__OnPullRequest__Setup(t *testing.T) {
 		assert.ElementsMatch(t, []string{"pullrequest:created", "pullrequest:fulfilled"}, webhookRequest.EventTypes)
 		assert.Equal(t, "widgets", webhookRequest.RepositorySlug)
 	})
+
+	workspaceSetup := func(t *testing.T, repositories []string) WebhookConfiguration {
+		t.Helper()
+		httpCtx := &contexts.HTTPContext{Responses: []*http.Response{{
+			StatusCode: http.StatusOK,
+			Body: io.NopCloser(strings.NewReader(
+				`{"values":[{"uuid":"{repo-uuid}","name":"widgets","full_name":"acme/widgets","slug":"widgets"}]}`,
+			)),
+		}}}
+		integrationCtx := &contexts.IntegrationContext{Configuration: map[string]any{"token": "token"}, Metadata: metadata}
+		require.NoError(t, trigger.Setup(core.TriggerContext{
+			HTTP:          httpCtx,
+			Integration:   integrationCtx,
+			Metadata:      &contexts.MetadataContext{},
+			Factory:       &recordingBitbucketFactory{repositories: repositories},
+			Configuration: map[string]any{"repository": "{{ workspace().repositories }}", "actions": []string{"merged"}},
+		}))
+		require.Len(t, integrationCtx.WebhookRequests, 1)
+		webhookRequest, ok := integrationCtx.WebhookRequests[0].(WebhookConfiguration)
+		require.True(t, ok)
+		return webhookRequest
+	}
+
+	t.Run("a workspace trigger listens on every workspace repository", func(t *testing.T) {
+		webhookRequest := workspaceSetup(t, []string{"acme/widgets", "acme/web", "partner/docs"})
+		assert.Equal(t, "widgets", webhookRequest.RepositorySlug)
+		assert.Equal(t, []string{"acme/widgets", "acme/web", "partner/docs"}, webhookRequest.Repositories)
+	})
+
+	t.Run("a workspace with one repository keeps the single-repository webhook", func(t *testing.T) {
+		webhookRequest := workspaceSetup(t, []string{"acme/widgets"})
+		assert.Equal(t, WebhookConfiguration{EventTypes: []string{"pullrequest:fulfilled"}, RepositorySlug: "widgets"}, webhookRequest)
+	})
 }
 
 func Test__OnPullRequest__HandleWebhook(t *testing.T) {
@@ -153,6 +186,26 @@ func Test__OnPullRequest__HandleWebhook(t *testing.T) {
 		assert.Equal(t, http.StatusOK, code)
 		assert.NoError(t, err)
 		assert.Zero(t, eventContext.Count())
+	})
+
+	t.Run("a workspace trigger emits events from any workspace repository", func(t *testing.T) {
+		body := pullRequestFixture(t)
+		headers, eventContext := signed(t, "pullrequest:created", body)
+
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:    body,
+			Headers: headers,
+			Webhook: &contexts.NodeWebhookContext{Secret: "test-secret"},
+			Metadata: &contexts.MetadataContext{Metadata: NodeMetadata{Repository: &RepositoryMetadata{
+				UUID: "{api-uuid}", FullName: "acme/api", Slug: "api", Name: "api",
+			}}},
+			Configuration: map[string]any{"repository": "{{ workspace().repositories }}", "actions": []string{"created"}},
+			Events:        eventContext,
+		})
+
+		assert.Equal(t, http.StatusOK, code)
+		assert.NoError(t, err)
+		assert.Equal(t, 1, eventContext.Count())
 	})
 
 	t.Run("unsubscribed action -> event is not emitted", func(t *testing.T) {
@@ -263,6 +316,34 @@ func Test__BitbucketWebhook__Merge(t *testing.T) {
 		require.NoError(t, err)
 		assert.False(t, changed)
 	})
+
+	t.Run("the same workspace repositories in any order merge", func(t *testing.T) {
+		merged, changed, err := handler.Merge(
+			WebhookConfiguration{EventTypes: []string{"repo:push"}, RepositorySlug: "api", Repositories: []string{"acme/api", "acme/web"}},
+			WebhookConfiguration{EventTypes: []string{"pullrequest:created"}, RepositorySlug: "api", Repositories: []string{"ACME/web", "acme/api"}},
+		)
+		require.NoError(t, err)
+		assert.True(t, changed)
+		config, ok := merged.(WebhookConfiguration)
+		require.True(t, ok)
+		assert.Equal(t, []string{"acme/api", "acme/web"}, config.Repositories)
+	})
+
+	t.Run("a workspace webhook never merges with a single-repository webhook", func(t *testing.T) {
+		_, changed, err := handler.Merge(
+			WebhookConfiguration{EventTypes: []string{"repo:push"}, RepositorySlug: "api"},
+			WebhookConfiguration{EventTypes: []string{"pullrequest:created"}, RepositorySlug: "api", Repositories: []string{"acme/api", "acme/web"}},
+		)
+		require.NoError(t, err)
+		assert.False(t, changed)
+
+		same, err := handler.CompareConfig(
+			WebhookConfiguration{EventTypes: []string{"pullrequest:created"}, RepositorySlug: "api"},
+			WebhookConfiguration{EventTypes: []string{"pullrequest:created"}, RepositorySlug: "api", Repositories: []string{"acme/api", "acme/web"}},
+		)
+		require.NoError(t, err)
+		assert.False(t, same)
+	})
 }
 
 func Test__OnPullRequest__OnlyFactoryPullRequests(t *testing.T) {
@@ -367,10 +448,11 @@ func triggerHandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookRes
 }
 
 type recordingBitbucketFactory struct {
-	calls  int
-	params core.FindPullRequestParams
-	match  *core.PullRequestMatch
-	err    error
+	calls        int
+	params       core.FindPullRequestParams
+	match        *core.PullRequestMatch
+	err          error
+	repositories []string
 }
 
 func (f *recordingBitbucketFactory) FindPullRequest(params core.FindPullRequestParams) (*core.PullRequestMatch, error) {
@@ -432,7 +514,7 @@ func (f *recordingBitbucketFactory) GitHubHost() (string, error) {
 }
 
 func (f *recordingBitbucketFactory) ListRepositories() ([]string, error) {
-	return nil, nil
+	return f.repositories, nil
 }
 
 func Test__OnPush__RepositoryRouting(t *testing.T) {

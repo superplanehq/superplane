@@ -572,7 +572,7 @@ func TestResetPRFeedbackPreservesEachRunnerAndGeneralSettings(t *testing.T) {
 						assert.Equal(t, []string{"required-ci"}, actual.CheckNames)
 					}
 					if provider == models.ProviderGitHub {
-						scoped := workspaceScopeNodeIDs(spec, true)
+						scoped := workspaceScopeNodeIDs(spec, provider, true)
 						require.NotEmpty(t, scoped)
 						for _, id := range scoped {
 							node := findIntakeNode(version.Nodes, id)
@@ -739,26 +739,30 @@ func TestResetUsesTemplateDefaultsForMissingSettings(t *testing.T) {
 }
 
 func TestResetFollowsMultiRepoTasksForTheImplementationTemplate(t *testing.T) {
-	r, factory := resetTestFactory(t)
-	canvas := resetTestTemplate(t, r, factory, "line-implementation", models.ProviderGitHub, func(doc *yaml.Canvas) {
-		setResetTestDraftPullRequests(t, doc, true)
-	})
-	hasPullRequestNode := func(nodes []models.Node) bool {
-		return slices.ContainsFunc(nodes, func(node models.Node) bool { return isFactoryPullRequestComponent(node.ComponentName()) })
+	for _, provider := range []string{models.ProviderGitHub, models.ProviderBitbucket} {
+		t.Run(provider, func(t *testing.T) {
+			r, factory := resetTestFactory(t)
+			canvas := resetTestTemplate(t, r, factory, "line-implementation", provider, func(doc *yaml.Canvas) {
+				setResetTestDraftPullRequests(t, doc, true)
+			})
+			hasPullRequestNode := func(nodes []models.Node) bool {
+				return slices.ContainsFunc(nodes, func(node models.Node) bool { return isFactoryPullRequestComponent(node.ComponentName()) })
+			}
+
+			require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryMultiRepoTasks))
+			require.NoError(t, resetTestOrganization(t, r))
+			current := resetTestLiveVersion(t, canvas)
+			assert.False(t, hasPullRequestNode(current.Nodes), "multi-repo agents open their own pull requests")
+			assert.True(t, resetTestDraftPullRequests(t, current.Nodes))
+
+			require.NoError(t, models.DisableExperimentalFeature(r.Organization.ID, features.FeatureFactoryMultiRepoTasks))
+			require.NoError(t, resetTestOrganization(t, r))
+			current = resetTestLiveVersion(t, canvas)
+			assert.True(t, hasPullRequestNode(current.Nodes))
+			assert.Nil(t, factoryEnvironmentEntry(findIntakeNode(current.Nodes, implementationAgentNodeID).Configuration, factoryDraftPullRequestsEnv))
+			assert.True(t, resetTestDraftPullRequests(t, current.Nodes))
+		})
 	}
-
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryMultiRepoTasks))
-	require.NoError(t, resetTestOrganization(t, r))
-	current := resetTestLiveVersion(t, canvas)
-	assert.False(t, hasPullRequestNode(current.Nodes), "multi-repo agents open their own pull requests")
-	assert.True(t, resetTestDraftPullRequests(t, current.Nodes))
-
-	require.NoError(t, models.DisableExperimentalFeature(r.Organization.ID, features.FeatureFactoryMultiRepoTasks))
-	require.NoError(t, resetTestOrganization(t, r))
-	current = resetTestLiveVersion(t, canvas)
-	assert.True(t, hasPullRequestNode(current.Nodes))
-	assert.Nil(t, factoryEnvironmentEntry(findIntakeNode(current.Nodes, implementationAgentNodeID).Configuration, factoryDraftPullRequestsEnv))
-	assert.True(t, resetTestDraftPullRequests(t, current.Nodes))
 }
 
 func TestResetMergeConfidencePreservesDisabledChecks(t *testing.T) {

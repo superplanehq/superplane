@@ -143,7 +143,7 @@ func TestBuildCodexTaskRunsOrderedSteps(t *testing.T) {
 	assert.Equal(t, "Fix panic", task.Commands[2].Name)
 	assert.Contains(t, task.Commands[2].Command, `node "$SUPERPLANE_TASK_DIR/run.js" "$SUPERPLANE_TASK_DIR/prompts/02-fix-panic.txt" 'gpt-5'`)
 	assert.Equal(t, runScript, requireTaskFile(t, task.Files, "run.js").Content)
-	assert.Equal(t, "Fix auth.py's nil panic", requireTaskFile(t, task.Files, "prompts/02-fix-panic.txt").Content)
+	assert.Contains(t, requireTaskFile(t, task.Files, "prompts/02-fix-panic.txt").Content, "Fix auth.py's nil panic")
 }
 
 func TestBuildCodexTaskRestoresSubscriptionWithSelectedModel(t *testing.T) {

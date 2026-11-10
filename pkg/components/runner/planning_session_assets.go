@@ -50,6 +50,7 @@ func PlanningSessionProtocolFile() TaskFile {
 // protocol. Runners append this. The canvas prompt must not replace it.
 func PlanningSessionProtocolMarkdown() string {
 	return strings.TrimSpace(analysisProtocolReviewMarkdown) +
+		"\n\n" + strings.TrimSpace(toolExecutionProtocol) +
 		"\n\n# Managed refinement guidance\n\n" + PlanningSessionUserPromptMarkdown()
 }
 
