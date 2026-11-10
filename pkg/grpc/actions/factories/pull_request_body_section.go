@@ -28,8 +28,8 @@ type sectionPublication struct {
 	stillActive   func(*gorm.DB) (bool, error)
 }
 
-// publishBodySection reads the latest description on every attempt. Provider
-// access never holds a database transaction or a checked-out connection.
+// publishBodySection reads the latest description on every attempt without a
+// database transaction. Human review shares a connection lock when configured.
 func publishBodySection(ctx context.Context, db *gorm.DB, deps IntakeDependencies, publication sectionPublication) (bodySectionPublicationOutcome, error) {
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
@@ -79,14 +79,42 @@ func publishBodySection(ctx context.Context, db *gorm.DB, deps IntakeDependencie
 		return skippedBodySection("Pull request provider is unavailable."), nil
 	}
 	ref := vcs.PullRequestRef{Provider: pr.Provider, Repository: pr.Repository, Number: pr.Number}
-	outcome, err := prbody.Publish(ctx, factoryBodySectionClient{client: client, ref: ref}, prbody.Configuration{
-		Repository: ref.Repository, PullNumber: strconv.FormatInt(ref.Number, 10), SectionKey: cfg.SectionKey,
-		Body: cfg.Body, ExpectedHeadSHA: cfg.ExpectedHeadSHA, Enabled: cfg.Enabled,
-	}, eligible)
+	outcome, err := withHumanReviewBodyPublicationLock(db, pr, func(conn *gorm.DB) (bodySectionPublicationOutcome, error) {
+		return prbody.Publish(ctx, factoryBodySectionClient{client: client, ref: ref}, prbody.Configuration{
+			Repository: ref.Repository, PullNumber: strconv.FormatInt(ref.Number, 10), SectionKey: cfg.SectionKey,
+			Body: cfg.Body, ExpectedHeadSHA: cfg.ExpectedHeadSHA, Enabled: cfg.Enabled,
+		}, func() (bool, error) { return publication.eligible(conn, pr) })
+	})
 	if err != nil {
 		return bodySectionPublicationError(err)
 	}
 	return outcome, nil
+}
+
+func withHumanReviewBodyPublicationLock(db *gorm.DB, pr *models.FactoryPullRequest, publish func(*gorm.DB) (bodySectionPublicationOutcome, error)) (bodySectionPublicationOutcome, error) {
+	if pr == nil || pr.Provider != models.ProviderGitHub {
+		return publish(db)
+	}
+	factory, err := models.FindFactory(db, pr.OrganizationID, pr.FactoryID)
+	if err != nil {
+		return bodySectionPublicationOutcome{}, err
+	}
+	automation, err := findHumanReviewAutomation(db, factory)
+	if err != nil {
+		return bodySectionPublicationOutcome{}, err
+	}
+	if automation == nil {
+		return publish(db)
+	}
+	// Both sections replace the full description. Serialize their read and write
+	// even when Human review is disabled and publishes an explanatory summary.
+	var outcome bodySectionPublicationOutcome
+	err = pr.WithHumanReviewPublicationLock(db, func(conn *gorm.DB) error {
+		var err error
+		outcome, err = publish(conn)
+		return err
+	})
+	return outcome, err
 }
 
 func (p sectionPublication) eligible(db *gorm.DB, pr *models.FactoryPullRequest) (bool, error) {
