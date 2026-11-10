@@ -108,6 +108,10 @@ test.license.scanner:
 check.vulnerabilities:
 	$(COMPOSE) exec -T app bash ./scripts/vulnerability-check.sh
 
+.PHONY: test.vulnerability.scanner
+test.vulnerability.scanner:
+	$(COMPOSE) exec -T app bash ./scripts/vulnerability-check-test.sh
+
 test.watch:
 	$(GOTESTSUM) --packages="$(PKG_TEST_PACKAGES)" --watch -- -p 1
 

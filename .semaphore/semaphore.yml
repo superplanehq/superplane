@@ -123,6 +123,7 @@ blocks:
             - "cache restore go-mod-$(checksum go.sum),go-mod"
             - "cache restore go-build-$(awk '/^go / {print $2}' go.mod)-$(checksum go.sum),go-build-$(awk '/^go / {print $2}' go.mod)"
             - make ci.setup.go
+            - make test.vulnerability.scanner
             - make check.vulnerabilities
 
         - name: npm audit
