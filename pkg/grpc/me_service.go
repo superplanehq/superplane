@@ -37,7 +37,8 @@ func (s *MeService) Me(ctx context.Context, req *pb.MeRequest) (*pb.MeResponse, 
 	return me.GetUser(ctx, s.authService, req.GetIncludePermissions())
 }
 
-func (s *MeService) RegenerateToken(ctx context.Context, req *emptypb.Empty) (*pb.RegenerateTokenResponse, error) {
+func (s *MeService) RegenerateToken(ctx context.Context, req *emptypb.Empty) (response *pb.RegenerateTokenResponse, err error) {
+	defer func() { securityChange(ctx, "personal_token.rotate", "user", req, response, err) }()
 	return me.RegenerateToken(ctx)
 }
 
@@ -49,11 +50,13 @@ func (s *MeService) ListCodexUsage(ctx context.Context, req *pb.ListCodexUsageRe
 	return me.ListCodexUsage(ctx)
 }
 
-func (s *MeService) CreateToken(ctx context.Context, req *pb.CreateTokenRequest) (*pb.CreateTokenResponse, error) {
+func (s *MeService) CreateToken(ctx context.Context, req *pb.CreateTokenRequest) (response *pb.CreateTokenResponse, err error) {
+	defer func() { securityChange(ctx, "personal_token.create", "personal_token", req, response, err) }()
 	return me.CreateToken(ctx, req)
 }
 
-func (s *MeService) RevokeToken(ctx context.Context, req *pb.RevokeTokenRequest) (*pb.RevokeTokenResponse, error) {
+func (s *MeService) RevokeToken(ctx context.Context, req *pb.RevokeTokenRequest) (response *pb.RevokeTokenResponse, err error) {
+	defer func() { securityChange(ctx, "personal_token.revoke", "personal_token", req, response, err) }()
 	return me.RevokeToken(ctx, req)
 }
 

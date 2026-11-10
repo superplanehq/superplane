@@ -89,12 +89,18 @@ func TestOrganizationAuthMiddleware_SupportSessionIsReadOnly(t *testing.T) {
 	t.Run("GET reaches the handler", func(t *testing.T) {
 		calls := 0
 		handler := OrganizationAuthMiddleware(f.signer)(countingHandler(&calls))
+		logger, logs := newJSONLogger()
+		handler = LoggingMiddleware(logger)(handler)
 
 		res := httptest.NewRecorder()
 		handler.ServeHTTP(res, f.organizationRequest(http.MethodGet, "/api/v1/canvases"))
 
 		assert.Equal(t, http.StatusNoContent, res.Code)
 		assert.Equal(t, 1, calls)
+		record := decodeLogLine(t, logs.String())
+		assert.Equal(t, f.registry.Account.ID.String(), record["support_admin_account_id"])
+		assert.NotEqual(t, record["account_id"], record["support_admin_account_id"])
+		assert.Equal(t, f.registry.Organization.ID.String(), record["organization_id"])
 	})
 
 	t.Run("POST to a read-only endpoint reaches the handler", func(t *testing.T) {

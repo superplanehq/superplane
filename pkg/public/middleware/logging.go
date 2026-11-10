@@ -15,6 +15,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/grpc"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
+	"github.com/superplanehq/superplane/pkg/logging"
 )
 
 func LoggingMiddleware(logger *log.Logger) mux.MiddlewareFunc {
@@ -87,16 +88,17 @@ func handledRequestFields(r *http.Request, status int, duration time.Duration) l
 	return fields
 }
 
-func appendRequestIdentity(fields log.Fields, logged *requestLogFields) {
+func appendRequestIdentity(fields log.Fields, logged *logging.SecurityIdentity) {
 	if logged == nil {
 		return
 	}
 
-	setLogField(fields, "request_id", logged.requestID)
-	setLogField(fields, "organization_id", logged.organizationID)
-	setLogField(fields, "user_id", logged.userID)
-	setLogField(fields, "account_id", logged.accountID)
-	setLogField(fields, "support_admin_account_id", logged.supportAdminAccountID)
+	setLogField(fields, "request_id", logged.RequestID)
+	setLogField(fields, "organization_id", logged.OrganizationID)
+	setLogField(fields, "user_id", logged.UserID)
+	setLogField(fields, "account_id", logged.AccountID)
+	setLogField(fields, "support_admin_account_id", logged.SupportAdminAccountID)
+	setLogField(fields, "service_id", logged.ServiceID)
 }
 
 func setLogField(fields log.Fields, key string, value string) {
@@ -136,22 +138,7 @@ func durationMilliseconds(duration time.Duration) float64 {
 // Proxy-set headers win. For X-Forwarded-For, the rightmost address is the
 // one a trusted proxy appended. The leftmost address is caller-supplied.
 func clientIP(r *http.Request) string {
-	for _, header := range []string{"CF-Connecting-IP", "True-Client-IP", "X-Real-IP"} {
-		if ip := strings.TrimSpace(r.Header.Get(header)); ip != "" {
-			return ip
-		}
-	}
-	return rightMostForwardedIP(r.Header.Get("X-Forwarded-For"))
-}
-
-func rightMostForwardedIP(forwarded string) string {
-	parts := strings.Split(forwarded, ",")
-	for i := len(parts) - 1; i >= 0; i-- {
-		if ip := strings.TrimSpace(parts[i]); ip != "" {
-			return ip
-		}
-	}
-	return ""
+	return logging.ClientIP(r)
 }
 
 // cloudTraceID returns the trace id from the GCP load balancer header.
@@ -173,7 +160,7 @@ func captureHTTPPanic(r *http.Request, status int, recovered any) {
 	}
 
 	hub.WithScope(func(scope *sentry.Scope) {
-		scope.SetRequest(r)
+		scope.SetRequest(operationalTelemetryRequest(r))
 		scope.SetTag("status", strconv.Itoa(status))
 		hub.Recover(recovered)
 		hub.Flush(2 * time.Second)
@@ -197,9 +184,9 @@ func captureHTTPError(r *http.Request, status int) {
 
 	noted, hasCause := grpc.NotedServerErrorFrom(r.Context())
 	hub.WithScope(func(scope *sentry.Scope) {
-		request := r
+		request := operationalTelemetryRequest(r)
 		if noted.OmitRequestBody {
-			request = requestWithoutBody(r)
+			request = requestWithoutBody(request)
 		}
 		scope.SetRequest(request)
 		scope.SetTag("status", strconv.Itoa(status))
@@ -229,6 +216,20 @@ func requestWithoutBody(r *http.Request) *http.Request {
 	clone.PostForm = nil
 	clone.MultipartForm = nil
 	return clone
+}
+
+func operationalTelemetryRequest(r *http.Request) *http.Request {
+	path := r.URL.Path
+	if path == "/mcp" || path == "/login" || path == "/signup" || strings.HasPrefix(path, "/auth/") ||
+		path == "/api/v1/sentry/app/webhook" ||
+		(strings.HasPrefix(path, "/api/v1/integrations/") && (strings.HasSuffix(path, "/events") || strings.HasSuffix(path, "/webhook"))) {
+		request := requestWithoutBody(r)
+		request.URL.RawQuery = ""
+		request.Header.Del("Authorization")
+		request.Header.Del("Cookie")
+		return request
+	}
+	return r
 }
 
 func setHandlerMessage(scope *sentry.Scope, source error) {

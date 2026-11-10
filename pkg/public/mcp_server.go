@@ -9,6 +9,7 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/database"
 	factoryactions "github.com/superplanehq/superplane/pkg/grpc/actions/factories"
+	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/mcp"
 	"github.com/superplanehq/superplane/pkg/mcpserver"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -270,6 +271,13 @@ func (s *Server) handleMCP(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("WWW-Authenticate", mcpserver.WWWAuthenticate(origin))
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
+	}
+	if identity := logging.SecurityIdentityFrom(r.Context()); identity != nil {
+		identity.UserID = claims.UserID.String()
+		identity.OrganizationID = claims.OrgID.String()
+	}
+	if user, err := models.FindActiveUserByID(claims.OrgID.String(), claims.UserID.String()); err == nil {
+		middleware.SetRequestLogUser(r.Context(), user)
 	}
 	if r.Method != http.MethodPost {
 		w.Header().Set("Allow", http.MethodPost)

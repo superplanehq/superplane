@@ -90,6 +90,8 @@ func TestAdminAuthMiddlewareAcceptsPersonalAPIToken(t *testing.T) {
 		w.WriteHeader(http.StatusNoContent)
 	})
 	handler := AdminAuthMiddleware(signer, "")(RequireInstallationAdmin()(finalHandler))
+	logger, logs := newJSONLogger()
+	handler = LoggingMiddleware(logger)(handler)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/api/installation/fleets", nil)
 	req.Header.Set("Authorization", "Bearer "+rawToken)
@@ -97,6 +99,12 @@ func TestAdminAuthMiddlewareAcceptsPersonalAPIToken(t *testing.T) {
 	handler.ServeHTTP(res, req)
 
 	assert.Equal(t, http.StatusNoContent, res.Code)
+	record := decodeLogLine(t, logs.String())
+	assert.Equal(t, r.Account.ID.String(), record["account_id"])
+	assert.Equal(t, r.User.String(), record["user_id"])
+	assert.Equal(t, r.Organization.ID.String(), record["organization_id"])
+	assert.NotContains(t, logs.String(), rawToken)
+	assert.NotContains(t, record, "support_admin_account_id")
 }
 
 func TestAdminAuthMiddlewareRejectsNonAdminPersonalAPITokenWithNotFound(t *testing.T) {

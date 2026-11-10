@@ -67,13 +67,15 @@ func (s *RoleService) DescribeRole(ctx context.Context, req *pb.DescribeRoleRequ
 	return auth.DescribeRole(ctx, domainType, domainID, req.RoleName, s.authService)
 }
 
-func (s *RoleService) CreateRole(ctx context.Context, req *pb.CreateRoleRequest) (*pb.CreateRoleResponse, error) {
+func (s *RoleService) CreateRole(ctx context.Context, req *pb.CreateRoleRequest) (response *pb.CreateRoleResponse, err error) {
+	defer func() { securityChange(ctx, "role.create", "role", req, response, err) }()
 	domainType := ctx.Value(authorization.DomainTypeContextKey).(string)
 	domainID := ctx.Value(authorization.DomainIdContextKey).(string)
 	return s.rbac.CreateRole(ctx, domainType, domainID, req.Role)
 }
 
-func (s *RoleService) UpdateRole(ctx context.Context, req *pb.UpdateRoleRequest) (*pb.UpdateRoleResponse, error) {
+func (s *RoleService) UpdateRole(ctx context.Context, req *pb.UpdateRoleRequest) (response *pb.UpdateRoleResponse, err error) {
+	defer func() { securityChange(ctx, "role.update", "role", req, response, err) }()
 	domainType := ctx.Value(authorization.DomainTypeContextKey).(string)
 	domainID := ctx.Value(authorization.DomainIdContextKey).(string)
 
@@ -84,7 +86,8 @@ func (s *RoleService) UpdateRole(ctx context.Context, req *pb.UpdateRoleRequest)
 	return s.rbac.UpdateRole(ctx, domainType, domainID, req.RoleName, req.Role.Spec)
 }
 
-func (s *RoleService) DeleteRole(ctx context.Context, req *pb.DeleteRoleRequest) (*pb.DeleteRoleResponse, error) {
+func (s *RoleService) DeleteRole(ctx context.Context, req *pb.DeleteRoleRequest) (response *pb.DeleteRoleResponse, err error) {
+	defer func() { securityChange(ctx, "role.delete", "role", req, response, err) }()
 	domainType := ctx.Value(authorization.DomainTypeContextKey).(string)
 	domainID := ctx.Value(authorization.DomainIdContextKey).(string)
 	return auth.DeleteRole(ctx, domainType, domainID, req.RoleName, s.authService)

@@ -797,7 +797,7 @@ func Test__Sentry__HandleWebhook__ReceiptHeaderDoesNotHideDirectLog(t *testing.T
 		},
 	}
 
-	body := []byte(`{"action":"created","installation":{"uuid":"install-123"},"data":{"issue":{"id":"123"}}}`)
+	body := []byte(`{"action":"created","installation":{"uuid":"install-123"},"data":{"issue":{"id":"123","arbitrary":{"secret":"nested-payload-sentinel"}}}}`)
 	request := httptest.NewRequest(http.MethodPost, "/api/v1/integrations/test/events", bytes.NewReader(body))
 	request.Header.Set("Sentry-Hook-Resource", "issue")
 	request.Header.Set("Sentry-Hook-Signature", computeWebhookSignature("client-secret", body))
@@ -814,7 +814,12 @@ func Test__Sentry__HandleWebhook__ReceiptHeaderDoesNotHideDirectLog(t *testing.T
 	})
 
 	require.Equal(t, http.StatusOK, response.Code)
-	assert.NotNil(t, directSentryWebhookLog(t, logs.String(), "Sentry webhook received"))
+	record := directSentryWebhookLog(t, logs.String(), "Sentry webhook received")
+	require.NotNil(t, record)
+	assert.Equal(t, "created", record["action"])
+	assert.Equal(t, "issue", record["hook_resource"])
+	assert.NotContains(t, record, "payload")
+	assert.NotContains(t, logs.String(), "nested-payload-sentinel")
 }
 
 func Test__Sentry__HandleWebhook__HostedHandlerSkipsDuplicateLog(t *testing.T) {
