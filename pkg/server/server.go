@@ -4,8 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	// Registers pprof handlers on http.DefaultServeMux, served by startPprofServer.
-	_ "net/http/pprof" // #nosec G108 -- pprof is served only by the explicitly enabled development profiling server.
+	pprof "net/http/pprof"
 	"os"
 	"os/signal"
 	"runtime"
@@ -678,12 +677,30 @@ func startPprofServer() {
 	runtime.SetBlockProfileRate(1)
 	runtime.SetMutexProfileFraction(5)
 
+	server := &http.Server{
+		Addr:              "0.0.0.0:" + port,
+		Handler:           pprofHandler(),
+		ReadHeaderTimeout: 5 * time.Second,
+		IdleTimeout:       time.Minute,
+		// Do not set WriteTimeout because CPU profiles can run for several minutes.
+	}
+
 	go func() {
 		log.Infof("pprof server listening on :%s", port)
-		if err := http.ListenAndServe("0.0.0.0:"+port, nil); err != nil { // #nosec G114 -- profiling requests can be long-running and the server is opt-in.
+		if err := server.ListenAndServe(); err != nil {
 			log.Warnf("pprof server stopped: %v", err)
 		}
 	}()
+}
+
+func pprofHandler() http.Handler {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/debug/pprof/", pprof.Index)
+	mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+	mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+	mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+	mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+	return mux
 }
 
 func Start() {
