@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 const (
@@ -48,6 +49,14 @@ func (s HumanReviewSettings) Validate() error {
 		return fmt.Errorf("select a valid fallback GitHub team in organization/team format before enabling Human review")
 	}
 	return nil
+}
+
+// LockHumanReviewPolicy serializes policy saves without blocking foreign-key
+// checks from decision inserts that hold a publication lock.
+func (f *Factory) LockHumanReviewPolicy(tx *gorm.DB) error {
+	return tx.Clauses(clause.Locking{Strength: lockingForUpdateNoKey}).
+		Where("id = ? AND organization_id = ?", f.ID, f.OrganizationID).
+		First(f).Error
 }
 
 // LockHumanReviewPublications waits for in-flight provider mutations before a

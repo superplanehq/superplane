@@ -30,7 +30,7 @@ func (p *CanvasPublisher) validateHumanReviewPolicy(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		if err := factory.LockForUpdate(p.tx); err != nil {
+		if err := factory.LockHumanReviewPolicy(p.tx); err != nil {
 			return err
 		}
 		if isHumanReview {
