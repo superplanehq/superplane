@@ -82,6 +82,8 @@ spec:
               5/ For each repository that you changed, call the SuperPlane open_pull_request tool. Use directory repo for the primary repository and context/<owner>/<name> for the other repositories. The tool pushes the branch and opens or updates the pull request on this task. If the tool is not available, run superplane task pr open --directory DIR --title TITLE --body-file FILE.
               6/ Do not push branches or open pull requests in another way.
 
+              Open pull requests ready for review unless the task plan explicitly requires a draft. Pass draft: true only when the plan requires it. Do not choose draft status because checks are pending or work is incomplete. The workspace can also require drafts through DRAFT_PULL_REQUESTS=true. Do not change this environment variable or convert an existing pull request to apply this setting.
+
               Pull request title and description:
 
               1/ Follow the conventions of each repository for the title, description, writing style, and formatting. Discover and use the applicable pull request template.

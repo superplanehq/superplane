@@ -99,16 +99,28 @@ test("open_pull_request uses the default branch of a context repository", async 
   assert.equal(client.requests[0].body.draft, false);
 });
 
-test("open_pull_request opens a draft when the workspace asks for drafts", async () => {
-  const { env, checkout } = workspace("repo", { BASE: "main", DRAFT_PULL_REQUESTS: "true" });
-  run(checkout, ["checkout", "-b", "feature"], env);
-  fs.writeFileSync(path.join(checkout, "change.txt"), "change\n");
-  const client = recordingClient(env);
+for (const [setting, requested, expected] of [
+  ["false", true, true],
+  ["false", undefined, false],
+  ["true", false, true],
+  [undefined, true, true],
+  [undefined, false, false],
+  [undefined, undefined, false],
+]) {
+  test(`open_pull_request resolves workspace draft ${setting} and requested ${requested}`, async () => {
+    const { env, checkout } = workspace("repo", {
+      BASE: "main",
+      ...(setting === undefined ? {} : { DRAFT_PULL_REQUESTS: setting }),
+    });
+    run(checkout, ["checkout", "-b", "feature"], env);
+    fs.writeFileSync(path.join(checkout, "change.txt"), "change\n");
+    const client = recordingClient(env);
 
-  await call("open_pull_request", { title: "Change" }, client);
+    await call("open_pull_request", { title: "Change", draft: requested }, client);
 
-  assert.equal(client.requests[0].body.draft, true);
-});
+    assert.equal(client.requests[0].body.draft, expected);
+  });
+}
 
 test("open_pull_request fails before the backend call when nothing changed", async () => {
   const { env, checkout } = workspace("repo", { BASE: "main" });

@@ -215,7 +215,7 @@ const OPEN_PULL_REQUEST = {
         title: { type: "string", maxLength: MAX_TITLE_LENGTH, description: "The pull request title." },
         body: { type: "string", description: "Optional. The pull request description in Markdown." },
         base: { type: "string", description: "Optional. The base branch. The default is the task branch for repo and the repository default branch for other repositories." },
-        draft: { type: "boolean", description: "Optional. Open the pull request as a draft. The workspace setting can also make every pull request a draft." },
+        draft: { type: "boolean", description: "Optional. Set true only when the task plan explicitly requires a draft pull request. The workspace setting can also require drafts." },
       },
       required: ["title"],
     },
