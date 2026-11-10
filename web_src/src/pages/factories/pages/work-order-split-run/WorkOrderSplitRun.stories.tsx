@@ -236,7 +236,7 @@ export const PullRequestPartialChecks: Story = {
   render: () => prReadyTask("partial"),
 };
 
-function humanReviewTask(experimentalFeatures: string[]) {
+function humanReviewTask(experimentalFeatures: string[], reviewStatus: "decided" | "failed" = "decided") {
   const fixture = prReadyFactoriesFixture("review");
   const orderId = LINE_BOARD_VERIFY_PR_REVIEW_ORDER.id!;
   const app = { id: "human-review-app", name: "Human review", columnKey: "verify", templateId: "human-review" };
@@ -266,20 +266,30 @@ function humanReviewTask(experimentalFeatures: string[]) {
             {
               ...pr,
               currentRevision: { id: "review-revision", sha: "review-head" },
-              humanReview: {
-                runId: run.id,
-                status: "decided",
-                assessedCommit: "review-head",
-                reviewRequired: true,
-                rationale: "The pull request changes files outside the task scope.",
-                blockingReason: "A selected reviewer must approve the current head commit.",
-                selectedReviewers: [
-                  { id: "7", login: "alex", reason: "Owns the affected application files." },
-                  { id: "8", login: "sam", reason: "Owns the regression tests." },
-                ],
-                checkUrl: "https://github.com/acme/payments/runs/7",
-              },
-              activities: [...(pr?.activities ?? []), { title: "Human review", run }],
+              humanReview:
+                reviewStatus === "failed"
+                  ? {
+                      status: "failed",
+                      assessedCommit: "review-head",
+                      blockingReason: "Human review could not start. Retry Human review.",
+                    }
+                  : {
+                      runId: run.id,
+                      status: "decided",
+                      assessedCommit: "review-head",
+                      reviewRequired: true,
+                      rationale: "The pull request changes files outside the task scope.",
+                      blockingReason: "A selected reviewer must approve the current head commit.",
+                      selectedReviewers: [
+                        { id: "7", login: "alex", reason: "Owns the affected application files." },
+                        { id: "8", login: "sam", reason: "Owns the regression tests." },
+                      ],
+                      checkUrl: "https://github.com/acme/payments/runs/7",
+                    },
+              activities: [
+                ...(pr?.activities ?? []),
+                ...(reviewStatus === "failed" ? [] : [{ title: "Human review", run }]),
+              ],
             },
           ],
         },
@@ -300,4 +310,9 @@ export const HumanReviewActions: Story = {
 export const HumanReviewActionsDisabled: Story = {
   name: "Human review — Actions disabled",
   render: () => humanReviewTask([]),
+};
+
+export const HumanReviewStartupFailed: Story = {
+  name: "Human review — agent startup failed",
+  render: () => humanReviewTask([FEATURE_FACTORY_STEP_ACTIONS], "failed"),
 };

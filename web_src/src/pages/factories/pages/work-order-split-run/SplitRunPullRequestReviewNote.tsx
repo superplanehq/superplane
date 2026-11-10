@@ -13,6 +13,7 @@ import {
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 
 import { HumanReviewState } from "../HumanReviewState";
+import { reviewTargetsPreviousRevision } from "../../lib/humanReview";
 import { PullRequestConfidence } from "./redesign/consoleCheckRows";
 import { ContinueFixesButton, MultiPullRequestReviewNote } from "./SplitRunMultiPullRequestReview";
 import { SplitRunPullRequestMergeAction } from "./SplitRunPullRequestMergeAction";
@@ -72,8 +73,10 @@ export function SplitRunPullRequestReviewNote({
 }) {
   const copy = usePullRequestReviewCopy(organizationId, factoryId, trackedPullRequest);
   const { has } = useExperimentalFeature(organizationId);
+  const humanReviewInActions =
+    trackedPullRequest && has(FEATURE_FACTORY_STEP_ACTIONS) && hasHumanReviewActionRun(trackedPullRequest);
   const humanReview =
-    trackedPullRequest?.humanReview && !has(FEATURE_FACTORY_STEP_ACTIONS) ? (
+    trackedPullRequest?.humanReview && !humanReviewInActions ? (
       <HumanReviewState pullRequest={trackedPullRequest} />
     ) : null;
   if (ctaOnly) {
@@ -155,6 +158,13 @@ export function SplitRunPullRequestReviewNote({
       </div>
     </div>
   );
+}
+
+function hasHumanReviewActionRun(pullRequest: FactoriesFactoryPullRequest): boolean {
+  const runId = pullRequest.humanReview?.runId;
+  if (!runId || reviewTargetsPreviousRevision(pullRequest)) return false;
+  const activities = pullRequest.activities?.length ? pullRequest.activities : (pullRequest.runs ?? []);
+  return activities.some(({ run }) => run?.id === runId && Boolean(run.canvasId));
 }
 
 /**
