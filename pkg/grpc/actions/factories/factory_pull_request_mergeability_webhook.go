@@ -28,7 +28,7 @@ const (
 	factoryMergeabilityRefreshDelay    = 200 * time.Millisecond
 )
 
-var factoryMergeabilityGitHubEvents = []string{"check_run", "check_suite", "status", "pull_request"}
+var factoryMergeabilityGitHubEvents = []string{"check_run", "check_suite", "status", "pull_request", "pull_request_review"}
 
 func RefreshFactoryPullRequestMergeabilityFromGitHubEvent(
 	ctx context.Context,
@@ -64,13 +64,14 @@ func RefreshFactoryPullRequestMergeabilityFromGitHubEvent(
 	}
 
 	_, numbers, sha := githubMergeabilityWebhookRefFromPayload(payload)
-	pullRequests, err := models.ListOpenGitHubFactoryPullRequestsForWebhook(
-		db,
-		integration.OrganizationID,
-		repository,
-		numbers,
-		sha,
-	)
+	reopened := strings.EqualFold(eventType, "pull_request") && strings.EqualFold(payload.Action, "reopened")
+	var pullRequests []models.FactoryPullRequest
+	if reopened {
+		pullRequests, err = models.ListGitHubFactoryPullRequestsForWebhook(db, integration.OrganizationID, repository, numbers)
+	} else {
+		pullRequests, err = models.ListOpenGitHubFactoryPullRequestsForWebhook(db, integration.OrganizationID, repository, numbers, sha)
+	}
+
 	if err != nil {
 		log.WithError(err).Warn("factory mergeability: failed to list pull requests for GitHub event")
 		return
@@ -91,6 +92,12 @@ func RefreshFactoryPullRequestMergeabilityFromGitHubEvent(
 			}
 			factory = loaded
 			factoriesByID[factory.ID.String()] = factory
+		}
+		if reopened {
+			if err := pullRequest.RequestHumanReviewReconciliation(db); err != nil {
+				log.WithError(err).Warnf("Human review: failed to retain reopen request for pull request %s", pullRequest.ID)
+				continue
+			}
 		}
 		if err := refreshFactoryPullRequestMergeabilityWithRetry(ctx, db, deps, factory, pullRequest); err != nil {
 			log.WithError(err).Warnf("factory mergeability: failed to refresh pull request %s", pullRequest.ID)
@@ -283,7 +290,7 @@ type githubMergeabilityWebhookPayload struct {
 // accepts a hook that has no canvas nodes.
 func IsGitHubFactoryMergeabilityEvent(eventType string) bool {
 	switch strings.ToLower(strings.TrimSpace(eventType)) {
-	case "ping", "pull_request", "check_run", "check_suite", "status":
+	case "ping", "pull_request", "pull_request_review", "check_run", "check_suite", "status":
 		return true
 	default:
 		return false
@@ -414,14 +421,33 @@ func factoryMergeabilityWebhookRepository(configuration any) string {
 }
 
 func updateFactoryMergeabilityWebhook(tx *gorm.DB, hook *models.Webhook) error {
-	if hook.State != models.WebhookStateFailed {
+	configuration, _ := hook.Configuration.Data().(map[string]any)
+	var configured []string
+	if raw, ok := configuration["eventTypes"].([]any); ok {
+		for _, event := range raw {
+			if name, ok := event.(string); ok {
+				configured = append(configured, name)
+			}
+		}
+	}
+	if raw, ok := configuration["eventTypes"].([]string); ok {
+		configured = raw
+	}
+	complete := true
+	for _, event := range factoryMergeabilityGitHubEvents {
+		if !slices.Contains(configured, event) {
+			complete = false
+			break
+		}
+	}
+	if complete && hook.State != models.WebhookStateFailed {
 		return nil
 	}
-
 	return tx.Model(hook).Updates(map[string]any{
-		"state":       models.WebhookStatePending,
-		"retry_count": 0,
-		"updated_at":  time.Now(),
+		"configuration": datatypes.NewJSONType(any(factoryMergeabilityWebhookConfiguration(factoryMergeabilityWebhookRepository(hook.Configuration.Data())))),
+		"state":         models.WebhookStatePending,
+		"retry_count":   0,
+		"updated_at":    time.Now(),
 	}).Error
 }
 
@@ -487,7 +513,7 @@ func isGitHubPullRequestClosedEvent(eventType string, payload githubMergeability
 
 func parseGitHubMergeabilityWebhookPayload(eventType string, body []byte) (githubMergeabilityWebhookPayload, bool) {
 	switch strings.ToLower(strings.TrimSpace(eventType)) {
-	case "pull_request", "check_run", "check_suite", "status":
+	case "pull_request", "pull_request_review", "check_run", "check_suite", "status":
 	default:
 		return githubMergeabilityWebhookPayload{}, false
 	}

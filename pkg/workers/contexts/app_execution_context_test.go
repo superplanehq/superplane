@@ -43,6 +43,7 @@ func Test__AppExecutionContext__Broadcast(t *testing.T) {
 		First(&message).
 		Error
 	require.NoError(t, err)
+	assert.Nil(t, message.SourceRunID)
 
 	var storedPayload map[string]any
 	require.NoError(t, json.Unmarshal(message.Payload, &storedPayload))

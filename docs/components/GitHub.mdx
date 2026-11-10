@@ -16,7 +16,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="On Issue" href="#on-issue" description="Listen to issue events" />
   <LinkCard title="On Issue Comment" href="#on-issue-comment" description="Listen to issue comment events" />
   <LinkCard title="On PR Comment" href="#on-pr-comment" description="Listen to PR conversation comment events" />
-  <LinkCard title="On PR Review" href="#on-pr-review" description="Listen to submitted pull request reviews" />
+  <LinkCard title="On PR Review" href="#on-pr-review" description="Listen to pull request review submissions and dismissals" />
   <LinkCard title="On PR Review Comment" href="#on-pr-review-comment" description="Listen to pull request review comment events" />
   <LinkCard title="On Pull Request" href="#on-pull-request" description="Listen to pull request events" />
   <LinkCard title="On Push" href="#on-push" description="Listen to GitHub push events" />
@@ -819,9 +819,9 @@ This trigger automatically sets up a GitHub webhook when configured. The webhook
 
 **Trigger key:** `github.onPRReview`
 
-The On PR Review trigger starts a workflow execution when a pull request review is submitted.
+The On PR Review trigger starts a workflow execution for the configured pull request review actions.
 
-It loads every inline comment that belongs to that review before it emits an event.
+For submitted reviews, it loads every inline comment before it emits an event.
 A review with several comments therefore produces one run, not one run per comment.
 
 ### Use Cases
@@ -833,13 +833,14 @@ A review with several comments therefore produces one run, not one run per comme
 ### Configuration
 
 - **Repository**: Select the GitHub repository to monitor
+- **Actions**: Select submitted reviews, dismissed reviews, or both. Existing configurations listen to submitted reviews only.
 - **Content Filter**: Optional filter on the review summary and inline comments. Mentions that start with @ match as an exact GitHub username. Other values are regular expressions.
 - **Ignore Bots**: Skip reviews written by GitHub Apps and bots
 - **Allowed Bots**: React to reviews from these GitHub Apps or bots even when the review does not match the content filter. Enter the bot login, for example coderabbitai.
 
 ### Event Data
 
-This trigger handles the GitHub `pull_request_review` event with action `submitted`.
+This trigger handles the GitHub `pull_request_review` event with the configured actions.
 
 SuperPlane passes through the full GitHub webhook payload under data and adds:
 

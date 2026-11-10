@@ -4,11 +4,14 @@ import { MemoryRouter, useLocation } from "react-router";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
+import { FEATURE_FACTORY_CUSTOM_AUTOMATIONS, FEATURE_FACTORY_HUMAN_REVIEW } from "@/lib/experimentalFeatures";
+
 import { catalogEntryToAutomation, catalogForColumn } from "../lib/columnAutomations";
 import { useAddColumnAutomation } from "./useAddColumnAutomation";
 
 const installFactory = vi.fn();
 const describeIntegration = vi.fn();
+const enabledFeatures = new Set<string>();
 vi.mock("@/api-client", () => ({
   organizationsDescribeIntegration: (...args: unknown[]) => describeIntegration(...args),
 }));
@@ -16,15 +19,52 @@ vi.mock("@/hooks/useFactoryData", () => ({
   useCreateFactoryAutomation: () => ({ isPending: false }),
   factoryAppsKey: (organizationId: string, factoryId: string) => ["apps", organizationId, factoryId],
 }));
-vi.mock("@/hooks/useExperimentalFeature", () => ({ useExperimentalFeature: () => ({ has: () => true }) }));
+vi.mock("@/hooks/useExperimentalFeature", () => ({
+  useExperimentalFeature: () => ({ has: (id: string) => enabledFeatures.has(id) }),
+}));
 vi.mock("@/pages/home/useInstallFactory", () => ({
   useInstallFactory: () => ({ installFactory, isInstalling: false }),
 }));
 
 beforeEach(() => {
+  enabledFeatures.clear();
+  enabledFeatures.add(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
   installFactory.mockReset();
   installFactory.mockResolvedValue({ canvasId: "closure-app" });
   describeIntegration.mockResolvedValue({ data: { integration: { metadata: { name: "workspace-vcs" } } } });
+});
+
+describe("Verify catalog", () => {
+  it.each([false, true])("uses the organization Request review flag (%s)", (enabled) => {
+    if (enabled) enabledFeatures.add(FEATURE_FACTORY_HUMAN_REVIEW);
+    const { result } = renderHook(
+      () =>
+        useAddColumnAutomation({
+          organizationId: "org",
+          factoryId: "factory",
+          factoryKey: "workspace",
+          lineId: "line",
+          appRepository: "acme/app",
+          backlogRepository: "acme/app",
+          defaultBranch: "main",
+          githubIntegrationId: "vcs-integration",
+          vcsProvider: "github",
+          automationsFor: () => [],
+        }),
+      {
+        wrapper: ({ children }: { children: ReactNode }) => (
+          <QueryClientProvider client={new QueryClient()}>
+            <MemoryRouter>{children}</MemoryRouter>
+          </QueryClientProvider>
+        ),
+      },
+    );
+
+    act(() => result.current.openPicker("verify"));
+
+    expect(result.current.catalog.some((entry) => entry.kind === "human-review")).toBe(enabled);
+    expect(result.current.catalog.some((entry) => entry.kind === "visual-evidence")).toBe(true);
+  });
 });
 
 describe("add pull request closure", () => {
@@ -77,8 +117,12 @@ describe("add pull request closure", () => {
   }
 });
 
-describe("add visual evidence", () => {
+describe.each([
+  { kind: "visual-evidence" as const, name: "Visual Evidence" },
+  { kind: "human-review" as const, name: "Request review" },
+])("add $name", ({ kind, name }) => {
   it("installs the GitHub canvas and stays on the board", async () => {
+    if (kind === "human-review") enabledFeatures.add(FEATURE_FACTORY_HUMAN_REVIEW);
     const client = new QueryClient();
     const invalidate = vi.spyOn(client, "invalidateQueries");
     const boardPath = "/org/workspaces/workspace/lines/line";
@@ -107,11 +151,11 @@ describe("add visual evidence", () => {
       },
     );
     act(() => result.current.automation.openPicker("verify"));
-    const entry = result.current.automation.catalog.find((item) => item.kind === "visual-evidence")!;
+    const entry = result.current.automation.catalog.find((item) => item.kind === kind)!;
     await act(async () => result.current.automation.onSelect(entry));
     expect(installFactory).toHaveBeenCalledWith(
       expect.objectContaining({
-        factoryId: "visual-evidence",
+        factoryId: kind,
         vcsProvider: "github",
         workspaceFactoryId: "factory",
         integrations: { github: { id: "vcs-integration", name: "workspace-vcs", ready: true } },
@@ -124,7 +168,8 @@ describe("add visual evidence", () => {
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ["apps", "org", "factory"] });
   });
 
-  it("does not install visual evidence for Bitbucket", async () => {
+  it("does not install a GitHub-only automation for Bitbucket", async () => {
+    enabledFeatures.add(FEATURE_FACTORY_HUMAN_REVIEW);
     const { result } = renderHook(
       () =>
         useAddColumnAutomation({
@@ -148,12 +193,12 @@ describe("add visual evidence", () => {
       },
     );
     act(() => result.current.openPicker("verify"));
-    expect(result.current.catalog.some((item) => item.kind === "visual-evidence")).toBe(false);
+    expect(result.current.catalog.some((item) => item.kind === kind)).toBe(false);
     await act(async () =>
       result.current.onSelect({
-        id: "visual-evidence",
-        kind: "visual-evidence",
-        name: "Visual Evidence",
+        id: kind,
+        kind,
+        name,
         description: "Capture screenshots or a short video when a pull request changes the user interface.",
         trigger: "On pull request opened or updated",
         action: "Capture screenshots or a short video",

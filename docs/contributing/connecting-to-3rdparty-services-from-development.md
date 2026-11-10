@@ -143,7 +143,7 @@ installation row.
 5. Grant repository permissions that match the workspace GitHub App manifest:
    - Issues: Read and write
    - Actions: Read and write
-   - Checks: Read-only
+   - Checks: Read and write
    - Contents: Read and write
    - Pull requests: Read and write
    - Repository hooks: Read and write
@@ -233,6 +233,98 @@ If Connect cannot create the app, confirm `BASE_URL` and
 
 CI sets dummy GitHub App values so factory E2E can skip create-app.
 Local `make test.e2e` needs the same dummy values or a real app.
+
+## Request review rollout
+
+Request review is an optional GitHub automation. The organization feature flag,
+`factory_human_review`, defaults to off and controls creation. Existing
+automations remain visible, editable, and active when the flag is off.
+The separate **Enable Request review** setting also defaults to off.
+It uses the existing GitHub integration and agent configuration.
+No new environment variables or Secret keys are required.
+
+1. Upgrade the applicable GitHub App to **Checks: Read and write**.
+2. Retain **Pull requests: Read and write**. Optional GitHub team fallbacks also require **Members: Read-only**.
+3. Ask existing installation owners to accept the permission update.
+4. Apply the Request review migrations before deploying API and worker code. Keep Request review disabled during deployment.
+5. Enable **Request review** (`factory_human_review`) for the organization through the existing admin feature controls.
+6. Add Request review from the Verify automation catalog. Upgrade existing installations through the built-in automation reset.
+7. Select a default GitHub reviewer and configure review instructions as a SuperPlane organization administrator.
+8. Test assessment completion, reviewer selection, approval, dismissal, new commits, and disablement in a test repository.
+9. Turn on **Enable Request review** only after these lifecycle checks pass.
+10. Configure GitHub branch protection separately to require `merge-confidence/merge-gate` from the correct GitHub App.
+11. Preserve existing CI requirements and verify bypass settings.
+
+The local and self-hosted manifests request the required permissions for new
+Apps. They do not update existing Apps or installations.
+Hosted App owners must update the hosted GitHub App configuration before enablement.
+This repository does not verify that configuration or live branch protection.
+
+The API receives authenticated review events. Workers select reviewers and
+publish checks through the existing integration credentials. Runner agents
+return scoped decisions; they do not publish checks or approve pull requests.
+The default reviewer must be a human with repository write access or higher.
+Personal GitHub repositories do not require a GitHub organization team.
+Existing team fallbacks remain supported. The pull request author cannot review their own pull request.
+The existing App credentials must remain available to the API and workers.
+The local Compose configuration and repository Helm chart enable both required
+workers: `START_APP_MESSAGE_WORKER=yes` and `START_NODE_REQUEST_WORKER=yes`.
+The message worker delivers assessment broadcasts. The node-request worker
+runs background components and the one-minute recovery schedule.
+
+Deploy compatible API and worker code before adding or resetting these
+automation templates. Apply the message provenance and request lease migrations
+first. Confirm that all worker replicas use the new code before template reset.
+Reset preserves review policy, fallback settings, agent configuration, and instructions.
+Existing broadcasts without source-run identity cannot authorize a review decision.
+The recovery schedule reads saved assessments and restores progress.
+
+The four superseded review migrations have not reached shared environments.
+Existing local databases with those versions need separate reconciliation before
+switching migration history. Do not reset those databases.
+
+Request review uses a database lease to coordinate GitHub publication across
+API and worker processes. Apply the publication lease migration before deploying
+these processes. If upgrading an earlier Request review build, stop its API and
+worker processes before starting the new version. The old advisory locks and
+new leases do not coordinate with each other.
+
+Publication releases database connections before GitHub calls. Reconciliation
+has a 90-second deadline. Description publication has a two-minute deadline.
+A claim expires 30 seconds after its operation deadline. Cancelled operations
+retain their claims until expiry; polling or the action queue then retries.
+Policy changes during publication return a retry message.
+
+Runner installation tokens cannot publish GitHub checks or commit statuses.
+The Publish Commit Status component uses server credentials and retains write access.
+
+A required check applies to the protected branch, including untracked pull
+requests. Those pull requests wait until Factory imports or accepts them.
+Without a required-check rule, the results remain advisory.
+Review event delivery and reconciliation have latency. Approval revocation
+cannot update a published check immediately in every case.
+SuperPlane does not change repository protection.
+
+Hosted API and workers require the existing GitHub App configuration:
+
+- `SUPERPLANE_GITHUB_APP_ID`
+- `SUPERPLANE_GITHUB_APP_SLUG`
+- `SUPERPLANE_GITHUB_APP_PRIVATE_KEY`
+- `SUPERPLANE_GITHUB_APP_WEBHOOK_SECRET`
+
+Self-hosted installations can instead use the encrypted installation App record.
+API and workers must share database access and `ENCRYPTION_MASTER_KEYS`.
+Keep existing PostgreSQL, RabbitMQ, and GitHub endpoint configuration for both processes.
+Runner agents use their existing scoped credentials; they do not receive these App secrets.
+
+The connected GitHub account could not read `superplanehq/helm-chart` or
+`superplanehq/launchpad` during this change. Both repositories returned HTTP 404.
+Hosted deployment sources and live configuration remain unverified.
+Before rollout, verify both worker flags and all four App keys in each environment.
+Previous rollout notes name `superplane-github-app` for production and
+`superplane-github-app-staging` for staging. Recheck those Secret references
+for API and worker pods. Prepare companion deployment changes if any reference
+is missing, and deploy those changes before upgrading automation templates.
 
 ## Bitbucket Forge local development
 

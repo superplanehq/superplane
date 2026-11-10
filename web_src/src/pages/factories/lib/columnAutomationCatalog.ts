@@ -16,6 +16,7 @@ export const CUSTOM_CATALOG_ID = "custom";
 export const CUSTOM_AUTOMATION_CATALOG_ID = "custom-verification";
 export const PR_CLOSURE_CATALOG_ID = "pr-closure";
 export const RISK_SCORE_CATALOG_ID = "risk-score";
+export const HUMAN_REVIEW_CATALOG_ID = "human-review";
 export const VISUAL_EVIDENCE_CATALOG_ID = "visual-evidence";
 
 export const ANALYSIS_ENTRY: ColumnAutomationCatalogEntry = {
@@ -90,6 +91,18 @@ export const RISK_SCORE_ENTRY: ColumnAutomationCatalogEntry = {
   unique: true,
 };
 
+export const HUMAN_REVIEW_ENTRY: ColumnAutomationCatalogEntry = {
+  id: HUMAN_REVIEW_CATALOG_ID,
+  kind: "human-review",
+  name: "Request review",
+  description: "Select human reviewers after merge confidence and wait for approval when required.",
+  trigger: "After merge confidence completes",
+  action: "Request human approval when required",
+  iconSrc: "",
+  iconAlt: "",
+  unique: true,
+};
+
 export const VISUAL_EVIDENCE_ENTRY: ColumnAutomationCatalogEntry = {
   id: VISUAL_EVIDENCE_CATALOG_ID,
   kind: "visual-evidence",
@@ -116,9 +129,10 @@ export const PR_CLOSURE_ENTRY: ColumnAutomationCatalogEntry = {
 
 export function catalogForColumn(
   key: ColumnKey,
-  options?: { allowCustom?: boolean; vcsProvider?: string },
+  options?: { allowCustom?: boolean; allowHumanReview?: boolean; vcsProvider?: string },
 ): ColumnAutomationCatalogEntry[] {
   const allowCustom = options?.allowCustom === true;
+  const isBitbucket = options?.vcsProvider === "bitbucket";
   if (key === "backlog") {
     return [
       ...LINE_INTAKE_SOURCES.map((source) => ({
@@ -152,15 +166,15 @@ export function catalogForColumn(
         };
       }),
       RISK_SCORE_ENTRY,
-      ...(options?.vcsProvider === "bitbucket" ? [] : [VISUAL_EVIDENCE_ENTRY]),
+      ...(options?.allowHumanReview === true && !isBitbucket ? [HUMAN_REVIEW_ENTRY] : []),
+      ...(isBitbucket ? [] : [VISUAL_EVIDENCE_ENTRY]),
       ...(allowCustom ? [CUSTOM_AUTOMATION_ENTRY] : []),
     ];
   }
   if (key === "done") {
-    const closureEntry =
-      options?.vcsProvider === "bitbucket"
-        ? { ...PR_CLOSURE_ENTRY, iconSrc: bitbucketIcon, iconAlt: "Bitbucket" }
-        : PR_CLOSURE_ENTRY;
+    const closureEntry = isBitbucket
+      ? { ...PR_CLOSURE_ENTRY, iconSrc: bitbucketIcon, iconAlt: "Bitbucket" }
+      : PR_CLOSURE_ENTRY;
     return allowCustom ? [closureEntry, EVENT_CUSTOM_ENTRY] : [closureEntry];
   }
   return allowCustom ? [AGENT_STEP_ENTRY, CUSTOM_ENTRY] : [AGENT_STEP_ENTRY];

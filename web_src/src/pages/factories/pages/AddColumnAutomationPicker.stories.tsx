@@ -57,9 +57,23 @@ export const VerifyCatalog: Story = {
   render: () => <OpenPicker catalog={catalogForColumn("verify", { allowCustom: true })} takenIds={["discussion"]} />,
 };
 
+export const VerifyCatalogWithRequestReview: Story = {
+  name: "Verify catalog with Request review",
+  render: () => (
+    <OpenPicker
+      catalog={catalogForColumn("verify", { allowCustom: true, allowHumanReview: true })}
+      takenIds={["discussion"]}
+    />
+  ),
+};
+
 export const BitbucketVerifyCatalog: Story = {
   name: "Bitbucket Verify catalog",
-  render: () => <OpenPicker catalog={catalogForColumn("verify", { allowCustom: true, vcsProvider: "bitbucket" })} />,
+  render: () => (
+    <OpenPicker
+      catalog={catalogForColumn("verify", { allowCustom: true, allowHumanReview: true, vcsProvider: "bitbucket" })}
+    />
+  ),
 };
 
 export const DoneCatalog: Story = {

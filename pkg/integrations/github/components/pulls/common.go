@@ -24,6 +24,7 @@ const (
 
 type prCommentTriggerConfiguration struct {
 	Repository               string   `json:"repository" mapstructure:"repository"`
+	Actions                  []string `json:"actions" mapstructure:"actions"`
 	ContentFilter            string   `json:"contentFilter" mapstructure:"contentFilter"`
 	IgnoreBots               bool     `json:"ignoreBots" mapstructure:"ignoreBots"`
 	AddressAllBots           bool     `json:"addressAllBots" mapstructure:"addressAllBots"`

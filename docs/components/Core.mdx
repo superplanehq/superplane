@@ -41,10 +41,14 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="GraphQL Request" href="#graph-ql-request" description="Send a GraphQL query to an HTTP endpoint (GraphQL over JSON POST)" />
   <LinkCard title="HTTP Request" href="#http-request" description="Make HTTP requests" />
   <LinkCard title="If" href="#if" description="Route events based on expression" />
+  <LinkCard title="List Human Review Recovery Candidates" href="#list-human-review-recovery-candidates" description="List tracked pull requests that need review recovery in the current workspace" />
   <LinkCard title="Loop" href="#loop" description="Repeat downstream steps until a condition is met" />
   <LinkCard title="Merge" href="#merge" description="Merge multiple upstream inputs and forward" />
   <LinkCard title="No Operation" href="#no-operation" description="Just pass events through without any additional processing" />
+  <LinkCard title="Prepare Human Review" href="#prepare-human-review" description="Authorize reviewer selection from the current policy and merge confidence assessment" />
   <LinkCard title="Read Memory" href="#read-memory" description="Find values from canvas memory by namespace and field matches" />
+  <LinkCard title="Record Human Review Decision" href="#record-human-review-decision" description="Validate and save the authorized agent decision from its stored completion" />
+  <LinkCard title="Refresh Human Review Gate" href="#refresh-human-review-gate" description="Evaluate current reviews, request eligible reviewers, and publish the review gate" />
   <LinkCard title="Report Task Check" href="#report-task-check" description="Report a scored or pass/fail check (risk, coverage, CI) on a task" />
   <LinkCard title="Run App" href="#run-app" description="Run another SuperPlane app and wait for its run to finish" />
   <LinkCard title="Run Shell Commands" href="#run-shell-commands" description="Runs shell commands on a fleet runner (host or Docker container)" />
@@ -88,6 +92,9 @@ Receive broadcast messages from another SuperPlane app
     },
     "payload": {
       "message": "Hello, World!"
+    },
+    "run": {
+      "id": "123"
     }
   },
   "timestamp": "2024-01-01T09:00:00Z",
@@ -1214,6 +1221,22 @@ The expression has access to:
 }
 ```
 
+<a id="list-human-review-recovery-candidates"></a>
+
+## List Human Review Recovery Candidates
+
+**Component key:** `listHumanReviewRecoveryCandidates`
+
+Use this component in the Request review automation. It uses the current policy and saved assessment for each tracked pull request.
+
+### Example Output
+
+```json
+{
+  "pullRequestId": "2b3cf24d-c0e2-4d42-bbe7-4c30ff2cb2a4"
+}
+```
+
 <a id="loop"></a>
 
 ## Loop
@@ -1373,6 +1396,22 @@ When executed, the No Operation component immediately emits the incoming event d
 }
 ```
 
+<a id="prepare-human-review"></a>
+
+## Prepare Human Review
+
+**Component key:** `prepareHumanReview`
+
+Use this component in the Request review automation. It uses the current policy and saved assessment for each tracked pull request.
+
+### Example Output
+
+```json
+{
+  "pullRequestId": "2b3cf24d-c0e2-4d42-bbe7-4c30ff2cb2a4"
+}
+```
+
 <a id="read-memory"></a>
 
 ## Read Memory
@@ -1426,6 +1465,38 @@ The Read Memory component looks up values from canvas-level memory storage.
   },
   "timestamp": "2026-02-28T00:00:00Z",
   "type": "memory.read"
+}
+```
+
+<a id="record-human-review-decision"></a>
+
+## Record Human Review Decision
+
+**Component key:** `recordHumanReviewDecision`
+
+Use this component in the Request review automation. It uses the current policy and saved assessment for each tracked pull request.
+
+### Example Output
+
+```json
+{
+  "pullRequestId": "2b3cf24d-c0e2-4d42-bbe7-4c30ff2cb2a4"
+}
+```
+
+<a id="refresh-human-review-gate"></a>
+
+## Refresh Human Review Gate
+
+**Component key:** `refreshHumanReviewGate`
+
+Use this component in the Request review automation. It uses the current policy and saved assessment for each tracked pull request.
+
+### Example Output
+
+```json
+{
+  "pullRequestId": "2b3cf24d-c0e2-4d42-bbe7-4c30ff2cb2a4"
 }
 ```
 

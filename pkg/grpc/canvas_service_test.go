@@ -32,6 +32,27 @@ func canvasServiceContext(orgID, userID string) context.Context {
 	return authentication.SetUserIdInMetadata(ctx, userID)
 }
 
+func TestCanvasServiceProtectsHumanReviewSettings(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	nodes := testCanvasNodes()
+	nodes[0].Metadata = datatypes.NewJSONType(models.FactoryAppTemplateMetadataFor(models.FactoryAppTemplateHumanReviewID, 1, models.ProviderGitHub))
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nodes, nil)
+	member := support.CreateUser(t, r, r.Organization.ID)
+	ctx := canvasServiceContext(r.Organization.ID.String(), member.ID.String())
+	svc := newTestCanvasService(r)
+	name := "Changed review policy"
+	_, err := svc.UpdateCanvas(ctx, &pb.UpdateCanvasRequest{Id: canvas.ID.String(), Name: &name})
+	require.Equal(t, codes.PermissionDenied, grpcerrors.Code(err))
+	_, err = svc.PutCanvasStaging(ctx, &pb.PutCanvasStagingRequest{CanvasId: canvas.ID.String(), Operations: []*pb.CanvasRepositoryFileOperation{{Path: "canvas.yaml", Content: []byte("spec: {}")}}})
+	require.Equal(t, codes.PermissionDenied, grpcerrors.Code(err))
+	_, err = svc.DeleteCanvas(ctx, &pb.DeleteCanvasRequest{Id: canvas.ID.String()})
+	require.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
+	ctx = canvasServiceContext(r.Organization.ID.String(), r.User.String())
+	_, err = svc.UpdateCanvas(ctx, &pb.UpdateCanvasRequest{Id: canvas.ID.String(), Name: &name})
+	require.NoError(t, err)
+}
+
 func testCanvasNodes() []models.CanvasNode {
 	return []models.CanvasNode{
 		{
