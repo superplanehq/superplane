@@ -57,12 +57,6 @@ blocks:
             - make ci.setup.unit
             - make test.coverage.autoparallel SHARD_INDEX=$SEMAPHORE_JOB_INDEX SHARD_COUNT=$SEMAPHORE_JOB_COUNT
 
-        - name: E2E Tests
-          parallelism: 8
-          commands:
-            - make ci.setup.e2e
-            - make test.e2e.autoparallel SHARD_INDEX=$SEMAPHORE_JOB_INDEX SHARD_COUNT=$SEMAPHORE_JOB_COUNT
-
         - name: Checks
           commands:
             - make ci.setup.unit
@@ -83,6 +77,29 @@ blocks:
             - make check.admin.routes
             - make check.generated.artifacts
 
+      epilogue:
+        always:
+          commands:
+            - "if [ -f junit-report.xml ]; then test-results publish junit-report.xml; fi"
+            - "if [ -d tmp/screenshots ] && ls tmp/screenshots/**/*.png >/dev/null 2>&1; then artifact push job tmp/screenshots; fi"
+            - bash scripts/ci_cache_store_go.sh
+
+  - name: "E2E Tests"
+    dependencies: []
+    # Run full workflow tests after merge to reduce feature-branch CI cost.
+    run:
+      when: "branch = 'main' AND change_in('/', {exclude: ['/docs/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
+    task:
+      prologue:
+        commands:
+          - "cache restore go-mod-$(checksum go.sum),go-mod"
+          - "cache restore go-build-$(awk '/^go / {print $2}' go.mod)-$(checksum go.sum),go-build-$(awk '/^go / {print $2}' go.mod)"
+      jobs:
+        - name: E2E Tests
+          parallelism: 8
+          commands:
+            - make ci.setup.e2e
+            - make test.e2e.autoparallel SHARD_INDEX=$SEMAPHORE_JOB_INDEX SHARD_COUNT=$SEMAPHORE_JOB_COUNT
       epilogue:
         always:
           commands:
