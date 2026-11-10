@@ -29,6 +29,7 @@ const (
 	waitChecksTimedOutChannel       = "timedOut"
 	waitChecksDefaultTimeoutSeconds = 3600
 	waitChecksPollInterval          = 5 * time.Minute
+	waitChecksRetryInterval         = 30 * time.Second
 	waitChecksWebhookDelay          = time.Second
 )
 
@@ -354,6 +355,10 @@ func evaluateWaitForPullRequestChecks(ctx waitChecksRuntime, now time.Time) erro
 	if err != nil {
 		return fmt.Errorf("failed to decode metadata: %w", err)
 	}
+	if !now.Before(metadata.TimeoutAt) {
+		metadata.Outcome = waitChecksOutcomeTimedOut
+		return completeWaitForPullRequestChecks(ctx, metadata, now)
+	}
 
 	client, err := common.NewClient(ctx.Integration, ctx.HTTP)
 	if err != nil {
@@ -362,13 +367,21 @@ func evaluateWaitForPullRequestChecks(ctx waitChecksRuntime, now time.Time) erro
 
 	checkRuns, combined, err := fetchPullRequestCheckSources(client, ctx.Configuration.Repository, ctx.Configuration.Ref)
 	if err != nil {
-		return err
+		statusCode := common.StatusCode(err)
+		if statusCode < http.StatusInternalServerError || statusCode >= 600 {
+			return err
+		}
+		if err := ctx.ExecutionState.SetKV(waitChecksRefKV, waitChecksRefKey(ctx.Configuration.Repository, metadata.SHA)); err != nil {
+			return err
+		}
+		delay := max(time.Second, nextEvaluateDelay(now, metadata.TimeoutAt, waitChecksRetryInterval))
+		logWaitChecks(ctx.Logger, log.Fields{"error": err, "retryDelay": delay}, "Retrying pull request checks after GitHub server error")
+		return ctx.Requests.ScheduleActionCall(waitChecksEvaluateHook, map[string]any{}, delay)
 	}
 
 	checks := normalizePullRequestChecks(checkRuns, combined)
 	sha := resolvedWaitChecksSHA(ctx.Configuration.Ref, checkRuns, combined)
-	timedOut := !now.Before(metadata.TimeoutAt)
-	evaluation := evaluatePullRequestChecks(checks, ctx.Configuration.CheckNames, timedOut)
+	evaluation := evaluatePullRequestChecks(checks, ctx.Configuration.CheckNames, false)
 	logWaitChecksEvaluation(ctx.Logger, sha, evaluation)
 
 	if metadata.Fingerprint != "" && metadata.Fingerprint != evaluation.Fingerprint {
@@ -395,17 +408,20 @@ func evaluateWaitForPullRequestChecks(ctx waitChecksRuntime, now time.Time) erro
 		if err := ctx.Metadata.Set(metadata); err != nil {
 			return err
 		}
-		return ctx.Requests.ScheduleActionCall(waitChecksEvaluateHook, map[string]any{}, delay)
+		return ctx.Requests.ScheduleActionCall(waitChecksEvaluateHook, map[string]any{}, max(time.Second, delay))
 	}
 
-	completedAt := now
+	return completeWaitForPullRequestChecks(ctx, metadata, now)
+}
+
+func completeWaitForPullRequestChecks(ctx waitChecksRuntime, metadata WaitForPullRequestChecksMetadata, completedAt time.Time) error {
 	metadata.CompletedAt = &completedAt
 	if err := ctx.Metadata.Set(metadata); err != nil {
 		return err
 	}
 
 	channel := waitChecksPassedChannel
-	switch evaluation.Outcome {
+	switch metadata.Outcome {
 	case waitChecksOutcomeFailed:
 		channel = waitChecksFailedChannel
 	case waitChecksOutcomeTimedOut:
