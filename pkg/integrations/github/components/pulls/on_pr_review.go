@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"slices"
 
 	"github.com/google/go-github/v84/github"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -23,13 +24,13 @@ func (p *OnPRReview) Label() string {
 }
 
 func (p *OnPRReview) Description() string {
-	return "Listen to submitted pull request reviews"
+	return "Listen to pull request review submissions and dismissals"
 }
 
 func (p *OnPRReview) Documentation() string {
-	return `The On PR Review trigger starts a workflow execution when a pull request review is submitted.
+	return `The On PR Review trigger starts a workflow execution for the configured pull request review actions.
 
-It loads every inline comment that belongs to that review before it emits an event.
+For submitted reviews, it loads every inline comment before it emits an event.
 A review with several comments therefore produces one run, not one run per comment.
 
 ## Use Cases
@@ -41,13 +42,14 @@ A review with several comments therefore produces one run, not one run per comme
 ## Configuration
 
 - **Repository**: Select the GitHub repository to monitor
+- **Actions**: Select submitted reviews, dismissed reviews, or both. Existing configurations listen to submitted reviews only.
 - **Content Filter**: Optional filter on the review summary and inline comments. Mentions that start with @ match as an exact GitHub username. Other values are regular expressions.
 - **Ignore Bots**: Skip reviews written by GitHub Apps and bots
 - **Allowed Bots**: React to reviews from these GitHub Apps or bots even when the review does not match the content filter. Enter the bot login, for example coderabbitai.
 
 ## Event Data
 
-This trigger handles the GitHub ` + "`pull_request_review`" + ` event with action ` + "`submitted`" + `.
+This trigger handles the GitHub ` + "`pull_request_review`" + ` event with the configured actions.
 
 SuperPlane passes through the full GitHub webhook payload under data and adds:
 
@@ -73,7 +75,15 @@ func (p *OnPRReview) Color() string {
 }
 
 func (p *OnPRReview) Configuration() []configuration.Field {
-	return prCommentConfigurationFields()
+	return append(prCommentConfigurationFields(), configuration.Field{
+		Name: "actions", Label: "Actions", Type: configuration.FieldTypeMultiSelect,
+		Required: false, Default: []string{"submitted"},
+		Description: "Start a run for these review actions. The default is submitted reviews only.",
+		TypeOptions: &configuration.TypeOptions{MultiSelect: &configuration.MultiSelectTypeOptions{Options: []configuration.FieldOption{
+			{Label: "Submitted", Value: "submitted"},
+			{Label: "Dismissed", Value: "dismissed"},
+		}}},
+	})
 }
 
 func (p *OnPRReview) Setup(ctx core.TriggerContext) error {
@@ -115,8 +125,12 @@ func (p *OnPRReview) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.W
 		return code, nil, fmt.Errorf("failed to verify and parse webhook data: %w", err)
 	}
 
-	if !isExpectedPRCommentAction(eventType, data) {
-		action, _ := common.ExtractAction(data)
+	action, _ := common.ExtractAction(data)
+	actions := config.Actions
+	if actions == nil {
+		actions = []string{"submitted"}
+	}
+	if !slices.Contains(actions, action) || (action != "submitted" && action != "dismissed") {
 		ctx.Logger.Infof("Ignoring event - action %q is not supported", action)
 		return http.StatusOK, nil, nil
 	}
@@ -127,14 +141,19 @@ func (p *OnPRReview) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.W
 		return http.StatusOK, nil, nil
 	}
 
-	comments, code, err := loadSubmittedReviewComments(ctx, config.Repository, data)
-	if err != nil {
-		ctx.Logger.Errorf("Failed to load review comments: %v", err)
-		return code, nil, err
+	var comments []*github.PullRequestComment
+	if action == "submitted" {
+		var code int
+		comments, code, err = loadSubmittedReviewComments(ctx, config.Repository, data)
+		if err != nil {
+			ctx.Logger.Errorf("Failed to load review comments: %v", err)
+			return code, nil, err
+		}
 	}
 
 	matched := bypassFilter
 	if !bypassFilter {
+		var code int
 		bodies := reviewFilterBodies(data, comments)
 		matched, code, err = applyContentFilter(config.ContentFilter, bodies...)
 		if err != nil {

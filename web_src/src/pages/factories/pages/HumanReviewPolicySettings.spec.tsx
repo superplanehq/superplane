@@ -5,15 +5,15 @@ import { describe, expect, it, vi } from "bun:test";
 import { HumanReviewPolicySettings } from "./HumanReviewPolicySettings";
 
 describe("HumanReviewPolicySettings", () => {
-  it("enables review with an individual default and preserves the entrypoint configuration", async () => {
+  it("enables review with an individual default and preserves the preparation input", async () => {
     const onSave = vi.fn().mockResolvedValue(undefined);
     const user = userEvent.setup();
     render(
       <HumanReviewPolicySettings
         node={{
-          id: "on-human-review",
+          id: "prepare-human-review",
           name: "Request review",
-          configuration: { enabled: false, fallbackTeam: "", parameters: { pullRequestId: "required" } },
+          configuration: { enabled: false, fallbackTeam: "", input: "{{ $ }}" },
         }}
         reviewers={["mytmlt", "maintainer"]}
         onSave={onSave}
@@ -29,12 +29,12 @@ describe("HumanReviewPolicySettings", () => {
     await waitFor(() =>
       expect(onSave).toHaveBeenCalledWith(
         expect.objectContaining({
-          nodeId: "on-human-review",
+          nodeId: "prepare-human-review",
           configuration: {
             enabled: true,
             defaultReviewer: "mytmlt",
             fallbackTeam: "",
-            parameters: { pullRequestId: "required" },
+            input: "{{ $ }}",
           },
         }),
       ),
@@ -47,7 +47,7 @@ describe("HumanReviewPolicySettings", () => {
     const user = userEvent.setup();
     render(
       <HumanReviewPolicySettings
-        node={{ id: "on-human-review", configuration: { enabled: true, defaultReviewer: "mytmlt" } }}
+        node={{ id: "prepare-human-review", configuration: { enabled: true, defaultReviewer: "mytmlt" } }}
         reviewers={[]}
         reviewersError="SuperPlane could not load reviewers. Check GitHub App access and try again."
         onRetryReviewers={onRetryReviewers}
@@ -70,7 +70,7 @@ describe("HumanReviewPolicySettings", () => {
     const user = userEvent.setup();
     render(
       <HumanReviewPolicySettings
-        node={{ id: "on-human-review", configuration: { enabled: true, fallbackTeam: "acme/reviewers" } }}
+        node={{ id: "prepare-human-review", configuration: { enabled: true, fallbackTeam: "acme/reviewers" } }}
         reviewers={[]}
         onSave={onSave}
       />,
@@ -88,7 +88,10 @@ describe("HumanReviewPolicySettings", () => {
     const onSave = vi.fn().mockRejectedValue(new Error("Only organization administrators can update Request review."));
     const user = userEvent.setup();
     render(
-      <HumanReviewPolicySettings node={{ id: "on-human-review", configuration: { enabled: false } }} onSave={onSave} />,
+      <HumanReviewPolicySettings
+        node={{ id: "prepare-human-review", configuration: { enabled: false } }}
+        onSave={onSave}
+      />,
     );
 
     await user.click(screen.getByRole("button", { name: "Save Request review settings" }));

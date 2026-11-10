@@ -37,3 +37,22 @@ func TestHumanReviewSettingsAcceptIndividualReviewerWithoutTeam(t *testing.T) {
 		})
 	}
 }
+
+func TestHumanReviewSettingsPreferPreparationPolicy(t *testing.T) {
+	settings, present := HumanReviewSettingsFromNodes([]Node{
+		{
+			ID: HumanReviewTriggerNodeID, Type: NodeTypeTrigger,
+			Metadata:      FactoryAppTemplateMetadataFor(FactoryAppTemplateHumanReviewID, 1, ProviderGitHub),
+			Configuration: map[string]any{"enabled": true, "defaultReviewer": "old-owner"},
+		},
+		{
+			ID: HumanReviewPrepareNodeID, Type: NodeTypeComponent,
+			Ref:           NodeRef{Component: &ComponentRef{Name: "prepareHumanReview"}},
+			Configuration: map[string]any{"enabled": false, "defaultReviewer": "", "fallbackTeam": ""},
+		},
+	})
+	require.True(t, present)
+	require.False(t, settings.Enabled)
+	require.Empty(t, settings.DefaultReviewer)
+	require.Empty(t, settings.FallbackTeam)
+}

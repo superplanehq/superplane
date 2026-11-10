@@ -48,7 +48,7 @@ it("loads reviewers for the workspace repository and recovers a failed request",
   render(
     <QueryClientProvider client={queryClient}>
       <HumanReviewPolicySettingsHost
-        node={{ id: "on-human-review", configuration: { enabled: false } }}
+        node={{ id: "prepare-human-review", configuration: { enabled: false } }}
         organizationId="org-1"
         factoryId="factory-1"
         onSave={vi.fn()}

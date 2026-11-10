@@ -24,10 +24,10 @@ func TestHumanReviewSetupFailureBlocksTheGateAndRecoversOnRetry(t *testing.T) {
 	automation.settings.DefaultReviewer = "owner"
 	client.permissions = map[string]*github.RepositoryPermissionLevel{"owner": {User: reviewTestUser(4, "owner", "User"), Permission: github.Ptr("admin")}}
 	client.teamError = errors.New("the GitHub account has no organization teams")
-	require.ErrorIs(t, reconcileHumanReview(t.Context(), db, IntakeDependencies{}, factory, pr, automation, client), setupFailure)
+	require.NoError(t, reconcileHumanReview(t.Context(), db, IntakeDependencies{}, factory, pr, automation, client))
 	failed, err := pr.CurrentHumanReview(db)
 	require.NoError(t, err)
-	require.Equal(t, models.FactoryHumanReviewStateFailed, failed.State)
+	require.Equal(t, models.FactoryHumanReviewStateWaitingDecision, failed.State)
 	require.Nil(t, failed.RunID)
 	require.Contains(t, failed.BlockingReason, setupFailure.Error())
 	require.Equal(t, humanReviewPublication{Status: "completed", Conclusion: "failure"}, client.publications[len(client.publications)-1])
@@ -40,7 +40,7 @@ func TestHumanReviewSetupFailureBlocksTheGateAndRecoversOnRetry(t *testing.T) {
 	require.NotNil(t, recovered.RunID)
 	require.Equal(t, humanReviewPublication{Status: "in_progress"}, client.publications[len(client.publications)-1])
 	var event models.CanvasEvent
-	require.NoError(t, db.Where("workflow_id = ? AND run_id = ?", automation.canvas.ID, *recovered.RunID).First(&event).Error)
+	require.NoError(t, db.Where("workflow_id = ? AND run_id = ? AND execution_id IS NOT NULL", automation.canvas.ID, *recovered.RunID).First(&event).Error)
 	payload, ok := models.RootEventSourcePayload(event.Data.Data()).(map[string]any)
 	require.True(t, ok)
 	review, ok := payload["humanReview"].(map[string]any)
@@ -118,7 +118,7 @@ func newHumanReviewReconciliationFixture(t *testing.T) humanReviewReconciliation
 		Ref:           datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "onRun"}}),
 		Configuration: datatypes.NewJSONType(map[string]any{"enabled": true, "fallbackTeam": "acme/reviewers"}),
 		Metadata:      datatypes.NewJSONType(models.FactoryAppTemplateMetadata(models.FactoryAppTemplateHumanReviewID, 1)),
-	}, {NodeID: models.HumanReviewAgentNodeID, Type: models.NodeTypeComponent, Ref: datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "runnerClaudeCode"}})}}, nil)
+	}, {NodeID: "on-merge-confidence", Type: models.NodeTypeTrigger, Ref: datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "onBroadcast"}}), Configuration: datatypes.NewJSONType(map[string]any{"app": assessmentCanvas.ID.String()})}, {NodeID: models.HumanReviewPrepareNodeID, Type: models.NodeTypeComponent, Ref: datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "prepareHumanReview"}}), Configuration: datatypes.NewJSONType(map[string]any{"enabled": true, "fallbackTeam": "acme/reviewers"})}, {NodeID: models.HumanReviewAgentNodeID, Type: models.NodeTypeComponent, Ref: datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "runnerClaudeCode"}})}}, nil)
 	require.NoError(t, db.Model(humanCanvas).Update("factory_id", factory.ID).Error)
 	automation, err := findHumanReviewAutomation(db, factory)
 	require.NoError(t, err)

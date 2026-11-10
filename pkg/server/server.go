@@ -210,7 +210,6 @@ func startWorkers(
 	}
 
 	if os.Getenv("START_NODE_REQUEST_WORKER") == "yes" {
-		go workers.NewFactoryHumanReviewWorker(encryptor, registry).Start(context.Background())
 
 		log.Println("Starting Node Request Worker")
 

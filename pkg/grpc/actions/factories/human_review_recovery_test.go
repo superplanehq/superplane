@@ -1,145 +1,97 @@
 package factories
 
 import (
-	"context"
-	"errors"
+	"fmt"
 	"testing"
-	"time"
 
-	"github.com/google/go-github/v84/github"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/components/runs"
+	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/workers/contexts"
 	"github.com/superplanehq/superplane/test/support"
+	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
-func TestHumanReviewRecoversRejectedReopenEvents(t *testing.T) {
-	for _, scenario := range []struct {
-		name        string
-		state       string
-		draft       bool
-		readFailure bool
-		newRequest  bool
-		staleUpdate bool
-	}{
-		{name: "open", state: "open"},
-		{name: "draft", state: "open", draft: true},
-		{name: "stale reopen", state: "closed"},
-		{name: "provider failure", state: "open", readFailure: true},
-		{name: "new reopen during reconciliation", state: "closed", newRequest: true},
-		{name: "lifecycle update during reconciliation", state: "closed", newRequest: true, staleUpdate: true},
-	} {
-		t.Run(scenario.name, func(t *testing.T) {
-			f := newHumanReviewReconciliationFixture(t)
-			order, err := f.factory.FindWorkOrder(f.db, f.pr.WorkOrderID)
-			require.NoError(t, err)
-			require.NoError(t, f.db.Model(order).Update("state", models.FactoryWorkOrderStateOpen).Error)
-			_, err = applyGitHubPullRequestClosed(f.db, f.factory, f.pr, false, nil, nil, nil)
-			require.NoError(t, err)
-			integration, err := models.CreateIntegration(uuid.New(), f.factory.OrganizationID, "github", support.RandomName("github"), map[string]any{})
-			require.NoError(t, err)
-			client := &humanReviewRecoveryFake{humanReviewSetupFake: f.client, factoryGitHubAPI: &fakeFactoryGitHub{}}
-			stubFactoryGitHub(t, client)
-			original := factoryHumanReviewScheduler
-			// An occupied slot fills the queue without starting provider work.
-			factoryHumanReviewScheduler = newHumanReviewScheduler(0, 1, reconcileFactoryHumanReview)
-			require.True(t, factoryHumanReviewScheduler.schedule(t.Context(), IntakeDependencies{}, models.FactoryPullRequest{ID: uuid.New()}))
-			t.Cleanup(func() { factoryHumanReviewScheduler = original })
+func TestHumanReviewRecoveryCreatesSeparateRunsForWorkspaceCandidates(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("review-recovery"), "", "")
+	require.NoError(t, err)
+	canvas, nodes := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{
+		{NodeID: models.HumanReviewTriggerNodeID, Type: models.NodeTypeTrigger, Ref: datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "onRun"}}), Metadata: datatypes.NewJSONType(models.FactoryAppTemplateMetadata(models.FactoryAppTemplateHumanReviewID, 2))},
+		{NodeID: models.HumanReviewPrepareNodeID, Type: models.NodeTypeComponent, Ref: datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "prepareHumanReview"}}), Configuration: datatypes.NewJSONType(map[string]any{"enabled": false})},
+		{NodeID: "recover", Type: models.NodeTypeTrigger, Ref: datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "schedule"}})},
+		{NodeID: "list", Type: models.NodeTypeComponent, Ref: datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "listHumanReviewRecoveryCandidates"}})},
+		{NodeID: "run", Type: models.NodeTypeComponent, Ref: datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "runApp"}})},
+	}, nil)
+	require.NoError(t, db.Model(canvas).Update("factory_id", factory.ID).Error)
+	createPR := func(owner *models.Factory, number int64) *models.FactoryPullRequest {
+		order, err := owner.CreateWorkOrder(db, "Review", "", &r.User, nil, nil)
+		require.NoError(t, err)
+		pr, err := order.CreatePullRequest(db, models.FactoryPullRequestParams{URL: fmt.Sprintf("https://github.com/acme/app/pull/%d", number)})
+		require.NoError(t, err)
+		return pr
+	}
+	first, second := createPR(factory, 41), createPR(factory, 42)
+	closed := createPR(factory, 43)
+	require.NoError(t, db.Model(closed).Update("state", models.FactoryPullRequestStateClosed).Error)
+	otherFactory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("other-review"), "", "")
+	require.NoError(t, err)
+	createPR(otherFactory, 44)
+	otherCanvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{{NodeID: models.HumanReviewTriggerNodeID, Type: models.NodeTypeTrigger, Metadata: datatypes.NewJSONType(models.FactoryAppTemplateMetadata(models.FactoryAppTemplateHumanReviewID, 2))}}, nil)
+	require.NoError(t, db.Model(otherCanvas).Update("factory_id", otherFactory.ID).Error)
 
-			RefreshFactoryPullRequestMergeabilityFromGitHubEvent(t.Context(), IntakeDependencies{}, &models.Webhook{AppInstallationID: &integration.ID}, "pull_request",
-				[]byte(`{"action":"reopened","repository":{"full_name":"acme/app"},"pull_request":{"number":42,"head":{"sha":"current-head"}}}`))
-
-			pending, err := models.ListFactoryHumanReviewPullRequestsToReconcile(f.db, uuid.Nil, 100)
-			require.NoError(t, err)
-			require.Len(t, pending, 1, "polling must recover a closed PR whose reopen event was rejected")
-			require.Equal(t, f.pr.ID, pending[0].ID)
-			require.Equal(t, models.FactoryPullRequestStateClosed, pending[0].State, "queue admission must not reopen a task without live confirmation")
-			client.current.State = github.Ptr(scenario.state)
-			client.current.Draft = github.Ptr(scenario.draft)
-			if scenario.newRequest {
-				client.onRead = func() error {
-					stale := *f.pr
-					if err := f.pr.RequestHumanReviewReconciliation(f.db); err != nil {
-						return err
-					}
-					if scenario.staleUpdate {
-						return stale.Update(f.db, models.FactoryPullRequestPatch{Title: github.Ptr("Updated title")})
-					}
-					return nil
-				}
-			}
-			if scenario.readFailure {
-				client.readFailure = errors.New("GitHub unavailable")
-				require.ErrorIs(t, reconcileFactoryHumanReview(t.Context(), IntakeDependencies{}, pending[0]), client.readFailure)
-				pending, err = models.ListFactoryHumanReviewPullRequestsToReconcile(f.db, uuid.Nil, 100)
-				require.NoError(t, err)
-				require.Len(t, pending, 1, "a provider failure must leave the request pending")
-				client.readFailure = nil
-			}
-			// A fresh scheduler models recovery after the original process exits.
-			completed := make(chan error, 1)
-			factoryHumanReviewScheduler = newHumanReviewScheduler(1, 1, func(ctx context.Context, deps IntakeDependencies, pr models.FactoryPullRequest) error {
-				err := reconcileFactoryHumanReview(ctx, deps, pr)
-				completed <- err
-				return err
+	root := support.EmitCanvasEventForNodeWithData(t, canvas.ID, "recover", "default", nil, map[string]any{"type": "schedule.tick", "data": map[string]any{}})
+	listExecution := support.CreateNodeExecutionWithConfiguration(t, canvas.ID, "list", root.ID, root.ID, map[string]any{})
+	component := &listHumanReviewRecoveryComponent{}
+	_, err = component.HandleBackgroundHook(core.BackgroundHookContext{
+		WorkflowID: canvas.ID, OrganizationID: r.Organization.ID, NodeID: "list", RunID: root.RunID, ExecutionID: listExecution.ID,
+		ActionHookContext: core.ActionHookContext{ExecutionState: contexts.NewExecutionStateContext(db, listExecution, nil)},
+	})
+	require.NoError(t, err)
+	var candidates []models.CanvasEvent
+	require.NoError(t, db.Where("execution_id = ?", listExecution.ID).Find(&candidates).Error)
+	require.Len(t, candidates, 2)
+	candidateIDs := make([]string, 0, len(candidates))
+	runner := &runs.RunApp{}
+	runConfiguration := map[string]any{"app": canvas.ID.String(), "node": models.HumanReviewTriggerNodeID}
+	require.NoError(t, runner.Setup(core.SetupContext{
+		Configuration: runConfiguration,
+		Apps:          contexts.NewAppContext(db, canvas, &nodes[4]),
+		Metadata:      contexts.NewNodeMetadataContext(db, &nodes[4]),
+	}))
+	for _, candidate := range candidates {
+		payload := models.RootEventSourcePayload(candidate.Data.Data()).(map[string]any)
+		candidateIDs = append(candidateIDs, payload["pullRequestId"].(string))
+		execution := support.CreateNodeExecutionWithConfiguration(t, canvas.ID, "run", root.ID, candidate.ID, map[string]any{})
+		require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+			return runner.Execute(core.ExecutionContext{
+				WorkflowID: canvas.ID.String(), NodeID: "run", RunID: root.RunID,
+				Configuration: map[string]any{"app": canvas.ID.String(), "node": models.HumanReviewTriggerNodeID, "parameters": payload},
+				NodeMetadata:  contexts.NewNodeMetadataContext(tx, &nodes[4]),
+				Metadata:      contexts.NewExecutionMetadataContext(tx, execution),
+				Requests:      contexts.NewExecutionRequestContext(tx, execution),
+				Runs:          contexts.NewRunExecutionContext(tx, canvas, &nodes[4], execution),
 			})
-			require.True(t, ScheduleFactoryHumanReview(t.Context(), IntakeDependencies{}, pending[0]))
-			select {
-			case err := <-completed:
-				require.NoError(t, err)
-			case <-time.After(5 * time.Second):
-				t.Fatal("reconciliation did not finish")
-			}
-			stored, err := f.factory.FindPullRequest(f.db, models.FactoryPullRequestLookup{ID: f.pr.ID})
-			require.NoError(t, err)
-			order, err = f.factory.FindWorkOrder(f.db, order.ID)
-			require.NoError(t, err)
-			if scenario.state == "closed" {
-				require.Equal(t, models.FactoryPullRequestStateClosed, stored.State)
-				require.False(t, order.IsOpen())
-				pending, err = models.ListFactoryHumanReviewPullRequestsToReconcile(f.db, uuid.Nil, 100)
-				require.NoError(t, err)
-				if scenario.newRequest {
-					require.Len(t, pending, 1, "completing an older request must preserve a newer reopen event")
-					client.onRead = nil
-					require.NoError(t, reconcileFactoryHumanReview(t.Context(), IntakeDependencies{}, pending[0]))
-					pending, err = models.ListFactoryHumanReviewPullRequestsToReconcile(f.db, uuid.Nil, 100)
-					require.NoError(t, err)
-				}
-				require.Empty(t, pending, "a stale reopen must retire after live confirmation")
-				return
-			}
-			state := models.FactoryPullRequestStateOpen
-			if scenario.draft {
-				state = models.FactoryPullRequestStateDraft
-			}
-			require.Equal(t, state, stored.State)
-			require.Nil(t, stored.ClosedAt)
-			require.Nil(t, stored.HumanReviewRequestID)
-			require.True(t, order.IsOpen())
-		})
+		}))
 	}
-}
-
-type humanReviewRecoveryFake struct {
-	*humanReviewSetupFake
-	factoryGitHubAPI
-	readFailure error
-	onRead      func() error
-}
-
-func (f *humanReviewRecoveryFake) GetPullRequest(ctx context.Context, repository string, number int) (*github.PullRequest, *github.Response, error) {
-	if f.readFailure != nil {
-		return nil, nil, f.readFailure
+	require.ElementsMatch(t, []string{first.ID.String(), second.ID.String()}, candidateIDs)
+	var children []models.CanvasRun
+	require.NoError(t, db.Where("parent_run_id = ?", root.RunID).Find(&children).Error)
+	require.Len(t, children, 2)
+	require.NotEqual(t, children[0].ID, children[1].ID)
+	recoveredIDs := make([]string, 0, len(children))
+	for _, child := range children {
+		require.Equal(t, models.HumanReviewTriggerNodeID, child.NodeID)
+		require.Equal(t, canvas.ID, child.WorkflowID)
+		input := child.Input.Data().(map[string]any)
+		recoveredIDs = append(recoveredIDs, input["parameters"].(map[string]any)["pullRequestId"].(string))
+		require.NotEqual(t, uuid.Nil, *child.ParentExecutionID)
 	}
-	if f.onRead != nil {
-		if err := f.onRead(); err != nil {
-			return nil, nil, err
-		}
-	}
-	return f.humanReviewSetupFake.GetPullRequest(ctx, repository, number)
-}
-
-func (f *humanReviewRecoveryFake) ListCheckRunsForRef(ctx context.Context, repository, ref string, opts *github.ListCheckRunsOptions) (*github.ListCheckRunsResults, *github.Response, error) {
-	return f.humanReviewSetupFake.ListCheckRunsForRef(ctx, repository, ref, opts)
+	require.ElementsMatch(t, candidateIDs, recoveredIDs)
 }

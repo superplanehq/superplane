@@ -130,7 +130,7 @@ export function NodeConfigPanel({
         </header>
         <div className="flex min-h-0 flex-1 flex-col">
           {body ??
-            (node.id === "on-human-review" ? (
+            (isHumanReviewPolicyNode(node) ? (
               <HumanReviewPolicySettingsHost
                 key={JSON.stringify(node.configuration)}
                 node={node}
@@ -197,6 +197,14 @@ export function NodeConfigPanel({
       ) : null}
     </>
   );
+}
+
+function isHumanReviewPolicyNode(node: SuperplaneComponentsNode) {
+  if (node.component === "prepareHumanReview") {
+    return true;
+  }
+  // Existing installations keep their policy on On Run until admin reset.
+  return node.id === "on-human-review" && "enabled" in (node.configuration ?? {});
 }
 
 function useNodeCatalog(node: SuperplaneComponentsNode, organizationId?: string) {

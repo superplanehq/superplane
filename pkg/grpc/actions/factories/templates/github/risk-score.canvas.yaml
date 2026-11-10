@@ -14,6 +14,8 @@ spec:
     - channel: failed
       sourceId: assess-risk
       targetId: publish-merge-confidence
+    - {sourceId: assess-risk, targetId: broadcast-merge-confidence, channel: passed}
+    - {sourceId: assess-risk, targetId: broadcast-merge-confidence, channel: failed}
   nodes:
     - id: on-pr-risk
       name: On Pull Request
@@ -303,4 +305,16 @@ spec:
       position:
         x: 1200
         "y": 80
+      isCollapsed: true
+    - id: broadcast-merge-confidence
+      name: Broadcast Merge Confidence
+      type: TYPE_ACTION
+      component: broadcastMessage
+      configuration:
+        payload:
+          pullRequestId: '{{ $["Assess Merge Confidence"].data.mergeConfidence.pullRequestId }}'
+          repository: '{{ root().data.repository.full_name }}'
+          number: '{{ root().data.pull_request.number }}'
+          assessedCommit: '{{ root().data.pull_request.head.sha }}'
+      position: {x: 1200, y: 360}
       isCollapsed: true

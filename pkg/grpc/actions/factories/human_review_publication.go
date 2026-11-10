@@ -139,6 +139,15 @@ func humanReviewPublicationCurrent(db *gorm.DB, pr *models.FactoryPullRequest, d
 	if current == nil || current.ID != decision.ID || pr.CurrentRevisionID == nil || *pr.CurrentRevisionID != decision.RevisionID || (pr.State != models.FactoryPullRequestStateOpen && pr.State != models.FactoryPullRequestStateDraft) {
 		return false, nil
 	}
+	if decision.RunID != nil && decision.State != models.FactoryHumanReviewStateFailed {
+		run, err := models.FindUnscopedCanvasRun(db, *decision.RunID)
+		if err != nil {
+			return false, err
+		}
+		if run.CancelledAt != nil || run.State == models.CanvasRunStateCancelling || run.Result == models.CanvasRunResultCancelled {
+			return false, nil
+		}
+	}
 	if decision.ConfigurationVersion == "" {
 		return true, nil
 	}

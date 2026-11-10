@@ -7,7 +7,7 @@ const meta = {
   title: "Factories/Components/HumanReviewPolicySettings",
   component: HumanReviewPolicySettings,
   args: {
-    node: { id: "on-human-review", name: "Request review", configuration: { enabled: false, fallbackTeam: "" } },
+    node: { id: "prepare-human-review", name: "Request review", configuration: { enabled: false, fallbackTeam: "" } },
     reviewers: ["mytmlt", "maintainer"],
     onRetryReviewers: fn(),
     onSave: fn(),
@@ -26,10 +26,10 @@ type Story = StoryObj<typeof meta>;
 
 export const Disabled: Story = {};
 export const Enabled: Story = {
-  args: { node: { id: "on-human-review", configuration: { enabled: true, defaultReviewer: "mytmlt" } } },
+  args: { node: { id: "prepare-human-review", configuration: { enabled: true, defaultReviewer: "mytmlt" } } },
 };
 export const LegacyTeam: Story = {
-  args: { node: { id: "on-human-review", configuration: { enabled: true, fallbackTeam: "acme/maintainers" } } },
+  args: { node: { id: "prepare-human-review", configuration: { enabled: true, fallbackTeam: "acme/maintainers" } } },
 };
 export const LoadingReviewers: Story = {
   args: { reviewers: [], reviewersLoading: true },
@@ -45,7 +45,7 @@ export const ReviewerLoadError: Story = {
 };
 export const SavedReviewerUnavailable: Story = {
   args: {
-    node: { id: "on-human-review", configuration: { enabled: true, defaultReviewer: "mytmlt" } },
+    node: { id: "prepare-human-review", configuration: { enabled: true, defaultReviewer: "mytmlt" } },
     reviewers: [],
   },
 };

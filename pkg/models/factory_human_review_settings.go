@@ -13,6 +13,7 @@ import (
 const (
 	FactoryAppTemplateHumanReviewID = "human-review"
 	HumanReviewTriggerNodeID        = "on-human-review"
+	HumanReviewPrepareNodeID        = "prepare-human-review"
 	HumanReviewAgentNodeID          = "human-review-agent"
 )
 
@@ -35,15 +36,24 @@ func HumanReviewSettingsFromNodes(nodes []Node) (HumanReviewSettings, bool) {
 		return HumanReviewSettings{}, false
 	}
 	for _, node := range nodes {
-		if node.ID != HumanReviewTriggerNodeID || node.Type != NodeTypeTrigger {
-			continue
+		if node.ID == HumanReviewPrepareNodeID && node.ComponentName() == "prepareHumanReview" {
+			return humanReviewSettings(node.Configuration), true
 		}
-		enabled, _ := node.Configuration["enabled"].(bool)
-		reviewer, _ := node.Configuration["defaultReviewer"].(string)
-		team, _ := node.Configuration["fallbackTeam"].(string)
-		return HumanReviewSettings{Enabled: enabled, DefaultReviewer: strings.TrimSpace(reviewer), FallbackTeam: strings.TrimSpace(team), AgentNodeID: HumanReviewAgentNodeID}, true
+	}
+	// Existing installations keep their policy on On Run until admin reset.
+	for _, node := range nodes {
+		if node.ID == HumanReviewTriggerNodeID && node.Type == NodeTypeTrigger {
+			return humanReviewSettings(node.Configuration), true
+		}
 	}
 	return HumanReviewSettings{}, false
+}
+
+func humanReviewSettings(configuration map[string]any) HumanReviewSettings {
+	enabled, _ := configuration["enabled"].(bool)
+	reviewer, _ := configuration["defaultReviewer"].(string)
+	team, _ := configuration["fallbackTeam"].(string)
+	return HumanReviewSettings{Enabled: enabled, DefaultReviewer: strings.TrimSpace(reviewer), FallbackTeam: strings.TrimSpace(team), AgentNodeID: HumanReviewAgentNodeID}
 }
 
 func (s HumanReviewSettings) Validate() error {

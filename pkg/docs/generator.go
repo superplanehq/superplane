@@ -12,6 +12,7 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	_ "github.com/superplanehq/superplane/pkg/grpc/actions/factories" // Register factory-owned lifecycle components.
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/registryimports"
 )

@@ -36,6 +36,11 @@ func TestMaterializeHumanReviewRequiresFeatureOnlyForCreation(t *testing.T) {
 			factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 			require.NoError(t, err)
 			canvas := support.CreateFactoryCanvas(t, r, factory.ID, "Request review")
+			source := support.CreateFactoryCanvas(t, r, factory.ID, "Renamed Merge confidence")
+			require.NoError(t, db.Model(&models.CanvasVersion{}).Where("id = ?", *source.LiveVersionID).
+				Update("nodes", datatypes.NewJSONSlice([]models.Node{{
+					ID: "on-pr-risk", Metadata: models.FactoryAppTemplateMetadataFor("risk-score", 1, models.ProviderGitHub),
+				}})).Error)
 			require.NoError(t, canvas.SetColumnKey(db, models.CanvasColumnKeyDone))
 			if test.existing {
 				require.NoError(t, db.Model(&models.CanvasVersion{}).Where("id = ?", *canvas.LiveVersionID).
@@ -63,7 +68,8 @@ func TestMaterializeHumanReviewRequiresFeatureOnlyForCreation(t *testing.T) {
 				require.NoError(t, err)
 				doc, err := yaml.CanvasFromYAML([]byte(response.GetCanvasYaml()))
 				require.NoError(t, err)
-				require.Equal(t, false, findYAMLNode(t, doc, models.HumanReviewTriggerNodeID).Configuration["enabled"])
+				require.Equal(t, false, findYAMLNode(t, doc, models.HumanReviewPrepareNodeID).Configuration["enabled"])
+				require.Equal(t, source.ID.String(), findYAMLNode(t, doc, "on-merge-confidence").Configuration["app"])
 			}
 
 			reloaded, err := models.FindCanvasInTransaction(db, r.Organization.ID, canvas.ID)

@@ -1,7 +1,9 @@
 package factories
 
 import (
+	"context"
 	"encoding/json"
+	"github.com/google/uuid"
 	"net/http"
 	"testing"
 	"time"
@@ -89,17 +91,7 @@ func TestHumanReviewStartsAfterDraftBecomesReadyOnTheSameCommit(t *testing.T) {
 	require.NotNil(t, decision)
 	require.NotNil(t, decision.RunID)
 	require.Equal(t, "current-head", decision.AssessedCommit)
-	require.NoError(t, f.db.Transaction(func(tx *gorm.DB) error {
-		run, err := models.FindCanvasRunInTransaction(tx, f.automation.canvas.ID, *decision.RunID)
-		if err != nil {
-			return err
-		}
-		root, err := run.RootEvent(tx)
-		if err != nil {
-			return err
-		}
-		return models.MaybeLinkHumanReviewRun(tx, f.automation.canvas, root, run)
-	}))
+
 	f.complete(t, decision)
 	owner := reviewTestUser(8, "owner", "User")
 	f.client.reviews = []*github.PullRequestReview{{ID: github.Ptr(int64(99)), User: owner, State: github.Ptr("APPROVED"), CommitID: github.Ptr("current-head")}}
@@ -244,12 +236,9 @@ func TestHumanReviewReconciliationPublishesGateAndRequestsMissingAssessment(t *t
 	require.NoError(t, err)
 	host := &supportcontexts.HTTPContext{Responses: []*http.Response{
 		publicationHTTPResponse(200, `{"state":"open","head":{"sha":"current-head"}}`),
+		publicationHTTPResponse(200, `{"state":"open","head":{"sha":"current-head"}}`),
 		publicationHTTPResponse(200, `{"check_runs":[]}`),
 		publicationHTTPResponse(201, `{"id":123}`),
-		publicationHTTPResponse(200, `{"state":"open","head":{"sha":"current-head"}}`),
-		publicationHTTPResponse(200, `{}`),
-		publicationHTTPResponse(200, `{"check_runs":[]}`),
-		publicationHTTPResponse(200, `{"id":123}`),
 		publicationHTTPResponse(200, string(current)),
 	}}
 	installPublicationGitHub(t, host)
@@ -262,13 +251,62 @@ func TestHumanReviewReconciliationPublishesGateAndRequestsMissingAssessment(t *t
 	require.Equal(t, models.FactoryHumanReviewStateWaitingAssessment, decision.State)
 	require.Equal(t, "current-head", decision.AssessedCommit)
 	require.Equal(t, int64(123), decision.CheckRunID)
-	require.Len(t, host.Requests, 8)
+	require.Len(t, host.Requests, 5)
 	var check map[string]any
-	require.NoError(t, json.NewDecoder(host.Requests[2].Body).Decode(&check))
+	require.NoError(t, json.NewDecoder(host.Requests[3].Body).Decode(&check))
 	require.Equal(t, humanReviewCheckName, check["name"])
 	require.Equal(t, "current-head", check["head_sha"])
 	require.Equal(t, "queued", check["status"])
 	requests, err := models.ListPullRequestChecksStartRequests(db, pr.ID)
 	require.NoError(t, err)
 	require.Len(t, requests, 1)
+}
+
+// The existing lifecycle cases now exercise the same preparation and gate
+// services used by the explicit automation components.
+func reconcileHumanReview(ctx context.Context, db *gorm.DB, deps IntakeDependencies, factory *models.Factory, pr *models.FactoryPullRequest, automation *humanReviewAutomation, client humanReviewGitHub) error {
+	root := &models.CanvasEvent{WorkflowID: automation.canvas.ID, NodeID: models.HumanReviewTriggerNodeID, Data: models.NewJSONValue(map[string]any{"type": "factory.humanReview.recovery", "data": map[string]any{"parameters": map[string]any{"pullRequestId": pr.ID.String()}}})}
+	if err := db.Create(root).Error; err != nil {
+		return err
+	}
+	run, err := models.FindCanvasRunInTransaction(db, automation.canvas.ID, root.RunID)
+	if err != nil {
+		return err
+	}
+	prepared, err := prepareHumanReview(ctx, db, factory, pr, automation, client, run, root)
+	if err != nil {
+		return err
+	}
+	if prepared.AgentNeeded {
+		// Persist the preparation output just as the component does. The runner
+		// consumes this output; the root event remains the triggering notification.
+		now := time.Now()
+		execution := &models.CanvasNodeExecution{ID: uuid.New(), WorkflowID: automation.canvas.ID, NodeID: models.HumanReviewTriggerNodeID, RootEventID: root.ID, EventID: root.ID, State: models.CanvasNodeExecutionStateStarted, Configuration: datatypes.NewJSONType(map[string]any{}), CreatedAt: &now, UpdatedAt: &now}
+		if err := db.Create(execution).Error; err != nil {
+			return err
+		}
+		if err := contexts.NewExecutionStateContext(db, execution, nil).Emit("agent", "factory.humanReview.prepared", []any{prepared.Payload}); err != nil {
+			return err
+		}
+	}
+	bounded, cancel := context.WithTimeout(ctx, 90*time.Second)
+	defer cancel()
+	return refreshHumanReviewGate(bounded, db.WithContext(bounded), factory, pr, automation, client)
+}
+
+func reconcileFactoryHumanReview(ctx context.Context, deps IntakeDependencies, pr models.FactoryPullRequest) error {
+	db := database.DB(ctx)
+	factory, err := models.FindFactory(db, pr.OrganizationID, pr.FactoryID)
+	if err != nil {
+		return err
+	}
+	automation, err := findHumanReviewAutomation(db, factory)
+	if err != nil || automation == nil {
+		return err
+	}
+	api, err := newFactoryGitHubAPI(db, deps, factory)
+	if err != nil {
+		return err
+	}
+	return reconcileHumanReview(ctx, db, deps, factory, &pr, automation, api.(humanReviewGitHub))
 }

@@ -248,7 +248,7 @@ No new environment variables or Secret keys are required.
 3. Ask existing installation owners to accept the permission update.
 4. Apply the Request review migrations before deploying API and worker code. Keep Request review disabled during deployment.
 5. Enable **Request review** (`factory_human_review`) for the organization through the existing admin feature controls.
-6. Add Request review from the Verify automation catalog.
+6. Add Request review from the Verify automation catalog. Upgrade existing installations through the built-in automation reset.
 7. Select a default GitHub reviewer and configure review instructions as a SuperPlane organization administrator.
 8. Test assessment completion, reviewer selection, approval, dismissal, new commits, and disablement in a test repository.
 9. Turn on **Enable Request review** only after these lifecycle checks pass.
@@ -267,7 +267,17 @@ The default reviewer must be a human with repository write access or higher.
 Personal GitHub repositories do not require a GitHub organization team.
 Existing team fallbacks remain supported. The pull request author cannot review their own pull request.
 The existing App credentials must remain available to the API and workers.
-No Helm value changes are required for this feature.
+The local Compose configuration and repository Helm chart enable both required
+workers: `START_APP_MESSAGE_WORKER=yes` and `START_NODE_REQUEST_WORKER=yes`.
+The message worker delivers assessment broadcasts. The node-request worker
+runs background components and the one-minute recovery schedule.
+
+Deploy compatible API and worker code before adding or resetting these
+automation templates. Apply the message provenance and request lease migrations
+first. Confirm that all worker replicas use the new code before template reset.
+Reset preserves review policy, fallback settings, agent configuration, and instructions.
+Existing broadcasts without source-run identity cannot authorize a review decision.
+The recovery schedule reads saved assessments and restores progress.
 
 The four superseded review migrations have not reached shared environments.
 Existing local databases with those versions need separate reconciliation before
@@ -295,11 +305,26 @@ Review event delivery and reconciliation have latency. Approval revocation
 cannot update a published check immediately in every case.
 SuperPlane does not change repository protection.
 
-Hosted API and workers use the existing `SUPERPLANE_GITHUB_APP_*` configuration.
-Workers must retain `START_NODE_REQUEST_WORKER=yes`. The hosted chart references
-the GitHub App Secret for workers. Launchpad references `superplane-github-app`
-in production and `superplane-github-app-staging` in staging. These source
-references do not verify deployed Secret contents or accepted App permissions.
+Hosted API and workers require the existing GitHub App configuration:
+
+- `SUPERPLANE_GITHUB_APP_ID`
+- `SUPERPLANE_GITHUB_APP_SLUG`
+- `SUPERPLANE_GITHUB_APP_PRIVATE_KEY`
+- `SUPERPLANE_GITHUB_APP_WEBHOOK_SECRET`
+
+Self-hosted installations can instead use the encrypted installation App record.
+API and workers must share database access and `ENCRYPTION_MASTER_KEYS`.
+Keep existing PostgreSQL, RabbitMQ, and GitHub endpoint configuration for both processes.
+Runner agents use their existing scoped credentials; they do not receive these App secrets.
+
+The connected GitHub account could not read `superplanehq/helm-chart` or
+`superplanehq/launchpad` during this change. Both repositories returned HTTP 404.
+Hosted deployment sources and live configuration remain unverified.
+Before rollout, verify both worker flags and all four App keys in each environment.
+Previous rollout notes name `superplane-github-app` for production and
+`superplane-github-app-staging` for staging. Recheck those Secret references
+for API and worker pods. Prepare companion deployment changes if any reference
+is missing, and deploy those changes before upgrading automation templates.
 
 ## Bitbucket Forge local development
 

@@ -289,6 +289,7 @@ func TestMaterializeRiskScoreTemplate(t *testing.T) {
 	assert.NotContains(t, result.canvasYAML, "merge-confidence.json")
 	for _, channel := range []string{"passed", "failed"} {
 		assert.Contains(t, canvas.Spec.Edges, yaml.Edge{SourceID: "assess-risk", TargetID: "publish-merge-confidence", Channel: channel})
+		assert.Contains(t, canvas.Spec.Edges, yaml.Edge{SourceID: "assess-risk", TargetID: "broadcast-merge-confidence", Channel: channel})
 	}
 	assert.Equal(t, true, findYAMLNode(t, canvas, "publish-merge-confidence").Configuration["enabled"])
 
@@ -299,6 +300,39 @@ func TestMaterializeRiskScoreTemplate(t *testing.T) {
 	assert.NotContains(t, result.canvasYAML, "git push")
 	assert.Contains(t, result.consoleYAML, "app-risk")
 
+	requireValidCanvasExpressions(t, canvas)
+}
+
+func TestMaterializeHumanReviewUsesSharedLifecycleForEveryEntry(t *testing.T) {
+	result, err := materializeFactoryTemplate(models.FactoryAppTemplateHumanReviewID, models.ProviderGitHub, factoryTemplateInput{
+		appID: "review-app", appName: "Request review", mergeConfidenceAppID: "assessment-app",
+		integrations: map[string]factoryTemplateIntegration{"github": {id: "github-1", name: "acme-github"}},
+	})
+	require.NoError(t, err)
+	canvas, err := yaml.CanvasFromYAML([]byte(result.canvasYAML))
+	require.NoError(t, err)
+	for _, entry := range []string{models.HumanReviewTriggerNodeID, "on-merge-confidence", "on-review-pull-request", "on-review-change"} {
+		assert.Contains(t, canvas.Spec.Edges, yaml.Edge{SourceID: entry, TargetID: models.HumanReviewPrepareNodeID, Channel: "default"})
+	}
+	assert.Contains(t, canvas.Spec.Edges, yaml.Edge{SourceID: models.HumanReviewPrepareNodeID, TargetID: models.HumanReviewAgentNodeID, Channel: "agent"})
+	assert.Contains(t, canvas.Spec.Edges, yaml.Edge{SourceID: models.HumanReviewPrepareNodeID, TargetID: "refresh-human-review-gate", Channel: "default"})
+	for _, outcome := range []string{"passed", "failed"} {
+		assert.Contains(t, canvas.Spec.Edges, yaml.Edge{SourceID: models.HumanReviewAgentNodeID, TargetID: "record-human-review-decision", Channel: outcome})
+	}
+	assert.Contains(t, canvas.Spec.Edges, yaml.Edge{SourceID: "record-human-review-decision", TargetID: "refresh-human-review-gate", Channel: "default"})
+	assert.Contains(t, canvas.Spec.Edges, yaml.Edge{SourceID: "recover-human-review", TargetID: "list-human-review-recovery", Channel: "default"})
+	assert.Contains(t, canvas.Spec.Edges, yaml.Edge{SourceID: "list-human-review-recovery", TargetID: "run-human-review-recovery", Channel: "default"})
+	recovery := findYAMLNode(t, canvas, "run-human-review-recovery")
+	assert.Equal(t, "runApp", recovery.Component)
+	assert.Equal(t, "review-app", recovery.Configuration["app"])
+	assert.Equal(t, models.HumanReviewTriggerNodeID, recovery.Configuration["node"])
+	assert.Equal(t, "{{ $[\"List Human Review Recovery Candidates\"].data }}", recovery.Configuration["parameters"])
+	assert.EqualValues(t, 1, findYAMLNode(t, canvas, "recover-human-review").Configuration["minutesInterval"])
+	assert.Equal(t, "assessment-app", findYAMLNode(t, canvas, "on-merge-confidence").Configuration["app"])
+	assert.Equal(t, []any{"submitted", "dismissed"}, findYAMLNode(t, canvas, "on-review-change").Configuration["actions"])
+	for _, id := range []string{models.HumanReviewPrepareNodeID, "refresh-human-review-gate", "on-review-change", "on-review-pull-request"} {
+		assert.Equal(t, &yaml.IntegrationRef{ID: "github-1", Name: "acme-github"}, findYAMLNode(t, canvas, id).Integration)
+	}
 	requireValidCanvasExpressions(t, canvas)
 }
 

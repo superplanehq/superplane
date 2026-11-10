@@ -80,33 +80,58 @@ func TestResetBuiltInAutomationPreservesImplementationSettings(t *testing.T) {
 }
 
 func TestResetBuiltInHumanReviewPreservesDisabledStateAndPolicy(t *testing.T) {
-	r, factory := resetTestFactory(t)
-	require.NoError(t, models.EnableExperimentalFeatureInTransaction(database.DB(t.Context()), r.Organization.ID, features.FeatureFactoryHumanReview))
-	canvas := resetTestTemplate(t, r, factory, models.FactoryAppTemplateHumanReviewID, models.ProviderGitHub, func(doc *yaml.Canvas) {
-		trigger := findYAMLNode(t, doc, models.HumanReviewTriggerNodeID)
-		trigger.Configuration["enabled"] = false
-		trigger.Configuration["defaultReviewer"] = "release-owner"
-		trigger.Configuration["fallbackTeam"] = "acme/release-reviewers"
-		agent := findYAMLNode(t, doc, models.HumanReviewAgentNodeID)
-		agent.Configuration["additionalInstructions"] = "Require approval for database changes."
-		agent.Configuration["executionTimeoutSeconds"] = 1200
-		agent.Configuration["steps"].([]any)[0].(map[string]any)["prompt"] = "Retired managed instructions"
-	})
-	require.NoError(t, models.DisableExperimentalFeatureInTransaction(database.DB(t.Context()), r.Organization.ID, features.FeatureFactoryHumanReview))
-	require.NoError(t, resetTestOrganization(t, r))
-	version := resetTestLiveVersion(t, canvas)
-	settings, ok := models.HumanReviewSettingsFromNodes(version.Nodes)
-	require.True(t, ok)
-	assert.False(t, settings.Enabled)
-	assert.Equal(t, "release-owner", settings.DefaultReviewer)
-	assert.Equal(t, "acme/release-reviewers", settings.FallbackTeam)
-	agent := findIntakeNode(version.Nodes, models.HumanReviewAgentNodeID)
-	require.NotNil(t, agent)
-	assert.Equal(t, "Require approval for database changes.", agent.Configuration["additionalInstructions"])
-	assert.EqualValues(t, 1200, agent.Configuration["executionTimeoutSeconds"])
-	assert.NotContains(t, liveCanvasJSON(t, canvas), "Retired managed instructions")
-	_, bitbucketSupported := lookupFactoryAppTemplate(models.FactoryAppTemplateHumanReviewID, models.ProviderBitbucket)
-	assert.False(t, bitbucketSupported)
+	for _, scenario := range []struct {
+		name         string
+		legacy       bool
+		reviewer     string
+		team         string
+		instructions string
+	}{
+		{name: "preparation policy", reviewer: "release-owner", team: "acme/release-reviewers", instructions: "Require approval for database changes."},
+		{name: "legacy trigger policy", legacy: true, reviewer: "release-owner", team: "acme/release-reviewers", instructions: "Require approval for database changes."},
+		{name: "explicit empty values"},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
+			r, factory := resetTestFactory(t)
+			source := resetTestTemplate(t, r, factory, "risk-score", models.ProviderGitHub, func(*yaml.Canvas) {})
+			require.NoError(t, models.EnableExperimentalFeatureInTransaction(database.DB(t.Context()), r.Organization.ID, features.FeatureFactoryHumanReview))
+			canvas := resetTestTemplate(t, r, factory, models.FactoryAppTemplateHumanReviewID, models.ProviderGitHub, func(doc *yaml.Canvas) {
+				prepare := findYAMLNode(t, doc, models.HumanReviewPrepareNodeID)
+				policy := prepare
+				if scenario.legacy {
+					policy = findYAMLNode(t, doc, models.HumanReviewTriggerNodeID)
+					// Rebuild the legacy two-node workflow so reset exercises its upgrade.
+					doc.Spec.Nodes = []yaml.Node{*policy, *findYAMLNode(t, doc, models.HumanReviewAgentNodeID)}
+					doc.Spec.Edges = []yaml.Edge{{SourceID: models.HumanReviewTriggerNodeID, TargetID: models.HumanReviewAgentNodeID, Channel: "default"}}
+					policy = &doc.Spec.Nodes[0]
+				}
+				policy.Configuration["enabled"] = false
+				policy.Configuration["defaultReviewer"] = scenario.reviewer
+				policy.Configuration["fallbackTeam"] = scenario.team
+				agent := findYAMLNode(t, doc, models.HumanReviewAgentNodeID)
+				agent.Configuration["additionalInstructions"] = scenario.instructions
+				agent.Configuration["executionTimeoutSeconds"] = 1200
+				agent.Configuration["steps"].([]any)[0].(map[string]any)["prompt"] = "Retired managed instructions"
+			})
+			require.NoError(t, models.DisableExperimentalFeatureInTransaction(database.DB(t.Context()), r.Organization.ID, features.FeatureFactoryHumanReview))
+			require.NoError(t, resetTestOrganization(t, r))
+			version := resetTestLiveVersion(t, canvas)
+			settings, ok := models.HumanReviewSettingsFromNodes(version.Nodes)
+			require.True(t, ok)
+			assert.False(t, settings.Enabled)
+			assert.Equal(t, scenario.reviewer, settings.DefaultReviewer)
+			assert.Equal(t, scenario.team, settings.FallbackTeam)
+			assert.NotContains(t, findIntakeNode(version.Nodes, models.HumanReviewTriggerNodeID).Configuration, "enabled")
+			assert.Equal(t, source.ID.String(), findIntakeNode(version.Nodes, "on-merge-confidence").Configuration["app"])
+			agent := findIntakeNode(version.Nodes, models.HumanReviewAgentNodeID)
+			require.NotNil(t, agent)
+			assert.Equal(t, scenario.instructions, agent.Configuration["additionalInstructions"])
+			assert.EqualValues(t, 1200, agent.Configuration["executionTimeoutSeconds"])
+			assert.NotContains(t, liveCanvasJSON(t, canvas), "Retired managed instructions")
+			_, bitbucketSupported := lookupFactoryAppTemplate(models.FactoryAppTemplateHumanReviewID, models.ProviderBitbucket)
+			assert.False(t, bitbucketSupported)
+		})
+	}
 }
 
 // setResetTestDraftPullRequests sets the "Create draft pull requests" setting.

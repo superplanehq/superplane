@@ -99,7 +99,6 @@ func RefreshFactoryPullRequestMergeabilityFromGitHubEvent(
 				continue
 			}
 		}
-		ScheduleFactoryHumanReview(ctx, deps, *pullRequest)
 		if err := refreshFactoryPullRequestMergeabilityWithRetry(ctx, db, deps, factory, pullRequest); err != nil {
 			log.WithError(err).Warnf("factory mergeability: failed to refresh pull request %s", pullRequest.ID)
 		}
@@ -199,7 +198,6 @@ func refreshFactoryPullRequestMergeabilityByID(
 	if pullRequest.Provider != models.FactoryPullRequestProviderGitHub {
 		return nil
 	}
-	ScheduleFactoryHumanReview(ctx, deps, *pullRequest)
 	if err := ensureFactoryMergeabilityWebhookForRepository(ctx, db, deps, factory, pullRequest.Repository); err != nil {
 		log.WithError(err).Warnf(
 			"factory mergeability: failed to ensure webhook for %s",

@@ -204,7 +204,8 @@ CREATE TABLE public.app_messages (
     canvas_id uuid NOT NULL,
     node_id character varying(128) NOT NULL,
     payload jsonb NOT NULL,
-    created_at timestamp without time zone DEFAULT now() NOT NULL
+    created_at timestamp without time zone DEFAULT now() NOT NULL,
+    source_run_id uuid
 );
 
 
@@ -2228,7 +2229,9 @@ CREATE TABLE public.workflow_node_requests (
     run_at timestamp without time zone NOT NULL,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
-    node_id character varying(128) NOT NULL
+    node_id character varying(128) NOT NULL,
+    lease_id uuid,
+    lease_expires_at timestamp with time zone
 );
 
 
@@ -6653,7 +6656,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261110183029	f
+20261110211308	f
 \.
 
 
