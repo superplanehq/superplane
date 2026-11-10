@@ -152,6 +152,7 @@ after a disk-full or interrupted download), run `make dev.clean.go.cache` then
 - Targeted backend tests: `make test PKG_TEST_PACKAGES=./pkg/workers`
 - Targeted E2E tests: `E2E_TEST_PACKAGES=./test/e2e/workflows make test.e2e`
   (or `make test.e2e.single FILE=test/e2e/foo_test.go LINE=19` for a single test).
+  Semaphore runs E2E tests only on `main`. Local E2E commands work on all branches.
 - UI unit tests: `make check.test.ui` (Bun + Happy DOM).
   Targeted UI tests: `make check.test.ui FILES=src/lib/duration.spec.ts`.
   Paths in `FILES` are relative to `web_src/`.
