@@ -149,10 +149,10 @@ func TestHandleGitHubAppCreatedRejectsExternalReturnPath(t *testing.T) {
 	t.Setenv(config.EnvGitHubAppSlug, "")
 	t.Setenv(config.EnvGitHubAppPrivateKey, "")
 	t.Setenv(config.EnvGitHubAppWebhookSecret, "")
-	t.Setenv("GITHUB_CLIENT_ID", "")
-	t.Setenv("GITHUB_CLIENT_SECRET", "")
 	r := support.Setup(t)
 	server, account, _ := setupTestServer(r, t)
+	t.Setenv("GITHUB_CLIENT_ID", "")
+	t.Setenv("GITHUB_CLIENT_SECRET", "")
 	require.NoError(t, models.PromoteToInstallationAdmin(account.ID.String()))
 	require.NoError(t, githubapp.Save(t.Context(), database.DB(t.Context()), r.Encryptor, config.GitHubHostedAppConfig{
 		ID:            44,
