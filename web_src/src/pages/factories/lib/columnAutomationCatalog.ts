@@ -16,6 +16,7 @@ export const CUSTOM_CATALOG_ID = "custom";
 export const CUSTOM_AUTOMATION_CATALOG_ID = "custom-verification";
 export const PR_CLOSURE_CATALOG_ID = "pr-closure";
 export const RISK_SCORE_CATALOG_ID = "risk-score";
+export const HUMAN_REVIEW_CATALOG_ID = "human-review";
 export const VISUAL_EVIDENCE_CATALOG_ID = "visual-evidence";
 
 export const ANALYSIS_ENTRY: ColumnAutomationCatalogEntry = {
@@ -90,6 +91,18 @@ export const RISK_SCORE_ENTRY: ColumnAutomationCatalogEntry = {
   unique: true,
 };
 
+export const HUMAN_REVIEW_ENTRY: ColumnAutomationCatalogEntry = {
+  id: HUMAN_REVIEW_CATALOG_ID,
+  kind: "human-review",
+  name: "Request review",
+  description: "Select human reviewers after merge confidence and wait for approval when required.",
+  trigger: "After merge confidence completes",
+  action: "Request human approval when required",
+  iconSrc: "",
+  iconAlt: "",
+  unique: true,
+};
+
 export const VISUAL_EVIDENCE_ENTRY: ColumnAutomationCatalogEntry = {
   id: VISUAL_EVIDENCE_CATALOG_ID,
   kind: "visual-evidence",
@@ -152,7 +165,7 @@ export function catalogForColumn(
         };
       }),
       RISK_SCORE_ENTRY,
-      ...(options?.vcsProvider === "bitbucket" ? [] : [VISUAL_EVIDENCE_ENTRY]),
+      ...(options?.vcsProvider === "bitbucket" ? [] : [HUMAN_REVIEW_ENTRY, VISUAL_EVIDENCE_ENTRY]),
       ...(allowCustom ? [CUSTOM_AUTOMATION_ENTRY] : []),
     ];
   }

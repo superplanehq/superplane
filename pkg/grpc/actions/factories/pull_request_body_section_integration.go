@@ -42,7 +42,17 @@ func (a *bodySectionActionAttempt) publish(ctx context.Context, db *gorm.DB, dep
 	if err != nil {
 		return bodySectionPublicationError(err)
 	}
-	outcome, err := prbody.Publish(ctx, client, config, eligible)
+	canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(db, a.source.WorkflowID)
+	if err != nil {
+		return bodySectionPublicationOutcome{}, err
+	}
+	pr, err := a.integrationPublicationPullRequest(db, canvas)
+	if err != nil {
+		return bodySectionPublicationOutcome{}, err
+	}
+	outcome, err := withHumanReviewBodyPublicationLock(db, pr, func(conn *gorm.DB) (bodySectionPublicationOutcome, error) {
+		return prbody.Publish(ctx, client, config, func() (bool, error) { return a.integrationPublicationEligible(conn) })
+	})
 	if err != nil {
 		return bodySectionPublicationError(err)
 	}
@@ -115,21 +125,33 @@ func (a *bodySectionActionAttempt) integrationPublicationEligible(db *gorm.DB) (
 	if err != nil || !enabled {
 		return false, err
 	}
-	workspace, err := models.FindFactory(db, canvas.OrganizationID, *canvas.FactoryID)
+	pr, err := a.integrationPublicationPullRequest(db, canvas)
 	if err != nil {
 		return false, err
 	}
+	if pr == nil {
+		return true, nil
+	}
+	return publication.eligible(db, pr)
+}
+
+func (a *bodySectionActionAttempt) integrationPublicationPullRequest(db *gorm.DB, canvas *models.Canvas) (*models.FactoryPullRequest, error) {
+	if canvas.FactoryID == nil {
+		return nil, nil
+	}
+	workspace, err := models.FindFactory(db, canvas.OrganizationID, *canvas.FactoryID)
+	if err != nil {
+		return nil, err
+	}
+	config := a.integrationConfiguration
 	number, err := config.Number()
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 	provider, _, _ := strings.Cut(a.component, ".")
 	pr, err := workspace.FindPullRequest(db, models.FactoryPullRequestLookup{Provider: provider, Repository: config.Repository, Number: number})
 	if errors.Is(err, models.ErrFactoryPullRequestNotFound) {
-		return true, nil
+		return nil, nil
 	}
-	if err != nil {
-		return false, err
-	}
-	return publication.eligible(db, pr)
+	return pr, err
 }

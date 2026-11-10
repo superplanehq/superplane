@@ -1,10 +1,12 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "bun:test";
+import { MemoryRouter } from "react-router";
 
 import type { FactoriesWorkOrderEvent } from "@/api-client";
 import type { AutomationStage, ConsoleAutomation } from "./automationsViewModel";
 import { stepActionRows } from "./consoleStepActions";
+import { humanReviewActionRows } from "./consoleHumanReviewActions";
 import type { StepActionRow } from "./consoleStepActions";
 import type { SplitRunPhase } from "../splitRunMocks";
 
@@ -106,6 +108,48 @@ function card(runCount = 1, startedAt?: string) {
 }
 
 describe("step Actions tab", () => {
+  it("groups human review reasons and evidence under the matching run", async () => {
+    shown.on = true;
+    shown.error = false;
+    shown.rows = humanReviewActionRows(
+      [
+        {
+          id: "implement",
+          runId: "run-1",
+          pullRequestActivity: {
+            pullRequest: {
+              currentRevision: { sha: "head" },
+              activities: [{ run: { id: "assessment", canvasId: "merge-app" } }],
+              humanReview: {
+                runId: "run-1",
+                sourceAssessmentRunId: "assessment",
+                assessedCommit: "head",
+                status: "decided",
+                reviewRequired: true,
+                rationale: "A security finding requires review.",
+                selectedReviewers: [{ login: "alex", reason: "Owns the affected files." }],
+                checkUrl: "https://github.com/acme/app/checks/123",
+              },
+            },
+          },
+        } as SplitRunPhase,
+      ],
+      new Set(["run-1"]),
+      () => "/assessment",
+    );
+    render(<MemoryRouter>{card()}</MemoryRouter>);
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("tab", { name: "Actions 2" }));
+    expect(screen.getByRole("button", { name: /Implement.*Run 1.*2 actions/ })).toBeInTheDocument();
+    expect(screen.getByText("Owns the affected files.")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "View assessment" })).toHaveAttribute("href", "/assessment");
+    expect(screen.getByRole("link", { name: "View GitHub check" })).toHaveAttribute(
+      "href",
+      "https://github.com/acme/app/checks/123",
+    );
+  });
+
   it("uses a valid action time when the run time is invalid and omits unavailable time", async () => {
     shown.on = true;
     shown.error = false;
