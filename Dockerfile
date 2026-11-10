@@ -9,6 +9,7 @@ ARG ARTIFACTS_STAGE=builder
 # the empty stages and download modules as before.
 FROM scratch AS ci-go-mod
 FROM scratch AS ci-go-build
+FROM ghcr.io/securego/gosec@sha256:7bcf1edbab3e80d8006a28d53e7031a9c9775be8eec30679e4adc1f51d272121 AS gosec
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Development stage with tools installed.
@@ -62,6 +63,8 @@ RUN rm -rf /opt/install /opt/install-scripts /tmp/*
 
 COPY scripts/docker/install-bun.sh /tmp/install-bun.sh
 RUN bash /tmp/install-bun.sh && rm /tmp/install-bun.sh
+
+COPY --from=gosec /bin/gosec /usr/local/bin/gosec
 
 CMD [ "/bin/bash",  "-c", "sleep infinity" ]
 

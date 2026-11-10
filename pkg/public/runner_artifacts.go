@@ -759,7 +759,7 @@ func servePublicArtifact(w http.ResponseWriter, r *http.Request, provider blob.P
 			http.Error(w, "Failed to download artifact", http.StatusInternalServerError)
 			return
 		}
-		http.Redirect(w, r, signedURL, http.StatusTemporaryRedirect)
+		http.Redirect(w, r, signedURL, http.StatusTemporaryRedirect) // #nosec G710 -- the storage provider generates this short-lived signed artifact URL.
 		return
 	}
 	reader, err := provider.Get(r.Context(), file.StorageKey)

@@ -97,7 +97,7 @@ func (a *Handler) parseLinkState(state string) (*linkState, error) {
 	provider, _ := claims["provider"].(string)
 	redirect, _ := claims["redirect"].(string)
 	nonce, _ := claims["jti"].(string)
-	if accountID == "" || provider == "" || nonce == "" {
+	if accountID == "" || provider == "" || nonce == "" || !isValidRedirectURL(redirect) {
 		return nil, errors.New("invalid link state")
 	}
 	if _, err := uuid.Parse(accountID); err != nil {
@@ -133,7 +133,7 @@ func (a *Handler) completeProviderLink(w http.ResponseWriter, r *http.Request, g
 
 	err = LinkProviderToAccount(database.DB(r.Context()), sessionAccount, gothUser)
 	if errors.Is(err, models.ErrSignInIdentityInUse) {
-		http.Redirect(w, r, linkErrorRedirectURL(state.Redirect, authErrorLinkFailed, gothUser.Provider), http.StatusSeeOther)
+		http.Redirect(w, r, linkErrorRedirectURL(state.Redirect, authErrorLinkFailed, gothUser.Provider), http.StatusSeeOther) // #nosec G710 -- parseLinkState validates the internal redirect path.
 		return
 	}
 	if err != nil {
@@ -142,7 +142,7 @@ func (a *Handler) completeProviderLink(w http.ResponseWriter, r *http.Request, g
 		return
 	}
 
-	http.Redirect(w, r, linkSuccessRedirectURL(state.Redirect, gothUser.Provider), http.StatusSeeOther)
+	http.Redirect(w, r, linkSuccessRedirectURL(state.Redirect, gothUser.Provider), http.StatusSeeOther) // #nosec G710 -- parseLinkState validates the internal redirect path.
 }
 
 func LinkProviderToAccount(tx *gorm.DB, account *models.Account, gothUser goth.User) error {
