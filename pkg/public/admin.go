@@ -14,6 +14,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/billing"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
+	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/networkpolicy"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
@@ -125,6 +126,18 @@ func (s *Server) adminUpdateInstallationNetworkSettings(w http.ResponseWriter, r
 	if req.AllowPrivateNetworkAccess != nil {
 		s.registry.HTTPContext().InvalidatePolicyCache()
 	}
+	fields := log.Fields{}
+	if req.AllowPrivateNetworkAccess != nil {
+		fields["allow_private_network_access"] = *req.AllowPrivateNetworkAccess
+	}
+	if req.SignupsEnabled != nil {
+		fields["signups_enabled"] = *req.SignupsEnabled
+	}
+	if req.InvitationDurationDays != nil {
+		fields["invitation_duration_days"] = *req.InvitationDurationDays
+	}
+	fields["smtp_settings_changed"] = shouldUpdateSMTPSettings(req)
+	logging.SecurityEvent(r.Context(), "installation.settings_update", "success", "installation", "", fields)
 
 	response, err := s.buildInstallationSettingsResponse()
 	if err != nil {
@@ -665,14 +678,7 @@ func (s *Server) startSupportSession(w http.ResponseWriter, r *http.Request) {
 
 	supportsession.SetCookie(w, r, token)
 
-	log.WithFields(log.Fields{
-		"admin_account_id":  admin.ID.String(),
-		"admin_email":       admin.Email,
-		"target_account_id": target.ID.String(),
-		"target_email":      target.Email,
-		"action":            "support_session_start",
-		"client_ip":         r.RemoteAddr,
-	}).Info("admin support session started")
+	logging.SecurityEvent(r.Context(), "support_session.start", "success", "account", target.ID.String(), log.Fields{"support_admin_account_id": admin.ID.String()})
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
@@ -689,25 +695,16 @@ func (s *Server) endSupportSession(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Read the token before clearing it so we can log the target identity
-	fields := log.Fields{
-		"admin_account_id": account.ID.String(),
-		"admin_email":      account.Email,
-		"action":           "support_session_end",
-		"client_ip":        r.RemoteAddr,
-	}
+	targetID := ""
 
 	if tokenStr, err := supportsession.ReadCookie(r); err == nil {
-		if claims, err := supportsession.ValidateToken(s.jwt, tokenStr); err == nil {
-			fields["target_account_id"] = claims.TargetAccountID
-			if target, err := models.FindAccountByID(claims.TargetAccountID); err == nil {
-				fields["target_email"] = target.Email
-			}
+		if claims, err := supportsession.ValidateToken(s.jwt, tokenStr); err == nil && claims.AdminAccountID == account.ID.String() && account.IsInstallationAdmin() {
+			targetID = claims.TargetAccountID
 		}
 	}
 
-	log.WithFields(fields).Info("admin support session ended")
-
 	supportsession.ClearCookie(w, r)
+	logging.SecurityEvent(r.Context(), "support_session.end", "success", "account", targetID, log.Fields{"support_admin_account_id": account.ID.String()})
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
@@ -757,7 +754,7 @@ func (s *Server) supportSessionStatus(w http.ResponseWriter, r *http.Request) {
 
 // promoteAdmin promotes an account to installation admin.
 func (s *Server) promoteAdmin(w http.ResponseWriter, r *http.Request) {
-	admin, ok := middleware.GetAccountFromContext(r.Context())
+	_, ok := middleware.GetAccountFromContext(r.Context())
 	if !ok {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -777,14 +774,7 @@ func (s *Server) promoteAdmin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.WithFields(log.Fields{
-		"admin_account_id":  admin.ID.String(),
-		"admin_email":       admin.Email,
-		"target_account_id": target.ID.String(),
-		"target_email":      target.Email,
-		"action":            "promote_admin",
-		"client_ip":         r.RemoteAddr,
-	}).Info("account promoted to installation admin")
+	logging.SecurityEvent(r.Context(), "installation.admin_promote", "success", "account", target.ID.String(), nil)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"status": "promoted"})
@@ -818,14 +808,7 @@ func (s *Server) demoteAdmin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.WithFields(log.Fields{
-		"admin_account_id":  admin.ID.String(),
-		"admin_email":       admin.Email,
-		"target_account_id": target.ID.String(),
-		"target_email":      target.Email,
-		"action":            "demote_admin",
-		"client_ip":         r.RemoteAddr,
-	}).Info("account demoted from installation admin")
+	logging.SecurityEvent(r.Context(), "installation.admin_demote", "success", "account", target.ID.String(), nil)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"status": "demoted"})
@@ -859,14 +842,7 @@ func (s *Server) blockAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.WithFields(log.Fields{
-		"admin_account_id":  admin.ID.String(),
-		"admin_email":       admin.Email,
-		"target_account_id": target.ID.String(),
-		"target_email":      target.Email,
-		"action":            "block_account",
-		"client_ip":         r.RemoteAddr,
-	}).Info("account blocked")
+	logging.SecurityEvent(r.Context(), "account.block", "success", "account", target.ID.String(), nil)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"status": "blocked"})
@@ -899,14 +875,7 @@ func (s *Server) unblockAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.WithFields(log.Fields{
-		"admin_account_id":  admin.ID.String(),
-		"admin_email":       admin.Email,
-		"target_account_id": target.ID.String(),
-		"target_email":      target.Email,
-		"action":            "unblock_account",
-		"client_ip":         r.RemoteAddr,
-	}).Info("account unblocked")
+	logging.SecurityEvent(r.Context(), "account.unblock", "success", "account", target.ID.String(), nil)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"status": "unblocked"})
@@ -932,7 +901,6 @@ func (s *Server) adminDeleteAccount(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Account not found", http.StatusNotFound)
 		return
 	}
-	targetEmail := target.Email
 	actorID := admin.ID
 
 	deletedOrganizations, err := s.softDeleteAccount(r.Context(), target)
@@ -952,15 +920,7 @@ func (s *Server) adminDeleteAccount(w http.ResponseWriter, r *http.Request) {
 		deletedOrganizationIDs = append(deletedOrganizationIDs, organization.ID.String())
 	}
 
-	log.WithFields(log.Fields{
-		"admin_account_id":         admin.ID.String(),
-		"admin_email":              admin.Email,
-		"target_account_id":        target.ID.String(),
-		"target_email":             targetEmail,
-		"deleted_organization_ids": deletedOrganizationIDs,
-		"action":                   "delete_account",
-		"client_ip":                r.RemoteAddr,
-	}).Info("account deleted")
+	logging.SecurityEvent(r.Context(), "account.delete", "success", "account", target.ID.String(), log.Fields{"deleted_organization_ids": deletedOrganizationIDs})
 
 	respondJSON(w, map[string]any{
 		"status":                   "deleted",
@@ -1025,6 +985,7 @@ func (s *Server) adminEnableOrgExperimentalFeature(w http.ResponseWriter, r *htt
 	}
 
 	w.Header().Set("Content-Type", "application/json")
+	logging.SecurityEvent(r.Context(), "organization.feature_enable", "success", "organization", orgID, log.Fields{"feature_id": featureID})
 	json.NewEncoder(w).Encode(map[string]string{"status": "enabled"})
 }
 
@@ -1056,6 +1017,7 @@ func (s *Server) adminDisableOrgExperimentalFeature(w http.ResponseWriter, r *ht
 	}
 
 	w.Header().Set("Content-Type", "application/json")
+	logging.SecurityEvent(r.Context(), "organization.feature_disable", "success", "organization", orgID, log.Fields{"feature_id": featureID})
 	json.NewEncoder(w).Encode(map[string]string{"status": "disabled"})
 }
 

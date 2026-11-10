@@ -137,6 +137,7 @@ func (a *Handler) completeAccountConnection(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	logAuthentication(r, "account.linked_account_connect", "success", sessionAccount)
 	http.Redirect(w, r, connectSuccessRedirectURL(state.Redirect, gothUser.Provider), http.StatusSeeOther) // #nosec G710 -- parseConnectState validates the internal redirect path.
 }
 

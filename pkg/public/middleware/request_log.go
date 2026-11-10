@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 )
 
@@ -14,28 +15,13 @@ const (
 	maxRequestIDLength = 128
 )
 
-type requestLogContextKey struct{}
-
-// requestLogFields is filled by auth middleware after LoggingMiddleware seeds it.
-// The pointer stays on the request context so later handlers can add identity
-// before the access log line is written.
-type requestLogFields struct {
-	requestID             string
-	organizationID        string
-	userID                string
-	accountID             string
-	supportAdminAccountID string
-}
-
 func withRequestLogFields(r *http.Request, requestID string) *http.Request {
-	fields := &requestLogFields{requestID: requestID}
-	ctx := context.WithValue(r.Context(), requestLogContextKey{}, fields)
+	ctx := logging.WithSecurityIdentity(r.Context(), &logging.SecurityIdentity{RequestID: requestID, ClientIP: logging.ClientIP(r)})
 	return r.WithContext(ctx)
 }
 
-func requestLogFieldsFrom(ctx context.Context) *requestLogFields {
-	fields, _ := ctx.Value(requestLogContextKey{}).(*requestLogFields)
-	return fields
+func requestLogFieldsFrom(ctx context.Context) *logging.SecurityIdentity {
+	return logging.SecurityIdentityFrom(ctx)
 }
 
 // SetRequestLogUser records the organization, user, and account for the access log.
@@ -43,16 +29,15 @@ func SetRequestLogUser(ctx context.Context, user *models.User) {
 	if user == nil {
 		return
 	}
-
 	fields := requestLogFieldsFrom(ctx)
 	if fields == nil {
 		return
 	}
 
-	fields.organizationID = uuidString(user.OrganizationID)
-	fields.userID = uuidString(user.ID)
+	fields.OrganizationID = uuidString(user.OrganizationID)
+	fields.UserID = uuidString(user.ID)
 	if user.AccountID != nil {
-		fields.accountID = uuidString(*user.AccountID)
+		fields.AccountID = uuidString(*user.AccountID)
 	}
 }
 
@@ -70,13 +55,12 @@ func SetRequestLogAccount(ctx context.Context, account *models.Account) {
 	if account == nil {
 		return
 	}
-
 	fields := requestLogFieldsFrom(ctx)
 	if fields == nil {
 		return
 	}
 
-	fields.accountID = uuidString(account.ID)
+	fields.AccountID = uuidString(account.ID)
 }
 
 // SetRequestLogSupportAdmin records the admin account that started the support session.
@@ -86,7 +70,7 @@ func SetRequestLogSupportAdmin(ctx context.Context, adminAccountID string) {
 		return
 	}
 
-	fields.supportAdminAccountID = strings.TrimSpace(adminAccountID)
+	fields.SupportAdminAccountID = strings.TrimSpace(adminAccountID)
 }
 
 // RequestIDFromContext returns the id assigned to this HTTP request.
@@ -95,7 +79,7 @@ func RequestIDFromContext(ctx context.Context) string {
 	if fields == nil {
 		return ""
 	}
-	return fields.requestID
+	return fields.RequestID
 }
 
 func requestIDFromHeader(r *http.Request) string {

@@ -14,6 +14,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/integrations/openrouter"
 	"github.com/superplanehq/superplane/pkg/llm"
+	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
@@ -235,6 +236,9 @@ func (s *Server) adminUpdateHostedLLMProvider(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	logging.SecurityEvent(r.Context(), "installation.hosted_provider_update", "success", "hosted_provider", provider, log.Fields{
+		"api_key_changed": req.APIKey != nil, "management_key_changed": req.ManagementKey != nil,
+	})
 	response, err := s.buildInstallationLLMSettingsResponse()
 	if err != nil {
 		log.Errorf("admin: failed to load hosted LLM settings: %v", err)

@@ -18,6 +18,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/billing"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
 	"github.com/superplanehq/superplane/pkg/utils"
@@ -120,6 +121,9 @@ func (s *Server) updateAccount(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.getAccount(w, r)
+	if req.Email != nil {
+		logging.SecurityEvent(r.Context(), "authentication.email_change", "success", "account", account.ID.String(), nil)
+	}
 }
 
 func (s *Server) disconnectAccountProvider(w http.ResponseWriter, r *http.Request) {
@@ -157,6 +161,7 @@ func (s *Server) disconnectAccountProvider(w http.ResponseWriter, r *http.Reques
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+	logging.SecurityEvent(r.Context(), "authentication.provider_disconnect", "success", "account", account.ID.String(), log.Fields{"provider": provider})
 }
 
 func (s *Server) deleteAccount(w http.ResponseWriter, r *http.Request) {
@@ -220,6 +225,7 @@ func (s *Server) deleteAccount(w http.ResponseWriter, r *http.Request) {
 
 	authentication.ClearAccountCookie(w, r)
 	captureAccountDeletion(r.Context(), actorID, account.ID, account.DeletedAt.Time, deletedOrganizations, "self_service")
+	logging.SecurityEvent(r.Context(), "account.delete", "success", "account", account.ID.String(), nil)
 	w.WriteHeader(http.StatusNoContent)
 }
 

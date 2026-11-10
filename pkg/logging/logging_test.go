@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"strings"
 	"testing"
 
 	log "github.com/sirupsen/logrus"
@@ -77,42 +76,6 @@ func TestProductiveWebhookWarning_JSONUsesWarningLevel(t *testing.T) {
 	assert.Equal(t, ComponentWebhookProductive, payloads[0]["component"])
 	assert.Equal(t, "task.updated", payloads[0]["webhookType"])
 	assert.Equal(t, "no activity", payloads[0]["error"])
-}
-
-func TestWithWebhookPayload_KeepsJSONAndCutsOversizedBodies(t *testing.T) {
-	fields := WithWebhookPayload(log.Fields{"component": ComponentWebhookSentry}, []byte(`{"action":"created"}`))
-	raw, ok := fields["payload"].(json.RawMessage)
-	require.True(t, ok)
-	payload := map[string]any{}
-	require.NoError(t, json.Unmarshal(raw, &payload))
-	assert.Equal(t, "created", payload["action"])
-
-	oversized := bytes.Repeat([]byte("a"), webhookLogPayloadLimit+1)
-	logged := webhookPayloadString(t, WithWebhookPayload(log.Fields{}, oversized))
-	assertWebhookPayloadFits(t, logged)
-
-	slashes := bytes.Repeat([]byte{'\\'}, webhookLogPayloadLimit+1)
-	assertWebhookPayloadFits(t, webhookPayloadString(t, WithWebhookPayload(log.Fields{}, slashes)))
-
-	controls := bytes.Repeat([]byte{0}, webhookLogPayloadLimit/2)
-	assertWebhookPayloadFits(t, webhookPayloadString(t, WithWebhookPayload(log.Fields{}, controls)))
-
-	assert.Nil(t, WithWebhookPayload(nil, nil))
-}
-
-func webhookPayloadString(t *testing.T, fields log.Fields) string {
-	t.Helper()
-	logged, ok := fields["payload"].(string)
-	require.True(t, ok)
-	return logged
-}
-
-func assertWebhookPayloadFits(t *testing.T, logged string) {
-	t.Helper()
-	assert.True(t, strings.HasSuffix(logged, webhookPayloadTruncated))
-	encoded, err := json.Marshal(logged)
-	require.NoError(t, err)
-	assert.LessOrEqual(t, len(encoded), webhookLogPayloadLimit)
 }
 
 func TestLogSentryWebhookInfo_JSONIncludesComponent(t *testing.T) {

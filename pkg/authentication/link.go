@@ -142,6 +142,7 @@ func (a *Handler) completeProviderLink(w http.ResponseWriter, r *http.Request, g
 		return
 	}
 
+	logAuthentication(r, "authentication.provider_connect", "success", sessionAccount)
 	http.Redirect(w, r, linkSuccessRedirectURL(state.Redirect, gothUser.Provider), http.StatusSeeOther) // #nosec G710 -- parseLinkState validates the internal redirect path.
 }
 

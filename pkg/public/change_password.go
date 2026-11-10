@@ -12,6 +12,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
 	"github.com/superplanehq/superplane/pkg/supportsession"
@@ -129,6 +130,7 @@ func (s *Server) changePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	logging.SecurityEvent(r.Context(), "authentication.password_change", "success", "account", account.ID.String(), log.Fields{"personal_tokens_revoked": true})
 	// Drop any support session cookie defensively (we already refused above
 	// when one was present, but a stale cookie might still be on the wire).
 	supportsession.ClearCookie(w, r)

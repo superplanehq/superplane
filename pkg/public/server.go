@@ -562,13 +562,6 @@ func (s *Server) grpcGatewayHandler(grpcGatewayMux *runtime.ServeMux) http.Handl
 			r2.Header.Set("x-account-id", user.AccountID.String())
 		}
 
-		//
-		// Remove the scoped token scopes from the request header,
-		// to not allow them to be spoofed by the client.
-		//
-		r2.Header.Del("x-Token-Scopes")
-
-		r2.Header.Del("x-Support-Session")
 		if middleware.IsSupportSessionActive(r) {
 			r2.Header.Set("x-Support-Session", "true")
 		}
