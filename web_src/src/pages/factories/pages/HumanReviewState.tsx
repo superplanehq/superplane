@@ -111,9 +111,9 @@ function ReviewEvidenceLinks({ assessmentHref, checkUrl }: { assessmentHref?: st
         </Link>
       ) : null}
       {checkUrl ? (
-        <a href={checkUrl} target="_blank" rel="noreferrer" className="underline">
+        <Link href={checkUrl} target="_blank" rel="noreferrer" className="underline">
           View GitHub check
-        </a>
+        </Link>
       ) : null}
     </div>
   );

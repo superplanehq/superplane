@@ -163,7 +163,7 @@ func humanReviewPublicationCurrent(db *gorm.DB, pr *models.FactoryPullRequest, d
 	if err != nil {
 		return false, err
 	}
-	if source == nil {
+	if source == nil || retentionClearedHumanReviewSource(decision, source) {
 		return decision.SourceRunID == nil, nil
 	}
 	return decision.SourceRunID != nil && *decision.SourceRunID == source.ID, nil

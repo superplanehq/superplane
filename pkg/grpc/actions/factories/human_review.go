@@ -159,12 +159,17 @@ func reconcileHumanReview(ctx context.Context, db *gorm.DB, deps IntakeDependenc
 	if err != nil {
 		return err
 	}
+	decision := previous
+	sameRevisionPolicy := decision != nil && decision.RevisionID == observed.Revision.ID && decision.ConfigurationVersion == automation.version.ID.String() && decision.State != models.FactoryHumanReviewStateDisabled
+	retainedSource := sameRevisionPolicy && retentionClearedHumanReviewSource(decision, source)
+	if retainedSource {
+		source, assessment = nil, decision.Assessment
+	}
 	var sourceID *uuid.UUID
 	if source != nil {
 		sourceID = &source.ID
 	}
-	decision := previous
-	changed := decision == nil || decision.RevisionID != observed.Revision.ID || decision.ConfigurationVersion != automation.version.ID.String() || !equalHumanReviewRun(decision.SourceRunID, sourceID) || decision.State == models.FactoryHumanReviewStateDisabled
+	changed := !sameRevisionPolicy || !equalHumanReviewRun(decision.SourceRunID, sourceID)
 	if changed {
 		decision, err = newHumanReviewDecision(db, pr, models.FactoryHumanReviewDecision{RevisionID: observed.Revision.ID, AssessedCommit: sha, SourceRunID: sourceID, ConfigurationVersion: automation.version.ID.String(), State: models.FactoryHumanReviewStateWaitingAssessment, Assessment: assessment, CheckRunID: sameRevisionCheck(previous, sha)})
 		if err != nil {
@@ -176,7 +181,7 @@ func reconcileHumanReview(ctx context.Context, db *gorm.DB, deps IntakeDependenc
 	}
 	// Completed decisions retain their evidence after run retention. A new
 	// revision, policy, or assessment still replaces that authority above.
-	retainedDecision := source == nil && !changed && len(decision.Assessment) > 0 && len(decision.Result) > 0
+	retainedDecision := retainedSource || (source == nil && !changed && len(decision.Assessment) > 0 && len(decision.Result) > 0)
 	if retainedDecision {
 		assessment = decision.Assessment
 	}
@@ -298,6 +303,17 @@ func equalHumanReviewRun(left, right *uuid.UUID) bool {
 		return left == nil && right == nil
 	}
 	return *left == *right
+}
+
+// Run retention clears SourceRunID through the foreign key. An older run for the
+// same head can then become the latest assessment. Runs can finish out of
+// creation order, so only a run created after the saved decision replaces the
+// saved assessment.
+func retentionClearedHumanReviewSource(decision *models.FactoryHumanReviewDecision, source *models.CanvasRun) bool {
+	if decision.SourceRunID != nil || len(decision.Assessment) == 0 || source == nil || source.CreatedAt == nil {
+		return false
+	}
+	return !source.CreatedAt.After(decision.CreatedAt)
 }
 
 func humanReviewCheckURL(previous *models.FactoryHumanReviewDecision) string {

@@ -4,10 +4,12 @@ import (
 	"encoding/json"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/google/go-github/v84/github"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/factories/mergeconfidence"
 	"github.com/superplanehq/superplane/pkg/integrations/prbody"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
@@ -104,6 +106,56 @@ func TestHumanReviewStartsAfterDraftBecomesReadyOnTheSameCommit(t *testing.T) {
 	f.client.permissions = map[string]*github.RepositoryPermissionLevel{"owner": {User: owner, Permission: github.Ptr("write")}}
 	f.reconcile(t)
 	require.Equal(t, humanReviewPublication{Status: "completed", Conclusion: "success"}, f.client.publications[len(f.client.publications)-1])
+}
+
+// Retention can delete the newer-created assessment run while an older run for
+// the same head remains. That older run must not reopen a completed gate.
+func TestHumanReviewRetentionOfNewerAssessmentKeepsCompletedGate(t *testing.T) {
+	f := newHumanReviewReconciliationFixture(t)
+	older := f.addAssessmentRun(t)
+	require.NoError(t, f.db.Model(&models.CanvasRun{}).Where("id = ?", older.ID).Update("created_at", f.source.CreatedAt.Add(-time.Minute)).Error)
+	f.reconcile(t)
+	decision, err := f.pr.CurrentHumanReview(f.db)
+	require.NoError(t, err)
+	require.Equal(t, f.source.ID, *decision.SourceRunID)
+	f.complete(t, decision)
+	owner := reviewTestUser(8, "owner", "User")
+	f.client.permissions = map[string]*github.RepositoryPermissionLevel{"owner": {User: owner, Permission: github.Ptr("write")}}
+	f.client.reviews = []*github.PullRequestReview{{ID: github.Ptr(int64(99)), User: owner, State: github.Ptr("APPROVED"), CommitID: github.Ptr("current-head")}}
+	f.reconcile(t)
+
+	require.NoError(t, f.db.Transaction(func(tx *gorm.DB) error {
+		_, err := f.source.DeleteChain(tx)
+		return err
+	}))
+	f.reconcile(t)
+	stored, err := f.pr.CurrentHumanReview(f.db)
+	require.NoError(t, err)
+	require.Equal(t, decision.ID, stored.ID)
+	require.Equal(t, decision.RunID, stored.RunID)
+	require.Equal(t, models.FactoryHumanReviewStateDecided, stored.State)
+	require.Equal(t, humanReviewPublication{Status: "completed", Conclusion: "success"}, f.client.publications[len(f.client.publications)-1])
+}
+
+func (f humanReviewReconciliationFixture) addAssessmentRun(t *testing.T) *models.CanvasRun {
+	t.Helper()
+	root := &models.CanvasEvent{WorkflowID: f.source.WorkflowID, NodeID: "on-pr-risk", Data: models.NewJSONValue(map[string]any{"type": "github.pullRequest", "data": map[string]any{"pull_request": map[string]any{"head": map[string]any{"sha": "current-head"}}}})}
+	require.NoError(t, f.db.Create(root).Error)
+	require.NoError(t, f.pr.LinkRun(f.db, root.RunID, "Merge confidence"))
+	execution := support.CreateCanvasNodeExecution(t, f.source.WorkflowID, "assess-risk", root.ID, root.ID)
+	score := 4.0
+	report := mergeconfidence.ReportData{
+		PullRequestID: f.pr.ID.String(), Complete: true, ReviewedCommit: "current-head", OverallScore: &score, OverallLevel: "positive",
+		Checks: []mergeconfidence.ReportCheck{{ID: "security", Score: 4, MaxScore: 5, Summary: "No security issue found.", Level: "positive"}},
+	}
+	require.NoError(t, f.db.Create(&models.CanvasEvent{
+		WorkflowID: f.source.WorkflowID, NodeID: "assess-risk", ExecutionID: &execution.ID, Channel: "passed",
+		Data: models.NewJSONValue(map[string]any{"type": "runnerClaudeCode.finished", "data": map[string]any{"mergeConfidence": report}}),
+	}).Error)
+	require.NoError(t, f.db.Model(&models.CanvasRun{}).Where("id = ?", root.RunID).Updates(map[string]any{"state": models.CanvasRunStateFinished, "result": models.CanvasRunResultPassed}).Error)
+	run, err := models.FindCanvasRunInTransaction(f.db, f.source.WorkflowID, root.RunID)
+	require.NoError(t, err)
+	return run
 }
 
 func TestHumanReviewReconciliationPreservesGateAfterRunRetention(t *testing.T) {

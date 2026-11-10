@@ -122,21 +122,38 @@ func EvaluateGate(input GateInput) Gate {
 }
 
 // Comments do not change review disposition. GitHub returns dismissed reviews
-// with state DISMISSED, so they revoke only that review, not an older request
-// for changes from the same reviewer that remains unresolved.
+// with state DISMISSED. A dismissal revokes that review and never restores an
+// earlier approval from the same reviewer. An earlier request for changes that
+// no later approval superseded stays unresolved.
 func latestDecisiveReviews(reviews []Review) map[int64]Review {
 	latest := map[int64]Review{}
+	latestUndismissed := map[int64]Review{}
 	for _, review := range reviews {
 		state := strings.ToUpper(review.State)
-		if state != "APPROVED" && state != "CHANGES_REQUESTED" {
+		if state != "APPROVED" && state != "CHANGES_REQUESTED" && state != "DISMISSED" {
 			continue
 		}
-		previous, exists := latest[review.UserID]
-		if !exists || review.SubmittedAt.After(previous.SubmittedAt) || (review.SubmittedAt.Equal(previous.SubmittedAt) && review.ID > previous.ID) {
-			latest[review.UserID] = review
+		keepLatest(latest, review)
+		if state != "DISMISSED" {
+			keepLatest(latestUndismissed, review)
+		}
+	}
+	for userID, review := range latest {
+		if !strings.EqualFold(review.State, "DISMISSED") {
+			continue
+		}
+		if previous, ok := latestUndismissed[userID]; ok && strings.EqualFold(previous.State, "CHANGES_REQUESTED") {
+			latest[userID] = previous
 		}
 	}
 	return latest
+}
+
+func keepLatest(latest map[int64]Review, review Review) {
+	previous, exists := latest[review.UserID]
+	if !exists || review.SubmittedAt.After(previous.SubmittedAt) || (review.SubmittedAt.Equal(previous.SubmittedAt) && review.ID > previous.ID) {
+		latest[review.UserID] = review
+	}
 }
 
 func blocked(reason string) Gate {
