@@ -5,6 +5,7 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "bun:test";
 
 import type { FactoriesFactoryPullRequest, FactoriesFactoryPullRequestMergeability } from "@/api-client";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { FEATURE_FACTORY_STEP_ACTIONS } from "@/lib/experimentalFeatures";
 
 const mergeability = { current: undefined as FactoriesFactoryPullRequestMergeability | undefined };
 const mergePending = { current: false };
@@ -25,6 +26,8 @@ vi.mock("@/hooks/useExperimentalFeature", () => ({
 }));
 
 import { SplitRunAttentionNote } from "./SplitRunAttentionNote";
+import { PullRequestChecksContext } from "./redesign/pullRequestChecksContext";
+import { SplitRunPullRequestReviewNote } from "./SplitRunPullRequestReviewNote";
 import type { SplitRunFooterAction, SplitRunFooterNote } from "./splitRunFooter";
 
 const PR_NOTE: SplitRunFooterNote = {
@@ -97,6 +100,79 @@ function renderNote(props: Partial<Parameters<typeof SplitRunAttentionNote>[0]> 
 }
 
 describe("SplitRunAttentionNote for a pull request", () => {
+  it.each(
+    [{ compact: false }, { compact: true }, { ctaOnly: true }].flatMap((variant) =>
+      [false, true].flatMap((actionsEnabled) =>
+        ([undefined, "activities", "runs"] as const).map((runSource) => ({ ...variant, actionsEnabled, runSource })),
+      ),
+    ),
+  )(
+    "keeps review evidence available until it can appear in Actions (%p)",
+    async ({ actionsEnabled, runSource, ...variant }) => {
+      experimentalFeatureHas.current = (id) => id !== FEATURE_FACTORY_STEP_ACTIONS || actionsEnabled;
+      renderNote({
+        ...variant,
+        pullRequests: [
+          {
+            ...GITHUB_PR,
+            activities: runSource === "activities" ? [{ run: { id: "review-run", canvasId: "review-app" } }] : [],
+            runs: runSource === "runs" ? [{ run: { id: "review-run", canvasId: "review-app" } }] : [],
+            humanReview: {
+              runId: runSource ? "review-run" : undefined,
+              status: "decided",
+              reviewRequired: true,
+              rationale: "A security finding requires review.",
+              selectedReviewers: [{ login: "alex", reason: "Owns the affected files." }],
+            },
+          },
+        ],
+      });
+      if (actionsEnabled && runSource) {
+        expect(screen.queryByRole("region", { name: "Human review" })).not.toBeInTheDocument();
+        return;
+      }
+      expect(screen.getByRole("region", { name: "Human review" })).toBeVisible();
+      await userEvent.setup().click(screen.getByRole("button", { name: /Human review/ }));
+      expect(screen.getByText("A security finding requires review.")).toBeVisible();
+      expect(screen.getByText(/Owns the affected files/)).toBeVisible();
+    },
+  );
+
+  it.each([
+    { status: "waiting_assessment", blockingReason: "Merge confidence failed. Retry the assessment." },
+    { status: "failed", blockingReason: "The review agent could not start. Retry Human review." },
+  ])("keeps recovery instructions available without a review run (%p)", async (humanReview) => {
+    renderNote({ pullRequests: [{ ...GITHUB_PR, humanReview }], ctaOnly: true });
+
+    await userEvent.setup().click(screen.getByRole("button", { name: /Human review/ }));
+    expect(screen.getByRole("status")).toHaveTextContent(humanReview.blockingReason);
+  });
+
+  it("keeps retained evidence available when the review run is absent from the activity log", async () => {
+    const pullRequest = {
+      ...GITHUB_PR,
+      activities: [{ run: { id: "assessment-run", canvasId: "assessment-app" } }],
+      humanReview: { runId: "deleted-review-run", status: "decided", rationale: "Retained review evidence." },
+    };
+    renderNote({ pullRequests: [pullRequest] });
+
+    await userEvent.setup().click(screen.getByRole("button", { name: /Human review/ }));
+    expect(screen.getByText("Retained review evidence.")).toBeVisible();
+  });
+
+  it("keeps the waiting state visible when Actions excludes the previous revision review", () => {
+    const pullRequest = {
+      ...GITHUB_PR,
+      currentRevision: { sha: "current" },
+      activities: [{ run: { id: "review-run", canvasId: "review-app" } }],
+      humanReview: { runId: "review-run", status: "decided", assessedCommit: "previous" },
+    };
+    renderNote({ pullRequests: [pullRequest] });
+
+    expect(screen.getByRole("region", { name: "Human review" })).toBeVisible();
+    expect(screen.getByRole("status")).toHaveTextContent("Waiting for merge confidence");
+  });
+
   it("says the pull request is ready without a numbered guide", () => {
     renderNote();
 
@@ -176,6 +252,39 @@ describe("SplitRunAttentionNote for a pull request", () => {
     expect(note).toHaveAttribute("data-variant", "pull-request");
     expect(note.className || "").not.toContain("rounded-lg");
     expect(note.className || "").not.toContain("border");
+  });
+
+  it("keeps repository merge confidence available in the compact summary", async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <TooltipProvider>
+          <PullRequestChecksContext.Provider
+            value={
+              new Map([
+                ["acme/payments", [{ id: "security", name: "Security", score: 60, maxScore: 100, level: "caution" }]],
+              ])
+            }
+          >
+            <SplitRunPullRequestReviewNote
+              ctaLabel={PR_NOTE.cta!.label}
+              pullRequest={{ href: GITHUB_PR.url!, number: 6812 }}
+              trackedPullRequest={{
+                ...GITHUB_PR,
+                repository: "acme/payments",
+                humanReview: { status: "decided", reviewRequired: true, rationale: "Review the payment changes." },
+              }}
+              compact
+            />
+          </PullRequestChecksContext.Provider>
+        </TooltipProvider>
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("button", { name: "Merge confidence" })).toBeVisible();
+    expect(screen.getByText("Security")).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Merge confidence" }));
+    expect(screen.queryByText("Security")).not.toBeInTheDocument();
   });
 
   it("says the pull request waits for checks while checks run", () => {

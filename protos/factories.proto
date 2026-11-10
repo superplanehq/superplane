@@ -1920,6 +1920,28 @@ message FactoryPullRequestActivity {
   repeated string models = 11;
 }
 
+message FactoryHumanReviewReviewer {
+  int64 id = 1;
+  string login = 2;
+  string reason = 3;
+}
+
+message FactoryHumanReviewState {
+  string id = 1;
+  string status = 2;
+  bool review_required = 3;
+  string rationale = 4;
+  repeated FactoryHumanReviewReviewer selected_reviewers = 5;
+  string blocking_reason = 6;
+  string check_url = 7;
+  string source_assessment_run_id = 8;
+  string assessed_commit = 9;
+  string run_id = 10;
+  string configuration_version = 11;
+  string publication_error = 12;
+  repeated int64 approval_ids = 13;
+}
+
 message FactoryPullRequest {
   enum Provider {
     PROVIDER_UNSPECIFIED = 0;
@@ -1954,6 +1976,7 @@ message FactoryPullRequest {
   optional FactoryPullRequestRevision current_revision = 17;
   repeated FactoryPullRequestActivity activities = 18;
   bool mergeable = 19;
+  optional FactoryHumanReviewState human_review = 20;
 }
 
 message DescribeFactoryPullRequestRequest {

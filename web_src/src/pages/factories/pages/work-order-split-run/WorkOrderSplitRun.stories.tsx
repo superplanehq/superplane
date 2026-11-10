@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import type { FactoriesWorkOrder } from "@/api-client";
+import { FEATURE_FACTORY_STEP_ACTIONS } from "@/lib/experimentalFeatures";
 
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
 import { REFUND_IMPLEMENTER_APP, factoryOwnedCanvasFixture } from "../../__fixtures__/factoryOwnedCanvasFixture";
@@ -233,4 +234,85 @@ export const PullRequestNeedsReview: Story = {
 export const PullRequestPartialChecks: Story = {
   name: "PR ready — partial checks",
   render: () => prReadyTask("partial"),
+};
+
+function humanReviewTask(experimentalFeatures: string[], reviewStatus: "decided" | "failed" = "decided") {
+  const fixture = prReadyFactoriesFixture("review");
+  const orderId = LINE_BOARD_VERIFY_PR_REVIEW_ORDER.id!;
+  const app = { id: "human-review-app", name: "Human review", columnKey: "verify", templateId: "human-review" };
+  const pr = fixture.pullRequestsByOrderId?.[orderId]?.[0];
+  const run = {
+    id: "human-review-run",
+    canvasId: app.id,
+    state: "STATE_FINISHED" as const,
+    result: "RESULT_PASSED" as const,
+    createdAt: new Date(Date.now() - 60_000).toISOString(),
+    finishedAt: new Date().toISOString(),
+  };
+  return (
+    <FactoriesHarness
+      mode="app"
+      experimentalFeatures={experimentalFeatures}
+      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/task/${LINE_BOARD_VERIFY_PR_REVIEW_ORDER.number}?lineId=${REFUND_FACTORY_LINES[0].id}`}
+      factoriesFixture={{
+        ...fixture,
+        appsByFactoryId: {
+          ...fixture.appsByFactoryId,
+          [PRIMARY_FACTORY_ID]: [...(fixture.appsByFactoryId?.[PRIMARY_FACTORY_ID] ?? []), app],
+        },
+        pullRequestsByOrderId: {
+          ...fixture.pullRequestsByOrderId,
+          [orderId]: [
+            {
+              ...pr,
+              currentRevision: { id: "review-revision", sha: "review-head" },
+              humanReview:
+                reviewStatus === "failed"
+                  ? {
+                      status: "failed",
+                      assessedCommit: "review-head",
+                      blockingReason: "Human review could not start. Retry Human review.",
+                    }
+                  : {
+                      runId: run.id,
+                      status: "decided",
+                      assessedCommit: "review-head",
+                      reviewRequired: true,
+                      rationale: "The pull request changes files outside the task scope.",
+                      blockingReason: "A selected reviewer must approve the current head commit.",
+                      selectedReviewers: [
+                        { id: "7", login: "alex", reason: "Owns the affected application files." },
+                        { id: "8", login: "sam", reason: "Owns the regression tests." },
+                      ],
+                      checkUrl: "https://github.com/acme/payments/runs/7",
+                    },
+              activities: [
+                ...(pr?.activities ?? []),
+                ...(reviewStatus === "failed" ? [] : [{ title: "Human review", run }]),
+              ],
+            },
+          ],
+        },
+      }}
+      appFixture={factoryOwnedCanvasFixture(app, {
+        runs: { runs: [run], totalCount: 1, hasNextPage: false },
+        runDetail: { run },
+      })}
+    />
+  );
+}
+
+export const HumanReviewActions: Story = {
+  name: "Human review — decision in Actions",
+  render: () => humanReviewTask([FEATURE_FACTORY_STEP_ACTIONS]),
+};
+
+export const HumanReviewActionsDisabled: Story = {
+  name: "Human review — Actions disabled",
+  render: () => humanReviewTask([]),
+};
+
+export const HumanReviewStartupFailed: Story = {
+  name: "Human review — agent startup failed",
+  render: () => humanReviewTask([FEATURE_FACTORY_STEP_ACTIONS], "failed"),
 };
