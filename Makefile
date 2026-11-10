@@ -134,6 +134,9 @@ dev.test.is.running:
 	@test -n "$$($(COMPOSE) ps --status running -q app 2>/dev/null)" || { echo "Run \`make dev.up\` first (app container is not running)." >&2; exit 1; }
 
 dev.up:
+ifeq ($(strip $(CI)),)
+	@bash ./scripts/check_dev_disk_space.sh
+endif
 	@mkdir -p tmp/screenshots $(GO_CACHE_DIRS)
 	@echo "Starting development containers..."
 	$(COMPOSE) --progress $(COMPOSE_PROGRESS) up -d --wait --build --pull always --quiet-pull $(COMPOSE_UP_EXTRA)
@@ -205,6 +208,10 @@ ci.setup.e2e:
 
 test.sharding:
 	$(COMPOSE) exec -T app bash scripts/test_sharding_test.sh
+
+.PHONY: test.dev.disk
+test.dev.disk:
+	bash scripts/check_dev_disk_space_test.sh
 
 .PHONY: dev.setup.runner.fleet
 dev.setup.runner.fleet:
