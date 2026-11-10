@@ -152,6 +152,96 @@ func TestMergeConfidenceCheckRetriesPublicationAndRecoversAcceptedCreate(t *test
 	}
 }
 
+func TestMergeConfidenceCheckReportsMissingPermissionUntilPublicationRecovers(t *testing.T) {
+	for _, outcome := range []string{"published", "superseded", "deleted"} {
+		t.Run(outcome, func(t *testing.T) {
+			f, request := newMergeConfidenceCheckFixture(t)
+			emitMergeConfidenceCheckAssessment(t, f, "passed", true)
+			f.finish(t, models.CanvasRunResultPassed)
+			_, err := f.order.UpdateStatus(f.db, models.FactoryWorkOrderStatusUpdate{ToState: models.FactoryWorkOrderStateOpen})
+			require.NoError(t, err)
+			_, err = f.order.SetStatusNote(f.db, models.FactoryWorkOrderStatusNoteParams{
+				Key: "other-wait", Headline: "Another automation needs attention",
+			})
+			require.NoError(t, err)
+			host := &contexts.HTTPContext{Responses: []*http.Response{
+				publicationHTTPResponse(200, `{"check_runs":[]}`),
+				publicationHTTPResponse(403, `{"message":"Resource not accessible by integration"}`),
+				publicationHTTPResponse(200, `{"check_runs":[]}`),
+				publicationHTTPResponse(201, `{"id":123}`),
+			}}
+			installPublicationGitHub(t, host)
+
+			require.Error(t, ProcessMergeConfidenceCheckRequest(t.Context(), IntakeDependencies{}, request.ID))
+			order, err := f.workspace.FindWorkOrder(f.db, f.order.ID)
+			require.NoError(t, err)
+			notes, err := order.StatusNotes()
+			require.NoError(t, err)
+			require.Len(t, notes, 2)
+			assert.Contains(t, notes[1].Body, "Checks: Read and write")
+			assert.Contains(t, notes[1].Body, "accept the permission update")
+			require.NotNil(t, notes[1].Run)
+			assert.Equal(t, f.run.ID, notes[1].Run.ID)
+			stored, err := models.FindCanvasNodeRequest(f.db, request.ID)
+			require.NoError(t, err)
+			assert.Equal(t, models.NodeExecutionRequestStatePending, stored.State)
+			assert.True(t, stored.RunAt.After(time.Now()))
+
+			switch outcome {
+			case "superseded":
+				newer := f
+				newer.startRun(t)
+			case "deleted":
+				require.NoError(t, f.db.Model(f.canvas).Update("deleted_at", time.Now()).Error)
+			}
+			require.NoError(t, request.Reschedule(f.db, time.Now().Add(-time.Second)))
+			require.NoError(t, ProcessMergeConfidenceCheckRequest(t.Context(), IntakeDependencies{}, request.ID))
+			order, err = f.workspace.FindWorkOrder(f.db, f.order.ID)
+			require.NoError(t, err)
+			notes, err = order.StatusNotes()
+			require.NoError(t, err)
+			require.Len(t, notes, 1)
+			assert.Equal(t, "other-wait", notes[0].Key)
+			if outcome == "superseded" {
+				require.Len(t, host.Requests, 3)
+			} else {
+				require.Len(t, host.Requests, 4)
+				conclusion := "success"
+				if outcome == "deleted" {
+					conclusion = "cancelled"
+				}
+				assert.Equal(t, conclusion, mergeConfidenceCheckRequestBody(t, host.Requests[3])["conclusion"])
+			}
+			stored, err = models.FindCanvasNodeRequest(f.db, request.ID)
+			require.NoError(t, err)
+			assert.Equal(t, models.NodeExecutionRequestStateCompleted, stored.State)
+		})
+	}
+}
+
+func TestMergeConfidenceCheckDoesNotReportRateLimitsAsMissingPermission(t *testing.T) {
+	f, request := newMergeConfidenceCheckFixture(t)
+	_, err := f.order.UpdateStatus(f.db, models.FactoryWorkOrderStatusUpdate{ToState: models.FactoryWorkOrderStateOpen})
+	require.NoError(t, err)
+	limited := publicationHTTPResponse(403, `{"message":"API rate limit exceeded"}`)
+	limited.Header.Set("X-RateLimit-Remaining", "0")
+	host := &contexts.HTTPContext{Responses: []*http.Response{
+		publicationHTTPResponse(200, `{"check_runs":[]}`), limited,
+	}}
+	installPublicationGitHub(t, host)
+
+	require.Error(t, ProcessMergeConfidenceCheckRequest(t.Context(), IntakeDependencies{}, request.ID))
+	order, err := f.workspace.FindWorkOrder(f.db, f.order.ID)
+	require.NoError(t, err)
+	notes, err := order.StatusNotes()
+	require.NoError(t, err)
+	assert.Empty(t, notes)
+	stored, err := models.FindCanvasNodeRequest(f.db, request.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.NodeExecutionRequestStatePending, stored.State)
+	assert.True(t, stored.RunAt.After(time.Now()))
+}
+
 func TestMergeConfidenceCheckDoesNotReplaceNewerAssessmentForTheSameHead(t *testing.T) {
 	for _, existing := range []bool{false, true} {
 		t.Run(fmt.Sprintf("older check exists %t", existing), func(t *testing.T) {
