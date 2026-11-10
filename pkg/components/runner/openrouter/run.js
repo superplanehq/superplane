@@ -21,6 +21,7 @@ const MODEL_ENDPOINT_LOOKUP_TIMEOUT_MS = 5_000;
 const DEFAULT_OPENROUTER_API_BASE = "https://openrouter.ai/api/v1";
 const AVAILABLE_ENDPOINT_STATUS = 0;
 const SESSION_FILE = "opencode_session";
+const OPENROUTER_EFFORT_VARIANT = "superplane_effort";
 
 function loadActivityStreamModule() {
   const taskDir = process.env.SUPERPLANE_TASK_DIR || "";
@@ -638,14 +639,23 @@ function writeSessionID(taskDir, sessionID) {
   fs.writeFileSync(path.join(taskDir, SESSION_FILE), `${id}\n`);
 }
 
-function thinkingArgs(thinking) {
+function normalizedThinkingLevel(thinking) {
   const level = String(thinking || "")
     .trim()
     .toLowerCase();
-  if (level === "low" || level === "medium" || level === "high") {
-    return ["--variant", level];
+  if (["none", "minimal", "low", "medium", "high", "xhigh", "max"].includes(level)) {
+    return level;
   }
-  return [];
+  return "";
+}
+
+function thinkingArgs(thinking, env = process.env) {
+  const level = normalizedThinkingLevel(thinking);
+  if (!level) {
+    return [];
+  }
+  const variant = customLLMFromEnv(env) ? level : OPENROUTER_EFFORT_VARIANT;
+  return ["--variant", variant];
 }
 
 function opencodeRunArgs({ model, sessionID, prompt, cwd, thinking, env }) {
@@ -654,7 +664,7 @@ function opencodeRunArgs({ model, sessionID, prompt, cwd, thinking, env }) {
   if (prefixed) {
     args.push("-m", prefixed);
   }
-  args.push(...thinkingArgs(thinking));
+  args.push(...thinkingArgs(thinking, env));
   if (cwd) {
     args.push("--dir", cwd);
   }
@@ -694,6 +704,7 @@ function buildOpenCodeConfig({
   env = process.env,
   planning = false,
   models = [],
+  thinking = "",
   providerOrder = [],
 } = {}) {
   const config = {
@@ -737,6 +748,7 @@ function buildOpenCodeConfig({
       options.baseURL = baseURL;
     }
     const modelEntries = {};
+    const effort = normalizedThinkingLevel(thinking);
     for (const id of modelIds) {
       modelEntries[id] = {
         attachment: true,
@@ -747,6 +759,12 @@ function buildOpenCodeConfig({
           provider: openRouterProviderRouting(providerOrder),
         },
       };
+      if (effort) {
+        // A separate variant avoids merging catalog token budgets into the effort.
+        modelEntries[id].variants = {
+          [OPENROUTER_EFFORT_VARIANT]: { reasoning: { effort } },
+        };
+      }
     }
     if (Object.keys(options).length > 0 || Object.keys(modelEntries).length > 0) {
       config.provider = { openrouter: {} };
@@ -783,13 +801,14 @@ function buildOpenCodeConfig({
   return config;
 }
 
-function writeOpenCodeConfig(taskDir, env, models, cwd, providerOrder) {
+function writeOpenCodeConfig(taskDir, { cwd, env, models, thinking, providerOrder }) {
   const config = buildOpenCodeConfig({
     taskDir,
     cwd,
     env,
     planning: planningEnabled(env),
     models,
+    thinking,
     providerOrder,
   });
   fs.writeFileSync(
@@ -1025,7 +1044,13 @@ async function runPrompt(promptFile, model, helpers = {}) {
     providerOrder = orderProviderTags(endpoints);
     printLiveLogLine(providerOrderLogLine(providerOrder));
   }
-  writeOpenCodeConfig(sp, env, currentModel ? [currentModel] : [], cwd, providerOrder);
+  writeOpenCodeConfig(sp, {
+    cwd,
+    env,
+    models: currentModel ? [currentModel] : [],
+    thinking,
+    providerOrder,
+  });
 
   const deadline = waitDeadlineMs(env, now);
   let lastResult = {};

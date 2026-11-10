@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -31,26 +32,6 @@ func TestClassifyOpenRouterErrorDetectsRateLimitsAndHardFailures(t *testing.T) {
 	assert.Equal(t, "retryable", jsClassify(t, "Provider returned error"))
 	assert.Equal(t, "retryable", jsClassify(t, "The model is currently overloaded"))
 	assert.Equal(t, "other", jsClassify(t, "opencode crashed"))
-}
-
-func TestOpencodeRunArgsAddsVariantForThinking(t *testing.T) {
-	args := jsOpencodeArgs(t, map[string]any{
-		"model":    "x-ai/grok-4.6",
-		"prompt":   "do the work",
-		"thinking": "high",
-	})
-	assert.Contains(t, args, "--thinking")
-	assert.Contains(t, args, "--variant")
-	assert.Contains(t, args, "high")
-}
-
-func TestOpencodeRunArgsOmitsVariantForDefaultThinking(t *testing.T) {
-	args := jsOpencodeArgs(t, map[string]any{
-		"model":  "x-ai/grok-4.6",
-		"prompt": "do the work",
-	})
-	assert.Contains(t, args, "--thinking")
-	assert.NotContains(t, args, "--variant")
 }
 
 func TestOpencodeRunArgsIncludesJSONAutoPureAndPrefix(t *testing.T) {
@@ -87,7 +68,8 @@ func TestBuildOpenCodeConfigWritesCustomProvider(t *testing.T) {
 	script, err := filepath.Abs("run.js")
 	require.NoError(t, err)
 	payload, err := json.Marshal(map[string]any{
-		"taskDir": "/task",
+		"taskDir":  "/task",
+		"thinking": "high",
 		"env": map[string]string{
 			"CUSTOM_LLM_API_KEY":  "token",
 			"CUSTOM_LLM_BASE_URL": "https://models.example/v1",
@@ -115,9 +97,10 @@ func TestBuildOpenCodeConfigWritesCustomProvider(t *testing.T) {
 	assert.False(t, hasOpenRouter)
 
 	args := jsOpencodeArgs(t, map[string]any{
-		"model":  "kimi-k3",
-		"prompt": "do the work",
-		"cwd":    "/tmp/repo",
+		"model":    "kimi-k3",
+		"prompt":   "do the work",
+		"cwd":      "/tmp/repo",
+		"thinking": "high",
 		"env": map[string]string{
 			"CUSTOM_LLM_API_KEY":  "token",
 			"CUSTOM_LLM_BASE_URL": "https://models.example/v1",
@@ -126,6 +109,7 @@ func TestBuildOpenCodeConfigWritesCustomProvider(t *testing.T) {
 	})
 	assert.Contains(t, args, "custom/kimi-k3")
 	assert.NotContains(t, args, "openrouter/kimi-k3")
+	assert.Contains(t, args, "high")
 }
 
 func TestBuildOpenCodeConfigWritesBaseURLAndAnalysisMCP(t *testing.T) {
@@ -201,7 +185,7 @@ func TestPlanningFollowUpReceivesToolGuidanceInSharedInstructions(t *testing.T) 
 		"SUPERPLANE_PLANNING_SESSION_ID":   "plan-1",
 		"SUPERPLANE_PLANNING_SESSION_KIND": "work_order_analysis",
 		"SUPERPLANE_ANALYSIS_REWIND":       "yes",
-	}, nil, nil, "")
+	}, nil, nil, "", "")
 	require.Equal(t, 0, result.exitCode, result.output, result.stderr)
 	require.Len(t, result.spawns, 1)
 	assert.NotContains(t, result.spawns[0], "--session")
@@ -1450,7 +1434,7 @@ func TestRunPromptContinuesSessionOnLaterPrompt(t *testing.T) {
 			`{"type":"text","sessionID":"ses_keep","part":{"type":"text","text":"first done"}}`,
 			`{"type":"step_finish","sessionID":"ses_keep","part":{"type":"step-finish","tokens":{"input":1,"output":1}}}`,
 		},
-	}}, nil, nil, nil, "")
+	}}, nil, nil, nil, "", "")
 	assert.Equal(t, 0, first.exitCode)
 	session, err := os.ReadFile(filepath.Join(dir, "opencode_session"))
 	require.NoError(t, err)
@@ -1463,7 +1447,7 @@ func TestRunPromptContinuesSessionOnLaterPrompt(t *testing.T) {
 			`{"type":"text","sessionID":"ses_keep","part":{"type":"text","text":"second done"}}`,
 			`{"type":"step_finish","sessionID":"ses_keep","part":{"type":"step-finish","tokens":{"input":1,"output":1}}}`,
 		},
-	}}, nil, nil, nil, "")
+	}}, nil, nil, nil, "", "")
 	assert.Equal(t, 0, second.exitCode)
 	require.NotEmpty(t, second.spawns)
 	assert.Contains(t, second.spawns[0], "--session")
@@ -1499,6 +1483,52 @@ func TestRunPromptWritesOpenRouterBaseURLIntoConfig(t *testing.T) {
 	requireStdoutLine(t, result.output, "Starting OpenCode · openrouter/anthropic/claude-sonnet-4-6")
 	requireStdoutLine(t, result.output, "Calling OpenCode · openrouter/anthropic/claude-sonnet-4-6 (attempt 1 of 4)")
 	requireNoTypedLiveLogLine(t, result.output, "Starting OpenCode")
+}
+
+func TestRunPromptAppliesSelectedOpenRouterEffort(t *testing.T) {
+	for _, effort := range []string{"", "none", "high", "xhigh", "max"} {
+		name := effort
+		if name == "" {
+			name = "provider default"
+		}
+		t.Run(name, func(t *testing.T) {
+			result := runOpenRouterPrompt(t, promptHarness{
+				model:    "deepseek/deepseek-v4-flash",
+				thinking: effort,
+				spawns:   []spawnScript{successSpawn("done")},
+			})
+			require.Equal(t, 0, result.exitCode, result.stderr)
+			require.Len(t, result.spawns, 1)
+
+			var config struct {
+				Provider struct {
+					OpenRouter struct {
+						Models map[string]struct {
+							Variants map[string]struct {
+								Reasoning map[string]any `json:"reasoning"`
+							} `json:"variants"`
+						} `json:"models"`
+					} `json:"openrouter"`
+				} `json:"provider"`
+			}
+			raw, err := os.ReadFile(filepath.Join(result.taskDir, "opencode.json"))
+			require.NoError(t, err)
+			require.NoError(t, json.Unmarshal(raw, &config))
+			model := config.Provider.OpenRouter.Models["deepseek/deepseek-v4-flash"]
+			if effort == "" {
+				assert.Empty(t, model.Variants)
+				assert.NotContains(t, result.spawns[0], "--variant")
+				return
+			}
+
+			variantIndex := slices.Index(result.spawns[0], "--variant")
+			require.GreaterOrEqual(t, variantIndex, 0)
+			require.Greater(t, len(result.spawns[0]), variantIndex+1)
+			variant := result.spawns[0][variantIndex+1]
+			require.Contains(t, model.Variants, variant)
+			assert.Equal(t, map[string]any{"effort": effort}, model.Variants[variant].Reasoning)
+		})
+	}
 }
 
 func TestRunPromptDoesNotRetryWhenSuccessfulSpawnLogs429(t *testing.T) {
@@ -1606,6 +1636,7 @@ type spawnScript struct {
 type promptHarness struct {
 	cwd           string
 	model         string
+	thinking      string
 	spawns        []spawnScript
 	env           map[string]string
 	nowValues     []int64
@@ -1644,7 +1675,7 @@ func runOpenRouterPrompt(t *testing.T, harness promptHarness) openRouterPromptRe
 		require.NoError(t, err)
 		require.NoError(t, os.WriteFile(filepath.Join(dir, "endpoint_lookup.json"), payload, 0o644))
 	}
-	return runPromptWithCwd(t, dir, harness.cwd, "prompt.txt", harness.model, harness.spawns, harness.env, harness.nowValues, harness.sessionUsage, harness.catalogSource)
+	return runPromptWithCwd(t, dir, harness.cwd, "prompt.txt", harness.model, harness.spawns, harness.env, harness.nowValues, harness.sessionUsage, harness.catalogSource, harness.thinking)
 }
 
 func rateLimitSpawn(message string) spawnScript {
@@ -1678,11 +1709,12 @@ func successSpawn(text string) spawnScript {
 	}
 }
 
-func runPromptInDir(t *testing.T, dir, promptName, model string, spawns []spawnScript, extraEnv map[string]string, nowValues []int64, sessionUsage []map[string]any, catalogSource string) openRouterPromptResult {
-	return runPromptWithCwd(t, dir, dir, promptName, model, spawns, extraEnv, nowValues, sessionUsage, catalogSource)
+func runPromptInDir(t *testing.T, dir, promptName, model string, spawns []spawnScript, extraEnv map[string]string, nowValues []int64, sessionUsage []map[string]any, catalogSource, thinking string) openRouterPromptResult {
+	t.Helper()
+	return runPromptWithCwd(t, dir, dir, promptName, model, spawns, extraEnv, nowValues, sessionUsage, catalogSource, thinking)
 }
 
-func runPromptWithCwd(t *testing.T, dir, cwd, promptName, model string, spawns []spawnScript, extraEnv map[string]string, nowValues []int64, sessionUsage []map[string]any, catalogSource string) openRouterPromptResult {
+func runPromptWithCwd(t *testing.T, dir, cwd, promptName, model string, spawns []spawnScript, extraEnv map[string]string, nowValues []int64, sessionUsage []map[string]any, catalogSource, thinking string) openRouterPromptResult {
 	t.Helper()
 	if cwd == "" {
 		cwd = dir
@@ -1753,6 +1785,7 @@ function mockChild(spec) {
   return child;
 }
 const helpers = {
+  thinking: %q,
   ensureOpenCodeModelCatalog() {
     return catalogSource;
   },
@@ -1809,7 +1842,7 @@ runPrompt(%q, %q, helpers)
     console.error(err && err.message ? err.message : err);
     process.exit(1);
   });
-`, script, spawnsJSON, nowJSON, sessionJSON, catalogSource, cwd, filepath.Join(dir, promptName), model)), 0o644))
+`, script, spawnsJSON, nowJSON, sessionJSON, catalogSource, thinking, cwd, filepath.Join(dir, promptName), model)), 0o644))
 
 	spawnsFile := filepath.Join(dir, "spawns.json")
 	cmd := exec.Command("node", harnessFile)

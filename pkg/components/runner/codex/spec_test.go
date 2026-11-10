@@ -50,16 +50,17 @@ func TestValidateRunCodexSpecRejectsHostedCredentials(t *testing.T) {
 
 func TestValidateCodexConfigurationAcceptsSubscription(t *testing.T) {
 	t.Parallel()
-	err := configuration.ValidateConfiguration((&RunCodex{}).Configuration(), map[string]any{
+	config := map[string]any{
 		"machineType":   "e1-large-amd64",
 		"credentials":   map[string]any{"source": runner.CredentialsSourceSubscription},
 		"model":         "gpt-5.4",
-		"thinkingLevel": "xhigh",
+		"thinkingLevel": "future-effort",
 		"steps": []any{
 			map[string]any{"name": "Plan task", "type": runner.AgentStepPrompt, "prompt": "Plan this task"},
 		},
-	})
-	require.NoError(t, err)
+	}
+	require.NoError(t, configuration.ValidateConfiguration((&RunCodex{}).Configuration(), config))
+	require.NoError(t, (&RunCodex{}).ValidateNodeConfiguration(config))
 }
 
 func TestInjectSubscriptionCredentialsPreservesPlanningEnvironment(t *testing.T) {
