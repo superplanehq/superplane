@@ -100,7 +100,8 @@ test("open_pull_request uses the default branch of a context repository", async 
 });
 
 for (const [setting, requested, expected] of [
-  ["false", true, false],
+  ["false", true, true],
+  ["false", undefined, false],
   ["true", false, true],
   [undefined, true, true],
   [undefined, false, false],
