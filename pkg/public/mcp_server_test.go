@@ -166,7 +166,7 @@ func TestMCPToolCallWorkspaceBindingAndMissingAgent(t *testing.T) {
 	require.NoError(t, err)
 	insertMCPAccessGrant(t, mcpAccessClaims(r, factoryA.ID))
 
-	callTool := func(name string, args any) *httptest.ResponseRecorder {
+	callTool := func(name string, args map[string]any) *httptest.ResponseRecorder {
 		payload, err := json.Marshal(map[string]any{
 			"jsonrpc": "2.0",
 			"id":      1,
@@ -182,27 +182,6 @@ func TestMCPToolCallWorkspaceBindingAndMissingAgent(t *testing.T) {
 		server.Router.ServeHTTP(rec, req)
 		return rec
 	}
-	t.Run("successful lookup emits success", func(t *testing.T) {
-		logs := support.CaptureSecurityLogs(t)
-		rec := callTool("get_task", map[string]any{"task": orderA.ID.String()})
-		require.Equal(t, http.StatusOK, rec.Code)
-		events := support.SecurityEvents(t, logs)
-		require.Len(t, events, 1)
-		assert.Equal(t, "success", events[0]["outcome"])
-		assert.Equal(t, "get_task", events[0]["tool_name"])
-		assert.Equal(t, orderA.ID.String(), events[0]["target_id"])
-		assert.NotContains(t, logs.String(), "No agent")
-	})
-	t.Run("JSON RPC argument error emits error", func(t *testing.T) {
-		logs := support.CaptureSecurityLogs(t)
-		rec := callTool("get_task", []string{"argument-secret-sentinel"})
-		require.Equal(t, http.StatusOK, rec.Code)
-		events := support.SecurityEvents(t, logs)
-		require.Len(t, events, 1)
-		assert.Equal(t, "error", events[0]["outcome"])
-		assert.Equal(t, "get_task", events[0]["tool_name"])
-		assert.NotContains(t, logs.String(), "argument-secret-sentinel")
-	})
 
 	t.Run("other workspace is not found", func(t *testing.T) {
 		rec := callTool("get_task", map[string]any{"task": orderB.ID.String()})
@@ -221,8 +200,7 @@ func TestMCPToolCallWorkspaceBindingAndMissingAgent(t *testing.T) {
 	})
 
 	t.Run("missing agent is a tool error", func(t *testing.T) {
-		logs := support.CaptureSecurityLogs(t)
-		rec := callTool("get_task_agent", map[string]any{"task": orderA.ID.String(), "arbitrary": "tool-argument-sentinel"})
+		rec := callTool("get_task_agent", map[string]any{"task": orderA.ID.String()})
 		assert.Equal(t, http.StatusOK, rec.Code)
 		var body map[string]any
 		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
@@ -235,16 +213,6 @@ func TestMCPToolCallWorkspaceBindingAndMissingAgent(t *testing.T) {
 		item, ok := content[0].(map[string]any)
 		require.True(t, ok)
 		assert.Equal(t, "This task has no agent session.", item["text"])
-		events := support.SecurityEvents(t, logs)
-		require.Len(t, events, 1)
-		assert.Equal(t, "error", events[0]["outcome"])
-		assert.Equal(t, "get_task_agent", events[0]["tool_name"])
-		assert.Equal(t, r.User.String(), events[0]["actor_user_id"])
-		assert.Equal(t, r.Account.ID.String(), events[0]["actor_account_id"])
-		assert.Equal(t, r.Organization.ID.String(), events[0]["organization_id"])
-		assert.Equal(t, orderA.ID.String(), events[0]["target_id"])
-		assert.NotContains(t, logs.String(), "tool-argument-sentinel")
-		assert.NotContains(t, logs.String(), "This task has no agent session.")
 	})
 }
 

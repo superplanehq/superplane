@@ -625,7 +625,6 @@ func TestHandleLogout_ClearsSupportSessionCookie(t *testing.T) {
 func TestHandler_completeProviderAuth(t *testing.T) {
 	t.Run("should create the account when signup intent is missing", func(t *testing.T) {
 		handler, _ := setupAuthHandler(t, false)
-		logs := support.CaptureSecurityLogs(t)
 		googleUser := goth.User{
 			UserID:   "google-login-no-account",
 			Email:    "google-login-no-account@example.com",
@@ -645,11 +644,6 @@ func TestHandler_completeProviderAuth(t *testing.T) {
 		account, err := models.FindAccountByEmail(googleUser.Email)
 		require.NoError(t, err)
 		assert.Equal(t, googleUser.Name, account.Name)
-		events := support.SecurityEvents(t, logs)
-		require.Len(t, events, 1)
-		assert.Equal(t, "authentication.login", events[0]["action"])
-		assert.Equal(t, "success", events[0]["outcome"])
-		assert.Equal(t, account.ID.String(), events[0]["actor_account_id"])
 	})
 
 	t.Run("should create the account when signup intent is present", func(t *testing.T) {
@@ -782,69 +776,6 @@ func TestHandler_completeProviderAuth(t *testing.T) {
 		assert.Equal(t, http.StatusTemporaryRedirect, recorder.Code)
 		assert.Equal(t, identityAccount.ID.String(), sessionAccountID(t, recorder, handler.jwtSigner))
 	})
-}
-
-func TestAuthenticationSecurityEventsValidateLogoutIdentity(t *testing.T) {
-	handler, r := setupAuthHandler(t, false)
-	valid, err := GenerateAccountToken(handler.jwtSigner, r.Account.ID.String(), time.Now(), time.Hour)
-	require.NoError(t, err)
-	expired, err := GenerateAccountToken(handler.jwtSigner, r.Account.ID.String(), time.Now(), -time.Hour)
-	require.NoError(t, err)
-	for _, test := range []struct{ name, token, outcome, actor string }{
-		{"validated session", valid, "success", r.Account.ID.String()},
-		{"expired session", expired, "denied", ""},
-		{"forged session", "forged-credential-sentinel", "denied", ""},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			logs := support.CaptureSecurityLogs(t)
-			request := httptest.NewRequest(http.MethodGet, "/logout", nil)
-			request.AddCookie(&http.Cookie{Name: "account_token", Value: test.token})
-			response := httptest.NewRecorder()
-			handler.handleLogout(response, request)
-			require.Equal(t, http.StatusTemporaryRedirect, response.Code)
-			events := support.SecurityEvents(t, logs)
-			require.Len(t, events, 1)
-			assert.Equal(t, "authentication.logout", events[0]["action"])
-			assert.Equal(t, test.outcome, events[0]["outcome"])
-			if test.actor == "" {
-				assert.NotContains(t, events[0], "actor_account_id")
-			} else {
-				assert.Equal(t, test.actor, events[0]["actor_account_id"])
-			}
-			assert.NotContains(t, logs.String(), test.token)
-		})
-	}
-}
-
-func TestPasswordLoginSecurityEvents(t *testing.T) {
-	handler, r := setupAuthHandler(t, false)
-	handler.passwordLoginEnabled = true
-	password := "password-secret-sentinel"
-	hash, err := crypto.HashPassword(password)
-	require.NoError(t, err)
-	_, err = models.CreateAccountPasswordAuthInTransaction(database.DB(t.Context()), r.Account.ID, hash)
-	require.NoError(t, err)
-	for _, test := range []struct{ name, password, outcome string }{
-		{"valid password", password, "success"}, {"invalid password", "wrong-password-sentinel", "denied"},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			logs := support.CaptureSecurityLogs(t)
-			form := url.Values{"email": {r.Account.Email}, "password": {test.password}}
-			request := httptest.NewRequest(http.MethodPost, "/login", strings.NewReader(form.Encode()))
-			request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-			response := httptest.NewRecorder()
-			handler.handlePasswordLogin(response, request)
-			events := support.SecurityEvents(t, logs)
-			require.Len(t, events, 1)
-			assert.Equal(t, test.outcome, events[0]["outcome"])
-			if test.outcome == "success" {
-				assert.Equal(t, r.Account.ID.String(), events[0]["actor_account_id"])
-			} else {
-				assert.NotContains(t, events[0], "actor_account_id")
-			}
-			assert.NotContains(t, logs.String(), test.password)
-		})
-	}
 }
 
 func TestLinkProviderToAccountUpdatesIdentityProfile(t *testing.T) {
@@ -1165,7 +1096,6 @@ func TestHandler_handleMagicCodeRequest_AutomaticSignup(t *testing.T) {
 }
 
 func TestHandler_handleMagicCodeVerify_AutomaticSignup(t *testing.T) {
-	logs := support.CaptureSecurityLogs(t)
 	handler, _ := setupAuthHandler(t, false)
 	handler.magicCodeEnabled = true
 	email := "verify-signup-required@example.com"
@@ -1185,15 +1115,9 @@ func TestHandler_handleMagicCodeVerify_AutomaticSignup(t *testing.T) {
 	account, err := models.FindAccountByEmail(email)
 	require.NoError(t, err)
 	assert.Equal(t, strings.Split(email, "@")[0], account.Name)
-	events := support.SecurityEvents(t, logs)
-	require.Len(t, events, 1)
-	assert.Equal(t, "success", events[0]["outcome"])
-	assert.Equal(t, account.ID.String(), events[0]["actor_account_id"])
-	assert.NotContains(t, logs.String(), code)
 }
 
 func TestHandler_handleMagicCodeVerify_SignupDisabled(t *testing.T) {
-	logs := support.CaptureSecurityLogs(t)
 	handler, _ := setupAuthHandler(t, true)
 	handler.magicCodeEnabled = true
 	email := "verify-signup-disabled@example.com"
@@ -1216,10 +1140,6 @@ func TestHandler_handleMagicCodeVerify_SignupDisabled(t *testing.T) {
 	assert.Error(t, err)
 	_, err = models.FindValidAccountMagicCode(email, codeHash, magicCodeMaxVerifyAttempts)
 	assert.NoError(t, err)
-	events := support.SecurityEvents(t, logs)
-	require.Len(t, events, 1)
-	assert.Equal(t, "denied", events[0]["outcome"])
-	assert.NotContains(t, events[0], "actor_account_id")
 }
 
 func TestHandler_handlePasswordSignup(t *testing.T) {

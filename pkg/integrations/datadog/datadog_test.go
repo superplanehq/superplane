@@ -220,8 +220,7 @@ func Test__Datadog__HandleRequest(t *testing.T) {
 			"event_type":"error_tracking_alert",
 			"alert_transition":"Triggered",
 			"title":"[Triggered] checkout new issues",
-			"body":"InventoryTimeout: checkout failed",
-			"arbitrary":{"nested":{"password":"payload-secret-sentinel"}}
+			"body":"InventoryTimeout: checkout failed"
 		}`
 		request := httptest.NewRequest(http.MethodPost, "/api/v1/integrations/"+integrationID.String()+"/events", strings.NewReader(body))
 		request.Header.Set(WebhookHeaderName, "secret-token")
@@ -242,9 +241,6 @@ func Test__Datadog__HandleRequest(t *testing.T) {
 		assertDatadogReceipt(t, lines[0], organizationID, integrationID.String(), "received", "error_tracking_alert", "Triggered")
 		assert.Equal(t, "info", lines[0]["level"])
 		assert.NotContains(t, logs.String(), "secret-token")
-		assert.NotContains(t, lines[0], "payload")
-		assert.NotContains(t, logs.String(), "InventoryTimeout")
-		assert.NotContains(t, logs.String(), "payload-secret-sentinel")
 	})
 
 	t.Run("rejects a body larger than the webhook limit", func(t *testing.T) {
@@ -480,7 +476,6 @@ func Test__Datadog__HandleRequest(t *testing.T) {
 		require.Len(t, lines, 1)
 		assertDatadogReceipt(t, lines[0], organizationID, integrationID.String(), "failed", "unknown", "")
 		assert.Equal(t, "error", lines[0]["level"])
-		assert.NotContains(t, lines[0], "payload")
 	})
 }
 

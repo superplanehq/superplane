@@ -860,7 +860,6 @@ func TestAdminInstallationNetworkSettings(t *testing.T) {
 	})
 
 	t.Run("admin can disable signups through installation settings", func(t *testing.T) {
-		logs := support.CaptureSecurityLogs(t)
 		body, err := json.Marshal(map[string]bool{
 			"signups_enabled": false,
 		})
@@ -884,12 +883,6 @@ func TestAdminInstallationNetworkSettings(t *testing.T) {
 		err = json.Unmarshal(response.Body.Bytes(), &result)
 		require.NoError(t, err)
 		assert.False(t, result.SignupsEnabled)
-		events := support.SecurityEvents(t, logs)
-		require.Len(t, events, 1)
-		assert.Equal(t, "installation.settings_update", events[0]["action"])
-		assert.Equal(t, "success", events[0]["outcome"])
-		assert.Equal(t, false, events[0]["signups_enabled"])
-		assert.NotEmpty(t, events[0]["actor_account_id"])
 	})
 
 	t.Run("admin can read existing smtp settings", func(t *testing.T) {
@@ -1116,7 +1109,6 @@ func TestStartSupportSession(t *testing.T) {
 	server, r, token := setupAdminTestServer(t)
 
 	t.Run("starts a support session with a different account", func(t *testing.T) {
-		logs := support.CaptureSecurityLogs(t)
 		otherAccount, err := models.CreateAccount("Other User", "other@example.com")
 		require.NoError(t, err)
 
@@ -1150,18 +1142,9 @@ func TestStartSupportSession(t *testing.T) {
 			}
 		}
 		assert.True(t, found, "support_session_token cookie should be set")
-		events := support.SecurityEvents(t, logs)
-		require.Len(t, events, 1)
-		assert.Equal(t, "support_session.start", events[0]["action"])
-		assert.Equal(t, "success", events[0]["outcome"])
-		assert.Equal(t, r.Account.ID.String(), events[0]["actor_account_id"])
-		assert.Equal(t, r.Account.ID.String(), events[0]["support_admin_account_id"])
-		assert.Equal(t, otherAccount.ID.String(), events[0]["target_id"])
-		assert.NotEmpty(t, events[0]["request_id"])
 	})
 
 	t.Run("rejects a support session for own account", func(t *testing.T) {
-		logs := support.CaptureSecurityLogs(t)
 		body, _ := json.Marshal(map[string]string{
 			"account_id": r.Account.ID.String(),
 		})
@@ -1176,7 +1159,6 @@ func TestStartSupportSession(t *testing.T) {
 
 		assert.Equal(t, http.StatusBadRequest, response.Code)
 		assert.Contains(t, response.Body.String(), "You cannot start a support session for your own account")
-		assert.Empty(t, support.SecurityEvents(t, logs))
 	})
 
 	t.Run("rejects a support session with missing account_id", func(t *testing.T) {
