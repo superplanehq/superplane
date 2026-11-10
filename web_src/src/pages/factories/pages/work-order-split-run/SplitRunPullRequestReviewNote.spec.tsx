@@ -25,6 +25,8 @@ vi.mock("@/hooks/useExperimentalFeature", () => ({
 }));
 
 import { SplitRunAttentionNote } from "./SplitRunAttentionNote";
+import { PullRequestChecksContext } from "./redesign/pullRequestChecksContext";
+import { SplitRunPullRequestReviewNote } from "./SplitRunPullRequestReviewNote";
 import type { SplitRunFooterAction, SplitRunFooterNote } from "./splitRunFooter";
 
 const PR_NOTE: SplitRunFooterNote = {
@@ -176,6 +178,38 @@ describe("SplitRunAttentionNote for a pull request", () => {
     expect(note).toHaveAttribute("data-variant", "pull-request");
     expect(note.className || "").not.toContain("rounded-lg");
     expect(note.className || "").not.toContain("border");
+  });
+
+  it("keeps human review and repository merge confidence available in the compact summary", async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <TooltipProvider>
+          <PullRequestChecksContext.Provider
+            value={
+              new Map([
+                ["acme/payments", [{ id: "security", name: "Security", score: 60, maxScore: 100, level: "caution" }]],
+              ])
+            }
+          >
+            <SplitRunPullRequestReviewNote
+              ctaLabel={PR_NOTE.cta!.label}
+              pullRequest={{ href: GITHUB_PR.url!, number: 6812 }}
+              trackedPullRequest={{
+                ...GITHUB_PR,
+                repository: "acme/payments",
+                humanReview: { status: "decided", reviewRequired: true, rationale: "Review the payment changes." },
+              }}
+              compact
+            />
+          </PullRequestChecksContext.Provider>
+        </TooltipProvider>
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("button", { name: "Merge confidence" })).toBeVisible();
+    await user.click(screen.getByRole("button", { name: /Human review/ }));
+    expect(screen.getByText("Review the payment changes.")).toBeVisible();
   });
 
   it("says the pull request waits for checks while checks run", () => {
