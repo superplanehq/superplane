@@ -8,6 +8,7 @@ export interface StepActionRow {
   timestamp?: string;
   title: string;
   detail?: string;
+  links?: { label: string; href: string; external?: boolean }[];
 }
 
 export interface StepActionRun {

@@ -230,6 +230,11 @@ func (c *Client) ListBranches(ctx context.Context, repository string, opts *gith
 	return c.underlying.Repositories.ListBranches(ctx, owner, name, opts)
 }
 
+func (c *Client) ListCollaborators(ctx context.Context, repository string, opts *github.ListCollaboratorsOptions) ([]*github.User, *github.Response, error) {
+	owner, name := c.ownerAndName(repository)
+	return c.underlying.Repositories.ListCollaborators(ctx, owner, name, opts)
+}
+
 func (c *Client) CreateIssueReaction(ctx context.Context, repository string, commentID int64, content string) (*github.Reaction, *github.Response, error) {
 	owner, name := c.ownerAndName(repository)
 	return c.underlying.Reactions.CreateIssueCommentReaction(ctx, owner, name, commentID, content)
@@ -663,6 +668,11 @@ func (c *Client) DeleteRelease(ctx context.Context, repository string, id int64)
 func (c *Client) CreateHook(ctx context.Context, repository string, hook *github.Hook) (*github.Hook, *github.Response, error) {
 	owner, name := c.ownerAndName(repository)
 	return c.underlying.Repositories.CreateHook(ctx, owner, name, hook)
+}
+
+func (c *Client) EditHook(ctx context.Context, repository string, hookID int64, hook *github.Hook) (*github.Hook, *github.Response, error) {
+	owner, name := c.ownerAndName(repository)
+	return c.underlying.Repositories.EditHook(ctx, owner, name, hookID, hook)
 }
 
 func (c *Client) DeleteHook(ctx context.Context, repository string, hookID int64) (*github.Response, error) {

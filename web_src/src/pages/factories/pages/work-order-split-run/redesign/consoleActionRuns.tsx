@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { Link } from "@/components/Link/link";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/ui/collapsible";
 import { ChevronRight } from "lucide-react";
 import type { StepActionRun } from "./consoleStepActions";
@@ -63,6 +64,21 @@ function ActionRun({ run, defaultOpen }: { run: StepActionRun; defaultOpen: bool
               <p className="text-[12px] font-medium text-foreground">{row.title}</p>
               {row.detail ? (
                 <p className="mt-1.5 whitespace-pre-wrap text-[12px] leading-5 text-muted-foreground">{row.detail}</p>
+              ) : null}
+              {row.links?.length ? (
+                <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-[12px]">
+                  {row.links.map((link) => (
+                    <Link
+                      key={link.href}
+                      href={link.href}
+                      target={link.external ? "_blank" : undefined}
+                      rel={link.external ? "noreferrer" : undefined}
+                      className="underline"
+                    >
+                      {link.label}
+                    </Link>
+                  ))}
+                </div>
               ) : null}
             </li>
           ))}
