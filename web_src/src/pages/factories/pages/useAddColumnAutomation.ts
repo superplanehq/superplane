@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { factoryVCSProvider } from "@/pages/home/factories";
 import { factoryAppsKey, useCreateFactoryAutomation } from "@/hooks/useFactoryData";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
-import { FEATURE_FACTORY_CUSTOM_AUTOMATIONS } from "@/lib/experimentalFeatures";
+import { FEATURE_FACTORY_CUSTOM_AUTOMATIONS, FEATURE_FACTORY_HUMAN_REVIEW } from "@/lib/experimentalFeatures";
 import { showErrorToast } from "@/lib/toast";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { useInstallFactory } from "@/pages/home/useInstallFactory";
@@ -46,7 +46,8 @@ export function useAddColumnAutomation(args: {
   const { installFactory, isInstalling } = useInstallFactory({ organizationId: args.organizationId });
   const experimentalFeatures = useExperimentalFeature(args.organizationId);
   const allowCustom = experimentalFeatures.has(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
-  const catalogOptions = { allowCustom, vcsProvider: args.vcsProvider };
+  const allowHumanReview = experimentalFeatures.has(FEATURE_FACTORY_HUMAN_REVIEW);
+  const catalogOptions = { allowCustom, allowHumanReview, vcsProvider: args.vcsProvider };
 
   const catalog = column ? catalogForColumn(column, catalogOptions) : [];
   const takenIds = column ? takenCatalogIds(args.automationsFor(column), catalog) : [];

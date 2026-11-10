@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
@@ -18,6 +19,64 @@ import (
 	"google.golang.org/grpc/codes"
 	"gorm.io/datatypes"
 )
+
+func TestMaterializeHumanReviewRequiresFeatureOnlyForCreation(t *testing.T) {
+	for _, test := range []struct {
+		name     string
+		enabled  bool
+		existing bool
+	}{
+		{name: "new automation without flag"},
+		{name: "new automation with flag", enabled: true},
+		{name: "existing automation without flag", existing: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			r := support.Setup(t)
+			db := database.DB(t.Context())
+			factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+			require.NoError(t, err)
+			canvas := support.CreateFactoryCanvas(t, r, factory.ID, "Request review")
+			require.NoError(t, canvas.SetColumnKey(db, models.CanvasColumnKeyDone))
+			if test.existing {
+				require.NoError(t, db.Model(&models.CanvasVersion{}).Where("id = ?", *canvas.LiveVersionID).
+					Update("nodes", datatypes.NewJSONSlice([]models.Node{{
+						ID:       models.HumanReviewTriggerNodeID,
+						Metadata: models.FactoryAppTemplateMetadata(models.FactoryAppTemplateHumanReviewID, 1),
+					}})).Error)
+			}
+			if test.enabled {
+				require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryHumanReview))
+			}
+
+			response, err := MaterializeFactoryAppTemplate(t.Context(), r.Organization.ID.String(), &pb.MaterializeFactoryAppTemplateRequest{
+				FactoryId:  factory.ID.String(),
+				AppId:      canvas.ID.String(),
+				TemplateId: models.FactoryAppTemplateHumanReviewID,
+			})
+			if !test.enabled && !test.existing {
+				code, message, ok := grpcerrors.HandlerStatus(err)
+				require.True(t, ok)
+				require.Equal(t, codes.FailedPrecondition, code)
+				require.Equal(t, "Request review is not enabled for this organization.", message)
+				require.Nil(t, response)
+			} else {
+				require.NoError(t, err)
+				doc, err := yaml.CanvasFromYAML([]byte(response.GetCanvasYaml()))
+				require.NoError(t, err)
+				require.Equal(t, false, findYAMLNode(t, doc, models.HumanReviewTriggerNodeID).Configuration["enabled"])
+			}
+
+			reloaded, err := models.FindCanvasInTransaction(db, r.Organization.ID, canvas.ID)
+			require.NoError(t, err)
+			require.NotNil(t, reloaded.ColumnKey)
+			if !test.enabled && !test.existing {
+				require.Equal(t, models.CanvasColumnKeyDone, *reloaded.ColumnKey)
+				return
+			}
+			require.Equal(t, models.CanvasColumnKeyVerify, *reloaded.ColumnKey)
+		})
+	}
+}
 
 func Test__MaterializeFactoryAutomationDefaults(t *testing.T) {
 	r := support.Setup(t)

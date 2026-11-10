@@ -129,9 +129,10 @@ export const PR_CLOSURE_ENTRY: ColumnAutomationCatalogEntry = {
 
 export function catalogForColumn(
   key: ColumnKey,
-  options?: { allowCustom?: boolean; vcsProvider?: string },
+  options?: { allowCustom?: boolean; allowHumanReview?: boolean; vcsProvider?: string },
 ): ColumnAutomationCatalogEntry[] {
   const allowCustom = options?.allowCustom === true;
+  const isBitbucket = options?.vcsProvider === "bitbucket";
   if (key === "backlog") {
     return [
       ...LINE_INTAKE_SOURCES.map((source) => ({
@@ -165,15 +166,15 @@ export function catalogForColumn(
         };
       }),
       RISK_SCORE_ENTRY,
-      ...(options?.vcsProvider === "bitbucket" ? [] : [HUMAN_REVIEW_ENTRY, VISUAL_EVIDENCE_ENTRY]),
+      ...(options?.allowHumanReview === true && !isBitbucket ? [HUMAN_REVIEW_ENTRY] : []),
+      ...(isBitbucket ? [] : [VISUAL_EVIDENCE_ENTRY]),
       ...(allowCustom ? [CUSTOM_AUTOMATION_ENTRY] : []),
     ];
   }
   if (key === "done") {
-    const closureEntry =
-      options?.vcsProvider === "bitbucket"
-        ? { ...PR_CLOSURE_ENTRY, iconSrc: bitbucketIcon, iconAlt: "Bitbucket" }
-        : PR_CLOSURE_ENTRY;
+    const closureEntry = isBitbucket
+      ? { ...PR_CLOSURE_ENTRY, iconSrc: bitbucketIcon, iconAlt: "Bitbucket" }
+      : PR_CLOSURE_ENTRY;
     return allowCustom ? [closureEntry, EVENT_CUSTOM_ENTRY] : [closureEntry];
   }
   return allowCustom ? [AGENT_STEP_ENTRY, CUSTOM_ENTRY] : [AGENT_STEP_ENTRY];

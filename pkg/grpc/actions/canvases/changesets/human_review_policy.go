@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -25,6 +26,15 @@ func (p *CanvasPublisher) validateHumanReviewPolicy(ctx context.Context) error {
 	if !p.options.BuiltInAutomationReset {
 		if err := p.requireHumanReviewAdministrator(ctx); err != nil {
 			return err
+		}
+	}
+	if !wasHumanReview && isHumanReview {
+		enabled, err := models.OrganizationHasExperimentalFeatures(p.tx, p.canvas.OrganizationID, features.FeatureFactoryHumanReview)
+		if err != nil {
+			return err
+		}
+		if !enabled {
+			return grpcerrors.FailedPrecondition(nil, "Request review is not enabled for this organization.")
 		}
 	}
 	if p.canvas.FactoryID != nil {

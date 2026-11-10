@@ -14,6 +14,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -114,6 +115,7 @@ func TestCanvasPublisherHumanReviewValidatesFallbackConnection(t *testing.T) {
 		t.Run(scenario.name, func(t *testing.T) {
 			r := support.Setup(t)
 			db := database.DB(t.Context())
+			require.NoError(t, models.EnableExperimentalFeatureInTransaction(db, r.Organization.ID, features.FeatureFactoryHumanReview))
 			policy := triggerNode(models.HumanReviewTriggerNodeID, "Human review", "onRun", map[string]any{"enabled": false, "fallbackTeam": "acme/reviewers"})
 			policy.Metadata = models.FactoryAppTemplateMetadataFor(models.FactoryAppTemplateHumanReviewID, 1, models.ProviderGitHub)
 			canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)

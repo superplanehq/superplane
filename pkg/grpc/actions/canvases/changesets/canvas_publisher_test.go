@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
@@ -67,6 +68,7 @@ func TestCanvasPublisherHumanReviewRequiresAdministrator(t *testing.T) {
 func TestCanvasPublisherRejectsASecondHumanReviewPolicy(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
+	require.NoError(t, models.EnableExperimentalFeatureInTransaction(db, r.Organization.ID, features.FeatureFactoryHumanReview))
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 	first := support.CreateFactoryCanvas(t, r, factory.ID, "Existing policy")

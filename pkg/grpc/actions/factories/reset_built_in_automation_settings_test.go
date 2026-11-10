@@ -81,6 +81,7 @@ func TestResetBuiltInAutomationPreservesImplementationSettings(t *testing.T) {
 
 func TestResetBuiltInHumanReviewPreservesDisabledStateAndPolicy(t *testing.T) {
 	r, factory := resetTestFactory(t)
+	require.NoError(t, models.EnableExperimentalFeatureInTransaction(database.DB(t.Context()), r.Organization.ID, features.FeatureFactoryHumanReview))
 	canvas := resetTestTemplate(t, r, factory, models.FactoryAppTemplateHumanReviewID, models.ProviderGitHub, func(doc *yaml.Canvas) {
 		trigger := findYAMLNode(t, doc, models.HumanReviewTriggerNodeID)
 		trigger.Configuration["enabled"] = false
@@ -91,6 +92,7 @@ func TestResetBuiltInHumanReviewPreservesDisabledStateAndPolicy(t *testing.T) {
 		agent.Configuration["executionTimeoutSeconds"] = 1200
 		agent.Configuration["steps"].([]any)[0].(map[string]any)["prompt"] = "Retired managed instructions"
 	})
+	require.NoError(t, models.DisableExperimentalFeatureInTransaction(database.DB(t.Context()), r.Organization.ID, features.FeatureFactoryHumanReview))
 	require.NoError(t, resetTestOrganization(t, r))
 	version := resetTestLiveVersion(t, canvas)
 	settings, ok := models.HumanReviewSettingsFromNodes(version.Nodes)

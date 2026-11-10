@@ -236,7 +236,10 @@ Local `make test.e2e` needs the same dummy values or a real app.
 
 ## Request review rollout
 
-Request review is an optional GitHub automation. It starts disabled.
+Request review is an optional GitHub automation. The organization feature flag,
+`factory_human_review`, defaults to off and controls creation. Existing
+automations remain visible, editable, and active when the flag is off.
+The separate **Enable Request review** setting also defaults to off.
 It uses the existing GitHub integration and agent configuration.
 No new environment variables or Secret keys are required.
 
@@ -244,12 +247,13 @@ No new environment variables or Secret keys are required.
 2. Retain **Pull requests: Read and write**. Optional GitHub team fallbacks also require **Members: Read-only**.
 3. Ask existing installation owners to accept the permission update.
 4. Apply the Request review migrations before deploying API and worker code. Keep Request review disabled during deployment.
-5. Add Request review from the Verify automation catalog.
-6. Select a default GitHub reviewer and configure review instructions as a SuperPlane organization administrator.
-7. Test assessment completion, reviewer selection, approval, dismissal, new commits, and disablement in a test repository.
-8. Enable Request review only after these lifecycle checks pass.
-9. Configure GitHub branch protection separately to require `merge-confidence/merge-gate` from the correct GitHub App.
-10. Preserve existing CI requirements and verify bypass settings.
+5. Enable **Request review** (`factory_human_review`) for the organization through the existing admin feature controls.
+6. Add Request review from the Verify automation catalog.
+7. Select a default GitHub reviewer and configure review instructions as a SuperPlane organization administrator.
+8. Test assessment completion, reviewer selection, approval, dismissal, new commits, and disablement in a test repository.
+9. Turn on **Enable Request review** only after these lifecycle checks pass.
+10. Configure GitHub branch protection separately to require `merge-confidence/merge-gate` from the correct GitHub App.
+11. Preserve existing CI requirements and verify bypass settings.
 
 The local and self-hosted manifests request the required permissions for new
 Apps. They do not update existing Apps or installations.
