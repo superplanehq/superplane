@@ -1,13 +1,19 @@
 package factories
 
 import (
+	"encoding/json"
+	"net/http"
 	"testing"
 
 	"github.com/google/go-github/v84/github"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/integrations/prbody"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
 	"github.com/superplanehq/superplane/test/support"
+	supportcontexts "github.com/superplanehq/superplane/test/support/contexts"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -136,4 +142,56 @@ func TestHumanReviewReconciliationPreservesGateAfterRunRetention(t *testing.T) {
 	f.client.reviews[0].State = github.Ptr("CHANGES_REQUESTED")
 	f.reconcile(t)
 	require.Equal(t, humanReviewPublication{Status: "completed", Conclusion: "failure"}, f.client.publications[len(f.client.publications)-1])
+}
+
+func TestHumanReviewReconciliationPublishesGateAndRequestsMissingAssessment(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("human-review"), "", "")
+	require.NoError(t, err)
+	order, err := factory.CreateWorkOrder(db, "Review", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	pr, err := order.CreatePullRequest(db, models.FactoryPullRequestParams{URL: "https://github.com/acme/app/pull/42"})
+	require.NoError(t, err)
+	createMergeConfidenceStartupCanvas(t, r, factory, "acme/app")
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{{
+		NodeID: models.HumanReviewTriggerNodeID, Type: models.NodeTypeTrigger,
+		Ref:           datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "onRun"}}),
+		Configuration: datatypes.NewJSONType(map[string]any{"enabled": true, "defaultReviewer": "owner"}),
+		Metadata:      datatypes.NewJSONType(models.FactoryAppTemplateMetadata(models.FactoryAppTemplateHumanReviewID, 1)),
+	}}, nil)
+	require.NoError(t, db.Model(canvas).Update("factory_id", factory.ID).Error)
+	summary, err := prbody.UpdateBodySection("", "human-review", "## SuperPlane human review\n\nWaiting for merge confidence.\n\nReviewed commit: current-head")
+	require.NoError(t, err)
+	current, err := json.Marshal(map[string]any{"state": "open", "head": map[string]any{"sha": "current-head"}, "body": summary})
+	require.NoError(t, err)
+	host := &supportcontexts.HTTPContext{Responses: []*http.Response{
+		publicationHTTPResponse(200, `{"state":"open","head":{"sha":"current-head"}}`),
+		publicationHTTPResponse(200, `{"check_runs":[]}`),
+		publicationHTTPResponse(201, `{"id":123}`),
+		publicationHTTPResponse(200, `{"state":"open","head":{"sha":"current-head"}}`),
+		publicationHTTPResponse(200, `{}`),
+		publicationHTTPResponse(200, `{"check_runs":[]}`),
+		publicationHTTPResponse(200, `{"id":123}`),
+		publicationHTTPResponse(200, string(current)),
+	}}
+	installPublicationGitHub(t, host)
+
+	require.NoError(t, reconcileFactoryHumanReview(t.Context(), IntakeDependencies{}, *pr))
+
+	decision, err := pr.CurrentHumanReview(db)
+	require.NoError(t, err)
+	require.NotNil(t, decision)
+	require.Equal(t, models.FactoryHumanReviewStateWaitingAssessment, decision.State)
+	require.Equal(t, "current-head", decision.AssessedCommit)
+	require.Equal(t, int64(123), decision.CheckRunID)
+	require.False(t, decision.PublicationPending)
+	require.Len(t, host.Requests, 8)
+	check := mergeConfidenceCheckRequestBody(t, host.Requests[2])
+	require.Equal(t, humanReviewCheckName, check["name"])
+	require.Equal(t, "current-head", check["head_sha"])
+	require.Equal(t, "queued", check["status"])
+	requests, err := models.ListPullRequestChecksStartRequests(db, pr.ID)
+	require.NoError(t, err)
+	require.Len(t, requests, 1)
 }

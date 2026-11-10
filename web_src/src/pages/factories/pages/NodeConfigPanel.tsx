@@ -19,7 +19,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import { useLocation } from "react-router";
 
 import { AgentRunnerSettings } from "./AgentRunnerSettings";
-import { HumanReviewPolicySettings } from "./HumanReviewPolicySettings";
+import { HumanReviewPolicySettingsHost } from "./HumanReviewPolicySettingsHost";
 import { INTAKE_SETTINGS_COPY } from "./intakeSourceSettingsModel";
 import type { NodeConfigurationUpdate } from "./nodeConfigurationCanvas";
 
@@ -131,7 +131,13 @@ export function NodeConfigPanel({
         <div className="flex min-h-0 flex-1 flex-col">
           {body ??
             (node.id === "on-human-review" ? (
-              <HumanReviewPolicySettings key={JSON.stringify(node.configuration)} node={node} onSave={onSave} />
+              <HumanReviewPolicySettingsHost
+                key={JSON.stringify(node.configuration)}
+                node={node}
+                organizationId={organizationId}
+                factoryId={factoryId}
+                onSave={onSave}
+              />
             ) : catalog.loading ? (
               <p className="workspace-body-text px-10 py-6 text-muted-foreground">{NODE_CONFIG_COPY.loading}</p>
             ) : isAgentHarnessComponent(node.component) ? (

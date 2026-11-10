@@ -4,6 +4,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/ui/collap
 import { ChevronDown } from "lucide-react";
 
 import { useOptionalFactoriesLayout } from "../layout/factoriesLayoutContext";
+import { humanReviewDecisionLabel, reviewTargetsPreviousRevision } from "../lib/humanReview";
 import { factoryAppRunPath } from "../lib/factoryPagePaths";
 
 type ReviewState = NonNullable<FactoriesFactoryPullRequest["humanReview"]>;
@@ -36,7 +37,7 @@ function HumanReviewDecision({ review, assessmentHref }: { review: ReviewState; 
     <span className="min-w-0 flex-1">
       <span className="block text-[14px] font-semibold leading-5 text-foreground">Human review</span>
       <span className="block text-[12px] font-normal leading-4 text-muted-foreground">
-        {decisionLabel(review)}
+        {humanReviewDecisionLabel(review)}
         {review.selectedReviewers?.length ? (
           <> · {review.selectedReviewers.map((reviewer) => `@${reviewer.login}`).join(", ")}</>
         ) : null}
@@ -62,7 +63,7 @@ function HumanReviewDecision({ review, assessmentHref }: { review: ReviewState; 
         </h4>
         {review.publicationError ? (
           <p role="alert" className="mt-2 text-[12px] leading-4">
-            GitHub check update failed. SuperPlane will retry.
+            GitHub review update failed. SuperPlane will retry.
           </p>
         ) : null}
         <CollapsibleContent className="mt-2 space-y-2 border-t border-border/70 pt-2 text-[12px] leading-5">
@@ -116,32 +117,4 @@ function ReviewEvidenceLinks({ assessmentHref, checkUrl }: { assessmentHref?: st
       ) : null}
     </div>
   );
-}
-
-/** An old approval must never appear to authorize a newly observed head commit. */
-function reviewTargetsPreviousRevision(pullRequest: FactoriesFactoryPullRequest): boolean {
-  const review = pullRequest.humanReview;
-  const currentCommit = pullRequest.currentRevision?.sha;
-  return Boolean(review && review.status !== "disabled" && currentCommit && review.assessedCommit !== currentCommit);
-}
-
-function decisionLabel(review: ReviewState): string {
-  switch (review.status) {
-    case "waiting_assessment":
-      return "Waiting for merge confidence";
-    case "waiting_decision":
-      return "Waiting for an agent decision";
-    case "failed":
-      return "Blocked";
-    case "disabled":
-      return "Disabled";
-    case "superseded":
-      return "Superseded";
-    case "decided":
-      if (review.blockingReason) return "Blocked";
-      if (!review.reviewRequired) return "Not required";
-      return review.approvalIds?.length ? "Approved" : "Approval required";
-    default:
-      return "Waiting for evaluation";
-  }
 }

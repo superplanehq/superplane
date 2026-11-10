@@ -21,6 +21,9 @@ func TestHumanReviewSetupFailureBlocksTheGateAndRecoversOnRetry(t *testing.T) {
 	setupFailure := errors.New("changed-file lookup is temporarily unavailable")
 	client := f.client
 	client.setupFailure = setupFailure
+	automation.settings.DefaultReviewer = "owner"
+	client.permissions = map[string]*github.RepositoryPermissionLevel{"owner": {User: reviewTestUser(4, "owner", "User"), Permission: github.Ptr("admin")}}
+	client.teamError = errors.New("the GitHub account has no organization teams")
 	require.ErrorIs(t, reconcileHumanReview(t.Context(), db, IntakeDependencies{}, factory, pr, automation, client), setupFailure)
 	failed, err := pr.CurrentHumanReview(db)
 	require.NoError(t, err)
@@ -36,6 +39,18 @@ func TestHumanReviewSetupFailureBlocksTheGateAndRecoversOnRetry(t *testing.T) {
 	require.Equal(t, models.FactoryHumanReviewStateWaitingDecision, recovered.State)
 	require.NotNil(t, recovered.RunID)
 	require.Equal(t, humanReviewPublication{Status: "in_progress"}, client.publications[len(client.publications)-1])
+	var event models.CanvasEvent
+	require.NoError(t, db.Where("workflow_id = ? AND run_id = ?", automation.canvas.ID, *recovered.RunID).First(&event).Error)
+	payload, ok := models.RootEventSourcePayload(event.Data.Data()).(map[string]any)
+	require.True(t, ok)
+	review, ok := payload["humanReview"].(map[string]any)
+	require.True(t, ok)
+	candidates, ok := review["fallbackCandidates"].([]any)
+	require.True(t, ok)
+	require.Len(t, candidates, 1)
+	candidate, ok := candidates[0].(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, "owner", candidate["login"])
 }
 
 type humanReviewSetupFake struct {

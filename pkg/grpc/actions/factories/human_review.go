@@ -25,7 +25,6 @@ const humanReviewCheckName = humanreview.CheckName
 
 type humanReviewGitHub interface {
 	humanReviewCheckPublisher
-	GetPullRequest(context.Context, string, int) (*github.PullRequest, *github.Response, error)
 	ListReviews(context.Context, string, int) ([]*github.PullRequestReview, error)
 	GetRepositoryPermissionLevel(context.Context, string, string) (*github.RepositoryPermissionLevel, *github.Response, error)
 	AddPullRequestReviewers(context.Context, string, int, github.ReviewersRequest) (*github.PullRequest, *github.Response, error)
@@ -320,7 +319,7 @@ func validHumanReviewAssessment(report mergeconfidence.ReportData, prID uuid.UUI
 }
 
 func startHumanReviewAgent(ctx context.Context, db *gorm.DB, factory *models.Factory, pr *models.FactoryPullRequest, automation *humanReviewAutomation, client humanReviewGitHub, current *github.PullRequest, decision *models.FactoryHumanReviewDecision, report mergeconfidence.ReportData) error {
-	contextData, err := gatherHumanReviewContext(ctx, client, pr, current, automation.settings.FallbackTeam)
+	contextData, err := gatherHumanReviewContext(ctx, client, pr, current, automation.settings)
 	if err != nil {
 		return err
 	}

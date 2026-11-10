@@ -13,7 +13,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 )
 
-func gatherHumanReviewContext(ctx context.Context, client humanReviewGitHub, pr *models.FactoryPullRequest, current *github.PullRequest, fallbackTeam string) (map[string]any, error) {
+func gatherHumanReviewContext(ctx context.Context, client humanReviewGitHub, pr *models.FactoryPullRequest, current *github.PullRequest, settings models.HumanReviewSettings) (map[string]any, error) {
 	files, err := client.HumanReviewChangedFiles(ctx, pr.Repository, int(pr.Number))
 	if err != nil {
 		return nil, fmt.Errorf("read changed files for Human review: %w", err)
@@ -94,7 +94,7 @@ func gatherHumanReviewContext(ctx context.Context, client humanReviewGitHub, pr 
 			}
 		}
 	}
-	candidates, err := humanReviewFallbackCandidates(ctx, client, pr.Repository, fallbackTeam, current.GetUser())
+	candidates, err := humanReviewConfiguredFallbackCandidates(ctx, client, pr.Repository, settings, current.GetUser())
 	if err != nil {
 		return nil, err
 	}
@@ -137,6 +137,29 @@ func gatherHumanReviewContext(ctx context.Context, client humanReviewGitHub, pr 
 		}
 	}
 	return map[string]any{"changedFiles": changed, "existingRequests": existing, "existingTeamRequests": existingTeams, "ownershipFiles": ownership, "ownershipCandidates": ownershipCandidates, "ownershipTeamCandidates": ownershipTeams, "recentContributions": contributions, "contributionHistoryFileLimit": 30, "fallbackCandidates": candidates}, nil
+}
+
+func humanReviewConfiguredFallbackCandidates(ctx context.Context, client humanReviewGitHub, repository string, settings models.HumanReviewSettings, author *github.User) ([]humanreview.Reviewer, error) {
+	if settings.DefaultReviewer == "" {
+		return humanReviewFallbackCandidates(ctx, client, repository, settings.FallbackTeam, author)
+	}
+	permission, _, err := client.GetRepositoryPermissionLevel(ctx, repository, settings.DefaultReviewer)
+	if err != nil {
+		return nil, fmt.Errorf("read default reviewer repository access: %w", err)
+	}
+	candidates := []humanreview.Reviewer{}
+	if permission == nil || permission.GetUser() == nil {
+		return candidates, nil
+	}
+	user := permission.GetUser()
+	eligible, err := humanReviewerEligible(ctx, client, repository, user, author)
+	if err != nil {
+		return nil, err
+	}
+	if eligible {
+		candidates = append(candidates, humanreview.Reviewer{ID: user.GetID(), Login: user.GetLogin(), Reason: "Configured default reviewer with repository write access."})
+	}
+	return candidates, nil
 }
 
 func humanReviewFallbackCandidates(ctx context.Context, client humanReviewGitHub, repository, fallbackTeam string, author *github.User) ([]humanreview.Reviewer, error) {

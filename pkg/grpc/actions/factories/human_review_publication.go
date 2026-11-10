@@ -16,6 +16,8 @@ import (
 var errHumanReviewPublication = errors.New("human review publication failed")
 
 type humanReviewCheckPublisher interface {
+	GetPullRequest(context.Context, string, int) (*github.PullRequest, *github.Response, error)
+	EditPullRequest(context.Context, string, int, *github.PullRequest) (*github.PullRequest, *github.Response, error)
 	CreateHumanReviewCheck(context.Context, string, github.CreateCheckRunOptions) (*github.CheckRun, *github.Response, error)
 	UpdateHumanReviewCheck(context.Context, string, int64, github.UpdateCheckRunOptions) (*github.CheckRun, *github.Response, error)
 	ListCheckRunsForRef(context.Context, string, string, *github.ListCheckRunsOptions) (*github.ListCheckRunsResults, *github.Response, error)
@@ -68,10 +70,7 @@ func publishHumanReviewCheck(ctx context.Context, db *gorm.DB, client humanRevie
 						decision.CheckRunID = check.GetID()
 						decision.CheckURL = check.GetHTMLURL()
 						if check.GetExternalID() == decision.ID.String() && check.GetStatus() == publication.Status && check.GetConclusion() == publication.Conclusion && check.GetOutput().GetSummary() == summary {
-							decision.PublicationPending = false
-							decision.PublicationError = ""
-							decision.RetryAt = nil
-							return decision.RecordPublication(db)
+							return completeHumanReviewPublication(ctx, db, client, pr, decision, publication)
 						}
 						break
 					}
@@ -110,6 +109,13 @@ func publishHumanReviewCheck(ctx context.Context, db *gorm.DB, client humanRevie
 	decision.CheckRunID = check.GetID()
 	if check.GetHTMLURL() != "" {
 		decision.CheckURL = check.GetHTMLURL()
+	}
+	return completeHumanReviewPublication(ctx, db, client, pr, decision, publication)
+}
+
+func completeHumanReviewPublication(ctx context.Context, db *gorm.DB, client humanReviewCheckPublisher, pr *models.FactoryPullRequest, decision *models.FactoryHumanReviewDecision, publication humanReviewPublication) error {
+	if err := publishHumanReviewSummary(ctx, db, client, pr, decision, publication); err != nil {
+		return recordHumanReviewPublicationError(db, decision, err)
 	}
 	decision.PublicationPending = false
 	decision.PublicationError = ""

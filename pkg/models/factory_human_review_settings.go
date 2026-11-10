@@ -16,12 +16,16 @@ const (
 	HumanReviewAgentNodeID          = "human-review-agent"
 )
 
-var humanReviewTeamPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9-]*/[A-Za-z0-9][A-Za-z0-9_-]*$`)
+var (
+	humanReviewTeamPattern     = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9-]*/[A-Za-z0-9][A-Za-z0-9_-]*$`)
+	humanReviewReviewerPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]*$`)
+)
 
 type HumanReviewSettings struct {
-	Enabled      bool
-	FallbackTeam string
-	AgentNodeID  string
+	Enabled         bool
+	DefaultReviewer string
+	FallbackTeam    string
+	AgentNodeID     string
 }
 
 // HumanReviewSettingsFromNodes only recognizes the GitHub built-in template.
@@ -35,8 +39,9 @@ func HumanReviewSettingsFromNodes(nodes []Node) (HumanReviewSettings, bool) {
 			continue
 		}
 		enabled, _ := node.Configuration["enabled"].(bool)
+		reviewer, _ := node.Configuration["defaultReviewer"].(string)
 		team, _ := node.Configuration["fallbackTeam"].(string)
-		return HumanReviewSettings{Enabled: enabled, FallbackTeam: strings.TrimSpace(team), AgentNodeID: HumanReviewAgentNodeID}, true
+		return HumanReviewSettings{Enabled: enabled, DefaultReviewer: strings.TrimSpace(reviewer), FallbackTeam: strings.TrimSpace(team), AgentNodeID: HumanReviewAgentNodeID}, true
 	}
 	return HumanReviewSettings{}, false
 }
@@ -45,8 +50,14 @@ func (s HumanReviewSettings) Validate() error {
 	if !s.Enabled {
 		return nil
 	}
+	if s.DefaultReviewer != "" {
+		if !humanReviewReviewerPattern.MatchString(s.DefaultReviewer) {
+			return fmt.Errorf("enter a GitHub username without @, spaces, or a URL")
+		}
+		return nil
+	}
 	if !humanReviewTeamPattern.MatchString(s.FallbackTeam) {
-		return fmt.Errorf("select a valid fallback GitHub team in organization/team format before enabling Human review")
+		return fmt.Errorf("select a default GitHub reviewer or a valid fallback team before enabling Human review")
 	}
 	return nil
 }

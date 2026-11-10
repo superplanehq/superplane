@@ -84,6 +84,7 @@ func TestResetBuiltInHumanReviewPreservesDisabledStateAndPolicy(t *testing.T) {
 	canvas := resetTestTemplate(t, r, factory, models.FactoryAppTemplateHumanReviewID, models.ProviderGitHub, func(doc *yaml.Canvas) {
 		trigger := findYAMLNode(t, doc, models.HumanReviewTriggerNodeID)
 		trigger.Configuration["enabled"] = false
+		trigger.Configuration["defaultReviewer"] = "release-owner"
 		trigger.Configuration["fallbackTeam"] = "acme/release-reviewers"
 		agent := findYAMLNode(t, doc, models.HumanReviewAgentNodeID)
 		agent.Configuration["additionalInstructions"] = "Require approval for database changes."
@@ -95,6 +96,7 @@ func TestResetBuiltInHumanReviewPreservesDisabledStateAndPolicy(t *testing.T) {
 	settings, ok := models.HumanReviewSettingsFromNodes(version.Nodes)
 	require.True(t, ok)
 	assert.False(t, settings.Enabled)
+	assert.Equal(t, "release-owner", settings.DefaultReviewer)
 	assert.Equal(t, "acme/release-reviewers", settings.FallbackTeam)
 	agent := findIntakeNode(version.Nodes, models.HumanReviewAgentNodeID)
 	require.NotNil(t, agent)

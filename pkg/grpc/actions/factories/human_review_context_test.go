@@ -23,7 +23,7 @@ func TestHumanReviewContextResolvesEligibleIndividualCodeOwners(t *testing.T) {
 		"robot[bot]": {User: bot, Permission: github.Ptr("write")},
 	}}, ownership: "# @ignored\npkg/** @owner @author @reader @robot[bot] owners@example.com\nweb/** @OWNER # @ignored\n"}
 	current := &github.PullRequest{User: author, Base: &github.PullRequestBranch{SHA: github.Ptr("target-branch-commit")}}
-	gathered, err := gatherHumanReviewContext(t.Context(), client, &models.FactoryPullRequest{Repository: "acme/app", Number: 42}, current, "acme/fallback")
+	gathered, err := gatherHumanReviewContext(t.Context(), client, &models.FactoryPullRequest{Repository: "acme/app", Number: 42}, current, models.HumanReviewSettings{FallbackTeam: "acme/fallback"})
 	require.NoError(t, err)
 	candidates, ok := gathered["ownershipCandidates"].([]humanreview.Reviewer)
 	require.True(t, ok)
@@ -60,7 +60,7 @@ func TestHumanReviewContextSkipsUnavailableOwnershipHints(t *testing.T) {
 				ownership:                "unrelated/** " + owner + "\n",
 			}}
 			current := &github.PullRequest{User: reviewTestUser(1, "author", "User")}
-			gathered, err := gatherHumanReviewContext(t.Context(), client, &models.FactoryPullRequest{Repository: "acme/app", Number: 42}, current, "acme/fallback")
+			gathered, err := gatherHumanReviewContext(t.Context(), client, &models.FactoryPullRequest{Repository: "acme/app", Number: 42}, current, models.HumanReviewSettings{FallbackTeam: "acme/fallback"})
 			require.NoError(t, err)
 			candidates := gathered["fallbackCandidates"].([]humanreview.Reviewer)
 			require.Len(t, candidates, 1)
@@ -71,7 +71,7 @@ func TestHumanReviewContextSkipsUnavailableOwnershipHints(t *testing.T) {
 			}
 
 			client.fallbackFailure = errors.New("fallback team is inaccessible")
-			_, err = gatherHumanReviewContext(t.Context(), client, &models.FactoryPullRequest{Repository: "acme/app", Number: 42}, current, "acme/fallback")
+			_, err = gatherHumanReviewContext(t.Context(), client, &models.FactoryPullRequest{Repository: "acme/app", Number: 42}, current, models.HumanReviewSettings{FallbackTeam: "acme/fallback"})
 			require.ErrorIs(t, err, client.fallbackFailure)
 		})
 	}

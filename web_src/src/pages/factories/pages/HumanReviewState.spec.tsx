@@ -108,6 +108,6 @@ describe("HumanReviewState", () => {
   it("keeps publication errors visible without expanding details", () => {
     renderReview({ status: "decided", reviewRequired: true, publicationError: "GitHub is unavailable" });
 
-    expect(screen.getByRole("alert")).toHaveTextContent("GitHub check");
+    expect(screen.getByRole("alert")).toHaveTextContent("GitHub");
   });
 });

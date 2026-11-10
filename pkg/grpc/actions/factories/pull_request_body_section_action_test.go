@@ -1,6 +1,7 @@
 package factories
 
 import (
+	"context"
 	"encoding/json"
 	"github.com/google/uuid"
 	"io"
@@ -174,6 +175,78 @@ func TestBodySectionActionRecoversInterruptedAttempt(t *testing.T) {
 	result, err := f.run.CalculateResult(f.db)
 	require.NoError(t, err)
 	assert.Equal(t, models.CanvasRunResultFailed, result)
+}
+
+func TestBodySectionActionWaitsForHumanReviewPublication(t *testing.T) {
+	f := newPublicationFixture(t)
+	humanReview, _ := support.CreateCanvas(t, f.workspace.OrganizationID, *f.order.CreatedByID, []models.CanvasNode{{
+		NodeID: models.HumanReviewTriggerNodeID, Type: models.NodeTypeTrigger,
+		Ref:           datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "onRun"}}),
+		Configuration: datatypes.NewJSONType(map[string]any{"enabled": false}),
+		Metadata:      datatypes.NewJSONType(models.FactoryAppTemplateMetadata(models.FactoryAppTemplateHumanReviewID, 1)),
+	}}, nil)
+	require.NoError(t, f.db.Model(humanReview).Update("factory_id", f.workspace.ID).Error)
+	_, request := f.arbitraryPublicationRequest(t)
+	const description = "User description.\n\n<!-- superplane:human-review:start -->\nHuman review is required.\n<!-- superplane:human-review:end -->"
+	read := make(chan struct{}, 1)
+	host := &publicationHTTPContext{
+		HTTPContext: contexts.HTTPContext{Responses: []*http.Response{descriptionResponse(t, models.ProviderGitHub, description), publicationHTTPResponse(200, `{}`)}},
+		beforeRequest: func(request *http.Request) {
+			if request.Method == http.MethodGet {
+				read <- struct{}{}
+			}
+		},
+	}
+	installPublicationGitHub(t, host)
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+	completed := make(chan error, 1)
+	var readBeforeRelease, completedBeforeRelease bool
+	var publicationErr error
+	require.NoError(t, f.pr.WithHumanReviewPublicationLock(f.db.WithContext(ctx), func(conn *gorm.DB) error {
+		var owner int
+		if err := conn.Raw("SELECT pg_backend_pid()").Scan(&owner).Error; err != nil {
+			return err
+		}
+		go func() {
+			_, err := ProcessBodySectionPublicationRequest(ctx, IntakeDependencies{}, request.ID, models.LockNodeRequestNow)
+			completed <- err
+		}()
+		// Wait for either the competing writer to block or the unsafe provider
+		// read to occur. This does not depend on goroutine scheduling delays.
+		require.Eventually(t, func() bool {
+			select {
+			case <-read:
+				readBeforeRelease = true
+				return true
+			case publicationErr = <-completed:
+				completedBeforeRelease = true
+				return true
+			default:
+			}
+			var waiting bool
+			err := f.db.WithContext(ctx).Raw("SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE ? = ANY(pg_blocking_pids(pid)))", owner).Scan(&waiting).Error
+			return err == nil && waiting
+		}, 5*time.Second, 10*time.Millisecond)
+		return nil
+	}))
+	assert.False(t, readBeforeRelease, "description reads must wait for the Human review writer")
+	assert.False(t, completedBeforeRelease, "publication must wait for the Human review writer")
+	if !completedBeforeRelease {
+		select {
+		case publicationErr = <-completed:
+		case <-ctx.Done():
+			t.Fatal("body section publication did not finish after releasing Human review")
+		}
+	}
+	require.NoError(t, publicationErr)
+	require.Len(t, host.Requests, 2)
+	body, err := io.ReadAll(host.Requests[1].Body)
+	require.NoError(t, err)
+	var update map[string]string
+	require.NoError(t, json.Unmarshal(body, &update))
+	assert.Contains(t, update["body"], description)
+	assert.Contains(t, update["body"], "<!-- superplane:merge-confidence:start -->")
 }
 
 func TestBodySectionActionSkipsWriteAfterCancellationDuringDescriptionRead(t *testing.T) {

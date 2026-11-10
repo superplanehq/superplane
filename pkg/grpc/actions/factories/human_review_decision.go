@@ -74,7 +74,7 @@ func evaluateHumanReviewDecision(ctx context.Context, db *gorm.DB, client humanR
 		selected = append(selected, reviewer)
 	}
 	if *result.ReviewRequired && len(selected) == 0 {
-		fallback, err := humanReviewFallbackCandidates(ctx, client, pr.Repository, automation.settings.FallbackTeam, current.GetUser())
+		fallback, err := humanReviewConfiguredFallbackCandidates(ctx, client, pr.Repository, automation.settings, current.GetUser())
 		if err != nil {
 			return err
 		}
@@ -110,6 +110,9 @@ func evaluateHumanReviewDecision(ctx context.Context, db *gorm.DB, client humanR
 	decision.ApprovalIDs = datatypes.NewJSONSlice(gate.ApprovalIDs)
 	if *result.ReviewRequired && len(selected) == 0 {
 		gate.Reason = "The fallback GitHub team has no eligible human reviewer. Add a human member with repository write access, then rerun Human review."
+		if automation.settings.DefaultReviewer != "" {
+			gate.Reason = "The default reviewer cannot approve this pull request. Select another human with repository write access, then rerun Human review."
+		}
 	}
 	decision.BlockingReason = gate.Reason
 	if gate.Conclusion == "success" {

@@ -3,6 +3,7 @@ package changesets
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/google/uuid"
@@ -57,10 +58,10 @@ func (p *CanvasPublisher) validateHumanReviewPolicy(ctx context.Context) error {
 		return nil
 	}
 	saved, _ := models.HumanReviewSettingsFromNodes(p.live.Nodes)
-	if !settings.Enabled || (saved.Enabled && saved.FallbackTeam == settings.FallbackTeam) {
+	if !settings.Enabled || (saved.Enabled && saved.DefaultReviewer == settings.DefaultReviewer && saved.FallbackTeam == settings.FallbackTeam) {
 		return nil
 	}
-	return p.validateHumanReviewFallbackTeam(ctx, settings.FallbackTeam)
+	return p.validateHumanReviewFallbackReviewer(ctx, settings)
 }
 
 func (p *CanvasPublisher) requireHumanReviewAdministrator(ctx context.Context) error {
@@ -84,7 +85,7 @@ func RequireHumanReviewAdministrator(ctx context.Context, authService authorizat
 	return grpcerrors.PermissionDenied(nil, "Only administrators can change Human review settings")
 }
 
-func (p *CanvasPublisher) validateHumanReviewFallbackTeam(ctx context.Context, team string) error {
+func (p *CanvasPublisher) validateHumanReviewFallbackReviewer(ctx context.Context, settings models.HumanReviewSettings) error {
 	if p.canvas.FactoryID == nil {
 		return grpcerrors.InvalidArgument(nil, "Human review must belong to a Factory")
 	}
@@ -112,12 +113,31 @@ func (p *CanvasPublisher) validateHumanReviewFallbackTeam(ctx context.Context, t
 		p.options.Registry.HTTPContextInTransaction(p.tx),
 	)
 	if err != nil {
-		return grpcerrors.FailedPrecondition(err, "Could not connect to GitHub to validate the fallback team")
+		return grpcerrors.FailedPrecondition(err, "Could not connect to GitHub to validate the fallback reviewer")
 	}
+	if settings.DefaultReviewer != "" {
+		return validateHumanReviewDefaultReviewer(ctx, client, config.AppRepository, settings.DefaultReviewer)
+	}
+	team := settings.FallbackTeam
 	organization, slug, _ := strings.Cut(team, "/")
 	found, _, err := client.GetTeamBySlug(ctx, organization, slug)
 	if err != nil || found == nil || found.GetID() == 0 {
 		return grpcerrors.FailedPrecondition(err, fmt.Sprintf("Cannot access fallback team %s. Check the team and GitHub App permissions", team))
+	}
+	return nil
+}
+
+func validateHumanReviewDefaultReviewer(ctx context.Context, client *common.Client, repository, reviewer string) error {
+	if strings.TrimSpace(repository) == "" {
+		return grpcerrors.FailedPrecondition(nil, "Select a repository before enabling Human review")
+	}
+	permission, _, err := client.GetRepositoryPermissionLevel(ctx, repository, reviewer)
+	if err != nil {
+		return grpcerrors.FailedPrecondition(err, fmt.Sprintf("Cannot access default reviewer %s. Check repository access and GitHub App permissions", reviewer))
+	}
+	user := permission.GetUser()
+	if user.GetID() == 0 || user.GetType() != "User" || strings.HasSuffix(strings.ToLower(user.GetLogin()), "[bot]") || !slices.Contains([]string{"admin", "maintain", "write"}, permission.GetPermission()) {
+		return grpcerrors.FailedPrecondition(nil, fmt.Sprintf("Default reviewer %s must be a human with repository write access", reviewer))
 	}
 	return nil
 }

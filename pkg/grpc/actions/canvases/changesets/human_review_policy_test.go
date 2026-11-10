@@ -2,7 +2,11 @@ package changesets
 
 import (
 	"context"
+	"encoding/json"
+	"io"
+	"net/http"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -18,6 +22,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
 	"github.com/superplanehq/superplane/test/support"
+	supportcontexts "github.com/superplanehq/superplane/test/support/contexts"
 	"google.golang.org/grpc/codes"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
@@ -219,6 +224,96 @@ func TestCanvasPublisherPreservesEnabledHumanReviewWithoutConnection(t *testing.
 			require.True(t, recognized)
 			require.True(t, settings.Enabled)
 			require.Equal(t, "acme/reviewers", settings.FallbackTeam)
+		})
+	}
+}
+
+func TestHumanReviewPublisherValidatesIndividualWithGitHub(t *testing.T) {
+	for _, scenario := range []struct {
+		name  string
+		saved map[string]any
+		next  map[string]any
+	}{
+		{name: "enable without organization team", saved: map[string]any{"enabled": false}, next: map[string]any{"enabled": true, "defaultReviewer": "owner"}},
+		{name: "changed individual revalidates unchanged team", saved: map[string]any{"enabled": true, "fallbackTeam": "acme/reviewers"}, next: map[string]any{"enabled": true, "defaultReviewer": "owner", "fallbackTeam": "acme/reviewers"}},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
+			r := support.Setup(t)
+			db := database.DB(t.Context())
+			factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("human-review"), "", "")
+			require.NoError(t, err)
+			canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{{
+				NodeID: models.HumanReviewTriggerNodeID, Name: "Human review", Type: models.NodeTypeTrigger,
+				Ref:           datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "onRun"}}),
+				Configuration: datatypes.NewJSONType(scenario.saved),
+				Metadata:      datatypes.NewJSONType(models.FactoryAppTemplateMetadataFor(models.FactoryAppTemplateHumanReviewID, 1, models.ProviderGitHub)),
+			}}, nil)
+			canvas.FactoryID = &factory.ID
+			require.NoError(t, db.Model(canvas).Update("factory_id", factory.ID).Error)
+			live, err := models.FindLiveCanvasVersionInTransaction(db, canvas.ID)
+			require.NoError(t, err)
+			nodes := slices.Clone(live.Nodes)
+			nodes[0].Configuration = scenario.next
+			draft, err := models.CreateCommitVersionWithSpecInTransaction(db, canvas.ID, r.User, "Set default reviewer", nodes, nil)
+			require.NoError(t, err)
+			publisher, err := NewCanvasPublisher(db, canvas, draft, live, canvasPublisherOptions(r))
+			require.NoError(t, err)
+			ctx := authentication.SetUserIdInMetadata(t.Context(), r.User.String())
+			err = publisher.Publish(ctx)
+			require.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
+			require.ErrorContains(t, err, "Connect GitHub")
+			unchanged, err := models.FindLiveCanvasVersionInTransaction(db, canvas.ID)
+			require.NoError(t, err)
+			require.Equal(t, live.ID, unchanged.ID)
+		})
+	}
+}
+
+func TestHumanReviewPublicationRequiresHumanWithRepositoryWriteAccess(t *testing.T) {
+	for _, scenario := range []struct {
+		name       string
+		permission string
+		userType   string
+		status     int
+		allowed    bool
+	}{
+		{name: "repository owner", permission: "admin", userType: "User", allowed: true},
+		{name: "repository maintainer", permission: "maintain", userType: "User", allowed: true},
+		{name: "repository writer", permission: "write", userType: "User", allowed: true},
+		{name: "read access", permission: "read", userType: "User"},
+		{name: "bot account", permission: "write", userType: "Bot"},
+		{name: "missing user", permission: "none"},
+		{name: "GitHub App lacks access", status: http.StatusForbidden},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
+			response := map[string]any{"permission": scenario.permission}
+			if scenario.userType != "" {
+				response["user"] = map[string]any{"id": 4, "login": "owner", "type": scenario.userType}
+			}
+			body, err := json.Marshal(response)
+			require.NoError(t, err)
+			status := scenario.status
+			if status == 0 {
+				status = http.StatusOK
+			}
+			httpContext := &supportcontexts.HTTPContext{Responses: []*http.Response{{
+				StatusCode: status, Header: http.Header{"Content-Type": []string{"application/json"}}, Body: io.NopCloser(strings.NewReader(string(body))),
+			}}}
+			integration := &supportcontexts.IntegrationContext{
+				NewSetupFlow:      true,
+				CurrentProperties: map[string]any{common.PropertyAuthMethod: common.AuthMethodPAT, common.PropertyOwner: "owner", common.PropertyOwnerType: common.OwnerTypeUser},
+				CurrentSecrets:    map[string]core.IntegrationSecret{common.SecretPAT: {Name: common.SecretPAT, Value: []byte("test-token")}},
+			}
+			client, err := common.NewClient(integration, httpContext)
+			require.NoError(t, err)
+			err = validateHumanReviewDefaultReviewer(t.Context(), client, "owner/app", "owner")
+			if scenario.allowed {
+				require.NoError(t, err)
+			} else {
+				require.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
+			}
+			require.Len(t, httpContext.Requests, 1)
+			require.Equal(t, "/repos/owner/app/collaborators/owner/permission", httpContext.Requests[0].URL.Path)
 		})
 	}
 }

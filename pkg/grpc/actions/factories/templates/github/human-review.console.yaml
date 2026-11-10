@@ -14,7 +14,7 @@ spec:
           >
           > This automation starts after a complete merge-confidence assessment for a tracked GitHub pull request.
           > It selects eligible human reviewers and maintains the merge-confidence/merge-gate check.
-          > Administrators must select a fallback GitHub team before enabling the automation.
+          > Administrators select a default reviewer before enabling the automation. Personal GitHub repositories do not require an organization team.
           > Human review starts disabled. Configure GitHub branch protection separately to require the check.
   layout:
     - i: about

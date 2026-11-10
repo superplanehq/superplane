@@ -15,6 +15,7 @@ spec:
       component: onRun
       configuration:
         enabled: false
+        defaultReviewer: ""
         fallbackTeam: ""
       position:
         x: 80
@@ -55,8 +56,9 @@ spec:
               Preserve existing requests and reuse eligible reviewers when suitable.
               Select one reviewer by default when adding a request, and explain each additional selection.
               Select individual human GitHub users with repository write access or higher. Exclude the pull request author and bots.
-              When no suitable candidate exists, select an eligible individual from the fallback-team candidates.
-              If no eligible fallback member exists, report the missing candidate and remain blocked.
+              When no suitable candidate exists, select the eligible default reviewer from the fallback candidates.
+              A configured GitHub team supplies fallback candidates only when no default reviewer is set.
+              If no eligible fallback reviewer exists, report the missing candidate and remain blocked.
 
               Write a JSON decision to /tmp/human-review.json with assessedCommit, reviewRequired, rationale, and selectedReviewers. Each selectedReviewer must contain id, login, and reason.
               Submit only for the supplied decision, pull request, assessed commit, and source assessment run.

@@ -51,6 +51,74 @@ type humanReviewPublicationFake struct {
 	failure     error
 	externalIDs []string
 	conclusions []string
+	pullRequest *github.PullRequest
+	bodyError   error
+	bodies      []string
+}
+
+func (f *humanReviewPublicationFake) GetPullRequest(context.Context, string, int) (*github.PullRequest, *github.Response, error) {
+	return f.pullRequest, nil, nil
+}
+
+func (f *humanReviewPublicationFake) EditPullRequest(_ context.Context, _ string, _ int, update *github.PullRequest) (*github.PullRequest, *github.Response, error) {
+	if f.bodyError != nil {
+		return nil, nil, f.bodyError
+	}
+	f.bodies = append(f.bodies, update.GetBody())
+	if f.pullRequest != nil {
+		f.pullRequest.Body = update.Body
+	}
+	return f.pullRequest, nil, nil
+}
+
+func TestHumanReviewSummaryTracksGateAndPreservesDescription(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("human-review"), "", "")
+	require.NoError(t, err)
+	order, err := factory.CreateWorkOrder(db, "Review", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	pr, err := order.CreatePullRequest(db, models.FactoryPullRequestParams{URL: "https://github.com/acme/app/pull/42"})
+	require.NoError(t, err)
+	revision, err := pr.ObserveRevision(db, "head")
+	require.NoError(t, err)
+	decision, err := pr.NewHumanReviewDecision(db, models.FactoryHumanReviewDecision{
+		RevisionID: revision.Revision.ID, AssessedCommit: "head", State: models.FactoryHumanReviewStateDecided,
+		ReviewRequired:    true,
+		Rationale:         "Detailed assessment that belongs in the action history.",
+		SelectedReviewers: datatypes.NewJSONSlice([]models.FactoryHumanReviewReviewer{{ID: 7, Login: "alex", Reason: "Owns the affected files."}}),
+	})
+	require.NoError(t, err)
+	original := "Task description.\n\n<!-- superplane:merge-confidence:start -->\nExisting assessment.\n<!-- superplane:merge-confidence:end -->"
+	client := &humanReviewPublicationFake{pullRequest: &github.PullRequest{
+		State: github.Ptr("open"), Head: &github.PullRequestBranch{SHA: github.Ptr("head")}, Body: &original,
+	}}
+	waiting := humanReviewPublication{Status: "completed", Conclusion: "failure", Reason: "A selected reviewer must approve the current head commit."}
+	require.NoError(t, publishHumanReviewCheck(t.Context(), db, client, pr, decision, waiting))
+	require.Len(t, client.bodies, 1)
+	require.Contains(t, client.bodies[0], original)
+	require.Contains(t, client.bodies[0], waiting.Reason)
+	require.Contains(t, client.bodies[0], "@alex")
+	require.NotContains(t, client.bodies[0], decision.Rationale)
+	require.NotContains(t, client.bodies[0], "Owns the affected files.")
+
+	approved := humanReviewPublication{Status: "completed", Conclusion: "success", Reason: "A selected reviewer approved the current head commit."}
+	client.bodyError = errors.New("GitHub unavailable")
+	require.Error(t, publishHumanReviewCheck(t.Context(), db, client, pr, decision, approved))
+	stored, err := models.FindFactoryHumanReviewDecision(db, decision.ID)
+	require.NoError(t, err)
+	require.True(t, stored.PublicationPending)
+	client.bodyError = nil
+	require.NoError(t, publishHumanReviewCheck(t.Context(), db, client, pr, stored, approved))
+	require.Len(t, client.bodies, 2)
+	require.Contains(t, client.bodies[1], original)
+	require.Contains(t, client.bodies[1], approved.Reason)
+	require.NotContains(t, client.bodies[1], waiting.Reason)
+	require.NoError(t, publishHumanReviewCheck(t.Context(), db, client, pr, stored, approved))
+	require.Len(t, client.bodies, 2)
+	client.pullRequest.Head.SHA = github.Ptr("new-head")
+	require.NoError(t, publishHumanReviewCheck(t.Context(), db, client, pr, stored, waiting))
+	require.Len(t, client.bodies, 2)
 }
 
 func (f *humanReviewPublicationFake) CreateHumanReviewCheck(_ context.Context, _ string, options github.CreateCheckRunOptions) (*github.CheckRun, *github.Response, error) {
@@ -165,6 +233,90 @@ func reviewTestUser(id int64, login, userType string) *github.User {
 	return &github.User{ID: &id, Login: &login, Type: &userType}
 }
 
+func TestHumanReviewDefaultReviewerSupportsPersonalRepositories(t *testing.T) {
+	for _, scenario := range []struct {
+		name            string
+		login           string
+		permission      string
+		userType        string
+		fallbackTeam    string
+		teamUnavailable bool
+		approved        bool
+		wantReviewer    bool
+	}{
+		{name: "personal repository owner", login: "owner", permission: "admin", userType: "User", wantReviewer: true},
+		{name: "individual precedes stale team", login: "owner", permission: "write", userType: "User", fallbackTeam: "acme/stale", teamUnavailable: true, wantReviewer: true},
+		{name: "individual approval completes gate", login: "owner", permission: "maintain", userType: "User", approved: true, wantReviewer: true},
+		{name: "author cannot approve own pull request", login: "author", permission: "admin", userType: "User"},
+		{name: "ineligible individual does not use stale team", login: "author", permission: "admin", userType: "User", fallbackTeam: "acme/stale", teamUnavailable: true},
+		{name: "bot cannot approve", login: "robot", permission: "write", userType: "Bot"},
+		{name: "read access cannot approve", login: "owner", permission: "read", userType: "User"},
+		{name: "missing user cannot approve", login: "missing"},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
+			r := support.Setup(t)
+			db := database.DB(t.Context())
+			factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("human-review"), "", "")
+			require.NoError(t, err)
+			order, err := factory.CreateWorkOrder(db, "Review", "", &r.User, nil, nil)
+			require.NoError(t, err)
+			pr, err := order.CreatePullRequest(db, models.FactoryPullRequestParams{URL: "https://github.com/owner/app/pull/42"})
+			require.NoError(t, err)
+			revision, err := pr.ObserveRevision(db, "head")
+			require.NoError(t, err)
+			decision, err := pr.NewHumanReviewDecision(db, models.FactoryHumanReviewDecision{RevisionID: revision.Revision.ID, AssessedCommit: "head", State: models.FactoryHumanReviewStateDecided, Result: datatypes.JSONMap{
+				"assessedCommit": "head", "reviewRequired": true, "rationale": "The agent could not find a suitable owner or contributor.", "selectedReviewers": []any{},
+			}})
+			require.NoError(t, err)
+			author := reviewTestUser(1, "author", "User")
+			user := reviewTestUser(4, scenario.login, scenario.userType)
+			if scenario.login == "author" {
+				user = author
+			}
+			current := &github.PullRequest{State: github.Ptr("open"), User: author, Head: &github.PullRequestBranch{SHA: github.Ptr("head")}}
+			client := &humanReviewLifecycleFake{current: current, permissions: map[string]*github.RepositoryPermissionLevel{}}
+			if scenario.permission != "" {
+				client.permissions[scenario.login] = &github.RepositoryPermissionLevel{User: user, Permission: github.Ptr(scenario.permission)}
+			}
+			if scenario.teamUnavailable {
+				client.teamError = errors.New("the GitHub account has no organization teams")
+			}
+			if scenario.approved {
+				client.reviews = []*github.PullRequestReview{{ID: github.Ptr(int64(99)), User: user, State: github.Ptr("APPROVED"), CommitID: github.Ptr("head")}}
+			}
+			settings, present := models.HumanReviewSettingsFromNodes([]models.Node{{
+				ID: models.HumanReviewTriggerNodeID, Type: models.NodeTypeTrigger,
+				Metadata:      models.FactoryAppTemplateMetadataFor(models.FactoryAppTemplateHumanReviewID, 1, models.ProviderGitHub),
+				Configuration: map[string]any{"enabled": true, "defaultReviewer": scenario.login, "fallbackTeam": scenario.fallbackTeam},
+			}})
+			require.True(t, present)
+			automation := &humanReviewAutomation{settings: settings}
+			require.NoError(t, evaluateHumanReviewDecision(t.Context(), db, client, pr, current, automation, decision))
+			stored, err := models.FindFactoryHumanReviewDecision(db, decision.ID)
+			require.NoError(t, err)
+			if scenario.wantReviewer {
+				require.Len(t, stored.SelectedReviewers, 1)
+				require.Equal(t, user.GetID(), stored.SelectedReviewers[0].ID)
+			} else {
+				require.Empty(t, stored.SelectedReviewers)
+			}
+			if scenario.wantReviewer && !scenario.approved {
+				require.Equal(t, [][]string{{scenario.login}}, client.requests)
+			} else {
+				require.Empty(t, client.requests)
+			}
+			if scenario.approved {
+				require.Equal(t, []int64{99}, []int64(stored.ApprovalIDs))
+				require.Empty(t, stored.BlockingReason)
+				require.Equal(t, []string{"success"}, client.conclusions)
+				return
+			}
+			require.NotEmpty(t, stored.BlockingReason)
+			require.Equal(t, []string{"failure"}, client.conclusions)
+		})
+	}
+}
+
 type humanReviewLifecycleFake struct {
 	humanReviewPublicationFake
 	current     *github.PullRequest
@@ -172,6 +324,7 @@ type humanReviewLifecycleFake struct {
 	permissions map[string]*github.RepositoryPermissionLevel
 	reviews     []*github.PullRequestReview
 	requests    [][]string
+	teamError   error
 }
 
 func (f *humanReviewLifecycleFake) GetPullRequest(context.Context, string, int) (*github.PullRequest, *github.Response, error) {
@@ -188,7 +341,7 @@ func (f *humanReviewLifecycleFake) AddPullRequestReviewers(_ context.Context, _ 
 	return f.current, nil, nil
 }
 func (f *humanReviewLifecycleFake) HumanReviewTeamMembers(context.Context, string, string) ([]*github.User, error) {
-	return f.members, nil
+	return f.members, f.teamError
 }
 func (f *humanReviewLifecycleFake) HumanReviewChangedFiles(context.Context, string, int) ([]*github.CommitFile, error) {
 	return nil, nil

@@ -259,11 +259,11 @@ It uses the existing GitHub integration and agent configuration.
 No new environment variables or Secret keys are required.
 
 1. Upgrade the applicable GitHub App to **Checks: Read and write**.
-2. Retain **Pull requests: Read and write** and **Members: Read-only**.
+2. Retain **Pull requests: Read and write**. Optional GitHub team fallbacks also require **Members: Read-only**.
 3. Ask existing installation owners to accept the permission update.
 4. Deploy the API and worker code with Human review disabled.
 5. Add Human review from the Verify automation catalog.
-6. Configure a fallback GitHub team and review instructions as an organization administrator.
+6. Select a default GitHub reviewer and configure review instructions as a SuperPlane organization administrator.
 7. Test assessment completion, reviewer selection, approval, dismissal, new commits, and disablement in a test repository.
 8. Enable Human review only after these lifecycle checks pass.
 9. Configure GitHub branch protection separately to require `merge-confidence/merge-gate` from the correct GitHub App.
@@ -277,6 +277,9 @@ This repository does not verify that configuration or live branch protection.
 The API receives authenticated review events. Workers select reviewers and
 publish checks through the existing integration credentials. Runner agents
 return scoped decisions; they do not publish checks or approve pull requests.
+The default reviewer must be a human with repository write access or higher.
+Personal GitHub repositories do not require a GitHub organization team.
+Existing team fallbacks remain supported. The pull request author cannot review their own pull request.
 The existing App credentials must remain available to the API and workers.
 No Helm value changes are required for this feature.
 
