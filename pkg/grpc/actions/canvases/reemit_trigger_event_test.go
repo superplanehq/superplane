@@ -118,9 +118,10 @@ func Test__ReemitTriggerEvent(t *testing.T) {
 			NodeID:     triggerNodeID,
 			Channel:    "default",
 			Data: models.NewJSONValue(map[string]any{
-				"type":      "manual.run",
-				"timestamp": now.UTC().Format(time.RFC3339Nano),
-				"data":      map[string]any{"message": "Hello"},
+				"type":                "manual.run",
+				"timestamp":           now.UTC().Format(time.RFC3339Nano),
+				"data":                map[string]any{"message": "Hello"},
+				"replayedFromEventId": "untrusted-source",
 			}),
 			CustomName: &customName,
 			State:      models.CanvasEventStatePending,
@@ -142,7 +143,12 @@ func Test__ReemitTriggerEvent(t *testing.T) {
 		assert.Equal(t, canvas.ID, reemitted.WorkflowID)
 		assert.Equal(t, triggerNodeID, reemitted.NodeID)
 		assert.Equal(t, sourceEvent.Channel, reemitted.Channel)
-		assert.Equal(t, sourceEvent.Data.Data(), reemitted.Data.Data())
+		expected := sourceEvent.Data.Data().(map[string]any)
+		expected["replayedFromEventId"] = sourceEvent.ID.String()
+		assert.Equal(t, expected, reemitted.Data.Data())
+		storedSource, err := models.FindCanvasEvent(sourceEvent.ID)
+		require.NoError(t, err)
+		assert.Equal(t, "untrusted-source", storedSource.Data.Data().(map[string]any)["replayedFromEventId"])
 		assert.Equal(t, models.CanvasEventStatePending, reemitted.State)
 		require.NotNil(t, reemitted.CustomName)
 		assert.Equal(t, customName, *reemitted.CustomName)

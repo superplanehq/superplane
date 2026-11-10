@@ -302,6 +302,19 @@ describe("buildColumnAutomations", () => {
     expect(automations[8]).toMatchObject({ kind: "custom", canvasId: "app-merge-payments" });
   });
 
+  it("shows a renamed Request review automation once and reserves its catalog entry", () => {
+    const automations = buildColumnAutomations("verify", {
+      columnTitle: "Verify",
+      apps: [{ id: "review-app", name: "Release reviewers", templateId: "human-review", columnKey: "verify" }],
+    });
+
+    expect(automations).toHaveLength(1);
+    expect(automations[0]).toMatchObject({ kind: "human-review", canvasId: "review-app", name: "Release reviewers" });
+    expect(takenCatalogIds(automations, catalogForColumn("verify", { allowHumanReview: true }))).toEqual([
+      "human-review",
+    ]);
+  });
+
   it("appends custom canvases attached to Verify or Done", () => {
     const verify = buildColumnAutomations("verify", {
       columnTitle: "Verify",
@@ -356,14 +369,18 @@ describe("catalogForColumn", () => {
     expect(catalog.map((entry) => entry.id)).toEqual([...LINE_INTAKE_SOURCES.map((source) => source.id), "analysis"]);
   });
 
-  it("offers discussion, status-check, merge confidence, and visual evidence in the verify catalog", () => {
-    expect(catalogForColumn("verify").map((entry) => entry.id)).toEqual([
-      "discussion",
-      "checks",
-      "risk-score",
-      "visual-evidence",
-    ]);
-  });
+  it.each([undefined, false, true])(
+    "offers Request review only when allowed (%s), independently of Visual Evidence",
+    (allowHumanReview) => {
+      expect(catalogForColumn("verify", { allowHumanReview }).map((entry) => entry.id)).toEqual([
+        "discussion",
+        "checks",
+        "risk-score",
+        ...(allowHumanReview ? ["human-review"] : []),
+        "visual-evidence",
+      ]);
+    },
+  );
 
   it("offers a custom canvas in the verify catalog when the feature is on", () => {
     expect(catalogForColumn("verify", { allowCustom: true }).map((entry) => entry.id)).toEqual([
@@ -373,6 +390,12 @@ describe("catalogForColumn", () => {
       "visual-evidence",
       "custom-verification",
     ]);
+  });
+
+  it("excludes Request review from Bitbucket", () => {
+    expect(
+      catalogForColumn("verify", { allowHumanReview: true, vcsProvider: "bitbucket" }).map((entry) => entry.id),
+    ).not.toContain("human-review");
   });
 
   it("offers pull request closure in the done catalog", () => {
@@ -404,8 +427,10 @@ describe("catalogForColumn", () => {
 
 describe("onlyCustomCatalogRemains", () => {
   it("is true when every unique Verify type is taken", () => {
-    const catalog = catalogForColumn("verify", { allowCustom: true });
-    expect(onlyCustomCatalogRemains(catalog, ["discussion", "checks", "risk-score", "visual-evidence"])).toBe(true);
+    const catalog = catalogForColumn("verify", { allowCustom: true, allowHumanReview: true });
+    expect(
+      onlyCustomCatalogRemains(catalog, ["discussion", "checks", "risk-score", "human-review", "visual-evidence"]),
+    ).toBe(true);
   });
 
   it("is false when risk score is still available", () => {

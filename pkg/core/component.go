@@ -15,7 +15,8 @@ var (
 	ErrExecutionKVNotFound = errors.New("execution kv not found")
 	ErrQueueItemDeferred   = errors.New("queue item deferred")
 	// ErrEventPayloadTooLarge rejects an emission before any output is stored.
-	ErrEventPayloadTooLarge = errors.New("event payload too large")
+	ErrEventPayloadTooLarge    = errors.New("event payload too large")
+	ErrBackgroundHookLeaseLost = errors.New("background hook lease lost")
 )
 
 /*

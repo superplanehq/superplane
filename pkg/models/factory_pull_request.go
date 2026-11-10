@@ -96,6 +96,7 @@ type FactoryPullRequest struct {
 	ClosedAt                *time.Time
 	CurrentRevisionID       *uuid.UUID
 	ActiveMutationRunID     *uuid.UUID
+	HumanReviewRequestID    *uuid.UUID
 	Mergeable               bool
 	MergeBlockedReason      string
 	MergeBlockedMessage     string
@@ -323,7 +324,8 @@ func (p *FactoryPullRequest) Update(tx *gorm.DB, patch FactoryPullRequestPatch) 
 	p.UpdatedAt = now
 
 	return tx.Transaction(func(inner *gorm.DB) error {
-		if saveErr := inner.Save(p).Error; saveErr != nil {
+		// Reconciliation requests have their own compare-and-clear lifecycle.
+		if saveErr := inner.Omit("HumanReviewRequestID").Save(p).Error; saveErr != nil {
 			return mapFactoryPullRequestConstraintError(saveErr)
 		}
 

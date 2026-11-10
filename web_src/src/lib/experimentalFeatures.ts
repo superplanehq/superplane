@@ -27,6 +27,9 @@ export const FEATURE_ORGANIZATION_BYOK_CUSTOM_PROVIDER = "organization_byok_cust
 /** Organization experimental feature: custom automations on Verify, Done, and phase columns. */
 export const FEATURE_FACTORY_CUSTOM_AUTOMATIONS = "factory_custom_automations";
 
+/** Organization experimental feature: add the Request review automation to Verify. */
+export const FEATURE_FACTORY_HUMAN_REVIEW = "factory_human_review";
+
 /** Organization experimental feature: Mergeable chip on task cards and Merge button on pull request review. */
 export const FEATURE_FACTORY_PULL_REQUEST_MERGE = "factory_pull_request_merge";
 

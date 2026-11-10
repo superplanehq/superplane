@@ -86,6 +86,9 @@ func (p *FactoryPullRequest) ObserveRevision(tx *gorm.DB, sha string) (*FactoryP
 	if err := tx.Model(p).Updates(updates).Error; err != nil {
 		return nil, err
 	}
+	if err := p.queueHumanReviewRevision(tx, revision); err != nil {
+		return nil, err
+	}
 	result.Current = true
 	return result, nil
 }

@@ -1,9 +1,33 @@
 package core
 
 import (
+	"time"
+
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/configuration"
 )
+
+// BackgroundHookHandler performs work without holding the request transaction.
+// Implementations own their short transactions and external publication fences.
+type BackgroundHookHandler interface {
+	HandleBackgroundHook(BackgroundHookContext) (BackgroundHookResult, error)
+}
+
+type BackgroundHookContext struct {
+	ActionHookContext
+	WorkflowID     uuid.UUID
+	OrganizationID uuid.UUID
+	NodeID         string
+	ExecutionID    uuid.UUID
+	RunID          uuid.UUID
+	Data           any
+}
+
+// A zero RetryAfter completes the request; a positive duration retries it.
+type BackgroundHookResult struct {
+	RetryAfter time.Duration
+}
 
 type HookType string
 

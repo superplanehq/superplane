@@ -1,17 +1,78 @@
 package workers
 
 import (
+	"errors"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
+	broadcast "github.com/superplanehq/superplane/pkg/triggers/messages"
+	"github.com/superplanehq/superplane/pkg/workers/contexts"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
-
-	_ "github.com/superplanehq/superplane/pkg/triggers/messages"
 )
+
+type failingBroadcastTrigger struct {
+	broadcast.OnBroadcast
+	err error
+}
+
+func (c *failingBroadcastTrigger) OnAppMessage(ctx core.AppMessageContext) error {
+	if err := c.OnBroadcast.OnAppMessage(ctx); err != nil {
+		return err
+	}
+	return c.err
+}
+
+func Test__AppMessageWorker_LockAndProcessMessage__retriesDeliveryAfterRollback(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	sourceCanvas, sourceNodes := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{
+		{
+			NodeID: "broadcast-message",
+			Type:   models.NodeTypeComponent,
+			Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "broadcastMessage"}}),
+		},
+	}, nil)
+	targetCanvas, targetNodes := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{
+		{
+			NodeID:        "on-broadcast",
+			Type:          models.NodeTypeTrigger,
+			Ref:           datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "onBroadcast"}}),
+			Configuration: datatypes.NewJSONType(map[string]any{"app": sourceCanvas.ID.String()}),
+		},
+	}, nil)
+	require.NoError(t, database.Conn().Create(&models.CanvasSubscription{
+		SourceCanvasID: sourceCanvas.ID,
+		TargetCanvasID: targetCanvas.ID,
+		TargetNodeID:   targetNodes[0].NodeID,
+	}).Error)
+	require.NoError(t, models.CreateAppMessage(database.Conn(), sourceCanvas.ID, sourceNodes[0].NodeID, map[string]any{"message": "retry"}, nil))
+	pending, err := models.ListAppMessages(database.Conn())
+	require.NoError(t, err)
+	require.Len(t, pending, 1)
+
+	deliveryError := errors.New("subscriber delivery failed")
+	r.Registry.Triggers["onBroadcast"] = &failingBroadcastTrigger{err: deliveryError}
+	worker := NewAppMessageWorker(r.Registry)
+	require.ErrorIs(t, worker.LockAndProcessMessage(pending[0]), deliveryError)
+	support.VerifyCanvasEventsCount(t, targetCanvas.ID, 0)
+	pending, err = models.ListAppMessages(database.Conn())
+	require.NoError(t, err)
+	require.Len(t, pending, 1)
+
+	r.Registry.Triggers["onBroadcast"] = &broadcast.OnBroadcast{}
+	require.NoError(t, worker.LockAndProcessMessage(pending[0]))
+	support.VerifyCanvasEventsCount(t, targetCanvas.ID, 1)
+	pending, err = models.ListAppMessages(database.Conn())
+	require.NoError(t, err)
+	require.Empty(t, pending)
+}
 
 func Test__AppMessageWorker_LockAndProcessMessage__deliversBroadcast(t *testing.T) {
 	r := support.Setup(t)
@@ -59,12 +120,16 @@ func Test__AppMessageWorker_LockAndProcessMessage__deliversBroadcast(t *testing.
 		TargetNodeID:   targetNodes[0].NodeID,
 	}).Error)
 
-	payload := map[string]any{"message": "hello"}
-	require.NoError(t, models.CreateAppMessage(database.Conn(), sourceCanvas.ID, sourceNodes[0].NodeID, payload))
+	sourceRun, err := models.CreateCanvasRunInTransaction(database.Conn(), sourceCanvas.ID, sourceNodes[0].NodeID, models.CanvasRunStateFinished, models.CanvasRunResultPassed)
+	require.NoError(t, err)
+	payload := map[string]any{"message": "hello", "run": map[string]any{"id": uuid.New().String()}}
+	appContext := contexts.NewAppExecutionContext(database.Conn(), sourceCanvas, &sourceNodes[0], &models.CanvasNodeExecution{RunID: sourceRun.ID})
+	require.NoError(t, appContext.Broadcast(payload))
 
 	messages, err := models.ListAppMessages(database.Conn())
 	require.NoError(t, err)
 	require.Len(t, messages, 1)
+	require.Equal(t, &sourceRun.ID, messages[0].SourceRunID)
 
 	require.NoError(t, worker.LockAndProcessMessage(messages[0]))
 
@@ -97,6 +162,7 @@ func Test__AppMessageWorker_LockAndProcessMessage__deliversBroadcast(t *testing.
 		"id":   sourceNodes[0].NodeID,
 		"name": sourceNodes[0].Name,
 	}, broadcastPayload["node"])
+	assert.Equal(t, map[string]any{"id": sourceRun.ID.String()}, broadcastPayload["run"])
 }
 
 func Test__AppMessageWorker_LockAndProcessMessage__deletesMessageWithoutSubscribers(t *testing.T) {
@@ -126,6 +192,7 @@ func Test__AppMessageWorker_LockAndProcessMessage__deletesMessageWithoutSubscrib
 		sourceCanvas.ID,
 		sourceNodes[0].NodeID,
 		map[string]any{"message": "ignored"},
+		nil,
 	))
 
 	messages, err := models.ListAppMessages(database.Conn())
@@ -206,7 +273,7 @@ func Test__AppMessageWorker_LockAndProcessMessage__skipsStaleSubscriptionAndDeli
 	).Error)
 
 	payload := map[string]any{"message": "hello"}
-	require.NoError(t, models.CreateAppMessage(database.Conn(), sourceCanvas.ID, sourceNodes[0].NodeID, payload))
+	require.NoError(t, models.CreateAppMessage(database.Conn(), sourceCanvas.ID, sourceNodes[0].NodeID, payload, nil))
 
 	messages, err := models.ListAppMessages(database.Conn())
 	require.NoError(t, err)
@@ -286,6 +353,7 @@ func Test__AppMessageWorker_LockAndProcessMessage__skipsTargetNodeInErrorState(t
 		sourceCanvas.ID,
 		sourceNodes[0].NodeID,
 		map[string]any{"message": "hello"},
+		nil,
 	))
 
 	messages, err := models.ListAppMessages(database.Conn())
@@ -354,6 +422,7 @@ func Test__AppMessageWorker_LockAndProcessMessage__skipsSubscriptionOnDeletedTar
 		sourceCanvas.ID,
 		sourceNodes[0].NodeID,
 		map[string]any{"message": "hello"},
+		nil,
 	))
 
 	messages, err := models.ListAppMessages(database.Conn())
@@ -405,6 +474,7 @@ func Test__AppMessageWorker_LockAndProcessMessage__deletesMessageWhenSourceNodeD
 		sourceCanvas.ID,
 		sourceNodes[0].NodeID,
 		map[string]any{"message": "stale"},
+		nil,
 	))
 
 	require.NoError(t, models.DeleteCanvasNode(database.Conn(), sourceNodes[0]))

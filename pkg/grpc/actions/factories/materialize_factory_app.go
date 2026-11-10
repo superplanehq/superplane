@@ -5,6 +5,8 @@ import (
 	"errors"
 
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"gorm.io/gorm"
@@ -30,9 +32,19 @@ func MaterializeFactoryAppTemplate(
 		return nil, factoryErrorToStatus(err, "failed to materialize factory app template")
 	}
 	factoryID := factory.ID
-	canvas, _, err := findFactoryAppForDefaults(db, orgID, factoryID, appID)
+	canvas, version, err := findFactoryAppForDefaults(db, orgID, factoryID, appID)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to materialize factory app template")
+	}
+
+	if req.GetTemplateId() == models.FactoryAppTemplateHumanReviewID && models.FactoryAppTemplateID(version.Nodes) != models.FactoryAppTemplateHumanReviewID {
+		enabled, err := models.OrganizationHasExperimentalFeatures(db, orgID, features.FeatureFactoryHumanReview)
+		if err != nil {
+			return nil, factoryErrorToStatus(err, "failed to materialize factory app template")
+		}
+		if !enabled {
+			return nil, grpcerrors.FailedPrecondition(nil, "Request review is not enabled for this organization.")
+		}
 	}
 
 	if req.GetTemplateId() == scheduledIntakeTemplateID {
@@ -47,6 +59,11 @@ func MaterializeFactoryAppTemplate(
 	input := factoryTemplateInputFromRequest(req)
 	input.appID = canvas.ID.String()
 	input.appName = canvas.Name
+	if req.GetTemplateId() == models.FactoryAppTemplateHumanReviewID {
+		if err := configureHumanReviewSource(db, factory, &input); err != nil {
+			return nil, factoryErrorToStatus(err, "failed to materialize factory app template")
+		}
+	}
 	// The template names the agent integration "claude". That is a type
 	// placeholder, not an installation. An install that omits the agent uses
 	// the workspace agent, the same one the other line apps already run.

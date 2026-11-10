@@ -3,11 +3,11 @@ package canvases
 import (
 	"context"
 	"fmt"
+	"maps"
 	"time"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
-	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
@@ -44,17 +44,23 @@ func ReemitTriggerEvent(
 	}
 
 	now := time.Now()
+	payload := sourceEvent.Data.Data()
+	if envelope, ok := payload.(map[string]any); ok {
+		envelope = maps.Clone(envelope)
+		envelope["replayedFromEventId"] = sourceEvent.ID.String()
+		payload = envelope
+	}
 	reemittedEvent := models.CanvasEvent{
 		WorkflowID: canvas.ID,
 		NodeID:     nodeID,
 		Channel:    sourceEvent.Channel,
-		Data:       models.NewJSONValue(sourceEvent.Data.Data()),
+		Data:       models.NewJSONValue(payload),
 		State:      models.CanvasEventStatePending,
 		CreatedAt:  &now,
 		CustomName: sourceEvent.CustomName,
 	}
 
-	if err := database.Conn().Create(&reemittedEvent).Error; err != nil {
+	if err := db.Create(&reemittedEvent).Error; err != nil {
 		log.Errorf("failed to create re-emitted workflow event: %v", err)
 		return nil, fmt.Errorf("failed to create workflow event: %w", err)
 	}

@@ -5,6 +5,9 @@ import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useOrgUserLookup } from "@/hooks/useOrgUserLookup";
 import { FEATURE_FACTORY_STEP_ACTIONS } from "@/lib/experimentalFeatures";
 import { flattenWorkOrderEventsPages } from "../../../lib/workOrderEventsPagination";
+import { useOptionalFactoriesLayout } from "../../../layout/factoriesLayoutContext";
+import { factoryAppRunPath } from "../../../lib/factoryPagePaths";
+import { humanReviewActionRows } from "./consoleHumanReviewActions";
 import type { ConsoleAutomation } from "./automationsViewModel";
 import { stepActionRows, type StepActionRow } from "./consoleStepActions";
 import type { SplitRunPhase } from "../splitRunMocks";
@@ -21,6 +24,8 @@ export function useStepActions(
   const { data, hasNextPage, isFetchingNextPage, isError, fetchNextPage, refetch } = events;
   const { resolveUser } = useOrgUserLookup(organizationId);
   const enabled = has(FEATURE_FACTORY_STEP_ACTIONS);
+  const layout = useOptionalFactoriesLayout();
+  const factoryKey = layout?.routeSegment ?? factoryId;
 
   useEffect(() => {
     if (!enabled || isError || !hasNextPage || isFetchingNextPage) {
@@ -33,12 +38,19 @@ export function useStepActions(
     if (!enabled) {
       return [];
     }
-    return stepActionRows(
+    const runIds = automationRunIds(automation, phases);
+    const eventRows = stepActionRows(
       flattenWorkOrderEventsPages(data?.pages),
-      automationRunIds(automation, phases),
+      runIds,
       (userId) => resolveUser(userId)?.name,
     );
-  }, [automation, data?.pages, enabled, phases, resolveUser]);
+    return [
+      ...eventRows,
+      ...humanReviewActionRows(phases, runIds, (canvasId, runId) =>
+        factoryAppRunPath(organizationId, factoryKey, canvasId, runId),
+      ),
+    ];
+  }, [automation, data?.pages, enabled, phases, resolveUser, organizationId, factoryKey]);
 
   return {
     rows,
