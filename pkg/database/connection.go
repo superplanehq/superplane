@@ -215,6 +215,7 @@ func TruncateTables() error {
 			vcs_provider_install_request_refreshes,
 			vcs_provider_installation_reconcile_jobs,
 			vcs_provider_reconcile_jobs,
+			vcs_provider_catalog_schedules,
 			vcs_provider_installations,
 			secrets,
 			account_magic_codes,
