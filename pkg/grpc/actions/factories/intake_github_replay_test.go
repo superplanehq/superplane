@@ -13,6 +13,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/yaml"
 	"github.com/superplanehq/superplane/test/support"
+	"gorm.io/gorm"
 )
 
 func TestGitHubReplaySelectionAndLimits(t *testing.T) {
@@ -107,6 +108,27 @@ func TestGitHubReplaySelectionAndLimits(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, payloads)
 	require.Len(t, host.Requests, 20)
+	for _, table := range []string{"workflow_runs", "factory_work_orders"} {
+		t.Run("timeout during "+table, func(t *testing.T) {
+			host := gitHubTestResponses(`{"number":24,"html_url":"https://github.com/acme/app/issues/24","title":"Fresh","state":"open"}`)
+			client, err := common.NewClient(gitHubPermissionTestIntegration(), host)
+			require.NoError(t, err)
+			ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+			defer cancel()
+			callback := "test:replay_read_timeout"
+			require.NoError(t, db.Callback().Query().Before("gorm:query").Register(callback, func(tx *gorm.DB) {
+				if len(host.Requests) == 1 && tx.Statement.Table == table {
+					<-ctx.Done()
+				}
+			}))
+			defer func() { require.NoError(t, db.Callback().Query().Remove(callback)) }()
+			payloads, err := skippedGitHubIssueEvents(ctx, db.WithContext(ctx), intake, client, "acme/app")
+			require.NoError(t, err)
+			require.ErrorIs(t, ctx.Err(), context.DeadlineExceeded)
+			require.Len(t, payloads, 1, "a later database timeout must retain the refreshed issue")
+			require.EqualValues(t, 24, payloads[0]["issue"].(map[string]any)["number"])
+		})
+	}
 	// Fill the scan with newer pending subjects: older drops outside the newest
 	// 200 events must not be reconsidered.
 	for number := 100; number < 300; number++ {
@@ -121,4 +143,18 @@ func TestGitHubReplaySelectionAndLimits(t *testing.T) {
 	retained, err := models.ListRecentCanvasRootEvents(db, canvas.ID, "github.issue", time.Now().Add(-intakeGitHubReplayWindow), intakeGitHubReplayEventLimit)
 	require.NoError(t, err)
 	require.Empty(t, retained)
+}
+
+func TestGitHubReplaySkipsPausedIntake(t *testing.T) {
+	r, factory := resetTestFactory(t)
+	defer r.Close()
+	db := database.DB(t.Context())
+	canvas := support.CreateFactoryCanvas(t, r, factory.ID, "GitHub")
+	intake, err := factory.CreateIntake(db, canvas.ID, models.FactoryIntakeSourceGitHubIssues)
+	require.NoError(t, err)
+	stored, err := factory.FindIntake(db, intake.ID)
+	require.NoError(t, err)
+	require.NoError(t, stored.SetPaused(db, true))
+	// The caller's intake is stale. Read the saved pause state before any GitHub setup.
+	require.NoError(t, replaySkippedGitHubIssues(t.Context(), IntakeDependencies{}, db, intake))
 }

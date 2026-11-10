@@ -12,6 +12,7 @@ import (
 	ghissue "github.com/superplanehq/superplane/pkg/integrations/github/issue"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 const (
@@ -25,6 +26,13 @@ func replaySkippedGitHubIssues(ctx context.Context, deps IntakeDependencies, db 
 	ctx, cancel := context.WithTimeout(ctx, intakeGitHubReplayBudget)
 	defer cancel()
 	reads := db.WithContext(ctx)
+	intake, err := models.FindFactoryIntakeByCanvasID(reads, intake.CanvasID)
+	if err != nil {
+		return err
+	}
+	if intake.Paused() {
+		return nil
+	}
 	binding, err := liveIntakeBinding(reads, intake)
 	if err != nil {
 		return err
@@ -43,7 +51,20 @@ func replaySkippedGitHubIssues(ctx context.Context, deps IntakeDependencies, db 
 	}
 	// Reads can exhaust their budget. Persist the readable subset with the
 	// request context, in a separate transaction against the committed graph.
+	return emitRecoveredGitHubIssueEvents(db, intake, payloads)
+}
+
+func emitRecoveredGitHubIssueEvents(db *gorm.DB, intake *models.FactoryIntake, payloads []map[string]any) error {
 	return db.Transaction(func(tx *gorm.DB) error {
+		// Serialize emission with pause updates after the external reads finish.
+		locked := tx.Clauses(clause.Locking{Strength: "UPDATE", Table: clause.Table{Name: "factory_intakes"}})
+		current, err := models.FindFactoryIntakeByCanvasID(locked, intake.CanvasID)
+		if err != nil {
+			return err
+		}
+		if current.Paused() {
+			return nil
+		}
 		return emitIntakeEvents(tx, intake.CanvasID, ghissue.PayloadType, payloads)
 	})
 }
@@ -71,6 +92,9 @@ func skippedGitHubIssueEvents(ctx context.Context, reads *gorm.DB, intake *model
 		seen[ref] = true
 		eligible, err := gitHubIssueRunWasSkipped(reads, event)
 		if err != nil {
+			if ctx.Err() == context.DeadlineExceeded {
+				return payloads, nil
+			}
 			return nil, err
 		}
 		if !eligible {
@@ -78,6 +102,9 @@ func skippedGitHubIssueEvents(ctx context.Context, reads *gorm.DB, intake *model
 		}
 		order, err := ghissue.FindActiveWorkOrder(reads, factory, ref)
 		if err != nil {
+			if ctx.Err() == context.DeadlineExceeded {
+				return payloads, nil
+			}
 			return nil, err
 		}
 		if order != nil {

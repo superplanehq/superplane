@@ -23,7 +23,6 @@ import (
 	"github.com/superplanehq/superplane/test/support"
 	"github.com/superplanehq/superplane/test/support/contexts"
 	"gorm.io/datatypes"
-	"gorm.io/gorm"
 )
 
 func gitHubPermissionTestIntegration() *contexts.IntegrationContext {
@@ -206,7 +205,16 @@ func TestGitHubIntakeDisableRecoversSkippedRun(t *testing.T) {
 	require.Nil(t, refreshed[0]["sender"])
 	issue := refreshed[0]["issue"].(map[string]any)
 	require.Equal(t, "maintainer", issue["assignees"].([]any)[0].(map[string]any)["login"])
-	require.NoError(t, db.Transaction(func(tx *gorm.DB) error { return emitIntakeEvents(tx, canvas.ID, "github.issue", refreshed) }))
+	stored, err := factory.FindIntake(db, intake.ID)
+	require.NoError(t, err)
+	require.NoError(t, stored.SetPaused(db, true))
+	// A pause saved during the refresh must block emission, even with a stale intake.
+	require.NoError(t, emitRecoveredGitHubIssueEvents(db, intake, refreshed))
+	roots, err := models.ListRecentCanvasRootEvents(db, canvas.ID, "github.issue", *canvas.CreatedAt, 10)
+	require.NoError(t, err)
+	require.Len(t, roots, 1)
+	require.NoError(t, stored.SetPaused(db, false))
+	require.NoError(t, emitRecoveredGitHubIssueEvents(db, intake, refreshed))
 	events, err = models.ListCanvasEvents(db, canvas.ID, intakeTriggerNodeID, 1, nil)
 	require.NoError(t, err)
 	version := resetTestLiveVersion(t, canvas)

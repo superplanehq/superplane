@@ -246,7 +246,7 @@ func applyIntakeUpdate(
 	if name != nil {
 		canvases.PublishCanvasUpdated(canvas)
 	}
-	if replay {
+	if replay && !intake.Paused() {
 		if err := replaySkippedGitHubIssues(ctx, deps, db, intake); err != nil {
 			log.WithError(err).WithField("intake_id", intake.ID).WithField("factory_id", intake.FactoryID).
 				Warn("failed to replay skipped GitHub issues after saving intake settings")
