@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, mock } from "bun:test";
 import type { ReactNode } from "react";
 
@@ -39,16 +40,9 @@ function check(key: string, score?: number): FactoriesWorkOrderCheck {
   return { id: key, key, name: key, score, maxScore: 5 };
 }
 
-function renderPanel(checks: FactoriesWorkOrderCheck[]) {
+function renderPanel(checks: FactoriesWorkOrderCheck[], pr = pullRequest) {
   const fixture = splitRunFixtureForWorkOrder(OPEN_WORK_ORDER, { checks, demoArtifacts: false });
-  render(
-    <ConsoleSummaryPanel
-      fixture={fixture}
-      outcome={outcomeSummary(fixture)}
-      stages={[]}
-      pullRequests={[pullRequest]}
-    />,
-  );
+  render(<ConsoleSummaryPanel fixture={fixture} outcome={outcomeSummary(fixture)} stages={[]} pullRequests={[pr]} />);
 }
 
 describe("ConsoleSummaryPanel mergeable chip", () => {
@@ -188,6 +182,77 @@ describe("ConsoleSummaryPanel merge confidence per pull request", () => {
     expect(within(docs).getByRole("button", { name: "Merge confidence" })).toHaveAttribute("aria-expanded", "false");
   });
 
+  it("keeps current assessments separate when repositories share an automation", () => {
+    const automation = { appId: "merge-app" };
+    renderWith(
+      [
+        {
+          ...check("risk-review", 1),
+          id: "payments-risk",
+          repository: "acme/payments",
+          level: "LEVEL_POSITIVE",
+          runId: "payments-run",
+          automation,
+        },
+        {
+          ...check("security-review", 5),
+          id: "payments-security",
+          repository: "acme/payments",
+          level: "LEVEL_POSITIVE",
+          runId: "old-run",
+          automation,
+        },
+        {
+          ...check("security-review", 5),
+          id: "docs-security",
+          repository: "acme/docs",
+          level: "LEVEL_POSITIVE",
+          runId: "docs-run",
+          automation,
+        },
+      ],
+      [
+        {
+          ...paymentsPullRequest,
+          activities: [
+            {
+              run: {
+                id: "payments-run",
+                canvasId: "merge-app",
+                result: "RESULT_FAILED",
+                createdAt: "2026-11-06T14:24:00Z",
+              },
+            },
+          ],
+        },
+        {
+          ...docsPullRequest,
+          activities: [
+            {
+              run: {
+                id: "docs-run",
+                canvasId: "merge-app",
+                result: "RESULT_PASSED",
+                createdAt: "2026-11-06T14:25:00Z",
+              },
+            },
+          ],
+        },
+      ],
+    );
+    const payments = confidenceFor("acme/payments");
+    const docs = confidenceFor("acme/docs");
+    expect(within(payments).getByText(/Assessment failed/)).toBeInTheDocument();
+    expect(within(docs).getByText(/All checks passed/)).toBeInTheDocument();
+    fireEvent.click(within(payments).getByRole("button", { name: "Merge confidence" }));
+    expect(
+      within(screen.getByTestId("split-run-check-payments-risk")).getByRole("img", { name: "Passed" }),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("split-run-check-payments-security")).getByRole("img", { name: "Not assessed" }),
+    ).toBeInTheDocument();
+  });
+
   it("keeps a check without a repository in the merge confidence list when several repositories have pull requests", () => {
     renderWith(
       [
@@ -216,5 +281,103 @@ describe("ConsoleSummaryPanel merge confidence per pull request", () => {
 
     expect(screen.getByTestId("redesign-console-checks")).toBeInTheDocument();
     expect(screen.queryByTestId("redesign-console-pull-request-checks")).not.toBeInTheDocument();
+  });
+});
+
+describe("ConsoleSummaryPanel merge confidence", () => {
+  beforeEach(() => {
+    multiRepoTasks.enabled = false;
+  });
+  it("does not reuse scores from an older run of the same revision", async () => {
+    const user = userEvent.setup();
+    renderPanel(
+      [
+        {
+          ...check("risk-review", 1),
+          level: "LEVEL_POSITIVE",
+          runId: "current-run",
+          automation: { appId: "merge-app" },
+        },
+        {
+          ...check("security-review", 5),
+          level: "LEVEL_POSITIVE",
+          runId: "old-run",
+          automation: { appId: "merge-app" },
+        },
+      ],
+      {
+        ...pullRequest,
+        currentRevision: { id: "current-revision" },
+        activities: [
+          {
+            revision: { id: "current-revision" },
+            run: { id: "old-run", canvasId: "merge-app", createdAt: "2026-11-06T14:22:00Z", result: "RESULT_PASSED" },
+          },
+          {
+            revision: { id: "current-revision" },
+            run: {
+              id: "current-run",
+              canvasId: "merge-app",
+              createdAt: "2026-11-06T14:23:00Z",
+              result: "RESULT_FAILED",
+            },
+          },
+        ],
+      },
+    );
+
+    expect(screen.queryByText("All checks passed")).not.toBeInTheDocument();
+    expect(screen.getByText("Assessment failed")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Merge confidence" }));
+    expect(
+      within(screen.getByTestId("split-run-check-security-review")).getByRole("img", { name: "Not assessed" }),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("split-run-check-risk-review")).getByRole("img", { name: "Passed" }),
+    ).toBeInTheDocument();
+  });
+
+  it("does not reuse an assessment after the pull request head changes", async () => {
+    const user = userEvent.setup();
+    renderPanel(
+      [
+        {
+          ...check("security-review", 5),
+          level: "LEVEL_POSITIVE",
+          runId: "old-run",
+          automation: { appId: "merge-app" },
+        },
+      ],
+      {
+        ...pullRequest,
+        currentRevision: { id: "new-revision" },
+        activities: [
+          { revision: { id: "old-revision" }, run: { id: "old-run", canvasId: "merge-app", result: "RESULT_PASSED" } },
+        ],
+      },
+    );
+
+    expect(screen.getByText("Checks not fully assessed")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Merge confidence" }));
+    expect(
+      within(screen.getByTestId("split-run-check-security-review")).getByRole("img", { name: "Not assessed" }),
+    ).toBeInTheDocument();
+  });
+
+  it("shows assessment failure when the first run reports only favorable scores", () => {
+    renderPanel(
+      [
+        {
+          ...check("risk-review", 1),
+          level: "LEVEL_POSITIVE",
+          runId: "current-run",
+          automation: { appId: "merge-app" },
+        },
+      ],
+      { ...pullRequest, activities: [{ run: { id: "current-run", canvasId: "merge-app", result: "RESULT_FAILED" } }] },
+    );
+
+    expect(screen.getByText("Assessment failed")).toBeInTheDocument();
+    expect(screen.queryByText("All checks passed")).not.toBeInTheDocument();
   });
 });

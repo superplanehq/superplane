@@ -302,6 +302,17 @@ describe("buildColumnAutomations", () => {
     expect(automations[8]).toMatchObject({ kind: "custom", canvasId: "app-merge-payments" });
   });
 
+  it("shows a renamed Human review automation once and reserves its catalog entry", () => {
+    const automations = buildColumnAutomations("verify", {
+      columnTitle: "Verify",
+      apps: [{ id: "review-app", name: "Release reviewers", templateId: "human-review", columnKey: "verify" }],
+    });
+
+    expect(automations).toHaveLength(1);
+    expect(automations[0]).toMatchObject({ kind: "human-review", canvasId: "review-app", name: "Release reviewers" });
+    expect(takenCatalogIds(automations, catalogForColumn("verify"))).toEqual(["human-review"]);
+  });
+
   it("appends custom canvases attached to Verify or Done", () => {
     const verify = buildColumnAutomations("verify", {
       columnTitle: "Verify",
@@ -361,6 +372,7 @@ describe("catalogForColumn", () => {
       "discussion",
       "checks",
       "risk-score",
+      "human-review",
       "visual-evidence",
     ]);
   });
@@ -370,9 +382,16 @@ describe("catalogForColumn", () => {
       "discussion",
       "checks",
       "risk-score",
+      "human-review",
       "visual-evidence",
       "custom-verification",
     ]);
+  });
+
+  it("excludes Human review from Bitbucket", () => {
+    expect(catalogForColumn("verify", { vcsProvider: "bitbucket" }).map((entry) => entry.id)).not.toContain(
+      "human-review",
+    );
   });
 
   it("offers pull request closure in the done catalog", () => {
@@ -405,7 +424,9 @@ describe("catalogForColumn", () => {
 describe("onlyCustomCatalogRemains", () => {
   it("is true when every unique Verify type is taken", () => {
     const catalog = catalogForColumn("verify", { allowCustom: true });
-    expect(onlyCustomCatalogRemains(catalog, ["discussion", "checks", "risk-score", "visual-evidence"])).toBe(true);
+    expect(
+      onlyCustomCatalogRemains(catalog, ["discussion", "checks", "risk-score", "human-review", "visual-evidence"]),
+    ).toBe(true);
   });
 
   it("is false when risk score is still available", () => {

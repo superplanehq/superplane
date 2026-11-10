@@ -117,6 +117,39 @@ func Test__DeleteExpiredCompletedNodeRequests(t *testing.T) {
 	assert.Equal(t, int64(1), pendingCount)
 }
 
+func TestMergeConfidenceCheckPublicationSurvivesCanvasDeletion(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{{
+		NodeID: "on-pr-risk", Type: models.NodeTypeTrigger,
+	}}, nil)
+	publication := createCanvasNodeRequest(t, canvas.ID, "on-pr-risk", models.NodeExecutionRequestStatePending, time.Now().Add(-time.Second))
+	require.NoError(t, db.Model(publication).Update("type", models.NodeRequestTypeMergeConfidenceCheck).Error)
+	action := createCanvasNodeRequest(t, canvas.ID, "on-pr-risk", models.NodeExecutionRequestStatePending, time.Now().Add(-time.Second))
+	require.NoError(t, db.Delete(canvas).Error)
+
+	requests, err := models.ListNodeRequests()
+	require.NoError(t, err)
+	require.Contains(t, requestIDs(requests), publication.ID)
+	require.NotContains(t, requestIDs(requests), action.ID)
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		locked, err := models.LockNodeRequest(tx, publication.ID)
+		require.NoError(t, err)
+		require.Equal(t, publication.ID, locked.ID)
+		_, err = models.LockNodeRequest(tx, action.ID)
+		require.ErrorIs(t, err, gorm.ErrRecordNotFound)
+		return nil
+	}))
+}
+
+func requestIDs(requests []models.CanvasNodeRequest) []uuid.UUID {
+	ids := make([]uuid.UUID, len(requests))
+	for i := range requests {
+		ids[i] = requests[i].ID
+	}
+	return ids
+}
+
 func createCanvasNodeRequest(t *testing.T, workflowID uuid.UUID, nodeID, state string, runAt time.Time) *models.CanvasNodeRequest {
 	t.Helper()
 
