@@ -493,13 +493,17 @@ func withoutPendingRunRequests(tx *gorm.DB) *gorm.DB {
 
 // Standalone check publications outlive execution cancellation. Keep their run
 // and root event until GitHub accepts the terminal update, including after the
-// canvas is deleted or the run expires.
+// canvas is deleted or the run expires. Deleted organizations cannot publish;
+// canvas cleanup discards their pending requests with the remaining resources.
 func withoutPendingMergeConfidenceChecks(tx *gorm.DB) *gorm.DB {
 	return tx.Where(`
 		NOT EXISTS (
 			SELECT 1
 			FROM workflow_node_requests
+			JOIN workflows ON workflow_node_requests.workflow_id = workflows.id
+			JOIN organizations ON workflows.organization_id = organizations.id
 			WHERE workflow_node_requests.workflow_id = workflow_runs.workflow_id
+			AND organizations.deleted_at IS NULL
 			AND workflow_node_requests.type = ?
 			AND workflow_node_requests.state = ?
 			AND workflow_node_requests.spec->'merge_confidence_check'->>'run_id' = workflow_runs.id::text
