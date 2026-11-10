@@ -64,6 +64,13 @@ func bitbucketFactoryTemplate(template factoryAppTemplate) factoryAppTemplate {
 }
 
 var factoryAppTemplates = map[factoryTemplateKey]factoryAppTemplate{
+	{id: models.FactoryAppTemplateHumanReviewID, provider: models.ProviderGitHub}: githubFactoryTemplate(factoryAppTemplate{
+		id:               models.FactoryAppTemplateHumanReviewID,
+		entrypointNodeID: models.HumanReviewTriggerNodeID,
+		canvasFile:       "templates/github/human-review.canvas.yaml",
+		consoleFile:      "templates/github/human-review.console.yaml",
+		columnKey:        models.CanvasColumnKeyVerify,
+	}),
 	{id: scheduledIntakeTemplateID, provider: models.ProviderGitHub}:    scheduledIntakeTemplate(models.ProviderGitHub),
 	{id: scheduledIntakeTemplateID, provider: models.ProviderBitbucket}: scheduledIntakeTemplate(models.ProviderBitbucket),
 	{id: "line-implementation", provider: models.ProviderGitHub}: githubFactoryTemplate(factoryAppTemplate{
