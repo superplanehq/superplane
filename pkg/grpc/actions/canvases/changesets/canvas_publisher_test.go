@@ -9,15 +9,85 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
+	"google.golang.org/grpc/codes"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 
 	_ "github.com/superplanehq/superplane/pkg/components/runs"
 	_ "github.com/superplanehq/superplane/pkg/triggers/messages"
 )
+
+func TestCanvasPublisherHumanReviewRequiresAdministrator(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	trigger := models.CanvasNode{
+		NodeID:        models.HumanReviewTriggerNodeID,
+		Name:          "Human review policy",
+		Type:          models.NodeTypeTrigger,
+		Ref:           datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "onRun"}}),
+		Configuration: datatypes.NewJSONType(map[string]any{"enabled": false, "fallbackTeam": ""}),
+		Metadata:      datatypes.NewJSONType(models.FactoryAppTemplateMetadataFor(models.FactoryAppTemplateHumanReviewID, 1, models.ProviderGitHub)),
+	}
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{
+		trigger,
+	}, nil)
+	live, err := models.FindLiveCanvasVersionInTransaction(db, canvas.ID)
+	require.NoError(t, err)
+	nodes := slices.Clone(live.Nodes)
+	nodes[0].Name = "Updated review"
+	nodes[0].Configuration = map[string]any{"enabled": true, "fallbackTeam": ""}
+	draft, err := models.CreateCommitVersionWithSpecInTransaction(db, canvas.ID, r.User, "Update review settings", nodes, nil)
+	require.NoError(t, err)
+	publisher, err := NewCanvasPublisher(db, canvas, draft, live, canvasPublisherOptions(r))
+	require.NoError(t, err)
+	member := support.CreateUser(t, r, r.Organization.ID)
+	ctx := authentication.SetUserIdInMetadata(t.Context(), member.ID.String())
+	require.Equal(t, codes.PermissionDenied, grpcerrors.Code(publisher.Publish(ctx)))
+	unchanged, err := models.FindLiveCanvasVersionInTransaction(db, canvas.ID)
+	require.NoError(t, err)
+	require.Equal(t, live.ID, unchanged.ID)
+	ctx = authentication.SetUserIdInMetadata(t.Context(), r.User.String())
+	require.Equal(t, codes.InvalidArgument, grpcerrors.Code(publisher.Publish(ctx)))
+	draft.Nodes[0].Metadata = map[string]any{}
+	publisher, err = NewCanvasPublisher(db, canvas, draft, live, canvasPublisherOptions(r))
+	require.NoError(t, err)
+	require.Equal(t, codes.FailedPrecondition, grpcerrors.Code(publisher.Publish(ctx)), "managed policy identity cannot be removed")
+	draft.Nodes[0].Metadata = models.FactoryAppTemplateMetadataFor(models.FactoryAppTemplateHumanReviewID, 1, models.ProviderGitHub)
+	draft.Nodes[0].Configuration = map[string]any{"enabled": false, "fallbackTeam": "acme/reviewers"}
+	publisher, err = NewCanvasPublisher(db, canvas, draft, live, canvasPublisherOptions(r))
+	require.NoError(t, err)
+	require.NoError(t, publisher.Publish(ctx))
+}
+
+func TestCanvasPublisherRejectsASecondHumanReviewPolicy(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	first := support.CreateFactoryCanvas(t, r, factory.ID, "Existing policy")
+	live, err := models.FindLiveCanvasVersionInTransaction(db, first.ID)
+	require.NoError(t, err)
+	policy := triggerNode(models.HumanReviewTriggerNodeID, "Human review policy", "onRun", map[string]any{"enabled": false, "fallbackTeam": ""})
+	policy.Metadata = models.FactoryAppTemplateMetadataFor(models.FactoryAppTemplateHumanReviewID, 1, models.ProviderGitHub)
+	require.NoError(t, db.Model(live).Update("nodes", datatypes.NewJSONSlice([]models.Node{policy})).Error)
+	second := support.CreateFactoryCanvas(t, r, factory.ID, "Another policy")
+	secondLive, err := models.FindLiveCanvasVersionInTransaction(db, second.ID)
+	require.NoError(t, err)
+	draft, err := models.CreateCommitVersionWithSpecInTransaction(db, second.ID, r.User, "Install Human review", []models.Node{policy}, nil)
+	require.NoError(t, err)
+	publisher, err := NewCanvasPublisher(db, second, draft, secondLive, canvasPublisherOptions(r))
+	require.NoError(t, err)
+	ctx := authentication.SetUserIdInMetadata(t.Context(), r.User.String())
+	require.Equal(t, codes.AlreadyExists, grpcerrors.Code(publisher.Publish(ctx)))
+	unchanged, err := models.FindLiveCanvasVersionInTransaction(db, second.ID)
+	require.NoError(t, err)
+	require.Equal(t, secondLive.ID, unchanged.ID)
+}
 
 func TestCanvasPublisherSubscriptionIntakePreservesDisconnectedDefaultAndValidatesReplacement(t *testing.T) {
 	r := support.Setup(t)

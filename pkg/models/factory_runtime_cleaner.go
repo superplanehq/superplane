@@ -64,6 +64,9 @@ func (c *FactoryRuntimeCleaner) Run() error {
 			return c.delete(&FactoryWorkOrderCheck{}, "factory_id = ?", c.factory.ID)
 		}},
 		{"delete work order assignees", c.deleteAssignees},
+		{"delete human review decisions", func() error {
+			return c.delete(&FactoryHumanReviewDecision{}, "factory_id = ?", c.factory.ID)
+		}},
 		{"clear pull request current revisions", c.clearPullRequestCurrentRevisions},
 		{"delete pull request runs", c.deletePullRequestRuns},
 		{"delete pull request revisions", c.deletePullRequestRevisions},
