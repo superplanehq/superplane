@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/go-github/v84/github"
 	"github.com/google/uuid"
@@ -23,6 +24,7 @@ import (
 	"github.com/superplanehq/superplane/test/support"
 	"github.com/superplanehq/superplane/test/support/contexts"
 	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
 func gitHubPermissionTestIntegration() *contexts.IntegrationContext {
@@ -112,12 +114,13 @@ func TestGitHubIntakeActorApproval(t *testing.T) {
 		name, action, author, sender string
 		wantTask                     bool
 	}{
-		{"maintainer labels community issue", "labeled", "none", "write", true},
-		{"maintainer reopens community issue", "reopened", "none", "admin", true},
-		{"author remains sufficient", "labeled", "read", "none", true},
-		{"community author and actor", "labeled", "none", "none", false},
-		{"opened cannot use actor", "opened", "none", "write", false},
-		{"missing sender", "reopened", "none", "", false},
+		{"maintainer labels community issue", "labeled", "read", "write", true},
+		{"triage sender labels community issue", "labeled", "read", "triage", true},
+		{"maintainer reopens community issue", "reopened", "read", "admin", true},
+		{"author remains sufficient", "labeled", "triage", "read", true},
+		{"community author and actor", "labeled", "read", "read", false},
+		{"opened cannot use actor", "opened", "read", "write", false},
+		{"missing sender", "reopened", "read", "", false},
 		{"author error actor approves", "labeled", "invalid", "write", true},
 		{"lookup failure cannot approve", "labeled", "invalid", "none", false},
 	} {
@@ -154,6 +157,9 @@ func TestGitHubIntakeActorApproval(t *testing.T) {
 				if permission == "invalid" {
 					return "invalid"
 				}
+				if permission == "triage" {
+					return `{"permission":"read","role_name":"triage"}`
+				}
 				return fmt.Sprintf(`{"permission":%q}`, permission)
 			}
 			executeGitHubIntakeRun(t, r, canvas, &events[0], gitHubTestResponses(permissionBody(tc.author), permissionBody(tc.sender)))
@@ -162,6 +168,78 @@ func TestGitHubIntakeActorApproval(t *testing.T) {
 			require.Equal(t, tc.wantTask, len(orders) == 1)
 		})
 	}
+}
+
+func TestGitHubIntakeSettingsSaveRecoversAfterCommit(t *testing.T) {
+	r, factory := resetTestFactory(t)
+	defer r.Close()
+	db := database.DB(t.Context())
+	integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
+	request := intakeCanvasRequest{Source: models.FactoryIntakeSourceGitHubIssues, Settings: defaultIntakeSettings(), Binding: &intakeBinding{
+		Integration: &yaml.IntegrationRef{ID: integrationID}, Configuration: map[string]any{"repository": "acme/app"},
+	}}
+	doc, err := buildIntakeCanvas(request)
+	require.NoError(t, err)
+	nodes, edges, err := applyDefaultAuthorAccess(request, doc.Nodes(), doc.Edges())
+	require.NoError(t, err)
+	canvas := support.CreateFactoryCanvas(t, r, factory.ID, "GitHub")
+	publishGitHubTestGraph(t, r, canvas, nodes, edges)
+	intake, err := factory.CreateIntake(db, canvas.ID, request.Source)
+	require.NoError(t, err)
+	payload, err := gitHubIssueEvent(&github.Issue{Number: github.Ptr(42), HTMLURL: github.Ptr("https://github.com/acme/app/issues/42"), Title: github.Ptr("Old title"), User: &github.User{Login: github.Ptr("community")}}, "acme/app")
+	require.NoError(t, err)
+	require.NoError(t, emitIntakeEvents(db, canvas.ID, "github.issue", []map[string]any{payload}))
+	roots, err := models.ListCanvasEvents(db, canvas.ID, intakeTriggerNodeID, 1, nil)
+	require.NoError(t, err)
+	executeGitHubIntakeRun(t, r, canvas, &roots[0], gitHubTestResponses(`{"permission":"read"}`))
+	orders, err := models.ListWorkOrdersBySourceRunIDs(db, factory.ID, []uuid.UUID{roots[0].RunID})
+	require.NoError(t, err)
+	require.Empty(t, orders)
+
+	host := gitHubTestResponses(`{"number":42,"html_url":"https://github.com/acme/app/issues/42","title":"Refreshed title","state":"open","user":{"login":"community"}}`)
+	client, err := common.NewClient(gitHubPermissionTestIntegration(), host)
+	require.NoError(t, err)
+	release := make(chan struct{}, 1)
+	defer close(release)
+	deps := IntakeDependencies{Registry: r.Registry, Encryptor: r.Encryptor, AuthService: r.AuthService, WebhookBaseURL: "http://localhost:8000",
+		NewItemSource: func(ctx context.Context, _ *gorm.DB, _ *models.FactoryIntake) (intakeItemSource, error) {
+			select {
+			case <-release:
+				return &gitHubIntakeItemSource{github: client, repository: "acme/app"}, nil
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			}
+		},
+	}
+	ctx, cancel := context.WithCancel(authentication.SetUserIdInMetadata(context.Background(), r.User.String()))
+	defer cancel()
+	saved := make(chan error, 1)
+	go func() {
+		_, err := UpdateFactoryIntake(ctx, deps, r.Organization.ID.String(), &pb.UpdateFactoryIntakeRequest{
+			FactoryId: factory.ID.String(), IntakeId: intake.ID.String(), Settings: &pb.FactoryIntake_Settings{AuthorsWithAccess: false},
+		})
+		saved <- err
+	}()
+	select {
+	case err := <-saved:
+		require.NoError(t, err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("settings save waited for recovery")
+	}
+	cancel() // A completed request must not cancel the background GitHub read.
+	version := resetTestLiveVersion(t, canvas)
+	spec := models.LiveCanvasSpec{Nodes: version.Nodes, Edges: version.Edges}
+	require.False(t, intakeSettingsFromGraph(request.Source, resolveIntakeGraph(request.Source, spec), spec).AuthorsWithAccess)
+	release <- struct{}{}
+	require.Eventually(t, func() bool {
+		roots, err = models.ListCanvasEvents(db, canvas.ID, intakeTriggerNodeID, 10, nil)
+		return err == nil && len(roots) == 2
+	}, 5*time.Second, 10*time.Millisecond)
+	executeGitHubIntakeRun(t, r, canvas, &roots[0], gitHubTestResponses())
+	orders, err = models.ListWorkOrdersBySourceRunIDs(db, factory.ID, []uuid.UUID{roots[0].RunID})
+	require.NoError(t, err)
+	require.Len(t, orders, 1)
+	require.Equal(t, "Refreshed title", orders[roots[0].RunID].Title)
 }
 
 func TestGitHubIntakeDisableRecoversSkippedRun(t *testing.T) {
@@ -185,7 +263,7 @@ func TestGitHubIntakeDisableRecoversSkippedRun(t *testing.T) {
 	require.NoError(t, emitIntakeEvents(db, canvas.ID, "github.issue", []map[string]any{payload}))
 	events, err := models.ListCanvasEvents(db, canvas.ID, intakeTriggerNodeID, 1, nil)
 	require.NoError(t, err)
-	executeGitHubIntakeRun(t, r, canvas, &events[0], gitHubTestResponses(`{"permission":"none"}`))
+	executeGitHubIntakeRun(t, r, canvas, &events[0], gitHubTestResponses(`{"permission":"read"}`))
 	orders, err := models.ListWorkOrdersBySourceRunIDs(db, factory.ID, []uuid.UUID{events[0].RunID})
 	require.NoError(t, err)
 	require.Empty(t, orders)

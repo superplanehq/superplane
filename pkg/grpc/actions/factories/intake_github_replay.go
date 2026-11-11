@@ -33,24 +33,20 @@ func replaySkippedGitHubIssues(ctx context.Context, deps IntakeDependencies, db 
 	if intake.Paused() {
 		return nil
 	}
-	binding, err := liveIntakeBinding(reads, intake)
+	itemSource, err := deps.itemSource(ctx, reads, intake)
 	if err != nil {
 		return err
 	}
-	if binding == nil || binding.installation() == nil {
+	source, ok := itemSource.(*gitHubIntakeItemSource)
+	if !ok {
 		return fmt.Errorf("GitHub intake is not bound")
 	}
-	client, err := newIntakeGitHubClient(deps, reads, binding.installation())
-	if err != nil {
-		return err
-	}
-	repository, _ := binding.Configuration["repository"].(string)
-	payloads, err := skippedGitHubIssueEvents(ctx, reads, intake, client, repository)
+	payloads, err := skippedGitHubIssueEvents(ctx, reads, intake, source.github, source.repository)
 	if err != nil {
 		return err
 	}
 	// Reads can exhaust their budget. Persist the readable subset with the
-	// request context, in a separate transaction against the committed graph.
+	// background context, in a separate transaction against the committed graph.
 	return emitRecoveredGitHubIssueEvents(db, intake, payloads)
 }
 
@@ -165,13 +161,8 @@ func gitHubIssueRunWasSkipped(db *gorm.DB, event models.CanvasEvent) (bool, erro
 			}
 			failedPermissionID = &execution.ID
 		}
-		if execution.NodeID == graph.AuthorFilterNodeID || execution.NodeID == graph.FilterNodeID {
-			// Legacy scoring thresholds are not issue-filter rejections.
-			node := findIntakeNode(spec.Nodes, execution.NodeID)
-			expression, _ := node.Configuration["expression"].(string)
-			if _, scoring := intakeConfidenceFromExpression(expression); !scoring {
-				ids = append(ids, execution.ID)
-			}
+		if execution.NodeID == graph.AuthorFilterNodeID {
+			ids = append(ids, execution.ID)
 		}
 	}
 	if failedPermissionID != nil {

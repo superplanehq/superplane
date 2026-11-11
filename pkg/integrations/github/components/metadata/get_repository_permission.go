@@ -137,10 +137,15 @@ func (c *GetRepositoryPermission) Execute(ctx core.ExecutionContext) error {
 			lookupErrors = append(lookupErrors, fmt.Errorf("missing repository permission for %s", candidate))
 			continue
 		}
-		switch result.GetPermission() {
-		case "read", "triage", "write", "maintain", "admin":
+		access := result.GetPermission()
+		// GitHub maps the triage role to the legacy read permission.
+		if access == "read" && result.GetRoleName() == "triage" {
+			access = "triage"
+		}
+		switch access {
+		case "triage", "write", "maintain", "admin":
 			return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, "github.repositoryPermission", []any{result})
-		case "none":
+		case "read", "none":
 			permission = result
 		default:
 			lookupErrors = append(lookupErrors, fmt.Errorf("invalid repository permission for %s", candidate))

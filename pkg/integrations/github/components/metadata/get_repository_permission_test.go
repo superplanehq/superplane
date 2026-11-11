@@ -51,11 +51,12 @@ func TestGetRepositoryPermissionFallback(t *testing.T) {
 		requests                      int
 	}{
 		{name: "single username", author: `{"permission":"read"}`, wantPermission: "read", requests: 1},
-		{name: "actor approves", fallback: "maintainer", author: `{"permission":"none"}`, actor: `{"permission":"write"}`, wantPermission: "write", requests: 2},
-		{name: "author sufficient", fallback: "maintainer", author: `{"permission":"read"}`, wantPermission: "read", requests: 1},
+		{name: "actor approves public outsider", fallback: "maintainer", author: `{"permission":"read"}`, actor: `{"permission":"write"}`, wantPermission: "write", requests: 2},
+		{name: "triage actor approves public outsider", fallback: "maintainer", author: `{"permission":"read","role_name":"read"}`, actor: `{"permission":"read","role_name":"triage"}`, wantPermission: "read", requests: 2},
+		{name: "author sufficient", fallback: "maintainer", author: `{"permission":"read","role_name":"triage"}`, wantPermission: "read", requests: 1},
 		{name: "author error actor approves", fallback: "maintainer", author: `invalid`, actor: `{"permission":"admin"}`, wantPermission: "admin", requests: 2},
 		{name: "actor error without access", fallback: "maintainer", author: `{"permission":"none"}`, actor: `invalid`, wantError: true, requests: 2},
-		{name: "neither has access", fallback: "maintainer", author: `{"permission":"none"}`, actor: `{"permission":"none"}`, wantPermission: "none", requests: 2},
+		{name: "neither has access on public repository", fallback: "maintainer", author: `{"permission":"read"}`, actor: `{"permission":"read"}`, wantPermission: "read", requests: 2},
 		{name: "missing permission cannot approve", fallback: "maintainer", author: `{}`, actor: `{"permission":"none"}`, wantError: true, requests: 2},
 		{name: "unknown permission cannot approve", author: `{"permission":"mystery"}`, wantError: true, requests: 1},
 		{name: "normalized duplicate", fallback: " @OCTOCAT ", author: `{"permission":"none"}`, wantPermission: "none", requests: 1},

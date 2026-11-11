@@ -57,13 +57,13 @@ func TestGitHubReplaySelectionAndLimits(t *testing.T) {
 	}
 	for number := 1; number <= 25; number++ {
 		event := emit(number, "acme/app")
-		executeGitHubIntakeRun(t, r, canvas, &event, gitHubTestResponses(`{"permission":"none"}`))
+		executeGitHubIntakeRun(t, r, canvas, &event, gitHubTestResponses(`{"permission":"read"}`))
 	}
 	_ = emit(25, "acme/app") // Newest pending event suppresses the older drop.
 	wrong := emit(26, "acme/other")
-	executeGitHubIntakeRun(t, r, canvas, &wrong, gitHubTestResponses(`{"permission":"none"}`))
+	executeGitHubIntakeRun(t, r, canvas, &wrong, gitHubTestResponses(`{"permission":"read"}`))
 	unrelated := emit(27, "acme/app")
-	executeGitHubIntakeRun(t, r, canvas, &unrelated, gitHubTestResponses(`{"permission":"none"}`))
+	executeGitHubIntakeRun(t, r, canvas, &unrelated, gitHubTestResponses(`{"permission":"read"}`))
 	require.NoError(t, db.Model(&models.CanvasNodeExecution{}).Where("run_id = ? AND node_id = ?", unrelated.RunID, intakeFilterNodeID).Update("result", models.CanvasNodeExecutionResultFailed).Error)
 	failedPermission := emit(28, "acme/app")
 	executeGitHubIntakeRun(t, r, canvas, &failedPermission, gitHubTestResponses(`invalid`))
@@ -73,9 +73,18 @@ func TestGitHubReplaySelectionAndLimits(t *testing.T) {
 	// Suppress this eligible failure with a newer pending event for the batch.
 	_ = emit(28, "acme/app")
 	active := emit(29, "acme/app")
-	executeGitHubIntakeRun(t, r, canvas, &active, gitHubTestResponses(`{"permission":"read"}`))
+	executeGitHubIntakeRun(t, r, canvas, &active, gitHubTestResponses(`{"permission":"write"}`))
 	active = emit(29, "acme/app")
-	executeGitHubIntakeRun(t, r, canvas, &active, gitHubTestResponses(`{"permission":"none"}`))
+	executeGitHubIntakeRun(t, r, canvas, &active, gitHubTestResponses(`{"permission":"read"}`))
+	// A separate issue-filter rejection must not consume the author recovery budget.
+	filter := findIntakeNode(nodes, intakeFilterNodeID)
+	filter.Configuration["expression"] = "false"
+	publishGitHubTestGraph(t, r, canvas, nodes, edges)
+	filtered := emit(30, "acme/app")
+	executeGitHubIntakeRun(t, r, canvas, &filtered, gitHubTestResponses())
+	eligible, err = gitHubIssueRunWasSkipped(db, filtered)
+	require.NoError(t, err)
+	require.False(t, eligible, "disabling author access does not relax issue filters")
 	host := gitHubTestResponses()
 	for number := 24; number >= 5; number-- {
 		body := fmt.Sprintf(`{"number":%d,"html_url":"https://github.com/acme/app/issues/%d","title":"Fresh","state":"open"}`, number, number)

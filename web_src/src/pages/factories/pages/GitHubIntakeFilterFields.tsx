@@ -57,12 +57,10 @@ export function GitHubIntakeFilterFields({
             </Label>
             <div id={`${id}-authors-help`} className="space-y-1.5 text-xs text-muted-foreground">
               <p>
-                Authors need repository access. Someone with repository access can also approve an issue by labeling or
-                reopening it.
+                Only issues from people with triage or higher access create tasks. Someone with access can approve an
+                issue by labeling or reopening it.
               </p>
-              <p>When off, issues from anyone can create tasks.</p>
-              <p>Turning this off checks up to 20 recent skipped issues again.</p>
-              <p>Recovery scans up to 200 issue events from the last 30 days. Other filters still apply.</p>
+              <p>Turning this off rechecks recently skipped issues.</p>
             </div>
           </div>
         </div>

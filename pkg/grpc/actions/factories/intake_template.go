@@ -29,7 +29,8 @@ const (
 
 	intakeAuthorPermissionNodeID    = "get-author-permission"
 	intakeAuthorFilterNodeID        = "author-has-repository-access"
-	intakeAuthorPermissionCondition = `previous().data.permission in ["read", "triage", "write", "maintain", "admin"]`
+	intakeAuthorPermissionCondition = `previous().data.permission in ["triage", "write", "maintain", "admin"] || (previous().data.permission == "read" && previous().data.role_name == "triage")`
+	intakeAuthorFallbackUsername    = `{{ root().data.action in ["labeled", "reopened"] ? (root().data.sender?.login ?? "") : "" }}`
 
 	// Legacy node identifiers. A graph generated before intake became
 	// create-only still resolves so settings and health keep working.
@@ -466,7 +467,7 @@ func configureIntakeAuthorAccess(
 		Configuration: map[string]any{
 			"repository":       repository,
 			"username":         "{{ root().data.issue.user.login }}",
-			"fallbackUsername": `{{ root().data.action in ["labeled", "reopened"] ? (root().data.sender?.login ?? "") : "" }}`,
+			"fallbackUsername": intakeAuthorFallbackUsername,
 		},
 		Position:      models.Position{X: 160, Y: 440},
 		Concurrency:   intakeModelConcurrency(),
