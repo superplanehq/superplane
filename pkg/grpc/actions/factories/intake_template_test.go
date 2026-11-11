@@ -507,7 +507,7 @@ func Test__ConfigureIntakeAuthorAccess(t *testing.T) {
 
 		gate := findModelNode(t, nodes, intakeAuthorFilterNodeID)
 		assert.Equal(t, intakeFilterComponent, gate.ComponentName())
-		assert.Equal(t, `root().data.permission != "none"`, gate.Configuration["expression"])
+		assert.Equal(t, intakeAuthorPermissionCondition, gate.Configuration["expression"])
 		assert.ElementsMatch(t, []models.Edge{
 			{Channel: "default", SourceID: intakeTriggerNodeID, TargetID: intakeFilterNodeID},
 			{Channel: "true", SourceID: intakeFilterNodeID, TargetID: intakeAuthorPermissionNodeID},

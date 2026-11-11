@@ -55,9 +55,13 @@ export function GitHubIntakeFilterFields({
             <Label htmlFor={`${id}-authors`} className="text-sm font-normal leading-5">
               Only authors with repository access
             </Label>
-            <p id={`${id}-authors-help`} className="text-xs text-muted-foreground">
-              When off, issues from anyone can create tasks.
-            </p>
+            <div id={`${id}-authors-help`} className="space-y-1.5 text-xs text-muted-foreground">
+              <p>
+                Only issues from people with triage or higher access create tasks. Someone with access can approve an
+                issue by labeling or reopening it.
+              </p>
+              <p>Turning this off rechecks recently skipped issues.</p>
+            </div>
           </div>
         </div>
         <div className="flex items-center gap-3">

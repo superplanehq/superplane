@@ -1239,7 +1239,7 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		assert.Equal(t, backlogRepository, permissionNode.Configuration["repository"])
 		assert.Equal(t, "{{ root().data.issue.user.login }}", permissionNode.Configuration["username"])
 		require.NotNil(t, authorFilterNode)
-		assert.Equal(t, `root().data.permission != "none"`, authorFilterNode.Configuration["expression"])
+		assert.Equal(t, intakeAuthorPermissionCondition, authorFilterNode.Configuration["expression"])
 		assert.Contains(t, liveVersion.Edges, models.Edge{
 			Channel:  "true",
 			SourceID: intakeAuthorFilterNodeID,

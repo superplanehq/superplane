@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-github/v84/github"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -449,6 +450,30 @@ func TestResetIntakePreservesGeneralSettings(t *testing.T) {
 			spec := models.LiveCanvasSpec{Nodes: version.Nodes, Edges: version.Edges}
 			actual := intakeSettingsFromGraph(source, resolveIntakeGraph(source, spec), spec)
 			assert.Equal(t, expected, serializeIntakeSettings(source, actual))
+			if source == models.FactoryIntakeSourceGitHubIssues && !tc.paused {
+				payload, err := gitHubIssueEvent(&github.Issue{Number: github.Ptr(42), HTMLURL: github.Ptr("https://github.com/acme/app/issues/42"), Title: github.Ptr("Community issue"), State: github.Ptr("open"), User: &github.User{Login: github.Ptr("community")}}, "acme/app")
+				require.NoError(t, err)
+				if tc.restrictAuthors {
+					payload["action"] = "labeled"
+					payload["label"] = map[string]any{"name": "superplane"}
+					payload["sender"] = map[string]any{"login": "maintainer"}
+				}
+				db := database.DB(t.Context())
+				events, err := models.ListCanvasEvents(db, canvas.ID, intakeTriggerNodeID, 200, nil)
+				require.NoError(t, err)
+				require.Empty(t, events, "reset does not replay settings")
+				require.NoError(t, emitIntakeEvents(db, canvas.ID, "github.issue", []map[string]any{payload}))
+				events, err = models.ListCanvasEvents(db, canvas.ID, intakeTriggerNodeID, 1, nil)
+				require.NoError(t, err)
+				host := gitHubTestResponses(`{"permission":"none"}`, `{"permission":"write"}`)
+				executeGitHubIntakeRun(t, r, canvas, &events[0], host)
+				if !tc.restrictAuthors {
+					require.Empty(t, host.Requests, "disabled gate does not check permissions after reset")
+				}
+				orders, err := models.ListWorkOrdersBySourceRunIDs(db, factory.ID, []uuid.UUID{events[0].RunID})
+				require.NoError(t, err)
+				require.Len(t, orders, 1)
+			}
 			if source == models.FactoryIntakeSourceLinearIssues {
 				assertResetLinearIntakeScope(t, version)
 			}
