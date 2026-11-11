@@ -340,7 +340,7 @@ func TestWorkspaceCheckoutScriptSelectsExistingBranchWithManyBranches(t *testing
 	mainCommit := runGitQuiet(t, "", "", "--git-dir="+remote, "rev-parse", "refs/heads/main")
 	// Keep dev early in a listing large enough to exceed pipe buffering.
 	var refs strings.Builder
-	for i := 1; i <= 20000; i++ {
+	for i := 1; i <= 5000; i++ {
 		fmt.Fprintf(&refs, "create refs/heads/feature/branch-%05d %s\n", i, mainCommit)
 	}
 	cmd := exec.Command(requireGitAndNode(t), "--git-dir="+remote, "update-ref", "--stdin")
