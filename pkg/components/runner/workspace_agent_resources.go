@@ -493,7 +493,8 @@ clone_default_branch() {
   fi
   rm -rf repo
   heads="$(git ls-remote --heads "${REPO_URL}")" || exit 1
-  if [ -n "$requested_branch" ] && printf '%s\n' "$heads" | awk '{print $2}' | grep -Fxq "refs/heads/${requested_branch}"; then
+  # Read all heads so an early match cannot cause SIGPIPE under pipefail.
+  if [ -n "$requested_branch" ] && printf '%s\n' "$heads" | awk -v ref="refs/heads/${requested_branch}" '$2 == ref {found=1} END {exit !found}'; then
     git clone --depth 1 --branch "${requested_branch}" "${REPO_URL}" repo
     branch="$requested_branch"
     return 0
