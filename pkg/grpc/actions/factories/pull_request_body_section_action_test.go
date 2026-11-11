@@ -215,6 +215,54 @@ func TestBodySectionActionSkipsWriteAfterCancellationDuringDescriptionRead(t *te
 	}
 }
 
+func TestBodySectionActionRechecksIdenticalContentBeforeCompletion(t *testing.T) {
+	for _, scenario := range []string{"eligible", "cancelled", "superseded", "disabled"} {
+		t.Run(scenario, func(t *testing.T) {
+			f := newPublicationFixture(t)
+			execution, request := f.arbitraryPublicationRequest(t)
+			host := &publicationHTTPContext{
+				HTTPContext: contexts.HTTPContext{Responses: []*http.Response{
+					descriptionResponse(t, models.ProviderGitHub, "<!-- superplane:merge-confidence:start -->\narbitrary **Markdown**\n<!-- superplane:merge-confidence:end -->"),
+				}},
+				beforeRequest: func(*http.Request) {
+					switch scenario {
+					case "cancelled":
+						require.NoError(t, f.run.MarkAsCancelling(f.db, nil))
+					case "superseded":
+						newer, err := models.CreateCanvasRunInTransaction(f.db, f.canvas.ID, "trigger", models.CanvasRunStateStarted, "")
+						require.NoError(t, err)
+						_, err = f.pr.CreateActivity(f.db, models.FactoryPullRequestActivityParams{RunID: newer.ID})
+						require.NoError(t, err)
+					case "disabled":
+						f.publishVersion(t, func(version *models.CanvasVersion) {
+							findIntakeNode(version.Nodes, "publish").Configuration["enabled"] = false
+						})
+					}
+				},
+			}
+			installPublicationGitHub(t, host)
+			events, err := ProcessBodySectionPublicationRequest(t.Context(), IntakeDependencies{}, request.ID, models.LockNodeRequestNow)
+			require.NoError(t, err)
+			require.Len(t, host.Requests, 1)
+			require.NoError(t, f.db.First(execution, "id = ?", execution.ID).Error)
+			expectedStatus := "skipped"
+			if scenario == "eligible" {
+				expectedStatus = "unchanged"
+			}
+			assert.Equal(t, expectedStatus, execution.Metadata.Data()["status"])
+			assert.Equal(t, models.CanvasNodeExecutionResultPassed, execution.Result)
+			require.Len(t, events, 1)
+			assert.Equal(t, "default", events[0].Channel)
+			encoded, err := events[0].Data.MarshalJSON()
+			require.NoError(t, err)
+			var envelope map[string]any
+			require.NoError(t, json.Unmarshal(encoded, &envelope))
+			assert.Equal(t, "pullRequest.bodySectionUpdated", envelope["type"])
+			assert.Equal(t, expectedStatus, envelope["data"].(map[string]any)["status"])
+		})
+	}
+}
+
 func (f publicationFixture) publishVersion(t *testing.T, change func(*models.CanvasVersion)) *models.CanvasVersion {
 	t.Helper()
 	canvas, err := models.FindCanvasInTransaction(f.db, f.canvas.OrganizationID, f.canvas.ID)

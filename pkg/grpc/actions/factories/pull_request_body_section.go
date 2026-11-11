@@ -18,7 +18,7 @@ import (
 type bodySectionPublicationOutcome = prbody.Outcome
 
 func skippedBodySection(reason string) bodySectionPublicationOutcome {
-	return bodySectionPublicationOutcome{Status: "skipped", Reason: reason}
+	return prbody.Skipped(reason)
 }
 
 type sectionPublication struct {

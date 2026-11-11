@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/config"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
@@ -47,7 +48,7 @@ func (s *EventContext) emit(payloadType string, payload any, dedupKey string) er
 	}
 
 	if len(data) > s.maxPayloadSize {
-		return fmt.Errorf("event payload too large: %d bytes (max %d)", len(data), s.maxPayloadSize)
+		return fmt.Errorf("%w: %d bytes (max %d)", core.ErrEventPayloadTooLarge, len(data), s.maxPayloadSize)
 	}
 
 	now := time.Now()

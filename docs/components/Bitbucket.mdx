@@ -658,13 +658,13 @@ Update one marked section in a pull request description. Select the integration,
 
 Use a stable section key with lowercase letters, numbers, and single hyphens. Start with a letter. The maximum length is 64 characters. Expressions are not supported in the section key.
 
-The section uses `<!-- superplane:KEY:start -->` and `<!-- superplane:KEY:end -->` markers. Missing sections are appended. Content outside the section is preserved byte for byte. Invalid markers and unchanged content are skipped.
+The section uses `<!-- superplane:KEY:start -->` and `<!-- superplane:KEY:end -->` markers. Missing sections are appended. Content outside the section is preserved byte for byte. Invalid markers produce skipped. Identical content produces unchanged when publication is still eligible. Writes produce published.
 
 The body supports canvas expressions. Use `markdownText(value)` in Markdown tables and `markdownLink(url)` in link destinations. The resolved body is saved with the execution and reused on retries.
 
 Set **Expected Head SHA** to skip publication if the pull request commit changes. Closed pull requests are skipped. **Enabled** defaults to true.
 
-Temporary failures retry through scheduled requests. Each attempt reads the latest description. Provider calls run outside database transactions. Execution details show attempts and skipped outcomes.
+Temporary failures retry through scheduled requests. Each attempt reads the latest description. Provider calls run outside database transactions. Execution details show attempts and publication outcomes.
 
 In factory apps, disabling the published node stops pending writes. Newer runs for the same pull request and section supersede older runs.
 
