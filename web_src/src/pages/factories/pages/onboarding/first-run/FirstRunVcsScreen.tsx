@@ -3,6 +3,8 @@ import { useIntegrationResources } from "@/hooks/useIntegrations";
 import { useOrganization } from "@/hooks/useOrganizationData";
 import { FEATURE_FLAG_GITHUB_ENTERPRISE } from "@/lib/experimentalFeatures";
 import { FEATURE_GITHUB_ENTERPRISE, hasOrganizationEnterpriseFeature } from "@/lib/license";
+import { QueryClientContext } from "@tanstack/react-query";
+import { useContext, type ReactNode } from "react";
 
 import { RepositoryBranchPromptLoader } from "../RepositoryBranchPromptLoader";
 import type { RepositoryBranchPrompt } from "../repositoryBranchPrompt";
@@ -115,6 +117,14 @@ type FirstRunVcsScreenProps = {
 };
 
 export function FirstRunVcsScreen(props: FirstRunVcsScreenProps) {
+  return (
+    <GitHubEnterpriseLicense organizationId={props.organizationId}>
+      {(githubEnterpriseLicensed) => <FirstRunVcsBody {...props} githubEnterpriseLicensed={githubEnterpriseLicensed} />}
+    </GitHubEnterpriseLicense>
+  );
+}
+
+function FirstRunVcsBody(props: FirstRunVcsScreenProps & { githubEnterpriseLicensed: boolean }) {
   const model = props.model;
   if (!model.defaultBranchRequired) return <FirstRunVcsChoices {...props} />;
   return (
@@ -129,6 +139,30 @@ export function FirstRunVcsScreen(props: FirstRunVcsScreenProps) {
   );
 }
 
+function GitHubEnterpriseLicenseQuery({
+  organizationId,
+  children,
+}: {
+  organizationId: string;
+  children: (licensed: boolean) => ReactNode;
+}) {
+  const { data: organization } = useOrganization(organizationId);
+  return children(hasOrganizationEnterpriseFeature(organization, FEATURE_GITHUB_ENTERPRISE));
+}
+
+// Without the application query client, GitHub Enterprise stays unavailable.
+function GitHubEnterpriseLicense({
+  organizationId,
+  children,
+}: {
+  organizationId: string;
+  children: (licensed: boolean) => ReactNode;
+}) {
+  const queryClient = useContext(QueryClientContext);
+  if (!queryClient) return children(false);
+  return <GitHubEnterpriseLicenseQuery organizationId={organizationId}>{children}</GitHubEnterpriseLicenseQuery>;
+}
+
 function FirstRunVcsChoices({
   screen,
   organizationId,
@@ -136,10 +170,9 @@ function FirstRunVcsChoices({
   model,
   chrome,
   branchPrompt,
-}: FirstRunVcsScreenProps & { branchPrompt?: RepositoryBranchPrompt }) {
-  const { data: organization } = useOrganization(organizationId);
+  githubEnterpriseLicensed,
+}: FirstRunVcsScreenProps & { branchPrompt?: RepositoryBranchPrompt; githubEnterpriseLicensed: boolean }) {
   const showGitHubEnterprise = useExperimentalFeature(organizationId).has(FEATURE_FLAG_GITHUB_ENTERPRISE);
-  const githubEnterpriseLicensed = hasOrganizationEnterpriseFeature(organization, FEATURE_GITHUB_ENTERPRISE);
   const setup = model.setup;
   if (screen === "host") {
     return (
