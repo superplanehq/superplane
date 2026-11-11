@@ -1,6 +1,7 @@
 package contexts
 
 import (
+	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
 )
@@ -27,5 +28,9 @@ func NewAppExecutionContext(
 }
 
 func (c *AppExecutionContext) Broadcast(payload any) error {
-	return models.CreateAppMessage(c.tx, c.canvas.ID, c.node.NodeID, payload)
+	var sourceRunID *uuid.UUID
+	if c.execution != nil && c.execution.RunID != uuid.Nil {
+		sourceRunID = &c.execution.RunID
+	}
+	return models.CreateAppMessage(c.tx, c.canvas.ID, c.node.NodeID, payload, sourceRunID)
 }

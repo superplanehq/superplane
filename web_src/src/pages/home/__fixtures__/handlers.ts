@@ -155,6 +155,17 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
               description: "Software factories for tasks",
             },
             {
+              id: "factory_step_actions",
+              label: "Step actions",
+              description: "Show agent action reasons on the step card",
+            },
+            {
+              id: "factory_human_review",
+              label: "Request review",
+              description: "Add the Request review automation to Verify",
+              released: false,
+            },
+            {
               id: "organization_byok",
               label: "Organization BYOK",
               description: "Show the organization Models settings page",

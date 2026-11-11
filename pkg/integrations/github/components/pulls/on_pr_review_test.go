@@ -24,6 +24,38 @@ func Test__OnPRReview__HandleWebhook(t *testing.T) {
 		"repository":{"full_name":"testhq/hello"}
 	}`
 
+	t.Run("review actions preserve submitted-only defaults", func(t *testing.T) {
+		for _, scenario := range []struct {
+			name    string
+			action  string
+			actions []string
+			want    int
+		}{
+			{name: "default submitted", action: "submitted", want: 1},
+			{name: "default dismissed", action: "dismissed"},
+			{name: "configured dismissed", action: "dismissed", actions: []string{"submitted", "dismissed"}, want: 1},
+			{name: "dismissed only excludes submitted", action: "submitted", actions: []string{"dismissed"}},
+			{name: "unsupported edited", action: "edited", actions: []string{"submitted", "dismissed"}},
+		} {
+			t.Run(scenario.name, func(t *testing.T) {
+				body := []byte(fmt.Sprintf(`{"action":%q,"review":{"id":987,"body":"","user":{"login":"jules","type":"User"}},"pull_request":{"number":42},"repository":{"full_name":"testhq/hello"}}`, scenario.action))
+				events := &contexts.EventContext{}
+				httpCtx := reviewCommentsHTTPContext(`[]`)
+				config := map[string]any{"repository": "hello"}
+				if scenario.actions != nil {
+					config["actions"] = scenario.actions
+				}
+				code, _, err := trigger.HandleWebhook(reviewWebhookContext(body, signedHeaders(body, "test-secret", eventType), events, httpCtx, config))
+				require.NoError(t, err)
+				assert.Equal(t, http.StatusOK, code)
+				assert.Equal(t, scenario.want, events.Count())
+				if scenario.action == "dismissed" {
+					assert.Empty(t, httpCtx.Requests, "dismissal does not need the submitted review comments")
+				}
+			})
+		}
+	})
+
 	t.Run("no X-Hub-Signature-256 -> 403", func(t *testing.T) {
 		headers := http.Header{}
 		headers.Set("X-GitHub-Event", eventType)

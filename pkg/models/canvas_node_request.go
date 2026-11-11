@@ -23,16 +23,18 @@ const (
 )
 
 type CanvasNodeRequest struct {
-	ID          uuid.UUID
-	WorkflowID  uuid.UUID
-	NodeID      string
-	ExecutionID *uuid.UUID
-	State       string
-	Type        string
-	Spec        datatypes.JSONType[NodeExecutionRequestSpec]
-	RunAt       time.Time
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	ID             uuid.UUID
+	WorkflowID     uuid.UUID
+	NodeID         string
+	ExecutionID    *uuid.UUID
+	State          string
+	Type           string
+	Spec           datatypes.JSONType[NodeExecutionRequestSpec]
+	RunAt          time.Time
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+	LeaseID        *uuid.UUID
+	LeaseExpiresAt *time.Time
 }
 
 func (r *CanvasNodeRequest) TableName() string {
@@ -82,6 +84,7 @@ func LockNodeRequestNow(tx *gorm.DB, id uuid.UUID) (*CanvasNodeRequest, error) {
 		}).
 		Where("workflow_node_requests.id = ?", id).
 		Where("workflow_node_requests.state = ?", NodeExecutionRequestStatePending).
+		Where("workflow_node_requests.lease_expires_at IS NULL OR workflow_node_requests.lease_expires_at <= ?", time.Now()).
 		Where("workflow_node_requests.type <> ?", NodeRequestTypePullRequestChecksStart)
 
 	err := withActiveCanvas(query, "workflow_node_requests.workflow_id").
@@ -104,6 +107,7 @@ func ListNodeRequests() ([]CanvasNodeRequest, error) {
 		Select("workflow_node_requests.*").
 		Where("workflow_node_requests.state = ?", NodeExecutionRequestStatePending).
 		Where("workflow_node_requests.run_at <= ?", now).
+		Where("workflow_node_requests.lease_expires_at IS NULL OR workflow_node_requests.lease_expires_at <= ?", now).
 		Where("workflow_node_requests.type <> ?", NodeRequestTypePullRequestChecksStart)
 
 	err := withActiveCanvas(query, "workflow_node_requests.workflow_id").
@@ -151,9 +155,67 @@ func FindPendingRequestForNode(tx *gorm.DB, workflowID uuid.UUID, nodeID string)
 
 func (r *CanvasNodeRequest) Complete(tx *gorm.DB) error {
 	return tx.Model(r).
-		Update("state", NodeExecutionRequestStateCompleted).
-		Update("updated_at", time.Now()).
+		Updates(map[string]any{
+			"state":            NodeExecutionRequestStateCompleted,
+			"updated_at":       time.Now(),
+			"lease_id":         nil,
+			"lease_expires_at": nil,
+		}).
 		Error
+}
+
+// ClaimLease must run while the pending request is locked.
+func (r *CanvasNodeRequest) ClaimLease(tx *gorm.DB, duration time.Duration) error {
+	now := time.Now()
+	leaseID := uuid.New()
+	expiresAt := now.Add(duration)
+	if err := tx.Model(r).Updates(map[string]any{
+		"lease_id":         leaseID,
+		"lease_expires_at": expiresAt,
+		"updated_at":       now,
+	}).Error; err != nil {
+		return err
+	}
+	r.LeaseID = &leaseID
+	r.LeaseExpiresAt = &expiresAt
+	return nil
+}
+
+// LockNodeRequestLease fences mutations made by a background handler.
+func LockNodeRequestLease(tx *gorm.DB, request *CanvasNodeRequest) error {
+	if request.LeaseID == nil {
+		return gorm.ErrRecordNotFound
+	}
+	var owned CanvasNodeRequest
+	query := tx.Table("workflow_node_requests").
+		Select("workflow_node_requests.*").
+		Clauses(clause.Locking{Strength: "UPDATE", Table: clause.Table{Name: "workflow_node_requests"}}).
+		Where("workflow_node_requests.id = ? AND workflow_node_requests.state = ?", request.ID, NodeExecutionRequestStatePending).
+		Where("workflow_node_requests.lease_id = ? AND workflow_node_requests.lease_expires_at > ?", request.LeaseID, time.Now())
+	return withActiveCanvas(query, "workflow_node_requests.workflow_id").First(&owned).Error
+}
+
+func (r *CanvasNodeRequest) CompleteLease(tx *gorm.DB) (bool, error) {
+	return r.finishLease(tx, map[string]any{"state": NodeExecutionRequestStateCompleted})
+}
+
+func (r *CanvasNodeRequest) RescheduleLease(tx *gorm.DB, runAt time.Time) (bool, error) {
+	return r.finishLease(tx, map[string]any{"run_at": runAt})
+}
+
+func (r *CanvasNodeRequest) finishLease(tx *gorm.DB, updates map[string]any) (bool, error) {
+	if r.LeaseID == nil {
+		return false, nil
+	}
+	now := time.Now()
+	updates["lease_id"] = nil
+	updates["lease_expires_at"] = nil
+	updates["updated_at"] = now
+	result := tx.Model(&CanvasNodeRequest{}).
+		Where("id = ? AND state = ?", r.ID, NodeExecutionRequestStatePending).
+		Where("lease_id = ? AND lease_expires_at > ?", r.LeaseID, now).
+		Updates(updates)
+	return result.RowsAffected == 1, result.Error
 }
 
 func (r *CanvasNodeRequest) Reschedule(tx *gorm.DB, runAt time.Time) error {
@@ -239,7 +301,7 @@ func CompletePendingExecutionActionRequests(tx *gorm.DB, executionID uuid.UUID, 
 	err = tx.Raw(`
 		WITH completed AS (
 			UPDATE workflow_node_requests
-			SET state = ?, updated_at = ?
+			SET state = ?, updated_at = ?, lease_id = NULL, lease_expires_at = NULL
 			WHERE id IN (
 				SELECT id FROM workflow_node_requests
 				WHERE execution_id = ?
@@ -278,8 +340,10 @@ func CompletePendingRequestsForExecution(tx *gorm.DB, executionID uuid.UUID) err
 	return tx.Model(&CanvasNodeRequest{}).
 		Where("id IN ?", ids).
 		Updates(map[string]any{
-			"state":      NodeExecutionRequestStateCompleted,
-			"updated_at": time.Now(),
+			"state":            NodeExecutionRequestStateCompleted,
+			"updated_at":       time.Now(),
+			"lease_id":         nil,
+			"lease_expires_at": nil,
 		}).
 		Error
 }

@@ -55,6 +55,15 @@ func Test__Get(t *testing.T) {
 		assert.Nil(t, f.Released)
 	})
 
+	t.Run("Request review is available for organization opt-in", func(t *testing.T) {
+		f, ok := Get(FeatureFactoryHumanReview)
+		assert.True(t, ok)
+		assert.Equal(t, "Request review", f.Label)
+		assert.Equal(t, "Add the Request review automation to Verify", f.Description)
+		assert.False(t, f.Hidden)
+		assert.False(t, IsReleased(FeatureFactoryHumanReview))
+	})
+
 	t.Run("retired workspace agent flag is absent", func(t *testing.T) {
 		feature, ok := Get("workspace_agent")
 		assert.False(t, ok)

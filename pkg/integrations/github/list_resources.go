@@ -75,6 +75,9 @@ func (g *GitHub) ListResources(resourceType string, ctx core.ListResourcesContex
 	case "review_bot":
 		return g.listReviewBotResources(ctx)
 
+	case "reviewer":
+		return g.listReviewerResources(ctx)
+
 	default:
 		return []core.IntegrationResource{}, nil
 	}

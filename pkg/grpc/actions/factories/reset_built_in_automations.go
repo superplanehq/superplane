@@ -220,11 +220,12 @@ func resetBuiltInAutomation(
 		nodes,
 		edges,
 		changesets.CanvasPublisherOptions{
-			Registry:       deps.Registry,
-			OrgID:          canvas.OrganizationID,
-			Encryptor:      deps.Encryptor,
-			AuthService:    deps.AuthService,
-			WebhookBaseURL: deps.WebhookBaseURL,
+			Registry:               deps.Registry,
+			OrgID:                  canvas.OrganizationID,
+			Encryptor:              deps.Encryptor,
+			AuthService:            deps.AuthService,
+			WebhookBaseURL:         deps.WebhookBaseURL,
+			BuiltInAutomationReset: true,
 		},
 	)
 	if err != nil {

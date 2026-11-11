@@ -33,6 +33,8 @@ func TestPublicManifestJSON(t *testing.T) {
 	permissions, ok := manifest["default_permissions"].(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, "write", permissions["contents"])
+	assert.Equal(t, "write", permissions["checks"])
+	assert.Equal(t, "write", permissions["pull_requests"])
 	assert.Equal(t, "read", permissions["members"])
 	_, hasEmailPermission := permissions["email_addresses"]
 	assert.False(t, hasEmailPermission)
