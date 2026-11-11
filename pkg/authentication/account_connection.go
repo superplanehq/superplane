@@ -13,6 +13,7 @@ import (
 	"github.com/markbates/goth"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 )
 
@@ -87,6 +88,11 @@ func (a *Handler) parseConnectState(state string) (*connectState, error) {
 // It issues no session and writes no sign-in credential, so a linked account
 // never becomes a way to sign in.
 func (a *Handler) completeAccountConnection(w http.ResponseWriter, r *http.Request, gothUser goth.User, state *connectState) {
+	logging.AddRequestLogFields(r.Context(), log.Fields{
+		"action":  "link_account",
+		"object":  "account",
+		"outcome": "failure",
+	})
 	if !strings.EqualFold(gothUser.Provider, state.Provider) {
 		http.Error(w, "Linked account does not match", http.StatusBadRequest)
 		return
@@ -136,6 +142,13 @@ func (a *Handler) completeAccountConnection(w http.ResponseWriter, r *http.Reque
 		http.Error(w, "Failed to link account", http.StatusInternalServerError)
 		return
 	}
+
+	logging.AddRequestLogFields(r.Context(), log.Fields{
+		"account_id":       sessionAccount.ID.String(),
+		"object_id":        sessionAccount.ID.String(),
+		"outcome":          "success",
+		"settings_updated": []string{"linked_accounts"},
+	})
 
 	http.Redirect(w, r, connectSuccessRedirectURL(state.Redirect, gothUser.Provider), http.StatusSeeOther) // #nosec G710 -- parseConnectState validates the internal redirect path.
 }

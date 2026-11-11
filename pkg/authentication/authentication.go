@@ -28,6 +28,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/githubapp"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/jwt"
+	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/supportsession"
 	"github.com/superplanehq/superplane/pkg/utils"
@@ -369,6 +370,11 @@ func (a *Handler) finishProviderAuth(w http.ResponseWriter, r *http.Request, got
 }
 
 func (a *Handler) handleAuthCallback(w http.ResponseWriter, r *http.Request) {
+	logging.AddRequestLogFields(r.Context(), log.Fields{
+		"action":  "login",
+		"object":  "account",
+		"outcome": "failure",
+	})
 	// Login starts on one pod and the callback can land on another. Load the
 	// saved GitHub client before gothic reads it, the same way login does.
 	if mux.Vars(r)["provider"] == models.ProviderGitHub {
@@ -414,12 +420,17 @@ func (a *Handler) completeProviderAuth(w http.ResponseWriter, r *http.Request, g
 		return
 	}
 
+	logging.AddRequestLogFields(r.Context(), log.Fields{
+		"action":  "login",
+		"object":  "account",
+		"outcome": "failure",
+	})
 	if strings.EqualFold(gothUser.Provider, models.ProviderBitbucket) {
 		http.Error(w, "Bitbucket does not support sign-in", http.StatusBadRequest)
 		return
 	}
 
-	account, wasCreated, err := a.findOrCreateAccountForProvider(gothUser, a.canCreateAccountFromRequest(r, gothUser.Email))
+	account, wasCreated, err := a.findOrCreateAccountForProvider(r.Context(), gothUser, a.canCreateAccountFromRequest(r, gothUser.Email))
 	if err != nil {
 		a.handleProviderAuthError(w, r, gothUser, err)
 		return
@@ -462,6 +473,16 @@ func (a *Handler) handleProviderAuthError(w http.ResponseWriter, r *http.Request
 }
 
 func (a *Handler) handleSuccessfulAuth(w http.ResponseWriter, r *http.Request, account *models.Account, wasCreated bool) {
+	action := "login"
+	if wasCreated {
+		action = "signup"
+	}
+	logging.AddRequestLogFields(r.Context(), log.Fields{
+		"action":               action,
+		"outcome":              "failure",
+		"attempted_account_id": account.ID.String(),
+		"object_id":            account.ID.String(),
+	})
 	if account.IsBlocked() {
 		redirectAccountBlocked(w, r)
 		return
@@ -477,6 +498,20 @@ func (a *Handler) handleSuccessfulAuth(w http.ResponseWriter, r *http.Request, a
 }
 
 func (a *Handler) handleLogout(w http.ResponseWriter, r *http.Request) {
+	logging.AddRequestLogFields(r.Context(), log.Fields{
+		"action": "logout",
+		"object": "account",
+	})
+	if cookie, err := r.Cookie("account_token"); err == nil {
+		if claims, err := a.jwtSigner.ValidateAndGetClaims(cookie.Value); err == nil {
+			if accountID, ok := claims["sub"].(string); ok {
+				logging.AddRequestLogFields(r.Context(), log.Fields{
+					"account_id": accountID,
+					"object_id":  accountID,
+				})
+			}
+		}
+	}
 	gothic.Logout(w, r)
 
 	ClearAccountCookie(w, r)
@@ -530,6 +565,11 @@ func (a *Handler) handleAuthConfig(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *Handler) handlePasswordLogin(w http.ResponseWriter, r *http.Request) {
+	logging.AddRequestLogFields(r.Context(), log.Fields{
+		"action":  "login",
+		"object":  "account",
+		"outcome": "failure",
+	})
 	if !a.passwordLoginEnabled {
 		http.Error(w, "Password login is not enabled", http.StatusForbidden)
 		return
@@ -555,6 +595,11 @@ func (a *Handler) handlePasswordLogin(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid email or password", http.StatusUnauthorized)
 		return
 	}
+
+	logging.AddRequestLogFields(r.Context(), log.Fields{
+		"attempted_account_id": account.ID.String(),
+		"object_id":            account.ID.String(),
+	})
 
 	// Find password auth for this account
 	passwordAuth, err := models.FindAccountPasswordAuthByAccountID(account.ID)
@@ -590,6 +635,11 @@ func (a *Handler) handlePasswordLogin(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *Handler) handlePasswordSignup(w http.ResponseWriter, r *http.Request) {
+	logging.AddRequestLogFields(r.Context(), log.Fields{
+		"action":  "signup",
+		"object":  "account",
+		"outcome": "failure",
+	})
 	if !a.passwordLoginEnabled {
 		http.Error(w, "Password login is not enabled", http.StatusForbidden)
 		return
@@ -772,6 +822,11 @@ func (a *Handler) handleMagicCodeRequest(w http.ResponseWriter, r *http.Request)
 }
 
 func (a *Handler) handleMagicCodeVerify(w http.ResponseWriter, r *http.Request) {
+	logging.AddRequestLogFields(r.Context(), log.Fields{
+		"action":  "login",
+		"object":  "account",
+		"outcome": "failure",
+	})
 	if !a.magicCodeEnabled {
 		http.Error(w, "Magic code login is not enabled", http.StatusForbidden)
 		return
@@ -910,6 +965,10 @@ var errAccountError = fmt.Errorf("Internal server error")
 func (a *Handler) checkSignupPolicy(email string, r *http.Request) error {
 	account, err := models.FindAccountByEmail(email)
 	if err == nil {
+		logging.AddRequestLogFields(r.Context(), log.Fields{
+			"attempted_account_id": account.ID.String(),
+			"object_id":            account.ID.String(),
+		})
 		if account.IsBlocked() {
 			return models.ErrAccountBlocked
 		}
@@ -971,6 +1030,16 @@ func errorStatusForAccountError(err error) int {
 }
 
 func (a *Handler) issueSessionAndRedirect(w http.ResponseWriter, r *http.Request, account *models.Account, wasCreated bool) {
+	action := "login"
+	if wasCreated {
+		action = "signup"
+	}
+	logging.AddRequestLogFields(r.Context(), log.Fields{
+		"action":               action,
+		"outcome":              "failure",
+		"attempted_account_id": account.ID.String(),
+		"object_id":            account.ID.String(),
+	})
 	if account.IsBlocked() {
 		if strings.Contains(r.Header.Get("Accept"), jsonContentType) {
 			http.Error(w, models.AccountBlockedMessage, http.StatusForbidden)
@@ -1139,14 +1208,18 @@ func (a *Handler) parseMagicLinkToken(tokenString string) (email string, code st
 }
 
 func (a *Handler) FindOrCreateAccountForProvider(gothUser goth.User) (*models.Account, error) {
-	account, _, err := a.findOrCreateAccountForProvider(gothUser, a.SignupsEnabled())
+	account, _, err := a.findOrCreateAccountForProvider(context.Background(), gothUser, a.SignupsEnabled())
 	return account, err
 }
 
-func (a *Handler) findOrCreateAccountForProvider(gothUser goth.User, allowSignup bool) (*models.Account, bool, error) {
+func (a *Handler) findOrCreateAccountForProvider(ctx context.Context, gothUser goth.User, allowSignup bool) (*models.Account, bool, error) {
 	account, err := models.FindAccountByProvider(database.Conn(), gothUser.Provider, gothUser.UserID)
 
 	if err == nil {
+		logging.AddRequestLogFields(ctx, log.Fields{
+			"attempted_account_id": account.ID.String(),
+			"object_id":            account.ID.String(),
+		})
 		if account.IsBlocked() {
 			return nil, false, models.ErrAccountBlocked
 		}
@@ -1168,6 +1241,10 @@ func (a *Handler) findOrCreateAccountForProvider(gothUser goth.User, allowSignup
 
 	account, err = models.FindAccountByEmail(gothUser.Email)
 	if err == nil {
+		logging.AddRequestLogFields(ctx, log.Fields{
+			"attempted_account_id": account.ID.String(),
+			"object_id":            account.ID.String(),
+		})
 		if account.IsBlocked() {
 			return nil, false, models.ErrAccountBlocked
 		}

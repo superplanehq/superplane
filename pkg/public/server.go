@@ -308,6 +308,7 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 	grpcGatewayMux = runtime.NewServeMux(
 		runtime.WithMarshalerOption(runtime.MIMEWildcard, newGRPCGatewayMarshaler()),
 		runtime.WithForwardResponseOption(middleware.GatewayForwardResponseTraceOption()),
+		runtime.WithForwardResponseOption(grpc.AuditGatewayResponse),
 		runtime.WithIncomingHeaderMatcher(headersMatcher),
 		runtime.WithMiddlewares(
 			grpc.GatewayRecoveryMiddleware(),
@@ -320,6 +321,7 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 			 * We copy it into the request-scoped holder so otelmux can use it later when
 			 * recording metrics for the outer HTTP request.
 			 */
+			grpc.RecordGatewayRequest(ctx)
 			pattern, ok := runtime.HTTPPathPattern(ctx)
 			if ok {
 				setOtelMetricRoute(ctx, pattern)
@@ -403,10 +405,12 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 	adminGatewayMux := runtime.NewServeMux(
 		runtime.WithMarshalerOption(runtime.MIMEWildcard, newGRPCGatewayMarshaler()),
 		runtime.WithForwardResponseOption(middleware.GatewayForwardResponseTraceOption()),
+		runtime.WithForwardResponseOption(grpc.AuditGatewayResponse),
 		runtime.WithIncomingHeaderMatcher(headersMatcher),
 		runtime.WithMiddlewares(grpc.GatewayRecoveryMiddleware()),
 		runtime.WithErrorHandler(grpc.SanitizedGatewayErrorHandler),
 		runtime.WithMetadata(func(ctx context.Context, _ *http.Request) metadata.MD {
+			grpc.RecordGatewayRequest(ctx)
 			pattern, ok := runtime.HTTPPathPattern(ctx)
 			if ok {
 				setOtelMetricRoute(ctx, pattern)
