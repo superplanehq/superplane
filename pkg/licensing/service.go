@@ -94,14 +94,15 @@ func (e *LifecycleFailure) Unwrap() error {
 	return e.Err
 }
 
-// Entitlements answers whether an Enterprise feature is available now.
+// Entitlements answers whether an Enterprise feature is available to an
+// organization now.
 type Entitlements interface {
-	IsEntitled(feature Feature) bool
+	IsEntitled(ctx context.Context, orgID uuid.UUID, feature Feature) bool
 }
 
 type communityEntitlements struct{}
 
-func (communityEntitlements) IsEntitled(Feature) bool {
+func (communityEntitlements) IsEntitled(context.Context, uuid.UUID, Feature) bool {
 	return false
 }
 
@@ -109,23 +110,24 @@ func (communityEntitlements) IsEntitled(Feature) bool {
 // configured so that Enterprise checks fail closed.
 var Community Entitlements = communityEntitlements{}
 
-// Allows reports whether entitlements grant a feature. A nil value grants
-// nothing.
-func Allows(entitlements Entitlements, feature Feature) bool {
+// Allows reports whether entitlements grant a feature to an organization.
+// A nil value grants nothing.
+func Allows(ctx context.Context, entitlements Entitlements, orgID uuid.UUID, feature Feature) bool {
 	if entitlements == nil {
 		return false
 	}
 
-	return entitlements.IsEntitled(feature)
+	return entitlements.IsEntitled(ctx, orgID, feature)
 }
 
-// ErrNotLicensed reports that the installation license does not grant an
-// Enterprise feature.
+// ErrNotLicensed reports that an Enterprise feature is not available.
+// A missing organization grant uses this same error.
 var ErrNotLicensed = errors.New("this action requires a SuperPlane Enterprise license")
 
-// Require returns ErrNotLicensed unless the entitlements grant the feature.
-func Require(entitlements Entitlements, feature Feature) error {
-	if !Allows(entitlements, feature) {
+// Require returns ErrNotLicensed unless the entitlements grant the feature
+// to the organization.
+func Require(ctx context.Context, entitlements Entitlements, orgID uuid.UUID, feature Feature) error {
+	if !Allows(ctx, entitlements, orgID, feature) {
 		return ErrNotLicensed
 	}
 
@@ -143,8 +145,6 @@ type Service struct {
 	source      Source
 	keySync     *KeySync
 	revocations *RevocationSync
-	// grantLookup is stored for organization checks. This change does not
-	// read it. Access still follows the installation license.
 	grantLookup GrantLookup
 	lifecycle   LifecycleHandler
 	now         func() time.Time
@@ -404,8 +404,33 @@ func (s *Service) Status() Status {
 	return status
 }
 
-func (s *Service) IsEntitled(feature Feature) bool {
-	return s.Status().IsEntitled(feature)
+// IsEntitled reports whether the organization can use the feature.
+// The license must be active and must contain the feature. A development
+// license then allows every organization. Any other license also requires
+// a grant. A missing organization, a missing lookup, or a lookup error
+// denies access.
+func (s *Service) IsEntitled(ctx context.Context, orgID uuid.UUID, feature Feature) bool {
+	status := s.Status()
+	if !status.IsEntitled(feature) {
+		return false
+	}
+	if status.IsDevelopment() {
+		return true
+	}
+	if orgID == uuid.Nil || s.grantLookup == nil {
+		return false
+	}
+
+	granted, err := s.grantLookup.HasGrant(ctx, orgID, feature)
+	if err != nil {
+		log.WithError(err).WithFields(log.Fields{
+			"organization_id": orgID.String(),
+			"feature":         string(feature),
+		}).Warn("Enterprise feature grant lookup failed")
+		return false
+	}
+
+	return granted
 }
 
 // TrustedKeys reports the trusted key list. It returns false when the service
