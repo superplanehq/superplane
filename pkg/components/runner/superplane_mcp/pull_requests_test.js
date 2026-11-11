@@ -122,18 +122,6 @@ test("open_pull_request fails before the backend call when nothing changed", asy
   assert.deepEqual(client.requests, []);
 });
 
-for (const draft of [undefined, false, true]) {
-  test(`open_pull_request with configured false preserves explicit draft argument ${draft}`, async () => {
-    const { env, checkout } = workspace("repo", { BASE: "main", DRAFT_PULL_REQUESTS: "false" });
-    featureCommit(checkout, env);
-    const client = recordingClient(env);
-
-    await call("open_pull_request", { title: "Change", ...(draft === undefined ? {} : { draft }) }, client);
-
-    assert.equal(client.requests[0].body.draft, draft === true);
-  });
-}
-
 // remoteServer serves the push URL of the checkout and tracks open
 // connections, so a test can see when git lets go of the remote.
 async function remoteServer(t, checkout, env, respond) {

@@ -92,17 +92,6 @@ func RefreshFactoryPullRequestMergeabilityFromGitHubEvent(
 			factory = loaded
 			factoriesByID[factory.ID.String()] = factory
 		}
-		if githubPullRequestReviewState(eventType, payload, pullRequest.Number) != "" {
-			changed, err := reconcileFactoryPullRequestReviewState(ctx, db, deps, factory, pullRequest)
-			if err != nil {
-				log.WithError(err).Warnf("factory mergeability: failed to update review state for %s", pullRequest.ID)
-			}
-			if changed {
-				if err := publishFactoryWorkOrderUpdated(pullRequest.FactoryID.String(), pullRequest.WorkOrderID.String(), factoryevents.EventTypeOrderPullRequestUpdated); err != nil {
-					log.WithError(err).Warnf("factory mergeability: failed to publish update for order %s", pullRequest.WorkOrderID)
-				}
-			}
-		}
 		if err := refreshFactoryPullRequestMergeabilityWithRetry(ctx, db, deps, factory, pullRequest); err != nil {
 			log.WithError(err).Warnf("factory mergeability: failed to refresh pull request %s", pullRequest.ID)
 		}
@@ -110,46 +99,6 @@ func RefreshFactoryPullRequestMergeabilityFromGitHubEvent(
 }
 
 var publishFactoryWorkOrderUpdated = messages.PublishFactoryWorkOrderUpdated
-
-func reconcileFactoryPullRequestReviewState(
-	ctx context.Context,
-	db *gorm.DB,
-	deps IntakeDependencies,
-	factory *models.Factory,
-	pullRequest *models.FactoryPullRequest,
-) (bool, error) {
-	client, err := newFactoryGitHubAPI(db, deps, factory)
-	if err != nil {
-		return false, err
-	}
-	for range factoryMergeabilityRefreshAttempts {
-		current, err := factory.FindPullRequest(db, models.FactoryPullRequestLookup{ID: pullRequest.ID})
-		if err != nil {
-			return false, err
-		}
-		*pullRequest = *current
-		// Webhook payloads can arrive late. Read GitHub before each guarded write.
-		githubPR, _, err := client.GetPullRequest(ctx, pullRequest.Repository, int(pullRequest.Number))
-		if err != nil {
-			return false, err
-		}
-		if githubPR == nil || githubPR.Draft == nil {
-			return false, errFactoryPullRequestMissing
-		}
-		if githubPR.GetMerged() || strings.EqualFold(githubPR.GetState(), "closed") {
-			return false, nil
-		}
-		state := models.FactoryPullRequestStateOpen
-		if githubPR.GetDraft() {
-			state = models.FactoryPullRequestStateDraft
-		}
-		changed, err := pullRequest.SetReviewState(db, state)
-		if !errors.Is(err, models.ErrFactoryPullRequestReviewStateStale) {
-			return changed, err
-		}
-	}
-	return false, models.ErrFactoryPullRequestReviewStateStale
-}
 
 func ScheduleFactoryPullRequestMergeabilityRefresh(
 	ctx context.Context,
@@ -306,7 +255,6 @@ type githubMergeabilityWebhookPayload struct {
 	Sender      *githubWebhookUser `json:"sender"`
 	PullRequest *struct {
 		Number   int64              `json:"number"`
-		Draft    *bool              `json:"draft"`
 		Merged   bool               `json:"merged"`
 		MergedAt string             `json:"merged_at"`
 		ClosedAt string             `json:"closed_at"`
@@ -535,26 +483,6 @@ func isGitHubPullRequestClosedEvent(eventType string, payload githubMergeability
 	return strings.EqualFold(strings.TrimSpace(eventType), "pull_request") &&
 		strings.EqualFold(strings.TrimSpace(payload.Action), "closed") &&
 		payload.PullRequest != nil
-}
-
-func githubPullRequestReviewState(eventType string, payload githubMergeabilityWebhookPayload, number int64) string {
-	if !strings.EqualFold(strings.TrimSpace(eventType), "pull_request") || payload.PullRequest == nil || payload.PullRequest.Number != number {
-		return ""
-	}
-	if payload.PullRequest.Draft != nil {
-		if *payload.PullRequest.Draft {
-			return models.FactoryPullRequestStateDraft
-		}
-		return models.FactoryPullRequestStateOpen
-	}
-	switch strings.ToLower(strings.TrimSpace(payload.Action)) {
-	case "ready_for_review":
-		return models.FactoryPullRequestStateOpen
-	case "converted_to_draft":
-		return models.FactoryPullRequestStateDraft
-	default:
-		return ""
-	}
 }
 
 func parseGitHubMergeabilityWebhookPayload(eventType string, body []byte) (githubMergeabilityWebhookPayload, bool) {

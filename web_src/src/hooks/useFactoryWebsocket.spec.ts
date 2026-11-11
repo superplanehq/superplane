@@ -123,7 +123,6 @@ describe("useFactoryWebsocket", () => {
       describeResponse({
         id: "order-1",
         title: "New",
-        pullRequests: [{ id: "pr-1", state: "STATE_OPEN" }],
         checks: [{ key: "confidence", name: "Confidence score", score: 4, maxScore: 5, analysis: "long" }],
         planningSession: {
           id: "ps-1",
@@ -136,15 +135,13 @@ describe("useFactoryWebsocket", () => {
     );
     const { queryClient, invalidateSpy } = renderFactoryWebsocket();
     queryClient.setQueryData(factoryQueryKeys.workOrders("org-1", "factory-1"), [
-      { id: "order-1", title: "Old", pullRequests: [{ id: "pr-1", state: "STATE_DRAFT" }] },
+      { id: "order-1", title: "Old" },
       { id: "order-2", title: "Other" },
     ]);
-    const detailKey = factoryQueryKeys.workOrderDetail("org-1", "factory-1", "order-1");
-    queryClient.setQueryData(detailKey, { id: "order-1", pullRequests: [{ id: "pr-1", state: "STATE_DRAFT" }] });
 
     await emit({
       event: "work_order_updated",
-      payload: { factoryId: "factory-1", orderId: "order-1", reason: "order.pull_request.updated" },
+      payload: { factoryId: "factory-1", orderId: "order-1", reason: "order.agent_question" },
     });
 
     expect(describeWorkOrder).toHaveBeenCalledTimes(1);
@@ -154,7 +151,6 @@ describe("useFactoryWebsocket", () => {
     expect(orders?.[0]).toMatchObject({
       id: "order-1",
       title: "New",
-      pullRequests: [{ id: "pr-1", state: "STATE_OPEN" }],
       checkScores: [{ key: "confidence", name: "Confidence score", score: 4, maxScore: 5 }],
       planningSession: {
         id: "ps-1",
@@ -165,9 +161,6 @@ describe("useFactoryWebsocket", () => {
       },
     });
     expect(orders?.[1]).toEqual({ id: "order-2", title: "Other" });
-    expect(queryClient.getQueryData<FactoriesWorkOrder>(detailKey)?.pullRequests).toEqual([
-      { id: "pr-1", state: "STATE_OPEN" },
-    ]);
     expect(invalidateSpy).toHaveBeenCalledWith({
       queryKey: factoryQueryKeys.workOrderEvents("org-1", "factory-1", "order-1"),
     });

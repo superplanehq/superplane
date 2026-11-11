@@ -32,11 +32,10 @@ func TestResetBuiltInAutomationPreservesImplementationSettings(t *testing.T) {
 		provider     string
 		max          int
 		instructions string
-		draft        bool
 		canvas       *models.Canvas
 	}{
-		{provider: models.ProviderGitHub, max: 7, instructions: "Avoid new dependencies. Include API examples in pull requests.", draft: true},
-		{provider: models.ProviderBitbucket, max: 9, instructions: "Document {{ example }} in the pull request.", draft: true},
+		{provider: models.ProviderGitHub, max: 7, instructions: "Avoid new dependencies. Include API examples in pull requests."},
+		{provider: models.ProviderBitbucket, max: 9, instructions: "Document {{ example }} in the pull request."},
 		{provider: models.ProviderGitHub, max: 3, instructions: ""},
 	}
 	for i := range cases {
@@ -54,7 +53,7 @@ func TestResetBuiltInAutomationPreservesImplementationSettings(t *testing.T) {
 			agent.Configuration["disabledAgentResourceTools"] = map[string]any{"github-resource": []any{"delete_issue"}}
 			agent.Configuration["enabledAgentResourceTools"] = map[string]any{"github-resource": []any{"get_issue"}}
 			implementationStep(t, agent, "Implementation")["prompt"] = "Retired implementation prompt"
-			setResetTestDraftPullRequests(t, doc, tc.draft)
+			setResetTestDraftPullRequests(t, doc, true)
 		})
 	}
 	require.NoError(t, resetTestOrganization(t, r))
@@ -74,7 +73,7 @@ func TestResetBuiltInAutomationPreservesImplementationSettings(t *testing.T) {
 			require.NotNil(t, agent.Concurrency)
 			assert.Equal(t, tc.max, agent.Concurrency.EffectiveMax())
 			assert.Equal(t, "team", agent.Concurrency.Key)
-			assert.Equal(t, tc.draft, resetTestDraftPullRequests(t, version.Nodes))
+			assert.True(t, resetTestDraftPullRequests(t, version.Nodes))
 			assert.NotContains(t, liveCanvasJSON(t, tc.canvas), "retired implementation prompt")
 		})
 	}
@@ -743,12 +742,8 @@ func TestResetFollowsMultiRepoTasksForTheImplementationTemplate(t *testing.T) {
 	for _, provider := range []string{models.ProviderGitHub, models.ProviderBitbucket} {
 		t.Run(provider, func(t *testing.T) {
 			r, factory := resetTestFactory(t)
-			draft := provider != models.ProviderGitHub
 			canvas := resetTestTemplate(t, r, factory, "line-implementation", provider, func(doc *yaml.Canvas) {
-				setResetTestDraftPullRequests(t, doc, draft)
-				agent := findYAMLNode(t, doc, implementationAgentNodeID)
-				agent.Configuration["additionalInstructions"] = "Keep release notes."
-				implementationStep(t, agent, "Implementation")["prompt"] = "Retired implementation prompt"
+				setResetTestDraftPullRequests(t, doc, true)
 			})
 			hasPullRequestNode := func(nodes []models.Node) bool {
 				return slices.ContainsFunc(nodes, func(node models.Node) bool { return isFactoryPullRequestComponent(node.ComponentName()) })
@@ -758,32 +753,14 @@ func TestResetFollowsMultiRepoTasksForTheImplementationTemplate(t *testing.T) {
 			require.NoError(t, resetTestOrganization(t, r))
 			current := resetTestLiveVersion(t, canvas)
 			assert.False(t, hasPullRequestNode(current.Nodes), "multi-repo agents open their own pull requests")
-			assert.Equal(t, draft, resetTestDraftPullRequests(t, current.Nodes))
-			agent := findIntakeNode(current.Nodes, implementationAgentNodeID)
-			assert.Equal(t, "Keep release notes.", agent.Configuration["additionalInstructions"])
-			if provider == models.ProviderGitHub {
-				var steps []runner.AgentStep
-				decoder, err := runner.NewSpecDecoder(&steps)
-				require.NoError(t, err)
-				require.NoError(t, decoder.Decode(agent.Configuration["steps"]))
-				var prompt string
-				for _, step := range steps {
-					if step.Name == "Implementation" {
-						require.NotNil(t, step.Prompt)
-						prompt = *step.Prompt
-					}
-				}
-				assert.NotContains(t, prompt, "Retired implementation prompt")
-				assert.Contains(t, prompt, "If DRAFT_PULL_REQUESTS is false or absent, create a pull request ready for review by default.")
-				assert.Contains(t, prompt, "For an explicit draft request, pass draft: true to open_pull_request.")
-			}
+			assert.True(t, resetTestDraftPullRequests(t, current.Nodes))
 
 			require.NoError(t, models.DisableExperimentalFeature(r.Organization.ID, features.FeatureFactoryMultiRepoTasks))
 			require.NoError(t, resetTestOrganization(t, r))
 			current = resetTestLiveVersion(t, canvas)
 			assert.True(t, hasPullRequestNode(current.Nodes))
 			assert.Nil(t, factoryEnvironmentEntry(findIntakeNode(current.Nodes, implementationAgentNodeID).Configuration, factoryDraftPullRequestsEnv))
-			assert.Equal(t, draft, resetTestDraftPullRequests(t, current.Nodes))
+			assert.True(t, resetTestDraftPullRequests(t, current.Nodes))
 		})
 	}
 }
