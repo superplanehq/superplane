@@ -24,7 +24,11 @@ func (p *OnPRReviewComment) Description() string {
 }
 
 func (p *OnPRReviewComment) Documentation() string {
-	return `The On PR Review Comment trigger starts a workflow execution when review comments are added to pull requests.
+	return `The On PR Review Comment trigger starts a workflow execution when review comments are created or edited on pull requests.
+
+The content filter checks the current comment body. Adding a matching mention in an edit can start a run. For comments that require a mention, removing it does not start a run. Each matching edit remains eligible. The comment scope and author filters also apply to edits.
+
+When review submissions are enabled, this trigger also accepts submitted reviews. Edits to submitted reviews do not start a run.
 
 ## Use Cases
 
@@ -44,7 +48,7 @@ func (p *OnPRReviewComment) Documentation() string {
 ## Event Data
 
 This trigger handles two GitHub webhook events:
-- **pull_request_review_comment**: line-level code review comments (` + "`comment`" + ` and ` + "`pull_request`" + `)
+- **pull_request_review_comment**: created and edited line-level code review comments (` + "`comment`" + ` and ` + "`pull_request`" + `)
 - **pull_request_review**: submitted review comments (` + "`review`" + ` and ` + "`pull_request`" + `)
 
 SuperPlane passes through the full GitHub webhook payload under data.

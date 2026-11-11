@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/google/go-github/v84/github"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -15,8 +16,9 @@ import (
 type GetRepositoryPermission struct{}
 
 type GetRepositoryPermissionConfiguration struct {
-	Repository string `json:"repository" mapstructure:"repository"`
-	Username   string `json:"username" mapstructure:"username"`
+	Repository       string `json:"repository" mapstructure:"repository"`
+	Username         string `json:"username" mapstructure:"username"`
+	FallbackUsername string `json:"fallbackUsername" mapstructure:"fallbackUsername"`
 }
 
 func (c *GetRepositoryPermission) Name() string {
@@ -75,6 +77,12 @@ func (c *GetRepositoryPermission) Configuration() []configuration.Field {
 			Type:     configuration.FieldTypeString,
 			Required: true,
 		},
+		{
+			Name:        "fallbackUsername",
+			Label:       "Fallback username",
+			Type:        configuration.FieldTypeString,
+			Description: "Check this user if the primary user does not have confirmed repository access.",
+		},
 	}
 }
 
@@ -107,10 +115,44 @@ func (c *GetRepositoryPermission) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to initialize GitHub client: %w", err)
 	}
 
-	username := strings.TrimPrefix(config.Username, "@")
-	permission, _, err := client.GetRepositoryPermissionLevel(context.Background(), config.Repository, username)
-	if err != nil {
-		return fmt.Errorf("failed to get repository permission level: %w", err)
+	username := normalizePermissionUsername(config.Username)
+	fallback := normalizePermissionUsername(config.FallbackUsername)
+	candidates := []string{username}
+	if fallback != "" && fallback != username {
+		candidates = append(candidates, fallback)
+	}
+	var lookupErrors []error
+	var permission *github.RepositoryPermissionLevel
+	for _, candidate := range candidates {
+		if candidate == "" {
+			lookupErrors = append(lookupErrors, errors.New("username is required"))
+			continue
+		}
+		result, _, err := client.GetRepositoryPermissionLevel(context.Background(), config.Repository, candidate)
+		if err != nil {
+			lookupErrors = append(lookupErrors, fmt.Errorf("failed to get repository permission level for %s: %w", candidate, err))
+			continue
+		}
+		if result == nil {
+			lookupErrors = append(lookupErrors, fmt.Errorf("missing repository permission for %s", candidate))
+			continue
+		}
+		access := result.GetPermission()
+		// GitHub maps the triage role to the legacy read permission.
+		if access == "read" && result.GetRoleName() == "triage" {
+			access = "triage"
+		}
+		switch access {
+		case "triage", "write", "maintain", "admin":
+			return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, "github.repositoryPermission", []any{result})
+		case "read", "none":
+			permission = result
+		default:
+			lookupErrors = append(lookupErrors, fmt.Errorf("invalid repository permission for %s", candidate))
+		}
+	}
+	if len(lookupErrors) > 0 {
+		return errors.Join(lookupErrors...)
 	}
 
 	return ctx.ExecutionState.Emit(
@@ -118,6 +160,10 @@ func (c *GetRepositoryPermission) Execute(ctx core.ExecutionContext) error {
 		"github.repositoryPermission",
 		[]any{permission},
 	)
+}
+
+func normalizePermissionUsername(username string) string {
+	return strings.ToLower(strings.TrimPrefix(strings.TrimSpace(username), "@"))
 }
 
 func (c *GetRepositoryPermission) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {

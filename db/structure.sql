@@ -4658,6 +4658,13 @@ CREATE INDEX idx_workflow_runs_parent_run_id ON public.workflow_runs USING btree
 
 
 --
+-- Name: idx_workflow_runs_retention_finished_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_runs_retention_finished_at ON public.workflow_runs USING btree (finished_at) WHERE (((state)::text = 'finished'::text) AND (finished_at IS NOT NULL));
+
+
+--
 -- Name: idx_workflow_runs_version_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -6572,7 +6579,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261111121823	f
+20261111175116	f
 \.
 
 
