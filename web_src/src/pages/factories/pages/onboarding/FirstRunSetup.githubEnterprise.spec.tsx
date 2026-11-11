@@ -80,9 +80,12 @@ vi.mock("@/contexts/useAccount", () => ({
       id: "account-1",
       name: "Ada Lovelace",
       email: "ada@example.com",
-      license: { edition: "enterprise", features: ["github_enterprise"] },
     },
   }),
+}));
+
+vi.mock("@/hooks/useOrganizationData", () => ({
+  useOrganization: () => ({ data: { id: "org-1", enterpriseFeatures: ["github_enterprise"] } }),
 }));
 
 vi.mock("@/hooks/useAccountOrganizations", () => ({

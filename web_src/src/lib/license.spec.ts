@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "bun:test";
 import {
   daysUntil,
   fetchInstallationLicenseWhenKeysReady,
+  hasOrganizationEnterpriseFeature,
   licenseExpiryWarning,
   licenseReasonMessage,
   type TrustedKeysState,
@@ -124,5 +125,16 @@ describe("fetchInstallationLicenseWhenKeysReady", () => {
     const status = await fetchInstallationLicenseWhenKeysReady(20, 5);
 
     expect(status.trusted_keys?.state).toBe("syncing");
+  });
+});
+
+describe("hasOrganizationEnterpriseFeature", () => {
+  it("uses the organization feature list", () => {
+    const organization = { enterpriseFeatures: ["groups"] };
+
+    expect(hasOrganizationEnterpriseFeature(organization, "groups")).toBe(true);
+    expect(hasOrganizationEnterpriseFeature(organization, "custom_roles")).toBe(false);
+    expect(hasOrganizationEnterpriseFeature({ enterpriseFeatures: undefined }, "groups")).toBe(false);
+    expect(hasOrganizationEnterpriseFeature(undefined, "groups")).toBe(false);
   });
 });
