@@ -275,6 +275,7 @@ func TestHandleRunnerTaskLogsWaitsUntilTheTaskStarts(t *testing.T) {
 	assert.Contains(t, waiting.Body.String(), "Logs are not available for this execution yet")
 
 	finished := createRunnerTaskForLogTest(t, resource, fleet.ID, models.RunnerTaskStateSucceeded)
+	require.NoError(t, database.Conn().Model(&finished).Update("started_at", time.Now()).Error)
 	finishedCanvasID, finishedExecutionID := createCanvasWithComponentExecution(
 		t,
 		resource,
@@ -289,6 +290,22 @@ func TestHandleRunnerTaskLogsWaitsUntilTheTaskStarts(t *testing.T) {
 	require.Equal(t, http.StatusNotFound, missing.Code)
 	assert.Empty(t, missing.Header().Get(runneraction.LiveLogErrorCodeHeader))
 	assert.Contains(t, missing.Body.String(), "Task logs not found")
+
+	for _, state := range []string{models.RunnerTaskStateFailed, models.RunnerTaskStateCanceled} {
+		t.Run(state+" before start", func(t *testing.T) {
+			task := createRunnerTaskForLogTest(t, resource, fleet.ID, state)
+			canvasID, executionID := createCanvasWithComponentExecution(t, resource,
+				runneraction.ComponentName, "runner-not-started", map[string]any{
+					runneraction.ExecutionMetadataBrokerTaskID: task.ID.String(),
+				})
+			response := runnerTaskLogsGET(t, server, signer, resource, canvasID, executionID, "")
+			require.Equal(t, http.StatusNoContent, response.Code, response.Body.String())
+			assert.Equal(t, models.RunnerTaskLogStateArchived, response.Header().Get(runnerlogs.HeaderState))
+			assert.Equal(t, "no-store", response.Header().Get("Cache-Control"))
+			assert.Empty(t, response.Body.String())
+			assert.Empty(t, response.Header().Get(runnerlogs.HeaderURL))
+		})
+	}
 }
 
 func TestHandleRunnerTaskLogsRecordsUnexpectedLookupFailure(t *testing.T) {

@@ -194,7 +194,7 @@ func (c *FactoryContext) prepareReviewRequestAgent(ctx *core.ExecutionContext, s
 	if !ok {
 		return fmt.Errorf("Review request configuration must be an object")
 	}
-	configuration = maps.Clone(configuration)
+	// Keep the execution's map so the runner's resolved hosted model is saved.
 	environment, _ := configuration["environment"].([]any)
 	environment = slices.Clone(environment)
 	for _, variable := range []struct {

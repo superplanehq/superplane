@@ -192,7 +192,7 @@ func reviewRequestCompletedProducer(t *testing.T, host *reviewRequestHTTP, score
 }
 
 func TestReviewRequestFromPublishedReportToGitHub(t *testing.T) {
-	for _, scenario := range []string{"favorable", "concerning", "concerning no review", "fallback", "no candidate", "malformed output", "reported lookup error", "agent failure", "author selected", "bot selected", "reader selected", "additional reviewer without reason", "additional reviewer", "discovery error", "permission error", "qualifying approval", "already requested", "stale before mutation", "paused after load"} {
+	for _, scenario := range []string{"favorable", "concerning", "hosted agent", "concerning no review", "fallback", "no candidate", "malformed output", "reported lookup error", "agent failure", "author selected", "bot selected", "reader selected", "additional reviewer without reason", "additional reviewer", "discovery error", "permission error", "qualifying approval", "already requested", "stale before mutation", "paused after load"} {
 		t.Run(scenario, func(t *testing.T) {
 			host := &reviewRequestHTTP{}
 			score := 2.0
@@ -205,6 +205,18 @@ func TestReviewRequestFromPublishedReportToGitHub(t *testing.T) {
 				fallback = "fallback-user"
 			}
 			consumer := reviewRequestTestCanvas(t, f, reviewRequestTemplateID, map[string]string{"mergeConfidenceAppId": f.canvas.ID.String(), "fallbackReviewer": fallback})
+			if scenario == "hosted agent" {
+				seedHostedModels(t, f.db, models.UsageProviderAnthropic, "claude-sonnet-4-6")
+				node, err := models.FindCanvasNode(f.db, consumer.ID, reviewRequestAgentNodeID)
+				require.NoError(t, err)
+				configuration := node.Configuration.Data()
+				delete(configuration, "model")
+				delete(configuration, "credentials")
+				require.NoError(t, f.db.Model(node).Updates(map[string]any{
+					"ref":           datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: models.SuperPlaneRunnerComponent}}),
+					"configuration": datatypes.NewJSONType(configuration),
+				}).Error)
+			}
 			trigger, err := models.FindCanvasNode(f.db, consumer.ID, reviewRequestTriggerNodeID)
 			require.NoError(t, err)
 			if scenario == "paused after load" {
@@ -255,6 +267,23 @@ func TestReviewRequestFromPublishedReportToGitHub(t *testing.T) {
 			immutable, err := json.Marshal(message["payload"].(map[string]any)["mergeConfidence"])
 			require.NoError(t, err)
 			require.JSONEq(t, string(immutable), reportContext)
+			if scenario == "hosted agent" {
+				tasks := &contexts.RunnerTaskContext{}
+				agentContext.RunnerTasks = tasks
+				agentContext.Metadata = workercontexts.NewExecutionMetadataContext(f.db, agent)
+				agentContext.ExecutionState = workercontexts.NewExecutionStateContext(f.db, agent, nil)
+				agentContext.Requests = &contexts.RequestContext{}
+				agentContext.Webhook = &contexts.NodeWebhookContext{}
+				agentContext.Secrets = &contexts.SecretsContext{IntegrationKeys: map[string]map[string][]byte{"github": {}}}
+				agentContext.HostedLLM = &contexts.HostedLLMContext{
+					Default: core.DefaultHostedLLMModel{Provider: models.UsageProviderAnthropic, Model: "claude-sonnet-4-6"},
+					Access:  core.HostedLLMAccess{APIKey: "test-key", AllowedModels: []string{"claude-sonnet-4-6"}},
+				}
+				require.NoError(t, agentAction.Execute(agentContext))
+				require.NoError(t, f.db.Save(agent).Error)
+				task := &models.RunnerTask{ID: uuid.MustParse(tasks.CreatedID), OrganizationID: consumer.OrganizationID}
+				require.NoError(t, task.RequireModelPolicyAdmission(f.db), "the hosted model must survive preparation and execution persistence")
+			}
 			decision := map[string]any{"reviewRequired": true, "rationale": "Security findings need review.", "noCandidate": false, "reviewers": []any{map[string]any{"login": "octocat", "reason": "Owns the changed security code."}}}
 			if scenario == "favorable" {
 				decision["reviewRequired"], decision["rationale"], decision["reviewers"] = false, "All findings are favorable.", []any{}
@@ -285,14 +314,18 @@ func TestReviewRequestFromPublishedReportToGitHub(t *testing.T) {
 			}
 			result, err := json.Marshal(decision)
 			require.NoError(t, err)
-			taskState, exitCode := "succeeded", 0
+			taskState, exitCode, taskError := "succeeded", 0, ""
 			if scenario == "agent failure" {
 				taskState, exitCode = "failed", 1
+				taskError = models.ErrSelectableLLMModelNotAllowed.Error()
 			}
-			require.NoError(t, agentAction.HandleHook(core.ActionHookContext{Name: runner.HookPoll, Configuration: agentContext.Configuration, Parameters: map[string]any{"task_id": "review-selection"}, Metadata: workercontexts.NewExecutionMetadataContext(f.db, agent), ExecutionState: workercontexts.NewExecutionStateContext(f.db, agent, nil), RunnerTasks: &contexts.RunnerTaskContext{Task: &core.RunnerTask{ID: "review-selection", State: taskState, ExitCode: &exitCode, Result: result}}}))
+			require.NoError(t, agentAction.HandleHook(core.ActionHookContext{Name: runner.HookPoll, Configuration: agentContext.Configuration, Parameters: map[string]any{"task_id": "review-selection"}, Metadata: workercontexts.NewExecutionMetadataContext(f.db, agent), ExecutionState: workercontexts.NewExecutionStateContext(f.db, agent, nil), RunnerTasks: &contexts.RunnerTaskContext{Task: &core.RunnerTask{ID: "review-selection", State: taskState, ExitCode: &exitCode, Result: result, ErrorMessage: taskError}}}))
 			if slices.Contains([]string{"agent failure", "malformed output", "reported lookup error", "concerning no review", "author selected", "bot selected", "reader selected", "additional reviewer without reason"}, scenario) {
 				require.NoError(t, f.db.First(agent, "id = ?", agent.ID).Error)
 				require.Equal(t, models.CanvasNodeExecutionResultFailed, agent.Result)
+				if scenario == "agent failure" {
+					require.Contains(t, agent.ResultMessage, taskError)
+				}
 				require.Empty(t, host.reviewerBodies)
 				return
 			}

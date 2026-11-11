@@ -83,15 +83,19 @@ func (s *ExecutionStateContext) prepareReviewRequestOutput(channel, payloadType 
 	if s.IsFinished() || s.IsCancelling() {
 		return payloads, nil
 	}
-	if channel != "passed" {
-		return nil, fmt.Errorf("Review request agent failed")
-	}
 	if len(payloads) != 1 {
 		return nil, fmt.Errorf("Review request agent must return one decision")
 	}
 	output, ok := payloads[0].(map[string]any)
 	if !ok {
 		return nil, fmt.Errorf("Review request agent output must be an object")
+	}
+	if channel != "passed" {
+		message, _ := output["error"].(string)
+		if strings.TrimSpace(message) != "" {
+			return nil, fmt.Errorf("Review request agent failed: %s", message)
+		}
+		return nil, fmt.Errorf("Review request agent failed")
 	}
 	decision, err := decodeReviewRequestDecision(output["result"])
 	if err != nil {
