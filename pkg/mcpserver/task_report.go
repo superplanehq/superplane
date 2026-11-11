@@ -8,7 +8,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/factories"
+	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 )
@@ -38,6 +40,7 @@ func (rt *Runtime) getTaskReport(ctx context.Context, claims *AccessClaims, args
 	if err != nil {
 		return ToolResult{}, actionError(err)
 	}
+	logging.AddRequestLogFields(ctx, log.Fields{"object": "task", "object_id": report.Order.GetId()})
 	return TextResult(mustJSON(taskReportJSON(report, newTaskLinks(rt.BaseURL, report.Factory)))), nil
 }
 

@@ -9,7 +9,9 @@ import (
 	"time"
 
 	jwtLib "github.com/golang-jwt/jwt/v4"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/jwt"
+	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 )
 
@@ -98,7 +100,11 @@ func GenerateAccountToken(jwtSigner *jwt.Signer, accountID string, sessionStart 
 
 // IssueAccountSession mints a fresh account_token for a new login session.
 func IssueAccountSession(w http.ResponseWriter, r *http.Request, jwtSigner *jwt.Signer, accountID string) error {
-	return issueAccountSession(w, r, jwtSigner, accountID, time.Now())
+	err := issueAccountSession(w, r, jwtSigner, accountID, time.Now())
+	if err == nil {
+		logging.AddRequestLogFields(r.Context(), log.Fields{"account_id": accountID, "object": "account", "object_id": accountID, "outcome": "success"})
+	}
+	return err
 }
 
 func issueAccountSession(w http.ResponseWriter, r *http.Request, jwtSigner *jwt.Signer, accountID string, sessionStart time.Time) error {
