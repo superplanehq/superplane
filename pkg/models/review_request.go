@@ -182,6 +182,15 @@ func CheckReviewRequestAttempt(tx *gorm.DB, canvas *Canvas, run *CanvasRun) (*Re
 	return source, nil
 }
 
+// ListReviewRequestDecisionEvents returns the output events of the reviewer
+// selection node in the run, newest first.
+func ListReviewRequestDecisionEvents(tx *gorm.DB, run *CanvasRun, selectionNodeID string) ([]CanvasEvent, error) {
+	var events []CanvasEvent
+	err := tx.Where("workflow_id = ? AND run_id = ? AND node_id = ? AND execution_id IS NOT NULL", run.WorkflowID, run.ID, selectionNodeID).
+		Order("created_at DESC, id DESC").Find(&events).Error
+	return events, err
+}
+
 // MaybeLinkReviewRequestRun gives the selection run the same task authority as
 // its validated producer, before ordinary agent admission checks run.
 func MaybeLinkReviewRequestRun(tx *gorm.DB, canvas *Canvas, event *CanvasEvent, run *CanvasRun) error {

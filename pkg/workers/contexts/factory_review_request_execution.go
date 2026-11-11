@@ -13,7 +13,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/models"
-	"gorm.io/datatypes"
 )
 
 // PrepareReviewRequest checks authority at dispatch and again immediately
@@ -61,9 +60,8 @@ func (c *FactoryContext) PrepareReviewRequest(ctx *core.ExecutionContext) (bool,
 	if c.execution.NodeID == "select-reviewers" {
 		return false, c.prepareReviewRequestAgent(ctx, source, candidates)
 	}
-	var outputs []models.CanvasEvent
-	if err := c.tx.Where("run_id = ? AND node_id = ? AND execution_id IS NOT NULL", run.ID, "select-reviewers").
-		Order("created_at DESC, id DESC").Find(&outputs).Error; err != nil {
+	outputs, err := models.ListReviewRequestDecisionEvents(c.tx, run, "select-reviewers")
+	if err != nil {
 		return false, err
 	}
 	if len(outputs) != 1 {
@@ -127,8 +125,7 @@ func (c *FactoryContext) PrepareReviewRequest(ctx *core.ExecutionContext) (bool,
 		metadata = map[string]any{}
 	}
 	metadata["reviewRequest"] = decision
-	c.execution.Metadata = datatypes.NewJSONType(metadata)
-	if err := c.tx.Model(c.execution).Update("metadata", c.execution.Metadata).Error; err != nil {
+	if err := c.execution.UpdateMetadata(c.tx, metadata); err != nil {
 		return false, err
 	}
 	if len(toRequest) == 0 {
@@ -190,8 +187,7 @@ func (c *FactoryContext) prepareReviewRequestAgent(ctx *core.ExecutionContext, s
 	metadata["reviewRequestCandidates"] = logins
 	metadata["reviewRequestCandidateIDs"] = identities
 	metadata["reviewRequestDiscovered"] = true
-	c.execution.Metadata = datatypes.NewJSONType(metadata)
-	if err := c.tx.Model(c.execution).Update("metadata", c.execution.Metadata).Error; err != nil {
+	if err := c.execution.UpdateMetadata(c.tx, metadata); err != nil {
 		return err
 	}
 	configuration, ok := ctx.Configuration.(map[string]any)

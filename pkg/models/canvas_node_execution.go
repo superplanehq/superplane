@@ -737,6 +737,12 @@ func (e *CanvasNodeExecution) GetOutputsInTransaction(tx *gorm.DB) ([]CanvasEven
 	return events, nil
 }
 
+// UpdateMetadata replaces the execution metadata and persists it.
+func (e *CanvasNodeExecution) UpdateMetadata(tx *gorm.DB, metadata map[string]any) error {
+	e.Metadata = datatypes.NewJSONType(metadata)
+	return tx.Model(e).Update("metadata", e.Metadata).Error
+}
+
 func (e *CanvasNodeExecution) IsFinished(tx *gorm.DB) (bool, error) {
 	state, err := e.findState(tx)
 	if err != nil {
