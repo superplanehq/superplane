@@ -116,6 +116,9 @@ func logHandledRequest(logger *log.Logger, r *http.Request, fields log.Fields, s
 
 	if noted, ok := grpc.NotedServerErrorFrom(r.Context()); ok {
 		entry = entry.WithError(noted.Cause)
+		for key, value := range noted.Tags {
+			entry = entry.WithField(key, value)
+		}
 	}
 	entry.Error(message)
 }
@@ -200,6 +203,7 @@ func captureHTTPError(r *http.Request, status int) {
 		request := r
 		if noted.OmitRequestBody {
 			request = requestWithoutBody(r)
+			scope.SetRequestBody(nil)
 		}
 		scope.SetRequest(request)
 		scope.SetTag("status", strconv.Itoa(status))
