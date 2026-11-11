@@ -338,6 +338,12 @@ func startWorkers(
 		w := workers.NewEventRetentionWorker()
 		go w.Start(context.Background())
 	}
+
+	if os.Getenv("START_HOSTED_MODEL_CALL_OUTCOME_CLEANUP_WORKER") == "yes" {
+		log.Println("Starting Hosted Model Call Outcome Cleanup Worker")
+		w := workers.NewHostedModelCallOutcomeCleanupWorker()
+		go w.Start(context.Background())
+	}
 }
 
 func startEmailConsumers(rabbitMQURL string, encryptor crypto.Encryptor, baseURL string) {
