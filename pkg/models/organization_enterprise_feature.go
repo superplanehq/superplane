@@ -53,6 +53,16 @@ func HasOrganizationEnterpriseFeature(tx *gorm.DB, orgID uuid.UUID, key string) 
 	return true, nil
 }
 
+func ListAllOrganizationEnterpriseFeatures(tx *gorm.DB) ([]OrganizationEnterpriseFeature, error) {
+	var rows []OrganizationEnterpriseFeature
+	err := tx.Order("organization_id ASC, feature_key ASC").Find(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return rows, nil
+}
+
 func ListOrganizationEnterpriseFeatures(tx *gorm.DB, orgID uuid.UUID) ([]OrganizationEnterpriseFeature, error) {
 	var rows []OrganizationEnterpriseFeature
 	err := tx.Where("organization_id = ?", orgID).Order("feature_key ASC").Find(&rows).Error
