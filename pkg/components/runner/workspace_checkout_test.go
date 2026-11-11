@@ -2,6 +2,7 @@ package runner_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -331,6 +332,40 @@ func TestWorkspaceCheckoutScriptAnchorsToTaskDirFromSubdirectory(t *testing.T) {
 	require.NoError(t, err, output)
 	assert.DirExists(t, filepath.Join(dir, "repo", ".git"))
 	assert.NoDirExists(t, filepath.Join(nested, "repo"))
+}
+
+func TestWorkspaceCheckoutScriptSelectsExistingBranchWithManyBranches(t *testing.T) {
+	remote := initBareRepo(t, "main")
+	devCommit := pushCommit(t, remote, "refs/heads/dev", "dev", "dev\n")
+	mainCommit := runGitQuiet(t, "", "", "--git-dir="+remote, "rev-parse", "refs/heads/main")
+	// Keep dev early in a listing large enough to exceed pipe buffering.
+	var refs strings.Builder
+	for i := 1; i <= 5000; i++ {
+		fmt.Fprintf(&refs, "create refs/heads/feature/branch-%05d %s\n", i, mainCommit)
+	}
+	cmd := exec.Command(requireGitAndNode(t), "--git-dir="+remote, "update-ref", "--stdin")
+	cmd.Stdin = strings.NewReader(refs.String())
+	output, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(output))
+
+	for _, mode := range []struct {
+		name        string
+		commitSetup string
+	}{
+		{name: "commit", commitSetup: "1"},
+		{name: "readonly", commitSetup: "0"},
+	} {
+		t.Run(mode.name, func(t *testing.T) {
+			dir := t.TempDir()
+			output, err := runCheckoutScriptFull(t, dir, "file://"+remote, "dev", checkoutScriptOptions{
+				commitSetup: mode.commitSetup,
+			})
+			require.NoError(t, err, output)
+			repo := filepath.Join(dir, "repo")
+			assert.Equal(t, "dev", runGitQuiet(t, "", repo, "branch", "--show-current"))
+			assert.Equal(t, devCommit, runGitQuiet(t, "", repo, "rev-parse", "HEAD"))
+		})
+	}
 }
 
 func TestWorkspaceCheckoutScriptFallsBackWhenBranchIsMissing(t *testing.T) {
