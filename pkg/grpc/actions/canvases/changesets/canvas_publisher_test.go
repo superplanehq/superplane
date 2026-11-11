@@ -10,14 +10,83 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
+	"google.golang.org/grpc/codes"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 
 	_ "github.com/superplanehq/superplane/pkg/components/runs"
 	_ "github.com/superplanehq/superplane/pkg/triggers/messages"
 )
+
+func TestCanvasPublisherReviewRequestCreationRequiresFeature(t *testing.T) {
+	for _, scenario := range []struct {
+		name             string
+		enabled          bool
+		installed        bool
+		otherMarkerFirst bool
+	}{
+		{name: "disabled new automation"},
+		{name: "enabled new automation", enabled: true},
+		{name: "disabled installed automation", installed: true},
+		{name: "disabled new automation after another template", otherMarkerFirst: true},
+		{name: "disabled installed automation after another template", installed: true, otherMarkerFirst: true},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
+			r := support.Setup(t)
+			db := database.DB(t.Context())
+			if scenario.enabled {
+				require.NoError(t, models.EnableExperimentalFeatureInTransaction(db, r.Organization.ID, features.FeatureFactoryReviewRequest))
+			}
+			reviewNode := componentCanvasNode("review-node", "Review node", "noop", nil)
+			if scenario.installed {
+				reviewNode.Metadata = datatypes.NewJSONType(models.FactoryAppTemplateMetadata("review-request", 1))
+			}
+			nodes := []models.CanvasNode{reviewNode}
+			if scenario.otherMarkerFirst {
+				other := componentCanvasNode("other-node", "Other node", "noop", nil)
+				other.Metadata = datatypes.NewJSONType(models.FactoryAppTemplateMetadata("custom-verification", 1))
+				nodes = append([]models.CanvasNode{other}, nodes...)
+			}
+			canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nodes, nil)
+			live, err := models.FindLiveCanvasVersionInTransaction(db, canvas.ID)
+			require.NoError(t, err)
+			proposed := slices.Clone(live.Nodes)
+			for i := range proposed {
+				if proposed[i].ID == reviewNode.NodeID {
+					proposed[i].Name = "Updated review node"
+					proposed[i].Metadata = models.FactoryAppTemplateMetadata("review-request", 1)
+				}
+			}
+			draft, err := models.CreateCommitVersionWithSpecInTransaction(db, canvas.ID, r.User, "Configure Review request", proposed, nil)
+			require.NoError(t, err)
+			publisher, err := NewCanvasPublisher(db, canvas, draft, live, canvasPublisherOptions(r))
+			require.NoError(t, err)
+
+			err = publisher.Publish(t.Context())
+			if !scenario.enabled && !scenario.installed {
+				require.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
+				retained, readErr := models.FindLiveCanvasVersionInTransaction(db, canvas.ID)
+				require.NoError(t, readErr)
+				require.Equal(t, live.ID, retained.ID)
+				exists, readErr := models.CanvasHasFactoryAppTemplate(db, canvas.ID, "review-request")
+				require.NoError(t, readErr)
+				require.False(t, exists)
+				return
+			}
+			require.NoError(t, err)
+			published, err := models.FindLiveCanvasVersionInTransaction(db, canvas.ID)
+			require.NoError(t, err)
+			require.Equal(t, draft.ID, published.ID)
+			active, err := models.FindCanvasNode(db, canvas.ID, reviewNode.NodeID)
+			require.NoError(t, err)
+			require.Equal(t, "Updated review node", active.Name)
+		})
+	}
+}
 
 func TestCanvasPublisherSubscriptionIntakePreservesDisconnectedDefaultAndValidatesReplacement(t *testing.T) {
 	r := support.Setup(t)

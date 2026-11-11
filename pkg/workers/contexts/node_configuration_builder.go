@@ -187,7 +187,7 @@ func (b *NodeConfigurationBuilder) resolveFieldValue(value any, field configurat
 	switch field.Type {
 	case configuration.FieldTypeObject:
 		return b.resolveObjectFieldValue(value, field)
-	case configuration.FieldTypeNumber, configuration.FieldTypeBool:
+	case configuration.FieldTypeNumber, configuration.FieldTypeBool, configuration.FieldTypeList:
 		if text, ok := value.(string); ok {
 			return b.resolveTemplatePreservingWholeValue(text)
 		}
