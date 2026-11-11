@@ -7,6 +7,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/grpc/errors"
+	"github.com/superplanehq/superplane/pkg/logging"
 	pb "github.com/superplanehq/superplane/pkg/protos/roles"
 )
 
@@ -35,5 +36,6 @@ func AssignRole(ctx context.Context, orgID, domainType, domainID, roleName, user
 		return nil, grpcerrors.Internal(err, "failed to assign role")
 	}
 
+	logging.AddRequestLogFields(ctx, log.Fields{"target_user_id": user.ID.String(), "role_name": roleName, "domain_id": domainID})
 	return &pb.AssignRoleResponse{}, nil
 }

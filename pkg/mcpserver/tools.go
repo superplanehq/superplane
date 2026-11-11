@@ -8,11 +8,13 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/factories"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
+	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/productanalytics"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
@@ -203,12 +205,21 @@ func withWorkspaceArgument(tool Tool) Tool {
 	return tool
 }
 
-func (rt *Runtime) CallTool(ctx context.Context, claims *AccessClaims, name string, args map[string]any) (ToolResult, error) {
+func (rt *Runtime) CallTool(ctx context.Context, claims *AccessClaims, name string, args map[string]any) (result ToolResult, err error) {
+	defer func() {
+		outcome := "success"
+		if err != nil || result.IsError {
+			outcome = "failure"
+		}
+		logging.AddRequestLogFields(ctx, log.Fields{"outcome": outcome})
+	}()
 	if rt == nil || rt.Auth == nil || claims == nil {
 		return ToolResult{}, ToolError("Not found")
 	}
+	logging.AddRequestLogFields(ctx, log.Fields{"action": name, "object": "task"})
 	switch name {
 	case "list_workspaces":
+		logging.AddRequestLogFields(ctx, log.Fields{"object": "workspace"})
 		return rt.listWorkspaces(ctx, claims, args)
 	case "list_tasks":
 		return rt.listTasks(ctx, claims, args)
@@ -229,8 +240,10 @@ func (rt *Runtime) CallTool(ctx context.Context, claims *AccessClaims, name stri
 	case "assign_task":
 		return rt.assignTask(ctx, claims, args)
 	case "list_members":
+		logging.AddRequestLogFields(ctx, log.Fields{"object": "member"})
 		return rt.listMembers(ctx, claims, args)
 	default:
+		logging.AddRequestLogFields(ctx, log.Fields{"action": "unknown_mcp_tool", "object": "mcp"})
 		return ToolResult{}, ToolError("Unknown tool: " + name)
 	}
 }
@@ -344,6 +357,7 @@ func (rt *Runtime) getTask(ctx context.Context, claims *AccessClaims, args map[s
 	}
 	links := newTaskLinks(rt.BaseURL, factory)
 	order := resp.GetOrder()
+	logging.AddRequestLogFields(ctx, log.Fields{"object": "task", "object_id": order.GetId()})
 	return TextResult(mustJSON(map[string]any{
 		"id":          order.GetId(),
 		"key":         order.GetKey(),
@@ -371,6 +385,7 @@ func (rt *Runtime) listTaskArtifacts(ctx context.Context, claims *AccessClaims, 
 	if err != nil {
 		return ToolResult{}, actionError(err)
 	}
+	logging.AddRequestLogFields(ctx, log.Fields{"object": "task", "object_id": task})
 	artifacts := make([]map[string]any, 0, len(resp.GetArtifacts()))
 	for _, artifact := range resp.GetArtifacts() {
 		row := map[string]any{
@@ -483,6 +498,7 @@ func (rt *Runtime) createTask(ctx context.Context, claims *AccessClaims, args ma
 	}
 	links := newTaskLinks(rt.BaseURL, factory)
 	order := resp.GetOrder()
+	logging.AddRequestLogFields(ctx, log.Fields{"object": "task", "object_id": order.GetId()})
 	return TextResult(mustJSON(map[string]any{
 		"id":    order.GetId(),
 		"key":   order.GetKey(),
@@ -541,6 +557,7 @@ func (rt *Runtime) handOffTask(ctx context.Context, claims *AccessClaims, args m
 	}
 	links := newTaskLinks(rt.BaseURL, factory)
 	order := result.Order
+	logging.AddRequestLogFields(ctx, log.Fields{"object": "task", "object_id": order.GetId()})
 	payload := map[string]any{
 		"id":     order.GetId(),
 		"key":    order.GetKey(),
@@ -605,6 +622,7 @@ func (rt *Runtime) assignTask(ctx context.Context, claims *AccessClaims, args ma
 	}
 	links := newTaskLinks(rt.BaseURL, factory)
 	order := resp.GetOrder()
+	logging.AddRequestLogFields(ctx, log.Fields{"object": "task", "object_id": order.GetId()})
 	return TextResult(mustJSON(map[string]any{
 		"id":        order.GetId(),
 		"key":       order.GetKey(),
@@ -826,6 +844,7 @@ func resolveTaskID(ctx context.Context, claims *AccessClaims, factoryID uuid.UUI
 	if err != nil {
 		return "", actionError(err)
 	}
+	logging.AddRequestLogFields(ctx, log.Fields{"object": "task", "object_id": resp.GetOrder().GetId()})
 	return resp.GetOrder().GetId(), nil
 }
 
@@ -929,6 +948,7 @@ func (rt *Runtime) resolveGrantedWorkspace(ctx context.Context, claims *AccessCl
 	if !OrganizationAllowsPublicMCP(factory.OrganizationID) || !organizationAllowsFactories(factory.OrganizationID) {
 		return nil, ToolError("Not found")
 	}
+	logging.AddRequestLogFields(ctx, log.Fields{"workspace_id": factory.ID.String()})
 	return factory, nil
 }
 

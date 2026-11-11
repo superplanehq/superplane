@@ -15,6 +15,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/grpc"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
+	"github.com/superplanehq/superplane/pkg/logging"
 )
 
 func LoggingMiddleware(logger *log.Logger) mux.MiddlewareFunc {
@@ -65,7 +66,7 @@ func LoggingMiddleware(logger *log.Logger) mux.MiddlewareFunc {
 func handledRequestFields(r *http.Request, status int, duration time.Duration) log.Fields {
 	fields := log.Fields{
 		"method":      r.Method,
-		"path":        r.URL.Path,
+		"path":        requestLogPath(r),
 		"duration_ms": durationMilliseconds(duration),
 		"status":      status,
 	}
@@ -75,7 +76,7 @@ func handledRequestFields(r *http.Request, status int, duration time.Duration) l
 		fields["user_agent"] = r.UserAgent()
 	}
 
-	if clientIP := clientIP(r); clientIP != "" {
+	if clientIP := ClientIP(r); clientIP != "" {
 		fields["client_ip"] = clientIP
 	}
 
@@ -83,27 +84,44 @@ func handledRequestFields(r *http.Request, status int, duration time.Duration) l
 		fields["trace_id"] = traceID
 	}
 
-	appendRequestIdentity(fields, requestLogFieldsFrom(r.Context()))
+	for key, value := range logging.RequestLogFields(r.Context()) {
+		if text, ok := value.(string); ok && text == "" {
+			continue
+		}
+		fields[key] = value
+	}
+	if _, ok := fields["action"]; !ok {
+		fields["action"] = r.Method
+	}
+	if _, ok := fields["object"]; !ok {
+		fields["object"] = fields["path"]
+	}
+	if _, ok := fields["outcome"]; !ok {
+		fields["outcome"] = "success"
+	}
+	if status >= http.StatusBadRequest {
+		fields["outcome"] = "failure"
+	}
 	return fields
 }
 
-func appendRequestIdentity(fields log.Fields, logged *requestLogFields) {
-	if logged == nil {
-		return
+// Public links and invitations carry credentials in the path, not just the query.
+func requestLogPath(r *http.Request) string {
+	for _, prefix := range []string{
+		"/api/v1/invitations/", "/api/v1/invite-links/",
+		"/api/v1/public/badges/", "/api/v1/public/artifacts/",
+	} {
+		suffix, ok := strings.CutPrefix(r.URL.Path, prefix)
+		if !ok {
+			continue
+		}
+		_, tail, hasTail := strings.Cut(suffix, "/")
+		if hasTail {
+			return prefix + "[redacted]/" + tail
+		}
+		return prefix + "[redacted]"
 	}
-
-	setLogField(fields, "request_id", logged.requestID)
-	setLogField(fields, "organization_id", logged.organizationID)
-	setLogField(fields, "user_id", logged.userID)
-	setLogField(fields, "account_id", logged.accountID)
-	setLogField(fields, "support_admin_account_id", logged.supportAdminAccountID)
-}
-
-func setLogField(fields log.Fields, key string, value string) {
-	if value == "" {
-		return
-	}
-	fields[key] = value
+	return r.URL.Path
 }
 
 func logHandledRequest(logger *log.Logger, r *http.Request, fields log.Fields, status int) {
@@ -135,16 +153,23 @@ func durationMilliseconds(duration time.Duration) float64 {
 	return float64(duration) / float64(time.Millisecond)
 }
 
-// clientIP uses the same trust order as hosted credit billing.
+// ClientIP uses the same trust order as hosted credit billing.
 // Proxy-set headers win. For X-Forwarded-For, the rightmost address is the
 // one a trusted proxy appended. The leftmost address is caller-supplied.
-func clientIP(r *http.Request) string {
+func ClientIP(r *http.Request) string {
 	for _, header := range []string{"CF-Connecting-IP", "True-Client-IP", "X-Real-IP"} {
 		if ip := strings.TrimSpace(r.Header.Get(header)); ip != "" {
 			return ip
 		}
 	}
-	return rightMostForwardedIP(r.Header.Get("X-Forwarded-For"))
+	if ip := rightMostForwardedIP(r.Header.Get("X-Forwarded-For")); ip != "" {
+		return ip
+	}
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err == nil {
+		return host
+	}
+	return r.RemoteAddr
 }
 
 func rightMostForwardedIP(forwarded string) string {

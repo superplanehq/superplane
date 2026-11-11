@@ -6,6 +6,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/grpc/errors"
+	"github.com/superplanehq/superplane/pkg/logging"
 	pbGroups "github.com/superplanehq/superplane/pkg/protos/groups"
 )
 
@@ -25,5 +26,6 @@ func RemoveUserFromGroup(ctx context.Context, orgID, domainType, domainID, userI
 		return nil, grpcerrors.Internal(err, "failed to remove user from group")
 	}
 
+	logging.AddRequestLogFields(ctx, log.Fields{"target_user_id": user.ID.String(), "group_name": groupName, "domain_id": domainID})
 	return &pbGroups.RemoveUserFromGroupResponse{}, nil
 }

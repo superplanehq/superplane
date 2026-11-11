@@ -11,6 +11,7 @@ import (
 	"github.com/markbates/goth"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
 )
@@ -116,6 +117,7 @@ func linkStateFromRequest(r *http.Request) string {
 }
 
 func (a *Handler) completeProviderLink(w http.ResponseWriter, r *http.Request, gothUser goth.User, state *linkState) {
+	logging.AddRequestLogFields(r.Context(), log.Fields{"action": "link_sign_in_method", "object": "account", "outcome": "failure"})
 	if !strings.EqualFold(gothUser.Provider, state.Provider) {
 		http.Error(w, "Sign-in method does not match", http.StatusBadRequest)
 		return
@@ -141,6 +143,8 @@ func (a *Handler) completeProviderLink(w http.ResponseWriter, r *http.Request, g
 		http.Error(w, "Failed to connect sign-in method", http.StatusInternalServerError)
 		return
 	}
+
+	logging.AddRequestLogFields(r.Context(), log.Fields{"account_id": sessionAccount.ID.String(), "object_id": sessionAccount.ID.String(), "outcome": "success", "settings_updated": []string{"sign_in_providers"}})
 
 	http.Redirect(w, r, linkSuccessRedirectURL(state.Redirect, gothUser.Provider), http.StatusSeeOther) // #nosec G710 -- parseLinkState validates the internal redirect path.
 }

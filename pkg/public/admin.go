@@ -14,6 +14,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/billing"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
+	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/networkpolicy"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
@@ -69,6 +70,48 @@ type installationSettingsRequest struct {
 	SMTPUseTLS                *bool   `json:"smtp_use_tls"`
 }
 
+// Record setting names only; SMTP credentials and other values must stay out of logs.
+func (req installationSettingsRequest) updatedSettingNames() []string {
+	names := []string{}
+	if req.AllowPrivateNetworkAccess != nil {
+		names = append(names, "allow_private_network_access")
+	}
+	if req.SignupsEnabled != nil {
+		names = append(names, "signups_enabled")
+	}
+	if req.InvitationDurationDays != nil {
+		names = append(names, "invitation_duration_days")
+	}
+	if req.PastDueGraceDays != nil {
+		names = append(names, "past_due_grace_days")
+	}
+	if req.SMTPEnabled != nil {
+		names = append(names, "smtp_enabled")
+	}
+	if req.SMTPHost != nil {
+		names = append(names, "smtp_host")
+	}
+	if req.SMTPPort != nil {
+		names = append(names, "smtp_port")
+	}
+	if req.SMTPUsername != nil {
+		names = append(names, "smtp_username")
+	}
+	if req.SMTPPassword != nil {
+		names = append(names, "smtp_password")
+	}
+	if req.SMTPFromName != nil {
+		names = append(names, "smtp_from_name")
+	}
+	if req.SMTPFromEmail != nil {
+		names = append(names, "smtp_from_email")
+	}
+	if req.SMTPUseTLS != nil {
+		names = append(names, "smtp_use_tls")
+	}
+	return names
+}
+
 func parsePagination(r *http.Request) (search string, limit, offset int) {
 	search = r.URL.Query().Get("search")
 
@@ -121,6 +164,10 @@ func (s *Server) adminUpdateInstallationNetworkSettings(w http.ResponseWriter, r
 		http.Error(w, err.Error(), statusCode)
 		return
 	}
+
+	logging.AddRequestLogFields(r.Context(), log.Fields{
+		"action": "update_security_settings", "object": "installation", "settings_updated": req.updatedSettingNames(),
+	})
 
 	if req.AllowPrivateNetworkAccess != nil {
 		s.registry.HTTPContext().InvalidatePolicyCache()
@@ -671,7 +718,7 @@ func (s *Server) startSupportSession(w http.ResponseWriter, r *http.Request) {
 		"target_account_id": target.ID.String(),
 		"target_email":      target.Email,
 		"action":            "support_session_start",
-		"client_ip":         r.RemoteAddr,
+		"client_ip":         middleware.ClientIP(r),
 	}).Info("admin support session started")
 
 	w.Header().Set("Content-Type", "application/json")
@@ -693,7 +740,7 @@ func (s *Server) endSupportSession(w http.ResponseWriter, r *http.Request) {
 		"admin_account_id": account.ID.String(),
 		"admin_email":      account.Email,
 		"action":           "support_session_end",
-		"client_ip":        r.RemoteAddr,
+		"client_ip":        middleware.ClientIP(r),
 	}
 
 	if tokenStr, err := supportsession.ReadCookie(r); err == nil {
@@ -783,7 +830,7 @@ func (s *Server) promoteAdmin(w http.ResponseWriter, r *http.Request) {
 		"target_account_id": target.ID.String(),
 		"target_email":      target.Email,
 		"action":            "promote_admin",
-		"client_ip":         r.RemoteAddr,
+		"client_ip":         middleware.ClientIP(r),
 	}).Info("account promoted to installation admin")
 
 	w.Header().Set("Content-Type", "application/json")
@@ -824,7 +871,7 @@ func (s *Server) demoteAdmin(w http.ResponseWriter, r *http.Request) {
 		"target_account_id": target.ID.String(),
 		"target_email":      target.Email,
 		"action":            "demote_admin",
-		"client_ip":         r.RemoteAddr,
+		"client_ip":         middleware.ClientIP(r),
 	}).Info("account demoted from installation admin")
 
 	w.Header().Set("Content-Type", "application/json")
@@ -865,7 +912,7 @@ func (s *Server) blockAccount(w http.ResponseWriter, r *http.Request) {
 		"target_account_id": target.ID.String(),
 		"target_email":      target.Email,
 		"action":            "block_account",
-		"client_ip":         r.RemoteAddr,
+		"client_ip":         middleware.ClientIP(r),
 	}).Info("account blocked")
 
 	w.Header().Set("Content-Type", "application/json")
@@ -905,7 +952,7 @@ func (s *Server) unblockAccount(w http.ResponseWriter, r *http.Request) {
 		"target_account_id": target.ID.String(),
 		"target_email":      target.Email,
 		"action":            "unblock_account",
-		"client_ip":         r.RemoteAddr,
+		"client_ip":         middleware.ClientIP(r),
 	}).Info("account unblocked")
 
 	w.Header().Set("Content-Type", "application/json")
@@ -959,7 +1006,7 @@ func (s *Server) adminDeleteAccount(w http.ResponseWriter, r *http.Request) {
 		"target_email":             targetEmail,
 		"deleted_organization_ids": deletedOrganizationIDs,
 		"action":                   "delete_account",
-		"client_ip":                r.RemoteAddr,
+		"client_ip":                middleware.ClientIP(r),
 	}).Info("account deleted")
 
 	respondJSON(w, map[string]any{
