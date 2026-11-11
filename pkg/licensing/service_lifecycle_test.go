@@ -122,7 +122,7 @@ func TestServiceSkipsLifecycleWhenReloadFailsOrLicenseIsDevelopment(t *testing.T
 	require.NoError(t, devService.Refresh(context.Background()))
 	assert.True(t, devService.Status().IsDevelopment())
 	assert.Equal(t, 0, devHandler.count())
-	assert.True(t, devService.IsEntitled(licensing.FeatureGroups))
+	assert.True(t, devService.IsEntitled(context.Background(), uuid.Nil, licensing.FeatureGroups))
 }
 
 func TestDryRunInstallDoesNotStoreTheLicense(t *testing.T) {
@@ -159,7 +159,7 @@ func TestServiceLifecycleErrorDoesNotFailTheLoad(t *testing.T) {
 	handler.service = service
 
 	require.NoError(t, service.Refresh(context.Background()))
-	assert.True(t, service.IsEntitled(licensing.FeatureGroups))
+	assert.True(t, service.Status().IsEntitled(licensing.FeatureGroups))
 
 	_, err := service.Install(context.Background(), issuer.License(licensing.FeatureGroups), uuid.New())
 	require.NoError(t, err)

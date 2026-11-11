@@ -107,6 +107,8 @@ func NewServices(cfg ServicesConfig) (*Services, error) {
 	}
 
 	organizationService := NewOrganizationService(cfg.AuthService, cfg.Registry, cfg.OIDCProvider, cfg.BaseURL, cfg.WebhooksBaseURL, billingImplementation)
+	organizationFeatures := enterprise.NewOrganizationFeatures(cfg.License)
+	organizationService.enterpriseFeatures = organizationFeatures
 	organizationService.invitations.Entitlements = entitlements
 	organizationService.runners = organizationActions.NewRunnerService(runnerActions.NewRunnerManager(cfg.JWTSigner, cfg.RunnerAPIBaseURL))
 	if cfg.EmailService != nil {
@@ -145,6 +147,6 @@ func NewServices(cfg ServicesConfig) (*Services, error) {
 		),
 		AdminKeys:               NewAdminKeysService(cfg.EncryptionStore),
 		AdminOrganizations:      NewAdminOrganizationsService(cfg.AuthService),
-		AdminEnterpriseFeatures: NewAdminEnterpriseFeaturesService(enterprise.NewOrganizationFeatures(cfg.License)),
+		AdminEnterpriseFeatures: NewAdminEnterpriseFeaturesService(organizationFeatures),
 	}, nil
 }
