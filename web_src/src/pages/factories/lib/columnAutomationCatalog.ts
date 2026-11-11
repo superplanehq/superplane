@@ -17,6 +17,7 @@ export const CUSTOM_AUTOMATION_CATALOG_ID = "custom-verification";
 export const PR_CLOSURE_CATALOG_ID = "pr-closure";
 export const RISK_SCORE_CATALOG_ID = "risk-score";
 export const VISUAL_EVIDENCE_CATALOG_ID = "visual-evidence";
+export const REVIEW_REQUEST_CATALOG_ID = "review-request";
 
 export const ANALYSIS_ENTRY: ColumnAutomationCatalogEntry = {
   id: ANALYSIS_CATALOG_ID,
@@ -90,6 +91,18 @@ export const RISK_SCORE_ENTRY: ColumnAutomationCatalogEntry = {
   unique: true,
 };
 
+export const REVIEW_REQUEST_ENTRY: ColumnAutomationCatalogEntry = {
+  id: REVIEW_REQUEST_CATALOG_ID,
+  kind: "review-request",
+  name: "Review request",
+  description: "Request reviewers after Merge confidence completes.",
+  trigger: "On completed Merge confidence report",
+  action: "Select and request reviewers",
+  iconSrc: githubIcon,
+  iconAlt: "GitHub",
+  unique: true,
+};
+
 export const VISUAL_EVIDENCE_ENTRY: ColumnAutomationCatalogEntry = {
   id: VISUAL_EVIDENCE_CATALOG_ID,
   kind: "visual-evidence",
@@ -116,7 +129,7 @@ export const PR_CLOSURE_ENTRY: ColumnAutomationCatalogEntry = {
 
 export function catalogForColumn(
   key: ColumnKey,
-  options?: { allowCustom?: boolean; vcsProvider?: string },
+  options?: { allowCustom?: boolean; allowReviewRequest?: boolean; vcsProvider?: string },
 ): ColumnAutomationCatalogEntry[] {
   const allowCustom = options?.allowCustom === true;
   if (key === "backlog") {
@@ -152,6 +165,7 @@ export function catalogForColumn(
         };
       }),
       RISK_SCORE_ENTRY,
+      ...(reviewRequestAvailable(options) ? [REVIEW_REQUEST_ENTRY] : []),
       ...(options?.vcsProvider === "bitbucket" ? [] : [VISUAL_EVIDENCE_ENTRY]),
       ...(allowCustom ? [CUSTOM_AUTOMATION_ENTRY] : []),
     ];
@@ -164,6 +178,10 @@ export function catalogForColumn(
     return allowCustom ? [closureEntry, EVENT_CUSTOM_ENTRY] : [closureEntry];
   }
   return allowCustom ? [AGENT_STEP_ENTRY, CUSTOM_ENTRY] : [AGENT_STEP_ENTRY];
+}
+
+function reviewRequestAvailable(options: { allowReviewRequest?: boolean; vcsProvider?: string } | undefined) {
+  return options?.allowReviewRequest === true && options.vcsProvider !== "bitbucket";
 }
 
 export function takenCatalogIds(automations: ColumnAutomation[], catalog: ColumnAutomationCatalogEntry[]): string[] {

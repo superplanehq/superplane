@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+import type { CanvasesCanvasNodeExecution, CanvasesCanvasRun } from "@/api-client";
 import type { RunHistoryIntakeSource } from "./automationRunHistory/intakeRunData";
 import { AutomationRunHistory } from "@/ui/AutomationRunHistory/AutomationRunHistory";
 import { FactoryAutomationRunHistory } from "./automationRunHistory/FactoryAutomationRunHistory";
@@ -12,6 +14,8 @@ export function FactoryAutomationHistory({
   loading,
   error,
   onRetry,
+  runRetryEnabled,
+  renderRunSummary,
 }: {
   organizationId?: string;
   factoryId?: string;
@@ -22,6 +26,8 @@ export function FactoryAutomationHistory({
   loading?: boolean;
   error?: boolean;
   onRetry?: () => void;
+  runRetryEnabled?: boolean;
+  renderRunSummary?: (run: CanvasesCanvasRun, executions: CanvasesCanvasNodeExecution[]) => ReactNode;
 }) {
   if (!organizationId || !factoryId || !canvasId) {
     return (
@@ -42,6 +48,8 @@ export function FactoryAutomationHistory({
       factoryId={factoryId}
       canvasId={canvasId}
       intakeSource={intakeSource}
+      runRetryEnabled={runRetryEnabled}
+      renderRunSummary={renderRunSummary}
       selectedRunId={selectedRunId}
       onSelectRun={onSelectRun}
     />
