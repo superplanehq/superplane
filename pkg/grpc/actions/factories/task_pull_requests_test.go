@@ -162,6 +162,16 @@ func TestOpenTaskPullRequest(t *testing.T) {
 		assert.Equal(t, calls, fake.calls)
 	})
 
+	t.Run("updating a remote draft preserves its draft state", func(t *testing.T) {
+		pullRequest, err := open(TaskPullRequestInput{Repository: "acme/web", Head: "feature", Title: "Update draft", Body: "Updated description", Draft: false})
+		require.NoError(t, err)
+		assert.Equal(t, models.FactoryPullRequestStateDraft, pullRequest.State)
+		patch := fake.edited[len(fake.edited)-1]
+		assert.Nil(t, patch.Draft)
+		assert.Contains(t, fake.open["acme/web"][0].GetBody(), "Updated description")
+		assert.True(t, fake.open["acme/web"][0].GetDraft())
+	})
+
 	t.Run("does not edit the pull request of another task", func(t *testing.T) {
 		other, err := factory.CreateWorkOrder(db, "Other", "", &r.User, nil, nil)
 		require.NoError(t, err)

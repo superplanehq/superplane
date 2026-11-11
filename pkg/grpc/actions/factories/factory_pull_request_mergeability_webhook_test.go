@@ -572,6 +572,97 @@ func TestRefreshFactoryPullRequestMergeabilityPublishesOnlyOnStoredChange(t *tes
 	assert.Equal(t, 1, published)
 }
 
+func TestGitHubPullRequestReviewStateEvents(t *testing.T) {
+	for _, tc := range []struct {
+		name, initial, action, draft, want string
+		active, unavailable                bool
+		number                             int64
+	}{
+		{name: "ready with unchanged mergeability", initial: "draft", action: "ready_for_review", draft: `,"draft":false`, want: "open"},
+		{name: "converted to draft", initial: "open", action: "converted_to_draft", draft: `,"draft":true`, want: "draft"},
+		{name: "ready action without draft flag", initial: "draft", action: "ready_for_review", want: "open"},
+		{name: "draft action without draft flag", initial: "open", action: "converted_to_draft", want: "draft"},
+		{name: "same head on another pull request", initial: "draft", action: "ready_for_review", draft: `,"draft":false`, number: 98, want: "draft"},
+		{name: "ready during active run", initial: "draft", action: "ready_for_review", draft: `,"draft":false`, want: "open", active: true},
+		{name: "ready with unavailable mergeability", initial: "draft", action: "ready_for_review", draft: `,"draft":false`, want: "open", unavailable: true},
+		{name: "synchronize without draft preserves draft", initial: "draft", action: "synchronize", want: "draft"},
+		{name: "delayed ready cannot reopen closed", initial: "closed", action: "ready_for_review", draft: `,"draft":false`, want: "closed"},
+		{name: "delayed draft cannot reopen merged", initial: "merged", action: "converted_to_draft", draft: `,"draft":true`, want: "merged"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := support.Setup(t)
+			db := database.DB(t.Context())
+			factory, pullRequest := createOpenGitHubFactoryPullRequest(t, db, r, "acme/app", 99)
+			require.NoError(t, pullRequest.Update(db, models.FactoryPullRequestPatch{State: &tc.initial}))
+			api := mergeableFactoryGitHub("abc123")
+			if tc.unavailable {
+				api.getPullErr = &github.ErrorResponse{Response: &http.Response{StatusCode: http.StatusForbidden}}
+			}
+			stubFactoryGitHub(t, api)
+			if tc.active {
+				grantExclusivePullRequestAccess(t, db, r, factory, &pb.FactoryPullRequest{Id: pullRequest.ID.String()})
+			}
+			require.NoError(t, pullRequest.SetMergeability(db, models.FactoryPullRequestMergeabilitySnapshot{
+				Mergeable: true, HeadSHA: "abc123", AllowedMethods: "SQUASH,MERGE,REBASE",
+			}))
+			integration, err := models.CreateIntegration(uuid.New(), r.Organization.ID, "github", support.RandomName("github"), map[string]any{})
+			require.NoError(t, err)
+			published := 0
+			original := publishFactoryWorkOrderUpdated
+			publishFactoryWorkOrderUpdated = func(factoryID, orderID, reason string) error {
+				assert.Equal(t, factory.ID.String(), factoryID)
+				assert.Equal(t, pullRequest.WorkOrderID.String(), orderID)
+				assert.Equal(t, factoryevents.EventTypeOrderPullRequestUpdated, reason)
+				published++
+				return nil
+			}
+			t.Cleanup(func() { publishFactoryWorkOrderUpdated = original })
+			number := tc.number
+			if number == 0 {
+				number = 99
+			}
+			body := []byte(fmt.Sprintf(`{"action":%q,"repository":{"full_name":"acme/app"},"pull_request":{"number":%d%s,"head":{"sha":"abc123"}}}`, tc.action, number, tc.draft))
+			for range 2 {
+				RefreshFactoryPullRequestMergeabilityFromGitHubEvent(t.Context(), IntakeDependencies{}, &models.Webhook{AppInstallationID: &integration.ID}, "pull_request", body)
+			}
+			stored, err := factory.FindPullRequest(db, models.FactoryPullRequestLookup{ID: pullRequest.ID})
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, stored.State)
+			wantPublished := 0
+			if tc.want != tc.initial {
+				wantPublished = 1
+			}
+			assert.Equal(t, wantPublished, published)
+		})
+	}
+}
+
+func TestFactoryPullRequestReviewStateGuardsStaleTerminalWrite(t *testing.T) {
+	for _, terminal := range []string{models.FactoryPullRequestStateClosed, models.FactoryPullRequestStateMerged} {
+		t.Run(terminal, func(t *testing.T) {
+			r := support.Setup(t)
+			db := database.DB(t.Context())
+			factory, stale := createOpenGitHubFactoryPullRequest(t, db, r, "acme/app", 100)
+			current := *stale
+			require.NoError(t, current.Update(db, models.FactoryPullRequestPatch{State: &terminal}))
+			order, err := factory.FindWorkOrder(db, stale.WorkOrderID)
+			require.NoError(t, err)
+			before, err := order.ListEvents(db, 0, nil)
+			require.NoError(t, err)
+
+			changed, err := stale.SetReviewState(db, models.FactoryPullRequestStateDraft)
+			require.NoError(t, err)
+			assert.False(t, changed)
+			stored, err := factory.FindPullRequest(db, models.FactoryPullRequestLookup{ID: stale.ID})
+			require.NoError(t, err)
+			assert.Equal(t, terminal, stored.State)
+			after, err := order.ListEvents(db, 0, nil)
+			require.NoError(t, err)
+			assert.Len(t, after, len(before))
+		})
+	}
+}
+
 func createOpenGitHubFactoryPullRequest(
 	t *testing.T,
 	db *gorm.DB,

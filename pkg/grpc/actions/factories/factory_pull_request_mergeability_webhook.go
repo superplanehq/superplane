@@ -82,6 +82,18 @@ func RefreshFactoryPullRequestMergeabilityFromGitHubEvent(
 	factoriesByID := map[string]*models.Factory{}
 	for i := range pullRequests {
 		pullRequest := &pullRequests[i]
+		if state := githubPullRequestReviewState(eventType, payload, pullRequest.Number); state != "" {
+			changed, err := pullRequest.SetReviewState(db, state)
+			if err != nil {
+				log.WithError(err).Warnf("factory mergeability: failed to update review state for %s", pullRequest.ID)
+				continue
+			}
+			if changed {
+				if err := publishFactoryWorkOrderUpdated(pullRequest.FactoryID.String(), pullRequest.WorkOrderID.String(), factoryevents.EventTypeOrderPullRequestUpdated); err != nil {
+					log.WithError(err).Warnf("factory mergeability: failed to publish update for order %s", pullRequest.WorkOrderID)
+				}
+			}
+		}
 		factory := factoriesByID[pullRequest.FactoryID.String()]
 		if factory == nil {
 			loaded, findErr := models.FindFactory(db, pullRequest.OrganizationID, pullRequest.FactoryID)
@@ -255,6 +267,7 @@ type githubMergeabilityWebhookPayload struct {
 	Sender      *githubWebhookUser `json:"sender"`
 	PullRequest *struct {
 		Number   int64              `json:"number"`
+		Draft    *bool              `json:"draft"`
 		Merged   bool               `json:"merged"`
 		MergedAt string             `json:"merged_at"`
 		ClosedAt string             `json:"closed_at"`
@@ -483,6 +496,26 @@ func isGitHubPullRequestClosedEvent(eventType string, payload githubMergeability
 	return strings.EqualFold(strings.TrimSpace(eventType), "pull_request") &&
 		strings.EqualFold(strings.TrimSpace(payload.Action), "closed") &&
 		payload.PullRequest != nil
+}
+
+func githubPullRequestReviewState(eventType string, payload githubMergeabilityWebhookPayload, number int64) string {
+	if !strings.EqualFold(strings.TrimSpace(eventType), "pull_request") || payload.PullRequest == nil || payload.PullRequest.Number != number {
+		return ""
+	}
+	if payload.PullRequest.Draft != nil {
+		if *payload.PullRequest.Draft {
+			return models.FactoryPullRequestStateDraft
+		}
+		return models.FactoryPullRequestStateOpen
+	}
+	switch strings.ToLower(strings.TrimSpace(payload.Action)) {
+	case "ready_for_review":
+		return models.FactoryPullRequestStateOpen
+	case "converted_to_draft":
+		return models.FactoryPullRequestStateDraft
+	default:
+		return ""
+	}
 }
 
 func parseGitHubMergeabilityWebhookPayload(eventType string, body []byte) (githubMergeabilityWebhookPayload, bool) {
