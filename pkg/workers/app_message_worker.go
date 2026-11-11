@@ -114,6 +114,11 @@ func (w *AppMessageWorker) LockAndProcessMessage(message models.AppMessage) erro
 
 		return locked.Delete(tx)
 	})
+	if errors.Is(err, core.ErrEventPayloadTooLarge) {
+		// Roll back all subscriber events before discarding a permanent failure.
+		logger.Errorf("Deleting oversized app message: %v", err)
+		return message.Delete(database.Conn())
+	}
 	if err != nil {
 		return err
 	}
