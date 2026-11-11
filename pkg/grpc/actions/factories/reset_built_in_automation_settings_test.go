@@ -179,6 +179,13 @@ func TestResetBuiltInVerificationSettings(t *testing.T) {
 				canvas := resetTestTemplate(t, r, factory, templateID, provider, func(doc *yaml.Canvas) {
 					if templateID == "risk-score" {
 						findYAMLNode(t, doc, "publish-merge-confidence").Configuration["enabled"] = false
+						// Simulate an installed version from before completion broadcasts.
+						doc.Spec.Nodes = slices.DeleteFunc(doc.Spec.Nodes, func(node yaml.Node) bool {
+							return node.Component == "filter" || node.Component == "broadcastMessage"
+						})
+						doc.Spec.Edges = slices.DeleteFunc(doc.Spec.Edges, func(edge yaml.Edge) bool {
+							return edge.SourceID == "publish-merge-confidence" || edge.SourceID == "complete-merge-confidence"
+						})
 					}
 					trigger := findYAMLNode(t, doc, template.entrypointNodeID)
 					trigger.Configuration["onlyFactoryPullRequests"] = false
@@ -214,6 +221,16 @@ func TestResetBuiltInVerificationSettings(t *testing.T) {
 					require.NotNil(t, publication)
 					assert.Equal(t, provider+".updatePullRequestBodySection", publication.ComponentName())
 					assert.Equal(t, false, publication.Configuration["enabled"])
+					if provider == models.ProviderGitHub {
+						gate := findIntakeNode(version.Nodes, "complete-merge-confidence")
+						require.NotNil(t, gate)
+						assert.Equal(t, "filter", gate.ComponentName())
+						broadcast := findIntakeNode(version.Nodes, "broadcast-merge-confidence")
+						require.NotNil(t, broadcast)
+						assert.Equal(t, "broadcastMessage", broadcast.ComponentName())
+						assert.Contains(t, version.Edges, models.Edge{SourceID: publication.ID, TargetID: gate.ID, Channel: "default"})
+						assert.Contains(t, version.Edges, models.Edge{SourceID: gate.ID, TargetID: broadcast.ID, Channel: "default"})
+					}
 				}
 				assert.Equal(t, false, trigger.Configuration["onlyFactoryPullRequests"])
 				assert.Equal(t, false, trigger.Configuration["ignoreDrafts"])
