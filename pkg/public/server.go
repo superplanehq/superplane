@@ -44,6 +44,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/oidc"
 	"github.com/superplanehq/superplane/pkg/productanalytics"
 	pbActions "github.com/superplanehq/superplane/pkg/protos/actions"
+	pbAdminEnterprise "github.com/superplanehq/superplane/pkg/protos/admin/enterprise_features"
 	pbAdminKeys "github.com/superplanehq/superplane/pkg/protos/admin/keys"
 	pbAdminOrganizations "github.com/superplanehq/superplane/pkg/protos/admin/organizations"
 	pbAdminRunners "github.com/superplanehq/superplane/pkg/protos/admin/runners"
@@ -428,12 +429,18 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 	if err := pbAdminOrganizations.RegisterAdminOrganizationsHandlerServer(ctx, adminGatewayMux, services.AdminOrganizations); err != nil {
 		return err
 	}
+	if err := pbAdminEnterprise.RegisterEnterpriseFeaturesHandlerServer(ctx, adminGatewayMux, services.AdminEnterpriseFeatures); err != nil {
+		return err
+	}
 	adminGatewayHandler := s.grpcGatewayAccountHandler(adminGatewayMux)
 	s.adminRouter.PathPrefix("/installation/fleets").Handler(adminGatewayHandler)
 	s.adminRouter.PathPrefix("/installation/keys").Handler(adminGatewayHandler)
 	// Define all new admin organization endpoints in protos/admin/organizations.proto.
 	// Keep existing HTTP handlers until they migrate to the admin gRPC gateway.
 	s.adminRouter.Handle("/organizations/{id}", adminGatewayHandler).Methods("DELETE")
+	s.adminRouter.Handle("/organizations/{organization_id}/enterprise-features", adminGatewayHandler).Methods(http.MethodGet, http.MethodPut)
+	s.adminRouter.PathPrefix("/installation/enterprise-features").Handler(adminGatewayHandler)
+	s.adminRouter.Handle("/installation/license/activations", adminGatewayHandler).Methods(http.MethodGet)
 
 	// Public health check
 	s.Router.HandleFunc("/api/v1/canvases/is-alive", func(w http.ResponseWriter, r *http.Request) {
