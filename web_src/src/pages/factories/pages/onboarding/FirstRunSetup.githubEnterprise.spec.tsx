@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, render, renderHook, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
@@ -80,9 +81,12 @@ vi.mock("@/contexts/useAccount", () => ({
       id: "account-1",
       name: "Ada Lovelace",
       email: "ada@example.com",
-      license: { edition: "enterprise", features: ["github_enterprise"] },
     },
   }),
+}));
+
+vi.mock("@/hooks/useOrganizationData", () => ({
+  useOrganization: () => ({ data: { id: "org-1", enterpriseFeatures: ["github_enterprise"] } }),
 }));
 
 vi.mock("@/hooks/useAccountOrganizations", () => ({
@@ -176,10 +180,13 @@ function pageModel(setup: OnboardingSetupApi, overrides: Partial<OnboardingPageM
 }
 
 function renderSetup(setup: OnboardingSetupApi, path: string) {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <MemoryRouter initialEntries={[path]}>
-      <FirstRunSetup model={pageModel(setup)} />
-    </MemoryRouter>,
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter initialEntries={[path]}>
+        <FirstRunSetup model={pageModel(setup)} />
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
 }
 

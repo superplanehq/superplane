@@ -1574,13 +1574,15 @@ type AccountResponse struct {
 const HideLicenseExpiryBannerEnv = "SUPERPLANE_LICENSE_HIDE_EXPIRY_BANNER"
 
 // AccountLicense tells the UI which Enterprise features are available. Only
-// installation administrators receive the license state and expiry.
+// installation administrators receive the license state, expiry, and the
+// number of organizations.
 type AccountLicense struct {
-	Edition          string     `json:"edition"`
-	Features         []string   `json:"features"`
-	State            string     `json:"state,omitempty"`
-	ExpiresAt        *time.Time `json:"expires_at,omitempty"`
-	HideExpiryBanner bool       `json:"hide_expiry_banner,omitempty"`
+	Edition           string     `json:"edition"`
+	Features          []string   `json:"features"`
+	State             string     `json:"state,omitempty"`
+	ExpiresAt         *time.Time `json:"expires_at,omitempty"`
+	HideExpiryBanner  bool       `json:"hide_expiry_banner,omitempty"`
+	OrganizationCount int64      `json:"organization_count,omitempty"`
 }
 
 func hideLicenseExpiryBanner() bool {
@@ -1592,7 +1594,7 @@ func hideLicenseExpiryBanner() bool {
 	}
 }
 
-func accountLicense(status licensing.Status, installationAdmin bool) AccountLicense {
+func accountLicense(status licensing.Status, installationAdmin bool, organizationCount int64) AccountLicense {
 	license := AccountLicense{
 		Edition:          string(status.Edition),
 		Features:         []string{},
@@ -1608,12 +1610,27 @@ func accountLicense(status licensing.Status, installationAdmin bool) AccountLice
 	}
 
 	license.State = string(status.State)
+	license.OrganizationCount = organizationCount
 	if status.License != nil {
 		expiresAt := status.License.ExpiresAt.UTC()
 		license.ExpiresAt = &expiresAt
 	}
 
 	return license
+}
+
+func organizationCountForLicenseBanner(ctx context.Context, installationAdmin bool) int64 {
+	if !installationAdmin {
+		return 0
+	}
+
+	count, err := models.CountOrganizations(database.DB(ctx))
+	if err != nil {
+		log.WithError(err).Warn("failed to count organizations for the license banner")
+		return 0
+	}
+
+	return count
 }
 
 func accountOrganizationsPendingDeletion(organizations []models.Organization) []AccountOrganizationPendingDeletion {
@@ -1680,8 +1697,12 @@ func (s *Server) getAccount(w http.ResponseWriter, r *http.Request) {
 		Providers:                    accountProviderResponses(providers),
 		LinkedAccounts:               accountLinkedAccountResponses(linkedAccounts),
 		OrganizationsPendingDeletion: accountOrganizationsPendingDeletion(pendingOrgs),
-		License:                      accountLicense(s.licenseStatus(), account.IsInstallationAdmin()),
-		BillingEnabled:               billing.Enabled(),
+		License: accountLicense(
+			s.licenseStatus(),
+			account.IsInstallationAdmin(),
+			organizationCountForLicenseBanner(r.Context(), account.IsInstallationAdmin()),
+		),
+		BillingEnabled: billing.Enabled(),
 	}
 
 	if info, ok := middleware.GetSupportSessionFromContext(r.Context()); ok && info.Active {
