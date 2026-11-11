@@ -33,6 +33,9 @@ func (c *FactoryContext) PrepareReviewRequest(ctx *core.ExecutionContext) (bool,
 	if err != nil {
 		return false, err
 	}
+	if !reviewRequestNeedsReview(source.Report) {
+		return true, ctx.ExecutionState.Pass()
+	}
 	client, err := c.reviewRequestClient(ctx)
 	if err != nil {
 		return false, err

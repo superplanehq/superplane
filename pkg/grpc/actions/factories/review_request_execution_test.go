@@ -192,11 +192,11 @@ func reviewRequestCompletedProducer(t *testing.T, host *reviewRequestHTTP, score
 }
 
 func TestReviewRequestFromPublishedReportToGitHub(t *testing.T) {
-	for _, scenario := range []string{"favorable", "concerning", "hosted agent", "concerning no review", "fallback", "no candidate", "malformed output", "reported lookup error", "agent failure", "author selected", "bot selected", "reader selected", "additional reviewer without reason", "additional reviewer", "discovery error", "permission error", "qualifying approval", "already requested", "stale before mutation", "paused after load"} {
+	for _, scenario := range []string{"favorable", "favorable queued request", "concerning", "hosted agent", "concerning no review", "fallback", "no candidate", "malformed output", "reported lookup error", "agent failure", "author selected", "bot selected", "reader selected", "additional reviewer without reason", "additional reviewer", "discovery error", "permission error", "qualifying approval", "already requested", "stale before mutation", "paused after load"} {
 		t.Run(scenario, func(t *testing.T) {
 			host := &reviewRequestHTTP{}
 			score := 2.0
-			if scenario == "favorable" {
+			if strings.HasPrefix(scenario, "favorable") {
 				score = 5
 			}
 			f, message := reviewRequestCompletedProducer(t, host, score)
@@ -245,10 +245,42 @@ func TestReviewRequestFromPublishedReportToGitHub(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, f.pr.ID, activity.PullRequestID)
 			agent, agentAction := reviewRequestTestExecution(t, f, consumer, run, reviewRequestAgentNodeID, root, root, nil)
+			if scenario == "favorable queued request" {
+				// An older run can already have a saved decision that requests review on a green report.
+				outputs, err := agent.PassInTransaction(f.db, map[string][]any{"passed": {map[string]any{
+					"type": "runnerClaudeCode.finished", "data": map[string]any{"reviewRequest": map[string]any{
+						"reviewRequired": true, "noCandidate": false, "rationale": "Request review as a precaution.",
+						"reviewers": []any{map[string]any{"id": 2, "login": "octocat", "reason": "Repository owner."}},
+						"reportId":  f.run.ID.String(), "sourceAppId": f.canvas.ID.String(), "reviewedCommit": "abc",
+					}},
+				}}})
+				require.NoError(t, err)
+				require.Len(t, outputs, 1)
+				request, _ := reviewRequestTestExecution(t, f, consumer, run, "request-reviewers", root, &outputs[0], agent)
+				requestContext := core.ExecutionContext{RunID: run.ID, Configuration: request.Configuration.Data(), Integration: reviewRequestIntegration(), HTTP: host, ExecutionState: workercontexts.NewExecutionStateContext(f.db, request, nil)}
+				requestsBefore := len(host.requests)
+				handled, err := workercontexts.NewFactoryContext(f.db, consumer, request).PrepareReviewRequest(&requestContext)
+				require.NoError(t, err)
+				require.True(t, handled)
+				require.Len(t, host.requests, requestsBefore, "a green report must stop a queued reviewer request before GitHub access")
+				require.NoError(t, f.db.First(request, "id = ?", request.ID).Error)
+				require.Equal(t, models.CanvasNodeExecutionResultPassed, request.Result)
+				return
+			}
 			host.discoveryError = scenario == "discovery error"
 			host.empty = scenario == "no candidate"
-			agentContext := core.ExecutionContext{RunID: run.ID, Configuration: agent.Configuration.Data(), Integration: reviewRequestIntegration(), HTTP: host}
+			agentContext := core.ExecutionContext{RunID: run.ID, Configuration: agent.Configuration.Data(), Integration: reviewRequestIntegration(), HTTP: host, ExecutionState: workercontexts.NewExecutionStateContext(f.db, agent, nil)}
+			requestsBefore := len(host.requests)
 			handled, err := workercontexts.NewFactoryContext(f.db, consumer, agent).PrepareReviewRequest(&agentContext)
+			if scenario == "favorable" {
+				require.NoError(t, err)
+				require.True(t, handled)
+				require.Len(t, host.requests, requestsBefore, "a green report must skip reviewer discovery and the agent")
+				require.NoError(t, f.db.First(agent, "id = ?", agent.ID).Error)
+				require.Equal(t, models.CanvasNodeExecutionResultPassed, agent.Result)
+				support.VerifyCanvasNodeEventsCount(t, consumer.ID, reviewRequestAgentNodeID, 0)
+				return
+			}
 			if host.discoveryError {
 				require.ErrorContains(t, err, "Discover Review request reviewers")
 				require.Empty(t, host.reviewerBodies)
@@ -285,9 +317,6 @@ func TestReviewRequestFromPublishedReportToGitHub(t *testing.T) {
 				require.NoError(t, task.RequireModelPolicyAdmission(f.db), "the hosted model must survive preparation and execution persistence")
 			}
 			decision := map[string]any{"reviewRequired": true, "rationale": "Security findings need review.", "noCandidate": false, "reviewers": []any{map[string]any{"login": "octocat", "reason": "Owns the changed security code."}}}
-			if scenario == "favorable" {
-				decision["reviewRequired"], decision["rationale"], decision["reviewers"] = false, "All findings are favorable.", []any{}
-			}
 			if scenario == "concerning no review" {
 				decision["reviewRequired"], decision["reviewers"] = false, []any{}
 			}
@@ -352,10 +381,10 @@ func TestReviewRequestFromPublishedReportToGitHub(t *testing.T) {
 			if !handled {
 				require.NoError(t, requestAction.Execute(requestContext))
 			}
-			if scenario == "favorable" || scenario == "no candidate" || host.approved || host.alreadyAsked {
+			if scenario == "no candidate" || host.approved || host.alreadyAsked {
 				require.True(t, handled)
 				require.Empty(t, host.reviewerBodies)
-				if scenario == "favorable" || scenario == "no candidate" {
+				if scenario == "no candidate" {
 					require.Equal(t, false, selection["reviewRequired"])
 				}
 			} else {
