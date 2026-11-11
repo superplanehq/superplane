@@ -19,6 +19,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/factories/vcs"
 	"github.com/superplanehq/superplane/pkg/integrations/bitbucket"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
+	"github.com/superplanehq/superplane/pkg/integrations/prbody"
 	"github.com/superplanehq/superplane/pkg/models"
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
 	workercontexts "github.com/superplanehq/superplane/pkg/workers/contexts"
@@ -460,7 +461,7 @@ func TestUpdatePullRequestBodySectionRejectsStaleRuns(t *testing.T) {
 	}
 }
 
-func TestUpdatePullRequestBodySectionRefetchesOnRetryAndSkipsUnchanged(t *testing.T) {
+func TestUpdatePullRequestBodySectionRefetchesOnRetryAndReportsUnchanged(t *testing.T) {
 	for _, provider := range []string{"github", "bitbucket"} {
 		t.Run(provider, func(t *testing.T) {
 			f := newPublicationFixture(t)
@@ -498,7 +499,9 @@ func TestUpdatePullRequestBodySectionRefetchesOnRetryAndSkipsUnchanged(t *testin
 			assert.True(t, strings.HasPrefix(update[field], "user edit\r\n"+initial))
 			assert.Contains(t, update[field], "arbitrary **Markdown**")
 			httpCtx.Responses = []*http.Response{read(update[field])}
-			require.NoError(t, f.publish(t, IntakeDependencies{}))
+			outcome, err := f.publishOutcome(t, IntakeDependencies{})
+			require.NoError(t, err)
+			assert.Equal(t, prbody.StatusUnchanged, outcome.Status)
 			require.Len(t, httpCtx.Requests, 5)
 		})
 	}
@@ -582,7 +585,7 @@ func TestUpdatePullRequestBodySectionRetriesVCSSetupFailures(t *testing.T) {
 			// The integration does not exist, so the connection is missing.
 			outcome, err := f.publishOutcome(t, f.deps)
 			require.NoError(t, err)
-			assert.Equal(t, "skipped", outcome.Status)
+			assert.Equal(t, prbody.StatusSkipped, outcome.Status)
 
 			// A failed integration lookup is temporary and must retry.
 			failingLookup, cancel := context.WithCancel(t.Context())
@@ -635,6 +638,6 @@ func TestBodySectionPublicationIgnoresNewerRunsForOtherSections(t *testing.T) {
 	installPublicationGitHub(t, host)
 	outcome, err := f.publishOutcome(t, IntakeDependencies{})
 	require.NoError(t, err)
-	assert.Equal(t, "published", outcome.Status)
+	assert.Equal(t, prbody.StatusPublished, outcome.Status)
 	require.Len(t, host.Requests, 2)
 }
