@@ -14,6 +14,12 @@ spec:
     - channel: failed
       sourceId: assess-risk
       targetId: publish-merge-confidence
+    - channel: default
+      sourceId: publish-merge-confidence
+      targetId: complete-merge-confidence
+    - channel: default
+      sourceId: complete-merge-confidence
+      targetId: broadcast-merge-confidence
   nodes:
     - id: on-pr-risk
       name: On Pull Request
@@ -302,5 +308,32 @@ spec:
         enabled: true
       position:
         x: 1200
+        "y": 80
+      isCollapsed: true
+    - id: complete-merge-confidence
+      name: Complete Merge Confidence
+      type: TYPE_ACTION
+      component: filter
+      configuration:
+        expression: '$["Assess Merge Confidence"].data.mergeConfidence.complete == true && previous().data.status in ["published", "unchanged"]'
+      position:
+        x: 1520
+        "y": 80
+      isCollapsed: true
+    - id: broadcast-merge-confidence
+      name: Broadcast Merge Confidence
+      type: TYPE_ACTION
+      component: broadcastMessage
+      configuration:
+        payload:
+          type: merge-confidence.completed
+          reportId: '{{ run().id }}'
+          pullRequestId: '{{ $["Assess Merge Confidence"].data.mergeConfidence.pullRequestId }}'
+          repository: '{{ $["Assess Merge Confidence"].data.mergeConfidence.repository }}'
+          pullNumber: '{{ $["Assess Merge Confidence"].data.mergeConfidence.pullNumber }}'
+          reviewedCommit: '{{ $["Assess Merge Confidence"].data.mergeConfidence.reviewedCommit }}'
+          mergeConfidence: '{{ $["Assess Merge Confidence"].data.mergeConfidence }}'
+      position:
+        x: 1840
         "y": 80
       isCollapsed: true

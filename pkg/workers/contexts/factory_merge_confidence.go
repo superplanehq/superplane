@@ -92,6 +92,8 @@ func (s *ExecutionStateContext) prepareMergeConfidenceOutput(channel, payloadTyp
 	assessment.TaskURL = strings.TrimRight(uiBaseURL(), "/") + order.URLPath(workspace.RouteSegment())
 	report := assessment.ReportData()
 	report.PullRequestID = pr.ID.String()
+	report.Repository = pr.Repository
+	report.PullNumber = pr.Number
 	outputs := make([]any, len(payloads))
 	for i, payload := range payloads {
 		data, ok := payload.(map[string]any)

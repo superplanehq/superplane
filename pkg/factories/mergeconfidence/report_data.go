@@ -19,6 +19,8 @@ type Assessment struct {
 
 type ReportData struct {
 	PullRequestID  string        `json:"pullRequestId"`
+	Repository     string        `json:"repository"`
+	PullNumber     int64         `json:"pullNumber"`
 	Complete       bool          `json:"complete"`
 	OverallScore   *float64      `json:"overallScore"`
 	OverallLevel   string        `json:"overallLevel"`
