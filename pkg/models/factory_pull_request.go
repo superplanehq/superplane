@@ -344,6 +344,47 @@ type FactoryPullRequestMergeabilitySnapshot struct {
 	AllowedMethods string
 }
 
+// SetReviewState changes draft status without overwriting concurrent terminal updates.
+func (p *FactoryPullRequest) SetReviewState(tx *gorm.DB, state string) (bool, error) {
+	if state != FactoryPullRequestStateOpen && state != FactoryPullRequestStateDraft {
+		return false, fmt.Errorf("%w: invalid review state %q", ErrFactoryPullRequestInvalid, state)
+	}
+	updated := *p
+	updated.State = state
+	updated.UpdatedAt = time.Now()
+	changed := false
+	err := tx.Transaction(func(inner *gorm.DB) error {
+		// Closure and merge lock the task before the pull request.
+		if err := LockFactoryWorkOrder(inner, p.WorkOrderID); err != nil {
+			return err
+		}
+		result := inner.Model(&FactoryPullRequest{}).
+			Where("id = ? AND organization_id = ? AND factory_id = ?", p.ID, p.OrganizationID, p.FactoryID).
+			Where("state IN ? AND state <> ?", []string{FactoryPullRequestStateOpen, FactoryPullRequestStateDraft}, state).
+			Updates(map[string]any{"state": state, "updated_at": updated.UpdatedAt})
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected == 0 {
+			return nil
+		}
+		order := &FactoryWorkOrder{ID: p.WorkOrderID, OrganizationID: p.OrganizationID, FactoryID: p.FactoryID}
+		if err := order.RecordPullRequestUpdated(inner, updated.Ref(), nil, nil); err != nil {
+			return err
+		}
+		changed = true
+		return nil
+	})
+	if err != nil {
+		return false, err
+	}
+	if changed {
+		p.State = updated.State
+		p.UpdatedAt = updated.UpdatedAt
+	}
+	return changed, nil
+}
+
 func (p *FactoryPullRequest) SetMergeability(tx *gorm.DB, snapshot FactoryPullRequestMergeabilitySnapshot) error {
 	now := time.Now()
 	headSHA := strings.TrimSpace(snapshot.HeadSHA)
