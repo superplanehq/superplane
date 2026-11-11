@@ -215,6 +215,7 @@ func TruncateTables() error {
 			vcs_provider_install_request_refreshes,
 			vcs_provider_installation_reconcile_jobs,
 			vcs_provider_reconcile_jobs,
+			vcs_provider_catalog_schedules,
 			vcs_provider_installations,
 			secrets,
 			account_magic_codes,
@@ -257,7 +258,9 @@ func TruncateTables() error {
 			hosted_model_call_outcomes,
 			mcp_oauth_clients,
 			mcp_oauth_codes,
-			mcp_oauth_refresh_tokens
+			mcp_oauth_refresh_tokens,
+			sentry_webhook_receipts,
+			sentry_app_install_grants
 		restart identity cascade;
 	`).Error
 }

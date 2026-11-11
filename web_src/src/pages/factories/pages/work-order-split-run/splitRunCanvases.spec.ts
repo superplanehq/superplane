@@ -309,7 +309,26 @@ describe("splitRunCanvasForPhase", () => {
     });
 
     expect(sentry.title).toBe("Sentry");
-    expect(sentry.nodes.map((node) => node.name)).toEqual(["On Issue", "Factory project?", "Create Task"]);
+    expect(sentry.nodes.map((node) => node.name)).toEqual([
+      "On Issue",
+      "Factory project?",
+      "Get Sentry Issue",
+      "Get Sentry Event",
+      "Latest event has a stack?",
+      "Get Recommended Sentry Event",
+      "Create Task",
+    ]);
+    const gate = sentry.nodes.find((node) => node.name === "Latest event has a stack?")!;
+    expect(gate.component).toBe("if");
+    expect(gate.configuration?.expression).toBe('sentryEventHasStack($["Get Sentry Event"].data?.body)');
+    expect(sentry.edges.filter((edge) => edge.targetId === gate.id)).toEqual([
+      { channel: "success", sourceId: "get-sentry-event", targetId: gate.id },
+      { channel: "failure", sourceId: "get-sentry-event", targetId: gate.id },
+    ]);
+    expect(sentry.edges.filter((edge) => edge.sourceId === gate.id)).toEqual([
+      { channel: "true", sourceId: gate.id, targetId: "create-work-order" },
+      { channel: "false", sourceId: gate.id, targetId: "get-recommended-sentry-event" },
+    ]);
     expect(slack.title).toBe("Slack");
     expect(slack.nodes.map((node) => node.name)).toEqual(["On Mention", "Mentioned the agent?", "Create Task"]);
   });

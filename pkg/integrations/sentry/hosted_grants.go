@@ -38,16 +38,7 @@ func (databaseHostedInstallGrants) Remember(install hostedSentryInstall) error {
 		return nil
 	}
 
-	encryptor, err := hostedInstallGrantEncryptor()
-	if err != nil {
-		return err
-	}
-
-	accessToken, err := sealHostedGrantToken(encryptor, installationUUID, install.AccessToken)
-	if err != nil {
-		return err
-	}
-	refreshToken, err := sealHostedGrantToken(encryptor, installationUUID, install.RefreshToken)
+	accessToken, refreshToken, err := sealHostedGrantTokens(installationUUID, install.AccessToken, install.RefreshToken)
 	if err != nil {
 		return err
 	}
@@ -141,6 +132,28 @@ func hostedInstallGrantEncryptor() (crypto.Encryptor, error) {
 		return nil, fmt.Errorf("Sentry install grants need an encryptor")
 	}
 	return hostedInstallEncryptor, nil
+}
+
+// sealHostedGrantTokens encrypts grant tokens. A grant from the
+// installation webhook has only a code, so it needs no encryptor.
+func sealHostedGrantTokens(installationUUID, accessToken, refreshToken string) ([]byte, []byte, error) {
+	if strings.TrimSpace(accessToken) == "" && strings.TrimSpace(refreshToken) == "" {
+		return nil, nil, nil
+	}
+
+	encryptor, err := hostedInstallGrantEncryptor()
+	if err != nil {
+		return nil, nil, err
+	}
+	sealedAccess, err := sealHostedGrantToken(encryptor, installationUUID, accessToken)
+	if err != nil {
+		return nil, nil, err
+	}
+	sealedRefresh, err := sealHostedGrantToken(encryptor, installationUUID, refreshToken)
+	if err != nil {
+		return nil, nil, err
+	}
+	return sealedAccess, sealedRefresh, nil
 }
 
 func sealHostedGrantToken(encryptor crypto.Encryptor, installationUUID, token string) ([]byte, error) {

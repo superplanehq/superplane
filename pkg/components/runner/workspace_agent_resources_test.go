@@ -739,6 +739,66 @@ func TestAttachWorkspaceAgentResourcesListsPrimaryRepositoryWithContext(t *testi
 	assert.Equal(t, "acme/web", contextFile.Repositories[1].Repository)
 }
 
+func TestAttachWorkspaceAgentResourcesBlocksPushToReadOnlyBitbucketRepositories(t *testing.T) {
+	r := setupWorkspaceAgentResources(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	repository := "acme/app"
+	provider := models.ProviderBitbucket
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{AppRepository: &repository, VCSProvider: &provider}))
+	canvas := support.CreateFactoryCanvas(t, r, factory.ID, "Line app")
+	for repository, access := range map[string]string{"acme/web": models.FactoryContextRepoAccessWrite, "acme/docs": models.FactoryContextRepoAccessRead} {
+		_, err = factory.CreateAgentResource(db, models.FactoryAgentResourceKindContextRepo, "", true, models.FactoryAgentResourceConfig{
+			Repository: repository, VCSProvider: models.ProviderBitbucket, Access: access,
+		})
+		require.NoError(t, err)
+	}
+	type contextEntry struct {
+		Repository  string `json:"repository"`
+		ReadOnly    bool   `json:"readOnly"`
+		PushBlocked bool   `json:"pushBlocked"`
+	}
+	contextEntries := func(t *testing.T) map[string]contextEntry {
+		t.Helper()
+		_, files := runner.AttachWorkspaceAgentResources(core.ExecutionContext{
+			OrganizationID: r.Organization.ID.String(),
+			WorkflowID:     canvas.ID.String(),
+		}, nil, nil)
+		var contextFile struct {
+			Repositories []contextEntry `json:"repositories"`
+		}
+		for _, file := range files {
+			if file.Path == runner.WorkspaceContextConfigPath {
+				require.NoError(t, json.Unmarshal([]byte(file.Content), &contextFile))
+			}
+		}
+		entries := map[string]contextEntry{}
+		for _, entry := range contextFile.Repositories {
+			entries[entry.Repository] = entry
+		}
+		return entries
+	}
+
+	t.Run("keeps push without multi-repo tasks", func(t *testing.T) {
+		entries := contextEntries(t)
+		assert.True(t, entries["acme/web"].ReadOnly)
+		assert.False(t, entries["acme/web"].PushBlocked)
+		assert.False(t, entries["acme/docs"].PushBlocked)
+	})
+
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryMultiRepoTasks))
+
+	t.Run("blocks push only for read-only repositories with multi-repo tasks", func(t *testing.T) {
+		entries := contextEntries(t)
+		assert.False(t, entries["acme/web"].ReadOnly)
+		assert.False(t, entries["acme/web"].PushBlocked)
+		assert.True(t, entries["acme/docs"].ReadOnly)
+		assert.True(t, entries["acme/docs"].PushBlocked)
+		assert.False(t, entries["acme/app"].PushBlocked, "the primary repository keeps push")
+	})
+}
+
 func TestAttachWorkspaceAgentResourcesSkipsSetupCommandsWhenConfigured(t *testing.T) {
 	r := setupWorkspaceAgentResources(t)
 	db := database.DB(t.Context())

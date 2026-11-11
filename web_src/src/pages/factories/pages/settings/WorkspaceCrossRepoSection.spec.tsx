@@ -310,6 +310,61 @@ describe("cross-repo context picker", () => {
     expect(within(list).queryByTestId("agent-cross-repo-primary")).toBeNull();
   }, 15000);
 
+  it("lets a Bitbucket workspace give write access with multi-repo tasks", async () => {
+    const user = userEvent.setup();
+    render(
+      <FactoriesHarness
+        pathSuffix={agentPath}
+        factoriesFixture={{
+          ...factoriesFixtureWithSetupAnswers({ ...SETUP_ANSWERS.repository, vcsProvider: "bitbucket" }),
+          agentResourcesByFactoryId: {},
+        }}
+        orgIntegrations={CONNECTED_SETUP_INTEGRATIONS}
+        experimentalFeatures={agentPageFeatures}
+      />,
+    );
+
+    await user.click(await screen.findByTestId("agent-cross-repo-add", {}, { timeout: 8000 }));
+    const picker = await screen.findByTestId("agent-cross-repo-picker", {}, { timeout: 8000 });
+    await user.click(await within(picker).findByRole("option", { name: /^acme\/web$/ }, { timeout: 8000 }));
+    const settings = await within(picker).findByTestId("agent-cross-repo-settings", {}, { timeout: 8000 });
+    expect(within(settings).getByTestId("agent-cross-repo-new-access")).toHaveTextContent(
+      AGENT_RESOURCES_COPY.accessWrite,
+    );
+    await user.click(within(settings).getByTestId("agent-cross-repo-confirm"));
+
+    const list = await screen.findByTestId("agent-cross-repo-list", {}, { timeout: 8000 });
+    expect(within(list).getByTestId("agent-cross-repo-primary")).toHaveTextContent("acme/api");
+    expect(
+      await within(list).findByText(`main · ${AGENT_RESOURCES_COPY.accessWrite}`, {}, { timeout: 8000 }),
+    ).toBeInTheDocument();
+  }, 15000);
+
+  it("keeps the Bitbucket cross-repo context card without multi-repo tasks", async () => {
+    const user = userEvent.setup();
+    render(
+      <FactoriesHarness
+        pathSuffix={agentPath}
+        factoriesFixture={{
+          ...factoriesFixtureWithSetupAnswers({ ...SETUP_ANSWERS.repository, vcsProvider: "bitbucket" }),
+          agentResourcesByFactoryId: {},
+        }}
+        orgIntegrations={CONNECTED_SETUP_INTEGRATIONS}
+        experimentalFeatures={[FEATURE_WORKSPACE_SKILLS]}
+      />,
+    );
+
+    await user.click(await screen.findByTestId("agent-cross-repo-add", {}, { timeout: 8000 }));
+    const picker = await screen.findByTestId("agent-cross-repo-picker", {}, { timeout: 8000 });
+    expect(within(picker).queryByTestId("agent-cross-repo-new-list-access")).toBeNull();
+    await user.click(await within(picker).findByRole("option", { name: /^acme\/web$/ }, { timeout: 8000 }));
+
+    const list = await screen.findByTestId("agent-cross-repo-list", {}, { timeout: 8000 });
+    expect(await within(list).findByText("acme/web", {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(within(list).queryByText(new RegExp(AGENT_RESOURCES_COPY.accessWrite))).toBeNull();
+    expect(within(list).queryByTestId("agent-cross-repo-primary")).toBeNull();
+  }, 15000);
+
   it("hides the workspace repository when only the letter case differs", async () => {
     const user = userEvent.setup();
     render(

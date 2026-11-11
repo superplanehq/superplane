@@ -72,6 +72,7 @@ services:
       START_PLANNING_SESSION_CLEANUP_WORKER: "yes"
       START_EVENT_RETENTION_WORKER: "yes"
       START_HOSTED_MODEL_CALL_OUTCOME_CLEANUP_WORKER: "yes"
+      START_VCS_PROVIDER_CATALOG_WORKER: "yes"
       WEB_BASE_PATH: ""
       SENTRY_DSN: ""
       SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-development}
@@ -175,7 +176,7 @@ services:
       - ${VITE_PREVIEW_PORT:-4173}:${VITE_PREVIEW_PORT:-4173}
       - ${STORYBOOK_PORT:-6006}:${STORYBOOK_PORT:-6006}
       - ${PUBLIC_API_PORT:-8000}:${PUBLIC_API_PORT:-8000}
-      - ${PPROF_PORT:-6060}:${PPROF_PORT:-6060}
+      - 127.0.0.1:${PPROF_PORT:-6060}:${PPROF_PORT:-6060}
 
     extra_hosts:
       - "host.docker.internal:host-gateway"

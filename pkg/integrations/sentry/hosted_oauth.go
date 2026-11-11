@@ -287,7 +287,11 @@ func resolveHostedAppTokens(
 		}
 	}
 
-	tokens, err := hostedAppTokensFromSentry(httpCtx, app, installationUUID, code, knownInstallationUUID)
+	// A claimed grant proves that the signed installation webhook sent this
+	// code for this installation. SuperPlane can then mint a token if the
+	// code exchange fails, for example after the code expires.
+	grantVerified := unclaimed != nil
+	tokens, err := hostedAppTokensFromSentry(httpCtx, app, installationUUID, code, knownInstallationUUID, grantVerified)
 	if err != nil {
 		return nil, "", err
 	}
@@ -298,6 +302,7 @@ func hostedAppTokensFromSentry(
 	httpCtx core.HTTPContext,
 	app HostedApp,
 	installationUUID, code, knownInstallationUUID string,
+	grantVerified bool,
 ) (*sentryAppAuthorizationResponse, error) {
 	installationUUID = strings.TrimSpace(installationUUID)
 	code = strings.TrimSpace(code)
@@ -308,7 +313,7 @@ func hostedAppTokensFromSentry(
 		if err == nil {
 			return tokens, nil
 		}
-		if !alreadyBound {
+		if !alreadyBound && !grantVerified {
 			return nil, fmt.Errorf("exchange Sentry app code: %w", err)
 		}
 		minted, mintErr := mintSentryAppToken(httpCtx, app, installationUUID)
@@ -324,9 +329,10 @@ func hostedAppTokensFromSentry(
 	return nil, fmt.Errorf("Sentry app authorization code is required")
 }
 
-// RememberHostedInstallGrant exchanges a webhook grant and stores tokens until
-// the authenticated setup callback presents the same code.
-func RememberHostedInstallGrant(httpCtx core.HTTPContext, app HostedApp, grant InstallationGrant) error {
+// RememberHostedInstallGrant stores a webhook grant until the authenticated
+// setup callback presents the same code. It does not call Sentry. The setup
+// callback exchanges the code, so a failed write here does not consume it.
+func RememberHostedInstallGrant(grant InstallationGrant) error {
 	if strings.TrimSpace(grant.UUID) == "" {
 		return fmt.Errorf("installation is required")
 	}
@@ -341,13 +347,6 @@ func RememberHostedInstallGrant(httpCtx core.HTTPContext, app HostedApp, grant I
 	}
 	if grant.OrgSlug != "" {
 		install.Organization = &OrganizationSummary{Slug: grant.OrgSlug}
-	}
-
-	tokens, err := exchangeSentryAppCode(httpCtx, app, grant.UUID, code)
-	if err == nil {
-		install.AccessToken = tokens.Token
-		install.RefreshToken = tokens.RefreshToken
-		install.TokenExpiresAt = tokens.ExpiresAt
 	}
 	return hostedInstallGrants.Remember(install)
 }
@@ -454,8 +453,8 @@ func firstNonEmpty(values ...string) string {
 }
 
 // ParseInstallationCreatedGrant reads the grant Sentry sends on
-// installation.created. SuperPlane uses it when the browser Redirect URL
-// never completed.
+// installation.created. The setup callback uses it to verify the code, and
+// to mint a token when the code exchange fails.
 func ParseInstallationCreatedGrant(resource string, body []byte) (InstallationGrant, bool) {
 	if strings.TrimSpace(resource) != "installation" {
 		return InstallationGrant{}, false
@@ -656,6 +655,8 @@ func clearIntegrationSetupReturnCookie(w http.ResponseWriter) {
 		Path:     "/",
 		MaxAge:   -1,
 		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteLaxMode,
 	})
 }
 
@@ -666,6 +667,8 @@ func clearSentryAppSetupStateCookie(w http.ResponseWriter) {
 		Path:     "/",
 		MaxAge:   -1,
 		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteLaxMode,
 	})
 }
 
@@ -676,6 +679,7 @@ func setSentryAppSetupStateCookie(w http.ResponseWriter, state string) {
 		Path:     "/",
 		MaxAge:   int((20 * time.Minute).Seconds()),
 		HttpOnly: true,
+		Secure:   true,
 		SameSite: http.SameSiteLaxMode,
 	})
 }

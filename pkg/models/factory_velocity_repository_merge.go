@@ -98,6 +98,7 @@ func ReplaceFactoryVelocityRepositoryMerges(
 	provider string,
 	from, to time.Time,
 	merges []FactoryVelocityRepositoryMerge,
+	repository ...string,
 ) error {
 	if strings.TrimSpace(provider) == "" {
 		provider = ProviderGitHub
@@ -107,8 +108,13 @@ func ReplaceFactoryVelocityRepositoryMerges(
 			merges[i].Provider = provider
 		}
 	}
-	err := tx.
-		Where("factory_id = ? AND provider = ? AND merged_at >= ? AND merged_at < ?", factoryID, provider, from, to).
+	query := tx.Where("factory_id = ? AND provider = ? AND merged_at >= ? AND merged_at < ?", factoryID, provider, from, to)
+	if len(repository) > 0 {
+		query = query.Where("repository = ?", CanonicalContextRepo(repository[0]))
+	} else if len(merges) > 0 {
+		query = query.Where("repository = ?", merges[0].Repository)
+	}
+	err := query.
 		Delete(&FactoryVelocityRepositoryMerge{}).Error
 	if err != nil {
 		return err
@@ -137,6 +143,28 @@ func ReplaceFactoryVelocityRepositoryMerges(
 			"updated_at",
 		}),
 	}).CreateInBatches(merges, factoryVelocityRepositoryMergeBatchSize).Error
+}
+
+// ReconcileFactoryVelocityRepositories removes excluded history and progress.
+// A repository added again must backfill rather than reuse an old watermark.
+func ReconcileFactoryVelocityRepositories(tx *gorm.DB, factoryID uuid.UUID, repositories []string) error {
+	canonical := make([]string, 0, len(repositories))
+	for _, repository := range repositories {
+		canonical = append(canonical, CanonicalContextRepo(repository))
+	}
+	return tx.Transaction(func(tx *gorm.DB) error {
+		merges := tx.Where("factory_id = ?", factoryID)
+		syncs := tx.Where("factory_id = ? AND scope_repository <> ''", factoryID)
+		if len(canonical) > 0 {
+			merges = merges.Where("repository NOT IN ?", canonical)
+			syncs = syncs.Where("scope_repository NOT IN ?", canonical)
+		}
+		// Lock progress before history, in the same order as a worker's save.
+		if err := syncs.Delete(&FactoryVelocitySync{}).Error; err != nil {
+			return err
+		}
+		return merges.Delete(&FactoryVelocityRepositoryMerge{}).Error
+	})
 }
 
 // DeleteFactoryVelocityRepositoryMerges drops every stored merge of a workspace.

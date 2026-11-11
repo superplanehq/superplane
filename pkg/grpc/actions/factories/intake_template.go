@@ -7,7 +7,9 @@ import (
 	"strconv"
 	"strings"
 
+	httpcomponent "github.com/superplanehq/superplane/pkg/components/http"
 	"github.com/superplanehq/superplane/pkg/components/runner"
+	"github.com/superplanehq/superplane/pkg/integrations/sentry"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/yaml"
 )
@@ -15,9 +17,15 @@ import (
 const (
 	// Node identifiers of a generated intake graph. An intake owns its whole
 	// canvas, so the identifiers are fixed rather than derived from the source.
-	intakeTriggerNodeID = "trigger"
-	intakeFilterNodeID  = "filter"
-	intakeCreateNodeID  = "create-work-order"
+	intakeTriggerNodeID     = "trigger"
+	intakeFilterNodeID      = "filter"
+	intakeEnrichIssueNodeID = "enrich-issue"
+	// Keep these IDs compatible with existing HTTP intakes.
+	intakeSentryRecommendedEventRequestNodeID = "get-recommended-sentry-event"
+	intakeSentryIssueRequestNodeID            = "get-sentry-issue"
+	intakeSentryEventRequestNodeID            = "get-sentry-event"
+	intakeSentryEventHasStackNodeID           = "latest-sentry-event-has-stack"
+	intakeCreateNodeID                        = "create-work-order"
 
 	intakeAuthorPermissionNodeID = "get-author-permission"
 	intakeAuthorFilterNodeID     = "author-has-repository-access"
@@ -34,6 +42,8 @@ const (
 	intakeAuthorPermissionComponent = "github.getRepositoryPermission"
 	intakeThresholdComponent        = intakeFilterComponent
 	intakeCreateComponent           = "createWorkOrder"
+	intakeEnrichIssueComponent      = "sentry.enrichIssue"
+	intakeHTTPRequestComponent      = "http"
 
 	intakeAddRunErrorNodeID    = "add-run-error"
 	intakeAddRunErrorNodeName  = "Record Analysis Failure"
@@ -55,6 +65,20 @@ const (
 // runner components reject a node without one, so the generated graph has to
 // name it.
 const intakeAnalysisMachineType = runner.MachineTypeE1LargeAMD64
+
+// sentryRequestAuthorization keeps the credentials current when an existing
+// HTTP-based intake is rebound to a different Sentry integration.
+func sentryRequestAuthorization(binding *intakeBinding) map[string]any {
+	integrationName := "Connect Sentry"
+	if ref := binding.integrationRef(); ref != nil && strings.TrimSpace(ref.Name) != "" {
+		integrationName = ref.Name
+	}
+	return map[string]any{
+		"type":           httpcomponent.AuthorizationTypeIntegrationBearer,
+		"integration":    map[string]any{"name": integrationName},
+		"integrationKey": sentry.IntegrationAuthTokenKey,
+	}
+}
 
 // intakeAnalysisComponents are the runners a backlog canvas can score with.
 // Creation picks the runner of the workspace agent, but a graph the user
@@ -98,7 +122,7 @@ var intakeSpecsBySource = map[string]intakeSpec{
 		triggerName:          "On Issue Event",
 		triggerConfiguration: map[string]any{"actions": intakeSentryActionsFor(defaultSentryIntakeSettings())},
 		createTitle:          "{{ root().data.data.issue.title }}",
-		createDescription:    "{{ root().data.description }}",
+		createDescription:    sentryIntakeDescriptionExpression,
 	},
 	models.FactoryIntakeSourcePagerDutyIncidents: {
 		name:             "PagerDuty incidents",
@@ -169,6 +193,9 @@ var intakeSpecsBySource = map[string]intakeSpec{
 		createDescription: `{{ root().data.data.description }}`,
 	},
 }
+
+// Both API errors and transport failures leave the original issue available.
+const sentryIntakeDescriptionExpression = `{{ sentryIssueDescription(root().data.data.issue, $["Get Sentry Issue"].data?.body, $["Get Sentry Event"].data?.body, $["Get Recommended Sentry Event"]?.data?.body) }}`
 
 // dependabotAlertCreateTitle names the package, not the manifest, because
 // every alert for one package lands on one task. It must match
@@ -252,6 +279,59 @@ func buildIntakeCanvas(request intakeCanvasRequest) (*yaml.Canvas, error) {
 		createY = 440
 	} else {
 		edges = append(edges, yaml.Edge{Channel: "default", SourceID: intakeTriggerNodeID, TargetID: intakeCreateNodeID})
+	}
+	if request.Source == models.FactoryIntakeSourceSentryExceptions {
+		for _, requestNode := range []struct {
+			id, name, url string
+		}{
+			{intakeSentryIssueRequestNodeID, "Get Sentry Issue", "{{ root().data.issueApiUrl }}"},
+			{intakeSentryEventRequestNodeID, "Get Sentry Event", "{{ root().data.issueApiUrl }}events/latest/"},
+			{intakeSentryRecommendedEventRequestNodeID, "Get Recommended Sentry Event", "{{ root().data.issueApiUrl }}events/recommended/"},
+		} {
+			nodes = append(nodes, yaml.Node{
+				ID:        requestNode.id,
+				Name:      requestNode.name,
+				Type:      yaml.NodeTypeAction,
+				Component: intakeHTTPRequestComponent,
+				Configuration: map[string]any{
+					"method":                 "GET",
+					"url":                    requestNode.url,
+					"authorization":          sentryRequestAuthorization(request.Binding),
+					"redactSensitiveHeaders": true,
+				},
+				Concurrency: intakeConcurrency(),
+				Position:    yaml.Position{X: 160, Y: createY},
+			})
+			createY += 180
+			if requestNode.id == intakeSentryEventRequestNodeID {
+				nodes = append(nodes, yaml.Node{
+					ID:        intakeSentryEventHasStackNodeID,
+					Name:      "Latest event has a stack?",
+					Type:      yaml.NodeTypeAction,
+					Component: intakeFilterComponent,
+					Configuration: map[string]any{
+						"expression": `sentryEventHasStack($["Get Sentry Event"].data?.body)`,
+					},
+					Concurrency: intakeConcurrency(),
+					Position:    yaml.Position{X: 160, Y: createY},
+				})
+				createY += 180
+			}
+		}
+		edges = slices.DeleteFunc(edges, func(edge yaml.Edge) bool {
+			return edge.SourceID == intakeFilterNodeID && edge.TargetID == intakeCreateNodeID
+		})
+		edges = append(edges,
+			yaml.Edge{Channel: "true", SourceID: intakeFilterNodeID, TargetID: intakeSentryIssueRequestNodeID},
+			yaml.Edge{Channel: "success", SourceID: intakeSentryIssueRequestNodeID, TargetID: intakeSentryEventRequestNodeID},
+			yaml.Edge{Channel: "failure", SourceID: intakeSentryIssueRequestNodeID, TargetID: intakeSentryEventRequestNodeID},
+			yaml.Edge{Channel: "success", SourceID: intakeSentryEventRequestNodeID, TargetID: intakeSentryEventHasStackNodeID},
+			yaml.Edge{Channel: "failure", SourceID: intakeSentryEventRequestNodeID, TargetID: intakeSentryEventHasStackNodeID},
+			yaml.Edge{Channel: "true", SourceID: intakeSentryEventHasStackNodeID, TargetID: intakeCreateNodeID},
+			yaml.Edge{Channel: "false", SourceID: intakeSentryEventHasStackNodeID, TargetID: intakeSentryRecommendedEventRequestNodeID},
+			yaml.Edge{Channel: "success", SourceID: intakeSentryRecommendedEventRequestNodeID, TargetID: intakeCreateNodeID},
+			yaml.Edge{Channel: "failure", SourceID: intakeSentryRecommendedEventRequestNodeID, TargetID: intakeCreateNodeID},
+		)
 	}
 
 	nodes = append(nodes, yaml.Node{

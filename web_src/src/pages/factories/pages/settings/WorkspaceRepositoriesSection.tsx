@@ -74,7 +74,6 @@ type ContextRepoListProps = {
   catalogRepositories: CatalogRepositories;
   resources: ContextRepoResource[];
   host: VcsHostId;
-  showAccess: boolean;
   canUpdate: boolean;
   isSaving: boolean;
   onRemove: (resourceId: string) => void;
@@ -142,7 +141,7 @@ function ContextRepoRow({
           <IntegrationChoiceIcon name={props.host} />
           <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{name}</span>
           <span className="shrink-0 truncate text-[12px] text-muted-foreground">
-            {workspaceRepositorySummary(settings, props.showAccess, defaultBranch)}
+            {workspaceRepositorySummary(settings, defaultBranch)}
           </span>
           <ChevronDown
             className={cn("size-4 shrink-0 text-muted-foreground transition-transform", expanded && "rotate-180")}
@@ -159,7 +158,6 @@ function ContextRepoRow({
             repository={name}
             defaultBranch={defaultBranch}
             value={settings}
-            showAccess={props.showAccess}
             disabled={!props.canUpdate || props.isSaving}
             onChange={(next) => resource.id && props.onUpdate(resource.id, changedRepositorySettings(settings, next))}
           />
@@ -244,12 +242,10 @@ export function WorkspaceRepositoriesCard({
   const createResource = useCreateFactoryAgentResource(organizationId, factoryId);
   const edits = useContextRepoEdits(organizationId, factoryId);
   const choices = useWorkspaceRepositoryChoices(organizationId, factory);
-  // Bitbucket repositories stay read-only.
-  const showAccess = !choices.bitbucket;
 
   const added = (contextRepos.data ?? []).map(contextRepoName).filter(Boolean);
   const mainRepository = factory?.onboarding?.appRepository;
-  const primaryRepository = showAccess ? (mainRepository?.trim() ?? "") : "";
+  const primaryRepository = mainRepository?.trim() ?? "";
   const otherRepos = (contextRepos.data ?? []).filter(
     (resource) => !isWorkspaceMainRepository(contextRepoName(resource), mainRepository),
   );
@@ -265,7 +261,7 @@ export function WorkspaceRepositoriesCard({
         enabled: true,
         repository,
         ref: settings.ref,
-        access: showAccess ? settings.access : "read",
+        access: settings.access,
         vcsProvider: choices.bitbucket ? "bitbucket" : "github",
       });
       showSuccessToast(AGENT_RESOURCES_COPY.crossRepoAdded);
@@ -280,7 +276,7 @@ export function WorkspaceRepositoriesCard({
       <FactorySettingsCard
         title={AGENT_RESOURCES_COPY.repositoriesTitle}
         titleClassName="text-sm font-semibold"
-        description={showAccess ? AGENT_RESOURCES_COPY.repositoriesHelper : AGENT_RESOURCES_COPY.crossRepoHelper}
+        description={AGENT_RESOURCES_COPY.repositoriesHelper}
         icon={<GitBranch className="size-4" strokeWidth={1.75} aria-hidden />}
         iconClassName="border-border bg-muted/60 text-foreground"
         className="shadow-sm"
@@ -315,7 +311,6 @@ export function WorkspaceRepositoriesCard({
             catalogRepositories={choices.catalogRepositories}
             resources={otherRepos}
             host={choices.host}
-            showAccess={showAccess}
             canUpdate={canUpdate}
             isSaving={isSaving}
             onRemove={edits.remove}
@@ -332,7 +327,6 @@ export function WorkspaceRepositoriesCard({
         catalog={available}
         added={added}
         mainRepository={mainRepository}
-        showAccess={showAccess}
         disabled={!canUpdate || createResource.isPending}
         onAdd={create}
       />
@@ -348,7 +342,6 @@ function AddRepositoryDialog(props: {
   catalog: string[];
   added: string[];
   mainRepository: string | undefined;
-  showAccess: boolean;
   disabled: boolean;
   onAdd: (repository: string, settings: WorkspaceRepositorySettings) => void;
 }) {
@@ -380,11 +373,7 @@ function AddRepositoryDialog(props: {
         <DialogHeader>
           <DialogTitle>{selected ?? AGENT_RESOURCES_COPY.addRepository}</DialogTitle>
           <DialogDescription>
-            {selected
-              ? AGENT_RESOURCES_COPY.crossRepoSettingsHelper
-              : props.showAccess
-                ? AGENT_RESOURCES_COPY.repositoriesDialogHelper
-                : AGENT_RESOURCES_COPY.crossRepoDialogHelper}
+            {selected ? AGENT_RESOURCES_COPY.crossRepoSettingsHelper : AGENT_RESOURCES_COPY.repositoriesDialogHelper}
           </DialogDescription>
         </DialogHeader>
         {selected ? (
@@ -396,7 +385,6 @@ function AddRepositoryDialog(props: {
               repository={selected}
               defaultBranch={defaultBranch}
               value={settings}
-              showAccess={props.showAccess}
               disabled={props.disabled}
               onChange={setSettings}
             />
@@ -416,7 +404,7 @@ function AddRepositoryDialog(props: {
           </div>
         ) : (
           <div className="flex flex-col gap-6">
-            {choices.integrationId && props.showAccess ? (
+            {choices.integrationId ? (
               <div className="sm:max-w-xs">
                 <RepositoryAccessField
                   id="agent-cross-repo-new-list-access"

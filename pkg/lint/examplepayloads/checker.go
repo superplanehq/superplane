@@ -240,7 +240,7 @@ func loadTargetPackages(patterns ...string) ([]*loadedPackage, error) {
 
 func goList(args ...string) ([]listedPackage, error) {
 	baseArgs := append([]string{"list", "-json"}, args...)
-	cmd := exec.Command("go", baseArgs...)
+	cmd := exec.Command("go", baseArgs...) // #nosec G204 -- the executable is fixed and arguments are Go package patterns.
 	cmd.Dir = repoRoot()
 	output, err := cmd.Output()
 	if err != nil {
@@ -458,6 +458,14 @@ func (a *packageAnalyzer) collectEmitSpecsFromBlock(block *ast.BlockStmt, env ma
 
 func (a *packageAnalyzer) collectEmitSpecsFromStmt(stmt ast.Stmt, env map[string]schema) []emitSpec {
 	switch s := stmt.(type) {
+	case *ast.AssignStmt:
+		var specs []emitSpec
+		for _, value := range s.Rhs {
+			if spec, ok := a.emitSpecFromCall(value, env); ok {
+				specs = append(specs, spec)
+			}
+		}
+		return specs
 	case *ast.ExprStmt:
 		if spec, ok := a.emitSpecFromCall(s.X, env); ok {
 			return []emitSpec{spec}

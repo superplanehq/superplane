@@ -109,6 +109,28 @@ func TestRunnerMergeConfidenceCheck(t *testing.T) {
 }
 
 func TestRunnerMergeConfidenceCheckKeepsEachRepositoryApart(t *testing.T) {
+	pullRequestEvents := map[string]func(repository string, number int) map[string]any{
+		"github": func(repository string, number int) map[string]any {
+			return map[string]any{
+				"type": "github.pullRequest",
+				"data": map[string]any{"repository": map[string]any{"full_name": repository}, "pull_request": map[string]any{"number": number}},
+			}
+		},
+		"bitbucket": func(repository string, number int) map[string]any {
+			return map[string]any{
+				"type": "bitbucket.pullRequest",
+				"data": map[string]any{"repository": map[string]any{"full_name": repository}, "pullrequest": map[string]any{"id": number}},
+			}
+		},
+	}
+	for provider, pullRequestEvent := range pullRequestEvents {
+		t.Run(provider, func(t *testing.T) {
+			testRunnerMergeConfidenceCheckKeepsEachRepositoryApart(t, pullRequestEvent)
+		})
+	}
+}
+
+func testRunnerMergeConfidenceCheckKeepsEachRepositoryApart(t *testing.T, pullRequestEvent func(repository string, number int) map[string]any) {
 	r := support.Setup(t)
 	server, _ := mustRunnerLiveLogServer(t, r)
 	db := database.DB(t.Context())
@@ -130,13 +152,7 @@ func TestRunnerMergeConfidenceCheckKeepsEachRepositoryApart(t *testing.T) {
 	t.Setenv("BASE_URL", "http://app.test")
 
 	tokenForPullRequest := func(repository string, number int) string {
-		rootEvent := support.EmitCanvasEventForNodeWithData(t, canvas.ID, nodeID, "default", nil, map[string]any{
-			"type": "github.pullRequest",
-			"data": map[string]any{
-				"repository":   map[string]any{"full_name": repository},
-				"pull_request": map[string]any{"number": number},
-			},
-		})
+		rootEvent := support.EmitCanvasEventForNodeWithData(t, canvas.ID, nodeID, "default", nil, pullRequestEvent(repository, number))
 		run, err := models.FindOrCreateCanvasRunForRootEventInTransaction(db, rootEvent)
 		require.NoError(t, err)
 		execution := createExecutionForCanvasRun(t, run, rootEvent.ID, nodeID)
