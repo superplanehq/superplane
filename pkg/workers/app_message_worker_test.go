@@ -2,10 +2,12 @@ package workers
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -141,6 +143,61 @@ func Test__AppMessageWorker_LockAndProcessMessage__retriesBroadcastAtomically(t 
 		"id":   sourceNodes[0].NodeID,
 		"name": sourceNodes[0].Name,
 	}, broadcastPayload["node"])
+}
+
+func Test__AppMessageWorker_LockAndProcessMessage__discardsOversizedBroadcast(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	worker := NewAppMessageWorker(r.Registry)
+	sourceCanvas, sourceNodes := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{
+		{
+			NodeID: "broadcast-message",
+			Name:   "Broadcast Message",
+			Type:   models.NodeTypeComponent,
+			Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "broadcastMessage"}}),
+		},
+	}, nil)
+	targetCanvas, targetNodes := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{
+		{
+			NodeID: "on-broadcast",
+			Name:   "On Broadcast",
+			Type:   models.NodeTypeTrigger,
+			Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "onBroadcast"}}),
+			Configuration: datatypes.NewJSONType(map[string]any{
+				"app": sourceCanvas.ID.String(),
+			}),
+		},
+	}, nil)
+	require.NoError(t, database.Conn().Create(&models.CanvasSubscription{
+		SourceCanvasID: sourceCanvas.ID,
+		TargetCanvasID: targetCanvas.ID,
+		TargetNodeID:   targetNodes[0].NodeID,
+	}).Error)
+
+	// The payload fits on its own, but the broadcast envelope exceeds the limit.
+	payload := strings.Repeat("a", config.MaxPayloadSize()-2)
+	require.NoError(t, models.CreateAppMessage(database.Conn(), sourceCanvas.ID, sourceNodes[0].NodeID, payload))
+	pending, err := models.ListAppMessages(database.Conn())
+	require.NoError(t, err)
+	require.Len(t, pending, 1)
+	require.NoError(t, worker.LockAndProcessMessage(pending[0]))
+
+	remaining, err := models.ListAppMessages(database.Conn())
+	require.NoError(t, err)
+	assert.Empty(t, remaining)
+	support.VerifyCanvasEventsCount(t, targetCanvas.ID, 0)
+
+	require.NoError(t, models.CreateAppMessage(database.Conn(), sourceCanvas.ID, sourceNodes[0].NodeID, "hello"))
+	pending, err = models.ListAppMessages(database.Conn())
+	require.NoError(t, err)
+	require.Len(t, pending, 1)
+	require.NoError(t, worker.LockAndProcessMessage(pending[0]))
+
+	remaining, err = models.ListAppMessages(database.Conn())
+	require.NoError(t, err)
+	assert.Empty(t, remaining)
+	support.VerifyCanvasEventsCount(t, targetCanvas.ID, 1)
 }
 
 func Test__AppMessageWorker_LockAndProcessMessage__deletesMessageWithoutSubscribers(t *testing.T) {
