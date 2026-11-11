@@ -30,7 +30,7 @@ func MaterializeFactoryAppTemplate(
 		return nil, factoryErrorToStatus(err, "failed to materialize factory app template")
 	}
 	factoryID := factory.ID
-	canvas, _, err := findFactoryAppForDefaults(db, orgID, factoryID, appID)
+	canvas, version, err := findFactoryAppForDefaults(db, orgID, factoryID, appID)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to materialize factory app template")
 	}
@@ -45,6 +45,25 @@ func MaterializeFactoryAppTemplate(
 		}
 	}
 	input := factoryTemplateInputFromRequest(req)
+	if req.GetTemplateId() == reviewRequestTemplateID {
+		org, findErr := models.FindOrganizationByIDInTransaction(db, orgID.String())
+		if findErr != nil {
+			return nil, findErr
+		}
+		if models.FactoryAppTemplateID(version.Nodes) != reviewRequestTemplateID {
+			if err := requireReviewRequest(org); err != nil {
+				return nil, err
+			}
+		}
+		source, sourceErr := resolveReviewRequestSource(db, factory, canvas, version, input.installParams["mergeConfidenceAppId"])
+		if sourceErr != nil {
+			return nil, factoryErrorToStatus(sourceErr, "failed to configure Review request")
+		}
+		if input.installParams == nil {
+			input.installParams = map[string]string{}
+		}
+		input.installParams["mergeConfidenceAppId"] = source
+	}
 	input.appID = canvas.ID.String()
 	input.appName = canvas.Name
 	// The template names the agent integration "claude". That is a type

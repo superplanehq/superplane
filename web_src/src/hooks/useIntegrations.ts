@@ -139,14 +139,14 @@ export async function resolveRepositoryDefaultBranch(
   return response.data?.resources?.[0]?.name?.trim() ?? "";
 }
 
-export const useIntegrationResources = (
+export const integrationResourcesQueryOptions = (
   organizationId: string,
   integrationId: string,
   resourceType: string,
   parameters?: Record<string, string>,
   options?: { enabled?: boolean },
 ) => {
-  return useQuery({
+  return {
     queryKey: integrationKeys.resources(organizationId, integrationId, resourceType, parameters),
     queryFn: async () => {
       const query: Record<string, string> = {
@@ -169,8 +169,16 @@ export const useIntegrationResources = (
     staleTime: 2 * 60 * 1000, // 2 minutes
     gcTime: 5 * 60 * 1000, // 5 minutes
     enabled: Boolean(organizationId && integrationId && resourceType) && (options?.enabled ?? true),
-  });
+  };
 };
+
+export const useIntegrationResources = (
+  organizationId: string,
+  integrationId: string,
+  resourceType: string,
+  parameters?: Record<string, string>,
+  options?: { enabled?: boolean },
+) => useQuery(integrationResourcesQueryOptions(organizationId, integrationId, resourceType, parameters, options));
 
 export type IntegrationSource = "integrations_page" | "node_configuration" | "install_wizard";
 

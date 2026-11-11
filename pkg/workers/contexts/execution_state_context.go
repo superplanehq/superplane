@@ -62,6 +62,10 @@ func (s *ExecutionStateContext) Emit(channel, payloadType string, payloads []any
 	if err != nil {
 		return err
 	}
+	payloads, err = s.prepareReviewRequestOutput(channel, payloadType, payloads)
+	if err != nil {
+		return s.Fail(models.CanvasNodeExecutionResultReasonError, err.Error())
+	}
 
 	outputs := map[string][]any{
 		channel: {},

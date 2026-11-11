@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"slices"
 	"strings"
 	"time"
 
@@ -12,6 +13,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/features"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -150,6 +153,9 @@ func NewCanvasPublisher(tx *gorm.DB, canvas *models.Canvas, draft *models.Canvas
 }
 
 func (p *CanvasPublisher) Publish(ctx context.Context) error {
+	if err := p.validateReviewRequestCreation(); err != nil {
+		return err
+	}
 	if err := models.ValidateSubscriptionIntakeOwners(p.tx, p.canvas, p.draft, p.live); err != nil {
 		return err
 	}
@@ -174,6 +180,28 @@ func (p *CanvasPublisher) Publish(ctx context.Context) error {
 		return err
 	}
 
+	return nil
+}
+
+func (p *CanvasPublisher) validateReviewRequestCreation() error {
+	proposed := slices.ContainsFunc(p.draft.Nodes, func(node models.Node) bool {
+		metadata, _ := node.Metadata[models.FactoryAppTemplateMetadataKey].(map[string]any)
+		return metadata["id"] == "review-request"
+	})
+	if !proposed {
+		return nil
+	}
+	installed, err := models.CanvasHasFactoryAppTemplate(p.tx, p.canvas.ID, "review-request")
+	if err != nil || installed {
+		return err
+	}
+	enabled, err := models.OrganizationHasExperimentalFeatures(p.tx, p.options.OrgID, features.FeatureFactoryReviewRequest)
+	if err != nil {
+		return err
+	}
+	if !enabled {
+		return grpcerrors.FailedPrecondition(nil, "Review request is not enabled for this organization.")
+	}
 	return nil
 }
 
