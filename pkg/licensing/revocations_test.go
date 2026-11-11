@@ -53,7 +53,7 @@ func TestRevocationListStopsOnlyTheListedLicense(t *testing.T) {
 		licensing.WithRevocationSync(revocations),
 	)
 	require.NoError(t, service.Refresh(context.Background()))
-	assert.True(t, service.IsEntitled(licensing.FeatureGroups), "a license stays active before a revocation list arrives")
+	assert.True(t, service.Status().IsEntitled(licensing.FeatureGroups), "a license stays active before a revocation list arrives")
 
 	changed, err := revocations.Sync(context.Background())
 	require.NoError(t, err)
@@ -64,7 +64,7 @@ func TestRevocationListStopsOnlyTheListedLicense(t *testing.T) {
 	assert.Equal(t, licensing.EditionCommunity, status.Edition)
 	require.NotNil(t, status.License)
 	assert.Equal(t, revokedLicense.ID, status.License.ID)
-	assert.False(t, service.IsEntitled(licensing.FeatureGroups))
+	assert.False(t, service.Status().IsEntitled(licensing.FeatureGroups))
 
 	_, err = service.Install(context.Background(), revokedRaw, uuid.New())
 	assert.Equal(t, licensing.ReasonRevoked, licensing.ReasonOf(err))
@@ -73,7 +73,7 @@ func TestRevocationListStopsOnlyTheListedLicense(t *testing.T) {
 	status, err = service.Install(context.Background(), otherRaw, uuid.New())
 	require.NoError(t, err)
 	assert.Equal(t, licensing.StateActive, status.State)
-	assert.True(t, service.IsEntitled(licensing.FeatureGroups))
+	assert.True(t, service.Status().IsEntitled(licensing.FeatureGroups))
 }
 
 func TestFailedRevocationDownloadKeepsLastResult(t *testing.T) {
@@ -98,7 +98,7 @@ func TestFailedRevocationDownloadKeepsLastResult(t *testing.T) {
 		require.NoError(t, service.Refresh(context.Background()))
 		_, err := revocations.Sync(context.Background())
 		require.Error(t, err)
-		assert.True(t, service.IsEntitled(licensing.FeatureGroups))
+		assert.True(t, service.Status().IsEntitled(licensing.FeatureGroups))
 	})
 
 	t.Run("a failed check keeps a revocation that already arrived", func(t *testing.T) {
@@ -118,7 +118,7 @@ func TestFailedRevocationDownloadKeepsLastResult(t *testing.T) {
 		_, err = revocations.Sync(context.Background())
 		require.Error(t, err)
 		assert.Equal(t, licensing.StateRevoked, service.Status().State)
-		assert.False(t, service.IsEntitled(licensing.FeatureGroups))
+		assert.False(t, service.Status().IsEntitled(licensing.FeatureGroups))
 	})
 
 	t.Run("a bad signature keeps the trusted list", func(t *testing.T) {
@@ -146,7 +146,7 @@ func TestFailedRevocationDownloadKeepsLastResult(t *testing.T) {
 		require.ErrorIs(t, err, licensing.ErrInvalidRevocationList)
 		assert.Equal(t, licensing.StateRevoked, service.Status().State)
 		assert.True(t, revocations.Contains(license.ID))
-		assert.False(t, service.IsEntitled(licensing.FeatureGroups))
+		assert.False(t, service.Status().IsEntitled(licensing.FeatureGroups))
 	})
 }
 
@@ -174,12 +174,12 @@ func TestNewerRevocationListCanClearARevocation(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, changed)
 	assert.Equal(t, licensing.StateActive, service.Status().State)
-	assert.True(t, service.IsEntitled(licensing.FeatureGroups))
+	assert.True(t, service.Status().IsEntitled(licensing.FeatureGroups))
 
 	server.serve(root.RevocationList(1, license.ID))
 	_, err = revocations.Sync(context.Background())
 	require.ErrorIs(t, err, licensing.ErrRevocationListDowngrade)
-	assert.True(t, service.IsEntitled(licensing.FeatureGroups), "an older list cannot restore a cleared revocation")
+	assert.True(t, service.Status().IsEntitled(licensing.FeatureGroups), "an older list cannot restore a cleared revocation")
 }
 
 func TestRevocationDownloadsStayOffWithoutAKeyListURL(t *testing.T) {
@@ -196,7 +196,7 @@ func TestRevocationDownloadsStayOffWithoutAKeyListURL(t *testing.T) {
 	changed, err := revocations.Sync(context.Background())
 	require.NoError(t, err)
 	assert.False(t, changed)
-	assert.True(t, service.IsEntitled(licensing.FeatureGroups))
+	assert.True(t, service.Status().IsEntitled(licensing.FeatureGroups))
 }
 
 func TestRefreshAppliesACachedRevocationList(t *testing.T) {
@@ -218,7 +218,7 @@ func TestRefreshAppliesACachedRevocationList(t *testing.T) {
 	)
 	require.NoError(t, service.Refresh(context.Background()))
 	assert.Equal(t, licensing.StateRevoked, service.Status().State)
-	assert.False(t, service.IsEntitled(licensing.FeatureGroups))
+	assert.False(t, service.Status().IsEntitled(licensing.FeatureGroups))
 }
 
 func TestRevocationsURL(t *testing.T) {

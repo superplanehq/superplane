@@ -186,13 +186,47 @@ func (s StaticSource) Read(context.Context) ([]byte, error) {
 	return s.Raw, nil
 }
 
+type allowAllGrants struct{}
+
+func (allowAllGrants) HasGrant(context.Context, uuid.UUID, licensing.Feature) (bool, error) {
+	return true, nil
+}
+
+type organizationGrants map[uuid.UUID][]licensing.Feature
+
+func (g organizationGrants) HasGrant(_ context.Context, orgID uuid.UUID, feature licensing.Feature) (bool, error) {
+	return slices.Contains(g[orgID], feature), nil
+}
+
+// OrganizationEntitlements grants features to specific organizations.
+// It does not check a license. Use it when a test only needs the
+// entitlement answer.
+type OrganizationEntitlements map[uuid.UUID][]licensing.Feature
+
+func (e OrganizationEntitlements) IsEntitled(_ context.Context, orgID uuid.UUID, feature licensing.Feature) bool {
+	return slices.Contains(e[orgID], feature)
+}
+
 // EnterpriseService returns a loaded license service with an active license
-// that grants the features.
+// that contains the features. Every organization is granted those features,
+// so existing tests do not need grant rows.
 func EnterpriseService(features ...licensing.Feature) *licensing.Service {
+	return enterpriseService(allowAllGrants{}, features...)
+}
+
+// EnterpriseServiceForOrganizations returns a loaded license service whose
+// license contains features. Only the organizations in grants receive those
+// features.
+func EnterpriseServiceForOrganizations(grants map[uuid.UUID][]licensing.Feature, features ...licensing.Feature) *licensing.Service {
+	return enterpriseService(organizationGrants(grants), features...)
+}
+
+func enterpriseService(grants licensing.GrantLookup, features ...licensing.Feature) *licensing.Service {
 	issuer := NewIssuer("licensingtest")
 	service := licensing.NewService(
 		licensing.NewVerifier(KeySet(issuer)),
 		StaticSource{Raw: issuer.License(features...)},
+		licensing.WithGrantLookup(grants),
 	)
 
 	if err := service.Refresh(context.Background()); err != nil {
