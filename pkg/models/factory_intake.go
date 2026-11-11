@@ -224,6 +224,14 @@ func (i *FactoryIntake) Delete(tx *gorm.DB) error {
 	return tx.Where("id = ?", i.ID).Delete(&FactoryIntake{}).Error
 }
 
+// ListFactoryIntakesBySourceAfterID scans live intakes in bounded startup batches.
+func ListFactoryIntakesBySourceAfterID(tx *gorm.DB, source string, after uuid.UUID, limit int) ([]FactoryIntake, error) {
+	var intakes []FactoryIntake
+	err := liveCanvasIntakes(tx).Where("factory_intakes.source = ? AND factory_intakes.id > ?", source, after).
+		Order("factory_intakes.id ASC").Limit(limit).Find(&intakes).Error
+	return intakes, err
+}
+
 // DeleteFactoryIntakesByCanvas removes the intakes a canvas implements. The
 // canvas reference is a RESTRICT foreign key, so canvas deletion has to call
 // this before the canvas row goes away.
