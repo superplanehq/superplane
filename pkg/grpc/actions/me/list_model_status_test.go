@@ -80,6 +80,7 @@ func TestListModelStatusReturnsScoredAndEmptyAllowlistCells(t *testing.T) {
 	assert.Equal(t, "claude-sonnet-4-6", sonnet.Model)
 	require.NotNil(t, sonnet.Score)
 	assert.Equal(t, int32(100), *sonnet.Score)
-	assert.Equal(t, int32(1), sonnet.CallCount)
-	assert.Equal(t, int32(1), sonnet.Attempt_1Count)
+	assert.Zero(t, sonnet.CallCount)
+	assert.Zero(t, sonnet.Attempt_1Count)
+	assert.Zero(t, sonnet.ErrorCount)
 }

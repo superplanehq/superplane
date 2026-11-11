@@ -31,15 +31,10 @@ func ListModelStatus(ctx context.Context, req *pb.ListModelStatusRequest) (*pb.L
 
 	response := &pb.ListModelStatusResponse{Window: normalized}
 	for _, cell := range cells {
+		// Scores only. Call counts would show every customer's volume.
 		view := &pb.ModelStatusCell{
-			Provider:       cell.Provider,
-			Model:          cell.Model,
-			CallCount:      int32(cell.CallCount),
-			Attempt_1Count: int32(cell.Attempt1Count),
-			Attempt_2Count: int32(cell.Attempt2Count),
-			Attempt_3Count: int32(cell.Attempt3Count),
-			Attempt_4Count: int32(cell.Attempt4Count),
-			ErrorCount:     int32(cell.ErrorCount),
+			Provider: cell.Provider,
+			Model:    cell.Model,
 		}
 		if cell.Score != nil {
 			score := int32(*cell.Score)

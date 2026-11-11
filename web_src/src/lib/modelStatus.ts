@@ -12,7 +12,6 @@ export type ModelStatusCell = {
   provider?: string;
   model?: string;
   score?: number;
-  callCount?: number;
 };
 
 export type ModelStatusBand = "available" | "degraded" | "unavailable" | "no-data";
@@ -21,7 +20,6 @@ export type ModelStatusMatrixCell = {
   provider: ModelStatusProvider;
   model: string;
   score?: number;
-  callCount: number;
   band: ModelStatusBand;
 };
 
@@ -79,10 +77,6 @@ export function modelStatusBand(score: number | undefined): ModelStatusBand {
   return "unavailable";
 }
 
-export function modelStatusCallCountLabel(count: number): string {
-  return count === 1 ? "1 call" : `${count} calls`;
-}
-
 function groupModelStatusCells(
   cells: ModelStatusCell[],
 ): Map<string, Partial<Record<ModelStatusProvider, ModelStatusCell>>> {
@@ -109,7 +103,6 @@ function matrixRowFromGrouped(
   for (const provider of MODEL_STATUS_PROVIDERS) {
     const source = grouped[provider];
     const score = typeof source?.score === "number" ? source.score : undefined;
-    const callCount = typeof source?.callCount === "number" ? source.callCount : 0;
     if (score != null && (lowestScore == null || score < lowestScore)) {
       lowestScore = score;
     }
@@ -117,7 +110,6 @@ function matrixRowFromGrouped(
       provider,
       model,
       score,
-      callCount,
       band: modelStatusBand(score),
     };
   }

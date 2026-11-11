@@ -52,7 +52,7 @@ describe("FactorySettingsOrganizationModelStatusPage", () => {
     view.unmount();
   });
 
-  it("shows the call count on a scored cell and No data when a pair has no calls", () => {
+  it("shows the score and No data when a pair has no calls", () => {
     render(
       <ModelStatusMatrix
         cells={[
@@ -61,8 +61,9 @@ describe("FactorySettingsOrganizationModelStatusPage", () => {
         ]}
       />,
     );
-    expect(screen.getByTestId("model-status-cell-anthropic-claude-sonnet-4-6")).toHaveTextContent("100");
-    expect(screen.getByTestId("model-status-cell-anthropic-claude-sonnet-4-6")).toHaveTextContent("3 calls");
+    const scored = screen.getByTestId("model-status-cell-anthropic-claude-sonnet-4-6");
+    expect(scored).toHaveTextContent("100");
+    expect(scored).not.toHaveTextContent("3 calls");
     expect(screen.getByTestId("model-status-cell-anthropic-claude-opus-4-6")).toHaveTextContent("No data");
     expect(screen.getByTestId("model-status-cell-openai-claude-sonnet-4-6")).toHaveTextContent("No data");
   });

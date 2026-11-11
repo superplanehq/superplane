@@ -17,20 +17,32 @@ type parsedModelCallOutcome struct {
 	OccurredAt string `json:"occurredAt"`
 }
 
-func RecordRunnerModelCallOutcomes(logger *log.Entry, taskID, finishedEventType string, configuration any, result json.RawMessage) {
+func RecordRunnerModelCallOutcomes(logger *log.Entry, taskID, finishedEventType string, configuration any, result json.RawMessage, notBefore time.Time) {
 	if !IsHostedCredentials(configurationCredentialsSource(configuration)) {
 		return
 	}
 	provider, ok := providerForFinishedEvent(finishedEventType, configuration)
-	if !ok || !isHostedModelStatusProvider(provider) {
+	if !ok || !models.IsHostedModelStatusProvider(provider) {
 		return
 	}
 	inputs := parseRunnerModelCallOutcomes(provider, taskID, result)
+	clampModelCallOccurredAt(inputs, notBefore)
 	if len(inputs) == 0 {
 		return
 	}
 	if err := models.InsertHostedModelCallOutcomes(database.Conn(), inputs); err != nil && logger != nil {
 		logger.WithError(err).Error("failed to record hosted model call outcomes")
+	}
+}
+
+func clampModelCallOccurredAt(inputs []models.HostedModelCallOutcomeInput, notBefore time.Time) {
+	if notBefore.IsZero() {
+		return
+	}
+	for i := range inputs {
+		if !inputs[i].OccurredAt.IsZero() && inputs[i].OccurredAt.Before(notBefore) {
+			inputs[i].OccurredAt = notBefore
+		}
 	}
 }
 
@@ -74,63 +86,4 @@ func parseOccurredAt(raw string) time.Time {
 		return parsed
 	}
 	return time.Time{}
-}
-
-// HostedModelStatusProvider returns the provider whose hosted calls may
-// affect the shared status page. The component and credential source come
-// from the execution record, not from runner output.
-func HostedModelStatusProvider(component string, configuration any) (string, bool) {
-	if !IsHostedCredentials(configurationCredentialsSource(configuration)) {
-		return "", false
-	}
-	switch strings.TrimSpace(component) {
-	case "runnerClaudeCode":
-		return models.UsageProviderAnthropic, true
-	case "runnerCodex":
-		return models.UsageProviderOpenAI, true
-	case "runnerOpenRouter":
-		if configurationString(configuration, "llmProvider") == models.UsageProviderCustom {
-			return "", false
-		}
-		return models.UsageProviderOpenRouter, true
-	case models.SuperPlaneRunnerComponent:
-		provider := configurationString(configuration, "hostedProvider")
-		if !isHostedModelStatusProvider(provider) {
-			return "", false
-		}
-		return provider, true
-	default:
-		return "", false
-	}
-}
-
-// TrustedHostedModelCallInputs keeps samples for the task provider and
-// stores the catalog model id. Runner-supplied providers are not trusted.
-func TrustedHostedModelCallInputs(provider string, inputs []models.HostedModelCallOutcomeInput) []models.HostedModelCallOutcomeInput {
-	if !isHostedModelStatusProvider(provider) || len(inputs) == 0 {
-		return nil
-	}
-	kept := make([]models.HostedModelCallOutcomeInput, 0, len(inputs))
-	for _, input := range inputs {
-		if strings.TrimSpace(input.Provider) != provider {
-			continue
-		}
-		model := modelid.CatalogModelID(input.Model)
-		if model == "" {
-			continue
-		}
-		input.Provider = provider
-		input.Model = model
-		kept = append(kept, input)
-	}
-	return kept
-}
-
-func isHostedModelStatusProvider(provider string) bool {
-	switch provider {
-	case models.UsageProviderAnthropic, models.UsageProviderOpenAI, models.UsageProviderOpenRouter:
-		return true
-	default:
-		return false
-	}
 }

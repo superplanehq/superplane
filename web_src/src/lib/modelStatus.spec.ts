@@ -1,11 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import {
-  MODEL_STATUS_DEFAULT_WINDOW,
-  modelStatusBand,
-  modelStatusCallCountLabel,
-  modelStatusMatrixRows,
-} from "./modelStatus";
+import { MODEL_STATUS_DEFAULT_WINDOW, modelStatusBand, modelStatusMatrixRows } from "./modelStatus";
 
 describe("modelStatusBand", () => {
   it("maps scores to availability bands and leaves empty cells without a score", () => {
@@ -23,9 +18,9 @@ describe("modelStatusMatrixRows", () => {
   it("sorts models by the lowest provider score and keeps empty cells as no data", () => {
     const rows = modelStatusMatrixRows([
       { provider: "anthropic", model: "claude-opus-4-6" },
-      { provider: "anthropic", model: "claude-sonnet-4-6", score: 100, callCount: 3 },
-      { provider: "openrouter", model: "claude-sonnet-4-6", score: 50, callCount: 2 },
-      { provider: "openai", model: "gpt-5", score: 0, callCount: 4 },
+      { provider: "anthropic", model: "claude-sonnet-4-6", score: 100 },
+      { provider: "openrouter", model: "claude-sonnet-4-6", score: 50 },
+      { provider: "openai", model: "gpt-5", score: 0 },
     ]);
 
     expect(rows.map((row) => row.model)).toEqual(["gpt-5", "claude-sonnet-4-6", "claude-opus-4-6"]);
@@ -34,7 +29,6 @@ describe("modelStatusMatrixRows", () => {
       provider: "openrouter",
       model: "claude-sonnet-4-6",
       score: 50,
-      callCount: 2,
       band: "degraded",
     });
     expect(rows[1]?.cells.openai.band).toBe("no-data");
@@ -42,11 +36,8 @@ describe("modelStatusMatrixRows", () => {
       provider: "anthropic",
       model: "claude-opus-4-6",
       score: undefined,
-      callCount: 0,
       band: "no-data",
     });
-    expect(modelStatusCallCountLabel(1)).toBe("1 call");
-    expect(modelStatusCallCountLabel(3)).toBe("3 calls");
     expect(MODEL_STATUS_DEFAULT_WINDOW).toBe("5m");
   });
 });

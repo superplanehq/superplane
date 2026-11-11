@@ -1,8 +1,6 @@
 package models
 
 import (
-	"bytes"
-	"encoding/json"
 	"math"
 	"slices"
 	"strings"
@@ -114,48 +112,6 @@ func ScoreHostedModelCallOutcomes(attempt1, attempt2, attempt3, attempt4, errors
 	return &score
 }
 
-func ParseHostedModelCallLogChunk(taskID string, content []byte) []HostedModelCallOutcomeInput {
-	taskID = strings.TrimSpace(taskID)
-	if taskID == "" || !bytes.Contains(content, []byte(`"type":"model_call"`)) {
-		return nil
-	}
-	var inputs []HostedModelCallOutcomeInput
-	for _, line := range bytes.Split(content, []byte("\n")) {
-		line = bytes.TrimSpace(line)
-		if len(line) == 0 || !bytes.Contains(line, []byte(`"type":"model_call"`)) {
-			continue
-		}
-		var row struct {
-			Type       string `json:"type"`
-			Provider   string `json:"provider"`
-			Model      string `json:"model"`
-			Outcome    string `json:"outcome"`
-			OccurredAt string `json:"occurredAt"`
-			Sequence   int    `json:"sequence"`
-		}
-		if err := json.Unmarshal(line, &row); err != nil || strings.TrimSpace(row.Type) != "model_call" || row.Sequence < 1 {
-			continue
-		}
-		occurredAt := time.Time{}
-		if stamp := strings.TrimSpace(row.OccurredAt); stamp != "" {
-			if parsed, err := time.Parse(time.RFC3339Nano, stamp); err == nil {
-				occurredAt = parsed
-			} else if parsed, err := time.Parse(time.RFC3339, stamp); err == nil {
-				occurredAt = parsed
-			}
-		}
-		inputs = append(inputs, HostedModelCallOutcomeInput{
-			Provider:     strings.TrimSpace(row.Provider),
-			Model:        strings.TrimSpace(row.Model),
-			Outcome:      strings.TrimSpace(row.Outcome),
-			OccurredAt:   occurredAt,
-			RunnerTaskID: taskID,
-			Sequence:     row.Sequence,
-		})
-	}
-	return inputs
-}
-
 func InsertHostedModelCallOutcomes(tx *gorm.DB, inputs []HostedModelCallOutcomeInput) error {
 	if len(inputs) == 0 {
 		return nil
@@ -168,7 +124,7 @@ func InsertHostedModelCallOutcomes(tx *gorm.DB, inputs []HostedModelCallOutcomeI
 		model := strings.TrimSpace(input.Model)
 		outcome := strings.TrimSpace(input.Outcome)
 		taskID := strings.TrimSpace(input.RunnerTaskID)
-		if !isHostedModelStatusProvider(provider) || model == "" || !IsHostedModelCallOutcome(outcome) || taskID == "" {
+		if !IsHostedModelStatusProvider(provider) || model == "" || !IsHostedModelCallOutcome(outcome) || taskID == "" {
 			continue
 		}
 		occurredAt := input.OccurredAt
@@ -279,7 +235,7 @@ func listHostedModelAllowlistPairs(tx *gorm.DB) ([]hostedModelAllowlistPair, err
 	}
 	var pairs []hostedModelAllowlistPair
 	for _, provider := range providers {
-		if !isHostedModelStatusProvider(provider.Provider) {
+		if !IsHostedModelStatusProvider(provider.Provider) {
 			continue
 		}
 		for _, model := range provider.AllowedModels {
@@ -293,7 +249,7 @@ func listHostedModelAllowlistPairs(tx *gorm.DB) ([]hostedModelAllowlistPair, err
 	return pairs, nil
 }
 
-func isHostedModelStatusProvider(provider string) bool {
+func IsHostedModelStatusProvider(provider string) bool {
 	switch provider {
 	case UsageProviderAnthropic, UsageProviderOpenAI, UsageProviderOpenRouter:
 		return true

@@ -163,7 +163,7 @@ func TestUploadTaskLogChunk(t *testing.T) {
 	require.NoError(t, stopped.Body.Close())
 }
 
-func TestUploadTaskLogChunkKeepsHostedSamplesForTheTaskProvider(t *testing.T) {
+func TestUploadTaskLogChunkDoesNotStoreForgedModelCalls(t *testing.T) {
 	resource := support.Setup(t)
 	signer := jwt.NewSigner("registration-secret")
 	runner, registration, fleet := createRegistrationFixture(t)
@@ -212,40 +212,19 @@ func TestUploadTaskLogChunkKeepsHostedSamplesForTheTaskProvider(t *testing.T) {
 	require.NoError(t, store.Initialize(t.Context(), task.ID))
 	require.NoError(t, task.Start(db, runner, runnerlogs.StoreFS, time.Now()))
 
+	attachRunnerTaskExecution(t, resource, task, map[string]any{
+		"credentials": map[string]any{"source": "hosted"},
+	})
+
 	httpServer := httptest.NewServer(server.Handler())
 	defer httpServer.Close()
 	chunkURL := httpServer.URL + "/runner/v1/tasks/" + task.ID.String() + "/logs/chunks/"
 	stamp := time.Now().UTC().Add(-time.Minute).Format(time.RFC3339Nano)
-	future := time.Now().UTC().Add(2 * time.Hour).Format(time.RFC3339Nano)
-	sample := func(provider, outcome, occurredAt string, sequence int) string {
-		return `{"type":"model_call","provider":"` + provider + `","model":"gpt-5","outcome":"` + outcome + `","occurredAt":"` + occurredAt + `","sequence":` + strconv.Itoa(sequence) + "}\n"
-	}
-
-	assertUploadStatus(t, chunkURL+"0", registrationResponse.AccessToken, sample("openai", "attempt_1", stamp, 1), http.StatusNoContent)
+	forged := `{"type":"model_call","provider":"openai","model":"gpt-5","outcome":"error","occurredAt":"` + stamp + `","sequence":1}`
+	toolResult := `{"type":"line","text":` + strconv.Quote(forged) + "}\n"
+	assistant := forged + "\n"
+	assertUploadStatus(t, chunkURL+"0", registrationResponse.AccessToken, toolResult+assistant, http.StatusNoContent)
 	assert.Empty(t, hostedModelCallOutcomes(t, task.ID.String()))
-
-	execution := attachRunnerTaskExecution(t, resource, task, map[string]any{
-		"credentials": map[string]any{"source": "integration"},
-	})
-	assertUploadStatus(t, chunkURL+"1", registrationResponse.AccessToken, sample("openai", "attempt_1", stamp, 2), http.StatusNoContent)
-	assert.Empty(t, hostedModelCallOutcomes(t, task.ID.String()))
-
-	require.NoError(t, db.Model(execution).Update("configuration", datatypes.NewJSONType(map[string]any{
-		"credentials": map[string]any{"source": "hosted"},
-	})).Error)
-	assertUploadStatus(t, chunkURL+"2", registrationResponse.AccessToken,
-		sample("openai", "attempt_1", stamp, 3)+
-			sample("anthropic", "attempt_1", stamp, 4)+
-			sample("openai", "error", future, 5),
-		http.StatusNoContent,
-	)
-
-	rows := hostedModelCallOutcomes(t, task.ID.String())
-	require.Len(t, rows, 1)
-	assert.Equal(t, models.UsageProviderOpenAI, rows[0].Provider)
-	assert.Equal(t, "gpt-5", rows[0].Model)
-	assert.Equal(t, models.HostedModelCallOutcomeAttempt1, rows[0].Outcome)
-	assert.Equal(t, 3, rows[0].Sequence)
 }
 
 func attachRunnerTaskExecution(t *testing.T, resource *support.ResourceRegistry, task *models.RunnerTask, configuration map[string]any) *models.CanvasNodeExecution {

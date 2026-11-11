@@ -52,8 +52,8 @@ func TestRecordRunnerModelCallOutcomesStoresHostedResultsOnce(t *testing.T) {
 		"hostedProvider": models.UsageProviderAnthropic,
 		"credentials":    map[string]any{"source": CredentialsSourceHosted},
 	}
-	RecordRunnerModelCallOutcomes(nil, "task-hosted-1", "runnerSuperPlane.finished", configuration, result)
-	RecordRunnerModelCallOutcomes(nil, "task-hosted-1", "runnerSuperPlane.finished", configuration, result)
+	RecordRunnerModelCallOutcomes(nil, "task-hosted-1", "runnerSuperPlane.finished", configuration, result, time.Time{})
+	RecordRunnerModelCallOutcomes(nil, "task-hosted-1", "runnerSuperPlane.finished", configuration, result, time.Time{})
 
 	var rows []models.HostedModelCallOutcome
 	require.NoError(t, db.Where("runner_task_id = ?", "task-hosted-1").Find(&rows).Error)
@@ -75,6 +75,7 @@ func TestRecordRunnerModelCallOutcomesIgnoresCustomerKeys(t *testing.T) {
 		"runnerOpenRouter.finished",
 		map[string]any{"credentials": map[string]any{"source": "secret"}},
 		json.RawMessage(`{"modelCallOutcomes":[{"model":"x-ai/grok-4.6","outcome":"attempt_1"}]}`),
+		time.Time{},
 	)
 
 	var count int64
@@ -122,6 +123,38 @@ func TestProcessTaskStatusRecordsHostedModelCallOutcomes(t *testing.T) {
 	assert.Equal(t, "gpt-5", rows[0].Model)
 	assert.Equal(t, models.HostedModelCallOutcomeError, rows[0].Outcome)
 	assert.True(t, rows[0].OccurredAt.UTC().Equal(occurredAt))
+}
+
+func TestRecordRunnerModelCallOutcomesClampsTimestampsBeforeTaskStart(t *testing.T) {
+	db := database.DB(t.Context())
+	t.Cleanup(func() {
+		_ = db.Where("runner_task_id = ?", "task-clamp-1").Delete(&models.HostedModelCallOutcome{}).Error
+	})
+
+	started := time.Now().UTC().Truncate(time.Millisecond)
+	_, stamp := rfc3339Stamp(t, -time.Hour)
+	result, err := json.Marshal(map[string]any{
+		"modelCallOutcomes": []map[string]any{
+			{"model": "gpt-5", "outcome": "attempt_1", "occurredAt": stamp},
+		},
+	})
+	require.NoError(t, err)
+	RecordRunnerModelCallOutcomes(
+		nil,
+		"task-clamp-1",
+		"runnerSuperPlane.finished",
+		map[string]any{
+			"hostedProvider": models.UsageProviderOpenAI,
+			"credentials":    map[string]any{"source": CredentialsSourceHosted},
+		},
+		result,
+		started,
+	)
+
+	var rows []models.HostedModelCallOutcome
+	require.NoError(t, db.Where("runner_task_id = ?", "task-clamp-1").Find(&rows).Error)
+	require.Len(t, rows, 1)
+	assert.True(t, rows[0].OccurredAt.UTC().Equal(started))
 }
 
 func rfc3339Stamp(t *testing.T, delta time.Duration) (time.Time, string) {

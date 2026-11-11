@@ -52,28 +52,6 @@ function loadActivityStreamModule() {
   return { createActivityStream: () => createDisabledActivityStream() };
 }
 
-function publishHostedModelCallOutcomes(provider, rows) {
-  const taskDir = process.env.SUPERPLANE_TASK_DIR || "";
-  const candidates = [
-    path.join(taskDir, "llm_usage.js"),
-    path.join(__dirname, "..", "llm_usage.js"),
-  ];
-  for (const file of candidates) {
-    if (!file || !fs.existsSync(file)) {
-      continue;
-    }
-    try {
-      const usage = require(file);
-      if (typeof usage.publishModelCallOutcomes === "function") {
-        usage.publishModelCallOutcomes(provider, rows);
-      }
-      return;
-    } catch (_err) {
-      return;
-    }
-  }
-}
-
 function createDisabledActivityStream() {
   const noop = () => undefined;
   return {
@@ -478,7 +456,7 @@ async function runCodexAttempt({ codexArgs, childEnv, sp, telemetry, activity, s
     ? superviseCodexProcessGroup(child)
     : () => child.kill("SIGKILL");
   onStop(stop);
-  const formatter = createCodexFormatter(telemetry, activity, { model });
+  const formatter = createCodexFormatter(telemetry, activity);
   let lastResult = {};
   let workStarted = false;
   let authenticationFailed = false;
@@ -702,14 +680,12 @@ async function runPrompt(promptFile, model, thinking) {
       model: payload.model,
     });
     outcomes.push(...failedOutcomes);
-    publishHostedModelCallOutcomes("openai", failedOutcomes);
   } else if (outcomes.length === 0) {
     const fallback = codexModelCallOutcomes({
       failed: false,
       model: payload.model,
     });
     outcomes.push(...fallback);
-    publishHostedModelCallOutcomes("openai", fallback);
   }
   if (outcomes.length > 0) {
     payload.modelCallOutcomes = outcomes;
@@ -948,7 +924,7 @@ function codexModelCallOutcomes({ failed, errorText, model, occurredAt }) {
   return [];
 }
 
-function createCodexFormatter(telemetry, activityOverride, options) {
+function createCodexFormatter(telemetry, activityOverride) {
   const tracker = telemetry || loadTurnTelemetry();
   const activity =
     activityOverride ||
@@ -965,21 +941,9 @@ function createCodexFormatter(telemetry, activityOverride, options) {
   let lastError = "";
   let lastRecordedMessageId = "";
   const modelCallTimes = [];
-  const callModel = String((options && options.model) || "").trim();
 
   function recordModelCall() {
-    const occurredAt = new Date().toISOString();
-    modelCallTimes.push(occurredAt);
-    if (callModel) {
-      publishHostedModelCallOutcomes(
-        "openai",
-        codexModelCallOutcomes({
-          failed: false,
-          model: callModel,
-          occurredAt,
-        }),
-      );
-    }
+    modelCallTimes.push(new Date().toISOString());
   }
 
   function reportError(message) {

@@ -31,28 +31,6 @@ function loadActivityStreamModule() {
   return { createActivityStream: () => createDisabledActivityStream() };
 }
 
-function publishHostedModelCallOutcomes(provider, rows) {
-  const taskDir = process.env.SUPERPLANE_TASK_DIR || "";
-  const candidates = [
-    path.join(taskDir, "llm_usage.js"),
-    path.join(__dirname, "..", "llm_usage.js"),
-  ];
-  for (const file of candidates) {
-    if (!file || !fs.existsSync(file)) {
-      continue;
-    }
-    try {
-      const usage = require(file);
-      if (typeof usage.publishModelCallOutcomes === "function") {
-        usage.publishModelCallOutcomes(provider, rows);
-      }
-      return;
-    } catch (_err) {
-      return;
-    }
-  }
-}
-
 function createDisabledActivityStream() {
   const noop = () => undefined;
   return {
@@ -634,15 +612,6 @@ function createFormatter(promptFile, onSession, activityOverride, model) {
               apiRetryCount,
               occurredAt,
             });
-            publishHostedModelCallOutcomes(
-              "anthropic",
-              claudeModelCallOutcomes({
-                failed: false,
-                apiRetryCount,
-                model,
-                occurredAt,
-              }),
-            );
             apiRetryCount = 0;
           }
           formatAssistant(event, streamedText, tools, activity);
@@ -723,7 +692,6 @@ function createFormatter(promptFile, onSession, activityOverride, model) {
           occurredAt,
         });
         outcomes.push(...failedOutcomes);
-        publishHostedModelCallOutcomes("anthropic", failedOutcomes);
       } else if (outcomes.length === 0) {
         const fallback = claudeModelCallOutcomes({
           failed: false,
@@ -732,7 +700,6 @@ function createFormatter(promptFile, onSession, activityOverride, model) {
           occurredAt,
         });
         outcomes.push(...fallback);
-        publishHostedModelCallOutcomes("anthropic", fallback);
       }
       if (outcomes.length > 0) {
         parsed.modelCallOutcomes = outcomes;
@@ -928,6 +895,7 @@ function claudeModelCallOutcomes({
   if (sawRateLimit || kind === "rate_limit" || kind === "retryable") {
     return [{ model: id, outcome: "error", occurredAt: stamp }];
   }
+  // Auth and context-length failures are not provider availability.
   return [];
 }
 

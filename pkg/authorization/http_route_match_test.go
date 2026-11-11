@@ -43,7 +43,8 @@ func TestMatchHTTPRoute(t *testing.T) {
 		{
 			method: http.MethodGet,
 			path:   "/api/v1/me/model-status",
-			wantOK: false,
+			want:   HTTPRoute{Method: http.MethodGet, Pattern: "/api/v1/me/model-status"},
+			wantOK: true,
 		},
 		{
 			method: http.MethodPost,

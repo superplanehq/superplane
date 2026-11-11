@@ -14,7 +14,6 @@ import {
   type ModelStatusMatrixCell,
   type ModelStatusWindow,
   isModelStatusWindow,
-  modelStatusCallCountLabel,
   modelStatusMatrixRows,
   modelStatusProviderLabel,
   modelStatusWindowLabel,
@@ -165,7 +164,7 @@ function ModelStatusCellView({ cell }: { cell: ModelStatusMatrixCell }) {
   const label =
     cell.band === "no-data"
       ? `${modelStatusProviderLabel(cell.provider)} ${cell.model}: ${COPY.noData}`
-      : `${modelStatusProviderLabel(cell.provider)} ${cell.model}: ${cell.score}, ${modelStatusCallCountLabel(cell.callCount)}, ${BAND_LABEL[cell.band]}`;
+      : `${modelStatusProviderLabel(cell.provider)} ${cell.model}: ${cell.score}, ${BAND_LABEL[cell.band]}`;
 
   return (
     <div
@@ -178,7 +177,6 @@ function ModelStatusCellView({ cell }: { cell: ModelStatusMatrixCell }) {
       ) : (
         <>
           <p className="font-medium">{cell.score}</p>
-          <p className="text-xs">{modelStatusCallCountLabel(cell.callCount)}</p>
         </>
       )}
     </div>
