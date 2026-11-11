@@ -1,23 +1,22 @@
 # Retention candidate selection performance
 
-## Repeat the local comparison
+## Local comparison methodology
 
-Run `make compare.retention.selection` after development setup.
-The comparison uses temporary tables and indexes in one PostgreSQL session.
-It does not change application data or production indexes.
+The local comparison used temporary tables and indexes in one PostgreSQL session.
+It did not change application data or production indexes.
 
-The fixture contains 100 organizations, 1,000 workflows, 200,000 runs,
+The fixture contained 100 organizations, 1,000 workflows, 200,000 runs,
 200,000 executions, 200,000 requests, and 2,000 queue items.
-Retention windows include null, zero, 7, 30, and 90 days.
-Runs include unfinished runs, active executions, queue items, and pending requests.
-Each run has a 512-character input payload.
-The fixed UTC reference time is `2026-11-01 12:00:00`.
+Retention windows included null, zero, 7, 30, and 90 days.
+Runs included unfinished runs, active executions, queue items, and pending requests.
+Each run had a 512-character input payload.
+The fixed UTC reference time was `2026-11-01 12:00:00`.
 
-The script compares the complete selection with all three safety checks,
+The comparison covered the complete selection with all three safety checks,
 oldest-first ordering, and a 1,000-row limit.
-It asserts equality of all eligible IDs before applying the limit.
-It runs `ANALYZE` and seven measurements for each variant and plan mode.
-It reports median execution time and buffer work, plus one complete JSON plan
+It checked equality of all eligible IDs before applying the limit.
+It ran `ANALYZE` and seven measurements for each variant and plan mode.
+It reported median execution time and buffer work, plus one complete JSON plan
 for each variant and mode.
 
 ## Local observation: November 11, 2026
