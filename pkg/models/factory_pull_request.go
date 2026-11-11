@@ -50,6 +50,7 @@ const (
 var (
 	ErrFactoryPullRequestNotFound             = errors.New("factory pull request not found")
 	ErrFactoryPullRequestInvalid              = errors.New("invalid factory pull request")
+	ErrFactoryPullRequestReviewStateStale     = errors.New("pull request changed during review state lookup")
 	ErrFactoryPullRequestAlreadyExists        = errors.New("factory pull request already exists")
 	ErrFactoryPullRequestRunAlreadyLinked     = errors.New("run is already linked to a different pull request")
 	ErrFactoryPullRequestLookupIncomplete     = errors.New("pull request lookup is incomplete")
@@ -344,28 +345,42 @@ type FactoryPullRequestMergeabilitySnapshot struct {
 	AllowedMethods string
 }
 
-// SetReviewState changes draft status without overwriting concurrent terminal updates.
+// SetReviewState saves an observation only if the pull request has not changed since it was loaded.
 func (p *FactoryPullRequest) SetReviewState(tx *gorm.DB, state string) (bool, error) {
 	if state != FactoryPullRequestStateOpen && state != FactoryPullRequestStateDraft {
 		return false, fmt.Errorf("%w: invalid review state %q", ErrFactoryPullRequestInvalid, state)
 	}
 	updated := *p
-	updated.State = state
-	updated.UpdatedAt = time.Now()
 	changed := false
 	err := tx.Transaction(func(inner *gorm.DB) error {
 		// Closure and merge lock the task before the pull request.
 		if err := LockFactoryWorkOrder(inner, p.WorkOrderID); err != nil {
 			return err
 		}
+		var current FactoryPullRequest
+		if err := inner.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("id = ? AND organization_id = ? AND factory_id = ?", p.ID, p.OrganizationID, p.FactoryID).
+			First(&current).Error; err != nil {
+			return err
+		}
+		if current.State != FactoryPullRequestStateOpen && current.State != FactoryPullRequestStateDraft {
+			updated = current
+			return nil
+		}
+		if !current.UpdatedAt.Equal(p.UpdatedAt) {
+			return ErrFactoryPullRequestReviewStateStale
+		}
+		updated = current
+		updated.State = state
+		updated.UpdatedAt = time.Now().Truncate(time.Microsecond)
 		result := inner.Model(&FactoryPullRequest{}).
 			Where("id = ? AND organization_id = ? AND factory_id = ?", p.ID, p.OrganizationID, p.FactoryID).
-			Where("state IN ? AND state <> ?", []string{FactoryPullRequestStateOpen, FactoryPullRequestStateDraft}, state).
 			Updates(map[string]any{"state": state, "updated_at": updated.UpdatedAt})
 		if result.Error != nil {
 			return result.Error
 		}
-		if result.RowsAffected == 0 {
+		// Even unchanged observations invalidate older in-flight GitHub reads.
+		if current.State == state {
 			return nil
 		}
 		order := &FactoryWorkOrder{ID: p.WorkOrderID, OrganizationID: p.OrganizationID, FactoryID: p.FactoryID}
@@ -378,10 +393,8 @@ func (p *FactoryPullRequest) SetReviewState(tx *gorm.DB, state string) (bool, er
 	if err != nil {
 		return false, err
 	}
-	if changed {
-		p.State = updated.State
-		p.UpdatedAt = updated.UpdatedAt
-	}
+	p.State = updated.State
+	p.UpdatedAt = updated.UpdatedAt
 	return changed, nil
 }
 

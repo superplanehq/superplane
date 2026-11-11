@@ -82,18 +82,6 @@ func RefreshFactoryPullRequestMergeabilityFromGitHubEvent(
 	factoriesByID := map[string]*models.Factory{}
 	for i := range pullRequests {
 		pullRequest := &pullRequests[i]
-		if state := githubPullRequestReviewState(eventType, payload, pullRequest.Number); state != "" {
-			changed, err := pullRequest.SetReviewState(db, state)
-			if err != nil {
-				log.WithError(err).Warnf("factory mergeability: failed to update review state for %s", pullRequest.ID)
-				continue
-			}
-			if changed {
-				if err := publishFactoryWorkOrderUpdated(pullRequest.FactoryID.String(), pullRequest.WorkOrderID.String(), factoryevents.EventTypeOrderPullRequestUpdated); err != nil {
-					log.WithError(err).Warnf("factory mergeability: failed to publish update for order %s", pullRequest.WorkOrderID)
-				}
-			}
-		}
 		factory := factoriesByID[pullRequest.FactoryID.String()]
 		if factory == nil {
 			loaded, findErr := models.FindFactory(db, pullRequest.OrganizationID, pullRequest.FactoryID)
@@ -104,6 +92,17 @@ func RefreshFactoryPullRequestMergeabilityFromGitHubEvent(
 			factory = loaded
 			factoriesByID[factory.ID.String()] = factory
 		}
+		if githubPullRequestReviewState(eventType, payload, pullRequest.Number) != "" {
+			changed, err := reconcileFactoryPullRequestReviewState(ctx, db, deps, factory, pullRequest)
+			if err != nil {
+				log.WithError(err).Warnf("factory mergeability: failed to update review state for %s", pullRequest.ID)
+			}
+			if changed {
+				if err := publishFactoryWorkOrderUpdated(pullRequest.FactoryID.String(), pullRequest.WorkOrderID.String(), factoryevents.EventTypeOrderPullRequestUpdated); err != nil {
+					log.WithError(err).Warnf("factory mergeability: failed to publish update for order %s", pullRequest.WorkOrderID)
+				}
+			}
+		}
 		if err := refreshFactoryPullRequestMergeabilityWithRetry(ctx, db, deps, factory, pullRequest); err != nil {
 			log.WithError(err).Warnf("factory mergeability: failed to refresh pull request %s", pullRequest.ID)
 		}
@@ -111,6 +110,46 @@ func RefreshFactoryPullRequestMergeabilityFromGitHubEvent(
 }
 
 var publishFactoryWorkOrderUpdated = messages.PublishFactoryWorkOrderUpdated
+
+func reconcileFactoryPullRequestReviewState(
+	ctx context.Context,
+	db *gorm.DB,
+	deps IntakeDependencies,
+	factory *models.Factory,
+	pullRequest *models.FactoryPullRequest,
+) (bool, error) {
+	client, err := newFactoryGitHubAPI(db, deps, factory)
+	if err != nil {
+		return false, err
+	}
+	for range factoryMergeabilityRefreshAttempts {
+		current, err := factory.FindPullRequest(db, models.FactoryPullRequestLookup{ID: pullRequest.ID})
+		if err != nil {
+			return false, err
+		}
+		*pullRequest = *current
+		// Webhook payloads can arrive late. Read GitHub before each guarded write.
+		githubPR, _, err := client.GetPullRequest(ctx, pullRequest.Repository, int(pullRequest.Number))
+		if err != nil {
+			return false, err
+		}
+		if githubPR == nil || githubPR.Draft == nil {
+			return false, errFactoryPullRequestMissing
+		}
+		if githubPR.GetMerged() || strings.EqualFold(githubPR.GetState(), "closed") {
+			return false, nil
+		}
+		state := models.FactoryPullRequestStateOpen
+		if githubPR.GetDraft() {
+			state = models.FactoryPullRequestStateDraft
+		}
+		changed, err := pullRequest.SetReviewState(db, state)
+		if !errors.Is(err, models.ErrFactoryPullRequestReviewStateStale) {
+			return changed, err
+		}
+	}
+	return false, models.ErrFactoryPullRequestReviewStateStale
+}
 
 func ScheduleFactoryPullRequestMergeabilityRefresh(
 	ctx context.Context,
