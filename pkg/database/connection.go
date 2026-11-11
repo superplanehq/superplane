@@ -199,6 +199,16 @@ func TruncateTables() error {
 		return err
 	}
 
+	// Background goroutines from a previous test can still hold locks.
+	// Postgres picks one side of a deadlock as the victim, so retry.
+	return RetryOnDeadlock(truncateTablesAttempts, truncateTables, func(attempt int) {
+		time.Sleep(time.Duration(attempt) * 100 * time.Millisecond)
+	})
+}
+
+const truncateTablesAttempts = 5
+
+func truncateTables() error {
 	return Conn().Exec(`
 		truncate table
 			credit_packs,
