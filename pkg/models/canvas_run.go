@@ -290,8 +290,15 @@ func expiredFinishedRunsQuery(tx *gorm.DB, referenceTime time.Time) *gorm.DB {
 		Joins("JOIN organizations ON workflows.organization_id = organizations.id").
 		Where("organizations.usage_retention_window_days IS NOT NULL").
 		Where("organizations.usage_retention_window_days > 0").
-		Where("workflow_runs.state = ?", CanvasRunStateFinished).
+		// Keep the fixed state literal so generic plans can use the partial index.
+		Where("workflow_runs.state = 'finished'").
 		Where("workflow_runs.finished_at IS NOT NULL").
+		// No run can expire before the shortest enabled retention window.
+		Where(`workflow_runs.finished_at < (
+			SELECT ?::timestamp - MIN(usage_retention_window_days) * INTERVAL '1 day'
+			FROM organizations
+			WHERE usage_retention_window_days > 0
+		)`, referenceTime.UTC()).
 		Where("workflow_runs.finished_at + (organizations.usage_retention_window_days * INTERVAL '1 day') < ?", referenceTime.UTC())
 }
 

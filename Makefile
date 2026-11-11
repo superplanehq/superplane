@@ -404,6 +404,10 @@ check.db.migrations:
 	bash ./scripts/verify_no_future_migrations.sh
 	bash ./scripts/verify_branch_migrations_are_latest.sh
 
+.PHONY: compare.retention.selection
+compare.retention.selection: dev.test.is.running
+	$(COMPOSE) exec -T db psql -U postgres -d superplane_dev -f /dev/stdin < scripts/compare_retention_selection.sql
+
 check.build.ui:
 	$(COMPOSE) exec app bash -c "cd web_src && NODE_OPTIONS=--max-old-space-size=4096 npm run build"
 
