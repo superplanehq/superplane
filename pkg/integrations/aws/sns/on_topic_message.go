@@ -3,7 +3,7 @@ package sns
 import (
 	"crypto"
 	"crypto/rsa"
-	"crypto/sha1"
+	"crypto/sha1" // #nosec G505 -- AWS SNS SignatureVersion 1 requires SHA-1 verification.
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/base64"
@@ -460,7 +460,7 @@ func (t *OnTopicMessage) fetchSigningCertificate(ctx core.WebhookRequestContext,
 func (t *OnTopicMessage) getHashAndDigest(signatureVersion, stringToSign string) (crypto.Hash, []byte, error) {
 	switch signatureVersion {
 	case "1":
-		sum := sha1.Sum([]byte(stringToSign))
+		sum := sha1.Sum([]byte(stringToSign)) // #nosec G401 -- AWS SNS SignatureVersion 1 requires SHA-1 verification.
 		return crypto.SHA1, sum[:], nil
 
 	case "2":

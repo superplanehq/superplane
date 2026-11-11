@@ -24,7 +24,9 @@ func (p *OnPRComment) Description() string {
 }
 
 func (p *OnPRComment) Documentation() string {
-	return `The On PR Comment trigger starts a workflow execution when comments are added on a pull request conversation.
+	return `The On PR Comment trigger starts a workflow execution when comments are created or edited in a pull request conversation.
+
+The content filter checks the current comment body. Adding a matching mention in an edit can start a run. For comments that require a mention, removing it does not start a run. Each matching edit remains eligible.
 
 ## Use Cases
 
@@ -45,7 +47,7 @@ Each comment event includes:
 - **comment**: Comment information including body, author, created timestamp
 - **issue**: Issue/PR information; for this trigger it is always a pull request issue
 - **repository**: Repository information
-- **sender**: User who added the comment
+- **sender**: User who created or edited the comment
 
 SuperPlane passes through the full GitHub webhook payload under data for the issue_comment event type.
 

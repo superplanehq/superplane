@@ -14,6 +14,9 @@ import (
 //go:embed fetch_task_attachments.sh process_video_attachments.sh
 var attachmentSetupScripts embed.FS
 
+//go:embed tool_execution_protocol.md
+var toolExecutionProtocol string
+
 type AgentPromptCommand func(promptName, model string) string
 
 type AgentTaskInput struct {

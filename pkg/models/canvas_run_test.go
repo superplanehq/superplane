@@ -17,6 +17,100 @@ import (
 	"gorm.io/gorm"
 )
 
+func Test__ListExpiredFinishedRuns__BoundariesAndOrdering(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	db := database.DB(t.Context())
+	now := time.Now().UTC().Truncate(time.Microsecond)
+	var expected []uuid.UUID
+	for _, days := range []int{30, 7, 0, -1, -2} {
+		org, err := models.CreateOrganizationInTransaction(db, support.RandomName("org"), support.RandomName("org"))
+		require.NoError(t, err)
+		require.NoError(t, db.Model(org).Update("usage_retention_window_days", days).Error)
+		canvas, _ := support.CreateCanvas(t, org.ID, r.User, []models.CanvasNode{{NodeID: "trigger", Type: models.NodeTypeTrigger}}, nil)
+		cutoff := now.AddDate(0, 0, -days)
+		for _, offset := range []time.Duration{time.Microsecond, 0, -time.Microsecond} {
+			run := createRunWithState(t, canvas.ID, models.CanvasRunStateFinished, models.CanvasRunResultPassed)
+			require.NoError(t, db.Model(run).Update("finished_at", cutoff.Add(offset)).Error)
+			if days > 0 && offset < 0 {
+				expected = append(expected, run.ID)
+			}
+		}
+		unfinished := createRunWithState(t, canvas.ID, models.CanvasRunStateStarted, "")
+		require.NoError(t, db.Model(unfinished).Update("finished_at", now.AddDate(0, 0, -100)).Error)
+		missingTime := createRunWithState(t, canvas.ID, models.CanvasRunStateFinished, models.CanvasRunResultPassed)
+		require.NoError(t, db.Model(missingTime).Update("finished_at", nil).Error)
+		if days == -2 {
+			require.NoError(t, db.Model(org).Update("usage_retention_window_days", nil).Error)
+		}
+	}
+	// A non-UTC caller must use the same timestamp boundary.
+	referenceTime := now.In(time.FixedZone("caller", 5*60*60))
+	for _, limit := range []int{1, 0, -1} {
+		runs, err := models.ListExpiredFinishedRuns(db, referenceTime, limit)
+		require.NoError(t, err)
+		var ids []uuid.UUID
+		for _, run := range runs {
+			ids = append(ids, run.ID)
+		}
+		want := expected
+		if limit > 0 {
+			want = expected[:limit]
+		}
+		require.Equal(t, want, ids)
+	}
+}
+
+func Test__ExpiredFinishedRun__RevalidatesActiveWorkAndRetention(t *testing.T) {
+	run, execution := setupRunWithExecution(t)
+	db := database.DB(t.Context())
+	now := time.Now().UTC().Truncate(time.Microsecond)
+	var canvas models.Canvas
+	require.NoError(t, db.First(&canvas, "id = ?", run.WorkflowID).Error)
+	require.NoError(t, db.Model(&models.Organization{}).Where("id = ?", canvas.OrganizationID).Update("usage_retention_window_days", 7).Error)
+	require.NoError(t, db.Model(run).Updates(map[string]any{"state": models.CanvasRunStateFinished, "finished_at": now.AddDate(0, 0, -8)}).Error)
+	require.NoError(t, db.Model(execution).Update("state", models.CanvasNodeExecutionStateFinished).Error)
+	runs, err := models.ListExpiredFinishedRuns(db, now, 1)
+	require.NoError(t, err)
+	require.Len(t, runs, 1)
+	require.Equal(t, run.ID, runs[0].ID)
+	for _, state := range []string{models.CanvasNodeExecutionStatePending, models.CanvasNodeExecutionStateStarted, models.CanvasNodeExecutionStateCancelling} {
+		require.NoError(t, db.Model(execution).Update("state", state).Error)
+		runs, err = models.ListExpiredFinishedRuns(db, now, 1)
+		require.NoError(t, err)
+		require.Empty(t, runs)
+		require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+			locked, err := models.LockExpiredFinishedRun(tx, now, run.ID)
+			require.NoError(t, err)
+			require.Nil(t, locked)
+			return nil
+		}))
+	}
+	require.NoError(t, db.Model(execution).Update("state", models.CanvasNodeExecutionStateFinished).Error)
+	for _, days := range []int{30, 0} {
+		require.NoError(t, db.Model(&models.Organization{}).Where("id = ?", canvas.OrganizationID).Update("usage_retention_window_days", days).Error)
+		require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+			locked, err := models.LockExpiredFinishedRun(tx, now, run.ID)
+			require.NoError(t, err)
+			require.Nil(t, locked)
+			return nil
+		}))
+	}
+	require.NoError(t, db.Model(&models.Organization{}).Where("id = ?", canvas.OrganizationID).Update("usage_retention_window_days", 7).Error)
+	tx := db.Begin()
+	require.NoError(t, tx.Error)
+	defer tx.Rollback()
+	locked, err := models.LockExpiredFinishedRun(tx, now, run.ID)
+	require.NoError(t, err)
+	require.NotNil(t, locked)
+	require.NoError(t, db.Transaction(func(other *gorm.DB) error {
+		locked, err := models.LockExpiredFinishedRun(other, now, run.ID)
+		require.NoError(t, err)
+		require.Nil(t, locked)
+		return nil
+	}))
+}
+
 func Test__CanvasRun__DeleteChain__DeletesAllData(t *testing.T) {
 	run, execution := setupRunWithExecution(t)
 

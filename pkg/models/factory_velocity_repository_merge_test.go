@@ -1,6 +1,8 @@
 package models_test
 
 import (
+	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -8,8 +10,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 func Test__FactoryVelocityRepositoryMerge__ReplaceIsIdempotent(t *testing.T) {
@@ -54,15 +59,18 @@ func Test__FactoryVelocityRepositoryMerge__ReplaceOnlyTouchesItsWindow(t *testin
 	// A later sync recomputes only the last two days, and must leave history alone.
 	recent := models.NewFactoryVelocityRepositoryMerge(r.Organization.ID, factory.ID, "example/repo", 2, models.FactoryVelocityMergeSourcePeople, now.Add(-time.Hour))
 	recent.AuthorLogin = "hubber"
+	other := models.NewFactoryVelocityRepositoryMerge(r.Organization.ID, factory.ID, "example/other", 2, models.FactoryVelocityMergeSourcePeople, now.Add(-2*time.Hour))
+	require.NoError(t, db.Create(&other).Error)
 	require.NoError(t, models.ReplaceFactoryVelocityRepositoryMerges(
 		db, factory.ID, models.ProviderGitHub, now.Add(-48*time.Hour), now.Add(time.Hour), []models.FactoryVelocityRepositoryMerge{recent},
 	))
 
 	stored, err := models.ListFactoryVelocityRepositoryMerges(db, factory.ID, now.Add(-60*24*time.Hour), now.Add(time.Hour))
 	require.NoError(t, err)
-	require.Len(t, stored, 2)
+	require.Len(t, stored, 3)
 	assert.Equal(t, int64(1), stored[0].Number, "the merge outside the recomputed window survives")
-	assert.Equal(t, int64(2), stored[1].Number)
+	assert.Equal(t, "example/other", stored[1].Repository, "another repository's history survives")
+	assert.Equal(t, int64(2), stored[2].Number)
 }
 
 func Test__FactoryVelocityRepositoryMerge__ReplaceDropsMergesThatBecameSuperPlanes(t *testing.T) {
@@ -298,6 +306,22 @@ func Test__ListFactoryVelocitySyncTargets__SkipsFreshAndClaimedWorkspaces(t *tes
 	require.NoError(t, err)
 	assert.NotContains(t, factoryIDs(fresh), factory.ID, "a workspace synced a moment ago waits its turn")
 
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryMultiRepoTasks))
+	contextRepo, err := factory.CreateAgentResource(db, models.FactoryAgentResourceKindContextRepo, "", true, models.FactoryAgentResourceConfig{Repository: "example/other", Access: models.FactoryContextRepoAccessWrite})
+	require.NoError(t, err)
+	targets, err := models.ListFactoryVelocitySyncTargets(db, now.Add(-5*time.Minute), now.Add(-15*time.Minute), allSyncTargets)
+	require.NoError(t, err)
+	var workspaceTargets []models.FactoryVelocitySyncTarget
+	for _, target := range targets {
+		if target.FactoryID == factory.ID {
+			workspaceTargets = append(workspaceTargets, target)
+		}
+	}
+	require.Len(t, workspaceTargets, 1, "a new context repository backfills even when the primary is fresh")
+	assert.Equal(t, "example/other", workspaceTargets[0].Repository)
+	assert.Nil(t, workspaceTargets[0].SyncedAt)
+	require.NoError(t, db.Model(contextRepo).Update("enabled", false).Error)
+
 	due, err := models.ListFactoryVelocitySyncTargets(db, now.Add(time.Hour), now.Add(time.Hour), allSyncTargets)
 	require.NoError(t, err)
 	assert.Contains(t, factoryIDs(due), factory.ID)
@@ -341,6 +365,51 @@ func Test__FindFactoryVelocitySyncTarget(t *testing.T) {
 	missing, err := models.FindFactoryVelocitySyncTarget(db, uuid.New())
 	require.NoError(t, err)
 	assert.Nil(t, missing)
+}
+
+func Test__ListFactoryVelocitySyncTargets__LimitsOnlyAvailableRepositories(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryMultiRepoTasks))
+	integrationID := uuid.New().String()
+	repository := "example/repo"
+	now := time.Now()
+	for i := range 201 {
+		key := fmt.Sprintf("VA%c%c", 'A'+i/26, 'A'+i%26)
+		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", key)
+		require.NoError(t, err)
+		require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSIntegrationID: &integrationID, AppRepository: &repository}))
+		sync, err := models.ClaimFactoryVelocitySync(db, factory.ID, now, repository)
+		require.NoError(t, err)
+		require.NoError(t, sync.RecordError(db, "provider unavailable"))
+	}
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSIntegrationID: &integrationID, AppRepository: &repository}))
+	sync, err := models.ClaimFactoryVelocitySync(db, factory.ID, now, repository)
+	require.NoError(t, err)
+	require.NoError(t, sync.RecordSuccess(db, repository, now, now.AddDate(0, 0, -60)))
+	_, err = factory.CreateAgentResource(db, models.FactoryAgentResourceKindContextRepo, "", true, models.FactoryAgentResourceConfig{Repository: "example/context", Access: models.FactoryContextRepoAccessWrite})
+	require.NoError(t, err)
+
+	queryRows := &velocityQueryRows{Interface: db.Logger}
+	targets, err := models.ListFactoryVelocitySyncTargets(db.Session(&gorm.Session{Logger: queryRows}), now.Add(-5*time.Minute), now.Add(-15*time.Minute), 1)
+	require.NoError(t, err)
+	require.Len(t, targets, 1)
+	assert.Equal(t, factory.ID, targets[0].FactoryID)
+	assert.Equal(t, "example/context", targets[0].Repository)
+	assert.LessOrEqual(t, queryRows.maxRows, int64(200), "candidate reads stay bounded even when the first page is unavailable")
+}
+
+type velocityQueryRows struct {
+	logger.Interface
+	maxRows int64
+}
+
+func (l *velocityQueryRows) Trace(ctx context.Context, begin time.Time, query func() (string, int64), err error) {
+	sql, rows := query()
+	l.maxRows = max(l.maxRows, rows)
+	l.Interface.Trace(ctx, begin, func() (string, int64) { return sql, rows }, err)
 }
 
 func factoryIDs(targets []models.FactoryVelocitySyncTarget) []uuid.UUID {

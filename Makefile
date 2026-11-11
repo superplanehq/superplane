@@ -64,6 +64,16 @@ GOTESTSUM=$(COMPOSE) run --rm -e DB_NAME=superplane_test -v $(PWD)/tmp/screensho
 lint:
 	$(COMPOSE) exec app revive -formatter friendly -config lint.toml -exclude ./tmp/... ./...
 
+.PHONY: check.gosec
+check.gosec: dev.test.is.running
+	mkdir -p tmp/gosec
+	$(COMPOSE) exec -T app bash /app/scripts/with-host-owned-output tmp/gosec gosec \
+		-exclude-generated -exclude-dir=pkg/protos -exclude-dir=pkg/openapi_client \
+		-exclude=G101,G104,G115,G117 \
+		-nosec-require-rules -nosec-require-justification -track-suppressions \
+		-fmt=json -out=tmp/gosec/report.json -stdout -verbose=text \
+		./cmd/... ./pkg/... ./ee/...
+
 tidy:
 	$(COMPOSE) exec app go mod tidy
 
@@ -98,7 +108,15 @@ test.coverage.baseline.update:
 	$(MAKE) check.coverage.go.baseline.update
 
 test.license.check:
-	bash ./scripts/license-check.sh
+	$(COMPOSE) exec -T app bash ./scripts/license-check.sh
+
+.PHONY: test.license.scanner
+test.license.scanner:
+	$(COMPOSE) exec -T app bash ./scripts/license-check-test.sh
+
+.PHONY: check.vulnerabilities
+check.vulnerabilities:
+	$(COMPOSE) exec -T app bash ./scripts/vulnerability-check.sh
 
 test.watch:
 	$(GOTESTSUM) --packages="$(PKG_TEST_PACKAGES)" --watch -- -p 1
@@ -126,6 +144,9 @@ dev.test.is.running:
 	@test -n "$$($(COMPOSE) ps --status running -q app 2>/dev/null)" || { echo "Run \`make dev.up\` first (app container is not running)." >&2; exit 1; }
 
 dev.up:
+ifeq ($(strip $(CI)),)
+	@bash ./scripts/check_dev_disk_space.sh
+endif
 	@mkdir -p tmp/screenshots $(GO_CACHE_DIRS)
 	@echo "Starting development containers..."
 	$(COMPOSE) --progress $(COMPOSE_PROGRESS) up -d --wait --build --pull always --quiet-pull $(COMPOSE_UP_EXTRA)
@@ -197,6 +218,10 @@ ci.setup.e2e:
 
 test.sharding:
 	$(COMPOSE) exec -T app bash scripts/test_sharding_test.sh
+
+.PHONY: test.dev.disk
+test.dev.disk:
+	bash scripts/check_dev_disk_space_test.sh
 
 .PHONY: dev.setup.runner.fleet
 dev.setup.runner.fleet:

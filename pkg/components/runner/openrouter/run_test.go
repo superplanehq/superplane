@@ -12,6 +12,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/components/runner"
 )
 
 func TestOpenRouterModelIdPrefixesCatalogIds(t *testing.T) {
@@ -180,6 +181,40 @@ func TestRunPromptRecordsPlanningAgentReply(t *testing.T) {
 
 	require.Equal(t, 0, result.exitCode, result.output)
 	assert.Equal(t, []string{"I found the retry seam."}, result.agentMessages)
+}
+
+func TestPlanningFollowUpReceivesToolGuidanceInSharedInstructions(t *testing.T) {
+	dir := t.TempDir()
+	writeTaskHelpers(t, dir)
+	copyScript(t, dir, "run.js", "run.js")
+	for _, file := range runner.AppendPlanningSessionMCPFiles(nil) {
+		require.NoError(t, os.WriteFile(filepath.Join(dir, file.Path), []byte(file.Content), 0o644))
+	}
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "follow_up_loop.js"), []byte(runner.FollowUpLoopScript()), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "prompt_count"), []byte("1\n"), 0o644))
+	cmd := exec.Command("node", "-e", `process.stdout.write(require(process.argv[1]).writePrompt(process.argv[2], "Inspect the UI in a browser and search for design references."));`, filepath.Join(dir, "follow_up_loop.js"), dir)
+	promptFile, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(promptFile))
+	promptName, err := filepath.Rel(dir, string(promptFile))
+	require.NoError(t, err)
+	result := runPromptInDir(t, dir, promptName, "anthropic/claude-sonnet-4-6", []spawnScript{successSpawn("Inspection complete.")}, map[string]string{
+		"SUPERPLANE_PLANNING_SESSION_ID":   "plan-1",
+		"SUPERPLANE_PLANNING_SESSION_KIND": "work_order_analysis",
+		"SUPERPLANE_ANALYSIS_REWIND":       "yes",
+	}, nil, nil, "")
+	require.Equal(t, 0, result.exitCode, result.output, result.stderr)
+	require.Len(t, result.spawns, 1)
+	assert.NotContains(t, result.spawns[0], "--session")
+	config := resultPayload(t, filepath.Join(dir, "opencode.json"))
+	instructions, ok := config["instructions"].([]any)
+	require.True(t, ok)
+	require.Contains(t, instructions, filepath.Join(dir, "analysis_protocol.md"))
+	protocol, err := os.ReadFile(filepath.Join(dir, "analysis_protocol.md"))
+	require.NoError(t, err)
+	assert.Contains(t, string(protocol), "discover its exposed tools and call a permitted tool")
+	assert.Contains(t, string(protocol), "Preserve disabled connections and tool restrictions")
+	assert.Contains(t, string(protocol), "Run the installed `playwright cli` on the runner host")
+	assert.Contains(t, string(protocol), "Browser navigation alone does not require screenshots, video, or artifact uploads")
 }
 
 func TestRunPromptIsolatesProjectConfigAndPreservesInstructions(t *testing.T) {
@@ -1655,6 +1690,9 @@ func runPromptWithCwd(t *testing.T, dir, cwd, promptName, model string, spawns [
 	resultFile := filepath.Join(dir, "result.json")
 	script, err := filepath.Abs("run.js")
 	require.NoError(t, err)
+	if _, err := os.Stat(filepath.Join(dir, "run.js")); err == nil {
+		script = filepath.Join(dir, "run.js")
+	}
 	spawnsJSON, err := json.Marshal(spawns)
 	require.NoError(t, err)
 	if nowValues == nil {

@@ -121,7 +121,7 @@ func (s *Server) handleMCPAuthorize(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "redirect_uri is not valid", http.StatusBadRequest)
 		return
 	}
-	http.Redirect(w, r, redirect, http.StatusFound)
+	http.Redirect(w, r, redirect, http.StatusFound) // #nosec G710 -- ResolveClient validates the registered OAuth redirect URI.
 }
 
 func consentClientName(client *mcpserver.Client) string {
@@ -150,7 +150,7 @@ func (s *Server) writeConsentPage(
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(status)
-	_, _ = w.Write(page)
+	_, _ = w.Write(page) // #nosec G705 -- RenderConsentPage uses html/template escaping.
 }
 
 func (s *Server) handleMCPToken(w http.ResponseWriter, r *http.Request) {

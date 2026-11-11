@@ -89,6 +89,12 @@ Run these three steps once, in order:
    containers (app shell, db, rabbitmq). The first run builds the images
    (~3-5 min); later runs reuse them. After you change
    `release/runner/Dockerfile`, run `make dev.up` again.
+   Local startup requires 15 GB free on the Docker filesystem. If space is
+   low, it removes unused build cache and checks again before building.
+   It also attempts this cleanup if the disk probe reports a full disk.
+   This cleanup never removes images, containers, or database volumes.
+   If space is still low, increase Docker disk space or remove unused images
+   manually. CI skips this cleanup. Run `make test.dev.disk` to test recovery.
 2. `make dev.setup` — installs npm deps, downloads Go modules, runs protobuf
    codegen, and creates + migrates `superplane_dev`. Re-run when protos, Go
    modules, or frontend deps change. By
@@ -146,6 +152,7 @@ after a disk-full or interrupted download), run `make dev.clean.go.cache` then
 - Targeted backend tests: `make test PKG_TEST_PACKAGES=./pkg/workers`
 - Targeted E2E tests: `E2E_TEST_PACKAGES=./test/e2e/workflows make test.e2e`
   (or `make test.e2e.single FILE=test/e2e/foo_test.go LINE=19` for a single test).
+  Semaphore runs E2E tests only on `main`. Local E2E commands work on all branches.
 - UI unit tests: `make check.test.ui` (Bun + Happy DOM).
   Targeted UI tests: `make check.test.ui FILES=src/lib/duration.spec.ts`.
   Paths in `FILES` are relative to `web_src/`.
