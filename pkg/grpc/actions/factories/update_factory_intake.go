@@ -250,7 +250,7 @@ func applyIntakeUpdate(
 		// Recovery owns its context and connection after the settings commit.
 		recoveryIntake := *intake
 		go func() {
-			ctx := context.Background()
+			ctx := context.WithoutCancel(ctx)
 			if err := replaySkippedGitHubIssues(ctx, deps, database.DB(ctx), &recoveryIntake); err != nil {
 				log.WithError(err).WithField("intake_id", recoveryIntake.ID).WithField("factory_id", recoveryIntake.FactoryID).
 					Warn("failed to replay skipped GitHub issues after saving intake settings")
