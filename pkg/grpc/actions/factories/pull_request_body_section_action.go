@@ -214,7 +214,7 @@ func (a *bodySectionActionAttempt) finish(tx *gorm.DB, outcome bodySectionPublic
 	if publishErr != nil {
 		return a.scheduleRetry(tx, current, execution, publishErr)
 	}
-	a.state.Status, a.state.Reason, a.state.NextRetryAt = outcome.Status, outcome.Reason, nil
+	a.state.Status, a.state.Reason, a.state.NextRetryAt = string(outcome.Status), outcome.Reason, nil
 	if err := setBodySectionPublicationState(tx, execution, a.state); err != nil {
 		return err
 	}
