@@ -167,6 +167,40 @@ func resetTestOrganization(t *testing.T, r *support.ResourceRegistry) error {
 	return err
 }
 
+func TestResetReviewRequestPreservesFallbackAndAgentSettings(t *testing.T) {
+	for _, fallback := range []string{"octocat", ""} {
+		t.Run("fallback="+fallback, func(t *testing.T) {
+			r, factory := resetTestFactory(t)
+			require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryReviewRequest))
+			source := resetTestTemplate(t, r, factory, "risk-score", models.ProviderGitHub, func(*yaml.Canvas) {})
+			canvas := resetTestTemplate(t, r, factory, reviewRequestTemplateID, models.ProviderGitHub, func(doc *yaml.Canvas) {
+				trigger := findYAMLNode(t, doc, reviewRequestTriggerNodeID)
+				trigger.Configuration["app"] = source.ID.String()
+				trigger.Configuration["enabled"] = false
+				agent := findYAMLNode(t, doc, reviewRequestAgentNodeID)
+				agent.Configuration["fallbackReviewer"] = fallback
+				agent.Configuration["model"] = models.FormatHostedLLMModelKey(models.UsageProviderOpenRouter, "anthropic/claude-sonnet-4-6")
+				agent.Configuration["thinkingLevel"] = "low"
+				agent.Configuration["executionTimeoutSeconds"] = 0
+				agent.Configuration["steps"] = []any{map[string]any{"type": "prompt", "prompt": "Retired selection policy"}}
+			})
+			require.NoError(t, models.DisableExperimentalFeature(r.Organization.ID, features.FeatureFactoryReviewRequest))
+			require.NoError(t, resetTestOrganization(t, r))
+			version := resetTestLiveVersion(t, canvas)
+			agent := findIntakeNode(version.Nodes, reviewRequestAgentNodeID)
+			require.NotNil(t, agent)
+			require.Equal(t, fallback, agent.Configuration["fallbackReviewer"])
+			require.Equal(t, models.FormatHostedLLMModelKey(models.UsageProviderOpenRouter, "anthropic/claude-sonnet-4-6"), agent.Configuration["model"])
+			require.Equal(t, "low", agent.Configuration["thinkingLevel"])
+			require.EqualValues(t, 0, agent.Configuration["executionTimeoutSeconds"])
+			trigger := findIntakeNode(version.Nodes, reviewRequestTriggerNodeID)
+			require.Equal(t, source.ID.String(), trigger.Configuration["app"])
+			require.Equal(t, false, trigger.Configuration["enabled"])
+			require.NotContains(t, liveCanvasJSON(t, canvas), "retired selection policy")
+		})
+	}
+}
+
 func TestResetBuiltInVerificationSettings(t *testing.T) {
 	for _, provider := range []string{models.ProviderGitHub, models.ProviderBitbucket} {
 		for _, templateID := range []string{"risk-score", "pr-closure", "visual-evidence"} {

@@ -609,6 +609,13 @@ func (w *NodeExecutor) executeActionNode(
 			}
 		}
 	}
+	prepared, err := ctx.Factory.(*contexts.FactoryContext).PrepareReviewRequest(&ctx)
+	if err != nil {
+		return failNodeExecution(tx, ctx.ExecutionState, execution.RunID, err)
+	}
+	if prepared {
+		return tx.Save(execution).Error
+	}
 	if err := action.Execute(ctx); err != nil {
 		var busy *models.CodexConnectionBusyError
 		if errors.As(err, &busy) {

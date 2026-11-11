@@ -36,6 +36,13 @@ func (s *EventContext) EmitDeduplicated(payloadType string, payload any, dedupKe
 }
 
 func (s *EventContext) emit(payloadType string, payload any, dedupKey string) error {
+	payload, reviewKey, suppress, err := s.reviewRequestEvent(payloadType, payload)
+	if err != nil || suppress {
+		return err
+	}
+	if reviewKey != "" {
+		dedupKey = reviewKey
+	}
 	structuredPayload := map[string]any{
 		"type":      payloadType,
 		"timestamp": time.Now(),

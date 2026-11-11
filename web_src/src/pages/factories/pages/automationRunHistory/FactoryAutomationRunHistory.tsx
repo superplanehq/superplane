@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useParams, useSearchParams } from "react-router";
-import type { CanvasesCanvasRun } from "@/api-client";
+import type { CanvasesCanvasNodeExecution, CanvasesCanvasRun } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { useCanvasVersion, useDescribeRun, useEventExecutions, useInfiniteCanvasRuns } from "@/hooks/useCanvasData";
 import { useCanvasRuntimeWebsocket } from "@/hooks/useCanvasWebsocket";
@@ -10,6 +10,7 @@ import { RunnerLogsTerminal } from "@/ui/Runs/RunInspectorRunnerLogs";
 import { LiveLogStateNotice } from "@/ui/CanvasPage/RunnerLiveLogDialog/LiveLogStateNotice";
 import type { RunHistoryIntakeSource } from "./intakeRunData";
 import { runDuration, taskPageNumber, toAutomationRun, toRunActivities } from "./runHistoryData";
+import { FactoryAutomationRunRetry } from "./FactoryAutomationRunRetry";
 import { workOrderDetailPath } from "../../lib/factoryPagePaths";
 
 interface FactoryAutomationRunHistoryProps {
@@ -19,6 +20,8 @@ interface FactoryAutomationRunHistoryProps {
   factoryId: string;
   selectedRunId: string | null;
   onSelectRun: (id: string | null) => void;
+  runRetryEnabled?: boolean;
+  renderRunSummary?: (run: CanvasesCanvasRun, executions: CanvasesCanvasNodeExecution[]) => ReactNode;
 }
 
 export function FactoryAutomationRunHistory(props: FactoryAutomationRunHistoryProps) {
@@ -111,6 +114,8 @@ function LoadedFactoryAutomationRunDetails({
   executionsQuery,
   versionQuery,
   intakeSource,
+  runRetryEnabled,
+  renderRunSummary,
 }: FactoryAutomationRunHistoryProps & {
   now: number;
   run: CanvasesCanvasRun;
@@ -143,6 +148,16 @@ function LoadedFactoryAutomationRunDetails({
           onRetry={() => void versionQuery.refetch()}
         />
       )}
+      {runRetryEnabled !== undefined ? (
+        <FactoryAutomationRunRetry
+          organizationId={organizationId}
+          canvasId={canvasId}
+          run={run}
+          enabled={runRetryEnabled}
+          onRetried={() => onSelectRun(null)}
+        />
+      ) : null}
+      {renderRunSummary?.(run, executions)}
       <AutomationRunDetails
         run={details}
         selectedActivityId={params.get("activity")}

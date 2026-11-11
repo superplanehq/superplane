@@ -45,3 +45,6 @@ export const FEATURE_FACTORY_STEP_ACTIONS = "factory_step_actions";
 export const FEATURE_FACTORY_PULL_REQUEST_IMPORT = "factory_pull_request_import";
 /** Organization experimental feature: GitHub Enterprise Cloud (ghe.com) connections. */
 export const FEATURE_FLAG_GITHUB_ENTERPRISE = "github_enterprise";
+
+/** Organization experimental feature: request reviewers after Merge confidence completes. */
+export const FEATURE_FACTORY_REVIEW_REQUEST = "factory_review_request";
