@@ -102,7 +102,12 @@ func GenerateAccountToken(jwtSigner *jwt.Signer, accountID string, sessionStart 
 func IssueAccountSession(w http.ResponseWriter, r *http.Request, jwtSigner *jwt.Signer, accountID string) error {
 	err := issueAccountSession(w, r, jwtSigner, accountID, time.Now())
 	if err == nil {
-		logging.AddRequestLogFields(r.Context(), log.Fields{"account_id": accountID, "object": "account", "object_id": accountID, "outcome": "success"})
+		logging.AddRequestLogFields(r.Context(), log.Fields{
+			"account_id": accountID,
+			"object":     "account",
+			"object_id":  accountID,
+			"outcome":    "success",
+		})
 	}
 	return err
 }

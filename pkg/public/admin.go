@@ -166,7 +166,9 @@ func (s *Server) adminUpdateInstallationNetworkSettings(w http.ResponseWriter, r
 	}
 
 	logging.AddRequestLogFields(r.Context(), log.Fields{
-		"action": "update_security_settings", "object": "installation", "settings_updated": req.updatedSettingNames(),
+		"action":           "update_security_settings",
+		"object":           "installation",
+		"settings_updated": req.updatedSettingNames(),
 	})
 
 	if req.AllowPrivateNetworkAccess != nil {

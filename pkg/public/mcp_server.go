@@ -260,7 +260,9 @@ func (s *Server) handleMCP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	logging.AddRequestLogFields(r.Context(), log.Fields{
-		"user_id": claims.UserID.String(), "organization_id": claims.OrgID.String(), "object": "mcp",
+		"user_id":         claims.UserID.String(),
+		"organization_id": claims.OrgID.String(),
+		"object":          "mcp",
 	})
 	if mcpserver.UserAccountBlocked(database.DB(r.Context()), claims.UserID) {
 		w.Header().Set("WWW-Authenticate", mcpserver.WWWAuthenticate(origin))

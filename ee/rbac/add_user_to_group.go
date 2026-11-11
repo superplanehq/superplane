@@ -26,6 +26,10 @@ func addUserToGroup(ctx context.Context, orgID, domainType, domainID, userID, us
 		return nil, grpcerrors.Internal(err, "failed to add user to group")
 	}
 
-	logging.AddRequestLogFields(ctx, log.Fields{"target_user_id": user.ID.String(), "group_name": groupName, "domain_id": domainID})
+	logging.AddRequestLogFields(ctx, log.Fields{
+		"target_user_id": user.ID.String(),
+		"group_name":     groupName,
+		"domain_id":      domainID,
+	})
 	return &pbGroups.AddUserToGroupResponse{}, nil
 }

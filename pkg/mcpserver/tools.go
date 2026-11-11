@@ -216,7 +216,10 @@ func (rt *Runtime) CallTool(ctx context.Context, claims *AccessClaims, name stri
 	if rt == nil || rt.Auth == nil || claims == nil {
 		return ToolResult{}, ToolError("Not found")
 	}
-	logging.AddRequestLogFields(ctx, log.Fields{"action": name, "object": "task"})
+	logging.AddRequestLogFields(ctx, log.Fields{
+		"action": name,
+		"object": "task",
+	})
 	switch name {
 	case "list_workspaces":
 		logging.AddRequestLogFields(ctx, log.Fields{"object": "workspace"})
@@ -243,7 +246,10 @@ func (rt *Runtime) CallTool(ctx context.Context, claims *AccessClaims, name stri
 		logging.AddRequestLogFields(ctx, log.Fields{"object": "member"})
 		return rt.listMembers(ctx, claims, args)
 	default:
-		logging.AddRequestLogFields(ctx, log.Fields{"action": "unknown_mcp_tool", "object": "mcp"})
+		logging.AddRequestLogFields(ctx, log.Fields{
+			"action": "unknown_mcp_tool",
+			"object": "mcp",
+		})
 		return ToolResult{}, ToolError("Unknown tool: " + name)
 	}
 }
@@ -357,7 +363,10 @@ func (rt *Runtime) getTask(ctx context.Context, claims *AccessClaims, args map[s
 	}
 	links := newTaskLinks(rt.BaseURL, factory)
 	order := resp.GetOrder()
-	logging.AddRequestLogFields(ctx, log.Fields{"object": "task", "object_id": order.GetId()})
+	logging.AddRequestLogFields(ctx, log.Fields{
+		"object":    "task",
+		"object_id": order.GetId(),
+	})
 	return TextResult(mustJSON(map[string]any{
 		"id":          order.GetId(),
 		"key":         order.GetKey(),
@@ -385,7 +394,10 @@ func (rt *Runtime) listTaskArtifacts(ctx context.Context, claims *AccessClaims, 
 	if err != nil {
 		return ToolResult{}, actionError(err)
 	}
-	logging.AddRequestLogFields(ctx, log.Fields{"object": "task", "object_id": task})
+	logging.AddRequestLogFields(ctx, log.Fields{
+		"object":    "task",
+		"object_id": task,
+	})
 	artifacts := make([]map[string]any, 0, len(resp.GetArtifacts()))
 	for _, artifact := range resp.GetArtifacts() {
 		row := map[string]any{
@@ -498,7 +510,10 @@ func (rt *Runtime) createTask(ctx context.Context, claims *AccessClaims, args ma
 	}
 	links := newTaskLinks(rt.BaseURL, factory)
 	order := resp.GetOrder()
-	logging.AddRequestLogFields(ctx, log.Fields{"object": "task", "object_id": order.GetId()})
+	logging.AddRequestLogFields(ctx, log.Fields{
+		"object":    "task",
+		"object_id": order.GetId(),
+	})
 	return TextResult(mustJSON(map[string]any{
 		"id":    order.GetId(),
 		"key":   order.GetKey(),
@@ -557,7 +572,10 @@ func (rt *Runtime) handOffTask(ctx context.Context, claims *AccessClaims, args m
 	}
 	links := newTaskLinks(rt.BaseURL, factory)
 	order := result.Order
-	logging.AddRequestLogFields(ctx, log.Fields{"object": "task", "object_id": order.GetId()})
+	logging.AddRequestLogFields(ctx, log.Fields{
+		"object":    "task",
+		"object_id": order.GetId(),
+	})
 	payload := map[string]any{
 		"id":     order.GetId(),
 		"key":    order.GetKey(),
@@ -622,7 +640,10 @@ func (rt *Runtime) assignTask(ctx context.Context, claims *AccessClaims, args ma
 	}
 	links := newTaskLinks(rt.BaseURL, factory)
 	order := resp.GetOrder()
-	logging.AddRequestLogFields(ctx, log.Fields{"object": "task", "object_id": order.GetId()})
+	logging.AddRequestLogFields(ctx, log.Fields{
+		"object":    "task",
+		"object_id": order.GetId(),
+	})
 	return TextResult(mustJSON(map[string]any{
 		"id":        order.GetId(),
 		"key":       order.GetKey(),
@@ -844,7 +865,10 @@ func resolveTaskID(ctx context.Context, claims *AccessClaims, factoryID uuid.UUI
 	if err != nil {
 		return "", actionError(err)
 	}
-	logging.AddRequestLogFields(ctx, log.Fields{"object": "task", "object_id": resp.GetOrder().GetId()})
+	logging.AddRequestLogFields(ctx, log.Fields{
+		"object":    "task",
+		"object_id": resp.GetOrder().GetId(),
+	})
 	return resp.GetOrder().GetId(), nil
 }
 

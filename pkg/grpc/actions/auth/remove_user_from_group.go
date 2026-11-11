@@ -26,6 +26,10 @@ func RemoveUserFromGroup(ctx context.Context, orgID, domainType, domainID, userI
 		return nil, grpcerrors.Internal(err, "failed to remove user from group")
 	}
 
-	logging.AddRequestLogFields(ctx, log.Fields{"target_user_id": user.ID.String(), "group_name": groupName, "domain_id": domainID})
+	logging.AddRequestLogFields(ctx, log.Fields{
+		"target_user_id": user.ID.String(),
+		"group_name":     groupName,
+		"domain_id":      domainID,
+	})
 	return &pbGroups.RemoveUserFromGroupResponse{}, nil
 }

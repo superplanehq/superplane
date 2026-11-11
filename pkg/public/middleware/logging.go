@@ -79,6 +79,9 @@ func handledRequestFields(r *http.Request, status int, duration time.Duration) l
 	if clientIP := ClientIP(r); clientIP != "" {
 		fields["client_ip"] = clientIP
 	}
+	if forwardedIP := untrustedForwardedIP(r); forwardedIP != "" {
+		fields["untrusted_forwarded_ip"] = forwardedIP
+	}
 
 	if traceID := cloudTraceID(r); traceID != "" {
 		fields["trace_id"] = traceID
@@ -150,23 +153,26 @@ func durationMilliseconds(duration time.Duration) float64 {
 	return float64(duration) / float64(time.Millisecond)
 }
 
-// ClientIP uses the same trust order as hosted credit billing.
-// Proxy-set headers win. For X-Forwarded-For, the rightmost address is the
-// one a trusted proxy appended. The leftmost address is caller-supplied.
+// ClientIP records the connection peer. Forwarding headers are caller-controlled
+// unless a deployment verifies the proxy; they are logged separately as hints.
 func ClientIP(r *http.Request) string {
-	for _, header := range []string{"CF-Connecting-IP", "True-Client-IP", "X-Real-IP"} {
-		if ip := strings.TrimSpace(r.Header.Get(header)); ip != "" {
-			return ip
-		}
-	}
-	if ip := rightMostForwardedIP(r.Header.Get("X-Forwarded-For")); ip != "" {
-		return ip
-	}
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err == nil {
 		return host
 	}
 	return r.RemoteAddr
+}
+
+func untrustedForwardedIP(r *http.Request) string {
+	for _, header := range []string{"CF-Connecting-IP", "True-Client-IP", "X-Real-IP"} {
+		if ip := net.ParseIP(strings.TrimSpace(r.Header.Get(header))); ip != nil {
+			return ip.String()
+		}
+	}
+	if ip := net.ParseIP(rightMostForwardedIP(r.Header.Get("X-Forwarded-For"))); ip != nil {
+		return ip.String()
+	}
+	return ""
 }
 
 func rightMostForwardedIP(forwarded string) string {

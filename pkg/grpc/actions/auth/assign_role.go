@@ -36,6 +36,10 @@ func AssignRole(ctx context.Context, orgID, domainType, domainID, roleName, user
 		return nil, grpcerrors.Internal(err, "failed to assign role")
 	}
 
-	logging.AddRequestLogFields(ctx, log.Fields{"target_user_id": user.ID.String(), "role_name": roleName, "domain_id": domainID})
+	logging.AddRequestLogFields(ctx, log.Fields{
+		"target_user_id": user.ID.String(),
+		"role_name":      roleName,
+		"domain_id":      domainID,
+	})
 	return &pb.AssignRoleResponse{}, nil
 }

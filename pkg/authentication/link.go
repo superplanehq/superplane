@@ -53,6 +53,10 @@ func (a *Handler) sessionAccountFromCookie(r *http.Request) (*models.Account, er
 	if err != nil {
 		return nil, err
 	}
+	logging.AddRequestLogFields(r.Context(), log.Fields{
+		"attempted_account_id": account.ID.String(),
+		"object_id":            account.ID.String(),
+	})
 	if account.IsBlocked() {
 		return nil, models.ErrAccountBlocked
 	}
@@ -62,6 +66,7 @@ func (a *Handler) sessionAccountFromCookie(r *http.Request) (*models.Account, er
 		return nil, errors.New("session invalidated by password change")
 	}
 
+	logging.AddRequestLogFields(r.Context(), log.Fields{"account_id": account.ID.String()})
 	return account, nil
 }
 
@@ -117,7 +122,11 @@ func linkStateFromRequest(r *http.Request) string {
 }
 
 func (a *Handler) completeProviderLink(w http.ResponseWriter, r *http.Request, gothUser goth.User, state *linkState) {
-	logging.AddRequestLogFields(r.Context(), log.Fields{"action": "link_sign_in_method", "object": "account", "outcome": "failure"})
+	logging.AddRequestLogFields(r.Context(), log.Fields{
+		"action":  "link_sign_in_method",
+		"object":  "account",
+		"outcome": "failure",
+	})
 	if !strings.EqualFold(gothUser.Provider, state.Provider) {
 		http.Error(w, "Sign-in method does not match", http.StatusBadRequest)
 		return
@@ -144,7 +153,12 @@ func (a *Handler) completeProviderLink(w http.ResponseWriter, r *http.Request, g
 		return
 	}
 
-	logging.AddRequestLogFields(r.Context(), log.Fields{"account_id": sessionAccount.ID.String(), "object_id": sessionAccount.ID.String(), "outcome": "success", "settings_updated": []string{"sign_in_providers"}})
+	logging.AddRequestLogFields(r.Context(), log.Fields{
+		"account_id":       sessionAccount.ID.String(),
+		"object_id":        sessionAccount.ID.String(),
+		"outcome":          "success",
+		"settings_updated": []string{"sign_in_providers"},
+	})
 
 	http.Redirect(w, r, linkSuccessRedirectURL(state.Redirect, gothUser.Provider), http.StatusSeeOther) // #nosec G710 -- parseLinkState validates the internal redirect path.
 }
