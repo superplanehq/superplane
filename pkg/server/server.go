@@ -429,6 +429,7 @@ func buildGRPCServices(
 		JWTSigner:        jwtSigner,
 		Entitlements:     licenseService,
 		Enterprise:       features,
+		License:          licenseService,
 	})
 }
 

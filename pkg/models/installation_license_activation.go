@@ -49,6 +49,20 @@ func (InstallationLicenseActivation) TableName() string {
 	return "installation_license_activations"
 }
 
+// FindLicenseActivationByID returns nil, nil when the row does not exist.
+func FindLicenseActivationByID(tx *gorm.DB, id int64) (*InstallationLicenseActivation, error) {
+	var row InstallationLicenseActivation
+	err := tx.First(&row, id).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return &row, nil
+}
+
 // FindOpenLicenseActivation returns nil, nil when no activation is open.
 func FindOpenLicenseActivation(tx *gorm.DB) (*InstallationLicenseActivation, error) {
 	return takeOpenLicenseActivation(tx, false)

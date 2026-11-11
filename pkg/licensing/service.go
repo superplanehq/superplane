@@ -50,6 +50,11 @@ func (s Status) IsEntitled(feature Feature) bool {
 	return s.State == StateActive && s.License.HasFeature(feature)
 }
 
+// StatusProvider reports the current installation license.
+type StatusProvider interface {
+	Status() Status
+}
+
 // IsDevelopment reports the ephemeral license used by the development server.
 // That license bypasses organization grants and the lifecycle handler.
 func (s Status) IsDevelopment() bool {
@@ -431,15 +436,17 @@ func (s *Service) InstallKeyList(ctx context.Context, raw []byte) error {
 	return nil
 }
 
-// Install verifies a license and stores it. It accepts only a license that is
-// valid now, so an installation never replaces a working license with one that
-// grants nothing.
-func (s *Service) Install(ctx context.Context, raw []byte, installedBy uuid.UUID) (Status, error) {
-	writable := s.writableSource()
-	if writable == nil {
-		return s.Status(), ErrManagedByFile
+// DryRunInstall verifies a license the same way Install does, and does not store it.
+func (s *Service) DryRunInstall(ctx context.Context, raw []byte) (*License, error) {
+	if s.writableSource() == nil {
+		return nil, ErrManagedByFile
 	}
 
+	return s.licenseAcceptedForInstall(ctx, raw)
+}
+
+// licenseAcceptedForInstall is the verification Install and DryRunInstall share.
+func (s *Service) licenseAcceptedForInstall(ctx context.Context, raw []byte) (*License, error) {
 	license, err := s.verifier.Verify(raw)
 	if ReasonOf(err) == ReasonUnknownKey && s.reloadKeys(ctx) {
 		license, err = s.verifier.Verify(raw)
@@ -449,6 +456,34 @@ func (s *Service) Install(ctx context.Context, raw []byte, installedBy uuid.UUID
 		license, err = s.verifier.Verify(raw)
 	}
 
+	if err != nil {
+		return nil, err
+	}
+
+	switch license.ValidityAt(s.now()) {
+	case ValidityExpired:
+		return nil, invalid(ReasonExpired)
+	case ValidityNotYetValid:
+		return nil, invalid(ReasonNotYetValid)
+	}
+
+	if s.licenseRevoked(license.ID) {
+		return nil, invalid(ReasonRevoked)
+	}
+
+	return license, nil
+}
+
+// Install verifies a license and stores it. It accepts only a license that is
+// valid now, so an installation never replaces a working license with one that
+// grants nothing.
+func (s *Service) Install(ctx context.Context, raw []byte, installedBy uuid.UUID) (Status, error) {
+	writable := s.writableSource()
+	if writable == nil {
+		return s.Status(), ErrManagedByFile
+	}
+
+	license, err := s.licenseAcceptedForInstall(ctx, raw)
 	if err != nil {
 		return s.Status(), err
 	}
