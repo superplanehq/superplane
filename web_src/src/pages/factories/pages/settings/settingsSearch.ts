@@ -147,6 +147,16 @@ export const FACTORY_SETTINGS_SEARCH_ENTRIES: FactorySettingsSearchResult[] = [
   // Organization · Integrations (page-level; providers are added dynamically)
   entry("organization", "integrations", "Integrations", undefined, ["connect", "filter integrations", "integration"]),
 
+  // Organization · Model status
+  entry("organization", "model-status", "Model status", undefined, [
+    "availability",
+    "hosted models",
+    "score",
+    "anthropic",
+    "openai",
+    "openrouter",
+  ]),
+
   // Organization · API keys / Secrets / Billing / Spending
   entry("organization", "api-keys", "API keys", undefined, ["create api key", "token", "credentials", "programmatic"]),
   entry("organization", "secrets", "Secrets", undefined, ["create secret", "credentials", "env", "key-value"]),
