@@ -104,7 +104,7 @@ func sendBeacon() {
 
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := client.Do(req)
+	resp, err := client.Do(req) // #nosec G704 -- the request uses the fixed SuperPlane telemetry endpoint.
 	if err != nil {
 		log.WithError(err).Warn("Failed to send beacon")
 		return

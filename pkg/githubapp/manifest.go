@@ -75,11 +75,12 @@ func PublicManifestJSON(baseURL, webhooksBaseURL string) (string, error) {
 			"organization_administration": "read",
 			"members":                     "read",
 		},
-		// member, repository, and create keep the catalog default branch current.
+		// membership, organization, team, and team_add refresh cached push access.
+		// repository and create keep the catalog default branch current.
 		// create covers a new branch. push would deliver every commit.
 		// An app created before these events were listed must subscribe to
 		// them in GitHub. The manifest applies to a new app only.
-		"default_events": []string{"member", "repository", "create"},
+		"default_events": []string{"member", "membership", "organization", "team", "team_add", "repository", "create"},
 		"setup_url":      baseURL + setupPath,
 		"redirect_url":   baseURL + createdPath,
 		"hook_attributes": map[string]any{

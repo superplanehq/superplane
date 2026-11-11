@@ -48,7 +48,7 @@ func setProcessEnv(cmd *exec.Cmd, name, hostPath string) {
 // readTaskResultFile reads and validates the result JSON file written by the task.
 // Returns (result, tooLarge): tooLarge is true when the file exists but exceeds maxBytes.
 func readTaskResultFile(path string, maxBytes int, log *slog.Logger) (json.RawMessage, bool) {
-	b, err := os.ReadFile(path)
+	b, err := os.ReadFile(path) // #nosec G304 -- the path is generated for the current runner task.
 	if err != nil || len(bytes.TrimSpace(b)) == 0 {
 		return nil, false
 	}

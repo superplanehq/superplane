@@ -97,7 +97,7 @@ func runJavaScriptHost(
 	}
 	defer os.RemoveAll(scriptDir)
 
-	cmd := exec.CommandContext(ctx, node, programPath)
+	cmd := exec.CommandContext(ctx, node, programPath) // #nosec G204 -- the runner intentionally executes the selected Node interpreter and generated program.
 	cmd.Dir = workDir
 	prepareTaskProcessGroup(cmd)
 	defer killTaskProcessGroup(cmd)

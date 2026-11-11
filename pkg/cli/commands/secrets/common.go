@@ -32,7 +32,7 @@ func parseSecretInput(path string, stdin io.Reader) (*secretResource, error) {
 			return nil, fmt.Errorf("failed to read from stdin: %w", err)
 		}
 	} else {
-		// #nosec
+		// #nosec G304 -- the CLI user explicitly selects the resource file.
 		data, err = os.ReadFile(path)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read resource file: %w", err)

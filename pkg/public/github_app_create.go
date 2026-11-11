@@ -114,20 +114,20 @@ func (s *Server) redirectAfterGitHubApp(w http.ResponseWriter, r *http.Request, 
 		http.Redirect(w, r, githubAccountConnectURL(returnPath), http.StatusFound)
 		return
 	}
-	http.Redirect(w, r, workspaceSetupURL(returnPath), http.StatusFound)
+	http.Redirect(w, r, workspaceSetupURL(returnPath), http.StatusFound) // #nosec G710 -- workspaceSetupURL accepts only internal paths.
 }
 
 func workspaceSetupURL(returnPath string) string {
-	target, err := url.Parse(returnPath)
-	if err != nil || target.Path == "" || !strings.HasPrefix(target.Path, "/") {
+	target, ok := internalReturnURL(returnPath)
+	if !ok {
 		return "/"
 	}
 	return target.String()
 }
 
 func githubAccountConnectURL(returnPath string) string {
-	target, err := url.Parse(returnPath)
-	if err != nil || target.Path == "" || !strings.HasPrefix(target.Path, "/") {
+	target, ok := internalReturnURL(returnPath)
+	if !ok {
 		target = &url.URL{Path: "/"}
 	}
 	query := target.Query()
@@ -139,4 +139,18 @@ func githubAccountConnectURL(returnPath string) string {
 	values.Set("intent", "connect")
 	values.Set("redirect", target.String())
 	return "/auth/github?" + values.Encode()
+}
+
+func internalReturnURL(raw string) (*url.URL, bool) {
+	if strings.Contains(raw, `\`) {
+		return nil, false
+	}
+	target, err := url.Parse(raw)
+	if err != nil || target.IsAbs() || target.Host != "" || target.User != nil || target.Fragment != "" {
+		return nil, false
+	}
+	if target.Path == "" || !strings.HasPrefix(target.Path, "/") || strings.HasPrefix(target.Path, "//") {
+		return nil, false
+	}
+	return target, true
 }

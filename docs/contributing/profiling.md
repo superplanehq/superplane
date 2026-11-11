@@ -8,20 +8,20 @@ The dev server exposes Go's [`net/http/pprof`](https://pkg.go.dev/net/http/pprof
 
 ## How it is wired
 
-The pprof HTTP server is started in [`pkg/server/server.go`](../../pkg/server/server.go) and is gated by environment variables:
+The pprof HTTP server is started in [`pkg/server/server.go`](../../pkg/server/server.go). It uses a dedicated HTTP server and route mux, separate from application routes. Environment variables control the server:
 
 | Env var | Default (dev) | Purpose |
 | --- | --- | --- |
 | `PPROF_ENABLED` | `yes` | Starts the pprof server only when set to `yes`. |
 | `PPROF_PORT` | `6060` | Port the pprof server listens on. |
 
-In the dev environment these default to on, and the port is published from the `app` container in [`docker-compose.dev.yml`](../../docker-compose.dev.yml). The endpoint is **unauthenticated** and exposes internal runtime details, so it is intentionally off by default in production: the release deployment does not set `PPROF_ENABLED`, so leave it unset there.
+In the dev environment these default to on. [`docker-compose.dev.yml`](../../docker-compose.dev.yml) publishes the port on `127.0.0.1` only. The endpoint is **unauthenticated** and exposes internal runtime details. Do not publish it on a public interface. The release deployment does not set `PPROF_ENABLED`, so profiling stays off by default in production.
 
 When enabled, the server also turns on block and mutex contention sampling (`runtime.SetBlockProfileRate` and `runtime.SetMutexProfileFraction`) so the `/debug/pprof/block` and `/debug/pprof/mutex` profiles are populated.
 
 ## Capturing profiles
 
-Make sure the dev server is running (`make dev.up` then `make dev.server`). The port is published to the host, so you can hit it from either the host or inside the container.
+Make sure the dev server is running (`make dev.up` then `make dev.server`). The port is published to the local host, so you can use it from the host or inside the container.
 
 ### Makefile helpers
 
