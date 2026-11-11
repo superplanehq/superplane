@@ -38,6 +38,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/enterprise"
 	"github.com/superplanehq/superplane/pkg/githubapp"
 	grpc "github.com/superplanehq/superplane/pkg/grpc"
+	factoryactions "github.com/superplanehq/superplane/pkg/grpc/actions/factories"
 	githubintegration "github.com/superplanehq/superplane/pkg/integrations/github"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/licensing"
@@ -830,6 +831,11 @@ func Start() {
 
 	if err != nil {
 		panic(fmt.Sprintf("failed to create registry: %v", err))
+	}
+	if err := factoryactions.UpgradeGitHubIntakeAuthorGates(context.Background(), factoryactions.IntakeDependencies{
+		Registry: registry, Encryptor: encryptorInstance, AuthService: authService, WebhookBaseURL: webhooksBaseURL,
+	}); err != nil {
+		log.Fatalf("failed to upgrade GitHub intake author gates: %v", err)
 	}
 	if os.Getenv("START_CONSUMERS") == "yes" && os.Getenv("START_REGULAR_WORKERS") != "no" {
 		rabbitMQURL, err := config.RabbitMQURL()
