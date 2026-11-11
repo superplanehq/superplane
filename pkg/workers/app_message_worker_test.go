@@ -1,19 +1,36 @@
 package workers
 
 import (
+	"errors"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/config"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/triggers/messages"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
-
-	_ "github.com/superplanehq/superplane/pkg/triggers/messages"
 )
 
-func Test__AppMessageWorker_LockAndProcessMessage__deliversBroadcast(t *testing.T) {
+type failingBroadcastTrigger struct {
+	messages.OnBroadcast
+	deliveries int
+	err        error
+}
+
+func (t *failingBroadcastTrigger) OnAppMessage(ctx core.AppMessageContext) error {
+	t.deliveries++
+	if t.deliveries == 2 {
+		return t.err
+	}
+	return t.OnBroadcast.OnAppMessage(ctx)
+}
+
+func Test__AppMessageWorker_LockAndProcessMessage__retriesBroadcastAtomically(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
@@ -49,6 +66,15 @@ func Test__AppMessageWorker_LockAndProcessMessage__deliversBroadcast(t *testing.
 					"app": sourceCanvas.ID.String(),
 				}),
 			},
+			{
+				NodeID: "other-on-broadcast",
+				Name:   "Other On Broadcast",
+				Type:   models.NodeTypeTrigger,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "onBroadcast"}}),
+				Configuration: datatypes.NewJSONType(map[string]any{
+					"app": sourceCanvas.ID.String(),
+				}),
+			},
 		},
 		nil,
 	)
@@ -58,21 +84,41 @@ func Test__AppMessageWorker_LockAndProcessMessage__deliversBroadcast(t *testing.
 		TargetCanvasID: targetCanvas.ID,
 		TargetNodeID:   targetNodes[0].NodeID,
 	}).Error)
+	require.NoError(t, database.Conn().Create(&models.CanvasSubscription{
+		SourceCanvasID: sourceCanvas.ID,
+		TargetCanvasID: targetCanvas.ID,
+		TargetNodeID:   targetNodes[1].NodeID,
+	}).Error)
 
 	payload := map[string]any{"message": "hello"}
 	require.NoError(t, models.CreateAppMessage(database.Conn(), sourceCanvas.ID, sourceNodes[0].NodeID, payload))
 
-	messages, err := models.ListAppMessages(database.Conn())
+	pending, err := models.ListAppMessages(database.Conn())
 	require.NoError(t, err)
-	require.Len(t, messages, 1)
+	require.Len(t, pending, 1)
 
-	require.NoError(t, worker.LockAndProcessMessage(messages[0]))
+	deliveryError := errors.New("subscriber unavailable")
+	trigger := &failingBroadcastTrigger{err: deliveryError}
+	r.Registry.Triggers["onBroadcast"] = trigger
+	assert.ErrorIs(t, worker.LockAndProcessMessage(pending[0]), deliveryError)
+	assert.Equal(t, 2, trigger.deliveries, "the failure must follow a successful subscriber insert")
+	remainingMessages, err := models.ListAppMessages(database.Conn())
+	require.NoError(t, err)
+	assert.Len(t, remainingMessages, 1)
+	support.VerifyCanvasEventsCount(t, targetCanvas.ID, 0)
+
+	r.Registry.Triggers["onBroadcast"] = &messages.OnBroadcast{}
+	require.NoError(t, worker.LockAndProcessMessage(pending[0]))
+	// A stale poll result can process the consumed message again.
+	require.NoError(t, worker.LockAndProcessMessage(pending[0]))
 
 	var remaining int64
 	require.NoError(t, database.Conn().Model(&models.AppMessage{}).Count(&remaining).Error)
 	assert.Equal(t, int64(0), remaining)
 
-	support.VerifyCanvasEventsCount(t, targetCanvas.ID, 1)
+	for _, node := range targetNodes {
+		support.VerifyCanvasNodeEventsCount(t, targetCanvas.ID, node.NodeID, 1)
+	}
 
 	var event models.CanvasEvent
 	err = database.Conn().
@@ -97,6 +143,61 @@ func Test__AppMessageWorker_LockAndProcessMessage__deliversBroadcast(t *testing.
 		"id":   sourceNodes[0].NodeID,
 		"name": sourceNodes[0].Name,
 	}, broadcastPayload["node"])
+}
+
+func Test__AppMessageWorker_LockAndProcessMessage__discardsOversizedBroadcast(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	worker := NewAppMessageWorker(r.Registry)
+	sourceCanvas, sourceNodes := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{
+		{
+			NodeID: "broadcast-message",
+			Name:   "Broadcast Message",
+			Type:   models.NodeTypeComponent,
+			Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "broadcastMessage"}}),
+		},
+	}, nil)
+	targetCanvas, targetNodes := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{
+		{
+			NodeID: "on-broadcast",
+			Name:   "On Broadcast",
+			Type:   models.NodeTypeTrigger,
+			Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "onBroadcast"}}),
+			Configuration: datatypes.NewJSONType(map[string]any{
+				"app": sourceCanvas.ID.String(),
+			}),
+		},
+	}, nil)
+	require.NoError(t, database.Conn().Create(&models.CanvasSubscription{
+		SourceCanvasID: sourceCanvas.ID,
+		TargetCanvasID: targetCanvas.ID,
+		TargetNodeID:   targetNodes[0].NodeID,
+	}).Error)
+
+	// The payload fits on its own, but the broadcast envelope exceeds the limit.
+	payload := strings.Repeat("a", config.MaxPayloadSize()-2)
+	require.NoError(t, models.CreateAppMessage(database.Conn(), sourceCanvas.ID, sourceNodes[0].NodeID, payload))
+	pending, err := models.ListAppMessages(database.Conn())
+	require.NoError(t, err)
+	require.Len(t, pending, 1)
+	require.NoError(t, worker.LockAndProcessMessage(pending[0]))
+
+	remaining, err := models.ListAppMessages(database.Conn())
+	require.NoError(t, err)
+	assert.Empty(t, remaining)
+	support.VerifyCanvasEventsCount(t, targetCanvas.ID, 0)
+
+	require.NoError(t, models.CreateAppMessage(database.Conn(), sourceCanvas.ID, sourceNodes[0].NodeID, "hello"))
+	pending, err = models.ListAppMessages(database.Conn())
+	require.NoError(t, err)
+	require.Len(t, pending, 1)
+	require.NoError(t, worker.LockAndProcessMessage(pending[0]))
+
+	remaining, err = models.ListAppMessages(database.Conn())
+	require.NoError(t, err)
+	assert.Empty(t, remaining)
+	support.VerifyCanvasEventsCount(t, targetCanvas.ID, 1)
 }
 
 func Test__AppMessageWorker_LockAndProcessMessage__deletesMessageWithoutSubscribers(t *testing.T) {

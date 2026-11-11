@@ -18,14 +18,22 @@ type Client interface {
 	Write(context.Context, string, int64, string) error
 }
 
+type Status string
+
+const (
+	StatusPublished Status = "published"
+	StatusUnchanged Status = "unchanged"
+	StatusSkipped   Status = "skipped"
+)
+
 type Outcome struct {
-	Status string `json:"status"`
+	Status Status `json:"status"`
 	Reason string `json:"reason,omitempty"`
 }
 
-func Skipped(reason string) Outcome { return Outcome{Status: "skipped", Reason: reason} }
+func Skipped(reason string) Outcome { return Outcome{Status: StatusSkipped, Reason: reason} }
 
-// Publish rechecks eligibility after the read so cancellation and newer runs can stop a pending write.
+// Publish rechecks eligibility after the read so excluded publication cannot complete or write.
 func Publish(ctx context.Context, client Client, config Configuration, eligible func() (bool, error)) (Outcome, error) {
 	if err := config.Validate(); err != nil {
 		return Outcome{}, err
@@ -61,20 +69,20 @@ func Publish(ctx context.Context, client Client, config Configuration, eligible 
 	if err != nil {
 		return Skipped("Description contains invalid section markers."), nil
 	}
-	if body == latest.Body {
-		return Skipped("Section is already current."), nil
-	}
 	active, err = canPublish()
 	if err != nil {
 		return Outcome{}, err
 	}
 	if !active {
-		return Skipped("Publication was disabled, cancelled, or superseded before writing."), nil
+		return Skipped("Publication was disabled, cancelled, or superseded."), nil
+	}
+	if body == latest.Body {
+		return Outcome{Status: StatusUnchanged}, nil
 	}
 	if err := client.Write(ctx, config.Repository, number, body); err != nil {
 		return Outcome{}, err
 	}
-	return Outcome{Status: "published"}, nil
+	return Outcome{Status: StatusPublished}, nil
 }
 
 func HandleHook(ctx core.ActionHookContext, client Client) error {
