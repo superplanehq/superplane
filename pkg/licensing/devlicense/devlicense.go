@@ -17,8 +17,6 @@ import (
 // development compose file sets it.
 const EnterpriseEnv = "SUPERPLANE_LICENSE_DEV_ENTERPRISE"
 
-const keyID = "development-ephemeral"
-
 func Enabled() bool {
 	return os.Getenv(EnterpriseEnv) == "true"
 }
@@ -35,7 +33,7 @@ func Wrap(source licensing.Source) (*licensing.KeySet, licensing.Source) {
 		return nil, source
 	}
 
-	issuer := licensingtest.NewIssuer(keyID)
+	issuer := licensingtest.NewIssuer(licensing.DevelopmentKeyID)
 	log.Warn("Licensing: development build grants every Enterprise feature when no license is installed. Do not use this build in production.")
 	return licensingtest.KeySet(issuer), &developmentSource{
 		WritableSource: writable,

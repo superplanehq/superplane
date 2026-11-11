@@ -50,6 +50,45 @@ func (s Status) IsEntitled(feature Feature) bool {
 	return s.State == StateActive && s.License.HasFeature(feature)
 }
 
+// IsDevelopment reports the ephemeral license used by the development server.
+// That license bypasses organization grants and the lifecycle handler.
+func (s Status) IsDevelopment() bool {
+	return s.State == StateActive && s.License != nil && s.License.KeyID == DevelopmentKeyID
+}
+
+// GrantLookup answers whether an organization has a grant for a feature.
+type GrantLookup interface {
+	HasGrant(ctx context.Context, orgID uuid.UUID, feature Feature) (bool, error)
+}
+
+// LifecycleHandler reacts to the status after each successful license load.
+type LifecycleHandler interface {
+	HandleStatus(ctx context.Context, status Status) error
+}
+
+// LifecycleFailure is a lifecycle handler error with the fields the service logs.
+type LifecycleFailure struct {
+	Event     string
+	LicenseID uuid.UUID
+	Err       error
+}
+
+func (e *LifecycleFailure) Error() string {
+	if e == nil || e.Err == nil {
+		return "enterprise license lifecycle failed"
+	}
+
+	return e.Err.Error()
+}
+
+func (e *LifecycleFailure) Unwrap() error {
+	if e == nil {
+		return nil
+	}
+
+	return e.Err
+}
+
 // Entitlements answers whether an Enterprise feature is available now.
 type Entitlements interface {
 	IsEntitled(feature Feature) bool
@@ -99,6 +138,10 @@ type Service struct {
 	source      Source
 	keySync     *KeySync
 	revocations *RevocationSync
+	// grantLookup is stored for organization checks. This change does not
+	// read it. Access still follows the installation license.
+	grantLookup GrantLookup
+	lifecycle   LifecycleHandler
 	now         func() time.Time
 	current     atomic.Pointer[snapshot]
 	refreshMu   sync.Mutex
@@ -117,6 +160,20 @@ func WithKeySync(keySync *KeySync) ServiceOption {
 func WithRevocationSync(revocations *RevocationSync) ServiceOption {
 	return func(s *Service) {
 		s.revocations = revocations
+	}
+}
+
+// WithGrantLookup stores organization grant checks.
+func WithGrantLookup(grants GrantLookup) ServiceOption {
+	return func(s *Service) {
+		s.grantLookup = grants
+	}
+}
+
+// WithLifecycleHandler runs grant maintenance after each successful load.
+func WithLifecycleHandler(handler LifecycleHandler) ServiceOption {
+	return func(s *Service) {
+		s.lifecycle = handler
 	}
 }
 
@@ -162,7 +219,11 @@ func (s *Service) Start(ctx context.Context) {
 	}
 
 	if s.revocations != nil {
-		s.revocations.Start(ctx)
+		s.revocations.Start(ctx, func() {
+			if err := s.Refresh(ctx); err != nil {
+				log.WithError(err).Warn("Licensing: license refresh after a revocation update failed")
+			}
+		})
 	}
 
 	go func() {
@@ -192,11 +253,42 @@ func (s *Service) Refresh(ctx context.Context) error {
 		return err
 	}
 
-	if s.current.Load().reason != ReasonUnknownKey || !s.syncKeysOnDemand(ctx) {
-		return nil
+	if s.current.Load().reason == ReasonUnknownKey && s.syncKeysOnDemand(ctx) {
+		if err := s.reloadLicense(ctx); err != nil {
+			return err
+		}
 	}
 
-	return s.reloadLicense(ctx)
+	s.notifyLifecycle(ctx, s.Status())
+	return nil
+}
+
+// notifyLifecycle runs after the license lock is released. A handler error
+// is logged and does not fail the load. The next refresh retries it.
+func (s *Service) notifyLifecycle(ctx context.Context, status Status) {
+	if s.lifecycle == nil || status.IsDevelopment() {
+		return
+	}
+
+	err := s.lifecycle.HandleStatus(ctx, status)
+	if err == nil {
+		return
+	}
+
+	fields := log.Fields{"event": "lifecycle", "error": err}
+	var failure *LifecycleFailure
+	if errors.As(err, &failure) {
+		if failure.Event != "" {
+			fields["event"] = failure.Event
+		}
+		if failure.LicenseID != uuid.Nil {
+			fields["license_id"] = failure.LicenseID.String()
+		}
+	} else if status.License != nil {
+		fields["license_id"] = status.License.ID.String()
+	}
+
+	log.WithFields(fields).Warn("Licensing: enterprise license lifecycle failed")
 }
 
 // reloadKeys trusts a newer key list that another replica saved. It reports
@@ -362,21 +454,28 @@ func (s *Service) Install(ctx context.Context, raw []byte, installedBy uuid.UUID
 	}
 
 	s.refreshMu.Lock()
-	defer s.refreshMu.Unlock()
 
 	switch license.ValidityAt(s.now()) {
 	case ValidityExpired:
-		return s.Status(), invalid(ReasonExpired)
+		status := s.Status()
+		s.refreshMu.Unlock()
+		return status, invalid(ReasonExpired)
 	case ValidityNotYetValid:
-		return s.Status(), invalid(ReasonNotYetValid)
+		status := s.Status()
+		s.refreshMu.Unlock()
+		return status, invalid(ReasonNotYetValid)
 	}
 
 	if s.licenseRevoked(license.ID) {
-		return s.Status(), invalid(ReasonRevoked)
+		status := s.Status()
+		s.refreshMu.Unlock()
+		return status, invalid(ReasonRevoked)
 	}
 
 	if err := writable.Write(ctx, bytes.TrimSpace(raw), installedBy); err != nil {
-		return s.Status(), err
+		status := s.Status()
+		s.refreshMu.Unlock()
+		return status, err
 	}
 
 	log.WithFields(log.Fields{
@@ -385,11 +484,15 @@ func (s *Service) Install(ctx context.Context, raw []byte, installedBy uuid.UUID
 		"installed_by": installedBy.String(),
 	}).Info("Licensing: license installed")
 
-	if err := s.refreshAfterChange(ctx); err != nil {
-		return s.Status(), err
+	reloadErr := s.refreshAfterChange(ctx)
+	status := s.Status()
+	s.refreshMu.Unlock()
+	if reloadErr != nil {
+		return status, reloadErr
 	}
 
-	return s.Status(), nil
+	s.notifyLifecycle(ctx, status)
+	return status, nil
 }
 
 func (s *Service) Remove(ctx context.Context, removedBy uuid.UUID) (Status, error) {
@@ -399,16 +502,23 @@ func (s *Service) Remove(ctx context.Context, removedBy uuid.UUID) (Status, erro
 	}
 
 	s.refreshMu.Lock()
-	defer s.refreshMu.Unlock()
 
 	if err := writable.Clear(ctx); err != nil {
-		return s.Status(), err
+		status := s.Status()
+		s.refreshMu.Unlock()
+		return status, err
 	}
 
 	log.WithField("removed_by", removedBy.String()).Info("Licensing: license removed")
 
-	_ = s.refreshAfterChange(ctx)
-	return s.Status(), nil
+	reloadErr := s.refreshAfterChange(ctx)
+	status := s.Status()
+	s.refreshMu.Unlock()
+	if reloadErr == nil {
+		s.notifyLifecycle(ctx, status)
+	}
+
+	return status, nil
 }
 
 // refreshAfterChange reads the shared state after a change. When the read

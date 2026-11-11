@@ -73,6 +73,7 @@ func TestWrapGrantsEveryFeatureWithoutInstalledLicense(t *testing.T) {
 
 	status := service.Status()
 	assert.Equal(t, licensing.EditionEnterprise, status.Edition)
+	assert.True(t, status.IsDevelopment())
 	assert.True(t, status.Writable, "administrators can still install a license")
 	for _, feature := range licensing.RecognizedFeatures() {
 		assert.True(t, service.IsEntitled(feature), feature)
@@ -87,6 +88,7 @@ func TestWrapPrefersInstalledLicense(t *testing.T) {
 
 	assert.True(t, service.IsEntitled(licensing.FeatureGroups))
 	assert.False(t, service.IsEntitled(licensing.FeatureCustomRoles))
+	assert.False(t, service.Status().IsDevelopment())
 }
 
 func TestWrapKeepsLicenseFileAuthoritative(t *testing.T) {
