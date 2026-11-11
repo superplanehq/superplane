@@ -65,6 +65,9 @@ func (c *OnBroadcast) ExampleData() map[string]any {
 				"id":   "123",
 				"name": "Node Name",
 			},
+			"run": map[string]any{
+				"id": "123",
+			},
 			"payload": map[string]any{
 				"message": "Hello, World!",
 			},

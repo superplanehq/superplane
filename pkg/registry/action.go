@@ -87,6 +87,28 @@ func (s *PanicableAction) QueueItemProcessor() core.QueueItemProcessor {
 	return &panicableQueueItemProcessor{underlying: processor}
 }
 
+// BackgroundHookHandler preserves the optional contract through registration.
+func (s *PanicableAction) BackgroundHookHandler() core.BackgroundHookHandler {
+	handler, ok := s.underlying.(core.BackgroundHookHandler)
+	if !ok {
+		return nil
+	}
+	return &panicableBackgroundHookHandler{underlying: handler}
+}
+
+type panicableBackgroundHookHandler struct {
+	underlying core.BackgroundHookHandler
+}
+
+func (p *panicableBackgroundHookHandler) HandleBackgroundHook(ctx core.BackgroundHookContext) (result core.BackgroundHookResult, err error) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			err = fmt.Errorf("action panicked in HandleBackgroundHook(%s): %v", ctx.Name, recovered)
+		}
+	}()
+	return p.underlying.HandleBackgroundHook(ctx)
+}
+
 type panicableQueueItemProcessor struct {
 	underlying core.QueueItemProcessor
 }

@@ -9,12 +9,58 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
 )
+
+func TestCommitCanvasStagingGatesRawHumanReviewYAML(t *testing.T) {
+	r, ctx, canvas, version := setupLiveCanvasStaging(t)
+	db := database.DB(ctx)
+	const rawYAML = `apiVersion: v1
+kind: Canvas
+metadata:
+  name: Request review
+spec:
+  nodes:
+    - id: on-human-review
+      name: On Request Review
+      type: TYPE_TRIGGER
+      component: onRun
+      configuration:
+        enabled: false
+      metadata:
+        factoryTemplate:
+          id: human-review
+          version: 1
+          provider: github
+  edges: []
+`
+	_, err := PutCanvasStaging(ctx, db, canvas, []*pb.CanvasRepositoryFileOperation{
+		{Path: CanvasYAMLRepositoryPath, Content: []byte(rawYAML)},
+	})
+	require.NoError(t, err)
+
+	_, err = CommitCanvasStaging(ctx, db, r.Encryptor, r.Registry, canvas, "Add Request review", "http://localhost:8000", r.AuthService)
+	code, message, ok := grpcerrors.HandlerStatus(err)
+	require.True(t, ok)
+	require.Equal(t, codes.FailedPrecondition, code)
+	require.Equal(t, "Request review is not enabled for this organization.", message)
+	unchanged, err := models.FindLiveCanvasVersionInTransaction(db, canvas.ID)
+	require.NoError(t, err)
+	require.Equal(t, version.ID, unchanged.ID)
+
+	require.NoError(t, models.EnableExperimentalFeatureInTransaction(db, r.Organization.ID, features.FeatureFactoryHumanReview))
+	_, err = CommitCanvasStaging(ctx, db, r.Encryptor, r.Registry, canvas, "Add Request review", "http://localhost:8000", r.AuthService)
+	require.NoError(t, err)
+	published, err := models.FindLiveCanvasVersionInTransaction(db, canvas.ID)
+	require.NoError(t, err)
+	require.NotEqual(t, version.ID, published.ID)
+	require.Equal(t, models.FactoryAppTemplateHumanReviewID, models.FactoryAppTemplateID(published.Nodes))
+}
 
 func Test__CommitCanvasStaging__AppliesStagedCanvas(t *testing.T) {
 	r, ctx, canvas, version := setupLiveCanvasStaging(t)

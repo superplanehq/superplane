@@ -95,6 +95,9 @@ func (e *NodeRequestExecutor) execute(
 	if request.Type == models.NodeRequestTypeVisualEvidenceCapture {
 		return e.processVisualEvidenceCapture(request)
 	}
+	if handled, err := e.executeBackgroundHook(request, lockRequest); handled || err != nil {
+		return err
+	}
 
 	logger := e.logger.WithFields(log.Fields{"request": request.ID})
 

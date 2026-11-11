@@ -211,6 +211,7 @@ func startWorkers(
 	}
 
 	if os.Getenv("START_NODE_REQUEST_WORKER") == "yes" {
+
 		log.Println("Starting Node Request Worker")
 
 		w := workers.NewNodeRequestWorker(nodeRequestExecutor)

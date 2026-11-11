@@ -5,9 +5,15 @@ import type { FactoriesFactoryPullRequest } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useFactoryPullRequestMergeability } from "@/hooks/useFactoryPullRequestMerge";
-import { FEATURE_FACTORY_MULTI_REPO_TASKS, FEATURE_FACTORY_PULL_REQUEST_MERGE } from "@/lib/experimentalFeatures";
+import {
+  FEATURE_FACTORY_MULTI_REPO_TASKS,
+  FEATURE_FACTORY_PULL_REQUEST_MERGE,
+  FEATURE_FACTORY_STEP_ACTIONS,
+} from "@/lib/experimentalFeatures";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 
+import { HumanReviewState } from "../HumanReviewState";
+import { reviewTargetsPreviousRevision } from "../../lib/humanReview";
 import { PullRequestConfidence } from "./redesign/consoleCheckRows";
 import { ContinueFixesButton, MultiPullRequestReviewNote } from "./SplitRunMultiPullRequestReview";
 import { SplitRunPullRequestMergeAction } from "./SplitRunPullRequestMergeAction";
@@ -66,11 +72,19 @@ export function SplitRunPullRequestReviewNote({
   children?: ReactNode;
 }) {
   const copy = usePullRequestReviewCopy(organizationId, factoryId, trackedPullRequest);
+  const { has } = useExperimentalFeature(organizationId);
+  const humanReviewInActions =
+    trackedPullRequest && has(FEATURE_FACTORY_STEP_ACTIONS) && hasHumanReviewActionRun(trackedPullRequest);
+  const humanReview =
+    trackedPullRequest?.humanReview && !humanReviewInActions ? (
+      <HumanReviewState pullRequest={trackedPullRequest} />
+    ) : null;
   if (ctaOnly) {
     return (
       <div className="flex flex-col gap-3" data-testid="split-run-attention-note" data-variant="pull-request">
         <h3 className="text-[14px] font-semibold leading-5 text-foreground">{copy.headline}</h3>
         {children}
+        {humanReview}
         <ReviewCallToAction
           ctaLabel={ctaLabel}
           pullRequest={pullRequest}
@@ -99,6 +113,7 @@ export function SplitRunPullRequestReviewNote({
         stacked={stacked}
         continueFixes={continueFixes}
         actionBusy={actionBusy}
+        humanReview={humanReview}
       />
     );
   }
@@ -116,6 +131,7 @@ export function SplitRunPullRequestReviewNote({
 
         <div className="min-w-0 flex-1">
           <h3 className="text-[18px] font-semibold leading-6 tracking-[-0.02em] text-foreground">{copy.headline}</h3>
+          {humanReview ? <div className="mt-3">{humanReview}</div> : null}
           <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
             <Button
               asChild
@@ -142,6 +158,13 @@ export function SplitRunPullRequestReviewNote({
       </div>
     </div>
   );
+}
+
+function hasHumanReviewActionRun(pullRequest: FactoriesFactoryPullRequest): boolean {
+  const runId = pullRequest.humanReview?.runId;
+  if (!runId || reviewTargetsPreviousRevision(pullRequest)) return false;
+  const activities = pullRequest.activities?.length ? pullRequest.activities : (pullRequest.runs ?? []);
+  return activities.some(({ run }) => run?.id === runId && Boolean(run.canvasId));
 }
 
 /**
@@ -181,6 +204,7 @@ function CompactPullRequestReviewNote({
   stacked,
   continueFixes,
   actionBusy,
+  humanReview,
 }: {
   ctaLabel: string;
   pullRequest: PullRequestReviewTarget;
@@ -193,6 +217,7 @@ function CompactPullRequestReviewNote({
   stacked: boolean;
   continueFixes?: () => void;
   actionBusy: boolean;
+  humanReview: ReactNode;
 }) {
   return (
     <div
@@ -207,6 +232,7 @@ function CompactPullRequestReviewNote({
       <div className="min-w-0">
         <h3 className="text-[14px] font-semibold leading-5 text-foreground">{copy.headline}</h3>
         <p className="mt-1 text-[12px] leading-4 text-foreground/70">{copy.closing}</p>
+        {humanReview ? <div className="mt-3">{humanReview}</div> : null}
         <PullRequestConfidence repository={trackedPullRequest?.repository} className="mt-3" />
         <div className="mt-3">
           <ReviewCallToAction

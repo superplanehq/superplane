@@ -19,6 +19,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import { useLocation } from "react-router";
 
 import { AgentRunnerSettings } from "./AgentRunnerSettings";
+import { HumanReviewPolicySettingsHost } from "./HumanReviewPolicySettingsHost";
 import { INTAKE_SETTINGS_COPY } from "./intakeSourceSettingsModel";
 import type { NodeConfigurationUpdate } from "./nodeConfigurationCanvas";
 
@@ -129,7 +130,15 @@ export function NodeConfigPanel({
         </header>
         <div className="flex min-h-0 flex-1 flex-col">
           {body ??
-            (catalog.loading ? (
+            (isHumanReviewPolicyNode(node) ? (
+              <HumanReviewPolicySettingsHost
+                key={JSON.stringify(node.configuration)}
+                node={node}
+                organizationId={organizationId}
+                factoryId={factoryId}
+                onSave={onSave}
+              />
+            ) : catalog.loading ? (
               <p className="workspace-body-text px-10 py-6 text-muted-foreground">{NODE_CONFIG_COPY.loading}</p>
             ) : isAgentHarnessComponent(node.component) ? (
               <AgentRunnerSettings
@@ -188,6 +197,14 @@ export function NodeConfigPanel({
       ) : null}
     </>
   );
+}
+
+function isHumanReviewPolicyNode(node: SuperplaneComponentsNode) {
+  if (node.component === "prepareHumanReview") {
+    return true;
+  }
+  // Existing installations keep their policy on On Run until admin reset.
+  return node.id === "on-human-review" && "enabled" in (node.configuration ?? {});
 }
 
 function useNodeCatalog(node: SuperplaneComponentsNode, organizationId?: string) {

@@ -117,6 +117,51 @@ func Test__DeleteExpiredCompletedNodeRequests(t *testing.T) {
 	assert.Equal(t, int64(1), pendingCount)
 }
 
+func Test__CanvasNodeRequest_LeaseFencesExpiredOwner(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	db := database.DB(t.Context())
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{{
+		NodeID: "schedule", Type: models.NodeTypeTrigger,
+		Ref: datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "schedule"}}),
+	}}, nil)
+	request := createCanvasNodeRequest(t, canvas.ID, "schedule", models.NodeExecutionRequestStatePending, time.Now().Add(-time.Minute))
+	claim := func() *models.CanvasNodeRequest {
+		var claimed *models.CanvasNodeRequest
+		require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+			var err error
+			claimed, err = models.LockNodeRequestNow(tx, request.ID)
+			if err != nil {
+				return err
+			}
+			return claimed.ClaimLease(tx, time.Minute)
+		}))
+		return claimed
+	}
+	first := claim()
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		_, err := models.LockNodeRequestNow(tx, request.ID)
+		assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
+		return nil
+	}))
+	require.NoError(t, db.Model(request).Update("lease_expires_at", time.Now().Add(-time.Second)).Error)
+	second := claim()
+	assert.NotEqual(t, first.LeaseID, second.LeaseID)
+	completed, err := first.CompleteLease(db)
+	require.NoError(t, err)
+	assert.False(t, completed)
+	rescheduled, err := first.RescheduleLease(db, time.Now().Add(time.Hour))
+	require.NoError(t, err)
+	assert.False(t, rescheduled)
+	completed, err = second.CompleteLease(db)
+	require.NoError(t, err)
+	assert.True(t, completed)
+	stored, err := models.FindCanvasNodeRequest(db, request.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.NodeExecutionRequestStateCompleted, stored.State)
+	assert.Nil(t, stored.LeaseID)
+}
+
 func createCanvasNodeRequest(t *testing.T, workflowID uuid.UUID, nodeID, state string, runAt time.Time) *models.CanvasNodeRequest {
 	t.Helper()
 

@@ -176,6 +176,41 @@ func TestBodySectionActionRecoversInterruptedAttempt(t *testing.T) {
 	assert.Equal(t, models.CanvasRunResultFailed, result)
 }
 
+func TestBodySectionActionRetriesDuringHumanReviewPublication(t *testing.T) {
+	f := newPublicationFixture(t)
+	humanReview, _ := support.CreateCanvas(t, f.workspace.OrganizationID, *f.order.CreatedByID, []models.CanvasNode{{
+		NodeID: models.HumanReviewTriggerNodeID, Type: models.NodeTypeTrigger,
+		Ref:           datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "onRun"}}),
+		Configuration: datatypes.NewJSONType(map[string]any{"enabled": false}),
+		Metadata:      datatypes.NewJSONType(models.FactoryAppTemplateMetadata(models.FactoryAppTemplateHumanReviewID, 1)),
+	}}, nil)
+	require.NoError(t, f.db.Model(humanReview).Update("factory_id", f.workspace.ID).Error)
+	execution, request := f.arbitraryPublicationRequest(t)
+	const description = "User description.\n\n<!-- superplane:human-review:start -->\nHuman review is required.\n<!-- superplane:human-review:end -->"
+	host := &contexts.HTTPContext{Responses: []*http.Response{descriptionResponse(t, models.ProviderGitHub, description), publicationHTTPResponse(200, `{}`)}}
+	installPublicationGitHub(t, host)
+	claim, err := f.pr.ClaimHumanReviewPublication(f.db, time.Minute)
+	require.NoError(t, err)
+	require.NotEqual(t, uuid.Nil, claim)
+	_, err = ProcessBodySectionPublicationRequest(t.Context(), IntakeDependencies{}, request.ID, models.LockNodeRequestNow)
+	require.NoError(t, err)
+	require.Empty(t, host.Requests, "a competing writer must not read or replace the description")
+	require.NoError(t, f.db.First(execution, "id = ?", execution.ID).Error)
+	require.Equal(t, "retrying", execution.Metadata.Data()["status"])
+	var retry models.CanvasNodeRequest
+	require.NoError(t, f.db.Where("execution_id = ? AND state = ?", execution.ID, models.NodeExecutionRequestStatePending).First(&retry).Error)
+	require.NoError(t, f.pr.ReleaseHumanReviewPublication(f.db, claim))
+	_, err = ProcessBodySectionPublicationRequest(t.Context(), IntakeDependencies{}, retry.ID, models.LockNodeRequestNow)
+	require.NoError(t, err)
+	require.Len(t, host.Requests, 2)
+	body, err := io.ReadAll(host.Requests[1].Body)
+	require.NoError(t, err)
+	var update map[string]string
+	require.NoError(t, json.Unmarshal(body, &update))
+	assert.Contains(t, update["body"], description)
+	assert.Contains(t, update["body"], "<!-- superplane:merge-confidence:start -->")
+}
+
 func TestBodySectionActionSkipsWriteAfterCancellationDuringDescriptionRead(t *testing.T) {
 	cancellations := map[string]func(t *testing.T, f publicationFixture, execution *models.CanvasNodeExecution){
 		"run": func(t *testing.T, f publicationFixture, _ *models.CanvasNodeExecution) {

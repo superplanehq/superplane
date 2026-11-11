@@ -154,7 +154,7 @@ func (w *AppMessageWorker) deliverBroadcast(tx *gorm.DB, canvas *models.Canvas, 
 			)
 
 			if err := models.DeleteCanvasSubscriptionsForNode(tx, sub.TargetCanvasID, sub.TargetNodeID); err != nil {
-				w.logger.Errorf("delete stale canvas subscription: %v", err)
+				return fmt.Errorf("delete stale canvas subscription: %w", err)
 			}
 
 			continue
@@ -169,8 +169,8 @@ func (w *AppMessageWorker) deliverBroadcast(tx *gorm.DB, canvas *models.Canvas, 
 			continue
 		}
 
-		if err := w.sendMessageToNode(tx, canvas, sourceNode, node, payload, onNewEvents); err != nil {
-			w.logger.Errorf("send broadcast to node: %v", err)
+		if err := w.sendMessageToNode(tx, canvas, sourceNode, node, appMessage, payload, onNewEvents); err != nil {
+			return fmt.Errorf("send broadcast to node %s on canvas %s: %w", node.NodeID, node.WorkflowID, err)
 		}
 	}
 
@@ -204,7 +204,7 @@ func (w *AppMessageWorker) findTargetNodes(tx *gorm.DB, subs []models.CanvasSubs
 	return nodesByKey, nil
 }
 
-func (w *AppMessageWorker) sendMessageToNode(tx *gorm.DB, sourceCanvas *models.Canvas, sourceNode *models.CanvasNode, targetNode *models.CanvasNode, payload any, onNewEvents func([]models.CanvasEvent)) error {
+func (w *AppMessageWorker) sendMessageToNode(tx *gorm.DB, sourceCanvas *models.Canvas, sourceNode *models.CanvasNode, targetNode *models.CanvasNode, appMessage *models.AppMessage, payload any, onNewEvents func([]models.CanvasEvent)) error {
 	ref := targetNode.Ref.Data()
 	if targetNode.Type != models.NodeTypeTrigger || ref.Trigger == nil {
 		return nil
@@ -226,6 +226,9 @@ func (w *AppMessageWorker) sendMessageToNode(tx *gorm.DB, sourceCanvas *models.C
 			"id":   sourceNode.NodeID,
 			"name": sourceNode.Name,
 		},
+	}
+	if appMessage.SourceRunID != nil {
+		message["run"] = map[string]any{"id": appMessage.SourceRunID.String()}
 	}
 
 	appTrigger, ok := trigger.(core.AppTrigger)

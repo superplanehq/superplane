@@ -145,6 +145,7 @@ type factoryAutomationSettings struct {
 	draftPullRequests *bool
 	agentSteps        map[string]any
 	bodySections      map[string]map[string]any
+	humanReviewPolicy map[string]any
 }
 
 func factoryAutomationSettingsFromVersion(version *models.CanvasVersion) *factoryAutomationSettings {
@@ -170,6 +171,11 @@ func factoryAutomationSettingsFromVersion(version *models.CanvasVersion) *factor
 		}
 		if draft, present := factoryDraftPullRequests(node.ComponentName(), node.Configuration); present {
 			settings.draftPullRequests = &draft
+		}
+	}
+	if policy, ok := models.HumanReviewSettingsFromNodes(version.Nodes); ok {
+		settings.humanReviewPolicy = map[string]any{
+			"enabled": policy.Enabled, "defaultReviewer": policy.DefaultReviewer, "fallbackTeam": policy.FallbackTeam,
 		}
 	}
 	return settings

@@ -64,6 +64,19 @@ func bitbucketFactoryTemplate(template factoryAppTemplate) factoryAppTemplate {
 }
 
 var factoryAppTemplates = map[factoryTemplateKey]factoryAppTemplate{
+	{id: models.FactoryAppTemplateHumanReviewID, provider: models.ProviderGitHub}: githubFactoryTemplate(factoryAppTemplate{
+		id:               models.FactoryAppTemplateHumanReviewID,
+		entrypointNodeID: models.HumanReviewTriggerNodeID,
+		canvasFile:       "templates/github/human-review.canvas.yaml",
+		consoleFile:      "templates/github/human-review.console.yaml",
+		columnKey:        models.CanvasColumnKeyVerify,
+		componentIntegrations: map[string]string{
+			"github.onPullRequest":   "github",
+			"github.onPRReview":      "github",
+			"prepareHumanReview":     "github",
+			"refreshHumanReviewGate": "github",
+		},
+	}),
 	{id: scheduledIntakeTemplateID, provider: models.ProviderGitHub}:    scheduledIntakeTemplate(models.ProviderGitHub),
 	{id: scheduledIntakeTemplateID, provider: models.ProviderBitbucket}: scheduledIntakeTemplate(models.ProviderBitbucket),
 	{id: "line-implementation", provider: models.ProviderGitHub}: githubFactoryTemplate(factoryAppTemplate{
@@ -177,6 +190,8 @@ type factoryTemplateInput struct {
 	multiRepo             bool
 	mergeCheckSteps       any
 	bodySectionSettings   map[string]map[string]any
+	humanReviewPolicy     map[string]any
+	mergeConfidenceAppID  string
 }
 
 type factoryTemplateIntegration struct {
@@ -406,6 +421,19 @@ func wireFactoryTemplate(canvas *yaml.Canvas, template factoryAppTemplate, input
 		}
 		if node.ID == template.entrypointNodeID {
 			*node = input.triggerSettings.configure(*node)
+			if template.id == models.FactoryAppTemplateHumanReviewID {
+				for _, field := range []string{"enabled", "defaultReviewer", "fallbackTeam"} {
+					delete(node.Configuration, field)
+				}
+			}
+		}
+		if template.id == models.FactoryAppTemplateHumanReviewID {
+			if node.ID == models.HumanReviewPrepareNodeID {
+				maps.Copy(node.Configuration, input.humanReviewPolicy)
+			}
+			if node.Component == "onBroadcast" && input.mergeConfidenceAppID != "" {
+				node.Configuration["app"] = input.mergeConfidenceAppID
+			}
 		}
 		applyFactoryDraftPullRequests(node, input.draftPullRequests)
 		if node.Component == "runApp" && configString(node.Configuration, "app") == input.appID {
@@ -617,6 +645,7 @@ func deriveFactoryTemplateInput(
 		input.agentSettings = settings.agents
 		input.triggerSettings = settings.triggers[template.entrypointNodeID]
 		input.draftPullRequests = settings.draftPullRequests
+		input.humanReviewPolicy = settings.humanReviewPolicy
 		if template.id == "risk-score" {
 			input.mergeCheckSteps = settings.agentSteps["assess-risk"]
 			input.bodySectionSettings = settings.bodySections
@@ -1120,6 +1149,11 @@ func materializeNonIntakeFactoryAppDefaults(
 		return nil, invalidArgument("factory app has no bundled defaults")
 	}
 	input := deriveFactoryTemplateInput(tx, factory, canvas, version, resolved, savedSettings)
+	if resolved.id == models.FactoryAppTemplateHumanReviewID {
+		if err := configureHumanReviewSource(tx, factory, &input); err != nil {
+			return nil, err
+		}
+	}
 	input.multiRepo, err = factory.MultiRepoTasksEnabled(tx)
 	if err != nil {
 		return nil, err

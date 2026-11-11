@@ -52,18 +52,58 @@ func serializeFactoryPullRequests(
 	if err != nil {
 		return nil, err
 	}
+	pullRequestIDs := make([]uuid.UUID, len(pullRequests))
+	for i := range pullRequests {
+		pullRequestIDs[i] = pullRequests[i].ID
+	}
+	decisions, err := models.ListCurrentFactoryHumanReviewDecisions(tx, pullRequestIDs)
+	if err != nil {
+		return nil, err
+	}
 
 	serialized := make([]*pb.FactoryPullRequest, 0, len(pullRequests))
 	for i := range pullRequests {
-		serialized = append(serialized, serializeFactoryPullRequest(
+		pullRequest := serializeFactoryPullRequest(
 			&pullRequests[i],
 			workOrderNumbers[pullRequests[i].WorkOrderID],
 			runsByPullRequest[pullRequests[i].ID],
 			revisions[pullRequests[i].ID],
 			ledgerByRun,
-		))
+		)
+		if decision, present := decisions[pullRequests[i].ID]; present {
+			pullRequest.HumanReview = serializeHumanReviewState(&decision)
+		}
+		serialized = append(serialized, pullRequest)
 	}
 	return serialized, nil
+}
+
+func serializeHumanReviewState(decision *models.FactoryHumanReviewDecision) *pb.FactoryHumanReviewState {
+	if decision == nil {
+		return nil
+	}
+	state := &pb.FactoryHumanReviewState{
+		Id:                   decision.ID.String(),
+		Status:               decision.State,
+		ReviewRequired:       decision.ReviewRequired,
+		Rationale:            decision.Rationale,
+		BlockingReason:       decision.BlockingReason,
+		CheckUrl:             decision.CheckURL,
+		AssessedCommit:       decision.AssessedCommit,
+		ConfigurationVersion: decision.ConfigurationVersion,
+		PublicationError:     decision.PublicationError,
+		ApprovalIds:          decision.ApprovalIDs,
+	}
+	if decision.SourceRunID != nil {
+		state.SourceAssessmentRunId = decision.SourceRunID.String()
+	}
+	if decision.RunID != nil {
+		state.RunId = decision.RunID.String()
+	}
+	for _, reviewer := range decision.SelectedReviewers {
+		state.SelectedReviewers = append(state.SelectedReviewers, &pb.FactoryHumanReviewReviewer{Id: reviewer.ID, Login: reviewer.Login, Reason: reviewer.Reason})
+	}
+	return state
 }
 
 func loadSerializedPullRequestsByWorkOrderIDs(

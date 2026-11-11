@@ -37,6 +37,9 @@ func (p *panickingAction) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.
 func (p *panickingAction) HandleHook(ctx core.ActionHookContext) error {
 	panic("handle hook panic")
 }
+func (p *panickingAction) HandleBackgroundHook(ctx core.BackgroundHookContext) (core.BackgroundHookResult, error) {
+	panic("handle background hook panic")
+}
 func (p *panickingAction) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	panic("handle webhook panic")
 }
@@ -91,6 +94,28 @@ func TestPanicableAction_QueueItemProcessor_NilWithoutImplementation(t *testing.
 	panicable := NewPanicableAction(impl.NewDummyAction(impl.DummyActionOptions{}))
 
 	assert.Nil(t, panicable.QueueItemProcessor())
+}
+
+func TestPanicableAction_BackgroundHookHandler_CatchesPanic(t *testing.T) {
+	action := &panickingAction{name: "panicking-action"}
+	panicable := NewPanicableAction(action)
+
+	handler := panicable.BackgroundHookHandler()
+	require.NotNil(t, handler)
+
+	_, err := handler.HandleBackgroundHook(core.BackgroundHookContext{
+		ActionHookContext: core.ActionHookContext{Name: "test-hook"},
+	})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "action panicked in HandleBackgroundHook(test-hook)")
+	assert.Contains(t, err.Error(), "handle background hook panic")
+}
+
+func TestPanicableAction_BackgroundHookHandler_NilWithoutImplementation(t *testing.T) {
+	panicable := NewPanicableAction(impl.NewDummyAction(impl.DummyActionOptions{}))
+
+	assert.Nil(t, panicable.BackgroundHookHandler())
 }
 
 func TestPanicableAction_HandleHook_CatchesPanic(t *testing.T) {
