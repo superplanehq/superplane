@@ -41,9 +41,13 @@ emission persists those ordinary values and records configured channel errors.
 A failed assessment remains failed after successful downstream publication.
 Finished and cancelling executions keep their existing guards.
 
-Each poll uses one task-status snapshot before completion data is prepared.
-A task that finishes during preparation remains pending until the next poll.
-This keeps the final reported check and terminal status consistent.
+Each agent poll uses one saved task-status snapshot. Report preparation runs
+only when that snapshot is terminal, before the handler emits its final output.
+Running tasks and lookup failures use the ordinary execution context. The poll
+handler keeps its scheduling and retry behavior and consumes the same snapshot.
+A task that finishes after the snapshot waits until the next poll. This keeps
+the final reported check and terminal status consistent. Cancellation, callbacks,
+and other hooks retain their existing context preparation.
 
 Publication and completion broadcast remain explicit canvas steps. Review
 request consumes the trusted broadcast through its filtered On Broadcast

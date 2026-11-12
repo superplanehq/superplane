@@ -11,6 +11,7 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/authorization"
 	factorycomponent "github.com/superplanehq/superplane/pkg/components/factory"
+	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -505,8 +506,17 @@ func (e *NodeRequestExecutor) invokeExecutionComponentHook(
 	logger = logging.WithExecution(logger, execution)
 	taskID, _ := spec.InvokeAction.Parameters["task_id"].(string)
 	runnerTasks := contexts.NewRunnerTaskContext(tx, e.encryptor, workflow.OrganizationID)
+	prepareFactoryOutput := true
 	if models.IsAgentRunnerComponent(componentName) {
 		runnerTasks.WithSnapshot(taskID)
+		if spec.InvokeAction.ActionName == runner.HookPoll {
+			task, err := runnerTasks.Find(taskID)
+			prepareFactoryOutput = err == nil && task.IsTerminal()
+		}
+	}
+	executionState := contexts.NewExecutionStateContext(tx, execution, onNewEvents)
+	if prepareFactoryOutput {
+		executionState = contexts.NewFactoryExecutionStateContext(tx, execution, onNewEvents)
 	}
 	hookCtx := core.ActionHookContext{
 		Name:           spec.InvokeAction.ActionName,
@@ -514,7 +524,7 @@ func (e *NodeRequestExecutor) invokeExecutionComponentHook(
 		Parameters:     spec.InvokeAction.Parameters,
 		HTTP:           e.registry.HTTPContextInTransaction(tx),
 		Metadata:       contexts.NewExecutionMetadataContext(tx, execution),
-		ExecutionState: contexts.NewFactoryExecutionStateContext(tx, execution, onNewEvents),
+		ExecutionState: executionState,
 		Requests:       contexts.NewExecutionRequestContext(tx, execution).WithCurrentRequest(request),
 		Auth:           contexts.NewAuthReader(tx, workflow.OrganizationID, e.authService, nil),
 		Secrets:        contexts.NewSecretsContext(tx, e.registry, workflow.OrganizationID, e.encryptor),
