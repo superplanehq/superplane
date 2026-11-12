@@ -16,6 +16,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/factories/lifecycle"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -323,7 +324,7 @@ func (w *EventRouter) processRootEvent(tx *gorm.DB, canvas *models.Canvas, edges
 		return nil, uuid.Nil, fmt.Errorf("attach analysis session for run %s: %w", run.ID, err)
 	}
 	if err := linkFactoryColumnAppRun(tx, canvas, event, run); err != nil {
-		if !models.IsPermanentSubscriptionAdmissionError(err) {
+		if !models.IsPermanentSubscriptionAdmissionError(err) && !lifecycle.IsRejection(err) {
 			return nil, uuid.Nil, err
 		}
 
@@ -386,23 +387,21 @@ func rejectRootEvent(tx *gorm.DB, event *models.CanvasEvent, run *models.CanvasR
 // linkFactoryColumnAppRun returns permanent subscription errors unchanged, so
 // the run error shows the same message as the task status note.
 func linkFactoryColumnAppRun(tx *gorm.DB, canvas *models.Canvas, event *models.CanvasEvent, run *models.CanvasRun) error {
-	links := []struct {
-		name string
-		link func(*gorm.DB, *models.Canvas, *models.CanvasEvent, *models.CanvasRun) error
-	}{
-		{"visual evidence", models.MaybeLinkVisualEvidenceRun},
-		{"custom automation", models.MaybeLinkCustomAutomationRun},
-		{"merge confidence", models.MaybeLinkMergeConfidenceRun},
+	links := []lifecycle.RunLink{
+		{Name: "visual evidence", Link: models.MaybeLinkVisualEvidenceRun},
+		{Name: "custom automation", Link: models.MaybeLinkCustomAutomationRun},
+		{Name: "merge confidence", Link: models.MaybeLinkMergeConfidenceRun},
 	}
+	links = append(links, lifecycle.RunLinks()...)
 	for _, step := range links {
-		err := step.link(tx, canvas, event, run)
+		err := step.Link(tx, canvas, event, run)
 		if err == nil {
 			continue
 		}
 		if models.IsPermanentSubscriptionAdmissionError(err) {
 			return err
 		}
-		return fmt.Errorf("link %s run %s: %w", step.name, run.ID, err)
+		return fmt.Errorf("link %s run %s: %w", step.Name, run.ID, err)
 	}
 	return nil
 }

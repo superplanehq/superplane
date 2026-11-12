@@ -531,3 +531,27 @@ it("keeps a renamed scheduled intake visible and opens its saved automation", ()
     factoryColumnAutomationViewPath("org", "workspace", undefined, "scheduled-app"),
   );
 });
+
+it("keeps a renamed Review request visible without discovery and avoids a duplicate custom row", () => {
+  const rows = buildColumnAutomations("verify", {
+    columnTitle: "Verify",
+    apps: [
+      {
+        id: "review-request-app",
+        name: "Request engineering review",
+        templateId: "review-request",
+        columnKey: "verify",
+      },
+    ],
+  });
+  expect(rows).toHaveLength(1);
+  expect(rows[0]).toMatchObject({
+    kind: "review-request",
+    canvasId: "review-request-app",
+    name: "Request engineering review",
+  });
+  expect(columnAutomationOpenPath(rows[0], { organizationId: "org", factoryKey: "workspace" })).toBe(
+    factoryColumnAutomationViewPath("org", "workspace", undefined, "review-request-app"),
+  );
+  expect(catalogForColumn("verify").some((entry) => entry.id === "review-request")).toBe(false);
+});

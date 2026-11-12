@@ -218,6 +218,18 @@ func LockPendingNodeExecutionInActiveCanvas(tx *gorm.DB, id uuid.UUID) (*CanvasN
 	return &execution, nil
 }
 
+// FindPendingNodeExecution reads a pending execution without a lock. The
+// result can change before LockPendingNodeExecutionInActiveCanvas locks it.
+func FindPendingNodeExecution(tx *gorm.DB, id uuid.UUID) (*CanvasNodeExecution, error) {
+	var execution CanvasNodeExecution
+	err := tx.Where("id = ? AND state = ?", id, CanvasNodeExecutionStatePending).First(&execution).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return &execution, nil
+}
+
 func ListNodeExecutions(db *gorm.DB, workflowID uuid.UUID, nodeID string, states []string, results []string, limit int, beforeTime *time.Time) ([]CanvasNodeExecution, error) {
 	var executions []CanvasNodeExecution
 	query := db.
@@ -735,6 +747,12 @@ func (e *CanvasNodeExecution) GetOutputsInTransaction(tx *gorm.DB) ([]CanvasEven
 	}
 
 	return events, nil
+}
+
+// UpdateMetadata replaces the execution metadata and persists it.
+func (e *CanvasNodeExecution) UpdateMetadata(tx *gorm.DB, metadata map[string]any) error {
+	e.Metadata = datatypes.NewJSONType(metadata)
+	return tx.Model(e).Update("metadata", e.Metadata).Error
 }
 
 func (e *CanvasNodeExecution) IsFinished(tx *gorm.DB) (bool, error) {

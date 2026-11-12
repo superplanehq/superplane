@@ -1,5 +1,6 @@
 // Package registryimports loads all built-in components, integrations,
-// triggers, and widgets so they register themselves via init().
+// triggers, widgets, and built-in automations so they register themselves
+// via init().
 package registryimports
 
 import (
@@ -30,6 +31,7 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/components/updatememory"
 	_ "github.com/superplanehq/superplane/pkg/components/upsertmemory"
 	_ "github.com/superplanehq/superplane/pkg/components/wait"
+	_ "github.com/superplanehq/superplane/pkg/factories/reviewrequest"
 	_ "github.com/superplanehq/superplane/pkg/integrations/aws"
 	_ "github.com/superplanehq/superplane/pkg/integrations/azure"
 	_ "github.com/superplanehq/superplane/pkg/integrations/bitbucket"

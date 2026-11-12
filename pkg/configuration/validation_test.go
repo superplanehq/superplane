@@ -312,6 +312,29 @@ func Test__ValidateConfiguration__CustomTimeFormat(t *testing.T) {
 	}
 }
 
+func TestValidateConfigurationListExpressions(t *testing.T) {
+	fields := []Field{{Name: "reviewers", Type: FieldTypeList, Required: true}}
+	for _, tc := range []struct {
+		name, value string
+		valid       bool
+	}{
+		{name: "full expression", value: `{{ map(previous().data.reviewers, {#.login}) }}`, valid: true},
+		{name: "surrounding whitespace", value: " \n{{ previous().data.reviewers }}\n", valid: true},
+		{name: "literal string", value: "octocat"},
+		{name: "interpolated string", value: "reviewers: {{ previous().data.reviewers }}"},
+		{name: "two expressions", value: "{{ previous().data.first }} {{ previous().data.second }}"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := ValidateConfiguration(fields, map[string]any{"reviewers": tc.value})
+			if tc.valid {
+				assert.NoError(t, err)
+				return
+			}
+			assert.ErrorContains(t, err, "must be a list of values")
+		})
+	}
+}
+
 func Test__ValidateList__MaxItems(t *testing.T) {
 	tests := []struct {
 		name        string
