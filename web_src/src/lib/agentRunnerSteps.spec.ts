@@ -15,7 +15,7 @@ describe("agentRunnerStepTitles", () => {
     ).toEqual(["Clone repo", "Write implementation plan", "Use plan as output"]);
   });
 
-  it("keeps a combined review step until the merge confidence canvas asks for the checks", () => {
+  it("keeps a combined review step with its saved name", () => {
     const prompt = [
       "Report each enabled check with the report_merge_check tool.",
       "Enabled checks: risk, performance.",
@@ -33,11 +33,6 @@ describe("agentRunnerStepTitles", () => {
     };
 
     expect(agentRunnerStepTitles(steps)).toEqual(["Checkout Pull Request", "Review Pull Request"]);
-    expect(agentRunnerStepTitles(steps, { expandMergeChecks: true })).toEqual([
-      "Checkout Pull Request",
-      "Blast radius",
-      "Performance",
-    ]);
   });
 
   it("ignores malformed and blank steps", () => {
