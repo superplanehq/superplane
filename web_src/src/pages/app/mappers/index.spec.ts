@@ -161,7 +161,7 @@ describe("getExecutionDetails", () => {
     });
 
     expect(props.headerAction).toBeDefined();
-    expect(props.factoryBody).toBeDefined();
+    expect(props.factorySteps).toBeDefined();
     expect(getStateMap("runnerClaudeCode")).toBe(RUNNER_STATE_REGISTRY.stateMap);
   });
 
@@ -197,7 +197,7 @@ describe("getExecutionDetails", () => {
     });
 
     expect(props.headerAction).toBeDefined();
-    expect(props.factoryBody).toBeDefined();
+    expect(props.factorySteps).toBeDefined();
     expect(getStateMap("runnerCodex")).toBe(RUNNER_STATE_REGISTRY.stateMap);
   });
 
@@ -233,7 +233,7 @@ describe("getExecutionDetails", () => {
     });
 
     expect(props.headerAction).toBeDefined();
-    expect(props.factoryBody).toBeDefined();
+    expect(props.factorySteps).toBeDefined();
     expect(getStateMap("runnerSuperPlane")).toBe(RUNNER_STATE_REGISTRY.stateMap);
   });
 
@@ -269,7 +269,7 @@ describe("getExecutionDetails", () => {
     });
 
     expect(props.headerAction).toBeDefined();
-    expect(props.factoryBody).toBeDefined();
+    expect(props.factorySteps).toBeDefined();
     expect(getStateMap("runnerOpenRouter")).toBe(RUNNER_STATE_REGISTRY.stateMap);
   });
 });

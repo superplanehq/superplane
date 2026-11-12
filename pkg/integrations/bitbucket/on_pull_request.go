@@ -185,6 +185,13 @@ func (p *OnPullRequest) HandleWebhook(ctx core.WebhookRequestContext) (int, *cor
 		}
 	}
 
+	if producer, ok := ctx.Factory.(core.FactoryPullRequestEventContext); ok {
+		if err := producer.EmitPullRequestEvent(ctx.NodeID, "bitbucket.pullRequest", event); err != nil {
+			return http.StatusInternalServerError, nil, err
+		}
+		return http.StatusOK, nil, nil
+	}
+
 	if err := ctx.Events.Emit("bitbucket.pullRequest", event); err != nil {
 		return http.StatusInternalServerError, nil, fmt.Errorf("error emitting event: %v", err)
 	}

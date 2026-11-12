@@ -2149,20 +2149,21 @@ func (s *Server) executeWebhookNode(ctx context.Context, body []byte, headers ht
 // lazyWebhookFactory reads the canvas only when a trigger calls it.
 // A webhook must send its response before that lookup.
 type lazyWebhookFactory struct {
-	tx       *gorm.DB
-	canvasID uuid.UUID
-	once     sync.Once
-	inner    core.FactoryContext
-	err      error
+	tx          *gorm.DB
+	node        *models.CanvasNode
+	once        sync.Once
+	inner       *contexts.FactoryContext
+	err         error
+	onNewEvents func([]models.CanvasEvent)
 }
 
-func newLazyWebhookFactory(tx *gorm.DB, canvasID uuid.UUID) core.FactoryContext {
-	return &lazyWebhookFactory{tx: tx, canvasID: canvasID}
+func newLazyWebhookFactory(tx *gorm.DB, node *models.CanvasNode, onNewEvents func([]models.CanvasEvent)) core.FactoryContext {
+	return &lazyWebhookFactory{tx: tx, node: node, onNewEvents: onNewEvents}
 }
 
-func (l *lazyWebhookFactory) load() (core.FactoryContext, error) {
+func (l *lazyWebhookFactory) load() (*contexts.FactoryContext, error) {
 	l.once.Do(func() {
-		canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(l.tx, l.canvasID)
+		canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(l.tx, l.node.WorkflowID)
 		if err != nil || canvas == nil || canvas.FactoryID == nil {
 			l.err = errors.New("app is not owned by a factory")
 			return
@@ -2338,7 +2339,7 @@ func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers ht
 		Webhook:       contexts.NewNodeWebhookContext(ctx, tx, s.encryptor, &node, s.BaseURL+s.BasePath),
 		Events:        events,
 		Integration:   integrationCtx,
-		Factory:       newLazyWebhookFactory(tx, node.WorkflowID),
+		Factory:       newLazyWebhookFactory(tx, &node, onNewEvents),
 	})
 	return code, response, integrationOrganizationID(integration), err
 }
@@ -2651,4 +2652,15 @@ func makeOriginChecker(allowed []string) func(*http.Request) bool {
 		_, ok := set[strings.ToLower(u.Scheme+"://"+u.Host)]
 		return ok
 	}
+}
+
+func (l *lazyWebhookFactory) EmitPullRequestEvent(nodeID, payloadType string, payload any) error {
+	if nodeID == l.node.NodeID {
+		return contexts.EmitFactoryPullRequestEvent(l.tx, l.node, payloadType, payload, l.onNewEvents)
+	}
+	inner, err := l.load()
+	if err != nil {
+		return err
+	}
+	return inner.WithNewEvents(l.onNewEvents).EmitPullRequestEvent(nodeID, payloadType, payload)
 }
