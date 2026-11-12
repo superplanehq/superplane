@@ -84,6 +84,42 @@ func TestRefreshPreservesOmittedEffortsAndClearsExplicitEmptyEfforts(t *testing.
 	assert.False(t, stored.ReasoningMandatory)
 }
 
+func TestRefreshStoresPartialReasoningMetadata(t *testing.T) {
+	for _, tc := range []struct {
+		name, reasoning, wantDefault string
+		wantMandatory                bool
+		cached                       bool
+	}{
+		{"first refresh without efforts", `{"default_effort":"high","mandatory":true}`, "high", true, false},
+		{"change default only", `{"default_effort":"medium"}`, "medium", true, true},
+		{"clear mandatory only", `{"mandatory":false}`, "high", false, true},
+		{"clear default only", `{"default_effort":""}`, "", true, true},
+		{"preserve omitted fields", `{}`, "high", true, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			support.Setup(t)
+			db := database.DB(t.Context())
+			provider := models.HostedLLMProvider{Provider: models.UsageProviderOpenRouter}
+			httpCtx := &contexts.HTTPContext{}
+			var wantLevels datatypes.JSONSlice[string]
+			if tc.cached {
+				httpCtx.Responses = append(httpCtx.Responses, catalogResponse(200, `{"data":[{"id":"partial/model","reasoning":{"supported_efforts":["high"],"default_effort":"high","mandatory":true}}]}`))
+				wantLevels = datatypes.JSONSlice[string]{"high"}
+			}
+			httpCtx.Responses = append(httpCtx.Responses, catalogResponse(200, `{"data":[{"id":"partial/model","reasoning":`+tc.reasoning+`}]}`))
+			svc := llmcatalog.New(nil, httpCtx)
+			if tc.cached {
+				require.NoError(t, svc.Refresh(t.Context(), db, provider))
+			}
+			require.NoError(t, svc.Refresh(t.Context(), db, provider))
+			stored := capability(t, db, provider.Provider, llm.DefaultOpenRouterBaseURL, "partial/model")
+			assert.Equal(t, wantLevels, stored.ThinkingLevels)
+			assert.Equal(t, tc.wantDefault, stored.DefaultThinkingLevel)
+			assert.Equal(t, tc.wantMandatory, stored.ReasoningMandatory)
+		})
+	}
+}
+
 func TestRefreshExpandsNullEfforts(t *testing.T) {
 	for _, mandatory := range []bool{false, true} {
 		t.Run(fmt.Sprint(mandatory), func(t *testing.T) {

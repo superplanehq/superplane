@@ -77,13 +77,15 @@ func (s *Service) Refresh(ctx context.Context, tx *gorm.DB, provider models.Host
 	capabilities := make([]models.LLMModelCapability, 0, len(listed))
 	for _, model := range listed {
 		capabilities = append(capabilities, models.LLMModelCapability{
-			Provider:             provider.Provider,
-			BaseURL:              baseURL,
-			Model:                strings.ToLower(modelid.CatalogModelID(model.ID)),
-			ThinkingLevels:       datatypes.NewJSONSlice(model.ThinkingLevels),
-			DefaultThinkingLevel: model.DefaultThinkingLevel,
-			ReasoningMandatory:   model.ReasoningMandatory,
-			RefreshedAt:          refreshedAt,
+			Provider:                provider.Provider,
+			BaseURL:                 baseURL,
+			Model:                   strings.ToLower(modelid.CatalogModelID(model.ID)),
+			ThinkingLevels:          datatypes.NewJSONSlice(model.ThinkingLevels),
+			DefaultThinkingLevel:    model.DefaultThinkingLevel,
+			ReasoningMandatory:      model.ReasoningMandatory,
+			RefreshedAt:             refreshedAt,
+			DefaultThinkingLevelSet: model.DefaultThinkingLevelSet,
+			ReasoningMandatorySet:   model.ReasoningMandatorySet,
 		})
 	}
 	if err := models.ReplaceLLMModelCapabilities(tx, provider.Provider, baseURL, capabilities); err != nil {

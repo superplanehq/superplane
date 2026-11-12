@@ -194,8 +194,8 @@ func TestListOpenRouterModelsPreservesReasoningCapabilities(t *testing.T) {
 			listed, err := ListOpenRouterModels(context.Background(), httpCtx, Credentials{APIKey: tc.apiKey})
 			require.NoError(t, err)
 			assert.Equal(t, []Model{
-				{ID: "deepseek/deepseek-v4-flash", ThinkingLevels: []string{"none", "high", "xhigh"}, DefaultThinkingLevel: "high"},
-				{ID: "reasoning/required", ThinkingLevels: []string{"high"}, DefaultThinkingLevel: "high", ReasoningMandatory: true},
+				{ID: "deepseek/deepseek-v4-flash", ThinkingLevels: []string{"none", "high", "xhigh"}, DefaultThinkingLevel: "high", DefaultThinkingLevelSet: true, ReasoningMandatorySet: true},
+				{ID: "reasoning/required", ThinkingLevels: []string{"high"}, DefaultThinkingLevel: "high", ReasoningMandatory: true, DefaultThinkingLevelSet: true, ReasoningMandatorySet: true},
 				{ID: "reasoning/no-efforts", ThinkingLevels: []string{}},
 				{ID: "legacy/model"},
 			}, listed)

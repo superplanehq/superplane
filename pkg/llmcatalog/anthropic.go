@@ -56,13 +56,15 @@ func StoreAnthropicCapabilities(tx *gorm.DB, baseURL string, listed []llm.Model)
 		}
 		seen[id] = true
 		capabilities = append(capabilities, models.LLMModelCapability{
-			Provider:             models.UsageProviderAnthropic,
-			BaseURL:              baseURL,
-			Model:                id,
-			ThinkingLevels:       datatypes.NewJSONSlice(model.ThinkingLevels),
-			DefaultThinkingLevel: model.DefaultThinkingLevel,
-			ReasoningMandatory:   model.ReasoningMandatory,
-			RefreshedAt:          refreshedAt,
+			Provider:                models.UsageProviderAnthropic,
+			BaseURL:                 baseURL,
+			Model:                   id,
+			ThinkingLevels:          datatypes.NewJSONSlice(model.ThinkingLevels),
+			DefaultThinkingLevel:    model.DefaultThinkingLevel,
+			ReasoningMandatory:      model.ReasoningMandatory,
+			RefreshedAt:             refreshedAt,
+			DefaultThinkingLevelSet: model.DefaultThinkingLevelSet,
+			ReasoningMandatorySet:   model.ReasoningMandatorySet,
 		})
 	}
 	if err := models.UpsertLLMModelCapabilities(tx, models.UsageProviderAnthropic, baseURL, capabilities); err != nil {

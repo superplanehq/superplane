@@ -34,6 +34,9 @@ type Model struct {
 	ThinkingLevels       []string
 	DefaultThinkingLevel string
 	ReasoningMandatory   bool
+	// Presence flags distinguish omitted fields from explicit zero values.
+	DefaultThinkingLevelSet bool
+	ReasoningMandatorySet   bool
 }
 
 // Usage is normalized token counts for one completion.
