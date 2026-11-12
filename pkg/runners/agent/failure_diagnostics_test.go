@@ -20,6 +20,9 @@ import (
 func TestAgentPreservesFailureDiagnostics(t *testing.T) {
 	for _, pipe := range []string{"0", "1"} {
 		t.Run("pipe="+pipe, func(t *testing.T) {
+			if pipe == "0" {
+				skipPTYIntegrationOnCI(t)
+			}
 			t.Setenv("RUNNER_SHELL_USE_PIPE", pipe)
 			for _, tc := range []struct {
 				name, command, cause string
@@ -42,7 +45,7 @@ func TestAgentPreservesFailureDiagnostics(t *testing.T) {
 					spool, err := logspool.New(logspool.Config{Directory: t.TempDir(), TaskID: "diagnostic-task", BaseURL: server.URL, AccessToken: "test-access-token", ChunkBytes: 65536, MaxBytes: 1048576})
 					require.NoError(t, err)
 					defer func() { require.NoError(t, spool.Close()); require.NoError(t, spool.Wait(t.Context())) }()
-					runner := &Agent{Config: Config{MaxOutputBytes: 8192, TaskWorkDir: t.TempDir()}}
+					runner := &Agent{Config: Config{MaxOutputBytes: 8192, MaxExecutionSeconds: 30, TaskWorkDir: t.TempDir()}}
 					stepName, kind := "Check pull requests", "bash"
 					if tc.name == "prompt" || tc.name == "Claude result" {
 						stepName, kind = "Implementation", "prompt"
