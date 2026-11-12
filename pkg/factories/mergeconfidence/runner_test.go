@@ -14,6 +14,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
+	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
 func TestParseMergeConfidenceChecks(t *testing.T) {
@@ -127,7 +128,7 @@ func environmentHas(environment []runner.TaskEnvironmentVariable, name string) b
 	return ok
 }
 
-func TestPreparedRunnerCredentialsPreserveLegacyConfiguration(t *testing.T) {
+func TestPreparedRunnerCredentialsPreserveConfiguration(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 	workspace, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
@@ -139,19 +140,55 @@ func TestPreparedRunnerCredentialsPreserveLegacyConfiguration(t *testing.T) {
 	execution := support.CreateCanvasNodeExecution(t, canvas.ID, "start", root.ID, root.ID)
 	t.Setenv("JWT_SECRET", "test")
 	signer := jwt.NewSigner("test")
+	secrets := &contexts.SecretsContext{
+		IntegrationKeys: map[string]map[string][]byte{
+			"merge": {runner.EnvSuperplaneMergeConfidenceOrderID: []byte(order.ID.String())},
+		},
+		SecretKeys: map[string]map[string][]byte{
+			"merge": {runner.EnvSuperplaneMergeConfidenceOrderID: []byte(order.ID.String())},
+			"stale": {runner.EnvSuperplaneMergeConfidenceOrderID: []byte("invalid-order")},
+		},
+	}
+	explicit := []map[string]any{{"name": runner.EnvSuperplaneMergeConfidenceOrderID, "value": order.ID.String(), "valueSource": "literal"}}
 	for _, tc := range []struct {
-		name     string
-		timeout  any
-		lifetime time.Duration
+		name            string
+		environment     []map[string]any
+		environmentFrom []map[string]any
+		timeout         any
+		lifetime        time.Duration
 	}{
-		{"default timeout", nil, 90 * time.Minute}, {"string timeout", "1800", time.Hour},
+		{name: "default timeout", environment: explicit, lifetime: 90 * time.Minute},
+		{name: "string timeout", environment: explicit, timeout: "1800", lifetime: time.Hour},
+		{
+			name:        "padded environment name",
+			environment: []map[string]any{{"name": " " + runner.EnvSuperplaneMergeConfidenceOrderID + " ", "value": order.ID.String(), "valueSource": "literal"}},
+			lifetime:    90 * time.Minute,
+		},
+		{
+			name:            "integration environment",
+			environmentFrom: []map[string]any{{"source": "integration", "integration": map[string]any{"name": "merge"}}},
+			lifetime:        90 * time.Minute,
+		},
+		{
+			name:            "secret environment",
+			environmentFrom: []map[string]any{{"source": "secret", "secret": map[string]any{"secret": "merge"}}},
+			lifetime:        90 * time.Minute,
+		},
+		{
+			name:            "explicit environment overrides import",
+			environment:     explicit,
+			environmentFrom: []map[string]any{{"source": "secret", "secret": map[string]any{"secret": "stale"}}},
+			lifetime:        90 * time.Minute,
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := core.ExecutionContext{ID: execution.ID, RunID: execution.RunID, WorkflowID: canvas.ID.String(),
 				OrganizationID: r.Organization.ID.String(), NodeID: execution.NodeID, BaseURL: "https://app.example",
+				Secrets: secrets,
 				Configuration: map[string]any{
-					"environment": []map[string]any{{"name": runner.EnvSuperplaneMergeConfidenceOrderID, "value": order.ID.String(), "valueSource": "literal"}},
-					"prompt":      "Enabled checks: risk, security.",
+					"environment":     tc.environment,
+					"environmentFrom": tc.environmentFrom,
+					"prompt":          "Enabled checks: risk, security.",
 				}}
 			if tc.timeout != nil {
 				ctx.Configuration.(map[string]any)["executionTimeoutSeconds"] = tc.timeout
@@ -167,7 +204,10 @@ func TestPreparedRunnerCredentialsPreserveLegacyConfiguration(t *testing.T) {
 			require.True(t, ok)
 			scope, err := runner.ParseRunnerToken(signer, token)
 			require.NoError(t, err)
+			assert.Equal(t, runner.RunnerFlowMergeConfidence, scope.Flow)
+			assert.Equal(t, order.ID, scope.WorkOrderID)
 			assert.Equal(t, []string{"risk", "security"}, scope.MergeChecks)
+			assert.Contains(t, scope.Scopes, runner.ScopeMergeChecksWrite)
 			claims, err := signer.ValidateAndGetClaims(token)
 			require.NoError(t, err)
 			assert.Equal(t, tc.lifetime.Seconds(), claims["exp"].(float64)-claims["iat"].(float64))
