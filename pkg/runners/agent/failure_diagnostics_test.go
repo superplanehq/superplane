@@ -1,7 +1,9 @@
 package agent
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -27,8 +29,9 @@ func TestAgentPreservesFailureDiagnostics(t *testing.T) {
 				{"shell", `printf 'Authentication failed: %s Bearer unknown-credential\n' "$PRIVATE_VALUE" >&2; return 23`, "Authentication failed", 23},
 				{"oversized result", `head -c 20000 /dev/zero | tr '\0' x > "$SUPERPLANE_RESULT_FILE"; echo 'original error' >&2; return 24`, "original error", 24},
 				{"silent", `return 7`, "No diagnostic output", 7},
-				{"bounded output", `for i in {1..400}; do echo 'diagnostic output before the final error'; done; printf 'final error: %s\n' "$PRIVATE_VALUE" >&2; return 9`, "final error", 9},
+				{"bounded output", `for i in {1..2000}; do echo 'diagnostic output before the final error'; done; printf 'final error: %s\n' "$PRIVATE_VALUE" >&2; return 9`, "final error", 9},
 				{"Claude result", `printf '%s\n' '{"type":"result","is_error":true,"result":"Claude provider unavailable"}' > "$SUPERPLANE_RESULT_FILE"; return 10`, "Claude provider unavailable", 10},
+				{"ordinary settings", `echo 'HTTP 401 after 3600 seconds: certificate rejected' >&2; return 1`, "HTTP 401 after 3600 seconds: certificate rejected", 1},
 			} {
 				t.Run(tc.name, func(t *testing.T) {
 					server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -44,7 +47,15 @@ func TestAgentPreservesFailureDiagnostics(t *testing.T) {
 					if tc.name == "prompt" || tc.name == "Claude result" {
 						stepName, kind = "Implementation", "prompt"
 					}
-					task := &api.TaskPayload{ID: "diagnostic-task", ExecutionMode: "host", Environment: []api.EnvironmentVariable{{Name: "PRIVATE_VALUE", Value: "private-environment-value"}}, Commands: models.CommandList{
+					if tc.name == "ordinary settings" {
+						stepName = "Check pull requests 1"
+					}
+					task := &api.TaskPayload{ID: "diagnostic-task", ExecutionMode: "host", Environment: []api.EnvironmentVariable{
+						{Name: "PRIVATE_VALUE", Value: "private-environment-value"},
+						{Name: "CHECKOUT_COMMIT_SETUP", Value: "1"},
+						{Name: "SUPERPLANE_EXECUTION_TIMEOUT_SECONDS", Value: "3600"},
+						{Name: "PAGER", Value: "cat"},
+					}, Commands: models.CommandList{
 						{Name: "Earlier prompt", Kind: "prompt", Command: `printf '%s\n' '{"type":"result","is_error":false,"error":"stale provider error"}' > "$SUPERPLANE_RESULT_FILE"; head -c 30000 /dev/zero | tr '\0' x; echo`},
 						{Name: stepName, Kind: kind, Command: tc.command},
 						{Name: "Later check", Command: `echo 'must not run'`},
@@ -67,5 +78,34 @@ func TestAgentPreservesFailureDiagnostics(t *testing.T) {
 				})
 			}
 		})
+	}
+}
+
+func TestFailureDiagnosticsRetainsLateOutputForFailedStep(t *testing.T) {
+	for _, nextStep := range []bool{false, true} {
+		t.Run(fmt.Sprintf("next step=%t", nextStep), func(t *testing.T) {
+			diagnostics := &failureDiagnostics{}
+			_, err := io.WriteString(diagnostics, `{"type":"cmd_start","index":0,"text":"Check pull requests"}`+"\n"+
+				`{"type":"cmd_end","index":0,"status":"failed"}`+"\n"+"late failure output\n")
+			require.NoError(t, err)
+			if nextStep {
+				_, err = io.WriteString(diagnostics, `{"type":"cmd_start","index":1,"text":"Cleanup"}`+"\n"+"later cleanup output\n")
+				require.NoError(t, err)
+			}
+			failure := diagnostics.failure(&api.TaskPayload{ID: "task-1"}, 23, errors.New("exit code 23"), nil)
+			assert.Contains(t, failure.Error(), "Check pull requests")
+			assert.Contains(t, failure.Error(), "late failure output")
+			assert.NotContains(t, failure.Error(), "later cleanup output")
+		})
+	}
+}
+
+func BenchmarkFailureDiagnosticsOutput(b *testing.B) {
+	chunk := bytes.Repeat([]byte("diagnostic output\n"), 4096)
+	diagnostics := &failureDiagnostics{}
+	b.SetBytes(int64(len(chunk)))
+	b.ReportAllocs()
+	for b.Loop() {
+		_, _ = diagnostics.Write(chunk)
 	}
 }
