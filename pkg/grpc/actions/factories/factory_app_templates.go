@@ -67,12 +67,15 @@ var factoryAppTemplates = map[factoryTemplateKey]factoryAppTemplate{
 	{id: scheduledIntakeTemplateID, provider: models.ProviderGitHub}:    scheduledIntakeTemplate(models.ProviderGitHub),
 	{id: scheduledIntakeTemplateID, provider: models.ProviderBitbucket}: scheduledIntakeTemplate(models.ProviderBitbucket),
 	{id: reviewRequestTemplateID, provider: models.ProviderGitHub}: githubFactoryTemplate(factoryAppTemplate{
-		id:                    reviewRequestTemplateID,
-		entrypointNodeID:      reviewRequestTriggerNodeID,
-		canvasFile:            "templates/github/review-request.canvas.yaml",
-		consoleFile:           "templates/github/review-request.console.yaml",
-		columnKey:             models.CanvasColumnKeyVerify,
-		componentIntegrations: map[string]string{"github.addPullRequestReviewers": "github"},
+		id:               reviewRequestTemplateID,
+		entrypointNodeID: reviewRequestTriggerNodeID,
+		canvasFile:       "templates/github/review-request.canvas.yaml",
+		consoleFile:      "templates/github/review-request.console.yaml",
+		columnKey:        models.CanvasColumnKeyVerify,
+		componentIntegrations: map[string]string{
+			"github.listPullRequestReviewCandidates": "github",
+			"github.ensurePullRequestReviewers":      "github",
+		},
 	}),
 	{id: "line-implementation", provider: models.ProviderGitHub}: githubFactoryTemplate(factoryAppTemplate{
 		id:                  "line-implementation",

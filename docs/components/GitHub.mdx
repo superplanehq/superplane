@@ -4405,13 +4405,17 @@ Returns GitHub's check run list response, including total_count and check_runs. 
 
 **Component key:** `github.listPullRequestReviewCandidates`
 
-List human collaborators with write, maintain, or admin access. Exclude the pull request author and bots. Read every page; incomplete discovery fails the execution. Output includes state, head, base, and candidate IDs and logins.
+List human collaborators with write, maintain, or admin access. Exclude the pull request author and bots. Read every page; incomplete discovery fails the execution. Output includes the pull request author, state, head, base, and candidate IDs and logins.
 
 ### Example Output
 
 ```json
 {
   "data": {
+    "author": {
+      "id": 1,
+      "login": "author"
+    },
     "base": {
       "ref": "main",
       "sha": "base-sha"

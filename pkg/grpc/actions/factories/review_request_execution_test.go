@@ -264,6 +264,9 @@ func runReviewRequestGraph(t *testing.T, f publicationFixture, canvas *models.Ca
 			}
 			if node.NodeID == reviewRequestAgentNodeID {
 				agentRuns++
+				steps := execution.Configuration.Data()["steps"].([]any)
+				prompt := steps[1].(map[string]any)["prompt"].(string)
+				require.Contains(t, prompt, "Pull request author: author")
 				environment := execution.Configuration.Data()["environment"].([]any)
 				for _, raw := range environment {
 					variable := raw.(map[string]any)

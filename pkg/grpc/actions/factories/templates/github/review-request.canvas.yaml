@@ -174,13 +174,24 @@ spec:
 
           Repository: {{ root().data.payload.repository }}
           Pull request: #{{ root().data.payload.pullNumber }}
+          Pull request author: {{ $["List candidates"].data.author.login }}
           Assessed commit: {{ root().data.payload.reviewedCommit }}
           Base branch: {{ $["List candidates"].data.base.ref }}
           Base commit: {{ $["List candidates"].data.base.sha }}
 
-          Prefer one eligible individual with relevant ownership or file contribution history.
-          Inspect CODEOWNERS, the pull request diff, and relevant Git contribution history.
+          Identify contributors to this pull request from all its commits, including authors, committers, and Co-authored-by trailers.
           Resolve Git authors to GitHub identities using GitHub commit data when needed.
+          Prefer eligible non-contributors before you compare ownership or file history.
+          Select a contributor to this pull request only when no eligible non-contributor is available.
+          Weaker ownership history does not make an eligible non-contributor unsuitable.
+          If you select a contributor, explain why no eligible non-contributor is available.
+          Never select the pull request author named above.
+
+          Prefer one individual with relevant ownership or file contribution history within the preferred group.
+          Inspect CODEOWNERS and the pull request diff. Read contribution history at the base commit above.
+          Do not count commits from this pull request as prior ownership.
+          The supplied candidates already passed the human-account and repository-access checks.
+          Do not classify a candidate as a bot based only on their login.
           Select only from the supplied eligible identities. Keep their IDs and logins unchanged.
           Explain the evidence for each reviewer. Explain why each additional reviewer is necessary.
           Use noCandidate only when successful selection finds no suitable eligible candidate.

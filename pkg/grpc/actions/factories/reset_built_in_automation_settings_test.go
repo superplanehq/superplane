@@ -171,9 +171,14 @@ func TestResetReviewRequestPreservesFallbackAndAgentSettings(t *testing.T) {
 	for _, fallback := range []string{"octocat", ""} {
 		t.Run("fallback="+fallback, func(t *testing.T) {
 			r, factory := resetTestFactory(t)
+			integration, err := models.CreateIntegration(uuid.New(), r.Organization.ID, "github", "workspace-github", nil)
+			require.NoError(t, err)
 			require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryReviewRequest))
 			source := resetTestTemplate(t, r, factory, "risk-score", models.ProviderGitHub, func(*yaml.Canvas) {})
 			canvas := resetTestTemplate(t, r, factory, reviewRequestTemplateID, models.ProviderGitHub, func(doc *yaml.Canvas) {
+				for _, id := range []string{"list-candidates", "request-reviewers"} {
+					findYAMLNode(t, doc, id).Integration = &yaml.IntegrationRef{ID: integration.ID.String(), Name: integration.InstallationName}
+				}
 				trigger := findYAMLNode(t, doc, reviewRequestTriggerNodeID)
 				trigger.Configuration["app"] = source.ID.String()
 				trigger.Configuration["enabled"] = false
@@ -187,8 +192,18 @@ func TestResetReviewRequestPreservesFallbackAndAgentSettings(t *testing.T) {
 			require.NoError(t, models.DisableExperimentalFeature(r.Organization.ID, features.FeatureFactoryReviewRequest))
 			require.NoError(t, resetTestOrganization(t, r))
 			version := resetTestLiveVersion(t, canvas)
+			for _, id := range []string{"list-candidates", "request-reviewers"} {
+				node := findIntakeNode(version.Nodes, id)
+				require.NotNil(t, node)
+				require.NotNil(t, node.IntegrationID, "%s must keep its GitHub connection after reset", id)
+				require.Equal(t, integration.ID.String(), *node.IntegrationID)
+			}
 			agent := findIntakeNode(version.Nodes, reviewRequestAgentNodeID)
 			require.NotNil(t, agent)
+			steps := agent.Configuration["steps"].([]any)
+			prompt := steps[1].(map[string]any)["prompt"].(string)
+			// The managed policy must replace an installed prompt during reset.
+			require.Contains(t, prompt, "Select a contributor to this pull request only when no eligible non-contributor is available.")
 			require.Equal(t, fallback, agent.Configuration["fallbackReviewer"])
 			require.Equal(t, models.FormatHostedLLMModelKey(models.UsageProviderOpenRouter, "anthropic/claude-sonnet-4-6"), agent.Configuration["model"])
 			require.Equal(t, "low", agent.Configuration["thinkingLevel"])

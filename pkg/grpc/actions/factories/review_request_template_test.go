@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -21,10 +22,13 @@ func TestReviewRequestSetupRequiresFlagAndWorkspaceSource(t *testing.T) {
 	db := database.DB(t.Context())
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 	canvas := support.CreateFactoryCanvas(t, r, factory.ID, "Review request")
+	integration, err := models.CreateIntegration(uuid.New(), r.Organization.ID, "github", "workspace-github", nil)
+	require.NoError(t, err)
 	request := &pb.MaterializeFactoryAppTemplateRequest{
 		FactoryId: factory.ID.String(), AppId: canvas.ID.String(), TemplateId: reviewRequestTemplateID,
+		Integrations: []*pb.FactoryAppTemplateIntegration{{Type: "github", Id: integration.ID.String(), Name: integration.InstallationName}},
 	}
-	_, err := MaterializeFactoryAppTemplate(ctx, r.Organization.ID.String(), request)
+	_, err = MaterializeFactoryAppTemplate(ctx, r.Organization.ID.String(), request)
 	code, _, ok := grpcerrors.HandlerStatus(err)
 	require.True(t, ok)
 	require.Equal(t, codes.FailedPrecondition, code)
@@ -37,6 +41,11 @@ func TestReviewRequestSetupRequiresFlagAndWorkspaceSource(t *testing.T) {
 	doc, err := yaml.CanvasFromYAML([]byte(response.CanvasYaml))
 	require.NoError(t, err)
 	require.Equal(t, source.ID.String(), findYAMLNode(t, doc, reviewRequestTriggerNodeID).Configuration["app"])
+	for _, id := range []string{"list-candidates", "request-reviewers"} {
+		node := findYAMLNode(t, doc, id)
+		require.NotNil(t, node.Integration, "%s must use the workspace GitHub connection", id)
+		require.Equal(t, integration.ID.String(), node.Integration.ID)
+	}
 	_, _, err = doc.Parse(r.Registry, r.Organization.ID.String())
 	require.NoError(t, err)
 	resetTestPublishCanvas(t, r, canvas, doc)

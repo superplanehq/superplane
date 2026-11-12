@@ -33,7 +33,7 @@ func (c *ListPullRequestReviewCandidates) Description() string {
 	return "Find eligible human reviewers for a pull request"
 }
 func (c *ListPullRequestReviewCandidates) Documentation() string {
-	return `List human collaborators with write, maintain, or admin access. Exclude the pull request author and bots. Read every page; incomplete discovery fails the execution. Output includes state, head, base, and candidate IDs and logins.`
+	return `List human collaborators with write, maintain, or admin access. Exclude the pull request author and bots. Read every page; incomplete discovery fails the execution. Output includes the pull request author, state, head, base, and candidate IDs and logins.`
 }
 func (c *ListPullRequestReviewCandidates) Icon() string  { return "github" }
 func (c *ListPullRequestReviewCandidates) Color() string { return "gray" }
@@ -100,6 +100,7 @@ func (c *ListPullRequestReviewCandidates) Execute(ctx core.ExecutionContext) err
 	}
 	return ctx.ExecutionState.Emit("default", "github.pullRequestReviewCandidates", []any{map[string]any{
 		"repository": config.Repository, "pullNumber": number, "state": pr.GetState(), "merged": pr.GetMerged(), "head": pr.Head, "base": pr.Base, "candidates": candidates,
+		"author": ReviewerIdentity{ID: pr.GetUser().GetID(), Login: pr.GetUser().GetLogin()},
 	}})
 }
 func (c *ListPullRequestReviewCandidates) Hooks() []core.Hook                      { return nil }
@@ -113,7 +114,8 @@ func (c *ListPullRequestReviewCandidates) Cleanup(core.SetupContext) error    { 
 func (c *ListPullRequestReviewCandidates) ExampleOutput() map[string]any {
 	return map[string]any{"type": "github.pullRequestReviewCandidates", "timestamp": "2026-01-01T09:00:00Z", "data": map[string]any{
 		"repository": "acme/app", "pullNumber": 42, "state": "open", "merged": false,
-		"head": map[string]any{"sha": "abc"}, "base": map[string]any{"ref": "main", "sha": "base-sha"},
+		"author": map[string]any{"id": 1, "login": "author"},
+		"head":   map[string]any{"sha": "abc"}, "base": map[string]any{"ref": "main", "sha": "base-sha"},
 		"candidates": []any{map[string]any{"id": 123, "login": "octocat"}},
 	}}
 }
