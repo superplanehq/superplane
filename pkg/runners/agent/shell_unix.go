@@ -212,6 +212,10 @@ type shellSession struct {
 }
 
 func (s *shellSession) appendOut(p []byte) {
+	// Keep live logs and failure diagnostics after the returned buffer fills.
+	if s.live != nil && len(p) > 0 {
+		_, _ = s.live.Write(p)
+	}
 	if s.maxOut <= 0 || len(p) == 0 {
 		return
 	}
@@ -222,16 +226,9 @@ func (s *shellSession) appendOut(p []byte) {
 	if len(p) > room {
 		s.out.Write(p[:room])
 		s.out.WriteString("\n…(truncated)")
-		if s.live != nil {
-			_, _ = s.live.Write(p[:room])
-			_, _ = s.live.Write([]byte("\n…(truncated)\n"))
-		}
 		return
 	}
 	s.out.Write(p)
-	if s.live != nil {
-		_, _ = s.live.Write(p)
-	}
 }
 
 func (s *shellSession) push(b []byte) {
