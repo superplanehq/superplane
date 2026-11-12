@@ -10,7 +10,11 @@ export function reviewRequestCanvas(): CanvasesCanvas {
           name: "On Merge confidence report",
           component: "onBroadcast",
           type: "TYPE_TRIGGER",
-          configuration: { enabled: true, app: "merge-confidence-app" },
+          configuration: {
+            enabled: true,
+            app: "merge-confidence-app",
+            filter: 'message.payload.type == "merge-confidence.completed"',
+          },
         },
         {
           id: "select-reviewers",
@@ -27,8 +31,8 @@ export function reviewRequestCanvas(): CanvasesCanvas {
         },
         {
           id: "request-reviewers",
-          name: "Request reviewers",
-          component: "github.addPullRequestReviewers",
+          name: "Ensure reviewers",
+          component: "github.ensurePullRequestReviewers",
           type: "TYPE_ACTION",
           integration: { id: "github-1", name: "GitHub" },
           configuration: {},

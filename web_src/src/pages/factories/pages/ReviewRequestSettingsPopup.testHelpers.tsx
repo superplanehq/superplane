@@ -31,10 +31,10 @@ const actions = [
       { name: "model", label: "Model", type: "hosted-model", typeOptions: { hostedModel: { provider: "all" } } },
     ],
   },
-  { name: "github.addPullRequestReviewers", label: "Request reviewers", configuration: [] },
+  { name: "github.ensurePullRequestReviewers", label: "Request reviewers", configuration: [] },
 ];
 const decision = {
-  reviewRequired: true,
+  status: "requested",
   rationale: "Ownership review is required for a cautious report.",
   reviewers: [{ login: "sam", reason: "Owns the changed package." }],
 };
@@ -55,7 +55,7 @@ class SettingsServer {
     rootEvent: { id: "report-event", nodeId: "review-request-trigger", data: {} },
     executions: [
       { id: "selection-1", nodeId: "select-reviewers" },
-      { id: "request-1", nodeId: "request-reviewers" },
+      { id: "outcome-1", nodeId: "request-reviewers" },
     ],
   };
   handlers: Map<string, Handler>;
@@ -144,16 +144,16 @@ class SettingsServer {
         state: "STATE_FINISHED",
         result: "RESULT_PASSED",
         outputs: {
-          passed: [{ data: { reviewRequest: { ...decision, rationale: "Agent decision before application." } } }],
+          passed: [{ data: { result: { rationale: "Agent decision before application." } } }],
         },
       },
       {
-        id: "request-1",
+        id: "outcome-1",
         runId: "run-1",
-        nodeId: "request-reviewers",
+        nodeId: "review-outcome",
         state: "STATE_FINISHED",
         result: "RESULT_PASSED",
-        metadata: { reviewRequest: decision },
+        outputs: { default: [{ data: { reviewRequest: decision } }] },
       },
     ];
   }

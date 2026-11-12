@@ -26,9 +26,6 @@ import (
 	"github.com/superplanehq/superplane/test/support/impl"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
-
-	// Ordinary behavior must not change when built-in automations are registered.
-	_ "github.com/superplanehq/superplane/pkg/factories/reviewrequest"
 )
 
 func newTestNodeExecutor(t *testing.T, r *support.ResourceRegistry) *NodeExecutor {

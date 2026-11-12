@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"maps"
 	"strings"
 
 	"github.com/google/go-github/v84/github"
@@ -133,19 +132,8 @@ func (c *AddPullRequestReviewers) Configuration() []configuration.Field {
 }
 
 func (c *AddPullRequestReviewers) Setup(ctx core.SetupContext) error {
-	configuration := ctx.Configuration
-	if fields, ok := configuration.(map[string]any); ok {
-		fields = maps.Clone(fields)
-		for _, field := range []string{"reviewers", "teamReviewers"} {
-			if expression, ok := fields[field].(string); ok && common.IsExpression(expression) {
-				// List expressions resolve before execution; setup validates the expression as one placeholder.
-				fields[field] = []string{expression}
-			}
-		}
-		configuration = fields
-	}
 	var config AddPullRequestReviewersConfiguration
-	if err := mapstructure.Decode(configuration, &config); err != nil {
+	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 

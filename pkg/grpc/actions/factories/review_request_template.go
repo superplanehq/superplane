@@ -3,7 +3,6 @@ package factories
 import (
 	"strings"
 
-	"github.com/superplanehq/superplane/pkg/factories/reviewrequest"
 	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -12,7 +11,7 @@ import (
 )
 
 const (
-	reviewRequestTemplateID    = reviewrequest.TemplateID
+	reviewRequestTemplateID    = "review-request"
 	reviewRequestTriggerNodeID = "review-request-trigger"
 	reviewRequestAgentNodeID   = "select-reviewers"
 )
