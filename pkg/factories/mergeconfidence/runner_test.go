@@ -1,7 +1,8 @@
-package runner_test
+package mergeconfidence_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -9,22 +10,24 @@ import (
 	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/factories/mergeconfidence"
+	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 )
 
 func TestParseMergeConfidenceChecks(t *testing.T) {
-	assert.Equal(t, []string{"risk", "drift"}, runner.ParseMergeConfidenceChecks([]string{
+	assert.Equal(t, []string{"risk", "drift"}, mergeconfidence.ParseMergeConfidenceChecks([]string{
 		"Review the diff.\nEnabled checks: risk, drift.\n",
 	}))
-	assert.Empty(t, runner.ParseMergeConfidenceChecks([]string{"Enabled checks: none."}))
-	assert.Empty(t, runner.ParseMergeConfidenceChecks([]string{"No checks line."}))
+	assert.Empty(t, mergeconfidence.ParseMergeConfidenceChecks([]string{"Enabled checks: none."}))
+	assert.Empty(t, mergeconfidence.ParseMergeConfidenceChecks([]string{"No checks line."}))
 }
 
 func TestMergeConfidenceChecksFromSteps(t *testing.T) {
 	risk := "Merge check: risk.\nScore the change."
 	custom := "Merge check: api-latency.\nScore the query."
-	ids, labels := runner.MergeConfidenceChecksFromSteps([]runner.AgentStep{
+	ids, labels := mergeconfidence.MergeConfidenceChecksFromSteps([]runner.AgentStep{
 		{Name: "Blast radius", Type: runner.AgentStepPrompt, Prompt: &risk},
 		{Name: "API latency", Type: runner.AgentStepPrompt, Prompt: &custom},
 	})
@@ -32,7 +35,7 @@ func TestMergeConfidenceChecksFromSteps(t *testing.T) {
 	assert.Equal(t, map[string]string{"risk": "Blast radius", "api-latency": "API latency"}, labels)
 
 	legacy := "Enabled checks: risk, drift.\n"
-	ids, labels = runner.MergeConfidenceChecksFromSteps([]runner.AgentStep{
+	ids, labels = mergeconfidence.MergeConfidenceChecksFromSteps([]runner.AgentStep{
 		{Name: "Review Pull Request", Type: runner.AgentStepPrompt, Prompt: &legacy},
 	})
 	assert.Equal(t, []string{"risk", "drift"}, ids)
@@ -41,13 +44,13 @@ func TestMergeConfidenceChecksFromSteps(t *testing.T) {
 
 func TestAttachMergeConfidenceEnvLeavesOtherRunsAlone(t *testing.T) {
 	environment := []runner.TaskEnvironmentVariable{{Name: "REPO", Value: "acme/app"}}
-	got, scope, err := runner.AttachMergeConfidenceEnv(core.ExecutionContext{}, environment, nil)
+	got, scope, err := mergeconfidence.AttachMergeConfidenceEnv(nil, core.ExecutionContext{}, environment, nil)
 	require.NoError(t, err)
 	assert.Equal(t, environment, got)
 	assert.Nil(t, scope)
 }
 
-func TestAttachMergeConfidenceEnvMintsToken(t *testing.T) {
+func TestMergeConfidenceScopeKeepsCheckAndRunIdentity(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
@@ -61,7 +64,7 @@ func TestAttachMergeConfidenceEnvMintsToken(t *testing.T) {
 	t.Setenv("BASE_URL", "https://app.example")
 
 	prompt := "Enabled checks: risk, security.\n"
-	environment, scope, err := runner.AttachMergeConfidenceEnv(core.ExecutionContext{
+	environment, scope, err := mergeconfidence.AttachMergeConfidenceEnv(database.DB(t.Context()), core.ExecutionContext{
 		ID:             executionID,
 		RunID:          runID,
 		WorkflowID:     canvas.ID.String(),
@@ -97,7 +100,7 @@ func TestAttachMergeConfidenceEnvRequiresFactoryCanvas(t *testing.T) {
 	t.Setenv("RUNNER_API_BASE_URL", "https://app.example")
 	t.Setenv("WEBHOOKS_BASE_URL", "https://app.example")
 
-	_, scope, err := runner.AttachMergeConfidenceEnv(core.ExecutionContext{
+	_, scope, err := mergeconfidence.AttachMergeConfidenceEnv(database.DB(t.Context()), core.ExecutionContext{
 		ID:             uuid.New(),
 		RunID:          uuid.New(),
 		WorkflowID:     canvas.ID.String(),
@@ -122,4 +125,52 @@ func environmentLookup(environment []runner.TaskEnvironmentVariable, name string
 func environmentHas(environment []runner.TaskEnvironmentVariable, name string) bool {
 	_, ok := environmentLookup(environment, name)
 	return ok
+}
+
+func TestPreparedRunnerCredentialsPreserveLegacyConfiguration(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	workspace, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	order, err := workspace.CreateWorkOrder(db, "Assess PR", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	canvas, _ := support.CreateFactoryAppWithOnRunTrigger(t, r, workspace.ID, "merge", "start")
+	root := support.EmitCanvasEventForNode(t, canvas.ID, "start", "default", nil)
+	execution := support.CreateCanvasNodeExecution(t, canvas.ID, "start", root.ID, root.ID)
+	t.Setenv("JWT_SECRET", "test")
+	signer := jwt.NewSigner("test")
+	for _, tc := range []struct {
+		name     string
+		timeout  any
+		lifetime time.Duration
+	}{
+		{"default timeout", nil, 90 * time.Minute}, {"string timeout", "1800", time.Hour},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := core.ExecutionContext{ID: execution.ID, RunID: execution.RunID, WorkflowID: canvas.ID.String(),
+				OrganizationID: r.Organization.ID.String(), NodeID: execution.NodeID, BaseURL: "https://app.example",
+				Configuration: map[string]any{
+					"environment": []map[string]any{{"name": runner.EnvSuperplaneMergeConfidenceOrderID, "value": order.ID.String(), "valueSource": "literal"}},
+					"prompt":      "Enabled checks: risk, security.",
+				}}
+			if tc.timeout != nil {
+				ctx.Configuration.(map[string]any)["executionTimeoutSeconds"] = tc.timeout
+			}
+			require.NoError(t, mergeconfidence.PrepareRunner(db, &ctx))
+			environment := runner.AttachRunnerEnv(ctx, []runner.TaskEnvironmentVariable{
+				{Name: runner.EnvSuperplaneMergeConfidenceOrderID, Value: order.ID.String()},
+				{Name: "SUPERPLANE_MERGE_CONFIDENCE_TOKEN", Value: "stale"},
+			}, runner.DefaultExecutionTimeoutSeconds)
+			require.False(t, environmentHas(environment, runner.EnvSuperplaneMergeConfidenceOrderID))
+			require.False(t, environmentHas(environment, "SUPERPLANE_MERGE_CONFIDENCE_TOKEN"))
+			token, ok := environmentLookup(environment, runner.EnvSuperplaneRunnerToken)
+			require.True(t, ok)
+			scope, err := runner.ParseRunnerToken(signer, token)
+			require.NoError(t, err)
+			assert.Equal(t, []string{"risk", "security"}, scope.MergeChecks)
+			claims, err := signer.ValidateAndGetClaims(token)
+			require.NoError(t, err)
+			assert.Equal(t, tc.lifetime.Seconds(), claims["exp"].(float64)-claims["iat"].(float64))
+		})
+	}
 }

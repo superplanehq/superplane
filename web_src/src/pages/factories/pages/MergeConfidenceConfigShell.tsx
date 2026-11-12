@@ -3,7 +3,7 @@ import type { RunsSidebarHrefForRun } from "@/components/CanvasToolSidebar/runsS
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { History, Settings } from "lucide-react";
-import { MergeConfidenceCanvasProvider } from "@/lib/mergeConfidenceCanvas";
+import { prepareMergeConfidenceDisplayGraph } from "./mergeConfidenceDisplayGraph";
 import { cn } from "@/lib/utils";
 import type { PointerEvent as ReactPointerEvent, ReactNode, RefObject } from "react";
 
@@ -72,7 +72,7 @@ interface MergeConfidenceConfigShellProps {
 
 export function MergeConfidenceConfigShell(props: MergeConfidenceConfigShellProps) {
   return (
-    <MergeConfidenceCanvasProvider>
+    <>
       {props.page ? (
         <section
           className="flex h-full min-h-0 flex-col overflow-hidden bg-background pt-[env(safe-area-inset-top)] dark:bg-gray-900"
@@ -86,7 +86,7 @@ export function MergeConfidenceConfigShell(props: MergeConfidenceConfigShellProp
           <MergeConfidenceConfigContent {...props} />
         </PopupShell>
       )}
-    </MergeConfidenceCanvasProvider>
+    </>
   );
 }
 
@@ -447,6 +447,7 @@ function MergeConfidenceCanvas({
   return (
     <SettingsAutomationWorkspace
       graph={graph}
+      prepareDisplayGraph={prepareMergeConfidenceDisplayGraph}
       testId="merge-confidence-config-canvas"
       canvasId={canvasId}
       runHrefFor={runHrefFor}
