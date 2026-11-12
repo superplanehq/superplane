@@ -506,8 +506,8 @@ func (e *NodeRequestExecutor) invokeExecutionComponentHook(
 	logger = logging.WithExecution(logger, execution)
 	taskID, _ := spec.InvokeAction.Parameters["task_id"].(string)
 	runnerTasks := contexts.NewRunnerTaskContext(tx, e.encryptor, workflow.OrganizationID)
-	prepareFactoryOutput := true
-	if models.IsAgentRunnerComponent(componentName) {
+	prepareFactoryOutput := models.IsAgentRunnerComponent(componentName)
+	if prepareFactoryOutput {
 		runnerTasks.WithSnapshot(taskID)
 		if spec.InvokeAction.ActionName == runner.HookPoll {
 			task, err := runnerTasks.Find(taskID)
