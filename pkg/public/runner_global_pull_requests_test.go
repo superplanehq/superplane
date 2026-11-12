@@ -39,7 +39,7 @@ func TestRunnerTaskPullRequests(t *testing.T) {
 		URL: "https://github.com/acme/api/pull/7", Title: "Change the API", State: models.FactoryPullRequestStateOpen,
 	})
 	require.NoError(t, err)
-	token := runnerTokenFrom(runner.AttachRunnerEnv(ctx, nil, 60, nil))
+	token := runnerTokenFrom(runner.AttachRunnerEnv(ctx, nil, 60))
 	require.NotEmpty(t, token)
 
 	rec := runnerRequest(t, server, http.MethodGet, token, "/api/v1/runner/task/pull-requests", "")

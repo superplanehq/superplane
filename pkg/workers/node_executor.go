@@ -609,7 +609,11 @@ func (w *NodeExecutor) executeActionNode(
 			}
 		}
 	}
-	if err := action.Execute(ctx); err != nil {
+	executeErr := contexts.PrepareFactoryAgentContext(tx, &ctx, componentName)
+	if executeErr == nil {
+		executeErr = action.Execute(ctx)
+	}
+	if err := executeErr; err != nil {
 		var busy *models.CodexConnectionBusyError
 		if errors.As(err, &busy) {
 			// Keep the execution pending while ChatGPT sign-in holds the subscription.

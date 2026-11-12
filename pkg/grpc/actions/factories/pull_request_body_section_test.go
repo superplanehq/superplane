@@ -138,7 +138,7 @@ func TestAssessmentCompletionEmitsStructuredMergeConfidence(t *testing.T) {
 			root, err := f.run.RootEvent(f.db)
 			require.NoError(t, err)
 			agent := support.CreateCanvasNodeExecution(t, f.canvas.ID, "agent", root.ID, root.ID)
-			state := workercontexts.NewExecutionStateContext(f.db, agent, nil)
+			state := workercontexts.NewFactoryExecutionStateContext(f.db, agent, nil)
 			require.NoError(t, state.Emit(channel, "runnerClaudeCode.finished", []any{map[string]any{"status": "finished"}}))
 			var event models.CanvasEvent
 			require.NoError(t, f.db.Where("execution_id = ?", agent.ID).First(&event).Error)
@@ -249,7 +249,7 @@ func TestMergeConfidenceTemplateReportFormat(t *testing.T) {
 }
 
 func TestAssessmentCompletionLeavesOtherAgentsUnchanged(t *testing.T) {
-	for _, scenario := range []string{"no scope", "wrong component", "nonfactory"} {
+	for _, scenario := range []string{"no scope", "wrong component", "nonfactory", "generic emission"} {
 		t.Run(scenario, func(t *testing.T) {
 			f := newPublicationFixture(t)
 			f.publishVersion(t, func(v *models.CanvasVersion) {
@@ -268,7 +268,10 @@ func TestAssessmentCompletionLeavesOtherAgentsUnchanged(t *testing.T) {
 			root, err := f.run.RootEvent(f.db)
 			require.NoError(t, err)
 			agent := support.CreateCanvasNodeExecution(t, f.canvas.ID, "agent", root.ID, root.ID)
-			state := workercontexts.NewExecutionStateContext(f.db, agent, nil)
+			state := workercontexts.NewFactoryExecutionStateContext(f.db, agent, nil)
+			if scenario == "generic emission" {
+				state = workercontexts.NewExecutionStateContext(f.db, agent, nil)
+			}
 			require.NoError(t, state.Emit("failed", "runnerClaudeCode.finished", []any{map[string]any{"status": "failed"}}))
 			var event models.CanvasEvent
 			require.NoError(t, f.db.Where("execution_id = ?", agent.ID).First(&event).Error)
@@ -286,8 +289,11 @@ func TestMergeConfidenceTemplateUsesRunSnapshots(t *testing.T) {
 	require.NoError(t, err)
 	f.report(t, other, 1)
 	require.NoError(t, f.db.Model(&models.CanvasNode{}).Where("workflow_id = ? AND node_id = ?", f.canvas.ID, "agent").Update("configuration", datatypes.NewJSONType(map[string]any{"steps": []any{}})).Error)
+	require.NoError(t, f.db.Model(&models.CanvasNode{}).Where("workflow_id = ? AND node_id = ?", f.canvas.ID, "agent").Update("ref", datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "runnerCodex"}})).Error)
 	f.publishVersion(t, func(version *models.CanvasVersion) {
-		findIntakeNode(version.Nodes, "agent").Configuration = map[string]any{"steps": []any{}}
+		current := findIntakeNode(version.Nodes, "agent")
+		current.Configuration = map[string]any{"steps": []any{}}
+		current.Ref.Component.Name = "runnerCodex"
 	})
 	execution, request := f.publicationRequest(t, "passed")
 	host := &contexts.HTTPContext{Responses: []*http.Response{publicationHTTPResponse(200, `{"state":"open","head":{"sha":"abc"},"body":"original"}`), publicationHTTPResponse(200, "{}")}}

@@ -23,13 +23,13 @@ func TestRunnerToolsFollowTheTokenScopes(t *testing.T) {
 	t.Setenv("JWT_SECRET", "test")
 	ctx, _, _ := mustTaskLinkedAgentRun(t, r)
 	server := newRunnerArtifactTestServer(t, r, jwt.NewSigner("test"))
-	token := runnerTokenFrom(runner.AttachRunnerEnv(ctx, nil, 60, nil))
+	token := runnerTokenFrom(runner.AttachRunnerEnv(ctx, nil, 60))
 	require.NotEmpty(t, token)
 
 	assert.Equal(t, everyGlobalRunnerTool, listRunnerTools(t, server, token))
 
 	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryMultiRepoTasks))
-	multiRepoToken := runnerTokenFrom(runner.AttachRunnerEnv(ctx, nil, 60, nil))
+	multiRepoToken := runnerTokenFrom(runner.AttachRunnerEnv(ctx, nil, 60))
 	assert.Equal(t, globalRunnerToolsWith("open_pull_request", "list_pull_requests"), listRunnerTools(t, server, multiRepoToken))
 
 	scope, err := runner.ParseRunnerToken(jwt.NewSigner("test"), token)
@@ -87,7 +87,7 @@ func TestPlanningRunnerTokenOwnsTheDraftTask(t *testing.T) {
 	env := runner.AttachRunnerEnv(ctx, []runner.TaskEnvironmentVariable{
 		{Name: runner.EnvSuperplanePlanningID, Value: session.ID.String()},
 		{Name: runner.EnvSuperplaneRunToken, Value: planningToken},
-	}, 60, nil)
+	}, 60)
 	token := runnerTokenFrom(env)
 	require.NotEmpty(t, token)
 	scope, err := runner.ParseRunnerToken(jwt.NewSigner("test"), token)
@@ -108,7 +108,7 @@ func TestPlanningRunnerTokenOwnsTheDraftTask(t *testing.T) {
 	require.NoError(t, db.Model(session).Update("state", models.PlanningSessionStateEnded).Error)
 	rec = assignRunnerOwner(t, server, token, `{"user":"planning-dev","reason":"Owns pkg/payments."}`)
 	assert.Equal(t, http.StatusConflict, rec.Code, rec.Body.String())
-	assert.False(t, runner.HasRunnerToken(runner.AttachRunnerEnv(ctx, env, 60, nil)))
+	assert.False(t, runner.HasRunnerToken(runner.AttachRunnerEnv(ctx, env, 60)))
 }
 
 // everyGlobalRunnerTool lists the tools that every run receives.

@@ -115,14 +115,14 @@ type RootEventScope struct {
 	// OtherKeyPrefixes match dedup keys that other start paths wrote for the
 	// same subject.
 	OtherKeyPrefixes []string
-	// LegacyPullRequest matches pull request events stored without a dedup key.
-	LegacyPullRequest *LegacyPullRequestEventMatch
+	// UnkeyedPayload matches legacy events that predate deduplication keys.
+	UnkeyedPayload []EventPayloadMatch
 }
 
-// LegacyPullRequestEventMatch identifies a pull request in an event payload.
-type LegacyPullRequestEventMatch struct {
-	Repository string
-	Number     string
+type EventPayloadMatch struct {
+	Path       []string
+	Values     []string
+	IgnoreCase bool
 }
 
 // CreateRootEventUnlessLatestInScope creates a root event with the dedup key
@@ -183,17 +183,18 @@ func (n *CanvasNode) latestRootEventInScope(tx *gorm.DB, scope RootEventScope) (
 	}
 	candidates = append(candidates, keyed...)
 
-	if legacy := scope.LegacyPullRequest; legacy != nil {
-		// Events stored before dedup keys existed keep the PR only in the payload.
+	if len(scope.UnkeyedPayload) > 0 {
+		// Legacy producers can identify their subject in the stored payload.
 		var unkeyed []CanvasEvent
-		err := tx.
-			Where("workflow_id = ? AND node_id = ? AND dedup_key IS NULL", n.WorkflowID, n.NodeID).
-			Where("data ->> 'type' IN ('github.pullRequest', 'bitbucket.pullRequest')").
-			Where("lower(data #>> '{data,repository,full_name}') = ?", strings.ToLower(strings.TrimSpace(legacy.Repository))).
-			Where("data #>> '{data,pull_request,number}' = ?", legacy.Number).
-			Order("created_at DESC, id DESC").
-			Limit(1).
-			Find(&unkeyed).Error
+		query := tx.Where("workflow_id = ? AND node_id = ? AND dedup_key IS NULL", n.WorkflowID, n.NodeID)
+		for _, match := range scope.UnkeyedPayload {
+			expression := "data #>> ?"
+			if match.IgnoreCase {
+				expression = "lower(" + expression + ")"
+			}
+			query = query.Where(expression+" IN ?", "{"+strings.Join(match.Path, ",")+"}", match.Values)
+		}
+		err := query.Order("created_at DESC, id DESC").Limit(1).Find(&unkeyed).Error
 		if err != nil {
 			return nil, err
 		}
