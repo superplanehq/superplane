@@ -291,11 +291,8 @@ func (a *Agent) runTask(
 		slog.Bool("canceled", execution.UserCanceled),
 		slog.Duration("duration", time.Since(startedAt)),
 	)
-	if execution.RunErr != nil && !execution.UserCanceled {
-		log.Error("task execution failed", slog.String("task_id", task.ID), slog.String("error", execution.errorMessage()))
-	}
 	if err := spool.Close(); err != nil {
-		return errors.Join(execution.RunErr, fmt.Errorf("close task log spool: %w", err))
+		return fmt.Errorf("close log spool for task %s: %w", task.ID, err)
 	}
 	if err := spool.Wait(taskContext); err != nil {
 		select {
@@ -303,7 +300,7 @@ func (a *Agent) runTask(
 			return sessionErr
 		default:
 		}
-		return errors.Join(execution.RunErr, fmt.Errorf("wait for task log acknowledgements: %w", err))
+		return fmt.Errorf("wait for log acknowledgements for task %s: %w", task.ID, err)
 	}
 	log.Info("task logs acknowledged", slog.String("task_id", task.ID))
 
@@ -321,7 +318,7 @@ func (a *Agent) runTask(
 			return sessionErr
 		default:
 		}
-		return errors.Join(execution.RunErr, fmt.Errorf("complete task: %w", err))
+		return fmt.Errorf("complete task %s: %w", task.ID, err)
 	}
 	log.Info(
 		"task completion acknowledged",
@@ -405,7 +402,7 @@ func (a *Agent) execute(
 	// Result handling must not replace the process failure that preceded it.
 	if resultTooLarge && exitCode == 0 && runErr == nil {
 		diagnostics.step = liveLogCommandStartRecord{Text: "Read task result", Index: -1}
-		diagnostics.output = ""
+		diagnostics.output.Reset()
 		exitCode = 1
 		runErr = fmt.Errorf("result payload too large: exceeds %d byte limit", resultLimit)
 	}
