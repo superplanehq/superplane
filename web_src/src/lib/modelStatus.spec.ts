@@ -38,6 +38,6 @@ describe("modelStatusMatrixRows", () => {
       score: undefined,
       band: "no-data",
     });
-    expect(MODEL_STATUS_DEFAULT_WINDOW).toBe("5m");
+    expect(MODEL_STATUS_DEFAULT_WINDOW).toBe("1h");
   });
 });

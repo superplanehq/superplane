@@ -24,9 +24,9 @@ export const ScoredAndEmptyCells: Story = {
       factoriesFixture={{
         ...defaultFactoriesFixture,
         modelStatusCells: [
-          { provider: "anthropic", model: "claude-sonnet-4-6", score: 100, callCount: 8, attempt1Count: 8 },
-          { provider: "openai", model: "gpt-5", score: 67, callCount: 3, attempt1Count: 2, errorCount: 1 },
-          { provider: "openrouter", model: "x-ai/grok-4.6", score: 0, callCount: 4, errorCount: 4 },
+          { provider: "anthropic", model: "claude-sonnet-4-6", score: 100 },
+          { provider: "openai", model: "gpt-5", score: 67 },
+          { provider: "openrouter", model: "x-ai/grok-4.6", score: 0 },
           { provider: "anthropic", model: "claude-opus-4-6" },
         ],
       }}

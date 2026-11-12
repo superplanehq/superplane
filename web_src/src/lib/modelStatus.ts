@@ -6,7 +6,7 @@ export const MODEL_STATUS_WINDOWS = ["5m", "15m", "1h", "24h"] as const;
 
 export type ModelStatusWindow = (typeof MODEL_STATUS_WINDOWS)[number];
 
-export const MODEL_STATUS_DEFAULT_WINDOW: ModelStatusWindow = "5m";
+export const MODEL_STATUS_DEFAULT_WINDOW: ModelStatusWindow = "1h";
 
 export type ModelStatusCell = {
   provider?: string;

@@ -265,7 +265,7 @@ message ListCodexUsageResponse {
 }
 
 message ListModelStatusRequest {
-  // Window of recent calls. One of 5m, 15m, 1h, 24h. Empty uses 5m.
+  // Window of recent calls. One of 5m, 15m, 1h, 24h. Empty uses 1h.
   string window = 1;
 }
 
@@ -278,12 +278,6 @@ message ModelStatusCell {
   string provider = 1;
   string model = 2;
   optional int32 score = 3;
-  int32 call_count = 4;
-  int32 attempt_1_count = 5;
-  int32 attempt_2_count = 6;
-  int32 attempt_3_count = 7;
-  int32 attempt_4_count = 8;
-  int32 error_count = 9;
 }
 
 message CodexUsageConnection {

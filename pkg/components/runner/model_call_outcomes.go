@@ -11,6 +11,10 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 )
 
+// The agent can write the task directory, including the usage sidecar.
+// One task cannot add more than this many rows to the shared status page.
+const maxModelCallOutcomesPerTask = 500
+
 type parsedModelCallOutcome struct {
 	Model      string `json:"model"`
 	Outcome    string `json:"outcome"`
@@ -58,6 +62,9 @@ func parseRunnerModelCallOutcomes(provider, taskID string, result json.RawMessag
 	}
 	inputs := make([]models.HostedModelCallOutcomeInput, 0, len(payload.ModelCallOutcomes))
 	for i, row := range payload.ModelCallOutcomes {
+		if len(inputs) == maxModelCallOutcomesPerTask {
+			break
+		}
 		model := modelid.CatalogModelID(row.Model)
 		if model == "" {
 			continue

@@ -37,8 +37,8 @@ func TestScoreHostedModelCallOutcomes(t *testing.T) {
 func TestHostedModelCallOutcomeWindowDuration(t *testing.T) {
 	window, duration, ok := models.HostedModelCallOutcomeWindowDuration("")
 	assert.True(t, ok)
-	assert.Equal(t, models.HostedModelCallOutcomeWindow5m, window)
-	assert.Equal(t, 5*time.Minute, duration)
+	assert.Equal(t, models.HostedModelCallOutcomeWindow1h, window)
+	assert.Equal(t, time.Hour, duration)
 
 	window, duration, ok = models.HostedModelCallOutcomeWindowDuration("24h")
 	assert.True(t, ok)

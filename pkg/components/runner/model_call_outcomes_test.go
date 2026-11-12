@@ -125,6 +125,37 @@ func TestProcessTaskStatusRecordsHostedModelCallOutcomes(t *testing.T) {
 	assert.True(t, rows[0].OccurredAt.UTC().Equal(occurredAt))
 }
 
+func TestRecordRunnerModelCallOutcomesCapsSamplesPerTask(t *testing.T) {
+	db := database.DB(t.Context())
+	t.Cleanup(func() {
+		_ = db.Where("runner_task_id = ?", "task-cap-1").Delete(&models.HostedModelCallOutcome{}).Error
+	})
+
+	rows := make([]map[string]any, maxModelCallOutcomesPerTask+1)
+	for i := range rows {
+		rows[i] = map[string]any{"model": "gpt-5", "outcome": "attempt_1"}
+	}
+	result, err := json.Marshal(map[string]any{"modelCallOutcomes": rows})
+	require.NoError(t, err)
+	RecordRunnerModelCallOutcomes(
+		nil,
+		"task-cap-1",
+		"runnerSuperPlane.finished",
+		map[string]any{
+			"hostedProvider": models.UsageProviderOpenAI,
+			"credentials":    map[string]any{"source": CredentialsSourceHosted},
+		},
+		result,
+		time.Time{},
+	)
+
+	var stored []models.HostedModelCallOutcome
+	require.NoError(t, db.Where("runner_task_id = ?", "task-cap-1").Order("sequence").Find(&stored).Error)
+	require.Len(t, stored, 500)
+	assert.Equal(t, 1, stored[0].Sequence)
+	assert.Equal(t, 500, stored[len(stored)-1].Sequence)
+}
+
 func TestRecordRunnerModelCallOutcomesClampsTimestampsBeforeTaskStart(t *testing.T) {
 	db := database.DB(t.Context())
 	t.Cleanup(func() {

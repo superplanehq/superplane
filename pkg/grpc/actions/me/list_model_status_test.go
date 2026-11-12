@@ -66,21 +66,17 @@ func TestListModelStatusReturnsScoredAndEmptyAllowlistCells(t *testing.T) {
 
 	response, err := ListModelStatus(meContext(r), &pb.ListModelStatusRequest{})
 	require.NoError(t, err)
-	assert.Equal(t, models.HostedModelCallOutcomeWindow5m, response.Window)
+	assert.Equal(t, models.HostedModelCallOutcomeWindow1h, response.Window)
 	require.Len(t, response.Cells, 2)
 
 	opus := response.Cells[0]
 	assert.Equal(t, models.UsageProviderAnthropic, opus.Provider)
 	assert.Equal(t, "claude-opus-4-6", opus.Model)
 	assert.Nil(t, opus.Score)
-	assert.Zero(t, opus.CallCount)
 
 	sonnet := response.Cells[1]
 	assert.Equal(t, models.UsageProviderAnthropic, sonnet.Provider)
 	assert.Equal(t, "claude-sonnet-4-6", sonnet.Model)
 	require.NotNil(t, sonnet.Score)
 	assert.Equal(t, int32(100), *sonnet.Score)
-	assert.Zero(t, sonnet.CallCount)
-	assert.Zero(t, sonnet.Attempt_1Count)
-	assert.Zero(t, sonnet.ErrorCount)
 }

@@ -32,19 +32,19 @@ function renderPage(client?: QueryClient) {
 }
 
 describe("FactorySettingsOrganizationModelStatusPage", () => {
-  it("loads the 5-minute window by default", async () => {
+  it("loads the 1-hour window by default", async () => {
     const load = vi.mocked(meListModelStatus);
-    load.mockResolvedValue({ data: { window: "5m", cells: [] }, error: undefined });
+    load.mockResolvedValue({ data: { window: "1h", cells: [] }, error: undefined });
     const view = renderPage();
     await waitFor(() => expect(load).toHaveBeenCalled());
     expect(load).toHaveBeenCalledWith(
       expect.objectContaining({
-        query: { window: "5m" },
+        query: { window: "1h" },
         headers: expect.objectContaining({ "x-organization-id": "org-1" }),
       }),
     );
     const windowControl = screen.getByLabelText("Window");
-    expect(windowControl).toHaveTextContent("5 minutes");
+    expect(windowControl).toHaveTextContent("1 hour");
     expect(windowControl).toHaveAttribute("id", "model-status-window");
     expect(
       screen.getByText("No SuperPlane-hosted models and no hosted agent calls in this window."),
@@ -56,14 +56,12 @@ describe("FactorySettingsOrganizationModelStatusPage", () => {
     render(
       <ModelStatusMatrix
         cells={[
-          { provider: "anthropic", model: "claude-sonnet-4-6", score: 100, callCount: 3 },
+          { provider: "anthropic", model: "claude-sonnet-4-6", score: 100 },
           { provider: "anthropic", model: "claude-opus-4-6" },
         ]}
       />,
     );
-    const scored = screen.getByTestId("model-status-cell-anthropic-claude-sonnet-4-6");
-    expect(scored).toHaveTextContent("100");
-    expect(scored).not.toHaveTextContent("3 calls");
+    expect(screen.getByTestId("model-status-cell-anthropic-claude-sonnet-4-6")).toHaveTextContent("100");
     expect(screen.getByTestId("model-status-cell-anthropic-claude-opus-4-6")).toHaveTextContent("No data");
     expect(screen.getByTestId("model-status-cell-openai-claude-sonnet-4-6")).toHaveTextContent("No data");
   });

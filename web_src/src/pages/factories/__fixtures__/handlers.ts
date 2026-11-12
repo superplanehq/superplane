@@ -1769,7 +1769,7 @@ function modelStatusRoute(fixture: FactoriesFixture): FactoriesRoute {
       if (fixture.modelStatusError) {
         return { status: 503, json: { message: "Could not load model status." } };
       }
-      return { json: { window: url.searchParams.get("window") || "5m", cells: fixture.modelStatusCells ?? [] } };
+      return { json: { window: url.searchParams.get("window") || "1h", cells: fixture.modelStatusCells ?? [] } };
     },
   };
 }

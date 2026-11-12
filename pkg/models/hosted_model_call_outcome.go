@@ -93,7 +93,7 @@ func IsHostedModelCallOutcome(outcome string) bool {
 func HostedModelCallOutcomeWindowDuration(window string) (string, time.Duration, bool) {
 	normalized := strings.TrimSpace(window)
 	if normalized == "" {
-		normalized = HostedModelCallOutcomeWindow5m
+		normalized = HostedModelCallOutcomeWindow1h
 	}
 	duration, ok := hostedModelCallOutcomeWindows[normalized]
 	return normalized, duration, ok
