@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Console
+metadata:
+  name: Review request
+  canvasId: __FACTORY_CANVAS_ID__
+spec:
+  panels:
+    - id: about
+      type: markdown
+      content:
+        title: Review request
+        body: |
+          Select human reviewers after Merge confidence completes.
+          Open Runs to inspect each decision, its rationale, and any errors.
+  layout:
+    - {i: about, x: 0, y: 0, w: 12, h: 4}
