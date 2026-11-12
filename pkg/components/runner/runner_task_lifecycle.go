@@ -138,9 +138,6 @@ func processTaskStatus(
 			"status":          status,
 			"exit_code":       taskExitCode(task),
 		}
-		if errorMessage != "" {
-			fields["error"] = errorMessage
-		}
 		logger.WithFields(fields).Warn("runner: task failed")
 	}
 	return state.Emit(channel, finishedEventType, []any{out})

@@ -299,8 +299,8 @@ func TestPollTaskExposesCodexFailureCause(t *testing.T) {
 		},
 		{
 			name:          "preserved runner diagnostics remain unchanged",
-			runnerError:   "Check pull requests (step 3) (exit code 23): Authentication failed.\nLogs: runner task task-1.",
-			expectedError: "Check pull requests (step 3) (exit code 23): Authentication failed.",
+			runnerError:   "Check pull requests (step 3) (exit code 23): Authentication failed.\nOutput excerpt:\nprivate task output\nLogs: runner task task-1.",
+			expectedError: "Check pull requests (step 3) (exit code 23): Authentication failed.\nOutput excerpt:\nprivate task output",
 		},
 		{
 			name:          "runner timeout takes precedence",
@@ -366,11 +366,7 @@ func TestPollTaskExposesCodexFailureCause(t *testing.T) {
 			assert.Equal(t, "root-1", entry.Data["root_event"])
 			assert.Equal(t, "failed", entry.Data["status"])
 			assert.Equal(t, 1, entry.Data["exit_code"])
-			if tc.expectedError == "" {
-				assert.NotContains(t, entry.Data, "error")
-			} else {
-				assert.Equal(t, tc.expectedError, entry.Data["error"])
-			}
+			assert.NotContains(t, entry.Data, "error")
 			assert.NotContains(t, entry.Data, "result")
 			logged, err := json.Marshal(entry.Data)
 			require.NoError(t, err)
