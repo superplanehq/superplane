@@ -227,10 +227,11 @@ func withoutEnvironmentName(environment []runner.TaskEnvironmentVariable, name s
 func PrepareRunner(tx *gorm.DB, ctx *core.ExecutionContext) error {
 	ctx.RunnerEnvironmentRemove = []string{legacyMergeConfidenceToken, runner.EnvSuperplaneMergeConfidenceOrderID}
 	var configuration struct {
-		Environment []runner.EnvironmentVariable `mapstructure:"environment"`
-		Steps       []runner.AgentStep           `mapstructure:"steps"`
-		Prompt      string                       `mapstructure:"prompt"`
-		Timeout     int                          `mapstructure:"executionTimeoutSeconds"`
+		EnvironmentFrom []runner.EnvironmentFromEntry `mapstructure:"environmentFrom"`
+		Environment     []runner.EnvironmentVariable  `mapstructure:"environment"`
+		Steps           []runner.AgentStep            `mapstructure:"steps"`
+		Prompt          string                        `mapstructure:"prompt"`
+		Timeout         int                           `mapstructure:"executionTimeoutSeconds"`
 	}
 	decoder, err := runner.NewSpecDecoder(&configuration)
 	if err != nil {
@@ -239,19 +240,13 @@ func PrepareRunner(tx *gorm.DB, ctx *core.ExecutionContext) error {
 	if err := decoder.Decode(ctx.Configuration); err != nil {
 		return err
 	}
-	var scoped []runner.EnvironmentVariable
-	for _, variable := range configuration.Environment {
-		if variable.Name == runner.EnvSuperplaneMergeConfidenceOrderID {
-			scoped = append(scoped, variable)
-		}
-	}
-	if len(scoped) == 0 {
-		return nil
-	}
-	if err := runner.ValidateEnvironment(scoped); err != nil {
+	if err := runner.ValidateEnvironmentFrom(configuration.EnvironmentFrom); err != nil {
 		return err
 	}
-	resolved, err := runner.ResolveEnvironment(ctx.Secrets, nil, scoped)
+	if err := runner.ValidateEnvironment(configuration.Environment); err != nil {
+		return err
+	}
+	resolved, err := runner.ResolveEnvironment(ctx.Secrets, configuration.EnvironmentFrom, configuration.Environment)
 	if err != nil {
 		return err
 	}
