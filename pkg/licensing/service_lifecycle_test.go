@@ -122,7 +122,30 @@ func TestServiceSkipsLifecycleWhenReloadFailsOrLicenseIsDevelopment(t *testing.T
 	require.NoError(t, devService.Refresh(context.Background()))
 	assert.True(t, devService.Status().IsDevelopment())
 	assert.Equal(t, 0, devHandler.count())
-	assert.True(t, devService.IsEntitled(licensing.FeatureGroups))
+	assert.True(t, devService.IsEntitled(context.Background(), uuid.Nil, licensing.FeatureGroups))
+}
+
+func TestDryRunInstallDoesNotStoreTheLicense(t *testing.T) {
+	issuer := licensingtest.NewIssuer("test-2026-01")
+	source := &memorySource{}
+	service := licensing.NewService(licensing.NewVerifier(licensingtest.KeySet(issuer)), source)
+	raw := issuer.License(licensing.FeatureGroups)
+
+	license, err := service.DryRunInstall(context.Background(), raw)
+	require.NoError(t, err)
+	assert.True(t, license.HasFeature(licensing.FeatureGroups))
+	assert.Nil(t, source.raw)
+	assert.Equal(t, licensing.StateNone, service.Status().State)
+
+	claims := licensingtest.Claims(licensing.FeatureGroups)
+	claims["exp"] = time.Now().Add(-time.Hour).Unix()
+	_, err = service.DryRunInstall(context.Background(), issuer.Sign(claims))
+	assert.Error(t, err)
+	assert.Nil(t, source.raw)
+
+	fileService := licensingtest.EnterpriseService(licensing.FeatureGroups)
+	_, err = fileService.DryRunInstall(context.Background(), raw)
+	assert.ErrorIs(t, err, licensing.ErrManagedByFile)
 }
 
 func TestServiceLifecycleErrorDoesNotFailTheLoad(t *testing.T) {
@@ -136,7 +159,7 @@ func TestServiceLifecycleErrorDoesNotFailTheLoad(t *testing.T) {
 	handler.service = service
 
 	require.NoError(t, service.Refresh(context.Background()))
-	assert.True(t, service.IsEntitled(licensing.FeatureGroups))
+	assert.True(t, service.Status().IsEntitled(licensing.FeatureGroups))
 
 	_, err := service.Install(context.Background(), issuer.License(licensing.FeatureGroups), uuid.New())
 	require.NoError(t, err)

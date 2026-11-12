@@ -24,6 +24,25 @@ export type InstallationLicense = {
     expires_at: string;
   };
   trusted_keys?: TrustedKeys;
+  feature_counts?: Record<string, number>;
+  organization_count?: number;
+  event?: "activation" | "replacement" | "none" | "";
+  removed_grants?: LicenseGrantChange[];
+  auto_grant_organization_id?: string;
+  auto_grant_organization_name?: string;
+};
+
+export type LicenseGrantChange = {
+  organization_id: string;
+  organization_name: string;
+  feature_key: string;
+};
+
+export type LicenseInstallPreview = {
+  event: string;
+  removed_grants: LicenseGrantChange[];
+  auto_grant_organization_id: string;
+  auto_grant_organization_name: string;
 };
 
 export type AccountLicense = {
@@ -32,6 +51,7 @@ export type AccountLicense = {
   state?: LicenseState;
   expires_at?: string;
   hide_expiry_banner?: boolean;
+  organization_count?: number;
 };
 
 export const FEATURE_GITHUB_ENTERPRISE = "github_enterprise";
@@ -45,6 +65,14 @@ export const ENTERPRISE_FEATURES = [
     description: "Connect GitHub Enterprise Cloud (ghe.com) with a private GitHub App.",
   },
 ] as const;
+
+export const enterpriseFeatureLabel = (key: string) =>
+  ENTERPRISE_FEATURES.find((feature) => feature.key === key)?.label ?? key;
+
+export const hasOrganizationEnterpriseFeature = (
+  organization: { enterpriseFeatures?: string[] } | null | undefined,
+  feature: string,
+) => organization?.enterpriseFeatures?.includes(feature) === true;
 
 export const LICENSE_EXPIRY_WARNING_DAYS = 30;
 
@@ -163,3 +191,36 @@ export const removeInstallationLicense = async () =>
     await fetch(LICENSE_PATH, { method: "DELETE", credentials: "include" }),
     "Failed to remove the license",
   );
+
+export const previewInstallationLicense = async (license: string): Promise<LicenseInstallPreview> => {
+  const response = await fetch(`${LICENSE_PATH}?dry_run=true`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ license: license.trim() }),
+  });
+  if (!response.ok) {
+    throw await responseError(response, "Failed to install the license");
+  }
+
+  const body = (await response.json()) as Partial<LicenseInstallPreview>;
+  return {
+    event: body.event ?? "none",
+    removed_grants: body.removed_grants ?? [],
+    auto_grant_organization_id: body.auto_grant_organization_id ?? "",
+    auto_grant_organization_name: body.auto_grant_organization_name ?? "",
+  };
+};
+
+export const previewLicenseRemoval = async (): Promise<LicenseGrantChange[]> => {
+  const response = await fetch(`${LICENSE_PATH}?dry_run=true`, {
+    method: "DELETE",
+    credentials: "include",
+  });
+  if (!response.ok) {
+    throw await responseError(response, "Failed to remove the license");
+  }
+
+  const body = (await response.json()) as { removed_grants?: LicenseGrantChange[] };
+  return body.removed_grants ?? [];
+};
