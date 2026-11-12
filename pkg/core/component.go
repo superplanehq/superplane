@@ -54,6 +54,8 @@ type ExecutionContext struct {
 	HostedLLM         HostedLLMContext
 	RunnerTasks       RunnerTaskContext
 	CodexSubscription CodexSubscriptionContext
+	// ResolvedEnvironment stays in this execution so startup does not resolve credentials twice.
+	ResolvedEnvironment *ResolvedEnvironment
 	// RunnerEnvironment is prepared by the trusted owner, never decoded from component configuration.
 	RunnerEnvironment       map[string]string
 	RunnerEnvironmentRemove []string

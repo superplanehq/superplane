@@ -30,6 +30,11 @@ configuration cannot supply these values directly. Shared runner preparation
 removes internal markers and applies the prepared credentials. Ordinary agents
 retain their planning and task paths, including Additional instructions.
 
+Startup resolves environment imports and explicit values once per execution.
+The execution context carries these variables, usage instructions, and setup
+scripts to the agent component. The result is not persisted or shared with
+other executions. Marker selection and removal use the same resolved variables.
+
 Signed claims, tool permissions, legacy token handling, and active execution
 authorization remain runner contracts. Moving preparation does not relax them.
 

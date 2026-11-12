@@ -250,6 +250,7 @@ func PrepareRunner(tx *gorm.DB, ctx *core.ExecutionContext) error {
 	if err != nil {
 		return err
 	}
+	ctx.ResolvedEnvironment = &resolved
 	if configuration.Timeout <= 0 {
 		configuration.Timeout = runner.DefaultExecutionTimeoutSeconds
 	}
