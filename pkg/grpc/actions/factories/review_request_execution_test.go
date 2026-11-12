@@ -40,6 +40,8 @@ type reviewRequestHTTP struct {
 	discoveryError  bool
 	permissionError bool
 	movedHead       bool
+	// pushDuringLookups moves the head after the permission lookup.
+	pushDuringLookups bool
 }
 
 func (h *reviewRequestHTTP) Do(request *http.Request) (*http.Response, error) {
@@ -69,6 +71,7 @@ func (h *reviewRequestHTTP) Do(request *http.Request) (*http.Response, error) {
 		if h.permissionError {
 			return publicationHTTPResponse(403, `{"message":"Forbidden"}`), nil
 		}
+		h.movedHead = h.movedHead || h.pushDuringLookups
 		return publicationHTTPResponse(200, `{"permission":"write","role_name":"write"}`), nil
 	}
 	if strings.HasSuffix(path, "/reviews") {
@@ -223,7 +226,7 @@ func linkReviewRequestRun(db *gorm.DB, canvas *models.Canvas, root *models.Canva
 }
 
 func TestReviewRequestFromPublishedReportToGitHub(t *testing.T) {
-	for _, scenario := range []string{"favorable", "favorable queued request", "concerning", "hosted agent", "concerning no review", "fallback", "no candidate", "malformed output", "reported lookup error", "agent failure", "author selected", "bot selected", "reader selected", "additional reviewer without reason", "additional reviewer", "discovery error", "permission error", "qualifying approval", "already requested", "head moved", "stale before mutation", "paused after load", "superseded before link"} {
+	for _, scenario := range []string{"favorable", "favorable queued request", "concerning", "hosted agent", "concerning no review", "fallback", "no candidate", "malformed output", "reported lookup error", "agent failure", "author selected", "bot selected", "reader selected", "additional reviewer without reason", "additional reviewer", "discovery error", "permission error", "qualifying approval", "already requested", "head moved", "head moved during lookups", "stale before mutation", "paused after load", "superseded before link"} {
 		t.Run(scenario, func(t *testing.T) {
 			host := &reviewRequestHTTP{}
 			score := 2.0
@@ -409,6 +412,7 @@ func TestReviewRequestFromPublishedReportToGitHub(t *testing.T) {
 			host.alreadyAsked = scenario == "already requested"
 			host.permissionError = scenario == "permission error"
 			host.movedHead = scenario == "head moved"
+			host.pushDuringLookups = scenario == "head moved during lookups"
 			requestContext := core.ExecutionContext{RunID: run.ID, Configuration: request.Configuration.Data(), Integration: reviewRequestIntegration(), HTTP: host, ExecutionState: workercontexts.NewExecutionStateContext(f.db, request, nil)}
 			// A push recorded after the GitHub reads and before the lock moves the saved revision.
 			var push func()
@@ -421,6 +425,9 @@ func TestReviewRequestFromPublishedReportToGitHub(t *testing.T) {
 			handled, err = prepareReviewRequestAction(t, f, host, consumer, request, &requestContext, push)
 			if host.permissionError || host.movedHead || push != nil {
 				require.Error(t, err)
+				if host.pushDuringLookups {
+					require.ErrorContains(t, err, "does not assess the current open pull request", "a push during the GitHub lookups must stop the reviewer request")
+				}
 				if push != nil {
 					require.ErrorIs(t, err, models.ErrReviewRequestSuperseded, "the saved revision must fence reviewer requests after the GitHub reads")
 				}

@@ -70,12 +70,9 @@ func loadAction(load lifecycle.ActionLoad) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	remote, _, err := client.GetPullRequest(context.Background(), state.repository, state.number)
+	remote, err := readAssessedPullRequest(client, state)
 	if err != nil {
-		return nil, fmt.Errorf("Read Review request pull request: %w", err)
-	}
-	if remote.GetState() != "open" || remote.GetHead().GetSHA() != state.sha || remote.GetMerged() {
-		return nil, fmt.Errorf("Review request report does not assess the current open pull request")
+		return nil, err
 	}
 	author := remote.GetUser().GetLogin()
 	if author == "" {
@@ -113,7 +110,27 @@ func loadAction(load lifecycle.ActionLoad) (any, error) {
 			return nil, fmt.Errorf("Read existing pull request reviews: %w", err)
 		}
 	}
+	// A push during the lookups above can arrive before its webhook updates
+	// the saved revision. Read the head again as the last provider call.
+	remote, err = readAssessedPullRequest(client, state)
+	if err != nil {
+		return nil, err
+	}
+	state.requested = remote.RequestedReviewers
 	return state, nil
+}
+
+// readAssessedPullRequest reads the pull request and requires that it is
+// open and that its head is the commit that the report assessed.
+func readAssessedPullRequest(client *githubcommon.Client, state *pullRequestState) (*github.PullRequest, error) {
+	remote, _, err := client.GetPullRequest(context.Background(), state.repository, state.number)
+	if err != nil {
+		return nil, fmt.Errorf("Read Review request pull request: %w", err)
+	}
+	if remote.GetState() != "open" || remote.GetHead().GetSHA() != state.sha || remote.GetMerged() {
+		return nil, fmt.Errorf("Review request report does not assess the current open pull request")
+	}
+	return remote, nil
 }
 
 // prepareAction checks authority under the PR lock and applies the GitHub
