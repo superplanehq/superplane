@@ -11,15 +11,76 @@ import (
 	"github.com/stretchr/testify/require"
 	factorycomponent "github.com/superplanehq/superplane/pkg/components/factory"
 	"github.com/superplanehq/superplane/pkg/components/runner"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/factories/mergeconfidence"
 	"github.com/superplanehq/superplane/pkg/models"
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
 	"github.com/superplanehq/superplane/test/support"
+	"github.com/superplanehq/superplane/test/support/impl"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
+
+func TestNodeRequestExecutorSkipsMergeConfidenceForUnrelatedPolls(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	db := database.DB(t.Context())
+	workspace, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("poll"), "", "")
+	require.NoError(t, err)
+	componentName := "unrelated_poll_" + uuid.NewString()
+	r.Registry.Actions[componentName] = impl.NewDummyAction(impl.DummyActionOptions{
+		Name: componentName, Hooks: []core.Hook{{Name: "poll", Type: core.HookTypeInternal}},
+		HandleHookFunc: func(ctx core.ActionHookContext) error {
+			return ctx.Requests.ScheduleActionCall("poll", nil, time.Minute)
+		},
+	})
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{{
+		NodeID: "unrelated", Type: models.NodeTypeComponent,
+		Ref: datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: componentName}}),
+	}}, nil)
+	require.NoError(t, db.Model(canvas).Update("factory_id", workspace.ID).Error)
+	root := support.EmitCanvasEventForNode(t, canvas.ID, "unrelated", "default", nil)
+	execution := support.CreateNodeExecutionWithConfiguration(t, canvas.ID, "unrelated", root.ID, root.ID, map[string]any{})
+	require.Empty(t, execution.FrozenComponentName())
+	require.NoError(t, db.Model(execution).Update("state", models.CanvasNodeExecutionStateStarted).Error)
+	require.NoError(t, contexts.NewExecutionRequestContext(db, execution).ScheduleActionCall("poll", nil, time.Minute))
+
+	reads := map[string]int{}
+	queries := db.Callback().Query()
+	name := "test:unrelated-poll:" + uuid.NewString()
+	require.NoError(t, queries.Before("gorm:query").Register(name, func(tx *gorm.DB) {
+		if slices.Contains([]string{"workflows", "workflow_runs", "workflow_versions"}, tx.Statement.Table) {
+			reads[tx.Statement.Table]++
+		}
+	}))
+	defer func() { require.NoError(t, queries.Remove(name)) }()
+	executor := NewNodeRequestExecutor(r.Encryptor, r.Registry, "", r.AuthService)
+	var previousID uuid.UUID
+	for range 3 {
+		var pending []models.CanvasNodeRequest
+		require.NoError(t, db.Where("execution_id = ? AND state = ?", execution.ID, models.NodeExecutionRequestStatePending).Find(&pending).Error)
+		require.Len(t, pending, 1, "unfinished polls must keep one scheduled request")
+		request := pending[0]
+		assert.NotEqual(t, previousID, request.ID)
+		assert.Equal(t, "poll", request.Spec.Data().InvokeAction.ActionName)
+		assert.True(t, request.RunAt.After(time.Now()))
+		clear(reads)
+		require.NoError(t, executor.RunNow(request))
+		// The hook needs its canvas; Merge Confidence must add no canvas, run, or version reads.
+		assert.Equal(t, map[string]int{"workflows": 1}, reads)
+		previousID = request.ID
+	}
+	var pending int64
+	require.NoError(t, db.Model(&models.CanvasNodeRequest{}).Where("execution_id = ? AND state = ?", execution.ID, models.NodeExecutionRequestStatePending).Count(&pending).Error)
+	assert.EqualValues(t, 1, pending)
+	require.NoError(t, db.First(execution, "id = ?", execution.ID).Error)
+	assert.Equal(t, models.CanvasNodeExecutionStateStarted, execution.State)
+	var completions int64
+	require.NoError(t, db.Model(&models.CanvasEvent{}).Where("execution_id = ?", execution.ID).Count(&completions).Error)
+	assert.Zero(t, completions)
+}
 
 func TestNodeRequestExecutorPreparesMergeConfidenceOnlyOnTerminalPoll(t *testing.T) {
 	for _, outcome := range []string{"succeeded", "failed", "lookup failure"} {
