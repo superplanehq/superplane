@@ -26,12 +26,13 @@ type failureDiagnostics struct {
 	pending       []byte
 	oversizedLine bool
 	step          liveLogCommandStartRecord
-	output        string
+	output        bytes.Buffer
 	failed        *failedStep
 }
 type failedStep struct {
-	step   liveLogCommandStartRecord
-	output string
+	step         liveLogCommandStartRecord
+	output       string
+	outputFrozen bool
 }
 
 func (d *failureDiagnostics) Write(p []byte) (int, error) {
@@ -44,7 +45,7 @@ func (d *failureDiagnostics) Write(p []byte) (int, error) {
 			} else {
 				d.line(d.pending)
 			}
-			d.pending = nil
+			d.pending = d.pending[:0]
 			d.oversizedLine = false
 			continue
 		}
@@ -70,14 +71,19 @@ func (d *failureDiagnostics) line(line []byte) {
 		if record.Type == "cmd_start" {
 			var start liveLogCommandStartRecord
 			if json.Unmarshal(line, &start) == nil {
+				if d.failed != nil && !d.failed.outputFrozen {
+					d.failed.output = d.output.String()
+					d.failed.outputFrozen = true
+				}
 				d.step = start
-				d.output = ""
+				d.output.Reset()
 			}
 			return
 		}
 		if record.Type == "cmd_end" {
 			if record.Status == "failed" && d.failed == nil && record.Index == d.step.Index {
-				d.failed = &failedStep{d.step, d.output}
+				// Stderr can arrive after cmd_end when stdout uses a separate pipe.
+				d.failed = &failedStep{step: d.step}
 			}
 			return
 		}
@@ -85,15 +91,15 @@ func (d *failureDiagnostics) line(line []byte) {
 	d.appendOutput(string(line) + "\n")
 }
 func (d *failureDiagnostics) appendOutput(line string) {
-	d.output += line
+	d.output.WriteString(line)
 	// Discard complete lines so a cut cannot expose part of a redacted value.
-	for len(d.output) > diagnosticCaptureBytes {
-		_, tail, found := strings.Cut(d.output, "\n")
-		if !found {
-			d.output = ""
+	for d.output.Len() > diagnosticCaptureBytes {
+		newline := bytes.IndexByte(d.output.Bytes(), '\n')
+		if newline < 0 {
+			d.output.Reset()
 			return
 		}
-		d.output = tail
+		d.output.Next(newline + 1)
 	}
 }
 
@@ -108,6 +114,11 @@ func diagnosticEnvironmentValues(task *api.TaskPayload) []string {
 		}
 	}
 	for _, variable := range task.Environment {
+		// Without secret provenance, only known runner controls are safe to skip.
+		switch variable.Name {
+		case "CHECKOUT_COMMIT_SETUP", "SUPERPLANE_EXECUTION_TIMEOUT_SECONDS", "PAGER", "GIT_PAGER", "GH_PAGER":
+			continue
+		}
 		values = append(values, strings.Split(variable.Value, "\n")...)
 	}
 	return values
@@ -119,9 +130,12 @@ func (d *failureDiagnostics) failure(task *api.TaskPayload, code int, runErr err
 	if !d.oversizedLine {
 		d.line(d.pending)
 	}
-	step, output := d.step, d.output
+	step, output := d.step, d.output.String()
 	if d.failed != nil {
-		step, output = d.failed.step, d.failed.output
+		step = d.failed.step
+		if d.failed.outputFrozen {
+			output = d.failed.output
+		}
 	}
 	values := diagnosticEnvironmentValues(task)
 	cause := "Process failed without an error message."
