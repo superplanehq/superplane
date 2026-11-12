@@ -164,13 +164,12 @@ func runHostShellDirectivesPipe(ctx context.Context, maxOut int, workDir string,
 	}
 	var buf bytes.Buffer
 	w := &cappedShellWriter{buf: &buf, max: max}
+	cmd.Stdout = w
 	if live != nil {
 		cmd.Stdout = io.MultiWriter(w, live)
-		cmd.Stderr = io.MultiWriter(w, live)
-	} else {
-		cmd.Stdout = w
-		cmd.Stderr = w
 	}
+	// Share the pipe so stderr cannot overtake stdout command records.
+	cmd.Stderr = cmd.Stdout
 
 	if runErr := cmd.Run(); runErr != nil {
 		outStr := truncateString(buf.String(), max)
