@@ -45,6 +45,17 @@ describe("LicenseExpiryBanner", () => {
     expect(screen.queryByTestId("license-expiry-banner")).toBeNull();
   });
 
+  it("warns that every organization loses features when more than one organization exists", () => {
+    accountRef.current = {
+      installation_admin: true,
+      license: { ...expiringLicense, organization_count: 3 },
+    };
+    renderBanner();
+    expect(screen.getByTestId("license-expiry-banner")).toHaveTextContent(
+      "When the license expires, all organizations lose their Enterprise features.",
+    );
+  });
+
   it("shows the expiry notice for a revoked license", () => {
     accountRef.current = {
       installation_admin: true,

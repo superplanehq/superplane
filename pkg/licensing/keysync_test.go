@@ -300,7 +300,7 @@ func TestServiceSyncsKeysForALicenseFromANewKey(t *testing.T) {
 		service := licensing.NewService(licensing.NewVerifier(fixture.store), source, licensing.WithKeySync(keySync))
 
 		require.NoError(t, service.Refresh(context.Background()))
-		assert.True(t, service.IsEntitled(licensing.FeatureGroups))
+		assert.True(t, service.Status().IsEntitled(licensing.FeatureGroups))
 	})
 
 	t.Run("on install with a list that another replica saved", func(t *testing.T) {
