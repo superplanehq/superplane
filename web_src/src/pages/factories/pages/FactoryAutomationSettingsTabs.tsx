@@ -20,7 +20,12 @@ export function FactoryAutomationSettingsTabs({
   generalLabel?: string;
   historyEnabled: boolean;
   label: string;
-  testId: "intake-settings" | "planning-settings" | "pr-feedback-settings" | "column-automation-view";
+  testId:
+    | "intake-settings"
+    | "planning-settings"
+    | "pr-feedback-settings"
+    | "column-automation-view"
+    | "review-request-settings";
 }) {
   const historyTab = historyEnabled ? "runs" : "automation";
   return (

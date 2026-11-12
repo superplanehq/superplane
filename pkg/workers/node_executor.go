@@ -18,6 +18,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/factories/lifecycle"
 	factoryactions "github.com/superplanehq/superplane/pkg/grpc/actions/factories"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/logging"
@@ -608,6 +609,21 @@ func (w *NodeExecutor) executeActionNode(
 				return failNodeExecution(tx, ctx.ExecutionState, execution.RunID, err)
 			}
 		}
+	}
+	prepared, err := lifecycle.PrepareAction(lifecycle.Action{
+		Tx:        tx,
+		Canvas:    workflow,
+		Execution: execution,
+		Context:   &ctx,
+		Integration: func(integration *models.Integration) core.IntegrationContext {
+			return contexts.NewIntegrationContext(tx, nil, integration, w.encryptor, w.registry, nil)
+		},
+	})
+	if err != nil {
+		return failNodeExecution(tx, ctx.ExecutionState, execution.RunID, err)
+	}
+	if prepared {
+		return tx.Save(execution).Error
 	}
 	if err := action.Execute(ctx); err != nil {
 		var busy *models.CodexConnectionBusyError

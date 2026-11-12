@@ -163,6 +163,14 @@ const FACTORY_BY_ID: Record<string, FactoryDefinition> = {
     description: "Score a pull request when it opens or updates.",
     triggerNodeId: "on-pr-risk",
   }),
+  "review-request": buildOnboardingApp({
+    id: "review-request",
+    title: "Review request",
+    description: "Select human reviewers after Merge confidence completes.",
+    integrations: ["github"],
+    componentIntegrations: { "github.addPullRequestReviewers": "github" },
+    entrypointNodeId: "review-request-trigger",
+  }),
   "visual-evidence": buildOnboardingApp({
     id: "visual-evidence",
     title: "Visual Evidence",
