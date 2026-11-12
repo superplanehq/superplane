@@ -3,9 +3,11 @@ package grpc
 import (
 	"context"
 
+	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/enterprise"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/organizations"
+	"github.com/superplanehq/superplane/pkg/licensing"
 	"github.com/superplanehq/superplane/pkg/oidc"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -26,6 +28,7 @@ type OrganizationService struct {
 	webhooksBaseURL      string
 	billing              enterprise.BillingOperations
 	runners              *organizations.RunnerService
+	enterpriseFeatures   *enterprise.OrganizationFeatures
 }
 
 func NewOrganizationService(
@@ -49,12 +52,50 @@ func NewOrganizationService(
 
 func (s *OrganizationService) DescribeOrganization(ctx context.Context, req *pb.DescribeOrganizationRequest) (*pb.DescribeOrganizationResponse, error) {
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return organizations.DescribeOrganization(ctx, orgID)
+	response, err := organizations.DescribeOrganization(ctx, orgID)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.attachEnterpriseFeatures(ctx, response.GetOrganization()); err != nil {
+		return nil, err
+	}
+	return response, nil
 }
 
 func (s *OrganizationService) UpdateOrganization(ctx context.Context, req *pb.UpdateOrganizationRequest) (*pb.UpdateOrganizationResponse, error) {
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return organizations.UpdateOrganization(ctx, orgID, req.Organization)
+	response, err := organizations.UpdateOrganization(ctx, orgID, req.Organization)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.attachEnterpriseFeatures(ctx, response.GetOrganization()); err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+func (s *OrganizationService) attachEnterpriseFeatures(ctx context.Context, organization *pb.Organization) error {
+	if s.enterpriseFeatures == nil || organization == nil || organization.GetMetadata() == nil {
+		return nil
+	}
+	orgID, err := uuid.Parse(organization.GetMetadata().GetId())
+	if err != nil {
+		return nil
+	}
+	effective, err := s.enterpriseFeatures.Effective(ctx, orgID)
+	if err != nil {
+		return status.Error(codes.Internal, "failed to describe organization")
+	}
+	organization.EnterpriseFeatures = enterpriseFeatureKeys(effective)
+	return nil
+}
+
+func enterpriseFeatureKeys(features []licensing.Feature) []string {
+	keys := make([]string, 0, len(features))
+	for _, feature := range features {
+		keys = append(keys, string(feature))
+	}
+	return keys
 }
 
 func (s *OrganizationService) RemoveUser(ctx context.Context, req *pb.RemoveUserRequest) (*pb.RemoveUserResponse, error) {

@@ -611,7 +611,8 @@ MODULES := \
 	files, \
 	admin/fleets, \
 	admin/keys, \
-	admin/organizations
+	admin/organizations, \
+	admin/enterprise_features
 REST_API_MODULES := \
 	authorization, \
 	organizations, \
@@ -631,7 +632,8 @@ REST_API_MODULES := \
 	files, \
 	admin/fleets, \
 	admin/keys, \
-	admin/organizations
+	admin/organizations, \
+	admin/enterprise_features
 
 pb.gen: dev.test.is.running
 	$(MAKE) pb.gen.go

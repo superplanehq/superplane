@@ -4,6 +4,7 @@ import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 import { FIRST_RUN_COPY } from "./first-run/firstRunCopy";
+import { withFirstRunQuery } from "./firstRunTestQuery";
 import { EMPTY_LINEAR_INTAKE_SCOPE } from "../linearIntakeScope";
 import { selectLinearProject } from "../linearScopeFields.testHelpers";
 import { FirstRunSetup } from "./FirstRunSetup";
@@ -194,9 +195,11 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
 function renderLiveSetup(model: OnboardingPageModel, setupOptions: SetupOptions) {
   const setupRef = { current: null as OnboardingSetupApi | null };
   const view = render(
-    <MemoryRouter initialEntries={["/org-1/workspaces/PAY/setup?step=issues"]}>
-      <LiveJiraSetup model={model} setupOptions={setupOptions} setupRef={setupRef} />
-    </MemoryRouter>,
+    withFirstRunQuery(
+      <MemoryRouter initialEntries={["/org-1/workspaces/PAY/setup?step=issues"]}>
+        <LiveJiraSetup model={model} setupOptions={setupOptions} setupRef={setupRef} />
+      </MemoryRouter>,
+    ),
   );
   return { ...view, setupRef };
 }
