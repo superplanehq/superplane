@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -153,8 +154,16 @@ func InsertHostedModelCallOutcomes(tx *gorm.DB, inputs []HostedModelCallOutcomeI
 	}).Create(&rows).Error
 }
 
-func DeleteExpiredHostedModelCallOutcomes(tx *gorm.DB, before time.Time) (int64, error) {
-	result := tx.Where("occurred_at < ?", before).Delete(&HostedModelCallOutcome{})
+func DeleteExpiredHostedModelCallOutcomesBatch(tx *gorm.DB, before time.Time, limit int) (int64, error) {
+	if tx == nil || limit <= 0 {
+		return 0, nil
+	}
+	subQuery := tx.Model(&HostedModelCallOutcome{}).
+		Select("id").
+		Where("occurred_at < ?", before).
+		Order("occurred_at").
+		Limit(limit)
+	result := tx.Where("id IN (?)", subQuery).Delete(&HostedModelCallOutcome{})
 	return result.RowsAffected, result.Error
 }
 
@@ -165,7 +174,9 @@ func ListHostedModelStatusCells(tx *gorm.DB, since time.Time) ([]HostedModelStat
 	}
 	allowlist, err := listHostedModelAllowlistPairs(tx)
 	if err != nil {
-		return nil, err
+		// A partial page is more useful than an error when only the allowlist fails.
+		log.WithError(err).Warn("hosted model status allowlist is unavailable")
+		allowlist = nil
 	}
 
 	cells := map[string]*HostedModelStatusCell{}

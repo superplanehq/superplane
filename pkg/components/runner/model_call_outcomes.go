@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"context"
 	"encoding/json"
 	"strings"
 	"time"
@@ -9,7 +10,19 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/llm/modelid"
 	"github.com/superplanehq/superplane/pkg/models"
+	"gorm.io/gorm"
 )
+
+const modelCallOutcomeInsertTimeout = 3 * time.Second
+
+// Tests set these so an insert can run inline, fail, or panic.
+var runModelCallOutcomeInsert = func(fn func()) {
+	go fn()
+}
+
+var insertHostedModelCallOutcomes = func(tx *gorm.DB, inputs []models.HostedModelCallOutcomeInput) error {
+	return models.InsertHostedModelCallOutcomes(tx, inputs)
+}
 
 // The agent can write the task directory, including the usage sidecar.
 // One task cannot add more than this many rows to the shared status page.
@@ -22,6 +35,12 @@ type parsedModelCallOutcome struct {
 }
 
 func RecordRunnerModelCallOutcomes(logger *log.Entry, taskID, finishedEventType string, configuration any, result json.RawMessage, notBefore time.Time) {
+	// A bad result must not panic the task status path.
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			warnModelCallOutcomePanic(logger, recovered)
+		}
+	}()
 	if !IsHostedCredentials(configurationCredentialsSource(configuration)) {
 		return
 	}
@@ -34,9 +53,33 @@ func RecordRunnerModelCallOutcomes(logger *log.Entry, taskID, finishedEventType 
 	if len(inputs) == 0 {
 		return
 	}
-	if err := models.InsertHostedModelCallOutcomes(database.Conn(), inputs); err != nil && logger != nil {
-		logger.WithError(err).Error("failed to record hosted model call outcomes")
+	// Detach the insert. A slow or failed sample must not change the task.
+	runModelCallOutcomeInsert(func() {
+		defer func() {
+			if recovered := recover(); recovered != nil {
+				warnModelCallOutcomePanic(logger, recovered)
+			}
+		}()
+		ctx, cancel := context.WithTimeout(context.Background(), modelCallOutcomeInsertTimeout)
+		defer cancel()
+		if err := insertHostedModelCallOutcomes(database.Conn().WithContext(ctx), inputs); err != nil {
+			warnModelCallOutcome(logger, err)
+		}
+	})
+}
+
+func warnModelCallOutcome(logger *log.Entry, err error) {
+	if logger == nil || err == nil {
+		return
 	}
+	logger.WithError(err).Warn("failed to record hosted model call outcomes")
+}
+
+func warnModelCallOutcomePanic(logger *log.Entry, recovered any) {
+	if logger == nil {
+		return
+	}
+	logger.WithField("panic", recovered).Warn("panic recording hosted model call outcomes")
 }
 
 func clampModelCallOccurredAt(inputs []models.HostedModelCallOutcomeInput, notBefore time.Time) {

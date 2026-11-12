@@ -24,7 +24,9 @@ func ListModelStatus(ctx context.Context, req *pb.ListModelStatusRequest) (*pb.L
 		return nil, grpcerrors.InvalidArgument(nil, "window must be 5m, 15m, 1h, or 24h")
 	}
 
-	cells, err := models.ListHostedModelStatusCells(database.DB(ctx), time.Now().Add(-duration))
+	queryCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	cells, err := models.ListHostedModelStatusCells(database.DB(queryCtx), time.Now().Add(-duration))
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to load model status")
 	}

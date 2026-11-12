@@ -1,6 +1,7 @@
 package models_test
 
 import (
+	"errors"
 	"testing"
 	"time"
 
@@ -8,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gorm.io/datatypes"
+	"gorm.io/gorm"
 
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -128,42 +130,46 @@ func TestListHostedModelStatusCellsMergesAllowlistAndRecentCalls(t *testing.T) {
 	assert.Equal(t, 1, grok.CallCount)
 }
 
-func TestDeleteExpiredHostedModelCallOutcomes(t *testing.T) {
+func TestListHostedModelStatusCellsKeepsCountsWhenAllowlistFails(t *testing.T) {
 	_ = support.Setup(t)
 	db := database.DB(t.Context())
 	t.Cleanup(func() {
-		_ = db.Where("1 = 1").Delete(&models.HostedModelCallOutcome{}).Error
+		_ = db.Where("runner_task_id = ?", "allowlist-down").Delete(&models.HostedModelCallOutcome{}).Error
+		_ = db.Where("provider = ?", models.UsageProviderAnthropic).Delete(&models.HostedLLMProvider{}).Error
 	})
 
-	now := time.Now()
-	require.NoError(t, models.InsertHostedModelCallOutcomes(db, []models.HostedModelCallOutcomeInput{
-		{
-			Provider:     models.UsageProviderOpenAI,
-			Model:        "gpt-5",
-			Outcome:      models.HostedModelCallOutcomeAttempt1,
-			OccurredAt:   now.Add(-26 * time.Hour),
-			RunnerTaskID: "old-task",
-			Sequence:     1,
-		},
-		{
-			Provider:     models.UsageProviderOpenAI,
-			Model:        "gpt-5",
-			Outcome:      models.HostedModelCallOutcomeAttempt1,
-			OccurredAt:   now.Add(-time.Hour),
-			RunnerTaskID: "new-task",
-			Sequence:     1,
-		},
-	}))
-
-	deleted, err := models.DeleteExpiredHostedModelCallOutcomes(db, now.Add(-25*time.Hour))
+	_, err := models.UpsertHostedLLMProvider(db, models.HostedLLMProvider{
+		Provider:      models.UsageProviderAnthropic,
+		Enabled:       true,
+		APIKey:        []byte("encrypted"),
+		AllowedModels: datatypes.JSONSlice[string]{"claude-opus-4-6"},
+	})
 	require.NoError(t, err)
-	assert.Equal(t, int64(1), deleted)
 
-	cells, err := models.ListHostedModelStatusCells(db, now.Add(-24*time.Hour))
+	now := time.Now()
+	require.NoError(t, models.InsertHostedModelCallOutcomes(db, []models.HostedModelCallOutcomeInput{{
+		Provider:     models.UsageProviderOpenAI,
+		Model:        "gpt-5",
+		Outcome:      models.HostedModelCallOutcomeAttempt1,
+		OccurredAt:   now.Add(-time.Minute),
+		RunnerTaskID: "allowlist-down",
+		Sequence:     1,
+	}}))
+
+	const callback = "test:hosted-model-allowlist-failure"
+	require.NoError(t, db.Callback().Query().Before("gorm:query").Register(callback, func(tx *gorm.DB) {
+		if tx.Statement != nil && tx.Statement.Table == "hosted_llm_providers" {
+			_ = tx.AddError(errors.New("allowlist unavailable"))
+		}
+	}))
+	t.Cleanup(func() { _ = db.Callback().Query().Remove(callback) })
+
+	cells, err := models.ListHostedModelStatusCells(db, now.Add(-time.Hour))
 	require.NoError(t, err)
 	require.Len(t, cells, 1)
 	assert.Equal(t, "gpt-5", cells[0].Model)
-	assert.Equal(t, 1, cells[0].CallCount)
+	require.NotNil(t, cells[0].Score)
+	assert.Equal(t, 100, *cells[0].Score)
 }
 
 func TestInsertHostedModelCallOutcomesRejectsFutureTimestamps(t *testing.T) {
