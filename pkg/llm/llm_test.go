@@ -48,7 +48,7 @@ func TestNew_UsesDefaultBaseURLs(t *testing.T) {
 	anthropic, err := New(httpCtx, ProviderAnthropic, Credentials{APIKey: "sk-ant"})
 	require.NoError(t, err)
 	assert.Equal(t, ProviderAnthropic, anthropic.Provider())
-	assert.Equal(t, defaultAnthropicBaseURL, anthropic.(*anthropicClient).baseURL)
+	assert.Equal(t, DefaultAnthropicBaseURL, anthropic.(*anthropicClient).baseURL)
 
 	openai, err := New(httpCtx, ProviderOpenAI, Credentials{APIKey: "sk"})
 	require.NoError(t, err)
@@ -56,7 +56,7 @@ func TestNew_UsesDefaultBaseURLs(t *testing.T) {
 
 	openrouter, err := New(httpCtx, ProviderOpenRouter, Credentials{APIKey: "sk-or"})
 	require.NoError(t, err)
-	assert.Equal(t, defaultOpenRouterBaseURL, openrouter.(*openAICompatClient).baseURL)
+	assert.Equal(t, DefaultOpenRouterBaseURL, openrouter.(*openAICompatClient).baseURL)
 }
 
 func TestAnthropic_ListModelsAndComplete(t *testing.T) {
@@ -90,8 +90,8 @@ func TestAnthropic_ListModelsAndComplete(t *testing.T) {
 
 	require.Len(t, httpCtx.Requests, 2)
 	assert.Equal(t, "sk-ant", httpCtx.Requests[0].Header.Get("x-api-key"))
-	assert.Equal(t, defaultAnthropicBaseURL+"/models", httpCtx.Requests[0].URL.String())
-	assert.Equal(t, defaultAnthropicBaseURL+"/messages", httpCtx.Requests[1].URL.String())
+	assert.Equal(t, DefaultAnthropicBaseURL+"/models", httpCtx.Requests[0].URL.String())
+	assert.Equal(t, DefaultAnthropicBaseURL+"/messages", httpCtx.Requests[1].URL.String())
 }
 
 func TestOpenAI_ListModelsAndComplete(t *testing.T) {
@@ -159,9 +159,55 @@ func TestOpenRouter_StripsProviderPrefixInUsageRecordAndSetsHeaders(t *testing.T
 	assert.Equal(t, "openai/gpt-5-mini", record.Model)
 
 	require.Len(t, httpCtx.Requests, 1)
-	assert.Equal(t, defaultOpenRouterBaseURL+"/chat/completions", httpCtx.Requests[0].URL.String())
+	assert.Equal(t, DefaultOpenRouterBaseURL+"/chat/completions", httpCtx.Requests[0].URL.String())
 	assert.Equal(t, "https://superplane.com", httpCtx.Requests[0].Header.Get("HTTP-Referer"))
 	assert.Equal(t, "SuperPlane", httpCtx.Requests[0].Header.Get("X-Title"))
+}
+
+func TestListOpenRouterModelsPreservesReasoningCapabilities(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		apiKey string
+	}{
+		{name: "authenticated catalog", apiKey: "sk-or"},
+		{name: "public catalog"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			httpCtx := &contexts.HTTPContext{
+				Responses: []*http.Response{jsonResponse(http.StatusOK, `{
+					"data":[
+						{
+							"id":" deepseek/deepseek-v4-flash ",
+							"reasoning":{"supported_efforts":["none","high","xhigh"],"default_effort":"high","mandatory":false}
+						},
+						{
+							"id":"reasoning/required",
+							"reasoning":{"supported_efforts":["high"],"default_effort":"high","mandatory":true}
+						},
+						{"id":"reasoning/no-efforts","reasoning":{"supported_efforts":[]}},
+						{"id":"legacy/model"},
+						{"id":" "}
+					]
+				}`)},
+			}
+
+			listed, err := ListOpenRouterModels(context.Background(), httpCtx, Credentials{APIKey: tc.apiKey})
+			require.NoError(t, err)
+			assert.Equal(t, []Model{
+				{ID: "deepseek/deepseek-v4-flash", ThinkingLevels: []string{"none", "high", "xhigh"}, DefaultThinkingLevel: "high"},
+				{ID: "reasoning/required", ThinkingLevels: []string{"high"}, DefaultThinkingLevel: "high", ReasoningMandatory: true},
+				{ID: "reasoning/no-efforts", ThinkingLevels: []string{}},
+				{ID: "legacy/model"},
+			}, listed)
+			require.Len(t, httpCtx.Requests, 1)
+			assert.Equal(t, DefaultOpenRouterBaseURL+"/models", httpCtx.Requests[0].URL.String())
+			if tc.apiKey == "" {
+				assert.Empty(t, httpCtx.Requests[0].Header.Get("Authorization"))
+				return
+			}
+			assert.Equal(t, "Bearer "+tc.apiKey, httpCtx.Requests[0].Header.Get("Authorization"))
+		})
+	}
 }
 
 func TestOpenAI_StreamEmitsDeltasAndUsage(t *testing.T) {
@@ -256,7 +302,9 @@ func TestComplete_ErrorStatus(t *testing.T) {
 	require.NoError(t, err)
 	_, err = client.ListModels(context.Background())
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "401")
+	var providerErr *core.ProviderAPIError
+	require.ErrorAs(t, err, &providerErr)
+	assert.Equal(t, http.StatusUnauthorized, providerErr.StatusCode)
 }
 
 func TestOpenAIChatRequestJSON(t *testing.T) {
@@ -300,4 +348,27 @@ func TestListCatalogPrices_OpenRouter(t *testing.T) {
 func TestListCatalogPrices_UnsupportedProvider(t *testing.T) {
 	_, err := ListCatalogPrices(context.Background(), &contexts.HTTPContext{}, ProviderAnthropic, Credentials{APIKey: "sk"})
 	require.ErrorIs(t, err, ErrNoCatalogPrices)
+}
+
+func TestModelEffortNullSemanticsAreProviderSpecific(t *testing.T) {
+	for _, tc := range []struct {
+		name, provider, reasoning string
+		want                      []string
+	}{
+		{name: "OpenRouter omitted", provider: ProviderOpenRouter, reasoning: `{"mandatory":true}`},
+		{name: "OpenRouter empty", provider: ProviderOpenRouter, reasoning: `{"supported_efforts":[]}`, want: []string{}},
+		{name: "OpenRouter null", provider: ProviderOpenRouter, reasoning: `{"supported_efforts":null}`, want: []string{"none", "minimal", "low", "medium", "high", "xhigh", "max"}},
+		{name: "OpenRouter mandatory null", provider: ProviderOpenRouter, reasoning: `{"supported_efforts":null,"mandatory":true}`, want: []string{"minimal", "low", "medium", "high", "xhigh", "max"}},
+		{name: "OpenAI null", provider: ProviderOpenAI, reasoning: `{"supported_efforts":null}`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			httpCtx := &contexts.HTTPContext{Responses: []*http.Response{jsonResponse(http.StatusOK, `{"data":[{"id":"model","reasoning":`+tc.reasoning+`}]}`)}}
+			client, err := New(httpCtx, tc.provider, Credentials{APIKey: "key"})
+			require.NoError(t, err)
+			listed, err := client.ListModels(t.Context())
+			require.NoError(t, err)
+			require.Len(t, listed, 1)
+			assert.Equal(t, tc.want, listed[0].ThinkingLevels)
+		})
+	}
 }
