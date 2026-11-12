@@ -2,6 +2,7 @@ package workers
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -519,4 +520,40 @@ func Test__AppMessageWorker_LockAndProcessMessage__deletesMessageWhenSourceNodeD
 	var remaining int64
 	require.NoError(t, database.Conn().Model(&models.AppMessage{}).Count(&remaining).Error)
 	assert.Equal(t, int64(0), remaining)
+}
+
+func TestAppMessageWorkerFilterErrorRollsBackDeliveryAndNonmatchAcknowledges(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	db := database.DB(t.Context())
+	source, sourceNodes := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{{NodeID: "source", Type: models.NodeTypeComponent, Ref: datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "broadcastMessage"}})}}, nil)
+	listeners := []models.CanvasNode{}
+	for i, filter := range []string{`message.payload.type == "completed"`, `len(message.payload.missing.value) > 0`} {
+		listeners = append(listeners, models.CanvasNode{NodeID: fmt.Sprintf("listener-%d", i), Type: models.NodeTypeTrigger, Ref: datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "onBroadcast"}}), Configuration: datatypes.NewJSONType(map[string]any{"app": source.ID.String(), "filter": filter})})
+	}
+	target, nodes := support.CreateCanvas(t, r.Organization.ID, r.User, listeners, nil)
+	for _, node := range nodes {
+		require.NoError(t, db.Create(&models.CanvasSubscription{SourceCanvasID: source.ID, TargetCanvasID: target.ID, TargetNodeID: node.NodeID}).Error)
+	}
+	require.NoError(t, models.CreateAppMessage(db, source.ID, sourceNodes[0].NodeID, map[string]any{"type": "completed"}))
+	pending, err := models.ListAppMessages(db)
+	require.NoError(t, err)
+	require.Len(t, pending, 1)
+	worker := NewAppMessageWorker(r.Registry)
+	require.ErrorContains(t, worker.LockAndProcessMessage(pending[0]), "broadcast filter")
+	support.VerifyCanvasEventsCount(t, target.ID, 0)
+	remaining, err := models.ListAppMessages(db)
+	require.NoError(t, err)
+	require.Len(t, remaining, 1)
+	nodes[1].Configuration = datatypes.NewJSONType(map[string]any{"app": source.ID.String(), "filter": "false"})
+	require.NoError(t, db.Model(&nodes[1]).Update("configuration", nodes[1].Configuration).Error)
+	require.NoError(t, worker.LockAndProcessMessage(pending[0]))
+	support.VerifyCanvasNodeEventsCount(t, target.ID, nodes[0].NodeID, 1)
+	support.VerifyCanvasNodeEventsCount(t, target.ID, nodes[1].NodeID, 0)
+	remaining, err = models.ListAppMessages(db)
+	require.NoError(t, err)
+	require.Empty(t, remaining)
+	var runs int64
+	require.NoError(t, db.Model(&models.CanvasRun{}).Where("workflow_id = ? AND node_id = ?", target.ID, nodes[1].NodeID).Count(&runs).Error)
+	require.Zero(t, runs, "filtered delivery must not create a run")
 }

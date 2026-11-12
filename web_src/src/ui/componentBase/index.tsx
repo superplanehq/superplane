@@ -11,7 +11,8 @@ import { SelectionWrapper } from "../selectionWrapper";
 import type { ComponentActionsProps } from "../types/componentActions";
 import { PayloadTooltip } from "./PayloadTooltip";
 import { SpecsTooltip } from "./SpecsTooltip";
-import { FactoryNodeCard } from "../factoryNodeChrome";
+import type { AgentRunnerStep } from "@/lib/agentRunnerSteps";
+import { FactoryNodeCard, FactoryNodeStepList } from "../factoryNodeChrome";
 import { DEFAULT_EVENT_STATE_MAP } from "./defaultEventStateMap";
 import { EventSectionDisplay } from "./EventSectionDisplay";
 import type { EventSection, EventStateMap } from "./eventState";
@@ -66,6 +67,7 @@ export interface ComponentBaseProps extends ComponentActionsProps {
   headerAction?: React.ReactNode;
   /** Extra body content for the larger factory node card. */
   factoryBody?: React.ReactNode;
+  factorySteps?: AgentRunnerStep[];
   /** Where to render customField: "before" (before events) or "after" (after events, default) */
   customFieldPosition?: "before" | "after";
   /** Whether the custom field should only be shown in live mode */
@@ -132,6 +134,7 @@ function shouldShowCustomField(
 }
 
 const FactoryComponentBase: React.FC<ComponentBaseProps> = (props) => {
+  const stepTitles = props.factorySteps?.map((step) => step.name.trim()).filter(Boolean) ?? [];
   const customField = shouldShowCustomField(props.customFieldVisibility, props.canvasMode ?? "live")
     ? resolveCustomFieldContent(props.customField)
     : null;
@@ -160,7 +163,7 @@ const FactoryComponentBase: React.FC<ComponentBaseProps> = (props) => {
       showRuntimeStatus={props.showRuntimeStatus}
       runIsActive={props.runIsActive}
       eventStateMap={props.eventStateMap}
-      body={props.factoryBody}
+      body={props.factoryBody ?? (stepTitles.length ? <FactoryNodeStepList steps={stepTitles} /> : undefined)}
       customField={customField}
       headerAction={props.headerAction}
     />

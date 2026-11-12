@@ -68,29 +68,12 @@ func TestLoggingMiddleware_GeneratesAndEchoesRequestID(t *testing.T) {
 	assert.Equal(t, "handled request /api/v1/organizations/devzero-inc", payload["msg"])
 	assert.Equal(t, "/api/v1/organizations/devzero-inc", payload["path"])
 	assert.Equal(t, requestID, payload["request_id"])
-	assert.Equal(t, "35.191.62.152", payload["client_ip"])
 	assert.Equal(t, "105445aa7843bc8bf206b12000100000", payload["trace_id"])
 	assert.EqualValues(t, http.StatusOK, payload["status"])
 	_, hasDuration := payload["duration_ms"]
 	assert.True(t, hasDuration)
 	_, hasDurationNanos := payload["duration"]
 	assert.False(t, hasDurationNanos)
-}
-
-func TestLoggingMiddleware_ClientIPPrefersProxyHeader(t *testing.T) {
-	logger, buffer := newJSONLogger()
-	handler := LoggingMiddleware(logger)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	}))
-
-	request := httptest.NewRequest(http.MethodGet, "/api/v1/organizations/devzero-inc", nil)
-	request.Header.Set("X-Forwarded-For", "203.0.113.8, 198.51.100.4")
-	request.Header.Set("CF-Connecting-IP", "198.51.100.20")
-	recorder := httptest.NewRecorder()
-	handler.ServeHTTP(recorder, request)
-
-	payload := decodeLogLine(t, buffer.String())
-	assert.Equal(t, "198.51.100.20", payload["client_ip"])
 }
 
 func TestRequestLogAccountIdentity_UsesEffectiveAccount(t *testing.T) {

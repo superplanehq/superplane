@@ -144,7 +144,7 @@ func startPullRequestChecksRequest(ctx context.Context, db *gorm.DB, deps Intake
 		if current == nil {
 			return request.Complete(tx)
 		}
-		if err := contexts.NewEventContext(tx, current, nil, func(created []models.CanvasEvent) { events = append(events, created...) }).Emit(pullRequest.Provider+".pullRequest", payload); err != nil {
+		if err := contexts.EmitFactoryPullRequestEvent(tx, current, pullRequest.Provider+".pullRequest", payload, func(created []models.CanvasEvent) { events = append(events, created...) }); err != nil {
 			return err
 		}
 		return request.Complete(tx)

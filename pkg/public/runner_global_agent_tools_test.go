@@ -22,7 +22,7 @@ func TestRunnerListMembers(t *testing.T) {
 	t.Setenv("JWT_SECRET", "test")
 	ctx, _, _ := mustTaskLinkedAgentRun(t, r)
 	server := newRunnerArtifactTestServer(t, r, jwt.NewSigner("test"))
-	token := runnerTokenFrom(runner.AttachRunnerEnv(ctx, nil, 60, nil))
+	token := runnerTokenFrom(runner.AttachRunnerEnv(ctx, nil, 60))
 	member := mustTaskOwnerMember(t, r, "members-dev")
 
 	rec := runnerRequest(t, server, http.MethodGet, token, "/api/v1/runner/members", "")
@@ -59,7 +59,7 @@ func TestRunnerChecks(t *testing.T) {
 	t.Setenv("JWT_SECRET", "test")
 	ctx, factory, order := mustTaskLinkedAgentRun(t, r)
 	server := newRunnerArtifactTestServer(t, r, jwt.NewSigner("test"))
-	token := runnerTokenFrom(runner.AttachRunnerEnv(ctx, nil, 60, nil))
+	token := runnerTokenFrom(runner.AttachRunnerEnv(ctx, nil, 60))
 	db := database.DB(t.Context())
 	_, err := order.ReportCheck(db, models.FactoryWorkOrderCheckParams{Key: "coverage", Name: "Coverage", Score: 5, MaxScore: 5})
 	require.NoError(t, err)
@@ -103,7 +103,7 @@ func TestRunnerArtifactsByKey(t *testing.T) {
 	t.Setenv("JWT_SECRET", "test")
 	ctx, _, order := mustTaskLinkedAgentRun(t, r)
 	server := newRunnerArtifactTestServer(t, r, jwt.NewSigner("test"))
-	token := runnerTokenFrom(runner.AttachRunnerEnv(ctx, nil, 60, nil))
+	token := runnerTokenFrom(runner.AttachRunnerEnv(ctx, nil, 60))
 
 	rec := runnerRequest(t, server, http.MethodPost, token, "/api/v1/runner/task/links", `{"url":"https://preview.example","title":"Preview","key":"preview"}`)
 	require.Equal(t, http.StatusCreated, rec.Code, rec.Body.String())

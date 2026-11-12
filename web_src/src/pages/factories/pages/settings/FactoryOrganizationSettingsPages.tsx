@@ -7,6 +7,7 @@ import { factorySettingsSectionPath } from "../../lib/factoryPagePaths";
 import { FactorySettingsApiKeysPage } from "./FactorySettingsApiKeysPage";
 import { FactorySettingsPageFrame } from "./FactorySettingsCard";
 import { FactorySettingsOrganizationLLMModelsPage } from "./FactorySettingsOrganizationLLMModelsPage";
+import { FactorySettingsOrganizationModelStatusPage } from "./FactorySettingsOrganizationModelStatusPage";
 import { FactorySettingsSecretsPage } from "./FactorySettingsSecretsPage";
 
 function useOrganizationId() {
@@ -68,4 +69,8 @@ export function FactoryOrganizationSecretDetailPage() {
 
 export function FactoryOrganizationLLMModelsPage() {
   return <FactorySettingsOrganizationLLMModelsPage />;
+}
+
+export function FactoryOrganizationModelStatusPage() {
+  return <FactorySettingsOrganizationModelStatusPage />;
 }
