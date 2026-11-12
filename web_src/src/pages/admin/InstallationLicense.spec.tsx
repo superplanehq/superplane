@@ -399,7 +399,7 @@ describe("InstallationLicense", () => {
     renderPage();
 
     const history = await screen.findByTestId("license-activations");
-    expect(within(history).getByText("abcdef12")).toBeInTheDocument();
+    expect(await within(history).findByText("abcdef12")).toBeInTheDocument();
     expect(history).toHaveTextContent("Replaced");
     const user = userEvent.setup();
     await user.click(within(history).getByText("1 removed grant"));
