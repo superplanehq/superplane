@@ -1,8 +1,8 @@
-import { useAccount } from "@/contexts/useAccount";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useIntegrationResources } from "@/hooks/useIntegrations";
+import { useOrganization } from "@/hooks/useOrganizationData";
 import { FEATURE_FLAG_GITHUB_ENTERPRISE } from "@/lib/experimentalFeatures";
-import { FEATURE_GITHUB_ENTERPRISE } from "@/lib/license";
+import { FEATURE_GITHUB_ENTERPRISE, hasOrganizationEnterpriseFeature } from "@/lib/license";
 
 import { RepositoryBranchPromptLoader } from "../RepositoryBranchPromptLoader";
 import type { RepositoryBranchPrompt } from "../repositoryBranchPrompt";
@@ -137,9 +137,9 @@ function FirstRunVcsChoices({
   chrome,
   branchPrompt,
 }: FirstRunVcsScreenProps & { branchPrompt?: RepositoryBranchPrompt }) {
-  const { account } = useAccount();
+  const { data: organization } = useOrganization(organizationId);
   const showGitHubEnterprise = useExperimentalFeature(organizationId).has(FEATURE_FLAG_GITHUB_ENTERPRISE);
-  const githubEnterpriseLicensed = Boolean(account?.license?.features?.includes(FEATURE_GITHUB_ENTERPRISE));
+  const githubEnterpriseLicensed = hasOrganizationEnterpriseFeature(organization, FEATURE_GITHUB_ENTERPRISE);
   const setup = model.setup;
   if (screen === "host") {
     return (

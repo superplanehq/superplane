@@ -3,8 +3,10 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
+import { FEATURE_GITHUB_ENTERPRISE } from "@/lib/license";
 import { EMPTY_LINEAR_INTAKE_SCOPE } from "../linearIntakeScope";
 import { FirstRunSetup } from "./FirstRunSetup";
+import { withFirstRunQuery } from "./firstRunTestQuery";
 import type { IntegrationId } from "./onboardingFixtures";
 import {
   githubOnboardingIntegrationId,
@@ -80,7 +82,6 @@ vi.mock("@/contexts/useAccount", () => ({
       id: "account-1",
       name: "Ada Lovelace",
       email: "ada@example.com",
-      license: { edition: "enterprise", features: ["github_enterprise"] },
     },
   }),
 }));
@@ -175,11 +176,14 @@ function pageModel(setup: OnboardingSetupApi, overrides: Partial<OnboardingPageM
   };
 }
 
-function renderSetup(setup: OnboardingSetupApi, path: string) {
+function renderSetup(setup: OnboardingSetupApi, path: string, enterpriseFeatures = [FEATURE_GITHUB_ENTERPRISE]) {
   return render(
-    <MemoryRouter initialEntries={[path]}>
-      <FirstRunSetup model={pageModel(setup)} />
-    </MemoryRouter>,
+    withFirstRunQuery(
+      <MemoryRouter initialEntries={[path]}>
+        <FirstRunSetup model={pageModel(setup)} />
+      </MemoryRouter>,
+      enterpriseFeatures,
+    ),
   );
 }
 
@@ -192,6 +196,16 @@ describe("FirstRunSetup GitHub Enterprise Cloud", () => {
     gheApp.connect.mockResolvedValue(true);
     gheApp.submitOwner.mockClear();
     gheApp.resume.mockClear();
+  });
+
+  it("does not enable GitHub Enterprise when the organization has no grant", async () => {
+    const user = userEvent.setup();
+    const hook = renderHook(() => useOnboardingSetupState("Payments", { simulateDiscovery: false }));
+    renderSetup(hook.result.current, "/org-1/workspaces/PAY/setup", []);
+
+    await user.click(screen.getByTestId("first-run-get-started"));
+    const option = screen.getByTestId("first-run-host-github-enterprise");
+    expect(within(option).getByRole("button")).toBeDisabled();
   });
 
   it("clears a github.com repository when switching to Enterprise", async () => {
@@ -370,9 +384,12 @@ describe("FirstRunSetup GitHub Enterprise Cloud", () => {
     hook.result.current.selectVcsHost("github");
 
     render(
-      <MemoryRouter initialEntries={["/org-1/workspaces/PAY/setup?step=ghe-host"]}>
-        <FirstRunSetup model={pageModel(hook.result.current, { githubIntegrationId: "" })} />
-      </MemoryRouter>,
+      withFirstRunQuery(
+        <MemoryRouter initialEntries={["/org-1/workspaces/PAY/setup?step=ghe-host"]}>
+          <FirstRunSetup model={pageModel(hook.result.current, { githubIntegrationId: "" })} />
+        </MemoryRouter>,
+        [FEATURE_GITHUB_ENTERPRISE],
+      ),
     );
 
     expect(screen.queryByTestId("first-run-github-enterprise-choose")).not.toBeInTheDocument();
@@ -395,14 +412,17 @@ describe("FirstRunSetup GitHub Enterprise Cloud", () => {
     hook.result.current.selectVcsHost("github");
 
     render(
-      <MemoryRouter initialEntries={["/org-1/workspaces/PAY/setup?step=repo"]}>
-        <FirstRunSetup
-          model={pageModel(hook.result.current, {
-            githubIntegrationId: restored.integrationId,
-            githubHost: restored.host,
-          })}
-        />
-      </MemoryRouter>,
+      withFirstRunQuery(
+        <MemoryRouter initialEntries={["/org-1/workspaces/PAY/setup?step=repo"]}>
+          <FirstRunSetup
+            model={pageModel(hook.result.current, {
+              githubIntegrationId: restored.integrationId,
+              githubHost: restored.host,
+            })}
+          />
+        </MemoryRouter>,
+        [FEATURE_GITHUB_ENTERPRISE],
+      ),
     );
 
     expect(screen.getByTestId("first-run-github-enterprise-choose")).toBeInTheDocument();
