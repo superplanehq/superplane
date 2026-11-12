@@ -17,11 +17,15 @@ import (
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
-func syncModelCallOutcomeInserts(t *testing.T) {
+func modelCallOutcomeDB(t *testing.T, taskID string) *gorm.DB {
 	t.Helper()
-	previous := runModelCallOutcomeInsert
-	runModelCallOutcomeInsert = func(fn func()) { fn() }
-	t.Cleanup(func() { runModelCallOutcomeInsert = previous })
+	// t.Context is canceled before Cleanup, so the delete must use its own context.
+	clear := func() {
+		_ = database.DB(context.Background()).Where("runner_task_id = ?", taskID).Delete(&models.HostedModelCallOutcome{}).Error
+	}
+	clear()
+	t.Cleanup(clear)
+	return database.DB(t.Context())
 }
 
 func TestParseRunnerModelCallOutcomesSkipsEmptyModels(t *testing.T) {
@@ -52,11 +56,7 @@ func TestParseRunnerModelCallOutcomesLeavesMissingOccurredAtZero(t *testing.T) {
 }
 
 func TestRecordRunnerModelCallOutcomesStoresHostedResultsOnce(t *testing.T) {
-	syncModelCallOutcomeInserts(t)
-	db := database.DB(t.Context())
-	t.Cleanup(func() {
-		_ = db.Where("runner_task_id = ?", "task-hosted-1").Delete(&models.HostedModelCallOutcome{}).Error
-	})
+	db := modelCallOutcomeDB(t, "task-hosted-1")
 
 	result := json.RawMessage(`{"modelCallOutcomes":[{"model":"claude-sonnet-4-6","outcome":"attempt_1"}]}`)
 	configuration := map[string]any{
@@ -75,10 +75,7 @@ func TestRecordRunnerModelCallOutcomesStoresHostedResultsOnce(t *testing.T) {
 }
 
 func TestRecordRunnerModelCallOutcomesIgnoresCustomerKeys(t *testing.T) {
-	db := database.DB(t.Context())
-	t.Cleanup(func() {
-		_ = db.Where("runner_task_id = ?", "task-byok-1").Delete(&models.HostedModelCallOutcome{}).Error
-	})
+	db := modelCallOutcomeDB(t, "task-byok-1")
 
 	RecordRunnerModelCallOutcomes(
 		nil,
@@ -95,11 +92,7 @@ func TestRecordRunnerModelCallOutcomesIgnoresCustomerKeys(t *testing.T) {
 }
 
 func TestProcessTaskStatusRecordsHostedModelCallOutcomes(t *testing.T) {
-	syncModelCallOutcomeInserts(t)
-	db := database.DB(t.Context())
-	t.Cleanup(func() {
-		_ = db.Where("runner_task_id = ?", "task-finish-1").Delete(&models.HostedModelCallOutcome{}).Error
-	})
+	db := modelCallOutcomeDB(t, "task-finish-1")
 
 	exit := 0
 	occurredAt, stamp := rfc3339Stamp(t, -time.Minute)
@@ -138,11 +131,7 @@ func TestProcessTaskStatusRecordsHostedModelCallOutcomes(t *testing.T) {
 }
 
 func TestRecordRunnerModelCallOutcomesCapsSamplesPerTask(t *testing.T) {
-	syncModelCallOutcomeInserts(t)
-	db := database.DB(t.Context())
-	t.Cleanup(func() {
-		_ = db.Where("runner_task_id = ?", "task-cap-1").Delete(&models.HostedModelCallOutcome{}).Error
-	})
+	db := modelCallOutcomeDB(t, "task-cap-1")
 
 	rows := make([]map[string]any, maxModelCallOutcomesPerTask+1)
 	for i := range rows {
@@ -170,11 +159,7 @@ func TestRecordRunnerModelCallOutcomesCapsSamplesPerTask(t *testing.T) {
 }
 
 func TestRecordRunnerModelCallOutcomesClampsTimestampsBeforeTaskStart(t *testing.T) {
-	syncModelCallOutcomeInserts(t)
-	db := database.DB(t.Context())
-	t.Cleanup(func() {
-		_ = db.Where("runner_task_id = ?", "task-clamp-1").Delete(&models.HostedModelCallOutcome{}).Error
-	})
+	db := modelCallOutcomeDB(t, "task-clamp-1")
 
 	started := time.Now().UTC().Truncate(time.Millisecond)
 	_, stamp := rfc3339Stamp(t, -time.Hour)
@@ -203,7 +188,6 @@ func TestRecordRunnerModelCallOutcomesClampsTimestampsBeforeTaskStart(t *testing
 }
 
 func TestProcessTaskStatusIgnoresModelStatusWriteFailures(t *testing.T) {
-	syncModelCallOutcomeInserts(t)
 	previous := insertHostedModelCallOutcomes
 	t.Cleanup(func() {
 		insertHostedModelCallOutcomes = previous
@@ -252,6 +236,8 @@ func TestProcessTaskStatusIgnoresModelStatusWriteFailures(t *testing.T) {
 }
 
 func TestProcessTaskStatusDoesNotWaitForModelStatusInsert(t *testing.T) {
+	previousRun := runModelCallOutcomeInsert
+	runModelCallOutcomeInsert = func(fn func()) { go fn() }
 	previousInsert := insertHostedModelCallOutcomes
 	blocked := make(chan struct{})
 	finished := make(chan struct{})
@@ -260,6 +246,7 @@ func TestProcessTaskStatusDoesNotWaitForModelStatusInsert(t *testing.T) {
 	t.Cleanup(func() {
 		unblock()
 		insertHostedModelCallOutcomes = previousInsert
+		runModelCallOutcomeInsert = previousRun
 	})
 	insertHostedModelCallOutcomes = func(*gorm.DB, []models.HostedModelCallOutcomeInput) error {
 		<-blocked

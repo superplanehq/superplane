@@ -54,6 +54,8 @@ func RecordRunnerModelCallOutcomes(logger *log.Entry, taskID, finishedEventType 
 		return
 	}
 	// Detach the insert. A slow or failed sample must not change the task.
+	// Read the hook here so a test can replace it after this call returns.
+	insert := insertHostedModelCallOutcomes
 	runModelCallOutcomeInsert(func() {
 		defer func() {
 			if recovered := recover(); recovered != nil {
@@ -62,7 +64,7 @@ func RecordRunnerModelCallOutcomes(logger *log.Entry, taskID, finishedEventType 
 		}()
 		ctx, cancel := context.WithTimeout(context.Background(), modelCallOutcomeInsertTimeout)
 		defer cancel()
-		if err := insertHostedModelCallOutcomes(database.Conn().WithContext(ctx), inputs); err != nil {
+		if err := insert(database.Conn().WithContext(ctx), inputs); err != nil {
 			warnModelCallOutcome(logger, err)
 		}
 	})
