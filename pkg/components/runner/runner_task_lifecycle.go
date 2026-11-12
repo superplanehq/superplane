@@ -8,6 +8,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/runners/diagnostics"
 )
 
 func afterRunnerTaskCreated(ctx core.ExecutionContext, taskID string) error {
@@ -114,6 +115,12 @@ func processTaskStatus(
 		if errorMessage == "" {
 			errorMessage = "runner task was lost"
 		}
+	}
+	if channel == FailedOutputChannel && !taskCanceled(task) {
+		if errorMessage == "" || errorMessage == fmt.Sprintf("exit code %d", taskExitCode(task)) || errorMessage == fmt.Sprintf("exit status %d", taskExitCode(task)) {
+			errorMessage = fmt.Sprintf("Runner task failed (exit code %d). The failed step and cause were not recorded.", taskExitCode(task))
+		}
+		errorMessage = diagnostics.WithLogReference(diagnostics.Sanitize(errorMessage, nil, 3900), task.ID)
 	}
 	out := map[string]any{"status": status, "exit_code": taskExitCode(task)}
 	if errorMessage != "" {

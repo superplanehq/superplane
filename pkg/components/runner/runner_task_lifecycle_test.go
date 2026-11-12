@@ -268,7 +268,7 @@ func TestPollTaskFinishesLostTask(t *testing.T) {
 	payload := state.Payloads[0].(map[string]any)
 	result := payload["data"].(map[string]any)
 	assert.Equal(t, "failed", result["status"])
-	assert.Equal(t, "runner task was lost", result["error"])
+	assert.Equal(t, "runner task was lost\nLogs: runner task task-lost.", result["error"])
 }
 
 func TestPollTaskExposesCodexFailureCause(t *testing.T) {
@@ -298,6 +298,11 @@ func TestPollTaskExposesCodexFailureCause(t *testing.T) {
 			expectedError: providerError,
 		},
 		{
+			name:          "preserved runner diagnostics remain unchanged",
+			runnerError:   "Check pull requests (step 3) (exit code 23): Authentication failed.\nLogs: runner task task-1.",
+			expectedError: "Check pull requests (step 3) (exit code 23): Authentication failed.",
+		},
+		{
 			name:          "runner timeout takes precedence",
 			runnerError:   "execution timed out",
 			result:        json.RawMessage(`{"type":"result","is_error":true,"error":"` + providerError + `"}`),
@@ -307,17 +312,18 @@ func TestPollTaskExposesCodexFailureCause(t *testing.T) {
 			name:          "a previous successful turn does not supply an error",
 			runnerError:   "exit code 1",
 			result:        json.RawMessage(`{"type":"result","is_error":false,"error":"stale error"}`),
-			expectedError: "exit code 1",
+			expectedError: "Runner task failed (exit code 1). The failed step and cause were not recorded.",
 		},
 		{
 			name:              "other components keep their result as ordinary output",
 			finishedEventType: RunBashFinishedEventType,
 			runnerError:       "exit code 1",
 			result:            json.RawMessage(`{"type":"result","is_error":true,"error":"ordinary output field"}`),
-			expectedError:     "exit code 1",
+			expectedError:     "Runner task failed (exit code 1). The failed step and cause were not recorded.",
 		},
 		{
-			name: "failure without a retained cause still produces a warning",
+			name:          "failure without a retained cause still produces a warning",
+			expectedError: "Runner task failed (exit code 1). The failed step and cause were not recorded.",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -325,6 +331,7 @@ func TestPollTaskExposesCodexFailureCause(t *testing.T) {
 			if finishedEventType == "" {
 				finishedEventType = "runnerCodex.finished"
 			}
+			tc.expectedError += "\nLogs: runner task task-1."
 			logger, hook := logtest.NewNullLogger()
 			state := &contexts.ExecutionStateContext{}
 			ctx := core.ActionHookContext{
