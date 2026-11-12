@@ -143,7 +143,7 @@ func (c *RunSuperPlane) Execute(ctx core.ExecutionContext) error {
 
 	recordSuperPlaneRunOnConfiguration(ctx.Configuration, runModel)
 
-	resolved, err := runner.ResolveEnvironment(ctx.Secrets, spec.EnvironmentFrom, spec.Environment)
+	resolved, err := runner.ResolveExecutionEnvironment(ctx, spec.EnvironmentFrom, spec.Environment)
 	if err != nil {
 		return err
 	}
