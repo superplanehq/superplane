@@ -74,24 +74,6 @@ func LockOpenLicenseActivationForShare(tx *gorm.DB) (*InstallationLicenseActivat
 	return takeOpenLicenseActivation(tx, true)
 }
 
-func takeOpenLicenseActivation(tx *gorm.DB, share bool) (*InstallationLicenseActivation, error) {
-	query := tx
-	if share {
-		query = tx.Clauses(clause.Locking{Strength: "SHARE"})
-	}
-
-	var row InstallationLicenseActivation
-	err := query.Where("deactivated_at IS NULL").Take(&row).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	return &row, nil
-}
-
 // InsertOpenLicenseActivation inserts an open activation. inserted is false
 // when another open row already exists. The partial unique index makes the
 // insert run once across replicas.
@@ -219,4 +201,22 @@ func FindOnlyOrganization(tx *gorm.DB) (*Organization, error) {
 	}
 
 	return &organizations[0], nil
+}
+
+func takeOpenLicenseActivation(tx *gorm.DB, share bool) (*InstallationLicenseActivation, error) {
+	query := tx
+	if share {
+		query = tx.Clauses(clause.Locking{Strength: "SHARE"})
+	}
+
+	var row InstallationLicenseActivation
+	err := query.Where("deactivated_at IS NULL").Take(&row).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return &row, nil
 }
