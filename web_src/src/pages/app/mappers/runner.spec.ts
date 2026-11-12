@@ -219,6 +219,23 @@ describe("runnerMapper.getExecutionDetails", () => {
     });
   });
 
+  it("preserves the failure summary and log reference in execution details", () => {
+    const node = buildRunnerNode({});
+    const summary = "Implementation (step 2, exit code 42): Provider unavailable.\nLogs: runner task task-1.";
+    const execution = buildExecution({
+      outputs: {
+        failed: [
+          {
+            type: "runnerCodex.finished",
+            timestamp: new Date().toISOString(),
+            data: { status: "failed", exit_code: 42, error: summary },
+          },
+        ],
+      },
+    });
+    expect(runnerMapper.getExecutionDetails({ nodes: [node], node, execution })["Error"]).toBe(summary);
+  });
+
   it("surfaces the payload task_id under the human-readable 'Task ID' label", () => {
     const node = buildRunnerNode({ execution_mode: "host", commands: "id", execution_timeout_seconds: 0 });
     const execution = buildExecution({
