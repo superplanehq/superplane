@@ -40,6 +40,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Create Release" href="#create-release" description="Create a new release in a GitHub repository" />
   <LinkCard title="Create Review" href="#create-review" description="Submit a pull request review on GitHub" />
   <LinkCard title="Delete Release" href="#delete-release" description="Delete a release from a GitHub repository" />
+  <LinkCard title="Ensure Pull Request Reviewers" href="#ensure-pull-request-reviewers" description="Request missing reviews after checking reviewer eligibility and the pull request head" />
   <LinkCard title="Find Pull Request" href="#find-pull-request" description="Find an existing pull request in a GitHub repository by branch" />
   <LinkCard title="Get Combined Commit Status" href="#get-combined-commit-status" description="Get the combined GitHub commit status for a commit, branch, or tag" />
   <LinkCard title="Get Issue" href="#get-issue" description="Get a GitHub issue by number" />
@@ -47,6 +48,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Get Repository Permission" href="#get-repository-permission" description="Get the role and permission level for a user on a GitHub repository" />
   <LinkCard title="Get Workflow Usage" href="#get-workflow-usage" description="Retrieve billable GitHub Actions usage (minutes) for the organization" />
   <LinkCard title="List Check Runs For Ref" href="#list-check-runs-for-ref" description="List GitHub Checks API check runs for a commit, branch, or tag" />
+  <LinkCard title="List Pull Request Review Candidates" href="#list-pull-request-review-candidates" description="Find eligible human reviewers for a pull request" />
   <LinkCard title="Mark Pull Request Ready for Review" href="#mark-pull-request-ready-for-review" description="Take a draft pull request out of the draft state in a GitHub repository" />
   <LinkCard title="Merge Pull Request" href="#merge-pull-request" description="Merge an open pull request in a GitHub repository" />
   <LinkCard title="Publish Commit Status" href="#publish-commit-status" description="Publish a status check to a GitHub commit" />
@@ -3306,6 +3308,34 @@ Returns confirmation of the deletion.
 }
 ```
 
+<a id="ensure-pull-request-reviewers"></a>
+
+## Ensure Pull Request Reviewers
+
+**Component key:** `github.ensurePullRequestReviewers`
+
+Ensure desired human reviewers have a review request or an approval for the current commit. Recheck IDs and repository write access. Preserve unrelated requests. Read the pull request again immediately before mutation. Closed pull requests and unexpected commits emit a skipped outcome. Provider failures and ineligible identities fail the execution. Output includes requested and already-covered identities. The final read and mutation are not atomic.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "alreadyCovered": [],
+    "headSha": "abc",
+    "requested": [
+      {
+        "id": 123,
+        "login": "octocat"
+      }
+    ],
+    "status": "requested"
+  },
+  "timestamp": "2026-01-01T09:00:00Z",
+  "type": "github.pullRequestReviewersEnsured"
+}
+```
+
 <a id="find-pull-request"></a>
 
 ## Find Pull Request
@@ -4366,6 +4396,42 @@ Returns GitHub's check run list response, including total_count and check_runs. 
   },
   "timestamp": "2026-06-01T12:02:02Z",
   "type": "github.checkRuns"
+}
+```
+
+<a id="list-pull-request-review-candidates"></a>
+
+## List Pull Request Review Candidates
+
+**Component key:** `github.listPullRequestReviewCandidates`
+
+List human collaborators with write, maintain, or admin access. Exclude the pull request author and bots. Read every page; incomplete discovery fails the execution. Output includes state, head, base, and candidate IDs and logins.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "base": {
+      "ref": "main",
+      "sha": "base-sha"
+    },
+    "candidates": [
+      {
+        "id": 123,
+        "login": "octocat"
+      }
+    ],
+    "head": {
+      "sha": "abc"
+    },
+    "merged": false,
+    "pullNumber": 42,
+    "repository": "acme/app",
+    "state": "open"
+  },
+  "timestamp": "2026-01-01T09:00:00Z",
+  "type": "github.pullRequestReviewCandidates"
 }
 ```
 

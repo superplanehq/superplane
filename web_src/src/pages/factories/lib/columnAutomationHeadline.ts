@@ -31,6 +31,7 @@ const FIXED_HEADLINES: Record<
   "pr-closure": "Closes tasks when pull requests merge",
   "risk-score": "Scores merge confidence",
   "visual-evidence": "Captures screenshots or a short video",
+  "review-request": "Requests pull request reviewers",
 };
 
 /**
