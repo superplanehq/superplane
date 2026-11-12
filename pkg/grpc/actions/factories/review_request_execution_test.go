@@ -211,7 +211,7 @@ func emitReviewRequestReport(t *testing.T, f publicationFixture, host *reviewReq
 	_, err = factorycomponent.ReportMergeConfidenceCheck(f.db, f.order, f.run.ID, &factoryevents.AutomationRef{AppID: f.canvas.ID, NodeID: "assess-risk"}, "acme/app", "security", score, "Security assessment evidence.", []string{"security"}, nil)
 	require.NoError(t, err)
 	assessment, _ := reviewRequestTestExecution(t, f, f.canvas, f.run, "assess-risk", root, root, nil)
-	require.NoError(t, workercontexts.NewExecutionStateContext(f.db, assessment, nil).Emit("passed", "runnerClaudeCode.finished", []any{map[string]any{"status": "succeeded"}}))
+	require.NoError(t, workercontexts.NewFactoryExecutionStateContext(f.db, assessment, nil).Emit("passed", "runnerClaudeCode.finished", []any{map[string]any{"status": "succeeded"}}))
 	var assessed models.CanvasEvent
 	require.NoError(t, f.db.Where("execution_id = ?", assessment.ID).First(&assessed).Error)
 	publication, action := reviewRequestTestExecution(t, f, f.canvas, f.run, "publish-merge-confidence", root, &assessed, assessment)

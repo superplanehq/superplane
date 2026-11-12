@@ -15,7 +15,7 @@ const customAutomationRunTitle = "Custom automation"
 // factory pull request in the root event. The task Verify list shows a column
 // app only after that link exists.
 func MaybeLinkVisualEvidenceRun(tx *gorm.DB, canvas *Canvas, event *CanvasEvent, run *CanvasRun) error {
-	return maybeLinkFactoryColumnAppRun(tx, canvas, event, run, FactoryAppTemplateVisualEvidenceID, visualEvidenceRunTitle)
+	return LinkFactoryColumnAppRun(tx, canvas, event, run, FactoryAppTemplateVisualEvidenceID, visualEvidenceRunTitle)
 }
 
 // MaybeLinkCustomAutomationRun stores task authority for a custom automation.
@@ -30,7 +30,7 @@ func MaybeLinkCustomAutomationRun(tx *gorm.DB, canvas *Canvas, event *CanvasEven
 	if canvas != nil && canvas.ColumnKey != nil && *canvas.ColumnKey == CanvasColumnKeyBacklog {
 		return maybeLinkBacklogCustomAutomationRun(tx, canvas, event, run, title)
 	}
-	return maybeLinkFactoryColumnAppRun(tx, canvas, event, run, FactoryAppTemplateCustomAutomationID, title)
+	return LinkFactoryColumnAppRun(tx, canvas, event, run, FactoryAppTemplateCustomAutomationID, title)
 }
 
 func maybeLinkBacklogCustomAutomationRun(tx *gorm.DB, canvas *Canvas, event *CanvasEvent, run *CanvasRun, title string) error {
@@ -71,12 +71,7 @@ func maybeLinkBacklogCustomAutomationRun(tx *gorm.DB, canvas *Canvas, event *Can
 	return order.RecordRefinementRun(tx, run.ID)
 }
 
-// MaybeLinkMergeConfidenceRun records task authority before agent admission.
-func MaybeLinkMergeConfidenceRun(tx *gorm.DB, canvas *Canvas, event *CanvasEvent, run *CanvasRun) error {
-	return maybeLinkFactoryColumnAppRun(tx, canvas, event, run, "risk-score", "Merge confidence")
-}
-
-func maybeLinkFactoryColumnAppRun(
+func LinkFactoryColumnAppRun(
 	tx *gorm.DB,
 	canvas *Canvas,
 	event *CanvasEvent,
