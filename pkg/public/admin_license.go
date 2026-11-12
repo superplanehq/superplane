@@ -27,14 +27,15 @@ type installationLicenseResponse struct {
 	Reason  string `json:"reason,omitempty"`
 	// ManagedByConfiguration is true when SUPERPLANE_LICENSE_PATH provides the
 	// license. Administrators cannot change it in the UI.
-	ManagedByConfiguration  bool                             `json:"managed_by_configuration"`
-	License                 *installationLicenseDetails      `json:"license,omitempty"`
-	TrustedKeys             *trustedKeysResponse             `json:"trusted_keys,omitempty"`
-	FeatureCounts           map[string]int64                 `json:"feature_counts"`
-	OrganizationCount       int64                            `json:"organization_count"`
-	Event                   string                           `json:"event,omitempty"`
-	RemovedGrants           []removedEnterpriseGrantResponse `json:"removed_grants,omitempty"`
-	AutoGrantOrganizationID string                           `json:"auto_grant_organization_id,omitempty"`
+	ManagedByConfiguration    bool                             `json:"managed_by_configuration"`
+	License                   *installationLicenseDetails      `json:"license,omitempty"`
+	TrustedKeys               *trustedKeysResponse             `json:"trusted_keys,omitempty"`
+	FeatureCounts             map[string]int64                 `json:"feature_counts"`
+	OrganizationCount         int64                            `json:"organization_count"`
+	Event                     string                           `json:"event,omitempty"`
+	RemovedGrants             []removedEnterpriseGrantResponse `json:"removed_grants,omitempty"`
+	AutoGrantOrganizationID   string                           `json:"auto_grant_organization_id,omitempty"`
+	AutoGrantOrganizationName string                           `json:"auto_grant_organization_name,omitempty"`
 }
 
 type removedEnterpriseGrantResponse struct {
@@ -44,10 +45,11 @@ type removedEnterpriseGrantResponse struct {
 }
 
 type licenseInstallDryRunResponse struct {
-	License                 *installationLicenseDetails      `json:"license"`
-	Event                   string                           `json:"event"`
-	RemovedGrants           []removedEnterpriseGrantResponse `json:"removed_grants"`
-	AutoGrantOrganizationID string                           `json:"auto_grant_organization_id"`
+	License                   *installationLicenseDetails      `json:"license"`
+	Event                     string                           `json:"event"`
+	RemovedGrants             []removedEnterpriseGrantResponse `json:"removed_grants"`
+	AutoGrantOrganizationID   string                           `json:"auto_grant_organization_id"`
+	AutoGrantOrganizationName string                           `json:"auto_grant_organization_name,omitempty"`
 }
 
 type licenseRemovalDryRunResponse struct {
@@ -238,13 +240,14 @@ func (s *Server) adminInstallInstallationLicense(w http.ResponseWriter, r *http.
 		return
 	}
 	response.RemovedGrants = removed
-	autoGrantID, err := autoGrantOrganizationID(applied.AutoGranted)
+	autoGrantID, autoGrantName, err := autoGrantOrganization(applied.AutoGranted)
 	if err != nil {
 		log.WithError(err).Error("admin: failed to read the organization that received automatic grants")
 		http.Error(w, "Failed to read the installation license", http.StatusInternalServerError)
 		return
 	}
 	response.AutoGrantOrganizationID = autoGrantID
+	response.AutoGrantOrganizationName = autoGrantName
 	respondJSON(w, response)
 }
 
@@ -270,14 +273,23 @@ func (s *Server) adminDryRunInstallLicense(w http.ResponseWriter, r *http.Reques
 	}
 
 	autoGrantID := ""
+	autoGrantName := ""
 	if plan.AutoGrantOrganizationID != uuid.Nil {
 		autoGrantID = plan.AutoGrantOrganizationID.String()
+		names, nameErr := organizationNames([]uuid.UUID{plan.AutoGrantOrganizationID})
+		if nameErr != nil {
+			log.WithError(nameErr).Error("admin: failed to read the organization that would receive automatic grants")
+			http.Error(w, "Failed to read the installation license", http.StatusInternalServerError)
+			return
+		}
+		autoGrantName = names[plan.AutoGrantOrganizationID]
 	}
 	respondJSON(w, licenseInstallDryRunResponse{
-		License:                 licenseDetails(license),
-		Event:                   plan.Event,
-		RemovedGrants:           removed,
-		AutoGrantOrganizationID: autoGrantID,
+		License:                   licenseDetails(license),
+		Event:                     plan.Event,
+		RemovedGrants:             removed,
+		AutoGrantOrganizationID:   autoGrantID,
+		AutoGrantOrganizationName: autoGrantName,
 	})
 }
 
@@ -476,17 +488,17 @@ func licenseDetails(license *licensing.License) *installationLicenseDetails {
 	}
 }
 
-func autoGrantOrganizationID(autoGranted bool) (string, error) {
+func autoGrantOrganization(autoGranted bool) (string, string, error) {
 	if !autoGranted {
-		return "", nil
+		return "", "", nil
 	}
 
 	organization, err := models.FindOnlyOrganization(database.Conn())
 	if err != nil || organization == nil {
-		return "", err
+		return "", "", err
 	}
 
-	return organization.ID.String(), nil
+	return organization.ID.String(), organization.Name, nil
 }
 
 func plannedGrantResponses(removals []enterprise.PlannedGrantRemoval) ([]removedEnterpriseGrantResponse, error) {
