@@ -184,6 +184,24 @@ service Factories {
     };
   }
 
+  rpc ListFactoryWebhooks(ListFactoryWebhooksRequest) returns (ListFactoryWebhooksResponse) {
+    option (google.api.http) = { get: "/api/v1/factories/{factory_id}/webhooks" };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List workspace GitHub webhooks";
+      description: "Returns GitHub webhook registration status for a workspace";
+      tags: "Factory";
+    };
+  }
+
+  rpc RetryFactoryWebhook(RetryFactoryWebhookRequest) returns (RetryFactoryWebhookResponse) {
+    option (google.api.http) = { post: "/api/v1/factories/{factory_id}/webhooks/{webhook_id}/retry" body: "*" };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Retry workspace GitHub webhook registration";
+      description: "Retries a failed GitHub webhook registration in the workspace";
+      tags: "Factory";
+    };
+  }
+
   rpc CreateFactoryAutomation(CreateFactoryAutomationRequest) returns (CreateFactoryAutomationResponse) {
     option (google.api.http) = {
       post: "/api/v1/factories/{factory_id}/automations"
@@ -1382,6 +1400,33 @@ message ListFactoryAutomationsRequest {
 
 message ListFactoryAutomationsResponse {
   repeated Factory.Automation automations = 1;
+}
+
+message FactoryWebhookStatus {
+  string id = 1;
+  string repository = 2;
+  repeated string event_types = 3;
+  repeated Factory.Automation affected_automations = 4;
+  string state = 5;
+  string message = 6;
+  string host = 7;
+}
+
+message ListFactoryWebhooksRequest {
+  string factory_id = 1;
+}
+
+message ListFactoryWebhooksResponse {
+  repeated FactoryWebhookStatus webhooks = 1;
+}
+
+message RetryFactoryWebhookRequest {
+  string factory_id = 1;
+  string webhook_id = 2;
+}
+
+message RetryFactoryWebhookResponse {
+  FactoryWebhookStatus webhook = 1;
 }
 
 message CreateFactoryAutomationRequest {

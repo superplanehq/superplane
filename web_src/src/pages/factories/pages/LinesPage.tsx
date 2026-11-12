@@ -70,8 +70,7 @@ import { AddIntakePicker } from "./AddIntakePicker";
 import { ScheduledIntakeSetupDialog } from "./ScheduledIntakeSetupDialog";
 import { AddPRFeedbackPicker } from "./AddPRFeedbackPicker";
 import { useAddColumnAutomation } from "./useAddColumnAutomation";
-import { IntakeWebhookFailureNotice } from "./IntakeWebhookFailureNotice";
-import { useIntakeWebhookRetry } from "./useIntakeWebhookRetry";
+import { FactoryWebhookWarnings } from "./FactoryWebhookWarnings";
 import { NextStepsPanel, WorkspaceNextStepsHeaderBadge } from "./NextStepsPanel";
 import { useWorkspaceNextStepDeferral } from "./workspaceNextStepDeferral";
 import {
@@ -386,7 +385,6 @@ export function LinesPage() {
   const prFeedbackHandlers = prFeedbackHandlersQuery.data ?? [];
   const { data: factoryIntakes = [] } = useFactoryIntakes(organizationId, factoryId);
   const createIntake = useCreateFactoryIntake(organizationId, factoryId);
-  const intakeWebhookRetry = useIntakeWebhookRetry(organizationId, factoryId);
   const configuredIntakes = useMemo(() => intakeSourcesFromFactoryIntakes(factoryIntakes), [factoryIntakes]);
   const showAddIntakeControl = useFactoryPreviewFlag("addIntakeControl");
   const { has: hasExperimentalFeature } = useExperimentalFeature(organizationId);
@@ -817,18 +815,7 @@ export function LinesPage() {
             onColorViewChange={setColumnColorView}
           />
           <SubscriptionIntakeOwnerRecovery />
-          {configuredIntakes
-            .filter((intake) => intake.source.id === "github-issues" && intake.health === "HEALTH_WEBHOOK_FAILED")
-            .map((intake) => (
-              <IntakeWebhookFailureNotice
-                key={intake.intakeId}
-                message={intake.healthMessage}
-                repository={intake.resourceId}
-                host={githubHost}
-                retrying={intakeWebhookRetry.retrying}
-                onRetry={() => intakeWebhookRetry.retryIntake(intake)}
-              />
-            ))}
+          <FactoryWebhookWarnings organizationId={organizationId} factoryId={factoryId} canRetry={canUpdate} />
           <NextStepsPanel
             steps={nextSteps}
             collapsed={nextStepsCollapsed}

@@ -273,8 +273,8 @@ vi.mock("./planningSessionClient", () => ({
   answerPlanningSessionSurvey: vi.fn(),
 }));
 
-vi.mock("./useIntakeWebhookRetry", () => ({
-  useIntakeWebhookRetry: () => ({ retryIntake: vi.fn(), retrying: false }),
+vi.mock("./FactoryWebhookWarnings", () => ({
+  FactoryWebhookWarnings: () => null,
 }));
 
 const enabledExperimentalFeatures = new Set<string>();

@@ -2,6 +2,7 @@ import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useWorkOrderCardActions } from "@/hooks/useWorkOrderCardActions";
+import { useFactoryWebhookData } from "@/hooks/useFactoryWebhookData";
 import { Plus } from "lucide-react";
 import { CreateFactoryAppDialog } from "../CreateFactoryAppDialog";
 import { WorkspacePageHeader } from "../layout/WorkspacePageHeader";
@@ -16,6 +17,13 @@ import { usePRFeedbackWorkOrderAttention } from "./useWorkOrderPRFeedbackRunHref
 export function AutomationsPage() {
   const model = useAutomationsPageModel();
   const cardActions = useWorkOrderCardActions(model.organizationId, model.factoryId);
+  const webhooks = useFactoryWebhookData(model.organizationId, model.factoryId);
+  const failedAutomationIds = new Set(
+    webhooks.warnings.flatMap(
+      (webhook) =>
+        webhook.affectedAutomations?.map((automation) => automation.id).filter((id): id is string => Boolean(id)) ?? [],
+    ),
+  );
   const pullRequests = pullRequestsFromWorkOrders(model.workOrders);
   const {
     addressingFeedbackOrderIds,
@@ -72,6 +80,8 @@ export function AutomationsPage() {
           factory={model.factory}
           workOrders={model.workOrders}
           workOrderCardContext={workOrderCardContext}
+          factoryId={model.factoryId}
+          canRetryWebhook={model.canRetryWebhook}
         />
       </div>
     );
@@ -107,6 +117,7 @@ export function AutomationsPage() {
           organizationId={model.organizationId}
           factoryKey={model.factoryKey}
           apps={model.apps}
+          failedAutomationIds={failedAutomationIds}
           workOrders={model.workOrders}
           appsLoading={model.appsLoading}
           actionsForApp={model.actionsForApp}

@@ -131,7 +131,7 @@ func githubIntakeWebhookFailure(tx *gorm.DB, canvasID uuid.UUID, triggerNodeID s
 		return pb.FactoryIntake_HEALTH_OK, ""
 	}
 
-	return pb.FactoryIntake_HEALTH_WEBHOOK_FAILED, githubWebhookFailureMessage(webhookSetupError(webhook.Metadata.Data()))
+	return pb.FactoryIntake_HEALTH_WEBHOOK_FAILED, githubWebhookFailureMessage(webhookSetupError(webhook.Metadata.Data()), []string{"issues"})
 }
 
 func intakeTriggerWebhook(tx *gorm.DB, canvasID uuid.UUID, triggerNodeID string) *models.Webhook {
@@ -159,13 +159,6 @@ func webhookSetupError(metadata any) string {
 	}
 	reason, _ := asMap["setupError"].(string)
 	return strings.TrimSpace(reason)
-}
-
-func githubWebhookFailureMessage(setupError string) string {
-	if strings.Contains(setupError, "cannot have more than 20 hooks") {
-		return "GitHub did not create the webhook. This repository already has 20 webhooks for issues. Remove unused webhooks in the repository settings, then try again."
-	}
-	return "GitHub did not create the webhook. SuperPlane cannot receive new issues. Try again."
 }
 
 func intakeSourceAllowsRebind(source string) bool {
