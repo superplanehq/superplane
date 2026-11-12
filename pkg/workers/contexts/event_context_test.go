@@ -11,6 +11,9 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
+
+	// Ordinary behavior must not change when built-in automations are registered.
+	_ "github.com/superplanehq/superplane/pkg/factories/reviewrequest"
 )
 
 func Test__EventContext__Emit(t *testing.T) {

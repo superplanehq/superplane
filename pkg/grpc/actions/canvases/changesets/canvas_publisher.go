@@ -12,6 +12,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/factories/lifecycle"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -150,6 +151,9 @@ func NewCanvasPublisher(tx *gorm.DB, canvas *models.Canvas, draft *models.Canvas
 }
 
 func (p *CanvasPublisher) Publish(ctx context.Context) error {
+	if err := lifecycle.ValidatePublication(lifecycle.Publication{Tx: p.tx, Canvas: p.canvas, Draft: p.draft, OrganizationID: p.options.OrgID}); err != nil {
+		return err
+	}
 	if err := models.ValidateSubscriptionIntakeOwners(p.tx, p.canvas, p.draft, p.live); err != nil {
 		return err
 	}

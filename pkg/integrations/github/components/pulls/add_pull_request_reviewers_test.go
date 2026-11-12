@@ -116,6 +116,24 @@ func Test__AddPullRequestReviewers__Setup(t *testing.T) {
 
 		require.NoError(t, err)
 	})
+
+	for _, field := range []string{"reviewers", "teamReviewers"} {
+		t.Run(field+" accepts an expression that returns a list", func(t *testing.T) {
+			configuration := validConfig(map[string]any{
+				"repository": `{{ root().data.repository.full_name }}`,
+				"pullNumber": `{{ root().data.pull_request.number }}`,
+				"reviewers":  []string{},
+				field:        `{{ previous().data.reviewers }}`,
+			})
+			err := component.Setup(core.SetupContext{
+				Integration:   mocks.IntegrationContextForNewSetupFlow(),
+				Metadata:      &contexts.MetadataContext{},
+				Configuration: configuration,
+			})
+			require.NoError(t, err)
+			require.IsType(t, "", configuration[field], "setup must preserve the expression for execution")
+		})
+	}
 }
 
 func Test__AddPullRequestReviewers__Execute(t *testing.T) {

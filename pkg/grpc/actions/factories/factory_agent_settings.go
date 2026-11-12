@@ -22,6 +22,7 @@ var factoryAgentSettingFields = []string{
 	"includeVisualEvidence", "disabledAgentResourceIds", "disabledAgentResourceTools",
 	"enabledAgentResourceTools", "skipSetupCommands", "environmentFrom",
 	"additionalInstructions",
+	"fallbackReviewer",
 }
 
 type factoryAgentSettings struct {

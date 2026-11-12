@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/factories/lifecycle"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
@@ -36,6 +37,14 @@ func (s *EventContext) EmitDeduplicated(payloadType string, payload any, dedupKe
 }
 
 func (s *EventContext) emit(payloadType string, payload any, dedupKey string) error {
+	admitted, err := lifecycle.AdmitEvent(lifecycle.EventAdmission{Tx: s.tx, Node: s.node, Run: s.run, PayloadType: payloadType, Payload: payload})
+	if err != nil || admitted.Suppress {
+		return err
+	}
+	payload = admitted.Payload
+	if admitted.DedupKey != "" {
+		dedupKey = admitted.DedupKey
+	}
 	structuredPayload := map[string]any{
 		"type":      payloadType,
 		"timestamp": time.Now(),

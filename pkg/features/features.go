@@ -37,6 +37,10 @@ const FeatureFactoryDatadogIntake = "factory_datadog_intake"
 
 const FeatureFactoryScheduledIntake = "factory_scheduled_intake"
 
+// FeatureFactoryReviewRequest gates new reviewer-request automations. Existing
+// automations continue to run when the organization disables discovery.
+const FeatureFactoryReviewRequest = "factory_review_request"
+
 // FeatureOrganizationBYOK gates the organization Models settings page
 // until the BYOK UX is ready for general use.
 const FeatureOrganizationBYOK = "organization_byok"
@@ -103,6 +107,7 @@ var registry = []Feature{
 	{ID: FeatureNewIntegrationSetupFlow, Label: "New Integration Setup Flow", Description: "Use the multi-step SetupProvider wizard when connecting integrations such as GitHub"},
 	{ID: FeatureFactoryProductiveIntake, Label: "Factory Productive Intake", Description: "Add Productive intake from the Backlog column menu"},
 	{ID: FeatureFactoryScheduledIntake, Label: "Scheduled Intake", Description: "Propose backlog tasks on a schedule"},
+	{ID: FeatureFactoryReviewRequest, Label: "Review request", Description: "Request human reviews after Merge confidence completes"},
 	{ID: FeatureFactoryDatadogIntake, Label: "Factory Datadog Intake", Description: "Add Datadog intake from the Backlog column menu"},
 	{ID: FeatureOrganizationBYOK, Label: "Organization BYOK", Description: "Show the organization Models settings page"},
 	{ID: FeatureOrganizationBYOKCustomProvider, Label: "Organization BYOK Custom Provider", Description: "Add a custom model provider with a URL, token, and API type"},
