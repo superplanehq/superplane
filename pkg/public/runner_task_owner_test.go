@@ -37,7 +37,7 @@ func TestTaskLinkedRunOwnsTaskWithoutVisualEvidence(t *testing.T) {
 	env := runner.AttachRunnerEnv(ctx, []runner.TaskEnvironmentVariable{
 		{Name: runner.EnvSuperplaneRunnerToken, Value: "untrusted"},
 		{Name: runner.EnvSuperplaneTaskID, Value: "untrusted"},
-	}, 60, nil)
+	}, 60)
 	token := runnerTokenFrom(env)
 	require.NotEmpty(t, token)
 	require.NotEqual(t, "untrusted", token)
@@ -191,7 +191,7 @@ func TestTaskLinkedRunOwnsTaskWithoutVisualEvidence(t *testing.T) {
 		} {
 			require.Equal(t, http.StatusConflict, rec.Code, rec.Body.String())
 		}
-		assert.False(t, runner.HasRunnerToken(runner.AttachRunnerEnv(ctx, nil, 60, nil)))
+		assert.False(t, runner.HasRunnerToken(runner.AttachRunnerEnv(ctx, nil, 60)))
 		eventsAfter, err := persisted.ListEvents(db, 0, nil)
 		require.NoError(t, err)
 		assert.Equal(t, eventsBefore, eventsAfter)
@@ -200,7 +200,7 @@ func TestTaskLinkedRunOwnsTaskWithoutVisualEvidence(t *testing.T) {
 		assert.Equal(t, []uuid.UUID{owner.ID}, unchanged.AssigneeIDs())
 	}
 	ctx.RunID = uuid.New()
-	assert.False(t, runner.HasRunnerToken(runner.AttachRunnerEnv(ctx, nil, 60, nil)))
+	assert.False(t, runner.HasRunnerToken(runner.AttachRunnerEnv(ctx, nil, 60)))
 }
 
 func TestRunnerAssignOwnerReasonIsOptional(t *testing.T) {
@@ -208,7 +208,7 @@ func TestRunnerAssignOwnerReasonIsOptional(t *testing.T) {
 	t.Setenv("JWT_SECRET", "test")
 	db := database.DB(t.Context())
 	ctx, factory, order := mustTaskLinkedAgentRun(t, r)
-	token := runnerTokenFrom(runner.AttachRunnerEnv(ctx, nil, 60, nil))
+	token := runnerTokenFrom(runner.AttachRunnerEnv(ctx, nil, 60))
 	require.NotEmpty(t, token)
 	server := newRunnerArtifactTestServer(t, r, jwt.NewSigner("test"))
 	owner := mustTaskOwnerMember(t, r, "implementation-dev")
@@ -256,7 +256,7 @@ func latestOwnerPayload(t *testing.T, order *models.FactoryWorkOrder) factoryeve
 
 func assertRunnerOwnerAccess(t *testing.T, server *Server, ctx core.ExecutionContext, env []runner.TaskEnvironmentVariable, orderID uuid.UUID) string {
 	t.Helper()
-	token := runnerTokenFrom(runner.AttachRunnerEnv(ctx, env, 60, nil))
+	token := runnerTokenFrom(runner.AttachRunnerEnv(ctx, env, 60))
 	require.NotEmpty(t, token)
 	scope, err := runner.ParseRunnerToken(jwt.NewSigner("test"), token)
 	require.NoError(t, err)

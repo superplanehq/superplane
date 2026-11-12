@@ -3,9 +3,11 @@ import { beforeEach, describe, expect, it, vi } from "bun:test";
 import { MemoryRouter, useNavigate } from "react-router";
 
 import { SettingsAutomationWorkspace } from "./SettingsAutomationWorkspace";
+import type { IntakeAutomationGraph } from "./useIntakeAutomationCanvas";
 import { useAutomationRunNavigation } from "./useAutomationRunNavigation";
 
-const { useCanvasRuntimeWebsocket, useInfiniteCanvasRuns } = vi.hoisted(() => ({
+const { useCanvasRuntimeWebsocket, useInfiniteCanvasRuns, selectedGraph } = vi.hoisted(() => ({
+  selectedGraph: { current: null as IntakeAutomationGraph | null },
   useCanvasRuntimeWebsocket: vi.fn(),
   useInfiniteCanvasRuns: vi.fn(),
 }));
@@ -20,7 +22,7 @@ vi.mock("@/hooks/useCanvasData", () => ({
 
 vi.mock("./useSettingsAutomationRunCanvas", () => ({
   useSettingsAutomationRunCanvas: ({ liveGraph }: { liveGraph: { nodes: unknown[]; edges: unknown[] } }) => ({
-    graph: liveGraph,
+    graph: selectedGraph.current ?? liveGraph,
     isRunInspectionMode: false,
     runCanvasLoading: false,
     selectedRun: null,
@@ -29,7 +31,9 @@ vi.mock("./useSettingsAutomationRunCanvas", () => ({
 }));
 
 vi.mock("./SettingsAutomationCanvas", () => ({
-  SettingsAutomationCanvas: () => <div data-testid="settings-automation-canvas" />,
+  SettingsAutomationCanvas: ({ graph }: { graph: IntakeAutomationGraph }) => (
+    <div data-testid="settings-automation-canvas">{graph.nodes.map((node) => node.id).join(",")}</div>
+  ),
 }));
 
 vi.mock("./factoryAutomationRunsSidebar/FactoryAutomationRunsSidebar", () => ({
@@ -77,6 +81,7 @@ function NavigableWorkspace() {
 describe("SettingsAutomationWorkspace", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    selectedGraph.current = null;
     useInfiniteCanvasRuns.mockReturnValue({
       data: { pages: [{ runs: [] }] },
     });
@@ -124,5 +129,20 @@ describe("SettingsAutomationWorkspace", () => {
     );
 
     expect(useCanvasRuntimeWebsocket).toHaveBeenCalledWith("", "org-1", false);
+  });
+  it("prepares display data after selecting the historical graph", () => {
+    selectedGraph.current = { nodes: [{ id: "historical", position: { x: 0, y: 0 }, data: {} }], edges: [] };
+    render(
+      <SettingsAutomationWorkspace
+        graph={{ nodes: [{ id: "live", position: { x: 0, y: 0 }, data: {} }], edges: [] }}
+        testId="workspace"
+        prepareDisplayGraph={(graph) => ({
+          ...graph,
+          nodes: graph.nodes.map((node) => ({ ...node, id: `display-${node.id}` })),
+        })}
+      />,
+    );
+    expect(screen.getByTestId("settings-automation-canvas")).toHaveTextContent("display-historical");
+    expect(screen.getByTestId("settings-automation-canvas")).not.toHaveTextContent("display-live");
   });
 });

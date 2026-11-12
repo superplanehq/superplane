@@ -145,15 +145,20 @@ func ValidateEnvironmentFrom(environmentFrom []EnvironmentFromEntry) error {
 	return nil
 }
 
-type IntegrationSetup struct {
-	Name   string
-	Script string
-}
+type IntegrationSetup = core.IntegrationSetup
 
-type ResolvedEnvironment struct {
-	Variables []TaskEnvironmentVariable
-	Usage     string
-	Setups    []IntegrationSetup
+type ResolvedEnvironment = core.ResolvedEnvironment
+
+// ResolveExecutionEnvironment reuses startup data prepared for the current execution.
+func ResolveExecutionEnvironment(
+	ctx core.ExecutionContext,
+	environmentFrom []EnvironmentFromEntry,
+	environment []EnvironmentVariable,
+) (ResolvedEnvironment, error) {
+	if ctx.ResolvedEnvironment != nil {
+		return *ctx.ResolvedEnvironment, nil
+	}
+	return ResolveEnvironment(ctx.Secrets, environmentFrom, environment)
 }
 
 func ResolveEnvironment(
