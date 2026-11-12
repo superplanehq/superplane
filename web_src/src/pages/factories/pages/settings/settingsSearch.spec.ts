@@ -34,6 +34,11 @@ describe("searchFactorySettings", () => {
     ).toBe(true);
   });
 
+  it("returns Model status under Organization for availability", () => {
+    const results = searchFactorySettings(index, "availability");
+    expect(results.some((result) => result.title === "Model status" && result.section === "model-status")).toBe(true);
+  });
+
   it("returns Billing and not Spending for a billing query", () => {
     const titles = searchFactorySettings(index, "billing").map((result) => result.title);
     expect(titles).toEqual(["Billing", "Hosted credit", "Invoices"]);

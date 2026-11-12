@@ -446,7 +446,7 @@ function isChatGPTAuthenticationError(value) {
   return /(?:chatgpt|codex).*(?:session (?:has )?expired|credentials? (?:expired|refresh failed|could not be refreshed)|authentication failed|unauthorized)|(?:failed|could not) to refresh.*chatgpt credentials|(?:access|auth(?:entication)?) token.*expired|(?:401|unauthorized).*(?:workspace.routing|chatgpt|codex)|workspace.routing.*(?:401|unauthorized)|^(?:refresh_token_expired|token_expired)$/i.test(message);
 }
 
-async function runCodexAttempt({ codexArgs, childEnv, sp, telemetry, activity, subscription, onStop }) {
+async function runCodexAttempt({ codexArgs, childEnv, sp, telemetry, activity, subscription, model, onStop }) {
   const child = spawn("codex", codexArgs, {
     env: childEnv,
     stdio: ["ignore", "pipe", "pipe"],
@@ -624,13 +624,13 @@ async function runPrompt(promptFile, model, thinking) {
   codexArgs.push(prompt);
 
   const telemetry = loadTurnTelemetry();
-  let attempt = await runCodexAttempt({ codexArgs, childEnv, sp, telemetry, activity, subscription, onStop: (stop) => { stopChild = stop; } });
+  let attempt = await runCodexAttempt({ codexArgs, childEnv, sp, telemetry, activity, subscription, model, onStop: (stop) => { stopChild = stop; } });
   let authenticationCode = "";
   if (attempt.authenticationFailed && !attempt.workStarted) {
     const deadline = attempt.authenticationFailedAt + 30000;
     authenticationCode = await recoverChatGPTAuthentication(subscription, deadline, activity) || "";
     if (!authenticationCode) {
-      attempt = await runCodexAttempt({ codexArgs, childEnv, sp, telemetry, activity, subscription, onStop: (stop) => { stopChild = stop; } });
+      attempt = await runCodexAttempt({ codexArgs, childEnv, sp, telemetry, activity, subscription, model, onStop: (stop) => { stopChild = stop; } });
       if (attempt.authenticationFailed) authenticationCode = "chatgpt_unauthorized";
     }
   } else if (attempt.authenticationFailed) {
@@ -663,6 +663,33 @@ async function runPrompt(promptFile, model, thinking) {
     thinkingLevel: rollout.effort || thinking,
     usage,
   };
+  const outcomes = [];
+  for (const occurredAt of formatter.modelCallTimes()) {
+    outcomes.push(
+      ...codexModelCallOutcomes({
+        failed: false,
+        model: payload.model,
+        occurredAt,
+      }),
+    );
+  }
+  if (exitCode !== 0) {
+    const failedOutcomes = codexModelCallOutcomes({
+      failed: true,
+      errorText: `${formatter.errorMessage()}\n${codexErrorText(lastResult)}\n${stderr}`,
+      model: payload.model,
+    });
+    outcomes.push(...failedOutcomes);
+  } else if (outcomes.length === 0) {
+    const fallback = codexModelCallOutcomes({
+      failed: false,
+      model: payload.model,
+    });
+    outcomes.push(...fallback);
+  }
+  if (outcomes.length > 0) {
+    payload.modelCallOutcomes = outcomes;
+  }
   telemetry.attachToResult(payload);
   const activityModule = loadActivityStreamModule();
   const safePayload = activityModule.sanitizeLogValue ? activityModule.sanitizeLogValue(payload) : payload;
@@ -841,6 +868,62 @@ function pipeRedactedStderr(stream, onLine = () => {}) {
   return new Promise((resolve) => lines.on("close", () => resolve(tail.trim())));
 }
 
+function classifyCodexProviderError(text) {
+  const raw = String(text || "");
+  const lower = raw.toLowerCase();
+  if (
+    /invalid api key|incorrect api key|unauthorized|authentication|insufficient credit|insufficient credits|unknown model|model not found|context (length|window|overflow)|maximum context|prompt is too long/.test(
+      lower,
+    )
+  ) {
+    return "hard";
+  }
+  if (
+    /rate limit exceeded|rate limit reached|please retry shortly|\b429\b/.test(
+      lower,
+    ) ||
+    /too many requests/.test(lower)
+  ) {
+    return "rate_limit";
+  }
+  if (
+    /\b(502|503|504|529)\b/.test(lower) ||
+    /overloaded|unavailable|temporarily|capacity|timeout|econnreset|fetch failed|server error|bad gateway|service unavailable/.test(
+      lower,
+    )
+  ) {
+    return "retryable";
+  }
+  return "other";
+}
+
+function codexErrorText(event) {
+  if (!event || typeof event !== "object") {
+    return "";
+  }
+  const parts = [event.error, event.result, event.text, event.message];
+  return parts
+    .map((part) => (typeof part === "string" ? part : ""))
+    .filter(Boolean)
+    .join("\n");
+}
+
+function codexModelCallOutcomes({ failed, errorText, model, occurredAt }) {
+  const id = String(model || "").trim();
+  if (!id) {
+    return [];
+  }
+  const stamp = String(occurredAt || "").trim() || new Date().toISOString();
+  if (!failed) {
+    return [{ model: id, outcome: "attempt_1", occurredAt: stamp }];
+  }
+  const kind = classifyCodexProviderError(errorText);
+  if (kind === "rate_limit" || kind === "retryable") {
+    return [{ model: id, outcome: "error", occurredAt: stamp }];
+  }
+  return [];
+}
+
 function createCodexFormatter(telemetry, activityOverride) {
   const tracker = telemetry || loadTurnTelemetry();
   const activity =
@@ -853,8 +936,15 @@ function createCodexFormatter(telemetry, activityOverride) {
   let anonSeq = 0;
   let contentSeq = 0;
   let roundOpen = false;
+  let roundHasMessage = false;
   let lastText = "";
   let lastError = "";
+  let lastRecordedMessageId = "";
+  const modelCallTimes = [];
+
+  function recordModelCall() {
+    modelCallTimes.push(new Date().toISOString());
+  }
 
   function reportError(message) {
     const safe = safeLogText(message).trim().slice(0, 8192) || "Codex failed without an error message.";
@@ -1015,6 +1105,7 @@ function createCodexFormatter(telemetry, activityOverride) {
       if (event.type === "turn.completed" || event.type === "result") {
         tracker.updateCurrentUsage(extractUsage(event));
         roundOpen = false;
+        roundHasMessage = false;
         return;
       }
       const item = event.item;
@@ -1052,6 +1143,14 @@ function createCodexFormatter(telemetry, activityOverride) {
               writeStdout(`${lastText}\n`);
             }
           }
+          if (type !== "reasoning") {
+            const messageId = String(item.id || id || "");
+            if (!messageId || messageId !== lastRecordedMessageId) {
+              lastRecordedMessageId = messageId;
+              recordModelCall();
+            }
+            roundHasMessage = true;
+          }
         }
         return;
       }
@@ -1062,6 +1161,9 @@ function createCodexFormatter(telemetry, activityOverride) {
         if (!roundOpen) {
           tracker.beginTurn(item.usage || event.usage);
           roundOpen = true;
+          if (!roundHasMessage) {
+            recordModelCall();
+          }
         }
         const id = rememberTool(item);
         emitStart(id);
@@ -1071,6 +1173,9 @@ function createCodexFormatter(telemetry, activityOverride) {
         if (!roundOpen) {
           tracker.beginTurn(item.usage || event.usage);
           roundOpen = true;
+          if (!roundHasMessage) {
+            recordModelCall();
+          }
         }
         completeTool(item);
       }
@@ -1097,6 +1202,9 @@ function createCodexFormatter(telemetry, activityOverride) {
     },
     lastText() {
       return lastText;
+    },
+    modelCallTimes() {
+      return modelCallTimes.slice();
     },
     errorMessage() {
       return lastError;
@@ -1280,6 +1388,7 @@ module.exports = {
   codexExecArgs,
   codexExecEnv,
   thinkingArgs,
+  codexModelCallOutcomes,
   codexSessionForPrompt,
   codexSessionIDFromEvent,
   planningEnabled,
