@@ -15,10 +15,11 @@ func (c *FactoryContext) EmitPullRequestEvent(nodeID, payloadType string, payloa
 	if err != nil {
 		return err
 	}
-	return emitFactoryPullRequestEvent(c.tx, node, payloadType, payload, c.onNewEvents)
+	return EmitFactoryPullRequestEvent(c.tx, node, payloadType, payload, c.onNewEvents)
 }
 
-func emitFactoryPullRequestEvent(tx *gorm.DB, node *models.CanvasNode, payloadType string, payload any, onNewEvents func([]models.CanvasEvent)) error {
+// EmitFactoryPullRequestEvent applies producer policy to an already loaded trigger.
+func EmitFactoryPullRequestEvent(tx *gorm.DB, node *models.CanvasNode, payloadType string, payload any, onNewEvents func([]models.CanvasEvent)) error {
 	events := NewEventContext(tx, node, nil, onNewEvents)
 	event, err := events.buildEvent(payloadType, payload)
 	if err != nil {
