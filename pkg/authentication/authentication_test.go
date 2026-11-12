@@ -345,7 +345,7 @@ func TestHandler_findOrCreateAccountForProvider(t *testing.T) {
 		err = database.Conn().Create(otherProvider).Error
 		require.NoError(t, err)
 
-		resultAccount, wasCreated, err := handler.findOrCreateAccountForProvider(gothUser, false)
+		resultAccount, wasCreated, err := handler.findOrCreateAccountForProvider(t.Context(), gothUser, false)
 		require.NoError(t, err)
 
 		assert.Equal(t, account.ID, resultAccount.ID)
@@ -387,7 +387,7 @@ func TestHandler_findOrCreateAccountForProvider(t *testing.T) {
 			Provider: "google",
 		}
 
-		resultAccount, wasCreated, err := handler.findOrCreateAccountForProvider(gothUser, false)
+		resultAccount, wasCreated, err := handler.findOrCreateAccountForProvider(t.Context(), gothUser, false)
 		require.NoError(t, err)
 
 		assert.Equal(t, account.ID, resultAccount.ID)
@@ -410,7 +410,7 @@ func TestHandler_findOrCreateAccountForProvider(t *testing.T) {
 		}).Error)
 		require.NoError(t, account.Block(database.Conn(), time.Now()))
 
-		resultAccount, wasCreated, err := handler.findOrCreateAccountForProvider(goth.User{
+		resultAccount, wasCreated, err := handler.findOrCreateAccountForProvider(t.Context(), goth.User{
 			UserID:   "blocked-provider-id",
 			Email:    "updated-blocked-provider@example.com",
 			Name:     account.Name,
@@ -433,7 +433,7 @@ func TestHandler_findOrCreateAccountForProvider(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, account.Block(database.Conn(), time.Now()))
 
-		resultAccount, wasCreated, err := handler.findOrCreateAccountForProvider(goth.User{
+		resultAccount, wasCreated, err := handler.findOrCreateAccountForProvider(t.Context(), goth.User{
 			UserID:   "new-provider-id",
 			Email:    account.Email,
 			Name:     account.Name,
@@ -455,7 +455,7 @@ func TestHandler_findOrCreateAccountForProvider(t *testing.T) {
 			Provider: "github",
 		}
 
-		resultAccount, wasCreated, err := handler.findOrCreateAccountForProvider(gothUser, true)
+		resultAccount, wasCreated, err := handler.findOrCreateAccountForProvider(t.Context(), gothUser, true)
 		require.NoError(t, err)
 
 		assert.NotNil(t, resultAccount)
@@ -479,7 +479,7 @@ func TestHandler_findOrCreateAccountForProvider(t *testing.T) {
 			Provider: "github",
 		}
 
-		resultAccount, wasCreated, err := handler.findOrCreateAccountForProvider(gothUser, false)
+		resultAccount, wasCreated, err := handler.findOrCreateAccountForProvider(t.Context(), gothUser, false)
 		require.Error(t, err)
 		assert.ErrorIs(t, err, errSignupDisabled)
 		assert.Nil(t, resultAccount)

@@ -61,6 +61,8 @@ func AdminAuthMiddleware(jwtSigner *jwt.Signer, fleetManagerToken string) mux.Mi
 			}
 
 			ctx := context.WithValue(r.Context(), AccountContextKey, account)
+			SetRequestLogUser(ctx, user)
+			SetRequestLogAccount(ctx, account)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}

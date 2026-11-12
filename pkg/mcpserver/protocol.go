@@ -7,6 +7,9 @@ import (
 	"io"
 	"slices"
 	"strings"
+
+	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/logging"
 )
 
 const maxJSONRPCBytes = 1 << 20
@@ -67,6 +70,7 @@ func ParseJSONRPC(body io.Reader) (*JSONRPCRequest, error) {
 }
 
 func HandleJSONRPC(ctx context.Context, runtime *Runtime, claims *AccessClaims, message *JSONRPCRequest) *JSONRPCResponse {
+	logging.AddRequestLogFields(ctx, log.Fields{"action": message.Method})
 	if message.Method == "notifications/initialized" || message.Method == "notifications/cancelled" {
 		return nil
 	}
@@ -91,6 +95,7 @@ func HandleJSONRPC(ctx context.Context, runtime *Runtime, claims *AccessClaims, 
 	case "logging/setLevel":
 		return rpcResult(message.ID, map[string]any{})
 	default:
+		logging.AddRequestLogFields(ctx, log.Fields{"action": "unknown_mcp_method"})
 		return rpcError(message.ID, -32601, "Unknown method: "+message.Method)
 	}
 }
