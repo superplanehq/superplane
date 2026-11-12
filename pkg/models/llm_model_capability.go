@@ -20,6 +20,9 @@ type LLMModelCapability struct {
 	DefaultThinkingLevel string
 	ReasoningMandatory   bool
 	RefreshedAt          time.Time
+	// Presence flags apply only to incoming metadata, not stored rows.
+	DefaultThinkingLevelSet bool `gorm:"-"`
+	ReasoningMandatorySet   bool `gorm:"-"`
 }
 
 func (LLMModelCapability) TableName() string {
@@ -73,8 +76,12 @@ func publishLLMModelCapabilities(tx *gorm.DB, provider, baseURL string, capabili
 			if capabilities[i].ThinkingLevels == nil {
 				cached := previousByModel[capabilities[i].Model]
 				capabilities[i].ThinkingLevels = datatypes.NewJSONSlice(slices.Clone(cached.ThinkingLevels))
-				capabilities[i].DefaultThinkingLevel = cached.DefaultThinkingLevel
-				capabilities[i].ReasoningMandatory = cached.ReasoningMandatory
+				if !capabilities[i].DefaultThinkingLevelSet && capabilities[i].DefaultThinkingLevel == "" {
+					capabilities[i].DefaultThinkingLevel = cached.DefaultThinkingLevel
+				}
+				if !capabilities[i].ReasoningMandatorySet && !capabilities[i].ReasoningMandatory {
+					capabilities[i].ReasoningMandatory = cached.ReasoningMandatory
+				}
 			}
 		}
 		if replace {
