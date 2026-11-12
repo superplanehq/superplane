@@ -508,7 +508,7 @@ func TestBitbucketImportStartsMergeConfidence(t *testing.T) {
 				mac := hmac.New(sha256.New, []byte("test-secret"))
 				mac.Write(webhook)
 				code, _, err := (&bitbucket.OnPullRequest{}).HandleWebhook(core.WebhookRequestContext{
-					Body: webhook, Headers: http.Header{"X-Event-Key": {"pullrequest:" + action}, "X-Hub-Signature": {"sha256=" + fmt.Sprintf("%x", mac.Sum(nil))}},
+					NodeID: node.NodeID, Body: webhook, Headers: http.Header{"X-Event-Key": {"pullrequest:" + action}, "X-Hub-Signature": {"sha256=" + fmt.Sprintf("%x", mac.Sum(nil))}},
 					Configuration: bitbucket.OnPullRequestConfiguration{Repository: "acme/app", Actions: []string{"created", "updated"}, OnlyFactoryPullRequests: true},
 					Webhook:       &testcontexts.NodeWebhookContext{Secret: "test-secret"},
 					Events:        contexts.NewEventContext(db, node, nil, nil), Factory: contexts.NewFactoryContext(db, canvas, nil),

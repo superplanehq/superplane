@@ -144,7 +144,11 @@ func startPullRequestChecksRequest(ctx context.Context, db *gorm.DB, deps Intake
 		if current == nil {
 			return request.Complete(tx)
 		}
-		if err := contexts.NewEventContext(tx, current, nil, func(created []models.CanvasEvent) { events = append(events, created...) }).Emit(pullRequest.Provider+".pullRequest", payload); err != nil {
+		canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(tx, current.WorkflowID)
+		if err != nil {
+			return err
+		}
+		if err := contexts.NewFactoryContext(tx, canvas, nil).WithNewEvents(func(created []models.CanvasEvent) { events = append(events, created...) }).EmitPullRequestEvent(current.NodeID, pullRequest.Provider+".pullRequest", payload); err != nil {
 			return err
 		}
 		return request.Complete(tx)

@@ -2,6 +2,7 @@ package factories
 
 import (
 	"context"
+	"github.com/superplanehq/superplane/pkg/factories/mergeconfidence"
 	"maps"
 	"slices"
 	"strconv"
@@ -876,7 +877,7 @@ func TestResetMergeConfidencePreservesDisabledChecks(t *testing.T) {
 			require.NoError(t, err)
 			require.NoError(t, decoder.Decode(node.Configuration["steps"]))
 			require.NotEmpty(t, steps)
-			checks, _ := runner.MergeConfidenceChecksFromSteps(steps)
+			checks, _ := mergeconfidence.MergeConfidenceChecksFromSteps(steps)
 			assert.Empty(t, checks)
 			assert.NotContains(t, liveCanvasJSON(t, canvas), "Retired system instruction")
 		})
