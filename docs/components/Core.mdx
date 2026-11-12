@@ -71,7 +71,17 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 **Trigger key:** `onBroadcast`
 
-Receive broadcast messages from another SuperPlane app
+Receive messages from the configured source app.
+
+The optional filter is a bare boolean expression. Use message.app, message.node, and message.payload.
+For example: message.payload.type == "completed".
+
+A blank filter accepts all messages. True emits the original message unchanged.
+False acknowledges delivery without a trigger event or run. Invalid expressions fail setup.
+Runtime evaluation errors fail delivery and use the existing transaction retry path.
+Run functions and node outputs are unavailable before a run exists.
+
+Disable Enabled to pause new deliveries.
 
 ### Example Data
 
