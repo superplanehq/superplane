@@ -26,6 +26,7 @@ import {
   FactoryOrganizationFleetsPage,
   FactoryOrganizationApiKeysPage,
   FactoryOrganizationLLMModelsPage,
+  FactoryOrganizationModelStatusPage,
   FactoryOrganizationMembersPage,
   FactoryOrganizationSecretDetailPage,
   FactoryOrganizationSecretsPage,
@@ -226,6 +227,15 @@ export const factorySettingsSectionRoutes = [
     element={
       <RequirePermission resource="factories" action="read">
         <FactoryOrganizationLLMModelsPage />
+      </RequirePermission>
+    }
+  />,
+  <Route
+    key="factory-settings-organization-model-status"
+    path="organization/model-status"
+    element={
+      <RequirePermission resource="org" action="read">
+        <FactoryOrganizationModelStatusPage />
       </RequirePermission>
     }
   />,

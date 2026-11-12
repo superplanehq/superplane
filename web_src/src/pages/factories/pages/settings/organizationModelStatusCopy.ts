@@ -1,0 +1,15 @@
+export const ORGANIZATION_MODEL_STATUS_COPY = {
+  pageTitle: "Model status",
+  pageSubtitle: "Scores use SuperPlane-hosted agent calls. They are not limited to this organization.",
+  windowLabel: "Window",
+  legend: "80 to 100 Available. 50 to 79 Degraded. 0 to 49 Unavailable.",
+  noData: "No data",
+  available: "Available",
+  degraded: "Degraded",
+  unavailable: "Unavailable",
+  loading: "Loading model status…",
+  loadError: "Could not load model status.",
+  tryAgain: "Try again",
+  empty: "No SuperPlane-hosted models and no hosted agent calls in this window.",
+  modelColumn: "Model",
+};

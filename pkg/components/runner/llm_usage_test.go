@@ -132,6 +132,70 @@ func TestAccumulateLLMUsageMergesIntoResultFile(t *testing.T) {
 	assert.Equal(t, float64(4), usage["output_tokens"])
 }
 
+func TestAccumulateLLMUsageKeepsModelCallOutcomesAcrossPrompts(t *testing.T) {
+	t.Parallel()
+
+	taskDir := t.TempDir()
+	writeLLMUsageScript(t, taskDir)
+	resultFile := filepath.Join(taskDir, "result.json")
+
+	firstStamp := time.Now().UTC().Add(-4 * time.Minute).Truncate(time.Millisecond).Format(time.RFC3339Nano)
+	secondStamp := time.Now().UTC().Truncate(time.Millisecond).Format(time.RFC3339Nano)
+	runAccumulate(t, taskDir, map[string]any{
+		"model": "claude-sonnet-4-6",
+		"usage": map[string]any{"input_tokens": 1, "output_tokens": 1},
+		"modelCallOutcomes": []any{
+			map[string]any{"model": "claude-sonnet-4-6", "outcome": "attempt_1", "occurredAt": firstStamp},
+		},
+	}, resultFile)
+
+	review, err := json.Marshal(map[string]any{
+		"result": "review",
+		"modelCallOutcomes": []map[string]any{
+			{"model": "claude-sonnet-4-6", "outcome": "attempt_2", "occurredAt": secondStamp},
+		},
+	})
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(resultFile, append(review, '\n'), 0o644))
+	runAccumulate(t, taskDir, map[string]any{
+		"model": "claude-sonnet-4-6",
+		"usage": map[string]any{"input_tokens": 2, "output_tokens": 1},
+		"modelCallOutcomes": []any{
+			map[string]any{"model": "claude-sonnet-4-6", "outcome": "attempt_2", "occurredAt": secondStamp},
+		},
+	}, resultFile)
+
+	merged := readJSONFile(t, resultFile)
+	assert.Equal(t, "review", merged["result"])
+	assert.Equal(t, []any{
+		map[string]any{"model": "claude-sonnet-4-6", "outcome": "attempt_1", "occurredAt": firstStamp},
+		map[string]any{"model": "claude-sonnet-4-6", "outcome": "attempt_2", "occurredAt": secondStamp},
+	}, merged["modelCallOutcomes"])
+}
+
+func TestMergeLLMUsageRestoresModelCallOutcomesAfterOverwrite(t *testing.T) {
+	t.Parallel()
+
+	taskDir := t.TempDir()
+	writeLLMUsageScript(t, taskDir)
+	resultFile := filepath.Join(taskDir, "result.json")
+	stamp := time.Now().UTC().Add(-time.Hour).Truncate(time.Millisecond).Format(time.RFC3339Nano)
+	runAccumulate(t, taskDir, map[string]any{
+		"modelCallOutcomes": []any{
+			map[string]any{"model": "gpt-5", "outcome": "attempt_1", "occurredAt": stamp},
+		},
+	}, resultFile)
+
+	require.NoError(t, os.WriteFile(resultFile, []byte(`{"result":"title only"}`+"\n"), 0o644))
+	runMerge(t, taskDir, resultFile)
+
+	merged := readJSONFile(t, resultFile)
+	assert.Equal(t, "title only", merged["result"])
+	assert.Equal(t, []any{
+		map[string]any{"model": "gpt-5", "outcome": "attempt_1", "occurredAt": stamp},
+	}, merged["modelCallOutcomes"])
+}
+
 func TestAccumulateLLMUsageCreatesResultFileWhenMissing(t *testing.T) {
 	t.Parallel()
 
