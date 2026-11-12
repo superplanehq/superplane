@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AgentAdditionalInstructions } from "./AgentAdditionalInstructions";
 import { ImplementSettingRow } from "./ImplementSettingRow";
 import { PlanningReviewForm } from "./PlanningReviewForm";
 import type { ReviewRequestSettingsPopupProps } from "./ReviewRequestSettingsPopup";
@@ -68,6 +69,13 @@ function ReviewRequestConfigurationFields(props: ConfigurationProps) {
         showConcurrency={false}
         showSteps={false}
         disabled={editor.saving}
+      />
+      <AgentAdditionalInstructions
+        draft={editor.draft}
+        onChange={editor.setEdited}
+        disabled={editor.saving}
+        description="Guide reviewer selection, ownership preferences, and rationale. SuperPlane keeps the review requirements, eligibility checks, and fallback rules."
+        placeholder="For example: Prefer the security owner for authentication changes. Explain the ownership evidence for each reviewer."
       />
     </>
   );
