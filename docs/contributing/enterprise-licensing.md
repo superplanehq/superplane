@@ -26,6 +26,51 @@ Installation administrators see a banner when the license is expired or expires
 within 30 days. `SUPERPLANE_LICENSE_HIDE_EXPIRY_BANNER` hides that banner when
 it is `yes` or `true`. The default is `no`. Hosted SuperPlane sets it to `yes`.
 
+When the installation has one organization, that organization receives every
+licensed feature. When it has more than one organization, open each
+organization in Installation Admin and enable the features there. A new
+organization does not receive grants.
+
+The license page asks for confirmation before an install or a removal that
+removes grants. It shows how many organizations use each feature and the
+activation history.
+
+## Organization grants
+
+A feature is available in an organization only when all of these are true:
+
+1. The license state is active.
+2. The license contains the feature.
+3. The organization has a grant for the feature, or the license is the
+   development license.
+
+A nil organization ID is not entitled. A grant lookup error denies access.
+The license check stays in the formula, so access stops when the license is
+no longer active even if grant removal is late.
+
+| Open activation | Loaded state | Same license | Result |
+| --- | --- | --- | --- |
+| None | Active | Not applicable | Activate. Prune grants the license does not contain. If exactly one organization exists, grant it every licensed feature. |
+| None | Any other state | Not applicable | No change |
+| Yes | Active | Yes | No change. A removed grant stays removed. |
+| Yes | Active | No | Replace. Keep grants for features the new license contains. Prune the rest. One organization also receives new features. |
+| Yes | Expired | Any | Deactivate. Remove all grants. |
+| Yes | Revoked | Any | Deactivate. Remove all grants. |
+| Yes | None | Not applicable | Deactivate. Remove all grants. |
+| Yes | Invalid | Any | No change. Access stays denied by the license check. |
+| Yes | Not yet valid | Any | No change. Access stays denied until the license is active. |
+| Any | Load error | Not applicable | No change. The handler does not run. |
+
+Expiry, revocation, and removal delete all grants. There is no grace period.
+Renew the license before it expires to keep the organization settings. A
+renewal before expiry keeps grants for features that the new license still
+contains. An invalid license or a failed license load does not remove grants.
+
+Installation administrators manage grants on **Installation Admin >
+Organizations > [organization] > Enterprise features**. Members of an
+organization see only that a feature is not available. They do not see
+license details.
+
 ## Enterprise code
 
 Code in the `ee/` directory is subject to the SuperPlane Enterprise Edition
@@ -37,6 +82,9 @@ Billing source in `ee/billing` uses the Enterprise source license. Billing
 does not require an installation license or a runtime license feature. The
 server always installs billing, including when billing enforcement is disabled.
 Usage costs remain recorded in that mode.
+
+The operations below stay the same. The check is now per organization. A
+grant in one organization does not enable the feature in another.
 
 The Enterprise features are:
 
@@ -51,7 +99,7 @@ GitHub Enterprise Cloud also needs the organization experimental feature
 feature on for each organization. github.com connections do not use the license
 or the experimental feature.
 
-When a license expires, existing custom roles and groups continue to work,
+When a license expires, SuperPlane removes all organization grants. Existing custom roles and groups continue to work,
 and administrators can still remove them. Existing GitHub Enterprise
 integrations continue to run: webhooks, API calls, and repository lists
 keep working, and administrators can still view and delete them. Turning the
@@ -59,9 +107,10 @@ experimental feature off only stops new connections.
 
 ## Feature registry
 
-`licensing.Service` answers whether the current license grants a feature such
-as `custom_roles` or `groups`. `enterprise.Registry` answers which code runs
-that feature. The two stay separate. The component registry in
+`licensing.Service` answers whether an organization can use a feature such
+as `custom_roles` or `groups`. `Status.IsEntitled` answers whether the
+active license contains the feature. `enterprise.Registry` answers which
+code runs that feature. The checks stay separate. The component registry in
 `pkg/registry/registry.go` uses the same lookup: register an implementation
 under a name, then ask for that name and receive the interface.
 
@@ -84,9 +133,11 @@ package that may import `ee/`. The steps for adding a feature are in
 
 ## Local development
 
-`make dev.server` enables every Enterprise feature when no license is
-installed. To test Community mode, set `SUPERPLANE_LICENSE_DEV_ENTERPRISE=false`
-in `.env` and restart the server.
+`make dev.server` uses a development license when no license is installed.
+That license allows every Enterprise feature in every organization and does
+not write grants. A real license installed in development uses the normal
+grant rules. To test Community mode, set
+`SUPERPLANE_LICENSE_DEV_ENTERPRISE=false` in `.env` and restart the server.
 
 Tests sign licenses with `pkg/licensing/licensingtest`. Do not commit private
 keys or license files.
