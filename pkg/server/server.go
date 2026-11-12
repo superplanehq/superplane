@@ -43,6 +43,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/licensing"
 	"github.com/superplanehq/superplane/pkg/llm"
+	"github.com/superplanehq/superplane/pkg/llmcatalog"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/networkpolicy"
@@ -314,6 +315,8 @@ func startWorkers(
 	}
 
 	if os.Getenv("START_PRICE_BOOK_SYNC_WORKER") == "yes" {
+		catalog := llmcatalog.New(encryptor, registry.HTTPContext())
+		go workers.NewLLMModelCatalogWorker(catalog, registry).Start(context.Background())
 		log.Println("Starting Price Book Sync Worker")
 
 		w := billingworkers.NewPriceBookSyncWorker(encryptor, registry)
