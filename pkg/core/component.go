@@ -54,6 +54,9 @@ type ExecutionContext struct {
 	HostedLLM         HostedLLMContext
 	RunnerTasks       RunnerTaskContext
 	CodexSubscription CodexSubscriptionContext
+	// RunnerEnvironment is prepared by the trusted owner, never decoded from component configuration.
+	RunnerEnvironment       map[string]string
+	RunnerEnvironmentRemove []string
 }
 
 // CodexSubscriptionLease is one run using a factory ChatGPT connection.
@@ -255,4 +258,10 @@ type GroupRef struct {
 
 type Node struct {
 	ID string `mapstructure:"id" json:"id"`
+}
+
+// ExecutionOutput contains owner-prepared fields for one output channel.
+type ExecutionOutput struct {
+	Fields       map[string]any
+	ErrorMessage string
 }

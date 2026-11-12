@@ -36,68 +36,22 @@ func (s *EventContext) EmitDeduplicated(payloadType string, payload any, dedupKe
 }
 
 func (s *EventContext) emit(payloadType string, payload any, dedupKey string) error {
-	structuredPayload := map[string]any{
-		"type":      payloadType,
-		"timestamp": time.Now(),
-		"data":      payload,
-	}
-
-	data, err := json.Marshal(structuredPayload)
+	event, err := s.buildEvent(payloadType, payload)
 	if err != nil {
-		return fmt.Errorf("failed to marshal event payload: %w", err)
+		return err
 	}
-
-	if len(data) > s.maxPayloadSize {
-		return fmt.Errorf("%w: %d bytes (max %d)", core.ErrEventPayloadTooLarge, len(data), s.maxPayloadSize)
-	}
-
-	now := time.Now()
-
-	//
-	// We use RawMessage here to avoid a second marshal when GORM persists the JSON value.
-	//
-	event := models.CanvasEvent{
-		WorkflowID: s.node.WorkflowID,
-		NodeID:     s.node.NodeID,
-		Channel:    "default",
-		Data:       models.NewJSONValue(json.RawMessage(data)),
-		State:      models.CanvasEventStatePending,
-		CreatedAt:  &now,
-	}
-
-	if s.run != nil {
-		event.RunID = s.run.ID
-	}
-
-	wrappedPayload := map[string]any{"data": payload}
-	customName, err := s.resolveCustomName(wrappedPayload, structuredPayload)
-	if err != nil {
-		failed := fmt.Sprintf("Failed to resolve run title: %s", err.Error())
-		event.CustomName = &failed
-	} else if customName != nil {
-		event.CustomName = customName
-	}
-
 	created := true
-	var mergeConfidence mergeConfidenceWebhookIdentity
 	if dedupKey == "" {
-		mergeConfidence = mergeConfidenceWebhookDedupKey(s.node, payloadType, payload)
-	}
-	if dedupKey == "" && mergeConfidence.Key == "" {
 		var suppress bool
 		dedupKey, suppress = customAutomationWebhookPolicy(s.tx, s.node, payloadType, payload)
 		if suppress {
 			return nil
 		}
 	}
-	if mergeConfidence.Key != "" && s.run == nil {
-		created, err = s.node.CreateRootEventUnlessLatestInScope(s.tx, &event, mergeConfidence.Scope, mergeConfidence.Key, mergeConfidence.isRedundantAfter)
-	} else if dedupKey != "" && s.run == nil {
-		created, err = s.node.CreateDeduplicatedRootEvent(s.tx, &event, dedupKey)
-	} else if (payloadType == "github.pullRequest" || payloadType == "bitbucket.pullRequest") && s.run == nil && s.node.Type == models.NodeTypeTrigger && s.node.ComponentName() == strings.TrimSuffix(payloadType, ".pullRequest")+".onPullRequest" {
-		created, err = s.node.CreatePullRequestChecksEvent(s.tx, &event)
+	if dedupKey != "" && s.run == nil {
+		created, err = s.node.CreateDeduplicatedRootEvent(s.tx, event, dedupKey)
 	} else {
-		err = s.tx.Create(&event).Error
+		err = s.tx.Create(event).Error
 	}
 	if err != nil {
 		if s.run == nil && errors.Is(err, gorm.ErrRecordNotFound) {
@@ -118,140 +72,10 @@ func (s *EventContext) emit(payloadType string, payload any, dedupKey string) er
 	}
 
 	if s.onNewEvents != nil {
-		s.onNewEvents([]models.CanvasEvent{event})
+		s.onNewEvents([]models.CanvasEvent{*event})
 	}
 
 	return nil
-}
-
-// mergeConfidenceWebhookIdentity identifies the diff that an automatic
-// Bitbucket merge confidence start assesses.
-type mergeConfidenceWebhookIdentity struct {
-	// Scope selects all earlier starts of one pull request.
-	Scope models.RootEventScope
-	// Key identifies the pull request, the head commit, and the destination branch.
-	Key string
-	// Diff identifies the head commit and the destination branch.
-	Diff string
-	// UpdatedAt is the Bitbucket update time of the pull request in the event.
-	UpdatedAt time.Time
-}
-
-// isRedundantAfter reports whether the newest start for the pull request makes
-// this start unnecessary. A start for the same diff is redundant, so a
-// description update cannot start a loop. A delayed webhook for an earlier
-// pull request state is also redundant. Without this check, an old head could
-// start after the current head and hide the current result.
-func (m mergeConfidenceWebhookIdentity) isRedundantAfter(latest models.CanvasEvent) bool {
-	if latest.DedupKey != nil && *latest.DedupKey == m.Key {
-		return true
-	}
-	envelope, _ := latest.Data.Data().(map[string]any)
-	stored := parseBitbucketMergeConfidenceEvent(envelope["data"])
-	// Starts from other paths and legacy starts have no key in this format.
-	if stored.diff() != "" && stored.diff() == m.Diff {
-		return true
-	}
-	latestUpdatedAt, ok := stored.updatedAt()
-	if !ok || m.UpdatedAt.IsZero() {
-		return false
-	}
-	return m.UpdatedAt.Before(latestUpdatedAt)
-}
-
-type bitbucketMergeConfidenceEvent struct {
-	PullRequest struct {
-		ID string `json:"id"`
-	} `json:"pullRequest"`
-	Repository struct {
-		FullName string `json:"full_name"`
-	} `json:"repository"`
-	View struct {
-		Number json.Number `json:"number"`
-		Head   struct {
-			SHA string `json:"sha"`
-		} `json:"head"`
-		Base struct {
-			Ref string `json:"ref"`
-		} `json:"base"`
-	} `json:"pull_request"`
-	Raw struct {
-		UpdatedOn string `json:"updated_on"`
-	} `json:"pullrequest"`
-}
-
-func parseBitbucketMergeConfidenceEvent(payload any) bitbucketMergeConfidenceEvent {
-	var event bitbucketMergeConfidenceEvent
-	raw, err := json.Marshal(payload)
-	if err != nil {
-		return bitbucketMergeConfidenceEvent{}
-	}
-	if err := json.Unmarshal(raw, &event); err != nil {
-		return bitbucketMergeConfidenceEvent{}
-	}
-	return event
-}
-
-// diff joins the head commit and the destination branch. Git ref names cannot
-// contain ":", so the parts stay unambiguous.
-func (e bitbucketMergeConfidenceEvent) diff() string {
-	sha := strings.TrimSpace(e.View.Head.SHA)
-	if sha == "" {
-		return ""
-	}
-	return sha + ":" + e.View.Base.Ref
-}
-
-func (e bitbucketMergeConfidenceEvent) updatedAt() (time.Time, bool) {
-	value := strings.TrimSpace(e.Raw.UpdatedOn)
-	if value == "" {
-		return time.Time{}, false
-	}
-	updatedAt, err := time.Parse(time.RFC3339Nano, value)
-	if err != nil {
-		return time.Time{}, false
-	}
-	return updatedAt, true
-}
-
-// Bitbucket emits PR updates for description edits and can deliver webhooks
-// late. Skip an automatic merge confidence start when the newest start for the
-// PR has the same head and destination branch, or when the newest start
-// reflects a later PR update. A retargeted PR gets a new assessment, also when
-// it returns to an earlier destination. Explicit reruns use a different
-// payload type and remain available.
-//
-// The newest start can also come from the PR checks start path, which keys
-// events by repository, PR number, and head commit, or from an event stored
-// before dedup keys existed. The scope includes both, so the rollout of this
-// key format does not start a second assessment for the same diff.
-func mergeConfidenceWebhookDedupKey(node *models.CanvasNode, payloadType string, payload any) mergeConfidenceWebhookIdentity {
-	if node == nil || node.Type != models.NodeTypeTrigger || payloadType != "bitbucket.pullRequest" {
-		return mergeConfidenceWebhookIdentity{}
-	}
-	template, _ := node.Metadata.Data()[models.FactoryAppTemplateMetadataKey].(map[string]any)
-	if template["id"] != "risk-score" {
-		return mergeConfidenceWebhookIdentity{}
-	}
-	event := parseBitbucketMergeConfidenceEvent(payload)
-	diff := event.diff()
-	if event.PullRequest.ID == "" || diff == "" {
-		return mergeConfidenceWebhookIdentity{}
-	}
-	scope := models.RootEventScope{KeyPrefix: "merge-confidence:" + event.PullRequest.ID + ":"}
-	repository := strings.ToLower(strings.TrimSpace(event.Repository.FullName))
-	number := event.View.Number.String()
-	if repository != "" && number != "" {
-		scope.OtherKeyPrefixes = []string{repository + "|" + number + "|"}
-		scope.LegacyPullRequest = &models.LegacyPullRequestEventMatch{Repository: repository, Number: number}
-	}
-	updatedAt, _ := event.updatedAt()
-	return mergeConfidenceWebhookIdentity{
-		Scope:     scope,
-		Key:       scope.KeyPrefix + diff,
-		Diff:      diff,
-		UpdatedAt: updatedAt,
-	}
 }
 
 func customAutomationWebhookPolicy(tx *gorm.DB, node *models.CanvasNode, payloadType string, payload any) (string, bool) {
@@ -352,4 +176,50 @@ func (s *EventContext) resolveCustomName(payload any, rootPayload any) (*string,
 	}
 
 	return &resolvedName, nil
+}
+
+func (s *EventContext) buildEvent(payloadType string, payload any) (*models.CanvasEvent, error) {
+	structuredPayload := map[string]any{
+		"type":      payloadType,
+		"timestamp": time.Now(),
+		"data":      payload,
+	}
+
+	data, err := json.Marshal(structuredPayload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal event payload: %w", err)
+	}
+
+	if len(data) > s.maxPayloadSize {
+		return nil, fmt.Errorf("%w: %d bytes (max %d)", core.ErrEventPayloadTooLarge, len(data), s.maxPayloadSize)
+	}
+
+	now := time.Now()
+
+	//
+	// We use RawMessage here to avoid a second marshal when GORM persists the JSON value.
+	//
+	event := models.CanvasEvent{
+		WorkflowID: s.node.WorkflowID,
+		NodeID:     s.node.NodeID,
+		Channel:    "default",
+		Data:       models.NewJSONValue(json.RawMessage(data)),
+		State:      models.CanvasEventStatePending,
+		CreatedAt:  &now,
+	}
+
+	if s.run != nil {
+		event.RunID = s.run.ID
+	}
+
+	wrappedPayload := map[string]any{"data": payload}
+	customName, err := s.resolveCustomName(wrappedPayload, structuredPayload)
+	if err != nil {
+		failed := fmt.Sprintf("Failed to resolve run title: %s", err.Error())
+		event.CustomName = &failed
+	} else if customName != nil {
+		event.CustomName = customName
+	}
+
+	return &event, nil
 }
