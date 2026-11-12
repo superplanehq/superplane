@@ -1,4 +1,3 @@
-import { Dialog, DialogActions, DialogDescription, DialogTitle } from "@/components/Dialog/dialog";
 import { KeyListUploadForm } from "@/components/License/KeyListUploadForm";
 import { LicenseInstallForm } from "@/components/License/LicenseInstallForm";
 import { Text } from "@/components/Text/text";
@@ -19,7 +18,12 @@ import {
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { CheckCircle2, Lock } from "lucide-react";
 import React, { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router";
+import { EnterpriseFeatureOrganizationsSheet } from "./EnterpriseFeatureOrganizationsSheet";
 import { formatDate } from "./formatDate";
+import { InstallLicenseDialog, RemoveLicenseDialog } from "./LicenseChangeDialogs";
+import { LicenseActivationHistory } from "./LicenseActivationHistory";
+import { useLicenseChangeActions, type LicenseInstallNote } from "./useLicenseChangeActions";
 
 const stateBadges: Record<LicenseState, { label: string; className: string }> = {
   none: {
@@ -147,14 +151,19 @@ const CurrentLicenseSection = ({
 
     {status.state === "none" ? (
       <Text className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-        Install an Enterprise license to enable Enterprise features for every organization in this installation.
+        Install an Enterprise license. When this installation has one organization, that organization receives every
+        licensed feature.
       </Text>
     ) : null}
   </section>
 );
 
+const usageLabel = (count: number) => `Used by ${count} ${count === 1 ? "organization" : "organizations"}`;
+
 const FeaturesSection = ({ status }: { status: InstallationLicenseStatus }) => {
   const granted = new Set(status.edition === "enterprise" ? (status.license?.features ?? []) : []);
+  const [openFeature, setOpenFeature] = useState<string | null>(null);
+  const counts = status.feature_counts ?? {};
 
   return (
     <section className={sectionClass}>
@@ -162,6 +171,7 @@ const FeaturesSection = ({ status }: { status: InstallationLicenseStatus }) => {
       <ul className="mt-3 grid gap-3 sm:grid-cols-2" data-testid="license-features">
         {ENTERPRISE_FEATURES.map((feature) => {
           const enabled = granted.has(feature.key);
+          const count = counts[feature.key] ?? 0;
           return (
             <li key={feature.key} className="flex items-start gap-2">
               {enabled ? (
@@ -175,11 +185,23 @@ const FeaturesSection = ({ status }: { status: InstallationLicenseStatus }) => {
                   <span className="sr-only">{enabled ? " (included)" : " (not included)"}</span>
                 </p>
                 <Text className="text-xs text-gray-500 dark:text-gray-400">{feature.description}</Text>
+                {enabled ? (
+                  <button
+                    type="button"
+                    className="mt-1 text-xs font-medium text-gray-700 underline underline-offset-2 dark:text-gray-300"
+                    onClick={() => setOpenFeature(feature.key)}
+                  >
+                    {usageLabel(count)}
+                  </button>
+                ) : null}
               </div>
             </li>
           );
         })}
       </ul>
+      {openFeature ? (
+        <EnterpriseFeatureOrganizationsSheet featureKey={openFeature} onClose={() => setOpenFeature(null)} />
+      ) : null}
     </section>
   );
 };
@@ -230,38 +252,35 @@ const TrustedKeysSection = ({ keys, onUploaded }: TrustedKeysSectionProps) => (
   </section>
 );
 
-type RemoveLicenseDialogProps = {
-  open: boolean;
-  removing: boolean;
-  onClose: () => void;
-  onConfirm: () => void;
+const InstallNote = ({ note }: { note: LicenseInstallNote }) => {
+  if (note?.kind === "auto") {
+    return (
+      <Text className="text-sm text-gray-700 dark:text-gray-300" data-testid="license-install-note">
+        All Enterprise features are enabled for {note.name}.
+      </Text>
+    );
+  }
+  if (note?.kind === "enable") {
+    return (
+      <Text className="text-sm text-gray-700 dark:text-gray-300" data-testid="license-install-note">
+        <Link to="/admin" className="font-medium underline underline-offset-2">
+          Enable Enterprise features for each organization.
+        </Link>
+      </Text>
+    );
+  }
+  return null;
 };
-
-const RemoveLicenseDialog = ({ open, removing, onClose, onConfirm }: RemoveLicenseDialogProps) => (
-  <Dialog open={open} onClose={onClose} size="md">
-    <DialogTitle className="text-gray-800 dark:text-gray-100">Remove the license?</DialogTitle>
-    <DialogDescription className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-      This installation returns to SuperPlane Community. Enterprise features on this license will not be available until
-      you install a license that includes them.
-    </DialogDescription>
-    <DialogActions>
-      <Button variant="destructive" onClick={onConfirm} disabled={removing}>
-        {removing ? "Removing..." : "Remove license"}
-      </Button>
-      <Button variant="outline" onClick={onClose}>
-        Cancel
-      </Button>
-    </DialogActions>
-  </Dialog>
-);
 
 type InstallSectionProps = {
   status: InstallationLicenseStatus;
+  formKey: number;
   onInstalled: (status: InstallationLicenseStatus) => void;
   onRemoveClick: () => void;
+  installLicense: (license: string) => Promise<InstallationLicenseStatus | null>;
 };
 
-const InstallSection = ({ status, onInstalled, onRemoveClick }: InstallSectionProps) => {
+const InstallSection = ({ status, formKey, onInstalled, onRemoveClick, installLicense }: InstallSectionProps) => {
   const hasStoredLicense = status.source === "database" && status.state !== "none";
 
   return (
@@ -273,7 +292,9 @@ const InstallSection = ({ status, onInstalled, onRemoveClick }: InstallSectionPr
       </Text>
       <div className="max-w-2xl">
         <LicenseInstallForm
+          key={formKey}
           submitLabel={hasStoredLicense ? "Replace license" : "Install license"}
+          installLicense={installLicense}
           onInstalled={onInstalled}
           secondaryAction={
             hasStoredLicense ? (
@@ -324,8 +345,10 @@ const useInstallationLicense = () => {
       setStatus(await removeInstallationLicense());
       showSuccessToast("License removed");
       void refreshAccount();
+      return true;
     } catch (error) {
       showErrorToast(error instanceof Error ? error.message : "Failed to remove the license");
+      return false;
     } finally {
       setRemoving(false);
     }
@@ -345,7 +368,7 @@ const useInstallationLicense = () => {
 const InstallationLicense: React.FC = () => {
   const { status, loadError, removing, hideExpiryBadge, handleInstalled, handleKeysUploaded, remove } =
     useInstallationLicense();
-  const [confirmingRemoval, setConfirmingRemoval] = useState(false);
+  const changes = useLicenseChangeActions(handleInstalled);
 
   useReportPageReady(status !== null || loadError !== null);
 
@@ -354,7 +377,7 @@ const InstallationLicense: React.FC = () => {
       <div className="pb-2">
         <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">License</h1>
         <Text className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          Manage the Enterprise license for this installation. The license applies to every organization.
+          Manage the Enterprise license for this installation. Enable Enterprise features for each organization.
         </Text>
       </div>
 
@@ -370,16 +393,20 @@ const InstallationLicense: React.FC = () => {
       {status ? (
         <div className="mt-5 bg-white px-6 dark:bg-gray-900">
           <CurrentLicenseSection status={status} hideExpiryBadge={hideExpiryBadge} />
+          <InstallNote note={changes.installNote} />
           <FeaturesSection status={status} />
           {status.managed_by_configuration ? (
             <ManagedByConfigurationNote />
           ) : (
             <InstallSection
               status={status}
-              onInstalled={handleInstalled}
-              onRemoveClick={() => setConfirmingRemoval(true)}
+              formKey={changes.formKey}
+              installLicense={changes.installWithPreview}
+              onInstalled={changes.finishInstall}
+              onRemoveClick={() => void changes.requestRemoval()}
             />
           )}
+          <LicenseActivationHistory />
           {status.trusted_keys ? (
             <TrustedKeysSection keys={status.trusted_keys} onUploaded={handleKeysUploaded} />
           ) : null}
@@ -387,12 +414,24 @@ const InstallationLicense: React.FC = () => {
       ) : null}
 
       <RemoveLicenseDialog
-        open={confirmingRemoval}
+        open={changes.confirmingRemoval}
         removing={removing}
-        onClose={() => setConfirmingRemoval(false)}
+        organizationCount={changes.removalOrganizations}
+        onClose={() => changes.setConfirmingRemoval(false)}
         onConfirm={() => {
-          void remove().then(() => setConfirmingRemoval(false));
+          void remove().then((removed) => {
+            if (removed) changes.setConfirmingRemoval(false);
+          });
         }}
+      />
+      <InstallLicenseDialog
+        grants={changes.pendingRemovalGrants}
+        installing={changes.installingConfirmed}
+        onClose={() => {
+          changes.setPendingLicense(null);
+          changes.setPendingRemovalGrants(null);
+        }}
+        onConfirm={() => void changes.confirmInstall()}
       />
     </div>
   );
