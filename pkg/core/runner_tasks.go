@@ -3,12 +3,25 @@ package core
 import (
 	"encoding/json"
 	"time"
+
+	runnermodels "github.com/superplanehq/superplane/pkg/runners/models"
 )
 
 const (
 	RunnerTaskBackendLegacy     = "legacy"
 	RunnerTaskBackendIntegrated = "integrated"
 )
+
+type IntegrationSetup struct {
+	Name   string
+	Script string
+}
+
+type ResolvedEnvironment struct {
+	Variables []runnermodels.EnvironmentVariable
+	Usage     string
+	Setups    []IntegrationSetup
+}
 
 // RunnerTaskContext gives runner components access to SuperPlane-owned tasks
 // without coupling component implementations to GORM or encryption details.
