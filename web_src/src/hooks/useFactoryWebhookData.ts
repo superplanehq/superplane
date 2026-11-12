@@ -2,7 +2,7 @@ import { factoriesListFactoryWebhooks, factoriesRetryFactoryWebhook } from "@/ap
 import type { FactoriesFactoryWebhookStatus } from "@/api-client";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { showErrorToast } from "@/lib/toast";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 
 const RETRY_POLL_INTERVAL_MS = 2000;
@@ -15,9 +15,15 @@ type RetryProgress = {
   timedOut: boolean;
 };
 
+function isRegistrationRunning(webhook: FactoriesFactoryWebhookStatus) {
+  return webhook.state === "pending" || webhook.state === "provisioning";
+}
+
 export function useFactoryWebhookData(organizationId: string, factoryId: string) {
+  const queryClient = useQueryClient();
+  const queryKey = ["factories", organizationId, factoryId, "webhooks"];
   const query = useQuery({
-    queryKey: ["factories", organizationId, factoryId, "webhooks"],
+    queryKey,
     queryFn: async () => {
       const response = await factoriesListFactoryWebhooks(
         withOrganizationHeader({ organizationId, path: { factoryId } }),
@@ -44,17 +50,21 @@ export function useFactoryWebhookData(organizationId: string, factoryId: string)
         if (!webhook || webhook.state === "ready" || (webhook.state === "failed" && retry.sawPending)) {
           delete next[id];
           changed = true;
-        } else if ((webhook.state === "pending" || webhook.state === "provisioning") && !retry.sawPending) {
+        } else if (isRegistrationRunning(webhook) && !retry.sawPending) {
           next[id] = { ...retry, sawPending: true };
           changed = true;
         }
       }
       return changed ? next : current;
     });
-  }, [webhooks]);
+  }, [webhooks, query.dataUpdatedAt]);
+
+  const hasSetupInProgress = webhooks?.some(
+    (webhook) => isRegistrationRunning(webhook) && !(webhook.id && progress[webhook.id]?.timedOut),
+  );
 
   useEffect(() => {
-    if (!Object.values(progress).some((item) => !item.timedOut)) {
+    if (!hasSetupInProgress && !Object.values(progress).some((item) => !item.timedOut)) {
       return;
     }
     const timer = window.setInterval(() => {
@@ -73,7 +83,7 @@ export function useFactoryWebhookData(organizationId: string, factoryId: string)
       void refetch();
     }, RETRY_POLL_INTERVAL_MS);
     return () => window.clearInterval(timer);
-  }, [progress, refetch]);
+  }, [hasSetupInProgress, progress, refetch]);
 
   const warnings = useMemo(() => {
     const listed = webhooks ?? [];
@@ -103,9 +113,16 @@ export function useFactoryWebhookData(organizationId: string, factoryId: string)
       [id]: { webhook, deadline: Date.now() + RETRY_POLL_WINDOW_MS, sawPending: false, timedOut: false },
     }));
     try {
-      await factoriesRetryFactoryWebhook(
+      const response = await factoriesRetryFactoryWebhook(
         withOrganizationHeader({ organizationId, path: { factoryId, webhookId: id }, body: {} }),
       );
+      await queryClient.cancelQueries({ queryKey });
+      const updatedWebhook = response.data?.webhook;
+      if (updatedWebhook) {
+        queryClient.setQueryData<FactoriesFactoryWebhookStatus[]>(queryKey, (current) =>
+          current?.map((item) => (item.id === id ? updatedWebhook : item)),
+        );
+      }
       setProgress((current) => {
         const pending = current[id];
         return pending ? { ...current, [id]: { ...pending, sawPending: true } } : current;

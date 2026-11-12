@@ -104,6 +104,20 @@ func listFactoryWebhookRegistrations(tx *gorm.DB, factory *models.Factory) (map[
 	if err != nil {
 		return nil, err
 	}
+	webhookIDs := make([]uuid.UUID, 0, len(nodes))
+	for _, node := range nodes {
+		if node.WebhookID != nil {
+			webhookIDs = append(webhookIDs, *node.WebhookID)
+		}
+	}
+	nodeWebhooks, err := models.ListWebhooksByIDs(tx, webhookIDs)
+	if err != nil {
+		return nil, err
+	}
+	webhookByID := make(map[uuid.UUID]*models.Webhook, len(nodeWebhooks))
+	for i := range nodeWebhooks {
+		webhookByID[nodeWebhooks[i].ID] = &nodeWebhooks[i]
+	}
 	integrations, err := models.ListIntegrations(tx, factory.OrganizationID)
 	if err != nil {
 		return nil, err
@@ -130,14 +144,8 @@ func listFactoryWebhookRegistrations(tx *gorm.DB, factory *models.Factory) (map[
 		}
 		registration, ok := registrations[*node.WebhookID]
 		if !ok {
-			webhook, err := models.FindWebhookInTransaction(tx, *node.WebhookID)
-			if err == gorm.ErrRecordNotFound {
-				continue
-			}
-			if err != nil {
-				return nil, err
-			}
-			if webhook.AppInstallationID == nil {
+			webhook, ok := webhookByID[*node.WebhookID]
+			if !ok || webhook.AppInstallationID == nil {
 				continue
 			}
 			integration, ok := githubIntegrations[*webhook.AppInstallationID]
@@ -180,12 +188,7 @@ func listFactoryWebhookRegistrations(tx *gorm.DB, factory *models.Factory) (map[
 		if !ok {
 			registration = factoryWebhookRegistration{webhook: webhook, status: serializeFactoryWebhook(webhook, &integration)}
 		}
-		for _, canvas := range canvases {
-			if canvas.LiveVersionID == nil {
-				continue
-			}
-			addAffectedAutomation(registration.status, canvas)
-		}
+		// Shared hooks refresh workspace pull request status, not automation triggers.
 		registrations[webhook.ID] = registration
 	}
 	return registrations, nil

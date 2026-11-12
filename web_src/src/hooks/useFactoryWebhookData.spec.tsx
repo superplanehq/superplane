@@ -60,6 +60,58 @@ describe("useFactoryWebhookData", () => {
     await waitFor(() => expect(result.current.warnings).toHaveLength(0));
   });
 
+  it("allows another retry when registration fails before the next status fetch", async () => {
+    const { result } = renderHook(() => useFactoryWebhookData("org-1", "factory-1"), { wrapper: createWrapper() });
+    await waitFor(() => expect(result.current.warnings).toHaveLength(1));
+    retryWebhook.mockImplementationOnce(async () => ({ data: { webhook: { ...failed, state: "pending" } } }));
+
+    await act(async () => result.current.retry(failed));
+    await waitFor(() => expect(result.current.retrying(failed.id)).toBe(false));
+    expect(result.current.warnings).toHaveLength(1);
+
+    await act(async () => result.current.retry(failed));
+    expect(retryWebhook).toHaveBeenCalledTimes(2);
+  });
+
+  it.each(["pending", "provisioning"])(
+    "polls initial %s registrations until failure and stops when setup finishes",
+    async (state) => {
+      remoteWebhook = { ...failed, state };
+      vi.useFakeTimers();
+      const { result } = renderHook(() => useFactoryWebhookData("org-1", "factory-1"), { wrapper: createWrapper() });
+      await act(async () => {});
+      await act(async () => vi.advanceTimersByTimeAsync(0));
+      expect(result.current.warnings).toHaveLength(0);
+      remoteWebhook = failed;
+
+      await act(async () => vi.advanceTimersByTimeAsync(2000));
+      await act(async () => vi.advanceTimersByTimeAsync(1));
+      expect(result.current.warnings).toHaveLength(1);
+      const callsAtFailure = listWebhooks.mock.calls.length;
+      await act(async () => vi.advanceTimersByTimeAsync(4000));
+      expect(listWebhooks).toHaveBeenCalledTimes(callsAtFailure);
+    },
+  );
+
+  it("keeps polling initial setup after the retry window until registration finishes", async () => {
+    remoteWebhook = { ...failed, state: "pending" };
+    vi.useFakeTimers();
+    const { result } = renderHook(() => useFactoryWebhookData("org-1", "factory-1"), { wrapper: createWrapper() });
+    await act(async () => {});
+    await act(async () => vi.advanceTimersByTimeAsync(0));
+
+    await act(async () => vi.advanceTimersByTimeAsync(60_000));
+    const callsAfterOneMinute = listWebhooks.mock.calls.length;
+    expect(callsAfterOneMinute).toBeGreaterThan(1);
+    await act(async () => vi.advanceTimersByTimeAsync(4000));
+    expect(listWebhooks.mock.calls.length).toBeGreaterThan(callsAfterOneMinute);
+
+    remoteWebhook = failed;
+    await act(async () => vi.advanceTimersByTimeAsync(2000));
+    await act(async () => vi.advanceTimersByTimeAsync(1));
+    expect(result.current.warnings).toHaveLength(1);
+  });
+
   it("stops polling after one minute and allows a manual refresh", async () => {
     const { result } = renderHook(() => useFactoryWebhookData("org-1", "factory-1"), { wrapper: createWrapper() });
     await waitFor(() => expect(result.current.warnings).toHaveLength(1));

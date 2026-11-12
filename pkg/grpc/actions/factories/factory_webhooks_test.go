@@ -1,6 +1,8 @@
 package factories
 
 import (
+	"context"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -12,6 +14,7 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
 func TestListFactoryWebhooksScopesAndDescribesRegistrations(t *testing.T) {
@@ -69,12 +72,49 @@ func TestListFactoryWebhooksScopesAndDescribesRegistrations(t *testing.T) {
 	assert.Equal(t, "acme/web", statuses[multiRepository.ID.String()].GetRepository())
 	assert.Equal(t, "GitHub could not register the webhook for pull requests. Check the repository settings, then try again.", statuses[pr.ID.String()].GetMessage())
 	assert.Len(t, statuses[pr.ID.String()].GetAffectedAutomations(), 2)
-	assert.Len(t, statuses[shared.ID.String()].GetAffectedAutomations(), 2)
-	sharedAutomations := statuses[shared.ID.String()].GetAffectedAutomations()
-	assert.ElementsMatch(t, []string{first.Name, second.Name}, []string{
-		sharedAutomations[0].GetName(), sharedAutomations[1].GetName(),
-	})
+	assert.Empty(t, statuses[shared.ID.String()].GetAffectedAutomations(), "shared pull request status hooks do not block automation triggers")
 	assert.Equal(t, "GitHub reached the webhook limit for pull requests. Remove unused webhooks in the repository settings, then try again.", statuses[shared.ID.String()].GetMessage())
+}
+
+func TestListFactoryWebhooksBatchesRegistrationLookups(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	integration, err := models.CreateIntegration(uuid.New(), r.Organization.ID, "github", support.RandomName("github"), map[string]any{})
+	require.NoError(t, err)
+	canvas := support.CreateFactoryCanvas(t, r, factory.ID, "Issues")
+	addWebhook := func() {
+		t.Helper()
+		webhook := failedFactoryWebhook(t, integration.ID, map[string]any{"repository": "acme/app", "eventType": "issues"}, "provider refused")
+		attachFactoryWebhookNode(t, canvas.ID, webhook.ID)
+	}
+	addWebhook()
+
+	type queryCountKey struct{}
+	const callback = "test:factory_webhooks_query_count"
+	require.NoError(t, db.Callback().Query().After("gorm:query").Register(callback, func(tx *gorm.DB) {
+		if count, ok := tx.Statement.Context.Value(queryCountKey{}).(*atomic.Int64); ok {
+			count.Add(1)
+		}
+	}))
+	t.Cleanup(func() { require.NoError(t, db.Callback().Query().Remove(callback)) })
+	list := func(expected int) int64 {
+		t.Helper()
+		var count atomic.Int64
+		ctx := context.WithValue(t.Context(), queryCountKey{}, &count)
+		response, err := ListFactoryWebhooks(ctx, r.Organization.ID.String(), &pb.ListFactoryWebhooksRequest{FactoryId: factory.ID.String()})
+		require.NoError(t, err)
+		require.Len(t, response.GetWebhooks(), expected)
+		return count.Load()
+	}
+	singleQueries := list(1)
+	for range 8 {
+		addWebhook()
+	}
+	batchQueries := list(9)
+	require.Positive(t, singleQueries)
+	assert.Equal(t, singleQueries, batchQueries, "listing queries must not grow with webhook registrations")
 }
 
 func TestRetryFactoryWebhookRevalidatesMembershipAndReusesRow(t *testing.T) {

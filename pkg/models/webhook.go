@@ -168,6 +168,16 @@ func FindWebhookInTransaction(tx *gorm.DB, id uuid.UUID) (*Webhook, error) {
 	return &webhook, nil
 }
 
+func ListWebhooksByIDs(tx *gorm.DB, ids []uuid.UUID) ([]Webhook, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+
+	var webhooks []Webhook
+	err := tx.Where("id IN ?", ids).Find(&webhooks).Error
+	return webhooks, err
+}
+
 func FindWebhookNodes(webhookID uuid.UUID) ([]CanvasNode, error) {
 	return FindWebhookNodesInTransaction(database.Conn(), webhookID)
 }
