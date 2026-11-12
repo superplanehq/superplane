@@ -19,6 +19,7 @@ import (
 	"gorm.io/gorm"
 
 	_ "github.com/superplanehq/superplane/pkg/components/runs"
+	_ "github.com/superplanehq/superplane/pkg/factories/reviewrequest"
 	_ "github.com/superplanehq/superplane/pkg/triggers/messages"
 )
 

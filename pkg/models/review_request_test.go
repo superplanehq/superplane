@@ -14,6 +14,9 @@ import (
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
+
+	// The server registers Review request with registryimports.
+	_ "github.com/superplanehq/superplane/pkg/factories/reviewrequest"
 )
 
 type reviewRequestFixture struct {

@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/factories/lifecycle"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
@@ -51,16 +52,9 @@ func ReemitTriggerEvent(
 	}
 
 	err = db.Transaction(func(tx *gorm.DB) error {
-		eventData := sourceEvent.Data.Data()
-		reviewRequest, err := models.CanvasHasFactoryAppTemplate(tx, canvas.ID, "review-request")
+		eventData, err := lifecycle.RetryEventData(tx, canvas, node, sourceEvent)
 		if err != nil {
 			return err
-		}
-		if reviewRequest {
-			eventData, err = models.ReviewRequestRetryEventData(tx, canvas, node, sourceEvent)
-			if err != nil {
-				return fmt.Errorf("cannot retry review request: %w", err)
-			}
 		}
 		now := time.Now()
 		reemittedEvent.CreatedAt = &now

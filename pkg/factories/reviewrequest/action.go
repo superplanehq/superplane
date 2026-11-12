@@ -1,4 +1,4 @@
-package contexts
+package reviewrequest
 
 import (
 	"context"
@@ -10,33 +10,34 @@ import (
 
 	"github.com/google/go-github/v84/github"
 	"github.com/google/uuid"
-	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/factories/lifecycle"
 	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/models"
 )
 
-// PrepareReviewRequest checks authority at dispatch and again immediately
-// before mutation. The caller keeps the PR lock through the GitHub action.
-func (c *FactoryContext) PrepareReviewRequest(ctx *core.ExecutionContext) (bool, error) {
-	if c.canvas.FactoryID == nil || (c.execution.NodeID != "select-reviewers" && c.execution.NodeID != "request-reviewers") {
+// prepareAction checks authority at dispatch and again immediately before
+// mutation. The caller keeps the PR lock through the GitHub action.
+func prepareAction(action lifecycle.Action) (bool, error) {
+	c, ctx := action, action.Context
+	if c.Canvas.FactoryID == nil || (c.Execution.NodeID != selectionNodeID && c.Execution.NodeID != requestNodeID) {
 		return false, nil
 	}
-	installed, err := models.CanvasHasFactoryAppTemplate(c.tx, c.canvas.ID, "review-request")
-	if err != nil || !installed {
+	exists, err := installed(c.Tx, c.Canvas)
+	if err != nil || !exists {
 		return false, err
 	}
-	run, err := models.FindCanvasRunInTransaction(c.tx, c.canvas.ID, c.execution.RunID)
+	run, err := models.FindCanvasRunInTransaction(c.Tx, c.Canvas.ID, c.Execution.RunID)
 	if err != nil {
 		return false, err
 	}
-	source, err := models.CheckReviewRequestAttempt(c.tx, c.canvas, run)
+	source, err := models.CheckReviewRequestAttempt(c.Tx, c.Canvas, run)
 	if err != nil {
 		return false, err
 	}
-	if !reviewRequestNeedsReview(source.Report) {
+	if !needsReview(source.Report) {
 		return true, ctx.ExecutionState.Pass()
 	}
-	client, err := c.reviewRequestClient(ctx)
+	client, err := githubClient(c)
 	if err != nil {
 		return false, err
 	}
@@ -60,10 +61,10 @@ func (c *FactoryContext) PrepareReviewRequest(ctx *core.ExecutionContext) (bool,
 	candidates = slices.DeleteFunc(candidates, func(user *github.User) bool {
 		return strings.EqualFold(user.GetLogin(), remote.GetUser().GetLogin())
 	})
-	if c.execution.NodeID == "select-reviewers" {
-		return false, c.prepareReviewRequestAgent(ctx, source, candidates)
+	if c.Execution.NodeID == selectionNodeID {
+		return false, prepareSelectionAgent(c, source, candidates)
 	}
-	outputs, err := models.ListReviewRequestDecisionEvents(c.tx, run, "select-reviewers")
+	outputs, err := models.ListReviewRequestDecisionEvents(c.Tx, run, selectionNodeID)
 	if err != nil {
 		return false, err
 	}
@@ -72,7 +73,7 @@ func (c *FactoryContext) PrepareReviewRequest(ctx *core.ExecutionContext) (bool,
 	}
 	envelope, _ := outputs[0].Data.Data().(map[string]any)
 	data, _ := envelope["data"].(map[string]any)
-	var decision reviewRequestDecision
+	var decision selectionDecision
 	encoded, err := json.Marshal(data["reviewRequest"])
 	if err != nil {
 		return false, err
@@ -103,7 +104,7 @@ func (c *FactoryContext) PrepareReviewRequest(ctx *core.ExecutionContext) (bool,
 	}
 	toRequest := []string{}
 	for _, selected := range decision.Reviewers {
-		if slices.ContainsFunc(remote.RequestedReviewers, func(user *github.User) bool { return strings.EqualFold(user.GetLogin(), selected.Login) }) || hasCurrentReviewRequestApproval(reviews, selected.Login, sha) {
+		if slices.ContainsFunc(remote.RequestedReviewers, func(user *github.User) bool { return strings.EqualFold(user.GetLogin(), selected.Login) }) || hasCurrentApproval(reviews, selected.Login, sha) {
 			continue
 		}
 		toRequest = append(toRequest, selected.Login)
@@ -120,15 +121,15 @@ func (c *FactoryContext) PrepareReviewRequest(ctx *core.ExecutionContext) (bool,
 	toRequest = slices.DeleteFunc(toRequest, func(login string) bool {
 		return slices.ContainsFunc(remote.RequestedReviewers, func(user *github.User) bool { return strings.EqualFold(user.GetLogin(), login) })
 	})
-	if _, err := models.CheckReviewRequestAttempt(c.tx, c.canvas, run); err != nil {
+	if _, err := models.CheckReviewRequestAttempt(c.Tx, c.Canvas, run); err != nil {
 		return false, err
 	}
-	metadata := maps.Clone(c.execution.Metadata.Data())
+	metadata := maps.Clone(c.Execution.Metadata.Data())
 	if metadata == nil {
 		metadata = map[string]any{}
 	}
 	metadata["reviewRequest"] = decision
-	if err := c.execution.UpdateMetadata(c.tx, metadata); err != nil {
+	if err := c.Execution.UpdateMetadata(c.Tx, metadata); err != nil {
 		return false, err
 	}
 	if len(toRequest) == 0 {
@@ -147,11 +148,12 @@ func (c *FactoryContext) PrepareReviewRequest(ctx *core.ExecutionContext) (bool,
 	return false, nil
 }
 
-func (c *FactoryContext) reviewRequestClient(ctx *core.ExecutionContext) (*githubcommon.Client, error) {
+func githubClient(c lifecycle.Action) (*githubcommon.Client, error) {
+	ctx := c.Context
 	if ctx.Integration != nil {
 		return githubcommon.NewClient(ctx.Integration, ctx.HTTP)
 	}
-	workspace, err := models.FindFactory(c.tx, c.canvas.OrganizationID, *c.canvas.FactoryID)
+	workspace, err := models.FindFactory(c.Tx, c.Canvas.OrganizationID, *c.Canvas.FactoryID)
 	if err != nil {
 		return nil, err
 	}
@@ -159,17 +161,18 @@ func (c *FactoryContext) reviewRequestClient(ctx *core.ExecutionContext) (*githu
 	if err != nil {
 		return nil, fmt.Errorf("Review request requires the workspace GitHub integration")
 	}
-	integration, err := models.FindIntegrationInTransaction(c.tx, c.canvas.OrganizationID, id)
+	integration, err := models.FindIntegrationInTransaction(c.Tx, c.Canvas.OrganizationID, id)
 	if err != nil {
 		return nil, err
 	}
-	if integration.AppName != "github" || integration.State != models.IntegrationStateReady || c.encryptor == nil || c.registry == nil {
+	if integration.AppName != "github" || integration.State != models.IntegrationStateReady || c.Integration == nil {
 		return nil, fmt.Errorf("Review request GitHub integration is unavailable")
 	}
-	return githubcommon.NewClient(NewIntegrationContext(c.tx, nil, integration, c.encryptor, c.registry, nil), ctx.HTTP)
+	return githubcommon.NewClient(c.Integration(integration), ctx.HTTP)
 }
 
-func (c *FactoryContext) prepareReviewRequestAgent(ctx *core.ExecutionContext, source *models.ReviewRequestSource, candidates []*github.User) error {
+func prepareSelectionAgent(c lifecycle.Action, source *models.ReviewRequestSource, candidates []*github.User) error {
+	ctx := c.Context
 	type candidateIdentity struct {
 		ID    int64  `json:"id"`
 		Login string `json:"login"`
@@ -183,14 +186,14 @@ func (c *FactoryContext) prepareReviewRequestAgent(ctx *core.ExecutionContext, s
 		identities[strings.ToLower(candidate.GetLogin())] = candidate.GetID()
 		eligible = append(eligible, candidateIdentity{ID: candidate.GetID(), Login: candidate.GetLogin(), Name: candidate.GetName()})
 	}
-	metadata := maps.Clone(c.execution.Metadata.Data())
+	metadata := maps.Clone(c.Execution.Metadata.Data())
 	if metadata == nil {
 		metadata = map[string]any{}
 	}
 	metadata["reviewRequestCandidates"] = logins
 	metadata["reviewRequestCandidateIDs"] = identities
 	metadata["reviewRequestDiscovered"] = true
-	if err := c.execution.UpdateMetadata(c.tx, metadata); err != nil {
+	if err := c.Execution.UpdateMetadata(c.Tx, metadata); err != nil {
 		return err
 	}
 	configuration, ok := ctx.Configuration.(map[string]any)
@@ -218,7 +221,7 @@ func (c *FactoryContext) prepareReviewRequestAgent(ctx *core.ExecutionContext, s
 	return nil
 }
 
-func hasCurrentReviewRequestApproval(reviews []*github.PullRequestReview, login, sha string) bool {
+func hasCurrentApproval(reviews []*github.PullRequestReview, login, sha string) bool {
 	var latest *github.PullRequestReview
 	for _, review := range reviews {
 		if !strings.EqualFold(review.GetUser().GetLogin(), login) || review.GetState() == "COMMENTED" || review.GetState() == "PENDING" {

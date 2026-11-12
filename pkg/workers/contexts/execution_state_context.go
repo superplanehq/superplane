@@ -8,6 +8,7 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/factories/lifecycle"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
 )
@@ -62,7 +63,7 @@ func (s *ExecutionStateContext) Emit(channel, payloadType string, payloads []any
 	if err != nil {
 		return err
 	}
-	payloads, err = s.prepareReviewRequestOutput(channel, payloadType, payloads)
+	payloads, err = lifecycle.PrepareOutput(lifecycle.Output{Tx: s.tx, Execution: s.execution, Channel: channel, PayloadType: payloadType, Payloads: payloads})
 	if err != nil {
 		return s.Fail(models.CanvasNodeExecutionResultReasonError, err.Error())
 	}

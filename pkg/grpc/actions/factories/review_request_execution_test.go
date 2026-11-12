@@ -15,6 +15,7 @@ import (
 	factorycomponent "github.com/superplanehq/superplane/pkg/components/factory"
 	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/factories/lifecycle"
 	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/integrations/prbody"
@@ -25,6 +26,7 @@ import (
 	"github.com/superplanehq/superplane/test/support"
 	"github.com/superplanehq/superplane/test/support/contexts"
 	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
 // The fixture substitutes only GitHub responses and the external agent task.
@@ -191,8 +193,18 @@ func reviewRequestCompletedProducer(t *testing.T, host *reviewRequestHTTP, score
 	}
 }
 
+// linkReviewRequestRun runs the registered run links, as the event router does.
+func linkReviewRequestRun(db *gorm.DB, canvas *models.Canvas, root *models.CanvasEvent, run *models.CanvasRun) error {
+	for _, link := range lifecycle.RunLinks() {
+		if err := link.Link(db, canvas, root, run); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func TestReviewRequestFromPublishedReportToGitHub(t *testing.T) {
-	for _, scenario := range []string{"favorable", "favorable queued request", "concerning", "hosted agent", "concerning no review", "fallback", "no candidate", "malformed output", "reported lookup error", "agent failure", "author selected", "bot selected", "reader selected", "additional reviewer without reason", "additional reviewer", "discovery error", "permission error", "qualifying approval", "already requested", "stale before mutation", "paused after load"} {
+	for _, scenario := range []string{"favorable", "favorable queued request", "concerning", "hosted agent", "concerning no review", "fallback", "no candidate", "malformed output", "reported lookup error", "agent failure", "author selected", "bot selected", "reader selected", "additional reviewer without reason", "additional reviewer", "discovery error", "permission error", "qualifying approval", "already requested", "stale before mutation", "paused after load", "superseded before link"} {
 		t.Run(scenario, func(t *testing.T) {
 			host := &reviewRequestHTTP{}
 			score := 2.0
@@ -240,7 +252,16 @@ func TestReviewRequestFromPublishedReportToGitHub(t *testing.T) {
 			require.NoError(t, err)
 			run, err := models.FindOrCreateCanvasRunForRootEventInTransaction(f.db, root)
 			require.NoError(t, err)
-			require.NoError(t, models.MaybeLinkReviewRequestRun(f.db, consumer, root, run))
+			if scenario == "superseded before link" {
+				newer, err := models.CreateCanvasRunInTransaction(f.db, f.canvas.ID, "on-pr-risk", models.CanvasRunStateStarted, "")
+				require.NoError(t, err)
+				_, err = f.pr.CreateActivity(f.db, models.FactoryPullRequestActivityParams{RunID: newer.ID})
+				require.NoError(t, err)
+				err = linkReviewRequestRun(f.db, consumer, root, run)
+				require.True(t, lifecycle.IsRejection(err), "a newer report must reject the run instead of retrying it: %v", err)
+				return
+			}
+			require.NoError(t, linkReviewRequestRun(f.db, consumer, root, run))
 			activity, err := models.FindPullRequestActivityByRunID(f.db, run.ID)
 			require.NoError(t, err)
 			require.Equal(t, f.pr.ID, activity.PullRequestID)
@@ -259,7 +280,7 @@ func TestReviewRequestFromPublishedReportToGitHub(t *testing.T) {
 				request, _ := reviewRequestTestExecution(t, f, consumer, run, "request-reviewers", root, &outputs[0], agent)
 				requestContext := core.ExecutionContext{RunID: run.ID, Configuration: request.Configuration.Data(), Integration: reviewRequestIntegration(), HTTP: host, ExecutionState: workercontexts.NewExecutionStateContext(f.db, request, nil)}
 				requestsBefore := len(host.requests)
-				handled, err := workercontexts.NewFactoryContext(f.db, consumer, request).PrepareReviewRequest(&requestContext)
+				handled, err := lifecycle.PrepareAction(lifecycle.Action{Tx: f.db, Canvas: consumer, Execution: request, Context: &requestContext})
 				require.NoError(t, err)
 				require.True(t, handled)
 				require.Len(t, host.requests, requestsBefore, "a green report must stop a queued reviewer request before GitHub access")
@@ -271,7 +292,7 @@ func TestReviewRequestFromPublishedReportToGitHub(t *testing.T) {
 			host.empty = scenario == "no candidate"
 			agentContext := core.ExecutionContext{RunID: run.ID, Configuration: agent.Configuration.Data(), Integration: reviewRequestIntegration(), HTTP: host, ExecutionState: workercontexts.NewExecutionStateContext(f.db, agent, nil)}
 			requestsBefore := len(host.requests)
-			handled, err := workercontexts.NewFactoryContext(f.db, consumer, agent).PrepareReviewRequest(&agentContext)
+			handled, err := lifecycle.PrepareAction(lifecycle.Action{Tx: f.db, Canvas: consumer, Execution: agent, Context: &agentContext})
 			if scenario == "favorable" {
 				require.NoError(t, err)
 				require.True(t, handled)
@@ -371,7 +392,7 @@ func TestReviewRequestFromPublishedReportToGitHub(t *testing.T) {
 			host.permissionError = scenario == "permission error"
 			host.staleFinalRead = scenario == "stale before mutation"
 			requestContext := core.ExecutionContext{RunID: run.ID, Configuration: request.Configuration.Data(), Integration: reviewRequestIntegration(), HTTP: host, ExecutionState: workercontexts.NewExecutionStateContext(f.db, request, nil)}
-			handled, err = workercontexts.NewFactoryContext(f.db, consumer, request).PrepareReviewRequest(&requestContext)
+			handled, err = lifecycle.PrepareAction(lifecycle.Action{Tx: f.db, Canvas: consumer, Execution: request, Context: &requestContext})
 			if host.permissionError || host.staleFinalRead {
 				require.Error(t, err)
 				require.Empty(t, host.reviewerBodies)
