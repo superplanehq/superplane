@@ -2,13 +2,13 @@ package factories
 
 import (
 	"encoding/json"
-	"github.com/google/uuid"
 	"io"
 	"net/http"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	factorycomponent "github.com/superplanehq/superplane/pkg/components/factory"
@@ -31,7 +31,7 @@ func (f publicationFixture) publicationRequest(t *testing.T, channel string) (*m
 	if channel == "failed" {
 		status = "failed"
 	}
-	state := workercontexts.NewExecutionStateContext(f.db, agent, nil)
+	state := workercontexts.NewFactoryExecutionStateContext(f.db, agent, nil)
 	require.NoError(t, state.Emit(channel, "runnerClaudeCode.finished", []any{map[string]any{"status": status}}))
 	var output models.CanvasEvent
 	require.NoError(t, f.db.Where("execution_id = ?", agent.ID).First(&output).Error)

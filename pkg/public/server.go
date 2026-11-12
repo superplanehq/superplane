@@ -2149,15 +2149,16 @@ func (s *Server) executeWebhookNode(ctx context.Context, body []byte, headers ht
 // lazyWebhookFactory reads the canvas only when a trigger calls it.
 // A webhook must send its response before that lookup.
 type lazyWebhookFactory struct {
-	tx       *gorm.DB
-	canvasID uuid.UUID
-	once     sync.Once
-	inner    core.FactoryContext
-	err      error
+	tx          *gorm.DB
+	canvasID    uuid.UUID
+	once        sync.Once
+	inner       core.FactoryContext
+	err         error
+	onNewEvents func([]models.CanvasEvent)
 }
 
-func newLazyWebhookFactory(tx *gorm.DB, canvasID uuid.UUID) core.FactoryContext {
-	return &lazyWebhookFactory{tx: tx, canvasID: canvasID}
+func newLazyWebhookFactory(tx *gorm.DB, canvasID uuid.UUID, onNewEvents func([]models.CanvasEvent)) core.FactoryContext {
+	return &lazyWebhookFactory{tx: tx, canvasID: canvasID, onNewEvents: onNewEvents}
 }
 
 func (l *lazyWebhookFactory) load() (core.FactoryContext, error) {
@@ -2338,7 +2339,7 @@ func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers ht
 		Webhook:       contexts.NewNodeWebhookContext(ctx, tx, s.encryptor, &node, s.BaseURL+s.BasePath),
 		Events:        events,
 		Integration:   integrationCtx,
-		Factory:       newLazyWebhookFactory(tx, node.WorkflowID),
+		Factory:       newLazyWebhookFactory(tx, node.WorkflowID, onNewEvents),
 	})
 	return code, response, integrationOrganizationID(integration), err
 }
@@ -2651,4 +2652,12 @@ func makeOriginChecker(allowed []string) func(*http.Request) bool {
 		_, ok := set[strings.ToLower(u.Scheme+"://"+u.Host)]
 		return ok
 	}
+}
+
+func (l *lazyWebhookFactory) EmitPullRequestEvent(nodeID, payloadType string, payload any) error {
+	canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(l.tx, l.canvasID)
+	if err != nil {
+		return err
+	}
+	return contexts.NewFactoryContext(l.tx, canvas, nil).WithNewEvents(l.onNewEvents).EmitPullRequestEvent(nodeID, payloadType, payload)
 }

@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/components/runner"
+	"github.com/superplanehq/superplane/pkg/factories/mergeconfidence"
 	"github.com/superplanehq/superplane/pkg/yaml"
 )
 
@@ -27,7 +28,7 @@ func configureMergeConfidenceChecks(node *yaml.Node, raw any) error {
 	if err := json.Unmarshal(encoded, &savedSteps); err != nil {
 		return fmt.Errorf("read saved merge confidence checks: %w", err)
 	}
-	ids, labels := runner.MergeConfidenceChecksFromSteps(savedSteps)
+	ids, labels := mergeconfidence.MergeConfidenceChecksFromSteps(savedSteps)
 	generated, _ := node.Configuration["steps"].([]any)
 	defaults := mergeCheckStepsByID(generated)
 	custom := savedMergeCheckSteps(raw)
@@ -68,7 +69,7 @@ func mergeCheckStepsByID(steps []any) map[string]map[string]any {
 	for _, item := range steps {
 		step := cloneMergeCheckStep(item)
 		prompt, _ := step["prompt"].(string)
-		if id := runner.MergeCheckID(prompt); id != "" {
+		if id := mergeconfidence.MergeCheckID(prompt); id != "" {
 			checks[id] = step
 		}
 	}
@@ -86,7 +87,7 @@ func replaceMergeCheckSteps(generated, selected []any) []any {
 	for _, item := range generated {
 		step, _ := item.(map[string]any)
 		prompt, _ := step["prompt"].(string)
-		if runner.MergeCheckID(prompt) != "" {
+		if mergeconfidence.MergeCheckID(prompt) != "" {
 			if !inserted {
 				result = append(result, selected...)
 				inserted = true

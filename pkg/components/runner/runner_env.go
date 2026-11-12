@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -17,12 +18,30 @@ import (
 	"gorm.io/gorm"
 )
 
-// AttachRunnerEnv mints the token of the global runner MCP server. Call it
-// after the planning, artifact, and merge confidence attach calls. Pass the
-// merge scope from AttachMergeConfidenceEnv. A nil scope is a planning or
-// task run. A run without an open task gets no token, so the global server
-// does not start.
-func AttachRunnerEnv(ctx core.ExecutionContext, environment []TaskEnvironmentVariable, timeoutSeconds int, merge *MergeConfidenceScope) []TaskEnvironmentVariable {
+// AttachRunnerEnv applies trusted owner credentials or resolves ordinary task access.
+func AttachRunnerEnv(ctx core.ExecutionContext, environment []TaskEnvironmentVariable, timeoutSeconds int) []TaskEnvironmentVariable {
+	for _, name := range ctx.RunnerEnvironmentRemove {
+		environment = withoutEnvironmentName(environment, name)
+	}
+	if ctx.RunnerEnvironment != nil && !HasPlanningSessionToken(environment) {
+		names := make([]string, 0, len(ctx.RunnerEnvironment))
+		for name := range ctx.RunnerEnvironment {
+			names = append(names, name)
+		}
+		slices.Sort(names)
+		environment = withoutEnvironmentName(environment, EnvSuperplaneRunnerToken)
+		environment = withoutEnvironmentName(environment, EnvSuperplaneTaskID)
+		for _, name := range names {
+			environment = withoutEnvironmentName(environment, name)
+			environment = append(environment, TaskEnvironmentVariable{Name: name, Value: ctx.RunnerEnvironment[name]})
+		}
+		return environment
+	}
+	return AttachScopedRunnerEnv(database.DB(context.Background()), ctx, environment, timeoutSeconds, nil)
+}
+
+// AttachScopedRunnerEnv validates a trusted scope before minting a runner credential.
+func AttachScopedRunnerEnv(db *gorm.DB, ctx core.ExecutionContext, environment []TaskEnvironmentVariable, timeoutSeconds int, prepared *RunnerScope) []TaskEnvironmentVariable {
 	environment = withoutEnvironmentName(environment, EnvSuperplaneRunnerToken)
 	environment = withoutEnvironmentName(environment, EnvSuperplaneTaskID)
 	secret := strings.TrimSpace(os.Getenv("JWT_SECRET"))
@@ -32,7 +51,7 @@ func AttachRunnerEnv(ctx core.ExecutionContext, environment []TaskEnvironmentVar
 	}
 
 	signer := jwt.NewSigner(secret)
-	scope, order, err := resolveRunnerScope(database.DB(context.Background()), ctx, environment, merge)
+	scope, order, err := resolveRunnerScope(db, ctx, environment, prepared)
 	if err != nil {
 		if ctx.Logger != nil {
 			ctx.Logger.WithError(err).Debug("skip runner token")
@@ -59,7 +78,7 @@ func resolveRunnerScope(
 	db *gorm.DB,
 	ctx core.ExecutionContext,
 	environment []TaskEnvironmentVariable,
-	merge *MergeConfidenceScope,
+	prepared *RunnerScope,
 ) (*RunnerScope, *models.FactoryWorkOrder, error) {
 	if ctx.RunID == uuid.Nil || ctx.ID == uuid.Nil {
 		return nil, nil, fmt.Errorf("run is missing")
@@ -83,8 +102,12 @@ func resolveRunnerScope(
 	switch {
 	case HasPlanningSessionToken(environment):
 		err = resolvePlanningRunnerScope(db, scope)
-	case merge != nil:
-		err = applyMergeConfidenceScope(scope, merge)
+	case prepared != nil:
+		if prepared.OrganizationID != scope.OrganizationID || prepared.CanvasID != scope.CanvasID || prepared.CanvasRunID != scope.CanvasRunID || prepared.NodeExecutionID != scope.NodeExecutionID || prepared.NodeID != scope.NodeID {
+			return nil, nil, fmt.Errorf("runner scope does not match the execution")
+		}
+		cloned := *prepared
+		scope = &cloned
 	default:
 		err = resolveTaskRunnerScope(db, scope)
 		if err != nil {
@@ -131,19 +154,6 @@ func resolvePlanningRunnerScope(db *gorm.DB, scope *RunnerScope) error {
 	scope.Flow = RunnerFlowPlanning
 	scope.FactoryID = session.FactoryID
 	scope.PlanningSessionID = session.ID
-	return nil
-}
-
-func applyMergeConfidenceScope(scope *RunnerScope, merge *MergeConfidenceScope) error {
-	if merge.OrganizationID != scope.OrganizationID || merge.CanvasRunID != scope.CanvasRunID || merge.NodeExecutionID != scope.NodeExecutionID {
-		return fmt.Errorf("merge confidence scope does not match the run")
-	}
-	scope.Flow = RunnerFlowMergeConfidence
-	scope.FactoryID = merge.FactoryID
-	scope.WorkOrderID = merge.WorkOrderID
-	scope.MergeChecks = merge.EnabledChecks
-	scope.MergeCheckLabels = merge.CheckLabels
-	scope.MergeRepository = merge.Repository
 	return nil
 }
 
