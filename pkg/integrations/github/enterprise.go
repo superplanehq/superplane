@@ -1,6 +1,7 @@
 package github
 
 import (
+	"context"
 	"crypto/tls"
 	"encoding/json"
 	"errors"
@@ -70,7 +71,7 @@ func githubEnterpriseEnabledForOrg(tx *gorm.DB, orgID string) bool {
 	return orgHasGitHubEnterprise(tx, id)
 }
 
-func authorizeGitHubEnterpriseHost(tx *gorm.DB, orgID uuid.UUID, host common.Host) error {
+func authorizeGitHubEnterpriseHost(ctx context.Context, tx *gorm.DB, orgID uuid.UUID, host common.Host) error {
 	if host.IsDotCom() {
 		return nil
 	}
@@ -85,10 +86,10 @@ func authorizeGitHubEnterpriseHost(tx *gorm.DB, orgID uuid.UUID, host common.Hos
 	if impl == nil {
 		return grpcerrors.PermissionDenied(licensing.ErrNotLicensed, licensing.ErrNotLicensed.Error())
 	}
-	return impl.AuthorizeHost(host.WebHostname())
+	return impl.AuthorizeHost(ctx, orgID, host.WebHostname())
 }
 
-func authorizeGitHubEnterpriseOrg(tx *gorm.DB, orgID string, host common.Host) error {
+func authorizeGitHubEnterpriseOrg(ctx context.Context, tx *gorm.DB, orgID string, host common.Host) error {
 	if host.IsDotCom() {
 		return nil
 	}
@@ -99,7 +100,7 @@ func authorizeGitHubEnterpriseOrg(tx *gorm.DB, orgID string, host common.Host) e
 		}
 		return grpcerrors.FailedPrecondition(errors.New(gitHubEnterpriseUnavailable), gitHubEnterpriseUnavailable)
 	}
-	return authorizeGitHubEnterpriseHost(tx, id, host)
+	return authorizeGitHubEnterpriseHost(ctx, tx, id, host)
 }
 
 func writeGitHubEnterpriseAuthorizationError(w http.ResponseWriter, err error) {
@@ -114,12 +115,12 @@ func writeGitHubEnterpriseAuthorizationError(w http.ResponseWriter, err error) {
 	http.Error(w, message, status)
 }
 
-func gitHubEnterpriseLicensed() bool {
+func gitHubEnterpriseLicensed(ctx context.Context, orgID uuid.UUID) bool {
 	impl := gitHubEnterprise
 	if impl == nil {
 		return false
 	}
-	return impl.AuthorizeHost("acme.ghe.com") == nil
+	return impl.AuthorizeHost(ctx, orgID, "acme.ghe.com") == nil
 }
 
 func githubEnterpriseServerEnabled(tx *gorm.DB, orgID uuid.UUID) bool {
