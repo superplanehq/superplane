@@ -9,6 +9,7 @@ import { Link, useParams } from "react-router";
 
 import { OrgCanvasesTable } from "./OrgCanvasesTable";
 import { DeleteOrganizationControl } from "./DeleteOrganizationControl";
+import { OrgEnterpriseFeaturesSection } from "./OrgEnterpriseFeaturesSection";
 import { OrgExperimentalFeaturesTable } from "./OrgExperimentalFeaturesTable";
 import { OrgIntegrationsTable } from "./OrgIntegrationsTable";
 import { OrgLLMCreditSection } from "./OrgLLMCreditSection";
@@ -274,6 +275,7 @@ const OrganizationDetail: React.FC = () => {
           <OrgIntegrationsTable orgId={orgId!} />
         </TabsContent>
         <TabsContent value="features" className="mt-3">
+          <OrgEnterpriseFeaturesSection orgId={orgId!} />
           <OrgExperimentalFeaturesTable orgId={orgId!} />
         </TabsContent>
         <TabsContent
