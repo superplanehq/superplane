@@ -82,6 +82,40 @@ func TestOrganizationEnterpriseFeatures(t *testing.T) {
 		assert.WithinDuration(t, past, listed[1].CreatedAt, time.Second)
 	})
 
+	t.Run("overlapping replacements do not merge grant sets", func(t *testing.T) {
+		org := createEnterpriseFeatureOrg(t, "grant-overlap")
+		db := database.Conn()
+
+		holder := db.Begin()
+		require.NoError(t, holder.Error)
+		t.Cleanup(func() { _ = holder.Rollback() })
+		require.NoError(t, holder.Exec("SELECT id FROM organizations WHERE id = ? FOR UPDATE", org.ID).Error)
+		_, err := GrantEnterpriseFeatures(holder, org.ID, []string{"groups"}, EnterpriseFeatureSourceAdmin, nil)
+		require.NoError(t, err)
+
+		err = db.Transaction(func(tx *gorm.DB) error {
+			if err := tx.Exec("SET LOCAL lock_timeout = '200ms'").Error; err != nil {
+				return err
+			}
+			_, _, err := SetOrganizationEnterpriseFeatures(tx, org.ID, []string{"audit_logs"}, uuid.New())
+			return err
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "lock timeout")
+
+		require.NoError(t, holder.Commit().Error)
+
+		_, removed, err := SetOrganizationEnterpriseFeatures(db, org.ID, []string{"audit_logs"}, uuid.New())
+		require.NoError(t, err)
+		require.Len(t, removed, 1)
+		assert.Equal(t, "groups", removed[0].FeatureKey)
+
+		listed, err := ListOrganizationEnterpriseFeatures(db, org.ID)
+		require.NoError(t, err)
+		require.Len(t, listed, 1)
+		assert.Equal(t, "audit_logs", listed[0].FeatureKey)
+	})
+
 	t.Run("lists and counts exclude deleted organizations", func(t *testing.T) {
 		require.NoError(t, database.TruncateTables())
 		first := createEnterpriseFeatureOrg(t, "grant-list-a")

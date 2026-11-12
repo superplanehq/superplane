@@ -127,79 +127,20 @@ func CountOrganizationsByEnterpriseFeature(tx *gorm.DB) (map[string]int64, error
 
 // SetOrganizationEnterpriseFeatures replaces the grants of one organization.
 // Rows that stay keep their source, granted_by, and created_at. New rows use
-// the admin source. The caller validates the keys.
+// the admin source. The caller validates the keys. The organization row stays
+// locked until the transaction ends, so two replacements cannot merge.
 func SetOrganizationEnterpriseFeatures(tx *gorm.DB, orgID uuid.UUID, keys []string, grantedBy uuid.UUID) (added, removed []OrganizationEnterpriseFeature, err error) {
-	current, err := ListOrganizationEnterpriseFeatures(tx, orgID)
+	err = tx.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Exec("SELECT id FROM organizations WHERE id = ? FOR UPDATE", orgID).Error; err != nil {
+			return err
+		}
+
+		var replaceErr error
+		added, removed, replaceErr = replaceOrganizationEnterpriseFeatures(tx, orgID, keys, grantedBy)
+		return replaceErr
+	})
 	if err != nil {
 		return nil, nil, err
-	}
-
-	currentByKey := make(map[string]OrganizationEnterpriseFeature, len(current))
-	for _, row := range current {
-		currentByKey[row.FeatureKey] = row
-	}
-
-	wanted := uniqueFeatureKeys(keys)
-	wantedSet := make(map[string]struct{}, len(wanted))
-	var deleteKeys []string
-	for _, key := range wanted {
-		wantedSet[key] = struct{}{}
-	}
-	for _, row := range current {
-		if _, ok := wantedSet[row.FeatureKey]; ok {
-			continue
-		}
-		removed = append(removed, row)
-		deleteKeys = append(deleteKeys, row.FeatureKey)
-	}
-	if len(deleteKeys) > 0 {
-		err = tx.Where("organization_id = ? AND feature_key IN ?", orgID, deleteKeys).
-			Delete(&OrganizationEnterpriseFeature{}).
-			Error
-		if err != nil {
-			return nil, nil, err
-		}
-	}
-
-	now := time.Now()
-	actor := grantedBy
-	toInsert := make([]OrganizationEnterpriseFeature, 0)
-	for _, key := range wanted {
-		if _, ok := currentByKey[key]; ok {
-			continue
-		}
-		toInsert = append(toInsert, OrganizationEnterpriseFeature{
-			OrganizationID: orgID,
-			FeatureKey:     key,
-			GrantedBy:      &actor,
-			Source:         EnterpriseFeatureSourceAdmin,
-			CreatedAt:      now,
-		})
-	}
-	if len(toInsert) == 0 {
-		return nil, removed, nil
-	}
-
-	result := tx.Clauses(clause.OnConflict{
-		Columns:   []clause.Column{{Name: "organization_id"}, {Name: "feature_key"}},
-		DoNothing: true,
-	}).Create(&toInsert)
-	if result.Error != nil {
-		return nil, nil, result.Error
-	}
-	if result.RowsAffected == int64(len(toInsert)) {
-		return toInsert, removed, nil
-	}
-
-	latest, err := ListOrganizationEnterpriseFeatures(tx, orgID)
-	if err != nil {
-		return nil, nil, err
-	}
-	for _, row := range latest {
-		if _, ok := currentByKey[row.FeatureKey]; ok {
-			continue
-		}
-		added = append(added, row)
 	}
 
 	return added, removed, nil
@@ -285,4 +226,81 @@ func uniqueFeatureKeys(keys []string) []string {
 	}
 
 	return unique
+}
+
+func replaceOrganizationEnterpriseFeatures(tx *gorm.DB, orgID uuid.UUID, keys []string, grantedBy uuid.UUID) (added, removed []OrganizationEnterpriseFeature, err error) {
+	current, err := ListOrganizationEnterpriseFeatures(tx, orgID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	currentByKey := make(map[string]OrganizationEnterpriseFeature, len(current))
+	for _, row := range current {
+		currentByKey[row.FeatureKey] = row
+	}
+
+	wanted := uniqueFeatureKeys(keys)
+	wantedSet := make(map[string]struct{}, len(wanted))
+	var deleteKeys []string
+	for _, key := range wanted {
+		wantedSet[key] = struct{}{}
+	}
+	for _, row := range current {
+		if _, ok := wantedSet[row.FeatureKey]; ok {
+			continue
+		}
+		removed = append(removed, row)
+		deleteKeys = append(deleteKeys, row.FeatureKey)
+	}
+	if len(deleteKeys) > 0 {
+		err = tx.Where("organization_id = ? AND feature_key IN ?", orgID, deleteKeys).
+			Delete(&OrganizationEnterpriseFeature{}).
+			Error
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+
+	now := time.Now()
+	actor := grantedBy
+	toInsert := make([]OrganizationEnterpriseFeature, 0)
+	for _, key := range wanted {
+		if _, ok := currentByKey[key]; ok {
+			continue
+		}
+		toInsert = append(toInsert, OrganizationEnterpriseFeature{
+			OrganizationID: orgID,
+			FeatureKey:     key,
+			GrantedBy:      &actor,
+			Source:         EnterpriseFeatureSourceAdmin,
+			CreatedAt:      now,
+		})
+	}
+	if len(toInsert) == 0 {
+		return nil, removed, nil
+	}
+
+	result := tx.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "organization_id"}, {Name: "feature_key"}},
+		DoNothing: true,
+	}).Create(&toInsert)
+	if result.Error != nil {
+		return nil, nil, result.Error
+	}
+	if result.RowsAffected == int64(len(toInsert)) {
+		return toInsert, removed, nil
+	}
+
+	latest, err := ListOrganizationEnterpriseFeatures(tx, orgID)
+	if err != nil {
+		return nil, nil, err
+	}
+	for _, row := range latest {
+		if _, ok := currentByKey[row.FeatureKey]; ok {
+			continue
+		}
+		added = append(added, row)
+	}
+
+	return added, removed, nil
 }
