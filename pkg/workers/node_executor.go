@@ -333,6 +333,10 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 
 	runCancellations := &RunCancellationNotifier{}
 
+	// Automations read providers before the transaction opens, so that no
+	// row lock is held while they wait.
+	loaded := w.loadAction(id)
+
 	var processedRunID uuid.UUID
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		//
@@ -372,7 +376,7 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 		if models.IsAgentRunnerComponent(metricComponent) {
 			processedRunID = execution.RunID
 		}
-		processErr := w.executeActionNode(tx, execution, node, onNewEvents, onMemoryChanged, onPendingRunCreated, onFactoryWorkOrderUpdated, onFactoryWorkOrderNotification, onGitHubPullRequestRecorded, onFileBindCleanup, onProductAnalytics, runCancellations)
+		processErr := w.executeActionNode(tx, execution, node, loaded, onNewEvents, onMemoryChanged, onPendingRunCreated, onFactoryWorkOrderUpdated, onFactoryWorkOrderNotification, onGitHubPullRequestRecorded, onFileBindCleanup, onProductAnalytics, runCancellations)
 		if processErr != nil {
 			metricOutcome = executorOutcomeFailed
 			metricReason = classifyAttemptFailure(processErr, execution)
@@ -449,10 +453,30 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 	return nil
 }
 
+// loadAction runs the automation reads for a pending execution outside the
+// execution transaction. PrepareAction checks the result under the lock.
+func (w *NodeExecutor) loadAction(id uuid.UUID) lifecycle.LoadedActions {
+	db := database.Conn()
+	execution, err := models.FindPendingNodeExecution(db, id)
+	if err != nil {
+		return nil
+	}
+
+	return lifecycle.LoadAction(lifecycle.ActionLoad{
+		DB:        db,
+		Execution: execution,
+		HTTP:      w.registry.HTTPContextInTransaction(db),
+		Integration: func(integration *models.Integration) core.IntegrationContext {
+			return contexts.NewIntegrationContext(db, nil, integration, w.encryptor, w.registry, nil)
+		},
+	})
+}
+
 func (w *NodeExecutor) executeActionNode(
 	tx *gorm.DB,
 	execution *models.CanvasNodeExecution,
 	node *models.CanvasNode,
+	loaded lifecycle.LoadedActions,
 	onNewEvents func([]models.CanvasEvent),
 	onMemoryChanged func(uuid.UUID),
 	onPendingRunCreated func(workflowID, runID uuid.UUID),
@@ -615,10 +639,7 @@ func (w *NodeExecutor) executeActionNode(
 		Canvas:    workflow,
 		Execution: execution,
 		Context:   &ctx,
-		Integration: func(integration *models.Integration) core.IntegrationContext {
-			return contexts.NewIntegrationContext(tx, nil, integration, w.encryptor, w.registry, nil)
-		},
-	})
+	}, loaded)
 	if err != nil {
 		return failNodeExecution(tx, ctx.ExecutionState, execution.RunID, err)
 	}

@@ -13,10 +13,112 @@ import (
 	"github.com/superplanehq/superplane/pkg/factories/lifecycle"
 	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/models"
+	"gorm.io/gorm"
 )
 
-// prepareAction checks authority at dispatch and again immediately before
-// mutation. The caller keeps the PR lock through the GitHub action.
+// pullRequestState is the GitHub state that loadAction reads before the
+// action transaction opens. prepareAction checks it against locked records.
+type pullRequestState struct {
+	executionID uuid.UUID
+	repository  string
+	number      int
+	sha         string
+	requested   []*github.User
+	candidates  []*github.User
+	permissions map[string]string
+	reviews     []*github.PullRequestReview
+}
+
+// loadAction reads GitHub before the action transaction opens, so that no
+// database lock is held during provider calls. It uses the unverified root
+// event only to choose what to read. prepareAction verifies the source.
+func loadAction(load lifecycle.ActionLoad) (any, error) {
+	execution := load.Execution
+	if execution.NodeID != selectionNodeID && execution.NodeID != requestNodeID {
+		return nil, nil
+	}
+	canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(load.DB, execution.WorkflowID)
+	if err != nil {
+		return nil, err
+	}
+	if canvas.FactoryID == nil {
+		return nil, nil
+	}
+	exists, err := installed(load.DB, canvas)
+	if err != nil || !exists {
+		return nil, err
+	}
+	run, err := models.FindCanvasRunInTransaction(load.DB, canvas.ID, execution.RunID)
+	if err != nil {
+		return nil, err
+	}
+	root, err := run.RootEvent(load.DB)
+	if err != nil {
+		return nil, err
+	}
+	message, _ := models.RootEventSourcePayload(root.Data.Data()).(map[string]any)
+	payload, _ := message["payload"].(map[string]any)
+	report, _ := payload["mergeConfidence"].(map[string]any)
+	if !needsReview(report) {
+		return nil, nil
+	}
+	state := &pullRequestState{executionID: execution.ID}
+	state.repository, _ = payload["repository"].(string)
+	state.sha, _ = report["reviewedCommit"].(string)
+	state.number = pullNumber(payload["pullNumber"])
+	client, err := githubClient(load, canvas)
+	if err != nil {
+		return nil, err
+	}
+	remote, _, err := client.GetPullRequest(context.Background(), state.repository, state.number)
+	if err != nil {
+		return nil, fmt.Errorf("Read Review request pull request: %w", err)
+	}
+	if remote.GetState() != "open" || remote.GetHead().GetSHA() != state.sha || remote.GetMerged() {
+		return nil, fmt.Errorf("Review request report does not assess the current open pull request")
+	}
+	author := remote.GetUser().GetLogin()
+	if author == "" {
+		return nil, fmt.Errorf("Review request pull request author is missing")
+	}
+	state.requested = remote.RequestedReviewers
+	candidates, err := client.ListHumanReviewers(context.Background(), state.repository)
+	if err != nil {
+		return nil, fmt.Errorf("Discover Review request reviewers: %w", err)
+	}
+	state.candidates = slices.DeleteFunc(candidates, func(user *github.User) bool {
+		return strings.EqualFold(user.GetLogin(), author)
+	})
+	if execution.NodeID == selectionNodeID {
+		return state, nil
+	}
+	decision, err := loadDecision(load.DB, run)
+	if err != nil {
+		return nil, err
+	}
+	state.permissions = map[string]string{}
+	for _, selected := range decision.Reviewers {
+		if !isCandidate(state.candidates, selected) {
+			continue
+		}
+		permission, _, err := client.GetRepositoryPermissionLevel(context.Background(), state.repository, selected.Login)
+		if err != nil {
+			return nil, fmt.Errorf("Read reviewer permission: %w", err)
+		}
+		state.permissions[strings.ToLower(selected.Login)] = permission.GetPermission()
+	}
+	if len(decision.Reviewers) > 0 {
+		state.reviews, err = client.ListReviews(context.Background(), state.repository, state.number)
+		if err != nil {
+			return nil, fmt.Errorf("Read existing pull request reviews: %w", err)
+		}
+	}
+	return state, nil
+}
+
+// prepareAction checks authority under the PR lock and applies the GitHub
+// state that loadAction read. It makes no provider calls. The saved PR
+// revision is the commit fence while the transaction stays open.
 func prepareAction(action lifecycle.Action) (bool, error) {
 	c, ctx := action, action.Context
 	if c.Canvas.FactoryID == nil || (c.Execution.NodeID != selectionNodeID && c.Execution.NodeID != requestNodeID) {
@@ -37,92 +139,39 @@ func prepareAction(action lifecycle.Action) (bool, error) {
 	if !needsReview(source.Report) {
 		return true, ctx.ExecutionState.Pass()
 	}
-	client, err := githubClient(c)
-	if err != nil {
-		return false, err
-	}
-	repository := source.PullRequest.Repository
-	number := int(source.PullRequest.Number)
-	remote, _, err := client.GetPullRequest(context.Background(), repository, number)
-	if err != nil {
-		return false, fmt.Errorf("Read Review request pull request: %w", err)
-	}
 	sha, _ := source.Report["reviewedCommit"].(string)
-	if remote.GetState() != "open" || remote.GetHead().GetSHA() != sha || remote.GetMerged() {
-		return false, fmt.Errorf("Review request report does not assess the current open pull request")
+	state, _ := c.Loaded.(*pullRequestState)
+	if state == nil || state.executionID != c.Execution.ID || state.repository != source.PullRequest.Repository || state.number != int(source.PullRequest.Number) || state.sha != sha {
+		return false, fmt.Errorf("Review request pull request state does not match the source report")
 	}
-	if remote.GetUser().GetLogin() == "" {
-		return false, fmt.Errorf("Review request pull request author is missing")
-	}
-	candidates, err := client.ListHumanReviewers(context.Background(), repository)
-	if err != nil {
-		return false, fmt.Errorf("Discover Review request reviewers: %w", err)
-	}
-	candidates = slices.DeleteFunc(candidates, func(user *github.User) bool {
-		return strings.EqualFold(user.GetLogin(), remote.GetUser().GetLogin())
-	})
 	if c.Execution.NodeID == selectionNodeID {
-		return false, prepareSelectionAgent(c, source, candidates)
+		return false, prepareSelectionAgent(c, source, state.candidates)
 	}
-	outputs, err := models.ListReviewRequestDecisionEvents(c.Tx, run, selectionNodeID)
+	decision, err := loadDecision(c.Tx, run)
 	if err != nil {
 		return false, err
 	}
-	if len(outputs) != 1 {
-		return false, fmt.Errorf("Review request has no unique validated decision")
-	}
-	envelope, _ := outputs[0].Data.Data().(map[string]any)
-	data, _ := envelope["data"].(map[string]any)
-	var decision selectionDecision
-	encoded, err := json.Marshal(data["reviewRequest"])
-	if err != nil {
-		return false, err
-	}
-	if err := json.Unmarshal(encoded, &decision); err != nil || decision.ReviewRequired == nil || decision.NoCandidate == nil || decision.ReportID != source.Run.ID.String() || decision.SourceAppID != source.App.ID.String() || decision.ReviewedCommit != sha {
+	if decision.ReportID != source.Run.ID.String() || decision.SourceAppID != source.App.ID.String() || decision.ReviewedCommit != sha {
 		return false, fmt.Errorf("Review request decision does not match its source report")
 	}
 	for _, selected := range decision.Reviewers {
-		if !slices.ContainsFunc(candidates, func(user *github.User) bool {
-			return strings.EqualFold(user.GetLogin(), selected.Login) && user.GetID() == selected.ID
-		}) {
+		if !isCandidate(state.candidates, selected) {
 			return false, fmt.Errorf("Review request reviewer is no longer eligible: %s", selected.Login)
 		}
-		permission, _, err := client.GetRepositoryPermissionLevel(context.Background(), repository, selected.Login)
-		if err != nil {
-			return false, fmt.Errorf("Read reviewer permission: %w", err)
+		permission, ok := state.permissions[strings.ToLower(selected.Login)]
+		if !ok {
+			return false, fmt.Errorf("Review request reviewer permission was not read: %s", selected.Login)
 		}
-		if !slices.Contains([]string{"write", "maintain", "admin"}, permission.GetPermission()) {
+		if !slices.Contains([]string{"write", "maintain", "admin"}, permission) {
 			return false, fmt.Errorf("Review request reviewer requires repository write access: %s", selected.Login)
-		}
-	}
-	var reviews []*github.PullRequestReview
-	if len(decision.Reviewers) > 0 {
-		reviews, err = client.ListReviews(context.Background(), repository, number)
-		if err != nil {
-			return false, fmt.Errorf("Read existing pull request reviews: %w", err)
 		}
 	}
 	toRequest := []string{}
 	for _, selected := range decision.Reviewers {
-		if slices.ContainsFunc(remote.RequestedReviewers, func(user *github.User) bool { return strings.EqualFold(user.GetLogin(), selected.Login) }) || hasCurrentApproval(reviews, selected.Login, sha) {
+		if slices.ContainsFunc(state.requested, func(user *github.User) bool { return strings.EqualFold(user.GetLogin(), selected.Login) }) || hasCurrentApproval(state.reviews, selected.Login, sha) {
 			continue
 		}
 		toRequest = append(toRequest, selected.Login)
-	}
-	// Permission and review lookups can take time. Reload the head immediately
-	// before the write, while the persisted attempt remains fenced by the lock.
-	remote, _, err = client.GetPullRequest(context.Background(), repository, number)
-	if err != nil {
-		return false, fmt.Errorf("Revalidate Review request pull request: %w", err)
-	}
-	if remote.GetState() != "open" || remote.GetMerged() || remote.GetHead().GetSHA() != sha {
-		return false, fmt.Errorf("Review request pull request changed before applying the decision")
-	}
-	toRequest = slices.DeleteFunc(toRequest, func(login string) bool {
-		return slices.ContainsFunc(remote.RequestedReviewers, func(user *github.User) bool { return strings.EqualFold(user.GetLogin(), login) })
-	})
-	if _, err := models.CheckReviewRequestAttempt(c.Tx, c.Canvas, run); err != nil {
-		return false, err
 	}
 	metadata := maps.Clone(c.Execution.Metadata.Data())
 	if metadata == nil {
@@ -140,20 +189,79 @@ func prepareAction(action lifecycle.Action) (bool, error) {
 		return false, fmt.Errorf("Review request configuration must be an object")
 	}
 	configuration = maps.Clone(configuration)
-	configuration["repository"] = repository
-	configuration["pullNumber"] = number
+	configuration["repository"] = source.PullRequest.Repository
+	configuration["pullNumber"] = int(source.PullRequest.Number)
 	configuration["reviewers"] = toRequest
 	configuration["teamReviewers"] = []string{}
 	ctx.Configuration = configuration
 	return false, nil
 }
 
-func githubClient(c lifecycle.Action) (*githubcommon.Client, error) {
-	ctx := c.Context
-	if ctx.Integration != nil {
-		return githubcommon.NewClient(ctx.Integration, ctx.HTTP)
+// loadDecision returns the unique saved selection decision of the run.
+func loadDecision(tx *gorm.DB, run *models.CanvasRun) (*selectionDecision, error) {
+	outputs, err := models.ListReviewRequestDecisionEvents(tx, run, selectionNodeID)
+	if err != nil {
+		return nil, err
 	}
-	workspace, err := models.FindFactory(c.Tx, c.Canvas.OrganizationID, *c.Canvas.FactoryID)
+	if len(outputs) != 1 {
+		return nil, fmt.Errorf("Review request has no unique validated decision")
+	}
+	envelope, _ := outputs[0].Data.Data().(map[string]any)
+	data, _ := envelope["data"].(map[string]any)
+	encoded, err := json.Marshal(data["reviewRequest"])
+	if err != nil {
+		return nil, err
+	}
+	var decision selectionDecision
+	if err := json.Unmarshal(encoded, &decision); err != nil || decision.ReviewRequired == nil || decision.NoCandidate == nil {
+		return nil, fmt.Errorf("Review request decision does not match its source report")
+	}
+	return &decision, nil
+}
+
+func pullNumber(value any) int {
+	encoded, err := json.Marshal(value)
+	if err != nil {
+		return 0
+	}
+	var number int
+	if err := json.Unmarshal(encoded, &number); err != nil {
+		return 0
+	}
+	return number
+}
+
+func isCandidate(candidates []*github.User, selected selectedReviewer) bool {
+	return slices.ContainsFunc(candidates, func(user *github.User) bool {
+		return strings.EqualFold(user.GetLogin(), selected.Login) && user.GetID() == selected.ID
+	})
+}
+
+func githubClient(load lifecycle.ActionLoad, canvas *models.Canvas) (*githubcommon.Client, error) {
+	node, err := models.FindCanvasNode(load.DB, canvas.ID, load.Execution.NodeID)
+	if err != nil {
+		return nil, err
+	}
+	var integration *models.Integration
+	if node.AppInstallationID != nil {
+		integration, err = models.FindUnscopedIntegrationInTransaction(load.DB, *node.AppInstallationID)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		integration, err = workspaceIntegration(load.DB, canvas)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if load.Integration == nil {
+		return nil, fmt.Errorf("Review request GitHub integration is unavailable")
+	}
+	return githubcommon.NewClient(load.Integration(integration), load.HTTP)
+}
+
+func workspaceIntegration(db *gorm.DB, canvas *models.Canvas) (*models.Integration, error) {
+	workspace, err := models.FindFactory(db, canvas.OrganizationID, *canvas.FactoryID)
 	if err != nil {
 		return nil, err
 	}
@@ -161,14 +269,14 @@ func githubClient(c lifecycle.Action) (*githubcommon.Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("Review request requires the workspace GitHub integration")
 	}
-	integration, err := models.FindIntegrationInTransaction(c.Tx, c.Canvas.OrganizationID, id)
+	integration, err := models.FindIntegrationInTransaction(db, canvas.OrganizationID, id)
 	if err != nil {
 		return nil, err
 	}
-	if integration.AppName != "github" || integration.State != models.IntegrationStateReady || c.Integration == nil {
+	if integration.AppName != "github" || integration.State != models.IntegrationStateReady {
 		return nil, fmt.Errorf("Review request GitHub integration is unavailable")
 	}
-	return githubcommon.NewClient(c.Integration(integration), ctx.HTTP)
+	return integration, nil
 }
 
 func prepareSelectionAgent(c lifecycle.Action, source *models.ReviewRequestSource, candidates []*github.User) error {

@@ -39,8 +39,7 @@ type reviewRequestHTTP struct {
 	empty           bool
 	discoveryError  bool
 	permissionError bool
-	staleFinalRead  bool
-	reads           int
+	movedHead       bool
 }
 
 func (h *reviewRequestHTTP) Do(request *http.Request) (*http.Response, error) {
@@ -81,9 +80,8 @@ func (h *reviewRequestHTTP) Do(request *http.Request) (*http.Response, error) {
 		return publicationHTTPResponse(200, body), nil
 	}
 	if request.Method == http.MethodGet && path == "/repos/acme/app/pulls/42" {
-		h.reads++
 		sha := "abc"
-		if h.staleFinalRead && h.reads > 1 {
+		if h.movedHead {
 			sha = "new-head"
 		}
 		requested := `[{"login":"unrelated"}]`
@@ -155,7 +153,11 @@ func reviewRequestCompletedProducer(t *testing.T, host *reviewRequestHTTP, score
 	require.NoError(t, err)
 	require.NoError(t, f.db.Model(integration).Update("state", models.IntegrationStateReady).Error)
 	integrationID := integration.ID.String()
-	require.NoError(t, f.workspace.UpdateOnboarding(f.db, models.FactoryOnboardingPatch{AgentIntegrationID: &integrationID}))
+	vcs, err := models.CreateIntegration(uuid.New(), f.canvas.OrganizationID, "github", "github", nil)
+	require.NoError(t, err)
+	require.NoError(t, f.db.Model(vcs).Update("state", models.IntegrationStateReady).Error)
+	vcsID := vcs.ID.String()
+	require.NoError(t, f.workspace.UpdateOnboarding(f.db, models.FactoryOnboardingPatch{AgentIntegrationID: &integrationID, VCSIntegrationID: &vcsID}))
 	_, err = models.UpsertOrganizationBYOKModelAllowlist(f.db, f.canvas.OrganizationID, models.UsageProviderAnthropic, datatypes.JSONSlice[string]{"claude-sonnet-4-6"})
 	require.NoError(t, err)
 	permitted, err := models.ResolveSelectableLLMModels(f.db, f.canvas.OrganizationID, &f.workspace.ID, models.UsageProviderAnthropic, models.UsageFundingSourceBYOK)
@@ -193,6 +195,23 @@ func reviewRequestCompletedProducer(t *testing.T, host *reviewRequestHTTP, score
 	}
 }
 
+// prepareReviewRequestAction loads GitHub state as the executor does before
+// it opens the action transaction. Then it prepares the action.
+func prepareReviewRequestAction(t *testing.T, f publicationFixture, host *reviewRequestHTTP, canvas *models.Canvas, execution *models.CanvasNodeExecution, ctx *core.ExecutionContext, beforePrepare func()) (bool, error) {
+	t.Helper()
+	loaded := lifecycle.LoadAction(lifecycle.ActionLoad{
+		DB: f.db, Execution: execution, HTTP: host,
+		Integration: func(*models.Integration) core.IntegrationContext { return reviewRequestIntegration() },
+	})
+	if beforePrepare != nil {
+		beforePrepare()
+	}
+	requests := len(host.requests)
+	handled, err := lifecycle.PrepareAction(lifecycle.Action{Tx: f.db, Canvas: canvas, Execution: execution, Context: ctx}, loaded)
+	require.Len(t, host.requests, requests, "preparation runs in the action transaction and must not call GitHub")
+	return handled, err
+}
+
 // linkReviewRequestRun runs the registered run links, as the event router does.
 func linkReviewRequestRun(db *gorm.DB, canvas *models.Canvas, root *models.CanvasEvent, run *models.CanvasRun) error {
 	for _, link := range lifecycle.RunLinks() {
@@ -204,7 +223,7 @@ func linkReviewRequestRun(db *gorm.DB, canvas *models.Canvas, root *models.Canva
 }
 
 func TestReviewRequestFromPublishedReportToGitHub(t *testing.T) {
-	for _, scenario := range []string{"favorable", "favorable queued request", "concerning", "hosted agent", "concerning no review", "fallback", "no candidate", "malformed output", "reported lookup error", "agent failure", "author selected", "bot selected", "reader selected", "additional reviewer without reason", "additional reviewer", "discovery error", "permission error", "qualifying approval", "already requested", "stale before mutation", "paused after load", "superseded before link"} {
+	for _, scenario := range []string{"favorable", "favorable queued request", "concerning", "hosted agent", "concerning no review", "fallback", "no candidate", "malformed output", "reported lookup error", "agent failure", "author selected", "bot selected", "reader selected", "additional reviewer without reason", "additional reviewer", "discovery error", "permission error", "qualifying approval", "already requested", "head moved", "stale before mutation", "paused after load", "superseded before link"} {
 		t.Run(scenario, func(t *testing.T) {
 			host := &reviewRequestHTTP{}
 			score := 2.0
@@ -280,7 +299,7 @@ func TestReviewRequestFromPublishedReportToGitHub(t *testing.T) {
 				request, _ := reviewRequestTestExecution(t, f, consumer, run, "request-reviewers", root, &outputs[0], agent)
 				requestContext := core.ExecutionContext{RunID: run.ID, Configuration: request.Configuration.Data(), Integration: reviewRequestIntegration(), HTTP: host, ExecutionState: workercontexts.NewExecutionStateContext(f.db, request, nil)}
 				requestsBefore := len(host.requests)
-				handled, err := lifecycle.PrepareAction(lifecycle.Action{Tx: f.db, Canvas: consumer, Execution: request, Context: &requestContext})
+				handled, err := prepareReviewRequestAction(t, f, host, consumer, request, &requestContext, nil)
 				require.NoError(t, err)
 				require.True(t, handled)
 				require.Len(t, host.requests, requestsBefore, "a green report must stop a queued reviewer request before GitHub access")
@@ -292,7 +311,7 @@ func TestReviewRequestFromPublishedReportToGitHub(t *testing.T) {
 			host.empty = scenario == "no candidate"
 			agentContext := core.ExecutionContext{RunID: run.ID, Configuration: agent.Configuration.Data(), Integration: reviewRequestIntegration(), HTTP: host, ExecutionState: workercontexts.NewExecutionStateContext(f.db, agent, nil)}
 			requestsBefore := len(host.requests)
-			handled, err := lifecycle.PrepareAction(lifecycle.Action{Tx: f.db, Canvas: consumer, Execution: agent, Context: &agentContext})
+			handled, err := prepareReviewRequestAction(t, f, host, consumer, agent, &agentContext, nil)
 			if scenario == "favorable" {
 				require.NoError(t, err)
 				require.True(t, handled)
@@ -386,15 +405,25 @@ func TestReviewRequestFromPublishedReportToGitHub(t *testing.T) {
 			require.Equal(t, f.canvas.ID.String(), selection["sourceAppId"])
 			require.NotEmpty(t, selection["rationale"])
 			request, requestAction := reviewRequestTestExecution(t, f, consumer, run, "request-reviewers", root, &selected, agent)
-			host.reads = 0
 			host.approved = scenario == "qualifying approval"
 			host.alreadyAsked = scenario == "already requested"
 			host.permissionError = scenario == "permission error"
-			host.staleFinalRead = scenario == "stale before mutation"
+			host.movedHead = scenario == "head moved"
 			requestContext := core.ExecutionContext{RunID: run.ID, Configuration: request.Configuration.Data(), Integration: reviewRequestIntegration(), HTTP: host, ExecutionState: workercontexts.NewExecutionStateContext(f.db, request, nil)}
-			handled, err = lifecycle.PrepareAction(lifecycle.Action{Tx: f.db, Canvas: consumer, Execution: request, Context: &requestContext})
-			if host.permissionError || host.staleFinalRead {
+			// A push recorded after the GitHub reads and before the lock moves the saved revision.
+			var push func()
+			if scenario == "stale before mutation" {
+				push = func() {
+					_, err := f.pr.ObserveRevision(f.db, "new-head")
+					require.NoError(t, err)
+				}
+			}
+			handled, err = prepareReviewRequestAction(t, f, host, consumer, request, &requestContext, push)
+			if host.permissionError || host.movedHead || push != nil {
 				require.Error(t, err)
+				if push != nil {
+					require.ErrorIs(t, err, models.ErrReviewRequestSuperseded, "the saved revision must fence reviewer requests after the GitHub reads")
+				}
 				require.Empty(t, host.reviewerBodies)
 				return
 			}

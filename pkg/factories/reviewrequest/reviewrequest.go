@@ -24,6 +24,7 @@ func init() {
 		ValidatePublication: validatePublication,
 		AdmitEvent:          admitEvent,
 		LinkRun:             linkRun,
+		LoadAction:          loadAction,
 		PrepareAction:       prepareAction,
 		PrepareOutput:       prepareOutput,
 		RetryEventData:      retryEventData,

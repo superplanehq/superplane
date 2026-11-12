@@ -218,6 +218,18 @@ func LockPendingNodeExecutionInActiveCanvas(tx *gorm.DB, id uuid.UUID) (*CanvasN
 	return &execution, nil
 }
 
+// FindPendingNodeExecution reads a pending execution without a lock. The
+// result can change before LockPendingNodeExecutionInActiveCanvas locks it.
+func FindPendingNodeExecution(tx *gorm.DB, id uuid.UUID) (*CanvasNodeExecution, error) {
+	var execution CanvasNodeExecution
+	err := tx.Where("id = ? AND state = ?", id, CanvasNodeExecutionStatePending).First(&execution).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return &execution, nil
+}
+
 func ListNodeExecutions(db *gorm.DB, workflowID uuid.UUID, nodeID string, states []string, results []string, limit int, beforeTime *time.Time) ([]CanvasNodeExecution, error) {
 	var executions []CanvasNodeExecution
 	query := db.

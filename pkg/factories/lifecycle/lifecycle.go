@@ -30,9 +30,17 @@ type Automation struct {
 	// Wrap errors with Reject when a retry cannot fix them.
 	LinkRun func(tx *gorm.DB, canvas *models.Canvas, event *models.CanvasEvent, run *models.CanvasRun) error
 
+	// LoadAction runs before the action transaction opens. Use it for slow
+	// reads, for example provider calls, so that no lock is held while they
+	// wait. It must not lock or change records. PrepareAction receives the
+	// result in Action.Loaded and must check it against the locked records.
+	// An error fails the execution if it is still pending.
+	LoadAction func(ActionLoad) (any, error)
+
 	// PrepareAction runs before an action executes. It can change the
 	// execution context or complete the execution. Return true when the
-	// execution is complete and the action must not run.
+	// execution is complete and the action must not run. It runs in the
+	// action transaction, so it must not call providers.
 	PrepareAction func(Action) (bool, error)
 
 	// PrepareOutput can validate or enrich output before it is saved. An
@@ -65,14 +73,34 @@ type EventAdmission struct {
 	Suppress bool
 }
 
+// ActionLoad is a pending action execution before its transaction opens.
+// The execution is an unlocked snapshot. It can change before the action
+// transaction locks it.
+type ActionLoad struct {
+	DB        *gorm.DB
+	Execution *models.CanvasNodeExecution
+	HTTP      core.HTTPContext
+	// Integration opens an integration outside the action transaction.
+	Integration func(*models.Integration) core.IntegrationContext
+}
+
 // Action is an action execution before the action runs.
 type Action struct {
 	Tx        *gorm.DB
 	Canvas    *models.Canvas
 	Execution *models.CanvasNodeExecution
 	Context   *core.ExecutionContext
-	// Integration opens an integration that the node does not reference.
-	Integration func(*models.Integration) core.IntegrationContext
+	// Loaded is the LoadAction result of the automation that prepares the
+	// action. It is nil when the automation loaded nothing.
+	Loaded any
+}
+
+// LoadedActions contains the LoadAction results of all automations.
+type LoadedActions map[string]loadedAction
+
+type loadedAction struct {
+	value any
+	err   error
 }
 
 // Output is the output of an execution before it is saved.
@@ -136,12 +164,33 @@ func RunLinks() []RunLink {
 	return links
 }
 
+// LoadAction runs the LoadAction operation of all automations. Call it
+// before the action transaction opens and pass the result to PrepareAction.
+func LoadAction(load ActionLoad) LoadedActions {
+	loaded := LoadedActions{}
+	for _, automation := range automations {
+		if automation.LoadAction == nil {
+			continue
+		}
+		value, err := automation.LoadAction(load)
+		loaded[automation.Name] = loadedAction{value: value, err: err}
+	}
+	return loaded
+}
+
 // PrepareAction returns true when an automation completed the execution.
-func PrepareAction(action Action) (bool, error) {
+// A LoadAction error of an automation fails the execution before that
+// automation prepares it.
+func PrepareAction(action Action, loaded LoadedActions) (bool, error) {
 	for _, automation := range automations {
 		if automation.PrepareAction == nil {
 			continue
 		}
+		result := loaded[automation.Name]
+		if result.err != nil {
+			return false, result.err
+		}
+		action.Loaded = result.value
 		handled, err := automation.PrepareAction(action)
 		if err != nil || handled {
 			return handled, err
