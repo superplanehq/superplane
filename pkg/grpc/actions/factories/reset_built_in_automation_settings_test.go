@@ -49,6 +49,7 @@ func TestResetBuiltInAutomationPreservesImplementationSettings(t *testing.T) {
 			agent.Concurrency = &yaml.ConcurrencySpec{Max: &tc.max, Key: "team"}
 			agent.Configuration["model"] = models.FormatHostedLLMModelKey(models.UsageProviderOpenRouter, "anthropic/claude-sonnet-4-6")
 			agent.Configuration["thinkingLevel"] = "low"
+			agent.Configuration["machineType"] = "organization-implementation"
 			agent.Configuration["additionalInstructions"] = tc.instructions
 			agent.Configuration["executionTimeoutSeconds"] = 0
 			agent.Configuration["disabledAgentResourceIds"] = []any{}
@@ -67,6 +68,7 @@ func TestResetBuiltInAutomationPreservesImplementationSettings(t *testing.T) {
 			assert.Equal(t, "runnerSuperPlane", agent.ComponentName())
 			assert.Equal(t, models.FormatHostedLLMModelKey(models.UsageProviderOpenRouter, "anthropic/claude-sonnet-4-6"), agent.Configuration["model"])
 			assert.Equal(t, "low", agent.Configuration["thinkingLevel"])
+			assert.Equal(t, "organization-implementation", agent.Configuration["machineType"])
 			assert.Equal(t, tc.instructions, agent.Configuration["additionalInstructions"])
 			assert.EqualValues(t, 0, agent.Configuration["executionTimeoutSeconds"])
 			assert.Equal(t, []any{}, agent.Configuration["disabledAgentResourceIds"])
@@ -203,6 +205,7 @@ func TestResetReviewRequestPreservesFallbackAndAgentSettings(t *testing.T) {
 				agent.Configuration["additionalInstructions"] = "Prefer the security owner. Keep {{ example }} literal."
 				agent.Configuration["model"] = models.FormatHostedLLMModelKey(models.UsageProviderOpenRouter, "anthropic/claude-sonnet-4-6")
 				agent.Configuration["thinkingLevel"] = "low"
+				agent.Configuration["machineType"] = "organization-review-request"
 				agent.Configuration["executionTimeoutSeconds"] = 0
 				agent.Configuration["steps"] = []any{map[string]any{"type": "prompt", "prompt": "Retired selection policy"}}
 			})
@@ -247,6 +250,7 @@ func TestResetReviewRequestPreservesFallbackAndAgentSettings(t *testing.T) {
 			require.Equal(t, instructions, agent.Configuration["additionalInstructions"])
 			require.Equal(t, models.FormatHostedLLMModelKey(models.UsageProviderOpenRouter, "anthropic/claude-sonnet-4-6"), agent.Configuration["model"])
 			require.Equal(t, "low", agent.Configuration["thinkingLevel"])
+			require.Equal(t, "organization-review-request", agent.Configuration["machineType"])
 			require.EqualValues(t, 0, agent.Configuration["executionTimeoutSeconds"])
 			trigger := findIntakeNode(version.Nodes, reviewRequestTriggerNodeID)
 			require.Equal(t, source.ID.String(), trigger.Configuration["app"])
@@ -311,6 +315,7 @@ func TestResetBuiltInVerificationSettings(t *testing.T) {
 							continue
 						}
 						node.Configuration["model"] = ""
+						node.Configuration["machineType"] = "organization-" + node.ID
 						node.Configuration["includeVisualEvidence"] = false
 						node.Configuration["executionTimeoutSeconds"] = 2400
 						if templateID == "risk-score" {
@@ -361,6 +366,7 @@ func TestResetBuiltInVerificationSettings(t *testing.T) {
 					value, present := node.Configuration["model"]
 					assert.True(t, present)
 					assert.Equal(t, "", value)
+					assert.Equal(t, "organization-"+node.ID, node.Configuration["machineType"])
 					assert.Equal(t, false, node.Configuration["includeVisualEvidence"])
 					assert.EqualValues(t, 2400, node.Configuration["executionTimeoutSeconds"])
 					if templateID == "risk-score" {
@@ -683,6 +689,7 @@ func TestResetPRFeedbackPreservesEachRunnerAndGeneralSettings(t *testing.T) {
 							node.Configuration["executionTimeoutSeconds"] = 1200 + i
 							node.Configuration["includeVisualEvidence"] = i%2 == 0
 							node.Configuration["model"] = model
+							node.Configuration["machineType"] = "organization-" + node.ID
 							expected[node.ID] = 1200 + i
 							evidence[node.ID] = i%2 == 0
 							for _, item := range node.Configuration["steps"].([]any) {
@@ -769,6 +776,7 @@ func TestResetPRFeedbackPreservesEachRunnerAndGeneralSettings(t *testing.T) {
 						assert.EqualValues(t, timeout, node.Configuration["executionTimeoutSeconds"])
 						assert.Equal(t, evidence[id], node.Configuration["includeVisualEvidence"])
 						assert.Equal(t, model, node.Configuration["model"])
+						assert.Equal(t, "organization-"+id, node.Configuration["machineType"])
 					}
 				})
 			}
@@ -841,6 +849,7 @@ func TestResetPlannerKeepsSettingsWhenGeneratedIDsChange(t *testing.T) {
 			model := models.FormatHostedLLMModelKey(models.UsageProviderOpenRouter, "anthropic/claude-sonnet-4-6")
 			agent.Configuration["model"] = model
 			agent.Configuration["thinkingLevel"] = "low"
+			agent.Configuration["machineType"] = "organization-planning"
 			agent.Configuration["executionTimeoutSeconds"] = 1250
 			agent.Configuration["disabledAgentResourceIds"] = []any{"skill-to-disable"}
 			for i := range doc.Spec.Edges {
@@ -860,6 +869,7 @@ func TestResetPlannerKeepsSettingsWhenGeneratedIDsChange(t *testing.T) {
 			assert.NotContains(t, liveCanvasJSON(t, canvas), "Retired planning prompt")
 			assert.Equal(t, model, current.Configuration["model"])
 			assert.Equal(t, "low", current.Configuration["thinkingLevel"])
+			assert.Equal(t, "organization-planning", current.Configuration["machineType"])
 			require.NotNil(t, current.Concurrency)
 			assert.Equal(t, max, current.Concurrency.EffectiveMax())
 			assert.Equal(t, "planning-team", current.Concurrency.Key)

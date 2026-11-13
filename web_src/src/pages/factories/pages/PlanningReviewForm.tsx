@@ -12,7 +12,7 @@ import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
 import { factoryAgentSkillEditorPath } from "../lib/factoryPagePaths";
 import { isMergeConfidenceSteps, newMergeConfidenceStep } from "./mergeConfidenceSteps";
 import type { PlanningReviewComponent, PlanningReviewDraft, PlanningReviewStep } from "./planningReviewMockup";
-import { planningReviewModelUsedField } from "./planningReviewRunnerFields";
+import { planningReviewModelUsedField, planningReviewRunnerFleetField } from "./planningReviewRunnerFields";
 import { disabledAgentResourceIds } from "./disabledAgentResourceIds";
 import { disabledAgentResourceTools, enabledAgentResourceTools } from "./PlanningReviewDisabledTools";
 import { PlanningReviewResourcesCard } from "./PlanningReviewResourcesCard";
@@ -180,6 +180,7 @@ function AgentPanel({
     onChange(next);
   };
   const { data: action } = useComponent(organizationId ?? "", component.component ?? "");
+  const runnerFleetField = planningReviewRunnerFleetField(action?.configuration);
   const modelUsedField = planningReviewModelUsedField(component.component, action?.configuration);
   const modelProvider = modelUsedField?.typeOptions?.hostedModel?.provider ?? "";
   const currentModel = typeof component.configuration.model === "string" ? component.configuration.model : "";
@@ -238,6 +239,23 @@ function AgentPanel({
     />
   ) : null;
 
+  const runnerFleetControl = (
+    <ConfigurationFieldRenderer
+      field={view !== "full" ? { ...runnerFleetField, description: "" } : runnerFleetField}
+      hideLabel={appearance === "fields"}
+      triggerClassName={
+        view !== "full" ? "h-8 w-full shadow-none" : appearance === "fields" ? FLAT_FIELD_CONTROL : undefined
+      }
+      value={component.configuration.machineType}
+      onChange={(value) => setConfigurationField("machineType", value)}
+      allValues={component.configuration}
+      organizationId={organizationId}
+      factoryId={factoryId}
+      fieldPath="machineType"
+      readOnly={disabled}
+    />
+  );
+
   const concurrencyControl = (
     <Input
       id={`planning-review-concurrency-max-${component.id}`}
@@ -270,6 +288,18 @@ function AgentPanel({
         }
         data-testid="planning-review-settings"
       >
+        {view !== "full" ? (
+          <div role="group" aria-label="Runner fleet">
+            <ImplementSettingRow label="Runner fleet" description="Select where this automation agent runs.">
+              <div className="w-full min-w-0">{runnerFleetControl}</div>
+            </ImplementSettingRow>
+          </div>
+        ) : (
+          <div className={appearance === "fields" ? "flex flex-col gap-2" : undefined}>
+            {appearance === "fields" ? <h3 className="workspace-section-title">Runner fleet</h3> : null}
+            {runnerFleetControl}
+          </div>
+        )}
         {view !== "full" && modelControl ? (
           <div role="group" aria-label={modelLabel ?? "Default model"}>
             <ImplementSettingRow

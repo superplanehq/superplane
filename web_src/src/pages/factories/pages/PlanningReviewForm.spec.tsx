@@ -9,6 +9,7 @@ import { useComponent } from "@/hooks/useComponentData";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useFactoryAgentResources } from "@/hooks/useFactoryAgentResources";
 import { useOrganizationWorkspaceUsage } from "@/hooks/useOrganizationWorkspaceUsage";
+import { useOrganizationRunnerFleets } from "@/hooks/useOrganizationRunnerFleets";
 import { useSelectableLLMModels } from "@/hooks/useSelectableLLMModels";
 import { FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
 import { HOSTED_MODEL_ALL_PROVIDERS } from "@/lib/hostedLLMModels";
@@ -35,6 +36,10 @@ vi.mock("@/hooks/useSelectableLLMModels", () => ({
 
 vi.mock("@/hooks/useOrganizationWorkspaceUsage", () => ({
   useOrganizationWorkspaceUsage: vi.fn(),
+}));
+
+vi.mock("@/hooks/useOrganizationRunnerFleets", () => ({
+  useOrganizationRunnerFleets: vi.fn(),
 }));
 
 vi.mock("@/hooks/useCanvasData", () => ({
@@ -165,6 +170,24 @@ describe("PlanningReviewForm model options", () => {
       data: { defaultHostedProvider: "openrouter", defaultHostedModel: "qwen/qwen3.7-max" },
       isLoading: false,
     } as unknown as ReturnType<typeof useOrganizationWorkspaceUsage>);
+    vi.mocked(useOrganizationRunnerFleets).mockReturnValue({
+      data: {
+        fleets: [
+          {
+            id: "e1-large-amd64",
+            scope: "installation",
+            spec: { operatingSystem: "linux", cpuMillicores: 8000, memoryMb: 32768 },
+          },
+          {
+            id: "team-runner",
+            scope: "organization",
+            spec: { operatingSystem: "linux", cpuMillicores: 4000, memoryMb: 16384 },
+          },
+        ],
+      },
+      isLoading: false,
+      isError: false,
+    } as unknown as ReturnType<typeof useOrganizationRunnerFleets>);
     vi.mocked(useExperimentalFeature).mockReturnValue({
       has: () => false,
       enabledExperimentalFeatures: [],
@@ -199,6 +222,27 @@ describe("PlanningReviewForm model options", () => {
     expect(control.querySelector(".text-muted-foreground")).toHaveTextContent("High");
   });
 
+  it("selects the runner fleet for the automation agent", async () => {
+    const onChange = vi.fn();
+    renderForm(PLANNING_REVIEW_DRAFT, { onChange });
+
+    const fleet = screen.getByTestId("field-machinetype-runner-fleet");
+    expect(fleet).toHaveTextContent("e1-large-amd64");
+
+    await userEvent.click(fleet);
+    await userEvent.click(screen.getByRole("option", { name: /team-runner/ }));
+
+    expect(onChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        components: [
+          expect.objectContaining({
+            configuration: expect.objectContaining({ machineType: "team-runner" }),
+          }),
+        ],
+      }),
+    );
+  });
+
   it("lists hosted SuperPlane models when the automation agent is Run SuperPlane Agent", async () => {
     const user = userEvent.setup();
     vi.mocked(useComponent).mockReturnValue({
@@ -231,7 +275,7 @@ describe("PlanningReviewForm model options", () => {
     const user = userEvent.setup();
     renderForm(PLANNING_REVIEW_DRAFT);
 
-    await user.click(screen.getByRole("combobox"));
+    await user.click(screen.getByTestId("field-model-select"));
     expect(screen.getByRole("option", { name: "Claude Sonnet" })).toBeInTheDocument();
     expect(screen.getByRole("option", { name: "Claude Opus" })).toBeInTheDocument();
     expect(screen.queryByTestId("field-model-hosted-model")).not.toBeInTheDocument();
