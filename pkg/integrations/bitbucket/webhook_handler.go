@@ -183,7 +183,7 @@ func setupForgeWebhook(client *Client, metadata Metadata, config WebhookConfigur
 	for _, event := range config.EventTypes {
 		switch event {
 		case pullRequestEventCreated, pullRequestEventUpdated, pullRequestEventFulfilled, pullRequestEventRejected,
-			waitBuildsStatusCreated, waitBuildsStatusUpdated, pullRequestCommentCreated:
+			waitBuildsStatusCreated, waitBuildsStatusUpdated, pullRequestCommentCreated, "repo:push", forgeReviewerStatusEvent:
 		default:
 			return nil, fmt.Errorf("Bitbucket Forge does not support event %q", event)
 		}
