@@ -267,6 +267,9 @@ func DeleteCanvasNodeWithResult(tx *gorm.DB, node CanvasNode) (DeleteCanvasNodeR
 		return DeleteCanvasNodeResult{}, err
 	}
 
+	if err := WakeOwnedPublications(tx, node.WorkflowID, node.NodeID); err != nil {
+		return DeleteCanvasNodeResult{}, err
+	}
 	err = DeleteIntegrationSubscriptionsForNodeInTransaction(tx, node.WorkflowID, node.NodeID)
 	if err != nil {
 		return DeleteCanvasNodeResult{}, err

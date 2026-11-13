@@ -182,3 +182,95 @@ func FindPublicationExecutionOutput(tx *gorm.DB, integrationID uuid.UUID, curren
 	result.Configuration, result.Output = execution.Configuration.Data(), event.Data.Data()
 	return result, nil
 }
+
+// FindPublicationNode exposes configuration, not automation-specific admission
+// policy. An attempt always reads its saved run version, never the latest graph.
+func FindPublicationNode(tx *gorm.DB, organizationID, integrationID, canvasID uuid.UUID, nodeID string, attempt uuid.UUID) (*core.PublicationNode, error) {
+	var canvas Canvas
+	err := tx.Where("id = ? AND organization_id = ?", canvasID, organizationID).First(&canvas).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if attempt == uuid.Nil {
+		var node CanvasNode
+		err := tx.Where("workflow_id = ? AND node_id = ? AND app_installation_id = ?", canvasID, nodeID, integrationID).First(&node).Error
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		if err != nil {
+			return nil, err
+		}
+		return &core.PublicationNode{Component: node.ComponentName(), Configuration: node.Configuration.Data()}, nil
+	}
+	var run CanvasRun
+	if err := tx.Joins("JOIN workflow_events ON workflow_events.run_id = workflow_runs.id").
+		Where("workflow_events.id = ? AND workflow_runs.workflow_id = ?", attempt, canvasID).First(&run).Error; err != nil {
+		return nil, err
+	}
+	version, err := FindCanvasVersionInTransaction(tx, canvasID, run.VersionID)
+	if err != nil {
+		return nil, err
+	}
+	for _, node := range version.Nodes {
+		if node.ID == nodeID && node.IntegrationID != nil && *node.IntegrationID == integrationID.String() {
+			return &core.PublicationNode{Component: node.ComponentName(), Configuration: node.Configuration}, nil
+		}
+	}
+	return nil, nil
+}
+
+// WakeOwnedPublications lets component hooks release removed resources, including
+// publications that stopped polling after the pull request closed.
+func WakeOwnedPublications(tx *gorm.DB, canvasID uuid.UUID, nodeID string) error {
+	query := tx.Where("record->>'ownerCanvasId' = ? AND record->>'hook' <> ''", canvasID.String())
+	if nodeID != "" {
+		query = query.Where("record->>'ownerNodeId' = ?", nodeID)
+	}
+	var publications []OrderedPublication
+	if err := query.Find(&publications).Error; err != nil {
+		return err
+	}
+	for _, publication := range publications {
+		if err := UpdateOrderedPublication(tx, publication.IntegrationID, publication.Key, func(record *core.OrderedPublication) error {
+			wake := time.Now()
+			record.WakeAt = &wake
+			return nil
+		}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// WakePublications schedules a bounded batch before deleted canvas data is
+// removed. The deletion timestamp makes progress durable across worker ticks
+// and allows another wakeup if a restored canvas is deleted again.
+func (c *Canvas) WakePublications(tx *gorm.DB, limit int) (bool, error) {
+	if limit <= 0 {
+		return false, fmt.Errorf("publication wake limit must be positive")
+	}
+	var publications []OrderedPublication
+	err := tx.Where("record->>'ownerCanvasId' = ? AND record->>'hook' <> ''", c.ID.String()).
+		Where("(record->>'ownerDeletedAt')::timestamptz IS DISTINCT FROM ?", c.DeletedAt.Time).
+		Order("integration_id, key").Limit(limit).Find(&publications).Error
+	if err != nil {
+		return false, err
+	}
+	for _, publication := range publications {
+		if err := UpdateOrderedPublication(tx, publication.IntegrationID, publication.Key, func(record *core.OrderedPublication) error {
+			if record.OwnerCanvasID != c.ID || (record.OwnerDeletedAt != nil && record.OwnerDeletedAt.Equal(c.DeletedAt.Time)) {
+				return core.ErrPublicationUnchanged
+			}
+			wake := time.Now()
+			record.WakeAt = &wake
+			record.OwnerDeletedAt = &c.DeletedAt.Time
+			return nil
+		}); err != nil {
+			return false, err
+		}
+	}
+	return len(publications) < limit, nil
+}

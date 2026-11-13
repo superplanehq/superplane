@@ -4742,13 +4742,15 @@ The Run Workflow component triggers a GitHub Actions workflow and waits for it t
 
 **Component key:** `github.setPullRequestReviewCheck`
 
-Publish a commit status and track required reviewers in any canvas. The action finishes after delivery. Approval monitoring continues through integration hooks.
+Publish a commit status and track required reviewers in any canvas. Pending selection finishes after durable registration. Other phases finish after delivery. Approval monitoring continues through integration hooks.
 
 Use pending_selection before selection, required_reviewers after Ensure Pull Request Reviewers, no_review for an explicit decision, selection_error for failed selection, or disabled to release the check.
 
 Supply the assessed SHA, status context, reason, and optional result URL. For required_reviewers, supply reviewer IDs and logins and reviewerRequestExecutionId from the recorded Ensure Pull Request Reviewers output. This component does not request reviewers again.
 
-Source Run ID and Attempt Root Event ID default to trusted current execution records. Cross-canvas sources require broadcast provenance. Persisted creation times and IDs determine order. Older attempts cannot replace newer state, including on the same commit. Disabled activations remain fenced. Activation Generation starts at 1. After disabling, use the next activation generation to enable the check again.
+An optional Activation Node ID binds participation to that check node in the admitted canvas version. Its live enabled state and activation generation must still match. Saving false releases owned checks durably.
+
+Source Run ID and Attempt Root Event ID default to trusted current execution records. Cross-canvas sources require broadcast provenance. Persisted creation times and IDs determine order. Older attempts cannot replace newer state, including on the same commit. Disabled activations remain fenced. Activation Generation is a positive saved version. After disabling, use a greater activation generation to enable the check again.
 
 All required reviewers must approve the assessed current commit. Comments do not change approval. Requested changes fail the check. Dismissed replacement reviews cannot revive older approvals. New heads stay pending for a new decision. Closed pull requests stop polling; reopening resumes monitoring.
 
