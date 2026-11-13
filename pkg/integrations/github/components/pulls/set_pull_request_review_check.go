@@ -23,6 +23,8 @@ const reviewCheckPrefix = "github.review-check/"
 type SetPullRequestReviewCheck struct{}
 
 type reviewCheckConfiguration struct {
+	ActivationNodeID           string             `json:"activationNodeId,omitempty" mapstructure:"activationNodeId"`
+	Enabled                    *bool              `json:"enabled,omitempty" mapstructure:"enabled"`
 	Repository                 string             `json:"repository" mapstructure:"repository"`
 	PullNumber                 any                `json:"pullNumber" mapstructure:"pullNumber"`
 	AssessedSHA                string             `json:"assessedSha" mapstructure:"assessedSha"`
@@ -62,13 +64,15 @@ func (*SetPullRequestReviewCheck) OutputChannels(any) []core.OutputChannel {
 	return []core.OutputChannel{core.DefaultOutputChannel}
 }
 func (*SetPullRequestReviewCheck) Documentation() string {
-	return `Publish a commit status and track required reviewers in any canvas. The action finishes after delivery. Approval monitoring continues through integration hooks.
+	return `Publish a commit status and track required reviewers in any canvas. Pending selection finishes after durable registration. Other phases finish after delivery. Approval monitoring continues through integration hooks.
 
 Use pending_selection before selection, required_reviewers after Ensure Pull Request Reviewers, no_review for an explicit decision, selection_error for failed selection, or disabled to release the check.
 
 Supply the assessed SHA, status context, reason, and optional result URL. For required_reviewers, supply reviewer IDs and logins and reviewerRequestExecutionId from the recorded Ensure Pull Request Reviewers output. This component does not request reviewers again.
 
-Source Run ID and Attempt Root Event ID default to trusted current execution records. Cross-canvas sources require broadcast provenance. Persisted creation times and IDs determine order. Older attempts cannot replace newer state, including on the same commit. Disabled activations remain fenced. Activation Generation starts at 1. After disabling, use the next activation generation to enable the check again.
+An optional Activation Node ID binds participation to that check node in the admitted canvas version. Its live enabled state and activation generation must still match. Saving false releases owned checks durably.
+
+Source Run ID and Attempt Root Event ID default to trusted current execution records. Cross-canvas sources require broadcast provenance. Persisted creation times and IDs determine order. Older attempts cannot replace newer state, including on the same commit. Disabled activations remain fenced. Activation Generation is a positive saved version. After disabling, use a greater activation generation to enable the check again.
 
 All required reviewers must approve the assessed current commit. Comments do not change approval. Requested changes fail the check. Dismissed replacement reviews cannot revive older approvals. New heads stay pending for a new decision. Closed pull requests stop polling; reopening resumes monitoring.
 
@@ -79,9 +83,11 @@ func (*SetPullRequestReviewCheck) Configuration() []configuration.Field {
 	reviewerField := reviewerConfigurationField()
 	reviewerField.Required = false
 	return append(fields,
+		configuration.Field{Name: "enabled", Label: "Enabled", Type: configuration.FieldTypeBool, Default: true, Description: "Disabling this node releases its managed checks."},
+		configuration.Field{Name: "activationNodeId", Label: "Activation node ID", Type: configuration.FieldTypeString, Description: "Optional check node whose saved enabled state and activation generation govern this action."},
 		configuration.Field{Name: "assessedSha", Label: "Assessed SHA", Type: configuration.FieldTypeString, Required: true},
 		configuration.Field{Name: "context", Label: "Status context", Type: configuration.FieldTypeString, Required: true, Description: "Stable status name for this requirement."},
-		configuration.Field{Name: "activationGeneration", Label: "Activation generation", Type: configuration.FieldTypeNumber, Default: 1, Description: "Start at 1. After disabling, use the next generation to enable this check again."},
+		configuration.Field{Name: "activationGeneration", Label: "Activation generation", Type: configuration.FieldTypeNumber, Default: 1, Description: "Use a positive saved generation. After disabling, select a greater generation to enable again."},
 		configuration.Field{Name: "sourceRunId", Label: "Source run ID", Type: configuration.FieldTypeString, Description: "Defaults to the broadcast source or current run."},
 		configuration.Field{Name: "attemptRootEventId", Label: "Attempt root event ID", Type: configuration.FieldTypeString, Description: "Defaults to the current run root event."},
 		configuration.Field{Name: "phase", Label: "Phase", Type: configuration.FieldTypeSelect, Required: true, TypeOptions: &configuration.TypeOptions{Select: &configuration.SelectTypeOptions{Options: []configuration.FieldOption{
@@ -95,14 +101,27 @@ func (*SetPullRequestReviewCheck) Configuration() []configuration.Field {
 }
 
 func (c *SetPullRequestReviewCheck) Setup(ctx core.SetupContext) error {
-	if err := (&ListPullRequestReviewCandidates{}).Setup(ctx); err != nil {
-		return err
+	var config struct {
+		Enabled          *bool  `mapstructure:"enabled"`
+		ActivationNodeID string `mapstructure:"activationNodeId"`
 	}
-	var config reviewCandidatesConfiguration
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return err
 	}
-	webhook, err := common.WorkspaceWebhookConfiguration(ctx.Factory, common.WebhookConfiguration{Repository: config.Repository, EventTypes: []string{"pull_request", "pull_request_review"}})
+	if config.ActivationNodeID != "" && config.ActivationNodeID != ctx.NodeID {
+		return nil
+	}
+	if config.Enabled != nil && !*config.Enabled {
+		return c.Cleanup(ctx)
+	}
+	if err := (&ListPullRequestReviewCandidates{}).Setup(ctx); err != nil {
+		return err
+	}
+	var candidatesConfig reviewCandidatesConfiguration
+	if err := mapstructure.Decode(ctx.Configuration, &candidatesConfig); err != nil {
+		return err
+	}
+	webhook, err := common.WorkspaceWebhookConfiguration(ctx.Factory, common.WebhookConfiguration{Repository: candidatesConfig.Repository, EventTypes: []string{"pull_request", "pull_request_review"}})
 	if err != nil {
 		return err
 	}
@@ -110,6 +129,33 @@ func (c *SetPullRequestReviewCheck) Setup(ctx core.SetupContext) error {
 }
 
 func (*SetPullRequestReviewCheck) Execute(ctx core.ExecutionContext) error {
+	var scopeConfig reviewCheckConfiguration
+	if err := mapstructure.Decode(ctx.Configuration, &scopeConfig); err != nil {
+		return err
+	}
+	if scopeConfig.ActivationNodeID != "" {
+		if ctx.Publications == nil {
+			return fmt.Errorf("publication context is required")
+		}
+		order, err := ctx.Publications.ResolveOrder(uuid.Nil, uuid.Nil)
+		if err != nil {
+			return err
+		}
+		generation, eligible, err := reviewCheckActivation(ctx.Publications, uuid.MustParse(ctx.WorkflowID), scopeConfig.ActivationNodeID, order.AttemptRootEventID)
+		if err != nil {
+			return err
+		}
+		if !eligible {
+			return emitReviewCheck(ctx.ExecutionState, "skipped", nil, nil)
+		}
+		raw, err := configurationWithActivation(ctx.Configuration, generation)
+		if err != nil {
+			return err
+		}
+		ctx.Configuration = raw
+	} else if scopeConfig.Enabled != nil && !*scopeConfig.Enabled {
+		return emitReviewCheck(ctx.ExecutionState, "skipped", nil, nil)
+	}
 	config, err := decodeReviewCheck(ctx.Configuration)
 	if err != nil {
 		return err
@@ -138,6 +184,15 @@ func (*SetPullRequestReviewCheck) Execute(ctx core.ExecutionContext) error {
 	if config.Phase == "required_reviewers" {
 		if err := validateRecordedReviewers(ctx.Publications, config); err != nil {
 			return err
+		}
+	}
+	if config.ActivationNodeID != "" {
+		generation, eligible, err := reviewCheckActivation(ctx.Publications, uuid.MustParse(ctx.WorkflowID), config.ActivationNodeID, order.AttemptRootEventID)
+		if err != nil {
+			return err
+		}
+		if !eligible || generation != config.ActivationGeneration {
+			return emitReviewCheck(ctx.ExecutionState, "superseded", nil, nil)
 		}
 	}
 	key := config.key()
@@ -175,6 +230,9 @@ func (*SetPullRequestReviewCheck) Execute(ctx core.ExecutionContext) error {
 		record.Order = order
 		record.Disabled, record.ActivationGeneration = config.Phase == "disabled", config.ActivationGeneration
 		record.OwnerCanvasID, record.OwnerNodeID = uuid.MustParse(ctx.WorkflowID), ctx.NodeID
+		if config.ActivationNodeID != "" {
+			record.OwnerNodeID = config.ActivationNodeID
+		}
 		// A replacement must wait for an already claimed status write to finish.
 		record.Payload, err = json.Marshal(reviewCheckState{Configuration: config, Delivery: previous.Delivery})
 		if err != nil {
@@ -190,6 +248,9 @@ func (*SetPullRequestReviewCheck) Execute(ctx core.ExecutionContext) error {
 	}
 	if status == "superseded" {
 		return emitReviewCheck(ctx.ExecutionState, status, nil, nil)
+	}
+	if config.Phase == "pending_selection" {
+		return emitReviewCheck(ctx.ExecutionState, "registered", nil, nil)
 	}
 	if err := ctx.Metadata.Set(map[string]any{"key": key, "generation": generation}); err != nil {
 		return err
@@ -246,7 +307,16 @@ func (*SetPullRequestReviewCheck) HandleWebhook(ctx core.WebhookRequestContext) 
 	return http.StatusOK, nil, nil
 }
 func (*SetPullRequestReviewCheck) Cancel(core.ExecutionContext) error { return nil }
-func (*SetPullRequestReviewCheck) Cleanup(core.SetupContext) error    { return nil }
+func (*SetPullRequestReviewCheck) Cleanup(ctx core.SetupContext) error {
+	if ctx.WorkflowID == "" || ctx.Integration == nil {
+		return nil
+	}
+	store, err := reviewCheckStore(ctx.Integration)
+	if err != nil {
+		return err
+	}
+	return releaseReviewChecks(store, uuid.MustParse(ctx.WorkflowID), ctx.NodeID)
+}
 func (*SetPullRequestReviewCheck) ExampleOutput() map[string]any {
 	return map[string]any{"type": "github.pullRequestReviewCheck", "timestamp": "2026-11-13T09:00:00Z", "data": map[string]any{"status": "applied", "state": "pending", "sha": "abc", "phase": "required_reviewers", "context": "team/review", "generation": 2, "activationGeneration": 1, "sourceRunId": "source-run-id", "attemptRootEventId": "attempt-root-event-id"}}
 }
