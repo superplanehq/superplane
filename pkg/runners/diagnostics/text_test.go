@@ -110,3 +110,49 @@ func TestSanitizeQuotedCredentials(t *testing.T) {
 		}
 	}
 }
+
+func TestSanitizeCookieCredentials(t *testing.T) {
+	for _, tc := range []struct {
+		name, text, expected string
+	}{
+		{
+			name:     "request header with multiple cookies",
+			text:     "HTTP 401\n> Cookie: session=private-value; identity=another-private-value\nRetry failed",
+			expected: "HTTP 401\n> Cookie: [REDACTED]\nRetry failed",
+		},
+		{
+			name:     "response header with attributes",
+			text:     "< sEt-CoOkIe: session=private-value; Path=/; HttpOnly; SameSite=Lax\r\nHTTP 401",
+			expected: "< sEt-CoOkIe: [REDACTED]\nHTTP 401",
+		},
+		{
+			name:     "serialized request header",
+			text:     `{"Cookie":"session=private-value; identity=another-private-value","status":401}`,
+			expected: `{"Cookie":"[REDACTED]","status":401}`,
+		},
+		{
+			name:     "serialized response header with escaped value",
+			text:     `{"set-cookie":"session=private\"value; Path=/","status":401}`,
+			expected: `{"set-cookie":"[REDACTED]","status":401}`,
+		},
+		{
+			name:     "serialized response header array",
+			text:     `{"set-cookie":["session=private]value; Path=/","identity=another-private-value"],"status":401}`,
+			expected: `{"set-cookie":["[REDACTED]"],"status":401}`,
+		},
+		{
+			name:     "header inside JSON message",
+			text:     `{"message":"Cookie: session=private-value; identity=another-private-value\r\nHTTP 401"}`,
+			expected: `{"message":"Cookie: [REDACTED]\r\nHTTP 401"}`,
+		},
+		{
+			name:     "ordinary cookie setting",
+			text:     "cookie_count=2\nHTTP 401",
+			expected: "cookie_count=2\nHTTP 401",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.expected, Sanitize(tc.text, nil, 4096))
+		})
+	}
+}
