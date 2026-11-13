@@ -18,7 +18,7 @@ export type ColumnAutomationApp = {
 
 export function customColumnAutomations(
   apps: ColumnAutomationApp[],
-  columnKey: "backlog" | "verify" | "done",
+  columnKey: "backlog" | "implement" | "verify" | "done",
   workOrders: FactoriesWorkOrder[],
   skipIds: Set<string>,
   runningCountForApp: (appId: string | undefined, orders: FactoriesWorkOrder[]) => number,

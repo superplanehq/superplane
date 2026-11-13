@@ -175,7 +175,10 @@ export function catalogForColumn(
       options?.vcsProvider === "bitbucket"
         ? { ...PR_CLOSURE_ENTRY, iconSrc: bitbucketIcon, iconAlt: "Bitbucket" }
         : PR_CLOSURE_ENTRY;
-    return allowCustom ? [closureEntry, EVENT_CUSTOM_ENTRY] : [closureEntry];
+    return allowCustom ? [closureEntry, CUSTOM_AUTOMATION_ENTRY] : [closureEntry];
+  }
+  if (key === "phase-0") {
+    return allowCustom ? [CUSTOM_AUTOMATION_ENTRY] : [AGENT_STEP_ENTRY];
   }
   return allowCustom ? [AGENT_STEP_ENTRY, CUSTOM_ENTRY] : [AGENT_STEP_ENTRY];
 }

@@ -17,7 +17,27 @@ const CUSTOM_AUTOMATION_START_MODES: Record<CustomAutomationMode, FactoryCustomA
   scheduled: "START_MODE_SCHEDULED",
 };
 export type CustomAutomationSchedule = { cronExpression: string; utcOffset: number };
-export type CustomAutomationColumn = "backlog" | "verify";
+export type CustomAutomationColumn = "backlog" | "implement" | "verify" | "done";
+
+export function customAutomationColumn(value: string | null | undefined): CustomAutomationColumn {
+  if (value === "backlog" || value === "implement" || value === "done" || value === "verify") {
+    return value;
+  }
+  return "verify";
+}
+
+export function customAutomationColumnLabel(column: CustomAutomationColumn): string {
+  switch (column) {
+    case "backlog":
+      return "Backlog";
+    case "implement":
+      return "Implement";
+    case "done":
+      return "Done";
+    default:
+      return "Verify";
+  }
+}
 export type CustomAutomationTrigger = {
   id: string;
   mode: CustomAutomationMode;
@@ -100,12 +120,15 @@ export function customAutomationModeCopy(
   }
   if (mode === "automatic") {
     return {
-      trigger: columnKey === "backlog" ? "When a task enters Backlog" : "On Verify and new commits",
+      trigger:
+        columnKey === "verify"
+          ? "On Verify and new commits"
+          : `When a task enters ${customAutomationColumnLabel(columnKey)}`,
       action: "Run automation automatically",
     };
   }
   return {
-    trigger: columnKey === "backlog" ? "Manual start on a Backlog task" : "Manual start on a Verify task",
+    trigger: `Manual start on a ${customAutomationColumnLabel(columnKey)} task`,
     action: "Run automation on demand",
   };
 }

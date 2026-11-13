@@ -755,6 +755,19 @@ func (c *FactoryContext) UpdateWorkOrderStatus(params core.UpdateWorkOrderStatus
 	if !changed {
 		return workOrderToCore(order), false, nil
 	}
+	if order.State == models.FactoryWorkOrderStateClosed {
+		factoryModel, findErr := models.FindFactory(c.tx, order.OrganizationID, order.FactoryID)
+		if findErr != nil {
+			log.WithError(findErr).Warnf("failed to load factory for Done custom automation on task %s", order.ID)
+		} else {
+			events, emitErr := EmitAutomaticTaskColumnCustomAutomations(c.tx, factoryModel, order, models.CanvasColumnKeyDone)
+			if emitErr != nil {
+				log.WithError(emitErr).Warnf("failed to start Done custom automation for task %s", order.ID)
+			} else if c.onNewEvents != nil {
+				c.onNewEvents(events)
+			}
+		}
+	}
 
 	c.notifyWorkOrderUpdated(order.FactoryID, order.ID, factory.EventTypeOrderStatusUpdated)
 	c.notifyWorkOrderNotification(messages.FactoryWorkOrderNotificationMessage{
