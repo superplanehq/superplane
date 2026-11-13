@@ -59,6 +59,10 @@ func (m *memoryPublications) Update(key string, apply func(*core.OrderedPublicat
 	return nil
 }
 func (m *memoryPublications) AttemptFinished(uuid.UUID) (bool, error) { return true, nil }
+func (m *memoryPublications) AttemptEnded(uuid.UUID) (bool, error)    { return true, nil }
+func (m *memoryPublications) OwnerStatus(uuid.UUID, string) (core.PublicationOwnerStatus, error) {
+	return core.PublicationOwnerStatus{Available: true}, nil
+}
 func (m *memoryPublications) NodeSnapshot(uuid.UUID, string, uuid.UUID) (*core.PublicationNode, error) {
 	return nil, nil
 }
