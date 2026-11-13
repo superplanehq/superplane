@@ -123,3 +123,15 @@ func decodeOrderedWriteState(raw json.RawMessage) (orderedWriteState, error) {
 	err := json.Unmarshal(raw, &state)
 	return state, err
 }
+
+// BeginPublicationLease claims a lease on a key that has no ordered owner.
+// Use it to serialize a provider read and write that several keys share.
+func BeginPublicationLease(store PublicationStore, key string, duration time.Duration) (PublicationLease, error) {
+	lease, _, err := BeginOrderedWrite(store, OrderedWrite{Key: key}, duration)
+	return lease, err
+}
+
+// FinishPublicationLease releases a lease from BeginPublicationLease.
+func FinishPublicationLease(store PublicationStore, key string, lease PublicationLease) error {
+	return FinishOrderedWrite(store, OrderedWrite{Key: key}, lease, nil)
+}

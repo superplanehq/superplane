@@ -2,6 +2,7 @@ package pulls
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -15,9 +16,14 @@ type fakeCommentClient struct {
 	comments map[int64]string
 	edited   []int64
 	created  int
+	headSHA  string
+	onList   func()
 }
 
 func (c *fakeCommentClient) Read(context.Context, string, int64) (prbody.Description, error) {
+	if c.headSHA != "" {
+		return prbody.Description{Open: true, HeadSHA: c.headSHA}, nil
+	}
 	return prbody.Description{Open: true, HeadSHA: "abc"}, nil
 }
 func (c *fakeCommentClient) Get(_ context.Context, _ string, id int64) (*ManagedComment, error) {
@@ -28,6 +34,9 @@ func (c *fakeCommentClient) Get(_ context.Context, _ string, id int64) (*Managed
 	return &ManagedComment{ID: id, Body: body}, nil
 }
 func (c *fakeCommentClient) List(context.Context, string, int64) ([]ManagedComment, error) {
+	if c.onList != nil {
+		c.onList()
+	}
 	comments := []ManagedComment{}
 	for id := int64(1); id <= int64(len(c.comments))+1; id++ {
 		if body, ok := c.comments[id]; ok {
@@ -85,5 +94,41 @@ func TestPublishCommentEditsOnlyMarkedComments(t *testing.T) {
 			require.Equal(t, outcome.CommentID, boundary.finished)
 			require.Equal(t, marker+"\nNew findings", client.comments[outcome.CommentID])
 		})
+	}
+}
+
+// The comment lookup can read many pages. A change during the lookup must
+// stop the create or edit.
+func TestPublishCommentRechecksAfterLookup(t *testing.T) {
+	canvas := uuid.New()
+	config := PullRequestCommentConfiguration{Repository: "acme/app", PullNumber: "42", CommentKey: "review-request", Body: "New findings", ExpectedHeadSHA: "abc"}
+	marker := config.Marker(canvas)
+	for _, scenario := range []string{"publication stopped", "commit pushed"} {
+		for _, existing := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/existing=%t", scenario, existing), func(t *testing.T) {
+				client := &fakeCommentClient{comments: map[int64]string{}}
+				if existing {
+					client.comments[1] = marker + "\nOld findings"
+				}
+				active := true
+				client.onList = func() {
+					if scenario == "publication stopped" {
+						active = false
+						return
+					}
+					client.headSHA = "def"
+				}
+				boundary := &fakeCommentBoundary{}
+				outcome, err := PublishComment(t.Context(), client, config, marker, func() (bool, error) { return active, nil }, boundary)
+				require.NoError(t, err)
+				require.Equal(t, prbody.StatusSkipped, outcome.Status)
+				require.Zero(t, client.created)
+				require.Empty(t, client.edited)
+				if existing {
+					require.Equal(t, marker+"\nOld findings", client.comments[1])
+					require.Equal(t, int64(1), boundary.finished)
+				}
+			})
+		}
 	}
 }

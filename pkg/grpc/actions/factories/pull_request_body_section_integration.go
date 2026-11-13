@@ -99,10 +99,11 @@ func (a *bodySectionActionAttempt) publish(ctx context.Context, db *gorm.DB, dep
 	if err != nil {
 		return a.publicationError(err)
 	}
+	publications := a.publications(db)
 	if a.ordered() {
-		client = prbody.OrderedClient(client, a.publications(db), *a.state.Publication)
+		client = prbody.OrderedClient(client, publications, *a.state.Publication)
 	}
-	outcome, err := prbody.Publish(ctx, client, a.integrationConfiguration, eligible)
+	outcome, err := prbody.PublishSerialized(ctx, client, publications, a.integrationConfiguration, eligible)
 	if err != nil {
 		return a.publicationError(err)
 	}

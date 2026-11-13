@@ -3,6 +3,7 @@ package prbody
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/superplanehq/superplane/pkg/core"
@@ -99,6 +100,30 @@ func HandleHook(ctx core.ActionHookContext, client Client) error {
 		return err
 	}
 	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, PayloadType, []any{outcome})
+}
+
+// DescriptionKey is shared by every section of one pull request description.
+func (c Configuration) DescriptionKey() string {
+	return fmt.Sprintf("pull-request-description/%s/%s", strings.ToLower(c.Repository), c.PullNumber)
+}
+
+// PublishSerialized holds the description lease from the read to the write.
+// Writers of different sections build their body from the same description,
+// so without the lease the last write removes the update of the other section.
+// It returns core.ErrPublicationBusy while another section write is in progress.
+func PublishSerialized(ctx context.Context, client Client, store core.PublicationStore, config Configuration, eligible func() (bool, error)) (Outcome, error) {
+	key := config.DescriptionKey()
+	lease, err := core.BeginPublicationLease(store, key, orderedWriteLease)
+	if err != nil {
+		return Outcome{}, err
+	}
+	publishCtx, cancel := context.WithDeadline(ctx, lease.ExpiresAt.Add(-orderedWriteMargin))
+	defer cancel()
+	outcome, err := Publish(publishCtx, client, config, eligible)
+	if releaseErr := core.FinishPublicationLease(store, key, lease); releaseErr != nil && err == nil {
+		return outcome, releaseErr
+	}
+	return outcome, err
 }
 
 const orderedWriteLease = time.Minute

@@ -234,9 +234,10 @@ type CommentOutcome struct {
 	CommentID int64 `json:"commentId,omitempty"`
 }
 
-// PublishComment rechecks eligibility after the pull request read and claims the
-// boundary before it looks up the managed comment, so concurrent attempts cannot
-// create duplicates or overwrite newer content.
+// PublishComment claims the boundary before it looks up the managed comment, so
+// concurrent attempts cannot create duplicates or overwrite newer content. It
+// checks the pull request and eligibility before the boundary and again after
+// the lookup, immediately before the create or edit.
 func PublishComment(ctx context.Context, client CommentClient, config PullRequestCommentConfiguration, marker string, eligible func() (bool, error), boundary CommentBoundary) (CommentOutcome, error) {
 	if err := config.Validate(); err != nil {
 		return CommentOutcome{}, err
@@ -252,16 +253,12 @@ func PublishComment(ctx context.Context, client CommentClient, config PullReques
 	if err != nil || !active {
 		return CommentOutcome{Outcome: prbody.Skipped("Publication is disabled, cancelled, or superseded.")}, err
 	}
-	latest, err := client.Read(ctx, config.Repository, number)
-	if err != nil {
-		return CommentOutcome{}, err
+	publishable := func(ctx context.Context) (*prbody.Outcome, error) {
+		return commentPublishable(ctx, client, config, number, eligible)
 	}
-	if !latest.Open || (config.ExpectedHeadSHA != "" && latest.HeadSHA != config.ExpectedHeadSHA) {
-		return CommentOutcome{Outcome: prbody.Skipped("Pull request is closed or its expected commit changed.")}, nil
-	}
-	active, err = eligible()
-	if err != nil || !active {
-		return CommentOutcome{Outcome: prbody.Skipped("Publication was disabled, cancelled, or superseded.")}, err
+	skipped, err := publishable(ctx)
+	if err != nil || skipped != nil {
+		return skippedComment(skipped, 0), err
 	}
 	savedID, deadline, err := boundary.Begin()
 	if errors.Is(err, core.ErrPublicationSuperseded) {
@@ -272,17 +269,55 @@ func PublishComment(ctx context.Context, client CommentClient, config PullReques
 	}
 	writeCtx, cancel := context.WithDeadline(ctx, deadline)
 	defer cancel()
-	outcome, err := upsertManagedComment(writeCtx, client, config.Repository, number, marker, savedID, marker+"\n"+config.Body)
+	outcome, err := upsertManagedComment(writeCtx, client, config.Repository, number, marker, savedID, marker+"\n"+config.Body, publishable)
 	if finishErr := boundary.Finish(outcome.CommentID); finishErr != nil && err == nil {
 		err = finishErr
 	}
 	return outcome, err
 }
 
-func upsertManagedComment(ctx context.Context, client CommentClient, repository string, number int64, marker string, savedID int64, body string) (CommentOutcome, error) {
+// commentPublishable reads the pull request and rechecks eligibility. It
+// returns the skipped outcome when the comment must not be written.
+func commentPublishable(ctx context.Context, client CommentClient, config PullRequestCommentConfiguration, number int64, eligible func() (bool, error)) (*prbody.Outcome, error) {
+	latest, err := client.Read(ctx, config.Repository, number)
+	if err != nil {
+		return nil, err
+	}
+	if !latest.Open || (config.ExpectedHeadSHA != "" && latest.HeadSHA != config.ExpectedHeadSHA) {
+		skipped := prbody.Skipped("Pull request is closed or its expected commit changed.")
+		return &skipped, nil
+	}
+	active, err := eligible()
+	if err != nil {
+		return nil, err
+	}
+	if !active {
+		skipped := prbody.Skipped("Publication was disabled, cancelled, or superseded.")
+		return &skipped, nil
+	}
+	return nil, nil
+}
+
+func skippedComment(skipped *prbody.Outcome, commentID int64) CommentOutcome {
+	if skipped == nil {
+		return CommentOutcome{CommentID: commentID}
+	}
+	return CommentOutcome{Outcome: *skipped, CommentID: commentID}
+}
+
+func upsertManagedComment(ctx context.Context, client CommentClient, repository string, number int64, marker string, savedID int64, body string, publishable func(context.Context) (*prbody.Outcome, error)) (CommentOutcome, error) {
 	existing, err := findManagedComment(ctx, client, repository, number, marker, savedID)
 	if err != nil {
 		return CommentOutcome{CommentID: savedID}, err
+	}
+	knownID := savedID
+	if existing != nil {
+		knownID = existing.ID
+	}
+	// The lookup can read many pages. Settings, the run, or the commit can change meanwhile.
+	skipped, err := publishable(ctx)
+	if err != nil || skipped != nil {
+		return skippedComment(skipped, knownID), err
 	}
 	if existing == nil {
 		id, err := client.Create(ctx, repository, number, body)
