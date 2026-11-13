@@ -285,6 +285,7 @@ func HandOffWorkOrder(
 			dispatched.fromState,
 			dispatched.startedSteps,
 		)
+		startImplementColumnAutomations(db, dispatched.logger, dispatched.factory, dispatched.order, implementIndex)
 	} else if !deferred {
 		trackedPRs, err = publishVerificationHandOff(ctx, deps, db, factory, order)
 		if err != nil {

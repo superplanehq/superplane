@@ -239,6 +239,8 @@ func TruncateTables() error {
 			installation_licenses,
 			installation_license_keys,
 			installation_license_revocations,
+			installation_license_activations,
+			organization_enterprise_features,
 			workflows,
 			workflow_runs,
 			workflow_nodes,

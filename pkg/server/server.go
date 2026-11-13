@@ -432,6 +432,7 @@ func buildGRPCServices(
 		JWTSigner:        jwtSigner,
 		Entitlements:     licenseService,
 		Enterprise:       features,
+		License:          licenseService,
 	})
 }
 
@@ -942,6 +943,8 @@ func startLicenseService(encryptor crypto.Encryptor) *licensing.Service {
 		source,
 		licensing.WithKeySync(keySync),
 		licensing.WithRevocationSync(revocations),
+		licensing.WithLifecycleHandler(enterprise.NewLicenseLifecycle(database.Conn)),
+		licensing.WithGrantLookup(enterprise.DatabaseGrantLookup{}),
 	)
 	service.Start(context.Background())
 	return service

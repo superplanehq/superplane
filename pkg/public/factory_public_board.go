@@ -338,11 +338,15 @@ func assemblePublicBoard(
 		if title == "" {
 			title = "Step"
 		}
+		automations := []publicAutomation{agentStepAutomation(index, title)}
+		if index == 0 {
+			automations = append(automations, customColumnAutomations(canvases, models.CanvasColumnKeyImplement, map[uuid.UUID]struct{}{})...)
+		}
 		columns = append(columns, publicColumn{
 			Key:         key,
 			Title:       title,
 			Color:       line.ColumnColorsValue()[key],
-			Automations: []publicAutomation{agentStepAutomation(index, title)},
+			Automations: automations,
 			Cards:       []publicCard{},
 		})
 	}

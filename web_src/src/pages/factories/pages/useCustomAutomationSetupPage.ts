@@ -8,12 +8,14 @@ import { useEffect, useMemo, useState } from "react";
 
 import type { FactoriesFactory } from "@/api-client";
 import {
+  customAutomationColumn,
   customAutomationDraft,
   customAutomationSettingsForTriggers,
   customAutomationTriggers,
   DEFAULT_CUSTOM_AUTOMATION_ICON,
   newCustomAutomationTrigger,
   workspaceAgentFromOnboarding,
+  type CustomAutomationColumn,
   type CustomAutomationTrigger,
 } from "../lib/customAutomation";
 import { factoryHomePath, factoryLineDetailPath, firstFactoryLineId } from "../lib/factoryPagePaths";
@@ -26,13 +28,15 @@ export function useCustomAutomationSetupPage(args: {
   factory?: FactoriesFactory;
   lineId?: string;
   automationId?: string;
-  columnKey?: "backlog" | "verify";
+  columnKey?: "backlog" | "implement" | "verify" | "done";
 }) {
   const described = useFactoryCustomAutomation(args.organizationId, args.factoryId, args.automationId);
   const create = useCreateFactoryCustomAutomation(args.organizationId, args.factoryId);
   const update = useUpdateFactoryCustomAutomation(args.organizationId, args.factoryId, args.automationId ?? "");
   const [name, setName] = useState("Custom automation");
-  const [triggers, setTriggers] = useState<CustomAutomationTrigger[]>(() => [newCustomAutomationTrigger()]);
+  const [triggers, setTriggers] = useState<CustomAutomationTrigger[]>(() => [
+    defaultCustomAutomationTrigger(args.columnKey),
+  ]);
   const [icon, setIcon] = useState(DEFAULT_CUSTOM_AUTOMATION_ICON);
   const agentHarness = args.factory?.onboarding?.agentHarness;
   const [draft, setDraft] = useState<PlanningReviewDraft>(() =>
@@ -40,23 +44,18 @@ export function useCustomAutomationSetupPage(args: {
   );
   const [saveError, setSaveError] = useState("");
   const automation = described.data;
-  const columnKey =
-    automation?.automation?.columnKey === "backlog"
-      ? "backlog"
-      : args.automationId
-        ? "verify"
-        : (args.columnKey ?? "verify");
+  const columnKey = customAutomationColumn(automation?.automation?.columnKey ?? args.columnKey);
 
   useEffect(() => {
     if (args.automationId) {
       return;
     }
     setName("Custom automation");
-    setTriggers([newCustomAutomationTrigger()]);
+    setTriggers([defaultCustomAutomationTrigger(args.columnKey)]);
     setIcon(DEFAULT_CUSTOM_AUTOMATION_ICON);
     setDraft(customAutomationDraft({ settings: { agent: workspaceAgentFromOnboarding({ agentHarness }) } }));
     setSaveError("");
-  }, [args.automationId, agentHarness]);
+  }, [args.automationId, args.columnKey, agentHarness]);
 
   useEffect(() => {
     if (!automation) {
@@ -126,6 +125,10 @@ export function useCustomAutomationSetupPage(args: {
     saving: create.isPending || update.isPending,
     save,
   };
+}
+
+function defaultCustomAutomationTrigger(column: CustomAutomationColumn | undefined): CustomAutomationTrigger {
+  return newCustomAutomationTrigger(column && column !== "verify" ? "automatic" : "manual");
 }
 
 function saveFallback(editing: boolean): string {

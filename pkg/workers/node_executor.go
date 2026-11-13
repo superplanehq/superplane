@@ -533,11 +533,12 @@ func (w *NodeExecutor) executeActionNode(
 		Secrets:        contexts.NewSecretsContext(tx, w.registry, workflow.OrganizationID, w.encryptor),
 		CanvasMemory: contexts.NewCanvasMemoryContext(tx, execution.WorkflowID).
 			WithChangeCallback(func() { onMemoryChanged(execution.WorkflowID) }),
-		Webhook:     contexts.NewNodeWebhookContext(context.Background(), tx, w.encryptor, node, w.webhookBaseURL),
-		Expressions: contexts.NewExpressionContext(builder),
-		OIDC:        w.oidcProvider,
-		Apps:        contexts.NewAppExecutionContext(tx, workflow, node, execution),
-		Runs:        contexts.NewRunExecutionContext(tx, workflow, node, execution).WithPendingRunCreated(onPendingRunCreated),
+		Webhook:      contexts.NewNodeWebhookContext(context.Background(), tx, w.encryptor, node, w.webhookBaseURL),
+		Expressions:  contexts.NewExpressionContext(builder),
+		OIDC:         w.oidcProvider,
+		Apps:         contexts.NewAppExecutionContext(tx, workflow, node, execution),
+		Publications: contexts.NewPublicationContext(tx, workflow.OrganizationID, node, execution),
+		Runs:         contexts.NewRunExecutionContext(tx, workflow, node, execution).WithPendingRunCreated(onPendingRunCreated),
 		Factory: contexts.NewFactoryContext(tx, workflow, execution).
 			WithNewEvents(onNewEvents).
 			WithWorkOrderUpdated(onFactoryWorkOrderUpdated).
@@ -609,7 +610,11 @@ func (w *NodeExecutor) executeActionNode(
 			}
 		}
 	}
-	if err := action.Execute(ctx); err != nil {
+	executeErr := contexts.PrepareFactoryAgentContext(tx, &ctx, componentName)
+	if executeErr == nil {
+		executeErr = action.Execute(ctx)
+	}
+	if err := executeErr; err != nil {
 		var busy *models.CodexConnectionBusyError
 		if errors.As(err, &busy) {
 			// Keep the execution pending while ChatGPT sign-in holds the subscription.

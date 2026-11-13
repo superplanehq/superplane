@@ -204,7 +204,8 @@ CREATE TABLE public.app_messages (
     canvas_id uuid NOT NULL,
     node_id character varying(128) NOT NULL,
     payload jsonb NOT NULL,
-    created_at timestamp without time zone DEFAULT now() NOT NULL
+    created_at timestamp without time zone DEFAULT now() NOT NULL,
+    source_run_id uuid
 );
 
 
@@ -1147,6 +1148,45 @@ CREATE TABLE public.installation_github_apps (
 
 
 --
+-- Name: installation_license_activations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.installation_license_activations (
+    id bigint NOT NULL,
+    license_id uuid NOT NULL,
+    license_features text[] NOT NULL,
+    activated_at timestamp with time zone DEFAULT now() NOT NULL,
+    organization_count integer NOT NULL,
+    auto_granted boolean DEFAULT false NOT NULL,
+    deactivated_at timestamp with time zone,
+    deactivation_reason text,
+    removed_grants jsonb DEFAULT '[]'::jsonb NOT NULL,
+    CONSTRAINT installation_license_activations_closed_check CHECK (((deactivated_at IS NULL) = (deactivation_reason IS NULL))),
+    CONSTRAINT installation_license_activations_org_count_check CHECK ((organization_count >= 0)),
+    CONSTRAINT installation_license_activations_reason_check CHECK (((deactivation_reason IS NULL) OR (deactivation_reason = ANY (ARRAY['expired'::text, 'revoked'::text, 'removed'::text, 'replaced'::text]))))
+);
+
+
+--
+-- Name: installation_license_activations_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.installation_license_activations_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: installation_license_activations_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.installation_license_activations_id_seq OWNED BY public.installation_license_activations.id;
+
+
+--
 -- Name: installation_license_keys; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1397,6 +1437,21 @@ CREATE TABLE public.organization_byok_model_allowlists (
 
 
 --
+-- Name: organization_enterprise_features; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.organization_enterprise_features (
+    organization_id uuid NOT NULL,
+    feature_key text NOT NULL,
+    granted_by uuid,
+    source text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT organization_enterprise_features_key_check CHECK ((feature_key ~ '^[a-z][a-z0-9_]*$'::text)),
+    CONSTRAINT organization_enterprise_features_source_check CHECK ((source = ANY (ARRAY['admin'::text, 'auto_single_org'::text])))
+);
+
+
+--
 -- Name: organization_feature_grants; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1611,6 +1666,19 @@ CREATE TABLE public.plan_feature_definitions (
     gated boolean DEFAULT true NOT NULL,
     CONSTRAINT plan_feature_definitions_key_check CHECK ((key ~ '^[a-z][a-z0-9_]*$'::text)),
     CONSTRAINT plan_feature_definitions_label_check CHECK ((btrim(label) <> ''::text))
+);
+
+
+--
+-- Name: review_request_publications; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.review_request_publications (
+    integration_id uuid NOT NULL,
+    key text NOT NULL,
+    record jsonb NOT NULL,
+    created_at timestamp without time zone DEFAULT now() NOT NULL,
+    updated_at timestamp without time zone DEFAULT now() NOT NULL
 );
 
 
@@ -2156,7 +2224,8 @@ CREATE TABLE public.workflow_events (
     created_at timestamp without time zone NOT NULL,
     custom_name text,
     run_id uuid NOT NULL,
-    dedup_key text
+    dedup_key text,
+    source_run_id uuid
 );
 
 
@@ -2387,6 +2456,13 @@ CREATE TABLE public.workspace_usage_events (
 --
 
 ALTER TABLE ONLY public.casbin_rule ALTER COLUMN id SET DEFAULT nextval('public.casbin_rule_id_seq'::regclass);
+
+
+--
+-- Name: installation_license_activations id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.installation_license_activations ALTER COLUMN id SET DEFAULT nextval('public.installation_license_activations_id_seq'::regclass);
 
 
 --
@@ -2998,6 +3074,14 @@ ALTER TABLE ONLY public.installation_github_apps
 
 
 --
+-- Name: installation_license_activations installation_license_activations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.installation_license_activations
+    ADD CONSTRAINT installation_license_activations_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: installation_license_keys installation_license_keys_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3099,6 +3183,14 @@ ALTER TABLE ONLY public.organization_billing_plans
 
 ALTER TABLE ONLY public.organization_byok_model_allowlists
     ADD CONSTRAINT organization_byok_model_allowlists_pkey PRIMARY KEY (organization_id, provider);
+
+
+--
+-- Name: organization_enterprise_features organization_enterprise_features_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_enterprise_features
+    ADD CONSTRAINT organization_enterprise_features_pkey PRIMARY KEY (organization_id, feature_key);
 
 
 --
@@ -3235,6 +3327,14 @@ ALTER TABLE ONLY public.organizations
 
 ALTER TABLE ONLY public.plan_feature_definitions
     ADD CONSTRAINT plan_feature_definitions_pkey PRIMARY KEY (key);
+
+
+--
+-- Name: review_request_publications review_request_publications_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.review_request_publications
+    ADD CONSTRAINT review_request_publications_pkey PRIMARY KEY (integration_id, key);
 
 
 --
@@ -4870,10 +4970,38 @@ CREATE INDEX installation_admin_organization_pins_account_pinned_at_idx ON publi
 
 
 --
+-- Name: installation_license_activations_activated_at_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX installation_license_activations_activated_at_idx ON public.installation_license_activations USING btree (activated_at DESC);
+
+
+--
+-- Name: installation_license_activations_license_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX installation_license_activations_license_id_idx ON public.installation_license_activations USING btree (license_id);
+
+
+--
+-- Name: installation_license_activations_one_open; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX installation_license_activations_one_open ON public.installation_license_activations USING btree ((true)) WHERE (deactivated_at IS NULL);
+
+
+--
 -- Name: organization_billing_plans_catalog; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX organization_billing_plans_catalog ON public.organization_billing_plans USING btree (plan_id);
+
+
+--
+-- Name: organization_enterprise_features_feature_key_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX organization_enterprise_features_feature_key_idx ON public.organization_enterprise_features USING btree (feature_key);
 
 
 --
@@ -5979,6 +6107,14 @@ ALTER TABLE ONLY public.organization_billing_plans
 
 
 --
+-- Name: organization_enterprise_features organization_enterprise_features_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_enterprise_features
+    ADD CONSTRAINT organization_enterprise_features_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
 -- Name: organization_feature_grants organization_feature_grants_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -6080,6 +6216,14 @@ ALTER TABLE ONLY public.organization_suspension_events
 
 ALTER TABLE ONLY public.organizations
     ADD CONSTRAINT organizations_created_by_account_id_fkey FOREIGN KEY (created_by_account_id) REFERENCES public.accounts(id);
+
+
+--
+-- Name: review_request_publications review_request_publications_integration_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.review_request_publications
+    ADD CONSTRAINT review_request_publications_integration_id_fkey FOREIGN KEY (integration_id) REFERENCES public.app_installations(id) ON DELETE CASCADE;
 
 
 --
@@ -6602,7 +6746,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261112160121	f
+20261113134801	f
 \.
 
 

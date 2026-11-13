@@ -3,12 +3,14 @@ import { screen, within } from "@testing-library/react";
 import { describe, expect, it } from "bun:test";
 
 import { DRAFT_WORK_ORDER } from "../../../__fixtures__/factoryPageResponses";
+import { CLOSED_FAILED_WORK_ORDER } from "../../../__fixtures__/factoryPageWorkOrders";
 import { BOARD_IMPLEMENT_NOTIFY_ORDER } from "../../../__fixtures__/lineMetricsBoardOrders";
 import { splitRunFixtureForWorkOrder } from "../splitRunMocks";
 
 const manualCustomAutomations = [
   { id: "backlog-custom", name: "Inspect task", columnKey: "backlog" as const },
   { id: "verify-custom", name: "Inspect pull request", columnKey: "verify" as const },
+  { id: "done-custom", name: "Close the books", columnKey: "done" as const },
 ];
 
 describe("AutomationsConsoleVariant manual actions", () => {
@@ -67,5 +69,17 @@ describe("AutomationsConsoleVariant manual actions", () => {
       within(screen.getByTestId("redesign-console-column-verify")).getByText("Inspect pull request"),
     ).toBeInTheDocument();
     expect(screen.queryByText("Inspect task")).not.toBeInTheDocument();
+  });
+
+  it.each(["RESULT_FAILED", "RESULT_PR_CLOSED"] as const)("offers Done manual actions for %s", (result) => {
+    const order = { ...CLOSED_FAILED_WORK_ORDER, id: `wo-done-${result}`, result };
+    renderConsole(splitRunFixtureForWorkOrder(order, { demoArtifacts: false }), {
+      organizationId: "org-1",
+      factoryId: "factory-1",
+      orderId: order.id,
+      canStopRun: true,
+      manualCustomAutomations,
+    });
+    expect(within(screen.getByTestId("redesign-console-column-done")).getByText("Close the books")).toBeInTheDocument();
   });
 });

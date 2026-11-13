@@ -71,7 +71,7 @@ func TestServiceDefaultsToCommunity(t *testing.T) {
 	assert.Equal(t, licensing.StateNone, status.State)
 	assert.Equal(t, licensing.SourceNone, status.Source)
 	assert.True(t, status.Writable)
-	assert.False(t, service.IsEntitled(licensing.FeatureGroups))
+	assert.False(t, service.Status().IsEntitled(licensing.FeatureGroups))
 }
 
 func TestServiceGrantsOnlyLicensedFeatures(t *testing.T) {
@@ -83,8 +83,8 @@ func TestServiceGrantsOnlyLicensedFeatures(t *testing.T) {
 	status := service.Status()
 	assert.Equal(t, licensing.EditionEnterprise, status.Edition)
 	assert.Equal(t, licensing.StateActive, status.State)
-	assert.True(t, service.IsEntitled(licensing.FeatureGroups))
-	assert.False(t, service.IsEntitled(licensing.FeatureCustomRoles))
+	assert.True(t, service.Status().IsEntitled(licensing.FeatureGroups))
+	assert.False(t, service.Status().IsEntitled(licensing.FeatureCustomRoles))
 }
 
 func TestServiceTreatsExpiredLicenseAsCommunity(t *testing.T) {
@@ -101,7 +101,7 @@ func TestServiceTreatsExpiredLicenseAsCommunity(t *testing.T) {
 	assert.Equal(t, licensing.StateExpired, status.State)
 	assert.Equal(t, licensing.EditionCommunity, status.Edition)
 	require.NotNil(t, status.License, "an expired license stays visible to administrators")
-	assert.False(t, service.IsEntitled(licensing.FeatureGroups))
+	assert.False(t, service.Status().IsEntitled(licensing.FeatureGroups))
 }
 
 func TestServiceReportsInvalidLicense(t *testing.T) {
@@ -114,7 +114,7 @@ func TestServiceReportsInvalidLicense(t *testing.T) {
 	assert.Equal(t, licensing.StateInvalid, status.State)
 	assert.Equal(t, licensing.ReasonUnknownKey, status.Reason)
 	assert.Nil(t, status.License)
-	assert.False(t, service.IsEntitled(licensing.FeatureGroups))
+	assert.False(t, service.Status().IsEntitled(licensing.FeatureGroups))
 }
 
 func TestServiceKeepsLastStateOnTemporaryDatabaseError(t *testing.T) {
@@ -126,7 +126,7 @@ func TestServiceKeepsLastStateOnTemporaryDatabaseError(t *testing.T) {
 	source.err = errors.New("connection refused")
 	require.Error(t, service.Refresh(context.Background()))
 
-	assert.True(t, service.IsEntitled(licensing.FeatureGroups))
+	assert.True(t, service.Status().IsEntitled(licensing.FeatureGroups))
 }
 
 func TestServiceAppliesChangesWhenReloadFails(t *testing.T) {
@@ -142,7 +142,7 @@ func TestServiceAppliesChangesWhenReloadFails(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, licensing.EditionCommunity, status.Edition)
-		assert.False(t, service.IsEntitled(licensing.FeatureGroups))
+		assert.False(t, service.Status().IsEntitled(licensing.FeatureGroups))
 	})
 
 	t.Run("replacement grants neither license until a read confirms it", func(t *testing.T) {
@@ -154,12 +154,12 @@ func TestServiceAppliesChangesWhenReloadFails(t *testing.T) {
 		_, err := service.Install(context.Background(), issuer.License(licensing.FeatureGroups), uuid.New())
 		require.Error(t, err)
 
-		assert.False(t, service.IsEntitled(licensing.FeatureCustomRoles))
-		assert.False(t, service.IsEntitled(licensing.FeatureGroups))
+		assert.False(t, service.Status().IsEntitled(licensing.FeatureCustomRoles))
+		assert.False(t, service.Status().IsEntitled(licensing.FeatureGroups))
 
 		source.err = nil
 		require.NoError(t, service.Refresh(context.Background()))
-		assert.True(t, service.IsEntitled(licensing.FeatureGroups))
+		assert.True(t, service.Status().IsEntitled(licensing.FeatureGroups))
 	})
 }
 
@@ -188,7 +188,7 @@ func TestServiceConcurrentChangesMatchStoredState(t *testing.T) {
 	}
 	wg.Wait()
 
-	assert.Equal(t, source.raw != nil, service.IsEntitled(licensing.FeatureGroups))
+	assert.Equal(t, source.raw != nil, service.Status().IsEntitled(licensing.FeatureGroups))
 }
 
 func TestServiceRefreshPicksUpChangesFromOtherReplicas(t *testing.T) {
@@ -196,16 +196,16 @@ func TestServiceRefreshPicksUpChangesFromOtherReplicas(t *testing.T) {
 	source := &memorySource{}
 	service := newService(t, issuer, source)
 	require.NoError(t, service.Refresh(context.Background()))
-	assert.False(t, service.IsEntitled(licensing.FeatureGroups))
+	assert.False(t, service.Status().IsEntitled(licensing.FeatureGroups))
 
 	source.raw = issuer.License(licensing.FeatureGroups)
-	assert.False(t, service.IsEntitled(licensing.FeatureGroups), "state changes only on refresh")
+	assert.False(t, service.Status().IsEntitled(licensing.FeatureGroups), "state changes only on refresh")
 	require.NoError(t, service.Refresh(context.Background()))
-	assert.True(t, service.IsEntitled(licensing.FeatureGroups))
+	assert.True(t, service.Status().IsEntitled(licensing.FeatureGroups))
 
 	source.raw = nil
 	require.NoError(t, service.Refresh(context.Background()))
-	assert.False(t, service.IsEntitled(licensing.FeatureGroups))
+	assert.False(t, service.Status().IsEntitled(licensing.FeatureGroups))
 	assert.Equal(t, licensing.StateNone, service.Status().State)
 }
 
@@ -217,13 +217,13 @@ func TestServiceStopsEntitlingWhenLicenseExpiresBetweenRefreshes(t *testing.T) {
 
 	service := newService(t, issuer, &memorySource{raw: issuer.Sign(claims)})
 	require.NoError(t, service.Refresh(context.Background()))
-	assert.True(t, service.IsEntitled(licensing.FeatureGroups))
+	assert.True(t, service.Status().IsEntitled(licensing.FeatureGroups))
 
 	service.SetClock(func() time.Time { return expiresAt.Add(licensing.ClockSkew - time.Second) })
-	assert.True(t, service.IsEntitled(licensing.FeatureGroups), "clock skew tolerance applies")
+	assert.True(t, service.Status().IsEntitled(licensing.FeatureGroups), "clock skew tolerance applies")
 
 	service.SetClock(func() time.Time { return expiresAt.Add(licensing.ClockSkew) })
-	assert.False(t, service.IsEntitled(licensing.FeatureGroups))
+	assert.False(t, service.Status().IsEntitled(licensing.FeatureGroups))
 	assert.Equal(t, licensing.StateExpired, service.Status().State)
 }
 
@@ -238,7 +238,7 @@ func TestServiceLicenseFileIsAuthoritative(t *testing.T) {
 		status := service.Status()
 		assert.Equal(t, licensing.SourceFile, status.Source)
 		assert.False(t, status.Writable)
-		assert.True(t, service.IsEntitled(licensing.FeatureCustomRoles))
+		assert.True(t, service.Status().IsEntitled(licensing.FeatureCustomRoles))
 	})
 
 	t.Run("invalid file does not fall back", func(t *testing.T) {
@@ -333,7 +333,7 @@ func TestServiceInstall(t *testing.T) {
 			_, err := service.Install(context.Background(), issuer.Sign(tc.claims()), uuid.New())
 			assert.Equal(t, tc.reason, licensing.ReasonOf(err))
 			assert.Equal(t, current, source.raw)
-			assert.True(t, service.IsEntitled(licensing.FeatureCustomRoles))
+			assert.True(t, service.Status().IsEntitled(licensing.FeatureCustomRoles))
 		})
 	}
 
@@ -345,13 +345,13 @@ func TestServiceInstall(t *testing.T) {
 		status, err := service.Remove(context.Background(), uuid.New())
 		require.NoError(t, err)
 		assert.Equal(t, licensing.StateNone, status.State)
-		assert.False(t, service.IsEntitled(licensing.FeatureGroups))
+		assert.False(t, service.Status().IsEntitled(licensing.FeatureGroups))
 	})
 }
 
 func TestAllowsFailsClosed(t *testing.T) {
-	assert.False(t, licensing.Allows(nil, licensing.FeatureGroups))
-	assert.False(t, licensing.Allows(licensing.Community, licensing.FeatureGroups))
+	assert.False(t, licensing.Allows(context.Background(), nil, uuid.New(), licensing.FeatureGroups))
+	assert.False(t, licensing.Allows(context.Background(), licensing.Community, uuid.New(), licensing.FeatureGroups))
 }
 
 type failingTransport struct {
@@ -385,7 +385,7 @@ func TestVerificationWorksWithoutNetwork(t *testing.T) {
 	path := writeLicenseFile(t, issuer.License(licensing.FeatureGroups))
 	service := newService(t, issuer, licensing.NewFileSource(path))
 	require.NoError(t, service.Refresh(context.Background()))
-	assert.True(t, service.IsEntitled(licensing.FeatureGroups))
+	assert.True(t, service.Status().IsEntitled(licensing.FeatureGroups))
 
 	_, err := licensing.TrustedKeyStore(nil)
 	require.NoError(t, err)

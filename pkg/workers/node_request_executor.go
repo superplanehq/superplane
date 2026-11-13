@@ -11,6 +11,7 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/authorization"
 	factorycomponent "github.com/superplanehq/superplane/pkg/components/factory"
+	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -503,13 +504,28 @@ func (e *NodeRequestExecutor) invokeExecutionComponentHook(
 	}
 
 	logger = logging.WithExecution(logger, execution)
+	taskID, _ := spec.InvokeAction.Parameters["task_id"].(string)
+	runnerTasks := contexts.NewRunnerTaskContext(tx, e.encryptor, workflow.OrganizationID)
+	prepareFactoryOutput := models.IsAgentRunnerComponent(componentName)
+	if prepareFactoryOutput {
+		runnerTasks.WithSnapshot(taskID)
+		if spec.InvokeAction.ActionName == runner.HookPoll {
+			task, err := runnerTasks.Find(taskID)
+			prepareFactoryOutput = err == nil && task.IsTerminal()
+		}
+	}
+	executionState := contexts.NewExecutionStateContext(tx, execution, onNewEvents)
+	if prepareFactoryOutput {
+		executionState = contexts.NewFactoryExecutionStateContext(tx, execution, onNewEvents)
+	}
 	hookCtx := core.ActionHookContext{
 		Name:           spec.InvokeAction.ActionName,
 		Configuration:  execution.Configuration.Data(),
 		Parameters:     spec.InvokeAction.Parameters,
 		HTTP:           e.registry.HTTPContextInTransaction(tx),
 		Metadata:       contexts.NewExecutionMetadataContext(tx, execution),
-		ExecutionState: contexts.NewExecutionStateContext(tx, execution, onNewEvents),
+		ExecutionState: executionState,
+		Publications:   contexts.NewPublicationContext(tx, workflow.OrganizationID, node, execution),
 		Requests:       contexts.NewExecutionRequestContext(tx, execution).WithCurrentRequest(request),
 		Auth:           contexts.NewAuthReader(tx, workflow.OrganizationID, e.authService, nil),
 		Secrets:        contexts.NewSecretsContext(tx, e.registry, workflow.OrganizationID, e.encryptor),
@@ -522,13 +538,9 @@ func (e *NodeRequestExecutor) invokeExecutionComponentHook(
 			WithFileBindCleanup(onFileBindCleanup).
 			WithProductAnalytics(onProductAnalytics).
 			WithRemoteImageIngest(e.encryptor, e.registry),
-		Usage:     contexts.NewUsageContext(workflow.OrganizationID, execution),
-		HostedLLM: contexts.NewHostedLLMContext(tx, e.encryptor, workflow.OrganizationID, workflow.FactoryID),
-		RunnerTasks: contexts.NewRunnerTaskContext(
-			tx,
-			e.encryptor,
-			workflow.OrganizationID,
-		),
+		Usage:       contexts.NewUsageContext(workflow.OrganizationID, execution),
+		HostedLLM:   contexts.NewHostedLLMContext(tx, e.encryptor, workflow.OrganizationID, workflow.FactoryID),
+		RunnerTasks: runnerTasks,
 	}
 
 	if node.AppInstallationID != nil {

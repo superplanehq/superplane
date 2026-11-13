@@ -61,7 +61,7 @@ when a successful saved refresh already covers the public endpoint.
 
 ## Deployment order
 
-1. Apply the additive migration before API and worker deployment.
+1. Apply additive migration `20261113134801` before API and worker deployment.
 2. Verify database and credential access for API and worker pods independently.
 3. Verify encryption Secret references and provider egress in both deployment repositories.
 4. Deploy the API and workers with the existing worker flag enabled.

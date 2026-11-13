@@ -220,12 +220,15 @@ export function renderSettings(options: SettingsOptions = {}) {
         </MemoryRouter>
       </QueryClientProvider>,
     );
-  const view = mount();
+  let view = mount();
   return {
-    view,
+    get view() {
+      return view;
+    },
     reload: () => {
       view.unmount();
-      return mount();
+      view = mount();
+      return view;
     },
     onClose,
     stored: () => server.stored,

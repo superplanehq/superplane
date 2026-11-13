@@ -21,6 +21,9 @@ type RunnerTaskContext struct {
 	tx             *gorm.DB
 	encryptor      crypto.Encryptor
 	organizationID uuid.UUID
+	snapshotID     string
+	snapshot       *core.RunnerTask
+	snapshotError  error
 }
 
 func NewRunnerTaskContext(
@@ -98,6 +101,9 @@ func withDefaultLogUploadPolicy(payload []byte) ([]byte, error) {
 }
 
 func (c *RunnerTaskContext) Find(rawID string) (*core.RunnerTask, error) {
+	if c.snapshotID != "" && rawID == c.snapshotID {
+		return c.snapshot, c.snapshotError
+	}
 	task, err := c.find(rawID)
 	if err != nil {
 		return nil, err
@@ -129,6 +135,11 @@ func (c *RunnerTaskContext) Find(rawID string) (*core.RunnerTask, error) {
 }
 
 func (c *RunnerTaskContext) RequestCancel(rawID string) error {
+	if rawID == c.snapshotID {
+		c.snapshotID = ""
+		c.snapshot = nil
+		c.snapshotError = nil
+	}
 	task, err := c.find(rawID)
 	if err != nil {
 		return err
@@ -160,3 +171,13 @@ func (c *RunnerTaskContext) find(rawID string) (*models.RunnerTask, error) {
 }
 
 var _ core.RunnerTaskContext = (*RunnerTaskContext)(nil)
+
+// WithSnapshot keeps task status and dependent completion data consistent within one hook.
+func (c *RunnerTaskContext) WithSnapshot(rawID string) *RunnerTaskContext {
+	if rawID == "" {
+		return c
+	}
+	c.snapshot, c.snapshotError = c.Find(rawID)
+	c.snapshotID = rawID
+	return c
+}

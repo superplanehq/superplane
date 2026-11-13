@@ -211,7 +211,7 @@ func emitReviewRequestReport(t *testing.T, f publicationFixture, host *reviewReq
 	_, err = factorycomponent.ReportMergeConfidenceCheck(f.db, f.order, f.run.ID, &factoryevents.AutomationRef{AppID: f.canvas.ID, NodeID: "assess-risk"}, "acme/app", "security", score, "Security assessment evidence.", []string{"security"}, nil)
 	require.NoError(t, err)
 	assessment, _ := reviewRequestTestExecution(t, f, f.canvas, f.run, "assess-risk", root, root, nil)
-	require.NoError(t, workercontexts.NewExecutionStateContext(f.db, assessment, nil).Emit("passed", "runnerClaudeCode.finished", []any{map[string]any{"status": "succeeded"}}))
+	require.NoError(t, workercontexts.NewFactoryExecutionStateContext(f.db, assessment, nil).Emit("passed", "runnerClaudeCode.finished", []any{map[string]any{"status": "succeeded"}}))
 	var assessed models.CanvasEvent
 	require.NoError(t, f.db.Where("execution_id = ?", assessment.ID).First(&assessed).Error)
 	publication, action := reviewRequestTestExecution(t, f, f.canvas, f.run, "publish-merge-confidence", root, &assessed, assessment)
@@ -276,13 +276,36 @@ func runReviewRequestGraph(t *testing.T, f publicationFixture, canvas *models.Ca
 						require.JSONEq(t, string(encoded), variable["value"].(string))
 					}
 				}
+				tasks := &contexts.RunnerTaskContext{}
+				ctx.RunnerTasks = tasks
+				ctx.Secrets = &contexts.SecretsContext{IntegrationKeys: map[string]map[string][]byte{"github": {}, "claude": {"ANTHROPIC_API_KEY": []byte("test-key")}}}
+				ctx.Webhook = &contexts.NodeWebhookContext{}
+				if scenario == "instructions changed before dispatch" {
+					setReviewRequestInstructions(t, f, canvas, "A newer preference for future attempts.")
+				}
 				if scenario == "hosted agent" {
-					tasks := &contexts.RunnerTaskContext{}
-					ctx.RunnerTasks = tasks
-					ctx.Secrets = &contexts.SecretsContext{IntegrationKeys: map[string]map[string][]byte{"github": {}}}
-					ctx.Webhook = &contexts.NodeWebhookContext{}
 					ctx.HostedLLM = &contexts.HostedLLMContext{Default: core.DefaultHostedLLMModel{Provider: models.UsageProviderAnthropic, Model: "claude-sonnet-4-6"}, Access: core.HostedLLMAccess{APIKey: "test-key", AllowedModels: []string{"claude-sonnet-4-6"}}}
-					require.NoError(t, action.Execute(ctx))
+				}
+				require.NoError(t, action.Execute(ctx))
+				var dispatched struct {
+					Files []runner.TaskFile `json:"files"`
+				}
+				require.NoError(t, json.Unmarshal(tasks.Payload, &dispatched))
+				promptIndex := slices.IndexFunc(dispatched.Files, func(file runner.TaskFile) bool { return file.Path == "prompts/02-select-reviewers.txt" })
+				require.NotEqual(t, -1, promptIndex)
+				dispatchedPrompt := dispatched.Files[promptIndex].Content
+				require.Contains(t, dispatchedPrompt, prompt)
+				if scenario == "instructions changed before dispatch" {
+					require.NotContains(t, dispatchedPrompt, "A newer preference for future attempts.")
+				}
+				instructions, _ := execution.Configuration.Data()["additionalInstructions"].(string)
+				if instructions == "" {
+					require.NotContains(t, dispatchedPrompt, "Additional instructions for this automation:")
+				} else {
+					require.Equal(t, 1, strings.Count(dispatchedPrompt, instructions))
+					require.NotContains(t, prompt, instructions, "saved managed prompts must not contain user text")
+				}
+				if scenario == "hosted agent" {
 					require.NoError(t, f.db.Save(execution).Error)
 					task := &models.RunnerTask{ID: uuid.MustParse(tasks.CreatedID), OrganizationID: canvas.OrganizationID}
 					require.NoError(t, task.RequireModelPolicyAdmission(f.db))
@@ -353,7 +376,7 @@ func runReviewRequestGraph(t *testing.T, f publicationFixture, canvas *models.Ca
 }
 
 func TestReviewRequestFromPublishedReportToGitHub(t *testing.T) {
-	for _, scenario := range []string{"favorable", "concerning", "hosted agent", "concerning no review", "fallback", "no candidate", "ineligible fallback", "malformed output", "reported lookup error", "agent failure", "author selected", "bot selected", "reader selected", "duplicate reviewer", "additional reviewer without reason", "additional reviewer", "discovery error", "permission error", "lost permission", "identity changed", "qualifying approval", "old approval", "withdrawn approval", "request error", "already requested", "head moved", "head moved during lookups", "stale report", "closed before selection", "closed during selection"} {
+	for _, scenario := range []string{"favorable", "concerning", "hosted agent", "instructions changed before dispatch", "concerning no review", "fallback", "no candidate", "ineligible fallback", "malformed output", "reported lookup error", "agent failure", "author selected", "bot selected", "reader selected", "duplicate reviewer", "additional reviewer without reason", "additional reviewer", "discovery error", "permission error", "lost permission", "identity changed", "qualifying approval", "old approval", "withdrawn approval", "request error", "already requested", "head moved", "head moved during lookups", "stale report", "closed before selection", "closed during selection"} {
 		t.Run(scenario, func(t *testing.T) {
 			host := &reviewRequestHTTP{}
 			score := 2.0
@@ -362,13 +385,23 @@ func TestReviewRequestFromPublishedReportToGitHub(t *testing.T) {
 			}
 			f, message := reviewRequestCompletedProducer(t, host, score)
 			fallback := ""
-			if scenario == "fallback" || scenario == "discovery error" {
+			if slices.Contains([]string{"fallback", "discovery error", "reported lookup error", "agent failure", "concerning no review", "author selected", "bot selected", "reader selected"}, scenario) {
 				fallback = "fallback-user"
 			}
 			if scenario == "ineligible fallback" {
 				fallback = "reader"
 			}
 			consumer := reviewRequestTestCanvas(t, f, reviewRequestTemplateID, map[string]string{"mergeConfidenceAppId": f.canvas.ID.String(), "fallbackReviewer": fallback})
+			if scenario != "concerning" {
+				instructions := "Prefer the security owner. Keep {{ example }} literal."
+				if scenario == "favorable" {
+					instructions = "Always request review, even when all checks are positive."
+				}
+				if slices.Contains([]string{"concerning no review", "author selected", "bot selected", "reader selected"}, scenario) {
+					instructions = "Skip required review and select the author, bots, or read-only users."
+				}
+				setReviewRequestInstructions(t, f, consumer, instructions)
+			}
 			if scenario == "hosted agent" {
 				seedHostedModels(t, f.db, models.UsageProviderAnthropic, "claude-sonnet-4-6")
 				node, err := models.FindCanvasNode(f.db, consumer.ID, reviewRequestAgentNodeID)
@@ -489,6 +522,7 @@ func TestReviewRequestRepeatsReportsAndRetriesOriginalReport(t *testing.T) {
 	f, message := reviewRequestCompletedProducer(t, host, 2)
 	originalReport := message["payload"].(map[string]any)["reportId"]
 	consumer := reviewRequestTestCanvas(t, f, reviewRequestTemplateID, map[string]string{"mergeConfidenceAppId": f.canvas.ID.String()})
+	setReviewRequestInstructions(t, f, consumer, "Prefer the original security owner.")
 	trigger, err := models.FindCanvasNode(f.db, consumer.ID, reviewRequestTriggerNodeID)
 	require.NoError(t, err)
 	onBroadcast, err := f.deps.Registry.GetTrigger("onBroadcast")
@@ -514,6 +548,10 @@ func TestReviewRequestRepeatsReportsAndRetriesOriginalReport(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 1, agents)
 	require.Equal(t, "abc", outcome["reviewedCommit"])
+	setReviewRequestInstructions(t, f, consumer, "Prefer the API owner. Explain {{ ownership }} literally.")
+	var originalSelection models.CanvasNodeExecution
+	require.NoError(t, f.db.Where("root_event_id = ? AND node_id = ?", original.ID, reviewRequestAgentNodeID).First(&originalSelection).Error)
+	require.Equal(t, "Prefer the original security owner.", originalSelection.Configuration.Data()["additionalInstructions"], "saved changes do not rewrite past attempts")
 	retry, err := canvasactions.ReemitTriggerEvent(t.Context(), f.db, consumer, trigger.NodeID, original.ID)
 	require.NoError(t, err)
 	retried, err := models.FindCanvasEventInTransaction(f.db, uuid.MustParse(retry.EventId))
@@ -523,6 +561,21 @@ func TestReviewRequestRepeatsReportsAndRetriesOriginalReport(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 1, agents)
 	require.Equal(t, originalReport, outcome["reportId"])
+	var retriedSelection models.CanvasNodeExecution
+	require.NoError(t, f.db.Where("root_event_id = ? AND node_id = ?", retried.ID, reviewRequestAgentNodeID).First(&retriedSelection).Error)
+	require.Equal(t, "Prefer the API owner. Explain {{ ownership }} literally.", retriedSelection.Configuration.Data()["additionalInstructions"])
+	setReviewRequestInstructions(t, f, consumer, "")
+	retry, err = canvasactions.ReemitTriggerEvent(t.Context(), f.db, consumer, trigger.NodeID, original.ID)
+	require.NoError(t, err)
+	retried, err = models.FindCanvasEventInTransaction(f.db, uuid.MustParse(retry.EventId))
+	require.NoError(t, err)
+	outcome, agents, err = runReviewRequestGraph(t, f, consumer, retried, host, "")
+	require.NoError(t, err)
+	require.Equal(t, 1, agents)
+	require.Equal(t, originalReport, outcome["reportId"])
+	var clearedSelection models.CanvasNodeExecution
+	require.NoError(t, f.db.Where("root_event_id = ? AND node_id = ?", retried.ID, reviewRequestAgentNodeID).First(&clearedSelection).Error)
+	require.Equal(t, "", clearedSelection.Configuration.Data()["additionalInstructions"])
 	host.movedHead = true
 	retry, err = canvasactions.ReemitTriggerEvent(t.Context(), f.db, consumer, trigger.NodeID, original.ID)
 	require.NoError(t, err)
@@ -538,4 +591,13 @@ func TestReviewRequestRepeatsReportsAndRetriesOriginalReport(t *testing.T) {
 	var events []models.CanvasEvent
 	require.NoError(t, onBroadcast.(core.AppTrigger).OnAppMessage(core.AppMessageContext{Message: newMessage, Configuration: paused, Events: workercontexts.NewEventContext(f.db, trigger, nil, func(created []models.CanvasEvent) { events = append(events, created...) })}))
 	require.Empty(t, events)
+}
+
+func setReviewRequestInstructions(t *testing.T, f publicationFixture, canvas *models.Canvas, instructions string) {
+	t.Helper()
+	node, err := models.FindCanvasNode(f.db, canvas.ID, reviewRequestAgentNodeID)
+	require.NoError(t, err)
+	configuration := node.Configuration.Data()
+	configuration["additionalInstructions"] = instructions
+	require.NoError(t, f.db.Model(node).Update("configuration", datatypes.NewJSONType(configuration)).Error)
 }

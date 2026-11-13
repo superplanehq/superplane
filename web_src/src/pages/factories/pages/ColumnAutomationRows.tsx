@@ -7,8 +7,11 @@ import { columnAutomationHeadline } from "../lib/columnAutomationHeadline";
 import { COLUMN_AUTOMATIONS_COPY, type ColumnAutomation } from "../lib/columnAutomations";
 import { ColumnAutomationGlyph, type ColumnAutomationRowAction } from "./ColumnAutomationsPopup";
 
-const ROW_CLASSNAME = "flex h-6 w-full min-w-0 items-center gap-1.5 rounded-md px-1.5 text-left text-[12px] leading-4";
+const ROW_CLASSNAME =
+  "flex h-6 w-full min-w-0 items-center gap-1.5 rounded-md pr-1.5 pl-0 text-left text-[12px] leading-4";
 const ROW_HOVER_CLASSNAME = "transition-colors hover:bg-black/10 dark:hover:bg-black/20";
+// Keep SVGs out of the button's direct children to avoid icon-dependent padding.
+const ICON_SLOT_CLASSNAME = "flex size-3.5 shrink-0 items-center justify-center";
 
 /**
  * Header rows that name the automations behind a column. Every column on
@@ -81,7 +84,9 @@ function EmptyAutomationRow({ title, onAdd, testId }: { title: string; onAdd?: (
       onClick={onAdd}
       className={cn(ROW_CLASSNAME, ROW_HOVER_CLASSNAME, "font-normal text-muted-foreground hover:text-foreground")}
     >
-      <Plus className="size-3.5 shrink-0" aria-hidden />
+      <span className={ICON_SLOT_CLASSNAME}>
+        <Plus className="size-3.5" aria-hidden />
+      </span>
       <span className="min-w-0 flex-1 truncate">{COLUMN_AUTOMATIONS_COPY.addLabel}</span>
     </Button>
   );
@@ -113,7 +118,9 @@ function ColumnAutomationRow({
   );
   const details = (
     <>
-      <ColumnAutomationGlyph automation={automation} className="size-3.5" />
+      <span className={ICON_SLOT_CLASSNAME}>
+        <ColumnAutomationGlyph automation={automation} className="size-3.5" />
+      </span>
       <span className="min-w-0 flex-1 truncate">{headline}</span>
       {needsRepair ? (
         <span

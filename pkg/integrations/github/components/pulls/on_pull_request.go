@@ -231,6 +231,13 @@ func (p *OnPullRequest) HandleWebhook(ctx core.WebhookRequestContext) (int, *cor
 		}
 	}
 
+	if producer, ok := ctx.Factory.(core.FactoryPullRequestEventContext); ok {
+		if err := producer.EmitPullRequestEvent(ctx.NodeID, "github.pullRequest", data); err != nil {
+			return http.StatusInternalServerError, nil, err
+		}
+		return http.StatusOK, nil, nil
+	}
+
 	err = ctx.Events.Emit("github.pullRequest", data)
 	if err != nil {
 		ctx.Logger.Errorf("Failed to emit event: %v", err)

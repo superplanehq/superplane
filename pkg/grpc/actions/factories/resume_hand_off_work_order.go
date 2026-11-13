@@ -51,6 +51,7 @@ func ResumeHandOffWorkOrder(ctx context.Context, deps IntakeDependencies, organi
 		}
 	}
 	var dispatched *workOrderLineDispatchResult
+	var startIndex int
 	err = db.Transaction(func(tx *gorm.DB) error {
 		if err := order.LockForUpdate(tx); err != nil {
 			return err
@@ -72,12 +73,11 @@ func ResumeHandOffWorkOrder(ctx context.Context, deps IntakeDependencies, organi
 		if err != nil {
 			return err
 		}
-		index := 0
 		switch intent.Column {
 		case HandOffColumnImplement:
-			index, err = resolveImplementationStageIndex(stages)
+			startIndex, err = resolveImplementationStageIndex(stages)
 		case HandOffColumnVerify:
-			index, err = resolveVerifyStageIndex(stages)
+			startIndex, err = resolveVerifyStageIndex(stages)
 		default:
 			return invalidArgument("The pending handoff stage is invalid.")
 		}
@@ -88,7 +88,7 @@ func ResumeHandOffWorkOrder(ctx context.Context, deps IntakeDependencies, organi
 			return err
 		}
 		if intent.Column == HandOffColumnImplement {
-			dispatched, err = dispatchWorkOrderOnLineTx(tx, factory, order.ID, line, &actor, index, false, req.GetModel(), req.GetThinkingLevel())
+			dispatched, err = dispatchWorkOrderOnLineTx(tx, factory, order.ID, line, &actor, startIndex, false, req.GetModel(), req.GetThinkingLevel())
 			if err == nil {
 				order = dispatched.order
 			}
@@ -101,13 +101,14 @@ func ResumeHandOffWorkOrder(ctx context.Context, deps IntakeDependencies, organi
 		if err != nil {
 			return err
 		}
-		return recordVerifyHandOff(tx, factory, order, line, &actor, pullRequests, index, models.FactoryLineStartOptions{Model: req.GetModel(), ThinkingLevel: normalizedThinking})
+		return recordVerifyHandOff(tx, factory, order, line, &actor, pullRequests, startIndex, models.FactoryLineStartOptions{Model: req.GetModel(), ThinkingLevel: normalizedThinking})
 	})
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to resume handoff")
 	}
 	if dispatched != nil {
 		publishDispatchedWorkOrder(dispatched.logger, orgID, factory.ID, order, &actor, dispatched.fromState, dispatched.startedSteps)
+		startImplementColumnAutomations(db, dispatched.logger, dispatched.factory, dispatched.order, startIndex)
 	} else {
 		if _, err := publishVerificationHandOff(ctx, deps, db, factory, order); err != nil {
 			return nil, factoryErrorToStatus(err, "failed to refresh pull request")
