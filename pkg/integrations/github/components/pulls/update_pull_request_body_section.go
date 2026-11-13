@@ -2,6 +2,8 @@ package pulls
 
 import (
 	"context"
+	"net/url"
+	"strings"
 
 	"github.com/google/go-github/v84/github"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -49,6 +51,11 @@ func NewBodySectionClient(integration core.IntegrationContext, http core.HTTPCon
 func (c *BodySectionClient) GetCommit(ctx context.Context, repository, sha string) (*github.RepositoryCommit, error) {
 	commit, _, err := c.client.GetCommit(ctx, repository, sha)
 	return commit, err
+}
+
+func (c *BodySectionClient) CommitURL(repository, sha string) string {
+	fullName := strings.ReplaceAll(url.PathEscape(c.client.RepositoryFullName(repository)), "%2F", "/")
+	return c.client.Host().RepoURL(fullName) + "/commit/" + url.PathEscape(sha)
 }
 
 func (c *BodySectionClient) Read(ctx context.Context, repository string, number int64) (prbody.Description, error) {

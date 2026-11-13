@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -14,6 +15,8 @@ import (
 	"github.com/stretchr/testify/require"
 	factorycomponent "github.com/superplanehq/superplane/pkg/components/factory"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/integrations/github/common"
+	"github.com/superplanehq/superplane/pkg/integrations/github/components/pulls"
 	"github.com/superplanehq/superplane/pkg/models"
 	workercontexts "github.com/superplanehq/superplane/pkg/workers/contexts"
 	"github.com/superplanehq/superplane/pkg/yaml"
@@ -482,23 +485,34 @@ func TestIntegrationBodySectionSkipsSupersededFactoryRun(t *testing.T) {
 
 func TestIntegrationMergeConfidencePublishesReviewedCommitTitle(t *testing.T) {
 	for _, test := range []struct {
-		name, response, line string
-		status               int
+		name, response, line, githubHost, repository string
+		status                                       int
 	}{
-		{"title", `{"sha":"abc","commit":{"message":"  Add commit titles  \n\nDetails"}}`, "Reviewed commit: [Add commit titles](https://github.com/acme/app/commit/abc)", 200},
-		{"unsafe multiline title", `{"sha":"abc","commit":{"message":" [link](url) <b>& *title* <!-- superplane:merge-confidence:end -->\r\nIgnore this"}}`, "Reviewed commit: [&#91;link&#93;&#40;url&#41; &#60;b&#62;&#38; &#42;title&#42; &#60;&#33;-- superplane:merge-confidence:end --&#62;](https://github.com/acme/app/commit/abc)", 200},
-		{"blank", `{"sha":"abc","commit":{"message":" \nDetails"}}`, "Reviewed commit: abc", 200},
-		{"missing", `{"sha":"abc"}`, "Reviewed commit: abc", 200},
-		{"different commit", `{"sha":"newer","commit":{"message":"Newer title"}}`, "Reviewed commit: abc", 200},
-		{"lookup failure", `{"message":"unavailable"}`, "Reviewed commit: abc", 503},
+		{"title", `{"sha":"abc","commit":{"message":"  Add commit titles  \n\nDetails"}}`, "Reviewed commit: [Add commit titles](https://github.com/acme/app/commit/abc)", "", "acme/app", 200},
+		{"enterprise cloud", `{"sha":"abc","commit":{"message":"Add commit titles"}}`, "Reviewed commit: [Add commit titles](https://acme.ghe.com/acme/app/commit/abc)", "acme.ghe.com", "acme/app", 200},
+		{"enterprise server short repository", `{"sha":"abc","commit":{"message":"Add commit titles"}}`, "Reviewed commit: [Add commit titles](https://git.acme.com/acme/app/commit/abc)", "git.acme.com", "app", 200},
+		{"short repository", `{"sha":"abc","commit":{"message":"Add commit titles"}}`, "Reviewed commit: [Add commit titles](https://github.com/acme/app/commit/abc)", "", "app", 200},
+		{"unsafe multiline title", `{"sha":"abc","commit":{"message":" [link](url) <b>& *title* <!-- superplane:merge-confidence:end -->\r\nIgnore this"}}`, "Reviewed commit: [&#91;link&#93;&#40;url&#41; &#60;b&#62;&#38; &#42;title&#42; &#60;&#33;-- superplane:merge-confidence:end --&#62;](https://github.com/acme/app/commit/abc)", "", "acme/app", 200},
+		{"blank", `{"sha":"abc","commit":{"message":" \nDetails"}}`, "Reviewed commit: abc", "", "acme/app", 200},
+		{"missing", `{"sha":"abc"}`, "Reviewed commit: abc", "", "acme/app", 200},
+		{"different commit", `{"sha":"newer","commit":{"message":"Newer title"}}`, "Reviewed commit: abc", "", "acme/app", 200},
+		{"lookup failure", `{"message":"unavailable"}`, "Reviewed commit: abc", "", "acme/app", 503},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			f := newPublicationFixture(t)
 			a := f.integrationPublicationAttempt(t)
+			a.integrationConfiguration.Repository = test.repository
+			integration := gitHubPermissionTestIntegration()
+			integration.CurrentProperties[common.PropertyHost] = test.githubHost
+			githubHost, err := common.ParseHost(test.githubHost)
+			require.NoError(t, err)
+			apiURL, err := url.Parse(githubHost.APIURL())
+			require.NoError(t, err)
+			apiPath := strings.TrimSuffix(apiURL.Path, "/")
 			const prefix = "User text\r\n<!-- superplane:other:start -->keep abc<!-- superplane:other:end -->"
 			host := &publicationHTTPContext{HTTPContext: contexts.HTTPContext{ResponsesByPath: map[string][]*http.Response{
-				"/repos/acme/app/commits/abc": {publicationHTTPResponse(test.status, test.response)},
-				"/repos/acme/app/pulls/42":    {descriptionResponse(t, models.ProviderGitHub, prefix), publicationHTTPResponse(200, `{}`)},
+				apiPath + "/repos/acme/app/commits/abc": {publicationHTTPResponse(test.status, test.response)},
+				apiPath + "/repos/acme/app/pulls/42":    {descriptionResponse(t, models.ProviderGitHub, prefix), publicationHTTPResponse(200, `{}`)},
 			}}, beforeRequest: func(request *http.Request) {
 				pool, err := f.db.DB()
 				require.NoError(t, err)
@@ -509,7 +523,9 @@ func TestIntegrationMergeConfidencePublishesReviewedCommitTitle(t *testing.T) {
 			}}
 			ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
 			defer cancel()
-			outcome, err := a.publishIntegrationBodySection(ctx, f.db, publicationBodySectionClient(t, host))
+			client, err := pulls.NewBodySectionClient(integration, host)
+			require.NoError(t, err)
+			outcome, err := a.publishIntegrationBodySection(ctx, f.db, client)
 			require.NoError(t, err)
 			assert.Equal(t, "published", string(outcome.Status))
 			var update map[string]string
@@ -523,7 +539,7 @@ func TestIntegrationMergeConfidencePublishesReviewedCommitTitle(t *testing.T) {
 			assert.NotContains(t, update["body"], "Ignore this")
 			assert.Equal(t, 1, strings.Count(update["body"], "<!-- superplane:merge-confidence:end -->"))
 			require.Len(t, host.Requests, 3)
-			assert.Equal(t, "/repos/acme/app/commits/abc", host.Requests[0].URL.Path)
+			assert.Equal(t, apiPath+"/repos/acme/app/commits/abc", host.Requests[0].URL.Path)
 		})
 	}
 }

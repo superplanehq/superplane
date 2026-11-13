@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/url"
 	"strings"
 	"time"
 
@@ -108,7 +107,7 @@ func (a *bodySectionActionAttempt) enrichReviewedCommit(ctx context.Context, db 
 	if title == "" {
 		return config.Body
 	}
-	commitURL := "https://github.com/" + strings.ReplaceAll(url.PathEscape(config.Repository), "%2F", "/") + "/commit/" + url.PathEscape(sha)
+	commitURL := client.CommitURL(config.Repository, sha)
 	lines[index] = fmt.Sprintf("Reviewed commit: [%s](%s)", exprruntime.MarkdownText(title), commitURL)
 	return strings.Join(lines, "\n")
 }
