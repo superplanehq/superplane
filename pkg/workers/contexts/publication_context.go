@@ -44,3 +44,7 @@ func (c *PublicationContext) Update(key string, apply func(*core.OrderedPublicat
 func (c *PublicationContext) AttemptFinished(id uuid.UUID) (bool, error) {
 	return models.PublicationAttemptFinished(c.tx, c.organizationID, id)
 }
+
+func (c *PublicationContext) OwnerStatus(canvasID uuid.UUID, nodeID string) (core.PublicationOwnerStatus, error) {
+	return models.PublicationOwnerStatus(c.tx, c.organizationID, c.integrationID, canvasID, nodeID)
+}

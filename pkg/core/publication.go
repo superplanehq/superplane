@@ -70,6 +70,11 @@ type PublicationExecution struct {
 	Output        any
 }
 
+type PublicationOwnerStatus struct {
+	Available bool
+	Removed   bool
+}
+
 // PublicationStore serializes one integration/key and persists the next hook in
 // the same transaction. Reads and provider lookups belong outside Update.
 type PublicationStore interface {
@@ -77,6 +82,7 @@ type PublicationStore interface {
 	List(prefix string) ([]OrderedPublication, error)
 	Update(key string, apply func(*OrderedPublication) error) error
 	AttemptFinished(rootEventID uuid.UUID) (bool, error)
+	OwnerStatus(canvasID uuid.UUID, nodeID string) (PublicationOwnerStatus, error)
 }
 
 type PublicationContext interface {

@@ -17,7 +17,6 @@ const (
 	NodeRequestTypePullRequestChecksStart = "pull-request-checks-start"
 	NodeRequestTypeInvokeAction           = "invoke-action"
 	NodeRequestTypeVisualEvidenceCapture  = "visual-evidence-capture"
-	NodeRequestTypeMergeConfidenceCheck   = "merge-confidence-check"
 
 	NodeExecutionRequestStatePending   = "pending"
 	NodeExecutionRequestStateCompleted = "completed"
@@ -44,7 +43,6 @@ type NodeExecutionRequestSpec struct {
 	PullRequestChecksStart *PullRequestChecksStartRequest `json:"pull_request_checks_start,omitempty"`
 	InvokeAction           *InvokeAction                  `json:"invoke_action,omitempty"`
 	VisualEvidenceCapture  *VisualEvidenceCaptureRequest  `json:"visual_evidence_capture,omitempty"`
-	MergeConfidenceCheck   *MergeConfidenceCheckRequest   `json:"merge_confidence_check,omitempty"`
 }
 
 type PullRequestChecksStartRequest struct {
@@ -73,18 +71,28 @@ func LockNodeRequest(tx *gorm.DB, id uuid.UUID) (*CanvasNodeRequest, error) {
 // LockNodeRequestNow locks a pending request regardless of its scheduled time.
 // Requests locked by another worker are skipped.
 func LockNodeRequestNow(tx *gorm.DB, id uuid.UUID) (*CanvasNodeRequest, error) {
-	return lockNodeRequest(tx, id, "SKIP LOCKED")
-}
+	var request CanvasNodeRequest
+	query := tx.
+		Table("workflow_node_requests").
+		Select("workflow_node_requests.*").
+		Clauses(clause.Locking{
+			Strength: "UPDATE",
+			Table:    clause.Table{Name: "workflow_node_requests"},
+			Options:  "SKIP LOCKED",
+		}).
+		Where("workflow_node_requests.id = ?", id).
+		Where("workflow_node_requests.state = ?", NodeExecutionRequestStatePending).
+		Where("workflow_node_requests.type <> ?", NodeRequestTypePullRequestChecksStart)
 
-// LockForUpdate waits for a pending request while keeping the publication's
-// canvas and organization guards. Finalization must not skip an unfinished rollback.
-func (r *CanvasNodeRequest) LockForUpdate(tx *gorm.DB) error {
-	locked, err := lockNodeRequest(tx, r.ID, "")
+	err := withActiveCanvas(query, "workflow_node_requests.workflow_id").
+		First(&request).
+		Error
+
 	if err != nil {
-		return err
+		return nil, err
 	}
-	*r = *locked
-	return nil
+
+	return &request, nil
 }
 
 func ListNodeRequests() ([]CanvasNodeRequest, error) {
@@ -98,7 +106,7 @@ func ListNodeRequests() ([]CanvasNodeRequest, error) {
 		Where("workflow_node_requests.run_at <= ?", now).
 		Where("workflow_node_requests.type <> ?", NodeRequestTypePullRequestChecksStart)
 
-	err := withNodeRequestCanvas(query).
+	err := withActiveCanvas(query, "workflow_node_requests.workflow_id").
 		Find(&requests).
 		Error
 
@@ -107,16 +115,6 @@ func ListNodeRequests() ([]CanvasNodeRequest, error) {
 	}
 
 	return requests, nil
-}
-
-func withNodeRequestCanvas(tx *gorm.DB) *gorm.DB {
-	// Publication must finish an existing GitHub check after its automation is
-	// deleted. Other requests still require an active canvas.
-	return tx.
-		Joins("JOIN workflows ON workflow_node_requests.workflow_id = workflows.id").
-		Joins("JOIN organizations ON workflows.organization_id = organizations.id").
-		Where("(workflows.deleted_at IS NULL OR workflow_node_requests.type = ?)", NodeRequestTypeMergeConfidenceCheck).
-		Where("organizations.deleted_at IS NULL")
 }
 
 func FindCanvasNodeRequest(tx *gorm.DB, id uuid.UUID) (*CanvasNodeRequest, error) {
@@ -316,29 +314,4 @@ func DeleteExpiredCompletedNodeRequests(db *gorm.DB, olderThan time.Time, limit 
 		NodeExecutionRequestStateCompleted,
 		olderThan,
 	)
-}
-
-func lockNodeRequest(tx *gorm.DB, id uuid.UUID, options string) (*CanvasNodeRequest, error) {
-	var request CanvasNodeRequest
-	query := tx.
-		Table("workflow_node_requests").
-		Select("workflow_node_requests.*").
-		Clauses(clause.Locking{
-			Strength: "UPDATE",
-			Table:    clause.Table{Name: "workflow_node_requests"},
-			Options:  options,
-		}).
-		Where("workflow_node_requests.id = ?", id).
-		Where("workflow_node_requests.state = ?", NodeExecutionRequestStatePending).
-		Where("workflow_node_requests.type <> ?", NodeRequestTypePullRequestChecksStart)
-
-	err := withNodeRequestCanvas(query).
-		First(&request).
-		Error
-
-	if err != nil {
-		return nil, err
-	}
-
-	return &request, nil
 }

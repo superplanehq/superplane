@@ -67,9 +67,6 @@ func (e *NodeRequestExecutor) execute(
 	lockRequest func(*gorm.DB, uuid.UUID) (*models.CanvasNodeRequest, error),
 ) error {
 	defer e.publishExecution(request)
-	if request.Type == models.NodeRequestTypeMergeConfidenceCheck {
-		return factoryactions.ProcessMergeConfidenceCheckRequest(context.Background(), e.factoryIntakeDeps(), request.ID)
-	}
 	if request.Type == models.NodeRequestTypeInvokeAction && request.Spec.Data().InvokeAction != nil &&
 		request.Spec.Data().InvokeAction.ActionName == factorycomponent.UpdatePullRequestBodySectionHook {
 		events, err := factoryactions.ProcessBodySectionPublicationRequest(context.Background(), e.factoryIntakeDeps(), request.ID, lockRequest)

@@ -143,7 +143,7 @@ installation row.
 5. Grant repository permissions that match the workspace GitHub App manifest:
    - Issues: Read and write
    - Actions: Read and write
-   - Checks: Read and write
+   - Checks: Read-only
    - Contents: Read and write
    - Pull requests: Read and write
    - Repository hooks: Read and write
@@ -243,28 +243,6 @@ If Connect cannot create the app, confirm `BASE_URL` and
 
 CI sets dummy GitHub App values so factory E2E can skip create-app.
 Local `make test.e2e` needs the same dummy values or a real app.
-
-## Merge confidence checks
-
-Merge confidence publishes the `SuperPlane merge confidence` GitHub check
-when an assessment starts. The check reports completion, failure, or cancellation
-and links to the task. Assessment scores remain advisory.
-
-Before deploying this behavior, set the GitHub App permission to
-**Checks: Read and write**. Existing installation owners must accept the
-permission update. Update any existing Apps that still have read-only Checks access.
-
-The factory App manifests request write access for new Apps. They do not update
-existing Apps or installations. Hosted App owners must update the hosted App
-configuration. This repository does not verify live installation permissions.
-The check uses the existing worker integration credentials. No new environment
-variables, Secret keys, or Helm values are required.
-
-Hosted API and workers use the existing `SUPERPLANE_GITHUB_APP_*` configuration.
-Workers must retain `START_NODE_REQUEST_WORKER=yes`. The hosted chart references
-the GitHub App Secret for workers. Launchpad references `superplane-github-app`
-in production and `superplane-github-app-staging` in staging. These source
-references do not verify deployed Secret contents or accepted App permissions.
 
 ## Bitbucket Forge local development
 

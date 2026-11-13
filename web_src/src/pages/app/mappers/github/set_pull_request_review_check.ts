@@ -9,6 +9,7 @@ interface ReviewCheckConfiguration {
   pullNumber?: string | number;
   context?: string;
   phase?: string;
+  state?: string;
   reviewers?: { id: number; login: string }[];
   reason?: string;
   resultUrl?: string;
@@ -61,8 +62,12 @@ function configurationDetails(configuration: ReviewCheckConfiguration): Record<s
     Repository: configuration.repository || "-",
     "Pull request": configuration.pullNumber ? `#${configuration.pullNumber}` : "-",
     Context: configuration.context || "-",
-    Phase: (configuration.phase || "-").replace(/_/g, " "),
-    Reviewers: configuration.reviewers?.map((reviewer) => reviewer.login).join(", ") || "-",
+    ...(configuration.state
+      ? { State: configuration.state }
+      : {
+          Phase: (configuration.phase || "-").replace(/_/g, " "),
+          Reviewers: configuration.reviewers?.map((reviewer) => reviewer.login).join(", ") || "-",
+        }),
     Reason: configuration.reason || "-",
     "Result URL": configuration.resultUrl || "-",
   };

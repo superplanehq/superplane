@@ -203,18 +203,6 @@ func Test__CanvasCleanupWorker_ProcessesWorkflowFromSoftDeletedOrganization(t *t
 	}
 	require.NoError(t, database.Conn().Create(&nodeRequest).Error)
 
-	run, err := models.CreateCanvasRunInTransaction(database.Conn(), canvas.ID, "node-1", models.CanvasRunStateFinished, models.CanvasRunResultPassed)
-	require.NoError(t, err)
-	publication := models.CanvasNodeRequest{
-		ID: uuid.New(), WorkflowID: canvas.ID, NodeID: "node-1",
-		Type: models.NodeRequestTypeMergeConfidenceCheck, State: models.NodeExecutionRequestStatePending,
-		RunAt: now.Add(time.Hour),
-		Spec: datatypes.NewJSONType(models.NodeExecutionRequestSpec{
-			MergeConfidenceCheck: &models.MergeConfidenceCheckRequest{RunID: run.ID},
-		}),
-	}
-	require.NoError(t, database.Conn().Create(&publication).Error)
-
 	require.NoError(t, models.SoftDeleteOrganization(r.Organization.ID.String()))
 	deletedAtOutsideGracePeriod := time.Now().AddDate(0, 0, -31)
 	require.NoError(t, database.Conn().
@@ -245,13 +233,6 @@ func Test__CanvasCleanupWorker_ProcessesWorkflowFromSoftDeletedOrganization(t *t
 	var organizationCount int64
 	require.NoError(t, database.Conn().Unscoped().Model(&models.Organization{}).Where("id = ?", r.Organization.ID).Count(&organizationCount).Error)
 	assert.Equal(t, int64(1), organizationCount)
-
-	organizations, err := models.ListDeletedOrganizations()
-	require.NoError(t, err)
-	require.Len(t, organizations, 1)
-	require.NoError(t, NewOrganizationCleanupWorker().LockAndProcessOrganization(organizations[0]))
-	require.NoError(t, database.Conn().Unscoped().Model(&models.Organization{}).Where("id = ?", r.Organization.ID).Count(&organizationCount).Error)
-	assert.Zero(t, organizationCount, "pending publication must not prevent organization cleanup")
 }
 
 func Test__CanvasCleanupWorker_SoftDeletesSharedWebhookWhenLastReferenceRemoved(t *testing.T) {

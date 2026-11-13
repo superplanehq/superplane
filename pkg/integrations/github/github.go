@@ -140,6 +140,7 @@ func (g *GitHub) Actions() []core.Action {
 		&pulls.ListPullRequestReviewCandidates{},
 		&pulls.EnsurePullRequestReviewers{},
 		&pulls.SetPullRequestReviewCheck{},
+		&pulls.SetPullRequestCheck{},
 		&pulls.UpdatePullRequest{},
 		&pulls.UpdatePullRequestBodySection{},
 		&pulls.FindPullRequest{},
@@ -966,7 +967,7 @@ func (g *GitHub) appManifest(ctx core.SyncContext) string {
 		"default_permissions": map[string]string{
 			"issues":                      "write",
 			"actions":                     "write",
-			"checks":                      "write",
+			"checks":                      "read",
 			"contents":                    "write",
 			"pull_requests":               "write",
 			"repository_hooks":            "write",
