@@ -54,12 +54,27 @@ func writeLiveLogCommandStart(live io.Writer, index int, text, kind, preview str
 		Type:      "cmd_start",
 		RecordID:  diagnosticRecordID(live),
 		Index:     index,
-		Text:      strings.TrimSpace(text),
+		Text:      liveLogRecordLabel(text),
 		Kind:      strings.TrimSpace(kind),
-		Preview:   strings.TrimSpace(preview),
+		Preview:   liveLogRecordLabel(preview),
 		StartedAt: startedAt.UnixMilli(),
 	}
 	writeLiveLogRecord(live, rec)
+}
+
+// An unnamed command uses its full shell text as the step label. Failure
+// diagnostics omit lines longer than diagnosticCaptureBytes, and an omitted
+// cmd_start record hides every later step. JSON escapes a rune as at most six
+// bytes, so two labels at this limit keep a record below that size.
+const liveLogRecordLabelMaxRunes = 1024
+
+func liveLogRecordLabel(text string) string {
+	text = strings.TrimSpace(text)
+	runes := []rune(text)
+	if len(runes) <= liveLogRecordLabelMaxRunes {
+		return text
+	}
+	return string(runes[:liveLogRecordLabelMaxRunes])
 }
 
 func liveLogPreview(text string) string {

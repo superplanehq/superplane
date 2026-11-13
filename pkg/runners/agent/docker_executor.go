@@ -434,12 +434,12 @@ func writeDockerCmdStart(script *strings.Builder, index int, directive shellDire
 		"type":          "cmd_start",
 		"diagnostic_id": directive.RecordID,
 		"index":         index,
-		"text":          directive.Text,
+		"text":          liveLogRecordLabel(directive.Text),
 	}
 	if kind := strings.TrimSpace(directive.Kind); kind != "" {
 		rec["kind"] = kind
 	}
-	if preview := strings.TrimSpace(directive.Preview); preview != "" {
+	if preview := liveLogRecordLabel(directive.Preview); preview != "" {
 		rec["preview"] = preview
 	}
 	raw, err := json.Marshal(rec)

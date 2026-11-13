@@ -9,7 +9,10 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"os/exec"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -181,4 +184,54 @@ func TestDockerCommandScriptPreservesFailureDiagnostics(t *testing.T) {
 	failure := capture.failure(task, 23, errors.New("exit status 23"), nil)
 	assert.Contains(t, failure.Error(), "Check pull requests (step 1)")
 	assert.Contains(t, failure.Error(), "original failure output")
+}
+
+func TestFailureDiagnosticsReportsStepAfterLongCommandLabel(t *testing.T) {
+	// Unnamed commands use their shell text as the cmd_start label.
+	longCommand := ": " + strings.Repeat("\x01", 2*diagnosticCaptureBytes) + "; true"
+	task := &api.TaskPayload{ID: "task-1", ExecutionMode: "host", Commands: models.CommandList{
+		{Command: longCommand, Preview: longCommand},
+		{Name: "Implementation", Kind: "prompt", Command: `printf '%s\n' '{"is_error":true,"error":"Provider unavailable"}' > "$SUPERPLANE_RESULT_FILE"; echo 'prompt output' >&2; (exit 42)`},
+	}}
+	assertReported := func(t *testing.T, message string) {
+		assert.Contains(t, message, "Implementation (step 2)")
+		assert.Contains(t, message, "Provider unavailable")
+		assert.Contains(t, message, "prompt output")
+	}
+
+	for _, pipe := range []string{"0", "1"} {
+		t.Run("pipe="+pipe, func(t *testing.T) {
+			if pipe == "0" {
+				skipPTYIntegrationOnCI(t)
+			}
+			t.Setenv("RUNNER_SHELL_USE_PIPE", pipe)
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				_, _ = io.Copy(io.Discard, r.Body)
+				w.WriteHeader(http.StatusNoContent)
+			}))
+			defer server.Close()
+			spool, err := logspool.New(logspool.Config{Directory: t.TempDir(), TaskID: task.ID, BaseURL: server.URL, AccessToken: "test-access-token", ChunkBytes: 65536, MaxBytes: 1048576})
+			require.NoError(t, err)
+			defer func() { require.NoError(t, spool.Close()); require.NoError(t, spool.Wait(t.Context())) }()
+			runner := &Agent{Config: Config{MaxOutputBytes: 8192, MaxExecutionSeconds: 30, TaskWorkDir: t.TempDir()}}
+			result := runner.execute(t.Context(), task, spool, make(chan string))
+			require.Equal(t, 42, result.ExitCode)
+			assertReported(t, result.errorMessage())
+		})
+	}
+
+	t.Run("docker script", func(t *testing.T) {
+		capture := &failureDiagnostics{recordID: "current-task"}
+		args, err := dockerExecArgs("container-name", task, capture.recordID)
+		require.NoError(t, err)
+		resultFile := filepath.Join(t.TempDir(), "result.json")
+		// Execute the generated POSIX shell bundle without requiring a Docker daemon.
+		cmd := exec.CommandContext(t.Context(), "bash", "-c", args[len(args)-1])
+		cmd.Env = append(os.Environ(), "SUPERPLANE_RESULT_FILE="+resultFile)
+		cmd.Stdout, cmd.Stderr = capture, capture
+		require.Error(t, cmd.Run())
+		result, err := os.ReadFile(resultFile)
+		require.NoError(t, err)
+		assertReported(t, capture.failure(task, 42, errors.New("exit status 42"), result).Error())
+	})
 }
