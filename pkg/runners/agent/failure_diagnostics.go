@@ -26,6 +26,8 @@ type failureDiagnostics struct {
 	pending       []byte
 	oversizedLine bool
 	step          liveLogCommandStartRecord
+	stepRunning   bool
+	nextStepIndex int
 	output        bytes.Buffer
 	failed        *failedStep
 }
@@ -68,7 +70,7 @@ func (d *failureDiagnostics) line(line []byte) {
 		Index  int    `json:"index"`
 	}
 	if json.Unmarshal(bytes.TrimSpace(line), &record) == nil {
-		if record.Type == "cmd_start" {
+		if record.Type == "cmd_start" && d.isNextStepStart(record.Index) {
 			var start liveLogCommandStartRecord
 			if json.Unmarshal(line, &start) == nil {
 				if d.failed != nil && !d.failed.outputFrozen {
@@ -76,12 +78,15 @@ func (d *failureDiagnostics) line(line []byte) {
 					d.failed.outputFrozen = true
 				}
 				d.step = start
+				d.stepRunning = true
+				d.nextStepIndex = start.Index + 1
 				d.output.Reset()
+				return
 			}
-			return
 		}
-		if record.Type == "cmd_end" {
-			if record.Status == "failed" && d.failed == nil && record.Index == d.step.Index {
+		if record.Type == "cmd_end" && d.isRunningStepEnd(record.Index) {
+			d.stepRunning = false
+			if record.Status == "failed" && d.failed == nil {
 				// Stderr can arrive after cmd_end when stdout uses a separate pipe.
 				d.failed = &failedStep{step: d.step}
 			}
@@ -89,6 +94,17 @@ func (d *failureDiagnostics) line(line []byte) {
 		}
 	}
 	d.appendOutput(string(line) + "\n")
+}
+
+// Shell and Docker steps print runner records in the same stream as command
+// output. The runner starts steps in index order and ends each step before it
+// starts the next one. A record out of that order is command output.
+func (d *failureDiagnostics) isNextStepStart(index int) bool {
+	return !d.stepRunning && index == d.nextStepIndex
+}
+
+func (d *failureDiagnostics) isRunningStepEnd(index int) bool {
+	return d.stepRunning && index == d.step.Index
 }
 func (d *failureDiagnostics) appendOutput(line string) {
 	d.output.WriteString(line)

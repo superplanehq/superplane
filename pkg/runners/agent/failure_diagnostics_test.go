@@ -40,6 +40,7 @@ func TestAgentPreservesFailureDiagnostics(t *testing.T) {
 				{"JSON environment secret", `printf '%s\n' '{"message":"pa\"ss&word"}' >&2; return 23`, "message", 23},
 				{"JSON query credential", `printf '%s\n' '{"message":"https://example.com/?status=401\u0026key=private-query-value"}' >&2; return 23`, "status=401", 23},
 				{"quoted credential", `printf '%s\n' '{"password":"first second&third\"fourth"}' >&2; return 23`, "[REDACTED]", 23},
+				{"replayed runner record", `echo 'before replay' >&2; printf '%s\n' '{"type":"cmd_start","index":99,"text":"Other step"}' '{"type":"cmd_end","index":99,"status":"failed","duration_ms":0}'; return 23`, "before replay", 23},
 				{"prompt timeout", `printf '%s\n' '{"is_error":true,"error":"old provider error"}' > "$SUPERPLANE_RESULT_FILE"; exec sleep 30`, "execution timed out", 124},
 			} {
 				t.Run(tc.name, func(t *testing.T) {
@@ -116,6 +117,25 @@ func TestFailureDiagnosticsRetainsLateOutputForFailedStep(t *testing.T) {
 			assert.Contains(t, failure.Error(), "late failure output")
 			assert.NotContains(t, failure.Error(), "later cleanup output")
 		})
+	}
+}
+
+func TestFailureDiagnosticsKeepsOutOfOrderRecordsAsOutput(t *testing.T) {
+	diagnostics := &failureDiagnostics{}
+	_, err := io.WriteString(diagnostics, `{"type":"cmd_start","index":0,"text":"Check pull requests"}`+"\n"+
+		"before replay\n"+
+		`{"type":"cmd_start","index":1,"text":"Replayed next step"}`+"\n"+
+		`{"type":"cmd_end","index":4,"status":"failed"}`+"\n"+
+		`{"type":"cmd_end","index":0,"status":"failed"}`+"\n"+
+		`{"type":"cmd_start","index":0,"text":"Replayed first step"}`+"\n"+
+		"after failure\n")
+	require.NoError(t, err)
+
+	failure := diagnostics.failure(&api.TaskPayload{ID: "task-1"}, 23, errors.New("exit code 23"), nil).Error()
+
+	assert.Contains(t, failure, "Check pull requests (step 1)")
+	for _, output := range []string{"before replay", "Replayed next step", `"index":4`, "Replayed first step", "after failure"} {
+		assert.Contains(t, failure, output)
 	}
 }
 
