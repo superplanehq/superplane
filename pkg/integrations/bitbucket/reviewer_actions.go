@@ -191,8 +191,19 @@ func (*EnsurePullRequestReviewers) Setup(ctx core.SetupContext) error {
 		if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 			return err
 		}
-		if _, err := normalizeReviewers(config.Reviewers); err != nil {
-			return err
+		if len(config.Reviewers) == 0 {
+			return fmt.Errorf("at least one reviewer UUID is required")
+		}
+		literals := []ReviewerIdentity{}
+		for _, reviewer := range config.Reviewers {
+			if !isExpression(reviewer.UUID) {
+				literals = append(literals, reviewer)
+			}
+		}
+		if len(literals) > 0 {
+			if _, err := normalizeReviewers(literals); err != nil {
+				return err
+			}
 		}
 	}
 	sha, _ := fields["expectedHeadSha"].(string)
@@ -220,8 +231,9 @@ func (h reviewerHTTPContext) Do(request *http.Request) (*http.Response, error) {
 	return h.HTTPContext.Do(request.WithContext(h.context))
 }
 
-// EnsurePullRequestReviewersSerialized reuses durable publication leases. No
-// database transaction stays open during provider calls. Requests end before lease expiry.
+// EnsurePullRequestReviewersSerialized requires a store whose updates commit
+// independently of the execution transaction. Provider calls hold no publication
+// locks and end before lease expiry.
 func (c *Client) EnsurePullRequestReviewersSerialized(store core.PublicationStore, repositoryID string, request ReviewerRequest) (ReviewerRequestOutcome, error) {
 	if store == nil {
 		return ReviewerRequestOutcome{}, fmt.Errorf("durable reviewer write serialization is unavailable")
@@ -269,7 +281,10 @@ func (*EnsurePullRequestReviewers) Execute(ctx core.ExecutionContext) error {
 	if err != nil {
 		return err
 	}
-	outcome, err := client.EnsurePullRequestReviewersSerialized(ctx.Publications, repositoryID, config)
+	if ctx.Publications == nil {
+		return fmt.Errorf("durable reviewer write serialization is unavailable")
+	}
+	outcome, err := client.EnsurePullRequestReviewersSerialized(ctx.Publications.IndependentStore(), repositoryID, config)
 	if err != nil {
 		return err
 	}

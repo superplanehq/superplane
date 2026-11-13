@@ -1,15 +1,22 @@
 package bitbucket
 
 import (
+	"context"
 	"encoding/json"
-	"github.com/google/uuid"
-	"github.com/superplanehq/superplane/pkg/core"
-	contexts "github.com/superplanehq/superplane/test/support/contexts"
+	"errors"
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/models"
+	workercontexts "github.com/superplanehq/superplane/pkg/workers/contexts"
+	"github.com/superplanehq/superplane/test/support"
+	contexts "github.com/superplanehq/superplane/test/support/contexts"
 )
 
 const reviewAuthor = "11111111-1111-1111-1111-111111111111"
@@ -299,6 +306,8 @@ type reviewerPublications struct {
 	records map[string]core.OrderedPublication
 }
 
+func (p *reviewerPublications) IndependentStore() core.PublicationStore { return p }
+
 func (p *reviewerPublications) Update(key string, apply func(*core.OrderedPublication) error) error {
 	record := p.records[key]
 	if err := apply(&record); err != nil {
@@ -406,7 +415,7 @@ func TestReviewerSetupAndResourceCredentialCapabilities(t *testing.T) {
 }
 
 func TestEnsureReviewerSetupRejectsInvalidSelection(t *testing.T) {
-	for _, reviewers := range []any{[]any{}, []any{map[string]any{"uuid": "nickname"}}, []any{map[string]any{"uuid": reviewHuman}, map[string]any{"uuid": "{" + reviewHuman + "}"}}} {
+	for _, reviewers := range []any{[]any{}, []any{map[string]any{"uuid": "{{ steps.reviewer }}"}, map[string]any{"uuid": "nickname"}}, []any{map[string]any{"uuid": "nickname"}}, []any{map[string]any{"uuid": reviewHuman}, map[string]any{"uuid": "{" + reviewHuman + "}"}}} {
 		err := (&EnsurePullRequestReviewers{}).Setup(core.SetupContext{Configuration: map[string]any{"repository": "acme/widgets", "pullNumber": "42", "expectedHeadSha": "abc", "reviewers": reviewers}, Integration: reviewerAPIIntegration()})
 		require.Error(t, err)
 	}
@@ -420,4 +429,66 @@ func TestEnsureReviewersKeepsPostWriteStalenessVisibleDuringReconciliation(t *te
 	outcome, err := client.ensurePullRequestReviewers("acme/widgets", 42, "abc", []ReviewerIdentity{{UUID: reviewHuman}})
 	require.ErrorContains(t, err, "changed during reviewer update")
 	require.Empty(t, outcome.Status)
+}
+
+func TestEnsureReviewerSetupAcceptsExpressions(t *testing.T) {
+	for _, reviewers := range []any{
+		"{{ steps.candidates.data.reviewers }}",
+		[]any{map[string]any{"uuid": "{{ steps.candidates.data.candidates[0].uuid }}"}},
+		[]any{map[string]any{"uuid": reviewHuman}, map[string]any{"uuid": "{{ steps.candidates.data.candidates[0].uuid }}"}},
+	} {
+		err := (&EnsurePullRequestReviewers{}).Setup(core.SetupContext{Configuration: map[string]any{"repository": "{{ steps.repository }}", "pullNumber": "42", "expectedHeadSha": "abc", "reviewers": reviewers}, Integration: reviewerAPIIntegration()})
+		require.NoError(t, err)
+		err = (&EnsurePullRequestReviewers{}).Execute(core.ExecutionContext{Configuration: map[string]any{"repository": "acme/widgets", "pullNumber": "42", "expectedHeadSha": "abc", "reviewers": reviewers}})
+		require.Error(t, err, "unresolved reviewer expressions must fail during execution")
+	}
+}
+
+func TestReviewerActionCommitsLeaseOutsideExecutionTransaction(t *testing.T) {
+	for _, providerFails := range []bool{false, true} {
+		t.Run(map[bool]string{false: "stale PR", true: "provider error"}[providerFails], func(t *testing.T) {
+			r := support.Setup(t)
+			t.Cleanup(r.Close)
+			installation := support.CreateIntegrationWithCapabilities(t, r.Organization.ID, nil)
+			integration := reviewerAPIIntegration()
+			integration.IntegrationID = installation.ID.String()
+			db := database.DB(t.Context())
+			tx := db.Begin()
+			require.NoError(t, tx.Error)
+			defer tx.Rollback()
+			node := &models.CanvasNode{AppInstallationID: &installation.ID}
+			publications := workercontexts.NewPublicationContext(tx, r.Organization.ID, node, nil)
+			key := ReviewerWriteKey(reviewOther, 42)
+			httpCtx := reviewerHTTPFunc(func(request *http.Request) (*http.Response, error) {
+				if strings.HasSuffix(request.URL.Path, "/pullrequests/42") {
+					readCtx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
+					defer cancel()
+					competing := workercontexts.NewPublicationContext(db.WithContext(readCtx), r.Organization.ID, node, nil)
+					record, err := competing.Get(key)
+					require.NoError(t, err)
+					require.NotNil(t, record, "lease must be visible before the provider call")
+					_, err = core.BeginPublicationLease(competing, key, time.Minute)
+					require.ErrorIs(t, err, core.ErrPublicationBusy)
+					if providerFails {
+						return nil, errors.New("provider unavailable")
+					}
+					return okResponse(reviewSnapshot("changed", "OPEN")), nil
+				}
+				return okResponse(`{"uuid":"{` + reviewOther + `}"}`), nil
+			})
+			state := &contexts.ExecutionStateContext{}
+			err := (&EnsurePullRequestReviewers{}).Execute(core.ExecutionContext{Configuration: map[string]any{"repository": "acme/widgets", "pullNumber": 42, "expectedHeadSha": "abc", "reviewers": []any{map[string]any{"uuid": reviewHuman}}}, Integration: integration, Publications: publications, ExecutionState: state, HTTP: httpCtx})
+			if providerFails {
+				require.ErrorContains(t, err, "provider unavailable")
+				require.Empty(t, state.Payloads)
+			} else {
+				require.NoError(t, err)
+			}
+			require.NoError(t, tx.Rollback().Error)
+			store := workercontexts.NewPublicationContext(db, r.Organization.ID, node, nil)
+			lease, err := core.BeginPublicationLease(store, key, time.Minute)
+			require.NoError(t, err, "lease release must survive execution rollback")
+			require.NoError(t, core.FinishPublicationLease(store, key, lease))
+		})
+	}
 }
