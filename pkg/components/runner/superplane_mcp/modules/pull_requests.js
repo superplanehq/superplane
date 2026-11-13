@@ -6,9 +6,38 @@ const path = require("node:path");
 
 const LEFTOVER_COMMIT_MESSAGE = "fix: implement task via SuperPlane";
 const MAX_TITLE_LENGTH = 256;
-const NO_RETRY = "A retry will not help. Report this failure to the user.";
 const AUTHENTICATION_FAILURE =
-  /terminal prompts disabled|could not read (username|password)|authentication failed|permission to .* denied|returned error: 40[13]/i;
+  /terminal prompts disabled|could not read (username|password)|authentication failed|returned error: 401/i;
+const MAX_OUTPUT_BYTES = 16384;
+const MAX_CAUSE_BYTES = 2048;
+
+function redactedCause(cause, env) {
+  let safe = String(cause);
+  const secrets = ["GITHUB_TOKEN", "GH_TOKEN", "GH_ENTERPRISE_TOKEN", "BITBUCKET_TOKEN", "SUPERPLANE_RUNNER_TOKEN"].map(
+    (name) => env[name],
+  );
+  for (const secret of [...secrets, ...(env.publicationSecrets || [])]) {
+    if (secret) {
+      for (const value of [
+        secret,
+        encodeURIComponent(secret),
+        Buffer.from(`x-access-token:${secret}`).toString("base64"),
+      ]) {
+        safe = safe.split(value).join("[REDACTED]");
+        // Captured output can stop in the middle of a credential.
+        for (let length = value.length - 1; length >= 4; length--) {
+          if (safe.endsWith(value.slice(0, length))) {
+            safe = safe.slice(0, -length) + "[REDACTED]";
+            break;
+          }
+        }
+      }
+    }
+  }
+  safe = safe.replace(/https?:\/\/[^\s/]*@/gi, "https://[REDACTED]@");
+  safe = safe.replace(/\b(Bearer|Basic)\s+[A-Za-z0-9+/=_-]+/gi, "$1 [REDACTED]");
+  return Buffer.from(safe).subarray(0, MAX_CAUSE_BYTES).toString();
+}
 
 // The server's whole tool call must end before the agent stops waiting for
 // it, so every git command has its own limit.
@@ -52,14 +81,20 @@ function git(directory, args, env, timeoutMs) {
     running.add(child);
     let stdout = "";
     let stderr = "";
-    child.stdout.setEncoding("utf8").on("data", (chunk) => (stdout += chunk));
-    child.stderr.setEncoding("utf8").on("data", (chunk) => (stderr += chunk));
+    let stdoutTruncated = false;
+    child.stdout.setEncoding("utf8").on("data", (chunk) => {
+      stdoutTruncated ||= stdout.length + chunk.length > MAX_OUTPUT_BYTES;
+      stdout = (stdout + chunk).slice(0, MAX_OUTPUT_BYTES);
+    });
+    child.stderr.setEncoding("utf8").on("data", (chunk) => (stderr = (stderr + chunk).slice(0, MAX_OUTPUT_BYTES)));
     const timer = setTimeout(() => {
       killProcessGroup(child);
       settle(reject, new Error(`git ${args[0]} did not finish in ${timeoutMs / 1000}s and was stopped`));
     }, timeoutMs);
-    child.on("error", (error) => settle(reject, new Error(`git ${args[0]} failed: ${error.message}`)));
-    child.on("close", (status) => settle(resolve, { status, stdout: stdout.trim(), stderr: stderr.trim() }));
+    child.on("error", (error) =>
+      settle(reject, new Error(`git ${args[0]} failed: ${redactedCause(error.message, env)}`)),
+    );
+    child.on("close", (status) => settle(resolve, { status, stdout: stdout.trim(), stderr: stderr.trim(), stdoutTruncated }));
   });
 }
 
@@ -80,22 +115,19 @@ function stopGitCommands() {
 
 async function gitOutput(directory, args, env, timeoutMs) {
   const result = await git(directory, args, env, timeoutMs);
-  if (result.status === 0) return result.stdout;
-  if (AUTHENTICATION_FAILURE.test(result.stderr)) {
-    throw new Error(
-      `git ${args[0]} could not authenticate to the remote. No usable credential is available to the SuperPlane tool. ${NO_RETRY}`,
-    );
+  if (result.status === 0) {
+    if (result.stdoutTruncated) throw new Error(`git ${args[0]} output exceeded the publication limit`);
+    return result.stdout;
   }
-  throw new Error(`git ${args.join(" ")} failed: ${result.stderr || `exit ${result.status}`}`);
-}
-
-// A rejected request does not change on retry. Server errors and timeouts can.
-function withRetryAdvice(error) {
-  const status = Number(error && error.status);
-  if (status >= 400 && status < 500 && status !== 408 && status !== 429) {
-    error.message = `${error.message} ${NO_RETRY}`;
-  }
-  return error;
+  const cause = redactedCause(result.stderr || `exit ${result.status}`, env);
+  let classification = "failed";
+  if (/permission to .* denied|write access .* not granted/i.test(cause)) classification = "permission denied";
+  else if (/returned error: 403/i.test(cause)) classification = "access denied (authentication or permission)";
+  else if (AUTHENTICATION_FAILURE.test(cause)) classification = "authentication rejected";
+  else if (/hook declined|pre-push|hook.*failed/i.test(cause)) classification = "hook rejected";
+  else if (/could not resolve|failed to connect|connection.*(reset|refused)|timed out/i.test(cause))
+    classification = "network failure";
+  throw new Error(`git ${args[0]} ${classification}: ${cause}`);
 }
 
 // workspaceRoot is the directory that holds repo/ and context/. The checkout
@@ -135,8 +167,82 @@ function repositoryDirectory(input, env) {
 async function remoteRepository(directory, env, timeouts) {
   const url = await gitOutput(directory, ["remote", "get-url", "origin"], env, timeouts.local);
   const match = url.replace(/\.git$/, "").match(/[/:]([^/:]+)\/([^/]+)$/);
-  if (!match) throw new Error(`cannot read the repository from the origin URL ${url}`);
+  if (!match) throw new Error("cannot read the repository from the origin URL");
   return `${match[1]}/${match[2]}`;
+}
+
+function githubDestination(raw) {
+  let url;
+  try {
+    url = new URL(raw);
+  } catch {
+    throw new Error("Unsupported GitHub publication destination");
+  }
+  const repository = url.pathname.replace(/^\//, "").replace(/\.git$/, "");
+  if (
+    url.protocol !== "https:" ||
+    url.username ||
+    url.password ||
+    url.search ||
+    url.hash ||
+    (url.port && url.port !== "443") ||
+    !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository)
+  ) {
+    throw new Error("Unsupported or credential-bearing GitHub publication destination");
+  }
+  return { host: url.hostname.toLowerCase(), repository };
+}
+
+async function publicationEnvironment(directory, client, timeouts) {
+  const env = client.env;
+  const fetchURLs = (await gitOutput(directory, ["remote", "get-url", "--all", "origin"], env, timeouts.local)).split(
+    "\n",
+  );
+  const pushURLs = (
+    await gitOutput(directory, ["remote", "get-url", "--push", "--all", "origin"], env, timeouts.local)
+  ).split("\n");
+  const bitbucket = fetchURLs.every((url) => /^https:\/\/bitbucket\.org\//i.test(url));
+  const github =
+    !bitbucket && (env.GITHUB_TOKEN || env.GH_HOST || fetchURLs.some((url) => /github\.com|\.ghe\.com/.test(url)));
+  if (!github)
+    return {
+      env,
+      repository: await remoteRepository(directory, env, timeouts),
+    };
+  const destination = githubDestination(fetchURLs[0]);
+  for (const raw of [...fetchURLs, ...pushURLs]) {
+    const candidate = githubDestination(raw);
+    if (
+      candidate.host !== destination.host ||
+      candidate.repository.toLowerCase() !== destination.repository.toLowerCase()
+    ) {
+      throw new Error("GitHub fetch and push destinations do not match");
+    }
+  }
+  let credential;
+  try {
+    credential = await client.request(
+      "POST",
+      "/api/v1/runner/task/publication-credential",
+      destination,
+      timeouts.request,
+    );
+  } catch (error) {
+    throw new Error(`GitHub publication credential resolution failed: ${redactedCause(error.message, env)}`);
+  }
+  if (!credential.token || credential.host !== destination.host)
+    throw new Error("Invalid GitHub publication credential response");
+  const renewed = {
+    ...env,
+    GITHUB_TOKEN: credential.token,
+    GH_TOKEN: credential.token,
+    GH_HOST: credential.host,
+  };
+  Object.defineProperty(renewed, "publicationSecrets", {
+    value: [env.GITHUB_TOKEN, env.GH_TOKEN, env.GH_ENTERPRISE_TOKEN],
+  });
+  if (credential.host !== "github.com") renewed.GH_ENTERPRISE_TOKEN = credential.token;
+  return { env: renewed, repository: destination.repository };
 }
 
 async function baseBranch(input, directory, primary, env, timeouts) {
@@ -153,7 +259,12 @@ async function ensureRemoteBase(directory, base, env, timeouts) {
   const remoteRef = `refs/remotes/origin/${base}`;
   const local = await git(directory, ["rev-parse", "--verify", "--quiet", remoteRef], env, timeouts.local);
   if (local.status === 0) return;
-  await gitOutput(directory, ["fetch", "--depth", "1", "origin", `refs/heads/${base}:${remoteRef}`], env, timeouts.fetch);
+  await gitOutput(
+    directory,
+    ["fetch", "--depth", "1", "origin", `refs/heads/${base}:${remoteRef}`],
+    env,
+    timeouts.fetch,
+  );
 }
 
 async function commitLeftovers(directory, env, timeouts) {
@@ -167,7 +278,16 @@ async function commitLeftovers(directory, env, timeouts) {
  * asks SuperPlane to open or update its pull request on this task.
  */
 async function openPullRequest(input, client, timeouts = DEFAULT_TIMEOUTS) {
-  const env = client.env;
+  // Leave time for the MCP response before its 270s deadline.
+  const deadline = Date.now() + 240000;
+  const limits = { ...timeouts, request: 60000 };
+  timeouts = {};
+  for (const [operation, limit] of Object.entries(limits)) {
+    Object.defineProperty(timeouts, operation, {
+      get: () => Math.max(1, Math.min(limit, deadline - Date.now())),
+    });
+  }
+  let env = client.env;
   const title = text(input, "title");
   if (!title) throw new Error("title is required");
   if (title.length > MAX_TITLE_LENGTH) throw new Error(`title must be at most ${MAX_TITLE_LENGTH} characters`);
@@ -178,24 +298,33 @@ async function openPullRequest(input, client, timeouts = DEFAULT_TIMEOUTS) {
   const base = await baseBranch(input, directory, primary, env, timeouts);
   if (head === base) throw new Error(`create a branch first; do not commit on ${base}`);
 
+  const publication = await publicationEnvironment(directory, client, timeouts);
+  env = publication.env;
   await commitLeftovers(directory, env, timeouts);
   await ensureRemoteBase(directory, base, env, timeouts);
-  const ahead = Number(await gitOutput(directory, ["rev-list", "--count", `origin/${base}..HEAD`], env, timeouts.local));
+  const ahead = Number(
+    await gitOutput(directory, ["rev-list", "--count", `origin/${base}..HEAD`], env, timeouts.local),
+  );
   if (!ahead) throw new Error(`${head} has no commits ahead of ${base}`);
   await gitOutput(directory, ["push", "-u", "origin", "HEAD"], env, timeouts.push);
-  const repository = await remoteRepository(directory, env, timeouts);
+  const repository = publication.repository;
 
   try {
-    return await client.request("POST", "/api/v1/runner/task/pull-requests", {
-      repository,
-      head,
-      base,
-      title,
-      body: String((input && input.body) || ""),
-      draft: (input && input.draft === true) || String(env.DRAFT_PULL_REQUESTS || "").trim() === "true",
-    });
+    return await client.request(
+      "POST",
+      "/api/v1/runner/task/pull-requests",
+      {
+        repository,
+        head,
+        base,
+        title,
+        body: String((input && input.body) || ""),
+        draft: (input && input.draft === true) || String(env.DRAFT_PULL_REQUESTS || "").trim() === "true",
+      },
+      timeouts.request,
+    );
   } catch (error) {
-    throw withRetryAdvice(error);
+    throw new Error(`Pull request creation failed: ${redactedCause(error.message, env)}`);
   }
 }
 
@@ -211,11 +340,29 @@ const OPEN_PULL_REQUEST = {
     inputSchema: {
       type: "object",
       properties: {
-        directory: { type: "string", description: "Optional. repo (the default) or context/<owner>/<name>." },
-        title: { type: "string", maxLength: MAX_TITLE_LENGTH, description: "The pull request title." },
-        body: { type: "string", description: "Optional. The pull request description in Markdown." },
-        base: { type: "string", description: "Optional. The base branch. The default is the task branch for repo and the repository default branch for other repositories." },
-        draft: { type: "boolean", description: "Optional. When the draft setting is false or absent, omit this argument or pass false. Pass true only if the task description or approved specification explicitly requests a draft. Do not infer a draft request from incomplete work, failed checks, repository convention, or agent preference. When DRAFT_PULL_REQUESTS is true, create a draft. Updating an existing pull request does not change its draft state." },
+        directory: {
+          type: "string",
+          description: "Optional. repo (the default) or context/<owner>/<name>.",
+        },
+        title: {
+          type: "string",
+          maxLength: MAX_TITLE_LENGTH,
+          description: "The pull request title.",
+        },
+        body: {
+          type: "string",
+          description: "Optional. The pull request description in Markdown.",
+        },
+        base: {
+          type: "string",
+          description:
+            "Optional. The base branch. The default is the task branch for repo and the repository default branch for other repositories.",
+        },
+        draft: {
+          type: "boolean",
+          description:
+            "Optional. When the draft setting is false or absent, omit this argument or pass false. Pass true only if the task description or approved specification explicitly requests a draft. Do not infer a draft request from incomplete work, failed checks, repository convention, or agent preference. When DRAFT_PULL_REQUESTS is true, create a draft. Updating an existing pull request does not change its draft state.",
+        },
       },
       required: ["title"],
     },
@@ -226,7 +373,8 @@ const OPEN_PULL_REQUEST = {
 const LIST_PULL_REQUESTS = {
   definition: {
     name: "list_pull_requests",
-    description: "List the pull requests on this run's task. Each pull request has repository, number, url, title, and state.",
+    description:
+      "List the pull requests on this run's task. Each pull request has repository, number, url, title, and state.",
     inputSchema: { type: "object", properties: {} },
   },
   handler: listPullRequests,
