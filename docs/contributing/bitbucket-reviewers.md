@@ -90,9 +90,11 @@ It takes a `ReviewerRequest`, a stable repository UUID, and the integration-scop
 `ReviewerWriteKey` adds provider, repository UUID, and PR number to that store boundary.
 All automation reviewer writers must use this method and key.
 
-The method reuses the durable publication lease. A busy lease returns an error before provider mutation.
+The method reuses the durable publication lease.
+Callers must use `Publications.IndependentStore()` so lease acquisition and release commit independently of the execution transaction.
+Provider calls run between these commits without publication locks. A busy lease returns an error before provider mutation.
 HTTP requests have a deadline 15 seconds before the two-minute lease expires.
-There is no database transaction open during provider calls.
+No publication transaction stays open during provider calls.
 A worker interruption leaves the lease for bounded expiry; a retry reads current provider state again.
 
 Each attempt rechecks effective eligibility and the latest PR snapshot immediately before a write.
