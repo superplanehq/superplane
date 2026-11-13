@@ -95,6 +95,7 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   addPullRequestReviewers: addPullRequestReviewersMapper,
   updatePullRequest: updatePullRequestMapper,
   updatePullRequestBodySection: updatePullRequestBodySectionMapper,
+  publishPullRequestComment: updatePullRequestBodySectionMapper,
   findPullRequest: findPullRequestMapper,
   runWorkflow: runWorkflowMapper,
   waitForPullRequestChecks: waitForPullRequestChecksMapper,

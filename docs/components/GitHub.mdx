@@ -52,6 +52,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Mark Pull Request Ready for Review" href="#mark-pull-request-ready-for-review" description="Take a draft pull request out of the draft state in a GitHub repository" />
   <LinkCard title="Merge Pull Request" href="#merge-pull-request" description="Merge an open pull request in a GitHub repository" />
   <LinkCard title="Publish Commit Status" href="#publish-commit-status" description="Publish a status check to a GitHub commit" />
+  <LinkCard title="Publish PR Comment" href="#publish-pr-comment" description="Create or update one managed comment on a GitHub pull request" />
   <LinkCard title="Remove Issue Assignee" href="#remove-issue-assignee" description="Remove assignees from a GitHub issue" />
   <LinkCard title="Remove Issue Label" href="#remove-issue-label" description="Remove labels from a GitHub issue" />
   <LinkCard title="Run Workflow" href="#run-workflow" description="Run GitHub Actions workflow" />
@@ -4598,6 +4599,38 @@ Returns the created status object with all status information.
 }
 ```
 
+<a id="publish-pr-comment"></a>
+
+## Publish PR Comment
+
+**Component key:** `github.publishPullRequestComment`
+
+Create or update one managed comment on a pull request. Each canvas keeps one comment for each pull request and comment key.
+
+Use a stable comment key with lowercase letters, numbers, and single hyphens. Start with a letter. SuperPlane adds a hidden marker with the key and the canvas ID. It edits the comment that has this marker and does not change other comments.
+
+Writers are ordered by their persisted source run and attempt. The source is the broadcast source run, or the current run for other triggers. An older source or attempt cannot replace the comment, including on the same commit.
+
+Each attempt reads the pull request, rechecks the order and the saved node, and then writes. Set **Expected Head SHA** to skip publication if the pull request commit changes. Closed pull requests are skipped. **Enabled** defaults to true. Increase **Activation Generation** when you enable the node again. Attempts that started with another generation do not write.
+
+The saved comment ID is checked before an update. If the comment is missing or has no marker, SuperPlane searches the pull request for the marker before it creates a comment. A retry after an uncertain response updates the same comment.
+
+Temporary failures retry through scheduled requests with the resolved body. Host rejections and exhausted retries fail the step. Disabling the node keeps published comments.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "attempts": 1,
+    "commentId": 123,
+    "status": "published"
+  },
+  "timestamp": "2026-11-13T12:00:00Z",
+  "type": "github.pullRequestCommentPublished"
+}
+```
+
 <a id="remove-issue-assignee"></a>
 
 ## Remove Issue Assignee
@@ -5471,6 +5504,10 @@ Set **Expected Head SHA** to skip publication if the pull request commit changes
 Temporary failures retry through scheduled requests. Each attempt reads the latest description. Provider calls run outside database transactions. Execution details show attempts and publication outcomes.
 
 In factory apps, disabling the published node stops pending writes. Newer runs for the same pull request and section supersede older runs.
+
+Turn on **Ordered** to order writers by their persisted source run and attempt. The source is the broadcast source run, or the current run for other triggers. An older source or attempt cannot replace the section, including on the same commit and across canvases. Each attempt rechecks the order, the pull request commit, and the saved node at the write. Ordered publication fails the step when the host rejects the write or retries are exhausted.
+
+**Activation Generation** fences saved activations. Increase it when you enable the node again. Attempts that started with another generation do not write.
 
 ### Example Output
 

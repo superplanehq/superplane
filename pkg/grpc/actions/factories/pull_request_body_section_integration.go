@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	factorycomponent "github.com/superplanehq/superplane/pkg/components/factory"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/exprruntime"
 	"github.com/superplanehq/superplane/pkg/factories/mergeconfidence"
 	"github.com/superplanehq/superplane/pkg/integrations/bitbucket"
@@ -21,6 +22,53 @@ import (
 
 var errBodySectionIntegrationUnavailable = errors.New("publication integration is unavailable")
 
+// permanentPublicationError marks an ordered publication that retries cannot fix.
+type permanentPublicationError struct{ cause error }
+
+func (e permanentPublicationError) Error() string { return e.cause.Error() }
+func (e permanentPublicationError) Unwrap() error { return e.cause }
+
+// newPublicationConnection builds the provider access of an integration node.
+// Tests replace it to substitute provider responses.
+var newPublicationConnection = func(db *gorm.DB, deps IntakeDependencies, node *models.CanvasNode, integration *models.Integration) (core.IntegrationContext, core.HTTPContext) {
+	return contexts.NewIntegrationContext(db, node, integration, deps.Encryptor, deps.Registry, nil), deps.Registry.HTTPContextInTransaction(db)
+}
+
+func isPublicationComponent(component string) bool {
+	return prbody.IsComponent(component) || component == pulls.PullRequestCommentComponent
+}
+
+func publicationHook(component string) string {
+	if component == pulls.PullRequestCommentComponent {
+		return pulls.PullRequestCommentHook
+	}
+	return factorycomponent.UpdatePullRequestBodySectionHook
+}
+
+func (a *bodySectionActionAttempt) isComment() bool {
+	return a.component == pulls.PullRequestCommentComponent
+}
+
+// Ordered publications apply source and attempt ordering at the write. They
+// fail the step when a write cannot complete, so Runs shows the destination.
+func (a *bodySectionActionAttempt) ordered() bool {
+	return a.isComment() || (a.component != factorycomponent.UpdatePullRequestBodySectionComponentName && a.integrationConfiguration.Ordered)
+}
+
+func (a *bodySectionActionAttempt) destination() string {
+	if a.isComment() {
+		return "pull request comment"
+	}
+	return "pull request description"
+}
+
+func (a *bodySectionActionAttempt) enabled() bool {
+	if a.isComment() {
+		return a.commentConfiguration.IsEnabled()
+	}
+	return a.integrationConfiguration.IsEnabled()
+}
+
 func (a *bodySectionActionAttempt) publish(ctx context.Context, db *gorm.DB, deps IntakeDependencies) (bodySectionPublicationOutcome, error) {
 	if a.component == factorycomponent.UpdatePullRequestBodySectionComponentName {
 		return publishBodySection(ctx, db, deps, sectionPublication{run: a.source, nodeID: a.execution.NodeID, configuration: a.configuration, stillActive: a.stillActive})
@@ -28,9 +76,11 @@ func (a *bodySectionActionAttempt) publish(ctx context.Context, db *gorm.DB, dep
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 	db = db.WithContext(ctx)
-	config := a.integrationConfiguration
-	if !config.IsEnabled() {
+	if !a.enabled() {
 		return prbody.Skipped("Publication is disabled for this run."), nil
+	}
+	if a.ordered() && a.state.Publication == nil {
+		return bodySectionPublicationOutcome{}, permanentPublicationError{fmt.Errorf("the publication was not accepted when the step started")}
 	}
 	eligible := func() (bool, error) { return a.integrationPublicationEligible(db) }
 	active, err := eligible()
@@ -40,9 +90,16 @@ func (a *bodySectionActionAttempt) publish(ctx context.Context, db *gorm.DB, dep
 	if !active {
 		return prbody.Skipped("Publication is disabled, cancelled, or superseded."), nil
 	}
-	client, err := a.integrationClient(db, deps)
+	integration, http, err := a.integrationConnection(db, deps)
 	if err != nil {
-		return bodySectionPublicationError(err)
+		return a.publicationError(err)
+	}
+	if a.isComment() {
+		return a.publishComment(ctx, db, integration, http, eligible)
+	}
+	client, err := a.bodySectionClient(integration, http)
+	if err != nil {
+		return a.publicationError(err)
 	}
 	return a.publishIntegrationBodySection(ctx, db, client)
 }
@@ -60,11 +117,49 @@ func (a *bodySectionActionAttempt) publishIntegrationBodySection(ctx context.Con
 	if githubClient, ok := client.(*pulls.BodySectionClient); ok && config.SectionKey == "merge-confidence" {
 		config.Body = a.enrichReviewedCommit(ctx, db, githubClient, config)
 	}
-	outcome, err := prbody.Publish(ctx, client, config, eligible)
+	publications := a.publications(db)
+	if a.ordered() {
+		client = prbody.OrderedClient(client, publications, *a.state.Publication)
+	}
+	outcome, err := prbody.PublishSerialized(ctx, client, publications, config, eligible)
 	if err != nil {
-		return bodySectionPublicationError(err)
+		return a.publicationError(err)
 	}
 	return outcome, nil
+}
+
+func (a *bodySectionActionAttempt) publishComment(ctx context.Context, db *gorm.DB, integration core.IntegrationContext, http core.HTTPContext, eligible func() (bool, error)) (bodySectionPublicationOutcome, error) {
+	client, err := pulls.NewCommentClient(integration, http)
+	if err != nil {
+		return a.publicationError(err)
+	}
+	boundary := pulls.NewOrderedCommentBoundary(a.publications(db), *a.state.Publication)
+	outcome, err := pulls.PublishComment(ctx, client, a.commentConfiguration, a.commentConfiguration.Marker(a.execution.WorkflowID), eligible, boundary)
+	if outcome.CommentID > 0 {
+		a.state.CommentID = outcome.CommentID
+	}
+	if err != nil {
+		return a.publicationError(err)
+	}
+	return outcome.Outcome, nil
+}
+
+func (a *bodySectionActionAttempt) publications(db *gorm.DB) *contexts.PublicationContext {
+	return contexts.NewPublicationContext(db, a.organizationID, a.node, a.execution)
+}
+
+// publicationError keeps unordered behavior: host rejections are skipped.
+func (a *bodySectionActionAttempt) publicationError(err error) (bodySectionPublicationOutcome, error) {
+	if errors.Is(err, core.ErrPublicationSuperseded) {
+		return prbody.Skipped(prbody.SupersededReason), nil
+	}
+	if !a.ordered() {
+		return bodySectionPublicationError(err)
+	}
+	if errors.Is(err, errBodySectionIntegrationUnavailable) || !retryableDescriptionError(err) {
+		return bodySectionPublicationOutcome{}, permanentPublicationError{err}
+	}
+	return bodySectionPublicationOutcome{}, fmt.Errorf("publish %s: %w", a.destination(), err)
 }
 
 func (a *bodySectionActionAttempt) enrichReviewedCommit(ctx context.Context, db *gorm.DB, client *pulls.BodySectionClient, config prbody.Configuration) string {
@@ -112,10 +207,10 @@ func (a *bodySectionActionAttempt) enrichReviewedCommit(ctx context.Context, db 
 	return strings.Join(lines, "\n")
 }
 
-func (a *bodySectionActionAttempt) integrationClient(db *gorm.DB, deps IntakeDependencies) (prbody.Client, error) {
+func (a *bodySectionActionAttempt) integrationConnection(db *gorm.DB, deps IntakeDependencies) (core.IntegrationContext, core.HTTPContext, error) {
 	version, err := models.FindCanvasVersionInTransaction(db, a.source.WorkflowID, a.source.VersionID)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	var integrationID string
 	for _, node := range version.Nodes {
@@ -125,34 +220,38 @@ func (a *bodySectionActionAttempt) integrationClient(db *gorm.DB, deps IntakeDep
 		}
 	}
 	if integrationID == "" {
-		return nil, errBodySectionIntegrationUnavailable
+		return nil, nil, errBodySectionIntegrationUnavailable
 	}
 	id, err := uuid.Parse(integrationID)
 	if err != nil {
-		return nil, errBodySectionIntegrationUnavailable
+		return nil, nil, errBodySectionIntegrationUnavailable
 	}
 	integration, err := models.FindUnscopedIntegrationInTransaction(db, id)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, errBodySectionIntegrationUnavailable
+		return nil, nil, errBodySectionIntegrationUnavailable
 	}
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(db, a.source.WorkflowID)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	provider, _, _ := strings.Cut(a.component, ".")
 	if integration.OrganizationID != canvas.OrganizationID || integration.AppName != provider || integration.DeletedAt.Valid {
-		return nil, errBodySectionIntegrationUnavailable
+		return nil, nil, errBodySectionIntegrationUnavailable
 	}
-	integrationContext := contexts.NewIntegrationContext(db, a.node, integration, deps.Encryptor, deps.Registry, nil)
-	http := deps.Registry.HTTPContextInTransaction(db)
+	connection, http := newPublicationConnection(db, deps, a.node, integration)
+	return connection, http, nil
+}
+
+func (a *bodySectionActionAttempt) bodySectionClient(integration core.IntegrationContext, http core.HTTPContext) (prbody.Client, error) {
+	provider, _, _ := strings.Cut(a.component, ".")
 	switch provider {
 	case models.ProviderGitHub:
-		return pulls.NewBodySectionClient(integrationContext, http)
+		return pulls.NewBodySectionClient(integration, http)
 	case models.ProviderBitbucket:
-		return bitbucket.NewBodySectionClient(integrationContext, http, a.integrationConfiguration.Repository)
+		return bitbucket.NewBodySectionClient(integration, http, a.integrationConfiguration.Repository)
 	default:
 		return nil, fmt.Errorf("unsupported publication provider: %s", provider)
 	}
@@ -160,10 +259,15 @@ func (a *bodySectionActionAttempt) integrationClient(db *gorm.DB, deps IntakeDep
 
 // Integration actions work in ordinary canvases. Factory apps additionally fence
 // publication against disabled settings and newer activity on the same PR.
+// Ordered publications fence saved activation and use persisted source and
+// attempt order instead of pull request activity.
 func (a *bodySectionActionAttempt) integrationPublicationEligible(db *gorm.DB) (bool, error) {
 	active, err := a.stillActive(db)
 	if err != nil || !active {
 		return false, err
+	}
+	if a.ordered() {
+		return a.orderedPublicationEligible(db)
 	}
 	config := a.integrationConfiguration
 	publication := sectionPublication{run: a.source, nodeID: a.execution.NodeID, configuration: factorycomponent.UpdatePullRequestBodySectionConfiguration{SectionKey: config.SectionKey}}
@@ -195,4 +299,19 @@ func (a *bodySectionActionAttempt) integrationPublicationEligible(db *gorm.DB) (
 		return false, err
 	}
 	return publication.eligible(db, pr)
+}
+
+func (a *bodySectionActionAttempt) orderedPublicationEligible(db *gorm.DB) (bool, error) {
+	component, key := a.component, a.integrationConfiguration.SectionKey
+	keyField := "sectionKey"
+	if a.isComment() {
+		key, keyField = a.commentConfiguration.CommentKey, "commentKey"
+	}
+	enabled, err := publicationNodesEnabled(db, a.source, a.execution.NodeID, func(node models.Node) bool {
+		return node.ComponentName() == component && node.Configuration[keyField] == key
+	})
+	if err != nil || !enabled {
+		return false, err
+	}
+	return core.IsCurrentOrderedWrite(a.publications(db), *a.state.Publication)
 }

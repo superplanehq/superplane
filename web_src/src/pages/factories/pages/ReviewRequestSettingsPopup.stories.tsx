@@ -5,6 +5,7 @@ import { useState } from "react";
 import { ComponentStoryShell } from "../__fixtures__/ComponentStoryShell";
 import { withFactoriesTheme } from "../__fixtures__/factoriesStoryTheme";
 import { reviewRequestCanvas } from "../__fixtures__/reviewRequestFixture";
+import { writeReviewFindings, type ReviewFindingsSettings } from "../lib/reviewRequestFindings";
 import { applyNodeConfigurations } from "./nodeConfigurationCanvas";
 import { ReviewRequestSettingsPopup } from "./ReviewRequestSettingsPopup";
 import {
@@ -14,6 +15,7 @@ import {
 } from "./automationRunHistory/factoryRunHistoryFixtures";
 
 function ReviewRequestPreview({
+  findings,
   publishCheck = false,
   empty = false,
   loading = false,
@@ -21,6 +23,7 @@ function ReviewRequestPreview({
   saving = false,
   failSave = false,
 }: {
+  findings?: ReviewFindingsSettings;
   publishCheck?: boolean;
   empty?: boolean;
   loading?: boolean;
@@ -31,6 +34,14 @@ function ReviewRequestPreview({
   const [client] = useState(() => new QueryClient({ defaultOptions: { queries: { retry: false } } }));
   const [canvas, setCanvas] = useState(() => {
     const canvas = reviewRequestCanvas();
+    if (findings) {
+      const [agent, body, comment] = ["select-reviewers", "findings-body", "findings-comment"].map(
+        (id) => canvas.spec!.nodes!.find((node) => node.id === id)!,
+      );
+      agent.configuration = writeReviewFindings(agent.configuration ?? {}, findings);
+      body.configuration = { ...body.configuration, enabled: findings.publish && findings.body };
+      comment.configuration = { ...comment.configuration, enabled: findings.publish && findings.comment };
+    }
     canvas.spec!.nodes![1].configuration!.publishPRCheck = publishCheck;
     canvas.spec!.nodes![3].configuration!.enabled = publishCheck;
     if (empty) canvas.spec!.nodes![1].configuration!.fallbackReviewer = "";
@@ -83,23 +94,38 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Configured: Story = {};
+export const FindingsOff: Story = { args: { findings: { publish: false, body: true, comment: false } } };
+export const FindingsPRBody: Story = { args: { findings: { publish: true, body: true, comment: false } } };
+export const FindingsPRComment: Story = { args: { findings: { publish: true, body: false, comment: true } } };
+export const FindingsBoth: Story = { args: { findings: { publish: true, body: true, comment: true } } };
+export const FindingsWithoutDestination: Story = {
+  args: { findings: { publish: true, body: true, comment: false } },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(await canvas.findByRole("checkbox", { name: "PR body" }));
+    await expect(canvas.getByRole("alert")).toHaveTextContent("Select at least one destination.");
+    await expect(canvas.getByTestId("review-request-settings-save")).toBeDisabled();
+  },
+};
 export const CheckOff: Story = {};
 export const CheckOn: Story = { args: { publishCheck: true } };
 export const Empty: Story = { args: { empty: true } };
 export const Loading: Story = { args: { loading: true } };
 export const Error: Story = { args: { error: true } };
 export const Saving: Story = {
-  args: { saving: true },
+  args: { saving: true, findings: { publish: true, body: true, comment: true } },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await userEvent.click(await canvas.findByTestId("review-request-settings-save"));
     await expect(canvas.getByRole("button", { name: "Saving" })).toBeDisabled();
     await expect(canvas.getByRole("textbox", { name: "Additional instructions" })).toBeDisabled();
+    await expect(canvas.getByRole("switch", { name: "Publish review findings" })).toBeDisabled();
+    await expect(canvas.getByRole("checkbox", { name: "PR comment" })).toBeDisabled();
     await expect(canvas.getByRole("switch", { name: "Publish PR check" })).toBeDisabled();
   },
 };
 export const SaveError: Story = {
-  args: { failSave: true },
+  args: { failSave: true, findings: { publish: true, body: false, comment: true } },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await userEvent.click(await canvas.findByTestId("review-request-settings-save"));

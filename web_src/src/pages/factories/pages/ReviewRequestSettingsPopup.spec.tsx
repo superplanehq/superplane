@@ -97,6 +97,75 @@ describe("Review request production settings", () => {
     }
   });
 
+  it("publishes review findings to selected destinations and keeps the choices through off, reload, and save", async () => {
+    const user = userEvent.setup();
+    const settings = renderSettings();
+    const publish = await screen.findByRole("switch", { name: "Publish review findings" });
+    expect(publish).not.toBeChecked();
+    expect(screen.queryByRole("checkbox", { name: "PR body" })).not.toBeInTheDocument();
+    await user.click(publish);
+    expect(screen.getByRole("checkbox", { name: "PR body" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "PR comment" })).not.toBeChecked();
+    await user.click(screen.getByRole("checkbox", { name: "PR body" }));
+    expect(screen.getByRole("alert")).toHaveTextContent("Select at least one destination.");
+    expect(screen.getByTestId("review-request-settings-save")).toBeDisabled();
+    await user.click(screen.getByRole("checkbox", { name: "PR comment" }));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    fireEvent.change(screen.getByRole("textbox", { name: "Additional instructions" }), {
+      target: { value: "Prefer the API owner." },
+    });
+    await user.click(screen.getByTestId("review-request-settings-save"));
+    await waitFor(() => expect(settings.onClose).toHaveBeenCalledTimes(1));
+    expect(savedConfiguration(settings, "select-reviewers")).toMatchObject({
+      publishReviewFindings: true,
+      reviewFindingsBody: false,
+      reviewFindingsComment: true,
+      reviewFindingsCommentActivationGeneration: 2,
+    });
+    expect(savedConfiguration(settings, "select-reviewers")?.additionalInstructions).toBe("Prefer the API owner.");
+    expect(savedConfiguration(settings, "findings-body")).toMatchObject({
+      enabled: false,
+      sectionKey: "review-request",
+    });
+    expect(savedConfiguration(settings, "findings-comment")).toMatchObject({ enabled: true, activationGeneration: 2 });
+
+    settings.reload();
+    await user.click(await screen.findByRole("switch", { name: "Publish review findings" }));
+    expect(screen.queryByRole("checkbox", { name: "PR comment" })).not.toBeInTheDocument();
+    fireEvent.change(screen.getByRole("textbox", { name: "Additional instructions" }), { target: { value: "" } });
+    await user.click(screen.getByTestId("review-request-settings-save"));
+    await waitFor(() => expect(savedConfiguration(settings, "findings-comment")?.enabled).toBe(false));
+    expect(savedConfiguration(settings, "select-reviewers")).toMatchObject({
+      publishReviewFindings: false,
+      reviewFindingsBody: false,
+      reviewFindingsComment: true,
+      additionalInstructions: "",
+    });
+
+    settings.reload();
+    await user.click(await screen.findByRole("switch", { name: "Publish review findings" }));
+    expect(screen.getByRole("checkbox", { name: "PR body" })).not.toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "PR comment" })).toBeChecked();
+    await user.click(screen.getByTestId("review-request-settings-save"));
+    // Enabling again starts a new activation, so earlier attempts cannot write.
+    await waitFor(() =>
+      expect(savedConfiguration(settings, "findings-comment")).toMatchObject({
+        enabled: true,
+        activationGeneration: 3,
+      }),
+    );
+    expect(savedConfiguration(settings, "select-reviewers")?.additionalInstructions).toBe("");
+  });
+
+  it("asks for admin reset before older installations publish review findings", async () => {
+    const user = userEvent.setup();
+    const settings = renderSettings({ legacy: true });
+    await user.click(await screen.findByRole("switch", { name: "Publish review findings" }));
+    await user.click(screen.getByTestId("review-request-settings-save"));
+    expect(await screen.findByRole("alert")).toHaveTextContent("admin reset");
+    expect(savedConfiguration(settings, "select-reviewers")?.publishReviewFindings).toBeUndefined();
+  });
+
   it("combines workspace repository reviewers without duplicates and preserves the saved fallback on lookup failure", async () => {
     const user = userEvent.setup();
     const settings = renderSettings();

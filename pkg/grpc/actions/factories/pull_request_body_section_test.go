@@ -131,11 +131,19 @@ func installPublicationGitHub(t *testing.T, httpCtx core.HTTPContext) {
 	}
 }
 
+// The publish node uses a GitHub integration, like an installed canvas, so
+// the body write can hold its pull request description lease.
 func (f publicationFixture) integrationPublicationAttempt(t *testing.T) *bodySectionActionAttempt {
 	t.Helper()
+	integration, err := models.CreateIntegration(uuid.New(), f.canvas.OrganizationID, "github", "github", nil)
+	require.NoError(t, err)
+	integrationID := integration.ID.String()
 	f.publishVersion(t, func(v *models.CanvasVersion) {
-		findIntakeNode(v.Nodes, "publish").Ref.Component.Name = "github.updatePullRequestBodySection"
+		node := findIntakeNode(v.Nodes, "publish")
+		node.Ref.Component.Name = "github.updatePullRequestBodySection"
+		node.IntegrationID = &integrationID
 	})
+	require.NoError(t, f.db.Model(&models.CanvasNode{}).Where("workflow_id = ? AND node_id = ?", f.canvas.ID, "publish").Update("app_installation_id", integration.ID).Error)
 	f.startRun(t)
 	f.report(t, f.run, 4)
 	execution, request := f.publicationRequest(t, "passed")

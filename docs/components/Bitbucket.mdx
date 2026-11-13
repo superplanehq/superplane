@@ -668,6 +668,10 @@ Temporary failures retry through scheduled requests. Each attempt reads the late
 
 In factory apps, disabling the published node stops pending writes. Newer runs for the same pull request and section supersede older runs.
 
+Turn on **Ordered** to order writers by their persisted source run and attempt. The source is the broadcast source run, or the current run for other triggers. An older source or attempt cannot replace the section, including on the same commit and across canvases. Each attempt rechecks the order, the pull request commit, and the saved node at the write. Ordered publication fails the step when the host rejects the write or retries are exhausted.
+
+**Activation Generation** fences saved activations. Increase it when you enable the node again. Attempts that started with another generation do not write.
+
 ### Example Output
 
 ```json

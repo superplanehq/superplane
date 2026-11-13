@@ -45,6 +45,22 @@ export function reviewRequestCanvas(): CanvasesCanvas {
           integration: { id: "github-1", name: "GitHub" },
           configuration: { enabled: false, activationGeneration: 1, activationNodeId: "pr-check-pending" },
         },
+        {
+          id: "findings-body",
+          name: "Publish findings to PR body",
+          component: "github.updatePullRequestBodySection",
+          type: "TYPE_ACTION",
+          integration: { id: "github-1", name: "GitHub" },
+          configuration: { sectionKey: "review-request", enabled: false, ordered: true, activationGeneration: 1 },
+        },
+        {
+          id: "findings-comment",
+          name: "Publish findings to PR comment",
+          component: "github.publishPullRequestComment",
+          type: "TYPE_ACTION",
+          integration: { id: "github-1", name: "GitHub" },
+          configuration: { commentKey: "review-request", enabled: false, activationGeneration: 1 },
+        },
       ],
       edges: [
         { sourceId: "review-request-trigger", targetId: "select-reviewers", channel: "default" },
