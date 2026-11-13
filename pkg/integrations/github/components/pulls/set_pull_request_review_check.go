@@ -55,6 +55,10 @@ type reviewCheckState struct {
 type retiredCommitCheck struct {
 	SHA       string `json:"sha"`
 	ResultURL string `json:"resultUrl"`
+	// State and Description keep an undelivered terminal result. Empty values
+	// publish the superseded error.
+	State       string `json:"state,omitempty"`
+	Description string `json:"description,omitempty"`
 }
 
 type reviewCheckDelivery struct {
@@ -258,8 +262,10 @@ func executePullRequestCheck(ctx core.ExecutionContext, config reviewCheckConfig
 		}
 		// A replacement must wait for an already claimed status write to finish.
 		retired := previous.Retired
-		if config.State != "" && previous.Configuration.State == "pending" && previous.Configuration.AssessedSHA != config.AssessedSHA {
-			retired = append(retired, retiredCommitCheck{SHA: previous.Configuration.AssessedSHA, ResultURL: previous.Configuration.ResultURL})
+		if config.State != "" && previous.Configuration.AssessedSHA != config.AssessedSHA {
+			if check, ok := previous.undeliveredCommitCheck(); ok {
+				retired = append(retired, check)
+			}
 		}
 		record.Payload, err = json.Marshal(reviewCheckState{Configuration: config, Delivery: previous.Delivery, Retired: retired})
 		if err != nil {
@@ -431,6 +437,30 @@ func (s reviewCheckState) resultURL() string {
 		return s.Retired[0].ResultURL
 	}
 	return s.Configuration.ResultURL
+}
+
+// undeliveredCommitCheck returns the status that the assessed commit still
+// needs when a newer commit replaces this check. A pending commit gets the
+// superseded error. A terminal result that GitHub did not confirm is kept.
+func (s reviewCheckState) undeliveredCommitCheck() (retiredCommitCheck, bool) {
+	config := s.Configuration
+	if config.State == "" {
+		return retiredCommitCheck{}, false
+	}
+	check := retiredCommitCheck{SHA: config.AssessedSHA, ResultURL: config.ResultURL}
+	if config.State == "pending" {
+		return check, true
+	}
+	if s.terminalResultDelivered() {
+		return retiredCommitCheck{}, false
+	}
+	check.State, check.Description = config.State, config.Reason
+	return check, true
+}
+
+func (s reviewCheckState) terminalResultDelivered() bool {
+	return len(s.Retired) == 0 && s.Delivered != "" && s.Delivered == s.fingerprint() &&
+		s.SHA == s.Configuration.AssessedSHA && s.State == s.Configuration.State
 }
 
 func (s *reviewCheckState) markOwnerRemoved() {

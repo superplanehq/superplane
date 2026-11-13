@@ -143,6 +143,46 @@ func TestPullRequestCheckRetiresPendingStatusOnAnOlderCommit(t *testing.T) {
 	require.Equal(t, "new-head", f.http.writes[2].SHA)
 }
 
+func TestPullRequestCheckKeepsUndeliveredTerminalResultOnAnOlderCommit(t *testing.T) {
+	for _, scenario := range []struct {
+		name  string
+		state string
+		push  bool
+	}{
+		{name: "head changed", state: "error", push: true},
+		{name: "final result", state: "success"},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
+			f := newPullRequestCheckFixture(t, "github.setPullRequestCheck")
+			require.NoError(t, f.applyStatus("pending"))
+			require.NoError(t, f.refresh())
+			require.Equal(t, "pending", f.state())
+			if scenario.push {
+				f.http.head = "new-head"
+			} else {
+				f.finishAction()
+				require.NoError(t, f.applyStatus(scenario.state))
+			}
+			// The old commit saves its terminal result, but GitHub rejects the write.
+			f.http.failWrite = true
+			require.Error(t, f.processDue())
+			f.http.failWrite = false
+
+			f.attempt(support.EmitCanvasEventForNode(t, f.canvas.ID, "trigger", "default", nil))
+			f.http.head = "new-head"
+			f.ctx.Configuration = map[string]any{"repository": "hello", "pullNumber": 42, "assessedSha": "new-head", "context": "team/review", "state": "pending", "reason": "New assessment"}
+			require.NoError(t, (&pulls.SetPullRequestCheck{}).Execute(f.ctx))
+			require.NoError(t, f.processDue())
+			old := f.http.writes[len(f.http.writes)-1]
+			require.Equal(t, "abc", old.SHA)
+			require.Equal(t, scenario.state, old.Status.GetState())
+			require.NoError(t, f.processDue())
+			require.Equal(t, "pending", f.state())
+			require.Equal(t, "new-head", f.http.writes[len(f.http.writes)-1].SHA)
+		})
+	}
+}
+
 func TestPullRequestCheckStopsUnavailableCredentialsAfterRetries(t *testing.T) {
 	f := newPullRequestCheckFixture(t, "github.setPullRequestCheck")
 	require.NoError(t, f.applyStatus("pending"))
