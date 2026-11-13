@@ -3,6 +3,14 @@ import { HOSTED_MODEL_ALL_PROVIDERS } from "@/lib/hostedLLMModels";
 
 const SUPERPLANE_AGENT_COMPONENT = "runnerSuperPlane";
 
+const RUNNER_FLEET_FIELD: ConfigurationField = {
+  name: "machineType",
+  label: "Runner fleet",
+  type: "runner-fleet",
+  required: true,
+  description: "Select where this automation agent runs.",
+};
+
 const select = (options: Array<{ label: string; value: string }>) => ({
   select: { options },
 });
@@ -73,12 +81,7 @@ const environmentVariableSchema: ConfigurationField[] = [
 ];
 
 export const PLANNING_REVIEW_RUNNER_FIELDS: ConfigurationField[] = [
-  {
-    name: "machineType",
-    label: "Environment",
-    type: "runner-fleet",
-    required: true,
-  },
+  RUNNER_FLEET_FIELD,
   {
     name: "credentials",
     label: "Credentials",
@@ -152,6 +155,11 @@ export const PLANNING_REVIEW_RUNNER_FIELDS: ConfigurationField[] = [
     typeOptions: { number: { min: 0, max: 86_400 } },
   },
 ];
+
+export function planningReviewRunnerFleetField(catalogFields?: ConfigurationField[]): ConfigurationField {
+  const field = catalogFields?.find((candidate) => candidate.name === "machineType") ?? RUNNER_FLEET_FIELD;
+  return { ...field, label: RUNNER_FLEET_FIELD.label, description: RUNNER_FLEET_FIELD.description };
+}
 
 const CLAUDE_MODEL_FIELD = PLANNING_REVIEW_RUNNER_FIELDS.find((field) => field.name === "model");
 
