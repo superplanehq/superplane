@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
@@ -59,6 +60,30 @@ func RefreshReviewCheck(ctx core.IntegrationHookContext) error {
 	if err != nil {
 		return err
 	}
+	if state.Configuration.State != "" {
+		if state.Error != "" {
+			return nil
+		}
+		owner, err := store.OwnerStatus(snapshot.OwnerCanvasID, snapshot.OwnerNodeID)
+		if err != nil {
+			return err
+		}
+		if !owner.Available {
+			return stopPullRequestCheck(store, snapshot, "The organization or integration is unavailable.")
+		}
+		if owner.Removed {
+			state.markOwnerRemoved()
+		}
+		if state.Configuration.State != "pending" && state.State == state.Configuration.State && state.Delivered != "" && state.Delivered == state.fingerprint() && len(state.Retired) == 0 {
+			return store.Update(parameters.Key, func(current *core.OrderedPublication) error {
+				if current.Revision != snapshot.Revision || current.WakeAt == nil {
+					return core.ErrPublicationUnchanged
+				}
+				current.WakeAt = nil
+				return nil
+			})
+		}
+	}
 	if state.Delivery != nil && time.Now().Before(state.Delivery.ExpiresAt) {
 		return store.Update(parameters.Key, func(current *core.OrderedPublication) error {
 			if current.Revision != snapshot.Revision {
@@ -80,18 +105,42 @@ func RefreshReviewCheck(ctx core.IntegrationHookContext) error {
 	}
 	client, err := common.NewClient(ctx.Integration, ctx.HTTP)
 	if err != nil {
+		if state.Configuration.State != "" {
+			return retryPullRequestCheckSetup(store, snapshot, err)
+		}
 		return err
 	}
+	state.SetupFailures = 0
 	monitor, lookupErr := evaluateReviewCheck(client, store, snapshot, &state)
 	if lookupErr != nil {
+		if state.Configuration.State != "" && permanentCheckError(lookupErr) {
+			return stopPullRequestCheck(store, snapshot, "Could not access the pull request. Check the integration permissions and retry this step.")
+		}
 		if snapshot.Disabled {
 			return lookupErr
 		}
 		state.State, state.Description = "error", "Could not verify pull request reviews"
+		if state.Configuration.State != "" {
+			state.Description = "Could not verify the pull request."
+		}
 		if state.SHA == "" {
 			state.SHA = state.Configuration.AssessedSHA
 		}
 		monitor = true
+	}
+	// Provider reads can overlap organization, integration, or canvas removal.
+	if state.Configuration.State != "" {
+		owner, err := store.OwnerStatus(snapshot.OwnerCanvasID, snapshot.OwnerNodeID)
+		if err != nil {
+			return err
+		}
+		if !owner.Available {
+			return stopPullRequestCheck(store, snapshot, "The organization or integration is unavailable.")
+		}
+		if owner.Removed {
+			state.markOwnerRemoved()
+			monitor = len(state.Retired) > 0
+		}
 	}
 	// Recheck activation after provider reads, outside the publication lock.
 	eligible := true
@@ -146,6 +195,15 @@ func RefreshReviewCheck(ctx core.IntegrationHookContext) error {
 			if !monitor {
 				current.WakeAt = nil
 			}
+			if len(latest.Retired) > 0 {
+				latest.Retired = latest.Retired[1:]
+				latest.Delivered = ""
+				current.WakeAt = reviewCheckWake(time.Second)
+			}
+		}
+		if ownsDelivery && current.Generation == snapshot.Generation && state.Configuration.State != "" && permanentCheckError(writeErr) {
+			latest.Error = "Could not publish the check. Check the integration permissions and retry this step."
+			current.WakeAt = nil
 		}
 		if !ownsDelivery {
 			// A late response can change GitHub after recovery has already run.
@@ -161,6 +219,9 @@ func RefreshReviewCheck(ctx core.IntegrationHookContext) error {
 		return err
 	}
 	if writeErr != nil {
+		if state.Configuration.State != "" && permanentCheckError(writeErr) {
+			return nil
+		}
 		return writeErr
 	}
 	return lookupErr
@@ -173,7 +234,8 @@ func publishReviewCheck(client *common.Client, state reviewCheckState) error {
 	writeCtx, cancel := context.WithDeadline(context.Background(), deadline)
 	defer cancel()
 	description := string([]rune(state.Description)[:min(len([]rune(state.Description)), 140)])
-	_, _, err := client.CreateStatus(writeCtx, state.Configuration.Repository, state.SHA, github.RepoStatus{State: &state.State, Context: &state.Configuration.Context, Description: &description, TargetURL: &state.Configuration.ResultURL})
+	resultURL := state.resultURL()
+	_, _, err := client.CreateStatus(writeCtx, state.Configuration.Repository, state.SHA, github.RepoStatus{State: &state.State, Context: &state.Configuration.Context, Description: &description, TargetURL: &resultURL})
 	if err != nil {
 		return fmt.Errorf("publish review check: %w", err)
 	}
@@ -182,6 +244,10 @@ func publishReviewCheck(client *common.Client, state reviewCheckState) error {
 
 func evaluateReviewCheck(client *common.Client, store core.PublicationStore, record *core.OrderedPublication, state *reviewCheckState) (bool, error) {
 	config := state.Configuration
+	if config.State != "" && len(state.Retired) > 0 {
+		state.SHA, state.State, state.Description = state.Retired[0].SHA, "error", "A newer attempt superseded this check."
+		return true, nil
+	}
 	number, err := parsePullNumber(config.PullNumber)
 	if err != nil {
 		return false, err
@@ -196,6 +262,29 @@ func evaluateReviewCheck(client *common.Client, store core.PublicationStore, rec
 		return true, fmt.Errorf("pull request head is missing")
 	}
 	state.SHA = pr.GetHead().GetSHA()
+	if config.State != "" {
+		// Commit status results stay attached to the assessed commit, including
+		// cancellation after a push. Never move an old result onto the new head.
+		state.SHA, state.State, state.Description = config.AssessedSHA, config.State, config.Reason
+		if pr.GetHead().GetSHA() != config.AssessedSHA || pr.GetState() != "open" || pr.GetMerged() {
+			state.State, state.Description = "error", "The pull request is closed or its assessed commit changed."
+		}
+		if state.State == "pending" {
+			// Recorded run errors do not end the attempt. The final step can
+			// still publish failure, so wait for the run to stop.
+			ended, err := store.AttemptEnded(record.Order.AttemptRootEventID)
+			if err != nil {
+				return true, err
+			}
+			if ended {
+				state.State, state.Description = "error", "The attempt ended without a final check result."
+			}
+		}
+		if state.State != "pending" {
+			state.Configuration.State, state.Configuration.Reason = state.State, state.Description
+		}
+		return state.State == "pending", nil
+	}
 	if record.Disabled {
 		state.State, state.Description = "success", "Review request check disabled"
 		return false, nil
@@ -253,6 +342,58 @@ func evaluateReviewCheck(client *common.Client, store core.PublicationStore, rec
 		return monitor, fmt.Errorf("invalid persisted review check phase")
 	}
 	return monitor, nil
+}
+
+func permanentCheckError(err error) bool {
+	switch common.StatusCode(err) {
+	case http.StatusBadRequest, http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound, http.StatusUnprocessableEntity:
+		return true
+	default:
+		return false
+	}
+}
+
+func retryPullRequestCheckSetup(store core.PublicationStore, snapshot *core.OrderedPublication, setupErr error) error {
+	// Each publication update replaces the hook request and its retry counter.
+	// Keep setup failures with the desired state to bound missing-credential retries.
+	stopped := false
+	err := store.Update(snapshot.Key, func(current *core.OrderedPublication) error {
+		if current.Revision != snapshot.Revision {
+			return core.ErrPublicationUnchanged
+		}
+		state, err := decodeReviewCheckState(current.Payload)
+		if err != nil {
+			return err
+		}
+		state.SetupFailures++
+		current.WakeAt = reviewCheckWake(time.Minute)
+		if state.SetupFailures >= 10 {
+			state.Error = "The GitHub integration is unavailable. Check its configuration and retry this step."
+			current.WakeAt, stopped = nil, true
+		}
+		current.Payload, err = json.Marshal(state)
+		return err
+	})
+	if err != nil || stopped {
+		return err
+	}
+	return setupErr
+}
+
+func stopPullRequestCheck(store core.PublicationStore, snapshot *core.OrderedPublication, message string) error {
+	return store.Update(snapshot.Key, func(current *core.OrderedPublication) error {
+		if current.Revision != snapshot.Revision {
+			return core.ErrPublicationUnchanged
+		}
+		state, err := decodeReviewCheckState(current.Payload)
+		if err != nil {
+			return err
+		}
+		state.Error = message
+		current.WakeAt = nil
+		current.Payload, err = json.Marshal(state)
+		return err
+	})
 }
 
 func reviewCheckStore(integration core.IntegrationContext) (core.PublicationStore, error) {
