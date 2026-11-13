@@ -6,6 +6,7 @@ describe("review check execution state", () => {
   it.each([
     ["STATE_FINISHED", "RESULT_PASSED", "applied", "applied"],
     ["STATE_FINISHED", "RESULT_PASSED", "superseded", "superseded"],
+    ["STATE_FINISHED", "RESULT_PASSED", "skipped", "skipped"],
     ["STATE_STARTED", "RESULT_PASSED", undefined, "running"],
     ["STATE_FINISHED", "RESULT_FAILED", undefined, "failed"],
     ["STATE_FINISHED", "RESULT_CANCELLED", undefined, "cancelled"],
