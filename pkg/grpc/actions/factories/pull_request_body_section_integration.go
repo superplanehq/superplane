@@ -10,6 +10,8 @@ import (
 	"github.com/google/uuid"
 	factorycomponent "github.com/superplanehq/superplane/pkg/components/factory"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/exprruntime"
+	"github.com/superplanehq/superplane/pkg/factories/mergeconfidence"
 	"github.com/superplanehq/superplane/pkg/integrations/bitbucket"
 	"github.com/superplanehq/superplane/pkg/integrations/github/components/pulls"
 	"github.com/superplanehq/superplane/pkg/integrations/prbody"
@@ -99,11 +101,27 @@ func (a *bodySectionActionAttempt) publish(ctx context.Context, db *gorm.DB, dep
 	if err != nil {
 		return a.publicationError(err)
 	}
+	return a.publishIntegrationBodySection(ctx, db, client)
+}
+
+func (a *bodySectionActionAttempt) publishIntegrationBodySection(ctx context.Context, db *gorm.DB, client prbody.Client) (bodySectionPublicationOutcome, error) {
+	config := a.integrationConfiguration
+	eligible := func() (bool, error) { return a.integrationPublicationEligible(db) }
+	active, err := eligible()
+	if err != nil {
+		return bodySectionPublicationOutcome{}, err
+	}
+	if !config.IsEnabled() || !active {
+		return prbody.Skipped("Publication is disabled, cancelled, or superseded."), nil
+	}
+	if githubClient, ok := client.(*pulls.BodySectionClient); ok && config.SectionKey == "merge-confidence" {
+		config.Body = a.enrichReviewedCommit(ctx, db, githubClient, config)
+	}
 	publications := a.publications(db)
 	if a.ordered() {
 		client = prbody.OrderedClient(client, publications, *a.state.Publication)
 	}
-	outcome, err := prbody.PublishSerialized(ctx, client, publications, a.integrationConfiguration, eligible)
+	outcome, err := prbody.PublishSerialized(ctx, client, publications, config, eligible)
 	if err != nil {
 		return a.publicationError(err)
 	}
@@ -142,6 +160,51 @@ func (a *bodySectionActionAttempt) publicationError(err error) (bodySectionPubli
 		return bodySectionPublicationOutcome{}, permanentPublicationError{err}
 	}
 	return bodySectionPublicationOutcome{}, fmt.Errorf("publish %s: %w", a.destination(), err)
+}
+
+func (a *bodySectionActionAttempt) enrichReviewedCommit(ctx context.Context, db *gorm.DB, client *pulls.BodySectionClient, config prbody.Configuration) string {
+	version, err := models.FindCanvasVersionInTransaction(db, a.source.WorkflowID, a.source.VersionID)
+	if err != nil || models.FactoryAppTemplateID(version.Nodes) != "risk-score" {
+		return config.Body
+	}
+	canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(db, a.source.WorkflowID)
+	if err != nil || canvas.FactoryID == nil {
+		return config.Body
+	}
+	root, err := a.source.RootEvent(db)
+	if err != nil {
+		return config.Body
+	}
+	sha := mergeconfidence.ReviewedCommit(root)
+	if sha == "" {
+		return config.Body
+	}
+	line := "Reviewed commit: " + sha
+	lines := strings.Split(config.Body, "\n")
+	index := -1
+	for i, candidate := range lines {
+		if candidate == line {
+			index = i
+			break
+		}
+	}
+	if index < 0 {
+		return config.Body
+	}
+	lookupCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	commit, err := client.GetCommit(lookupCtx, config.Repository, sha)
+	if err != nil || commit == nil || commit.GetSHA() != sha {
+		return config.Body
+	}
+	title, _, _ := strings.Cut(commit.GetCommit().GetMessage(), "\n")
+	title = strings.TrimSpace(title)
+	if title == "" {
+		return config.Body
+	}
+	commitURL := client.CommitURL(config.Repository, sha)
+	lines[index] = fmt.Sprintf("Reviewed commit: [%s](%s)", exprruntime.MarkdownText(title), commitURL)
+	return strings.Join(lines, "\n")
 }
 
 func (a *bodySectionActionAttempt) integrationConnection(db *gorm.DB, deps IntakeDependencies) (core.IntegrationContext, core.HTTPContext, error) {

@@ -44,3 +44,7 @@ func (c *PublicationContext) Update(key string, apply func(*core.OrderedPublicat
 func (c *PublicationContext) AttemptFinished(id uuid.UUID) (bool, error) {
 	return models.PublicationAttemptFinished(c.tx, c.organizationID, id)
 }
+
+func (c *PublicationContext) NodeSnapshot(canvasID uuid.UUID, nodeID string, attempt uuid.UUID) (*core.PublicationNode, error) {
+	return models.FindPublicationNode(c.tx, c.organizationID, c.integrationID, canvasID, nodeID, attempt)
+}

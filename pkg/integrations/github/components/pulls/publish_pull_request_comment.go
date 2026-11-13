@@ -369,7 +369,7 @@ func NewCommentClient(integration core.IntegrationContext, http core.HTTPContext
 }
 
 func (c *githubCommentClient) Read(ctx context.Context, repository string, number int64) (prbody.Description, error) {
-	return (&bodySectionClient{client: c.client}).Read(ctx, repository, number)
+	return (&BodySectionClient{client: c.client}).Read(ctx, repository, number)
 }
 
 func (c *githubCommentClient) Get(ctx context.Context, repository string, id int64) (*ManagedComment, error) {

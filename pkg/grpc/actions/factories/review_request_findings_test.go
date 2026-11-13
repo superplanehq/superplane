@@ -131,55 +131,67 @@ func TestReviewRequestFindingsPublishToSelectedDestinations(t *testing.T) {
 	}
 }
 
+// Findings and Publish PR check share the decision branches, so each decision
+// is checked with the PR check off and on.
 func TestReviewRequestFindingsExplainEachDecision(t *testing.T) {
-	for _, scenario := range []string{"concerning", "fallback", "favorable", "no candidate", "malformed output", "agent failure", "stale report"} {
-		t.Run(scenario, func(t *testing.T) {
-			host := &reviewRequestHTTP{}
-			score := 2.0
-			if scenario == "favorable" {
-				score = 5
-			}
-			f, message := reviewRequestCompletedProducer(t, host, score)
-			fallback := ""
-			if scenario == "fallback" || scenario == "malformed output" || scenario == "agent failure" {
-				fallback = "fallback-user"
-			}
-			consumer := reviewFindingsConsumer(t, f, reviewFindingsSettings{publish: true, body: true, comment: true}, fallback)
-			root := deliverReviewRequestReport(t, f, consumer, message)
-			host.empty = scenario == "no candidate"
-			host.movedHead = scenario == "stale report"
-			_, _, err := runReviewRequestGraph(t, f, consumer, root, host, scenario)
-			require.NoError(t, err)
-			section := reviewSection(host.description)
-			switch scenario {
-			case "malformed output", "agent failure", "stale report":
-				// Errors and stale reports must never read as a valid no-review decision.
-				require.Empty(t, section)
-				require.Empty(t, host.comments)
-				return
-			}
-			_, comment := onlyComment(t, host)
-			require.Contains(t, comment, section)
-			require.Contains(t, section, "Assessed commit: abc")
-			switch scenario {
-			case "concerning":
-				require.Contains(t, section, "**Reviewers selected**")
-				require.Contains(t, section, "Security findings need review.")
-				require.Contains(t, section, "Fallback reviewer: not used")
-			case "fallback":
-				require.Contains(t, section, "**Reviewers selected**")
-				require.Contains(t, section, "| fallback-user | Use the configured fallback because selection found no suitable candidate. |")
-				require.Contains(t, section, "Fallback reviewer: used because selection found no suitable candidate.")
-			case "favorable":
-				require.Contains(t, section, "**No review needed**")
-				require.Contains(t, section, "All checks are positive.")
-				require.NotContains(t, section, "No reviewer was requested.")
-			case "no candidate":
-				require.Contains(t, section, "**No eligible reviewer**")
-				require.Contains(t, section, "No eligible candidate or fallback reviewer is available.")
-				require.Contains(t, section, "No reviewer was requested.")
-			}
-		})
+	for _, publishCheck := range []bool{false, true} {
+		for _, scenario := range []string{"concerning", "fallback", "favorable", "no candidate", "malformed output", "agent failure", "stale report"} {
+			t.Run(fmt.Sprintf("publish_check=%t/%s", publishCheck, scenario), func(t *testing.T) {
+				host := &reviewRequestHTTP{}
+				score := 2.0
+				if scenario == "favorable" {
+					score = 5
+				}
+				f, message := reviewRequestCompletedProducer(t, host, score)
+				fallback := ""
+				if scenario == "fallback" || scenario == "malformed output" || scenario == "agent failure" {
+					fallback = "fallback-user"
+				}
+				consumer := reviewFindingsConsumer(t, f, reviewFindingsSettings{publish: true, body: true, comment: true}, fallback)
+				if publishCheck {
+					setReviewRequestCheck(t, f, consumer, true, 2)
+				}
+				root := deliverReviewRequestReport(t, f, consumer, message)
+				host.empty = scenario == "no candidate"
+				host.movedHead = scenario == "stale report"
+				_, _, err := runReviewRequestGraph(t, f, consumer, root, host, scenario)
+				require.NoError(t, err)
+				section := reviewSection(host.description)
+				switch scenario {
+				case "malformed output", "agent failure", "stale report":
+					// Errors and stale reports must never read as a valid no-review decision.
+					require.Empty(t, section)
+					require.Empty(t, host.comments)
+					return
+				}
+				_, comment := onlyComment(t, host)
+				require.Contains(t, comment, section)
+				require.Contains(t, section, "Assessed commit: abc")
+				switch scenario {
+				case "concerning":
+					require.Contains(t, section, "**Reviewers selected**")
+					require.Contains(t, section, "Security findings need review.")
+					require.Contains(t, section, "Fallback reviewer: not used")
+				case "fallback":
+					require.Contains(t, section, "**Reviewers selected**")
+					require.Contains(t, section, "| fallback-user | Use the configured fallback because selection found no suitable candidate. |")
+					require.Contains(t, section, "Fallback reviewer: used because selection found no suitable candidate.")
+				case "favorable":
+					require.Contains(t, section, "**No review needed**")
+					require.Contains(t, section, "All checks are positive.")
+					require.NotContains(t, section, "No reviewer was requested.")
+				case "no candidate":
+					require.Contains(t, section, "**No eligible reviewer**")
+					require.Contains(t, section, "No eligible candidate or fallback reviewer is available.")
+					require.Contains(t, section, "No reviewer was requested.")
+				}
+				if publishCheck {
+					require.Equal(t, models.CanvasNodeExecutionResultPassed, reviewFindingsExecution(t, f, root, "pr-check-pending").Result)
+				} else {
+					require.Empty(t, host.statuses)
+				}
+			})
+		}
 	}
 }
 

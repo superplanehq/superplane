@@ -260,6 +260,11 @@ func (c *Client) GetPullRequest(ctx context.Context, repository string, pullNumb
 	return c.underlying.PullRequests.Get(ctx, owner, name, pullNumber)
 }
 
+func (c *Client) GetCommit(ctx context.Context, repository, sha string) (*github.RepositoryCommit, *github.Response, error) {
+	owner, name := c.ownerAndName(repository)
+	return c.underlying.Repositories.GetCommit(ctx, owner, name, sha, nil)
+}
+
 // ListPullRequests returns one page of a repository's pull requests.
 //
 // This is the plain REST endpoint, which draws on the 5000-per-hour budget.

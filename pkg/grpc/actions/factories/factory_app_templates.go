@@ -75,6 +75,7 @@ var factoryAppTemplates = map[factoryTemplateKey]factoryAppTemplate{
 		columnKey:        models.CanvasColumnKeyVerify,
 		componentIntegrations: map[string]string{
 			"github.listPullRequestReviewCandidates": "github",
+			"github.setPullRequestReviewCheck":       "github",
 			"github.ensurePullRequestReviewers":      "github",
 			"github.updatePullRequestBodySection":    "github",
 			"github.publishPullRequestComment":       "github",
@@ -312,6 +313,7 @@ func materializeFactoryTemplate(templateID, provider string, input factoryTempla
 	canvas.Metadata.Name = input.appName
 	wireFactoryTemplate(canvas, template, input)
 	if template.id == reviewRequestTemplateID {
+		configureReviewRequestCheck(canvas)
 		if err := configureReviewRequestFindings(canvas); err != nil {
 			return nil, &BuiltInAutomationSettingsError{cause: err}
 		}

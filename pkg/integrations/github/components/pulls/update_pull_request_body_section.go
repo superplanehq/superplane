@@ -2,6 +2,8 @@ package pulls
 
 import (
 	"context"
+	"net/url"
+	"strings"
 
 	"github.com/google/go-github/v84/github"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -37,23 +39,33 @@ func (*UpdatePullRequestBodySection) HandleHook(ctx core.ActionHookContext) erro
 	return prbody.HandleHook(ctx, client)
 }
 
-type bodySectionClient struct{ client *common.Client }
+type BodySectionClient struct{ client *common.Client }
 
 func NewBodySectionClient(integration core.IntegrationContext, http core.HTTPContext) (prbody.Client, error) {
 	client, err := common.NewClient(integration, http)
 	if err != nil {
 		return nil, err
 	}
-	return &bodySectionClient{client: client}, nil
+	return &BodySectionClient{client: client}, nil
 }
-func (c *bodySectionClient) Read(ctx context.Context, repository string, number int64) (prbody.Description, error) {
+func (c *BodySectionClient) GetCommit(ctx context.Context, repository, sha string) (*github.RepositoryCommit, error) {
+	commit, _, err := c.client.GetCommit(ctx, repository, sha)
+	return commit, err
+}
+
+func (c *BodySectionClient) CommitURL(repository, sha string) string {
+	fullName := strings.ReplaceAll(url.PathEscape(c.client.RepositoryFullName(repository)), "%2F", "/")
+	return c.client.Host().RepoURL(fullName) + "/commit/" + url.PathEscape(sha)
+}
+
+func (c *BodySectionClient) Read(ctx context.Context, repository string, number int64) (prbody.Description, error) {
 	pr, _, err := c.client.GetPullRequest(ctx, repository, int(number))
 	if err != nil {
 		return prbody.Description{}, err
 	}
 	return prbody.Description{Body: pr.GetBody(), Open: pr.GetState() == "open", HeadSHA: pr.GetHead().GetSHA()}, nil
 }
-func (c *bodySectionClient) Write(ctx context.Context, repository string, number int64, body string) error {
+func (c *BodySectionClient) Write(ctx context.Context, repository string, number int64, body string) error {
 	_, _, err := c.client.EditPullRequest(ctx, repository, int(number), &github.PullRequest{Body: &body})
 	return err
 }

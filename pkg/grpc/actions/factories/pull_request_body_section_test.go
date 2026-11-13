@@ -19,6 +19,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/factories/vcs"
 	"github.com/superplanehq/superplane/pkg/integrations/bitbucket"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
+	"github.com/superplanehq/superplane/pkg/integrations/github/components/pulls"
 	"github.com/superplanehq/superplane/pkg/integrations/prbody"
 	"github.com/superplanehq/superplane/pkg/models"
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
@@ -128,6 +129,40 @@ func installPublicationGitHub(t *testing.T, httpCtx core.HTTPContext) {
 	newFactoryGitHubAPI = func(*gorm.DB, IntakeDependencies, *models.Factory) (factoryGitHubAPI, error) {
 		return publicationGitHubClient(t, httpCtx), nil
 	}
+}
+
+// The publish node uses a GitHub integration, like an installed canvas, so
+// the body write can hold its pull request description lease.
+func (f publicationFixture) integrationPublicationAttempt(t *testing.T) *bodySectionActionAttempt {
+	t.Helper()
+	integration, err := models.CreateIntegration(uuid.New(), f.canvas.OrganizationID, "github", "github", nil)
+	require.NoError(t, err)
+	integrationID := integration.ID.String()
+	f.publishVersion(t, func(v *models.CanvasVersion) {
+		node := findIntakeNode(v.Nodes, "publish")
+		node.Ref.Component.Name = "github.updatePullRequestBodySection"
+		node.IntegrationID = &integrationID
+	})
+	require.NoError(t, f.db.Model(&models.CanvasNode{}).Where("workflow_id = ? AND node_id = ?", f.canvas.ID, "publish").Update("app_installation_id", integration.ID).Error)
+	f.startRun(t)
+	f.report(t, f.run, 4)
+	execution, request := f.publicationRequest(t, "passed")
+	configuration := execution.Configuration.Data()
+	delete(configuration, "pullRequestId")
+	configuration["repository"], configuration["pullNumber"] = "acme/app", "42"
+	execution.Configuration = datatypes.NewJSONType(configuration)
+	execution.Metadata = datatypes.NewJSONType(map[string]any{models.CanvasNodeExecutionFrozenComponentKey: "github.updatePullRequestBodySection"})
+	require.NoError(t, f.db.Save(execution).Error)
+	attempt := &bodySectionActionAttempt{request: request}
+	require.NoError(t, f.db.Transaction(func(tx *gorm.DB) error { return attempt.claim(tx) }))
+	return attempt
+}
+
+func publicationBodySectionClient(t *testing.T, host core.HTTPContext) prbody.Client {
+	t.Helper()
+	client, err := pulls.NewBodySectionClient(gitHubPermissionTestIntegration(), host)
+	require.NoError(t, err)
+	return client
 }
 
 func TestAssessmentCompletionEmitsStructuredMergeConfidence(t *testing.T) {

@@ -191,6 +191,8 @@ func TestResetReviewRequestPreservesFallbackAndAgentSettings(t *testing.T) {
 				trigger.Configuration["enabled"] = false
 				agent := findYAMLNode(t, doc, reviewRequestAgentNodeID)
 				agent.Configuration["fallbackReviewer"] = fallback
+				agent.Configuration["publishPRCheck"] = fallback != ""
+				agent.Configuration["prCheckActivationGeneration"] = 7
 				// One case saves publication with only a comment; the other saves it
 				// off with no destination, which remains valid.
 				agent.Configuration["publishReviewFindings"] = fallback != ""
@@ -224,6 +226,12 @@ func TestResetReviewRequestPreservesFallbackAndAgentSettings(t *testing.T) {
 			// The managed policy must replace an installed prompt during reset.
 			require.Contains(t, prompt, "Select a contributor to this pull request only when no eligible non-contributor is available.")
 			require.Equal(t, fallback, agent.Configuration["fallbackReviewer"])
+			require.Equal(t, fallback != "", agent.Configuration["publishPRCheck"])
+			require.EqualValues(t, 7, agent.Configuration["prCheckActivationGeneration"])
+			check := findIntakeNode(version.Nodes, "pr-check-pending")
+			require.NotNil(t, check)
+			require.Equal(t, fallback != "", check.Configuration["enabled"])
+			require.EqualValues(t, 7, check.Configuration["activationGeneration"])
 			require.Equal(t, fallback != "", agent.Configuration["publishReviewFindings"])
 			require.Equal(t, false, agent.Configuration["reviewFindingsBody"])
 			require.Equal(t, fallback != "", agent.Configuration["reviewFindingsComment"])
@@ -667,6 +675,12 @@ func TestResetPRFeedbackPreservesEachRunnerAndGeneralSettings(t *testing.T) {
 							node.Configuration["model"] = model
 							expected[node.ID] = 1200 + i
 							evidence[node.ID] = i%2 == 0
+							for _, item := range node.Configuration["steps"].([]any) {
+								step := item.(map[string]any)
+								if step["type"] == "prompt" {
+									step["prompt"] = "Do not set git user.email, and do not add Co-authored-by or Signed-off-by trailers."
+								}
+							}
 							if source == models.FactoryPRFeedbackHandlerSourcePullRequestChecks {
 								original := node.ID
 								node.ID = "legacy-repair"
@@ -735,6 +749,10 @@ func TestResetPRFeedbackPreservesEachRunnerAndGeneralSettings(t *testing.T) {
 							require.True(t, ok)
 							hasGitUser = hasGitUser || step["name"] == "Set Up Git User"
 							hasDCOSigning = hasDCOSigning || step["name"] == "Set Up DCO Signing"
+							if step["type"] == "prompt" {
+								assert.Contains(t, step["prompt"], "Do not remove or override the automatic sign-off.")
+								assert.Contains(t, step["prompt"], "Do not bypass the Git wrapper, repository hooks, or push verification.")
+							}
 						}
 						assert.True(t, hasGitUser)
 						assert.True(t, hasDCOSigning)

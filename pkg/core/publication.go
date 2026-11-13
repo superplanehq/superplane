@@ -44,22 +44,23 @@ type OrderedPublication struct {
 	Disabled             bool             `json:"disabled"`
 	OwnerCanvasID        uuid.UUID        `json:"ownerCanvasId"`
 	OwnerNodeID          string           `json:"ownerNodeId"`
+	OwnerDeletedAt       *time.Time       `json:"ownerDeletedAt,omitempty"`
 	Payload              json.RawMessage  `json:"payload"`
 	Hook                 string           `json:"hook"`
 	WakeAt               *time.Time       `json:"wakeAt,omitempty"`
 }
 
 // CanReplace fences callbacks from a disabled activation even if they carry a
-// newer source. Re-activation must explicitly use the next activation generation.
+// newer source. Re-activation must explicitly use a greater activation generation.
 func (p OrderedPublication) CanReplace(order PublicationOrder, activation int64, disabled bool) bool {
 	if p.Generation == 0 {
-		return activation == 1
+		return activation >= 1
 	}
 	if disabled {
 		return activation == p.ActivationGeneration && order.Compare(p.Order) >= 0
 	}
 	if p.Disabled {
-		return activation == p.ActivationGeneration+1 && order.Compare(p.Order) >= 0
+		return activation > p.ActivationGeneration && order.Compare(p.Order) >= 0
 	}
 	return activation == p.ActivationGeneration && order.Compare(p.Order) >= 0
 }
@@ -70,9 +71,18 @@ type PublicationExecution struct {
 	Output        any
 }
 
+// PublicationNode exposes saved node configuration without component policy.
+type PublicationNode struct {
+	Component     string
+	Configuration map[string]any
+}
+
 // PublicationStore serializes one integration/key and persists the next hook in
 // the same transaction. Reads and provider lookups belong outside Update.
 type PublicationStore interface {
+	// NodeSnapshot reads the live node, or the version admitted by the attempt.
+	// A missing or removed node returns nil. Components own eligibility policy.
+	NodeSnapshot(canvasID uuid.UUID, nodeID string, attemptRootEventID uuid.UUID) (*PublicationNode, error)
 	Get(key string) (*OrderedPublication, error)
 	List(prefix string) ([]OrderedPublication, error)
 	Update(key string, apply func(*OrderedPublication) error) error

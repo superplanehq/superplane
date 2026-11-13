@@ -16,6 +16,7 @@ import {
 
 function ReviewRequestPreview({
   findings,
+  publishCheck = false,
   empty = false,
   loading = false,
   error = false,
@@ -23,6 +24,7 @@ function ReviewRequestPreview({
   failSave = false,
 }: {
   findings?: ReviewFindingsSettings;
+  publishCheck?: boolean;
   empty?: boolean;
   loading?: boolean;
   error?: boolean;
@@ -40,6 +42,8 @@ function ReviewRequestPreview({
       body.configuration = { ...body.configuration, enabled: findings.publish && findings.body };
       comment.configuration = { ...comment.configuration, enabled: findings.publish && findings.comment };
     }
+    canvas.spec!.nodes![1].configuration!.publishPRCheck = publishCheck;
+    canvas.spec!.nodes![3].configuration!.enabled = publishCheck;
     if (empty) canvas.spec!.nodes![1].configuration!.fallbackReviewer = "";
     canvas.spec!.nodes![1].configuration!.additionalInstructions = empty
       ? ""
@@ -103,6 +107,8 @@ export const FindingsWithoutDestination: Story = {
     await expect(canvas.getByTestId("review-request-settings-save")).toBeDisabled();
   },
 };
+export const CheckOff: Story = {};
+export const CheckOn: Story = { args: { publishCheck: true } };
 export const Empty: Story = { args: { empty: true } };
 export const Loading: Story = { args: { loading: true } };
 export const Error: Story = { args: { error: true } };
@@ -115,6 +121,7 @@ export const Saving: Story = {
     await expect(canvas.getByRole("textbox", { name: "Additional instructions" })).toBeDisabled();
     await expect(canvas.getByRole("switch", { name: "Publish review findings" })).toBeDisabled();
     await expect(canvas.getByRole("checkbox", { name: "PR comment" })).toBeDisabled();
+    await expect(canvas.getByRole("switch", { name: "Publish PR check" })).toBeDisabled();
   },
 };
 export const SaveError: Story = {

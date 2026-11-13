@@ -81,6 +81,19 @@ function ReviewRequestConfigurationFields(props: ConfigurationProps) {
         disabled={editor.saving}
         onChange={editor.updateFindings}
       />
+      <ImplementSettingRow
+        label="Publish PR check"
+        htmlFor="review-request-publish-check"
+        description="Track required approvals. To enforce them, administrators must require superplane/review-request in GitHub branch rules."
+      >
+        <Switch
+          id="review-request-publish-check"
+          aria-describedby="review-request-publish-check-help"
+          checked={editor.publishPRCheck}
+          disabled={editor.saving}
+          onCheckedChange={editor.updatePublishPRCheck}
+        />
+      </ImplementSettingRow>
       <AgentAdditionalInstructions
         draft={editor.draft}
         onChange={editor.setEdited}

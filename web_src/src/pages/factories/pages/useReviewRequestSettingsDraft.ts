@@ -15,6 +15,7 @@ import type { IntakeAutomationGraph } from "./useIntakeAutomationCanvas";
 
 export const REVIEW_REQUEST_TRIGGER_NODE_ID = "review-request-trigger";
 export const REVIEW_REQUEST_AGENT_NODE_ID = "select-reviewers";
+export const REVIEW_REQUEST_CHECK_NODE_ID = "pr-check-pending";
 
 export function useReviewRequestSettingsDraft({
   graph,
@@ -101,6 +102,17 @@ export function useReviewRequestSettingsDraft({
         })),
       });
     },
+    publishPRCheck: draft?.components[0]?.configuration.publishPRCheck === true,
+    updatePublishPRCheck: (publishPRCheck: boolean) => {
+      if (!draft) return;
+      setEdited({
+        ...draft,
+        components: draft.components.map((component) => ({
+          ...component,
+          configuration: { ...component.configuration, publishPRCheck },
+        })),
+      });
+    },
   };
 }
 
@@ -124,7 +136,7 @@ function nodeUpdate(node: SuperplaneComponentsNode) {
   };
 }
 
-// Findings settings stay on the agent node, which admin reset keeps. Each
+// Publication settings stay on the agent node, which admin reset keeps. Each
 // publication node receives its effective state and activation generation.
 function settingsUpdates(
   graph: IntakeAutomationGraph,
@@ -132,22 +144,31 @@ function settingsUpdates(
   draft: PlanningReviewDraft,
 ): NodeConfigurationSave {
   const component = draft.components[0];
-  const activation = reviewFindingsActivation(agent.configuration, component.configuration);
+  const check = prCheckActivation(agent, component.configuration);
+  const findings = reviewFindingsActivation(agent.configuration, component.configuration);
   const updates: NodeConfigurationUpdate[] = [
     {
       ...nodeUpdate(agent),
       configuration: {
+        ...agent.configuration,
         ...component.configuration,
         fallbackReviewer: fallbackReviewer(draft),
-        ...activation.generations,
+        publishPRCheck: check.enabled,
+        prCheckActivationGeneration: check.activationGeneration,
+        ...findings.generations,
       },
     },
   ];
-  for (const destination of activation.nodes) {
+  const destinations = [
+    { ...check, missingMessage: "Update this automation through admin reset before you publish PR checks." },
+    ...findings.nodes.map((destination) => ({
+      ...destination,
+      missingMessage: "Update this automation through admin reset before you publish review findings.",
+    })),
+  ];
+  for (const destination of destinations) {
     const node = graph.specNodes?.find((candidate) => candidate.id === destination.nodeId);
-    if (!node && destination.enabled) {
-      throw new Error("Update this automation through admin reset before you publish review findings.");
-    }
+    if (!node && destination.enabled) throw new Error(destination.missingMessage);
     if (!node) continue;
     updates.push({
       ...nodeUpdate(node),
@@ -159,4 +180,16 @@ function settingsUpdates(
     });
   }
   return updates.length === 1 ? updates[0] : updates;
+}
+
+// An off-to-on save increases the generation, so old attempts cannot resume.
+function prCheckActivation(agent: SuperplaneComponentsNode, configuration: Record<string, unknown>) {
+  const enabled = configuration.publishPRCheck === true;
+  const wasPublished = agent.configuration?.publishPRCheck === true;
+  const savedGeneration = Number(agent.configuration?.prCheckActivationGeneration) || 1;
+  return {
+    nodeId: REVIEW_REQUEST_CHECK_NODE_ID,
+    enabled,
+    activationGeneration: savedGeneration + (enabled && !wasPublished ? 1 : 0),
+  };
 }

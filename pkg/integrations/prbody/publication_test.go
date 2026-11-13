@@ -59,6 +59,9 @@ func (m *memoryPublications) Update(key string, apply func(*core.OrderedPublicat
 	return nil
 }
 func (m *memoryPublications) AttemptFinished(uuid.UUID) (bool, error) { return true, nil }
+func (m *memoryPublications) NodeSnapshot(uuid.UUID, string, uuid.UUID) (*core.PublicationNode, error) {
+	return nil, nil
+}
 
 type descriptionHost struct {
 	body   string
