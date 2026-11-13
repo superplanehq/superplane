@@ -808,3 +808,64 @@ func TestReviewCheckTracksApprovalsAfterRunRetention(t *testing.T) {
 	require.True(t, f.record().Disabled)
 	require.Equal(t, "Review request check disabled", f.http.writes[len(f.http.writes)-1].Status.GetDescription())
 }
+
+// PublicationStore forbids database reads while its update lock is held.
+type reviewCheckReadGuard struct {
+	core.PublicationContext
+	updating bool
+}
+
+func (s *reviewCheckReadGuard) NodeSnapshot(canvas uuid.UUID, node string, attempt uuid.UUID) (*core.PublicationNode, error) {
+	if s.updating {
+		return nil, fmt.Errorf("activation read inside publication update")
+	}
+	return s.PublicationContext.NodeSnapshot(canvas, node, attempt)
+}
+
+func (s *reviewCheckReadGuard) Update(key string, apply func(*core.OrderedPublication) error) error {
+	return s.PublicationContext.Update(key, func(record *core.OrderedPublication) error {
+		s.updating = true
+		defer func() { s.updating = false }()
+		return apply(record)
+	})
+}
+
+func TestReviewCheckReadsActivationOutsidePublicationUpdate(t *testing.T) {
+	for _, phase := range []string{"registration", "delivery"} {
+		t.Run(phase, func(t *testing.T) {
+			f := newReviewCheckFixture(t)
+			f.activationNode = "check"
+			f.saveActivation(true, 2)
+			f.attempt(support.EmitCanvasEventForNode(t, f.canvas.ID, "trigger", "default", nil))
+			guard := &reviewCheckReadGuard{PublicationContext: f.ctx.Publications}
+			if phase == "registration" {
+				f.ctx.Publications = guard
+			} else {
+				f.integration.store = guard
+			}
+			require.NoError(t, f.apply("no_review", nil, ""))
+			require.NoError(t, f.refresh())
+			require.Equal(t, "success", f.state())
+		})
+	}
+}
+
+func TestReviewCheckRechecksActivationAfterProviderLookup(t *testing.T) {
+	f := newReviewCheckFixture(t)
+	f.activationNode = "check"
+	f.saveActivation(true, 2)
+	f.attempt(support.EmitCanvasEventForNode(t, f.canvas.ID, "trigger", "default", nil))
+	require.NoError(t, f.apply("no_review", nil, ""))
+	f.http.onRead = func() {
+		// Change the live fence without changing the publication revision.
+		require.NoError(t, f.db.Model(&models.CanvasNode{}).
+			Where("workflow_id = ? AND node_id = ?", f.canvas.ID, "check").
+			Update("configuration", datatypes.NewJSONType(map[string]any{"enabled": true, "activationGeneration": 3})).Error)
+	}
+	require.NoError(t, f.refresh())
+	require.True(t, f.record().Disabled)
+	require.Empty(t, f.http.writes, "an obsolete activation cannot claim delivery")
+	f.http.onRead = nil
+	require.NoError(t, f.refresh())
+	require.Equal(t, "Review request check disabled", f.http.writes[0].Status.GetDescription())
+}
