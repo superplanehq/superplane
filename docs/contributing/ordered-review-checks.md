@@ -91,8 +91,8 @@ activation cannot reopen it, even with a newer source. Re-enabling requires
 the next activation generation and a current or newer source and attempt.
 
 Each accepted replacement increments `generation`. Each persisted update
-increments `revision`. Refresh checks the revision after lookups and before
-delivery. Concurrent refreshes cannot publish an obsolete snapshot.
+increments `revision`. Refresh checks the revision after lookups and claims
+delivery before publishing. Concurrent refreshes share one delivery lease.
 
 ## Reuse without a check
 
@@ -116,14 +116,25 @@ remain usable without managed publication records.
 record and its next integration request in one transaction. Matching requests
 form one recurring chain.
 
-Refresh reads GitHub outside the lock. It then persists desired status and
-recovery work before delivery. The final revision check and bounded status
-write share the requirement lock. Replacement and disable use that same lock.
-Failed or interrupted delivery leaves recovery work pending.
+Refresh reads GitHub outside the transaction. A short transaction checks the
+revision, claims a one-minute delivery lease, and schedules recovery. The status
+write runs outside the transaction with a 20-second deadline measured from the
+claim. A short transaction then records the result and releases the lease.
+
+Replacement and disable can save newer decisions while delivery runs. They
+preserve the active lease so another status write waits for completion or lease
+expiry. An older delivery cannot acknowledge a newer decision. Completion
+schedules immediate refresh when the revision changes. A refresh that finds an
+active lease preserves recovery work for lease expiry.
+
+Failed or interrupted delivery leaves recovery work pending. Expired leases
+permit recovery after worker interruption. A late response from an expired
+owner cannot release a newer lease. It schedules another delivery of the current
+decision, including for disabled or closed checks.
 
 Delivery is at least once. A crash after GitHub accepts a status but before
-the database commit can repeat that status. Duplicate successful application
-does not issue another reviewer request or status write.
+the completion transaction can repeat that status. Duplicate successful
+application does not issue another reviewer request or status write.
 
 The integration request worker retries failed hooks with bounded backoff.
 After ten failures, it retains a failed request and its error. A leased request

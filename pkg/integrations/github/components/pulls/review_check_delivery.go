@@ -8,13 +8,17 @@ import (
 	"time"
 
 	"github.com/google/go-github/v84/github"
+	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
 )
 
+const reviewCheckDeliveryLease = time.Minute
+const reviewCheckWriteTimeout = 20 * time.Second
+
 // RefreshReviewCheck runs as an integration hook, after the owning execution
-// transaction commits. Lookups do not hold the per-requirement publication lock.
+// transaction commits. All provider requests run outside publication updates.
 func RefreshReviewCheck(ctx core.IntegrationHookContext) error {
 	var parameters struct{ Key string }
 	if err := mapstructure.Decode(ctx.Parameters, &parameters); err != nil {
@@ -35,8 +39,24 @@ func RefreshReviewCheck(ctx core.IntegrationHookContext) error {
 	if err != nil {
 		return err
 	}
+	if state.Delivery != nil && time.Now().Before(state.Delivery.ExpiresAt) {
+		return store.Update(parameters.Key, func(current *core.OrderedPublication) error {
+			if current.Revision != snapshot.Revision {
+				return core.ErrPublicationUnchanged
+			}
+			// A replacement or webhook can consume the original recovery request.
+			current.WakeAt = &state.Delivery.ExpiresAt
+			return nil
+		})
+	}
 	if snapshot.Disabled && state.Delivered != "" && state.Delivered == state.fingerprint() {
-		return nil
+		return store.Update(parameters.Key, func(current *core.OrderedPublication) error {
+			if current.Revision != snapshot.Revision || current.WakeAt == nil {
+				return core.ErrPublicationUnchanged
+			}
+			current.WakeAt = nil
+			return nil
+		})
 	}
 	client, err := common.NewClient(ctx.Integration, ctx.HTTP)
 	if err != nil {
@@ -53,51 +73,80 @@ func RefreshReviewCheck(ctx core.IntegrationHookContext) error {
 		}
 		monitor = true
 	}
-	// Commit desired state and recovery work before attempting external delivery.
+	// Claim delivery and commit recovery work before attempting external delivery.
 	var revision int64
 	err = store.Update(parameters.Key, func(current *core.OrderedPublication) error {
 		if current.Revision != snapshot.Revision {
 			return core.ErrPublicationUnchanged
 		}
-		current.Payload, err = json.Marshal(state)
-		if err != nil {
-			return err
+		current.WakeAt = nil
+		if monitor {
+			current.WakeAt = reviewCheckWake(5 * time.Minute)
 		}
-		current.WakeAt = reviewCheckWake(5 * time.Minute)
-		revision = current.Revision + 1
-		return nil
-	})
-	if err != nil || revision == 0 {
+		if state.Delivery != nil || state.Delivered != state.fingerprint() {
+			state.Delivery = &reviewCheckDelivery{ID: uuid.New(), ExpiresAt: time.Now().Add(reviewCheckDeliveryLease)}
+			state.Delivered = ""
+			current.WakeAt = &state.Delivery.ExpiresAt
+			revision = current.Revision + 1
+		}
+		current.Payload, err = json.Marshal(state)
 		return err
-	}
-	err = store.Update(parameters.Key, func(current *core.OrderedPublication) error {
-		if current.Revision != revision {
-			return core.ErrPublicationUnchanged
-		}
-		if state.Delivered != state.fingerprint() {
-			// Bound the only provider write held under this requirement's lock.
-			writeCtx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
-			defer cancel()
-			description := string([]rune(state.Description)[:min(len([]rune(state.Description)), 140)])
-			_, _, err := client.CreateStatus(writeCtx, state.Configuration.Repository, state.SHA, github.RepoStatus{State: &state.State, Context: &state.Configuration.Context, Description: &description, TargetURL: &state.Configuration.ResultURL})
-			if err != nil {
-				return fmt.Errorf("publish review check: %w", err)
-			}
-		}
-		state.Delivered = state.fingerprint()
-		current.Payload, err = json.Marshal(state)
-		if err != nil {
-			return err
-		}
-		if !monitor {
-			current.WakeAt = nil
-		}
-		return nil
 	})
 	if err != nil {
 		return err
 	}
+	if revision == 0 {
+		return lookupErr
+	}
+
+	writeErr := publishReviewCheck(client, state)
+	err = store.Update(parameters.Key, func(current *core.OrderedPublication) error {
+		latest, err := decodeReviewCheckState(current.Payload)
+		if err != nil {
+			return err
+		}
+		ownsDelivery := latest.Delivery != nil && latest.Delivery.ID == state.Delivery.ID
+		if ownsDelivery {
+			latest.Delivery = nil
+		}
+		current.WakeAt = reviewCheckWake(5 * time.Minute)
+		if ownsDelivery && writeErr == nil && current.Generation == snapshot.Generation && latest.fingerprint() == state.fingerprint() {
+			latest.Delivered = state.fingerprint()
+			if !monitor {
+				current.WakeAt = nil
+			}
+		}
+		if !ownsDelivery {
+			// A late response can change GitHub after recovery has already run.
+			latest.Delivered = ""
+		}
+		if !ownsDelivery || current.Revision != revision {
+			current.WakeAt = reviewCheckWake(time.Second)
+		}
+		current.Payload, err = json.Marshal(latest)
+		return err
+	})
+	if err != nil {
+		return err
+	}
+	if writeErr != nil {
+		return writeErr
+	}
 	return lookupErr
+}
+
+func publishReviewCheck(client *common.Client, state reviewCheckState) error {
+	// Anchor the HTTP deadline to the claim so a paused worker cannot start a
+	// status request after its lease expires.
+	deadline := state.Delivery.ExpiresAt.Add(reviewCheckWriteTimeout - reviewCheckDeliveryLease)
+	writeCtx, cancel := context.WithDeadline(context.Background(), deadline)
+	defer cancel()
+	description := string([]rune(state.Description)[:min(len([]rune(state.Description)), 140)])
+	_, _, err := client.CreateStatus(writeCtx, state.Configuration.Repository, state.SHA, github.RepoStatus{State: &state.State, Context: &state.Configuration.Context, Description: &description, TargetURL: &state.Configuration.ResultURL})
+	if err != nil {
+		return fmt.Errorf("publish review check: %w", err)
+	}
+	return nil
 }
 
 func evaluateReviewCheck(client *common.Client, store core.PublicationStore, record *core.OrderedPublication, state *reviewCheckState) (bool, error) {
