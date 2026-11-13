@@ -86,7 +86,7 @@ func (c *Client) Connect() (*ssh.Client, error) {
 	config := &ssh.ClientConfig{
 		User:            c.Username,
 		Auth:            auth,
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(), // #nosec G106 -- existing SSH workflows do not provide a host-key trust anchor.
 		Timeout:         10 * time.Second,
 	}
 

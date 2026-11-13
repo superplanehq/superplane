@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	"github.com/markbates/goth"
 	"github.com/stretchr/testify/assert"
@@ -36,6 +37,21 @@ func setupAuthHandler(t *testing.T, blockSignup bool) (*Handler, *support.Resour
 	signer := jwt.NewSigner("test-secret")
 	handler := NewHandler(signer, r.Encryptor, r.AuthService, "test", "/templates", blockSignup, false, false)
 	return handler, r
+}
+
+func TestSignedAccountStateRejectsExternalRedirect(t *testing.T) {
+	handler := &Handler{jwtSigner: jwt.NewSigner("test-secret")}
+	accountID := uuid.NewString()
+
+	connectState, err := handler.signConnectState(accountID, models.ProviderGitHub, "https://attacker.example")
+	require.NoError(t, err)
+	_, err = handler.parseConnectState(connectState)
+	assert.ErrorContains(t, err, "invalid connect state")
+
+	linkState, err := handler.signLinkState(accountID, models.ProviderGitHub, "//attacker.example")
+	require.NoError(t, err)
+	_, err = handler.parseLinkState(linkState)
+	assert.ErrorContains(t, err, "invalid link state")
 }
 
 func TestHandler_InitializeProviders_UsesEmailOnlyGitHubScope(t *testing.T) {
@@ -329,7 +345,7 @@ func TestHandler_findOrCreateAccountForProvider(t *testing.T) {
 		err = database.Conn().Create(otherProvider).Error
 		require.NoError(t, err)
 
-		resultAccount, wasCreated, err := handler.findOrCreateAccountForProvider(gothUser, false)
+		resultAccount, wasCreated, err := handler.findOrCreateAccountForProvider(t.Context(), gothUser, false)
 		require.NoError(t, err)
 
 		assert.Equal(t, account.ID, resultAccount.ID)
@@ -371,7 +387,7 @@ func TestHandler_findOrCreateAccountForProvider(t *testing.T) {
 			Provider: "google",
 		}
 
-		resultAccount, wasCreated, err := handler.findOrCreateAccountForProvider(gothUser, false)
+		resultAccount, wasCreated, err := handler.findOrCreateAccountForProvider(t.Context(), gothUser, false)
 		require.NoError(t, err)
 
 		assert.Equal(t, account.ID, resultAccount.ID)
@@ -394,7 +410,7 @@ func TestHandler_findOrCreateAccountForProvider(t *testing.T) {
 		}).Error)
 		require.NoError(t, account.Block(database.Conn(), time.Now()))
 
-		resultAccount, wasCreated, err := handler.findOrCreateAccountForProvider(goth.User{
+		resultAccount, wasCreated, err := handler.findOrCreateAccountForProvider(t.Context(), goth.User{
 			UserID:   "blocked-provider-id",
 			Email:    "updated-blocked-provider@example.com",
 			Name:     account.Name,
@@ -417,7 +433,7 @@ func TestHandler_findOrCreateAccountForProvider(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, account.Block(database.Conn(), time.Now()))
 
-		resultAccount, wasCreated, err := handler.findOrCreateAccountForProvider(goth.User{
+		resultAccount, wasCreated, err := handler.findOrCreateAccountForProvider(t.Context(), goth.User{
 			UserID:   "new-provider-id",
 			Email:    account.Email,
 			Name:     account.Name,
@@ -439,7 +455,7 @@ func TestHandler_findOrCreateAccountForProvider(t *testing.T) {
 			Provider: "github",
 		}
 
-		resultAccount, wasCreated, err := handler.findOrCreateAccountForProvider(gothUser, true)
+		resultAccount, wasCreated, err := handler.findOrCreateAccountForProvider(t.Context(), gothUser, true)
 		require.NoError(t, err)
 
 		assert.NotNil(t, resultAccount)
@@ -463,7 +479,7 @@ func TestHandler_findOrCreateAccountForProvider(t *testing.T) {
 			Provider: "github",
 		}
 
-		resultAccount, wasCreated, err := handler.findOrCreateAccountForProvider(gothUser, false)
+		resultAccount, wasCreated, err := handler.findOrCreateAccountForProvider(t.Context(), gothUser, false)
 		require.Error(t, err)
 		assert.ErrorIs(t, err, errSignupDisabled)
 		assert.Nil(t, resultAccount)
@@ -530,6 +546,13 @@ func TestGetRedirectURL(t *testing.T) {
 		redirectURL := getRedirectURL(req)
 
 		assert.Equal(t, "/", redirectURL)
+	})
+
+	t.Run("should reject encoded protocol-relative and backslash URLs", func(t *testing.T) {
+		for _, redirect := range []string{"/%2f%2fevil.com", `/\evil.com`} {
+			req := httptest.NewRequest(http.MethodGet, "/login?redirect="+url.QueryEscape(redirect), nil)
+			assert.Equal(t, "/", getRedirectURL(req))
+		}
 	})
 }
 

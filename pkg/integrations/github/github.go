@@ -137,6 +137,9 @@ func (g *GitHub) Actions() []core.Action {
 		&pulls.MergePullRequest{},
 		&pulls.MarkPullRequestReadyForReview{},
 		&pulls.AddPullRequestReviewers{},
+		&pulls.ListPullRequestReviewCandidates{},
+		&pulls.EnsurePullRequestReviewers{},
+		&pulls.SetPullRequestReviewCheck{},
 		&pulls.UpdatePullRequest{},
 		&pulls.UpdatePullRequestBodySection{},
 		&pulls.FindPullRequest{},
@@ -323,6 +326,11 @@ func (g *GitHub) handleWebhook(ctx core.HTTPRequestContext) {
 	//
 	case *github.InstallationRepositoriesEvent:
 		g.handleInstallationRepositoriesEvent(ctx, event)
+	case *github.PullRequestEvent, *github.PullRequestReviewEvent:
+		if err := pulls.WakeReviewChecks(ctx.Integration, eventType, payload); err != nil {
+			ctx.Logger.Errorf("schedule review checks: %v", err)
+			http.Error(ctx.Response, "could not schedule review checks", http.StatusInternalServerError)
+		}
 
 	default:
 		ctx.Logger.Warnf("ignoring eventType %s", eventType)
@@ -577,7 +585,7 @@ func (g *GitHub) handleInstallationRepositoriesEvent(ctx core.HTTPRequestContext
 }
 
 func (g *GitHub) afterAppCreation(ctx core.HTTPRequestContext) {
-	if err := authorizeGitHubEnterpriseOrg(setupDB(ctx.HTTP), ctx.OrganizationID, common.HostFromIntegration(ctx.Integration)); err != nil {
+	if err := authorizeGitHubEnterpriseOrg(ctx.Request.Context(), setupDB(ctx.HTTP), ctx.OrganizationID, common.HostFromIntegration(ctx.Integration)); err != nil {
 		writeGitHubEnterpriseAuthorizationError(ctx.Response, err)
 		return
 	}
@@ -750,7 +758,7 @@ func (g *GitHub) afterAppCreationLegacy(ctx core.HTTPRequestContext, appData *Gi
 
 func (g *GitHub) afterAppInstallation(ctx core.HTTPRequestContext) {
 	if !gitHubAppAlreadyCreated(ctx) {
-		if err := authorizeGitHubEnterpriseOrg(setupDB(ctx.HTTP), ctx.OrganizationID, common.HostFromIntegration(ctx.Integration)); err != nil {
+		if err := authorizeGitHubEnterpriseOrg(ctx.Request.Context(), setupDB(ctx.HTTP), ctx.OrganizationID, common.HostFromIntegration(ctx.Integration)); err != nil {
 			writeGitHubEnterpriseAuthorizationError(ctx.Response, err)
 			return
 		}
@@ -1336,10 +1344,13 @@ func clearIntegrationSetupReturnCookie(response http.ResponseWriter) {
 	}
 
 	http.SetCookie(response, &http.Cookie{
-		Name:   integrationSetupReturnCookie,
-		Value:  "",
-		Path:   "/",
-		MaxAge: -1,
+		Name:     integrationSetupReturnCookie,
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteLaxMode,
 	})
 }
 
@@ -1431,10 +1442,13 @@ func listInstallationRepositories(ctx context.Context, client *github.Client) ([
 }
 
 func (g *GitHub) Hooks() []core.Hook {
-	return []core.Hook{}
+	return []core.Hook{{Name: pulls.ReviewCheckHook, Type: core.HookTypeInternal}}
 }
 
 func (g *GitHub) HandleHook(ctx core.IntegrationHookContext) error {
+	if ctx.Name == pulls.ReviewCheckHook {
+		return pulls.RefreshReviewCheck(ctx)
+	}
 	return nil
 }
 

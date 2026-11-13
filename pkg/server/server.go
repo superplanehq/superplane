@@ -4,8 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	// Registers pprof handlers on http.DefaultServeMux, served by startPprofServer.
-	_ "net/http/pprof"
+	pprof "net/http/pprof"
 	"os"
 	"os/signal"
 	"runtime"
@@ -39,6 +38,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/enterprise"
 	"github.com/superplanehq/superplane/pkg/githubapp"
 	grpc "github.com/superplanehq/superplane/pkg/grpc"
+	factoryactions "github.com/superplanehq/superplane/pkg/grpc/actions/factories"
 	githubintegration "github.com/superplanehq/superplane/pkg/integrations/github"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/licensing"
@@ -172,7 +172,9 @@ func startWorkers(
 		panic(err)
 	}
 
-	go startGitHubAppCatalogWorker(context.Background())
+	if os.Getenv("START_VCS_PROVIDER_CATALOG_WORKER") == "yes" {
+		go startGitHubAppCatalogWorker(context.Background())
+	}
 
 	if os.Getenv("START_CONSUMERS") == "yes" {
 		startEmailConsumers(rabbitMQURL, encryptor, baseURL)
@@ -427,6 +429,7 @@ func buildGRPCServices(
 		JWTSigner:        jwtSigner,
 		Entitlements:     licenseService,
 		Enterprise:       features,
+		License:          licenseService,
 	})
 }
 
@@ -678,12 +681,30 @@ func startPprofServer() {
 	runtime.SetBlockProfileRate(1)
 	runtime.SetMutexProfileFraction(5)
 
+	server := &http.Server{
+		Addr:              "0.0.0.0:" + port,
+		Handler:           pprofHandler(),
+		ReadHeaderTimeout: 5 * time.Second,
+		IdleTimeout:       time.Minute,
+		// Do not set WriteTimeout because CPU profiles can run for several minutes.
+	}
+
 	go func() {
 		log.Infof("pprof server listening on :%s", port)
-		if err := http.ListenAndServe("0.0.0.0:"+port, nil); err != nil {
+		if err := server.ListenAndServe(); err != nil {
 			log.Warnf("pprof server stopped: %v", err)
 		}
 	}()
+}
+
+func pprofHandler() http.Handler {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/debug/pprof/", pprof.Index)
+	mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+	mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+	mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+	mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+	return mux
 }
 
 func Start() {
@@ -812,6 +833,13 @@ func Start() {
 	if err != nil {
 		panic(fmt.Sprintf("failed to create registry: %v", err))
 	}
+	go func() {
+		if err := factoryactions.UpgradeGitHubIntakeAuthorGates(context.Background(), factoryactions.IntakeDependencies{
+			Registry: registry, Encryptor: encryptorInstance, AuthService: authService, WebhookBaseURL: webhooksBaseURL,
+		}); err != nil {
+			log.WithError(err).Warn("failed to scan GitHub intake author gates")
+		}
+	}()
 	if os.Getenv("START_CONSUMERS") == "yes" && os.Getenv("START_REGULAR_WORKERS") != "no" {
 		rabbitMQURL, err := config.RabbitMQURL()
 		if err != nil {
@@ -912,6 +940,8 @@ func startLicenseService(encryptor crypto.Encryptor) *licensing.Service {
 		source,
 		licensing.WithKeySync(keySync),
 		licensing.WithRevocationSync(revocations),
+		licensing.WithLifecycleHandler(enterprise.NewLicenseLifecycle(database.Conn)),
+		licensing.WithGrantLookup(enterprise.DatabaseGrantLookup{}),
 	)
 	service.Start(context.Background())
 	return service

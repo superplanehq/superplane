@@ -14,6 +14,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/licensing"
 	"github.com/superplanehq/superplane/pkg/oidc"
 	pbActions "github.com/superplanehq/superplane/pkg/protos/actions"
+	pbAdminEnterprise "github.com/superplanehq/superplane/pkg/protos/admin/enterprise_features"
 	pbAdminKeys "github.com/superplanehq/superplane/pkg/protos/admin/keys"
 	pbAdminOrganizations "github.com/superplanehq/superplane/pkg/protos/admin/organizations"
 	pbAdminRunners "github.com/superplanehq/superplane/pkg/protos/admin/runners"
@@ -35,23 +36,24 @@ import (
 )
 
 type Services struct {
-	Users              pbUsers.UsersServer
-	Groups             pbGroups.GroupsServer
-	Roles              pbRoles.RolesServer
-	Organizations      pbOrganizations.OrganizationsServer
-	Integrations       pbIntegrations.IntegrationsServer
-	Secrets            pbSecrets.SecretsServer
-	Me                 pbMe.MeServer
-	Actions            pbActions.ActionsServer
-	Triggers           pbTriggers.TriggersServer
-	Widgets            pbWidgets.WidgetsServer
-	Canvases           pbCanvases.CanvasesServer
-	Factories          pbFactories.FactoriesServer
-	Files              pbFiles.FilesServer
-	APIKeys            pbAPIKeys.ApiKeysServer
-	AdminRunners       pbAdminRunners.RunnersServer
-	AdminKeys          pbAdminKeys.KeysServer
-	AdminOrganizations pbAdminOrganizations.AdminOrganizationsServer
+	Users                   pbUsers.UsersServer
+	Groups                  pbGroups.GroupsServer
+	Roles                   pbRoles.RolesServer
+	Organizations           pbOrganizations.OrganizationsServer
+	Integrations            pbIntegrations.IntegrationsServer
+	Secrets                 pbSecrets.SecretsServer
+	Me                      pbMe.MeServer
+	Actions                 pbActions.ActionsServer
+	Triggers                pbTriggers.TriggersServer
+	Widgets                 pbWidgets.WidgetsServer
+	Canvases                pbCanvases.CanvasesServer
+	Factories               pbFactories.FactoriesServer
+	Files                   pbFiles.FilesServer
+	APIKeys                 pbAPIKeys.ApiKeysServer
+	AdminRunners            pbAdminRunners.RunnersServer
+	AdminKeys               pbAdminKeys.KeysServer
+	AdminOrganizations      pbAdminOrganizations.AdminOrganizationsServer
+	AdminEnterpriseFeatures pbAdminEnterprise.EnterpriseFeaturesServer
 }
 
 type ServicesConfig struct {
@@ -70,6 +72,9 @@ type ServicesConfig struct {
 	// registry whose Community implementations refuse every operation.
 	Entitlements licensing.Entitlements
 	Enterprise   *enterprise.Registry
+	// License reports installation license status for grant administration.
+	// A nil license means no Enterprise license is active.
+	License licensing.StatusProvider
 }
 
 func NewServices(cfg ServicesConfig) (*Services, error) {
@@ -102,6 +107,8 @@ func NewServices(cfg ServicesConfig) (*Services, error) {
 	}
 
 	organizationService := NewOrganizationService(cfg.AuthService, cfg.Registry, cfg.OIDCProvider, cfg.BaseURL, cfg.WebhooksBaseURL, billingImplementation)
+	organizationFeatures := enterprise.NewOrganizationFeatures(cfg.License)
+	organizationService.enterpriseFeatures = organizationFeatures
 	organizationService.invitations.Entitlements = entitlements
 	organizationService.runners = organizationActions.NewRunnerService(runnerActions.NewRunnerManager(cfg.JWTSigner, cfg.RunnerAPIBaseURL))
 	if cfg.EmailService != nil {
@@ -138,7 +145,8 @@ func NewServices(cfg ServicesConfig) (*Services, error) {
 				cfg.RunnerAPIBaseURL,
 			),
 		),
-		AdminKeys:          NewAdminKeysService(cfg.EncryptionStore),
-		AdminOrganizations: NewAdminOrganizationsService(cfg.AuthService),
+		AdminKeys:               NewAdminKeysService(cfg.EncryptionStore),
+		AdminOrganizations:      NewAdminOrganizationsService(cfg.AuthService),
+		AdminEnterpriseFeatures: NewAdminEnterpriseFeaturesService(organizationFeatures),
 	}, nil
 }

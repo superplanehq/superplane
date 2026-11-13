@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"time"
 
 	"github.com/superplanehq/superplane/pkg/config"
@@ -17,6 +18,9 @@ type ExecutionStateContext struct {
 	tx             *gorm.DB
 	maxPayloadSize int
 	onNewEvents    func([]models.CanvasEvent)
+	outputType     string
+	outputs        map[string]core.ExecutionOutput
+	outputError    error
 }
 
 func NewExecutionStateContext(
@@ -58,7 +62,7 @@ func (s *ExecutionStateContext) Emit(channel, payloadType string, payloads []any
 		return fmt.Errorf("cannot emit %d events (max %d per execution)", len(payloads), config.MaxEmitCount())
 	}
 
-	payloads, err := s.prepareMergeConfidenceOutput(channel, payloadType, payloads)
+	payloads, err := s.prepareOutput(channel, payloadType, payloads)
 	if err != nil {
 		return err
 	}
@@ -168,4 +172,37 @@ func (s *ExecutionStateContext) GetKV(key string) (string, error) {
 		return "", err
 	}
 	return value, nil
+}
+
+func (s *ExecutionStateContext) prepareOutput(channel, payloadType string, payloads []any) ([]any, error) {
+	if s.IsFinished() || s.IsCancelling() || len(payloads) == 0 || payloadType != s.outputType {
+		return payloads, nil
+	}
+	output, ok := s.outputs[channel]
+	if !ok {
+		return payloads, nil
+	}
+	if s.outputError != nil {
+		return nil, s.outputError
+	}
+	prepared := make([]any, len(payloads))
+	for i, payload := range payloads {
+		fields, ok := payload.(map[string]any)
+		if !ok {
+			return nil, fmt.Errorf("completion must emit an object")
+		}
+		fields = maps.Clone(fields)
+		maps.Copy(fields, output.Fields)
+		prepared[i] = fields
+	}
+	if output.ErrorMessage != "" {
+		run, err := models.FindCanvasRunInTransaction(s.tx, s.execution.WorkflowID, s.execution.RunID)
+		if err != nil {
+			return nil, err
+		}
+		if err := run.AddError(s.tx, output.ErrorMessage, config.MaxPayloadSize()); err != nil {
+			return nil, err
+		}
+	}
+	return prepared, nil
 }

@@ -67,7 +67,7 @@ func (h *HostExecutor) Execute(ctx context.Context, task *api.TaskPayload, live 
 	if len(task.Command) == 0 {
 		return 1, "", errors.New("empty command")
 	}
-	cmd := exec.CommandContext(ctx, task.Command[0], task.Command[1:]...)
+	cmd := exec.CommandContext(ctx, task.Command[0], task.Command[1:]...) // #nosec G204 -- executing the authorized task command is the runner's purpose.
 	cmd.Dir = workDir
 	prepareTaskProcessGroup(cmd)
 	defer killTaskProcessGroup(cmd)

@@ -40,6 +40,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Create Release" href="#create-release" description="Create a new release in a GitHub repository" />
   <LinkCard title="Create Review" href="#create-review" description="Submit a pull request review on GitHub" />
   <LinkCard title="Delete Release" href="#delete-release" description="Delete a release from a GitHub repository" />
+  <LinkCard title="Ensure Pull Request Reviewers" href="#ensure-pull-request-reviewers" description="Request missing reviews after checking reviewer eligibility and the pull request head" />
   <LinkCard title="Find Pull Request" href="#find-pull-request" description="Find an existing pull request in a GitHub repository by branch" />
   <LinkCard title="Get Combined Commit Status" href="#get-combined-commit-status" description="Get the combined GitHub commit status for a commit, branch, or tag" />
   <LinkCard title="Get Issue" href="#get-issue" description="Get a GitHub issue by number" />
@@ -47,12 +48,14 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Get Repository Permission" href="#get-repository-permission" description="Get the role and permission level for a user on a GitHub repository" />
   <LinkCard title="Get Workflow Usage" href="#get-workflow-usage" description="Retrieve billable GitHub Actions usage (minutes) for the organization" />
   <LinkCard title="List Check Runs For Ref" href="#list-check-runs-for-ref" description="List GitHub Checks API check runs for a commit, branch, or tag" />
+  <LinkCard title="List Pull Request Review Candidates" href="#list-pull-request-review-candidates" description="Find eligible human reviewers for a pull request" />
   <LinkCard title="Mark Pull Request Ready for Review" href="#mark-pull-request-ready-for-review" description="Take a draft pull request out of the draft state in a GitHub repository" />
   <LinkCard title="Merge Pull Request" href="#merge-pull-request" description="Merge an open pull request in a GitHub repository" />
   <LinkCard title="Publish Commit Status" href="#publish-commit-status" description="Publish a status check to a GitHub commit" />
   <LinkCard title="Remove Issue Assignee" href="#remove-issue-assignee" description="Remove assignees from a GitHub issue" />
   <LinkCard title="Remove Issue Label" href="#remove-issue-label" description="Remove labels from a GitHub issue" />
   <LinkCard title="Run Workflow" href="#run-workflow" description="Run GitHub Actions workflow" />
+  <LinkCard title="Set Pull Request Review Check" href="#set-pull-request-review-check" description="Track required approvals for the assessed pull request commit" />
   <LinkCard title="Update Issue" href="#update-issue" description="Update a GitHub issue" />
   <LinkCard title="Update Issue Comment" href="#update-issue-comment" description="Update an existing comment on a GitHub issue or pull request" />
   <LinkCard title="Update Pull Request" href="#update-pull-request" description="Update a pull request's title, body, state, base branch, labels, or assignees in a GitHub repository" />
@@ -507,7 +510,9 @@ This trigger automatically sets up a GitHub webhook when configured. The webhook
 
 **Trigger key:** `github.onPRComment`
 
-The On PR Comment trigger starts a workflow execution when comments are added on a pull request conversation.
+The On PR Comment trigger starts a workflow execution when comments are created or edited in a pull request conversation.
+
+The content filter checks the current comment body. Adding a matching mention in an edit can start a run. For comments that require a mention, removing it does not start a run. Each matching edit remains eligible.
 
 ### Use Cases
 
@@ -528,7 +533,7 @@ Each comment event includes:
 - **comment**: Comment information including body, author, created timestamp
 - **issue**: Issue/PR information; for this trigger it is always a pull request issue
 - **repository**: Repository information
-- **sender**: User who added the comment
+- **sender**: User who created or edited the comment
 
 SuperPlane passes through the full GitHub webhook payload under data for the issue_comment event type.
 
@@ -909,7 +914,11 @@ This trigger automatically sets up a GitHub webhook when configured. The webhook
 
 **Trigger key:** `github.onPRReviewComment`
 
-The On PR Review Comment trigger starts a workflow execution when review comments are added to pull requests.
+The On PR Review Comment trigger starts a workflow execution when review comments are created or edited on pull requests.
+
+The content filter checks the current comment body. Adding a matching mention in an edit can start a run. For comments that require a mention, removing it does not start a run. Each matching edit remains eligible. The comment scope and author filters also apply to edits.
+
+When review submissions are enabled, this trigger also accepts submitted reviews. Edits to submitted reviews do not start a run.
 
 ### Use Cases
 
@@ -929,7 +938,7 @@ The On PR Review Comment trigger starts a workflow execution when review comment
 ### Event Data
 
 This trigger handles two GitHub webhook events:
-- **pull_request_review_comment**: line-level code review comments (`comment` and `pull_request`)
+- **pull_request_review_comment**: created and edited line-level code review comments (`comment` and `pull_request`)
 - **pull_request_review**: submitted review comments (`review` and `pull_request`)
 
 SuperPlane passes through the full GitHub webhook payload under data.
@@ -3300,6 +3309,35 @@ Returns confirmation of the deletion.
 }
 ```
 
+<a id="ensure-pull-request-reviewers"></a>
+
+## Ensure Pull Request Reviewers
+
+**Component key:** `github.ensurePullRequestReviewers`
+
+Ensure desired human reviewers have a review request or an approval for the current commit. Recheck IDs and repository write access. Preserve unrelated requests. Read the pull request again immediately before mutation. Closed pull requests and unexpected commits emit a skipped outcome. Provider failures and ineligible identities fail the execution. Output includes requested and already-covered identities. The final read and mutation are not atomic.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "alreadyCovered": [],
+    "executionId": "11111111-1111-1111-1111-111111111111",
+    "headSha": "abc",
+    "requested": [
+      {
+        "id": 123,
+        "login": "octocat"
+      }
+    ],
+    "status": "requested"
+  },
+  "timestamp": "2026-01-01T09:00:00Z",
+  "type": "github.pullRequestReviewersEnsured"
+}
+```
+
 <a id="find-pull-request"></a>
 
 ## Find Pull Request
@@ -4363,6 +4401,46 @@ Returns GitHub's check run list response, including total_count and check_runs. 
 }
 ```
 
+<a id="list-pull-request-review-candidates"></a>
+
+## List Pull Request Review Candidates
+
+**Component key:** `github.listPullRequestReviewCandidates`
+
+List human collaborators with write, maintain, or admin access. Exclude the pull request author and bots. Read every page; incomplete discovery fails the execution. Output includes the pull request author, state, head, base, and candidate IDs and logins.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "author": {
+      "id": 1,
+      "login": "author"
+    },
+    "base": {
+      "ref": "main",
+      "sha": "base-sha"
+    },
+    "candidates": [
+      {
+        "id": 123,
+        "login": "octocat"
+      }
+    ],
+    "head": {
+      "sha": "abc"
+    },
+    "merged": false,
+    "pullNumber": 42,
+    "repository": "acme/app",
+    "state": "open"
+  },
+  "timestamp": "2026-01-01T09:00:00Z",
+  "type": "github.pullRequestReviewCandidates"
+}
+```
+
 <a id="mark-pull-request-ready-for-review"></a>
 
 ## Mark Pull Request Ready for Review
@@ -4655,6 +4733,44 @@ The Run Workflow component triggers a GitHub Actions workflow and waits for it t
   },
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "github.workflow.finished"
+}
+```
+
+<a id="set-pull-request-review-check"></a>
+
+## Set Pull Request Review Check
+
+**Component key:** `github.setPullRequestReviewCheck`
+
+Publish a commit status and track required reviewers in any canvas. The action finishes after delivery. Approval monitoring continues through integration hooks.
+
+Use pending_selection before selection, required_reviewers after Ensure Pull Request Reviewers, no_review for an explicit decision, selection_error for failed selection, or disabled to release the check.
+
+Supply the assessed SHA, status context, reason, and optional result URL. For required_reviewers, supply reviewer IDs and logins and reviewerRequestExecutionId from the recorded Ensure Pull Request Reviewers output. This component does not request reviewers again.
+
+Source Run ID and Attempt Root Event ID default to trusted current execution records. Cross-canvas sources require broadcast provenance. Persisted creation times and IDs determine order. Older attempts cannot replace newer state, including on the same commit. Disabled activations remain fenced. Activation Generation starts at 1. After disabling, use the next activation generation to enable the check again.
+
+All required reviewers must approve the assessed current commit. Comments do not change approval. Requested changes fail the check. Dismissed replacement reviews cannot revive older approvals. New heads stay pending for a new decision. Closed pull requests stop polling; reopening resumes monitoring.
+
+Provider failures publish error and retry. Delivery is durable and at least once. A crash after a GitHub write can repeat the same status. This component does not change branch rules or start agents.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "activationGeneration": 1,
+    "attemptRootEventId": "attempt-root-event-id",
+    "context": "team/review",
+    "generation": 2,
+    "phase": "required_reviewers",
+    "sha": "abc",
+    "sourceRunId": "source-run-id",
+    "state": "pending",
+    "status": "applied"
+  },
+  "timestamp": "2026-11-13T09:00:00Z",
+  "type": "github.pullRequestReviewCheck"
 }
 ```
 
@@ -5313,13 +5429,13 @@ Update one marked section in a pull request description. Select the integration,
 
 Use a stable section key with lowercase letters, numbers, and single hyphens. Start with a letter. The maximum length is 64 characters. Expressions are not supported in the section key.
 
-The section uses `<!-- superplane:KEY:start -->` and `<!-- superplane:KEY:end -->` markers. Missing sections are appended. Content outside the section is preserved byte for byte. Invalid markers and unchanged content are skipped.
+The section uses `<!-- superplane:KEY:start -->` and `<!-- superplane:KEY:end -->` markers. Missing sections are appended. Content outside the section is preserved byte for byte. Invalid markers produce skipped. Identical content produces unchanged when publication is still eligible. Writes produce published.
 
 The body supports canvas expressions. Use `markdownText(value)` in Markdown tables and `markdownLink(url)` in link destinations. The resolved body is saved with the execution and reused on retries.
 
 Set **Expected Head SHA** to skip publication if the pull request commit changes. Closed pull requests are skipped. **Enabled** defaults to true.
 
-Temporary failures retry through scheduled requests. Each attempt reads the latest description. Provider calls run outside database transactions. Execution details show attempts and skipped outcomes.
+Temporary failures retry through scheduled requests. Each attempt reads the latest description. Provider calls run outside database transactions. Execution details show attempts and publication outcomes.
 
 In factory apps, disabling the published node stops pending writes. Newer runs for the same pull request and section supersede older runs.
 

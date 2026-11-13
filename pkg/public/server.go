@@ -44,6 +44,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/oidc"
 	"github.com/superplanehq/superplane/pkg/productanalytics"
 	pbActions "github.com/superplanehq/superplane/pkg/protos/actions"
+	pbAdminEnterprise "github.com/superplanehq/superplane/pkg/protos/admin/enterprise_features"
 	pbAdminKeys "github.com/superplanehq/superplane/pkg/protos/admin/keys"
 	pbAdminOrganizations "github.com/superplanehq/superplane/pkg/protos/admin/organizations"
 	pbAdminRunners "github.com/superplanehq/superplane/pkg/protos/admin/runners"
@@ -308,6 +309,7 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 	grpcGatewayMux = runtime.NewServeMux(
 		runtime.WithMarshalerOption(runtime.MIMEWildcard, newGRPCGatewayMarshaler()),
 		runtime.WithForwardResponseOption(middleware.GatewayForwardResponseTraceOption()),
+		runtime.WithForwardResponseOption(grpc.AuditGatewayResponse),
 		runtime.WithIncomingHeaderMatcher(headersMatcher),
 		runtime.WithMiddlewares(
 			grpc.GatewayRecoveryMiddleware(),
@@ -320,6 +322,7 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 			 * We copy it into the request-scoped holder so otelmux can use it later when
 			 * recording metrics for the outer HTTP request.
 			 */
+			grpc.RecordGatewayRequest(ctx)
 			pattern, ok := runtime.HTTPPathPattern(ctx)
 			if ok {
 				setOtelMetricRoute(ctx, pattern)
@@ -403,10 +406,12 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 	adminGatewayMux := runtime.NewServeMux(
 		runtime.WithMarshalerOption(runtime.MIMEWildcard, newGRPCGatewayMarshaler()),
 		runtime.WithForwardResponseOption(middleware.GatewayForwardResponseTraceOption()),
+		runtime.WithForwardResponseOption(grpc.AuditGatewayResponse),
 		runtime.WithIncomingHeaderMatcher(headersMatcher),
 		runtime.WithMiddlewares(grpc.GatewayRecoveryMiddleware()),
 		runtime.WithErrorHandler(grpc.SanitizedGatewayErrorHandler),
 		runtime.WithMetadata(func(ctx context.Context, _ *http.Request) metadata.MD {
+			grpc.RecordGatewayRequest(ctx)
 			pattern, ok := runtime.HTTPPathPattern(ctx)
 			if ok {
 				setOtelMetricRoute(ctx, pattern)
@@ -424,12 +429,18 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 	if err := pbAdminOrganizations.RegisterAdminOrganizationsHandlerServer(ctx, adminGatewayMux, services.AdminOrganizations); err != nil {
 		return err
 	}
+	if err := pbAdminEnterprise.RegisterEnterpriseFeaturesHandlerServer(ctx, adminGatewayMux, services.AdminEnterpriseFeatures); err != nil {
+		return err
+	}
 	adminGatewayHandler := s.grpcGatewayAccountHandler(adminGatewayMux)
 	s.adminRouter.PathPrefix("/installation/fleets").Handler(adminGatewayHandler)
 	s.adminRouter.PathPrefix("/installation/keys").Handler(adminGatewayHandler)
 	// Define all new admin organization endpoints in protos/admin/organizations.proto.
 	// Keep existing HTTP handlers until they migrate to the admin gRPC gateway.
 	s.adminRouter.Handle("/organizations/{id}", adminGatewayHandler).Methods("DELETE")
+	s.adminRouter.Handle("/organizations/{organization_id}/enterprise-features", adminGatewayHandler).Methods(http.MethodGet, http.MethodPut)
+	s.adminRouter.PathPrefix("/installation/enterprise-features").Handler(adminGatewayHandler)
+	s.adminRouter.Handle("/installation/license/activations", adminGatewayHandler).Methods(http.MethodGet)
 
 	// Public health check
 	s.Router.HandleFunc("/api/v1/canvases/is-alive", func(w http.ResponseWriter, r *http.Request) {
@@ -629,17 +640,17 @@ func (s *Server) RegisterOpenAPIHandler() {
 		return
 	}
 
-	if _, err := os.Stat(swaggerFilesPath); os.IsNotExist(err) {
+	if _, err := os.Stat(swaggerFilesPath); os.IsNotExist(err) { // #nosec G703 -- the path comes from trusted server configuration.
 		log.Errorf("API documentation directory %s does not exist", swaggerFilesPath)
 		return
 	}
 
 	s.Router.HandleFunc(s.BasePath+"/docs", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, swaggerFilesPath+"/swagger-ui.html")
+		http.ServeFile(w, r, swaggerFilesPath+"/swagger-ui.html") // #nosec G703 -- the configured directory is combined with a fixed filename.
 	})
 
 	s.Router.HandleFunc(s.BasePath+"/docs/superplane.swagger.json", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, swaggerFilesPath+"/superplane.swagger.json")
+		http.ServeFile(w, r, swaggerFilesPath+"/superplane.swagger.json") // #nosec G703 -- the configured directory is combined with a fixed filename.
 	})
 
 	log.Infof("OpenAPI specification available at %s", swaggerFilesPath)
@@ -1563,13 +1574,15 @@ type AccountResponse struct {
 const HideLicenseExpiryBannerEnv = "SUPERPLANE_LICENSE_HIDE_EXPIRY_BANNER"
 
 // AccountLicense tells the UI which Enterprise features are available. Only
-// installation administrators receive the license state and expiry.
+// installation administrators receive the license state, expiry, and the
+// number of organizations.
 type AccountLicense struct {
-	Edition          string     `json:"edition"`
-	Features         []string   `json:"features"`
-	State            string     `json:"state,omitempty"`
-	ExpiresAt        *time.Time `json:"expires_at,omitempty"`
-	HideExpiryBanner bool       `json:"hide_expiry_banner,omitempty"`
+	Edition           string     `json:"edition"`
+	Features          []string   `json:"features"`
+	State             string     `json:"state,omitempty"`
+	ExpiresAt         *time.Time `json:"expires_at,omitempty"`
+	HideExpiryBanner  bool       `json:"hide_expiry_banner,omitempty"`
+	OrganizationCount int64      `json:"organization_count,omitempty"`
 }
 
 func hideLicenseExpiryBanner() bool {
@@ -1581,7 +1594,7 @@ func hideLicenseExpiryBanner() bool {
 	}
 }
 
-func accountLicense(status licensing.Status, installationAdmin bool) AccountLicense {
+func accountLicense(status licensing.Status, installationAdmin bool, organizationCount int64) AccountLicense {
 	license := AccountLicense{
 		Edition:          string(status.Edition),
 		Features:         []string{},
@@ -1597,12 +1610,27 @@ func accountLicense(status licensing.Status, installationAdmin bool) AccountLice
 	}
 
 	license.State = string(status.State)
+	license.OrganizationCount = organizationCount
 	if status.License != nil {
 		expiresAt := status.License.ExpiresAt.UTC()
 		license.ExpiresAt = &expiresAt
 	}
 
 	return license
+}
+
+func organizationCountForLicenseBanner(ctx context.Context, installationAdmin bool) int64 {
+	if !installationAdmin {
+		return 0
+	}
+
+	count, err := models.CountOrganizations(database.DB(ctx))
+	if err != nil {
+		log.WithError(err).Warn("failed to count organizations for the license banner")
+		return 0
+	}
+
+	return count
 }
 
 func accountOrganizationsPendingDeletion(organizations []models.Organization) []AccountOrganizationPendingDeletion {
@@ -1669,8 +1697,12 @@ func (s *Server) getAccount(w http.ResponseWriter, r *http.Request) {
 		Providers:                    accountProviderResponses(providers),
 		LinkedAccounts:               accountLinkedAccountResponses(linkedAccounts),
 		OrganizationsPendingDeletion: accountOrganizationsPendingDeletion(pendingOrgs),
-		License:                      accountLicense(s.licenseStatus(), account.IsInstallationAdmin()),
-		BillingEnabled:               billing.Enabled(),
+		License: accountLicense(
+			s.licenseStatus(),
+			account.IsInstallationAdmin(),
+			organizationCountForLicenseBanner(r.Context(), account.IsInstallationAdmin()),
+		),
+		BillingEnabled: billing.Enabled(),
 	}
 
 	if info, ok := middleware.GetSupportSessionFromContext(r.Context()); ok && info.Active {
@@ -1784,7 +1816,7 @@ func (s *Server) Serve(host string, port int) error {
 
 	handler := http.Handler(s.Router)
 	if os.Getenv("REDIRECT_HTTP_REQUESTS") == "yes" {
-		handler = middleware.RedirectInsecureForwardedHTTP(handler)
+		handler = middleware.RedirectInsecureForwardedHTTP(handler, s.BaseURL)
 	}
 
 	s.httpServer = &http.Server{
@@ -2145,20 +2177,21 @@ func (s *Server) executeWebhookNode(ctx context.Context, body []byte, headers ht
 // lazyWebhookFactory reads the canvas only when a trigger calls it.
 // A webhook must send its response before that lookup.
 type lazyWebhookFactory struct {
-	tx       *gorm.DB
-	canvasID uuid.UUID
-	once     sync.Once
-	inner    core.FactoryContext
-	err      error
+	tx          *gorm.DB
+	node        *models.CanvasNode
+	once        sync.Once
+	inner       *contexts.FactoryContext
+	err         error
+	onNewEvents func([]models.CanvasEvent)
 }
 
-func newLazyWebhookFactory(tx *gorm.DB, canvasID uuid.UUID) core.FactoryContext {
-	return &lazyWebhookFactory{tx: tx, canvasID: canvasID}
+func newLazyWebhookFactory(tx *gorm.DB, node *models.CanvasNode, onNewEvents func([]models.CanvasEvent)) core.FactoryContext {
+	return &lazyWebhookFactory{tx: tx, node: node, onNewEvents: onNewEvents}
 }
 
-func (l *lazyWebhookFactory) load() (core.FactoryContext, error) {
+func (l *lazyWebhookFactory) load() (*contexts.FactoryContext, error) {
 	l.once.Do(func() {
-		canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(l.tx, l.canvasID)
+		canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(l.tx, l.node.WorkflowID)
 		if err != nil || canvas == nil || canvas.FactoryID == nil {
 			l.err = errors.New("app is not owned by a factory")
 			return
@@ -2334,7 +2367,7 @@ func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers ht
 		Webhook:       contexts.NewNodeWebhookContext(ctx, tx, s.encryptor, &node, s.BaseURL+s.BasePath),
 		Events:        events,
 		Integration:   integrationCtx,
-		Factory:       newLazyWebhookFactory(tx, node.WorkflowID),
+		Factory:       newLazyWebhookFactory(tx, &node, onNewEvents),
 	})
 	return code, response, integrationOrganizationID(integration), err
 }
@@ -2540,7 +2573,7 @@ func (s *Server) setupDevProxy(webBasePath string) {
 		log.Fatalf("Error parsing Vite dev server URL: %v", err)
 	}
 
-	proxy := httputil.NewSingleHostReverseProxy(target)
+	proxy := httputil.NewSingleHostReverseProxy(target) // #nosec G704 -- the proxy target comes only from trusted development configuration.
 
 	proxy.ModifyResponse = func(res *http.Response) error {
 		contentType := res.Header.Get("Content-Type")
@@ -2647,4 +2680,15 @@ func makeOriginChecker(allowed []string) func(*http.Request) bool {
 		_, ok := set[strings.ToLower(u.Scheme+"://"+u.Host)]
 		return ok
 	}
+}
+
+func (l *lazyWebhookFactory) EmitPullRequestEvent(nodeID, payloadType string, payload any) error {
+	if nodeID == l.node.NodeID {
+		return contexts.EmitFactoryPullRequestEvent(l.tx, l.node, payloadType, payload, l.onNewEvents)
+	}
+	inner, err := l.load()
+	if err != nil {
+		return err
+	}
+	return inner.WithNewEvents(l.onNewEvents).EmitPullRequestEvent(nodeID, payloadType, payload)
 }

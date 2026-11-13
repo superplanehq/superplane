@@ -2,19 +2,24 @@ package public
 
 import (
 	"context"
+	"database/sql"
+	"database/sql/driver"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 
 	runneraction "github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/public/middleware"
 	"gorm.io/gorm"
 )
 
@@ -143,22 +148,28 @@ func (s *Server) handleRunnerCodexSubscriptionCheckpoint(w http.ResponseWriter, 
 		availableModels = nil
 	}
 	var version int64
+	checkpointStep := "begin_transaction"
 	err = database.DB(r.Context()).Transaction(func(tx *gorm.DB) error {
+		checkpointStep = "lock_connection"
 		connection, lockErr := models.LockScopedFactoryCodexConnection(tx, scope.OrganizationID, scope.ConnectionID)
 		if lockErr != nil {
 			return lockErr
 		}
+		checkpointStep = "validate_lease"
 		lease, err := scopedCodexLease(tx, connection, scope)
 		if err != nil {
 			return err
 		}
 		if lease.Purpose == models.CodexLeasePurposeRun {
+			checkpointStep = "store_usage"
 			if err := connection.StoreUsage(tx, limits, availableModels, time.Now()); err != nil {
 				return err
 			}
 			version = connection.CredentialVersion
+			checkpointStep = "commit_transaction"
 			return nil
 		}
+		checkpointStep = "prepare_bundle"
 		prepared, label, prepareErr := runneraction.PrepareCodexAuthBundle(request.Bundle)
 		if prepareErr != nil {
 			return errInvalidCodexBundle
@@ -167,18 +178,22 @@ func (s *Server) handleRunnerCodexSubscriptionCheckpoint(w http.ResponseWriter, 
 		if next == 0 {
 			next = connection.CredentialVersion + 1
 		}
+		checkpointStep = "encrypt_bundle"
 		ciphertext, encryptErr := s.encryptor.Encrypt(context.Background(), prepared, []byte(connection.ID.String()))
 		if encryptErr != nil {
 			return encryptErr
 		}
+		checkpointStep = "store_bundle"
 		if storeErr := connection.StoreBundle(tx, scope.TaskID, scope.Generation, next, ciphertext, label, request.Final, time.Now()); storeErr != nil {
 			return storeErr
 		}
 		// Catalog and quota data are independent and optional.
+		checkpointStep = "store_usage"
 		if err := connection.StoreUsage(tx, limits, availableModels, time.Now()); err != nil {
 			return err
 		}
 		version = connection.CredentialVersion
+		checkpointStep = "commit_transaction"
 		return nil
 	})
 	if errors.Is(err, errInvalidCodexBundle) {
@@ -186,7 +201,18 @@ func (s *Server) handleRunnerCodexSubscriptionCheckpoint(w http.ResponseWriter, 
 		return
 	}
 	if err != nil {
-		writeCodexSubscriptionError(w, err)
+		message, status := codexSubscriptionErrorResponse(err)
+		if status == http.StatusInternalServerError {
+			middleware.SetServerError(r.Context(), fmt.Errorf("codex checkpoint %s: %s", checkpointStep, safeCodexCheckpointCause(err)), map[string]string{
+				"operation":        "checkpoint",
+				"checkpoint_step":  checkpointStep,
+				"organization_id":  scope.OrganizationID.String(),
+				"connection_id":    scope.ConnectionID.String(),
+				"task_id":          scope.TaskID.String(),
+				"lease_generation": fmt.Sprint(scope.Generation),
+			})
+		}
+		http.Error(w, message, status)
 		return
 	}
 	_ = messages.PublishOrganizationCodexConnectionUpdated(database.DB(r.Context()), scope.OrganizationID)
@@ -460,18 +486,40 @@ func scopedCodexLease(tx *gorm.DB, connection *models.FactoryCodexConnection, sc
 }
 
 func writeCodexSubscriptionError(w http.ResponseWriter, err error) {
+	message, status := codexSubscriptionErrorResponse(err)
+	http.Error(w, message, status)
+}
+
+func codexSubscriptionErrorResponse(err error) (string, int) {
 	switch {
 	case errors.Is(err, models.ErrCodexConnectionNotFound):
-		http.Error(w, "ChatGPT subscription connection not found", http.StatusNotFound)
+		return "ChatGPT subscription connection not found", http.StatusNotFound
 	case errors.Is(err, models.ErrCodexConnectionStale):
-		http.Error(w, "The ChatGPT sign-in update is out of date", http.StatusConflict)
+		return "The ChatGPT sign-in update is out of date", http.StatusConflict
 	case errors.Is(err, models.ErrCodexConnectionNotReady):
-		http.Error(w, "Connect ChatGPT before this task can run", http.StatusConflict)
+		return "Connect ChatGPT before this task can run", http.StatusConflict
 	case errors.Is(err, models.ErrCodexConnectionNotEligible):
-		http.Error(w, "Connect a ChatGPT subscription as an active workspace member", http.StatusForbidden)
+		return "Connect a ChatGPT subscription as an active workspace member", http.StatusForbidden
 	case errors.Is(err, models.ErrCodexConnectionUnavailable):
-		http.Error(w, err.Error(), http.StatusForbidden)
+		return err.Error(), http.StatusForbidden
 	default:
-		http.Error(w, "ChatGPT subscription request failed", http.StatusInternalServerError)
+		return "ChatGPT subscription request failed", http.StatusInternalServerError
 	}
+}
+
+func safeCodexCheckpointCause(err error) string {
+	// Error messages and PostgreSQL details can contain credentials or SQL values.
+	var postgresError *pgconn.PgError
+	if errors.As(err, &postgresError) && len(postgresError.Code) == 5 && strings.Trim(postgresError.Code, "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ") == "" {
+		return "PostgreSQL error (SQLSTATE " + postgresError.Code + ")"
+	}
+	for _, cause := range []error{context.Canceled, context.DeadlineExceeded, sql.ErrConnDone, sql.ErrTxDone, driver.ErrBadConn, gorm.ErrRecordNotFound} {
+		if errors.Is(err, cause) {
+			return cause.Error()
+		}
+	}
+	for errors.Unwrap(err) != nil {
+		err = errors.Unwrap(err)
+	}
+	return fmt.Sprintf("unexpected error (%T)", err)
 }

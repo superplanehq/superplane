@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/licensing"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -58,6 +59,10 @@ func (a *GatewayAuthorizer) AuthorizeHTTP(
 	}
 
 	organizationID := firstHTTPHeader(r, "x-organization-id")
+	orgID, licenseRequired, err := organizationForLicenseRule(userID, organizationID, rule)
+	if err != nil {
+		return nil, err
+	}
 	if organizationID == "" {
 		log.Errorf("Organization not found in request headers")
 		return nil, status.Error(codes.NotFound, "Not found")
@@ -108,8 +113,40 @@ func (a *GatewayAuthorizer) AuthorizeHTTP(
 		return nil, err
 	}
 
+	if err := a.requireLicenseFeatures(ctx, userID, organizationID, orgID, licenseRequired, rule); err != nil {
+		return nil, err
+	}
+
+	return withAuthorizedContext(ctx, pathParams, organizationID), nil
+}
+
+func organizationForLicenseRule(userID, organizationID string, rule AuthorizationRule) (uuid.UUID, bool, error) {
+	if len(rule.RequiredLicenseFeatures) == 0 {
+		return uuid.Nil, false, nil
+	}
+
+	orgID, err := uuid.Parse(organizationID)
+	if organizationID == "" || err != nil {
+		log.Warnf(
+			"User %s tried to access %s:%s without an organization for license feature %s",
+			userID,
+			rule.Resource,
+			rule.Action,
+			rule.RequiredLicenseFeatures[0],
+		)
+		return uuid.Nil, true, status.Error(codes.PermissionDenied, licensing.ErrNotLicensed.Error())
+	}
+
+	return orgID, true, nil
+}
+
+func (a *GatewayAuthorizer) requireLicenseFeatures(ctx context.Context, userID, organizationID string, orgID uuid.UUID, required bool, rule AuthorizationRule) error {
+	if !required {
+		return nil
+	}
+
 	for _, feature := range rule.RequiredLicenseFeatures {
-		if err := licensing.Require(a.entitlements, feature); err != nil {
+		if err := licensing.Require(ctx, a.entitlements, orgID, feature); err != nil {
 			log.Warnf(
 				"User %s tried to access %s:%s in organization %s without the %s license feature",
 				userID,
@@ -118,11 +155,11 @@ func (a *GatewayAuthorizer) AuthorizeHTTP(
 				organizationID,
 				feature,
 			)
-			return nil, status.Error(codes.PermissionDenied, err.Error())
+			return status.Error(codes.PermissionDenied, err.Error())
 		}
 	}
 
-	return withAuthorizedContext(ctx, pathParams, organizationID), nil
+	return nil
 }
 
 func withAuthorizedContext(ctx context.Context, pathParams map[string]string, organizationID string) context.Context {

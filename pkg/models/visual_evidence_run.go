@@ -15,11 +15,11 @@ const customAutomationRunTitle = "Custom automation"
 // factory pull request in the root event. The task Verify list shows a column
 // app only after that link exists.
 func MaybeLinkVisualEvidenceRun(tx *gorm.DB, canvas *Canvas, event *CanvasEvent, run *CanvasRun) error {
-	return maybeLinkFactoryColumnAppRun(tx, canvas, event, run, FactoryAppTemplateVisualEvidenceID, visualEvidenceRunTitle)
+	return LinkFactoryColumnAppRun(tx, canvas, event, run, FactoryAppTemplateVisualEvidenceID, visualEvidenceRunTitle)
 }
 
 // MaybeLinkCustomAutomationRun stores task authority for a custom automation.
-// Backlog runs use a task link; Verify runs use pull-request activity.
+// Backlog, Implement, and Done runs use a task link. Verify runs use pull-request activity.
 func MaybeLinkCustomAutomationRun(tx *gorm.DB, canvas *Canvas, event *CanvasEvent, run *CanvasRun) error {
 	title := customAutomationRunTitle
 	if canvas != nil {
@@ -27,13 +27,25 @@ func MaybeLinkCustomAutomationRun(tx *gorm.DB, canvas *Canvas, event *CanvasEven
 			title = name
 		}
 	}
-	if canvas != nil && canvas.ColumnKey != nil && *canvas.ColumnKey == CanvasColumnKeyBacklog {
-		return maybeLinkBacklogCustomAutomationRun(tx, canvas, event, run, title)
+	if canvasUsesTaskCustomAutomationLink(canvas) {
+		return maybeLinkTaskCustomAutomationRun(tx, canvas, event, run, title)
 	}
-	return maybeLinkFactoryColumnAppRun(tx, canvas, event, run, FactoryAppTemplateCustomAutomationID, title)
+	return LinkFactoryColumnAppRun(tx, canvas, event, run, FactoryAppTemplateCustomAutomationID, title)
 }
 
-func maybeLinkBacklogCustomAutomationRun(tx *gorm.DB, canvas *Canvas, event *CanvasEvent, run *CanvasRun, title string) error {
+func canvasUsesTaskCustomAutomationLink(canvas *Canvas) bool {
+	if canvas == nil || canvas.ColumnKey == nil {
+		return false
+	}
+	switch *canvas.ColumnKey {
+	case CanvasColumnKeyBacklog, CanvasColumnKeyImplement, CanvasColumnKeyDone:
+		return true
+	default:
+		return false
+	}
+}
+
+func maybeLinkTaskCustomAutomationRun(tx *gorm.DB, canvas *Canvas, event *CanvasEvent, run *CanvasRun, title string) error {
 	if event == nil || run == nil || canvas.FactoryID == nil || event.WorkflowID != canvas.ID || run.WorkflowID != canvas.ID {
 		return nil
 	}
@@ -71,53 +83,7 @@ func maybeLinkBacklogCustomAutomationRun(tx *gorm.DB, canvas *Canvas, event *Can
 	return order.RecordRefinementRun(tx, run.ID)
 }
 
-// MaybeLinkMergeConfidenceRun records task authority before agent admission.
-func MaybeLinkMergeConfidenceRun(tx *gorm.DB, canvas *Canvas, event *CanvasEvent, run *CanvasRun) error {
-	if canvas == nil || event == nil || run == nil || canvas.FactoryID == nil || event.WorkflowID != canvas.ID || run.WorkflowID != canvas.ID {
-		return nil
-	}
-	matches, err := CanvasHasFactoryAppTemplate(tx, canvas.ID, "risk-score")
-	if err != nil || !matches {
-		return err
-	}
-	prID := visualEvidencePullRequestID(event.Data.Data())
-	if prID == uuid.Nil {
-		return nil
-	}
-	if err := maybeLinkFactoryColumnAppRun(tx, canvas, event, run, "risk-score", "Merge confidence"); err != nil {
-		return err
-	}
-	activity, err := FindPullRequestActivityByRunID(tx, run.ID)
-	if err != nil {
-		return err
-	}
-	payload, _ := objectMap(RootEventSourcePayload(event.Data.Data()))
-	providerPR, _ := objectMap(payload["pull_request"])
-	head, _ := objectMap(providerPR["head"])
-	sha, _ := head["sha"].(string)
-	if sha = strings.TrimSpace(sha); sha != "" && activity.RevisionID == nil {
-		// The event identifies the assessed commit, not an observation of the
-		// live head. Delayed admission must not move the current revision back.
-		revision, _, err := findOrCreatePullRequestRevision(tx, activity.PullRequestID, sha)
-		if err != nil {
-			return err
-		}
-		if err := tx.Model(activity).Update("revision_id", revision.ID).Error; err != nil {
-			return err
-		}
-	}
-	factory, err := FindFactory(tx, canvas.OrganizationID, *canvas.FactoryID)
-	if err != nil {
-		return err
-	}
-	pr, err := factory.FindPullRequest(tx, FactoryPullRequestLookup{ID: activity.PullRequestID})
-	if err != nil {
-		return err
-	}
-	return run.QueueMergeConfidenceCheck(tx, pr)
-}
-
-func maybeLinkFactoryColumnAppRun(
+func LinkFactoryColumnAppRun(
 	tx *gorm.DB,
 	canvas *Canvas,
 	event *CanvasEvent,

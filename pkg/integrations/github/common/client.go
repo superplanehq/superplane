@@ -45,6 +45,11 @@ type Client struct {
 	underlying *github.Client
 }
 
+func (c *Client) RepositoryFullName(repository string) string {
+	owner, name := c.ownerAndName(repository)
+	return owner + "/" + name
+}
+
 func (c *Client) Host() Host {
 	if c == nil {
 		return DotCom()
@@ -752,7 +757,10 @@ func (c *Client) HTTPDo(req *http.Request) (*http.Response, error) {
 	if c == nil || c.underlying == nil {
 		return nil, fmt.Errorf("github client is not configured")
 	}
-	return c.underlying.Client().Do(req)
+	if req == nil || req.URL == nil || req.URL.Scheme != "https" || !c.Host().Matches(req.URL.Hostname()) {
+		return nil, fmt.Errorf("github request URL is not allowed")
+	}
+	return c.underlying.Client().Do(req) // #nosec G704 -- the scheme and configured GitHub host are allowlisted above.
 }
 
 func NewClient(ctx core.IntegrationContext, httpCtx core.HTTPContext) (*Client, error) {

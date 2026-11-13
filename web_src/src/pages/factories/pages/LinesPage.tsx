@@ -48,6 +48,7 @@ import { Navigate, useLocation, useNavigate, useParams } from "react-router";
 import { backlogAnalysisCreditLabels, type BacklogAnalysisRun } from "../lib/backlogAnalysis";
 import {
   customAutomationAllowsManualStart,
+  customAutomationColumn,
   customAutomationMode,
   CUSTOM_AUTOMATION_TEMPLATE_ID,
   DEFAULT_CUSTOM_AUTOMATION_ICON,
@@ -768,7 +769,7 @@ export function LinesPage() {
         <CustomAutomationSetupModal
           lineId={selectedLine.id}
           automationId={customAutomationAutomationId ?? undefined}
-          columnKey={new URLSearchParams(search).get("automationColumn") === "backlog" ? "backlog" : "verify"}
+          columnKey={customAutomationColumn(new URLSearchParams(search).get("automationColumn"))}
           onClose={() => navigate(factoryHomePath(organizationId, routeSegment, selectedLine.id))}
         />
       ) : null}
@@ -1172,7 +1173,7 @@ function LineDetail({
                 id: automationId,
                 name: automation.automation?.name?.trim() || "Custom automation",
                 icon: automation.settings?.icon?.trim() || DEFAULT_CUSTOM_AUTOMATION_ICON,
-                columnKey: automation.automation?.columnKey === "backlog" ? ("backlog" as const) : ("verify" as const),
+                columnKey: customAutomationColumn(automation.automation?.columnKey),
               },
             ]
           : [],
@@ -1278,6 +1279,7 @@ function LineDetail({
           automationsFor={automationsFor}
           onAutomationRowAction={handleRowAction}
           onAddVerifyAutomation={canAddVerifyAutomation ? () => addAutomation.openPicker("verify") : undefined}
+          onAddImplementAutomation={canAddColumnAutomation ? () => addAutomation.openPicker("phase-0") : undefined}
           onAddDoneAutomation={canAddColumnAutomation ? () => addAutomation.openPicker("done") : undefined}
         />
       )}
@@ -1545,6 +1547,7 @@ function PhaseBoard({
   automationsFor,
   onAutomationRowAction,
   onAddVerifyAutomation,
+  onAddImplementAutomation,
   onAddDoneAutomation,
 }: {
   organizationId: string;
@@ -1574,6 +1577,7 @@ function PhaseBoard({
   automationsFor: (key: ColumnKey, columnTitle: string) => ColumnAutomation[];
   onAutomationRowAction: (automation: ColumnAutomation, action: ColumnAutomationRowAction) => void;
   onAddVerifyAutomation?: () => void;
+  onAddImplementAutomation?: () => void;
   onAddDoneAutomation?: () => void;
 }) {
   const [columnColors, setColumnColors] = useState<Record<string, LineBoardColumnColorId | null>>(() =>
@@ -1742,6 +1746,7 @@ function PhaseBoard({
               automations={phaseAutomations[index]}
               automationRowCount={automationRowCount}
               onAutomationRowAction={onAutomationRowAction}
+              onAddAutomation={column.stepIndex === 0 ? onAddImplementAutomation : undefined}
               paging={columnPaging.open}
               cardsPending={cardsPending}
             />
@@ -2076,6 +2081,7 @@ function PhaseColumn({
   automations,
   automationRowCount,
   onAutomationRowAction,
+  onAddAutomation,
   paging,
   cardsPending,
 }: {
@@ -2096,6 +2102,7 @@ function PhaseColumn({
   automations?: ColumnAutomation[];
   automationRowCount?: number;
   onAutomationRowAction?: (automation: ColumnAutomation, action: ColumnAutomationRowAction) => void;
+  onAddAutomation?: () => void;
   paging: BoardColumnPaging;
   cardsPending: boolean;
 }) {
@@ -2139,6 +2146,7 @@ function PhaseColumn({
           automations,
           rowCount: automationRowCount,
           onRowAction: onAutomationRowAction,
+          onAdd: onAddAutomation,
           testId: `lines-phase-${column.stepIndex}-automation-rows`,
         })}
         actions={
@@ -2158,6 +2166,7 @@ function PhaseColumn({
               parallelism={parallelism}
               colorId={colorId}
               onColorChange={onColorChange}
+              onAddAutomation={onAddAutomation}
             />
           </div>
         }

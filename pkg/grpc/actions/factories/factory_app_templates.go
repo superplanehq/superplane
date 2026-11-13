@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/components/runner"
+	"github.com/superplanehq/superplane/pkg/factories/mergeconfidence"
 	"github.com/superplanehq/superplane/pkg/integrations/prbody"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
@@ -66,6 +67,17 @@ func bitbucketFactoryTemplate(template factoryAppTemplate) factoryAppTemplate {
 var factoryAppTemplates = map[factoryTemplateKey]factoryAppTemplate{
 	{id: scheduledIntakeTemplateID, provider: models.ProviderGitHub}:    scheduledIntakeTemplate(models.ProviderGitHub),
 	{id: scheduledIntakeTemplateID, provider: models.ProviderBitbucket}: scheduledIntakeTemplate(models.ProviderBitbucket),
+	{id: reviewRequestTemplateID, provider: models.ProviderGitHub}: githubFactoryTemplate(factoryAppTemplate{
+		id:               reviewRequestTemplateID,
+		entrypointNodeID: reviewRequestTriggerNodeID,
+		canvasFile:       "templates/github/review-request.canvas.yaml",
+		consoleFile:      "templates/github/review-request.console.yaml",
+		columnKey:        models.CanvasColumnKeyVerify,
+		componentIntegrations: map[string]string{
+			"github.listPullRequestReviewCandidates": "github",
+			"github.ensurePullRequestReviewers":      "github",
+		},
+	}),
 	{id: "line-implementation", provider: models.ProviderGitHub}: githubFactoryTemplate(factoryAppTemplate{
 		id:                  "line-implementation",
 		entrypointNodeID:    "onrun-implement",
@@ -291,6 +303,9 @@ func materializeFactoryTemplate(templateID, provider string, input factoryTempla
 			return nil, err
 		}
 	}
+	if template.id == reviewRequestTemplateID {
+		configureReviewRequest(canvas, params)
+	}
 	canvas.Metadata.ID = input.appID
 	canvas.Metadata.Name = input.appName
 	wireFactoryTemplate(canvas, template, input)
@@ -341,7 +356,7 @@ func filterDisabledMergeChecks(canvas *yaml.Canvas, enabled string) {
 				continue
 			}
 			prompt, _ := item["prompt"].(string)
-			id := runner.MergeCheckID(prompt)
+			id := mergeconfidence.MergeCheckID(prompt)
 			if id == "" || allowed[id] {
 				kept = append(kept, step)
 			}
@@ -620,6 +635,13 @@ func deriveFactoryTemplateInput(
 		if template.id == "risk-score" {
 			input.mergeCheckSteps = settings.agentSteps["assess-risk"]
 			input.bodySectionSettings = settings.bodySections
+		}
+	}
+	if template.id == reviewRequestTemplateID {
+		for _, node := range version.Nodes {
+			if node.ID == reviewRequestTriggerNodeID {
+				input.installParams["mergeConfidenceAppId"] = configString(node.Configuration, "app")
+			}
 		}
 	}
 

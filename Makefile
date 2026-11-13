@@ -64,6 +64,16 @@ GOTESTSUM=$(COMPOSE) run --rm -e DB_NAME=superplane_test -v $(PWD)/tmp/screensho
 lint:
 	$(COMPOSE) exec app revive -formatter friendly -config lint.toml -exclude ./tmp/... ./...
 
+.PHONY: check.gosec
+check.gosec: dev.test.is.running
+	mkdir -p tmp/gosec
+	$(COMPOSE) exec -T app bash /app/scripts/with-host-owned-output tmp/gosec gosec \
+		-exclude-generated -exclude-dir=pkg/protos -exclude-dir=pkg/openapi_client \
+		-exclude=G101,G104,G115,G117 \
+		-nosec-require-rules -nosec-require-justification -track-suppressions \
+		-fmt=json -out=tmp/gosec/report.json -stdout -verbose=text \
+		./cmd/... ./pkg/... ./ee/...
+
 tidy:
 	$(COMPOSE) exec app go mod tidy
 
@@ -601,7 +611,8 @@ MODULES := \
 	files, \
 	admin/fleets, \
 	admin/keys, \
-	admin/organizations
+	admin/organizations, \
+	admin/enterprise_features
 REST_API_MODULES := \
 	authorization, \
 	organizations, \
@@ -621,7 +632,8 @@ REST_API_MODULES := \
 	files, \
 	admin/fleets, \
 	admin/keys, \
-	admin/organizations
+	admin/organizations, \
+	admin/enterprise_features
 
 pb.gen: dev.test.is.running
 	$(MAKE) pb.gen.go

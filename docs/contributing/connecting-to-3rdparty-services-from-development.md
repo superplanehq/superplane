@@ -157,9 +157,19 @@ installation row.
    members with team or base-permission access then do not see the
    repositories in SuperPlane.
 
-   Subscribe the app to the **Member** event. SuperPlane uses this event to
-   refresh cached push access after repository membership changes. Do not
-   subscribe to installation or installation_repositories events.
+   Subscribe the app to the **Member**, **Membership**, **Organization**,
+   **Team**, **Team add**, **Repository**, and **Create** events.
+   SuperPlane uses the membership events to refresh cached push access.
+   SuperPlane uses the repository and create events to keep the default
+   branch current. Do not subscribe to installation or
+   installation_repositories events.
+
+   An app that you created before these events existed can receive only
+   the **Member** event. Open the app settings, select **Permissions &
+   events**, select the other events, and save. The Members permission is
+   already granted, so installations do not have to approve a change.
+   Without the membership events, SuperPlane refreshes team access only
+   during the periodic catalog refresh.
 
 6. Create the app.
 7. Make the app public. Other GitHub accounts can then install it.

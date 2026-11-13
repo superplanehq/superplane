@@ -240,7 +240,7 @@ func loadTargetPackages(patterns ...string) ([]*loadedPackage, error) {
 
 func goList(args ...string) ([]listedPackage, error) {
 	baseArgs := append([]string{"list", "-json"}, args...)
-	cmd := exec.Command("go", baseArgs...)
+	cmd := exec.Command("go", baseArgs...) // #nosec G204 -- the executable is fixed and arguments are Go package patterns.
 	cmd.Dir = repoRoot()
 	output, err := cmd.Output()
 	if err != nil {

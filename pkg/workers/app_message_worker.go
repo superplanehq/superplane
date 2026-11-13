@@ -114,6 +114,11 @@ func (w *AppMessageWorker) LockAndProcessMessage(message models.AppMessage) erro
 
 		return locked.Delete(tx)
 	})
+	if errors.Is(err, core.ErrEventPayloadTooLarge) {
+		// Roll back all subscriber events before discarding a permanent failure.
+		logger.Errorf("Deleting oversized app message: %v", err)
+		return message.Delete(database.Conn())
+	}
 	if err != nil {
 		return err
 	}
@@ -169,8 +174,8 @@ func (w *AppMessageWorker) deliverBroadcast(tx *gorm.DB, canvas *models.Canvas, 
 			continue
 		}
 
-		if err := w.sendMessageToNode(tx, canvas, sourceNode, node, payload, onNewEvents); err != nil {
-			w.logger.Errorf("send broadcast to node: %v", err)
+		if err := w.sendMessageToNode(tx, canvas, sourceNode, node, payload, appMessage.SourceRunID, onNewEvents); err != nil {
+			return fmt.Errorf("send broadcast to node %s on canvas %s: %w", node.NodeID, node.WorkflowID, err)
 		}
 	}
 
@@ -204,7 +209,7 @@ func (w *AppMessageWorker) findTargetNodes(tx *gorm.DB, subs []models.CanvasSubs
 	return nodesByKey, nil
 }
 
-func (w *AppMessageWorker) sendMessageToNode(tx *gorm.DB, sourceCanvas *models.Canvas, sourceNode *models.CanvasNode, targetNode *models.CanvasNode, payload any, onNewEvents func([]models.CanvasEvent)) error {
+func (w *AppMessageWorker) sendMessageToNode(tx *gorm.DB, sourceCanvas *models.Canvas, sourceNode *models.CanvasNode, targetNode *models.CanvasNode, payload any, sourceRunID *uuid.UUID, onNewEvents func([]models.CanvasEvent)) error {
 	ref := targetNode.Ref.Data()
 	if targetNode.Type != models.NodeTypeTrigger || ref.Trigger == nil {
 		return nil
@@ -238,7 +243,7 @@ func (w *AppMessageWorker) sendMessageToNode(tx *gorm.DB, sourceCanvas *models.C
 		Configuration: targetNode.Configuration.Data(),
 		NodeMetadata:  contexts.NewNodeMetadataContext(tx, targetNode),
 		Message:       message,
-		Events:        contexts.NewEventContext(tx, targetNode, nil, onNewEvents),
+		Events:        contexts.NewEventContext(tx, targetNode, nil, onNewEvents).WithSourceRun(sourceRunID),
 		Logger:        logging.ForNode(*targetNode),
 	})
 }

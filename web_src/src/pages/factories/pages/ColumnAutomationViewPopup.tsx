@@ -1,3 +1,5 @@
+import { ReviewRequestSettingsHost } from "./ReviewRequestSettingsPopup";
+import { REVIEW_REQUEST_TRIGGER_NODE_ID } from "./useReviewRequestSettingsDraft";
 import { ScheduledIntakeOwnerSettings } from "./ScheduledIntakeOwnerSettings";
 import { useOptionalFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { useFactoryAutomationNavigation } from "@/hooks/useFactoryAutomationNavigation";
@@ -319,6 +321,24 @@ export function ColumnAutomationViewHost({
     general,
   });
 
+  if (nodeIds.includes(REVIEW_REQUEST_TRIGGER_NODE_ID)) {
+    return (
+      <ReviewRequestSettingsHost
+        organizationId={organizationId}
+        factoryId={factoryId}
+        canvasId={canvasId}
+        graph={automation.graph}
+        loading={automation.isLoading}
+        error={automation.isError}
+        onRetry={() => void automation.refetch()}
+        onSaveNode={(update) => agent.saveNode(update, { notify: false })}
+        onDelete={onDelete}
+        deletePending={deletePending}
+        initialTab={initialTab}
+        onClose={onClose}
+      />
+    );
+  }
   if (columnAutomationUsesSplitConfig(nodeIds)) {
     return (
       <MergeConfidenceConfigModal
@@ -357,24 +377,25 @@ export function ColumnAutomationViewHost({
       runHrefFor={(runId) => factoryAppRunPath(organizationId, factoryKey, canvasId, runId, { from: "lines", lineId })}
       onClose={onClose}
       general={generalSettings}
-      agent={
-        agent.agentNode
-          ? {
-              draft: agent.draft ?? undefined,
-              isLoading: agent.isLoading || !agent.draft,
-              organizationId,
-              factoryId,
-              factoryKey,
-              automationId: canvasId,
-              onSave: agent.save,
-            }
-          : undefined
-      }
+      agent={columnAutomationAgentSlot(agent, { organizationId, factoryId, factoryKey, automationId: canvasId })}
       initialTab={initialTab}
       onDelete={onDelete}
       deletePending={deletePending}
     />
   );
+}
+
+function columnAutomationAgentSlot(
+  agent: ReturnType<typeof useColumnCanvasAgentEditor>,
+  scope: Pick<PlanningReviewAgentSlot, "organizationId" | "factoryId" | "factoryKey" | "automationId">,
+): PlanningReviewAgentSlot | undefined {
+  if (!agent.agentNode) return undefined;
+  return {
+    ...scope,
+    draft: agent.draft ?? undefined,
+    isLoading: agent.isLoading || !agent.draft,
+    onSave: agent.save,
+  };
 }
 
 function scheduledIntakeHistorySource(graph: IntakeAutomationGraph): RunHistoryIntakeSource | undefined {

@@ -59,7 +59,7 @@ func NewAuthService() (*AuthService, error) {
 		return nil, fmt.Errorf("failed to load policies: %w", err)
 	}
 
-	orgPoliciesCsv, err := os.ReadFile(orgPolicyPath)
+	orgPoliciesCsv, err := os.ReadFile(orgPolicyPath) // #nosec G304 G703 -- the policy path comes from trusted process configuration.
 	if err != nil {
 		return nil, fmt.Errorf("failed to read org policies: %w", err)
 	}

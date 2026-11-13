@@ -48,12 +48,18 @@ type ExecutionContext struct {
 	Expressions       ExpressionContext
 	OIDC              oidc.Provider
 	Apps              AppExecutionContext
+	Publications      PublicationContext
 	Runs              RunExecutionContext
 	Factory           FactoryContext
 	Usage             UsageRecorder
 	HostedLLM         HostedLLMContext
 	RunnerTasks       RunnerTaskContext
 	CodexSubscription CodexSubscriptionContext
+	// ResolvedEnvironment stays in this execution so startup does not resolve credentials twice.
+	ResolvedEnvironment *ResolvedEnvironment
+	// RunnerEnvironment is prepared by the trusted owner, never decoded from component configuration.
+	RunnerEnvironment       map[string]string
+	RunnerEnvironmentRemove []string
 }
 
 // CodexSubscriptionLease is one run using a factory ChatGPT connection.
@@ -255,4 +261,10 @@ type GroupRef struct {
 
 type Node struct {
 	ID string `mapstructure:"id" json:"id"`
+}
+
+// ExecutionOutput contains owner-prepared fields for one output channel.
+type ExecutionOutput struct {
+	Fields       map[string]any
+	ErrorMessage string
 }

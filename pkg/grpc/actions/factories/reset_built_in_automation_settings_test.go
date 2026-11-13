@@ -2,6 +2,7 @@ package factories
 
 import (
 	"context"
+	"github.com/superplanehq/superplane/pkg/factories/mergeconfidence"
 	"maps"
 	"slices"
 	"strconv"
@@ -9,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-github/v84/github"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -166,6 +168,67 @@ func resetTestOrganization(t *testing.T, r *support.ResourceRegistry) error {
 	return err
 }
 
+func TestResetReviewRequestPreservesFallbackAndAgentSettings(t *testing.T) {
+	for _, fallback := range []string{"octocat", ""} {
+		t.Run("fallback="+fallback, func(t *testing.T) {
+			instructions := ""
+			if fallback != "" {
+				instructions = "Prefer the security owner. Keep {{ example }} literal."
+			}
+			r, factory := resetTestFactory(t)
+			integration, err := models.CreateIntegration(uuid.New(), r.Organization.ID, "github", "workspace-github", nil)
+			require.NoError(t, err)
+			require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryReviewRequest))
+			source := resetTestTemplate(t, r, factory, "risk-score", models.ProviderGitHub, func(*yaml.Canvas) {})
+			var installedCanvas *yaml.Canvas
+			canvas := resetTestTemplate(t, r, factory, reviewRequestTemplateID, models.ProviderGitHub, func(doc *yaml.Canvas) {
+				installedCanvas = doc
+				for _, id := range []string{"list-candidates", "request-reviewers"} {
+					findYAMLNode(t, doc, id).Integration = &yaml.IntegrationRef{ID: integration.ID.String(), Name: integration.InstallationName}
+				}
+				trigger := findYAMLNode(t, doc, reviewRequestTriggerNodeID)
+				trigger.Configuration["app"] = source.ID.String()
+				trigger.Configuration["enabled"] = false
+				agent := findYAMLNode(t, doc, reviewRequestAgentNodeID)
+				agent.Configuration["fallbackReviewer"] = fallback
+				agent.Configuration["additionalInstructions"] = "Prefer the security owner. Keep {{ example }} literal."
+				agent.Configuration["model"] = models.FormatHostedLLMModelKey(models.UsageProviderOpenRouter, "anthropic/claude-sonnet-4-6")
+				agent.Configuration["thinkingLevel"] = "low"
+				agent.Configuration["executionTimeoutSeconds"] = 0
+				agent.Configuration["steps"] = []any{map[string]any{"type": "prompt", "prompt": "Retired selection policy"}}
+			})
+			if instructions == "" {
+				findYAMLNode(t, installedCanvas, reviewRequestAgentNodeID).Configuration["additionalInstructions"] = ""
+				resetTestPublishCanvas(t, r, canvas, installedCanvas)
+			}
+			require.NoError(t, models.DisableExperimentalFeature(r.Organization.ID, features.FeatureFactoryReviewRequest))
+			require.NoError(t, resetTestOrganization(t, r))
+			version := resetTestLiveVersion(t, canvas)
+			for _, id := range []string{"list-candidates", "request-reviewers"} {
+				node := findIntakeNode(version.Nodes, id)
+				require.NotNil(t, node)
+				require.NotNil(t, node.IntegrationID, "%s must keep its GitHub connection after reset", id)
+				require.Equal(t, integration.ID.String(), *node.IntegrationID)
+			}
+			agent := findIntakeNode(version.Nodes, reviewRequestAgentNodeID)
+			require.NotNil(t, agent)
+			steps := agent.Configuration["steps"].([]any)
+			prompt := steps[1].(map[string]any)["prompt"].(string)
+			// The managed policy must replace an installed prompt during reset.
+			require.Contains(t, prompt, "Select a contributor to this pull request only when no eligible non-contributor is available.")
+			require.Equal(t, fallback, agent.Configuration["fallbackReviewer"])
+			require.Equal(t, instructions, agent.Configuration["additionalInstructions"])
+			require.Equal(t, models.FormatHostedLLMModelKey(models.UsageProviderOpenRouter, "anthropic/claude-sonnet-4-6"), agent.Configuration["model"])
+			require.Equal(t, "low", agent.Configuration["thinkingLevel"])
+			require.EqualValues(t, 0, agent.Configuration["executionTimeoutSeconds"])
+			trigger := findIntakeNode(version.Nodes, reviewRequestTriggerNodeID)
+			require.Equal(t, source.ID.String(), trigger.Configuration["app"])
+			require.Equal(t, false, trigger.Configuration["enabled"])
+			require.NotContains(t, liveCanvasJSON(t, canvas), "retired selection policy")
+		})
+	}
+}
+
 func TestResetBuiltInVerificationSettings(t *testing.T) {
 	for _, provider := range []string{models.ProviderGitHub, models.ProviderBitbucket} {
 		for _, templateID := range []string{"risk-score", "pr-closure", "visual-evidence"} {
@@ -178,6 +241,13 @@ func TestResetBuiltInVerificationSettings(t *testing.T) {
 				canvas := resetTestTemplate(t, r, factory, templateID, provider, func(doc *yaml.Canvas) {
 					if templateID == "risk-score" {
 						findYAMLNode(t, doc, "publish-merge-confidence").Configuration["enabled"] = false
+						// Simulate an installed version from before completion broadcasts.
+						doc.Spec.Nodes = slices.DeleteFunc(doc.Spec.Nodes, func(node yaml.Node) bool {
+							return node.Component == "filter" || node.Component == "broadcastMessage"
+						})
+						doc.Spec.Edges = slices.DeleteFunc(doc.Spec.Edges, func(edge yaml.Edge) bool {
+							return edge.SourceID == "publish-merge-confidence" || edge.SourceID == "complete-merge-confidence"
+						})
 					}
 					trigger := findYAMLNode(t, doc, template.entrypointNodeID)
 					trigger.Configuration["onlyFactoryPullRequests"] = false
@@ -213,6 +283,16 @@ func TestResetBuiltInVerificationSettings(t *testing.T) {
 					require.NotNil(t, publication)
 					assert.Equal(t, provider+".updatePullRequestBodySection", publication.ComponentName())
 					assert.Equal(t, false, publication.Configuration["enabled"])
+					if provider == models.ProviderGitHub {
+						gate := findIntakeNode(version.Nodes, "complete-merge-confidence")
+						require.NotNil(t, gate)
+						assert.Equal(t, "filter", gate.ComponentName())
+						broadcast := findIntakeNode(version.Nodes, "broadcast-merge-confidence")
+						require.NotNil(t, broadcast)
+						assert.Equal(t, "broadcastMessage", broadcast.ComponentName())
+						assert.Contains(t, version.Edges, models.Edge{SourceID: publication.ID, TargetID: gate.ID, Channel: "default"})
+						assert.Contains(t, version.Edges, models.Edge{SourceID: gate.ID, TargetID: broadcast.ID, Channel: "default"})
+					}
 				}
 				assert.Equal(t, false, trigger.Configuration["onlyFactoryPullRequests"])
 				assert.Equal(t, false, trigger.Configuration["ignoreDrafts"])
@@ -449,6 +529,30 @@ func TestResetIntakePreservesGeneralSettings(t *testing.T) {
 			spec := models.LiveCanvasSpec{Nodes: version.Nodes, Edges: version.Edges}
 			actual := intakeSettingsFromGraph(source, resolveIntakeGraph(source, spec), spec)
 			assert.Equal(t, expected, serializeIntakeSettings(source, actual))
+			if source == models.FactoryIntakeSourceGitHubIssues && !tc.paused {
+				payload, err := gitHubIssueEvent(&github.Issue{Number: github.Ptr(42), HTMLURL: github.Ptr("https://github.com/acme/app/issues/42"), Title: github.Ptr("Community issue"), State: github.Ptr("open"), User: &github.User{Login: github.Ptr("community")}}, "acme/app")
+				require.NoError(t, err)
+				if tc.restrictAuthors {
+					payload["action"] = "labeled"
+					payload["label"] = map[string]any{"name": "superplane"}
+					payload["sender"] = map[string]any{"login": "maintainer"}
+				}
+				db := database.DB(t.Context())
+				events, err := models.ListCanvasEvents(db, canvas.ID, intakeTriggerNodeID, 200, nil)
+				require.NoError(t, err)
+				require.Empty(t, events, "reset does not replay settings")
+				require.NoError(t, emitIntakeEvents(db, canvas.ID, "github.issue", []map[string]any{payload}))
+				events, err = models.ListCanvasEvents(db, canvas.ID, intakeTriggerNodeID, 1, nil)
+				require.NoError(t, err)
+				host := gitHubTestResponses(`{"permission":"none"}`, `{"permission":"write"}`)
+				executeGitHubIntakeRun(t, r, canvas, &events[0], host)
+				if !tc.restrictAuthors {
+					require.Empty(t, host.Requests, "disabled gate does not check permissions after reset")
+				}
+				orders, err := models.ListWorkOrdersBySourceRunIDs(db, factory.ID, []uuid.UUID{events[0].RunID})
+				require.NoError(t, err)
+				require.Len(t, orders, 1)
+			}
 			if source == models.FactoryIntakeSourceLinearIssues {
 				assertResetLinearIntakeScope(t, version)
 			}
@@ -528,6 +632,12 @@ func TestResetPRFeedbackPreservesEachRunnerAndGeneralSettings(t *testing.T) {
 							node.Configuration["model"] = model
 							expected[node.ID] = 1200 + i
 							evidence[node.ID] = i%2 == 0
+							for _, item := range node.Configuration["steps"].([]any) {
+								step := item.(map[string]any)
+								if step["type"] == "prompt" {
+									step["prompt"] = "Do not set git user.email, and do not add Co-authored-by or Signed-off-by trailers."
+								}
+							}
 							if source == models.FactoryPRFeedbackHandlerSourcePullRequestChecks {
 								original := node.ID
 								node.ID = "legacy-repair"
@@ -596,6 +706,10 @@ func TestResetPRFeedbackPreservesEachRunnerAndGeneralSettings(t *testing.T) {
 							require.True(t, ok)
 							hasGitUser = hasGitUser || step["name"] == "Set Up Git User"
 							hasDCOSigning = hasDCOSigning || step["name"] == "Set Up DCO Signing"
+							if step["type"] == "prompt" {
+								assert.Contains(t, step["prompt"], "Do not remove or override the automatic sign-off.")
+								assert.Contains(t, step["prompt"], "Do not bypass the Git wrapper, repository hooks, or push verification.")
+							}
 						}
 						assert.True(t, hasGitUser)
 						assert.True(t, hasDCOSigning)
@@ -785,7 +899,7 @@ func TestResetMergeConfidencePreservesDisabledChecks(t *testing.T) {
 			require.NoError(t, err)
 			require.NoError(t, decoder.Decode(node.Configuration["steps"]))
 			require.NotEmpty(t, steps)
-			checks, _ := runner.MergeConfidenceChecksFromSteps(steps)
+			checks, _ := mergeconfidence.MergeConfidenceChecksFromSteps(steps)
 			assert.Empty(t, checks)
 			assert.NotContains(t, liveCanvasJSON(t, canvas), "Retired system instruction")
 		})
