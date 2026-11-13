@@ -23,6 +23,7 @@ type ensureReviewersConfiguration struct {
 }
 
 type ensureReviewersOutcome struct {
+	ExecutionID    string             `json:"executionId"`
 	Status         string             `json:"status"`
 	Reason         string             `json:"reason,omitempty"`
 	HeadSHA        string             `json:"headSha"`
@@ -46,12 +47,16 @@ func (c *EnsurePullRequestReviewers) OutputChannels(any) []core.OutputChannel {
 func (c *EnsurePullRequestReviewers) Configuration() []configuration.Field {
 	fields := (&ListPullRequestReviewCandidates{}).Configuration()
 	return append(fields,
-		configuration.Field{Name: "reviewers", Label: "Reviewers", Type: configuration.FieldTypeList, Required: true, TypeOptions: &configuration.TypeOptions{List: &configuration.ListTypeOptions{ItemLabel: "Reviewer", ItemDefinition: &configuration.ListItemDefinition{Type: configuration.FieldTypeObject, Schema: []configuration.Field{
-			{Name: "id", Label: "GitHub user ID", Type: configuration.FieldTypeNumber, Required: true},
-			{Name: "login", Label: "GitHub login", Type: configuration.FieldTypeString, Required: true},
-		}}}}},
+		reviewerConfigurationField(),
 		configuration.Field{Name: "expectedHeadSha", Label: "Expected Head SHA", Type: configuration.FieldTypeString, Description: "Skip the request if the current head differs from this commit."},
 	)
+}
+
+func reviewerConfigurationField() configuration.Field {
+	return configuration.Field{Name: "reviewers", Label: "Reviewers", Type: configuration.FieldTypeList, Required: true, TypeOptions: &configuration.TypeOptions{List: &configuration.ListTypeOptions{ItemLabel: "Reviewer", ItemDefinition: &configuration.ListItemDefinition{Type: configuration.FieldTypeObject, Schema: []configuration.Field{
+		{Name: "id", Label: "GitHub user ID", Type: configuration.FieldTypeNumber, Required: true},
+		{Name: "login", Label: "GitHub login", Type: configuration.FieldTypeString, Required: true},
+	}}}}}
 }
 func (c *EnsurePullRequestReviewers) Setup(ctx core.SetupContext) error {
 	fields, ok := ctx.Configuration.(map[string]any)
@@ -123,7 +128,7 @@ func (c *EnsurePullRequestReviewers) Execute(ctx core.ExecutionContext) error {
 	if err != nil {
 		return fmt.Errorf("read pull request: %w", err)
 	}
-	outcome := ensureReviewersOutcome{Requested: []ReviewerIdentity{}, AlreadyCovered: []ReviewerIdentity{}}
+	outcome := ensureReviewersOutcome{ExecutionID: ctx.ID.String(), Requested: []ReviewerIdentity{}, AlreadyCovered: []ReviewerIdentity{}}
 	if reason := skipped(pr); reason != "" {
 		outcome.Status, outcome.Reason, outcome.HeadSHA = "skipped", reason, pr.GetHead().GetSHA()
 		return emit(outcome)
@@ -185,6 +190,11 @@ func (c *EnsurePullRequestReviewers) Execute(ctx core.ExecutionContext) error {
 	return emit(outcome)
 }
 func hasCurrentApproval(reviews []*github.PullRequestReview, reviewer ReviewerIdentity, sha string) bool {
+	latest := latestReviewerDecision(reviews, reviewer)
+	return latest != nil && latest.GetState() == "APPROVED" && latest.GetCommitID() == sha
+}
+
+func latestReviewerDecision(reviews []*github.PullRequestReview, reviewer ReviewerIdentity) *github.PullRequestReview {
 	var latest *github.PullRequestReview
 	for _, review := range reviews {
 		if review.GetUser().GetID() != reviewer.ID || !strings.EqualFold(review.GetUser().GetLogin(), reviewer.Login) || review.GetState() == "COMMENTED" || review.GetState() == "PENDING" {
@@ -194,7 +204,7 @@ func hasCurrentApproval(reviews []*github.PullRequestReview, reviewer ReviewerId
 			latest = review
 		}
 	}
-	return latest != nil && latest.GetState() == "APPROVED" && latest.GetCommitID() == sha
+	return latest
 }
 func (c *EnsurePullRequestReviewers) Hooks() []core.Hook                      { return nil }
 func (c *EnsurePullRequestReviewers) HandleHook(core.ActionHookContext) error { return nil }
@@ -206,6 +216,6 @@ func (c *EnsurePullRequestReviewers) Cleanup(core.SetupContext) error    { retur
 
 func (c *EnsurePullRequestReviewers) ExampleOutput() map[string]any {
 	return map[string]any{"type": "github.pullRequestReviewersEnsured", "timestamp": "2026-01-01T09:00:00Z", "data": map[string]any{
-		"status": "requested", "headSha": "abc", "requested": []any{map[string]any{"id": 123, "login": "octocat"}}, "alreadyCovered": []any{},
+		"executionId": "11111111-1111-1111-1111-111111111111", "status": "requested", "headSha": "abc", "requested": []any{map[string]any{"id": 123, "login": "octocat"}}, "alreadyCovered": []any{},
 	}}
 }

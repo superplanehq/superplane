@@ -21,6 +21,13 @@ type EventContext struct {
 	run            *models.CanvasRun
 	maxPayloadSize int
 	onNewEvents    func([]models.CanvasEvent)
+	sourceRunID    *uuid.UUID
+}
+
+// WithSourceRun records trusted broadcast provenance outside the message payload.
+func (s *EventContext) WithSourceRun(id *uuid.UUID) *EventContext {
+	s.sourceRunID = id
+	return s
 }
 
 func NewEventContext(tx *gorm.DB, node *models.CanvasNode, run *models.CanvasRun, onNewEvents func([]models.CanvasEvent)) *EventContext {
@@ -200,12 +207,13 @@ func (s *EventContext) buildEvent(payloadType string, payload any) (*models.Canv
 	// We use RawMessage here to avoid a second marshal when GORM persists the JSON value.
 	//
 	event := models.CanvasEvent{
-		WorkflowID: s.node.WorkflowID,
-		NodeID:     s.node.NodeID,
-		Channel:    "default",
-		Data:       models.NewJSONValue(json.RawMessage(data)),
-		State:      models.CanvasEventStatePending,
-		CreatedAt:  &now,
+		SourceRunID: s.sourceRunID,
+		WorkflowID:  s.node.WorkflowID,
+		NodeID:      s.node.NodeID,
+		Channel:     "default",
+		Data:        models.NewJSONValue(json.RawMessage(data)),
+		State:       models.CanvasEventStatePending,
+		CreatedAt:   &now,
 	}
 
 	if s.run != nil {
