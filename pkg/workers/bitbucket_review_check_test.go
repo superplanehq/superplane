@@ -114,7 +114,7 @@ func (f *bitbucketReviewFixture) state() string {
 }
 func (f *bitbucketReviewFixture) ensure() {
 	execution := support.CreateCanvasNodeExecution(f.t, f.canvas.ID, "ensure", f.root.ID, f.root.ID)
-	execution.Configuration = datatypes.NewJSONType(map[string]any{"repository": "acme/widgets", "pullRequestId": "42"})
+	execution.Configuration = datatypes.NewJSONType(map[string]any{"repository": "acme/widgets", "pullRequestId": f.ctx.Configuration.(map[string]any)["pullRequestId"]})
 	require.NoError(f.t, f.db.Save(execution).Error)
 	ctx := f.executionContext(execution, &f.nodes[1])
 	require.NoError(f.t, ctx.ExecutionState.Emit("default", "bitbucket.pullRequestReviewersEnsured", []any{map[string]any{"status": "requested", "headSha": f.http.head, "requested": []bitbucket.ReviewerIdentity{{UUID: bbReviewUser, DisplayName: "Reviewer"}}}}))
@@ -334,4 +334,48 @@ func TestBitbucketReviewCheckEndsFailedSelectionAndReopensTracking(t *testing.T)
 	f.event("pullrequest:updated", f.http.head, time.Now())
 	require.NoError(t, f.refresh())
 	require.NotNil(t, f.record().WakeAt)
+}
+
+func TestBitbucketReviewCheckExplicitDisableUsesSavedSource(t *testing.T) {
+	f := newBitbucketReviewFixture(t)
+	require.NoError(t, f.apply("pending_selection"))
+	require.NoError(t, f.refresh())
+	require.Equal(t, "INPROGRESS", f.state())
+	publishedSHA := f.http.head
+	f.ctx.Configuration.(map[string]any)["assessedSha"] = strings.Repeat("b", 40)
+	require.NoError(t, f.apply("disabled"))
+	f.http.failRead = true
+	require.NoError(t, f.refresh())
+	require.Equal(t, "SUCCESSFUL", f.state())
+	write := f.http.writes[len(f.http.writes)-1]
+	require.Contains(t, write["path"], publishedSHA)
+	require.Equal(t, "topic", write["refname"])
+	require.Nil(t, f.record().WakeAt)
+}
+
+func TestBitbucketReviewCheckNormalizesPullRequestIdentity(t *testing.T) {
+	for _, id := range []string{"042", "42 "} {
+		t.Run(id, func(t *testing.T) {
+			f := newBitbucketReviewFixture(t)
+			f.ctx.Configuration.(map[string]any)["pullRequestId"] = id
+			require.NoError(t, f.apply("pending_selection"))
+			require.NoError(t, f.refresh())
+			f.ensure()
+			f.ctx.Configuration.(map[string]any)["pullRequestId"] = "42"
+			require.NoError(t, f.apply("required_reviewers"))
+			records, err := f.integration.store.List("bitbucket.review-check/")
+			require.NoError(t, err)
+			require.Len(t, records, 1)
+			require.EqualValues(t, 2, f.record().Generation)
+			require.NoError(t, f.integration.store.Update(bbReviewKey, func(record *core.OrderedPublication) error {
+				record.WakeAt = nil
+				return nil
+			}))
+			f.event("pullrequest:approved", f.http.head, f.http.approval)
+			require.NotNil(t, f.record().WakeAt)
+			f.http.participant = `"approved":true,"state":"approved"`
+			require.NoError(t, f.refresh())
+			require.Equal(t, "SUCCESSFUL", f.state())
+		})
+	}
 }

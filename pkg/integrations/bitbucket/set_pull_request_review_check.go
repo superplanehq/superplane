@@ -134,6 +134,11 @@ func (*SetPullRequestReviewCheck) Execute(ctx core.ExecutionContext) error {
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return err
 	}
+	pullRequestID, err := parsePullRequestID(config.PullRequestID)
+	if err != nil {
+		return err
+	}
+	config.PullRequestID = fmt.Sprint(pullRequestID)
 	canvas, err := uuid.Parse(ctx.WorkflowID)
 	if err != nil {
 		return err
@@ -215,7 +220,11 @@ func (*SetPullRequestReviewCheck) Execute(ctx core.ExecutionContext) error {
 		record.Order, record.ActivationGeneration, record.Disabled = order, generation, config.Phase == "disabled"
 		record.OwnerCanvasID, record.OwnerNodeID = canvas, config.ActivationNodeID
 		record.Hook, record.WakeAt = reviewCheckHook, reviewWake(time.Second)
-		record.Payload, err = json.Marshal(reviewCheckState{Configuration: config, Delivery: previous.Delivery})
+		next := reviewCheckState{Configuration: config, Delivery: previous.Delivery}
+		if record.Disabled {
+			next.SHA, next.Refname = previous.SHA, previous.Refname
+		}
+		record.Payload, err = json.Marshal(next)
 		accepted = record.Generation
 		return err
 	})
@@ -360,6 +369,11 @@ func validateRecordedReviewers(publications core.PublicationContext, config revi
 	if err := mapstructure.Decode(execution.Configuration, &ensured); err != nil {
 		return err
 	}
+	pullRequestID, err := parsePullRequestID(ensured.PullRequestID)
+	if err != nil {
+		return err
+	}
+	ensured.PullRequestID = fmt.Sprint(pullRequestID)
 	var output struct {
 		Type string
 		Data struct {
