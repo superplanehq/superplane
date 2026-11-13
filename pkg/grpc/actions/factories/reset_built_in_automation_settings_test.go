@@ -191,6 +191,8 @@ func TestResetReviewRequestPreservesFallbackAndAgentSettings(t *testing.T) {
 				trigger.Configuration["enabled"] = false
 				agent := findYAMLNode(t, doc, reviewRequestAgentNodeID)
 				agent.Configuration["fallbackReviewer"] = fallback
+				agent.Configuration["publishPRCheck"] = fallback != ""
+				agent.Configuration["prCheckActivationGeneration"] = 7
 				agent.Configuration["additionalInstructions"] = "Prefer the security owner. Keep {{ example }} literal."
 				agent.Configuration["model"] = models.FormatHostedLLMModelKey(models.UsageProviderOpenRouter, "anthropic/claude-sonnet-4-6")
 				agent.Configuration["thinkingLevel"] = "low"
@@ -217,6 +219,12 @@ func TestResetReviewRequestPreservesFallbackAndAgentSettings(t *testing.T) {
 			// The managed policy must replace an installed prompt during reset.
 			require.Contains(t, prompt, "Select a contributor to this pull request only when no eligible non-contributor is available.")
 			require.Equal(t, fallback, agent.Configuration["fallbackReviewer"])
+			require.Equal(t, fallback != "", agent.Configuration["publishPRCheck"])
+			require.EqualValues(t, 7, agent.Configuration["prCheckActivationGeneration"])
+			check := findIntakeNode(version.Nodes, "pr-check-pending")
+			require.NotNil(t, check)
+			require.Equal(t, fallback != "", check.Configuration["enabled"])
+			require.EqualValues(t, 7, check.Configuration["activationGeneration"])
 			require.Equal(t, instructions, agent.Configuration["additionalInstructions"])
 			require.Equal(t, models.FormatHostedLLMModelKey(models.UsageProviderOpenRouter, "anthropic/claude-sonnet-4-6"), agent.Configuration["model"])
 			require.Equal(t, "low", agent.Configuration["thinkingLevel"])
