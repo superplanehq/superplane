@@ -45,6 +45,11 @@ type Client struct {
 	underlying *github.Client
 }
 
+func (c *Client) RepositoryFullName(repository string) string {
+	owner, name := c.ownerAndName(repository)
+	return owner + "/" + name
+}
+
 func (c *Client) Host() Host {
 	if c == nil {
 		return DotCom()
