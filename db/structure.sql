@@ -204,7 +204,8 @@ CREATE TABLE public.app_messages (
     canvas_id uuid NOT NULL,
     node_id character varying(128) NOT NULL,
     payload jsonb NOT NULL,
-    created_at timestamp without time zone DEFAULT now() NOT NULL
+    created_at timestamp without time zone DEFAULT now() NOT NULL,
+    source_run_id uuid
 );
 
 
@@ -1654,6 +1655,19 @@ CREATE TABLE public.plan_feature_definitions (
 
 
 --
+-- Name: review_request_publications; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.review_request_publications (
+    integration_id uuid NOT NULL,
+    key text NOT NULL,
+    record jsonb NOT NULL,
+    created_at timestamp without time zone DEFAULT now() NOT NULL,
+    updated_at timestamp without time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: role_metadata; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -2195,7 +2209,8 @@ CREATE TABLE public.workflow_events (
     created_at timestamp without time zone NOT NULL,
     custom_name text,
     run_id uuid NOT NULL,
-    dedup_key text
+    dedup_key text,
+    source_run_id uuid
 );
 
 
@@ -3289,6 +3304,14 @@ ALTER TABLE ONLY public.organizations
 
 ALTER TABLE ONLY public.plan_feature_definitions
     ADD CONSTRAINT plan_feature_definitions_pkey PRIMARY KEY (key);
+
+
+--
+-- Name: review_request_publications review_request_publications_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.review_request_publications
+    ADD CONSTRAINT review_request_publications_pkey PRIMARY KEY (integration_id, key);
 
 
 --
@@ -6173,6 +6196,14 @@ ALTER TABLE ONLY public.organizations
 
 
 --
+-- Name: review_request_publications review_request_publications_integration_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.review_request_publications
+    ADD CONSTRAINT review_request_publications_integration_id_fkey FOREIGN KEY (integration_id) REFERENCES public.app_installations(id) ON DELETE CASCADE;
+
+
+--
 -- Name: runner_credentials runner_credentials_runner_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -6692,7 +6723,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261112234514	f
+20261113000615	f
 \.
 
 
