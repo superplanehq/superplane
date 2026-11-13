@@ -43,13 +43,18 @@ func ReemitTriggerEvent(
 		return nil, fmt.Errorf("only root trigger events can be re-emitted")
 	}
 
+	sourceRunID := sourceEvent.SourceRunID
+	if sourceRunID == nil {
+		sourceRunID = &sourceEvent.RunID
+	}
+
 	now := time.Now()
 	reemittedEvent := models.CanvasEvent{
 		WorkflowID:  canvas.ID,
 		NodeID:      nodeID,
 		Channel:     sourceEvent.Channel,
 		Data:        models.NewJSONValue(sourceEvent.Data.Data()),
-		SourceRunID: sourceEvent.SourceRunID,
+		SourceRunID: sourceRunID,
 		State:       models.CanvasEventStatePending,
 		CreatedAt:   &now,
 		CustomName:  sourceEvent.CustomName,

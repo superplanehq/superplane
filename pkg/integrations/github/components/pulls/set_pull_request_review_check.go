@@ -92,7 +92,7 @@ func (c *SetPullRequestReviewCheck) Setup(ctx core.SetupContext) error {
 	if err := (&ListPullRequestReviewCandidates{}).Setup(ctx); err != nil {
 		return err
 	}
-	var config reviewCheckConfiguration
+	var config reviewCandidatesConfiguration
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return err
 	}

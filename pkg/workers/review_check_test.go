@@ -401,6 +401,38 @@ func TestReviewCheckDetectsAttemptFailureWithoutFailedChannel(t *testing.T) {
 	require.Equal(t, "error", f.state())
 }
 
+func TestReviewCheckPreservesSourceAcrossOrdinaryTriggerRetries(t *testing.T) {
+	f := newReviewCheckFixture(t)
+	old := f.root
+	newer := support.EmitCanvasEventForNode(t, f.canvas.ID, "trigger", "default", nil)
+	f.attempt(newer)
+	require.NoError(t, f.apply("no_review", nil, ""))
+	require.NoError(t, f.refresh())
+	current := f.record().Generation
+
+	// Retrying an old event, including a retry of that retry, keeps its source.
+	for range 2 {
+		retry, err := canvasactions.ReemitTriggerEvent(t.Context(), f.db, f.canvas, "trigger", old.ID)
+		require.NoError(t, err)
+		old, err = models.FindCanvasEventInTransaction(f.db, uuid.MustParse(retry.EventId))
+		require.NoError(t, err)
+		f.attempt(old)
+		require.NoError(t, f.apply("pending_selection", nil, ""))
+		require.Equal(t, current, f.record().Generation, "an older source cannot replace the current decision")
+	}
+
+	// A retry of the current source can still replace its earlier attempt.
+	retry, err := canvasactions.ReemitTriggerEvent(t.Context(), f.db, f.canvas, "trigger", newer.ID)
+	require.NoError(t, err)
+	retried, err := models.FindCanvasEventInTransaction(f.db, uuid.MustParse(retry.EventId))
+	require.NoError(t, err)
+	f.attempt(retried)
+	require.NoError(t, f.apply("selection_error", nil, ""))
+	require.NoError(t, f.refresh())
+	require.Greater(t, f.record().Generation, current)
+	require.Equal(t, "error", f.state())
+}
+
 func TestPublicationOrderingUsesBroadcastProvenanceAndOriginalRetry(t *testing.T) {
 	f := newReviewCheckFixture(t)
 	source, nodes := support.CreateCanvas(t, f.r.Organization.ID, f.r.User, []models.CanvasNode{{NodeID: "start", Type: models.NodeTypeTrigger}, {NodeID: "broadcast", Type: models.NodeTypeComponent, Ref: datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "broadcastMessage"}})}}, nil)
