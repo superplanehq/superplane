@@ -782,3 +782,29 @@ func TestReviewCheckRemovalReleasesDormantChecks(t *testing.T) {
 		})
 	}
 }
+
+func TestReviewCheckTracksApprovalsAfterRunRetention(t *testing.T) {
+	f := newReviewCheckFixture(t)
+	f.activationNode = "check"
+	f.saveActivation(true, 2)
+	f.attempt(support.EmitCanvasEventForNode(t, f.canvas.ID, "trigger", "default", nil))
+	reviewers := []pulls.ReviewerIdentity{{ID: 2, Login: "first"}}
+	outcome := f.ensure(reviewers)
+	require.NoError(t, f.apply("required_reviewers", reviewers, outcome))
+	require.NoError(t, f.refresh())
+	f.finishAction()
+	var run models.CanvasRun
+	require.NoError(t, f.db.First(&run, "id = ?", f.ctx.RunID).Error)
+	_, err := run.DeleteChain(f.db)
+	require.NoError(t, err)
+	for _, step := range []struct{ decision, want string }{{"APPROVED", "success"}, {"DISMISSED", "pending"}} {
+		f.http.reviews = []map[string]any{reviewDecision(1, 2, "first", step.decision, "abc")}
+		require.NoError(t, pulls.WakeReviewChecks(f.integration, "pull_request_review", []byte(`{"repository":{"full_name":"testhq/hello"},"pull_request":{"number":42}}`)))
+		require.NoError(t, f.processDue())
+		require.Equal(t, step.want, f.state())
+	}
+	f.saveActivation(false, 2)
+	require.NoError(t, f.processDue())
+	require.True(t, f.record().Disabled)
+	require.Equal(t, "Review request check disabled", f.http.writes[len(f.http.writes)-1].Status.GetDescription())
+}

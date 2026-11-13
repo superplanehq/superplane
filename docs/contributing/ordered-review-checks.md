@@ -51,10 +51,12 @@ The check action does not request reviews again.
 }
 ```
 
-`status` is `applied` after delivery, `superseded` when newer state wins, or
+`status` is `registered` after pending selection is stored, `applied` after
+delivery, `superseded` when newer state wins, or
 `skipped` when the admitted attempt does not participate. Skipping creates no
 publication record.
-The action finishes after delivery. Approval tracking continues independently.
+Pending selection finishes after durable registration. Other phases finish
+after delivery. Approval tracking continues independently.
 
 ## Status behavior
 
@@ -187,7 +189,8 @@ including an explicitly cleared value.
 
 The check action reads participation from the attempt's admitted canvas
 version. At application and refresh, it verifies that the live activation
-still matches. Disabling durably releases existing requirements with success
+still matches the generation stored at admission. Refresh does not need retained
+run records. Disabling durably releases existing requirements with success
 and the reason `Review request check disabled`. Failed release delivery retries
 through integration requests. Re-enabling cannot resume old callbacks.
 Removing a canvas or its activation node durably wakes owned publications so
