@@ -63,7 +63,9 @@ class SettingsServer {
 
   constructor(private options: SettingsOptions) {
     if (options.legacy && this.stored.spec) {
-      this.stored.spec.nodes = this.stored.spec.nodes?.filter((node) => node.id !== "pr-check-pending");
+      this.stored.spec.nodes = this.stored.spec.nodes?.filter(
+        (node) => node.id !== "pr-check-pending" && !node.id?.startsWith("findings-"),
+      );
     }
     this.handlers = new Map<string, Handler>([
       [`POST ${canvasPath}/triggers/review-request-trigger/events/report-event/reemit`, () => this.retry()],
