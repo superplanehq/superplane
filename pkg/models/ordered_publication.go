@@ -244,3 +244,33 @@ func WakeOwnedPublications(tx *gorm.DB, canvasID uuid.UUID, nodeID string) error
 	}
 	return nil
 }
+
+// WakePublications schedules a bounded batch before deleted canvas data is
+// removed. The deletion timestamp makes progress durable across worker ticks
+// and allows another wakeup if a restored canvas is deleted again.
+func (c *Canvas) WakePublications(tx *gorm.DB, limit int) (bool, error) {
+	if limit <= 0 {
+		return false, fmt.Errorf("publication wake limit must be positive")
+	}
+	var publications []OrderedPublication
+	err := tx.Where("record->>'ownerCanvasId' = ? AND record->>'hook' <> ''", c.ID.String()).
+		Where("(record->>'ownerDeletedAt')::timestamptz IS DISTINCT FROM ?", c.DeletedAt.Time).
+		Order("integration_id, key").Limit(limit).Find(&publications).Error
+	if err != nil {
+		return false, err
+	}
+	for _, publication := range publications {
+		if err := UpdateOrderedPublication(tx, publication.IntegrationID, publication.Key, func(record *core.OrderedPublication) error {
+			if record.OwnerCanvasID != c.ID || (record.OwnerDeletedAt != nil && record.OwnerDeletedAt.Equal(c.DeletedAt.Time)) {
+				return core.ErrPublicationUnchanged
+			}
+			wake := time.Now()
+			record.WakeAt = &wake
+			record.OwnerDeletedAt = &c.DeletedAt.Time
+			return nil
+		}); err != nil {
+			return false, err
+		}
+	}
+	return len(publications) < limit, nil
+}

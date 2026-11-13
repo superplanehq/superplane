@@ -772,6 +772,10 @@ func TestReviewCheckRemovalReleasesDormantChecks(t *testing.T) {
 			} else {
 				_, err := canvasactions.DeleteCanvas(t.Context(), f.db, f.canvas)
 				require.NoError(t, err)
+				deleted, err := models.FindUnscopedCanvas(f.canvas.ID)
+				require.NoError(t, err)
+				require.Empty(t, pendingActionRequests(t, f.installation.ID, pulls.ReviewCheckHook), "deletion must defer publication work")
+				require.NoError(t, NewCanvasCleanupWorker().LockAndProcessCanvas(*deleted))
 			}
 			require.NoError(t, f.processDue()) // Persist the disabled decision.
 			require.True(t, f.record().Disabled)
