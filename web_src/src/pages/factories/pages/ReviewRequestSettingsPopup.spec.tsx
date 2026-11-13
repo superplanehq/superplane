@@ -14,6 +14,20 @@ beforeAll(() => {
 afterEach(() => vi.restoreAllMocks());
 
 describe("Review request production settings", () => {
+  it("keeps legacy settings editable and explains the canvas upgrade before enabling checks", async () => {
+    const user = userEvent.setup();
+    const settings = renderSettings({ legacy: true });
+    const instructions = await screen.findByRole("textbox", { name: "Additional instructions" });
+    fireEvent.change(instructions, { target: { value: "Prefer the security owner." } });
+    await user.click(screen.getByTestId("review-request-settings-save"));
+    await waitFor(() => expect(settings.onClose).toHaveBeenCalledTimes(1));
+    expect(savedConfiguration(settings, "select-reviewers")?.additionalInstructions).toBe("Prefer the security owner.");
+    settings.reload();
+    await user.click(await screen.findByRole("switch", { name: "Publish PR check" }));
+    await user.click(screen.getByTestId("review-request-settings-save"));
+    expect(await screen.findByRole("alert")).toHaveTextContent("admin reset");
+    expect(savedConfiguration(settings, "select-reviewers")?.publishPRCheck).toBe(false);
+  });
   it("saves agent settings and clears instructions through reload after a failed commit with the flag off", async () => {
     const user = userEvent.setup();
     const settings = renderSettings({ failSave: true });
@@ -31,7 +45,9 @@ describe("Review request production settings", () => {
       settings.stored().spec?.nodes?.find((node) => node.id === "select-reviewers")?.configuration
         ?.additionalInstructions,
     ).toBeUndefined();
-    expect(screen.queryByRole("checkbox", { name: "Publish PR check" })).not.toBeInTheDocument();
+    const publishCheck = screen.getByRole("switch", { name: "Publish PR check" });
+    expect(publishCheck).not.toBeChecked();
+    await user.click(publishCheck);
     await user.click(fallback);
     await user.click(screen.getByRole("option", { name: "None" }));
     await waitForPopupDismissal();
@@ -54,6 +70,7 @@ describe("Review request production settings", () => {
       model: "hosted::openai::gpt-5.4",
       thinkingLevel: "medium",
       additionalInstructions: value,
+      publishPRCheck: true,
       steps: [{ name: "Select reviewers", type: "prompt", prompt: "Managed reviewer policy" }],
     });
     settings.reload();
@@ -61,6 +78,8 @@ describe("Review request production settings", () => {
     expect(screen.getByTestId("field-model-hosted-model")).toHaveTextContent("gpt-5.4");
     expect(screen.getByTestId("field-model-hosted-model")).toHaveTextContent("Medium");
     expect(screen.getByRole("textbox", { name: "Additional instructions" })).toHaveValue(value);
+    expect(screen.getByRole("switch", { name: "Publish PR check" })).toBeChecked();
+    await user.click(screen.getByRole("switch", { name: "Publish PR check" }));
     for (const next of ["Prefer the API owner and explain the evidence.", ""]) {
       fireEvent.change(screen.getByRole("textbox", { name: "Additional instructions" }), { target: { value: next } });
       await user.click(screen.getByTestId("review-request-settings-save"));
@@ -72,6 +91,9 @@ describe("Review request production settings", () => {
       );
       settings.reload();
       expect(await screen.findByRole("textbox", { name: "Additional instructions" })).toHaveValue(next);
+      expect(screen.getByRole("switch", { name: "Publish PR check" })).not.toBeChecked();
+      expect(savedConfiguration(settings, "select-reviewers")?.publishPRCheck).toBe(false);
+      expect(savedConfiguration(settings, "pr-check-pending")?.enabled).toBe(false);
     }
   });
 
@@ -142,3 +164,7 @@ describe("Review request production settings", () => {
     await waitFor(() => expect(screen.queryByRole("region", { name: "Review decision" })).not.toBeInTheDocument());
   });
 });
+
+function savedConfiguration(settings: ReturnType<typeof renderSettings>, nodeId: string) {
+  return settings.stored().spec?.nodes?.find((node) => node.id === nodeId)?.configuration;
+}

@@ -1,8 +1,8 @@
 # Ordered pull request review checks
 
 `github.setPullRequestReviewCheck` is a reusable canvas action. It does not
-select reviewers or apply Factory policy. Review request does not use this
-action until the later activation phase.
+select reviewers or apply Factory policy. Review request uses this action when Publish PR check is enabled. The setting
+is off by default.
 
 ## Component contract
 
@@ -13,7 +13,9 @@ action until the later activation phase.
 | `context` | Stable GitHub commit status context. |
 | `sourceRunId` | Source run. Defaults to the persisted broadcast source, or the current run for ordinary triggers. |
 | `attemptRootEventId` | Attempt root event. Defaults to the current execution root event. |
-| `activationGeneration` | Starts at 1. After disabling, explicitly select the next generation to enable the check again. |
+| `activationGeneration` | Positive saved activation version. After disabling, select a greater generation to enable again. |
+| `enabled` | Defaults to true for ordinary check nodes. Saving false releases that node's managed checks. |
+| `activationNodeId` | Optional check node in the same canvas and integration. Its admitted enabled state and generation govern participation. |
 | `phase` | `pending_selection`, `required_reviewers`, `no_review`, `selection_error`, or `disabled`. |
 | `reviewers` | Required human reviewer IDs and logins. Required for `required_reviewers`. |
 | `reviewerRequestExecutionId` | Recorded Ensure Pull Request Reviewers execution. Required for `required_reviewers`. |
@@ -49,7 +51,9 @@ The check action does not request reviews again.
 }
 ```
 
-`status` is `applied` after delivery, or `superseded` when newer state wins.
+`status` is `applied` after delivery, `superseded` when newer state wins, or
+`skipped` when the admitted attempt does not participate. Skipping creates no
+publication record.
 The action finishes after delivery. Approval tracking continues independently.
 
 ## Status behavior
@@ -88,7 +92,8 @@ and attempt. Callers cannot substitute unrelated run references.
 Within one attempt, pending selection can become one outcome. Disable can
 supersede that outcome. The disabled record remains as a fence. Work from that
 activation cannot reopen it, even with a newer source. Re-enabling requires
-the next activation generation and a current or newer source and attempt.
+a greater activation generation and a current or newer source and attempt.
+A PR can miss intermediate activations. A new PR can start in any positive generation.
 
 Each accepted replacement increments `generation`. Each persisted update
 increments `revision`. Refresh checks the revision after lookups and claims
@@ -165,3 +170,57 @@ unavailable through the connected GitHub account. No companion deployment PR
 is required by a new configuration key. Deployed configuration remains
 unverified. Do not enable the later Review request phase until combined
 Phase 2 validation passes.
+
+## Review request configuration
+
+Publish PR check is off for new and existing automations. Reviewer selection
+and reviewer requests continue independently. Save the switch to publish
+`superplane/review-request` for future attempts. Saving does not start an agent,
+backfill decisions, or attach a check to an attempt that already started.
+
+The existing canvas settings store `publishPRCheck` and
+`prCheckActivationGeneration` on `select-reviewers`. The `pr-check-pending`
+node stores the corresponding `enabled` and `activationGeneration` values.
+An off-to-on save increases the generation. Other saves retain it. Admin reset
+preserves both settings, fallback, models, and Additional instructions,
+including an explicitly cleared value.
+
+The check action reads participation from the attempt's admitted canvas
+version. At application and refresh, it verifies that the live activation
+still matches. Disabling durably releases existing requirements with success
+and the reason `Review request check disabled`. Failed release delivery retries
+through integration requests. Re-enabling cannot resume old callbacks.
+Removing a canvas or its activation node durably wakes owned publications so
+the same release path also handles checks that stopped polling on closed PRs.
+Pausing changes trigger admission and keeps existing approval tracking.
+
+The canvas registers pending before candidate discovery. It applies explicit
+no-review outcomes for all-positive reports and empty eligible candidate lists.
+Empty lists skip the selection agent. Required-reviewer application uses the
+recorded Ensure reviewers execution and does not request reviewers again.
+Stale or skipped outcomes cannot publish no-review success. Failed or cancelled
+attempts without a valid decision produce error through the pending check's
+existing refresh hook.
+
+Explicit Runs retry creates a new attempt of the original report. It uses the
+current saved activation, current-SHA checks, and persisted source/attempt
+ordering. It does not load the latest report. Review and dismissal webhooks
+refresh approval state independently of the completed selection run.
+
+Administrators must require `superplane/review-request` in GitHub branch rules
+to enforce required approvals. SuperPlane does not modify branch rules.
+
+Before enabling publication on an older installed canvas, use the existing
+admin reset to install the new explicit check steps. The settings editor keeps
+ordinary saves available for older canvases and explains this prerequisite if
+publication is requested. Reset preserves supported settings and does not
+start selection or backfill decisions.
+
+Apply Phase 2C's migration before API and worker rollout. This phase adds no
+migration or runtime configuration key. API and workers continue to require
+`ENCRYPTION_MASTER_KEYS` and the existing encrypted GitHub integration.
+Workers require `START_INTEGRATION_REQUEST_WORKER`, `START_NODE_REQUEST_WORKER`,
+`START_APP_MESSAGE_WORKER`, and `START_WEBHOOK_PROVISIONER`. Runners require
+no change. Local Docker and the repository chart include these settings.
+The hosted chart and launchpad repositories returned HTTP 404 through `gh`.
+Their current configuration and deployed configuration remain unverified.
