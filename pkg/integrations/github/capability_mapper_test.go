@@ -156,6 +156,12 @@ func Test__CapabilityMapper__NewPermissionSet(t *testing.T) {
 		assert.Equal(t, "read", got["checks"])
 	})
 
+	t.Run("assessment check run requests checks write without status write", func(t *testing.T) {
+		t.Parallel()
+		permissions := m.NewPermissionSet([]string{"github.setPullRequestCheckRun"})
+		assert.Equal(t, map[string]string{"checks": "write", "pull_requests": "read"}, permissions.ForAppManifest())
+	})
+
 	t.Run("dependabot alert trigger requests vulnerability alerts read", func(t *testing.T) {
 		t.Parallel()
 
