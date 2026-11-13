@@ -35,7 +35,9 @@ func completionFixture(t *testing.T) publicationFixture {
 			}
 		}
 		for _, edge := range doc.Edges() {
-			if edge.SourceID == "on-pr-risk" || edge.SourceID == "assess-risk" {
+			// This fixture owns completion broadcasts. Status delivery has its
+			// own execution tests and runs on a separate branch of the graph.
+			if edge.SourceID == "on-pr-risk" || edge.SourceID == "assess-risk" || edge.SourceID == "start-assessment-check" || edge.TargetID == "finish-assessment-check" {
 				continue
 			}
 			if edge.SourceID == "publish-merge-confidence" {
@@ -58,6 +60,11 @@ func (f publicationFixture) completePublication(t *testing.T, execution *models.
 		require.NoError(t, err)
 		for _, edge := range version.Edges {
 			if edge.SourceID != execution.NodeID || edge.Channel != event.Channel {
+				continue
+			}
+			// Follow completion delivery only; status delivery is an independent
+			// branch covered by the assessment and generic publication tests.
+			if edge.TargetID == "finish-assessment-check" {
 				continue
 			}
 			node := findIntakeNode(version.Nodes, edge.TargetID)

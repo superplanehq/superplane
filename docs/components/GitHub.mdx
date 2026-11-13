@@ -56,6 +56,8 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Remove Issue Assignee" href="#remove-issue-assignee" description="Remove assignees from a GitHub issue" />
   <LinkCard title="Remove Issue Label" href="#remove-issue-label" description="Remove labels from a GitHub issue" />
   <LinkCard title="Run Workflow" href="#run-workflow" description="Run GitHub Actions workflow" />
+  <LinkCard title="Set Pull Request Check" href="#set-pull-request-check" description="Publish a durable status for a pull request commit" />
+  <LinkCard title="Set Pull Request Check Run" href="#set-pull-request-check-run" description="Publish a running check for a pull request assessment" />
   <LinkCard title="Set Pull Request Review Check" href="#set-pull-request-review-check" description="Track required approvals for the assessed pull request commit" />
   <LinkCard title="Update Issue" href="#update-issue" description="Update a GitHub issue" />
   <LinkCard title="Update Issue Comment" href="#update-issue-comment" description="Update an existing comment on a GitHub issue or pull request" />
@@ -4766,6 +4768,68 @@ The Run Workflow component triggers a GitHub Actions workflow and waits for it t
   },
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "github.workflow.finished"
+}
+```
+
+<a id="set-pull-request-check"></a>
+
+## Set Pull Request Check
+
+**Component key:** `github.setPullRequestCheck`
+
+Publish pending, success, failure, or error through GitHub commit statuses. Use any canvas and status context. No reviewer requirements or Factory records are needed.
+
+Pending monitors the persisted attempt. Failure, cancellation, completion without a final status, removal, or a changed or closed pull request resolves pending as error on the assessed commit. Terminal delivery survives source history cleanup and retries without running earlier steps.
+
+The action waits for delivery. Persisted source and attempt records determine order. Older attempts cannot replace newer state, including on the same commit. One attempt can move from pending to one terminal result. Delivery is at least once; an interrupted write can repeat an identical status.
+
+Permission and missing-resource errors stop delivery and fail the action. Correct access and retry the step to resume. Transient failures retry through the existing integration worker. This component does not change branch rules or Checks API permissions.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "context": "team/assessment",
+    "generation": 2,
+    "sha": "abc",
+    "state": "success",
+    "status": "applied"
+  },
+  "timestamp": "2026-11-13T09:00:00Z",
+  "type": "github.pullRequestCheck"
+}
+```
+
+<a id="set-pull-request-check-run"></a>
+
+## Set Pull Request Check Run
+
+**Component key:** `github.setPullRequestCheckRun`
+
+Publish a GitHub check run for an assessed pull request commit. Use the same configuration as Set Pull Request Check.
+
+Pending shows a running check. Success completes the check successfully. Failure and error complete the check as failed. The output includes the reason and result URL.
+
+The same attempt updates one check run. A stable external ID recovers interrupted creation. New attempts retire running checks, including retries on the same commit. Results stay on the assessed commit.
+
+Cancellation, removal, a closed or changed pull request, and completion without a final result fail the running check. Delivery uses the existing durable retries and ordering.
+
+The GitHub App needs Checks write and Pull requests read permissions. Existing installations must accept the permission update. This component does not change branch rules.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "context": "team/assessment",
+    "generation": 2,
+    "sha": "abc",
+    "state": "success",
+    "status": "applied"
+  },
+  "timestamp": "2026-11-13T09:00:00Z",
+  "type": "github.pullRequestCheck"
 }
 ```
 

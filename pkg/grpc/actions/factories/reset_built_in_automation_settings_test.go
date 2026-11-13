@@ -283,6 +283,11 @@ func TestResetBuiltInVerificationSettings(t *testing.T) {
 				r, factory := resetTestFactory(t)
 				canvas := resetTestTemplate(t, r, factory, templateID, provider, func(doc *yaml.Canvas) {
 					if templateID == "risk-score" {
+						if provider == models.ProviderGitHub {
+							for _, id := range []string{"start-assessment-check", "finish-assessment-check"} {
+								findYAMLNode(t, doc, id).Component = "github.setPullRequestCheck"
+							}
+						}
 						findYAMLNode(t, doc, "publish-merge-confidence").Configuration["enabled"] = false
 						// Simulate an installed version from before completion broadcasts.
 						doc.Spec.Nodes = slices.DeleteFunc(doc.Spec.Nodes, func(node yaml.Node) bool {
@@ -327,6 +332,11 @@ func TestResetBuiltInVerificationSettings(t *testing.T) {
 					assert.Equal(t, provider+".updatePullRequestBodySection", publication.ComponentName())
 					assert.Equal(t, false, publication.Configuration["enabled"])
 					if provider == models.ProviderGitHub {
+						for _, id := range []string{"start-assessment-check", "finish-assessment-check"} {
+							check := findIntakeNode(version.Nodes, id)
+							require.NotNil(t, check)
+							assert.Equal(t, "github.setPullRequestCheckRun", check.ComponentName())
+						}
 						gate := findIntakeNode(version.Nodes, "complete-merge-confidence")
 						require.NotNil(t, gate)
 						assert.Equal(t, "filter", gate.ComponentName())
