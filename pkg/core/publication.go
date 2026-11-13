@@ -44,6 +44,7 @@ type OrderedPublication struct {
 	Disabled             bool             `json:"disabled"`
 	OwnerCanvasID        uuid.UUID        `json:"ownerCanvasId"`
 	OwnerNodeID          string           `json:"ownerNodeId"`
+	OwnerDeletedAt       *time.Time       `json:"ownerDeletedAt,omitempty"`
 	Payload              json.RawMessage  `json:"payload"`
 	Hook                 string           `json:"hook"`
 	WakeAt               *time.Time       `json:"wakeAt,omitempty"`
