@@ -63,6 +63,7 @@ func TestPullRequestCheckRecoversTerminalDeliveryAfterOwnerEnds(t *testing.T) {
 				require.NoError(t, f.db.Model(&models.CanvasRun{}).Where("id = ?", f.ctx.RunID).Update("state", models.CanvasRunStateCancelling).Error)
 			case "failed":
 				require.NoError(t, f.ctx.ExecutionState.Fail(models.CanvasNodeExecutionResultReasonError, "agent failed"))
+				// Failed steps resolve pending after the run finalizer ends the run.
 				require.NoError(t, f.db.Model(&models.CanvasRun{}).Where("id = ?", f.ctx.RunID).Update("state", models.CanvasRunStateFinished).Error)
 			case "finished without output":
 				require.NoError(t, f.db.Model(&models.CanvasRun{}).Where("id = ?", f.ctx.RunID).Update("state", models.CanvasRunStateFinished).Error)

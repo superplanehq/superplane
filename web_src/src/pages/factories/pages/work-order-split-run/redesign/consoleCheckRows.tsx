@@ -32,9 +32,10 @@ export function ConsoleCheckRows({
 }) {
   const [open, setOpen] = useState(defaultOpen);
   if (checks.length === 0) {
+    // A failed assessment can end before it saves a score. Show its state only.
     return summary ? (
       <div data-testid={testId}>
-        <span className="block text-[14px] font-semibold leading-5 text-foreground">{title}</span>
+        <span className="block truncate text-[14px] font-semibold leading-5 text-foreground">{title}</span>
         <span className="block text-[12px] leading-4 text-muted-foreground">{summary}</span>
       </div>
     ) : null;
@@ -79,7 +80,16 @@ export function PullRequestConfidence({
   const [toggled, setToggled] = useState<boolean | null>(null);
   const summaryId = useId();
   if (checks.length === 0) {
-    return assessmentFailed ? <ConsoleCheckRows checks={[]} summary="Assessment failed" /> : null;
+    return assessmentFailed ? (
+      <p
+        className={cn("min-w-0 truncate text-[12px] leading-4", className)}
+        data-testid="redesign-console-pull-request-checks"
+        data-repository={repository ?? ""}
+      >
+        <span className="font-medium text-foreground">{MERGE_CONFIDENCE_SCORE_NAME}</span>
+        <span className="text-muted-foreground">{" · "}Assessment failed</span>
+      </p>
+    ) : null;
   }
   const attention = needsReview(checks);
   const open = toggled ?? attention;

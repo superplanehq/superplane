@@ -310,6 +310,25 @@ describe("ConsoleSummaryPanel merge confidence per pull request", () => {
     ).toBeInTheDocument();
   });
 
+  it("shows a failed assessment without scores under its pull request", () => {
+    const failed = { id: "payments-run", canvasId: "merge-app", result: "RESULT_FAILED" as const };
+    renderWith(
+      [],
+      [
+        { ...paymentsPullRequest, activities: [{ title: "Merge confidence", run: failed }] },
+        { ...docsPullRequest, activities: [{ title: "Visual evidence", run: { ...failed, id: "docs-run" } }] },
+      ],
+    );
+
+    expect(within(confidenceFor("acme/payments")).getByText(/Assessment failed/)).toBeInTheDocument();
+    expect(
+      screen
+        .queryAllByTestId("redesign-console-pull-request-checks")
+        .some((element) => element.dataset.repository === "acme/docs"),
+    ).toBe(false);
+    expect(screen.queryByTestId("redesign-console-checks")).not.toBeInTheDocument();
+  });
+
   it("keeps a check without a repository in the merge confidence list when several repositories have pull requests", () => {
     renderWith(
       [
@@ -436,5 +455,29 @@ describe("ConsoleSummaryPanel merge confidence", () => {
 
     expect(screen.getByText("Assessment failed")).toBeInTheDocument();
     expect(screen.queryByText("All checks passed")).not.toBeInTheDocument();
+  });
+
+  it("shows assessment failure when the first run fails before it reports a score", () => {
+    multiRepoTasks.enabled = false;
+    renderPanel([], {
+      ...pullRequest,
+      activities: [
+        { title: "Merge confidence", run: { id: "current-run", canvasId: "merge-app", result: "RESULT_FAILED" } },
+      ],
+    });
+
+    expect(within(screen.getByTestId("redesign-console-checks")).getByText("Assessment failed")).toBeInTheDocument();
+  });
+
+  it("does not show a failure from another automation when no score exists", () => {
+    multiRepoTasks.enabled = false;
+    renderPanel([], {
+      ...pullRequest,
+      activities: [
+        { title: "Visual evidence", run: { id: "other-run", canvasId: "other-app", result: "RESULT_FAILED" } },
+      ],
+    });
+
+    expect(screen.queryByTestId("redesign-console-checks")).not.toBeInTheDocument();
   });
 });

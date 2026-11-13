@@ -270,11 +270,13 @@ func evaluateReviewCheck(client *common.Client, store core.PublicationStore, rec
 			state.State, state.Description = "error", "The pull request is closed or its assessed commit changed."
 		}
 		if state.State == "pending" {
-			finished, err := store.AttemptEnded(record.Order.AttemptRootEventID)
+			// Recorded run errors do not end the attempt. The final step can
+			// still publish failure, so wait for the run to stop.
+			ended, err := store.AttemptEnded(record.Order.AttemptRootEventID)
 			if err != nil {
 				return true, err
 			}
-			if finished {
+			if ended {
 				state.State, state.Description = "error", "The attempt ended without a final check result."
 			}
 		}
