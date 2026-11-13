@@ -1,6 +1,7 @@
 package models_test
 
 import (
+	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -17,6 +18,73 @@ import (
 func Test__FactoryPullRequestActivityCoordination(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
+
+	for _, operation := range []string{"create activity", "request exclusive access"} {
+		t.Run("retries busy task/"+operation, func(t *testing.T) {
+			pullRequest, canvas := createActivityFixture(t, db, r)
+			run := createCanvasRun(t, db, canvas.ID, models.CanvasRunStateStarted, "")
+			created, err := pullRequest.CreateActivity(db, models.FactoryPullRequestActivityParams{RunID: run.ID})
+			require.NoError(t, err)
+			newRun := createCanvasRun(t, db, canvas.ID, models.CanvasRunStateStarted, "")
+			request := func(tx *gorm.DB) error {
+				if operation == "create activity" {
+					_, err := pullRequest.CreateActivity(tx, models.FactoryPullRequestActivityParams{RunID: newRun.ID})
+					return err
+				}
+				_, err := created.Activity.RequestExclusiveAccess(tx)
+				return err
+			}
+
+			deletion := db.Begin()
+			require.NoError(t, deletion.Error)
+			t.Cleanup(func() { deletion.Rollback() })
+			order := &models.FactoryWorkOrder{ID: pullRequest.WorkOrderID}
+			require.NoError(t, order.LockForUpdate(deletion))
+
+			err = db.Transaction(func(tx *gorm.DB) error {
+				if err := tx.Exec("SET LOCAL lock_timeout = '250ms'").Error; err != nil {
+					return err
+				}
+				return request(tx)
+			})
+			var busy *models.CodexConnectionBusyError
+			require.ErrorAs(t, err, &busy)
+			assert.Nil(t, reloadPullRequest(t, db, pullRequest).ActiveMutationRunID)
+			_, err = models.FindPullRequestActivityByRunID(db, newRun.ID)
+			assert.ErrorIs(t, err, models.ErrFactoryPullRequestActivityNotFound)
+
+			require.NoError(t, deletion.Rollback().Error)
+			require.NoError(t, db.Transaction(request))
+		})
+	}
+
+	for _, result := range []string{models.FactoryWorkOrderResultArchived, models.FactoryWorkOrderResultRejected} {
+		t.Run("blocks activity after task deletion/"+result, func(t *testing.T) {
+			pullRequest, canvas := createActivityFixture(t, db, r)
+			run := createCanvasRun(t, db, canvas.ID, models.CanvasRunStateStarted, "")
+			activity, err := pullRequest.CreateActivity(db, models.FactoryPullRequestActivityParams{RunID: run.ID})
+			require.NoError(t, err)
+			order, err := models.FindUnscopedWorkOrder(db, pullRequest.WorkOrderID)
+			require.NoError(t, err)
+			_, err = order.Close(db, result, &r.User)
+			require.NoError(t, err)
+
+			access, err := pullRequest.RequestExclusiveAccess(db, activity.Activity)
+			assert.ErrorIs(t, err, models.ErrFactoryWorkOrderInvalidState)
+			assert.Nil(t, access)
+			assert.Nil(t, reloadPullRequest(t, db, pullRequest).ActiveMutationRunID)
+
+			newRun := createCanvasRun(t, db, canvas.ID, models.CanvasRunStateStarted, "")
+			created, err := pullRequest.CreateActivity(db, models.FactoryPullRequestActivityParams{
+				RunID:  newRun.ID,
+				Access: models.FactoryPullRequestAccessExclusive,
+			})
+			assert.ErrorIs(t, err, models.ErrFactoryWorkOrderInvalidState)
+			assert.Nil(t, created)
+			_, err = models.FindPullRequestActivityByRunID(db, newRun.ID)
+			assert.ErrorIs(t, err, models.ErrFactoryPullRequestActivityNotFound)
+		})
+	}
 
 	t.Run("observes a revision once and keeps it current", func(t *testing.T) {
 		pullRequest, canvas := createActivityFixture(t, db, r)
@@ -244,8 +312,9 @@ func Test__FactoryPullRequestActivityCoordination(t *testing.T) {
 		require.NoError(t, err)
 
 		type accessOutcome struct {
-			result *models.FactoryPullRequestAccessResult
-			err    error
+			result   *models.FactoryPullRequestAccessResult
+			activity *models.FactoryPullRequestRun
+			err      error
 		}
 		outcomes := make(chan accessOutcome, 2)
 		var started sync.WaitGroup
@@ -255,15 +324,16 @@ func Test__FactoryPullRequestActivityCoordination(t *testing.T) {
 			started.Done()
 			started.Wait()
 			var result *models.FactoryPullRequestAccessResult
+			var requestErr error
 			err := db.Transaction(func(tx *gorm.DB) error {
 				var locked models.FactoryPullRequest
 				if loadErr := tx.Where("id = ?", pullRequest.ID).First(&locked).Error; loadErr != nil {
 					return loadErr
 				}
-				result, err = locked.RequestExclusiveAccess(tx, activity)
-				return err
+				result, requestErr = locked.RequestExclusiveAccess(tx, activity)
+				return requestErr
 			})
-			outcomes <- accessOutcome{result: result, err: err}
+			outcomes <- accessOutcome{result: result, activity: activity, err: err}
 		}
 
 		go request(first.Activity)
@@ -271,8 +341,16 @@ func Test__FactoryPullRequestActivityCoordination(t *testing.T) {
 
 		firstOutcome := <-outcomes
 		secondOutcome := <-outcomes
-		require.NoError(t, firstOutcome.err)
-		require.NoError(t, secondOutcome.err)
+		for _, outcome := range []*accessOutcome{&firstOutcome, &secondOutcome} {
+			var busy *models.CodexConnectionBusyError
+			if errors.As(outcome.err, &busy) {
+				outcome.err = db.Transaction(func(tx *gorm.DB) error {
+					outcome.result, err = pullRequest.RequestExclusiveAccess(tx, outcome.activity)
+					return err
+				})
+			}
+			require.NoError(t, outcome.err)
+		}
 
 		readyCount := 0
 		waitingCount := 0

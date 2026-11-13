@@ -1212,6 +1212,9 @@ func (c *FactoryContext) pullRequestMatch(pullRequest *models.FactoryPullRequest
 	if err != nil {
 		return nil, err
 	}
+	if order.IsArchived() {
+		return nil, core.ErrPullRequestNotFound
+	}
 	workOrder := workOrderToCore(order)
 	workOrder.Key = factoryModel.WorkOrderKey(order.Number)
 	workOrder.URL = workOrderPermalink(order, factoryModel.RouteSegment())
