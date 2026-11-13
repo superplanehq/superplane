@@ -164,13 +164,12 @@ func runHostShellDirectivesPipe(ctx context.Context, maxOut int, workDir string,
 	}
 	var buf bytes.Buffer
 	w := &cappedShellWriter{buf: &buf, max: max}
+	cmd.Stdout = w
 	if live != nil {
 		cmd.Stdout = io.MultiWriter(w, live)
-		cmd.Stderr = io.MultiWriter(w, live)
-	} else {
-		cmd.Stdout = w
-		cmd.Stderr = w
 	}
+	// Share the pipe so stderr cannot overtake stdout command records.
+	cmd.Stderr = cmd.Stdout
 
 	if runErr := cmd.Run(); runErr != nil {
 		outStr := truncateString(buf.String(), max)
@@ -212,6 +211,10 @@ type shellSession struct {
 }
 
 func (s *shellSession) appendOut(p []byte) {
+	// Keep live logs and failure diagnostics after the returned buffer fills.
+	if s.live != nil && len(p) > 0 {
+		_, _ = s.live.Write(p)
+	}
 	if s.maxOut <= 0 || len(p) == 0 {
 		return
 	}
@@ -222,16 +225,9 @@ func (s *shellSession) appendOut(p []byte) {
 	if len(p) > room {
 		s.out.Write(p[:room])
 		s.out.WriteString("\n…(truncated)")
-		if s.live != nil {
-			_, _ = s.live.Write(p[:room])
-			_, _ = s.live.Write([]byte("\n…(truncated)\n"))
-		}
 		return
 	}
 	s.out.Write(p)
-	if s.live != nil {
-		_, _ = s.live.Write(p)
-	}
 }
 
 func (s *shellSession) push(b []byte) {
