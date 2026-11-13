@@ -355,3 +355,48 @@ func TestPullRequestCheckRunPreservesUndeliveredFinalResult(t *testing.T) {
 		}
 	}
 }
+
+func TestPullRequestCheckRunKeepsFinalResultWhenWriterFinishesAfterRecovery(t *testing.T) {
+	f := newPullRequestCheckFixture(t, "github.setPullRequestCheckRun")
+	require.NoError(t, f.applyCheckRun("pending", "abc"))
+	require.NoError(t, f.processDue())
+	f.finishAction()
+	require.NoError(t, f.applyCheckRun("success", "abc"))
+	entered, resume, finished := make(chan struct{}), make(chan struct{}), make(chan struct{})
+	var calls atomic.Int32
+	var release sync.Once
+	f.http.onWrite = func() {
+		if calls.Add(1) == 1 {
+			close(entered)
+			<-resume
+		}
+	}
+	done := make(chan error, 1)
+	go func() { defer close(finished); done <- f.refresh() }()
+	t.Cleanup(func() { release.Do(func() { close(resume) }); <-finished })
+	<-entered
+	f.attempt(support.EmitCanvasEventForNode(t, f.canvas.ID, "trigger", "default", nil))
+	require.NoError(t, f.applyCheckRun("pending", "abc"))
+	require.NoError(t, f.integration.store.Update(f.record().Key, func(record *core.OrderedPublication) error {
+		var payload map[string]any
+		if err := json.Unmarshal(record.Payload, &payload); err != nil {
+			return err
+		}
+		payload["delivery"].(map[string]any)["expiresAt"] = time.Now().Add(-time.Second)
+		var err error
+		record.Payload, err = json.Marshal(payload)
+		return err
+	}))
+	require.NoError(t, f.refresh()) // Deliver and remove the old result while its writer is paused.
+	require.NoError(t, f.refresh()) // Start the new attempt's check.
+	require.Equal(t, "success", f.http.checkRuns[0].GetConclusion())
+	release.Do(func() { close(resume) })
+	require.NoError(t, <-done)
+	f.http.onWrite = nil
+	require.NoError(t, f.processDue())
+	require.NoError(t, f.refresh())
+	require.Len(t, f.http.checkRuns, 2)
+	require.Equal(t, "completed", f.http.checkRuns[0].GetStatus())
+	require.Equal(t, "success", f.http.checkRuns[0].GetConclusion(), "a late receipt must not replace the delivered result")
+	require.Equal(t, "in_progress", f.http.checkRuns[1].GetStatus())
+}
