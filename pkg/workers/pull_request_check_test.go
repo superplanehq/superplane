@@ -125,11 +125,20 @@ func TestPullRequestCheckDoesNotPublishForDeletedCredentialsOrOrganization(t *te
 }
 
 func TestPullRequestCheckRetiresUnfinishedStatusOnAnOlderCommit(t *testing.T) {
-	for _, scenario := range []string{"pending", "undelivered error", "delivered error"} {
+	for _, scenario := range []string{"pending", "undelivered error", "undelivered success", "delivered error"} {
 		t.Run(scenario, func(t *testing.T) {
 			f := newPullRequestCheckFixture(t, "github.setPullRequestCheck")
 			require.NoError(t, f.applyStatus("pending"))
 			require.NoError(t, f.processDue())
+			retiredState := "error"
+			if scenario == "undelivered success" {
+				f.finishAction()
+				require.NoError(t, f.applyStatus("success"))
+				f.http.failWrite = true
+				require.ErrorContains(t, f.processDue(), "publish review check")
+				f.http.failWrite = false
+				retiredState = "success"
+			}
 			f.http.head = "new-head"
 			if scenario == "undelivered error" {
 				f.http.failWrite = true
@@ -149,7 +158,7 @@ func TestPullRequestCheckRetiresUnfinishedStatusOnAnOlderCommit(t *testing.T) {
 				require.Error(t, f.processDue())
 				f.http.failWrite = false
 				require.NoError(t, f.processDue())
-				require.Equal(t, "error", f.state())
+				require.Equal(t, retiredState, f.state())
 				require.Equal(t, "abc", f.http.writes[writes].SHA)
 				require.Equal(t, "https://superplane.example/run", f.http.writes[writes].Status.GetTargetURL())
 				writes++

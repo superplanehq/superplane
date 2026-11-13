@@ -245,7 +245,11 @@ func publishReviewCheck(client *common.Client, state reviewCheckState) error {
 func evaluateReviewCheck(client *common.Client, store core.PublicationStore, record *core.OrderedPublication, state *reviewCheckState) (bool, error) {
 	config := state.Configuration
 	if config.State != "" && len(state.Retired) > 0 {
-		state.SHA, state.State, state.Description = state.Retired[0].SHA, "error", "A newer attempt superseded this check."
+		retired := state.Retired[0]
+		state.SHA, state.State, state.Description = retired.SHA, "error", "A newer attempt superseded this check."
+		if retired.State != "" {
+			state.State, state.Description = retired.State, retired.Description
+		}
 		return true, nil
 	}
 	number, err := parsePullNumber(config.PullNumber)
