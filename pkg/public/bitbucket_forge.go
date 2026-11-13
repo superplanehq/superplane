@@ -33,6 +33,8 @@ type forgeDeliveryBody struct {
 	BuildStatus   map[string]any `json:"buildStatus"`
 	Actor         map[string]any `json:"actor"`
 	Comment       map[string]any `json:"comment"`
+	Reviewers     map[string]any `json:"reviewers"`
+	Push          map[string]any `json:"push"`
 	SelfGenerated bool           `json:"selfGenerated"`
 }
 
@@ -97,7 +99,7 @@ func (s *Server) handleBitbucketForgeDelivery(w http.ResponseWriter, r *http.Req
 				http.Error(w, "invalid forge event", http.StatusBadRequest)
 				return
 			}
-		} else {
+		} else if eventType != "avi:bitbucket:push:repository" {
 			var pr struct {
 				ID int64 `json:"id"`
 			}
