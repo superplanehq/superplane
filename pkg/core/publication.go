@@ -100,6 +100,9 @@ type PublicationStore interface {
 
 type PublicationContext interface {
 	PublicationStore
+	// IndependentStore returns a store whose updates commit before returning,
+	// independently of the execution transaction. Use it for provider write leases.
+	IndependentStore() PublicationStore
 	ResolveOrder(sourceRunID, attemptRootEventID uuid.UUID) (PublicationOrder, error)
 	ExecutionOutput(executionID uuid.UUID) (PublicationExecution, error)
 }
