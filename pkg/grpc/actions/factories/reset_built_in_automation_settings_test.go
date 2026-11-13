@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/expr-lang/expr"
 	"github.com/google/go-github/v84/github"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -55,6 +56,7 @@ func TestResetBuiltInAutomationPreservesImplementationSettings(t *testing.T) {
 			agent.Configuration["disabledAgentResourceTools"] = map[string]any{"github-resource": []any{"delete_issue"}}
 			agent.Configuration["enabledAgentResourceTools"] = map[string]any{"github-resource": []any{"get_issue"}}
 			implementationStep(t, agent, "Implementation")["prompt"] = "Retired implementation prompt"
+			findYAMLNode(t, doc, "add-run-error").Configuration["message"] = "Retired generic error"
 			setResetTestDraftPullRequests(t, doc, true)
 		})
 	}
@@ -77,6 +79,7 @@ func TestResetBuiltInAutomationPreservesImplementationSettings(t *testing.T) {
 			assert.Equal(t, "team", agent.Concurrency.Key)
 			assert.True(t, resetTestDraftPullRequests(t, version.Nodes))
 			assert.NotContains(t, liveCanvasJSON(t, tc.canvas), "retired implementation prompt")
+			assertImplementationFailureSummary(t, version.Nodes)
 		})
 	}
 }
@@ -911,6 +914,7 @@ func TestResetFollowsMultiRepoTasksForTheImplementationTemplate(t *testing.T) {
 			current := resetTestLiveVersion(t, canvas)
 			assert.False(t, hasPullRequestNode(current.Nodes), "multi-repo agents open their own pull requests")
 			assert.True(t, resetTestDraftPullRequests(t, current.Nodes))
+			assertImplementationFailureSummary(t, current.Nodes)
 
 			require.NoError(t, models.DisableExperimentalFeature(r.Organization.ID, features.FeatureFactoryMultiRepoTasks))
 			require.NoError(t, resetTestOrganization(t, r))
@@ -918,6 +922,7 @@ func TestResetFollowsMultiRepoTasksForTheImplementationTemplate(t *testing.T) {
 			assert.True(t, hasPullRequestNode(current.Nodes))
 			assert.Nil(t, factoryEnvironmentEntry(findIntakeNode(current.Nodes, implementationAgentNodeID).Configuration, factoryDraftPullRequestsEnv))
 			assert.True(t, resetTestDraftPullRequests(t, current.Nodes))
+			assertImplementationFailureSummary(t, current.Nodes)
 		})
 	}
 }
@@ -1050,4 +1055,18 @@ func TestInstallationResetPreservesMergeConfidencePublishing(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, true, findYAMLNode(t, doc, "publish-merge-confidence").Configuration["enabled"])
 	}
+}
+
+// Evaluate the published error expression to verify reset retains diagnostics.
+func assertImplementationFailureSummary(t *testing.T, nodes []models.Node) {
+	t.Helper()
+	node := findIntakeNode(nodes, "add-run-error")
+	require.NotNil(t, node)
+	template := node.Configuration["message"].(string)
+	summary := "Implementation (step 2, exit code 42): Provider unavailable.\nLogs: runner task task-1."
+	program, err := expr.Compile(strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(template, "{{"), "}}")))
+	require.NoError(t, err)
+	result, err := expr.Run(program, map[string]any{"previous": func() map[string]any { return map[string]any{"data": map[string]any{"error": summary}} }})
+	require.NoError(t, err)
+	assert.Equal(t, summary, result)
 }

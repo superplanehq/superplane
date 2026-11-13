@@ -16,6 +16,7 @@ const (
 
 type liveLogCommandStartRecord struct {
 	Type      string `json:"type"`
+	RecordID  string `json:"diagnostic_id,omitempty"`
 	Index     int    `json:"index"`
 	Text      string `json:"text"`
 	Kind      string `json:"kind,omitempty"`
@@ -39,6 +40,7 @@ type liveLogToolEndRecord struct {
 
 type liveLogCommandEndRecord struct {
 	Type       string               `json:"type"`
+	RecordID   string               `json:"diagnostic_id,omitempty"`
 	Index      int                  `json:"index"`
 	Status     liveLogCommandStatus `json:"status"`
 	DurationMS int64                `json:"duration_ms"`
@@ -50,13 +52,29 @@ func writeLiveLogCommandStart(live io.Writer, index int, text, kind, preview str
 	}
 	rec := liveLogCommandStartRecord{
 		Type:      "cmd_start",
+		RecordID:  diagnosticRecordID(live),
 		Index:     index,
-		Text:      strings.TrimSpace(text),
+		Text:      liveLogRecordLabel(text),
 		Kind:      strings.TrimSpace(kind),
-		Preview:   strings.TrimSpace(preview),
+		Preview:   liveLogRecordLabel(preview),
 		StartedAt: startedAt.UnixMilli(),
 	}
 	writeLiveLogRecord(live, rec)
+}
+
+// An unnamed command uses its full shell text as the step label. Failure
+// diagnostics omit lines longer than diagnosticCaptureBytes, and an omitted
+// cmd_start record hides every later step. JSON escapes a rune as at most six
+// bytes, so two labels at this limit keep a record below that size.
+const liveLogRecordLabelMaxRunes = 1024
+
+func liveLogRecordLabel(text string) string {
+	text = strings.TrimSpace(text)
+	runes := []rune(text)
+	if len(runes) <= liveLogRecordLabelMaxRunes {
+		return text
+	}
+	return string(runes[:liveLogRecordLabelMaxRunes])
 }
 
 func liveLogPreview(text string) string {
@@ -87,6 +105,7 @@ func writeLiveLogCommandEnd(live io.Writer, index int, exitCode int, duration ti
 	}
 	rec := liveLogCommandEndRecord{
 		Type:       "cmd_end",
+		RecordID:   diagnosticRecordID(live),
 		Index:      index,
 		Status:     status,
 		DurationMS: duration.Milliseconds(),
@@ -107,4 +126,20 @@ func writeLiveLogRecord(live io.Writer, rec any) {
 	payload = append(payload, b...)
 	payload = append(payload, '\n')
 	_, _ = live.Write(payload)
+}
+
+// The identifier distinguishes generated records from JSON printed or replayed
+// by commands. It correlates records; it is not a task security boundary.
+func diagnosticRecordID(live io.Writer) string {
+	if capture, ok := live.(*failureDiagnostics); ok {
+		return capture.recordID
+	}
+	return ""
+}
+
+func diagnosticDirectives(directives []shellDirective, recordID string) []shellDirective {
+	for i := range directives {
+		directives[i].RecordID = recordID
+	}
+	return directives
 }
