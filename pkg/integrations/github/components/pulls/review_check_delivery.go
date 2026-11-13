@@ -35,6 +35,26 @@ func RefreshReviewCheck(ctx core.IntegrationHookContext) error {
 	if err != nil || snapshot == nil {
 		return err
 	}
+	if !snapshot.Disabled {
+		state, err := decodeReviewCheckState(snapshot.Payload)
+		if err != nil {
+			return err
+		}
+		if state.Configuration.ActivationNodeID != "" {
+			eligible, err := reviewCheckStillActive(store, snapshot)
+			if err != nil {
+				return err
+			}
+			if !eligible {
+				return store.Update(parameters.Key, func(current *core.OrderedPublication) error {
+					if current.Revision != snapshot.Revision {
+						return core.ErrPublicationUnchanged
+					}
+					return disableReviewCheck(current)
+				})
+			}
+		}
+	}
 	state, err := decodeReviewCheckState(snapshot.Payload)
 	if err != nil {
 		return err
@@ -73,11 +93,22 @@ func RefreshReviewCheck(ctx core.IntegrationHookContext) error {
 		}
 		monitor = true
 	}
+	// Recheck activation after provider reads, outside the publication lock.
+	eligible := true
+	if !snapshot.Disabled && state.Configuration.ActivationNodeID != "" {
+		eligible, err = reviewCheckStillActive(store, snapshot)
+		if err != nil {
+			return err
+		}
+	}
 	// Claim delivery and commit recovery work before attempting external delivery.
 	var revision int64
 	err = store.Update(parameters.Key, func(current *core.OrderedPublication) error {
 		if current.Revision != snapshot.Revision {
 			return core.ErrPublicationUnchanged
+		}
+		if !eligible {
+			return disableReviewCheck(current)
 		}
 		current.WakeAt = nil
 		if monitor {

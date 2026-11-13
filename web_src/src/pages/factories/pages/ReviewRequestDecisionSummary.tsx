@@ -12,7 +12,9 @@ export function ReviewRequestDecisionSummary({
   );
   const decision = scoped
     .filter((execution) =>
-      ["review-unnecessary", "stale-report", "no-reviewer", "review-outcome"].includes(execution.nodeId ?? ""),
+      ["review-unnecessary", "stale-report", "no-reviewer", "no-candidates", "review-outcome"].includes(
+        execution.nodeId ?? "",
+      ),
     )
     .flatMap((execution) => execution.outputs?.default ?? [])
     .map((output) => record(record(record(output)?.data)?.reviewRequest))
