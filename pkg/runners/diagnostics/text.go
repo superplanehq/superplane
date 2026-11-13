@@ -21,6 +21,7 @@ var urlCredentialPattern = regexp.MustCompile(`(?i)(https?://)[^/@\s]+:[^/@\s]+@
 var queryParameterPattern = regexp.MustCompile(`[?&][^=\s&#"']+=[^\s&#"']+`)
 var queryCredentialNamePattern = regexp.MustCompile(`(?i)(?:key|token|secret|password|credential|signature|sig)$`)
 var jsonStringPattern = regexp.MustCompile(`"(?:\\.|[^"\\])*"`)
+
 // Sensitive headers carry credentials in the complete value, for any auth scheme.
 const sensitiveHeaderNames = `(?:set-cookie|cookie|proxy-authorization|authorization)`
 
