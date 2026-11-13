@@ -376,51 +376,65 @@ func pendingActionRequests(t *testing.T, integrationID uuid.UUID, actionName str
 }
 
 func Test__AppInstallationRequestWorker_InvokeHookError(t *testing.T) {
-	r := support.Setup(t)
-	defer r.Close()
-
-	worker := NewIntegrationRequestWorker(r.Encryptor, r.Registry, nil, "http://localhost:8000", "http://localhost:8000")
-
-	//
-	// Register a dummy application and install it.
-	//
-	var hookCalled bool
-	r.Registry.Integrations["dummy"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{
-		Hooks: []core.Hook{
-			{
-				Name:       "test",
-				Parameters: []configuration.Field{},
-			},
-		},
-		HandleHook: func(ctx core.IntegrationHookContext) error {
-			hookCalled = true
-			return errors.New("action failed")
-		},
-	})
-
-	integration, err := models.CreateIntegration(uuid.New(), r.Organization.ID, "dummy", support.RandomName("integration"), nil)
-	require.NoError(t, err)
-
-	//
-	// Create the integration sync request
-	//
-	runAt := time.Now().Add(-time.Second)
-	require.NoError(t, integration.CreateActionRequest(database.Conn(), "test", nil, &runAt))
-	requests, err := integration.ListRequests(models.IntegrationRequestTypeInvokeAction)
-	require.NoError(t, err)
-	require.Len(t, requests, 1)
-	request := &requests[0]
-
-	//
-	// Process request
-	//
-	require.NoError(t, worker.LockAndProcessRequest(*request))
-
-	//
-	// Reload request, verify it was completed, even though the action failed.
-	//
-	request, err = integration.GetRequest(request.ID.String())
-	require.NoError(t, err)
-	assert.Equal(t, models.IntegrationRequestStateCompleted, request.State)
-	assert.True(t, hookCalled)
+	for _, exhausted := range []bool{false, true} {
+		t.Run(fmt.Sprintf("exhausted=%t", exhausted), func(t *testing.T) {
+			r := support.Setup(t)
+			defer r.Close()
+			worker := NewIntegrationRequestWorker(r.Encryptor, r.Registry, nil, "http://localhost:8000", "http://localhost:8000")
+			calls := 0
+			r.Registry.Integrations["dummy"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{
+				Hooks: []core.Hook{{Name: "test"}},
+				HandleHook: func(ctx core.IntegrationHookContext) error {
+					calls++
+					ctx.Integration.SetMetadata(map[string]any{"lastAttempt": calls})
+					if exhausted || calls == 1 {
+						return errors.New("action failed")
+					}
+					return nil
+				},
+			})
+			integration, err := models.CreateIntegration(uuid.New(), r.Organization.ID, "dummy", support.RandomName("integration"), nil)
+			require.NoError(t, err)
+			runAt := time.Now().Add(-time.Second)
+			require.NoError(t, integration.CreateActionRequest(database.Conn(), "test", nil, &runAt))
+			requests, err := integration.ListRequests(models.IntegrationRequestTypeInvokeAction)
+			require.NoError(t, err)
+			require.Len(t, requests, 1)
+			request := &requests[0]
+			attempts := 2
+			if exhausted {
+				attempts = 10
+			}
+			for i := 0; i < attempts; i++ {
+				require.NoError(t, database.Conn().Model(request).Update("run_at", runAt).Error)
+				err = worker.LockAndProcessRequest(*request)
+				if exhausted || i == 0 {
+					require.ErrorContains(t, err, "action failed")
+				} else {
+					require.NoError(t, err)
+				}
+				request, err = integration.GetRequest(request.ID.String())
+				require.NoError(t, err)
+				if i < attempts-1 {
+					require.Equal(t, models.IntegrationRequestStatePending, request.State)
+					require.True(t, request.RunAt.After(time.Now()))
+				}
+			}
+			expected := models.IntegrationRequestStateCompleted
+			if exhausted {
+				expected = models.IntegrationRequestStateFailed
+			}
+			require.Equal(t, expected, request.State)
+			require.Equal(t, attempts, calls)
+			if exhausted {
+				require.Equal(t, 10, request.Spec.Data().Attempts)
+				require.Equal(t, "action failed", request.Spec.Data().LastError)
+			}
+			saved, err := models.FindIntegration(r.Organization.ID, integration.ID)
+			require.NoError(t, err)
+			require.EqualValues(t, attempts, saved.Metadata.Data()["lastAttempt"])
+			require.NoError(t, worker.LockAndProcessRequest(*request))
+			require.Equal(t, attempts, calls, "completed or exhausted requests cannot run again")
+		})
+	}
 }
