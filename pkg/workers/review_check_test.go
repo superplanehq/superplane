@@ -57,11 +57,15 @@ type reviewCheckHTTP struct {
 		SHA    string
 		Status github.RepoStatus
 	}
-	onRead  func()
-	onWrite func()
+	onRead     func()
+	onWrite    func()
+	onResponse func(*http.Request)
 }
 
 func (h *reviewCheckHTTP) Do(request *http.Request) (*http.Response, error) {
+	if h.onResponse != nil {
+		defer h.onResponse(request)
+	}
 	if request.Method == http.MethodGet && strings.HasSuffix(request.URL.Path, "/pulls/42") && h.onRead != nil {
 		h.onRead()
 	}

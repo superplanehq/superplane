@@ -278,7 +278,11 @@ func retainDeliveredCheckRun(latest, delivered *reviewCheckState) {
 	}
 	// Recovery may have retired this target before a paused writer returned.
 	// Retain even a missing receipt so a lost creation response can be found.
-	latest.Retired = append(latest.Retired, retiredCommitCheck{SHA: delivered.SHA, ResultURL: delivered.resultURL(), CheckRun: target})
+	check := retiredCommitCheck{SHA: delivered.SHA, ResultURL: delivered.resultURL(), CheckRun: target}
+	if delivered.State != "pending" {
+		check.State, check.Description = delivered.State, delivered.Description
+	}
+	latest.Retired = append(latest.Retired, check)
 }
 
 func evaluateReviewCheck(client *common.Client, store core.PublicationStore, record *core.OrderedPublication, state *reviewCheckState) (bool, error) {
