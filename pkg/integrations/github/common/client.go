@@ -45,6 +45,11 @@ type Client struct {
 	underlying *github.Client
 }
 
+func (c *Client) RepositoryFullName(repository string) string {
+	owner, name := c.ownerAndName(repository)
+	return owner + "/" + name
+}
+
 func (c *Client) Host() Host {
 	if c == nil {
 		return DotCom()
@@ -253,6 +258,11 @@ func (c *Client) CreatePullRequest(ctx context.Context, repository string, pullR
 func (c *Client) GetPullRequest(ctx context.Context, repository string, pullNumber int) (*github.PullRequest, *github.Response, error) {
 	owner, name := c.ownerAndName(repository)
 	return c.underlying.PullRequests.Get(ctx, owner, name, pullNumber)
+}
+
+func (c *Client) GetCommit(ctx context.Context, repository, sha string) (*github.RepositoryCommit, *github.Response, error) {
+	owner, name := c.ownerAndName(repository)
+	return c.underlying.Repositories.GetCommit(ctx, owner, name, sha, nil)
 }
 
 // ListPullRequests returns one page of a repository's pull requests.

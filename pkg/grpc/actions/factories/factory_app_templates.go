@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/components/runner"
+	"github.com/superplanehq/superplane/pkg/factories/mergeconfidence"
 	"github.com/superplanehq/superplane/pkg/integrations/prbody"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
@@ -74,6 +75,7 @@ var factoryAppTemplates = map[factoryTemplateKey]factoryAppTemplate{
 		columnKey:        models.CanvasColumnKeyVerify,
 		componentIntegrations: map[string]string{
 			"github.listPullRequestReviewCandidates": "github",
+			"github.setPullRequestReviewCheck":       "github",
 			"github.ensurePullRequestReviewers":      "github",
 		},
 	}),
@@ -308,6 +310,9 @@ func materializeFactoryTemplate(templateID, provider string, input factoryTempla
 	canvas.Metadata.ID = input.appID
 	canvas.Metadata.Name = input.appName
 	wireFactoryTemplate(canvas, template, input)
+	if template.id == reviewRequestTemplateID {
+		configureReviewRequestCheck(canvas)
+	}
 	markFactoryTemplate(canvas, template)
 
 	canvasYAML, err := goyaml.Marshal(canvas)
@@ -355,7 +360,7 @@ func filterDisabledMergeChecks(canvas *yaml.Canvas, enabled string) {
 				continue
 			}
 			prompt, _ := item["prompt"].(string)
-			id := runner.MergeCheckID(prompt)
+			id := mergeconfidence.MergeCheckID(prompt)
 			if id == "" || allowed[id] {
 				kept = append(kept, step)
 			}

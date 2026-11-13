@@ -1,11 +1,10 @@
 import { renderTimeAgo } from "@/components/TimeAgo";
-import { agentRunnerStepTitles } from "@/lib/agentRunnerSteps";
+import { configuredAgentSteps } from "@/lib/agentRunnerSteps";
 import { getColorClass } from "@/lib/colors";
 import { RunnerLiveLogDialog } from "@/ui/CanvasPage/RunnerLiveLogDialog";
 import type { ComponentBaseProps, EventSection, EventState, EventStateMap } from "@/ui/componentBase";
 import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase/eventState";
 import React from "react";
-import { AgentHarnessSteps } from "./AgentHarnessSteps";
 import { getTriggerRenderer } from "./mapperLookup";
 
 import type {
@@ -232,10 +231,10 @@ export const agentHarnessMapper: ComponentBaseMapper = {
   ...runnerMapper,
   props(context: ComponentBaseContext): ComponentBaseProps {
     const props = runnerMapper.props(context);
-    const steps = agentRunnerStepTitles(context.node.configuration);
+    const steps = configuredAgentSteps(context.node.configuration);
     return {
       ...props,
-      factoryBody: steps.length > 0 ? <AgentHarnessSteps configuration={context.node.configuration} /> : undefined,
+      factorySteps: steps ?? undefined,
     };
   },
 };

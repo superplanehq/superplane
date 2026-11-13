@@ -19,6 +19,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/factories/vcs"
 	"github.com/superplanehq/superplane/pkg/integrations/bitbucket"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
+	"github.com/superplanehq/superplane/pkg/integrations/github/components/pulls"
 	"github.com/superplanehq/superplane/pkg/integrations/prbody"
 	"github.com/superplanehq/superplane/pkg/models"
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
@@ -130,6 +131,32 @@ func installPublicationGitHub(t *testing.T, httpCtx core.HTTPContext) {
 	}
 }
 
+func (f publicationFixture) integrationPublicationAttempt(t *testing.T) *bodySectionActionAttempt {
+	t.Helper()
+	f.publishVersion(t, func(v *models.CanvasVersion) {
+		findIntakeNode(v.Nodes, "publish").Ref.Component.Name = "github.updatePullRequestBodySection"
+	})
+	f.startRun(t)
+	f.report(t, f.run, 4)
+	execution, request := f.publicationRequest(t, "passed")
+	configuration := execution.Configuration.Data()
+	delete(configuration, "pullRequestId")
+	configuration["repository"], configuration["pullNumber"] = "acme/app", "42"
+	execution.Configuration = datatypes.NewJSONType(configuration)
+	execution.Metadata = datatypes.NewJSONType(map[string]any{models.CanvasNodeExecutionFrozenComponentKey: "github.updatePullRequestBodySection"})
+	require.NoError(t, f.db.Save(execution).Error)
+	attempt := &bodySectionActionAttempt{request: request}
+	require.NoError(t, f.db.Transaction(func(tx *gorm.DB) error { return attempt.claim(tx) }))
+	return attempt
+}
+
+func publicationBodySectionClient(t *testing.T, host core.HTTPContext) prbody.Client {
+	t.Helper()
+	client, err := pulls.NewBodySectionClient(gitHubPermissionTestIntegration(), host)
+	require.NoError(t, err)
+	return client
+}
+
 func TestAssessmentCompletionEmitsStructuredMergeConfidence(t *testing.T) {
 	for _, channel := range []string{"passed", "failed"} {
 		t.Run(channel, func(t *testing.T) {
@@ -138,7 +165,7 @@ func TestAssessmentCompletionEmitsStructuredMergeConfidence(t *testing.T) {
 			root, err := f.run.RootEvent(f.db)
 			require.NoError(t, err)
 			agent := support.CreateCanvasNodeExecution(t, f.canvas.ID, "agent", root.ID, root.ID)
-			state := workercontexts.NewExecutionStateContext(f.db, agent, nil)
+			state := workercontexts.NewFactoryExecutionStateContext(f.db, agent, nil)
 			require.NoError(t, state.Emit(channel, "runnerClaudeCode.finished", []any{map[string]any{"status": "finished"}}))
 			var event models.CanvasEvent
 			require.NoError(t, f.db.Where("execution_id = ?", agent.ID).First(&event).Error)
@@ -249,7 +276,7 @@ func TestMergeConfidenceTemplateReportFormat(t *testing.T) {
 }
 
 func TestAssessmentCompletionLeavesOtherAgentsUnchanged(t *testing.T) {
-	for _, scenario := range []string{"no scope", "wrong component", "nonfactory"} {
+	for _, scenario := range []string{"no scope", "wrong component", "nonfactory", "generic emission"} {
 		t.Run(scenario, func(t *testing.T) {
 			f := newPublicationFixture(t)
 			f.publishVersion(t, func(v *models.CanvasVersion) {
@@ -268,7 +295,10 @@ func TestAssessmentCompletionLeavesOtherAgentsUnchanged(t *testing.T) {
 			root, err := f.run.RootEvent(f.db)
 			require.NoError(t, err)
 			agent := support.CreateCanvasNodeExecution(t, f.canvas.ID, "agent", root.ID, root.ID)
-			state := workercontexts.NewExecutionStateContext(f.db, agent, nil)
+			state := workercontexts.NewFactoryExecutionStateContext(f.db, agent, nil)
+			if scenario == "generic emission" {
+				state = workercontexts.NewExecutionStateContext(f.db, agent, nil)
+			}
 			require.NoError(t, state.Emit("failed", "runnerClaudeCode.finished", []any{map[string]any{"status": "failed"}}))
 			var event models.CanvasEvent
 			require.NoError(t, f.db.Where("execution_id = ?", agent.ID).First(&event).Error)
@@ -286,8 +316,11 @@ func TestMergeConfidenceTemplateUsesRunSnapshots(t *testing.T) {
 	require.NoError(t, err)
 	f.report(t, other, 1)
 	require.NoError(t, f.db.Model(&models.CanvasNode{}).Where("workflow_id = ? AND node_id = ?", f.canvas.ID, "agent").Update("configuration", datatypes.NewJSONType(map[string]any{"steps": []any{}})).Error)
+	require.NoError(t, f.db.Model(&models.CanvasNode{}).Where("workflow_id = ? AND node_id = ?", f.canvas.ID, "agent").Update("ref", datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "runnerCodex"}})).Error)
 	f.publishVersion(t, func(version *models.CanvasVersion) {
-		findIntakeNode(version.Nodes, "agent").Configuration = map[string]any{"steps": []any{}}
+		current := findIntakeNode(version.Nodes, "agent")
+		current.Configuration = map[string]any{"steps": []any{}}
+		current.Ref.Component.Name = "runnerCodex"
 	})
 	execution, request := f.publicationRequest(t, "passed")
 	host := &contexts.HTTPContext{Responses: []*http.Response{publicationHTTPResponse(200, `{"state":"open","head":{"sha":"abc"},"body":"original"}`), publicationHTTPResponse(200, "{}")}}

@@ -79,7 +79,8 @@ func (k *RevocationSync) Contains(id uuid.UUID) bool {
 }
 
 // Start syncs once and then every RevocationSyncInterval until the context ends.
-func (k *RevocationSync) Start(ctx context.Context) {
+// onChange runs after the trusted list changes so the caller can refresh the license.
+func (k *RevocationSync) Start(ctx context.Context, onChange func()) {
 	if k.url == "" {
 		return
 	}
@@ -89,8 +90,12 @@ func (k *RevocationSync) Start(ctx context.Context) {
 		defer ticker.Stop()
 
 		for {
-			if _, err := k.Sync(ctx); err != nil {
+			changed, err := k.Sync(ctx)
+			if err != nil {
 				log.WithError(err).Warn("Licensing: revocation list sync failed; keeping the last verified list")
+			}
+			if changed && onChange != nil {
+				onChange()
 			}
 
 			select {

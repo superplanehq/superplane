@@ -10,6 +10,7 @@ import { reviewRequestCanvas } from "../__fixtures__/reviewRequestFixture";
 import { ColumnAutomationViewHost } from "./ColumnAutomationViewPopup";
 
 interface SettingsOptions {
+  legacy?: boolean;
   failSave?: boolean;
   failReviewers?: boolean;
   failRetry?: boolean;
@@ -61,6 +62,9 @@ class SettingsServer {
   handlers: Map<string, Handler>;
 
   constructor(private options: SettingsOptions) {
+    if (options.legacy && this.stored.spec) {
+      this.stored.spec.nodes = this.stored.spec.nodes?.filter((node) => node.id !== "pr-check-pending");
+    }
     this.handlers = new Map<string, Handler>([
       [`POST ${canvasPath}/triggers/review-request-trigger/events/report-event/reemit`, () => this.retry()],
       [`POST ${canvasPath}/staging/commit`, () => this.commit()],
@@ -220,12 +224,15 @@ export function renderSettings(options: SettingsOptions = {}) {
         </MemoryRouter>
       </QueryClientProvider>,
     );
-  const view = mount();
+  let view = mount();
   return {
-    view,
+    get view() {
+      return view;
+    },
     reload: () => {
       view.unmount();
-      return mount();
+      view = mount();
+      return view;
     },
     onClose,
     stored: () => server.stored,

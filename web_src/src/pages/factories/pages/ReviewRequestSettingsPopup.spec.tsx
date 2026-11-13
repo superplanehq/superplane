@@ -14,7 +14,21 @@ beforeAll(() => {
 afterEach(() => vi.restoreAllMocks());
 
 describe("Review request production settings", () => {
-  it("keeps installed settings editable with the flag off and saves model, reasoning, and cleared fallback after a failed commit", async () => {
+  it("keeps legacy settings editable and explains the canvas upgrade before enabling checks", async () => {
+    const user = userEvent.setup();
+    const settings = renderSettings({ legacy: true });
+    const instructions = await screen.findByRole("textbox", { name: "Additional instructions" });
+    fireEvent.change(instructions, { target: { value: "Prefer the security owner." } });
+    await user.click(screen.getByTestId("review-request-settings-save"));
+    await waitFor(() => expect(settings.onClose).toHaveBeenCalledTimes(1));
+    expect(savedConfiguration(settings, "select-reviewers")?.additionalInstructions).toBe("Prefer the security owner.");
+    settings.reload();
+    await user.click(await screen.findByRole("switch", { name: "Publish PR check" }));
+    await user.click(screen.getByTestId("review-request-settings-save"));
+    expect(await screen.findByRole("alert")).toHaveTextContent("admin reset");
+    expect(savedConfiguration(settings, "select-reviewers")?.publishPRCheck).toBe(false);
+  });
+  it("saves agent settings and clears instructions through reload after a failed commit with the flag off", async () => {
     const user = userEvent.setup();
     const settings = renderSettings({ failSave: true });
     const fallback = await screen.findByRole("combobox", { name: "Fallback reviewer" });
@@ -22,8 +36,18 @@ describe("Review request production settings", () => {
     expect(fallback).toHaveTextContent("saved-reviewer");
     expect(screen.getByRole("tab", { name: "Configuration" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Runs" })).toBeInTheDocument();
-    expect(screen.queryByRole("textbox", { name: "Additional instructions" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("checkbox", { name: "Publish PR check" })).not.toBeInTheDocument();
+    const instructions = screen.getByRole("textbox", { name: "Additional instructions" });
+    expect(instructions).toHaveValue("");
+    const value = "Prefer the security owner. Explain ownership using {{ example }} literally.";
+    fireEvent.change(instructions, { target: { value } });
+    fireEvent.blur(instructions);
+    expect(
+      settings.stored().spec?.nodes?.find((node) => node.id === "select-reviewers")?.configuration
+        ?.additionalInstructions,
+    ).toBeUndefined();
+    const publishCheck = screen.getByRole("switch", { name: "Publish PR check" });
+    expect(publishCheck).not.toBeChecked();
+    await user.click(publishCheck);
     await user.click(fallback);
     await user.click(screen.getByRole("option", { name: "None" }));
     await waitForPopupDismissal();
@@ -37,6 +61,7 @@ describe("Review request production settings", () => {
     await user.click(screen.getByTestId("review-request-settings-save"));
     expect(await screen.findByRole("alert")).toHaveTextContent("Could not commit settings");
     expect(settings.onClose).not.toHaveBeenCalled();
+    expect(instructions).toHaveValue(value);
     expect(screen.getByRole("combobox", { name: "Fallback reviewer" })).toHaveTextContent("None");
     await user.click(screen.getByTestId("review-request-settings-save"));
     await waitFor(() => expect(settings.onClose).toHaveBeenCalledTimes(1));
@@ -44,11 +69,32 @@ describe("Review request production settings", () => {
       fallbackReviewer: "",
       model: "hosted::openai::gpt-5.4",
       thinkingLevel: "medium",
+      additionalInstructions: value,
+      publishPRCheck: true,
+      steps: [{ name: "Select reviewers", type: "prompt", prompt: "Managed reviewer policy" }],
     });
     settings.reload();
     expect(await screen.findByRole("combobox", { name: "Fallback reviewer" })).toHaveTextContent("None");
     expect(screen.getByTestId("field-model-hosted-model")).toHaveTextContent("gpt-5.4");
     expect(screen.getByTestId("field-model-hosted-model")).toHaveTextContent("Medium");
+    expect(screen.getByRole("textbox", { name: "Additional instructions" })).toHaveValue(value);
+    expect(screen.getByRole("switch", { name: "Publish PR check" })).toBeChecked();
+    await user.click(screen.getByRole("switch", { name: "Publish PR check" }));
+    for (const next of ["Prefer the API owner and explain the evidence.", ""]) {
+      fireEvent.change(screen.getByRole("textbox", { name: "Additional instructions" }), { target: { value: next } });
+      await user.click(screen.getByTestId("review-request-settings-save"));
+      await waitFor(() =>
+        expect(
+          settings.stored().spec?.nodes?.find((node) => node.id === "select-reviewers")?.configuration
+            ?.additionalInstructions,
+        ).toBe(next),
+      );
+      settings.reload();
+      expect(await screen.findByRole("textbox", { name: "Additional instructions" })).toHaveValue(next);
+      expect(screen.getByRole("switch", { name: "Publish PR check" })).not.toBeChecked();
+      expect(savedConfiguration(settings, "select-reviewers")?.publishPRCheck).toBe(false);
+      expect(savedConfiguration(settings, "pr-check-pending")?.enabled).toBe(false);
+    }
   });
 
   it("combines workspace repository reviewers without duplicates and preserves the saved fallback on lookup failure", async () => {
@@ -82,6 +128,9 @@ describe("Review request production settings", () => {
     await user.click(await screen.findByRole("combobox", { name: "Fallback reviewer" }));
     await user.click(screen.getByRole("option", { name: "None" }));
     await waitForPopupDismissal();
+    fireEvent.change(screen.getByRole("textbox", { name: "Additional instructions" }), {
+      target: { value: "Unsaved ownership preference." },
+    });
     await user.click(screen.getByRole("button", { name: "Review request menu" }));
     await user.click(screen.getByRole("menuitem", { name: "Pause Review request" }));
     await waitFor(() =>
@@ -92,6 +141,10 @@ describe("Review request production settings", () => {
     expect(
       settings.stored().spec?.nodes?.find((node) => node.id === "select-reviewers")?.configuration?.fallbackReviewer,
     ).toBe("saved-reviewer");
+    expect(
+      settings.stored().spec?.nodes?.find((node) => node.id === "select-reviewers")?.configuration
+        ?.additionalInstructions,
+    ).toBeUndefined();
     expect(
       within(screen.getByRole("region", { name: "Review request configuration" })).getByRole("status"),
     ).toHaveTextContent("paused");
@@ -111,3 +164,7 @@ describe("Review request production settings", () => {
     await waitFor(() => expect(screen.queryByRole("region", { name: "Review decision" })).not.toBeInTheDocument());
   });
 });
+
+function savedConfiguration(settings: ReturnType<typeof renderSettings>, nodeId: string) {
+  return settings.stored().spec?.nodes?.find((node) => node.id === nodeId)?.configuration;
+}

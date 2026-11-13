@@ -3,11 +3,14 @@ package rbac
 import (
 	"context"
 	"testing"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/licensing"
+	"github.com/superplanehq/superplane/pkg/licensing/licensingtest"
 	"github.com/superplanehq/superplane/pkg/models"
 	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
 	pbGroups "github.com/superplanehq/superplane/pkg/protos/groups"
@@ -18,7 +21,7 @@ import (
 
 type fakeEntitlements map[licensing.Feature]bool
 
-func (e fakeEntitlements) IsEntitled(feature licensing.Feature) bool {
+func (e fakeEntitlements) IsEntitled(_ context.Context, _ uuid.UUID, feature licensing.Feature) bool {
 	return e[feature]
 }
 
@@ -138,4 +141,66 @@ func Test_ServiceRequiresLicense(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, models.RoleOrgOperator, role)
 	})
+}
+
+type allowGrant struct{}
+
+func (allowGrant) HasGrant(context.Context, uuid.UUID, licensing.Feature) (bool, error) {
+	return true, nil
+}
+
+func TestServiceUsesTheOrganizationGrant(t *testing.T) {
+	r := support.Setup(t)
+	ctx := context.Background()
+	orgID := r.Organization.ID
+	other := uuid.New()
+	service := NewService(r.AuthService, licensingtest.OrganizationEntitlements{
+		orgID: {licensing.FeatureCustomRoles, licensing.FeatureGroups},
+	})
+
+	_, err := service.CreateRole(ctx, models.DomainTypeOrganization, orgID.String(), testRole("granted-role"))
+	require.NoError(t, err)
+
+	_, err = service.UpdateRole(ctx, models.DomainTypeOrganization, orgID.String(), "granted-role", testRole("granted-role").Spec)
+	require.NoError(t, err)
+
+	_, err = service.CreateGroup(ctx, models.DomainTypeOrganization, orgID.String(), testGroup("granted-group"))
+	require.NoError(t, err)
+
+	_, err = service.AddUserToGroup(ctx, orgID.String(), models.DomainTypeOrganization, orgID.String(), r.User.String(), "", "granted-group")
+	require.NoError(t, err)
+
+	_, err = service.CreateRole(ctx, models.DomainTypeOrganization, other.String(), testRole("other-role"))
+	assertNotLicensed(t, err)
+
+	_, err = service.CreateGroup(ctx, models.DomainTypeOrganization, other.String(), testGroup("other-group"))
+	assertNotLicensed(t, err)
+
+	_, err = service.AddUserToGroup(ctx, other.String(), models.DomainTypeOrganization, other.String(), r.User.String(), "", "other-group")
+	assertNotLicensed(t, err)
+
+	_, err = service.CreateRole(ctx, "canvas", orgID.String(), testRole("canvas-role"))
+	assertNotLicensed(t, err)
+}
+
+func TestExpiredLicenseDeniesGrantedOrganizations(t *testing.T) {
+	r := support.Setup(t)
+	issuer := licensingtest.NewIssuer("rbac-expired")
+	claims := licensingtest.Claims(licensing.FeatureCustomRoles, licensing.FeatureGroups)
+	claims["iat"] = time.Now().Add(-48 * time.Hour).Unix()
+	claims["nbf"] = claims["iat"]
+	claims["exp"] = time.Now().Add(-time.Hour).Unix()
+	entitlements := licensing.NewService(
+		licensing.NewVerifier(licensingtest.KeySet(issuer)),
+		licensingtest.StaticSource{Raw: issuer.Sign(claims)},
+		licensing.WithGrantLookup(allowGrant{}),
+	)
+	require.NoError(t, entitlements.Refresh(context.Background()))
+
+	service := NewService(r.AuthService, entitlements)
+	_, err := service.CreateRole(context.Background(), models.DomainTypeOrganization, r.Organization.ID.String(), testRole("expired-role"))
+	assertNotLicensed(t, err)
+
+	_, err = service.CreateGroup(context.Background(), models.DomainTypeOrganization, r.Organization.ID.String(), testGroup("expired-group"))
+	assertNotLicensed(t, err)
 }

@@ -57,6 +57,12 @@ const VERIFY: ColumnAutomation = {
   action: "Run the Verify agent",
 };
 
+const VERIFY_AUTOMATIONS: ColumnAutomation[] = [
+  { ...GITHUB_INTAKE, id: "pr-comments", kind: "pr-discussion", name: "Pull request comments" },
+  { ...GITHUB_INTAKE, id: "pr-checks", kind: "pr-checks", name: "Status checks" },
+  { ...ANALYSIS, id: "merge-confidence", kind: "risk-score", name: "Merge confidence" },
+];
+
 const meta = {
   title: "Factories/Components/ColumnAutomationRows",
   component: ColumnAutomationRows,
@@ -77,6 +83,26 @@ type Story = StoryObj;
 
 export const SettingsRows: Story = {
   name: "Settings rows",
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const labelOffsets: number[] = [];
+    const cardTops: number[] = [];
+    for (const title of ["Backlog", "Implement", "Verify", "Review"]) {
+      const lane = within(canvas.getByRole("region", { name: title }));
+      const titleLeft = lane.getByRole("heading", { name: title }).getBoundingClientRect().left;
+      const rows = within(lane.getByRole("list", { name: `${title} automations` }));
+      for (const button of rows.getAllByRole("button", { name: /^(Open automation:|Add automation)/ })) {
+        const icon = button.querySelector("img, svg");
+        const label = button.lastElementChild;
+        if (!icon || !label) throw new Error("The automation row is missing its icon or label.");
+        expect(Math.abs(icon.getBoundingClientRect().left - titleLeft)).toBeLessThanOrEqual(1);
+        labelOffsets.push(label.getBoundingClientRect().left - titleLeft);
+      }
+      cardTops.push(lane.getAllByRole("listitem").at(-1)!.getBoundingClientRect().top);
+    }
+    expect(Math.max(...labelOffsets) - Math.min(...labelOffsets)).toBeLessThanOrEqual(1);
+    expect(Math.max(...cardTops) - Math.min(...cardTops)).toBeLessThanOrEqual(1);
+  },
   render: () => <Board />,
 };
 
@@ -163,18 +189,20 @@ function Board() {
         />
         <Lane
           title="Implement"
-          automations={[IMPLEMENT]}
+          automations={[
+            { ...IMPLEMENT, name: "Scheduled repository implementation and documentation review", canRunNow: true },
+          ]}
           cards={[{ title: "Notify on status change after a refund", meta: "Draft #114" }]}
         />
         <Lane
           title="Verify"
-          automations={[VERIFY]}
+          automations={VERIFY_AUTOMATIONS}
           cards={[{ title: "Add refund reason enum to schema", meta: "Draft #1022" }]}
         />
         <Lane
           title="Review"
           automations={[]}
-          onAdd={() => undefined}
+          onAdd={() => console.log("Add automation", "Review")}
           cards={[{ title: "Ship idempotent refund retries", meta: "Review #6812" }]}
         />
       </WorkOrderKanbanBoard>
@@ -221,8 +249,9 @@ function Lane({
         <ColumnAutomationRows
           title={title}
           automations={automations}
-          rowCount={2}
-          onRowAction={() => undefined}
+          rowCount={3}
+          onRowAction={(automation, action) => console.log("Automation action", automation.id, action)}
+          onRun={(automation) => console.log("Run automation", automation.id)}
           onAdd={onAdd}
           testId={`${title.toLowerCase()}-rows`}
         />

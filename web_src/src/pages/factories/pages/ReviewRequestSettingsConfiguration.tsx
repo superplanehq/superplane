@@ -1,5 +1,7 @@
+import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AgentAdditionalInstructions } from "./AgentAdditionalInstructions";
 import { ImplementSettingRow } from "./ImplementSettingRow";
 import { PlanningReviewForm } from "./PlanningReviewForm";
 import type { ReviewRequestSettingsPopupProps } from "./ReviewRequestSettingsPopup";
@@ -68,6 +70,26 @@ function ReviewRequestConfigurationFields(props: ConfigurationProps) {
         showConcurrency={false}
         showSteps={false}
         disabled={editor.saving}
+      />
+      <ImplementSettingRow
+        label="Publish PR check"
+        htmlFor="review-request-publish-check"
+        description="Track required approvals. To enforce them, administrators must require superplane/review-request in GitHub branch rules."
+      >
+        <Switch
+          id="review-request-publish-check"
+          aria-describedby="review-request-publish-check-help"
+          checked={editor.publishPRCheck}
+          disabled={editor.saving}
+          onCheckedChange={editor.updatePublishPRCheck}
+        />
+      </ImplementSettingRow>
+      <AgentAdditionalInstructions
+        draft={editor.draft}
+        onChange={editor.setEdited}
+        disabled={editor.saving}
+        description="Guide reviewer selection, ownership preferences, and rationale. SuperPlane keeps the review requirements, eligibility checks, and fallback rules."
+        placeholder="For example: Prefer the security owner for authentication changes. Explain the ownership evidence for each reviewer."
       />
     </>
   );
