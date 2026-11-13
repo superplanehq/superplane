@@ -41,7 +41,7 @@ func RefreshReviewCheck(ctx core.IntegrationHookContext) error {
 			return err
 		}
 		if state.Configuration.ActivationNodeID != "" {
-			_, eligible, err := reviewCheckActivation(store, snapshot.OwnerCanvasID, snapshot.OwnerNodeID, snapshot.Order.AttemptRootEventID)
+			eligible, err := reviewCheckStillActive(store, snapshot)
 			if err != nil {
 				return err
 			}
@@ -100,7 +100,7 @@ func RefreshReviewCheck(ctx core.IntegrationHookContext) error {
 			return core.ErrPublicationUnchanged
 		}
 		if !current.Disabled && state.Configuration.ActivationNodeID != "" {
-			_, eligible, err := reviewCheckActivation(store, current.OwnerCanvasID, current.OwnerNodeID, current.Order.AttemptRootEventID)
+			eligible, err := reviewCheckStillActive(store, current)
 			if err != nil {
 				return err
 			}
