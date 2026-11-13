@@ -206,6 +206,21 @@ func TestSanitizeAuthorizationHeaders(t *testing.T) {
 			text:     `curl -H 'Authorization: ApiKey private-value' https://example.com returned 401`,
 			expected: `curl -H 'Authorization: [REDACTED]' https://example.com returned 401`,
 		},
+		{
+			name:     "header inside JSON message",
+			text:     `{"message":"Authorization: Token private\"value\r\nHTTP 401"}`,
+			expected: `{"message":"Authorization: [REDACTED]\r\nHTTP 401"}`,
+		},
+		{
+			name:     "serialized header array",
+			text:     `{"Authorization":["ApiKey private-value"],"status":401}`,
+			expected: `{"Authorization":["[REDACTED]"],"status":401}`,
+		},
+		{
+			name:     "ordinary authorization setting",
+			text:     "authorization_enabled=true\nHTTP 401",
+			expected: "authorization_enabled=true\nHTTP 401",
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			assert.Equal(t, tc.expected, Sanitize(tc.text, nil, 4096))
