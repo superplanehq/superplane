@@ -71,6 +71,11 @@ type PublicationExecution struct {
 	Output        any
 }
 
+type PublicationOwnerStatus struct {
+	Available bool
+	Removed   bool
+}
+
 // PublicationNode exposes saved node configuration without component policy.
 type PublicationNode struct {
 	Component     string
@@ -87,6 +92,7 @@ type PublicationStore interface {
 	List(prefix string) ([]OrderedPublication, error)
 	Update(key string, apply func(*OrderedPublication) error) error
 	AttemptFinished(rootEventID uuid.UUID) (bool, error)
+	OwnerStatus(canvasID uuid.UUID, nodeID string) (PublicationOwnerStatus, error)
 }
 
 type PublicationContext interface {

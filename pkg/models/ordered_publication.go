@@ -104,6 +104,8 @@ func ResolvePublicationOrder(tx *gorm.DB, organizationID, integrationID uuid.UUI
 	var node CanvasNode
 	if err := tx.Joins("JOIN workflows ON workflows.id = workflow_nodes.workflow_id").
 		Joins("JOIN app_installations ON app_installations.id = workflow_nodes.app_installation_id").
+		Joins("JOIN organizations ON organizations.id = workflows.organization_id").
+		Where("workflows.deleted_at IS NULL AND workflow_nodes.deleted_at IS NULL AND app_installations.deleted_at IS NULL AND organizations.deleted_at IS NULL").
 		Where("workflow_nodes.workflow_id = ? AND workflow_nodes.node_id = ? AND workflows.organization_id = ? AND workflow_nodes.app_installation_id = ? AND app_installations.organization_id = ?", execution.WorkflowID, execution.NodeID, organizationID, integrationID, organizationID).
 		First(&node).Error; err != nil {
 		return order, fmt.Errorf("publication scope is not authorized: %w", err)
@@ -137,6 +139,28 @@ func ResolvePublicationOrder(tx *gorm.DB, organizationID, integrationID uuid.UUI
 		return order, fmt.Errorf("publication ordering timestamps are missing")
 	}
 	return core.PublicationOrder{SourceRunID: source.ID, SourceCreatedAt: *source.CreatedAt, AttemptRootEventID: attempt.ID, AttemptCreatedAt: *attempt.CreatedAt}, nil
+}
+
+// PublicationOwnerStatus does not require source history. Durable delivery can
+// finish after retention removes the run, or after its canvas is removed.
+func PublicationOwnerStatus(tx *gorm.DB, organizationID, integrationID, canvasID uuid.UUID, nodeID string) (core.PublicationOwnerStatus, error) {
+	var status core.PublicationOwnerStatus
+	var available int64
+	err := tx.Model(&Integration{}).
+		Joins("JOIN organizations ON organizations.id = app_installations.organization_id").
+		Where("app_installations.id = ? AND organizations.id = ? AND organizations.deleted_at IS NULL", integrationID, organizationID).
+		Count(&available).Error
+	if err != nil || available == 0 {
+		return status, err
+	}
+	status.Available = true
+	var owners int64
+	err = tx.Model(&CanvasNode{}).
+		Joins("JOIN workflows ON workflows.id = workflow_nodes.workflow_id").
+		Where("workflow_nodes.workflow_id = ? AND workflow_nodes.node_id = ? AND workflows.organization_id = ? AND workflows.deleted_at IS NULL AND workflow_nodes.app_installation_id = ?", canvasID, nodeID, organizationID, integrationID).
+		Count(&owners).Error
+	status.Removed = owners == 0
+	return status, err
 }
 
 func PublicationAttemptFinished(tx *gorm.DB, organizationID, rootEventID uuid.UUID) (bool, error) {
