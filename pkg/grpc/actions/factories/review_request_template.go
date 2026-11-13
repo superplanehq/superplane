@@ -77,3 +77,24 @@ func resolveReviewRequestSource(db *gorm.DB, factory *models.Factory, canvas *mo
 	}
 	return "", invalidArgument("Add Merge confidence to this workspace before you add Review request.")
 }
+
+// Keep publication settings separate from the selection policy and instructions.
+func configureReviewRequestCheck(canvas *yaml.Canvas) {
+	var enabled bool
+	var generation any = 1
+	for _, node := range canvas.Spec.Nodes {
+		if node.ID == reviewRequestAgentNodeID {
+			enabled, _ = node.Configuration["publishPRCheck"].(bool)
+			if saved, ok := node.Configuration["prCheckActivationGeneration"]; ok {
+				generation = saved
+			}
+		}
+	}
+	for i := range canvas.Spec.Nodes {
+		node := &canvas.Spec.Nodes[i]
+		if node.ID == "pr-check-pending" {
+			node.Configuration["enabled"] = enabled
+			node.Configuration["activationGeneration"] = generation
+		}
+	}
+}

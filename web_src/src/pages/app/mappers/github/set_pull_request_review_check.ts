@@ -30,6 +30,7 @@ export const SET_PULL_REQUEST_REVIEW_CHECK_STATE_REGISTRY: EventStateRegistry = 
   stateMap: {
     ...appliedStateRegistry.stateMap,
     superseded: { ...DEFAULT_EVENT_STATE_MAP.neutral, label: "Superseded" },
+    skipped: { ...DEFAULT_EVENT_STATE_MAP.neutral, label: "Skipped" },
   },
   getState(execution) {
     const state = appliedStateRegistry.getState(execution);
@@ -37,6 +38,7 @@ export const SET_PULL_REQUEST_REVIEW_CHECK_STATE_REGISTRY: EventStateRegistry = 
 
     const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
     const output = outputs?.default?.[0]?.data as ReviewCheckOutput | undefined;
+    if (output?.status === "skipped") return "skipped";
     return output?.status === "superseded" ? "superseded" : "applied";
   },
 };
