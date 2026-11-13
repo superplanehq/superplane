@@ -127,7 +127,7 @@ export function ConsoleSummaryPanel({
               showRepository={panel.showsPullRequestRepository}
               multiRepo={multiRepo}
             />
-            {panel.mergeChecks.length > 0 ? (
+            {panel.showsMergeChecks ? (
               <FramePanel className="py-3">
                 <ConsoleCheckRows
                   checks={panel.mergeChecks}
@@ -287,6 +287,7 @@ function consolePanelFacts({
     pullRequestChecks: repositories.mergeChecks.byRepository,
     failedRepositories: repositories.failedRepositories,
     mergeAssessmentFailed: repositories.assessmentFailed,
+    showsMergeChecks: showsTaskMergeChecks(repositories),
     mergeChecks: repositories.mergeChecks.unattached,
     otherChecks: fixture.checks.filter(
       (check) =>
@@ -298,6 +299,16 @@ function consolePanelFacts({
     ),
     duration: /\d/.test(outcome.duration) ? outcome.duration : undefined,
   };
+}
+
+/**
+ * The task list shows merge checks that belong to no pull request row. A
+ * failed assessment without scores shows here only when no pull request row
+ * owns merge checks, so multi-repo tasks report it on each pull request.
+ */
+function showsTaskMergeChecks(repositories: ReturnType<typeof mergeConfidencePanelFacts>): boolean {
+  if (repositories.mergeChecks.unattached.length > 0) return true;
+  return repositories.assessmentFailed && repositories.mergeChecks.byRepository == null;
 }
 
 function SummaryDecisionStrip({

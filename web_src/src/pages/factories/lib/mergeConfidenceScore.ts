@@ -220,12 +220,12 @@ function currentMergeConfidenceCheck(
   check: WorkOrderCheckPresentation,
   pullRequests: FactoriesFactoryPullRequest[],
 ): { check: WorkOrderCheckPresentation; assessmentFailed: boolean } {
-  const assessment = latestMergeConfidenceActivity(check, pullRequests);
-  const staleRevision = Boolean(
-    assessment?.currentRevision && assessment.revision && assessment.currentRevision !== assessment.revision,
-  );
-  const assessmentFailed = !staleRevision && assessment?.run?.result === "RESULT_FAILED";
-  if (!assessment || (check.runId === assessment.run?.id && !staleRevision)) {
+  if (!check.appId) return { check, assessmentFailed: false };
+  const assessment = latestMergeConfidenceActivity(pullRequests, check.repository, (activity) => {
+    return activity.run?.canvasId === check.appId;
+  });
+  const assessmentFailed = isFailedAssessment(assessment);
+  if (!assessment || (check.runId === assessment.run?.id && !isStaleAssessment(assessment))) {
     return { check, assessmentFailed };
   }
   // A newer assessment invalidates older scores, even for the same commit.
@@ -245,21 +245,61 @@ function currentMergeConfidenceCheck(
   };
 }
 
-function latestMergeConfidenceActivity(check: WorkOrderCheckPresentation, pullRequests: FactoriesFactoryPullRequest[]) {
-  if (!check.appId) return undefined;
-  const repository = pullRequestChecksKey(check.repository);
+type MergeConfidenceActivity = {
+  run?: FactoriesFactoryPullRequestActivity["run"];
+  title?: string;
+  revision?: string;
+  currentRevision?: string;
+};
+
+function latestMergeConfidenceActivity(
+  pullRequests: FactoriesFactoryPullRequest[],
+  repository: string | undefined,
+  matches: (activity: MergeConfidenceActivity) => boolean,
+): MergeConfidenceActivity | undefined {
+  const key = pullRequestChecksKey(repository);
   return pullRequests
-    .filter((pr) => !repository || pullRequestChecksKey(pr.repository) === repository)
+    .filter((pr) => !key || pullRequestChecksKey(pr.repository) === key)
     .flatMap((pr) => {
       const activities: FactoriesFactoryPullRequestActivity[] = pr.activities?.length ? pr.activities : (pr.runs ?? []);
       return activities.map((activity) => ({
         run: activity.run,
+        title: activity.title,
         revision: activity.revision?.id,
         currentRevision: pr.currentRevision?.id,
       }));
     })
-    .filter((activity) => activity.run?.canvasId === check.appId)
+    .filter(matches)
     .sort((left, right) => (right.run?.createdAt ?? "").localeCompare(left.run?.createdAt ?? ""))[0];
+}
+
+function isStaleAssessment(assessment: MergeConfidenceActivity): boolean {
+  return Boolean(
+    assessment.currentRevision && assessment.revision && assessment.currentRevision !== assessment.revision,
+  );
+}
+
+function isFailedAssessment(assessment: MergeConfidenceActivity | undefined): boolean {
+  return Boolean(assessment && !isStaleAssessment(assessment) && assessment.run?.result === "RESULT_FAILED");
+}
+
+/**
+ * A first assessment can fail before it saves a score. Without a score, no
+ * check names the app canvas, so the server activity title identifies it.
+ */
+function unscoredAssessmentFailed(pullRequests: FactoriesFactoryPullRequest[]): boolean {
+  const assessment = latestMergeConfidenceActivity(pullRequests, undefined, (activity) => {
+    return activity.title?.trim() === MERGE_CONFIDENCE_SCORE_NAME;
+  });
+  return isFailedAssessment(assessment);
+}
+
+function mergeConfidenceAssessmentFailed(
+  checks: WorkOrderCheckPresentation[],
+  pullRequests: FactoriesFactoryPullRequest[],
+): boolean {
+  const assessment = consoleCheckList(checks, pullRequests);
+  return assessment ? assessment.assessmentFailed : unscoredAssessmentFailed(pullRequests);
 }
 
 // Without multi-repo tasks, the panel keeps one review link and one merge
@@ -269,24 +309,25 @@ export function mergeConfidencePanelFacts(
   pullRequests: FactoriesFactoryPullRequest[],
   multiRepo: boolean,
 ) {
-  const assessment = consoleCheckList(checks, pullRequests);
-  const currentChecks = assessment?.metrics ?? [];
-  const failedRepositories = new Set(
-    pullRequests
-      .filter((pr) => consoleCheckList(checksForRepository(checks, pr.repository), [pr])?.assessmentFailed)
-      .map((pr) => pr.repository?.trim().toLowerCase() ?? ""),
-  );
+  const currentChecks = consoleCheckList(checks, pullRequests)?.metrics ?? [];
+  const assessmentFailed = mergeConfidenceAssessmentFailed(checks, pullRequests);
   if (!multiRepo) {
+    // One task list reports the failure. Pull request rows do not repeat it.
     return {
-      assessmentFailed: assessment?.assessmentFailed ?? false,
-      failedRepositories,
+      assessmentFailed,
+      failedRepositories: new Set<string>(),
       reviewPullRequests: [],
       mergeChecks: { byRepository: null, unattached: currentChecks },
       showsPullRequestRepository: false,
     };
   }
+  const failedRepositories = new Set(
+    pullRequests
+      .filter((pr) => mergeConfidenceAssessmentFailed(checksForRepository(checks, pr.repository), [pr]))
+      .map((pr) => pullRequestChecksKey(pr.repository)),
+  );
   return {
-    assessmentFailed: assessment?.assessmentFailed ?? false,
+    assessmentFailed,
     failedRepositories,
     reviewPullRequests: pullRequests,
     mergeChecks: splitMergeChecksByPullRequest(
