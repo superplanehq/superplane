@@ -72,7 +72,7 @@ func RefreshReviewCheck(ctx core.IntegrationHookContext) error {
 			return stopPullRequestCheck(store, snapshot, "The organization or integration is unavailable.")
 		}
 		if owner.Removed {
-			state.Configuration.State, state.Configuration.Reason = "error", "The canvas or check was removed."
+			state.markOwnerRemoved()
 		}
 		if state.Configuration.State != "pending" && state.State == state.Configuration.State && state.Delivered != "" && state.Delivered == state.fingerprint() && len(state.Retired) == 0 {
 			return store.Update(parameters.Key, func(current *core.OrderedPublication) error {
@@ -127,6 +127,20 @@ func RefreshReviewCheck(ctx core.IntegrationHookContext) error {
 			state.SHA = state.Configuration.AssessedSHA
 		}
 		monitor = true
+	}
+	// Provider reads can overlap organization, integration, or canvas removal.
+	if state.Configuration.State != "" {
+		owner, err := store.OwnerStatus(snapshot.OwnerCanvasID, snapshot.OwnerNodeID)
+		if err != nil {
+			return err
+		}
+		if !owner.Available {
+			return stopPullRequestCheck(store, snapshot, "The organization or integration is unavailable.")
+		}
+		if owner.Removed {
+			state.markOwnerRemoved()
+			monitor = len(state.Retired) > 0
+		}
 	}
 	// Recheck activation after provider reads, outside the publication lock.
 	eligible := true
@@ -338,6 +352,8 @@ func permanentCheckError(err error) bool {
 }
 
 func retryPullRequestCheckSetup(store core.PublicationStore, snapshot *core.OrderedPublication, setupErr error) error {
+	// Each publication update replaces the hook request and its retry counter.
+	// Keep setup failures with the desired state to bound missing-credential retries.
 	stopped := false
 	err := store.Update(snapshot.Key, func(current *core.OrderedPublication) error {
 		if current.Revision != snapshot.Revision {

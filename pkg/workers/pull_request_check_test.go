@@ -154,3 +154,26 @@ func TestPullRequestCheckStopsPermissionFailuresAndAllowsExplicitRetry(t *testin
 	require.NoError(t, f.processDue())
 	require.Equal(t, "success", f.state())
 }
+
+func TestPullRequestCheckRechecksOwnerAfterProviderRead(t *testing.T) {
+	for _, organization := range []bool{true, false} {
+		t.Run(map[bool]string{true: "organization", false: "canvas"}[organization], func(t *testing.T) {
+			f := newPullRequestCheckFixture(t, "github.setPullRequestCheck")
+			require.NoError(t, f.applyStatus("success"))
+			f.http.onRead = func() {
+				if organization {
+					require.NoError(t, f.db.Model(&models.Organization{}).Where("id = ?", f.r.Organization.ID).Update("deleted_at", time.Now()).Error)
+					return
+				}
+				require.NoError(t, f.db.Delete(f.canvas).Error)
+			}
+			require.NoError(t, f.refresh())
+			require.Nil(t, f.record().WakeAt)
+			if organization {
+				require.Empty(t, f.http.writes, "deletion during provider reads must prevent publication")
+				return
+			}
+			require.Equal(t, "error", f.state(), "removal during provider reads must not publish success")
+		})
+	}
+}

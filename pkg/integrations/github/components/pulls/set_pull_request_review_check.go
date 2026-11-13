@@ -432,6 +432,14 @@ func (s reviewCheckState) resultURL() string {
 	}
 	return s.Configuration.ResultURL
 }
+
+func (s *reviewCheckState) markOwnerRemoved() {
+	s.Configuration.State, s.Configuration.Reason = "error", "The canvas or check was removed."
+	if len(s.Retired) > 0 {
+		return
+	}
+	s.SHA, s.State, s.Description = s.Configuration.AssessedSHA, "error", s.Configuration.Reason
+}
 func emitReviewCheck(execution core.ExecutionStateContext, status string, record *core.OrderedPublication, state *reviewCheckState) error {
 	out := map[string]any{"status": status}
 	if record != nil {
