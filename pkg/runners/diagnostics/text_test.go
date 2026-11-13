@@ -15,6 +15,8 @@ func TestSanitizeFailureText(t *testing.T) {
 	}{
 		{name: "environment value", text: "rejected private value", values: []string{"private value"}},
 		{name: "escaped environment value", text: `{"error":"rejected private\"value"}`, values: []string{`private"value`}},
+		{name: "JavaScript escaped environment value", text: `{"message":"private\"value&word"}`, values: []string{`private"value&word`}},
+		{name: "Go escaped environment value", text: `{"message":"private\"value\u0026word"}`, values: []string{`private"value&word`}},
 		{name: "authorization", text: "Bearer private-value"},
 		{name: "basic authorization", text: "Basic private-value"},
 		{name: "URL credentials", text: "https://user:private-value@example.com/path"},
@@ -78,6 +80,11 @@ func TestSanitizeURLQueryCredentials(t *testing.T) {
 			expected: "https://example.com/check?%74oken=[REDACTED]&status=401",
 		},
 		{
+			name:     "JSON escaped separator",
+			text:     `{"message":"https://example.com/?status=401\u0026key=private-value"}`,
+			expected: `{"message":"https://example.com/?status=401&key=[REDACTED]"}`,
+		},
+		{
 			name:     "ordinary parameters and settings",
 			text:     "HTTP 401 after 3600 seconds: key=lookup https://example.com/check?status=401&timeout=3600",
 			expected: "HTTP 401 after 3600 seconds: key=lookup https://example.com/check?status=401&timeout=3600",
@@ -86,5 +93,20 @@ func TestSanitizeURLQueryCredentials(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			assert.Equal(t, tc.expected, Sanitize(tc.text, nil, 4096))
 		})
+	}
+}
+
+func TestSanitizeQuotedCredentials(t *testing.T) {
+	for _, text := range []string{
+		`{"password":"first second&third"}`,
+		`{"password":"first second&third\"fourth"}`,
+		`PASSWORD='first second&third'`,
+		`password="first second&third"`,
+	} {
+		result := Sanitize(text, nil, 4096)
+		assert.Contains(t, result, "[REDACTED]")
+		for _, fragment := range []string{"first", "second", "third", "fourth"} {
+			assert.NotContains(t, result, fragment)
+		}
 	}
 }

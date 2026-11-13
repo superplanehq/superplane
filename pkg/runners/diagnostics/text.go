@@ -20,7 +20,8 @@ var credentialPatterns = []*regexp.Regexp{
 var urlCredentialPattern = regexp.MustCompile(`(?i)(https?://)[^/@\s]+:[^/@\s]+@`)
 var queryParameterPattern = regexp.MustCompile(`[?&][^=\s&#"']+=[^\s&#"']+`)
 var queryCredentialNamePattern = regexp.MustCompile(`(?i)(?:key|token|secret|password|credential|signature|sig)$`)
-var assignmentPattern = regexp.MustCompile(`(?i)((?:[a-z0-9_-]*(?:api[_-]?key|token|secret|password|credential|signature)|sig)["']?\s*[=:]\s*["']?)[^\s&"']+`)
+var jsonStringPattern = regexp.MustCompile(`"(?:\\.|[^"\\])*"`)
+var assignmentPattern = regexp.MustCompile(`(?i)((?:[a-z0-9_-]*(?:api[_-]?key|token|secret|password|credential|signature)|sig)["']?\s*[=:]\s*)("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^\s&"']+)`)
 var ansiPattern = regexp.MustCompile("\x1b\\[[0-?]*[ -/]*[@-~]")
 
 // Sanitize removes known environment values and common credential formats before
@@ -29,6 +30,44 @@ func Sanitize(text string, values []string, limit int) string {
 	text = ansiPattern.ReplaceAllString(text, "")
 	values = slices.Clone(values)
 	slices.SortFunc(values, func(a, b string) int { return len(b) - len(a) })
+	// Decode each JSON string, including strings embedded in ordinary log lines.
+	text = jsonStringPattern.ReplaceAllStringFunc(text, func(encoded string) string {
+		var decoded string
+		if json.Unmarshal([]byte(encoded), &decoded) != nil {
+			return encoded
+		}
+		redacted := redactCredentials(decoded, values)
+		if redacted == decoded {
+			return encoded
+		}
+		var output strings.Builder
+		encoder := json.NewEncoder(&output)
+		encoder.SetEscapeHTML(false)
+		_ = encoder.Encode(redacted)
+		return strings.TrimSuffix(output.String(), "\n")
+	})
+	text = redactCredentials(text, values)
+	text = strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) && r != '\n' && r != '\t' {
+			return -1
+		}
+		return r
+	}, text)
+	text = strings.TrimSpace(text)
+	if limit > 0 && len(text) > limit {
+		if limit < len("\n[truncated]") {
+			return ""
+		}
+		text = text[:limit-len("\n[truncated]")]
+		for !utf8.ValidString(text) {
+			text = text[:len(text)-1]
+		}
+		text += "\n[truncated]"
+	}
+	return text
+}
+
+func redactCredentials(text string, values []string) string {
 	for _, value := range values {
 		if value != "" {
 			encoded, _ := json.Marshal(value)
@@ -48,25 +87,15 @@ func Sanitize(text string, values []string, limit int) string {
 		}
 		return prefix + "=[REDACTED]"
 	})
-	text = assignmentPattern.ReplaceAllString(text, "${1}[REDACTED]")
-	text = strings.Map(func(r rune) rune {
-		if unicode.IsControl(r) && r != '\n' && r != '\t' {
-			return -1
+	return assignmentPattern.ReplaceAllStringFunc(text, func(assignment string) string {
+		parts := assignmentPattern.FindStringSubmatch(assignment)
+		value := "[REDACTED]"
+		if parts[2][0] == '"' || parts[2][0] == '\'' {
+			quote := parts[2][:1]
+			value = quote + value + quote
 		}
-		return r
-	}, text)
-	text = strings.TrimSpace(text)
-	if limit > 0 && len(text) > limit {
-		if limit < len("\n[truncated]") {
-			return ""
-		}
-		text = text[:limit-len("\n[truncated]")]
-		for !utf8.ValidString(text) {
-			text = text[:len(text)-1]
-		}
-		text += "\n[truncated]"
-	}
-	return text
+		return parts[1] + value
+	})
 }
 
 // WithLogReference keeps the same reference in task, component, and run errors.

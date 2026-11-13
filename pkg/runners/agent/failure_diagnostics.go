@@ -143,8 +143,10 @@ func (d *failureDiagnostics) failure(task *api.TaskPayload, code int, runErr err
 		cause = runErr.Error()
 	}
 	// Only a prompt result is a provider error; ordinary script results can use
-	// these same JSON keys for unrelated application data.
-	if step.Kind == "prompt" {
+	// these same JSON keys for unrelated application data. Keep runner causes
+	// such as timeouts instead of replacing them with a saved provider error.
+	processExit := runErr == nil || cause == fmt.Sprintf("exit code %d", code) || cause == fmt.Sprintf("exit status %d", code)
+	if step.Kind == "prompt" && processExit {
 		var provider struct {
 			IsError bool     `json:"is_error"`
 			Error   string   `json:"error"`
