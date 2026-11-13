@@ -262,6 +262,31 @@ function latestMergeConfidenceActivity(check: WorkOrderCheckPresentation, pullRe
     .sort((left, right) => (right.run?.createdAt ?? "").localeCompare(left.run?.createdAt ?? ""))[0];
 }
 
+function pullRequestAssessmentFailed(checks: WorkOrderCheckPresentation[], pr: FactoriesFactoryPullRequest): boolean {
+  const appIds = new Set(
+    checks
+      .filter(isMergeConfidenceMetric)
+      .map((check) => check.appId)
+      .filter(Boolean),
+  );
+  const activities: FactoriesFactoryPullRequestActivity[] = pr.activities?.length ? pr.activities : (pr.runs ?? []);
+  const latestByApp = new Map<string, FactoriesFactoryPullRequestActivity>();
+  for (const activity of activities) {
+    const appId = activity.run?.canvasId;
+    // The built-in activity title exists before the first metric is reported.
+    if (!appId || (!appIds.has(appId) && activity.title !== MERGE_CONFIDENCE_SCORE_NAME)) continue;
+    const latest = latestByApp.get(appId);
+    if (!latest || (activity.run?.createdAt ?? "") >= (latest.run?.createdAt ?? "")) {
+      latestByApp.set(appId, activity);
+    }
+  }
+  return [...latestByApp.values()].some((activity) => {
+    const staleRevision =
+      pr.currentRevision?.id && activity.revision?.id && pr.currentRevision.id !== activity.revision.id;
+    return !staleRevision && activity.run?.result === "RESULT_FAILED";
+  });
+}
+
 // Without multi-repo tasks, the panel keeps one review link and one merge
 // confidence list.
 export function mergeConfidencePanelFacts(
@@ -273,12 +298,12 @@ export function mergeConfidencePanelFacts(
   const currentChecks = assessment?.metrics ?? [];
   const failedRepositories = new Set(
     pullRequests
-      .filter((pr) => consoleCheckList(checksForRepository(checks, pr.repository), [pr])?.assessmentFailed)
+      .filter((pr) => pullRequestAssessmentFailed(checksForRepository(checks, pr.repository), pr))
       .map((pr) => pr.repository?.trim().toLowerCase() ?? ""),
   );
   if (!multiRepo) {
     return {
-      assessmentFailed: assessment?.assessmentFailed ?? false,
+      assessmentFailed: failedRepositories.size > 0,
       failedRepositories,
       reviewPullRequests: [],
       mergeChecks: { byRepository: null, unattached: currentChecks },
@@ -286,7 +311,7 @@ export function mergeConfidencePanelFacts(
     };
   }
   return {
-    assessmentFailed: assessment?.assessmentFailed ?? false,
+    assessmentFailed: failedRepositories.size > 0,
     failedRepositories,
     reviewPullRequests: pullRequests,
     mergeChecks: splitMergeChecksByPullRequest(

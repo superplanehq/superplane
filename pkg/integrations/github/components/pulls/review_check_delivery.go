@@ -270,7 +270,7 @@ func evaluateReviewCheck(client *common.Client, store core.PublicationStore, rec
 			state.State, state.Description = "error", "The pull request is closed or its assessed commit changed."
 		}
 		if state.State == "pending" {
-			finished, err := store.AttemptFinished(record.Order.AttemptRootEventID)
+			finished, err := store.AttemptEnded(record.Order.AttemptRootEventID)
 			if err != nil {
 				return true, err
 			}

@@ -92,6 +92,8 @@ type PublicationStore interface {
 	List(prefix string) ([]OrderedPublication, error)
 	Update(key string, apply func(*OrderedPublication) error) error
 	AttemptFinished(rootEventID uuid.UUID) (bool, error)
+	// AttemptEnded reports termination, even if a running attempt has errors.
+	AttemptEnded(rootEventID uuid.UUID) (bool, error)
 	OwnerStatus(canvasID uuid.UUID, nodeID string) (PublicationOwnerStatus, error)
 }
 

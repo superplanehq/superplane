@@ -45,6 +45,63 @@ function renderPanel(checks: FactoriesWorkOrderCheck[], pr = pullRequest) {
   render(<ConsoleSummaryPanel fixture={fixture} outcome={outcomeSummary(fixture)} stages={[]} pullRequests={[pr]} />);
 }
 
+describe("ConsoleSummaryPanel empty assessments", () => {
+  for (const multiRepo of [false, true]) {
+    it(`shows failure without scores with multi-repo ${multiRepo}`, () => {
+      multiRepoTasks.enabled = multiRepo;
+      renderPanel([], {
+        ...pullRequest,
+        currentRevision: { id: "current-revision" },
+        activities: [
+          {
+            title: "Merge confidence",
+            revision: { id: "current-revision" },
+            run: { id: "failed-run", canvasId: "merge-app", result: "RESULT_FAILED" },
+          },
+        ],
+      });
+      expect(screen.getByText(/Assessment failed/)).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Merge confidence" })).not.toBeInTheDocument();
+    });
+  }
+
+  for (const scenario of ["stale revision", "newer assessment", "unrelated automation"]) {
+    it(`does not show an empty failure for ${scenario}`, () => {
+      renderPanel([], {
+        ...pullRequest,
+        currentRevision: { id: "current-revision" },
+        activities: [
+          {
+            title: scenario === "unrelated automation" ? "Visual Evidence" : "Merge confidence",
+            revision: { id: scenario === "stale revision" ? "old-revision" : "current-revision" },
+            run: {
+              id: "failed-run",
+              canvasId: "merge-app",
+              result: "RESULT_FAILED",
+              createdAt: "2026-11-13T10:00:00Z",
+            },
+          },
+          ...(scenario === "newer assessment"
+            ? [
+                {
+                  title: "Merge confidence",
+                  revision: { id: "current-revision" },
+                  run: {
+                    id: "new-run",
+                    canvasId: "merge-app",
+                    result: "RESULT_UNKNOWN" as const,
+                    createdAt: "2026-11-13T10:01:00Z",
+                  },
+                },
+              ]
+            : []),
+        ],
+      });
+      expect(screen.queryByText(/Assessment failed/)).not.toBeInTheDocument();
+    });
+  }
+});
+
 describe("ConsoleSummaryPanel mergeable chip", () => {
   it("hides Mergeable when a scored merge confidence metric is critical", () => {
     renderPanel([check("risk-review", 4), check("security-review", 5)]);

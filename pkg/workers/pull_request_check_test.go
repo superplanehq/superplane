@@ -63,6 +63,7 @@ func TestPullRequestCheckRecoversTerminalDeliveryAfterOwnerEnds(t *testing.T) {
 				require.NoError(t, f.db.Model(&models.CanvasRun{}).Where("id = ?", f.ctx.RunID).Update("state", models.CanvasRunStateCancelling).Error)
 			case "failed":
 				require.NoError(t, f.ctx.ExecutionState.Fail(models.CanvasNodeExecutionResultReasonError, "agent failed"))
+				require.NoError(t, f.db.Model(&models.CanvasRun{}).Where("id = ?", f.ctx.RunID).Update("state", models.CanvasRunStateFinished).Error)
 			case "finished without output":
 				require.NoError(t, f.db.Model(&models.CanvasRun{}).Where("id = ?", f.ctx.RunID).Update("state", models.CanvasRunStateFinished).Error)
 			case "removed":
@@ -82,6 +83,27 @@ func TestPullRequestCheckRecoversTerminalDeliveryAfterOwnerEnds(t *testing.T) {
 			require.Nil(t, f.record().WakeAt)
 		})
 	}
+}
+
+func TestPullRequestCheckKeepsIncompleteAssessmentPendingUntilFinalStep(t *testing.T) {
+	f := newPullRequestCheckFixture(t, "github.setPullRequestCheck")
+	require.NoError(t, f.applyStatus("pending"))
+	require.NoError(t, f.processDue())
+	f.finishAction()
+	run, err := models.FindCanvasRunInTransaction(f.db, f.canvas.ID, f.ctx.RunID)
+	require.NoError(t, err)
+	require.NoError(t, run.AddError(f.db, "Assessment did not report all checks", 1024))
+	require.NoError(t, f.processDue())
+	require.Equal(t, "pending", f.state())
+
+	f.attempt(f.root)
+	require.NoError(t, f.applyStatus("failure"))
+	f.http.failWrite = true
+	require.Error(t, f.processDue())
+	f.http.failWrite = false
+	require.NoError(t, f.processDue())
+	require.Equal(t, "failure", f.state())
+	require.Nil(t, f.record().WakeAt)
 }
 
 func TestPullRequestCheckDoesNotPublishForDeletedCredentialsOrOrganization(t *testing.T) {

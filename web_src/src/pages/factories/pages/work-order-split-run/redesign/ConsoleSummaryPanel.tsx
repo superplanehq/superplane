@@ -127,7 +127,7 @@ export function ConsoleSummaryPanel({
               showRepository={panel.showsPullRequestRepository}
               multiRepo={multiRepo}
             />
-            {panel.mergeChecks.length > 0 ? (
+            {panel.mergeChecks.length > 0 || (!multiRepo && panel.mergeAssessmentFailed) ? (
               <FramePanel className="py-3">
                 <ConsoleCheckRows
                   checks={panel.mergeChecks}
@@ -285,7 +285,7 @@ function consolePanelFacts({
     // rest. Other non-planning checks stay reachable here when no verify
     // card copied them.
     pullRequestChecks: repositories.mergeChecks.byRepository,
-    failedRepositories: repositories.failedRepositories,
+    failedRepositories: multiRepo ? repositories.failedRepositories : new Set<string>(),
     mergeAssessmentFailed: repositories.assessmentFailed,
     mergeChecks: repositories.mergeChecks.unattached,
     otherChecks: fixture.checks.filter(

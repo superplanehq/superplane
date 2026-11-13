@@ -164,10 +164,7 @@ func PublicationOwnerStatus(tx *gorm.DB, organizationID, integrationID, canvasID
 }
 
 func PublicationAttemptFinished(tx *gorm.DB, organizationID, rootEventID uuid.UUID) (bool, error) {
-	var run CanvasRun
-	err := tx.Joins("JOIN workflow_events ON workflow_events.run_id = workflow_runs.id").
-		Joins("JOIN workflows ON workflows.id = workflow_runs.workflow_id").
-		Where("workflow_events.id = ? AND workflows.organization_id = ?", rootEventID, organizationID).First(&run).Error
+	run, err := findPublicationAttemptRun(tx, organizationID, rootEventID)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return true, nil
 	}
@@ -179,6 +176,18 @@ func PublicationAttemptFinished(tx *gorm.DB, organizationID, rootEventID uuid.UU
 	}
 	result, err := run.CalculateResult(tx)
 	return result != CanvasRunResultPassed, err
+}
+
+func PublicationAttemptEnded(tx *gorm.DB, organizationID, rootEventID uuid.UUID) (bool, error) {
+	run, err := findPublicationAttemptRun(tx, organizationID, rootEventID)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return true, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	// Errors determine the result, not whether downstream report steps can run.
+	return run.State == CanvasRunStateFinished || run.State == CanvasRunStateCancelling, nil
 }
 
 func FindPublicationExecutionOutput(tx *gorm.DB, integrationID uuid.UUID, current *CanvasNodeExecution, executionID uuid.UUID) (core.PublicationExecution, error) {
@@ -297,4 +306,12 @@ func (c *Canvas) WakePublications(tx *gorm.DB, limit int) (bool, error) {
 		}
 	}
 	return len(publications) < limit, nil
+}
+
+func findPublicationAttemptRun(tx *gorm.DB, organizationID, rootEventID uuid.UUID) (*CanvasRun, error) {
+	var run CanvasRun
+	err := tx.Joins("JOIN workflow_events ON workflow_events.run_id = workflow_runs.id").
+		Joins("JOIN workflows ON workflows.id = workflow_runs.workflow_id").
+		Where("workflow_events.id = ? AND workflows.organization_id = ?", rootEventID, organizationID).First(&run).Error
+	return &run, err
 }
