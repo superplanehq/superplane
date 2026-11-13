@@ -45,13 +45,14 @@ func ReemitTriggerEvent(
 
 	now := time.Now()
 	reemittedEvent := models.CanvasEvent{
-		WorkflowID: canvas.ID,
-		NodeID:     nodeID,
-		Channel:    sourceEvent.Channel,
-		Data:       models.NewJSONValue(sourceEvent.Data.Data()),
-		State:      models.CanvasEventStatePending,
-		CreatedAt:  &now,
-		CustomName: sourceEvent.CustomName,
+		WorkflowID:  canvas.ID,
+		NodeID:      nodeID,
+		Channel:     sourceEvent.Channel,
+		Data:        models.NewJSONValue(sourceEvent.Data.Data()),
+		SourceRunID: sourceEvent.SourceRunID,
+		State:       models.CanvasEventStatePending,
+		CreatedAt:   &now,
+		CustomName:  sourceEvent.CustomName,
 	}
 
 	if err := database.Conn().Create(&reemittedEvent).Error; err != nil {

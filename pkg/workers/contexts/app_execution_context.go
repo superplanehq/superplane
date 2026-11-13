@@ -27,5 +27,8 @@ func NewAppExecutionContext(
 }
 
 func (c *AppExecutionContext) Broadcast(payload any) error {
+	if c.execution != nil {
+		return models.CreateAppMessage(c.tx, c.canvas.ID, c.node.NodeID, payload, c.execution.RunID)
+	}
 	return models.CreateAppMessage(c.tx, c.canvas.ID, c.node.NodeID, payload)
 }

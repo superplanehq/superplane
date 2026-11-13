@@ -525,6 +525,7 @@ func (e *NodeRequestExecutor) invokeExecutionComponentHook(
 		HTTP:           e.registry.HTTPContextInTransaction(tx),
 		Metadata:       contexts.NewExecutionMetadataContext(tx, execution),
 		ExecutionState: executionState,
+		Publications:   contexts.NewPublicationContext(tx, workflow.OrganizationID, node, execution),
 		Requests:       contexts.NewExecutionRequestContext(tx, execution).WithCurrentRequest(request),
 		Auth:           contexts.NewAuthReader(tx, workflow.OrganizationID, e.authService, nil),
 		Secrets:        contexts.NewSecretsContext(tx, e.registry, workflow.OrganizationID, e.encryptor),
