@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/core"
@@ -22,7 +23,7 @@ func newAnthropicClient(httpClient core.HTTPContext, creds Credentials) *anthrop
 	return &anthropicClient{
 		http:    httpClient,
 		apiKey:  creds.APIKey,
-		baseURL: resolveBaseURL(creds.BaseURL, defaultAnthropicBaseURL),
+		baseURL: resolveBaseURL(creds.BaseURL, DefaultAnthropicBaseURL),
 	}
 }
 
@@ -30,28 +31,79 @@ func (c *anthropicClient) Provider() string { return ProviderAnthropic }
 
 type anthropicModelsResponse struct {
 	Data []struct {
-		ID string `json:"id"`
+		ID           string `json:"id"`
+		Capabilities *struct {
+			Effort *anthropicEffortCapability `json:"effort"`
+		} `json:"capabilities"`
 	} `json:"data"`
+	HasMore bool   `json:"has_more"`
+	LastID  string `json:"last_id"`
+}
+
+type anthropicCapability struct {
+	Supported bool `json:"supported"`
+}
+
+type anthropicEffortCapability struct {
+	Supported bool                `json:"supported"`
+	Low       anthropicCapability `json:"low"`
+	Medium    anthropicCapability `json:"medium"`
+	High      anthropicCapability `json:"high"`
+	XHigh     anthropicCapability `json:"xhigh"`
+	Max       anthropicCapability `json:"max"`
+}
+
+func (e *anthropicEffortCapability) thinkingLevels() []string {
+	levels := []string{}
+	if !e.Supported {
+		return levels
+	}
+	for _, level := range []struct {
+		name       string
+		capability anthropicCapability
+	}{
+		{"low", e.Low}, {"medium", e.Medium}, {"high", e.High}, {"xhigh", e.XHigh}, {"max", e.Max},
+	} {
+		if level.capability.Supported {
+			levels = append(levels, level.name)
+		}
+	}
+	return levels
 }
 
 func (c *anthropicClient) ListModels(ctx context.Context) ([]Model, error) {
-	body, err := c.doJSON(ctx, http.MethodGet, c.baseURL+"/models", nil, false)
-	if err != nil {
-		return nil, err
-	}
-
-	var response anthropicModelsResponse
-	if err := json.Unmarshal(body, &response); err != nil {
-		return nil, fmt.Errorf("decode anthropic models: %w", err)
-	}
-
-	models := make([]Model, 0, len(response.Data))
-	for _, item := range response.Data {
-		if id := strings.TrimSpace(item.ID); id != "" {
-			models = append(models, Model{ID: id})
+	listed := []Model{}
+	pageURL := c.baseURL + "/models"
+	seenCursors := map[string]bool{}
+	for {
+		body, err := c.doJSON(ctx, http.MethodGet, pageURL, nil, false)
+		if err != nil {
+			return nil, err
 		}
+		var response anthropicModelsResponse
+		if err := json.Unmarshal(body, &response); err != nil {
+			return nil, fmt.Errorf("decode anthropic models: %w", err)
+		}
+		for _, item := range response.Data {
+			id := strings.TrimSpace(item.ID)
+			if id == "" {
+				continue
+			}
+			model := Model{ID: id}
+			if item.Capabilities != nil && item.Capabilities.Effort != nil {
+				model.ThinkingLevels = item.Capabilities.Effort.thinkingLevels()
+			}
+			listed = append(listed, model)
+		}
+		if !response.HasMore {
+			return listed, nil
+		}
+		if response.LastID == "" || seenCursors[response.LastID] {
+			return nil, fmt.Errorf("anthropic models returned an invalid pagination cursor")
+		}
+		seenCursors[response.LastID] = true
+		pageURL = c.baseURL + "/models?after_id=" + url.QueryEscape(response.LastID)
 	}
-	return models, nil
 }
 
 type anthropicMessageRequest struct {
@@ -179,12 +231,25 @@ func (c *anthropicClient) do(ctx context.Context, method, url string, body io.Re
 
 	res, err := c.http.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("anthropic request failed: %w", err)
+		return nil, core.NewProviderTransportError("anthropic request failed", err)
 	}
 	if res.StatusCode < http.StatusOK || res.StatusCode >= http.StatusMultipleChoices {
 		defer res.Body.Close()
-		msg, _ := io.ReadAll(res.Body)
-		return nil, fmt.Errorf("anthropic request failed (%d): %s", res.StatusCode, strings.TrimSpace(string(msg)))
+		body, _ := io.ReadAll(res.Body)
+		message := strings.TrimSpace(string(body))
+		var response struct {
+			Error struct {
+				Message string `json:"message"`
+			} `json:"error"`
+		}
+		if json.Unmarshal(body, &response) == nil && response.Error.Message != "" {
+			message = response.Error.Message
+		}
+		err := fmt.Errorf("request failed (%d): %s", res.StatusCode, message)
+		if res.StatusCode == http.StatusUnauthorized {
+			err = fmt.Errorf("Claude credentials are invalid or expired: %s", message)
+		}
+		return nil, core.NewProviderAPIError(res.StatusCode, err.Error(), err)
 	}
 	return res, nil
 }
