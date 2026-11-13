@@ -10,6 +10,7 @@ import (
 	"math/big"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -24,6 +25,65 @@ import (
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
 )
+
+func TestForgeReviewEventsPersistEvidenceOnlyForVerifiedCommitAttribution(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+	useForgeTestApp(t, key)
+	server := linearAppWebhookServer(t, r)
+	installationID, workspaceID, repositoryID := uuid.NewString(), uuid.NewString(), uuid.NewString()
+	user := uuid.NewString()
+	integration, err := models.CreateIntegration(uuid.New(), r.Organization.ID, "bitbucket", uuid.NewString(), nil)
+	require.NoError(t, err)
+	db := database.DB(t.Context())
+	require.NoError(t, db.Model(integration).Updates(map[string]any{"state": models.IntegrationStateReady, "metadata": datatypes.NewJSONType(map[string]any{"authType": "forgeApp", "forgeInstallationId": installationID})}).Error)
+	webhookID := uuid.New()
+	secret, err := r.Encryptor.Encrypt(t.Context(), []byte("secret"), []byte(webhookID.String()))
+	require.NoError(t, err)
+	require.NoError(t, db.Create(&models.Webhook{ID: webhookID, State: models.WebhookStateReady, Secret: secret, AppInstallationID: &integration.ID, Configuration: datatypes.NewJSONType[any](bitbucket.WebhookConfiguration{RepositorySlug: "widgets", EventTypes: []string{"pullrequest:reviewer_status_updated", "repo:push"}}), Metadata: datatypes.NewJSONType[any](bitbucket.BitbucketWebhook{RepositoryUUID: repositoryID, RepositoryFullName: "acme/widgets"})}).Error)
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{{NodeID: "check", Type: models.NodeTypeComponent, Ref: datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "bitbucket.setPullRequestReviewCheck"}})}}, nil)
+	require.NoError(t, db.Model(&models.CanvasNode{}).Where("workflow_id = ?", canvas.ID).Updates(map[string]any{"webhook_id": webhookID, "app_installation_id": integration.ID}).Error)
+	date := time.Now().UTC().Truncate(time.Microsecond).Format(time.RFC3339Nano)
+	sha := strings.Repeat("a", 40)
+	body := map[string]any{"eventType": "avi:bitbucket:updated:pullrequest-reviewer-status", "timestamp": date, "workspace": map[string]any{"uuid": workspaceID}, "repository": map[string]any{"uuid": repositoryID}, "actor": map[string]any{"uuid": user}, "pullrequest": map[string]any{"id": 42, "source": map[string]any{"branch": "topic", "commit": map[string]any{"hash": sha}}}, "reviewers": map[string]any{"value": []any{map[string]any{"user": map[string]any{"uuid": user}, "status": "approved", "timestamp": date}}, "truncated": false}}
+	post := func(token string) int {
+		encoded, err := json.Marshal(body)
+		require.NoError(t, err)
+		request := httptest.NewRequest(http.MethodPost, "/api/v1/bitbucket/forge/events", bytes.NewReader(encoded))
+		request.Header.Set("Authorization", "Bearer "+token)
+		request.Header.Set("x-forge-oauth-system", signForgeSystemToken(t, time.Now().Add(time.Hour)))
+		response := httptest.NewRecorder()
+		server.HandleBitbucketForgeEvent(response, request)
+		return response.Code
+	}
+	evidenceKey := "bitbucket.review-evidence/" + repositoryID + "/42"
+	require.Equal(t, http.StatusUnauthorized, post("invalid"))
+	record, err := models.FindOrderedPublication(db, integration.ID, evidenceKey)
+	require.NoError(t, err)
+	require.Nil(t, record)
+	token := signForgeInvocation(t, key, installationID, workspaceID)
+	require.Equal(t, http.StatusNoContent, post(token))
+	record, err = models.FindOrderedPublication(db, integration.ID, evidenceKey)
+	require.NoError(t, err)
+	require.NotNil(t, record)
+	var evidence map[string]bitbucket.ApprovalEvidence
+	require.NoError(t, json.Unmarshal(record.Payload, &evidence))
+	require.Equal(t, sha, evidence[user].SHA)
+	// A later snapshot with the same old approval must not acquire a new SHA.
+	body["timestamp"] = time.Now().Add(time.Second).Format(time.RFC3339Nano)
+	body["pullrequest"].(map[string]any)["source"].(map[string]any)["commit"] = map[string]any{"hash": strings.Repeat("b", 40)}
+	require.Equal(t, http.StatusNoContent, post(token))
+	record, err = models.FindOrderedPublication(db, integration.ID, evidenceKey)
+	require.NoError(t, err)
+	require.NoError(t, json.Unmarshal(record.Payload, &evidence))
+	require.Equal(t, sha, evidence[user].SHA)
+	// Pushes have no pullrequest object and still pass the authenticated bridge.
+	body["eventType"] = "avi:bitbucket:push:repository"
+	delete(body, "pullrequest")
+	require.Equal(t, http.StatusNoContent, post(token))
+}
 
 func TestHandleBitbucketForgeEventRoutesOnlyTheInstalledRepository(t *testing.T) {
 	for _, commentEvent := range []bool{false, true} {

@@ -2,6 +2,7 @@ package bitbucket
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -293,22 +294,28 @@ type BitbucketPullRequest struct {
 	DestBranch          string
 	DestMergeStrategies []string
 	MergeCommit         string
+	Participants        []ReviewParticipant
 }
 
 // GetPullRequest reads one pull request by number.
 func (c *Client) GetPullRequest(repository string, id int64) (*BitbucketPullRequest, error) {
+	return c.GetPullRequestContext(context.Background(), repository, id)
+}
+
+func (c *Client) GetPullRequestContext(ctx context.Context, repository string, id int64) (*BitbucketPullRequest, error) {
 	path, err := repositoryPath(repository)
 	if err != nil {
 		return nil, err
 	}
 
 	var response struct {
-		ID          int64  `json:"id"`
-		State       string `json:"state"`
-		Draft       bool   `json:"draft"`
-		Title       string `json:"title"`
-		Description string `json:"description"`
-		Links       struct {
+		ID           int64               `json:"id"`
+		State        string              `json:"state"`
+		Draft        bool                `json:"draft"`
+		Title        string              `json:"title"`
+		Description  string              `json:"description"`
+		Participants []ReviewParticipant `json:"participants"`
+		Links        struct {
 			HTML struct {
 				Href string `json:"href"`
 			} `json:"html"`
@@ -338,7 +345,7 @@ func (c *Client) GetPullRequest(repository string, id int64) (*BitbucketPullRequ
 		} `json:"merge_commit"`
 	}
 	endpoint := fmt.Sprintf("%s/repositories/%s/pullrequests/%d", baseURL, path, id)
-	if err := c.doJSON(http.MethodGet, endpoint, nil, http.StatusOK, &response); err != nil {
+	if err := c.doJSONContext(ctx, http.MethodGet, endpoint, nil, http.StatusOK, &response); err != nil {
 		return nil, err
 	}
 	return &BitbucketPullRequest{
@@ -354,6 +361,7 @@ func (c *Client) GetPullRequest(repository string, id int64) (*BitbucketPullRequ
 		DestBranch:          response.Destination.Branch.Name,
 		DestMergeStrategies: response.Destination.Branch.MergeStrategies,
 		MergeCommit:         response.MergeCommit.Hash,
+		Participants:        response.Participants,
 	}, nil
 }
 
@@ -523,6 +531,10 @@ func (c *Client) ListCommitStatuses(repository, sha string) ([]CommitStatus, err
 }
 
 func (c *Client) doJSON(method, endpoint string, payload any, expectedStatus int, out any) error {
+	return c.doJSONContext(context.Background(), method, endpoint, payload, expectedStatus, out)
+}
+
+func (c *Client) doJSONContext(ctx context.Context, method, endpoint string, payload any, expectedStatus int, out any) error {
 	var reader io.Reader
 	if payload != nil {
 		encoded, err := json.Marshal(payload)
@@ -532,7 +544,7 @@ func (c *Client) doJSON(method, endpoint string, payload any, expectedStatus int
 		reader = bytes.NewReader(encoded)
 	}
 
-	req, err := http.NewRequest(method, endpoint, reader)
+	req, err := http.NewRequestWithContext(ctx, method, endpoint, reader)
 	if err != nil {
 		return fmt.Errorf("error creating request: %w", err)
 	}

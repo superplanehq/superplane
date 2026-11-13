@@ -11,6 +11,10 @@ import (
 // Forge to repository webhook keys.
 func ForgeEventKey(eventType string) string {
 	switch eventType {
+	case "avi:bitbucket:push:repository":
+		return "repo:push"
+	case "avi:bitbucket:updated:pullrequest-reviewer-status":
+		return forgeReviewerStatusEvent
 	case "avi:bitbucket:created:pullrequest":
 		return pullRequestEventCreated
 	case "avi:bitbucket:updated:pullrequest":
@@ -39,7 +43,7 @@ func IsForgeBuildEvent(eventType string) bool {
 func IsForgePullRequestEvent(eventType string) bool {
 	switch eventType {
 	case "avi:bitbucket:created:pullrequest", "avi:bitbucket:updated:pullrequest",
-		"avi:bitbucket:fulfilled:pullrequest", "avi:bitbucket:rejected:pullrequest":
+		"avi:bitbucket:fulfilled:pullrequest", "avi:bitbucket:rejected:pullrequest", "avi:bitbucket:updated:pullrequest-reviewer-status":
 		return true
 	default:
 		return false
