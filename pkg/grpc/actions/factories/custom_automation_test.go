@@ -163,7 +163,7 @@ func TestBacklogCustomAutomationLifecycle(t *testing.T) {
 		},
 	}
 	_, err := CreateFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &pb.CreateFactoryCustomAutomationRequest{
-		FactoryId: factory.ID.String(), ColumnKey: "done", Settings: settings,
+		FactoryId: factory.ID.String(), ColumnKey: "phase-0", Settings: settings,
 	})
 	require.Error(t, err)
 	created, err := CreateFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &pb.CreateFactoryCustomAutomationRequest{
@@ -1006,4 +1006,44 @@ func environmentVars(t *testing.T, raw any) map[string]string {
 		got[name] = value
 	}
 	return got
+}
+
+func TestImplementAndDoneCustomAutomationsStartFromTheTask(t *testing.T) {
+	for _, column := range []string{models.CanvasColumnKeyImplement, models.CanvasColumnKeyDone} {
+		t.Run(column, func(t *testing.T) {
+			r := support.Setup(t)
+			db := database.DB(t.Context())
+			factory := seedHandOffFactory(t, r, db)
+			require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
+			integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
+			require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSIntegrationID: &integrationID}))
+			ctx, deps := onboardingContext(r), onboardingDeps(r)
+			settings := &pb.FactoryCustomAutomation_Settings{
+				StartMode: pb.FactoryCustomAutomation_START_MODE_MANUAL,
+				Agent:     &pb.FactoryAppTemplateAgent{Component: "runnerClaudeCode"},
+				Steps: []*pb.FactoryCustomAutomation_Step{
+					{Name: "Inspect", Type: pb.FactoryCustomAutomation_Step_TYPE_PROMPT, Prompt: "Inspect the task.", WorkingDirectory: "repo"},
+				},
+			}
+			created, err := CreateFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &pb.CreateFactoryCustomAutomationRequest{
+				FactoryId: factory.ID.String(), Name: column + " automation", ColumnKey: column, Settings: settings,
+			})
+			require.NoError(t, err)
+			assert.Equal(t, column, created.GetCustomAutomation().GetAutomation().GetColumnKey())
+			canvas, err := models.FindCanvasInTransaction(db, r.Organization.ID, uuid.MustParse(created.GetCustomAutomation().GetAutomation().GetId()))
+			require.NoError(t, err)
+			version, err := models.FindLiveCanvasVersionByCanvasInTransaction(db, canvas)
+			require.NoError(t, err)
+			trigger := customAutomationNode([]models.Node(version.Nodes), customAutomationTaskTriggerID)
+			require.NotNil(t, trigger)
+			assert.Equal(t, "onWorkOrder", trigger.ComponentName())
+			order, err := factory.CreateWorkOrder(db, "Inspect this task", "Task context", &r.User, nil, nil)
+			require.NoError(t, err)
+			_, err = RunFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &pb.RunFactoryCustomAutomationRequest{
+				FactoryId: factory.ID.String(), AutomationId: canvas.ID.String(), WorkOrderId: order.ID.String(),
+			})
+			require.Error(t, err)
+			assert.ErrorContains(t, err, "The task is not in")
+		})
+	}
 }

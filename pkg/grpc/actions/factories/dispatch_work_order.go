@@ -147,7 +147,17 @@ func DispatchWorkOrderOnLine(
 		result.fromState,
 		result.startedSteps,
 	)
+	startImplementColumnAutomations(db, result.logger, result.factory, result.order, startIndex)
 	return result.factory, result.order, nil
+}
+
+func startImplementColumnAutomations(db *gorm.DB, logger *log.Entry, factory *models.Factory, order *models.FactoryWorkOrder, startIndex int) {
+	if startIndex != 0 || db == nil || factory == nil || order == nil {
+		return
+	}
+	if err := StartAutomaticTaskColumnCustomAutomations(db, factory, order, models.CanvasColumnKeyImplement); err != nil && logger != nil {
+		logger.WithError(err).Warnf("Failed to start Implement custom automation for order %s", order.ID)
+	}
 }
 
 func dispatchWorkOrderOnLineTx(

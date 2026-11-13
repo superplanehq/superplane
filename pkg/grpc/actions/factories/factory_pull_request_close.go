@@ -110,6 +110,7 @@ func closeFactoryWorkOrdersFromGitHubPullRequestClosed(
 			)
 		}
 		publishWorkOrderClosed(
+			db,
 			factory.OrganizationID,
 			factory,
 			outcome.order,
