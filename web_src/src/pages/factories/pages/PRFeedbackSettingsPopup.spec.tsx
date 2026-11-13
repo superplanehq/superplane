@@ -183,6 +183,47 @@ describe("PRFeedbackSettingsPopup discussion", () => {
 });
 
 describe("PRFeedbackSettingsPopup check names", () => {
+  const excludedNames = ["superplane/merge-confidence", "superplane/review-request", "  SuPeRpLaNe/future-check  "];
+
+  it.each([false, true])(
+    "drops excluded saved targets while preserving missing external names (loading=%s)",
+    async (loading) => {
+      vi.mocked(useIntegrationResources).mockReturnValue(
+        mockIntegrationResources(
+          loading ? [] : excludedNames.map((name) => ({ type: "status_check", id: name, name })),
+          { isLoading: loading, isPending: loading, isFetching: loading },
+        ),
+      );
+      const user = userEvent.setup();
+      const draft = checksDraft({ checkNames: [...excludedNames, "build", "superplane-ci/build"] });
+      const { onSave } = renderChecksPopup(vi.fn(), draft, "org-1", "gh-1");
+
+      for (const name of excludedNames) {
+        expect(screen.queryByTestId(`pr-feedback-check-option-${name.trim()}`)).not.toBeInTheDocument();
+      }
+      expect(screen.getByTestId("pr-feedback-check-option-build")).toHaveAttribute("aria-selected", "true");
+      expect(screen.getByTestId("pr-feedback-check-option-superplane-ci/build")).toHaveAttribute(
+        "aria-selected",
+        "true",
+      );
+      await user.click(screen.getByTestId("pr-feedback-settings-save"));
+      expect(onSave).toHaveBeenCalledWith({ ...draft, checkNames: ["build", "superplane-ci/build"] });
+    },
+  );
+
+  it("requires an eligible selection before saving an excluded-only draft", async () => {
+    vi.mocked(useIntegrationResources).mockReturnValue(
+      mockIntegrationResources([{ type: "status_check", id: "build", name: "build" }]),
+    );
+    const user = userEvent.setup();
+    const { onSave } = renderChecksPopup(vi.fn(), checksDraft({ checkNames: excludedNames }), "org-1", "gh-1");
+    expect(screen.getByTestId("pr-feedback-settings-save")).toBeDisabled();
+    await user.click(screen.getByTestId("pr-feedback-check-option-build"));
+    expect(screen.getByTestId("pr-feedback-settings-save")).toBeEnabled();
+    await user.click(screen.getByTestId("pr-feedback-settings-save"));
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ checkNames: ["build"] }));
+  });
+
   it("does not offer name or repository fields because those come from setup", () => {
     renderChecksPopup(vi.fn(), checksDraft({ checkNames: ["lint"] }), "org-1", "gh-1");
 
