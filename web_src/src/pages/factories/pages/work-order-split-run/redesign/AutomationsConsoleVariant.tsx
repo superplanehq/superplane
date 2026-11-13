@@ -430,7 +430,16 @@ function eligibleColumnAutomations(
   return automations.filter((automation) => {
     const savedColumn = automation.columnKey ?? "verify";
     if (savedColumn !== columnId) return false;
-    return savedColumn === "backlog" ? fixture.footer.kind === "draft" : fixture.canRunVerifyCustomAutomation;
+    if (savedColumn === "backlog") return fixture.footer.kind === "draft";
+    if (savedColumn === "implement") {
+      return (
+        fixture.currentStepIndex === 0 &&
+        !fixture.canRunVerifyCustomAutomation &&
+        (fixture.lineStatus === "running" || fixture.lineStatus === "waiting")
+      );
+    }
+    if (savedColumn === "done") return fixture.footer.status === "completed" || fixture.footer.status === "rejected";
+    return Boolean(fixture.canRunVerifyCustomAutomation);
   });
 }
 

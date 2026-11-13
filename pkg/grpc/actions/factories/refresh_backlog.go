@@ -248,6 +248,7 @@ func archiveDraftWorkOrderIfCurrent(
 		productanalytics.Properties{"archive_source": "backlog_refresh"})
 
 	publishWorkOrderClosed(
+		db,
 		orgID,
 		factory,
 		archivedOrder,

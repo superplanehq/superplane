@@ -181,7 +181,14 @@ function automationsForColumn(
     const skip = new Set(closure.flatMap((automation) => (automation.canvasId ? [automation.canvasId] : [])));
     return [...closure, ...customColumnAutomations(input.apps ?? [], "done", workOrders, skip, runningCountForApp)];
   }
-  return agentStepAutomation(key, input.columnTitle, input.columns ?? [], workOrders);
+  const steps = agentStepAutomation(key, input.columnTitle, input.columns ?? [], workOrders);
+  if (phaseIndexFromColumnKey(key) !== 0) {
+    return steps;
+  }
+  return [
+    ...steps,
+    ...customColumnAutomations(input.apps ?? [], "implement", workOrders, new Set(), runningCountForApp),
+  ];
 }
 
 function attachAutomationActivity(automation: ColumnAutomation, workOrders: FactoriesWorkOrder[]): ColumnAutomation {
