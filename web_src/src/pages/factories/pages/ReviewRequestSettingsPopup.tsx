@@ -96,7 +96,7 @@ export function ReviewRequestSettingsPopup(props: ReviewRequestSettingsPopupProp
           <PlanningSettingsFooter
             error={editor.saveError}
             saving={editor.saving}
-            disabled={editor.saving || editor.unavailable}
+            disabled={editor.saving || editor.unavailable || editor.findingsMissingDestination}
             onSave={() => void editor.save()}
             testId="review-request-settings-save"
           />
