@@ -177,6 +177,10 @@ export function catalogForColumn(
         : PR_CLOSURE_ENTRY;
     return allowCustom ? [closureEntry, CUSTOM_AUTOMATION_ENTRY] : [closureEntry];
   }
+  return phaseCatalog(key, allowCustom);
+}
+
+function phaseCatalog(key: ColumnKey, allowCustom: boolean): ColumnAutomationCatalogEntry[] {
   if (key === "phase-0") {
     return allowCustom ? [CUSTOM_AUTOMATION_ENTRY] : [AGENT_STEP_ENTRY];
   }
