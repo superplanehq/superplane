@@ -32,6 +32,7 @@ import (
 // The fixture substitutes only GitHub responses and the external agent task.
 // Both materialized graphs, expressions, component execution, and runner hooks are real.
 type reviewRequestHTTP struct {
+	statusDenied      bool
 	statuses          []github.RepoStatus
 	requests          []*http.Request
 	reviewerBodies    []map[string]any
@@ -55,6 +56,9 @@ func (h *reviewRequestHTTP) Do(request *http.Request) (*http.Response, error) {
 	h.requests = append(h.requests, request)
 	path := request.URL.Path
 	if request.Method == http.MethodPost && strings.Contains(path, "/statuses/") {
+		if h.statusDenied {
+			return publicationHTTPResponse(403, `{"message":"status write denied"}`), nil
+		}
 		var status github.RepoStatus
 		if err := json.NewDecoder(request.Body).Decode(&status); err != nil {
 			return nil, err
@@ -390,10 +394,22 @@ func runReviewRequestGraph(t *testing.T, f publicationFixture, canvas *models.Ca
 					return err
 				}
 				if node.ComponentName() == "github.setPullRequestReviewCheck" {
-					metadata := ctx.Metadata.Get().(map[string]any)
+					if node.NodeID == "pr-check-pending" && host.statusDenied {
+						records, err := ctx.Publications.List("github.review-check/")
+						require.NoError(t, err)
+						require.Len(t, records, 1)
+						integration := reviewRequestManagedIntegration{IntegrationContext: ctx.Integration, store: ctx.Publications}
+						require.Error(t, pulls.RefreshReviewCheck(core.IntegrationHookContext{Parameters: map[string]any{"key": records[0].Key}, Integration: integration, HTTP: host}))
+					}
+					metadata, _ := ctx.Metadata.Get().(map[string]any)
 					if key, ok := metadata["key"].(string); ok {
 						integration := reviewRequestManagedIntegration{IntegrationContext: ctx.Integration, store: ctx.Publications}
-						require.NoError(t, pulls.RefreshReviewCheck(core.IntegrationHookContext{Parameters: map[string]any{"key": key}, Integration: integration, HTTP: host}))
+						refreshErr := pulls.RefreshReviewCheck(core.IntegrationHookContext{Parameters: map[string]any{"key": key}, Integration: integration, HTTP: host})
+						if host.statusDenied {
+							require.Error(t, refreshErr)
+						} else {
+							require.NoError(t, refreshErr)
+						}
 						require.NoError(t, action.HandleHook(core.ActionHookContext{Name: "awaitReviewCheck", Metadata: ctx.Metadata, ExecutionState: ctx.ExecutionState, Publications: ctx.Publications, Requests: ctx.Requests}))
 					}
 				}
@@ -422,7 +438,7 @@ func runReviewRequestGraph(t *testing.T, f publicationFixture, canvas *models.Ca
 
 func TestReviewRequestFromPublishedReportToGitHub(t *testing.T) {
 	for _, publishCheck := range []bool{false, true} {
-		for _, scenario := range []string{"favorable", "concerning", "hosted agent", "instructions changed before dispatch", "concerning no review", "fallback", "no candidate", "ineligible fallback", "malformed output", "reported lookup error", "agent failure", "author selected", "bot selected", "reader selected", "duplicate reviewer", "additional reviewer without reason", "additional reviewer", "discovery error", "permission error", "lost permission", "identity changed", "qualifying approval", "old approval", "withdrawn approval", "request error", "already requested", "head moved", "head moved during lookups", "stale report", "closed before selection", "closed during selection"} {
+		for _, scenario := range []string{"favorable", "concerning", "status write denied", "hosted agent", "instructions changed before dispatch", "concerning no review", "fallback", "no candidate", "ineligible fallback", "malformed output", "reported lookup error", "agent failure", "author selected", "bot selected", "reader selected", "duplicate reviewer", "additional reviewer without reason", "additional reviewer", "discovery error", "permission error", "lost permission", "identity changed", "qualifying approval", "old approval", "withdrawn approval", "request error", "already requested", "head moved", "head moved during lookups", "stale report", "closed before selection", "closed during selection"} {
 			t.Run(fmt.Sprintf("publish_check=%t/%s", publishCheck, scenario), func(t *testing.T) {
 				host := &reviewRequestHTTP{}
 				score := 2.0
@@ -467,6 +483,7 @@ func TestReviewRequestFromPublishedReportToGitHub(t *testing.T) {
 				require.NoError(t, onBroadcast.(core.AppTrigger).OnAppMessage(core.AppMessageContext{Message: message, Configuration: trigger.Configuration.Data(), Events: workercontexts.NewEventContext(f.db, trigger, nil, nil)}))
 				var root models.CanvasEvent
 				require.NoError(t, f.db.Where("workflow_id = ? AND node_id = ?", consumer.ID, trigger.NodeID).First(&root).Error)
+				host.statusDenied = publishCheck && scenario == "status write denied"
 				host.discoveryError = scenario == "discovery error"
 				host.empty = scenario == "no candidate"
 				host.approved = slices.Contains([]string{"qualifying approval", "old approval", "withdrawn approval"}, scenario)
@@ -484,6 +501,11 @@ func TestReviewRequestFromPublishedReportToGitHub(t *testing.T) {
 					require.NoError(t, readErr)
 					require.Len(t, records, 1)
 					integration := reviewRequestManagedIntegration{IntegrationContext: reviewRequestIntegration(), store: store}
+					if host.statusDenied {
+						require.Empty(t, host.statuses)
+						require.NotNil(t, records[0].WakeAt)
+						host.statusDenied = false
+					}
 					require.NoError(t, pulls.RefreshReviewCheck(core.IntegrationHookContext{Parameters: map[string]any{"key": records[0].Key}, Integration: integration, HTTP: host}))
 					require.NotEmpty(t, host.statuses)
 					require.Equal(t, "superplane/review-request", host.statuses[len(host.statuses)-1].GetContext())

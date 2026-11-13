@@ -64,7 +64,7 @@ func (*SetPullRequestReviewCheck) OutputChannels(any) []core.OutputChannel {
 	return []core.OutputChannel{core.DefaultOutputChannel}
 }
 func (*SetPullRequestReviewCheck) Documentation() string {
-	return `Publish a commit status and track required reviewers in any canvas. The action finishes after delivery. Approval monitoring continues through integration hooks.
+	return `Publish a commit status and track required reviewers in any canvas. Pending selection finishes after durable registration. Other phases finish after delivery. Approval monitoring continues through integration hooks.
 
 Use pending_selection before selection, required_reviewers after Ensure Pull Request Reviewers, no_review for an explicit decision, selection_error for failed selection, or disabled to release the check.
 
@@ -249,6 +249,9 @@ func (*SetPullRequestReviewCheck) Execute(ctx core.ExecutionContext) error {
 	}
 	if status == "superseded" {
 		return emitReviewCheck(ctx.ExecutionState, status, nil, nil)
+	}
+	if config.Phase == "pending_selection" {
+		return emitReviewCheck(ctx.ExecutionState, "registered", nil, nil)
 	}
 	if err := ctx.Metadata.Set(map[string]any{"key": key, "generation": generation}); err != nil {
 		return err

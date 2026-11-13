@@ -38,6 +38,23 @@ func reviewCheckActivation(store core.PublicationStore, canvas uuid.UUID, nodeID
 	return before.ActivationGeneration, eligible, nil
 }
 
+// Admission already persisted this generation in the publication. Refresh only
+// needs the live fence, so tracking survives retention of the selection run.
+func reviewCheckStillActive(store core.PublicationStore, record *core.OrderedPublication) (bool, error) {
+	current, err := store.NodeSnapshot(record.OwnerCanvasID, record.OwnerNodeID, uuid.Nil)
+	if err != nil {
+		return false, err
+	}
+	if current == nil || current.Component != "github.setPullRequestReviewCheck" {
+		return false, nil
+	}
+	var config reviewCheckConfiguration
+	if err := mapstructure.Decode(current.Configuration, &config); err != nil {
+		return false, err
+	}
+	return config.Enabled != nil && *config.Enabled && config.ActivationGeneration == record.ActivationGeneration, nil
+}
+
 func configurationWithActivation(raw any, generation int64) (map[string]any, error) {
 	var config map[string]any
 	if err := mapstructure.Decode(raw, &config); err != nil {
