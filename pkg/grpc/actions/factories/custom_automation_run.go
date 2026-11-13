@@ -118,6 +118,26 @@ func StartAutomaticCustomAutomations(
 	return nil
 }
 
+// StartAutomaticTaskColumnCustomAutomations starts automatic Implement or Done
+// automations after the task is already in that column.
+func StartAutomaticTaskColumnCustomAutomations(
+	db *gorm.DB,
+	factory *models.Factory,
+	order *models.FactoryWorkOrder,
+	column string,
+) error {
+	events, err := contexts.EmitAutomaticTaskColumnCustomAutomations(db, factory, order, column)
+	if err != nil {
+		return err
+	}
+	for i := range events {
+		if err := messages.PublishCanvasEventCreatedMessage(&events[i]); err != nil {
+			log.WithError(err).Warnf("custom automation: failed to publish event %s", events[i].ID)
+		}
+	}
+	return nil
+}
+
 // startScheduledCustomAutomation starts the schedule chain. That chain creates a
 // task from the prompt result, so it does not need a task to already exist.
 func startScheduledCustomAutomation(db *gorm.DB, canvas *models.Canvas) (*pb.RunFactoryCustomAutomationResponse, error) {
@@ -188,8 +208,19 @@ func startCustomAutomation(
 	order *models.FactoryWorkOrder,
 	automatic bool,
 ) ([]*models.CanvasEvent, error) {
-	if canvas.ColumnKey != nil && *canvas.ColumnKey == models.CanvasColumnKeyBacklog {
+	column := ""
+	if canvas.ColumnKey != nil {
+		column = *canvas.ColumnKey
+	}
+	if column == models.CanvasColumnKeyBacklog {
 		event, err := contexts.StartBacklogCustomAutomation(db, factory, canvas, order, automatic)
+		if err != nil || event == nil {
+			return nil, err
+		}
+		return []*models.CanvasEvent{event}, nil
+	}
+	if column == models.CanvasColumnKeyImplement || column == models.CanvasColumnKeyDone {
+		event, err := contexts.StartTaskColumnCustomAutomation(db, factory, canvas, order, automatic)
 		if err != nil || event == nil {
 			return nil, err
 		}

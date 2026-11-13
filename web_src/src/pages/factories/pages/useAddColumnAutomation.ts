@@ -60,8 +60,11 @@ export function useAddColumnAutomation(args: {
   const openPicker = (key: ColumnKey) => {
     const nextCatalog = catalogForColumn(key, catalogOptions);
     const nextTaken = takenCatalogIds(args.automationsFor(key), nextCatalog);
-    if (key === "verify" && onlyCustomCatalogRemains(nextCatalog, nextTaken) && args.lineId) {
-      navigate(factoryCustomAutomationSetupPath(args.organizationId, args.factoryKey, args.lineId));
+    const setupColumn = customAutomationSetupColumn(key);
+    if (setupColumn !== null && onlyCustomCatalogRemains(nextCatalog, nextTaken) && args.lineId) {
+      navigate(
+        factoryCustomAutomationSetupPath(args.organizationId, args.factoryKey, args.lineId, undefined, setupColumn),
+      );
       return;
     }
     setColumn(key);
@@ -73,7 +76,7 @@ export function useAddColumnAutomation(args: {
       return;
     }
     if (entry.kind === "pr-discussion" || entry.kind === "pr-checks" || entry.kind === "custom-verification") {
-      openFocusedVerifySetup(entry, args, navigate, closePicker);
+      openFocusedVerifySetup(entry, column, args, navigate, closePicker);
       return;
     }
     if (entry.kind === "pr-closure") {
@@ -150,14 +153,22 @@ function githubVerifyTemplate(
   };
 }
 
+function customAutomationSetupColumn(key: ColumnKey): "implement" | "verify" | "done" | undefined | null {
+  if (key === "verify") return undefined;
+  if (key === "done") return "done";
+  if (key === "phase-0") return "implement";
+  return null;
+}
+
 function openFocusedVerifySetup(
   entry: ColumnAutomationCatalogEntry,
+  column: ColumnKey,
   args: { organizationId: string; factoryKey: string; lineId?: string },
   navigate: (path: string) => void,
   close: () => void,
 ) {
   const sourceId = entry.id === "checks" ? "checks" : "discussion";
-  const href = args.lineId ? focusedVerifySetupPath(entry, args, sourceId) : undefined;
+  const href = args.lineId ? focusedVerifySetupPath(entry, column, args, sourceId) : undefined;
   close();
   if (href) {
     navigate(href);
@@ -166,6 +177,7 @@ function openFocusedVerifySetup(
 
 function focusedVerifySetupPath(
   entry: ColumnAutomationCatalogEntry,
+  column: ColumnKey,
   args: { organizationId: string; factoryKey: string; lineId?: string },
   sourceId: "checks" | "discussion",
 ): string | undefined {
@@ -173,7 +185,14 @@ function focusedVerifySetupPath(
     return undefined;
   }
   if (entry.kind === "custom-verification") {
-    return factoryCustomAutomationSetupPath(args.organizationId, args.factoryKey, args.lineId);
+    const setupColumn = customAutomationSetupColumn(column);
+    return factoryCustomAutomationSetupPath(
+      args.organizationId,
+      args.factoryKey,
+      args.lineId,
+      undefined,
+      setupColumn ?? undefined,
+    );
   }
   return factoryPRFeedbackSetupPath(
     args.organizationId,

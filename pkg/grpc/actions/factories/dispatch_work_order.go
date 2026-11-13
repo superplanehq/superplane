@@ -147,6 +147,11 @@ func DispatchWorkOrderOnLine(
 		result.fromState,
 		result.startedSteps,
 	)
+	if startIndex == 0 {
+		if err := StartAutomaticTaskColumnCustomAutomations(db, result.factory, result.order, models.CanvasColumnKeyImplement); err != nil {
+			result.logger.WithError(err).Warnf("Failed to start Implement custom automation for order %s", result.order.ID)
+		}
+	}
 	return result.factory, result.order, nil
 }
 
