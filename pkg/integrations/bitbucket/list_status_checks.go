@@ -117,6 +117,10 @@ func mergeStatusCheckResources(statuses []CommitStatus) []core.IntegrationResour
 			continue
 		}
 		lower := strings.ToLower(key)
+		// SuperPlane checks report automation outcomes, not repair targets.
+		if strings.HasPrefix(lower, "superplane/") {
+			continue
+		}
 		existing, ok := latest[lower]
 		if !ok {
 			latest[lower] = status

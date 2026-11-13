@@ -13,8 +13,10 @@ import {
   catalogStatusCheckNames,
   checksToolsAccess,
   isChecksHandlerCIIntegration,
+  isEligibleRepairCheck,
   readyChecksHandlerIntegrationIds,
   selectedChecksUseGitHubActions,
+  statusCheckValue,
   suggestedIntegrationsForChecks,
 } from "./checksPRFeedbackSetup";
 import {
@@ -106,7 +108,10 @@ function useChecksSetupResources(
   const [seeded, setSeeded] = useState({ catalog: false, connected: false });
   const catalogParameters = repository.trim() ? { repository: repository.trim() } : undefined;
   const catalogQuery = useIntegrationResources(organizationId, githubIntegrationId, "status_check", catalogParameters);
-  const catalog = useMemo(() => catalogQuery.data ?? [], [catalogQuery.data]);
+  const catalog = useMemo(
+    () => (catalogQuery.data ?? []).filter((check) => isEligibleRepairCheck(statusCheckValue(check))),
+    [catalogQuery.data],
+  );
   const catalogLoading = catalogQuery.isPending || catalogQuery.isFetching;
   const connectedQuery = useConnectedIntegrations(organizationId, { enabled: Boolean(organizationId) });
   const availableQuery = useAvailableIntegrations({ enabled: Boolean(organizationId), organizationId });

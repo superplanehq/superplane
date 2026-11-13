@@ -236,15 +236,25 @@ describe("PRFeedbackSettingsPopup check names", () => {
     expect(screen.getByTestId("pr-feedback-check-option-unit")).toHaveAttribute("aria-selected", "true");
   });
 
-  it("saves only the selected catalog checks", async () => {
+  it("excludes SuperPlane checks from the catalog, saved selections, and saves", async () => {
     vi.mocked(useIntegrationResources).mockReturnValue(
       mockIntegrationResources([
         { type: "status_check", id: "lint", name: "lint" },
         { type: "status_check", id: "e2e", name: "e2e" },
+        { type: "status_check", id: "superplane/merge-confidence", name: "superplane/merge-confidence" },
+        { type: "status_check", id: "superplane/future-check", name: "superplane/future-check" },
       ]),
     );
     const user = userEvent.setup();
-    const { onSave } = renderChecksPopup(vi.fn(), checksDraft(), "org-1", "gh-1");
+    const { onSave } = renderChecksPopup(
+      vi.fn(),
+      checksDraft({ checkNames: ["superplane/review-request", "superplane/future-check"] }),
+      "org-1",
+      "gh-1",
+    );
+
+    expect(screen.getAllByRole("option")).toHaveLength(2);
+    expect(screen.getByTestId("pr-feedback-settings-save")).toBeDisabled();
 
     await user.click(screen.getByTestId("pr-feedback-check-option-e2e"));
     await user.click(screen.getByTestId("pr-feedback-settings-save"));
