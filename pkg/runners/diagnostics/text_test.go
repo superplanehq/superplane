@@ -37,3 +37,54 @@ func TestSanitizeFailureText(t *testing.T) {
 		assert.Contains(t, result, "[truncated]")
 	})
 }
+
+func TestSanitizeURLQueryCredentials(t *testing.T) {
+	for _, tc := range []struct {
+		name, text, expected string
+	}{
+		{
+			name:     "key in first parameter",
+			text:     "HTTP 401: https://example.com/check?key=private-value&status=401#details",
+			expected: "HTTP 401: https://example.com/check?key=[REDACTED]&status=401#details",
+		},
+		{
+			name:     "key in later parameter",
+			text:     "https://example.com/check?status=401&key=private-value",
+			expected: "https://example.com/check?status=401&key=[REDACTED]",
+		},
+		{
+			name:     "case insensitive key",
+			text:     "https://example.com/check?KEY=private-value",
+			expected: "https://example.com/check?KEY=[REDACTED]",
+		},
+		{
+			name:     "access key",
+			text:     "https://example.com/check?access_key=private-value",
+			expected: "https://example.com/check?access_key=[REDACTED]",
+		},
+		{
+			name:     "repeated keys",
+			text:     "https://example.com/check?key=first-private-value&key=second-private-value&status=401",
+			expected: "https://example.com/check?key=[REDACTED]&key=[REDACTED]&status=401",
+		},
+		{
+			name:     "encoded key name and value",
+			text:     "https://example.com/check?%6b%65%79=private%2Dvalue&status=401",
+			expected: "https://example.com/check?%6b%65%79=[REDACTED]&status=401",
+		},
+		{
+			name:     "encoded token name",
+			text:     "https://example.com/check?%74oken=private-value&status=401",
+			expected: "https://example.com/check?%74oken=[REDACTED]&status=401",
+		},
+		{
+			name:     "ordinary parameters and settings",
+			text:     "HTTP 401 after 3600 seconds: key=lookup https://example.com/check?status=401&timeout=3600",
+			expected: "HTTP 401 after 3600 seconds: key=lookup https://example.com/check?status=401&timeout=3600",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.expected, Sanitize(tc.text, nil, 4096))
+		})
+	}
+}

@@ -3,6 +3,7 @@ package diagnostics
 
 import (
 	"encoding/json"
+	"net/url"
 	"regexp"
 	"slices"
 	"strings"
@@ -17,6 +18,8 @@ var credentialPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`\b(?:AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{35})\b`),
 }
 var urlCredentialPattern = regexp.MustCompile(`(?i)(https?://)[^/@\s]+:[^/@\s]+@`)
+var queryParameterPattern = regexp.MustCompile(`[?&][^=\s&#"']+=[^\s&#"']+`)
+var queryCredentialNamePattern = regexp.MustCompile(`(?i)(?:key|token|secret|password|credential|signature|sig)$`)
 var assignmentPattern = regexp.MustCompile(`(?i)((?:[a-z0-9_-]*(?:api[_-]?key|token|secret|password|credential|signature)|sig)["']?\s*[=:]\s*["']?)[^\s&"']+`)
 var ansiPattern = regexp.MustCompile("\x1b\\[[0-?]*[ -/]*[@-~]")
 
@@ -37,6 +40,14 @@ func Sanitize(text string, values []string, limit int) string {
 		text = pattern.ReplaceAllString(text, "[REDACTED]")
 	}
 	text = urlCredentialPattern.ReplaceAllString(text, "${1}[REDACTED]@")
+	text = queryParameterPattern.ReplaceAllStringFunc(text, func(parameter string) string {
+		prefix, _, _ := strings.Cut(parameter, "=")
+		name, err := url.QueryUnescape(prefix[1:])
+		if err != nil || !queryCredentialNamePattern.MatchString(name) {
+			return parameter
+		}
+		return prefix + "=[REDACTED]"
+	})
 	text = assignmentPattern.ReplaceAllString(text, "${1}[REDACTED]")
 	text = strings.Map(func(r rune) rune {
 		if unicode.IsControl(r) && r != '\n' && r != '\t' {
