@@ -67,6 +67,7 @@ func NewCapabilityMapper() *CapabilityMapper {
 				PermissionScope: PermissionScopeRepository,
 				Capabilities: []CapabilityDef{
 					{ReadOnly: true, Action: &checks.ListCheckRunsForRef{}},
+					{ReadOnly: false, Action: &pulls.SetPullRequestCheckRun{}},
 					{ReadOnly: true, Action: &checks.WaitForPullRequestChecks{}},
 					{ReadOnly: true, Trigger: &checks.OnCheckRun{}},
 				},
@@ -154,6 +155,7 @@ func NewCapabilityMapper() *CapabilityMapper {
 					{ReadOnly: false, Action: &pulls.EnsurePullRequestReviewers{}},
 					{ReadOnly: true, Action: &pulls.SetPullRequestReviewCheck{}},
 					{ReadOnly: true, Action: &pulls.SetPullRequestCheck{}},
+					{ReadOnly: true, Action: &pulls.SetPullRequestCheckRun{}},
 					{ReadOnly: false, Action: &pulls.UpdatePullRequest{}},
 					{ReadOnly: false, Action: &pulls.UpdatePullRequestBodySection{}},
 					{ReadOnly: true, Action: &pulls.PublishPullRequestComment{}},

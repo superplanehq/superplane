@@ -35,10 +35,12 @@ func (*SetPullRequestCheck) Configuration() []configuration.Field {
 		}
 		common = append(common, field)
 	}
-	return append(common, configuration.Field{Name: "state", Label: "State", Type: configuration.FieldTypeSelect, Required: true,
-		TypeOptions: &configuration.TypeOptions{Select: &configuration.SelectTypeOptions{Options: []configuration.FieldOption{
-			{Label: "Pending", Value: "pending"}, {Label: "Success", Value: "success"}, {Label: "Failure", Value: "failure"}, {Label: "Error", Value: "error"},
-		}}},
+	return append(common, configuration.Field{
+		Name:        "state",
+		Label:       "State",
+		Type:        configuration.FieldTypeString,
+		Required:    true,
+		Description: "Enter pending, success, failure, or error. You can use an expression.",
 	})
 }
 func (*SetPullRequestCheck) Setup(ctx core.SetupContext) error {

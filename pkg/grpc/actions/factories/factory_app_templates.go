@@ -143,7 +143,7 @@ var factoryAppTemplates = map[factoryTemplateKey]factoryAppTemplate{
 		componentIntegrations: map[string]string{
 			"github.onPullRequest":                "github",
 			"github.updatePullRequestBodySection": "github",
-			"github.setPullRequestCheck":          "github",
+			"github.setPullRequestCheckRun":       "github",
 		},
 	}),
 	{id: "visual-evidence", provider: models.ProviderGitHub}: githubFactoryTemplate(factoryAppTemplate{

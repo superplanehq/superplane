@@ -23,6 +23,7 @@ const reviewCheckPrefix = "github.review-check/"
 type SetPullRequestReviewCheck struct{}
 
 type reviewCheckConfiguration struct {
+	CheckRun                   bool               `json:"checkRun,omitempty" mapstructure:"-"`
 	ActivationNodeID           string             `json:"activationNodeId,omitempty" mapstructure:"activationNodeId"`
 	Enabled                    *bool              `json:"enabled,omitempty" mapstructure:"enabled"`
 	Repository                 string             `json:"repository" mapstructure:"repository"`
@@ -49,12 +50,19 @@ type reviewCheckState struct {
 	Delivery      *reviewCheckDelivery     `json:"delivery,omitempty"`
 	Error         string                   `json:"error,omitempty"`
 	SetupFailures int                      `json:"setupFailures,omitempty"`
+	CheckRun      *pullRequestCheckRun     `json:"checkRun,omitempty"`
 	Retired       []retiredCommitCheck     `json:"retired,omitempty"`
 }
 
+type pullRequestCheckRun struct {
+	ID         int64  `json:"id,omitempty"`
+	ExternalID string `json:"externalId"`
+}
+
 type retiredCommitCheck struct {
-	SHA       string `json:"sha"`
-	ResultURL string `json:"resultUrl"`
+	CheckRun  *pullRequestCheckRun `json:"checkRun,omitempty"`
+	SHA       string               `json:"sha"`
+	ResultURL string               `json:"resultUrl"`
 	// State and Description keep an undelivered terminal result. Empty values
 	// publish the superseded error.
 	State       string `json:"state,omitempty"`
@@ -103,9 +111,7 @@ func (*SetPullRequestReviewCheck) Configuration() []configuration.Field {
 		configuration.Field{Name: "activationGeneration", Label: "Activation generation", Type: configuration.FieldTypeNumber, Default: 1, Description: "Use a positive saved generation. After disabling, select a greater generation to enable again."},
 		configuration.Field{Name: "sourceRunId", Label: "Source run ID", Type: configuration.FieldTypeString, Description: "Defaults to the broadcast source or current run."},
 		configuration.Field{Name: "attemptRootEventId", Label: "Attempt root event ID", Type: configuration.FieldTypeString, Description: "Defaults to the current run root event."},
-		configuration.Field{Name: "phase", Label: "Phase", Type: configuration.FieldTypeSelect, Required: true, TypeOptions: &configuration.TypeOptions{Select: &configuration.SelectTypeOptions{Options: []configuration.FieldOption{
-			{Label: "Pending selection", Value: "pending_selection"}, {Label: "Required reviewers", Value: "required_reviewers"}, {Label: "No review", Value: "no_review"}, {Label: "Selection error", Value: "selection_error"}, {Label: "Disabled", Value: "disabled"},
-		}}}},
+		configuration.Field{Name: "phase", Label: "Phase", Type: configuration.FieldTypeString, Required: true, Description: "Enter a phase or an expression that returns one: pending_selection, required_reviewers, no_review, selection_error, disabled."},
 		reviewerField,
 		configuration.Field{Name: "reviewerRequestExecutionId", Label: "Reviewer request execution ID", Type: configuration.FieldTypeString, Description: "Execution ID from Ensure Pull Request Reviewers. Required when reviewers are required."},
 		configuration.Field{Name: "reason", Label: "Reason", Type: configuration.FieldTypeString, Required: true},
@@ -229,6 +235,10 @@ func executePullRequestCheck(ctx core.ExecutionContext, config reviewCheckConfig
 			}
 		}
 		if comparison == 0 && record.Generation > 0 && record.ActivationGeneration == config.ActivationGeneration {
+			if (config.CheckRun || previous.Configuration.CheckRun) && (previous.Configuration.AssessedSHA != config.AssessedSHA || previous.Configuration.CheckRun != config.CheckRun) {
+				status = "superseded"
+				return core.ErrPublicationUnchanged
+			}
 			if reflect.DeepEqual(previous.Configuration, config) {
 				generation = record.Generation
 				if previous.Error != "" {
@@ -260,14 +270,24 @@ func executePullRequestCheck(ctx core.ExecutionContext, config reviewCheckConfig
 		if config.ActivationNodeID != "" {
 			record.OwnerNodeID = config.ActivationNodeID
 		}
-		// A replacement must wait for an already claimed status write to finish.
+		// A replacement waits for a claimed write and retires its attempt's spinner.
 		retired := previous.Retired
-		if config.State != "" && previous.Configuration.AssessedSHA != config.AssessedSHA {
+		sameAttempt := comparison == 0 && previous.Configuration.AssessedSHA == config.AssessedSHA && previous.Configuration.CheckRun == config.CheckRun
+		checkRun := previous.CheckRun
+		if config.CheckRun && (!sameAttempt || checkRun == nil) {
+			externalID := uuid.NewSHA1(uuid.NameSpaceURL, []byte(fmt.Sprintf("%s/%s/%s/%s/%d", ctx.Integration.ID(), key, order.SourceRunID, order.AttemptRootEventID, config.ActivationGeneration))).String()
+			checkRun = &pullRequestCheckRun{ExternalID: externalID}
+		}
+		if !config.CheckRun {
+			checkRun = nil
+		}
+		replaceAttempt := config.State != "" && (previous.Configuration.AssessedSHA != config.AssessedSHA || previous.Configuration.CheckRun != config.CheckRun || previous.CheckRun != nil && !sameAttempt)
+		if replaceAttempt {
 			if check, ok := previous.undeliveredCommitCheck(); ok {
 				retired = append(retired, check)
 			}
 		}
-		record.Payload, err = json.Marshal(reviewCheckState{Configuration: config, Delivery: previous.Delivery, Retired: retired})
+		record.Payload, err = json.Marshal(reviewCheckState{Configuration: config, Delivery: previous.Delivery, Retired: retired, CheckRun: checkRun})
 		if err != nil {
 			return err
 		}
@@ -428,7 +448,11 @@ func decodeReviewCheckState(raw json.RawMessage) (reviewCheckState, error) {
 	return state, err
 }
 func (s reviewCheckState) fingerprint() string {
-	b, _ := json.Marshal([]string{s.SHA, s.State, s.Description, s.resultURL()})
+	fields := []string{s.SHA, s.State, s.Description, s.resultURL()}
+	if target := s.checkRunTarget(); target != nil {
+		fields = append(fields, target.ExternalID, fmt.Sprint(target.ID), fmt.Sprint(len(s.Retired) > 0))
+	}
+	b, _ := json.Marshal(fields)
 	return string(b)
 }
 
@@ -447,7 +471,7 @@ func (s reviewCheckState) undeliveredCommitCheck() (retiredCommitCheck, bool) {
 	if config.State == "" {
 		return retiredCommitCheck{}, false
 	}
-	check := retiredCommitCheck{SHA: config.AssessedSHA, ResultURL: config.ResultURL}
+	check := retiredCommitCheck{SHA: config.AssessedSHA, ResultURL: config.ResultURL, CheckRun: s.CheckRun}
 	if config.State == "pending" {
 		return check, true
 	}
@@ -477,6 +501,9 @@ func emitReviewCheck(execution core.ExecutionStateContext, status string, record
 		out["activationGeneration"] = record.ActivationGeneration
 	}
 	if state != nil {
+		if state.CheckRun != nil {
+			out["checkRunId"] = state.CheckRun.ID
+		}
 		out["state"], out["sha"], out["phase"], out["context"] = state.State, state.SHA, state.Configuration.Phase, state.Configuration.Context
 	}
 	payloadType := "github.pullRequestReviewCheck"

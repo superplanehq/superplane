@@ -122,6 +122,9 @@ func RefreshReviewCheck(ctx core.IntegrationHookContext) error {
 		state.State, state.Description = "error", "Could not verify pull request reviews"
 		if state.Configuration.State != "" {
 			state.Description = "Could not verify the pull request."
+			if state.CheckRun != nil && state.Configuration.State == "pending" {
+				state.State = "pending"
+			}
 		}
 		if state.SHA == "" {
 			state.SHA = state.Configuration.AssessedSHA
@@ -179,12 +182,15 @@ func RefreshReviewCheck(ctx core.IntegrationHookContext) error {
 		return lookupErr
 	}
 
-	writeErr := publishReviewCheck(client, state)
+	writeErr := publishReviewCheck(client, &state)
 	err = store.Update(parameters.Key, func(current *core.OrderedPublication) error {
 		latest, err := decodeReviewCheckState(current.Payload)
 		if err != nil {
 			return err
 		}
+		// Creation can finish after a new attempt replaces the publication.
+		// Save the receipt on its own target, including a retired target.
+		retainDeliveredCheckRun(&latest, &state)
 		ownsDelivery := latest.Delivery != nil && latest.Delivery.ID == state.Delivery.ID
 		if ownsDelivery {
 			latest.Delivery = nil
@@ -227,12 +233,15 @@ func RefreshReviewCheck(ctx core.IntegrationHookContext) error {
 	return lookupErr
 }
 
-func publishReviewCheck(client *common.Client, state reviewCheckState) error {
+func publishReviewCheck(client *common.Client, state *reviewCheckState) error {
 	// Anchor the HTTP deadline to the claim so a paused worker cannot start a
 	// status request after its lease expires.
 	deadline := state.Delivery.ExpiresAt.Add(reviewCheckWriteTimeout - reviewCheckDeliveryLease)
 	writeCtx, cancel := context.WithDeadline(context.Background(), deadline)
 	defer cancel()
+	if state.checkRunTarget() != nil {
+		return publishPullRequestCheckRun(writeCtx, client, state)
+	}
 	description := string([]rune(state.Description)[:min(len([]rune(state.Description)), 140)])
 	resultURL := state.resultURL()
 	_, _, err := client.CreateStatus(writeCtx, state.Configuration.Repository, state.SHA, github.RepoStatus{State: &state.State, Context: &state.Configuration.Context, Description: &description, TargetURL: &resultURL})
@@ -240,6 +249,36 @@ func publishReviewCheck(client *common.Client, state reviewCheckState) error {
 		return fmt.Errorf("publish review check: %w", err)
 	}
 	return nil
+}
+
+func (s *reviewCheckState) checkRunTarget() *pullRequestCheckRun {
+	if len(s.Retired) > 0 {
+		return s.Retired[0].CheckRun
+	}
+	return s.CheckRun
+}
+
+func retainDeliveredCheckRun(latest, delivered *reviewCheckState) {
+	target := delivered.checkRunTarget()
+	if target == nil {
+		return
+	}
+	matches := func(saved *pullRequestCheckRun) bool {
+		return saved != nil && saved.ExternalID == target.ExternalID && (saved.ID == 0 || saved.ID == target.ID)
+	}
+	if matches(latest.CheckRun) {
+		latest.CheckRun.ID = target.ID
+		return
+	}
+	for i := range latest.Retired {
+		if matches(latest.Retired[i].CheckRun) {
+			latest.Retired[i].CheckRun.ID = target.ID
+			return
+		}
+	}
+	// Recovery may have retired this target before a paused writer returned.
+	// Retain even a missing receipt so a lost creation response can be found.
+	latest.Retired = append(latest.Retired, retiredCommitCheck{SHA: delivered.SHA, ResultURL: delivered.resultURL(), CheckRun: target})
 }
 
 func evaluateReviewCheck(client *common.Client, store core.PublicationStore, record *core.OrderedPublication, state *reviewCheckState) (bool, error) {

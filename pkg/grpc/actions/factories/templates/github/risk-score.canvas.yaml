@@ -47,7 +47,7 @@ spec:
     - id: start-assessment-check
       name: Start Assessment Check
       type: TYPE_ACTION
-      component: github.setPullRequestCheck
+      component: github.setPullRequestCheckRun
       configuration:
         repository: '{{ root().data.repository.full_name }}'
         pullNumber: '{{ root().data.pull_request.number }}'
@@ -335,7 +335,7 @@ spec:
     - id: finish-assessment-check
       name: Finish Assessment Check
       type: TYPE_ACTION
-      component: github.setPullRequestCheck
+      component: github.setPullRequestCheckRun
       configuration:
         repository: '{{ root().data.repository.full_name }}'
         pullNumber: '{{ root().data.pull_request.number }}'

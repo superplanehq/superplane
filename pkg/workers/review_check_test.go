@@ -39,17 +39,21 @@ type reviewCheckIntegration struct {
 func (c reviewCheckIntegration) Publications() core.PublicationStore { return c.store }
 
 type reviewCheckHTTP struct {
-	t            *testing.T
-	mu           sync.Mutex
-	head         string
-	closed       bool
-	reviews      []map[string]any
-	failReviews  bool
-	failWrite    bool
-	writeStatus  int
-	failPR       bool
-	requestCount int
-	writes       []struct {
+	t                 *testing.T
+	mu                sync.Mutex
+	head              string
+	closed            bool
+	reviews           []map[string]any
+	failReviews       bool
+	failWrite         bool
+	writeStatus       int
+	checkRuns         []*github.CheckRun
+	checkWrites       []github.CheckRun
+	loseCheckResponse bool
+	checkRunPageSize  int
+	failPR            bool
+	requestCount      int
+	writes            []struct {
 		SHA    string
 		Status github.RepoStatus
 	}
@@ -61,12 +65,15 @@ func (h *reviewCheckHTTP) Do(request *http.Request) (*http.Response, error) {
 	if request.Method == http.MethodGet && strings.HasSuffix(request.URL.Path, "/pulls/42") && h.onRead != nil {
 		h.onRead()
 	}
-	if request.Method == http.MethodPost && strings.Contains(request.URL.Path, "/statuses/") && h.onWrite != nil {
+	if (request.Method == http.MethodPost || request.Method == http.MethodPatch) && (strings.Contains(request.URL.Path, "/statuses/") || strings.Contains(request.URL.Path, "/check-runs")) && h.onWrite != nil {
 		h.onWrite()
 	}
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	path := request.URL.Path
+	if strings.Contains(path, "/check-runs") {
+		return h.checkRequest(request)
+	}
 	if request.Method == http.MethodPost && strings.Contains(path, "/statuses/") {
 		if h.writeStatus > 0 {
 			return mocks.GitHubResponse(h.writeStatus, `{"message":"Resource not accessible by integration"}`), nil
