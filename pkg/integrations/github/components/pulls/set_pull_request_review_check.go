@@ -43,6 +43,12 @@ type reviewCheckState struct {
 	State         string                   `json:"state"`
 	Description   string                   `json:"description"`
 	Delivered     string                   `json:"delivered,omitempty"`
+	Delivery      *reviewCheckDelivery     `json:"delivery,omitempty"`
+}
+
+type reviewCheckDelivery struct {
+	ID        uuid.UUID `json:"id"`
+	ExpiresAt time.Time `json:"expiresAt"`
 }
 
 func (*SetPullRequestReviewCheck) Name() string  { return "github.setPullRequestReviewCheck" }
@@ -143,21 +149,24 @@ func (*SetPullRequestReviewCheck) Execute(ctx core.ExecutionContext) error {
 			status = "superseded"
 			return core.ErrPublicationUnchanged
 		}
-		if comparison == 0 && record.Generation > 0 && record.ActivationGeneration == config.ActivationGeneration {
-			state, err := decodeReviewCheckState(record.Payload)
+		var previous reviewCheckState
+		if record.Generation > 0 {
+			previous, err = decodeReviewCheckState(record.Payload)
 			if err != nil {
 				return err
 			}
-			if reflect.DeepEqual(state.Configuration, config) {
+		}
+		if comparison == 0 && record.Generation > 0 && record.ActivationGeneration == config.ActivationGeneration {
+			if reflect.DeepEqual(previous.Configuration, config) {
 				generation = record.Generation
-				if state.Delivered == "" || state.Delivered != state.fingerprint() {
+				if previous.Delivered == "" || previous.Delivered != previous.fingerprint() {
 					record.WakeAt = reviewCheckWake(time.Second)
 					return nil
 				}
 				return core.ErrPublicationUnchanged
 			}
 			// One attempt can move from selection to one outcome, then disable.
-			if state.Configuration.Phase != "pending_selection" && config.Phase != "disabled" {
+			if previous.Configuration.Phase != "pending_selection" && config.Phase != "disabled" {
 				status = "superseded"
 				return core.ErrPublicationUnchanged
 			}
@@ -166,7 +175,8 @@ func (*SetPullRequestReviewCheck) Execute(ctx core.ExecutionContext) error {
 		record.Order = order
 		record.Disabled, record.ActivationGeneration = config.Phase == "disabled", config.ActivationGeneration
 		record.OwnerCanvasID, record.OwnerNodeID = uuid.MustParse(ctx.WorkflowID), ctx.NodeID
-		record.Payload, err = json.Marshal(reviewCheckState{Configuration: config})
+		// A replacement must wait for an already claimed status write to finish.
+		record.Payload, err = json.Marshal(reviewCheckState{Configuration: config, Delivery: previous.Delivery})
 		if err != nil {
 			return err
 		}

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -46,12 +47,16 @@ type reviewCheckHTTP struct {
 		SHA    string
 		Status github.RepoStatus
 	}
-	onRead func()
+	onRead  func()
+	onWrite func()
 }
 
 func (h *reviewCheckHTTP) Do(request *http.Request) (*http.Response, error) {
 	if request.Method == http.MethodGet && strings.HasSuffix(request.URL.Path, "/pulls/42") && h.onRead != nil {
 		h.onRead()
+	}
+	if request.Method == http.MethodPost && strings.Contains(request.URL.Path, "/statuses/") && h.onWrite != nil {
+		h.onWrite()
 	}
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -387,6 +392,153 @@ func TestReviewCheckRechecksGenerationAfterLookup(t *testing.T) {
 	require.NoError(t, f.refresh())
 	require.Equal(t, "success", f.state())
 	require.True(t, f.record().Disabled)
+}
+
+func TestReviewCheckDeliveryDoesNotBlockReplacement(t *testing.T) {
+	f := newReviewCheckFixture(t)
+	require.NoError(t, f.apply("selection_error", nil, ""))
+	entered, resume := make(chan struct{}), make(chan struct{})
+	var once sync.Once
+	f.http.onWrite = func() { once.Do(func() { close(entered); <-resume }) }
+	done := make(chan error, 1)
+	finished := make(chan struct{})
+	go func() {
+		defer close(finished)
+		done <- f.refresh()
+	}()
+	<-entered
+	var release sync.Once
+	t.Cleanup(func() {
+		release.Do(func() { close(resume) })
+		<-finished
+	})
+
+	replaced := make(chan error, 1)
+	go func() { replaced <- f.apply("disabled", nil, "") }()
+	select {
+	case err := <-replaced:
+		require.NoError(t, err)
+	case <-time.After(2 * time.Second):
+		release.Do(func() { close(resume) })
+		<-done
+		<-replaced
+		t.Fatal("a GitHub status request must not block a newer decision")
+	}
+	require.NoError(t, f.refresh())
+	require.Empty(t, f.http.writes, "concurrent refresh must wait for the active delivery")
+	release.Do(func() { close(resume) })
+	require.NoError(t, <-done)
+	f.http.onWrite = nil
+	var state map[string]any
+	require.NoError(t, json.Unmarshal(f.record().Payload, &state))
+	require.Empty(t, state["delivered"], "an old delivery cannot acknowledge the replacement")
+	require.NotNil(t, f.record().WakeAt)
+	require.NoError(t, f.processDue())
+	require.Len(t, f.http.writes, 2)
+	require.Equal(t, "success", f.state())
+	require.Equal(t, "Review request check disabled", f.http.writes[1].Status.GetDescription())
+	require.Nil(t, f.record().WakeAt)
+}
+
+func TestReviewCheckRecoversInterruptedDelivery(t *testing.T) {
+	f := newReviewCheckFixture(t)
+	require.NoError(t, f.apply("selection_error", nil, ""))
+	key := f.record().Key
+	expiresAt := time.Now().Add(time.Minute)
+	setLease := func(expiry time.Time) {
+		require.NoError(t, f.integration.store.Update(key, func(record *core.OrderedPublication) error {
+			var state map[string]any
+			if err := json.Unmarshal(record.Payload, &state); err != nil {
+				return err
+			}
+			state["delivery"] = map[string]any{"id": uuid.NewString(), "expiresAt": expiry}
+			var err error
+			record.Payload, err = json.Marshal(state)
+			return err
+		}))
+	}
+	setLease(expiresAt)
+	require.NoError(t, f.processDue())
+	require.Empty(t, f.http.writes, "a live lease prevents overlapping status writes")
+	requests := pendingActionRequests(t, f.installation.ID, pulls.ReviewCheckHook)
+	require.Len(t, requests, 1, "skipping an active delivery must retain recovery work")
+	require.WithinDuration(t, expiresAt, requests[0].RunAt, time.Second)
+
+	setLease(time.Now().Add(-time.Second))
+	require.NoError(t, f.processDue())
+	require.Equal(t, "error", f.state())
+	var state map[string]any
+	require.NoError(t, json.Unmarshal(f.record().Payload, &state))
+	require.NotEmpty(t, state["delivered"])
+	require.Empty(t, state["delivery"], "the recovered delivery must release its lease")
+}
+
+func TestReviewCheckFencesLateDeliveryCompletion(t *testing.T) {
+	for _, recoveryInFlight := range []bool{true, false} {
+		t.Run(fmt.Sprintf("recovery_in_flight=%t", recoveryInFlight), func(t *testing.T) {
+			f := newReviewCheckFixture(t)
+			require.NoError(t, f.apply("selection_error", nil, ""))
+			entered, resume := make(chan struct{}), make(chan struct{})
+			recovering, finishRecovery := make(chan struct{}), make(chan struct{})
+			var calls atomic.Int32
+			f.http.onWrite = func() {
+				call := calls.Add(1)
+				if call == 1 {
+					close(entered)
+					<-resume
+				}
+				if call == 2 && recoveryInFlight {
+					close(recovering)
+					<-finishRecovery
+				}
+			}
+			done := make(chan error, 1)
+			finished := make(chan struct{})
+			go func() {
+				defer close(finished)
+				done <- f.refresh()
+			}()
+			var release, releaseRecovery sync.Once
+			t.Cleanup(func() {
+				release.Do(func() { close(resume) })
+				releaseRecovery.Do(func() { close(finishRecovery) })
+				<-finished
+			})
+			<-entered
+			require.NoError(t, f.apply("disabled", nil, ""))
+			// Simulate lease expiry while the old provider response is delayed.
+			require.NoError(t, f.integration.store.Update(f.record().Key, func(record *core.OrderedPublication) error {
+				var state map[string]any
+				if err := json.Unmarshal(record.Payload, &state); err != nil {
+					return err
+				}
+				state["delivery"].(map[string]any)["expiresAt"] = time.Now().Add(-time.Second)
+				var err error
+				record.Payload, err = json.Marshal(state)
+				return err
+			}))
+
+			recovered := make(chan error, 1)
+			go func() { recovered <- f.refresh() }()
+			if recoveryInFlight {
+				<-recovering
+			} else {
+				require.NoError(t, <-recovered)
+			}
+			release.Do(func() { close(resume) })
+			require.NoError(t, <-done)
+			if recoveryInFlight {
+				require.NoError(t, f.refresh())
+				require.Len(t, f.http.writes, 1, "an expired owner cannot release the new delivery lease")
+				releaseRecovery.Do(func() { close(finishRecovery) })
+				require.NoError(t, <-recovered)
+			}
+			f.http.onWrite = nil
+			require.NoError(t, f.processDue())
+			require.Equal(t, "success", f.state(), "late responses must not leave an obsolete status on GitHub")
+			require.Nil(t, f.record().WakeAt)
+		})
+	}
 }
 
 func TestReviewCheckDetectsAttemptFailureWithoutFailedChannel(t *testing.T) {
