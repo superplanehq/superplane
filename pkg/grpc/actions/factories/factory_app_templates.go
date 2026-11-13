@@ -75,6 +75,7 @@ var factoryAppTemplates = map[factoryTemplateKey]factoryAppTemplate{
 		columnKey:        models.CanvasColumnKeyVerify,
 		componentIntegrations: map[string]string{
 			"github.listPullRequestReviewCandidates": "github",
+			"github.setPullRequestReviewCheck":       "github",
 			"github.ensurePullRequestReviewers":      "github",
 		},
 	}),
@@ -310,6 +311,9 @@ func materializeFactoryTemplate(templateID, provider string, input factoryTempla
 	canvas.Metadata.ID = input.appID
 	canvas.Metadata.Name = input.appName
 	wireFactoryTemplate(canvas, template, input)
+	if template.id == reviewRequestTemplateID {
+		configureReviewRequestCheck(canvas)
+	}
 	markFactoryTemplate(canvas, template)
 
 	canvasYAML, err := goyaml.Marshal(canvas)

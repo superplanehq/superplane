@@ -8,6 +8,7 @@ import type { IntakeAutomationGraph } from "./useIntakeAutomationCanvas";
 
 export const REVIEW_REQUEST_TRIGGER_NODE_ID = "review-request-trigger";
 export const REVIEW_REQUEST_AGENT_NODE_ID = "select-reviewers";
+export const REVIEW_REQUEST_CHECK_NODE_ID = "pr-check-pending";
 
 export function useReviewRequestSettingsDraft({
   graph,
@@ -37,10 +38,7 @@ export function useReviewRequestSettingsDraft({
     setSaving(true);
     setSaveError(undefined);
     try {
-      await onSaveNode({
-        ...nodeUpdate(agent),
-        configuration: { ...component.configuration, fallbackReviewer: fallbackReviewer(draft) },
-      });
+      await onSaveNode(settingsUpdates(graph, agent, draft));
       onClose();
     } catch (failure) {
       setSaveError(getApiErrorMessage(failure, "Could not save Review request. Try again."));
@@ -83,6 +81,17 @@ export function useReviewRequestSettingsDraft({
     setEnabled,
     updateFallbackReviewer,
     fallbackReviewer: draft ? fallbackReviewer(draft) : "",
+    publishPRCheck: draft?.components[0]?.configuration.publishPRCheck === true,
+    updatePublishPRCheck: (publishPRCheck: boolean) => {
+      if (!draft) return;
+      setEdited({
+        ...draft,
+        components: draft.components.map((component) => ({
+          ...component,
+          configuration: { ...component.configuration, publishPRCheck },
+        })),
+      });
+    },
   };
 }
 
@@ -104,4 +113,37 @@ function nodeUpdate(node: SuperplaneComponentsNode) {
     integration: node.integration,
     concurrency: node.concurrency,
   };
+}
+
+function settingsUpdates(
+  graph: IntakeAutomationGraph,
+  agent: SuperplaneComponentsNode,
+  draft: PlanningReviewDraft,
+): NodeConfigurationSave {
+  const component = draft.components[0];
+  const publishPRCheck = component.configuration.publishPRCheck === true;
+  const wasPublished = agent.configuration?.publishPRCheck === true;
+  const savedGeneration = Number(agent.configuration?.prCheckActivationGeneration) || 1;
+  const generation = savedGeneration + (publishPRCheck && !wasPublished ? 1 : 0);
+  const configuration = {
+    ...agent.configuration,
+    ...component.configuration,
+    fallbackReviewer: fallbackReviewer(draft),
+    publishPRCheck,
+    prCheckActivationGeneration: generation,
+  };
+  const check = graph.specNodes?.find((node) => node.id === REVIEW_REQUEST_CHECK_NODE_ID);
+  if (!check && publishPRCheck) {
+    throw new Error("Update this automation through admin reset before you publish PR checks.");
+  }
+  if (!check) {
+    return { ...nodeUpdate(agent), configuration };
+  }
+  return [
+    { ...nodeUpdate(agent), configuration },
+    {
+      ...nodeUpdate(check),
+      configuration: { ...check.configuration, enabled: publishPRCheck, activationGeneration: generation },
+    },
+  ];
 }

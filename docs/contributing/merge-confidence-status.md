@@ -50,6 +50,7 @@ Local Docker and the repository Helm chart configure both workers. The connected
 GitHub account could not read the hosted chart or Launchpad sources; their
 configuration and deployed credentials remain unverified.
 
-This implements #9278 on the updated #9246 branch. The Phase 3 PRs for #9259
-and #9274 must merge before Phase 4 merge and combined validation. This branch
-does not include their unmerged configuration or findings changes.
+This implements #9278 on the updated #9246 branch and preserves the optional
+Review request check from #9259. The findings PR for #9274 must merge before
+Phase 4 merge and combined validation. This branch does not include its
+unmerged findings changes.

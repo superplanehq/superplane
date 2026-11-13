@@ -30,7 +30,7 @@ func (*SetPullRequestCheck) Configuration() []configuration.Field {
 	fields := (&SetPullRequestReviewCheck{}).Configuration()
 	common := make([]configuration.Field, 0, len(fields))
 	for _, field := range fields {
-		if slices.Contains([]string{"phase", "reviewers", "reviewerRequestExecutionId"}, field.Name) {
+		if slices.Contains([]string{"enabled", "activationNodeId", "phase", "reviewers", "reviewerRequestExecutionId"}, field.Name) {
 			continue
 		}
 		common = append(common, field)
@@ -44,6 +44,10 @@ func (*SetPullRequestCheck) Configuration() []configuration.Field {
 func (*SetPullRequestCheck) Setup(ctx core.SetupContext) error {
 	return (&ListPullRequestReviewCandidates{}).Setup(ctx)
 }
+
+// Node and canvas removal wake owned publications through the generic model
+// boundary. Direct status checks do not use reviewer activation or release rules.
+func (*SetPullRequestCheck) Cleanup(core.SetupContext) error { return nil }
 func (*SetPullRequestCheck) Execute(ctx core.ExecutionContext) error {
 	config, err := decodePullRequestCheck(ctx.Configuration)
 	if err != nil {

@@ -19,6 +19,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/factories/vcs"
 	"github.com/superplanehq/superplane/pkg/integrations/bitbucket"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
+	"github.com/superplanehq/superplane/pkg/integrations/github/components/pulls"
 	"github.com/superplanehq/superplane/pkg/integrations/prbody"
 	"github.com/superplanehq/superplane/pkg/models"
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
@@ -128,6 +129,32 @@ func installPublicationGitHub(t *testing.T, httpCtx core.HTTPContext) {
 	newFactoryGitHubAPI = func(*gorm.DB, IntakeDependencies, *models.Factory) (factoryGitHubAPI, error) {
 		return publicationGitHubClient(t, httpCtx), nil
 	}
+}
+
+func (f publicationFixture) integrationPublicationAttempt(t *testing.T) *bodySectionActionAttempt {
+	t.Helper()
+	f.publishVersion(t, func(v *models.CanvasVersion) {
+		findIntakeNode(v.Nodes, "publish").Ref.Component.Name = "github.updatePullRequestBodySection"
+	})
+	f.startRun(t)
+	f.report(t, f.run, 4)
+	execution, request := f.publicationRequest(t, "passed")
+	configuration := execution.Configuration.Data()
+	delete(configuration, "pullRequestId")
+	configuration["repository"], configuration["pullNumber"] = "acme/app", "42"
+	execution.Configuration = datatypes.NewJSONType(configuration)
+	execution.Metadata = datatypes.NewJSONType(map[string]any{models.CanvasNodeExecutionFrozenComponentKey: "github.updatePullRequestBodySection"})
+	require.NoError(t, f.db.Save(execution).Error)
+	attempt := &bodySectionActionAttempt{request: request}
+	require.NoError(t, f.db.Transaction(func(tx *gorm.DB) error { return attempt.claim(tx) }))
+	return attempt
+}
+
+func publicationBodySectionClient(t *testing.T, host core.HTTPContext) prbody.Client {
+	t.Helper()
+	client, err := pulls.NewBodySectionClient(gitHubPermissionTestIntegration(), host)
+	require.NoError(t, err)
+	return client
 }
 
 func TestAssessmentCompletionEmitsStructuredMergeConfidence(t *testing.T) {
