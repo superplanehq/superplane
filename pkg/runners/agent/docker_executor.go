@@ -238,7 +238,7 @@ func dockerExecShellDirectiveList(ctx context.Context, name string, task *api.Ta
 	if err != nil {
 		return 1, "", err
 	}
-	script := dockerCommandsScript(directives)
+	script := dockerCommandsScript(diagnosticDirectives(directives, diagnosticRecordID(live)))
 	args := append([]string{"exec"}, envArgs...)
 	args = append(args, name, "sh", "-c", script)
 	return runDockerExec(ctx, args, live)
@@ -352,14 +352,14 @@ func runDockerExec(ctx context.Context, args []string, live io.Writer) (int, str
 // When live is non-nil, stdout/stderr bytes are tee'd to it in addition to
 // being captured for the returned `output` string (internal only; not sent on complete).
 func dockerExecTask(ctx context.Context, name string, task *api.TaskPayload, live io.Writer) (int, string, error) {
-	args, err := dockerExecArgs(name, task)
+	args, err := dockerExecArgs(name, task, diagnosticRecordID(live))
 	if err != nil {
 		return 1, "", err
 	}
 	return runDockerExec(ctx, args, live)
 }
 
-func dockerExecArgs(name string, task *api.TaskPayload) ([]string, error) {
+func dockerExecArgs(name string, task *api.TaskPayload, recordID string) ([]string, error) {
 	envArgs, err := dockerExecEnvironmentArgs(task.Environment)
 	if err != nil {
 		return nil, err
@@ -371,7 +371,7 @@ func dockerExecArgs(name string, task *api.TaskPayload) ([]string, error) {
 		if len(directives) == 0 {
 			return nil, errEmptyCommands()
 		}
-		script := dockerCommandsScript(directives)
+		script := dockerCommandsScript(diagnosticDirectives(directives, recordID))
 		args = append([]string{"exec"}, envArgs...)
 		args = append(args, name, "sh", "-c", script)
 	case len(task.Command) > 0:
@@ -421,6 +421,7 @@ func dockerCommandsScript(directives []shellDirective) string {
 		script.WriteString("printf '\\n'\n")
 		script.WriteString(`printf '{"type":"cmd_end","index":`)
 		script.WriteString(strconv.Itoa(i))
+		script.WriteString(`,"diagnostic_id":"` + directive.RecordID + `"`)
 		script.WriteString(`,"status":"%s","duration_ms":%s}\n' "$__sp_cmd_status" "$__sp_cmd_duration"` + "\n")
 		script.WriteString("if [ \"$__sp_cmd_exit\" -ne 0 ]; then exit \"$__sp_cmd_exit\"; fi\n")
 	}
@@ -430,9 +431,10 @@ func dockerCommandsScript(directives []shellDirective) string {
 
 func writeDockerCmdStart(script *strings.Builder, index int, directive shellDirective) {
 	rec := map[string]any{
-		"type":  "cmd_start",
-		"index": index,
-		"text":  directive.Text,
+		"type":          "cmd_start",
+		"diagnostic_id": directive.RecordID,
+		"index":         index,
+		"text":          directive.Text,
 	}
 	if kind := strings.TrimSpace(directive.Kind); kind != "" {
 		rec["kind"] = kind

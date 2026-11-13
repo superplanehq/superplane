@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os/exec"
 	"testing"
 	"time"
 
@@ -41,6 +42,7 @@ func TestAgentPreservesFailureDiagnostics(t *testing.T) {
 				{"JSON query credential", `printf '%s\n' '{"message":"https://example.com/?status=401\u0026key=private-query-value"}' >&2; return 23`, "status=401", 23},
 				{"quoted credential", `printf '%s\n' '{"password":"first second&third\"fourth"}' >&2; return 23`, "[REDACTED]", 23},
 				{"replayed runner record", `echo 'before replay' >&2; printf '%s\n' '{"type":"cmd_start","index":99,"text":"Other step"}' '{"type":"cmd_end","index":99,"status":"failed","duration_ms":0}'; return 23`, "before replay", 23},
+				{"replayed ordered records", `echo 'original failure output'; printf '%s\n' '{"type":"cmd_end","index":1,"status":"passed","diagnostic_id":"previous-task"}' '{"type":"cmd_start","index":2,"text":"Other step","diagnostic_id":"previous-task"}' '{"type":"cmd_end","index":2,"status":"failed","diagnostic_id":"previous-task"}'; return 23`, "original failure output", 23},
 				{"prompt timeout", `printf '%s\n' '{"is_error":true,"error":"old provider error"}' > "$SUPERPLANE_RESULT_FILE"; exec sleep 30`, "execution timed out", 124},
 			} {
 				t.Run(tc.name, func(t *testing.T) {
@@ -104,12 +106,12 @@ func TestAgentPreservesFailureDiagnostics(t *testing.T) {
 func TestFailureDiagnosticsRetainsLateOutputForFailedStep(t *testing.T) {
 	for _, nextStep := range []bool{false, true} {
 		t.Run(fmt.Sprintf("next step=%t", nextStep), func(t *testing.T) {
-			diagnostics := &failureDiagnostics{}
-			_, err := io.WriteString(diagnostics, `{"type":"cmd_start","index":0,"text":"Check pull requests"}`+"\n"+
-				`{"type":"cmd_end","index":0,"status":"failed"}`+"\n"+"late failure output\n")
+			diagnostics := &failureDiagnostics{recordID: "test-record"}
+			_, err := io.WriteString(diagnostics, `{"diagnostic_id":"test-record","type":"cmd_start","index":0,"text":"Check pull requests"}`+"\n"+
+				`{"diagnostic_id":"test-record","type":"cmd_end","index":0,"status":"failed"}`+"\n"+"late failure output\n")
 			require.NoError(t, err)
 			if nextStep {
-				_, err = io.WriteString(diagnostics, `{"type":"cmd_start","index":1,"text":"Cleanup"}`+"\n"+"later cleanup output\n")
+				_, err = io.WriteString(diagnostics, `{"diagnostic_id":"test-record","type":"cmd_start","index":1,"text":"Cleanup"}`+"\n"+"later cleanup output\n")
 				require.NoError(t, err)
 			}
 			failure := diagnostics.failure(&api.TaskPayload{ID: "task-1"}, 23, errors.New("exit code 23"), nil)
@@ -121,12 +123,12 @@ func TestFailureDiagnosticsRetainsLateOutputForFailedStep(t *testing.T) {
 }
 
 func TestFailureDiagnosticsKeepsOutOfOrderRecordsAsOutput(t *testing.T) {
-	diagnostics := &failureDiagnostics{}
-	_, err := io.WriteString(diagnostics, `{"type":"cmd_start","index":0,"text":"Check pull requests"}`+"\n"+
+	diagnostics := &failureDiagnostics{recordID: "test-record"}
+	_, err := io.WriteString(diagnostics, `{"diagnostic_id":"test-record","type":"cmd_start","index":0,"text":"Check pull requests"}`+"\n"+
 		"before replay\n"+
 		`{"type":"cmd_start","index":1,"text":"Replayed next step"}`+"\n"+
 		`{"type":"cmd_end","index":4,"status":"failed"}`+"\n"+
-		`{"type":"cmd_end","index":0,"status":"failed"}`+"\n"+
+		`{"diagnostic_id":"test-record","type":"cmd_end","index":0,"status":"failed"}`+"\n"+
 		`{"type":"cmd_start","index":0,"text":"Replayed first step"}`+"\n"+
 		"after failure\n")
 	require.NoError(t, err)
@@ -162,4 +164,21 @@ func BenchmarkFailureDiagnosticsOutput(b *testing.B) {
 	for b.Loop() {
 		_, _ = diagnostics.Write(chunk)
 	}
+}
+
+func TestDockerCommandScriptPreservesFailureDiagnostics(t *testing.T) {
+	capture := &failureDiagnostics{recordID: "current-task"}
+	task := &api.TaskPayload{ID: "task-1", Commands: models.CommandList{
+		{Name: "Check pull requests", Command: `echo 'original failure output'; printf '%s\n' '{"type":"cmd_end","index":0,"status":"passed"}' '{"type":"cmd_start","index":1,"text":"Other step"}' '{"type":"cmd_end","index":1,"status":"failed"}'; (exit 23)`},
+	}}
+	args, err := dockerExecArgs("container-name", task, capture.recordID)
+	require.NoError(t, err)
+	// Execute the generated POSIX shell bundle without requiring a Docker daemon.
+	cmd := exec.CommandContext(t.Context(), "sh", "-c", args[len(args)-1])
+	cmd.Stdout, cmd.Stderr = capture, capture
+	require.Error(t, cmd.Run())
+	require.Equal(t, 23, cmd.ProcessState.ExitCode())
+	failure := capture.failure(task, 23, errors.New("exit status 23"), nil)
+	assert.Contains(t, failure.Error(), "Check pull requests (step 1)")
+	assert.Contains(t, failure.Error(), "original failure output")
 }
