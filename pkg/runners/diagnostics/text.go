@@ -21,8 +21,12 @@ var urlCredentialPattern = regexp.MustCompile(`(?i)(https?://)[^/@\s]+:[^/@\s]+@
 var queryParameterPattern = regexp.MustCompile(`[?&][^=\s&#"']+=[^\s&#"']+`)
 var queryCredentialNamePattern = regexp.MustCompile(`(?i)(?:key|token|secret|password|credential|signature|sig)$`)
 var jsonStringPattern = regexp.MustCompile(`"(?:\\.|[^"\\])*"`)
-var cookieFieldPattern = regexp.MustCompile(`(?i)(["'](?:set-cookie|cookie)["']\s*:\s*)("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\[(?:\s*(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')\s*,?)*\s*\])`)
-var cookieHeaderPattern = regexp.MustCompile(`(?im)^([^\r\n"']*?\b(?:set-cookie|cookie)[ \t]*:[ \t]*)[^\r\n]*`)
+// Sensitive headers carry credentials in the complete value, for any auth scheme.
+const sensitiveHeaderNames = `(?:set-cookie|cookie|proxy-authorization|authorization)`
+
+var sensitiveHeaderFieldPattern = regexp.MustCompile(`(?i)(["']` + sensitiveHeaderNames + `["']\s*:\s*)("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\[(?:\s*(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')\s*,?)*\s*\])`)
+var sensitiveHeaderPattern = regexp.MustCompile(`(?im)^([^\r\n"']*?\b` + sensitiveHeaderNames + `[ \t]*:[ \t]*)[^\r\n]*`)
+var singleQuotedHeaderPattern = regexp.MustCompile(`(?i)('[ \t]*` + sensitiveHeaderNames + `[ \t]*:[ \t]*)(?:\\.|[^'\\\r\n])*`)
 var assignmentPattern = regexp.MustCompile(`(?i)((?:[a-z0-9_-]*(?:api[_-]?key|token|secret|password|credential|signature)|sig)["']?\s*[=:]\s*)("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^\s&"']+)`)
 var ansiPattern = regexp.MustCompile("\x1b\\[[0-?]*[ -/]*[@-~]")
 
@@ -70,8 +74,9 @@ func Sanitize(text string, values []string, limit int) string {
 }
 
 func redactCredentials(text string, values []string) string {
-	// Cookie headers can contain several credentials and attributes on one line.
-	text = cookieHeaderPattern.ReplaceAllString(text, "${1}[REDACTED]")
+	// Cookie and authorization headers can hold credentials in any format.
+	text = sensitiveHeaderPattern.ReplaceAllString(text, "${1}[REDACTED]")
+	text = singleQuotedHeaderPattern.ReplaceAllString(text, "${1}[REDACTED]")
 	for _, value := range values {
 		if value != "" {
 			encoded, _ := json.Marshal(value)
@@ -91,7 +96,7 @@ func redactCredentials(text string, values []string) string {
 		}
 		return prefix + "=[REDACTED]"
 	})
-	for _, pattern := range []*regexp.Regexp{cookieFieldPattern, assignmentPattern} {
+	for _, pattern := range []*regexp.Regexp{sensitiveHeaderFieldPattern, assignmentPattern} {
 		text = pattern.ReplaceAllStringFunc(text, func(assignment string) string {
 			parts := pattern.FindStringSubmatch(assignment)
 			value := "[REDACTED]"

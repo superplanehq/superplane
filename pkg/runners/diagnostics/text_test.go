@@ -166,3 +166,49 @@ func TestSanitizeCookieCredentials(t *testing.T) {
 		})
 	}
 }
+
+func TestSanitizeAuthorizationHeaders(t *testing.T) {
+	for _, tc := range []struct {
+		name, text, expected string
+	}{
+		{
+			name:     "token scheme",
+			text:     "HTTP 401\n> Authorization: Token private-value\nRetry failed",
+			expected: "HTTP 401\n> Authorization: [REDACTED]\nRetry failed",
+		},
+		{
+			name:     "api key scheme",
+			text:     "authorization: ApiKey private-value\r\nHTTP 401",
+			expected: "authorization: [REDACTED]\nHTTP 401",
+		},
+		{
+			name:     "proxy authorization",
+			text:     "Proxy-Authorization: Digest username=private-value",
+			expected: "Proxy-Authorization: [REDACTED]",
+		},
+		{
+			name:     "serialized header",
+			text:     `{"Authorization":"Token private-value","status":401}`,
+			expected: `{"Authorization":"[REDACTED]","status":401}`,
+		},
+		{
+			name:     "single quoted serialized header",
+			text:     `{'authorization': 'ApiKey private-value', 'status': 401}`,
+			expected: `{'authorization': '[REDACTED]', 'status': 401}`,
+		},
+		{
+			name:     "double quoted curl header",
+			text:     `curl -H "Authorization: Token private-value" https://example.com returned 401`,
+			expected: `curl -H "Authorization: [REDACTED]" https://example.com returned 401`,
+		},
+		{
+			name:     "single quoted curl header",
+			text:     `curl -H 'Authorization: ApiKey private-value' https://example.com returned 401`,
+			expected: `curl -H 'Authorization: [REDACTED]' https://example.com returned 401`,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.expected, Sanitize(tc.text, nil, 4096))
+		})
+	}
+}
