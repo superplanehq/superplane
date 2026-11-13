@@ -21,7 +21,7 @@ var urlCredentialPattern = regexp.MustCompile(`(?i)(https?://)[^/@\s]+:[^/@\s]+@
 var queryParameterPattern = regexp.MustCompile(`[?&][^=\s&#"']+=[^\s&#"']+`)
 var queryCredentialNamePattern = regexp.MustCompile(`(?i)(?:key|token|secret|password|credential|signature|sig)$`)
 var jsonStringPattern = regexp.MustCompile(`"(?:\\.|[^"\\])*"`)
-var cookieFieldPattern = regexp.MustCompile(`(?i)(["'](?:set-cookie|cookie)["']\s*:\s*)("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\[(?:\s*"(?:\\.|[^"\\])*"\s*,?)*\s*\])`)
+var cookieFieldPattern = regexp.MustCompile(`(?i)(["'](?:set-cookie|cookie)["']\s*:\s*)("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\[(?:\s*(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')\s*,?)*\s*\])`)
 var cookieHeaderPattern = regexp.MustCompile(`(?im)^([^\r\n"']*?\b(?:set-cookie|cookie)[ \t]*:[ \t]*)[^\r\n]*`)
 var assignmentPattern = regexp.MustCompile(`(?i)((?:[a-z0-9_-]*(?:api[_-]?key|token|secret|password|credential|signature)|sig)["']?\s*[=:]\s*)("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^\s&"']+)`)
 var ansiPattern = regexp.MustCompile("\x1b\\[[0-?]*[ -/]*[@-~]")

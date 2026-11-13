@@ -141,6 +141,16 @@ func TestSanitizeCookieCredentials(t *testing.T) {
 			expected: `{"set-cookie":["[REDACTED]"],"status":401}`,
 		},
 		{
+			name:     "single quoted response header array",
+			text:     `{'set-cookie': ['session=private]value; Path=/', 'identity=another-private-value'], 'status': 401}`,
+			expected: `{'set-cookie': ["[REDACTED]"], 'status': 401}`,
+		},
+		{
+			name:     "mixed quoted response header array with escaped quotes",
+			text:     `{"Set-Cookie": ["session=private\"value", 'identity=another\'private]value'], "status": 401}`,
+			expected: `{"Set-Cookie": ["[REDACTED]"], "status": 401}`,
+		},
+		{
 			name:     "header inside JSON message",
 			text:     `{"message":"Cookie: session=private-value; identity=another-private-value\r\nHTTP 401"}`,
 			expected: `{"message":"Cookie: [REDACTED]\r\nHTTP 401"}`,
