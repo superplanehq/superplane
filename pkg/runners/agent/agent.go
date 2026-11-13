@@ -292,7 +292,7 @@ func (a *Agent) runTask(
 		slog.Duration("duration", time.Since(startedAt)),
 	)
 	if err := spool.Close(); err != nil {
-		return fmt.Errorf("close task log spool: %w", err)
+		return fmt.Errorf("close log spool for task %s: %w", task.ID, err)
 	}
 	if err := spool.Wait(taskContext); err != nil {
 		select {
@@ -300,7 +300,7 @@ func (a *Agent) runTask(
 			return sessionErr
 		default:
 		}
-		return fmt.Errorf("wait for task log acknowledgements: %w", err)
+		return fmt.Errorf("wait for log acknowledgements for task %s: %w", task.ID, err)
 	}
 	log.Info("task logs acknowledged", slog.String("task_id", task.ID))
 
@@ -318,7 +318,7 @@ func (a *Agent) runTask(
 			return sessionErr
 		default:
 		}
-		return fmt.Errorf("complete task: %w", err)
+		return fmt.Errorf("complete task %s: %w", task.ID, err)
 	}
 	log.Info(
 		"task completion acknowledged",
@@ -333,13 +333,15 @@ func (a *Agent) execute(
 	live *logspool.Spool,
 	cancellations <-chan string,
 ) taskExecutionResult {
+	diagnostics := &failureDiagnostics{live: live, step: liveLogCommandStartRecord{Index: -1}}
 	executor, err := a.executorFor(task)
 	if err != nil {
-		return taskExecutionResult{ExitCode: 1, RunErr: err}
+		return taskExecutionResult{ExitCode: 1, RunErr: diagnostics.failure(task, 1, err, nil)}
 	}
 
 	resultPath := filepath.Join(os.TempDir(), "superplane-result-"+task.ID+".json")
 	_ = os.Remove(resultPath)
+	defer os.Remove(resultPath)
 
 	timeoutContext, cancelTimeout := context.WithTimeout(
 		ctx,
@@ -372,9 +374,10 @@ func (a *Agent) execute(
 	exitCode, _, runErr := executor.Execute(
 		executionContext,
 		task,
-		live,
+		diagnostics,
 		resultPath,
 	)
+	executionContextErr := executionContext.Err()
 	resultLimit := a.Config.MaxOutputBytes
 	if task.WebhookPayloadSizeLimit > 0 {
 		webhookResultLimit := task.WebhookPayloadSizeLimit - 1024
@@ -383,15 +386,7 @@ func (a *Agent) execute(
 		}
 	}
 	result, resultTooLarge := readTaskResultFile(resultPath, resultLimit, a.Config.Log)
-	if resultTooLarge {
-		return taskExecutionResult{
-			ExitCode: 1,
-			RunErr: fmt.Errorf(
-				"result payload too large: exceeds %d byte limit",
-				resultLimit,
-			),
-		}
-	}
+
 	if canceled.Load() {
 		return taskExecutionResult{
 			ExitCode:     exitCode,
@@ -400,19 +395,21 @@ func (a *Agent) execute(
 			Result:       result,
 		}
 	}
-	if errors.Is(executionContext.Err(), context.DeadlineExceeded) ||
-		errors.Is(runErr, context.DeadlineExceeded) {
-		return taskExecutionResult{
-			ExitCode: 124,
-			RunErr:   errors.New("execution timed out"),
-			Result:   result,
-		}
+	if errors.Is(executionContextErr, context.DeadlineExceeded) || errors.Is(runErr, context.DeadlineExceeded) {
+		exitCode = 124
+		runErr = errors.New("execution timed out")
 	}
-	return taskExecutionResult{
-		ExitCode: exitCode,
-		RunErr:   runErr,
-		Result:   result,
+	// Result handling must not replace the process failure that preceded it.
+	if resultTooLarge && exitCode == 0 && runErr == nil {
+		diagnostics.step = liveLogCommandStartRecord{Text: "Read task result", Index: -1}
+		diagnostics.output.Reset()
+		exitCode = 1
+		runErr = fmt.Errorf("result payload too large: exceeds %d byte limit", resultLimit)
 	}
+	if exitCode != 0 || runErr != nil {
+		runErr = diagnostics.failure(task, exitCode, runErr, result)
+	}
+	return taskExecutionResult{ExitCode: exitCode, RunErr: runErr, Result: result}
 }
 
 func (a *Agent) executorFor(task *api.TaskPayload) (Executor, error) {
