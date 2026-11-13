@@ -22,9 +22,13 @@ const (
 	FactoryGitWrapperPath = "bin/git"
 	FactoryGitHookPath    = "git-hooks/prepare-commit-msg"
 
-	// FactoryCommitIdentityPrompt tells the agent not to override the identity
-	// the environment, wrapper, and hook already enforce.
-	FactoryCommitIdentityPrompt = "Do not set git user.email, and do not add Co-authored-by or Signed-off-by trailers."
+	// FactoryCommitIdentityPrompt tells the agent to preserve the identity and
+	// automatic sign-off enforced by the wrapper and repository hooks.
+	FactoryCommitIdentityPrompt = "SuperPlane sets the Git identity and adds the required Signed-off-by trailer automatically." +
+		" Do not remove or override the automatic sign-off." +
+		" Do not change the Git identity or manually add Co-authored-by or Signed-off-by trailers." +
+		" Do not bypass the Git wrapper, repository hooks, or push verification." +
+		" If a hook fails, fix the cause or report the blocker."
 )
 
 // AttachFactoryCommitIdentity forces SuperPlane Agent
