@@ -632,6 +632,12 @@ func TestResetPRFeedbackPreservesEachRunnerAndGeneralSettings(t *testing.T) {
 							node.Configuration["model"] = model
 							expected[node.ID] = 1200 + i
 							evidence[node.ID] = i%2 == 0
+							for _, item := range node.Configuration["steps"].([]any) {
+								step := item.(map[string]any)
+								if step["type"] == "prompt" {
+									step["prompt"] = "Do not set git user.email, and do not add Co-authored-by or Signed-off-by trailers."
+								}
+							}
 							if source == models.FactoryPRFeedbackHandlerSourcePullRequestChecks {
 								original := node.ID
 								node.ID = "legacy-repair"
@@ -700,6 +706,10 @@ func TestResetPRFeedbackPreservesEachRunnerAndGeneralSettings(t *testing.T) {
 							require.True(t, ok)
 							hasGitUser = hasGitUser || step["name"] == "Set Up Git User"
 							hasDCOSigning = hasDCOSigning || step["name"] == "Set Up DCO Signing"
+							if step["type"] == "prompt" {
+								assert.Contains(t, step["prompt"], "Do not remove or override the automatic sign-off.")
+								assert.Contains(t, step["prompt"], "Do not bypass the Git wrapper, repository hooks, or push verification.")
+							}
 						}
 						assert.True(t, hasGitUser)
 						assert.True(t, hasDCOSigning)
