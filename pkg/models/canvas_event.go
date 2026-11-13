@@ -27,6 +27,7 @@ type CanvasEvent struct {
 	Data        JSONValue
 	ExecutionID *uuid.UUID
 	RunID       uuid.UUID
+	SourceRunID *uuid.UUID
 	State       string
 	CreatedAt   *time.Time
 }
