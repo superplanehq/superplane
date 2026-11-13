@@ -23,6 +23,7 @@ const diagnosticCaptureBytes = 16 * 1024
 type failureDiagnostics struct {
 	mu            sync.Mutex
 	live          io.Writer
+	recordID      string
 	pending       []byte
 	oversizedLine bool
 	step          liveLogCommandStartRecord
@@ -65,11 +66,12 @@ func (d *failureDiagnostics) Write(p []byte) (int, error) {
 }
 func (d *failureDiagnostics) line(line []byte) {
 	var record struct {
-		Type   string `json:"type"`
-		Status string `json:"status"`
-		Index  int    `json:"index"`
+		Type     string `json:"type"`
+		RecordID string `json:"diagnostic_id"`
+		Status   string `json:"status"`
+		Index    int    `json:"index"`
 	}
-	if json.Unmarshal(bytes.TrimSpace(line), &record) == nil {
+	if json.Unmarshal(bytes.TrimSpace(line), &record) == nil && d.recordID != "" && record.RecordID == d.recordID {
 		if record.Type == "cmd_start" && d.isNextStepStart(record.Index) {
 			var start liveLogCommandStartRecord
 			if json.Unmarshal(line, &start) == nil {

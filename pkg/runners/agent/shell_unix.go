@@ -131,6 +131,7 @@ func writeLiveLogWrappedSource(script *strings.Builder, index int, dir shellDire
 	script.WriteString("printf '\\n'\n")
 	script.WriteString(`printf '{"type":"cmd_end","index":`)
 	script.WriteString(strconv.Itoa(index))
+	script.WriteString(`,"diagnostic_id":"` + dir.RecordID + `"`)
 	script.WriteString(`,"status":"%s","duration_ms":%s}\n' "$__sp_cmd_status" "$__sp_cmd_duration"` + "\n")
 	script.WriteString("if [ \"$__sp_cmd_exit\" -ne 0 ]; then exit \"$__sp_cmd_exit\"; fi\n")
 }
@@ -148,7 +149,7 @@ func runHostShellDirectivesPipe(ctx context.Context, maxOut int, workDir string,
 	}
 	defer func() { _ = os.RemoveAll(tmpRoot) }()
 
-	metaPath, err := writeDirectiveBundle(tmpRoot, workDir, directives)
+	metaPath, err := writeDirectiveBundle(tmpRoot, workDir, diagnosticDirectives(directives, diagnosticRecordID(live)))
 	if err != nil {
 		return 1, "", err
 	}

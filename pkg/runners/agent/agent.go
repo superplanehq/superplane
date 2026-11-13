@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -333,7 +334,7 @@ func (a *Agent) execute(
 	live *logspool.Spool,
 	cancellations <-chan string,
 ) taskExecutionResult {
-	diagnostics := &failureDiagnostics{live: live, step: liveLogCommandStartRecord{Index: -1}}
+	diagnostics := &failureDiagnostics{live: live, recordID: rand.Text(), step: liveLogCommandStartRecord{Index: -1}}
 	executor, err := a.executorFor(task)
 	if err != nil {
 		return taskExecutionResult{ExitCode: 1, RunErr: diagnostics.failure(task, 1, err, nil)}
