@@ -1,4 +1,6 @@
-import type { ComponentBaseMapper, ExecutionDetailsContext, OutputPayload } from "../types";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase/eventState";
+import { buildActionStateRegistry } from "../eventDisplay";
+import type { ComponentBaseMapper, EventStateRegistry, ExecutionDetailsContext, OutputPayload } from "../types";
 import { baseProps } from "./base";
 import { publishCommitStatusMapper } from "./publish_commit_status";
 
@@ -21,6 +23,23 @@ interface ReviewCheckOutput {
   generation?: number;
   activationGeneration?: number;
 }
+
+const appliedStateRegistry = buildActionStateRegistry("applied");
+
+export const SET_PULL_REQUEST_REVIEW_CHECK_STATE_REGISTRY: EventStateRegistry = {
+  stateMap: {
+    ...appliedStateRegistry.stateMap,
+    superseded: { ...DEFAULT_EVENT_STATE_MAP.neutral, label: "Superseded" },
+  },
+  getState(execution) {
+    const state = appliedStateRegistry.getState(execution);
+    if (state !== "applied") return state;
+
+    const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
+    const output = outputs?.default?.[0]?.data as ReviewCheckOutput | undefined;
+    return output?.status === "superseded" ? "superseded" : "applied";
+  },
+};
 
 export const setPullRequestReviewCheckMapper: ComponentBaseMapper = {
   props(context) {
