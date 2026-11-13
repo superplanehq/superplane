@@ -52,19 +52,30 @@ func (f publicationFixture) publicationRequest(t *testing.T, channel string) (*m
 	template, err := yaml.CanvasFromYAML(raw)
 	require.NoError(t, err)
 	configuration := findYAMLNode(t, template, "publish-merge-confidence").Configuration
+	version, err := models.FindCanvasVersionInTransaction(f.db, f.canvas.ID, f.run.VersionID)
+	require.NoError(t, err)
+	component := findIntakeNode(version.Nodes, "publish").ComponentName()
+	action, err := f.deps.Registry.GetAction(component)
+	require.NoError(t, err)
+	execution.Metadata = datatypes.NewJSONType(map[string]any{models.CanvasNodeExecutionFrozenComponentKey: component})
 	// Saved core nodes use the factory PR ID instead of a provider PR number.
-	delete(configuration, "repository")
-	delete(configuration, "pullNumber")
-	configuration["pullRequestId"] = `{{ $["Assess Merge Confidence"].data.mergeConfidence.pullRequestId }}`
+	if component == factorycomponent.UpdatePullRequestBodySectionComponentName {
+		delete(configuration, "repository")
+		delete(configuration, "pullNumber")
+		configuration["pullRequestId"] = `{{ $["Assess Merge Confidence"].data.mergeConfidence.pullRequestId }}`
+	} else {
+		configuration["repository"] = "acme/app"
+		configuration["pullNumber"] = "42"
+	}
 	resolved, err := workercontexts.NewNodeConfigurationBuilder(f.db, f.canvas.ID).
 		WithRunID(f.run.ID).WithNodeID("publish").WithRootEvent(&root.ID).
 		WithPreviousExecution(&agent.ID).WithIncomingEventID(&output.ID).
 		WithInput(output.Data.Data()).
-		WithConfigurationFields((&factorycomponent.UpdatePullRequestBodySection{}).Configuration()).Build(configuration)
+		WithConfigurationFields(action.Configuration()).Build(configuration)
 	require.NoError(t, err)
 	execution.Configuration = datatypes.NewJSONType(resolved)
 	require.NoError(t, f.db.Save(execution).Error)
-	require.NoError(t, (&factorycomponent.UpdatePullRequestBodySection{}).Execute(core.ExecutionContext{
+	require.NoError(t, action.Execute(core.ExecutionContext{
 		RunID: execution.RunID, Configuration: execution.Configuration.Data(),
 		Metadata: workercontexts.NewExecutionMetadataContext(f.db, execution), Requests: workercontexts.NewExecutionRequestContext(f.db, execution),
 	}))
