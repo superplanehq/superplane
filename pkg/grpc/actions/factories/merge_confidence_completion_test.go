@@ -5,31 +5,43 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/integrations/bitbucket"
 	"github.com/superplanehq/superplane/pkg/models"
 	workercontexts "github.com/superplanehq/superplane/pkg/workers/contexts"
 	"github.com/superplanehq/superplane/pkg/yaml"
 	"github.com/superplanehq/superplane/test/support"
 	"github.com/superplanehq/superplane/test/support/contexts"
 	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
 // Use the materialized graph and real actions so a disconnected edge or an
 // expression that reads the wrong execution cannot silently lose completion.
-func completionFixture(t *testing.T) publicationFixture {
+func completionFixture(t *testing.T, provider string) publicationFixture {
 	t.Helper()
 	f := newPublicationFixture(t)
-	result, err := materializeFactoryTemplate("risk-score", models.ProviderGitHub, factoryTemplateInput{
+	require.NoError(t, f.db.Model(f.pr).Update("provider", provider).Error)
+	require.NoError(t, f.workspace.UpdateOnboarding(f.db, models.FactoryOnboardingPatch{VCSProvider: &provider}))
+	integration, err := models.CreateIntegration(uuid.New(), f.canvas.OrganizationID, provider, provider, nil)
+	require.NoError(t, err)
+	result, err := materializeFactoryTemplate("risk-score", provider, factoryTemplateInput{
 		appID: f.canvas.ID.String(), appName: "Merge confidence",
 		installParams: map[string]string{"appRepository": "acme/app", "defaultBranch": "main"},
+		integrations:  map[string]factoryTemplateIntegration{provider: {id: integration.ID.String(), name: provider}},
 	})
 	require.NoError(t, err)
 	doc, err := yaml.CanvasFromYAML([]byte(result.canvasYAML))
 	require.NoError(t, err)
 	f.publishVersion(t, func(version *models.CanvasVersion) {
 		for _, node := range doc.Nodes() {
+			if provider == models.ProviderBitbucket && node.ID == "publish-merge-confidence" {
+				node.ID = "publish"
+				*findIntakeNode(version.Nodes, "publish") = node
+			}
 			if node.ComponentName() == "filter" || node.ComponentName() == "broadcastMessage" {
 				version.Nodes = append(version.Nodes, node)
 			}
@@ -46,8 +58,24 @@ func completionFixture(t *testing.T) publicationFixture {
 			version.Edges = append(version.Edges, edge)
 		}
 	})
+	require.NoError(t, f.db.Model(&models.CanvasNode{}).Where("workflow_id = ? AND node_id = ?", f.canvas.ID, "publish").Update("app_installation_id", integration.ID).Error)
 	f.startRun(t)
 	return f
+}
+
+func installCompletionConnection(t *testing.T, host core.HTTPContext) {
+	t.Helper()
+	installPublicationGitHub(t, host)
+	previous := newPublicationConnection
+	t.Cleanup(func() { newPublicationConnection = previous })
+	newPublicationConnection = func(_ *gorm.DB, _ IntakeDependencies, _ *models.CanvasNode, integration *models.Integration) (core.IntegrationContext, core.HTTPContext) {
+		if integration.AppName == models.ProviderGitHub {
+			return gitHubPermissionTestIntegration(), host
+		}
+		return &contexts.IntegrationContext{Configuration: map[string]any{"token": "token"}, Metadata: bitbucket.Metadata{
+			AuthType: bitbucket.AuthTypeWorkspaceAccessToken, Workspace: &bitbucket.WorkspaceMetadata{Slug: "acme"},
+		}}, host
+	}
 }
 
 func (f publicationFixture) completePublication(t *testing.T, execution *models.CanvasNodeExecution, events []models.CanvasEvent) []map[string]any {
@@ -105,142 +133,167 @@ func (f publicationFixture) completePublication(t *testing.T, execution *models.
 }
 
 func TestMergeConfidenceCompletionPublicationOutcomes(t *testing.T) {
-	for _, scenario := range []string{"published", "unchanged", "incomplete", "failed", "cancelled", "disabled", "closed", "stale", "superseded", "rejected", "invalid markers"} {
-		t.Run(scenario, func(t *testing.T) {
-			f := completionFixture(t)
-			if scenario != "incomplete" {
-				f.report(t, f.run, 4)
-			}
-			channel := "passed"
-			if scenario == "failed" {
-				channel = "failed"
-			}
-			execution, request := f.publicationRequest(t, channel)
-			description := "User text"
-			if scenario == "unchanged" {
-				description = "<!-- superplane:merge-confidence:start -->\n" + execution.Configuration.Data()["body"].(string) + "\n<!-- superplane:merge-confidence:end -->"
-			}
-			if scenario == "invalid markers" {
-				description = "<!-- superplane:merge-confidence:start -->"
-			}
-			read := descriptionResponse(t, models.ProviderGitHub, description)
-			switch scenario {
-			case "cancelled":
-				require.NoError(t, f.run.MarkAsCancelling(f.db, nil))
-			case "disabled":
-				f.publishVersion(t, func(version *models.CanvasVersion) {
-					findIntakeNode(version.Nodes, "publish").Configuration["enabled"] = false
-				})
-			case "closed":
-				read = publicationHTTPResponse(200, `{"state":"closed","head":{"sha":"abc"}}`)
-			case "stale":
-				read = publicationHTTPResponse(200, `{"state":"open","head":{"sha":"new"}}`)
-			case "superseded":
-				f.startRun(t)
-			case "rejected":
-				read = publicationHTTPResponse(403, `{"message":"Forbidden"}`)
-			}
-			host := &contexts.HTTPContext{Responses: []*http.Response{read, publicationHTTPResponse(200, `{}`)}}
-			installPublicationGitHub(t, host)
-			events, err := ProcessBodySectionPublicationRequest(t.Context(), IntakeDependencies{}, request.ID, models.LockNodeRequestNow)
-			require.NoError(t, err)
-			require.NoError(t, f.db.First(execution, "id = ?", execution.ID).Error)
-			expectedStatus := "skipped"
-			switch scenario {
-			case "published", "incomplete", "failed":
-				expectedStatus = "published"
-			case "unchanged":
-				expectedStatus = "unchanged"
-			case "cancelled":
-				expectedStatus = "rejected"
-			}
-			assert.Equal(t, expectedStatus, execution.Metadata.Data()["status"])
-			// Continue the producer's graph even when another run superseded it.
-			f.run, err = models.FindCanvasRunInTransaction(f.db, f.canvas.ID, execution.RunID)
-			require.NoError(t, err)
-			payloads := f.completePublication(t, execution, events)
-			if scenario == "published" || scenario == "unchanged" {
-				require.Len(t, payloads, 1)
-				assert.Equal(t, "merge-confidence.completed", payloads[0]["type"])
-				assert.Equal(t, f.run.ID.String(), payloads[0]["reportId"])
-				assert.Equal(t, f.pr.ID.String(), payloads[0]["pullRequestId"])
-				assert.Equal(t, "acme/app", payloads[0]["repository"])
-				assert.EqualValues(t, 42, payloads[0]["pullNumber"])
-				assert.Equal(t, "abc", payloads[0]["reviewedCommit"])
-				var assessment models.CanvasEvent
-				require.NoError(t, f.db.Where("run_id = ? AND node_id = ? AND execution_id IS NOT NULL", f.run.ID, "agent").First(&assessment).Error)
-				savedReport, err := json.Marshal(assessment.Data.Data().(map[string]any)["data"].(map[string]any)["mergeConfidence"])
+	for _, provider := range []string{models.ProviderGitHub, models.ProviderBitbucket} {
+		for _, scenario := range []string{"published", "unchanged", "incomplete", "failed", "cancelled", "cancelled during unchanged read", "disabled", "closed", "stale", "superseded", "rejected", "invalid markers"} {
+			t.Run(provider+"/"+scenario, func(t *testing.T) {
+				f := completionFixture(t, provider)
+				if scenario != "incomplete" {
+					f.report(t, f.run, 4)
+				}
+				channel := "passed"
+				if scenario == "failed" {
+					channel = "failed"
+				}
+				execution, request := f.publicationRequest(t, channel)
+				description := "User text"
+				if scenario == "unchanged" || scenario == "cancelled during unchanged read" {
+					description = "<!-- superplane:merge-confidence:start -->\n" + execution.Configuration.Data()["body"].(string) + "\n<!-- superplane:merge-confidence:end -->"
+				}
+				if scenario == "invalid markers" {
+					description = "<!-- superplane:merge-confidence:start -->"
+				}
+				read := descriptionResponse(t, provider, description)
+				switch scenario {
+				case "cancelled":
+					require.NoError(t, f.run.MarkAsCancelling(f.db, nil))
+				case "disabled":
+					f.publishVersion(t, func(version *models.CanvasVersion) {
+						findIntakeNode(version.Nodes, "publish").Configuration["enabled"] = false
+					})
+				case "closed":
+					read = publicationHTTPResponse(200, `{"state":"closed","head":{"sha":"abc"}}`)
+					if provider == models.ProviderBitbucket {
+						read = publicationHTTPResponse(200, `{"state":"DECLINED","source":{"commit":{"hash":"abc"}}}`)
+					}
+				case "stale":
+					read = publicationHTTPResponse(200, `{"state":"open","head":{"sha":"new"}}`)
+					if provider == models.ProviderBitbucket {
+						read = publicationHTTPResponse(200, `{"state":"OPEN","source":{"commit":{"hash":"new"}}}`)
+					}
+				case "superseded":
+					f.startRun(t)
+				case "rejected":
+					read = publicationHTTPResponse(403, `{"message":"Forbidden"}`)
+				}
+				host := &publicationHTTPContext{HTTPContext: contexts.HTTPContext{Responses: []*http.Response{read, publicationHTTPResponse(200, `{}`)}}, beforeRequest: func(request *http.Request) {
+					if scenario == "cancelled during unchanged read" && request.Method == http.MethodGet {
+						require.NoError(t, f.run.MarkAsCancelling(f.db, nil))
+					}
+				}}
+				installCompletionConnection(t, host)
+				events, err := ProcessBodySectionPublicationRequest(t.Context(), f.deps, request.ID, models.LockNodeRequestNow)
 				require.NoError(t, err)
-				emittedReport, err := json.Marshal(payloads[0]["mergeConfidence"])
+				require.NoError(t, f.db.First(execution, "id = ?", execution.ID).Error)
+				expectedStatus := "skipped"
+				switch scenario {
+				case "published", "incomplete", "failed":
+					expectedStatus = "published"
+				case "unchanged":
+					expectedStatus = "unchanged"
+				case "cancelled":
+					expectedStatus = "rejected"
+				}
+				assert.Equal(t, expectedStatus, execution.Metadata.Data()["status"])
+				// Continue the producer's graph even when another run superseded it.
+				f.run, err = models.FindCanvasRunInTransaction(f.db, f.canvas.ID, execution.RunID)
 				require.NoError(t, err)
-				assert.JSONEq(t, string(savedReport), string(emittedReport))
-				return
-			}
-			assert.Empty(t, payloads)
-			if scenario == "failed" || scenario == "incomplete" {
-				require.Len(t, host.Requests, 2, "incomplete reports still reach the PR")
-				assert.Contains(t, execution.Configuration.Data()["body"], "**Incomplete**")
-			}
-			if scenario == "failed" {
-				result, err := f.run.CalculateResult(f.db)
-				require.NoError(t, err)
-				assert.Equal(t, models.CanvasRunResultFailed, result)
-			}
-		})
+				payloads := f.completePublication(t, execution, events)
+				if scenario == "cancelled during unchanged read" {
+					require.Len(t, host.Requests, 1)
+				}
+				if scenario == "published" || scenario == "unchanged" {
+					require.Len(t, payloads, 1)
+					assert.Equal(t, "merge-confidence.completed", payloads[0]["type"])
+					assert.Equal(t, f.run.ID.String(), payloads[0]["reportId"])
+					assert.Equal(t, f.pr.ID.String(), payloads[0]["pullRequestId"])
+					assert.Equal(t, "acme/app", payloads[0]["repository"])
+					assert.EqualValues(t, 42, payloads[0]["pullNumber"])
+					assert.Equal(t, "abc", payloads[0]["reviewedCommit"])
+					var message models.AppMessage
+					require.NoError(t, f.db.Where("canvas_id = ?", f.canvas.ID).First(&message).Error)
+					assert.Equal(t, "broadcast-merge-confidence", message.NodeID)
+					require.NotNil(t, message.SourceRunID)
+					assert.Equal(t, f.run.ID, *message.SourceRunID)
+					assert.Equal(t, f.order.ID, f.pr.WorkOrderID)
+					var assessment models.CanvasEvent
+					require.NoError(t, f.db.Where("run_id = ? AND node_id = ? AND execution_id IS NOT NULL", f.run.ID, "agent").First(&assessment).Error)
+					savedReport, err := json.Marshal(assessment.Data.Data().(map[string]any)["data"].(map[string]any)["mergeConfidence"])
+					require.NoError(t, err)
+					emittedReport, err := json.Marshal(payloads[0]["mergeConfidence"])
+					require.NoError(t, err)
+					assert.JSONEq(t, string(savedReport), string(emittedReport))
+					return
+				}
+				assert.Empty(t, payloads)
+				if scenario == "failed" || scenario == "incomplete" {
+					require.Len(t, host.Requests, 2, "incomplete reports still reach the PR")
+					assert.Contains(t, execution.Configuration.Data()["body"], "**Incomplete**")
+				}
+				if scenario == "failed" {
+					result, err := f.run.CalculateResult(f.db)
+					require.NoError(t, err)
+					assert.Equal(t, models.CanvasRunResultFailed, result)
+				}
+			})
+		}
 	}
 }
 
 func TestMergeConfidenceCompletionKeepsIdentityAndSnapshotOnRetry(t *testing.T) {
-	f := completionFixture(t)
-	f.report(t, f.run, 4)
-	execution, request := f.publicationRequest(t, "passed")
-	body := execution.Configuration.Data()["body"].(string)
-	host := &contexts.HTTPContext{Responses: []*http.Response{
-		descriptionResponse(t, models.ProviderGitHub, "User text"),
-		publicationHTTPResponse(503, `{"message":"unavailable"}`),
-		descriptionResponse(t, models.ProviderGitHub, "<!-- superplane:merge-confidence:start -->\n"+body+"\n<!-- superplane:merge-confidence:end -->"),
-	}}
-	installPublicationGitHub(t, host)
-	events, err := ProcessBodySectionPublicationRequest(t.Context(), IntakeDependencies{}, request.ID, models.LockNodeRequestNow)
-	require.NoError(t, err)
-	assert.Empty(t, f.completePublication(t, execution, events))
-	var retry models.CanvasNodeRequest
-	require.NoError(t, f.db.Where("execution_id = ? AND state = ?", execution.ID, models.NodeExecutionRequestStatePending).First(&retry).Error)
-	// Another report changes the mutable latest results without superseding this activity.
-	other, err := models.CreateCanvasRunInTransaction(f.db, f.canvas.ID, "trigger", models.CanvasRunStateStarted, "")
-	require.NoError(t, err)
-	f.report(t, other, 1)
-	events, err = ProcessBodySectionPublicationRequest(t.Context(), IntakeDependencies{}, retry.ID, models.LockNodeRequestNow)
-	require.NoError(t, err)
-	payloads := f.completePublication(t, execution, events)
-	require.Len(t, payloads, 1)
-	first := payloads[0]
-	assert.Equal(t, f.run.ID.String(), first["reportId"])
-	report := first["mergeConfidence"].(map[string]any)
-	assert.EqualValues(t, 4, report["checks"].([]any)[0].(map[string]any)["score"])
-	require.Len(t, host.Requests, 3, "retry recognizes the same published report")
-	events, err = ProcessBodySectionPublicationRequest(t.Context(), IntakeDependencies{}, retry.ID, models.LockNodeRequestNow)
-	require.NoError(t, err)
-	assert.Equal(t, payloads, f.completePublication(t, execution, events), "consumed requests do not emit again")
+	for _, provider := range []string{models.ProviderGitHub, models.ProviderBitbucket} {
+		t.Run(provider, func(t *testing.T) {
+			f := completionFixture(t, provider)
+			f.report(t, f.run, 4)
+			execution, request := f.publicationRequest(t, "passed")
+			body := execution.Configuration.Data()["body"].(string)
+			host := &contexts.HTTPContext{Responses: []*http.Response{
+				descriptionResponse(t, provider, "User text"),
+				publicationHTTPResponse(503, `{"message":"unavailable"}`),
+				descriptionResponse(t, provider, "<!-- superplane:merge-confidence:start -->\n"+body+"\n<!-- superplane:merge-confidence:end -->"),
+			}}
+			installCompletionConnection(t, host)
+			events, err := ProcessBodySectionPublicationRequest(t.Context(), f.deps, request.ID, models.LockNodeRequestNow)
+			require.NoError(t, err)
+			assert.Empty(t, f.completePublication(t, execution, events))
+			var retry models.CanvasNodeRequest
+			require.NoError(t, f.db.Where("execution_id = ? AND state = ?", execution.ID, models.NodeExecutionRequestStatePending).First(&retry).Error)
+			// Another report changes the mutable latest results without superseding this activity.
+			other, err := models.CreateCanvasRunInTransaction(f.db, f.canvas.ID, "trigger", models.CanvasRunStateStarted, "")
+			require.NoError(t, err)
+			f.report(t, other, 1)
+			events, err = ProcessBodySectionPublicationRequest(t.Context(), f.deps, retry.ID, models.LockNodeRequestNow)
+			require.NoError(t, err)
+			payloads := f.completePublication(t, execution, events)
+			require.Len(t, payloads, 1)
+			first := payloads[0]
+			assert.Equal(t, f.run.ID.String(), first["reportId"])
+			report := first["mergeConfidence"].(map[string]any)
+			assert.EqualValues(t, 4, report["checks"].([]any)[0].(map[string]any)["score"])
+			require.Len(t, host.Requests, 3, "retry recognizes the same published report")
+			events, err = ProcessBodySectionPublicationRequest(t.Context(), f.deps, retry.ID, models.LockNodeRequestNow)
+			require.NoError(t, err)
+			assert.Equal(t, payloads, f.completePublication(t, execution, events), "consumed requests do not emit again")
 
-	f.startRun(t)
-	f.report(t, f.run, 4)
-	execution, request = f.publicationRequest(t, "passed")
-	host.Responses = []*http.Response{descriptionResponse(t, models.ProviderGitHub, "<!-- superplane:merge-confidence:start -->\n"+body+"\n<!-- superplane:merge-confidence:end -->")}
-	events, err = ProcessBodySectionPublicationRequest(t.Context(), IntakeDependencies{}, request.ID, models.LockNodeRequestNow)
-	require.NoError(t, err)
-	payloads = f.completePublication(t, execution, events)
-	require.Len(t, payloads, 2)
-	var second map[string]any
-	for _, payload := range payloads {
-		if payload["reportId"] == first["reportId"] {
-			assert.Equal(t, first, payload)
-			continue
-		}
-		second = payload
-		assert.Equal(t, f.run.ID.String(), payload["reportId"])
-		assert.Equal(t, first["reviewedCommit"], payload["reviewedCommit"])
-		assert.Equal(t, first["mergeConfidence"], payload["mergeConfidence"])
+			f.startRun(t)
+			f.report(t, f.run, 4)
+			execution, request = f.publicationRequest(t, "passed")
+			host.Responses = []*http.Response{descriptionResponse(t, provider, "<!-- superplane:merge-confidence:start -->\n"+body+"\n<!-- superplane:merge-confidence:end -->")}
+			events, err = ProcessBodySectionPublicationRequest(t.Context(), f.deps, request.ID, models.LockNodeRequestNow)
+			require.NoError(t, err)
+			payloads = f.completePublication(t, execution, events)
+			require.Len(t, payloads, 2)
+			var second map[string]any
+			for _, payload := range payloads {
+				if payload["reportId"] == first["reportId"] {
+					assert.Equal(t, first, payload)
+					continue
+				}
+				second = payload
+				assert.Equal(t, f.run.ID.String(), payload["reportId"])
+				assert.Equal(t, first["reviewedCommit"], payload["reviewedCommit"])
+				assert.Equal(t, first["mergeConfidence"], payload["mergeConfidence"])
+			}
+			require.NotNil(t, second, "a new same-SHA run must emit a new report identity")
+		})
 	}
-	require.NotNil(t, second, "a new same-SHA run must emit a new report identity")
 }
