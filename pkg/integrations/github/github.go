@@ -140,6 +140,7 @@ func (g *GitHub) Actions() []core.Action {
 		&pulls.ListPullRequestReviewCandidates{},
 		&pulls.EnsurePullRequestReviewers{},
 		&pulls.SetPullRequestReviewCheck{},
+		&pulls.SetPullRequestCheck{},
 		&pulls.UpdatePullRequest{},
 		&pulls.UpdatePullRequestBodySection{},
 		&pulls.FindPullRequest{},

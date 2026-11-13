@@ -158,15 +158,24 @@ func publicationBodySectionClient(t *testing.T, host core.HTTPContext) prbody.Cl
 }
 
 func TestAssessmentCompletionEmitsStructuredMergeConfidence(t *testing.T) {
-	for _, channel := range []string{"passed", "failed"} {
-		t.Run(channel, func(t *testing.T) {
+	for _, scenario := range []struct {
+		name, channel string
+		reported      bool
+	}{
+		{"complete", "passed", true},
+		{"failed", "failed", true},
+		{"incomplete", "passed", false},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
 			f := newPublicationFixture(t)
-			f.report(t, f.run, 4)
+			if scenario.reported {
+				f.report(t, f.run, 4)
+			}
 			root, err := f.run.RootEvent(f.db)
 			require.NoError(t, err)
 			agent := support.CreateCanvasNodeExecution(t, f.canvas.ID, "agent", root.ID, root.ID)
 			state := workercontexts.NewFactoryExecutionStateContext(f.db, agent, nil)
-			require.NoError(t, state.Emit(channel, "runnerClaudeCode.finished", []any{map[string]any{"status": "finished"}}))
+			require.NoError(t, state.Emit(scenario.channel, "runnerClaudeCode.finished", []any{map[string]any{"status": "finished"}}))
 			var event models.CanvasEvent
 			require.NoError(t, f.db.Where("execution_id = ?", agent.ID).First(&event).Error)
 			payload := event.Data.Data().(map[string]any)["data"].(map[string]any)
@@ -174,9 +183,9 @@ func TestAssessmentCompletionEmitsStructuredMergeConfidence(t *testing.T) {
 			require.True(t, ok, "assessment completion must expose saved report data to downstream templates")
 			assert.Equal(t, f.pr.ID.String(), report["pullRequestId"])
 			assert.Equal(t, "abc", report["reviewedCommit"])
-			assert.Equal(t, channel == "passed", report["complete"])
+			assert.Equal(t, scenario.channel == "passed" && scenario.reported, report["complete"])
 			require.NoError(t, f.db.First(f.run, "id = ?", f.run.ID).Error)
-			assert.Equal(t, channel == "failed", len(f.run.Errors) > 0)
+			assert.Equal(t, report["complete"] != true, len(f.run.Errors) > 0)
 		})
 	}
 }
