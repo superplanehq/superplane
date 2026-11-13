@@ -131,6 +131,7 @@ func writeLiveLogWrappedSource(script *strings.Builder, index int, dir shellDire
 	script.WriteString("printf '\\n'\n")
 	script.WriteString(`printf '{"type":"cmd_end","index":`)
 	script.WriteString(strconv.Itoa(index))
+	script.WriteString(`,"diagnostic_id":"` + dir.RecordID + `"`)
 	script.WriteString(`,"status":"%s","duration_ms":%s}\n' "$__sp_cmd_status" "$__sp_cmd_duration"` + "\n")
 	script.WriteString("if [ \"$__sp_cmd_exit\" -ne 0 ]; then exit \"$__sp_cmd_exit\"; fi\n")
 }
@@ -148,7 +149,7 @@ func runHostShellDirectivesPipe(ctx context.Context, maxOut int, workDir string,
 	}
 	defer func() { _ = os.RemoveAll(tmpRoot) }()
 
-	metaPath, err := writeDirectiveBundle(tmpRoot, workDir, directives)
+	metaPath, err := writeDirectiveBundle(tmpRoot, workDir, diagnosticDirectives(directives, diagnosticRecordID(live)))
 	if err != nil {
 		return 1, "", err
 	}
@@ -164,13 +165,12 @@ func runHostShellDirectivesPipe(ctx context.Context, maxOut int, workDir string,
 	}
 	var buf bytes.Buffer
 	w := &cappedShellWriter{buf: &buf, max: max}
+	cmd.Stdout = w
 	if live != nil {
 		cmd.Stdout = io.MultiWriter(w, live)
-		cmd.Stderr = io.MultiWriter(w, live)
-	} else {
-		cmd.Stdout = w
-		cmd.Stderr = w
 	}
+	// Share the pipe so stderr cannot overtake stdout command records.
+	cmd.Stderr = cmd.Stdout
 
 	if runErr := cmd.Run(); runErr != nil {
 		outStr := truncateString(buf.String(), max)
@@ -212,6 +212,10 @@ type shellSession struct {
 }
 
 func (s *shellSession) appendOut(p []byte) {
+	// Keep live logs and failure diagnostics after the returned buffer fills.
+	if s.live != nil && len(p) > 0 {
+		_, _ = s.live.Write(p)
+	}
 	if s.maxOut <= 0 || len(p) == 0 {
 		return
 	}
@@ -222,16 +226,9 @@ func (s *shellSession) appendOut(p []byte) {
 	if len(p) > room {
 		s.out.Write(p[:room])
 		s.out.WriteString("\n…(truncated)")
-		if s.live != nil {
-			_, _ = s.live.Write(p[:room])
-			_, _ = s.live.Write([]byte("\n…(truncated)\n"))
-		}
 		return
 	}
 	s.out.Write(p)
-	if s.live != nil {
-		_, _ = s.live.Write(p)
-	}
 }
 
 func (s *shellSession) push(b []byte) {

@@ -115,8 +115,28 @@ spec:
             command: |-
               set -euo pipefail
 
-              # The agent opens the pull requests. Fail when the task has none.
-              count="$(superplane task pr list | jq '.pull_requests | length')"
+              # A failed lookup must retain its status and stderr.
+              if response="$(superplane task pr list)"; then
+                :
+              else
+                status=$?
+                echo "Pull request lookup failed (exit code $status)." >&2
+                exit "$status"
+              fi
+              count="$(printf '%s' "$response" | node -e '
+                let response;
+                try {
+                  response = JSON.parse(require("fs").readFileSync(0, "utf8"));
+                } catch {
+                  console.error("Invalid pull request response: response is not valid JSON.");
+                  process.exit(1);
+                }
+                if (!response || !Array.isArray(response.pull_requests)) {
+                  console.error("Invalid pull request response: pull_requests must be an array.");
+                  process.exit(1);
+                }
+                process.stdout.write(String(response.pull_requests.length));
+              ')"
               if [ "$count" -eq 0 ]; then
                 echo "The agent did not open a pull request. Call open_pull_request for each changed repository." >&2
                 exit 1
@@ -131,7 +151,7 @@ spec:
       type: TYPE_ACTION
       component: addRunError
       configuration:
-        message: The implementation agent failed. Open the agent logs to find the cause.
+        message: '{{ previous().data.error ?? "The implementation failed. The failed step and cause were not recorded. Open the agent logs." }}'
       position:
         x: 1770
         "y": 648

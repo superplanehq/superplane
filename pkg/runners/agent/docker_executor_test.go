@@ -61,7 +61,7 @@ func TestDockerExecArgsIncludeEnvironmentBeforeContainerName(t *testing.T) {
 			{Name: "SPECIAL", Value: "line one\nline two=ok"},
 		},
 	}
-	args, err := dockerExecArgs("container-name", task)
+	args, err := dockerExecArgs("container-name", task, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -83,7 +83,7 @@ func TestDockerExecArgsRejectInvalidEnvironment(t *testing.T) {
 		Command:     []string{"true"},
 		Environment: []api.EnvironmentVariable{{Name: "BAD-NAME", Value: "x"}},
 	}
-	if _, err := dockerExecArgs("container-name", task); err == nil {
+	if _, err := dockerExecArgs("container-name", task, ""); err == nil {
 		t.Fatal("expected invalid environment error")
 	}
 }
