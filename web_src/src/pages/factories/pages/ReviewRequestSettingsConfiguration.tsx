@@ -1,4 +1,9 @@
+import type { ChangeEvent } from "react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import type { ReviewFindingsSettings } from "../lib/reviewRequestFindings";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AgentAdditionalInstructions } from "./AgentAdditionalInstructions";
 import { ImplementSettingRow } from "./ImplementSettingRow";
@@ -70,6 +75,12 @@ function ReviewRequestConfigurationFields(props: ConfigurationProps) {
         showSteps={false}
         disabled={editor.saving}
       />
+      <ReviewFindingsField
+        findings={editor.findings}
+        missingDestination={editor.findingsMissingDestination}
+        disabled={editor.saving}
+        onChange={editor.updateFindings}
+      />
       <AgentAdditionalInstructions
         draft={editor.draft}
         onChange={editor.setEdited}
@@ -78,6 +89,67 @@ function ReviewRequestConfigurationFields(props: ConfigurationProps) {
         placeholder="For example: Prefer the security owner for authentication changes. Explain the ownership evidence for each reviewer."
       />
     </>
+  );
+}
+
+function ReviewFindingsField({
+  findings,
+  missingDestination,
+  disabled,
+  onChange,
+}: {
+  findings: ReviewFindingsSettings;
+  missingDestination: boolean;
+  disabled: boolean;
+  onChange: (patch: Partial<ReviewFindingsSettings>) => void;
+}) {
+  return (
+    <div>
+      <ImplementSettingRow
+        label="Publish review findings"
+        htmlFor="review-request-publish-findings"
+        description="Publish selected reviewers and the reason for the decision."
+      >
+        <Switch
+          id="review-request-publish-findings"
+          aria-describedby="review-request-publish-findings-help"
+          checked={findings.publish}
+          disabled={disabled}
+          onCheckedChange={(publish: boolean) => onChange({ publish })}
+        />
+      </ImplementSettingRow>
+      {findings.publish ? (
+        <fieldset
+          className="mt-3 flex flex-col gap-2"
+          aria-describedby={missingDestination ? "review-request-findings-destination-error" : undefined}
+        >
+          <legend className="sr-only">Destinations</legend>
+          {(
+            [
+              ["body", "PR body"],
+              ["comment", "PR comment"],
+            ] as const
+          ).map(([destination, label]) => (
+            <div key={destination} className="flex items-center gap-2">
+              <Checkbox
+                id={`review-request-findings-${destination}`}
+                checked={findings[destination]}
+                disabled={disabled}
+                onChange={(event: ChangeEvent<HTMLInputElement>) => onChange({ [destination]: event.target.checked })}
+              />
+              <Label htmlFor={`review-request-findings-${destination}`} className="text-sm font-normal">
+                {label}
+              </Label>
+            </div>
+          ))}
+          {missingDestination ? (
+            <p id="review-request-findings-destination-error" role="alert" className="text-sm text-destructive">
+              Select at least one destination.
+            </p>
+          ) : null}
+        </fieldset>
+      ) : null}
+    </div>
   );
 }
 

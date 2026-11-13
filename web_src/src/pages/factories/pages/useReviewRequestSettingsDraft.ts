@@ -2,7 +2,14 @@ import { useState } from "react";
 import type { SuperplaneComponentsNode } from "@/api-client";
 import { getApiErrorMessage } from "@/lib/errors";
 import { canvasNodeToPlanningReviewComponent } from "../lib/columnCanvasAgent";
-import type { NodeConfigurationSave } from "./nodeConfigurationCanvas";
+import {
+  readReviewFindings,
+  reviewFindingsActivation,
+  reviewFindingsMissingDestination,
+  writeReviewFindings,
+  type ReviewFindingsSettings,
+} from "../lib/reviewRequestFindings";
+import type { NodeConfigurationSave, NodeConfigurationUpdate } from "./nodeConfigurationCanvas";
 import type { PlanningReviewDraft } from "./planningReviewMockup";
 import type { IntakeAutomationGraph } from "./useIntakeAutomationCanvas";
 
@@ -30,17 +37,16 @@ export function useReviewRequestSettingsDraft({
   const enabled = trigger?.configuration?.enabled !== false;
   const draft = edited ?? agentDraft(agent);
   const unavailable = Boolean(loading || error || !agent || !trigger || !draft);
+  const findings = readReviewFindings(draft?.components[0]?.configuration);
+  const findingsMissingDestination = reviewFindingsMissingDestination(findings);
 
   const save = async () => {
     const component = draft?.components[0];
-    if (saving || unavailable || !component || !agent || !draft) return;
+    if (saving || unavailable || findingsMissingDestination || !component || !agent || !draft) return;
     setSaving(true);
     setSaveError(undefined);
     try {
-      await onSaveNode({
-        ...nodeUpdate(agent),
-        configuration: { ...component.configuration, fallbackReviewer: fallbackReviewer(draft) },
-      });
+      await onSaveNode(settingsUpdates(graph, agent, draft));
       onClose();
     } catch (failure) {
       setSaveError(getApiErrorMessage(failure, "Could not save Review request. Try again."));
@@ -83,6 +89,18 @@ export function useReviewRequestSettingsDraft({
     setEnabled,
     updateFallbackReviewer,
     fallbackReviewer: draft ? fallbackReviewer(draft) : "",
+    findings,
+    findingsMissingDestination,
+    updateFindings: (patch: Partial<ReviewFindingsSettings>) => {
+      if (!draft) return;
+      setEdited({
+        ...draft,
+        components: draft.components.map((component) => ({
+          ...component,
+          configuration: writeReviewFindings(component.configuration, { ...findings, ...patch }),
+        })),
+      });
+    },
   };
 }
 
@@ -104,4 +122,41 @@ function nodeUpdate(node: SuperplaneComponentsNode) {
     integration: node.integration,
     concurrency: node.concurrency,
   };
+}
+
+// Findings settings stay on the agent node, which admin reset keeps. Each
+// publication node receives its effective state and activation generation.
+function settingsUpdates(
+  graph: IntakeAutomationGraph,
+  agent: SuperplaneComponentsNode,
+  draft: PlanningReviewDraft,
+): NodeConfigurationSave {
+  const component = draft.components[0];
+  const activation = reviewFindingsActivation(agent.configuration, component.configuration);
+  const updates: NodeConfigurationUpdate[] = [
+    {
+      ...nodeUpdate(agent),
+      configuration: {
+        ...component.configuration,
+        fallbackReviewer: fallbackReviewer(draft),
+        ...activation.generations,
+      },
+    },
+  ];
+  for (const destination of activation.nodes) {
+    const node = graph.specNodes?.find((candidate) => candidate.id === destination.nodeId);
+    if (!node && destination.enabled) {
+      throw new Error("Update this automation through admin reset before you publish review findings.");
+    }
+    if (!node) continue;
+    updates.push({
+      ...nodeUpdate(node),
+      configuration: {
+        ...node.configuration,
+        enabled: destination.enabled,
+        activationGeneration: destination.activationGeneration,
+      },
+    });
+  }
+  return updates.length === 1 ? updates[0] : updates;
 }

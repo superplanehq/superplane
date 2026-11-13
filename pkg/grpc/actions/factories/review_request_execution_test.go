@@ -2,9 +2,12 @@ package factories
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"maps"
 	"net/http"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -25,6 +28,7 @@ import (
 	"github.com/superplanehq/superplane/test/support"
 	"github.com/superplanehq/superplane/test/support/contexts"
 	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
 // The fixture substitutes only GitHub responses and the external agent task.
@@ -46,6 +50,63 @@ type reviewRequestHTTP struct {
 	changedIdentity   bool
 	// pushDuringLookups moves the head after the permission lookup.
 	pushDuringLookups bool
+	// description and comments hold the published pull request state.
+	description   string
+	bodyWrites    []string
+	comments      map[int64]string
+	commentWrites int
+	// commentFails comment writes fail with commentStatus. When commentApplied
+	// is set, the host applies a failed write before the response is lost.
+	commentFails   int
+	commentStatus  int
+	commentApplied bool
+	// holdPublications leaves accepted publication requests pending.
+	holdPublications bool
+}
+
+func (h *reviewRequestHTTP) commentResponse(request *http.Request) (*http.Response, error) {
+	path := request.URL.Path
+	if h.comments == nil {
+		h.comments = map[int64]string{}
+	}
+	if request.Method == http.MethodGet && path == "/repos/acme/app/issues/42/comments" {
+		comments := []map[string]any{}
+		for _, id := range slices.Sorted(maps.Keys(h.comments)) {
+			comments = append(comments, map[string]any{"id": id, "body": h.comments[id]})
+		}
+		encoded, err := json.Marshal(comments)
+		return publicationHTTPResponse(200, string(encoded)), err
+	}
+	id, _ := strconv.ParseInt(strings.TrimPrefix(path, "/repos/acme/app/issues/comments/"), 10, 64)
+	if request.Method == http.MethodGet {
+		body, ok := h.comments[id]
+		if !ok {
+			return publicationHTTPResponse(404, `{"message":"Not Found"}`), nil
+		}
+		encoded, err := json.Marshal(map[string]any{"id": id, "body": body})
+		return publicationHTTPResponse(200, string(encoded)), err
+	}
+	var comment struct{ Body string }
+	if err := json.NewDecoder(request.Body).Decode(&comment); err != nil {
+		return nil, err
+	}
+	failed := h.commentFails > 0
+	if failed {
+		h.commentFails--
+		if !h.commentApplied {
+			return publicationHTTPResponse(h.commentStatus, `{"message":"comment write failed"}`), nil
+		}
+	}
+	h.commentWrites++
+	if request.Method == http.MethodPost {
+		id = int64(100 + len(h.comments))
+	}
+	h.comments[id] = comment.Body
+	if failed {
+		return publicationHTTPResponse(h.commentStatus, `{"message":"comment response was lost"}`), nil
+	}
+	encoded, err := json.Marshal(map[string]any{"id": id, "body": comment.Body})
+	return publicationHTTPResponse(201, string(encoded)), err
 }
 
 func (h *reviewRequestHTTP) Do(request *http.Request) (*http.Response, error) {
@@ -63,7 +124,16 @@ func (h *reviewRequestHTTP) Do(request *http.Request) (*http.Response, error) {
 		return publicationHTTPResponse(201, `{"number":42,"requested_reviewers":[{"login":"unrelated"},{"id":2,"login":"octocat"}]}`), nil
 	}
 	if request.Method == http.MethodPatch && path == "/repos/acme/app/pulls/42" {
+		var update struct{ Body string }
+		if err := json.NewDecoder(request.Body).Decode(&update); err != nil {
+			return nil, err
+		}
+		h.description = update.Body
+		h.bodyWrites = append(h.bodyWrites, update.Body)
 		return publicationHTTPResponse(200, `{}`), nil
+	}
+	if strings.HasPrefix(path, "/repos/acme/app/issues/") && strings.Contains(path, "comments") {
+		return h.commentResponse(request)
 	}
 	if strings.HasSuffix(path, "/collaborators") {
 		if h.discoveryError {
@@ -115,7 +185,11 @@ func (h *reviewRequestHTTP) Do(request *http.Request) (*http.Response, error) {
 		if h.closed {
 			state = "closed"
 		}
-		return publicationHTTPResponse(200, fmt.Sprintf(`{"number":42,"state":%q,"body":"User description","head":{"sha":%q},"base":{"ref":"main","sha":"base-sha"},"user":{"login":"author"},"requested_reviewers":%s}`, state, sha, requested)), nil
+		description := h.description
+		if description == "" {
+			description = "User description"
+		}
+		return publicationHTTPResponse(200, fmt.Sprintf(`{"number":42,"state":%q,"body":%q,"head":{"sha":%q},"base":{"ref":"main","sha":"base-sha"},"user":{"login":"author"},"requested_reviewers":%s}`, state, description, sha, requested)), nil
 	}
 	return nil, fmt.Errorf("unexpected GitHub request: %s %s", request.Method, path)
 }
@@ -130,7 +204,18 @@ func reviewRequestIntegration() core.IntegrationContext {
 
 func reviewRequestTestCanvas(t *testing.T, f publicationFixture, template string, params map[string]string) *models.Canvas {
 	t.Helper()
-	result, err := materializeFactoryTemplate(template, models.ProviderGitHub, factoryTemplateInput{appName: template, installParams: params})
+	return reviewRequestTestCanvasWith(t, f, template, factoryTemplateInput{appName: template, installParams: params})
+}
+
+// The GitHub integration is wired like an installation, so ordered
+// publication can authorize its persisted source and attempt records.
+func reviewRequestTestCanvasWith(t *testing.T, f publicationFixture, template string, input factoryTemplateInput) *models.Canvas {
+	t.Helper()
+	vcs := f.workspace.OnboardingConfigValue().VCSIntegrationID
+	if vcs != "" {
+		input.integrations = map[string]factoryTemplateIntegration{"github": {id: vcs, name: "github"}}
+	}
+	result, err := materializeFactoryTemplate(template, models.ProviderGitHub, input)
 	require.NoError(t, err)
 	doc, err := yaml.CanvasFromYAML([]byte(result.canvasYAML))
 	require.NoError(t, err)
@@ -144,6 +229,16 @@ func reviewRequestTestCanvas(t *testing.T, f publicationFixture, template string
 	canvas, _ := support.CreateCanvas(t, f.canvas.OrganizationID, *f.canvas.CreatedBy, nodes, doc.Edges())
 	require.NoError(t, f.db.Model(canvas).Update("factory_id", f.workspace.ID).Error)
 	canvas.FactoryID = &f.workspace.ID
+	version, err := models.FindLiveCanvasVersionByCanvasInTransaction(f.db, canvas)
+	require.NoError(t, err)
+	for i := range version.Nodes {
+		if !strings.HasPrefix(version.Nodes[i].ComponentName(), "github.") || vcs == "" {
+			continue
+		}
+		version.Nodes[i].IntegrationID = &vcs
+		require.NoError(t, f.db.Model(&models.CanvasNode{}).Where("workflow_id = ? AND node_id = ?", canvas.ID, version.Nodes[i].ID).Update("app_installation_id", uuid.MustParse(vcs)).Error)
+	}
+	require.NoError(t, f.db.Save(version).Error)
 	return canvas
 }
 
@@ -253,7 +348,8 @@ func runReviewRequestGraph(t *testing.T, f publicationFixture, canvas *models.Ca
 			}
 			builder := workercontexts.NewNodeConfigurationBuilder(f.db, canvas.ID).WithRunID(run.ID).WithNodeID(node.NodeID).WithRootEvent(&root.ID).WithPreviousExecution(previousID).WithIncomingEventID(&incoming.ID).WithInput(map[string]any{incoming.NodeID: incoming.Data.Data()})
 			ctx := core.ExecutionContext{
-				RunID: run.ID, Configuration: execution.Configuration.Data(), HTTP: host, Integration: reviewRequestIntegration(),
+				ID: execution.ID, WorkflowID: canvas.ID.String(), NodeID: node.NodeID, RunID: run.ID, Configuration: execution.Configuration.Data(), HTTP: host, Integration: reviewRequestIntegration(),
+				Publications:   workercontexts.NewPublicationContext(f.db, canvas.OrganizationID, node, execution),
 				Expressions:    workercontexts.NewExpressionContext(builder),
 				Metadata:       workercontexts.NewExecutionMetadataContext(f.db, execution),
 				ExecutionState: workercontexts.NewExecutionStateContext(f.db, execution, nil),
@@ -350,6 +446,12 @@ func runReviewRequestGraph(t *testing.T, f publicationFixture, canvas *models.Ca
 				host.movedHead = scenario == "head moved"
 				host.pushDuringLookups = scenario == "head moved during lookups"
 				host.closed = scenario == "closed during selection"
+			} else if isPublicationComponent(node.ComponentName()) {
+				ctx.Requests = workercontexts.NewExecutionRequestContext(f.db, execution)
+				require.NoError(t, action.Execute(ctx))
+				if !host.holdPublications {
+					processReviewRequestPublication(t, f, host, execution)
+				}
 			} else if err := action.Execute(ctx); err != nil {
 				return err
 			}
@@ -591,6 +693,25 @@ func TestReviewRequestRepeatsReportsAndRetriesOriginalReport(t *testing.T) {
 	var events []models.CanvasEvent
 	require.NoError(t, onBroadcast.(core.AppTrigger).OnAppMessage(core.AppMessageContext{Message: newMessage, Configuration: paused, Events: workercontexts.NewEventContext(f.db, trigger, nil, func(created []models.CanvasEvent) { events = append(events, created...) })}))
 	require.Empty(t, events)
+}
+
+// processReviewRequestPublication runs the pending request of a publication step
+// through the publication worker with substituted GitHub responses.
+func processReviewRequestPublication(t *testing.T, f publicationFixture, host *reviewRequestHTTP, execution *models.CanvasNodeExecution) {
+	t.Helper()
+	previous := newPublicationConnection
+	newPublicationConnection = func(*gorm.DB, IntakeDependencies, *models.CanvasNode, *models.Integration) (core.IntegrationContext, core.HTTPContext) {
+		return reviewRequestIntegration(), host
+	}
+	defer func() { newPublicationConnection = previous }()
+	var request models.CanvasNodeRequest
+	err := f.db.Where("execution_id = ? AND state = ?", execution.ID, models.NodeExecutionRequestStatePending).First(&request).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return
+	}
+	require.NoError(t, err)
+	_, err = ProcessBodySectionPublicationRequest(t.Context(), f.deps, request.ID, models.LockNodeRequestNow)
+	require.NoError(t, err)
 }
 
 func setReviewRequestInstructions(t *testing.T, f publicationFixture, canvas *models.Canvas, instructions string) {

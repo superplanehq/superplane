@@ -29,6 +29,9 @@ type Configuration struct {
 	Body            string `json:"body" mapstructure:"body"`
 	ExpectedHeadSHA string `json:"expectedHeadSha,omitempty" mapstructure:"expectedHeadSha"`
 	Enabled         *bool  `json:"enabled,omitempty" mapstructure:"enabled"`
+	// Ordered accepts only the newest source run and attempt for this section.
+	Ordered              bool  `json:"ordered,omitempty" mapstructure:"ordered"`
+	ActivationGeneration int64 `json:"activationGeneration,omitempty" mapstructure:"activationGeneration"`
 }
 
 func Decode(value any) (Configuration, error) {
@@ -42,6 +45,12 @@ func Decode(value any) (Configuration, error) {
 }
 
 func (c Configuration) IsEnabled() bool { return c.Enabled == nil || *c.Enabled }
+
+// PublicationKey is unique within one integration. Writers of the same section
+// share it, so ordering applies across canvases.
+func (c Configuration) PublicationKey() string {
+	return fmt.Sprintf("pull-request-body/%s/%s/%s", strings.ToLower(c.Repository), c.PullNumber, c.SectionKey)
+}
 
 func (c Configuration) Number() (int64, error) {
 	number, err := strconv.ParseInt(c.PullNumber, 10, 64)
@@ -63,6 +72,9 @@ func (c Configuration) Validate() error {
 			return err
 		}
 	}
+	if c.ActivationGeneration < 0 {
+		return fmt.Errorf("activation generation must be positive")
+	}
 	return ValidateBodySectionKey(c.SectionKey)
 }
 
@@ -83,7 +95,11 @@ Set **Expected Head SHA** to skip publication if the pull request commit changes
 
 Temporary failures retry through scheduled requests. Each attempt reads the latest description. Provider calls run outside database transactions. Execution details show attempts and publication outcomes.
 
-In factory apps, disabling the published node stops pending writes. Newer runs for the same pull request and section supersede older runs.`
+In factory apps, disabling the published node stops pending writes. Newer runs for the same pull request and section supersede older runs.
+
+Turn on **Ordered** to order writers by their persisted source run and attempt. The source is the broadcast source run, or the current run for other triggers. An older source or attempt cannot replace the section, including on the same commit and across canvases. Each attempt rechecks the order, the pull request commit, and the saved node at the write. Ordered publication fails the step when the host rejects the write or retries are exhausted.
+
+**Activation Generation** fences saved activations. Increase it when you enable the node again. Attempts that started with another generation do not write.`
 }
 func (Action) Configuration() []configuration.Field {
 	literalKey := false
@@ -94,6 +110,8 @@ func (Action) Configuration() []configuration.Field {
 		{Name: "body", Label: "Body", Type: configuration.FieldTypeText, Required: true, Description: "Markdown to place inside the section markers. Supports expressions."},
 		{Name: "expectedHeadSha", Label: "Expected Head SHA", Type: configuration.FieldTypeString, Description: "Skip the update if the pull request commit changed."},
 		{Name: "enabled", Label: "Enabled", Type: configuration.FieldTypeBool, Default: true, Description: "Publish this section to the pull request."},
+		{Name: "ordered", Label: "Ordered", Type: configuration.FieldTypeBool, Default: false, Description: "Skip publication when a newer source run or attempt owns this section."},
+		{Name: "activationGeneration", Label: "Activation Generation", Type: configuration.FieldTypeNumber, Default: 1, Description: "Increase when you enable publication again. Older attempts do not write."},
 	}
 }
 func ExampleOutput() map[string]any {
@@ -129,11 +147,46 @@ func (Action) Execute(ctx core.ExecutionContext) error {
 		metadata = map[string]any{}
 	}
 	metadata["sourceRunId"], metadata["status"], metadata["attempts"] = ctx.RunID.String(), "queued", 0
+	if config.Ordered && config.IsEnabled() {
+		accepted, err := AcceptOrderedWrite(ctx, config.PublicationKey())
+		if err != nil {
+			return err
+		}
+		if accepted == nil {
+			metadata["status"], metadata["reason"] = string(StatusSkipped), SupersededReason
+			if err := ctx.Metadata.Set(metadata); err != nil {
+				return err
+			}
+			return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, PayloadType, []any{Skipped(SupersededReason)})
+		}
+		metadata["publication"] = accepted
+	}
 	if err := ctx.Metadata.Set(metadata); err != nil {
 		return err
 	}
 	return ctx.Requests.ScheduleActionCall(HookName, nil, time.Second)
 }
+
+// SupersededReason explains an ordered write that lost to a newer source or attempt.
+const SupersededReason = "A newer source run or attempt owns this publication."
+
+// AcceptOrderedWrite claims the key for the current execution. It returns nil
+// when a newer source run or attempt already owns the key.
+func AcceptOrderedWrite(ctx core.ExecutionContext, key string) (*core.OrderedWrite, error) {
+	if ctx.Publications == nil {
+		return nil, fmt.Errorf("ordered publication requires a publication context")
+	}
+	canvasID, err := uuid.Parse(ctx.WorkflowID)
+	if err != nil {
+		return nil, fmt.Errorf("ordered publication requires a canvas: %w", err)
+	}
+	accepted, ok, err := core.AcceptOrderedWrite(ctx.Publications, key, canvasID, ctx.NodeID)
+	if err != nil || !ok {
+		return nil, err
+	}
+	return &accepted, nil
+}
+
 func (Action) Hooks() []core.Hook { return []core.Hook{{Name: HookName, Type: core.HookTypeInternal}} }
 func (Action) HandleWebhook(core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusNotFound, nil, nil
