@@ -164,21 +164,36 @@ func PublicationOwnerStatus(tx *gorm.DB, organizationID, integrationID, canvasID
 }
 
 func PublicationAttemptFinished(tx *gorm.DB, organizationID, rootEventID uuid.UUID) (bool, error) {
+	run, ended, err := findPublicationAttemptRun(tx, organizationID, rootEventID)
+	if err != nil || ended {
+		return ended, err
+	}
+	if len(run.Errors) > 0 {
+		return true, nil
+	}
+	result, err := run.CalculateResult(tx)
+	return result != CanvasRunResultPassed, err
+}
+
+// PublicationAttemptEnded reports only a stopped run. Run errors and failed
+// steps do not end the attempt, because later steps can publish its result.
+func PublicationAttemptEnded(tx *gorm.DB, organizationID, rootEventID uuid.UUID) (bool, error) {
+	_, ended, err := findPublicationAttemptRun(tx, organizationID, rootEventID)
+	return ended, err
+}
+
+func findPublicationAttemptRun(tx *gorm.DB, organizationID, rootEventID uuid.UUID) (*CanvasRun, bool, error) {
 	var run CanvasRun
 	err := tx.Joins("JOIN workflow_events ON workflow_events.run_id = workflow_runs.id").
 		Joins("JOIN workflows ON workflows.id = workflow_runs.workflow_id").
 		Where("workflow_events.id = ? AND workflows.organization_id = ?", rootEventID, organizationID).First(&run).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return true, nil
+		return nil, true, nil
 	}
 	if err != nil {
-		return false, err
+		return nil, false, err
 	}
-	if run.State == CanvasRunStateFinished || run.State == CanvasRunStateCancelling || len(run.Errors) > 0 {
-		return true, nil
-	}
-	result, err := run.CalculateResult(tx)
-	return result != CanvasRunResultPassed, err
+	return &run, run.State == CanvasRunStateFinished || run.State == CanvasRunStateCancelling, nil
 }
 
 func FindPublicationExecutionOutput(tx *gorm.DB, integrationID uuid.UUID, current *CanvasNodeExecution, executionID uuid.UUID) (core.PublicationExecution, error) {

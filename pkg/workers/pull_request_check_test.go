@@ -52,6 +52,23 @@ func TestPullRequestCheckPublishesWithoutFactoryOrReviewers(t *testing.T) {
 	require.Equal(t, generation, f.record().Generation)
 }
 
+func TestPullRequestCheckPublishesFinalFailureAfterRecordedRunError(t *testing.T) {
+	f := newPullRequestCheckFixture(t, "github.setPullRequestCheck")
+	require.NoError(t, f.applyStatus("pending"))
+	require.NoError(t, f.processDue())
+	f.finishAction()
+	run, err := models.FindCanvasRunInTransaction(f.db, f.canvas.ID, f.ctx.RunID)
+	require.NoError(t, err)
+	// An incomplete assessment records a run error before the report step ends.
+	require.NoError(t, run.AddError(f.db, "Merge confidence assessment failed.", 1024))
+	require.NoError(t, f.refresh())
+	require.Equal(t, "pending", f.state())
+
+	require.NoError(t, f.applyStatus("failure"))
+	require.NoError(t, f.processDue())
+	require.Equal(t, "failure", f.state())
+}
+
 func TestPullRequestCheckRecoversTerminalDeliveryAfterOwnerEnds(t *testing.T) {
 	for _, scenario := range []string{"cancelled", "failed", "finished without output", "removed", "retention"} {
 		t.Run(scenario, func(t *testing.T) {
@@ -63,6 +80,8 @@ func TestPullRequestCheckRecoversTerminalDeliveryAfterOwnerEnds(t *testing.T) {
 				require.NoError(t, f.db.Model(&models.CanvasRun{}).Where("id = ?", f.ctx.RunID).Update("state", models.CanvasRunStateCancelling).Error)
 			case "failed":
 				require.NoError(t, f.ctx.ExecutionState.Fail(models.CanvasNodeExecutionResultReasonError, "agent failed"))
+				// Failed steps resolve pending after the run finalizer ends the run.
+				require.NoError(t, f.db.Model(&models.CanvasRun{}).Where("id = ?", f.ctx.RunID).Update("state", models.CanvasRunStateFinished).Error)
 			case "finished without output":
 				require.NoError(t, f.db.Model(&models.CanvasRun{}).Where("id = ?", f.ctx.RunID).Update("state", models.CanvasRunStateFinished).Error)
 			case "removed":
