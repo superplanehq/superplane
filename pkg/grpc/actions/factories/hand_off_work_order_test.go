@@ -115,6 +115,48 @@ func Test__HandOffWorkOrder__ImplementStartsCustomStageWhenDoneFollows(t *testin
 	assert.Equal(t, pb.WorkOrderExecution_STATE_PENDING, result.Order.GetLineDispatches()[0].GetStepExecutions()[0].GetState())
 }
 
+func Test__HandOffWorkOrder__ImplementStartsAutomaticCustomAutomation(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+	factoryModel := seedHandOffFactory(t, r, db)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
+	integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
+	require.NoError(t, factoryModel.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSIntegrationID: &integrationID}))
+	customApp, customEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "custom", "start-custom")
+	_, err := factoryModel.CreateLine(db, "ship", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: customApp.ID, Entrypoint: customEntry},
+	})
+	require.NoError(t, err)
+	created, err := CreateFactoryCustomAutomation(onboardingContext(r), onboardingDeps(r), r.Organization.ID.String(), &pb.CreateFactoryCustomAutomationRequest{
+		FactoryId: factoryModel.ID.String(),
+		Name:      "Lint on Implement",
+		ColumnKey: models.CanvasColumnKeyImplement,
+		Settings: &pb.FactoryCustomAutomation_Settings{
+			StartMode: pb.FactoryCustomAutomation_START_MODE_AUTOMATIC,
+			Agent:     &pb.FactoryAppTemplateAgent{Component: "runnerClaudeCode"},
+			Steps: []*pb.FactoryCustomAutomation_Step{
+				{Name: "Lint", Type: pb.FactoryCustomAutomation_Step_TYPE_PROMPT, Prompt: "Lint the task.", WorkingDirectory: "repo"},
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	result, err := HandOffWorkOrder(ctx, IntakeDependencies{}, r.Organization.ID.String(), HandOffWorkOrderRequest{
+		FactoryID: factoryModel.ID.String(),
+		Title:     "Ship the lint",
+		Plan:      "# Lint",
+		Column:    HandOffColumnImplement,
+	})
+	require.NoError(t, err)
+	require.Len(t, result.Order.GetLineDispatches()[0].GetStepExecutions(), 1)
+	assert.Equal(t, int32(0), result.Order.GetLineDispatches()[0].GetStepExecutions()[0].GetStepIndex())
+
+	var events []models.CanvasEvent
+	require.NoError(t, db.Where("workflow_id = ?", created.GetCustomAutomation().GetAutomation().GetId()).Find(&events).Error)
+	require.NotEmpty(t, events)
+}
+
 func Test__HandOffWorkOrder__VerifyWritesRecordsWithoutARun(t *testing.T) {
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())

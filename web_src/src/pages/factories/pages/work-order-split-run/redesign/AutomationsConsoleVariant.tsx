@@ -18,6 +18,7 @@ import type { ManualCustomAutomation } from "../../../lib/customAutomation";
 import { CustomAutomationRunAction } from "../../CustomAutomationRunAction";
 
 import { type SplitRunFixture, type SplitRunPhase } from "../splitRunMocks";
+import { isClosedWorkOrderDisplayStatus } from "../splitRunFooter";
 import type { SplitRunSource } from "../splitRunSource";
 import { ConsoleSummaryPanel } from "./ConsoleSummaryPanel";
 import { timingsForConsoleColumns, type ColumnTiming } from "./columnTiming";
@@ -438,7 +439,7 @@ function eligibleColumnAutomations(
         (fixture.lineStatus === "running" || fixture.lineStatus === "waiting")
       );
     }
-    if (savedColumn === "done") return fixture.footer.status === "completed" || fixture.footer.status === "rejected";
+    if (savedColumn === "done") return isClosedWorkOrderDisplayStatus(fixture.footer.status);
     return Boolean(fixture.canRunVerifyCustomAutomation);
   });
 }
