@@ -11,18 +11,19 @@ import (
 )
 
 type AppMessage struct {
-	ID        uuid.UUID
-	CanvasID  uuid.UUID
-	NodeID    string
-	Payload   datatypes.JSON
-	CreatedAt time.Time
+	ID          uuid.UUID
+	CanvasID    uuid.UUID
+	NodeID      string
+	Payload     datatypes.JSON
+	CreatedAt   time.Time
+	SourceRunID *uuid.UUID
 }
 
 func (m *AppMessage) TableName() string {
 	return "app_messages"
 }
 
-func CreateAppMessage(tx *gorm.DB, canvasID uuid.UUID, nodeID string, payload any) error {
+func CreateAppMessage(tx *gorm.DB, canvasID uuid.UUID, nodeID string, payload any, sourceRunID ...uuid.UUID) error {
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
 		return err
@@ -34,6 +35,9 @@ func CreateAppMessage(tx *gorm.DB, canvasID uuid.UUID, nodeID string, payload an
 		NodeID:    nodeID,
 		Payload:   datatypes.JSON(payloadBytes),
 		CreatedAt: time.Now(),
+	}
+	if len(sourceRunID) > 0 && sourceRunID[0] != uuid.Nil {
+		message.SourceRunID = &sourceRunID[0]
 	}
 
 	return tx.Create(message).Error
