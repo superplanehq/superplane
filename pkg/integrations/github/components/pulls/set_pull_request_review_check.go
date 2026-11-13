@@ -186,20 +186,19 @@ func (*SetPullRequestReviewCheck) Execute(ctx core.ExecutionContext) error {
 			return err
 		}
 	}
+	if config.ActivationNodeID != "" {
+		generation, eligible, err := reviewCheckActivation(ctx.Publications, uuid.MustParse(ctx.WorkflowID), config.ActivationNodeID, order.AttemptRootEventID)
+		if err != nil {
+			return err
+		}
+		if !eligible || generation != config.ActivationGeneration {
+			return emitReviewCheck(ctx.ExecutionState, "superseded", nil, nil)
+		}
+	}
 	key := config.key()
 	var generation int64
 	status := "applied"
 	err = ctx.Publications.Update(key, func(record *core.OrderedPublication) error {
-		if config.ActivationNodeID != "" {
-			generation, eligible, err := reviewCheckActivation(ctx.Publications, uuid.MustParse(ctx.WorkflowID), config.ActivationNodeID, order.AttemptRootEventID)
-			if err != nil {
-				return err
-			}
-			if !eligible || generation != config.ActivationGeneration {
-				status = "superseded"
-				return core.ErrPublicationUnchanged
-			}
-		}
 		comparison := order.Compare(record.Order)
 		if !record.CanReplace(order, config.ActivationGeneration, config.Phase == "disabled") {
 			status = "superseded"
