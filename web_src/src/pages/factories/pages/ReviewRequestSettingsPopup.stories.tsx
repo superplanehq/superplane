@@ -14,12 +14,14 @@ import {
 } from "./automationRunHistory/factoryRunHistoryFixtures";
 
 function ReviewRequestPreview({
+  publishCheck = false,
   empty = false,
   loading = false,
   error = false,
   saving = false,
   failSave = false,
 }: {
+  publishCheck?: boolean;
   empty?: boolean;
   loading?: boolean;
   error?: boolean;
@@ -29,6 +31,8 @@ function ReviewRequestPreview({
   const [client] = useState(() => new QueryClient({ defaultOptions: { queries: { retry: false } } }));
   const [canvas, setCanvas] = useState(() => {
     const canvas = reviewRequestCanvas();
+    canvas.spec!.nodes![1].configuration!.publishPRCheck = publishCheck;
+    canvas.spec!.nodes![3].configuration!.enabled = publishCheck;
     if (empty) canvas.spec!.nodes![1].configuration!.fallbackReviewer = "";
     canvas.spec!.nodes![1].configuration!.additionalInstructions = empty
       ? ""
@@ -79,6 +83,8 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Configured: Story = {};
+export const CheckOff: Story = {};
+export const CheckOn: Story = { args: { publishCheck: true } };
 export const Empty: Story = { args: { empty: true } };
 export const Loading: Story = { args: { loading: true } };
 export const Error: Story = { args: { error: true } };
@@ -89,6 +95,7 @@ export const Saving: Story = {
     await userEvent.click(await canvas.findByTestId("review-request-settings-save"));
     await expect(canvas.getByRole("button", { name: "Saving" })).toBeDisabled();
     await expect(canvas.getByRole("textbox", { name: "Additional instructions" })).toBeDisabled();
+    await expect(canvas.getByRole("switch", { name: "Publish PR check" })).toBeDisabled();
   },
 };
 export const SaveError: Story = {

@@ -18,7 +18,7 @@ spec:
     targetId: review-outcome-activity
     channel: default
   - sourceId: review-request-trigger
-    targetId: add-review-activity
+    targetId: pr-check-pending
     channel: default
   - sourceId: add-review-activity
     targetId: review-needed
@@ -33,7 +33,7 @@ spec:
     targetId: current-report
     channel: default
   - sourceId: current-report
-    targetId: select-reviewers
+    targetId: has-candidates
     channel: 'true'
   - sourceId: current-report
     targetId: stale-report
@@ -58,6 +58,36 @@ spec:
     channel: 'false'
   - sourceId: request-reviewers
     targetId: review-outcome
+    channel: default
+  - sourceId: pr-check-pending
+    targetId: add-review-activity
+    channel: default
+  - sourceId: has-candidates
+    targetId: select-reviewers
+    channel: 'true'
+  - sourceId: has-candidates
+    targetId: no-candidates
+    channel: 'false'
+  - sourceId: no-candidates
+    targetId: no-candidates-activity
+    channel: default
+  - sourceId: review-unnecessary
+    targetId: pr-check-unnecessary
+    channel: default
+  - sourceId: no-reviewer
+    targetId: pr-check-no-reviewer
+    channel: default
+  - sourceId: no-candidates
+    targetId: pr-check-no-candidates
+    channel: default
+  - sourceId: review-outcome
+    targetId: pr-check-apply
+    channel: default
+  - sourceId: stale-report
+    targetId: pr-check-stale
+    channel: default
+  - sourceId: selection-error
+    targetId: pr-check-error
     channel: default
   nodes:
   - id: review-request-trigger
@@ -121,6 +151,8 @@ spec:
       max: 5
     configuration:
       fallbackReviewer: ''
+      publishPRCheck: false
+      prCheckActivationGeneration: 1
       additionalInstructions: ''
       executionTimeoutSeconds: 1800
       includeVisualEvidence: false
@@ -420,3 +452,162 @@ spec:
     position:
       x: 3280
       y: 80
+  - id: has-candidates
+    name: Eligible candidates
+    type: TYPE_ACTION
+    component: if
+    configuration:
+      expression: len($["List candidates"].data.candidates) > 0
+    position:
+      x: 1680
+      y: -240
+  - id: no-candidates
+    name: No candidates
+    type: TYPE_ACTION
+    component: broadcastMessage
+    configuration:
+      payload:
+        type: review-request.completed
+        sourceAppId: '{{ root().data.app.id }}'
+        reportId: '{{ root().data.payload.reportId }}'
+        reviewedCommit: '{{ root().data.payload.reviewedCommit }}'
+        pullRequestId: '{{ root().data.payload.pullRequestId }}'
+        repository: '{{ root().data.payload.repository }}'
+        pullNumber: '{{ root().data.payload.pullNumber }}'
+        runId: '{{ run().id }}'
+        runUrl: '{{ run().url }}'
+        reviewRequest:
+          status: no_eligible_reviewer
+          rationale: No eligible candidate or fallback reviewer is available.
+          reviewers: '{{ [] }}'
+          fallbackUsed: '{{ false }}'
+    position:
+      x: 2000
+      y: -240
+  - id: no-candidates-activity
+    name: No candidates activity
+    type: TYPE_ACTION
+    component: updatePullRequestActivity
+    configuration:
+      title: No eligible reviewer
+      description: No eligible candidate or fallback reviewer is available.
+    position:
+      x: 2320
+      y: -240
+  - id: pr-check-pending
+    name: Register PR check
+    type: TYPE_ACTION
+    component: github.setPullRequestReviewCheck
+    configuration:
+      repository: '{{ root().data.payload.repository }}'
+      pullNumber: '{{ root().data.payload.pullNumber }}'
+      assessedSha: '{{ root().data.payload.reviewedCommit }}'
+      context: superplane/review-request
+      activationNodeId: pr-check-pending
+      resultUrl: '{{ run().url }}'
+      phase: pending_selection
+      reason: Select required reviewers.
+      enabled: false
+      activationGeneration: 1
+    position:
+      x: 400
+      y: -240
+  - id: pr-check-unnecessary
+    name: Apply unnecessary review check
+    type: TYPE_ACTION
+    component: github.setPullRequestReviewCheck
+    configuration:
+      repository: '{{ root().data.payload.repository }}'
+      pullNumber: '{{ root().data.payload.pullNumber }}'
+      assessedSha: '{{ root().data.payload.reviewedCommit }}'
+      context: superplane/review-request
+      activationNodeId: pr-check-pending
+      resultUrl: '{{ run().url }}'
+      phase: no_review
+      reason: '{{ previous().data.reviewRequest.rationale }}'
+    position:
+      x: 1360
+      y: 800
+  - id: pr-check-no-reviewer
+    name: Apply no reviewer check
+    type: TYPE_ACTION
+    component: github.setPullRequestReviewCheck
+    configuration:
+      repository: '{{ root().data.payload.repository }}'
+      pullNumber: '{{ root().data.payload.pullNumber }}'
+      assessedSha: '{{ root().data.payload.reviewedCommit }}'
+      context: superplane/review-request
+      activationNodeId: pr-check-pending
+      resultUrl: '{{ run().url }}'
+      phase: no_review
+      reason: '{{ previous().data.reviewRequest.rationale }}'
+    position:
+      x: 2960
+      y: 800
+  - id: pr-check-no-candidates
+    name: Apply no candidates check
+    type: TYPE_ACTION
+    component: github.setPullRequestReviewCheck
+    configuration:
+      repository: '{{ root().data.payload.repository }}'
+      pullNumber: '{{ root().data.payload.pullNumber }}'
+      assessedSha: '{{ root().data.payload.reviewedCommit }}'
+      context: superplane/review-request
+      activationNodeId: pr-check-pending
+      resultUrl: '{{ run().url }}'
+      phase: no_review
+      reason: '{{ previous().data.reviewRequest.rationale }}'
+    position:
+      x: 2640
+      y: -240
+  - id: pr-check-apply
+    name: Apply required reviewers
+    type: TYPE_ACTION
+    component: github.setPullRequestReviewCheck
+    configuration:
+      repository: '{{ root().data.payload.repository }}'
+      pullNumber: '{{ root().data.payload.pullNumber }}'
+      assessedSha: '{{ root().data.payload.reviewedCommit }}'
+      context: superplane/review-request
+      activationNodeId: pr-check-pending
+      resultUrl: '{{ run().url }}'
+      phase: '{{ $["Ensure reviewers"].data.status == "skipped" ? "selection_error" : "required_reviewers" }}'
+      reason: '{{ $["Ensure reviewers"].data.status == "skipped" ? "The reviewer request was skipped because the assessed commit is no longer current."
+        : $["Select reviewers"].data.result.rationale }}'
+      reviewers: '{{ $["Ensure reviewers"].config.reviewers }}'
+      reviewerRequestExecutionId: '{{ $["Ensure reviewers"].data.executionId }}'
+    position:
+      x: 3280
+      y: 800
+  - id: pr-check-stale
+    name: Apply stale report check
+    type: TYPE_ACTION
+    component: github.setPullRequestReviewCheck
+    configuration:
+      repository: '{{ root().data.payload.repository }}'
+      pullNumber: '{{ root().data.payload.pullNumber }}'
+      assessedSha: '{{ root().data.payload.reviewedCommit }}'
+      context: superplane/review-request
+      activationNodeId: pr-check-pending
+      resultUrl: '{{ run().url }}'
+      phase: selection_error
+      reason: The pull request is closed or its head differs from the assessed commit.
+    position:
+      x: 2000
+      y: 800
+  - id: pr-check-error
+    name: Apply selection error check
+    type: TYPE_ACTION
+    component: github.setPullRequestReviewCheck
+    configuration:
+      repository: '{{ root().data.payload.repository }}'
+      pullNumber: '{{ root().data.payload.pullNumber }}'
+      assessedSha: '{{ root().data.payload.reviewedCommit }}'
+      context: superplane/review-request
+      activationNodeId: pr-check-pending
+      resultUrl: '{{ run().url }}'
+      phase: selection_error
+      reason: Reviewer selection failed or returned an invalid decision.
+    position:
+      x: 2320
+      y: 800
