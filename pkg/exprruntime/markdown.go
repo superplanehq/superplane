@@ -11,7 +11,7 @@ import (
 // MarkdownFunctionOptions adds escaping functions for text and angle-bracket link destinations.
 func MarkdownFunctionOptions() []expr.Option {
 	return []expr.Option{
-		markdownFunction("markdownText", markdownText),
+		markdownFunction("markdownText", MarkdownText),
 		markdownFunction("markdownLink", markdownLink),
 	}
 }
@@ -29,7 +29,8 @@ func markdownFunction(name string, escape func(string) string) expr.Option {
 	}, new(func(string) string))
 }
 
-func markdownText(value string) string {
+// MarkdownText escapes untrusted text for Markdown and HTML rendering.
+func MarkdownText(value string) string {
 	var escaped strings.Builder
 	for _, r := range value {
 		if unicode.IsControl(r) || r == '\u2028' || r == '\u2029' {
