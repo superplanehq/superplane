@@ -243,15 +243,20 @@ func FindPullRequestActivityByRunID(tx *gorm.DB, runID uuid.UUID) (*FactoryPullR
 }
 
 func (p *FactoryPullRequest) lockActivityWorkOrder(tx *gorm.DB) (*FactoryWorkOrder, error) {
-	// Serialize activity admission with deletion so deletion can cancel every admitted run.
-	order := &FactoryWorkOrder{ID: p.WorkOrderID}
-	if err := order.LockForUpdate(tx); err != nil {
+	// Do not wait behind deletion while the worker holds an execution lock.
+	var order FactoryWorkOrder
+	err := tx.Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
+		Where("id = ?", p.WorkOrderID).First(&order).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, &CodexConnectionBusyError{}
+	}
+	if err != nil {
 		return nil, err
 	}
 	if order.IsArchived() {
 		return nil, fmt.Errorf("%w: task is archived", ErrFactoryWorkOrderInvalidState)
 	}
-	return order, nil
+	return &order, nil
 }
 
 func (p *FactoryPullRequest) insertActivity(
