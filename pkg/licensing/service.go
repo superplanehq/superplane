@@ -50,14 +50,59 @@ func (s Status) IsEntitled(feature Feature) bool {
 	return s.State == StateActive && s.License.HasFeature(feature)
 }
 
-// Entitlements answers whether an Enterprise feature is available now.
+// StatusProvider reports the current installation license.
+type StatusProvider interface {
+	Status() Status
+}
+
+// IsDevelopment reports the ephemeral license used by the development server.
+// That license bypasses organization grants and the lifecycle handler.
+func (s Status) IsDevelopment() bool {
+	return s.State == StateActive && s.License != nil && s.License.KeyID == DevelopmentKeyID
+}
+
+// GrantLookup answers whether an organization has a grant for a feature.
+type GrantLookup interface {
+	HasGrant(ctx context.Context, orgID uuid.UUID, feature Feature) (bool, error)
+}
+
+// LifecycleHandler reacts to the status after each successful license load.
+type LifecycleHandler interface {
+	HandleStatus(ctx context.Context, status Status) error
+}
+
+// LifecycleFailure is a lifecycle handler error with the fields the service logs.
+type LifecycleFailure struct {
+	Event     string
+	LicenseID uuid.UUID
+	Err       error
+}
+
+func (e *LifecycleFailure) Error() string {
+	if e == nil || e.Err == nil {
+		return "enterprise license lifecycle failed"
+	}
+
+	return e.Err.Error()
+}
+
+func (e *LifecycleFailure) Unwrap() error {
+	if e == nil {
+		return nil
+	}
+
+	return e.Err
+}
+
+// Entitlements answers whether an Enterprise feature is available to an
+// organization now.
 type Entitlements interface {
-	IsEntitled(feature Feature) bool
+	IsEntitled(ctx context.Context, orgID uuid.UUID, feature Feature) bool
 }
 
 type communityEntitlements struct{}
 
-func (communityEntitlements) IsEntitled(Feature) bool {
+func (communityEntitlements) IsEntitled(context.Context, uuid.UUID, Feature) bool {
 	return false
 }
 
@@ -65,23 +110,24 @@ func (communityEntitlements) IsEntitled(Feature) bool {
 // configured so that Enterprise checks fail closed.
 var Community Entitlements = communityEntitlements{}
 
-// Allows reports whether entitlements grant a feature. A nil value grants
-// nothing.
-func Allows(entitlements Entitlements, feature Feature) bool {
+// Allows reports whether entitlements grant a feature to an organization.
+// A nil value grants nothing.
+func Allows(ctx context.Context, entitlements Entitlements, orgID uuid.UUID, feature Feature) bool {
 	if entitlements == nil {
 		return false
 	}
 
-	return entitlements.IsEntitled(feature)
+	return entitlements.IsEntitled(ctx, orgID, feature)
 }
 
-// ErrNotLicensed reports that the installation license does not grant an
-// Enterprise feature.
+// ErrNotLicensed reports that an Enterprise feature is not available.
+// A missing organization grant uses this same error.
 var ErrNotLicensed = errors.New("this action requires a SuperPlane Enterprise license")
 
-// Require returns ErrNotLicensed unless the entitlements grant the feature.
-func Require(entitlements Entitlements, feature Feature) error {
-	if !Allows(entitlements, feature) {
+// Require returns ErrNotLicensed unless the entitlements grant the feature
+// to the organization.
+func Require(ctx context.Context, entitlements Entitlements, orgID uuid.UUID, feature Feature) error {
+	if !Allows(ctx, entitlements, orgID, feature) {
 		return ErrNotLicensed
 	}
 
@@ -99,6 +145,8 @@ type Service struct {
 	source      Source
 	keySync     *KeySync
 	revocations *RevocationSync
+	grantLookup GrantLookup
+	lifecycle   LifecycleHandler
 	now         func() time.Time
 	current     atomic.Pointer[snapshot]
 	refreshMu   sync.Mutex
@@ -117,6 +165,20 @@ func WithKeySync(keySync *KeySync) ServiceOption {
 func WithRevocationSync(revocations *RevocationSync) ServiceOption {
 	return func(s *Service) {
 		s.revocations = revocations
+	}
+}
+
+// WithGrantLookup stores organization grant checks.
+func WithGrantLookup(grants GrantLookup) ServiceOption {
+	return func(s *Service) {
+		s.grantLookup = grants
+	}
+}
+
+// WithLifecycleHandler runs grant maintenance after each successful load.
+func WithLifecycleHandler(handler LifecycleHandler) ServiceOption {
+	return func(s *Service) {
+		s.lifecycle = handler
 	}
 }
 
@@ -162,7 +224,11 @@ func (s *Service) Start(ctx context.Context) {
 	}
 
 	if s.revocations != nil {
-		s.revocations.Start(ctx)
+		s.revocations.Start(ctx, func() {
+			if err := s.Refresh(ctx); err != nil {
+				log.WithError(err).Warn("Licensing: license refresh after a revocation update failed")
+			}
+		})
 	}
 
 	go func() {
@@ -192,11 +258,42 @@ func (s *Service) Refresh(ctx context.Context) error {
 		return err
 	}
 
-	if s.current.Load().reason != ReasonUnknownKey || !s.syncKeysOnDemand(ctx) {
-		return nil
+	if s.current.Load().reason == ReasonUnknownKey && s.syncKeysOnDemand(ctx) {
+		if err := s.reloadLicense(ctx); err != nil {
+			return err
+		}
 	}
 
-	return s.reloadLicense(ctx)
+	s.notifyLifecycle(ctx, s.Status())
+	return nil
+}
+
+// notifyLifecycle runs after the license lock is released. A handler error
+// is logged and does not fail the load. The next refresh retries it.
+func (s *Service) notifyLifecycle(ctx context.Context, status Status) {
+	if s.lifecycle == nil || status.IsDevelopment() {
+		return
+	}
+
+	err := s.lifecycle.HandleStatus(ctx, status)
+	if err == nil {
+		return
+	}
+
+	fields := log.Fields{"event": "lifecycle", "error": err}
+	var failure *LifecycleFailure
+	if errors.As(err, &failure) {
+		if failure.Event != "" {
+			fields["event"] = failure.Event
+		}
+		if failure.LicenseID != uuid.Nil {
+			fields["license_id"] = failure.LicenseID.String()
+		}
+	} else if status.License != nil {
+		fields["license_id"] = status.License.ID.String()
+	}
+
+	log.WithFields(fields).Warn("Licensing: enterprise license lifecycle failed")
 }
 
 // reloadKeys trusts a newer key list that another replica saved. It reports
@@ -307,8 +404,33 @@ func (s *Service) Status() Status {
 	return status
 }
 
-func (s *Service) IsEntitled(feature Feature) bool {
-	return s.Status().IsEntitled(feature)
+// IsEntitled reports whether the organization can use the feature.
+// The license must be active and must contain the feature. A development
+// license then allows every organization. Any other license also requires
+// a grant. A missing organization, a missing lookup, or a lookup error
+// denies access.
+func (s *Service) IsEntitled(ctx context.Context, orgID uuid.UUID, feature Feature) bool {
+	status := s.Status()
+	if !status.IsEntitled(feature) {
+		return false
+	}
+	if status.IsDevelopment() {
+		return true
+	}
+	if orgID == uuid.Nil || s.grantLookup == nil {
+		return false
+	}
+
+	granted, err := s.grantLookup.HasGrant(ctx, orgID, feature)
+	if err != nil {
+		log.WithError(err).WithFields(log.Fields{
+			"organization_id": orgID.String(),
+			"feature":         string(feature),
+		}).Warn("Enterprise feature grant lookup failed")
+		return false
+	}
+
+	return granted
 }
 
 // TrustedKeys reports the trusted key list. It returns false when the service
@@ -339,15 +461,17 @@ func (s *Service) InstallKeyList(ctx context.Context, raw []byte) error {
 	return nil
 }
 
-// Install verifies a license and stores it. It accepts only a license that is
-// valid now, so an installation never replaces a working license with one that
-// grants nothing.
-func (s *Service) Install(ctx context.Context, raw []byte, installedBy uuid.UUID) (Status, error) {
-	writable := s.writableSource()
-	if writable == nil {
-		return s.Status(), ErrManagedByFile
+// DryRunInstall verifies a license the same way Install does, and does not store it.
+func (s *Service) DryRunInstall(ctx context.Context, raw []byte) (*License, error) {
+	if s.writableSource() == nil {
+		return nil, ErrManagedByFile
 	}
 
+	return s.licenseAcceptedForInstall(ctx, raw)
+}
+
+// licenseAcceptedForInstall is the verification Install and DryRunInstall share.
+func (s *Service) licenseAcceptedForInstall(ctx context.Context, raw []byte) (*License, error) {
 	license, err := s.verifier.Verify(raw)
 	if ReasonOf(err) == ReasonUnknownKey && s.reloadKeys(ctx) {
 		license, err = s.verifier.Verify(raw)
@@ -358,25 +482,60 @@ func (s *Service) Install(ctx context.Context, raw []byte, installedBy uuid.UUID
 	}
 
 	if err != nil {
+		return nil, err
+	}
+
+	switch license.ValidityAt(s.now()) {
+	case ValidityExpired:
+		return nil, invalid(ReasonExpired)
+	case ValidityNotYetValid:
+		return nil, invalid(ReasonNotYetValid)
+	}
+
+	if s.licenseRevoked(license.ID) {
+		return nil, invalid(ReasonRevoked)
+	}
+
+	return license, nil
+}
+
+// Install verifies a license and stores it. It accepts only a license that is
+// valid now, so an installation never replaces a working license with one that
+// grants nothing.
+func (s *Service) Install(ctx context.Context, raw []byte, installedBy uuid.UUID) (Status, error) {
+	writable := s.writableSource()
+	if writable == nil {
+		return s.Status(), ErrManagedByFile
+	}
+
+	license, err := s.licenseAcceptedForInstall(ctx, raw)
+	if err != nil {
 		return s.Status(), err
 	}
 
 	s.refreshMu.Lock()
-	defer s.refreshMu.Unlock()
 
 	switch license.ValidityAt(s.now()) {
 	case ValidityExpired:
-		return s.Status(), invalid(ReasonExpired)
+		status := s.Status()
+		s.refreshMu.Unlock()
+		return status, invalid(ReasonExpired)
 	case ValidityNotYetValid:
-		return s.Status(), invalid(ReasonNotYetValid)
+		status := s.Status()
+		s.refreshMu.Unlock()
+		return status, invalid(ReasonNotYetValid)
 	}
 
 	if s.licenseRevoked(license.ID) {
-		return s.Status(), invalid(ReasonRevoked)
+		status := s.Status()
+		s.refreshMu.Unlock()
+		return status, invalid(ReasonRevoked)
 	}
 
 	if err := writable.Write(ctx, bytes.TrimSpace(raw), installedBy); err != nil {
-		return s.Status(), err
+		status := s.Status()
+		s.refreshMu.Unlock()
+		return status, err
 	}
 
 	log.WithFields(log.Fields{
@@ -385,11 +544,15 @@ func (s *Service) Install(ctx context.Context, raw []byte, installedBy uuid.UUID
 		"installed_by": installedBy.String(),
 	}).Info("Licensing: license installed")
 
-	if err := s.refreshAfterChange(ctx); err != nil {
-		return s.Status(), err
+	reloadErr := s.refreshAfterChange(ctx)
+	status := s.Status()
+	s.refreshMu.Unlock()
+	if reloadErr != nil {
+		return status, reloadErr
 	}
 
-	return s.Status(), nil
+	s.notifyLifecycle(ctx, status)
+	return status, nil
 }
 
 func (s *Service) Remove(ctx context.Context, removedBy uuid.UUID) (Status, error) {
@@ -399,16 +562,23 @@ func (s *Service) Remove(ctx context.Context, removedBy uuid.UUID) (Status, erro
 	}
 
 	s.refreshMu.Lock()
-	defer s.refreshMu.Unlock()
 
 	if err := writable.Clear(ctx); err != nil {
-		return s.Status(), err
+		status := s.Status()
+		s.refreshMu.Unlock()
+		return status, err
 	}
 
 	log.WithField("removed_by", removedBy.String()).Info("Licensing: license removed")
 
-	_ = s.refreshAfterChange(ctx)
-	return s.Status(), nil
+	reloadErr := s.refreshAfterChange(ctx)
+	status := s.Status()
+	s.refreshMu.Unlock()
+	if reloadErr == nil {
+		s.notifyLifecycle(ctx, status)
+	}
+
+	return status, nil
 }
 
 // refreshAfterChange reads the shared state after a change. When the read

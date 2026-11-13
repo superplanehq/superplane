@@ -9,7 +9,11 @@ GitHub Marketplace.
 ## 1. Create the owner account
 
 Open SuperPlane and complete owner setup. Choose Community or add an
-Enterprise license. You can add a license later.
+Enterprise license. You can add a license later. When the installation has
+one organization, that organization receives every licensed feature. When it
+has more than one organization, open Installation Admin, select each
+organization, and enable Enterprise features. A new organization does not
+receive them.
 
 ## 2. Configure email (optional)
 
