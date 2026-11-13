@@ -18,6 +18,34 @@ func Test__FactoryPullRequestActivityCoordination(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 
+	for _, result := range []string{models.FactoryWorkOrderResultArchived, models.FactoryWorkOrderResultRejected} {
+		t.Run("blocks activity after task deletion/"+result, func(t *testing.T) {
+			pullRequest, canvas := createActivityFixture(t, db, r)
+			run := createCanvasRun(t, db, canvas.ID, models.CanvasRunStateStarted, "")
+			activity, err := pullRequest.CreateActivity(db, models.FactoryPullRequestActivityParams{RunID: run.ID})
+			require.NoError(t, err)
+			order, err := models.FindUnscopedWorkOrder(db, pullRequest.WorkOrderID)
+			require.NoError(t, err)
+			_, err = order.Close(db, result, &r.User)
+			require.NoError(t, err)
+
+			access, err := pullRequest.RequestExclusiveAccess(db, activity.Activity)
+			assert.ErrorIs(t, err, models.ErrFactoryWorkOrderInvalidState)
+			assert.Nil(t, access)
+			assert.Nil(t, reloadPullRequest(t, db, pullRequest).ActiveMutationRunID)
+
+			newRun := createCanvasRun(t, db, canvas.ID, models.CanvasRunStateStarted, "")
+			created, err := pullRequest.CreateActivity(db, models.FactoryPullRequestActivityParams{
+				RunID:  newRun.ID,
+				Access: models.FactoryPullRequestAccessExclusive,
+			})
+			assert.ErrorIs(t, err, models.ErrFactoryWorkOrderInvalidState)
+			assert.Nil(t, created)
+			_, err = models.FindPullRequestActivityByRunID(db, newRun.ID)
+			assert.ErrorIs(t, err, models.ErrFactoryPullRequestActivityNotFound)
+		})
+	}
+
 	t.Run("observes a revision once and keeps it current", func(t *testing.T) {
 		pullRequest, canvas := createActivityFixture(t, db, r)
 		sha := activitySHA("aa")

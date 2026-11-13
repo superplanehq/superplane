@@ -51,7 +51,10 @@ func (p *FactoryPullRequest) CreateActivity(tx *gorm.DB, params FactoryPullReque
 		return nil, err
 	}
 
-	order := &FactoryWorkOrder{ID: p.WorkOrderID, OrganizationID: p.OrganizationID, FactoryID: p.FactoryID}
+	order, err := p.lockActivityWorkOrder(tx)
+	if err != nil {
+		return nil, err
+	}
 	if err := order.RequireExecutionOwner(tx, true); err != nil {
 		return nil, err
 	}
@@ -118,6 +121,9 @@ func (p *FactoryPullRequest) CreateActivity(tx *gorm.DB, params FactoryPullReque
 func (p *FactoryPullRequest) RequestExclusiveAccess(tx *gorm.DB, activity *FactoryPullRequestRun) (*FactoryPullRequestAccessResult, error) {
 	if activity == nil {
 		return nil, fmt.Errorf("%w: activity is required", ErrFactoryPullRequestInvalid)
+	}
+	if _, err := p.lockActivityWorkOrder(tx); err != nil {
+		return nil, err
 	}
 	if err := p.lock(tx); err != nil {
 		return nil, err
@@ -234,6 +240,18 @@ func FindPullRequestActivityByRunID(tx *gorm.DB, runID uuid.UUID) (*FactoryPullR
 		return nil, err
 	}
 	return &activity, nil
+}
+
+func (p *FactoryPullRequest) lockActivityWorkOrder(tx *gorm.DB) (*FactoryWorkOrder, error) {
+	// Serialize activity admission with deletion so deletion can cancel every admitted run.
+	order := &FactoryWorkOrder{ID: p.WorkOrderID}
+	if err := order.LockForUpdate(tx); err != nil {
+		return nil, err
+	}
+	if order.IsArchived() {
+		return nil, fmt.Errorf("%w: task is archived", ErrFactoryWorkOrderInvalidState)
+	}
+	return order, nil
 }
 
 func (p *FactoryPullRequest) insertActivity(
