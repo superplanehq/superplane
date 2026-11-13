@@ -156,17 +156,27 @@ func newPullRequestCheckFixture(t *testing.T, component string) *reviewCheckFixt
 	r := support.Setup(t)
 	t.Cleanup(r.Close)
 	db := database.DB(t.Context())
-	installation, err := models.CreateIntegration(uuid.New(), r.Organization.ID, "github", support.RandomName("github"), nil)
+	provider, _, _ := strings.Cut(component, ".")
+	installation, err := models.CreateIntegration(uuid.New(), r.Organization.ID, provider, support.RandomName(provider), nil)
 	require.NoError(t, err)
 	canvas, nodes := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{
 		{NodeID: "trigger", Type: models.NodeTypeTrigger, Ref: datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "onBroadcast"}})},
-		{NodeID: "ensure", Type: models.NodeTypeComponent, AppInstallationID: &installation.ID, Ref: datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "github.ensurePullRequestReviewers"}})},
+		{NodeID: "ensure", Type: models.NodeTypeComponent, AppInstallationID: &installation.ID, Ref: datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: provider + ".ensurePullRequestReviewers"}})},
 		{NodeID: "check", Type: models.NodeTypeComponent, AppInstallationID: &installation.ID, Ref: datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: component}})},
 	}, nil)
 	for i := 1; i < len(nodes); i++ {
 		nodes[i].AppInstallationID = &installation.ID
 		require.NoError(t, db.Model(&nodes[i]).Update("app_installation_id", installation.ID).Error)
 	}
+	version, err := models.FindLiveCanvasVersionInTransaction(db, canvas.ID)
+	require.NoError(t, err)
+	for i := range version.Nodes {
+		if version.Nodes[i].ID != "trigger" {
+			integrationID := installation.ID.String()
+			version.Nodes[i].IntegrationID = &integrationID
+		}
+	}
+	require.NoError(t, db.Save(version).Error)
 	store := contexts.NewIntegrationContext(db, nil, installation, r.Encryptor, r.Registry, nil).Publications()
 	f := &reviewCheckFixture{t: t, r: r, db: db, canvas: canvas, nodes: nodes, installation: installation, http: &reviewCheckHTTP{t: t, head: "abc"}, integration: reviewCheckIntegration{IntegrationContext: mocks.IntegrationContextForNewSetupFlow(), store: store}}
 	f.root = support.EmitCanvasEventForNode(t, canvas.ID, "trigger", "default", nil)
