@@ -124,23 +124,42 @@ func TestPullRequestCheckDoesNotPublishForDeletedCredentialsOrOrganization(t *te
 	}
 }
 
-func TestPullRequestCheckRetiresPendingStatusOnAnOlderCommit(t *testing.T) {
-	f := newPullRequestCheckFixture(t, "github.setPullRequestCheck")
-	require.NoError(t, f.applyStatus("pending"))
-	require.NoError(t, f.refresh())
-	f.attempt(support.EmitCanvasEventForNode(t, f.canvas.ID, "trigger", "default", nil))
-	f.http.head = "new-head"
-	f.ctx.Configuration = map[string]any{"repository": "hello", "pullNumber": 42, "assessedSha": "new-head", "context": "team/review", "state": "pending", "reason": "New assessment"}
-	require.NoError(t, (&pulls.SetPullRequestCheck{}).Execute(f.ctx))
-	f.http.failWrite = true
-	require.Error(t, f.processDue())
-	f.http.failWrite = false
-	require.NoError(t, f.processDue())
-	require.Equal(t, "error", f.state())
-	require.Equal(t, "abc", f.http.writes[1].SHA)
-	require.NoError(t, f.processDue())
-	require.Equal(t, "pending", f.state())
-	require.Equal(t, "new-head", f.http.writes[2].SHA)
+func TestPullRequestCheckRetiresUnfinishedStatusOnAnOlderCommit(t *testing.T) {
+	for _, scenario := range []string{"pending", "undelivered error", "delivered error"} {
+		t.Run(scenario, func(t *testing.T) {
+			f := newPullRequestCheckFixture(t, "github.setPullRequestCheck")
+			require.NoError(t, f.applyStatus("pending"))
+			require.NoError(t, f.processDue())
+			f.http.head = "new-head"
+			if scenario == "undelivered error" {
+				f.http.failWrite = true
+				require.ErrorContains(t, f.processDue(), "publish review check")
+				f.http.failWrite = false
+			}
+			if scenario == "delivered error" {
+				require.NoError(t, f.processDue())
+				require.Equal(t, "error", f.state())
+			}
+			writes := len(f.http.writes)
+			f.attempt(support.EmitCanvasEventForNode(t, f.canvas.ID, "trigger", "default", nil))
+			f.ctx.Configuration = map[string]any{"repository": "hello", "pullNumber": 42, "assessedSha": "new-head", "context": "team/review", "state": "pending", "reason": "New assessment"}
+			require.NoError(t, (&pulls.SetPullRequestCheck{}).Execute(f.ctx))
+			if scenario != "delivered error" {
+				f.http.failWrite = true
+				require.Error(t, f.processDue())
+				f.http.failWrite = false
+				require.NoError(t, f.processDue())
+				require.Equal(t, "error", f.state())
+				require.Equal(t, "abc", f.http.writes[writes].SHA)
+				require.Equal(t, "https://superplane.example/run", f.http.writes[writes].Status.GetTargetURL())
+				writes++
+			}
+			require.NoError(t, f.processDue())
+			require.Equal(t, "pending", f.state())
+			require.Equal(t, "new-head", f.http.writes[writes].SHA)
+			require.Len(t, f.http.writes, writes+1)
+		})
+	}
 }
 
 func TestPullRequestCheckStopsUnavailableCredentialsAfterRetries(t *testing.T) {

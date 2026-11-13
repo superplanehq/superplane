@@ -258,7 +258,9 @@ func executePullRequestCheck(ctx core.ExecutionContext, config reviewCheckConfig
 		}
 		// A replacement must wait for an already claimed status write to finish.
 		retired := previous.Retired
-		if config.State != "" && previous.Configuration.State == "pending" && previous.Configuration.AssessedSHA != config.AssessedSHA {
+		// A terminal result can still be undelivered after a failed status write.
+		previousCheckUnfinished := previous.Configuration.State == "pending" || previous.Delivered != previous.fingerprint()
+		if config.State != "" && previous.Configuration.State != "" && previousCheckUnfinished && previous.Configuration.AssessedSHA != config.AssessedSHA {
 			retired = append(retired, retiredCommitCheck{SHA: previous.Configuration.AssessedSHA, ResultURL: previous.Configuration.ResultURL})
 		}
 		record.Payload, err = json.Marshal(reviewCheckState{Configuration: config, Delivery: previous.Delivery, Retired: retired})
