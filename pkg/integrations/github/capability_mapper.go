@@ -79,6 +79,7 @@ func NewCapabilityMapper() *CapabilityMapper {
 					{ReadOnly: true, Action: &checks.WaitForPullRequestChecks{}},
 					{ReadOnly: false, Action: &statuses.PublishCommitStatus{}},
 					{ReadOnly: false, Action: &pulls.SetPullRequestReviewCheck{}},
+					{ReadOnly: false, Action: &pulls.SetPullRequestCheck{}},
 				},
 			},
 			PermissionDeployments: {
@@ -152,6 +153,7 @@ func NewCapabilityMapper() *CapabilityMapper {
 					{ReadOnly: true, Action: &pulls.ListPullRequestReviewCandidates{}},
 					{ReadOnly: false, Action: &pulls.EnsurePullRequestReviewers{}},
 					{ReadOnly: true, Action: &pulls.SetPullRequestReviewCheck{}},
+					{ReadOnly: true, Action: &pulls.SetPullRequestCheck{}},
 					{ReadOnly: false, Action: &pulls.UpdatePullRequest{}},
 					{ReadOnly: false, Action: &pulls.UpdatePullRequestBodySection{}},
 					{ReadOnly: true, Action: &pulls.PublishPullRequestComment{}},

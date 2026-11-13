@@ -7,6 +7,9 @@ spec:
   edges:
     - channel: default
       sourceId: on-pr-risk
+      targetId: start-assessment-check
+    - channel: default
+      sourceId: start-assessment-check
       targetId: assess-risk
     - channel: passed
       sourceId: assess-risk
@@ -17,6 +20,9 @@ spec:
     - channel: default
       sourceId: publish-merge-confidence
       targetId: complete-merge-confidence
+    - channel: default
+      sourceId: publish-merge-confidence
+      targetId: finish-assessment-check
     - channel: default
       sourceId: complete-merge-confidence
       targetId: broadcast-merge-confidence
@@ -36,6 +42,22 @@ spec:
         repository: '{{ workspace().repositories }}'
       position:
         x: 80
+        "y": 80
+      isCollapsed: true
+    - id: start-assessment-check
+      name: Start Assessment Check
+      type: TYPE_ACTION
+      component: github.setPullRequestCheck
+      configuration:
+        repository: '{{ root().data.repository.full_name }}'
+        pullNumber: '{{ root().data.pull_request.number }}'
+        assessedSha: '{{ root().data.pull_request.head.sha }}'
+        context: superplane/merge-confidence
+        state: pending
+        reason: Merge confidence assessment is running.
+        resultUrl: '{{ run().url }}'
+      position:
+        x: 360
         "y": 80
       isCollapsed: true
     - id: assess-risk
@@ -309,6 +331,22 @@ spec:
       position:
         x: 1200
         "y": 80
+      isCollapsed: true
+    - id: finish-assessment-check
+      name: Finish Assessment Check
+      type: TYPE_ACTION
+      component: github.setPullRequestCheck
+      configuration:
+        repository: '{{ root().data.repository.full_name }}'
+        pullNumber: '{{ root().data.pull_request.number }}'
+        assessedSha: '{{ root().data.pull_request.head.sha }}'
+        context: superplane/merge-confidence
+        state: '{{ $["Assess Merge Confidence"].data.mergeConfidence.complete == true && previous().data.status in ["published", "unchanged"] ? "success" : "failure" }}'
+        reason: '{{ $["Assess Merge Confidence"].data.mergeConfidence.complete == true && previous().data.status in ["published", "unchanged"] ? "Merge confidence assessment completed. Scores are advisory." : "Merge confidence assessment or report publication did not complete." }}'
+        resultUrl: '{{ run().url }}'
+      position:
+        x: 1520
+        "y": 400
       isCollapsed: true
     - id: complete-merge-confidence
       name: Complete Merge Confidence
