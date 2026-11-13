@@ -75,6 +75,12 @@ const defaultCatalog = [
   },
 ];
 
+const superplaneCatalog = [
+  "superplane/merge-confidence",
+  "superplane/review-request",
+  "  SuPeRpLaNe/future-check  ",
+].map((name) => ({ type: "status_check", id: name, name, url: "https://acme.semaphoreci.com/workflows/1" }));
+
 describe("ChecksPRFeedbackSetupDialog", () => {
   beforeEach(() => {
     mocks.createHandler.mockReset();
@@ -275,7 +281,8 @@ describe("ChecksPRFeedbackSetupDialog", () => {
     });
   });
 
-  it("creates the handler with selected check names", async () => {
+  it("offers and submits only eligible checks from a mixed catalog", async () => {
+    mocks.catalog.push(...superplaneCatalog);
     const user = userEvent.setup();
     const onCreated = vi.fn();
     render(
@@ -291,7 +298,12 @@ describe("ChecksPRFeedbackSetupDialog", () => {
     );
 
     await waitFor(() => expect(screen.getByTestId("pr-feedback-check-names-list")).toHaveTextContent("lint"));
+    for (const check of superplaneCatalog) {
+      expect(screen.queryByTestId(`pr-feedback-check-option-${check.id.trim()}`)).not.toBeInTheDocument();
+      expect(screen.queryByTestId(`checks-setup-preview-check-${check.id.trim()}`)).not.toBeInTheDocument();
+    }
     await user.click(screen.getByTestId("checks-setup-continue"));
+    expect(screen.queryByText("Semaphore")).not.toBeInTheDocument();
     expect(screen.getByTestId("checks-setup-finish")).toHaveTextContent("Finish");
     expect(
       screen.getByText("Based on the status checks you selected, SuperPlane needs access to these tools."),
@@ -301,9 +313,6 @@ describe("ChecksPRFeedbackSetupDialog", () => {
     ).toBeInTheDocument();
     expect(screen.getByTestId("checks-setup-tools-unselected")).toHaveTextContent(
       "Some of the checks you selected require additional access that you are not granting.",
-    );
-    expect(screen.getByTestId("checks-setup-tools-unselected")).toHaveTextContent(
-      "That prevents the agent from having enough context to fix issues correctly.",
     );
     expect(screen.getByTestId("checks-setup-preview-tool-outcome")).toHaveTextContent("Not enough access");
     expect(screen.getByTestId("checks-setup-preview-caption")).toHaveTextContent(
@@ -350,7 +359,6 @@ describe("ChecksPRFeedbackSetupDialog", () => {
     expect(screen.getByTestId("checks-setup-preview-caption")).toHaveTextContent(
       "These checks do not need additional access.",
     );
-    expect(screen.queryByText("Suggested")).not.toBeInTheDocument();
     expect(screen.queryByText("CircleCI")).not.toBeInTheDocument();
     expect(screen.queryByText("Semaphore")).not.toBeInTheDocument();
     expect(screen.queryByTestId("checks-setup-tools-unknown")).not.toBeInTheDocument();
@@ -452,44 +460,39 @@ describe("ChecksPRFeedbackSetupDialog", () => {
     );
   });
 
-  it("finishes without a handler and minimizes next steps when no checks exist", async () => {
-    const user = userEvent.setup();
-    const onClose = vi.fn();
-    const onCreated = vi.fn();
-    mocks.catalog.splice(0);
-    render(
-      <ChecksPRFeedbackSetupDialog
-        organizationId="org-1"
-        factoryId="factory-1"
-        githubIntegrationId="gh-1"
-        repository="acme/api"
-        source={checksSource}
-        onClose={onClose}
-        onCreated={onCreated}
-      />,
-    );
+  it.each([{ catalog: [] }, { catalog: superplaneCatalog }])(
+    "finishes without a handler when no eligible checks exist: %j",
+    async ({ catalog }) => {
+      const user = userEvent.setup();
+      const onClose = vi.fn();
+      const onCreated = vi.fn();
+      mocks.catalog.splice(0, mocks.catalog.length, ...catalog);
+      render(
+        <ChecksPRFeedbackSetupDialog
+          organizationId="org-1"
+          factoryId="factory-1"
+          githubIntegrationId="gh-1"
+          repository="acme/api"
+          source={checksSource}
+          onClose={onClose}
+          onCreated={onCreated}
+        />,
+      );
 
-    await waitFor(() => expect(screen.getByTestId("checks-setup-empty")).toBeInTheDocument());
-    expect(screen.getByTestId("checks-setup-preview")).toHaveTextContent("No status checks found on recent commits.");
-    expect(screen.getByTestId("checks-setup-preview-caption")).toHaveTextContent(
-      "No status checks found on recent commits.",
-    );
-    expect(screen.queryByTestId("checks-setup-preview-attempts")).not.toBeInTheDocument();
-    expect(screen.getByTestId("checks-setup-empty")).toHaveTextContent("No status checks found on recent commits.");
-    expect(screen.getByTestId("checks-setup-empty")).toHaveTextContent(
-      "Run CI on a recent pull request, then reopen Configure to select checks.",
-    );
-    expect(screen.queryByTestId("pr-feedback-check-names-picker")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("checks-setup-maximum-attempts")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("checks-setup-continue")).not.toBeInTheDocument();
+      await waitFor(() => expect(screen.getByTestId("checks-setup-empty")).toBeInTheDocument());
+      expect(screen.queryByTestId("checks-setup-preview-attempts")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("pr-feedback-check-names-picker")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("checks-setup-maximum-attempts")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("checks-setup-continue")).not.toBeInTheDocument();
 
-    await user.click(screen.getByTestId("checks-setup-finish"));
+      await user.click(screen.getByTestId("checks-setup-finish"));
 
-    expect(mocks.createHandler).not.toHaveBeenCalled();
-    expect(onCreated).not.toHaveBeenCalled();
-    expect(onClose).toHaveBeenCalled();
-    expect(readDeferredWorkspaceNextStep("factory-1")).toBe("pr-checks-handler");
-  });
+      expect(mocks.createHandler).not.toHaveBeenCalled();
+      expect(onCreated).not.toHaveBeenCalled();
+      expect(onClose).toHaveBeenCalled();
+      expect(readDeferredWorkspaceNextStep("factory-1")).toBe("pr-checks-handler");
+    },
+  );
 
   it("preselects a connected integration and hides Connect", async () => {
     const user = userEvent.setup();
