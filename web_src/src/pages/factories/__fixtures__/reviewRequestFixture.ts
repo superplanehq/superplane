@@ -37,6 +37,14 @@ export function reviewRequestCanvas(): CanvasesCanvas {
           integration: { id: "github-1", name: "GitHub" },
           configuration: {},
         },
+        {
+          id: "pr-check-pending",
+          name: "Register PR check",
+          type: "TYPE_ACTION",
+          component: "github.setPullRequestReviewCheck",
+          integration: { id: "github-1", name: "GitHub" },
+          configuration: { enabled: false, activationGeneration: 1, activationNodeId: "pr-check-pending" },
+        },
       ],
       edges: [
         { sourceId: "review-request-trigger", targetId: "select-reviewers", channel: "default" },
