@@ -515,6 +515,11 @@ func (c *Client) CreateIssueComment(ctx context.Context, repository string, issu
 	return c.underlying.Issues.CreateComment(ctx, owner, name, issueNumber, comment)
 }
 
+func (c *Client) GetIssueComment(ctx context.Context, repository string, commentID int64) (*github.IssueComment, *github.Response, error) {
+	owner, name := c.ownerAndName(repository)
+	return c.underlying.Issues.GetComment(ctx, owner, name, commentID)
+}
+
 func (c *Client) EditIssueComment(ctx context.Context, repository string, commentID int64, comment *github.IssueComment) (*github.IssueComment, *github.Response, error) {
 	owner, name := c.ownerAndName(repository)
 	return c.underlying.Issues.EditComment(ctx, owner, name, commentID, comment)

@@ -1,6 +1,7 @@
 package factories
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/features"
@@ -14,6 +15,8 @@ const (
 	reviewRequestTemplateID    = "review-request"
 	reviewRequestTriggerNodeID = "review-request-trigger"
 	reviewRequestAgentNodeID   = "select-reviewers"
+	reviewFindingsBodyNodeID   = "findings-body"
+	reviewFindingsCommentNode  = "findings-comment"
 )
 
 func requireReviewRequest(organization *models.Organization) error {
@@ -76,4 +79,37 @@ func resolveReviewRequestSource(db *gorm.DB, factory *models.Factory, canvas *mo
 		return "", invalidArgument("The Merge confidence app must belong to this workspace.")
 	}
 	return "", invalidArgument("Add Merge confidence to this workspace before you add Review request.")
+}
+
+// configureReviewRequestFindings applies the findings settings saved on the
+// agent node, which admin reset keeps, to the publication nodes. Absent
+// settings use the template defaults.
+func configureReviewRequestFindings(canvas *yaml.Canvas) error {
+	var agent map[string]any
+	for _, node := range canvas.Spec.Nodes {
+		if node.ID == reviewRequestAgentNodeID {
+			agent = node.Configuration
+		}
+	}
+	publish, _ := agent["publishReviewFindings"].(bool)
+	body := agent["reviewFindingsBody"] != false
+	comment := agent["reviewFindingsComment"] == true
+	if publish && !body && !comment {
+		return fmt.Errorf("select at least one destination for review findings")
+	}
+	destinations := map[string]struct {
+		enabled    bool
+		generation int64
+	}{
+		reviewFindingsBodyNodeID:  {publish && body, savedActivationGeneration(agent["reviewFindingsBodyActivationGeneration"])},
+		reviewFindingsCommentNode: {publish && comment, savedActivationGeneration(agent["reviewFindingsCommentActivationGeneration"])},
+	}
+	for i := range canvas.Spec.Nodes {
+		node := &canvas.Spec.Nodes[i]
+		if destination, ok := destinations[node.ID]; ok {
+			node.Configuration["enabled"] = destination.enabled
+			node.Configuration["activationGeneration"] = destination.generation
+		}
+	}
+	return nil
 }

@@ -76,6 +76,8 @@ var factoryAppTemplates = map[factoryTemplateKey]factoryAppTemplate{
 		componentIntegrations: map[string]string{
 			"github.listPullRequestReviewCandidates": "github",
 			"github.ensurePullRequestReviewers":      "github",
+			"github.updatePullRequestBodySection":    "github",
+			"github.publishPullRequestComment":       "github",
 		},
 	}),
 	{id: "line-implementation", provider: models.ProviderGitHub}: githubFactoryTemplate(factoryAppTemplate{
@@ -309,6 +311,11 @@ func materializeFactoryTemplate(templateID, provider string, input factoryTempla
 	canvas.Metadata.ID = input.appID
 	canvas.Metadata.Name = input.appName
 	wireFactoryTemplate(canvas, template, input)
+	if template.id == reviewRequestTemplateID {
+		if err := configureReviewRequestFindings(canvas); err != nil {
+			return nil, &BuiltInAutomationSettingsError{cause: err}
+		}
+	}
 	markFactoryTemplate(canvas, template)
 
 	canvasYAML, err := goyaml.Marshal(canvas)
