@@ -21,7 +21,7 @@ import {
   VISUAL_EVIDENCE_ENTRY,
   prFeedbackSentence,
 } from "./columnAutomationCatalog";
-import { customColumnAutomations, type ColumnAutomationApp } from "./customColumnAutomations";
+import { customColumnAutomations, firstPhaseAutomations, type ColumnAutomationApp } from "./customColumnAutomations";
 import {
   factoryColumnAutomationViewPath,
   factoryIntakePath,
@@ -181,7 +181,7 @@ function automationsForColumn(
     const skip = new Set(closure.flatMap((automation) => (automation.canvasId ? [automation.canvasId] : [])));
     return [...closure, ...customColumnAutomations(input.apps ?? [], "done", workOrders, skip, runningCountForApp)];
   }
-  return agentStepAutomation(key, input.columnTitle, input.columns ?? [], workOrders);
+  return firstPhaseAutomations(key, input, workOrders, agentStepAutomation, runningCountForApp);
 }
 
 function attachAutomationActivity(automation: ColumnAutomation, workOrders: FactoriesWorkOrder[]): ColumnAutomation {

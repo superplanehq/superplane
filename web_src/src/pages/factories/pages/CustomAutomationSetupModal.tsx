@@ -20,7 +20,7 @@ export function CustomAutomationSetupModal({
 }: {
   lineId: string;
   automationId?: string;
-  columnKey?: "backlog" | "verify";
+  columnKey?: "backlog" | "implement" | "verify" | "done";
   onClose: () => void;
 }) {
   const { organizationId, factoryId, routeSegment, factory } = useFactoriesLayout();

@@ -49,8 +49,8 @@ const FeatureOrganizationBYOK = "organization_byok"
 // organization Models page. It requires FeatureOrganizationBYOK as well.
 const FeatureOrganizationBYOKCustomProvider = "organization_byok_custom_provider"
 
-// FeatureFactoryCustomAutomations gates custom automations on Verify, Done,
-// and phase columns until the flow is generally available.
+// FeatureFactoryCustomAutomations gates custom automations on Backlog,
+// Implement, Verify, and Done until the flow is generally available.
 const FeatureFactoryCustomAutomations = "factory_custom_automations"
 
 // FeatureWorkspaceSkills gates workspace skill settings, skill APIs, and skill attach.

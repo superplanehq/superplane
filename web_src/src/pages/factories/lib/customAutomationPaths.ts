@@ -9,7 +9,7 @@ export function factoryCustomAutomationSetupPath(
   factoryKey: string,
   lineId: string,
   automationId?: string,
-  columnKey?: "backlog" | "verify",
+  columnKey?: "backlog" | "implement" | "verify" | "done",
 ) {
   const params = new URLSearchParams({
     [CUSTOM_AUTOMATION_PARAM]: automationId?.trim() || NEW_CUSTOM_AUTOMATION,
