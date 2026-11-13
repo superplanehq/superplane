@@ -70,10 +70,13 @@ function recordingClient(env) {
   };
 }
 
-test("open_pull_request commits leftovers, pushes the branch, and opens the pull request", async () => {
-  const { env, origin, checkout } = workspace("repo", { BASE: "main" });
+test("open_pull_request publishes a leftover commit whose file list exceeds the output limit", async (t) => {
+  const { root, env, origin, checkout } = workspace("repo", { BASE: "main" });
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   run(checkout, ["checkout", "-b", "feature"], env);
-  fs.writeFileSync(path.join(checkout, "change.txt"), "change\n");
+  for (let index = 0; index < 600; index++) {
+    fs.writeFileSync(path.join(checkout, `new-file-with-a-long-name-${index}.txt`), "change\n");
+  }
   const client = recordingClient(env);
 
   await call("open_pull_request", { title: " Add change ", body: "Why", draft: true }, client);

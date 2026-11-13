@@ -113,12 +113,9 @@ function stopGitCommands() {
   running.clear();
 }
 
-async function gitOutput(directory, args, env, timeoutMs) {
+async function gitCommand(directory, args, env, timeoutMs) {
   const result = await git(directory, args, env, timeoutMs);
-  if (result.status === 0) {
-    if (result.stdoutTruncated) throw new Error(`git ${args[0]} output exceeded the publication limit`);
-    return result.stdout;
-  }
+  if (result.status === 0) return result;
   const cause = redactedCause(result.stderr || `exit ${result.status}`, env);
   let classification = "failed";
   if (/permission to .* denied|write access .* not granted/i.test(cause)) classification = "permission denied";
@@ -128,6 +125,12 @@ async function gitOutput(directory, args, env, timeoutMs) {
   else if (/could not resolve|failed to connect|connection.*(reset|refused)|timed out/i.test(cause))
     classification = "network failure";
   throw new Error(`git ${args[0]} ${classification}: ${cause}`);
+}
+
+async function gitOutput(directory, args, env, timeoutMs) {
+  const result = await gitCommand(directory, args, env, timeoutMs);
+  if (result.stdoutTruncated) throw new Error(`git ${args[0]} output exceeded the publication limit`);
+  return result.stdout;
 }
 
 // workspaceRoot is the directory that holds repo/ and context/. The checkout
@@ -259,7 +262,7 @@ async function ensureRemoteBase(directory, base, env, timeouts) {
   const remoteRef = `refs/remotes/origin/${base}`;
   const local = await git(directory, ["rev-parse", "--verify", "--quiet", remoteRef], env, timeouts.local);
   if (local.status === 0) return;
-  await gitOutput(
+  await gitCommand(
     directory,
     ["fetch", "--depth", "1", "origin", `refs/heads/${base}:${remoteRef}`],
     env,
@@ -268,9 +271,9 @@ async function ensureRemoteBase(directory, base, env, timeouts) {
 }
 
 async function commitLeftovers(directory, env, timeouts) {
-  await gitOutput(directory, ["add", "-A"], env, timeouts.local);
+  await gitCommand(directory, ["add", "-A"], env, timeouts.local);
   if ((await git(directory, ["diff", "--cached", "--quiet"], env, timeouts.local)).status === 0) return;
-  await gitOutput(directory, ["commit", "-s", "-m", LEFTOVER_COMMIT_MESSAGE], env, timeouts.local);
+  await gitCommand(directory, ["commit", "-s", "-m", LEFTOVER_COMMIT_MESSAGE], env, timeouts.local);
 }
 
 /**
@@ -306,7 +309,7 @@ async function openPullRequest(input, client, timeouts = DEFAULT_TIMEOUTS) {
     await gitOutput(directory, ["rev-list", "--count", `origin/${base}..HEAD`], env, timeouts.local),
   );
   if (!ahead) throw new Error(`${head} has no commits ahead of ${base}`);
-  await gitOutput(directory, ["push", "-u", "origin", "HEAD"], env, timeouts.push);
+  await gitCommand(directory, ["push", "-u", "origin", "HEAD"], env, timeouts.push);
   const repository = publication.repository;
 
   try {
