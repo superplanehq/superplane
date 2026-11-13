@@ -89,6 +89,24 @@ spec:
   - sourceId: selection-error
     targetId: pr-check-error
     channel: default
+  - sourceId: review-unnecessary
+    targetId: findings-decision
+    channel: default
+  - sourceId: no-reviewer
+    targetId: findings-decision
+    channel: default
+  - sourceId: review-outcome
+    targetId: findings-decision
+    channel: default
+  - sourceId: no-candidates
+    targetId: findings-decision
+    channel: default
+  - sourceId: findings-decision
+    targetId: findings-body
+    channel: default
+  - sourceId: findings-decision
+    targetId: findings-comment
+    channel: default
   nodes:
   - id: review-request-trigger
     name: Merge confidence completed
@@ -153,6 +171,11 @@ spec:
       fallbackReviewer: ''
       publishPRCheck: false
       prCheckActivationGeneration: 1
+      publishReviewFindings: false
+      reviewFindingsBody: true
+      reviewFindingsComment: false
+      reviewFindingsBodyActivationGeneration: 1
+      reviewFindingsCommentActivationGeneration: 1
       additionalInstructions: ''
       executionTimeoutSeconds: 1800
       includeVisualEvidence: false
@@ -611,3 +634,58 @@ spec:
     position:
       x: 2320
       y: 800
+  - id: findings-decision
+    name: Publishable decision
+    type: TYPE_ACTION
+    component: filter
+    configuration:
+      expression: previous().data.reviewRequest.status in ["review_unnecessary", "no_eligible_reviewer", "requested", "already_covered"]
+    position:
+      x: 3280
+      y: 1120
+  - id: findings-body
+    name: Publish findings to PR body
+    type: TYPE_ACTION
+    component: github.updatePullRequestBodySection
+    configuration:
+      repository: '{{ root().data.payload.repository }}'
+      pullNumber: '{{ root().data.payload.pullNumber }}'
+      sectionKey: review-request
+      body: &review-findings |-
+        ## SuperPlane review request
+
+        {{ let outcome = previous(2).data;
+           let decision = outcome.reviewRequest;
+           (decision.status in ["requested", "already_covered"]
+             ? "**Reviewers selected**\n\n" + replace(markdownText(decision.rationale), "@", "&#64;") + "\n\n"
+               + "| Reviewer | Reason |\n| --- | --- |\n"
+               + join(map(decision.reviewers, { "| " + replace(markdownText(#.login), "@", "&#64;") + " | " + replace(markdownText(#.reason), "@", "&#64;") + " |\n" }), "")
+               + (decision.fallbackUsed
+                 ? "\nFallback reviewer: used because selection found no suitable candidate.\n"
+                 : "\nFallback reviewer: not used because selection found a suitable candidate.\n")
+             : decision.status == "review_unnecessary"
+               ? "**No review needed**\n\n" + replace(markdownText(decision.rationale), "@", "&#64;") + "\n"
+               : "**No eligible reviewer**\n\n" + replace(markdownText(decision.rationale), "@", "&#64;") + "\n\nNo reviewer was requested.\n")
+           + "\nAssessed commit: " + markdownText(outcome.reviewedCommit) + "\n\n[View Review request run](<" + markdownLink(outcome.runUrl) + ">)" }}
+      expectedHeadSha: '{{ root().data.payload.reviewedCommit }}'
+      enabled: false
+      ordered: true
+      activationGeneration: 1
+    position:
+      x: 3600
+      y: 1120
+  - id: findings-comment
+    name: Publish findings to PR comment
+    type: TYPE_ACTION
+    component: github.publishPullRequestComment
+    configuration:
+      repository: '{{ root().data.payload.repository }}'
+      pullNumber: '{{ root().data.payload.pullNumber }}'
+      commentKey: review-request
+      body: *review-findings
+      expectedHeadSha: '{{ root().data.payload.reviewedCommit }}'
+      enabled: false
+      activationGeneration: 1
+    position:
+      x: 3600
+      y: 1440

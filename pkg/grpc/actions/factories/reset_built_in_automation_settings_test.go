@@ -183,7 +183,7 @@ func TestResetReviewRequestPreservesFallbackAndAgentSettings(t *testing.T) {
 			var installedCanvas *yaml.Canvas
 			canvas := resetTestTemplate(t, r, factory, reviewRequestTemplateID, models.ProviderGitHub, func(doc *yaml.Canvas) {
 				installedCanvas = doc
-				for _, id := range []string{"list-candidates", "request-reviewers"} {
+				for _, id := range []string{"list-candidates", "request-reviewers", reviewFindingsBodyNodeID, reviewFindingsCommentNode} {
 					findYAMLNode(t, doc, id).Integration = &yaml.IntegrationRef{ID: integration.ID.String(), Name: integration.InstallationName}
 				}
 				trigger := findYAMLNode(t, doc, reviewRequestTriggerNodeID)
@@ -193,6 +193,13 @@ func TestResetReviewRequestPreservesFallbackAndAgentSettings(t *testing.T) {
 				agent.Configuration["fallbackReviewer"] = fallback
 				agent.Configuration["publishPRCheck"] = fallback != ""
 				agent.Configuration["prCheckActivationGeneration"] = 7
+				// One case saves publication with only a comment; the other saves it
+				// off with no destination, which remains valid.
+				agent.Configuration["publishReviewFindings"] = fallback != ""
+				agent.Configuration["reviewFindingsBody"] = false
+				agent.Configuration["reviewFindingsComment"] = fallback != ""
+				agent.Configuration["reviewFindingsBodyActivationGeneration"] = 4
+				agent.Configuration["reviewFindingsCommentActivationGeneration"] = 3
 				agent.Configuration["additionalInstructions"] = "Prefer the security owner. Keep {{ example }} literal."
 				agent.Configuration["model"] = models.FormatHostedLLMModelKey(models.UsageProviderOpenRouter, "anthropic/claude-sonnet-4-6")
 				agent.Configuration["thinkingLevel"] = "low"
@@ -225,6 +232,18 @@ func TestResetReviewRequestPreservesFallbackAndAgentSettings(t *testing.T) {
 			require.NotNil(t, check)
 			require.Equal(t, fallback != "", check.Configuration["enabled"])
 			require.EqualValues(t, 7, check.Configuration["activationGeneration"])
+			require.Equal(t, fallback != "", agent.Configuration["publishReviewFindings"])
+			require.Equal(t, false, agent.Configuration["reviewFindingsBody"])
+			require.Equal(t, fallback != "", agent.Configuration["reviewFindingsComment"])
+			body, comment := findIntakeNode(version.Nodes, reviewFindingsBodyNodeID), findIntakeNode(version.Nodes, reviewFindingsCommentNode)
+			require.Equal(t, false, body.Configuration["enabled"])
+			require.EqualValues(t, 4, body.Configuration["activationGeneration"])
+			require.Equal(t, fallback != "", comment.Configuration["enabled"])
+			require.EqualValues(t, 3, comment.Configuration["activationGeneration"])
+			for _, node := range []*models.Node{body, comment} {
+				require.NotNil(t, node.IntegrationID, "%s must keep its GitHub connection after reset", node.ID)
+				require.Equal(t, integration.ID.String(), *node.IntegrationID)
+			}
 			require.Equal(t, instructions, agent.Configuration["additionalInstructions"])
 			require.Equal(t, models.FormatHostedLLMModelKey(models.UsageProviderOpenRouter, "anthropic/claude-sonnet-4-6"), agent.Configuration["model"])
 			require.Equal(t, "low", agent.Configuration["thinkingLevel"])
@@ -235,6 +254,22 @@ func TestResetReviewRequestPreservesFallbackAndAgentSettings(t *testing.T) {
 			require.NotContains(t, liveCanvasJSON(t, canvas), "retired selection policy")
 		})
 	}
+}
+
+func TestResetReviewRequestRejectsFindingsWithoutDestination(t *testing.T) {
+	r, factory := resetTestFactory(t)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryReviewRequest))
+	source := resetTestTemplate(t, r, factory, "risk-score", models.ProviderGitHub, func(*yaml.Canvas) {})
+	canvas := resetTestTemplate(t, r, factory, reviewRequestTemplateID, models.ProviderGitHub, func(doc *yaml.Canvas) {
+		findYAMLNode(t, doc, reviewRequestTriggerNodeID).Configuration["app"] = source.ID.String()
+		agent := findYAMLNode(t, doc, reviewRequestAgentNodeID)
+		agent.Configuration["publishReviewFindings"] = true
+		agent.Configuration["reviewFindingsBody"] = false
+		agent.Configuration["reviewFindingsComment"] = false
+	})
+	before := liveCanvasJSON(t, canvas)
+	require.ErrorContains(t, resetTestOrganization(t, r), "select at least one destination")
+	require.Equal(t, before, liveCanvasJSON(t, canvas), "reset must not apply settings that cannot be saved")
 }
 
 func TestResetBuiltInVerificationSettings(t *testing.T) {

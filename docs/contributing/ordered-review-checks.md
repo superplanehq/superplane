@@ -117,6 +117,37 @@ The store treats payloads as opaque JSON. It does not interpret reports,
 recognize templates, or invoke named automation callbacks. Phase 1 canvases
 remain usable without managed publication records.
 
+## Ordered pull request findings
+
+`core.AcceptOrderedWrite`, `core.BeginOrderedWrite`, and
+`core.FinishOrderedWrite` apply this ordering to provider writes without a
+check. `github.updatePullRequestBodySection` uses them when **Ordered** is on.
+`github.publishPullRequestComment` always uses them.
+
+1. Execute resolves the order of the current execution and accepts it for the
+   key. An older source or attempt is skipped before any provider call.
+2. The publication worker reads the pull request. It rechecks the run, the
+   expected commit, and the saved node in the admitted and live versions. The
+   node must stay enabled with the same `activationGeneration`.
+3. Immediately before the write, `BeginOrderedWrite` claims a one-minute
+   lease. It fails when a newer attempt was accepted. Writes must finish 15
+   seconds before the lease expires.
+4. `FinishOrderedWrite` releases the lease and saves component state, such as
+   the managed comment ID.
+
+Body keys are `pull-request-body/<repository>/<number>/<section>`, so writers
+of one section share an order. Comment keys and markers include the canvas,
+so each automation owns one comment. Retries reconcile the saved comment ID and
+the `<!-- superplane:comment:KEY:CANVAS -->` marker before they create a
+comment.
+
+Ordered publication fails the step after a host rejection or ten attempts.
+Unordered body sections keep the earlier skip behavior. Review request uses
+both components. Its findings settings are saved on the agent node, so admin
+reset keeps them. Findings and Publish PR check use separate keys and nodes.
+Both receive the same decisions, including `no-candidates`, which skips the
+selection agent when the eligible candidate list is empty.
+
 ## Durable delivery
 
 `Update` holds a lock for one integration and publication key. It persists the
