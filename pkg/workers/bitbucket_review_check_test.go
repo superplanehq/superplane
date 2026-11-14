@@ -231,6 +231,26 @@ func TestBitbucketReviewCheckTracksApprovalsAfterSelection(t *testing.T) {
 	require.Equal(t, "SUCCESSFUL", f.state())
 }
 
+func TestBitbucketReviewCheckRemembersHeadChangesDuringRegistration(t *testing.T) {
+	for _, previousPhase := range []string{"", "no_review", "pending_selection"} {
+		t.Run("previous_phase="+previousPhase, func(t *testing.T) {
+			f := newBitbucketReviewFixture(t)
+			assessed := f.http.head
+			if previousPhase != "" {
+				require.NoError(t, f.apply(previousPhase))
+			}
+			f.http.head = strings.Repeat("b", 40)
+			require.NoError(t, f.apply("no_review"))
+			// The branch returns before either reconciliation or another retry.
+			f.http.head = assessed
+			require.NoError(t, f.apply("no_review"))
+			require.NoError(t, f.refresh())
+			require.Equal(t, "INPROGRESS", f.state())
+			require.Equal(t, "Waiting for a decision on the current commit", f.http.writes[len(f.http.writes)-1]["description"])
+		})
+	}
+}
+
 func TestBitbucketReviewCheckRecoversDeliveryAndDisable(t *testing.T) {
 	f := newBitbucketReviewFixture(t)
 	require.NoError(t, f.apply("no_review"))

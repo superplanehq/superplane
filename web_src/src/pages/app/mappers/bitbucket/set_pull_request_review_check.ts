@@ -15,6 +15,7 @@ const appliedRegistry = buildActionStateRegistry("applied");
 export const REVIEW_CHECK_STATE_REGISTRY: EventStateRegistry = {
   stateMap: {
     ...appliedRegistry.stateMap,
+    registered: { ...DEFAULT_EVENT_STATE_MAP.neutral, label: "Registered" },
     skipped: { ...DEFAULT_EVENT_STATE_MAP.neutral, label: "Skipped" },
     superseded: { ...DEFAULT_EVENT_STATE_MAP.neutral, label: "Superseded" },
   },
@@ -23,7 +24,8 @@ export const REVIEW_CHECK_STATE_REGISTRY: EventStateRegistry = {
     if (state !== "applied") return state;
     const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
     const output = outputs?.default?.[0]?.data as ReviewCheckOutput | undefined;
-    if (output?.status === "skipped" || output?.status === "superseded") return output.status;
+    if (output?.status === "registered" || output?.status === "skipped" || output?.status === "superseded")
+      return output.status;
     return state;
   },
 };

@@ -198,6 +198,7 @@ func (*SetPullRequestReviewCheck) Execute(ctx core.ExecutionContext) error {
 		}
 	}
 	var refname string
+	var headChanged bool
 	if config.Phase != "disabled" {
 		readCtx, cancel := context.WithTimeout(context.Background(), time.Minute)
 		defer cancel()
@@ -209,6 +210,7 @@ func (*SetPullRequestReviewCheck) Execute(ctx core.ExecutionContext) error {
 			return fmt.Errorf("pull request source branch is missing")
 		}
 		refname = pr.Source.Branch.Name
+		headChanged = pr.Source.Commit.Hash != config.AssessedSHA
 	}
 	currentGeneration, eligible, err := reviewCheckActivation(ctx.Publications, canvas, config.ActivationNodeID, order.AttemptRootEventID)
 	if err != nil {
@@ -231,6 +233,7 @@ func (*SetPullRequestReviewCheck) Execute(ctx core.ExecutionContext) error {
 				if reflect.DeepEqual(previous.Configuration, config) {
 					accepted = record.Generation
 					previous.Error, previous.Failures = "", 0
+					previous.Invalidated = previous.Invalidated || headChanged
 					record.WakeAt = reviewWake(time.Second)
 					record.Payload, err = json.Marshal(previous)
 					return err
@@ -240,7 +243,7 @@ func (*SetPullRequestReviewCheck) Execute(ctx core.ExecutionContext) error {
 				}
 			}
 		}
-		next := reviewCheckState{Configuration: config, SHA: config.AssessedSHA, Refname: refname, Retired: slices.Clone(previous.Retired), Delivery: previous.Delivery, Invalidated: previous.Invalidated && order.Compare(record.Order) == 0}
+		next := reviewCheckState{Configuration: config, SHA: config.AssessedSHA, Refname: refname, Retired: slices.Clone(previous.Retired), Delivery: previous.Delivery, Invalidated: headChanged || (previous.Invalidated && order.Compare(record.Order) == 0)}
 		if previous.SHA != "" && previous.SHA != config.AssessedSHA && config.Phase != "disabled" && (previous.State == "INPROGRESS" || previous.State == "" || previous.Delivery != nil) {
 			next.Retired = append(next.Retired, reviewCheckTarget{SHA: previous.SHA, Refname: previous.Refname, ResultURL: previous.Configuration.ResultURL})
 		}
