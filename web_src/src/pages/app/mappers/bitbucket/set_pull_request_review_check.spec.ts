@@ -30,7 +30,7 @@ function execution(status: string): ExecutionInfo {
 }
 
 describe("Bitbucket review check mapper", () => {
-  it.each(["superseded", "skipped"])("keeps %s separate from an applied decision", (status) => {
+  it.each(["registered", "superseded", "skipped"])("keeps %s separate from an applied decision", (status) => {
     expect(eventStateRegistry.setPullRequestReviewCheck.getState(execution(status))).toBe(status);
   });
 
