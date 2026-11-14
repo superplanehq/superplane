@@ -11,6 +11,10 @@ import (
 // Forge to repository webhook keys.
 func ForgeEventKey(eventType string) string {
 	switch eventType {
+	case "avi:bitbucket:push:repository":
+		return "repo:push"
+	case "avi:bitbucket:updated:pullrequest-reviewer-status":
+		return forgeReviewerStatusEvent
 	case "avi:bitbucket:created:pullrequest":
 		return pullRequestEventCreated
 	case "avi:bitbucket:updated:pullrequest":
@@ -39,7 +43,7 @@ func IsForgeBuildEvent(eventType string) bool {
 func IsForgePullRequestEvent(eventType string) bool {
 	switch eventType {
 	case "avi:bitbucket:created:pullrequest", "avi:bitbucket:updated:pullrequest",
-		"avi:bitbucket:fulfilled:pullrequest", "avi:bitbucket:rejected:pullrequest":
+		"avi:bitbucket:fulfilled:pullrequest", "avi:bitbucket:rejected:pullrequest", "avi:bitbucket:updated:pullrequest-reviewer-status":
 		return true
 	default:
 		return false
@@ -131,6 +135,48 @@ func ForgeBuildCommitSHA(buildStatus map[string]any) string {
 	commit, _ := buildStatus["commit"].(map[string]any)
 	hash, _ := commit["hash"].(string)
 	return strings.TrimSpace(hash)
+}
+
+// ForgePushPayload preserves the repository webhook shape for every subscriber,
+// including existing On Push triggers that filter refs through push.changes.
+func ForgePushPayload(repositoryUUID, fullName string, push, actor map[string]any) map[string]any {
+	name, _ := push["ref"].(string)
+	kind := "branch"
+	if _, branch := push["commits"]; !branch {
+		kind = "tag"
+	}
+	if strings.HasPrefix(name, "refs/tags/") {
+		kind = "tag"
+	}
+	name = strings.TrimPrefix(strings.TrimPrefix(name, "refs/heads/"), "refs/tags/")
+	ref := func(value any) any {
+		hash, _ := value.(string)
+		if hash == "" {
+			return nil
+		}
+		return map[string]any{"type": kind, "name": name, "target": map[string]any{"hash": hash}}
+	}
+	change := maps.Clone(push)
+	if change == nil {
+		change = map[string]any{}
+	}
+	change["old"], change["new"] = ref(push["before"]), ref(push["after"])
+	if commits, ok := push["commits"].([]any); ok {
+		projected := make([]any, 0, len(commits))
+		for _, entry := range commits {
+			commit, ok := entry.(map[string]any)
+			if !ok {
+				continue
+			}
+			commit = maps.Clone(commit)
+			if message, ok := commit["message"].(map[string]any); ok {
+				commit["message"] = message["value"]
+			}
+			projected = append(projected, commit)
+		}
+		change["commits"] = projected
+	}
+	return map[string]any{"repository": map[string]any{"uuid": repositoryUUID, "full_name": fullName}, "actor": actor, "push": map[string]any{"changes": []any{change}}}
 }
 
 // ForgeBuildKey extracts the build key from a Forge buildStatus object.
