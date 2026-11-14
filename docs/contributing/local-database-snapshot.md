@@ -39,8 +39,3 @@ Restore replaces `superplane_dev` only. It does not change `superplane_test`.
 The dump stores Postgres rows. It does not restore blob files. GitHub App
 credentials can live in the dump (`installation_github_apps`) or in `.env`.
 Environment values win.
-
-## Multiple local instances
-
-Run `make db.snapshot` and `make db.restore` in the worktree that serves the
-UI you use. See [Running Multiple Local Instances](multi-instance-dev.md).
