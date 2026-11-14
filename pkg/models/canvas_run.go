@@ -353,41 +353,29 @@ func (r *CanvasRun) DeleteChain(db *gorm.DB) (*RunDeletionSummary, error) {
 		return nil, err
 	}
 
-	var executionIDs []uuid.UUID
-	err := db.
-		Model(&CanvasNodeExecution{}).
-		Where("run_id = ?", r.ID).
-		Pluck("id", &executionIDs).
-		Error
+	count, err := deleteRows(db, &CanvasNodeRequest{}, "execution_id IN (SELECT id FROM workflow_node_executions WHERE run_id = ?)", r.ID)
 	if err != nil {
 		return nil, err
 	}
+	summary.NodeRequests = count
 
-	if len(executionIDs) > 0 {
-		count, err := deleteRows(db, &CanvasNodeRequest{}, "execution_id IN ?", executionIDs)
-		if err != nil {
-			return nil, err
-		}
-		summary.NodeRequests = count
-
-		count, err = deleteRows(db, &CanvasNodeExecutionKV{}, "execution_id IN ?", executionIDs)
-		if err != nil {
-			return nil, err
-		}
-		summary.NodeExecutionKVs = count
-
-		count, err = deleteRows(db, &CanvasEvent{}, "execution_id IN ?", executionIDs)
-		if err != nil {
-			return nil, err
-		}
-		summary.Events += count
-
-		count, err = deleteRows(db, &CanvasNodeExecution{}, "run_id = ?", r.ID)
-		if err != nil {
-			return nil, err
-		}
-		summary.NodeExecutions = count
+	count, err = deleteRows(db, &CanvasNodeExecutionKV{}, "execution_id IN (SELECT id FROM workflow_node_executions WHERE run_id = ?)", r.ID)
+	if err != nil {
+		return nil, err
 	}
+	summary.NodeExecutionKVs = count
+
+	count, err = deleteRows(db, &CanvasEvent{}, "execution_id IN (SELECT id FROM workflow_node_executions WHERE run_id = ?)", r.ID)
+	if err != nil {
+		return nil, err
+	}
+	summary.Events += count
+
+	count, err = deleteRows(db, &CanvasNodeExecution{}, "run_id = ?", r.ID)
+	if err != nil {
+		return nil, err
+	}
+	summary.NodeExecutions = count
 
 	count, err := deleteRows(db, &CanvasNodeQueueItem{}, "run_id = ?", r.ID)
 	if err != nil {
