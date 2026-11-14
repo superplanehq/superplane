@@ -206,8 +206,12 @@ For a focused scan, pass lockfile paths to `bash scripts/license-check.sh`.
 This command suppresses vulnerability findings through a temporary configuration.
 The shared `osv-scanner.toml` does not suppress vulnerabilities.
 
-The Semaphore Dependency vulnerabilities job scans the same dependency files
-with `make check.vulnerabilities`. It uses the shared configuration without
+The Semaphore Dependency vulnerabilities job scans all supported tracked
+lockfiles and manifests with `make check.vulnerabilities`. This includes Go,
+npm, Bun, and Bitbucket lockfiles. The command prints the selected paths.
+Explicit lockfile arguments override discovery, including untracked fixtures.
+Run `make test.vulnerability.scanner` to check discovery and severity blocking.
+The check uses the shared configuration without
 the temporary vulnerability suppression. High and critical vulnerabilities
 (CVSS 7.0 or higher) and vulnerabilities with unknown severity fail this job.
 Lower severities are reported without blocking. Scan errors also fail the job.
