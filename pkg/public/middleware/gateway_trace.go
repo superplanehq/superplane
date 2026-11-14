@@ -15,6 +15,7 @@ import (
 /*
  * CloneGatewayRequest copies the request the gateway handler forwards.
  * The copy keeps the caller context so a later error report can still find it.
+ * Headers are cloned so gateway-only changes do not leak into the original request.
  */
 func CloneGatewayRequest(r *http.Request) *http.Request {
 	if r == nil {
@@ -27,6 +28,7 @@ func CloneGatewayRequest(r *http.Request) *http.Request {
 		cloned.URL = new(url.URL)
 		*cloned.URL = *r.URL
 	}
+	cloned.Header = r.Header.Clone()
 	return cloned
 }
 
