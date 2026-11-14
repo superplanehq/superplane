@@ -5,6 +5,7 @@ import {
   Sentry,
   isIgnoredConsoleMessage,
   filterSentryEvent,
+  filterSentryBreadcrumb,
   isMonacoCanceledEvent,
   isMonacoClipboardDeniedEvent,
   normalizeApiRouteTemplate,
@@ -335,6 +336,70 @@ describe("captureConsole unknown-touch warnings", () => {
       expect(captured).toEqual(["Something actually broke"]);
     } finally {
       await client?.close(0);
+    }
+  });
+});
+
+describe("captureConsole cross-origin stylesheet warnings", () => {
+  it("drops only the reported diagnostic from events and console breadcrumbs", async () => {
+    const diagnostic =
+      "Cannot get CSS styles from text's parentNode. Error: SecurityError: CSSStyleSheet.cssRules getter: Not allowed to access cross-origin stylesheet";
+    const retainedWarnings = [
+      "SecurityError: CSSStyleSheet.cssRules getter: Not allowed to access cross-origin stylesheet",
+      "Cannot get CSS styles from text's parentNode. Error: TypeError: parentNode is null",
+      `Other warning: ${diagnostic}`,
+      `${diagnostic} [object Element]`,
+      `${diagnostic} with additional details`,
+      "Something actually broke",
+    ];
+    const captured: Sentry.ErrorEvent[] = [];
+    const client = Sentry.init({
+      dsn: "https://public@o0.ingest.sentry.io/0",
+      autoSessionTracking: false,
+      sendClientReports: false,
+      ignoreErrors: IGNORED_CONSOLE_MESSAGES,
+      beforeBreadcrumb: filterSentryBreadcrumb,
+      beforeSend(event) {
+        const filtered = filterSentryEvent(event);
+        if (filtered) {
+          captured.push(filtered);
+        }
+        return null;
+      },
+      integrations: [
+        Sentry.captureConsoleIntegration({
+          levels: ["warn", "error"],
+        }),
+      ],
+    });
+
+    expect(client).toBeDefined();
+    Sentry.getCurrentScope().clearBreadcrumbs();
+    Sentry.getIsolationScope().clearBreadcrumbs();
+
+    try {
+      console.warn(diagnostic);
+      console.warn(diagnostic, document.createTextNode("onboarding"));
+      for (const warning of retainedWarnings) {
+        console.warn(warning);
+      }
+      Sentry.addBreadcrumb({ category: "navigation", message: diagnostic });
+      console.error("Unrelated application error");
+
+      await Sentry.flush(2000);
+
+      expect(captured.map((event) => event.message)).toEqual([...retainedWarnings, "Unrelated application error"]);
+      const breadcrumbs = captured.at(-1)?.breadcrumbs ?? [];
+      expect(
+        breadcrumbs.filter((breadcrumb) => breadcrumb.category === "console").map((breadcrumb) => breadcrumb.message),
+      ).toEqual([...retainedWarnings, "Unrelated application error"]);
+      expect(breadcrumbs.filter((breadcrumb) => breadcrumb.category === "navigation")).toEqual([
+        expect.objectContaining({ message: diagnostic }),
+      ]);
+    } finally {
+      await client?.close(0);
+      Sentry.getCurrentScope().clearBreadcrumbs();
+      Sentry.getIsolationScope().clearBreadcrumbs();
     }
   });
 });
