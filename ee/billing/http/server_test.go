@@ -58,7 +58,7 @@ func setupAdminTestServer(t *testing.T) (*testServer, *support.ResourceRegistry,
 	t.Setenv("GOOGLE_CLIENT_SECRET", "test-google-client-secret")
 	t.Setenv("BASE_URL", "http://localhost:8000")
 	signer := jwt.NewSigner("test-client-secret")
-	server, err := public.NewServer(r.Encryptor, r.Registry, signer, support.NewOIDCProvider(), "", "", "", "test", "/app/templates", r.AuthService, false)
+	server, err := public.NewServer(r.Encryptor, r.Registry, signer, support.NewOIDCProvider(), "", "", "", "test", "/app/templates", r.AuthService, false, nil)
 	require.NoError(t, err)
 	handlers := New(r.Encryptor, r.Registry, func() (string, string) { return server.BaseURL, server.WebhooksBaseURL })
 	server.SetBillingHTTPRegistrar(handlers)

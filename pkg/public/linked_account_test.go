@@ -79,6 +79,7 @@ func newLinkedAccountServer(t *testing.T) (*Server, *support.ResourceRegistry, s
 		"/app/templates",
 		registry.AuthService,
 		false,
+		nil,
 	)
 	require.NoError(t, err)
 	token, err := authentication.GenerateAccountToken(signer, registry.Account.ID.String(), time.Now(), time.Hour)

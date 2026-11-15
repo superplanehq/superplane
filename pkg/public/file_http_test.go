@@ -41,6 +41,7 @@ func TestFileContentUploadAndPublicDownload(t *testing.T) {
 		"test",
 		"/app/templates",
 		r.AuthService, false,
+		nil,
 	)
 	require.NoError(t, err)
 	registerTestGRPCGateway(t, server, r.AuthService, r.Registry, r.Encryptor, support.NewOIDCProvider())
@@ -135,6 +136,7 @@ func TestWorkspaceFileContentUploadUsesWorkOrderCreatePermission(t *testing.T) {
 		"test",
 		"/app/templates",
 		r.AuthService, false,
+		nil,
 	)
 	require.NoError(t, err)
 	registerTestGRPCGateway(t, server, r.AuthService, r.Registry, r.Encryptor, support.NewOIDCProvider())
@@ -182,6 +184,7 @@ func TestFileContentUploadRejectsOversizedContentLength(t *testing.T) {
 		"test",
 		"/app/templates",
 		r.AuthService, false,
+		nil,
 	)
 	require.NoError(t, err)
 	registerTestGRPCGateway(t, server, r.AuthService, r.Registry, r.Encryptor, support.NewOIDCProvider())
@@ -229,6 +232,7 @@ func TestFileContentUploadAcceptsExactMaxContentLength(t *testing.T) {
 		"test",
 		"/app/templates",
 		r.AuthService, false,
+		nil,
 	)
 	require.NoError(t, err)
 	registerTestGRPCGateway(t, server, r.AuthService, r.Registry, r.Encryptor, support.NewOIDCProvider())

@@ -70,6 +70,7 @@ message User {
     repeated AccountProvider account_providers = 1;
     repeated RoleAssignment roles = 2;
     bool is_owner = 3;
+    string provisioned_by = 4;
   }
 
   Metadata metadata = 1;

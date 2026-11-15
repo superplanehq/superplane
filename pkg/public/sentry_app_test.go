@@ -166,6 +166,7 @@ func TestHandleSentryAppWebhook_canceledCommitReturnsServerError(t *testing.T) {
 	server, err := NewServer(
 		r.Encryptor, r.Registry, signer, support.NewOIDCProvider(),
 		"", "", "", "test", "/app/templates", r.AuthService, false,
+		nil,
 	)
 	require.NoError(t, err)
 

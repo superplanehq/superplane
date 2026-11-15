@@ -18,6 +18,7 @@ import (
 	pbAdminKeys "github.com/superplanehq/superplane/pkg/protos/admin/keys"
 	pbAdminOrganizations "github.com/superplanehq/superplane/pkg/protos/admin/organizations"
 	pbAdminRunners "github.com/superplanehq/superplane/pkg/protos/admin/runners"
+	pbAdminSSO "github.com/superplanehq/superplane/pkg/protos/admin/sso"
 	pbAPIKeys "github.com/superplanehq/superplane/pkg/protos/api_keys"
 	pbCanvases "github.com/superplanehq/superplane/pkg/protos/canvases"
 	pbFactories "github.com/superplanehq/superplane/pkg/protos/factories"
@@ -28,6 +29,7 @@ import (
 	pbOrganizations "github.com/superplanehq/superplane/pkg/protos/organizations"
 	pbRoles "github.com/superplanehq/superplane/pkg/protos/roles"
 	pbSecrets "github.com/superplanehq/superplane/pkg/protos/secrets"
+	pbSSO "github.com/superplanehq/superplane/pkg/protos/sso"
 	pbTriggers "github.com/superplanehq/superplane/pkg/protos/triggers"
 	pbUsers "github.com/superplanehq/superplane/pkg/protos/users"
 	pbWidgets "github.com/superplanehq/superplane/pkg/protos/widgets"
@@ -54,6 +56,9 @@ type Services struct {
 	AdminKeys               pbAdminKeys.KeysServer
 	AdminOrganizations      pbAdminOrganizations.AdminOrganizationsServer
 	AdminEnterpriseFeatures pbAdminEnterprise.EnterpriseFeaturesServer
+	SSO                     enterprise.SSO
+	SSOAPI                  pbSSO.SSOServer
+	AdminSSO                pbAdminSSO.AdminSSOServer
 }
 
 type ServicesConfig struct {
@@ -93,6 +98,10 @@ func NewServices(cfg ServicesConfig) (*Services, error) {
 	}
 
 	billingImplementation, err := enterprise.Get[enterprise.BillingOperations](featureRegistry, enterprise.Billing)
+	if err != nil {
+		return nil, err
+	}
+	ssoImplementation, err := enterprise.Get[enterprise.SSO](featureRegistry, enterprise.SSOCapability)
 	if err != nil {
 		return nil, err
 	}
@@ -148,5 +157,8 @@ func NewServices(cfg ServicesConfig) (*Services, error) {
 		AdminKeys:               NewAdminKeysService(cfg.EncryptionStore),
 		AdminOrganizations:      NewAdminOrganizationsService(cfg.AuthService),
 		AdminEnterpriseFeatures: NewAdminEnterpriseFeaturesService(organizationFeatures),
+		SSO:                     ssoImplementation,
+		SSOAPI:                  NewSSOService(ssoImplementation),
+		AdminSSO:                NewAdminSSOService(ssoImplementation),
 	}, nil
 }

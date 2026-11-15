@@ -232,6 +232,7 @@ func (s *TestSession) setupUserAndOrganization() {
 	if _, err := models.GrantEnterpriseFeatures(database.Conn(), organization.ID, []string{
 		string(licensing.FeatureCustomRoles),
 		string(licensing.FeatureGroups),
+		string(licensing.FeatureSSO),
 	}, models.EnterpriseFeatureSourceAdmin, nil); err != nil {
 		s.t.Fatalf("grant enterprise features: %v", err)
 	}

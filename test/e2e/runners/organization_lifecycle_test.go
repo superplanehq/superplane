@@ -124,7 +124,7 @@ func newLifecycleSteps(t *testing.T) *lifecycleSteps {
 	require.NoError(t, err)
 	runnerHTTP := httptest.NewServer(gateway.Handler())
 	t.Cleanup(runnerHTTP.Close)
-	api, err := public.NewServer(r.Encryptor, r.Registry, signer, support.NewOIDCProvider(), "", "", "", "test", "/app/templates", r.AuthService, false)
+	api, err := public.NewServer(r.Encryptor, r.Registry, signer, support.NewOIDCProvider(), "", "", "", "test", "/app/templates", r.AuthService, false, nil)
 	require.NoError(t, err)
 	enterpriseRegistry := enterprise.NewRegistry()
 	enterpriseRegistry.Register(enterprise.Billing, billingorganizations.New())

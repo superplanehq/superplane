@@ -38,6 +38,7 @@ func TestSetupOwnerIgnoresInstallationSettings(t *testing.T) {
 		"test",
 		"/app/templates",
 		r.AuthService, false,
+		nil,
 	)
 	require.NoError(t, err)
 
@@ -110,6 +111,7 @@ func setupOwnerTestServer(t *testing.T) *Server {
 		"test",
 		"/app/templates",
 		r.AuthService, false,
+		nil,
 	)
 	require.NoError(t, err)
 	return server

@@ -1,8 +1,8 @@
 export const LAST_USED_LOGIN_METHOD_STORAGE_KEY = "superplane:last-used-login-method";
 
-export type LastUsedLoginMethod = "password" | "github" | "google";
+export type LastUsedLoginMethod = "password" | "github" | "google" | "sso";
 
-const KNOWN_METHODS: LastUsedLoginMethod[] = ["password", "github", "google"];
+const KNOWN_METHODS: LastUsedLoginMethod[] = ["password", "github", "google", "sso"];
 
 function isKnownMethod(value: string | null): value is LastUsedLoginMethod {
   return value !== null && (KNOWN_METHODS as string[]).includes(value);

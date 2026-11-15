@@ -128,6 +128,18 @@ func ApplicationEncryptedStorage() []EncryptedStorageLocation {
 			ReadPage: ReadSentryAppInstallGrantRefreshTokenPage,
 			Replace:  ReplaceSentryAppInstallGrantRefreshToken,
 		},
+		{
+			Name:     "sso_connections.client_secret",
+			Format:   EncryptedStorageBytes,
+			ReadPage: ReadSSOConnectionClientSecretPage,
+			Replace:  ReplaceSSOConnectionClientSecret,
+		},
+		{
+			Name:     "sso_identities.id_token",
+			Format:   EncryptedStorageBytes,
+			ReadPage: ReadSSOIdentityIDTokenPage,
+			Replace:  ReplaceSSOIdentityIDToken,
+		},
 	}
 }
 
@@ -383,6 +395,36 @@ func ReadSentryAppInstallGrantRefreshTokenPage(tx *gorm.DB, cursor string, limit
 
 func ReplaceSentryAppInstallGrantRefreshToken(tx *gorm.DB, row EncryptedStorageRow, replacement []byte) (bool, error) {
 	result := tx.Exec("UPDATE sentry_app_install_grants SET refresh_token = ? WHERE installation_uuid = ? AND refresh_token = ?", replacement, row.Cursor, row.Value)
+	return result.RowsAffected == 1, result.Error
+}
+
+func ReadSSOConnectionClientSecretPage(tx *gorm.DB, cursor string, limit int) ([]EncryptedStorageRow, error) {
+	query := tx.Table("sso_connections").
+		Select("id::text, client_secret, '" + SSOClientSecretAssociatedData + "', ''").
+		Where("client_secret IS NOT NULL")
+	if cursor != "" {
+		query = query.Where("id > CAST(? AS uuid)", cursor)
+	}
+	return scanEncryptedStorageRows(query.Order("id").Limit(limit), limit)
+}
+
+func ReplaceSSOConnectionClientSecret(tx *gorm.DB, row EncryptedStorageRow, replacement []byte) (bool, error) {
+	result := tx.Exec("UPDATE sso_connections SET client_secret = ? WHERE id = CAST(? AS uuid) AND client_secret = ?", replacement, row.Cursor, row.Value)
+	return result.RowsAffected == 1, result.Error
+}
+
+func ReadSSOIdentityIDTokenPage(tx *gorm.DB, cursor string, limit int) ([]EncryptedStorageRow, error) {
+	query := tx.Table("sso_identities").
+		Select("id::text, id_token, '" + SSOIDTokenAssociatedData + "', ''").
+		Where("id_token IS NOT NULL")
+	if cursor != "" {
+		query = query.Where("id > CAST(? AS uuid)", cursor)
+	}
+	return scanEncryptedStorageRows(query.Order("id").Limit(limit), limit)
+}
+
+func ReplaceSSOIdentityIDToken(tx *gorm.DB, row EncryptedStorageRow, replacement []byte) (bool, error) {
+	result := tx.Exec("UPDATE sso_identities SET id_token = ? WHERE id = CAST(? AS uuid) AND id_token = ?", replacement, row.Cursor, row.Value)
 	return result.RowsAffected == 1, result.Error
 }
 

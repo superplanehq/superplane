@@ -46,6 +46,7 @@ import { BillingProductSettingsRoute } from "@/pages/factories/pages/settings/Bi
 import { LegacyAgentResourcesRedirect } from "@/pages/factories/pages/settings/LegacyAgentResourcesRedirect";
 import { FactorySettingsIndexRoute } from "@/pages/factories/pages/settings/MobileSettingsIndexPage";
 import { FactorySettingsAccountCodexUsagePage } from "./FactorySettingsAccountCodexUsagePage";
+import { FactorySettingsSsoPage } from "./sso/FactorySettingsSsoPage";
 import { LegacyRepositorySettingsRoute } from "./LegacyRepositorySettingsRoute";
 
 export const factorySettingsSectionRoutes = [
@@ -200,6 +201,15 @@ export const factorySettingsSectionRoutes = [
     element={
       <RequirePermission resource="org" action="read">
         <OrganizationSettingsOverviewPage />
+      </RequirePermission>
+    }
+  />,
+  <Route
+    key="factory-settings-organization-sso"
+    path="organization/sso"
+    element={
+      <RequirePermission resource="sso" action="read">
+        <FactorySettingsSsoPage />
       </RequirePermission>
     }
   />,

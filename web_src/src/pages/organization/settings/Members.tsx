@@ -122,6 +122,7 @@ export function Members({ organizationId }: MembersProps) {
         type: "member",
         status: "active",
         isOwner: Boolean(user.status?.isOwner),
+        provisionedBy: user.status?.provisionedBy,
       };
     });
   }, [users]);

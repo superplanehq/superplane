@@ -46,6 +46,7 @@ func sentryAdmissionServer(t *testing.T) (*support.ResourceRegistry, *Server) {
 	server, err := NewServer(
 		resources.Encryptor, resources.Registry, jwt.NewSigner("test-client-secret"), support.NewOIDCProvider(),
 		"", "", "", "test", "/app/templates", resources.AuthService, false,
+		nil,
 	)
 	require.NoError(t, err)
 	return resources, server

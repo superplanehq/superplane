@@ -198,6 +198,19 @@ func LockAccount(tx *gorm.DB, id uuid.UUID) (*Account, error) {
 	return &account, nil
 }
 
+// LockAccountByEmail locks the account row for a normalized email.
+// A missing account returns gorm.ErrRecordNotFound.
+func LockAccountByEmail(tx *gorm.DB, email string) (*Account, error) {
+	var account Account
+	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("email = ?", utils.NormalizeEmail(email)).
+		First(&account).Error
+	if err != nil {
+		return nil, err
+	}
+	return &account, nil
+}
+
 func FindAccountByEmail(email string) (*Account, error) {
 	var account Account
 

@@ -31,6 +31,7 @@ type User struct {
 	APIKeyExpiresAt *time.Time                  `gorm:"column:api_key_expires_at"`
 	APIKeyCanvasIDs datatypes.JSONSlice[string] `gorm:"column:api_key_canvas_ids"`
 	IsOwner         bool
+	ProvisionedBy   *string
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
 	DeletedAt       gorm.DeletedAt

@@ -63,6 +63,13 @@ type Handler struct {
 	blockSignup          bool
 	passwordLoginEnabled bool
 	magicCodeEnabled     bool
+	sso                  SSOHooks
+}
+
+// SSOHooks reports installation SSO state and an optional identity-provider sign-out URL.
+type SSOHooks interface {
+	ActiveConnectionExists(ctx context.Context) (bool, error)
+	EndSession(ctx context.Context, accountID string, ssoClaim string) (url string, ok bool)
 }
 
 type ProviderConfig struct {
@@ -88,6 +95,11 @@ func NewHandler(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, authService a
 // currently enabled for this installation. Used by handlers outside this
 // package (e.g. the change-password endpoint) that should refuse work
 // when the feature is disabled.
+// SetSSO connects organization SSO to the login and logout handlers.
+func (a *Handler) SetSSO(hooks SSOHooks) {
+	a.sso = hooks
+}
+
 func (a *Handler) PasswordLoginEnabled() bool {
 	return a.passwordLoginEnabled
 }
@@ -152,8 +164,16 @@ func (a *Handler) RegisterRoutes(router *mux.Router) {
 	router.HandleFunc("/auth/{provider}", a.handleAuth).Methods("GET")
 }
 
+func rejectReservedSSOProvider(w http.ResponseWriter, r *http.Request) bool {
+	if mux.Vars(r)["provider"] == "sso" {
+		http.NotFound(w, r)
+		return true
+	}
+	return false
+}
+
 func (a *Handler) handleAuth(w http.ResponseWriter, r *http.Request) {
-	if rejectBitbucketSignIn(w, r) {
+	if rejectReservedSSOProvider(w, r) || rejectBitbucketSignIn(w, r) {
 		return
 	}
 	if !isConnectIntent(r) {
@@ -270,6 +290,9 @@ func useRealProviderAuthInDevelopment(r *http.Request) bool {
 }
 
 func (a *Handler) handleDevelopmentAuth(w http.ResponseWriter, r *http.Request) {
+	if rejectReservedSSOProvider(w, r) {
+		return
+	}
 	if useRealProviderAuthInDevelopment(r) {
 		a.handleAuth(w, r)
 		return
@@ -370,6 +393,9 @@ func (a *Handler) finishProviderAuth(w http.ResponseWriter, r *http.Request, got
 }
 
 func (a *Handler) handleAuthCallback(w http.ResponseWriter, r *http.Request) {
+	if rejectReservedSSOProvider(w, r) {
+		return
+	}
 	logging.AddRequestLogFields(r.Context(), log.Fields{
 		"action":  "login",
 		"object":  "account",
@@ -512,11 +538,23 @@ func (a *Handler) handleLogout(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	var endSessionURL string
+	if a.sso != nil {
+		if session, err := AccountSessionFromRequest(r, a.jwtSigner); err == nil {
+			if target, ok := a.sso.EndSession(r.Context(), session.AccountID, session.SSO); ok {
+				endSessionURL = target
+			}
+		}
+	}
 	gothic.Logout(w, r)
 
 	ClearAccountCookie(w, r)
 	supportsession.ClearCookie(w, r)
 
+	if endSessionURL != "" {
+		http.Redirect(w, r, endSessionURL, http.StatusTemporaryRedirect) // #nosec G710 -- the URL comes from the identity provider discovery document.
+		return
+	}
 	http.Redirect(w, r, getPostLogoutRedirectURL(r), http.StatusTemporaryRedirect) // #nosec G710 -- getPostLogoutRedirectURL returns a validated internal path.
 }
 
@@ -543,18 +581,27 @@ func (a *Handler) handleAuthConfig(w http.ResponseWriter, r *http.Request) {
 	}
 	sort.Strings(providerNames)
 
+	ssoEnabled := false
+	if a.sso != nil {
+		enabled, err := a.sso.ActiveConnectionExists(r.Context())
+		if err == nil {
+			ssoEnabled = enabled
+		}
+	}
 	response := struct {
 		Providers                   []string `json:"providers"`
 		PasswordLoginEnabled        bool     `json:"passwordLoginEnabled"`
 		SignupEnabled               bool     `json:"signupEnabled"`
 		SignupsBlockedByEnvironment bool     `json:"signupsBlockedByEnvironment"`
 		MagicCodeEnabled            bool     `json:"magicCodeEnabled"`
+		SSOEnabled                  bool     `json:"ssoEnabled"`
 	}{
 		Providers:                   providerNames,
 		PasswordLoginEnabled:        a.passwordLoginEnabled,
 		SignupEnabled:               a.SignupsEnabled(),
 		SignupsBlockedByEnvironment: a.SignupsBlockedByEnvironment(),
 		MagicCodeEnabled:            a.magicCodeEnabled,
+		SSOEnabled:                  ssoEnabled,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -1598,5 +1645,19 @@ func SetAccountCookie(w http.ResponseWriter, r *http.Request, token string, ttl 
 }
 
 func requestUsesHTTPS(r *http.Request) bool {
+	return RequestUsesHTTPS(r)
+}
+
+// RequestUsesHTTPS reports whether the browser connection is HTTPS.
+// A reverse proxy sets X-Forwarded-Proto.
+func RequestUsesHTTPS(r *http.Request) bool {
+	if r == nil {
+		return false
+	}
 	return r.TLS != nil || strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https")
+}
+
+// IsValidRedirectURL reports whether a post-login path stays inside this installation.
+func IsValidRedirectURL(redirectURL string) bool {
+	return isValidRedirectURL(redirectURL)
 }
