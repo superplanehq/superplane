@@ -30,11 +30,11 @@ func TestLicenseGatedRoutes(t *testing.T) {
 		{Method: http.MethodPost, Pattern: "/api/v1/groups"}:                    licensing.FeatureGroups,
 		{Method: http.MethodPut, Pattern: "/api/v1/groups/{group_name}"}:        licensing.FeatureGroups,
 		{Method: http.MethodPost, Pattern: "/api/v1/groups/{group_name}/users"}: licensing.FeatureGroups,
-		{Method: http.MethodPut, Pattern: "/api/v1/sso/connection"}:            licensing.FeatureSSO,
-		{Method: http.MethodPost, Pattern: "/api/v1/sso/connection/activate"}: licensing.FeatureSSO,
-		{Method: http.MethodPost, Pattern: "/api/v1/sso/domains"}:             licensing.FeatureSSO,
-		{Method: http.MethodPost, Pattern: "/api/v1/sso/domains/{id}/verify"}: licensing.FeatureSSO,
-		{Method: http.MethodPost, Pattern: "/api/v1/sso/scim-tokens"}:         licensing.FeatureSSO,
+		{Method: http.MethodPut, Pattern: "/api/v1/sso/connection"}:             licensing.FeatureSSO,
+		{Method: http.MethodPost, Pattern: "/api/v1/sso/connection/activate"}:   licensing.FeatureSSO,
+		{Method: http.MethodPost, Pattern: "/api/v1/sso/domains"}:               licensing.FeatureSSO,
+		{Method: http.MethodPost, Pattern: "/api/v1/sso/domains/{id}/verify"}:   licensing.FeatureSSO,
+		{Method: http.MethodPost, Pattern: "/api/v1/sso/scim-tokens"}:           licensing.FeatureSSO,
 	}
 
 	for route, feature := range gated {
