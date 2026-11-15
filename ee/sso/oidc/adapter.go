@@ -306,6 +306,12 @@ func (a *Adapter) provider(ctx context.Context, conn *models.SSOConnection, issu
 		return nil, err
 	}
 	a.mu.Lock()
+	prefix := conn.ID.String() + "|"
+	for cachedKey := range a.cache {
+		if strings.HasPrefix(cachedKey, prefix) {
+			delete(a.cache, cachedKey)
+		}
+	}
 	a.cache[key] = cachedProvider{provider: provider, until: a.now().Add(providerCacheTTL)}
 	a.mu.Unlock()
 	return provider, nil

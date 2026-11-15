@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	billingmodels "github.com/superplanehq/superplane/ee/billing/models"
 	"github.com/superplanehq/superplane/ee/sso/core"
@@ -321,6 +322,25 @@ func TestDeactivatedIdentityCannotSignIn(t *testing.T) {
 	require.Equal(t, core.CodeAccessDenied, core.CodeOf(err))
 }
 
+func TestInactiveIdentityWithoutMembershipCannotSignIn(t *testing.T) {
+	f := newFlow(t)
+	f.verifyExample()
+	conn := f.put(connectionInput(true))
+	account, err := models.CreateAccount("Inactive", "inactive.member@example.com")
+	require.NoError(t, err)
+	now := time.Now()
+	subject := "pending"
+	require.NoError(t, database.Conn().Create(&models.SSOIdentity{
+		ID: uuid.New(), ConnectionID: conn.ID, OrganizationID: conn.OrganizationID, AccountID: account.ID,
+		Subject: &subject, Email: account.Email, Active: false, ProvisionedBy: models.SSOProvisionedBySCIM,
+		CreatedAt: now, UpdatedAt: now,
+	}).Error)
+	err = f.signIn(conn, "pending", account.Email)
+	require.Equal(t, core.CodeAccessDenied, core.CodeOf(err))
+	_, err = models.FindActiveUserByEmail(f.r.Organization.ID.String(), account.Email)
+	require.Error(t, err)
+}
+
 func TestEnforcement(t *testing.T) {
 	f := newFlow(t)
 	f.verifyExample()
@@ -352,6 +372,16 @@ func TestEnforcement(t *testing.T) {
 		require.Nil(t, required)
 	})
 
+	t.Run("requires SSO for the owner when bypass is off", func(t *testing.T) {
+		conn.AllowOwnerBypass = false
+		require.NoError(t, conn.Save(database.Conn()))
+		required, err := f.service.CheckOrganizationAccess(f.ctx(), owner, enterprise.SSOAccessSession{AccountID: accountID})
+		require.NoError(t, err)
+		require.NotNil(t, required)
+		conn.AllowOwnerBypass = true
+		require.NoError(t, conn.Save(database.Conn()))
+	})
+
 	t.Run("allows a fresh SSO session", func(t *testing.T) {
 		f.setOwnerEmail("owner@example.com")
 		require.NoError(t, f.signIn(conn, "owner-subject", "owner@example.com"))
@@ -372,6 +402,39 @@ func TestEnforcement(t *testing.T) {
 		member.IsOwner = false
 		required, err := f.service.CheckOrganizationAccess(f.ctx(), &member, enterprise.SSOAccessSession{
 			AccountID: accountID,
+			SSO:       claim,
+		})
+		require.NoError(t, err)
+		require.NotNil(t, required)
+	})
+
+	t.Run("requires SSO when the identity session was revoked", func(t *testing.T) {
+		identity, err := models.FindSSOIdentityBySubject(database.Conn(), conn.ID, "owner-subject")
+		require.NoError(t, err)
+		revoked := time.Now()
+		identity.SessionsRevokedAt = &revoked
+		require.NoError(t, identity.Save(database.Conn()))
+		claim := conn.ID.String() + ":" + strconv.FormatInt(revoked.Add(-time.Minute).Unix(), 10)
+		member := *owner
+		member.IsOwner = false
+		required, err := f.service.CheckOrganizationAccess(f.ctx(), &member, enterprise.SSOAccessSession{
+			AccountID: accountID,
+			SSO:       claim,
+		})
+		require.NoError(t, err)
+		require.NotNil(t, required)
+		identity.SessionsRevokedAt = nil
+		require.NoError(t, identity.Save(database.Conn()))
+	})
+
+	t.Run("requires SSO when the session entry has no identity", func(t *testing.T) {
+		claim := conn.ID.String() + ":" + strconv.FormatInt(time.Now().Unix(), 10)
+		member := *owner
+		member.IsOwner = false
+		missing := uuid.New()
+		member.AccountID = &missing
+		required, err := f.service.CheckOrganizationAccess(f.ctx(), &member, enterprise.SSOAccessSession{
+			AccountID: missing,
 			SSO:       claim,
 		})
 		require.NoError(t, err)

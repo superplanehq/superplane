@@ -170,7 +170,9 @@ func (p *Pipeline) EnsureMembership(ctx context.Context, tx *gorm.DB, conn *mode
 		return nil
 	}
 
-	if requireJIT && user != nil && !identity.Active {
+	// An inactive identity with no active membership stays inactive until SCIM
+	// reactivation. Just-in-time sign-in must not recreate that member.
+	if requireJIT && !identity.Active {
 		return Fail(CodeAccessDenied)
 	}
 	if requireJIT && !conn.JITEnabled {

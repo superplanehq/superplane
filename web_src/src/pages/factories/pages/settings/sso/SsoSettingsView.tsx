@@ -34,6 +34,7 @@ export function SsoSettingsView({
 
   return (
     <div className="space-y-8" data-testid="sso-settings">
+      {model.notice ? <p data-testid="sso-test-notice">{model.notice}</p> : null}
       {model.error ? (
         <p role="alert" data-testid="sso-error">
           {model.error}

@@ -472,7 +472,8 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
   const canSignupWithPassword = authConfig.passwordLoginEnabled && canSignup;
   const canLoginWithPassword = authConfig.passwordLoginEnabled;
   const redirectQuery = safeRedirect ? `?redirect=${encodeURIComponent(safeRedirect)}` : "";
-  const showProviderButtons = hasProviders && (!isSignupMode || canSignup);
+  const showProviderButtons =
+    (hasProviders && (!isSignupMode || canSignup)) || (Boolean(authConfig.ssoEnabled) && !isSignupMode);
   const canUseMagicCode = authConfig.magicCodeEnabled && (!isSignupMode || canSignup);
   const useMagicCodePrimary = canUseMagicCode && !showPasswordLogin;
   const isSignupDisabledReturn = authError === SIGNUP_DISABLED_AUTH_ERROR || emailSignupDisabled;
@@ -510,7 +511,10 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
           email: magicCodeEmail,
           resume: () => {
             skipSso.current = true;
-            void requestMagicCode(signup);
+            void requestMagicCode(signup).catch(() => {
+              setFormError("Network error occurred");
+              setSubmitLoading(false);
+            });
           },
         });
         setSubmitLoading(false);

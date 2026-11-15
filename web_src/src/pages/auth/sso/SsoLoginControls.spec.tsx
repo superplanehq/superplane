@@ -21,6 +21,17 @@ describe("ContinueWithSso", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("SSO is not set up for this email domain.");
   });
 
+  it("keeps the form when discovery fails", async () => {
+    globalThis.fetch = mock().mockResolvedValue(new Response("", { status: 500 }));
+    const user = userEvent.setup();
+    render(<ContinueWithSso redirect="" lastUsed={false} />);
+    await user.click(screen.getByRole("button", { name: "Continue with SSO" }));
+    await user.type(screen.getByLabelText("Work email"), "ada@example.com");
+    await user.click(screen.getByRole("button", { name: "Continue with SSO" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Single Sign-On could not be checked. Try again.");
+    expect(screen.getByLabelText("Work email")).toBeInTheDocument();
+  });
+
   it("records SSO as the last used method before navigation", async () => {
     globalThis.fetch = mock().mockResolvedValue(
       Response.json({ ssoAvailable: true, startUrl: "/auth/sso/connection/start" }),

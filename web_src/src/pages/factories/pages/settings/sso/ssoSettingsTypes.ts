@@ -1,11 +1,31 @@
 import type { SsoConnection, SsoDomain, SsoPutConnectionRequest, SsoscimToken } from "@/api-client/types.gen";
 
+export function testResultText(connection: SsoConnection | null | undefined, tested: boolean) {
+  if (!connection?.lastTest) {
+    return "No test yet.";
+  }
+  const outcome = tested ? "Last test succeeded." : "Last test failed.";
+  const when = connection.lastTestedAt ? new Date(connection.lastTestedAt).toLocaleString() : "";
+  const detail = tested ? connection.lastTest.email : connection.lastTest.error;
+  return [outcome, when, detail].filter(Boolean).join(" ");
+}
+
+export function statusLabel(status: string | undefined) {
+  if (status === "STATUS_ACTIVE") return "Active";
+  if (status === "STATUS_DISABLED") return "Disabled";
+  return "Draft";
+}
+
 export type SsoSettingsModel = {
   licensed: boolean;
+  canUpdate?: boolean;
+  busy?: boolean;
+  secretEpoch?: number;
   connection?: SsoConnection | null;
   domains: SsoDomain[];
   tokens: SsoscimToken[];
   error?: string | null;
+  notice?: string | null;
   revealedToken?: string | null;
 };
 
@@ -23,10 +43,12 @@ export type SsoSettingsActions = {
   onDismissToken: () => void;
 };
 
-export type ConfirmRequest = { title: string; body: string; run: () => void };
+export type ConfirmRequest = { title: string; body: string; actionLabel: string; run: () => void };
 
 export type SsoDraft = {
   canChange: boolean;
+  canUpdate: boolean;
+  sessionError: string | null;
   exists: boolean;
   tested: boolean;
   verified: boolean;
@@ -56,7 +78,7 @@ export type SsoDraft = {
   setIdpLogout: (value: boolean) => void;
   tokenDescription: string;
   setTokenDescription: (value: string) => void;
-  ask: (title: string, body: string, run: () => void) => void;
+  ask: (title: string, body: string, actionLabel: string, run: () => void) => void;
   requestRequired: () => void;
   save: (nextEnforcement?: string) => void;
 };

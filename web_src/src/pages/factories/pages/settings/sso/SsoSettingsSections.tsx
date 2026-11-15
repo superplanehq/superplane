@@ -13,7 +13,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { CopyButton } from "@/ui/CopyButton";
 
-import type { ConfirmRequest, SsoDraft, SsoSettingsActions, SsoSettingsModel } from "./ssoSettingsTypes";
+import { SsoSelect, SsoSwitch } from "./SsoSettingsControls";
+import {
+  statusLabel,
+  testResultText,
+  type ConfirmRequest,
+  type SsoDraft,
+  type SsoSettingsActions,
+  type SsoSettingsModel,
+} from "./ssoSettingsTypes";
 
 const ROLES = [
   { value: "org_admin", label: "Admin" },
@@ -80,9 +88,10 @@ function DomainRow({ item, actions, draft }: { item: SsoDomain; actions: SsoSett
       <Button
         type="button"
         variant="outline"
+        disabled={!draft.canUpdate}
         onClick={() =>
           item.id &&
-          draft.ask("Delete domain", "Delete this domain. This action cannot be undone.", () =>
+          draft.ask("Delete domain", "Delete this domain. This action cannot be undone.", "Delete domain", () =>
             actions.onDeleteDomain(item.id!),
           )
         }
@@ -105,17 +114,18 @@ export function ProviderSection({
   return (
     <section className="space-y-3">
       <h2 className="text-base font-medium">Identity provider</h2>
-      <Label htmlFor="sso-preset">Preset</Label>
-      <select
+      <SsoSelect
         id="sso-preset"
+        label="Preset"
         value={draft.preset}
         disabled={!draft.canChange}
-        onChange={(event) => draft.setPreset(event.target.value)}
-      >
-        <option value="PRESET_OKTA">Okta</option>
-        <option value="PRESET_ENTRA">Microsoft Entra ID</option>
-        <option value="PRESET_GENERIC">Generic OIDC</option>
-      </select>
+        onChange={draft.setPreset}
+        options={[
+          { value: "PRESET_OKTA", label: "Okta" },
+          { value: "PRESET_ENTRA", label: "Microsoft Entra ID" },
+          { value: "PRESET_GENERIC", label: "Generic OIDC" },
+        ]}
+      />
       <Label htmlFor="sso-display-name">Display name</Label>
       <Input
         id="sso-display-name"
@@ -179,12 +189,9 @@ export function ActivationSection({
     <section className="space-y-3" data-testid="sso-activation">
       <h2 className="text-base font-medium">Test and activate</h2>
       <p>Status: {statusLabel(connection?.status)}</p>
-      <p data-testid="sso-test-result">
-        {connection?.lastTest ? (draft.tested ? "Last test succeeded." : "Last test failed.") : "No test yet."}{" "}
-        {connection?.lastTest?.email}
-      </p>
+      <p data-testid="sso-test-result">{testResultText(connection, draft.tested)}</p>
       <div className="flex flex-wrap gap-2">
-        <Button type="button" disabled={!draft.exists} onClick={actions.onTest}>
+        <Button type="button" disabled={!draft.canUpdate || !draft.exists} onClick={actions.onTest}>
           Test connection
         </Button>
         <Button
@@ -197,9 +204,14 @@ export function ActivationSection({
         <Button
           type="button"
           variant="outline"
-          disabled={!draft.exists}
+          disabled={!draft.canUpdate || !draft.exists}
           onClick={() =>
-            draft.ask("Disable Single Sign-On", "Members can sign in with other methods again.", actions.onDisable)
+            draft.ask(
+              "Disable Single Sign-On",
+              "Members can sign in with other methods again.",
+              "Disable Single Sign-On",
+              actions.onDisable,
+            )
           }
         >
           Disable
@@ -207,9 +219,14 @@ export function ActivationSection({
         <Button
           type="button"
           variant="outline"
-          disabled={!draft.exists}
+          disabled={!draft.canUpdate || !draft.exists}
           onClick={() =>
-            draft.ask("Delete Single Sign-On", "Delete the connection and its identities.", actions.onDelete)
+            draft.ask(
+              "Delete Single Sign-On",
+              "Delete the connection and its identities.",
+              "Delete Single Sign-On",
+              actions.onDelete,
+            )
           }
         >
           Delete
@@ -231,28 +248,21 @@ export function ProvisioningSection({
   return (
     <section className="space-y-3">
       <h2 className="text-base font-medium">Provisioning</h2>
-      <label className="flex items-center gap-2 text-sm">
-        <input
-          type="checkbox"
-          checked={draft.jitEnabled}
-          disabled={!draft.canChange}
-          onChange={(event) => draft.setJitEnabled(event.target.checked)}
-        />
-        Create a member on the first sign-in
-      </label>
-      <Label htmlFor="sso-role">Default role</Label>
-      <select
+      <SsoSwitch
+        id="sso-jit"
+        label="Create a member on the first sign-in"
+        checked={draft.jitEnabled}
+        disabled={!draft.canChange}
+        onCheckedChange={draft.setJitEnabled}
+      />
+      <SsoSelect
         id="sso-role"
+        label="Default role"
         value={draft.defaultRole}
         disabled={!draft.canChange}
-        onChange={(event) => draft.setDefaultRole(event.target.value)}
-      >
-        {ROLES.map((role) => (
-          <option key={role.value} value={role.value}>
-            {role.label}
-          </option>
-        ))}
-      </select>
+        onChange={draft.setDefaultRole}
+        options={ROLES}
+      />
       <CopyField label="SCIM base URL" value={model.connection?.scimBaseUrl ?? ""} />
       <ul>
         {model.tokens.map((token) => (
@@ -261,12 +271,18 @@ export function ProvisioningSection({
             <Button
               type="button"
               variant="outline"
-              onClick={() =>
-                token.id &&
-                draft.ask("Revoke SCIM token", "The identity provider can no longer use this token.", () =>
-                  actions.onRevokeToken(token.id!),
-                )
-              }
+              disabled={!draft.canUpdate}
+              onClick={() => {
+                if (!token.id) {
+                  return;
+                }
+                draft.ask(
+                  "Revoke SCIM token",
+                  "The identity provider can no longer use this token.",
+                  "Revoke SCIM token",
+                  () => actions.onRevokeToken(token.id!),
+                );
+              }}
             >
               Revoke
             </Button>
@@ -295,48 +311,52 @@ export function PolicySection({ draft }: { draft: SsoDraft }) {
   return (
     <section className="space-y-3">
       <h2 className="text-base font-medium">Policy</h2>
-      <Label htmlFor="sso-enforcement">Enforcement</Label>
-      <select
+      <SsoSelect
         id="sso-enforcement"
+        label="Enforcement"
         value={draft.enforcement}
         disabled={!draft.canChange}
-        onChange={(event) => {
-          const next = event.target.value;
+        onChange={(next) => {
           if (next === "ENFORCEMENT_REQUIRED") {
             draft.requestRequired();
             return;
           }
           draft.setEnforcement(next);
         }}
-      >
-        <option value="ENFORCEMENT_OPTIONAL">Optional</option>
-        <option value="ENFORCEMENT_REQUIRED">Required</option>
-      </select>
-      <label className="flex items-center gap-2 text-sm">
-        <input
-          type="checkbox"
-          checked={draft.ownerBypass}
-          disabled={!draft.canChange}
-          onChange={(event) => draft.setOwnerBypass(event.target.checked)}
-        />
-        Allow an owner to sign in with another method
-      </label>
+        options={[
+          { value: "ENFORCEMENT_OPTIONAL", label: "Optional" },
+          { value: "ENFORCEMENT_REQUIRED", label: "Required" },
+        ]}
+      />
+      <SsoSwitch
+        id="sso-owner-bypass"
+        label="Allow an owner to sign in with another method"
+        checked={draft.ownerBypass}
+        disabled={!draft.canChange}
+        onCheckedChange={draft.setOwnerBypass}
+      />
       <Label htmlFor="sso-session-hours">Maximum session age in hours</Label>
       <Input
         id="sso-session-hours"
+        type="number"
+        min={1}
+        max={168}
         value={draft.sessionHours}
         disabled={!draft.canChange}
         onChange={(event) => draft.setSessionHours(event.target.value)}
       />
-      <label className="flex items-center gap-2 text-sm">
-        <input
-          type="checkbox"
-          checked={draft.idpLogout}
-          disabled={!draft.canChange}
-          onChange={(event) => draft.setIdpLogout(event.target.checked)}
-        />
-        Sign out from the identity provider
-      </label>
+      {draft.sessionError ? (
+        <p className="text-sm text-red-600" role="alert">
+          {draft.sessionError}
+        </p>
+      ) : null}
+      <SsoSwitch
+        id="sso-idp-logout"
+        label="Sign out from the identity provider"
+        checked={draft.idpLogout}
+        disabled={!draft.canChange}
+        onCheckedChange={draft.setIdpLogout}
+      />
       <Button type="button" disabled={!draft.canChange} onClick={() => draft.save()}>
         Save policy
       </Button>
@@ -363,7 +383,7 @@ export function ConfirmDialog({ confirm, onClose }: { confirm: ConfirmRequest | 
               onClose();
             }}
           >
-            Confirm
+            {confirm?.actionLabel || "Confirm"}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -432,10 +452,4 @@ function CopyField({ label, value }: { label: string; value: string }) {
       </CopyButton>
     </div>
   );
-}
-
-function statusLabel(status: string | undefined) {
-  if (status === "STATUS_ACTIVE") return "Active";
-  if (status === "STATUS_DISABLED") return "Disabled";
-  return "Draft";
 }

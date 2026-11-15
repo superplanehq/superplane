@@ -13,6 +13,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -23,8 +24,14 @@ import (
 	"github.com/superplanehq/superplane/pkg/features"
 	spjwt "github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/test/e2e/queries"
 	"github.com/superplanehq/superplane/test/e2e/session"
 )
+
+func writeJSON(w http.ResponseWriter, body any) {
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(body)
+}
 
 func TestSSOSettingsPage(t *testing.T) {
 	s := ctx.NewSession(t)
@@ -34,6 +41,99 @@ func TestSSOSettingsPage(t *testing.T) {
 	s.Visit("/" + s.OrgID.String() + "/settings/sso")
 	s.AssertText("Single Sign-On")
 	s.AssertText("Identity provider")
+}
+
+func TestSSOConfigureTestAndSignIn(t *testing.T) {
+	s := ctx.NewSession(t)
+	s.Start()
+	t.Cleanup(func() {
+		clearSSO(t, s)
+		if member, err := models.FindActiveUserByEmail(s.OrgID.String(), "ada@superplane.local"); err == nil {
+			_ = member.SoftDelete(database.Conn(), time.Now(), "")
+		}
+		_ = models.ApplyInstallationMetadata(database.Conn(), func(metadata *models.InstallationMetadata) {
+			metadata.AllowPrivateNetworkAccess = false
+		})
+	})
+	clearSSO(t, s)
+	require.NoError(t, models.ApplyInstallationMetadata(database.Conn(), func(metadata *models.InstallationMetadata) {
+		metadata.AllowPrivateNetworkAccess = true
+	}))
+	time.Sleep(6 * time.Second)
+	fake := newE2EOIDC(t, "ada@superplane.local")
+	require.NoError(t, models.EnableExperimentalFeature(s.OrgID, features.FeatureFactories))
+	s.Login()
+	s.Visit("/" + s.OrgID.String() + "/settings/sso")
+	s.FillIn(queries.Locator("#sso-issuer"), fake.issuer)
+	s.FillIn(queries.Locator("#sso-client-id"), "client-1")
+	s.FillIn(queries.Locator("#sso-client-secret"), "secret")
+	s.Click(queries.Locator("button:text-is(\"Save\")"))
+	s.AssertVisible(queries.Locator("p:text-is(\"Saved\")"))
+	s.FillIn(queries.Locator("#sso-domain"), "superplane.local")
+	s.Click(queries.Locator("button:text-is(\"Add domain\")"))
+	s.AssertText("Pending")
+
+	var domain models.OrganizationDomain
+	require.NoError(t, database.Conn().Where("organization_id = ? AND domain = ?", s.OrgID, "superplane.local").First(&domain).Error)
+	now := time.Now()
+	domain.VerifiedAt = &now
+	method := models.DomainVerificationDNS
+	domain.VerificationMethod = &method
+	require.NoError(t, database.Conn().Save(&domain).Error)
+	s.Visit("/" + s.OrgID.String() + "/settings/sso")
+	s.AssertText("Verified")
+	s.Click(queries.Locator("button:text-is(\"Test connection\")"))
+	s.AssertText("The sign-in test succeeded.")
+	s.Click(queries.Locator("button:text-is(\"Activate\")"))
+	s.AssertText("Status: Active")
+
+	require.NoError(t, s.Page().Context().ClearCookies())
+	s.Visit("/login")
+	s.Click(queries.Text("Continue with SSO"))
+	s.FillIn(queries.Locator("#sso-email"), "ada@superplane.local")
+	s.Click(queries.Text("Continue with SSO"))
+	require.Eventually(t, func() bool {
+		return strings.Contains(s.Page().URL(), "/"+s.OrgSlug)
+	}, 20*time.Second, 200*time.Millisecond)
+
+	s.Login()
+	s.Visit("/" + s.OrgID.String() + "/settings/members")
+	s.AssertText("ada@superplane.local")
+	s.AssertText("SSO")
+
+	conn, err := models.FindSSOConnectionByOrganization(database.Conn(), s.OrgID)
+	require.NoError(t, err)
+	conn.Enforcement = models.SSOEnforcementRequired
+	conn.AllowOwnerBypass = false
+	require.NoError(t, conn.Save(database.Conn()))
+	s.Login()
+	s.Visit("/" + s.OrgID.String() + "/settings/members")
+	require.Eventually(t, func() bool {
+		return accountCookieHasSSO(t, s)
+	}, 20*time.Second, 200*time.Millisecond)
+}
+
+func accountCookieHasSSO(t *testing.T, s *session.TestSession) bool {
+	t.Helper()
+	cookies, err := s.Page().Context().Cookies()
+	if err != nil {
+		return false
+	}
+	for _, cookie := range cookies {
+		if cookie.Name != "account_token" {
+			continue
+		}
+		parts := strings.Split(cookie.Value, ".")
+		if len(parts) < 2 {
+			return false
+		}
+		payload, err := base64.RawURLEncoding.DecodeString(parts[1])
+		if err != nil {
+			return false
+		}
+		return strings.Contains(string(payload), `"sso"`)
+	}
+	return false
 }
 
 func TestSSORequiredEnforcementRedirects(t *testing.T) {
@@ -230,15 +330,19 @@ func newE2EOIDC(t *testing.T, email string) *e2eOIDC {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/.well-known/openid-configuration":
-			_ = json.NewEncoder(w).Encode(map[string]any{
+			writeJSON(w, map[string]any{
 				"issuer": fake.issuer, "authorization_endpoint": fake.issuer + "/authorize",
 				"token_endpoint": fake.issuer + "/token", "jwks_uri": fake.issuer + "/jwks",
 				"userinfo_endpoint": fake.issuer + "/userinfo", "end_session_endpoint": fake.issuer + "/logout",
 				"response_types_supported": []string{"code"}, "subject_types_supported": []string{"public"},
 				"id_token_signing_alg_values_supported": []string{"RS256"},
 			})
+		case "/authorize":
+			fake.nonce = r.URL.Query().Get("nonce")
+			target := r.URL.Query().Get("redirect_uri") + "?code=code-1&state=" + url.QueryEscape(r.URL.Query().Get("state"))
+			http.Redirect(w, r, target, http.StatusFound)
 		case "/jwks":
-			_ = json.NewEncoder(w).Encode(map[string]any{"keys": []any{map[string]string{
+			writeJSON(w, map[string]any{"keys": []any{map[string]string{
 				"kty": "RSA", "use": "sig", "alg": "RS256", "kid": "test",
 				"n": base64.RawURLEncoding.EncodeToString(fake.key.N.Bytes()),
 				"e": base64.RawURLEncoding.EncodeToString(big.NewInt(int64(fake.key.E)).Bytes()),
@@ -256,7 +360,7 @@ func newE2EOIDC(t *testing.T, email string) *e2eOIDC {
 				http.Error(w, signErr.Error(), http.StatusInternalServerError)
 				return
 			}
-			_ = json.NewEncoder(w).Encode(map[string]any{"access_token": "access", "token_type": "Bearer", "id_token": signed})
+			writeJSON(w, map[string]any{"access_token": "access", "token_type": "Bearer", "id_token": signed})
 		default:
 			http.NotFound(w, r)
 		}

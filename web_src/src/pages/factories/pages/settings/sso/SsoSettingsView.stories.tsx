@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
+import { RequiredDialog, TokenDialog } from "./SsoSettingsSections";
 import { SsoSettingsView } from "./SsoSettingsView";
 
 const meta = {
@@ -48,4 +49,52 @@ export const Active: Story = {
 };
 export const ErrorState: Story = {
   args: { model: { licensed: true, domains: [], tokens: [], error: "The sign-in test failed." } },
+};
+export const UnlicensedConnection: Story = {
+  args: {
+    model: {
+      licensed: false,
+      domains: [{ id: "domain", domain: "example.com", verifiedAt: "2026-11-14T00:00:00Z" }],
+      tokens: [],
+      connection: { id: "conn", status: "STATUS_ACTIVE", displayName: "Okta" },
+    },
+  },
+};
+export const FailedTest: Story = {
+  args: {
+    model: {
+      licensed: true,
+      domains: [],
+      tokens: [],
+      connection: {
+        id: "conn",
+        status: "STATUS_DRAFT",
+        lastTestedAt: "2026-11-14T12:00:00Z",
+        lastTest: { ok: false, error: "The issuer did not respond." },
+      },
+    },
+  },
+};
+export const PendingDomain: Story = {
+  args: {
+    model: {
+      licensed: true,
+      domains: [
+        {
+          id: "domain",
+          domain: "example.com",
+          txtName: "_superplane-verification.example.com",
+          txtValue: "superplane-domain-verification=token",
+        },
+      ],
+      tokens: [],
+      connection: { id: "conn", status: "STATUS_DRAFT" },
+    },
+  },
+};
+export const TokenShownOnce: StoryObj = {
+  render: () => <TokenDialog secret="scim-token-secret" onDismiss={() => undefined} />,
+};
+export const RequiredConfirmation: StoryObj = {
+  render: () => <RequiredDialog open onOpenChange={() => undefined} onConfirm={() => undefined} />,
 };

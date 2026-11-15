@@ -9,11 +9,13 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 	"time"
 
 	jwtLib "github.com/golang-jwt/jwt/v4"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 )
@@ -150,6 +152,95 @@ func TestOIDCSignIn(t *testing.T) {
 		response := f.callback(t, conn, fake, callbackOptions{otherConnection: true})
 		require.Contains(t, response.Header().Get("Location"), "auth_error=sso_failed")
 	})
+
+	t.Run("refuses a callback after the connection is disabled", func(t *testing.T) {
+		start := httptest.NewRequest(http.MethodGet, "/auth/sso/"+conn.ID.String()+"/start", nil)
+		started := httptest.NewRecorder()
+		f.service.AuthHandler().ServeHTTP(started, start)
+		location, err := url.Parse(started.Header().Get("Location"))
+		require.NoError(t, err)
+		fake.nonce = location.Query().Get("nonce")
+		conn.Status = models.SSOStatusDisabled
+		require.NoError(t, conn.Save(database.Conn()))
+		callback := httptest.NewRequest(http.MethodGet, "/auth/sso/"+conn.ID.String()+"/callback?code=code-1&state="+url.QueryEscape(location.Query().Get("state")), nil)
+		for _, cookie := range started.Result().Cookies() {
+			callback.AddCookie(cookie)
+		}
+		response := httptest.NewRecorder()
+		f.service.AuthHandler().ServeHTTP(response, callback)
+		require.Contains(t, response.Header().Get("Location"), "auth_error=sso_not_available")
+	})
+}
+
+func TestOIDCTestSignIn(t *testing.T) {
+	f := newFlow(t)
+	f.setOwnerEmail("owner@example.com")
+	f.verifyExample()
+	require.NoError(t, models.ApplyInstallationMetadata(database.Conn(), func(metadata *models.InstallationMetadata) {
+		metadata.AllowPrivateNetworkAccess = true
+	}))
+	fake, _ := newFakeOIDC(t)
+	input := connectionInput(true)
+	input.Issuer = fake.issuer
+	conn := f.put(input)
+
+	t.Run("refuses a test without a session", func(t *testing.T) {
+		response := f.testCallback(t, conn, fake, nil)
+		require.Contains(t, response.Header().Get("Location"), "auth_error=sso_failed")
+	})
+
+	t.Run("refuses a member without permission to update SSO", func(t *testing.T) {
+		account, err := models.CreateAccount("Operator", "operator@example.com")
+		require.NoError(t, err)
+		user, err := models.CreateUser(f.r.Organization.ID, account.ID, account.Email, account.Name)
+		require.NoError(t, err)
+		require.NoError(t, f.r.AuthService.AssignRole(user.ID.String(), models.RoleOrgOperator, f.r.Organization.ID.String(), models.DomainTypeOrganization))
+		response := f.testCallback(t, conn, fake, account)
+		require.Contains(t, response.Header().Get("Location"), "auth_error=sso_failed")
+	})
+
+	t.Run("stores the claims and does not provision", func(t *testing.T) {
+		response := f.testCallback(t, conn, fake, f.r.Account)
+		require.Contains(t, response.Header().Get("Location"), "sso_test=ok")
+		saved, err := models.FindSSOConnectionByID(database.Conn(), conn.ID)
+		require.NoError(t, err)
+		require.NotNil(t, saved.LastTestedAt)
+		require.NotContains(t, string(saved.LastTestResult), "eyJ")
+		require.Contains(t, string(saved.LastTestResult), "owner@example.com")
+		_, err = models.FindSSOIdentityBySubject(database.Conn(), conn.ID, fake.subject)
+		require.Error(t, err)
+	})
+}
+
+func (f *flow) testCallback(t *testing.T, conn *models.SSOConnection, fake *fakeOIDC, account *models.Account) *httptest.ResponseRecorder {
+	t.Helper()
+	start := httptest.NewRequest(http.MethodGet, "/auth/sso/"+conn.ID.String()+"/start?test=1", nil)
+	if account != nil {
+		token, err := authentication.GenerateAccountToken(f.service.Signer, account.ID.String(), time.Now(), time.Hour)
+		require.NoError(t, err)
+		start.AddCookie(&http.Cookie{Name: "account_token", Value: token})
+	}
+	started := httptest.NewRecorder()
+	f.service.AuthHandler().ServeHTTP(started, start)
+	require.Equal(t, http.StatusFound, started.Code, started.Header().Get("Location"))
+	location, err := url.Parse(started.Header().Get("Location"))
+	require.NoError(t, err)
+	if !strings.Contains(started.Header().Get("Location"), "/authorize") {
+		return started
+	}
+	fake.nonce = location.Query().Get("nonce")
+	callback := httptest.NewRequest(http.MethodGet, "/auth/sso/"+conn.ID.String()+"/callback?code=code-1&state="+url.QueryEscape(location.Query().Get("state")), nil)
+	for _, cookie := range started.Result().Cookies() {
+		callback.AddCookie(cookie)
+	}
+	if account != nil {
+		token, err := authentication.GenerateAccountToken(f.service.Signer, account.ID.String(), time.Now(), time.Hour)
+		require.NoError(t, err)
+		callback.AddCookie(&http.Cookie{Name: "account_token", Value: token})
+	}
+	response := httptest.NewRecorder()
+	f.service.AuthHandler().ServeHTTP(response, callback)
+	return response
 }
 
 type callbackOptions struct {

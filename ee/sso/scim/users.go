@@ -5,12 +5,14 @@ import (
 	"errors"
 	"net/http"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
+	"github.com/jackc/pgx/v5/pgconn"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/ee/sso/core"
 	"github.com/superplanehq/superplane/pkg/billing"
@@ -51,24 +53,44 @@ type profileChange struct {
 	UserName   *string
 	ExternalID *string
 	Name       *string
+	GivenName  *string
+	FamilyName *string
 	Email      *string
 	Active     *bool
+}
+
+func (c profileChange) resolvedName() *string {
+	if c.Name != nil {
+		return c.Name
+	}
+	if c.GivenName == nil && c.FamilyName == nil {
+		return nil
+	}
+	given, family := "", ""
+	if c.GivenName != nil {
+		given = strings.TrimSpace(*c.GivenName)
+	}
+	if c.FamilyName != nil {
+		family = strings.TrimSpace(*c.FamilyName)
+	}
+	name := strings.TrimSpace(given + " " + family)
+	return &name
 }
 
 func (h *Handler) listUsers(w http.ResponseWriter, r *http.Request, conn *models.SSOConnection) {
 	attr, value, ok := parseFilter(r.URL.Query().Get("filter"))
 	if !ok {
-		writeError(w, http.StatusBadRequest, "invalidFilter", "This filter is not supported.")
+		writeError(w, r, http.StatusBadRequest, "invalidFilter", "This filter is not supported.")
 		return
 	}
 	start, count, ok := page(r)
 	if !ok {
-		writeError(w, http.StatusBadRequest, "invalidValue", "The page values are not valid.")
+		writeError(w, r, http.StatusBadRequest, "invalidValue", "The page values are not valid.")
 		return
 	}
 	rows, total, err := models.ListSSOIdentities(database.DB(r.Context()), conn.ID, attr, value, start-1, count)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "", "The request failed.")
+		writeError(w, r, http.StatusInternalServerError, "", "The request failed.")
 		return
 	}
 	resources := make([]any, 0, len(rows))
@@ -94,39 +116,43 @@ func (h *Handler) getUser(w http.ResponseWriter, r *http.Request, conn *models.S
 
 func (h *Handler) createUser(w http.ResponseWriter, r *http.Request, conn *models.SSOConnection) {
 	if !acceptJSON(r) {
-		writeError(w, http.StatusBadRequest, "invalidValue", "The content type is not supported.")
+		writeError(w, r, http.StatusBadRequest, "invalidValue", "The content type is not supported.")
 		return
 	}
 	body, raw, err := decodeUser(r)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalidValue", "The user document is not valid.")
+		writeError(w, r, http.StatusBadRequest, "invalidValue", "The user document is not valid.")
+		return
+	}
+	if strings.TrimSpace(body.UserName) == "" {
+		writeError(w, r, http.StatusBadRequest, "invalidValue", "The userName is empty.")
 		return
 	}
 	email, name, err := identityFields(body)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalidValue", err.Error())
+		writeError(w, r, http.StatusBadRequest, "invalidValue", err.Error())
 		return
 	}
 	active := true
 	if _, present := raw["active"]; present {
 		parsed, ok := parseActive(body.Active)
 		if !ok {
-			writeError(w, http.StatusBadRequest, "invalidValue", "The active value is not valid.")
+			writeError(w, r, http.StatusBadRequest, "invalidValue", "The active value is not valid.")
 			return
 		}
 		active = parsed
 	}
-	if err := licensing.Require(r.Context(), h.pipeline.Entitlements, conn.OrganizationID, licensing.FeatureSSO); err != nil {
-		writeError(w, http.StatusForbidden, "", notLicensed)
+	if err := h.ensureUnique(r, conn.ID, uuid.Nil, body.UserName, body.ExternalID); err != nil {
+		writeMapped(w, r, err)
 		return
 	}
-	if err := h.ensureUnique(r, conn.ID, uuid.Nil, body.UserName, body.ExternalID); err != nil {
-		writeMapped(w, err)
+	if err := licensing.Require(r.Context(), h.pipeline.Entitlements, conn.OrganizationID, licensing.FeatureSSO); err != nil {
+		writeError(w, r, http.StatusForbidden, "", notLicensed)
 		return
 	}
 	if active {
 		if err := billing.PrepareAdmission(r.Context(), conn.OrganizationID); err != nil {
-			writeMapped(w, err)
+			writeMapped(w, r, err)
 			return
 		}
 	}
@@ -136,25 +162,24 @@ func (h *Handler) createUser(w http.ResponseWriter, r *http.Request, conn *model
 		if err != nil {
 			return err
 		}
-		now := h.now()
-		identity := &models.SSOIdentity{
-			ID:             uuid.New(),
-			ConnectionID:   conn.ID,
-			OrganizationID: conn.OrganizationID,
-			AccountID:      account.ID,
-			Email:          utils.NormalizeEmail(email),
-			Name:           name,
-			Active:         active,
-			ProvisionedBy:  models.SSOProvisionedBySCIM,
-			CreatedAt:      now,
-			UpdatedAt:      now,
+		identity, err := models.FindSSOIdentityByAccount(tx, conn.ID, account.ID)
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
 		}
-		userName := body.UserName
-		identity.SCIMUserName = &userName
-		if body.ExternalID != "" {
-			externalID := body.ExternalID
-			identity.ExternalID = &externalID
+		if identity == nil {
+			now := h.now()
+			identity = &models.SSOIdentity{
+				ID:             uuid.New(),
+				ConnectionID:   conn.ID,
+				OrganizationID: conn.OrganizationID,
+				AccountID:      account.ID,
+				CreatedAt:      now,
+			}
 		}
+		applySCIMProfile(identity, body.UserName, body.ExternalID, email, name)
+		identity.ProvisionedBy = models.SSOProvisionedBySCIM
+		identity.Active = active
+		identity.UpdatedAt = h.now()
 		if active {
 			if err := h.pipeline.EnsureMembership(r.Context(), tx, conn, account, identity, models.SSOProvisionedBySCIM, models.SSOProvisionedBySCIM, false); err != nil {
 				return err
@@ -167,7 +192,7 @@ func (h *Handler) createUser(w http.ResponseWriter, r *http.Request, conn *model
 		return nil
 	})
 	if err != nil {
-		writeMapped(w, err)
+		writeMapped(w, r, err)
 		return
 	}
 	logging.AddRequestLogFields(r.Context(), map[string]any{
@@ -181,7 +206,7 @@ func (h *Handler) createUser(w http.ResponseWriter, r *http.Request, conn *model
 
 func (h *Handler) replaceUser(w http.ResponseWriter, r *http.Request, conn *models.SSOConnection) {
 	if !acceptJSON(r) {
-		writeError(w, http.StatusBadRequest, "invalidValue", "The content type is not supported.")
+		writeError(w, r, http.StatusBadRequest, "invalidValue", "The content type is not supported.")
 		return
 	}
 	identity, ok := h.identityFromPath(w, r, conn)
@@ -190,7 +215,7 @@ func (h *Handler) replaceUser(w http.ResponseWriter, r *http.Request, conn *mode
 	}
 	body, raw, err := decodeUser(r)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalidValue", "The user document is not valid.")
+		writeError(w, r, http.StatusBadRequest, "invalidValue", "The user document is not valid.")
 		return
 	}
 	change := profileChange{}
@@ -201,14 +226,16 @@ func (h *Handler) replaceUser(w http.ResponseWriter, r *http.Request, conn *mode
 		change.ExternalID = &body.ExternalID
 	}
 	email, name, err := identityFields(body)
-	if err == nil {
-		change.Email = &email
-		change.Name = &name
+	if err != nil {
+		writeError(w, r, http.StatusBadRequest, "invalidValue", err.Error())
+		return
 	}
+	change.Email = &email
+	change.Name = &name
 	if _, present := raw["active"]; present {
 		parsed, ok := parseActive(body.Active)
 		if !ok {
-			writeError(w, http.StatusBadRequest, "invalidValue", "The active value is not valid.")
+			writeError(w, r, http.StatusBadRequest, "invalidValue", "The active value is not valid.")
 			return
 		}
 		change.Active = &parsed
@@ -218,7 +245,7 @@ func (h *Handler) replaceUser(w http.ResponseWriter, r *http.Request, conn *mode
 
 func (h *Handler) patchUser(w http.ResponseWriter, r *http.Request, conn *models.SSOConnection) {
 	if !acceptJSON(r) {
-		writeError(w, http.StatusBadRequest, "invalidValue", "The content type is not supported.")
+		writeError(w, r, http.StatusBadRequest, "invalidValue", "The content type is not supported.")
 		return
 	}
 	identity, ok := h.identityFromPath(w, r, conn)
@@ -227,12 +254,12 @@ func (h *Handler) patchUser(w http.ResponseWriter, r *http.Request, conn *models
 	}
 	body, err := readBody(r)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalidValue", "The patch document is not valid.")
+		writeError(w, r, http.StatusBadRequest, "invalidValue", "The patch document is not valid.")
 		return
 	}
 	change, err := parsePatch(body)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalidValue", err.Error())
+		writeError(w, r, http.StatusBadRequest, "invalidValue", err.Error())
 		return
 	}
 	h.applyChange(w, r, conn, identity, change)
@@ -244,7 +271,7 @@ func (h *Handler) deleteUser(w http.ResponseWriter, r *http.Request, conn *model
 		return
 	}
 	if err := h.deactivate(r, conn, identity); err != nil {
-		writeMapped(w, err)
+		writeMapped(w, r, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -260,7 +287,7 @@ func (h *Handler) applyChange(w http.ResponseWriter, r *http.Request, conn *mode
 		externalID = *change.ExternalID
 	}
 	if err := h.ensureUnique(r, conn.ID, identity.ID, userName, externalID); err != nil {
-		writeMapped(w, err)
+		writeMapped(w, r, err)
 		return
 	}
 	if change.UserName != nil {
@@ -272,68 +299,98 @@ func (h *Handler) applyChange(w http.ResponseWriter, r *http.Request, conn *mode
 	if change.Email != nil {
 		identity.Email = utils.NormalizeEmail(*change.Email)
 	}
-	if change.Name != nil {
-		identity.Name = *change.Name
+	if name := change.resolvedName(); name != nil {
+		identity.Name = *name
 	}
-	if err := identity.Save(database.DB(r.Context())); err != nil {
-		writeMapped(w, err)
-		return
-	}
-	if change.Active != nil && *change.Active != identity.Active {
-		var err error
-		if *change.Active {
-			err = h.reactivate(r, conn, identity)
-		} else {
-			err = h.deactivate(r, conn, identity)
-		}
-		if err != nil {
-			writeMapped(w, err)
+	deactivating := change.Active != nil && !*change.Active
+	reactivating := change.Active != nil && *change.Active && !identity.Active
+	if deactivating {
+		if err := h.deactivate(r, conn, identity); err != nil {
+			writeMapped(w, r, err)
 			return
 		}
+	} else if reactivating {
+		if err := h.reactivate(r, conn, identity); err != nil {
+			writeMapped(w, r, err)
+			return
+		}
+	} else if err := identity.Save(database.DB(r.Context())); err != nil {
+		writeMapped(w, r, err)
+		return
 	}
-	logging.AddRequestLogFields(r.Context(), map[string]any{
-		"action": "scim_user_update", "object": "sso_identity", "outcome": "success",
-		"sso_connection_id": conn.ID.String(), "organization_id": conn.OrganizationID.String(),
-	})
+	if !deactivating {
+		logging.AddRequestLogFields(r.Context(), map[string]any{
+			"action": "scim_user_update", "object": "sso_identity", "outcome": "success",
+			"sso_connection_id": conn.ID.String(), "organization_id": conn.OrganizationID.String(),
+		})
+	}
 	updated, err := models.FindSSOIdentityByID(database.DB(r.Context()), conn.ID, identity.ID)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "", "The request failed.")
+		writeError(w, r, http.StatusInternalServerError, "", "The request failed.")
 		return
 	}
 	writeJSON(w, http.StatusOK, h.userResource(*updated))
 }
 
 func (h *Handler) deactivate(r *http.Request, conn *models.SSOConnection, identity *models.SSOIdentity) error {
+	keptOwner, err := h.removeMembership(r, conn, identity)
+	if err != nil {
+		return err
+	}
 	now := h.now()
 	identity.Active = false
 	identity.SessionsRevokedAt = &now
+	identity.UpdatedAt = now
 	if err := identity.Save(database.DB(r.Context())); err != nil {
 		return err
 	}
-	logging.AddRequestLogFields(r.Context(), map[string]any{
+	fields := map[string]any{
 		"action": "scim_user_deactivate", "object": "sso_identity", "outcome": "success",
 		"sso_connection_id": conn.ID.String(), "organization_id": conn.OrganizationID.String(),
-	})
-	if identity.UserID == nil {
-		return nil
 	}
-	_, err := organizations.RemoveUser(r.Context(), h.pipeline.Auth, conn.OrganizationID.String(), identity.UserID.String())
-	if err == nil || errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil
-	}
-	if errors.Is(err, models.ErrLastOrganizationOwner) {
-		logging.AddRequestLogFields(r.Context(), map[string]any{"scim_last_owner_kept": true})
+	if keptOwner {
+		fields["scim_last_owner_kept"] = true
 		log.WithField("organization_id", conn.OrganizationID.String()).Warn("SCIM deactivation kept the last organization owner")
-		return nil
 	}
+	logging.AddRequestLogFields(r.Context(), fields)
+	return nil
+}
+
+func (h *Handler) removeMembership(r *http.Request, conn *models.SSOConnection, identity *models.SSOIdentity) (bool, error) {
+	ids := []string{}
+	if identity.UserID != nil {
+		ids = append(ids, identity.UserID.String())
+	}
+	if account, err := models.FindAccountByID(identity.AccountID.String()); err == nil {
+		if user, err := models.FindActiveUserByEmail(conn.OrganizationID.String(), account.Email); err == nil {
+			id := user.ID.String()
+			if !slices.Contains(ids, id) {
+				ids = append(ids, id)
+			}
+		}
+	}
+	for _, id := range ids {
+		_, err := organizations.RemoveUser(r.Context(), h.pipeline.Auth, conn.OrganizationID.String(), id)
+		if err == nil || errors.Is(err, gorm.ErrRecordNotFound) || grpcNotFound(err) {
+			continue
+		}
+		if errors.Is(err, models.ErrLastOrganizationOwner) {
+			return true, nil
+		}
+		return false, err
+	}
+	return false, nil
+}
+
+func grpcNotFound(err error) bool {
 	code, _, ok := grpcerrors.HandlerStatus(err)
-	if ok && code == codes.NotFound {
-		return nil
-	}
-	return err
+	return ok && code == codes.NotFound
 }
 
 func (h *Handler) reactivate(r *http.Request, conn *models.SSOConnection, identity *models.SSOIdentity) error {
+	if err := licensing.Require(r.Context(), h.pipeline.Entitlements, conn.OrganizationID, licensing.FeatureSSO); err != nil {
+		return err
+	}
 	if err := billing.PrepareAdmission(r.Context(), conn.OrganizationID); err != nil {
 		return err
 	}
@@ -349,6 +406,7 @@ func (h *Handler) reactivate(r *http.Request, conn *models.SSOConnection, identi
 		return err
 	}
 	identity.Active = true
+	identity.UpdatedAt = h.now()
 	return identity.Save(database.DB(r.Context()))
 }
 
@@ -377,24 +435,24 @@ func (h *Handler) ensureUnique(r *http.Request, connectionID, self uuid.UUID, us
 func (h *Handler) identityFromPath(w http.ResponseWriter, r *http.Request, conn *models.SSOConnection) (*models.SSOIdentity, bool) {
 	id, err := uuid.Parse(mux.Vars(r)["userID"])
 	if err != nil {
-		writeError(w, http.StatusNotFound, "", "This user does not exist.")
+		writeError(w, r, http.StatusNotFound, "", "This user does not exist.")
 		return nil, false
 	}
 	identity, err := models.FindSSOIdentityByID(database.DB(r.Context()), conn.ID, id)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		writeError(w, http.StatusNotFound, "", "This user does not exist.")
+		writeError(w, r, http.StatusNotFound, "", "This user does not exist.")
 		return nil, false
 	}
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "", "The request failed.")
+		writeError(w, r, http.StatusInternalServerError, "", "The request failed.")
 		return nil, false
 	}
 	return identity, true
 }
 
 func (h *Handler) userResource(identity models.SSOIdentity) map[string]any {
-	userName := ""
-	if identity.SCIMUserName != nil {
+	userName := identity.Email
+	if identity.SCIMUserName != nil && strings.TrimSpace(*identity.SCIMUserName) != "" {
 		userName = *identity.SCIMUserName
 	}
 	location := h.baseURL + "/scim/v2/" + identity.ConnectionID.String() + "/Users/" + identity.ID.String()
@@ -454,7 +512,7 @@ func identityFields(body scimUserBody) (string, string, error) {
 	if email == "" && strings.Contains(body.UserName, "@") {
 		email = body.UserName
 	}
-	if strings.TrimSpace(email) == "" || !strings.Contains(email, "@") {
+	if !validSCIMEmail(email) {
 		return "", "", scimErr("The user has no email address.")
 	}
 	name := strings.TrimSpace(body.DisplayName)
@@ -608,11 +666,31 @@ func applyPatchValue(change *profileChange, path string, value json.RawMessage) 
 		if err := json.Unmarshal(value, &emails); err != nil {
 			return scimErr("The email value is not valid.")
 		}
-		email, _, err := identityFields(scimUserBody{Emails: emails, UserName: "missing@example.com"})
+		email, _, err := identityFields(scimUserBody{Emails: emails})
 		if err != nil {
 			return err
 		}
 		change.Email = &email
+	case "name":
+		var parsed scimName
+		if err := json.Unmarshal(value, &parsed); err != nil {
+			return scimErr("The name value is not valid.")
+		}
+		if name := formatSCIMName(parsed); name != "" {
+			change.Name = &name
+		}
+	case "name.givenname":
+		text, err := jsonString(value)
+		if err != nil {
+			return err
+		}
+		change.GivenName = &text
+	case "name.familyname":
+		text, err := jsonString(value)
+		if err != nil {
+			return err
+		}
+		change.FamilyName = &text
 	case "active":
 		var parsed any
 		if err := json.Unmarshal(value, &parsed); err != nil {
@@ -624,7 +702,7 @@ func applyPatchValue(change *profileChange, path string, value json.RawMessage) 
 		}
 		change.Active = &active
 	default:
-		return scimErr("This attribute is not supported.")
+		return nil
 	}
 	return nil
 }
@@ -649,26 +727,63 @@ func scimErr(detail string) error { return detailError{detail: detail} }
 
 func uniqueError(detail string) error { return uniquenessError{detail: detail} }
 
-func writeMapped(w http.ResponseWriter, err error) {
+func uniqueViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23505"
+}
+
+func applySCIMProfile(identity *models.SSOIdentity, userName, externalID, email, name string) {
+	userName = strings.TrimSpace(userName)
+	identity.SCIMUserName = &userName
+	identity.Email = utils.NormalizeEmail(email)
+	identity.Name = name
+	if externalID == "" {
+		return
+	}
+	identity.ExternalID = &externalID
+}
+
+func validSCIMEmail(email string) bool {
+	email = strings.TrimSpace(email)
+	at := strings.LastIndex(email, "@")
+	if at <= 0 || at >= len(email)-1 {
+		return false
+	}
+	domain := email[at+1:]
+	return strings.Contains(domain, ".") && !strings.ContainsAny(domain, " \t")
+}
+
+func formatSCIMName(name scimName) string {
+	if formatted := strings.TrimSpace(name.Formatted); formatted != "" {
+		return formatted
+	}
+	return strings.TrimSpace(strings.TrimSpace(name.GivenName) + " " + strings.TrimSpace(name.FamilyName))
+}
+
+func writeMapped(w http.ResponseWriter, r *http.Request, err error) {
 	var unique uniquenessError
 	if errors.As(err, &unique) {
-		writeError(w, http.StatusConflict, "uniqueness", unique.detail)
+		writeError(w, r, http.StatusConflict, "uniqueness", unique.detail)
+		return
+	}
+	if uniqueViolation(err) {
+		writeError(w, r, http.StatusConflict, "uniqueness", "A user with this userName already exists.")
 		return
 	}
 	if errors.Is(err, licensing.ErrNotLicensed) || core.CodeOf(err) == core.CodeNotLicensed {
-		writeError(w, http.StatusForbidden, "", notLicensed)
+		writeError(w, r, http.StatusForbidden, "", notLicensed)
 		return
 	}
 	if core.CodeOf(err) == core.CodeSeatLimit || core.IsSeatLimit(err) {
-		writeError(w, http.StatusConflict, "", "No seat is available for a new member.")
+		writeError(w, r, http.StatusConflict, "", "No seat is available for a new member.")
 		return
 	}
 	switch core.CodeOf(err) {
 	case core.CodeAccountConflict:
-		writeError(w, http.StatusConflict, "", "An account with this email already exists, and this organization has not verified the email domain.")
+		writeError(w, r, http.StatusConflict, "", "An account with this email already exists, and this organization has not verified the email domain.")
 	case core.CodeAccountBlocked:
-		writeError(w, http.StatusConflict, "", "This account is blocked.")
+		writeError(w, r, http.StatusConflict, "", "This account is blocked.")
 	default:
-		writeError(w, http.StatusInternalServerError, "", "The request failed.")
+		writeError(w, r, http.StatusInternalServerError, "", "The request failed.")
 	}
 }
