@@ -175,6 +175,8 @@ func (h *Handler) createUser(w http.ResponseWriter, r *http.Request, conn *model
 				AccountID:      account.ID,
 				CreatedAt:      now,
 			}
+		} else if !canAdoptSCIMIdentity(identity, body.UserName) {
+			return uniqueError("An identity for this account already has a different userName.")
 		}
 		applySCIMProfile(identity, body.UserName, body.ExternalID, email, name)
 		identity.ProvisionedBy = models.SSOProvisionedBySCIM
@@ -408,6 +410,13 @@ func (h *Handler) reactivate(r *http.Request, conn *models.SSOConnection, identi
 	identity.Active = true
 	identity.UpdatedAt = h.now()
 	return identity.Save(database.DB(r.Context()))
+}
+
+func canAdoptSCIMIdentity(identity *models.SSOIdentity, userName string) bool {
+	if identity.SCIMUserName == nil || strings.TrimSpace(*identity.SCIMUserName) == "" {
+		return true
+	}
+	return strings.EqualFold(strings.TrimSpace(*identity.SCIMUserName), strings.TrimSpace(userName))
 }
 
 func (h *Handler) ensureUnique(r *http.Request, connectionID, self uuid.UUID, userName, externalID string) error {

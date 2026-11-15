@@ -42,6 +42,32 @@ func TestSCIMAdoptsAJITIdentity(t *testing.T) {
 	require.Equal(t, models.SSOProvisionedBySCIM, *member.ProvisionedBy)
 }
 
+func TestSCIMDoesNotReplaceAnotherUserName(t *testing.T) {
+	f := newFlow(t)
+	f.setOwnerEmail("owner@example.com")
+	f.verifyExample()
+	conn := f.put(connectionInput(true))
+	require.NoError(t, f.signIn(conn, "ada-subject", "ada@example.com"))
+	identity, err := models.FindSSOIdentityBySubject(database.Conn(), conn.ID, "ada-subject")
+	require.NoError(t, err)
+	userName := "ada@example.com"
+	identity.SCIMUserName = &userName
+	require.NoError(t, identity.Save(database.Conn()))
+	created, err := f.service.CreateSCIMToken(f.ctx(), f.r.Organization.ID, f.r.Account.ID, "Okta")
+	require.NoError(t, err)
+
+	body := `{"userName":"ada.other@example.com","externalId":"okta-other","active":true,"emails":[{"value":"ada@example.com","primary":true}]}`
+	response := f.scim(http.MethodPost, conn, created.Secret, "/Users", body)
+	require.Equal(t, http.StatusConflict, response.Code, response.Body.String())
+	require.Contains(t, response.Body.String(), "uniqueness")
+
+	again, err := models.FindSSOIdentityBySubject(database.Conn(), conn.ID, "ada-subject")
+	require.NoError(t, err)
+	require.NotNil(t, again.SCIMUserName)
+	require.Equal(t, "ada@example.com", *again.SCIMUserName)
+	require.Nil(t, again.ExternalID)
+}
+
 func TestSCIMUserValidationAndUpdates(t *testing.T) {
 	f := newFlow(t)
 	f.setOwnerEmail("owner@example.com")
