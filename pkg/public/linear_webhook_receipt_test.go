@@ -54,6 +54,7 @@ func Test__HandleWebhook_RecordsLinearReceipt(t *testing.T) {
 		"test",
 		"/app/templates",
 		r.AuthService, false,
+		nil,
 	)
 	require.NoError(t, err)
 

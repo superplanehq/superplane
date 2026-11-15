@@ -23,6 +23,7 @@ import (
 	billingworkers "github.com/superplanehq/superplane/ee/billing/workers"
 	"github.com/superplanehq/superplane/ee/githubenterprise"
 	"github.com/superplanehq/superplane/ee/rbac"
+	ssoservice "github.com/superplanehq/superplane/ee/sso"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/billing"
 	"github.com/superplanehq/superplane/pkg/bitbucketapp"
@@ -409,6 +410,14 @@ func buildGRPCServices(
 	features.Register(enterprise.RBAC, rbac.NewService(authService, licenseService))
 	features.Register(enterprise.GitHubEnterpriseCapability, githubenterprise.NewService(licenseService))
 	features.Register(enterprise.Billing, billingorganizations.New())
+	features.Register(enterprise.SSOCapability, ssoservice.New(ssoservice.Config{
+		Encryptor:    encryptor,
+		Entitlements: licenseService,
+		Auth:         authService,
+		Signer:       jwtSigner,
+		HTTP:         registry.HTTPContext(),
+		BaseURL:      baseURL,
+	}))
 
 	githubEnterprise, err := enterprise.Get[enterprise.GitHubEnterprise](features, enterprise.GitHubEnterpriseCapability)
 	if err != nil {
@@ -550,6 +559,7 @@ func startPublicAPI(
 		templateDir,
 		authService,
 		blockSignup,
+		grpcServices.SSO,
 	)
 	if err != nil {
 		log.Panicf("Error creating public API server: %v", err)

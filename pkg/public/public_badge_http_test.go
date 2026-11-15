@@ -211,6 +211,7 @@ func newPublicTestServer(t *testing.T, r *support.ResourceRegistry) *Server {
 		"/app/templates",
 		r.AuthService,
 		false,
+		nil,
 	)
 	require.NoError(t, err)
 	registerTestGRPCGateway(t, server, r.AuthService, r.Registry, r.Encryptor, support.NewOIDCProvider())

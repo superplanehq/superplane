@@ -278,6 +278,7 @@ func newWebhookTestServer(t *testing.T, r *support.ResourceRegistry) *Server {
 		"/app/templates",
 		r.AuthService,
 		false,
+		nil,
 	)
 	require.NoError(t, err)
 	return server

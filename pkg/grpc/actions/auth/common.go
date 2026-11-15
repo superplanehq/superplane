@@ -107,11 +107,19 @@ func usersToProto(users []models.User, accountProviders []models.UserAccountProv
 			Status: &userpb.User_Status{
 				AccountProviders: accountProvidersForUser(user.ID.String(), accountProviders),
 				IsOwner:          user.IsOwner,
+				ProvisionedBy:    provisionedBy(user),
 			},
 		}
 	}
 
 	return protoUsers
+}
+
+func provisionedBy(user models.User) string {
+	if user.ProvisionedBy == nil {
+		return ""
+	}
+	return *user.ProvisionedBy
 }
 
 func accountProvidersForUser(userID string, accountProviders []models.UserAccountProvider) []*userpb.AccountProvider {

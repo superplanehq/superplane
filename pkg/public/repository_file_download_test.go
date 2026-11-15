@@ -59,6 +59,7 @@ func Test__RepositoryFileDownload(t *testing.T) {
 		"test",
 		"/app/templates",
 		r.AuthService, false,
+		nil,
 	)
 
 	require.NoError(t, err)
