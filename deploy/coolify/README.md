@@ -127,3 +127,18 @@ the same host.
 For coolify-docs, copy `coolify-docs-superplane.mdx` to
 `content/docs/services/superplane.mdx` and the same SVG to
 `public/images/services/superplane-logo.svg`.
+
+## Development license for Single Sign-On tests
+
+A release image does not include the development license. Build a test image
+when you need every Enterprise feature, including Single Sign-On, on a local
+Coolify installation.
+
+```bash
+make image.build GO_BUILD_TAGS=licensedev
+```
+
+Set the `app` image to that local build. Set
+`SUPERPLANE_LICENSE_DEV_ENTERPRISE=true` on the app service. This build is for
+tests only. Do not publish it. Set the variable to `false` and restart the app
+when you want to test the behavior without the development grant.
