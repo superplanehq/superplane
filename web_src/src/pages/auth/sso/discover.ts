@@ -4,9 +4,14 @@ export type SsoDiscovery = {
   required?: boolean;
 };
 
+export type SsoDiscoveryResult =
+  | { status: "available"; startUrl: string; required: boolean }
+  | { status: "unavailable" }
+  | { status: "error" };
+
 export type EmailFirstSsoDecision = { kind: "continue" } | { kind: "prompt"; startUrl: string; required: boolean };
 
-export async function discoverSso(email: string): Promise<SsoDiscovery | null> {
+export async function discoverSso(email: string): Promise<SsoDiscoveryResult> {
   try {
     const response = await fetch("/auth/sso/discover", {
       method: "POST",
@@ -14,11 +19,15 @@ export async function discoverSso(email: string): Promise<SsoDiscovery | null> {
       body: JSON.stringify({ email }),
     });
     if (!response.ok) {
-      return null;
+      return { status: "error" };
     }
-    return (await response.json()) as SsoDiscovery;
+    const body = (await response.json()) as SsoDiscovery;
+    if (body.ssoAvailable && body.startUrl) {
+      return { status: "available", startUrl: body.startUrl, required: Boolean(body.required) };
+    }
+    return { status: "unavailable" };
   } catch {
-    return null;
+    return { status: "error" };
   }
 }
 
@@ -31,10 +40,10 @@ export async function resolveEmailFirstSso(input: {
     return { kind: "continue" };
   }
   const discovery = await discoverSso(input.email);
-  if (!discovery?.ssoAvailable || !discovery.startUrl) {
+  if (discovery.status !== "available") {
     return { kind: "continue" };
   }
-  return { kind: "prompt", startUrl: discovery.startUrl, required: Boolean(discovery.required) };
+  return { kind: "prompt", startUrl: discovery.startUrl, required: discovery.required };
 }
 
 export function ssoStartHref(startUrl: string, email: string, redirect: string): string {

@@ -13,6 +13,7 @@ import (
 	"github.com/superplanehq/superplane/ee/sso/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 )
 
@@ -34,13 +35,19 @@ func NewHandler(pipeline *core.Pipeline, baseURL string) http.Handler {
 	handler := &Handler{pipeline: pipeline, baseURL: strings.TrimRight(baseURL, "/")}
 	router := mux.NewRouter()
 	router.PathPrefix("/scim/v2/{connectionID}/Groups").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		writeError(w, http.StatusNotFound, "", "Groups are not supported.")
+		writeError(w, r, http.StatusNotFound, "", "Groups are not supported.")
 	})
 	router.HandleFunc("/scim/v2/{connectionID}/ServiceProviderConfig", handler.serviceProviderConfig).Methods(http.MethodGet)
 	router.HandleFunc("/scim/v2/{connectionID}/ResourceTypes", handler.resourceTypes).Methods(http.MethodGet)
 	router.HandleFunc("/scim/v2/{connectionID}/Schemas", handler.schemas).Methods(http.MethodGet)
 	router.HandleFunc("/scim/v2/{connectionID}/Users", handler.users).Methods(http.MethodGet, http.MethodPost)
 	router.HandleFunc("/scim/v2/{connectionID}/Users/{userID}", handler.user).Methods(http.MethodGet, http.MethodPut, http.MethodPatch, http.MethodDelete)
+	router.NotFoundHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		writeError(w, r, http.StatusNotFound, "", "This resource does not exist.")
+	})
+	router.MethodNotAllowedHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		writeError(w, r, http.StatusMethodNotAllowed, "", "This method is not supported.")
+	})
 	return router
 }
 
@@ -54,26 +61,26 @@ func (h *Handler) now() time.Time {
 func (h *Handler) authenticate(w http.ResponseWriter, r *http.Request) (*models.SSOConnection, bool) {
 	connectionID, err := uuid.Parse(mux.Vars(r)["connectionID"])
 	if err != nil {
-		writeError(w, http.StatusUnauthorized, "", "The SCIM token is not valid.")
+		writeError(w, r, http.StatusUnauthorized, "", "The SCIM token is not valid.")
 		return nil, false
 	}
 	token := bearerToken(r.Header.Get("Authorization"))
 	if token == "" {
-		writeError(w, http.StatusUnauthorized, "", "The SCIM token is not valid.")
+		writeError(w, r, http.StatusUnauthorized, "", "The SCIM token is not valid.")
 		return nil, false
 	}
 	stored, err := models.FindActiveSCIMTokenByHash(database.DB(r.Context()), crypto.HashToken(token))
 	if err != nil || stored.ConnectionID != connectionID {
-		writeError(w, http.StatusUnauthorized, "", "The SCIM token is not valid.")
+		writeError(w, r, http.StatusUnauthorized, "", "The SCIM token is not valid.")
 		return nil, false
 	}
 	conn, err := models.FindSSOConnectionByID(database.DB(r.Context()), connectionID)
 	if err != nil {
-		writeError(w, http.StatusUnauthorized, "", "The SCIM token is not valid.")
+		writeError(w, r, http.StatusUnauthorized, "", "The SCIM token is not valid.")
 		return nil, false
 	}
 	if conn.Status != models.SSOStatusActive && conn.Status != models.SSOStatusDraft {
-		writeError(w, http.StatusForbidden, "", "Single Sign-On is disabled for this organization.")
+		writeError(w, r, http.StatusForbidden, "", "Single Sign-On is disabled for this organization.")
 		return nil, false
 	}
 	_ = models.TouchSCIMTokenLastUsed(database.DB(r.Context()), stored.ID, h.now())
@@ -163,7 +170,7 @@ func (h *Handler) user(w http.ResponseWriter, r *http.Request) {
 	case http.MethodDelete:
 		h.deleteUser(w, r, conn)
 	default:
-		writeError(w, http.StatusMethodNotAllowed, "", "This method is not supported.")
+		writeError(w, r, http.StatusMethodNotAllowed, "", "This method is not supported.")
 	}
 }
 
@@ -181,7 +188,10 @@ func writeJSON(w http.ResponseWriter, status int, body any) {
 	_ = json.NewEncoder(w).Encode(body)
 }
 
-func writeError(w http.ResponseWriter, status int, scimType, detail string) {
+func writeError(w http.ResponseWriter, r *http.Request, status int, scimType, detail string) {
+	if r != nil {
+		logSCIM(r, "failure", detail)
+	}
 	body := map[string]any{
 		"schemas": []string{schemaError},
 		"status":  strconv.Itoa(status),
@@ -191,6 +201,42 @@ func writeError(w http.ResponseWriter, status int, scimType, detail string) {
 		body["scimType"] = scimType
 	}
 	writeJSON(w, status, body)
+}
+
+func logSCIM(r *http.Request, outcome, reason string) {
+	fields := map[string]any{
+		"action":  scimAction(r),
+		"object":  "sso_identity",
+		"outcome": outcome,
+	}
+	if outcome == "failure" && reason != "" {
+		fields["sso_failure_reason"] = reason
+	}
+	if id := mux.Vars(r)["connectionID"]; id != "" {
+		fields["sso_connection_id"] = id
+		if parsed, err := uuid.Parse(id); err == nil {
+			if conn, err := models.FindSSOConnectionByID(database.DB(r.Context()), parsed); err == nil {
+				fields["organization_id"] = conn.OrganizationID.String()
+			}
+		}
+	}
+	logging.AddRequestLogFields(r.Context(), fields)
+}
+
+func scimAction(r *http.Request) string {
+	if !strings.Contains(r.URL.Path, "/Users") {
+		return "scim_request"
+	}
+	switch r.Method {
+	case http.MethodPost:
+		return "scim_user_create"
+	case http.MethodDelete:
+		return "scim_user_deactivate"
+	case http.MethodGet:
+		return "scim_user_read"
+	default:
+		return "scim_user_update"
+	}
 }
 
 func readBody(r *http.Request) ([]byte, error) {

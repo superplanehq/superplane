@@ -1,4 +1,4 @@
-import { useState, type Dispatch, type SetStateAction } from "react";
+import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
 
 import type { SsoConnection, SsoPutConnectionRequest } from "@/api-client/types.gen";
 
@@ -25,15 +25,32 @@ export function useSsoSettingsState(model: SsoSettingsModel, actions: SsoSetting
   const [form, setForm] = useState(() => initialForm(connection));
   const [confirm, setConfirm] = useState<ConfirmRequest | null>(null);
   const [requiredConfirm, setRequiredConfirm] = useState(false);
+  const [sessionError, setSessionError] = useState<string | null>(null);
   const access = accessState(model);
   const set = formSetters(setForm);
-  const ask = (title: string, body: string, run: () => void) => setConfirm({ title, body, run });
+  const allowed = model.canUpdate !== false && !model.busy;
+  const ask = (title: string, body: string, actionLabel: string, run: () => void) =>
+    setConfirm({ title, body, actionLabel, run });
   const requestRequired = () => setRequiredConfirm(true);
   const save = (nextEnforcement = form.enforcement) => {
-    actions.onSave(connectionInput(form, nextEnforcement));
+    const seconds = sessionAgeSeconds(form.sessionHours);
+    if (seconds == null) {
+      setSessionError("Enter a whole number of hours from 1 to 168.");
+      return;
+    }
+    setSessionError(null);
+    actions.onSave(connectionInput(form, nextEnforcement, seconds));
   };
+  useEffect(() => {
+    if (!model.secretEpoch) {
+      return;
+    }
+    setForm((current) => ({ ...current, clientSecret: "" }));
+  }, [model.secretEpoch]);
   const draft: SsoDraft = {
-    canChange: model.licensed,
+    canChange: Boolean(model.licensed) && allowed,
+    canUpdate: allowed,
+    sessionError,
     ...access,
     ...form,
     ...set,
@@ -105,7 +122,19 @@ function updateForm<K extends keyof SsoForm>(setForm: Dispatch<SetStateAction<Ss
   return (value: SsoForm[K]) => setForm((current) => ({ ...current, [key]: value }));
 }
 
-function connectionInput(form: SsoForm, enforcement: string): SsoPutConnectionRequest {
+export function sessionAgeSeconds(value: string): number | null {
+  if (!/^\d+$/.test(value.trim())) {
+    return null;
+  }
+  const hours = Number(value);
+  const seconds = hours * 3600;
+  if (seconds < 900 || seconds > 604800) {
+    return null;
+  }
+  return seconds;
+}
+
+function connectionInput(form: SsoForm, enforcement: string, maxSessionAgeSeconds: number): SsoPutConnectionRequest {
   return {
     preset: form.preset as SsoPutConnectionRequest["preset"],
     displayName: form.displayName,
@@ -116,7 +145,7 @@ function connectionInput(form: SsoForm, enforcement: string): SsoPutConnectionRe
     defaultRole: form.defaultRole,
     enforcement: enforcement as SsoPutConnectionRequest["enforcement"],
     allowOwnerBypass: form.ownerBypass,
-    maxSessionAgeSeconds: Math.round(Number(form.sessionHours) * 3600),
+    maxSessionAgeSeconds,
     idpLogoutEnabled: form.idpLogout,
   };
 }

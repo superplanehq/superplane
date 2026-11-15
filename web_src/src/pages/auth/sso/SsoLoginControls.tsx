@@ -5,20 +5,29 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { recordLastUsedLoginMethod } from "@/lib/lastUsedLoginMethod";
 
-import { discoverSso, ssoStartHref } from "./discover";
+import { discoverSso, ssoStartHref, type SsoDiscoveryResult } from "./discover";
+
+const DOMAIN_UNAVAILABLE = "SSO is not set up for this email domain.";
+const DISCOVERY_FAILED = "Single Sign-On could not be checked. Try again.";
 
 export function ContinueWithSso({
   redirect,
   lastUsed,
   onLastUsedHint,
+  startOpen = false,
+  initialError = null,
+  discover = discoverSso,
 }: {
   redirect: string;
   lastUsed: boolean;
   onLastUsedHint?: string;
+  startOpen?: boolean;
+  initialError?: string | null;
+  discover?: (email: string) => Promise<SsoDiscoveryResult>;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(startOpen);
   const [email, setEmail] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(initialError);
   const [loading, setLoading] = useState(false);
 
   const submit = async (event: FormEvent) => {
@@ -29,10 +38,14 @@ export function ContinueWithSso({
       return;
     }
     setLoading(true);
-    const discovery = await discoverSso(email.trim());
+    const discovery = await discover(email.trim());
     setLoading(false);
-    if (!discovery?.ssoAvailable || !discovery.startUrl) {
-      setError("SSO is not set up for this email domain.");
+    if (discovery.status === "error") {
+      setError(DISCOVERY_FAILED);
+      return;
+    }
+    if (discovery.status !== "available") {
+      setError(DOMAIN_UNAVAILABLE);
       return;
     }
     recordLastUsedLoginMethod("sso");

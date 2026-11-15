@@ -20,6 +20,22 @@ export const RequiredPrompt: StoryObj = {
 export const OptionalPrompt: StoryObj = {
   render: () => <SsoOrganizationPrompt required={false} onContinue={() => undefined} onUseAnother={() => undefined} />,
 };
+export const EmailStep: StoryObj = {
+  args: { redirect: "", lastUsed: false, startOpen: true },
+};
 export const DomainError: StoryObj = {
-  render: () => <p role="alert">SSO is not set up for this email domain.</p>,
+  args: {
+    redirect: "",
+    lastUsed: false,
+    startOpen: true,
+    initialError: "SSO is not set up for this email domain.",
+  },
+};
+export const DiscoveryError: StoryObj = {
+  args: {
+    redirect: "",
+    lastUsed: false,
+    startOpen: true,
+    initialError: "Single Sign-On could not be checked. Try again.",
+  },
 };

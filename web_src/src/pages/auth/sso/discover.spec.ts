@@ -33,4 +33,10 @@ describe("resolveEmailFirstSso", () => {
     const decision = await resolveEmailFirstSso({ email: "ada@example.com", signup: false, ssoEnabled: true });
     expect(decision).toEqual({ kind: "continue" });
   });
+
+  it("continues when discovery returns an error status", async () => {
+    globalThis.fetch = (() => Promise.resolve(new Response("", { status: 429 }))) as typeof fetch;
+    const decision = await resolveEmailFirstSso({ email: "ada@example.com", signup: false, ssoEnabled: true });
+    expect(decision).toEqual({ kind: "continue" });
+  });
 });

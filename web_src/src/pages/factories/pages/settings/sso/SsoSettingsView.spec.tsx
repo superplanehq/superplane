@@ -74,4 +74,48 @@ describe("SsoSettingsView", () => {
     render(<SsoSettingsView model={{ licensed: true, domains: [], tokens: [], error: "The sign-in test failed." }} />);
     expect(screen.getByRole("alert")).toHaveTextContent("The sign-in test failed.");
   });
+
+  it("shows the stored test failure", () => {
+    render(
+      <SsoSettingsView
+        model={{
+          licensed: true,
+          domains: [],
+          tokens: [],
+          connection: {
+            id: "conn",
+            status: "STATUS_DRAFT",
+            lastTestedAt: "2026-11-14T12:00:00Z",
+            lastTest: { ok: false, error: "The issuer did not respond." },
+          },
+        }}
+      />,
+    );
+    expect(screen.getByTestId("sso-test-result")).toHaveTextContent("Last test failed.");
+    expect(screen.getByTestId("sso-test-result")).toHaveTextContent("The issuer did not respond.");
+  });
+
+  it("disables changes when the user cannot update SSO", () => {
+    render(
+      <SsoSettingsView
+        model={{
+          licensed: true,
+          canUpdate: false,
+          domains: [domain],
+          tokens: [{ id: "token-1", description: "Okta" }],
+          connection: { id: "conn", status: "STATUS_ACTIVE" },
+        }}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Disable" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Test connection" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Create SCIM token" })).toBeDisabled();
+  });
+
+  it("shows a successful test notice", () => {
+    render(
+      <SsoSettingsView model={{ licensed: true, domains: [], tokens: [], notice: "The sign-in test succeeded." }} />,
+    );
+    expect(screen.getByTestId("sso-test-notice")).toHaveTextContent("The sign-in test succeeded.");
+  });
 });

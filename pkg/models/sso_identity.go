@@ -114,9 +114,11 @@ func ListSSOIdentities(tx *gorm.DB, connectionID uuid.UUID, filterAttr, filterVa
 	query := tx.Model(&SSOIdentity{}).Where("connection_id = ?", connectionID)
 	switch filterAttr {
 	case "userName":
-		query = query.Where("lower(scim_user_name) = lower(?)", filterValue)
+		// Identities created by just-in-time sign-in have no SCIM userName yet.
+		// The email is the userName Okta looks up before it creates the user.
+		query = query.Where("lower(COALESCE(NULLIF(scim_user_name, ''), email)) = lower(?)", filterValue)
 	case "externalId":
-		query = query.Where("lower(external_id) = lower(?)", filterValue)
+		query = query.Where("external_id = ?", filterValue)
 	}
 	var total int64
 	if err := query.Session(&gorm.Session{}).Count(&total).Error; err != nil {

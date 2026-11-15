@@ -55,6 +55,20 @@ describe("api-interceptor", () => {
     expect(locationHref).toBe("/auth/sso/conn/start?redirect=%2Fdashboard%3Ftab%3Doverview");
   });
 
+  it("does not redirect again when the browser is already on the SSO start path", async () => {
+    pathname = "/auth/sso/conn/start";
+    locationHref = "http://localhost/auth/sso/conn/start";
+    globalThis.fetch = mock().mockResolvedValue(
+      new Response("", { status: 401, headers: { "X-SuperPlane-SSO-Start": "/auth/sso/conn/start" } }),
+    );
+    const { setupApiInterceptor } = await import("@/lib/api-interceptor");
+
+    setupApiInterceptor();
+
+    await expect(globalThis.fetch("/api/me")).rejects.toThrow("SSO required");
+    expect(locationHref).toBe("http://localhost/auth/sso/conn/start");
+  });
+
   it("redirects unauthorized api requests on non-auth routes", async () => {
     globalThis.fetch = mock().mockResolvedValue(new Response("", { status: 401 }));
     const { setupApiInterceptor } = await import("@/lib/api-interceptor");

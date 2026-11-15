@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -182,6 +183,10 @@ func (s *Service) callback(w http.ResponseWriter, r *http.Request) {
 		s.failLogin(w, r, core.CodeFailed, "state", conn)
 		return
 	}
+	if !state.Test && conn.Status != models.SSOStatusActive {
+		s.failLogin(w, r, core.CodeNotAvailable, "status", conn)
+		return
+	}
 	identity, err := s.adapter.HandleCallback(r.Context(), conn, r, state)
 	if state.Test {
 		s.finishTest(w, r, conn, identity, err)
@@ -236,7 +241,7 @@ func (s *Service) finishTest(w http.ResponseWriter, r *http.Request, conn *model
 	org, orgErr := models.FindOrganizationByIDInTransaction(database.DB(r.Context()), conn.OrganizationID.String())
 	target := "/login?sso_test=" + query
 	if orgErr == nil {
-		target = "/" + org.Slug + "/organization/sso?sso_test=" + query
+		target = "/" + org.Slug + "/settings/sso?sso_test=" + query
 	}
 	http.Redirect(w, r, target, http.StatusFound)
 }
@@ -416,7 +421,7 @@ func writeBackchannelError(w http.ResponseWriter) {
 type ipLimiter struct {
 	limit rate.Limit
 	burst int
-	mu    chan struct{}
+	mu    sync.Mutex
 	byIP  map[string]*rate.Limiter
 }
 
@@ -424,7 +429,6 @@ func newIPLimiter() *ipLimiter {
 	return &ipLimiter{
 		limit: rate.Limit(10.0 / 60.0),
 		burst: 10,
-		mu:    make(chan struct{}, 1),
 		byIP:  map[string]*rate.Limiter{},
 	}
 }
@@ -433,8 +437,8 @@ func (l *ipLimiter) allow(ip string) bool {
 	if ip == "" {
 		ip = "unknown"
 	}
-	l.mu <- struct{}{}
-	defer func() { <-l.mu }()
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	if len(l.byIP) > 10000 {
 		l.byIP = map[string]*rate.Limiter{}
 	}
