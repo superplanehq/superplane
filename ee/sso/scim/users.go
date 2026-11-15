@@ -455,7 +455,7 @@ func identityFields(body scimUserBody) (string, string, error) {
 		email = body.UserName
 	}
 	if strings.TrimSpace(email) == "" || !strings.Contains(email, "@") {
-		return "", "", errors.New("The user has no email address.")
+		return "", "", scimErr("The user has no email address.")
 	}
 	name := strings.TrimSpace(body.DisplayName)
 	if name == "" && body.Name != nil {
@@ -533,7 +533,7 @@ func page(r *http.Request) (int, int, bool) {
 func parsePatch(body []byte) (profileChange, error) {
 	var document map[string]json.RawMessage
 	if err := json.Unmarshal(body, &document); err != nil {
-		return profileChange{}, errors.New("The patch document is not valid.")
+		return profileChange{}, scimErr("The patch document is not valid.")
 	}
 	var rawOps json.RawMessage
 	for key, value := range document {
@@ -542,7 +542,7 @@ func parsePatch(body []byte) (profileChange, error) {
 		}
 	}
 	if len(rawOps) == 0 {
-		return profileChange{}, errors.New("The patch document has no operations.")
+		return profileChange{}, scimErr("The patch document has no operations.")
 	}
 	var operations []struct {
 		Op    string          `json:"op"`
@@ -550,14 +550,14 @@ func parsePatch(body []byte) (profileChange, error) {
 		Value json.RawMessage `json:"value"`
 	}
 	if err := json.Unmarshal(rawOps, &operations); err != nil {
-		return profileChange{}, errors.New("The patch document is not valid.")
+		return profileChange{}, scimErr("The patch document is not valid.")
 	}
 	change := profileChange{}
 	for _, operation := range operations {
 		switch strings.ToLower(operation.Op) {
 		case "replace", "add":
 		default:
-			return profileChange{}, errors.New("This patch operation is not supported.")
+			return profileChange{}, scimErr("This patch operation is not supported.")
 		}
 		if err := applyPatchValue(&change, operation.Path, operation.Value); err != nil {
 			return profileChange{}, err
@@ -571,7 +571,7 @@ func applyPatchValue(change *profileChange, path string, value json.RawMessage) 
 	if path == "" {
 		var object map[string]any
 		if err := json.Unmarshal(value, &object); err != nil {
-			return errors.New("The patch value is not valid.")
+			return scimErr("The patch value is not valid.")
 		}
 		for key, item := range object {
 			raw, err := json.Marshal(item)
@@ -606,7 +606,7 @@ func applyPatchValue(change *profileChange, path string, value json.RawMessage) 
 	case "emails":
 		var emails []scimEmail
 		if err := json.Unmarshal(value, &emails); err != nil {
-			return errors.New("The email value is not valid.")
+			return scimErr("The email value is not valid.")
 		}
 		email, _, err := identityFields(scimUserBody{Emails: emails, UserName: "missing@example.com"})
 		if err != nil {
@@ -616,15 +616,15 @@ func applyPatchValue(change *profileChange, path string, value json.RawMessage) 
 	case "active":
 		var parsed any
 		if err := json.Unmarshal(value, &parsed); err != nil {
-			return errors.New("The active value is not valid.")
+			return scimErr("The active value is not valid.")
 		}
 		active, ok := parseActive(parsed)
 		if !ok {
-			return errors.New("The active value is not valid.")
+			return scimErr("The active value is not valid.")
 		}
 		change.Active = &active
 	default:
-		return errors.New("This attribute is not supported.")
+		return scimErr("This attribute is not supported.")
 	}
 	return nil
 }
@@ -632,7 +632,7 @@ func applyPatchValue(change *profileChange, path string, value json.RawMessage) 
 func jsonString(value json.RawMessage) (string, error) {
 	var text string
 	if err := json.Unmarshal(value, &text); err != nil {
-		return "", errors.New("The value is not text.")
+		return "", scimErr("The value is not text.")
 	}
 	return text, nil
 }
@@ -640,6 +640,12 @@ func jsonString(value json.RawMessage) (string, error) {
 type uniquenessError struct{ detail string }
 
 func (e uniquenessError) Error() string { return e.detail }
+
+type detailError struct{ detail string }
+
+func (e detailError) Error() string { return e.detail }
+
+func scimErr(detail string) error { return detailError{detail: detail} }
 
 func uniqueError(detail string) error { return uniquenessError{detail: detail} }
 
