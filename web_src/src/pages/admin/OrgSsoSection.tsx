@@ -54,23 +54,24 @@ export function OrgSsoSection({
       <p>Status: {connectionStatus(connection)}</p>
       <p>Enforcement: {connection?.enforcement || "none"}</p>
       <AdminSsoDomains orgId={orgId} domains={domains} load={load} setConfirm={setConfirm} />
-      <Button
-        type="button"
-        variant="outline"
-        disabled={!connection?.exists}
-        onClick={() =>
-          setConfirm({
-            title: "Disable connection",
-            body: "Members can sign in with other methods again.",
-            run: async () => {
-              await adminSsoDisableOrganizationSso({ path: { organizationId: orgId } });
-              load();
-            },
-          })
-        }
-      >
-        Disable connection
-      </Button>
+      {connection?.exists && connection.status === "active" ? (
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() =>
+            setConfirm({
+              title: "Disable connection",
+              body: "Members can sign in with other methods again.",
+              run: async () => {
+                await adminSsoDisableOrganizationSso({ path: { organizationId: orgId } });
+                load();
+              },
+            })
+          }
+        >
+          Disable connection
+        </Button>
+      ) : null}
       <AdminSsoConfirm
         confirm={confirm}
         pending={pending}
