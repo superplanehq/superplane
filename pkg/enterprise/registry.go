@@ -21,6 +21,11 @@ const (
 
 	// Billing is the backend billing capability. It has no runtime license check.
 	Billing Key = "billing"
+
+	// SSOCapability is organization Single Sign-On. The license feature sso
+	// is checked inside that implementation, and only for operations that
+	// create or expand access.
+	SSOCapability Key = "sso"
 )
 
 // Registry maps a capability name to the code that implements it. Callers
@@ -37,6 +42,7 @@ func NewRegistry() *Registry {
 	registry := &Registry{values: map[Key]any{}}
 	registry.Register(RBAC, communityRbac{})
 	registry.Register(GitHubEnterpriseCapability, communityGitHubEnterprise{})
+	registry.Register(SSOCapability, communitySSO{})
 	return registry
 }
 

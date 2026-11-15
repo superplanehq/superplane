@@ -27,6 +27,8 @@ import (
 	pbMe "github.com/superplanehq/superplane/pkg/protos/me"
 	pbOrganizations "github.com/superplanehq/superplane/pkg/protos/organizations"
 	pbRoles "github.com/superplanehq/superplane/pkg/protos/roles"
+	pbAdminSSO "github.com/superplanehq/superplane/pkg/protos/admin/sso"
+	pbSSO "github.com/superplanehq/superplane/pkg/protos/sso"
 	pbSecrets "github.com/superplanehq/superplane/pkg/protos/secrets"
 	pbTriggers "github.com/superplanehq/superplane/pkg/protos/triggers"
 	pbUsers "github.com/superplanehq/superplane/pkg/protos/users"
@@ -54,6 +56,9 @@ type Services struct {
 	AdminKeys               pbAdminKeys.KeysServer
 	AdminOrganizations      pbAdminOrganizations.AdminOrganizationsServer
 	AdminEnterpriseFeatures pbAdminEnterprise.EnterpriseFeaturesServer
+	SSO                     enterprise.SSO
+	SSOAPI                  pbSSO.SSOServer
+	AdminSSO                pbAdminSSO.AdminSSOServer
 }
 
 type ServicesConfig struct {
@@ -93,6 +98,10 @@ func NewServices(cfg ServicesConfig) (*Services, error) {
 	}
 
 	billingImplementation, err := enterprise.Get[enterprise.BillingOperations](featureRegistry, enterprise.Billing)
+	if err != nil {
+		return nil, err
+	}
+	ssoImplementation, err := enterprise.Get[enterprise.SSO](featureRegistry, enterprise.SSOCapability)
 	if err != nil {
 		return nil, err
 	}
@@ -148,5 +157,8 @@ func NewServices(cfg ServicesConfig) (*Services, error) {
 		AdminKeys:               NewAdminKeysService(cfg.EncryptionStore),
 		AdminOrganizations:      NewAdminOrganizationsService(cfg.AuthService),
 		AdminEnterpriseFeatures: NewAdminEnterpriseFeaturesService(organizationFeatures),
+		SSO:                     ssoImplementation,
+		SSOAPI:                  NewSSOService(ssoImplementation),
+		AdminSSO:                NewAdminSSOService(ssoImplementation),
 	}, nil
 }
