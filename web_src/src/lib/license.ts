@@ -60,6 +60,11 @@ export const ENTERPRISE_FEATURES = [
   { key: "custom_roles", label: "Custom roles", description: "Define roles with specific permissions." },
   { key: "groups", label: "Groups", description: "Manage access for teams of members." },
   {
+    key: "sso",
+    label: "Single Sign-On",
+    description: "Sign in through an identity provider and provision members with SCIM.",
+  },
+  {
     key: FEATURE_GITHUB_ENTERPRISE,
     label: "GitHub Enterprise Cloud",
     description: "Connect GitHub Enterprise Cloud (ghe.com) with a private GitHub App.",

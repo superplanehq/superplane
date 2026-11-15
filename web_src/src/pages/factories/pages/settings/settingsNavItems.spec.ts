@@ -58,6 +58,7 @@ describe("FACTORY_SETTINGS_NAV_GROUPS", () => {
       "Usage",
       "General",
       "Members",
+      "Single Sign-On",
       "Fleets",
       "Integrations",
       "Model status",

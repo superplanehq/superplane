@@ -57,6 +57,15 @@ export const setupApiInterceptor = (): void => {
     }
 
     if (response.status === 401) {
+      const ssoStart = response.headers.get("X-SuperPlane-SSO-Start");
+      if (ssoStart) {
+        const redirectTarget = `${window.location.pathname}${window.location.search}`;
+        const start = new URL(ssoStart, window.location.origin);
+        start.searchParams.set("redirect", redirectTarget);
+        window.location.href = `${start.pathname}${start.search}`;
+        throw new Error("SSO required");
+      }
+
       if (skipUnauthorizedRedirect(input)) {
         return response;
       }

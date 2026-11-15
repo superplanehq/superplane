@@ -17,6 +17,7 @@ export interface OrganizationMember {
   type: "member";
   status: "active";
   isOwner: boolean;
+  provisionedBy?: string;
 }
 
 export interface AssignableRoleOption {

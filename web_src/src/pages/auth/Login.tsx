@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import { LoginLayout } from "./LoginLayout";
 import { Button } from "@/components/ui/button";
@@ -29,6 +29,9 @@ import {
   getSignupUnavailableReason,
   isSignupDisabledErrorBody,
 } from "./signupUnavailableReason";
+import { resolveEmailFirstSso, ssoStartHref } from "./sso/discover";
+import { ssoAuthErrorMessage } from "./sso/messages";
+import { ContinueWithSso, SsoOrganizationPrompt } from "./sso/SsoLoginControls";
 
 type AuthConfig = {
   providers: string[];
@@ -36,6 +39,7 @@ type AuthConfig = {
   signupEnabled: boolean;
   signupsBlockedByEnvironment: boolean;
   magicCodeEnabled: boolean;
+  ssoEnabled: boolean;
 };
 
 const getProviderLabel = (provider: string) => {
@@ -67,11 +71,7 @@ interface LoginProps {
 }
 
 const getAuthErrorMessage = (authError: string | null) => {
-  if (authError === "account_blocked") {
-    return ACCOUNT_BLOCKED_MESSAGE;
-  }
-
-  return null;
+  return ssoAuthErrorMessage(authError) ?? (authError === "account_blocked" ? ACCOUNT_BLOCKED_MESSAGE : null);
 };
 
 const LastUsedHint: React.FC<{ label: string }> = ({ label }) => (
@@ -268,6 +268,17 @@ const getSignupValidationError = ({
   return null;
 };
 
+async function passwordLoginError(response: Response): Promise<string> {
+  if (response.status === 403) {
+    const errorText = (await response.text()).trim();
+    return errorText || ACCOUNT_BLOCKED_MESSAGE;
+  }
+  if (response.status === 401) {
+    return "Invalid email or password";
+  }
+  return "Login failed. Please try again.";
+}
+
 export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
   const [authConfig, setAuthConfig] = useState<AuthConfig>({
     providers: [],
@@ -275,6 +286,7 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
     signupEnabled: true,
     signupsBlockedByEnvironment: false,
     magicCodeEnabled: false,
+    ssoEnabled: false,
   });
   const [configLoading, setConfigLoading] = useState(true);
   const [configError, setConfigError] = useState<string | null>(null);
@@ -299,6 +311,13 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
   const [showPasswordLogin, setShowPasswordLogin] = useState(false);
 
   const [lastUsedMethod, setLastUsedMethod] = useState<LastUsedLoginMethod | null>(null);
+  const [ssoPrompt, setSsoPrompt] = useState<{
+    startUrl: string;
+    required: boolean;
+    email: string;
+    resume: () => void;
+  } | null>(null);
+  const skipSso = useRef(false);
 
   const [searchParams] = useSearchParams();
   const { account, loading: accountLoading } = useAccount();
@@ -419,6 +438,7 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
             signupEnabled: Boolean(data.signupEnabled),
             signupsBlockedByEnvironment: Boolean(data.signupsBlockedByEnvironment),
             magicCodeEnabled: Boolean(data.magicCodeEnabled),
+            ssoEnabled: Boolean(data.ssoEnabled),
           });
         }
       } catch {
@@ -477,6 +497,28 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
   const logoutHref = redirectQuery ? `/logout${redirectQuery}` : "/logout";
 
   const requestMagicCode = async (signup: boolean) => {
+    if (!skipSso.current) {
+      const decision = await resolveEmailFirstSso({
+        email: magicCodeEmail,
+        signup,
+        ssoEnabled: authConfig.ssoEnabled,
+      });
+      if (decision.kind === "prompt") {
+        setSsoPrompt({
+          startUrl: decision.startUrl,
+          required: decision.required,
+          email: magicCodeEmail,
+          resume: () => {
+            skipSso.current = true;
+            void requestMagicCode(signup);
+          },
+        });
+        setSubmitLoading(false);
+        return;
+      }
+    }
+    skipSso.current = false;
+
     const response = await fetch("/auth/magic-code/request", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -599,6 +641,31 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
     setFormError(null);
   };
 
+  const promptForOrganizationSso = async (event: React.FormEvent) => {
+    if (skipSso.current) {
+      return false;
+    }
+    const decision = await resolveEmailFirstSso({
+      email: loginEmail.trim(),
+      signup: false,
+      ssoEnabled: authConfig.ssoEnabled,
+    });
+    if (decision.kind !== "prompt") {
+      return false;
+    }
+    setSsoPrompt({
+      startUrl: decision.startUrl,
+      required: decision.required,
+      email: loginEmail.trim(),
+      resume: () => {
+        skipSso.current = true;
+        void handleLoginSubmit(event);
+      },
+    });
+    setSubmitLoading(false);
+    return true;
+  };
+
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
@@ -611,6 +678,11 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
     setSubmitLoading(true);
 
     try {
+      if (await promptForOrganizationSso(e)) {
+        return;
+      }
+      skipSso.current = false;
+
       const formData = new URLSearchParams();
       formData.append("email", loginEmail.trim());
       formData.append("password", loginPassword);
@@ -626,14 +698,7 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
       });
 
       if (!response.ok) {
-        if (response.status === 403) {
-          const errorText = (await response.text()).trim();
-          setFormError(errorText || ACCOUNT_BLOCKED_MESSAGE);
-        } else if (response.status === 401) {
-          setFormError("Invalid email or password");
-        } else {
-          setFormError("Login failed. Please try again.");
-        }
+        setFormError(await passwordLoginError(response));
         setSubmitLoading(false);
         return;
       }
@@ -754,6 +819,23 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
 
       {showAuthMethods && !isSignupMode && !hasAnyFormMethod && (
         <p className="text-sm text-gray-500 dark:text-gray-400">No login methods are configured.</p>
+      )}
+
+      {showAuthMethods && ssoPrompt && (
+        <div className="mb-4">
+          <SsoOrganizationPrompt
+            required={ssoPrompt.required}
+            onContinue={() => {
+              recordLastUsedLoginMethod("sso");
+              window.location.href = ssoStartHref(ssoPrompt.startUrl, ssoPrompt.email, redirectTarget);
+            }}
+            onUseAnother={() => {
+              const resume = ssoPrompt.resume;
+              setSsoPrompt(null);
+              resume();
+            }}
+          />
+        </div>
       )}
 
       {showAuthMethods && visibleFormError && (
@@ -1011,6 +1093,13 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
 
       {showAuthMethods && showProviderButtons && (!useMagicCodePrimary || magicCodeStep === "email") && (
         <div className={providerButtonsNeedTopSpacing ? "mt-4 space-y-3" : "space-y-3"}>
+          {authConfig.ssoEnabled && !isSignupMode && (
+            <ContinueWithSso
+              redirect={redirectTarget}
+              lastUsed={showLastUsedMethodHints && lastUsedMethod === "sso"}
+              onLastUsedHint="You used SSO to log in last time"
+            />
+          )}
           {activeProviders.map((provider) => (
             <div key={provider}>
               <Button variant="outline" className="w-full justify-center gap-2" asChild>
