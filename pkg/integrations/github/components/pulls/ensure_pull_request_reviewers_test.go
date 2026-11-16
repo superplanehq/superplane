@@ -52,6 +52,7 @@ type reviewerHost struct {
 	mutations                         []string
 	failAdd, failRemove, appliedError bool
 	moved, approved                   bool
+	commented                         bool
 	onAdd                             func()
 }
 
@@ -90,10 +91,13 @@ func (h *reviewerHost) Do(req *http.Request) (*http.Response, error) {
 					return mocks.GitHubResponse(503, `{"message":"response lost"}`), nil
 				}
 			} else {
-				if h.failRemove {
+				if h.failRemove && !h.appliedError {
 					return mocks.GitHubResponse(503, `{"message":"failed"}`), nil
 				}
 				h.pending = slices.DeleteFunc(h.pending, func(r ReviewerIdentity) bool { return r.Login == login })
+				if h.failRemove {
+					return mocks.GitHubResponse(503, `{"message":"response lost"}`), nil
+				}
 			}
 		}
 	case strings.HasSuffix(path, "/collaborators"):
@@ -104,6 +108,9 @@ func (h *reviewerHost) Do(req *http.Request) (*http.Response, error) {
 		body = []any{}
 		if h.approved {
 			body = []any{map[string]any{"id": 1, "user": ReviewerIdentity{ID: 2, Login: "first"}, "state": "APPROVED", "commit_id": "abc", "submitted_at": time.Now().Format(time.RFC3339)}}
+		}
+		if h.commented {
+			body = []any{map[string]any{"id": 2, "user": ReviewerIdentity{ID: 2, Login: "first"}, "state": "COMMENTED", "commit_id": "abc", "submitted_at": time.Now().Format(time.RFC3339)}}
 		}
 	case strings.HasSuffix(path, "/pulls/42"):
 		sha := "abc"
@@ -128,7 +135,7 @@ func mapTeams(slugs []string) []map[string]string {
 	return teams
 }
 func reviewerExecution(store *reviewerPublications, host *reviewerHost, reviewers ...ReviewerIdentity) core.ExecutionContext {
-	return core.ExecutionContext{ID: uuid.New(), WorkflowID: "11111111-1111-1111-1111-111111111111", NodeID: "ensure", Configuration: map[string]any{"repository": "hello", "pullNumber": 42, "managed": true, "expectedHeadSha": "abc", "reviewers": reviewers}, Publications: store, Integration: mocks.IntegrationContextForNewSetupFlow(), HTTP: host, ExecutionState: &contexts.ExecutionStateContext{}}
+	return core.ExecutionContext{ID: uuid.New(), WorkflowID: "11111111-1111-1111-1111-111111111111", NodeID: "ensure", Configuration: map[string]any{"repository": "hello", "pullNumber": 42, "managed": true, "expectedHeadSha": "abc", "reviewers": reviewers}, Publications: store, Metadata: &contexts.MetadataContext{}, Requests: &contexts.RequestContext{}, Integration: mocks.IntegrationContextForNewSetupFlow(), HTTP: host, ExecutionState: &contexts.ExecutionStateContext{}}
 }
 func newReviewerPublications() *reviewerPublications {
 	return &reviewerPublications{records: map[string]core.OrderedPublication{}, order: core.PublicationOrder{SourceRunID: uuid.New(), SourceCreatedAt: time.Now(), AttemptRootEventID: uuid.New(), AttemptCreatedAt: time.Now()}}
@@ -185,9 +192,17 @@ func TestManagedReviewersRetryPartialGitHubFailures(t *testing.T) {
 			require.Contains(t, host.pending, first, "a failed replacement must retain the previous request")
 			host.failAdd, host.failRemove = false, false
 			require.NoError(t, (&EnsurePullRequestReviewers{}).Execute(reviewerExecution(store, host, second)))
-			require.Equal(t, []ReviewerIdentity{second}, host.pending)
+			if failure == "withdraw failed" {
+				require.ElementsMatch(t, []ReviewerIdentity{first, second}, host.pending)
+			} else {
+				require.Equal(t, []ReviewerIdentity{second}, host.pending)
+			}
 			require.NoError(t, (&EnsurePullRequestReviewers{}).Execute(reviewerExecution(store, host)))
-			require.Empty(t, host.pending, "retry must preserve ownership of additions whose response was lost")
+			if failure == "withdraw failed" {
+				require.Equal(t, []ReviewerIdentity{first}, host.pending)
+			} else {
+				require.Empty(t, host.pending, "retry must preserve ownership of additions whose response was lost")
+			}
 		})
 	}
 }
@@ -199,17 +214,21 @@ func TestManagedReviewersFenceOverlappingRunsAndOldReportRetries(t *testing.T) {
 	second := ReviewerIdentity{ID: 3, Login: "second"}
 	originalOrder := store.order
 	var overlapErr error
+	var newer core.ExecutionContext
 	host.onAdd = func() {
 		store.order.SourceRunID = uuid.New()
 		store.order.SourceCreatedAt = store.order.SourceCreatedAt.Add(time.Minute)
-		overlapErr = (&EnsurePullRequestReviewers{}).Execute(reviewerExecution(store, host, second))
+		newer = reviewerExecution(store, host, second)
+		overlapErr = (&EnsurePullRequestReviewers{}).Execute(newer)
 	}
 	older := reviewerExecution(store, host, first)
 	require.NoError(t, (&EnsurePullRequestReviewers{}).Execute(older))
-	require.ErrorIs(t, overlapErr, core.ErrPublicationBusy)
+	require.NoError(t, overlapErr)
+	require.NotEmpty(t, newer.Requests.(*contexts.RequestContext).Action)
+	require.Empty(t, newer.ExecutionState.(*contexts.ExecutionStateContext).Payloads)
 	envelope := older.ExecutionState.(*contexts.ExecutionStateContext).Payloads[0].(map[string]any)
 	require.Equal(t, "skipped", envelope["data"].(ensureReviewersOutcome).Status)
-	require.NoError(t, (&EnsurePullRequestReviewers{}).Execute(reviewerExecution(store, host, second)))
+	require.NoError(t, resumeReviewers(newer))
 	require.Equal(t, []ReviewerIdentity{second}, host.pending)
 	mutations := slices.Clone(host.mutations)
 	store.order = originalOrder
@@ -237,15 +256,42 @@ func TestManagedReviewersPreserveRequestsAtStaleCommit(t *testing.T) {
 	}
 }
 
+func resumeReviewers(ctx core.ExecutionContext) error {
+	return (&EnsurePullRequestReviewers{}).HandleHook(core.ActionHookContext{Name: ctx.Requests.(*contexts.RequestContext).Action, Configuration: ctx.Configuration, Metadata: ctx.Metadata, Requests: ctx.Requests, Publications: ctx.Publications, Integration: ctx.Integration, HTTP: ctx.HTTP, ExecutionState: ctx.ExecutionState})
+}
+
 func TestManagedReviewersLeaveManualRerequestsAfterSubmittedReviews(t *testing.T) {
-	store := newReviewerPublications()
-	host := &reviewerHost{}
-	first := ReviewerIdentity{ID: 2, Login: "first"}
-	require.NoError(t, (&EnsurePullRequestReviewers{}).Execute(reviewerExecution(store, host, first)))
-	host.approved = true // The reviewer submitted a decision, then somebody requested them again.
-	require.NoError(t, (&EnsurePullRequestReviewers{}).Execute(reviewerExecution(store, host)))
-	require.Equal(t, []ReviewerIdentity{first}, host.pending)
-	require.Equal(t, []string{"POST first"}, host.mutations)
+	for _, state := range []string{"APPROVED", "COMMENTED"} {
+		t.Run(state, func(t *testing.T) {
+			store := newReviewerPublications()
+			host := &reviewerHost{}
+			first := ReviewerIdentity{ID: 2, Login: "first"}
+			require.NoError(t, (&EnsurePullRequestReviewers{}).Execute(reviewerExecution(store, host, first)))
+			host.approved, host.commented = state == "APPROVED", state == "COMMENTED"
+			require.NoError(t, (&EnsurePullRequestReviewers{}).Execute(reviewerExecution(store, host)))
+			require.Equal(t, []ReviewerIdentity{first}, host.pending)
+			require.Equal(t, []string{"POST first"}, host.mutations)
+		})
+	}
+}
+
+func TestManagedReviewersPreserveRequestsAfterUncertainWithdrawal(t *testing.T) {
+	for _, applied := range []bool{false, true} {
+		t.Run(fmt.Sprint(applied), func(t *testing.T) {
+			store := newReviewerPublications()
+			host := &reviewerHost{}
+			first := ReviewerIdentity{ID: 2, Login: "first"}
+			require.NoError(t, (&EnsurePullRequestReviewers{}).Execute(reviewerExecution(store, host, first)))
+			host.failRemove, host.appliedError = true, applied
+			require.Error(t, (&EnsurePullRequestReviewers{}).Execute(reviewerExecution(store, host)))
+			// A person re-requests the reviewer after GitHub applied the DELETE.
+			host.pending = []ReviewerIdentity{first}
+			host.failRemove = false
+			require.NoError(t, (&EnsurePullRequestReviewers{}).Execute(reviewerExecution(store, host)))
+			require.Equal(t, []ReviewerIdentity{first}, host.pending)
+			require.Equal(t, []string{"POST first", "DELETE first"}, host.mutations)
+		})
+	}
 }
 
 func TestReviewCandidateDiscoveryIncludesPendingAndPreviousSelection(t *testing.T) {
@@ -304,4 +350,39 @@ func TestManagedReviewersExpiredWriterCannotRestoreOwnership(t *testing.T) {
 	require.Equal(t, []ReviewerIdentity{second}, host.pending)
 	require.NoError(t, (&EnsurePullRequestReviewers{}).Execute(reviewerExecution(store, host)))
 	require.Empty(t, host.pending, "the superseded writer must not lose the successor's ownership")
+}
+
+func TestManagedReviewersRetrySharedLeaseContention(t *testing.T) {
+	for _, superseded := range []bool{false, true} {
+		t.Run(fmt.Sprint(superseded), func(t *testing.T) {
+			store := newReviewerPublications()
+			host := &reviewerHost{}
+			key := "github.review-requests-lock/testhq/hello/42"
+			lease, err := core.BeginPublicationLease(store, key, time.Minute)
+			require.NoError(t, err)
+			first := ReviewerIdentity{ID: 2, Login: "first"}
+			waiting := reviewerExecution(store, host, first)
+			require.NoError(t, (&EnsurePullRequestReviewers{}).Execute(waiting))
+			require.NotEmpty(t, waiting.Requests.(*contexts.RequestContext).Action)
+			require.NoError(t, resumeReviewers(waiting))
+			require.Empty(t, host.mutations)
+			require.Empty(t, waiting.ExecutionState.(*contexts.ExecutionStateContext).Payloads)
+			require.NoError(t, core.FinishPublicationLease(store, key, lease))
+			if superseded {
+				store.order.SourceRunID = uuid.New()
+				store.order.SourceCreatedAt = store.order.SourceCreatedAt.Add(time.Minute)
+				require.NoError(t, (&EnsurePullRequestReviewers{}).Execute(reviewerExecution(store, host)))
+			}
+			require.NoError(t, resumeReviewers(waiting))
+			outcome := waiting.ExecutionState.(*contexts.ExecutionStateContext).Payloads[0].(map[string]any)["data"].(ensureReviewersOutcome)
+			require.Equal(t, waiting.ID.String(), outcome.ExecutionID)
+			if superseded {
+				require.Empty(t, host.pending)
+				require.Equal(t, "superseded", outcome.Reason)
+			} else {
+				require.Equal(t, []ReviewerIdentity{first}, host.pending)
+				require.Equal(t, "requested", outcome.Status)
+			}
+		})
+	}
 }

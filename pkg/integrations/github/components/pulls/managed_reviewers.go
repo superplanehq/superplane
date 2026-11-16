@@ -15,15 +15,16 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
 )
 
-// A later submitted decision ends ownership, so a manual re-request survives.
+// A later submitted review ends ownership, so a manual re-request survives.
 type ownedReviewerRequest struct {
 	Reviewer ReviewerIdentity `json:"reviewer"`
 	ReviewID int64            `json:"reviewId"`
 }
 type managedReviewerState struct {
-	Selected []ReviewerIdentity     `json:"selected"`
-	Owned    []ownedReviewerRequest `json:"owned"`
-	Adding   *ownedReviewerRequest  `json:"adding,omitempty"`
+	Selected    []ReviewerIdentity     `json:"selected"`
+	Owned       []ownedReviewerRequest `json:"owned"`
+	Adding      *ownedReviewerRequest  `json:"adding,omitempty"`
+	Withdrawing *ownedReviewerRequest  `json:"withdrawing,omitempty"`
 }
 
 // This envelope is shared with core.BeginOrderedWrite.
@@ -87,15 +88,24 @@ func reconcileManagedReviewers(ctx core.ExecutionContext, client *common.Client,
 	if err != nil {
 		return err
 	}
-	r := reviewerReconciliation{execution: ctx, client: client, config: config, number: number, write: write, outcome: ensureReviewersOutcome{
-		ExecutionID: ctx.ID.String(), Requested: []ReviewerIdentity{}, AlreadyCovered: []ReviewerIdentity{}, Removed: []ReviewerIdentity{}, Selected: []ReviewerIdentity{},
-	}}
 	if !accepted {
-		return r.emitSuperseded()
+		return (&reviewerReconciliation{execution: ctx, outcome: newReviewerOutcome(ctx)}).emitSuperseded()
 	}
+	return runManagedReviewers(ctx, client, config, number, write)
+}
+
+func newReviewerOutcome(ctx core.ExecutionContext) ensureReviewersOutcome {
+	return ensureReviewersOutcome{ExecutionID: ctx.ID.String(), Requested: []ReviewerIdentity{}, AlreadyCovered: []ReviewerIdentity{}, Removed: []ReviewerIdentity{}, Selected: []ReviewerIdentity{}}
+}
+
+func runManagedReviewers(ctx core.ExecutionContext, client *common.Client, config ensureReviewersConfiguration, number int, write core.OrderedWrite) error {
+	r := reviewerReconciliation{execution: ctx, client: client, config: config, number: number, write: write, outcome: newReviewerOutcome(ctx)}
 	lease, raw, err := core.BeginOrderedWrite(ctx.Publications, write, time.Minute)
 	if errors.Is(err, core.ErrPublicationSuperseded) {
 		return r.emitSuperseded()
+	}
+	if errors.Is(err, core.ErrPublicationBusy) {
+		return r.scheduleRetry()
 	}
 	if err != nil {
 		return err
@@ -115,6 +125,9 @@ func reconcileManagedReviewers(ctx core.ExecutionContext, client *common.Client,
 	if finishErr := r.persist(nil); finishErr != nil {
 		return errors.Join(reconcileErr, finishErr)
 	}
+	if errors.Is(reconcileErr, core.ErrPublicationBusy) {
+		return r.scheduleRetry()
+	}
 	if reconcileErr != nil && reconcileErr != core.ErrPublicationSuperseded {
 		return reconcileErr
 	}
@@ -127,6 +140,16 @@ func reconcileManagedReviewers(ctx core.ExecutionContext, client *common.Client,
 	}
 	return ctx.ExecutionState.Emit("default", "github.pullRequestReviewersEnsured", []any{r.outcome})
 }
+
+const reviewerRetryHook = "retryManagedReviewers"
+
+func (r *reviewerReconciliation) scheduleRetry() error {
+	if err := r.execution.Metadata.Set(map[string]any{"executionId": r.execution.ID.String(), "write": r.write}); err != nil {
+		return err
+	}
+	return r.execution.Requests.ScheduleActionCall(reviewerRetryHook, nil, time.Second)
+}
+
 func (r *reviewerReconciliation) emitSuperseded() error {
 	r.outcome.Status, r.outcome.Reason = "skipped", "superseded"
 	r.outcome.Selected = []ReviewerIdentity{}
@@ -223,6 +246,13 @@ func (r *reviewerReconciliation) reconcile() (resultErr error) {
 	return nil
 }
 func (r *reviewerReconciliation) recoverOwnership(pr *github.PullRequest, reviews []*github.PullRequestReview) {
+	// A lost DELETE response makes a later request indistinguishable from a manual one.
+	if r.state.Withdrawing != nil {
+		r.state.Owned = slices.DeleteFunc(r.state.Owned, func(owned ownedReviewerRequest) bool {
+			return sameReviewer(owned.Reviewer, r.state.Withdrawing.Reviewer)
+		})
+		r.state.Withdrawing = nil
+	}
 	// Recover an uncertain POST only for an identity that was absent before it.
 	if r.state.Adding != nil {
 		if requestedReviewer(pr, r.state.Adding.Reviewer) {
@@ -231,7 +261,7 @@ func (r *reviewerReconciliation) recoverOwnership(pr *github.PullRequest, review
 		r.state.Adding = nil
 	}
 	r.state.Owned = slices.DeleteFunc(r.state.Owned, func(owned ownedReviewerRequest) bool {
-		return !requestedReviewer(pr, owned.Reviewer) || reviewerDecisionID(reviews, owned.Reviewer) != owned.ReviewID
+		return !requestedReviewer(pr, owned.Reviewer) || reviewerSubmittedReviewID(reviews, owned.Reviewer) != owned.ReviewID
 	})
 }
 func (r *reviewerReconciliation) requestMissing(pr *github.PullRequest, reviews []*github.PullRequestReview) error {
@@ -249,7 +279,7 @@ func (r *reviewerReconciliation) requestMissing(pr *github.PullRequest, reviews 
 			r.outcome.AlreadyCovered = append(r.outcome.AlreadyCovered, reviewer)
 			continue
 		}
-		r.state.Adding = &ownedReviewerRequest{Reviewer: reviewer, ReviewID: reviewerDecisionID(reviews, reviewer)}
+		r.state.Adding = &ownedReviewerRequest{Reviewer: reviewer, ReviewID: reviewerSubmittedReviewID(reviews, reviewer)}
 		if err := r.persist(&r.lease); err != nil {
 			return err
 		}
@@ -283,10 +313,15 @@ func (r *reviewerReconciliation) withdrawUnselected() error {
 		if err != nil {
 			return err
 		}
-		if requestedReviewer(pr, owned.Reviewer) && reviewerDecisionID(reviews, owned.Reviewer) == owned.ReviewID {
+		if requestedReviewer(pr, owned.Reviewer) && reviewerSubmittedReviewID(reviews, owned.Reviewer) == owned.ReviewID {
+			r.state.Withdrawing = &owned
+			if err := r.persist(&r.lease); err != nil {
+				return err
+			}
 			if _, err := r.client.RemovePullRequestReviewers(r.providerContext, r.config.Repository, r.number, github.ReviewersRequest{Reviewers: []string{owned.Reviewer.Login}}); err != nil {
 				return fmt.Errorf("withdraw pull request reviewer: %w", err)
 			}
+			r.state.Withdrawing = nil
 			r.outcome.Removed = append(r.outcome.Removed, owned.Reviewer)
 		}
 		r.state.Owned = slices.DeleteFunc(r.state.Owned, func(other ownedReviewerRequest) bool { return sameReviewer(other.Reviewer, owned.Reviewer) })
@@ -307,6 +342,15 @@ func requestedReviewer(pr *github.PullRequest, reviewer ReviewerIdentity) bool {
 		return user.GetID() == reviewer.ID && strings.EqualFold(user.GetLogin(), reviewer.Login)
 	})
 }
-func reviewerDecisionID(reviews []*github.PullRequestReview, reviewer ReviewerIdentity) int64 {
-	return latestReviewerDecision(reviews, reviewer).GetID()
+func reviewerSubmittedReviewID(reviews []*github.PullRequestReview, reviewer ReviewerIdentity) int64 {
+	var latest *github.PullRequestReview
+	for _, review := range reviews {
+		if review.GetUser().GetID() != reviewer.ID || !strings.EqualFold(review.GetUser().GetLogin(), reviewer.Login) || review.GetState() == "PENDING" {
+			continue
+		}
+		if latest == nil || review.GetSubmittedAt().After(latest.GetSubmittedAt().Time) || (review.GetSubmittedAt().Time.Equal(latest.GetSubmittedAt().Time) && review.GetID() > latest.GetID()) {
+			latest = review
+		}
+	}
+	return latest.GetID()
 }

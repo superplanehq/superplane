@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/google/go-github/v84/github"
+	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -234,8 +235,45 @@ func latestReviewerDecision(reviews []*github.PullRequestReview, reviewer Review
 	}
 	return latest
 }
-func (c *EnsurePullRequestReviewers) Hooks() []core.Hook                      { return nil }
-func (c *EnsurePullRequestReviewers) HandleHook(core.ActionHookContext) error { return nil }
+func (c *EnsurePullRequestReviewers) Hooks() []core.Hook {
+	return []core.Hook{{Name: reviewerRetryHook, Type: core.HookTypeInternal}}
+}
+func (c *EnsurePullRequestReviewers) HandleHook(ctx core.ActionHookContext) error {
+	if ctx.Name != reviewerRetryHook {
+		return fmt.Errorf("unknown hook: %s", ctx.Name)
+	}
+	if ctx.ExecutionState.IsFinished() || ctx.ExecutionState.IsCancelling() {
+		return nil
+	}
+	var metadata struct {
+		ExecutionID string
+		Write       core.OrderedWrite
+	}
+	if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil {
+		return err
+	}
+	id, err := uuid.Parse(metadata.ExecutionID)
+	if err != nil {
+		return err
+	}
+	var config ensureReviewersConfiguration
+	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
+		return err
+	}
+	number, err := parsePullNumber(config.PullNumber)
+	if err != nil {
+		return err
+	}
+	client, err := common.NewClient(ctx.Integration, ctx.HTTP)
+	if err != nil {
+		return err
+	}
+	publications := ctx.Publications
+	if independent, ok := publications.(core.IndependentPublicationContext); ok {
+		publications = independent.Independent()
+	}
+	return runManagedReviewers(core.ExecutionContext{ID: id, Publications: publications, Metadata: ctx.Metadata, Requests: ctx.Requests, ExecutionState: ctx.ExecutionState}, client, config, number, metadata.Write)
+}
 func (c *EnsurePullRequestReviewers) HandleWebhook(core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return 200, nil, nil
 }

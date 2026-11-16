@@ -281,16 +281,22 @@ PR descriptions, previous workflow runs, or GitHub request lists.
 Managed reconciliation requests every replacement before withdrawing old
 requests. It removes only pending requests that it owns and no longer selects.
 It preserves unrelated individual requests, team requests, and submitted
-reviews. A submitted decision ends ownership of the original request. A later
-manual request for that reviewer remains outside automation ownership.
+reviews. Any submitted review, including a comment-only review, ends ownership
+of the original request. A later manual request for that reviewer remains
+outside automation ownership.
 
 Trusted source and attempt order fence older reports, including retries.
 Publication updates commit independently of the execution transaction, so a
 worker rollback cannot discard ownership after a GitHub write. Publication
-leases serialize mutations. Each mutation rechecks the current head and order. Successful additions survive partial failures. A persisted
-addition intent lets a retry recover a request when GitHub applied the POST
+leases serialize mutations. Lease contention schedules a retry with the same
+ordered claim. A newer claim supersedes that retry. Each mutation rechecks the
+current head and order. Successful additions survive partial failures.
+A persisted addition intent lets a retry recover a request when GitHub applied the POST
 but the response was lost. GitHub does not provide an atomic request ownership
 operation; a simultaneous manual request during that POST cannot be distinguished.
+A persisted withdrawal intent prevents a retry from deleting a later manual
+request after an uncertain DELETE. A request that remains after such a failure
+loses managed ownership and needs manual removal.
 Selection, discovery, and replacement failures preserve existing requests.
 Completion and publication follow successful reconciliation only.
 
