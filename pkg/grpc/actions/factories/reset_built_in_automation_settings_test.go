@@ -697,6 +697,9 @@ func TestResetPRFeedbackPreservesEachRunnerAndGeneralSettings(t *testing.T) {
 								step := item.(map[string]any)
 								if step["type"] == "prompt" {
 									step["prompt"] = "Do not set git user.email, and do not add Co-authored-by or Signed-off-by trailers."
+									if source == models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion {
+										step["prompt"] = "Post one pull request comment after you address all feedback.\nSummarize the changes in this comment."
+									}
 								}
 							}
 							if source == models.FactoryPRFeedbackHandlerSourcePullRequestChecks {
@@ -770,6 +773,9 @@ func TestResetPRFeedbackPreservesEachRunnerAndGeneralSettings(t *testing.T) {
 							if step["type"] == "prompt" {
 								assert.Contains(t, step["prompt"], "Do not remove or override the automatic sign-off.")
 								assert.Contains(t, step["prompt"], "Do not bypass the Git wrapper, repository hooks, or push verification.")
+								if source == models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion {
+									assert.Contains(t, step["prompt"], prFeedbackCompletionInstructions)
+								}
 							}
 						}
 						assert.True(t, hasGitUser)

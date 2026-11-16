@@ -309,13 +309,30 @@ func Test__BuildPRFeedbackCanvas(t *testing.T) {
 			assert.NotEqual(t, "github.createIssueComment", node.Component)
 			assert.NotContains(t, node.ID, "visual-evidence")
 		}
+	})
 
-		prompt := prFeedbackPrompt()
-		assert.Contains(t, prompt, "Explain disagreements in the completion comment.")
-		assert.Contains(t, prompt, "Post one pull request comment after you address all feedback.")
-		assert.Contains(t, prompt, "Summarize the changes in this comment.")
-		assert.Contains(t, prompt, "If you upload visual evidence, include it in the same comment.")
-		assert.Contains(t, prompt, "Do not post a separate visual evidence comment.")
+	t.Run("discussion prompts receive the shared completion policy", func(t *testing.T) {
+		// This checks instruction delivery, not agent compliance.
+		assert.Contains(t, prFeedbackCompletionInstructions, "If no request needs action, finish successfully without posting a completion comment.")
+
+		for _, provider := range []string{models.ProviderGitHub, models.ProviderBitbucket} {
+			t.Run(provider, func(t *testing.T) {
+				canvas := buildDiscussionPRFeedbackCanvas(prFeedbackBuildRequest{VCSProvider: provider})
+				nodeIDs := []string{prFeedbackRunnerNodeID, prFeedbackReviewRunnerNodeID, prFeedbackReplyRunnerNodeID}
+				if provider == models.ProviderBitbucket {
+					nodeIDs = []string{prFeedbackRunnerNodeID}
+				}
+				for _, nodeID := range nodeIDs {
+					t.Run(nodeID, func(t *testing.T) {
+						prompt := runnerStepPrompt(t, findSpecNode(t, canvas, nodeID), "Address PR feedback")
+						assert.Contains(t, prompt, prFeedbackCompletionInstructions)
+						if provider == models.ProviderGitHub {
+							assert.Contains(t, prompt, "Do not resolve GitHub review threads. The reviewer controls resolution.")
+						}
+					})
+				}
+			})
+		}
 	})
 
 	t.Run("an empty mention is written as an empty content filter", func(t *testing.T) {
