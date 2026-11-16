@@ -145,8 +145,8 @@ Ordered publication fails the step after a host rejection or ten attempts.
 Unordered body sections keep the earlier skip behavior. Review request uses
 both components. Its findings settings are saved on the agent node, so admin
 reset keeps them. Findings and Publish PR check use separate keys and nodes.
-Both receive the same decisions, including `no-candidates`, which skips the
-selection agent when the eligible candidate list is empty.
+Both receive the same decisions. An empty eligible candidate list skips the
+selection agent and uses the shared no-reviewer activity and check steps.
 
 ## Durable delivery
 
@@ -306,3 +306,19 @@ supported user settings and GitHub connections while installing the current
 managed workflow. This change requires no migration, new service, or secret.
 Do not backfill ownership or clean up accumulated requests on existing PRs,
 including #9315. Those requests remain untouched unless a person removes them.
+
+## Review request workflow simplification
+
+Review request keeps the incoming `merge-confidence.completed` broadcast. The
+updated template emits no outgoing `review-request.completed` events. This is
+an intentional compatibility change for canvases that consume those events.
+Activity, PR checks, and findings use the recorded selection and reviewer
+operation outputs directly. Read decision validates the agent result and
+applies an eligible configured fallback once. Selection errors never use fallback.
+
+New installations use the updated template. After deployment, use the existing
+targeted Review request reset to update installed automations. Reset preserves
+supported settings, cleared instructions, disabled switches, activation
+generations, and active approval tracking. Existing runs keep their saved
+graph and can still emit outgoing events. Do not rewrite historical executions.
+This change requires no migration, deployment configuration, or frontend update.

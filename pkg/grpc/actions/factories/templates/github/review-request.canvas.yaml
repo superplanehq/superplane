@@ -5,16 +5,19 @@ metadata:
   description: Select human reviewers after Merge confidence completes.
 spec:
   edges:
-  - sourceId: review-unnecessary
+  - sourceId: withdraw-reviewers
     targetId: review-unnecessary-activity
     channel: default
-  - sourceId: stale-report
+  - sourceId: current-report
     targetId: stale-report-activity
-    channel: default
-  - sourceId: no-reviewer
+    channel: 'false'
+  - sourceId: has-reviewers
     targetId: no-reviewer-activity
-    channel: default
-  - sourceId: review-outcome
+    channel: 'false'
+  - sourceId: has-candidates
+    targetId: no-reviewer-activity
+    channel: 'false'
+  - sourceId: request-reviewers
     targetId: review-outcome-activity
     channel: default
   - sourceId: review-request-trigger
@@ -22,9 +25,6 @@ spec:
     channel: default
   - sourceId: add-review-activity
     targetId: review-needed
-    channel: default
-  - sourceId: withdraw-reviewers
-    targetId: review-unnecessary
     channel: default
   - sourceId: review-needed
     targetId: withdraw-reviewers
@@ -38,70 +38,46 @@ spec:
   - sourceId: current-report
     targetId: has-candidates
     channel: 'true'
-  - sourceId: current-report
-    targetId: stale-report
-    channel: 'false'
-  - sourceId: select-reviewers
-    targetId: valid-decision
-    channel: passed
   - sourceId: select-reviewers
     targetId: selection-error
     channel: failed
-  - sourceId: valid-decision
-    targetId: selection-error
-    channel: 'false'
-  - sourceId: valid-decision
-    targetId: has-reviewers
-    channel: 'true'
   - sourceId: has-reviewers
     targetId: request-reviewers
     channel: 'true'
-  - sourceId: has-reviewers
-    targetId: no-reviewer
-    channel: 'false'
-  - sourceId: request-reviewers
-    targetId: review-outcome
-    channel: default
   - sourceId: pr-check-pending
     targetId: add-review-activity
     channel: default
   - sourceId: has-candidates
     targetId: select-reviewers
     channel: 'true'
-  - sourceId: has-candidates
-    targetId: no-candidates
-    channel: 'false'
-  - sourceId: no-candidates
-    targetId: no-candidates-activity
-    channel: default
-  - sourceId: review-unnecessary
+  - sourceId: withdraw-reviewers
     targetId: pr-check-unnecessary
     channel: default
-  - sourceId: no-reviewer
+  - sourceId: has-reviewers
     targetId: pr-check-no-reviewer
-    channel: default
-  - sourceId: no-candidates
-    targetId: pr-check-no-candidates
-    channel: default
-  - sourceId: review-outcome
+    channel: 'false'
+  - sourceId: has-candidates
+    targetId: pr-check-no-reviewer
+    channel: 'false'
+  - sourceId: request-reviewers
     targetId: pr-check-apply
     channel: default
-  - sourceId: stale-report
+  - sourceId: current-report
     targetId: pr-check-stale
-    channel: default
+    channel: 'false'
   - sourceId: selection-error
     targetId: pr-check-error
     channel: default
-  - sourceId: review-unnecessary
+  - sourceId: withdraw-reviewers
     targetId: findings-decision
     channel: default
-  - sourceId: no-reviewer
+  - sourceId: has-reviewers
     targetId: findings-decision
-    channel: default
-  - sourceId: review-outcome
+    channel: 'false'
+  - sourceId: has-candidates
     targetId: findings-decision
-    channel: default
-  - sourceId: no-candidates
+    channel: 'false'
+  - sourceId: request-reviewers
     targetId: findings-decision
     channel: default
   - sourceId: findings-decision
@@ -110,6 +86,9 @@ spec:
   - sourceId: findings-decision
     targetId: findings-comment
     channel: default
+  - sourceId: select-reviewers
+    targetId: has-reviewers
+    channel: passed
   nodes:
   - id: review-request-trigger
     name: Merge confidence completed
@@ -288,30 +267,45 @@ spec:
           if (!decision || typeof decision !== 'object' || Array.isArray(decision)) {
             throw new Error('The review decision must be a JSON object.');
           }
+          if (decision.error != null) {
+            throw new Error('Reviewer lookup failed: ' + JSON.stringify(decision.error));
+          }
+          if (decision.reviewRequired !== true ||
+              typeof decision.rationale !== 'string' || !decision.rationale.trim() ||
+              typeof decision.noCandidate !== 'boolean' || !Array.isArray(decision.reviewers) ||
+              (decision.noCandidate ? decision.reviewers.length !== 0 : decision.reviewers.length === 0)) {
+            throw new Error('The review decision must require review, explain its rationale, and contain a consistent reviewer selection.');
+          }
+          const candidates = JSON.parse(process.env.SUPERPLANE_REVIEW_REQUEST_CANDIDATES);
+          const ids = new Set();
+          const logins = new Set();
+          for (const reviewer of decision.reviewers) {
+            if (!reviewer || typeof reviewer.login !== 'string' ||
+                typeof reviewer.reason !== 'string' || !reviewer.reason.trim() ||
+                !candidates.some(candidate => candidate.id === reviewer.id && candidate.login === reviewer.login)) {
+              throw new Error('Each reviewer must be an eligible identity with a nonempty reason.');
+            }
+            const login = reviewer.login.toLowerCase();
+            if (ids.has(reviewer.id) || logins.has(login)) {
+              throw new Error('Reviewer IDs and logins must be unique.');
+            }
+            ids.add(reviewer.id);
+            logins.add(login);
+          }
+          decision.fallbackUsed = false;
+          if (decision.noCandidate) {
+            const fallback = (process.env.SUPERPLANE_REVIEW_REQUEST_FALLBACK || '').trim().toLowerCase();
+            const candidate = candidates.find(candidate => candidate.login.toLowerCase() === fallback);
+            if (candidate) {
+              decision.reviewers = [{id: candidate.id, login: candidate.login,
+                reason: 'Use the configured fallback because selection found no suitable candidate.'}];
+              decision.fallbackUsed = true;
+            }
+          }
           fs.writeFileSync(process.env.SUPERPLANE_RESULT_FILE, JSON.stringify(decision));
           NODE
     position:
       x: 1680
-      y: 80
-  - id: valid-decision
-    name: Valid decision
-    type: TYPE_ACTION
-    component: if
-    configuration:
-      expression: |-
-        let d = $["Select reviewers"].data.result;
-        let candidates = $["List candidates"].data.candidates;
-        type(d) == "map" && d.error == nil && d.reviewRequired == true &&
-        type(d.noCandidate) == "bool" && type(d.rationale) == "string" && len(trim(d.rationale)) > 0 &&
-        type(d.reviewers) == "array" &&
-        (d.noCandidate ? len(d.reviewers) == 0 : len(d.reviewers) > 0) &&
-        len(uniq(map(d.reviewers, {lower(#.login)}))) == len(d.reviewers) &&
-        len(uniq(map(d.reviewers, {#.id}))) == len(d.reviewers) &&
-        all(d.reviewers, {let reviewer = #;
-         type(reviewer.login) == "string" && type(reviewer.reason) == "string" && len(trim(reviewer.reason)) > 0 &&
-         any(candidates, {#.id == reviewer.id && #.login == reviewer.login})})
-    position:
-      x: 2000
       y: 80
   - id: selection-error
     name: Selection failed
@@ -327,10 +321,7 @@ spec:
     type: TYPE_ACTION
     component: if
     configuration:
-      expression: |-
-        len((let d = $["Select reviewers"].data.result;
-        let fallback = $["Select reviewers"].config.fallbackReviewer;
-        d.noCandidate ? map(filter($["List candidates"].data.candidates, {lower(#.login) == lower(fallback)}), { {id: #.id, login: #.login, reason: "Use the configured fallback because selection found no suitable candidate."} }) : d.reviewers)) > 0
+      expression: len($["Select reviewers"].data.result.reviewers) > 0
     position:
       x: 2320
       y: 80
@@ -343,10 +334,7 @@ spec:
       pullNumber: '{{ root().data.payload.pullNumber }}'
       expectedHeadSha: '{{ root().data.payload.reviewedCommit }}'
       managed: true
-      reviewers: |-
-        {{ let d = $["Select reviewers"].data.result;
-        let fallback = $["Select reviewers"].config.fallbackReviewer;
-        d.noCandidate ? map(filter($["List candidates"].data.candidates, {lower(#.login) == lower(fallback)}), { {id: #.id, login: #.login, reason: "Use the configured fallback because selection found no suitable candidate."} }) : d.reviewers }}
+      reviewers: '{{ $["Select reviewers"].data.result.reviewers }}'
     position:
       x: 2640
       y: 80
@@ -363,62 +351,15 @@ spec:
     position:
       x: 880
       y: 480
-  - id: review-unnecessary
-    name: Review unnecessary
-    type: TYPE_ACTION
-    component: broadcastMessage
-    configuration:
-      payload:
-        type: review-request.completed
-        sourceAppId: '{{ root().data.app.id }}'
-        reportId: '{{ root().data.payload.reportId }}'
-        reviewedCommit: '{{ root().data.payload.reviewedCommit }}'
-        pullRequestId: '{{ root().data.payload.pullRequestId }}'
-        repository: '{{ root().data.payload.repository }}'
-        pullNumber: '{{ root().data.payload.pullNumber }}'
-        runId: '{{ run().id }}'
-        runUrl: '{{ run().url }}'
-        reviewRequest:
-          status: '{{ $["Withdraw reviewers"].data.status == "skipped" ? "stale" : "review_unnecessary" }}'
-          rationale: '{{ $["Withdraw reviewers"].data.status == "skipped" ? "The reviewer decision is stale or superseded. Existing requests are preserved." : "All checks are positive. Human review is unnecessary." }}'
-          requestOutcome: '{{ $["Withdraw reviewers"].data }}'
-          reviewers: '{{ [] }}'
-          fallbackUsed: '{{ false }}'
-    position:
-      x: 1040
-      y: 480
   - id: review-unnecessary-activity
     name: Review unnecessary activity
     type: TYPE_ACTION
     component: updatePullRequestActivity
     configuration:
       title: '{{ $["Withdraw reviewers"].data.status == "skipped" ? "Stale report" : "Review unnecessary" }}'
-      description: '{{ $["Review unnecessary"].data.reviewRequest.rationale }}'
+      description: &review-unnecessary-reason '{{ $["Withdraw reviewers"].data.status == "skipped" ? "The reviewer decision is stale or superseded. Existing requests are preserved." : "All checks are positive. Human review is unnecessary." }}'
     position:
       x: 1360
-      y: 480
-  - id: stale-report
-    name: Stale report
-    type: TYPE_ACTION
-    component: broadcastMessage
-    configuration:
-      payload:
-        type: review-request.completed
-        sourceAppId: '{{ root().data.app.id }}'
-        reportId: '{{ root().data.payload.reportId }}'
-        reviewedCommit: '{{ root().data.payload.reviewedCommit }}'
-        pullRequestId: '{{ root().data.payload.pullRequestId }}'
-        repository: '{{ root().data.payload.repository }}'
-        pullNumber: '{{ root().data.payload.pullNumber }}'
-        runId: '{{ run().id }}'
-        runUrl: '{{ run().url }}'
-        reviewRequest:
-          status: stale
-          rationale: The pull request is closed or its head differs from the assessed commit.
-          reviewers: '{{ [] }}'
-          fallbackUsed: '{{ false }}'
-    position:
-      x: 1680
       y: 480
   - id: stale-report-activity
     name: Stale report activity
@@ -430,63 +371,16 @@ spec:
     position:
       x: 2000
       y: 480
-  - id: no-reviewer
-    name: No eligible reviewer
-    type: TYPE_ACTION
-    component: broadcastMessage
-    configuration:
-      payload:
-        type: review-request.completed
-        sourceAppId: '{{ root().data.app.id }}'
-        reportId: '{{ root().data.payload.reportId }}'
-        reviewedCommit: '{{ root().data.payload.reviewedCommit }}'
-        pullRequestId: '{{ root().data.payload.pullRequestId }}'
-        repository: '{{ root().data.payload.repository }}'
-        pullNumber: '{{ root().data.payload.pullNumber }}'
-        runId: '{{ run().id }}'
-        runUrl: '{{ run().url }}'
-        reviewRequest:
-          status: no_eligible_reviewer
-          rationale: '{{ $["Select reviewers"].data.result.rationale + " No eligible candidate or fallback reviewer is available." }}'
-          reviewers: '{{ [] }}'
-          fallbackUsed: '{{ false }}'
-    position:
-      x: 2640
-      y: 480
   - id: no-reviewer-activity
     name: No eligible reviewer activity
     type: TYPE_ACTION
     component: updatePullRequestActivity
     configuration:
       title: No eligible reviewer
-      description: '{{ $["Select reviewers"].data.result.rationale + " No eligible candidate or fallback reviewer is available." }}'
+      description: &no-reviewer-reason '{{ $["Select reviewers"] != nil ? $["Select reviewers"].data.result.rationale + " No eligible candidate or fallback reviewer is available." : "No eligible candidate or fallback reviewer is available." }}'
     position:
       x: 2960
       y: 480
-  - id: review-outcome
-    name: Review decision
-    type: TYPE_ACTION
-    component: broadcastMessage
-    configuration:
-      payload:
-        type: review-request.completed
-        sourceAppId: '{{ root().data.app.id }}'
-        reportId: '{{ root().data.payload.reportId }}'
-        reviewedCommit: '{{ root().data.payload.reviewedCommit }}'
-        pullRequestId: '{{ root().data.payload.pullRequestId }}'
-        repository: '{{ root().data.payload.repository }}'
-        pullNumber: '{{ root().data.payload.pullNumber }}'
-        runId: '{{ run().id }}'
-        runUrl: '{{ run().url }}'
-        reviewRequest:
-          status: '{{ $["Ensure reviewers"].data.status == "skipped" ? "stale" : $["Ensure reviewers"].data.status }}'
-          rationale: '{{ $["Select reviewers"].data.result.rationale }}'
-          reviewers: '{{ $["Ensure reviewers"].data.selected }}'
-          fallbackUsed: '{{ $["Select reviewers"].data.result.noCandidate }}'
-          requestOutcome: '{{ $["Ensure reviewers"].data }}'
-    position:
-      x: 2960
-      y: 80
   - id: review-outcome-activity
     name: Review decision activity
     type: TYPE_ACTION
@@ -501,7 +395,7 @@ spec:
              : "Requested: " + join(map(outcome.requested, {#.login}), ", ")
                + ". Already covered: " + join(map(outcome.alreadyCovered, {#.login}), ", ")
                + ". Withdrawn: " + join(map(outcome.removed, {#.login}), ", ") + "." }}
-        {{ $["Select reviewers"].data.result.noCandidate ? "Fallback reviewer used." : "" }}
+        {{ $["Select reviewers"].data.result.fallbackUsed ? "Fallback reviewer used." : "" }}
         {{ join(map($["Ensure reviewers"].data.selected, {#.login + ": " + #.reason}), "\n") }}
     position:
       x: 3280
@@ -514,39 +408,6 @@ spec:
       expression: len($["List candidates"].data.candidates) > 0
     position:
       x: 1680
-      y: -240
-  - id: no-candidates
-    name: No candidates
-    type: TYPE_ACTION
-    component: broadcastMessage
-    configuration:
-      payload:
-        type: review-request.completed
-        sourceAppId: '{{ root().data.app.id }}'
-        reportId: '{{ root().data.payload.reportId }}'
-        reviewedCommit: '{{ root().data.payload.reviewedCommit }}'
-        pullRequestId: '{{ root().data.payload.pullRequestId }}'
-        repository: '{{ root().data.payload.repository }}'
-        pullNumber: '{{ root().data.payload.pullNumber }}'
-        runId: '{{ run().id }}'
-        runUrl: '{{ run().url }}'
-        reviewRequest:
-          status: no_eligible_reviewer
-          rationale: No eligible candidate or fallback reviewer is available.
-          reviewers: '{{ [] }}'
-          fallbackUsed: '{{ false }}'
-    position:
-      x: 2000
-      y: -240
-  - id: no-candidates-activity
-    name: No candidates activity
-    type: TYPE_ACTION
-    component: updatePullRequestActivity
-    configuration:
-      title: No eligible reviewer
-      description: No eligible candidate or fallback reviewer is available.
-    position:
-      x: 2320
       y: -240
   - id: pr-check-pending
     name: Register PR check
@@ -578,7 +439,7 @@ spec:
       activationNodeId: pr-check-pending
       resultUrl: '{{ run().url }}'
       phase: '{{ $["Withdraw reviewers"].data.status == "skipped" ? "selection_error" : "no_review" }}'
-      reason: '{{ previous().data.reviewRequest.rationale }}'
+      reason: *review-unnecessary-reason
     position:
       x: 1360
       y: 800
@@ -594,26 +455,10 @@ spec:
       activationNodeId: pr-check-pending
       resultUrl: '{{ run().url }}'
       phase: selection_error
-      reason: '{{ previous().data.reviewRequest.rationale }}'
+      reason: *no-reviewer-reason
     position:
       x: 2960
       y: 800
-  - id: pr-check-no-candidates
-    name: Apply no candidates check
-    type: TYPE_ACTION
-    component: github.setPullRequestReviewCheck
-    configuration:
-      repository: '{{ root().data.payload.repository }}'
-      pullNumber: '{{ root().data.payload.pullNumber }}'
-      assessedSha: '{{ root().data.payload.reviewedCommit }}'
-      context: superplane/review-request
-      activationNodeId: pr-check-pending
-      resultUrl: '{{ run().url }}'
-      phase: selection_error
-      reason: '{{ previous().data.reviewRequest.rationale }}'
-    position:
-      x: 2640
-      y: -240
   - id: pr-check-apply
     name: Apply required reviewers
     type: TYPE_ACTION
@@ -670,7 +515,11 @@ spec:
     type: TYPE_ACTION
     component: filter
     configuration:
-      expression: previous().data.reviewRequest.status in ["review_unnecessary", "no_eligible_reviewer", "requested", "already_covered"]
+      expression: |-
+        let withdrawal = $["Withdraw reviewers"];
+        let request = $["Ensure reviewers"];
+        withdrawal != nil ? withdrawal.data.status != "skipped"
+          : request == nil || request.data.status in ["requested", "already_covered"]
     position:
       x: 3280
       y: 1120
@@ -685,19 +534,23 @@ spec:
       body: &review-findings |-
         ## SuperPlane review request
 
-        {{ let outcome = previous(2).data;
-           let decision = outcome.reviewRequest;
-           (decision.status in ["requested", "already_covered"]
-             ? "**Reviewers selected**\n\n" + replace(markdownText(decision.rationale), "@", "&#64;") + "\n\n"
+        {{ let withdrawal = $["Withdraw reviewers"];
+           let request = $["Ensure reviewers"];
+           let selection = $["Select reviewers"];
+           let rationale = withdrawal != nil ? "All checks are positive. Human review is unnecessary."
+             : selection != nil ? selection.data.result.rationale
+             : "No eligible candidate or fallback reviewer is available.";
+           (request != nil
+             ? "**Reviewers selected**\n\n" + replace(markdownText(rationale), "@", "&#64;") + "\n\n"
                + "| Reviewer | Reason |\n| --- | --- |\n"
-               + join(map(decision.reviewers, { "| " + replace(markdownText(#.login), "@", "&#64;") + " | " + replace(markdownText(#.reason), "@", "&#64;") + " |\n" }), "")
-               + (decision.fallbackUsed
+               + join(map(request.data.selected, { "| " + replace(markdownText(#.login), "@", "&#64;") + " | " + replace(markdownText(#.reason), "@", "&#64;") + " |\n" }), "")
+               + (selection.data.result.fallbackUsed
                  ? "\nFallback reviewer: used because selection found no suitable candidate.\n"
                  : "\nFallback reviewer: not used because selection found a suitable candidate.\n")
-             : decision.status == "review_unnecessary"
-               ? "**No review needed**\n\n" + replace(markdownText(decision.rationale), "@", "&#64;") + "\n"
-               : "**No eligible reviewer**\n\n" + replace(markdownText(decision.rationale), "@", "&#64;") + "\n\nNo reviewer was requested. Existing requests are preserved.\n")
-           + "\nAssessed commit: " + markdownText(outcome.reviewedCommit) + "\n\n[View Review request run](<" + markdownLink(outcome.runUrl) + ">)" }}
+             : withdrawal != nil
+               ? "**No review needed**\n\n" + replace(markdownText(rationale), "@", "&#64;") + "\n"
+               : "**No eligible reviewer**\n\n" + replace(markdownText(rationale), "@", "&#64;") + "\n\nNo reviewer was requested. Existing requests are preserved.\n")
+           + "\nAssessed commit: " + markdownText(root().data.payload.reviewedCommit) + "\n\n[View Review request run](<" + markdownLink(run().url) + ">)" }}
       expectedHeadSha: '{{ root().data.payload.reviewedCommit }}'
       enabled: false
       ordered: true

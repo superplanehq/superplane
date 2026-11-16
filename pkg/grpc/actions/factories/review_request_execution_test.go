@@ -59,6 +59,7 @@ type reviewRequestHTTP struct {
 	pushDuringLookups bool
 	// description and comments hold the published pull request state.
 	description   string
+	bodyFails     bool
 	bodyWrites    []string
 	comments      map[int64]string
 	commentWrites int
@@ -159,6 +160,9 @@ func (h *reviewRequestHTTP) Do(request *http.Request) (*http.Response, error) {
 		return publicationHTTPResponse(201, `{"number":42,"requested_reviewers":[{"login":"unrelated"},{"id":2,"login":"octocat"}]}`), nil
 	}
 	if request.Method == http.MethodPatch && path == "/repos/acme/app/pulls/42" {
+		if h.bodyFails {
+			return publicationHTTPResponse(403, `{"message":"body write denied"}`), nil
+		}
 		var update struct{ Body string }
 		if err := json.NewDecoder(request.Body).Decode(&update); err != nil {
 			return nil, err
@@ -240,6 +244,12 @@ type reviewRequestManagedIntegration struct {
 }
 
 func (c reviewRequestManagedIntegration) Publications() core.PublicationStore { return c.store }
+
+type reviewRequestFailedActivity struct{ core.FactoryContext }
+
+func (c reviewRequestFailedActivity) UpdatePullRequestActivity(core.UpdatePullRequestActivityParams) (*core.PullRequestActivityResult, error) {
+	return nil, errors.New("activity update unavailable")
+}
 
 func reviewRequestIntegration() core.IntegrationContext {
 	return &contexts.IntegrationContext{
@@ -380,8 +390,10 @@ func runReviewRequestGraph(t *testing.T, f publicationFixture, canvas *models.Ca
 	version, err := models.FindLiveCanvasVersionByCanvasInTransaction(f.db, canvas)
 	require.NoError(t, err)
 	agentRuns := 0
+	recorded := map[string]any{}
 	var visit func(*models.CanvasEvent, *models.CanvasNodeExecution) error
 	visit = func(incoming *models.CanvasEvent, previous *models.CanvasNodeExecution) error {
+		var executionError error
 		for _, edge := range version.Edges {
 			if edge.SourceID != incoming.NodeID || edge.Channel != incoming.Channel {
 				continue
@@ -404,6 +416,9 @@ func runReviewRequestGraph(t *testing.T, f publicationFixture, canvas *models.Ca
 				Apps:           workercontexts.NewAppExecutionContext(f.db, canvas, node, execution),
 				Runs:           workercontexts.NewRunExecutionContext(f.db, canvas, node, execution),
 				Requests:       &contexts.RequestContext{},
+			}
+			if scenario == "activity failure" && node.NodeID == "review-outcome-activity" {
+				ctx.Factory = reviewRequestFailedActivity{ctx.Factory}
 			}
 			if node.NodeID == reviewRequestAgentNodeID {
 				agentRuns++
@@ -464,7 +479,7 @@ func runReviewRequestGraph(t *testing.T, f publicationFixture, canvas *models.Ca
 				case "replacement":
 					decision["rationale"] = "The previous reviewer is unavailable. Select the authorization owner."
 					decision["reviewers"] = []any{map[string]any{"id": 3, "login": "fallback-user", "reason": "The previous reviewer is unavailable. Owns authorization changes."}}
-				case "fallback", "no candidate", "ineligible fallback":
+				case "fallback", "no candidate", "no suitable candidate", "ineligible fallback":
 					decision["noCandidate"], decision["reviewers"] = true, []any{}
 				case "malformed output":
 					decision = map[string]any{"reviewRequired": true}
@@ -489,8 +504,9 @@ func runReviewRequestGraph(t *testing.T, f publicationFixture, canvas *models.Ca
 				}
 				result, err := json.Marshal(decision)
 				require.NoError(t, err)
+				result, readErr := readReviewDecision(t, steps[2].(map[string]any)["command"].(string), result, selectionEnvironment)
 				state, code := "succeeded", 0
-				if scenario == "agent failure" {
+				if scenario == "agent failure" || readErr != nil {
 					state, code = "failed", 1
 				}
 				err = action.HandleHook(core.ActionHookContext{Name: runner.HookPoll, Configuration: ctx.Configuration, Parameters: map[string]any{"task_id": "review-selection"}, Metadata: ctx.Metadata, ExecutionState: ctx.ExecutionState, RunnerTasks: &contexts.RunnerTaskContext{Task: &core.RunnerTask{ID: "review-selection", State: state, ExitCode: &code, Result: result}}})
@@ -511,7 +527,8 @@ func runReviewRequestGraph(t *testing.T, f publicationFixture, canvas *models.Ca
 			} else {
 				if err := action.Execute(ctx); err != nil {
 					require.NoError(t, ctx.ExecutionState.Fail(models.CanvasNodeExecutionResultReasonError, err.Error()))
-					return err
+					executionError = errors.Join(executionError, err)
+					continue
 				}
 				if node.ComponentName() == "github.setPullRequestReviewCheck" {
 					if node.NodeID == "pr-check-pending" && host.statusDenied {
@@ -537,28 +554,24 @@ func runReviewRequestGraph(t *testing.T, f publicationFixture, canvas *models.Ca
 			var outputs []models.CanvasEvent
 			require.NoError(t, f.db.Where("execution_id = ?", execution.ID).Order("created_at").Find(&outputs).Error)
 			for i := range outputs {
+				recorded[node.NodeID] = outputs[i].Data.Data().(map[string]any)["data"]
 				if err := visit(&outputs[i], execution); err != nil {
-					return err
+					executionError = errors.Join(executionError, err)
 				}
 			}
 		}
-		return nil
+		return executionError
 	}
 	err = visit(root, nil)
-	var messages []models.AppMessage
-	require.NoError(t, f.db.Where("canvas_id = ? AND payload->>'runId' = ?", canvas.ID, run.ID.String()).Find(&messages).Error)
-	if len(messages) == 0 {
-		return nil, agentRuns, err
-	}
-	require.Len(t, messages, 1)
-	var outcome map[string]any
-	require.NoError(t, json.Unmarshal(messages[0].Payload, &outcome))
-	return outcome, agentRuns, err
+	var messageCount int64
+	require.NoError(t, f.db.Model(&models.AppMessage{}).Where("canvas_id = ?", canvas.ID).Count(&messageCount).Error)
+	require.Zero(t, messageCount, "Review request must not broadcast outgoing app messages")
+	return recorded, agentRuns, err
 }
 
 func TestReviewRequestFromPublishedReportToGitHub(t *testing.T) {
 	for _, publishCheck := range []bool{false, true} {
-		for _, scenario := range []string{"favorable", "concerning", "status write denied", "hosted agent", "instructions changed before dispatch", "concerning no review", "fallback", "no candidate", "ineligible fallback", "malformed output", "reported lookup error", "agent failure", "author selected", "bot selected", "reader selected", "duplicate reviewer", "additional reviewer without reason", "additional reviewer", "discovery error", "permission error", "lost permission", "identity changed", "qualifying approval", "old approval", "withdrawn approval", "request error", "already requested", "head moved", "head moved during lookups", "stale report", "closed before selection", "closed during selection"} {
+		for _, scenario := range []string{"favorable", "concerning", "status write denied", "hosted agent", "instructions changed before dispatch", "concerning no review", "fallback", "no candidate", "no suitable candidate", "ineligible fallback", "malformed output", "reported lookup error", "agent failure", "author selected", "bot selected", "reader selected", "duplicate reviewer", "additional reviewer without reason", "additional reviewer", "discovery error", "permission error", "lost permission", "identity changed", "qualifying approval", "old approval", "withdrawn approval", "request error", "already requested", "head moved", "head moved during lookups", "stale report", "closed before selection", "closed during selection"} {
 			t.Run(fmt.Sprintf("publish_check=%t/%s", publishCheck, scenario), func(t *testing.T) {
 				host := &reviewRequestHTTP{}
 				score := 2.0
@@ -632,7 +645,7 @@ func TestReviewRequestFromPublishedReportToGitHub(t *testing.T) {
 					switch scenario {
 					case "favorable", "qualifying approval":
 						want = "success"
-					case "no candidate", "ineligible fallback", "concerning no review", "malformed output", "reported lookup error", "agent failure", "author selected", "bot selected", "reader selected", "duplicate reviewer", "additional reviewer without reason", "discovery error", "permission error", "lost permission", "identity changed", "request error":
+					case "no candidate", "no suitable candidate", "ineligible fallback", "concerning no review", "malformed output", "reported lookup error", "agent failure", "author selected", "bot selected", "reader selected", "duplicate reviewer", "additional reviewer without reason", "discovery error", "permission error", "lost permission", "identity changed", "request error":
 						want = "error"
 					case "withdrawn approval":
 						want = "failure"
@@ -646,49 +659,63 @@ func TestReviewRequestFromPublishedReportToGitHub(t *testing.T) {
 				}
 				if slices.Contains([]string{"discovery error", "permission error", "lost permission", "identity changed", "request error"}, scenario) {
 					require.Error(t, err)
-					require.Nil(t, outcome)
+					require.NotContains(t, outcome, "request-reviewers")
 					require.Empty(t, host.reviewerBodies)
 					return
 				}
 				require.NoError(t, err)
 				if slices.Contains([]string{"concerning no review", "malformed output", "reported lookup error", "agent failure", "author selected", "bot selected", "reader selected", "duplicate reviewer", "additional reviewer without reason"}, scenario) {
-					require.Nil(t, outcome)
+					require.NotContains(t, outcome, "request-reviewers")
 					require.Empty(t, host.reviewerBodies)
 					var run models.CanvasRun
 					require.NoError(t, f.db.First(&run, "id = ?", root.RunID).Error)
 					require.NotEmpty(t, run.Errors)
 					return
 				}
-				require.NotNil(t, outcome)
-				require.Equal(t, f.run.ID.String(), outcome["reportId"])
-				require.Equal(t, f.canvas.ID.String(), outcome["sourceAppId"])
-				require.Equal(t, "abc", outcome["reviewedCommit"])
-				require.NotEmpty(t, outcome["runId"])
-				decision := outcome["reviewRequest"].(map[string]any)
-				require.NotEmpty(t, decision["rationale"])
+				activity, err := models.FindPullRequestActivityByRunID(f.db, root.RunID)
+				require.NoError(t, err)
+				require.Equal(t, f.pr.ID, activity.PullRequestID)
 				expected := "requested"
+				wantTitle := "Review requested"
 				switch scenario {
 				case "favorable":
-					expected = "review_unnecessary"
+					wantTitle = "Review unnecessary"
 					require.Zero(t, agents)
+					require.Contains(t, outcome, "withdraw-reviewers")
 				case "stale report", "closed before selection":
-					expected = "stale"
+					wantTitle = "Stale report"
 					require.Zero(t, agents)
 				case "head moved", "head moved during lookups", "closed during selection":
-					expected = "stale"
-				case "no candidate", "ineligible fallback":
-					expected = "no_eligible_reviewer"
+					wantTitle = "Stale report"
+					expected = "skipped"
+				case "no candidate", "no suitable candidate", "ineligible fallback":
+					wantTitle = "No eligible reviewer"
+					require.Contains(t, outcome, "no-reviewer-activity")
+					if scenario == "no candidate" {
+						require.Zero(t, agents)
+						require.NotContains(t, outcome, reviewRequestAgentNodeID)
+					} else {
+						require.Equal(t, 1, agents)
+						require.Contains(t, activity.Description, "Security findings need review.")
+					}
 				case "qualifying approval", "already requested":
+					wantTitle = "Review already covered"
 					expected = "already_covered"
 				}
-				require.Equal(t, expected, decision["status"])
+				require.Equal(t, wantTitle, activity.Title)
+				require.NotEmpty(t, activity.Description)
+				if request, ok := outcome["request-reviewers"].(map[string]any); ok {
+					require.Equal(t, expected, request["status"])
+				} else {
+					expected = ""
+				}
 				if expected != "requested" {
 					require.Empty(t, host.reviewerBodies)
 				} else {
 					logins := []any{"octocat"}
 					if scenario == "fallback" {
 						logins = []any{"fallback-user"}
-						require.Equal(t, true, decision["fallbackUsed"])
+						require.Equal(t, true, outcome[reviewRequestAgentNodeID].(map[string]any)["result"].(map[string]any)["fallbackUsed"])
 					}
 					if scenario == "additional reviewer" {
 						logins = append(logins, "fallback-user")
@@ -706,9 +733,6 @@ func TestReviewRequestFromPublishedReportToGitHub(t *testing.T) {
 						require.NotContains(t, request.URL.Path, "/check-runs")
 					}
 				}
-				activity, err := models.FindPullRequestActivityByRunID(f.db, uuid.MustParse(outcome["runId"].(string)))
-				require.NoError(t, err)
-				require.Equal(t, f.pr.ID, activity.PullRequestID)
 			})
 		}
 	}
@@ -760,14 +784,14 @@ func TestReviewRequestRepeatsReportsAndRetriesOriginalReport(t *testing.T) {
 		outcome, agents, err := runReviewRequestGraph(t, f, consumer, root, host, "")
 		require.NoError(t, err)
 		require.Equal(t, 1, agents, "separate broadcasts may repeat selection")
-		require.Equal(t, originalReport, outcome["reportId"])
+		require.Contains(t, outcome, "request-reviewers")
 	}
 	f, newMessage := emitReviewRequestReport(t, f, host, 3)
 	require.NotEqual(t, originalReport, newMessage["payload"].(map[string]any)["reportId"])
 	outcome, agents, err := runReviewRequestGraph(t, f, consumer, deliver(newMessage), host, "")
 	require.NoError(t, err)
 	require.Equal(t, 1, agents)
-	require.Equal(t, "abc", outcome["reviewedCommit"])
+	require.Equal(t, "abc", outcome["request-reviewers"].(map[string]any)["headSha"])
 	setReviewRequestInstructions(t, f, consumer, "Prefer the API owner. Explain {{ ownership }} literally.")
 	var originalSelection models.CanvasNodeExecution
 	require.NoError(t, f.db.Where("root_event_id = ? AND node_id = ?", original.ID, reviewRequestAgentNodeID).First(&originalSelection).Error)
@@ -780,7 +804,7 @@ func TestReviewRequestRepeatsReportsAndRetriesOriginalReport(t *testing.T) {
 	outcome, agents, err = runReviewRequestGraph(t, f, consumer, retried, host, "")
 	require.NoError(t, err)
 	require.Equal(t, 1, agents)
-	require.Equal(t, originalReport, outcome["reportId"])
+	require.Contains(t, outcome, "request-reviewers")
 	var retriedSelection models.CanvasNodeExecution
 	require.NoError(t, f.db.Where("root_event_id = ? AND node_id = ?", retried.ID, reviewRequestAgentNodeID).First(&retriedSelection).Error)
 	require.Equal(t, "Prefer the API owner. Explain {{ ownership }} literally.", retriedSelection.Configuration.Data()["additionalInstructions"])
@@ -792,7 +816,7 @@ func TestReviewRequestRepeatsReportsAndRetriesOriginalReport(t *testing.T) {
 	outcome, agents, err = runReviewRequestGraph(t, f, consumer, retried, host, "")
 	require.NoError(t, err)
 	require.Equal(t, 1, agents)
-	require.Equal(t, originalReport, outcome["reportId"])
+	require.Contains(t, outcome, "request-reviewers")
 	var clearedSelection models.CanvasNodeExecution
 	require.NoError(t, f.db.Where("root_event_id = ? AND node_id = ?", retried.ID, reviewRequestAgentNodeID).First(&clearedSelection).Error)
 	require.Equal(t, "", clearedSelection.Configuration.Data()["additionalInstructions"])
@@ -804,7 +828,7 @@ func TestReviewRequestRepeatsReportsAndRetriesOriginalReport(t *testing.T) {
 	outcome, agents, err = runReviewRequestGraph(t, f, consumer, retried, host, "")
 	require.NoError(t, err)
 	require.Zero(t, agents)
-	require.Equal(t, "stale", outcome["reviewRequest"].(map[string]any)["status"])
+	require.Contains(t, outcome, "stale-report-activity")
 	// Pause affects new deliveries while installed configuration remains intact.
 	paused := trigger.Configuration.Data()
 	paused["enabled"] = false
@@ -854,12 +878,52 @@ func setReviewRequestCheck(t *testing.T, f publicationFixture, canvas *models.Ca
 	require.NoError(t, err)
 	for i := range version.Nodes {
 		node := &version.Nodes[i]
-		if node.ID == "pr-check-pending" {
+		switch node.ID {
+		case "pr-check-pending":
 			node.Configuration["enabled"], node.Configuration["activationGeneration"] = enabled, generation
-			require.NoError(t, f.db.Model(&models.CanvasNode{}).Where("workflow_id = ? AND node_id = ?", canvas.ID, node.ID).Update("configuration", datatypes.NewJSONType(node.Configuration)).Error)
+		case reviewRequestAgentNodeID:
+			node.Configuration["publishPRCheck"], node.Configuration["prCheckActivationGeneration"] = enabled, generation
+		default:
+			continue
 		}
+		require.NoError(t, f.db.Model(&models.CanvasNode{}).Where("workflow_id = ? AND node_id = ?", canvas.ID, node.ID).Update("configuration", datatypes.NewJSONType(node.Configuration)).Error)
 	}
 	require.NoError(t, f.db.Save(version).Error)
+}
+
+func TestReviewRequestResetKeepsActiveCheck(t *testing.T) {
+	host := &reviewRequestHTTP{}
+	f, message := reviewRequestCompletedProducer(t, host, 2)
+	consumer := reviewFindingsConsumer(t, f, reviewFindingsSettings{}, "fallback-user")
+	setReviewRequestCheck(t, f, consumer, true, 7)
+	root := deliverReviewRequestReport(t, f, consumer, message)
+	_, agents, err := runReviewRequestGraph(t, f, consumer, root, host, "")
+	require.NoError(t, err)
+	require.Equal(t, 1, agents)
+	store := workercontexts.NewPublicationContext(f.db, consumer.OrganizationID, mustReviewCheckNode(t, f, consumer), nil)
+	before, err := store.List("github.review-check/")
+	require.NoError(t, err)
+	require.Len(t, before, 1)
+	require.Equal(t, "pending", host.statuses[len(host.statuses)-1].GetState())
+
+	f.deps.WebhookBaseURL = "http://localhost:8000"
+	reset, err := resetOrganizationBuiltInAutomations(t.Context(), consumer.OrganizationID, reviewRequestTemplateID, f.deps)
+	require.NoError(t, err)
+	require.Equal(t, 1, reset.Reset)
+	after, err := store.Get(before[0].Key)
+	require.NoError(t, err)
+	require.False(t, after.Disabled)
+	require.Equal(t, before[0].Order, after.Order)
+	require.Equal(t, before[0].Generation, after.Generation)
+	require.Equal(t, before[0].ActivationGeneration, after.ActivationGeneration)
+	require.JSONEq(t, string(before[0].Payload), string(after.Payload))
+
+	host.approved = true
+	integration := reviewRequestManagedIntegration{IntegrationContext: reviewRequestIntegration(), store: store}
+	require.NoError(t, pulls.RefreshReviewCheck(core.IntegrationHookContext{Parameters: map[string]any{"key": after.Key}, Integration: integration, HTTP: host}))
+	require.Equal(t, "success", host.statuses[len(host.statuses)-1].GetState(), "reset keeps approval tracking active")
+	require.Len(t, host.reviewerBodies, 1)
+	require.Len(t, host.selectionEnvironments, 1)
 }
 
 func TestManagedReviewerOwnershipSurvivesExecutionRollback(t *testing.T) {
