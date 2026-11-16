@@ -394,7 +394,7 @@ func evaluateReviewCheck(client *common.Client, store core.PublicationStore, rec
 func hasSelectedReviewRequests(requested []*github.User, selected []ReviewerIdentity) bool {
 	for _, reviewer := range selected {
 		if slices.ContainsFunc(requested, func(user *github.User) bool {
-			return user.GetID() == reviewer.ID && strings.EqualFold(user.GetLogin(), reviewer.Login)
+			return user.GetID() == reviewer.ID
 		}) {
 			return true
 		}

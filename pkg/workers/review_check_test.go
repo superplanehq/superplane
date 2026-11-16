@@ -319,6 +319,12 @@ func TestReviewCheckPassesAfterSelectedRequestsAreRemoved(t *testing.T) {
 	require.Equal(t, "pending", f.state())
 	f.finishAction()
 
+	// A renamed account still owns its outstanding request.
+	f.http.requestedReviewers = []pulls.ReviewerIdentity{{ID: 3, Login: "renamed-second"}}
+	f.webhook("pull_request", "review_request_removed")
+	require.NoError(t, f.processDue())
+	require.Equal(t, "pending", f.state())
+
 	// One selected request still blocks, including a login with different casing.
 	f.http.requestedReviewers = []pulls.ReviewerIdentity{{ID: 3, Login: "SECOND"}}
 	f.webhook("pull_request", "review_request_removed")
