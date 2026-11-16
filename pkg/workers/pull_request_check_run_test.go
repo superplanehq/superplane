@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
 	canvasactions "github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
 	"github.com/superplanehq/superplane/pkg/integrations/github/components/pulls"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
@@ -118,6 +119,30 @@ func TestPullRequestCheckRunDisableReleasesInterruptedCheckAndFencesCallbacks(t 
 	require.NoError(t, f.processDue())
 	require.Len(t, f.http.checkRuns, 2)
 	require.Equal(t, "in_progress", f.http.checkRuns[1].GetStatus())
+}
+
+func TestPullRequestCheckRunDefaultsToEnabledWithActivation(t *testing.T) {
+	f := newPullRequestCheckFixture(t, "github.setPullRequestCheckRun")
+	f.activationNode = "check"
+	f.saveActivation(true, 1)
+	version, err := models.FindLiveCanvasVersionInTransaction(f.db, f.canvas.ID)
+	require.NoError(t, err)
+	for i := range version.Nodes {
+		if version.Nodes[i].ID == "check" {
+			delete(version.Nodes[i].Configuration, "enabled")
+		}
+	}
+	require.NoError(t, canvasactions.PublishGeneratedCanvasNodesWithOwner(t.Context(), f.db, f.canvas, nil, "Use default enabled setting", version.Nodes, version.Edges, changesets.CanvasPublisherOptions{Registry: f.r.Registry, OrgID: f.r.Organization.ID, Encryptor: f.r.Encryptor, AuthService: f.r.AuthService, WebhookBaseURL: "http://localhost:8000"}))
+	f.attempt(support.EmitCanvasEventForNode(t, f.canvas.ID, "trigger", "default", nil))
+	require.NoError(t, f.applyCheckRun("pending", "abc"))
+	require.NoError(t, f.processDue())
+	require.Len(t, f.http.checkRuns, 1)
+	require.Equal(t, "in_progress", f.http.checkRuns[0].GetStatus())
+	f.finishAction()
+	require.NoError(t, f.applyCheckRun("success", "abc"))
+	require.NoError(t, f.processDue())
+	require.Len(t, f.http.checkRuns, 1)
+	require.Equal(t, "success", f.http.checkRuns[0].GetConclusion())
 }
 
 func TestPullRequestCheckRunCompletesSameRun(t *testing.T) {

@@ -248,7 +248,7 @@ function publicationUpdates(current: SettingsDraft, update: NodeConfigurationUpd
       }),
     );
   }
-  return [...updates, ...finalCheckUpdate(current, update.configuration)];
+  return [...updates, ...completionUpdates(current, update.configuration)];
 }
 
 function publicationDestinations(current: SettingsDraft, body: SuperplaneComponentsNode) {
@@ -295,15 +295,27 @@ function publicationNodeUpdate(
   };
 }
 
-function finalCheckUpdate(current: SettingsDraft, configuration: Record<string, unknown>): NodeConfigurationUpdate[] {
+function completionUpdates(current: SettingsDraft, configuration: Record<string, unknown>): NodeConfigurationUpdate[] {
   const start = current.publicationNodes.find((node) => node.id === "start-assessment-check");
-  const finish = current.publicationNodes.find((node) => node.id === "finish-assessment-check");
-  if (!start || !finish) return [];
-  return [
-    publicationNodeUpdate(finish, {
-      ...finish.configuration,
-      activationNodeId: start.id,
-      activationGeneration: configuration.prCheckActivationGeneration,
-    }),
-  ];
+  return current.publicationNodes.flatMap((node) => {
+    const finish = node.id === "finish-assessment-check" && node.component === "github.setPullRequestCheckRun";
+    const complete = node.id === "complete-merge-confidence" && node.component === "filter";
+    if (!finish && !complete) return [];
+    const updated = { ...node.configuration };
+    // Installed graphs keep the older predicates until settings are saved.
+    for (const key of complete ? ["expression"] : ["state", "reason"]) {
+      const expression = updated[key];
+      if (typeof expression === "string") {
+        updated[key] = expression.replace(
+          '.data.status in ["published", "unchanged"]',
+          '.data.status in ["published", "unchanged", "disabled"]',
+        );
+      }
+    }
+    if (finish && start) {
+      updated.activationNodeId = start.id;
+      updated.activationGeneration = configuration.prCheckActivationGeneration;
+    }
+    return [publicationNodeUpdate(node, updated)];
+  });
 }

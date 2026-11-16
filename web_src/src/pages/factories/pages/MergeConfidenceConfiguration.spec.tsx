@@ -161,6 +161,63 @@ describe("Merge confidence configuration", () => {
     expect(loadDefaults).not.toHaveBeenCalled();
     rendered.unmount();
   });
+  it.each(["github", "bitbucket"])(
+    "upgrades existing %s completion rules when results are disabled",
+    async (provider) => {
+      const predicate =
+        '$["Assess Merge Confidence"].data.mergeConfidence.complete == true && previous().data.status in ["published", "unchanged"]';
+      const body: SuperplaneComponentsNode = {
+        id: "publish-merge-confidence",
+        component: `${provider}.updatePullRequestBodySection`,
+        configuration: { enabled: true },
+      };
+      const completion: SuperplaneComponentsNode = {
+        id: "complete-merge-confidence",
+        component: "filter",
+        configuration: { expression: predicate },
+      };
+      const finish: SuperplaneComponentsNode = {
+        id: "finish-assessment-check",
+        component: "github.setPullRequestCheckRun",
+        configuration: {
+          state: `{{ ${predicate} ? "success" : "failure" }}`,
+          reason: `{{ ${predicate} ? "Complete" : "Incomplete" }}`,
+        },
+      };
+      const nodes =
+        provider === "github"
+          ? [
+              body,
+              completion,
+              finish,
+              {
+                id: "start-assessment-check",
+                component: "github.setPullRequestCheckRun",
+                configuration: {},
+              },
+            ]
+          : [body, completion];
+      const { onSave } = renderSettings(steps, vi.fn(), vi.fn(), body, { publicationNodes: nodes });
+      fireEvent.click(screen.getByRole("switch", { name: "Publish results" }));
+      fireEvent.click(screen.getByRole("button", { name: "Save" }));
+      await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+      const updates = onSave.mock.calls[0][0] as NodeConfigurationUpdate[];
+      const upgraded = predicate.replace('["published", "unchanged"]', '["published", "unchanged", "disabled"]');
+      expect(updates.find((node) => node.nodeId === completion.id)?.configuration.expression).toBe(upgraded);
+      if (provider === "github") {
+        const final = updates.filter((node) => node.nodeId === finish.id);
+        expect(final).toHaveLength(1);
+        expect(final[0].configuration).toEqual(
+          expect.objectContaining({
+            state: `{{ ${upgraded} ? "success" : "failure" }}`,
+            reason: `{{ ${upgraded} ? "Complete" : "Incomplete" }}`,
+            activationNodeId: "start-assessment-check",
+          }),
+        );
+      }
+      expect(completion.configuration?.expression).toBe(predicate);
+    },
+  );
   it("validates destinations and preserves choices while publication is off", async () => {
     const { onSave } = renderSettings(steps, vi.fn(), vi.fn(), {
       id: "publish-merge-confidence",

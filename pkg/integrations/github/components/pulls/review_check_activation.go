@@ -34,7 +34,7 @@ func reviewCheckActivation(store core.PublicationStore, canvas uuid.UUID, nodeID
 	if err := mapstructure.Decode(current.Configuration, &now); err != nil {
 		return 0, false, err
 	}
-	eligible := before.Enabled != nil && *before.Enabled && now.Enabled != nil && *now.Enabled && before.ActivationGeneration == now.ActivationGeneration
+	eligible := checkActivationEnabled(before, admitted.Component) && checkActivationEnabled(now, current.Component) && before.ActivationGeneration == now.ActivationGeneration
 	return before.ActivationGeneration, eligible, nil
 }
 
@@ -60,7 +60,14 @@ func reviewCheckStillActive(store core.PublicationStore, record *core.OrderedPub
 	if err := mapstructure.Decode(current.Configuration, &config); err != nil {
 		return false, err
 	}
-	return config.Enabled != nil && *config.Enabled && config.ActivationGeneration == record.ActivationGeneration, nil
+	return checkActivationEnabled(config, component) && config.ActivationGeneration == record.ActivationGeneration, nil
+}
+
+func checkActivationEnabled(config reviewCheckConfiguration, component string) bool {
+	if config.Enabled != nil {
+		return *config.Enabled
+	}
+	return component == "github.setPullRequestCheckRun"
 }
 
 func supportsCheckActivation(component string) bool {
