@@ -49,6 +49,7 @@ export function MembersTable({ members, manager, controls, onShowLink, sort }: M
                 initials={member.initials}
                 avatar={member.avatar}
                 isOwner={member.isOwner}
+                provisionedBy={member.provisionedBy}
               />
             }
             role={<MemberRoleSelect member={member} {...controls} />}
