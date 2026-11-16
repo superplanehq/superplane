@@ -264,6 +264,40 @@ func TestResetReviewRequestPreservesFallbackAndAgentSettings(t *testing.T) {
 	}
 }
 
+func TestInstallationResetReviewRequestSetupCommands(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		saved    any
+		expected bool
+	}{
+		{name: "legacy installation", expected: true},
+		{name: "skip setup", saved: true, expected: true},
+		{name: "run setup", saved: false, expected: false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r, factory := resetTestFactory(t)
+			require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryReviewRequest))
+			source := resetTestTemplate(t, r, factory, "risk-score", models.ProviderGitHub, func(*yaml.Canvas) {})
+			canvas := resetTestTemplate(t, r, factory, reviewRequestTemplateID, models.ProviderGitHub, func(doc *yaml.Canvas) {
+				findYAMLNode(t, doc, reviewRequestTriggerNodeID).Configuration["app"] = source.ID.String()
+				config := findYAMLNode(t, doc, reviewRequestAgentNodeID).Configuration
+				delete(config, "skipSetupCommands")
+				if tc.saved != nil {
+					config["skipSetupCommands"] = tc.saved
+				}
+			})
+			ctx := authentication.SetUserIdInMetadata(t.Context(), r.User.String())
+			result, err := resetBuiltInAutomationForOrganizations(ctx, []models.Organization{*r.Organization}, reviewRequestTemplateID, testIntakeDependencies(r))
+			require.NoError(t, err)
+			require.Empty(t, result.Failed)
+			require.Equal(t, 1, result.Reset)
+			agent := findIntakeNode(resetTestLiveVersion(t, canvas).Nodes, reviewRequestAgentNodeID)
+			require.NotNil(t, agent)
+			require.Equal(t, tc.expected, agent.Configuration["skipSetupCommands"])
+		})
+	}
+}
+
 func TestResetReviewRequestRejectsFindingsWithoutDestination(t *testing.T) {
 	r, factory := resetTestFactory(t)
 	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryReviewRequest))

@@ -322,3 +322,19 @@ supported settings, cleared instructions, disabled switches, activation
 generations, and active approval tracking. Existing runs keep their saved
 graph and can still emit outgoing events. Do not rewrite historical executions.
 This change requires no migration, deployment configuration, or frontend update.
+
+## Review request workspace setup
+
+New Review request installations set `skipSetupCommands: true` on
+`select-reviewers`. The runner checks out the repository and context
+repositories without running workspace setup commands. Selection uses Git
+history and the existing Merge confidence report. It does not need application
+services.
+
+After deployment, open installation administration at `/admin/settings`.
+Under **Reset one automation**, reset **Review request**. This updates
+installed automations that have no saved `skipSetupCommands` value to the new
+default. Organization reset applies the same default. Both resets preserve
+explicit `true` and `false` values. To change an explicit `false`, set
+`skipSetupCommands: true` on `select-reviewers` in the canvas YAML. Publish
+the canvas. Existing runs keep their saved configuration.
