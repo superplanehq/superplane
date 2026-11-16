@@ -264,6 +264,40 @@ func TestResetReviewRequestPreservesFallbackAndAgentSettings(t *testing.T) {
 	}
 }
 
+func TestInstallationResetReviewRequestSetupCommands(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		saved    any
+		expected bool
+	}{
+		{name: "legacy installation", expected: true},
+		{name: "skip setup", saved: true, expected: true},
+		{name: "run setup", saved: false, expected: false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r, factory := resetTestFactory(t)
+			require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryReviewRequest))
+			source := resetTestTemplate(t, r, factory, "risk-score", models.ProviderGitHub, func(*yaml.Canvas) {})
+			canvas := resetTestTemplate(t, r, factory, reviewRequestTemplateID, models.ProviderGitHub, func(doc *yaml.Canvas) {
+				findYAMLNode(t, doc, reviewRequestTriggerNodeID).Configuration["app"] = source.ID.String()
+				config := findYAMLNode(t, doc, reviewRequestAgentNodeID).Configuration
+				delete(config, "skipSetupCommands")
+				if tc.saved != nil {
+					config["skipSetupCommands"] = tc.saved
+				}
+			})
+			ctx := authentication.SetUserIdInMetadata(t.Context(), r.User.String())
+			result, err := resetBuiltInAutomationForOrganizations(ctx, []models.Organization{*r.Organization}, reviewRequestTemplateID, testIntakeDependencies(r))
+			require.NoError(t, err)
+			require.Empty(t, result.Failed)
+			require.Equal(t, 1, result.Reset)
+			agent := findIntakeNode(resetTestLiveVersion(t, canvas).Nodes, reviewRequestAgentNodeID)
+			require.NotNil(t, agent)
+			require.Equal(t, tc.expected, agent.Configuration["skipSetupCommands"])
+		})
+	}
+}
+
 func TestResetReviewRequestRejectsFindingsWithoutDestination(t *testing.T) {
 	r, factory := resetTestFactory(t)
 	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryReviewRequest))
@@ -302,7 +336,7 @@ func TestResetBuiltInVerificationSettings(t *testing.T) {
 							return node.Component == "filter" || node.Component == "broadcastMessage"
 						})
 						doc.Spec.Edges = slices.DeleteFunc(doc.Spec.Edges, func(edge yaml.Edge) bool {
-							return edge.SourceID == "publish-merge-confidence" || edge.SourceID == "complete-merge-confidence"
+							return edge.SourceID == "publish-merge-confidence" || edge.SourceID == "comment-merge-confidence" || edge.SourceID == "complete-merge-confidence"
 						})
 					}
 					trigger := findYAMLNode(t, doc, template.entrypointNodeID)
@@ -351,7 +385,7 @@ func TestResetBuiltInVerificationSettings(t *testing.T) {
 						broadcast := findIntakeNode(version.Nodes, "broadcast-merge-confidence")
 						require.NotNil(t, broadcast)
 						assert.Equal(t, "broadcastMessage", broadcast.ComponentName())
-						assert.Contains(t, version.Edges, models.Edge{SourceID: publication.ID, TargetID: gate.ID, Channel: "default"})
+						assert.Contains(t, version.Edges, models.Edge{SourceID: "comment-merge-confidence", TargetID: gate.ID, Channel: "default"})
 						assert.Contains(t, version.Edges, models.Edge{SourceID: gate.ID, TargetID: broadcast.ID, Channel: "default"})
 					}
 				}
@@ -1065,7 +1099,11 @@ func TestInstallationResetPreservesMergeConfidencePublishing(t *testing.T) {
 	for _, canvas := range saved {
 		version := resetTestLiveVersion(t, canvas)
 		assert.Equal(t, false, findIntakeNode(version.Nodes, "publish-merge-confidence").Configuration["enabled"])
-		assert.Contains(t, version.Edges, models.Edge{SourceID: "publish-merge-confidence", TargetID: "complete-merge-confidence", Channel: "default"})
+		source := "publish-merge-confidence"
+		if findIntakeNode(version.Nodes, "comment-merge-confidence") != nil {
+			source = "comment-merge-confidence"
+		}
+		assert.Contains(t, version.Edges, models.Edge{SourceID: source, TargetID: "complete-merge-confidence", Channel: "default"})
 		assert.Contains(t, version.Edges, models.Edge{SourceID: "complete-merge-confidence", TargetID: "broadcast-merge-confidence", Channel: "default"})
 		assert.Equal(t, "filter", findIntakeNode(version.Nodes, "complete-merge-confidence").ComponentName())
 		assert.Equal(t, "broadcastMessage", findIntakeNode(version.Nodes, "broadcast-merge-confidence").ComponentName())
@@ -1077,5 +1115,32 @@ func TestInstallationResetPreservesMergeConfidencePublishing(t *testing.T) {
 		doc, err := yaml.CanvasFromYAML([]byte(restored.canvasYAML))
 		require.NoError(t, err)
 		assert.Equal(t, true, findYAMLNode(t, doc, "publish-merge-confidence").Configuration["enabled"])
+	}
+}
+
+func TestResetMergeConfidencePreservesPublicationDestinations(t *testing.T) {
+	for name, settings := range map[string]reviewFindingsSettings{"off": {}, "off with comment": {comment: true}, "comment": {publish: true, comment: true}} {
+		t.Run(name, func(t *testing.T) {
+			r, factory := resetTestFactory(t)
+			canvas := resetTestTemplate(t, r, factory, "risk-score", models.ProviderGitHub, func(doc *yaml.Canvas) {
+				config := findYAMLNode(t, doc, "assess-risk").Configuration
+				config["publishPRCheck"] = false
+				config["publishResults"], config["resultsBody"], config["resultsComment"] = settings.publish, false, settings.comment
+				config["resultsBodyActivationGeneration"], config["resultsCommentActivationGeneration"] = 3, 4
+			})
+			_, err := ResetOrganizationBuiltInAutomations(context.Background(), r.Organization.ID, testIntakeDependencies(r))
+			require.NoError(t, err)
+			version := resetTestLiveVersion(t, canvas)
+			agent := findIntakeNode(version.Nodes, "assess-risk").Configuration
+			assert.Equal(t, false, agent["publishPRCheck"])
+			assert.Equal(t, settings.publish, agent["publishResults"])
+			assert.Equal(t, false, agent["resultsBody"])
+			assert.Equal(t, settings.comment, agent["resultsComment"])
+			assert.Equal(t, false, findIntakeNode(version.Nodes, "start-assessment-check").Configuration["enabled"])
+			assert.Equal(t, false, findIntakeNode(version.Nodes, "publish-merge-confidence").Configuration["enabled"])
+			comment := findIntakeNode(version.Nodes, "comment-merge-confidence").Configuration
+			assert.Equal(t, settings.publish && settings.comment, comment["enabled"])
+			assert.EqualValues(t, 4, comment["activationGeneration"])
+		})
 	}
 }
