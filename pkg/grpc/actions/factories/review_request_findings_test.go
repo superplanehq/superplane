@@ -1,6 +1,7 @@
 package factories
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
@@ -9,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
 	canvasactions "github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
+	"github.com/superplanehq/superplane/pkg/integrations/github/components/pulls"
 	"github.com/superplanehq/superplane/pkg/models"
 	workercontexts "github.com/superplanehq/superplane/pkg/workers/contexts"
 	"gorm.io/datatypes"
@@ -267,10 +269,9 @@ func TestReviewRequestFindingsKeepNewestSourceAndAttempt(t *testing.T) {
 	// The older report completes later on the same commit, with PR checks off.
 	_, _, err = runReviewRequestGraph(t, f, consumer, olderRoot, host, "")
 	require.NoError(t, err)
-	for _, node := range []string{reviewFindingsBodyNodeID, reviewFindingsCommentNode} {
-		execution := reviewFindingsExecution(t, f, olderRoot, node)
-		require.Equal(t, "skipped", execution.Metadata.Data()["status"], node)
-	}
+	var olderPublications int64
+	require.NoError(t, f.db.Model(&models.CanvasNodeExecution{}).Where("root_event_id = ? AND node_id IN ?", olderRoot.ID, []string{reviewFindingsBodyNodeID, reviewFindingsCommentNode}).Count(&olderPublications).Error)
+	require.Zero(t, olderPublications, "superseded reviewer selection must not reach publication")
 	require.Equal(t, newest, reviewSection(host.description))
 	_, comment := onlyComment(t, host)
 	require.Equal(t, newestComment, comment)
@@ -352,4 +353,79 @@ func setReviewFindingsNode(t *testing.T, f publicationFixture, consumer *models.
 	require.NoError(t, f.db.Create(version).Error)
 	require.NoError(t, f.db.Model(consumer).Update("live_version_id", version.ID).Error)
 	consumer.LiveVersionID = &version.ID
+}
+
+func TestReviewRequestReconcilesRepeatedReportsBeforePublication(t *testing.T) {
+	for _, publishCheck := range []bool{false, true} {
+		t.Run(fmt.Sprint(publishCheck), func(t *testing.T) {
+			host := &reviewRequestHTTP{alreadyAsked: true} // This pre-existing request must never be adopted.
+			f, message := reviewRequestCompletedProducer(t, host, 2)
+			consumer := reviewFindingsConsumer(t, f, reviewFindingsSettings{publish: true, body: true, comment: true}, "")
+			setReviewRequestCheck(t, f, consumer, publishCheck, 2)
+			run := func(scenario string) map[string]any {
+				t.Helper()
+				root := deliverReviewRequestReport(t, f, consumer, message)
+				outcome, _, err := runReviewRequestGraph(t, f, consumer, root, host, scenario)
+				require.NoError(t, err)
+				return outcome["reviewRequest"].(map[string]any)
+			}
+			first := run("")
+			require.Equal(t, "already_covered", first["status"])
+			require.Empty(t, host.reviewerBodies)
+			replacement := run("replacement")
+			environment := host.selectionEnvironments[len(host.selectionEnvironments)-1]
+			var previous, requested []pulls.ReviewerIdentity
+			require.NoError(t, json.Unmarshal([]byte(environment["SUPERPLANE_REVIEW_REQUEST_PREVIOUS_SELECTION"]), &previous))
+			require.Len(t, previous, 1)
+			require.Equal(t, "octocat", previous[0].Login)
+			require.NoError(t, json.Unmarshal([]byte(environment["SUPERPLANE_REVIEW_REQUEST_CURRENT_REVIEWERS"]), &requested))
+			require.Contains(t, requested, pulls.ReviewerIdentity{ID: 2, Login: "octocat"})
+
+			require.Equal(t, "requested", replacement["status"])
+			require.Empty(t, host.reviewerRemovals, "pre-existing requests have no automation owner")
+			require.Contains(t, reviewSection(host.description), "| fallback-user |")
+			require.NotContains(t, reviewSection(host.description), "| octocat |")
+			repeated := run("replacement")
+			require.Equal(t, "already_covered", repeated["status"])
+			require.Len(t, host.reviewerBodies, 1)
+			published := reviewSection(host.description)
+			failedRoot := deliverReviewRequestReport(t, f, consumer, message)
+			failedOutcome, _, err := runReviewRequestGraph(t, f, consumer, failedRoot, host, "reported lookup error")
+			require.NoError(t, err)
+			require.Nil(t, failedOutcome)
+			require.Equal(t, published, reviewSection(host.description))
+			require.Len(t, host.pendingReviewers, 1)
+			failedRoot = deliverReviewRequestReport(t, f, consumer, message)
+			host.discoveryError = true
+			failedOutcome, _, err = runReviewRequestGraph(t, f, consumer, failedRoot, host, "")
+			require.Error(t, err)
+			require.Nil(t, failedOutcome)
+			host.discoveryError = false
+			require.Equal(t, published, reviewSection(host.description))
+			require.Len(t, host.pendingReviewers, 1)
+			// Select the pre-existing reviewer again. Withdraw only our replacement.
+			restored := run("")
+			require.Equal(t, "already_covered", restored["status"])
+			require.Equal(t, []string{"fallback-user"}, host.reviewerRemovals)
+			require.Contains(t, reviewSection(host.description), "| octocat |")
+			require.Empty(t, host.pendingReviewers)
+			// Add an owned request again, then let an all-positive report withdraw it.
+			run("replacement")
+			f, message = emitReviewRequestReport(t, f, host, 5)
+			unnecessary := run("favorable")
+			require.Equal(t, "review_unnecessary", unnecessary["status"])
+			require.Empty(t, host.pendingReviewers)
+			require.Contains(t, reviewSection(host.description), "**No review needed**")
+			require.Equal(t, []string{"fallback-user", "fallback-user"}, host.reviewerRemovals)
+			if publishCheck {
+				store := workercontexts.NewPublicationContext(f.db, consumer.OrganizationID, mustReviewCheckNode(t, f, consumer), nil)
+				records, err := store.List("github.review-check/")
+				require.NoError(t, err)
+				require.Len(t, records, 1)
+				integration := reviewRequestManagedIntegration{IntegrationContext: reviewRequestIntegration(), store: store}
+				require.NoError(t, pulls.RefreshReviewCheck(core.IntegrationHookContext{Parameters: map[string]any{"key": records[0].Key}, Integration: integration, HTTP: host}))
+				require.Equal(t, "success", host.statuses[len(host.statuses)-1].GetState())
+			}
+		})
+	}
 }
