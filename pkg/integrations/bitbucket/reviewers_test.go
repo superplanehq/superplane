@@ -72,15 +72,25 @@ func reviewUserResponse() *http.Response {
 }
 
 func TestEnsureReviewersPreservesUnrelatedRequestsAndRetries(t *testing.T) {
-	for _, conflict := range []bool{false, true} {
-		t.Run(map[bool]string{false: "update", true: "conflict"}[conflict], func(t *testing.T) {
-			responses := []*http.Response{okResponse(reviewSnapshot("abc", "OPEN", reviewOther)), reviewPermissionPage(), reviewUserResponse(), okResponse(reviewSnapshot("abc", "OPEN", reviewOther))}
-			if conflict {
+	cases := []struct {
+		name      string
+		conflict  bool
+		reviewers []string
+	}{
+		{name: "update", reviewers: []string{reviewOther}},
+		{name: "conflict", conflict: true, reviewers: []string{reviewOther}},
+		{name: "unrelated reviewer removed during discovery"},
+		{name: "unrelated reviewer removed with desired already requested", reviewers: []string{reviewHuman}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			responses := []*http.Response{okResponse(reviewSnapshot("abc", "OPEN", reviewOther)), reviewPermissionPage(), reviewUserResponse(), okResponse(reviewSnapshot("abc", "OPEN", tc.reviewers...))}
+			if tc.conflict {
 				responses = append(responses, bitbucketResponse(http.StatusConflict, `{}`), reviewPermissionPage(), reviewUserResponse(), okResponse(reviewSnapshot("abc", "OPEN", reviewOther)))
 			}
 			responses = append(responses, okResponse(`{}`), okResponse(reviewSnapshot("abc", "OPEN", reviewOther, reviewHuman)))
 			responses[3].Header = http.Header{"Etag": []string{`"revision-1"`}}
-			if conflict {
+			if tc.conflict {
 				responses[7].Header = http.Header{"Etag": []string{`"revision-2"`}}
 			}
 			client, httpCtx := stubBitbucketClient(responses...)
@@ -236,19 +246,32 @@ func TestEnsureReviewersRechecksStateAndEligibilityBeforeWrite(t *testing.T) {
 }
 
 func TestEnsureReviewersPreservesApprovalsWithoutInventingCommitEvidence(t *testing.T) {
-	for _, retained := range []bool{false, true} {
-		t.Run(map[bool]string{false: "approval lost", true: "approval retained"}[retained], func(t *testing.T) {
+	cases := []struct {
+		name                string
+		retained            bool
+		lostDuringDiscovery bool
+	}{
+		{name: "approval lost"},
+		{name: "approval retained", retained: true},
+		{name: "approval lost during discovery", lostDuringDiscovery: true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
 			withApproval := func(snapshot string) string {
 				return strings.Replace(snapshot, `"participants":[]`, `"participants":[{"approved":true,"user":{"uuid":"{`+reviewOther+`}"}}]`, 1)
 			}
 			current := withApproval(reviewSnapshot("abc", "OPEN", reviewOther))
 			verified := reviewSnapshot("abc", "OPEN", reviewHuman, reviewOther)
-			if retained {
+			if tc.retained {
 				verified = withApproval(verified)
 			}
-			client, _ := stubBitbucketClient(okResponse(current), reviewPermissionPage(), reviewUserResponse(), okResponse(current), okResponse(`{}`), okResponse(verified))
+			beforeWrite := current
+			if tc.lostDuringDiscovery {
+				beforeWrite = reviewSnapshot("abc", "OPEN", reviewOther)
+			}
+			client, _ := stubBitbucketClient(okResponse(current), reviewPermissionPage(), reviewUserResponse(), okResponse(beforeWrite), okResponse(`{}`), okResponse(verified))
 			outcome, err := client.ensurePullRequestReviewers("acme/widgets", 42, "abc", []ReviewerIdentity{{UUID: reviewHuman}})
-			if !retained {
+			if !tc.retained {
 				require.ErrorContains(t, err, "approval changed")
 				return
 			}

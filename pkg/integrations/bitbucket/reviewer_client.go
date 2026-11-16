@@ -258,6 +258,7 @@ func (c *Client) ensurePullRequestReviewers(repository string, number int64, sha
 	}
 	preserved := map[string]bool{}
 	approvals := map[string]bool{}
+	retainReviewers(snapshot, preserved, approvals)
 	wrote := false
 	for attempt := 0; attempt < 3; attempt++ {
 		eligible, err := c.listEligibleReviewers(repository, desired)
