@@ -15,7 +15,7 @@ export function DraftStartSelectionLabel({
       </span>
       <span
         className={resolved.isThinkingUnresolved ? "min-w-0 truncate" : "shrink-0"}
-        title={thinkingLevel === undefined ? "Implementation default" : "Task override"}
+        title={thinkingLevel === undefined ? "Default" : "Task override"}
       >
         · {resolved.thinkingLabel}
       </span>
