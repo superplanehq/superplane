@@ -49,6 +49,198 @@ func decodeToolJSON(t *testing.T, result ToolResult) map[string]any {
 	return payload
 }
 
+func callMCPTool(t *testing.T, runtime *Runtime, claims *AccessClaims, name string, args map[string]any) ToolResult {
+	t.Helper()
+	params, err := json.Marshal(map[string]any{"name": name, "arguments": args})
+	require.NoError(t, err)
+	response := HandleJSONRPC(t.Context(), runtime, claims, &JSONRPCRequest{
+		JSONRPC: "2.0", ID: 1, Method: "tools/call", Params: params,
+	})
+	require.NotNil(t, response)
+	require.Nil(t, response.Error)
+	result, ok := response.Result.(ToolResult)
+	require.True(t, ok)
+	return result
+}
+
+func TestArchiveTaskClosesTasksAndHidesThemFromListings(t *testing.T) {
+	r := support.Setup(t)
+	enableFactories(t, r.Organization.ID)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, "MCP Archive", "", "ARC")
+	require.NoError(t, err)
+	control := createDraftTask(t, factory, r.User)
+	runtime := &Runtime{Auth: r.AuthService, BaseURL: "https://app.example.test"}
+	claims := toolClaims(r, factory.ID)
+
+	for _, reference := range []string{"id", "number", "key"} {
+		t.Run(reference, func(t *testing.T) {
+			order := createDraftTask(t, factory, r.User)
+			if reference == "number" {
+				setTaskState(t, order, models.FactoryWorkOrderStateOpen, r.User)
+			}
+			task := order.ID.String()
+			if reference == "number" {
+				task = strconv.FormatInt(order.Number, 10)
+			}
+			if reference == "key" {
+				task = factory.WorkOrderKey(order.Number)
+			}
+			payload := decodeToolJSON(t, callMCPTool(t, runtime, claims, "archive_task", map[string]any{"task": task}))
+			assert.Equal(t, order.ID.String(), payload["id"])
+			assert.Equal(t, factory.WorkOrderKey(order.Number), payload["key"])
+			assert.Equal(t, order.Title, payload["title"])
+			assert.Equal(t, "closed", payload["state"])
+			assert.Equal(t, "archived", payload["result"])
+			assert.Equal(t, true, payload["archived"])
+			assert.Equal(t, fmt.Sprintf("https://app.example.test/%s/workspaces/%s/task/%d",
+				r.Organization.ID, factory.RouteSegment(), order.Number), payload["url"])
+			saved, err := factory.FindWorkOrder(db, order.ID)
+			require.NoError(t, err)
+			assert.Equal(t, models.FactoryWorkOrderStateClosed, saved.State)
+			assert.Equal(t, models.FactoryWorkOrderResultArchived, saved.Result)
+		})
+	}
+	listed := decodeToolJSON(t, callMCPTool(t, runtime, claims, "list_tasks", map[string]any{}))
+	rows, ok := listed["tasks"].([]any)
+	require.True(t, ok)
+	require.Len(t, rows, 1)
+	assert.Equal(t, control.ID.String(), rows[0].(map[string]any)["id"])
+}
+
+func TestArchiveTaskIsDiscoverable(t *testing.T) {
+	response := HandleJSONRPC(t.Context(), &Runtime{}, &AccessClaims{}, &JSONRPCRequest{
+		JSONRPC: "2.0", ID: 1, Method: "tools/list",
+	})
+	require.Nil(t, response.Error)
+	tools := response.Result.(map[string]any)["tools"].([]Tool)
+	for _, tool := range tools {
+		if tool.Name != "archive_task" {
+			continue
+		}
+		assert.NotEmpty(t, tool.Description)
+		assert.Equal(t, []string{"task"}, tool.InputSchema["required"])
+		properties := tool.InputSchema["properties"].(map[string]any)
+		assert.Equal(t, "string", properties["task"].(map[string]any)["type"])
+		assert.Equal(t, "string", properties["workspace"].(map[string]any)["type"])
+		return
+	}
+	t.Fatal("archive_task is missing from tools/list")
+}
+
+func TestArchiveTaskPreservesClosedResults(t *testing.T) {
+	r := support.Setup(t)
+	enableFactories(t, r.Organization.ID)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, "MCP Closed", "", "CLS")
+	require.NoError(t, err)
+	runtime := &Runtime{Auth: r.AuthService}
+	claims := toolClaims(r, factory.ID)
+	for _, result := range []string{models.FactoryWorkOrderResultCompleted, models.FactoryWorkOrderResultArchived} {
+		t.Run(result, func(t *testing.T) {
+			order := createDraftTask(t, factory, r.User)
+			setTaskState(t, order, models.FactoryWorkOrderStateOpen, r.User)
+			_, err := order.Close(db, result, &r.User)
+			require.NoError(t, err)
+			response := callMCPTool(t, runtime, claims, "archive_task", map[string]any{"task": factory.WorkOrderKey(order.Number)})
+			if result == models.FactoryWorkOrderResultArchived {
+				payload := decodeToolJSON(t, response)
+				assert.Equal(t, order.ID.String(), payload["id"])
+				assert.Equal(t, true, payload["archived"])
+			} else {
+				require.True(t, response.IsError)
+				assert.Contains(t, response.Content[0]["text"], "not archived")
+			}
+			saved, err := factory.FindWorkOrder(db, order.ID)
+			require.NoError(t, err)
+			assert.Equal(t, models.FactoryWorkOrderStateClosed, saved.State)
+			assert.Equal(t, result, saved.Result)
+		})
+	}
+}
+
+func TestArchiveTaskRejectsUnauthorizedAndInvalidRequests(t *testing.T) {
+	r := support.Setup(t)
+	enableFactories(t, r.Organization.ID)
+	db := database.DB(t.Context())
+	first, err := models.CreateFactory(db, r.Organization.ID, "First", "", "FST")
+	require.NoError(t, err)
+	second, err := models.CreateFactory(db, r.Organization.ID, "Second", "", "SND")
+	require.NoError(t, err)
+	order := createDraftTask(t, first, r.User)
+	otherOrder := createDraftTask(t, second, r.User)
+	runtime := &Runtime{Auth: r.AuthService}
+	reader := createHumanMember(t, r.Organization.ID, "Reader", "reader-"+uuid.NewString()+"@example.com")
+	roleName := "archive-reader-" + uuid.NewString()
+	require.NoError(t, r.AuthService.CreateCustomRole(r.Organization.ID.String(), &authorization.RoleDefinition{
+		Name: roleName, DisplayName: "Task reader", DomainType: models.DomainTypeOrganization,
+		Permissions: []*authorization.Permission{{Resource: "work_orders", Action: "read", DomainType: models.DomainTypeOrganization}},
+	}))
+	require.NoError(t, r.AuthService.AssignRole(reader.ID.String(), roleName, r.Organization.ID.String(), models.DomainTypeOrganization))
+	withoutScope := toolClaims(r, first.ID)
+	withoutScope.Scopes = []string{"work_orders:read"}
+	withoutPermission := toolClaims(r, first.ID)
+	withoutPermission.UserID = reader.ID
+	multiple := toolClaims(r, first.ID)
+	multiple.FactoryIDs = []uuid.UUID{first.ID, second.ID}
+
+	for _, test := range []struct {
+		name    string
+		claims  *AccessClaims
+		args    map[string]any
+		message string
+	}{
+		{"missing update scope", withoutScope, map[string]any{"task": order.ID.String()}, "Not found"},
+		{"missing user update permission", withoutPermission, map[string]any{"task": order.ID.String()}, "Not found"},
+		{"ungranted workspace", toolClaims(r, first.ID), map[string]any{"workspace": second.ID.String(), "task": otherOrder.ID.String()}, "Not found"},
+		{"task outside selected workspace", multiple, map[string]any{"workspace": second.ID.String(), "task": order.ID.String()}, "Not found"},
+		{"workspace required", multiple, map[string]any{"task": order.ID.String()}, "Pass workspace"},
+		{"missing task", toolClaims(r, first.ID), map[string]any{}, "task is required"},
+		{"blank task", toolClaims(r, first.ID), map[string]any{"task": "   "}, "task is required"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			response := callMCPTool(t, runtime, test.claims, "archive_task", test.args)
+			require.True(t, response.IsError)
+			assert.Contains(t, response.Content[0]["text"], test.message)
+			saved, err := first.FindWorkOrder(db, order.ID)
+			require.NoError(t, err)
+			assert.Equal(t, models.FactoryWorkOrderStateDraft, saved.State)
+			assert.Empty(t, saved.Result)
+			otherSaved, err := second.FindWorkOrder(db, otherOrder.ID)
+			require.NoError(t, err)
+			assert.Equal(t, models.FactoryWorkOrderStateDraft, otherSaved.State)
+			assert.Empty(t, otherSaved.Result)
+		})
+	}
+	payload := decodeToolJSON(t, callMCPTool(t, runtime, multiple, "archive_task", map[string]any{
+		"workspace": first.ID.String(), "task": order.ID.String(),
+	}))
+	assert.Equal(t, order.ID.String(), payload["id"])
+	assert.Equal(t, true, payload["archived"])
+}
+
+func TestArchiveTaskRequestsRunCancellationWithCallerAttribution(t *testing.T) {
+	r := support.Setup(t)
+	enableFactories(t, r.Organization.ID)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, "MCP Active", "", "ACT")
+	require.NoError(t, err)
+	app, entry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "implement", "start")
+	run, err := models.CreateCanvasRunInTransaction(db, app.ID, entry, models.CanvasRunStateStarted, "")
+	require.NoError(t, err)
+	creator := support.CreateUser(t, r, r.Organization.ID)
+	order, err := factory.CreateWorkOrder(db, "Active task", "", &creator.ID, nil, &run.ID)
+	require.NoError(t, err)
+	setTaskState(t, order, models.FactoryWorkOrderStateOpen, r.User)
+	runtime := &Runtime{Auth: r.AuthService}
+	decodeToolJSON(t, callMCPTool(t, runtime, toolClaims(r, factory.ID), "archive_task", map[string]any{"task": order.ID.String()}))
+	savedRun, err := models.FindUnscopedCanvasRun(db, run.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasRunStateCancelling, savedRun.State)
+	require.NotNil(t, savedRun.CancelledBy)
+	assert.Equal(t, r.User, *savedRun.CancelledBy)
+}
+
 func TestListTasksAppliesMineAndStates(t *testing.T) {
 	r := support.Setup(t)
 	enableFactories(t, r.Organization.ID)
