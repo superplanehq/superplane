@@ -9,6 +9,7 @@ interface ReviewCheckConfiguration {
   pullNumber?: string | number;
   context?: string;
   phase?: string;
+  state?: string;
   reviewers?: { id: number; login: string }[];
   reason?: string;
   resultUrl?: string;
@@ -30,6 +31,7 @@ export const SET_PULL_REQUEST_REVIEW_CHECK_STATE_REGISTRY: EventStateRegistry = 
   stateMap: {
     ...appliedStateRegistry.stateMap,
     superseded: { ...DEFAULT_EVENT_STATE_MAP.neutral, label: "Superseded" },
+    skipped: { ...DEFAULT_EVENT_STATE_MAP.neutral, label: "Skipped" },
   },
   getState(execution) {
     const state = appliedStateRegistry.getState(execution);
@@ -37,6 +39,7 @@ export const SET_PULL_REQUEST_REVIEW_CHECK_STATE_REGISTRY: EventStateRegistry = 
 
     const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
     const output = outputs?.default?.[0]?.data as ReviewCheckOutput | undefined;
+    if (output?.status === "skipped") return "skipped";
     return output?.status === "superseded" ? "superseded" : "applied";
   },
 };
@@ -61,8 +64,12 @@ function configurationDetails(configuration: ReviewCheckConfiguration): Record<s
     Repository: configuration.repository || "-",
     "Pull request": configuration.pullNumber ? `#${configuration.pullNumber}` : "-",
     Context: configuration.context || "-",
-    Phase: (configuration.phase || "-").replace(/_/g, " "),
-    Reviewers: configuration.reviewers?.map((reviewer) => reviewer.login).join(", ") || "-",
+    ...(configuration.state
+      ? { State: configuration.state }
+      : {
+          Phase: (configuration.phase || "-").replace(/_/g, " "),
+          Reviewers: configuration.reviewers?.map((reviewer) => reviewer.login).join(", ") || "-",
+        }),
     Reason: configuration.reason || "-",
     "Result URL": configuration.resultUrl || "-",
   };

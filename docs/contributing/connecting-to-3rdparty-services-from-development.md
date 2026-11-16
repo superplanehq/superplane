@@ -143,7 +143,7 @@ installation row.
 5. Grant repository permissions that match the workspace GitHub App manifest:
    - Issues: Read and write
    - Actions: Read and write
-   - Checks: Read-only
+   - Checks: Read and write
    - Contents: Read and write
    - Pull requests: Read and write
    - Repository hooks: Read and write

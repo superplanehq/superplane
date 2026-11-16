@@ -90,7 +90,7 @@ func PrepareOutputs(tx *gorm.DB, execution *models.CanvasNodeExecution) (payload
 	if err != nil {
 		return payloadType, nil, err
 	}
-	assessment.ReviewedCommit = mergeConfidenceReviewedCommit(event)
+	assessment.ReviewedCommit = ReviewedCommit(event)
 	if assessment.ReviewedCommit == "" {
 		return payloadType, nil, fmt.Errorf("assessment has no reviewed commit")
 	}
@@ -105,6 +105,18 @@ func PrepareOutputs(tx *gorm.DB, execution *models.CanvasNodeExecution) (payload
 		output := core.ExecutionOutput{Fields: map[string]any{"mergeConfidence": report}}
 		if channel == "failed" {
 			output.ErrorMessage = "Merge confidence assessment failed."
+		}
+		if channel == "passed" && !report.Complete {
+			var missing []string
+			for _, check := range report.Checks {
+				if check.Missing {
+					missing = append(missing, check.Label)
+				}
+			}
+			output.ErrorMessage = "Merge confidence assessment failed."
+			if len(missing) > 0 {
+				output.ErrorMessage = "Merge confidence did not report these checks: " + strings.Join(missing, ", ") + ". Run merge confidence again."
+			}
 		}
 		outputs[channel] = output
 	}
@@ -139,7 +151,8 @@ func mergeConfidenceAssessmentFromNode(node models.Node) (*Assessment, error) {
 	return &Assessment{Enabled: enabled, Labels: labels}, nil
 }
 
-func mergeConfidenceReviewedCommit(event *models.CanvasEvent) string {
+// ReviewedCommit returns the assessed SHA from the saved root event.
+func ReviewedCommit(event *models.CanvasEvent) string {
 	// Bitbucket trigger events also carry this normalized pull_request shape.
 	payload, ok := models.RootEventSourcePayload(event.Data.Data()).(map[string]any)
 	if !ok {

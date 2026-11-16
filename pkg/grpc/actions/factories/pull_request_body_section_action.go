@@ -10,7 +10,9 @@ import (
 
 	"github.com/google/uuid"
 	factorycomponent "github.com/superplanehq/superplane/pkg/components/factory"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/integrations/github/components/pulls"
 	"github.com/superplanehq/superplane/pkg/integrations/prbody"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
@@ -20,13 +22,16 @@ import (
 const bodySectionRequestLease = 5 * time.Minute
 
 type bodySectionPublicationState struct {
-	SourceRunID string     `json:"sourceRunId"`
-	Status      string     `json:"status"`
-	Attempts    int        `json:"attempts"`
-	Reason      string     `json:"reason,omitempty"`
-	LastError   string     `json:"lastError,omitempty"`
-	NextRetryAt *time.Time `json:"nextRetryAt,omitempty"`
-	LeaseUntil  *time.Time `json:"leaseUntil,omitempty"`
+	// Publication is the ordered claim accepted when the step started.
+	Publication *core.OrderedWrite `json:"publication,omitempty"`
+	CommentID   int64              `json:"commentId,omitempty"`
+	SourceRunID string             `json:"sourceRunId"`
+	Status      string             `json:"status"`
+	Attempts    int                `json:"attempts"`
+	Reason      string             `json:"reason,omitempty"`
+	LastError   string             `json:"lastError,omitempty"`
+	NextRetryAt *time.Time         `json:"nextRetryAt,omitempty"`
+	LeaseUntil  *time.Time         `json:"leaseUntil,omitempty"`
 }
 
 type bodySectionActionAttempt struct {
@@ -35,6 +40,8 @@ type bodySectionActionAttempt struct {
 	source                   *models.CanvasRun
 	configuration            factorycomponent.UpdatePullRequestBodySectionConfiguration
 	integrationConfiguration prbody.Configuration
+	commentConfiguration     pulls.PullRequestCommentConfiguration
+	organizationID           uuid.UUID
 	component                string
 	node                     *models.CanvasNode
 	state                    bodySectionPublicationState
@@ -96,7 +103,7 @@ func (a *bodySectionActionAttempt) collectEvents(events []models.CanvasEvent) {
 func (a *bodySectionActionAttempt) claim(tx *gorm.DB) error {
 	request := a.request
 	hook := request.Spec.Data().InvokeAction
-	if request.Type != models.NodeRequestTypeInvokeAction || hook == nil || hook.ActionName != factorycomponent.UpdatePullRequestBodySectionHook || request.ExecutionID == nil {
+	if request.Type != models.NodeRequestTypeInvokeAction || hook == nil || !IsPublicationHook(hook.ActionName) || request.ExecutionID == nil {
 		return fmt.Errorf("invalid publication action request")
 	}
 	execution, err := models.LockNodeExecution(tx, request.WorkflowID, *request.ExecutionID)
@@ -121,7 +128,7 @@ func (a *bodySectionActionAttempt) claim(tx *gorm.DB) error {
 	if component == "" && node.Ref.Data().Component != nil {
 		component = node.Ref.Data().Component.Name
 	}
-	if !prbody.IsComponent(component) {
+	if !isPublicationComponent(component) || publicationHook(component) != hook.ActionName {
 		return a.reject(tx, "Publication request has an invalid component.")
 	}
 	a.component, a.node = component, node
@@ -161,6 +168,21 @@ func (a *bodySectionActionAttempt) resolveSource(tx *gorm.DB) error {
 	}
 	if a.source.State != models.CanvasRunStateStarted {
 		return a.reject(tx, "The source run is no longer active.")
+	}
+	canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(tx, a.execution.WorkflowID)
+	if err != nil {
+		return err
+	}
+	a.organizationID = canvas.OrganizationID
+	if a.isComment() {
+		a.commentConfiguration, err = pulls.DecodePullRequestComment(a.execution.Configuration.Data())
+		if err == nil {
+			err = a.commentConfiguration.Validate()
+		}
+		if err != nil {
+			return a.reject(tx, "Publication configuration is invalid: "+err.Error())
+		}
+		return nil
 	}
 	if a.component != factorycomponent.UpdatePullRequestBodySectionComponentName {
 		a.integrationConfiguration, err = prbody.Decode(a.execution.Configuration.Data())
@@ -212,13 +234,47 @@ func (a *bodySectionActionAttempt) finish(tx *gorm.DB, outcome bodySectionPublic
 	}
 	a.state.LeaseUntil = nil
 	if publishErr != nil {
+		var permanent permanentPublicationError
+		if a.ordered() && (errors.As(publishErr, &permanent) || a.state.Attempts >= orderedPublicationAttempts) {
+			return a.failPublication(tx, current, execution, publishErr)
+		}
 		return a.scheduleRetry(tx, current, execution, publishErr)
 	}
 	a.state.Status, a.state.Reason, a.state.NextRetryAt = string(outcome.Status), outcome.Reason, nil
 	if err := setBodySectionPublicationState(tx, execution, a.state); err != nil {
 		return err
 	}
-	if err := contexts.NewExecutionStateContext(tx, execution, a.collectEvents).Emit("default", factorycomponent.PullRequestBodySectionUpdatedPayloadType, []any{a.state}); err != nil {
+	if err := contexts.NewExecutionStateContext(tx, execution, a.collectEvents).Emit("default", a.payloadType(), []any{a.state}); err != nil {
+		return err
+	}
+	return current.Complete(tx)
+}
+
+// orderedPublicationAttempts bounds automatic retries of ordered publications.
+// The last delay is 100 seconds, so failures appear within about ten minutes.
+const orderedPublicationAttempts = 10
+
+// IsPublicationHook identifies hooks that the publication worker processes.
+func IsPublicationHook(name string) bool {
+	return name == factorycomponent.UpdatePullRequestBodySectionHook || name == pulls.PullRequestCommentHook
+}
+
+func (a *bodySectionActionAttempt) payloadType() string {
+	if a.isComment() {
+		return pulls.PullRequestCommentPayloadType
+	}
+	return factorycomponent.PullRequestBodySectionUpdatedPayloadType
+}
+
+// failPublication keeps earlier results of the run, such as reviewer requests.
+// Only this step fails, and its message names the destination.
+func (a *bodySectionActionAttempt) failPublication(tx *gorm.DB, current *models.CanvasNodeRequest, execution *models.CanvasNodeExecution, publishErr error) error {
+	a.state.Status, a.state.LastError, a.state.NextRetryAt = "failed", publishErr.Error(), nil
+	if err := setBodySectionPublicationState(tx, execution, a.state); err != nil {
+		return err
+	}
+	message := fmt.Sprintf("Could not publish to the %s: %s", a.destination(), publishErr.Error())
+	if err := contexts.NewExecutionStateContext(tx, execution, a.collectEvents).Fail(models.CanvasNodeExecutionResultReasonError, message); err != nil {
 		return err
 	}
 	return current.Complete(tx)
@@ -234,7 +290,7 @@ func (a *bodySectionActionAttempt) scheduleRetry(tx *gorm.DB, current *models.Ca
 	if err := current.Complete(tx); err != nil {
 		return err
 	}
-	return contexts.NewExecutionRequestContext(tx, execution).ScheduleActionCall(factorycomponent.UpdatePullRequestBodySectionHook, current.Spec.Data().InvokeAction.Parameters, delay)
+	return contexts.NewExecutionRequestContext(tx, execution).ScheduleActionCall(publicationHook(a.component), current.Spec.Data().InvokeAction.Parameters, delay)
 }
 
 func setBodySectionPublicationState(tx *gorm.DB, execution *models.CanvasNodeExecution, state bodySectionPublicationState) error {

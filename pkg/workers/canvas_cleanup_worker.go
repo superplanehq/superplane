@@ -2,6 +2,7 @@ package workers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -52,10 +53,6 @@ func (w *CanvasCleanupWorker) Start(ctx context.Context) {
 			telemetry.RecordWorkflowCleanupWorkerCanvasesCount(context.Background(), len(canvases))
 
 			for _, canvas := range canvases {
-				if deletedResourceWithinGracePeriod(canvas.DeletedAt.Time, tickStart) {
-					continue
-				}
-
 				if err := w.semaphore.Acquire(context.Background(), 1); err != nil {
 					w.logger.Errorf("Error acquiring semaphore: %v", err)
 					continue
@@ -76,6 +73,25 @@ func (w *CanvasCleanupWorker) Start(ctx context.Context) {
 }
 
 func (w *CanvasCleanupWorker) LockAndProcessCanvas(canvas models.Canvas) error {
+	// Release managed resources promptly, while retaining canvas data for restore.
+	var publicationsWoken bool
+	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+		locked, err := models.LockCanvas(tx, canvas.ID)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		publicationsWoken, err = locked.WakePublications(tx, w.maxResourcesPerTick)
+		return err
+	})
+	if err != nil {
+		return fmt.Errorf("wake deleted canvas publications: %w", err)
+	}
+	if !publicationsWoken {
+		return nil
+	}
 	if deletedResourceWithinGracePeriod(canvas.DeletedAt.Time, time.Now()) {
 		return nil
 	}

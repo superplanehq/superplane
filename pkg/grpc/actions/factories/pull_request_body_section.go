@@ -131,14 +131,24 @@ func (p sectionPublication) eligible(db *gorm.DB, pr *models.FactoryPullRequest)
 }
 
 func (p sectionPublication) nodesEnabled(db *gorm.DB) (bool, error) {
-	version, err := models.FindCanvasVersionInTransaction(db, p.run.WorkflowID, p.run.VersionID)
+	return publicationNodesEnabled(db, p.run, p.nodeID, func(node models.Node) bool {
+		return prbody.IsComponent(node.ComponentName()) && node.Configuration["sectionKey"] == p.configuration.SectionKey
+	})
+}
+
+// publicationNodesEnabled requires the node in the admitted and live versions.
+// Both must be enabled with the same activation generation, so an attempt from
+// an earlier activation cannot resume after the node is enabled again.
+func publicationNodesEnabled(db *gorm.DB, run *models.CanvasRun, nodeID string, matches func(models.Node) bool) (bool, error) {
+	version, err := models.FindCanvasVersionInTransaction(db, run.WorkflowID, run.VersionID)
 	if err != nil {
 		return false, err
 	}
-	if !publicationNodeEnabled(version, p.nodeID, p.configuration.SectionKey) {
+	admitted, ok := publicationNodeActivation(version, nodeID, matches)
+	if !ok {
 		return false, nil
 	}
-	canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(db, p.run.WorkflowID)
+	canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(db, run.WorkflowID)
 	if err != nil {
 		return false, err
 	}
@@ -146,20 +156,38 @@ func (p sectionPublication) nodesEnabled(db *gorm.DB) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	if !publicationNodeEnabled(live, p.nodeID, p.configuration.SectionKey) {
-		return false, nil
-	}
-	return true, nil
+	current, ok := publicationNodeActivation(live, nodeID, matches)
+	return ok && current == admitted, nil
 }
 
-func publicationNodeEnabled(version *models.CanvasVersion, nodeID, sectionKey string) bool {
+// publicationNodeActivation returns the activation generation of an enabled node.
+func publicationNodeActivation(version *models.CanvasVersion, nodeID string, matches func(models.Node) bool) (int64, bool) {
 	for _, node := range version.Nodes {
-		if node.ID != nodeID || !prbody.IsComponent(node.ComponentName()) || node.Configuration["sectionKey"] != sectionKey {
+		if node.ID != nodeID || !matches(node) {
 			continue
 		}
-		return node.Configuration["enabled"] != false
+		if node.Configuration["enabled"] == false {
+			return 0, false
+		}
+		return savedActivationGeneration(node.Configuration["activationGeneration"]), true
 	}
-	return false
+	return 0, false
+}
+
+// Absent and invalid generations use the first activation.
+func savedActivationGeneration(value any) int64 {
+	var generation int64
+	switch v := value.(type) {
+	case float64:
+		generation = int64(v)
+	case int:
+		generation = int64(v)
+	case int64:
+		generation = v
+	case string:
+		generation, _ = strconv.ParseInt(v, 10, 64)
+	}
+	return max(generation, 1)
 }
 
 func bodySectionPublicationError(err error) (bodySectionPublicationOutcome, error) {
