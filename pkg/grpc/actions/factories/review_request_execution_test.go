@@ -36,22 +36,23 @@ import (
 // The fixture substitutes only GitHub responses and the external agent task.
 // Both materialized graphs, expressions, component execution, and runner hooks are real.
 type reviewRequestHTTP struct {
-	statusDenied      bool
-	statuses          []github.RepoStatus
-	requests          []*http.Request
-	reviewerBodies    []map[string]any
-	approved          bool
-	oldApproval       bool
-	withdrawnApproval bool
-	requestError      bool
-	alreadyAsked      bool
-	empty             bool
-	discoveryError    bool
-	permissionError   bool
-	movedHead         bool
-	closed            bool
-	lostPermission    bool
-	changedIdentity   bool
+	statusDenied       bool
+	statuses           []github.RepoStatus
+	requests           []*http.Request
+	reviewerBodies     []map[string]any
+	requestedReviewers []pulls.ReviewerIdentity
+	approved           bool
+	oldApproval        bool
+	withdrawnApproval  bool
+	requestError       bool
+	alreadyAsked       bool
+	empty              bool
+	discoveryError     bool
+	permissionError    bool
+	movedHead          bool
+	closed             bool
+	lostPermission     bool
+	changedIdentity    bool
 	// pushDuringLookups moves the head after the permission lookup.
 	pushDuringLookups bool
 	// description and comments hold the published pull request state.
@@ -136,6 +137,10 @@ func (h *reviewRequestHTTP) Do(request *http.Request) (*http.Response, error) {
 			return nil, err
 		}
 		h.reviewerBodies = append(h.reviewerBodies, body)
+		for _, login := range body["reviewers"].([]any) {
+			id := map[string]int64{"octocat": 2, "fallback-user": 3}[login.(string)]
+			h.requestedReviewers = append(h.requestedReviewers, pulls.ReviewerIdentity{ID: id, Login: login.(string)})
+		}
 		return publicationHTTPResponse(201, `{"number":42,"requested_reviewers":[{"login":"unrelated"},{"id":2,"login":"octocat"}]}`), nil
 	}
 	if request.Method == http.MethodPatch && path == "/repos/acme/app/pulls/42" {
@@ -192,9 +197,13 @@ func (h *reviewRequestHTTP) Do(request *http.Request) (*http.Response, error) {
 		if h.movedHead {
 			sha = "new-head"
 		}
-		requested := `[{"login":"unrelated"}]`
+		requested := append([]pulls.ReviewerIdentity{{Login: "unrelated"}}, h.requestedReviewers...)
 		if h.alreadyAsked {
-			requested = `[{"login":"unrelated"},{"id":2,"login":"octocat"}]`
+			requested = append(requested, pulls.ReviewerIdentity{ID: 2, Login: "octocat"})
+		}
+		encodedReviewers, err := json.Marshal(requested)
+		if err != nil {
+			return nil, err
 		}
 		state := "open"
 		if h.closed {
@@ -204,7 +213,7 @@ func (h *reviewRequestHTTP) Do(request *http.Request) (*http.Response, error) {
 		if description == "" {
 			description = "User description"
 		}
-		return publicationHTTPResponse(200, fmt.Sprintf(`{"number":42,"state":%q,"body":%q,"head":{"sha":%q},"base":{"ref":"main","sha":"base-sha"},"user":{"login":"author"},"requested_reviewers":%s}`, state, description, sha, requested)), nil
+		return publicationHTTPResponse(200, fmt.Sprintf(`{"number":42,"state":%q,"body":%q,"head":{"sha":%q},"base":{"ref":"main","sha":"base-sha"},"user":{"login":"author"},"requested_reviewers":%s}`, state, description, sha, encodedReviewers)), nil
 	}
 	return nil, fmt.Errorf("unexpected GitHub request: %s %s", request.Method, path)
 }
