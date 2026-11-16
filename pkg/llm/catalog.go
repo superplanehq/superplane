@@ -18,6 +18,16 @@ type CatalogPrice struct {
 	Pricing RawCatalogRate
 }
 
+// ListOpenRouterModels fetches the public OpenRouter catalog. Credentials are
+// optional because the provider allows unauthenticated catalog requests.
+func ListOpenRouterModels(ctx context.Context, httpClient core.HTTPContext, creds Credentials) ([]Model, error) {
+	if httpClient == nil {
+		return nil, fmt.Errorf("http client is required")
+	}
+	client := newOpenAICompatClient(httpClient, ProviderOpenRouter, DefaultOpenRouterBaseURL, creds)
+	return client.ListModels(ctx)
+}
+
 // ListCatalogPrices fetches priced models for providers that publish catalog rates.
 func ListCatalogPrices(ctx context.Context, httpClient core.HTTPContext, provider string, creds Credentials) ([]CatalogPrice, error) {
 	normalized := strings.ToLower(strings.TrimSpace(provider))

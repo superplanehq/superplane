@@ -154,9 +154,10 @@ func (i *Claude) listModelResources(client *Client) ([]core.IntegrationResource,
 		}
 
 		resources = append(resources, core.IntegrationResource{
-			Type: "model",
-			Name: model.ID,
-			ID:   model.ID,
+			Type:           "model",
+			Name:           model.ID,
+			ID:             model.ID,
+			ThinkingLevels: model.ThinkingLevels,
 		})
 	}
 
