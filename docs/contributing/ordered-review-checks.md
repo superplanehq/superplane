@@ -145,8 +145,8 @@ Ordered publication fails the step after a host rejection or ten attempts.
 Unordered body sections keep the earlier skip behavior. Review request uses
 both components. Its findings settings are saved on the agent node, so admin
 reset keeps them. Findings and Publish PR check use separate keys and nodes.
-Both receive the same decisions, including `no-candidates`, which skips the
-selection agent when the eligible candidate list is empty.
+Both receive the same decisions. An empty eligible candidate list skips the
+selection agent and uses the shared no-reviewer activity and check steps.
 
 ## Durable delivery
 
@@ -229,9 +229,10 @@ the same release path also handles checks that stopped polling on closed PRs.
 Pausing changes trigger admission and keeps existing approval tracking.
 
 The canvas registers pending before candidate discovery. It applies explicit
-no-review outcomes for all-positive reports and empty eligible candidate lists.
-Empty lists skip the selection agent. Required-reviewer application uses the
-recorded Ensure reviewers execution and does not request reviewers again.
+no-review outcomes for all-positive reports after managed request withdrawal.
+Empty eligible candidate lists skip the selection agent and produce a selection error.
+Existing reviewer requests are preserved when no replacement is available.
+Required-reviewer application uses the recorded Ensure reviewers execution and does not request reviewers again.
 Stale or skipped outcomes cannot publish no-review success. Failed or cancelled
 attempts without a valid decision produce error through the pending check's
 existing refresh hook.
@@ -258,3 +259,82 @@ Workers require `START_INTEGRATION_REQUEST_WORKER`, `START_NODE_REQUEST_WORKER`,
 no change. Local Docker and the repository chart include these settings.
 The hosted chart and launchpad repositories returned HTTP 404 through `gh`.
 Their current configuration and deployed configuration remain unverified.
+
+## Managed reviewer requests
+
+The built-in Review request workflow enables `managed` on Ensure Pull Request
+Reviewers. Ordinary canvases keep additive behavior unless they enable this
+setting. Managed execution requires `expectedHeadSha`. An empty managed
+selection withdraws this automation's pending requests.
+
+Candidate discovery supplies `requestedReviewers`, `requestedTeams`, and
+`previousSelection`. Selection reassesses these identities with the current
+eligibility and contributor rules. It prefers a suitable existing reviewer
+and explains replacements and additional reviewers.
+
+Ownership uses the existing publication store. Its scope includes the GitHub
+integration, repository, pull request, and automation canvas. Ownership begins
+only when this automation adds a missing request. Existing pending requests
+and approvals do not establish ownership. No ownership is inferred from old
+PR descriptions, previous workflow runs, or GitHub request lists.
+
+Managed reconciliation requests every replacement before withdrawing old
+requests. It removes only pending requests that it owns and no longer selects.
+It preserves unrelated individual requests, team requests, and submitted
+reviews. Any submitted review, including a comment-only review, ends ownership
+of the original request. A later manual request for that reviewer remains
+outside automation ownership.
+
+Trusted source and attempt order fence older reports, including retries.
+Publication updates commit independently of the execution transaction, so a
+worker rollback cannot discard ownership after a GitHub write. Publication
+leases serialize mutations. Lease contention schedules a retry with the same
+ordered claim. A newer claim supersedes that retry. Each mutation rechecks the
+current head and order. Successful additions survive partial failures.
+A persisted addition intent lets a retry recover a request when GitHub applied the POST
+but the response was lost. GitHub does not provide an atomic request ownership
+operation; a simultaneous manual request during that POST cannot be distinguished.
+A persisted withdrawal intent prevents a retry from deleting a later manual
+request after an uncertain DELETE. A request that remains after such a failure
+loses managed ownership and needs manual removal.
+Selection, discovery, and replacement failures preserve existing requests.
+Completion and publication follow successful reconciliation only.
+
+After deployment, use the existing installation or organization reset for
+`review-request` to update installed built-in automations. Reset preserves
+supported user settings and GitHub connections while installing the current
+managed workflow. This change requires no migration, new service, or secret.
+Do not backfill ownership or clean up accumulated requests on existing PRs,
+including #9315. Those requests remain untouched unless a person removes them.
+
+## Review request workflow simplification
+
+Review request keeps the incoming `merge-confidence.completed` broadcast. The
+updated template emits no outgoing `review-request.completed` events. This is
+an intentional compatibility change for canvases that consume those events.
+Activity, PR checks, and findings use the recorded selection and reviewer
+operation outputs directly. Read decision validates the agent result and
+applies an eligible configured fallback once. Selection errors never use fallback.
+
+New installations use the updated template. After deployment, use the existing
+targeted Review request reset to update installed automations. Reset preserves
+supported settings, cleared instructions, disabled switches, activation
+generations, and active approval tracking. Existing runs keep their saved
+graph and can still emit outgoing events. Do not rewrite historical executions.
+This change requires no migration, deployment configuration, or frontend update.
+
+## Review request workspace setup
+
+New Review request installations set `skipSetupCommands: true` on
+`select-reviewers`. The runner checks out the repository and context
+repositories without running workspace setup commands. Selection uses Git
+history and the existing Merge confidence report. It does not need application
+services.
+
+After deployment, open installation administration at `/admin/settings`.
+Under **Reset one automation**, reset **Review request**. This updates
+installed automations that have no saved `skipSetupCommands` value to the new
+default. Organization reset applies the same default. Both resets preserve
+explicit `true` and `false` values. To change an explicit `false`, set
+`skipSetupCommands: true` on `select-reviewers` in the canvas YAML. Publish
+the canvas. Existing runs keep their saved configuration.

@@ -13,6 +13,11 @@ export function statusCheckValue(check: OrganizationsIntegrationResourceRef): st
   return check.id?.trim() || check.name?.trim() || "";
 }
 
+export function isEligibleRepairCheck(name: string): boolean {
+  const normalized = name.trim().toLowerCase();
+  return normalized.length > 0 && !normalized.startsWith("superplane/");
+}
+
 export function statusCheckLabel(check: OrganizationsIntegrationResourceRef): string {
   return check.name?.trim() || check.id?.trim() || "";
 }
@@ -20,7 +25,7 @@ export function statusCheckLabel(check: OrganizationsIntegrationResourceRef): st
 export function catalogStatusCheckNames(catalog: OrganizationsIntegrationResourceRef[]): string[] {
   return catalog.flatMap((check) => {
     const value = statusCheckValue(check);
-    return value ? [value] : [];
+    return isEligibleRepairCheck(value) ? [value] : [];
   });
 }
 
@@ -106,7 +111,7 @@ export function statusCheckRows(
 
   for (const check of catalog) {
     const value = statusCheckValue(check);
-    if (!value) {
+    if (!isEligibleRepairCheck(value)) {
       continue;
     }
     const key = value.toLowerCase();
@@ -119,7 +124,7 @@ export function statusCheckRows(
 
   for (const name of names) {
     const trimmed = name.trim();
-    if (!trimmed) {
+    if (!isEligibleRepairCheck(trimmed)) {
       continue;
     }
     const key = trimmed.toLowerCase();

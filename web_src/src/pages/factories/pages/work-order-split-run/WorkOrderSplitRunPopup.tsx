@@ -1,5 +1,5 @@
 import { FactoryTaskScope } from "../../FactoryTaskScope";
-import { useState, type ReactNode } from "react";
+import { type ReactNode } from "react";
 
 import type { FactoriesFactory, FactoriesFactoryPullRequest } from "@/api-client";
 import { useFactory } from "@/hooks/useFactoryData";
@@ -11,8 +11,8 @@ import { formatWorkOrderIdentifier } from "../../lib/workspaceKey";
 import { LiveHeaderSpendProvider } from "./liveHeaderSpendContext";
 import { planningHeaderSpendActive } from "./planningHeaderSpend";
 import { DraftStartModelSelect } from "./DraftStartModelSelect";
-import { DRAFT_START_MODEL_AUTO } from "./draftStartModel";
-import { THINKING_LEVEL_MEDIUM } from "@/lib/thinkingLevel";
+import type { DraftStartSelection } from "./draftStartModel";
+import { useDraftStartDefaults, useDraftStartSelection, type DraftStartDefaults } from "@/hooks/useDraftStartDefaults";
 import { SplitRunPopupTabs } from "./SplitRunPopupTabs";
 import { SplitRunReview } from "./SplitRunReview";
 import { draftStripAnalysis } from "./draftStripAnalysis";
@@ -160,8 +160,9 @@ function AnalysisWorkOrderPopup({
   const mutations = footerMutationHandlers(canUpdate, footerActions, fixture, dismissCurrentPopup);
   const edits = useAnalysisPopupEdits({ organizationId, factoryId, orderId, canUpdate, fixture, popupData });
   const { fullPage, toggleFullPage } = useWorkOrderFullPagePreference();
-  const [draftModel, setDraftModel] = useState(DRAFT_START_MODEL_AUTO);
-  const [draftThinking, setDraftThinking] = useState(THINKING_LEVEL_MEDIUM);
+  const { selection, onChange } = useDraftStartSelection(`${factoryId}:${orderId}:${lineId ?? fixture.lineName}`);
+  const { model: draftModel, thinkingLevel: draftThinking } = selection;
+  const defaults = useDraftStartDefaults(organizationId, factoryId, fixture.lineName, lineId);
   const factory = useFactory(organizationId ?? "", factoryId ?? "").data;
   const { sourceOnly, viewFixture: originalViewFixture } = analysisPopupView(fixture, factory);
   const footer = useWorkOrderStartFooter(originalViewFixture.footer, organizationId, factoryId, fixture.lineName);
@@ -189,10 +190,8 @@ function AnalysisWorkOrderPopup({
     canUpdate,
     draftModel,
     draftThinking,
-    onDraftStartChange: ({ model, thinkingLevel }) => {
-      setDraftModel(model);
-      setDraftThinking(thinkingLevel);
-    },
+    defaults,
+    onDraftStartChange: onChange,
     disabled: isDispatching || !startAllowed,
   });
   const reviewArgs = analysisReviewArgs({
@@ -416,9 +415,10 @@ type AnalysisDraftChromeArgs = {
   analysis: ReturnType<typeof useAnalysisPlanningSession>;
   planningFailure?: string;
   canUpdate: boolean;
-  draftModel: string;
-  draftThinking: string;
-  onDraftStartChange: (next: { model: string; thinkingLevel: string }) => void;
+  draftModel?: string;
+  draftThinking?: string;
+  defaults: DraftStartDefaults;
+  onDraftStartChange: (next: DraftStartSelection) => void;
   disabled: boolean;
 };
 
@@ -433,6 +433,7 @@ function analysisDraftChrome(args: AnalysisDraftChromeArgs) {
     fixture: args.fixture,
     model: args.draftModel,
     thinkingLevel: args.draftThinking,
+    defaults: args.defaults,
     onChange: args.onDraftStartChange,
     disabled: args.disabled,
   });
@@ -483,9 +484,10 @@ function draftModelSelects(args: {
   factoryId?: string;
   orderId?: string;
   fixture: WorkOrderSplitRunPopupProps["fixture"];
-  model: string;
-  thinkingLevel: string;
-  onChange: (next: { model: string; thinkingLevel: string }) => void;
+  model?: string;
+  thinkingLevel?: string;
+  defaults: DraftStartDefaults;
+  onChange: (next: DraftStartSelection) => void;
   disabled: boolean;
 }): { footer?: ReactNode; strip?: ReactNode } {
   const { fixture, ...select } = args;

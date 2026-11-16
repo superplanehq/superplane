@@ -39,21 +39,22 @@ type reviewCheckIntegration struct {
 func (c reviewCheckIntegration) Publications() core.PublicationStore { return c.store }
 
 type reviewCheckHTTP struct {
-	t                 *testing.T
-	mu                sync.Mutex
-	head              string
-	closed            bool
-	reviews           []map[string]any
-	failReviews       bool
-	failWrite         bool
-	writeStatus       int
-	checkRuns         []*github.CheckRun
-	checkWrites       []github.CheckRun
-	loseCheckResponse bool
-	checkRunPageSize  int
-	failPR            bool
-	requestCount      int
-	writes            []struct {
+	t                  *testing.T
+	mu                 sync.Mutex
+	head               string
+	closed             bool
+	reviews            []map[string]any
+	requestedReviewers []pulls.ReviewerIdentity
+	failReviews        bool
+	failWrite          bool
+	writeStatus        int
+	checkRuns          []*github.CheckRun
+	checkWrites        []github.CheckRun
+	loseCheckResponse  bool
+	checkRunPageSize   int
+	failPR             bool
+	requestCount       int
+	writes             []struct {
 		SHA    string
 		Status github.RepoStatus
 	}
@@ -128,7 +129,9 @@ func (h *reviewCheckHTTP) Do(request *http.Request) (*http.Response, error) {
 		if h.closed {
 			state = "closed"
 		}
-		return mocks.GitHubResponse(200, fmt.Sprintf(`{"state":%q,"user":{"id":1,"login":"author"},"head":{"sha":%q},"requested_reviewers":[]}`, state, h.head)), nil
+		requested, err := json.Marshal(h.requestedReviewers)
+		require.NoError(h.t, err)
+		return mocks.GitHubResponse(200, fmt.Sprintf(`{"state":%q,"user":{"id":1,"login":"author"},"head":{"sha":%q},"requested_reviewers":%s}`, state, h.head, requested)), nil
 	}
 	return nil, fmt.Errorf("unexpected GitHub request: %s %s", request.Method, request.URL)
 }
@@ -234,6 +237,17 @@ func (f *reviewCheckFixture) refresh() error {
 	require.NoError(f.t, err)
 	return integration.HandleHook(core.IntegrationHookContext{Name: pulls.ReviewCheckHook, Parameters: map[string]any{"key": "github.review-check/testhq/hello/42/team/review"}, Integration: f.integration, HTTP: f.http})
 }
+func (f *reviewCheckFixture) webhook(eventType, action string) {
+	f.t.Helper()
+	body := []byte(fmt.Sprintf(`{"action":%q,"repository":{"full_name":"testhq/hello"},"pull_request":{"number":42}}`, action))
+	signature := hmac.New(sha256.New, []byte("review-hook-secret"))
+	_, err := signature.Write(body)
+	require.NoError(f.t, err)
+	headers := http.Header{"X-Github-Event": {eventType}, "X-Hub-Signature-256": {"sha256=" + hex.EncodeToString(signature.Sum(nil))}}
+	code, _, err := (&pulls.SetPullRequestReviewCheck{}).HandleWebhook(core.WebhookRequestContext{Headers: headers, Body: body, Integration: f.integration, Webhook: &testcontexts.NodeWebhookContext{Secret: "review-hook-secret"}})
+	require.NoError(f.t, err)
+	require.Equal(f.t, http.StatusOK, code)
+}
 func (f *reviewCheckFixture) record() *core.OrderedPublication {
 	record, err := f.integration.store.Get("github.review-check/testhq/hello/42/team/review")
 	require.NoError(f.t, err)
@@ -257,6 +271,7 @@ func TestReviewCheckTracksCurrentApprovals(t *testing.T) {
 	f.http.reviews = []map[string]any{reviewDecision(1, 2, "first", "APPROVED", "abc"), reviewDecision(2, 3, "second", "APPROVED", "abc")}
 	outcome := f.ensure(reviewers)
 	require.Zero(t, f.http.requestCount, "existing approvals on all pages cover reviewer requests")
+	f.http.requestedReviewers = reviewers
 	require.NoError(t, f.apply("required_reviewers", reviewers, outcome))
 	require.NoError(t, f.refresh())
 	require.Equal(t, "success", f.state())
@@ -274,14 +289,7 @@ func TestReviewCheckTracksCurrentApprovals(t *testing.T) {
 		} else {
 			f.http.reviews = append(f.http.reviews, decision)
 		}
-		body := []byte(`{"repository":{"full_name":"testhq/hello"},"pull_request":{"number":42}}`)
-		signature := hmac.New(sha256.New, []byte("review-hook-secret"))
-		_, err := signature.Write(body)
-		require.NoError(t, err)
-		headers := http.Header{"X-Github-Event": {"pull_request_review"}, "X-Hub-Signature-256": {"sha256=" + hex.EncodeToString(signature.Sum(nil))}}
-		code, _, err := (&pulls.SetPullRequestReviewCheck{}).HandleWebhook(core.WebhookRequestContext{Headers: headers, Body: body, Integration: f.integration, Webhook: &testcontexts.NodeWebhookContext{Secret: "review-hook-secret"}})
-		require.NoError(t, err)
-		require.Equal(t, http.StatusOK, code)
+		f.webhook("pull_request_review", "submitted")
 		require.NoError(t, f.processDue())
 		require.Equal(t, step.want, f.state(), step.state)
 	}
@@ -301,11 +309,139 @@ func TestReviewCheckTracksCurrentApprovals(t *testing.T) {
 	require.NotNil(t, f.record().WakeAt)
 }
 
+func TestReviewCheckPassesAfterSelectedRequestsAreRemoved(t *testing.T) {
+	f := newReviewCheckFixture(t)
+	reviewers := []pulls.ReviewerIdentity{{ID: 2, Login: "first"}, {ID: 3, Login: "second"}}
+	outcome := f.ensure(reviewers)
+	f.http.requestedReviewers = reviewers
+	require.NoError(t, f.apply("required_reviewers", reviewers, outcome))
+	require.NoError(t, f.processDue())
+	require.Equal(t, "pending", f.state())
+	f.finishAction()
+
+	// A renamed account still owns its outstanding request.
+	f.http.requestedReviewers = []pulls.ReviewerIdentity{{ID: 3, Login: "renamed-second"}}
+	f.webhook("pull_request", "review_request_removed")
+	require.NoError(t, f.processDue())
+	require.Equal(t, "pending", f.state())
+
+	// One selected request still blocks, including a login with different casing.
+	f.http.requestedReviewers = []pulls.ReviewerIdentity{{ID: 3, Login: "SECOND"}}
+	f.webhook("pull_request", "review_request_removed")
+	require.NoError(t, f.processDue())
+	require.Equal(t, "pending", f.state())
+
+	f.http.requestedReviewers = nil
+	f.webhook("pull_request", "review_request_removed")
+	require.NoError(t, f.processDue())
+	require.Equal(t, "success", f.state())
+	require.Equal(t, "No selected review requests remain", f.http.writes[len(f.http.writes)-1].Status.GetDescription())
+	require.NotNil(t, f.record().WakeAt, "a selected reviewer can be requested again")
+
+	f.http.requestedReviewers = reviewers[:1]
+	f.webhook("pull_request", "review_requested")
+	require.NoError(t, f.processDue())
+	require.Equal(t, "pending", f.state())
+
+	// Reconciliation also recovers a missed removal webhook. An unrelated user
+	// with a selected reviewer's login must not keep the gate pending.
+	f.http.requestedReviewers = []pulls.ReviewerIdentity{{ID: 99, Login: "first"}}
+	require.NoError(t, f.processDue())
+	require.Equal(t, "success", f.state())
+	var executions int64
+	require.NoError(t, f.db.Model(&models.CanvasNodeExecution{}).Where("workflow_id = ?", f.canvas.ID).Count(&executions).Error)
+	require.EqualValues(t, 2, executions, "removal and reconciliation must not start new executions")
+	require.Equal(t, 1, f.http.requestCount, "tracking must not request reviewers again")
+}
+
+func TestReviewCheckNoSelectedRequestsTakesPrecedenceOverReviews(t *testing.T) {
+	for _, decision := range []string{"CHANGES_REQUESTED", "COMMENTED", "DISMISSED"} {
+		t.Run(decision, func(t *testing.T) {
+			f := newReviewCheckFixture(t)
+			reviewers := []pulls.ReviewerIdentity{{ID: 2, Login: "first"}}
+			outcome := f.ensure(reviewers)
+			f.http.reviews = []map[string]any{reviewDecision(1, 2, "first", decision, "abc")}
+			f.http.requestedReviewers = []pulls.ReviewerIdentity{{ID: 3, Login: "second"}}
+			require.NoError(t, f.apply("required_reviewers", reviewers, outcome))
+			require.NoError(t, f.processDue())
+			require.Equal(t, "success", f.state())
+
+			f.http.requestedReviewers = reviewers
+			f.webhook("pull_request", "review_requested")
+			require.NoError(t, f.processDue())
+			want := "pending"
+			if decision == "CHANGES_REQUESTED" {
+				want = "failure"
+			}
+			require.Equal(t, want, f.state(), "a new selected request resumes approval evaluation")
+		})
+	}
+}
+
+func TestReviewCheckUsesFinalPullRequestForRemoval(t *testing.T) {
+	for _, test := range []struct {
+		name           string
+		initialRequest bool
+		finalRequest   bool
+		pushOnRead     int
+		failFinalRead  bool
+		want           string
+	}{
+		{name: "removed during reads", initialRequest: true, want: "success"},
+		{name: "requested during reads", finalRequest: true, want: "pending"},
+		{name: "push before reads", pushOnRead: 1, want: "pending"},
+		{name: "push during reads", pushOnRead: 2, want: "pending"},
+		{name: "final read fails", failFinalRead: true, want: "error"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			f := newReviewCheckFixture(t)
+			reviewers := []pulls.ReviewerIdentity{{ID: 2, Login: "first"}}
+			outcome := f.ensure(reviewers)
+			require.NoError(t, f.apply("required_reviewers", reviewers, outcome))
+			if test.initialRequest {
+				f.http.requestedReviewers = reviewers
+			}
+			reads := 0
+			f.http.onRead = func() {
+				reads++
+				if reads == test.pushOnRead {
+					f.http.head = "new-head"
+				}
+				if reads != 2 {
+					return
+				}
+				f.http.requestedReviewers = nil
+				if test.finalRequest {
+					f.http.requestedReviewers = reviewers
+				}
+				f.http.failPR = test.failFinalRead
+			}
+			err := f.refresh()
+			if test.failFinalRead {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+			require.Equal(t, test.want, f.state())
+			require.NotNil(t, f.record().WakeAt)
+			if test.pushOnRead > 0 {
+				require.Equal(t, "new-head", f.http.writes[len(f.http.writes)-1].SHA)
+			}
+			if test.failFinalRead {
+				f.http.onRead, f.http.failPR = nil, false
+				require.NoError(t, f.processDue())
+				require.Equal(t, "success", f.state())
+			}
+		})
+	}
+}
+
 func TestReviewCheckPersistsDeliveryAndRecoversWithoutWebhooks(t *testing.T) {
 	f := newReviewCheckFixture(t)
 	reviewers := []pulls.ReviewerIdentity{{ID: 2, Login: "first"}}
 	outcome := f.ensure(reviewers)
 	require.Equal(t, 1, f.http.requestCount)
+	f.http.requestedReviewers = reviewers
 	require.NoError(t, f.apply("required_reviewers", reviewers, outcome))
 	f.http.failWrite = true
 	require.ErrorContains(t, f.refresh(), "publish review check")
@@ -700,7 +836,12 @@ func (a reviewCheckSetupAction) Setup(ctx core.SetupContext) error {
 }
 
 func (f *reviewCheckFixture) saveActivation(enabled bool, generation int, pause ...bool) {
-	f.r.Registry.Actions["github.setPullRequestReviewCheck"] = reviewCheckSetupAction{Action: &pulls.SetPullRequestReviewCheck{}, integration: f.integration, http: f.http}
+	component := f.nodes[2].Ref.Data().Component.Name
+	var action core.Action = &pulls.SetPullRequestReviewCheck{}
+	if component == "github.setPullRequestCheckRun" {
+		action = &pulls.SetPullRequestCheckRun{}
+	}
+	f.r.Registry.Actions[component] = reviewCheckSetupAction{Action: action, integration: f.integration, http: f.http}
 	version, err := models.FindLiveCanvasVersionInTransaction(f.db, f.canvas.ID)
 	require.NoError(f.t, err)
 	for i := range version.Nodes {
@@ -715,6 +856,10 @@ func (f *reviewCheckFixture) saveActivation(enabled bool, generation int, pause 
 		integrationID := f.installation.ID.String()
 		node.IntegrationID = &integrationID
 		node.Configuration = map[string]any{"repository": "{{ root().data.repository }}", "pullNumber": "{{ root().data.pullNumber }}", "enabled": enabled, "activationGeneration": generation, "activationNodeId": "check", "assessedSha": "abc", "context": "team/review", "phase": "pending_selection", "reason": "Select required reviewers"}
+		if component == "github.setPullRequestCheckRun" {
+			delete(node.Configuration, "phase")
+			node.Configuration["state"] = "pending"
+		}
 	}
 	require.NoError(f.t, canvasactions.PublishGeneratedCanvasNodesWithOwner(f.t.Context(), f.db, f.canvas, nil, "Save publication settings", version.Nodes, version.Edges, changesets.CanvasPublisherOptions{Registry: f.r.Registry, OrgID: f.r.Organization.ID, Encryptor: f.r.Encryptor, AuthService: f.r.AuthService, WebhookBaseURL: "http://localhost:8000"}))
 	current, err := models.FindCanvasNode(f.db, f.canvas.ID, "check")
@@ -810,6 +955,7 @@ func TestReviewCheckTracksApprovalsAfterRunRetention(t *testing.T) {
 	f.attempt(support.EmitCanvasEventForNode(t, f.canvas.ID, "trigger", "default", nil))
 	reviewers := []pulls.ReviewerIdentity{{ID: 2, Login: "first"}}
 	outcome := f.ensure(reviewers)
+	f.http.requestedReviewers = reviewers
 	require.NoError(t, f.apply("required_reviewers", reviewers, outcome))
 	require.NoError(t, f.refresh())
 	f.finishAction()

@@ -104,6 +104,12 @@ type PublicationContext interface {
 	ExecutionOutput(executionID uuid.UUID) (PublicationExecution, error)
 }
 
+// IndependentPublicationContext checkpoints external effects outside an enclosing
+// execution transaction. Run and event records must exist before it is used.
+type IndependentPublicationContext interface {
+	Independent() PublicationContext
+}
+
 // PublicationIntegration is optional: integrations that own durable publications
 // use it from hooks without keeping component executions open for monitoring.
 type PublicationIntegration interface {

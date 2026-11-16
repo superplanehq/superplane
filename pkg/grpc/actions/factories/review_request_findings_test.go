@@ -1,6 +1,7 @@
 package factories
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
@@ -9,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
 	canvasactions "github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
+	"github.com/superplanehq/superplane/pkg/integrations/github/components/pulls"
 	"github.com/superplanehq/superplane/pkg/models"
 	workercontexts "github.com/superplanehq/superplane/pkg/workers/contexts"
 	"gorm.io/datatypes"
@@ -82,7 +84,7 @@ func TestReviewRequestFindingsPublishToSelectedDestinations(t *testing.T) {
 		"off and none": {},
 	} {
 		t.Run(name, func(t *testing.T) {
-			host := &reviewRequestHTTP{}
+			host := &reviewRequestHTTP{commitMessage: "  Improve reviewer selection  \n\nCommit details"}
 			f, message := reviewRequestCompletedProducer(t, host, 2)
 			mergeConfidence := host.description
 			require.Contains(t, mergeConfidence, "superplane:merge-confidence:start")
@@ -91,7 +93,7 @@ func TestReviewRequestFindingsPublishToSelectedDestinations(t *testing.T) {
 			outcome, agents, err := runReviewRequestGraph(t, f, consumer, root, host, "")
 			require.NoError(t, err)
 			require.Equal(t, 1, agents)
-			require.Equal(t, "requested", outcome["reviewRequest"].(map[string]any)["status"])
+			require.Equal(t, "requested", outcome["request-reviewers"].(map[string]any)["status"])
 			require.Len(t, host.reviewerBodies, 1, "reviewer requests do not depend on findings")
 
 			publishBody, publishComment := settings.publish && settings.body, settings.publish && settings.comment
@@ -104,8 +106,8 @@ func TestReviewRequestFindingsPublishToSelectedDestinations(t *testing.T) {
 				require.Contains(t, host.description, strings.TrimSpace(strings.TrimPrefix(mergeConfidence, "User description")), "the merge confidence section is preserved")
 				require.Contains(t, section, "**Reviewers selected**")
 				require.Contains(t, section, "| octocat | Owns the changed security code. |")
-				require.Contains(t, section, "Assessed commit: abc")
-				require.Contains(t, section, outcome["runId"].(string))
+				require.Contains(t, section, "Assessed commit: [Improve reviewer selection](https://github.com/acme/app/commit/abc)")
+				require.Contains(t, section, root.RunID.String())
 			}
 			if !publishComment {
 				require.Empty(t, host.comments)
@@ -114,6 +116,7 @@ func TestReviewRequestFindingsPublishToSelectedDestinations(t *testing.T) {
 				marker := fmt.Sprintf("<!-- superplane:comment:review-request:%s -->\n", consumer.ID)
 				require.True(t, strings.HasPrefix(comment, marker))
 				require.Contains(t, comment, "**Reviewers selected**")
+				require.Contains(t, comment, "Assessed commit: [Improve reviewer selection](https://github.com/acme/app/commit/abc)")
 				if publishBody {
 					require.Equal(t, section, strings.TrimSpace(strings.TrimPrefix(comment, marker)), "both destinations publish the same decision")
 				}
@@ -135,7 +138,7 @@ func TestReviewRequestFindingsPublishToSelectedDestinations(t *testing.T) {
 // is checked with the PR check off and on.
 func TestReviewRequestFindingsExplainEachDecision(t *testing.T) {
 	for _, publishCheck := range []bool{false, true} {
-		for _, scenario := range []string{"concerning", "fallback", "favorable", "no candidate", "malformed output", "agent failure", "stale report"} {
+		for _, scenario := range []string{"concerning", "fallback", "favorable", "no candidate", "no suitable candidate", "malformed output", "agent failure", "stale report"} {
 			t.Run(fmt.Sprintf("publish_check=%t/%s", publishCheck, scenario), func(t *testing.T) {
 				host := &reviewRequestHTTP{}
 				score := 2.0
@@ -180,9 +183,13 @@ func TestReviewRequestFindingsExplainEachDecision(t *testing.T) {
 					require.Contains(t, section, "**No review needed**")
 					require.Contains(t, section, "All checks are positive.")
 					require.NotContains(t, section, "No reviewer was requested.")
-				case "no candidate":
+				case "no candidate", "no suitable candidate":
 					require.Contains(t, section, "**No eligible reviewer**")
-					require.Contains(t, section, "No eligible candidate or fallback reviewer is available.")
+					if scenario == "no candidate" {
+						require.Contains(t, section, "No eligible candidate or fallback reviewer is available.")
+					} else {
+						require.Contains(t, section, "Security findings need review.")
+					}
 					require.Contains(t, section, "No reviewer was requested.")
 				}
 				if publishCheck {
@@ -219,35 +226,55 @@ func TestReviewRequestFindingsRetryReconcilesManagedComment(t *testing.T) {
 	require.Equal(t, id, reconciledID)
 	require.Equal(t, created, reconciled)
 	require.Len(t, host.reviewerBodies, 1, "publication retries do not request reviewers again")
+	require.Len(t, host.selectionEnvironments, 1, "publication retries do not select reviewers again")
 
 	// A newer accepted decision updates the same comment in place.
 	f, newer := emitReviewRequestReport(t, f, host, 3)
 	newerRoot := deliverReviewRequestReport(t, f, consumer, newer)
-	outcome, _, err := runReviewRequestGraph(t, f, consumer, newerRoot, host, "")
+	_, _, err = runReviewRequestGraph(t, f, consumer, newerRoot, host, "")
 	require.NoError(t, err)
 	updatedID, updated := onlyComment(t, host)
 	require.Equal(t, id, updatedID)
-	require.Contains(t, updated, outcome["runId"].(string))
+	require.Contains(t, updated, newerRoot.RunID.String())
 	require.Equal(t, 2, host.commentWrites)
 }
 
 func TestReviewRequestFindingsShowPartialFailure(t *testing.T) {
-	host := &reviewRequestHTTP{}
-	f, message := reviewRequestCompletedProducer(t, host, 2)
-	consumer := reviewFindingsConsumer(t, f, reviewFindingsSettings{publish: true, body: true, comment: true}, "")
-	root := deliverReviewRequestReport(t, f, consumer, message)
-	host.commentFails, host.commentStatus = 1, 403
-	_, _, err := runReviewRequestGraph(t, f, consumer, root, host, "")
-	require.NoError(t, err)
-	comment := reviewFindingsExecution(t, f, root, reviewFindingsCommentNode)
-	require.Equal(t, models.CanvasNodeExecutionResultFailed, comment.Result)
-	require.Contains(t, comment.ResultMessage, "Could not publish to the pull request comment")
-	body := reviewFindingsExecution(t, f, root, reviewFindingsBodyNodeID)
-	require.Equal(t, models.CanvasNodeExecutionResultPassed, body.Result)
-	require.Equal(t, "published", body.Metadata.Data()["status"])
-	require.Contains(t, reviewSection(host.description), "**Reviewers selected**")
-	require.Len(t, host.reviewerBodies, 1, "the saved reviewer request is kept")
-	require.Empty(t, host.comments)
+	for _, destination := range []string{"body", "comment", "activity"} {
+		t.Run(destination, func(t *testing.T) {
+			host := &reviewRequestHTTP{}
+			f, message := reviewRequestCompletedProducer(t, host, 2)
+			consumer := reviewFindingsConsumer(t, f, reviewFindingsSettings{publish: true, body: true, comment: true}, "")
+			setReviewRequestCheck(t, f, consumer, true, 2)
+			root := deliverReviewRequestReport(t, f, consumer, message)
+			scenario := ""
+			if destination == "activity" {
+				scenario = "activity failure"
+			}
+			host.bodyFails = destination == "body"
+			if destination == "comment" {
+				host.commentFails, host.commentStatus = 1, 403
+			}
+			_, agents, err := runReviewRequestGraph(t, f, consumer, root, host, scenario)
+			if destination == "activity" {
+				require.ErrorContains(t, err, "activity update unavailable")
+			} else {
+				require.NoError(t, err)
+			}
+			require.Equal(t, 1, agents)
+			require.Len(t, host.reviewerBodies, 1, "the saved reviewer request is kept")
+			require.Equal(t, models.CanvasNodeExecutionResultPassed, reviewFindingsExecution(t, f, root, "pr-check-apply").Result)
+			for name, node := range map[string]string{"body": reviewFindingsBodyNodeID, "comment": reviewFindingsCommentNode, "activity": "review-outcome-activity"} {
+				execution := reviewFindingsExecution(t, f, root, node)
+				if name == destination {
+					require.Equal(t, models.CanvasNodeExecutionResultFailed, execution.Result)
+					require.NotEmpty(t, execution.ResultMessage)
+					continue
+				}
+				require.Equal(t, models.CanvasNodeExecutionResultPassed, execution.Result, "other reporting destinations remain independent")
+			}
+		})
+	}
 }
 
 func TestReviewRequestFindingsKeepNewestSourceAndAttempt(t *testing.T) {
@@ -258,19 +285,18 @@ func TestReviewRequestFindingsKeepNewestSourceAndAttempt(t *testing.T) {
 	f, newer := emitReviewRequestReport(t, f, host, 3)
 	newerRoot := deliverReviewRequestReport(t, f, consumer, newer)
 
-	newerOutcome, _, err := runReviewRequestGraph(t, f, consumer, newerRoot, host, "")
+	_, _, err := runReviewRequestGraph(t, f, consumer, newerRoot, host, "")
 	require.NoError(t, err)
 	newest := reviewSection(host.description)
-	require.Contains(t, newest, newerOutcome["runId"].(string))
+	require.Contains(t, newest, newerRoot.RunID.String())
 	_, newestComment := onlyComment(t, host)
 
 	// The older report completes later on the same commit, with PR checks off.
 	_, _, err = runReviewRequestGraph(t, f, consumer, olderRoot, host, "")
 	require.NoError(t, err)
-	for _, node := range []string{reviewFindingsBodyNodeID, reviewFindingsCommentNode} {
-		execution := reviewFindingsExecution(t, f, olderRoot, node)
-		require.Equal(t, "skipped", execution.Metadata.Data()["status"], node)
-	}
+	var olderPublications int64
+	require.NoError(t, f.db.Model(&models.CanvasNodeExecution{}).Where("root_event_id = ? AND node_id IN ?", olderRoot.ID, []string{reviewFindingsBodyNodeID, reviewFindingsCommentNode}).Count(&olderPublications).Error)
+	require.Zero(t, olderPublications, "superseded reviewer selection must not reach publication")
 	require.Equal(t, newest, reviewSection(host.description))
 	_, comment := onlyComment(t, host)
 	require.Equal(t, newestComment, comment)
@@ -286,10 +312,10 @@ func TestReviewRequestFindingsKeepNewestSourceAndAttempt(t *testing.T) {
 	host.holdPublications = false
 	held := reviewFindingsExecution(t, f, firstRetry, reviewFindingsBodyNodeID)
 	retried := retryReviewRequest(t, f, consumer, trigger, newerRoot)
-	retriedOutcome, _, err := runReviewRequestGraph(t, f, consumer, retried, host, "")
+	_, _, err = runReviewRequestGraph(t, f, consumer, retried, host, "")
 	require.NoError(t, err)
 	latest := reviewSection(host.description)
-	require.Contains(t, latest, retriedOutcome["runId"].(string))
+	require.Contains(t, latest, retried.RunID.String())
 	processReviewRequestPublication(t, f, host, held)
 	require.NoError(t, f.db.First(held, "id = ?", held.ID).Error)
 	require.Equal(t, "skipped", held.Metadata.Data()["status"])
@@ -321,9 +347,10 @@ func TestReviewRequestFindingsSettingsChangesFencePendingWrites(t *testing.T) {
 			}
 			// Future attempts use the new activation.
 			f, newer := emitReviewRequestReport(t, f, host, 3)
-			outcome, _, err := runReviewRequestGraph(t, f, consumer, deliverReviewRequestReport(t, f, consumer, newer), host, "")
+			newerRoot := deliverReviewRequestReport(t, f, consumer, newer)
+			_, _, err = runReviewRequestGraph(t, f, consumer, newerRoot, host, "")
 			require.NoError(t, err)
-			require.Contains(t, reviewSection(host.description), outcome["runId"].(string))
+			require.Contains(t, reviewSection(host.description), newerRoot.RunID.String())
 		})
 	}
 }
@@ -352,4 +379,79 @@ func setReviewFindingsNode(t *testing.T, f publicationFixture, consumer *models.
 	require.NoError(t, f.db.Create(version).Error)
 	require.NoError(t, f.db.Model(consumer).Update("live_version_id", version.ID).Error)
 	consumer.LiveVersionID = &version.ID
+}
+
+func TestReviewRequestReconcilesRepeatedReportsBeforePublication(t *testing.T) {
+	for _, publishCheck := range []bool{false, true} {
+		t.Run(fmt.Sprint(publishCheck), func(t *testing.T) {
+			host := &reviewRequestHTTP{alreadyAsked: true} // This pre-existing request must never be adopted.
+			f, message := reviewRequestCompletedProducer(t, host, 2)
+			consumer := reviewFindingsConsumer(t, f, reviewFindingsSettings{publish: true, body: true, comment: true}, "")
+			setReviewRequestCheck(t, f, consumer, publishCheck, 2)
+			run := func(scenario string) map[string]any {
+				t.Helper()
+				root := deliverReviewRequestReport(t, f, consumer, message)
+				outcome, _, err := runReviewRequestGraph(t, f, consumer, root, host, scenario)
+				require.NoError(t, err)
+				return outcome
+			}
+			first := run("")
+			require.Equal(t, "already_covered", first["request-reviewers"].(map[string]any)["status"])
+			require.Empty(t, host.reviewerBodies)
+			replacement := run("replacement")
+			environment := host.selectionEnvironments[len(host.selectionEnvironments)-1]
+			var previous, requested []pulls.ReviewerIdentity
+			require.NoError(t, json.Unmarshal([]byte(environment["SUPERPLANE_REVIEW_REQUEST_PREVIOUS_SELECTION"]), &previous))
+			require.Len(t, previous, 1)
+			require.Equal(t, "octocat", previous[0].Login)
+			require.NoError(t, json.Unmarshal([]byte(environment["SUPERPLANE_REVIEW_REQUEST_CURRENT_REVIEWERS"]), &requested))
+			require.Contains(t, requested, pulls.ReviewerIdentity{ID: 2, Login: "octocat"})
+
+			require.Equal(t, "requested", replacement["request-reviewers"].(map[string]any)["status"])
+			require.Empty(t, host.reviewerRemovals, "pre-existing requests have no automation owner")
+			require.Contains(t, reviewSection(host.description), "| fallback-user |")
+			require.NotContains(t, reviewSection(host.description), "| octocat |")
+			repeated := run("replacement")
+			require.Equal(t, "already_covered", repeated["request-reviewers"].(map[string]any)["status"])
+			require.Len(t, host.reviewerBodies, 1)
+			published := reviewSection(host.description)
+			failedRoot := deliverReviewRequestReport(t, f, consumer, message)
+			failedOutcome, _, err := runReviewRequestGraph(t, f, consumer, failedRoot, host, "reported lookup error")
+			require.NoError(t, err)
+			require.NotContains(t, failedOutcome, "request-reviewers")
+			require.Equal(t, published, reviewSection(host.description))
+			require.Len(t, host.pendingReviewers, 1)
+			failedRoot = deliverReviewRequestReport(t, f, consumer, message)
+			host.discoveryError = true
+			failedOutcome, _, err = runReviewRequestGraph(t, f, consumer, failedRoot, host, "")
+			require.Error(t, err)
+			require.NotContains(t, failedOutcome, "request-reviewers")
+			host.discoveryError = false
+			require.Equal(t, published, reviewSection(host.description))
+			require.Len(t, host.pendingReviewers, 1)
+			// Select the pre-existing reviewer again. Withdraw only our replacement.
+			restored := run("")
+			require.Equal(t, "already_covered", restored["request-reviewers"].(map[string]any)["status"])
+			require.Equal(t, []string{"fallback-user"}, host.reviewerRemovals)
+			require.Contains(t, reviewSection(host.description), "| octocat |")
+			require.Empty(t, host.pendingReviewers)
+			// Add an owned request again, then let an all-positive report withdraw it.
+			run("replacement")
+			f, message = emitReviewRequestReport(t, f, host, 5)
+			unnecessary := run("favorable")
+			require.Contains(t, unnecessary, "withdraw-reviewers")
+			require.Empty(t, host.pendingReviewers)
+			require.Contains(t, reviewSection(host.description), "**No review needed**")
+			require.Equal(t, []string{"fallback-user", "fallback-user"}, host.reviewerRemovals)
+			if publishCheck {
+				store := workercontexts.NewPublicationContext(f.db, consumer.OrganizationID, mustReviewCheckNode(t, f, consumer), nil)
+				records, err := store.List("github.review-check/")
+				require.NoError(t, err)
+				require.Len(t, records, 1)
+				integration := reviewRequestManagedIntegration{IntegrationContext: reviewRequestIntegration(), store: store}
+				require.NoError(t, pulls.RefreshReviewCheck(core.IntegrationHookContext{Parameters: map[string]any{"key": records[0].Key}, Integration: integration, HTTP: host}))
+				require.Equal(t, "success", host.statuses[len(host.statuses)-1].GetState())
+			}
+		})
+	}
 }

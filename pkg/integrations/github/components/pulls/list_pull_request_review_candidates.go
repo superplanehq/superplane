@@ -19,8 +19,9 @@ type reviewCandidatesConfiguration struct {
 }
 
 type ReviewerIdentity struct {
-	ID    int64  `json:"id" mapstructure:"id"`
-	Login string `json:"login" mapstructure:"login"`
+	ID     int64  `json:"id" mapstructure:"id"`
+	Login  string `json:"login" mapstructure:"login"`
+	Reason string `json:"reason,omitempty" mapstructure:"reason"`
 }
 
 func (c *ListPullRequestReviewCandidates) Name() string {
@@ -33,7 +34,7 @@ func (c *ListPullRequestReviewCandidates) Description() string {
 	return "Find eligible human reviewers for a pull request"
 }
 func (c *ListPullRequestReviewCandidates) Documentation() string {
-	return `List human collaborators with write, maintain, or admin access. Exclude the pull request author and bots. Read every page; incomplete discovery fails the execution. Output includes the pull request author, state, head, base, and candidate IDs and logins.`
+	return `List human collaborators with write, maintain, or admin access. Exclude the pull request author and bots. Read every page; incomplete discovery fails the execution. Output includes the pull request author, state, head, base, and candidate IDs and logins. Include current requested reviewers, teams, and the previous selection saved by this automation. Never infer ownership from current GitHub requests or the pull request description.`
 }
 func (c *ListPullRequestReviewCandidates) Icon() string  { return "github" }
 func (c *ListPullRequestReviewCandidates) Color() string { return "gray" }
@@ -98,8 +99,17 @@ func (c *ListPullRequestReviewCandidates) Execute(ctx core.ExecutionContext) err
 		}
 		candidates = append(candidates, ReviewerIdentity{ID: user.GetID(), Login: user.GetLogin()})
 	}
+	previous, err := previousManagedReviewers(ctx, client, config.Repository, number)
+	if err != nil {
+		return err
+	}
+	requested := []ReviewerIdentity{}
+	for _, user := range pr.RequestedReviewers {
+		requested = append(requested, ReviewerIdentity{ID: user.GetID(), Login: user.GetLogin()})
+	}
 	return ctx.ExecutionState.Emit("default", "github.pullRequestReviewCandidates", []any{map[string]any{
 		"repository": config.Repository, "pullNumber": number, "state": pr.GetState(), "merged": pr.GetMerged(), "head": pr.Head, "base": pr.Base, "candidates": candidates,
+		"requestedReviewers": requested, "requestedTeams": pr.RequestedTeams, "previousSelection": previous,
 		"author": ReviewerIdentity{ID: pr.GetUser().GetID(), Login: pr.GetUser().GetLogin()},
 	}})
 }
@@ -116,6 +126,7 @@ func (c *ListPullRequestReviewCandidates) ExampleOutput() map[string]any {
 		"repository": "acme/app", "pullNumber": 42, "state": "open", "merged": false,
 		"author": map[string]any{"id": 1, "login": "author"},
 		"head":   map[string]any{"sha": "abc"}, "base": map[string]any{"ref": "main", "sha": "base-sha"},
+		"requestedReviewers": []any{}, "requestedTeams": []any{}, "previousSelection": []any{},
 		"candidates": []any{map[string]any{"id": 123, "login": "octocat"}},
 	}}
 }

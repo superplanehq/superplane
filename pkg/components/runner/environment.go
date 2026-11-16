@@ -155,10 +155,22 @@ func ResolveExecutionEnvironment(
 	environmentFrom []EnvironmentFromEntry,
 	environment []EnvironmentVariable,
 ) (ResolvedEnvironment, error) {
+	var resolved ResolvedEnvironment
 	if ctx.ResolvedEnvironment != nil {
-		return *ctx.ResolvedEnvironment, nil
+		resolved = *ctx.ResolvedEnvironment
+	} else {
+		var err error
+		resolved, err = ResolveEnvironment(ctx.Secrets, environmentFrom, environment)
+		if err != nil {
+			return ResolvedEnvironment{}, err
+		}
 	}
-	return ResolveEnvironment(ctx.Secrets, environmentFrom, environment)
+	// Read decision uses the fallback saved for this attempt, including a cleared value.
+	config, _ := ctx.Configuration.(map[string]any)
+	if fallback, ok := config["fallbackReviewer"].(string); ok {
+		resolved.Variables = upsertEnvironment(slices.Clone(resolved.Variables), "SUPERPLANE_REVIEW_REQUEST_FALLBACK", fallback)
+	}
+	return resolved, nil
 }
 
 func ResolveEnvironment(
