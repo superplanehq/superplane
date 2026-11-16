@@ -101,6 +101,68 @@ describe("createFixtureFetch run routes", () => {
   });
 });
 
+describe("createFixtureFetch canvas versions", () => {
+  const generalVersions = {
+    versions: [{ metadata: { id: "version-1" } }, { metadata: { id: "version-2" } }],
+    totalCount: 10,
+    hasNextPage: true,
+  };
+  const latestVersions = {
+    versions: [{ metadata: { id: "latest-version" } }],
+    totalCount: 5,
+    hasNextPage: true,
+  };
+  const versionsFixture: CanvasAppFixture = {
+    ...baseFixture,
+    versions: generalVersions,
+    versionsLatest: latestVersions,
+  };
+  const emptyPage = { versions: [], totalCount: 0, hasNextPage: false };
+
+  it.each(["?state=STATE_DRAFT", "?state=STATE_DRAFT&limit=1"])(
+    "returns no drafts with populated fixtures for %s",
+    async (query) => {
+      const response = await fetchFixture(`/api/v1/canvases/canvas-1/versions${query}`, versionsFixture);
+      await expect(response.json()).resolves.toEqual(emptyPage);
+    },
+  );
+
+  it.each(["1", "01", "1suffix"])("prefers the latest payload when limit=%s parses as one", async (limit) => {
+    const response = await fetchFixture(`/api/v1/canvases/canvas-1/versions?limit=${limit}`, versionsFixture);
+    await expect(response.json()).resolves.toEqual(latestVersions);
+  });
+
+  it("slices the general list and counts the slice when the latest payload is missing", async () => {
+    const response = await fetchFixture("/api/v1/canvases/canvas-1/versions?limit=1", {
+      ...baseFixture,
+      versions: generalVersions,
+    });
+    await expect(response.json()).resolves.toEqual({
+      versions: [{ metadata: { id: "version-1" } }],
+      totalCount: 1,
+      hasNextPage: false,
+    });
+  });
+
+  it.each([undefined, {}])("returns an empty latest page without a general version array (%j)", async (versions) => {
+    const response = await fetchFixture("/api/v1/canvases/canvas-1/versions?limit=1", { ...baseFixture, versions });
+    await expect(response.json()).resolves.toEqual(emptyPage);
+  });
+
+  it.each(["", "?limit=2"])("returns the general payload unchanged for %s", async (query) => {
+    const response = await fetchFixture(`/api/v1/canvases/canvas-1/versions${query}`, versionsFixture);
+    await expect(response.json()).resolves.toEqual(generalVersions);
+  });
+
+  it.each([undefined, latestVersions])(
+    "returns an empty general page even when only a latest payload exists (%j)",
+    async (versionsLatest) => {
+      const response = await fetchFixture("/api/v1/canvases/canvas-1/versions", { ...baseFixture, versionsLatest });
+      await expect(response.json()).resolves.toEqual(emptyPage);
+    },
+  );
+});
+
 describe("createFixtureFetch canvas detail", () => {
   it("exposes a live version so edit sessions can start", async () => {
     const { canvasAppIds, createFixtureFetch: createDefaultFixtureFetch } = await import("./handlers");
