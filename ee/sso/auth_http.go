@@ -297,7 +297,7 @@ func (s *Service) backchannelLogout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if identity != nil {
-		if err := models.RevokeSSOIdentitySessions(database.DB(r.Context()), conn.ID, identity.ID, s.now()); err != nil {
+		if err := identity.RevokeSessions(database.DB(r.Context()), s.now()); err != nil {
 			writeBackchannelError(w)
 			return
 		}

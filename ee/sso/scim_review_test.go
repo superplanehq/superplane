@@ -2,6 +2,7 @@ package sso
 
 import (
 	"net/http"
+	"sync"
 	"testing"
 	"time"
 
@@ -242,6 +243,53 @@ func TestSCIMCreateInactiveRemovesTheAdoptedMember(t *testing.T) {
 	owner, err := models.FindActiveUserByEmail(f.r.Organization.ID.String(), "owner@example.com")
 	require.NoError(t, err)
 	require.True(t, owner.IsOwner)
+}
+
+func TestSCIMInactiveCreateKeepsTheAcceptedUserName(t *testing.T) {
+	f := newFlow(t)
+	f.setOwnerEmail("owner@example.com")
+	f.verifyExample()
+	conn := f.put(connectionInput(true))
+	require.NoError(t, f.signIn(conn, "ada-subject", "ada@example.com"))
+	created, err := f.service.CreateSCIMToken(f.ctx(), f.r.Organization.ID, f.r.Account.ID, "Okta")
+	require.NoError(t, err)
+
+	names := []string{"ada@example.com", "ada.other@example.com"}
+	codes := make([]int, len(names))
+	bodies := make([]string, len(names))
+	start := make(chan struct{})
+	var group sync.WaitGroup
+	for i, name := range names {
+		group.Add(1)
+		go func() {
+			defer group.Done()
+			<-start
+			body := `{"userName":"` + name + `","active":false,"emails":[{"value":"ada@example.com","primary":true}]}`
+			response := f.scim(http.MethodPost, conn, created.Secret, "/Users", body)
+			codes[i] = response.Code
+			bodies[i] = response.Body.String()
+		}()
+	}
+	close(start)
+	group.Wait()
+
+	require.ElementsMatch(t, []int{http.StatusCreated, http.StatusConflict}, codes)
+	var accepted string
+	for i, code := range codes {
+		if code == http.StatusCreated {
+			require.Contains(t, bodies[i], `"active":false`)
+			accepted = names[i]
+		} else {
+			require.Contains(t, bodies[i], "uniqueness")
+		}
+	}
+	identity, err := models.FindSSOIdentityBySubject(database.Conn(), conn.ID, "ada-subject")
+	require.NoError(t, err)
+	require.NotNil(t, identity.SCIMUserName)
+	require.Equal(t, accepted, *identity.SCIMUserName)
+	require.False(t, identity.Active)
+	_, err = models.FindActiveUserByEmail(f.r.Organization.ID.String(), "ada@example.com")
+	require.Error(t, err)
 }
 
 func TestSCIMUserNameIsUniqueIgnoringCase(t *testing.T) {

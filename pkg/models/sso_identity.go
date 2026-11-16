@@ -39,6 +39,15 @@ func (identity *SSOIdentity) Save(tx *gorm.DB) error {
 	return tx.Save(identity).Error
 }
 
+func (identity *SSOIdentity) RevokeSessions(tx *gorm.DB, at time.Time) error {
+	return tx.Model(&SSOIdentity{}).
+		Where("connection_id = ? AND id = ?", identity.ConnectionID, identity.ID).
+		Updates(map[string]any{
+			"sessions_revoked_at": at,
+			"updated_at":          time.Now(),
+		}).Error
+}
+
 func LockSSOIdentity(tx *gorm.DB, connectionID, id uuid.UUID) (*SSOIdentity, error) {
 	var identity SSOIdentity
 	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
@@ -48,25 +57,6 @@ func LockSSOIdentity(tx *gorm.DB, connectionID, id uuid.UUID) (*SSOIdentity, err
 		return nil, err
 	}
 	return &identity, nil
-}
-
-func CountSSOIdentities(tx *gorm.DB, connectionID uuid.UUID) (int64, error) {
-	var count int64
-	err := tx.Model(&SSOIdentity{}).Where("connection_id = ?", connectionID).Count(&count).Error
-	return count, err
-}
-
-func ClearSSOIdentityIDTokens(tx *gorm.DB, connectionID uuid.UUID) error {
-	return tx.Model(&SSOIdentity{}).Where("connection_id = ?", connectionID).Update("id_token", nil).Error
-}
-
-func RevokeSSOIdentitySessions(tx *gorm.DB, connectionID, id uuid.UUID, at time.Time) error {
-	return tx.Model(&SSOIdentity{}).
-		Where("connection_id = ? AND id = ?", connectionID, id).
-		Updates(map[string]any{
-			"sessions_revoked_at": at,
-			"updated_at":          time.Now(),
-		}).Error
 }
 
 func FindSSOIdentityBySubject(tx *gorm.DB, connectionID uuid.UUID, subject string) (*SSOIdentity, error) {

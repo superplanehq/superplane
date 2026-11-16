@@ -145,7 +145,7 @@ func (s *Service) markDomainVerified(ctx context.Context, orgID, domainID, accou
 		if accountID != uuid.Nil {
 			locked.VerifiedBy = &accountID
 		}
-		if err := models.MarkOrganizationDomainVerified(tx, locked); err != nil {
+		if err := locked.MarkVerified(tx); err != nil {
 			if isUnique(err) {
 				return conflict("Another organization already verified this domain.")
 			}

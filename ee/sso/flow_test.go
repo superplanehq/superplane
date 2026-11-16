@@ -591,3 +591,25 @@ func TestRecordTestDoesNotRestoreADisabledConnection(t *testing.T) {
 	require.NotNil(t, result)
 	require.True(t, result.OK)
 }
+
+func TestRecordTestSkipsAReplacedConfiguration(t *testing.T) {
+	f := newFlow(t)
+	f.verifyExample()
+	input := connectionInput(true)
+	f.put(input)
+	loaded, err := models.FindSSOConnectionByOrganization(database.Conn(), f.r.Organization.ID)
+	require.NoError(t, err)
+
+	input.Issuer = "https://other.okta.com"
+	input.ClientSecret = ""
+	_, err = f.service.PutConnection(f.ctx(), f.r.Organization.ID, f.r.Account.ID, input)
+	require.NoError(t, err)
+	require.NoError(t, f.service.recordTest(f.ctx(), loaded, true, "", "subject", "ada@example.com", "Ada"))
+
+	saved, err := models.FindSSOConnectionByOrganization(database.Conn(), f.r.Organization.ID)
+	require.NoError(t, err)
+	cfg, err := saved.OIDCConfig()
+	require.NoError(t, err)
+	require.Equal(t, "https://other.okta.com", cfg.Issuer)
+	require.Nil(t, saved.LastTestedAt)
+}

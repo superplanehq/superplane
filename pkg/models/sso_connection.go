@@ -141,14 +141,6 @@ func (c *SSOConnection) TestResult() (*SSOTestResultDocument, error) {
 	return &result, nil
 }
 
-func RecordSSOConnectionTest(tx *gorm.DB, id uuid.UUID, at time.Time, result []byte) error {
-	return tx.Model(&SSOConnection{}).Where("id = ?", id).Updates(map[string]any{
-		"last_tested_at":   at,
-		"last_test_result": datatypes.JSON(result),
-		"updated_at":       time.Now(),
-	}).Error
-}
-
 func LockSSOConnection(tx *gorm.DB, id uuid.UUID) (*SSOConnection, error) {
 	var connection SSOConnection
 	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", id).First(&connection).Error
@@ -196,8 +188,26 @@ func (c *SSOConnection) Save(tx *gorm.DB) error {
 	return tx.Save(c).Error
 }
 
-func DeleteSSOConnection(tx *gorm.DB, id uuid.UUID) error {
-	return tx.Where("id = ?", id).Delete(&SSOConnection{}).Error
+func (c *SSOConnection) Delete(tx *gorm.DB) error {
+	return tx.Where("id = ?", c.ID).Delete(&SSOConnection{}).Error
+}
+
+func (c *SSOConnection) RecordTest(tx *gorm.DB, at time.Time, result []byte) error {
+	return tx.Model(&SSOConnection{}).Where("id = ?", c.ID).Updates(map[string]any{
+		"last_tested_at":   at,
+		"last_test_result": datatypes.JSON(result),
+		"updated_at":       time.Now(),
+	}).Error
+}
+
+func (c *SSOConnection) CountIdentities(tx *gorm.DB) (int64, error) {
+	var count int64
+	err := tx.Model(&SSOIdentity{}).Where("connection_id = ?", c.ID).Count(&count).Error
+	return count, err
+}
+
+func (c *SSOConnection) ClearIdentityIDTokens(tx *gorm.DB) error {
+	return tx.Model(&SSOIdentity{}).Where("connection_id = ?", c.ID).Update("id_token", nil).Error
 }
 
 // ValidSSOPreset reports whether the preset name is one this release stores.

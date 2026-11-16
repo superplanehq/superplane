@@ -202,6 +202,13 @@ func (h *Handler) createUser(w http.ResponseWriter, r *http.Request, conn *model
 		identity.ProvisionedBy = models.SSOProvisionedBySCIM
 		identity.UpdatedAt = h.now()
 		if !active {
+			now := h.now()
+			identity.Active = false
+			identity.SessionsRevokedAt = &now
+			if err := identity.Save(tx); err != nil {
+				return err
+			}
+			created = identity
 			deactivateExisting = identity
 			return nil
 		}
@@ -220,11 +227,10 @@ func (h *Handler) createUser(w http.ResponseWriter, r *http.Request, conn *model
 		return
 	}
 	if deactivateExisting != nil {
-		if err := h.deactivate(r, conn, deactivateExisting); err != nil {
+		if err := h.finishDeactivation(r, conn, deactivateExisting); err != nil {
 			writeMapped(w, r, err)
 			return
 		}
-		created = deactivateExisting
 	}
 	logging.AddRequestLogFields(r.Context(), map[string]any{
 		"action": "scim_user_create", "object": "sso_identity", "outcome": "success",
@@ -371,6 +377,10 @@ func (h *Handler) deactivate(r *http.Request, conn *models.SSOConnection, identi
 	}); err != nil {
 		return err
 	}
+	return h.finishDeactivation(r, conn, identity)
+}
+
+func (h *Handler) finishDeactivation(r *http.Request, conn *models.SSOConnection, identity *models.SSOIdentity) error {
 	keptOwner, err := h.removeMembership(r, conn, identity)
 	if err != nil {
 		return err

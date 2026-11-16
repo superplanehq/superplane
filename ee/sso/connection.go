@@ -72,7 +72,7 @@ func (s *Service) PutConnection(ctx context.Context, orgID, accountID uuid.UUID,
 			return err
 		}
 		if existing != nil && previous.Issuer != "" && previous.Issuer != normalized.Issuer {
-			count, err := models.CountSSOIdentities(tx, conn.ID)
+			count, err := conn.CountIdentities(tx)
 			if err != nil {
 				return err
 			}
@@ -88,7 +88,7 @@ func (s *Service) PutConnection(ctx context.Context, orgID, accountID uuid.UUID,
 			}
 		}
 		if !conn.IDPLogoutEnabled {
-			if err := models.ClearSSOIdentityIDTokens(tx, conn.ID); err != nil {
+			if err := conn.ClearIdentityIDTokens(tx); err != nil {
 				return err
 			}
 		}
@@ -174,7 +174,7 @@ func (s *Service) DeleteConnection(ctx context.Context, orgID uuid.UUID) error {
 	if err != nil {
 		return err
 	}
-	return models.DeleteSSOConnection(database.DB(ctx), conn.ID)
+	return conn.Delete(database.DB(ctx))
 }
 
 func (s *Service) connectionForOrg(ctx context.Context, orgID uuid.UUID) (*models.SSOConnection, error) {
@@ -329,10 +329,27 @@ func (s *Service) recordTest(ctx context.Context, conn *models.SSOConnection, ok
 		return err
 	}
 	now := s.now()
-	if err := models.RecordSSOConnectionTest(database.DB(ctx), conn.ID, now, raw); err != nil {
+	tested, err := conn.OIDCConfig()
+	if err != nil {
 		return err
 	}
-	conn.LastTestedAt = &now
-	conn.LastTestResult = raw
-	return nil
+	return database.DB(ctx).Transaction(func(tx *gorm.DB) error {
+		current, err := models.LockSSOConnection(tx, conn.ID)
+		if err != nil {
+			return err
+		}
+		latest, err := current.OIDCConfig()
+		if err != nil {
+			return err
+		}
+		if tested.Issuer != latest.Issuer || tested.ClientID != latest.ClientID {
+			return nil
+		}
+		if err := current.RecordTest(tx, now, raw); err != nil {
+			return err
+		}
+		conn.LastTestedAt = &now
+		conn.LastTestResult = raw
+		return nil
+	})
 }
