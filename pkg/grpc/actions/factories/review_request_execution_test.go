@@ -215,7 +215,10 @@ func (h *reviewRequestHTTP) Do(request *http.Request) (*http.Response, error) {
 		if h.alreadyAsked {
 			requestedReviewers = append(requestedReviewers, pulls.ReviewerIdentity{ID: 2, Login: "octocat"})
 		}
-		encoded, _ := json.Marshal(requestedReviewers)
+		encoded, err := json.Marshal(requestedReviewers)
+		if err != nil {
+			return nil, err
+		}
 		requested := string(encoded)
 		state := "open"
 		if h.closed {

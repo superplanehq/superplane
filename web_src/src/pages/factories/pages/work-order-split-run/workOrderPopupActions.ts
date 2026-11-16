@@ -46,7 +46,7 @@ export function footerMutationHandlers(
 export function draftStartAction(
   kind: SplitRunFixture["footer"]["kind"],
   onDispatch: ((model?: string, thinkingLevel?: string) => Promise<void>) | undefined,
-  selectedModel: string,
+  selectedModel?: string,
   selectedThinking?: string,
 ) {
   if (kind !== "draft") {
