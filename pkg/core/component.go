@@ -99,6 +99,8 @@ type HTTPContext interface {
  * to control the state and metadata of each execution of it.
  */
 type SetupContext struct {
+	WorkflowID    string
+	NodeID        string
 	Logger        *log.Entry
 	Configuration any
 	HTTP          HTTPContext

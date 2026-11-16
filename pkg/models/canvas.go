@@ -185,10 +185,7 @@ func (c *Canvas) SoftDeleteInTransaction(tx *gorm.DB) error {
 	timestamp := now.Unix()
 
 	newName := fmt.Sprintf("%s (deleted-%d)", c.Name, timestamp)
-	return tx.Model(c).Updates(map[string]any{
-		"name":       newName,
-		"deleted_at": now,
-	}).Error
+	return tx.Model(c).Updates(map[string]any{"name": newName, "deleted_at": now}).Error
 }
 
 func FindCanvas(orgID, id uuid.UUID) (*Canvas, error) {

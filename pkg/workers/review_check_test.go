@@ -1,6 +1,9 @@
 package workers
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -16,10 +19,12 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	canvasactions "github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
 	"github.com/superplanehq/superplane/pkg/integrations/github/components/pulls"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
 	"github.com/superplanehq/superplane/test/support"
+	testcontexts "github.com/superplanehq/superplane/test/support/contexts"
 	"github.com/superplanehq/superplane/test/support/impl"
 	mocks "github.com/superplanehq/superplane/test/support/mocks/github"
 	"gorm.io/datatypes"
@@ -34,16 +39,21 @@ type reviewCheckIntegration struct {
 func (c reviewCheckIntegration) Publications() core.PublicationStore { return c.store }
 
 type reviewCheckHTTP struct {
-	t            *testing.T
-	mu           sync.Mutex
-	head         string
-	closed       bool
-	reviews      []map[string]any
-	failReviews  bool
-	failWrite    bool
-	failPR       bool
-	requestCount int
-	writes       []struct {
+	t                 *testing.T
+	mu                sync.Mutex
+	head              string
+	closed            bool
+	reviews           []map[string]any
+	failReviews       bool
+	failWrite         bool
+	writeStatus       int
+	checkRuns         []*github.CheckRun
+	checkWrites       []github.CheckRun
+	loseCheckResponse bool
+	checkRunPageSize  int
+	failPR            bool
+	requestCount      int
+	writes            []struct {
 		SHA    string
 		Status github.RepoStatus
 	}
@@ -55,13 +65,19 @@ func (h *reviewCheckHTTP) Do(request *http.Request) (*http.Response, error) {
 	if request.Method == http.MethodGet && strings.HasSuffix(request.URL.Path, "/pulls/42") && h.onRead != nil {
 		h.onRead()
 	}
-	if request.Method == http.MethodPost && strings.Contains(request.URL.Path, "/statuses/") && h.onWrite != nil {
+	if (request.Method == http.MethodPost || request.Method == http.MethodPatch) && (strings.Contains(request.URL.Path, "/statuses/") || strings.Contains(request.URL.Path, "/check-runs")) && h.onWrite != nil {
 		h.onWrite()
 	}
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	path := request.URL.Path
+	if strings.Contains(path, "/check-runs") {
+		return h.checkRequest(request)
+	}
 	if request.Method == http.MethodPost && strings.Contains(path, "/statuses/") {
+		if h.writeStatus > 0 {
+			return mocks.GitHubResponse(h.writeStatus, `{"message":"Resource not accessible by integration"}`), nil
+		}
 		if h.failWrite {
 			return mocks.GitHubResponse(503, `{"message":"unavailable"}`), nil
 		}
@@ -118,19 +134,24 @@ func (h *reviewCheckHTTP) Do(request *http.Request) (*http.Response, error) {
 }
 
 type reviewCheckFixture struct {
-	t            *testing.T
-	r            *support.ResourceRegistry
-	db           *gorm.DB
-	canvas       *models.Canvas
-	nodes        []models.CanvasNode
-	root         *models.CanvasEvent
-	installation *models.Integration
-	integration  reviewCheckIntegration
-	http         *reviewCheckHTTP
-	ctx          core.ExecutionContext
+	activationNode string
+	t              *testing.T
+	r              *support.ResourceRegistry
+	db             *gorm.DB
+	canvas         *models.Canvas
+	nodes          []models.CanvasNode
+	root           *models.CanvasEvent
+	installation   *models.Integration
+	integration    reviewCheckIntegration
+	http           *reviewCheckHTTP
+	ctx            core.ExecutionContext
 }
 
 func newReviewCheckFixture(t *testing.T) *reviewCheckFixture {
+	return newPullRequestCheckFixture(t, "github.setPullRequestReviewCheck")
+}
+
+func newPullRequestCheckFixture(t *testing.T, component string) *reviewCheckFixture {
 	t.Helper()
 	r := support.Setup(t)
 	t.Cleanup(r.Close)
@@ -140,7 +161,7 @@ func newReviewCheckFixture(t *testing.T) *reviewCheckFixture {
 	canvas, nodes := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{
 		{NodeID: "trigger", Type: models.NodeTypeTrigger, Ref: datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "onBroadcast"}})},
 		{NodeID: "ensure", Type: models.NodeTypeComponent, AppInstallationID: &installation.ID, Ref: datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "github.ensurePullRequestReviewers"}})},
-		{NodeID: "check", Type: models.NodeTypeComponent, AppInstallationID: &installation.ID, Ref: datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "github.setPullRequestReviewCheck"}})},
+		{NodeID: "check", Type: models.NodeTypeComponent, AppInstallationID: &installation.ID, Ref: datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: component}})},
 	}, nil)
 	for i := 1; i < len(nodes); i++ {
 		nodes[i].AppInstallationID = &installation.ID
@@ -172,13 +193,14 @@ func (f *reviewCheckFixture) processDue() error {
 	provider, err := f.r.Registry.GetIntegration("github")
 	require.NoError(f.t, err)
 	f.r.Registry.Integrations["github"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{
-		Hooks: provider.Hooks(),
+		Actions: provider.Actions(),
+		Hooks:   provider.Hooks(),
 		HandleHook: func(ctx core.IntegrationHookContext) error {
 			ctx.HTTP, ctx.Integration = f.http, f.integration
 			return provider.HandleHook(ctx)
 		},
 	})
-	f.t.Cleanup(func() { f.r.Registry.Integrations["github"] = provider })
+	defer func() { f.r.Registry.Integrations["github"] = provider }()
 	requests := pendingActionRequests(f.t, f.installation.ID, pulls.ReviewCheckHook)
 	require.Len(f.t, requests, 1)
 	require.NoError(f.t, f.db.Model(&requests[0]).Update("run_at", time.Now().Add(-time.Second)).Error)
@@ -193,6 +215,9 @@ func (f *reviewCheckFixture) executionContext(execution *models.CanvasNodeExecut
 }
 func (f *reviewCheckFixture) apply(phase string, reviewers []pulls.ReviewerIdentity, outcome string) error {
 	f.ctx.Configuration = map[string]any{"repository": "hello", "pullNumber": 42, "assessedSha": "abc", "context": "team/review", "phase": phase, "reason": "Review decision", "reviewers": reviewers, "reviewerRequestExecutionId": outcome}
+	if f.activationNode != "" {
+		f.ctx.Configuration.(map[string]any)["activationNodeId"] = f.activationNode
+	}
 	return (&pulls.SetPullRequestReviewCheck{}).Execute(f.ctx)
 }
 func (f *reviewCheckFixture) ensure(reviewers []pulls.ReviewerIdentity) string {
@@ -249,9 +274,20 @@ func TestReviewCheckTracksCurrentApprovals(t *testing.T) {
 		} else {
 			f.http.reviews = append(f.http.reviews, decision)
 		}
-		require.NoError(t, f.refresh())
+		body := []byte(`{"repository":{"full_name":"testhq/hello"},"pull_request":{"number":42}}`)
+		signature := hmac.New(sha256.New, []byte("review-hook-secret"))
+		_, err := signature.Write(body)
+		require.NoError(t, err)
+		headers := http.Header{"X-Github-Event": {"pull_request_review"}, "X-Hub-Signature-256": {"sha256=" + hex.EncodeToString(signature.Sum(nil))}}
+		code, _, err := (&pulls.SetPullRequestReviewCheck{}).HandleWebhook(core.WebhookRequestContext{Headers: headers, Body: body, Integration: f.integration, Webhook: &testcontexts.NodeWebhookContext{Secret: "review-hook-secret"}})
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, code)
+		require.NoError(t, f.processDue())
 		require.Equal(t, step.want, f.state(), step.state)
 	}
+	var executions int64
+	require.NoError(t, f.db.Model(&models.CanvasNodeExecution{}).Where("workflow_id = ?", f.canvas.ID).Count(&executions).Error)
+	require.EqualValues(t, 2, executions, "review events must not start new executions")
 	require.Zero(t, f.http.requestCount, "tracking must not request reviews a second time")
 	f.http.head = "new-head"
 	require.NoError(t, f.refresh())
@@ -648,4 +684,208 @@ func TestPublicationOrderingUsesBroadcastProvenanceAndOriginalRetry(t *testing.T
 	require.NoError(t, f.apply("disabled", nil, ""))
 	require.False(t, f.record().Disabled, "a stale attempt cannot disable a newer requirement")
 	require.Equal(t, current, f.record().Generation)
+}
+
+// Publish actual versions so the attempt owner, rather than the test, supplies
+// participation snapshots. Setup and durable integration requests stay real.
+type reviewCheckSetupAction struct {
+	core.Action
+	integration core.IntegrationContext
+	http        core.HTTPContext
+}
+
+func (a reviewCheckSetupAction) Setup(ctx core.SetupContext) error {
+	ctx.Integration, ctx.HTTP = a.integration, a.http
+	return a.Action.Setup(ctx)
+}
+
+func (f *reviewCheckFixture) saveActivation(enabled bool, generation int, pause ...bool) {
+	f.r.Registry.Actions["github.setPullRequestReviewCheck"] = reviewCheckSetupAction{Action: &pulls.SetPullRequestReviewCheck{}, integration: f.integration, http: f.http}
+	version, err := models.FindLiveCanvasVersionInTransaction(f.db, f.canvas.ID)
+	require.NoError(f.t, err)
+	for i := range version.Nodes {
+		node := &version.Nodes[i]
+		node.ErrorMessage = nil
+		if node.ID == "trigger" && len(pause) > 0 {
+			node.Configuration = map[string]any{"enabled": !pause[0]}
+		}
+		if node.ID != "check" {
+			continue
+		}
+		integrationID := f.installation.ID.String()
+		node.IntegrationID = &integrationID
+		node.Configuration = map[string]any{"repository": "{{ root().data.repository }}", "pullNumber": "{{ root().data.pullNumber }}", "enabled": enabled, "activationGeneration": generation, "activationNodeId": "check", "assessedSha": "abc", "context": "team/review", "phase": "pending_selection", "reason": "Select required reviewers"}
+	}
+	require.NoError(f.t, canvasactions.PublishGeneratedCanvasNodesWithOwner(f.t.Context(), f.db, f.canvas, nil, "Save publication settings", version.Nodes, version.Edges, changesets.CanvasPublisherOptions{Registry: f.r.Registry, OrgID: f.r.Organization.ID, Encryptor: f.r.Encryptor, AuthService: f.r.AuthService, WebhookBaseURL: "http://localhost:8000"}))
+	current, err := models.FindCanvasNode(f.db, f.canvas.ID, "check")
+	require.NoError(f.t, err)
+	if current.StateReason != nil {
+		f.t.Fatalf("check setup failed: %s", *current.StateReason)
+	}
+	require.Equal(f.t, models.CanvasNodeStateReady, current.State)
+	require.Equal(f.t, enabled, current.Configuration.Data()["enabled"])
+
+}
+
+func TestReviewCheckSavedActivationFencesInFlightAttempts(t *testing.T) {
+	f := newReviewCheckFixture(t)
+	f.activationNode = "check"
+	f.saveActivation(false, 1)
+	f.attempt(support.EmitCanvasEventForNode(t, f.canvas.ID, "trigger", "default", nil))
+	disabledAttempt := f.root
+	f.saveActivation(true, 2)
+	require.NoError(t, f.apply("pending_selection", nil, ""))
+	require.Empty(t, pendingActionRequests(t, f.installation.ID, pulls.ReviewCheckHook), "enabling cannot attach checks to admitted attempts")
+	f.attempt(support.EmitCanvasEventForNode(t, f.canvas.ID, "trigger", "default", nil))
+	enabledAttempt := f.root
+	require.NoError(t, f.apply("pending_selection", nil, ""))
+	require.NoError(t, f.processDue())
+	require.Equal(t, "pending", f.state())
+	// Pausing selection does not invalidate approval tracking.
+	f.saveActivation(true, 2, true)
+	require.False(t, f.record().Disabled)
+	f.saveActivation(false, 2)
+	require.True(t, f.record().Disabled)
+	f.http.failWrite = true
+	require.Error(t, f.processDue())
+	f.http.failWrite = false
+	require.NoError(t, f.processDue())
+	require.Equal(t, "success", f.state())
+	require.Nil(t, f.record().WakeAt)
+	f.saveActivation(true, 5, false) // PRs can miss intervening activation generations.
+	generation := f.record().Generation
+	for _, old := range []*models.CanvasEvent{disabledAttempt, enabledAttempt} {
+		f.attempt(old)
+		require.NoError(t, f.apply("no_review", nil, ""))
+		require.Equal(t, generation, f.record().Generation)
+		require.True(t, f.record().Disabled)
+	}
+	retry, err := canvasactions.ReemitTriggerEvent(t.Context(), f.db, f.canvas, "trigger", enabledAttempt.ID)
+	require.NoError(t, err)
+	retried, err := models.FindCanvasEventInTransaction(f.db, uuid.MustParse(retry.EventId))
+	require.NoError(t, err)
+	f.attempt(retried)
+	require.NoError(t, f.apply("no_review", nil, ""))
+	require.NoError(t, f.processDue())
+	require.False(t, f.record().Disabled)
+	require.Equal(t, int64(5), f.record().ActivationGeneration)
+}
+
+func TestReviewCheckRemovalReleasesDormantChecks(t *testing.T) {
+	for _, removeNode := range []bool{false, true} {
+		t.Run(fmt.Sprintf("remove_node=%t", removeNode), func(t *testing.T) {
+			f := newReviewCheckFixture(t)
+			f.activationNode = "check"
+			f.saveActivation(true, 4)
+			f.attempt(support.EmitCanvasEventForNode(t, f.canvas.ID, "trigger", "default", nil))
+			require.NoError(t, f.apply("pending_selection", nil, ""))
+			f.http.closed = true
+			require.NoError(t, f.processDue())
+			require.Nil(t, f.record().WakeAt)
+			if removeNode {
+				_, err := models.DeleteCanvasNodeWithResult(f.db, f.nodes[2])
+				require.NoError(t, err)
+			} else {
+				_, err := canvasactions.DeleteCanvas(t.Context(), f.db, f.canvas)
+				require.NoError(t, err)
+				deleted, err := models.FindUnscopedCanvas(f.canvas.ID)
+				require.NoError(t, err)
+				require.Empty(t, pendingActionRequests(t, f.installation.ID, pulls.ReviewCheckHook), "deletion must defer publication work")
+				require.NoError(t, NewCanvasCleanupWorker().LockAndProcessCanvas(*deleted))
+			}
+			require.NoError(t, f.processDue()) // Persist the disabled decision.
+			require.True(t, f.record().Disabled)
+			require.NoError(t, f.processDue()) // Deliver the release.
+			require.Equal(t, "success", f.state())
+			require.Equal(t, "Review request check disabled", f.http.writes[len(f.http.writes)-1].Status.GetDescription())
+			require.Nil(t, f.record().WakeAt)
+		})
+	}
+}
+
+func TestReviewCheckTracksApprovalsAfterRunRetention(t *testing.T) {
+	f := newReviewCheckFixture(t)
+	f.activationNode = "check"
+	f.saveActivation(true, 2)
+	f.attempt(support.EmitCanvasEventForNode(t, f.canvas.ID, "trigger", "default", nil))
+	reviewers := []pulls.ReviewerIdentity{{ID: 2, Login: "first"}}
+	outcome := f.ensure(reviewers)
+	require.NoError(t, f.apply("required_reviewers", reviewers, outcome))
+	require.NoError(t, f.refresh())
+	f.finishAction()
+	var run models.CanvasRun
+	require.NoError(t, f.db.First(&run, "id = ?", f.ctx.RunID).Error)
+	_, err := run.DeleteChain(f.db)
+	require.NoError(t, err)
+	for _, step := range []struct{ decision, want string }{{"APPROVED", "success"}, {"DISMISSED", "pending"}} {
+		f.http.reviews = []map[string]any{reviewDecision(1, 2, "first", step.decision, "abc")}
+		require.NoError(t, pulls.WakeReviewChecks(f.integration, "pull_request_review", []byte(`{"repository":{"full_name":"testhq/hello"},"pull_request":{"number":42}}`)))
+		require.NoError(t, f.processDue())
+		require.Equal(t, step.want, f.state())
+	}
+	f.saveActivation(false, 2)
+	require.NoError(t, f.processDue())
+	require.True(t, f.record().Disabled)
+	require.Equal(t, "Review request check disabled", f.http.writes[len(f.http.writes)-1].Status.GetDescription())
+}
+
+// PublicationStore forbids database reads while its update lock is held.
+type reviewCheckReadGuard struct {
+	core.PublicationContext
+	updating bool
+}
+
+func (s *reviewCheckReadGuard) NodeSnapshot(canvas uuid.UUID, node string, attempt uuid.UUID) (*core.PublicationNode, error) {
+	if s.updating {
+		return nil, fmt.Errorf("activation read inside publication update")
+	}
+	return s.PublicationContext.NodeSnapshot(canvas, node, attempt)
+}
+
+func (s *reviewCheckReadGuard) Update(key string, apply func(*core.OrderedPublication) error) error {
+	return s.PublicationContext.Update(key, func(record *core.OrderedPublication) error {
+		s.updating = true
+		defer func() { s.updating = false }()
+		return apply(record)
+	})
+}
+
+func TestReviewCheckReadsActivationOutsidePublicationUpdate(t *testing.T) {
+	for _, phase := range []string{"registration", "delivery"} {
+		t.Run(phase, func(t *testing.T) {
+			f := newReviewCheckFixture(t)
+			f.activationNode = "check"
+			f.saveActivation(true, 2)
+			f.attempt(support.EmitCanvasEventForNode(t, f.canvas.ID, "trigger", "default", nil))
+			guard := &reviewCheckReadGuard{PublicationContext: f.ctx.Publications}
+			if phase == "registration" {
+				f.ctx.Publications = guard
+			} else {
+				f.integration.store = guard
+			}
+			require.NoError(t, f.apply("no_review", nil, ""))
+			require.NoError(t, f.refresh())
+			require.Equal(t, "success", f.state())
+		})
+	}
+}
+
+func TestReviewCheckRechecksActivationAfterProviderLookup(t *testing.T) {
+	f := newReviewCheckFixture(t)
+	f.activationNode = "check"
+	f.saveActivation(true, 2)
+	f.attempt(support.EmitCanvasEventForNode(t, f.canvas.ID, "trigger", "default", nil))
+	require.NoError(t, f.apply("no_review", nil, ""))
+	f.http.onRead = func() {
+		// Change the live fence without changing the publication revision.
+		require.NoError(t, f.db.Model(&models.CanvasNode{}).
+			Where("workflow_id = ? AND node_id = ?", f.canvas.ID, "check").
+			Update("configuration", datatypes.NewJSONType(map[string]any{"enabled": true, "activationGeneration": 3})).Error)
+	}
+	require.NoError(t, f.refresh())
+	require.True(t, f.record().Disabled)
+	require.Empty(t, f.http.writes, "an obsolete activation cannot claim delivery")
+	f.http.onRead = nil
+	require.NoError(t, f.refresh())
+	require.Equal(t, "Review request check disabled", f.http.writes[0].Status.GetDescription())
 }

@@ -9,6 +9,8 @@ import type { WorkOrderCheckPresentation } from "../../../lib/workOrderChecks";
  */
 export const PullRequestChecksContext = createContext<MergeChecksByPullRequest["byRepository"] | null>(null);
 
+export const PullRequestAssessmentFailuresContext = createContext<ReadonlySet<string>>(new Set());
+
 const NO_CHECKS: WorkOrderCheckPresentation[] = [];
 
 export function usePullRequestMergeChecks(repository: string | null | undefined): WorkOrderCheckPresentation[] {

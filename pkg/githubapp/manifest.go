@@ -66,7 +66,7 @@ func PublicManifestJSON(baseURL, webhooksBaseURL string) (string, error) {
 		"default_permissions": map[string]string{
 			"issues":                      "write",
 			"actions":                     "write",
-			"checks":                      "read",
+			"checks":                      "write",
 			"contents":                    "write",
 			"pull_requests":               "write",
 			"repository_hooks":            "write",

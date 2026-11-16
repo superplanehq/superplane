@@ -1,12 +1,14 @@
 package workers
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
@@ -492,4 +494,57 @@ func Test__CanvasCleanupWorker_IgnoresNonDeletedWorkflows(t *testing.T) {
 	assert.Len(t, nodes, 1)
 
 	support.VerifyCanvasEventsCount(t, canvas.ID, 1)
+}
+
+// Publication wakeups must progress across ticks even while canvas data remains
+// inside the deletion grace period.
+func TestCanvasCleanupBoundsPublicationWakeups(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	db := database.DB(t.Context())
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
+	installation, err := models.CreateIntegration(uuid.New(), r.Organization.ID, "github", support.RandomName("github"), nil)
+	require.NoError(t, err)
+	for i := range 3 {
+		key := fmt.Sprintf("cleanup/%d", i)
+		require.NoError(t, models.UpdateOrderedPublication(db, installation.ID, key, func(record *core.OrderedPublication) error {
+			record.OwnerCanvasID = canvas.ID
+			record.Hook = "test-publication"
+			return nil
+		}))
+	}
+	require.NoError(t, canvas.SoftDeleteInTransaction(db))
+	require.Empty(t, pendingActionRequests(t, installation.ID, "test-publication"), "soft deletion must not update publications")
+	deleted, err := models.FindUnscopedCanvas(canvas.ID)
+	require.NoError(t, err)
+	worker := NewCanvasCleanupWorker()
+	worker.maxResourcesPerTick = 2
+	for _, want := range []int{2, 3, 3} {
+		require.NoError(t, worker.LockAndProcessCanvas(*deleted))
+		require.Len(t, pendingActionRequests(t, installation.ID, "test-publication"), want)
+		_, err := models.FindUnscopedCanvas(canvas.ID)
+		require.NoError(t, err, "publication cleanup must respect the canvas data grace period")
+	}
+	records, err := models.ListOrderedPublications(db, installation.ID, "cleanup/")
+	require.NoError(t, err)
+	require.Len(t, records, 3)
+	for _, record := range records {
+		require.EqualValues(t, 2, record.Revision, "later ticks must not repeat completed wakeups")
+	}
+	// Restoring a canvas prevents a stale cleanup candidate from changing it.
+	require.NoError(t, db.Unscoped().Model(canvas).Update("deleted_at", nil).Error)
+	require.NoError(t, worker.LockAndProcessCanvas(*deleted))
+	restored, err := models.FindCanvas(r.Organization.ID, canvas.ID)
+	require.NoError(t, err)
+	require.NoError(t, restored.SoftDeleteInTransaction(db))
+	deleted, err = models.FindUnscopedCanvas(canvas.ID)
+	require.NoError(t, err)
+	for range 2 {
+		require.NoError(t, worker.LockAndProcessCanvas(*deleted))
+	}
+	records, err = models.ListOrderedPublications(db, installation.ID, "cleanup/")
+	require.NoError(t, err)
+	for _, record := range records {
+		require.EqualValues(t, 3, record.Revision, "another deletion must wake each publication again")
+	}
 }

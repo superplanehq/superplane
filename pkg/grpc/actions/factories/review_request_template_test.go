@@ -41,10 +41,13 @@ func TestReviewRequestSetupRequiresFlagAndWorkspaceSource(t *testing.T) {
 	doc, err := yaml.CanvasFromYAML([]byte(response.CanvasYaml))
 	require.NoError(t, err)
 	require.Equal(t, source.ID.String(), findYAMLNode(t, doc, reviewRequestTriggerNodeID).Configuration["app"])
-	for _, id := range []string{"list-candidates", "request-reviewers"} {
+	for _, id := range []string{"list-candidates", "request-reviewers", reviewFindingsBodyNodeID, reviewFindingsCommentNode} {
 		node := findYAMLNode(t, doc, id)
 		require.NotNil(t, node.Integration, "%s must use the workspace GitHub connection", id)
 		require.Equal(t, integration.ID.String(), node.Integration.ID)
+	}
+	for _, id := range []string{reviewFindingsBodyNodeID, reviewFindingsCommentNode} {
+		require.Equal(t, false, findYAMLNode(t, doc, id).Configuration["enabled"], "new installations do not publish findings")
 	}
 	_, _, err = doc.Parse(r.Registry, r.Organization.ID.String())
 	require.NoError(t, err)
