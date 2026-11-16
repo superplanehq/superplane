@@ -51,7 +51,10 @@ func (p *FactoryPullRequest) CreateActivity(tx *gorm.DB, params FactoryPullReque
 		return nil, err
 	}
 
-	order := &FactoryWorkOrder{ID: p.WorkOrderID, OrganizationID: p.OrganizationID, FactoryID: p.FactoryID}
+	order, err := p.lockActivityWorkOrder(tx)
+	if err != nil {
+		return nil, err
+	}
 	if err := order.RequireExecutionOwner(tx, true); err != nil {
 		return nil, err
 	}
@@ -118,6 +121,9 @@ func (p *FactoryPullRequest) CreateActivity(tx *gorm.DB, params FactoryPullReque
 func (p *FactoryPullRequest) RequestExclusiveAccess(tx *gorm.DB, activity *FactoryPullRequestRun) (*FactoryPullRequestAccessResult, error) {
 	if activity == nil {
 		return nil, fmt.Errorf("%w: activity is required", ErrFactoryPullRequestInvalid)
+	}
+	if _, err := p.lockActivityWorkOrder(tx); err != nil {
+		return nil, err
 	}
 	if err := p.lock(tx); err != nil {
 		return nil, err
@@ -234,6 +240,23 @@ func FindPullRequestActivityByRunID(tx *gorm.DB, runID uuid.UUID) (*FactoryPullR
 		return nil, err
 	}
 	return &activity, nil
+}
+
+func (p *FactoryPullRequest) lockActivityWorkOrder(tx *gorm.DB) (*FactoryWorkOrder, error) {
+	// Do not wait behind deletion while the worker holds an execution lock.
+	var order FactoryWorkOrder
+	err := tx.Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
+		Where("id = ?", p.WorkOrderID).First(&order).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, &CodexConnectionBusyError{}
+	}
+	if err != nil {
+		return nil, err
+	}
+	if order.IsArchived() {
+		return nil, fmt.Errorf("%w: task is archived", ErrFactoryWorkOrderInvalidState)
+	}
+	return &order, nil
 }
 
 func (p *FactoryPullRequest) insertActivity(

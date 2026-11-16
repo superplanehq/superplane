@@ -11,6 +11,7 @@ import bitbucketIcon from "@/assets/icons/integrations/bitbucket.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 
 import { isActiveCanvasRun } from "../lib/workOrderPullRequest";
+import { isEligibleRepairCheck } from "./checksPRFeedbackSetup";
 
 export { PR_FEEDBACK_SETTINGS_COPY } from "./prFeedbackSettingsCopy";
 
@@ -168,7 +169,7 @@ export function normalizePRFeedbackDraft(draft: PRFeedbackDraftSettings): PRFeed
     ignoreBots: draft.ignoreBots,
     addressAllBots: draft.addressAllBots,
     allowedBots: normalizeAllowedBots(draft.allowedBots),
-    checkNames: normalizeUniqueStrings(draft.checkNames),
+    checkNames: normalizeUniqueStrings(draft.checkNames).filter(isEligibleRepairCheck),
     maximumAttempts: draft.maximumAttempts,
     runnerIntegrationIds: normalizeUniqueStrings(draft.runnerIntegrationIds),
   };

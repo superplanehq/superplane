@@ -432,6 +432,11 @@ func (c *Client) AddPullRequestReviewers(ctx context.Context, repository string,
 	return c.underlying.PullRequests.RequestReviewers(ctx, owner, name, pullNumber, reviewers)
 }
 
+func (c *Client) RemovePullRequestReviewers(ctx context.Context, repository string, pullNumber int, reviewers github.ReviewersRequest) (*github.Response, error) {
+	owner, name := c.ownerAndName(repository)
+	return c.underlying.PullRequests.RemoveReviewers(ctx, owner, name, pullNumber, reviewers)
+}
+
 func (c *Client) CreateStatus(ctx context.Context, repository string, sha string, status github.RepoStatus) (*github.RepoStatus, *github.Response, error) {
 	owner, name := c.ownerAndName(repository)
 	return c.underlying.Repositories.CreateStatus(ctx, owner, name, sha, status)

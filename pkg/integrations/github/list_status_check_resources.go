@@ -213,6 +213,9 @@ func mergeStatusCheckResources(protectionNames []string, observed []observedStat
 			return
 		}
 		key := strings.ToLower(name)
+		if strings.HasPrefix(key, "superplane/") {
+			return
+		}
 		if existing, ok := index[key]; ok {
 			if resources[existing].URL == "" {
 				resources[existing].URL = strings.TrimSpace(checkURL)
