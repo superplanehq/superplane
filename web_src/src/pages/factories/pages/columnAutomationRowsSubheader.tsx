@@ -1,4 +1,6 @@
 import type { ReactNode } from "react";
+import type { ColumnAutomationDisclosureState } from "@/hooks/useColumnAutomationCollapsePreference";
+import { ColumnAutomationDisclosure } from "./ColumnAutomationDisclosure";
 
 import type { ColumnAutomation } from "../lib/columnAutomations";
 import { ColumnAutomationRows } from "./ColumnAutomationRows";
@@ -9,6 +11,7 @@ export function columnAutomationRowsSubheader(args: {
   title: string;
   automations?: ColumnAutomation[];
   rowCount?: number;
+  disclosure?: ColumnAutomationDisclosureState;
   onRowAction?: (automation: ColumnAutomation, action: ColumnAutomationRowAction) => void;
   onRun?: (automation: ColumnAutomation) => void;
   runPending?: boolean;
@@ -19,7 +22,7 @@ export function columnAutomationRowsSubheader(args: {
   if (!args.rowCount || !args.automations) {
     return undefined;
   }
-  return (
+  const rows = (
     <ColumnAutomationRows
       title={args.title}
       automations={args.automations}
@@ -31,5 +34,14 @@ export function columnAutomationRowsSubheader(args: {
       onAdd={args.onAdd}
       testId={args.testId}
     />
+  );
+  return args.disclosure ? (
+    <ColumnAutomationDisclosure
+      disclosure={{ ...args.disclosure, open: args.automations.length === 0 || args.disclosure.open }}
+    >
+      {rows}
+    </ColumnAutomationDisclosure>
+  ) : (
+    rows
   );
 }
