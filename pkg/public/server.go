@@ -32,6 +32,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/enterprise"
 	"github.com/superplanehq/superplane/pkg/grpc"
 	factoryactions "github.com/superplanehq/superplane/pkg/grpc/actions/factories"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
@@ -48,6 +49,7 @@ import (
 	pbAdminKeys "github.com/superplanehq/superplane/pkg/protos/admin/keys"
 	pbAdminOrganizations "github.com/superplanehq/superplane/pkg/protos/admin/organizations"
 	pbAdminRunners "github.com/superplanehq/superplane/pkg/protos/admin/runners"
+	pbAdminSSO "github.com/superplanehq/superplane/pkg/protos/admin/sso"
 	pbAPIKeys "github.com/superplanehq/superplane/pkg/protos/api_keys"
 	pbCanvases "github.com/superplanehq/superplane/pkg/protos/canvases"
 	pbFactories "github.com/superplanehq/superplane/pkg/protos/factories"
@@ -58,6 +60,7 @@ import (
 	pbOrg "github.com/superplanehq/superplane/pkg/protos/organizations"
 	pbRoles "github.com/superplanehq/superplane/pkg/protos/roles"
 	pbSecret "github.com/superplanehq/superplane/pkg/protos/secrets"
+	pbSSO "github.com/superplanehq/superplane/pkg/protos/sso"
 	pbTriggers "github.com/superplanehq/superplane/pkg/protos/triggers"
 	pbUsers "github.com/superplanehq/superplane/pkg/protos/users"
 	pbWidgets "github.com/superplanehq/superplane/pkg/protos/widgets"
@@ -103,6 +106,7 @@ type Server struct {
 	WebhooksBaseURL       string
 	wsHub                 *ws.Hub
 	authHandler           *authentication.Handler
+	sso                   enterprise.SSO
 	isDev                 bool
 	licenseService        *licensing.Service
 	codexTokenRefresh     func(context.Context, string) (runner.CodexTokenSet, error)
@@ -202,6 +206,7 @@ func NewServer(
 	templateDir string,
 	authorizationService authorization.Authorization,
 	blockSignup bool,
+	sso enterprise.SSO,
 	middlewares ...mux.MiddlewareFunc,
 ) (*Server, error) {
 
@@ -209,6 +214,9 @@ func NewServer(
 	passwordLoginEnabled := os.Getenv("ENABLE_PASSWORD_LOGIN") == "yes"
 	magicCodeEnabled := os.Getenv("ENABLE_MAGIC_CODE_LOGIN") == "yes"
 	authHandler := authentication.NewHandler(jwtSigner, encryptor, authorizationService, appEnv, templateDir, blockSignup, passwordLoginEnabled, magicCodeEnabled)
+	if sso != nil {
+		authHandler.SetSSO(authenticationSSOHooks{sso: sso})
+	}
 	providers := getOAuthProviders()
 	authHandler.InitializeProviders(providers)
 
@@ -218,6 +226,7 @@ func NewServer(
 		BasePath:              basePath,
 		wsHub:                 ws.NewHub(),
 		authHandler:           authHandler,
+		sso:                   sso,
 		isDev:                 appEnv == "development",
 		timeoutHandlerTimeout: 15 * time.Second,
 		encryptor:             encryptor,
@@ -237,6 +246,29 @@ func NewServer(
 	eventdistributer.SetPublicBoardBroadcaster(server.wsHub, broadcastPublicFactoryBoard)
 	server.InitRouter(middlewares...)
 	return server, nil
+}
+
+func (s *Server) organizationAuth() mux.MiddlewareFunc {
+	if s.sso == nil {
+		return middleware.OrganizationAuthMiddleware(s.jwt)
+	}
+	return middleware.OrganizationAuthMiddleware(s.jwt, s.sso)
+}
+
+type authenticationSSOHooks struct {
+	sso enterprise.SSO
+}
+
+func (h authenticationSSOHooks) ActiveConnectionExists(ctx context.Context) (bool, error) {
+	return h.sso.ActiveConnectionExists(ctx)
+}
+
+func (h authenticationSSOHooks) EndSession(ctx context.Context, accountID string, ssoClaim string) (string, bool) {
+	id, err := uuid.Parse(accountID)
+	if err != nil {
+		return "", false
+	}
+	return h.sso.LogoutRedirect(ctx, id, enterprise.SSOAccessSession{AccountID: id, SSO: ssoClaim})
 }
 
 func getOAuthProviders() map[string]authentication.ProviderConfig {
@@ -368,6 +400,11 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 		return err
 	}
 
+	err = pbSSO.RegisterSSOHandlerServer(ctx, grpcGatewayMux, services.SSOAPI)
+	if err != nil {
+		return err
+	}
+
 	err = pbActions.RegisterActionsHandlerServer(ctx, grpcGatewayMux, services.Actions)
 	if err != nil {
 		return err
@@ -432,6 +469,9 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 	if err := pbAdminEnterprise.RegisterEnterpriseFeaturesHandlerServer(ctx, adminGatewayMux, services.AdminEnterpriseFeatures); err != nil {
 		return err
 	}
+	if err := pbAdminSSO.RegisterAdminSSOHandlerServer(ctx, adminGatewayMux, services.AdminSSO); err != nil {
+		return err
+	}
 	adminGatewayHandler := s.grpcGatewayAccountHandler(adminGatewayMux)
 	s.adminRouter.PathPrefix("/installation/fleets").Handler(adminGatewayHandler)
 	s.adminRouter.PathPrefix("/installation/keys").Handler(adminGatewayHandler)
@@ -441,6 +481,9 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 	s.adminRouter.Handle("/organizations/{organization_id}/enterprise-features", adminGatewayHandler).Methods(http.MethodGet, http.MethodPut)
 	s.adminRouter.PathPrefix("/installation/enterprise-features").Handler(adminGatewayHandler)
 	s.adminRouter.Handle("/installation/license/activations", adminGatewayHandler).Methods(http.MethodGet)
+	s.adminRouter.Handle("/organizations/{organization_id}/sso", adminGatewayHandler).Methods(http.MethodGet)
+	s.adminRouter.Handle("/organizations/{organization_id}/sso/disable", adminGatewayHandler).Methods(http.MethodPost)
+	s.adminRouter.Handle("/organizations/{organization_id}/sso/domains/{domain_id}/verify", adminGatewayHandler).Methods(http.MethodPost)
 
 	// Public health check
 	s.Router.HandleFunc("/api/v1/canvases/is-alive", func(w http.ResponseWriter, r *http.Request) {
@@ -489,15 +532,15 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 
 	s.Router.Handle(
 		"/api/v1/canvases/{canvas_id}/node-executions/{execution_id}/runner-live-logs/session",
-		middleware.OrganizationAuthMiddleware(s.jwt)(http.HandlerFunc(s.handleRunnerLiveLogSession)),
+		s.organizationAuth()(http.HandlerFunc(s.handleRunnerLiveLogSession)),
 	).Methods("GET")
 	s.Router.Handle(
 		"/api/v1/canvases/{canvas_id}/node-executions/{execution_id}/runner-logs",
-		middleware.OrganizationAuthMiddleware(s.jwt)(http.HandlerFunc(s.handleRunnerTaskLogs)),
+		s.organizationAuth()(http.HandlerFunc(s.handleRunnerTaskLogs)),
 	).Methods(http.MethodGet)
 
 	// Protect the gRPC gateway routes with organization authentication
-	orgAuthMiddleware := middleware.OrganizationAuthMiddleware(s.jwt)
+	orgAuthMiddleware := s.organizationAuth()
 
 	//
 	// This is not part of the proto APIs and gRPC gateway route,
@@ -525,6 +568,7 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 	accountAuthMiddleware := middleware.AccountAuthMiddleware(s.jwt)
 	protectedAccountGRPCHandler := accountAuthMiddleware(s.grpcGatewayAccountHandler(grpcGatewayMux))
 
+	s.Router.PathPrefix("/api/v1/sso").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/users").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/groups").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/roles").Handler(protectedGRPCHandler)
@@ -666,14 +710,14 @@ func (s *Server) RegisterWebSocketRoutes() {
 	// WebSocket endpoint - protected by organization scoped authentication
 	s.Router.Handle(
 		"/ws/{workflowId}",
-		middleware.OrganizationAuthMiddleware(s.jwt).
+		s.organizationAuth().
 			Middleware(http.HandlerFunc(s.handleWebSocket)),
 	)
 
 	// Factory WebSocket: org-scoped work-order updates for a single factory.
 	s.Router.Handle(
 		"/ws/factories/{factoryId}",
-		middleware.OrganizationAuthMiddleware(s.jwt).
+		s.organizationAuth().
 			Middleware(http.HandlerFunc(s.handleFactoryWebSocket)),
 	)
 
@@ -686,7 +730,7 @@ func (s *Server) RegisterWebSocketRoutes() {
 	// User notifications WebSocket: live alerts for the authenticated user.
 	s.Router.Handle(
 		"/ws/users/notifications",
-		middleware.OrganizationAuthMiddleware(s.jwt).
+		s.organizationAuth().
 			Middleware(http.HandlerFunc(s.handleUserNotificationsWebSocket)),
 	)
 }
@@ -766,6 +810,11 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 		otelmux.WithTracerProvider(nooptrace.NewTracerProvider()),
 	))
 	r.Use(middleware.LoggingMiddleware(log.StandardLogger()))
+
+	if s.sso != nil {
+		r.PathPrefix("/auth/sso").Handler(s.sso.AuthHandler())
+		r.PathPrefix("/scim/v2").Handler(s.sso.SCIMHandler())
+	}
 
 	// Register authentication routes (no auth required)
 	s.authHandler.RegisterRoutes(r)

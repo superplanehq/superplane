@@ -62,6 +62,7 @@ func Test__HandleWebhook_PublishesExecutionStateForFinalizedExecution(t *testing
 		"test",
 		"/app/templates",
 		r.AuthService, false,
+		nil,
 	)
 	require.NoError(t, err)
 
@@ -169,6 +170,7 @@ func Test__HandleWebhook_PausedIntakeIgnoresLiveEvents(t *testing.T) {
 		"test",
 		"/app/templates",
 		r.AuthService, false,
+		nil,
 	)
 	require.NoError(t, err)
 
