@@ -4831,6 +4831,8 @@ The same attempt updates one check run. A stable external ID recovers interrupte
 
 Cancellation, removal, a closed or changed pull request, and completion without a final result fail the running check. Delivery uses the existing durable retries and ordering.
 
+Enabled defaults to true. Bind Activation Node ID to the starting check node to apply its admitted and live activation generation. Disabling that node releases its outstanding checks. Increase the generation when enabling it again so old callbacks cannot reopen them.
+
 The GitHub App needs Checks write and Pull requests read permissions. Existing installations must accept the permission update. This component does not change branch rules.
 
 ### Example Output

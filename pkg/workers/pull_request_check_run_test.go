@@ -83,7 +83,41 @@ func (f *reviewCheckFixture) applyCheckRun(state, sha string) error {
 		"context": "team/review", "state": state, "reason": "Assessment result",
 		"resultUrl": "https://superplane.example/run",
 	}
+	if f.activationNode != "" {
+		f.ctx.Configuration.(map[string]any)["activationNodeId"] = f.activationNode
+	}
 	return (&pulls.SetPullRequestCheckRun{}).Execute(f.ctx)
+}
+
+func TestPullRequestCheckRunDisableReleasesInterruptedCheckAndFencesCallbacks(t *testing.T) {
+	f := newPullRequestCheckFixture(t, "github.setPullRequestCheckRun")
+	f.activationNode = "check"
+	f.saveActivation(true, 1)
+	f.attempt(support.EmitCanvasEventForNode(t, f.canvas.ID, "trigger", "default", nil))
+	old := f.root
+	require.NoError(t, f.applyCheckRun("pending", "abc"))
+	f.http.loseCheckResponse = true
+	require.Error(t, f.processDue())
+	require.Len(t, f.http.checkRuns, 1)
+	f.saveActivation(false, 1)
+	require.NoError(t, f.processDue())
+	require.Equal(t, "completed", f.http.checkRuns[0].GetStatus())
+	require.Equal(t, "success", f.http.checkRuns[0].GetConclusion())
+	f.attempt(support.EmitCanvasEventForNode(t, f.canvas.ID, "trigger", "default", nil))
+	disabled := f.root
+	f.saveActivation(true, 2)
+	for _, root := range []*models.CanvasEvent{old, disabled} {
+		f.attempt(root)
+		require.NoError(t, f.applyCheckRun("pending", "abc"))
+		require.NoError(t, f.applyCheckRun("failure", "abc"))
+	}
+	require.Len(t, f.http.checkRuns, 1)
+	require.Empty(t, pendingActionRequests(t, f.installation.ID, pulls.ReviewCheckHook))
+	f.attempt(support.EmitCanvasEventForNode(t, f.canvas.ID, "trigger", "default", nil))
+	require.NoError(t, f.applyCheckRun("pending", "abc"))
+	require.NoError(t, f.processDue())
+	require.Len(t, f.http.checkRuns, 2)
+	require.Equal(t, "in_progress", f.http.checkRuns[1].GetStatus())
 }
 
 func TestPullRequestCheckRunCompletesSameRun(t *testing.T) {

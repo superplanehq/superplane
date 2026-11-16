@@ -22,7 +22,6 @@ import (
 	canvasactions "github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/integrations/github/components/pulls"
-	"github.com/superplanehq/superplane/pkg/integrations/prbody"
 	"github.com/superplanehq/superplane/pkg/models"
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
 	workercontexts "github.com/superplanehq/superplane/pkg/workers/contexts"
@@ -310,7 +309,7 @@ func reviewRequestTestExecution(t *testing.T, f publicationFixture, canvas *mode
 	return execution, action
 }
 
-func reviewRequestCompletedProducer(t *testing.T, host *reviewRequestHTTP, score float64) (publicationFixture, map[string]any) {
+func reviewRequestCompletedProducer(t *testing.T, host *reviewRequestHTTP, score float64, settings ...map[string]any) (publicationFixture, map[string]any) {
 	t.Helper()
 	f := newPublicationFixture(t)
 	support.AssignOpenSystemTrial(t, f.canvas.OrganizationID)
@@ -329,11 +328,15 @@ func reviewRequestCompletedProducer(t *testing.T, host *reviewRequestHTTP, score
 	permitted, err := models.ResolveSelectableLLMModels(f.db, f.canvas.OrganizationID, &f.workspace.ID, models.UsageProviderAnthropic, models.UsageFundingSourceBYOK)
 	require.NoError(t, err)
 	require.Contains(t, permitted, "claude-sonnet-4-6", "the fixture must configure an allowed agent before executing its graphs")
-	f.canvas = reviewRequestTestCanvas(t, f, "risk-score", map[string]string{"appRepository": "acme/app", "enabledChecks": "security"})
+	input := factoryTemplateInput{appName: "Merge confidence", installParams: map[string]string{"appRepository": "acme/app", "enabledChecks": "security"}}
+	if len(settings) > 0 {
+		input.agentSettings = map[string]*factoryAgentSettings{"assess-risk": {component: "runnerClaudeCode", configuration: settings[0]}}
+	}
+	f.canvas = reviewRequestTestCanvasWith(t, f, "risk-score", input)
 	return emitReviewRequestReport(t, f, host, score)
 }
 
-func emitReviewRequestReport(t *testing.T, f publicationFixture, host *reviewRequestHTTP, score float64) (publicationFixture, map[string]any) {
+func startMergeConfidencePublication(t *testing.T, f publicationFixture, host *reviewRequestHTTP, score float64) (publicationFixture, *models.CanvasNodeExecution) {
 	t.Helper()
 	var err error
 
@@ -354,9 +357,17 @@ func emitReviewRequestReport(t *testing.T, f publicationFixture, host *reviewReq
 	var assessed models.CanvasEvent
 	require.NoError(t, f.db.Where("execution_id = ?", assessment.ID).First(&assessed).Error)
 	publication, action := reviewRequestTestExecution(t, f, f.canvas, f.run, "publish-merge-confidence", root, &assessed, assessment)
-	state := workercontexts.NewExecutionStateContext(f.db, publication, nil)
-	require.NoError(t, action.Execute(core.ExecutionContext{RunID: f.run.ID, Configuration: publication.Configuration.Data(), Metadata: workercontexts.NewExecutionMetadataContext(f.db, publication), Requests: workercontexts.NewExecutionRequestContext(f.db, publication)}))
-	require.NoError(t, action.HandleHook(core.ActionHookContext{Name: prbody.HookName, Configuration: publication.Configuration.Data(), Integration: reviewRequestIntegration(), HTTP: host, Metadata: workercontexts.NewExecutionMetadataContext(f.db, publication), ExecutionState: state}))
+	node, err := models.FindCanvasNode(f.db, f.canvas.ID, publication.NodeID)
+	require.NoError(t, err)
+	require.NoError(t, action.Execute(core.ExecutionContext{ID: publication.ID, NodeID: node.NodeID, WorkflowID: f.canvas.ID.String(), RunID: f.run.ID, Configuration: publication.Configuration.Data(), Publications: workercontexts.NewPublicationContext(f.db, f.canvas.OrganizationID, node, publication), Metadata: workercontexts.NewExecutionMetadataContext(f.db, publication), Requests: workercontexts.NewExecutionRequestContext(f.db, publication)}))
+	installCompletionConnection(t, host)
+	processReviewRequestPublication(t, f, host, publication)
+	return f, publication
+}
+
+func emitReviewRequestReport(t *testing.T, f publicationFixture, host *reviewRequestHTTP, score float64) (publicationFixture, map[string]any) {
+	t.Helper()
+	f, publication := startMergeConfidencePublication(t, f, host, score)
 	var events []models.CanvasEvent
 	require.NoError(t, f.db.Where("execution_id = ?", publication.ID).Find(&events).Error)
 	payloads := slices.DeleteFunc(f.completePublication(t, publication, events), func(payload map[string]any) bool { return payload["reportId"] != f.run.ID.String() })

@@ -7,6 +7,7 @@ import type { SuperplaneComponentsNode } from "@/api-client";
 import { MergeConfidenceConfiguration } from "./MergeConfidenceConfiguration";
 import { MERGE_CONFIDENCE_CHECKS } from "./mergeConfidenceChecks";
 import type { PlanningReviewStep } from "./planningReviewMockup";
+import type { NodeConfigurationUpdate } from "./nodeConfigurationCanvas";
 
 const loadDefaults = vi.fn();
 vi.mock("../lib/loadDefaultAgentPrompt", () => ({ loadDefaultAgentPrompt: loadDefaults }));
@@ -53,22 +54,24 @@ function renderSettings(
   onSave = vi.fn(),
   onClose = vi.fn(),
   publishing?: SuperplaneComponentsNode,
+  options: { configuration?: Record<string, unknown>; publicationNodes?: SuperplaneComponentsNode[] } = {},
 ) {
   const agent: SuperplaneComponentsNode = {
     id: "assess-risk",
     name: "Assess risk",
     component: "runnerClaudeCode",
-    configuration: { model: "sonnet", executionTimeoutSeconds: 3600, steps: savedSteps },
+    configuration: { model: "sonnet", executionTimeoutSeconds: 3600, steps: savedSteps, ...options.configuration },
     concurrency: { max: 5, key: "pr" },
   };
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   client.setQueryData(experimentalFeaturesKeys.registry(), { features: [] });
-  render(
+  const rendered = render(
     <QueryClientProvider client={client}>
       <MemoryRouter>
         <MergeConfidenceConfiguration
           agent={agent}
           publishing={publishing}
+          publicationNodes={options.publicationNodes}
           organizationId="org"
           factoryId="factory"
           canvasId="automation"
@@ -78,19 +81,112 @@ function renderSettings(
       </MemoryRouter>
     </QueryClientProvider>,
   );
-  return { onSave, onClose };
+  return { onSave, onClose, unmount: rendered.unmount };
 }
 
 beforeEach(() => loadDefaults.mockReset());
 
 describe("Merge confidence configuration", () => {
+  it("saves independent controls, reloads choices, and fences earlier activations", async () => {
+    const body: SuperplaneComponentsNode = {
+      id: "publish-merge-confidence",
+      component: "github.updatePullRequestBodySection",
+      configuration: { enabled: true },
+    };
+    const nodes: SuperplaneComponentsNode[] = [
+      body,
+      {
+        id: "comment-merge-confidence",
+        component: "github.publishPullRequestComment",
+        configuration: { enabled: false },
+      },
+      { id: "start-assessment-check", component: "github.setPullRequestCheckRun", configuration: { enabled: true } },
+      { id: "finish-assessment-check", component: "github.setPullRequestCheckRun", configuration: {} },
+    ];
+    const onSave = vi.fn();
+    let rendered = renderSettings(steps, onSave, vi.fn(), body, { publicationNodes: nodes });
+    fireEvent.click(screen.getByRole("switch", { name: "Publish PR check" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "PR body" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "PR comment" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+    const first = onSave.mock.calls[0][0] as NodeConfigurationUpdate[];
+    expect(first[0].configuration).toEqual(
+      expect.objectContaining({
+        publishPRCheck: false,
+        publishResults: true,
+        resultsBody: false,
+        resultsComment: true,
+      }),
+    );
+    expect(first.find((node) => node.nodeId === "comment-merge-confidence")?.configuration).toEqual(
+      expect.objectContaining({ enabled: true, activationGeneration: 2 }),
+    );
+    expect(first.find((node) => node.nodeId === "start-assessment-check")?.configuration).toEqual(
+      expect.objectContaining({ enabled: false }),
+    );
+    rendered.unmount();
+    const reload = (updates: NodeConfigurationUpdate[]) => {
+      const savedNodes = updates.slice(1).map((update) => ({
+        ...nodes.find((node) => node.id === update.nodeId),
+        id: update.nodeId,
+        configuration: update.configuration,
+      }));
+      return renderSettings(steps, onSave, vi.fn(), savedNodes[0], {
+        configuration: updates[0].configuration,
+        publicationNodes: savedNodes,
+      });
+    };
+    rendered = reload(first);
+    expect(screen.getByRole("checkbox", { name: "PR comment" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "PR body" })).not.toBeChecked();
+    fireEvent.click(screen.getByRole("switch", { name: "Publish results" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(2));
+    const off = onSave.mock.calls[1][0] as NodeConfigurationUpdate[];
+    expect(off[0].configuration).toEqual(
+      expect.objectContaining({ publishResults: false, resultsBody: false, resultsComment: true }),
+    );
+    rendered.unmount();
+    rendered = reload(off);
+    expect(screen.getByRole("switch", { name: "Publish PR check" })).not.toBeChecked();
+    expect(screen.queryByRole("checkbox", { name: "PR comment" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("switch", { name: "Publish results" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(3));
+    const enabled = onSave.mock.calls[2][0] as NodeConfigurationUpdate[];
+    expect(enabled.find((node) => node.nodeId === "comment-merge-confidence")?.configuration).toEqual(
+      expect.objectContaining({ enabled: true, activationGeneration: 3 }),
+    );
+    expect(loadDefaults).not.toHaveBeenCalled();
+    rendered.unmount();
+  });
+  it("validates destinations and preserves choices while publication is off", async () => {
+    const { onSave } = renderSettings(steps, vi.fn(), vi.fn(), {
+      id: "publish-merge-confidence",
+      component: "github.updatePullRequestBodySection",
+      configuration: { sectionKey: "merge-confidence" },
+    });
+    fireEvent.click(screen.getByRole("checkbox", { name: "PR body" }));
+    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("switch", { name: "Publish results" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+    expect(onSave.mock.calls[0][0][0].configuration).toEqual(
+      expect.objectContaining({
+        publishResults: false,
+        resultsBody: false,
+        resultsComment: false,
+      }),
+    );
+  });
   it("loads a saved opt-out and permits publishing again", async () => {
     const { onSave } = renderSettings(steps, vi.fn(), vi.fn(), {
       id: "publication",
       component: "bitbucket.updatePullRequestBodySection",
       configuration: { sectionKey: "merge-confidence", enabled: false },
     });
-    const publishing = screen.getByRole("switch", { name: "Publish results to pull request" });
+    const publishing = screen.getByRole("switch", { name: "Publish results" });
     expect(publishing).not.toBeChecked();
     fireEvent.click(publishing);
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
@@ -99,7 +195,7 @@ describe("Merge confidence configuration", () => {
       expect.objectContaining({ nodeId: "assess-risk" }),
       expect.objectContaining({
         nodeId: "publication",
-        configuration: { sectionKey: "merge-confidence", enabled: true },
+        configuration: { sectionKey: "merge-confidence", enabled: true, activationGeneration: 2 },
       }),
     ]);
   });
@@ -112,7 +208,7 @@ describe("Merge confidence configuration", () => {
       component: "github.updatePullRequestBodySection",
       configuration: { sectionKey: "merge-confidence", body: "{{ event.data.body }}", pullRequestId: "pr" },
     });
-    const publishing = screen.getByRole("switch", { name: "Publish results to pull request" });
+    const publishing = screen.getByRole("switch", { name: "Publish results" });
     expect(publishing).toBeChecked();
     fireEvent.click(publishing);
     fireEvent.change(screen.getByDisplayValue("sonnet"), { target: { value: "opus" } });
@@ -128,6 +224,7 @@ describe("Merge confidence configuration", () => {
         nodeId: "publish-merge-confidence",
         configuration: {
           enabled: false,
+          activationGeneration: 1,
           sectionKey: "merge-confidence",
           body: "{{ event.data.body }}",
           pullRequestId: "pr",

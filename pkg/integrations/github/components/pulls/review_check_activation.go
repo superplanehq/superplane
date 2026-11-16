@@ -24,7 +24,7 @@ func reviewCheckActivation(store core.PublicationStore, canvas uuid.UUID, nodeID
 	if admitted == nil || current == nil {
 		return 0, false, nil
 	}
-	if admitted.Component != "github.setPullRequestReviewCheck" || current.Component != admitted.Component {
+	if !supportsCheckActivation(admitted.Component) || current.Component != admitted.Component {
 		return 0, false, nil
 	}
 	var before, now reviewCheckConfiguration
@@ -45,7 +45,15 @@ func reviewCheckStillActive(store core.PublicationStore, record *core.OrderedPub
 	if err != nil {
 		return false, err
 	}
-	if current == nil || current.Component != "github.setPullRequestReviewCheck" {
+	state, err := decodeReviewCheckState(record.Payload)
+	if err != nil {
+		return false, err
+	}
+	component := "github.setPullRequestReviewCheck"
+	if state.Configuration.CheckRun {
+		component = "github.setPullRequestCheckRun"
+	}
+	if current == nil || current.Component != component {
 		return false, nil
 	}
 	var config reviewCheckConfiguration
@@ -53,6 +61,10 @@ func reviewCheckStillActive(store core.PublicationStore, record *core.OrderedPub
 		return false, err
 	}
 	return config.Enabled != nil && *config.Enabled && config.ActivationGeneration == record.ActivationGeneration, nil
+}
+
+func supportsCheckActivation(component string) bool {
+	return component == "github.setPullRequestReviewCheck" || component == "github.setPullRequestCheckRun"
 }
 
 func configurationWithActivation(raw any, generation int64) (map[string]any, error) {
@@ -97,9 +109,19 @@ func disableReviewCheck(record *core.OrderedPublication) error {
 		return err
 	}
 	state.Configuration.Phase = "disabled"
+	if state.Configuration.CheckRun {
+		// Retain receipts and in-flight delivery so a late creation is released.
+		state.Configuration.State, state.Configuration.Reason = "success", "PR check publication is disabled."
+		state.State, state.Description, state.Delivered, state.Error = "", "", "", ""
+		state.SetupFailures = 0
+	}
 	record.Disabled = true
 	record.Generation++
 	record.WakeAt = reviewCheckWake(time.Second)
+	if state.Configuration.CheckRun {
+		record.Payload, err = json.Marshal(state)
+		return err
+	}
 	record.Payload, err = json.Marshal(reviewCheckState{Configuration: state.Configuration, Delivery: state.Delivery})
 	return err
 }
