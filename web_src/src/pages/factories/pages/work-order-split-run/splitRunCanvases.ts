@@ -14,7 +14,7 @@ import {
 } from "../../__fixtures__/factoryPageFixtureVariants";
 import { HOUR_AGO, REVIEWER_USER } from "../../__fixtures__/factoryPageResponses";
 import issueIntakeYaml from "@factory-templates/github/issue-intake.canvas.yaml?raw";
-import implementationYaml from "@factory-templates/github/line-implementation.canvas.yaml?raw";
+import implementationYaml from "@factory-templates/github/line-implementation-multi-repo.canvas.yaml?raw";
 import prClosureYaml from "@factory-templates/github/pr-closure.canvas.yaml?raw";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
 import slackIcon from "@/assets/icons/integrations/slack.svg";
