@@ -84,7 +84,7 @@ func TestReviewRequestFindingsPublishToSelectedDestinations(t *testing.T) {
 		"off and none": {},
 	} {
 		t.Run(name, func(t *testing.T) {
-			host := &reviewRequestHTTP{}
+			host := &reviewRequestHTTP{commitMessage: "  Improve reviewer selection  \n\nCommit details"}
 			f, message := reviewRequestCompletedProducer(t, host, 2)
 			mergeConfidence := host.description
 			require.Contains(t, mergeConfidence, "superplane:merge-confidence:start")
@@ -106,7 +106,7 @@ func TestReviewRequestFindingsPublishToSelectedDestinations(t *testing.T) {
 				require.Contains(t, host.description, strings.TrimSpace(strings.TrimPrefix(mergeConfidence, "User description")), "the merge confidence section is preserved")
 				require.Contains(t, section, "**Reviewers selected**")
 				require.Contains(t, section, "| octocat | Owns the changed security code. |")
-				require.Contains(t, section, "Assessed commit: abc")
+				require.Contains(t, section, "Assessed commit: [Improve reviewer selection](https://github.com/acme/app/commit/abc)")
 				require.Contains(t, section, root.RunID.String())
 			}
 			if !publishComment {
@@ -116,6 +116,7 @@ func TestReviewRequestFindingsPublishToSelectedDestinations(t *testing.T) {
 				marker := fmt.Sprintf("<!-- superplane:comment:review-request:%s -->\n", consumer.ID)
 				require.True(t, strings.HasPrefix(comment, marker))
 				require.Contains(t, comment, "**Reviewers selected**")
+				require.Contains(t, comment, "Assessed commit: [Improve reviewer selection](https://github.com/acme/app/commit/abc)")
 				if publishBody {
 					require.Equal(t, section, strings.TrimSpace(strings.TrimPrefix(comment, marker)), "both destinations publish the same decision")
 				}

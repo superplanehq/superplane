@@ -54,6 +54,7 @@ type reviewRequestHTTP struct {
 	closed                bool
 	lostPermission        bool
 	changedIdentity       bool
+	commitMessage         string
 	// pushDuringLookups moves the head after the permission lookup.
 	pushDuringLookups bool
 	// description and comments hold the published pull request state.
@@ -119,6 +120,9 @@ func (h *reviewRequestHTTP) commentResponse(request *http.Request) (*http.Respon
 func (h *reviewRequestHTTP) Do(request *http.Request) (*http.Response, error) {
 	h.requests = append(h.requests, request)
 	path := request.URL.Path
+	if request.Method == http.MethodGet && path == "/repos/acme/app/commits/abc" {
+		return publicationHTTPResponse(200, fmt.Sprintf(`{"sha":"abc","commit":{"message":%q}}`, h.commitMessage)), nil
+	}
 	if request.Method == http.MethodPost && strings.Contains(path, "/statuses/") {
 		if h.statusDenied {
 			return publicationHTTPResponse(403, `{"message":"status write denied"}`), nil
