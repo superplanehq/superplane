@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -380,11 +381,27 @@ func evaluateReviewCheck(client *common.Client, store core.PublicationStore, rec
 		state.SHA = pr.GetHead().GetSHA()
 		if state.SHA != config.AssessedSHA {
 			state.State, state.Description = "pending", "Waiting for a decision on the current commit"
+			return monitor, nil
+		}
+		if !hasSelectedReviewRequests(pr.RequestedReviewers, config.Reviewers) {
+			// GitHub clears requests after review submission, including requested changes.
+			state.State, state.Description = "success", "No selected review requests remain"
 		}
 	default:
 		return monitor, fmt.Errorf("invalid persisted review check phase")
 	}
 	return monitor, nil
+}
+
+func hasSelectedReviewRequests(requested []*github.User, selected []ReviewerIdentity) bool {
+	for _, reviewer := range selected {
+		if slices.ContainsFunc(requested, func(user *github.User) bool {
+			return user.GetID() == reviewer.ID
+		}) {
+			return true
+		}
+	}
+	return false
 }
 
 func permanentCheckError(err error) bool {
