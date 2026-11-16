@@ -36,22 +36,25 @@ import (
 // The fixture substitutes only GitHub responses and the external agent task.
 // Both materialized graphs, expressions, component execution, and runner hooks are real.
 type reviewRequestHTTP struct {
-	statusDenied      bool
-	statuses          []github.RepoStatus
-	requests          []*http.Request
-	reviewerBodies    []map[string]any
-	approved          bool
-	oldApproval       bool
-	withdrawnApproval bool
-	requestError      bool
-	alreadyAsked      bool
-	empty             bool
-	discoveryError    bool
-	permissionError   bool
-	movedHead         bool
-	closed            bool
-	lostPermission    bool
-	changedIdentity   bool
+	statusDenied          bool
+	statuses              []github.RepoStatus
+	requests              []*http.Request
+	reviewerBodies        []map[string]any
+	reviewerRemovals      []string
+	pendingReviewers      []pulls.ReviewerIdentity
+	selectionEnvironments []map[string]string
+	approved              bool
+	oldApproval           bool
+	withdrawnApproval     bool
+	requestError          bool
+	alreadyAsked          bool
+	empty                 bool
+	discoveryError        bool
+	permissionError       bool
+	movedHead             bool
+	closed                bool
+	lostPermission        bool
+	changedIdentity       bool
 	// pushDuringLookups moves the head after the permission lookup.
 	pushDuringLookups bool
 	// description and comments hold the published pull request state.
@@ -127,6 +130,15 @@ func (h *reviewRequestHTTP) Do(request *http.Request) (*http.Response, error) {
 		h.statuses = append(h.statuses, status)
 		return publicationHTTPResponse(201, `{}`), nil
 	}
+	if strings.HasSuffix(path, "/requested_reviewers") && request.Method == http.MethodDelete {
+		var body struct{ Reviewers []string }
+		if err := json.NewDecoder(request.Body).Decode(&body); err != nil {
+			return nil, err
+		}
+		h.reviewerRemovals = append(h.reviewerRemovals, body.Reviewers...)
+		h.pendingReviewers = slices.DeleteFunc(h.pendingReviewers, func(reviewer pulls.ReviewerIdentity) bool { return slices.Contains(body.Reviewers, reviewer.Login) })
+		return publicationHTTPResponse(200, `{}`), nil
+	}
 	if strings.HasSuffix(path, "/requested_reviewers") && request.Method == http.MethodPost {
 		if h.requestError {
 			return publicationHTTPResponse(403, `{"message":"review request denied"}`), nil
@@ -134,6 +146,14 @@ func (h *reviewRequestHTTP) Do(request *http.Request) (*http.Response, error) {
 		var body map[string]any
 		if err := json.NewDecoder(request.Body).Decode(&body); err != nil {
 			return nil, err
+		}
+		for _, raw := range body["reviewers"].([]any) {
+			login := raw.(string)
+			id := int64(2)
+			if login == "fallback-user" {
+				id = 3
+			}
+			h.pendingReviewers = append(h.pendingReviewers, pulls.ReviewerIdentity{ID: id, Login: login})
 		}
 		h.reviewerBodies = append(h.reviewerBodies, body)
 		return publicationHTTPResponse(201, `{"number":42,"requested_reviewers":[{"login":"unrelated"},{"id":2,"login":"octocat"}]}`), nil
@@ -192,10 +212,12 @@ func (h *reviewRequestHTTP) Do(request *http.Request) (*http.Response, error) {
 		if h.movedHead {
 			sha = "new-head"
 		}
-		requested := `[{"login":"unrelated"}]`
+		requestedReviewers := append([]pulls.ReviewerIdentity{{ID: 9, Login: "unrelated"}}, h.pendingReviewers...)
 		if h.alreadyAsked {
-			requested = `[{"login":"unrelated"},{"id":2,"login":"octocat"}]`
+			requestedReviewers = append(requestedReviewers, pulls.ReviewerIdentity{ID: 2, Login: "octocat"})
 		}
+		encoded, _ := json.Marshal(requestedReviewers)
+		requested := string(encoded)
 		state := "open"
 		if h.closed {
 			state = "closed"
@@ -406,9 +428,15 @@ func runReviewRequestGraph(t *testing.T, f publicationFixture, canvas *models.Ca
 				}
 				require.NoError(t, action.Execute(ctx))
 				var dispatched struct {
-					Files []runner.TaskFile `json:"files"`
+					Files       []runner.TaskFile                `json:"files"`
+					Environment []runner.TaskEnvironmentVariable `json:"environment"`
 				}
 				require.NoError(t, json.Unmarshal(tasks.Payload, &dispatched))
+				selectionEnvironment := map[string]string{}
+				for _, variable := range dispatched.Environment {
+					selectionEnvironment[variable.Name] = variable.Value
+				}
+				host.selectionEnvironments = append(host.selectionEnvironments, selectionEnvironment)
 				promptIndex := slices.IndexFunc(dispatched.Files, func(file runner.TaskFile) bool { return file.Path == "prompts/02-select-reviewers.txt" })
 				require.NotEqual(t, -1, promptIndex)
 				dispatchedPrompt := dispatched.Files[promptIndex].Content
@@ -430,6 +458,9 @@ func runReviewRequestGraph(t *testing.T, f publicationFixture, canvas *models.Ca
 				}
 				decision := map[string]any{"reviewRequired": true, "rationale": "Security findings need review.", "noCandidate": false, "reviewers": []any{map[string]any{"id": 2, "login": "octocat", "reason": "Owns the changed security code."}}}
 				switch scenario {
+				case "replacement":
+					decision["rationale"] = "The previous reviewer is unavailable. Select the authorization owner."
+					decision["reviewers"] = []any{map[string]any{"id": 3, "login": "fallback-user", "reason": "The previous reviewer is unavailable. Owns authorization changes."}}
 				case "fallback", "no candidate", "ineligible fallback":
 					decision["noCandidate"], decision["reviewers"] = true, []any{}
 				case "malformed output":
@@ -579,7 +610,6 @@ func TestReviewRequestFromPublishedReportToGitHub(t *testing.T) {
 				host.alreadyAsked = scenario == "already requested"
 				host.movedHead = scenario == "stale report"
 				host.closed = scenario == "closed before selection"
-				readsBefore := len(host.requests)
 				outcome, agents, err := runReviewRequestGraph(t, f, consumer, &root, host, scenario)
 				if publishCheck {
 					store := workercontexts.NewPublicationContext(f.db, consumer.OrganizationID, mustReviewCheckNode(t, f, consumer), nil)
@@ -597,9 +627,9 @@ func TestReviewRequestFromPublishedReportToGitHub(t *testing.T) {
 					require.Equal(t, "superplane/review-request", host.statuses[len(host.statuses)-1].GetContext())
 					want := "pending"
 					switch scenario {
-					case "favorable", "no candidate", "ineligible fallback", "qualifying approval":
+					case "favorable", "qualifying approval":
 						want = "success"
-					case "concerning no review", "malformed output", "reported lookup error", "agent failure", "author selected", "bot selected", "reader selected", "duplicate reviewer", "additional reviewer without reason", "discovery error", "permission error", "lost permission", "identity changed", "request error":
+					case "no candidate", "ineligible fallback", "concerning no review", "malformed output", "reported lookup error", "agent failure", "author selected", "bot selected", "reader selected", "duplicate reviewer", "additional reviewer without reason", "discovery error", "permission error", "lost permission", "identity changed", "request error":
 						want = "error"
 					case "withdrawn approval":
 						want = "failure"
@@ -638,9 +668,6 @@ func TestReviewRequestFromPublishedReportToGitHub(t *testing.T) {
 				case "favorable":
 					expected = "review_unnecessary"
 					require.Zero(t, agents)
-					if !publishCheck {
-						require.Len(t, host.requests, readsBefore)
-					}
 				case "stale report", "closed before selection":
 					expected = "stale"
 					require.Zero(t, agents)
@@ -655,7 +682,6 @@ func TestReviewRequestFromPublishedReportToGitHub(t *testing.T) {
 				if expected != "requested" {
 					require.Empty(t, host.reviewerBodies)
 				} else {
-					require.Len(t, host.reviewerBodies, 1)
 					logins := []any{"octocat"}
 					if scenario == "fallback" {
 						logins = []any{"fallback-user"}
@@ -664,8 +690,12 @@ func TestReviewRequestFromPublishedReportToGitHub(t *testing.T) {
 					if scenario == "additional reviewer" {
 						logins = append(logins, "fallback-user")
 					}
-					require.Equal(t, logins, host.reviewerBodies[0]["reviewers"])
-					require.NotContains(t, host.reviewerBodies[0], "requested_reviewers")
+					actual := []any{}
+					for _, body := range host.reviewerBodies {
+						actual = append(actual, body["reviewers"].([]any)...)
+						require.NotContains(t, body, "requested_reviewers")
+					}
+					require.Equal(t, logins, actual)
 				}
 				if !publishCheck {
 					for _, request := range host.requests {
@@ -827,4 +857,32 @@ func setReviewRequestCheck(t *testing.T, f publicationFixture, canvas *models.Ca
 		}
 	}
 	require.NoError(t, f.db.Save(version).Error)
+}
+
+func TestManagedReviewerOwnershipSurvivesExecutionRollback(t *testing.T) {
+	host := &reviewRequestHTTP{}
+	f, message := reviewRequestCompletedProducer(t, host, 2)
+	consumer := reviewFindingsConsumer(t, f, reviewFindingsSettings{}, "")
+	root := deliverReviewRequestReport(t, f, consumer, message)
+	_, err := models.FindOrCreateCanvasRunForRootEventInTransaction(f.db, root)
+	require.NoError(t, err)
+	node, err := models.FindCanvasNode(f.db, consumer.ID, "request-reviewers")
+	require.NoError(t, err)
+	execution := support.CreateCanvasNodeExecution(t, consumer.ID, node.NodeID, root.ID, root.ID)
+	config := map[string]any{"repository": "acme/app", "pullNumber": 42, "managed": true, "expectedHeadSha": "abc", "reviewers": []pulls.ReviewerIdentity{{ID: 2, Login: "octocat"}}}
+	ctx := core.ExecutionContext{ID: execution.ID, WorkflowID: consumer.ID.String(), NodeID: node.NodeID, Configuration: config, Integration: reviewRequestIntegration(), HTTP: host, ExecutionState: &contexts.ExecutionStateContext{}}
+	interrupted := errors.New("execution interrupted after GitHub accepted the request")
+	err = f.db.Transaction(func(tx *gorm.DB) error {
+		ctx.Publications = workercontexts.NewPublicationContext(tx, consumer.OrganizationID, node, execution)
+		require.NoError(t, (&pulls.EnsurePullRequestReviewers{}).Execute(ctx))
+		return interrupted
+	})
+	require.ErrorIs(t, err, interrupted)
+	require.Len(t, host.pendingReviewers, 1)
+	// A later report can still withdraw the request after the execution rolls back.
+	ctx.Publications = workercontexts.NewPublicationContext(f.db, consumer.OrganizationID, node, execution)
+	config["reviewers"] = []pulls.ReviewerIdentity{}
+	require.NoError(t, (&pulls.EnsurePullRequestReviewers{}).Execute(ctx))
+	require.Empty(t, host.pendingReviewers)
+	require.Equal(t, []string{"octocat"}, host.reviewerRemovals)
 }
