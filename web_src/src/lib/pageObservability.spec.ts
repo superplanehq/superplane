@@ -57,11 +57,36 @@ describe("resolvePageObservability", () => {
     });
   });
 
-  it("maps settings routes", () => {
-    expect(resolvePageObservability("/org-1/settings/general")).toEqual({
-      pageKey: "settingsGeneral",
+  it.each([
+    ["", "settingsGeneral"],
+    ["/", "settingsGeneral"],
+    ["/general", "settingsGeneral"],
+    ["/members", "settingsMembers"],
+    ["/create-group", "settingsCreateGroup"],
+    ["/roles", "settingsRoles"],
+    ["/profile", "settingsProfile"],
+    ["/notifications", "settingsNotifications"],
+    ["/billing", "settingsUsage"],
+    ["/general/extra", "settingsGeneral"],
+    ["/billing/extra/more", "settingsUsage"],
+  ])("maps fixed settings path %s to %s", (path, pageKey) => {
+    expect(resolvePageObservability(`/org-1/settings${path}`)).toEqual({
+      pageKey,
       attributes: { organization_id: "org-1" },
     });
+  });
+
+  it.each(["unknown", "constructor", "toString", "__proto__"])(
+    "maps unknown settings section %s to the fallback",
+    (section) => {
+      expect(resolvePageObservability(`/org-1/settings/${section}`)).toEqual({
+        pageKey: "settingsUnknown",
+        attributes: { organization_id: "org-1" },
+      });
+    },
+  );
+
+  it("maps settings detail routes", () => {
     expect(resolvePageObservability("/org-1/settings/integrations/slack/setup")).toEqual({
       pageKey: "settingsIntegrationSetup",
       attributes: { organization_id: "org-1", integration_name: "slack" },
@@ -70,9 +95,45 @@ describe("resolvePageObservability", () => {
       pageKey: "settingsGroupMembers",
       attributes: { organization_id: "org-1", group_name: "admins" },
     });
-    expect(resolvePageObservability("/org-1/settings/notifications")).toEqual({
-      pageKey: "settingsNotifications",
+    expect(resolvePageObservability("/org-1/settings/groups")).toEqual({
+      pageKey: "settingsGroups",
       attributes: { organization_id: "org-1" },
+    });
+    expect(resolvePageObservability("/org-1/settings/groups/admins")).toEqual({
+      pageKey: "settingsGroups",
+      attributes: { organization_id: "org-1" },
+    });
+    expect(resolvePageObservability("/org-1/settings/create-role")).toEqual({
+      pageKey: "settingsCreateRole",
+      attributes: { organization_id: "org-1" },
+    });
+    expect(resolvePageObservability("/org-1/settings/create-role/operator")).toEqual({
+      pageKey: "settingsCreateRole",
+      attributes: { organization_id: "org-1", role_name: "operator" },
+    });
+    expect(resolvePageObservability("/org-1/settings/integrations")).toEqual({
+      pageKey: "settingsIntegrations",
+      attributes: { organization_id: "org-1" },
+    });
+    expect(resolvePageObservability("/org-1/settings/integrations/int-9")).toEqual({
+      pageKey: "settingsIntegrationDetail",
+      attributes: { organization_id: "org-1", integration_id: "int-9" },
+    });
+    expect(resolvePageObservability("/org-1/settings/secrets")).toEqual({
+      pageKey: "settingsSecrets",
+      attributes: { organization_id: "org-1" },
+    });
+    expect(resolvePageObservability("/org-1/settings/secrets/secret-1")).toEqual({
+      pageKey: "settingsSecretDetail",
+      attributes: { organization_id: "org-1", secret_id: "secret-1" },
+    });
+    expect(resolvePageObservability("/org-1/settings/api-keys")).toEqual({
+      pageKey: "settingsAPIKeys",
+      attributes: { organization_id: "org-1" },
+    });
+    expect(resolvePageObservability("/org-1/settings/api-keys/key-1")).toEqual({
+      pageKey: "settingsAPIKeyDetail",
+      attributes: { organization_id: "org-1", api_key_id: "key-1" },
     });
   });
 

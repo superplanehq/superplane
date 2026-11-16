@@ -114,6 +114,16 @@ export function resolvePageObservability(pathname: string): PageObservabilityCon
   return null;
 }
 
+const SETTINGS_PAGE_KEYS: Record<string, PageObservabilityContext["pageKey"]> = {
+  general: "settingsGeneral",
+  members: "settingsMembers",
+  "create-group": "settingsCreateGroup",
+  roles: "settingsRoles",
+  profile: "settingsProfile",
+  notifications: "settingsNotifications",
+  billing: "settingsUsage",
+};
+
 function resolveSettingsPageObservability(organizationId: string, segments: string[]): PageObservabilityContext {
   const organizationAttributes = { organization_id: organizationId };
 
@@ -123,11 +133,11 @@ function resolveSettingsPageObservability(organizationId: string, segments: stri
 
   const [section, ...rest] = segments;
 
+  if (Object.prototype.hasOwnProperty.call(SETTINGS_PAGE_KEYS, section)) {
+    return { pageKey: SETTINGS_PAGE_KEYS[section], attributes: organizationAttributes };
+  }
+
   switch (section) {
-    case "general":
-      return { pageKey: "settingsGeneral", attributes: organizationAttributes };
-    case "members":
-      return { pageKey: "settingsMembers", attributes: organizationAttributes };
     case "groups":
       if (rest[0] && rest[1] === "members") {
         return {
@@ -136,10 +146,6 @@ function resolveSettingsPageObservability(organizationId: string, segments: stri
         };
       }
       return { pageKey: "settingsGroups", attributes: organizationAttributes };
-    case "create-group":
-      return { pageKey: "settingsCreateGroup", attributes: organizationAttributes };
-    case "roles":
-      return { pageKey: "settingsRoles", attributes: organizationAttributes };
     case "create-role":
       return {
         pageKey: "settingsCreateRole",
@@ -175,12 +181,6 @@ function resolveSettingsPageObservability(organizationId: string, segments: stri
         };
       }
       return { pageKey: "settingsAPIKeys", attributes: organizationAttributes };
-    case "profile":
-      return { pageKey: "settingsProfile", attributes: organizationAttributes };
-    case "notifications":
-      return { pageKey: "settingsNotifications", attributes: organizationAttributes };
-    case "billing":
-      return { pageKey: "settingsUsage", attributes: organizationAttributes };
     default:
       return { pageKey: "settingsUnknown", attributes: organizationAttributes };
   }
