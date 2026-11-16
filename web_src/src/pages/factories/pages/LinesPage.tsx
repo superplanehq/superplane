@@ -1124,10 +1124,9 @@ function LineDetail({
   const customAutomationModes = useMemo(
     () =>
       new Map<string, CustomAutomationMode>(
-        customAutomationDetails.map(({ automationId, automation }) => [
-          automationId,
-          customAutomationMode(automation.settings?.startMode),
-        ]),
+        customAutomationDetails
+          .filter(({ automation }) => automation.settings?.startMode)
+          .map(({ automationId, automation }) => [automationId, customAutomationMode(automation.settings?.startMode)]),
       ),
     [customAutomationDetails],
   );
@@ -1152,7 +1151,7 @@ function LineDetail({
         customAutomationTriggers: (() => {
           const triggers = customAutomationDetails.find(({ automationId }) => automationId === app.id)?.automation
             .settings?.triggers;
-          if (!triggers || triggers.length < 2) {
+          if (!triggers) {
             return undefined;
           }
           return triggers.flatMap((trigger) =>

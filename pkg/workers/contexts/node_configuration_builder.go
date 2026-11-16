@@ -97,6 +97,10 @@ func (b *NodeConfigurationBuilder) WithConfigurationFields(fields []configuratio
 }
 
 func (b *NodeConfigurationBuilder) Build(configuration map[string]any) (map[string]any, error) {
+	configuration, checkoutErr := b.withBacklogCheckoutFallback(configuration)
+	if checkoutErr != nil {
+		return nil, checkoutErr
+	}
 	var (
 		resolved map[string]any
 		err      error
