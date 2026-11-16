@@ -11,7 +11,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/models"
 	contexts "github.com/superplanehq/superplane/test/support/contexts"
@@ -100,8 +99,6 @@ func TestGitHub__ResolveSecrets__HostedTokensFollowContextRepositoryAccess(t *te
 	require.NoError(t, err)
 	other, err := models.CreateOrganization("org-"+uuid.NewString(), "")
 	require.NoError(t, err)
-	require.NoError(t, models.EnableExperimentalFeature(organization.ID, features.FeatureFactoryMultiRepoTasks))
-	require.NoError(t, models.EnableExperimentalFeature(other.ID, features.FeatureFactoryMultiRepoTasks))
 	t.Setenv(common.EnvGitHubAppID, "99")
 	t.Setenv(common.EnvGitHubAppSlug, "superplane")
 	t.Setenv(common.EnvGitHubAppPrivateKey, string(githubPrivateKeyPEM(t)))
@@ -179,7 +176,6 @@ func TestGitHub__ResolveSecrets__HostedWriteTokenCoversContextRepositoriesWithou
 	require.NoError(t, database.TruncateTables())
 	organization, err := models.CreateOrganization("org-"+uuid.NewString(), "")
 	require.NoError(t, err)
-	require.NoError(t, models.EnableExperimentalFeature(organization.ID, features.FeatureFactoryMultiRepoTasks))
 	t.Setenv(common.EnvGitHubAppID, "99")
 	t.Setenv(common.EnvGitHubAppSlug, "superplane")
 	t.Setenv(common.EnvGitHubAppPrivateKey, string(githubPrivateKeyPEM(t)))

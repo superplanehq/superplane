@@ -7,7 +7,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 )
@@ -51,25 +50,22 @@ func Test__FactoryWorkspaceRepositories(t *testing.T) {
 		addRepo(t, factory, repository, enabled, models.FactoryContextRepoAccessWrite)
 	}
 
-	t.Run("keeps only the primary repository without multi-repo tasks", func(t *testing.T) {
+	t.Run("keeps a single-repository workspace working", func(t *testing.T) {
 		factory := newWorkspace(t, "")
-		addContextRepo(t, factory, "acme/web", true)
 
 		repositories, err := factory.WorkspaceRepositories(db)
 		require.NoError(t, err)
 		assert.Equal(t, []string{"acme/app"}, repositories)
 	})
 
-	t.Run("keeps only the primary Bitbucket repository without multi-repo tasks", func(t *testing.T) {
+	t.Run("adds writable Bitbucket repositories by default", func(t *testing.T) {
 		factory := newWorkspace(t, models.ProviderBitbucket)
 		addProviderRepo(t, factory, models.ProviderBitbucket, "acme/web", true, models.FactoryContextRepoAccessWrite)
 
 		repositories, err := factory.WorkspaceRepositories(db)
 		require.NoError(t, err)
-		assert.Equal(t, []string{"acme/app"}, repositories)
+		assert.Equal(t, []string{"acme/app", "acme/web"}, repositories)
 	})
-
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryMultiRepoTasks))
 
 	t.Run("lists the primary repository first and then enabled context repositories", func(t *testing.T) {
 		factory := newWorkspace(t, "")

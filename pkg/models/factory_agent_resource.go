@@ -11,7 +11,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/superplanehq/superplane/pkg/features"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -773,8 +772,7 @@ func (f *Factory) ListEnabledContextRepos(tx *gorm.DB) ([]FactoryAgentResource, 
 // ListEnabledGitHubContextRepositoryNames returns owner/name values for
 // enabled GitHub context repositories with access on workspaces that use
 // this integration. Disabled resources, other providers, and deleted
-// workspaces are omitted. A write repository counts as read when its
-// organization does not have multi-repo tasks.
+// workspaces are omitted. Configured repository access is preserved.
 func ListEnabledGitHubContextRepositoryNames(tx *gorm.DB, integrationID uuid.UUID, access string) ([]string, error) {
 	if integrationID == uuid.Nil {
 		return nil, nil
@@ -801,11 +799,9 @@ func ListEnabledGitHubContextRepositoryNames(tx *gorm.DB, integrationID uuid.UUI
 			)
 			AND (CASE
 				WHEN LOWER(COALESCE(resource.config ->> 'access', '')) = ?
-					AND (? OR organization.enabled_experimental_features @> jsonb_build_array(?::text))
 				THEN ? ELSE ? END) = ?
 	`, integrationID.String(), FactoryAgentResourceKindContextRepo, ProviderGitHub,
 		FactoryContextRepoAccessWrite,
-		features.IsReleased(features.FeatureFactoryMultiRepoTasks), features.FeatureFactoryMultiRepoTasks,
 		FactoryContextRepoAccessWrite, FactoryContextRepoAccessRead,
 		NormalizeContextRepoAccess(access)).Scan(&rows).Error
 	if err != nil {

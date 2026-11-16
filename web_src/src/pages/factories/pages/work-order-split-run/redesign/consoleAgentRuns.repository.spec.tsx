@@ -3,16 +3,6 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it, mock } from "bun:test";
 
 import type { AutomationStage } from "./automationsViewModel";
-import { FEATURE_FACTORY_MULTI_REPO_TASKS } from "@/lib/experimentalFeatures";
-
-mock.module("@/hooks/useExperimentalFeature", () => ({
-  useExperimentalFeature: () => ({
-    has: (id: string) => id === FEATURE_FACTORY_MULTI_REPO_TASKS,
-    enabledExperimentalFeatures: [],
-    isLoading: false,
-    organizationReady: true,
-  }),
-}));
 
 mock.module("../useSplitRunLiveCanvas", () => ({
   useSplitRunLiveCanvas: () => ({

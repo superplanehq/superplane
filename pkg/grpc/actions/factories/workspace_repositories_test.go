@@ -10,7 +10,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"github.com/superplanehq/superplane/test/support/impl"
@@ -24,7 +23,6 @@ func TestRefreshWorkspaceRepositoryAutomationsListensOnEveryRepository(t *testin
 	t.Setenv(config.EnvGitHubAppWebhookSecret, "test-webhook-secret")
 
 	r := support.Setup(t)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryMultiRepoTasks))
 	db := database.DB(t.Context())
 	factory := githubCatalogFactory(t, r, db)
 	integrationID := factory.OnboardingConfigValue().VCSIntegrationID
@@ -103,7 +101,6 @@ func TestRefreshWorkspaceRepositoryAutomationsCoversNewRepositoriesInCustomAutom
 	t.Setenv(config.EnvGitHubAppWebhookSecret, "test-webhook-secret")
 
 	r := support.Setup(t)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryMultiRepoTasks))
 	db := database.DB(t.Context())
 	factory := githubCatalogFactory(t, r, db)
 	integrationID := factory.OnboardingConfigValue().VCSIntegrationID
@@ -131,7 +128,6 @@ func TestRefreshWorkspaceRepositoryAutomationsCoversNewRepositoriesInCustomAutom
 
 func TestRefreshWorkspaceRepositoryAutomationsListensOnEveryBitbucketRepository(t *testing.T) {
 	r := support.Setup(t)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryMultiRepoTasks))
 	db := database.DB(t.Context())
 	integration, err := models.CreateIntegration(uuid.New(), r.Organization.ID, "bitbucket", support.RandomName("bitbucket"), nil)
 	require.NoError(t, err)
