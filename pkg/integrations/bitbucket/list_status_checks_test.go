@@ -17,6 +17,26 @@ func statusCheckIntegration() *contexts.IntegrationContext {
 }
 
 func Test__Bitbucket__ListResources__StatusCheck(t *testing.T) {
+	t.Run("excludes SuperPlane status keys and keeps external checks", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{Responses: []*http.Response{
+			bitbucketResponse(http.StatusOK, `{"values": [{"source": {"commit": {"hash": "aaa111aaa111aaa111aaa111aaa111aaa111aaaa"}}}]}`),
+			bitbucketResponse(http.StatusOK, `{"values": [
+				{"key": "superplane/merge-confidence", "name": "Merge confidence"},
+				{"key": "superplane/review-request", "name": "Review request"},
+				{"key": " SuperPlane/future-check ", "name": "Future check"},
+				{"key": "build", "name": "Build"}
+			]}`),
+		}}
+
+		resources, err := (&Bitbucket{}).ListResources("status_check", core.ListResourcesContext{
+			HTTP:        httpCtx,
+			Integration: statusCheckIntegration(),
+			Parameters:  map[string]string{"repository": "acme/widgets"},
+		})
+		require.NoError(t, err)
+		assert.Equal(t, []core.IntegrationResource{{Type: "status_check", ID: "build", Name: "Build"}}, resources)
+	})
+
 	t.Run("discovers checks from recent PR statuses", func(t *testing.T) {
 		httpCtx := &contexts.HTTPContext{Responses: []*http.Response{
 			bitbucketResponse(http.StatusOK, `{"values": [
