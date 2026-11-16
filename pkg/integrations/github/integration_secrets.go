@@ -72,7 +72,34 @@ func resolveAccessToken(httpCtx core.HTTPContext, integrationCtx core.Integratio
 	}
 }
 
-func legacyAccessToken(httpCtx core.HTTPContext, integrationCtx core.IntegrationContext) (string, error) {
+// ResolvePublicationToken resolves only the credential for an authorized target.
+// The caller must enforce task, workspace, host, and write access first.
+func ResolvePublicationToken(httpCtx core.HTTPContext, integrationCtx core.IntegrationContext, repository string) (string, error) {
+	parts := strings.Split(repository, "/")
+	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+		return "", fmt.Errorf("publication repository is required")
+	}
+	if integrationCtx.LegacySetup() {
+		return legacyAccessToken(httpCtx, integrationCtx, repository)
+	}
+	authMethod, err := integrationCtx.Properties().GetString(common.PropertyAuthMethod)
+	if err != nil {
+		return "", err
+	}
+	if authMethod == common.AuthMethodPAT {
+		return resolveAccessToken(httpCtx, integrationCtx)
+	}
+	if authMethod != common.AuthMethodApp {
+		return "", fmt.Errorf("invalid authentication method")
+	}
+	owner, err := integrationCtx.Properties().GetString(common.PropertyOwner)
+	if err != nil || !strings.EqualFold(owner, parts[0]) {
+		return "", fmt.Errorf("publication repository owner does not match the installation")
+	}
+	return appInstallationAccessToken(httpCtx, integrationCtx.Properties(), integrationCtx.Secrets(), parts[1])
+}
+
+func legacyAccessToken(httpCtx core.HTTPContext, integrationCtx core.IntegrationContext, repository ...string) (string, error) {
 	var metadata common.Metadata
 	if err := mapstructure.Decode(integrationCtx.GetMetadata(), &metadata); err != nil {
 		return "", fmt.Errorf("failed to decode metadata: %v", err)
@@ -91,7 +118,17 @@ func legacyAccessToken(httpCtx core.HTTPContext, integrationCtx core.Integration
 		appID = hosted.App.ID
 		pem = hosted.App.PrivateKey
 		repositoryIDs = hosted.RepositoryIDs
+		if len(repository) > 0 {
+			ids, missing, err := models.MatchVCSProviderRepositoryIDs(database.Conn(), models.ProviderGitHub, hosted.ID, repository)
+			if err != nil || len(missing) != 0 || len(ids) != 1 || !slices.Contains(repositoryIDs, ids[0]) {
+				return "", fmt.Errorf("publication repository is not granted to the installation")
+			}
+			repositoryIDs = ids
+		}
 	} else {
+		if len(repository) > 0 && !strings.EqualFold(metadata.Owner, strings.Split(repository[0], "/")[0]) {
+			return "", fmt.Errorf("publication repository owner does not match the installation")
+		}
 		var err error
 		installationID, err = strconv.Atoi(metadata.InstallationID)
 		if err != nil {
@@ -117,6 +154,8 @@ func legacyAccessToken(httpCtx core.HTTPContext, integrationCtx core.Integration
 		if err := common.RestrictHostedAppTransport(itr, repositoryIDs); err != nil {
 			return "", err
 		}
+	} else if len(repository) > 0 {
+		itr.InstallationTokenOptions = &githubauth.InstallationTokenOptions{Repositories: []string{strings.Split(repository[0], "/")[1]}}
 	}
 
 	token, err := itr.Token(context.Background())
@@ -217,6 +256,7 @@ func appInstallationAccessToken(
 	httpCtx core.HTTPContext,
 	properties core.IntegrationPropertyStorageReader,
 	secrets core.IntegrationSecretStorageReader,
+	repositories ...string,
 ) (string, error) {
 	appID, err := properties.GetString(common.PropertyAppID)
 	if err != nil {
@@ -253,6 +293,9 @@ func appInstallationAccessToken(
 		return "", fmt.Errorf("failed to create apps transport: %v", err)
 	}
 	common.ApplyHostToInstallationTransport(itr, common.HostFromProperties(properties))
+	if len(repositories) > 0 {
+		itr.InstallationTokenOptions = &githubauth.InstallationTokenOptions{Repositories: repositories}
+	}
 
 	token, err := itr.Token(context.Background())
 	if err != nil {
