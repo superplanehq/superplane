@@ -360,6 +360,10 @@ func TestMaterializeRiskScoreTemplateBitbucket(t *testing.T) {
 	assert.Equal(t, "{{ root().data.repository.full_name }}", publication.Configuration["repository"])
 	assert.Equal(t, "{{ root().data.pull_request.number }}", publication.Configuration["pullNumber"])
 	assert.Equal(t, true, publication.Configuration["enabled"])
+	assert.Contains(t, canvas.Spec.Edges, yaml.Edge{SourceID: "publish-merge-confidence", TargetID: "complete-merge-confidence", Channel: "default"})
+	assert.Contains(t, canvas.Spec.Edges, yaml.Edge{SourceID: "complete-merge-confidence", TargetID: "broadcast-merge-confidence", Channel: "default"})
+	assert.Equal(t, "filter", findYAMLNode(t, canvas, "complete-merge-confidence").Component)
+	assert.Equal(t, "broadcastMessage", findYAMLNode(t, canvas, "broadcast-merge-confidence").Component)
 	requireValidCanvasExpressions(t, canvas)
 }
 

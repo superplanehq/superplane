@@ -213,7 +213,6 @@ func mergeStatusCheckResources(protectionNames []string, observed []observedStat
 			return
 		}
 		key := strings.ToLower(name)
-		// SuperPlane checks report automation outcomes, not repair targets.
 		if strings.HasPrefix(key, "superplane/") {
 			return
 		}
