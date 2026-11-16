@@ -1644,6 +1644,38 @@ func TestFactoryContext_FindPullRequest_IncludesWorkOrderOrigin(t *testing.T) {
 	})
 }
 
+func TestFactoryContext_FindPullRequest_IgnoresArchivedTasks(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	canvas, execution, _ := setupFactoryAppExecution(t, r, factory.ID)
+	ctx := NewFactoryContext(db, canvas, execution)
+
+	for _, result := range []string{models.FactoryWorkOrderResultArchived, models.FactoryWorkOrderResultRejected} {
+		t.Run(result, func(t *testing.T) {
+			order, err := factory.CreateWorkOrder(db, "Deleted task", "", &r.User, nil, nil)
+			require.NoError(t, err)
+			_, err = order.UpdateStatus(db, models.FactoryWorkOrderStatusUpdate{ToState: models.FactoryWorkOrderStateOpen, Actor: &r.User})
+			require.NoError(t, err)
+			pr, err := order.CreatePullRequest(db, models.FactoryPullRequestParams{
+				URL: fmt.Sprintf("https://github.com/acme/app/pull/%d", order.Number),
+			})
+			require.NoError(t, err)
+			lookup := core.FindPullRequestParams{ID: pr.ID.String()}
+			_, err = ctx.FindPullRequest(lookup)
+			require.NoError(t, err)
+
+			_, err = order.Close(db, result, &r.User)
+			require.NoError(t, err)
+			match, err := ctx.FindPullRequest(lookup)
+			assert.ErrorIs(t, err, core.ErrPullRequestNotFound)
+			assert.Nil(t, match)
+		})
+	}
+}
+
 func TestFactoryContext_AddWorkOrderComment(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()

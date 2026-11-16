@@ -88,7 +88,7 @@ func Test__EventRouter_ProcessRootEvent(t *testing.T) {
 	assert.False(t, terminalEventConsumer.HasReceivedMessage())
 }
 
-func Test__EventRouter_ProcessRootEvent_RecordsPermanentSubscriptionRejection(t *testing.T) {
+func Test__EventRouter_ProcessRootEvent_RecordsPermanentTaskRejection(t *testing.T) {
 	amqpURL, _ := config.RabbitMQURL()
 	router := NewEventRouter(amqpURL)
 	logger := log.NewEntry(log.New())
@@ -154,6 +154,21 @@ func Test__EventRouter_ProcessRootEvent_RecordsPermanentSubscriptionRejection(t 
 	require.NoError(t, err)
 	require.Len(t, notes, 1)
 	assert.Contains(t, notes[0].Body, models.ErrSubscriptionOwnerRequired.Error())
+
+	subscription = false
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{CodexSubscription: &subscription}))
+	_, err = order.Close(db, models.FactoryWorkOrderResultArchived, &r.User)
+	require.NoError(t, err)
+	event = support.EmitCanvasEventForNodeWithData(t, canvas.ID, trigger, "default", nil, map[string]any{
+		"data": map[string]any{"pullRequest": map[string]any{"id": pullRequest.ID.String()}},
+	})
+	require.NoError(t, router.LockAndProcessEvent(logger, *event, time.Now()))
+	updatedEvent, err = models.FindCanvasEvent(event.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasEventStateRouted, updatedEvent.State)
+	queueItems, err = models.ListNodeQueueItems(db, canvas.ID, component, 10, nil)
+	require.NoError(t, err)
+	assert.Empty(t, queueItems)
 }
 
 func Test__EventRouter_ProcessRootEvent_FailsRefinementRunOnPermanentSubscriptionRejection(t *testing.T) {
