@@ -37,6 +37,7 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
   field,
   value,
   onChange,
+  allValues = {},
   integrationId,
   organizationId,
   hasError: _,
@@ -150,14 +151,15 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
 
     const itemValues =
       item && typeof item === "object" ? (item as Record<string, unknown>) : ({} as Record<string, unknown>);
+    const inheritedValues = { ...allValues, ...itemValues };
     const nestedValues = isApprovalItemsList
       ? {
-          ...itemValues,
+          ...inheritedValues,
           __listItems: items,
           __itemIndex: index,
           __isApprovalList: true,
         }
-      : itemValues;
+      : inheritedValues;
 
     return itemDefinition.schema.map((schemaField, schemaIndex) => {
       const nestedFieldPath = `${fieldPath}[${index}].${schemaField.name}`;

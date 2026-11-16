@@ -19,7 +19,9 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 <CardGrid>
   <LinkCard title="Create Pull Request" href="#create-pull-request" description="Create a pull request in a Bitbucket repository" />
   <LinkCard title="Create Pull Request Comment" href="#create-pull-request-comment" description="Add a comment to a Bitbucket pull request" />
+  <LinkCard title="Ensure Pull Request Reviewers" href="#ensure-pull-request-reviewers" description="Request eligible reviewers and preserve existing reviewers" />
   <LinkCard title="Find Pull Request" href="#find-pull-request" description="Find a pull request in a Bitbucket repository by branch" />
+  <LinkCard title="List Pull Request Review Candidates" href="#list-pull-request-review-candidates" description="Find active human reviewers with effective repository write access" />
   <LinkCard title="Update Pull Request" href="#update-pull-request" description="Update the title or description of a Bitbucket pull request" />
   <LinkCard title="Update PR Body Section" href="#update-pr-body-section" description="Update one Markdown section in a Bitbucket pull request description" />
   <LinkCard title="Wait for Builds" href="#wait-for-builds" description="Wait for Bitbucket builds to finish on a commit" />
@@ -507,6 +509,56 @@ Emits the comment that Bitbucket returns.
 }
 ```
 
+<a id="ensure-pull-request-reviewers"></a>
+
+## Ensure Pull Request Reviewers
+
+**Component key:** `bitbucket.ensurePullRequestReviewers`
+
+Request selected humans by UUID after rechecking effective access, account status, the pull request state, and its assessed commit.
+
+### Configuration
+
+- **Repository**: Repository in workspace/repository format.
+- **Pull Request Number**: Pull request number. Supports expressions.
+- **Expected Head SHA**: Required full assessed commit hash. Changed or closed pull requests emit stale_pr.
+- **Reviewers**: Distinct Bitbucket UUIDs in objects with a uuid field. The repository reviewer picker stores UUIDs. displayName is optional.
+
+### Output
+
+The default channel emits executionId, provider, integrationId, repository, repositoryId, pullNumber, headSha, status, reason, requested, alreadyCovered, and unresolvedApprovals. Status is requested, already_covered, or stale_pr. Errors fail the execution and emit no success payload. Existing reviewer assignments count as covered. Participant approvals without reliable commit evidence stay unresolved.
+
+SuperPlane serializes its own reviewer writes for one integration, repository, and pull request. It merges current reviewers, writes only the reviewers field, and verifies the result. Conflicts and missing reviewers allow three reconciliation attempts. Strong ETags are sent as If-Match when present. Bitbucket does not document an atomic additive update. Concurrent external edits can still race. Missing reviewers, changed approvals, and uncertain updates remain errors.
+
+Use an API token with read:repository:bitbucket, read:user:bitbucket, read:pullrequest:bitbucket, and write:pullrequest:bitbucket scopes. Repository admin access is required. Hosted Forge and access tokens are not supported. Approval-evidence integration remains a merge requirement. See docs/contributing/bitbucket-reviewers.md.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "alreadyCovered": [],
+    "executionId": "55555555-5555-5555-5555-555555555555",
+    "headSha": "abc123",
+    "integrationId": "11111111-1111-1111-1111-111111111111",
+    "provider": "bitbucket",
+    "pullNumber": 42,
+    "repository": "acme/widgets",
+    "repositoryId": "33333333-3333-3333-3333-333333333333",
+    "requested": [
+      {
+        "uuid": "22222222-2222-2222-2222-222222222222",
+        "displayName": "Reviewer"
+      }
+    ],
+    "status": "requested",
+    "unresolvedApprovals": []
+  },
+  "timestamp": "2026-04-22T10:00:00Z",
+  "type": "bitbucket.pullRequestReviewersEnsured"
+}
+```
+
 <a id="find-pull-request"></a>
 
 ## Find Pull Request
@@ -574,6 +626,59 @@ The Find Pull Request component looks up a pull request in a Bitbucket repositor
   },
   "timestamp": "2026-04-22T10:00:00.000000000Z",
   "type": "bitbucket.pullRequest"
+}
+```
+
+<a id="list-pull-request-review-candidates"></a>
+
+## List Pull Request Review Candidates
+
+**Component key:** `bitbucket.listPullRequestReviewCandidates`
+
+List eligible humans, excluding the pull request author, app users, bots, and inactive accounts. Read all effective permission pages, including group grants. Repository admin access is required.
+
+### Configuration
+
+- **Repository**: Repository in workspace/repository format.
+- **Pull Request Number**: Pull request number. Supports expressions.
+
+### Output
+
+The default channel emits provider, integrationId, repository, repositoryId, pullNumber, headSha, state, author, and candidates. Each identity has uuid and displayName. UUIDs are canonical and have no braces. Candidate evidence includes default_reviewer and recent_contributor. Defaults include project inheritance. Contributor evidence samples the latest 100 repository commits. contributorCommits and contributorHistoryLimited describe this sample. Empty evidence means an eligible fallback candidate. Defaults and commits do not prove ownership. SuperPlane does not interpret CODEOWNERS.
+
+Use an API token with read:repository:bitbucket, read:pullrequest:bitbucket, and read:user:bitbucket scopes. The account must have repository admin permission. Hosted Forge and access tokens do not currently support account verification. Permission or incomplete-data failures fail the execution. See docs/contributing/bitbucket-reviewers.md for credential limits.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "author": {
+      "uuid": "44444444-4444-4444-4444-444444444444",
+      "displayName": "Author"
+    },
+    "candidates": [
+      {
+        "uuid": "22222222-2222-2222-2222-222222222222",
+        "displayName": "Reviewer",
+        "evidence": [
+          "default_reviewer",
+          "recent_contributor"
+        ]
+      }
+    ],
+    "contributorCommits": 100,
+    "contributorHistoryLimited": true,
+    "headSha": "abc123",
+    "integrationId": "11111111-1111-1111-1111-111111111111",
+    "provider": "bitbucket",
+    "pullNumber": 42,
+    "repository": "acme/widgets",
+    "repositoryId": "33333333-3333-3333-3333-333333333333",
+    "state": "OPEN"
+  },
+  "timestamp": "2026-04-22T10:00:00Z",
+  "type": "bitbucket.pullRequestReviewCandidates"
 }
 ```
 

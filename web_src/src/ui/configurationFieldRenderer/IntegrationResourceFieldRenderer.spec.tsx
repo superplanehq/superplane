@@ -8,6 +8,7 @@ import { useIntegrationResources } from "@/hooks/useIntegrations";
 import { DATADOG_ISSUE_SEARCH_FAILED_NOTICE_ID, INTEGRATION_LIST_NOTICE_TYPE } from "@/lib/integrationListNotice";
 import { toTestId } from "@/lib/testID";
 
+import { ListFieldRenderer } from "./ListFieldRenderer";
 import { IntegrationResourceFieldRenderer } from "./IntegrationResourceFieldRenderer";
 
 vi.mock("@/hooks/useIntegrations", () => ({
@@ -195,4 +196,49 @@ describe("IntegrationResourceFieldRenderer", () => {
     expect(screen.queryByText(DATADOG_ISSUE_SEARCH_FAILED_NOTICE_ID)).not.toBeInTheDocument();
     expect(screen.getByTestId(toTestId("app-installation-resource-field-channel"))).toBeInTheDocument();
   });
+});
+
+it("loads reviewers for the parent repository and stores the selected identity in a list item", async () => {
+  const user = userEvent.setup();
+  const onChange = vi.fn();
+  const field: ConfigurationField = {
+    name: "reviewers",
+    type: "list",
+    typeOptions: {
+      list: {
+        itemDefinition: {
+          type: "object",
+          schema: [
+            {
+              name: "uuid",
+              label: "Reviewer",
+              type: "integration-resource",
+              typeOptions: {
+                resource: {
+                  type: "reviewer",
+                  parameters: [{ name: "repository", valueFrom: { field: "repository" } }],
+                },
+              },
+            },
+          ],
+        },
+      },
+    },
+  };
+  render(
+    <ListFieldRenderer
+      field={field}
+      value={[{}]}
+      allValues={{ repository: "acme/widgets" }}
+      onChange={onChange}
+      organizationId="org-1"
+      integrationId="int-1"
+    />,
+  );
+  expect(mockUseIntegrationResources).toHaveBeenLastCalledWith("org-1", "int-1", "reviewer", {
+    repository: "acme/widgets",
+  });
+  await user.click(screen.getByRole("combobox"));
+  await user.click(screen.getByText("Resource One"));
+  expect(onChange).toHaveBeenCalledWith([{ uuid: "resource-1" }]);
 });

@@ -148,6 +148,8 @@ func (b *Bitbucket) Configuration() []configuration.Field {
 func (b *Bitbucket) Actions() []core.Action {
 	return []core.Action{
 		&FindPullRequest{},
+		&ListPullRequestReviewCandidates{},
+		&EnsurePullRequestReviewers{},
 		&CreatePullRequest{},
 		&UpdatePullRequest{},
 		&UpdatePullRequestBodySection{},
