@@ -87,6 +87,7 @@ func (s *TestContext) Start() {
 		licensingtest.StaticSource{Raw: issuer.License(
 			licensing.FeatureCustomRoles,
 			licensing.FeatureGroups,
+			licensing.FeatureSSO,
 		)},
 		licensing.WithGrantLookup(enterprise.DatabaseGrantLookup{}),
 	)

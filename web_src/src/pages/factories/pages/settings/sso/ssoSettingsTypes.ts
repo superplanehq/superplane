@@ -1,0 +1,98 @@
+import type { SsoConnection, SsoDomain, SsoPutConnectionRequest, SsoscimToken } from "@/api-client/types.gen";
+
+export function testResultText(connection: SsoConnection | null | undefined, tested: boolean) {
+  if (!connection?.lastTest) {
+    return "No test yet.";
+  }
+  const outcome = tested ? "Last test succeeded." : "Last test failed.";
+  const when = connection.lastTestedAt ? new Date(connection.lastTestedAt).toLocaleString() : "";
+  const detail = tested ? connection.lastTest.email : connection.lastTest.error;
+  return [outcome, when, detail].filter(Boolean).join(" ");
+}
+
+export function statusLabel(status: string | undefined) {
+  if (status === "STATUS_ACTIVE") return "Active";
+  if (status === "STATUS_DISABLED") return "Disabled";
+  return "Draft";
+}
+
+export type SsoSettingsModel = {
+  licensed: boolean;
+  canUpdate?: boolean;
+  busy?: boolean;
+  secretEpoch?: number;
+  connection?: SsoConnection | null;
+  domains: SsoDomain[];
+  tokens: SsoscimToken[];
+  error?: string | null;
+  notice?: string | null;
+  revealedToken?: string | null;
+};
+
+export type SsoSettingsActions = {
+  onAddDomain: (domain: string) => void;
+  onVerifyDomain: (id: string) => void;
+  onDeleteDomain: (id: string) => void;
+  onSave: (input: SsoPutConnectionRequest) => void;
+  onTest: () => void;
+  onActivate: () => void;
+  onDisable: () => void;
+  onDelete: () => void;
+  onCreateToken: (description: string) => void;
+  onRevokeToken: (id: string) => void;
+  onDismissToken: () => void;
+};
+
+export type ConfirmRequest = { title: string; body: string; actionLabel: string; run: () => void };
+
+export type SsoDraft = {
+  canChange: boolean;
+  canUpdate: boolean;
+  sessionError: string | null;
+  exists: boolean;
+  tested: boolean;
+  verified: boolean;
+  domain: string;
+  setDomain: (value: string) => void;
+  displayName: string;
+  setDisplayName: (value: string) => void;
+  preset: string;
+  setPreset: (value: string) => void;
+  issuer: string;
+  setIssuer: (value: string) => void;
+  clientId: string;
+  setClientId: (value: string) => void;
+  clientSecret: string;
+  setClientSecret: (value: string) => void;
+  jitEnabled: boolean;
+  setJitEnabled: (value: boolean) => void;
+  defaultRole: string;
+  setDefaultRole: (value: string) => void;
+  enforcement: string;
+  setEnforcement: (value: string) => void;
+  ownerBypass: boolean;
+  setOwnerBypass: (value: boolean) => void;
+  sessionHours: string;
+  setSessionHours: (value: string) => void;
+  idpLogout: boolean;
+  setIdpLogout: (value: boolean) => void;
+  tokenDescription: string;
+  setTokenDescription: (value: string) => void;
+  ask: (title: string, body: string, actionLabel: string, run: () => void) => void;
+  requestRequired: () => void;
+  save: (nextEnforcement?: string) => void;
+};
+
+export const noopSsoActions: SsoSettingsActions = {
+  onAddDomain: () => undefined,
+  onVerifyDomain: () => undefined,
+  onDeleteDomain: () => undefined,
+  onSave: () => undefined,
+  onTest: () => undefined,
+  onActivate: () => undefined,
+  onDisable: () => undefined,
+  onDelete: () => undefined,
+  onCreateToken: () => undefined,
+  onRevokeToken: () => undefined,
+  onDismissToken: () => undefined,
+};

@@ -31,6 +31,7 @@ type User struct {
 	APIKeyExpiresAt *time.Time                  `gorm:"column:api_key_expires_at"`
 	APIKeyCanvasIDs datatypes.JSONSlice[string] `gorm:"column:api_key_canvas_ids"`
 	IsOwner         bool
+	ProvisionedBy   *string
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
 	DeletedAt       gorm.DeletedAt
@@ -108,6 +109,11 @@ func (u *User) RestoreInTransaction(tx *gorm.DB) error {
 		Model(u).
 		Update("deleted_at", nil).
 		Error
+}
+
+func (u *User) SetProvisionedBy(tx *gorm.DB, provisionedBy string) error {
+	u.ProvisionedBy = &provisionedBy
+	return tx.Model(u).Update("provisioned_by", provisionedBy).Error
 }
 
 func PreloadRemovedMember(db *gorm.DB) *gorm.DB {
