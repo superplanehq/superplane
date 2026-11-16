@@ -19,6 +19,7 @@ import (
 	"github.com/superplanehq/superplane/test/support"
 	"github.com/superplanehq/superplane/test/support/impl"
 	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
 func Test__ListBYOKLLMModels(t *testing.T) {
@@ -239,4 +240,48 @@ func Test__UpdateBYOKLLMModels(t *testing.T) {
 		assert.Equal(t, "gpt-4.1", resp.Selected[0].Id)
 		assert.Equal(t, "gpt-4o", resp.Selected[1].Id)
 	})
+}
+
+func TestClaudeDiscoveryCachesCapabilitiesWithoutChangingSelection(t *testing.T) {
+	for _, failCache := range []bool{false, true} {
+		t.Run(fmt.Sprint(failCache), func(t *testing.T) {
+			r := support.Setup(t)
+			db := database.DB(t.Context())
+			require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
+			integration, err := models.CreateIntegration(uuid.New(), r.Organization.ID, "claude", support.RandomName("claude"), map[string]any{})
+			require.NoError(t, err)
+			require.NoError(t, db.Model(integration).Update("state", models.IntegrationStateReady).Error)
+			_, err = models.UpsertOrganizationBYOKModelAllowlist(db, r.Organization.ID, models.UsageProviderAnthropic, datatypes.JSONSlice[string]{})
+			require.NoError(t, err)
+			calls := 0
+			r.Registry.Integrations["claude"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{ListResources: func(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+				calls++
+				return []core.IntegrationResource{{ID: "claude-discovered", ThinkingLevels: []string{"high"}}}, nil
+			}})
+			if failCache {
+				callback := "test:fail_capability_publication"
+				require.NoError(t, db.Callback().Create().Before("gorm:create").Register(callback, func(tx *gorm.DB) {
+					if tx.Statement.Table == "llm_model_capabilities" {
+						tx.AddError(fmt.Errorf("storage unavailable"))
+					}
+				}))
+				t.Cleanup(func() { _ = db.Callback().Create().Remove(callback) })
+			}
+			response, err := ListBYOKLLMModels(t.Context(), r.Registry, r.Organization.ID.String(), &pb.ListBYOKLLMModelsRequest{Provider: models.UsageProviderAnthropic})
+			require.NoError(t, err)
+			assert.Equal(t, 1, calls)
+			require.Len(t, response.Candidates, 1)
+			assert.Equal(t, "claude-discovered", response.Candidates[0].Id)
+			assert.Empty(t, response.Selected)
+			rows, err := models.ListLLMModelCapabilities(db, models.UsageProviderAnthropic)
+			require.NoError(t, err)
+			if failCache {
+				assert.Empty(t, rows)
+				return
+			}
+			require.Len(t, rows, 1)
+			assert.Equal(t, "claude-discovered", rows[0].Model)
+			assert.Equal(t, datatypes.JSONSlice[string]{"high"}, rows[0].ThinkingLevels)
+		})
+	}
 }
