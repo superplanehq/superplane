@@ -145,7 +145,11 @@ function useChecksSetupResources(
 
   return {
     checkNames,
-    toggleCheckName: (name: string) => setCheckNames((current) => toggleUniqueString(current, name)),
+    toggleCheckName: (name: string) => {
+      if (isEligibleRepairCheck(name)) {
+        setCheckNames((current) => toggleUniqueString(current, name));
+      }
+    },
     catalog,
     catalogQuery,
     catalogLoading,
@@ -178,6 +182,7 @@ async function finishChecksSetup({
   createHandler: ReturnType<typeof useCreateFactoryPRFeedbackHandler>;
   setError: (error: string | undefined) => void;
 }) {
+  checkNames = checkNames.filter(isEligibleRepairCheck);
   if (checkNames.length === 0) {
     setError(PR_FEEDBACK_SETTINGS_COPY.checkNamesNone);
     return undefined;

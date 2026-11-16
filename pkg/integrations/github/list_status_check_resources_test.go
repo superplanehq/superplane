@@ -3,6 +3,7 @@ package github
 import (
 	"context"
 	"errors"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -270,37 +271,49 @@ func Test__RecentStatusCheckRefs(t *testing.T) {
 func Test__ListStatusCheckResourcesFromClient(t *testing.T) {
 	t.Parallel()
 
-	for _, includeExternal := range []bool{false, true} {
-		name := "only SuperPlane checks"
-		if includeExternal {
-			name = "SuperPlane and external checks"
+	for _, source := range []string{"protection contexts", "protection checks", "check runs", "commit statuses"} {
+		for _, external := range []bool{false, true} {
+			t.Run(source+" external="+strconv.FormatBool(external), func(t *testing.T) {
+				t.Parallel()
+				names := []string{"superplane/merge-confidence", "superplane/review-request", "  SuPeRpLaNe/future-check  "}
+				if external {
+					names = append(names, "build", "superplane-ci/build", "other/superplane/check")
+				}
+				api := &fakeGitHubStatusCheckAPI{}
+				switch source {
+				case "protection contexts":
+					api.protection = &github.Protection{RequiredStatusChecks: &github.RequiredStatusChecks{Contexts: &names}}
+				case "protection checks":
+					checks := []*github.RequiredStatusCheck{}
+					for _, name := range names {
+						checks = append(checks, &github.RequiredStatusCheck{Context: name})
+					}
+					api.protection = &github.Protection{RequiredStatusChecks: &github.RequiredStatusChecks{Checks: &checks}}
+				case "check runs":
+					result := &github.ListCheckRunsResults{}
+					for _, name := range names {
+						result.CheckRuns = append(result.CheckRuns, &github.CheckRun{Name: github.Ptr(name)})
+					}
+					api.checkRuns = map[string]*github.ListCheckRunsResults{"main": result}
+				case "commit statuses":
+					api.combinedStatus = &github.CombinedStatus{}
+					for _, name := range names {
+						api.combinedStatus.Statuses = append(api.combinedStatus.Statuses, &github.RepoStatus{Context: github.Ptr(name)})
+					}
+				}
+				resources, err := listStatusCheckResourcesFromClient(context.Background(), api, "acme/app")
+				require.NoError(t, err)
+				if !external {
+					assert.Empty(t, resources)
+					return
+				}
+				assert.Equal(t, []core.IntegrationResource{
+					{Type: "status_check", Name: "build", ID: "build"},
+					{Type: "status_check", Name: "superplane-ci/build", ID: "superplane-ci/build"},
+					{Type: "status_check", Name: "other/superplane/check", ID: "other/superplane/check"},
+				}, resources)
+			})
 		}
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			api := &fakeGitHubStatusCheckAPI{
-				protection: &github.Protection{RequiredStatusChecks: &github.RequiredStatusChecks{
-					Contexts: github.Ptr([]string{"superplane/merge-confidence"}),
-				}},
-				checkRuns: map[string]*github.ListCheckRunsResults{
-					"main": {CheckRuns: []*github.CheckRun{{Name: github.Ptr("superplane/future-check")}}},
-				},
-				combinedStatus: &github.CombinedStatus{Statuses: []*github.RepoStatus{
-					{Context: github.Ptr(" SuperPlane/review-request ")},
-				}},
-			}
-			want := []core.IntegrationResource{}
-			if includeExternal {
-				api.checkRuns["main"].CheckRuns = append(api.checkRuns["main"].CheckRuns,
-					&github.CheckRun{Name: github.Ptr("build"), DetailsURL: github.Ptr("https://ci.example/build")})
-				want = append(want, core.IntegrationResource{
-					Type: "status_check", Name: "build", ID: "build", URL: "https://ci.example/build",
-				})
-			}
-
-			resources, err := listStatusCheckResourcesFromClient(context.Background(), api, "acme/app")
-			require.NoError(t, err)
-			assert.Equal(t, want, resources)
-		})
 	}
 
 	t.Run("returns the open listing error instead of a default-branch catalog", func(t *testing.T) {
