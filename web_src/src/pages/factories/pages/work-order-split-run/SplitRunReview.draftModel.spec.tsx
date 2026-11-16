@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { describe, expect, it, vi } from "bun:test";
 import { DraftStartModelSelect } from "./DraftStartModelSelect";
+import { MobileDraftStartModelSelect } from "../../mobile/MobileDraftStartModelSelect";
 import type { DraftStartSelection } from "./draftStartModel";
 import { SplitRunReview } from "./SplitRunReview";
 import { splitRunFixtureForWorkOrder } from "./splitRunMocks";
@@ -70,6 +71,32 @@ describe("SplitRunReview draft model select", () => {
   it("disables the selector when Start is disabled", () => {
     render(<Selector disabled />);
     expect(screen.getByTestId("split-run-draft-model")).toBeDisabled();
+  });
+
+  describe.each(["desktop", "mobile"])("%s unresolved defaults", (surface) => {
+    it.each([
+      { model: "openai/gpt-6.1-sol", thinkingLevel: undefined },
+      { model: undefined, thinkingLevel: "low" },
+      { model: "openai/gpt-6.1-sol", thinkingLevel: "low" },
+    ])("shows explicit choices with unavailable inherited fields: %j", (selection) => {
+      const props = {
+        ...selection,
+        defaults: { values: undefined, isLoading: false, isError: true, retry: vi.fn() },
+        onChange: vi.fn(),
+      };
+      render(
+        surface === "mobile" ? (
+          <MobileDraftStartModelSelect {...props} />
+        ) : (
+          <DraftStartModelSelect {...props} appearance="labeled" />
+        ),
+      );
+      const trigger = screen.getByTestId("split-run-draft-model");
+      const modelLabel = selection.model ? "GPT 6.1 Sol" : "Implementation defaults unavailable";
+      const thinkingLabel = selection.thinkingLevel ? "Low" : "Implementation defaults unavailable";
+      expect(trigger).toHaveTextContent(`${modelLabel}· ${thinkingLabel}`);
+      expect(trigger).toHaveAccessibleName(new RegExp(`Model: ${modelLabel}.*Thinking: ${thinkingLabel}`));
+    });
   });
 
   it.each([false, true])(

@@ -13,7 +13,7 @@ import {
 } from "@/ui/dropdownMenu";
 
 import { resolveDraftStartSelection, type DraftStartSelection } from "../pages/work-order-split-run/draftStartModel";
-import type { DraftStartDefaults } from "@/hooks/useDraftStartDefaults";
+import { draftStartDefaultsStatus, type DraftStartDefaults } from "@/hooks/useDraftStartDefaults";
 import { DraftStartSelectionLabel } from "../pages/work-order-split-run/DraftStartSelectionLabel";
 
 const THINKING_OPTIONS = [
@@ -49,12 +49,12 @@ export function MobileDraftStartModelSelect({
   const modelOptions = lineName
     ? runnerModelOptions(models.data?.models)
     : [{ value: "", label: "Implementation default" }];
-  const resolved = resolveDraftStartSelection({ model, thinkingLevel }, defaults.values ?? {}, models.data?.models);
-  const closedLabel = defaults.values
-    ? resolved.label
-    : defaults.isError
-      ? "Implementation defaults unavailable"
-      : "Loading Implementation defaults";
+  const resolved = resolveDraftStartSelection(
+    { model, thinkingLevel },
+    defaults.values ?? {},
+    models.data?.models,
+    defaults.values ? undefined : draftStartDefaultsStatus(defaults),
+  );
 
   return (
     <DropdownMenu>
@@ -63,12 +63,12 @@ export function MobileDraftStartModelSelect({
           type="button"
           size="sm"
           variant="outline"
-          aria-label={defaults.values ? resolved.accessibleLabel : closedLabel}
+          aria-label={resolved.accessibleLabel}
           data-testid="split-run-draft-model"
           disabled={disabled}
           className="h-7 max-w-36 min-w-0 shrink gap-1.5 overflow-hidden !rounded-none border-0 bg-background px-2 text-xs shadow-none"
         >
-          <DraftStartSelectionLabel defaults={defaults} resolved={resolved} thinkingLevel={thinkingLevel} />
+          <DraftStartSelectionLabel resolved={resolved} thinkingLevel={thinkingLevel} />
           <ChevronDown className="size-3 shrink-0 opacity-60" aria-hidden />
         </Button>
       </DropdownMenuTrigger>
