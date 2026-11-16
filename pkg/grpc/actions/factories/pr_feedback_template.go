@@ -46,9 +46,8 @@ const (
 	prFeedbackCompletionInstructions = `If no request needs action, finish successfully without posting a completion comment.
 A clean bot summary, an approval, or feedback already handled without a new request needs no action.
 If you address at least one request, post exactly one pull request completion comment after processing all current feedback.
-A substantive explanation of why a request is invalid or unsafe counts as addressing it.
-A code change, commit, or test run is not required to address a request.
-In that comment, summarize requests addressed, changes made, and substantive disagreements as applicable.
+If you decline an invalid or unsafe request, briefly explain why in the completion comment.
+In that comment, briefly summarize the requests addressed and changes made.
 Do not post comments that only report that no requests, changes, commits, or test runs were needed.
 If you upload visual evidence, include it in the same comment.
 Do not post a separate visual evidence comment.`

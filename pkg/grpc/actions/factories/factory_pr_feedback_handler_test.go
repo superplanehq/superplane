@@ -189,7 +189,7 @@ func Test__FactoryPRFeedbackHandlerActions(t *testing.T) {
 				for _, node := range liveVersion.Nodes {
 					if isFactoryAgentHarness(node.ComponentName()) {
 						prompt := runnerStepPrompt(t, yaml.Node{Configuration: node.Configuration}, "Address PR feedback")
-						assertPRFeedbackCompletionPolicy(t, prompt)
+						assert.Contains(t, prompt, prFeedbackCompletionInstructions)
 					}
 					if title, description, ok := prFeedbackDiscussionActivityExpressions(node.ID, provider); ok {
 						assert.Equal(t, title, node.Configuration["title"])

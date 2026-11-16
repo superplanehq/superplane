@@ -774,9 +774,7 @@ func TestResetPRFeedbackPreservesEachRunnerAndGeneralSettings(t *testing.T) {
 								assert.Contains(t, step["prompt"], "Do not remove or override the automatic sign-off.")
 								assert.Contains(t, step["prompt"], "Do not bypass the Git wrapper, repository hooks, or push verification.")
 								if source == models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion {
-									prompt, ok := step["prompt"].(string)
-									require.True(t, ok)
-									assertPRFeedbackCompletionPolicy(t, prompt)
+									assert.Contains(t, step["prompt"], prFeedbackCompletionInstructions)
 								}
 							}
 						}
