@@ -199,6 +199,35 @@ describe("custom automation settings", () => {
     expect(automation?.canRunNow).toBe(true);
   });
 
+  it("allows standalone Backlog starts only for confirmed manual or scheduled triggers", () => {
+    const cases = [
+      { customAutomationMode: "manual" as const, eligible: true },
+      { customAutomationTriggers: [{ mode: "manual" as const }, { mode: "automatic" as const }], eligible: true },
+      {
+        customAutomationMode: "scheduled" as const,
+        customAutomationTriggers: [{ mode: "automatic" as const }],
+        eligible: false,
+      },
+      {
+        customAutomationMode: "automatic" as const,
+        customAutomationTriggers: [{ mode: "manual" as const }],
+        eligible: true,
+      },
+      { customAutomationMode: "manual" as const, customAutomationTriggers: [], eligible: true },
+      { customAutomationMode: "scheduled" as const, customAutomationTriggers: [], eligible: true },
+      { customAutomationMode: "automatic" as const, customAutomationTriggers: [], eligible: false },
+      { customAutomationTriggers: [], eligible: false },
+      { eligible: false },
+    ];
+    for (const { eligible, ...settings } of cases) {
+      const [automation] = buildColumnAutomations("backlog", {
+        columnTitle: "Backlog",
+        apps: [{ id: "hello", columnKey: "backlog", templateId: "custom-verification", ...settings }],
+      });
+      expect(automation?.canRunNow === true).toBe(eligible);
+    }
+  });
+
   it("opens an existing managed row in the focused editor", () => {
     const automation = buildColumnAutomations("verify", {
       columnTitle: "Verify",
