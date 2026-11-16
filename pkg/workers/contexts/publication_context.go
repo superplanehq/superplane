@@ -27,6 +27,14 @@ func (c *IntegrationContext) Publications() core.PublicationStore {
 	return &PublicationContext{tx: c.tx, organizationID: c.integration.OrganizationID, integrationID: c.integration.ID}
 }
 
+// Independent keeps authorization scope while committing each publication update
+// independently of node execution. Provider effects must survive worker rollback.
+func (c *PublicationContext) Independent() core.PublicationContext {
+	independent := *c
+	independent.tx = database.DB(c.tx.Statement.Context)
+	return &independent
+}
+
 func (c *PublicationContext) ResolveOrder(source, attempt uuid.UUID) (core.PublicationOrder, error) {
 	return models.ResolvePublicationOrder(c.tx, c.organizationID, c.integrationID, c.execution, source, attempt)
 }

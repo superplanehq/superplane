@@ -382,7 +382,7 @@ describe("WorkOrderSplitRunPopup", () => {
       onDispatch: vi.fn(),
     });
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "Model: Auto Medium" }));
+    await user.click(await screen.findByTestId("split-run-draft-model"));
     await user.hover(screen.getByTestId("split-run-draft-model-list"));
     expect(await screen.findByRole("menuitem", { name: assigned ? "owner-model" : "caller-model" })).toBeVisible();
   });
@@ -2400,7 +2400,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(tab).getByTestId("split-run-intent-status-card")).toHaveAttribute("data-slot", "frame");
     expect(within(tab).getByTestId("split-run-intent-document")).toBeInTheDocument();
     expect(within(tab).getByRole("button", { name: "Start" })).toBeInTheDocument();
-    expect(within(tab).getByRole("button", { name: /^Model/ })).toBeInTheDocument();
+    expect(within(tab).getByTestId("split-run-draft-model")).toBeDisabled();
   });
 
   it("opens and closes a check with details and summary", async () => {

@@ -205,6 +205,7 @@ func TestResetReviewRequestPreservesFallbackAndAgentSettings(t *testing.T) {
 				agent.Configuration["thinkingLevel"] = "low"
 				agent.Configuration["executionTimeoutSeconds"] = 0
 				agent.Configuration["steps"] = []any{map[string]any{"type": "prompt", "prompt": "Retired selection policy"}}
+				findYAMLNode(t, doc, "request-reviewers").Configuration["managed"] = false
 			})
 			if instructions == "" {
 				findYAMLNode(t, installedCanvas, reviewRequestAgentNodeID).Configuration["additionalInstructions"] = ""
@@ -217,6 +218,13 @@ func TestResetReviewRequestPreservesFallbackAndAgentSettings(t *testing.T) {
 				node := findIntakeNode(version.Nodes, id)
 				require.NotNil(t, node)
 				require.NotNil(t, node.IntegrationID, "%s must keep its GitHub connection after reset", id)
+				require.Equal(t, integration.ID.String(), *node.IntegrationID)
+			}
+			for _, id := range []string{"request-reviewers", "withdraw-reviewers"} {
+				node := findIntakeNode(version.Nodes, id)
+				require.NotNil(t, node)
+				require.Equal(t, true, node.Configuration["managed"], "reset installs managed reconciliation")
+				require.NotNil(t, node.IntegrationID)
 				require.Equal(t, integration.ID.String(), *node.IntegrationID)
 			}
 			agent := findIntakeNode(version.Nodes, reviewRequestAgentNodeID)
@@ -294,7 +302,7 @@ func TestResetBuiltInVerificationSettings(t *testing.T) {
 							return node.Component == "filter" || node.Component == "broadcastMessage"
 						})
 						doc.Spec.Edges = slices.DeleteFunc(doc.Spec.Edges, func(edge yaml.Edge) bool {
-							return edge.SourceID == "publish-merge-confidence" || edge.SourceID == "complete-merge-confidence"
+							return edge.SourceID == "publish-merge-confidence" || edge.SourceID == "comment-merge-confidence" || edge.SourceID == "complete-merge-confidence"
 						})
 					}
 					trigger := findYAMLNode(t, doc, template.entrypointNodeID)
@@ -343,7 +351,7 @@ func TestResetBuiltInVerificationSettings(t *testing.T) {
 						broadcast := findIntakeNode(version.Nodes, "broadcast-merge-confidence")
 						require.NotNil(t, broadcast)
 						assert.Equal(t, "broadcastMessage", broadcast.ComponentName())
-						assert.Contains(t, version.Edges, models.Edge{SourceID: publication.ID, TargetID: gate.ID, Channel: "default"})
+						assert.Contains(t, version.Edges, models.Edge{SourceID: "comment-merge-confidence", TargetID: gate.ID, Channel: "default"})
 						assert.Contains(t, version.Edges, models.Edge{SourceID: gate.ID, TargetID: broadcast.ID, Channel: "default"})
 					}
 				}
@@ -689,6 +697,9 @@ func TestResetPRFeedbackPreservesEachRunnerAndGeneralSettings(t *testing.T) {
 								step := item.(map[string]any)
 								if step["type"] == "prompt" {
 									step["prompt"] = "Do not set git user.email, and do not add Co-authored-by or Signed-off-by trailers."
+									if source == models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion {
+										step["prompt"] = "Post one pull request comment after you address all feedback.\nSummarize the changes in this comment."
+									}
 								}
 							}
 							if source == models.FactoryPRFeedbackHandlerSourcePullRequestChecks {
@@ -762,6 +773,9 @@ func TestResetPRFeedbackPreservesEachRunnerAndGeneralSettings(t *testing.T) {
 							if step["type"] == "prompt" {
 								assert.Contains(t, step["prompt"], "Do not remove or override the automatic sign-off.")
 								assert.Contains(t, step["prompt"], "Do not bypass the Git wrapper, repository hooks, or push verification.")
+								if source == models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion {
+									assert.Contains(t, step["prompt"], prFeedbackCompletionInstructions)
+								}
 							}
 						}
 						assert.True(t, hasGitUser)
@@ -1051,6 +1065,14 @@ func TestInstallationResetPreservesMergeConfidencePublishing(t *testing.T) {
 	for _, canvas := range saved {
 		version := resetTestLiveVersion(t, canvas)
 		assert.Equal(t, false, findIntakeNode(version.Nodes, "publish-merge-confidence").Configuration["enabled"])
+		source := "publish-merge-confidence"
+		if findIntakeNode(version.Nodes, "comment-merge-confidence") != nil {
+			source = "comment-merge-confidence"
+		}
+		assert.Contains(t, version.Edges, models.Edge{SourceID: source, TargetID: "complete-merge-confidence", Channel: "default"})
+		assert.Contains(t, version.Edges, models.Edge{SourceID: "complete-merge-confidence", TargetID: "broadcast-merge-confidence", Channel: "default"})
+		assert.Equal(t, "filter", findIntakeNode(version.Nodes, "complete-merge-confidence").ComponentName())
+		assert.Equal(t, "broadcastMessage", findIntakeNode(version.Nodes, "broadcast-merge-confidence").ComponentName())
 		factory, err := models.FindFactory(db, canvas.OrganizationID, *canvas.FactoryID)
 		require.NoError(t, err)
 		// The user-facing restore-defaults path supplies no saved settings.
@@ -1059,5 +1081,32 @@ func TestInstallationResetPreservesMergeConfidencePublishing(t *testing.T) {
 		doc, err := yaml.CanvasFromYAML([]byte(restored.canvasYAML))
 		require.NoError(t, err)
 		assert.Equal(t, true, findYAMLNode(t, doc, "publish-merge-confidence").Configuration["enabled"])
+	}
+}
+
+func TestResetMergeConfidencePreservesPublicationDestinations(t *testing.T) {
+	for name, settings := range map[string]reviewFindingsSettings{"off": {}, "off with comment": {comment: true}, "comment": {publish: true, comment: true}} {
+		t.Run(name, func(t *testing.T) {
+			r, factory := resetTestFactory(t)
+			canvas := resetTestTemplate(t, r, factory, "risk-score", models.ProviderGitHub, func(doc *yaml.Canvas) {
+				config := findYAMLNode(t, doc, "assess-risk").Configuration
+				config["publishPRCheck"] = false
+				config["publishResults"], config["resultsBody"], config["resultsComment"] = settings.publish, false, settings.comment
+				config["resultsBodyActivationGeneration"], config["resultsCommentActivationGeneration"] = 3, 4
+			})
+			_, err := ResetOrganizationBuiltInAutomations(context.Background(), r.Organization.ID, testIntakeDependencies(r))
+			require.NoError(t, err)
+			version := resetTestLiveVersion(t, canvas)
+			agent := findIntakeNode(version.Nodes, "assess-risk").Configuration
+			assert.Equal(t, false, agent["publishPRCheck"])
+			assert.Equal(t, settings.publish, agent["publishResults"])
+			assert.Equal(t, false, agent["resultsBody"])
+			assert.Equal(t, settings.comment, agent["resultsComment"])
+			assert.Equal(t, false, findIntakeNode(version.Nodes, "start-assessment-check").Configuration["enabled"])
+			assert.Equal(t, false, findIntakeNode(version.Nodes, "publish-merge-confidence").Configuration["enabled"])
+			comment := findIntakeNode(version.Nodes, "comment-merge-confidence").Configuration
+			assert.Equal(t, settings.publish && settings.comment, comment["enabled"])
+			assert.EqualValues(t, 4, comment["activationGeneration"])
+		})
 	}
 }

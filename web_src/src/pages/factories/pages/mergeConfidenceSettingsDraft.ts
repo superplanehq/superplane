@@ -13,11 +13,17 @@ import { expandMergeConfidenceSteps } from "./mergeConfidenceSteps";
 import type { NodeConfigurationSave, NodeConfigurationUpdate } from "./nodeConfigurationCanvas";
 import type { PlanningReviewDraft, PlanningReviewStep } from "./planningReviewMockup";
 
+const NO_PUBLICATION_NODES: SuperplaneComponentsNode[] = [];
+
 type SettingsContext = { organizationId?: string; factoryId?: string; canvasId?: string };
 type SettingsDraft = {
   agentBase: SuperplaneComponentsNode;
   publishingBase?: SuperplaneComponentsNode;
   publishResults: boolean;
+  resultsBody: boolean;
+  resultsComment: boolean;
+  publishPRCheck: boolean;
+  publicationNodes: SuperplaneComponentsNode[];
   agentDraft: PlanningReviewDraft;
   checks: MergeConfidenceCheck[];
   savedSnapshot: string;
@@ -44,20 +50,34 @@ function snapshot(draft: SettingsDraft): string {
   return JSON.stringify({
     update: nodeUpdate(draft),
     publishResults: draft.publishResults,
+    resultsBody: draft.resultsBody,
+    resultsComment: draft.resultsComment,
+    publishPRCheck: draft.publishPRCheck,
     checks: draft.checks,
     durationMinutes: draft.durationMinutes,
     durationInvalid: draft.durationInvalid,
   });
 }
 
-function createDraft(agent: SuperplaneComponentsNode, publishing?: SuperplaneComponentsNode): SettingsDraft {
+function createDraft(
+  agent: SuperplaneComponentsNode,
+  publishing?: SuperplaneComponentsNode,
+  publicationNodes: SuperplaneComponentsNode[] = NO_PUBLICATION_NODES,
+): SettingsDraft {
   const agentBase = structuredClone(agent);
   const component = canvasNodeToPlanningReviewComponent(agentBase as CanvasSpecNode);
   const agentDraft = { title: component.title, components: [component] };
   const draft: SettingsDraft = {
     agentBase,
     publishingBase: publishing ? structuredClone(publishing) : undefined,
-    publishResults: publishing?.configuration?.enabled !== false,
+    publishResults:
+      agent.configuration?.publishResults === undefined
+        ? publishing?.configuration?.enabled !== false
+        : agent.configuration.publishResults !== false,
+    resultsBody: agent.configuration?.resultsBody !== false,
+    resultsComment: agent.configuration?.resultsComment === true,
+    publishPRCheck: agent.configuration?.publishPRCheck !== false,
+    publicationNodes,
     agentDraft,
     checks: enabledMergeChecks(expandMergeConfidenceSteps(draftSteps(agentDraft))),
     savedSnapshot: "",
@@ -102,8 +122,11 @@ export function useMergeConfidenceSettingsDraft(
   agent: SuperplaneComponentsNode | undefined,
   context: SettingsContext,
   publishing?: SuperplaneComponentsNode,
+  publicationNodes: SuperplaneComponentsNode[] = NO_PUBLICATION_NODES,
 ) {
-  const [draft, setDraft] = useState<SettingsDraft | null>(() => (agent ? createDraft(agent, publishing) : null));
+  const [draft, setDraft] = useState<SettingsDraft | null>(() =>
+    agent ? createDraft(agent, publishing, publicationNodes) : null,
+  );
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string>();
   const draftRef = useRef(draft);
@@ -116,10 +139,10 @@ export function useMergeConfidenceSettingsDraft(
       (draftRef.current && snapshot(draftRef.current) !== draftRef.current.savedSnapshot)
     )
       return;
-    const incoming = createDraft(agent, publishing);
+    const incoming = createDraft(agent, publishing, publicationNodes);
     draftRef.current = incoming;
     setDraft(incoming);
-  }, [agent, publishing]);
+  }, [agent, publishing, publicationNodes]);
 
   const patchDraft = (patch: Partial<SettingsDraft>) => {
     if (!draftRef.current) return;
@@ -129,7 +152,13 @@ export function useMergeConfidenceSettingsDraft(
 
   const save = async (onSave: (update: NodeConfigurationSave) => Promise<void> | void, onClose: () => void) => {
     const current = draftRef.current;
-    if (!current || current.durationInvalid || savingRef.current) return;
+    if (
+      !current ||
+      current.durationInvalid ||
+      (current.publishResults && !current.resultsBody && !current.resultsComment) ||
+      savingRef.current
+    )
+      return;
     if (snapshot(current) === current.savedSnapshot) {
       onClose();
       return;
@@ -139,19 +168,7 @@ export function useMergeConfidenceSettingsDraft(
     setSaveError(undefined);
     try {
       const update = await updateForSave(current, context);
-      const publication = current.publishingBase;
-      const updates: NodeConfigurationSave = publication
-        ? [
-            update,
-            {
-              nodeId: publication.id ?? "",
-              name: publication.name ?? "",
-              configuration: { ...publication.configuration, enabled: current.publishResults },
-              integration: publication.integration,
-              concurrency: publication.concurrency,
-            },
-          ]
-        : update;
+      const updates = publicationUpdates(current, update);
       try {
         await onSave(updates);
       } catch {
@@ -183,6 +200,9 @@ export function useMergeConfidenceSettingsDraft(
     save,
     updateAgentDraft: (agentDraft: PlanningReviewDraft) => patchDraft({ agentDraft }),
     updatePublishResults: (publishResults: boolean) => patchDraft({ publishResults }),
+    updateResultsBody: (resultsBody: boolean) => patchDraft({ resultsBody }),
+    updateResultsComment: (resultsComment: boolean) => patchDraft({ resultsComment }),
+    updatePublishPRCheck: (publishPRCheck: boolean) => patchDraft({ publishPRCheck }),
     updateChecks: (check: MergeConfidenceCheck, enabled: boolean) => {
       if (!draftRef.current) return;
       const checks = enabled
@@ -193,4 +213,109 @@ export function useMergeConfidenceSettingsDraft(
     updateDuration: (state: { minutes: string; invalid: boolean }) =>
       patchDraft({ durationMinutes: state.minutes, durationInvalid: state.invalid }),
   };
+}
+
+function publicationUpdates(current: SettingsDraft, update: NodeConfigurationUpdate): NodeConfigurationSave {
+  const body = current.publishingBase;
+  if (!body) return update;
+  const saved = current.agentBase.configuration;
+  const github = body.component === "github.updatePullRequestBodySection";
+  const destinations = publicationDestinations(current, body);
+  update.configuration = {
+    ...update.configuration,
+    publishResults: current.publishResults,
+    resultsBody: current.resultsBody,
+    resultsComment: current.resultsComment,
+    ...(github ? { publishPRCheck: current.publishPRCheck } : {}),
+  };
+  const updates = [update];
+  for (const destination of destinations) {
+    if (!destination.node) {
+      if (destination.enabled && !destination.wasEnabled)
+        throw new Error("Update this automation through admin reset before you enable this destination.");
+      continue;
+    }
+    const generation =
+      (Number(saved?.[destination.key]) || 1) + (destination.enabled && !destination.wasEnabled ? 1 : 0);
+    update.configuration[destination.key] = generation;
+    const node = destination.node;
+    updates.push(
+      publicationNodeUpdate(node, {
+        ...node.configuration,
+        enabled: destination.enabled,
+        activationGeneration: generation,
+        ...(node.id === "start-assessment-check" ? { activationNodeId: node.id } : {}),
+      }),
+    );
+  }
+  return [...updates, ...completionUpdates(current, update.configuration)];
+}
+
+function publicationDestinations(current: SettingsDraft, body: SuperplaneComponentsNode) {
+  const saved = current.agentBase.configuration;
+  const wasPublished =
+    saved?.publishResults === undefined ? body.configuration?.enabled !== false : saved.publishResults !== false;
+  const github = body.component === "github.updatePullRequestBodySection";
+  return [
+    {
+      node: body,
+      enabled: current.publishResults && current.resultsBody,
+      wasEnabled: wasPublished && saved?.resultsBody !== false,
+      key: "resultsBodyActivationGeneration",
+    },
+    ...(github
+      ? [
+          {
+            node: current.publicationNodes.find((node) => node.id === "comment-merge-confidence"),
+            enabled: current.publishResults && current.resultsComment,
+            wasEnabled: wasPublished && saved?.resultsComment === true,
+            key: "resultsCommentActivationGeneration",
+          },
+          {
+            node: current.publicationNodes.find((node) => node.id === "start-assessment-check"),
+            enabled: current.publishPRCheck,
+            wasEnabled: saved?.publishPRCheck !== false,
+            key: "prCheckActivationGeneration",
+          },
+        ]
+      : []),
+  ];
+}
+
+function publicationNodeUpdate(
+  node: SuperplaneComponentsNode,
+  configuration: Record<string, unknown>,
+): NodeConfigurationUpdate {
+  return {
+    nodeId: node.id ?? "",
+    name: node.name ?? "",
+    configuration,
+    integration: node.integration,
+    concurrency: node.concurrency,
+  };
+}
+
+function completionUpdates(current: SettingsDraft, configuration: Record<string, unknown>): NodeConfigurationUpdate[] {
+  const start = current.publicationNodes.find((node) => node.id === "start-assessment-check");
+  return current.publicationNodes.flatMap((node) => {
+    const finish = node.id === "finish-assessment-check" && node.component === "github.setPullRequestCheckRun";
+    const complete = node.id === "complete-merge-confidence" && node.component === "filter";
+    if (!finish && !complete) return [];
+    const updated = { ...node.configuration };
+    // Installed graphs keep the older predicates until settings are saved.
+    for (const key of complete ? ["expression"] : ["state", "reason"]) {
+      const expression = updated[key];
+      if (typeof expression === "string") {
+        updated[key] = expression.replace(
+          '.data.status in ["published", "unchanged"]',
+          '.data.status in ["published", "unchanged", "disabled"]',
+        );
+      }
+    }
+    if (finish && start) {
+      updated.activationNodeId = start.id;
+      updated.activationGeneration = configuration.prCheckActivationGeneration;
+    }
+    return [publicationNodeUpdate(node, updated)];
+  });
 }
