@@ -12,8 +12,10 @@ import (
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
+	"github.com/superplanehq/superplane/pkg/yaml"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
+	"gorm.io/datatypes"
 
 	_ "github.com/superplanehq/superplane/pkg/registryimports"
 )
@@ -130,50 +132,81 @@ func Test__FactoryPRFeedbackHandlerActions(t *testing.T) {
 	})
 
 	t.Run("settings updates reach every trigger", func(t *testing.T) {
-		factory := newFactory(t)
-		appRepo := "acme/app"
-		require.NoError(t, factory.UpdateOnboarding(database.DB(t.Context()), models.FactoryOnboardingPatch{
-			AppRepository: &appRepo,
-		}))
-		handler := create(t, factory, &pb.CreateFactoryPRFeedbackHandlerRequest{})
+		for _, provider := range []string{models.ProviderGitHub, models.ProviderBitbucket} {
+			t.Run(provider, func(t *testing.T) {
+				factory := newFactory(t)
+				appRepo := "acme/app"
+				require.NoError(t, factory.UpdateOnboarding(database.DB(t.Context()), models.FactoryOnboardingPatch{
+					AppRepository: &appRepo,
+					VCSProvider:   &provider,
+				}))
+				handler := create(t, factory, &pb.CreateFactoryPRFeedbackHandlerRequest{})
+				canvas, err := models.FindCanvasInTransaction(database.DB(t.Context()), r.Organization.ID, uuid.MustParse(handler.GetCanvasId()))
+				require.NoError(t, err)
+				version := resetTestLiveVersion(t, canvas)
+				spec := models.LiveCanvasSpec{Nodes: version.Nodes, Edges: version.Edges}
+				for nodeID := range resolvePRFeedbackGraph(spec).discussionRunnerNodeIDs(spec) {
+					node := findIntakeNode(version.Nodes, nodeID)
+					for _, item := range node.Configuration["steps"].([]any) {
+						step := item.(map[string]any)
+						if step["type"] == "prompt" {
+							step["prompt"] = "Post one pull request comment after you address all feedback.\nSummarize the changes in this comment."
+						}
+					}
+				}
+				require.NoError(t, database.DB(t.Context()).Model(version).Update("nodes", datatypes.NewJSONSlice(version.Nodes)).Error)
 
-		name := "Address review comments"
-		response, err := UpdateFactoryPRFeedbackHandler(ctx, deps, orgID, &pb.UpdateFactoryPRFeedbackHandlerRequest{
-			FactoryId: factory.ID.String(),
-			HandlerId: handler.GetId(),
-			Name:      &name,
-			Settings: &pb.FactoryPRFeedbackHandler_Settings{
-				Subject: &pb.FactoryPRFeedbackHandler_SubjectSettings{
-					Repository: "acme/other",
-				},
-				Discussion: &pb.FactoryPRFeedbackHandler_DiscussionSettings{
-					Mention:     "@superplaneagent",
-					IgnoreBots:  true,
-					AllowedBots: []string{"coderabbitai", "bugbot"},
-				},
-			},
-		})
-		require.NoError(t, err)
-		assert.Equal(t, "Address review comments", response.GetHandler().GetName())
-		assert.Equal(t, "acme/app", response.GetHandler().GetSettings().GetSubject().GetRepository(), "workspace triggers report the primary repository")
-		assert.True(t, response.GetHandler().GetHealthy())
-		assert.Equal(t, []string{"coderabbitai", "bugbot"}, response.GetHandler().GetSettings().GetDiscussion().GetAllowedBots())
+				name := "Address review comments"
+				response, err := UpdateFactoryPRFeedbackHandler(ctx, deps, orgID, &pb.UpdateFactoryPRFeedbackHandlerRequest{
+					FactoryId: factory.ID.String(),
+					HandlerId: handler.GetId(),
+					Name:      &name,
+					Settings: &pb.FactoryPRFeedbackHandler_Settings{
+						Subject: &pb.FactoryPRFeedbackHandler_SubjectSettings{
+							Repository: "acme/other",
+						},
+						Discussion: &pb.FactoryPRFeedbackHandler_DiscussionSettings{
+							Mention:     "@superplaneagent",
+							IgnoreBots:  true,
+							AllowedBots: []string{"coderabbitai", "bugbot"},
+						},
+					},
+				})
+				require.NoError(t, err)
+				assert.Equal(t, "Address review comments", response.GetHandler().GetName())
+				expectedRepository := "acme/other"
+				if provider == models.ProviderGitHub {
+					expectedRepository = "acme/app"
+				}
+				assert.Equal(t, expectedRepository, response.GetHandler().GetSettings().GetSubject().GetRepository())
+				assert.True(t, response.GetHandler().GetHealthy())
+				assert.Equal(t, []string{"coderabbitai", "bugbot"}, response.GetHandler().GetSettings().GetDiscussion().GetAllowedBots())
 
-		canvas, err := models.FindCanvasInTransaction(database.DB(t.Context()), r.Organization.ID, uuid.MustParse(handler.GetCanvasId()))
-		require.NoError(t, err)
-		liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(database.DB(t.Context()), canvas)
-		require.NoError(t, err)
-		for _, node := range liveVersion.Nodes {
-			if title, description, ok := prFeedbackDiscussionActivityExpressions(node.ID, ""); ok {
-				assert.Equal(t, title, node.Configuration["title"])
-				assert.Equal(t, description, node.Configuration["description"])
-			}
-			if node.ID != prFeedbackCommentTriggerNodeID && node.ID != prFeedbackReviewTriggerNodeID && node.ID != prFeedbackReplyTriggerNodeID {
-				continue
-			}
-			assert.Equal(t, models.WorkspaceRepositoriesExpression, node.Configuration["repository"])
-			assert.Equal(t, "@superplaneagent", node.Configuration["contentFilter"])
-			assert.Equal(t, []any{"coderabbitai", "bugbot"}, node.Configuration["allowedBots"])
+				canvas, err = models.FindCanvasInTransaction(database.DB(t.Context()), r.Organization.ID, uuid.MustParse(handler.GetCanvasId()))
+				require.NoError(t, err)
+				liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(database.DB(t.Context()), canvas)
+				require.NoError(t, err)
+				for _, node := range liveVersion.Nodes {
+					if isFactoryAgentHarness(node.ComponentName()) {
+						prompt := runnerStepPrompt(t, yaml.Node{Configuration: node.Configuration}, "Address PR feedback")
+						assertPRFeedbackCompletionPolicy(t, prompt)
+					}
+					if title, description, ok := prFeedbackDiscussionActivityExpressions(node.ID, provider); ok {
+						assert.Equal(t, title, node.Configuration["title"])
+						assert.Equal(t, description, node.Configuration["description"])
+					}
+					if node.ID != prFeedbackCommentTriggerNodeID && node.ID != prFeedbackReviewTriggerNodeID && node.ID != prFeedbackReplyTriggerNodeID {
+						continue
+					}
+					expectedScope := "acme/other"
+					if provider == models.ProviderGitHub {
+						expectedScope = models.WorkspaceRepositoriesExpression
+					}
+					assert.Equal(t, expectedScope, node.Configuration["repository"])
+					assert.Equal(t, "@superplaneagent", node.Configuration["contentFilter"])
+					assert.Equal(t, []any{"coderabbitai", "bugbot"}, node.Configuration["allowedBots"])
+				}
+			})
 		}
 	})
 
