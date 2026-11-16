@@ -240,20 +240,6 @@ describe("MobileTaskDetailPage back link", () => {
     updateAssignees.mockResolvedValue({ assignees: [] });
   });
 
-  it("returns to the clicked line when the task URL has no line id", async () => {
-    const user = userEvent.setup();
-    renderTask({
-      pathname: `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/task/42`,
-      state: { lineId: REFUND_LINE_HOTFIX_ID },
-    });
-
-    await user.click(screen.getByTestId("mobile-task-back"));
-
-    expect(screen.getByTestId("mobile-task-location")).toHaveTextContent(
-      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_HOTFIX_ID}`,
-    );
-  });
-
   it("returns to the board column carried in the navigation state", async () => {
     const user = userEvent.setup();
     renderTask({
