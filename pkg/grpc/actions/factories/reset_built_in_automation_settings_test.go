@@ -1051,6 +1051,10 @@ func TestInstallationResetPreservesMergeConfidencePublishing(t *testing.T) {
 	for _, canvas := range saved {
 		version := resetTestLiveVersion(t, canvas)
 		assert.Equal(t, false, findIntakeNode(version.Nodes, "publish-merge-confidence").Configuration["enabled"])
+		assert.Contains(t, version.Edges, models.Edge{SourceID: "publish-merge-confidence", TargetID: "complete-merge-confidence", Channel: "default"})
+		assert.Contains(t, version.Edges, models.Edge{SourceID: "complete-merge-confidence", TargetID: "broadcast-merge-confidence", Channel: "default"})
+		assert.Equal(t, "filter", findIntakeNode(version.Nodes, "complete-merge-confidence").ComponentName())
+		assert.Equal(t, "broadcastMessage", findIntakeNode(version.Nodes, "broadcast-merge-confidence").ComponentName())
 		factory, err := models.FindFactory(db, canvas.OrganizationID, *canvas.FactoryID)
 		require.NoError(t, err)
 		// The user-facing restore-defaults path supplies no saved settings.
