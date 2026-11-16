@@ -68,6 +68,7 @@ func TestReviewRequestReadDecision(t *testing.T) {
 		{name: "ineligible identity", decision: strings.Replace(valid, `"id":2`, `"id":1`, 1), fails: true},
 		{name: "changed login", decision: strings.Replace(valid, "octocat", "another-user", 1), fails: true},
 		{name: "blank reason", decision: strings.Replace(valid, "Owns the changed code.", " ", 1), fails: true},
+		{name: "second reviewer without reason", decision: strings.Replace(valid, `}]`, `},{"id":3,"login":"fallback-user","reason":""}]`, 1), fails: true},
 		{name: "lookup error", decision: strings.Replace(empty, `"reviewRequired":true`, `"reviewRequired":true,"error":"lookup unavailable"`, 1), fallback: "fallback-user", fails: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
