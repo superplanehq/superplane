@@ -14,6 +14,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/integrations/openrouter"
 	"github.com/superplanehq/superplane/pkg/llm"
+	"github.com/superplanehq/superplane/pkg/llmcatalog"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
@@ -159,7 +160,8 @@ func (s *Server) adminUpdateHostedLLMProvider(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	err = database.Conn().Transaction(func(tx *gorm.DB) error {
+	var saved *models.HostedLLMProvider
+	err = database.DB(r.Context()).Transaction(func(tx *gorm.DB) error {
 		current, err := models.FindHostedLLMProvider(tx, provider)
 		if err != nil && !errors.Is(err, models.ErrHostedLLMProviderNotFound) {
 			return err
@@ -220,7 +222,8 @@ func (s *Server) adminUpdateHostedLLMProvider(w http.ResponseWriter, r *http.Req
 		if next.Enabled && len(next.AllowedModels) == 0 {
 			return errors.New("select at least one model when the provider is enabled")
 		}
-		if _, err = models.UpsertHostedLLMProvider(tx, next); err != nil {
+		saved, err = models.UpsertHostedLLMProvider(tx, next)
+		if err != nil {
 			return err
 		}
 		return models.SyncDefaultHostedLLMModelAfterProviderChange(tx)
@@ -233,6 +236,13 @@ func (s *Server) adminUpdateHostedLLMProvider(w http.ResponseWriter, r *http.Req
 		}
 		http.Error(w, err.Error(), status)
 		return
+	}
+
+	if (saved.Provider == models.UsageProviderOpenRouter || saved.Provider == models.UsageProviderAnthropic) && saved.HasAPIKey() {
+		catalog := llmcatalog.New(s.encryptor, s.registry.HTTPContext())
+		if refreshErr := catalog.Refresh(r.Context(), database.DB(r.Context()), *saved); refreshErr != nil {
+			log.Warnf("admin: saved hosted LLM provider %s but failed to refresh model capabilities: %v", provider, refreshErr)
+		}
 	}
 
 	response, err := s.buildInstallationLLMSettingsResponse()

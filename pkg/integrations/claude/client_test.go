@@ -126,7 +126,7 @@ func TestClient_ListModels(t *testing.T) {
 		},
 	}
 
-	client := &Client{http: httpCtx, BaseURL: defaultBaseURL}
+	client := &Client{http: httpCtx, BaseURL: defaultBaseURL, APIKey: "test-key"}
 
 	models, err := client.ListModels()
 	if err != nil {
@@ -276,9 +276,9 @@ func TestClient_ErrorHandling(t *testing.T) {
 				},
 			}
 
-			client := &Client{http: httpCtx, BaseURL: defaultBaseURL}
+			client := &Client{http: httpCtx, BaseURL: defaultBaseURL, APIKey: "test-key"}
 
-			// We use ListModels as a simple way to trigger execRequest
+			// Model discovery preserves the provider error classification.
 			_, err := client.ListModels()
 
 			if err == nil {
@@ -301,7 +301,7 @@ func TestClient_ErrorHandling_TransportFailure(t *testing.T) {
 	// error, simulating a network failure before any response is received.
 	httpCtx := &contexts.HTTPContext{}
 
-	client := &Client{http: httpCtx, BaseURL: defaultBaseURL}
+	client := &Client{http: httpCtx, BaseURL: defaultBaseURL, APIKey: "test-key"}
 
 	_, err := client.ListModels()
 	require.Error(t, err)

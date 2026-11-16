@@ -149,6 +149,8 @@ type IntegrationResource struct {
 	Name string
 	ID   string
 	URL  string
+	// ThinkingLevels is nil when a model resource omits effort metadata.
+	ThinkingLevels []string
 }
 
 type ListResourcesContext struct {
