@@ -242,17 +242,16 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
     );
 
     const settings = implementationSettings();
-    const model = within(settings).getByRole("button", { name: "Model: Auto Medium" });
-    expect(model).toHaveTextContent("Auto Medium");
+    const model = within(settings).getByTestId("split-run-draft-model");
     await user.click(model);
     await user.hover(screen.getByTestId("split-run-draft-model-list"));
     fireEvent.click(await screen.findByRole("menuitem", { name: "claude-opus-4-6" }));
     await user.keyboard("{Escape}");
-    expect(within(settings).getByRole("button", { name: "Model: claude-opus-4-6 Medium" })).toBeInTheDocument();
+    expect(model).toHaveAccessibleName(/claude-opus-4-6/);
     const actions = within(settings).getByTestId("split-run-draft-action-group");
     expect(within(actions).queryByTestId("split-run-draft-model")).not.toBeInTheDocument();
     await user.click(within(actions).getByRole("button", { name: "Start" }));
-    expect(onDispatch).toHaveBeenCalledWith("claude-opus-4-6", "medium");
+    expect(onDispatch).toHaveBeenCalledWith("claude-opus-4-6", undefined);
   });
 
   it("starts a draft with the picked thinking level", async () => {
@@ -275,7 +274,7 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
     );
 
     const settings = implementationSettings();
-    await user.click(within(settings).getByRole("button", { name: "Model: Auto Medium" }));
+    await user.click(within(settings).getByTestId("split-run-draft-model"));
     await user.hover(screen.getByTestId("split-run-draft-thinking"));
     fireEvent.click(await screen.findByRole("menuitem", { name: "Low" }));
     await user.keyboard("{Escape}");
@@ -303,7 +302,7 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
     );
 
     const settings = implementationSettings();
-    await user.click(within(settings).getByRole("button", { name: "Model: Auto Medium" }));
+    await user.click(within(settings).getByTestId("split-run-draft-model"));
     await user.hover(screen.getByTestId("split-run-draft-thinking"));
     fireEvent.click(await screen.findByRole("menuitem", { name: "High" }));
     await user.hover(screen.getByTestId("split-run-draft-model-list"));

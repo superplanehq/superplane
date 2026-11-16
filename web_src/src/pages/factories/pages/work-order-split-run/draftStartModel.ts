@@ -1,9 +1,64 @@
 import { concreteClaudeModelId, displayModelName } from "@/lib/hostedLLMModels";
+import { visibleThinkingLevelLabel } from "@/lib/thinkingLevel";
 
 export const DRAFT_START_MODEL_AUTO = "auto";
 
-export function draftStartModelPayload(selected: string): string | undefined {
-  const trimmed = selected.trim();
+export type DraftStartSelection = { model?: string; thinkingLevel?: string };
+
+export function draftStartModelOptions(models: Array<{ id?: string; name?: string }> = []) {
+  return [
+    { value: "", label: "Implementation default" },
+    ...models
+      .filter((item) => Boolean(item.id))
+      .map((item) => ({
+        value: item.id ?? "",
+        label: item.name && item.name !== item.id ? `${item.name} (${item.id})` : (item.id ?? ""),
+      })),
+  ];
+}
+
+export function resolveDraftStartSelection(
+  selection: DraftStartSelection,
+  defaults: DraftStartSelection,
+  models: Array<{ id?: string; name?: string }> = [],
+  defaultsStatus?: string,
+) {
+  const model = selection.model ?? defaults.model ?? "auto";
+  const thinking = selection.thinkingLevel ?? defaults.thinkingLevel;
+  const unresolvedModelStatus = selection.model === undefined ? defaultsStatus : undefined;
+  const unresolvedThinkingStatus = selection.thinkingLevel === undefined ? defaultsStatus : undefined;
+  const { name, accessibleName } = draftStartModelLabels(model, models, unresolvedModelStatus);
+  const thinkingLabel =
+    unresolvedThinkingStatus ?? visibleThinkingLevelLabel(thinking) ?? (thinking === "auto" ? "Auto" : "Default");
+  const modelSource = selection.model === undefined ? " (Implementation default)" : "";
+  const thinkingSource = selection.thinkingLevel === undefined ? " (Implementation default)" : "";
+  const hasOnlyUnresolvedDefaults = Boolean(unresolvedModelStatus && unresolvedThinkingStatus);
+  return {
+    hasOnlyUnresolvedDefaults,
+    isThinkingUnresolved: Boolean(unresolvedThinkingStatus),
+    modelLabel: name,
+    thinkingLabel,
+    label: hasOnlyUnresolvedDefaults ? defaultsStatus : `${name}${modelSource} · ${thinkingLabel}${thinkingSource}`,
+    accessibleLabel: hasOnlyUnresolvedDefaults
+      ? defaultsStatus
+      : `Model: ${accessibleName}${modelSource} · Thinking: ${thinkingLabel}${thinkingSource}`,
+  };
+}
+
+function draftStartModelLabels(
+  model: string,
+  models: Array<{ id?: string; name?: string }>,
+  unresolvedStatus?: string,
+) {
+  const name =
+    unresolvedStatus ??
+    (model === "auto" || !model ? "Auto" : models.find((item) => item.id === model)?.name || displayRunnerModel(model));
+  const accessibleName = name !== model && model !== "auto" && !unresolvedStatus ? `${name} [${model}]` : name;
+  return { name, accessibleName };
+}
+
+export function draftStartModelPayload(selected?: string): string | undefined {
+  const trimmed = selected?.trim() ?? "";
   if (trimmed === "" || trimmed === DRAFT_START_MODEL_AUTO) {
     return undefined;
   }
