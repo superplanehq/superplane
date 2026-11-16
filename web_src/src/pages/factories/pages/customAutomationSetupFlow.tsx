@@ -219,7 +219,9 @@ function triggerDescription(mode: CustomAutomationTrigger["mode"], columnKey: Cu
       ? "Runs for every new pull request commit."
       : `Runs when a task enters ${customAutomationColumnLabel(columnKey)}.`;
   }
-  return "Runs when you start it from a task.";
+  return columnKey === "backlog"
+    ? "Runs when you start it from Backlog or a task."
+    : "Runs when you start it from a task.";
 }
 
 function FlowConnector() {

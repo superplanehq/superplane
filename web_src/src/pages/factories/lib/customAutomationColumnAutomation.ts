@@ -29,8 +29,9 @@ export function customAutomationColumnAutomation(
   }
   const columnKey = customAutomationColumn(app.columnKey);
   const listed = app.customAutomationTriggers ?? [];
-  const hasSchedule =
-    listed.some((trigger) => trigger.mode === "scheduled") || app.customAutomationMode === "scheduled";
+  const canStartStandalone = app.customAutomationTriggers
+    ? listed.some((trigger) => trigger.mode === "manual" || trigger.mode === "scheduled")
+    : app.customAutomationMode === "manual" || app.customAutomationMode === "scheduled";
   const primary = primaryCustomAutomationMode(app.customAutomationMode, listed);
   const copy = customAutomationModeCopy(primary, columnKey);
   const trigger = customAutomationTriggerSummary(app, listed, columnKey, copy.trigger);
@@ -47,7 +48,7 @@ export function customAutomationColumnAutomation(
     runningCount: runningCountForApp(id, workOrders),
     catalogId: CUSTOM_AUTOMATION_CATALOG_ID,
     canvasId: id,
-    canRunNow: columnKey === "backlog" && hasSchedule ? true : undefined,
+    canRunNow: columnKey === "backlog" && canStartStandalone ? true : undefined,
   };
 }
 
@@ -61,7 +62,7 @@ function primaryCustomAutomationMode(
   if (listed.some((trigger) => trigger.mode === "scheduled")) {
     return "scheduled";
   }
-  return saved ?? "manual";
+  return listed[0]?.mode ?? saved ?? "manual";
 }
 
 function customAutomationTriggerSummary(

@@ -128,7 +128,8 @@ export function customAutomationModeCopy(
     };
   }
   return {
-    trigger: `Manual start on a ${customAutomationColumnLabel(columnKey)} task`,
+    trigger:
+      columnKey === "backlog" ? "Manual start" : `Manual start on a ${customAutomationColumnLabel(columnKey)} task`,
     action: "Run automation on demand",
   };
 }
