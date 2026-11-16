@@ -160,6 +160,12 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
               description: "Show the organization Models settings page",
             },
             {
+              id: "model_status",
+              label: "Model status",
+              description: "Show the hosted Model status page in organization settings",
+              released: false,
+            },
+            {
               id: "organization_byok_custom_provider",
               label: "Organization BYOK Custom Provider",
               description: "Add a custom model provider with a URL, token, and API type",

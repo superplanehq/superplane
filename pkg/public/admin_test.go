@@ -1630,8 +1630,13 @@ func TestAdminListOrgExperimentalFeatures(t *testing.T) {
 		for _, f := range body.Features {
 			id, _ := f["id"].(string)
 			ids = append(ids, id)
+			if id == features.FeatureModelStatus {
+				assert.Equal(t, false, f["released"])
+			}
 		}
 		assert.Contains(t, ids, features.FeatureFactories)
+		assert.Contains(t, ids, features.FeatureModelStatus)
+		assert.NotContains(t, body.Enabled, features.FeatureModelStatus)
 		assert.Contains(t, ids, features.FeatureGitHubEnterprise)
 		assert.NotContains(t, ids, features.FeatureGitHubEnterpriseServer)
 	})
@@ -1669,20 +1674,23 @@ func TestAdminEnableOrgExperimentalFeature(t *testing.T) {
 
 	t.Cleanup(func() {
 		_ = models.DisableExperimentalFeature(r.Organization.ID, features.FeatureFactories)
+		_ = models.DisableExperimentalFeature(r.Organization.ID, features.FeatureModelStatus)
 	})
 
-	t.Run("enables a known feature", func(t *testing.T) {
-		response := execRequest(server, requestParams{
-			method:     "POST",
-			path:       "/admin/api/organizations/" + r.Organization.ID.String() + "/experimental-features/" + features.FeatureFactories,
-			authCookie: token,
+	for _, featureID := range []string{features.FeatureFactories, features.FeatureModelStatus} {
+		t.Run("enables "+featureID, func(t *testing.T) {
+			response := execRequest(server, requestParams{
+				method:     "POST",
+				path:       "/admin/api/organizations/" + r.Organization.ID.String() + "/experimental-features/" + featureID,
+				authCookie: token,
+			})
+			assert.Equal(t, http.StatusOK, response.Code)
+
+			reloaded, err := models.FindOrganizationByID(r.Organization.ID.String())
+			require.NoError(t, err)
+			assert.Contains(t, []string(reloaded.EnabledExperimentalFeatures), featureID)
 		})
-		assert.Equal(t, http.StatusOK, response.Code)
-
-		reloaded, err := models.FindOrganizationByID(r.Organization.ID.String())
-		require.NoError(t, err)
-		assert.Contains(t, []string(reloaded.EnabledExperimentalFeatures), features.FeatureFactories)
-	})
+	}
 
 	t.Run("rejects unknown feature ids", func(t *testing.T) {
 		response := execRequest(server, requestParams{

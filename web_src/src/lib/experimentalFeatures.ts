@@ -21,6 +21,9 @@ export const FEATURE_WORKSPACE_SKILLS = "workspace_skills";
 /** Organization experimental feature: organization Models (BYOK) settings page. */
 export const FEATURE_ORGANIZATION_BYOK = "organization_byok";
 
+/** Organization experimental feature: hosted Model status settings page. */
+export const FEATURE_MODEL_STATUS = "model_status";
+
 /** Organization experimental feature: custom model provider on the BYOK settings page. Requires organization BYOK. */
 export const FEATURE_ORGANIZATION_BYOK_CUSTOM_PROVIDER = "organization_byok_custom_provider";
 
