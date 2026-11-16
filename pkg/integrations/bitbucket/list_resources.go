@@ -9,16 +9,39 @@ import (
 )
 
 const (
+	resourceTypeReviewer      = "reviewer"
 	resourceTypeRepository    = "repository"
 	resourceTypeDefaultBranch = "default_branch"
 	resourceTypeStatusCheck   = "status_check"
 )
 
 func (b *Bitbucket) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
-	if resourceType != resourceTypeRepository && resourceType != resourceTypeDefaultBranch && resourceType != resourceTypeStatusCheck {
+	if resourceType != resourceTypeReviewer && resourceType != resourceTypeRepository && resourceType != resourceTypeDefaultBranch && resourceType != resourceTypeStatusCheck {
 		return []core.IntegrationResource{}, nil
 	}
 
+	if resourceType == resourceTypeReviewer {
+		repository := strings.TrimSpace(ctx.Parameters["repository"])
+		if repository == "" {
+			return []core.IntegrationResource{}, nil
+		}
+		if err := requireRepositoryInWorkspace(ctx.Integration, repository); err != nil {
+			return nil, err
+		}
+		client, err := newReviewerClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return nil, err
+		}
+		reviewers, err := client.ListEligibleReviewers(repository)
+		if err != nil {
+			return nil, err
+		}
+		resources := make([]core.IntegrationResource, 0, len(reviewers))
+		for _, reviewer := range reviewers {
+			resources = append(resources, core.IntegrationResource{Type: resourceTypeReviewer, Name: reviewer.DisplayName, ID: reviewer.UUID})
+		}
+		return resources, nil
+	}
 	metadata := Metadata{}
 	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err != nil {
 		return nil, fmt.Errorf("failed to decode integration metadata: %w", err)
