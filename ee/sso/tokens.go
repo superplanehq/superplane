@@ -48,13 +48,6 @@ func (s *Service) CreateSCIMToken(ctx context.Context, orgID, accountID uuid.UUI
 	if err != nil {
 		return nil, err
 	}
-	count, err := models.CountActiveSCIMTokens(database.DB(ctx), conn.ID)
-	if err != nil {
-		return nil, err
-	}
-	if count >= models.SSOMaxActiveSCIMTokens {
-		return nil, conflict("This organization already has five active SCIM tokens.")
-	}
 	secret, err := newSCIMSecret()
 	if err != nil {
 		return nil, err
@@ -67,7 +60,16 @@ func (s *Service) CreateSCIMToken(ctx context.Context, orgID, accountID uuid.UUI
 		CreatedBy:    &accountID,
 		CreatedAt:    s.now(),
 	}
-	if err := database.DB(ctx).Create(row).Error; err != nil {
+	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := models.CreateSCIMToken(tx, row); err != nil {
+			if errors.Is(err, models.ErrSCIMTokenLimit) {
+				return conflict("This organization already has five active SCIM tokens.")
+			}
+			return err
+		}
+		return nil
+	})
+	if err != nil {
 		return nil, err
 	}
 	return &enterprise.CreatedSCIMToken{

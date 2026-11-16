@@ -36,7 +36,9 @@ You need:
 1. In SuperPlane, select the **Okta** preset.
 2. Enter the issuer `https://<okta-domain>`, the client ID, and the client
    secret.
-3. Save the connection.
+3. Save the connection. To change the issuer, delete the connection and
+   create a new one. SuperPlane keeps the existing identity links until
+   you delete the connection.
 4. Select **Test connection**. The page shows the subject, email, and name
    from the ID token.
 5. Select **Activate**.

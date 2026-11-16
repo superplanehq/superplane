@@ -4,7 +4,7 @@ import type { SsoConnection, SsoPutConnectionRequest } from "@/api-client/types.
 
 import type { ConfirmRequest, SsoDraft, SsoSettingsActions, SsoSettingsModel } from "./ssoSettingsTypes";
 
-type SsoForm = {
+export type SsoForm = {
   domain: string;
   displayName: string;
   preset: string;
@@ -18,6 +18,11 @@ type SsoForm = {
   sessionHours: string;
   idpLogout: boolean;
   tokenDescription: string;
+  scopes: string[];
+  subjectClaim: string;
+  emailClaim: string;
+  nameClaim: string;
+  loadedPreset: string;
 };
 
 export function useSsoSettingsState(model: SsoSettingsModel, actions: SsoSettingsActions) {
@@ -39,7 +44,7 @@ export function useSsoSettingsState(model: SsoSettingsModel, actions: SsoSetting
       return;
     }
     setSessionError(null);
-    actions.onSave(connectionInput(form, nextEnforcement, seconds));
+    actions.onSave(ssoConnectionInput(form, nextEnforcement, seconds));
   };
   useEffect(() => {
     if (!model.secretEpoch) {
@@ -89,6 +94,17 @@ function initialForm(connection?: SsoConnection | null): SsoForm {
     tokenDescription: "Okta",
     ...textFields(connection),
     ...flagFields(connection),
+    ...claimFields(connection),
+  };
+}
+
+function claimFields(connection?: SsoConnection | null) {
+  return {
+    scopes: connection?.scopes ?? [],
+    subjectClaim: connection?.subjectClaim ?? "",
+    emailClaim: connection?.emailClaim ?? "",
+    nameClaim: connection?.nameClaim ?? "",
+    loadedPreset: connection?.preset || "PRESET_OKTA",
   };
 }
 
@@ -134,13 +150,22 @@ export function sessionAgeSeconds(value: string): number | null {
   return seconds;
 }
 
-function connectionInput(form: SsoForm, enforcement: string, maxSessionAgeSeconds: number): SsoPutConnectionRequest {
+export function ssoConnectionInput(
+  form: SsoForm,
+  enforcement: string,
+  maxSessionAgeSeconds: number,
+): SsoPutConnectionRequest {
+  const presetChanged = form.preset !== form.loadedPreset;
   return {
     preset: form.preset as SsoPutConnectionRequest["preset"],
     displayName: form.displayName,
     issuer: form.issuer,
     clientId: form.clientId,
     clientSecret: form.clientSecret,
+    scopes: presetChanged ? [] : form.scopes,
+    subjectClaim: presetChanged ? "" : form.subjectClaim,
+    emailClaim: presetChanged ? "" : form.emailClaim,
+    nameClaim: presetChanged ? "" : form.nameClaim,
     jitEnabled: form.jitEnabled,
     defaultRole: form.defaultRole,
     enforcement: enforcement as SsoPutConnectionRequest["enforcement"],

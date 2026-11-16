@@ -1,11 +1,16 @@
 package models
 
 import (
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
+
+// ErrSCIMTokenLimit is returned when a connection already has five active tokens.
+var ErrSCIMTokenLimit = errors.New("this organization already has five active SCIM tokens")
 
 // SCIMToken is a bearer credential for the SCIM endpoint of one connection.
 type SCIMToken struct {
@@ -20,6 +25,25 @@ type SCIMToken struct {
 }
 
 func (SCIMToken) TableName() string { return "scim_tokens" }
+
+func CreateSCIMToken(tx *gorm.DB, token *SCIMToken) error {
+	var connection SSOConnection
+	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Select("id").
+		Where("id = ?", token.ConnectionID).
+		First(&connection).Error
+	if err != nil {
+		return err
+	}
+	count, err := CountActiveSCIMTokens(tx, token.ConnectionID)
+	if err != nil {
+		return err
+	}
+	if count >= SSOMaxActiveSCIMTokens {
+		return ErrSCIMTokenLimit
+	}
+	return tx.Create(token).Error
+}
 
 func ListActiveSCIMTokens(tx *gorm.DB, connectionID uuid.UUID) ([]SCIMToken, error) {
 	var tokens []SCIMToken

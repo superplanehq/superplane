@@ -569,8 +569,8 @@ describe("Login Single Sign-On", () => {
     await user.type(await screen.findByPlaceholderText("Email"), "ada@example.com");
     await user.type(screen.getByPlaceholderText("Password"), "secret");
     await user.click(screen.getByRole("button", { name: "Login" }));
-    expect(await screen.findByText("Your organization uses SSO.")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Use another method" })).toBeNull();
+    expect(await screen.findByText("Your organization requires SSO.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Use another method" })).toBeInTheDocument();
   });
 
   it("shows the SSO failure message from the login URL", async () => {

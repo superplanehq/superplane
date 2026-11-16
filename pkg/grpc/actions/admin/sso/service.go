@@ -5,15 +5,14 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/enterprise"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	pb "github.com/superplanehq/superplane/pkg/protos/admin/sso"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 func GetOrganization(ctx context.Context, service enterprise.SSO, organizationID string) (*pb.GetOrganizationSSOResponse, error) {
 	orgID, err := uuid.Parse(organizationID)
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "The organization is not valid.")
+		return nil, grpcerrors.InvalidArgument(err, "The organization is not valid.")
 	}
 	view, err := service.AdminGet(ctx, orgID)
 	if err != nil {
@@ -25,7 +24,7 @@ func GetOrganization(ctx context.Context, service enterprise.SSO, organizationID
 func DisableOrganization(ctx context.Context, service enterprise.SSO, organizationID string) (*pb.GetOrganizationSSOResponse, error) {
 	orgID, err := uuid.Parse(organizationID)
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "The organization is not valid.")
+		return nil, grpcerrors.InvalidArgument(err, "The organization is not valid.")
 	}
 	view, err := service.AdminDisable(ctx, orgID)
 	if err != nil {
@@ -37,15 +36,15 @@ func DisableOrganization(ctx context.Context, service enterprise.SSO, organizati
 func VerifyDomain(ctx context.Context, service enterprise.SSO, organizationID, domainID, accountID string) (*pb.VerifyOrganizationDomainResponse, error) {
 	orgID, err := uuid.Parse(organizationID)
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "The organization is not valid.")
+		return nil, grpcerrors.InvalidArgument(err, "The organization is not valid.")
 	}
 	domain, err := uuid.Parse(domainID)
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "The domain is not valid.")
+		return nil, grpcerrors.InvalidArgument(err, "The domain is not valid.")
 	}
 	actor, err := uuid.Parse(accountID)
 	if err != nil {
-		return nil, status.Error(codes.Unauthenticated, "account not found")
+		return nil, grpcerrors.Unauthenticated(err, "account not found")
 	}
 	view, err := service.AdminVerifyDomain(ctx, orgID, domain, actor)
 	if err != nil {

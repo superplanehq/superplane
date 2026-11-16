@@ -52,19 +52,7 @@ func (p *Pipeline) LinkAccount(tx *gorm.DB, conn *models.SSOConnection, external
 		return nil, nil, err
 	}
 	if identity != nil {
-		if identity.OrganizationID != conn.OrganizationID {
-			return nil, nil, Fail(CodeFailed)
-		}
-		account, err := models.LockAccount(tx, identity.AccountID)
-		if err != nil {
-			return nil, nil, err
-		}
-		if account.IsBlocked() {
-			return nil, nil, Fail(CodeAccountBlocked)
-		}
-		identity.Email = email
-		identity.Name = external.Name
-		return account, identity, nil
+		return p.bindExistingIdentity(tx, conn, identity, external, false)
 	}
 
 	pending, err := models.FindSSOIdentityByPendingEmail(tx, conn.ID, email)
@@ -72,21 +60,7 @@ func (p *Pipeline) LinkAccount(tx *gorm.DB, conn *models.SSOConnection, external
 		return nil, nil, err
 	}
 	if pending != nil {
-		if pending.OrganizationID != conn.OrganizationID {
-			return nil, nil, Fail(CodeFailed)
-		}
-		account, err := models.LockAccount(tx, pending.AccountID)
-		if err != nil {
-			return nil, nil, err
-		}
-		if account.IsBlocked() {
-			return nil, nil, Fail(CodeAccountBlocked)
-		}
-		subject := external.Subject
-		pending.Subject = &subject
-		pending.Email = email
-		pending.Name = external.Name
-		return account, pending, nil
+		return p.bindExistingIdentity(tx, conn, pending, external, true)
 	}
 
 	account, err := p.AccountForEmail(tx, conn, email, external.Name)
@@ -109,6 +83,39 @@ func (p *Pipeline) LinkAccount(tx *gorm.DB, conn *models.SSOConnection, external
 		UpdatedAt:      p.now(),
 	}
 	return account, identity, nil
+}
+
+func (p *Pipeline) bindExistingIdentity(tx *gorm.DB, conn *models.SSOConnection, identity *models.SSOIdentity, external ExternalIdentity, assignSubject bool) (*models.Account, *models.SSOIdentity, error) {
+	if identity.OrganizationID != conn.OrganizationID {
+		return nil, nil, Fail(CodeFailed)
+	}
+	if p.BeforeIdentityLock != nil {
+		p.BeforeIdentityLock(tx, identity.ID)
+	}
+	account, err := models.LockAccount(tx, identity.AccountID)
+	if err != nil {
+		return nil, nil, err
+	}
+	if account.IsBlocked() {
+		return nil, nil, Fail(CodeAccountBlocked)
+	}
+	locked, err := models.LockSSOIdentity(tx, identity.ConnectionID, identity.ID)
+	if err != nil {
+		return nil, nil, err
+	}
+	if locked.OrganizationID != conn.OrganizationID {
+		return nil, nil, Fail(CodeFailed)
+	}
+	if !locked.Active {
+		return nil, nil, Fail(CodeAccessDenied)
+	}
+	locked.Email = utils.NormalizeEmail(external.Email)
+	locked.Name = external.Name
+	if assignSubject {
+		subject := external.Subject
+		locked.Subject = &subject
+	}
+	return account, locked, nil
 }
 
 // AccountForEmail applies linking rules 3 and 4. The domain must be verified
@@ -162,7 +169,7 @@ func (p *Pipeline) EnsureMembership(ctx context.Context, tx *gorm.DB, conn *mode
 			return Fail(CodeAccountConflict)
 		}
 		if adoptProvisionedBy != "" {
-			if err := setProvisionedBy(tx, user, adoptProvisionedBy); err != nil {
+			if err := user.SetProvisionedBy(tx, adoptProvisionedBy); err != nil {
 				return err
 			}
 		}
@@ -202,7 +209,7 @@ func (p *Pipeline) EnsureMembership(ctx context.Context, tx *gorm.DB, conn *mode
 			return err
 		}
 	}
-	if err := setProvisionedBy(tx, user, provisionedBy); err != nil {
+	if err := user.SetProvisionedBy(tx, provisionedBy); err != nil {
 		return err
 	}
 	if err := p.Auth.AssignRoleInTransaction(tx, user.ID.String(), conn.DefaultRole, conn.OrganizationID.String(), models.DomainTypeOrganization); err != nil {
@@ -211,11 +218,6 @@ func (p *Pipeline) EnsureMembership(ctx context.Context, tx *gorm.DB, conn *mode
 	identity.UserID = &user.ID
 	identity.Active = true
 	return nil
-}
-
-func setProvisionedBy(tx *gorm.DB, user *models.User, provisionedBy string) error {
-	user.ProvisionedBy = &provisionedBy
-	return tx.Model(user).Update("provisioned_by", provisionedBy).Error
 }
 
 func firstNonEmpty(values ...string) string {

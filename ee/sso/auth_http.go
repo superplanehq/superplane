@@ -123,11 +123,34 @@ func (s *Service) organizationStart(w http.ResponseWriter, r *http.Request) {
 		s.failLogin(w, r, core.CodeNotAvailable, "connection", conn)
 		return
 	}
-	target := "/auth/sso/" + conn.ID.String() + "/start"
-	if r.URL.RawQuery != "" {
-		target += "?" + r.URL.RawQuery
+	target, err := internalStartURL(conn.ID, r.URL.Query())
+	if err != nil {
+		s.failLogin(w, r, core.CodeFailed, "redirect", conn)
+		return
 	}
-	http.Redirect(w, r, target, http.StatusFound)
+	http.Redirect(w, r, target, http.StatusFound) // #nosec G710 -- the path is an internal SSO route and the query allows only login_hint, redirect, and iss.
+}
+
+func internalStartURL(id uuid.UUID, query url.Values) (string, error) {
+	parsed, err := url.Parse("/auth/sso/" + id.String() + "/start")
+	if err != nil {
+		return "", err
+	}
+	parsed.RawQuery = allowedStartQuery(query).Encode()
+	if parsed.IsAbs() || parsed.Host != "" || !strings.HasPrefix(parsed.Path, "/auth/sso/") {
+		return "", errors.New("the start path is not internal")
+	}
+	return parsed.RequestURI(), nil
+}
+
+func allowedStartQuery(query url.Values) url.Values {
+	values := url.Values{}
+	for _, key := range []string{"login_hint", "redirect", "iss"} {
+		if value := query.Get(key); value != "" {
+			values.Set(key, value)
+		}
+	}
+	return values
 }
 
 func (s *Service) start(w http.ResponseWriter, r *http.Request) {
@@ -170,7 +193,7 @@ func (s *Service) start(w http.ResponseWriter, r *http.Request) {
 		s.failLogin(w, r, core.CodeFailed, "state", conn)
 		return
 	}
-	http.Redirect(w, r, target, http.StatusFound)
+	http.Redirect(w, r, target, http.StatusFound) // #nosec G710 -- target is the authorization URL from the identity provider discovery document.
 }
 
 func (s *Service) callback(w http.ResponseWriter, r *http.Request) {
@@ -243,7 +266,7 @@ func (s *Service) finishTest(w http.ResponseWriter, r *http.Request, conn *model
 	if orgErr == nil {
 		target = "/" + org.Slug + "/settings/sso?sso_test=" + query
 	}
-	http.Redirect(w, r, target, http.StatusFound)
+	http.Redirect(w, r, target, http.StatusFound) // #nosec G710 -- target is an internal settings path built from the organization slug.
 }
 
 func (s *Service) backchannelLogout(w http.ResponseWriter, r *http.Request) {
@@ -355,7 +378,7 @@ func (s *Service) writeLoginState(w http.ResponseWriter, r *http.Request, state 
 	if err != nil {
 		return err
 	}
-	http.SetCookie(w, &http.Cookie{
+	http.SetCookie(w, &http.Cookie{ // #nosec G124 -- local HTTP development must accept the cookie; forwarded HTTPS is detected.
 		Name: loginStateCookie, Value: token, Path: "/auth/sso", HttpOnly: true,
 		Secure: authentication.RequestUsesHTTPS(r), SameSite: http.SameSiteLaxMode, MaxAge: 600,
 	})
@@ -396,7 +419,7 @@ func (s *Service) readLoginState(w http.ResponseWriter, r *http.Request, connect
 }
 
 func (s *Service) clearLoginState(w http.ResponseWriter, r *http.Request) {
-	http.SetCookie(w, &http.Cookie{
+	http.SetCookie(w, &http.Cookie{ // #nosec G124 -- local HTTP development must accept the cookie; forwarded HTTPS is detected.
 		Name: loginStateCookie, Value: "", Path: "/auth/sso", HttpOnly: true,
 		Secure: authentication.RequestUsesHTTPS(r), SameSite: http.SameSiteLaxMode, MaxAge: -1,
 	})

@@ -65,6 +65,15 @@ func (s *Service) PutConnection(ctx context.Context, orgID, accountID uuid.UUID,
 		if err != nil {
 			return err
 		}
+		if existing != nil && previous.Issuer != "" && previous.Issuer != normalized.Issuer {
+			count, err := models.CountSSOIdentities(tx, conn.ID)
+			if err != nil {
+				return err
+			}
+			if count > 0 {
+				return precondition("Delete this connection and create a new one before you change the issuer.")
+			}
+		}
 		if previous.Issuer != next.Issuer || previous.ClientID != next.ClientID {
 			conn.LastTestedAt = nil
 			conn.LastTestResult = nil
@@ -73,7 +82,7 @@ func (s *Service) PutConnection(ctx context.Context, orgID, accountID uuid.UUID,
 			}
 		}
 		if !conn.IDPLogoutEnabled {
-			if err := tx.Model(&models.SSOIdentity{}).Where("connection_id = ?", conn.ID).Update("id_token", nil).Error; err != nil {
+			if err := models.ClearSSOIdentityIDTokens(tx, conn.ID); err != nil {
 				return err
 			}
 		}
@@ -93,29 +102,41 @@ func (s *Service) ActivateConnection(ctx context.Context, orgID uuid.UUID) (*ent
 	if err := s.requireLicense(ctx, orgID); err != nil {
 		return nil, err
 	}
-	conn, err := s.connectionForOrg(ctx, orgID)
+	current, err := s.connectionForOrg(ctx, orgID)
 	if err != nil {
 		return nil, err
 	}
-	result, err := conn.TestResult()
+	var saved *models.SSOConnection
+	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
+		conn, err := models.LockSSOConnection(tx, current.ID)
+		if err != nil {
+			return err
+		}
+		result, err := conn.TestResult()
+		if err != nil {
+			return err
+		}
+		if conn.LastTestedAt == nil || result == nil || !result.OK {
+			return precondition("Test the connection before you activate it.")
+		}
+		count, err := models.CountVerifiedOrganizationDomains(tx, orgID)
+		if err != nil {
+			return err
+		}
+		if count < 1 {
+			return precondition("Verify a domain before you activate Single Sign-On.")
+		}
+		conn.Status = models.SSOStatusActive
+		if err := conn.Save(tx); err != nil {
+			return err
+		}
+		saved = conn
+		return nil
+	})
 	if err != nil {
 		return nil, err
 	}
-	if conn.LastTestedAt == nil || result == nil || !result.OK {
-		return nil, precondition("Test the connection before you activate it.")
-	}
-	count, err := models.CountVerifiedOrganizationDomains(database.DB(ctx), orgID)
-	if err != nil {
-		return nil, err
-	}
-	if count < 1 {
-		return nil, precondition("Verify a domain before you activate Single Sign-On.")
-	}
-	conn.Status = models.SSOStatusActive
-	if err := conn.Save(database.DB(ctx)); err != nil {
-		return nil, err
-	}
-	return s.connectionView(conn)
+	return s.connectionView(saved)
 }
 
 func (s *Service) DisableConnection(ctx context.Context, orgID uuid.UUID) (*enterprise.SSOConnection, error) {

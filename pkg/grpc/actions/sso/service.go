@@ -7,10 +7,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/enterprise"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	pb "github.com/superplanehq/superplane/pkg/protos/sso"
-	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -18,7 +17,7 @@ func organizationID(ctx context.Context) (uuid.UUID, error) {
 	value, _ := ctx.Value(authorization.DomainIdContextKey).(string)
 	id, err := uuid.Parse(value)
 	if err != nil {
-		return uuid.Nil, status.Error(codes.InvalidArgument, "The organization is not valid.")
+		return uuid.Nil, grpcerrors.InvalidArgument(err, "The organization is not valid.")
 	}
 	return id, nil
 }
@@ -26,16 +25,16 @@ func organizationID(ctx context.Context) (uuid.UUID, error) {
 func accountID(ctx context.Context) (uuid.UUID, error) {
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
-		return uuid.Nil, status.Error(codes.Unauthenticated, "account not found")
+		return uuid.Nil, grpcerrors.Unauthenticated(nil, "account not found")
 	}
 	values := md.Get("x-account-id")
 	if len(values) == 0 || values[0] == "" {
-		return uuid.Nil, status.Error(codes.Unauthenticated, "account not found")
+		return uuid.Nil, grpcerrors.Unauthenticated(nil, "account not found")
 	}
 	raw := values[0]
 	id, err := uuid.Parse(raw)
 	if err != nil {
-		return uuid.Nil, status.Error(codes.InvalidArgument, "The account is not valid.")
+		return uuid.Nil, grpcerrors.InvalidArgument(err, "The account is not valid.")
 	}
 	return id, nil
 }
@@ -158,7 +157,7 @@ func VerifyDomain(ctx context.Context, service enterprise.SSO, req *pb.VerifyDom
 	}
 	domainID, err := uuid.Parse(req.GetId())
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "The domain is not valid.")
+		return nil, grpcerrors.InvalidArgument(err, "The domain is not valid.")
 	}
 	view, err := service.VerifyDomain(ctx, orgID, domainID)
 	if err != nil {
@@ -174,7 +173,7 @@ func DeleteDomain(ctx context.Context, service enterprise.SSO, req *pb.DeleteDom
 	}
 	domainID, err := uuid.Parse(req.GetId())
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "The domain is not valid.")
+		return nil, grpcerrors.InvalidArgument(err, "The domain is not valid.")
 	}
 	if err := service.DeleteDomain(ctx, orgID, domainID); err != nil {
 		return nil, err
@@ -232,7 +231,7 @@ func RevokeSCIMToken(ctx context.Context, service enterprise.SSO, req *pb.Revoke
 	}
 	tokenID, err := uuid.Parse(req.GetId())
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "The token is not valid.")
+		return nil, grpcerrors.InvalidArgument(err, "The token is not valid.")
 	}
 	if err := service.RevokeSCIMToken(ctx, orgID, tokenID); err != nil {
 		return nil, err

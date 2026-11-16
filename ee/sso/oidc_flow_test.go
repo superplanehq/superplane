@@ -21,13 +21,15 @@ import (
 )
 
 type fakeOIDC struct {
-	issuer   string
-	key      *rsa.PrivateKey
-	nonce    string
-	audience string
-	expired  bool
-	subject  string
-	email    string
+	issuer          string
+	key             *rsa.PrivateKey
+	nonce           string
+	audience        string
+	expired         bool
+	subject         string
+	email           string
+	omitEmail       bool
+	userinfoSubject string
 }
 
 func newFakeOIDC(t *testing.T) (*fakeOIDC, *httptest.Server) {
@@ -70,6 +72,12 @@ func (f *fakeOIDC) serve(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		writeJSON(w, map[string]any{"access_token": "access", "token_type": "Bearer", "id_token": signed})
+	case "/userinfo":
+		subject := f.userinfoSubject
+		if subject == "" {
+			subject = f.subject
+		}
+		writeJSON(w, map[string]any{"sub": subject, "email": f.email, "name": "Owner"})
 	default:
 		http.NotFound(w, r)
 	}
@@ -82,11 +90,15 @@ func (f *fakeOIDC) claims() jwtLib.MapClaims {
 		now = time.Now().Add(-2 * time.Hour)
 		exp = time.Now().Add(-time.Minute)
 	}
-	return jwtLib.MapClaims{
+	claims := jwtLib.MapClaims{
 		"iss": f.issuer, "sub": f.subject, "aud": f.audience,
 		"exp": exp.Unix(), "iat": now.Unix(), "nonce": f.nonce,
-		"email": f.email, "name": "Owner", "sid": "sid-1",
+		"name": "Owner", "sid": "sid-1",
 	}
+	if !f.omitEmail {
+		claims["email"] = f.email
+	}
+	return claims
 }
 
 func writeJSON(w http.ResponseWriter, body any) {
@@ -169,6 +181,56 @@ func TestOIDCSignIn(t *testing.T) {
 		response := httptest.NewRecorder()
 		f.service.AuthHandler().ServeHTTP(response, callback)
 		require.Contains(t, response.Header().Get("Location"), "auth_error=sso_not_available")
+	})
+}
+
+func TestAllowedStartQueryDropsUnknownKeys(t *testing.T) {
+	query := url.Values{}
+	query.Set("login_hint", "ada@example.com")
+	query.Set("redirect", "/home")
+	query.Set("iss", "https://idp.example.com")
+	query.Set("test", "1")
+	query.Set("next", "https://evil.example")
+	encoded := allowedStartQuery(query).Encode()
+	require.Contains(t, encoded, "login_hint=ada%40example.com")
+	require.Contains(t, encoded, "redirect=%2Fhome")
+	require.Contains(t, encoded, "iss=")
+	require.NotContains(t, encoded, "test")
+	require.NotContains(t, encoded, "evil")
+}
+
+func TestOIDCUserInfoSubject(t *testing.T) {
+	f := newFlow(t)
+	f.setOwnerEmail("owner@example.com")
+	f.verifyExample()
+	require.NoError(t, models.ApplyInstallationMetadata(database.Conn(), func(metadata *models.InstallationMetadata) {
+		metadata.AllowPrivateNetworkAccess = true
+	}))
+	fake, _ := newFakeOIDC(t)
+	input := connectionInput(true)
+	input.Issuer = fake.issuer
+	conn := f.put(input)
+	f.markTested(conn)
+	_, err := f.service.ActivateConnection(f.ctx(), f.r.Organization.ID)
+	require.NoError(t, err)
+	conn, err = models.FindSSOConnectionByOrganization(database.Conn(), f.r.Organization.ID)
+	require.NoError(t, err)
+	fake.omitEmail = true
+
+	t.Run("rejects a userinfo subject that differs from the ID token", func(t *testing.T) {
+		fake.userinfoSubject = "other-user"
+		response := f.callback(t, conn, fake, callbackOptions{})
+		require.Contains(t, response.Header().Get("Location"), "auth_error=sso_failed")
+	})
+
+	t.Run("uses the userinfo email when the ID token has no email", func(t *testing.T) {
+		fake.userinfoSubject = ""
+		response := f.callback(t, conn, fake, callbackOptions{})
+		require.Equal(t, http.StatusFound, response.Code)
+		require.Contains(t, response.Header().Get("Location"), f.r.Organization.Slug)
+		saved, err := models.FindSSOIdentityBySubject(database.Conn(), conn.ID, fake.subject)
+		require.NoError(t, err)
+		require.Equal(t, "owner@example.com", saved.Email)
 	})
 }
 

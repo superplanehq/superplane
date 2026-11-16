@@ -6558,7 +6558,7 @@ ALTER TABLE ONLY public.sso_identities
 --
 
 ALTER TABLE ONLY public.sso_identities
-    ADD CONSTRAINT sso_identities_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id);
+    ADD CONSTRAINT sso_identities_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE SET NULL;
 
 
 --

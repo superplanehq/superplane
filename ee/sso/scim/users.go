@@ -316,7 +316,7 @@ func (h *Handler) applyChange(w http.ResponseWriter, r *http.Request, conn *mode
 			writeMapped(w, r, err)
 			return
 		}
-	} else if err := identity.Save(database.DB(r.Context())); err != nil {
+	} else if err := h.saveLockedProfile(r, identity); err != nil {
 		writeMapped(w, r, err)
 		return
 	}
@@ -335,15 +335,15 @@ func (h *Handler) applyChange(w http.ResponseWriter, r *http.Request, conn *mode
 }
 
 func (h *Handler) deactivate(r *http.Request, conn *models.SSOConnection, identity *models.SSOIdentity) error {
-	keptOwner, err := h.removeMembership(r, conn, identity)
-	if err != nil {
+	now := h.now()
+	if err := h.saveLockedProfile(r, identity, func(locked *models.SSOIdentity) {
+		locked.Active = false
+		locked.SessionsRevokedAt = &now
+	}); err != nil {
 		return err
 	}
-	now := h.now()
-	identity.Active = false
-	identity.SessionsRevokedAt = &now
-	identity.UpdatedAt = now
-	if err := identity.Save(database.DB(r.Context())); err != nil {
+	keptOwner, err := h.removeMembership(r, conn, identity)
+	if err != nil {
 		return err
 	}
 	fields := map[string]any{
@@ -396,20 +396,54 @@ func (h *Handler) reactivate(r *http.Request, conn *models.SSOConnection, identi
 	if err := billing.PrepareAdmission(r.Context(), conn.OrganizationID); err != nil {
 		return err
 	}
-	err := database.DB(r.Context()).Transaction(func(tx *gorm.DB) error {
+	return database.DB(r.Context()).Transaction(func(tx *gorm.DB) error {
 		account, err := models.LockAccount(tx, identity.AccountID)
 		if err != nil {
 			return err
 		}
-		identity.Active = true
-		return h.pipeline.EnsureMembership(r.Context(), tx, conn, account, identity, models.SSOProvisionedBySCIM, models.SSOProvisionedBySCIM, false)
+		locked, err := models.LockSSOIdentity(tx, identity.ConnectionID, identity.ID)
+		if err != nil {
+			return err
+		}
+		copySCIMProfile(locked, identity)
+		locked.Active = true
+		if err := h.pipeline.EnsureMembership(r.Context(), tx, conn, account, locked, models.SSOProvisionedBySCIM, models.SSOProvisionedBySCIM, false); err != nil {
+			return err
+		}
+		if err := locked.Save(tx); err != nil {
+			return err
+		}
+		*identity = *locked
+		return nil
 	})
-	if err != nil {
-		return err
-	}
-	identity.Active = true
-	identity.UpdatedAt = h.now()
-	return identity.Save(database.DB(r.Context()))
+}
+
+func (h *Handler) saveLockedProfile(r *http.Request, identity *models.SSOIdentity, extra ...func(*models.SSOIdentity)) error {
+	return database.DB(r.Context()).Transaction(func(tx *gorm.DB) error {
+		if _, err := models.LockAccount(tx, identity.AccountID); err != nil {
+			return err
+		}
+		locked, err := models.LockSSOIdentity(tx, identity.ConnectionID, identity.ID)
+		if err != nil {
+			return err
+		}
+		copySCIMProfile(locked, identity)
+		for _, apply := range extra {
+			apply(locked)
+		}
+		if err := locked.Save(tx); err != nil {
+			return err
+		}
+		*identity = *locked
+		return nil
+	})
+}
+
+func copySCIMProfile(dst, src *models.SSOIdentity) {
+	dst.SCIMUserName = src.SCIMUserName
+	dst.ExternalID = src.ExternalID
+	dst.Email = src.Email
+	dst.Name = src.Name
 }
 
 func canAdoptSCIMIdentity(identity *models.SSOIdentity, userName string) bool {

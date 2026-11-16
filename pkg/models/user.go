@@ -111,6 +111,11 @@ func (u *User) RestoreInTransaction(tx *gorm.DB) error {
 		Error
 }
 
+func (u *User) SetProvisionedBy(tx *gorm.DB, provisionedBy string) error {
+	u.ProvisionedBy = &provisionedBy
+	return tx.Model(u).Update("provisioned_by", provisionedBy).Error
+}
+
 func PreloadRemovedMember(db *gorm.DB) *gorm.DB {
 	return db.Unscoped().Preload("Account", func(tx *gorm.DB) *gorm.DB { return tx.Unscoped() })
 }

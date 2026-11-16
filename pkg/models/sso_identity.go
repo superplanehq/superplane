@@ -6,6 +6,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/utils"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // SSOIdentity links an account to one organization connection.
@@ -35,6 +36,27 @@ func (SSOIdentity) TableName() string { return "sso_identities" }
 func (identity *SSOIdentity) Save(tx *gorm.DB) error {
 	identity.UpdatedAt = time.Now()
 	return tx.Save(identity).Error
+}
+
+func LockSSOIdentity(tx *gorm.DB, connectionID, id uuid.UUID) (*SSOIdentity, error) {
+	var identity SSOIdentity
+	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("connection_id = ? AND id = ?", connectionID, id).
+		First(&identity).Error
+	if err != nil {
+		return nil, err
+	}
+	return &identity, nil
+}
+
+func CountSSOIdentities(tx *gorm.DB, connectionID uuid.UUID) (int64, error) {
+	var count int64
+	err := tx.Model(&SSOIdentity{}).Where("connection_id = ?", connectionID).Count(&count).Error
+	return count, err
+}
+
+func ClearSSOIdentityIDTokens(tx *gorm.DB, connectionID uuid.UUID) error {
+	return tx.Model(&SSOIdentity{}).Where("connection_id = ?", connectionID).Update("id_token", nil).Error
 }
 
 func FindSSOIdentityBySubject(tx *gorm.DB, connectionID uuid.UUID, subject string) (*SSOIdentity, error) {

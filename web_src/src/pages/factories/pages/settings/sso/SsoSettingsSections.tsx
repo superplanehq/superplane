@@ -1,3 +1,5 @@
+import { useId } from "react";
+
 import type { SsoConnection, SsoDomain } from "@/api-client/types.gen";
 import { Badge } from "@/components/Badge/badge";
 import { Button } from "@/components/ui/button";
@@ -290,7 +292,11 @@ export function ProvisioningSection({
         ))}
       </ul>
       <div className="flex gap-2">
+        <Label className="sr-only" htmlFor="sso-token-description">
+          Token description
+        </Label>
         <Input
+          id="sso-token-description"
           value={draft.tokenDescription}
           disabled={!draft.canChange || !draft.exists}
           onChange={(event) => draft.setTokenDescription(event.target.value)}
@@ -424,6 +430,7 @@ export function RequiredDialog({
 }
 
 export function TokenDialog({ secret, onDismiss }: { secret?: string | null; onDismiss: () => void }) {
+  const id = useId();
   return (
     <Dialog open={Boolean(secret)} onOpenChange={(open) => !open && onDismiss()}>
       <DialogContent>
@@ -432,7 +439,10 @@ export function TokenDialog({ secret, onDismiss }: { secret?: string | null; onD
           <DialogDescription>Copy this token now. You cannot see it again.</DialogDescription>
         </DialogHeader>
         <div className="flex items-center gap-2">
-          <Input readOnly value={secret ?? ""} />
+          <Label className="sr-only" htmlFor={id}>
+            SCIM token
+          </Label>
+          <Input id={id} readOnly value={secret ?? ""} />
           <CopyButton variant="button" text={secret ?? ""} copiedLabel="Copied">
             Copy
           </CopyButton>
@@ -443,10 +453,11 @@ export function TokenDialog({ secret, onDismiss }: { secret?: string | null; onD
 }
 
 function CopyField({ label, value }: { label: string; value: string }) {
+  const id = useId();
   return (
     <div className="flex items-center gap-2">
-      <Label>{label}</Label>
-      <Input readOnly value={value} />
+      <Label htmlFor={id}>{label}</Label>
+      <Input id={id} readOnly value={value} />
       <CopyButton variant="button" text={value} copiedLabel="Copied">
         Copy
       </CopyButton>

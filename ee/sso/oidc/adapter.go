@@ -174,7 +174,7 @@ func (a *Adapter) HandleCallback(ctx context.Context, conn *models.SSOConnection
 	}
 	identity := identityFromClaims(cfg, idToken.Subject, raw, claims)
 	if identity.Email == "" {
-		if err := a.fillEmailFromUserInfo(a.clientContext(ctx), provider, token, cfg, identity); err != nil {
+		if err := a.fillEmailFromUserInfo(a.clientContext(ctx), provider, token, cfg, idToken.Subject, identity); err != nil {
 			return nil, err
 		}
 	}
@@ -317,10 +317,13 @@ func (a *Adapter) provider(ctx context.Context, conn *models.SSOConnection, issu
 	return provider, nil
 }
 
-func (a *Adapter) fillEmailFromUserInfo(ctx context.Context, provider *oidc.Provider, token *oauth2.Token, cfg models.OIDCConnectionConfig, identity *core.ExternalIdentity) error {
+func (a *Adapter) fillEmailFromUserInfo(ctx context.Context, provider *oidc.Provider, token *oauth2.Token, cfg models.OIDCConnectionConfig, subject string, identity *core.ExternalIdentity) error {
 	info, err := provider.UserInfo(ctx, oauth2.StaticTokenSource(token))
 	if err != nil {
 		return err
+	}
+	if info.Subject == "" || info.Subject != subject {
+		return fmt.Errorf("userinfo subject does not match the ID token")
 	}
 	claims := map[string]any{}
 	if err := info.Claims(&claims); err != nil {

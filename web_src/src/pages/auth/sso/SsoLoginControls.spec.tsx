@@ -46,10 +46,13 @@ describe("ContinueWithSso", () => {
 });
 
 describe("SsoOrganizationPrompt", () => {
-  it("hides the other method when SSO is required", () => {
-    render(<SsoOrganizationPrompt required onContinue={() => undefined} onUseAnother={() => undefined} />);
-    expect(screen.getByText("Your organization uses SSO.")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Use another method" })).toBeNull();
+  it("keeps the other method when SSO is required", async () => {
+    const onUseAnother = mock();
+    const user = userEvent.setup();
+    render(<SsoOrganizationPrompt required onContinue={() => undefined} onUseAnother={onUseAnother} />);
+    expect(screen.getByText("Your organization requires SSO.")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Use another method" }));
+    expect(onUseAnother).toHaveBeenCalled();
   });
 
   it("keeps the other method when SSO is optional", async () => {

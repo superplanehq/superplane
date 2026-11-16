@@ -54,7 +54,7 @@ CREATE TABLE sso_identities (
     connection_id        uuid NOT NULL REFERENCES sso_connections(id) ON DELETE CASCADE,
     organization_id      uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
     account_id           uuid NOT NULL REFERENCES accounts(id),
-    user_id              uuid REFERENCES users(id),
+    user_id              uuid REFERENCES users(id) ON DELETE SET NULL,
     subject              text,
     external_id          text,
     scim_user_name       text,

@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 const (
@@ -49,20 +50,6 @@ type OIDCConnectionConfig struct {
 	NameClaim    string   `json:"name_claim"`
 }
 
-// DefaultOIDCConfig applies preset defaults. Presets only fill empty claims.
-func DefaultOIDCConfig(preset string) OIDCConnectionConfig {
-	subject := "sub"
-	if preset == SSOPresetEntra {
-		subject = "oid"
-	}
-	return OIDCConnectionConfig{
-		Scopes:       []string{"openid", "email", "profile"},
-		SubjectClaim: subject,
-		EmailClaim:   "email",
-		NameClaim:    "name",
-	}
-}
-
 // SSOConnection is one identity-provider connection owned by an organization.
 type SSOConnection struct {
 	ID                   uuid.UUID `gorm:"type:uuid;primary_key;default:gen_random_uuid()"`
@@ -84,6 +71,29 @@ type SSOConnection struct {
 	CreatedBy            *uuid.UUID
 	CreatedAt            time.Time
 	UpdatedAt            time.Time
+}
+
+// SSOTestResultDocument is the JSON stored in last_test_result.
+type SSOTestResultDocument struct {
+	OK      bool   `json:"ok"`
+	Error   string `json:"error,omitempty"`
+	Subject string `json:"subject,omitempty"`
+	Email   string `json:"email,omitempty"`
+	Name    string `json:"name,omitempty"`
+}
+
+// DefaultOIDCConfig applies preset defaults. Presets only fill empty claims.
+func DefaultOIDCConfig(preset string) OIDCConnectionConfig {
+	subject := "sub"
+	if preset == SSOPresetEntra {
+		subject = "oid"
+	}
+	return OIDCConnectionConfig{
+		Scopes:       []string{"openid", "email", "profile"},
+		SubjectClaim: subject,
+		EmailClaim:   "email",
+		NameClaim:    "name",
+	}
 }
 
 func (SSOConnection) TableName() string { return "sso_connections" }
@@ -120,15 +130,6 @@ func (c *SSOConnection) SetOIDCConfig(cfg OIDCConnectionConfig) error {
 	return nil
 }
 
-// SSOTestResultDocument is the JSON stored in last_test_result.
-type SSOTestResultDocument struct {
-	OK      bool   `json:"ok"`
-	Error   string `json:"error,omitempty"`
-	Subject string `json:"subject,omitempty"`
-	Email   string `json:"email,omitempty"`
-	Name    string `json:"name,omitempty"`
-}
-
 func (c *SSOConnection) TestResult() (*SSOTestResultDocument, error) {
 	if len(c.LastTestResult) == 0 {
 		return nil, nil
@@ -138,6 +139,15 @@ func (c *SSOConnection) TestResult() (*SSOTestResultDocument, error) {
 		return nil, err
 	}
 	return &result, nil
+}
+
+func LockSSOConnection(tx *gorm.DB, id uuid.UUID) (*SSOConnection, error) {
+	var connection SSOConnection
+	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", id).First(&connection).Error
+	if err != nil {
+		return nil, err
+	}
+	return &connection, nil
 }
 
 func FindSSOConnectionByOrganization(tx *gorm.DB, orgID uuid.UUID) (*SSOConnection, error) {

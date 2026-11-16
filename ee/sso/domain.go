@@ -147,27 +147,35 @@ func (s *Service) markDomainVerified(ctx context.Context, orgID, domainID, accou
 }
 
 func (s *Service) DeleteDomain(ctx context.Context, orgID, domainID uuid.UUID) error {
-	row, err := models.FindOrganizationDomain(database.DB(ctx), orgID, domainID)
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return notFound("This domain does not exist.")
-	}
-	if err != nil {
-		return err
-	}
-	if row.Verified() {
-		count, err := models.CountVerifiedOrganizationDomains(database.DB(ctx), orgID)
+	return database.DB(ctx).Transaction(func(tx *gorm.DB) error {
+		row, err := models.FindOrganizationDomain(tx, orgID, domainID)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return notFound("This domain does not exist.")
+		}
 		if err != nil {
 			return err
 		}
-		conn, err := models.FindSSOConnectionByOrganization(database.DB(ctx), orgID)
+		conn, err := models.FindSSOConnectionByOrganization(tx, orgID)
 		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 			return err
 		}
-		if err == nil && conn.Status == models.SSOStatusActive && count <= 1 {
-			return precondition("Disable Single Sign-On before you delete the last verified domain.")
+		if err == nil {
+			conn, err = models.LockSSOConnection(tx, conn.ID)
+			if err != nil {
+				return err
+			}
 		}
-	}
-	return models.DeleteOrganizationDomain(database.DB(ctx), orgID, domainID)
+		if row.Verified() && conn != nil && conn.Status == models.SSOStatusActive {
+			count, err := models.CountVerifiedOrganizationDomains(tx, orgID)
+			if err != nil {
+				return err
+			}
+			if count <= 1 {
+				return precondition("Disable Single Sign-On before you delete the last verified domain.")
+			}
+		}
+		return models.DeleteOrganizationDomain(tx, orgID, domainID)
+	})
 }
 
 func domainView(row models.OrganizationDomain) enterprise.SSODomain {

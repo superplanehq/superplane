@@ -21,6 +21,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/registry"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"gorm.io/gorm"
 )
 
 func invalid(message string) error {
@@ -65,16 +66,17 @@ type Config struct {
 
 // Service is the Enterprise implementation of organization SSO.
 type Service struct {
-	Encryptor    crypto.Encryptor
-	Entitlements licensing.Entitlements
-	Auth         authorization.Authorization
-	Signer       *jwt.Signer
-	HTTP         *registry.HTTPContext
-	BaseURL      string
-	Lookup       TXTLookup
-	Now          func() time.Time
-	adapter      *oidc.Adapter
-	limits       *ipLimiter
+	Encryptor          crypto.Encryptor
+	Entitlements       licensing.Entitlements
+	Auth               authorization.Authorization
+	Signer             *jwt.Signer
+	HTTP               *registry.HTTPContext
+	BaseURL            string
+	Lookup             TXTLookup
+	Now                func() time.Time
+	adapter            *oidc.Adapter
+	limits             *ipLimiter
+	beforeIdentityLock func(tx *gorm.DB, id uuid.UUID)
 }
 
 // New returns the SSO service that pkg/server registers.
@@ -116,10 +118,11 @@ func (s *Service) now() time.Time {
 
 func (s *Service) pipeline() *core.Pipeline {
 	return &core.Pipeline{
-		Encryptor:    s.Encryptor,
-		Entitlements: s.Entitlements,
-		Auth:         s.Auth,
-		Now:          s.Now,
+		Encryptor:          s.Encryptor,
+		Entitlements:       s.Entitlements,
+		Auth:               s.Auth,
+		Now:                s.Now,
+		BeforeIdentityLock: s.beforeIdentityLock,
 	}
 }
 

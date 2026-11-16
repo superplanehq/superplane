@@ -98,15 +98,13 @@ export function SsoOrganizationPrompt({
 }) {
   return (
     <div className="space-y-3 rounded-md border p-4" data-testid="sso-organization-prompt">
-      <p className="text-sm">Your organization uses SSO.</p>
+      <p className="text-sm">{required ? "Your organization requires SSO." : "Your organization uses SSO."}</p>
       <Button type="button" className="w-full" onClick={onContinue}>
         Continue with SSO
       </Button>
-      {required ? null : (
-        <Button type="button" variant="outline" className="w-full" onClick={onUseAnother}>
-          Use another method
-        </Button>
-      )}
+      <Button type="button" variant="outline" className="w-full" onClick={onUseAnother}>
+        Use another method
+      </Button>
     </div>
   );
 }

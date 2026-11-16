@@ -11,6 +11,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/licensing"
 	"github.com/superplanehq/superplane/pkg/models"
+	"gorm.io/gorm"
 )
 
 // ExternalIdentity is the person the protocol adapter authenticated.
@@ -63,10 +64,11 @@ type SignInResult struct {
 
 // Pipeline links an external identity to an account and a membership.
 type Pipeline struct {
-	Encryptor    crypto.Encryptor
-	Entitlements licensing.Entitlements
-	Auth         authorization.Authorization
-	Now          func() time.Time
+	Encryptor          crypto.Encryptor
+	Entitlements       licensing.Entitlements
+	Auth               authorization.Authorization
+	Now                func() time.Time
+	BeforeIdentityLock func(tx *gorm.DB, id uuid.UUID)
 }
 
 func (p *Pipeline) now() time.Time {

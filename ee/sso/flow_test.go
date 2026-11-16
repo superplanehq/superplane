@@ -19,6 +19,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/test/support"
+	"gorm.io/gorm"
 )
 
 type fakeTXT struct {
@@ -139,6 +140,95 @@ func mustJSON(value any) string {
 		return ""
 	}
 	return string(raw)
+}
+
+func TestIssuerChangeKeepsIdentitiesUntilTheConnectionIsReplaced(t *testing.T) {
+	f := newFlow(t)
+	f.verifyExample()
+	input := connectionInput(true)
+	conn := f.put(input)
+
+	withoutIdentities := input
+	withoutIdentities.Issuer = "https://other.okta.com"
+	withoutIdentities.ClientSecret = ""
+	changed, err := f.service.PutConnection(f.ctx(), f.r.Organization.ID, f.r.Account.ID, withoutIdentities)
+	require.NoError(t, err)
+	require.Equal(t, "https://other.okta.com", changed.Issuer)
+
+	original := input
+	original.ClientSecret = ""
+	_, err = f.service.PutConnection(f.ctx(), f.r.Organization.ID, f.r.Account.ID, original)
+	require.NoError(t, err)
+
+	subject := "same-subject"
+	require.NoError(t, database.Conn().Create(&models.SSOIdentity{
+		ConnectionID: conn.ID, OrganizationID: f.r.Organization.ID, AccountID: f.r.Account.ID,
+		Subject: &subject, Email: "ada@example.com", Active: true,
+		ProvisionedBy: models.SSOProvisionedByJIT, CreatedAt: time.Now(), UpdatedAt: time.Now(),
+	}).Error)
+	_, err = f.service.PutConnection(f.ctx(), f.r.Organization.ID, f.r.Account.ID, withoutIdentities)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "Delete this connection and create a new one before you change the issuer.")
+
+	conn, err = models.FindSSOConnectionByID(database.Conn(), conn.ID)
+	require.NoError(t, err)
+	f.markTested(conn)
+	activated, err := f.service.ActivateConnection(f.ctx(), f.r.Organization.ID)
+	require.NoError(t, err)
+	require.Equal(t, models.SSOStatusActive, activated.Status)
+
+	clientChange := input
+	clientChange.ClientID = "client-2"
+	clientChange.ClientSecret = ""
+	view, err := f.service.PutConnection(f.ctx(), f.r.Organization.ID, f.r.Account.ID, clientChange)
+	require.NoError(t, err)
+	require.Equal(t, models.SSOStatusDraft, view.Status)
+	require.Equal(t, "client-2", view.ClientID)
+}
+
+func TestSaveKeepsCustomClaims(t *testing.T) {
+	f := newFlow(t)
+	input := connectionInput(true)
+	input.Scopes = []string{"openid", "groups"}
+	input.SubjectClaim = "uid"
+	input.EmailClaim = "mail"
+	input.NameClaim = "displayName"
+	conn := f.put(input)
+
+	input.ClientSecret = ""
+	input.MaxSessionAgeSeconds = 7200
+	_, err := f.service.PutConnection(f.ctx(), f.r.Organization.ID, f.r.Account.ID, input)
+	require.NoError(t, err)
+	saved, err := models.FindSSOConnectionByID(database.Conn(), conn.ID)
+	require.NoError(t, err)
+	cfg, err := saved.OIDCConfig()
+	require.NoError(t, err)
+	require.Equal(t, []string{"openid", "groups"}, cfg.Scopes)
+	require.Equal(t, "uid", cfg.SubjectClaim)
+	require.Equal(t, "mail", cfg.EmailClaim)
+	require.Equal(t, "displayName", cfg.NameClaim)
+	require.Equal(t, 7200, saved.MaxSessionAgeSeconds)
+}
+
+func TestSignInRefusesAnIdentityDeactivatedBeforeTheLock(t *testing.T) {
+	f := newFlow(t)
+	f.setOwnerEmail("ada@example.com")
+	conn := f.put(connectionInput(true))
+	subject := "user-1"
+	identity := &models.SSOIdentity{
+		ConnectionID: conn.ID, OrganizationID: f.r.Organization.ID, AccountID: f.r.Account.ID,
+		Subject: &subject, Email: "ada@example.com", Active: true,
+		ProvisionedBy: models.SSOProvisionedByJIT, CreatedAt: time.Now(), UpdatedAt: time.Now(),
+	}
+	require.NoError(t, database.Conn().Create(identity).Error)
+	f.service.beforeIdentityLock = func(_ *gorm.DB, id uuid.UUID) {
+		require.NoError(t, database.Conn().Model(&models.SSOIdentity{}).Where("id = ?", id).Update("active", false).Error)
+	}
+	err := f.signIn(conn, "user-1", "ada@example.com")
+	require.Equal(t, core.CodeAccessDenied, core.CodeOf(err))
+	saved, err := models.FindSSOIdentityBySubject(database.Conn(), conn.ID, "user-1")
+	require.NoError(t, err)
+	require.False(t, saved.Active)
 }
 
 func TestConnectionAndDomainRules(t *testing.T) {

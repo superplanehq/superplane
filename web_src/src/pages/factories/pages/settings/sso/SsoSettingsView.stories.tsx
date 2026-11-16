@@ -1,7 +1,9 @@
+import { useState } from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { RequiredDialog, TokenDialog } from "./SsoSettingsSections";
 import { SsoSettingsView } from "./SsoSettingsView";
+import { noopSsoActions, type SsoSettingsModel } from "./ssoSettingsTypes";
 
 const meta = {
   title: "Settings/Single Sign-On",
@@ -97,4 +99,61 @@ export const TokenShownOnce: StoryObj = {
 };
 export const RequiredConfirmation: StoryObj = {
   render: () => <RequiredDialog open onOpenChange={() => undefined} onConfirm={() => undefined} />,
+};
+
+export const Interactive: Story = {
+  render: function InteractiveSSO() {
+    const [model, setModel] = useState<SsoSettingsModel>({
+      licensed: true,
+      domains: [{ id: "domain", domain: "example.com", verifiedAt: "2026-11-14T00:00:00Z" }],
+      tokens: [],
+      connection: {
+        id: "conn",
+        status: "STATUS_DRAFT",
+        displayName: "Okta",
+        issuer: "https://example.okta.com",
+        clientId: "client",
+        lastTest: { ok: true, email: "ada@example.com" },
+      },
+    });
+    return (
+      <SsoSettingsView
+        model={model}
+        actions={{
+          ...noopSsoActions,
+          onSave: (input) => {
+            console.log("save", input);
+            setModel((current) => ({
+              ...current,
+              notice: "Saved",
+              connection: { ...current.connection, displayName: input.displayName, issuer: input.issuer },
+            }));
+          },
+          onActivate: () => {
+            console.log("activate");
+            setModel((current) => ({
+              ...current,
+              connection: { ...current.connection, status: "STATUS_ACTIVE" },
+            }));
+          },
+          onAddDomain: (domain) => {
+            console.log("add domain", domain);
+            setModel((current) => ({
+              ...current,
+              domains: [...current.domains, { id: domain, domain }],
+            }));
+          },
+          onCreateToken: (description) => {
+            console.log("create token", description);
+            setModel((current) => ({
+              ...current,
+              revealedToken: "scim-token-secret",
+              tokens: [...current.tokens, { id: description || "token", description }],
+            }));
+          },
+          onDismissToken: () => setModel((current) => ({ ...current, revealedToken: null })),
+        }}
+      />
+    );
+  },
 };
