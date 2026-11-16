@@ -6,13 +6,28 @@ describe("colors", () => {
     expect(getColorClass("emerald")).toBe("text-emerald-600 dark:text-emerald-400");
   });
 
-  it("maps black to a light icon color in dark mode", () => {
-    expect(getColorClass("black")).toBe("text-gray-900 dark:text-gray-300");
+  it.each([
+    ["gray", "text-gray-500 dark:text-gray-400", "bg-gray-100"],
+    ["zinc", "text-gray-500 dark:text-gray-400", "bg-gray-100"],
+    ["white", "text-white dark:text-white", "bg-white"],
+    ["black", "text-gray-900 dark:text-gray-300", "bg-black"],
+  ])("preserves special color mappings for %s", (color, textClass, backgroundClass) => {
+    expect(getColorClass(color)).toBe(textClass);
+    expect(getBackgroundColorClass(color)).toBe(backgroundClass);
   });
 
-  it("falls back to gray text classes for unknown colors", () => {
-    expect(getColorClass("unknown")).toBe("text-gray-500 dark:text-gray-400");
+  it("falls back to gray classes when the color is omitted", () => {
+    expect(getColorClass()).toBe("text-gray-500 dark:text-gray-400");
+    expect(getBackgroundColorClass()).toBe("bg-gray-100");
   });
+
+  it.each(["", "unknown", "constructor", "toString", "__proto__", "Red", " red "])(
+    "falls back to gray classes for unsupported color %j",
+    (color) => {
+      expect(getColorClass(color)).toBe("text-gray-500 dark:text-gray-400");
+      expect(getBackgroundColorClass(color)).toBe("bg-gray-100");
+    },
+  );
 
   it("adds dark mode classes for legacy icon colors", () => {
     expect(resolveNodeIconColorClass("text-gray-800")).toBe("text-gray-800 dark:text-gray-400");
@@ -26,9 +41,5 @@ describe("colors", () => {
 
   it("returns the mapped background color class", () => {
     expect(getBackgroundColorClass("violet")).toBe("bg-violet-100");
-  });
-
-  it("falls back to gray background classes for unknown colors", () => {
-    expect(getBackgroundColorClass("unknown")).toBe("bg-gray-100");
   });
 });
