@@ -1737,10 +1737,19 @@ func TestAdminDisableOrgExperimentalFeature(t *testing.T) {
 	t.Run("is idempotent for ids not currently enabled", func(t *testing.T) {
 		response := execRequest(server, requestParams{
 			method:     "DELETE",
-			path:       "/admin/api/organizations/" + r.Organization.ID.String() + "/experimental-features/does-not-exist",
+			path:       "/admin/api/organizations/" + r.Organization.ID.String() + "/experimental-features/" + features.FeatureFactories,
 			authCookie: token,
 		})
 		assert.Equal(t, http.StatusOK, response.Code)
+	})
+
+	t.Run("rejects unknown feature ids", func(t *testing.T) {
+		response := execRequest(server, requestParams{
+			method:     "DELETE",
+			path:       "/admin/api/organizations/" + r.Organization.ID.String() + "/experimental-features/does-not-exist",
+			authCookie: token,
+		})
+		assert.Equal(t, http.StatusBadRequest, response.Code)
 	})
 
 	t.Run("returns 404 for non-existent org", func(t *testing.T) {
