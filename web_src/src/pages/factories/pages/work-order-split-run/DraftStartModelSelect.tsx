@@ -1,4 +1,5 @@
 import { Bot, ChevronDown } from "lucide-react";
+import { useMemo } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -75,14 +76,15 @@ export function DraftStartModelSelect({
 }) {
   const models = useFactoryLineRunnerModels(organizationId, factoryId, lineName, true, orderId);
   const catalog = models.data?.models;
+  const modelOptions = useMemo(() => draftStartModelOptions(catalog), [catalog]);
   const resolved = resolveDraftStartSelection(
     { model, thinkingLevel },
     defaults.values ?? {},
-    catalog,
+    modelOptions,
     defaults.values ? undefined : draftStartDefaultsStatus(defaults),
   );
   const showName = appearance !== "icon";
-  const defaultLabels = draftStartDefaultLabels(defaults.values, catalog);
+  const defaultLabels = draftStartDefaultLabels(defaults.values, modelOptions);
 
   return (
     <DropdownMenu>
@@ -110,7 +112,7 @@ export function DraftStartModelSelect({
           testId="split-run-draft-model-list"
           value={model ?? ""}
           displayedValue={resolved.modelLabel}
-          options={draftStartModelOptions(catalog, defaultLabels.model)}
+          options={[{ value: "", label: defaultLabels.model }, ...modelOptions]}
           onValueChange={(nextModel) => onChange({ model: nextModel || undefined, thinkingLevel })}
         />
         <DropdownMenuValueSub

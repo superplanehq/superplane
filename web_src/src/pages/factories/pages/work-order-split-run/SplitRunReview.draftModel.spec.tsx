@@ -136,6 +136,32 @@ describe("SplitRunReview draft model select", () => {
     expect(screen.getByTestId("split-run-draft-model")).toBeDisabled();
   });
 
+  it.each(["desktop", "mobile"])("refreshes catalog labels and saved defaults on %s", async (surface) => {
+    const model = catalog[0].id;
+    const props = {
+      lineName: "ship",
+      defaults: {
+        values: { model, thinkingLevel: "high" },
+        isLoading: false,
+        isError: false,
+        retry: vi.fn(),
+      },
+      onChange: vi.fn(),
+    };
+    const Component = surface === "mobile" ? MobileDraftStartModelSelect : DraftStartModelSelect;
+    const { rerender } = render(<Component {...props} />);
+    catalog = [{ id: model, name: "Updated model" }];
+    rerender(<Component {...props} defaults={{ ...props.defaults, values: { model, thinkingLevel: "low" } }} />);
+    expect(screen.getByTestId("split-run-draft-model")).toHaveAccessibleName(
+      "Model: Updated model (Default) · Thinking: Low (Default)",
+    );
+    const user = userEvent.setup();
+    await user.click(screen.getByTestId("split-run-draft-model"));
+    if (surface === "desktop") await user.hover(screen.getByTestId("split-run-draft-model-list"));
+    expect(await screen.findByRole("menuitem", { name: "Default (Updated model)" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Updated model" })).toBeInTheDocument();
+  });
+
   describe.each(["desktop", "mobile"])("%s unresolved defaults", (surface) => {
     it.each([
       { model: "openai/gpt-6.1-sol", thinkingLevel: undefined },

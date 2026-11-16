@@ -1,4 +1,5 @@
 import { Check, ChevronDown } from "lucide-react";
+import { useMemo } from "react";
 
 import { Button } from "@/components/ui/button";
 import { useFactoryLineRunnerModels } from "@/hooks/useFactoryLineRunnerModels";
@@ -51,12 +52,13 @@ export function MobileDraftStartModelSelect({
   disabled?: boolean;
 }) {
   const models = useFactoryLineRunnerModels(organizationId, factoryId, lineName, Boolean(lineName), orderId);
-  const defaultLabels = draftStartDefaultLabels(defaults.values, models.data?.models);
-  const modelOptions = draftStartModelOptions(lineName ? models.data?.models : [], defaultLabels.model);
+  const catalog = models.data?.models;
+  const modelOptions = useMemo(() => draftStartModelOptions(catalog), [catalog]);
+  const defaultLabels = draftStartDefaultLabels(defaults.values, modelOptions);
   const resolved = resolveDraftStartSelection(
     { model, thinkingLevel },
     defaults.values ?? {},
-    models.data?.models,
+    modelOptions,
     defaults.values ? undefined : draftStartDefaultsStatus(defaults),
   );
 
@@ -89,7 +91,7 @@ export function MobileDraftStartModelSelect({
           Model — {resolved.modelLabel}
         </DropdownMenuLabel>
         <div className="max-h-52 overflow-y-auto" data-testid="mobile-task-model-list">
-          {modelOptions.map((option) => (
+          {[{ value: "", label: defaultLabels.model }, ...(lineName ? modelOptions : [])].map((option) => (
             <ChoiceItem
               key={option.value}
               label={option.label}
