@@ -43,6 +43,16 @@ const (
 	prFeedbackMaximumAttemptsMin     = 1
 	prFeedbackMaximumAttemptsMax     = 10
 
+	prFeedbackCompletionInstructions = `If no request needs action, finish successfully without posting a completion comment.
+A clean bot summary, an approval, or feedback already handled without a new request needs no action.
+If you address at least one request, post exactly one pull request completion comment after processing all current feedback.
+A substantive explanation of why a request is invalid or unsafe counts as addressing it.
+A code change, commit, or test run is not required to address a request.
+In that comment, summarize requests addressed, changes made, and substantive disagreements as applicable.
+Do not post comments that only report that no requests, changes, commits, or test runs were needed.
+If you upload visual evidence, include it in the same comment.
+Do not post a separate visual evidence comment.`
+
 	bitbucketPRCommentAcknowledgement = `Sure, looking into this. Follow along: [{{ $["Find Pull Request"].data.workOrder.key }}]({{ $["Find Pull Request"].data.workOrder.url }})`
 
 	prFeedbackDiscussionTemplateID = "pr-feedback:discussion"
@@ -736,10 +746,7 @@ func prFeedbackPromptFor(request prFeedbackBuildRequest) string {
 			"- Explain disagreements in the completion comment. Do not make unsafe changes.",
 			"",
 			"Do not report a work-order check or add a work-order comment.",
-			"Post one pull request comment after you address all feedback.",
-			"Summarize the changes in this comment.",
-			"If you upload visual evidence, include it in the same comment.",
-			"Do not post a separate visual evidence comment.",
+			prFeedbackCompletionInstructions,
 			"Stop after current feedback is addressed.",
 			"Keep the change focused. Add tests where they are needed.",
 			runner.FactoryCommitIdentityPrompt,
@@ -763,10 +770,7 @@ func prFeedbackPromptFor(request prFeedbackBuildRequest) string {
 		"",
 		"Do not resolve GitHub review threads. The reviewer controls resolution.",
 		"Do not report a work-order check or add a work-order comment.",
-		"Post one pull request comment after you address all feedback.",
-		"Summarize the changes in this comment.",
-		"If you upload visual evidence, include it in the same comment.",
-		"Do not post a separate visual evidence comment.",
+		prFeedbackCompletionInstructions,
 		"Stop after current feedback is addressed.",
 		"Keep the change focused. Add tests where they are needed.",
 		runner.FactoryCommitIdentityPrompt,

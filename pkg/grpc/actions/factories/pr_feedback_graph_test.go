@@ -309,13 +309,27 @@ func Test__BuildPRFeedbackCanvas(t *testing.T) {
 			assert.NotEqual(t, "github.createIssueComment", node.Component)
 			assert.NotContains(t, node.ID, "visual-evidence")
 		}
+	})
 
-		prompt := prFeedbackPrompt()
-		assert.Contains(t, prompt, "Explain disagreements in the completion comment.")
-		assert.Contains(t, prompt, "Post one pull request comment after you address all feedback.")
-		assert.Contains(t, prompt, "Summarize the changes in this comment.")
-		assert.Contains(t, prompt, "If you upload visual evidence, include it in the same comment.")
-		assert.Contains(t, prompt, "Do not post a separate visual evidence comment.")
+	t.Run("discussion prompts allow a completion comment only for addressed requests", func(t *testing.T) {
+		for _, provider := range []string{models.ProviderGitHub, models.ProviderBitbucket} {
+			t.Run(provider, func(t *testing.T) {
+				canvas := buildDiscussionPRFeedbackCanvas(prFeedbackBuildRequest{VCSProvider: provider})
+				nodeIDs := []string{prFeedbackRunnerNodeID, prFeedbackReviewRunnerNodeID, prFeedbackReplyRunnerNodeID}
+				if provider == models.ProviderBitbucket {
+					nodeIDs = []string{prFeedbackRunnerNodeID}
+				}
+				for _, nodeID := range nodeIDs {
+					t.Run(nodeID, func(t *testing.T) {
+						prompt := runnerStepPrompt(t, findSpecNode(t, canvas, nodeID), "Address PR feedback")
+						assertPRFeedbackCompletionPolicy(t, prompt)
+						if provider == models.ProviderGitHub {
+							assert.Contains(t, prompt, "Do not resolve GitHub review threads. The reviewer controls resolution.")
+						}
+					})
+				}
+			})
+		}
 	})
 
 	t.Run("an empty mention is written as an empty content filter", func(t *testing.T) {
@@ -512,6 +526,23 @@ func Test__BuildChecksPRFeedbackCanvas(t *testing.T) {
 
 		assertPRFeedbackPerPullRequestConcurrency(t, canvas)
 	})
+}
+
+// This checks the generated instruction contract, not the agent's decisions or provider API calls.
+func assertPRFeedbackCompletionPolicy(t *testing.T, prompt string) {
+	t.Helper()
+
+	assert.Contains(t, prompt, "If no request needs action, finish successfully without posting a completion comment.")
+	assert.Contains(t, prompt, "A clean bot summary, an approval, or feedback already handled without a new request needs no action.")
+	assert.Contains(t, prompt, "If you address at least one request, post exactly one pull request completion comment after processing all current feedback.")
+	assert.Contains(t, prompt, "A substantive explanation of why a request is invalid or unsafe counts as addressing it.")
+	assert.Contains(t, prompt, "A code change, commit, or test run is not required to address a request.")
+	assert.Contains(t, prompt, "In that comment, summarize requests addressed, changes made, and substantive disagreements as applicable.")
+	assert.Contains(t, prompt, "Do not post comments that only report that no requests, changes, commits, or test runs were needed.")
+	assert.Contains(t, prompt, "If you upload visual evidence, include it in the same comment.")
+	assert.Contains(t, prompt, "Do not post a separate visual evidence comment.")
+	assert.NotContains(t, prompt, "Post one pull request comment after you address all feedback.")
+	assert.NotContains(t, prompt, "Summarize the changes in this comment.")
 }
 
 func assertPRFeedbackPerPullRequestConcurrency(t *testing.T, canvas *yaml.Canvas) {
