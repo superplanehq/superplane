@@ -2,12 +2,7 @@ import { Check, ChevronDown } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { useFactoryLineRunnerModels } from "@/hooks/useFactoryLineRunnerModels";
-import {
-  THINKING_LEVEL_HIGH,
-  THINKING_LEVEL_LOW,
-  THINKING_LEVEL_MEDIUM,
-  modelNameWithThinking,
-} from "@/lib/thinkingLevel";
+import { THINKING_LEVEL_HIGH, THINKING_LEVEL_LOW, THINKING_LEVEL_MEDIUM } from "@/lib/thinkingLevel";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,7 +12,9 @@ import {
   DropdownMenuTrigger,
 } from "@/ui/dropdownMenu";
 
-import { DRAFT_START_MODEL_AUTO } from "../pages/work-order-split-run/draftStartModel";
+import { resolveDraftStartSelection, type DraftStartSelection } from "../pages/work-order-split-run/draftStartModel";
+import { draftStartDefaultsStatus, type DraftStartDefaults } from "@/hooks/useDraftStartDefaults";
+import { DraftStartSelectionLabel } from "../pages/work-order-split-run/DraftStartSelectionLabel";
 
 const THINKING_OPTIONS = [
   { value: THINKING_LEVEL_LOW, label: "Low" },
@@ -27,11 +24,6 @@ const THINKING_OPTIONS = [
 
 const MENU_ITEM_CLASS = "cursor-pointer text-[13px]";
 
-type StartChoice = {
-  model: string;
-  thinkingLevel: string;
-};
-
 export function MobileDraftStartModelSelect({
   organizationId,
   factoryId,
@@ -39,6 +31,7 @@ export function MobileDraftStartModelSelect({
   orderId,
   model,
   thinkingLevel,
+  defaults,
   onChange,
   disabled = false,
 }: {
@@ -46,19 +39,22 @@ export function MobileDraftStartModelSelect({
   factoryId?: string;
   lineName?: string;
   orderId?: string;
-  model: string;
-  thinkingLevel: string;
-  onChange: (next: StartChoice) => void;
+  model?: string;
+  thinkingLevel?: string;
+  defaults: DraftStartDefaults;
+  onChange: (next: DraftStartSelection) => void;
   disabled?: boolean;
 }) {
   const models = useFactoryLineRunnerModels(organizationId, factoryId, lineName, Boolean(lineName), orderId);
   const modelOptions = lineName
     ? runnerModelOptions(models.data?.models)
-    : [{ value: DRAFT_START_MODEL_AUTO, label: "Auto" }];
-  const selectedName =
-    modelOptions.find((option) => option.value === model)?.label ||
-    (models.isLoading ? model : `${model} (unavailable)`);
-  const closedLabel = modelNameWithThinking(selectedName, thinkingLevel);
+    : [{ value: "", label: "Implementation default" }];
+  const resolved = resolveDraftStartSelection(
+    { model, thinkingLevel },
+    defaults.values ?? {},
+    models.data?.models,
+    defaults.values ? undefined : draftStartDefaultsStatus(defaults),
+  );
 
   return (
     <DropdownMenu>
@@ -67,12 +63,12 @@ export function MobileDraftStartModelSelect({
           type="button"
           size="sm"
           variant="outline"
-          aria-label={`Model: ${closedLabel}`}
+          aria-label={resolved.accessibleLabel}
           data-testid="split-run-draft-model"
           disabled={disabled}
           className="h-7 max-w-36 min-w-0 shrink gap-1.5 overflow-hidden !rounded-none border-0 bg-background px-2 text-xs shadow-none"
         >
-          <span className="min-w-0 truncate">{closedLabel}</span>
+          <DraftStartSelectionLabel resolved={resolved} thinkingLevel={thinkingLevel} />
           <ChevronDown className="size-3 shrink-0 opacity-60" aria-hidden />
         </Button>
       </DropdownMenuTrigger>
@@ -82,27 +78,32 @@ export function MobileDraftStartModelSelect({
         collisionPadding={8}
         className="w-[min(18rem,var(--radix-dropdown-menu-content-available-width))] max-w-[calc(100vw-1rem)]"
       >
+        {!defaults.values ? (
+          <DropdownMenuItem onSelect={defaults.retry}>Retry Implementation defaults</DropdownMenuItem>
+        ) : null}
         <DropdownMenuLabel className="text-xs text-muted-foreground">Model</DropdownMenuLabel>
         <div className="max-h-52 overflow-y-auto" data-testid="mobile-task-model-list">
           {modelOptions.map((option) => (
             <ChoiceItem
               key={option.value}
               label={option.label}
-              selected={option.value === model}
-              onSelect={() => onChange({ model: option.value, thinkingLevel })}
+              selected={option.value === (model ?? "")}
+              onSelect={() => onChange({ model: option.value || undefined, thinkingLevel })}
             />
           ))}
         </div>
         <DropdownMenuSeparator />
         <DropdownMenuLabel className="text-xs text-muted-foreground">Thinking</DropdownMenuLabel>
-        {THINKING_OPTIONS.map((option) => (
+        {[{ value: "", label: "Implementation default" }, ...THINKING_OPTIONS].map((option) => (
           <ChoiceItem
             key={option.value}
             label={option.label}
-            selected={option.value === thinkingLevel}
-            onSelect={() => onChange({ model, thinkingLevel: option.value })}
+            selected={option.value === (thinkingLevel ?? "")}
+            onSelect={() => onChange({ model, thinkingLevel: option.value || undefined })}
           />
         ))}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onSelect={() => onChange({})}>Use Implementation defaults</DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -110,7 +111,7 @@ export function MobileDraftStartModelSelect({
 
 function runnerModelOptions(models: Array<{ id?: string; name?: string }> | undefined) {
   return [
-    { value: DRAFT_START_MODEL_AUTO, label: "Auto" },
+    { value: "", label: "Implementation default" },
     ...(models ?? [])
       .filter((item) => (item.id ?? "") !== "")
       .map((item) => ({ value: item.id ?? "", label: item.name || item.id || "" })),

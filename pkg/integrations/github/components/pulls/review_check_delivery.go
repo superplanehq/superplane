@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -283,6 +284,10 @@ func retainDeliveredCheckRun(latest, delivered *reviewCheckState) {
 
 func evaluateReviewCheck(client *common.Client, store core.PublicationStore, record *core.OrderedPublication, state *reviewCheckState) (bool, error) {
 	config := state.Configuration
+	if record.Disabled && config.CheckRun && len(state.Retired) == 0 {
+		state.SHA, state.State, state.Description = config.AssessedSHA, "success", config.Reason
+		return false, nil
+	}
 	if config.State != "" && len(state.Retired) > 0 {
 		retired := state.Retired[0]
 		state.SHA, state.State, state.Description = retired.SHA, "error", "A newer attempt superseded this check."
@@ -380,11 +385,27 @@ func evaluateReviewCheck(client *common.Client, store core.PublicationStore, rec
 		state.SHA = pr.GetHead().GetSHA()
 		if state.SHA != config.AssessedSHA {
 			state.State, state.Description = "pending", "Waiting for a decision on the current commit"
+			return monitor, nil
+		}
+		if !hasSelectedReviewRequests(pr.RequestedReviewers, config.Reviewers) {
+			// GitHub clears requests after review submission, including requested changes.
+			state.State, state.Description = "success", "No selected review requests remain"
 		}
 	default:
 		return monitor, fmt.Errorf("invalid persisted review check phase")
 	}
 	return monitor, nil
+}
+
+func hasSelectedReviewRequests(requested []*github.User, selected []ReviewerIdentity) bool {
+	for _, reviewer := range selected {
+		if slices.ContainsFunc(requested, func(user *github.User) bool {
+			return user.GetID() == reviewer.ID
+		}) {
+			return true
+		}
+	}
+	return false
 }
 
 func permanentCheckError(err error) bool {

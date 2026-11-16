@@ -111,7 +111,7 @@ func newPublicationFixture(t *testing.T) publicationFixture {
 	require.NoError(t, db.Create(&models.CanvasEvent{WorkflowID: canvas.ID, NodeID: "trigger", RunID: run.ID, State: models.CanvasEventStateRouted, Data: models.NewJSONValue(map[string]any{"data": map[string]any{"pull_request": map[string]any{"head": map[string]any{"sha": "abc"}}}})}).Error)
 	_, err = pr.CreateActivity(db, models.FactoryPullRequestActivityParams{RunID: run.ID, Title: "Merge confidence"})
 	require.NoError(t, err)
-	return publicationFixture{db, workspace, order, pr, canvas, run, IntakeDependencies{Registry: r.Registry, Encryptor: r.Encryptor}}
+	return publicationFixture{db, workspace, order, pr, canvas, run, IntakeDependencies{Registry: r.Registry, Encryptor: r.Encryptor, AuthService: r.AuthService}}
 }
 
 func (f publicationFixture) report(t *testing.T, run *models.CanvasRun, score float64) {

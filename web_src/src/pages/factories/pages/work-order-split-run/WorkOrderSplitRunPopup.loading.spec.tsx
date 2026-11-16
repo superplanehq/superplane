@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
@@ -8,8 +8,9 @@ import { ThemeProvider } from "@/contexts/ThemeProvider";
 import type * as FactoryData from "@/hooks/useFactoryData";
 import { unmockedSrc } from "@/test/unmockedModule";
 import { TooltipProvider } from "@/ui/tooltip";
+import { canvasKeys } from "@/hooks/useCanvasData";
 
-import { APPROVAL_WORK_ORDER, DRAFT_WORK_ORDER } from "../../__fixtures__/factoryPageResponses";
+import { APPROVAL_WORK_ORDER, DRAFT_WORK_ORDER, REFUND_FACTORY_LINES } from "../../__fixtures__/factoryPageResponses";
 import { INTENT_DOCUMENT_TITLE } from "../../lib/intentDocument";
 import { WorkOrderSplitRunPopup } from "./WorkOrderSplitRunPopup";
 import { splitRunFixtureForWorkOrder } from "./splitRunMocks";
@@ -21,6 +22,7 @@ const lookupState = vi.hoisted(() => ({
   queryError: null as Error | null,
   artifactsLoading: false,
   artifactsError: null as Error | null,
+  ready: false,
 }));
 
 vi.mock("@/hooks/useFactoryData", () => {
@@ -28,7 +30,9 @@ vi.mock("@/hooks/useFactoryData", () => {
   return {
     ...actual,
     useFactory: () => ({
-      data: lookupState.factoryPending ? undefined : { id: "factory-1", planning: lookupState.planning },
+      data: lookupState.factoryPending
+        ? undefined
+        : { id: "factory-1", planning: lookupState.planning, lines: REFUND_FACTORY_LINES },
       isPending: lookupState.factoryPending,
     }),
   };
@@ -36,6 +40,13 @@ vi.mock("@/hooks/useFactoryData", () => {
 
 vi.mock("@monaco-editor/react", () => ({
   default: ({ value }: { value?: string }) => <pre data-testid="monaco-stub">{value}</pre>,
+}));
+
+vi.mock("@/hooks/useFactoryLineRunnerModels", () => ({
+  useFactoryLineRunnerModels: () => ({
+    data: { models: [{ id: "task-model", name: "Task model" }] },
+    isLoading: false,
+  }),
 }));
 
 vi.mock("@/hooks/useExperimentalFeature", () => ({
@@ -64,7 +75,15 @@ vi.mock("./useAnalysisPlanningSession", () => ({
 
 vi.mock("./useSplitRunPopupData", () => ({
   useSplitRunPopupData: () => ({
-    artifacts: [],
+    artifacts: lookupState.ready
+      ? [
+          {
+            id: "plan",
+            type: "TYPE_MARKDOWN",
+            data: { name: "plan.md", body: "# Plan\n\nImplement the change." },
+          },
+        ]
+      : [],
     pullRequests: [],
     sourceDescription: "",
     useLive: true,
@@ -75,9 +94,25 @@ vi.mock("./useSplitRunPopupData", () => ({
   }),
 }));
 
-function renderPopup(onClose?: () => void, fixture = splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER)) {
+function renderPopup(
+  onClose?: () => void,
+  fixture = splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER),
+  onDispatch?: (model?: string, thinking?: string) => Promise<void>,
+) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  client.setQueryData(canvasKeys.detail("organization-1", "app-refund-implementer"), {
+    spec: {
+      nodes: [
+        {
+          id: "implementation-agent-no-issue",
+          component: "runnerOpenRouter",
+          configuration: { model: "openai/gpt-6.1-sol", thinkingLevel: "high" },
+        },
+      ],
+    },
+  });
   render(
-    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+    <QueryClientProvider client={client}>
       <MemoryRouter>
         <ThemeProvider>
           <TooltipProvider>
@@ -85,6 +120,9 @@ function renderPopup(onClose?: () => void, fixture = splitRunFixtureForWorkOrder
               organizationId="organization-1"
               factoryId="factory-1"
               orderId="work-order-1"
+              lineId={REFUND_FACTORY_LINES[0].id}
+              canDispatch
+              onDispatch={onDispatch}
               fixture={fixture}
               onClose={onClose}
             />
@@ -93,6 +131,7 @@ function renderPopup(onClose?: () => void, fixture = splitRunFixtureForWorkOrder
       </MemoryRouter>
     </QueryClientProvider>,
   );
+  return client;
 }
 
 describe("WorkOrderSplitRunPopup loading mode", () => {
@@ -103,7 +142,64 @@ describe("WorkOrderSplitRunPopup loading mode", () => {
     lookupState.queryError = null;
     lookupState.artifactsLoading = false;
     lookupState.artifactsError = null;
+    lookupState.ready = false;
   });
+
+  it("starts an untouched task without overriding saved High thinking", async () => {
+    const onDispatch = vi.fn(async () => {});
+    lookupState.ready = true;
+    renderPopup(undefined, splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER), onDispatch);
+    expect(screen.getByTestId("split-run-draft-model")).toHaveAccessibleName(
+      /openai\/gpt-6.1-sol.*High.*Implementation default/,
+    );
+    await userEvent.setup().click(screen.getByTestId("split-run-draft-model"));
+    await userEvent.setup().keyboard("{Escape}");
+    await userEvent.setup().click(screen.getByRole("button", { name: "Start" }));
+    await userEvent.setup().click(screen.getByRole("button", { name: "Start anyway" }));
+    expect(onDispatch).toHaveBeenCalledWith(undefined, undefined);
+  });
+
+  it.each(["model", "thinking"])(
+    "dispatches only an explicit %s override while saved defaults refresh",
+    async (field) => {
+      lookupState.ready = true;
+      const user = userEvent.setup();
+      const onDispatch = vi.fn(async () => {});
+      const client = renderPopup(undefined, splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER), onDispatch);
+      const trigger = screen.getByTestId("split-run-draft-model");
+      await user.click(trigger);
+      await user.hover(
+        screen.getByTestId(field === "model" ? "split-run-draft-model-list" : "split-run-draft-thinking"),
+      );
+      fireEvent.click(
+        await screen.findByRole("menuitem", { name: field === "model" ? "Task model (task-model)" : "High" }),
+      );
+      await user.keyboard("{Escape}");
+      client.setQueryData(canvasKeys.detail("organization-1", "app-refund-implementer"), {
+        spec: {
+          nodes: [{ component: "runnerOpenRouter", configuration: { model: "new-default", thinkingLevel: "low" } }],
+        },
+      });
+      await waitFor(() =>
+        expect(trigger).toHaveAccessibleName(
+          field === "model"
+            ? /task-model.*Low \(Implementation default\)/
+            : /new-default.*Implementation default.*High$/,
+        ),
+      );
+      await user.click(screen.getByRole("button", { name: "Start" }));
+      await user.click(screen.getByRole("button", { name: "Start anyway" }));
+      expect(onDispatch).toHaveBeenLastCalledWith(
+        field === "model" ? "task-model" : undefined,
+        field === "thinking" ? "high" : undefined,
+      );
+      await user.click(trigger);
+      await user.click(screen.getByRole("menuitem", { name: "Use Implementation defaults" }));
+      await user.click(screen.getByRole("button", { name: "Start" }));
+      await user.click(screen.getByRole("button", { name: "Start anyway" }));
+      expect(onDispatch).toHaveBeenLastCalledWith(undefined, undefined);
+    },
+  );
 
   it("shows a dismissible loading popup while Planning settings load", async () => {
     const user = userEvent.setup();

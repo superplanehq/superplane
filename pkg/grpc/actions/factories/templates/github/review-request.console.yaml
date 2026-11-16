@@ -11,6 +11,7 @@ spec:
         title: Review request
         body: |
           Select human reviewers after Merge confidence completes.
+          Keep suitable reviewers across reports. Replace only requests this automation adds.
           Open Runs to inspect each decision, its rationale, and any errors.
   layout:
     - {i: about, x: 0, y: 0, w: 12, h: 4}

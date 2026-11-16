@@ -13,8 +13,10 @@ import {
   catalogStatusCheckNames,
   checksToolsAccess,
   isChecksHandlerCIIntegration,
+  isEligibleRepairCheck,
   readyChecksHandlerIntegrationIds,
   selectedChecksUseGitHubActions,
+  statusCheckValue,
   suggestedIntegrationsForChecks,
 } from "./checksPRFeedbackSetup";
 import {
@@ -106,7 +108,10 @@ function useChecksSetupResources(
   const [seeded, setSeeded] = useState({ catalog: false, connected: false });
   const catalogParameters = repository.trim() ? { repository: repository.trim() } : undefined;
   const catalogQuery = useIntegrationResources(organizationId, githubIntegrationId, "status_check", catalogParameters);
-  const catalog = useMemo(() => catalogQuery.data ?? [], [catalogQuery.data]);
+  const catalog = useMemo(
+    () => (catalogQuery.data ?? []).filter((check) => isEligibleRepairCheck(statusCheckValue(check))),
+    [catalogQuery.data],
+  );
   const catalogLoading = catalogQuery.isPending || catalogQuery.isFetching;
   const connectedQuery = useConnectedIntegrations(organizationId, { enabled: Boolean(organizationId) });
   const availableQuery = useAvailableIntegrations({ enabled: Boolean(organizationId), organizationId });
@@ -140,7 +145,11 @@ function useChecksSetupResources(
 
   return {
     checkNames,
-    toggleCheckName: (name: string) => setCheckNames((current) => toggleUniqueString(current, name)),
+    toggleCheckName: (name: string) => {
+      if (isEligibleRepairCheck(name)) {
+        setCheckNames((current) => toggleUniqueString(current, name));
+      }
+    },
     catalog,
     catalogQuery,
     catalogLoading,
@@ -173,6 +182,7 @@ async function finishChecksSetup({
   createHandler: ReturnType<typeof useCreateFactoryPRFeedbackHandler>;
   setError: (error: string | undefined) => void;
 }) {
+  checkNames = checkNames.filter(isEligibleRepairCheck);
   if (checkNames.length === 0) {
     setError(PR_FEEDBACK_SETTINGS_COPY.checkNamesNone);
     return undefined;

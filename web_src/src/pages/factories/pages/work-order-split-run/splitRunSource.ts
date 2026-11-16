@@ -13,13 +13,13 @@ import sentryIcon from "@/assets/icons/integrations/sentry.svg";
 import slackIcon from "@/assets/icons/integrations/slack.svg";
 import superplaneMark from "@/assets/superplane-mark.svg";
 import { isGitHubWebHostname } from "@/lib/githubHost";
-import { getUserInitials, type OrgUserDisplay, type OrgUserDisplayLookup } from "@/lib/orgUserDisplay";
-
 import {
-  STORYBOOK_ME_USER_AVATAR_URL,
-  STORYBOOK_ME_USER_ID,
-  STORYBOOK_ME_USER_NAME,
-} from "../../__fixtures__/factoryPageResponses";
+  getUserInitials,
+  UNKNOWN_ORG_USER_NAME,
+  type OrgUserDisplay,
+  type OrgUserDisplayLookup,
+} from "@/lib/orgUserDisplay";
+
 import { extractArtifactUrl, toArtifactDataRecord } from "../../lib/workOrderArtifact";
 import { reviewCandidateForWorkOrderId } from "../onboarding/first-run/reviewCandidates";
 import { canvasKeyForAutomation } from "./splitRunCanvases";
@@ -84,10 +84,9 @@ export function isMonochromeSourceLogo(iconAlt: string): boolean {
 }
 
 const SOURCE_PERSON_FALLBACK: OrgUserDisplay = {
-  id: STORYBOOK_ME_USER_ID,
-  name: STORYBOOK_ME_USER_NAME,
-  initials: getUserInitials(STORYBOOK_ME_USER_NAME),
-  avatarUrl: STORYBOOK_ME_USER_AVATAR_URL,
+  id: "unknown",
+  name: UNKNOWN_ORG_USER_NAME,
+  initials: getUserInitials(UNKNOWN_ORG_USER_NAME),
 };
 
 export const INTAKE_PRESENTATION: Record<SplitRunIntakeKind, { name: string; iconSrc: string; iconAlt: string }> = {
@@ -298,23 +297,22 @@ function isGitHubDependabotAlertHref(parsed: URL | undefined): boolean {
 
 function sourcePerson(order: FactoriesWorkOrder, resolveUser?: OrgUserDisplayLookup): OrgUserDisplay {
   const user = order.createdBy?.user;
-  if (!user?.id && !user?.name) {
+  if (!user) {
     return SOURCE_PERSON_FALLBACK;
   }
+  const name = user.name?.trim() || SOURCE_PERSON_FALLBACK.name;
   // `resolveUser` looks the source up against the org members list, which
   // carries the avatar image. Without it we can only show initials.
-  const resolved = resolveUser?.(user.id, user.name, user.deleted, user.formerMember);
+  const resolved = resolveUser?.(user.id, name, user.deleted, user.formerMember);
   if (resolved) {
     return resolved;
   }
-  const name = user.name?.trim() || SOURCE_PERSON_FALLBACK.name;
   return {
     id: user.id ?? SOURCE_PERSON_FALLBACK.id,
     name,
     initials: getUserInitials(name),
     ...(user.deleted ? { deleted: true } : {}),
     ...(user.formerMember ? { formerMember: true } : {}),
-    avatarUrl: user.id === SOURCE_PERSON_FALLBACK.id ? SOURCE_PERSON_FALLBACK.avatarUrl : undefined,
   };
 }
 

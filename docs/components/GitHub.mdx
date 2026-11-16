@@ -3318,7 +3318,13 @@ Returns confirmation of the deletion.
 
 **Component key:** `github.ensurePullRequestReviewers`
 
-Ensure desired human reviewers have a review request or an approval for the current commit. Recheck IDs and repository write access. Preserve unrelated requests. Read the pull request again immediately before mutation. Closed pull requests and unexpected commits emit a skipped outcome. Provider failures and ineligible identities fail the execution. Output includes requested and already-covered identities. The final read and mutation are not atomic.
+Ensure desired human reviewers have a review request or an approval for the current commit. Recheck IDs and repository write access. Closed pull requests and unexpected commits emit a skipped outcome. Provider failures and ineligible identities fail the execution.
+
+By default, add missing requests and preserve all existing requests. Enable managed reconciliation to track requests added by this automation after enablement. Managed execution requires expectedHeadSha. An empty managed selection withdraws its pending requests.
+
+Request replacements before withdrawals. Preserve pre-existing requests, requests owned by other automations, team requests, and submitted reviews. Never infer ownership from old PR descriptions or current requests. Keep suitable reviewers across selections.
+
+Ordered publication state fences superseded runs and records partial writes for retry. Output includes requested, alreadyCovered, selected, and removed identities. GitHub reads and mutations are not atomic.
 
 ### Example Output
 
@@ -3328,7 +3334,14 @@ Ensure desired human reviewers have a review request or an approval for the curr
     "alreadyCovered": [],
     "executionId": "11111111-1111-1111-1111-111111111111",
     "headSha": "abc",
+    "removed": [],
     "requested": [
+      {
+        "id": 123,
+        "login": "octocat"
+      }
+    ],
+    "selected": [
       {
         "id": 123,
         "login": "octocat"
@@ -4410,7 +4423,7 @@ Returns GitHub's check run list response, including total_count and check_runs. 
 
 **Component key:** `github.listPullRequestReviewCandidates`
 
-List human collaborators with write, maintain, or admin access. Exclude the pull request author and bots. Read every page; incomplete discovery fails the execution. Output includes the pull request author, state, head, base, and candidate IDs and logins.
+List human collaborators with write, maintain, or admin access. Exclude the pull request author and bots. Read every page; incomplete discovery fails the execution. Output includes the pull request author, state, head, base, and candidate IDs and logins. Include current requested reviewers, teams, and the previous selection saved by this automation. Never infer ownership from current GitHub requests or the pull request description.
 
 ### Example Output
 
@@ -4435,8 +4448,11 @@ List human collaborators with write, maintain, or admin access. Exclude the pull
       "sha": "abc"
     },
     "merged": false,
+    "previousSelection": [],
     "pullNumber": 42,
     "repository": "acme/app",
+    "requestedReviewers": [],
+    "requestedTeams": [],
     "state": "open"
   },
   "timestamp": "2026-01-01T09:00:00Z",
@@ -4815,6 +4831,8 @@ The same attempt updates one check run. A stable external ID recovers interrupte
 
 Cancellation, removal, a closed or changed pull request, and completion without a final result fail the running check. Delivery uses the existing durable retries and ordering.
 
+Enabled defaults to true. Bind Activation Node ID to the starting check node to apply its admitted and live activation generation. Disabling that node releases its outstanding checks. Increase the generation when enabling it again so old callbacks cannot reopen them.
+
 The GitHub App needs Checks write and Pull requests read permissions. Existing installations must accept the permission update. This component does not change branch rules.
 
 ### Example Output
@@ -4849,7 +4867,9 @@ An optional Activation Node ID binds participation to that check node in the adm
 
 Source Run ID and Attempt Root Event ID default to trusted current execution records. Cross-canvas sources require broadcast provenance. Persisted creation times and IDs determine order. Older attempts cannot replace newer state, including on the same commit. Disabled activations remain fenced. Activation Generation is a positive saved version. After disabling, use a greater activation generation to enable the check again.
 
-All required reviewers must approve the assessed current commit. Comments do not change approval. Requested changes fail the check. Dismissed replacement reviews cannot revive older approvals. New heads stay pending for a new decision. Closed pull requests stop polling; reopening resumes monitoring.
+The check passes when no selected reviewer requests remain on the assessed current commit. Unrelated requests do not block the check. This takes precedence over recorded review decisions, including requested changes, comments, and dismissed reviews. GitHub clears requests after review submission.
+
+While selected requests remain, all required reviewers must approve the assessed current commit. Comments do not change approval. Requested changes fail the check. Dismissed replacement reviews cannot revive older approvals. Requesting a selected reviewer again resumes approval evaluation. New heads stay pending for a new decision. Closed pull requests stop polling; reopening resumes monitoring.
 
 Provider failures publish error and retry. Delivery is durable and at least once. A crash after a GitHub write can repeat the same status. This component does not change branch rules or start agents.
 
