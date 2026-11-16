@@ -14,9 +14,8 @@ const ROW_HOVER_CLASSNAME = "transition-colors hover:bg-black/10 dark:hover:bg-b
 const ICON_SLOT_CLASSNAME = "flex size-3.5 shrink-0 items-center justify-center";
 
 /**
- * Header rows that name the automations behind a column. Every column on
- * the board reserves the same `rowCount`, so short columns pad with blank
- * slots and the card lists start at one height.
+ * Header rows that name the automations behind a column. Public boards can
+ * reserve a shared rowCount to align card lists with blank slots.
  */
 export function ColumnAutomationRows({
   title,

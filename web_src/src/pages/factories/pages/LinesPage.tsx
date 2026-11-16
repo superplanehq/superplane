@@ -99,6 +99,8 @@ type BoardPaging = {
 import { LineBoardViewMenu } from "./LineBoardViewMenu";
 import { columnAutomationRowsSubheader } from "./columnAutomationRowsSubheader";
 import { ColumnAutomationsHeaderSlot } from "./ColumnAutomationsIndicator";
+import { ColumnAutomationToggle } from "./ColumnAutomationDisclosure";
+import { useColumnAutomationCollapsePreference } from "@/hooks/useColumnAutomationCollapsePreference";
 import type { ColumnAutomationRowAction } from "./ColumnAutomationsPopup";
 import { LineBoardColumnCardList, LineBoardOrderCard, LineBoardWorkOrderCard } from "./LineBoardOrderCard";
 import {
@@ -205,7 +207,6 @@ import {
   type ColumnAutomation,
   type ColumnKey,
 } from "../lib/columnAutomations";
-import { columnAutomationHeaderRowCount } from "../lib/columnAutomationHeadline";
 import { replaceLineStepParallelism } from "../lib/factoryLineFormShared";
 import { ColumnLaneMenu } from "./ColumnLaneMenu";
 import { ParallelismSettingsDialog } from "./ParallelismSettingsDialog";
@@ -1650,11 +1651,10 @@ function PhaseBoard({
   );
   const verifyAutomations = showColumnAutomations ? automationsFor("verify", verifyTitle) : undefined;
   const doneAutomations = showColumnAutomations ? automationsFor("done", doneTitle) : undefined;
-  const automationRowCount = showAutomationRows
-    ? columnAutomationHeaderRowCount(
-        [backlogAutomations, ...phaseAutomations, verifyAutomations, doneAutomations].map((list) => list ?? []),
-      )
-    : undefined;
+  const automationRowCount = (automations?: ColumnAutomation[]) =>
+    showAutomationRows ? Math.max(1, automations?.length ?? 0) : undefined;
+  const automationPreferenceKey = (columnKey: ColumnKey) =>
+    JSON.stringify([organizationId, factoryId, lineId, columnKey]);
 
   const saveParallelism = useCallback(
     async (stepIndex: number, value: number) => {
@@ -1712,7 +1712,7 @@ function PhaseBoard({
           intakePanel={intakePanel}
           onAddIntake={onAddIntake}
           automations={backlogAutomations}
-          automationRowCount={automationRowCount}
+          automationRowCount={automationRowCount(backlogAutomations)}
           onAutomationRowAction={onAutomationRowAction}
           paging={columnPaging.backlog}
           cardsPending={cardsPending}
@@ -1722,7 +1722,7 @@ function PhaseBoard({
         const columnKey: ColumnKey = `phase-${column.stepIndex}`;
         return (
           <div
-            key={`${column.stepIndex}-${column.stepName}`}
+            key={column.stepIndex}
             className={cn("relative flex min-h-0 self-stretch", workOrderKanbanLaneSizeClassName)}
           >
             {index < columns.length - 1 || columns.length > 0 ? (
@@ -1744,7 +1744,8 @@ function PhaseBoard({
               workOrderCardContext={workOrderCardContext}
               onOpenWorkOrder={onOpenWorkOrder}
               automations={phaseAutomations[index]}
-              automationRowCount={automationRowCount}
+              automationRowCount={automationRowCount(phaseAutomations[index])}
+              automationPreferenceKey={automationPreferenceKey(columnKey)}
               onAutomationRowAction={onAutomationRowAction}
               onAddAutomation={column.stepIndex === 0 ? onAddImplementAutomation : undefined}
               paging={columnPaging.open}
@@ -1779,7 +1780,8 @@ function PhaseBoard({
           workOrderCardContext={workOrderCardContext}
           onOpenWorkOrder={onOpenWorkOrder}
           automations={verifyAutomations}
-          automationRowCount={automationRowCount}
+          automationRowCount={automationRowCount(verifyAutomations)}
+          automationPreferenceKey={automationPreferenceKey("verify")}
           onAutomationRowAction={onAutomationRowAction}
           onAddAutomation={onAddVerifyAutomation}
           paging={columnPaging.open}
@@ -1800,7 +1802,8 @@ function PhaseBoard({
           workOrderCardContext={workOrderCardContext}
           onOpenWorkOrder={onOpenWorkOrder}
           automations={doneAutomations}
-          automationRowCount={automationRowCount}
+          automationRowCount={automationRowCount(doneAutomations)}
+          automationPreferenceKey={automationPreferenceKey("done")}
           onAutomationRowAction={onAutomationRowAction}
           onAddAutomation={onAddDoneAutomation}
           paging={columnPaging.done}
@@ -1826,6 +1829,7 @@ function VerifyColumn({
   onOpenWorkOrder,
   automations,
   automationRowCount,
+  automationPreferenceKey,
   onAutomationRowAction,
   onAddAutomation,
   paging,
@@ -1846,6 +1850,7 @@ function VerifyColumn({
   onOpenWorkOrder: (orderId: string, order?: FactoriesWorkOrder) => void;
   automations?: ColumnAutomation[];
   automationRowCount?: number;
+  automationPreferenceKey: string;
   onAutomationRowAction?: (automation: ColumnAutomation, action: ColumnAutomationRowAction) => void;
   onAddAutomation?: () => void;
   paging: BoardColumnPaging;
@@ -1853,6 +1858,7 @@ function VerifyColumn({
   scrollPersistenceKey?: string;
 }) {
   const lane = lineBoardColumnLaneProps(colorId, colorView, { mutedFallback: true });
+  const disclosure = useColumnAutomationCollapsePreference(automationPreferenceKey, automations?.length ?? 0);
   const { scrollRef, handleScroll } = useFactoryBoardLaneScroll(scrollPersistenceKey, !cardsPending);
   const loadMoreIfNeeded = useAutoLoadMoreOnScroll({
     hasMore: paging.hasMore,
@@ -1875,6 +1881,9 @@ function VerifyColumn({
       className={lane.className}
       actions={
         <div className="flex shrink-0 items-center gap-0.5">
+          {automationRowCount && automations?.length ? (
+            <ColumnAutomationToggle title={title} disclosure={disclosure} />
+          ) : null}
           {importPicker}
           {automationRowCount ? null : (
             <ColumnAutomationsHeaderSlot
@@ -1905,7 +1914,9 @@ function VerifyColumn({
           />
         </div>
       }
+      subheaderOwnSpacing
       subheader={columnAutomationRowsSubheader({
+        disclosure,
         title,
         automations,
         rowCount: automationRowCount,
@@ -1954,6 +1965,7 @@ function DoneColumn({
   onOpenWorkOrder,
   automations,
   automationRowCount,
+  automationPreferenceKey,
   onAutomationRowAction,
   onAddAutomation,
   paging,
@@ -1971,6 +1983,7 @@ function DoneColumn({
   onOpenWorkOrder: (orderId: string, order?: FactoriesWorkOrder) => void;
   automations?: ColumnAutomation[];
   automationRowCount?: number;
+  automationPreferenceKey: string;
   onAutomationRowAction?: (automation: ColumnAutomation, action: ColumnAutomationRowAction) => void;
   onAddAutomation?: () => void;
   paging: BoardColumnPaging;
@@ -1978,6 +1991,7 @@ function DoneColumn({
   scrollPersistenceKey?: string;
 }) {
   const lane = lineBoardColumnLaneProps(colorId, colorView, { mutedFallback: true });
+  const disclosure = useColumnAutomationCollapsePreference(automationPreferenceKey, automations?.length ?? 0);
   const { scrollRef, handleScroll } = useFactoryBoardLaneScroll(scrollPersistenceKey, !cardsPending);
   const loadMoreIfNeeded = useAutoLoadMoreOnScroll({
     hasMore: paging.hasMore,
@@ -2000,6 +2014,9 @@ function DoneColumn({
       className={lane.className}
       actions={
         <div className="flex shrink-0 items-center gap-0.5">
+          {automationRowCount && automations?.length ? (
+            <ColumnAutomationToggle title={title} disclosure={disclosure} />
+          ) : null}
           {automationRowCount ? null : (
             <ColumnAutomationsHeaderSlot
               title={title}
@@ -2017,7 +2034,9 @@ function DoneColumn({
           />
         </div>
       }
+      subheaderOwnSpacing
       subheader={columnAutomationRowsSubheader({
+        disclosure,
         title,
         automations,
         rowCount: automationRowCount,
@@ -2080,6 +2099,7 @@ function PhaseColumn({
   onOpenWorkOrder,
   automations,
   automationRowCount,
+  automationPreferenceKey,
   onAutomationRowAction,
   onAddAutomation,
   paging,
@@ -2101,11 +2121,13 @@ function PhaseColumn({
   onOpenWorkOrder: (orderId: string, order?: FactoriesWorkOrder) => void;
   automations?: ColumnAutomation[];
   automationRowCount?: number;
+  automationPreferenceKey: string;
   onAutomationRowAction?: (automation: ColumnAutomation, action: ColumnAutomationRowAction) => void;
   onAddAutomation?: () => void;
   paging: BoardColumnPaging;
   cardsPending: boolean;
 }) {
+  const disclosure = useColumnAutomationCollapsePreference(automationPreferenceKey, automations?.length ?? 0);
   const { scrollRef, handleScroll } = useFactoryBoardLaneScroll(
     lineId ? factoryBoardLaneScrollKey(factoryKey, lineId, `step-${column.stepIndex}`) : undefined,
     !cardsPending,
@@ -2141,7 +2163,9 @@ function PhaseColumn({
         onRename={onRename}
         titleTestId={`lines-column-title-phase-${column.stepIndex}`}
         testId={`lines-phase-column-${column.stepIndex}`}
+        subheaderOwnSpacing
         subheader={columnAutomationRowsSubheader({
+          disclosure,
           title,
           automations,
           rowCount: automationRowCount,
@@ -2151,6 +2175,9 @@ function PhaseColumn({
         })}
         actions={
           <div className="flex shrink-0 items-center gap-0.5">
+            {automationRowCount && automations?.length ? (
+              <ColumnAutomationToggle title={title} disclosure={disclosure} />
+            ) : null}
             {automationRowCount ? null : (
               <ColumnAutomationsHeaderSlot
                 title={title}
