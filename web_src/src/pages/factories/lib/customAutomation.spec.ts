@@ -213,7 +213,10 @@ describe("custom automation settings", () => {
         customAutomationTriggers: [{ mode: "manual" as const }],
         eligible: true,
       },
-      { customAutomationMode: "manual" as const, customAutomationTriggers: [], eligible: false },
+      { customAutomationMode: "manual" as const, customAutomationTriggers: [], eligible: true },
+      { customAutomationMode: "scheduled" as const, customAutomationTriggers: [], eligible: true },
+      { customAutomationMode: "automatic" as const, customAutomationTriggers: [], eligible: false },
+      { customAutomationTriggers: [], eligible: false },
       { eligible: false },
     ];
     for (const { eligible, ...settings } of cases) {

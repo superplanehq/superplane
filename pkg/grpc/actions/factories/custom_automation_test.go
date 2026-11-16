@@ -250,13 +250,27 @@ func TestBacklogCustomAutomationLifecycle(t *testing.T) {
 	assert.Equal(t, order.ID.String(), payload["workOrder"].(map[string]any)["id"])
 	// The same saved runner must keep the supplied task checkout context.
 	taskCheckout := payload["workOrder"].(map[string]any)
-	resolved, err := contexts.NewNodeConfigurationBuilder(db, canvas.ID).WithNodeID(agent.NodeID).
-		WithRootEvent(&event.ID).WithInput(map[string]any{trigger.ID: event.Data.Data()}).Build(agent.Configuration.Data())
-	require.NoError(t, err)
-	env := environmentVars(t, resolved["environment"])
-	assert.Equal(t, taskCheckout["repository"], env["REPO"])
-	assert.Equal(t, taskCheckout["repository_url"], env["REPO_URL"])
-	assert.Equal(t, taskCheckout["default_branch"], env["BASE"])
+	for _, branch := range []string{"develop", ""} {
+		require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{DefaultBranch: &branch}))
+		for _, legacy := range []bool{false, true} {
+			configuration := agent.Configuration.Data()
+			configuration["environment"] = backlogSharedCheckoutEnvironment(factory, "")
+			if legacy {
+				configuration["environment"] = taskColumnCheckoutEnvironment()
+			}
+			resolved, err := contexts.NewNodeConfigurationBuilder(db, canvas.ID).WithNodeID(agent.NodeID).
+				WithRootEvent(&event.ID).WithInput(map[string]any{trigger.ID: event.Data.Data()}).Build(configuration)
+			require.NoError(t, err)
+			env := environmentVars(t, resolved["environment"])
+			assert.Equal(t, taskCheckout["repository"], env["REPO"])
+			assert.Equal(t, taskCheckout["repository_url"], env["REPO_URL"])
+			assert.Equal(t, taskCheckout["default_branch"], env["BASE"], "workspace branch %q, legacy %t", branch, legacy)
+			resolved, err = contexts.NewNodeConfigurationBuilder(db, canvas.ID).WithNodeID(agent.NodeID).
+				WithRootEvent(&standaloneEvent.ID).WithInput(map[string]any{trigger.ID: standaloneEvent.Data.Data()}).Build(configuration)
+			require.NoError(t, err)
+			assert.Equal(t, branch, environmentVars(t, resolved["environment"])["BASE"], "standalone legacy %t", legacy)
+		}
+	}
 	runs, err = order.ListRuns(db)
 	require.NoError(t, err)
 	require.Len(t, runs, 1)

@@ -36,7 +36,8 @@ function automations(mode: CustomAutomationMode) {
         name: "Hello world",
         columnKey: "backlog",
         templateId: "custom-verification",
-        customAutomationTriggers: [{ mode }],
+        customAutomationMode: mode,
+        customAutomationTriggers: [],
       },
     ],
   });

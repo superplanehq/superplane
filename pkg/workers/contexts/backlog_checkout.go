@@ -13,15 +13,14 @@ import (
 func BacklogSharedCheckoutEnvironment(factory *models.Factory, githubHost string) []any {
 	config := factory.OnboardingConfigValue()
 	repository := strings.TrimSpace(config.AppRepository)
+	branch := strings.TrimSpace(config.DefaultBranch)
 	url := runner.WorkspaceContextRepoURL(config.EffectiveVCSProvider(), repository, githubHost)
 	quote := func(value string) string { return strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(value) }
 	env := []any{
 		map[string]any{"name": "REPO", "value": fmt.Sprintf(`{{ root().data.workOrder?.repository ?? "%s" }}`, quote(repository)), "valueSource": runner.EnvironmentValueSourceLiteral},
 		map[string]any{"name": "REPO_URL", "value": fmt.Sprintf(`{{ root().data.workOrder?.repository_url ?? "%s" }}`, quote(url)), "valueSource": runner.EnvironmentValueSourceLiteral},
 		map[string]any{"name": "SOURCE_REPO", "value": repository, "valueSource": runner.EnvironmentValueSourceLiteral},
-	}
-	if branch := strings.TrimSpace(config.DefaultBranch); branch != "" {
-		env = append(env, map[string]any{"name": "BASE", "value": fmt.Sprintf(`{{ root().data.workOrder?.default_branch ?? "%s" }}`, quote(branch)), "valueSource": runner.EnvironmentValueSourceLiteral})
+		map[string]any{"name": "BASE", "value": fmt.Sprintf(`{{ root().data.workOrder?.default_branch ?? "%s" }}`, quote(branch)), "valueSource": runner.EnvironmentValueSourceLiteral},
 	}
 	return env
 }
@@ -79,10 +78,6 @@ func (b *NodeConfigurationBuilder) withBacklogCheckoutFallback(configuration map
 		if value, ok := legacy[name]; ok && variable["value"] == value {
 			variable = maps.Clone(variable)
 			variable["value"] = fallbacks[name]
-			// An empty default branch lets checkout use the repository default.
-			if variable["value"] == nil {
-				variable["value"] = ""
-			}
 			item = variable
 		}
 		updated = append(updated, item)

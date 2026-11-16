@@ -29,9 +29,10 @@ export function customAutomationColumnAutomation(
   }
   const columnKey = customAutomationColumn(app.columnKey);
   const listed = app.customAutomationTriggers ?? [];
-  const canStartStandalone = app.customAutomationTriggers
-    ? listed.some((trigger) => trigger.mode === "manual" || trigger.mode === "scheduled")
-    : app.customAutomationMode === "manual" || app.customAutomationMode === "scheduled";
+  const canStartStandalone =
+    listed.length > 0
+      ? listed.some((trigger) => trigger.mode === "manual" || trigger.mode === "scheduled")
+      : app.customAutomationMode === "manual" || app.customAutomationMode === "scheduled";
   const primary = primaryCustomAutomationMode(app.customAutomationMode, listed);
   const copy = customAutomationModeCopy(primary, columnKey);
   const trigger = customAutomationTriggerSummary(app, listed, columnKey, copy.trigger);
