@@ -147,7 +147,7 @@ func AttachWorkspaceAgentResources(
 	skills = rejectDisabledAgentResources(skills, disabled)
 	contextRepos = rejectDisabledAgentResources(contextRepos, disabled)
 	setupCommands = rejectDisabledSetupCommands(db, factory, setupCommands, disabled)
-	if skipSetupCommands(ctx.Configuration) {
+	if skipSetupCommands(ctx.Configuration) || taskTargetsOtherRepository(environment, factory) {
 		setupCommands = nil
 	}
 
@@ -960,6 +960,31 @@ func skipSetupCommands(configuration any) bool {
 	}
 	enabled, ok := config[SkipSetupCommandsField].(bool)
 	return ok && enabled
+}
+
+// taskTargetsOtherRepository reports whether repo/ holds a workspace
+// repository other than the primary. Setup steps are written for the
+// primary repository, so they must not run in another repository.
+func taskTargetsOtherRepository(environment []TaskEnvironmentVariable, factory *models.Factory) bool {
+	primary := models.CanonicalContextRepo(factory.OnboardingConfigValue().AppRepository)
+	repository, _ := environmentValue(environment, "REPO")
+	repository = models.CanonicalContextRepo(repository)
+	if repository == "" {
+		url, _ := environmentValue(environment, "REPO_URL")
+		repository = repositoryFromCloneURL(url)
+	}
+	return primary != "" && repository != "" && repository != primary
+}
+
+// repositoryFromCloneURL returns the owner/name of a clone URL in lower case.
+func repositoryFromCloneURL(url string) string {
+	parts := strings.FieldsFunc(strings.TrimSuffix(strings.TrimSpace(url), ".git"), func(r rune) bool {
+		return r == '/' || r == ':'
+	})
+	if len(parts) < 2 {
+		return ""
+	}
+	return models.CanonicalContextRepo(parts[len(parts)-2] + "/" + parts[len(parts)-1])
 }
 
 func workspaceMCPAccessTokenLifetime(configuration any) time.Duration {
