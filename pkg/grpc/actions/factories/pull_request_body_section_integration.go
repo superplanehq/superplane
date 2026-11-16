@@ -186,7 +186,7 @@ func (a *bodySectionActionAttempt) verifyUnpublishedAssessment(ctx context.Conte
 func (a *bodySectionActionAttempt) sectionConfiguration() prbody.Configuration {
 	if a.isComment() {
 		comment := a.commentConfiguration
-		return prbody.Configuration{Repository: comment.Repository, PullNumber: comment.PullNumber, SectionKey: comment.CommentKey, ExpectedHeadSHA: comment.ExpectedHeadSHA}
+		return prbody.Configuration{Repository: comment.Repository, PullNumber: comment.PullNumber, SectionKey: comment.CommentKey, Body: comment.Body, ExpectedHeadSHA: comment.ExpectedHeadSHA}
 	}
 	return a.integrationConfiguration
 }
@@ -201,7 +201,7 @@ func (a *bodySectionActionAttempt) publishIntegrationBodySection(ctx context.Con
 	if !config.IsEnabled() || !active {
 		return prbody.Skipped("Publication is disabled, cancelled, or superseded."), nil
 	}
-	if githubClient, ok := client.(*pulls.BodySectionClient); ok && config.SectionKey == "merge-confidence" {
+	if githubClient, ok := client.(*pulls.BodySectionClient); ok {
 		config.Body = a.enrichReviewedCommit(ctx, db, githubClient, config)
 	}
 	publications := a.publications(db)
@@ -220,8 +220,18 @@ func (a *bodySectionActionAttempt) publishComment(ctx context.Context, db *gorm.
 	if err != nil {
 		return a.publicationError(err)
 	}
+	config := a.commentConfiguration
+	if config.CommentKey == reviewRequestTemplateID {
+		bodyClient, err := pulls.NewBodySectionClient(integration, http)
+		if err != nil {
+			return a.publicationError(err)
+		}
+		if githubClient, ok := bodyClient.(*pulls.BodySectionClient); ok {
+			config.Body = a.enrichReviewedCommit(ctx, db, githubClient, a.sectionConfiguration())
+		}
+	}
 	boundary := pulls.NewOrderedCommentBoundary(a.publications(db), *a.state.Publication)
-	outcome, err := pulls.PublishComment(ctx, client, a.commentConfiguration, a.commentConfiguration.Marker(a.execution.WorkflowID), eligible, boundary)
+	outcome, err := pulls.PublishComment(ctx, client, config, config.Marker(a.execution.WorkflowID), eligible, boundary)
 	if outcome.CommentID > 0 {
 		a.state.CommentID = outcome.CommentID
 	}
@@ -251,7 +261,17 @@ func (a *bodySectionActionAttempt) publicationError(err error) (bodySectionPubli
 
 func (a *bodySectionActionAttempt) enrichReviewedCommit(ctx context.Context, db *gorm.DB, client *pulls.BodySectionClient, config prbody.Configuration) string {
 	version, err := models.FindCanvasVersionInTransaction(db, a.source.WorkflowID, a.source.VersionID)
-	if err != nil || models.FactoryAppTemplateID(version.Nodes) != "risk-score" {
+	if err != nil {
+		return config.Body
+	}
+	templateID := models.FactoryAppTemplateID(version.Nodes)
+	var label string
+	switch {
+	case templateID == "risk-score" && config.SectionKey == "merge-confidence":
+		label = "Reviewed commit: "
+	case templateID == reviewRequestTemplateID && config.SectionKey == reviewRequestTemplateID:
+		label = "Assessed commit: "
+	default:
 		return config.Body
 	}
 	canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(db, a.source.WorkflowID)
@@ -263,10 +283,16 @@ func (a *bodySectionActionAttempt) enrichReviewedCommit(ctx context.Context, db 
 		return config.Body
 	}
 	sha := mergeconfidence.ReviewedCommit(root)
+	if templateID == reviewRequestTemplateID {
+		source, _ := models.RootEventSourcePayload(root.Data.Data()).(map[string]any)
+		payload, _ := source["payload"].(map[string]any)
+		sha, _ = payload["reviewedCommit"].(string)
+		sha = strings.TrimSpace(sha)
+	}
 	if sha == "" {
 		return config.Body
 	}
-	line := "Reviewed commit: " + sha
+	line := label + sha
 	lines := strings.Split(config.Body, "\n")
 	index := -1
 	for i, candidate := range lines {
@@ -290,7 +316,7 @@ func (a *bodySectionActionAttempt) enrichReviewedCommit(ctx context.Context, db 
 		return config.Body
 	}
 	commitURL := client.CommitURL(config.Repository, sha)
-	lines[index] = fmt.Sprintf("Reviewed commit: [%s](%s)", exprruntime.MarkdownText(title), commitURL)
+	lines[index] = fmt.Sprintf("%s[%s](%s)", label, exprruntime.MarkdownText(title), commitURL)
 	return strings.Join(lines, "\n")
 }
 
