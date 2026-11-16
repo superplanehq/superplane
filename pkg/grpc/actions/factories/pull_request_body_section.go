@@ -100,6 +100,10 @@ func (p sectionPublication) eligible(db *gorm.DB, pr *models.FactoryPullRequest)
 	if err != nil || !enabled {
 		return false, err
 	}
+	return p.currentAssessment(db, pr)
+}
+
+func (p sectionPublication) currentAssessment(db *gorm.DB, pr *models.FactoryPullRequest) (bool, error) {
 	activity, err := models.FindPullRequestActivityByRunID(db, p.run.ID)
 	if errors.Is(err, models.ErrFactoryPullRequestActivityNotFound) {
 		return true, nil
