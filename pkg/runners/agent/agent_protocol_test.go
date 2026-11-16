@@ -2,6 +2,7 @@ package agent
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"log/slog"
@@ -11,6 +12,8 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/superplanehq/superplane/pkg/runners/protocol"
 )
@@ -40,7 +43,7 @@ func TestAgentCompletesOnlyAfterEveryLogChunkIsAcknowledged(t *testing.T) {
 			"task": map[string]any{
 				"id":             "task-1",
 				"run_mode":       "argv",
-				"command":        []string{"sh", "-c", "printf 'hello from runner\\n'"},
+				"command":        []string{"sh", "-c", "printf 'private task output\\n'; exit 23"},
 				"execution_mode": "host",
 			},
 		}); err != nil {
@@ -92,6 +95,7 @@ func TestAgentCompletesOnlyAfterEveryLogChunkIsAcknowledged(t *testing.T) {
 	server := httptest.NewServer(mux)
 	defer server.Close()
 
+	var agentLogs bytes.Buffer
 	runner := &Agent{
 		Config: Config{
 			BaseURL: server.URL,
@@ -108,7 +112,7 @@ func TestAgentCompletesOnlyAfterEveryLogChunkIsAcknowledged(t *testing.T) {
 			LogSpoolMaxBytes:  4096,
 			ReconnectMin:      time.Millisecond,
 			ReconnectMax:      2 * time.Millisecond,
-			Log:               slog.New(slog.NewTextHandler(io.Discard, nil)),
+			Log:               slog.New(slog.NewTextHandler(&agentLogs, nil)),
 		},
 		HTTP: server.Client(),
 	}
@@ -130,9 +134,10 @@ func TestAgentCompletesOnlyAfterEveryLogChunkIsAcknowledged(t *testing.T) {
 
 	select {
 	case completion := <-completionReceived:
-		if completion.TaskID != "task-1" || completion.ExitCode != 0 {
+		if completion.TaskID != "task-1" || completion.ExitCode != 23 {
 			t.Fatalf("completion = %#v", completion)
 		}
+		assert.Contains(t, completion.Error, "private task output")
 	case <-time.After(2 * time.Second):
 		t.Fatal("timed out waiting for completion")
 	}
@@ -144,6 +149,33 @@ func TestAgentCompletesOnlyAfterEveryLogChunkIsAcknowledged(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("timed out waiting for agent to stop")
 	}
+	assert.Contains(t, agentLogs.String(), "task execution finished")
+	assert.NotContains(t, agentLogs.String(), "private task output")
+}
+
+func TestAgentCompletionFailureOmitsTaskOutput(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.Copy(io.Discard, r.Body)
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
+	registration := protocol.Registration{RunnerID: "runner-1", FleetID: "linux-amd64", AccessToken: "access-token"}
+	session, err := protocol.NewSession(protocol.SessionConfig{BaseURL: server.URL, Registration: registration, Version: "0.1.0"})
+	require.NoError(t, err)
+	runner := &Agent{HTTP: server.Client(), Config: Config{
+		BaseURL: server.URL, Registration: registration,
+		TaskWorkDir: t.TempDir(), LogSpoolDirectory: t.TempDir(),
+		Log: slog.New(slog.NewTextHandler(io.Discard, nil)),
+	}}
+	// An unconnected session cannot acknowledge the completion.
+	ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+	defer cancel()
+	err = runner.runTask(ctx, session, &sessionStatus{done: make(chan struct{})}, json.RawMessage(`{
+		"id":"task-1", "run_mode":"argv", "execution_mode":"host",
+		"command":["sh", "-c", "echo 'private task output'; exit 23"]
+	}`))
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+	assert.NotContains(t, err.Error(), "private task output")
 }
 
 func TestAgentRequestsShutdownBeforeCancelingCurrentTask(t *testing.T) {

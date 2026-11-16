@@ -35,7 +35,7 @@ import (
 )
 
 func TestRunnerWebSocketDeliversAndCompletesTask(t *testing.T) {
-	for _, scenario := range []string{"complete", "cancel", "queued subscription"} {
+	for _, scenario := range []string{"complete", "cancel", "queued subscription", "failure diagnostics"} {
 		t.Run(scenario, func(t *testing.T) {
 			cancelOnHeartbeat := scenario == "cancel"
 			resource := support.Setup(t)
@@ -161,14 +161,14 @@ func TestRunnerWebSocketDeliversAndCompletesTask(t *testing.T) {
 			}
 
 			requestID := uuid.New()
-			require.NoError(t, socket.WriteJSON(completeMessage{
-				Type:      messageTypeComplete,
-				RequestID: requestID.String(),
-				TaskID:    task.ID.String(),
-				ExitCode:  0,
-				Canceled:  cancelOnHeartbeat,
-				Result:    json.RawMessage(`{"value":"ok"}`),
-			}))
+			completion := completeMessage{
+				Type: messageTypeComplete, RequestID: requestID.String(), TaskID: task.ID.String(), Canceled: cancelOnHeartbeat, Result: json.RawMessage(`{"value":"ok"}`),
+			}
+			if scenario == "failure diagnostics" {
+				completion.ExitCode = 42
+				completion.Error = "Implementation (step 2) (exit code 42): Provider unavailable.\nLogs: runner task " + task.ID.String() + "."
+			}
+			require.NoError(t, socket.WriteJSON(completion))
 
 			var ack ackMessage
 			require.NoError(t, socket.ReadJSON(&ack))
@@ -183,6 +183,11 @@ func TestRunnerWebSocketDeliversAndCompletesTask(t *testing.T) {
 			expectedState := models.RunnerTaskStateSucceeded
 			if cancelOnHeartbeat {
 				expectedState = models.RunnerTaskStateCanceled
+			}
+			if scenario == "failure diagnostics" {
+				expectedState = models.RunnerTaskStateFailed
+				require.NotNil(t, reloadedTask.ErrorMessage)
+				assert.Equal(t, completion.Error, *reloadedTask.ErrorMessage)
 			}
 			assert.Equal(t, expectedState, reloadedTask.State)
 			assert.JSONEq(t, `{"value":"ok"}`, string(reloadedTask.Result))
@@ -541,11 +546,13 @@ func TestCompleteRunnerTaskRetriesPendingRequest(t *testing.T) {
 			executor := workers.NewNodeRequestExecutor(resource.Encryptor, resource.Registry, "", resource.AuthService)
 			server, err := NewServer(jwt.NewSigner("secret"), resource.Encryptor, runnerlogs.StoreFS, executor)
 			require.NoError(t, err)
-			completion := completeMessage{RequestID: uuid.NewString(), TaskID: task.ID.String(), Result: json.RawMessage(`{"value":"ok"}`)}
+			completion := completeMessage{RequestID: uuid.NewString(), TaskID: task.ID.String(), ExitCode: 42, Error: "Implementation (step 2) (exit code 42): Provider unavailable.\nLogs: runner task " + task.ID.String() + ".", Result: json.RawMessage(`{"value":"ok"}`)}
 			require.NoError(t, server.completeRunnerTask(t.Context(), runner, connectionID, completion, fleet.Slug, fleet.ScopeType))
 			reloadedTask, err := models.FindRunnerTask(db, task.ID)
 			require.NoError(t, err)
-			assert.Equal(t, models.RunnerTaskStateSucceeded, reloadedTask.State)
+			assert.Equal(t, models.RunnerTaskStateFailed, reloadedTask.State)
+			require.NotNil(t, reloadedTask.ErrorMessage)
+			assert.Equal(t, completion.Error, *reloadedTask.ErrorMessage)
 			require.NoError(t, db.First(request, "id = ?", request.ID).Error)
 			assert.Equal(t, models.NodeExecutionRequestStatePending, request.State, "request must remain available after a failed or skipped attempt")
 
@@ -559,6 +566,12 @@ func TestCompleteRunnerTaskRetriesPendingRequest(t *testing.T) {
 				completion.RequestID = uuid.NewString()
 				require.NoError(t, server.completeRunnerTask(t.Context(), runner, connectionID, completion, fleet.Slug, fleet.ScopeType))
 			}
+			conflicting := completion
+			conflicting.Error = "Later cleanup failure"
+			require.ErrorIs(t, server.completeRunnerTask(t.Context(), runner, connectionID, conflicting, fleet.Slug, fleet.ScopeType), models.ErrRunnerTaskCompletionConflict)
+			stored, err := models.FindRunnerTask(db, task.ID)
+			require.NoError(t, err)
+			assert.Equal(t, completion.Error, *stored.ErrorMessage)
 			require.NoError(t, db.First(execution, "id = ?", execution.ID).Error)
 			assert.Equal(t, models.CanvasNodeExecutionStateFinished, execution.State)
 			events, err := models.FindCanvasEventsForExecutions(db, []string{execution.ID.String()})

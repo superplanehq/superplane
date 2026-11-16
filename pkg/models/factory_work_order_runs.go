@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -107,6 +108,7 @@ type TaskRunHistoryQuery struct {
 
 // TaskRun is one associated automation run.
 type TaskRun struct {
+	Errors              datatypes.JSONSlice[RunError]
 	ID                  uuid.UUID
 	AutomationID        uuid.UUID
 	AutomationName      string
@@ -177,7 +179,7 @@ func (o *FactoryWorkOrder) ListTaskRunHistory(tx *gorm.DB, query TaskRunHistoryQ
 	var rows []taskRunRow
 	err = tx.Raw(querySQL+`
 		SELECT r.id, r.workflow_id, w.name AS workflow_name, r.parent_run_id,
-			r.state, r.result, r.created_at, r.updated_at, r.finished_at,
+			r.state, r.result, r.errors, r.created_at, r.updated_at, r.finished_at,
 			COALESCE(activity.title, '') AS activity_title,
 			COALESCE(activity.description, '') AS activity_description
 		FROM workflow_runs r
@@ -224,6 +226,7 @@ func (o *FactoryWorkOrder) ListTaskRunHistory(tx *gorm.DB, query TaskRunHistoryQ
 		usage, recorded := usageByRun[row.ID]
 		runs[i] = TaskRun{
 			ID:                  row.ID,
+			Errors:              row.Errors,
 			AutomationID:        row.WorkflowID,
 			AutomationName:      row.WorkflowName,
 			ParentRunID:         row.ParentRunID,
@@ -290,6 +293,7 @@ func (o *FactoryWorkOrder) taskRunQuery(tx *gorm.DB) (string, []any, error) {
 }
 
 type taskRunRow struct {
+	Errors              datatypes.JSONSlice[RunError]
 	ID                  uuid.UUID
 	WorkflowID          uuid.UUID
 	WorkflowName        string

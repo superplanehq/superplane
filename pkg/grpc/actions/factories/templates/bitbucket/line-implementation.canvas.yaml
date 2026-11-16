@@ -315,7 +315,7 @@ spec:
       type: TYPE_ACTION
       component: addRunError
       configuration:
-        message: The implementation agent failed. Open the agent logs to find the cause.
+        message: '{{ previous().data.error ?? "The implementation failed. The failed step and cause were not recorded. Open the agent logs." }}'
       position:
         x: 1770
         "y": 648
