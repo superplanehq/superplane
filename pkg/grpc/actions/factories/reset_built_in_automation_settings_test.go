@@ -205,6 +205,7 @@ func TestResetReviewRequestPreservesFallbackAndAgentSettings(t *testing.T) {
 				agent.Configuration["thinkingLevel"] = "low"
 				agent.Configuration["executionTimeoutSeconds"] = 0
 				agent.Configuration["steps"] = []any{map[string]any{"type": "prompt", "prompt": "Retired selection policy"}}
+				findYAMLNode(t, doc, "request-reviewers").Configuration["managed"] = false
 			})
 			if instructions == "" {
 				findYAMLNode(t, installedCanvas, reviewRequestAgentNodeID).Configuration["additionalInstructions"] = ""
@@ -217,6 +218,13 @@ func TestResetReviewRequestPreservesFallbackAndAgentSettings(t *testing.T) {
 				node := findIntakeNode(version.Nodes, id)
 				require.NotNil(t, node)
 				require.NotNil(t, node.IntegrationID, "%s must keep its GitHub connection after reset", id)
+				require.Equal(t, integration.ID.String(), *node.IntegrationID)
+			}
+			for _, id := range []string{"request-reviewers", "withdraw-reviewers"} {
+				node := findIntakeNode(version.Nodes, id)
+				require.NotNil(t, node)
+				require.Equal(t, true, node.Configuration["managed"], "reset installs managed reconciliation")
+				require.NotNil(t, node.IntegrationID)
 				require.Equal(t, integration.ID.String(), *node.IntegrationID)
 			}
 			agent := findIntakeNode(version.Nodes, reviewRequestAgentNodeID)
