@@ -324,7 +324,7 @@ func (w *EventRouter) processRootEvent(tx *gorm.DB, canvas *models.Canvas, edges
 		return nil, uuid.Nil, fmt.Errorf("attach analysis session for run %s: %w", run.ID, err)
 	}
 	if err := columnapps.LinkRun(tx, canvas, event, run); err != nil {
-		if !models.IsPermanentSubscriptionAdmissionError(err) {
+		if !models.IsPermanentSubscriptionAdmissionError(err) && !errors.Is(err, models.ErrFactoryWorkOrderInvalidState) {
 			return nil, uuid.Nil, err
 		}
 
