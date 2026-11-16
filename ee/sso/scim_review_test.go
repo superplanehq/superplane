@@ -3,8 +3,10 @@ package sso
 import (
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/stretchr/testify/require"
 	billingmodels "github.com/superplanehq/superplane/ee/billing/models"
 	"github.com/superplanehq/superplane/pkg/authorization"
@@ -199,6 +201,88 @@ func TestSCIMRevokedToken(t *testing.T) {
 	require.NoError(t, f.service.RevokeSCIMToken(f.ctx(), f.r.Organization.ID, created.Token.ID))
 	response := f.scim(http.MethodGet, conn, created.Secret, "/Users", "")
 	require.Equal(t, http.StatusUnauthorized, response.Code)
+}
+
+func TestSCIMCreateInactiveRemovesTheAdoptedMember(t *testing.T) {
+	f := newFlow(t)
+	f.setOwnerEmail("owner@example.com")
+	f.verifyExample()
+	conn := f.put(connectionInput(true))
+	require.NoError(t, f.signIn(conn, "ada-subject", "ada@example.com"))
+	member, err := models.FindActiveUserByEmail(f.r.Organization.ID.String(), "ada@example.com")
+	require.NoError(t, err)
+	require.NoError(t, database.Conn().Create(models.NewUserAPIToken(member.ID, "laptop", "hash")).Error)
+	created, err := f.service.CreateSCIMToken(f.ctx(), f.r.Organization.ID, f.r.Account.ID, "Okta")
+	require.NoError(t, err)
+
+	body := `{"userName":"ada@example.com","active":false,"emails":[{"value":"ada@example.com","primary":true}]}`
+	response := f.scim(http.MethodPost, conn, created.Secret, "/Users", body)
+	require.Equal(t, http.StatusCreated, response.Code, response.Body.String())
+	require.Contains(t, response.Body.String(), `"active":false`)
+
+	identity, err := models.FindSSOIdentityBySubject(database.Conn(), conn.ID, "ada-subject")
+	require.NoError(t, err)
+	require.False(t, identity.Active)
+	require.NotNil(t, identity.SessionsRevokedAt)
+	_, err = models.FindActiveUserByEmail(f.r.Organization.ID.String(), "ada@example.com")
+	require.Error(t, err)
+	var tokens int64
+	require.NoError(t, database.Conn().Model(&models.UserAPIToken{}).Where("user_id = ?", member.ID).Count(&tokens).Error)
+	require.Zero(t, tokens)
+
+	require.NoError(t, f.signIn(conn, "owner-subject", "owner@example.com"))
+	ownerBody := `{"userName":"owner@example.com","active":false,"emails":[{"value":"owner@example.com","primary":true}]}`
+	ownerResponse := f.scim(http.MethodPost, conn, created.Secret, "/Users", ownerBody)
+	require.Equal(t, http.StatusCreated, ownerResponse.Code, ownerResponse.Body.String())
+	require.Contains(t, ownerResponse.Body.String(), `"active":false`)
+	ownerIdentity, err := models.FindSSOIdentityBySubject(database.Conn(), conn.ID, "owner-subject")
+	require.NoError(t, err)
+	require.False(t, ownerIdentity.Active)
+	require.NotNil(t, ownerIdentity.SessionsRevokedAt)
+	owner, err := models.FindActiveUserByEmail(f.r.Organization.ID.String(), "owner@example.com")
+	require.NoError(t, err)
+	require.True(t, owner.IsOwner)
+}
+
+func TestSCIMUserNameIsUniqueIgnoringCase(t *testing.T) {
+	f := newFlow(t)
+	f.verifyExample()
+	conn := f.put(connectionInput(true))
+	other, err := models.CreateAccount("Other", "other@example.com")
+	require.NoError(t, err)
+	firstName := "Ada@example.com"
+	require.NoError(t, database.Conn().Create(&models.SSOIdentity{
+		ID: uuid.New(), ConnectionID: conn.ID, OrganizationID: f.r.Organization.ID,
+		AccountID: f.r.Account.ID, SCIMUserName: &firstName, Email: "ada@example.com",
+		Name: "Ada", Active: true, ProvisionedBy: models.SSOProvisionedBySCIM,
+		CreatedAt: time.Now(), UpdatedAt: time.Now(),
+	}).Error)
+	folded := "ada@example.com"
+	err = database.Conn().Create(&models.SSOIdentity{
+		ID: uuid.New(), ConnectionID: conn.ID, OrganizationID: f.r.Organization.ID,
+		AccountID: other.ID, SCIMUserName: &folded, Email: "other@example.com",
+		Name: "Other", Active: true, ProvisionedBy: models.SSOProvisionedBySCIM,
+		CreatedAt: time.Now(), UpdatedAt: time.Now(),
+	}).Error
+	var pgErr *pgconn.PgError
+	require.ErrorAs(t, err, &pgErr)
+	require.Equal(t, "23505", pgErr.Code)
+
+	created, err := f.service.CreateSCIMToken(f.ctx(), f.r.Organization.ID, f.r.Account.ID, "Okta")
+	require.NoError(t, err)
+	duplicate := f.scim(http.MethodPost, conn, created.Secret, "/Users", `{"userName":"ADA@example.com","emails":[{"value":"ada.other@example.com","primary":true}]}`)
+	require.Equal(t, http.StatusConflict, duplicate.Code, duplicate.Body.String())
+	require.Contains(t, duplicate.Body.String(), "uniqueness")
+
+	second := f.scim(http.MethodPost, conn, created.Secret, "/Users", `{"userName":"bea@example.com","emails":[{"value":"bea@example.com","primary":true}]}`)
+	require.Equal(t, http.StatusCreated, second.Code, second.Body.String())
+	secondID := jsonString(t, second.Body.String(), "id")
+	renamed := f.scim(http.MethodPatch, conn, created.Secret, "/Users/"+secondID, `{"Operations":[{"op":"replace","path":"userName","value":"ADA@example.com"}]}`)
+	require.Equal(t, http.StatusConflict, renamed.Code, renamed.Body.String())
+	require.Contains(t, renamed.Body.String(), "uniqueness")
+	replaced := f.scim(http.MethodPut, conn, created.Secret, "/Users/"+secondID, `{"userName":"ADA@example.com","active":true,"emails":[{"value":"bea@example.com","primary":true}]}`)
+	require.Equal(t, http.StatusConflict, replaced.Code, replaced.Body.String())
+	require.Contains(t, replaced.Body.String(), "uniqueness")
 }
 
 func roleNames(roles []*authorization.RoleDefinition, name string) bool {

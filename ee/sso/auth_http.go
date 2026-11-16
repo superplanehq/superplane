@@ -297,23 +297,25 @@ func (s *Service) backchannelLogout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if identity != nil {
-		now := s.now()
-		identity.SessionsRevokedAt = &now
-		if err := identity.Save(database.DB(r.Context())); err != nil {
+		if err := models.RevokeSSOIdentitySessions(database.DB(r.Context()), conn.ID, identity.ID, s.now()); err != nil {
 			writeBackchannelError(w)
 			return
 		}
 	}
-	logging.AddRequestLogFields(r.Context(), map[string]any{
+	fields := map[string]any{
 		"action": "sso_backchannel_logout", "object": "sso_identity", "outcome": "success",
 		"sso_connection_id": conn.ID.String(), "organization_id": conn.OrganizationID.String(),
-	})
+	}
+	if identity == nil {
+		fields["sso_logout_identity_found"] = "false"
+	}
+	logging.AddRequestLogFields(r.Context(), fields)
 	w.WriteHeader(http.StatusOK)
 }
 
 func findLogoutIdentity(ctx context.Context, connectionID uuid.UUID, subject, sessionID string) (*models.SSOIdentity, error) {
 	if subject != "" {
-		identity, err := models.FindSSOIdentityBySubject(database.DB(ctx), connectionID, subject)
+		identity, err := models.FindSSOIdentityByIDPSubject(database.DB(ctx), connectionID, subject)
 		if err == nil || !errors.Is(err, gorm.ErrRecordNotFound) || sessionID == "" {
 			return identity, err
 		}

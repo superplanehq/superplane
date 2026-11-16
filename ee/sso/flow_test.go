@@ -569,3 +569,25 @@ func TestSignInDoesNotOpenAnotherOrganization(t *testing.T) {
 	_, err = models.FindActiveUserByEmailInTransaction(database.Conn(), other.ID.String(), "isolated@example.com")
 	require.Error(t, err)
 }
+
+func TestRecordTestDoesNotRestoreADisabledConnection(t *testing.T) {
+	f := newFlow(t)
+	f.verifyExample()
+	f.put(connectionInput(true))
+	loaded, err := models.FindSSOConnectionByOrganization(database.Conn(), f.r.Organization.ID)
+	require.NoError(t, err)
+	_, err = f.service.DisableConnection(f.ctx(), f.r.Organization.ID)
+	require.NoError(t, err)
+
+	require.NoError(t, f.service.recordTest(f.ctx(), loaded, true, "", "subject", "ada@example.com", "Ada"))
+
+	saved, err := models.FindSSOConnectionByOrganization(database.Conn(), f.r.Organization.ID)
+	require.NoError(t, err)
+	require.Equal(t, models.SSOStatusDisabled, saved.Status)
+	require.NotNil(t, saved.LastTestedAt)
+	require.True(t, saved.UpdatedAt.After(loaded.UpdatedAt))
+	result, err := saved.TestResult()
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.True(t, result.OK)
+}

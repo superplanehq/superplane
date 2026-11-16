@@ -362,6 +362,7 @@ func identityFromClaims(cfg models.OIDCConnectionConfig, verifiedSubject, raw st
 	verified, _ := claims["email_verified"].(bool)
 	return &core.ExternalIdentity{
 		Subject:       subject,
+		IDPSubject:    verifiedSubject,
 		Email:         claimString(claims, cfg.EmailClaim),
 		EmailVerified: verified,
 		Name:          claimString(claims, cfg.NameClaim),

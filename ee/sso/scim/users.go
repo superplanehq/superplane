@@ -157,35 +157,57 @@ func (h *Handler) createUser(w http.ResponseWriter, r *http.Request, conn *model
 		}
 	}
 	var created *models.SSOIdentity
+	var deactivateExisting *models.SSOIdentity
 	err = database.DB(r.Context()).Transaction(func(tx *gorm.DB) error {
 		account, err := h.pipeline.AccountForEmail(tx, conn, email, name)
 		if err != nil {
 			return err
 		}
-		identity, err := models.FindSSOIdentityByAccount(tx, conn.ID, account.ID)
+		found, err := models.FindSSOIdentityByAccount(tx, conn.ID, account.ID)
 		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 			return err
 		}
-		if identity == nil {
+		if found == nil {
 			now := h.now()
-			identity = &models.SSOIdentity{
+			identity := &models.SSOIdentity{
 				ID:             uuid.New(),
 				ConnectionID:   conn.ID,
 				OrganizationID: conn.OrganizationID,
 				AccountID:      account.ID,
 				CreatedAt:      now,
 			}
-		} else if !canAdoptSCIMIdentity(identity, body.UserName) {
+			applySCIMProfile(identity, body.UserName, body.ExternalID, email, name)
+			identity.ProvisionedBy = models.SSOProvisionedBySCIM
+			identity.Active = active
+			identity.UpdatedAt = h.now()
+			if active {
+				if err := h.pipeline.EnsureMembership(r.Context(), tx, conn, account, identity, models.SSOProvisionedBySCIM, models.SSOProvisionedBySCIM, false); err != nil {
+					return err
+				}
+			}
+			if err := identity.Save(tx); err != nil {
+				return err
+			}
+			created = identity
+			return nil
+		}
+		identity, err := models.LockSSOIdentity(tx, conn.ID, found.ID)
+		if err != nil {
+			return err
+		}
+		if !canAdoptSCIMIdentity(identity, body.UserName) {
 			return uniqueError("An identity for this account already has a different userName.")
 		}
 		applySCIMProfile(identity, body.UserName, body.ExternalID, email, name)
 		identity.ProvisionedBy = models.SSOProvisionedBySCIM
-		identity.Active = active
 		identity.UpdatedAt = h.now()
-		if active {
-			if err := h.pipeline.EnsureMembership(r.Context(), tx, conn, account, identity, models.SSOProvisionedBySCIM, models.SSOProvisionedBySCIM, false); err != nil {
-				return err
-			}
+		if !active {
+			deactivateExisting = identity
+			return nil
+		}
+		identity.Active = true
+		if err := h.pipeline.EnsureMembership(r.Context(), tx, conn, account, identity, models.SSOProvisionedBySCIM, models.SSOProvisionedBySCIM, false); err != nil {
+			return err
 		}
 		if err := identity.Save(tx); err != nil {
 			return err
@@ -196,6 +218,13 @@ func (h *Handler) createUser(w http.ResponseWriter, r *http.Request, conn *model
 	if err != nil {
 		writeMapped(w, r, err)
 		return
+	}
+	if deactivateExisting != nil {
+		if err := h.deactivate(r, conn, deactivateExisting); err != nil {
+			writeMapped(w, r, err)
+			return
+		}
+		created = deactivateExisting
 	}
 	logging.AddRequestLogFields(r.Context(), map[string]any{
 		"action": "scim_user_create", "object": "sso_identity", "outcome": "success",

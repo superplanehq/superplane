@@ -17,6 +17,7 @@ type SSOIdentity struct {
 	AccountID         uuid.UUID
 	UserID            *uuid.UUID
 	Subject           *string
+	IDPSubject        *string `gorm:"column:idp_subject"`
 	ExternalID        *string
 	SCIMUserName      *string
 	Email             string
@@ -57,6 +58,15 @@ func CountSSOIdentities(tx *gorm.DB, connectionID uuid.UUID) (int64, error) {
 
 func ClearSSOIdentityIDTokens(tx *gorm.DB, connectionID uuid.UUID) error {
 	return tx.Model(&SSOIdentity{}).Where("connection_id = ?", connectionID).Update("id_token", nil).Error
+}
+
+func RevokeSSOIdentitySessions(tx *gorm.DB, connectionID, id uuid.UUID, at time.Time) error {
+	return tx.Model(&SSOIdentity{}).
+		Where("connection_id = ? AND id = ?", connectionID, id).
+		Updates(map[string]any{
+			"sessions_revoked_at": at,
+			"updated_at":          time.Now(),
+		}).Error
 }
 
 func FindSSOIdentityBySubject(tx *gorm.DB, connectionID uuid.UUID, subject string) (*SSOIdentity, error) {
@@ -115,6 +125,15 @@ func FindSSOIdentityByUserName(tx *gorm.DB, connectionID uuid.UUID, userName str
 		connectionID,
 		userName,
 	).First(&identity).Error
+	if err != nil {
+		return nil, err
+	}
+	return &identity, nil
+}
+
+func FindSSOIdentityByIDPSubject(tx *gorm.DB, connectionID uuid.UUID, subject string) (*SSOIdentity, error) {
+	var identity SSOIdentity
+	err := tx.Where("connection_id = ? AND idp_subject = ?", connectionID, subject).First(&identity).Error
 	if err != nil {
 		return nil, err
 	}

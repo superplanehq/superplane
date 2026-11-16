@@ -116,6 +116,94 @@ func TestExistingConnectionWorksWithoutTheGrant(t *testing.T) {
 	require.NoError(t, f.service.DeleteConnection(f.ctx(), f.r.Organization.ID))
 }
 
+func TestBackchannelLogoutKeepsAnInactiveIdentity(t *testing.T) {
+	f, fake, conn := activeOIDCConnection(t)
+	response := f.callback(t, conn, fake, callbackOptions{})
+	require.Equal(t, http.StatusFound, response.Code)
+	identity, err := models.FindSSOIdentityByIDPSubject(database.Conn(), conn.ID, fake.subject)
+	require.NoError(t, err)
+	require.NoError(t, database.Conn().Model(&models.SSOIdentity{}).Where("id = ?", identity.ID).Update("active", false).Error)
+
+	logoutToken := signLogoutToken(t, fake, jwtLib.MapClaims{
+		"events": map[string]any{"http://schemas.openid.net/event/backchannel-logout": map[string]any{}},
+	})
+	require.Equal(t, http.StatusOK, postLogout(f, conn.ID, logoutToken).Code)
+
+	saved, err := models.FindSSOIdentityByID(database.Conn(), conn.ID, identity.ID)
+	require.NoError(t, err)
+	require.False(t, saved.Active)
+	require.NotNil(t, saved.SessionsRevokedAt)
+}
+
+func TestBackchannelLogoutUsesTheIDTokenSubject(t *testing.T) {
+	f := newFlow(t)
+	f.setOwnerEmail("owner@example.com")
+	f.verifyExample()
+	require.NoError(t, models.ApplyInstallationMetadata(database.Conn(), func(metadata *models.InstallationMetadata) {
+		metadata.AllowPrivateNetworkAccess = true
+	}))
+	fake, _ := newFakeOIDC(t)
+	fake.subject = "s1"
+	fake.extraClaims = map[string]any{"oid": "o1"}
+	input := connectionInput(true)
+	input.Issuer = fake.issuer
+	input.IDPLogoutEnabled = true
+	input.SubjectClaim = "oid"
+	conn := f.put(input)
+	f.markTested(conn)
+	_, err := f.service.ActivateConnection(f.ctx(), f.r.Organization.ID)
+	require.NoError(t, err)
+	conn, err = models.FindSSOConnectionByOrganization(database.Conn(), f.r.Organization.ID)
+	require.NoError(t, err)
+
+	response := f.callback(t, conn, fake, callbackOptions{})
+	require.Equal(t, http.StatusFound, response.Code)
+	identity, err := models.FindSSOIdentityBySubject(database.Conn(), conn.ID, "o1")
+	require.NoError(t, err)
+	require.NotNil(t, identity.IDPSubject)
+	require.Equal(t, "s1", *identity.IDPSubject)
+
+	logoutToken := signLogoutToken(t, fake, jwtLib.MapClaims{
+		"sid":    nil,
+		"events": map[string]any{"http://schemas.openid.net/event/backchannel-logout": map[string]any{}},
+	})
+	require.Equal(t, http.StatusOK, postLogout(f, conn.ID, logoutToken).Code)
+	saved, err := models.FindSSOIdentityByID(database.Conn(), conn.ID, identity.ID)
+	require.NoError(t, err)
+	require.NotNil(t, saved.SessionsRevokedAt)
+
+	require.NoError(t, database.Conn().Model(&models.SSOIdentity{}).Where("id = ?", identity.ID).Update("sessions_revoked_at", nil).Error)
+	bySession := signLogoutToken(t, fake, jwtLib.MapClaims{
+		"sub":    "other",
+		"events": map[string]any{"http://schemas.openid.net/event/backchannel-logout": map[string]any{}},
+	})
+	require.Equal(t, http.StatusOK, postLogout(f, conn.ID, bySession).Code)
+	saved, err = models.FindSSOIdentityByID(database.Conn(), conn.ID, identity.ID)
+	require.NoError(t, err)
+	require.NotNil(t, saved.SessionsRevokedAt)
+}
+
+func activeOIDCConnection(t *testing.T) (*flow, *fakeOIDC, *models.SSOConnection) {
+	t.Helper()
+	f := newFlow(t)
+	f.setOwnerEmail("owner@example.com")
+	f.verifyExample()
+	require.NoError(t, models.ApplyInstallationMetadata(database.Conn(), func(metadata *models.InstallationMetadata) {
+		metadata.AllowPrivateNetworkAccess = true
+	}))
+	fake, _ := newFakeOIDC(t)
+	input := connectionInput(true)
+	input.Issuer = fake.issuer
+	input.IDPLogoutEnabled = true
+	conn := f.put(input)
+	f.markTested(conn)
+	_, err := f.service.ActivateConnection(f.ctx(), f.r.Organization.ID)
+	require.NoError(t, err)
+	conn, err = models.FindSSOConnectionByOrganization(database.Conn(), f.r.Organization.ID)
+	require.NoError(t, err)
+	return f, fake, conn
+}
+
 func signLogoutToken(t *testing.T, fake *fakeOIDC, extra jwtLib.MapClaims) string {
 	t.Helper()
 	claims := jwtLib.MapClaims{
@@ -123,6 +211,10 @@ func signLogoutToken(t *testing.T, fake *fakeOIDC, extra jwtLib.MapClaims) strin
 		"exp": time.Now().Add(time.Hour).Unix(), "iat": time.Now().Unix(),
 	}
 	for key, value := range extra {
+		if value == nil {
+			delete(claims, key)
+			continue
+		}
 		claims[key] = value
 	}
 	token := jwtLib.NewWithClaims(jwtLib.SigningMethodRS256, claims)

@@ -141,6 +141,14 @@ func (c *SSOConnection) TestResult() (*SSOTestResultDocument, error) {
 	return &result, nil
 }
 
+func RecordSSOConnectionTest(tx *gorm.DB, id uuid.UUID, at time.Time, result []byte) error {
+	return tx.Model(&SSOConnection{}).Where("id = ?", id).Updates(map[string]any{
+		"last_tested_at":   at,
+		"last_test_result": datatypes.JSON(result),
+		"updated_at":       time.Now(),
+	}).Error
+}
+
 func LockSSOConnection(tx *gorm.DB, id uuid.UUID) (*SSOConnection, error) {
 	var connection SSOConnection
 	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", id).First(&connection).Error

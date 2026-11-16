@@ -1958,6 +1958,7 @@ CREATE TABLE public.sso_identities (
     account_id uuid NOT NULL,
     user_id uuid,
     subject text,
+    idp_subject text,
     external_id text,
     scim_user_name text,
     email text NOT NULL,
@@ -5310,7 +5311,7 @@ CREATE INDEX sso_identities_connection_email ON public.sso_identities USING btre
 -- Name: sso_identities_connection_user_name; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX sso_identities_connection_user_name ON public.sso_identities USING btree (connection_id, lower(scim_user_name));
+CREATE UNIQUE INDEX sso_identities_connection_user_name ON public.sso_identities USING btree (connection_id, lower(scim_user_name)) WHERE ((scim_user_name IS NOT NULL) AND (scim_user_name <> ''::text));
 
 
 --
@@ -5325,6 +5326,13 @@ CREATE UNIQUE INDEX sso_identities_external_id ON public.sso_identities USING bt
 --
 
 CREATE INDEX sso_identities_idp_session ON public.sso_identities USING btree (connection_id, idp_session_id) WHERE (idp_session_id IS NOT NULL);
+
+
+--
+-- Name: sso_identities_idp_subject; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX sso_identities_idp_subject ON public.sso_identities USING btree (connection_id, idp_subject) WHERE (idp_subject IS NOT NULL);
 
 
 --

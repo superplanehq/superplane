@@ -31,6 +31,10 @@ func (p *Pipeline) SignIn(ctx context.Context, conn *models.SSOConnection, exter
 
 		now := p.now()
 		identity.LastLoginAt = &now
+		if external.IDPSubject != "" {
+			idpSubject := external.IDPSubject
+			identity.IDPSubject = &idpSubject
+		}
 		if external.SessionID != "" {
 			sessionID := external.SessionID
 			identity.IDPSessionID = &sessionID

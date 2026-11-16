@@ -40,6 +40,12 @@ func (s *Service) PutConnection(ctx context.Context, orgID, accountID uuid.UUID,
 		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 			return err
 		}
+		if existing != nil {
+			existing, err = models.LockSSOConnection(tx, existing.ID)
+			if err != nil {
+				return err
+			}
+		}
 		conn := existing
 		if conn == nil {
 			if strings.TrimSpace(normalized.ClientSecret) == "" {
@@ -140,15 +146,27 @@ func (s *Service) ActivateConnection(ctx context.Context, orgID uuid.UUID) (*ent
 }
 
 func (s *Service) DisableConnection(ctx context.Context, orgID uuid.UUID) (*enterprise.SSOConnection, error) {
-	conn, err := s.connectionForOrg(ctx, orgID)
+	current, err := s.connectionForOrg(ctx, orgID)
 	if err != nil {
 		return nil, err
 	}
-	conn.Status = models.SSOStatusDisabled
-	if err := conn.Save(database.DB(ctx)); err != nil {
+	var saved *models.SSOConnection
+	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
+		conn, err := models.LockSSOConnection(tx, current.ID)
+		if err != nil {
+			return err
+		}
+		conn.Status = models.SSOStatusDisabled
+		if err := conn.Save(tx); err != nil {
+			return err
+		}
+		saved = conn
+		return nil
+	})
+	if err != nil {
 		return nil, err
 	}
-	return s.connectionView(conn)
+	return s.connectionView(saved)
 }
 
 func (s *Service) DeleteConnection(ctx context.Context, orgID uuid.UUID) error {
@@ -311,7 +329,10 @@ func (s *Service) recordTest(ctx context.Context, conn *models.SSOConnection, ok
 		return err
 	}
 	now := s.now()
+	if err := models.RecordSSOConnectionTest(database.DB(ctx), conn.ID, now, raw); err != nil {
+		return err
+	}
 	conn.LastTestedAt = &now
 	conn.LastTestResult = raw
-	return conn.Save(database.DB(ctx))
+	return nil
 }

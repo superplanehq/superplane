@@ -17,6 +17,7 @@ import (
 // ExternalIdentity is the person the protocol adapter authenticated.
 type ExternalIdentity struct {
 	Subject       string
+	IDPSubject    string
 	Email         string
 	EmailVerified bool
 	Name          string

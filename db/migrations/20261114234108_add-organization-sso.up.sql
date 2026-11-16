@@ -56,6 +56,7 @@ CREATE TABLE sso_identities (
     account_id           uuid NOT NULL REFERENCES accounts(id),
     user_id              uuid REFERENCES users(id) ON DELETE SET NULL,
     subject              text,
+    idp_subject          text,
     external_id          text,
     scim_user_name       text,
     email                text NOT NULL,
@@ -82,8 +83,12 @@ CREATE UNIQUE INDEX sso_identities_account
 CREATE INDEX sso_identities_connection_email
     ON sso_identities (connection_id, lower(email));
 
-CREATE INDEX sso_identities_connection_user_name
-    ON sso_identities (connection_id, lower(scim_user_name));
+CREATE UNIQUE INDEX sso_identities_connection_user_name
+    ON sso_identities (connection_id, lower(scim_user_name))
+    WHERE scim_user_name IS NOT NULL AND scim_user_name <> '';
+
+CREATE INDEX sso_identities_idp_subject
+    ON sso_identities (connection_id, idp_subject) WHERE idp_subject IS NOT NULL;
 
 CREATE INDEX sso_identities_idp_session
     ON sso_identities (connection_id, idp_session_id) WHERE idp_session_id IS NOT NULL;

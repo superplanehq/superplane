@@ -30,6 +30,7 @@ type fakeOIDC struct {
 	email           string
 	omitEmail       bool
 	userinfoSubject string
+	extraClaims     map[string]any
 }
 
 func newFakeOIDC(t *testing.T) (*fakeOIDC, *httptest.Server) {
@@ -97,6 +98,9 @@ func (f *fakeOIDC) claims() jwtLib.MapClaims {
 	}
 	if !f.omitEmail {
 		claims["email"] = f.email
+	}
+	for key, value := range f.extraClaims {
+		claims[key] = value
 	}
 	return claims
 }

@@ -123,26 +123,41 @@ func (s *Service) markDomainVerified(ctx context.Context, orgID, domainID, accou
 			return nil, invalid("The DNS TXT record does not match.")
 		}
 	}
-	held, err := models.FindVerifiedOrganizationDomain(database.DB(ctx), row.Domain)
-	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, err
-	}
-	if held != nil && held.OrganizationID != orgID {
-		return nil, conflict("Another organization already verified this domain.")
-	}
-	now := s.now()
-	row.VerifiedAt = &now
-	row.VerificationMethod = &method
-	if accountID != uuid.Nil {
-		row.VerifiedBy = &accountID
-	}
-	if err := row.Save(database.DB(ctx)); err != nil {
-		if isUnique(err) {
-			return nil, conflict("Another organization already verified this domain.")
+	var saved models.OrganizationDomain
+	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
+		locked, err := models.LockOrganizationDomain(tx, orgID, domainID)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return notFound("This domain does not exist.")
 		}
+		if err != nil {
+			return err
+		}
+		held, err := models.FindVerifiedOrganizationDomain(tx, locked.Domain)
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+		if held != nil && held.OrganizationID != orgID {
+			return conflict("Another organization already verified this domain.")
+		}
+		now := s.now()
+		locked.VerifiedAt = &now
+		locked.VerificationMethod = &method
+		if accountID != uuid.Nil {
+			locked.VerifiedBy = &accountID
+		}
+		if err := models.MarkOrganizationDomainVerified(tx, locked); err != nil {
+			if isUnique(err) {
+				return conflict("Another organization already verified this domain.")
+			}
+			return err
+		}
+		saved = *locked
+		return nil
+	})
+	if err != nil {
 		return nil, err
 	}
-	view := domainView(*row)
+	view := domainView(saved)
 	return &view, nil
 }
 
