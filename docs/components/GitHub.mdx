@@ -4865,7 +4865,9 @@ An optional Activation Node ID binds participation to that check node in the adm
 
 Source Run ID and Attempt Root Event ID default to trusted current execution records. Cross-canvas sources require broadcast provenance. Persisted creation times and IDs determine order. Older attempts cannot replace newer state, including on the same commit. Disabled activations remain fenced. Activation Generation is a positive saved version. After disabling, use a greater activation generation to enable the check again.
 
-All required reviewers must approve the assessed current commit. Comments do not change approval. Requested changes fail the check. Dismissed replacement reviews cannot revive older approvals. New heads stay pending for a new decision. Closed pull requests stop polling; reopening resumes monitoring.
+The check passes when no selected reviewer requests remain on the assessed current commit. Unrelated requests do not block the check. This takes precedence over recorded review decisions, including requested changes, comments, and dismissed reviews. GitHub clears requests after review submission.
+
+While selected requests remain, all required reviewers must approve the assessed current commit. Comments do not change approval. Requested changes fail the check. Dismissed replacement reviews cannot revive older approvals. Requesting a selected reviewer again resumes approval evaluation. New heads stay pending for a new decision. Closed pull requests stop polling; reopening resumes monitoring.
 
 Provider failures publish error and retry. Delivery is durable and at least once. A crash after a GitHub write can repeat the same status. This component does not change branch rules or start agents.
 
