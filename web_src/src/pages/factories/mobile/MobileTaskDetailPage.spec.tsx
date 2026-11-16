@@ -1,4 +1,4 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useLocation, useSearchParams } from "react-router";
@@ -7,6 +7,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "bun:
 import type { FactoriesFactory, FactoriesWorkOrder } from "@/api-client";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { TooltipProvider } from "@/ui/tooltip";
+import { canvasKeys } from "@/hooks/useCanvasData";
 
 import {
   PRIMARY_FACTORY_ID,
@@ -64,6 +65,7 @@ vi.mock("../pages/work-order-split-run/useSplitRunLiveCanvas", () => ({
 }));
 
 vi.mock("@/hooks/useFactoryData", () => ({
+  useFactory: () => ({ data: REFUND_FACTORY, isPending: false, isError: false, refetch: vi.fn() }),
   useWorkOrder: () => useWorkOrder(),
   useWorkOrderArtifacts: () => ({ data: [] }),
   useFactoryAutomations: () => ({ data: [] }),
@@ -157,12 +159,39 @@ function TestLineSwitch() {
   );
 }
 
+function TestDefaultsSave() {
+  const client = useQueryClient();
+  return (
+    <button
+      onClick={() =>
+        client.setQueryData(canvasKeys.detail("org-1", "app-refund-implementer"), {
+          spec: {
+            nodes: [{ component: "runnerOpenRouter", configuration: { model: "saved-model", thinkingLevel: "low" } }],
+          },
+        })
+      }
+    >
+      Save defaults
+    </button>
+  );
+}
+
 function renderTask(
   entry: string | { pathname: string; search?: string; state?: unknown },
   factory: FactoriesFactory = REFUND_FACTORY,
 ) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  for (const id of ["app-refund-implementer", "app-refund-verifier"]) {
+    client.setQueryData(canvasKeys.detail("org-1", id), {
+      spec: {
+        nodes: [
+          { component: "runnerOpenRouter", configuration: { model: "openai/gpt-6.1-sol", thinkingLevel: "high" } },
+        ],
+      },
+    });
+  }
   return render(
-    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+    <QueryClientProvider client={client}>
       <ThemeProvider>
         <TooltipProvider>
           <MemoryRouter initialEntries={[entry]}>
@@ -178,6 +207,7 @@ function renderTask(
               }}
             >
               <TestLineSwitch />
+              <TestDefaultsSave />
               <Routes>
                 <Route path="/org-1/workspaces/:factoryKey/task/:orderNumber" element={<MobileTaskDetailPage />} />
                 <Route path="/org-1/workspaces/:factoryKey/lines/:lineId" element={<LocationProbe />} />
@@ -348,7 +378,9 @@ describe("MobileTaskDetailPage model select", () => {
   it("shows a model control next to Start on a draft when planning is on", () => {
     renderDraft();
 
-    expect(screen.getByRole("button", { name: "Model: Auto Medium" })).toBeInTheDocument();
+    expect(screen.getByTestId("split-run-draft-model")).toHaveAccessibleName(
+      /openai\/gpt-6.1-sol.*High.*Implementation default/,
+    );
     expect(screen.getByRole("button", { name: "Start" })).toBeEnabled();
   });
 
@@ -366,14 +398,14 @@ describe("MobileTaskDetailPage model select", () => {
     });
     const user = userEvent.setup();
     renderTask(`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/task/${order.number}?lineId=${REFUND_LINE_PLAN_ID}`);
-    await user.click(screen.getByRole("button", { name: "Model: Auto Medium" }));
+    await user.click(screen.getByTestId("split-run-draft-model"));
     const expectedModel = assigned ? "owner-model" : "caller-model";
     await user.click(await screen.findByRole("menuitem", { name: expectedModel }));
     await user.click(screen.getByRole("button", { name: "Start" }));
     expect(onDispatch).toHaveBeenCalledWith(order.id, {
       lineName: PLAN_LINE_NAME,
       model: expectedModel,
-      thinkingLevel: "medium",
+      thinkingLevel: undefined,
     });
   });
 
@@ -381,9 +413,9 @@ describe("MobileTaskDetailPage model select", () => {
     const user = userEvent.setup();
     renderDraft();
 
-    await user.click(screen.getByRole("button", { name: "Model: Auto Medium" }));
+    await user.click(screen.getByTestId("split-run-draft-model"));
 
-    expect(screen.getByRole("menuitem", { name: "Auto" })).toBeInTheDocument();
+    expect(screen.getAllByRole("menuitem", { name: "Implementation default" })).toHaveLength(2);
     expect(screen.getByRole("menuitem", { name: "claude-opus-4-6" })).toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: "Low" })).toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: "Medium" })).toBeInTheDocument();
@@ -391,31 +423,36 @@ describe("MobileTaskDetailPage model select", () => {
 
     await user.click(screen.getByRole("menuitem", { name: "claude-opus-4-6" }));
 
-    expect(screen.getByRole("button", { name: "Model: claude-opus-4-6 Medium" })).toBeInTheDocument();
+    expect(screen.getByTestId("split-run-draft-model")).toHaveAccessibleName(
+      /claude-opus-4-6.*High \(Implementation default\)/,
+    );
   });
 
   it("keeps the full model name in the accessible label", async () => {
     const user = userEvent.setup();
     renderDraft();
 
-    await user.click(screen.getByRole("button", { name: "Model: Auto Medium" }));
+    await user.click(screen.getByTestId("split-run-draft-model"));
     await user.click(screen.getByRole("menuitem", { name: "Anthropic Claude Opus 4.6 with extended context" }));
 
     expect(
-      screen.getByRole("button", { name: "Model: Anthropic Claude Opus 4.6 with extended context Medium" }),
+      screen.getByRole("button", { name: /Anthropic Claude Opus 4.6 with extended context.*long-model.*High/ }),
     ).toBeInTheDocument();
   });
 
-  it("starts on Auto without a model id and sends the thinking level", async () => {
+  it("opens the selector without creating overrides and starts with saved defaults", async () => {
     const user = userEvent.setup();
     renderDraft();
+
+    await user.click(screen.getByTestId("split-run-draft-model"));
+    await user.keyboard("{Escape}");
 
     await user.click(screen.getByRole("button", { name: "Start" }));
 
     expect(onDispatch).toHaveBeenCalledWith(DRAFT_WORK_ORDER.id, {
       lineName: PLAN_LINE_NAME,
       model: undefined,
-      thinkingLevel: "medium",
+      thinkingLevel: undefined,
     });
   });
 
@@ -423,9 +460,9 @@ describe("MobileTaskDetailPage model select", () => {
     const user = userEvent.setup();
     renderDraft();
 
-    await user.click(screen.getByRole("button", { name: "Model: Auto Medium" }));
+    await user.click(screen.getByTestId("split-run-draft-model"));
     await user.click(screen.getByRole("menuitem", { name: "High" }));
-    await user.click(screen.getByRole("button", { name: "Model: Auto High" }));
+    await user.click(screen.getByTestId("split-run-draft-model"));
     await user.click(screen.getByRole("menuitem", { name: "claude-opus-4-6" }));
     await user.click(screen.getByRole("button", { name: "Start" }));
 
@@ -434,25 +471,68 @@ describe("MobileTaskDetailPage model select", () => {
       model: "claude-opus-4-6",
       thinkingLevel: "high",
     });
+    await user.click(screen.getByRole("button", { name: "Save defaults" }));
+    expect(screen.getByTestId("split-run-draft-model")).toHaveAccessibleName(/claude-opus-4-6.*High$/);
+    await user.click(screen.getByTestId("split-run-draft-model"));
+    await user.click(screen.getAllByRole("menuitem", { name: "Implementation default" })[0]);
+    await user.click(screen.getByRole("button", { name: "Start" }));
+    expect(onDispatch).toHaveBeenLastCalledWith(DRAFT_WORK_ORDER.id, {
+      lineName: PLAN_LINE_NAME,
+      model: undefined,
+      thinkingLevel: "high",
+    });
   });
+
+  it.each(["model", "thinking"])(
+    "refreshes the inherited field and clears an independent %s override",
+    async (field) => {
+      const user = userEvent.setup();
+      renderDraft();
+      await user.click(screen.getByTestId("split-run-draft-model"));
+      await user.click(screen.getByRole("menuitem", { name: field === "model" ? "claude-opus-4-6" : "High" }));
+      await user.click(screen.getByRole("button", { name: "Save defaults" }));
+      expect(screen.getByTestId("split-run-draft-model")).toHaveAccessibleName(
+        field === "model"
+          ? /claude-opus-4-6.*Low \(Implementation default\)/
+          : /saved-model.*Implementation default.*High$/,
+      );
+      await user.click(screen.getByRole("button", { name: "Start" }));
+      expect(onDispatch).toHaveBeenLastCalledWith(DRAFT_WORK_ORDER.id, {
+        lineName: PLAN_LINE_NAME,
+        model: field === "model" ? "claude-opus-4-6" : undefined,
+        thinkingLevel: field === "thinking" ? "high" : undefined,
+      });
+      await user.click(screen.getByTestId("split-run-draft-model"));
+      await user.click(screen.getByRole("menuitem", { name: "Use Implementation defaults" }));
+      expect(screen.getByTestId("split-run-draft-model")).toHaveAccessibleName(
+        /saved-model.*Implementation default.*Low \(Implementation default\)/,
+      );
+      await user.click(screen.getByRole("button", { name: "Start" }));
+      expect(onDispatch).toHaveBeenLastCalledWith(DRAFT_WORK_ORDER.id, {
+        lineName: PLAN_LINE_NAME,
+        model: undefined,
+        thinkingLevel: undefined,
+      });
+    },
+  );
 
   it("does not start with a model from the previous line", async () => {
     const user = userEvent.setup();
     renderDraft();
 
-    await user.click(screen.getByRole("button", { name: "Model: Auto Medium" }));
+    await user.click(screen.getByTestId("split-run-draft-model"));
     await user.click(screen.getByRole("menuitem", { name: "High" }));
-    await user.click(screen.getByRole("button", { name: "Model: Auto High" }));
+    await user.click(screen.getByTestId("split-run-draft-model"));
     await user.click(screen.getByRole("menuitem", { name: "claude-opus-4-6" }));
     await user.click(screen.getByTestId("mobile-task-test-line"));
 
-    expect(screen.getByRole("button", { name: "Model: Auto High" })).toBeInTheDocument();
+    expect(screen.getByTestId("split-run-draft-model")).toHaveAccessibleName(/High \(Implementation default\)/);
     await user.click(screen.getByRole("button", { name: "Start" }));
 
     expect(onDispatch).toHaveBeenCalledWith(DRAFT_WORK_ORDER.id, {
       lineName: "hotfix",
       model: undefined,
-      thinkingLevel: "high",
+      thinkingLevel: undefined,
     });
   });
 
@@ -483,7 +563,7 @@ describe("MobileTaskDetailPage model select", () => {
     dispatchingIds.current = new Set([DRAFT_WORK_ORDER.id ?? ""]);
     renderDraft();
 
-    expect(screen.getByRole("button", { name: "Model: Auto Medium" })).toBeDisabled();
+    expect(screen.getByTestId("split-run-draft-model")).toBeDisabled();
     expect(screen.getByRole("button", { name: "Start" })).toBeDisabled();
   });
 
@@ -500,7 +580,7 @@ describe("MobileTaskDetailPage model select", () => {
     );
 
     expect(screen.getByRole("button", { name: "Start" })).toBeDisabled();
-    await userEvent.setup().click(screen.getByRole("button", { name: "Model: Auto Medium" }));
+    await userEvent.setup().click(screen.getByTestId("split-run-draft-model"));
     expect(screen.queryByRole("menuitem", { name: "claude-opus-4-6" })).not.toBeInTheDocument();
   });
 });

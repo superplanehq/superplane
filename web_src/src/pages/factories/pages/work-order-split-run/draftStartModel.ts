@@ -1,9 +1,44 @@
 import { concreteClaudeModelId, displayModelName } from "@/lib/hostedLLMModels";
+import { visibleThinkingLevelLabel } from "@/lib/thinkingLevel";
 
 export const DRAFT_START_MODEL_AUTO = "auto";
 
-export function draftStartModelPayload(selected: string): string | undefined {
-  const trimmed = selected.trim();
+export type DraftStartSelection = { model?: string; thinkingLevel?: string };
+
+export function draftStartModelOptions(models: Array<{ id?: string; name?: string }> = []) {
+  return [
+    { value: "", label: "Implementation default" },
+    ...models
+      .filter((item) => Boolean(item.id))
+      .map((item) => ({
+        value: item.id ?? "",
+        label: item.name && item.name !== item.id ? `${item.name} (${item.id})` : (item.id ?? ""),
+      })),
+  ];
+}
+
+export function resolveDraftStartSelection(
+  selection: DraftStartSelection,
+  defaults: DraftStartSelection,
+  models: Array<{ id?: string; name?: string }> = [],
+) {
+  const model = selection.model ?? defaults.model ?? "auto";
+  const thinking = selection.thinkingLevel ?? defaults.thinkingLevel;
+  const name =
+    model === "auto" || !model ? "Auto" : models.find((item) => item.id === model)?.name || displayRunnerModel(model);
+  const thinkingLabel = visibleThinkingLevelLabel(thinking) ?? (thinking === "auto" ? "Auto" : "Default");
+  const modelSource = selection.model === undefined ? " (Implementation default)" : "";
+  const thinkingSource = selection.thinkingLevel === undefined ? " (Implementation default)" : "";
+  return {
+    modelLabel: name,
+    thinkingLabel,
+    label: `${name}${modelSource} · ${thinkingLabel}${thinkingSource}`,
+    accessibleLabel: `Model: ${name}${name !== model && model !== "auto" ? ` [${model}]` : ""}${modelSource} · Thinking: ${thinkingLabel}${thinkingSource}`,
+  };
+}
+
+export function draftStartModelPayload(selected?: string): string | undefined {
+  const trimmed = selected?.trim() ?? "";
   if (trimmed === "" || trimmed === DRAFT_START_MODEL_AUTO) {
     return undefined;
   }
