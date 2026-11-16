@@ -107,24 +107,7 @@ export function MCPCatalogSetupDialog({
             {tokenError ? <p className="text-[12px] text-destructive">{tokenError}</p> : null}
           </div>
         ) : null}
-        {isDatadog ? (
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="mcp-catalog-setup-site">{AGENT_RESOURCES_COPY.datadogSiteLabel}</Label>
-            <Select value={siteId} onValueChange={setSiteId}>
-              <SelectTrigger id="mcp-catalog-setup-site" data-testid="mcp-catalog-setup-site" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {DATADOG_MCP_SITES.map((site) => (
-                  <SelectItem key={site.id} value={site.id}>
-                    {site.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-[12px] text-muted-foreground">{AGENT_RESOURCES_COPY.datadogSiteHelper}</p>
-          </div>
-        ) : null}
+        {isDatadog ? <DatadogSiteSelector siteId={siteId} onSiteChange={setSiteId} /> : null}
         <DialogFooter>
           <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>
             {AGENT_RESOURCES_COPY.cancel}
@@ -152,6 +135,27 @@ export function MCPCatalogSetupDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function DatadogSiteSelector({ siteId, onSiteChange }: { siteId: string; onSiteChange: (siteId: string) => void }) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <Label htmlFor="mcp-catalog-setup-site">{AGENT_RESOURCES_COPY.datadogSiteLabel}</Label>
+      <Select value={siteId} onValueChange={onSiteChange}>
+        <SelectTrigger id="mcp-catalog-setup-site" data-testid="mcp-catalog-setup-site" className="w-full">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {DATADOG_MCP_SITES.map((site) => (
+            <SelectItem key={site.id} value={site.id}>
+              {site.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <p className="text-[12px] text-muted-foreground">{AGENT_RESOURCES_COPY.datadogSiteHelper}</p>
+    </div>
   );
 }
 
