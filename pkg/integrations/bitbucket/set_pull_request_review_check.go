@@ -255,6 +255,7 @@ func (*SetPullRequestReviewCheck) Execute(ctx core.ExecutionContext) error {
 		record.Generation++
 		record.Order, record.ActivationGeneration, record.Disabled = order, generation, config.Phase == "disabled"
 		record.OwnerCanvasID, record.OwnerNodeID = canvas, config.ActivationNodeID
+		record.OwnerDeletedAt = nil
 		record.Hook, record.WakeAt = reviewCheckHook, reviewWake(time.Second)
 		record.Payload, err = json.Marshal(next)
 		accepted = record.Generation

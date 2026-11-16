@@ -15,6 +15,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
+	canvasactions "github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/integrations/bitbucket"
 	"github.com/superplanehq/superplane/pkg/models"
 	workercontexts "github.com/superplanehq/superplane/pkg/workers/contexts"
@@ -281,6 +282,52 @@ func TestBitbucketReviewCheckRecoversDeliveryAndDisable(t *testing.T) {
 	f.http.failRead = false
 	require.NoError(t, f.apply("no_review"))
 	require.True(t, f.record().Disabled, "obsolete callback cannot reopen the disabled activation")
+}
+
+func TestBitbucketReviewCheckReplacementSurvivesDeletedOwner(t *testing.T) {
+	f := newBitbucketReviewFixture(t)
+	require.NoError(t, f.apply("pending_selection"))
+	require.NoError(t, f.refresh())
+	_, err := canvasactions.DeleteCanvas(t.Context(), f.db, f.canvas)
+	require.NoError(t, err)
+	deleted, err := models.FindUnscopedCanvas(f.canvas.ID)
+	require.NoError(t, err)
+	require.NoError(t, NewCanvasCleanupWorker().LockAndProcessCanvas(*deleted))
+	require.NotNil(t, f.record().OwnerDeletedAt)
+	require.NoError(t, f.refresh())
+	require.True(t, f.record().Disabled)
+	old := f.ctx
+
+	canvas, nodes := support.CreateCanvas(t, f.r.Organization.ID, f.r.User, []models.CanvasNode{
+		{NodeID: "trigger", Type: models.NodeTypeTrigger, Ref: datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "onBroadcast"}})},
+		{NodeID: "check", Type: models.NodeTypeComponent, AppInstallationID: &f.installation.ID, Ref: datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "bitbucket.setPullRequestReviewCheck"}}), Configuration: datatypes.NewJSONType(map[string]any{"enabled": true, "activationGeneration": 2})},
+	}, nil)
+	nodes[1].AppInstallationID = &f.installation.ID
+	require.NoError(t, f.db.Model(&nodes[1]).Update("app_installation_id", f.installation.ID).Error)
+	version, err := models.FindLiveCanvasVersionInTransaction(f.db, canvas.ID)
+	require.NoError(t, err)
+	integrationID := f.installation.ID.String()
+	version.Nodes[1].IntegrationID = &integrationID
+	require.NoError(t, f.db.Save(version).Error)
+	f.canvas = canvas
+	f.root = support.EmitCanvasEventForNode(t, canvas.ID, "trigger", "default", nil)
+	execution := support.CreateCanvasNodeExecution(t, canvas.ID, "check", f.root.ID, f.root.ID)
+	f.ctx = f.executionContext(execution, &nodes[1])
+	f.ctx.Integration, f.ctx.HTTP = f.integration, f.http
+	f.ctx.Configuration = old.Configuration
+	require.NoError(t, f.apply("pending_selection"))
+	require.Equal(t, canvas.ID, f.record().OwnerCanvasID)
+	require.EqualValues(t, 2, f.record().ActivationGeneration)
+	for range 2 {
+		require.NoError(t, f.refresh())
+	}
+	require.False(t, f.record().Disabled)
+	require.Equal(t, "INPROGRESS", f.state())
+	require.NotNil(t, f.record().WakeAt)
+
+	generation := f.record().Generation
+	require.ErrorContains(t, (&bitbucket.SetPullRequestReviewCheck{}).Execute(old), "publication scope is not authorized")
+	require.Equal(t, generation, f.record().Generation, "the deleted owner's callback cannot replace the live check")
 }
 
 func TestBitbucketReviewCheckRechecksAfterLookupAndWrite(t *testing.T) {
