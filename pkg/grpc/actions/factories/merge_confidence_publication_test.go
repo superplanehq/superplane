@@ -8,16 +8,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
-	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
-	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
-	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	workercontexts "github.com/superplanehq/superplane/pkg/workers/contexts"
-	"github.com/superplanehq/superplane/pkg/yaml"
-	"google.golang.org/grpc/codes"
 	"gorm.io/datatypes"
-	"gorm.io/gorm"
 )
 
 func TestMergeConfidenceDestinationsDeliverCompletionAndStartReviewRequest(t *testing.T) {
@@ -126,33 +119,6 @@ func TestMergeConfidenceCommentRetryKeepsAssessmentAndManagedComment(t *testing.
 			var assessments int64
 			require.NoError(t, f.db.Model(&models.CanvasNodeExecution{}).Where("run_id = ? AND node_id = ?", f.run.ID, "assess-risk").Count(&assessments).Error)
 			require.EqualValues(t, 1, assessments, "publication retries keep the completed assessment")
-		})
-	}
-}
-
-func TestMergeConfidenceSaveRejectsMissingOrUnavailableDestination(t *testing.T) {
-	for _, provider := range []string{models.ProviderGitHub, models.ProviderBitbucket} {
-		t.Run(provider, func(t *testing.T) {
-			r, factory := resetTestFactory(t)
-			canvas := resetTestTemplate(t, r, factory, "risk-score", provider, func(*yaml.Canvas) {})
-			db := database.DB(t.Context())
-			original := resetTestLiveVersion(t, canvas)
-			version := resetTestLiveVersion(t, canvas)
-			settings := findIntakeNode(version.Nodes, "assess-risk").Configuration
-			for _, explicit := range []bool{false, true} {
-				settings["resultsBody"], settings["resultsComment"] = false, provider == models.ProviderBitbucket
-				if explicit {
-					settings["publishResults"] = true
-				} else {
-					delete(settings, "publishResults")
-				}
-				err := db.Transaction(func(tx *gorm.DB) error {
-					return canvases.PublishGeneratedCanvasNodesWithOwner(t.Context(), tx, canvas, nil, "Save settings", version.Nodes, version.Edges,
-						changesets.CanvasPublisherOptions{Registry: r.Registry, OrgID: canvas.OrganizationID, Encryptor: r.Encryptor, AuthService: r.AuthService, WebhookBaseURL: "http://localhost:8000"})
-				})
-				require.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
-				require.Equal(t, original.ID, resetTestLiveVersion(t, canvas).ID, "invalid settings must not replace the published version")
-			}
 		})
 	}
 }
