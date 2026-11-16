@@ -19,20 +19,19 @@ if [[ -z "$packages" ]]; then
   exit 1
 fi
 
-# Weigh each package by its test file count, so that heavy packages do not
-# cluster on one shard.
-weighted_packages=()
+# Discovery remains authoritative; timings cannot add removed packages.
+package_dirs=()
 while IFS= read -r import_path; do
-  package_dir="./${import_path#"$module_prefix"/}"
-  test_file_count="$(find "$package_dir" -maxdepth 1 -type f -name '*_test.go' | wc -l | tr -d ' ')"
-  weighted_packages+=("${test_file_count}:${package_dir}")
+  package_dirs+=("./${import_path#"$module_prefix"/}")
 done <<< "$packages"
 
-# Heaviest package first, so the greedy assignment below stays balanced.
-sorted_packages=()
-while IFS= read -r entry; do
-  sorted_packages+=("$entry")
-done < <(printf '%s\n' "${weighted_packages[@]}" | sort -t: -k1,1nr -k2,2)
+# New packages receive ten seconds. A one-second minimum accounts for package
+# overhead, including packages without tests, instead of putting all on shard 1.
+weighted_packages="$(printf '%s\n' "${package_dirs[@]}" | awk '
+  NR == FNR { if ($1 !~ /^#/ && NF == 2) durations[$1] = $2; next }
+  { seconds = ($1 in durations) ? durations[$1] : 10;
+    print (seconds < 1 ? 1 : seconds), $1 }
+' "$(dirname "${BASH_SOURCE[0]}")/unit_test_durations.tsv" - | sort -k1,1nr -k2,2)"
 
 shard_loads=()
 for ((shard = 0; shard < SHARD_COUNT; shard++)); do
@@ -41,10 +40,7 @@ done
 
 # Assign every package to the least loaded shard, and keep the ones for us.
 shard_packages=()
-for entry in "${sorted_packages[@]}"; do
-  test_file_count="${entry%%:*}"
-  package_dir="${entry#*:}"
-
+while read -r seconds package_dir; do
   lightest_shard=0
   for ((shard = 1; shard < SHARD_COUNT; shard++)); do
     if [[ "${shard_loads[$shard]}" -lt "${shard_loads[$lightest_shard]}" ]]; then
@@ -52,11 +48,11 @@ for entry in "${sorted_packages[@]}"; do
     fi
   done
 
-  shard_loads[$lightest_shard]=$((shard_loads[lightest_shard] + test_file_count))
+  shard_loads[$lightest_shard]=$((shard_loads[lightest_shard] + seconds))
   if [[ $((lightest_shard + 1)) -eq "$SHARD_INDEX" ]]; then
     shard_packages+=("$package_dir")
   fi
-done
+done <<< "$weighted_packages"
 
 if [[ "${#shard_packages[@]}" -eq 0 ]]; then
   echo "No packages assigned to shard ${SHARD_INDEX}/${SHARD_COUNT}." >&2
@@ -64,6 +60,7 @@ if [[ "${#shard_packages[@]}" -eq 0 ]]; then
 fi
 
 echo "Selected packages for shard ${SHARD_INDEX}/${SHARD_COUNT}:"
+echo "Estimated test duration: ${shard_loads[$((SHARD_INDEX - 1))]}s"
 for package_dir in "${shard_packages[@]}"; do
   echo "  - ${package_dir}"
 done
