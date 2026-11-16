@@ -9,6 +9,7 @@ trap 'rm -rf "$fixture"' EXIT
 mkdir -p "$fixture/bin" "$fixture/repo/scripts/lib" "$fixture/repo/pkg/example"
 cp "$repo_root/scripts/test_unit_autoparallel.sh" "$fixture/repo/scripts/"
 cp "$repo_root/scripts/lib/shard_args.sh" "$fixture/repo/scripts/lib/"
+echo '# Package durations' > "$fixture/repo/scripts/unit_test_durations.tsv"
 cat > "$fixture/bin/go" <<'MOCK'
 #!/usr/bin/env bash
 if [[ "$*" == "list -m" ]]; then
@@ -23,7 +24,13 @@ if [[ "$DISCOVERY" == failure ]]; then
 fi
 if [[ "$DISCOVERY" == success ]]; then
   case "$1" in
-    list) echo example.com/project/pkg/example ;;
+    list)
+      if [[ -n "${PACKAGE_LIST:-}" ]]; then
+        cat "$PACKAGE_LIST"
+      else
+        echo example.com/project/pkg/example
+      fi
+      ;;
     tool) echo 'total: 100.0%' ;;
   esac
 fi
@@ -31,6 +38,13 @@ MOCK
 cat > "$fixture/bin/gotestsum" <<'MOCK'
 #!/usr/bin/env bash
 touch "$TESTS_STARTED"
+if [[ -n "${SHARD_SELECTIONS:-}" ]]; then
+  for arg in "$@"; do
+    case "$arg" in
+      --packages=*) echo "${arg#--packages=}" >> "$SHARD_SELECTIONS" ;;
+    esac
+  done
+fi
 case "${REPORT:-missing}" in
   empty) echo '<testsuites><testsuite tests="0"/></testsuites>' > junit-report.xml ;;
   populated) echo '<testsuites><testsuite tests="1"><testcase name="TestExample"/></testsuite></testsuites>' > junit-report.xml ;;
@@ -64,6 +78,31 @@ for REPORT in missing empty; do
 done
 REPORT=populated SHARD_INDEX=1 SHARD_COUNT=1 bash scripts/test_unit_autoparallel.sh >"$fixture/output" 2>&1
 echo 'Unit shard discovery tests passed.'
+
+# File counts are deliberately equal: only measured time identifies the slow
+# package. New packages still run, and stale timings cannot add packages.
+export PACKAGE_LIST="$fixture/packages" SHARD_SELECTIONS="$fixture/unit-selections" REPORT=populated
+for name in heavy a b c d e f g h new empty-a empty-b; do
+  mkdir -p "pkg/$name"
+  echo "example.com/project/pkg/$name" >> "$PACKAGE_LIST"
+done
+printf './pkg/heavy\t60\n./pkg/removed\t999\n' > scripts/unit_test_durations.tsv
+for name in a b c d e f g h; do
+  printf './pkg/%s\t5\n' "$name" >> scripts/unit_test_durations.tsv
+done
+printf './pkg/empty-a\t1\n./pkg/empty-b\t1\n' >> scripts/unit_test_durations.tsv
+for SHARD_INDEX in 1 2; do
+  if ! SHARD_INDEX="$SHARD_INDEX" SHARD_COUNT=2 bash scripts/test_unit_autoparallel.sh >"$fixture/output" 2>&1; then
+    cat "$fixture/output"
+    exit 1
+  fi
+done
+sed 's|example.com/project/|./|' "$PACKAGE_LIST" | sort > "$fixture/expected"
+tr ' ' '\n' < "$SHARD_SELECTIONS" | sort > "$fixture/actual"
+cmp "$fixture/expected" "$fixture/actual"
+grep -Fxq './pkg/heavy' "$SHARD_SELECTIONS"
+echo 'Unit shard balancing tests passed.'
+unset PACKAGE_LIST SHARD_SELECTIONS
 
 cp "$repo_root/scripts/test_e2e_autoparallel.sh" scripts/
 mkdir -p test/e2e
