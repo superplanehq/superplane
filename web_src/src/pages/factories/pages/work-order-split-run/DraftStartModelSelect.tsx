@@ -69,8 +69,12 @@ export function DraftStartModelSelect({
   appearance?: Appearance;
 }) {
   const models = useFactoryLineRunnerModels(organizationId, factoryId, lineName, true, orderId);
-  const resolved = resolveDraftStartSelection({ model, thinkingLevel }, defaults.values ?? {}, models.data?.models);
-  const closedLabel = defaults.values ? resolved.label : draftStartDefaultsStatus(defaults);
+  const resolved = resolveDraftStartSelection(
+    { model, thinkingLevel },
+    defaults.values ?? {},
+    models.data?.models,
+    defaults.values ? undefined : draftStartDefaultsStatus(defaults),
+  );
   const showName = appearance !== "icon";
 
   return (
@@ -80,15 +84,13 @@ export function DraftStartModelSelect({
           type="button"
           size={showName ? "sm" : "icon-xs"}
           variant={TRIGGER_VARIANT[appearance]}
-          aria-label={defaults.values ? resolved.accessibleLabel : closedLabel}
+          aria-label={resolved.accessibleLabel}
           data-testid="split-run-draft-model"
           disabled={disabled}
           className={`${TRIGGER_CLASS[appearance]} min-w-0 max-w-full`}
         >
           {appearance === "ghost" ? <Bot className="size-4" aria-hidden /> : null}
-          {showName ? (
-            <DraftStartSelectionLabel defaults={defaults} resolved={resolved} thinkingLevel={thinkingLevel} />
-          ) : null}
+          {showName ? <DraftStartSelectionLabel resolved={resolved} thinkingLevel={thinkingLevel} /> : null}
           <ChevronDown className={showName ? "size-3 opacity-60" : "size-3.5"} aria-hidden />
         </Button>
       </DropdownMenuTrigger>
