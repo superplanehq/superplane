@@ -25,6 +25,8 @@ var factoryAgentSettingFields = []string{
 	"fallbackReviewer", "publishPRCheck", "prCheckActivationGeneration",
 	"publishReviewFindings", "reviewFindingsBody", "reviewFindingsComment",
 	"reviewFindingsBodyActivationGeneration", "reviewFindingsCommentActivationGeneration",
+	"publishResults", "resultsBody", "resultsComment",
+	"resultsBodyActivationGeneration", "resultsCommentActivationGeneration",
 }
 
 type factoryAgentSettings struct {

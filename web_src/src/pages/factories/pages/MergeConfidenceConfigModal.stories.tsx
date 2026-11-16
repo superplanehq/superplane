@@ -68,6 +68,24 @@ function confidenceGraph(): IntakeAutomationGraph {
         },
         concurrency: { max: 5, key: "{{ $.data.pull_request.number }}" },
       },
+      {
+        id: "publish-merge-confidence",
+        name: "Publish Merge Confidence",
+        component: "github.updatePullRequestBodySection",
+        configuration: { sectionKey: "merge-confidence", enabled: true, activationGeneration: 1 },
+      },
+      {
+        id: "comment-merge-confidence",
+        name: "Comment Merge Confidence",
+        component: "github.publishPullRequestComment",
+        configuration: { commentKey: "merge-confidence", enabled: false, activationGeneration: 1 },
+      },
+      {
+        id: "start-assessment-check",
+        name: "Start Assessment Check",
+        component: "github.setPullRequestCheckRun",
+        configuration: { enabled: true, activationNodeId: "start-assessment-check", activationGeneration: 1 },
+      },
     ],
   };
 }

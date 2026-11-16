@@ -700,7 +700,12 @@ func (a reviewCheckSetupAction) Setup(ctx core.SetupContext) error {
 }
 
 func (f *reviewCheckFixture) saveActivation(enabled bool, generation int, pause ...bool) {
-	f.r.Registry.Actions["github.setPullRequestReviewCheck"] = reviewCheckSetupAction{Action: &pulls.SetPullRequestReviewCheck{}, integration: f.integration, http: f.http}
+	component := f.nodes[2].Ref.Data().Component.Name
+	var action core.Action = &pulls.SetPullRequestReviewCheck{}
+	if component == "github.setPullRequestCheckRun" {
+		action = &pulls.SetPullRequestCheckRun{}
+	}
+	f.r.Registry.Actions[component] = reviewCheckSetupAction{Action: action, integration: f.integration, http: f.http}
 	version, err := models.FindLiveCanvasVersionInTransaction(f.db, f.canvas.ID)
 	require.NoError(f.t, err)
 	for i := range version.Nodes {
@@ -715,6 +720,10 @@ func (f *reviewCheckFixture) saveActivation(enabled bool, generation int, pause 
 		integrationID := f.installation.ID.String()
 		node.IntegrationID = &integrationID
 		node.Configuration = map[string]any{"repository": "{{ root().data.repository }}", "pullNumber": "{{ root().data.pullNumber }}", "enabled": enabled, "activationGeneration": generation, "activationNodeId": "check", "assessedSha": "abc", "context": "team/review", "phase": "pending_selection", "reason": "Select required reviewers"}
+		if component == "github.setPullRequestCheckRun" {
+			delete(node.Configuration, "phase")
+			node.Configuration["state"] = "pending"
+		}
 	}
 	require.NoError(f.t, canvasactions.PublishGeneratedCanvasNodesWithOwner(f.t.Context(), f.db, f.canvas, nil, "Save publication settings", version.Nodes, version.Edges, changesets.CanvasPublisherOptions{Registry: f.r.Registry, OrgID: f.r.Organization.ID, Encryptor: f.r.Encryptor, AuthService: f.r.AuthService, WebhookBaseURL: "http://localhost:8000"}))
 	current, err := models.FindCanvasNode(f.db, f.canvas.ID, "check")
