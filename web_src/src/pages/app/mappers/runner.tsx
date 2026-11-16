@@ -220,6 +220,9 @@ export const runnerMapper: ComponentBaseMapper = {
 
     details["Status"] = stringOrDash(payload.status);
     details["Exit code"] = stringOrDash(payload.exit_code);
+    if (typeof payload.error === "string" && payload.error.trim()) {
+      details["Error"] = payload.error;
+    }
     return details;
   },
 };

@@ -202,6 +202,8 @@ func TestGetTaskReportReturnsUsageAndRunHistory(t *testing.T) {
 
 	attempt1 := mustStampRun(t, implement.ID, entry, models.CanvasRunStateFinished, models.CanvasRunResultPassed, stamp(2), nil)
 	attempt2 := mustStampRun(t, implement.ID, entry, models.CanvasRunStateFinished, models.CanvasRunResultFailed, stamp(3), nil)
+	failureSummary := "Implementation (step 2, exit code 42): Provider unavailable. Logs: runner task task-1."
+	require.NoError(t, attempt2.AddError(db, failureSummary, 65536))
 	stepChild := mustStampRun(t, implement.ID, entry, models.CanvasRunStateFinished, models.CanvasRunResultPassed, stamp(4), &attempt2.ID)
 	linkedChild := mustStampRun(t, implement.ID, entry, models.CanvasRunStateStarted, "", stamp(5), &source.ID)
 	require.NoError(t, db.Model(linkedChild).Update("input", models.NewJSONValue(map[string]any{
@@ -378,6 +380,9 @@ func TestGetTaskReportReturnsUsageAndRunHistory(t *testing.T) {
 			assert.Equal(t, "The pull request activity recorded the failed checks.", run["activity_description"])
 			assert.Equal(t, checks.Name, run["automation_name"])
 			assert.Equal(t, "failed", run["result"])
+		}
+		if id == attempt2.ID.String() {
+			assert.Equal(t, []any{failureSummary}, run["errors"])
 		}
 		if id == attempt1.ID.String() {
 			assert.Equal(t, true, run["usage_recorded"])

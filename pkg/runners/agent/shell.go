@@ -9,10 +9,11 @@ import (
 
 // shellDirective is one command_list entry with optional display name for live logs.
 type shellDirective struct {
-	Text    string
-	Shell   string
-	Kind    string
-	Preview string
+	RecordID string
+	Text     string
+	Shell    string
+	Kind     string
+	Preview  string
 }
 
 func normalizeDirectiveLines(directives []string) []string {

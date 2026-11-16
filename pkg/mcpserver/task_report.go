@@ -210,21 +210,22 @@ type reportStep struct {
 }
 
 type reportRun struct {
-	ID                  string `json:"id"`
-	AutomationID        string `json:"automation_id"`
-	AutomationName      string `json:"automation_name"`
-	ParentRunID         string `json:"parent_run_id,omitempty"`
-	State               string `json:"state"`
-	Result              string `json:"result"`
-	CreatedAt           string `json:"created_at"`
-	UpdatedAt           string `json:"updated_at,omitempty"`
-	FinishedAt          string `json:"finished_at,omitempty"`
-	ActivityTitle       string `json:"activity_title,omitempty"`
-	ActivityDescription string `json:"activity_description,omitempty"`
-	UsageRecorded       bool   `json:"usage_recorded"`
-	TotalTokens         *int64 `json:"total_tokens,omitempty"`
-	TotalCostCents      *int64 `json:"total_cost_cents,omitempty"`
-	VMDurationSeconds   *int64 `json:"vm_duration_seconds,omitempty"`
+	Errors              []string `json:"errors,omitempty"`
+	ID                  string   `json:"id"`
+	AutomationID        string   `json:"automation_id"`
+	AutomationName      string   `json:"automation_name"`
+	ParentRunID         string   `json:"parent_run_id,omitempty"`
+	State               string   `json:"state"`
+	Result              string   `json:"result"`
+	CreatedAt           string   `json:"created_at"`
+	UpdatedAt           string   `json:"updated_at,omitempty"`
+	FinishedAt          string   `json:"finished_at,omitempty"`
+	ActivityTitle       string   `json:"activity_title,omitempty"`
+	ActivityDescription string   `json:"activity_description,omitempty"`
+	UsageRecorded       bool     `json:"usage_recorded"`
+	TotalTokens         *int64   `json:"total_tokens,omitempty"`
+	TotalCostCents      *int64   `json:"total_cost_cents,omitempty"`
+	VMDurationSeconds   *int64   `json:"vm_duration_seconds,omitempty"`
 }
 
 type reportRunCount struct {
@@ -399,6 +400,9 @@ func reportRunsJSON(runs []models.TaskRun) []reportRun {
 			ActivityTitle:       run.ActivityTitle,
 			ActivityDescription: run.ActivityDescription,
 			UsageRecorded:       run.UsageRecorded,
+		}
+		for _, runError := range run.Errors {
+			item.Errors = append(item.Errors, runError.Message)
 		}
 		if run.ParentRunID != nil {
 			item.ParentRunID = run.ParentRunID.String()

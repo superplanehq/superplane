@@ -160,6 +160,7 @@ func TestRunBashProcessTaskStatusIncludesError(t *testing.T) {
 	state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 	exit := 1
 	task := &core.RunnerTask{
+		ID:           "task-1",
 		State:        "failed",
 		ExitCode:     &exit,
 		ErrorMessage: "runner lost before completion",
@@ -171,5 +172,5 @@ func TestRunBashProcessTaskStatusIncludesError(t *testing.T) {
 	data := wrapped["data"].(map[string]any)
 	assert.Equal(t, "failed", data["status"])
 	assert.Equal(t, 1, data["exit_code"])
-	assert.Equal(t, "runner lost before completion", data["error"])
+	assert.Equal(t, "runner lost before completion\nLogs: runner task task-1.", data["error"])
 }
