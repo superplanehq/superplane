@@ -364,9 +364,7 @@ describe("MobileTaskDetailPage model select", () => {
   it("shows a model control next to Start on a draft when planning is on", () => {
     renderDraft();
 
-    expect(screen.getByTestId("split-run-draft-model")).toHaveAccessibleName(
-      /openai\/gpt-6.1-sol.*High.*Implementation default/,
-    );
+    expect(screen.getByTestId("split-run-draft-model")).toHaveAccessibleName(/openai\/gpt-6.1-sol.*High.*Default/);
     expect(screen.getByRole("button", { name: "Start" })).toBeEnabled();
   });
 
@@ -401,7 +399,8 @@ describe("MobileTaskDetailPage model select", () => {
 
     await user.click(screen.getByTestId("split-run-draft-model"));
 
-    expect(screen.getAllByRole("menuitem", { name: "Implementation default" })).toHaveLength(2);
+    expect(screen.getByRole("menuitem", { name: "Default (openai/gpt-6.1-sol)" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Default (High)" })).toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: "claude-opus-4-6" })).toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: "Low" })).toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: "Medium" })).toBeInTheDocument();
@@ -409,9 +408,7 @@ describe("MobileTaskDetailPage model select", () => {
 
     await user.click(screen.getByRole("menuitem", { name: "claude-opus-4-6" }));
 
-    expect(screen.getByTestId("split-run-draft-model")).toHaveAccessibleName(
-      /claude-opus-4-6.*High \(Implementation default\)/,
-    );
+    expect(screen.getByTestId("split-run-draft-model")).toHaveAccessibleName(/claude-opus-4-6.*High \(Default\)/);
   });
 
   it("keeps the full model name in the accessible label", async () => {
@@ -422,7 +419,7 @@ describe("MobileTaskDetailPage model select", () => {
     await user.click(screen.getByRole("menuitem", { name: "Anthropic Claude Opus 4.6 with extended context" }));
 
     expect(
-      screen.getByRole("button", { name: /Anthropic Claude Opus 4.6 with extended context.*long-model.*High/ }),
+      screen.getByRole("button", { name: /Anthropic Claude Opus 4.6 with extended context.*High/ }),
     ).toBeInTheDocument();
   });
 
@@ -460,7 +457,7 @@ describe("MobileTaskDetailPage model select", () => {
     await user.click(screen.getByRole("button", { name: "Save defaults" }));
     expect(screen.getByTestId("split-run-draft-model")).toHaveAccessibleName(/claude-opus-4-6.*High$/);
     await user.click(screen.getByTestId("split-run-draft-model"));
-    await user.click(screen.getAllByRole("menuitem", { name: "Implementation default" })[0]);
+    await user.click(screen.getByRole("menuitem", { name: "Default (saved-model)" }));
     await user.click(screen.getByRole("button", { name: "Start" }));
     expect(onDispatch).toHaveBeenLastCalledWith(DRAFT_WORK_ORDER.id, {
       lineName: PLAN_LINE_NAME,
@@ -478,9 +475,7 @@ describe("MobileTaskDetailPage model select", () => {
       await user.click(screen.getByRole("menuitem", { name: field === "model" ? "claude-opus-4-6" : "High" }));
       await user.click(screen.getByRole("button", { name: "Save defaults" }));
       expect(screen.getByTestId("split-run-draft-model")).toHaveAccessibleName(
-        field === "model"
-          ? /claude-opus-4-6.*Low \(Implementation default\)/
-          : /saved-model.*Implementation default.*High$/,
+        field === "model" ? /claude-opus-4-6.*Low \(Default\)/ : /saved-model.*Default.*High$/,
       );
       await user.click(screen.getByRole("button", { name: "Start" }));
       expect(onDispatch).toHaveBeenLastCalledWith(DRAFT_WORK_ORDER.id, {
@@ -489,10 +484,8 @@ describe("MobileTaskDetailPage model select", () => {
         thinkingLevel: field === "thinking" ? "high" : undefined,
       });
       await user.click(screen.getByTestId("split-run-draft-model"));
-      await user.click(screen.getByRole("menuitem", { name: "Use Implementation defaults" }));
-      expect(screen.getByTestId("split-run-draft-model")).toHaveAccessibleName(
-        /saved-model.*Implementation default.*Low \(Implementation default\)/,
-      );
+      await user.click(screen.getByRole("menuitem", { name: "Use defaults" }));
+      expect(screen.getByTestId("split-run-draft-model")).toHaveAccessibleName(/saved-model.*Default.*Low \(Default\)/);
       await user.click(screen.getByRole("button", { name: "Start" }));
       expect(onDispatch).toHaveBeenLastCalledWith(DRAFT_WORK_ORDER.id, {
         lineName: PLAN_LINE_NAME,
@@ -512,7 +505,7 @@ describe("MobileTaskDetailPage model select", () => {
     await user.click(screen.getByRole("menuitem", { name: "claude-opus-4-6" }));
     await user.click(screen.getByTestId("mobile-task-test-line"));
 
-    expect(screen.getByTestId("split-run-draft-model")).toHaveAccessibleName(/High \(Implementation default\)/);
+    expect(screen.getByTestId("split-run-draft-model")).toHaveAccessibleName(/High \(Default\)/);
     await user.click(screen.getByRole("button", { name: "Start" }));
 
     expect(onDispatch).toHaveBeenCalledWith(DRAFT_WORK_ORDER.id, {
