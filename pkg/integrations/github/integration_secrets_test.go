@@ -49,6 +49,40 @@ func TestGitHub__ResolveSecrets__PAT(t *testing.T) {
 	assert.NotContains(t, secrets.Setup, "ghp_test_token")
 }
 
+func TestPublicationAppTokenRestrictsRepositoryOnSupportedHosts(t *testing.T) {
+	for _, host := range []string{"github.com", "acme.ghe.com", "github.acme.test"} {
+		t.Run(host, func(t *testing.T) {
+			integrationCtx := &contexts.IntegrationContext{
+				NewSetupFlow: true,
+				CurrentProperties: map[string]any{
+					common.PropertyAuthMethod: common.AuthMethodApp,
+					common.PropertyAppID:      "99", common.PropertyAppInstallationID: "501",
+					common.PropertyOwner: "acme", common.PropertyHost: host,
+				},
+				CurrentSecrets: map[string]core.IntegrationSecret{
+					common.SecretAppPEM: {Name: common.SecretAppPEM, Value: githubPrivateKeyPEM(t)},
+				},
+			}
+			httpCtx := &contexts.HTTPContext{Responses: []*http.Response{
+				mocks.GitHubResponse(http.StatusCreated, `{"token":"ghs_publication","expires_at":"2030-01-01T00:00:00Z"}`),
+			}}
+			_, err := ResolvePublicationToken(httpCtx, integrationCtx, "other/api")
+			require.Error(t, err)
+			require.Empty(t, httpCtx.Requests)
+			token, err := ResolvePublicationToken(httpCtx, integrationCtx, "acme/api")
+			require.NoError(t, err)
+			assert.Equal(t, "ghs_publication", token)
+			require.Len(t, httpCtx.Requests, 1)
+			body, err := io.ReadAll(httpCtx.Requests[0].Body)
+			require.NoError(t, err)
+			assert.JSONEq(t, `{"repositories":["api"]}`, string(body))
+			parsed, err := common.ParseHost(host)
+			require.NoError(t, err)
+			assert.Equal(t, parsed.APIURL()+"app/installations/501/access_tokens", httpCtx.Requests[0].URL.String())
+		})
+	}
+}
+
 func TestGitHub__ResolveSecrets__HostedBinding(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	organization, err := models.CreateOrganization("org-"+uuid.NewString(), "")
@@ -92,6 +126,19 @@ func TestGitHub__ResolveSecrets__HostedBinding(t *testing.T) {
 	body, err := io.ReadAll(httpCtx.Requests[0].Body)
 	require.NoError(t, err)
 	assert.JSONEq(t, `{"repository_ids":[601]}`, string(body))
+	publicationHTTP := &contexts.HTTPContext{Responses: []*http.Response{
+		mocks.GitHubResponse(http.StatusCreated, `{"token":"ghs_publication","expires_at":"2030-01-01T00:00:00Z"}`),
+	}}
+	token, err := ResolvePublicationToken(publicationHTTP, integrationCtx, "acme/api")
+	require.NoError(t, err)
+	assert.Equal(t, "ghs_publication", token)
+	require.Len(t, publicationHTTP.Requests, 1)
+	body, err = io.ReadAll(publicationHTTP.Requests[0].Body)
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"repository_ids":[601]}`, string(body))
+	_, err = ResolvePublicationToken(publicationHTTP, integrationCtx, "acme/web")
+	require.Error(t, err)
+	assert.Len(t, publicationHTTP.Requests, 1, "an ungranted repository must not mint a token")
 }
 
 func TestGitHub__ResolveSecrets__HostedTokensFollowContextRepositoryAccess(t *testing.T) {

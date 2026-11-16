@@ -483,6 +483,7 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 	s.Router.HandleFunc("/api/v1/runner/task/markdown", s.handleRunnerGlobalArtifactMarkdown).Methods(http.MethodPost)
 	s.Router.HandleFunc("/api/v1/runner/task/pull-requests", s.handleRunnerListPullRequests).Methods(http.MethodGet)
 	s.Router.HandleFunc("/api/v1/runner/task/pull-requests", s.handleRunnerOpenPullRequest).Methods(http.MethodPost)
+	s.Router.HandleFunc("/api/v1/runner/task/publication-credential", s.handleRunnerPublicationCredential).Methods(http.MethodPost)
 	s.Router.HandleFunc("/api/v1/runner/artifacts", s.handleRunnerArtifactUpload).Methods(http.MethodPost)
 	s.Router.HandleFunc("/api/v1/runner/artifacts/links", s.handleRunnerArtifactLink).Methods(http.MethodPost)
 	s.Router.HandleFunc("/api/v1/runner/artifacts/markdown", s.handleRunnerArtifactMarkdown).Methods(http.MethodPost)
