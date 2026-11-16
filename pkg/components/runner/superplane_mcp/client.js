@@ -50,8 +50,8 @@ function createClient(env = process.env, fetchImpl = fetch, timeouts = DEFAULT_T
     return parsed;
   }
 
-  async function request(method, path, body) {
-    if (body === undefined) return send(path, { method, headers: {} }, timeouts.request);
+  async function request(method, path, body, timeoutMs = timeouts.request) {
+    if (body === undefined) return send(path, { method, headers: {} }, timeoutMs);
     return send(
       path,
       {
@@ -59,7 +59,7 @@ function createClient(env = process.env, fetchImpl = fetch, timeouts = DEFAULT_T
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       },
-      timeouts.request,
+      timeoutMs,
     );
   }
 
