@@ -1,20 +1,62 @@
 import { concreteClaudeModelId, displayModelName } from "@/lib/hostedLLMModels";
 import { visibleThinkingLevelLabel } from "@/lib/thinkingLevel";
+import { parseSelectableLLMModelKey, selectableLLMModelLabelFromKey } from "@/lib/selectableLLMModels";
 
 export const DRAFT_START_MODEL_AUTO = "auto";
 
 export type DraftStartSelection = { model?: string; thinkingLevel?: string };
 
-export function draftStartModelOptions(models: Array<{ id?: string; name?: string }> = []) {
+function hasDraftStartOverrides(selection: DraftStartSelection): boolean {
+  return selection.model !== undefined || selection.thinkingLevel !== undefined;
+}
+
+export function draftStartModelOptions(models: Array<{ id?: string; name?: string }> = [], defaultLabel = "Default") {
+  const options = models
+    .filter((item) => Boolean(item.id))
+    .map((item) => ({
+      value: item.id ?? "",
+      label: selectableLLMModelLabelFromKey(item.name || item.id || ""),
+      ...parseSelectableLLMModelKey(item.id ?? ""),
+    }));
   return [
-    { value: "", label: "Implementation default" },
-    ...models
-      .filter((item) => Boolean(item.id))
-      .map((item) => ({
-        value: item.id ?? "",
-        label: item.name && item.name !== item.id ? `${item.name} (${item.id})` : (item.id ?? ""),
-      })),
+    { value: "", label: defaultLabel },
+    ...options.map((option) => {
+      const collisions = options.filter((other) => other.label === option.label);
+      if (collisions.length === 1) return { value: option.value, label: option.label };
+      const source = connectionLabel(option.source) || "Line runner";
+      const needsProvider =
+        option.provider && collisions.some((other) => other.value !== option.value && other.source === option.source);
+      const qualifier = needsProvider ? `${source} · ${connectionLabel(option.provider)}` : source;
+      return { value: option.value, label: `${option.label} (${qualifier})` };
+    }),
   ];
+}
+
+function connectionLabel(id: string): string {
+  const labels: Record<string, string> = {
+    hosted: "Hosted",
+    byok: "API key",
+    subscription: "Subscription",
+    openrouter: "OpenRouter",
+    openai: "OpenAI",
+    anthropic: "Anthropic",
+  };
+  return labels[id] ?? id;
+}
+
+function draftStartDefaultLabel(value?: string): string {
+  return value ? `Default (${value})` : "Default";
+}
+
+export function draftStartDefaultLabels(
+  defaults: DraftStartSelection | undefined,
+  models: Array<{ id?: string; name?: string }> = [],
+) {
+  const resolved = defaults ? resolveDraftStartSelection({}, defaults, models) : undefined;
+  return {
+    model: draftStartDefaultLabel(resolved?.modelLabel),
+    thinking: draftStartDefaultLabel(resolved?.thinkingLabel),
+  };
 }
 
 export function resolveDraftStartSelection(
@@ -27,21 +69,22 @@ export function resolveDraftStartSelection(
   const thinking = selection.thinkingLevel ?? defaults.thinkingLevel;
   const unresolvedModelStatus = selection.model === undefined ? defaultsStatus : undefined;
   const unresolvedThinkingStatus = selection.thinkingLevel === undefined ? defaultsStatus : undefined;
-  const { name, accessibleName } = draftStartModelLabels(model, models, unresolvedModelStatus);
+  const name = draftStartModelLabels(model, models, unresolvedModelStatus);
   const thinkingLabel =
     unresolvedThinkingStatus ?? visibleThinkingLevelLabel(thinking) ?? (thinking === "auto" ? "Auto" : "Default");
-  const modelSource = selection.model === undefined ? " (Implementation default)" : "";
-  const thinkingSource = selection.thinkingLevel === undefined ? " (Implementation default)" : "";
+  const modelSource = selection.model === undefined ? " (Default)" : "";
+  const thinkingSource = selection.thinkingLevel === undefined ? " (Default)" : "";
   const hasOnlyUnresolvedDefaults = Boolean(unresolvedModelStatus && unresolvedThinkingStatus);
   return {
     hasOnlyUnresolvedDefaults,
+    hasOverrides: hasDraftStartOverrides(selection),
     isThinkingUnresolved: Boolean(unresolvedThinkingStatus),
     modelLabel: name,
     thinkingLabel,
     label: hasOnlyUnresolvedDefaults ? defaultsStatus : `${name}${modelSource} · ${thinkingLabel}${thinkingSource}`,
     accessibleLabel: hasOnlyUnresolvedDefaults
       ? defaultsStatus
-      : `Model: ${accessibleName}${modelSource} · Thinking: ${thinkingLabel}${thinkingSource}`,
+      : `Model: ${name}${modelSource} · Thinking: ${thinkingLabel}${thinkingSource}`,
   };
 }
 
@@ -50,11 +93,11 @@ function draftStartModelLabels(
   models: Array<{ id?: string; name?: string }>,
   unresolvedStatus?: string,
 ) {
-  const name =
-    unresolvedStatus ??
-    (model === "auto" || !model ? "Auto" : models.find((item) => item.id === model)?.name || displayRunnerModel(model));
-  const accessibleName = name !== model && model !== "auto" && !unresolvedStatus ? `${name} [${model}]` : name;
-  return { name, accessibleName };
+  if (unresolvedStatus) return unresolvedStatus;
+  if (model === "auto" || !model) return "Auto";
+  return (
+    draftStartModelOptions(models).find((item) => item.value === model)?.label || selectableLLMModelLabelFromKey(model)
+  );
 }
 
 export function draftStartModelPayload(selected?: string): string | undefined {

@@ -12,7 +12,12 @@ import {
   DropdownMenuTrigger,
 } from "@/ui/dropdownMenu";
 
-import { resolveDraftStartSelection, type DraftStartSelection } from "../pages/work-order-split-run/draftStartModel";
+import {
+  draftStartDefaultLabels,
+  draftStartModelOptions,
+  resolveDraftStartSelection,
+  type DraftStartSelection,
+} from "../pages/work-order-split-run/draftStartModel";
 import { draftStartDefaultsStatus, type DraftStartDefaults } from "@/hooks/useDraftStartDefaults";
 import { DraftStartSelectionLabel } from "../pages/work-order-split-run/DraftStartSelectionLabel";
 
@@ -46,9 +51,8 @@ export function MobileDraftStartModelSelect({
   disabled?: boolean;
 }) {
   const models = useFactoryLineRunnerModels(organizationId, factoryId, lineName, Boolean(lineName), orderId);
-  const modelOptions = lineName
-    ? runnerModelOptions(models.data?.models)
-    : [{ value: "", label: "Implementation default" }];
+  const defaultLabels = draftStartDefaultLabels(defaults.values, models.data?.models);
+  const modelOptions = draftStartModelOptions(lineName ? models.data?.models : [], defaultLabels.model);
   const resolved = resolveDraftStartSelection(
     { model, thinkingLevel },
     defaults.values ?? {},
@@ -81,7 +85,9 @@ export function MobileDraftStartModelSelect({
         {!defaults.values ? (
           <DropdownMenuItem onSelect={defaults.retry}>Retry Implementation defaults</DropdownMenuItem>
         ) : null}
-        <DropdownMenuLabel className="text-xs text-muted-foreground">Model</DropdownMenuLabel>
+        <DropdownMenuLabel className="break-words text-xs text-muted-foreground">
+          Model — {resolved.modelLabel}
+        </DropdownMenuLabel>
         <div className="max-h-52 overflow-y-auto" data-testid="mobile-task-model-list">
           {modelOptions.map((option) => (
             <ChoiceItem
@@ -93,8 +99,10 @@ export function MobileDraftStartModelSelect({
           ))}
         </div>
         <DropdownMenuSeparator />
-        <DropdownMenuLabel className="text-xs text-muted-foreground">Thinking</DropdownMenuLabel>
-        {[{ value: "", label: "Implementation default" }, ...THINKING_OPTIONS].map((option) => (
+        <DropdownMenuLabel className="break-words text-xs text-muted-foreground">
+          Thinking — {resolved.thinkingLabel}
+        </DropdownMenuLabel>
+        {[{ value: "", label: defaultLabels.thinking }, ...THINKING_OPTIONS].map((option) => (
           <ChoiceItem
             key={option.value}
             label={option.label}
@@ -102,20 +110,15 @@ export function MobileDraftStartModelSelect({
             onSelect={() => onChange({ model, thinkingLevel: option.value || undefined })}
           />
         ))}
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onSelect={() => onChange({})}>Use Implementation defaults</DropdownMenuItem>
+        {resolved.hasOverrides ? (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={() => onChange({})}>Use defaults</DropdownMenuItem>
+          </>
+        ) : null}
       </DropdownMenuContent>
     </DropdownMenu>
   );
-}
-
-function runnerModelOptions(models: Array<{ id?: string; name?: string }> | undefined) {
-  return [
-    { value: "", label: "Implementation default" },
-    ...(models ?? [])
-      .filter((item) => (item.id ?? "") !== "")
-      .map((item) => ({ value: item.id ?? "", label: item.name || item.id || "" })),
-  ];
 }
 
 function ChoiceItem({ label, selected, onSelect }: { label: string; selected: boolean; onSelect: () => void }) {
