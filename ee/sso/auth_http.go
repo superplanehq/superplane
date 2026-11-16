@@ -291,7 +291,7 @@ func (s *Service) backchannelLogout(w http.ResponseWriter, r *http.Request) {
 		writeBackchannelError(w)
 		return
 	}
-	identity, err := findLogoutIdentity(r.Context(), conn.ID, subject, sessionID)
+	identity, err := findLogoutIdentity(r.Context(), conn.ID, subject, sessionID, s.now())
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		writeBackchannelError(w)
 		return
@@ -313,7 +313,7 @@ func (s *Service) backchannelLogout(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func findLogoutIdentity(ctx context.Context, connectionID uuid.UUID, subject, sessionID string) (*models.SSOIdentity, error) {
+func findLogoutIdentity(ctx context.Context, connectionID uuid.UUID, subject, sessionID string, now time.Time) (*models.SSOIdentity, error) {
 	if subject != "" {
 		identity, err := models.FindSSOIdentityByIDPSubject(database.DB(ctx), connectionID, subject)
 		if err == nil || !errors.Is(err, gorm.ErrRecordNotFound) || sessionID == "" {
@@ -323,7 +323,7 @@ func findLogoutIdentity(ctx context.Context, connectionID uuid.UUID, subject, se
 	if sessionID == "" {
 		return nil, gorm.ErrRecordNotFound
 	}
-	return models.FindSSOIdentityByIDPSession(database.DB(ctx), connectionID, sessionID)
+	return models.FindSSOIdentityByIDPSession(database.DB(ctx), connectionID, sessionID, now)
 }
 
 func (s *Service) connectionFromPath(w http.ResponseWriter, r *http.Request) (*models.SSOConnection, bool) {

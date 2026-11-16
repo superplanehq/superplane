@@ -49,6 +49,15 @@ func (p *Pipeline) SignIn(ctx context.Context, conn *models.SSOConnection, exter
 		if err := identity.Save(tx); err != nil {
 			return err
 		}
+		if external.SessionID != "" {
+			age := conn.MaxSessionAgeSeconds
+			if age <= 0 {
+				age = models.SSODefaultSessionAge
+			}
+			if err := identity.RememberIDPSession(tx, external.SessionID, now.Add(time.Duration(age)*time.Second)); err != nil {
+				return err
+			}
+		}
 
 		org, err := models.FindOrganizationByIDInTransaction(tx, conn.OrganizationID.String())
 		if err != nil {

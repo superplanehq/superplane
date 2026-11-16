@@ -71,16 +71,21 @@ func (s *Service) PutConnection(ctx context.Context, orgID, accountID uuid.UUID,
 		if err != nil {
 			return err
 		}
-		if existing != nil && previous.Issuer != "" && previous.Issuer != normalized.Issuer {
+		issuerChanged := existing != nil && previous.Issuer != "" && previous.Issuer != normalized.Issuer
+		claimChanged := existing != nil && previous.SubjectClaim != "" && previous.SubjectClaim != next.SubjectClaim
+		if issuerChanged || claimChanged {
 			count, err := conn.CountIdentities(tx)
 			if err != nil {
 				return err
 			}
-			if count > 0 {
+			if count > 0 && issuerChanged {
 				return precondition("Delete this connection and create a new one before you change the issuer.")
 			}
+			if count > 0 && claimChanged {
+				return precondition("Delete this connection and create a new one before you change the subject claim.")
+			}
 		}
-		if previous.Issuer != next.Issuer || previous.ClientID != next.ClientID {
+		if previous.Issuer != next.Issuer || previous.ClientID != next.ClientID || previous.SubjectClaim != next.SubjectClaim {
 			conn.LastTestedAt = nil
 			conn.LastTestResult = nil
 			if conn.Status == models.SSOStatusActive {
@@ -342,7 +347,7 @@ func (s *Service) recordTest(ctx context.Context, conn *models.SSOConnection, ok
 		if err != nil {
 			return err
 		}
-		if tested.Issuer != latest.Issuer || tested.ClientID != latest.ClientID {
+		if tested.Issuer != latest.Issuer || tested.ClientID != latest.ClientID || tested.SubjectClaim != latest.SubjectClaim {
 			return nil
 		}
 		if err := current.RecordTest(tx, now, raw); err != nil {

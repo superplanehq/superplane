@@ -163,24 +163,80 @@ func TestBackchannelLogoutUsesTheIDTokenSubject(t *testing.T) {
 	require.NotNil(t, identity.IDPSubject)
 	require.Equal(t, "s1", *identity.IDPSubject)
 
-	logoutToken := signLogoutToken(t, fake, jwtLib.MapClaims{
-		"sid":    nil,
-		"events": map[string]any{"http://schemas.openid.net/event/backchannel-logout": map[string]any{}},
-	})
-	require.Equal(t, http.StatusOK, postLogout(f, conn.ID, logoutToken).Code)
-	saved, err := models.FindSSOIdentityByID(database.Conn(), conn.ID, identity.ID)
-	require.NoError(t, err)
-	require.NotNil(t, saved.SessionsRevokedAt)
-
-	require.NoError(t, database.Conn().Model(&models.SSOIdentity{}).Where("id = ?", identity.ID).Update("sessions_revoked_at", nil).Error)
 	bySession := signLogoutToken(t, fake, jwtLib.MapClaims{
 		"sub":    "other",
 		"events": map[string]any{"http://schemas.openid.net/event/backchannel-logout": map[string]any{}},
 	})
 	require.Equal(t, http.StatusOK, postLogout(f, conn.ID, bySession).Code)
+	saved, err := models.FindSSOIdentityByID(database.Conn(), conn.ID, identity.ID)
+	require.NoError(t, err)
+	require.NotNil(t, saved.SessionsRevokedAt)
+
+	require.NoError(t, database.Conn().Model(&models.SSOIdentity{}).Where("id = ?", identity.ID).Update("sessions_revoked_at", nil).Error)
+	logoutToken := signLogoutToken(t, fake, jwtLib.MapClaims{
+		"sid":    nil,
+		"events": map[string]any{"http://schemas.openid.net/event/backchannel-logout": map[string]any{}},
+	})
+	require.Equal(t, http.StatusOK, postLogout(f, conn.ID, logoutToken).Code)
 	saved, err = models.FindSSOIdentityByID(database.Conn(), conn.ID, identity.ID)
 	require.NoError(t, err)
 	require.NotNil(t, saved.SessionsRevokedAt)
+}
+
+func TestBackchannelLogoutFindsAnEarlierBrowserSession(t *testing.T) {
+	f, fake, conn := activeOIDCConnection(t)
+	fake.extraClaims = map[string]any{"sid": "sid-first"}
+	require.Equal(t, http.StatusFound, f.callback(t, conn, fake, callbackOptions{}).Code)
+	fake.extraClaims = map[string]any{"sid": "sid-second"}
+	require.Equal(t, http.StatusFound, f.callback(t, conn, fake, callbackOptions{}).Code)
+
+	identity, err := models.FindSSOIdentityByIDPSubject(database.Conn(), conn.ID, fake.subject)
+	require.NoError(t, err)
+	require.NotNil(t, identity.IDPSessionID)
+	require.Equal(t, "sid-second", *identity.IDPSessionID)
+
+	firstBrowser := signLogoutToken(t, fake, jwtLib.MapClaims{
+		"sub":    "other",
+		"sid":    "sid-first",
+		"events": map[string]any{"http://schemas.openid.net/event/backchannel-logout": map[string]any{}},
+	})
+	require.Equal(t, http.StatusOK, postLogout(f, conn.ID, firstBrowser).Code)
+	saved, err := models.FindSSOIdentityByID(database.Conn(), conn.ID, identity.ID)
+	require.NoError(t, err)
+	require.NotNil(t, saved.SessionsRevokedAt)
+
+	require.Equal(t, http.StatusFound, f.callback(t, conn, fake, callbackOptions{}).Code)
+	replay := signLogoutToken(t, fake, jwtLib.MapClaims{
+		"sub":    "other",
+		"sid":    "sid-first",
+		"events": map[string]any{"http://schemas.openid.net/event/backchannel-logout": map[string]any{}},
+	})
+	signedIn, err := models.FindSSOIdentityByID(database.Conn(), conn.ID, identity.ID)
+	require.NoError(t, err)
+	require.NotNil(t, signedIn.SessionsRevokedAt)
+	require.NotNil(t, signedIn.LastLoginAt)
+	require.True(t, signedIn.SessionsRevokedAt.Before(*signedIn.LastLoginAt))
+	revokedAt := *signedIn.SessionsRevokedAt
+
+	require.Equal(t, http.StatusOK, postLogout(f, conn.ID, replay).Code)
+	again, err := models.FindSSOIdentityByID(database.Conn(), conn.ID, identity.ID)
+	require.NoError(t, err)
+	require.NotNil(t, again.SessionsRevokedAt)
+	require.True(t, again.SessionsRevokedAt.Equal(revokedAt))
+
+	require.NoError(t, database.Conn().Model(&models.SSOIdentitySession{}).
+		Where("identity_id = ? AND idp_session_id = ? AND revoked_at IS NULL", identity.ID, "sid-second").
+		Update("expires_at", time.Now().Add(-time.Minute)).Error)
+	expired := signLogoutToken(t, fake, jwtLib.MapClaims{
+		"sub":    "other",
+		"sid":    "sid-second",
+		"events": map[string]any{"http://schemas.openid.net/event/backchannel-logout": map[string]any{}},
+	})
+	require.Equal(t, http.StatusOK, postLogout(f, conn.ID, expired).Code)
+	final, err := models.FindSSOIdentityByID(database.Conn(), conn.ID, identity.ID)
+	require.NoError(t, err)
+	require.NotNil(t, final.SessionsRevokedAt)
+	require.True(t, final.SessionsRevokedAt.Equal(revokedAt))
 }
 
 func activeOIDCConnection(t *testing.T) (*flow, *fakeOIDC, *models.SSOConnection) {

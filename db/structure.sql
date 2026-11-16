@@ -1976,6 +1976,21 @@ CREATE TABLE public.sso_identities (
 
 
 --
+-- Name: sso_identity_sessions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.sso_identity_sessions (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    connection_id uuid NOT NULL,
+    identity_id uuid NOT NULL,
+    idp_session_id text NOT NULL,
+    expires_at timestamp with time zone NOT NULL,
+    revoked_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: usage_price_book_rates; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -3553,6 +3568,14 @@ ALTER TABLE ONLY public.sso_connections
 
 ALTER TABLE ONLY public.sso_identities
     ADD CONSTRAINT sso_identities_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: sso_identity_sessions sso_identity_sessions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.sso_identity_sessions
+    ADD CONSTRAINT sso_identity_sessions_pkey PRIMARY KEY (id);
 
 
 --
@@ -5343,6 +5366,20 @@ CREATE UNIQUE INDEX sso_identities_subject ON public.sso_identities USING btree 
 
 
 --
+-- Name: sso_identity_sessions_active_session; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX sso_identity_sessions_active_session ON public.sso_identity_sessions USING btree (connection_id, idp_session_id) WHERE (revoked_at IS NULL);
+
+
+--
+-- Name: sso_identity_sessions_identity; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX sso_identity_sessions_identity ON public.sso_identity_sessions USING btree (identity_id) WHERE (revoked_at IS NULL);
+
+
+--
 -- Name: unique_api_key_in_organization; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -6570,6 +6607,22 @@ ALTER TABLE ONLY public.sso_identities
 
 
 --
+-- Name: sso_identity_sessions sso_identity_sessions_connection_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.sso_identity_sessions
+    ADD CONSTRAINT sso_identity_sessions_connection_id_fkey FOREIGN KEY (connection_id) REFERENCES public.sso_connections(id) ON DELETE CASCADE;
+
+
+--
+-- Name: sso_identity_sessions sso_identity_sessions_identity_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.sso_identity_sessions
+    ADD CONSTRAINT sso_identity_sessions_identity_id_fkey FOREIGN KEY (identity_id) REFERENCES public.sso_identities(id) ON DELETE CASCADE;
+
+
+--
 -- Name: usage_price_book_rates usage_price_book_rates_version_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -7025,7 +7078,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261114234108	f
+20261116234001	f
 \.
 
 

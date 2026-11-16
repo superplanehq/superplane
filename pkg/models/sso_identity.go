@@ -40,6 +40,9 @@ func (identity *SSOIdentity) Save(tx *gorm.DB) error {
 }
 
 func (identity *SSOIdentity) RevokeSessions(tx *gorm.DB, at time.Time) error {
+	if err := identity.RevokeIDPSessions(tx, at); err != nil {
+		return err
+	}
 	return tx.Model(&SSOIdentity{}).
 		Where("connection_id = ? AND id = ?", identity.ConnectionID, identity.ID).
 		Updates(map[string]any{
@@ -130,9 +133,19 @@ func FindSSOIdentityByIDPSubject(tx *gorm.DB, connectionID uuid.UUID, subject st
 	return &identity, nil
 }
 
-func FindSSOIdentityByIDPSession(tx *gorm.DB, connectionID uuid.UUID, sessionID string) (*SSOIdentity, error) {
+func FindSSOIdentityByIDPSession(tx *gorm.DB, connectionID uuid.UUID, sessionID string, now time.Time) (*SSOIdentity, error) {
+	var session SSOIdentitySession
+	err := tx.Where(
+		"connection_id = ? AND idp_session_id = ? AND revoked_at IS NULL AND expires_at > ?",
+		connectionID,
+		sessionID,
+		now,
+	).First(&session).Error
+	if err != nil {
+		return nil, err
+	}
 	var identity SSOIdentity
-	err := tx.Where("connection_id = ? AND idp_session_id = ?", connectionID, sessionID).First(&identity).Error
+	err = tx.Where("connection_id = ? AND id = ?", connectionID, session.IdentityID).First(&identity).Error
 	if err != nil {
 		return nil, err
 	}

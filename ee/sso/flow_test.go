@@ -186,6 +186,55 @@ func TestIssuerChangeKeepsIdentitiesUntilTheConnectionIsReplaced(t *testing.T) {
 	require.Equal(t, "client-2", view.ClientID)
 }
 
+func TestSubjectClaimChangeKeepsIdentitiesUntilTheConnectionIsReplaced(t *testing.T) {
+	f := newFlow(t)
+	f.verifyExample()
+	input := connectionInput(true)
+	conn := f.put(input)
+	f.markTested(conn)
+	activated, err := f.service.ActivateConnection(f.ctx(), f.r.Organization.ID)
+	require.NoError(t, err)
+	require.Equal(t, models.SSOStatusActive, activated.Status)
+
+	withoutIdentities := input
+	withoutIdentities.SubjectClaim = "oid"
+	withoutIdentities.ClientSecret = ""
+	changed, err := f.service.PutConnection(f.ctx(), f.r.Organization.ID, f.r.Account.ID, withoutIdentities)
+	require.NoError(t, err)
+	require.Equal(t, "oid", changed.SubjectClaim)
+	require.Equal(t, models.SSOStatusDraft, changed.Status)
+	require.Nil(t, changed.LastTestedAt)
+
+	original := input
+	original.SubjectClaim = "sub"
+	original.ClientSecret = ""
+	_, err = f.service.PutConnection(f.ctx(), f.r.Organization.ID, f.r.Account.ID, original)
+	require.NoError(t, err)
+	conn, err = models.FindSSOConnectionByID(database.Conn(), conn.ID)
+	require.NoError(t, err)
+	f.markTested(conn)
+	activated, err = f.service.ActivateConnection(f.ctx(), f.r.Organization.ID)
+	require.NoError(t, err)
+	require.Equal(t, models.SSOStatusActive, activated.Status)
+
+	subject := "same-subject"
+	require.NoError(t, database.Conn().Create(&models.SSOIdentity{
+		ConnectionID: conn.ID, OrganizationID: f.r.Organization.ID, AccountID: f.r.Account.ID,
+		Subject: &subject, Email: "ada@example.com", Active: true,
+		ProvisionedBy: models.SSOProvisionedByJIT, CreatedAt: time.Now(), UpdatedAt: time.Now(),
+	}).Error)
+	_, err = f.service.PutConnection(f.ctx(), f.r.Organization.ID, f.r.Account.ID, withoutIdentities)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "Delete this connection and create a new one before you change the subject claim.")
+
+	saved, err := models.FindSSOConnectionByID(database.Conn(), conn.ID)
+	require.NoError(t, err)
+	require.Equal(t, models.SSOStatusActive, saved.Status)
+	cfg, err := saved.OIDCConfig()
+	require.NoError(t, err)
+	require.Equal(t, "sub", cfg.SubjectClaim)
+}
+
 func TestSaveKeepsCustomClaims(t *testing.T) {
 	f := newFlow(t)
 	input := connectionInput(true)

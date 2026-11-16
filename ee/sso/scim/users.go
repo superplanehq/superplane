@@ -205,6 +205,9 @@ func (h *Handler) createUser(w http.ResponseWriter, r *http.Request, conn *model
 			now := h.now()
 			identity.Active = false
 			identity.SessionsRevokedAt = &now
+			if err := identity.RevokeIDPSessions(tx, now); err != nil {
+				return err
+			}
 			if err := identity.Save(tx); err != nil {
 				return err
 			}
@@ -351,7 +354,7 @@ func (h *Handler) applyChange(w http.ResponseWriter, r *http.Request, conn *mode
 			writeMapped(w, r, err)
 			return
 		}
-	} else if err := h.saveLockedProfile(r, identity); err != nil {
+	} else if err := h.saveLockedProfile(r, identity, nil); err != nil {
 		writeMapped(w, r, err)
 		return
 	}
@@ -371,9 +374,10 @@ func (h *Handler) applyChange(w http.ResponseWriter, r *http.Request, conn *mode
 
 func (h *Handler) deactivate(r *http.Request, conn *models.SSOConnection, identity *models.SSOIdentity) error {
 	now := h.now()
-	if err := h.saveLockedProfile(r, identity, func(locked *models.SSOIdentity) {
+	if err := h.saveLockedProfile(r, identity, func(tx *gorm.DB, locked *models.SSOIdentity) error {
 		locked.Active = false
 		locked.SessionsRevokedAt = &now
+		return locked.RevokeIDPSessions(tx, now)
 	}); err != nil {
 		return err
 	}
@@ -457,7 +461,7 @@ func (h *Handler) reactivate(r *http.Request, conn *models.SSOConnection, identi
 	})
 }
 
-func (h *Handler) saveLockedProfile(r *http.Request, identity *models.SSOIdentity, extra ...func(*models.SSOIdentity)) error {
+func (h *Handler) saveLockedProfile(r *http.Request, identity *models.SSOIdentity, extra func(*gorm.DB, *models.SSOIdentity) error) error {
 	return database.DB(r.Context()).Transaction(func(tx *gorm.DB) error {
 		if _, err := models.LockAccount(tx, identity.AccountID); err != nil {
 			return err
@@ -467,8 +471,10 @@ func (h *Handler) saveLockedProfile(r *http.Request, identity *models.SSOIdentit
 			return err
 		}
 		copySCIMProfile(locked, identity)
-		for _, apply := range extra {
-			apply(locked)
+		if extra != nil {
+			if err := extra(tx, locked); err != nil {
+				return err
+			}
 		}
 		if err := locked.Save(tx); err != nil {
 			return err
