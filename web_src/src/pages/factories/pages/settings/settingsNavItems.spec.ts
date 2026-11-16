@@ -52,7 +52,6 @@ describe("FACTORY_SETTINGS_NAV_GROUPS", () => {
       "Notifications",
       "Codex",
       "General",
-      "Repository",
       "Models",
       "MCP Server",
       "Usage",
@@ -92,7 +91,6 @@ describe("filterFactorySettingsNavGroups", () => {
     const workspaceGroup = filtered.find((group) => group.id === "workspace");
     expect(workspaceGroup?.items.map((item) => item.id)).toEqual([
       "workspace-general",
-      "workspace-repository",
       "workspace-models",
       "workspace-superplane-mcp-server",
       "workspace-usage",

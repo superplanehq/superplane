@@ -1063,10 +1063,6 @@ func (s *Server) adminEnableOrgExperimentalFeature(w http.ResponseWriter, r *htt
 		http.Error(w, "Organization not found", http.StatusNotFound)
 		return
 	}
-	if featureID == features.FeatureFactoryMultiRepoTasks {
-		s.adminSetMultiRepoTasks(w, r, parsedOrgID, true)
-		return
-	}
 	if err := models.EnableExperimentalFeature(parsedOrgID, featureID); err != nil {
 		log.Errorf("admin: failed to enable feature %s for org %s: %v", featureID, orgID, err)
 		http.Error(w, "Failed to enable feature", http.StatusInternalServerError)
@@ -1082,6 +1078,10 @@ func (s *Server) adminEnableOrgExperimentalFeature(w http.ResponseWriter, r *htt
 func (s *Server) adminDisableOrgExperimentalFeature(w http.ResponseWriter, r *http.Request) {
 	orgID := mux.Vars(r)["orgId"]
 	featureID := mux.Vars(r)["featureId"]
+	if !features.Exists(featureID) || features.IsHidden(featureID) {
+		http.Error(w, "Unknown experimental feature", http.StatusBadRequest)
+		return
+	}
 
 	parsedOrgID, err := uuid.Parse(orgID)
 	if err != nil {
@@ -1091,10 +1091,6 @@ func (s *Server) adminDisableOrgExperimentalFeature(w http.ResponseWriter, r *ht
 
 	if _, err := models.FindOrganizationByID(orgID); err != nil {
 		http.Error(w, "Organization not found", http.StatusNotFound)
-		return
-	}
-	if featureID == features.FeatureFactoryMultiRepoTasks {
-		s.adminSetMultiRepoTasks(w, r, parsedOrgID, false)
 		return
 	}
 

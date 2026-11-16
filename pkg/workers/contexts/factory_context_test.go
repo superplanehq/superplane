@@ -21,7 +21,6 @@ import (
 	factorycomp "github.com/superplanehq/superplane/pkg/components/factory"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	ghdependabot "github.com/superplanehq/superplane/pkg/integrations/github/dependabot"
 	"github.com/superplanehq/superplane/pkg/integrations/jira"
@@ -1078,7 +1077,6 @@ func testUpdateWorkOrderStatusWhenAllPullRequestsDone(t *testing.T, provider str
 		Result:                  models.FactoryWorkOrderResultCompleted,
 		WhenAllPullRequestsDone: true,
 	}
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryMultiRepoTasks))
 	updated, changed, err := ctx.UpdateWorkOrderStatus(closeWhenDone)
 	require.NoError(t, err)
 	assert.False(t, changed, "an open pull request must keep the task open")
@@ -1095,13 +1093,13 @@ func testUpdateWorkOrderStatusWhenAllPullRequestsDone(t *testing.T, provider str
 	assert.Equal(t, models.FactoryWorkOrderResultCompleted, updated.Result, "one merged pull request completes the task")
 }
 
-func TestFactoryContext_UpdateWorkOrderStatus_ClosesAtOnceWithoutMultiRepoTasks(t *testing.T) {
+func TestFactoryContext_UpdateWorkOrderStatus_ExplicitCloseDoesNotWaitForPullRequests(t *testing.T) {
 	for _, provider := range []string{models.FactoryPullRequestProviderGitHub, models.FactoryPullRequestProviderBitbucket} {
-		t.Run(provider, func(t *testing.T) { testUpdateWorkOrderStatusClosesAtOnceWithoutMultiRepoTasks(t, provider) })
+		t.Run(provider, func(t *testing.T) { testUpdateWorkOrderStatusExplicitClose(t, provider) })
 	}
 }
 
-func testUpdateWorkOrderStatusClosesAtOnceWithoutMultiRepoTasks(t *testing.T, provider string) {
+func testUpdateWorkOrderStatusExplicitClose(t *testing.T, provider string) {
 	r := support.Setup(t)
 	defer r.Close()
 
@@ -1124,7 +1122,7 @@ func testUpdateWorkOrderStatusClosesAtOnceWithoutMultiRepoTasks(t *testing.T, pr
 		OrderID:                 order.ID.String(),
 		State:                   models.FactoryWorkOrderStateClosed,
 		Result:                  models.FactoryWorkOrderResultPRClosed,
-		WhenAllPullRequestsDone: true,
+		WhenAllPullRequestsDone: false,
 	})
 	require.NoError(t, err)
 	assert.True(t, changed)
