@@ -176,6 +176,6 @@ func assertManifestContainsChecksPermission(t *testing.T, manifest string) {
 	t.Helper()
 	var parsed githubManifest
 	require.NoError(t, json.Unmarshal([]byte(manifest), &parsed))
-	assert.Equal(t, "read", parsed.DefaultPermissions["checks"])
+	assert.Equal(t, "write", parsed.DefaultPermissions["checks"])
 	assert.Equal(t, "read", parsed.DefaultPermissions["vulnerability_alerts"])
 }

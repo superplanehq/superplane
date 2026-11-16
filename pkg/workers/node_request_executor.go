@@ -10,7 +10,6 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/superplanehq/superplane/pkg/authorization"
-	factorycomponent "github.com/superplanehq/superplane/pkg/components/factory"
 	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
@@ -68,7 +67,7 @@ func (e *NodeRequestExecutor) execute(
 ) error {
 	defer e.publishExecution(request)
 	if request.Type == models.NodeRequestTypeInvokeAction && request.Spec.Data().InvokeAction != nil &&
-		request.Spec.Data().InvokeAction.ActionName == factorycomponent.UpdatePullRequestBodySectionHook {
+		factoryactions.IsPublicationHook(request.Spec.Data().InvokeAction.ActionName) {
 		events, err := factoryactions.ProcessBodySectionPublicationRequest(context.Background(), e.factoryIntakeDeps(), request.ID, lockRequest)
 		if err != nil {
 			return err

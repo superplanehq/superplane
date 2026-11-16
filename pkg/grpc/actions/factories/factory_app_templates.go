@@ -77,6 +77,8 @@ var factoryAppTemplates = map[factoryTemplateKey]factoryAppTemplate{
 			"github.listPullRequestReviewCandidates": "github",
 			"github.setPullRequestReviewCheck":       "github",
 			"github.ensurePullRequestReviewers":      "github",
+			"github.updatePullRequestBodySection":    "github",
+			"github.publishPullRequestComment":       "github",
 		},
 	}),
 	{id: "line-implementation", provider: models.ProviderGitHub}: githubFactoryTemplate(factoryAppTemplate{
@@ -141,6 +143,7 @@ var factoryAppTemplates = map[factoryTemplateKey]factoryAppTemplate{
 		componentIntegrations: map[string]string{
 			"github.onPullRequest":                "github",
 			"github.updatePullRequestBodySection": "github",
+			"github.setPullRequestCheckRun":       "github",
 		},
 	}),
 	{id: "visual-evidence", provider: models.ProviderGitHub}: githubFactoryTemplate(factoryAppTemplate{
@@ -312,6 +315,9 @@ func materializeFactoryTemplate(templateID, provider string, input factoryTempla
 	wireFactoryTemplate(canvas, template, input)
 	if template.id == reviewRequestTemplateID {
 		configureReviewRequestCheck(canvas)
+		if err := configureReviewRequestFindings(canvas); err != nil {
+			return nil, &BuiltInAutomationSettingsError{cause: err}
+		}
 	}
 	markFactoryTemplate(canvas, template)
 

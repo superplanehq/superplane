@@ -106,6 +106,18 @@ func PrepareOutputs(tx *gorm.DB, execution *models.CanvasNodeExecution) (payload
 		if channel == "failed" {
 			output.ErrorMessage = "Merge confidence assessment failed."
 		}
+		if channel == "passed" && !report.Complete {
+			var missing []string
+			for _, check := range report.Checks {
+				if check.Missing {
+					missing = append(missing, check.Label)
+				}
+			}
+			output.ErrorMessage = "Merge confidence assessment failed."
+			if len(missing) > 0 {
+				output.ErrorMessage = "Merge confidence did not report these checks: " + strings.Join(missing, ", ") + ". Run merge confidence again."
+			}
+		}
 		outputs[channel] = output
 	}
 	return payloadType, outputs, nil

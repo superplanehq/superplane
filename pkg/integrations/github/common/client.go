@@ -447,6 +447,16 @@ func (c *Client) ListCheckRunsForRef(ctx context.Context, repository string, ref
 	return c.underlying.Checks.ListCheckRunsForRef(ctx, owner, name, ref, opts)
 }
 
+func (c *Client) CreateCheckRun(ctx context.Context, repository string, opts github.CreateCheckRunOptions) (*github.CheckRun, *github.Response, error) {
+	owner, name := c.ownerAndName(repository)
+	return c.underlying.Checks.CreateCheckRun(ctx, owner, name, opts)
+}
+
+func (c *Client) UpdateCheckRun(ctx context.Context, repository string, id int64, opts github.UpdateCheckRunOptions) (*github.CheckRun, *github.Response, error) {
+	owner, name := c.ownerAndName(repository)
+	return c.underlying.Checks.UpdateCheckRun(ctx, owner, name, id, opts)
+}
+
 // GetBranchProtection returns required status checks for a branch. A missing
 // or unreadable rule is not an error: GitHub answers 404 when the branch is
 // open, and 403 when the installation cannot read Administration rules.
@@ -518,6 +528,11 @@ func (c *Client) RemoveIssueAssignees(ctx context.Context, repository string, is
 func (c *Client) CreateIssueComment(ctx context.Context, repository string, issueNumber int, comment *github.IssueComment) (*github.IssueComment, *github.Response, error) {
 	owner, name := c.ownerAndName(repository)
 	return c.underlying.Issues.CreateComment(ctx, owner, name, issueNumber, comment)
+}
+
+func (c *Client) GetIssueComment(ctx context.Context, repository string, commentID int64) (*github.IssueComment, *github.Response, error) {
+	owner, name := c.ownerAndName(repository)
+	return c.underlying.Issues.GetComment(ctx, owner, name, commentID)
 }
 
 func (c *Client) EditIssueComment(ctx context.Context, repository string, commentID int64, comment *github.IssueComment) (*github.IssueComment, *github.Response, error) {

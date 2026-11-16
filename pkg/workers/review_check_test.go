@@ -39,16 +39,21 @@ type reviewCheckIntegration struct {
 func (c reviewCheckIntegration) Publications() core.PublicationStore { return c.store }
 
 type reviewCheckHTTP struct {
-	t            *testing.T
-	mu           sync.Mutex
-	head         string
-	closed       bool
-	reviews      []map[string]any
-	failReviews  bool
-	failWrite    bool
-	failPR       bool
-	requestCount int
-	writes       []struct {
+	t                 *testing.T
+	mu                sync.Mutex
+	head              string
+	closed            bool
+	reviews           []map[string]any
+	failReviews       bool
+	failWrite         bool
+	writeStatus       int
+	checkRuns         []*github.CheckRun
+	checkWrites       []github.CheckRun
+	loseCheckResponse bool
+	checkRunPageSize  int
+	failPR            bool
+	requestCount      int
+	writes            []struct {
 		SHA    string
 		Status github.RepoStatus
 	}
@@ -60,13 +65,19 @@ func (h *reviewCheckHTTP) Do(request *http.Request) (*http.Response, error) {
 	if request.Method == http.MethodGet && strings.HasSuffix(request.URL.Path, "/pulls/42") && h.onRead != nil {
 		h.onRead()
 	}
-	if request.Method == http.MethodPost && strings.Contains(request.URL.Path, "/statuses/") && h.onWrite != nil {
+	if (request.Method == http.MethodPost || request.Method == http.MethodPatch) && (strings.Contains(request.URL.Path, "/statuses/") || strings.Contains(request.URL.Path, "/check-runs")) && h.onWrite != nil {
 		h.onWrite()
 	}
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	path := request.URL.Path
+	if strings.Contains(path, "/check-runs") {
+		return h.checkRequest(request)
+	}
 	if request.Method == http.MethodPost && strings.Contains(path, "/statuses/") {
+		if h.writeStatus > 0 {
+			return mocks.GitHubResponse(h.writeStatus, `{"message":"Resource not accessible by integration"}`), nil
+		}
 		if h.failWrite {
 			return mocks.GitHubResponse(503, `{"message":"unavailable"}`), nil
 		}
@@ -137,6 +148,10 @@ type reviewCheckFixture struct {
 }
 
 func newReviewCheckFixture(t *testing.T) *reviewCheckFixture {
+	return newPullRequestCheckFixture(t, "github.setPullRequestReviewCheck")
+}
+
+func newPullRequestCheckFixture(t *testing.T, component string) *reviewCheckFixture {
 	t.Helper()
 	r := support.Setup(t)
 	t.Cleanup(r.Close)
@@ -146,7 +161,7 @@ func newReviewCheckFixture(t *testing.T) *reviewCheckFixture {
 	canvas, nodes := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{
 		{NodeID: "trigger", Type: models.NodeTypeTrigger, Ref: datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "onBroadcast"}})},
 		{NodeID: "ensure", Type: models.NodeTypeComponent, AppInstallationID: &installation.ID, Ref: datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "github.ensurePullRequestReviewers"}})},
-		{NodeID: "check", Type: models.NodeTypeComponent, AppInstallationID: &installation.ID, Ref: datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "github.setPullRequestReviewCheck"}})},
+		{NodeID: "check", Type: models.NodeTypeComponent, AppInstallationID: &installation.ID, Ref: datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: component}})},
 	}, nil)
 	for i := 1; i < len(nodes); i++ {
 		nodes[i].AppInstallationID = &installation.ID
@@ -178,7 +193,8 @@ func (f *reviewCheckFixture) processDue() error {
 	provider, err := f.r.Registry.GetIntegration("github")
 	require.NoError(f.t, err)
 	f.r.Registry.Integrations["github"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{
-		Hooks: provider.Hooks(),
+		Actions: provider.Actions(),
+		Hooks:   provider.Hooks(),
 		HandleHook: func(ctx core.IntegrationHookContext) error {
 			ctx.HTTP, ctx.Integration = f.http, f.integration
 			return provider.HandleHook(ctx)

@@ -131,11 +131,19 @@ func installPublicationGitHub(t *testing.T, httpCtx core.HTTPContext) {
 	}
 }
 
+// The publish node uses a GitHub integration, like an installed canvas, so
+// the body write can hold its pull request description lease.
 func (f publicationFixture) integrationPublicationAttempt(t *testing.T) *bodySectionActionAttempt {
 	t.Helper()
+	integration, err := models.CreateIntegration(uuid.New(), f.canvas.OrganizationID, "github", "github", nil)
+	require.NoError(t, err)
+	integrationID := integration.ID.String()
 	f.publishVersion(t, func(v *models.CanvasVersion) {
-		findIntakeNode(v.Nodes, "publish").Ref.Component.Name = "github.updatePullRequestBodySection"
+		node := findIntakeNode(v.Nodes, "publish")
+		node.Ref.Component.Name = "github.updatePullRequestBodySection"
+		node.IntegrationID = &integrationID
 	})
+	require.NoError(t, f.db.Model(&models.CanvasNode{}).Where("workflow_id = ? AND node_id = ?", f.canvas.ID, "publish").Update("app_installation_id", integration.ID).Error)
 	f.startRun(t)
 	f.report(t, f.run, 4)
 	execution, request := f.publicationRequest(t, "passed")
@@ -158,15 +166,24 @@ func publicationBodySectionClient(t *testing.T, host core.HTTPContext) prbody.Cl
 }
 
 func TestAssessmentCompletionEmitsStructuredMergeConfidence(t *testing.T) {
-	for _, channel := range []string{"passed", "failed"} {
-		t.Run(channel, func(t *testing.T) {
+	for _, scenario := range []struct {
+		name, channel string
+		reported      bool
+	}{
+		{"complete", "passed", true},
+		{"failed", "failed", true},
+		{"incomplete", "passed", false},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
 			f := newPublicationFixture(t)
-			f.report(t, f.run, 4)
+			if scenario.reported {
+				f.report(t, f.run, 4)
+			}
 			root, err := f.run.RootEvent(f.db)
 			require.NoError(t, err)
 			agent := support.CreateCanvasNodeExecution(t, f.canvas.ID, "agent", root.ID, root.ID)
 			state := workercontexts.NewFactoryExecutionStateContext(f.db, agent, nil)
-			require.NoError(t, state.Emit(channel, "runnerClaudeCode.finished", []any{map[string]any{"status": "finished"}}))
+			require.NoError(t, state.Emit(scenario.channel, "runnerClaudeCode.finished", []any{map[string]any{"status": "finished"}}))
 			var event models.CanvasEvent
 			require.NoError(t, f.db.Where("execution_id = ?", agent.ID).First(&event).Error)
 			payload := event.Data.Data().(map[string]any)["data"].(map[string]any)
@@ -174,9 +191,9 @@ func TestAssessmentCompletionEmitsStructuredMergeConfidence(t *testing.T) {
 			require.True(t, ok, "assessment completion must expose saved report data to downstream templates")
 			assert.Equal(t, f.pr.ID.String(), report["pullRequestId"])
 			assert.Equal(t, "abc", report["reviewedCommit"])
-			assert.Equal(t, channel == "passed", report["complete"])
+			assert.Equal(t, scenario.channel == "passed" && scenario.reported, report["complete"])
 			require.NoError(t, f.db.First(f.run, "id = ?", f.run.ID).Error)
-			assert.Equal(t, channel == "failed", len(f.run.Errors) > 0)
+			assert.Equal(t, report["complete"] != true, len(f.run.Errors) > 0)
 		})
 	}
 }

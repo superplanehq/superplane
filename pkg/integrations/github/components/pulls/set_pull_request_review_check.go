@@ -23,6 +23,7 @@ const reviewCheckPrefix = "github.review-check/"
 type SetPullRequestReviewCheck struct{}
 
 type reviewCheckConfiguration struct {
+	CheckRun                   bool               `json:"checkRun,omitempty" mapstructure:"-"`
 	ActivationNodeID           string             `json:"activationNodeId,omitempty" mapstructure:"activationNodeId"`
 	Enabled                    *bool              `json:"enabled,omitempty" mapstructure:"enabled"`
 	Repository                 string             `json:"repository" mapstructure:"repository"`
@@ -33,6 +34,7 @@ type reviewCheckConfiguration struct {
 	SourceRunID                string             `json:"sourceRunId,omitempty" mapstructure:"sourceRunId"`
 	AttemptRootEventID         string             `json:"attemptRootEventId,omitempty" mapstructure:"attemptRootEventId"`
 	Phase                      string             `json:"phase" mapstructure:"phase"`
+	State                      string             `json:"state,omitempty" mapstructure:"state"`
 	Reviewers                  []ReviewerIdentity `json:"reviewers" mapstructure:"reviewers"`
 	ReviewerRequestExecutionID string             `json:"reviewerRequestExecutionId,omitempty" mapstructure:"reviewerRequestExecutionId"`
 	Reason                     string             `json:"reason" mapstructure:"reason"`
@@ -46,6 +48,25 @@ type reviewCheckState struct {
 	Description   string                   `json:"description"`
 	Delivered     string                   `json:"delivered,omitempty"`
 	Delivery      *reviewCheckDelivery     `json:"delivery,omitempty"`
+	Error         string                   `json:"error,omitempty"`
+	SetupFailures int                      `json:"setupFailures,omitempty"`
+	CheckRun      *pullRequestCheckRun     `json:"checkRun,omitempty"`
+	Retired       []retiredCommitCheck     `json:"retired,omitempty"`
+}
+
+type pullRequestCheckRun struct {
+	ID         int64  `json:"id,omitempty"`
+	ExternalID string `json:"externalId"`
+}
+
+type retiredCommitCheck struct {
+	CheckRun  *pullRequestCheckRun `json:"checkRun,omitempty"`
+	SHA       string               `json:"sha"`
+	ResultURL string               `json:"resultUrl"`
+	// State and Description keep an undelivered terminal result. Empty values
+	// publish the superseded error.
+	State       string `json:"state,omitempty"`
+	Description string `json:"description,omitempty"`
 }
 
 type reviewCheckDelivery struct {
@@ -90,9 +111,7 @@ func (*SetPullRequestReviewCheck) Configuration() []configuration.Field {
 		configuration.Field{Name: "activationGeneration", Label: "Activation generation", Type: configuration.FieldTypeNumber, Default: 1, Description: "Use a positive saved generation. After disabling, select a greater generation to enable again."},
 		configuration.Field{Name: "sourceRunId", Label: "Source run ID", Type: configuration.FieldTypeString, Description: "Defaults to the broadcast source or current run."},
 		configuration.Field{Name: "attemptRootEventId", Label: "Attempt root event ID", Type: configuration.FieldTypeString, Description: "Defaults to the current run root event."},
-		configuration.Field{Name: "phase", Label: "Phase", Type: configuration.FieldTypeSelect, Required: true, TypeOptions: &configuration.TypeOptions{Select: &configuration.SelectTypeOptions{Options: []configuration.FieldOption{
-			{Label: "Pending selection", Value: "pending_selection"}, {Label: "Required reviewers", Value: "required_reviewers"}, {Label: "No review", Value: "no_review"}, {Label: "Selection error", Value: "selection_error"}, {Label: "Disabled", Value: "disabled"},
-		}}}},
+		configuration.Field{Name: "phase", Label: "Phase", Type: configuration.FieldTypeString, Required: true, Description: "Enter a phase or an expression that returns one: pending_selection, required_reviewers, no_review, selection_error, disabled."},
 		reviewerField,
 		configuration.Field{Name: "reviewerRequestExecutionId", Label: "Reviewer request execution ID", Type: configuration.FieldTypeString, Description: "Execution ID from Ensure Pull Request Reviewers. Required when reviewers are required."},
 		configuration.Field{Name: "reason", Label: "Reason", Type: configuration.FieldTypeString, Required: true},
@@ -160,6 +179,10 @@ func (*SetPullRequestReviewCheck) Execute(ctx core.ExecutionContext) error {
 	if err != nil {
 		return err
 	}
+	return executePullRequestCheck(ctx, config)
+}
+
+func executePullRequestCheck(ctx core.ExecutionContext, config reviewCheckConfiguration) error {
 	if ctx.Publications == nil {
 		return fmt.Errorf("publication context is required")
 	}
@@ -212,8 +235,22 @@ func (*SetPullRequestReviewCheck) Execute(ctx core.ExecutionContext) error {
 			}
 		}
 		if comparison == 0 && record.Generation > 0 && record.ActivationGeneration == config.ActivationGeneration {
+			if (config.CheckRun || previous.Configuration.CheckRun) && (previous.Configuration.AssessedSHA != config.AssessedSHA || previous.Configuration.CheckRun != config.CheckRun) {
+				status = "superseded"
+				return core.ErrPublicationUnchanged
+			}
 			if reflect.DeepEqual(previous.Configuration, config) {
 				generation = record.Generation
+				if previous.Error != "" {
+					previous.Error = ""
+					previous.SetupFailures = 0
+					record.Payload, err = json.Marshal(previous)
+					if err != nil {
+						return err
+					}
+					record.WakeAt = reviewCheckWake(time.Second)
+					return nil
+				}
 				if previous.Delivered == "" || previous.Delivered != previous.fingerprint() {
 					record.WakeAt = reviewCheckWake(time.Second)
 					return nil
@@ -221,7 +258,7 @@ func (*SetPullRequestReviewCheck) Execute(ctx core.ExecutionContext) error {
 				return core.ErrPublicationUnchanged
 			}
 			// One attempt can move from selection to one outcome, then disable.
-			if previous.Configuration.Phase != "pending_selection" && config.Phase != "disabled" {
+			if previous.Configuration.Phase != "pending_selection" && previous.Configuration.State != "pending" && config.Phase != "disabled" {
 				status = "superseded"
 				return core.ErrPublicationUnchanged
 			}
@@ -233,8 +270,24 @@ func (*SetPullRequestReviewCheck) Execute(ctx core.ExecutionContext) error {
 		if config.ActivationNodeID != "" {
 			record.OwnerNodeID = config.ActivationNodeID
 		}
-		// A replacement must wait for an already claimed status write to finish.
-		record.Payload, err = json.Marshal(reviewCheckState{Configuration: config, Delivery: previous.Delivery})
+		// A replacement waits for a claimed write and retires its attempt's spinner.
+		retired := previous.Retired
+		sameAttempt := comparison == 0 && previous.Configuration.AssessedSHA == config.AssessedSHA && previous.Configuration.CheckRun == config.CheckRun
+		checkRun := previous.CheckRun
+		if config.CheckRun && (!sameAttempt || checkRun == nil) {
+			externalID := uuid.NewSHA1(uuid.NameSpaceURL, []byte(fmt.Sprintf("%s/%s/%s/%s/%d", ctx.Integration.ID(), key, order.SourceRunID, order.AttemptRootEventID, config.ActivationGeneration))).String()
+			checkRun = &pullRequestCheckRun{ExternalID: externalID}
+		}
+		if !config.CheckRun {
+			checkRun = nil
+		}
+		replaceAttempt := config.State != "" && (previous.Configuration.AssessedSHA != config.AssessedSHA || previous.Configuration.CheckRun != config.CheckRun || previous.CheckRun != nil && !sameAttempt)
+		if replaceAttempt {
+			if check, ok := previous.undeliveredCommitCheck(); ok {
+				retired = append(retired, check)
+			}
+		}
+		record.Payload, err = json.Marshal(reviewCheckState{Configuration: config, Delivery: previous.Delivery, Retired: retired, CheckRun: checkRun})
 		if err != nil {
 			return err
 		}
@@ -247,7 +300,7 @@ func (*SetPullRequestReviewCheck) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 	if status == "superseded" {
-		return emitReviewCheck(ctx.ExecutionState, status, nil, nil)
+		return emitReviewCheck(ctx.ExecutionState, status, nil, &reviewCheckState{Configuration: config})
 	}
 	if config.Phase == "pending_selection" {
 		return emitReviewCheck(ctx.ExecutionState, "registered", nil, nil)
@@ -283,11 +336,27 @@ func (*SetPullRequestReviewCheck) HandleHook(ctx core.ActionHookContext) error {
 		return err
 	}
 	if record == nil || record.Generation != metadata.Generation {
-		return emitReviewCheck(ctx.ExecutionState, "superseded", nil, nil)
+		var config reviewCheckConfiguration
+		if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
+			return err
+		}
+		return emitReviewCheck(ctx.ExecutionState, "superseded", nil, &reviewCheckState{Configuration: config})
 	}
 	state, err := decodeReviewCheckState(record.Payload)
 	if err != nil {
 		return err
+	}
+	if state.Error != "" {
+		return ctx.ExecutionState.Fail("error", state.Error)
+	}
+	if state.Configuration.State != "" {
+		owner, err := ctx.Publications.OwnerStatus(record.OwnerCanvasID, record.OwnerNodeID)
+		if err != nil {
+			return err
+		}
+		if !owner.Available {
+			return ctx.ExecutionState.Fail("error", "The organization or integration is unavailable.")
+		}
 	}
 	if state.Delivered == "" || state.Delivered != state.fingerprint() {
 		return ctx.Requests.ScheduleActionCall(reviewCheckWaitHook, nil, time.Second)
@@ -322,6 +391,25 @@ func (*SetPullRequestReviewCheck) ExampleOutput() map[string]any {
 }
 
 func decodeReviewCheck(raw any) (reviewCheckConfiguration, error) {
+	c, err := decodePullRequestCheck(raw)
+	if err != nil {
+		return c, err
+	}
+	if c.State != "" || !slices.Contains([]string{"pending_selection", "required_reviewers", "no_review", "selection_error", "disabled"}, c.Phase) {
+		return c, fmt.Errorf("invalid review check phase")
+	}
+	if c.Phase == "required_reviewers" {
+		if err := validateDesiredReviewers(c.Reviewers); err != nil {
+			return c, err
+		}
+		if _, err := uuid.Parse(c.ReviewerRequestExecutionID); err != nil {
+			return c, fmt.Errorf("reviewer request execution ID is required")
+		}
+	}
+	return c, nil
+}
+
+func decodePullRequestCheck(raw any) (reviewCheckConfiguration, error) {
 	var c reviewCheckConfiguration
 	if err := mapstructure.Decode(raw, &c); err != nil {
 		return c, err
@@ -340,17 +428,6 @@ func decodeReviewCheck(raw any) (reviewCheckConfiguration, error) {
 	}
 	if c.Repository == "" || c.Context == "" || c.AssessedSHA == "" || strings.TrimSpace(c.Reason) == "" {
 		return c, fmt.Errorf("repository, assessed SHA, context, and reason are required")
-	}
-	if !slices.Contains([]string{"pending_selection", "required_reviewers", "no_review", "selection_error", "disabled"}, c.Phase) {
-		return c, fmt.Errorf("invalid review check phase")
-	}
-	if c.Phase == "required_reviewers" {
-		if err := validateDesiredReviewers(c.Reviewers); err != nil {
-			return c, err
-		}
-		if _, err := uuid.Parse(c.ReviewerRequestExecutionID); err != nil {
-			return c, fmt.Errorf("reviewer request execution ID is required")
-		}
 	}
 	return c, nil
 }
@@ -371,8 +448,51 @@ func decodeReviewCheckState(raw json.RawMessage) (reviewCheckState, error) {
 	return state, err
 }
 func (s reviewCheckState) fingerprint() string {
-	b, _ := json.Marshal([]string{s.SHA, s.State, s.Description, s.Configuration.ResultURL})
+	fields := []string{s.SHA, s.State, s.Description, s.resultURL()}
+	if target := s.checkRunTarget(); target != nil {
+		fields = append(fields, target.ExternalID, fmt.Sprint(target.ID), fmt.Sprint(len(s.Retired) > 0))
+	}
+	b, _ := json.Marshal(fields)
 	return string(b)
+}
+
+func (s reviewCheckState) resultURL() string {
+	if len(s.Retired) > 0 {
+		return s.Retired[0].ResultURL
+	}
+	return s.Configuration.ResultURL
+}
+
+// undeliveredCommitCheck returns the status that the assessed commit still
+// needs when a newer commit replaces this check. A pending commit gets the
+// superseded error. A terminal result that GitHub did not confirm is kept.
+func (s reviewCheckState) undeliveredCommitCheck() (retiredCommitCheck, bool) {
+	config := s.Configuration
+	if config.State == "" {
+		return retiredCommitCheck{}, false
+	}
+	check := retiredCommitCheck{SHA: config.AssessedSHA, ResultURL: config.ResultURL, CheckRun: s.CheckRun}
+	if config.State == "pending" {
+		return check, true
+	}
+	if s.terminalResultDelivered() {
+		return retiredCommitCheck{}, false
+	}
+	check.State, check.Description = config.State, config.Reason
+	return check, true
+}
+
+func (s reviewCheckState) terminalResultDelivered() bool {
+	return len(s.Retired) == 0 && s.Delivered != "" && s.Delivered == s.fingerprint() &&
+		s.SHA == s.Configuration.AssessedSHA && s.State == s.Configuration.State
+}
+
+func (s *reviewCheckState) markOwnerRemoved() {
+	s.Configuration.State, s.Configuration.Reason = "error", "The canvas or check was removed."
+	if len(s.Retired) > 0 {
+		return
+	}
+	s.SHA, s.State, s.Description = s.Configuration.AssessedSHA, "error", s.Configuration.Reason
 }
 func emitReviewCheck(execution core.ExecutionStateContext, status string, record *core.OrderedPublication, state *reviewCheckState) error {
 	out := map[string]any{"status": status}
@@ -381,9 +501,16 @@ func emitReviewCheck(execution core.ExecutionStateContext, status string, record
 		out["activationGeneration"] = record.ActivationGeneration
 	}
 	if state != nil {
+		if state.CheckRun != nil {
+			out["checkRunId"] = state.CheckRun.ID
+		}
 		out["state"], out["sha"], out["phase"], out["context"] = state.State, state.SHA, state.Configuration.Phase, state.Configuration.Context
 	}
-	return execution.Emit("default", "github.pullRequestReviewCheck", []any{out})
+	payloadType := "github.pullRequestReviewCheck"
+	if state != nil && state.Configuration.State != "" {
+		payloadType = "github.pullRequestCheck"
+	}
+	return execution.Emit("default", payloadType, []any{out})
 }
 
 func validateRecordedReviewers(publications core.PublicationContext, config reviewCheckConfiguration) error {

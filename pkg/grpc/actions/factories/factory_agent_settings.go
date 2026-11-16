@@ -23,6 +23,8 @@ var factoryAgentSettingFields = []string{
 	"enabledAgentResourceTools", "skipSetupCommands", "environmentFrom",
 	"additionalInstructions",
 	"fallbackReviewer", "publishPRCheck", "prCheckActivationGeneration",
+	"publishReviewFindings", "reviewFindingsBody", "reviewFindingsComment",
+	"reviewFindingsBodyActivationGeneration", "reviewFindingsCommentActivationGeneration",
 }
 
 type factoryAgentSettings struct {
