@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/google/go-github/v84/github"
+	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -19,6 +20,7 @@ type ensureReviewersConfiguration struct {
 	Repository      string             `json:"repository" mapstructure:"repository"`
 	PullNumber      any                `json:"pullNumber" mapstructure:"pullNumber"`
 	Reviewers       []ReviewerIdentity `json:"reviewers" mapstructure:"reviewers"`
+	Managed         bool               `json:"managed" mapstructure:"managed"`
 	ExpectedHeadSHA string             `json:"expectedHeadSha" mapstructure:"expectedHeadSha"`
 }
 
@@ -29,6 +31,8 @@ type ensureReviewersOutcome struct {
 	HeadSHA        string             `json:"headSha"`
 	Requested      []ReviewerIdentity `json:"requested"`
 	AlreadyCovered []ReviewerIdentity `json:"alreadyCovered"`
+	Selected       []ReviewerIdentity `json:"selected"`
+	Removed        []ReviewerIdentity `json:"removed"`
 }
 
 func (c *EnsurePullRequestReviewers) Name() string  { return "github.ensurePullRequestReviewers" }
@@ -37,7 +41,13 @@ func (c *EnsurePullRequestReviewers) Description() string {
 	return "Request missing reviews after checking reviewer eligibility and the pull request head"
 }
 func (c *EnsurePullRequestReviewers) Documentation() string {
-	return `Ensure desired human reviewers have a review request or an approval for the current commit. Recheck IDs and repository write access. Preserve unrelated requests. Read the pull request again immediately before mutation. Closed pull requests and unexpected commits emit a skipped outcome. Provider failures and ineligible identities fail the execution. Output includes requested and already-covered identities. The final read and mutation are not atomic.`
+	return `Ensure desired human reviewers have a review request or an approval for the current commit. Recheck IDs and repository write access. Closed pull requests and unexpected commits emit a skipped outcome. Provider failures and ineligible identities fail the execution.
+
+By default, add missing requests and preserve all existing requests. Enable managed reconciliation to track requests added by this automation after enablement. Managed execution requires expectedHeadSha. An empty managed selection withdraws its pending requests.
+
+Request replacements before withdrawals. Preserve pre-existing requests, requests owned by other automations, team requests, and submitted reviews. Never infer ownership from old PR descriptions or current requests. Keep suitable reviewers across selections.
+
+Ordered publication state fences superseded runs and records partial writes for retry. Output includes requested, alreadyCovered, selected, and removed identities. GitHub reads and mutations are not atomic.`
 }
 func (c *EnsurePullRequestReviewers) Icon() string  { return "github" }
 func (c *EnsurePullRequestReviewers) Color() string { return "gray" }
@@ -48,6 +58,7 @@ func (c *EnsurePullRequestReviewers) Configuration() []configuration.Field {
 	fields := (&ListPullRequestReviewCandidates{}).Configuration()
 	return append(fields,
 		reviewerConfigurationField(),
+		configuration.Field{Name: "managed", Label: "Manage reviewer requests", Type: configuration.FieldTypeBool, Description: "Reconcile requests added by this automation. An empty selection withdraws its pending requests."},
 		configuration.Field{Name: "expectedHeadSha", Label: "Expected Head SHA", Type: configuration.FieldTypeString, Description: "Skip the request if the current head differs from this commit."},
 	)
 }
@@ -68,7 +79,7 @@ func (c *EnsurePullRequestReviewers) Setup(ctx core.SetupContext) error {
 		if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 			return err
 		}
-		if err := validateDesiredReviewers(config.Reviewers); err != nil {
+		if err := validateReviewerSelection(config); err != nil {
 			return err
 		}
 	}
@@ -94,7 +105,7 @@ func (c *EnsurePullRequestReviewers) Execute(ctx core.ExecutionContext) error {
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return err
 	}
-	if err := validateDesiredReviewers(config.Reviewers); err != nil {
+	if err := validateReviewerSelection(config); err != nil {
 		return err
 	}
 	number, err := parsePullNumber(config.PullNumber)
@@ -107,6 +118,9 @@ func (c *EnsurePullRequestReviewers) Execute(ctx core.ExecutionContext) error {
 	client, err := common.NewClient(ctx.Integration, ctx.HTTP)
 	if err != nil {
 		return err
+	}
+	if config.Managed {
+		return reconcileManagedReviewers(ctx, client, config, number)
 	}
 	read := func() (*github.PullRequest, error) {
 		pr, _, err := client.GetPullRequest(context.Background(), config.Repository, number)
@@ -128,31 +142,13 @@ func (c *EnsurePullRequestReviewers) Execute(ctx core.ExecutionContext) error {
 	if err != nil {
 		return fmt.Errorf("read pull request: %w", err)
 	}
-	outcome := ensureReviewersOutcome{ExecutionID: ctx.ID.String(), Requested: []ReviewerIdentity{}, AlreadyCovered: []ReviewerIdentity{}}
+	outcome := ensureReviewersOutcome{ExecutionID: ctx.ID.String(), Requested: []ReviewerIdentity{}, AlreadyCovered: []ReviewerIdentity{}, Removed: []ReviewerIdentity{}}
 	if reason := skipped(pr); reason != "" {
 		outcome.Status, outcome.Reason, outcome.HeadSHA = "skipped", reason, pr.GetHead().GetSHA()
 		return emit(outcome)
 	}
-	users, err := client.ListHumanReviewers(context.Background(), config.Repository)
-	if err != nil {
+	if err := validateReviewerEligibility(context.Background(), client, config, pr); err != nil {
 		return err
-	}
-	if pr.GetUser().GetLogin() == "" {
-		return fmt.Errorf("pull request author is missing")
-	}
-	for _, reviewer := range config.Reviewers {
-		if strings.EqualFold(reviewer.Login, pr.GetUser().GetLogin()) || !slices.ContainsFunc(users, func(user *github.User) bool {
-			return user.GetID() == reviewer.ID && strings.EqualFold(user.GetLogin(), reviewer.Login)
-		}) {
-			return fmt.Errorf("reviewer is not eligible: %s", reviewer.Login)
-		}
-		permission, _, err := client.GetRepositoryPermissionLevel(context.Background(), config.Repository, reviewer.Login)
-		if err != nil {
-			return fmt.Errorf("read reviewer permission: %w", err)
-		}
-		if !slices.Contains([]string{"write", "maintain", "admin"}, permission.GetPermission()) {
-			return fmt.Errorf("reviewer requires repository write access: %s", reviewer.Login)
-		}
 	}
 	reviews, err := client.ListReviews(context.Background(), config.Repository, number)
 	if err != nil {
@@ -180,6 +176,7 @@ func (c *EnsurePullRequestReviewers) Execute(ctx core.ExecutionContext) error {
 		logins = append(logins, reviewer.Login)
 		outcome.Requested = append(outcome.Requested, reviewer)
 	}
+	outcome.Selected = config.Reviewers
 	outcome.Status = "already_covered"
 	if len(logins) > 0 {
 		if _, _, err := client.AddPullRequestReviewers(context.Background(), config.Repository, number, github.ReviewersRequest{Reviewers: logins}); err != nil {
@@ -189,6 +186,38 @@ func (c *EnsurePullRequestReviewers) Execute(ctx core.ExecutionContext) error {
 	}
 	return emit(outcome)
 }
+func validateReviewerSelection(config ensureReviewersConfiguration) error {
+	if len(config.Reviewers) == 0 && config.Managed {
+		return nil
+	}
+	return validateDesiredReviewers(config.Reviewers)
+}
+
+func validateReviewerEligibility(providerContext context.Context, client *common.Client, config ensureReviewersConfiguration, pr *github.PullRequest) error {
+	users, err := client.ListHumanReviewers(providerContext, config.Repository)
+	if err != nil {
+		return err
+	}
+	if pr.GetUser().GetLogin() == "" {
+		return fmt.Errorf("pull request author is missing")
+	}
+	for _, reviewer := range config.Reviewers {
+		if strings.EqualFold(reviewer.Login, pr.GetUser().GetLogin()) || !slices.ContainsFunc(users, func(user *github.User) bool {
+			return user.GetID() == reviewer.ID && strings.EqualFold(user.GetLogin(), reviewer.Login)
+		}) {
+			return fmt.Errorf("reviewer is not eligible: %s", reviewer.Login)
+		}
+		permission, _, err := client.GetRepositoryPermissionLevel(providerContext, config.Repository, reviewer.Login)
+		if err != nil {
+			return fmt.Errorf("read reviewer permission: %w", err)
+		}
+		if !slices.Contains([]string{"write", "maintain", "admin"}, permission.GetPermission()) {
+			return fmt.Errorf("reviewer requires repository write access: %s", reviewer.Login)
+		}
+	}
+	return nil
+}
+
 func hasCurrentApproval(reviews []*github.PullRequestReview, reviewer ReviewerIdentity, sha string) bool {
 	latest := latestReviewerDecision(reviews, reviewer)
 	return latest != nil && latest.GetState() == "APPROVED" && latest.GetCommitID() == sha
@@ -206,8 +235,45 @@ func latestReviewerDecision(reviews []*github.PullRequestReview, reviewer Review
 	}
 	return latest
 }
-func (c *EnsurePullRequestReviewers) Hooks() []core.Hook                      { return nil }
-func (c *EnsurePullRequestReviewers) HandleHook(core.ActionHookContext) error { return nil }
+func (c *EnsurePullRequestReviewers) Hooks() []core.Hook {
+	return []core.Hook{{Name: reviewerRetryHook, Type: core.HookTypeInternal}}
+}
+func (c *EnsurePullRequestReviewers) HandleHook(ctx core.ActionHookContext) error {
+	if ctx.Name != reviewerRetryHook {
+		return fmt.Errorf("unknown hook: %s", ctx.Name)
+	}
+	if ctx.ExecutionState.IsFinished() || ctx.ExecutionState.IsCancelling() {
+		return nil
+	}
+	var metadata struct {
+		ExecutionID string
+		Write       core.OrderedWrite
+	}
+	if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil {
+		return err
+	}
+	id, err := uuid.Parse(metadata.ExecutionID)
+	if err != nil {
+		return err
+	}
+	var config ensureReviewersConfiguration
+	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
+		return err
+	}
+	number, err := parsePullNumber(config.PullNumber)
+	if err != nil {
+		return err
+	}
+	client, err := common.NewClient(ctx.Integration, ctx.HTTP)
+	if err != nil {
+		return err
+	}
+	publications := ctx.Publications
+	if independent, ok := publications.(core.IndependentPublicationContext); ok {
+		publications = independent.Independent()
+	}
+	return runManagedReviewers(core.ExecutionContext{ID: id, Publications: publications, Metadata: ctx.Metadata, Requests: ctx.Requests, ExecutionState: ctx.ExecutionState}, client, config, number, metadata.Write)
+}
 func (c *EnsurePullRequestReviewers) HandleWebhook(core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return 200, nil, nil
 }
@@ -216,6 +282,6 @@ func (c *EnsurePullRequestReviewers) Cleanup(core.SetupContext) error    { retur
 
 func (c *EnsurePullRequestReviewers) ExampleOutput() map[string]any {
 	return map[string]any{"type": "github.pullRequestReviewersEnsured", "timestamp": "2026-01-01T09:00:00Z", "data": map[string]any{
-		"executionId": "11111111-1111-1111-1111-111111111111", "status": "requested", "headSha": "abc", "requested": []any{map[string]any{"id": 123, "login": "octocat"}}, "alreadyCovered": []any{},
+		"executionId": "11111111-1111-1111-1111-111111111111", "status": "requested", "headSha": "abc", "requested": []any{map[string]any{"id": 123, "login": "octocat"}}, "alreadyCovered": []any{}, "selected": []any{map[string]any{"id": 123, "login": "octocat"}}, "removed": []any{},
 	}}
 }
