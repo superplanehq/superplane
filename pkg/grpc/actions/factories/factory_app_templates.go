@@ -144,6 +144,7 @@ var factoryAppTemplates = map[factoryTemplateKey]factoryAppTemplate{
 			"github.onPullRequest":                "github",
 			"github.updatePullRequestBodySection": "github",
 			"github.setPullRequestCheckRun":       "github",
+			"github.publishPullRequestComment":    "github",
 		},
 	}),
 	{id: "visual-evidence", provider: models.ProviderGitHub}: githubFactoryTemplate(factoryAppTemplate{
@@ -313,6 +314,11 @@ func materializeFactoryTemplate(templateID, provider string, input factoryTempla
 	canvas.Metadata.ID = input.appID
 	canvas.Metadata.Name = input.appName
 	wireFactoryTemplate(canvas, template, input)
+	if template.id == "risk-score" {
+		if err := configureMergeConfidencePublication(canvas); err != nil {
+			return nil, &BuiltInAutomationSettingsError{cause: err}
+		}
+	}
 	if template.id == reviewRequestTemplateID {
 		configureReviewRequestCheck(canvas)
 		if err := configureReviewRequestFindings(canvas); err != nil {

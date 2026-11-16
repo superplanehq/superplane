@@ -323,7 +323,7 @@ spec:
       type: TYPE_ACTION
       component: filter
       configuration:
-        expression: '$["Assess Merge Confidence"].data.mergeConfidence.complete == true && previous().data.status in ["published", "unchanged"]'
+        expression: '$["Assess Merge Confidence"].data.mergeConfidence.complete == true && previous().data.status in ["published", "unchanged", "disabled"]'
       position:
         x: 1520
         "y": 80

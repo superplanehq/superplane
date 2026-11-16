@@ -55,6 +55,12 @@ func (f publicationFixture) publicationRequest(t *testing.T, channel string) (*m
 	version, err := models.FindCanvasVersionInTransaction(f.db, f.canvas.ID, f.run.VersionID)
 	require.NoError(t, err)
 	component := findIntakeNode(version.Nodes, "publish").ComponentName()
+	for _, key := range []string{"enabled", "ordered", "activationGeneration"} {
+		delete(configuration, key)
+		if saved, ok := findIntakeNode(version.Nodes, "publish").Configuration[key]; ok {
+			configuration[key] = saved
+		}
+	}
 	action, err := f.deps.Registry.GetAction(component)
 	require.NoError(t, err)
 	execution.Metadata = datatypes.NewJSONType(map[string]any{models.CanvasNodeExecutionFrozenComponentKey: component})
@@ -75,9 +81,13 @@ func (f publicationFixture) publicationRequest(t *testing.T, channel string) (*m
 	require.NoError(t, err)
 	execution.Configuration = datatypes.NewJSONType(resolved)
 	require.NoError(t, f.db.Save(execution).Error)
+	node, err := models.FindCanvasNode(f.db, f.canvas.ID, "publish")
+	require.NoError(t, err)
 	require.NoError(t, action.Execute(core.ExecutionContext{
+		ID: execution.ID, NodeID: node.NodeID, WorkflowID: f.canvas.ID.String(),
 		RunID: execution.RunID, Configuration: execution.Configuration.Data(),
-		Metadata: workercontexts.NewExecutionMetadataContext(f.db, execution), Requests: workercontexts.NewExecutionRequestContext(f.db, execution),
+		Publications: workercontexts.NewPublicationContext(f.db, f.canvas.OrganizationID, node, execution),
+		Metadata:     workercontexts.NewExecutionMetadataContext(f.db, execution), Requests: workercontexts.NewExecutionRequestContext(f.db, execution),
 	}))
 	var request models.CanvasNodeRequest
 	require.NoError(t, f.db.Where("execution_id = ? AND state = ?", execution.ID, models.NodeExecutionRequestStatePending).First(&request).Error)
@@ -295,7 +305,7 @@ func (f *publicationFixture) startRun(t *testing.T) {
 	t.Helper()
 	run, err := models.CreateCanvasRunInTransaction(f.db, f.canvas.ID, "trigger", models.CanvasRunStateStarted, "")
 	require.NoError(t, err)
-	require.NoError(t, f.db.Create(&models.CanvasEvent{WorkflowID: f.canvas.ID, NodeID: "trigger", RunID: run.ID, State: models.CanvasEventStateRouted, Data: models.NewJSONValue(map[string]any{"data": map[string]any{"pull_request": map[string]any{"head": map[string]any{"sha": "abc"}}}})}).Error)
+	require.NoError(t, f.db.Create(&models.CanvasEvent{WorkflowID: f.canvas.ID, NodeID: "trigger", RunID: run.ID, State: models.CanvasEventStateRouted, Data: models.NewJSONValue(map[string]any{"data": map[string]any{"repository": map[string]any{"full_name": "acme/app"}, "pull_request": map[string]any{"number": 42, "head": map[string]any{"sha": "abc"}}}})}).Error)
 	_, err = f.pr.CreateActivity(f.db, models.FactoryPullRequestActivityParams{RunID: run.ID})
 	require.NoError(t, err)
 	f.run = run

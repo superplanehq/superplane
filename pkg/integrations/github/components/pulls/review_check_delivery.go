@@ -283,6 +283,10 @@ func retainDeliveredCheckRun(latest, delivered *reviewCheckState) {
 
 func evaluateReviewCheck(client *common.Client, store core.PublicationStore, record *core.OrderedPublication, state *reviewCheckState) (bool, error) {
 	config := state.Configuration
+	if record.Disabled && config.CheckRun && len(state.Retired) == 0 {
+		state.SHA, state.State, state.Description = config.AssessedSHA, "success", config.Reason
+		return false, nil
+	}
 	if config.State != "" && len(state.Retired) > 0 {
 		retired := state.Retired[0]
 		state.SHA, state.State, state.Description = retired.SHA, "error", "A newer attempt superseded this check."
