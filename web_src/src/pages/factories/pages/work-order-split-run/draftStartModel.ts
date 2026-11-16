@@ -21,20 +21,40 @@ export function resolveDraftStartSelection(
   selection: DraftStartSelection,
   defaults: DraftStartSelection,
   models: Array<{ id?: string; name?: string }> = [],
+  defaultsStatus?: string,
 ) {
   const model = selection.model ?? defaults.model ?? "auto";
   const thinking = selection.thinkingLevel ?? defaults.thinkingLevel;
-  const name =
-    model === "auto" || !model ? "Auto" : models.find((item) => item.id === model)?.name || displayRunnerModel(model);
-  const thinkingLabel = visibleThinkingLevelLabel(thinking) ?? (thinking === "auto" ? "Auto" : "Default");
+  const unresolvedModelStatus = selection.model === undefined ? defaultsStatus : undefined;
+  const unresolvedThinkingStatus = selection.thinkingLevel === undefined ? defaultsStatus : undefined;
+  const { name, accessibleName } = draftStartModelLabels(model, models, unresolvedModelStatus);
+  const thinkingLabel =
+    unresolvedThinkingStatus ?? visibleThinkingLevelLabel(thinking) ?? (thinking === "auto" ? "Auto" : "Default");
   const modelSource = selection.model === undefined ? " (Implementation default)" : "";
   const thinkingSource = selection.thinkingLevel === undefined ? " (Implementation default)" : "";
+  const hasOnlyUnresolvedDefaults = Boolean(unresolvedModelStatus && unresolvedThinkingStatus);
   return {
+    hasOnlyUnresolvedDefaults,
+    isThinkingUnresolved: Boolean(unresolvedThinkingStatus),
     modelLabel: name,
     thinkingLabel,
-    label: `${name}${modelSource} · ${thinkingLabel}${thinkingSource}`,
-    accessibleLabel: `Model: ${name}${name !== model && model !== "auto" ? ` [${model}]` : ""}${modelSource} · Thinking: ${thinkingLabel}${thinkingSource}`,
+    label: hasOnlyUnresolvedDefaults ? defaultsStatus : `${name}${modelSource} · ${thinkingLabel}${thinkingSource}`,
+    accessibleLabel: hasOnlyUnresolvedDefaults
+      ? defaultsStatus
+      : `Model: ${accessibleName}${modelSource} · Thinking: ${thinkingLabel}${thinkingSource}`,
   };
+}
+
+function draftStartModelLabels(
+  model: string,
+  models: Array<{ id?: string; name?: string }>,
+  unresolvedStatus?: string,
+) {
+  const name =
+    unresolvedStatus ??
+    (model === "auto" || !model ? "Auto" : models.find((item) => item.id === model)?.name || displayRunnerModel(model));
+  const accessibleName = name !== model && model !== "auto" && !unresolvedStatus ? `${name} [${model}]` : name;
+  return { name, accessibleName };
 }
 
 export function draftStartModelPayload(selected?: string): string | undefined {

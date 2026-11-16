@@ -66,3 +66,4 @@ export const Desktop: Story = { decorators, render: () => <Preview /> };
 export const Mobile: Story = { decorators, render: () => <Preview mobile /> };
 export const Loading: Story = { decorators, render: () => <Preview loading /> };
 export const Retry: Story = { decorators, render: () => <Preview failed /> };
+export const MobileRetry: Story = { decorators, render: () => <Preview mobile failed /> };
