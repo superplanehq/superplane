@@ -161,6 +161,7 @@ spec:
       additionalInstructions: ''
       executionTimeoutSeconds: 1800
       includeVisualEvidence: false
+      skipSetupCommands: true
       machineType: e1-large-amd64
       model: sonnet
       credentials:
