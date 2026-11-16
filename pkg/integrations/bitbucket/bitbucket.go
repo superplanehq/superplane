@@ -153,6 +153,7 @@ func (b *Bitbucket) Actions() []core.Action {
 		&UpdatePullRequestBodySection{},
 		&CreatePullRequestComment{},
 		&WaitForBuilds{},
+		&SetPullRequestReviewCheck{},
 	}
 }
 
@@ -293,9 +294,12 @@ func (b *Bitbucket) HandleRequest(ctx core.HTTPRequestContext) {
 }
 
 func (b *Bitbucket) Hooks() []core.Hook {
-	return []core.Hook{}
+	return []core.Hook{{Name: reviewCheckHook, Type: core.HookTypeInternal}}
 }
 
 func (b *Bitbucket) HandleHook(ctx core.IntegrationHookContext) error {
+	if ctx.Name == reviewCheckHook {
+		return refreshReviewCheck(ctx)
+	}
 	return nil
 }

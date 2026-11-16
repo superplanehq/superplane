@@ -2,6 +2,7 @@ import { updatePullRequestBodySectionMapper } from "../updatePullRequestBodySect
 import type { ComponentBaseMapper, EventStateRegistry, TriggerRenderer } from "../types";
 import { buildActionStateRegistry } from "../eventDisplay";
 import { onPushTriggerRenderer } from "./on_push";
+import { REVIEW_CHECK_STATE_REGISTRY, setPullRequestReviewCheckMapper } from "./set_pull_request_review_check";
 import {
   FIND_PULL_REQUEST_STATE_REGISTRY,
   createPullRequestCommentMapper,
@@ -15,6 +16,7 @@ export const triggerRenderers: Record<string, TriggerRenderer> = {
 };
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
+  setPullRequestReviewCheck: setPullRequestReviewCheckMapper,
   findPullRequest: findPullRequestMapper,
   createPullRequest: createPullRequestMapper,
   updatePullRequest: updatePullRequestMapper,
@@ -23,6 +25,7 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
 };
 
 export const eventStateRegistry: Record<string, EventStateRegistry> = {
+  setPullRequestReviewCheck: REVIEW_CHECK_STATE_REGISTRY,
   findPullRequest: FIND_PULL_REQUEST_STATE_REGISTRY,
   createPullRequest: buildActionStateRegistry("created"),
   updatePullRequest: buildActionStateRegistry("updated"),

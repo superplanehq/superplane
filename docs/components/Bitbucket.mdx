@@ -20,6 +20,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Create Pull Request" href="#create-pull-request" description="Create a pull request in a Bitbucket repository" />
   <LinkCard title="Create Pull Request Comment" href="#create-pull-request-comment" description="Add a comment to a Bitbucket pull request" />
   <LinkCard title="Find Pull Request" href="#find-pull-request" description="Find a pull request in a Bitbucket repository by branch" />
+  <LinkCard title="Set Pull Request Review Check" href="#set-pull-request-review-check" description="Track required approvals for the assessed pull request commit" />
   <LinkCard title="Update Pull Request" href="#update-pull-request" description="Update the title or description of a Bitbucket pull request" />
   <LinkCard title="Update PR Body Section" href="#update-pr-body-section" description="Update one Markdown section in a Bitbucket pull request description" />
   <LinkCard title="Wait for Builds" href="#wait-for-builds" description="Wait for Bitbucket builds to finish on a commit" />
@@ -574,6 +575,36 @@ The Find Pull Request component looks up a pull request in a Bitbucket repositor
   },
   "timestamp": "2026-04-22T10:00:00.000000000Z",
   "type": "bitbucket.pullRequest"
+}
+```
+
+<a id="set-pull-request-review-check"></a>
+
+## Set Pull Request Review Check
+
+**Component key:** `bitbucket.setPullRequestReviewCheck`
+
+Publish superplane/review-request on a Bitbucket pull request from any canvas. Supply repository, pullRequestId, assessedSha, phase, and reason. The result URL defaults to the current run.
+
+Use pending_selection before selection, required_reviewers after Ensure Pull Request Reviewers, no_review for an explicit decision, selection_error for failed selection, or disabled to release the check. Required reviewers use UUIDs and separate displayName values. Supply reviewerRequestExecutionId from the recorded reviewer action.
+
+Pending selection finishes after durable registration. Other phases finish after delivery. Monitoring continues after the selection run finishes. Signed review events and the complete activity log must prove approval of the assessed current commit. Existing approvals without reliable commit evidence stay unresolved. Comments do not revoke approvals. Changes requests fail the check. A new head requires a new decision.
+
+Source and attempt order come from trusted execution records. Activation generation defaults to 1. Use a greater saved generation after disabling. An optional activationNodeId uses that node's admitted and live settings. Disabling or removing the check releases its statuses. Publication retries are bounded and interrupted writes recover through existing integration hooks. This action does not change repository rules or enable Review request.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "key": "superplane/review-request",
+    "reason": "approval_commit_unverified",
+    "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "state": "INPROGRESS",
+    "status": "applied"
+  },
+  "timestamp": "2026-11-13T09:00:00Z",
+  "type": "bitbucket.pullRequestReviewCheck"
 }
 ```
 
