@@ -52,7 +52,7 @@ blocks:
             - make lint
 
         - name: Unit Tests
-          parallelism: 4
+          parallelism: 5
           commands:
             - make ci.setup.unit
             - make test.coverage.autoparallel SHARD_INDEX=$SEMAPHORE_JOB_INDEX SHARD_COUNT=$SEMAPHORE_JOB_COUNT
