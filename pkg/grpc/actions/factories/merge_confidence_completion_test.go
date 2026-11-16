@@ -3,6 +3,7 @@ package factories
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -38,12 +39,18 @@ func completionFixture(t *testing.T, provider string) publicationFixture {
 	require.NoError(t, err)
 	f.publishVersion(t, func(version *models.CanvasVersion) {
 		for _, node := range doc.Nodes() {
-			if provider == models.ProviderBitbucket && node.ID == "publish-merge-confidence" {
+			if node.ID == "publish-merge-confidence" {
 				node.ID = "publish"
 				*findIntakeNode(version.Nodes, "publish") = node
+				require.NoError(t, f.db.Model(&models.CanvasNode{}).Where("workflow_id = ? AND node_id = ?", f.canvas.ID, "publish").Updates(map[string]any{
+					"name": node.Name, "ref": datatypes.NewJSONType(node.Ref), "configuration": datatypes.NewJSONType(node.Configuration),
+				}).Error)
 			}
-			if node.ComponentName() == "filter" || node.ComponentName() == "broadcastMessage" {
+			if node.ID == "comment-merge-confidence" || node.ComponentName() == "filter" || node.ComponentName() == "broadcastMessage" {
 				version.Nodes = append(version.Nodes, node)
+				if node.ID == "comment-merge-confidence" {
+					require.NoError(t, f.db.Create(&models.CanvasNode{WorkflowID: f.canvas.ID, NodeID: node.ID, Name: node.Name, Type: node.Type, AppInstallationID: &integration.ID, Ref: datatypes.NewJSONType(node.Ref), Configuration: datatypes.NewJSONType(node.Configuration)}).Error)
+				}
 			}
 		}
 		for _, edge := range doc.Edges() {
@@ -65,6 +72,7 @@ func completionFixture(t *testing.T, provider string) publicationFixture {
 
 func installCompletionConnection(t *testing.T, host core.HTTPContext) {
 	t.Helper()
+	host = completionHTTP{host}
 	installPublicationGitHub(t, host)
 	previous := newPublicationConnection
 	t.Cleanup(func() { newPublicationConnection = previous })
@@ -76,6 +84,17 @@ func installCompletionConnection(t *testing.T, host core.HTTPContext) {
 			AuthType: bitbucket.AuthTypeWorkspaceAccessToken, Workspace: &bitbucket.WorkspaceMetadata{Slug: "acme"},
 		}}, host
 	}
+}
+
+// Commit-title enrichment is optional and has separate coverage. Keep the
+// response queue here focused on publication and completion delivery.
+type completionHTTP struct{ core.HTTPContext }
+
+func (h completionHTTP) Do(request *http.Request) (*http.Response, error) {
+	if strings.Contains(request.URL.Path, "/commits/") {
+		return publicationHTTPResponse(http.StatusNotFound, `{}`), nil
+	}
+	return h.HTTPContext.Do(request)
 }
 
 func (f publicationFixture) completePublication(t *testing.T, execution *models.CanvasNodeExecution, events []models.CanvasEvent) []map[string]any {
@@ -112,14 +131,24 @@ func (f publicationFixture) completePublication(t *testing.T, execution *models.
 			require.NoError(t, err)
 			var emitted []models.CanvasEvent
 			err = action.Execute(core.ExecutionContext{
+				ID: next.ID, NodeID: node.ID, WorkflowID: f.canvas.ID.String(),
 				RunID: f.run.ID, Configuration: configuration,
-				Expressions: workercontexts.NewExpressionContext(builder),
+				Publications: workercontexts.NewPublicationContext(f.db, f.canvas.OrganizationID, current, next),
+				Metadata:     workercontexts.NewExecutionMetadataContext(f.db, next),
+				Requests:     workercontexts.NewExecutionRequestContext(f.db, next),
+				Expressions:  workercontexts.NewExpressionContext(builder),
 				ExecutionState: workercontexts.NewExecutionStateContext(f.db, next, func(events []models.CanvasEvent) {
 					emitted = append(emitted, events...)
 				}),
 				Apps: workercontexts.NewAppExecutionContext(f.db, f.canvas, current, next),
 			})
 			require.NoError(t, err)
+			if isPublicationComponent(node.ComponentName()) {
+				var request models.CanvasNodeRequest
+				require.NoError(t, f.db.Where("execution_id = ? AND state = ?", next.ID, models.NodeExecutionRequestStatePending).First(&request).Error)
+				emitted, err = ProcessBodySectionPublicationRequest(t.Context(), f.deps, request.ID, models.LockNodeRequestNow)
+				require.NoError(t, err)
+			}
 			f.completePublication(t, next, emitted)
 		}
 	}
@@ -134,14 +163,20 @@ func (f publicationFixture) completePublication(t *testing.T, execution *models.
 
 func TestMergeConfidenceCompletionPublicationOutcomes(t *testing.T) {
 	for _, provider := range []string{models.ProviderGitHub, models.ProviderBitbucket} {
-		for _, scenario := range []string{"published", "unchanged", "incomplete", "failed", "cancelled", "cancelled during unchanged read", "disabled", "closed", "stale", "superseded", "rejected", "invalid markers"} {
+		for _, scenario := range []string{"published", "unchanged", "incomplete", "failed", "cancelled", "cancelled during unchanged read", "disabled", "closed", "stale", "superseded", "rejected", "invalid markers", "off", "off incomplete", "off failed", "off cancelled", "off closed", "off stale", "off superseded"} {
 			t.Run(provider+"/"+scenario, func(t *testing.T) {
 				f := completionFixture(t, provider)
-				if scenario != "incomplete" {
+				if strings.HasPrefix(scenario, "off") {
+					f.publishVersion(t, func(version *models.CanvasVersion) {
+						findIntakeNode(version.Nodes, "publish").Configuration["enabled"] = false
+					})
+					f.startRun(t)
+				}
+				if scenario != "incomplete" && scenario != "off incomplete" {
 					f.report(t, f.run, 4)
 				}
 				channel := "passed"
-				if scenario == "failed" {
+				if scenario == "failed" || scenario == "off failed" {
 					channel = "failed"
 				}
 				execution, request := f.publicationRequest(t, channel)
@@ -154,23 +189,23 @@ func TestMergeConfidenceCompletionPublicationOutcomes(t *testing.T) {
 				}
 				read := descriptionResponse(t, provider, description)
 				switch scenario {
-				case "cancelled":
+				case "cancelled", "off cancelled":
 					require.NoError(t, f.run.MarkAsCancelling(f.db, nil))
 				case "disabled":
 					f.publishVersion(t, func(version *models.CanvasVersion) {
 						findIntakeNode(version.Nodes, "publish").Configuration["enabled"] = false
 					})
-				case "closed":
+				case "closed", "off closed":
 					read = publicationHTTPResponse(200, `{"state":"closed","head":{"sha":"abc"}}`)
 					if provider == models.ProviderBitbucket {
 						read = publicationHTTPResponse(200, `{"state":"DECLINED","source":{"commit":{"hash":"abc"}}}`)
 					}
-				case "stale":
+				case "stale", "off stale":
 					read = publicationHTTPResponse(200, `{"state":"open","head":{"sha":"new"}}`)
 					if provider == models.ProviderBitbucket {
 						read = publicationHTTPResponse(200, `{"state":"OPEN","source":{"commit":{"hash":"new"}}}`)
 					}
-				case "superseded":
+				case "superseded", "off superseded":
 					f.startRun(t)
 				case "rejected":
 					read = publicationHTTPResponse(403, `{"message":"Forbidden"}`)
@@ -188,12 +223,18 @@ func TestMergeConfidenceCompletionPublicationOutcomes(t *testing.T) {
 				switch scenario {
 				case "published", "incomplete", "failed":
 					expectedStatus = "published"
+				case "disabled", "off", "off incomplete", "off failed":
+					expectedStatus = "disabled"
 				case "unchanged":
 					expectedStatus = "unchanged"
-				case "cancelled":
+				case "cancelled", "off cancelled":
 					expectedStatus = "rejected"
+				case "rejected":
+					if provider == models.ProviderGitHub {
+						expectedStatus = "failed"
+					}
 				}
-				assert.Equal(t, expectedStatus, execution.Metadata.Data()["status"])
+				assert.Equal(t, expectedStatus, execution.Metadata.Data()["status"], "%#v", execution.Metadata.Data())
 				// Continue the producer's graph even when another run superseded it.
 				f.run, err = models.FindCanvasRunInTransaction(f.db, f.canvas.ID, execution.RunID)
 				require.NoError(t, err)
@@ -201,7 +242,7 @@ func TestMergeConfidenceCompletionPublicationOutcomes(t *testing.T) {
 				if scenario == "cancelled during unchanged read" {
 					require.Len(t, host.Requests, 1)
 				}
-				if scenario == "published" || scenario == "unchanged" {
+				if scenario == "published" || scenario == "unchanged" || scenario == "off" || scenario == "disabled" {
 					require.Len(t, payloads, 1)
 					assert.Equal(t, "merge-confidence.completed", payloads[0]["type"])
 					assert.Equal(t, f.run.ID.String(), payloads[0]["reportId"])
@@ -229,7 +270,7 @@ func TestMergeConfidenceCompletionPublicationOutcomes(t *testing.T) {
 					require.Len(t, host.Requests, 2, "incomplete reports still reach the PR")
 					assert.Contains(t, execution.Configuration.Data()["body"], "**Incomplete**")
 				}
-				if scenario == "failed" {
+				if scenario == "failed" || scenario == "off failed" {
 					result, err := f.run.CalculateResult(f.db)
 					require.NoError(t, err)
 					assert.Equal(t, models.CanvasRunResultFailed, result)
