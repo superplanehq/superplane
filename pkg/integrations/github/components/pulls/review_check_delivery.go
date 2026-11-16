@@ -381,7 +381,9 @@ func evaluateReviewCheck(client *common.Client, store core.PublicationStore, rec
 		state.SHA = pr.GetHead().GetSHA()
 		if state.SHA != config.AssessedSHA {
 			state.State, state.Description = "pending", "Waiting for a decision on the current commit"
-		} else if !hasSelectedReviewRequests(pr.RequestedReviewers, config.Reviewers) {
+			return monitor, nil
+		}
+		if !hasSelectedReviewRequests(pr.RequestedReviewers, config.Reviewers) {
 			// GitHub clears requests after review submission, including requested changes.
 			state.State, state.Description = "success", "No selected review requests remain"
 		}
