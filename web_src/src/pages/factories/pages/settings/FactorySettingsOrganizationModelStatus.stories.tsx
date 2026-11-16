@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { FEATURE_MODEL_STATUS } from "@/lib/experimentalFeatures";
 
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
 import { defaultFactoriesFixture, PRIMARY_FACTORY_KEY } from "../../__fixtures__/factoryPageResponses";
@@ -21,6 +22,7 @@ export const ScoredAndEmptyCells: Story = {
   render: () => (
     <FactoriesHarness
       pathSuffix={statusPath}
+      experimentalFeatures={[FEATURE_MODEL_STATUS]}
       factoriesFixture={{
         ...defaultFactoriesFixture,
         modelStatusCells: [
@@ -39,6 +41,7 @@ export const Loading: Story = {
   render: () => (
     <FactoriesHarness
       pathSuffix={statusPath}
+      experimentalFeatures={[FEATURE_MODEL_STATUS]}
       factoriesFixture={{ ...defaultFactoriesFixture, modelStatusDelayMs: 30000 }}
     />
   ),
@@ -49,6 +52,7 @@ export const CouldNotLoad: Story = {
   render: () => (
     <FactoriesHarness
       pathSuffix={statusPath}
+      experimentalFeatures={[FEATURE_MODEL_STATUS]}
       factoriesFixture={{ ...defaultFactoriesFixture, modelStatusError: true }}
     />
   ),

@@ -220,9 +220,10 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 		// Model status is installation-wide. Organization settings shows
 		// it, so the caller must be able to read the organization.
 		{Method: "GET", Pattern: "/api/v1/me/model-status"}: {
-			Resource:   "org",
-			Action:     "read",
-			DomainType: models.DomainTypeOrganization,
+			Resource:                     "org",
+			Action:                       "read",
+			DomainType:                   models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureModelStatus},
 		},
 		// Self-scoped: members read their own notification settings.
 		// Note: /api/v1/me, /api/v1/me/token, /api/v1/me/tokens*,
