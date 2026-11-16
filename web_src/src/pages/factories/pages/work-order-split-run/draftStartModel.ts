@@ -10,7 +10,9 @@ function hasDraftStartOverrides(selection: DraftStartSelection): boolean {
   return selection.model !== undefined || selection.thinkingLevel !== undefined;
 }
 
-export function draftStartModelOptions(models: Array<{ id?: string; name?: string }> = [], defaultLabel = "Default") {
+type DraftStartModelOption = { value: string; label: string };
+
+export function draftStartModelOptions(models: Array<{ id?: string; name?: string }> = []): DraftStartModelOption[] {
   const options = models
     .filter((item) => Boolean(item.id))
     .map((item) => ({
@@ -18,18 +20,24 @@ export function draftStartModelOptions(models: Array<{ id?: string; name?: strin
       label: selectableLLMModelLabelFromKey(item.name || item.id || ""),
       ...parseSelectableLLMModelKey(item.id ?? ""),
     }));
-  return [
-    { value: "", label: defaultLabel },
-    ...options.map((option) => {
-      const collisions = options.filter((other) => other.label === option.label);
-      if (collisions.length === 1) return { value: option.value, label: option.label };
-      const source = connectionLabel(option.source) || "Line runner";
-      const needsProvider =
-        option.provider && collisions.some((other) => other.value !== option.value && other.source === option.source);
-      const qualifier = needsProvider ? `${source} · ${connectionLabel(option.provider)}` : source;
-      return { value: option.value, label: `${option.label} (${qualifier})` };
-    }),
-  ];
+  const labelCounts = new Map<string, number>();
+  const valuesByLabelAndSource = new Map<string, Map<string, Set<string>>>();
+  for (const option of options) {
+    labelCounts.set(option.label, (labelCounts.get(option.label) ?? 0) + 1);
+    const sources = valuesByLabelAndSource.get(option.label) ?? new Map<string, Set<string>>();
+    const values = sources.get(option.source) ?? new Set<string>();
+    values.add(option.value);
+    sources.set(option.source, values);
+    valuesByLabelAndSource.set(option.label, sources);
+  }
+  return options.map((option) => {
+    if (labelCounts.get(option.label) === 1) return { value: option.value, label: option.label };
+    const source = connectionLabel(option.source) || "Line runner";
+    const needsProvider =
+      option.provider && (valuesByLabelAndSource.get(option.label)?.get(option.source)?.size ?? 0) > 1;
+    const qualifier = needsProvider ? `${source} · ${connectionLabel(option.provider)}` : source;
+    return { value: option.value, label: `${option.label} (${qualifier})` };
+  });
 }
 
 function connectionLabel(id: string): string {
@@ -50,9 +58,9 @@ function draftStartDefaultLabel(value?: string): string {
 
 export function draftStartDefaultLabels(
   defaults: DraftStartSelection | undefined,
-  models: Array<{ id?: string; name?: string }> = [],
+  options: DraftStartModelOption[] = [],
 ) {
-  const resolved = defaults ? resolveDraftStartSelection({}, defaults, models) : undefined;
+  const resolved = defaults ? resolveDraftStartSelection({}, defaults, options) : undefined;
   return {
     model: draftStartDefaultLabel(resolved?.modelLabel),
     thinking: draftStartDefaultLabel(resolved?.thinkingLabel),
@@ -62,14 +70,14 @@ export function draftStartDefaultLabels(
 export function resolveDraftStartSelection(
   selection: DraftStartSelection,
   defaults: DraftStartSelection,
-  models: Array<{ id?: string; name?: string }> = [],
+  options: DraftStartModelOption[] = [],
   defaultsStatus?: string,
 ) {
   const model = selection.model ?? defaults.model ?? "auto";
   const thinking = selection.thinkingLevel ?? defaults.thinkingLevel;
   const unresolvedModelStatus = selection.model === undefined ? defaultsStatus : undefined;
   const unresolvedThinkingStatus = selection.thinkingLevel === undefined ? defaultsStatus : undefined;
-  const name = draftStartModelLabels(model, models, unresolvedModelStatus);
+  const name = draftStartModelLabels(model, options, unresolvedModelStatus);
   const thinkingLabel =
     unresolvedThinkingStatus ?? visibleThinkingLevelLabel(thinking) ?? (thinking === "auto" ? "Auto" : "Default");
   const modelSource = selection.model === undefined ? " (Default)" : "";
@@ -88,16 +96,10 @@ export function resolveDraftStartSelection(
   };
 }
 
-function draftStartModelLabels(
-  model: string,
-  models: Array<{ id?: string; name?: string }>,
-  unresolvedStatus?: string,
-) {
+function draftStartModelLabels(model: string, options: DraftStartModelOption[], unresolvedStatus?: string) {
   if (unresolvedStatus) return unresolvedStatus;
   if (model === "auto" || !model) return "Auto";
-  return (
-    draftStartModelOptions(models).find((item) => item.value === model)?.label || selectableLLMModelLabelFromKey(model)
-  );
+  return options.find((item) => item.value === model)?.label || selectableLLMModelLabelFromKey(model);
 }
 
 export function draftStartModelPayload(selected?: string): string | undefined {
