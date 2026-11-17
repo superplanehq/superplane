@@ -890,7 +890,30 @@ function mount(target, options){
   /* ======================================================================
      THREE SETUP (scoped to this instance)
   ====================================================================== */
-  var renderer = new THREE.WebGLRenderer({canvas:canvas, antialias:true});
+  // Match the bundled Three.js context preferences on the renderer's own canvas.
+  // Unavailable WebGL is an expected fallback, before its constructor logs an error.
+  var context = null;
+  var contextAttributes = {
+    alpha:false, depth:true, stencil:true, antialias:true,
+    premultipliedAlpha:true, preserveDrawingBuffer:false,
+    powerPreference:'default', failIfMajorPerformanceCaveat:false
+  };
+  try {
+    var contextTypes = ['webgl2', 'webgl', 'experimental-webgl'];
+    for(var contextIndex = 0; contextIndex < contextTypes.length; contextIndex++){
+      context = canvas.getContext(contextTypes[contextIndex], contextAttributes);
+      if(context) break;
+    }
+  } catch(err) {
+    context = null;
+  }
+  if(!context){
+    root.remove();
+    if(instanceBaseMat !== sharedBaseMat) instanceBaseMat.dispose();
+    if(instanceAccentMat !== instanceBaseMat && instanceAccentMat !== sharedAccentMat) instanceAccentMat.dispose();
+    return null;
+  }
+  var renderer = new THREE.WebGLRenderer({canvas:canvas, context:context, antialias:true});
   renderer.setPixelRatio(Math.min(global.devicePixelRatio||1, 2));
   renderer.setClearColor(effectiveBgColor, 1);
 
