@@ -1160,6 +1160,59 @@ func TestInstallationResetPreservesMergeConfidencePublishing(t *testing.T) {
 	}
 }
 
+func TestInstallationResetMergeConfidenceSetupCommands(t *testing.T) {
+	for _, provider := range []string{models.ProviderGitHub, models.ProviderBitbucket} {
+		t.Run(provider, func(t *testing.T) {
+			for _, tc := range []struct {
+				name     string
+				saved    any
+				expected bool
+			}{
+				{name: "legacy installation", expected: true},
+				{name: "skip setup", saved: true, expected: true},
+				{name: "run setup", saved: false, expected: false},
+			} {
+				t.Run(tc.name, func(t *testing.T) {
+					r, factory := resetTestFactory(t)
+					canvas := resetTestTemplate(t, r, factory, "risk-score", provider, func(doc *yaml.Canvas) {
+						config := findYAMLNode(t, doc, "assess-risk").Configuration
+						delete(config, "skipSetupCommands")
+						if tc.saved != nil {
+							config["skipSetupCommands"] = tc.saved
+						}
+					})
+					version := resetTestLiveVersion(t, canvas)
+					agent := findIntakeNode(version.Nodes, "assess-risk")
+					require.NotNil(t, agent)
+					saved, present := agent.Configuration["skipSetupCommands"]
+					require.Equal(t, tc.saved != nil, present)
+					require.Equal(t, tc.saved, saved)
+
+					ctx := authentication.SetUserIdInMetadata(t.Context(), r.User.String())
+					result, err := resetBuiltInAutomationForOrganizations(ctx, []models.Organization{*r.Organization}, "risk-score", testIntakeDependencies(r))
+					require.NoError(t, err)
+					require.Empty(t, result.Failed)
+					require.Equal(t, 1, result.Reset)
+					version = resetTestLiveVersion(t, canvas)
+					agent = findIntakeNode(version.Nodes, "assess-risk")
+					require.NotNil(t, agent)
+					require.Equal(t, tc.expected, agent.Configuration["skipSetupCommands"])
+
+					if tc.saved != false {
+						return
+					}
+					// The user-facing restore-defaults path supplies no saved settings.
+					restored, err := materializeNonIntakeFactoryAppDefaults(database.DB(t.Context()), factory, canvas, version, nil)
+					require.NoError(t, err)
+					doc, err := yaml.CanvasFromYAML([]byte(restored.canvasYAML))
+					require.NoError(t, err)
+					require.Equal(t, true, findYAMLNode(t, doc, "assess-risk").Configuration["skipSetupCommands"])
+				})
+			}
+		})
+	}
+}
+
 func TestResetMergeConfidencePreservesPublicationDestinations(t *testing.T) {
 	for name, settings := range map[string]reviewFindingsSettings{"off": {}, "off with comment": {comment: true}, "comment": {publish: true, comment: true}} {
 		t.Run(name, func(t *testing.T) {
