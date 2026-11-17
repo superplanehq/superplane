@@ -133,25 +133,6 @@ func FindSSOIdentityByIDPSubject(tx *gorm.DB, connectionID uuid.UUID, subject st
 	return &identity, nil
 }
 
-func FindSSOIdentityByIDPSession(tx *gorm.DB, connectionID uuid.UUID, sessionID string, now time.Time) (*SSOIdentity, error) {
-	var session SSOIdentitySession
-	err := tx.Where(
-		"connection_id = ? AND idp_session_id = ? AND revoked_at IS NULL AND expires_at > ?",
-		connectionID,
-		sessionID,
-		now,
-	).First(&session).Error
-	if err != nil {
-		return nil, err
-	}
-	var identity SSOIdentity
-	err = tx.Where("connection_id = ? AND id = ?", connectionID, session.IdentityID).First(&identity).Error
-	if err != nil {
-		return nil, err
-	}
-	return &identity, nil
-}
-
 // ListSSOIdentities returns one page of identities for a connection.
 // filterAttr is "userName" or "externalId". An empty filter lists every identity.
 func ListSSOIdentities(tx *gorm.DB, connectionID uuid.UUID, filterAttr, filterValue string, offset, limit int) ([]SSOIdentity, int64, error) {

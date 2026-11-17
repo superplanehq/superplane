@@ -50,10 +50,14 @@ func (p *Pipeline) CheckOrganizationAccess(ctx context.Context, user *models.Use
 		if identity == nil || !identity.Active || revoked(identity, entry.AuthUnix) {
 			return required(conn), nil
 		}
-		age := time.Duration(conn.MaxSessionAgeSeconds) * time.Second
-		if now.Sub(time.Unix(entry.AuthUnix, 0)) <= age {
+		authAt := time.Unix(entry.AuthUnix, 0)
+		if SessionStillOpensOrganization(conn, authAt, now, user.IsOwner) {
+			if conn.Enforcement != models.SSOEnforcementOptional && now.Sub(authAt) > time.Duration(conn.MaxSessionAgeSeconds)*time.Second {
+				logging.AddRequestLogFields(ctx, map[string]any{"sso_owner_bypass": true})
+			}
 			return nil, nil
 		}
+		return required(conn), nil
 	}
 
 	if conn.Enforcement == models.SSOEnforcementOptional {
@@ -81,6 +85,19 @@ func entryFor(raw, connectionID string) (authentication.SSOSession, bool) {
 		}
 	}
 	return authentication.SSOSession{}, false
+}
+
+// SessionStillOpensOrganization reports whether a sign-in at authAt can still
+// open the organization under the connection's current rules.
+func SessionStillOpensOrganization(conn *models.SSOConnection, authAt, now time.Time, owner bool) bool {
+	age := time.Duration(conn.MaxSessionAgeSeconds) * time.Second
+	if now.Sub(authAt) <= age {
+		return true
+	}
+	if conn.Enforcement == models.SSOEnforcementOptional {
+		return true
+	}
+	return owner && conn.AllowOwnerBypass
 }
 
 func revoked(identity *models.SSOIdentity, authUnix int64) bool {

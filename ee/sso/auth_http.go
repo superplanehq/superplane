@@ -291,7 +291,7 @@ func (s *Service) backchannelLogout(w http.ResponseWriter, r *http.Request) {
 		writeBackchannelError(w)
 		return
 	}
-	identity, err := findLogoutIdentity(r.Context(), conn.ID, subject, sessionID, s.now())
+	identity, err := findLogoutIdentity(r.Context(), conn, subject, sessionID, s.now())
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		writeBackchannelError(w)
 		return
@@ -313,9 +313,9 @@ func (s *Service) backchannelLogout(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func findLogoutIdentity(ctx context.Context, connectionID uuid.UUID, subject, sessionID string, now time.Time) (*models.SSOIdentity, error) {
+func findLogoutIdentity(ctx context.Context, conn *models.SSOConnection, subject, sessionID string, now time.Time) (*models.SSOIdentity, error) {
 	if subject != "" {
-		identity, err := models.FindSSOIdentityByIDPSubject(database.DB(ctx), connectionID, subject)
+		identity, err := models.FindSSOIdentityByIDPSubject(database.DB(ctx), conn.ID, subject)
 		if err == nil || !errors.Is(err, gorm.ErrRecordNotFound) || sessionID == "" {
 			return identity, err
 		}
@@ -323,7 +323,38 @@ func findLogoutIdentity(ctx context.Context, connectionID uuid.UUID, subject, se
 	if sessionID == "" {
 		return nil, gorm.ErrRecordNotFound
 	}
-	return models.FindSSOIdentityByIDPSession(database.DB(ctx), connectionID, sessionID, now)
+	session, err := models.FindUnrevokedSSOIdentitySession(
+		database.DB(ctx),
+		conn.ID,
+		sessionID,
+		now.Add(-authentication.AccountSessionMaxAge()),
+	)
+	if err != nil {
+		return nil, err
+	}
+	identity, err := models.FindSSOIdentityByID(database.DB(ctx), conn.ID, session.IdentityID)
+	if err != nil {
+		return nil, err
+	}
+	owner, err := identityOwner(ctx, conn, identity)
+	if err != nil {
+		return nil, err
+	}
+	if !core.SessionStillOpensOrganization(conn, session.CreatedAt, now, owner) {
+		return nil, gorm.ErrRecordNotFound
+	}
+	return identity, nil
+}
+
+func identityOwner(ctx context.Context, conn *models.SSOConnection, identity *models.SSOIdentity) (bool, error) {
+	user, err := models.FindActiveHumanUserByAccountAndOrganization(database.DB(ctx), conn.OrganizationID, identity.AccountID)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return user.IsOwner, nil
 }
 
 func (s *Service) connectionFromPath(w http.ResponseWriter, r *http.Request) (*models.SSOConnection, bool) {

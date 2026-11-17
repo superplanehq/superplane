@@ -50,11 +50,7 @@ func (p *Pipeline) SignIn(ctx context.Context, conn *models.SSOConnection, exter
 			return err
 		}
 		if external.SessionID != "" {
-			age := conn.MaxSessionAgeSeconds
-			if age <= 0 {
-				age = models.SSODefaultSessionAge
-			}
-			if err := identity.RememberIDPSession(tx, external.SessionID, now.Add(time.Duration(age)*time.Second)); err != nil {
+			if err := identity.RememberIDPSession(tx, external.SessionID, now, now.Add(authentication.AccountSessionMaxAge())); err != nil {
 				return err
 			}
 		}

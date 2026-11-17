@@ -226,7 +226,7 @@ func TestBackchannelLogoutFindsAnEarlierBrowserSession(t *testing.T) {
 
 	require.NoError(t, database.Conn().Model(&models.SSOIdentitySession{}).
 		Where("identity_id = ? AND idp_session_id = ? AND revoked_at IS NULL", identity.ID, "sid-second").
-		Update("expires_at", time.Now().Add(-time.Minute)).Error)
+		Update("created_at", time.Now().Add(-authentication.AccountSessionMaxAge()-time.Hour)).Error)
 	expired := signLogoutToken(t, fake, jwtLib.MapClaims{
 		"sub":    "other",
 		"sid":    "sid-second",
@@ -237,6 +237,92 @@ func TestBackchannelLogoutFindsAnEarlierBrowserSession(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, final.SessionsRevokedAt)
 	require.True(t, final.SessionsRevokedAt.Equal(revokedAt))
+}
+
+func TestBackchannelLogoutReachesACookieThatCanStillOpen(t *testing.T) {
+	f, fake, conn := activeOIDCConnection(t)
+	conn.Enforcement = models.SSOEnforcementRequired
+	conn.AllowOwnerBypass = false
+	conn.MaxSessionAgeSeconds = 900
+	require.NoError(t, conn.Save(database.Conn()))
+
+	fake.extraClaims = map[string]any{"sid": "sid-aged"}
+	require.Equal(t, http.StatusFound, f.callback(t, conn, fake, callbackOptions{}).Code)
+	identity, err := models.FindSSOIdentityByIDPSubject(database.Conn(), conn.ID, fake.subject)
+	require.NoError(t, err)
+	require.NoError(t, database.Conn().Model(&models.SSOIdentitySession{}).
+		Where("identity_id = ? AND idp_session_id = ?", identity.ID, "sid-aged").
+		Update("created_at", time.Now().Add(-time.Hour)).Error)
+
+	logout := signLogoutToken(t, fake, jwtLib.MapClaims{
+		"sub":    "other",
+		"sid":    "sid-aged",
+		"events": map[string]any{"http://schemas.openid.net/event/backchannel-logout": map[string]any{}},
+	})
+	require.Equal(t, http.StatusOK, postLogout(f, conn.ID, logout).Code)
+	missed, err := models.FindSSOIdentityByID(database.Conn(), conn.ID, identity.ID)
+	require.NoError(t, err)
+	require.Nil(t, missed.SessionsRevokedAt)
+
+	conn.MaxSessionAgeSeconds = 7200
+	require.NoError(t, conn.Save(database.Conn()))
+	require.Equal(t, http.StatusOK, postLogout(f, conn.ID, logout).Code)
+	extended, err := models.FindSSOIdentityByID(database.Conn(), conn.ID, identity.ID)
+	require.NoError(t, err)
+	require.NotNil(t, extended.SessionsRevokedAt)
+
+	conn.Enforcement = models.SSOEnforcementOptional
+	conn.MaxSessionAgeSeconds = 900
+	require.NoError(t, conn.Save(database.Conn()))
+	require.NoError(t, database.Conn().Model(&models.SSOIdentity{}).Where("id = ?", identity.ID).Update("sessions_revoked_at", nil).Error)
+	fake.extraClaims = map[string]any{"sid": "sid-optional"}
+	require.Equal(t, http.StatusFound, f.callback(t, conn, fake, callbackOptions{}).Code)
+	require.NoError(t, database.Conn().Model(&models.SSOIdentitySession{}).
+		Where("identity_id = ? AND idp_session_id = ?", identity.ID, "sid-optional").
+		Update("created_at", time.Now().Add(-time.Hour)).Error)
+	optionalLogout := signLogoutToken(t, fake, jwtLib.MapClaims{
+		"sub":    "other",
+		"sid":    "sid-optional",
+		"events": map[string]any{"http://schemas.openid.net/event/backchannel-logout": map[string]any{}},
+	})
+	require.Equal(t, http.StatusOK, postLogout(f, conn.ID, optionalLogout).Code)
+	var optionalSession models.SSOIdentitySession
+	require.NoError(t, database.Conn().Where("identity_id = ? AND idp_session_id = ?", identity.ID, "sid-optional").First(&optionalSession).Error)
+	require.NotNil(t, optionalSession.RevokedAt)
+}
+
+func TestUnusedSSOIdentitySessionsAreRemoved(t *testing.T) {
+	f, fake, conn := activeOIDCConnection(t)
+	require.Equal(t, http.StatusFound, f.callback(t, conn, fake, callbackOptions{}).Code)
+	identity, err := models.FindSSOIdentityByIDPSubject(database.Conn(), conn.ID, fake.subject)
+	require.NoError(t, err)
+
+	keep := models.SSOIdentitySession{
+		ID: uuid.New(), ConnectionID: conn.ID, IdentityID: identity.ID,
+		IDPSessionID: "keep", ExpiresAt: time.Now().Add(time.Hour), CreatedAt: time.Now(),
+	}
+	revokedAt := time.Now()
+	revoked := models.SSOIdentitySession{
+		ID: uuid.New(), ConnectionID: conn.ID, IdentityID: identity.ID,
+		IDPSessionID: "revoked", ExpiresAt: time.Now().Add(time.Hour), CreatedAt: time.Now(), RevokedAt: &revokedAt,
+	}
+	ancient := models.SSOIdentitySession{
+		ID: uuid.New(), ConnectionID: conn.ID, IdentityID: identity.ID,
+		IDPSessionID: "ancient", ExpiresAt: time.Now(), CreatedAt: time.Now(),
+	}
+	require.NoError(t, database.Conn().Create(&keep).Error)
+	require.NoError(t, database.Conn().Create(&revoked).Error)
+	require.NoError(t, database.Conn().Create(&ancient).Error)
+	require.NoError(t, database.Conn().Model(&keep).Update("created_at", time.Now().Add(-48*time.Hour)).Error)
+	require.NoError(t, database.Conn().Model(&ancient).Update("created_at", time.Now().Add(-authentication.AccountSessionMaxAge()-time.Hour)).Error)
+
+	_, err = models.DeleteUnusedSSOIdentitySessions(database.Conn(), time.Now().Add(-authentication.AccountSessionMaxAge()), 100)
+	require.NoError(t, err)
+
+	var kept models.SSOIdentitySession
+	require.NoError(t, database.Conn().Where("id = ?", keep.ID).First(&kept).Error)
+	require.Error(t, database.Conn().Where("id = ?", revoked.ID).First(&models.SSOIdentitySession{}).Error)
+	require.Error(t, database.Conn().Where("id = ?", ancient.ID).First(&models.SSOIdentitySession{}).Error)
 }
 
 func activeOIDCConnection(t *testing.T) (*flow, *fakeOIDC, *models.SSOConnection) {
