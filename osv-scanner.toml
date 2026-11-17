@@ -1,5 +1,10 @@
-# Shared OSV-Scanner license exceptions. These do not suppress vulnerabilities.
+# Shared OSV-Scanner license and vulnerability exceptions.
 # Permitted licenses are listed in scripts/permitted-licenses.txt.
+
+[[IgnoredVulns]]
+id = "GHSA-fc5q-39xc-vjpf"
+ignoreUntil = 2026-12-17
+reason = "picomatch 4.0.7 has no patched release. Its consumers are frontend build and development tools that use repository-controlled glob patterns. Upgrade and remove this exception when a fixed release is available."
 
 [[PackageOverrides]]
 name = "@csstools/color-helpers"
