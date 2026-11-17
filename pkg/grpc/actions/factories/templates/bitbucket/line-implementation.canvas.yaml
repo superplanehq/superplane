@@ -160,13 +160,33 @@ spec:
               Read the applicable repository instructions for commit and pull request writing. Check AGENTS.md, CLAUDE.md, contribution documentation, and applicable SKILL.md files. Read referenced skills instead of assuming that their availability means their instructions were followed.
 
               1/ Compare the current branch with {{ task().default_branch }} and review the commits you made.
-              2/ Follow repository conventions for the title, description, writing style, and formatting. Discover and use the applicable pull request template. These instructions take precedence over the fallback below.
-              3/ If the repository provides no guidance, write a short, descriptive title and a concise description of the problem and resulting behavior. Include relevant verification and known limitations. Use sections only when they help the reader. Do not require a Conventional Commits title or sections for each part of the system.
+              2/ Follow repository conventions for the title, description, language, writing style, and formatting. Discover and use the applicable pull request template. Apply the writing guidance below within these requirements.
+              3/ If the repository has no title convention, write a short, descriptive title. Do not require a Conventional Commits prefix.
               4/ Do not add closing keywords (Closes, Fixes, Resolves).
               5/ If the repository has no formatting rules, use clear Markdown with each paragraph on one line. Separate paragraphs, headings, and list items with blank lines.
-              6/ Include only verification results you can substantiate. Do not claim that tests, lint, or builds passed without evidence. State any checks that could not run and why.
-              7/ Write the title to /tmp/TITLE and the description to /tmp/DESCRIPTION.md. Do not add these files to the repository.
-              8/ Do not create or update the pull request yourself. The automation uses these files to create or update it.
+              6/ Write the title to /tmp/TITLE and the description to /tmp/DESCRIPTION.md. Do not add these files to the repository.
+              7/ Do not create or update the pull request yourself. The automation uses these files to create or update it.
+
+              Write for the reviewer:
+
+              - Explain the problem and resulting behavior first. Assume the reader has not seen the task or agent logs.
+              - Match detail to the size and risk of the change. A small fix may need only a few sentences. Explain complex changes as needed for an informed review.
+              - For English text, use Simplified Technical English. Write short sentences in active voice. Use familiar words and consistent terms.
+              - Summarize successful checks. State failed checks and relevant checks that could not run, with reasons. Only report results supported by evidence.
+              - Include risks, limitations, compatibility changes, migrations, and deployment steps when they affect review or use.
+              - Keep required repository content. Otherwise, omit work logs, lists of unchanged surfaces, and command inventories unless they help the reviewer.
+              - Use paragraphs, bullets, or sections as needed. Do not impose a fixed section layout or word limit. Before saving, remove repetition and details that do not help review.
+
+              These examples illustrate writing choices, not required templates. Their facts and check results are hypothetical:
+
+              Small fix:
+              Empty search results no longer crash the results page. The page now shows its empty state.
+              Search regression tests passed.
+
+              Change with deployment requirements:
+              Sessions now expire after 24 hours of inactivity. Active users keep their sessions.
+              Deploy the cleanup worker before enabling expiry. Backfill activity timestamps for existing sessions first.
+              API and worker tests passed. The backfill has not been tested on production-sized data.
           - name: Push output
             type: bash
             workingDirectory: repo
