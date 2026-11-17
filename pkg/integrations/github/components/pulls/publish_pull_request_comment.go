@@ -130,7 +130,7 @@ func (*PublishPullRequestComment) OutputChannels(any) []core.OutputChannel {
 }
 
 func (*PublishPullRequestComment) ExampleOutput() map[string]any {
-	return map[string]any{"type": PullRequestCommentPayloadType, "timestamp": "2026-11-13T12:00:00Z", "data": map[string]any{"status": "published", "attempts": 1, "commentId": 123}}
+	return map[string]any{"type": PullRequestCommentPayloadType, "timestamp": "2026-11-13T12:00:00Z", "data": map[string]any{"executionId": "11111111-1111-1111-1111-111111111111", "status": "published", "attempts": 1, "commentId": 123}}
 }
 
 func (*PublishPullRequestComment) ValidateNodeConfiguration(value map[string]any) error {
