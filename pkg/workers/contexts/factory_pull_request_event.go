@@ -20,16 +20,29 @@ func (c *FactoryContext) EmitPullRequestEvent(nodeID, payloadType string, payloa
 
 // EmitFactoryPullRequestEvent applies producer policy to an already loaded trigger.
 func EmitFactoryPullRequestEvent(tx *gorm.DB, node *models.CanvasNode, payloadType string, payload any, onNewEvents func([]models.CanvasEvent)) error {
-	events := NewEventContext(tx, node, nil, onNewEvents)
-	event, err := events.buildEvent(payloadType, payload)
+	event, created, err := CreateFactoryPullRequestEvent(tx, node, payloadType, payload)
 	if err != nil {
 		return err
+	}
+	if created && onNewEvents != nil {
+		onNewEvents([]models.CanvasEvent{*event})
+	}
+	return nil
+}
+
+// CreateFactoryPullRequestEvent returns the new or reused event under producer policy.
+// The caller publishes newly created events after its transaction commits.
+func CreateFactoryPullRequestEvent(tx *gorm.DB, node *models.CanvasNode, payloadType string, payload any) (*models.CanvasEvent, bool, error) {
+	events := NewEventContext(tx, node, nil, nil)
+	event, err := events.buildEvent(payloadType, payload)
+	if err != nil {
+		return nil, false, err
 	}
 	handled, created, err := mergeconfidence.CreateWebhookEvent(tx, node, event, payloadType, payload)
 	if !handled {
 		key, suppress := customAutomationWebhookPolicy(tx, node, payloadType, payload)
 		if suppress {
-			return nil
+			return nil, false, nil
 		}
 		switch {
 		case key != "":
@@ -41,13 +54,10 @@ func EmitFactoryPullRequestEvent(tx *gorm.DB, node *models.CanvasNode, payloadTy
 		}
 	}
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil
+		return nil, false, nil
 	}
 	if err != nil {
-		return err
+		return nil, false, err
 	}
-	if created && onNewEvents != nil {
-		onNewEvents([]models.CanvasEvent{*event})
-	}
-	return nil
+	return event, created, nil
 }
