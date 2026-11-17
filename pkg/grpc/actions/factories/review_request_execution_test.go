@@ -494,28 +494,14 @@ func runReviewRequestGraph(t *testing.T, f publicationFixture, canvas *models.Ca
 				case "replacement":
 					decision["rationale"] = "The previous reviewer is unavailable. Select the authorization owner."
 					decision["reviewers"] = []any{map[string]any{"id": 3, "login": "fallback-user", "reason": "The previous reviewer is unavailable. Owns authorization changes."}}
-				case "fallback", "no candidate", "no suitable candidate", "ineligible fallback":
+				case "fallback", "no candidate", "no suitable candidate":
 					decision["noCandidate"], decision["reviewers"] = true, []any{}
 				case "malformed output":
 					decision = map[string]any{"reviewRequired": true}
 				case "reported lookup error":
 					decision["error"] = "GitHub contribution lookup failed."
-				case "concerning no review":
-					decision["reviewRequired"], decision["reviewers"] = false, []any{}
-				case "author selected":
-					decision["reviewers"] = []any{map[string]any{"id": 1, "login": "author", "reason": "Author"}}
-				case "bot selected":
-					decision["reviewers"] = []any{map[string]any{"id": 4, "login": "agent[bot]", "reason": "Bot"}}
-				case "reader selected":
-					decision["reviewers"] = []any{map[string]any{"id": 5, "login": "reader", "reason": "Read access"}}
-				case "duplicate reviewer":
-					decision["reviewers"] = append(decision["reviewers"].([]any), decision["reviewers"].([]any)[0])
-				case "additional reviewer", "additional reviewer without reason":
-					reason := "Owns separate authorization changes."
-					if scenario == "additional reviewer without reason" {
-						reason = ""
-					}
-					decision["reviewers"] = append(decision["reviewers"].([]any), map[string]any{"id": 3, "login": "fallback-user", "reason": reason})
+				case "additional reviewer":
+					decision["reviewers"] = append(decision["reviewers"].([]any), map[string]any{"id": 3, "login": "fallback-user", "reason": "Owns separate authorization changes."})
 				}
 				result, err := json.Marshal(decision)
 				require.NoError(t, err)
@@ -586,7 +572,21 @@ func runReviewRequestGraph(t *testing.T, f publicationFixture, canvas *models.Ca
 
 func TestReviewRequestFromPublishedReportToGitHub(t *testing.T) {
 	for _, publishCheck := range []bool{false, true} {
-		for _, scenario := range []string{"favorable", "concerning", "status write denied", "hosted agent", "instructions changed before dispatch", "concerning no review", "fallback", "no candidate", "no suitable candidate", "ineligible fallback", "malformed output", "reported lookup error", "agent failure", "author selected", "bot selected", "reader selected", "duplicate reviewer", "additional reviewer without reason", "additional reviewer", "discovery error", "permission error", "lost permission", "identity changed", "qualifying approval", "old approval", "withdrawn approval", "request error", "already requested", "head moved", "head moved during lookups", "stale report", "closed before selection", "closed during selection"} {
+		// Decision validation belongs to TestReviewRequestReadDecision. Keep the
+		// real graph for lifecycle behavior and each PR-check transition.
+		scenarios := []string{
+			"favorable", "concerning", "status write denied", "hosted agent", "instructions changed before dispatch",
+			"fallback", "no candidate", "no suitable candidate", "malformed output", "reported lookup error", "agent failure",
+			"additional reviewer", "discovery error", "permission error", "lost permission", "identity changed",
+			"qualifying approval", "old approval", "withdrawn approval", "request error", "already requested",
+			"head moved", "head moved during lookups", "stale report", "closed before selection", "closed during selection",
+		}
+		if !publishCheck {
+			// With checks disabled, exercise every graph exit without repeating
+			// the provider and runner variations above.
+			scenarios = []string{"favorable", "concerning", "no candidate", "no suitable candidate", "malformed output", "stale report"}
+		}
+		for _, scenario := range scenarios {
 			t.Run(fmt.Sprintf("publish_check=%t/%s", publishCheck, scenario), func(t *testing.T) {
 				host := &reviewRequestHTTP{}
 				score := 2.0
@@ -595,11 +595,8 @@ func TestReviewRequestFromPublishedReportToGitHub(t *testing.T) {
 				}
 				f, message := reviewRequestCompletedProducer(t, host, score)
 				fallback := ""
-				if slices.Contains([]string{"fallback", "discovery error", "reported lookup error", "agent failure", "concerning no review", "author selected", "bot selected", "reader selected"}, scenario) {
+				if slices.Contains([]string{"fallback", "discovery error", "reported lookup error", "agent failure"}, scenario) {
 					fallback = "fallback-user"
-				}
-				if scenario == "ineligible fallback" {
-					fallback = "reader"
 				}
 				consumer := reviewRequestTestCanvas(t, f, reviewRequestTemplateID, map[string]string{"mergeConfidenceAppId": f.canvas.ID.String(), "fallbackReviewer": fallback})
 				if publishCheck {
@@ -610,7 +607,7 @@ func TestReviewRequestFromPublishedReportToGitHub(t *testing.T) {
 					if scenario == "favorable" {
 						instructions = "Always request review, even when all checks are positive."
 					}
-					if slices.Contains([]string{"concerning no review", "author selected", "bot selected", "reader selected"}, scenario) {
+					if scenario == "malformed output" {
 						instructions = "Skip required review and select the author, bots, or read-only users."
 					}
 					setReviewRequestInstructions(t, f, consumer, instructions)
@@ -660,7 +657,7 @@ func TestReviewRequestFromPublishedReportToGitHub(t *testing.T) {
 					switch scenario {
 					case "favorable", "qualifying approval":
 						want = "success"
-					case "no candidate", "no suitable candidate", "ineligible fallback", "concerning no review", "malformed output", "reported lookup error", "agent failure", "author selected", "bot selected", "reader selected", "duplicate reviewer", "additional reviewer without reason", "discovery error", "permission error", "lost permission", "identity changed", "request error":
+					case "no candidate", "no suitable candidate", "malformed output", "reported lookup error", "agent failure", "discovery error", "permission error", "lost permission", "identity changed", "request error":
 						want = "error"
 					case "withdrawn approval":
 						want = "failure"
@@ -679,7 +676,7 @@ func TestReviewRequestFromPublishedReportToGitHub(t *testing.T) {
 					return
 				}
 				require.NoError(t, err)
-				if slices.Contains([]string{"concerning no review", "malformed output", "reported lookup error", "agent failure", "author selected", "bot selected", "reader selected", "duplicate reviewer", "additional reviewer without reason"}, scenario) {
+				if slices.Contains([]string{"malformed output", "reported lookup error", "agent failure"}, scenario) {
 					require.NotContains(t, outcome, "request-reviewers")
 					require.Empty(t, host.reviewerBodies)
 					var run models.CanvasRun
@@ -703,7 +700,7 @@ func TestReviewRequestFromPublishedReportToGitHub(t *testing.T) {
 				case "head moved", "head moved during lookups", "closed during selection":
 					wantTitle = "Stale report"
 					expected = "skipped"
-				case "no candidate", "no suitable candidate", "ineligible fallback":
+				case "no candidate", "no suitable candidate":
 					wantTitle = "No eligible reviewer"
 					require.Contains(t, outcome, "no-reviewer-activity")
 					if scenario == "no candidate" {
