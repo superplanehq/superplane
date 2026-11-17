@@ -91,24 +91,13 @@ spec:
 
               Write for the reviewer:
 
-              - Explain the problem and resulting behavior first. Assume the reader has not seen the task or agent logs.
-              - Match detail to the size and risk of the change. A small fix may need only a few sentences. Explain complex changes as needed for an informed review.
-              - For English text, use Simplified Technical English. Write short sentences in active voice. Use familiar words and consistent terms.
-              - Summarize successful checks. State failed checks and relevant checks that could not run, with reasons. Only report results supported by evidence.
-              - Include risks, limitations, compatibility changes, migrations, and deployment steps when they affect review or use.
-              - Keep required repository content. Otherwise, omit work logs, lists of unchanged surfaces, and command inventories unless they help the reviewer.
-              - Use paragraphs, bullets, or sections as needed. Do not impose a fixed section layout or word limit. Before saving, remove repetition and details that do not help review.
+              - Explain the problem and resulting behavior. Match the detail to the scope of the change.
+              - For English text, use Simplified Technical English: short sentences, active voice, and familiar words.
+              - Omit local check results and risk assessments. CI and merge confidence report those separately.
+              - Keep required repository content and migration or deployment steps. Otherwise, use only paragraphs or sections that help review.
 
-              These examples illustrate writing choices, not required templates. Their facts and check results are hypothetical:
-
-              Small fix:
-              Empty search results no longer crash the results page. The page now shows its empty state.
-              Search regression tests passed.
-
-              Change with deployment requirements:
-              Sessions now expire after 24 hours of inactivity. Active users keep their sessions.
-              Deploy the cleanup worker before enabling expiry. Backfill activity timestamps for existing sessions first.
-              API and worker tests passed. The backfill has not been tested on production-sized data.
+              Example of a small fix, not a required template:
+              Empty search results no longer crash the page. The page now shows its empty state.
 
               Guidelines:
 
@@ -128,7 +117,7 @@ spec:
               3/ For behavior changes, add or update tests that verify observable behavior.
               4/ Avoid tests that only mirror implementation details or assert incidental layout, classes, or wording. Purely cosmetic changes do not need new tests unless repository instructions require them. Add coverage if behavior or accessibility changes.
               5/ Run the relevant tests, lint, and build checks specified by the repository. Fix failures caused by your changes.
-              6/ Report which checks passed or failed. State which checks you could not run and explain why. Do not claim verification you did not perform.
+              6/ Report check results in the run output. Do not repeat them in the pull request description unless repository instructions require it. Do not claim verification you did not perform.
           - name: Check pull requests
             type: bash
             workingDirectory: repo
