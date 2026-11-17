@@ -470,10 +470,7 @@ func buildCustomAutomationCanvas(
 		return nil, invalidArgument("workspace VCS integration is required")
 	}
 	provider := config.EffectiveVCSProvider()
-	workspaceScope, err := customAutomationListensOnWorkspace(tx, factory)
-	if err != nil {
-		return nil, err
-	}
+	workspaceScope := customAutomationListensOnWorkspace(factory)
 	if workspaceScope {
 		repository = models.WorkspaceRepositoriesExpression
 	}
@@ -915,16 +912,13 @@ func stripBacklogTaskInstructions(prompt string) string {
 }
 
 // customAutomationListensOnWorkspace reports whether a pull request
-// automation listens on every workspace repository. A Bitbucket workspace
-// does so only with multi-repo tasks.
-func customAutomationListensOnWorkspace(tx *gorm.DB, factory *models.Factory) (bool, error) {
+// automation listens on every workspace repository.
+func customAutomationListensOnWorkspace(factory *models.Factory) bool {
 	switch factory.OnboardingConfigValue().EffectiveVCSProvider() {
-	case models.ProviderGitHub:
-		return true, nil
-	case models.ProviderBitbucket:
-		return factory.MultiRepoTasksEnabled(tx)
+	case models.ProviderGitHub, models.ProviderBitbucket:
+		return true
 	}
-	return false, nil
+	return false
 }
 
 // customAutomationCheckoutEnvironment checks out the pull request that

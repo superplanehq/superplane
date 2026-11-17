@@ -205,20 +205,14 @@ func closeFactoryWorkOrderForPullRequest(
 		return outcome, nil
 	}
 
-	multiRepo, err := factory.MultiRepoTasksEnabled(tx)
+	result, done, err := order.PullRequestCloseOutcome(tx)
 	if err != nil {
 		return nil, err
 	}
-	if multiRepo {
-		result, done, err := order.PullRequestCloseOutcome(tx)
-		if err != nil {
-			return nil, err
-		}
-		if !done {
-			return outcome, nil
-		}
-		outcome.result = result
+	if !done {
+		return outcome, nil
 	}
+	outcome.result = result
 
 	if _, err := order.UpdateStatus(tx, models.FactoryWorkOrderStatusUpdate{
 		ToState:    models.FactoryWorkOrderStateClosed,
