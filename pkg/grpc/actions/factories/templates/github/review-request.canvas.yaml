@@ -87,8 +87,17 @@ spec:
     targetId: findings-comment
     channel: default
   - sourceId: select-reviewers
-    targetId: has-reviewers
+    targetId: selection-recovered
     channel: passed
+  - sourceId: selection-recovered
+    targetId: has-reviewers
+    channel: 'true'
+  - sourceId: selection-recovered
+    targetId: selection-error-activity
+    channel: 'false'
+  - sourceId: selection-error-activity
+    targetId: pr-check-error
+    channel: default
   nodes:
   - id: review-request-trigger
     name: Merge confidence completed
@@ -250,14 +259,24 @@ spec:
           Explain the evidence for each reviewer. Explain why each additional reviewer is necessary.
           Use noCandidate only when successful selection finds no suitable eligible candidate.
           Report lookup failures as errors. Never convert failures into noCandidate.
-          If a lookup fails, write {"error":"Explain the failed lookup."} and stop selection.
+          The gh --jq regex parser does not support lookaround, including negative lookbehind such as (?<!_test).
+          Use separate positive and negative predicates, or retrieve filenames without regex filtering.
+          For non-test Go files, use this compatible filter:
+          .[] | select((.filename | test("\\.go$")) and (.filename | test("_test\\.go$") | not)) | .filename
+          If an optional query is invalid, retry once with a compatible filter or a simpler query and filter locally.
+          Keep the eligibility, contributor, and ownership evidence requirements during recovery.
+          Do not invent evidence or treat unavailable data as an empty successful lookup.
+          If necessary evidence remains unavailable, write {"error":"Explain the failed lookup and recovery attempt."} and stop selection.
+          Do not retry indefinitely.
           The canvas applies fallback only after a valid no-candidate decision.
           Do not request reviews, change files, commit, push, or publish a pull request status.
 
           Write /tmp/review-request.json with this JSON structure:
           {"reviewRequired":true,"rationale":"Explain the decision.","reviewers":[{"id":123,"login":"human-login","reason":"Ownership or contribution evidence."}],"noCandidate":false}
           For no suitable candidate, keep reviewRequired true, reviewers [], and noCandidate true.
-          Always include a non-empty rationale. Your final message is not the structured result.
+          For a normal decision, always include a non-empty rationale.
+          For an unrecoverable lookup failure, use the error-only structure above.
+          Your final message is not the structured result.
       - name: Read decision
         type: bash
         command: |-
@@ -268,8 +287,15 @@ spec:
           if (!decision || typeof decision !== 'object' || Array.isArray(decision)) {
             throw new Error('The review decision must be a JSON object.');
           }
-          if (decision.error != null) {
-            throw new Error('Reviewer lookup failed: ' + JSON.stringify(decision.error));
+          if (Object.hasOwn(decision, 'error')) {
+            if (typeof decision.error !== 'string' || !decision.error.trim()) {
+              throw new Error('The lookup error must contain a nonempty explanation.');
+            }
+            fs.writeFileSync(process.env.SUPERPLANE_RESULT_FILE, JSON.stringify({
+              status: 'selection_error', error: decision.error,
+              reviewers: [], noCandidate: false, fallbackUsed: false
+            }));
+            process.exit(0);
           }
           if (decision.reviewRequired !== true ||
               typeof decision.rationale !== 'string' || !decision.rationale.trim() ||
@@ -293,6 +319,8 @@ spec:
             ids.add(reviewer.id);
             logins.add(login);
           }
+          // Only the validated lookup-error branch can report an error status.
+          delete decision.status;
           decision.fallbackUsed = false;
           if (decision.noCandidate) {
             const fallback = (process.env.SUPERPLANE_REVIEW_REQUEST_FALLBACK || '').trim().toLowerCase();
@@ -326,6 +354,25 @@ spec:
     position:
       x: 2320
       y: 80
+  - id: selection-recovered
+    name: Selection recovered
+    type: TYPE_ACTION
+    component: if
+    configuration:
+      expression: '$["Select reviewers"].data.result.status != "selection_error"'
+    position:
+      x: 2000
+      y: 80
+  - id: selection-error-activity
+    name: Selection error activity
+    type: TYPE_ACTION
+    component: updatePullRequestActivity
+    configuration:
+      title: Reviewer selection error
+      description: '{{ $["Select reviewers"].data.result.error + " Existing requests are preserved. Fallback was not used." }}'
+    position:
+      x: 2320
+      y: 1120
   - id: request-reviewers
     name: Ensure reviewers
     type: TYPE_ACTION
@@ -507,7 +554,7 @@ spec:
       activationNodeId: pr-check-pending
       resultUrl: '{{ run().url }}'
       phase: selection_error
-      reason: Reviewer selection failed or returned an invalid decision.
+      reason: '{{ let selection = $["Select reviewers"]; selection != nil && selection.data.result != nil && selection.data.result.status == "selection_error" ? selection.data.result.error : "Reviewer selection failed or returned an invalid decision." }}'
     position:
       x: 2320
       y: 800
