@@ -175,6 +175,13 @@ func evaluatePullRequestChecks(checks []PullRequestCheck, selectedNames []string
 		evaluation.Outcome = waitChecksOutcomeFailed
 		return evaluation
 	}
+	for _, check := range selected {
+		if check.Conclusion == "cancelled" {
+			// A rerun on this commit can replace a cancelled check.
+			evaluation.Outcome = waitChecksOutcomePending
+			return evaluation
+		}
+	}
 	evaluation.Outcome = waitChecksOutcomePassed
 	return evaluation
 }

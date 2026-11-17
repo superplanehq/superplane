@@ -92,11 +92,11 @@ func Test__EvaluatePullRequestChecks(t *testing.T) {
 		assert.Equal(t, "build", evaluation.FailedChecks[0].Name)
 	})
 
-	t.Run("passed when remaining checks were cancelled", func(t *testing.T) {
+	t.Run("pending when a selected check was cancelled", func(t *testing.T) {
 		t.Parallel()
 		cancelled := PullRequestCheck{Key: "check-run:ci:build", Name: "build", Status: checkStatusCompleted, Conclusion: "cancelled"}
 		evaluation := evaluatePullRequestChecks([]PullRequestCheck{passed, cancelled}, []string{"DCO", "build"}, false)
-		assert.Equal(t, waitChecksOutcomePassed, evaluation.Outcome)
+		assert.Equal(t, waitChecksOutcomePending, evaluation.Outcome)
 		assert.True(t, evaluation.AllTerminal)
 		assert.Empty(t, evaluation.FailedChecks)
 	})
@@ -136,9 +136,10 @@ func Test__EvaluatePullRequestChecks(t *testing.T) {
 		assert.False(t, evaluation.AllTerminal)
 	})
 
-	t.Run("timeout after selected checks are terminal", func(t *testing.T) {
+	t.Run("timeout when a selected check remains cancelled", func(t *testing.T) {
 		t.Parallel()
-		evaluation := evaluatePullRequestChecks([]PullRequestCheck{passed}, []string{"DCO"}, true)
+		cancelled := PullRequestCheck{Key: "check-run:ci:build", Name: "build", Status: checkStatusCompleted, Conclusion: "cancelled"}
+		evaluation := evaluatePullRequestChecks([]PullRequestCheck{passed, cancelled}, []string{"DCO", "build"}, true)
 		assert.Equal(t, waitChecksOutcomeTimedOut, evaluation.Outcome)
 		assert.True(t, evaluation.AllTerminal)
 	})
