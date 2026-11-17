@@ -770,9 +770,10 @@ func (f *Factory) ListEnabledContextRepos(tx *gorm.DB) ([]FactoryAgentResource, 
 }
 
 // ListEnabledGitHubContextRepositoryNames returns owner/name values for
-// enabled GitHub context repositories with access on workspaces that use
-// this integration. Disabled resources, other providers, and deleted
-// workspaces are omitted. Configured repository access is preserved.
+// enabled GitHub context repositories in workspaces that use integrationID.
+// Only repositories whose configured read or write access matches access are
+// included. Missing repository access defaults to read. Disabled resources,
+// other providers, and deleted workspaces are excluded.
 func ListEnabledGitHubContextRepositoryNames(tx *gorm.DB, integrationID uuid.UUID, access string) ([]string, error) {
 	if integrationID == uuid.Nil {
 		return nil, nil
