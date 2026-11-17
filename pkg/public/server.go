@@ -569,6 +569,7 @@ func (s *Server) grpcGatewayHandler(grpcGatewayMux *runtime.ServeMux) http.Handl
 		r2 := middleware.CloneGatewayRequest(r)
 		r2.Header.Set("x-User-id", user.ID.String())
 		r2.Header.Set("x-Organization-id", user.OrganizationID.String())
+		r2.Header.Del("x-account-id")
 		if user.AccountID != nil {
 			r2.Header.Set("x-account-id", user.AccountID.String())
 		}
