@@ -3,6 +3,7 @@ package changesets
 import (
 	"testing"
 
+	"github.com/google/go-github/v84/github"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
@@ -19,7 +20,11 @@ func TestCanvasPublisherMergeConfidencePublication(t *testing.T) {
 		bodyEnabled      bool
 		commentAvailable bool
 		expectedError    string
+		checkEnabled     *bool
+		expectedCode     codes.Code
 	}{
+		{name: "cannot enable a check without GitHub even with results off", settings: map[string]any{"publishResults": false, "publishPRCheck": true}, checkEnabled: github.Ptr(true), expectedError: "Connect GitHub", expectedCode: codes.FailedPrecondition},
+		{name: "disabled checks need no GitHub permissions", settings: map[string]any{"publishResults": false, "publishPRCheck": false}, checkEnabled: github.Ptr(false)},
 		{
 			name:        "older automation defaults to body publication",
 			bodyEnabled: true,
@@ -74,6 +79,9 @@ func TestCanvasPublisherMergeConfidencePublication(t *testing.T) {
 				agent,
 				componentCanvasNode("publish-merge-confidence", "Publish results", "noop", map[string]any{"enabled": tc.bodyEnabled}),
 			}
+			if tc.checkEnabled != nil {
+				nodes = append(nodes, componentCanvasNode("start-assessment-check", "Start assessment check", "github.setPullRequestCheckRun", map[string]any{"enabled": false}))
+			}
 			if tc.commentAvailable {
 				nodes = append(nodes, componentCanvasNode("comment-merge-confidence", "Publish comment", "github.publishPullRequestComment", nil))
 			}
@@ -84,6 +92,9 @@ func TestCanvasPublisherMergeConfidencePublication(t *testing.T) {
 			require.NoError(t, err)
 			draftNodes := append([]models.Node(nil), live.Nodes...)
 			for i := range draftNodes {
+				if draftNodes[i].ID == "start-assessment-check" {
+					draftNodes[i].Configuration = map[string]any{"enabled": *tc.checkEnabled}
+				}
 				if draftNodes[i].ID == "assess-risk" {
 					draftNodes[i].Name = "Updated assessment"
 					draftNodes[i].Configuration = tc.settings
@@ -96,7 +107,11 @@ func TestCanvasPublisherMergeConfidencePublication(t *testing.T) {
 
 			err = publisher.Publish(t.Context())
 			if tc.expectedError != "" {
-				require.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
+				expectedCode := tc.expectedCode
+				if expectedCode == codes.OK {
+					expectedCode = codes.InvalidArgument
+				}
+				require.Equal(t, expectedCode, grpcerrors.Code(err))
 				require.ErrorContains(t, err, tc.expectedError)
 				unchanged, err := models.FindLiveCanvasVersionInTransaction(db, canvas.ID)
 				require.NoError(t, err)

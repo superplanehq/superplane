@@ -149,9 +149,7 @@ describe("WorkOrderSplitRunPopup loading mode", () => {
     const onDispatch = vi.fn(async () => {});
     lookupState.ready = true;
     renderPopup(undefined, splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER), onDispatch);
-    expect(screen.getByTestId("split-run-draft-model")).toHaveAccessibleName(
-      /openai\/gpt-6.1-sol.*High.*Implementation default/,
-    );
+    expect(screen.getByTestId("split-run-draft-model")).toHaveAccessibleName(/openai\/gpt-6.1-sol.*High.*Default/);
     await userEvent.setup().click(screen.getByTestId("split-run-draft-model"));
     await userEvent.setup().keyboard("{Escape}");
     await userEvent.setup().click(screen.getByRole("button", { name: "Start" }));
@@ -171,9 +169,7 @@ describe("WorkOrderSplitRunPopup loading mode", () => {
       await user.hover(
         screen.getByTestId(field === "model" ? "split-run-draft-model-list" : "split-run-draft-thinking"),
       );
-      fireEvent.click(
-        await screen.findByRole("menuitem", { name: field === "model" ? "Task model (task-model)" : "High" }),
-      );
+      fireEvent.click(await screen.findByRole("menuitem", { name: field === "model" ? "Task model" : "High" }));
       await user.keyboard("{Escape}");
       client.setQueryData(canvasKeys.detail("organization-1", "app-refund-implementer"), {
         spec: {
@@ -182,9 +178,7 @@ describe("WorkOrderSplitRunPopup loading mode", () => {
       });
       await waitFor(() =>
         expect(trigger).toHaveAccessibleName(
-          field === "model"
-            ? /task-model.*Low \(Implementation default\)/
-            : /new-default.*Implementation default.*High$/,
+          field === "model" ? /Task model.*Low \(Default\)/ : /new-default.*Default.*High$/,
         ),
       );
       await user.click(screen.getByRole("button", { name: "Start" }));
@@ -194,7 +188,7 @@ describe("WorkOrderSplitRunPopup loading mode", () => {
         field === "thinking" ? "high" : undefined,
       );
       await user.click(trigger);
-      await user.click(screen.getByRole("menuitem", { name: "Use Implementation defaults" }));
+      await user.click(screen.getByRole("menuitem", { name: "Use defaults" }));
       await user.click(screen.getByRole("button", { name: "Start" }));
       await user.click(screen.getByRole("button", { name: "Start anyway" }));
       expect(onDispatch).toHaveBeenLastCalledWith(undefined, undefined);

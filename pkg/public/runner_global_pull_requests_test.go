@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 	runner "github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	factoryactions "github.com/superplanehq/superplane/pkg/grpc/actions/factories"
 	"github.com/superplanehq/superplane/pkg/integrations/bitbucket"
 	"github.com/superplanehq/superplane/pkg/jwt"
@@ -27,7 +26,6 @@ func TestRunnerTaskPullRequests(t *testing.T) {
 	db := database.DB(t.Context())
 	server := newRunnerArtifactTestServer(t, r, jwt.NewSigner("test"))
 	ctx, factory, order := mustTaskLinkedAgentRun(t, r)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryMultiRepoTasks))
 	integrationID := uuid.NewString()
 	repository := "acme/api"
 	provider := models.ProviderGitHub
@@ -56,6 +54,13 @@ func TestRunnerTaskPullRequests(t *testing.T) {
 		`{"repository":"acme/other","head":"feature","base":"main","title":"Change other"}`)
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
 	assert.Contains(t, rec.Body.String(), "The pull request repository is not in this workspace.")
+
+	// The task credential reaches provider validation without an organization flag.
+	// This fixture has no stored GitHub credentials, so the provider rejects it.
+	rec = runnerRequest(t, server, http.MethodPost, token, "/api/v1/runner/task/pull-requests",
+		`{"repository":"acme/api","head":"feature","base":"main","title":"Change"}`)
+	assert.Equal(t, http.StatusConflict, rec.Code, rec.Body.String())
+	assert.Contains(t, rec.Body.String(), "GitHub integration is not connected")
 
 	readOnly := runnerTokenWithScopes(t, token, runner.ScopePullRequestsRead)
 	rec = runnerRequest(t, server, http.MethodPost, readOnly, "/api/v1/runner/task/pull-requests",
