@@ -16,7 +16,6 @@ import (
 	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/mcp"
 	"github.com/superplanehq/superplane/pkg/models"
-	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -133,7 +132,7 @@ func AttachWorkspaceAgentResources(
 			skills = nil
 		}
 	}
-	setupCommands, contextRepos, multiRepo, err := loadWorkspaceSetupAndContext(db, factory)
+	setupCommands, contextRepos, err := loadWorkspaceSetupAndContext(db, factory)
 	if err != nil {
 		logger.WithError(err).Warn("skip workspace setup and context: list failed")
 		setupCommands = nil
@@ -155,32 +154,21 @@ func AttachWorkspaceAgentResources(
 	environment, files, mcpNames = attachWorkspaceMCPServers(ctx, db, mcpServers, disabledTools, enabledTools, environment, files)
 	files = appendWorkspaceSkillFiles(skills, files)
 	files = appendWorkspaceSetupFiles(setupCommands, files)
-	files = appendWorkspaceContextFiles(db, factory, contextRepos, multiRepo, files)
+	files = appendWorkspaceContextFiles(db, factory, contextRepos, files)
 	files = appendWorkspaceAgentResourcesHint(files, mcpNames, setupCommands, contextRepos)
 	return environment, files
 }
 
-func loadWorkspaceSetupAndContext(db *gorm.DB, factory *models.Factory) ([]string, []models.FactoryAgentResource, bool, error) {
+func loadWorkspaceSetupAndContext(db *gorm.DB, factory *models.Factory) ([]string, []models.FactoryAgentResource, error) {
 	commands, err := factory.ListEnabledSetupCommands(db)
 	if err != nil {
-		return nil, nil, false, err
+		return nil, nil, err
 	}
 	repos, err := factory.ListEnabledContextRepos(db)
 	if err != nil {
-		return nil, nil, false, err
+		return nil, nil, err
 	}
-	multiRepo, err := factory.MultiRepoTasksEnabled(db)
-	if err != nil {
-		return nil, nil, false, err
-	}
-	if !multiRepo {
-		for i := range repos {
-			config := repos[i].Config.Data()
-			config.Access = models.FactoryContextRepoAccessRead
-			repos[i].Config = datatypes.NewJSONType(config)
-		}
-	}
-	return commands, repos, multiRepo, nil
+	return commands, repos, nil
 }
 
 func rejectDisabledSetupCommands(db *gorm.DB, factory *models.Factory, commands []string, disabled map[string]struct{}) []string {
@@ -317,7 +305,7 @@ func WorkspaceContextRepoDirectory(repository string) string {
 	return "context/" + repository
 }
 
-func appendWorkspaceContextFiles(db *gorm.DB, factory *models.Factory, resources []models.FactoryAgentResource, multiRepo bool, files []TaskFile) []TaskFile {
+func appendWorkspaceContextFiles(db *gorm.DB, factory *models.Factory, resources []models.FactoryAgentResource, files []TaskFile) []TaskFile {
 	if len(resources) == 0 {
 		return files
 	}
@@ -352,7 +340,7 @@ func appendWorkspaceContextFiles(db *gorm.DB, factory *models.Factory, resources
 			Directory:   WorkspaceContextRepoDirectory(repository),
 			Branch:      strings.TrimSpace(config.Ref),
 			ReadOnly:    readOnly,
-			PushBlocked: multiRepo && readOnly && strings.EqualFold(provider, models.ProviderBitbucket),
+			PushBlocked: readOnly && strings.EqualFold(provider, models.ProviderBitbucket),
 		})
 	}
 	if len(repos) == 0 {

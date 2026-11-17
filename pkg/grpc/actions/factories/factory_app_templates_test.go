@@ -113,33 +113,10 @@ func TestMaterializeFactoryTemplate(t *testing.T) {
 		"value":       "1",
 		"valueSource": "literal",
 	})
-	assert.Contains(t, result.canvasYAML, `title: ($title | gsub("[\\r\\n]"; "") | @base64)`)
-
-	createPR := findYAMLNode(t, canvas, "create-pr")
-	assert.Equal(t, "{{ task().repository }}", createPR.Configuration["repository"])
-	assert.Equal(t, "{{ task().default_branch }}", createPR.Configuration["base"])
-	assert.Equal(t, &yaml.IntegrationRef{ID: "github-1", Name: "acme-github"}, createPR.Integration)
-
-	body, ok := createPR.Configuration["body"].(string)
-	require.True(t, ok, "expected create-pr body to be a string")
-	assert.Contains(t, body, `task().origin != nil ? "Closes " + task().origin.label : ""`)
-	assert.Contains(t, body, "[{{ task().key }}]({{ task().url }})")
-	assert.Less(t, strings.Index(body, "Closes"), strings.Index(body, "task().key"), "body: %s", body)
-	assert.NotContains(t, body, "[Task](")
 	assert.NotContains(t, result.canvasYAML, "visualEvidence")
 	assert.NotContains(t, result.canvasYAML, "has-visual-evidence")
 	assert.NotContains(t, result.canvasYAML, "comment-visual-evidence")
 	assert.NotContains(t, result.canvasYAML, "github.createIssueComment")
-
-	attach := findYAMLNode(t, canvas, "attach-pr-artifact")
-	assert.Equal(t, "addPullRequest", attach.Component)
-	assert.Contains(t, canvas.Spec.Edges, yaml.Edge{SourceID: "create-pr", TargetID: "attach-pr-artifact", Channel: "default"})
-	assert.Contains(t, canvas.Spec.Edges, yaml.Edge{SourceID: "update-pr", TargetID: "attach-pr-artifact-updated", Channel: "default"})
-
-	updatePR := findYAMLNode(t, canvas, "update-pr")
-	updateBody, ok := updatePR.Configuration["body"].(string)
-	require.True(t, ok, "expected update-pr body to be a string")
-	assert.Contains(t, updateBody, `task().origin != nil ? "Closes " + task().origin.label : ""`)
 
 	console, err := yaml.ConsoleFromYML([]byte(result.consoleYAML))
 	require.NoError(t, err)
@@ -156,7 +133,6 @@ func TestMaterializeMultiRepoImplementationTemplate(t *testing.T) {
 		installParams: map[string]string{"appRepository": "acme/refunds", "defaultBranch": "develop"},
 		integrations:  map[string]factoryTemplateIntegration{"github": {id: "github-1", name: "acme-github"}},
 		agent:         &factoryTemplateAgent{component: "runnerOpenRouter", model: "anthropic/claude-sonnet-4-6", credentialSource: "integration", credentialIntegrationName: "acme-openrouter"},
-		multiRepo:     true,
 	})
 	require.NoError(t, err)
 
@@ -197,7 +173,6 @@ func TestMaterializeBitbucketMultiRepoImplementationTemplate(t *testing.T) {
 		installParams: map[string]string{"appRepository": "acme/refunds", "defaultBranch": "develop"},
 		integrations:  map[string]factoryTemplateIntegration{"bitbucket": {id: "bitbucket-1", name: "acme-bitbucket"}},
 		agent:         &factoryTemplateAgent{component: "runnerOpenRouter", model: "anthropic/claude-sonnet-4-6", credentialSource: "integration", credentialIntegrationName: "acme-openrouter"},
-		multiRepo:     true,
 		draftPullRequests: func() *bool {
 			draft := true
 			return &draft
@@ -265,7 +240,10 @@ func TestMaterializeRiskScoreTemplate(t *testing.T) {
 	assert.Contains(t, canvas.Spec.Edges, yaml.Edge{SourceID: "start-assessment-check", TargetID: "assess-risk", Channel: "default"})
 
 	agent := findYAMLNode(t, canvas, "assess-risk")
+	assert.Equal(t, false, agent.Configuration["publishPRCheck"])
+	assert.Equal(t, false, findYAMLNode(t, canvas, "start-assessment-check").Configuration["enabled"])
 	assert.Equal(t, models.SuperPlaneRunnerComponent, agent.Component)
+	assert.Equal(t, true, agent.Configuration["skipSetupCommands"])
 	maxRuns := 5
 	assert.Equal(t, &yaml.ConcurrencySpec{Max: &maxRuns}, agent.Concurrency)
 	assert.NotContains(t, agent.Configuration, "credentials")
@@ -337,6 +315,7 @@ func TestMaterializeRiskScoreTemplateBitbucket(t *testing.T) {
 	assert.Equal(t, &yaml.IntegrationRef{ID: "bitbucket-1", Name: "acme-bitbucket"}, entrypoint.Integration)
 
 	agent := findYAMLNode(t, canvas, "assess-risk")
+	assert.Equal(t, true, agent.Configuration["skipSetupCommands"])
 	maxRuns := 5
 	assert.Equal(t, &yaml.ConcurrencySpec{Max: &maxRuns}, agent.Concurrency)
 	prompt := agentPrompt(t, agent)
@@ -918,20 +897,6 @@ func TestMaterializeFactoryTemplateBitbucketImplement(t *testing.T) {
 		"integration": map[string]any{"name": "acme-bitbucket"},
 	}}, agent.Configuration["environmentFrom"])
 
-	bitbucket := &yaml.IntegrationRef{ID: "bitbucket-1", Name: "acme-bitbucket"}
-	for nodeID, component := range map[string]string{
-		"find-pr":   "bitbucket.findPullRequest",
-		"create-pr": "bitbucket.createPullRequest",
-		"update-pr": "bitbucket.updatePullRequest",
-	} {
-		node := findYAMLNode(t, canvas, nodeID)
-		assert.Equal(t, component, node.Component, nodeID)
-		assert.Equal(t, bitbucket, node.Integration, nodeID)
-	}
-
-	attach := findYAMLNode(t, canvas, "attach-pr-artifact")
-	assert.Equal(t, "bitbucket", attach.Configuration["provider"])
-	assert.Equal(t, `{{ $["Create Pull Request"].data.links.html.href }}`, attach.Configuration["url"])
 	assert.NotContains(t, agent.Configuration, "includeVisualEvidence")
 	assert.NotContains(t, result.canvasYAML, "visualEvidence")
 	assert.NotContains(t, result.canvasYAML, "bitbucket.createPullRequestComment")

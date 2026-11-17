@@ -7,7 +7,8 @@ import { MobileDraftStartModelSelect } from "../../mobile/MobileDraftStartModelS
 import { DraftStartModelSelect } from "./DraftStartModelSelect";
 import type { DraftStartSelection } from "./draftStartModel";
 
-const model = "openai/gpt-6.1-sol";
+const modelName = "openai/gpt-6.1-sol";
+const model = `hosted::openrouter::${modelName}`;
 const meta = {
   title: "Factories/Start defaults",
   component: DraftStartModelSelect,
@@ -15,7 +16,15 @@ const meta = {
     msw: {
       handlers: [
         http.get("*/line-runner-models", () =>
-          HttpResponse.json({ models: [{ id: model, name: "OpenAI GPT 6.1 Sol with extended context" }] }),
+          HttpResponse.json({
+            models: [
+              { id: model, name: modelName },
+              { id: `hosted::openai::gpt-6.1-sol`, name: modelName },
+              { id: `byok::openrouter::${modelName}`, name: modelName },
+              { id: modelName, name: modelName },
+              { id: "long-model", name: "Anthropic Claude Opus 4.6 with extended context" },
+            ],
+          }),
         ),
       ],
     },
@@ -24,8 +33,20 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-function Preview({ mobile = false, loading = false, failed = false }) {
-  const [selection, onChange] = useState<DraftStartSelection>({});
+function Preview({
+  mobile = false,
+  loading = false,
+  failed = false,
+  initialSelection = {},
+  appearance = "labeled",
+}: {
+  mobile?: boolean;
+  loading?: boolean;
+  failed?: boolean;
+  initialSelection?: DraftStartSelection;
+  appearance?: "labeled" | "ghost" | "icon";
+}) {
+  const [selection, onChange] = useState<DraftStartSelection>(initialSelection);
   const [ready, setReady] = useState(!loading && !failed);
   const defaults = {
     values: ready ? { model, thinkingLevel: "high" } : undefined,
@@ -48,7 +69,7 @@ function Preview({ mobile = false, loading = false, failed = false }) {
         {mobile ? (
           <MobileDraftStartModelSelect {...props} />
         ) : (
-          <DraftStartModelSelect {...props} appearance="labeled" />
+          <DraftStartModelSelect {...props} appearance={appearance} />
         )}
       </div>
     </div>
@@ -67,3 +88,13 @@ export const Mobile: Story = { decorators, render: () => <Preview mobile /> };
 export const Loading: Story = { decorators, render: () => <Preview loading /> };
 export const Retry: Story = { decorators, render: () => <Preview failed /> };
 export const MobileRetry: Story = { decorators, render: () => <Preview mobile failed /> };
+export const Overrides: Story = {
+  decorators,
+  render: () => <Preview initialSelection={{ model: modelName, thinkingLevel: "low" }} />,
+};
+export const MobileOverrides: Story = {
+  decorators,
+  render: () => <Preview mobile initialSelection={{ thinkingLevel: "high" }} />,
+};
+export const RefineStrip: Story = { decorators, render: () => <Preview appearance="ghost" /> };
+export const Icon: Story = { decorators, render: () => <Preview appearance="icon" /> };

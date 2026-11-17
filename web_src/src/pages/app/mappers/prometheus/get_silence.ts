@@ -41,17 +41,21 @@ export const getSilenceMapper: ComponentBaseMapper = {
       return details;
     }
 
-    const silence = outputs.default[0].data as PrometheusSilencePayload;
+    const silence = outputs.default[0].data as PrometheusSilencePayload | null | undefined;
 
-    if (silence?.silenceID) {
+    if (!silence) {
+      return details;
+    }
+
+    if (silence.silenceID) {
       details["Silence ID"] = silence.silenceID;
     }
 
-    if (silence?.status) {
+    if (silence.status) {
       details["Status"] = silence.status;
     }
 
-    if (silence?.matchers && silence.matchers.length > 0) {
+    if (silence.matchers && silence.matchers.length > 0) {
       details["Matchers"] = silence.matchers
         .map((m) => {
           const operator = m.isEqual === false ? "!=" : "=";
@@ -61,19 +65,19 @@ export const getSilenceMapper: ComponentBaseMapper = {
         .join(", ");
     }
 
-    if (silence?.startsAt) {
+    if (silence.startsAt) {
       details["Starts At"] = new Date(silence.startsAt).toLocaleString();
     }
 
-    if (silence?.endsAt && silence.endsAt !== "0001-01-01T00:00:00Z") {
+    if (silence.endsAt && silence.endsAt !== "0001-01-01T00:00:00Z") {
       details["Ends At"] = new Date(silence.endsAt).toLocaleString();
     }
 
-    if (silence?.createdBy) {
+    if (silence.createdBy) {
       details["Created By"] = silence.createdBy;
     }
 
-    if (silence?.comment) {
+    if (silence.comment) {
       details["Comment"] = silence.comment;
     }
 

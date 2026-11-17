@@ -39,7 +39,7 @@ func configureMergeConfidencePublication(canvas *yaml.Canvas) error {
 		node := &canvas.Spec.Nodes[i]
 		switch node.ID {
 		case "start-assessment-check":
-			node.Configuration["enabled"] = agent["publishPRCheck"] != false
+			node.Configuration["enabled"] = agent["publishPRCheck"] == true
 			node.Configuration["activationGeneration"] = savedActivationGeneration(agent["prCheckActivationGeneration"])
 		case "publish-merge-confidence":
 			node.Configuration["enabled"] = publish && bodyEnabled

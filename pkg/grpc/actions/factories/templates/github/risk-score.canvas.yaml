@@ -57,7 +57,7 @@ spec:
         assessedSha: '{{ root().data.pull_request.head.sha }}'
         activationNodeId: start-assessment-check
         context: superplane/merge-confidence
-        enabled: true
+        enabled: false
         activationGeneration: 1
         state: pending
         reason: Merge confidence assessment is running.
@@ -73,8 +73,10 @@ spec:
       concurrency:
         max: 5
       configuration:
+        publishPRCheck: false
         executionTimeoutSeconds: 1800
         includeVisualEvidence: false
+        skipSetupCommands: true
         machineType: e1-large-amd64
         model: sonnet
         credentials:

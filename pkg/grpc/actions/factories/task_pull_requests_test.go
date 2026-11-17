@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	bitbucketintegration "github.com/superplanehq/superplane/pkg/integrations/bitbucket"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
@@ -75,7 +74,6 @@ func (f *fakeTaskPullRequestGitHub) EditPullRequest(_ context.Context, repositor
 
 func TestOpenTaskPullRequest(t *testing.T) {
 	r := support.Setup(t)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryMultiRepoTasks))
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -294,7 +292,6 @@ func installTaskPullRequestBitbucket(t *testing.T, api taskPullRequestBitbucketA
 
 func TestOpenTaskPullRequestInBitbucket(t *testing.T) {
 	r := support.Setup(t)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryMultiRepoTasks))
 	db := database.DB(t.Context())
 	factory, order := bitbucketTaskPullRequestWorkspace(t, r)
 	fake := &fakeTaskPullRequestBitbucket{mainBranch: "trunk", open: map[string][]map[string]any{}}
@@ -388,18 +385,19 @@ func TestOpenTaskPullRequestInBitbucket(t *testing.T) {
 	})
 }
 
-func TestOpenTaskPullRequestInBitbucketWithoutMultiRepoTasks(t *testing.T) {
+func TestOpenTaskPullRequestInBitbucketByDefault(t *testing.T) {
 	r := support.Setup(t)
 	factory, order := bitbucketTaskPullRequestWorkspace(t, r)
 	fake := &fakeTaskPullRequestBitbucket{mainBranch: "trunk", open: map[string][]map[string]any{}}
 	installTaskPullRequestBitbucket(t, fake)
 
-	_, err := OpenTaskPullRequest(context.Background(), IntakeDependencies{}, "http://app.test", factory, order, TaskPullRequestInput{
+	pullRequest, err := OpenTaskPullRequest(context.Background(), IntakeDependencies{}, "http://app.test", factory, order, TaskPullRequestInput{
 		Repository: "acme/web", Head: "feature", Title: "Change the web app",
 	})
 
-	require.ErrorIs(t, err, models.ErrFactoryPullRequestRepositoryNotInWorkspace)
-	assert.Zero(t, fake.calls)
+	require.NoError(t, err)
+	assert.Equal(t, "acme/web", pullRequest.Repository)
+	assert.Positive(t, fake.calls)
 }
 
 // stalledTaskPullRequestGitHub never answers the pull request lookup.
