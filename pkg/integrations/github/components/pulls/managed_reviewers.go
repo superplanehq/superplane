@@ -274,11 +274,14 @@ func (r *reviewerReconciliation) recoverOwnership(pr *github.PullRequest, review
 	}
 	r.state.Uncertain = slices.DeleteFunc(r.state.Uncertain, func(uncertain ownedReviewerRequest) bool {
 		r.state.Owned = slices.DeleteFunc(r.state.Owned, func(owned ownedReviewerRequest) bool { return sameReviewer(owned.Reviewer, uncertain.Reviewer) })
-		if !requestedReviewer(pr, uncertain.Reviewer) && reviewerSubmittedReviewID(reviews, uncertain.Reviewer) == uncertain.ReviewID {
-			r.recordWithdrawal(uncertain)
-			return true
+		if requestedReviewer(pr, uncertain.Reviewer) {
+			return false
 		}
-		return false
+		// A submission also clears the request, but does not prove our DELETE applied.
+		if reviewerSubmittedReviewID(reviews, uncertain.Reviewer) == uncertain.ReviewID {
+			r.recordWithdrawal(uncertain)
+		}
+		return true
 	})
 	// Recover an uncertain POST only for an identity that was absent before it.
 	if r.state.Adding != nil {

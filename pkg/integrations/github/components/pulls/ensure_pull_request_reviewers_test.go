@@ -410,3 +410,37 @@ func TestManagedReviewersRecoverWithdrawalExplanation(t *testing.T) {
 	}
 	require.Equal(t, []string{"POST first", "DELETE first"}, host.mutations)
 }
+
+func TestManagedReviewersRecoverUncertainWithdrawalAfterSubmission(t *testing.T) {
+	for _, manualRequest := range []bool{false, true} {
+		t.Run(fmt.Sprintf("manual_request=%t", manualRequest), func(t *testing.T) {
+			store := newReviewerPublications()
+			host := &reviewerHost{}
+			first := ReviewerIdentity{ID: 2, Login: "first"}
+			require.NoError(t, (&EnsurePullRequestReviewers{}).Execute(reviewerExecution(store, host, first)))
+			host.failRemove = true
+			require.Error(t, (&EnsurePullRequestReviewers{}).Execute(reviewerExecution(store, host)))
+			host.failRemove = false
+			host.commented = true
+			host.pending = nil
+			if manualRequest {
+				host.pending = []ReviewerIdentity{first}
+				require.ErrorContains(t, (&EnsurePullRequestReviewers{}).Execute(reviewerExecution(store, host)), "uncertain withdrawal")
+				require.Equal(t, []ReviewerIdentity{first}, host.pending)
+				host.pending = nil
+			}
+			for range 2 {
+				ctx := reviewerExecution(store, host)
+				require.NoError(t, (&EnsurePullRequestReviewers{}).Execute(ctx))
+				outcome := ctx.ExecutionState.(*contexts.ExecutionStateContext).Payloads[0].(map[string]any)["data"].(ensureReviewersOutcome)
+				require.Empty(t, outcome.Withdrawals, "submission does not prove an automation withdrawal")
+			}
+			// A later manual request remains outside managed ownership.
+			host.pending = []ReviewerIdentity{first}
+			require.NoError(t, (&EnsurePullRequestReviewers{}).Execute(reviewerExecution(store, host, first)))
+			require.NoError(t, (&EnsurePullRequestReviewers{}).Execute(reviewerExecution(store, host)))
+			require.Equal(t, []ReviewerIdentity{first}, host.pending)
+			require.Equal(t, []string{"POST first", "DELETE first"}, host.mutations)
+		})
+	}
+}

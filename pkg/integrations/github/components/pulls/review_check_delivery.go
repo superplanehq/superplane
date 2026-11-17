@@ -596,6 +596,7 @@ func WakeReviewChecks(integration core.IntegrationContext, eventType string, pay
 	if event.Repository.FullName == "" || event.PullRequest.Number <= 0 {
 		return nil
 	}
+	reviewState := strings.ToUpper(event.Review.GetState())
 	store, err := reviewCheckStore(integration)
 	if err != nil {
 		return err
@@ -610,12 +611,12 @@ func WakeReviewChecks(integration core.IntegrationContext, eventType string, pay
 			if current.Disabled {
 				return core.ErrPublicationUnchanged
 			}
-			if eventType == "pull_request_review" && event.Review.GetID() > 0 && event.Review.GetUser().GetID() > 0 && event.Review.GetCommitID() != "" && slices.Contains([]string{"APPROVED", "CHANGES_REQUESTED", "COMMENTED", "DISMISSED"}, event.Review.GetState()) {
+			if eventType == "pull_request_review" && event.Review.GetID() > 0 && event.Review.GetUser().GetID() > 0 && event.Review.GetCommitID() != "" && slices.Contains([]string{"APPROVED", "CHANGES_REQUESTED", "COMMENTED", "DISMISSED"}, reviewState) {
 				state, err := decodeReviewCheckState(current.Payload)
 				if err != nil {
 					return err
 				}
-				activity := verifiedReviewActivity{ID: event.Review.GetID(), Reviewer: ReviewerIdentity{ID: event.Review.GetUser().GetID(), Login: event.Review.GetUser().GetLogin()}, SHA: event.Review.GetCommitID(), State: event.Review.GetState()}
+				activity := verifiedReviewActivity{ID: event.Review.GetID(), Reviewer: ReviewerIdentity{ID: event.Review.GetUser().GetID(), Login: event.Review.GetUser().GetLogin()}, SHA: event.Review.GetCommitID(), State: reviewState}
 				index := slices.IndexFunc(state.ReviewActivity, func(previous verifiedReviewActivity) bool { return previous.ID == activity.ID })
 				if index < 0 {
 					state.ReviewActivity = append(state.ReviewActivity, activity)

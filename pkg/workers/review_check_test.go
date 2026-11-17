@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"net/http"
 	"strings"
 	"sync"
@@ -257,6 +258,12 @@ func (f *reviewCheckFixture) webhook(eventType, action string, evidence ...map[s
 	payload := map[string]any{"action": action, "repository": map[string]any{"full_name": "testhq/hello"}, "pull_request": map[string]any{"number": 42, "head": map[string]any{"sha": "abc"}}}
 	if len(evidence) > 0 {
 		for key, value := range evidence[0] {
+			if key == "review" {
+				// GitHub webhook states are lowercase; REST review states are uppercase.
+				review := maps.Clone(value.(map[string]any))
+				review["state"] = strings.ToLower(review["state"].(string))
+				value = review
+			}
 			payload[key] = value
 		}
 	}
