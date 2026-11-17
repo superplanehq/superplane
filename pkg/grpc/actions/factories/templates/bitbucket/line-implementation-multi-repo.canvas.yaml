@@ -84,11 +84,20 @@ spec:
 
               Pull request title and description:
 
-              1/ Follow the conventions of each repository for the title, description, writing style, and formatting. Discover and use the applicable pull request template.
-              2/ If the repository provides no guidance, write a short, descriptive title and a concise description of the problem and resulting behavior. Include relevant verification and known limitations. Use sections only when they help the reader.
+              1/ Follow the conventions of each repository for the title, description, language, writing style, and formatting. Discover and use the applicable pull request template. Apply the writing guidance below within these requirements.
+              2/ If the repository has no title convention, write a short, descriptive title. Do not require a Conventional Commits prefix.
               3/ When the task changes more than one repository, name the related pull requests in each description.
               4/ Do not add closing keywords (Closes, Fixes, Resolves) or the task link. SuperPlane adds the task link.
-              5/ Include only verification results you can substantiate. State any checks that could not run and why.
+
+              Write for the reviewer:
+
+              - Explain the problem and resulting behavior. Match the detail to the scope of the change.
+              - For English text, use Simplified Technical English: short sentences, active voice, and familiar words.
+              - Omit local check results and risk assessments. CI and merge confidence report those separately.
+              - Keep required repository content and migration or deployment steps. Otherwise, use only paragraphs or sections that help review.
+
+              Example of a small fix, not a required template:
+              Empty search results no longer crash the page. The page now shows its empty state.
 
               Guidelines:
 
@@ -108,7 +117,7 @@ spec:
               3/ For behavior changes, add or update tests that verify observable behavior.
               4/ Avoid tests that only mirror implementation details or assert incidental layout, classes, or wording. Purely cosmetic changes do not need new tests unless repository instructions require them. Add coverage if behavior or accessibility changes.
               5/ Run the relevant tests, lint, and build checks specified by the repository. Fix failures caused by your changes.
-              6/ Report which checks passed or failed. State which checks you could not run and explain why. Do not claim verification you did not perform.
+              6/ Report check results in the run output. Do not repeat them in the pull request description unless repository instructions require it. Do not claim verification you did not perform.
           - name: Check pull requests
             type: bash
             workingDirectory: repo
