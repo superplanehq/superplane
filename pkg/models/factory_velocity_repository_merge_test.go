@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/gorm"
@@ -306,7 +305,6 @@ func Test__ListFactoryVelocitySyncTargets__SkipsFreshAndClaimedWorkspaces(t *tes
 	require.NoError(t, err)
 	assert.NotContains(t, factoryIDs(fresh), factory.ID, "a workspace synced a moment ago waits its turn")
 
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryMultiRepoTasks))
 	contextRepo, err := factory.CreateAgentResource(db, models.FactoryAgentResourceKindContextRepo, "", true, models.FactoryAgentResourceConfig{Repository: "example/other", Access: models.FactoryContextRepoAccessWrite})
 	require.NoError(t, err)
 	targets, err := models.ListFactoryVelocitySyncTargets(db, now.Add(-5*time.Minute), now.Add(-15*time.Minute), allSyncTargets)
@@ -370,7 +368,6 @@ func Test__FindFactoryVelocitySyncTarget(t *testing.T) {
 func Test__ListFactoryVelocitySyncTargets__LimitsOnlyAvailableRepositories(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryMultiRepoTasks))
 	integrationID := uuid.New().String()
 	repository := "example/repo"
 	now := time.Now()

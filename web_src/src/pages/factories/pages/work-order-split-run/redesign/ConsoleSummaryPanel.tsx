@@ -9,8 +9,6 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/ui/tooltip";
 import { type ReactNode } from "react";
 
 import type { FactoriesFactoryPullRequest, FactoriesWorkOrderArtifact } from "@/api-client";
-import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
-import { FEATURE_FACTORY_MULTI_REPO_TASKS } from "@/lib/experimentalFeatures";
 
 import { CONFIDENCE_CHECK_KEY, CONFIDENCE_CHECK_NAME, isScoreCheckName } from "../../../lib/confidenceScore";
 import {
@@ -84,7 +82,6 @@ export function ConsoleSummaryPanel({
 }: ConsoleSummaryPanelProps) {
   const liveSpend = useLiveHeaderSpendOverlay();
   const spend = overlayHeaderSpend(outcome.spend, outcome.tokens, liveSpend);
-  const multiRepo = useExperimentalFeature(organizationId).has(FEATURE_FACTORY_MULTI_REPO_TASKS);
   const panel = consolePanelFacts({
     fixture,
     outcome,
@@ -93,7 +90,6 @@ export function ConsoleSummaryPanel({
     artifacts,
     source,
     panelReview,
-    multiRepo,
   });
   const shownOwner = owner ?? outcome.owner;
   const shownAssigneeIds = assigneeIds ?? fixture.assigneeIds;
@@ -125,13 +121,12 @@ export function ConsoleSummaryPanel({
               pullRequests={panel.panelPullRequests}
               checks={fixture.checks}
               showRepository={panel.showsPullRequestRepository}
-              multiRepo={multiRepo}
             />
             {panel.showsMergeChecks ? (
               <FramePanel className="py-3">
                 <ConsoleCheckRows
                   checks={panel.mergeChecks}
-                  groupByRepository={multiRepo}
+                  groupByRepository
                   summary={panel.mergeAssessmentFailed ? "Assessment failed" : undefined}
                 />
               </FramePanel>
@@ -193,7 +188,6 @@ function PanelPullRequests({
   pullRequests: FactoriesFactoryPullRequest[];
   checks: SplitRunFixture["checks"];
   showRepository: boolean;
-  multiRepo: boolean;
 }) {
   if (pullRequests.length === 0) return null;
   return (
@@ -241,7 +235,6 @@ function consolePanelFacts({
   artifacts,
   source,
   panelReview,
-  multiRepo,
 }: {
   fixture: SplitRunFixture;
   outcome: ReturnType<typeof outcomeSummary>;
@@ -250,13 +243,12 @@ function consolePanelFacts({
   artifacts?: FactoriesWorkOrderArtifact[];
   source?: SplitRunSource;
   panelReview?: ReactNode;
-  multiRepo: boolean;
 }) {
   const hasDecision = Boolean(fixture.footer.attentionCard && fixture.footer.note);
   const liveStage = stages.find((stage) => stage.status === "running");
   const isLive = fixture.footer.kind === "running" || Boolean(liveStage);
   const taskPullRequests = pullRequests?.length ? pullRequests : outcome.pullRequests;
-  const repositories = mergeConfidencePanelFacts(fixture.checks, taskPullRequests, multiRepo);
+  const repositories = mergeConfidencePanelFacts(fixture.checks, taskPullRequests);
   const reviewedHrefs = panelReview ? reviewStripPullRequestHrefs(fixture, repositories.reviewPullRequests) : [];
   const panelPullRequests = withoutPullRequests(taskPullRequests, reviewedHrefs);
   const hasPullRequest = panelPullRequests.length > 0 || reviewedHrefs.length > 0;
@@ -285,7 +277,7 @@ function consolePanelFacts({
     // rest. Other non-planning checks stay reachable here when no verify
     // card copied them.
     pullRequestChecks: repositories.mergeChecks.byRepository,
-    failedRepositories: multiRepo ? repositories.failedRepositories : new Set<string>(),
+    failedRepositories: repositories.failedRepositories,
     mergeAssessmentFailed: repositories.assessmentFailed,
     showsMergeChecks: showsTaskMergeChecks(repositories),
     mergeChecks: repositories.mergeChecks.unattached,
@@ -438,12 +430,10 @@ function PanelPullRequest({
   pullRequest,
   checks,
   showRepository,
-  multiRepo,
 }: {
   pullRequest: FactoriesFactoryPullRequest;
   checks: SplitRunFixture["checks"];
   showRepository: boolean;
-  multiRepo: boolean;
 }) {
   const href = safeExternalUrl(pullRequest.url);
   const title = pullRequest.title?.trim() || pullRequestLabel(pullRequest);
@@ -468,10 +458,7 @@ function PanelPullRequest({
       )}
       <div className="flex flex-wrap items-center gap-1.5">
         <WorkOrderPullRequestChip pullRequest={pullRequest} />
-        {workOrderCardPullRequestShowsMergeable(
-          pullRequest,
-          multiRepo ? checksForRepository(checks, pullRequest.repository) : checks,
-        ) ? (
+        {workOrderCardPullRequestShowsMergeable(pullRequest, checksForRepository(checks, pullRequest.repository)) ? (
           <WorkOrderMergeableChip />
         ) : null}
       </div>

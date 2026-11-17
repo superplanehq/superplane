@@ -465,31 +465,6 @@ func calendarDayUTCNoon(t time.Time) time.Time {
 	return time.Date(year, month, day, 12, 0, 0, 0, time.UTC)
 }
 
-// filterVelocityRowsByRepository keeps only pull requests of the repository the
-// workspace reports on. Without a selected repository every factory pull
-// request counts.
-func filterVelocityRowsByRepository(
-	rows []models.FactoryVelocityPullRequest,
-	repoOwner, repoName string,
-	hasRepo bool,
-) []models.FactoryVelocityPullRequest {
-	if !hasRepo {
-		return rows
-	}
-
-	out := make([]models.FactoryVelocityPullRequest, 0, len(rows))
-	for i := range rows {
-		owner, repo, ok := parseOwnerRepo(rows[i].Repository)
-		if !ok {
-			continue
-		}
-		if owner == repoOwner && repo == repoName {
-			out = append(out, rows[i])
-		}
-	}
-	return out
-}
-
 func parseOwnerRepo(repository string) (owner, repo string, ok bool) {
 	repository = strings.TrimSpace(repository)
 	if repository == "" {
