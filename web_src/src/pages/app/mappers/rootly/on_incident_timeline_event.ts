@@ -3,8 +3,18 @@ import type React from "react";
 import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
 import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import type { TriggerProps } from "@/ui/trigger";
+import type { MetadataItem } from "@/ui/metadataList";
 import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
 import type { IncidentEvent } from "./types";
+
+interface OnEventConfiguration {
+  incidentStatus?: string[];
+  severity?: string[];
+  service?: string[];
+  team?: string[];
+  eventSource?: string[];
+  visibility?: string;
+}
 
 interface IncidentSummary {
   id?: string;
@@ -44,63 +54,13 @@ export const onEventTriggerRenderer: TriggerRenderer = {
 
   getTriggerProps: (context: TriggerRendererContext) => {
     const { node, definition, lastEvent } = context;
-    const configuration = node.configuration as {
-      incidentStatus?: string[];
-      severity?: string[];
-      service?: string[];
-      team?: string[];
-      eventSource?: string[];
-      visibility?: string;
-    };
-    const metadataItems = [];
-
-    if (configuration?.incidentStatus?.length) {
-      metadataItems.push({
-        icon: "funnel",
-        label: `Status: ${configuration.incidentStatus.join(", ")}`,
-      });
-    }
-
-    if (configuration?.severity?.length) {
-      metadataItems.push({
-        icon: "alert-circle",
-        label: `Severity: ${configuration.severity.join(", ")}`,
-      });
-    }
-
-    if (configuration?.service?.length) {
-      metadataItems.push({
-        icon: "layers",
-        label: `Service: ${configuration.service.join(", ")}`,
-      });
-    }
-
-    if (configuration?.team?.length) {
-      metadataItems.push({
-        icon: "users",
-        label: `Team: ${configuration.team.join(", ")}`,
-      });
-    }
-
-    if (configuration?.eventSource?.length) {
-      metadataItems.push({
-        icon: "activity",
-        label: `Source: ${configuration.eventSource.join(", ")}`,
-      });
-    }
-
-    if (configuration?.visibility) {
-      metadataItems.push({
-        icon: "eye",
-        label: `Visibility: ${configuration.visibility}`,
-      });
-    }
+    const configuration = node.configuration as OnEventConfiguration | undefined;
 
     const props: TriggerProps = {
       title: node.name!,
       iconSrc: rootlyIcon,
       collapsedBackground: getBackgroundColorClass(definition.color),
-      metadata: metadataItems,
+      metadata: buildConfigurationMetadata(configuration ?? {}),
     };
 
     if (lastEvent) {
@@ -122,6 +82,54 @@ export const onEventTriggerRenderer: TriggerRenderer = {
     return props;
   },
 };
+
+function buildConfigurationMetadata(configuration: OnEventConfiguration): MetadataItem[] {
+  const metadataItems: MetadataItem[] = [];
+
+  if (configuration.incidentStatus?.length) {
+    metadataItems.push({
+      icon: "funnel",
+      label: `Status: ${configuration.incidentStatus.join(", ")}`,
+    });
+  }
+
+  if (configuration.severity?.length) {
+    metadataItems.push({
+      icon: "alert-circle",
+      label: `Severity: ${configuration.severity.join(", ")}`,
+    });
+  }
+
+  if (configuration.service?.length) {
+    metadataItems.push({
+      icon: "layers",
+      label: `Service: ${configuration.service.join(", ")}`,
+    });
+  }
+
+  if (configuration.team?.length) {
+    metadataItems.push({
+      icon: "users",
+      label: `Team: ${configuration.team.join(", ")}`,
+    });
+  }
+
+  if (configuration.eventSource?.length) {
+    metadataItems.push({
+      icon: "activity",
+      label: `Source: ${configuration.eventSource.join(", ")}`,
+    });
+  }
+
+  if (configuration.visibility) {
+    metadataItems.push({
+      icon: "eye",
+      label: `Visibility: ${configuration.visibility}`,
+    });
+  }
+
+  return metadataItems;
+}
 
 function buildSubtitle(content: string, createdAt?: string): string | React.ReactNode {
   if (content && createdAt) {
