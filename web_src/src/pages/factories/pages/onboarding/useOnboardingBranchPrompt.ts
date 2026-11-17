@@ -2,7 +2,7 @@ import { useIntegrationResources } from "@/hooks/useIntegrations";
 import { useMemo } from "react";
 
 import type { RepositoryBranchPrompt } from "./repositoryBranchPrompt";
-import { branchNames, repositoryBranchChoices } from "../settings/useFactoryRepositoryDraft";
+import { branchNames, repositoryBranchChoices } from "@/lib/repositoryBranchChoices";
 
 /** Branch list for the repository step. Shown only when no branch is known. */
 export function useOnboardingBranchPrompt(args: {

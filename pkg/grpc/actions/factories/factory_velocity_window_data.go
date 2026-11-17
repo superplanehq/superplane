@@ -86,11 +86,7 @@ func loadVelocityWindowData(
 	previousBuckets := buildWindowBuckets(previous, period)
 
 	repoOwner, repoName, hasRepo := parseOwnerRepo(repository)
-	multiRepo, err := factory.MultiRepoTasksEnabled(db)
-	if err != nil {
-		return nil, err
-	}
-	if multiRepo && strings.TrimSpace(repository) != "" && !hasRepo {
+	if strings.TrimSpace(repository) != "" && !hasRepo {
 		return nil, models.ErrFactoryPullRequestRepositoryNotInWorkspace
 	}
 	repositories, err := factory.WorkspaceRepositories(db)
@@ -99,7 +95,7 @@ func loadVelocityWindowData(
 	}
 	scope := repositories
 	if hasRepo {
-		if multiRepo && !slices.ContainsFunc(repositories, func(candidate string) bool {
+		if len(repositories) > 0 && !slices.ContainsFunc(repositories, func(candidate string) bool {
 			return models.CanonicalContextRepo(candidate) == models.CanonicalContextRepo(repository)
 		}) {
 			return nil, models.ErrFactoryPullRequestRepositoryNotInWorkspace
@@ -112,21 +108,16 @@ func loadVelocityWindowData(
 	}
 	currentOrders := collectVelocityOrders(rows, current)
 	previousOrders := collectVelocityOrders(rows, previous)
-	if !multiRepo {
-		rows = filterVelocityRowsByRepository(rows, repoOwner, repoName, hasRepo)
-		currentOrders = collectVelocityOrders(rows, current)
-		previousOrders = collectVelocityOrders(rows, previous)
-	} else {
-		filtered := make([]models.FactoryVelocityPullRequest, 0, len(rows))
-		for _, row := range rows {
-			if slices.ContainsFunc(scope, func(candidate string) bool {
-				return models.CanonicalContextRepo(candidate) == models.CanonicalContextRepo(row.Repository)
-			}) {
-				filtered = append(filtered, row)
-			}
+	filtered := make([]models.FactoryVelocityPullRequest, 0, len(rows))
+	for _, row := range rows {
+		// Workspaces without configured repositories can still report saved tasks.
+		if len(scope) == 0 || slices.ContainsFunc(scope, func(candidate string) bool {
+			return models.CanonicalContextRepo(candidate) == models.CanonicalContextRepo(row.Repository)
+		}) {
+			filtered = append(filtered, row)
 		}
-		rows = filtered
 	}
+	rows = filtered
 	usage, err := models.SumUsageForWorkOrdersByKind(db, append(velocityOrderIDs(currentOrders), velocityOrderIDs(previousOrders)...))
 	if err != nil {
 		return nil, err
@@ -134,10 +125,7 @@ func loadVelocityWindowData(
 	applyVelocityOrderUsage(currentOrders, usage)
 	applyVelocityOrderUsage(previousOrders, usage)
 
-	cohort := mergeCohort{}
-	if multiRepo || hasRepo {
-		cohort, err = loadRepositoryMergeCohort(db, factory.ID, scope, previous.start, current.end)
-	}
+	cohort, err := loadRepositoryMergeCohort(db, factory.ID, scope, previous.start, current.end)
 	if err != nil {
 		return nil, err
 	}

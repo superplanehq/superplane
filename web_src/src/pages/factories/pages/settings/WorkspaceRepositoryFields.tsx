@@ -6,7 +6,7 @@ import { useIntegrationResources } from "@/hooks/useIntegrations";
 
 import { AGENT_RESOURCES_COPY } from "./agentResourceCopy";
 import { BranchPicker } from "./BranchPicker";
-import { branchNames, repositoryBranchChoices } from "./useFactoryRepositoryDraft";
+import { branchNames, repositoryBranchChoices } from "@/lib/repositoryBranchChoices";
 import {
   workspaceRepositoryAccess,
   type WorkspaceRepositoryAccess,
