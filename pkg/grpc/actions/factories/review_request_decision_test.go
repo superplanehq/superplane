@@ -49,7 +49,13 @@ func TestReviewRequestReadDecision(t *testing.T) {
 	for _, tc := range []struct {
 		name, decision, fallback, login string
 		fails, fallbackUsed             bool
+		report                          string
 	}{
+		{name: "waive positive report", decision: `{"reviewRequired":false,"rationale":"All checks are positive.","noCandidate":false,"reviewers":[]}`, report: `{"complete":true,"checks":[{"level":"positive"}]}`},
+		{name: "cannot waive concerning report", decision: `{"reviewRequired":false,"rationale":"Skip.","noCandidate":false,"reviewers":[]}`, fails: true},
+		{name: "cannot waive empty report", decision: `{"reviewRequired":false,"rationale":"Skip.","noCandidate":false,"reviewers":[]}`, report: `{"complete":true,"checks":[]}`, fails: true},
+		{name: "cannot waive missing check", decision: `{"reviewRequired":false,"rationale":"Skip.","noCandidate":false,"reviewers":[]}`, report: `{"complete":true,"checks":[{"level":"positive","missing":true}]}`, fails: true},
+		{name: "cannot waive incomplete report", decision: `{"reviewRequired":false,"rationale":"Skip.","noCandidate":false,"reviewers":[]}`, report: `{"complete":false,"checks":[{"level":"positive"}]}`, fails: true},
 		{name: "selection", decision: valid, login: "octocat"},
 		{name: "selection takes precedence", decision: valid, fallback: "fallback-user", login: "octocat"},
 		{name: "fallback", decision: empty, fallback: " FALLBACK-USER ", login: "fallback-user", fallbackUsed: true},
@@ -71,6 +77,9 @@ func TestReviewRequestReadDecision(t *testing.T) {
 		{name: "lookup error", decision: strings.Replace(empty, `"reviewRequired":true`, `"reviewRequired":true,"error":"lookup unavailable"`, 1), fallback: "fallback-user", fails: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			if tc.report == "" {
+				tc.report = `{"complete":true,"checks":[{"level":"concerning"}]}`
+			}
 			var input []byte
 			if tc.decision != "" {
 				input = []byte(tc.decision)
@@ -78,6 +87,7 @@ func TestReviewRequestReadDecision(t *testing.T) {
 			output, err := readReviewDecision(t, script, input, map[string]string{
 				"SUPERPLANE_REVIEW_REQUEST_CANDIDATES": `[{"id":2,"login":"octocat"},{"id":3,"login":"fallback-user"}]`,
 				"SUPERPLANE_REVIEW_REQUEST_FALLBACK":   tc.fallback,
+				"SUPERPLANE_REVIEW_REQUEST_REPORT":     tc.report,
 			})
 			if tc.fails {
 				require.Error(t, err)

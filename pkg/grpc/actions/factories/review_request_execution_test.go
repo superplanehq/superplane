@@ -40,6 +40,9 @@ type reviewRequestHTTP struct {
 	requests              []*http.Request
 	reviewerBodies        []map[string]any
 	reviewerRemovals      []string
+	deleteFails           int
+	deleteApplied         bool
+	deleteFailLogin       string
 	pendingReviewers      []pulls.ReviewerIdentity
 	selectionEnvironments []map[string]string
 	approved              bool
@@ -139,8 +142,18 @@ func (h *reviewRequestHTTP) Do(request *http.Request) (*http.Response, error) {
 		if err := json.NewDecoder(request.Body).Decode(&body); err != nil {
 			return nil, err
 		}
+		failed := h.deleteFails > 0 && (h.deleteFailLogin == "" || slices.Contains(body.Reviewers, h.deleteFailLogin))
+		if failed {
+			h.deleteFails--
+			if !h.deleteApplied {
+				return publicationHTTPResponse(503, `{"message":"withdrawal failed"}`), nil
+			}
+		}
 		h.reviewerRemovals = append(h.reviewerRemovals, body.Reviewers...)
 		h.pendingReviewers = slices.DeleteFunc(h.pendingReviewers, func(reviewer pulls.ReviewerIdentity) bool { return slices.Contains(body.Reviewers, reviewer.Login) })
+		if failed {
+			return publicationHTTPResponse(503, `{"message":"withdrawal response lost"}`), nil
+		}
 		return publicationHTTPResponse(200, `{}`), nil
 	}
 	if strings.HasSuffix(path, "/requested_reviewers") && request.Method == http.MethodPost {
@@ -398,7 +411,7 @@ func emitReviewRequestReport(t *testing.T, f publicationFixture, host *reviewReq
 
 // Follow the published graph using persisted events and ordinary configuration
 // resolution. Only the remote agent task and GitHub HTTP responses are replaced.
-func runReviewRequestGraph(t *testing.T, f publicationFixture, canvas *models.Canvas, root *models.CanvasEvent, host *reviewRequestHTTP, scenario string) (map[string]any, int, error) {
+func runReviewRequestGraph(t *testing.T, f publicationFixture, canvas *models.Canvas, root *models.CanvasEvent, host *reviewRequestHTTP, scenario string, resume ...*models.CanvasNodeExecution) (map[string]any, int, error) {
 	t.Helper()
 	run, err := models.FindOrCreateCanvasRunForRootEventInTransaction(f.db, root)
 	require.NoError(t, err)
@@ -491,6 +504,8 @@ func runReviewRequestGraph(t *testing.T, f publicationFixture, canvas *models.Ca
 				}
 				decision := map[string]any{"reviewRequired": true, "rationale": "Security findings need review.", "noCandidate": false, "reviewers": []any{map[string]any{"id": 2, "login": "octocat", "reason": "Owns the changed security code."}}}
 				switch scenario {
+				case "favorable", "favorable no candidates":
+					decision["reviewRequired"], decision["reviewers"], decision["rationale"] = false, []any{}, "All checks are positive. Factory policy permits no review."
 				case "replacement":
 					decision["rationale"] = "The previous reviewer is unavailable. Select the authorization owner."
 					decision["reviewers"] = []any{map[string]any{"id": 3, "login": "fallback-user", "reason": "The previous reviewer is unavailable. Owns authorization changes."}}
@@ -577,7 +592,13 @@ func runReviewRequestGraph(t *testing.T, f publicationFixture, canvas *models.Ca
 		}
 		return executionError
 	}
-	err = visit(root, nil)
+	if len(resume) == 0 {
+		err = visit(root, nil)
+	} else {
+		var output models.CanvasEvent
+		require.NoError(t, f.db.Where("execution_id = ?", resume[0].ID).First(&output).Error)
+		err = visit(&output, resume[0])
+	}
 	var messageCount int64
 	require.NoError(t, f.db.Model(&models.AppMessage{}).Where("canvas_id = ?", canvas.ID).Count(&messageCount).Error)
 	require.Zero(t, messageCount, "Review request must not broadcast outgoing app messages")
@@ -586,11 +607,11 @@ func runReviewRequestGraph(t *testing.T, f publicationFixture, canvas *models.Ca
 
 func TestReviewRequestFromPublishedReportToGitHub(t *testing.T) {
 	for _, publishCheck := range []bool{false, true} {
-		for _, scenario := range []string{"favorable", "concerning", "status write denied", "hosted agent", "instructions changed before dispatch", "concerning no review", "fallback", "no candidate", "no suitable candidate", "ineligible fallback", "malformed output", "reported lookup error", "agent failure", "author selected", "bot selected", "reader selected", "duplicate reviewer", "additional reviewer without reason", "additional reviewer", "discovery error", "permission error", "lost permission", "identity changed", "qualifying approval", "old approval", "withdrawn approval", "request error", "already requested", "head moved", "head moved during lookups", "stale report", "closed before selection", "closed during selection"} {
+		for _, scenario := range []string{"favorable", "favorable policy", "favorable no candidates", "concerning", "status write denied", "hosted agent", "instructions changed before dispatch", "concerning no review", "fallback", "no candidate", "no suitable candidate", "ineligible fallback", "malformed output", "reported lookup error", "agent failure", "author selected", "bot selected", "reader selected", "duplicate reviewer", "additional reviewer without reason", "additional reviewer", "discovery error", "permission error", "lost permission", "identity changed", "qualifying approval", "old approval", "withdrawn approval", "request error", "already requested", "head moved", "head moved during lookups", "stale report", "closed before selection", "closed during selection"} {
 			t.Run(fmt.Sprintf("publish_check=%t/%s", publishCheck, scenario), func(t *testing.T) {
 				host := &reviewRequestHTTP{}
 				score := 2.0
-				if scenario == "favorable" {
+				if strings.HasPrefix(scenario, "favorable") {
 					score = 5
 				}
 				f, message := reviewRequestCompletedProducer(t, host, score)
@@ -607,7 +628,7 @@ func TestReviewRequestFromPublishedReportToGitHub(t *testing.T) {
 				}
 				if scenario != "concerning" {
 					instructions := "Prefer the security owner. Keep {{ example }} literal."
-					if scenario == "favorable" {
+					if scenario == "favorable policy" {
 						instructions = "Always request review, even when all checks are positive."
 					}
 					if slices.Contains([]string{"concerning no review", "author selected", "bot selected", "reader selected"}, scenario) {
@@ -633,7 +654,7 @@ func TestReviewRequestFromPublishedReportToGitHub(t *testing.T) {
 				require.NoError(t, f.db.Where("workflow_id = ? AND node_id = ?", consumer.ID, trigger.NodeID).First(&root).Error)
 				host.statusDenied = publishCheck && scenario == "status write denied"
 				host.discoveryError = scenario == "discovery error"
-				host.empty = scenario == "no candidate"
+				host.empty = scenario == "no candidate" || scenario == "favorable no candidates"
 				host.approved = slices.Contains([]string{"qualifying approval", "old approval", "withdrawn approval"}, scenario)
 				host.oldApproval = scenario == "old approval"
 				host.withdrawnApproval = scenario == "withdrawn approval"
@@ -658,7 +679,7 @@ func TestReviewRequestFromPublishedReportToGitHub(t *testing.T) {
 					require.Equal(t, "superplane/review-request", host.statuses[len(host.statuses)-1].GetContext())
 					want := "pending"
 					switch scenario {
-					case "favorable", "qualifying approval":
+					case "favorable", "favorable no candidates", "qualifying approval":
 						want = "success"
 					case "no candidate", "no suitable candidate", "ineligible fallback", "concerning no review", "malformed output", "reported lookup error", "agent failure", "author selected", "bot selected", "reader selected", "duplicate reviewer", "additional reviewer without reason", "discovery error", "permission error", "lost permission", "identity changed", "request error":
 						want = "error"
@@ -693,9 +714,9 @@ func TestReviewRequestFromPublishedReportToGitHub(t *testing.T) {
 				expected := "requested"
 				wantTitle := "Review requested"
 				switch scenario {
-				case "favorable":
+				case "favorable", "favorable no candidates":
 					wantTitle = "Review unnecessary"
-					require.Zero(t, agents)
+					require.Equal(t, 1, agents)
 					require.Contains(t, outcome, "withdraw-reviewers")
 				case "stale report", "closed before selection":
 					wantTitle = "Stale report"
@@ -707,8 +728,8 @@ func TestReviewRequestFromPublishedReportToGitHub(t *testing.T) {
 					wantTitle = "No eligible reviewer"
 					require.Contains(t, outcome, "no-reviewer-activity")
 					if scenario == "no candidate" {
-						require.Zero(t, agents)
-						require.NotContains(t, outcome, reviewRequestAgentNodeID)
+						require.Equal(t, 1, agents)
+						require.Contains(t, outcome, reviewRequestAgentNodeID)
 					} else {
 						require.Equal(t, 1, agents)
 						require.Contains(t, activity.Description, "Security findings need review.")
@@ -716,6 +737,10 @@ func TestReviewRequestFromPublishedReportToGitHub(t *testing.T) {
 				case "qualifying approval", "already requested":
 					wantTitle = "Review already covered"
 					expected = "already_covered"
+				}
+				if scenario == "favorable policy" {
+					require.Equal(t, 1, agents)
+					require.Contains(t, outcome, "request-reviewers")
 				}
 				require.Equal(t, wantTitle, activity.Title)
 				require.NotEmpty(t, activity.Description)
@@ -911,6 +936,7 @@ func TestReviewRequestResetKeepsActiveCheck(t *testing.T) {
 	f, message := reviewRequestCompletedProducer(t, host, 2)
 	consumer := reviewFindingsConsumer(t, f, reviewFindingsSettings{}, "fallback-user")
 	setReviewRequestCheck(t, f, consumer, true, 7)
+	setReviewRequestInstructions(t, f, consumer, "Always require human review for this workspace.")
 	root := deliverReviewRequestReport(t, f, consumer, message)
 	_, agents, err := runReviewRequestGraph(t, f, consumer, root, host, "")
 	require.NoError(t, err)
@@ -939,6 +965,17 @@ func TestReviewRequestResetKeepsActiveCheck(t *testing.T) {
 	require.Equal(t, "success", host.statuses[len(host.statuses)-1].GetState(), "reset keeps approval tracking active")
 	require.Len(t, host.reviewerBodies, 1)
 	require.Len(t, host.selectionEnvironments, 1)
+	host.approved = false
+	f, message = emitReviewRequestReport(t, f, host, 5)
+	outcome, agents, err := runReviewRequestGraph(t, f, consumer, deliverReviewRequestReport(t, f, consumer, message), host, "favorable policy")
+	require.NoError(t, err)
+	require.Equal(t, 1, agents, "reset installs policy evaluation for positive reports")
+	require.Contains(t, outcome, "request-reviewers")
+	setReviewRequestInstructions(t, f, consumer, "")
+	outcome, _, err = runReviewRequestGraph(t, f, consumer, deliverReviewRequestReport(t, f, consumer, message), host, "favorable")
+	require.NoError(t, err)
+	require.Contains(t, outcome, "acknowledge-withdrawal", "reset installs the mandatory explanation flow")
+	require.Len(t, host.comments, 1)
 }
 
 func TestManagedReviewerOwnershipSurvivesExecutionRollback(t *testing.T) {

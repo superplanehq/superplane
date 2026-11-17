@@ -11,16 +11,20 @@ import (
 
 	"github.com/google/go-github/v84/github"
 	"github.com/google/uuid"
+	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
 )
 
 // A later submitted review ends ownership, so a manual re-request survives.
 type ownedReviewerRequest struct {
-	Reviewer ReviewerIdentity `json:"reviewer"`
-	ReviewID int64            `json:"reviewId"`
+	Reviewer    ReviewerIdentity `json:"reviewer"`
+	ReviewID    int64            `json:"reviewId"`
+	AssessedSHA string           `json:"assessedSha,omitempty"`
 }
 type managedReviewerState struct {
+	Uncertain   []ownedReviewerRequest `json:"uncertain,omitempty"`
+	Withdrawals []reviewerWithdrawal   `json:"withdrawals,omitempty"`
 	Selected    []ReviewerIdentity     `json:"selected"`
 	Owned       []ownedReviewerRequest `json:"owned"`
 	Adding      *ownedReviewerRequest  `json:"adding,omitempty"`
@@ -95,7 +99,7 @@ func reconcileManagedReviewers(ctx core.ExecutionContext, client *common.Client,
 }
 
 func newReviewerOutcome(ctx core.ExecutionContext) ensureReviewersOutcome {
-	return ensureReviewersOutcome{ExecutionID: ctx.ID.String(), Requested: []ReviewerIdentity{}, AlreadyCovered: []ReviewerIdentity{}, Removed: []ReviewerIdentity{}, Selected: []ReviewerIdentity{}}
+	return ensureReviewersOutcome{ExecutionID: ctx.ID.String(), Withdrawals: []reviewerWithdrawal{}, Requested: []ReviewerIdentity{}, AlreadyCovered: []ReviewerIdentity{}, Removed: []ReviewerIdentity{}, Selected: []ReviewerIdentity{}}
 }
 
 func runManagedReviewers(ctx core.ExecutionContext, client *common.Client, config ensureReviewersConfiguration, number int, write core.OrderedWrite) error {
@@ -227,6 +231,14 @@ func (r *reviewerReconciliation) reconcile() (resultErr error) {
 	if err := r.persist(&r.lease); err != nil {
 		return err
 	}
+	if r.config.WithdrawalExplanationExecutionID != "" {
+		if err := r.validateExplanation(); err != nil {
+			return err
+		}
+		r.state.Withdrawals = nil
+		r.outcome.Status = "already_covered"
+		return nil
+	}
 	if err := r.requestMissing(pr, reviews); err != nil {
 		return err
 	}
@@ -237,6 +249,15 @@ func (r *reviewerReconciliation) reconcile() (resultErr error) {
 	if _, err := r.readCurrent(); err != nil {
 		return err
 	}
+	if len(r.config.Reviewers) == 0 && len(r.state.Uncertain) > 0 {
+		return fmt.Errorf("uncertain withdrawal for %s: request remains outside managed ownership", r.state.Uncertain[0].Reviewer.Login)
+	}
+	r.outcome.Withdrawals = append([]reviewerWithdrawal{}, r.state.Withdrawals...)
+	for _, withdrawal := range r.state.Withdrawals {
+		if !containsReviewer(r.outcome.Removed, withdrawal.Reviewer) {
+			r.outcome.Removed = append(r.outcome.Removed, withdrawal.Reviewer)
+		}
+	}
 	r.state.Selected = append([]ReviewerIdentity{}, r.config.Reviewers...)
 	r.outcome.Selected = r.state.Selected
 	r.outcome.Status = "already_covered"
@@ -246,13 +267,22 @@ func (r *reviewerReconciliation) reconcile() (resultErr error) {
 	return nil
 }
 func (r *reviewerReconciliation) recoverOwnership(pr *github.PullRequest, reviews []*github.PullRequestReview) {
-	// A lost DELETE response makes a later request indistinguishable from a manual one.
+	// A lost DELETE response must not authorize deleting a later manual request.
 	if r.state.Withdrawing != nil {
-		r.state.Owned = slices.DeleteFunc(r.state.Owned, func(owned ownedReviewerRequest) bool {
-			return sameReviewer(owned.Reviewer, r.state.Withdrawing.Reviewer)
-		})
+		r.state.Uncertain = append(r.state.Uncertain, *r.state.Withdrawing)
 		r.state.Withdrawing = nil
 	}
+	r.state.Uncertain = slices.DeleteFunc(r.state.Uncertain, func(uncertain ownedReviewerRequest) bool {
+		r.state.Owned = slices.DeleteFunc(r.state.Owned, func(owned ownedReviewerRequest) bool { return sameReviewer(owned.Reviewer, uncertain.Reviewer) })
+		if requestedReviewer(pr, uncertain.Reviewer) {
+			return false
+		}
+		// A submission also clears the request, but does not prove our DELETE applied.
+		if reviewerSubmittedReviewID(reviews, uncertain.Reviewer) == uncertain.ReviewID {
+			r.recordWithdrawal(uncertain)
+		}
+		return true
+	})
 	// Recover an uncertain POST only for an identity that was absent before it.
 	if r.state.Adding != nil {
 		if requestedReviewer(pr, r.state.Adding.Reviewer) {
@@ -266,7 +296,11 @@ func (r *reviewerReconciliation) recoverOwnership(pr *github.PullRequest, review
 }
 func (r *reviewerReconciliation) requestMissing(pr *github.PullRequest, reviews []*github.PullRequestReview) error {
 	for _, reviewer := range r.config.Reviewers {
-		if requestedReviewer(pr, reviewer) || hasCurrentApproval(reviews, reviewer, r.outcome.HeadSHA) {
+		requested, approved := requestedReviewer(pr, reviewer), hasCurrentApproval(reviews, reviewer, r.outcome.HeadSHA)
+		if requested || !approved {
+			r.outcome.Requests = append(r.outcome.Requests, observedReviewRequest{Reviewer: reviewer, ReviewID: reviewerSubmittedReviewID(reviews, reviewer)})
+		}
+		if requested || approved {
 			r.outcome.AlreadyCovered = append(r.outcome.AlreadyCovered, reviewer)
 			continue
 		}
@@ -314,6 +348,7 @@ func (r *reviewerReconciliation) withdrawUnselected() error {
 			return err
 		}
 		if requestedReviewer(pr, owned.Reviewer) && reviewerSubmittedReviewID(reviews, owned.Reviewer) == owned.ReviewID {
+			owned.AssessedSHA = r.config.ExpectedHeadSHA
 			r.state.Withdrawing = &owned
 			if err := r.persist(&r.lease); err != nil {
 				return err
@@ -321,8 +356,8 @@ func (r *reviewerReconciliation) withdrawUnselected() error {
 			if _, err := r.client.RemovePullRequestReviewers(r.providerContext, r.config.Repository, r.number, github.ReviewersRequest{Reviewers: []string{owned.Reviewer.Login}}); err != nil {
 				return fmt.Errorf("withdraw pull request reviewer: %w", err)
 			}
+			r.recordWithdrawal(owned)
 			r.state.Withdrawing = nil
-			r.outcome.Removed = append(r.outcome.Removed, owned.Reviewer)
 		}
 		r.state.Owned = slices.DeleteFunc(r.state.Owned, func(other ownedReviewerRequest) bool { return sameReviewer(other.Reviewer, owned.Reviewer) })
 		if err := r.persist(&r.lease); err != nil {
@@ -345,7 +380,7 @@ func requestedReviewer(pr *github.PullRequest, reviewer ReviewerIdentity) bool {
 func reviewerSubmittedReviewID(reviews []*github.PullRequestReview, reviewer ReviewerIdentity) int64 {
 	var latest *github.PullRequestReview
 	for _, review := range reviews {
-		if review.GetUser().GetID() != reviewer.ID || !strings.EqualFold(review.GetUser().GetLogin(), reviewer.Login) || review.GetState() == "PENDING" {
+		if review.GetUser().GetID() != reviewer.ID || review.GetState() == "PENDING" {
 			continue
 		}
 		if latest == nil || review.GetSubmittedAt().After(latest.GetSubmittedAt().Time) || (review.GetSubmittedAt().Time.Equal(latest.GetSubmittedAt().Time) && review.GetID() > latest.GetID()) {
@@ -353,4 +388,54 @@ func reviewerSubmittedReviewID(reviews []*github.PullRequestReview, reviewer Rev
 		}
 	}
 	return latest.GetID()
+}
+
+func (r *reviewerReconciliation) recordWithdrawal(owned ownedReviewerRequest) {
+	withdrawal := reviewerWithdrawal{Reviewer: owned.Reviewer, AssessedSHA: owned.AssessedSHA}
+	if !slices.ContainsFunc(r.state.Withdrawals, func(previous reviewerWithdrawal) bool {
+		return sameReviewer(previous.Reviewer, withdrawal.Reviewer) && previous.AssessedSHA == withdrawal.AssessedSHA
+	}) {
+		r.state.Withdrawals = append(r.state.Withdrawals, withdrawal)
+	}
+}
+
+// Acknowledge only a successful comment recorded in this canvas, integration,
+// and attempt. PublicationContext enforces that scope for ExecutionOutput.
+func (r *reviewerReconciliation) validateExplanation() error {
+	if len(r.config.Reviewers) > 0 || len(r.state.Uncertain) > 0 {
+		return fmt.Errorf("withdrawal explanation requires a resolved empty selection")
+	}
+	id, err := uuid.Parse(r.config.WithdrawalExplanationExecutionID)
+	if err != nil {
+		return fmt.Errorf("invalid withdrawal explanation execution ID: %w", err)
+	}
+	execution, err := r.execution.Publications.ExecutionOutput(id)
+	if err != nil {
+		return fmt.Errorf("read withdrawal explanation: %w", err)
+	}
+	if execution.Component != "github.publishPullRequestComment" {
+		return fmt.Errorf("withdrawal explanation must be a managed pull request comment")
+	}
+	comment, err := DecodePullRequestComment(execution.Configuration)
+	if err != nil {
+		return err
+	}
+	number, err := comment.Number()
+	if err != nil {
+		return err
+	}
+	if !strings.EqualFold(r.client.RepositoryFullName(comment.Repository), r.client.RepositoryFullName(r.config.Repository)) || number != int64(r.number) || comment.ExpectedHeadSHA != r.config.ExpectedHeadSHA || comment.CommentKey != "review-request-withdrawal" || !comment.IsEnabled() {
+		return fmt.Errorf("withdrawal explanation does not cover this pull request and commit")
+	}
+	var envelope struct {
+		Type string
+		Data struct{ Status string }
+	}
+	if err := mapstructure.Decode(execution.Output, &envelope); err != nil {
+		return err
+	}
+	if envelope.Type != PullRequestCommentPayloadType || !slices.Contains([]string{"published", "unchanged"}, envelope.Data.Status) {
+		return fmt.Errorf("withdrawal explanation is not confirmed")
+	}
+	return nil
 }
