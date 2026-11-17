@@ -161,11 +161,10 @@ spec:
 
               1/ Compare the current branch with {{ task().default_branch }} and review the commits you made.
               2/ Follow repository conventions for the title, description, language, writing style, and formatting. Discover and use the applicable pull request template. Apply the writing guidance below within these requirements.
-              3/ If the repository has no title convention, write a short, descriptive title. Do not require a Conventional Commits prefix.
-              4/ Do not add closing keywords (Closes, Fixes, Resolves).
-              5/ If the repository has no formatting rules, use clear Markdown with each paragraph on one line. Separate paragraphs, headings, and list items with blank lines.
-              6/ Write the title to /tmp/TITLE and the description to /tmp/DESCRIPTION.md. Do not add these files to the repository.
-              7/ Do not create or update the pull request yourself. The automation uses these files to create or update it.
+              3/ Do not add closing keywords (Closes, Fixes, Resolves).
+              4/ If the repository has no formatting rules, use clear Markdown with each paragraph on one line. Separate paragraphs, headings, and list items with blank lines.
+              5/ Write the title to /tmp/TITLE and the description to /tmp/DESCRIPTION.md. Do not add these files to the repository.
+              6/ Do not create or update the pull request yourself. The automation uses these files to create or update it.
 
               Write for the reviewer:
 
