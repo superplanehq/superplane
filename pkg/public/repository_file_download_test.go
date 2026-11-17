@@ -121,3 +121,46 @@ func Test__RepositoryFileDownload(t *testing.T) {
 		assert.Contains(t, response.Body.String(), "kind: Canvas")
 	})
 }
+
+func TestRepositoryFileDownloadCanvasScopes(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	server, signer := mustRunnerLiveLogServer(t, r)
+	canvasA, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
+	canvasB, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
+	credentials := canvasReadCredentials(t, r, signer, canvasA.ID)
+	// The gateway already enforces the persisted API-key restriction.
+	for _, item := range []struct {
+		id     uuid.UUID
+		status int
+	}{{canvasA.ID, http.StatusOK}, {canvasB.ID, http.StatusNotFound}} {
+		response := canvasReadGET(server, credentials[0].token, "/api/v1/canvases/"+item.id.String())
+		require.Equal(t, item.status, response.Code, response.Body.String())
+	}
+	for _, credential := range credentials {
+		t.Run(credential.name, func(t *testing.T) {
+			queries := observeCanvasReadQueries(t)
+			for _, item := range []struct {
+				canvas  *models.Canvas
+				allowed bool
+			}{{canvasA, credential.allowedA}, {canvasB, credential.allowedB}} {
+				for _, suffix := range []string{"", "&stage=true", "&version_id=" + item.canvas.LiveVersionID.String()} {
+					*queries = nil
+					response := canvasReadGET(server, credential.token, "/api/v1/canvases/"+item.canvas.ID.String()+"/file?path=canvas.yaml"+suffix)
+					if !item.allowed {
+						require.Equal(t, http.StatusForbidden, response.Code, response.Body.String())
+						require.Empty(t, *queries, "denial must precede content reads")
+						continue
+					}
+					require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+					require.Contains(t, response.Body.String(), "kind: Canvas")
+					require.NotEmpty(t, *queries)
+				}
+			}
+		})
+	}
+	foreignOrg := support.CreateOrganization(t, r, r.User)
+	foreignCanvas, _ := support.CreateCanvas(t, foreignOrg.ID, r.User, nil, nil)
+	response := canvasReadGET(server, credentials[len(credentials)-1].token, "/api/v1/canvases/"+foreignCanvas.ID.String()+"/file?path=canvas.yaml")
+	require.Equal(t, http.StatusNotFound, response.Code)
+}
