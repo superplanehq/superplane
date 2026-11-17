@@ -332,29 +332,7 @@ func findLogoutIdentity(ctx context.Context, conn *models.SSOConnection, subject
 	if err != nil {
 		return nil, err
 	}
-	identity, err := models.FindSSOIdentityByID(database.DB(ctx), conn.ID, session.IdentityID)
-	if err != nil {
-		return nil, err
-	}
-	owner, err := identityOwner(ctx, conn, identity)
-	if err != nil {
-		return nil, err
-	}
-	if !core.SessionStillOpensOrganization(conn, session.CreatedAt, now, owner) {
-		return nil, gorm.ErrRecordNotFound
-	}
-	return identity, nil
-}
-
-func identityOwner(ctx context.Context, conn *models.SSOConnection, identity *models.SSOIdentity) (bool, error) {
-	user, err := models.FindActiveHumanUserByAccountAndOrganization(database.DB(ctx), conn.OrganizationID, identity.AccountID)
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return false, nil
-	}
-	if err != nil {
-		return false, err
-	}
-	return user.IsOwner, nil
+	return models.FindSSOIdentityByID(database.DB(ctx), conn.ID, session.IdentityID)
 }
 
 func (s *Service) connectionFromPath(w http.ResponseWriter, r *http.Request) (*models.SSOConnection, bool) {

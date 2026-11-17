@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -239,56 +240,58 @@ func TestBackchannelLogoutFindsAnEarlierBrowserSession(t *testing.T) {
 	require.True(t, final.SessionsRevokedAt.Equal(revokedAt))
 }
 
-func TestBackchannelLogoutReachesACookieThatCanStillOpen(t *testing.T) {
+func TestBackchannelLogoutRevokesBeforeTheConnectionRulesChange(t *testing.T) {
 	f, fake, conn := activeOIDCConnection(t)
 	conn.Enforcement = models.SSOEnforcementRequired
 	conn.AllowOwnerBypass = false
-	conn.MaxSessionAgeSeconds = 900
+	conn.MaxSessionAgeSeconds = 3600
 	require.NoError(t, conn.Save(database.Conn()))
 
-	fake.extraClaims = map[string]any{"sid": "sid-aged"}
+	fake.extraClaims = map[string]any{"sid": "sid-old"}
 	require.Equal(t, http.StatusFound, f.callback(t, conn, fake, callbackOptions{}).Code)
 	identity, err := models.FindSSOIdentityByIDPSubject(database.Conn(), conn.ID, fake.subject)
 	require.NoError(t, err)
+	authAt := time.Now().Add(-2 * time.Hour)
 	require.NoError(t, database.Conn().Model(&models.SSOIdentitySession{}).
-		Where("identity_id = ? AND idp_session_id = ?", identity.ID, "sid-aged").
-		Update("created_at", time.Now().Add(-time.Hour)).Error)
+		Where("identity_id = ? AND idp_session_id = ?", identity.ID, "sid-old").
+		Update("created_at", authAt).Error)
 
 	logout := signLogoutToken(t, fake, jwtLib.MapClaims{
-		"sub":    "other",
-		"sid":    "sid-aged",
+		"sub":    nil,
+		"sid":    "sid-old",
 		"events": map[string]any{"http://schemas.openid.net/event/backchannel-logout": map[string]any{}},
 	})
 	require.Equal(t, http.StatusOK, postLogout(f, conn.ID, logout).Code)
-	missed, err := models.FindSSOIdentityByID(database.Conn(), conn.ID, identity.ID)
+	revoked, err := models.FindSSOIdentityByID(database.Conn(), conn.ID, identity.ID)
 	require.NoError(t, err)
-	require.Nil(t, missed.SessionsRevokedAt)
+	require.NotNil(t, revoked.SessionsRevokedAt)
 
-	conn.MaxSessionAgeSeconds = 7200
-	require.NoError(t, conn.Save(database.Conn()))
-	require.Equal(t, http.StatusOK, postLogout(f, conn.ID, logout).Code)
-	extended, err := models.FindSSOIdentityByID(database.Conn(), conn.ID, identity.ID)
+	owner, err := models.FindActiveHumanUserByAccountAndOrganization(database.Conn(), conn.OrganizationID, identity.AccountID)
 	require.NoError(t, err)
-	require.NotNil(t, extended.SessionsRevokedAt)
+	require.NoError(t, models.SetUserIsOwner(database.Conn(), owner.ID, true))
+	owner.IsOwner = true
+	cookie := enterprise.SSOAccessSession{
+		AccountID: identity.AccountID,
+		SSO:       conn.ID.String() + ":" + strconv.FormatInt(authAt.Unix(), 10),
+	}
 
 	conn.Enforcement = models.SSOEnforcementOptional
-	conn.MaxSessionAgeSeconds = 900
 	require.NoError(t, conn.Save(database.Conn()))
-	require.NoError(t, database.Conn().Model(&models.SSOIdentity{}).Where("id = ?", identity.ID).Update("sessions_revoked_at", nil).Error)
-	fake.extraClaims = map[string]any{"sid": "sid-optional"}
-	require.Equal(t, http.StatusFound, f.callback(t, conn, fake, callbackOptions{}).Code)
-	require.NoError(t, database.Conn().Model(&models.SSOIdentitySession{}).
-		Where("identity_id = ? AND idp_session_id = ?", identity.ID, "sid-optional").
-		Update("created_at", time.Now().Add(-time.Hour)).Error)
-	optionalLogout := signLogoutToken(t, fake, jwtLib.MapClaims{
-		"sub":    "other",
-		"sid":    "sid-optional",
-		"events": map[string]any{"http://schemas.openid.net/event/backchannel-logout": map[string]any{}},
-	})
-	require.Equal(t, http.StatusOK, postLogout(f, conn.ID, optionalLogout).Code)
-	var optionalSession models.SSOIdentitySession
-	require.NoError(t, database.Conn().Where("identity_id = ? AND idp_session_id = ?", identity.ID, "sid-optional").First(&optionalSession).Error)
-	require.NotNil(t, optionalSession.RevokedAt)
+	required, err := f.service.CheckOrganizationAccess(f.ctx(), owner, cookie)
+	require.NoError(t, err)
+	require.NotNil(t, required)
+
+	conn.MaxSessionAgeSeconds = 86400
+	require.NoError(t, conn.Save(database.Conn()))
+	required, err = f.service.CheckOrganizationAccess(f.ctx(), owner, cookie)
+	require.NoError(t, err)
+	require.NotNil(t, required)
+
+	conn.AllowOwnerBypass = true
+	require.NoError(t, conn.Save(database.Conn()))
+	required, err = f.service.CheckOrganizationAccess(f.ctx(), owner, cookie)
+	require.NoError(t, err)
+	require.NotNil(t, required)
 }
 
 func TestUnusedSSOIdentitySessionsAreRemoved(t *testing.T) {
