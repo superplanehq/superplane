@@ -1,9 +1,11 @@
 import { describe, expect, it } from "bun:test";
 
+import type { FactoriesWorkOrder } from "@/api-client";
 import claudeIcon from "@/assets/icons/integrations/claude.svg";
 import cursorIcon from "@/assets/icons/integrations/cursor.svg";
 import dependabotIcon from "@/assets/icons/integrations/dependabot.svg";
 import superplaneMark from "@/assets/superplane-mark.svg";
+import { buildOrgUserDisplayMap, createOrgUserDisplayLookup } from "@/lib/orgUserDisplay";
 
 import { PRIMARY_FACTORY_ID, STORYBOOK_ME_USER_ID } from "../../__fixtures__/factoryPageIds";
 import {
@@ -55,6 +57,94 @@ describe("sourceTicketLabel", () => {
 });
 
 describe("splitRunSourceForOrder", () => {
+  const creatorFallbackCases: Array<{
+    label: string;
+    createdBy?: FactoriesWorkOrder["createdBy"];
+    person: { id: string; name: string; deleted?: boolean; formerMember?: boolean };
+  }> = [
+    { label: "missing creator", person: { id: "unknown", name: "Unknown member" } },
+    { label: "empty creator", createdBy: {}, person: { id: "unknown", name: "Unknown member" } },
+    { label: "empty user", createdBy: { user: {} }, person: { id: "unknown", name: "Unknown member" } },
+    { label: "empty name", createdBy: { user: { name: "" } }, person: { id: "unknown", name: "Unknown member" } },
+    { label: "blank name", createdBy: { user: { name: " \t " } }, person: { id: "unknown", name: "Unknown member" } },
+    { label: "ID only", createdBy: { user: { id: "creator" } }, person: { id: "creator", name: "Unknown member" } },
+    { label: "name only", createdBy: { user: { name: " Alex Chen " } }, person: { id: "unknown", name: "Alex Chen" } },
+    {
+      label: "known name",
+      createdBy: { user: { id: "creator", name: " Alex Chen " } },
+      person: { id: "creator", name: "Alex Chen" },
+    },
+    {
+      label: "deleted user without details",
+      createdBy: { user: { deleted: true } },
+      person: { id: "unknown", name: "Unknown member", deleted: true },
+    },
+    {
+      label: "former member without details",
+      createdBy: { user: { name: " ", formerMember: true } },
+      person: { id: "unknown", name: "Unknown member", formerMember: true },
+    },
+  ];
+
+  it.each(creatorFallbackCases)(
+    "keeps neutral creator attribution for $label without a roster",
+    ({ createdBy, person }) => {
+      const source = splitRunSourceForOrder(
+        {
+          id: "production-task",
+          createdBy,
+          assignees: [{ id: "owner", name: "Task Owner" }],
+        },
+        () => null,
+      );
+      expect(source.kind).toBe("manual");
+      if (source.kind !== "manual") return;
+      expect(source.person).toMatchObject(person);
+      expect(source.person.avatarUrl).toBeUndefined();
+      expect(source.person.initials).toBeTruthy();
+    },
+  );
+
+  it.each([undefined, " \t "])("resolves an ID-only creator with name=%s from the organization roster", (name) => {
+    const resolveUser = createOrgUserDisplayLookup(
+      buildOrgUserDisplayMap([
+        {
+          metadata: { id: "creator" },
+          spec: { displayName: "Alex Chen" },
+          status: { accountProviders: [{ avatarUrl: "https://example.com/alex.jpg" }] },
+        },
+        { metadata: { id: "owner" }, spec: { displayName: "Task Owner" } },
+      ]),
+    );
+    const source = splitRunSourceForOrder(
+      {
+        id: "production-task",
+        createdBy: { user: { id: "creator", name } },
+        assignees: [{ id: "owner", name: "Task Owner" }],
+      },
+      resolveUser,
+    );
+    expect(source).toMatchObject({
+      kind: "manual",
+      person: { id: "creator", name: "Alex Chen", avatarUrl: "https://example.com/alex.jpg" },
+    });
+  });
+
+  it.each(["deleted", "formerMember"] as const)(
+    "preserves %s for an unnamed creator even when the roster contains them",
+    (flag) => {
+      const resolveUser = createOrgUserDisplayLookup(
+        buildOrgUserDisplayMap([{ metadata: { id: "creator" }, spec: { displayName: "Alex Chen" } }]),
+      );
+      expect(
+        splitRunSourceForOrder(
+          { id: "production-task", createdBy: { user: { id: "creator", [flag]: true } } },
+          resolveUser,
+        ),
+      ).toMatchObject({ kind: "manual", person: { id: "creator", name: "Unknown member", [flag]: true } });
+    },
+  );
+
   it("uses the GitHub issue for a review candidate even when a person created the draft", () => {
     const source = splitRunSourceForOrder(REVIEW_CANDIDATE_WORK_ORDERS[0]!);
     expect(source).toEqual(

@@ -63,7 +63,7 @@ func TestMergeConfidenceDestinationsDeliverCompletionAndStartReviewRequest(t *te
 				outcome, agents, err := runReviewRequestGraph(t, f, consumer, deliverReviewRequestReport(t, f, consumer, message), host, "")
 				require.NoError(t, err)
 				require.Equal(t, 1, agents)
-				require.Equal(t, "requested", outcome["reviewRequest"].(map[string]any)["status"])
+				require.Equal(t, "requested", outcome["request-reviewers"].(map[string]any)["status"])
 				require.Len(t, host.reviewerBodies, 1)
 			})
 		}
