@@ -240,6 +240,8 @@ func TestMaterializeRiskScoreTemplate(t *testing.T) {
 	assert.Contains(t, canvas.Spec.Edges, yaml.Edge{SourceID: "start-assessment-check", TargetID: "assess-risk", Channel: "default"})
 
 	agent := findYAMLNode(t, canvas, "assess-risk")
+	assert.Equal(t, false, agent.Configuration["publishPRCheck"])
+	assert.Equal(t, false, findYAMLNode(t, canvas, "start-assessment-check").Configuration["enabled"])
 	assert.Equal(t, models.SuperPlaneRunnerComponent, agent.Component)
 	assert.Equal(t, true, agent.Configuration["skipSetupCommands"])
 	maxRuns := 5

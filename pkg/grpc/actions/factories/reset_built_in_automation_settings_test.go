@@ -1219,19 +1219,26 @@ func TestResetMergeConfidencePreservesPublicationDestinations(t *testing.T) {
 			r, factory := resetTestFactory(t)
 			canvas := resetTestTemplate(t, r, factory, "risk-score", models.ProviderGitHub, func(doc *yaml.Canvas) {
 				config := findYAMLNode(t, doc, "assess-risk").Configuration
-				config["publishPRCheck"] = false
+				config["publishPRCheck"] = settings.publish
 				config["publishResults"], config["resultsBody"], config["resultsComment"] = settings.publish, false, settings.comment
 				config["resultsBodyActivationGeneration"], config["resultsCommentActivationGeneration"] = 3, 4
 			})
+			// Seed an already enabled check, as saved before permission validation existed.
+			saved := resetTestLiveVersion(t, canvas)
+			start := findIntakeNode(saved.Nodes, "start-assessment-check")
+			start.Configuration["enabled"] = settings.publish
+			db := database.DB(t.Context())
+			require.NoError(t, db.Model(saved).Update("nodes", datatypes.NewJSONSlice(saved.Nodes)).Error)
+			require.NoError(t, db.Model(&models.CanvasNode{}).Where("workflow_id = ? AND node_id = ?", canvas.ID, start.ID).Update("configuration", datatypes.NewJSONType(start.Configuration)).Error)
 			_, err := ResetOrganizationBuiltInAutomations(context.Background(), r.Organization.ID, testIntakeDependencies(r))
 			require.NoError(t, err)
 			version := resetTestLiveVersion(t, canvas)
 			agent := findIntakeNode(version.Nodes, "assess-risk").Configuration
-			assert.Equal(t, false, agent["publishPRCheck"])
+			assert.Equal(t, settings.publish, agent["publishPRCheck"])
 			assert.Equal(t, settings.publish, agent["publishResults"])
 			assert.Equal(t, false, agent["resultsBody"])
 			assert.Equal(t, settings.comment, agent["resultsComment"])
-			assert.Equal(t, false, findIntakeNode(version.Nodes, "start-assessment-check").Configuration["enabled"])
+			assert.Equal(t, settings.publish, findIntakeNode(version.Nodes, "start-assessment-check").Configuration["enabled"])
 			assert.Equal(t, false, findIntakeNode(version.Nodes, "publish-merge-confidence").Configuration["enabled"])
 			comment := findIntakeNode(version.Nodes, "comment-merge-confidence").Configuration
 			assert.Equal(t, settings.publish && settings.comment, comment["enabled"])
