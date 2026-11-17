@@ -15,7 +15,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
@@ -304,7 +303,6 @@ func TestRunMergeConfidenceRechecksEligibilityAfterProviderFetch(t *testing.T) {
 func TestRunMergeConfidenceRepositoryMatching(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryMultiRepoTasks))
 	factory, order, canvas := mergeConfidenceTask(t, r)
 	for _, repository := range []string{"acme/web", "acme/docs"} {
 		_, err := factory.CreateAgentResource(db, models.FactoryAgentResourceKindContextRepo, "", true, models.FactoryAgentResourceConfig{Repository: repository, Access: models.FactoryContextRepoAccessWrite})
