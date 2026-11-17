@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/google/go-github/v84/github"
@@ -156,6 +155,47 @@ func startPullRequestChecksRequest(ctx context.Context, db *gorm.DB, deps Intake
 }
 
 func checksStartupPayload(ctx context.Context, db *gorm.DB, deps IntakeDependencies, factory *models.Factory, pullRequest *models.FactoryPullRequest, node *models.CanvasNode) (map[string]any, error) {
+	payload, err := checksStartupSnapshot(ctx, db, deps, factory, pullRequest)
+	if err != nil || payload == nil {
+		return nil, err
+	}
+	if checksStartupExcludesDraft(node, pullRequest.Provider, payload) {
+		return nil, nil
+	}
+	if err := validateChecksStartupSnapshot(pullRequest, payload); err != nil {
+		return nil, err
+	}
+	return payload, nil
+}
+
+func validateChecksStartupSnapshot(pullRequest *models.FactoryPullRequest, payload map[string]any) error {
+	current, _ := payload["pull_request"].(map[string]any)
+	if pullRequest.Provider == models.FactoryPullRequestProviderBitbucket {
+		current, _ = payload["pullrequest"].(map[string]any)
+		if nestedString(current, "source", "commit", "hash") != "" && nestedString(current, "source", "branch", "name") != "" && nestedString(current, "source", "repository", "full_name") != "" && nestedString(current, "destination", "branch", "name") != "" {
+			return nil
+		}
+		return fmt.Errorf("pull request %s has incomplete head revision, branch, repository, or base branch", pullRequest.ID)
+	}
+	if nestedString(current, "head", "sha") == "" || nestedString(current, "head", "ref") == "" || nestedString(current, "head", "repo", "full_name") == "" || nestedString(current, "base", "ref") == "" {
+		return fmt.Errorf("pull request %s has incomplete head revision, branch, repository, or base branch", pullRequest.ID)
+	}
+	return nil
+}
+
+func checksStartupExcludesDraft(node *models.CanvasNode, provider string, payload map[string]any) bool {
+	if provider == models.FactoryPullRequestProviderBitbucket {
+		current, _ := payload["pullrequest"].(map[string]any)
+		draft, _ := current["draft"].(bool)
+		return draft
+	}
+	current, _ := payload["pull_request"].(map[string]any)
+	draft, _ := current["draft"].(bool)
+	ignoreDrafts, _ := node.Configuration.Data()["ignoreDrafts"].(bool)
+	return draft && ignoreDrafts
+}
+
+func checksStartupSnapshot(ctx context.Context, db *gorm.DB, deps IntakeDependencies, factory *models.Factory, pullRequest *models.FactoryPullRequest) (map[string]any, error) {
 	if pullRequest.Provider == models.FactoryPullRequestProviderBitbucket {
 		return bitbucketChecksStartupPayload(db, deps, factory, pullRequest)
 	}
@@ -170,12 +210,8 @@ func checksStartupPayload(ctx context.Context, db *gorm.DB, deps IntakeDependenc
 	if githubPR == nil {
 		return nil, errFactoryPullRequestMissing
 	}
-	ignoreDrafts, _ := node.Configuration.Data()["ignoreDrafts"].(bool)
-	if githubPR.GetState() != models.FactoryPullRequestStateOpen || (githubPR.GetDraft() && ignoreDrafts) {
+	if githubPR.GetState() != models.FactoryPullRequestStateOpen {
 		return nil, nil
-	}
-	if strings.TrimSpace(githubPR.GetHead().GetSHA()) == "" || strings.TrimSpace(githubPR.GetHead().GetRef()) == "" || strings.TrimSpace(githubPR.GetHead().GetRepo().GetFullName()) == "" || strings.TrimSpace(githubPR.GetBase().GetRef()) == "" {
-		return nil, fmt.Errorf("pull request %s has incomplete head revision, branch, repository, or base branch", pullRequest.ID)
 	}
 	order, err := factory.FindWorkOrder(db, pullRequest.WorkOrderID)
 	if err != nil {
@@ -194,12 +230,8 @@ func bitbucketChecksStartupPayload(db *gorm.DB, deps IntakeDependencies, factory
 		return nil, fmt.Errorf("get current Bitbucket pull request: %w", err)
 	}
 	current := payload["pullrequest"].(map[string]any)
-	draft, _ := current["draft"].(bool)
-	if nestedString(current, "state") != "OPEN" || draft {
+	if nestedString(current, "state") != "OPEN" {
 		return nil, nil
-	}
-	if nestedString(current, "source", "commit", "hash") == "" || nestedString(current, "source", "branch", "name") == "" || nestedString(current, "source", "repository", "full_name") == "" || nestedString(current, "destination", "branch", "name") == "" {
-		return nil, fmt.Errorf("pull request %s has incomplete head revision, branch, repository, or base branch", pullRequest.ID)
 	}
 	order, err := factory.FindWorkOrder(db, pullRequest.WorkOrderID)
 	if err != nil {

@@ -145,6 +145,7 @@ func ClaimDuePullRequestChecksStartRequest(tx *gorm.DB, id uuid.UUID, leaseUntil
 // run finishes.
 // A later reopen, ready-for-review, push, or Bitbucket update starts only when its
 // pull request time is newer than the stored snapshot.
+// When skipped, event receives the latest matching assessment.
 func (n *CanvasNode) CreatePullRequestChecksEvent(tx *gorm.DB, event *CanvasEvent) (bool, error) {
 	canvas, err := FindUnscopedCanvasInTransaction(tx, n.WorkflowID)
 	if err != nil {
@@ -174,8 +175,9 @@ func (n *CanvasNode) CreatePullRequestChecksEvent(tx *gorm.DB, event *CanvasEven
 			return err
 		}
 		var stored []CanvasEvent
-		if err := inner.Select("data").
+		if err := inner.
 			Where("workflow_id = ? AND node_id = ? AND dedup_key = ?", n.WorkflowID, n.NodeID, key).
+			Order("created_at DESC, id DESC").
 			Find(&stored).Error; err != nil {
 			return err
 		}
@@ -188,6 +190,7 @@ func (n *CanvasNode) CreatePullRequestChecksEvent(tx *gorm.DB, event *CanvasEven
 			known = append(known, identity)
 		}
 		if checksEventIsDuplicate(known, incoming) {
+			*event = stored[0]
 			return nil
 		}
 		if err := inner.Create(event).Error; err != nil {

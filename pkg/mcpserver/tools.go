@@ -87,6 +87,15 @@ func Tools() []Tool {
 			},
 		},
 		{
+			Name:        "run_merge_confidence",
+			Description: "Assess tracked open pull requests for an existing task in Verify with its saved Merge confidence settings. Reuse existing assessments for the current revision, including failed assessments. The tool returns immediately without waiting for completion. Call get_task_report to follow run status.",
+			InputSchema: map[string]any{
+				"type":       "object",
+				"properties": map[string]any{"task": map[string]any{"type": "string", "description": "Task id, number, or key."}},
+				"required":   []string{"task"},
+			},
+		},
+		{
 			Name:        "get_task",
 			Description: "Return one task by id, number, or key.",
 			InputSchema: map[string]any{
@@ -228,6 +237,8 @@ func (rt *Runtime) CallTool(ctx context.Context, claims *AccessClaims, name stri
 		return rt.listTasks(ctx, claims, args)
 	case "get_task":
 		return rt.getTask(ctx, claims, args)
+	case "run_merge_confidence":
+		return rt.runMergeConfidence(ctx, claims, args)
 	case "get_task_report":
 		return rt.getTaskReport(ctx, claims, args)
 	case "list_task_artifacts":
