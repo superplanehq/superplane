@@ -46,28 +46,9 @@ export const onCaseStatusChangeTriggerRenderer: TriggerRenderer = {
 
   getTriggerProps: (context: TriggerRendererContext): TriggerProps => {
     const { node, definition, lastEvent } = context;
-    const config = node.configuration as OnCaseStatusChangeConfiguration | undefined;
+    const config = (node.configuration as OnCaseStatusChangeConfiguration | undefined) ?? {};
     const nodeMetadata = node.metadata as OnCaseStatusChangeNodeMetadata | undefined;
-    const metadata: MetadataItem[] = [];
-    if (config?.cases && config.cases.length > 0) {
-      const caseNames = config.cases.map((id) => nodeMetadata?.caseNames?.[id] ?? id);
-      metadata.push({ icon: "folder", label: caseNames.join(", ") });
-    }
-    if (config?.statuses && config.statuses.length > 0) {
-      metadata.push({ icon: "activity", label: config.statuses.join(", ") });
-    }
-    if (config?.severities && config.severities.length > 0) {
-      metadata.push({ icon: "alert-triangle", label: config.severities.join(", ") });
-    }
-    if (config?.tags && config.tags.length > 0) {
-      metadata.push({
-        icon: "tag",
-        label: config.tags
-          .map((t) => t.value)
-          .filter(Boolean)
-          .join(", "),
-      });
-    }
+    const metadata = buildConfigurationMetadata(config, nodeMetadata);
 
     if (lastEvent) {
       const payload = lastEvent.data as OnCaseStatusChangeEventData | undefined;
@@ -96,3 +77,30 @@ export const onCaseStatusChangeTriggerRenderer: TriggerRenderer = {
     };
   },
 };
+
+function buildConfigurationMetadata(
+  config: OnCaseStatusChangeConfiguration,
+  nodeMetadata?: OnCaseStatusChangeNodeMetadata,
+): MetadataItem[] {
+  const metadata: MetadataItem[] = [];
+  if (config.cases?.length) {
+    const caseNames = config.cases.map((id) => nodeMetadata?.caseNames?.[id] ?? id);
+    metadata.push({ icon: "folder", label: caseNames.join(", ") });
+  }
+  if (config.statuses?.length) {
+    metadata.push({ icon: "activity", label: config.statuses.join(", ") });
+  }
+  if (config.severities?.length) {
+    metadata.push({ icon: "alert-triangle", label: config.severities.join(", ") });
+  }
+  if (config.tags?.length) {
+    metadata.push({
+      icon: "tag",
+      label: config.tags
+        .map((tag) => tag.value)
+        .filter(Boolean)
+        .join(", "),
+    });
+  }
+  return metadata;
+}
