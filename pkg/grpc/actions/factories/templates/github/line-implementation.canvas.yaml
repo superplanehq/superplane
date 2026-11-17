@@ -112,7 +112,7 @@ spec:
               3/ For behavior changes, add or update tests that verify observable behavior.
               4/ Avoid tests that only mirror implementation details or assert incidental layout, classes, or wording. Purely cosmetic changes do not need new tests unless repository instructions require them. Add coverage if behavior or accessibility changes.
               5/ Run the relevant tests, lint, and build checks specified by the repository. Fix failures caused by your changes.
-              6/ Report which checks passed or failed. State which checks you could not run and explain why. Do not claim verification you did not perform.
+              6/ Report check results in the run output. Do not repeat them in the pull request description unless repository instructions require it. Do not claim verification you did not perform.
 
           - name: Commit and Push
             type: bash
@@ -153,13 +153,21 @@ spec:
               Read the applicable repository instructions for commit and pull request writing. Check AGENTS.md, CLAUDE.md, contribution documentation, and applicable SKILL.md files. Read referenced skills instead of assuming that their availability means their instructions were followed.
 
               1/ Compare the current branch with {{ task().default_branch }} and review the commits you made.
-              2/ Follow repository conventions for the title, description, writing style, and formatting. Discover and use the applicable pull request template. These instructions take precedence over the fallback below.
-              3/ If the repository provides no guidance, write a short, descriptive title and a concise description of the problem and resulting behavior. Include relevant verification and known limitations. Use sections only when they help the reader. Do not require a Conventional Commits title or sections for each part of the system.
-              4/ Do not add GitHub closing keywords (Closes, Fixes, Resolves). The automation adds them.
-              5/ If the repository has no formatting rules, use clear Markdown with each paragraph on one line. Separate paragraphs, headings, and list items with blank lines.
-              6/ Include only verification results you can substantiate. Do not claim that tests, lint, or builds passed without evidence. State any checks that could not run and why.
-              7/ Write the title to /tmp/TITLE and the description to /tmp/DESCRIPTION.md. Do not add these files to the repository.
-              8/ Do not create or update the pull request yourself. The automation uses these files to create or update it.
+              2/ Follow repository conventions for the title, description, language, writing style, and formatting. Discover and use the applicable pull request template. Apply the writing guidance below within these requirements.
+              3/ Do not add GitHub closing keywords (Closes, Fixes, Resolves). The automation adds them.
+              4/ If the repository has no formatting rules, use clear Markdown with each paragraph on one line. Separate paragraphs, headings, and list items with blank lines.
+              5/ Write the title to /tmp/TITLE and the description to /tmp/DESCRIPTION.md. Do not add these files to the repository.
+              6/ Do not create or update the pull request yourself. The automation uses these files to create or update it.
+
+              Write for the reviewer:
+
+              - Explain the problem and resulting behavior. Match the detail to the scope of the change.
+              - For English text, use Simplified Technical English: short sentences, active voice, and familiar words.
+              - Omit local check results and risk assessments. CI and merge confidence report those separately.
+              - Keep required repository content and migration or deployment steps. Otherwise, use only paragraphs or sections that help review.
+
+              Example of a small fix, not a required template:
+              Empty search results no longer crash the page. The page now shows its empty state.
           - name: Push output
             type: bash
             workingDirectory: repo
