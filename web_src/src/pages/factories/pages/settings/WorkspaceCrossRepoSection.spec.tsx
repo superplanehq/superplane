@@ -22,6 +22,33 @@ import { AGENT_RESOURCES_COPY } from "./agentResourceCopy";
 const agentPath = `workspaces/${PRIMARY_FACTORY_KEY}/agent`;
 const agentPageFeatures = [FEATURE_WORKSPACE_SKILLS];
 
+function primaryRepositoryHarness() {
+  return (
+    <FactoriesHarness
+      pathSuffix={agentPath}
+      factoriesFixture={factoriesFixtureWithSetupAnswers({ ...SETUP_ANSWERS.repository, defaultBranch: "main" })}
+      orgIntegrations={CONNECTED_SETUP_INTEGRATIONS}
+      experimentalFeatures={agentPageFeatures}
+    />
+  );
+}
+
+function captureRepositoryUpdates() {
+  const originalFetch = globalThis.fetch.bind(globalThis);
+  const bodies: Array<{ repository?: string; defaultBranch?: string; retargetTasks?: boolean }> = [];
+  vi.stubGlobal("fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = input instanceof Request ? input.url : input instanceof URL ? input.href : input;
+    const method = (init?.method ?? (input instanceof Request ? input.method : "GET")).toUpperCase();
+    if (method === "PATCH" && url.includes("/repository")) {
+      const raw =
+        typeof init?.body === "string" ? init.body : input instanceof Request ? await input.clone().text() : "";
+      if (raw) bodies.push(JSON.parse(raw) as (typeof bodies)[number]);
+    }
+    return originalFetch(input, init);
+  });
+  return { bodies, restore: () => vi.unstubAllGlobals() };
+}
+
 describe("cross-repo context picker", () => {
   beforeAll(() => {
     client.setConfig({ baseUrl: "http://localhost" });
@@ -135,6 +162,46 @@ describe("cross-repo context picker", () => {
     ]);
     const primary = rows[0]!;
     expect(within(primary).queryByRole("button", { name: AGENT_RESOURCES_COPY.removeRepository })).toBeNull();
+  }, 15000);
+
+  it("keeps existing tasks when the primary branch changes", async () => {
+    const user = userEvent.setup();
+    const updates = captureRepositoryUpdates();
+    try {
+      render(primaryRepositoryHarness());
+      await user.click(await screen.findByTestId("agent-cross-repo-primary-toggle", {}, { timeout: 8000 }));
+      await user.click(await screen.findByTestId("agent-primary-branch", {}, { timeout: 8000 }));
+      await user.click(await screen.findByRole("option", { name: "develop" }, { timeout: 8000 }));
+      await user.click(screen.getByTestId("agent-primary-save"));
+      await user.click(await screen.findByTestId("agent-primary-keep-tasks", {}, { timeout: 8000 }));
+
+      await waitFor(() => expect(updates.bodies.at(-1)?.retargetTasks).toBe(false), { timeout: 8000 });
+      expect(updates.bodies.at(-1)).toMatchObject({ repository: "acme/api", defaultBranch: "develop" });
+      expect(screen.getByTestId("agent-cross-repo-primary")).toHaveTextContent("develop");
+    } finally {
+      updates.restore();
+    }
+  }, 15000);
+
+  it("can move the primary repository and update unfinished tasks", async () => {
+    const user = userEvent.setup();
+    const updates = captureRepositoryUpdates();
+    try {
+      render(primaryRepositoryHarness());
+      await user.click(await screen.findByTestId("agent-cross-repo-primary-toggle", {}, { timeout: 8000 }));
+      await user.click(await screen.findByTestId("agent-primary-change-repository", {}, { timeout: 8000 }));
+      const picker = await screen.findByTestId("agent-primary-repository-picker", {}, { timeout: 8000 });
+      await user.click(await within(picker).findByRole("option", { name: /^acme\/web$/ }, { timeout: 8000 }));
+      await waitFor(() => expect(screen.getByTestId("agent-primary-save")).toBeEnabled(), { timeout: 8000 });
+      await user.click(screen.getByTestId("agent-primary-save"));
+      await user.click(await screen.findByTestId("agent-primary-update-tasks", {}, { timeout: 8000 }));
+
+      await waitFor(() => expect(updates.bodies.at(-1)?.repository).toBe("acme/web"), { timeout: 8000 });
+      expect(updates.bodies.at(-1)).toMatchObject({ defaultBranch: "main", retargetTasks: true });
+      expect(screen.getByTestId("agent-cross-repo-primary")).toHaveTextContent("acme/web");
+    } finally {
+      updates.restore();
+    }
   }, 15000);
 
   it("asks for the branch and access before it adds a repository", async () => {
