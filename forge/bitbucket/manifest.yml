@@ -17,6 +17,8 @@ modules:
       events:
         - avi:bitbucket:created:pullrequest
         - avi:bitbucket:updated:pullrequest
+        - avi:bitbucket:updated:pullrequest-reviewer-status
+        - avi:bitbucket:push:repository
         - avi:bitbucket:fulfilled:pullrequest
         - avi:bitbucket:rejected:pullrequest
         - avi:bitbucket:created:pullrequest-comment

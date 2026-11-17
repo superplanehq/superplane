@@ -2,6 +2,7 @@ package bitbucket
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -523,20 +524,36 @@ func (c *Client) ListCommitStatuses(repository, sha string) ([]CommitStatus, err
 }
 
 func (c *Client) doJSON(method, endpoint string, payload any, expectedStatus int, out any) error {
+	return c.doJSONContext(context.Background(), method, endpoint, payload, expectedStatus, out)
+}
+
+func (c *Client) doJSONContext(ctx context.Context, method, endpoint string, payload any, expectedStatus int, out any) error {
+	_, err := c.doJSONWithHeadersContext(ctx, method, endpoint, payload, expectedStatus, out, nil)
+	return err
+}
+
+func (c *Client) doJSONWithHeaders(method, endpoint string, payload any, expectedStatus int, out any, headers http.Header) (http.Header, error) {
+	return c.doJSONWithHeadersContext(context.Background(), method, endpoint, payload, expectedStatus, out, headers)
+}
+
+func (c *Client) doJSONWithHeadersContext(ctx context.Context, method, endpoint string, payload any, expectedStatus int, out any, headers http.Header) (http.Header, error) {
 	var reader io.Reader
 	if payload != nil {
 		encoded, err := json.Marshal(payload)
 		if err != nil {
-			return fmt.Errorf("error encoding request: %w", err)
+			return nil, fmt.Errorf("error encoding request: %w", err)
 		}
 		reader = bytes.NewReader(encoded)
 	}
 
-	req, err := http.NewRequest(method, endpoint, reader)
+	req, err := http.NewRequestWithContext(ctx, method, endpoint, reader)
 	if err != nil {
-		return fmt.Errorf("error creating request: %w", err)
+		return nil, fmt.Errorf("error creating request: %w", err)
 	}
 
+	for key, values := range headers {
+		req.Header[key] = values
+	}
 	c.setAuthHeaders(req)
 	req.Header.Set("Accept", "application/json")
 	if payload != nil {
@@ -545,23 +562,23 @@ func (c *Client) doJSON(method, endpoint string, payload any, expectedStatus int
 
 	resp, err := c.HTTP.Do(req)
 	if err != nil {
-		return fmt.Errorf("error executing request: %w", err)
+		return nil, fmt.Errorf("error executing request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return fmt.Errorf("error reading response body: %w", err)
+		return nil, fmt.Errorf("error reading response body: %w", err)
 	}
 
 	if resp.StatusCode != expectedStatus {
-		return &APIError{StatusCode: resp.StatusCode, Message: fmt.Sprintf("unexpected status code %d: %s", resp.StatusCode, bitbucketErrorMessage(body))}
+		return resp.Header, &APIError{StatusCode: resp.StatusCode, Message: fmt.Sprintf("unexpected status code %d: %s", resp.StatusCode, bitbucketErrorMessage(body))}
 	}
 
 	if err := json.Unmarshal(body, out); err != nil {
-		return fmt.Errorf("error decoding response: %w", err)
+		return nil, fmt.Errorf("error decoding response: %w", err)
 	}
-	return nil
+	return resp.Header, nil
 }
 
 // bitbucketErrorMessage returns error.message from a Bitbucket error body,
