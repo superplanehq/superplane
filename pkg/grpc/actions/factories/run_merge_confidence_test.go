@@ -43,7 +43,7 @@ func mergeConfidenceTask(t *testing.T, r *support.ResourceRegistry) (*models.Fac
 	return factory, order, canvas
 }
 
-func TestRunMergeConfidenceReusesAutomaticAndFinishedAssessments(t *testing.T) {
+func TestRunMergeConfidenceStartsAfterRunningAndFinishedAssessments(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 	factory, order, canvas := mergeConfidenceTask(t, r)
@@ -51,50 +51,85 @@ func TestRunMergeConfidenceReusesAutomaticAndFinishedAssessments(t *testing.T) {
 	useGitHub(t, current)
 	prs, err := trackedPullRequests(db, order.ID)
 	require.NoError(t, err)
-	requests, err := models.ListPullRequestChecksStartRequests(db, prs[0].ID)
+	first, err := RunMergeConfidence(t.Context(), IntakeDependencies{}, r.Organization.ID.String(), RunMergeConfidenceRequest{FactoryID: factory.ID.String(), Task: order.ID.String()})
 	require.NoError(t, err)
-	require.Len(t, requests, 1)
-	automatic, err := ProcessPullRequestChecksStartRequest(t.Context(), IntakeDependencies{}, requests[0].ID)
-	require.NoError(t, err)
-	require.Len(t, automatic, 1)
+	require.Len(t, first.Runs, 1)
+	runIDs := []string{first.Runs[0].RunID}
+	eventIDs := []string{first.Runs[0].EventID}
+	savedPayloads := map[uuid.UUID]string{}
+	expectedRuns := map[uuid.UUID]models.CanvasRun{}
 	for i, ref := range []string{order.ID.String(), strconv.FormatInt(order.Number, 10), factory.WorkOrderKey(order.Number)} {
+		previousID := uuid.MustParse(runIDs[i])
+		state, outcome := models.CanvasRunStateStarted, ""
+		switch i {
+		case 1:
+			state = models.CanvasRunStateFinished
+			outcome = models.CanvasRunResultPassed
+		case 2:
+			state = models.CanvasRunStateFinished
+			outcome = models.CanvasRunResultFailed
+		}
+		require.NoError(t, db.Model(&models.CanvasRun{}).Where("id = ?", previousID).Updates(map[string]any{"state": state, "result": outcome}).Error)
+		expectedRuns[previousID] = models.CanvasRun{State: state, Result: outcome}
+		previousEvent, err := models.FindCanvasEventForCanvas(db, canvas.ID, uuid.MustParse(eventIDs[i]))
+		require.NoError(t, err)
+		saved, err := previousEvent.Data.MarshalJSON()
+		require.NoError(t, err)
+		savedPayloads[previousEvent.ID] = string(saved)
+		current.Title = github.Ptr("Review update " + strconv.Itoa(i))
 		result, err := RunMergeConfidence(t.Context(), IntakeDependencies{}, r.Organization.ID.String(), RunMergeConfidenceRequest{FactoryID: factory.ID.String(), Task: ref})
 		require.NoError(t, err)
 		require.Len(t, result.Runs, 1)
-		assert.Equal(t, automatic[0].ID.String(), result.Runs[0].EventID)
-		assert.Equal(t, automatic[0].RunID.String(), result.Runs[0].RunID)
+		assert.NotContains(t, eventIDs, result.Runs[0].EventID)
+		assert.NotContains(t, runIDs, result.Runs[0].RunID)
+		eventIDs = append(eventIDs, result.Runs[0].EventID)
+		runIDs = append(runIDs, result.Runs[0].RunID)
 		assert.Equal(t, canvas.ID.String(), result.Runs[0].AutomationID)
-		assert.Equal(t, "reused", result.Runs[0].Status)
+		assert.Equal(t, "started", result.Runs[0].Status)
 		assert.Equal(t, prs[0].URL, result.Runs[0].PullRequestURL)
-		outcome := models.CanvasRunResultPassed
-		if i == 1 {
-			outcome = models.CanvasRunResultFailed
-		}
-		require.NoError(t, db.Model(&models.CanvasRun{}).Where("id = ?", automatic[0].RunID).Updates(map[string]any{"state": models.CanvasRunStateFinished, "result": outcome}).Error)
+		event, err := models.FindCanvasEventForCanvas(db, canvas.ID, uuid.MustParse(result.Runs[0].EventID))
+		require.NoError(t, err)
+		payload := models.RootEventSourcePayload(event.Data.Data()).(map[string]any)
+		assert.Equal(t, current.GetTitle(), payload["pull_request"].(map[string]any)["title"])
 	}
-	assert.EqualValues(t, 1, countCanvasEvents(t, canvas.ID))
+	assert.EqualValues(t, 4, countCanvasEvents(t, canvas.ID))
 	current.Head.SHA = github.Ptr("new-head")
 	result, err := RunMergeConfidence(t.Context(), IntakeDependencies{}, r.Organization.ID.String(), RunMergeConfidenceRequest{FactoryID: factory.ID.String(), Task: order.ID.String()})
 	require.NoError(t, err)
 	require.Len(t, result.Runs, 1)
 	assert.Equal(t, "started", result.Runs[0].Status)
-	assert.NotEqual(t, automatic[0].RunID.String(), result.Runs[0].RunID)
+	assert.NotContains(t, runIDs, result.Runs[0].RunID)
+	assert.NotContains(t, eventIDs, result.Runs[0].EventID)
+	runIDs = append(runIDs, result.Runs[0].RunID)
 	var event models.CanvasEvent
 	require.NoError(t, db.Where("id = ?", result.Runs[0].EventID).First(&event).Error)
-	activity, err := models.FindPullRequestActivityByRunID(db, uuid.MustParse(result.Runs[0].RunID))
-	require.NoError(t, err)
-	assert.Equal(t, prs[0].ID, activity.PullRequestID)
+	assert.Equal(t, "github.pullRequest", event.Data.Data().(map[string]any)["type"])
 	payload := models.RootEventSourcePayload(event.Data.Data()).(map[string]any)
 	assert.Equal(t, "new-head", payload["pull_request"].(map[string]any)["head"].(map[string]any)["sha"])
+	for _, id := range runIDs {
+		activity, err := models.FindPullRequestActivityByRunID(db, uuid.MustParse(id))
+		require.NoError(t, err)
+		assert.Equal(t, prs[0].ID, activity.PullRequestID)
+	}
+	for id, saved := range savedPayloads {
+		persisted, err := models.FindCanvasEventForCanvas(db, canvas.ID, id)
+		require.NoError(t, err)
+		payload, err := persisted.Data.MarshalJSON()
+		require.NoError(t, err)
+		assert.JSONEq(t, saved, string(payload))
+	}
 	report, err := BuildTaskReport(t.Context(), factory.OrganizationID.String(), factory.ID.String(), order.ID.String(), models.TaskRunHistoryQuery{})
 	require.NoError(t, err)
 	var reported []string
 	for _, run := range report.Runs.Runs {
 		reported = append(reported, run.ID.String())
+		if expected, ok := expectedRuns[run.ID]; ok {
+			assert.Equal(t, expected.State, run.State)
+			assert.Equal(t, expected.Result, run.Result)
+		}
 	}
-	assert.Contains(t, reported, result.Runs[0].RunID)
-	assert.EqualValues(t, 2, countCanvasEvents(t, canvas.ID))
-	assert.Len(t, report.Runs.Runs, 2, "implementation does not start")
+	assert.ElementsMatch(t, runIDs, reported)
+	assert.EqualValues(t, 5, countCanvasEvents(t, canvas.ID))
 }
 
 func TestRunMergeConfidencePreconditions(t *testing.T) {
@@ -167,7 +202,7 @@ func TestRunMergeConfidenceBatchAndDraftRules(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, result.Runs, 2)
 	assert.Empty(t, result.Skipped)
-	assert.EqualValues(t, 2, countCanvasEvents(t, canvas.ID))
+	assert.EqualValues(t, 3, countCanvasEvents(t, canvas.ID))
 }
 
 func TestRunMergeConfidenceFetchFailureCreatesNoPartialRuns(t *testing.T) {
@@ -182,9 +217,15 @@ func TestRunMergeConfidenceFetchFailureCreatesNoPartialRuns(t *testing.T) {
 	require.Error(t, err)
 	assert.Equal(t, []int{42, 43}, api.fetched)
 	assert.Zero(t, countCanvasEvents(t, canvas.ID))
+	runs, err := canvas.ListRuns(db, 10)
+	require.NoError(t, err)
+	assert.Empty(t, runs)
+	linked, err := order.ListRuns(db)
+	require.NoError(t, err)
+	assert.Empty(t, linked)
 }
 
-func TestRunMergeConfidenceConcurrentCallsReuseOneAssessment(t *testing.T) {
+func TestRunMergeConfidenceConcurrentCallsStartSeparateAssessments(t *testing.T) {
 	r := support.Setup(t)
 	factory, order, canvas := mergeConfidenceTask(t, r)
 	arrivals, release := make(chan struct{}, 2), make(chan struct{})
@@ -220,12 +261,14 @@ func TestRunMergeConfidenceConcurrentCallsReuseOneAssessment(t *testing.T) {
 	require.NoError(t, second.err)
 	require.Len(t, first.result.Runs, 1)
 	require.Len(t, second.result.Runs, 1)
-	assert.Equal(t, first.result.Runs[0].RunID, second.result.Runs[0].RunID)
-	assert.NotEqual(t, first.result.Runs[0].Status, second.result.Runs[0].Status)
-	assert.EqualValues(t, 1, countCanvasEvents(t, canvas.ID))
+	assert.NotEqual(t, first.result.Runs[0].RunID, second.result.Runs[0].RunID)
+	assert.NotEqual(t, first.result.Runs[0].EventID, second.result.Runs[0].EventID)
+	assert.Equal(t, "started", first.result.Runs[0].Status)
+	assert.Equal(t, "started", second.result.Runs[0].Status)
+	assert.EqualValues(t, 2, countCanvasEvents(t, canvas.ID))
 }
 
-func TestRunMergeConfidenceBitbucketReusesAutomaticAndRetargets(t *testing.T) {
+func TestRunMergeConfidenceBitbucketStartsAfterAutomaticAndRetargets(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 	factory, order, canvas := mergeConfidenceTask(t, r)
@@ -250,16 +293,25 @@ func TestRunMergeConfidenceBitbucketReusesAutomaticAndRetargets(t *testing.T) {
 	automatic, err := ProcessPullRequestChecksStartRequest(t.Context(), IntakeDependencies{}, requests[0].ID)
 	require.NoError(t, err)
 	require.Len(t, automatic, 1)
-	for _, expected := range []string{"reused", "reused", "started", "started", "started"} {
+	runIDs := []string{automatic[0].RunID.String()}
+	eventIDs := []string{automatic[0].ID.String()}
+	for range 5 {
 		result, err := RunMergeConfidence(t.Context(), IntakeDependencies{}, r.Organization.ID.String(), RunMergeConfidenceRequest{FactoryID: factory.ID.String(), Task: order.ID.String()})
 		require.NoError(t, err)
 		require.Len(t, result.Runs, 1)
-		assert.Equal(t, expected, result.Runs[0].Status)
-		if expected == "reused" {
-			assert.Equal(t, automatic[0].RunID.String(), result.Runs[0].RunID)
-		}
+		assert.Equal(t, "started", result.Runs[0].Status)
+		assert.NotContains(t, runIDs, result.Runs[0].RunID)
+		assert.NotContains(t, eventIDs, result.Runs[0].EventID)
+		runIDs = append(runIDs, result.Runs[0].RunID)
+		eventIDs = append(eventIDs, result.Runs[0].EventID)
 	}
-	assert.EqualValues(t, 4, countCanvasEvents(t, canvas.ID))
+	assert.EqualValues(t, 6, countCanvasEvents(t, canvas.ID))
+	event, err := models.FindCanvasEventForCanvas(db, canvas.ID, uuid.MustParse(eventIDs[len(eventIDs)-1]))
+	require.NoError(t, err)
+	assert.Equal(t, "bitbucket.pullRequest", event.Data.Data().(map[string]any)["type"])
+	payload := models.RootEventSourcePayload(event.Data.Data()).(map[string]any)
+	assert.Equal(t, "new-head", nestedString(payload, "pullrequest", "source", "commit", "hash"))
+	assert.Equal(t, "main", nestedString(payload, "pullrequest", "destination", "branch", "name"))
 }
 
 func TestRunMergeConfidenceRechecksEligibilityAfterProviderFetch(t *testing.T) {
@@ -349,6 +401,9 @@ func TestRunMergeConfidenceRollsBackAllStarts(t *testing.T) {
 	require.Error(t, err)
 	assert.Equal(t, 2, inserts)
 	assert.Zero(t, countCanvasEvents(t, canvas.ID))
+	canvasRuns, err := canvas.ListRuns(db, 10)
+	require.NoError(t, err)
+	assert.Empty(t, canvasRuns)
 	runs, err := order.ListRuns(db)
 	require.NoError(t, err)
 	assert.Empty(t, runs, "failed batches leave no runs or task activity")
@@ -396,7 +451,7 @@ func (f *mergeConfidenceFailingGitHub) GetPullRequest(ctx context.Context, repos
 	return f.fakeFactoryGitHub.GetPullRequest(ctx, repository, number)
 }
 
-func TestRunMergeConfidenceReusesWorkspaceScopedAssessment(t *testing.T) {
+func TestRunMergeConfidenceStartsWorkspaceScopedAssessments(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 	factory, order, canvas := mergeConfidenceTask(t, r)
@@ -415,17 +470,22 @@ func TestRunMergeConfidenceReusesWorkspaceScopedAssessment(t *testing.T) {
 	automatic, err := ProcessPullRequestChecksStartRequest(t.Context(), IntakeDependencies{}, requests[0].ID)
 	require.NoError(t, err)
 	require.Len(t, automatic, 1)
+	runIDs := []string{automatic[0].RunID.String()}
+	eventIDs := []string{automatic[0].ID.String()}
 	for range 2 {
 		result, err := RunMergeConfidence(t.Context(), IntakeDependencies{}, r.Organization.ID.String(), RunMergeConfidenceRequest{FactoryID: factory.ID.String(), Task: order.ID.String()})
 		require.NoError(t, err)
 		require.Len(t, result.Runs, 1)
-		assert.Equal(t, "reused", result.Runs[0].Status)
-		assert.Equal(t, automatic[0].RunID.String(), result.Runs[0].RunID)
+		assert.Equal(t, "started", result.Runs[0].Status)
+		assert.NotContains(t, runIDs, result.Runs[0].RunID)
+		assert.NotContains(t, eventIDs, result.Runs[0].EventID)
+		runIDs = append(runIDs, result.Runs[0].RunID)
+		eventIDs = append(eventIDs, result.Runs[0].EventID)
 	}
-	assert.EqualValues(t, 1, countCanvasEvents(t, canvas.ID))
+	assert.EqualValues(t, 3, countCanvasEvents(t, canvas.ID))
 }
 
-func TestRunMergeConfidenceReusesWithoutNewRunnerAdmission(t *testing.T) {
+func TestRunMergeConfidenceRequiresNewRunnerAdmission(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 	factory, order, canvas := mergeConfidenceTask(t, r)
@@ -439,18 +499,27 @@ func TestRunMergeConfidenceReusesWithoutNewRunnerAdmission(t *testing.T) {
 	// Saved assessments remain readable when current settings cannot admit a new run.
 	subscription := true
 	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{CodexSubscription: &subscription}))
-	reused, err := RunMergeConfidence(t.Context(), IntakeDependencies{}, r.Organization.ID.String(), request)
-	require.NoError(t, err)
-	require.Len(t, reused.Runs, 1)
-	assert.Equal(t, "reused", reused.Runs[0].Status)
-	assert.Equal(t, first.Runs[0].RunID, reused.Runs[0].RunID)
-	current.Head.SHA = github.Ptr("another-head")
 	_, err = RunMergeConfidence(t.Context(), IntakeDependencies{}, r.Organization.ID.String(), request)
 	require.Error(t, err)
 	code, _, ok := grpcerrors.HandlerStatus(err)
 	require.True(t, ok)
 	assert.Equal(t, codes.FailedPrecondition, code)
 	assert.EqualValues(t, 1, countCanvasEvents(t, canvas.ID))
+	runs, err := canvas.ListRuns(db, 10)
+	require.NoError(t, err)
+	require.Len(t, runs, 1)
+	assert.Equal(t, first.Runs[0].RunID, runs[0].ID.String())
+	assert.Equal(t, models.CanvasRunStateFinished, runs[0].State)
+	assert.Equal(t, models.CanvasRunResultFailed, runs[0].Result)
+	prs, err := trackedPullRequests(db, order.ID)
+	require.NoError(t, err)
+	activities, err := models.ListPullRequestRuns(db, []uuid.UUID{prs[0].ID})
+	require.NoError(t, err)
+	assert.Len(t, activities[prs[0].ID], 1)
+	report, err := BuildTaskReport(t.Context(), factory.OrganizationID.String(), factory.ID.String(), order.ID.String(), models.TaskRunHistoryQuery{})
+	require.NoError(t, err)
+	require.Len(t, report.Runs.Runs, 1)
+	assert.Equal(t, runs[0].ID, report.Runs.Runs[0].ID)
 }
 
 func TestRunMergeConfidenceGitHubRetargets(t *testing.T) {
@@ -459,7 +528,7 @@ func TestRunMergeConfidenceGitHubRetargets(t *testing.T) {
 	current := checksStartupGitHubPullRequest()
 	useGitHub(t, current)
 	request := RunMergeConfidenceRequest{FactoryID: factory.ID.String(), Task: order.ID.String()}
-	var previous string
+	var runIDs, eventIDs []string
 	for i, branch := range []string{"main", "release", "main"} {
 		current.Base.Ref = github.Ptr(branch)
 		current.UpdatedAt = &github.Timestamp{Time: time.Now().Add(time.Duration(i) * time.Minute)}
@@ -467,24 +536,30 @@ func TestRunMergeConfidenceGitHubRetargets(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, result.Runs, 1)
 		assert.Equal(t, "started", result.Runs[0].Status)
-		assert.NotEqual(t, previous, result.Runs[0].RunID)
-		previous = result.Runs[0].RunID
-		reused, err := RunMergeConfidence(t.Context(), IntakeDependencies{}, r.Organization.ID.String(), request)
+		assert.NotContains(t, runIDs, result.Runs[0].RunID)
+		assert.NotContains(t, eventIDs, result.Runs[0].EventID)
+		runIDs = append(runIDs, result.Runs[0].RunID)
+		eventIDs = append(eventIDs, result.Runs[0].EventID)
+		repeated, err := RunMergeConfidence(t.Context(), IntakeDependencies{}, r.Organization.ID.String(), request)
 		require.NoError(t, err)
-		require.Len(t, reused.Runs, 1)
-		assert.Equal(t, "reused", reused.Runs[0].Status)
-		assert.Equal(t, previous, reused.Runs[0].RunID)
+		require.Len(t, repeated.Runs, 1)
+		assert.Equal(t, "started", repeated.Runs[0].Status)
+		assert.NotContains(t, runIDs, repeated.Runs[0].RunID)
+		assert.NotContains(t, eventIDs, repeated.Runs[0].EventID)
+		runIDs = append(runIDs, repeated.Runs[0].RunID)
+		eventIDs = append(eventIDs, repeated.Runs[0].EventID)
 	}
 	current.Base.Ref = github.Ptr("release")
 	current.UpdatedAt = &github.Timestamp{Time: time.Now().Add(-time.Minute)}
 	delayed, err := RunMergeConfidence(t.Context(), IntakeDependencies{}, r.Organization.ID.String(), request)
 	require.NoError(t, err)
 	require.Len(t, delayed.Runs, 1)
-	assert.Equal(t, "reused", delayed.Runs[0].Status)
-	assert.Equal(t, previous, delayed.Runs[0].RunID)
+	assert.Equal(t, "started", delayed.Runs[0].Status)
+	assert.NotContains(t, runIDs, delayed.Runs[0].RunID)
+	assert.NotContains(t, eventIDs, delayed.Runs[0].EventID)
 }
 
-func TestRunMergeConfidenceLinksUntrackedWebhookAssessment(t *testing.T) {
+func TestRunMergeConfidenceStartsAfterUntrackedWebhookAssessment(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 	factory, order, canvas := mergeConfidenceTask(t, r)
@@ -511,16 +586,22 @@ func TestRunMergeConfidenceLinksUntrackedWebhookAssessment(t *testing.T) {
 	result, err := RunMergeConfidence(t.Context(), IntakeDependencies{}, r.Organization.ID.String(), RunMergeConfidenceRequest{FactoryID: factory.ID.String(), Task: order.ID.String()})
 	require.NoError(t, err)
 	require.Len(t, result.Runs, 1)
-	assert.Equal(t, "reused", result.Runs[0].Status)
-	assert.Equal(t, event.RunID.String(), result.Runs[0].RunID)
+	assert.Equal(t, "started", result.Runs[0].Status)
+	assert.NotEqual(t, event.RunID.String(), result.Runs[0].RunID)
+	assert.NotEqual(t, event.ID.String(), result.Runs[0].EventID)
+	activity, err := models.FindPullRequestActivityByRunID(db, uuid.MustParse(result.Runs[0].RunID))
+	require.NoError(t, err)
+	assert.Equal(t, prs[0].ID, activity.PullRequestID)
+	_, err = models.FindPullRequestActivityByRunID(db, event.RunID)
+	require.ErrorIs(t, err, models.ErrFactoryPullRequestActivityNotFound)
 	report, err := BuildTaskReport(t.Context(), factory.OrganizationID.String(), factory.ID.String(), order.ID.String(), models.TaskRunHistoryQuery{})
 	require.NoError(t, err)
 	require.Len(t, report.Runs.Runs, 1)
-	assert.Equal(t, event.RunID, report.Runs.Runs[0].ID)
+	assert.Equal(t, result.Runs[0].RunID, report.Runs.Runs[0].ID.String())
 	persisted, err := models.FindCanvasEventForCanvas(db, canvas.ID, event.ID)
 	require.NoError(t, err)
 	persistedPayload, err := persisted.Data.MarshalJSON()
 	require.NoError(t, err)
 	assert.JSONEq(t, string(saved), string(persistedPayload))
-	assert.EqualValues(t, 1, countCanvasEvents(t, canvas.ID))
+	assert.EqualValues(t, 2, countCanvasEvents(t, canvas.ID))
 }
