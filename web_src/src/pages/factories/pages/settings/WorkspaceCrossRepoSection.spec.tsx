@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeAll, describe, expect, it, vi } from "bun:test";
 
 import { client } from "@/api-client/client.gen";
-import { FEATURE_FACTORY_MULTI_REPO_TASKS, FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
+import { FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
 
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
 import {
@@ -20,7 +20,7 @@ import { RepositoryPicker } from "../onboarding/onboardingSteps";
 import { AGENT_RESOURCES_COPY } from "./agentResourceCopy";
 
 const agentPath = `workspaces/${PRIMARY_FACTORY_KEY}/agent`;
-const agentPageFeatures = [FEATURE_WORKSPACE_SKILLS, FEATURE_FACTORY_MULTI_REPO_TASKS];
+const agentPageFeatures = [FEATURE_WORKSPACE_SKILLS];
 
 describe("cross-repo context picker", () => {
   beforeAll(() => {
@@ -286,30 +286,6 @@ describe("cross-repo context picker", () => {
     );
   }, 15000);
 
-  it("keeps the cross-repo context card without multi-repo tasks", async () => {
-    const user = userEvent.setup();
-    render(
-      <FactoriesHarness
-        pathSuffix={agentPath}
-        factoriesFixture={{
-          ...factoriesFixtureWithSetupAnswers(SETUP_ANSWERS.repository),
-          agentResourcesByFactoryId: {},
-        }}
-        orgIntegrations={CONNECTED_SETUP_INTEGRATIONS}
-        experimentalFeatures={[FEATURE_WORKSPACE_SKILLS]}
-      />,
-    );
-
-    await user.click(await screen.findByTestId("agent-cross-repo-add", {}, { timeout: 8000 }));
-    const picker = await screen.findByTestId("agent-cross-repo-picker", {}, { timeout: 8000 });
-    await user.click(await within(picker).findByRole("option", { name: /^acme\/web$/ }, { timeout: 8000 }));
-
-    const list = await screen.findByTestId("agent-cross-repo-list", {}, { timeout: 8000 });
-    expect(await within(list).findByText("acme/web", {}, { timeout: 8000 })).toBeInTheDocument();
-    expect(within(list).queryByText(new RegExp(AGENT_RESOURCES_COPY.accessWrite))).toBeNull();
-    expect(within(list).queryByTestId("agent-cross-repo-primary")).toBeNull();
-  }, 15000);
-
   it("lets a Bitbucket workspace give write access with multi-repo tasks", async () => {
     const user = userEvent.setup();
     render(
@@ -338,31 +314,6 @@ describe("cross-repo context picker", () => {
     expect(
       await within(list).findByText(`main · ${AGENT_RESOURCES_COPY.accessWrite}`, {}, { timeout: 8000 }),
     ).toBeInTheDocument();
-  }, 15000);
-
-  it("keeps the Bitbucket cross-repo context card without multi-repo tasks", async () => {
-    const user = userEvent.setup();
-    render(
-      <FactoriesHarness
-        pathSuffix={agentPath}
-        factoriesFixture={{
-          ...factoriesFixtureWithSetupAnswers({ ...SETUP_ANSWERS.repository, vcsProvider: "bitbucket" }),
-          agentResourcesByFactoryId: {},
-        }}
-        orgIntegrations={CONNECTED_SETUP_INTEGRATIONS}
-        experimentalFeatures={[FEATURE_WORKSPACE_SKILLS]}
-      />,
-    );
-
-    await user.click(await screen.findByTestId("agent-cross-repo-add", {}, { timeout: 8000 }));
-    const picker = await screen.findByTestId("agent-cross-repo-picker", {}, { timeout: 8000 });
-    expect(within(picker).queryByTestId("agent-cross-repo-new-list-access")).toBeNull();
-    await user.click(await within(picker).findByRole("option", { name: /^acme\/web$/ }, { timeout: 8000 }));
-
-    const list = await screen.findByTestId("agent-cross-repo-list", {}, { timeout: 8000 });
-    expect(await within(list).findByText("acme/web", {}, { timeout: 8000 })).toBeInTheDocument();
-    expect(within(list).queryByText(new RegExp(AGENT_RESOURCES_COPY.accessWrite))).toBeNull();
-    expect(within(list).queryByTestId("agent-cross-repo-primary")).toBeNull();
   }, 15000);
 
   it("hides the workspace repository when only the letter case differs", async () => {
