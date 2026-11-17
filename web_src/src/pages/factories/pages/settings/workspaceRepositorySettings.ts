@@ -7,6 +7,12 @@ export type WorkspaceRepositorySettings = {
   access: WorkspaceRepositoryAccess;
 };
 
+export function isWorkspaceMainRepository(name: string, appRepository: string | undefined): boolean {
+  const main = appRepository?.trim().toLowerCase() ?? "";
+  if (!main) return false;
+  return name.trim().toLowerCase() === main;
+}
+
 export function workspaceRepositoryAccess(access: string | null | undefined): WorkspaceRepositoryAccess {
   return access === "write" ? "write" : "read";
 }

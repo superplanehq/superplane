@@ -5,7 +5,6 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/superplanehq/superplane/pkg/features"
 	"gorm.io/gorm"
 )
 
@@ -21,24 +20,9 @@ func IsWorkspaceRepositoriesExpression(value string) bool {
 	return workspaceRepositoriesExpressionPattern.MatchString(strings.TrimSpace(value))
 }
 
-// MultiRepoTasksEnabled reports whether the organization of the workspace
-// lets agents change context repositories.
-func (f *Factory) MultiRepoTasksEnabled(tx *gorm.DB) (bool, error) {
-	organization, err := FindOrganizationByIDInTransaction(tx, f.OrganizationID.String())
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		// A deleted organization keeps the single-repository behavior.
-		return false, nil
-	}
-	if err != nil {
-		return false, err
-	}
-	return organization.HasExperimentalFeature(features.FeatureFactoryMultiRepoTasks), nil
-}
-
 // WorkspaceRepositories returns the owner/name values that the workspace may
-// change. The primary repository comes first. Workspaces with multi-repo
-// tasks add the enabled write-access context repositories of the workspace
-// provider; other workspaces keep one repository.
+// change. The primary repository comes first, followed by enabled write-access
+// context repositories of the workspace provider.
 func (f *Factory) WorkspaceRepositories(tx *gorm.DB) ([]string, error) {
 	config := f.OnboardingConfigValue()
 	repositories := []string{}
@@ -61,11 +45,6 @@ func (f *Factory) WorkspaceRepositories(tx *gorm.DB) ([]string, error) {
 	if provider != ProviderGitHub && provider != ProviderBitbucket {
 		return repositories, nil
 	}
-	multiRepo, err := f.MultiRepoTasksEnabled(tx)
-	if err != nil || !multiRepo {
-		return repositories, err
-	}
-
 	resources, err := f.ListEnabledContextRepos(tx)
 	if err != nil {
 		return nil, err

@@ -308,12 +308,9 @@ function pullRequestAssessmentFailed(checks: WorkOrderCheckPresentation[], pr: F
   });
 }
 
-// Without multi-repo tasks, the panel keeps one review link and one merge
-// confidence list.
 export function mergeConfidencePanelFacts(
   checks: WorkOrderCheckPresentation[],
   pullRequests: FactoriesFactoryPullRequest[],
-  multiRepo: boolean,
 ) {
   const assessment = consoleCheckList(checks, pullRequests);
   const currentChecks = assessment?.metrics ?? [];
@@ -322,12 +319,12 @@ export function mergeConfidencePanelFacts(
       .filter((pr) => pullRequestAssessmentFailed(checksForRepository(checks, pr.repository), pr))
       .map((pr) => pr.repository?.trim().toLowerCase() ?? ""),
   );
-  if (!multiRepo) {
-    // One task list reports the failure. Pull request rows do not repeat it.
+  // Historical pull requests can lack repository names. Keep their checks on the task.
+  if (pullRequests.length > 0 && pullRequests.every((pr) => !pr.repository?.trim())) {
     return {
       assessmentFailed: failedRepositories.size > 0,
       failedRepositories: new Set<string>(),
-      reviewPullRequests: [],
+      reviewPullRequests: pullRequests,
       mergeChecks: { byRepository: null, unattached: currentChecks },
       showsPullRequestRepository: false,
     };
