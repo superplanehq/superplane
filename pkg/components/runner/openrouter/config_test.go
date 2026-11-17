@@ -96,9 +96,12 @@ async function main() {
     for (const hasConfig of [false, true]) {
       const repo = path.join(root, hasConfig ? "v2-repo" : "plain-repo");
       const task = path.join(root, hasConfig ? "v2-task" : "plain-task");
+      const contextRepo = path.join(root, "context", "acme", "instabot");
       fs.mkdirSync(repo, { recursive: true });
       const git = spawnSync("git", ["init", "--quiet", repo]);
       assert.equal(git.status, 0);
+      fs.mkdirSync(path.join(contextRepo, ".git"), { recursive: true });
+      write(path.join(contextRepo, "README.md"), "Context repository content.");
       write(path.join(repo, "AGENTS.md"), "Repository instruction marker.");
       write(path.join(repo, "CLAUDE.md"), "Disabled Claude marker.");
       write(path.join(root, "AGENTS.md"), "Outside repository marker.");
@@ -118,14 +121,27 @@ async function main() {
         );
         readFile = path.join(cwd, "deep/file.txt");
         write(readFile, "Nested file content.");
+      } else {
+        readFile = path.join(contextRepo, "README.md");
       }
       write(path.join(task, "prompt_count"), "0\n");
+      write(path.join(task, "task_cwd"), root + "\n");
+      write(
+        path.join(task, "workspace_context.json"),
+        JSON.stringify({
+          repositories: [
+            { repository: "acme/app", directory: "context/acme/app" },
+            { repository: "acme/instabot", directory: "context/acme/instabot" },
+          ],
+        }),
+      );
       write(
         path.join(task, "prompt.txt"),
         "Return Plan complete. Do not use tools.",
       );
       const env = {
         ...baseEnv,
+        REPO: "acme/app",
         SUPERPLANE_TASK_DIR: task,
         SUPERPLANE_RESULT_FILE: path.join(task, "result.json"),
         SUPERPLANE_PLANNING_SESSION_ID: "synthetic-plan",
@@ -165,10 +181,12 @@ async function main() {
       assert.equal(config.permissions, undefined);
       assert.equal(config.agent.triaging, undefined);
       assert.equal(config.provider.unwanted, undefined);
+      assert.equal(config.references["acme-instabot"].path, contextRepo);
       const context = JSON.stringify(
         requests.filter((request) => request.tools?.length).at(-1).messages,
       );
       assert.match(context, /Repository instruction marker/);
+      assert.match(context, /Workspace repository acme\/instabot/);
       assert.match(context, /Instructions from: .*analysis_protocol.md/);
       assert.doesNotMatch(
         context,
@@ -177,6 +195,8 @@ async function main() {
       if (hasConfig) {
         assert.match(context, /Nested working directory marker/);
         assert.match(context, /Lazy nested instruction marker/);
+      } else {
+        assert.match(context, /Context repository content/);
       }
       const skills = cli(["debug", "skill"], childEnv, cwd);
       assert.equal(skills.status, 0, skills.stderr);
@@ -190,6 +210,7 @@ async function main() {
             cwd,
             planning: true,
             env: {
+              REPO: "acme/app",
               OPENROUTER_API_KEY: "synthetic-openrouter-key",
               OPENROUTER_BASE_URL: "https://models.example/v1",
             },
