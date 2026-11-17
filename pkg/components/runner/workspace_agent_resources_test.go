@@ -780,16 +780,7 @@ func TestAttachWorkspaceAgentResourcesBlocksPushToReadOnlyBitbucketRepositories(
 		return entries
 	}
 
-	t.Run("keeps push without multi-repo tasks", func(t *testing.T) {
-		entries := contextEntries(t)
-		assert.True(t, entries["acme/web"].ReadOnly)
-		assert.False(t, entries["acme/web"].PushBlocked)
-		assert.False(t, entries["acme/docs"].PushBlocked)
-	})
-
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryMultiRepoTasks))
-
-	t.Run("blocks push only for read-only repositories with multi-repo tasks", func(t *testing.T) {
+	t.Run("blocks push only for read-only repositories", func(t *testing.T) {
 		entries := contextEntries(t)
 		assert.False(t, entries["acme/web"].ReadOnly)
 		assert.False(t, entries["acme/web"].PushBlocked)

@@ -466,7 +466,7 @@ func Test__CreateFactoryAgentResourceCreatesContextRepo(t *testing.T) {
 	assert.Equal(t, "superplanehq/suss", response.GetResource().GetRepository())
 }
 
-func Test__ContextRepoWriteAccessNeedsMultiRepoTasks(t *testing.T) {
+func Test__ContextRepoWriteAccessByDefault(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
@@ -478,25 +478,18 @@ func Test__ContextRepoWriteAccessNeedsMultiRepoTasks(t *testing.T) {
 		})
 	}
 
-	_, err = create("acme/web")
-	code, _, ok := grpcerrors.HandlerStatus(err)
-	require.True(t, ok)
-	assert.Equal(t, codes.FailedPrecondition, code)
+	response, err := create("acme/web")
+	require.NoError(t, err)
+	assert.Equal(t, models.FactoryContextRepoAccessWrite, response.GetResource().GetAccess())
 
 	readOnly, err := factory.CreateAgentResource(db, models.FactoryAgentResourceKindContextRepo, "", true, models.FactoryAgentResourceConfig{Repository: "acme/docs"})
 	require.NoError(t, err)
 	write := models.FactoryContextRepoAccessWrite
-	_, err = UpdateFactoryAgentResource(t.Context(), IntakeDependencies{}, r.Organization.ID.String(), &pb.UpdateFactoryAgentResourceRequest{
+	updated, err := UpdateFactoryAgentResource(t.Context(), IntakeDependencies{}, r.Organization.ID.String(), &pb.UpdateFactoryAgentResourceRequest{
 		FactoryId: factory.ID.String(), ResourceId: readOnly.ID.String(), Access: &write,
 	})
-	code, _, ok = grpcerrors.HandlerStatus(err)
-	require.True(t, ok)
-	assert.Equal(t, codes.FailedPrecondition, code)
-
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryMultiRepoTasks))
-	response, err := create("acme/web")
 	require.NoError(t, err)
-	assert.Equal(t, models.FactoryContextRepoAccessWrite, response.GetResource().GetAccess())
+	assert.Equal(t, models.FactoryContextRepoAccessWrite, updated.GetResource().GetAccess())
 }
 
 func Test__BitbucketContextRepoWriteAccess(t *testing.T) {
@@ -529,13 +522,6 @@ func Test__BitbucketContextRepoWriteAccess(t *testing.T) {
 		assert.Equal(t, expected, code)
 	}
 
-	t.Run("rejects write access without multi-repo tasks", func(t *testing.T) {
-		httpCtx := stubBitbucket(t, bitbucketintegration.AuthTypeWorkspaceAccessToken)
-		_, err := create("acme/flag-off", models.FactoryContextRepoAccessWrite)
-		requireCode(t, err, codes.FailedPrecondition)
-		assert.Empty(t, httpCtx.Requests)
-	})
-
 	t.Run("keeps read access without a repository check", func(t *testing.T) {
 		httpCtx := stubBitbucket(t, bitbucketintegration.AuthTypeWorkspaceAccessToken)
 		response, err := create("other/docs", models.FactoryContextRepoAccessRead)
@@ -543,8 +529,6 @@ func Test__BitbucketContextRepoWriteAccess(t *testing.T) {
 		assert.Equal(t, models.FactoryContextRepoAccessRead, response.GetResource().GetAccess())
 		assert.Empty(t, httpCtx.Requests)
 	})
-
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryMultiRepoTasks))
 
 	t.Run("accepts write access to a repository the token reaches", func(t *testing.T) {
 		httpCtx := stubBitbucket(t, bitbucketintegration.AuthTypeWorkspaceAccessToken, okBitbucketResponse(`{"full_name": "acme/web"}`))

@@ -277,8 +277,6 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.FailedPrecondition(err, "Pull request merge is not enabled for this organization.")
 	case errors.Is(err, errWorkspaceSkillsDisabled):
 		return grpcerrors.FailedPrecondition(err, "Workspace skills are not enabled for this organization.")
-	case errors.Is(err, errMultiRepoTasksDisabled):
-		return grpcerrors.FailedPrecondition(err, "Multi-repo tasks are not enabled for this organization.")
 	case errors.Is(err, errSuperPlaneMCPServerDisabled):
 		return grpcerrors.FailedPrecondition(err, "MCP Server is not enabled for this organization.")
 	case errors.Is(err, models.ErrMCPOAuthRefreshNotFound):
@@ -317,7 +315,6 @@ var errListMCPTools = errors.New("could not list MCP tools")
 var errMCPConnectionChanged = errors.New("mcp connection changed before tool defaults were saved")
 var errFactoryPullRequestMergeDisabled = errors.New("pull request merge is not enabled")
 var errWorkspaceSkillsDisabled = errors.New("workspace skills are not enabled")
-var errMultiRepoTasksDisabled = errors.New("multi-repo tasks are not enabled")
 var errSuperPlaneMCPServerDisabled = errors.New("superplane MCP server is not enabled")
 var errCannotCloseBitbucketPullRequest = errors.New("cannot close a bitbucket pull request")
 var errCannotClosePullRequest = errors.New("could not close a previous pull request")

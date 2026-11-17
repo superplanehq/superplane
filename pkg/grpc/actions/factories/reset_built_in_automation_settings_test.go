@@ -82,8 +82,8 @@ func TestResetBuiltInAutomationPreservesImplementationSettings(t *testing.T) {
 }
 
 // setResetTestDraftPullRequests sets the "Create draft pull requests" setting.
-// Bitbucket holds it on the pull request node. GitHub holds it in the agent
-// environment.
+// Legacy templates hold it on the pull request node. Current templates hold
+// it in the agent environment.
 func setResetTestDraftPullRequests(t *testing.T, doc *yaml.Canvas, draft bool) {
 	t.Helper()
 	for i := range doc.Spec.Nodes {
@@ -112,13 +112,10 @@ func resetTestDraftPullRequests(t *testing.T, nodes []models.Node) bool {
 func resetTestTemplate(t *testing.T, r *support.ResourceRegistry, factory *models.Factory, templateID, provider string, configure func(*yaml.Canvas)) *models.Canvas {
 	t.Helper()
 	canvas := support.CreateFactoryCanvas(t, r, factory.ID, templateID)
-	multiRepo, err := factory.MultiRepoTasksEnabled(database.DB(t.Context()))
-	require.NoError(t, err)
 	result, err := materializeFactoryTemplate(templateID, provider, factoryTemplateInput{
 		appID: canvas.ID.String(), appName: canvas.Name,
 		installParams: map[string]string{"appRepository": "acme/app", "defaultBranch": "main"},
 		agent:         &factoryTemplateAgent{component: models.SuperPlaneRunnerComponent, credentialSource: "hosted"},
-		multiRepo:     multiRepo,
 	})
 	require.NoError(t, err)
 	doc, err := yaml.CanvasFromYAML([]byte(result.canvasYAML))
@@ -941,7 +938,7 @@ func TestResetUsesTemplateDefaultsForMissingSettings(t *testing.T) {
 		agent := findYAMLNode(t, doc, implementationAgentNodeID)
 		delete(agent.Configuration, "executionTimeoutSeconds")
 		agent.Concurrency = nil
-		delete(findYAMLNode(t, doc, "create-pr").Configuration, "draft")
+		delete(factoryEnvironmentEntry(agent.Configuration, factoryDraftPullRequestsEnv), "value")
 	})
 	require.NoError(t, resetTestOrganization(t, r))
 	version := resetTestLiveVersion(t, canvas)
@@ -953,29 +950,74 @@ func TestResetUsesTemplateDefaultsForMissingSettings(t *testing.T) {
 	assert.False(t, resetTestDraftPullRequests(t, version.Nodes))
 }
 
-func TestResetFollowsMultiRepoTasksForTheImplementationTemplate(t *testing.T) {
+func TestResetMigratesLegacyImplementationTemplates(t *testing.T) {
+	// Only the saved settings and retired pull request node matter to reset.
+	const legacyImplementation = `apiVersion: v1
+kind: Canvas
+metadata:
+  name: Implement
+spec:
+  edges:
+    - sourceId: onrun-implement
+      targetId: implementation-agent-no-issue
+      channel: default
+    - sourceId: implementation-agent-no-issue
+      targetId: create-pr
+      channel: passed
+  nodes:
+    - id: onrun-implement
+      name: Start Implementation
+      type: TYPE_TRIGGER
+      component: onRun
+      configuration: {}
+    - id: implementation-agent-no-issue
+      name: Implement From Task Description
+      type: TYPE_ACTION
+      component: runnerSuperPlane
+      configuration:
+        model: claude-opus-5-5
+        machineType: e1-large-amd64
+        steps:
+          - name: Implementation
+            type: prompt
+            prompt: Retired implementation prompt
+    - id: create-pr
+      name: Create Pull Request
+      type: TYPE_ACTION
+      component: github.createPullRequest
+      configuration:
+        repository: "{{ task().repository }}"
+        base: "{{ task().default_branch }}"
+        head: task-branch
+        title: Implement task
+        draft: true
+`
 	for _, provider := range []string{models.ProviderGitHub, models.ProviderBitbucket} {
 		t.Run(provider, func(t *testing.T) {
 			r, factory := resetTestFactory(t)
-			canvas := resetTestTemplate(t, r, factory, "line-implementation", provider, func(doc *yaml.Canvas) {
-				setResetTestDraftPullRequests(t, doc, true)
-			})
+			canvas := support.CreateFactoryCanvas(t, r, factory.ID, "Implement")
+			doc, err := yaml.CanvasFromYAML([]byte(legacyImplementation))
+			require.NoError(t, err)
+			findYAMLNode(t, doc, "onrun-implement").Metadata = models.FactoryAppTemplateMetadataFor(lineImplementationTemplateID, 1, provider)
+			findYAMLNode(t, doc, "create-pr").Component = provider + ".createPullRequest"
+			agent := findYAMLNode(t, doc, implementationAgentNodeID)
+			rewriteFactoryAgent(agent, &factoryTemplateAgent{component: models.SuperPlaneRunnerComponent, credentialSource: "hosted"})
+			agent.Configuration["additionalInstructions"] = "Keep public APIs compatible."
+			agent.Configuration["thinkingLevel"] = "low"
+			setResetTestDraftPullRequests(t, doc, true)
+			resetTestPublishCanvas(t, r, canvas, doc)
 			hasPullRequestNode := func(nodes []models.Node) bool {
 				return slices.ContainsFunc(nodes, func(node models.Node) bool { return isFactoryPullRequestComponent(node.ComponentName()) })
 			}
 
-			require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryMultiRepoTasks))
 			require.NoError(t, resetTestOrganization(t, r))
 			current := resetTestLiveVersion(t, canvas)
 			assert.False(t, hasPullRequestNode(current.Nodes), "multi-repo agents open their own pull requests")
 			assert.True(t, resetTestDraftPullRequests(t, current.Nodes))
-
-			require.NoError(t, models.DisableExperimentalFeature(r.Organization.ID, features.FeatureFactoryMultiRepoTasks))
-			require.NoError(t, resetTestOrganization(t, r))
-			current = resetTestLiveVersion(t, canvas)
-			assert.True(t, hasPullRequestNode(current.Nodes))
-			assert.Nil(t, factoryEnvironmentEntry(findIntakeNode(current.Nodes, implementationAgentNodeID).Configuration, factoryDraftPullRequestsEnv))
-			assert.True(t, resetTestDraftPullRequests(t, current.Nodes))
+			publishedAgent := findIntakeNode(current.Nodes, implementationAgentNodeID)
+			assert.Equal(t, "Keep public APIs compatible.", publishedAgent.Configuration["additionalInstructions"])
+			assert.Equal(t, "low", publishedAgent.Configuration["thinkingLevel"])
+			assert.NotContains(t, liveCanvasJSON(t, canvas), "Retired implementation prompt")
 		})
 	}
 }
