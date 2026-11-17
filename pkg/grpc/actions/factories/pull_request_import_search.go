@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/google/go-github/v84/github"
 	"github.com/google/uuid"
@@ -118,7 +119,11 @@ func searchPullRequestImportItems(ctx context.Context, db *gorm.DB, deps IntakeD
 	}
 	// Quoting prevents user text from adding repository or state qualifiers.
 	escaped := strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(query)
-	results, _, err := search.SearchIssues(ctx, fmt.Sprintf(`repo:%s is:pr is:open in:title "%s"`, repository, escaped), &github.SearchOptions{Sort: "created", Order: "desc", ListOptions: github.ListOptions{PerPage: limit}})
+	searchQuery := fmt.Sprintf(`repo:%s is:pr is:open in:title "%s"`, repository, escaped)
+	if utf8.RuneCountInString(searchQuery) > 256 {
+		return nil, invalidArgument("This search is too long. Shorten the search or enter a pull request URL.")
+	}
+	results, _, err := search.SearchIssues(ctx, searchQuery, &github.SearchOptions{Sort: "created", Order: "desc", ListOptions: github.ListOptions{PerPage: limit}})
 	if err != nil {
 		return nil, err
 	}
