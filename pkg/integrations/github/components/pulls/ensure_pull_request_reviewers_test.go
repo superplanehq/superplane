@@ -197,7 +197,12 @@ func TestManagedReviewersRetryPartialGitHubFailures(t *testing.T) {
 			} else {
 				require.Equal(t, []ReviewerIdentity{second}, host.pending)
 			}
-			require.NoError(t, (&EnsurePullRequestReviewers{}).Execute(reviewerExecution(store, host)))
+			err := (&EnsurePullRequestReviewers{}).Execute(reviewerExecution(store, host))
+			if failure == "withdraw failed" {
+				require.ErrorContains(t, err, "uncertain withdrawal")
+			} else {
+				require.NoError(t, err)
+			}
 			if failure == "withdraw failed" {
 				require.Equal(t, []ReviewerIdentity{first}, host.pending)
 			} else {
@@ -287,7 +292,7 @@ func TestManagedReviewersPreserveRequestsAfterUncertainWithdrawal(t *testing.T) 
 			// A person re-requests the reviewer after GitHub applied the DELETE.
 			host.pending = []ReviewerIdentity{first}
 			host.failRemove = false
-			require.NoError(t, (&EnsurePullRequestReviewers{}).Execute(reviewerExecution(store, host)))
+			require.ErrorContains(t, (&EnsurePullRequestReviewers{}).Execute(reviewerExecution(store, host)), "uncertain withdrawal")
 			require.Equal(t, []ReviewerIdentity{first}, host.pending)
 			require.Equal(t, []string{"POST first", "DELETE first"}, host.mutations)
 		})
@@ -385,4 +390,23 @@ func TestManagedReviewersRetrySharedLeaseContention(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestManagedReviewersRecoverWithdrawalExplanation(t *testing.T) {
+	store := newReviewerPublications()
+	host := &reviewerHost{}
+	first := ReviewerIdentity{ID: 2, Login: "first"}
+	require.NoError(t, (&EnsurePullRequestReviewers{}).Execute(reviewerExecution(store, host, first)))
+	host.failRemove, host.appliedError = true, true
+	require.Error(t, (&EnsurePullRequestReviewers{}).Execute(reviewerExecution(store, host)))
+	host.failRemove = false
+	for range 2 {
+		ctx := reviewerExecution(store, host)
+		require.NoError(t, (&EnsurePullRequestReviewers{}).Execute(ctx))
+		outcome := ctx.ExecutionState.(*contexts.ExecutionStateContext).Payloads[0].(map[string]any)["data"].(ensureReviewersOutcome)
+		require.Equal(t, []ReviewerIdentity{first}, outcome.Removed)
+		require.Len(t, outcome.Withdrawals, 1)
+		require.Equal(t, "abc", outcome.Withdrawals[0].AssessedSHA)
+	}
+	require.Equal(t, []string{"POST first", "DELETE first"}, host.mutations)
 }
