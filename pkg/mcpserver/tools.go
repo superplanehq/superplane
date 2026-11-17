@@ -88,7 +88,7 @@ func Tools() []Tool {
 		},
 		{
 			Name:        "run_merge_confidence",
-			Description: "Assess tracked open pull requests for an existing task in Verify with its saved Merge confidence settings. Reuse existing assessments for the current revision, including failed assessments. The tool returns immediately without waiting for completion. Call get_task_report to follow run status.",
+			Description: "Assess tracked open pull requests for an existing task in Verify with its saved Merge confidence settings. Every call starts new assessments, even when the current revision already has an assessment. The tool returns immediately without waiting for completion. Call get_task_report to follow run status.",
 			InputSchema: map[string]any{
 				"type":       "object",
 				"properties": map[string]any{"task": map[string]any{"type": "string", "description": "Task id, number, or key."}},
