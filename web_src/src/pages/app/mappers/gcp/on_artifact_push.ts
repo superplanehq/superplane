@@ -6,6 +6,7 @@ import { renderTimeAgo } from "@/components/TimeAgo";
 import type { MetadataItem } from "@/ui/metadataList";
 import gcpArtifactRegistryIcon from "@/assets/icons/integrations/gcp.artifactregistry.svg";
 import type { ArtifactPushData } from "./artifact_registry";
+import { shortArtifactRef } from "./artifact_reference";
 
 type OnArtifactPushConfiguration = {
   location?: string;
@@ -87,62 +88,6 @@ function buildConfigurationMetadata(configuration?: OnArtifactPushConfiguration)
     { icon: "map-pin", label: configuration?.location || "All locations" },
     { icon: "folder", label: configuration?.repository || "All repositories" },
   ];
-}
-
-function shortArtifactRef(uri?: string): string | undefined {
-  if (!uri) {
-    return undefined;
-  }
-
-  let normalized = uri.trim();
-  normalized = normalized.replace(/^https?:\/\//, "");
-
-  const slashIndex = normalized.indexOf("/");
-  if (slashIndex < 0 || slashIndex === normalized.length - 1) {
-    return undefined;
-  }
-
-  const path = normalized.slice(slashIndex + 1);
-  const pathParts = path.split("/");
-  if (pathParts.length < 3) {
-    return path;
-  }
-
-  const imageWithRef = pathParts.slice(2).join("/");
-  let imagePath = imageWithRef;
-  let ref = "";
-  let refSeparator = "";
-
-  const atIndex = imageWithRef.indexOf("@");
-  if (atIndex >= 0) {
-    imagePath = imageWithRef.slice(0, atIndex);
-    ref = imageWithRef.slice(atIndex + 1);
-    refSeparator = "@";
-  } else {
-    const lastSlash = imageWithRef.lastIndexOf("/");
-    const lastColon = imageWithRef.lastIndexOf(":");
-    if (lastColon > lastSlash) {
-      imagePath = imageWithRef.slice(0, lastColon);
-      ref = imageWithRef.slice(lastColon + 1);
-      refSeparator = ":";
-    }
-  }
-
-  const imageName = imagePath.split("/").pop() || imagePath;
-  if (!ref) {
-    return imageName || path;
-  }
-
-  if (refSeparator === "@" && ref.startsWith("sha256:")) {
-    const digest = ref.slice("sha256:".length);
-    return `${imageName}@${digest.slice(0, 8)}`;
-  }
-
-  if (ref.length > 12) {
-    ref = `${ref.slice(0, 12)}...`;
-  }
-
-  return `${imageName}${refSeparator}${ref}`;
 }
 
 function formatPushAction(action: string): string {
