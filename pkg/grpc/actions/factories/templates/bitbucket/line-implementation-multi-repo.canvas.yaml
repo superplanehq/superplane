@@ -85,9 +85,8 @@ spec:
               Pull request title and description:
 
               1/ Follow the conventions of each repository for the title, description, language, writing style, and formatting. Discover and use the applicable pull request template. Apply the writing guidance below within these requirements.
-              2/ If the repository has no title convention, write a short, descriptive title. Do not require a Conventional Commits prefix.
-              3/ When the task changes more than one repository, name the related pull requests in each description.
-              4/ Do not add closing keywords (Closes, Fixes, Resolves) or the task link. SuperPlane adds the task link.
+              2/ When the task changes more than one repository, name the related pull requests in each description.
+              3/ Do not add closing keywords (Closes, Fixes, Resolves) or the task link. SuperPlane adds the task link.
 
               Write for the reviewer:
 
