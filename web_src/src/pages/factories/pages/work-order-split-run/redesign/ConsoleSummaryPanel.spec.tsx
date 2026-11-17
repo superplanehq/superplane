@@ -200,7 +200,7 @@ describe("ConsoleSummaryPanel merge confidence per pull request", () => {
     return row;
   }
 
-  it("shows the checks of each repository under its pull request", () => {
+  it("starts merge confidence collapsed and toggles each repository independently", () => {
     renderWith(
       [
         { ...check("risk-review", 4), id: "payments-risk", repository: "acme/payments", level: "LEVEL_CRITICAL" },
@@ -212,11 +212,22 @@ describe("ConsoleSummaryPanel merge confidence per pull request", () => {
     expect(screen.queryByTestId("redesign-console-checks")).not.toBeInTheDocument();
     const payments = confidenceFor("acme/payments");
     const docs = confidenceFor("acme/docs");
-    // The critical check opens its pull request. The passing one stays one line.
-    expect(within(payments).getByRole("button", { name: "Merge confidence" })).toHaveAttribute("aria-expanded", "true");
+    const paymentsToggle = within(payments).getByRole("button", { name: "Merge confidence" });
+    const docsToggle = within(docs).getByRole("button", { name: "Merge confidence" });
+    expect(paymentsToggle).toHaveAttribute("aria-expanded", "false");
+    expect(docsToggle).toHaveAttribute("aria-expanded", "false");
+    expect(paymentsToggle).toHaveAccessibleDescription(/1 check needs review/);
+    expect(within(payments).queryByTestId("split-run-check-payments-risk")).not.toBeInTheDocument();
+
+    fireEvent.click(paymentsToggle);
+    expect(paymentsToggle).toHaveAttribute("aria-expanded", "true");
     expect(within(payments).getByTestId("split-run-check-payments-risk")).toBeInTheDocument();
     expect(within(payments).queryByTestId("split-run-check-docs-risk")).not.toBeInTheDocument();
-    expect(within(docs).getByRole("button", { name: "Merge confidence" })).toHaveAttribute("aria-expanded", "false");
+    expect(docsToggle).toHaveAttribute("aria-expanded", "false");
+
+    fireEvent.click(paymentsToggle);
+    expect(paymentsToggle).toHaveAttribute("aria-expanded", "false");
+    expect(within(payments).queryByTestId("split-run-check-payments-risk")).not.toBeInTheDocument();
   });
 
   it("keeps current assessments separate when repositories share an automation", () => {

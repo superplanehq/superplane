@@ -64,10 +64,7 @@ export function ConsoleCheckRows({
   );
 }
 
-/**
- * Merge confidence of one pull request, under its title. It opens by itself
- * when a check needs review, so passing pull requests stay one line.
- */
+/** Merge confidence of one pull request, collapsed until the user opens it. */
 export function PullRequestConfidence({
   repository,
   className,
@@ -77,7 +74,7 @@ export function PullRequestConfidence({
 }) {
   const checks = usePullRequestMergeChecks(repository);
   const assessmentFailed = useContext(PullRequestAssessmentFailuresContext).has(pullRequestChecksKey(repository));
-  const [toggled, setToggled] = useState<boolean | null>(null);
+  const [open, setOpen] = useState(false);
   const summaryId = useId();
   if (checks.length === 0) {
     return assessmentFailed ? (
@@ -92,7 +89,6 @@ export function PullRequestConfidence({
     ) : null;
   }
   const attention = needsReview(checks);
-  const open = toggled ?? attention;
   return (
     <div
       className={cn("min-w-0", className)}
@@ -105,7 +101,7 @@ export function PullRequestConfidence({
         aria-expanded={open}
         aria-label={MERGE_CONFIDENCE_SCORE_NAME}
         aria-describedby={summaryId}
-        onClick={() => setToggled(!open)}
+        onClick={() => setOpen((current) => !current)}
         className="h-auto w-full min-w-0 justify-start gap-2 rounded-md p-0 text-left font-normal hover:bg-transparent dark:hover:bg-transparent"
       >
         <CheckStatusBars checks={checks} className="shrink-0" />
