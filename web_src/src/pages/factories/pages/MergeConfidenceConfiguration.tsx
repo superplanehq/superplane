@@ -96,7 +96,7 @@ function MergeConfidenceConfigurationView({
           ) : null}
           <Button
             type="button"
-            disabled={saving || draft.durationInvalid || missingDestination}
+            disabled={saving || settings.checkingPRCheck || draft.durationInvalid || missingDestination}
             onClick={() => void settings.save(onSave, onClose)}
             data-testid="merge-confidence-settings-save"
           >

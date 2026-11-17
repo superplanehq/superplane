@@ -68,6 +68,7 @@ func TestMergeConfidenceCanvasAssessmentStatus(t *testing.T) {
 				configuration, err := builder.Build(findYAMLNode(t, doc, id).Configuration)
 				require.NoError(t, err)
 				delete(configuration, "activationNodeId")
+				configuration["enabled"] = true
 				return configuration
 			}
 			installation, err := models.CreateIntegration(uuid.New(), f.canvas.OrganizationID, "github", "github", nil)
