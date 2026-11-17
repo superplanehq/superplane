@@ -1,30 +1,14 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, mock } from "bun:test";
+import { describe, expect, it } from "bun:test";
 import type { ReactNode } from "react";
 
 import type { FactoriesFactoryPullRequest, FactoriesWorkOrderCheck } from "@/api-client";
-import { FEATURE_FACTORY_MULTI_REPO_TASKS } from "@/lib/experimentalFeatures";
 
 import { OPEN_WORK_ORDER } from "../../../__fixtures__/factoryPageResponses";
 import { splitRunFixtureForWorkOrder } from "../splitRunMocks";
 import { outcomeSummary } from "./automationsViewModel";
 import { ConsoleSummaryPanel } from "./ConsoleSummaryPanel";
-
-const multiRepoTasks = { enabled: true };
-
-mock.module("@/hooks/useExperimentalFeature", () => ({
-  useExperimentalFeature: () => ({
-    has: (id: string) => id === FEATURE_FACTORY_MULTI_REPO_TASKS && multiRepoTasks.enabled,
-    enabledExperimentalFeatures: [],
-    isLoading: false,
-    organizationReady: true,
-  }),
-}));
-
-beforeEach(() => {
-  multiRepoTasks.enabled = true;
-});
 
 const pullRequest: FactoriesFactoryPullRequest = {
   id: "pr-482",
@@ -46,25 +30,21 @@ function renderPanel(checks: FactoriesWorkOrderCheck[], pr = pullRequest) {
 }
 
 describe("ConsoleSummaryPanel empty assessments", () => {
-  for (const multiRepo of [false, true]) {
-    it(`shows failure without scores with multi-repo ${multiRepo}`, () => {
-      multiRepoTasks.enabled = multiRepo;
-      renderPanel([], {
-        ...pullRequest,
-        currentRevision: { id: "current-revision" },
-        activities: [
-          {
-            title: "Merge confidence",
-            revision: { id: "current-revision" },
-            run: { id: "failed-run", canvasId: "merge-app", result: "RESULT_FAILED" },
-          },
-        ],
-      });
-      expect(screen.getByText(/Assessment failed/)).toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: "Merge confidence" })).not.toBeInTheDocument();
+  it("shows failure without scores", () => {
+    renderPanel([], {
+      ...pullRequest,
+      currentRevision: { id: "current-revision" },
+      activities: [
+        {
+          title: "Merge confidence",
+          revision: { id: "current-revision" },
+          run: { id: "failed-run", canvasId: "merge-app", result: "RESULT_FAILED" },
+        },
+      ],
     });
-  }
-
+    expect(screen.getByText(/Assessment failed/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Merge confidence" })).not.toBeInTheDocument();
+  });
   for (const scenario of ["stale revision", "newer assessment", "unrelated automation"]) {
     it(`does not show an empty failure for ${scenario}`, () => {
       renderPanel([], {
@@ -220,7 +200,7 @@ describe("ConsoleSummaryPanel merge confidence per pull request", () => {
     return row;
   }
 
-  it("shows the checks of each repository under its pull request", () => {
+  it("starts merge confidence collapsed and toggles each repository independently", () => {
     renderWith(
       [
         { ...check("risk-review", 4), id: "payments-risk", repository: "acme/payments", level: "LEVEL_CRITICAL" },
@@ -232,11 +212,22 @@ describe("ConsoleSummaryPanel merge confidence per pull request", () => {
     expect(screen.queryByTestId("redesign-console-checks")).not.toBeInTheDocument();
     const payments = confidenceFor("acme/payments");
     const docs = confidenceFor("acme/docs");
-    // The critical check opens its pull request. The passing one stays one line.
-    expect(within(payments).getByRole("button", { name: "Merge confidence" })).toHaveAttribute("aria-expanded", "true");
+    const paymentsToggle = within(payments).getByRole("button", { name: "Merge confidence" });
+    const docsToggle = within(docs).getByRole("button", { name: "Merge confidence" });
+    expect(paymentsToggle).toHaveAttribute("aria-expanded", "false");
+    expect(docsToggle).toHaveAttribute("aria-expanded", "false");
+    expect(paymentsToggle).toHaveAccessibleDescription(/1 check needs review/);
+    expect(within(payments).queryByTestId("split-run-check-payments-risk")).not.toBeInTheDocument();
+
+    fireEvent.click(paymentsToggle);
+    expect(paymentsToggle).toHaveAttribute("aria-expanded", "true");
     expect(within(payments).getByTestId("split-run-check-payments-risk")).toBeInTheDocument();
     expect(within(payments).queryByTestId("split-run-check-docs-risk")).not.toBeInTheDocument();
-    expect(within(docs).getByRole("button", { name: "Merge confidence" })).toHaveAttribute("aria-expanded", "false");
+    expect(docsToggle).toHaveAttribute("aria-expanded", "false");
+
+    fireEvent.click(paymentsToggle);
+    expect(paymentsToggle).toHaveAttribute("aria-expanded", "false");
+    expect(within(payments).queryByTestId("split-run-check-payments-risk")).not.toBeInTheDocument();
   });
 
   it("keeps current assessments separate when repositories share an automation", () => {
@@ -345,25 +336,17 @@ describe("ConsoleSummaryPanel merge confidence per pull request", () => {
   });
 
   it("puts the checks of the only pull request under it", () => {
-    renderWith([check("risk-review", 1), check("security-review", 5)], [pullRequest]);
+    renderWith(
+      [check("risk-review", 1), check("security-review", 5)],
+      [{ ...pullRequest, repository: "acme/payments" }],
+    );
 
     expect(screen.queryByTestId("redesign-console-checks")).not.toBeInTheDocument();
     expect(screen.getAllByTestId("redesign-console-pull-request-checks")).toHaveLength(1);
   });
-
-  it("keeps the merge confidence list apart without multi-repo tasks", () => {
-    multiRepoTasks.enabled = false;
-    renderWith([check("risk-review", 1), check("security-review", 5)], [pullRequest]);
-
-    expect(screen.getByTestId("redesign-console-checks")).toBeInTheDocument();
-    expect(screen.queryByTestId("redesign-console-pull-request-checks")).not.toBeInTheDocument();
-  });
 });
 
 describe("ConsoleSummaryPanel merge confidence", () => {
-  beforeEach(() => {
-    multiRepoTasks.enabled = false;
-  });
   it("does not reuse scores from an older run of the same revision", async () => {
     const user = userEvent.setup();
     renderPanel(
@@ -458,7 +441,6 @@ describe("ConsoleSummaryPanel merge confidence", () => {
   });
 
   it("shows assessment failure when the first run fails before it reports a score", () => {
-    multiRepoTasks.enabled = false;
     renderPanel([], {
       ...pullRequest,
       activities: [
@@ -466,11 +448,10 @@ describe("ConsoleSummaryPanel merge confidence", () => {
       ],
     });
 
-    expect(within(screen.getByTestId("redesign-console-checks")).getByText("Assessment failed")).toBeInTheDocument();
+    expect(screen.getByText("Assessment failed")).toBeInTheDocument();
   });
 
   it("does not show a failure from another automation when no score exists", () => {
-    multiRepoTasks.enabled = false;
     renderPanel([], {
       ...pullRequest,
       activities: [

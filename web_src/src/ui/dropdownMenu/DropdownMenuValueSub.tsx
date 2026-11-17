@@ -14,6 +14,7 @@ const SUB_TRIGGER_CLASSNAME = `${MENU_ITEM_CLASSNAME} py-1 [&_svg]:size-3.5 [&>s
 export function DropdownMenuValueSub({
   label,
   value,
+  displayedValue,
   options,
   onValueChange,
   testId,
@@ -21,21 +22,24 @@ export function DropdownMenuValueSub({
 }: {
   label: string;
   value: string;
+  displayedValue?: string;
   options: Array<{ value: string; label: string; testId?: string }>;
   onValueChange: (next: string) => void;
   testId?: string;
   disabled?: boolean;
 }) {
-  const currentLabel = options.find((option) => option.value === value)?.label ?? value;
+  const currentLabel = displayedValue ?? options.find((option) => option.value === value)?.label ?? value;
 
   return (
     <DropdownMenuSub>
       <DropdownMenuSubTrigger className={SUB_TRIGGER_CLASSNAME} data-testid={testId} disabled={disabled}>
         {label}
-        <span className="ml-auto text-[11px] text-muted-foreground">{currentLabel}</span>
+        <span className="ml-auto min-w-0 truncate text-[11px] text-muted-foreground" title={currentLabel}>
+          {currentLabel}
+        </span>
       </DropdownMenuSubTrigger>
       <DropdownMenuPortal>
-        <DropdownMenuSubContent className="max-h-[var(--radix-dropdown-menu-content-available-height)] overflow-x-hidden overflow-y-auto">
+        <DropdownMenuSubContent className="max-w-[calc(100vw-1rem)] max-h-[var(--radix-dropdown-menu-content-available-height)] overflow-x-hidden overflow-y-auto">
           {options.map((option) => (
             <DropdownMenuItem
               key={option.value || option.label}
@@ -46,7 +50,7 @@ export function DropdownMenuValueSub({
                 onValueChange(option.value);
               }}
             >
-              <span className="flex-1">{option.label}</span>
+              <span className="min-w-0 flex-1 break-words">{option.label}</span>
               {value === option.value ? <Check className="size-3.5" aria-hidden /> : null}
             </DropdownMenuItem>
           ))}

@@ -1,5 +1,10 @@
 import type { FactoriesWorkOrder } from "@/api-client";
 import { useRef, useState } from "react";
+import {
+  useColumnAutomationCollapsePreference,
+  type ColumnAutomationDisclosureState,
+} from "@/hooks/useColumnAutomationCollapsePreference";
+import { ColumnAutomationToggle } from "./ColumnAutomationDisclosure";
 import { useNavigate } from "react-router";
 import { useAutoLoadMoreOnScroll } from "@/hooks/useAutoLoadMoreOnScroll";
 import { usePermissions } from "@/contexts/usePermissions";
@@ -59,7 +64,7 @@ export type BacklogColumnProps = {
   onAddIntake?: () => void;
   /** Column automations for the header icons. Hidden when unset. */
   automations?: ColumnAutomation[];
-  /** Rows the automation subheader reserves. Shared across the board. Hidden when unset. */
+  /** Rows the automation subheader reserves. Hidden when unset. */
   automationRowCount?: number;
   onAutomationRowAction?: (automation: ColumnAutomation, action: ColumnAutomationRowAction) => void;
   paging?: {
@@ -110,6 +115,10 @@ export function BacklogColumn({
   cardsPending = false,
 }: BacklogColumnProps) {
   const lane = lineBoardColumnLaneProps(colorId, colorView, { mutedFallback: true });
+  const disclosure = useColumnAutomationCollapsePreference(
+    JSON.stringify([organizationId, factoryId, lineId, "backlog"]),
+    automations?.length ?? 0,
+  );
   const atCapacity = size != null && orders.length >= size;
   const canAdd = canCreateWorkOrder && !atCapacity;
   const createMenu = useBacklogCreateMenu(organizationId, factoryId, onOpenWorkOrder);
@@ -118,6 +127,7 @@ export function BacklogColumn({
   const scheduleRun = useBacklogScheduleRun(organizationId, factoryId, factoryKey, lineId);
   const intakesQuery = useFactoryIntakes(organizationId, factoryId);
   const refreshBacklog = useRefreshBacklog(organizationId, factoryId);
+  const onRefreshBacklog = () => void runBacklogRefresh(refreshBacklog.mutateAsync);
   const createPopover = backlogCreatePopoverProps({
     canAdd,
     atCapacity,
@@ -146,22 +156,19 @@ export function BacklogColumn({
             createPopover={createPopover}
             automations={automations}
             automationRowCount={automationRowCount}
+            disclosure={disclosure}
             onAutomationRowAction={onAutomationRowAction}
             onOpenSettings={onOpenSettings}
             onAddIntake={onAddIntake}
-            onRefreshBacklog={
-              canRefreshBacklog(intakesQuery.data, canUpdateWorkOrders)
-                ? () => {
-                    void runBacklogRefresh(refreshBacklog.mutateAsync);
-                  }
-                : undefined
-            }
+            onRefreshBacklog={canRefreshBacklog(intakesQuery.data, canUpdateWorkOrders) ? onRefreshBacklog : undefined}
             refreshBacklogPending={refreshBacklog.isPending}
             colorId={colorId}
             onColorChange={onColorChange}
           />
         }
+        subheaderOwnSpacing
         subheader={columnAutomationRowsSubheader({
+          disclosure,
           title,
           automations,
           rowCount: automationRowCount,
@@ -238,6 +245,7 @@ function BacklogColumnHeaderActions({
   createPopover,
   automations,
   automationRowCount,
+  disclosure,
   onAutomationRowAction,
   onOpenSettings,
   onAddIntake,
@@ -257,11 +265,15 @@ function BacklogColumnHeaderActions({
   | "onColorChange"
 > & {
   createPopover: BacklogCreatePopoverProps;
+  disclosure: ColumnAutomationDisclosureState;
   onRefreshBacklog?: () => void;
   refreshBacklogPending?: boolean;
 }) {
   return (
     <div className="flex shrink-0 items-center gap-0.5">
+      {automationRowCount && automations?.length ? (
+        <ColumnAutomationToggle title={title} disclosure={disclosure} />
+      ) : null}
       {automationRowCount ? null : (
         <ColumnAutomationsHeaderSlot
           title={title}

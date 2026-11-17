@@ -160,6 +160,80 @@ func TestBuildOpenCodeConfigWritesAnalysisInstructions(t *testing.T) {
 	require.Equal(t, []any{"/task/analysis_protocol.md"}, instructions)
 }
 
+func TestBuildOpenCodeConfigAddsWorkspaceRepositoryReferences(t *testing.T) {
+	taskDir := t.TempDir()
+	workspaceRoot := t.TempDir()
+	writeWorkspaceContext(t, taskDir, workspaceRoot, []map[string]any{
+		{"repository": "acme/app", "directory": "context/acme/app"},
+		{"repository": "acme/foo-bar", "directory": "context/acme/foo-bar"},
+		{"repository": "acme-foo/bar", "directory": "context/acme-foo/bar", "readOnly": true},
+	})
+	writeGitCheckout(t, filepath.Join(workspaceRoot, "context/acme/foo-bar"))
+	writeGitCheckout(t, filepath.Join(workspaceRoot, "context/acme-foo/bar"))
+
+	config := jsBuildConfig(t, taskDir, map[string]string{"REPO": "acme/app"})
+	references, ok := config["references"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, map[string]any{
+		"path": filepath.Join(workspaceRoot, "context/acme/foo-bar"),
+		"description": "Workspace repository acme/foo-bar (read and write). " +
+			"Inspect this checkout when the task involves this repository.",
+	}, references["acme-foo-bar"])
+	assert.Equal(t, map[string]any{
+		"path": filepath.Join(workspaceRoot, "context/acme-foo/bar"),
+		"description": "Workspace repository acme-foo/bar (read only). " +
+			"Inspect this checkout when the task involves this repository.",
+	}, references["acme-foo-bar-2"])
+	instructions, ok := config["instructions"].([]any)
+	require.True(t, ok)
+	require.Contains(t, instructions, filepath.Join(taskDir, "workspace_repositories.md"))
+	workspaceInstructions, err := os.ReadFile(filepath.Join(taskDir, "workspace_repositories.md"))
+	require.NoError(t, err)
+	assert.Contains(t, string(workspaceInstructions), "acme/foo-bar")
+	assert.Contains(t, string(workspaceInstructions), filepath.Join(workspaceRoot, "context/acme/foo-bar"))
+}
+
+func TestBuildOpenCodeConfigOmitsPrimaryOnlyWorkspaceReferences(t *testing.T) {
+	taskDir := t.TempDir()
+	writeWorkspaceContext(t, taskDir, t.TempDir(), []map[string]any{
+		{"repository": "acme/app", "directory": "context/acme/app"},
+	})
+
+	config := jsBuildConfig(t, taskDir, map[string]string{"REPO_URL": "https://github.com/acme/app.git"})
+	assert.Nil(t, config["references"])
+}
+
+func TestBuildOpenCodeConfigRejectsInvalidWorkspaceRepositoryReferences(t *testing.T) {
+	for name, context := range map[string]string{
+		"malformed manifest": `{`,
+		"escaping directory": `{"repositories":[{"repository":"acme/web","directory":"../web"}]}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			taskDir := t.TempDir()
+			workspaceRoot := t.TempDir()
+			require.NoError(t, os.WriteFile(filepath.Join(taskDir, "task_cwd"), []byte(workspaceRoot+"\n"), 0o644))
+			require.NoError(t, os.WriteFile(filepath.Join(taskDir, "workspace_context.json"), []byte(context), 0o644))
+
+			output := jsBuildConfigFailure(t, taskDir, map[string]string{"REPO": "acme/app"})
+			assert.Contains(t, output, "workspace_context.json")
+		})
+	}
+
+	t.Run("symlink outside context", func(t *testing.T) {
+		taskDir := t.TempDir()
+		workspaceRoot := t.TempDir()
+		outside := t.TempDir()
+		require.NoError(t, os.Mkdir(filepath.Join(workspaceRoot, "context"), 0o755))
+		require.NoError(t, os.Symlink(outside, filepath.Join(workspaceRoot, "context", "web")))
+		writeWorkspaceContext(t, taskDir, workspaceRoot, []map[string]any{
+			{"repository": "acme/web", "directory": "context/web"},
+		})
+
+		output := jsBuildConfigFailure(t, taskDir, map[string]string{"REPO": "acme/app"})
+		assert.Contains(t, output, "workspace_context.json directory resolves outside context/")
+	})
+}
+
 func TestBuildOpenCodeConfigKeepsProtocolAtInstructionPriority(t *testing.T) {
 	protocol, err := os.ReadFile(filepath.Join("..", "analysis_protocol_review.md"))
 	require.NoError(t, err)
@@ -264,6 +338,17 @@ func TestRunPromptIsolatesProjectConfigAndPreservesInstructions(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestBuildOpenCodeConfigOmitsPendingWorkspaceRepositoryCheckout(t *testing.T) {
+	taskDir := t.TempDir()
+	writeWorkspaceContext(t, taskDir, t.TempDir(), []map[string]any{
+		{"repository": "acme/app", "directory": "context/acme/app"},
+		{"repository": "acme/web", "directory": "context/acme/web"},
+	})
+
+	config := jsBuildConfig(t, taskDir, map[string]string{"REPO": "acme/app"})
+	assert.Nil(t, config["references"])
 }
 
 func TestRunPromptStopsOnManagedConfigurationError(t *testing.T) {
@@ -1500,7 +1585,13 @@ func TestRunPromptFailsImmediatelyOnInvalidAPIKey(t *testing.T) {
 
 func TestRunPromptContinuesSessionOnLaterPrompt(t *testing.T) {
 	dir := t.TempDir()
+	workspaceRoot := t.TempDir()
 	writeTaskHelpers(t, dir)
+	writeWorkspaceContext(t, dir, workspaceRoot, []map[string]any{
+		{"repository": "acme/app", "directory": "context/acme/app"},
+		{"repository": "acme/instabot", "directory": "context/acme/instabot"},
+	})
+	writeGitCheckout(t, filepath.Join(workspaceRoot, "context/acme/instabot"))
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "prompt_count"), []byte("0\n"), 0o644))
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "prompt.txt"), []byte("first"), 0o644))
 
@@ -1511,8 +1602,9 @@ func TestRunPromptContinuesSessionOnLaterPrompt(t *testing.T) {
 			`{"type":"text","sessionID":"ses_keep","part":{"type":"text","text":"first done"}}`,
 			`{"type":"step_finish","sessionID":"ses_keep","part":{"type":"step-finish","tokens":{"input":1,"output":1}}}`,
 		},
-	}}, nil, nil, nil, "")
+	}}, map[string]string{"REPO": "acme/app"}, nil, nil, "")
 	assert.Equal(t, 0, first.exitCode)
+	assertWorkspaceReference(t, dir, "acme-instabot", filepath.Join(workspaceRoot, "context/acme/instabot"))
 	session, err := os.ReadFile(filepath.Join(dir, "opencode_session"))
 	require.NoError(t, err)
 	assert.Equal(t, "ses_keep\n", string(session))
@@ -1524,8 +1616,9 @@ func TestRunPromptContinuesSessionOnLaterPrompt(t *testing.T) {
 			`{"type":"text","sessionID":"ses_keep","part":{"type":"text","text":"second done"}}`,
 			`{"type":"step_finish","sessionID":"ses_keep","part":{"type":"step-finish","tokens":{"input":1,"output":1}}}`,
 		},
-	}}, nil, nil, nil, "")
+	}}, map[string]string{"REPO": "acme/app"}, nil, nil, "")
 	assert.Equal(t, 0, second.exitCode)
+	assertWorkspaceReference(t, dir, "acme-instabot", filepath.Join(workspaceRoot, "context/acme/instabot"))
 	require.NotEmpty(t, second.spawns)
 	assert.Contains(t, second.spawns[0], "--session")
 	assert.Contains(t, second.spawns[0], "ses_keep")
@@ -2150,6 +2243,41 @@ func jsBuildConfigWithPrompt(t *testing.T, taskDir string, env map[string]string
 	var config map[string]any
 	require.NoError(t, json.Unmarshal(out, &config))
 	return config
+}
+
+func jsBuildConfigFailure(t *testing.T, taskDir string, env map[string]string) string {
+	t.Helper()
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	payload, err := json.Marshal(map[string]any{"taskDir": taskDir, "env": env})
+	require.NoError(t, err)
+	cmd := exec.Command("node", "-e", `const { buildOpenCodeConfig } = require(process.argv[1]); buildOpenCodeConfig(JSON.parse(process.argv[2]));`, script, string(payload))
+	out, err := cmd.CombinedOutput()
+	require.Error(t, err, string(out))
+	return string(out)
+}
+
+func writeWorkspaceContext(t *testing.T, taskDir, workspaceRoot string, repositories []map[string]any) {
+	t.Helper()
+	require.NoError(t, os.WriteFile(filepath.Join(taskDir, "task_cwd"), []byte(workspaceRoot+"\n"), 0o644))
+	payload, err := json.Marshal(map[string]any{"repositories": repositories})
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(filepath.Join(taskDir, "workspace_context.json"), payload, 0o644))
+}
+
+func writeGitCheckout(t *testing.T, directory string) {
+	t.Helper()
+	require.NoError(t, os.MkdirAll(filepath.Join(directory, ".git"), 0o755))
+}
+
+func assertWorkspaceReference(t *testing.T, taskDir, name, checkout string) {
+	t.Helper()
+	config := resultPayload(t, filepath.Join(taskDir, "opencode.json"))
+	references, ok := config["references"].(map[string]any)
+	require.True(t, ok)
+	reference, ok := references[name].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, checkout, reference["path"])
 }
 
 type modelCatalogResult struct {
