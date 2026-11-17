@@ -143,6 +143,8 @@ type importSearchGitHub struct {
 	*fakeFactoryGitHub
 	t            *testing.T
 	query        string
+	searchCalls  int
+	searchError  error
 	pullRequests []*github.PullRequest
 }
 
@@ -156,8 +158,12 @@ func (f *importSearchGitHub) ListPullRequests(_ context.Context, repository stri
 	return []*github.PullRequest{f.pullRequest, openHandOffPullRequest("other/app", 43, "branch")}, nil, nil
 }
 func (f *importSearchGitHub) SearchIssues(_ context.Context, query string, opts *github.SearchOptions) (*github.IssuesSearchResult, *github.Response, error) {
+	f.searchCalls++
 	assert.Equal(f.t, f.query, query)
 	assert.Equal(f.t, 50, opts.PerPage)
+	if f.searchError != nil {
+		return nil, nil, f.searchError
+	}
 	return &github.IssuesSearchResult{Issues: []*github.Issue{
 		{Number: github.Ptr(42), Title: github.Ptr("Ready"), State: github.Ptr("open"), HTMLURL: f.pullRequest.HTMLURL, Draft: github.Ptr(true), PullRequestLinks: &github.PullRequestLinks{}},
 		{Number: github.Ptr(43), Title: github.Ptr("Wrong repository"), State: github.Ptr("open"), HTMLURL: github.Ptr("https://github.com/other/app/pull/43"), PullRequestLinks: &github.PullRequestLinks{}},
@@ -203,6 +209,72 @@ func TestSearchFactoryPullRequestImportItemsGitHub(t *testing.T) {
 					assert.Equal(t, codes.InvalidArgument, code)
 				})
 			}
+		})
+	}
+}
+
+func TestSearchFactoryPullRequestImportItemsGitHubQueryLength(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory := seedHandOffFactory(t, r, db)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryPullRequestImport))
+	pr := openHandOffPullRequest("acme/app", 42, "branch")
+	fake := &importSearchGitHub{fakeFactoryGitHub: &fakeFactoryGitHub{pullRequest: pr}}
+	original := newFactoryGitHubAPI
+	newFactoryGitHubAPI = func(*gorm.DB, IntakeDependencies, *models.Factory) (factoryGitHubAPI, error) { return fake, nil }
+	t.Cleanup(func() { newFactoryGitHubAPI = original })
+
+	const prefix = `repo:acme/app is:pr is:open in:title "`
+	const textBudget = 256 - len(prefix) - 1 // Include the closing quote.
+	providerError := &github.ErrorResponse{Response: &http.Response{StatusCode: http.StatusUnprocessableEntity}, Message: "Unrelated validation failure"}
+	for _, scenario := range []struct {
+		name          string
+		query         string
+		escaped       string
+		rejected      bool
+		providerError error
+	}{
+		{name: "below limit", query: strings.Repeat("a", textBudget-1), escaped: strings.Repeat("a", textBudget-1)},
+		{name: "at limit", query: strings.Repeat("a", textBudget), escaped: strings.Repeat("a", textBudget)},
+		{name: "above limit", query: strings.Repeat("a", textBudget+1), rejected: true},
+		{name: "Unicode at limit", query: strings.Repeat("é", textBudget), escaped: strings.Repeat("é", textBudget)},
+		{name: "Unicode above limit", query: strings.Repeat("é", textBudget+1), rejected: true},
+		{name: "escaped quote at limit", query: strings.Repeat("a", textBudget-2) + `"`, escaped: strings.Repeat("a", textBudget-2) + `\"`},
+		{name: "escaped backslash at limit", query: strings.Repeat("a", textBudget-2) + `\`, escaped: strings.Repeat("a", textBudget-2) + `\\`},
+		{name: "quote escaping exceeds limit", query: strings.Repeat(`"`, textBudget/2+1), rejected: true},
+		{name: "backslash escaping exceeds limit", query: strings.Repeat(`\`, textBudget/2+1), rejected: true},
+		{name: "Portuguese production regression", query: "Uma coisa que acho meio estranha nessa história da factory é que a maior parte do meu trabalho agora é encontrar alguém pra revisar o PR e passar a tarefa pra frente.  Eu criei a tarefa, mas só descrevi o que precisava ser feito. Quem implementou tudo foi a IA kkk", rejected: true},
+		{name: "unrelated provider error", query: "fix", escaped: "fix", providerError: providerError},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
+			fake.t = t
+			fake.query = prefix + scenario.escaped + `"`
+			if scenario.rejected {
+				fake.query = prefix + strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(scenario.query) + `"`
+			}
+			fake.searchCalls = 0
+			fake.searchError = scenario.providerError
+			result, err := SearchFactoryPullRequestImportItems(t.Context(), IntakeDependencies{}, r.Organization.ID.String(), &pb.SearchFactoryPullRequestImportItemsRequest{FactoryId: factory.ID.String(), Query: scenario.query, Limit: 100})
+			if scenario.rejected {
+				assert.Zero(t, fake.searchCalls, "oversized queries must not reach GitHub search")
+				code, message, ok := grpcerrors.HandlerStatus(err)
+				require.True(t, ok)
+				assert.Equal(t, codes.InvalidArgument, code)
+				assert.Contains(t, message, "search is too long")
+				assert.Contains(t, message, "Shorten")
+				return
+			}
+			assert.Equal(t, 1, fake.searchCalls)
+			if scenario.providerError != nil {
+				require.ErrorIs(t, err, scenario.providerError)
+				code, _, ok := grpcerrors.HandlerStatus(err)
+				require.True(t, ok)
+				assert.Equal(t, codes.Internal, code)
+				return
+			}
+			require.NoError(t, err)
+			require.Len(t, result.Items, 1)
+			assert.Equal(t, pr.GetHTMLURL(), result.Items[0].Url)
 		})
 	}
 }
