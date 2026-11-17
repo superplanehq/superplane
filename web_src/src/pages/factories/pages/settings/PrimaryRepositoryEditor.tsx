@@ -113,7 +113,7 @@ export function PrimaryRepositoryRow(
       {expanded ? (
         <div id={panelId} className="border-t border-border bg-muted/30 px-3 py-3">
           <PrimaryRepositoryEditor
-            key={`${props.repository}:${props.branch}`}
+            key={`${props.organizationId}:${props.factoryId}:${props.repository}:${props.branch}`}
             {...props}
             savedRepository={props.repository}
             savedBranch={props.branch}
