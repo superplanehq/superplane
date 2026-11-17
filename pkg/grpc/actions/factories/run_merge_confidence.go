@@ -126,7 +126,7 @@ func runMergeConfidence(ctx context.Context, deps IntakeDependencies, organizati
 				if event == nil {
 					return grpcFailedPrecondition("The merge confidence automation is no longer eligible.")
 				}
-				// Link from the saved payload so task authority exists before routing.
+				// Load the saved run before linking task authority.
 				event, err = models.FindCanvasEventForCanvas(tx, canvas.ID, event.ID)
 				if err != nil {
 					return err
@@ -144,7 +144,12 @@ func runMergeConfidence(ctx context.Context, deps IntakeDependencies, organizati
 				}
 				// Reuse keeps existing task authority without admitting another run.
 				if activity == nil {
-					if err := mergeconfidence.LinkRun(tx, canvas, event, run); err != nil {
+					// Use the locked PR without changing a reused webhook's saved payload.
+					linkEvent := *event
+					linkEvent.Data = models.NewJSONValue(map[string]any{
+						"data": map[string]any{"pullRequest": map[string]any{"id": pr.ID.String()}},
+					})
+					if err := mergeconfidence.LinkRun(tx, canvas, &linkEvent, run); err != nil {
 						return err
 					}
 				}

@@ -235,6 +235,7 @@ type checksEventIdentity struct {
 	repository   string
 	number       string
 	sha          string
+	baseBranch   string
 	action       string
 	before       string
 	updatedAt    time.Time
@@ -271,7 +272,10 @@ func checksEventIdentityFrom(event *CanvasEvent) (checksEventIdentity, error) {
 			PullRequest struct {
 				Number    int64  `json:"number"`
 				UpdatedAt string `json:"updated_at"`
-				Head      struct {
+				Base      struct {
+					Ref string `json:"ref"`
+				} `json:"base"`
+				Head struct {
 					SHA string `json:"sha"`
 				} `json:"head"`
 			} `json:"pull_request"`
@@ -301,6 +305,7 @@ func checksEventIdentityFrom(event *CanvasEvent) (checksEventIdentity, error) {
 		repository:   repository,
 		number:       strconv.FormatInt(payload.Data.PullRequest.Number, 10),
 		sha:          sha,
+		baseBranch:   strings.TrimSpace(payload.Data.PullRequest.Base.Ref),
 		action:       strings.TrimSpace(payload.Data.Action),
 		before:       strings.TrimSpace(payload.Data.Before),
 		updatedAt:    updatedAt,
@@ -323,6 +328,11 @@ func parseChecksUpdatedAt(value string) (time.Time, bool) {
 func checksEventIsDuplicate(stored []checksEventIdentity, incoming checksEventIdentity) bool {
 	if len(stored) == 0 {
 		return false
+	}
+	// Compare the latest target so retargeting back also starts a fresh assessment.
+	if incoming.baseBranch != "" && incoming.baseBranch != stored[0].baseBranch {
+		newest, ok := newestChecksUpdatedAt(stored)
+		return ok && incoming.hasUpdatedAt && incoming.updatedAt.Before(newest)
 	}
 	for _, event := range stored {
 		if sameChecksDelivery(event, incoming) {

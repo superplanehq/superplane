@@ -18,6 +18,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/workers/contexts"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
 	"gorm.io/datatypes"
@@ -451,5 +452,77 @@ func TestRunMergeConfidenceReusesWithoutNewRunnerAdmission(t *testing.T) {
 	code, _, ok := grpcerrors.HandlerStatus(err)
 	require.True(t, ok)
 	assert.Equal(t, codes.FailedPrecondition, code)
+	assert.EqualValues(t, 1, countCanvasEvents(t, canvas.ID))
+}
+
+func TestRunMergeConfidenceGitHubRetargets(t *testing.T) {
+	r := support.Setup(t)
+	factory, order, _ := mergeConfidenceTask(t, r)
+	current := checksStartupGitHubPullRequest()
+	useGitHub(t, current)
+	request := RunMergeConfidenceRequest{FactoryID: factory.ID.String(), Task: order.ID.String()}
+	var previous string
+	for i, branch := range []string{"main", "release", "main"} {
+		current.Base.Ref = github.Ptr(branch)
+		current.UpdatedAt = &github.Timestamp{Time: time.Now().Add(time.Duration(i) * time.Minute)}
+		result, err := RunMergeConfidence(t.Context(), IntakeDependencies{}, r.Organization.ID.String(), request)
+		require.NoError(t, err)
+		require.Len(t, result.Runs, 1)
+		assert.Equal(t, "started", result.Runs[0].Status)
+		assert.NotEqual(t, previous, result.Runs[0].RunID)
+		previous = result.Runs[0].RunID
+		reused, err := RunMergeConfidence(t.Context(), IntakeDependencies{}, r.Organization.ID.String(), request)
+		require.NoError(t, err)
+		require.Len(t, reused.Runs, 1)
+		assert.Equal(t, "reused", reused.Runs[0].Status)
+		assert.Equal(t, previous, reused.Runs[0].RunID)
+	}
+	current.Base.Ref = github.Ptr("release")
+	current.UpdatedAt = &github.Timestamp{Time: time.Now().Add(-time.Minute)}
+	delayed, err := RunMergeConfidence(t.Context(), IntakeDependencies{}, r.Organization.ID.String(), request)
+	require.NoError(t, err)
+	require.Len(t, delayed.Runs, 1)
+	assert.Equal(t, "reused", delayed.Runs[0].Status)
+	assert.Equal(t, previous, delayed.Runs[0].RunID)
+}
+
+func TestRunMergeConfidenceLinksUntrackedWebhookAssessment(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, order, canvas := mergeConfidenceTask(t, r)
+	current := checksStartupGitHubPullRequest()
+	useGitHub(t, current)
+	prs, err := trackedPullRequests(db, order.ID)
+	require.NoError(t, err)
+	trigger, err := canvas.VerificationTrigger(db, "github", "acme/app")
+	require.NoError(t, err)
+	require.NotNil(t, trigger)
+	configuration := trigger.Configuration.Data()
+	configuration["onlyFactoryPullRequests"] = false
+	trigger.Configuration = datatypes.NewJSONType(configuration)
+	require.NoError(t, db.Save(trigger).Error)
+	payload, err := pullRequestChecksEventData(&prs[0], order, current)
+	require.NoError(t, err)
+	delete(payload, "pullRequest")
+	delete(payload, "workOrder")
+	event, created, err := contexts.CreateFactoryPullRequestEvent(db, trigger, "github.pullRequest", payload)
+	require.NoError(t, err)
+	require.True(t, created)
+	saved, err := event.Data.MarshalJSON()
+	require.NoError(t, err)
+	result, err := RunMergeConfidence(t.Context(), IntakeDependencies{}, r.Organization.ID.String(), RunMergeConfidenceRequest{FactoryID: factory.ID.String(), Task: order.ID.String()})
+	require.NoError(t, err)
+	require.Len(t, result.Runs, 1)
+	assert.Equal(t, "reused", result.Runs[0].Status)
+	assert.Equal(t, event.RunID.String(), result.Runs[0].RunID)
+	report, err := BuildTaskReport(t.Context(), factory.OrganizationID.String(), factory.ID.String(), order.ID.String(), models.TaskRunHistoryQuery{})
+	require.NoError(t, err)
+	require.Len(t, report.Runs.Runs, 1)
+	assert.Equal(t, event.RunID, report.Runs.Runs[0].ID)
+	persisted, err := models.FindCanvasEventForCanvas(db, canvas.ID, event.ID)
+	require.NoError(t, err)
+	persistedPayload, err := persisted.Data.MarshalJSON()
+	require.NoError(t, err)
+	assert.JSONEq(t, string(saved), string(persistedPayload))
 	assert.EqualValues(t, 1, countCanvasEvents(t, canvas.ID))
 }
