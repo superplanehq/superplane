@@ -35,16 +35,17 @@ export const onReleaseTriggerRenderer: TriggerRenderer = {
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
     const eventData = context.event?.data as OnReleaseEventData;
+    const release: Release = eventData?.release ?? {};
     const values: Record<string, string> = {
-      Name: eventData?.release?.name || "",
-      Tag: eventData?.release?.tag_name || "",
+      Name: release.name || "",
+      Tag: release.tag_name || "",
       Action: eventData?.action || "",
-      Author: eventData?.release?.author?.login || "",
-      Prerelease: eventData?.release?.prerelease ? "true" : "false",
+      Author: release.author?.login || "",
+      Prerelease: release.prerelease ? "true" : "false",
     };
 
     if (eventData?.action !== "deleted") {
-      values.URL = eventData?.release?.html_url || "";
+      values.URL = release.html_url || "";
     }
 
     return values;
