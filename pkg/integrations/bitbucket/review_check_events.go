@@ -147,6 +147,18 @@ func receiveReviewEvent(store core.PublicationStore, eventKey string, body []byt
 			if current.Disabled {
 				return core.ErrPublicationUnchanged
 			}
+			// Approval receipts can arrive late; PR updates report head changes.
+			if eventKey == pullRequestEventUpdated && IsValidFullCommitSHA(event.PullRequest.Source.Commit.Hash) {
+				var state reviewCheckState
+				if err := json.Unmarshal(current.Payload, &state); err != nil {
+					return err
+				}
+				state.Invalidated = state.Invalidated || event.PullRequest.Source.Commit.Hash != state.Configuration.AssessedSHA
+				current.Payload, err = json.Marshal(state)
+				if err != nil {
+					return err
+				}
+			}
 			current.WakeAt = reviewWake(time.Second)
 			return nil
 		}); err != nil {

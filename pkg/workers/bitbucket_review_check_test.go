@@ -252,6 +252,32 @@ func TestBitbucketReviewCheckRemembersHeadChangesDuringRegistration(t *testing.T
 	}
 }
 
+func TestBitbucketReviewCheckRemembersHeadChangesReportedByEvents(t *testing.T) {
+	for _, test := range []struct {
+		name, event, sha, want string
+	}{
+		{"changed head", "pullrequest:updated", strings.Repeat("b", 40), "INPROGRESS"},
+		{"uppercase head", "pullrequest:updated", strings.Repeat("B", 40), "INPROGRESS"},
+		{"unchanged head", "pullrequest:updated", strings.Repeat("a", 40), "SUCCESSFUL"},
+		{"short head", "pullrequest:updated", "bbbbbbb", "SUCCESSFUL"},
+		{"missing head", "pullrequest:updated", "", "SUCCESSFUL"},
+		{"push without PR head authority", "repo:push", strings.Repeat("b", 40), "SUCCESSFUL"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			f := newBitbucketReviewFixture(t)
+			require.NoError(t, f.apply("no_review"))
+			require.NoError(t, f.refresh())
+			require.Equal(t, "SUCCESSFUL", f.state())
+
+			f.event(test.event, test.sha, time.Now())
+			// The branch returns before refresh. A later event cannot clear invalidation.
+			f.event("pullrequest:updated", f.http.head, time.Now())
+			require.NoError(t, f.refresh())
+			require.Equal(t, test.want, f.state())
+		})
+	}
+}
+
 func TestBitbucketReviewCheckRecoversDeliveryAndDisable(t *testing.T) {
 	f := newBitbucketReviewFixture(t)
 	require.NoError(t, f.apply("no_review"))
