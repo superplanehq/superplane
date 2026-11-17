@@ -8,6 +8,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 
+	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 )
@@ -29,7 +30,8 @@ var deleteExpiredHostedModelCallOutcomesBatch = models.DeleteExpiredHostedModelC
 
 // NodeRequestCleanupWorker deletes old rows that otherwise grow without bound.
 // It removes completed workflow node requests, expired webhook receipts,
-// expired organization invitation sends, and hosted model call samples.
+// expired organization invitation sends, hosted model call samples, and
+// SSO provider sessions that can no longer end access.
 type NodeRequestCleanupWorker struct {
 	logger              *log.Entry
 	retentionDays       int
@@ -72,6 +74,7 @@ func (w *NodeRequestCleanupWorker) tick(ctx context.Context) {
 	w.deleteExpiredDatadogWebhookReceipts()
 	w.deleteExpiredLinearWebhookReceipts()
 	w.deleteExpiredOrganizationInvitationSends()
+	w.deleteUnusedSSOIdentitySessions()
 
 	startedAt := time.Now()
 	olderThan := startedAt.AddDate(0, 0, -w.retentionDays)
@@ -191,6 +194,22 @@ func (w *NodeRequestCleanupWorker) deleteExpiredDatadogWebhookReceipts() {
 		"deleted":    deleted,
 		"older_than": cutoff.Format(time.RFC3339),
 	}).Info("Deleted expired Datadog webhook receipts")
+}
+
+func (w *NodeRequestCleanupWorker) deleteUnusedSSOIdentitySessions() {
+	cutoff := time.Now().Add(-authentication.AccountSessionMaxAge())
+	deleted, err := models.DeleteUnusedSSOIdentitySessions(database.Conn(), cutoff, expiredRecordCleanupBatch)
+	if err != nil {
+		w.logger.Errorf("Error cleaning SSO identity sessions: %v", err)
+		return
+	}
+	if deleted == 0 {
+		return
+	}
+	w.logger.WithFields(log.Fields{
+		"deleted":    deleted,
+		"older_than": cutoff.Format(time.RFC3339),
+	}).Info("Deleted unused SSO identity sessions")
 }
 
 func (w *NodeRequestCleanupWorker) deleteExpiredOrganizationInvitationSends() {

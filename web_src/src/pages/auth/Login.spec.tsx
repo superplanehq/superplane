@@ -22,6 +22,7 @@ const authConfig = {
   signupEnabled: true,
   signupsBlockedByEnvironment: false,
   magicCodeEnabled: true,
+  ssoEnabled: false,
 };
 
 function mockAuthConfig() {
@@ -75,6 +76,7 @@ describe("Login automatic magic-code signup", () => {
     authConfig.magicCodeEnabled = true;
     authConfig.signupEnabled = true;
     authConfig.signupsBlockedByEnvironment = false;
+    authConfig.ssoEnabled = false;
     localStorage.clear();
     vi.restoreAllMocks();
   });
@@ -259,6 +261,7 @@ describe("Login signup-disabled return", () => {
     authConfig.magicCodeEnabled = true;
     authConfig.signupEnabled = false;
     authConfig.signupsBlockedByEnvironment = true;
+    authConfig.ssoEnabled = false;
     delete waitlistWindow.SUPERPLANE_SIGNUP_WAITLIST_HUBSPOT_PORTAL_ID;
     delete waitlistWindow.SUPERPLANE_SIGNUP_WAITLIST_HUBSPOT_FORM_ID;
     vi.restoreAllMocks();
@@ -392,6 +395,7 @@ describe("Sign up terms disclosure", () => {
     authConfig.passwordLoginEnabled = true;
     authConfig.magicCodeEnabled = true;
     authConfig.providers = [];
+    authConfig.ssoEnabled = false;
     vi.restoreAllMocks();
   });
 
@@ -476,5 +480,105 @@ describe("Sign up terms disclosure", () => {
     renderLogin("/signup", "signup");
 
     expect(screen.queryByText(/By creating an account, you agree to the/)).not.toBeInTheDocument();
+  });
+});
+
+describe("Login Single Sign-On", () => {
+  beforeEach(() => {
+    authConfig.providers = [];
+    authConfig.passwordLoginEnabled = true;
+    authConfig.magicCodeEnabled = true;
+    authConfig.signupEnabled = true;
+    authConfig.ssoEnabled = true;
+    localStorage.clear();
+    vi.restoreAllMocks();
+  });
+
+  it("shows Continue with SSO when no social provider is configured", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => mockAuthConfig()),
+    );
+    renderLogin();
+    expect(await screen.findByRole("button", { name: "Continue with SSO" })).toBeInTheDocument();
+  });
+
+  it("prompts after the magic code email when the domain uses SSO", async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url === "/auth/config") return mockAuthConfig();
+        if (url === "/auth/sso/discover") {
+          return {
+            ok: true,
+            json: async () => ({ ssoAvailable: true, startUrl: "/auth/sso/1/start", required: false }),
+          } as Response;
+        }
+        throw new Error(`unexpected fetch ${url}`);
+      }),
+    );
+    renderLogin();
+    await user.type(await screen.findByPlaceholderText("you@example.com"), "ada@example.com");
+    await user.click(screen.getByRole("button", { name: "Continue with email" }));
+    expect(await screen.findByText("Your organization uses SSO.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Use another method" })).toBeInTheDocument();
+  });
+
+  it("does not discover SSO during signup", async () => {
+    const calls: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        calls.push(url);
+        if (url === "/auth/config") return mockAuthConfig();
+        if (url === "/auth/magic-code/request") {
+          return { ok: true, status: 200, text: async () => JSON.stringify({ message: "sent" }) } as Response;
+        }
+        throw new Error(`unexpected fetch ${url}`);
+      }),
+    );
+    const user = userEvent.setup();
+    renderLogin("/signup", "signup");
+    await user.type(await screen.findByPlaceholderText("you@example.com"), "ada@example.com");
+    await user.click(screen.getByRole("button", { name: "Continue with email" }));
+    expect(await screen.findByText("Check your email")).toBeInTheDocument();
+    expect(calls.some((url) => url.includes("/auth/sso/discover"))).toBe(false);
+  });
+
+  it("prompts after the password form when the domain uses SSO", async () => {
+    authConfig.magicCodeEnabled = false;
+    const user = userEvent.setup();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url === "/auth/config") return mockAuthConfig();
+        if (url === "/auth/sso/discover") {
+          return {
+            ok: true,
+            json: async () => ({ ssoAvailable: true, startUrl: "/auth/sso/1/start", required: true }),
+          } as Response;
+        }
+        throw new Error(`unexpected fetch ${url}`);
+      }),
+    );
+    renderLogin();
+    await user.type(await screen.findByPlaceholderText("Email"), "ada@example.com");
+    await user.type(screen.getByPlaceholderText("Password"), "secret");
+    await user.click(screen.getByRole("button", { name: "Login" }));
+    expect(await screen.findByText("Your organization requires SSO.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Use another method" })).toBeInTheDocument();
+  });
+
+  it("shows the SSO failure message from the login URL", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => mockAuthConfig()),
+    );
+    renderLogin("/login?auth_error=sso_failed");
+    expect(await screen.findByText("Single Sign-On failed. Try again.")).toBeInTheDocument();
   });
 });

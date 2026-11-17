@@ -78,6 +78,7 @@ FROM dev-base AS builder
 ARG BASE_URL=https://app.superplane.com
 ARG VITE_ASSET_BASE_URL=
 ARG FRONTEND_PREBUILT=0
+ARG GO_BUILD_TAGS=
 
 WORKDIR /app
 COPY pkg /app/pkg
@@ -105,7 +106,7 @@ RUN --mount=from=ci-go-mod,target=/mnt/ci-go-mod \
     if [ -n "$(ls -A /mnt/ci-go-build 2>/dev/null)" ]; then \
       cp -a /mnt/ci-go-build/. "${GOCACHE}/"; \
     fi && \
-    rm -rf build && go build -o build/superplane cmd/server/main.go
+    rm -rf build && go build -tags "${GO_BUILD_TAGS}" -o build/superplane cmd/server/main.go
 
 WORKDIR /app/web_src
 RUN if [ "$FRONTEND_PREBUILT" = "1" ]; then \
