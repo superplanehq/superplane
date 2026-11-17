@@ -61,7 +61,11 @@ export function MCPCatalogSetupDialog({
   const signInEntry = isDatadog ? { ...entry, url: datadogMCPURL(siteId) } : entry;
 
   const handleSignIn = async () => {
-    await onSignIn(signInEntry);
+    try {
+      await onSignIn(signInEntry);
+    } catch {
+      // The caller already shows the error notification.
+    }
   };
 
   const handleSaveToken = async () => {
