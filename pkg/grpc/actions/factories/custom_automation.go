@@ -594,9 +594,9 @@ func taskColumnRunDescription(column string) string {
 
 func taskColumnCheckoutEnvironment() []any {
 	return []any{
-		checkoutEnvironmentVar("REPO", "{{ $['on-task'].data.workOrder.repository }}"),
-		checkoutEnvironmentVar("REPO_URL", "{{ $['on-task'].data.workOrder.repository_url }}"),
-		checkoutEnvironmentVar("BASE", "{{ $['on-task'].data.workOrder.default_branch }}"),
+		checkoutEnvironmentVar("REPO", "{{ $['On Task'].data.workOrder.repository }}"),
+		checkoutEnvironmentVar("REPO_URL", "{{ $['On Task'].data.workOrder.repository_url }}"),
+		checkoutEnvironmentVar("BASE", "{{ $['On Task'].data.workOrder.default_branch }}"),
 	}
 }
 
