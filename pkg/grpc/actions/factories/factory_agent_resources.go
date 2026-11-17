@@ -74,9 +74,6 @@ func CreateFactoryAgentResource(
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create agent resource")
 	}
-	if err := requireContextRepoAccess(factory, req.GetKind(), req.GetAccess()); err != nil {
-		return nil, factoryErrorToStatus(err, "failed to create agent resource")
-	}
 	if err := authorizeContextRepository(ctx, db, deps, organizationID, factory, config); err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create agent resource")
 	}
@@ -163,9 +160,6 @@ func UpdateFactoryAgentResource(
 				merged.Ref = req.GetRef()
 			}
 			if req.Access != nil {
-				if err := requireContextRepoAccess(factory, pb.FactoryAgentResource_KIND_CONTEXT_REPO, req.GetAccess()); err != nil {
-					return nil, factoryErrorToStatus(err, "failed to update agent resource")
-				}
 				merged.Access = req.GetAccess()
 			}
 			config = &merged
@@ -459,15 +453,6 @@ func requireAgentResourceKindFeature(orgID uuid.UUID, kind string) error {
 		return nil
 	}
 	return requireEnabledFeature(orgID, features.FeatureWorkspaceSkills, errWorkspaceSkillsDisabled)
-}
-
-// requireContextRepoAccess rejects Read & Write context repositories when the
-// organization does not have multi-repo tasks.
-func requireContextRepoAccess(factory *models.Factory, kind pb.FactoryAgentResource_Kind, access string) error {
-	if kind != pb.FactoryAgentResource_KIND_CONTEXT_REPO || models.NormalizeContextRepoAccess(access) != models.FactoryContextRepoAccessWrite {
-		return nil
-	}
-	return requireEnabledFeature(factory.OrganizationID, features.FeatureFactoryMultiRepoTasks, errMultiRepoTasksDisabled)
 }
 
 func requireEnabledFeature(orgID uuid.UUID, featureID string, disabled error) error {

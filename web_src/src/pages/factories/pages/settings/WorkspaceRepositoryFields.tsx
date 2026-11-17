@@ -6,7 +6,7 @@ import { useIntegrationResources } from "@/hooks/useIntegrations";
 
 import { AGENT_RESOURCES_COPY } from "./agentResourceCopy";
 import { BranchPicker } from "./BranchPicker";
-import { branchNames, repositoryBranchChoices } from "./useFactoryRepositoryDraft";
+import { branchNames, repositoryBranchChoices } from "@/lib/repositoryBranchChoices";
 import {
   workspaceRepositoryAccess,
   type WorkspaceRepositoryAccess,
@@ -84,10 +84,10 @@ export function RepositoryAccessField(props: {
   );
 }
 
-export function RepositoryBranchField(props: RepositoryBranchProps) {
+export function RepositoryBranchField({ label, ...props }: RepositoryBranchProps & { label?: string }) {
   return (
     <div className="min-w-0 space-y-2">
-      <Label htmlFor={props.id}>{AGENT_RESOURCES_COPY.branchLabel}</Label>
+      <Label htmlFor={props.id}>{label ?? AGENT_RESOURCES_COPY.branchLabel}</Label>
       <RepositoryBranchControl {...props} />
     </div>
   );

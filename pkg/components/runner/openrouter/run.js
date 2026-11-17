@@ -736,6 +736,129 @@ function repositoryInstructions(cwd) {
   return [];
 }
 
+function repositoryNameFromURL(rawURL) {
+  const match = String(rawURL || "")
+    .trim()
+    .replace(/\.git$/, "")
+    .match(/[/:]([^/:]+\/[^/:]+)$/);
+  return match ? match[1] : "";
+}
+
+function workspaceReferenceAlias(repository, references) {
+  const base =
+    String(repository || "")
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9._-]+/g, "-")
+      .replace(/^[-.]+|[-.]+$/g, "") || "repository";
+  let alias = base;
+  for (let suffix = 2; Object.hasOwn(references, alias); suffix += 1) {
+    alias = `${base}-${suffix}`;
+  }
+  return alias;
+}
+
+function pathIsInside(parent, child) {
+  const relative = path.relative(parent, child);
+  return (
+    relative !== "" &&
+    relative !== ".." &&
+    !relative.startsWith(`..${path.sep}`) &&
+    !path.isAbsolute(relative)
+  );
+}
+
+function workspaceRepositoryReferences(taskDir, env) {
+  if (!taskDir) return {};
+  const contextFile = path.join(taskDir, "workspace_context.json");
+  if (!fs.existsSync(contextFile)) return {};
+
+  let manifest;
+  try {
+    manifest = JSON.parse(fs.readFileSync(contextFile, "utf8"));
+  } catch (error) {
+    throw new Error(`workspace_context.json is invalid: ${error.message}`);
+  }
+  if (!manifest || !Array.isArray(manifest.repositories)) {
+    throw new Error("workspace_context.json must contain a repositories array");
+  }
+
+  const primaryRepository = String(
+    (env && env.REPO) || repositoryNameFromURL(env && env.REPO_URL),
+  )
+    .trim()
+    .toLowerCase();
+  const repositories = manifest.repositories.filter((entry) => {
+    const repository = String((entry && entry.repository) || "")
+      .trim()
+      .toLowerCase();
+    return !primaryRepository || repository !== primaryRepository;
+  });
+  if (repositories.length === 0) return {};
+
+  const taskCwdFile = path.join(taskDir, "task_cwd");
+  let workspaceRoot;
+  try {
+    workspaceRoot = fs.readFileSync(taskCwdFile, "utf8").trim();
+  } catch (error) {
+    throw new Error(`workspace_context.json requires task_cwd: ${error.message}`);
+  }
+  if (!path.isAbsolute(workspaceRoot)) {
+    throw new Error("workspace_context.json requires an absolute task_cwd");
+  }
+
+  const contextRoot = path.join(workspaceRoot, "context");
+  const references = {};
+  for (const entry of repositories) {
+    const repository = String((entry && entry.repository) || "").trim();
+    const directory = String((entry && entry.directory) || "").trim();
+    if (!repository || !directory) {
+      throw new Error("workspace_context.json contains a repository without a name or directory");
+    }
+
+    const checkout = path.resolve(workspaceRoot, directory);
+    if (!pathIsInside(contextRoot, checkout)) {
+      throw new Error(`workspace_context.json directory escapes context/: ${directory}`);
+    }
+    if (!fs.existsSync(checkout) || !fs.statSync(checkout).isDirectory()) {
+      continue;
+    }
+    const realContextRoot = fs.realpathSync(contextRoot);
+    const realCheckout = fs.realpathSync(checkout);
+    if (!pathIsInside(realContextRoot, realCheckout)) {
+      throw new Error(`workspace_context.json directory resolves outside context/: ${directory}`);
+    }
+
+    const access = entry.readOnly ? "read only" : "read and write";
+    references[workspaceReferenceAlias(repository, references)] = {
+      path: realCheckout,
+      description:
+        `Workspace repository ${repository} (${access}). ` +
+        "Inspect this checkout when the task involves this repository.",
+    };
+  }
+  return references;
+}
+
+function writeWorkspaceRepositoryInstructions(taskDir, references) {
+  const instructionFile = path.join(taskDir, "workspace_repositories.md");
+  const repositories = Object.entries(references).map(
+    ([alias, reference]) =>
+      `- @${alias}: ${reference.path}\n  ${reference.description}`,
+  );
+  const content = [
+    "# Workspace repositories",
+    "",
+    "The primary repository is the current working directory. The repositories below are also part of this task workspace.",
+    "Inspect the listed path before you conclude that a workspace repository is unavailable.",
+    "",
+    ...repositories,
+    "",
+  ].join("\n");
+  fs.writeFileSync(instructionFile, content);
+  return instructionFile;
+}
+
 function buildOpenCodeConfig({
   taskDir,
   cwd,
@@ -815,8 +938,13 @@ function buildOpenCodeConfig({
       },
     };
   }
+  const references = workspaceRepositoryReferences(taskDir, env);
+  if (Object.keys(references).length > 0) config.references = references;
   applyWorkspaceMCPDenylist(config, workspaceMCPServers(env));
   const instructions = repositoryInstructions(cwd);
+  if (Object.keys(references).length > 0) {
+    instructions.push(writeWorkspaceRepositoryInstructions(taskDir, references));
+  }
   const protocol = planningSystemPrompt(env);
   if (protocol && taskDir) {
     const protocolPath = path.join(taskDir, "analysis_protocol.md");

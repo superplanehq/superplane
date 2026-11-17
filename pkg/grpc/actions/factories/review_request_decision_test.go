@@ -47,11 +47,12 @@ func TestReviewRequestReadDecision(t *testing.T) {
 	valid := `{"reviewRequired":true,"rationale":"Security findings need review.","noCandidate":false,"reviewers":[{"id":2,"login":"octocat","reason":"Owns the changed code."}]}`
 	empty := `{"reviewRequired":true,"rationale":"No suitable owner.","noCandidate":true,"reviewers":[]}`
 	for _, tc := range []struct {
-		name, decision, fallback, login string
-		fails, fallbackUsed             bool
+		name, decision, fallback, login, lookupError string
+		fails, fallbackUsed                          bool
 	}{
 		{name: "selection", decision: valid, login: "octocat"},
 		{name: "selection takes precedence", decision: valid, fallback: "fallback-user", login: "octocat"},
+		{name: "selection ignores supplied error status", decision: strings.Replace(valid, `"reviewRequired":true`, `"reviewRequired":true,"status":"selection_error"`, 1), login: "octocat"},
 		{name: "fallback", decision: empty, fallback: " FALLBACK-USER ", login: "fallback-user", fallbackUsed: true},
 		{name: "no fallback", decision: empty},
 		{name: "ineligible fallback", decision: empty, fallback: "author"},
@@ -68,7 +69,12 @@ func TestReviewRequestReadDecision(t *testing.T) {
 		{name: "ineligible identity", decision: strings.Replace(valid, `"id":2`, `"id":1`, 1), fails: true},
 		{name: "changed login", decision: strings.Replace(valid, "octocat", "another-user", 1), fails: true},
 		{name: "blank reason", decision: strings.Replace(valid, "Owns the changed code.", " ", 1), fails: true},
-		{name: "lookup error", decision: strings.Replace(empty, `"reviewRequired":true`, `"reviewRequired":true,"error":"lookup unavailable"`, 1), fallback: "fallback-user", fails: true},
+		{name: "lookup error only", decision: `{"error":"lookup unavailable"}`, fallback: "fallback-user", lookupError: "lookup unavailable"},
+		{name: "lookup error overrides selection", decision: strings.Replace(valid, `"reviewRequired":true`, `"reviewRequired":true,"error":"lookup unavailable","fallbackUsed":true`, 1), fallback: "fallback-user", lookupError: "lookup unavailable"},
+		{name: "lookup error overrides no candidate", decision: strings.Replace(empty, `"reviewRequired":true`, `"reviewRequired":true,"error":"lookup unavailable"`, 1), fallback: "fallback-user", lookupError: "lookup unavailable"},
+		{name: "blank lookup error", decision: `{"error":" "}`, fails: true},
+		{name: "non-string lookup error", decision: `{"error":{"message":"unavailable"}}`, fails: true},
+		{name: "null lookup error", decision: `{"error":null}`, fails: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var input []byte
@@ -87,6 +93,13 @@ func TestReviewRequestReadDecision(t *testing.T) {
 			var decision map[string]any
 			require.NoError(t, json.Unmarshal(output, &decision))
 			require.Equal(t, tc.fallbackUsed, decision["fallbackUsed"])
+			if tc.lookupError != "" {
+				require.Equal(t, "selection_error", decision["status"])
+				require.Equal(t, tc.lookupError, decision["error"])
+				require.Equal(t, false, decision["noCandidate"])
+			} else {
+				require.NotContains(t, decision, "status")
+			}
 			reviewers := decision["reviewers"].([]any)
 			if tc.login == "" {
 				require.Empty(t, reviewers)

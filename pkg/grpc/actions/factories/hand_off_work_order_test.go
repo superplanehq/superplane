@@ -466,7 +466,6 @@ func Test__HandOffWorkOrder__VerifyRejectsUnsupportedPullRequestURL(t *testing.T
 
 func Test__HandOffWorkOrder__VerifyAttachesPullRequestsFromEveryWorkspaceRepository(t *testing.T) {
 	r := support.Setup(t)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryMultiRepoTasks))
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 	db := database.DB(t.Context())
 
