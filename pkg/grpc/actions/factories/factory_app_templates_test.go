@@ -266,6 +266,7 @@ func TestMaterializeRiskScoreTemplate(t *testing.T) {
 
 	agent := findYAMLNode(t, canvas, "assess-risk")
 	assert.Equal(t, models.SuperPlaneRunnerComponent, agent.Component)
+	assert.Equal(t, true, agent.Configuration["skipSetupCommands"])
 	maxRuns := 5
 	assert.Equal(t, &yaml.ConcurrencySpec{Max: &maxRuns}, agent.Concurrency)
 	assert.NotContains(t, agent.Configuration, "credentials")
@@ -337,6 +338,7 @@ func TestMaterializeRiskScoreTemplateBitbucket(t *testing.T) {
 	assert.Equal(t, &yaml.IntegrationRef{ID: "bitbucket-1", Name: "acme-bitbucket"}, entrypoint.Integration)
 
 	agent := findYAMLNode(t, canvas, "assess-risk")
+	assert.Equal(t, true, agent.Configuration["skipSetupCommands"])
 	maxRuns := 5
 	assert.Equal(t, &yaml.ConcurrencySpec{Max: &maxRuns}, agent.Concurrency)
 	prompt := agentPrompt(t, agent)
