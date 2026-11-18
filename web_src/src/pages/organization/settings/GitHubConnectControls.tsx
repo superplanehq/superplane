@@ -8,8 +8,6 @@ interface GitHubConnectControlsProps {
   canCreateIntegrations: boolean;
   permissionsLoading: boolean;
   onConnect: () => void;
-  /** Show private GitHub App and PAT setup. Factory onboarding owns the public App flow. */
-  allowPrivateApp?: boolean;
 }
 
 export function GitHubConnectControls({
@@ -17,10 +15,7 @@ export function GitHubConnectControls({
   canCreateIntegrations,
   permissionsLoading,
   onConnect,
-  allowPrivateApp = true,
 }: GitHubConnectControlsProps) {
-  if (!allowPrivateApp) return null;
-
   const canCreate = Boolean(definition) && canCreateIntegrations;
 
   return (

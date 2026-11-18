@@ -628,11 +628,11 @@ func TestUpdatePullRequestBodySectionRetriesVCSSetupFailures(t *testing.T) {
 			f := newPublicationFixture(t)
 			f.report(t, f.run, 5)
 			f.finish(t, models.CanvasRunResultPassed)
-			integrationID := uuid.NewString()
+			integrationID := support.CreateIntegrationID(t, f.workspace.OrganizationID, provider)
 			require.NoError(t, f.workspace.UpdateOnboarding(f.db, models.FactoryOnboardingPatch{VCSProvider: &provider, VCSIntegrationID: &integrationID}))
 			require.NoError(t, f.db.Model(f.pr).Update("provider", provider).Error)
 
-			// The integration does not exist, so the connection is missing.
+			// The integration is not ready, so the connection is missing.
 			outcome, err := f.publishOutcome(t, f.deps)
 			require.NoError(t, err)
 			assert.Equal(t, prbody.StatusSkipped, outcome.Status)

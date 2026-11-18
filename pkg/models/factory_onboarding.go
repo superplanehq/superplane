@@ -2,6 +2,7 @@ package models
 
 import (
 	"errors"
+	"fmt"
 	"regexp"
 	"strings"
 	"time"
@@ -50,7 +51,9 @@ var factoryOnboardingRepositoryPattern = regexp.MustCompile(`^[^/\s]+/[^/\s]+$`)
 // resource IDs. Empty strings mean the field has not been saved yet.
 type FactoryOnboardingConfig struct {
 	InitialOnboardingAttemptID string `json:"initial_onboarding_attempt_id,omitempty"`
-	VCSIntegrationID           string `json:"vcs_integration_id,omitempty"`
+	// VCSIntegrationID lives in factories.vcs_integration_id, a foreign key to
+	// app_installations, so it is not stored in the JSON column.
+	VCSIntegrationID string `json:"-"`
 	// VCSProvider is the Git host. Empty means GitHub. Existing rows stay empty.
 	VCSProvider        string `json:"vcs_provider,omitempty"`
 	AgentIntegrationID string `json:"agent_integration_id,omitempty"`
@@ -222,7 +225,11 @@ func (f *Factory) IsPendingInitialOnboarding() bool {
 }
 
 func (f *Factory) OnboardingConfigValue() FactoryOnboardingConfig {
-	return f.OnboardingConfig.Data()
+	config := f.OnboardingConfig.Data()
+	if f.VCSIntegrationID != nil {
+		config.VCSIntegrationID = f.VCSIntegrationID.String()
+	}
+	return config
 }
 
 func (f *Factory) OnboardingConfigAfter(patch FactoryOnboardingPatch) (FactoryOnboardingConfig, error) {
@@ -276,9 +283,18 @@ func (f *Factory) CompleteOnboarding(tx *gorm.DB, patch FactoryOnboardingPatch) 
 
 func (f *Factory) persistOnboarding(tx *gorm.DB, config FactoryOnboardingConfig, completedAt *time.Time) error {
 	now := time.Now()
+	var vcsIntegrationID *uuid.UUID
+	if raw := strings.TrimSpace(config.VCSIntegrationID); raw != "" {
+		id, err := uuid.Parse(raw)
+		if err != nil {
+			return fmt.Errorf("invalid VCS integration id %q: %w", raw, err)
+		}
+		vcsIntegrationID = &id
+	}
 	updates := map[string]any{
-		"onboarding_config": datatypes.NewJSONType(config),
-		"updated_at":        now,
+		"onboarding_config":  datatypes.NewJSONType(config),
+		"vcs_integration_id": vcsIntegrationID,
+		"updated_at":         now,
 	}
 	if completedAt != nil {
 		updates["onboarding_completed_at"] = *completedAt
@@ -295,6 +311,7 @@ func (f *Factory) persistOnboarding(tx *gorm.DB, config FactoryOnboardingConfig,
 	}
 
 	f.OnboardingConfig = datatypes.NewJSONType(config)
+	f.VCSIntegrationID = vcsIntegrationID
 	f.OnboardingCompletedAt = completedAt
 	f.UpdatedAt = now
 	return nil
@@ -422,16 +439,15 @@ func validateFactoryOnboardingReady(config FactoryOnboardingConfig) error {
 	return validateOptionalUUID(config.ProvisionedLineID, ErrFactoryOnboardingInvalidLineID)
 }
 
-// CountFactoriesUsingVCSIntegration counts workspaces in the organization
-// that still store this integration as their version-control connection.
-func CountFactoriesUsingVCSIntegration(tx *gorm.DB, organizationID, integrationID uuid.UUID) (int64, error) {
-	var count int64
-	err := tx.Model(&Factory{}).
+// ClearFactoriesVCSIntegration removes a deleted integration from every
+// workspace that uses it. The provider stays set so a new connection must
+// use the same Git host.
+func ClearFactoriesVCSIntegration(tx *gorm.DB, organizationID, integrationID uuid.UUID) error {
+	return tx.Model(&Factory{}).
 		Where("organization_id = ?", organizationID).
-		Where("onboarding_config->>'vcs_integration_id' = ?", integrationID.String()).
-		Count(&count).
+		Where("vcs_integration_id = ?", integrationID).
+		Updates(map[string]any{"vcs_integration_id": nil, "updated_at": time.Now()}).
 		Error
-	return count, err
 }
 
 // OrganizationIDsPendingInitialOnboardingOnly returns organizations whose

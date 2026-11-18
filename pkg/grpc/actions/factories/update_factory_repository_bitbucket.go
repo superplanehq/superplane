@@ -29,10 +29,11 @@ func updateBitbucketFactoryRepository(
 		return nil, factoryErrorToStatus(err, "failed to update factory repository")
 	}
 	previous := factory.OnboardingConfigValue()
-	if previous.VCSIntegrationID == "" {
+	integrationID := requestedIntegrationID(req, previous.VCSIntegrationID)
+	if integrationID == "" {
 		return nil, factoryErrorToStatus(invalidArgument("connect Bitbucket before selecting a repository"), "failed to update factory repository")
 	}
-	integration, err := findReadyOnboardingIntegration(db, orgID, previous.VCSIntegrationID)
+	integration, err := findReadyOnboardingIntegration(db, orgID, integrationID)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update factory repository")
 	}
@@ -64,6 +65,9 @@ func updateBitbucketFactoryRepository(
 		if bindErr != nil {
 			return nil, factoryErrorToStatus(bindErr, "failed to update factory repository")
 		}
+		if req.IntegrationId != nil && bound.ID != integration.ID {
+			return nil, factoryErrorToStatus(invalidArgument("the selected connection cannot access this repository. Choose another repository"), "failed to update factory repository")
+		}
 		selectedIntegration = bound
 		selectedRepository = match.FullName
 		hostDefault = match.DefaultBranch
@@ -92,6 +96,7 @@ func updateBitbucketFactoryRepository(
 			return err
 		}
 		factory = loaded
+		previous = factory.OnboardingConfigValue()
 		previousBranch, err := currentFactoryDefaultBranch(tx, factory, previous.DefaultBranch)
 		if err != nil {
 			return err
@@ -101,8 +106,10 @@ func updateBitbucketFactoryRepository(
 		}
 		selectedIntegrationID := selectedIntegration.ID.String()
 		patch := models.FactoryOnboardingPatch{DefaultBranch: &selectedDefaultBranch}
-		if repositoryChanged {
+		if repositoryChanged || selectedIntegrationID != previous.VCSIntegrationID {
 			patch.VCSIntegrationID = &selectedIntegrationID
+		}
+		if repositoryChanged {
 			patch.AppRepository = &selectedRepository
 			patch.BacklogRepository = &selectedRepository
 			if forgeInstall {
