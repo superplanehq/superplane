@@ -165,6 +165,27 @@ func TestModelSourceRouteAllowsHostedRecoveryWithoutBYOK(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestModelStatusRouteRequiresExperimentalFeature(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	t.Cleanup(clearOrgExperimentalFeatureCacheForTest)
+	t.Cleanup(clearOrganizationPermissionCacheForTest)
+	org, err := models.CreateOrganization("model-status-auth", "")
+	require.NoError(t, err)
+	request := httptestRequest(t, map[string]string{"x-user-id": uuid.NewString(), "x-organization-id": org.ID.String()})
+	route := HTTPRoute{Method: "GET", Pattern: "/api/v1/me/model-status"}
+	authorizer := NewGatewayAuthorizer(actionPermissionChecker{"org:read": true})
+	_, err = authorizer.AuthorizeHTTP(t.Context(), request, route, nil)
+	require.Equal(t, codes.PermissionDenied, status.Code(err))
+
+	require.NoError(t, models.EnableExperimentalFeature(org.ID, features.FeatureModelStatus))
+	_, err = authorizer.AuthorizeHTTP(t.Context(), request, route, nil)
+	require.NoError(t, err)
+
+	clearOrganizationPermissionCacheForTest()
+	_, err = NewGatewayAuthorizer(actionPermissionChecker{}).AuthorizeHTTP(t.Context(), request, route, nil)
+	require.Equal(t, codes.NotFound, status.Code(err))
+}
+
 func TestTeamBillingMutationsRequireBillingPermission(t *testing.T) {
 	for _, pattern := range []string{
 		"/api/v1/organizations/{id}/billing/select-plan",

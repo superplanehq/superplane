@@ -7,6 +7,15 @@ import (
 )
 
 func Test__Get(t *testing.T) {
+	t.Run("model status is visible and unreleased", func(t *testing.T) {
+		f, ok := Get("model_status")
+		assert.True(t, ok)
+		assert.Equal(t, FeatureModelStatus, f.ID)
+		assert.Equal(t, "Model status", f.Label)
+		assert.Nil(t, f.Released)
+		assert.False(t, f.Hidden)
+	})
+
 	t.Run("known id returns feature and true", func(t *testing.T) {
 		f, ok := Get(FeatureFactories)
 		assert.True(t, ok)
