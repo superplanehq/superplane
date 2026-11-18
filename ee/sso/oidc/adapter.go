@@ -232,16 +232,27 @@ func (a *Adapter) VerifyLogoutToken(ctx context.Context, conn *models.SSOConnect
 	if err != nil {
 		return "", "", err
 	}
-	idToken, err := provider.Verifier(&oidc.Config{ClientID: cfg.ClientID}).Verify(a.clientContext(ctx), raw)
+	// A logout token may omit exp. Signature, issuer, and audience stay checked.
+	// A present exp is checked below. iat limits how old the token can be.
+	idToken, err := provider.Verifier(&oidc.Config{
+		ClientID:        cfg.ClientID,
+		SkipExpiryCheck: true,
+	}).Verify(a.clientContext(ctx), raw)
 	if err != nil {
 		return "", "", err
 	}
-	if a.now().Sub(idToken.IssuedAt) > 5*time.Minute || idToken.IssuedAt.After(a.now().Add(time.Minute)) {
+	now := a.now()
+	if now.Sub(idToken.IssuedAt) > 5*time.Minute || idToken.IssuedAt.After(now.Add(time.Minute)) {
 		return "", "", fmt.Errorf("logout token is too old")
 	}
 	claims := map[string]any{}
 	if err := idToken.Claims(&claims); err != nil {
 		return "", "", err
+	}
+	if rawExp, ok := claims["exp"]; ok {
+		if err := requireLogoutUnexpired(rawExp, now); err != nil {
+			return "", "", err
+		}
 	}
 	if _, hasNonce := claims["nonce"]; hasNonce {
 		return "", "", fmt.Errorf("logout token must not include a nonce")
@@ -259,6 +270,17 @@ func (a *Adapter) VerifyLogoutToken(ctx context.Context, conn *models.SSOConnect
 		return "", "", fmt.Errorf("logout token needs a subject or a session id")
 	}
 	return subject, sessionID, nil
+}
+
+func requireLogoutUnexpired(raw any, now time.Time) error {
+	seconds, ok := raw.(float64)
+	if !ok {
+		return fmt.Errorf("logout token is expired")
+	}
+	if time.Unix(int64(seconds), 0).Before(now) {
+		return fmt.Errorf("logout token is expired")
+	}
+	return nil
 }
 
 func (a *Adapter) client(ctx context.Context, conn *models.SSOConnection) (models.OIDCConnectionConfig, string, error) {

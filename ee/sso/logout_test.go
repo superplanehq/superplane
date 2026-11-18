@@ -294,6 +294,30 @@ func TestBackchannelLogoutRevokesBeforeTheConnectionRulesChange(t *testing.T) {
 	require.NotNil(t, required)
 }
 
+func TestBackchannelLogoutAcceptsATokenWithoutExpiry(t *testing.T) {
+	f, fake, conn := activeOIDCConnection(t)
+	require.Equal(t, http.StatusFound, f.callback(t, conn, fake, callbackOptions{}).Code)
+	events := map[string]any{"http://schemas.openid.net/event/backchannel-logout": map[string]any{}}
+
+	expired := signLogoutToken(t, fake, jwtLib.MapClaims{
+		"exp":    time.Now().Add(-time.Minute).Unix(),
+		"events": events,
+	})
+	require.Equal(t, http.StatusBadRequest, postLogout(f, conn.ID, expired).Code)
+	identity, err := models.FindSSOIdentityBySubject(database.Conn(), conn.ID, fake.subject)
+	require.NoError(t, err)
+	require.Nil(t, identity.SessionsRevokedAt)
+
+	withoutExpiry := signLogoutToken(t, fake, jwtLib.MapClaims{
+		"exp":    nil,
+		"events": events,
+	})
+	require.Equal(t, http.StatusOK, postLogout(f, conn.ID, withoutExpiry).Code)
+	identity, err = models.FindSSOIdentityBySubject(database.Conn(), conn.ID, fake.subject)
+	require.NoError(t, err)
+	require.NotNil(t, identity.SessionsRevokedAt)
+}
+
 func TestUnusedSSOIdentitySessionsAreRemoved(t *testing.T) {
 	f, fake, conn := activeOIDCConnection(t)
 	require.Equal(t, http.StatusFound, f.callback(t, conn, fake, callbackOptions{}).Code)
