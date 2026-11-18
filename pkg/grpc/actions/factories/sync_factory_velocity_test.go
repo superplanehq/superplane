@@ -4,7 +4,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
@@ -26,7 +25,7 @@ func Test__SyncFactoryVelocity(t *testing.T) {
 		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 		require.NoError(t, err)
 
-		integrationID := uuid.NewString()
+		integrationID := support.CreateIntegrationID(t, r.Organization.ID, models.ProviderGitHub)
 		appRepo := "acme/app"
 		require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
 			VCSIntegrationID: &integrationID,

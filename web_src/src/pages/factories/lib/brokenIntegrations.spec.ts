@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test";
 
 import type { OrganizationsIntegration } from "@/api-client";
 
-import { findBrokenIntegrations, repairActionLabel } from "./brokenIntegrations";
+import { findBrokenIntegrations, repairActionLabel, workspaceNeedsGitConnection } from "./brokenIntegrations";
 
 function instance(
   overrides: Partial<{
@@ -145,5 +145,19 @@ describe("findBrokenIntegrations", () => {
     } as OrganizationsIntegration;
 
     expect(findBrokenIntegrations([incomplete])).toEqual([]);
+  });
+});
+
+describe("workspaceNeedsGitConnection", () => {
+  it("flags a finished workspace without a Git connection", () => {
+    expect(workspaceNeedsGitConnection({ onboarding: { completedAt: "2026-11-17T00:00:00Z" } })).toBe(true);
+  });
+
+  it("ignores workspaces that are connected or still in setup", () => {
+    expect(
+      workspaceNeedsGitConnection({ onboarding: { completedAt: "2026-11-17T00:00:00Z", vcsIntegrationId: "id-1" } }),
+    ).toBe(false);
+    expect(workspaceNeedsGitConnection({ onboarding: {} })).toBe(false);
+    expect(workspaceNeedsGitConnection(undefined)).toBe(false);
   });
 });
