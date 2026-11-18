@@ -157,8 +157,11 @@ func UpdateFactoryRepository(
 		}
 		if !repositoryChanged {
 			selectedRepository = previous.AppRepository
-			selectedRepositoryID = previous.AppRepositoryID
 			selectedIntegration = integration
+			// A private App or PAT connection saves no catalog repository ID.
+			if bindingErr != nil {
+				selectedRepositoryID = previous.AppRepositoryID
+			}
 		}
 
 		previousBranch, err := currentFactoryDefaultBranch(tx, factory, previous.DefaultBranch)
@@ -174,12 +177,14 @@ func UpdateFactoryRepository(
 		patch := models.FactoryOnboardingPatch{DefaultBranch: &selectedDefaultBranch}
 		if repositoryChanged || integrationChanged {
 			patch.VCSIntegrationID = &selectedIntegrationID
+			patch.AppRepositoryID = &selectedRepositoryID
+		}
+		if repositoryChanged || (integrationChanged && sameRepository(previous.BacklogRepository, selectedRepository)) {
+			patch.BacklogRepositoryID = &selectedRepositoryID
 		}
 		if repositoryChanged {
 			patch.AppRepository = &selectedRepository
-			patch.AppRepositoryID = &selectedRepositoryID
 			patch.BacklogRepository = &selectedRepository
-			patch.BacklogRepositoryID = &selectedRepositoryID
 		}
 		if err := factory.UpdateOnboarding(tx, patch); err != nil {
 			return err
@@ -328,6 +333,7 @@ func reconcileFactoryRepository(
 		factory.OrganizationID,
 		previousVCSIntegrationID,
 		vcsIntegrationID,
+		config,
 	)
 	if err != nil {
 		return err
@@ -541,9 +547,14 @@ func addPRFeedbackGitHubNodeIDs(nodeIDs map[string]bool, graph prFeedbackGraph) 
 
 // previousVCSIntegrations returns the integration IDs and names whose canvas
 // references move to the selected integration. A workspace whose connection
-// was deleted has no previous ID, so references to every deleted integration
-// of the same app move.
-func previousVCSIntegrations(tx *gorm.DB, organizationID uuid.UUID, previousID, selectedID string) ([]string, []string, string, error) {
+// was deleted has no previous ID, so references to the deleted connection it
+// saved, and to every soft-deleted integration of the same app, move.
+func previousVCSIntegrations(
+	tx *gorm.DB,
+	organizationID uuid.UUID,
+	previousID, selectedID string,
+	config models.FactoryOnboardingConfig,
+) ([]string, []string, string, error) {
 	if selectedID == "" || previousID == selectedID {
 		return nil, nil, "", nil
 	}
@@ -568,6 +579,10 @@ func previousVCSIntegrations(tx *gorm.DB, organizationID uuid.UUID, previousID, 
 		return nil, nil, "", err
 	}
 	ids, names := []string{}, []string{}
+	if config.DeletedVCSIntegrationID != "" {
+		ids = append(ids, config.DeletedVCSIntegrationID)
+		names = append(names, config.DeletedVCSIntegrationName)
+	}
 	for _, integration := range integrations {
 		if integration.DeletedAt.Valid && integration.AppName == selected.AppName {
 			ids = append(ids, integration.ID.String())

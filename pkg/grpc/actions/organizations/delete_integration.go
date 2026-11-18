@@ -33,7 +33,7 @@ func DeleteIntegration(ctx context.Context, orgID string, ID string) (*pb.Delete
 	// and delete its webhooks before we delete the integration itself.
 	//
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-		if err := models.ClearFactoriesVCSIntegration(tx, org, integration.ID); err != nil {
+		if err := models.ClearFactoriesVCSIntegration(tx, org, integration); err != nil {
 			return grpcerrors.Internal(err, "failed to clear workspace connections")
 		}
 

@@ -54,6 +54,11 @@ type FactoryOnboardingConfig struct {
 	// VCSIntegrationID lives in factories.vcs_integration_id, a foreign key to
 	// app_installations, so it is not stored in the JSON column.
 	VCSIntegrationID string `json:"-"`
+	// DeletedVCSIntegrationID and DeletedVCSIntegrationName keep the connection
+	// that was deleted, so a new connection can rebind automations after the
+	// integration row is permanently removed.
+	DeletedVCSIntegrationID   string `json:"deleted_vcs_integration_id,omitempty"`
+	DeletedVCSIntegrationName string `json:"deleted_vcs_integration_name,omitempty"`
 	// VCSProvider is the Git host. Empty means GitHub. Existing rows stay empty.
 	VCSProvider        string `json:"vcs_provider,omitempty"`
 	AgentIntegrationID string `json:"agent_integration_id,omitempty"`
@@ -442,11 +447,19 @@ func validateFactoryOnboardingReady(config FactoryOnboardingConfig) error {
 // ClearFactoriesVCSIntegration removes a deleted integration from every
 // workspace that uses it. The provider stays set so a new connection must
 // use the same Git host.
-func ClearFactoriesVCSIntegration(tx *gorm.DB, organizationID, integrationID uuid.UUID) error {
+func ClearFactoriesVCSIntegration(tx *gorm.DB, organizationID uuid.UUID, integration *Integration) error {
 	return tx.Model(&Factory{}).
 		Where("organization_id = ?", organizationID).
-		Where("vcs_integration_id = ?", integrationID).
-		Updates(map[string]any{"vcs_integration_id": nil, "updated_at": time.Now()}).
+		Where("vcs_integration_id = ?", integration.ID).
+		Updates(map[string]any{
+			"vcs_integration_id": nil,
+			"onboarding_config": gorm.Expr(
+				"onboarding_config || jsonb_build_object('deleted_vcs_integration_id', ?::text, 'deleted_vcs_integration_name', ?::text)",
+				integration.ID.String(),
+				integration.NameBeforeDelete(),
+			),
+			"updated_at": time.Now(),
+		}).
 		Error
 }
 

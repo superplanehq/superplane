@@ -81,6 +81,14 @@ func (a *Integration) TableName() string {
 	return "app_installations"
 }
 
+var deletedIntegrationNameSuffix = regexp.MustCompile(` \(deleted-\d+\)$`)
+
+// NameBeforeDelete returns the name that canvases referenced before
+// SoftDeleteInTransaction renamed the integration.
+func (a *Integration) NameBeforeDelete() string {
+	return deletedIntegrationNameSuffix.ReplaceAllString(a.InstallationName, "")
+}
+
 type IntegrationSecret struct {
 	ID             uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
 	OrganizationID uuid.UUID
@@ -386,14 +394,6 @@ func (a *Integration) SoftDeleteInTransaction(tx *gorm.DB) error {
 		"deleted_at":        now,
 		"installation_name": newName,
 	}).Error
-}
-
-var deletedIntegrationNameSuffix = regexp.MustCompile(` \(deleted-\d+\)$`)
-
-// NameBeforeDelete returns the name that canvases referenced before
-// SoftDeleteInTransaction renamed the integration.
-func (a *Integration) NameBeforeDelete() string {
-	return deletedIntegrationNameSuffix.ReplaceAllString(a.InstallationName, "")
 }
 
 func (a *Integration) GetRequest(ID string) (*IntegrationRequest, error) {

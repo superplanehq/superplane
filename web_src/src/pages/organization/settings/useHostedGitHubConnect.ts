@@ -34,7 +34,10 @@ export function unconnectedGitHubInstallations(
  * App, then connect each installed account to the organization.
  */
 export function useHostedGitHubConnect(organizationId: string, connectedNames: string[]) {
-  const github = useGitHubOnboarding(organizationId, { poll: false });
+  // Poll only after the user opens GitHub. The setup callback syncs the new
+  // installation in the background, so one refetch on return can miss it.
+  const [waiting, setWaiting] = useState(false);
+  const github = useGitHubOnboarding(organizationId, { poll: waiting });
   const location = useLocation();
   const queryClient = useQueryClient();
   const [opening, setOpening] = useState(false);
@@ -47,6 +50,7 @@ export function useHostedGitHubConnect(organizationId: string, connectedNames: s
     },
     onSuccess: (installation) => {
       showSuccessToast(`Connected ${installation.accountLogin}.`);
+      setWaiting(false);
       void queryClient.invalidateQueries({ queryKey: integrationKeys.connected(organizationId) });
       void github.refetch();
     },
@@ -62,6 +66,7 @@ export function useHostedGitHubConnect(organizationId: string, connectedNames: s
     const popup = openGitHubWindow();
     try {
       navigateGitHubWindow(popup, await github.startInstallation.mutateAsync());
+      setWaiting(true);
     } catch (error) {
       popup?.close();
       showErrorToast(getApiErrorMessage(error, "SuperPlane could not open GitHub. Try again."));

@@ -122,6 +122,36 @@ func TestUpdateFactoryRepositorySynchronizesHostedBindingAccess(t *testing.T) {
 
 	r := support.Setup(t)
 	db := database.DB(t.Context())
+	seedHostedGitHubCatalog(t, r, db)
+
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	selected, err := SelectFactoryVCSProviderRepository(ctx, IntakeDependencies{}, r.Organization.ID.String(), &pb.SelectFactoryVCSProviderRepositoryRequest{
+		Id:           factory.ID.String(),
+		Provider:     models.ProviderGitHub,
+		RepositoryId: 201,
+	})
+	require.NoError(t, err)
+
+	updated, err := UpdateFactoryRepository(ctx, IntakeDependencies{}, r.Organization.ID.String(), &pb.UpdateFactoryRepositoryRequest{
+		Id:         factory.ID.String(),
+		Repository: "ACME/WEB",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "acme/web", updated.Factory.Onboarding.AppRepository)
+	assert.Equal(t, int64(202), updated.Factory.Onboarding.AppRepositoryId)
+	assert.Equal(t, "trunk", updated.Factory.Onboarding.DefaultBranch)
+
+	integrationID := selected.Factory.Onboarding.VcsIntegrationId
+	granted, err := models.ListVCSProviderBindingRepositories(db, uuid.MustParse(integrationID))
+	require.NoError(t, err)
+	require.Len(t, granted, 1)
+	assert.Equal(t, int64(202), granted[0].RepositoryID)
+}
+
+func seedHostedGitHubCatalog(t *testing.T, r *support.ResourceRegistry, db *gorm.DB) int64 {
+	t.Helper()
 	const githubUserID = int64(42)
 	const installationID = int64(101)
 	repositories := []models.VCSProviderRepository{
@@ -151,31 +181,44 @@ func TestUpdateFactoryRepositorySynchronizesHostedBindingAccess(t *testing.T) {
 			[]models.VCSProviderRepositoryCollaborator{{ProviderUserID: githubUserID, ProviderLogin: "octocat"}},
 		))
 	}
+	return installationID
+}
 
+func TestUpdateFactoryRepositorySavesCatalogIDsWhenTheConnectionChanges(t *testing.T) {
+	t.Setenv(config.EnvGitHubAppID, "123")
+	t.Setenv(config.EnvGitHubAppSlug, "superplane-test")
+	t.Setenv(config.EnvGitHubAppPrivateKey, "test-private-key")
+	t.Setenv(config.EnvGitHubAppWebhookSecret, "test-webhook-secret")
+
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	installationID := seedHostedGitHubCatalog(t, r, db)
+	privateID := createReadyOnboardingIntegration(t, r.Organization.ID, models.ProviderGitHub)
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
-	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-	selected, err := SelectFactoryVCSProviderRepository(ctx, IntakeDependencies{}, r.Organization.ID.String(), &pb.SelectFactoryVCSProviderRepositoryRequest{
-		Id:           factory.ID.String(),
-		Provider:     models.ProviderGitHub,
-		RepositoryId: 201,
-	})
+	provider, repository, branch := models.ProviderGitHub, "acme/api", "main"
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
+		VCSProvider: &provider, VCSIntegrationID: &privateID,
+		AppRepository: &repository, BacklogRepository: &repository, DefaultBranch: &branch,
+	}))
+	binding, err := models.FindOrCreateVCSProviderBinding(db, r.Organization.ID, models.ProviderGitHub, installationID, "acme")
 	require.NoError(t, err)
+	bindingID := binding.ID.String()
 
+	ctx := withRepositoryBranchResolver(
+		authentication.SetUserIdInMetadata(context.Background(), r.User.String()),
+		repositoryBranchResolver{gitHubBranches: func(string) ([]string, error) { return []string{branch}, nil }},
+	)
 	updated, err := UpdateFactoryRepository(ctx, IntakeDependencies{}, r.Organization.ID.String(), &pb.UpdateFactoryRepositoryRequest{
-		Id:         factory.ID.String(),
-		Repository: "ACME/WEB",
+		Id: factory.ID.String(), Repository: repository, DefaultBranch: branch, IntegrationId: &bindingID,
 	})
 	require.NoError(t, err)
-	assert.Equal(t, "acme/web", updated.Factory.Onboarding.AppRepository)
-	assert.Equal(t, int64(202), updated.Factory.Onboarding.AppRepositoryId)
-	assert.Equal(t, "trunk", updated.Factory.Onboarding.DefaultBranch)
-
-	integrationID := selected.Factory.Onboarding.VcsIntegrationId
-	granted, err := models.ListVCSProviderBindingRepositories(db, uuid.MustParse(integrationID))
+	assert.Equal(t, bindingID, updated.Factory.Onboarding.VcsIntegrationId)
+	assert.Equal(t, int64(201), updated.Factory.Onboarding.AppRepositoryId)
+	granted, err := models.ListVCSProviderBindingRepositories(db, binding.ID)
 	require.NoError(t, err)
 	require.Len(t, granted, 1)
-	assert.Equal(t, int64(202), granted[0].RepositoryID)
+	assert.Equal(t, int64(201), granted[0].RepositoryID)
 }
 
 func TestReconcileFactoryRepositoryUpdatesLegacyEvidenceComments(t *testing.T) {
@@ -722,11 +765,13 @@ func TestUpdateFactoryRepositoryRejectsGitHubBranchWhenCheckCannotRun(t *testing
 
 func TestUpdateFactoryRepositoryMovesAutomationsToTheSelectedConnection(t *testing.T) {
 	for _, testCase := range []struct {
-		name           string
-		deletePrevious bool
+		name              string
+		deletePrevious    bool
+		permanentlyDelete bool
 	}{
 		{name: "switch from a live connection"},
 		{name: "rebind after the connection was deleted", deletePrevious: true},
+		{name: "rebind after cleanup removed the connection", deletePrevious: true, permanentlyDelete: true},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
 			r := support.Setup(t)
@@ -765,8 +810,11 @@ func TestUpdateFactoryRepositoryMovesAutomationsToTheSelectedConnection(t *testi
 			if testCase.deletePrevious {
 				previous, err := models.FindIntegrationInTransaction(db, r.Organization.ID, uuid.MustParse(previousID))
 				require.NoError(t, err)
+				require.NoError(t, models.ClearFactoriesVCSIntegration(db, r.Organization.ID, previous))
 				require.NoError(t, previous.SoftDeleteInTransaction(db))
-				require.NoError(t, models.ClearFactoriesVCSIntegration(db, r.Organization.ID, previous.ID))
+			}
+			if testCase.permanentlyDelete {
+				require.NoError(t, db.Unscoped().Delete(&models.Integration{}, "id = ?", previousID).Error)
 			}
 
 			ctx := withRepositoryBranchResolver(
