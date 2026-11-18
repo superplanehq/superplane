@@ -168,7 +168,6 @@ func TestModelSourceRouteAllowsHostedRecoveryWithoutBYOK(t *testing.T) {
 func TestModelStatusRouteRequiresExperimentalFeature(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	t.Cleanup(clearOrgExperimentalFeatureCacheForTest)
-	t.Cleanup(clearOrganizationPermissionCacheForTest)
 	org, err := models.CreateOrganization("model-status-auth", "")
 	require.NoError(t, err)
 	request := httptestRequest(t, map[string]string{"x-user-id": uuid.NewString(), "x-organization-id": org.ID.String()})
@@ -181,7 +180,6 @@ func TestModelStatusRouteRequiresExperimentalFeature(t *testing.T) {
 	_, err = authorizer.AuthorizeHTTP(t.Context(), request, route, nil)
 	require.NoError(t, err)
 
-	clearOrganizationPermissionCacheForTest()
 	_, err = NewGatewayAuthorizer(actionPermissionChecker{}).AuthorizeHTTP(t.Context(), request, route, nil)
 	require.Equal(t, codes.NotFound, status.Code(err))
 }
