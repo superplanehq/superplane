@@ -24,7 +24,8 @@ args=(
 if [[ -n "${SHARD_COUNT:-}" ]]; then
   source "${script_dir}/lib/shard_args.sh"
   echo "Running UI unit tests shard ${SHARD_INDEX}/${SHARD_COUNT}"
-  args+=(--parallel --shard="${SHARD_INDEX}/${SHARD_COUNT}")
+  # Avoid overlapping memory-heavy UI workers on the small CI agents.
+  args+=(--parallel=1 --shard="${SHARD_INDEX}/${SHARD_COUNT}")
 else
   args+=(--isolate)
 fi
