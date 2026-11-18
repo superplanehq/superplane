@@ -57,6 +57,14 @@ export function getDetailsForIncident(incident: Incident | undefined): Record<st
   details.Reference = incident?.reference || "-";
   details.Visibility = incident?.visibility || "-";
 
+  Object.assign(details, getOptionalIncidentDetails(incident));
+
+  return details;
+}
+
+function getOptionalIncidentDetails(incident: Incident | undefined): Record<string, string> {
+  const details: Record<string, string> = {};
+
   if (incident?.severity?.name) {
     details.Severity = incident.severity.name;
   }
