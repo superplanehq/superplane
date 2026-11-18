@@ -1,4 +1,4 @@
-import type { ComponentBaseProps, ComponentBaseSpec } from "@/ui/componentBase";
+import type { ComponentBaseProps, ComponentBaseSpec, ComponentBaseSpecValue } from "@/ui/componentBase";
 import type React from "react";
 import { getBackgroundColorClass } from "@/lib/colors";
 import { getStateMap } from "../mapperLookup";
@@ -80,18 +80,19 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   return metadata;
 }
 
+interface CreateIncidentConfiguration {
+  incidentType?: string;
+  statusRealtime?: string;
+  statusScheduled?: string;
+  body?: string;
+  impactOverride?: string;
+  scheduledFor?: string;
+  scheduledUntil?: string;
+  components?: Array<{ componentId?: string; status?: string }>;
+}
+
 function createIncidentSpecs(node: NodeInfo): ComponentBaseSpec[] {
-  const configuration = node.configuration as {
-    incidentType?: string;
-    statusRealtime?: string;
-    statusScheduled?: string;
-    body?: string;
-    impactOverride?: string;
-    scheduledFor?: string;
-    scheduledUntil?: string;
-    components?: Array<{ componentId?: string; status?: string }>;
-  };
-  const nodeMetadata = node.metadata as StatuspageNodeMetadata | undefined;
+  const configuration = node.configuration as CreateIncidentConfiguration | undefined;
   const values: ComponentBaseSpec["values"] = [];
 
   const typeLabel = configuration?.incidentType === "scheduled" ? "Scheduled" : "Realtime";
@@ -129,26 +130,13 @@ function createIncidentSpecs(node: NodeInfo): ComponentBaseSpec[] {
       ],
     });
   }
-  if (configuration?.scheduledFor || configuration?.scheduledUntil) {
-    const scheduledLabel = [configuration.scheduledFor, configuration.scheduledUntil].filter(Boolean).join(" – ");
-    values.push({
-      badges: [
-        { label: "Scheduled:", bgColor: "bg-gray-100", textColor: "text-gray-700" },
-        { label: truncateForDisplay(scheduledLabel, 40), bgColor: "bg-gray-100", textColor: "text-gray-800" },
-      ],
-    });
+  const scheduledValue = scheduledSpecValue(configuration);
+  if (scheduledValue) {
+    values.push(scheduledValue);
   }
-  if (configuration?.components && configuration.components.length > 0) {
-    const componentLabel =
-      nodeMetadata?.componentNames && nodeMetadata.componentNames.length > 0
-        ? nodeMetadata.componentNames.join(", ")
-        : `${configuration.components.length} component(s)`;
-    values.push({
-      badges: [
-        { label: "Components:", bgColor: "bg-gray-100", textColor: "text-gray-700" },
-        { label: truncateForDisplay(componentLabel, 60), bgColor: "bg-gray-100", textColor: "text-gray-800" },
-      ],
-    });
+  const componentsValue = componentsSpecValue(node, configuration);
+  if (componentsValue) {
+    values.push(componentsValue);
   }
 
   return [
@@ -159,4 +147,41 @@ function createIncidentSpecs(node: NodeInfo): ComponentBaseSpec[] {
       values,
     },
   ];
+}
+
+function scheduledSpecValue(
+  configuration: CreateIncidentConfiguration | undefined,
+): ComponentBaseSpecValue | undefined {
+  if (!configuration?.scheduledFor && !configuration?.scheduledUntil) {
+    return undefined;
+  }
+
+  const scheduledLabel = [configuration.scheduledFor, configuration.scheduledUntil].filter(Boolean).join(" – ");
+  return {
+    badges: [
+      { label: "Scheduled:", bgColor: "bg-gray-100", textColor: "text-gray-700" },
+      { label: truncateForDisplay(scheduledLabel, 40), bgColor: "bg-gray-100", textColor: "text-gray-800" },
+    ],
+  };
+}
+
+function componentsSpecValue(
+  node: NodeInfo,
+  configuration: CreateIncidentConfiguration | undefined,
+): ComponentBaseSpecValue | undefined {
+  if (!configuration?.components || configuration.components.length === 0) {
+    return undefined;
+  }
+
+  const nodeMetadata = node.metadata as StatuspageNodeMetadata | undefined;
+  const componentLabel =
+    nodeMetadata?.componentNames && nodeMetadata.componentNames.length > 0
+      ? nodeMetadata.componentNames.join(", ")
+      : `${configuration.components.length} component(s)`;
+  return {
+    badges: [
+      { label: "Components:", bgColor: "bg-gray-100", textColor: "text-gray-700" },
+      { label: truncateForDisplay(componentLabel, 60), bgColor: "bg-gray-100", textColor: "text-gray-800" },
+    ],
+  };
 }
