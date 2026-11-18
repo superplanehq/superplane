@@ -346,6 +346,45 @@ function storybookBranchResources(resourceType: string): FixtureResult {
   };
 }
 
+function storybookFactoryResources(resourceType: string | null): FixtureResult {
+  if (resourceType === "default_branch" || resourceType === "branch") {
+    return storybookBranchResources(resourceType);
+  }
+  if (resourceType === "status_check") {
+    return {
+      json: {
+        resources: [
+          { type: "status_check", id: "lint", name: "lint" },
+          { type: "status_check", id: "unit", name: "unit" },
+          {
+            type: "status_check",
+            id: "e2e",
+            name: "e2e",
+            url: "https://app.circleci.com/pipelines/github/acme/api/1",
+          },
+        ],
+      },
+    };
+  }
+  if (resourceType === "project") {
+    return { json: { resources: STORYBOOK_SENTRY_PROJECTS } };
+  }
+  if (resourceType === "unresolved-issue") {
+    return { json: { resources: STORYBOOK_SENTRY_UNRESOLVED_ISSUES } };
+  }
+  if (resourceType === "review_bot") {
+    return {
+      json: {
+        resources: [
+          { type: "review_bot", id: "coderabbitai", name: "coderabbitai[bot]" },
+          { type: "review_bot", id: "bugbot", name: "bugbot[bot]" },
+        ],
+      },
+    };
+  }
+  return { json: { resources: STORYBOOK_GITHUB_REPOSITORIES } };
+}
+
 /** Storybook definitions aligned with real integration Configuration() fields. */
 function storybookApiKeyField(description: string): StorybookConfigField {
   return {
@@ -470,43 +509,7 @@ export async function matchFactorySetupFixture(
 
   const resourcesMatch = /^\/api\/v1\/organizations\/([^/]+)\/integrations\/([^/]+)\/resources$/.exec(url.pathname);
   if (resourcesMatch && method === "GET") {
-    const resourceType = url.searchParams.get("type");
-    if (resourceType === "default_branch" || resourceType === "branch") {
-      return storybookBranchResources(resourceType);
-    }
-    if (resourceType === "status_check") {
-      return {
-        json: {
-          resources: [
-            { type: "status_check", id: "lint", name: "lint" },
-            { type: "status_check", id: "unit", name: "unit" },
-            {
-              type: "status_check",
-              id: "e2e",
-              name: "e2e",
-              url: "https://app.circleci.com/pipelines/github/acme/api/1",
-            },
-          ],
-        },
-      };
-    }
-    if (resourceType === "project") {
-      return { json: { resources: STORYBOOK_SENTRY_PROJECTS } };
-    }
-    if (resourceType === "unresolved-issue") {
-      return { json: { resources: STORYBOOK_SENTRY_UNRESOLVED_ISSUES } };
-    }
-    if (resourceType === "review_bot") {
-      return {
-        json: {
-          resources: [
-            { type: "review_bot", id: "coderabbitai", name: "coderabbitai[bot]" },
-            { type: "review_bot", id: "bugbot", name: "bugbot[bot]" },
-          ],
-        },
-      };
-    }
-    return { json: { resources: STORYBOOK_GITHUB_REPOSITORIES } };
+    return storybookFactoryResources(url.searchParams.get("type"));
   }
 
   return null;
