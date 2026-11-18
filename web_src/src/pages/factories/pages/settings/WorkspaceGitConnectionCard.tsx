@@ -206,15 +206,16 @@ function ConnectionOptions(props: {
         const id = integration.metadata?.id ?? "";
         const selected = id === props.selectedId;
         return (
-          <button
+          <Button
             key={id}
             type="button"
+            variant="outline"
             role="radio"
             aria-checked={selected}
             onClick={() => props.onSelect(id)}
             className={cn(
-              "flex min-w-0 items-center gap-2.5 rounded-lg border px-3 py-2.5 text-left transition-colors",
-              selected ? "border-foreground/40 bg-accent" : "border-border hover:bg-accent/40",
+              "h-auto min-w-0 justify-start gap-2.5 rounded-lg px-3 py-2.5 text-left font-normal",
+              selected && "border-foreground/40 bg-accent",
             )}
             data-testid={`agent-git-connection-option-${id}`}
           >
@@ -226,7 +227,7 @@ function ConnectionOptions(props: {
               </span>
             ) : null}
             <Check className={cn("size-4 shrink-0", selected ? "opacity-100" : "opacity-0")} aria-hidden />
-          </button>
+          </Button>
         );
       })}
     </div>
