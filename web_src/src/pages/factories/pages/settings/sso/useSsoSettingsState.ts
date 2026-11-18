@@ -40,7 +40,7 @@ export function useSsoSettingsState(model: SsoSettingsModel, actions: SsoSetting
   const save = (nextEnforcement = form.enforcement) => {
     const seconds = sessionAgeSeconds(form.sessionHours);
     if (seconds == null) {
-      setSessionError("Enter a whole number of hours from 1 to 168.");
+      setSessionError("Enter 15 minutes to 7 days, as hours or minutes.");
       return;
     }
     setSessionError(null);
@@ -82,7 +82,7 @@ function flagFields(connection?: SsoConnection | null) {
     jitEnabled: connection?.jitEnabled !== false,
     enforcement: connection?.enforcement || "ENFORCEMENT_OPTIONAL",
     ownerBypass: connection?.allowOwnerBypass !== false,
-    sessionHours: String(Math.round(seconds / 3600)),
+    sessionHours: formatSessionAge(seconds),
     idpLogout: Boolean(connection?.idpLogoutEnabled),
   };
 }
@@ -139,15 +139,44 @@ function updateForm<K extends keyof SsoForm>(setForm: Dispatch<SetStateAction<Ss
 }
 
 export function sessionAgeSeconds(value: string): number | null {
-  if (!/^\d+$/.test(value.trim())) {
+  const trimmed = value.trim();
+  const minutes = /^(\d+(?:\.\d+)?)m$/.exec(trimmed);
+  const hours = /^(\d+(?:\.\d+)?)$/.exec(trimmed);
+  const amount = minutes?.[1] ?? hours?.[1];
+  if (!amount) {
     return null;
   }
-  const hours = Number(value);
-  const seconds = hours * 3600;
-  if (seconds < 900 || seconds > 604800) {
+  const seconds = Math.round(Number(amount) * (minutes ? 60 : 3600));
+  if (!Number.isFinite(seconds) || seconds < 900 || seconds > 604800) {
     return null;
   }
   return seconds;
+}
+
+export function formatSessionAge(seconds: number): string {
+  if (seconds % 3600 === 0) {
+    return String(seconds / 3600);
+  }
+  for (let digits = 1; digits <= 2; digits += 1) {
+    const text = trimDecimal((seconds / 3600).toFixed(digits));
+    if (sessionAgeSeconds(text) === seconds) {
+      return text;
+    }
+  }
+  if (seconds % 60 === 0) {
+    return `${seconds / 60}m`;
+  }
+  for (let digits = 3; digits <= 8; digits += 1) {
+    const text = trimDecimal((seconds / 3600).toFixed(digits));
+    if (sessionAgeSeconds(text) === seconds) {
+      return text;
+    }
+  }
+  return String(seconds / 3600);
+}
+
+function trimDecimal(value: string): string {
+  return value.replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "");
 }
 
 export function ssoConnectionInput(

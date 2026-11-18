@@ -119,7 +119,7 @@ func (p *Pipeline) bindExistingIdentity(tx *gorm.DB, conn *models.SSOConnection,
 }
 
 // AccountForEmail applies linking rules 3 and 4. The domain must be verified
-// by this organization before an existing account is linked.
+// by this organization before an account is linked or created.
 func (p *Pipeline) AccountForEmail(tx *gorm.DB, conn *models.SSOConnection, email, name string) (*models.Account, error) {
 	domain, ok := EmailDomain(email)
 	if !ok {
@@ -133,13 +133,13 @@ func (p *Pipeline) AccountForEmail(tx *gorm.DB, conn *models.SSOConnection, emai
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, err
 	}
+	if account != nil && account.IsBlocked() {
+		return nil, Fail(CodeAccountBlocked)
+	}
+	if !owned {
+		return nil, Fail(CodeAccountConflict)
+	}
 	if account != nil {
-		if account.IsBlocked() {
-			return nil, Fail(CodeAccountBlocked)
-		}
-		if !owned {
-			return nil, Fail(CodeAccountConflict)
-		}
 		return account, nil
 	}
 	created, err := models.CreateAccountInTransaction(tx, name, utils.NormalizeEmail(email))

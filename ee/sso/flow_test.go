@@ -344,12 +344,11 @@ func TestLinkingRules(t *testing.T) {
 		require.Equal(t, core.CodeAccountConflict, core.CodeOf(err))
 	})
 
-	t.Run("creates an account when the domain is not verified and nobody owns the email", func(t *testing.T) {
+	t.Run("refuses a new account when the domain is not verified", func(t *testing.T) {
 		err := f.signIn(conn, "subject-new-domain", "stranger@stranger.example")
-		require.NoError(t, err)
-		account, err := models.FindAccountByEmail("stranger@stranger.example")
-		require.NoError(t, err)
-		require.NotEqual(t, f.r.Account.ID, account.ID)
+		require.Equal(t, core.CodeAccountConflict, core.CodeOf(err))
+		_, err = models.FindAccountByEmail("stranger@stranger.example")
+		require.Error(t, err)
 	})
 
 	f.verifyExample()

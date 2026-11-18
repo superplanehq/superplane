@@ -341,16 +341,14 @@ export function PolicySection({ draft }: { draft: SsoDraft }) {
         disabled={!draft.canChange}
         onCheckedChange={draft.setOwnerBypass}
       />
-      <Label htmlFor="sso-session-hours">Maximum session age in hours</Label>
+      <Label htmlFor="sso-session-hours">Maximum session age</Label>
       <Input
         id="sso-session-hours"
-        type="number"
-        min={1}
-        max={168}
         value={draft.sessionHours}
         disabled={!draft.canChange}
         onChange={(event) => draft.setSessionHours(event.target.value)}
       />
+      <p className="text-sm text-muted-foreground">Use hours, such as 24 or 1.5, or minutes, such as 15m.</p>
       {draft.sessionError ? (
         <p className="text-sm text-red-600" role="alert">
           {draft.sessionError}
