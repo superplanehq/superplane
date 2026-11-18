@@ -1,5 +1,6 @@
 import type { OrganizationsIntegration } from "@/api-client";
 import { TooltipProvider } from "@/ui/tooltip";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 import { MemoryRouter } from "react-router";
@@ -54,12 +55,15 @@ vi.mock("@/hooks/useIntegrationCatalog", () => ({
 }));
 
 function renderCatalog() {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <MemoryRouter>
-      <TooltipProvider>
-        <IntegrationCatalog organizationId="org-1" appearance="factories" />
-      </TooltipProvider>
-    </MemoryRouter>,
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter>
+        <TooltipProvider>
+          <IntegrationCatalog organizationId="org-1" appearance="factories" />
+        </TooltipProvider>
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
 }
 
