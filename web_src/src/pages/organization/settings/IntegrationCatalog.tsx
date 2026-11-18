@@ -15,6 +15,8 @@ import { settingsModalClassName } from "./settingsPageStyles";
 import { GitHubAppInstallationLink } from "./GitHubAppInstallationLink";
 import { GitHubHostBadge } from "./GitHubHostBadge";
 import { GitHubConnectControls } from "./GitHubConnectControls";
+import { HostedGitHubConnectButton, HostedGitHubInstallations } from "./HostedGitHubConnect";
+import { useHostedGitHubConnect } from "./useHostedGitHubConnect";
 import { usesHostedGitHubAppInstall } from "@/lib/integrations";
 import { useIntegrationCatalog } from "@/hooks/useIntegrationCatalog";
 import { integrationStatusLabel, type IntegrationCatalogItem } from "@/lib/integrationCatalog";
@@ -119,17 +121,31 @@ function CatalogList({
 }) {
   return (
     <div className={styles.list}>
-      {catalog.filteredIntegrationCatalog.map((item) => (
-        <CatalogProviderCard
-          key={item.providerName}
-          appearance={appearance}
-          catalog={catalog}
-          item={item}
-          styles={styles}
-        />
-      ))}
+      {catalog.filteredIntegrationCatalog.map((item) =>
+        appearance === "factories" && usesHostedGitHubAppInstall(item.integrationDef ?? undefined) ? (
+          <HostedGitHubProviderCard key={item.providerName} catalog={catalog} item={item} styles={styles} />
+        ) : (
+          <CatalogProviderCard
+            key={item.providerName}
+            appearance={appearance}
+            catalog={catalog}
+            item={item}
+            styles={styles}
+          />
+        ),
+      )}
     </div>
   );
+}
+
+function HostedGitHubProviderCard(props: {
+  catalog: CatalogState;
+  item: IntegrationCatalogItem;
+  styles: CatalogStyles;
+}) {
+  const connectedNames = props.item.instances.map((integration) => integration.metadata?.name ?? "");
+  const hostedConnect = useHostedGitHubConnect(props.catalog.organizationId, connectedNames);
+  return <CatalogProviderCard {...props} appearance="factories" hostedConnect={hostedConnect} />;
 }
 
 function CatalogProviderCard({
@@ -137,11 +153,13 @@ function CatalogProviderCard({
   catalog,
   item,
   styles,
+  hostedConnect,
 }: {
   appearance: CatalogAppearance;
   catalog: CatalogState;
   item: IntegrationCatalogItem;
   styles: CatalogStyles;
+  hostedConnect?: ReturnType<typeof useHostedGitHubConnect>;
 }) {
   return (
     <section
@@ -165,13 +183,18 @@ function CatalogProviderCard({
             ) : null}
           </div>
         </div>
-        {usesHostedGitHubAppInstall(item.integrationDef ?? undefined) ? (
+        {hostedConnect?.loading ? null : hostedConnect?.enabled ? (
+          <HostedGitHubConnectButton
+            connect={hostedConnect}
+            canCreateIntegrations={catalog.canCreateIntegrations}
+            permissionsLoading={catalog.permissionsLoading}
+          />
+        ) : usesHostedGitHubAppInstall(item.integrationDef ?? undefined) ? (
           <GitHubConnectControls
             definition={item.integrationDef ?? undefined}
             canCreateIntegrations={catalog.canCreateIntegrations}
             permissionsLoading={catalog.permissionsLoading}
             onConnect={() => item.integrationDef && catalog.handleConnectClick(item.integrationDef)}
-            allowPrivateApp={appearance !== "factories"}
           />
         ) : (
           <PermissionTooltip
@@ -194,6 +217,9 @@ function CatalogProviderCard({
           </PermissionTooltip>
         )}
       </div>
+      {hostedConnect?.enabled ? (
+        <HostedGitHubInstallations connect={hostedConnect} canCreateIntegrations={catalog.canCreateIntegrations} />
+      ) : null}
       {item.instances.length > 0 ? (
         <div className={styles.instancesWrap}>
           <p className={styles.instanceCount}>

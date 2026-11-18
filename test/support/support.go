@@ -204,6 +204,14 @@ func CreateIntegrationWithCapabilities(
 	return integration
 }
 
+// CreateIntegrationID creates a pending integration and returns its ID, for
+// workspace fixtures that need a valid factories.vcs_integration_id.
+func CreateIntegrationID(t require.TestingT, organizationID uuid.UUID, appName string) string {
+	integration, err := models.CreateIntegration(uuid.New(), organizationID, appName, RandomName(appName), nil)
+	require.NoError(t, err)
+	return integration.ID.String()
+}
+
 func RandomName(prefix string) string {
 	return prefix + "-" + uuid.New().String()
 }
