@@ -790,7 +790,7 @@ func ListEnabledGitHubContextRepositoryNames(tx *gorm.DB, integrationID uuid.UUI
 		JOIN organizations AS organization
 			ON organization.id = factory.organization_id
 		WHERE factory.deleted_at IS NULL
-			AND factory.onboarding_config ->> 'vcs_integration_id' = ?
+			AND factory.vcs_integration_id = ?
 			AND resource.kind = ?
 			AND resource.enabled = TRUE
 			AND BTRIM(COALESCE(resource.config ->> 'repository', '')) <> ''
@@ -801,7 +801,7 @@ func ListEnabledGitHubContextRepositoryNames(tx *gorm.DB, integrationID uuid.UUI
 			AND (CASE
 				WHEN LOWER(COALESCE(resource.config ->> 'access', '')) = ?
 				THEN ? ELSE ? END) = ?
-	`, integrationID.String(), FactoryAgentResourceKindContextRepo, ProviderGitHub,
+	`, integrationID, FactoryAgentResourceKindContextRepo, ProviderGitHub,
 		FactoryContextRepoAccessWrite,
 		FactoryContextRepoAccessWrite, FactoryContextRepoAccessRead,
 		NormalizeContextRepoAccess(access)).Scan(&rows).Error

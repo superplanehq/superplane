@@ -13,6 +13,7 @@ import { MCPAddPicker } from "./MCPAddPicker";
 import { MCPCatalogSetupDialog } from "./MCPCatalogSetupDialog";
 import { MCPServerList } from "./MCPServerList";
 import { useMCPPage } from "./useMCPPage";
+import { WorkspaceGitConnectionCard } from "./WorkspaceGitConnectionCard";
 import { WorkspaceRepositoriesCard } from "./WorkspaceRepositoriesSection";
 import { WorkspaceSetupStepsSection } from "./WorkspaceSetupStepsSection";
 import { WorkspaceSkillsSection } from "./WorkspaceSkillsSection";
@@ -34,6 +35,13 @@ export function FactorySettingsAgentPage() {
           organizationId={page.organizationId}
           factoryId={page.factoryId}
           factoryKey={factoryRouteSegment(page.factory)}
+          canUpdate={page.canUpdate}
+        />
+        <WorkspaceGitConnectionCard
+          organizationId={page.organizationId}
+          factoryId={page.factoryId}
+          factoryKey={factoryRouteSegment(page.factory)}
+          factory={page.factory}
           canUpdate={page.canUpdate}
         />
         <WorkspaceRepositoriesCard

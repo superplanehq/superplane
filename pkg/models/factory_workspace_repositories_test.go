@@ -3,7 +3,6 @@ package models_test
 import (
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -19,7 +18,7 @@ func Test__FactoryWorkspaceRepositories(t *testing.T) {
 		t.Helper()
 		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 		require.NoError(t, err)
-		integrationID := uuid.NewString()
+		integrationID := support.CreateIntegrationID(t, r.Organization.ID, provider)
 		repository := "acme/app"
 		patch := models.FactoryOnboardingPatch{
 			VCSIntegrationID: &integrationID,
