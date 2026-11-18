@@ -39,6 +39,7 @@ export function FactorySettingsAgentPage() {
         <WorkspaceRepositoriesCard
           organizationId={page.organizationId}
           factoryId={page.factoryId}
+          factoryKey={factoryRouteSegment(page.factory)}
           factory={page.factory}
           canUpdate={page.canUpdate}
         />

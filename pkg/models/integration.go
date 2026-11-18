@@ -3,6 +3,7 @@ package models
 import (
 	"fmt"
 	"maps"
+	"regexp"
 	"strings"
 	"time"
 
@@ -385,6 +386,14 @@ func (a *Integration) SoftDeleteInTransaction(tx *gorm.DB) error {
 		"deleted_at":        now,
 		"installation_name": newName,
 	}).Error
+}
+
+var deletedIntegrationNameSuffix = regexp.MustCompile(` \(deleted-\d+\)$`)
+
+// NameBeforeDelete returns the name that canvases referenced before
+// SoftDeleteInTransaction renamed the integration.
+func (a *Integration) NameBeforeDelete() string {
+	return deletedIntegrationNameSuffix.ReplaceAllString(a.InstallationName, "")
 }
 
 func (a *Integration) GetRequest(ID string) (*IntegrationRequest, error) {

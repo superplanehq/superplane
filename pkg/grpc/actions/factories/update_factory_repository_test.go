@@ -522,7 +522,7 @@ func TestReplaceVCSNodeIntegration(t *testing.T) {
 	changed := replaceVCSNodeIntegration(
 		nodes,
 		map[string]bool{"managed": true},
-		previousID,
+		[]string{previousID},
 		"new-integration",
 		"acme/old",
 		"acme/old",
@@ -718,6 +718,98 @@ func TestUpdateFactoryRepositoryRejectsGitHubBranchWhenCheckCannotRun(t *testing
 	require.NoError(t, err)
 	assert.Equal(t, "main", reloaded.OnboardingConfigValue().DefaultBranch)
 	assert.Equal(t, "acme/api", reloaded.OnboardingConfigValue().AppRepository)
+}
+
+func TestUpdateFactoryRepositoryMovesAutomationsToTheSelectedConnection(t *testing.T) {
+	for _, testCase := range []struct {
+		name           string
+		deletePrevious bool
+	}{
+		{name: "switch from a live connection"},
+		{name: "rebind after the connection was deleted", deletePrevious: true},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			r := support.Setup(t)
+			db := database.DB(t.Context())
+			previousID := createReadyOnboardingIntegration(t, r.Organization.ID, models.ProviderGitHub)
+			previousName := integrationName(t, r.Organization.ID, previousID)
+			selectedID := createReadyOnboardingIntegration(t, r.Organization.ID, models.ProviderGitHub)
+			selectedName := integrationName(t, r.Organization.ID, selectedID)
+			factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+			require.NoError(t, err)
+			provider, repository, branch := models.ProviderGitHub, "acme/api", "main"
+			require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
+				VCSProvider: &provider, VCSIntegrationID: &previousID,
+				AppRepository: &repository, BacklogRepository: &repository, DefaultBranch: &branch,
+			}))
+			deps := IntakeDependencies{Registry: r.Registry, Encryptor: r.Encryptor, AuthService: r.AuthService, WebhookBaseURL: "http://localhost:8000"}
+			canvas := support.CreateFactoryCanvas(t, r, factory.ID, "Risk score")
+			publishRepositoryCanvas(t, r, deps, canvas, []models.Node{
+				{
+					ID: "on-pr-risk", Name: "Comment", Type: models.NodeTypeComponent,
+					Ref:           models.NodeRef{Component: &models.ComponentRef{Name: "github.createIssueComment"}},
+					IntegrationID: &previousID,
+					Configuration: map[string]any{"repository": repository},
+					Metadata:      models.FactoryAppTemplateMetadataFor("risk-score", 1, models.ProviderGitHub),
+				},
+				{
+					ID: "assess-risk", Name: "Assess risk", Type: models.NodeTypeComponent,
+					Ref: models.NodeRef{Component: &models.ComponentRef{Name: "runnerBash"}},
+					Configuration: map[string]any{
+						"machineType":     "e1-large-amd64",
+						"script":          "echo risk",
+						"environmentFrom": []any{map[string]any{"source": "integration", "integration": map[string]any{"name": previousName}}},
+					},
+				},
+			})
+			if testCase.deletePrevious {
+				previous, err := models.FindIntegrationInTransaction(db, r.Organization.ID, uuid.MustParse(previousID))
+				require.NoError(t, err)
+				require.NoError(t, previous.SoftDeleteInTransaction(db))
+				require.NoError(t, models.ClearFactoriesVCSIntegration(db, r.Organization.ID, previous.ID))
+			}
+
+			ctx := withRepositoryBranchResolver(
+				authentication.SetUserIdInMetadata(context.Background(), r.User.String()),
+				repositoryBranchResolver{gitHubBranches: func(string) ([]string, error) { return []string{branch}, nil }},
+			)
+			updated, err := UpdateFactoryRepository(ctx, deps, r.Organization.ID.String(), &pb.UpdateFactoryRepositoryRequest{
+				Id: factory.ID.String(), Repository: repository, DefaultBranch: branch, IntegrationId: &selectedID,
+			})
+			require.NoError(t, err)
+			assert.Equal(t, selectedID, updated.Factory.Onboarding.VcsIntegrationId)
+
+			version := liveRepositoryCanvas(t, db, r.Organization.ID, canvas)
+			assert.Equal(t, selectedID, *findIntakeNode(version.Nodes, "on-pr-risk").IntegrationID)
+			assert.Equal(t, []any{
+				map[string]any{"source": "integration", "integration": map[string]any{"name": selectedName}},
+			}, findIntakeNode(version.Nodes, "assess-risk").Configuration["environmentFrom"])
+		})
+	}
+}
+
+func TestUpdateFactoryRepositoryRejectsAConnectionFromAnotherGitHost(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	previousID := createReadyOnboardingIntegration(t, r.Organization.ID, models.ProviderGitHub)
+	bitbucketID := createReadyOnboardingIntegration(t, r.Organization.ID, models.ProviderBitbucket)
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	provider, repository, branch := models.ProviderGitHub, "acme/api", "main"
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
+		VCSProvider: &provider, VCSIntegrationID: &previousID,
+		AppRepository: &repository, BacklogRepository: &repository, DefaultBranch: &branch,
+	}))
+
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	_, err = UpdateFactoryRepository(ctx, IntakeDependencies{}, r.Organization.ID.String(), &pb.UpdateFactoryRepositoryRequest{
+		Id: factory.ID.String(), Repository: repository, DefaultBranch: branch, IntegrationId: &bitbucketID,
+	})
+	require.Error(t, err)
+
+	reloaded, err := models.FindFactory(db, r.Organization.ID, factory.ID)
+	require.NoError(t, err)
+	assert.Equal(t, previousID, reloaded.OnboardingConfigValue().VCSIntegrationID)
 }
 
 func githubCatalogFactory(t *testing.T, r *support.ResourceRegistry, db *gorm.DB) *models.Factory {
