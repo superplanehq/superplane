@@ -65,7 +65,7 @@ export type ColumnAutomation = {
   runningCount: number;
   catalogId: string;
   canvasId?: string;
-  /** Backlog schedule job. A person can start it before a task exists. */
+  /** Backlog automation that a person can start before a task exists. */
   canRunNow?: boolean;
   activity?: ColumnAutomationActivity;
 };

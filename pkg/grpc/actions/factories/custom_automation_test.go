@@ -182,6 +182,57 @@ func TestBacklogCustomAutomationLifecycle(t *testing.T) {
 	for _, node := range version.Nodes {
 		assert.NotEqual(t, "github.onPullRequest", node.ComponentName())
 	}
+	standalone, err := RunFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &pb.RunFactoryCustomAutomationRequest{
+		FactoryId: factory.ID.String(), AutomationId: automationID,
+	})
+	require.NoError(t, err)
+	standaloneEvent, err := models.FindCanvasEventForCanvas(db, canvas.ID, uuid.MustParse(standalone.GetEventId()))
+	require.NoError(t, err)
+	standaloneRun, err := models.FindCanvasRunInTransaction(db, canvas.ID, uuid.MustParse(standalone.GetRunId()))
+	require.NoError(t, err)
+	assert.Equal(t, trigger.ID, standaloneRun.NodeID)
+	assert.NotContains(t, models.RootEventSourcePayload(standaloneEvent.Data.Data()), "workOrder")
+	agent, err := models.FindCanvasNode(db, canvas.ID, customAutomationRunnerID)
+	require.NoError(t, err)
+	for _, legacy := range []bool{false, true} {
+		if legacy {
+			// Reproduce a saved automation from before standalone checkout support.
+			configuration := agent.Configuration.Data()
+			configuration["environment"] = taskColumnCheckoutEnvironment()
+			agent.Configuration = datatypes.NewJSONType(configuration)
+			require.NoError(t, db.Save(agent).Error)
+			for i := range version.Nodes {
+				if version.Nodes[i].ID == agent.NodeID {
+					version.Nodes[i].Configuration = configuration
+				}
+			}
+			require.NoError(t, db.Save(version).Error)
+			agent, err = models.FindCanvasNode(db, canvas.ID, customAutomationRunnerID)
+			require.NoError(t, err)
+			standalone, err = RunFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &pb.RunFactoryCustomAutomationRequest{
+				FactoryId: factory.ID.String(), AutomationId: automationID,
+			})
+			require.NoError(t, err)
+			standaloneEvent, err = models.FindCanvasEventForCanvas(db, canvas.ID, uuid.MustParse(standalone.GetEventId()))
+			require.NoError(t, err)
+			standaloneRun, err = models.FindCanvasRunInTransaction(db, canvas.ID, uuid.MustParse(standalone.GetRunId()))
+			require.NoError(t, err)
+		}
+		resolved, err := contexts.NewNodeConfigurationBuilder(db, canvas.ID).WithNodeID(agent.NodeID).
+			WithRunID(standaloneRun.ID).WithRootEvent(&standaloneEvent.ID).
+			WithInput(map[string]any{trigger.ID: standaloneEvent.Data.Data()}).Build(agent.Configuration.Data())
+		require.NoError(t, err)
+		env := environmentVars(t, resolved["environment"])
+		assert.Equal(t, "acme/app", env["REPO"])
+		assert.Equal(t, "https://github.com/acme/app.git", env["REPO_URL"])
+		assert.Equal(t, "main", env["BASE"])
+		steps := resolved["steps"].([]any)
+		require.Len(t, steps, 2)
+		assert.Equal(t, "Inspect the task.", steps[0].(map[string]any)["prompt"])
+	}
+	var placeholderCount int64
+	require.NoError(t, db.Model(&models.FactoryWorkOrder{}).Where("factory_id = ?", factory.ID).Count(&placeholderCount).Error)
+	assert.Zero(t, placeholderCount, "standalone starts must not create placeholder tasks")
 	order, err := factory.CreateWorkOrder(db, "Inspect this task", "Task context", &r.User, nil, nil)
 	require.NoError(t, err)
 	contexts.EmitWorkOrderCreated(db, factory, order)
@@ -197,6 +248,29 @@ func TestBacklogCustomAutomationLifecycle(t *testing.T) {
 	require.NoError(t, err)
 	payload := models.RootEventSourcePayload(event.Data.Data()).(map[string]any)
 	assert.Equal(t, order.ID.String(), payload["workOrder"].(map[string]any)["id"])
+	// The same saved runner must keep the supplied task checkout context.
+	taskCheckout := payload["workOrder"].(map[string]any)
+	for _, branch := range []string{"develop", ""} {
+		require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{DefaultBranch: &branch}))
+		for _, legacy := range []bool{false, true} {
+			configuration := agent.Configuration.Data()
+			configuration["environment"] = backlogSharedCheckoutEnvironment(factory, "")
+			if legacy {
+				configuration["environment"] = taskColumnCheckoutEnvironment()
+			}
+			resolved, err := contexts.NewNodeConfigurationBuilder(db, canvas.ID).WithNodeID(agent.NodeID).
+				WithRootEvent(&event.ID).WithInput(map[string]any{trigger.ID: event.Data.Data()}).Build(configuration)
+			require.NoError(t, err)
+			env := environmentVars(t, resolved["environment"])
+			assert.Equal(t, taskCheckout["repository"], env["REPO"])
+			assert.Equal(t, taskCheckout["repository_url"], env["REPO_URL"])
+			assert.Equal(t, taskCheckout["default_branch"], env["BASE"], "workspace branch %q, legacy %t", branch, legacy)
+			resolved, err = contexts.NewNodeConfigurationBuilder(db, canvas.ID).WithNodeID(agent.NodeID).
+				WithRootEvent(&standaloneEvent.ID).WithInput(map[string]any{trigger.ID: standaloneEvent.Data.Data()}).Build(configuration)
+			require.NoError(t, err)
+			assert.Equal(t, branch, environmentVars(t, resolved["environment"])["BASE"], "standalone legacy %t", legacy)
+		}
+	}
 	runs, err = order.ListRuns(db)
 	require.NoError(t, err)
 	require.Len(t, runs, 1)
@@ -210,6 +284,13 @@ func TestBacklogCustomAutomationLifecycle(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "backlog", updated.GetCustomAutomation().GetAutomation().GetColumnKey())
+	_, err = RunFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &pb.RunFactoryCustomAutomationRequest{
+		FactoryId: factory.ID.String(), AutomationId: automationID,
+	})
+	code, message, ok := grpcerrors.HandlerStatus(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.InvalidArgument, code)
+	assert.Contains(t, message, "no connected")
 	assert.Equal(t, "make lint", updated.GetCustomAutomation().GetSettings().GetSteps()[1].GetCommand())
 	runs, err = order.ListRuns(db)
 	require.NoError(t, err)
@@ -271,6 +352,30 @@ func TestBacklogCustomAutomationLifecycle(t *testing.T) {
 		FactoryId: factory.ID.String(), AutomationId: automationID, WorkOrderId: otherOrder.ID.String(),
 	})
 	require.Error(t, err, "tasks from another factory are not eligible")
+	canvas, err = models.FindCanvasInTransaction(db, r.Organization.ID, canvas.ID)
+	require.NoError(t, err)
+	version, err = models.FindLiveCanvasVersionByCanvasInTransaction(db, canvas)
+	require.NoError(t, err)
+	connectedEdges := version.Edges
+	version.Edges = datatypes.NewJSONSlice([]models.Edge{})
+	require.NoError(t, db.Save(version).Error)
+	_, err = RunFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &pb.RunFactoryCustomAutomationRequest{
+		FactoryId: factory.ID.String(), AutomationId: automationID,
+	})
+	code, message, ok = grpcerrors.HandlerStatus(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.InvalidArgument, code)
+	assert.Contains(t, message, "no connected")
+	version.Edges = connectedEdges
+	require.NoError(t, db.Save(version).Error)
+	triggerNode, err := models.FindCanvasNode(db, canvas.ID, customAutomationTaskTriggerID)
+	require.NoError(t, err)
+	_, err = models.DeleteCanvasNodeWithResult(db, *triggerNode)
+	require.NoError(t, err)
+	_, err = RunFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &pb.RunFactoryCustomAutomationRequest{
+		FactoryId: factory.ID.String(), AutomationId: automationID,
+	})
+	require.Error(t, err, "a connected trigger missing from storage cannot start a run")
 }
 
 func TestBacklogScheduledCustomAutomationCreatesATask(t *testing.T) {
@@ -464,6 +569,16 @@ func TestCustomAutomationMultipleTriggers(t *testing.T) {
 	require.NotEmpty(t, started.GetRunId())
 
 	duplicate := proto.Clone(settings).(*pb.FactoryCustomAutomation_Settings)
+	standalone, err := RunFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &pb.RunFactoryCustomAutomationRequest{
+		FactoryId: factory.ID.String(), AutomationId: automationID,
+	})
+	require.NoError(t, err)
+	standaloneRun, err := models.FindCanvasRunInTransaction(db, canvas.ID, uuid.MustParse(standalone.GetRunId()))
+	require.NoError(t, err)
+	assert.Equal(t, customAutomationTaskTriggerID, standaloneRun.NodeID, "Manual takes precedence over Schedule even with Automatic")
+	standaloneEvent, err := models.FindCanvasEventForCanvas(db, canvas.ID, uuid.MustParse(standalone.GetEventId()))
+	require.NoError(t, err)
+	assert.NotContains(t, models.RootEventSourcePayload(standaloneEvent.Data.Data()), "workOrder")
 	duplicate.Triggers = append(duplicate.Triggers, &pb.FactoryCustomAutomation_StartTrigger{StartMode: pb.FactoryCustomAutomation_START_MODE_AUTOMATIC})
 	_, err = UpdateFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &pb.UpdateFactoryCustomAutomationRequest{
 		FactoryId: factory.ID.String(), AutomationId: automationID, Name: "ESLint tasks", Settings: duplicate,
@@ -1027,6 +1142,10 @@ func TestImplementAndDoneCustomAutomationsStartFromTheTask(t *testing.T) {
 			trigger := customAutomationNode([]models.Node(version.Nodes), customAutomationTaskTriggerID)
 			require.NotNil(t, trigger)
 			assert.Equal(t, "onWorkOrder", trigger.ComponentName())
+			_, err = RunFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &pb.RunFactoryCustomAutomationRequest{
+				FactoryId: factory.ID.String(), AutomationId: canvas.ID.String(),
+			})
+			require.ErrorContains(t, err, "starts from a task")
 			order, err := factory.CreateWorkOrder(db, "Inspect this task", "Task context", &r.User, nil, nil)
 			require.NoError(t, err)
 			_, err = RunFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &pb.RunFactoryCustomAutomationRequest{

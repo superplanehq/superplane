@@ -124,7 +124,7 @@ export function BacklogColumn({
   const createMenu = useBacklogCreateMenu(organizationId, factoryId, onOpenWorkOrder);
   const { canAct } = usePermissions();
   const canUpdateWorkOrders = canAct("work_orders", "update");
-  const scheduleRun = useBacklogScheduleRun(organizationId, factoryId, factoryKey, lineId);
+  const standaloneRun = useBacklogStandaloneRun(organizationId, factoryId, factoryKey, lineId);
   const intakesQuery = useFactoryIntakes(organizationId, factoryId);
   const refreshBacklog = useRefreshBacklog(organizationId, factoryId);
   const onRefreshBacklog = () => void runBacklogRefresh(refreshBacklog.mutateAsync);
@@ -173,9 +173,9 @@ export function BacklogColumn({
           automations,
           rowCount: automationRowCount,
           onRowAction: onAutomationRowAction,
-          onRun: canUpdateWorkOrders ? scheduleRun.onRun : undefined,
-          runPending: scheduleRun.runPending,
-          runningAutomationId: scheduleRun.runningAutomationId,
+          onRun: canUpdateWorkOrders ? standaloneRun.onRun : undefined,
+          runPending: standaloneRun.runPending,
+          runningAutomationId: standaloneRun.runningAutomationId,
           testId: "lines-backlog-automation-rows",
         })}
         banner={<BacklogColumnBanner panel={intakePanel} />}
@@ -205,7 +205,7 @@ export function BacklogColumn({
   );
 }
 
-function useBacklogScheduleRun(organizationId: string, factoryId: string, factoryKey: string, lineId?: string) {
+function useBacklogStandaloneRun(organizationId: string, factoryId: string, factoryKey: string, lineId?: string) {
   const navigate = useNavigate();
   const runAutomation = useRunFactoryCustomAutomation(organizationId, factoryId);
   const [runningAutomationId, setRunningAutomationId] = useState<string | null>(null);

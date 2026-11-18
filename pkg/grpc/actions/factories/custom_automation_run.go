@@ -38,7 +38,7 @@ func RunFactoryCustomAutomation(
 		return nil, factoryErrorToStatus(err, "failed to run custom automation")
 	}
 	if strings.TrimSpace(req.GetWorkOrderId()) == "" {
-		return startScheduledCustomAutomation(db, canvas)
+		return startStandaloneCustomAutomation(db, canvas)
 	}
 	order, err := findWorkOrder(db, factory, req.GetWorkOrderId())
 	if err != nil {
@@ -138,9 +138,8 @@ func StartAutomaticTaskColumnCustomAutomations(
 	return nil
 }
 
-// startScheduledCustomAutomation starts the schedule chain. That chain creates a
-// task from the prompt result, so it does not need a task to already exist.
-func startScheduledCustomAutomation(db *gorm.DB, canvas *models.Canvas) (*pb.RunFactoryCustomAutomationResponse, error) {
+// startStandaloneCustomAutomation starts Backlog without granting task authority.
+func startStandaloneCustomAutomation(db *gorm.DB, canvas *models.Canvas) (*pb.RunFactoryCustomAutomationResponse, error) {
 	if canvas.ColumnKey == nil || *canvas.ColumnKey != models.CanvasColumnKeyBacklog {
 		return nil, factoryErrorToStatus(invalidArgument("This automation starts from a task."), "failed to run custom automation")
 	}
@@ -148,11 +147,16 @@ func startScheduledCustomAutomation(db *gorm.DB, canvas *models.Canvas) (*pb.Run
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to run custom automation")
 	}
-	scheduleID := scheduledCustomAutomationTriggerID(version)
-	if scheduleID == "" {
-		return nil, factoryErrorToStatus(invalidArgument("This automation starts from a task."), "failed to run custom automation")
+	triggerID := manualCustomAutomationTriggerID(version)
+	payloadType := "factory.customAutomation"
+	if triggerID == "" {
+		triggerID = scheduledCustomAutomationTriggerID(version)
+		payloadType = "scheduler.tick"
 	}
-	trigger, err := models.FindCanvasNode(db, canvas.ID, scheduleID)
+	if triggerID == "" {
+		return nil, factoryErrorToStatus(invalidArgument("This automation has no connected Manual or Schedule trigger."), "failed to run custom automation")
+	}
+	trigger, err := models.FindCanvasNode(db, canvas.ID, triggerID)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to run custom automation")
 	}
@@ -161,7 +165,7 @@ func startScheduledCustomAutomation(db *gorm.DB, canvas *models.Canvas) (*pb.Run
 	events := contexts.NewEventContext(db, trigger, nil, func(newEvents []models.CanvasEvent) {
 		created = append(created, newEvents...)
 	})
-	if err := events.Emit("scheduler.tick", map[string]any{}); err != nil {
+	if err := events.Emit(payloadType, map[string]any{}); err != nil {
 		return nil, factoryErrorToStatus(err, "failed to run custom automation")
 	}
 	if len(created) == 0 {
@@ -175,6 +179,19 @@ func startScheduledCustomAutomation(db *gorm.DB, canvas *models.Canvas) (*pb.Run
 		RunId:   event.RunID.String(),
 		EventId: event.ID.String(),
 	}, nil
+}
+
+func manualCustomAutomationTriggerID(version *models.CanvasVersion) string {
+	for _, node := range version.Nodes {
+		if node.Type != models.NodeTypeTrigger || node.ComponentName() == "schedule" {
+			continue
+		}
+		template, _ := node.Metadata[models.FactoryAppTemplateMetadataKey].(map[string]any)
+		if triggerMetadataHasMode(template, "manual") && slices.ContainsFunc(version.Edges, func(edge models.Edge) bool { return edge.SourceID == node.ID }) {
+			return node.ID
+		}
+	}
+	return ""
 }
 
 func taskCustomAutomationTriggerID(version *models.CanvasVersion) string {

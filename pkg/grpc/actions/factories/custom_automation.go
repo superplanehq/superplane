@@ -19,6 +19,7 @@ import (
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
+	"github.com/superplanehq/superplane/pkg/workers/contexts"
 	"github.com/superplanehq/superplane/pkg/yaml"
 	"gorm.io/gorm"
 )
@@ -564,6 +565,9 @@ func buildCustomAutomationCanvas(
 		doc.Spec.Nodes[1].Name = "Run automation"
 		doc.Metadata.Description = taskColumnRunDescription(settings.ColumnKey)
 		runnerConfiguration["environment"] = taskColumnCheckoutEnvironment()
+		if settings.ColumnKey == models.CanvasColumnKeyBacklog {
+			runnerConfiguration["environment"] = backlogSharedCheckoutEnvironment(factory, githubHostForFactory(tx, factory))
+		}
 	}
 	return doc, nil
 }
@@ -663,9 +667,11 @@ func buildMultiTriggerCustomAutomationCanvas(
 			taskConfiguration = map[string]any{}
 			taskEnvironment = taskColumnCheckoutEnvironment()
 			runnerName = "Run on task"
-			if backlog && len(schedules) > 0 {
-				runnerName = backlogTaskRunnerName
+			if backlog {
 				taskEnvironment = backlogSharedCheckoutEnvironment(factory, githubHost)
+				if len(schedules) > 0 {
+					runnerName = backlogTaskRunnerName
+				}
 			}
 		}
 		nodes = append(nodes, yaml.Node{
@@ -886,22 +892,7 @@ func backlogTaskSteps(raw any) []any {
 }
 
 func backlogSharedCheckoutEnvironment(factory *models.Factory, githubHost string) []any {
-	config := factory.OnboardingConfigValue()
-	repository := strings.TrimSpace(config.AppRepository)
-	url := runner.WorkspaceContextRepoURL(config.EffectiveVCSProvider(), repository, githubHost)
-	env := []any{
-		checkoutEnvironmentVar("REPO", fmt.Sprintf(`{{ root().data.workOrder?.repository ?? "%s" }}`, celString(repository))),
-		checkoutEnvironmentVar("REPO_URL", fmt.Sprintf(`{{ root().data.workOrder?.repository_url ?? "%s" }}`, celString(url))),
-		checkoutEnvironmentVar("SOURCE_REPO", repository),
-	}
-	if branch := strings.TrimSpace(config.DefaultBranch); branch != "" {
-		env = append(env, checkoutEnvironmentVar("BASE", fmt.Sprintf(`{{ root().data.workOrder?.default_branch ?? "%s" }}`, celString(branch))))
-	}
-	return env
-}
-
-func celString(value string) string {
-	return strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(value)
+	return contexts.BacklogSharedCheckoutEnvironment(factory, githubHost)
 }
 
 func stripBacklogTaskInstructions(prompt string) string {
