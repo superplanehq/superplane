@@ -25,6 +25,30 @@ type GetObjectOutputs = {
   not_found?: OutputPayload[];
 };
 
+function getFoundObjectDetails(result: GetObjectOutput): Record<string, string> {
+  const details: Record<string, string> = {
+    "File Path": result.filePath || "-",
+    "Origin Endpoint": result.endpoint || "-",
+    "Content Type": result.contentType || "-",
+    Size: result.size || "-",
+    "Last Modified": result.lastModified || "-",
+  };
+
+  if (result.tags && Object.keys(result.tags).length > 0) {
+    details["Tags"] = Object.entries(result.tags)
+      .map(([k, v]) => `${k}=${v}`)
+      .join(", ");
+  }
+
+  if (result.metadata && Object.keys(result.metadata).length > 0) {
+    details["Metadata"] = Object.entries(result.metadata)
+      .map(([k, v]) => `${k}=${v}`)
+      .join(", ");
+  }
+
+  return details;
+}
+
 const GET_OBJECT_STATE_MAP: EventStateMap = {
   ...DEFAULT_EVENT_STATE_MAP,
   found: {
@@ -103,25 +127,7 @@ export const getObjectMapper: ComponentBaseMapper = {
 
     if (!result) return details;
 
-    details["File Path"] = result.filePath || "-";
-    details["Origin Endpoint"] = result.endpoint || "-";
-    details["Content Type"] = result.contentType || "-";
-    details["Size"] = result.size || "-";
-    details["Last Modified"] = result.lastModified || "-";
-
-    if (result.tags && Object.keys(result.tags).length > 0) {
-      details["Tags"] = Object.entries(result.tags)
-        .map(([k, v]) => `${k}=${v}`)
-        .join(", ");
-    }
-
-    if (result.metadata && Object.keys(result.metadata).length > 0) {
-      details["Metadata"] = Object.entries(result.metadata)
-        .map(([k, v]) => `${k}=${v}`)
-        .join(", ");
-    }
-
-    return details;
+    return { ...details, ...getFoundObjectDetails(result) };
   },
 
   subtitle(context: SubtitleContext): string | React.ReactNode {
