@@ -25,7 +25,6 @@ import { FactorySettingsCard } from "./FactorySettingsCard";
 import { PrimaryRepositoryListItem } from "./PrimaryRepositoryEditor";
 import { useRepositoryBranchesPrefetch, useRepositoryDefaultBranch } from "./useRepositoryDefaultBranch";
 import { useWorkspaceRepositoryChoices } from "./useWorkspaceRepositoryChoices";
-import { WorkspaceGitConnectionField } from "./WorkspaceGitConnectionField";
 import { RepositoryAccessField, WorkspaceRepositoryFields } from "./WorkspaceRepositoryFields";
 import {
   isWorkspaceMainRepository,
@@ -212,13 +211,11 @@ function useContextRepoEdits(organizationId: string, factoryId: string) {
 export function WorkspaceRepositoriesCard({
   organizationId,
   factoryId,
-  factoryKey,
   factory,
   canUpdate,
 }: {
   organizationId: string;
   factoryId: string;
-  factoryKey: string;
   factory: RepositoryWorkspace | null | undefined;
   canUpdate: boolean;
 }) {
@@ -284,7 +281,6 @@ export function WorkspaceRepositoriesCard({
         }
         data-testid="agent-cross-repo"
       >
-        <WorkspaceGitConnectionField {...{ organizationId, factoryId, factoryKey, factory, choices, canUpdate }} />
         {contextRepos.isLoading ? (
           <p className="text-[13px] text-muted-foreground">{AGENT_RESOURCES_COPY.repositoriesLoadingResources}</p>
         ) : contextRepos.isError ? (
