@@ -51,7 +51,7 @@ func Test__UpdateFactoryOnboarding(t *testing.T) {
 		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 		require.NoError(t, err)
 
-		vcsID := uuid.New().String()
+		vcsID := support.CreateIntegrationID(t, r.Organization.ID, models.ProviderGitHub)
 		appRepo := "acme/api"
 		issuesSource := pb.FactoryOnboarding_ISSUES_SOURCE_VCS
 

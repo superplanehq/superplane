@@ -58,6 +58,7 @@ type Factory struct {
 	URLID                   string `gorm:"column:url_id"`
 	NextWorkOrderNumber     int64
 	OnboardingConfig        datatypes.JSONType[FactoryOnboardingConfig]
+	VCSIntegrationID        *uuid.UUID `gorm:"column:vcs_integration_id"`
 	OnboardingCompletedAt   *time.Time
 	HostedSpendBudgetCents  *int64
 	PlanningEnabled         bool

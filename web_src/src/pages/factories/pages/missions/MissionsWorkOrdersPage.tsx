@@ -33,7 +33,7 @@ export function MissionsWorkOrdersPage() {
   const canDispatch = canAct("work_orders", "update");
   const canAssign = canAct("work_orders", "update");
   const { headerKicker: hostedCreditHeaderKicker } = useHostedCreditChrome(organizationId, routeSegment);
-  const brokenIntegrationsBanner = useBrokenIntegrationsBanner(organizationId, routeSegment);
+  const brokenIntegrationsBanner = useBrokenIntegrationsBanner(organizationId, routeSegment, factory);
   const isOrdersLoading = workOrdersLoading || (workOrdersFetching && workOrders.length === 0);
 
   if (workOrdersError) {

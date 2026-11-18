@@ -3,6 +3,7 @@ package models
 import (
 	"fmt"
 	"maps"
+	"regexp"
 	"strings"
 	"time"
 
@@ -78,6 +79,14 @@ func NewIntegration(id, orgID uuid.UUID, appName string, installationName string
 
 func (a *Integration) TableName() string {
 	return "app_installations"
+}
+
+var deletedIntegrationNameSuffix = regexp.MustCompile(` \(deleted-\d+\)$`)
+
+// NameBeforeDelete returns the name that canvases referenced before
+// SoftDeleteInTransaction renamed the integration.
+func (a *Integration) NameBeforeDelete() string {
+	return deletedIntegrationNameSuffix.ReplaceAllString(a.InstallationName, "")
 }
 
 type IntegrationSecret struct {
