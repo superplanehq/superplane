@@ -75,7 +75,6 @@ function GitConnectionCard(props: CardProps & { repository: string }) {
           <Button
             type="button"
             size="sm"
-            variant={current ? "outline" : "default"}
             disabled={!props.canUpdate}
             onClick={() => setChoosing(true)}
             data-testid="agent-git-connection-change"
