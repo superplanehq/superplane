@@ -19,7 +19,7 @@ func TestFactoryVelocitySync_BitbucketFactory(t *testing.T) {
 	require.NoError(t, err)
 
 	provider := models.ProviderBitbucket
-	integrationID := uuid.New().String()
+	integrationID := support.CreateIntegrationID(t, r.Organization.ID, models.ProviderBitbucket)
 	repository := "acme/app"
 	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
 		VCSProvider:      &provider,

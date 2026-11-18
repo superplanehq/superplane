@@ -256,7 +256,7 @@ func Test__ListFactoryVelocitySyncTargets__NeedsIntegrationAndRepository(t *test
 	ready, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 
-	integrationID := uuid.New().String()
+	integrationID := support.CreateIntegrationID(t, r.Organization.ID, models.ProviderGitHub)
 	repository := "example/repo"
 	err = ready.UpdateOnboarding(db, models.FactoryOnboardingPatch{
 		VCSIntegrationID: &integrationID,
@@ -288,7 +288,7 @@ func Test__ListFactoryVelocitySyncTargets__SkipsFreshAndClaimedWorkspaces(t *tes
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 
-	integrationID := uuid.New().String()
+	integrationID := support.CreateIntegrationID(t, r.Organization.ID, models.ProviderGitHub)
 	repository := "example/repo"
 	err = factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
 		VCSIntegrationID: &integrationID,
@@ -336,7 +336,7 @@ func Test__FindFactoryVelocitySyncTarget(t *testing.T) {
 	require.NoError(t, err)
 	assert.Nil(t, bare, "a workspace without a repository has nothing to sync")
 
-	integrationID := uuid.New().String()
+	integrationID := support.CreateIntegrationID(t, r.Organization.ID, models.ProviderGitHub)
 	repository := "example/repo"
 	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
 		VCSIntegrationID: &integrationID,
@@ -368,7 +368,7 @@ func Test__FindFactoryVelocitySyncTarget(t *testing.T) {
 func Test__ListFactoryVelocitySyncTargets__LimitsOnlyAvailableRepositories(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
-	integrationID := uuid.New().String()
+	integrationID := support.CreateIntegrationID(t, r.Organization.ID, models.ProviderGitHub)
 	repository := "example/repo"
 	now := time.Now()
 	for i := range 201 {
