@@ -53,18 +53,9 @@ export const onAlertFiresTriggerRenderer: TriggerRenderer = {
       details["Received At"] = new Date(receivedAt).toLocaleString();
     }
 
-    const rule = payload?.ruleName || payload?.alertName || payload?.ruleId;
-    if (rule) details["Rule"] = String(rule);
-    if (payload?.alertName && payload.alertName !== rule) details["Alert Name"] = String(payload.alertName);
-    if (payload?.spaceId) details["Space"] = String(payload.spaceId);
-    if (payload?.status) details["Status"] = String(payload.status);
-    if (payload?.severity) details["Severity"] = String(payload.severity);
+    if (!payload) return details;
 
-    const tags = payload?.tags;
-    if (Array.isArray(tags) && tags.length > 0) {
-      details["Tags"] = tags.join(", ");
-    }
-
+    addAlertPayloadDetails(details, payload);
     return details;
   },
 
@@ -102,6 +93,20 @@ export const onAlertFiresTriggerRenderer: TriggerRenderer = {
     };
   },
 };
+
+function addAlertPayloadDetails(details: Record<string, string>, payload: ElasticAlertPayload): void {
+  const rule = payload.ruleName || payload.alertName || payload.ruleId;
+  if (rule) details["Rule"] = String(rule);
+  if (payload.alertName && payload.alertName !== rule) details["Alert Name"] = String(payload.alertName);
+  if (payload.spaceId) details["Space"] = String(payload.spaceId);
+  if (payload.status) details["Status"] = String(payload.status);
+  if (payload.severity) details["Severity"] = String(payload.severity);
+
+  const tags = payload.tags;
+  if (Array.isArray(tags) && tags.length > 0) {
+    details["Tags"] = tags.join(", ");
+  }
+}
 
 interface Predicate {
   type: string;
