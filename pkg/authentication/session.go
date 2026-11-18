@@ -90,12 +90,23 @@ func IsAccountSessionWithinMaxAge(claims jwtLib.MapClaims) bool {
 	return time.Since(start) <= AccountSessionMaxAge()
 }
 
+// SSOSessionClaim records organization SSO sign-ins on the account token.
+// The value is connection_id:auth_unix entries joined with commas.
+const SSOSessionClaim = "sso"
+
 // GenerateAccountToken creates a signed account_token JWT with session tracking.
-func GenerateAccountToken(jwtSigner *jwt.Signer, accountID string, sessionStart time.Time, ttl time.Duration) (string, error) {
-	return jwtSigner.GenerateWithClaims(ttl, map[string]string{
+// extra claims are copied into the token. Reserved time claims stay owned by the signer.
+func GenerateAccountToken(jwtSigner *jwt.Signer, accountID string, sessionStart time.Time, ttl time.Duration, extra ...map[string]string) (string, error) {
+	claims := map[string]string{
 		"sub":             accountID,
 		sessionStartClaim: fmt.Sprintf("%d", sessionStart.Unix()),
-	})
+	}
+	if len(extra) > 0 {
+		for key, value := range extra[0] {
+			claims[key] = value
+		}
+	}
+	return jwtSigner.GenerateWithClaims(ttl, claims)
 }
 
 // IssueAccountSession mints a fresh account_token for a new login session.
@@ -112,15 +123,20 @@ func IssueAccountSession(w http.ResponseWriter, r *http.Request, jwtSigner *jwt.
 	return err
 }
 
-func issueAccountSession(w http.ResponseWriter, r *http.Request, jwtSigner *jwt.Signer, accountID string, sessionStart time.Time) error {
+func issueAccountSession(w http.ResponseWriter, r *http.Request, jwtSigner *jwt.Signer, accountID string, sessionStart time.Time, extra ...map[string]string) error {
 	ttl := AccountSessionTTL()
-	token, err := GenerateAccountToken(jwtSigner, accountID, sessionStart, ttl)
+	token, err := GenerateAccountToken(jwtSigner, accountID, sessionStart, ttl, extra...)
 	if err != nil {
 		return err
 	}
 
 	SetAccountCookie(w, r, token, ttl)
 	return nil
+}
+
+// IssueAccountSessionWithClaims mints a session and keeps the supplied extra claims.
+func IssueAccountSessionWithClaims(w http.ResponseWriter, r *http.Request, jwtSigner *jwt.Signer, accountID string, sessionStart time.Time, extra map[string]string) error {
+	return issueAccountSession(w, r, jwtSigner, accountID, sessionStart, extra)
 }
 
 // MaybeRefreshAccountSession extends active sessions using a sliding window.
@@ -155,5 +171,39 @@ func MaybeRefreshAccountSession(w http.ResponseWriter, r *http.Request, jwtSigne
 		return
 	}
 
-	_ = issueAccountSession(w, r, jwtSigner, account.ID.String(), sessionStart)
+	extra := map[string]string{}
+	if sso, ok := claims[SSOSessionClaim].(string); ok && sso != "" {
+		extra[SSOSessionClaim] = sso
+	}
+	_ = issueAccountSession(w, r, jwtSigner, account.ID.String(), sessionStart, extra)
+}
+
+// AccountSessionFromRequest reads the account cookie claims used by SSO.
+// It does not load the account. Callers that already validated the session
+// can use it to read the sso claim.
+func AccountSessionFromRequest(r *http.Request, jwtSigner *jwt.Signer) (AccountSession, error) {
+	cookie, err := r.Cookie("account_token")
+	if err != nil {
+		return AccountSession{}, err
+	}
+	claims, err := jwtSigner.ValidateAndGetClaims(cookie.Value)
+	if err != nil {
+		return AccountSession{}, err
+	}
+	if !IsAccountSessionWithinMaxAge(claims) {
+		return AccountSession{}, fmt.Errorf("session exceeded maximum age")
+	}
+	accountID, _ := claims["sub"].(string)
+	if accountID == "" {
+		return AccountSession{}, fmt.Errorf("account ID missing from token")
+	}
+	iat, _ := claims["iat"].(float64)
+	sso, _ := claims[SSOSessionClaim].(string)
+	sessionStart, _ := SessionStartFromClaims(claims)
+	return AccountSession{
+		AccountID:    accountID,
+		IssuedAt:     int64(iat),
+		SessionStart: sessionStart,
+		SSO:          sso,
+	}, nil
 }
