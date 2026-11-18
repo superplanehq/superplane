@@ -38,7 +38,6 @@ export { FactorySettingsAccountSecurityPage } from "./settings/FactorySettingsAc
 export { FactorySettingsNotificationsPage } from "./settings/FactorySettingsNotificationsPage";
 export { FactorySettingsProfilePage } from "./settings/FactorySettingsProfilePage";
 export { FactorySettingsSoonPage } from "./settings/FactorySettingsSoonPage";
-export { FactorySettingsRepositoryPage } from "./settings/FactorySettingsRepositoryPage";
 export { FactorySettingsUsagePage } from "./settings/FactorySettingsUsagePage";
 export { FactorySettingsAgentPage } from "./settings/FactorySettingsAgentPage";
 export { FactorySettingsConnectPage } from "./settings/FactorySettingsConnectPage";

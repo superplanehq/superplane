@@ -6,10 +6,18 @@ export function PlanningSettingsMenu({
   enabled,
   disabled,
   onEnabledChange,
+  title = "Planning",
+  noun = "planning",
+  testId = "planning-settings",
+  onDelete,
 }: {
   enabled: boolean;
   disabled: boolean;
   onEnabledChange: (enabled: boolean) => void;
+  title?: string;
+  noun?: string;
+  testId?: string;
+  onDelete?: () => void;
 }) {
   return (
     <DropdownMenu>
@@ -19,8 +27,8 @@ export function PlanningSettingsMenu({
           size="icon"
           className="size-6"
           disabled={disabled}
-          aria-label="Planning menu"
-          data-testid="planning-settings-menu"
+          aria-label={`${title} menu`}
+          data-testid={`${testId}-menu`}
         >
           <MoreHorizontal className="size-4" aria-hidden />
         </Button>
@@ -29,11 +37,16 @@ export function PlanningSettingsMenu({
         <DropdownMenuItem
           disabled={disabled}
           onSelect={() => onEnabledChange(!enabled)}
-          data-testid={enabled ? "planning-settings-pause" : "planning-settings-resume"}
+          data-testid={`${testId}-${enabled ? "pause" : "resume"}`}
         >
           {enabled ? <Pause aria-hidden /> : <Play aria-hidden />}
-          {enabled ? "Pause planning" : "Resume planning"}
+          {enabled ? `Pause ${noun}` : `Resume ${noun}`}
         </DropdownMenuItem>
+        {onDelete ? (
+          <DropdownMenuItem className="text-destructive focus:text-destructive" disabled={disabled} onSelect={onDelete}>
+            Delete automation
+          </DropdownMenuItem>
+        ) : null}
       </DropdownMenuContent>
     </DropdownMenu>
   );

@@ -90,6 +90,7 @@ func PrepareHostedRun(ctx core.ExecutionContext, provider, model string) (core.H
 }
 
 func InjectHostedAPIKey(environment []TaskEnvironmentVariable, envName, apiKey string, extra ...TaskEnvironmentVariable) []TaskEnvironmentVariable {
+	environment = dropEnvironmentNames(environment, envName)
 	environment = append(environment, TaskEnvironmentVariable{Name: envName, Value: apiKey})
 	return append(environment, extra...)
 }

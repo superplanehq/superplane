@@ -276,7 +276,8 @@ func (s *InvitationService) validateRole(ctx context.Context, orgID, role string
 	if _, err := s.AuthService.GetRoleDefinition(ctx, role, models.DomainTypeOrganization, orgID); err != nil {
 		return grpcerrors.InvalidArgument(err, "Select an existing organization role.")
 	}
-	if !s.AuthService.IsDefaultRole(role, models.DomainTypeOrganization) && !licensing.Allows(s.Entitlements, licensing.FeatureCustomRoles) {
+	orgUUID, err := uuid.Parse(orgID)
+	if !s.AuthService.IsDefaultRole(role, models.DomainTypeOrganization) && (err != nil || !licensing.Allows(ctx, s.Entitlements, orgUUID, licensing.FeatureCustomRoles)) {
 		return grpcerrors.PermissionDenied(licensing.ErrNotLicensed, licensing.ErrNotLicensed.Error())
 	}
 	return nil

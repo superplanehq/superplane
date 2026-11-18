@@ -7,8 +7,10 @@ import (
 	"strings"
 	"time"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
 	factoryactions "github.com/superplanehq/superplane/pkg/grpc/actions/factories"
+	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/mcp"
 	"github.com/superplanehq/superplane/pkg/mcpserver"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -121,7 +123,7 @@ func (s *Server) handleMCPAuthorize(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "redirect_uri is not valid", http.StatusBadRequest)
 		return
 	}
-	http.Redirect(w, r, redirect, http.StatusFound)
+	http.Redirect(w, r, redirect, http.StatusFound) // #nosec G710 -- ResolveClient validates the registered OAuth redirect URI.
 }
 
 func consentClientName(client *mcpserver.Client) string {
@@ -150,7 +152,7 @@ func (s *Server) writeConsentPage(
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(status)
-	_, _ = w.Write(page)
+	_, _ = w.Write(page) // #nosec G705 -- RenderConsentPage uses html/template escaping.
 }
 
 func (s *Server) handleMCPToken(w http.ResponseWriter, r *http.Request) {
@@ -257,6 +259,11 @@ func (s *Server) handleMCP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
+	logging.AddRequestLogFields(r.Context(), log.Fields{
+		"user_id":         claims.UserID.String(),
+		"organization_id": claims.OrgID.String(),
+		"object":          "mcp",
+	})
 	if mcpserver.UserAccountBlocked(database.DB(r.Context()), claims.UserID) {
 		w.Header().Set("WWW-Authenticate", mcpserver.WWWAuthenticate(origin))
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -296,6 +303,9 @@ func (s *Server) handleMCP(w http.ResponseWriter, r *http.Request) {
 		BaseURL: s.BaseURL,
 	}
 	response := mcpserver.HandleJSONRPC(r.Context(), runtime, claims, message)
+	if response != nil && response.Error != nil {
+		logging.AddRequestLogFields(r.Context(), log.Fields{"outcome": "failure"})
+	}
 	if response == nil {
 		w.WriteHeader(http.StatusAccepted)
 		return

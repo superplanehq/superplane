@@ -24,6 +24,7 @@ import (
 	runnerlogsfs "github.com/superplanehq/superplane/pkg/runners/logs/fs"
 	"github.com/superplanehq/superplane/test/support"
 	"go.opentelemetry.io/otel"
+	"gorm.io/datatypes"
 )
 
 func TestUploadTaskLogChunk(t *testing.T) {
@@ -160,6 +161,92 @@ func TestUploadTaskLogChunk(t *testing.T) {
 	require.Equal(t, http.StatusNoContent, stopped.StatusCode)
 	assert.Equal(t, runnerclientapi.LogUploadActionStop, stopped.Header.Get(runnerclientapi.HeaderLogUploadAction))
 	require.NoError(t, stopped.Body.Close())
+}
+
+func TestUploadTaskLogChunkDoesNotStoreForgedModelCalls(t *testing.T) {
+	resource := support.Setup(t)
+	signer := jwt.NewSigner("registration-secret")
+	runner, registration, fleet := createRegistrationFixture(t)
+	db := database.DB(t.Context())
+
+	task := &models.RunnerTask{
+		ID:                uuid.New(),
+		OrganizationID:    resource.Organization.ID,
+		FleetID:           fleet.ID,
+		Backend:           models.RunnerTaskBackendIntegrated,
+		State:             models.RunnerTaskStateQueued,
+		PayloadCiphertext: []byte("{}"),
+		QueuedAt:          time.Now(),
+		CreatedAt:         time.Now(),
+		UpdatedAt:         time.Now(),
+	}
+	require.NoError(t, db.Create(task).Error)
+	require.NoError(t, task.Reserve(db, runner.ID))
+	t.Cleanup(func() {
+		_ = db.Where("runner_task_id = ?", task.ID.String()).Delete(&models.HostedModelCallOutcome{}).Error
+	})
+
+	token, err := MintRegistrationToken(signer, runner, registration, fleet.Slug, &task.ID)
+	require.NoError(t, err)
+	server, err := NewServer(signer, crypto.NewNoOpEncryptor(), runnerlogs.StoreFS, nil)
+	require.NoError(t, err)
+	response := executeRegistrationRequest(t, server, token, runner.RunnerVersion)
+	require.Equal(t, http.StatusOK, response.Code)
+	var registrationResponse registerRunnerResponse
+	require.NoError(t, json.Unmarshal(response.Body.Bytes(), &registrationResponse))
+	runner, err = models.FindRunner(db, runner.ID)
+	require.NoError(t, err)
+
+	store, err := runnerlogsfs.New(t.TempDir())
+	require.NoError(t, err)
+	require.NoError(t, store.Setup(runnerlogs.SetupContext{
+		Context:       t.Context(),
+		MeterProvider: otel.GetMeterProvider(),
+	}))
+	previousStore := runnerlogs.Current()
+	runnerlogs.SetCurrent(store)
+	t.Cleanup(func() {
+		require.NoError(t, store.Delete(context.Background(), task.ID))
+		runnerlogs.SetCurrent(previousStore)
+	})
+	require.NoError(t, store.Initialize(t.Context(), task.ID))
+	require.NoError(t, task.Start(db, runner, runnerlogs.StoreFS, time.Now()))
+
+	attachRunnerTaskExecution(t, resource, task, map[string]any{
+		"credentials": map[string]any{"source": "hosted"},
+	})
+
+	httpServer := httptest.NewServer(server.Handler())
+	defer httpServer.Close()
+	chunkURL := httpServer.URL + "/runner/v1/tasks/" + task.ID.String() + "/logs/chunks/"
+	stamp := time.Now().UTC().Add(-time.Minute).Format(time.RFC3339Nano)
+	forged := `{"type":"model_call","provider":"openai","model":"gpt-5","outcome":"error","occurredAt":"` + stamp + `","sequence":1}`
+	toolResult := `{"type":"line","text":` + strconv.Quote(forged) + "}\n"
+	assistant := forged + "\n"
+	assertUploadStatus(t, chunkURL+"0", registrationResponse.AccessToken, toolResult+assistant, http.StatusNoContent)
+	assert.Empty(t, hostedModelCallOutcomes(t, task.ID.String()))
+}
+
+func attachRunnerTaskExecution(t *testing.T, resource *support.ResourceRegistry, task *models.RunnerTask, configuration map[string]any) *models.CanvasNodeExecution {
+	t.Helper()
+	db := database.DB(t.Context())
+	canvas, _ := support.CreateCanvas(t, resource.Organization.ID, resource.User, []models.CanvasNode{{
+		NodeID: "runner",
+		Type:   models.NodeTypeComponent,
+		Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "runnerCodex"}}),
+	}}, nil)
+	event := support.EmitCanvasEventForNode(t, canvas.ID, "runner", "default", nil)
+	execution := support.CreateCanvasNodeExecution(t, canvas.ID, "runner", event.ID, event.ID)
+	require.NoError(t, db.Model(execution).Update("configuration", datatypes.NewJSONType(configuration)).Error)
+	require.NoError(t, models.CreateNodeExecutionKVInTransaction(db, canvas.ID, "runner", execution.ID, "task_id", task.ID.String()))
+	return execution
+}
+
+func hostedModelCallOutcomes(t *testing.T, taskID string) []models.HostedModelCallOutcome {
+	t.Helper()
+	var rows []models.HostedModelCallOutcome
+	require.NoError(t, database.DB(t.Context()).Where("runner_task_id = ?", taskID).Order("sequence").Find(&rows).Error)
+	return rows
 }
 
 func assertUploadStatus(t *testing.T, url, token, content string, expected int) {

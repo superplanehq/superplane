@@ -2,6 +2,7 @@ package workers
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"testing"
 	"time"
@@ -16,6 +17,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/features"
 	factoryactions "github.com/superplanehq/superplane/pkg/grpc/actions/factories"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+	"github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/models"
 	factorypb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -93,12 +95,23 @@ func Test__NodeRequestExecutor_CustomScheduleLifecycle(t *testing.T) {
 	require.NoError(t, err)
 	integration, err := models.CreateIntegration(uuid.New(), r.Organization.ID, "github", support.RandomName("github"), map[string]any{})
 	require.NoError(t, err)
-	require.NoError(t, db.Model(integration).Update("state", models.IntegrationStateReady).Error)
+	integration.State = models.IntegrationStateReady
+	setupState := datatypes.NewJSONType(models.SetupState{})
+	integration.SetupState = &setupState
+	integration.Properties = datatypes.JSONSlice[core.IntegrationPropertyDefinition]{
+		{Name: common.PropertyAuthMethod, Value: common.AuthMethodPAT},
+	}
+	require.NoError(t, db.Save(integration).Error)
+	require.NoError(t, contexts.NewIntegrationSecretStorage(db, r.Encryptor, integration).Create(core.IntegrationSecretDefinition{
+		Name: common.SecretPAT, Value: "test-github-token",
+	}))
 	repository, branch, integrationID := "acme/app", "main", integration.ID.String()
 	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{AppRepository: &repository, DefaultBranch: &branch, VCSIntegrationID: &integrationID}))
 	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
 	support.AssignOpenSystemTrial(t, r.Organization.ID)
-	claudeIntegration, err := models.CreateIntegration(uuid.New(), r.Organization.ID, "claude", support.RandomName("claude"), map[string]any{})
+	claudeIntegration, err := models.CreateIntegration(uuid.New(), r.Organization.ID, "claude", support.RandomName("claude"), map[string]any{
+		"apiKey": base64.StdEncoding.EncodeToString([]byte("test-claude-key")),
+	})
 	require.NoError(t, err)
 	require.NoError(t, db.Model(claudeIntegration).Update("state", models.IntegrationStateReady).Error)
 	_, err = models.UpsertOrganizationBYOKModelAllowlist(db, r.Organization.ID, models.UsageProviderAnthropic, datatypes.JSONSlice[string]{"claude-sonnet-4-6"})

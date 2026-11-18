@@ -13,6 +13,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	runneraction "github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/database"
+	factoryactions "github.com/superplanehq/superplane/pkg/grpc/actions/factories"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
@@ -188,6 +189,9 @@ func (s *Server) handleRunnerCloseTask(w http.ResponseWriter, r *http.Request) {
 	}
 	order := target.order
 
+	if err := factoryactions.StartAutomaticTaskColumnCustomAutomations(db, target.factory, order, models.CanvasColumnKeyDone); err != nil {
+		log.WithError(err).Warnf("Failed to start Done custom automation for order %s", order.ID)
+	}
 	publishRunnerTaskUpdate(target.factory, order, factoryevents.EventTypeOrderStatusUpdated)
 	notification := messages.FactoryWorkOrderNotificationMessage{
 		OrganizationID: target.factory.OrganizationID.String(),

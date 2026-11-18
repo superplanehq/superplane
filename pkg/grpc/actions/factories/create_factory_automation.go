@@ -50,7 +50,7 @@ func CreateFactoryAutomation(
 		return nil, factoryErrorToStatus(invalidArgument("Use the scheduled intake template for Backlog automations."), "failed to create factory automation")
 	}
 	if columnKey != "" && !models.ValidCanvasColumnKey(columnKey) {
-		return nil, factoryErrorToStatus(invalidArgument("column key must be backlog, verify, or done"), "failed to create factory automation")
+		return nil, factoryErrorToStatus(invalidArgument("column key must be backlog, implement, verify, or done"), "failed to create factory automation")
 	}
 
 	factory, err := findFactory(db, orgID, req.GetFactoryId())

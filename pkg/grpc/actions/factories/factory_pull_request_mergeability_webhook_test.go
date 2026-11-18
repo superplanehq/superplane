@@ -19,7 +19,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
@@ -945,10 +944,6 @@ func TestRefreshFactoryPullRequestMergeabilityFromGitHubEvent_ClosesWorkOrder(t 
 	}
 
 	t.Run("keeps the task open until every pull request is done", func(t *testing.T) {
-		require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryMultiRepoTasks))
-		defer func() {
-			require.NoError(t, models.DisableExperimentalFeature(r.Organization.ID, features.FeatureFactoryMultiRepoTasks))
-		}()
 		factory, order, webhook := setupOpenOrder(t, "acme/app", 67)
 		_, err := order.CreatePullRequest(db, models.FactoryPullRequestParams{
 			Provider:   models.FactoryPullRequestProviderGitHub,

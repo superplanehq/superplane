@@ -19,6 +19,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/factories/vcs"
 	"github.com/superplanehq/superplane/pkg/integrations/bitbucket"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
+	"github.com/superplanehq/superplane/pkg/integrations/github/components/pulls"
+	"github.com/superplanehq/superplane/pkg/integrations/prbody"
 	"github.com/superplanehq/superplane/pkg/models"
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
 	workercontexts "github.com/superplanehq/superplane/pkg/workers/contexts"
@@ -109,7 +111,7 @@ func newPublicationFixture(t *testing.T) publicationFixture {
 	require.NoError(t, db.Create(&models.CanvasEvent{WorkflowID: canvas.ID, NodeID: "trigger", RunID: run.ID, State: models.CanvasEventStateRouted, Data: models.NewJSONValue(map[string]any{"data": map[string]any{"pull_request": map[string]any{"head": map[string]any{"sha": "abc"}}}})}).Error)
 	_, err = pr.CreateActivity(db, models.FactoryPullRequestActivityParams{RunID: run.ID, Title: "Merge confidence"})
 	require.NoError(t, err)
-	return publicationFixture{db, workspace, order, pr, canvas, run, IntakeDependencies{Registry: r.Registry, Encryptor: r.Encryptor}}
+	return publicationFixture{db, workspace, order, pr, canvas, run, IntakeDependencies{Registry: r.Registry, Encryptor: r.Encryptor, AuthService: r.AuthService}}
 }
 
 func (f publicationFixture) report(t *testing.T, run *models.CanvasRun, score float64) {
@@ -129,16 +131,59 @@ func installPublicationGitHub(t *testing.T, httpCtx core.HTTPContext) {
 	}
 }
 
+// The publish node uses a GitHub integration, like an installed canvas, so
+// the body write can hold its pull request description lease.
+func (f publicationFixture) integrationPublicationAttempt(t *testing.T) *bodySectionActionAttempt {
+	t.Helper()
+	integration, err := models.CreateIntegration(uuid.New(), f.canvas.OrganizationID, "github", "github", nil)
+	require.NoError(t, err)
+	integrationID := integration.ID.String()
+	f.publishVersion(t, func(v *models.CanvasVersion) {
+		node := findIntakeNode(v.Nodes, "publish")
+		node.Ref.Component.Name = "github.updatePullRequestBodySection"
+		node.IntegrationID = &integrationID
+	})
+	require.NoError(t, f.db.Model(&models.CanvasNode{}).Where("workflow_id = ? AND node_id = ?", f.canvas.ID, "publish").Update("app_installation_id", integration.ID).Error)
+	f.startRun(t)
+	f.report(t, f.run, 4)
+	execution, request := f.publicationRequest(t, "passed")
+	configuration := execution.Configuration.Data()
+	delete(configuration, "pullRequestId")
+	configuration["repository"], configuration["pullNumber"] = "acme/app", "42"
+	execution.Configuration = datatypes.NewJSONType(configuration)
+	execution.Metadata = datatypes.NewJSONType(map[string]any{models.CanvasNodeExecutionFrozenComponentKey: "github.updatePullRequestBodySection"})
+	require.NoError(t, f.db.Save(execution).Error)
+	attempt := &bodySectionActionAttempt{request: request}
+	require.NoError(t, f.db.Transaction(func(tx *gorm.DB) error { return attempt.claim(tx) }))
+	return attempt
+}
+
+func publicationBodySectionClient(t *testing.T, host core.HTTPContext) prbody.Client {
+	t.Helper()
+	client, err := pulls.NewBodySectionClient(gitHubPermissionTestIntegration(), host)
+	require.NoError(t, err)
+	return client
+}
+
 func TestAssessmentCompletionEmitsStructuredMergeConfidence(t *testing.T) {
-	for _, channel := range []string{"passed", "failed"} {
-		t.Run(channel, func(t *testing.T) {
+	for _, scenario := range []struct {
+		name, channel string
+		reported      bool
+	}{
+		{"complete", "passed", true},
+		{"failed", "failed", true},
+		{"incomplete", "passed", false},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
 			f := newPublicationFixture(t)
-			f.report(t, f.run, 4)
+			if scenario.reported {
+				f.report(t, f.run, 4)
+			}
 			root, err := f.run.RootEvent(f.db)
 			require.NoError(t, err)
 			agent := support.CreateCanvasNodeExecution(t, f.canvas.ID, "agent", root.ID, root.ID)
-			state := workercontexts.NewExecutionStateContext(f.db, agent, nil)
-			require.NoError(t, state.Emit(channel, "runnerClaudeCode.finished", []any{map[string]any{"status": "finished"}}))
+			state := workercontexts.NewFactoryExecutionStateContext(f.db, agent, nil)
+			require.NoError(t, state.Emit(scenario.channel, "runnerClaudeCode.finished", []any{map[string]any{"status": "finished"}}))
 			var event models.CanvasEvent
 			require.NoError(t, f.db.Where("execution_id = ?", agent.ID).First(&event).Error)
 			payload := event.Data.Data().(map[string]any)["data"].(map[string]any)
@@ -146,9 +191,9 @@ func TestAssessmentCompletionEmitsStructuredMergeConfidence(t *testing.T) {
 			require.True(t, ok, "assessment completion must expose saved report data to downstream templates")
 			assert.Equal(t, f.pr.ID.String(), report["pullRequestId"])
 			assert.Equal(t, "abc", report["reviewedCommit"])
-			assert.Equal(t, channel == "passed", report["complete"])
+			assert.Equal(t, scenario.channel == "passed" && scenario.reported, report["complete"])
 			require.NoError(t, f.db.First(f.run, "id = ?", f.run.ID).Error)
-			assert.Equal(t, channel == "failed", len(f.run.Errors) > 0)
+			assert.Equal(t, report["complete"] != true, len(f.run.Errors) > 0)
 		})
 	}
 }
@@ -248,7 +293,7 @@ func TestMergeConfidenceTemplateReportFormat(t *testing.T) {
 }
 
 func TestAssessmentCompletionLeavesOtherAgentsUnchanged(t *testing.T) {
-	for _, scenario := range []string{"no scope", "wrong component", "nonfactory"} {
+	for _, scenario := range []string{"no scope", "wrong component", "nonfactory", "generic emission"} {
 		t.Run(scenario, func(t *testing.T) {
 			f := newPublicationFixture(t)
 			f.publishVersion(t, func(v *models.CanvasVersion) {
@@ -267,7 +312,10 @@ func TestAssessmentCompletionLeavesOtherAgentsUnchanged(t *testing.T) {
 			root, err := f.run.RootEvent(f.db)
 			require.NoError(t, err)
 			agent := support.CreateCanvasNodeExecution(t, f.canvas.ID, "agent", root.ID, root.ID)
-			state := workercontexts.NewExecutionStateContext(f.db, agent, nil)
+			state := workercontexts.NewFactoryExecutionStateContext(f.db, agent, nil)
+			if scenario == "generic emission" {
+				state = workercontexts.NewExecutionStateContext(f.db, agent, nil)
+			}
 			require.NoError(t, state.Emit("failed", "runnerClaudeCode.finished", []any{map[string]any{"status": "failed"}}))
 			var event models.CanvasEvent
 			require.NoError(t, f.db.Where("execution_id = ?", agent.ID).First(&event).Error)
@@ -285,8 +333,11 @@ func TestMergeConfidenceTemplateUsesRunSnapshots(t *testing.T) {
 	require.NoError(t, err)
 	f.report(t, other, 1)
 	require.NoError(t, f.db.Model(&models.CanvasNode{}).Where("workflow_id = ? AND node_id = ?", f.canvas.ID, "agent").Update("configuration", datatypes.NewJSONType(map[string]any{"steps": []any{}})).Error)
+	require.NoError(t, f.db.Model(&models.CanvasNode{}).Where("workflow_id = ? AND node_id = ?", f.canvas.ID, "agent").Update("ref", datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "runnerCodex"}})).Error)
 	f.publishVersion(t, func(version *models.CanvasVersion) {
-		findIntakeNode(version.Nodes, "agent").Configuration = map[string]any{"steps": []any{}}
+		current := findIntakeNode(version.Nodes, "agent")
+		current.Configuration = map[string]any{"steps": []any{}}
+		current.Ref.Component.Name = "runnerCodex"
 	})
 	execution, request := f.publicationRequest(t, "passed")
 	host := &contexts.HTTPContext{Responses: []*http.Response{publicationHTTPResponse(200, `{"state":"open","head":{"sha":"abc"},"body":"original"}`), publicationHTTPResponse(200, "{}")}}
@@ -460,7 +511,7 @@ func TestUpdatePullRequestBodySectionRejectsStaleRuns(t *testing.T) {
 	}
 }
 
-func TestUpdatePullRequestBodySectionRefetchesOnRetryAndSkipsUnchanged(t *testing.T) {
+func TestUpdatePullRequestBodySectionRefetchesOnRetryAndReportsUnchanged(t *testing.T) {
 	for _, provider := range []string{"github", "bitbucket"} {
 		t.Run(provider, func(t *testing.T) {
 			f := newPublicationFixture(t)
@@ -498,7 +549,9 @@ func TestUpdatePullRequestBodySectionRefetchesOnRetryAndSkipsUnchanged(t *testin
 			assert.True(t, strings.HasPrefix(update[field], "user edit\r\n"+initial))
 			assert.Contains(t, update[field], "arbitrary **Markdown**")
 			httpCtx.Responses = []*http.Response{read(update[field])}
-			require.NoError(t, f.publish(t, IntakeDependencies{}))
+			outcome, err := f.publishOutcome(t, IntakeDependencies{})
+			require.NoError(t, err)
+			assert.Equal(t, prbody.StatusUnchanged, outcome.Status)
 			require.Len(t, httpCtx.Requests, 5)
 		})
 	}
@@ -582,7 +635,7 @@ func TestUpdatePullRequestBodySectionRetriesVCSSetupFailures(t *testing.T) {
 			// The integration does not exist, so the connection is missing.
 			outcome, err := f.publishOutcome(t, f.deps)
 			require.NoError(t, err)
-			assert.Equal(t, "skipped", outcome.Status)
+			assert.Equal(t, prbody.StatusSkipped, outcome.Status)
 
 			// A failed integration lookup is temporary and must retry.
 			failingLookup, cancel := context.WithCancel(t.Context())
@@ -635,6 +688,6 @@ func TestBodySectionPublicationIgnoresNewerRunsForOtherSections(t *testing.T) {
 	installPublicationGitHub(t, host)
 	outcome, err := f.publishOutcome(t, IntakeDependencies{})
 	require.NoError(t, err)
-	assert.Equal(t, "published", outcome.Status)
+	assert.Equal(t, prbody.StatusPublished, outcome.Status)
 	require.Len(t, host.Requests, 2)
 }

@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	pw "github.com/mxschmitt/playwright-go"
+	"github.com/superplanehq/superplane/pkg/enterprise"
 	"github.com/superplanehq/superplane/pkg/licensing"
 	"github.com/superplanehq/superplane/pkg/licensing/licensingtest"
 	"github.com/superplanehq/superplane/pkg/server"
@@ -79,10 +81,19 @@ func (s *TestContext) Start() {
 		os.Setenv("BLOB_STORAGE_LOCAL_PATH", filepath.Join(os.TempDir(), "superplane-e2e-blobs"))
 	}
 
-	server.SetLicenseServiceForTests(licensingtest.EnterpriseService(
-		licensing.FeatureCustomRoles,
-		licensing.FeatureGroups,
-	))
+	issuer := licensingtest.NewIssuer("e2e")
+	licenseService := licensing.NewService(
+		licensing.NewVerifier(licensingtest.KeySet(issuer)),
+		licensingtest.StaticSource{Raw: issuer.License(
+			licensing.FeatureCustomRoles,
+			licensing.FeatureGroups,
+		)},
+		licensing.WithGrantLookup(enterprise.DatabaseGrantLookup{}),
+	)
+	if err := licenseService.Refresh(context.Background()); err != nil {
+		panic("load e2e license: " + err.Error())
+	}
+	server.SetLicenseServiceForTests(licenseService)
 
 	s.startVite()
 	s.startAppServer()

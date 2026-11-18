@@ -1,0 +1,121 @@
+syntax = "proto3";
+
+package Superplane.Admin.EnterpriseFeatures;
+
+import "google/api/annotations.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/superplanehq/superplane/pkg/protos/admin/enterprise_features";
+
+service EnterpriseFeatures {
+  rpc ListOrganizationEnterpriseFeatures(ListOrganizationEnterpriseFeaturesRequest)
+      returns (ListOrganizationEnterpriseFeaturesResponse) {
+    option (google.api.http) = {
+      get: "/admin/api/organizations/{organization_id}/enterprise-features"
+    };
+  }
+
+  rpc SetOrganizationEnterpriseFeatures(SetOrganizationEnterpriseFeaturesRequest)
+      returns (SetOrganizationEnterpriseFeaturesResponse) {
+    option (google.api.http) = {
+      put: "/admin/api/organizations/{organization_id}/enterprise-features"
+      body: "*"
+    };
+  }
+
+  rpc ListEnterpriseFeatureOrganizations(ListEnterpriseFeatureOrganizationsRequest)
+      returns (ListEnterpriseFeatureOrganizationsResponse) {
+    option (google.api.http) = {
+      get: "/admin/api/installation/enterprise-features/{feature_key}/organizations"
+    };
+  }
+
+  rpc ListLicenseActivations(ListLicenseActivationsRequest)
+      returns (ListLicenseActivationsResponse) {
+    option (google.api.http) = {
+      get: "/admin/api/installation/license/activations"
+    };
+  }
+}
+
+message OrganizationEnterpriseFeature {
+  string key = 1;
+  bool licensed = 2;
+  bool granted = 3;
+  bool effective = 4;
+  string source = 5;
+  string granted_by = 6;
+  string granted_by_name = 7;
+  google.protobuf.Timestamp created_at = 8;
+}
+
+message ListOrganizationEnterpriseFeaturesRequest {
+  string organization_id = 1;
+}
+
+message ListOrganizationEnterpriseFeaturesResponse {
+  repeated OrganizationEnterpriseFeature features = 1;
+  bool license_active = 2;
+}
+
+message SetOrganizationEnterpriseFeaturesRequest {
+  string organization_id = 1;
+  repeated string features = 2;
+}
+
+message SetOrganizationEnterpriseFeaturesResponse {
+  repeated OrganizationEnterpriseFeature features = 1;
+  repeated string added = 2;
+  repeated string removed = 3;
+}
+
+message ListEnterpriseFeatureOrganizationsRequest {
+  string feature_key = 1;
+  int32 page_size = 2;
+  string page_token = 3;
+}
+
+message EnterpriseFeatureOrganization {
+  string organization_id = 1;
+  string name = 2;
+  string slug = 3;
+  string source = 4;
+  google.protobuf.Timestamp created_at = 5;
+}
+
+message ListEnterpriseFeatureOrganizationsResponse {
+  repeated EnterpriseFeatureOrganization organizations = 1;
+  string next_page_token = 2;
+  int64 total = 3;
+}
+
+message RemovedEnterpriseGrant {
+  string organization_id = 1;
+  string organization_name = 2;
+  string feature_key = 3;
+  string source = 4;
+  string removed_by = 5;
+  google.protobuf.Timestamp removed_at = 6;
+}
+
+message LicenseActivation {
+  string id = 1;
+  string license_id = 2;
+  repeated string license_features = 3;
+  google.protobuf.Timestamp activated_at = 4;
+  int32 organization_count = 5;
+  bool auto_granted = 6;
+  google.protobuf.Timestamp deactivated_at = 7;
+  string deactivation_reason = 8;
+  repeated RemovedEnterpriseGrant removed_grants = 9;
+}
+
+message ListLicenseActivationsRequest {
+  int32 page_size = 1;
+  string page_token = 2;
+}
+
+message ListLicenseActivationsResponse {
+  repeated LicenseActivation activations = 1;
+  string next_page_token = 2;
+}

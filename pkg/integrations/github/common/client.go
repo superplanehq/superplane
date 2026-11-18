@@ -45,6 +45,11 @@ type Client struct {
 	underlying *github.Client
 }
 
+func (c *Client) RepositoryFullName(repository string) string {
+	owner, name := c.ownerAndName(repository)
+	return owner + "/" + name
+}
+
 func (c *Client) Host() Host {
 	if c == nil {
 		return DotCom()
@@ -255,6 +260,11 @@ func (c *Client) GetPullRequest(ctx context.Context, repository string, pullNumb
 	return c.underlying.PullRequests.Get(ctx, owner, name, pullNumber)
 }
 
+func (c *Client) GetCommit(ctx context.Context, repository, sha string) (*github.RepositoryCommit, *github.Response, error) {
+	owner, name := c.ownerAndName(repository)
+	return c.underlying.Repositories.GetCommit(ctx, owner, name, sha, nil)
+}
+
 // ListPullRequests returns one page of a repository's pull requests.
 //
 // This is the plain REST endpoint, which draws on the 5000-per-hour budget.
@@ -422,6 +432,11 @@ func (c *Client) AddPullRequestReviewers(ctx context.Context, repository string,
 	return c.underlying.PullRequests.RequestReviewers(ctx, owner, name, pullNumber, reviewers)
 }
 
+func (c *Client) RemovePullRequestReviewers(ctx context.Context, repository string, pullNumber int, reviewers github.ReviewersRequest) (*github.Response, error) {
+	owner, name := c.ownerAndName(repository)
+	return c.underlying.PullRequests.RemoveReviewers(ctx, owner, name, pullNumber, reviewers)
+}
+
 func (c *Client) CreateStatus(ctx context.Context, repository string, sha string, status github.RepoStatus) (*github.RepoStatus, *github.Response, error) {
 	owner, name := c.ownerAndName(repository)
 	return c.underlying.Repositories.CreateStatus(ctx, owner, name, sha, status)
@@ -435,6 +450,16 @@ func (c *Client) GetCombinedStatus(ctx context.Context, repository string, ref s
 func (c *Client) ListCheckRunsForRef(ctx context.Context, repository string, ref string, opts *github.ListCheckRunsOptions) (*github.ListCheckRunsResults, *github.Response, error) {
 	owner, name := c.ownerAndName(repository)
 	return c.underlying.Checks.ListCheckRunsForRef(ctx, owner, name, ref, opts)
+}
+
+func (c *Client) CreateCheckRun(ctx context.Context, repository string, opts github.CreateCheckRunOptions) (*github.CheckRun, *github.Response, error) {
+	owner, name := c.ownerAndName(repository)
+	return c.underlying.Checks.CreateCheckRun(ctx, owner, name, opts)
+}
+
+func (c *Client) UpdateCheckRun(ctx context.Context, repository string, id int64, opts github.UpdateCheckRunOptions) (*github.CheckRun, *github.Response, error) {
+	owner, name := c.ownerAndName(repository)
+	return c.underlying.Checks.UpdateCheckRun(ctx, owner, name, id, opts)
 }
 
 // GetBranchProtection returns required status checks for a branch. A missing
@@ -508,6 +533,11 @@ func (c *Client) RemoveIssueAssignees(ctx context.Context, repository string, is
 func (c *Client) CreateIssueComment(ctx context.Context, repository string, issueNumber int, comment *github.IssueComment) (*github.IssueComment, *github.Response, error) {
 	owner, name := c.ownerAndName(repository)
 	return c.underlying.Issues.CreateComment(ctx, owner, name, issueNumber, comment)
+}
+
+func (c *Client) GetIssueComment(ctx context.Context, repository string, commentID int64) (*github.IssueComment, *github.Response, error) {
+	owner, name := c.ownerAndName(repository)
+	return c.underlying.Issues.GetComment(ctx, owner, name, commentID)
 }
 
 func (c *Client) EditIssueComment(ctx context.Context, repository string, commentID int64, comment *github.IssueComment) (*github.IssueComment, *github.Response, error) {
@@ -752,7 +782,10 @@ func (c *Client) HTTPDo(req *http.Request) (*http.Response, error) {
 	if c == nil || c.underlying == nil {
 		return nil, fmt.Errorf("github client is not configured")
 	}
-	return c.underlying.Client().Do(req)
+	if req == nil || req.URL == nil || req.URL.Scheme != "https" || !c.Host().Matches(req.URL.Hostname()) {
+		return nil, fmt.Errorf("github request URL is not allowed")
+	}
+	return c.underlying.Client().Do(req) // #nosec G704 -- the scheme and configured GitHub host are allowlisted above.
 }
 
 func NewClient(ctx core.IntegrationContext, httpCtx core.HTTPContext) (*Client, error) {

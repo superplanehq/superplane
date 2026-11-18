@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { factoryVCSProvider } from "@/pages/home/factories";
 import { factoryAppsKey, useCreateFactoryAutomation } from "@/hooks/useFactoryData";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
-import { FEATURE_FACTORY_CUSTOM_AUTOMATIONS } from "@/lib/experimentalFeatures";
+import { FEATURE_FACTORY_CUSTOM_AUTOMATIONS, FEATURE_FACTORY_REVIEW_REQUEST } from "@/lib/experimentalFeatures";
 import { showErrorToast } from "@/lib/toast";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { useInstallFactory } from "@/pages/home/useInstallFactory";
@@ -46,7 +46,8 @@ export function useAddColumnAutomation(args: {
   const { installFactory, isInstalling } = useInstallFactory({ organizationId: args.organizationId });
   const experimentalFeatures = useExperimentalFeature(args.organizationId);
   const allowCustom = experimentalFeatures.has(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
-  const catalogOptions = { allowCustom, vcsProvider: args.vcsProvider };
+  const allowReviewRequest = experimentalFeatures.has(FEATURE_FACTORY_REVIEW_REQUEST);
+  const catalogOptions = { allowCustom, allowReviewRequest, vcsProvider: args.vcsProvider };
 
   const catalog = column ? catalogForColumn(column, catalogOptions) : [];
   const takenIds = column ? takenCatalogIds(args.automationsFor(column), catalog) : [];
@@ -59,8 +60,11 @@ export function useAddColumnAutomation(args: {
   const openPicker = (key: ColumnKey) => {
     const nextCatalog = catalogForColumn(key, catalogOptions);
     const nextTaken = takenCatalogIds(args.automationsFor(key), nextCatalog);
-    if (key === "verify" && onlyCustomCatalogRemains(nextCatalog, nextTaken) && args.lineId) {
-      navigate(factoryCustomAutomationSetupPath(args.organizationId, args.factoryKey, args.lineId));
+    const setupColumn = customAutomationSetupColumn(key);
+    if (setupColumn !== null && onlyCustomCatalogRemains(nextCatalog, nextTaken) && args.lineId) {
+      navigate(
+        factoryCustomAutomationSetupPath(args.organizationId, args.factoryKey, args.lineId, undefined, setupColumn),
+      );
       return;
     }
     setColumn(key);
@@ -72,7 +76,7 @@ export function useAddColumnAutomation(args: {
       return;
     }
     if (entry.kind === "pr-discussion" || entry.kind === "pr-checks" || entry.kind === "custom-verification") {
-      openFocusedVerifySetup(entry, args, navigate, closePicker);
+      openFocusedVerifySetup(entry, column, args, navigate, closePicker);
       return;
     }
     if (entry.kind === "pr-closure") {
@@ -84,16 +88,9 @@ export function useAddColumnAutomation(args: {
       });
       return;
     }
-    if (entry.kind === "visual-evidence") {
-      if (factoryVCSProvider(args.vcsProvider) !== "github") {
-        showErrorToast("Visual evidence is available for GitHub only.");
-        return;
-      }
-      await installBundledCanvas(args, installFactory, queryClient, closePicker, {
-        factoryId: "visual-evidence",
-        provider: "github",
-        missingIntegrationMessage: "Connect GitHub in workspace setup before you add visual evidence.",
-      });
+    if (entry.kind === "visual-evidence" || entry.kind === "review-request") {
+      const template = githubVerifyTemplate(entry.kind, args.vcsProvider, allowReviewRequest);
+      if (template) await installBundledCanvas(args, installFactory, queryClient, closePicker, template);
       return;
     }
     if (entry.kind === "risk-score") {
@@ -138,14 +135,40 @@ export function useAddColumnAutomation(args: {
   };
 }
 
+function githubVerifyTemplate(
+  kind: "visual-evidence" | "review-request",
+  vcsProvider: string | undefined,
+  allowReviewRequest: boolean,
+) {
+  if (kind === "review-request" && !allowReviewRequest) return undefined;
+  if (factoryVCSProvider(vcsProvider) !== "github") {
+    if (kind === "visual-evidence") showErrorToast("Visual evidence is available for GitHub only.");
+    return undefined;
+  }
+  const label = kind === "review-request" ? "Review request" : "visual evidence";
+  return {
+    factoryId: kind,
+    provider: "github" as const,
+    missingIntegrationMessage: `Connect GitHub in workspace setup before you add ${label}.`,
+  };
+}
+
+function customAutomationSetupColumn(key: ColumnKey): "implement" | "verify" | "done" | undefined | null {
+  if (key === "verify") return undefined;
+  if (key === "done") return "done";
+  if (key === "phase-0") return "implement";
+  return null;
+}
+
 function openFocusedVerifySetup(
   entry: ColumnAutomationCatalogEntry,
+  column: ColumnKey,
   args: { organizationId: string; factoryKey: string; lineId?: string },
   navigate: (path: string) => void,
   close: () => void,
 ) {
   const sourceId = entry.id === "checks" ? "checks" : "discussion";
-  const href = args.lineId ? focusedVerifySetupPath(entry, args, sourceId) : undefined;
+  const href = args.lineId ? focusedVerifySetupPath(entry, column, args, sourceId) : undefined;
   close();
   if (href) {
     navigate(href);
@@ -154,6 +177,7 @@ function openFocusedVerifySetup(
 
 function focusedVerifySetupPath(
   entry: ColumnAutomationCatalogEntry,
+  column: ColumnKey,
   args: { organizationId: string; factoryKey: string; lineId?: string },
   sourceId: "checks" | "discussion",
 ): string | undefined {
@@ -161,7 +185,14 @@ function focusedVerifySetupPath(
     return undefined;
   }
   if (entry.kind === "custom-verification") {
-    return factoryCustomAutomationSetupPath(args.organizationId, args.factoryKey, args.lineId);
+    const setupColumn = customAutomationSetupColumn(column);
+    return factoryCustomAutomationSetupPath(
+      args.organizationId,
+      args.factoryKey,
+      args.lineId,
+      undefined,
+      setupColumn ?? undefined,
+    );
   }
   return factoryPRFeedbackSetupPath(
     args.organizationId,

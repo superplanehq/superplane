@@ -241,9 +241,6 @@ func Test__Datadog__HandleRequest(t *testing.T) {
 		assertDatadogReceipt(t, lines[0], organizationID, integrationID.String(), "received", "error_tracking_alert", "Triggered")
 		assert.Equal(t, "info", lines[0]["level"])
 		assert.NotContains(t, logs.String(), "secret-token")
-		payload, ok := lines[0]["payload"].(map[string]any)
-		require.True(t, ok)
-		assert.Contains(t, payload["body"], "InventoryTimeout")
 	})
 
 	t.Run("rejects a body larger than the webhook limit", func(t *testing.T) {
@@ -479,7 +476,6 @@ func Test__Datadog__HandleRequest(t *testing.T) {
 		require.Len(t, lines, 1)
 		assertDatadogReceipt(t, lines[0], organizationID, integrationID.String(), "failed", "unknown", "")
 		assert.Equal(t, "error", lines[0]["level"])
-		assert.Equal(t, "{", lines[0]["payload"])
 	})
 }
 

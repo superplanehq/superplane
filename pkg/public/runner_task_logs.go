@@ -80,6 +80,12 @@ func (s *Server) serveRunnerTaskLogs(
 			writeRunnerLogNotReady(w)
 			return
 		}
+		// Tasks rejected or canceled before starting never create logs.
+		if task.Backend == models.RunnerTaskBackendIntegrated && task.StartedAt == nil {
+			writeRunnerLogState(w, models.RunnerTaskLogStateArchived, "")
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
 		s.serveFinalRunnerTaskLog(w, r, task, nil)
 		return
 	}

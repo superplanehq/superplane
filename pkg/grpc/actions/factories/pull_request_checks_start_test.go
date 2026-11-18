@@ -563,7 +563,10 @@ func emitChecksStartupWebhook(t *testing.T, node *models.CanvasNode, payload map
 	headers := http.Header{}
 	headers.Set("X-GitHub-Event", "pull_request")
 	headers.Set("X-Hub-Signature-256", "sha256="+fmt.Sprintf("%x", mac.Sum(nil)))
+	canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(database.DB(t.Context()), node.WorkflowID)
+	require.NoError(t, err)
 	code, _, err := (&pulls.OnPullRequest{}).HandleWebhook(core.WebhookRequestContext{
+		NodeID: node.NodeID, Factory: contexts.NewFactoryContext(database.DB(t.Context()), canvas, nil),
 		Body: body, Headers: headers, Logger: log.NewEntry(log.New()),
 		Configuration: pulls.OnPullRequestConfiguration{Repository: "acme/app", Actions: []string{"opened", "synchronize", "reopened", "ready_for_review"}},
 		Webhook:       &testcontexts.NodeWebhookContext{Secret: "test-secret"},

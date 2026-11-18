@@ -3,6 +3,7 @@ package grpc
 import (
 	"context"
 
+	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/enterprise"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/auth"
@@ -48,7 +49,8 @@ func (s *RoleService) AssignRole(ctx context.Context, req *pb.AssignRoleRequest)
 
 	// Built-in roles are Community features. Assigning a custom role grants
 	// Enterprise access, so it requires the custom roles entitlement.
-	if !s.authService.IsDefaultRole(req.RoleName, domainType) && !licensing.Allows(s.entitlements, licensing.FeatureCustomRoles) {
+	orgUUID, err := uuid.Parse(orgID)
+	if !s.authService.IsDefaultRole(req.RoleName, domainType) && (err != nil || !licensing.Allows(ctx, s.entitlements, orgUUID, licensing.FeatureCustomRoles)) {
 		return nil, notLicensed()
 	}
 

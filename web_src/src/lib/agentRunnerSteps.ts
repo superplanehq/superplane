@@ -1,18 +1,21 @@
-import { expandMergeConfidenceSteps } from "@/pages/factories/pages/mergeConfidenceSteps";
-import type { PlanningReviewStep } from "@/pages/factories/pages/planningReviewMockup";
+export interface AgentRunnerStep {
+  name: string;
+  type: "bash" | "prompt";
+  prompt?: string;
+  workingDirectory?: string;
+}
 
 /** Titles of configured bash and prompt steps, in execution order. */
-export function agentRunnerStepTitles(configuration: unknown, options?: { expandMergeChecks?: boolean }): string[] {
-  const steps = configuredSteps(configuration);
+export function agentRunnerStepTitles(configuration: unknown): string[] {
+  const steps = configuredAgentSteps(configuration);
   if (!steps) {
     return [];
   }
-  const listed = options?.expandMergeChecks ? expandMergeConfidenceSteps(steps) : steps;
 
-  return listed.map((step) => step.name.trim()).filter((name) => name.length > 0);
+  return steps.map((step) => step.name.trim()).filter((name) => name.length > 0);
 }
 
-function configuredSteps(configuration: unknown): PlanningReviewStep[] | null {
+export function configuredAgentSteps(configuration: unknown): AgentRunnerStep[] | null {
   if (!configuration || typeof configuration !== "object") {
     return null;
   }
@@ -20,10 +23,10 @@ function configuredSteps(configuration: unknown): PlanningReviewStep[] | null {
   if (!Array.isArray(steps)) {
     return null;
   }
-  return steps.flatMap(planningStep);
+  return steps.flatMap(agentStep);
 }
 
-function planningStep(step: unknown): PlanningReviewStep[] {
+function agentStep(step: unknown): AgentRunnerStep[] {
   if (!step || typeof step !== "object") {
     return [];
   }

@@ -64,6 +64,7 @@ function BrowserControls() {
 function renderModal(
   search = "?customAutomation=custom-1",
   automationId: string | undefined = search.includes("customAutomation=new") ? undefined : "custom-1",
+  columnKey?: "backlog" | "implement" | "verify" | "done",
 ) {
   const onClose = vi.fn();
   render(
@@ -80,7 +81,12 @@ function renderModal(
         }}
       >
         <ThemeProvider>
-          <CustomAutomationSetupModal lineId="line" automationId={automationId} onClose={onClose} />
+          <CustomAutomationSetupModal
+            lineId="line"
+            automationId={automationId}
+            columnKey={columnKey}
+            onClose={onClose}
+          />
         </ThemeProvider>
       </FactoriesLayoutContext.Provider>
     </MemoryRouter>,
@@ -169,6 +175,18 @@ describe("custom automation configuration run history", () => {
     await user.click(screen.getByRole("button", { name: /Manual.*Runs when/ }));
     expect(screen.getByLabelText("Automation name")).toHaveValue("Draft automation");
     expect(hooks.update).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["backlog", "When a task enters Backlog", "Manual"],
+    ["implement", "When a task enters Implement", "Manual"],
+    ["done", "When a task enters Done", "Manual"],
+    ["verify", "Manual", "Every pull request commit"],
+  ] as const)("starts a new %s automation on %s", (columnKey, label, absent) => {
+    hooks.describe.mockReturnValue({});
+    renderModal("?customAutomation=new", undefined, columnKey);
+    expect(screen.getAllByText(label).length).toBeGreaterThan(0);
+    expect(screen.queryByText(absent)).not.toBeInTheDocument();
   });
 
   it("keeps new automation configuration available without mounting history", async () => {

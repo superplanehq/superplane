@@ -14,7 +14,7 @@ func TestRedirectInsecureForwardedHTTP(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok"))
 	})
-	handler := RedirectInsecureForwardedHTTP(next)
+	handler := RedirectInsecureForwardedHTTP(next, "https://superplane.example")
 
 	t.Run("redirects forwarded HTTP login", func(t *testing.T) {
 		request := httptest.NewRequest(http.MethodPost, "http://superplane.example/login?next=/", nil)
@@ -26,6 +26,18 @@ func TestRedirectInsecureForwardedHTTP(t *testing.T) {
 
 		require.Equal(t, http.StatusPermanentRedirect, response.Code)
 		assert.Equal(t, "https://superplane.example/login?next=/", response.Header().Get("Location"))
+	})
+
+	t.Run("uses the configured host", func(t *testing.T) {
+		request := httptest.NewRequest(http.MethodGet, "http://attacker.example/login", nil)
+		request.Host = "attacker.example"
+		request.Header.Set("X-Forwarded-Proto", "http")
+		response := httptest.NewRecorder()
+
+		handler.ServeHTTP(response, request)
+
+		require.Equal(t, http.StatusPermanentRedirect, response.Code)
+		assert.Equal(t, "https://superplane.example/login", response.Header().Get("Location"))
 	})
 
 	t.Run("keeps HTTPS and direct probes", func(t *testing.T) {

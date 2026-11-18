@@ -7,8 +7,39 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
+
+func TestResolveExecutionEnvironmentUsesSavedReviewFallback(t *testing.T) {
+	for _, cached := range []bool{false, true} {
+		for _, fallback := range []string{"fallback-user", ""} {
+			t.Run(fmt.Sprintf("cached=%t/fallback=%s", cached, fallback), func(t *testing.T) {
+				const name = "SUPERPLANE_REVIEW_REQUEST_FALLBACK"
+				environment := []EnvironmentVariable{{Name: name, ValueSource: EnvironmentValueSourceLiteral, Value: strPtr("old-value")}}
+				prepared := ResolvedEnvironment{Variables: []TaskEnvironmentVariable{{Name: name, Value: "old-value"}}, Usage: "Keep usage"}
+				ctx := core.ExecutionContext{Configuration: map[string]any{"fallbackReviewer": fallback}}
+				if cached {
+					ctx.ResolvedEnvironment = &prepared
+				}
+				resolved, err := ResolveExecutionEnvironment(ctx, nil, environment)
+				require.NoError(t, err)
+				require.Equal(t, fallback, environmentValues(resolved.Variables)[name])
+				count := 0
+				for _, variable := range resolved.Variables {
+					if variable.Name == name {
+						count++
+					}
+				}
+				require.Equal(t, 1, count, "runner tasks reject duplicate environment names")
+				require.Equal(t, "old-value", prepared.Variables[0].Value)
+				if cached {
+					require.Equal(t, prepared.Usage, resolved.Usage)
+				}
+			})
+		}
+	}
+}
 
 func Test__ValidateEnvironmentFrom(t *testing.T) {
 	t.Parallel()

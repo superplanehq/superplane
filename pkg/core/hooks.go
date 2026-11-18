@@ -29,6 +29,7 @@ type ActionHookContext struct {
 	HTTP           HTTPContext
 	Metadata       MetadataWriter
 	ExecutionState ExecutionStateContext
+	Publications   PublicationContext
 	Auth           AuthReader
 	Requests       RequestContext
 	Integration    IntegrationContext

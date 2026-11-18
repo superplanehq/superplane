@@ -131,7 +131,7 @@ func (s *Server) handleSubmitFeedback(w http.ResponseWriter, r *http.Request) {
 func parseFeedbackForm(r *http.Request) error {
 	contentType := r.Header.Get("Content-Type")
 	if strings.HasPrefix(contentType, "multipart/form-data") {
-		return r.ParseMultipartForm(int64(services.MaxSupportFeedbackRequestBytes))
+		return r.ParseMultipartForm(int64(services.MaxSupportFeedbackRequestBytes)) // #nosec G120 -- the handler wraps the body with MaxBytesReader before parsing.
 	}
 	return r.ParseForm()
 }

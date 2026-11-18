@@ -51,7 +51,7 @@ func NewProviderFromKeyDir(issuer, keysPath string) (Provider, error) {
 				continue
 			}
 		}
-		privateKeyPEM, err := os.ReadFile(keyPath)
+		privateKeyPEM, err := os.ReadFile(keyPath) // #nosec G304 -- keyPath is an entry discovered inside the configured key directory.
 		if err != nil {
 			return nil, fmt.Errorf("read key %s: %w", entry.Name(), err)
 		}

@@ -3,7 +3,11 @@ import { cn } from "@/lib/utils";
 import { ArrowDown, ArrowUp, MessageSquareText, Plus, Terminal, Trash2, Zap } from "lucide-react";
 import type { ReactNode } from "react";
 
-import type { CustomAutomationColumn, CustomAutomationTrigger } from "../lib/customAutomation";
+import {
+  customAutomationColumnLabel,
+  type CustomAutomationColumn,
+  type CustomAutomationTrigger,
+} from "../lib/customAutomation";
 import { mergeCheckPromptBody } from "./mergeConfidenceSteps";
 import type { PlanningReviewStep, PlanningReviewStepKind } from "./planningReviewMockup";
 
@@ -198,7 +202,11 @@ function sidebarTriggerDescription(triggers: CustomAutomationTrigger[], columnKe
 
 function triggerTitle(mode: CustomAutomationTrigger["mode"], columnKey: CustomAutomationColumn): string {
   if (mode === "scheduled") return "Schedule";
-  if (mode === "automatic") return columnKey === "backlog" ? "When a task enters Backlog" : "Every pull request commit";
+  if (mode === "automatic") {
+    return columnKey === "verify"
+      ? "Every pull request commit"
+      : `When a task enters ${customAutomationColumnLabel(columnKey)}`;
+  }
   return "Manual";
 }
 
@@ -207,7 +215,9 @@ function triggerDescription(mode: CustomAutomationTrigger["mode"], columnKey: Cu
     return columnKey === "backlog" ? "Run automation on a schedule." : "Runs on the repository default branch.";
   }
   if (mode === "automatic") {
-    return columnKey === "backlog" ? "Runs when a task enters Backlog." : "Runs for every new pull request commit.";
+    return columnKey === "verify"
+      ? "Runs for every new pull request commit."
+      : `Runs when a task enters ${customAutomationColumnLabel(columnKey)}.`;
   }
   return "Runs when you start it from a task.";
 }

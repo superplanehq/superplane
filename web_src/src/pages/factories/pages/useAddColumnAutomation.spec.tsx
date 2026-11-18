@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it, vi } from "bun:test";
 import { catalogEntryToAutomation, catalogForColumn } from "../lib/columnAutomations";
 import { useAddColumnAutomation } from "./useAddColumnAutomation";
 
+const reviewRequestFeature = { enabled: false };
 const installFactory = vi.fn();
 const describeIntegration = vi.fn();
 vi.mock("@/api-client", () => ({
@@ -16,12 +17,17 @@ vi.mock("@/hooks/useFactoryData", () => ({
   useCreateFactoryAutomation: () => ({ isPending: false }),
   factoryAppsKey: (organizationId: string, factoryId: string) => ["apps", organizationId, factoryId],
 }));
-vi.mock("@/hooks/useExperimentalFeature", () => ({ useExperimentalFeature: () => ({ has: () => true }) }));
+vi.mock("@/hooks/useExperimentalFeature", () => ({
+  useExperimentalFeature: () => ({
+    has: (feature: string) => feature !== "factory_review_request" || reviewRequestFeature.enabled,
+  }),
+}));
 vi.mock("@/pages/home/useInstallFactory", () => ({
   useInstallFactory: () => ({ installFactory, isInstalling: false }),
 }));
 
 beforeEach(() => {
+  reviewRequestFeature.enabled = false;
   installFactory.mockReset();
   installFactory.mockResolvedValue({ canvasId: "closure-app" });
   describeIntegration.mockResolvedValue({ data: { integration: { metadata: { name: "workspace-vcs" } } } });
@@ -235,5 +241,47 @@ describe("add custom automation", () => {
     expect(result.current.location.pathname).toBe("/org/workspaces/workspace/lines/line");
     expect(result.current.location.search).toBe("?customAutomation=new");
     expect(result.current.automation.naming).toBe(false);
+  });
+});
+
+describe("add Review request", () => {
+  it.each([false, true])("gates discovery and installs with the flag enabled: %s", async (enabled) => {
+    reviewRequestFeature.enabled = enabled;
+    const { result } = renderHook(
+      () =>
+        useAddColumnAutomation({
+          organizationId: "org",
+          factoryId: "factory",
+          factoryKey: "workspace",
+          lineId: "line",
+          appRepository: "acme/app",
+          backlogRepository: "acme/backlog",
+          defaultBranch: "main",
+          githubIntegrationId: "vcs-integration",
+          vcsProvider: "github",
+          automationsFor: () => [],
+        }),
+      {
+        wrapper: ({ children }: { children: ReactNode }) => (
+          <QueryClientProvider client={new QueryClient()}>
+            <MemoryRouter>{children}</MemoryRouter>
+          </QueryClientProvider>
+        ),
+      },
+    );
+    act(() => result.current.openPicker("verify"));
+    const entry = result.current.catalog.find((item) => item.kind === "review-request");
+    expect(Boolean(entry)).toBe(enabled);
+    if (!entry) return;
+    await act(async () => result.current.onSelect(entry));
+    expect(installFactory).toHaveBeenCalledWith(
+      expect.objectContaining({
+        factoryId: "review-request",
+        workspaceFactoryId: "factory",
+        vcsProvider: "github",
+        navigateOnComplete: false,
+        startInitialRun: false,
+      }),
+    );
   });
 });

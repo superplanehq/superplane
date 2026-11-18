@@ -39,7 +39,7 @@ type commandRunner interface {
 type dockerCLI struct{}
 
 func (dockerCLI) Run(ctx context.Context, args ...string) ([]byte, error) {
-	return exec.CommandContext(ctx, "docker", args...).CombinedOutput()
+	return exec.CommandContext(ctx, "docker", args...).CombinedOutput() // #nosec G204 -- this provider intentionally invokes the Docker CLI with structured arguments.
 }
 
 type Provider struct {

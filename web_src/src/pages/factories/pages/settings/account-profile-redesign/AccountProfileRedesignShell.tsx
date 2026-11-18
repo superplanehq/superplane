@@ -4,7 +4,6 @@ import {
   ArrowLeft,
   BarChart3,
   Bell,
-  Blocks,
   BookOpen,
   CircleUser,
   Grid3x3,
@@ -53,7 +52,6 @@ const REDESIGN_NAV_GROUPS: RedesignNavGroup[] = [
     label: "Workspace",
     items: [
       { id: "workspace-general", label: "General", Icon: Grid3x3 },
-      { id: "workspace-repository", label: "Repository", Icon: Blocks },
       { id: "workspace-mcp", label: "MCP servers", Icon: Plug },
       { id: "workspace-skills", label: "Skills", Icon: BookOpen },
       { id: "workspace-spending", label: "Spending", Icon: BarChart3 },

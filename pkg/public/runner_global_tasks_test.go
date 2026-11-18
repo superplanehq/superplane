@@ -23,7 +23,7 @@ func TestRunnerListsTasksByState(t *testing.T) {
 	t.Setenv("JWT_SECRET", "test")
 	ctx, factory, draft := mustTaskLinkedAgentRun(t, r)
 	server := newRunnerArtifactTestServer(t, r, jwt.NewSigner("test"))
-	token := runnerTokenFrom(runner.AttachRunnerEnv(ctx, nil, 60, nil))
+	token := runnerTokenFrom(runner.AttachRunnerEnv(ctx, nil, 60))
 	require.NotEmpty(t, token)
 
 	db := database.DB(t.Context())
@@ -77,7 +77,7 @@ func TestScheduleAutomationCreatesATaskWithoutAnExistingTask(t *testing.T) {
 		OrganizationID: r.Organization.ID.String(), NodeID: "agent", BaseURL: "http://app.test",
 	}
 	server := newRunnerArtifactTestServer(t, r, jwt.NewSigner("test"))
-	assert.Empty(t, runnerTokenFrom(runner.AttachRunnerEnv(ctx, nil, 60, nil)))
+	assert.Empty(t, runnerTokenFrom(runner.AttachRunnerEnv(ctx, nil, 60)))
 
 	node, err := models.FindCanvasNode(db, canvas.ID, "agent")
 	require.NoError(t, err)
@@ -89,7 +89,7 @@ func TestScheduleAutomationCreatesATaskWithoutAnExistingTask(t *testing.T) {
 	})
 	require.NoError(t, db.Save(node).Error)
 
-	token := runnerTokenFrom(runner.AttachRunnerEnv(ctx, nil, 60, nil))
+	token := runnerTokenFrom(runner.AttachRunnerEnv(ctx, nil, 60))
 	require.NotEmpty(t, token)
 	assert.Equal(t, []string{"list_tasks", "create_task"}, listRunnerTools(t, server, token))
 	rec := runnerRequest(t, server, http.MethodPost, token, "/api/v1/runner/tasks", `{"title":"Fix the lint","description":"Clean the reported errors."}`)
@@ -106,7 +106,7 @@ func TestRunnerCreatesADraftTaskWithoutAnOwner(t *testing.T) {
 	t.Setenv("JWT_SECRET", "test")
 	ctx, factory, _ := mustTaskLinkedAgentRun(t, r)
 	server := newRunnerArtifactTestServer(t, r, jwt.NewSigner("test"))
-	token := runnerTokenFrom(runner.AttachRunnerEnv(ctx, nil, 60, nil))
+	token := runnerTokenFrom(runner.AttachRunnerEnv(ctx, nil, 60))
 
 	rec := runnerRequest(t, server, http.MethodPost, token, "/api/v1/runner/tasks", `{"title":" Ship the fix ","description":"Stop the retry loop."}`)
 	require.Equal(t, http.StatusCreated, rec.Code, rec.Body.String())
@@ -139,7 +139,7 @@ func TestRunnerClosesThisTaskOnce(t *testing.T) {
 	t.Setenv("JWT_SECRET", "test")
 	ctx, factory, order := mustTaskLinkedAgentRun(t, r)
 	server := newRunnerArtifactTestServer(t, r, jwt.NewSigner("test"))
-	token := runnerTokenFrom(runner.AttachRunnerEnv(ctx, nil, 60, nil))
+	token := runnerTokenFrom(runner.AttachRunnerEnv(ctx, nil, 60))
 	db := database.DB(t.Context())
 	_, err := order.UpdateStatus(db, models.FactoryWorkOrderStatusUpdate{ToState: models.FactoryWorkOrderStateOpen})
 	require.NoError(t, err)
@@ -168,7 +168,7 @@ func TestRunnerRemovesOneArtifactByKeyOrTitle(t *testing.T) {
 	t.Setenv("JWT_SECRET", "test")
 	ctx, _, order := mustTaskLinkedAgentRun(t, r)
 	server := newRunnerArtifactTestServer(t, r, jwt.NewSigner("test"))
-	token := runnerTokenFrom(runner.AttachRunnerEnv(ctx, nil, 60, nil))
+	token := runnerTokenFrom(runner.AttachRunnerEnv(ctx, nil, 60))
 	db := database.DB(t.Context())
 	mustMarkdownArtifact(t, order, "plan", "PLAN.md")
 	mustMarkdownArtifact(t, order, "", "NOTES.md")
@@ -210,7 +210,7 @@ func TestPlanningRunnerEditsTheSessionDraft(t *testing.T) {
 	env := runner.AttachRunnerEnv(ctx, []runner.TaskEnvironmentVariable{
 		{Name: runner.EnvSuperplanePlanningID, Value: session.ID.String()},
 		{Name: runner.EnvSuperplaneRunToken, Value: planningToken},
-	}, 60, nil)
+	}, 60)
 	token := runnerTokenFrom(env)
 	require.NotEmpty(t, token)
 

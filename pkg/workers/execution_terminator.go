@@ -252,7 +252,7 @@ func (w *ExecutionTerminator) cancelComponent(
 		Configuration:  execution.Configuration.Data(),
 		HTTP:           w.registry.HTTPContextInTransaction(tx),
 		Metadata:       contexts.NewExecutionMetadataContext(tx, execution),
-		ExecutionState: contexts.NewExecutionStateContext(tx, execution, nil),
+		ExecutionState: contexts.NewFactoryExecutionStateContext(tx, execution, nil),
 		Requests:       contexts.NewExecutionRequestContext(tx, execution),
 		Auth:           contexts.NewAuthReader(tx, orgUUID, w.authService, nil),
 		CanvasMemory:   contexts.NewCanvasMemoryContext(tx, execution.WorkflowID),

@@ -19,6 +19,11 @@ const (
 	FeatureAuditLogs Feature = "audit_logs"
 )
 
+// DevelopmentKeyID is the signing key of the ephemeral development license.
+// Release binaries do not trust that key, so a license with this key ID
+// cannot verify in production.
+const DevelopmentKeyID = "development-ephemeral"
+
 var recognizedFeatures = []Feature{
 	FeatureAuditLogs,
 	FeatureCustomRoles,

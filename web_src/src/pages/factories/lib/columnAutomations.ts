@@ -16,11 +16,12 @@ import {
   PR_CLOSURE_ENTRY,
   RISK_SCORE_CATALOG_ID,
   RISK_SCORE_ENTRY,
+  REVIEW_REQUEST_ENTRY,
   VISUAL_EVIDENCE_CATALOG_ID,
   VISUAL_EVIDENCE_ENTRY,
   prFeedbackSentence,
 } from "./columnAutomationCatalog";
-import { customColumnAutomations, type ColumnAutomationApp } from "./customColumnAutomations";
+import { customColumnAutomations, firstPhaseAutomations, type ColumnAutomationApp } from "./customColumnAutomations";
 import {
   factoryColumnAutomationViewPath,
   factoryIntakePath,
@@ -46,7 +47,8 @@ export type ColumnAutomationKind =
   | "pr-checks"
   | "pr-closure"
   | "risk-score"
-  | "visual-evidence";
+  | "visual-evidence"
+  | "review-request";
 
 export type ColumnAutomationHealth = "healthy" | "needs-repair" | "disabled";
 
@@ -160,13 +162,17 @@ function automationsForColumn(
   if (key === "verify") {
     const riskScore = riskScoreAutomation(input.apps ?? [], workOrders);
     const visualEvidence = visualEvidenceAutomation(input.apps ?? [], workOrders);
+    const reviewRequest = reviewRequestAutomation(input.apps ?? [], workOrders);
     const skip = new Set(
-      [...riskScore, ...visualEvidence].flatMap((automation) => (automation.canvasId ? [automation.canvasId] : [])),
+      [...riskScore, ...visualEvidence, ...reviewRequest].flatMap((automation) =>
+        automation.canvasId ? [automation.canvasId] : [],
+      ),
     );
     return [
       ...prFeedbackAutomations(input.prFeedbackHandlers ?? [], workOrders, input.vcsProvider),
       ...riskScore,
       ...visualEvidence,
+      ...reviewRequest,
       ...customColumnAutomations(input.apps ?? [], "verify", workOrders, skip, runningCountForApp),
     ];
   }
@@ -175,7 +181,7 @@ function automationsForColumn(
     const skip = new Set(closure.flatMap((automation) => (automation.canvasId ? [automation.canvasId] : [])));
     return [...closure, ...customColumnAutomations(input.apps ?? [], "done", workOrders, skip, runningCountForApp)];
   }
-  return agentStepAutomation(key, input.columnTitle, input.columns ?? [], workOrders);
+  return firstPhaseAutomations(key, input, workOrders, agentStepAutomation, runningCountForApp);
 }
 
 function attachAutomationActivity(automation: ColumnAutomation, workOrders: FactoriesWorkOrder[]): ColumnAutomation {
@@ -348,6 +354,28 @@ function visualEvidenceAutomation(
         health: "healthy" as const,
         runningCount: runningCountForApp(id, workOrders),
         catalogId: VISUAL_EVIDENCE_CATALOG_ID,
+        canvasId: id,
+      },
+    ];
+  });
+}
+
+function reviewRequestAutomation(apps: ColumnAutomationApp[], workOrders: FactoriesWorkOrder[]): ColumnAutomation[] {
+  return apps.flatMap((app) => {
+    const id = app.id?.trim();
+    if (!id || app.templateId !== "review-request") return [];
+    return [
+      {
+        id: `review-request-${id}`,
+        kind: "review-request" as const,
+        name: app.name?.trim() || REVIEW_REQUEST_ENTRY.name,
+        trigger: REVIEW_REQUEST_ENTRY.trigger,
+        action: REVIEW_REQUEST_ENTRY.action,
+        iconSrc: REVIEW_REQUEST_ENTRY.iconSrc,
+        iconAlt: REVIEW_REQUEST_ENTRY.iconAlt,
+        health: "healthy" as const,
+        runningCount: runningCountForApp(id, workOrders),
+        catalogId: REVIEW_REQUEST_ENTRY.id,
         canvasId: id,
       },
     ];

@@ -4,6 +4,9 @@
 package githubenterprise
 
 import (
+	"context"
+
+	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/enterprise"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/licensing"
@@ -21,8 +24,8 @@ func NewService(entitlements licensing.Entitlements) *Service {
 	return &Service{entitlements: entitlements}
 }
 
-func (s *Service) AuthorizeHost(string) error {
-	if err := licensing.Require(s.entitlements, licensing.FeatureGitHubEnterprise); err != nil {
+func (s *Service) AuthorizeHost(ctx context.Context, orgID uuid.UUID, _ string) error {
+	if err := licensing.Require(ctx, s.entitlements, orgID, licensing.FeatureGitHubEnterprise); err != nil {
 		return grpcerrors.PermissionDenied(err, err.Error())
 	}
 

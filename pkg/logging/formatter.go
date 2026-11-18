@@ -36,7 +36,7 @@ func ConfigureProcessLogger() {
 
 	log.SetFormatter(&log.TextFormatter{
 		FullTimestamp:   true,
-		TimestampFormat: time.StampMilli,
+		TimestampFormat: time.RFC3339Nano,
 	})
 }
 

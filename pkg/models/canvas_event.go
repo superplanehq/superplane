@@ -1,6 +1,7 @@
 package models
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -27,6 +28,7 @@ type CanvasEvent struct {
 	Data        JSONValue
 	ExecutionID *uuid.UUID
 	RunID       uuid.UUID
+	SourceRunID *uuid.UUID
 	State       string
 	CreatedAt   *time.Time
 }
@@ -74,6 +76,7 @@ func (e *CanvasEvent) BeforeCreate(tx *gorm.DB) error {
 // CreateDeduplicatedRootEvent creates one root event for a stable external
 // identity. The advisory lock and indexed lookup keep concurrent webhook and
 // API starts idempotent without coupling deduplication to run state.
+// When reused, event receives the existing event and its run reference.
 func (n *CanvasNode) CreateDeduplicatedRootEvent(tx *gorm.DB, event *CanvasEvent, key string) (bool, error) {
 	key = strings.TrimSpace(key)
 	if key == "" {
@@ -88,14 +91,16 @@ func (n *CanvasNode) CreateDeduplicatedRootEvent(tx *gorm.DB, event *CanvasEvent
 			return err
 		}
 
-		var count int64
-		if err := inner.Model(&CanvasEvent{}).
+		var existing CanvasEvent
+		err := inner.
 			Where("workflow_id = ? AND node_id = ? AND dedup_key = ?", n.WorkflowID, n.NodeID, key).
-			Count(&count).Error; err != nil {
-			return err
-		}
-		if count > 0 {
+			Order("created_at DESC, id DESC").First(&existing).Error
+		if err == nil {
+			*event = existing
 			return nil
+		}
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
 		}
 		if err := inner.Create(event).Error; err != nil {
 			return err
@@ -115,14 +120,14 @@ type RootEventScope struct {
 	// OtherKeyPrefixes match dedup keys that other start paths wrote for the
 	// same subject.
 	OtherKeyPrefixes []string
-	// LegacyPullRequest matches pull request events stored without a dedup key.
-	LegacyPullRequest *LegacyPullRequestEventMatch
+	// UnkeyedPayload matches legacy events that predate deduplication keys.
+	UnkeyedPayload []EventPayloadMatch
 }
 
-// LegacyPullRequestEventMatch identifies a pull request in an event payload.
-type LegacyPullRequestEventMatch struct {
-	Repository string
-	Number     string
+type EventPayloadMatch struct {
+	Path       []string
+	Values     []string
+	IgnoreCase bool
 }
 
 // CreateRootEventUnlessLatestInScope creates a root event with the dedup key
@@ -131,6 +136,7 @@ type LegacyPullRequestEventMatch struct {
 // CreateDeduplicatedRootEvent, an older key can start again after a different
 // key in the scope, for example when a pull request returns to an earlier
 // target.
+// When skipped, event receives the latest event that made it redundant.
 func (n *CanvasNode) CreateRootEventUnlessLatestInScope(tx *gorm.DB, event *CanvasEvent, scope RootEventScope, key string, skip func(latest CanvasEvent) bool) (bool, error) {
 	if scope.KeyPrefix == "" || !strings.HasPrefix(key, scope.KeyPrefix) {
 		return false, fmt.Errorf("dedup key %q is not in scope %q", key, scope.KeyPrefix)
@@ -149,6 +155,7 @@ func (n *CanvasNode) CreateRootEventUnlessLatestInScope(tx *gorm.DB, event *Canv
 			return err
 		}
 		if latest != nil && skip(*latest) {
+			*event = *latest
 			return nil
 		}
 		if err := inner.Create(event).Error; err != nil {
@@ -183,17 +190,18 @@ func (n *CanvasNode) latestRootEventInScope(tx *gorm.DB, scope RootEventScope) (
 	}
 	candidates = append(candidates, keyed...)
 
-	if legacy := scope.LegacyPullRequest; legacy != nil {
-		// Events stored before dedup keys existed keep the PR only in the payload.
+	if len(scope.UnkeyedPayload) > 0 {
+		// Legacy producers can identify their subject in the stored payload.
 		var unkeyed []CanvasEvent
-		err := tx.
-			Where("workflow_id = ? AND node_id = ? AND dedup_key IS NULL", n.WorkflowID, n.NodeID).
-			Where("data ->> 'type' IN ('github.pullRequest', 'bitbucket.pullRequest')").
-			Where("lower(data #>> '{data,repository,full_name}') = ?", strings.ToLower(strings.TrimSpace(legacy.Repository))).
-			Where("data #>> '{data,pull_request,number}' = ?", legacy.Number).
-			Order("created_at DESC, id DESC").
-			Limit(1).
-			Find(&unkeyed).Error
+		query := tx.Where("workflow_id = ? AND node_id = ? AND dedup_key IS NULL", n.WorkflowID, n.NodeID)
+		for _, match := range scope.UnkeyedPayload {
+			expression := "data #>> ?"
+			if match.IgnoreCase {
+				expression = "lower(" + expression + ")"
+			}
+			query = query.Where(expression+" IN ?", "{"+strings.Join(match.Path, ",")+"}", match.Values)
+		}
+		err := query.Order("created_at DESC, id DESC").Limit(1).Find(&unkeyed).Error
 		if err != nil {
 			return nil, err
 		}

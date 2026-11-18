@@ -118,6 +118,9 @@ func UpdateWorkOrderStatus(
 	if changed {
 		if toState == models.FactoryWorkOrderStateClosed {
 			messages.PublishWorkOrderRunCancellations(db, order)
+			if err := StartAutomaticTaskColumnCustomAutomations(db, factory, order, models.CanvasColumnKeyDone); err != nil {
+				log.WithError(err).Warnf("Failed to start Done custom automation for order %s", order.ID)
+			}
 		}
 		notification := messages.FactoryWorkOrderNotificationMessage{
 			OrganizationID: orgID.String(),

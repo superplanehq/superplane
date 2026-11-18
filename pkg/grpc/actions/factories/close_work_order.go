@@ -13,6 +13,7 @@ import (
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
 	"github.com/superplanehq/superplane/pkg/productanalytics"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
+	"gorm.io/gorm"
 )
 
 func CloseWorkOrder(ctx context.Context, organizationID string, req *pb.CloseWorkOrderRequest) (*pb.CloseWorkOrderResponse, error) {
@@ -62,7 +63,7 @@ func CloseWorkOrder(ctx context.Context, organizationID string, req *pb.CloseWor
 		return nil, factoryErrorToStatus(err, "failed to close work order")
 	}
 
-	publishWorkOrderClosed(orgID, factory, order, &closedBy, fromState, result, wasClosed)
+	publishWorkOrderClosed(db, orgID, factory, order, &closedBy, fromState, result, wasClosed)
 	if !wasClosed {
 		if eventName, properties, ok := factoryCloseEvent(result); ok {
 			captureFactoryProductEvent(
@@ -94,6 +95,7 @@ func CloseWorkOrder(ctx context.Context, organizationID string, req *pb.CloseWor
 }
 
 func publishWorkOrderClosed(
+	db *gorm.DB,
 	orgID uuid.UUID,
 	factory *models.Factory,
 	order *models.FactoryWorkOrder,
@@ -113,6 +115,9 @@ func publishWorkOrderClosed(
 
 	if wasClosed {
 		return
+	}
+	if err := StartAutomaticTaskColumnCustomAutomations(db, factory, order, models.CanvasColumnKeyDone); err != nil {
+		logger.WithError(err).Warnf("Failed to start Done custom automation for order %s", order.ID)
 	}
 
 	notification := messages.FactoryWorkOrderNotificationMessage{

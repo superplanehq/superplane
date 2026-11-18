@@ -177,7 +177,7 @@ func Load(path string) (*Config, error) {
 		if path == "" {
 			return nil, fmt.Errorf("config path is required")
 		}
-		file, err := os.Open(path)
+		file, err := os.Open(path) // #nosec G304 -- the operator explicitly selects the fleet configuration file.
 		if err != nil {
 			return nil, fmt.Errorf("open config: %w", err)
 		}

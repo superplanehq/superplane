@@ -382,7 +382,7 @@ func (s *Store) ReadAfter(
 		return nil, err
 	}
 
-	file, err := os.Open(filepath.Join(taskDir, dataFilename))
+	file, err := os.Open(filepath.Join(taskDir, dataFilename)) // #nosec G304 -- taskDir is derived from the configured root and a task UUID.
 	if err != nil {
 		return nil, fmt.Errorf("open active runner log data: %w", err)
 	}
@@ -451,7 +451,7 @@ func (s *Store) acquireFileLock(
 		lockDirectory,
 		fmt.Sprintf("%04x.lock", s.lockShard(taskID)),
 	)
-	file, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600)
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600) // #nosec G304 -- path is derived from the configured root and a lock shard.
 	if err != nil {
 		return nil, fmt.Errorf("open active runner log lock: %w", err)
 	}
@@ -505,7 +505,7 @@ func (s *Store) locateTask(taskID uuid.UUID) (string, bool, error) {
 }
 
 func readManifest(taskDir string) (manifest, bool, error) {
-	data, err := os.ReadFile(filepath.Join(taskDir, manifestFilename))
+	data, err := os.ReadFile(filepath.Join(taskDir, manifestFilename)) // #nosec G304 -- taskDir is derived from the configured root and a task UUID.
 	if errors.Is(err, os.ErrNotExist) {
 		return manifest{}, false, nil
 	}
@@ -552,7 +552,7 @@ func writeManifest(taskDir string, current manifest) error {
 		return fmt.Errorf("replace active runner log manifest: %w", err)
 	}
 
-	directory, err := os.Open(taskDir)
+	directory, err := os.Open(taskDir) // #nosec G304 -- taskDir is derived from the configured root and a task UUID.
 	if err != nil {
 		return fmt.Errorf("open active runner log directory: %w", err)
 	}
@@ -564,7 +564,7 @@ func writeManifest(taskDir string, current manifest) error {
 }
 
 func appendAndSync(taskDir string, committedBytes int64, content []byte) error {
-	file, err := os.OpenFile(
+	file, err := os.OpenFile( // #nosec G304 -- taskDir is derived from the configured root and a task UUID.
 		filepath.Join(taskDir, dataFilename),
 		os.O_CREATE|os.O_RDWR,
 		0o600,
@@ -600,7 +600,7 @@ func appendAndSync(taskDir string, committedBytes int64, content []byte) error {
 
 func repairDataFile(taskDir string, committedBytes int64) error {
 	path := filepath.Join(taskDir, dataFilename)
-	file, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600)
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600) // #nosec G304 -- path is derived from the configured root and a task UUID.
 	if err != nil {
 		return fmt.Errorf("open active runner log data: %w", err)
 	}

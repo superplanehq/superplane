@@ -160,6 +160,12 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
               description: "Show the organization Models settings page",
             },
             {
+              id: "model_status",
+              label: "Model status",
+              description: "Show the hosted Model status page in organization settings",
+              released: false,
+            },
+            {
               id: "organization_byok_custom_provider",
               label: "Organization BYOK Custom Provider",
               description: "Add a custom model provider with a URL, token, and API type",
@@ -168,12 +174,6 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
               id: "workspace_skills",
               label: "Workspace Skills",
               description: "Add skills for workspace agents",
-            },
-            {
-              id: "factory_multi_repo_tasks",
-              label: "Multi-repo tasks",
-              description:
-                "Let agents change every Read & Write workspace repository and open one pull request per repository",
             },
             {
               id: "superplane_mcp_server",

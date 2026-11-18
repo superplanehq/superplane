@@ -1,9 +1,10 @@
 import type { FactoriesWorkOrder } from "@/api-client";
 
 import { CUSTOM_CATALOG_ID, EVENT_CUSTOM_ENTRY } from "./columnAutomationCatalog";
-import type { ColumnAutomation } from "./columnAutomations";
+import type { ColumnAutomation, ColumnKey } from "./columnAutomations";
 import { CUSTOM_AUTOMATION_TEMPLATE_ID, type CustomAutomationMode } from "./customAutomation";
 import { customAutomationColumnAutomation } from "./customAutomationColumnAutomation";
+import type { LinePhaseColumn } from "./linePhaseRuns";
 
 export type ColumnAutomationApp = {
   id?: string;
@@ -18,7 +19,7 @@ export type ColumnAutomationApp = {
 
 export function customColumnAutomations(
   apps: ColumnAutomationApp[],
-  columnKey: "backlog" | "verify" | "done",
+  columnKey: "backlog" | "implement" | "verify" | "done",
   workOrders: FactoriesWorkOrder[],
   skipIds: Set<string>,
   runningCountForApp: (appId: string | undefined, orders: FactoriesWorkOrder[]) => number,
@@ -49,4 +50,26 @@ export function customColumnAutomations(
       },
     ];
   });
+}
+
+export function firstPhaseAutomations(
+  key: ColumnKey,
+  input: { columnTitle: string; columns?: LinePhaseColumn[]; apps?: ColumnAutomationApp[] },
+  workOrders: FactoriesWorkOrder[],
+  agentSteps: (
+    key: ColumnKey,
+    columnTitle: string,
+    columns: LinePhaseColumn[],
+    workOrders: FactoriesWorkOrder[],
+  ) => ColumnAutomation[],
+  runningCountForApp: (appId: string | undefined, orders: FactoriesWorkOrder[]) => number,
+): ColumnAutomation[] {
+  const steps = agentSteps(key, input.columnTitle, input.columns ?? [], workOrders);
+  if (key !== "phase-0") {
+    return steps;
+  }
+  return [
+    ...steps,
+    ...customColumnAutomations(input.apps ?? [], "implement", workOrders, new Set(), runningCountForApp),
+  ];
 }

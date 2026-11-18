@@ -18,6 +18,7 @@ import type { ManualCustomAutomation } from "../../../lib/customAutomation";
 import { CustomAutomationRunAction } from "../../CustomAutomationRunAction";
 
 import { type SplitRunFixture, type SplitRunPhase } from "../splitRunMocks";
+import { isClosedWorkOrderDisplayStatus } from "../splitRunFooter";
 import type { SplitRunSource } from "../splitRunSource";
 import { ConsoleSummaryPanel } from "./ConsoleSummaryPanel";
 import { timingsForConsoleColumns, type ColumnTiming } from "./columnTiming";
@@ -430,7 +431,16 @@ function eligibleColumnAutomations(
   return automations.filter((automation) => {
     const savedColumn = automation.columnKey ?? "verify";
     if (savedColumn !== columnId) return false;
-    return savedColumn === "backlog" ? fixture.footer.kind === "draft" : fixture.canRunVerifyCustomAutomation;
+    if (savedColumn === "backlog") return fixture.footer.kind === "draft";
+    if (savedColumn === "implement") {
+      return (
+        fixture.currentStepIndex === 0 &&
+        !fixture.canRunVerifyCustomAutomation &&
+        (fixture.lineStatus === "running" || fixture.lineStatus === "waiting")
+      );
+    }
+    if (savedColumn === "done") return isClosedWorkOrderDisplayStatus(fixture.footer.status);
+    return Boolean(fixture.canRunVerifyCustomAutomation);
   });
 }
 

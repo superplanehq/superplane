@@ -77,8 +77,8 @@ func CreateFactoryCustomAutomation(
 	if column == "" {
 		column = models.CanvasColumnKeyVerify
 	}
-	if column != models.CanvasColumnKeyVerify && column != models.CanvasColumnKeyBacklog {
-		return nil, factoryErrorToStatus(invalidArgument("column must be backlog or verify"), "failed to create custom automation")
+	if !customAutomationColumnAllowed(column) {
+		return nil, factoryErrorToStatus(invalidArgument("column must be backlog, implement, verify, or done"), "failed to create custom automation")
 	}
 	settings, err := parseCustomAutomationSettings(db, factory, req.GetSettings())
 	if err != nil {
@@ -470,10 +470,7 @@ func buildCustomAutomationCanvas(
 		return nil, invalidArgument("workspace VCS integration is required")
 	}
 	provider := config.EffectiveVCSProvider()
-	workspaceScope, err := customAutomationListensOnWorkspace(tx, factory)
-	if err != nil {
-		return nil, err
-	}
+	workspaceScope := customAutomationListensOnWorkspace(factory)
 	if workspaceScope {
 		repository = models.WorkspaceRepositoriesExpression
 	}
@@ -552,11 +549,11 @@ func buildCustomAutomationCanvas(
 			},
 		},
 	}
-	if settings.ColumnKey == models.CanvasColumnKeyBacklog {
-		if settings.StartMode == pb.FactoryCustomAutomation_START_MODE_SCHEDULED {
-			attachBacklogScheduleTask(doc, customAutomationRunnerID, provider, settings.Icon, runnerConfiguration)
-			return doc, nil
-		}
+	if settings.ColumnKey == models.CanvasColumnKeyBacklog && settings.StartMode == pb.FactoryCustomAutomation_START_MODE_SCHEDULED {
+		attachBacklogScheduleTask(doc, customAutomationRunnerID, provider, settings.Icon, runnerConfiguration)
+		return doc, nil
+	}
+	if customAutomationUsesTaskTrigger(settings.ColumnKey) && settings.StartMode != pb.FactoryCustomAutomation_START_MODE_SCHEDULED {
 		trigger := &doc.Spec.Nodes[0]
 		trigger.ID = customAutomationTaskTriggerID
 		trigger.Name = "On Task"
@@ -565,14 +562,42 @@ func buildCustomAutomationCanvas(
 		trigger.Integration = nil
 		doc.Spec.Edges[0].SourceID = trigger.ID
 		doc.Spec.Nodes[1].Name = "Run automation"
-		doc.Metadata.Description = "Run prompt and Bash steps for a Backlog task."
-		runnerConfiguration["environment"] = []any{
-			checkoutEnvironmentVar("REPO", "{{ $['on-task'].data.workOrder.repository }}"),
-			checkoutEnvironmentVar("REPO_URL", "{{ $['on-task'].data.workOrder.repository_url }}"),
-			checkoutEnvironmentVar("BASE", "{{ $['on-task'].data.workOrder.default_branch }}"),
-		}
+		doc.Metadata.Description = taskColumnRunDescription(settings.ColumnKey)
+		runnerConfiguration["environment"] = taskColumnCheckoutEnvironment()
 	}
 	return doc, nil
+}
+
+func customAutomationColumnAllowed(column string) bool {
+	switch column {
+	case models.CanvasColumnKeyBacklog, models.CanvasColumnKeyImplement, models.CanvasColumnKeyVerify, models.CanvasColumnKeyDone:
+		return true
+	default:
+		return false
+	}
+}
+
+func customAutomationUsesTaskTrigger(column string) bool {
+	return column == models.CanvasColumnKeyBacklog || column == models.CanvasColumnKeyImplement || column == models.CanvasColumnKeyDone
+}
+
+func taskColumnRunDescription(column string) string {
+	switch column {
+	case models.CanvasColumnKeyImplement:
+		return "Run prompt and Bash steps for an Implement task."
+	case models.CanvasColumnKeyDone:
+		return "Run prompt and Bash steps for a Done task."
+	default:
+		return "Run prompt and Bash steps for a Backlog task."
+	}
+}
+
+func taskColumnCheckoutEnvironment() []any {
+	return []any{
+		checkoutEnvironmentVar("REPO", "{{ $['on-task'].data.workOrder.repository }}"),
+		checkoutEnvironmentVar("REPO_URL", "{{ $['on-task'].data.workOrder.repository_url }}"),
+		checkoutEnvironmentVar("BASE", "{{ $['on-task'].data.workOrder.default_branch }}"),
+	}
 }
 
 func buildMultiTriggerCustomAutomationCanvas(
@@ -585,6 +610,7 @@ func buildMultiTriggerCustomAutomationCanvas(
 ) (*yaml.Canvas, error) {
 	githubHost := githubHostForFactory(tx, factory)
 	backlog := settings.ColumnKey == models.CanvasColumnKeyBacklog
+	taskColumn := customAutomationUsesTaskTrigger(settings.ColumnKey)
 	var taskKinds []string
 	var taskIndexes []any
 	var schedules []customAutomationTrigger
@@ -629,19 +655,15 @@ func buildMultiTriggerCustomAutomationCanvas(
 		}
 		taskEnvironment := customAutomationCheckoutEnvironment(factory, pb.FactoryCustomAutomation_START_MODE_MANUAL, githubHost, workspaceScope)
 		runnerName := "Verify"
-		if backlog {
+		if taskColumn {
 			taskTriggerID = customAutomationTaskTriggerID
 			taskName = "On Task"
 			taskComponent = factorycomponent.OnWorkOrderTriggerName
 			taskIntegration = nil
 			taskConfiguration = map[string]any{}
-			taskEnvironment = []any{
-				checkoutEnvironmentVar("REPO", "{{ $['on-task'].data.workOrder.repository }}"),
-				checkoutEnvironmentVar("REPO_URL", "{{ $['on-task'].data.workOrder.repository_url }}"),
-				checkoutEnvironmentVar("BASE", "{{ $['on-task'].data.workOrder.default_branch }}"),
-			}
+			taskEnvironment = taskColumnCheckoutEnvironment()
 			runnerName = "Run on task"
-			if len(schedules) > 0 {
+			if backlog && len(schedules) > 0 {
 				runnerName = backlogTaskRunnerName
 				taskEnvironment = backlogSharedCheckoutEnvironment(factory, githubHost)
 			}
@@ -709,6 +731,8 @@ func buildMultiTriggerCustomAutomationCanvas(
 			}
 			if backlog {
 				runnerName = backlogTaskRunnerName
+			} else if taskColumn {
+				runnerName = "Run automation"
 			}
 			nodes = append(nodes, customAutomationRunnerNode(scheduleRunnerID, runnerName, settings, scheduleConfiguration, 480))
 		}
@@ -721,6 +745,12 @@ func buildMultiTriggerCustomAutomationCanvas(
 		description = "Run prompt and Bash steps on a schedule. The agent creates a task."
 	} else if backlog {
 		description = "Run prompt and Bash steps for a Backlog task."
+	} else if taskColumn && len(schedules) > 0 && hasTask {
+		description = "Run prompt and Bash steps on a schedule or for a task."
+	} else if taskColumn && len(schedules) > 0 {
+		description = "Run prompt and Bash steps on a schedule."
+	} else if taskColumn {
+		description = taskColumnRunDescription(settings.ColumnKey)
 	}
 	doc := &yaml.Canvas{
 		APIVersion: yaml.APIVersion,
@@ -882,16 +912,13 @@ func stripBacklogTaskInstructions(prompt string) string {
 }
 
 // customAutomationListensOnWorkspace reports whether a pull request
-// automation listens on every workspace repository. A Bitbucket workspace
-// does so only with multi-repo tasks.
-func customAutomationListensOnWorkspace(tx *gorm.DB, factory *models.Factory) (bool, error) {
+// automation listens on every workspace repository.
+func customAutomationListensOnWorkspace(factory *models.Factory) bool {
 	switch factory.OnboardingConfigValue().EffectiveVCSProvider() {
-	case models.ProviderGitHub:
-		return true, nil
-	case models.ProviderBitbucket:
-		return factory.MultiRepoTasksEnabled(tx)
+	case models.ProviderGitHub, models.ProviderBitbucket:
+		return true
 	}
-	return false, nil
+	return false
 }
 
 // customAutomationCheckoutEnvironment checks out the pull request that

@@ -1,0 +1,340 @@
+# Ordered pull request review checks
+
+`github.setPullRequestReviewCheck` is a reusable canvas action. It does not
+select reviewers or apply Factory policy. Review request uses this action when Publish PR check is enabled. The setting
+is off by default.
+
+## Component contract
+
+| Field | Meaning |
+| --- | --- |
+| `repository`, `pullNumber` | Repository and pull request. Short repository names use the integration owner. |
+| `assessedSha` | Commit covered by this decision. |
+| `context` | Stable GitHub commit status context. |
+| `sourceRunId` | Source run. Defaults to the persisted broadcast source, or the current run for ordinary triggers. |
+| `attemptRootEventId` | Attempt root event. Defaults to the current execution root event. |
+| `activationGeneration` | Positive saved activation version. After disabling, select a greater generation to enable again. |
+| `enabled` | Defaults to true for ordinary check nodes. Saving false releases that node's managed checks. |
+| `activationNodeId` | Optional check node in the same canvas and integration. Its admitted enabled state and generation govern participation. |
+| `phase` | `pending_selection`, `required_reviewers`, `no_review`, `selection_error`, or `disabled`. |
+| `reviewers` | Required human reviewer IDs and logins. Required for `required_reviewers`. |
+| `reviewerRequestExecutionId` | Recorded Ensure Pull Request Reviewers execution. Required for `required_reviewers`. |
+| `reason` | Reason for the decision. |
+| `resultUrl` | Optional status details link. |
+
+GitHub treats status contexts as
+[case-insensitive](https://docs.github.com/en/rest/commits/statuses#create-a-commit-status).
+The action stores their lowercase form so case variants share one requirement.
+
+Ensure Pull Request Reviewers emits `executionId` with its existing outcome.
+Pass that ID to this action. The referenced execution must belong to the same
+canvas, attempt, integration, repository, and pull request. Its successful
+output must cover the assessed commit and the same reviewer identities.
+The check action does not request reviews again.
+
+`github.pullRequestReviewCheck` uses the default output channel:
+
+```json
+{
+  "type": "github.pullRequestReviewCheck",
+  "data": {
+    "status": "applied",
+    "state": "pending",
+    "sha": "current-head-sha",
+    "phase": "required_reviewers",
+    "context": "team/review",
+    "generation": 2,
+    "activationGeneration": 1,
+    "sourceRunId": "source-run-id",
+    "attemptRootEventId": "attempt-root-event-id"
+  }
+}
+```
+
+`status` is `registered` after pending selection is stored, `applied` after
+delivery, `superseded` when newer state wins, or
+`skipped` when the admitted attempt does not participate. Skipping creates no
+publication record.
+Pending selection finishes after durable registration. Other phases finish
+after delivery. Approval tracking continues independently.
+
+## Status behavior
+
+All required reviewers must approve the current assessed commit. Existing
+approvals count. The client reads every review page. Comments do not change
+approval. Dismissal revokes approval. A dismissed replacement does not restore
+an older approval.
+
+Selection and missing approvals produce pending. A selected changes request
+produces failure. Selection errors and provider lookup failures produce error.
+All required approvals, explicit no-review decisions, and disabling produce
+success. Disabling uses the description `Review request check disabled`.
+
+A new head produces pending until a new decision covers it. Monitoring
+continues after success. Closed or merged pull requests stop polling after
+delivery. Pull request events resume validation on reopening.
+
+## Ordering and authorization
+
+One current record exists per integration, repository, pull request, and context.
+Ordering uses persisted values in this order:
+
+1. Source run creation time, then source run ID.
+2. Attempt root event creation time, then root event ID.
+
+Agent timestamps and delivery times have no authority. An older source cannot
+replace a newer source, even when its retry finishes later. Newer attempts of
+the same source supersede older attempts, including on the same commit.
+
+Broadcast delivery stores source provenance outside the immutable message
+payload. Explicit Runs retries copy that provenance and the original payload.
+The model verifies the current organization, integration, canvas, source run,
+and attempt. Callers cannot substitute unrelated run references.
+
+Within one attempt, pending selection can become one outcome. Disable can
+supersede that outcome. The disabled record remains as a fence. Work from that
+activation cannot reopen it, even with a newer source. Re-enabling requires
+a greater activation generation and a current or newer source and attempt.
+A PR can miss intermediate activations. A new PR can start in any positive generation.
+
+Each accepted replacement increments `generation`. Each persisted update
+increments `revision`. Refresh checks the revision after lookups and claims
+delivery before publishing. Concurrent refreshes share one delivery lease.
+
+## Reuse without a check
+
+`core.ExecutionContext.Publications` exposes `ResolveOrder`, `ExecutionOutput`,
+and the `PublicationStore` methods. Findings publication can use these APIs
+without a status, review monitoring, or an active check node.
+
+Resolve order from the current execution. Use a separate, stable publication
+key for findings. In `Update`, call `OrderedPublication.CanReplace` with the
+resolved order and activation generation before replacing the current state.
+Persist the accepted order and generation with the component-owned payload.
+An empty `Hook` does not schedule work.
+
+The store treats payloads as opaque JSON. It does not interpret reports,
+recognize templates, or invoke named automation callbacks. Phase 1 canvases
+remain usable without managed publication records.
+
+## Ordered pull request findings
+
+`core.AcceptOrderedWrite`, `core.BeginOrderedWrite`, and
+`core.FinishOrderedWrite` apply this ordering to provider writes without a
+check. `github.updatePullRequestBodySection` uses them when **Ordered** is on.
+`github.publishPullRequestComment` always uses them.
+
+1. Execute resolves the order of the current execution and accepts it for the
+   key. An older source or attempt is skipped before any provider call.
+2. The publication worker reads the pull request. It rechecks the run, the
+   expected commit, and the saved node in the admitted and live versions. The
+   node must stay enabled with the same `activationGeneration`.
+3. Immediately before the write, `BeginOrderedWrite` claims a one-minute
+   lease. It fails when a newer attempt was accepted. Writes must finish 15
+   seconds before the lease expires.
+4. `FinishOrderedWrite` releases the lease and saves component state, such as
+   the managed comment ID.
+
+Body keys are `pull-request-body/<repository>/<number>/<section>`, so writers
+of one section share an order. Comment keys and markers include the canvas,
+so each automation owns one comment. Retries reconcile the saved comment ID and
+the `<!-- superplane:comment:KEY:CANVAS -->` marker before they create a
+comment.
+
+Ordered publication fails the step after a host rejection or ten attempts.
+Unordered body sections keep the earlier skip behavior. Review request uses
+both components. Its findings settings are saved on the agent node, so admin
+reset keeps them. Findings and Publish PR check use separate keys and nodes.
+Both receive the same decisions. An empty eligible candidate list skips the
+selection agent and uses the shared no-reviewer activity and check steps.
+
+## Durable delivery
+
+`Update` holds a lock for one integration and publication key. It persists the
+record and its next integration request in one transaction. Matching requests
+form one recurring chain.
+
+Refresh reads GitHub outside the transaction. A short transaction checks the
+revision, claims a one-minute delivery lease, and schedules recovery. The status
+write runs outside the transaction with a 20-second deadline measured from the
+claim. A short transaction then records the result and releases the lease.
+
+Replacement and disable can save newer decisions while delivery runs. They
+preserve the active lease so another status write waits for completion or lease
+expiry. An older delivery cannot acknowledge a newer decision. Completion
+schedules immediate refresh when the revision changes. A refresh that finds an
+active lease preserves recovery work for lease expiry.
+
+Failed or interrupted delivery leaves recovery work pending. Expired leases
+permit recovery after worker interruption. A late response from an expired
+owner cannot release a newer lease. It schedules another delivery of the current
+decision, including for disabled or closed checks.
+
+Delivery is at least once. A crash after GitHub accepts a status but before
+the completion transaction can repeat that status. Duplicate successful
+application does not issue another reviewer request or status write.
+
+The integration request worker retries failed hooks with bounded backoff.
+After ten failures, it retains a failed request and its error. A leased request
+can recover after worker interruption. Existing recurring recovery requests
+remain independent of the failed request.
+Reapplying an undelivered requirement restarts delivery without changing its
+generation.
+
+Pending selection checks inspect their owning attempt during refresh.
+Cancellation, failure, or completion without a valid decision produces error,
+including failures that do not emit a failed-channel event.
+
+## Deployment
+
+Apply the generated migration before deploying API and worker code. Both
+processes require the existing database, encrypted integration credentials,
+and `ENCRYPTION_MASTER_KEYS`. Workers use the existing integration-request,
+node-request, and webhook workers. Runners require no new configuration.
+
+GitHub needs existing commit-status write and pull-request read permissions.
+Reviewer requests continue through the existing reviewer action. Repository
+webhook provisioning uses the existing repository-hook permission. This change
+adds no Checks API permission, service, secret, environment key, or branch rule.
+
+Local Docker and the repository chart provide the existing worker and
+encryption configuration. Hosted chart and launchpad verification was
+unavailable through the connected GitHub account. No companion deployment PR
+is required by a new configuration key. Deployed configuration remains
+unverified. Do not enable the later Review request phase until combined
+Phase 2 validation passes.
+
+## Review request configuration
+
+Publish PR check is off for new and existing automations. Reviewer selection
+and reviewer requests continue independently. Save the switch to publish
+`superplane/review-request` for future attempts. Saving does not start an agent,
+backfill decisions, or attach a check to an attempt that already started.
+
+The existing canvas settings store `publishPRCheck` and
+`prCheckActivationGeneration` on `select-reviewers`. The `pr-check-pending`
+node stores the corresponding `enabled` and `activationGeneration` values.
+An off-to-on save increases the generation. Other saves retain it. Admin reset
+preserves both settings, fallback, models, and Additional instructions,
+including an explicitly cleared value.
+
+The check action reads participation from the attempt's admitted canvas
+version. At application and refresh, it verifies that the live activation
+still matches the generation stored at admission. Refresh does not need retained
+run records. Disabling durably releases existing requirements with success
+and the reason `Review request check disabled`. Failed release delivery retries
+through integration requests. Re-enabling cannot resume old callbacks.
+Removing a canvas or its activation node durably wakes owned publications so
+the same release path also handles checks that stopped polling on closed PRs.
+Pausing changes trigger admission and keeps existing approval tracking.
+
+The canvas registers pending before candidate discovery. It applies explicit
+no-review outcomes for all-positive reports after managed request withdrawal.
+Empty eligible candidate lists skip the selection agent and produce a selection error.
+Existing reviewer requests are preserved when no replacement is available.
+Required-reviewer application uses the recorded Ensure reviewers execution and does not request reviewers again.
+Stale or skipped outcomes cannot publish no-review success. Failed or cancelled
+attempts without a valid decision produce error through the pending check's
+existing refresh hook.
+
+Explicit Runs retry creates a new attempt of the original report. It uses the
+current saved activation, current-SHA checks, and persisted source/attempt
+ordering. It does not load the latest report. Review and dismissal webhooks
+refresh approval state independently of the completed selection run.
+
+Administrators must require `superplane/review-request` in GitHub branch rules
+to enforce required approvals. SuperPlane does not modify branch rules.
+
+Before enabling publication on an older installed canvas, use the existing
+admin reset to install the new explicit check steps. The settings editor keeps
+ordinary saves available for older canvases and explains this prerequisite if
+publication is requested. Reset preserves supported settings and does not
+start selection or backfill decisions.
+
+Apply Phase 2C's migration before API and worker rollout. This phase adds no
+migration or runtime configuration key. API and workers continue to require
+`ENCRYPTION_MASTER_KEYS` and the existing encrypted GitHub integration.
+Workers require `START_INTEGRATION_REQUEST_WORKER`, `START_NODE_REQUEST_WORKER`,
+`START_APP_MESSAGE_WORKER`, and `START_WEBHOOK_PROVISIONER`. Runners require
+no change. Local Docker and the repository chart include these settings.
+The hosted chart and launchpad repositories returned HTTP 404 through `gh`.
+Their current configuration and deployed configuration remain unverified.
+
+## Managed reviewer requests
+
+The built-in Review request workflow enables `managed` on Ensure Pull Request
+Reviewers. Ordinary canvases keep additive behavior unless they enable this
+setting. Managed execution requires `expectedHeadSha`. An empty managed
+selection withdraws this automation's pending requests.
+
+Candidate discovery supplies `requestedReviewers`, `requestedTeams`, and
+`previousSelection`. Selection reassesses these identities with the current
+eligibility and contributor rules. It prefers a suitable existing reviewer
+and explains replacements and additional reviewers.
+
+Ownership uses the existing publication store. Its scope includes the GitHub
+integration, repository, pull request, and automation canvas. Ownership begins
+only when this automation adds a missing request. Existing pending requests
+and approvals do not establish ownership. No ownership is inferred from old
+PR descriptions, previous workflow runs, or GitHub request lists.
+
+Managed reconciliation requests every replacement before withdrawing old
+requests. It removes only pending requests that it owns and no longer selects.
+It preserves unrelated individual requests, team requests, and submitted
+reviews. Any submitted review, including a comment-only review, ends ownership
+of the original request. A later manual request for that reviewer remains
+outside automation ownership.
+
+Trusted source and attempt order fence older reports, including retries.
+Publication updates commit independently of the execution transaction, so a
+worker rollback cannot discard ownership after a GitHub write. Publication
+leases serialize mutations. Lease contention schedules a retry with the same
+ordered claim. A newer claim supersedes that retry. Each mutation rechecks the
+current head and order. Successful additions survive partial failures.
+A persisted addition intent lets a retry recover a request when GitHub applied the POST
+but the response was lost. GitHub does not provide an atomic request ownership
+operation; a simultaneous manual request during that POST cannot be distinguished.
+A persisted withdrawal intent prevents a retry from deleting a later manual
+request after an uncertain DELETE. A request that remains after such a failure
+loses managed ownership and needs manual removal.
+Selection, discovery, and replacement failures preserve existing requests.
+Completion and publication follow successful reconciliation only.
+
+After deployment, use the existing installation or organization reset for
+`review-request` to update installed built-in automations. Reset preserves
+supported user settings and GitHub connections while installing the current
+managed workflow. This change requires no migration, new service, or secret.
+Do not backfill ownership or clean up accumulated requests on existing PRs,
+including #9315. Those requests remain untouched unless a person removes them.
+
+## Review request workflow simplification
+
+Review request keeps the incoming `merge-confidence.completed` broadcast. The
+updated template emits no outgoing `review-request.completed` events. This is
+an intentional compatibility change for canvases that consume those events.
+Activity, PR checks, and findings use the recorded selection and reviewer
+operation outputs directly. Read decision validates the agent result and
+applies an eligible configured fallback once. Selection errors never use fallback.
+
+New installations use the updated template. After deployment, use the existing
+targeted Review request reset to update installed automations. Reset preserves
+supported settings, cleared instructions, disabled switches, activation
+generations, and active approval tracking. Existing runs keep their saved
+graph and can still emit outgoing events. Do not rewrite historical executions.
+This change requires no migration, deployment configuration, or frontend update.
+
+## Review request workspace setup
+
+New Review request installations set `skipSetupCommands: true` on
+`select-reviewers`. The runner checks out the repository and context
+repositories without running workspace setup commands. Selection uses Git
+history and the existing Merge confidence report. It does not need application
+services.
+
+After deployment, open installation administration at `/admin/settings`.
+Under **Reset one automation**, reset **Review request**. This updates
+installed automations that have no saved `skipSetupCommands` value to the new
+default. Organization reset applies the same default. Both resets preserve
+explicit `true` and `false` values. To change an explicit `false`, set
+`skipSetupCommands: true` on `select-reviewers` in the canvas YAML. Publish
+the canvas. Existing runs keep their saved configuration.

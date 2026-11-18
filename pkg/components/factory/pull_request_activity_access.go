@@ -82,7 +82,7 @@ func attemptCountLabel(count int) string {
 }
 
 func scheduleAcquireAccess(requests core.RequestContext) error {
-	jitter := time.Duration(rand.Intn(2000)) * time.Millisecond
+	jitter := time.Duration(rand.Intn(2000)) * time.Millisecond // #nosec G404 -- scheduling jitter is not security-sensitive.
 	return requests.ScheduleActionCall(acquireAccessHookName, map[string]any{}, 10*time.Second+jitter)
 }
 

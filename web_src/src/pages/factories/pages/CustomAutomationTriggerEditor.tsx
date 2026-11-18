@@ -7,6 +7,7 @@ import { AlarmClock, ChevronDown, GitCommitHorizontal, MousePointerClick, Plus, 
 import { useState } from "react";
 
 import {
+  customAutomationColumnLabel,
   newCustomAutomationTrigger,
   type CustomAutomationColumn,
   type CustomAutomationMode,
@@ -310,7 +311,11 @@ function removeTriggerLabel(
 
 function triggerTitle(mode: CustomAutomationMode, columnKey: CustomAutomationColumn): string {
   if (mode === "scheduled") return "Schedule";
-  if (mode === "automatic") return columnKey === "backlog" ? "When a task enters Backlog" : "Every pull request commit";
+  if (mode === "automatic") {
+    return columnKey === "verify"
+      ? "Every pull request commit"
+      : `When a task enters ${customAutomationColumnLabel(columnKey)}`;
+  }
   return "Manual";
 }
 
@@ -334,9 +339,9 @@ function TriggerOption({ mode, columnKey }: { mode: CustomAutomationMode; column
           {mode === "scheduled"
             ? "Schedule"
             : automatic
-              ? columnKey === "backlog"
-                ? "When a task enters Backlog"
-                : "Every pull request commit"
+              ? columnKey === "verify"
+                ? "Every pull request commit"
+                : `When a task enters ${customAutomationColumnLabel(columnKey)}`
               : "Manual"}
         </span>
         <span className="text-xs font-normal text-muted-foreground">
@@ -345,9 +350,9 @@ function TriggerOption({ mode, columnKey }: { mode: CustomAutomationMode; column
               ? "Run automation on a schedule."
               : "Runs on the repository default branch."
             : automatic
-              ? columnKey === "backlog"
-                ? "Runs when a task enters Backlog."
-                : "Runs after each new commit."
+              ? columnKey === "verify"
+                ? "Runs after each new commit."
+                : `Runs when a task enters ${customAutomationColumnLabel(columnKey)}.`
               : "A person starts each run."}
         </span>
       </span>

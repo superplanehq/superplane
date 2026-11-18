@@ -255,7 +255,7 @@ func (d *RunCallbackDispatcher) dispatchActionHook(
 		Configuration:  node.Configuration.Data(),
 		HTTP:           d.registry.HTTPContextInTransaction(d.tx),
 		Metadata:       contexts.NewExecutionMetadataContext(d.tx, execution),
-		ExecutionState: contexts.NewExecutionStateContext(d.tx, execution, d.eventCollector),
+		ExecutionState: contexts.NewFactoryExecutionStateContext(d.tx, execution, d.eventCollector),
 		Requests:       contexts.NewExecutionRequestContext(d.tx, execution),
 		Runs:           contexts.NewRunExecutionContext(d.tx, parentCanvas, node, execution),
 		Usage:          contexts.NewUsageContext(parentCanvas.OrganizationID, execution),

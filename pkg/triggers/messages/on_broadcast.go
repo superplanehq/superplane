@@ -2,6 +2,10 @@ package messages
 
 import (
 	"fmt"
+	"strings"
+
+	"github.com/expr-lang/expr"
+	"github.com/expr-lang/expr/vm"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -16,7 +20,9 @@ func init() {
 }
 
 type OnBroadcastConfiguration struct {
-	App string `json:"app" mapstructure:"app"`
+	App     string `json:"app" mapstructure:"app"`
+	Enabled *bool  `json:"enabled" mapstructure:"enabled"`
+	Filter  string `json:"filter" mapstructure:"filter"`
 }
 
 type OnBroadcastMetadata struct {
@@ -49,7 +55,17 @@ func (c *OnBroadcast) Icon() string {
 }
 
 func (c *OnBroadcast) Documentation() string {
-	return "Receive broadcast messages from another SuperPlane app"
+	return `Receive messages from the configured source app.
+
+The optional filter is a bare boolean expression. Use message.app, message.node, and message.payload.
+For example: message.payload.type == "completed".
+
+A blank filter accepts all messages. True emits the original message unchanged.
+False acknowledges delivery without a trigger event or run. Invalid expressions fail setup.
+Runtime evaluation errors fail delivery and use the existing transaction retry path.
+Run functions and node outputs are unavailable before a run exists.
+
+Disable Enabled to pause new deliveries.`
 }
 
 func (c *OnBroadcast) ExampleData() map[string]any {
@@ -81,6 +97,8 @@ func (c *OnBroadcast) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeApp,
 			Required:    true,
 		},
+		{Name: "enabled", Label: "Enabled", Type: configuration.FieldTypeBool, Default: true},
+		{Name: "filter", Label: "Filter", Description: "Accept messages when this expression is true. Use message.app, message.node, and message.payload.", Type: configuration.FieldTypeExpression},
 	}
 }
 
@@ -89,6 +107,10 @@ func (c *OnBroadcast) Setup(ctx core.TriggerContext) error {
 	err := mapstructure.Decode(ctx.Configuration, &config)
 	if err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
+	}
+
+	if _, err := compileBroadcastFilter(config.Filter); err != nil {
+		return err
 	}
 
 	metadata := OnBroadcastMetadata{}
@@ -165,6 +187,30 @@ func (c *OnBroadcast) Update(ctx core.TriggerContext, config OnBroadcastConfigur
 }
 
 func (c *OnBroadcast) OnAppMessage(ctx core.AppMessageContext) error {
+	var config OnBroadcastConfiguration
+	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
+		return fmt.Errorf("decode broadcast configuration: %w", err)
+	}
+	if config.Enabled != nil && !*config.Enabled {
+		return nil
+	}
+	program, err := compileBroadcastFilter(config.Filter)
+	if err != nil {
+		return err
+	}
+	if program != nil {
+		result, err := expr.Run(program, map[string]any{"message": ctx.Message})
+		if err != nil {
+			return fmt.Errorf("evaluate broadcast filter: %w", err)
+		}
+		matches, ok := result.(bool)
+		if !ok {
+			return fmt.Errorf("broadcast filter must return a boolean, got %T", result)
+		}
+		if !matches {
+			return nil
+		}
+	}
 	return ctx.Events.Emit("app.broadcast", ctx.Message)
 }
 
@@ -182,4 +228,16 @@ func (c *OnBroadcast) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.
 
 func (c *OnBroadcast) Cleanup(ctx core.TriggerContext) error {
 	return ctx.Apps.Unsubscribe()
+}
+
+// Only message is available before a run exists. Do not register run functions.
+func compileBroadcastFilter(filter string) (*vm.Program, error) {
+	if strings.TrimSpace(filter) == "" {
+		return nil, nil
+	}
+	program, err := expr.Compile(filter, expr.Env(map[string]any{"message": map[string]any{"app": map[string]any{}, "node": map[string]any{}, "payload": map[string]any{}}}), expr.AsBool())
+	if err != nil {
+		return nil, fmt.Errorf("invalid broadcast filter: %w", err)
+	}
+	return program, nil
 }

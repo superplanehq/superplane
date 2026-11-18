@@ -21,7 +21,6 @@ import (
 	factorycomp "github.com/superplanehq/superplane/pkg/components/factory"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	ghdependabot "github.com/superplanehq/superplane/pkg/integrations/github/dependabot"
 	"github.com/superplanehq/superplane/pkg/integrations/jira"
@@ -1078,7 +1077,6 @@ func testUpdateWorkOrderStatusWhenAllPullRequestsDone(t *testing.T, provider str
 		Result:                  models.FactoryWorkOrderResultCompleted,
 		WhenAllPullRequestsDone: true,
 	}
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryMultiRepoTasks))
 	updated, changed, err := ctx.UpdateWorkOrderStatus(closeWhenDone)
 	require.NoError(t, err)
 	assert.False(t, changed, "an open pull request must keep the task open")
@@ -1095,13 +1093,13 @@ func testUpdateWorkOrderStatusWhenAllPullRequestsDone(t *testing.T, provider str
 	assert.Equal(t, models.FactoryWorkOrderResultCompleted, updated.Result, "one merged pull request completes the task")
 }
 
-func TestFactoryContext_UpdateWorkOrderStatus_ClosesAtOnceWithoutMultiRepoTasks(t *testing.T) {
+func TestFactoryContext_UpdateWorkOrderStatus_ExplicitCloseDoesNotWaitForPullRequests(t *testing.T) {
 	for _, provider := range []string{models.FactoryPullRequestProviderGitHub, models.FactoryPullRequestProviderBitbucket} {
-		t.Run(provider, func(t *testing.T) { testUpdateWorkOrderStatusClosesAtOnceWithoutMultiRepoTasks(t, provider) })
+		t.Run(provider, func(t *testing.T) { testUpdateWorkOrderStatusExplicitClose(t, provider) })
 	}
 }
 
-func testUpdateWorkOrderStatusClosesAtOnceWithoutMultiRepoTasks(t *testing.T, provider string) {
+func testUpdateWorkOrderStatusExplicitClose(t *testing.T, provider string) {
 	r := support.Setup(t)
 	defer r.Close()
 
@@ -1124,7 +1122,7 @@ func testUpdateWorkOrderStatusClosesAtOnceWithoutMultiRepoTasks(t *testing.T, pr
 		OrderID:                 order.ID.String(),
 		State:                   models.FactoryWorkOrderStateClosed,
 		Result:                  models.FactoryWorkOrderResultPRClosed,
-		WhenAllPullRequestsDone: true,
+		WhenAllPullRequestsDone: false,
 	})
 	require.NoError(t, err)
 	assert.True(t, changed)
@@ -1642,6 +1640,38 @@ func TestFactoryContext_FindPullRequest_IncludesWorkOrderOrigin(t *testing.T) {
 		require.NotNil(t, match.WorkOrder)
 		assert.Nil(t, match.WorkOrder.Origin)
 	})
+}
+
+func TestFactoryContext_FindPullRequest_IgnoresArchivedTasks(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	canvas, execution, _ := setupFactoryAppExecution(t, r, factory.ID)
+	ctx := NewFactoryContext(db, canvas, execution)
+
+	for _, result := range []string{models.FactoryWorkOrderResultArchived, models.FactoryWorkOrderResultRejected} {
+		t.Run(result, func(t *testing.T) {
+			order, err := factory.CreateWorkOrder(db, "Deleted task", "", &r.User, nil, nil)
+			require.NoError(t, err)
+			_, err = order.UpdateStatus(db, models.FactoryWorkOrderStatusUpdate{ToState: models.FactoryWorkOrderStateOpen, Actor: &r.User})
+			require.NoError(t, err)
+			pr, err := order.CreatePullRequest(db, models.FactoryPullRequestParams{
+				URL: fmt.Sprintf("https://github.com/acme/app/pull/%d", order.Number),
+			})
+			require.NoError(t, err)
+			lookup := core.FindPullRequestParams{ID: pr.ID.String()}
+			_, err = ctx.FindPullRequest(lookup)
+			require.NoError(t, err)
+
+			_, err = order.Close(db, result, &r.User)
+			require.NoError(t, err)
+			match, err := ctx.FindPullRequest(lookup)
+			assert.ErrorIs(t, err, core.ErrPullRequestNotFound)
+			assert.Nil(t, match)
+		})
+	}
 }
 
 func TestFactoryContext_AddWorkOrderComment(t *testing.T) {

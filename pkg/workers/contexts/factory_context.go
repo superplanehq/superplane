@@ -16,7 +16,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/integrations/datadog"
 	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
@@ -696,19 +695,6 @@ func (c *FactoryContext) githubClientForCanvas() *githubcommon.Client {
 	return nil
 }
 
-// waitsForAllPullRequests keeps a task open until its last pull request is
-// done. Only organizations with multi-repo tasks open more than one.
-func (c *FactoryContext) waitsForAllPullRequests(params core.UpdateWorkOrderStatusParams) (bool, error) {
-	if params.State != models.FactoryWorkOrderStateClosed || !params.WhenAllPullRequestsDone {
-		return false, nil
-	}
-	organization, err := models.FindOrganizationByIDInTransaction(c.tx, c.canvas.OrganizationID.String())
-	if err != nil {
-		return false, err
-	}
-	return organization.HasExperimentalFeature(features.FeatureFactoryMultiRepoTasks), nil
-}
-
 func (c *FactoryContext) UpdateWorkOrderStatus(params core.UpdateWorkOrderStatusParams) (*core.WorkOrder, bool, error) {
 	order, err := c.resolveWorkOrder(params.OrderID)
 	if err != nil {
@@ -722,11 +708,7 @@ func (c *FactoryContext) UpdateWorkOrderStatus(params core.UpdateWorkOrderStatus
 	if params.State == models.FactoryWorkOrderStateClosed && result == models.FactoryWorkOrderResultRejected {
 		result = models.FactoryWorkOrderResultManualRejected
 	}
-	waitForPullRequests, err := c.waitsForAllPullRequests(params)
-	if err != nil {
-		return nil, false, err
-	}
-	if waitForPullRequests {
+	if params.State == models.FactoryWorkOrderStateClosed && params.WhenAllPullRequestsDone {
 		pullRequestResult, done, err := order.PullRequestCloseOutcome(c.tx)
 		if err != nil {
 			return nil, false, err
@@ -754,6 +736,19 @@ func (c *FactoryContext) UpdateWorkOrderStatus(params core.UpdateWorkOrderStatus
 	// the component is re-run.
 	if !changed {
 		return workOrderToCore(order), false, nil
+	}
+	if order.State == models.FactoryWorkOrderStateClosed {
+		factoryModel, findErr := models.FindFactory(c.tx, order.OrganizationID, order.FactoryID)
+		if findErr != nil {
+			log.WithError(findErr).Warnf("failed to load factory for Done custom automation on task %s", order.ID)
+		} else {
+			events, emitErr := EmitAutomaticTaskColumnCustomAutomations(c.tx, factoryModel, order, models.CanvasColumnKeyDone)
+			if emitErr != nil {
+				log.WithError(emitErr).Warnf("failed to start Done custom automation for task %s", order.ID)
+			} else if c.onNewEvents != nil {
+				c.onNewEvents(events)
+			}
+		}
 	}
 
 	c.notifyWorkOrderUpdated(order.FactoryID, order.ID, factory.EventTypeOrderStatusUpdated)
@@ -1198,6 +1193,9 @@ func (c *FactoryContext) pullRequestMatch(pullRequest *models.FactoryPullRequest
 	order, err := factoryModel.FindWorkOrder(c.tx, pullRequest.WorkOrderID)
 	if err != nil {
 		return nil, err
+	}
+	if order.IsArchived() {
+		return nil, core.ErrPullRequestNotFound
 	}
 	workOrder := workOrderToCore(order)
 	workOrder.Key = factoryModel.WorkOrderKey(order.Number)

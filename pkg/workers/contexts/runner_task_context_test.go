@@ -126,3 +126,25 @@ func TestRunnerTaskContextReadsImportedTerminalTasks(t *testing.T) {
 		})
 	}
 }
+
+func TestRunnerTaskSnapshotKeepsPollAndCompletionConsistent(t *testing.T) {
+	resource := support.Setup(t)
+	db := database.DB(t.Context())
+	fleet := models.RunnerFleet{ID: uuid.New(), Slug: support.RandomName("snapshot"), ScopeType: models.RunnerFleetScopeInstallation,
+		Enabled: true, Spec: datatypes.NewJSONType(models.RunnerFleetSpec{}), RunnerVersion: models.DefaultRunnerVersion}
+	require.NoError(t, fleet.Create(db))
+	now := time.Now()
+	task := models.RunnerTask{ID: uuid.New(), OrganizationID: resource.Organization.ID, FleetID: fleet.ID,
+		Backend: models.RunnerTaskBackendIntegrated, State: models.RunnerTaskStatePending, PayloadCiphertext: []byte{},
+		QueuedAt: now, CreatedAt: now, UpdatedAt: now}
+	require.NoError(t, db.Create(&task).Error)
+	snapshot := NewRunnerTaskContext(db, nil, resource.Organization.ID).WithSnapshot(task.ID.String())
+	// The agent can report its last check and finish after hook preparation.
+	require.NoError(t, db.Model(&task).Update("state", models.RunnerTaskStateSucceeded).Error)
+	polled, err := snapshot.Find(task.ID.String())
+	require.NoError(t, err)
+	assert.False(t, polled.IsTerminal(), "this hook must keep polling until its next snapshot")
+	next, err := NewRunnerTaskContext(db, nil, resource.Organization.ID).WithSnapshot(task.ID.String()).Find(task.ID.String())
+	require.NoError(t, err)
+	assert.True(t, next.IsTerminal())
+}

@@ -323,6 +323,54 @@ function isRetryableKind(kind) {
   return kind === "rate_limit" || kind === "retryable";
 }
 
+function attemptOutcome(attempt) {
+  const n = Math.min(MAX_ATTEMPTS, Math.max(1, Math.floor(Number(attempt) || 1)));
+  return `attempt_${n}`;
+}
+
+function occurredAtStamp(value) {
+  if (typeof value === "string" && value.trim()) {
+    return value.trim();
+  }
+  const n = Number(value);
+  if (Number.isFinite(n) && n > 0) {
+    const date = n < 1e12 ? new Date(n * 1000) : new Date(n);
+    if (!Number.isNaN(date.getTime())) {
+      return date.toISOString();
+    }
+  }
+  return new Date().toISOString();
+}
+
+function appendModelCallOutcomes(outcomes, model, outcome, count, occurredAt) {
+  const id = catalogModelId(model);
+  const n = Math.max(0, Number(count) || 0);
+  if (!id || !outcome || n < 1) {
+    return;
+  }
+  const stamp = occurredAtStamp(occurredAt);
+  for (let i = 0; i < n; i += 1) {
+    outcomes.push({ model: id, outcome, occurredAt: stamp });
+  }
+}
+
+function appendSpawnRoundtripOutcomes(outcomes, model, attempt, count, times) {
+  const id = catalogModelId(model);
+  const n = Math.max(0, Number(count) || 0);
+  if (!id || n < 1) {
+    return;
+  }
+  const stamps = Array.isArray(times) ? times : [];
+  for (let i = 0; i < n; i += 1) {
+    const callAttempt = Number(attempt) > 1 && i === 0 ? attempt : 1;
+    outcomes.push({
+      model: id,
+      outcome: attemptOutcome(callAttempt),
+      occurredAt: occurredAtStamp(stamps[i]),
+    });
+  }
+}
+
 function uniqueCatalogModels(ids) {
   const seen = new Set();
   const out = [];
@@ -688,6 +736,129 @@ function repositoryInstructions(cwd) {
   return [];
 }
 
+function repositoryNameFromURL(rawURL) {
+  const match = String(rawURL || "")
+    .trim()
+    .replace(/\.git$/, "")
+    .match(/[/:]([^/:]+\/[^/:]+)$/);
+  return match ? match[1] : "";
+}
+
+function workspaceReferenceAlias(repository, references) {
+  const base =
+    String(repository || "")
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9._-]+/g, "-")
+      .replace(/^[-.]+|[-.]+$/g, "") || "repository";
+  let alias = base;
+  for (let suffix = 2; Object.hasOwn(references, alias); suffix += 1) {
+    alias = `${base}-${suffix}`;
+  }
+  return alias;
+}
+
+function pathIsInside(parent, child) {
+  const relative = path.relative(parent, child);
+  return (
+    relative !== "" &&
+    relative !== ".." &&
+    !relative.startsWith(`..${path.sep}`) &&
+    !path.isAbsolute(relative)
+  );
+}
+
+function workspaceRepositoryReferences(taskDir, env) {
+  if (!taskDir) return {};
+  const contextFile = path.join(taskDir, "workspace_context.json");
+  if (!fs.existsSync(contextFile)) return {};
+
+  let manifest;
+  try {
+    manifest = JSON.parse(fs.readFileSync(contextFile, "utf8"));
+  } catch (error) {
+    throw new Error(`workspace_context.json is invalid: ${error.message}`);
+  }
+  if (!manifest || !Array.isArray(manifest.repositories)) {
+    throw new Error("workspace_context.json must contain a repositories array");
+  }
+
+  const primaryRepository = String(
+    (env && env.REPO) || repositoryNameFromURL(env && env.REPO_URL),
+  )
+    .trim()
+    .toLowerCase();
+  const repositories = manifest.repositories.filter((entry) => {
+    const repository = String((entry && entry.repository) || "")
+      .trim()
+      .toLowerCase();
+    return !primaryRepository || repository !== primaryRepository;
+  });
+  if (repositories.length === 0) return {};
+
+  const taskCwdFile = path.join(taskDir, "task_cwd");
+  let workspaceRoot;
+  try {
+    workspaceRoot = fs.readFileSync(taskCwdFile, "utf8").trim();
+  } catch (error) {
+    throw new Error(`workspace_context.json requires task_cwd: ${error.message}`);
+  }
+  if (!path.isAbsolute(workspaceRoot)) {
+    throw new Error("workspace_context.json requires an absolute task_cwd");
+  }
+
+  const contextRoot = path.join(workspaceRoot, "context");
+  const references = {};
+  for (const entry of repositories) {
+    const repository = String((entry && entry.repository) || "").trim();
+    const directory = String((entry && entry.directory) || "").trim();
+    if (!repository || !directory) {
+      throw new Error("workspace_context.json contains a repository without a name or directory");
+    }
+
+    const checkout = path.resolve(workspaceRoot, directory);
+    if (!pathIsInside(contextRoot, checkout)) {
+      throw new Error(`workspace_context.json directory escapes context/: ${directory}`);
+    }
+    if (!fs.existsSync(checkout) || !fs.statSync(checkout).isDirectory()) {
+      continue;
+    }
+    const realContextRoot = fs.realpathSync(contextRoot);
+    const realCheckout = fs.realpathSync(checkout);
+    if (!pathIsInside(realContextRoot, realCheckout)) {
+      throw new Error(`workspace_context.json directory resolves outside context/: ${directory}`);
+    }
+
+    const access = entry.readOnly ? "read only" : "read and write";
+    references[workspaceReferenceAlias(repository, references)] = {
+      path: realCheckout,
+      description:
+        `Workspace repository ${repository} (${access}). ` +
+        "Inspect this checkout when the task involves this repository.",
+    };
+  }
+  return references;
+}
+
+function writeWorkspaceRepositoryInstructions(taskDir, references) {
+  const instructionFile = path.join(taskDir, "workspace_repositories.md");
+  const repositories = Object.entries(references).map(
+    ([alias, reference]) =>
+      `- @${alias}: ${reference.path}\n  ${reference.description}`,
+  );
+  const content = [
+    "# Workspace repositories",
+    "",
+    "The primary repository is the current working directory. The repositories below are also part of this task workspace.",
+    "Inspect the listed path before you conclude that a workspace repository is unavailable.",
+    "",
+    ...repositories,
+    "",
+  ].join("\n");
+  fs.writeFileSync(instructionFile, content);
+  return instructionFile;
+}
+
 function buildOpenCodeConfig({
   taskDir,
   cwd,
@@ -767,8 +938,13 @@ function buildOpenCodeConfig({
       },
     };
   }
+  const references = workspaceRepositoryReferences(taskDir, env);
+  if (Object.keys(references).length > 0) config.references = references;
   applyWorkspaceMCPDenylist(config, workspaceMCPServers(env));
   const instructions = repositoryInstructions(cwd);
+  if (Object.keys(references).length > 0) {
+    instructions.push(writeWorkspaceRepositoryInstructions(taskDir, references));
+  }
   const protocol = planningSystemPrompt(env);
   if (protocol && taskDir) {
     const protocolPath = path.join(taskDir, "analysis_protocol.md");
@@ -1065,6 +1241,7 @@ async function runPrompt(promptFile, model, helpers = {}) {
   let lastErrorText = "";
   let attempt = 1;
   let pendingSuccessfulRoundtrips = 0;
+  const modelCallOutcomes = [];
 
   while (true) {
     printLiveLogLine(callingOpenCodeLine(currentModel, attempt, env));
@@ -1100,7 +1277,15 @@ async function runPrompt(promptFile, model, helpers = {}) {
     }
     lastErrorText = spawnResult.errorText || "";
     const spawnFailed = spawnTurnFailed(spawnResult, formatter, planning);
-    pendingSuccessfulRoundtrips += Number(spawnResult.successfulRoundtrips) || 0;
+    const successfulRoundtrips = Number(spawnResult.successfulRoundtrips) || 0;
+    appendSpawnRoundtripOutcomes(
+      modelCallOutcomes,
+      currentModel,
+      attempt,
+      successfulRoundtrips,
+      spawnResult.successfulRoundtripTimes,
+    );
+    pendingSuccessfulRoundtrips += successfulRoundtrips;
     const resetHappened =
       pendingSuccessfulRoundtrips >= SUCCESSFUL_ROUNDTRIPS_TO_RESET;
     if (resetHappened) {
@@ -1127,6 +1312,7 @@ async function runPrompt(promptFile, model, helpers = {}) {
     if (attempt >= MAX_ATTEMPTS) {
       failed = true;
       exitCode = failedExit;
+      appendModelCallOutcomes(modelCallOutcomes, currentModel, "error", 1);
       printRetryOutcome(
         lastErrorText,
         stoppedAfterAttemptsLine(classKind, currentModel),
@@ -1138,6 +1324,7 @@ async function runPrompt(promptFile, model, helpers = {}) {
     if (remaining < waitMs || remaining <= 0) {
       failed = true;
       exitCode = 1;
+      appendModelCallOutcomes(modelCallOutcomes, currentModel, "error", 1);
       printRetryOutcome(lastErrorText, waitExceededTimeoutLine(classKind));
       break;
     }
@@ -1180,6 +1367,9 @@ async function runPrompt(promptFile, model, helpers = {}) {
     model: catalogModelId(currentModel) || catalogModelId(model),
     usage,
   };
+  if (modelCallOutcomes.length > 0) {
+    payload.modelCallOutcomes = modelCallOutcomes;
+  }
   if (lastCost) {
     payload.total_cost_usd = lastCost;
   }
@@ -1359,6 +1549,9 @@ async function spawnOpenCodeTurn(args, env, cwd, formatter, helpers) {
     lastEvent: snapshot.lastEvent,
     roundOpen: Boolean(snapshot.roundOpen),
     successfulRoundtrips: Number(snapshot.successfulRoundtrips) || 0,
+    successfulRoundtripTimes: Array.isArray(snapshot.successfulRoundtripTimes)
+      ? snapshot.successfulRoundtripTimes
+      : [],
   };
 }
 
@@ -1993,6 +2186,7 @@ function createOpenCodeFormatter(telemetry, onSession, activityOverride) {
   let roundOpen = false;
   let announcedStart = false;
   let successfulRoundtrips = 0;
+  let successfulRoundtripTimes = [];
 
   function rememberSession(event) {
     const id = String(
@@ -2025,6 +2219,7 @@ function createOpenCodeFormatter(telemetry, onSession, activityOverride) {
       roundOpen = false;
       sessionID = "";
       successfulRoundtrips = 0;
+      successfulRoundtripTimes = [];
     },
     handleLine(raw) {
       const line = String(raw || "").trim();
@@ -2121,6 +2316,7 @@ function createOpenCodeFormatter(telemetry, onSession, activityOverride) {
           }
           if (isSuccessfulRoundtrip(part)) {
             successfulRoundtrips += 1;
+            successfulRoundtripTimes.push(new Date().toISOString());
           }
           roundOpen = false;
           break;
@@ -2155,6 +2351,7 @@ function createOpenCodeFormatter(telemetry, onSession, activityOverride) {
         lastEvent,
         roundOpen,
         successfulRoundtrips,
+        successfulRoundtripTimes,
       };
     },
     lastText() {
@@ -2482,6 +2679,9 @@ module.exports = {
   thinkingArgs,
   planningEnabled,
   classifyOpenRouterError,
+  attemptOutcome,
+  appendModelCallOutcomes,
+  appendSpawnRoundtripOutcomes,
   openRouterModelId,
   buildOpenCodeConfig,
   orderProviderTags,

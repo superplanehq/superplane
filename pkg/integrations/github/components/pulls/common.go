@@ -213,7 +213,7 @@ func isExpectedPRCommentAction(eventType string, data map[string]any) bool {
 		return action == "submitted"
 	}
 
-	return action == "created"
+	return action == "created" || action == "edited"
 }
 
 func applyPRCommentContentFilter(filter, eventType string, data map[string]any) (bool, int, error) {

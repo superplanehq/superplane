@@ -17,6 +17,15 @@ import (
 
 func (g *GitHub) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	switch resourceType {
+	case "check_run_permission":
+		if err := common.VerifyCheckRunPermissions(context.Background(), ctx.Integration, ctx.HTTP); err != nil {
+			if errors.Is(err, common.ErrCheckRunPermissions) || errors.Is(err, common.ErrCheckRunAppRequired) {
+				return []core.IntegrationResource{{Type: resourceType, ID: "missing", Name: err.Error()}}, nil
+			}
+			return nil, err
+		}
+		return []core.IntegrationResource{{Type: resourceType, ID: "granted", Name: "Checks write"}}, nil
+
 	case "repository":
 		metadata := common.Metadata{}
 		if decodeErr := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); decodeErr != nil {
@@ -75,9 +84,35 @@ func (g *GitHub) ListResources(resourceType string, ctx core.ListResourcesContex
 	case "review_bot":
 		return g.listReviewBotResources(ctx)
 
+	case "human_reviewer":
+		return g.listHumanReviewerResources(ctx)
+
 	default:
 		return []core.IntegrationResource{}, nil
 	}
+}
+
+func (g *GitHub) listHumanReviewerResources(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	repository := strings.TrimSpace(ctx.Parameters["repository"])
+	if repository == "" {
+		return []core.IntegrationResource{}, nil
+	}
+	client, err := common.NewClient(ctx.Integration, ctx.HTTP)
+	if err != nil {
+		return nil, fmt.Errorf("create GitHub client: %w", err)
+	}
+	users, err := client.ListHumanReviewers(context.Background(), repository)
+	if err != nil {
+		return nil, err
+	}
+	resources := make([]core.IntegrationResource, 0, len(users))
+	for _, user := range users {
+		login := strings.TrimSpace(user.GetLogin())
+		resources = append(resources, core.IntegrationResource{
+			Type: "human_reviewer", ID: login, Name: login, URL: user.GetHTMLURL(),
+		})
+	}
+	return resources, nil
 }
 
 func toIntegrationResources(repositories []*github.Repository) []core.IntegrationResource {
