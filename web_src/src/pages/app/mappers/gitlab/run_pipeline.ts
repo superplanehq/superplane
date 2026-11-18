@@ -26,6 +26,20 @@ interface ExecutionMetadata {
   pipeline?: PipelineMetadata;
 }
 
+const PIPELINE_STATUS_STATES: ReadonlyMap<string, EventState> = new Map([
+  ["success", "passed"],
+  ["failed", "failed"],
+  ["canceled", "failed"],
+  ["cancelled", "failed"],
+  ["skipped", "failed"],
+  ["manual", "failed"],
+  ["blocked", "failed"],
+]);
+
+function pipelineMetadataState(metadata: ExecutionMetadata | undefined): EventState {
+  return PIPELINE_STATUS_STATES.get(metadata?.pipeline?.status ?? "") ?? "neutral";
+}
+
 interface RunPipelineConfiguration {
   project: string;
   ref: string;
@@ -81,20 +95,7 @@ export const runPipelineStateFunction: StateFunction = (execution: ExecutionInfo
     return "passed";
   }
 
-  const metadata = execution.metadata as ExecutionMetadata;
-  switch (metadata?.pipeline?.status) {
-    case "success":
-      return "passed";
-    case "failed":
-    case "canceled":
-    case "cancelled":
-    case "skipped":
-    case "manual":
-    case "blocked":
-      return "failed";
-    default:
-      return "neutral";
-  }
+  return pipelineMetadataState(execution.metadata as ExecutionMetadata | undefined);
 };
 
 export const RUN_PIPELINE_STATE_REGISTRY: EventStateRegistry = {
