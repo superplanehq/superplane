@@ -136,3 +136,14 @@ export function findBrokenIntegrations(integrations: OrganizationsIntegration[])
     .map((integration) => classifyIntegration(integration))
     .filter((integration): integration is BrokenIntegration => integration !== null);
 }
+
+/**
+ * A finished workspace lost its Git connection, usually because someone
+ * deleted the integration. Automations cannot reach the repository until a
+ * new connection is chosen on the Agent page.
+ */
+export function workspaceNeedsGitConnection(
+  factory: { onboarding?: { completedAt?: string; vcsIntegrationId?: string } | null } | null | undefined,
+): boolean {
+  return Boolean(factory?.onboarding?.completedAt) && !factory?.onboarding?.vcsIntegrationId;
+}

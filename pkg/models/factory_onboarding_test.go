@@ -54,7 +54,7 @@ func Test__FactoryOnboarding(t *testing.T) {
 		require.NoError(t, factory.SetInitialOnboardingAttempt(db, uuid.New()))
 		assert.True(t, factory.IsPendingInitialOnboarding())
 
-		require.NoError(t, factory.CompleteOnboarding(db, readyOnboardingPatch()))
+		require.NoError(t, factory.CompleteOnboarding(db, readyOnboardingPatch(t, r.Organization.ID)))
 		assert.False(t, factory.IsPendingInitialOnboarding())
 		assert.True(t, factory.IsInitialOnboarding())
 	})
@@ -63,7 +63,7 @@ func Test__FactoryOnboarding(t *testing.T) {
 		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 		require.NoError(t, err)
 
-		vcsID := uuid.New().String()
+		vcsID := support.CreateIntegrationID(t, r.Organization.ID, models.ProviderGitHub)
 		appRepo := "acme/api"
 		require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
 			VCSIntegrationID: &vcsID,
@@ -122,7 +122,7 @@ func Test__FactoryOnboarding(t *testing.T) {
 		err = factory.CompleteOnboarding(db, models.FactoryOnboardingPatch{})
 		assert.ErrorIs(t, err, models.ErrFactoryOnboardingAppRepositoryRequired)
 
-		ready := readyOnboardingPatch()
+		ready := readyOnboardingPatch(t, r.Organization.ID)
 		require.NoError(t, factory.CompleteOnboarding(db, ready))
 		require.NotNil(t, factory.OnboardingCompletedAt)
 		firstCompletedAt := *factory.OnboardingCompletedAt
@@ -138,7 +138,7 @@ func Test__FactoryOnboarding(t *testing.T) {
 		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 		require.NoError(t, err)
 
-		ready := readyOnboardingPatch()
+		ready := readyOnboardingPatch(t, r.Organization.ID)
 		ready.AgentIntegrationID = nil
 		require.NoError(t, factory.CompleteOnboarding(db, ready))
 		assert.Empty(t, factory.OnboardingConfigValue().AgentIntegrationID)
@@ -161,7 +161,7 @@ func Test__OrganizationIDsPendingInitialOnboardingOnly(t *testing.T) {
 	readyFactory, err := models.CreateFactory(db, readyOrg.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 	require.NoError(t, readyFactory.SetInitialOnboardingAttempt(db, uuid.New()))
-	require.NoError(t, readyFactory.CompleteOnboarding(db, readyOnboardingPatch()))
+	require.NoError(t, readyFactory.CompleteOnboarding(db, readyOnboardingPatch(t, readyOrg.ID)))
 
 	pending, err := models.OrganizationIDsPendingInitialOnboardingOnly(db, []uuid.UUID{pendingOrg.ID, readyOrg.ID, r.Organization.ID})
 	require.NoError(t, err)
@@ -174,8 +174,8 @@ func Test__OrganizationIDsPendingInitialOnboardingOnly(t *testing.T) {
 	assert.False(t, setupListed)
 }
 
-func readyOnboardingPatch() models.FactoryOnboardingPatch {
-	vcsID := uuid.New().String()
+func readyOnboardingPatch(t *testing.T, organizationID uuid.UUID) models.FactoryOnboardingPatch {
+	vcsID := support.CreateIntegrationID(t, organizationID, models.ProviderGitHub)
 	agentID := uuid.New().String()
 	appRepo := "acme/api"
 	backlogRepo := "acme/backlog"

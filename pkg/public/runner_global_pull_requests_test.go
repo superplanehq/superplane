@@ -8,7 +8,6 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	runner "github.com/superplanehq/superplane/pkg/components/runner"
@@ -26,7 +25,7 @@ func TestRunnerTaskPullRequests(t *testing.T) {
 	db := database.DB(t.Context())
 	server := newRunnerArtifactTestServer(t, r, jwt.NewSigner("test"))
 	ctx, factory, order := mustTaskLinkedAgentRun(t, r)
-	integrationID := uuid.NewString()
+	integrationID := support.CreateIntegrationID(t, r.Organization.ID, models.ProviderGitHub)
 	repository := "acme/api"
 	provider := models.ProviderGitHub
 	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
