@@ -31,8 +31,8 @@ export function MissingGitConnectionBanner({ agentPath }: { agentPath?: string }
       <div className="flex min-w-0 items-center gap-2">
         <TriangleAlert className="h-4 w-4 shrink-0 text-amber-700 dark:text-amber-300" aria-hidden />
         <span>
-          <span className="font-medium">This workspace has no Git connection.</span> Automations cannot reach the
-          repository until you choose a connection.
+          <span className="font-medium">This workspace has no source control connection.</span> Automations cannot reach
+          the repository until you choose a connection.
         </span>
       </div>
       {agentPath ? (
