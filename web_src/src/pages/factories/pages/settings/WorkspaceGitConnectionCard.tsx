@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check, Link2, TriangleAlert } from "lucide-react";
+import { Check, Plug, TriangleAlert } from "lucide-react";
 import { Link } from "react-router";
 
 import type { OrganizationsIntegration } from "@/api-client";
@@ -66,7 +66,7 @@ function GitConnectionCard(props: CardProps & { repository: string }) {
       title={AGENT_RESOURCES_COPY.gitConnectionTitle}
       titleClassName="text-sm font-semibold"
       description={AGENT_RESOURCES_COPY.gitConnectionHelper}
-      icon={<Link2 className="size-4" strokeWidth={1.75} aria-hidden />}
+      icon={<Plug className="size-4" strokeWidth={1.75} aria-hidden />}
       iconClassName="border-border bg-muted/60 text-foreground"
       className="shadow-sm"
       attachedList
