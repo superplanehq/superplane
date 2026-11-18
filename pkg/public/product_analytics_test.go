@@ -197,7 +197,7 @@ func TestOrganizationCreationAnalytics(t *testing.T) {
 			encryptor := &crypto.NoOpEncryptor{}
 			componentRegistry, err := registry.NewRegistry(encryptor, registry.HTTPOptions{})
 			require.NoError(t, err)
-			server, err := NewServer(encryptor, componentRegistry, signer, support.NewOIDCProvider(), "", "localhost", "", "test", "/app/templates", authService, false)
+			server, err := NewServer(encryptor, componentRegistry, signer, support.NewOIDCProvider(), "", "localhost", "", "test", "/app/templates", authService, false, nil)
 			require.NoError(t, err)
 
 			postOrganization := func(body []byte) *httptest.ResponseRecorder {
@@ -280,6 +280,7 @@ func TestInitialWorkspaceAnalytics(t *testing.T) {
 		"/app/templates",
 		resource.AuthService,
 		false,
+		nil,
 	)
 	require.NoError(t, err)
 
