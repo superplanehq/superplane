@@ -67,7 +67,6 @@ func TestGatewayAuthorizerEnforcesLicenseFeatures(t *testing.T) {
 	})
 
 	t.Run("denies without entitlements", func(t *testing.T) {
-		clearOrganizationPermissionCacheForTest()
 		authorizer := NewGatewayAuthorizer(allowingPermissionChecker{})
 
 		_, err := authorizer.AuthorizeHTTP(context.Background(), r, createRole, nil)
@@ -77,7 +76,6 @@ func TestGatewayAuthorizerEnforcesLicenseFeatures(t *testing.T) {
 	})
 
 	t.Run("denies when the license grants a different feature", func(t *testing.T) {
-		clearOrganizationPermissionCacheForTest()
 		authorizer := NewGatewayAuthorizer(allowingPermissionChecker{}).
 			WithEntitlements(fakeEntitlements{licensing.FeatureGroups: true})
 
@@ -86,7 +84,6 @@ func TestGatewayAuthorizerEnforcesLicenseFeatures(t *testing.T) {
 	})
 
 	t.Run("allows when the license grants the feature", func(t *testing.T) {
-		clearOrganizationPermissionCacheForTest()
 		authorizer := NewGatewayAuthorizer(allowingPermissionChecker{}).
 			WithEntitlements(fakeEntitlements{licensing.FeatureCustomRoles: true})
 
@@ -95,7 +92,6 @@ func TestGatewayAuthorizerEnforcesLicenseFeatures(t *testing.T) {
 	})
 
 	t.Run("nil entitlements keep the Community default", func(t *testing.T) {
-		clearOrganizationPermissionCacheForTest()
 		authorizer := NewGatewayAuthorizer(allowingPermissionChecker{}).WithEntitlements(nil)
 
 		_, err := authorizer.AuthorizeHTTP(context.Background(), r, createRole, nil)
@@ -103,7 +99,6 @@ func TestGatewayAuthorizerEnforcesLicenseFeatures(t *testing.T) {
 	})
 
 	t.Run("RBAC denial hides the license state", func(t *testing.T) {
-		clearOrganizationPermissionCacheForTest()
 		authorizer := NewGatewayAuthorizer(actionPermissionChecker{})
 
 		_, err := authorizer.AuthorizeHTTP(context.Background(), r, createRole, nil)
@@ -130,7 +125,6 @@ func TestGatewayAuthorizerUsesTheOrganizationGrant(t *testing.T) {
 		})
 
 	t.Run("allows the organization that has the grant", func(t *testing.T) {
-		clearOrganizationPermissionCacheForTest()
 		request := httptestRequest(t, map[string]string{
 			"x-user-id":         "22222222-2222-4222-8222-222222222222",
 			"x-organization-id": granted.String(),
@@ -140,7 +134,6 @@ func TestGatewayAuthorizerUsesTheOrganizationGrant(t *testing.T) {
 	})
 
 	t.Run("denies an organization without the grant", func(t *testing.T) {
-		clearOrganizationPermissionCacheForTest()
 		request := httptestRequest(t, map[string]string{
 			"x-user-id":         "22222222-2222-4222-8222-222222222222",
 			"x-organization-id": other.String(),
@@ -152,7 +145,6 @@ func TestGatewayAuthorizerUsesTheOrganizationGrant(t *testing.T) {
 	})
 
 	t.Run("denies a request without an organization", func(t *testing.T) {
-		clearOrganizationPermissionCacheForTest()
 		request := httptestRequest(t, map[string]string{
 			"x-user-id": "22222222-2222-4222-8222-222222222222",
 		})
@@ -162,7 +154,6 @@ func TestGatewayAuthorizerUsesTheOrganizationGrant(t *testing.T) {
 	})
 
 	t.Run("denies a request with an invalid organization id", func(t *testing.T) {
-		clearOrganizationPermissionCacheForTest()
 		request := httptestRequest(t, map[string]string{
 			"x-user-id":         "22222222-2222-4222-8222-222222222222",
 			"x-organization-id": "not-an-organization",
