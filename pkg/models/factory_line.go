@@ -118,53 +118,6 @@ func defaultColumnColors() map[string]string {
 	}
 }
 
-func defaultFactoryLineStages(tx *gorm.DB, steps []FactoryLineStep) ([]FactoryLineStage, error) {
-	names, err := factoryLineStepNames(tx, steps)
-	if err != nil {
-		return nil, err
-	}
-
-	stages := make([]FactoryLineStage, 0, len(steps)+3)
-	stages = append(stages, newFactoryLineStage(FactoryLineStageBacklog, "backlog", "Backlog", nil))
-	for index, step := range steps {
-		stepIndex := index
-		name := names[step.AppID]
-		if name == "" {
-			name = "Step"
-		}
-		stages = append(stages, newFactoryLineStage(FactoryLineStagePhase, "phase-"+strconv.Itoa(index), name, &stepIndex))
-	}
-	stages = append(stages,
-		newFactoryLineStage(FactoryLineStageVerify, "verify", "Verify", nil),
-		newFactoryLineStage(FactoryLineStageDone, "done", "Done", nil),
-	)
-	return stages, nil
-}
-
-func factoryLineStepNames(tx *gorm.DB, steps []FactoryLineStep) (map[uuid.UUID]string, error) {
-	ids := make([]uuid.UUID, 0, len(steps))
-	for _, step := range steps {
-		ids = append(ids, step.AppID)
-	}
-	if len(ids) == 0 {
-		return map[uuid.UUID]string{}, nil
-	}
-
-	var canvases []Canvas
-	if err := tx.Select("id", "name").Where("id IN ?", ids).Find(&canvases).Error; err != nil {
-		return nil, err
-	}
-	names := make(map[uuid.UUID]string, len(canvases))
-	for _, canvas := range canvases {
-		names[canvas.ID] = canvas.Name
-	}
-	return names, nil
-}
-
-func newFactoryLineStage(kind, key, name string, stepIndex *int) FactoryLineStage {
-	return FactoryLineStage{ID: uuid.New(), Key: key, Name: name, Kind: kind, StepIndex: stepIndex}
-}
-
 func (f *Factory) CreateLine(tx *gorm.DB, name string, steps []FactoryLineStep) (*FactoryLine, error) {
 	stages, err := defaultFactoryLineStages(tx, steps)
 	if err != nil {
@@ -204,19 +157,11 @@ type FactoryLineStepResult struct {
 const onRunTriggerName = "onRun"
 
 func (f *Factory) FindLine(tx *gorm.DB, lineID uuid.UUID) (*FactoryLine, error) {
-	var line FactoryLine
-	err := tx.
-		Where("organization_id = ? AND factory_id = ? AND id = ?", f.OrganizationID, f.ID, lineID).
-		First(&line).
-		Error
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrFactoryLineNotFound
-		}
-		return nil, err
-	}
+	return f.findLine(tx, lineID)
+}
 
-	return &line, nil
+func (f *Factory) FindLineForUpdate(tx *gorm.DB, lineID uuid.UUID) (*FactoryLine, error) {
+	return f.findLine(tx.Clauses(clause.Locking{Strength: "UPDATE"}), lineID)
 }
 
 func (f *Factory) FindLineByName(tx *gorm.DB, name string) (*FactoryLine, error) {
@@ -383,4 +328,76 @@ func (l *FactoryLine) ReconcileStages(tx *gorm.DB, steps []FactoryLineStep) ([]F
 		result = append(result, stage)
 	}
 	return result, nil
+}
+
+func (l *FactoryLine) IsStageReferenced(tx *gorm.DB, key string) (bool, error) {
+	var count int64
+	err := tx.Model(&Canvas{}).
+		Where("factory_id = ? AND column_key = ?", l.FactoryID, key).
+		Count(&count).
+		Error
+	return count > 0, err
+}
+
+func (f *Factory) findLine(tx *gorm.DB, lineID uuid.UUID) (*FactoryLine, error) {
+	var line FactoryLine
+	err := tx.
+		Where("organization_id = ? AND factory_id = ? AND id = ?", f.OrganizationID, f.ID, lineID).
+		First(&line).
+		Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrFactoryLineNotFound
+		}
+		return nil, err
+	}
+
+	return &line, nil
+}
+
+func defaultFactoryLineStages(tx *gorm.DB, steps []FactoryLineStep) ([]FactoryLineStage, error) {
+	names, err := factoryLineStepNames(tx, steps)
+	if err != nil {
+		return nil, err
+	}
+
+	stages := make([]FactoryLineStage, 0, len(steps)+3)
+	stages = append(stages, newFactoryLineStage(FactoryLineStageBacklog, "backlog", "Backlog", nil))
+	for index, step := range steps {
+		stepIndex := index
+		name := names[step.AppID]
+		if name == "" {
+			name = "Step"
+		}
+		stages = append(stages, newFactoryLineStage(FactoryLineStagePhase, "phase-"+strconv.Itoa(index), name, &stepIndex))
+	}
+	stages = append(stages,
+		newFactoryLineStage(FactoryLineStageVerify, "verify", "Verify", nil),
+		newFactoryLineStage(FactoryLineStageDone, "done", "Done", nil),
+	)
+	return stages, nil
+}
+
+func factoryLineStepNames(tx *gorm.DB, steps []FactoryLineStep) (map[uuid.UUID]string, error) {
+	ids := make([]uuid.UUID, 0, len(steps))
+	for _, step := range steps {
+		ids = append(ids, step.AppID)
+	}
+	if len(ids) == 0 {
+		return map[uuid.UUID]string{}, nil
+	}
+
+	var canvases []Canvas
+	if err := tx.Select("id", "name").Where("id IN ?", ids).Find(&canvases).Error; err != nil {
+		return nil, err
+	}
+	names := make(map[uuid.UUID]string, len(canvases))
+	for _, canvas := range canvases {
+		names[canvas.ID] = canvas.Name
+	}
+	return names, nil
+}
+
+func newFactoryLineStage(kind, key, name string, stepIndex *int) FactoryLineStage {
+	return FactoryLineStage{ID: uuid.New(), Key: key, Name: name, Kind: kind, StepIndex: stepIndex}
 }
