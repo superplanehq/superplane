@@ -16,6 +16,7 @@ type HostedAgentDefaults = {
   customProvider?: boolean;
   usageLoading?: boolean;
   selectedModel?: string | null;
+  subscription?: { ready: boolean; loading: boolean };
 };
 
 export function useOnboardingAgentPlan(
@@ -48,9 +49,11 @@ export function useOnboardingAgentPlan(
     defaultHostedProvider: defaultHosted.provider,
     defaultHostedModel: defaultHosted.model,
     preferOwnKey: access.allowed && defaultHosted.preferOwnKey,
+    subscription: defaultHosted.subscription,
   });
   const providerId = plan?.providerId ?? AGENT_PROVIDER_IDS.find((id) => connectedForPlan.has(id));
-  const query = plan?.credentialsSource !== "hosted" && providerId ? queries[providerId] : undefined;
+  const query =
+    !defaultHosted.subscription && plan?.credentialsSource !== "hosted" && providerId ? queries[providerId] : undefined;
   return {
     remainingCreditCents,
     hostedModelsAvailable: hasHostedDefaultModel({
@@ -58,7 +61,7 @@ export function useOnboardingAgentPlan(
       defaultHostedModel: defaultHosted.model,
     }),
     hostedModelsAvailableLoading: defaultHosted.usageLoading ?? false,
-    hostedModelsLoading: Boolean(query && !query.isFetched),
+    hostedModelsLoading: defaultHosted.subscription?.loading ?? Boolean(query && !query.isFetched),
     ...onboardingModelChoice(plan, query, defaultHosted.selectedModel),
   };
 }
@@ -137,6 +140,9 @@ export function agentRewriteFromPlan(
       planningModel: "",
     };
   }
+  if (plan.credentialsSource === "subscription") {
+    return { component: "runnerCodex", model: "", planningModel: "", credentials: { source: "subscription" } };
+  }
   const integrationName = plan.integrationName;
   if (!integrationName) {
     throw new Error("Agent integration is missing");
@@ -158,7 +164,7 @@ export function useOnboardingAgentContext(
   connected: Set<IntegrationId>,
   preferOwnKey: boolean,
   customProvider = false,
-  selectedModel?: string | null,
+  choices: Pick<HostedAgentDefaults, "selectedModel" | "subscription"> = {},
 ) {
   const spend = useOrganizationWorkspaceUsage(organizationId);
   const remainingCreditCents = parseWorkOrderMetric(spend.data?.remainingCreditCents);
@@ -167,7 +173,7 @@ export function useOnboardingAgentContext(
     model: spend.data?.defaultHostedModel,
     preferOwnKey,
     customProvider,
-    selectedModel,
+    ...choices,
     usageLoading: spend.isLoading,
   });
 }
