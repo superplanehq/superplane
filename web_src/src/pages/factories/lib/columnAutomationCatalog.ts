@@ -3,12 +3,8 @@ import githubIcon from "@/assets/icons/integrations/github.svg";
 
 import { LINE_INTAKE_SOURCES } from "../pages/lineIntakeModel";
 import { availablePRFeedbackSources } from "../pages/prFeedbackSettingsModel";
-import type {
-  ColumnAutomation,
-  ColumnAutomationCatalogEntry,
-  ColumnAutomationKind,
-  ColumnKey,
-} from "./columnAutomations";
+import type { ColumnAutomation, ColumnAutomationCatalogEntry, ColumnAutomationKind } from "./columnAutomations";
+import type { ColumnKey } from "./columnKeys";
 
 export const ANALYSIS_CATALOG_ID = "analysis";
 export const AGENT_STEP_CATALOG_ID = "agent-step";
@@ -132,6 +128,9 @@ export function catalogForColumn(
   options?: { allowCustom?: boolean; allowReviewRequest?: boolean; vcsProvider?: string },
 ): ColumnAutomationCatalogEntry[] {
   const allowCustom = options?.allowCustom === true;
+  if (key.startsWith("custom-")) {
+    return [CUSTOM_ENTRY];
+  }
   if (key === "backlog") {
     return [
       ...LINE_INTAKE_SOURCES.map((source) => ({
