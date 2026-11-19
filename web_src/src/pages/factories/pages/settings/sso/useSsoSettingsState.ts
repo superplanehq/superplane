@@ -65,7 +65,8 @@ export function useSsoSettingsState(model: SsoSettingsModel, actions: SsoSetting
     canChange: Boolean(model.licensed) && allowed,
     canUpdate: allowed,
     permitted,
-    providerDirty: isProviderDirty(form, connection),
+    identityDirty: isIdentityDirty(form, connection),
+    credentialsDirty: isCredentialsDirty(form, connection),
     provisioningDirty: isProvisioningDirty(form, connection),
     policyDirty: isPolicyDirty(form, connection),
     providerReady: Boolean(connection?.issuer?.trim() && connection.clientId?.trim() && connection.clientSecretSet),
@@ -187,15 +188,14 @@ function saveCard(
   actions.onSave(ssoConnectionInput(next, enforcement, seconds));
 }
 
-function isProviderDirty(form: SsoForm, connection?: SsoConnection | null) {
+function isIdentityDirty(form: SsoForm, connection?: SsoConnection | null) {
   const base = initialForm(connection);
-  return (
-    form.preset !== base.preset ||
-    form.displayName !== base.displayName ||
-    form.issuer !== base.issuer ||
-    form.clientId !== base.clientId ||
-    form.clientSecret !== ""
-  );
+  return form.preset !== base.preset || form.displayName !== base.displayName;
+}
+
+function isCredentialsDirty(form: SsoForm, connection?: SsoConnection | null) {
+  const base = initialForm(connection);
+  return form.issuer !== base.issuer || form.clientId !== base.clientId || form.clientSecret !== "";
 }
 
 function isProvisioningDirty(form: SsoForm, connection?: SsoConnection | null) {

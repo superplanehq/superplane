@@ -70,6 +70,9 @@ describe("SsoSettingsView", () => {
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Create connection" })).toBeEnabled();
     expect(screen.getAllByText("Create the connection first.")).toHaveLength(3);
+    expect(screen.queryByTestId("sso-provider-urls")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("sso-provider-values")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("sso-scim")).not.toBeInTheDocument();
   });
 
   it("adds, verifies, and deletes a domain", async () => {
@@ -120,9 +123,29 @@ describe("SsoSettingsView", () => {
       tokens: [],
       connection: { ...draftConnection, issuer: "", clientId: "", clientSecretSet: false },
     });
+    expect(screen.getByTestId("sso-provider-values")).toBeInTheDocument();
+    expect(screen.getByTestId("sso-identity-save")).toBeDisabled();
     await user.type(screen.getByLabelText("Issuer URL"), "https://example.okta.com");
+    expect(screen.getByTestId("sso-identity-save")).toBeDisabled();
     await user.click(screen.getByTestId("sso-provider-save"));
     expect(calls.onSave).toHaveBeenCalledWith(expect.objectContaining({ issuer: "https://example.okta.com" }));
+  });
+
+  it("saves the provider name only after the display name changes", async () => {
+    const user = userEvent.setup();
+    const calls = renderSettings({
+      licensed: true,
+      domains: [],
+      tokens: [],
+      connection: draftConnection,
+    });
+    expect(screen.getByTestId("sso-identity-save")).toBeDisabled();
+    expect(screen.getByTestId("sso-provider-save")).toBeDisabled();
+    await user.clear(screen.getByLabelText("Display name"));
+    await user.type(screen.getByLabelText("Display name"), "Company Okta");
+    expect(screen.getByTestId("sso-provider-save")).toBeDisabled();
+    await user.click(screen.getByTestId("sso-identity-save"));
+    expect(calls.onSave).toHaveBeenCalledWith(expect.objectContaining({ displayName: "Company Okta" }));
   });
 
   it("disables the test until the provider values are saved", () => {

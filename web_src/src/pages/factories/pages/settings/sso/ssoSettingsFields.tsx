@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { Switch } from "@/components/ui/switch";
+import { cn } from "@/lib/utils";
 import { CopyButton } from "@/ui/CopyButton";
 
 const permissionMessage = "You do not have permission to update Single Sign-On.";
@@ -19,7 +20,8 @@ export function TextField({
   error,
   type = "text",
   placeholder,
-  className = "w-full max-w-xs",
+  className = "w-full",
+  wrapperClassName,
 }: {
   id: string;
   label: string;
@@ -31,9 +33,10 @@ export function TextField({
   type?: string;
   placeholder?: string;
   className?: string;
+  wrapperClassName?: string;
 }) {
   return (
-    <div className="space-y-2">
+    <div className={cn("space-y-2", wrapperClassName)}>
       <Label htmlFor={id}>{label}</Label>
       <Input
         id={id}
@@ -56,8 +59,8 @@ export function CopyField({ label, value, helper }: { label: string; value: stri
     <div className="space-y-2">
       <Label htmlFor={id}>{label}</Label>
       {helper ? <p className="text-[12px] text-muted-foreground">{helper}</p> : null}
-      <div className="flex w-full max-w-xl items-center gap-2">
-        <Input id={id} readOnly value={value} className="font-mono text-[12px]" />
+      <div className="flex w-full items-center gap-2">
+        <Input id={id} readOnly value={value} className="w-auto min-w-0 flex-1 font-mono text-[12px]" />
         <CopyButton variant="icon" text={value} ariaLabel={`Copy ${label}`} />
       </div>
     </div>
@@ -80,12 +83,18 @@ export function SwitchRow({
   onCheckedChange: (checked: boolean) => void;
 }) {
   return (
-    <div className="flex flex-wrap items-start justify-between gap-6">
-      <div className="min-w-0 space-y-0.5">
+    <div className="flex items-start justify-between gap-6">
+      <div className="min-w-0 flex-1 space-y-0.5">
         <p className="text-[13px] font-medium text-foreground">{title}</p>
         <p className="text-[12px] leading-5 text-muted-foreground">{description}</p>
       </div>
-      <Switch id={id} checked={checked} disabled={disabled} onCheckedChange={onCheckedChange} className="mt-0.5" />
+      <Switch
+        id={id}
+        checked={checked}
+        disabled={disabled}
+        onCheckedChange={onCheckedChange}
+        className="mt-0.5 shrink-0"
+      />
     </div>
   );
 }
@@ -102,8 +111,8 @@ export function ActionRow({
   children: ReactNode;
 }) {
   return (
-    <div className="flex flex-wrap items-start justify-between gap-6">
-      <div className="min-w-0 max-w-xl space-y-0.5">
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="min-w-0 flex-1 space-y-0.5">
         <p className="text-[13px] font-medium text-foreground">{title}</p>
         <p className="text-[12px] leading-5 text-muted-foreground">{description}</p>
         {detail}

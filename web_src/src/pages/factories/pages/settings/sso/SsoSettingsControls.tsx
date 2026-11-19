@@ -8,7 +8,7 @@ export function SsoSelect({
   disabled,
   onChange,
   options,
-  className = "w-full max-w-xs",
+  className = "w-full",
   helper,
 }: {
   id: string;

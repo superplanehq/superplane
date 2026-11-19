@@ -4,9 +4,16 @@ import { Badge } from "@/components/Badge/badge";
 
 import { FactorySettingsCard, FactorySettingsPageFrame } from "../FactorySettingsCard";
 import { DangerCard, PolicyCard } from "./SsoPolicySection";
-import { ProvisioningCard } from "./SsoProvisioningSection";
+import { ProvisioningCard, ScimCard } from "./SsoProvisioningSection";
 import { ConfirmDialog, RequiredDialog, TokenDialog } from "./SsoSettingsDialogs";
-import { ActivationCard, DomainCard, ProviderCard, SetupCard } from "./SsoSettingsSections";
+import {
+  ActivationCard,
+  DomainCard,
+  ProviderCard,
+  ProviderUrlsCard,
+  ProviderValuesCard,
+  SetupCard,
+} from "./SsoSettingsSections";
 import { noopSsoActions, statusLabel, type SsoSettingsActions, type SsoSettingsModel } from "./ssoSettingsTypes";
 import { useSsoSettingsState } from "./useSsoSettingsState";
 
@@ -55,8 +62,11 @@ export function SsoSettingsView({
         {active ? null : <SetupCard draft={state.draft} />}
         <DomainCard model={model} actions={actions} draft={state.draft} />
         <ProviderCard model={model} draft={state.draft} />
+        {state.exists ? <ProviderUrlsCard model={model} draft={state.draft} /> : null}
+        {state.exists ? <ProviderValuesCard model={model} draft={state.draft} /> : null}
         <ActivationCard model={model} actions={actions} draft={state.draft} />
-        <ProvisioningCard model={model} actions={actions} draft={state.draft} />
+        <ProvisioningCard model={model} draft={state.draft} />
+        {state.exists ? <ScimCard model={model} actions={actions} draft={state.draft} /> : null}
         <PolicyCard model={model} draft={state.draft} />
         {state.exists ? <DangerCard actions={actions} draft={state.draft} /> : null}
       </div>

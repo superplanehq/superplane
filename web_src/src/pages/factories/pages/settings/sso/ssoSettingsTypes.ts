@@ -70,7 +70,8 @@ export type SsoDraft = {
   canChange: boolean;
   canUpdate: boolean;
   permitted: boolean;
-  providerDirty: boolean;
+  identityDirty: boolean;
+  credentialsDirty: boolean;
   provisioningDirty: boolean;
   policyDirty: boolean;
   providerReady: boolean;

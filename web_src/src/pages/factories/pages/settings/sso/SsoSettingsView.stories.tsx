@@ -7,6 +7,7 @@ import { type SsoSettingsActions, type SsoSettingsModel } from "./ssoSettingsTyp
 const meta = {
   title: "Settings/Single Sign-On",
   component: SsoSettingsView,
+  parameters: { layout: "fullscreen" },
 } satisfies Meta<typeof SsoSettingsView>;
 
 export default meta;

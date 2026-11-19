@@ -3,7 +3,6 @@ import { Circle, CircleCheck, Trash2 } from "lucide-react";
 import type { SsoConnection, SsoDomain } from "@/api-client/types.gen";
 import { Badge } from "@/components/Badge/badge";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 
 import { FactorySettingsCard } from "../FactorySettingsCard";
 import { SsoSelect } from "./SsoSettingsControls";
@@ -59,7 +58,7 @@ export function DomainCard({
       data-testid="sso-domains"
     >
       <form
-        className="flex flex-wrap items-end gap-2"
+        className="flex items-end gap-2"
         onSubmit={(event) => {
           event.preventDefault();
           if (draft.domain.trim()) actions.onAddDomain(draft.domain.trim());
@@ -71,10 +70,11 @@ export function DomainCard({
           value={draft.domain}
           placeholder="example.com"
           disabled={!draft.canChange}
+          wrapperClassName="min-w-0 flex-1"
           onChange={draft.setDomain}
         />
         <PermissionTip permitted={draft.permitted}>
-          <Button type="submit" disabled={!draft.canChange || !draft.domain.trim()}>
+          <Button type="submit" className="shrink-0" disabled={!draft.canChange || !draft.domain.trim()}>
             Add domain
           </Button>
         </PermissionTip>
@@ -166,7 +166,75 @@ export function ProviderCard({ model, draft }: { model: SsoSettingsModel; draft:
     <FactorySettingsCard title="Identity provider" data-testid="sso-provider">
       <div className="space-y-6">
         <ProviderIdentity draft={draft} />
-        {draft.exists ? <ProviderDetails model={model} draft={draft} /> : <CreateConnection draft={draft} />}
+        {draft.exists ? (
+          <CardSave
+            permitted={draft.permitted}
+            disabled={!draft.canChange || !draft.identityDirty}
+            busy={Boolean(model.busy)}
+            onClick={draft.saveProvider}
+            testId="sso-identity-save"
+          />
+        ) : (
+          <CreateConnection draft={draft} />
+        )}
+      </div>
+    </FactorySettingsCard>
+  );
+}
+
+export function ProviderUrlsCard({ model, draft }: { model: SsoSettingsModel; draft: SsoDraft }) {
+  return (
+    <FactorySettingsCard
+      title="Values for your identity provider"
+      description="Add these values to the application in your identity provider."
+      data-testid="sso-provider-urls"
+    >
+      <ProviderUrls connection={model.connection} preset={draft.preset} />
+    </FactorySettingsCard>
+  );
+}
+
+export function ProviderValuesCard({ model, draft }: { model: SsoSettingsModel; draft: SsoDraft }) {
+  return (
+    <FactorySettingsCard
+      title="Values from your identity provider"
+      description="Copy these values from the application in your identity provider."
+      data-testid="sso-provider-values"
+    >
+      <div className="space-y-6">
+        <TextField
+          id="sso-issuer"
+          label="Issuer URL"
+          value={draft.issuer}
+          placeholder="https://example.okta.com"
+          disabled={!draft.canChange}
+          onChange={draft.setIssuer}
+        />
+        <TextField
+          id="sso-client-id"
+          label="Client ID"
+          value={draft.clientId}
+          disabled={!draft.canChange}
+          onChange={draft.setClientId}
+        />
+        <TextField
+          id="sso-client-secret"
+          label="Client secret"
+          type="password"
+          value={draft.clientSecret}
+          disabled={!draft.canChange}
+          helper={
+            model.connection?.clientSecretSet ? "A client secret is saved. Enter a new one to replace it." : undefined
+          }
+          onChange={draft.setClientSecret}
+        />
+        <CardSave
+          permitted={draft.permitted}
+          disabled={!draft.canChange || !draft.credentialsDirty}
+          busy={Boolean(model.busy)}
+          onClick={draft.saveProvider}
+          testId="sso-provider-save"
+        />
       </div>
     </FactorySettingsCard>
   );
@@ -210,60 +278,10 @@ function CreateConnection({ draft }: { draft: SsoDraft }) {
   );
 }
 
-function ProviderDetails({ model, draft }: { model: SsoSettingsModel; draft: SsoDraft }) {
-  return (
-    <>
-      <Separator />
-      <ProviderUrls connection={model.connection} preset={draft.preset} />
-      <Separator />
-      <div className="space-y-4">
-        <p className="text-[13px] font-medium text-foreground">Values from your identity provider</p>
-        <TextField
-          id="sso-issuer"
-          label="Issuer URL"
-          value={draft.issuer}
-          placeholder="https://example.okta.com"
-          disabled={!draft.canChange}
-          className="w-full max-w-md"
-          onChange={draft.setIssuer}
-        />
-        <TextField
-          id="sso-client-id"
-          label="Client ID"
-          value={draft.clientId}
-          disabled={!draft.canChange}
-          className="w-full max-w-md"
-          onChange={draft.setClientId}
-        />
-        <TextField
-          id="sso-client-secret"
-          label="Client secret"
-          type="password"
-          value={draft.clientSecret}
-          disabled={!draft.canChange}
-          helper={
-            model.connection?.clientSecretSet ? "A client secret is saved. Enter a new one to replace it." : undefined
-          }
-          className="w-full max-w-md"
-          onChange={draft.setClientSecret}
-        />
-      </div>
-      <CardSave
-        permitted={draft.permitted}
-        disabled={!draft.canChange || !draft.providerDirty}
-        busy={Boolean(model.busy)}
-        onClick={draft.saveProvider}
-        testId="sso-provider-save"
-      />
-    </>
-  );
-}
-
 function ProviderUrls({ connection, preset }: { connection?: SsoConnection | null; preset: string }) {
   const okta = preset === "PRESET_OKTA";
   return (
-    <div className="space-y-4">
-      <p className="text-[13px] font-medium text-foreground">Add these values to your identity provider</p>
+    <div className="space-y-6">
       <CopyField
         label="Redirect URI"
         value={connection?.redirectUri ?? ""}
