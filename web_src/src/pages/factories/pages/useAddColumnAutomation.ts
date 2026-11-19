@@ -13,6 +13,7 @@ import { useNavigate } from "react-router";
 import {
   catalogForColumn,
   onlyCustomCatalogRemains,
+  pickerCatalogForColumn,
   takenCatalogIds,
   type ColumnAutomation,
   type ColumnAutomationCatalogEntry,
@@ -50,8 +51,16 @@ export function useAddColumnAutomation(args: {
   const allowReviewRequest = experimentalFeatures.has(FEATURE_FACTORY_REVIEW_REQUEST);
   const catalogOptions = { allowCustom, allowReviewRequest, vcsProvider: args.vcsProvider };
 
-  const catalog = column ? catalogForColumn(column, catalogOptions) : [];
-  const takenIds = column ? takenCatalogIds(args.automationsFor(column), catalog) : [];
+  const pickerCatalog = column
+    ? pickerCatalogForColumn(column, catalogOptions)
+    : { catalog: [], unavailableReasons: {} };
+  const catalog = pickerCatalog.catalog;
+  const takenIds = column
+    ? takenCatalogIds(
+        ["backlog", "phase-0", "verify", "done", column].flatMap((key) => args.automationsFor(key as ColumnKey)),
+        catalog,
+      )
+    : [];
 
   const closePicker = () => {
     setColumn(null);
@@ -76,7 +85,7 @@ export function useAddColumnAutomation(args: {
   };
 
   const onSelect = async (entry: ColumnAutomationCatalogEntry) => {
-    if (!column) {
+    if (!column || pickerCatalog.unavailableReasons[entry.id]) {
       return;
     }
     if (entry.kind === "pr-discussion" || entry.kind === "pr-checks" || entry.kind === "custom-verification") {
@@ -134,6 +143,7 @@ export function useAddColumnAutomation(args: {
     closePicker,
     catalog,
     takenIds,
+    unavailableReasons: pickerCatalog.unavailableReasons,
     onSelect,
     createNamed,
     isPending: createAutomation.isPending || isInstalling,

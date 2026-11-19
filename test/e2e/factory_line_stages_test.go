@@ -21,10 +21,23 @@ func TestFactoryLineCustomStages(t *testing.T) {
 	s.openLine()
 	s.addStage("QA")
 	s.assertStageOrder("backlog", "phase", "verify", "custom", "done")
+	s.moveStage("QA")
+	s.assertStageOrder("backlog", "custom", "phase", "verify", "done")
 	s.reloadAndAssertStageVisible()
 	s.removeStage("QA")
 	s.assertStageOrder("backlog", "phase", "verify", "done")
 	s.reloadAndAssertStageHidden()
+}
+
+func (s *factoryLineStagesSteps) moveStage(name string) {
+	page := s.session.Page()
+	handle := page.GetByTestId("lines-stage-reorder-" + s.stageKey)
+	target := page.GetByTestId("lines-stage-shell-phase-0")
+	require.NoError(s.t, handle.DragTo(target))
+	dialog := page.GetByTestId("move-line-stage-dialog")
+	require.NoError(s.t, dialog.GetByRole("heading", pw.LocatorGetByRoleOptions{Name: "Move " + name + "?", Exact: pw.Bool(true)}).WaitFor())
+	require.NoError(s.t, dialog.GetByRole("button", pw.LocatorGetByRoleOptions{Name: "Move stage", Exact: pw.Bool(true)}).Click())
+	require.NoError(s.t, dialog.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateHidden}))
 }
 
 type factoryLineStagesSteps struct {

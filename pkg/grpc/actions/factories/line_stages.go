@@ -46,7 +46,7 @@ func parseFactoryLineStages(
 		result = append(result, parsed)
 	}
 
-	if err := validateFactoryLineSystemStages(line.StagesValue(), result); err != nil {
+	if err := validateFactoryLineSystemStages(result); err != nil {
 		return nil, err
 	}
 	return result, nil
@@ -143,30 +143,12 @@ func sameStepIndex(value *int32, expected *int) bool {
 	return int(*value) == *expected
 }
 
-func validateFactoryLineSystemStages(existing, next []models.FactoryLineStage) error {
+func validateFactoryLineSystemStages(next []models.FactoryLineStage) error {
 	if len(next) == 0 || next[0].Kind != models.FactoryLineStageBacklog {
 		return invalidArgument("Backlog must remain the first stage")
 	}
 	if next[len(next)-1].Kind != models.FactoryLineStageDone {
 		return invalidArgument("Done must remain the last stage")
-	}
-
-	retained := make(map[uuid.UUID]bool, len(next))
-	for _, stage := range next {
-		retained[stage.ID] = true
-	}
-	expectedIndex := 0
-	for _, stage := range existing {
-		if stage.Kind == models.FactoryLineStageCustom || !retained[stage.ID] {
-			continue
-		}
-		for expectedIndex < len(next) && next[expectedIndex].Kind == models.FactoryLineStageCustom {
-			expectedIndex++
-		}
-		if expectedIndex >= len(next) || next[expectedIndex].ID != stage.ID {
-			return invalidArgument("system stages must remain in order")
-		}
-		expectedIndex++
 	}
 	return nil
 }

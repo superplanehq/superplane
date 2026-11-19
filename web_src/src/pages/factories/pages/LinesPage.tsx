@@ -42,8 +42,18 @@ import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { FEATURE_FACTORY_CUSTOM_STAGES, FEATURE_FACTORY_PULL_REQUEST_MERGE } from "@/lib/experimentalFeatures";
 import { useAutoLoadMoreOnScroll } from "@/hooks/useAutoLoadMoreOnScroll";
-import { Clock, Plus } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Clock, GripHorizontal, Plus } from "lucide-react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type DragEvent,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react";
+import { flushSync } from "react-dom";
 import { Navigate, useLocation, useNavigate, useParams } from "react-router";
 import { backlogAnalysisCreditLabels, type BacklogAnalysisRun } from "../lib/backlogAnalysis";
 import {
@@ -99,6 +109,7 @@ type BoardPaging = {
 import { LineBoardViewMenu } from "./LineBoardViewMenu";
 import { AddLineStageDialog } from "./AddLineStageDialog";
 import { DeleteLineStageDialog } from "./DeleteLineStageDialog";
+import { MoveLineStageDialog } from "./MoveLineStageDialog";
 import { columnAutomationRowsSubheader } from "./columnAutomationRowsSubheader";
 import { ColumnAutomationsHeaderSlot } from "./ColumnAutomationsIndicator";
 import { ColumnAutomationToggle } from "./ColumnAutomationDisclosure";
@@ -211,7 +222,7 @@ import {
   type ColumnKey,
 } from "../lib/columnAutomations";
 import { replaceLineStepParallelism } from "../lib/factoryLineFormShared";
-import { orderedLineBoardStages, type LineBoardStage } from "../lib/lineBoardStages";
+import { orderedLineBoardStages, reorderLineBoardStages, type LineBoardStage } from "../lib/lineBoardStages";
 import { ColumnLaneMenu } from "./ColumnLaneMenu";
 import { ParallelismSettingsDialog } from "./ParallelismSettingsDialog";
 import {
@@ -1342,6 +1353,7 @@ function LineDetail({
         }}
         catalog={addAutomation.catalog}
         takenIds={addAutomation.takenIds}
+        unavailableReasons={addAutomation.unavailableReasons}
       />
       <CreateFactoryAppDialog
         open={addAutomation.naming}
@@ -1643,6 +1655,14 @@ function PhaseBoard({
   const [backlogSettingsOpen, setBacklogSettingsOpen] = useState(false);
   const [parallelismByStep, setParallelismByStep] = useState<Record<number, number>>({});
   const [stageToDelete, setStageToDelete] = useState<LineBoardStage | null>(null);
+  const [stagePreview, setStagePreview] = useState<LineBoardStage[] | null>(null);
+  const stagePreviewRef = useRef<LineBoardStage[] | null>(null);
+  const [draggingStageId, setDraggingStageId] = useState<string | null>(null);
+  const [pendingStageMove, setPendingStageMove] = useState<{
+    stages: LineBoardStage[];
+    movedStage: LineBoardStage;
+  } | null>(null);
+  const stageElements = useRef(new Map<string, HTMLDivElement>());
   const updateLine = useUpdateFactoryLine(organizationId, factoryId);
   const lineId = line.id;
 
@@ -1715,14 +1735,62 @@ function PhaseBoard({
     [stageNamesVersion],
   );
   const phaseByStep = useMemo(() => new Map(columns.map((column) => [column.stepIndex, column])), [columns]);
+  const displayedStageOrder = pendingStageMove?.stages ?? stagePreview ?? orderedStages;
   const visibleStages = useMemo(
     () =>
-      orderedStages.filter(
+      displayedStageOrder.filter(
         (stage) =>
           stage.kind !== "STAGE_KIND_PHASE" || (stage.stepIndex !== undefined && phaseByStep.has(stage.stepIndex)),
       ),
-    [orderedStages, phaseByStep],
+    [displayedStageOrder, phaseByStep],
   );
+  const reorderStagePreview = (stageId: string, targetId: string) => {
+    const current = stagePreviewRef.current ?? orderedStages;
+    const next = reorderLineBoardStages(current, stageId, targetId);
+    if (next === current) return;
+
+    const before = new Map(
+      [...stageElements.current].map(([id, element]) => [id, element.getBoundingClientRect().left]),
+    );
+    stagePreviewRef.current = next;
+    flushSync(() => setStagePreview(next));
+    for (const [id, element] of stageElements.current) {
+      const delta = (before.get(id) ?? element.getBoundingClientRect().left) - element.getBoundingClientRect().left;
+      if (delta !== 0) {
+        element.animate?.([{ transform: `translateX(${delta}px)` }, { transform: "translateX(0)" }], {
+          duration: 180,
+          easing: "ease-out",
+        });
+      }
+    }
+  };
+  const startStageDrag = (event: DragEvent<HTMLButtonElement>, stage: LineBoardStage) => {
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", stage.id);
+    stagePreviewRef.current = orderedStages;
+    setStagePreview(orderedStages);
+    setDraggingStageId(stage.id);
+  };
+  const finishStageDrag = () => {
+    const next = stagePreviewRef.current;
+    const movedStage = orderedStages.find((stage) => stage.id === draggingStageId);
+    stagePreviewRef.current = null;
+    setStagePreview(null);
+    setDraggingStageId(null);
+    if (next && movedStage && next.map((stage) => stage.id).join() !== orderedStages.map((stage) => stage.id).join()) {
+      setPendingStageMove({ stages: next, movedStage });
+    }
+  };
+  const moveStageWithKeyboard = (event: KeyboardEvent<HTMLButtonElement>, stage: LineBoardStage) => {
+    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+    const stageIndex = visibleStages.findIndex((entry) => entry.id === stage.id);
+    const targetIndex = stageIndex + (event.key === "ArrowLeft" ? -1 : 1);
+    const target = visibleStages[targetIndex];
+    if (!target || target.kind === "STAGE_KIND_BACKLOG" || target.kind === "STAGE_KIND_DONE") return;
+    event.preventDefault();
+    const next = reorderLineBoardStages(orderedStages, stage.id, target.id);
+    if (next !== orderedStages) setPendingStageMove({ stages: next, movedStage: stage });
+  };
   const stageName = (key: string, fallback: string) =>
     columnTitles[key] ?? orderedStages.find((stage) => stage.key === key)?.name ?? fallback;
   const backlogTitle = stageName("backlog", "Backlog");
@@ -1931,16 +1999,73 @@ function PhaseBoard({
         stage={stageToDelete}
         onClose={() => setStageToDelete(null)}
       />
+      <MoveLineStageDialog
+        organizationId={organizationId}
+        factoryId={factoryId}
+        line={line}
+        stages={pendingStageMove?.stages ?? null}
+        movedStage={pendingStageMove?.movedStage ?? null}
+        onClose={() => setPendingStageMove(null)}
+      />
       <WorkOrderKanbanBoard testId="lines-phase-board">
         {visibleStages.map((stage) => (
-          <div key={stage.id} className={cn("relative flex min-h-0 self-stretch", workOrderKanbanLaneSizeClassName)}>
+          <div
+            key={stage.id}
+            ref={(element) => {
+              if (element) stageElements.current.set(stage.id, element);
+              else stageElements.current.delete(stage.id);
+            }}
+            data-testid={`lines-stage-shell-${stage.key}`}
+            className={cn(
+              "relative flex h-full min-h-0 flex-col self-stretch [&>section]:flex-1",
+              draggingStageId === stage.id && "z-10 opacity-60",
+              workOrderKanbanLaneSizeClassName,
+            )}
+            onDragEnter={() => {
+              if (draggingStageId) reorderStagePreview(draggingStageId, stage.id);
+            }}
+            onDragOver={(event) => {
+              if (draggingStageId) event.preventDefault();
+            }}
+          >
+            {canManageStages ? (
+              <div className="flex h-6 shrink-0 items-center justify-center">
+                {stage.kind !== "STAGE_KIND_BACKLOG" && stage.kind !== "STAGE_KIND_DONE" ? (
+                  <button
+                    type="button"
+                    draggable
+                    aria-label={`Reorder ${stage.name}`}
+                    title="Drag to reorder stage"
+                    data-testid={`lines-stage-reorder-${stage.key}`}
+                    className="flex h-5 w-10 cursor-grab touch-none items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground active:cursor-grabbing"
+                    onDragStart={(event) => startStageDrag(event, stage)}
+                    onDragEnd={finishStageDrag}
+                    onKeyDown={(event) => moveStageWithKeyboard(event, stage)}
+                  >
+                    <GripHorizontal className="size-4" aria-hidden />
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
             {stage.kind === "STAGE_KIND_PHASE" ? (
-              <span className="absolute top-[21px] left-full z-[1] h-px w-3 bg-border" aria-hidden />
+              <span
+                className={cn(
+                  "absolute left-full z-[1] h-px w-3 bg-border",
+                  canManageStages ? "top-[45px]" : "top-[21px]",
+                )}
+                aria-hidden
+              />
             ) : null}
             {stage.kind === "STAGE_KIND_CUSTOM" ||
             stage.kind === "STAGE_KIND_VERIFY" ||
             stage.kind === "STAGE_KIND_DONE" ? (
-              <span className="absolute top-[21px] left-0 z-[1] h-px w-3 -translate-x-full bg-border" aria-hidden />
+              <span
+                className={cn(
+                  "absolute left-0 z-[1] h-px w-3 -translate-x-full bg-border",
+                  canManageStages ? "top-[45px]" : "top-[21px]",
+                )}
+                aria-hidden
+              />
             ) : null}
             {renderStage(stage)}
           </div>

@@ -129,6 +129,32 @@ func TestUpdateFactoryLineStages(t *testing.T) {
 		}
 	})
 
+	t.Run("reorders optional system stages", func(t *testing.T) {
+		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		app, entrypoint := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "implement", "start")
+		line, err := factory.CreateLine(db, "ship", []models.FactoryLineStep{{
+			Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entrypoint,
+		}})
+		require.NoError(t, err)
+		stages := factoryLineStageRequests(line.StagesValue())
+		reordered := []*pb.FactoryLine_Stage{stages[0], stages[2], stages[1], stages[3]}
+
+		updated, err := UpdateFactoryLine(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
+			FactoryId:          factory.ID.String(),
+			LineId:             line.ID.String(),
+			StageConfiguration: &pb.FactoryLine_StageConfiguration{Stages: reordered},
+		})
+		require.NoError(t, err)
+		require.Len(t, updated.Line.Stages, 4)
+		assert.Equal(t, []string{stages[0].Id, stages[2].Id, stages[1].Id, stages[3].Id}, []string{
+			updated.Line.Stages[0].Id,
+			updated.Line.Stages[1].Id,
+			updated.Line.Stages[2].Id,
+			updated.Line.Stages[3].Id,
+		})
+	})
+
 	t.Run("detaches automations when their stage is removed", func(t *testing.T) {
 		factory, line := newLine(t)
 		stages := factoryLineStageRequests(line.StagesValue())

@@ -33,7 +33,12 @@ import { phaseIndexFromColumnKey, type ColumnKey } from "./columnKeys";
 import { isActiveWorkOrderExecution } from "./workOrderExecutions";
 import { findBacklogAutomationApp, findClosureAutomationApp, type LinePhaseColumn } from "./linePhaseRuns";
 
-export { catalogForColumn, onlyCustomCatalogRemains, takenCatalogIds } from "./columnAutomationCatalog";
+export {
+  catalogForColumn,
+  onlyCustomCatalogRemains,
+  pickerCatalogForColumn,
+  takenCatalogIds,
+} from "./columnAutomationCatalog";
 export { COLUMN_AUTOMATIONS_COPY } from "./columnAutomationsCopy";
 export { isColumnKey, phaseIndexFromColumnKey, type ColumnKey } from "./columnKeys";
 

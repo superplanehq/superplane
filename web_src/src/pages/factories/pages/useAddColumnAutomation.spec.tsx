@@ -61,7 +61,17 @@ describe("add custom stage automation", () => {
 
     expect(result.current.pickerOpen).toBe(true);
     expect(result.current.pickerTitle).toBe("Add an automation for Deploy to prod");
-    expect(result.current.catalog.map((entry) => entry.id)).toEqual(["custom"]);
+    expect(result.current.catalog.map((entry) => entry.id)).toEqual([
+      "custom",
+      "analysis",
+      "agent-step",
+      "discussion",
+      "checks",
+      "risk-score",
+      "visual-evidence",
+      "pr-closure",
+    ]);
+    expect(result.current.unavailableReasons.checks).toBe("Available in Verify.");
   });
 });
 

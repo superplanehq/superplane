@@ -68,4 +68,20 @@ describe("AddColumnAutomationPicker", () => {
     expect(onSelect).not.toHaveBeenCalled();
     expect(screen.getByTestId("add-column-automation-template-checks")).toBeEnabled();
   });
+
+  it("keeps unavailable options visible", () => {
+    render(
+      <AddColumnAutomationPicker
+        open
+        onClose={vi.fn()}
+        onSelect={vi.fn()}
+        catalog={catalogForColumn("verify")}
+        unavailableReasons={{ checks: "Available in Verify." }}
+      />,
+    );
+
+    const checks = screen.getByTestId("add-column-automation-template-checks");
+    expect(checks).toBeDisabled();
+    expect(checks).toHaveTextContent("Available in Verify.");
+  });
 });

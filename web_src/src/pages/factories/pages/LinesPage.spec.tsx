@@ -1863,6 +1863,62 @@ describe("LinesPage board editing", () => {
     expect(screen.getByTestId("workspace-page-header-title")).toHaveTextContent(/^Workspace$/);
   });
 
+  it("confirms and saves a stage reorder", async () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_STAGES);
+    updateFactoryLineMutateAsync.mockResolvedValueOnce({});
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    expect(screen.queryByRole("button", { name: "Reorder Backlog" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Reorder Done" })).not.toBeInTheDocument();
+    await user.type(screen.getByTestId("lines-stage-reorder-phase-0"), "{ArrowRight}");
+
+    expect(screen.getByRole("heading", { name: /^Move .+\?$/ })).toBeInTheDocument();
+    expect(screen.getByTestId("move-line-stage-dialog")).toHaveTextContent(
+      "This changes the stage order for everyone who uses this line.",
+    );
+    await user.click(screen.getByRole("button", { name: "Move stage" }));
+
+    await waitFor(() =>
+      expect(updateFactoryLineMutateAsync).toHaveBeenCalledWith(
+        expect.objectContaining({
+          lineId: REFUND_LINE_PLAN_ID,
+          stageConfiguration: {
+            stages: expect.arrayContaining([expect.objectContaining({ kind: "STAGE_KIND_PHASE" })]),
+          },
+        }),
+      ),
+    );
+    const stages = updateFactoryLineMutateAsync.mock.calls[0][0].stageConfiguration.stages;
+    expect(stages.map((stage: { key: string }) => stage.key)).toEqual([
+      "backlog",
+      "phase-1",
+      "phase-0",
+      "verify",
+      "done",
+    ]);
+  });
+
+  it("restores the stage order when the move is cancelled", async () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_STAGES);
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    await user.type(screen.getByTestId("lines-stage-reorder-phase-0"), "{ArrowRight}");
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(updateFactoryLineMutateAsync).not.toHaveBeenCalled();
+    expect(
+      [...screen.getByTestId("lines-phase-board").children].map((element) => element.getAttribute("data-testid")),
+    ).toEqual([
+      "lines-stage-shell-backlog",
+      "lines-stage-shell-phase-0",
+      "lines-stage-shell-phase-1",
+      "lines-stage-shell-verify",
+      "lines-stage-shell-done",
+    ]);
+  });
+
   it("renames a column title on Enter", async () => {
     const user = userEvent.setup();
     renderLinesBoard();

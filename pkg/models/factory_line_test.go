@@ -114,6 +114,34 @@ func Test__FactoryLine__Update__KeepsOptionalStagesRemoved(t *testing.T) {
 	assert.Equal(t, []string{"backlog", "done"}, []string{line.StagesValue()[0].Key, line.StagesValue()[1].Key})
 }
 
+func Test__FactoryLine__Update__KeepsConfiguredStageOrder(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	first, firstEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "Implement", "start-one")
+	second, secondEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "Release", "start-two")
+	steps := []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: first.ID, Entrypoint: firstEntry},
+		{Type: models.FactoryLineStepTypeRunApp, AppID: second.ID, Entrypoint: secondEntry},
+	}
+	line, err := factory.CreateLine(db, "ship", steps)
+	require.NoError(t, err)
+	stages := line.StagesValue()
+	reordered := []models.FactoryLineStage{stages[0], stages[3], stages[2], stages[1], stages[4]}
+	require.NoError(t, line.UpdateConfiguration(db, nil, nil, nil, reordered))
+
+	require.NoError(t, line.Update(db, nil, steps[:1], nil))
+
+	assert.Equal(t, []string{"backlog", "verify", "phase-0", "done"}, []string{
+		line.StagesValue()[0].Key,
+		line.StagesValue()[1].Key,
+		line.StagesValue()[2].Key,
+		line.StagesValue()[3].Key,
+	})
+}
+
 func Test__FactoryLine__Update__PersistsColumnColors(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())

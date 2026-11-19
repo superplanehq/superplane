@@ -299,42 +299,47 @@ func (l *FactoryLine) ReconcileStages(tx *gorm.DB, steps []FactoryLineStep) ([]F
 	}
 
 	existingStages := l.StagesValue()
+	if len(existingStages) == 0 {
+		return systemStages, nil
+	}
 	existingByKey := make(map[string]FactoryLineStage, len(existingStages))
 	for _, stage := range existingStages {
 		if stage.Kind != FactoryLineStageCustom {
 			existingByKey[stage.Key] = stage
 		}
 	}
-	if len(existingStages) > 0 {
-		systemStages = retainConfiguredOptionalStages(systemStages, existingByKey, len(l.Steps))
-	}
-	nextSystemKeys := make(map[string]bool, len(systemStages))
+	systemStages = retainConfiguredOptionalStages(systemStages, existingByKey, len(l.Steps))
+	nextByKey := make(map[string]FactoryLineStage, len(systemStages))
 	for _, stage := range systemStages {
-		nextSystemKeys[stage.Key] = true
+		nextByKey[stage.Key] = stage
 	}
-	customBefore := make(map[string][]FactoryLineStage)
-	pendingCustom := []FactoryLineStage{}
+	result := make([]FactoryLineStage, 0, len(systemStages)+len(l.Stages))
+	appendNewStages := func() {
+		for _, stage := range systemStages {
+			if _, ok := nextByKey[stage.Key]; !ok || stage.Kind == FactoryLineStageBacklog || stage.Kind == FactoryLineStageDone {
+				continue
+			}
+			result = append(result, stage)
+			delete(nextByKey, stage.Key)
+		}
+	}
 	for _, stage := range existingStages {
 		if stage.Kind == FactoryLineStageCustom {
-			pendingCustom = append(pendingCustom, stage)
+			result = append(result, stage)
 			continue
 		}
-		if len(pendingCustom) > 0 && nextSystemKeys[stage.Key] {
-			customBefore[stage.Key] = append(customBefore[stage.Key], pendingCustom...)
-			pendingCustom = nil
+		next, ok := nextByKey[stage.Key]
+		if !ok {
+			continue
 		}
-	}
-	customBefore["done"] = append(customBefore["done"], pendingCustom...)
-
-	result := make([]FactoryLineStage, 0, len(systemStages)+len(l.Stages))
-	for _, stage := range systemStages {
-		result = append(result, customBefore[stage.Key]...)
-		if existing, ok := existingByKey[stage.Key]; ok && existing.Kind == stage.Kind {
-			existing.StepIndex = stage.StepIndex
-			stage = existing
+		if stage.Kind == FactoryLineStageDone {
+			appendNewStages()
 		}
+		stage.StepIndex = next.StepIndex
 		result = append(result, stage)
+		delete(nextByKey, stage.Key)
 	}
+	appendNewStages()
 	return result, nil
 }
 

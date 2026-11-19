@@ -41,3 +41,28 @@ export function orderedLineBoardStages(
 export function isCustomLineBoardStage(stage: FactoryLineStage): boolean {
   return stage.kind === "STAGE_KIND_CUSTOM";
 }
+
+export function reorderLineBoardStages(stages: LineBoardStage[], stageId: string, targetId: string): LineBoardStage[] {
+  const fromIndex = stages.findIndex((stage) => stage.id === stageId);
+  const toIndex = stages.findIndex((stage) => stage.id === targetId);
+  const stage = stages[fromIndex];
+  const target = stages[toIndex];
+  if (
+    fromIndex === toIndex ||
+    fromIndex < 1 ||
+    toIndex < 1 ||
+    fromIndex >= stages.length - 1 ||
+    toIndex >= stages.length - 1 ||
+    stage?.kind === "STAGE_KIND_BACKLOG" ||
+    stage?.kind === "STAGE_KIND_DONE" ||
+    target?.kind === "STAGE_KIND_BACKLOG" ||
+    target?.kind === "STAGE_KIND_DONE"
+  ) {
+    return stages;
+  }
+
+  const next = [...stages];
+  const [moved] = next.splice(fromIndex, 1);
+  next.splice(toIndex, 0, moved);
+  return next;
+}
