@@ -12,8 +12,10 @@ import (
 	runner "github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
+	factoryactions "github.com/superplanehq/superplane/pkg/grpc/actions/factories"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
+	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
 )
@@ -97,6 +99,22 @@ func TestScheduleAutomationCreatesATaskWithoutAnExistingTask(t *testing.T) {
 	created := decodeRunnerTask(t, rec.Body.Bytes())
 	assert.Equal(t, "Fix the lint", created.Title)
 	assert.Equal(t, "draft", created.State)
+	order, err := factory.FindWorkOrder(db, uuid.MustParse(created.ID))
+	require.NoError(t, err)
+	assert.Equal(t, &run.ID, order.SourceRunID)
+	assert.Nil(t, order.CreatedByID)
+	assignees, err := order.ListAssignees(db)
+	require.NoError(t, err)
+	assert.Empty(t, assignees)
+	detail, err := factoryactions.DescribeWorkOrder(t.Context(), r.Organization.ID.String(), &pb.DescribeWorkOrderRequest{
+		FactoryId: factory.ID.String(), OrderId: created.ID,
+	})
+	require.NoError(t, err)
+	automation := detail.GetOrder().GetCreatedBy().GetAutomation()
+	require.NotNil(t, automation)
+	assert.Equal(t, canvas.ID.String(), automation.GetAppId())
+	assert.Equal(t, canvas.Name, automation.GetAppName())
+	assert.Equal(t, "Run automation", automation.GetNodeName())
 	rec = runnerRequest(t, server, http.MethodPost, token, "/api/v1/runner/task/close", `{}`)
 	assert.Equal(t, http.StatusForbidden, rec.Code)
 }
