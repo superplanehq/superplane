@@ -26,6 +26,7 @@ export function AgentStep({
   showHostedCredit = true,
   showCustomProvider = false,
   onRequestConnect,
+  onSelectProvider,
   modelPicker,
 }: {
   organizationId: string;
@@ -33,6 +34,7 @@ export function AgentStep({
   showHostedCredit?: boolean;
   showCustomProvider?: boolean;
   onRequestConnect: (id: IntegrationId) => void;
+  onSelectProvider?: () => void;
   modelPicker?: OnboardingAgentModelPicker;
 }) {
   const spend = useOrganizationWorkspaceUsage(organizationId);
@@ -72,7 +74,7 @@ export function AgentStep({
             connectLabel={option.label}
             connected={setup.connected.has(option.id)}
             soon={option.soon}
-            onSelect={() => undefined}
+            onSelect={() => onSelectProvider?.()}
             onConnect={() => onRequestConnect(option.id)}
           />
         ))}

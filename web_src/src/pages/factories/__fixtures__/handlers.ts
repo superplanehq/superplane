@@ -462,7 +462,8 @@ function mergedOnboarding(
 ): FactoriesFactoryOnboarding {
   const next: FactoriesFactoryOnboarding = { ...current };
   if (request.vcsIntegrationId) next.vcsIntegrationId = request.vcsIntegrationId;
-  if (request.agentIntegrationId) next.agentIntegrationId = request.agentIntegrationId;
+  if (request.agentIntegrationId != null) next.agentIntegrationId = request.agentIntegrationId;
+  if (request.codexSubscription != null) next.codexSubscription = request.codexSubscription;
   if (request.appRepository) next.appRepository = request.appRepository;
   if (request.appRepositoryId) next.appRepositoryId = request.appRepositoryId;
   if (request.backlogRepository) next.backlogRepository = request.backlogRepository;

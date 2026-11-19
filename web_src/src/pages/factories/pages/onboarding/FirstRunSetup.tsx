@@ -318,6 +318,7 @@ function AgentScreenHost({
       loading={model.agentLoading}
       hostedAgentReady={model.hostedAgentReady}
       providerKeysOffered={model.bringYourOwnKey}
+      subscription={model.subscription}
       showCustomProvider={model.customProvider}
       modelSource={{
         offered: modelSourceOffered(model),
@@ -327,7 +328,8 @@ function AgentScreenHost({
       onRequestConnect={model.requestConnect}
       modelPicker={model.agentModelPicker}
       onContinue={() => {
-        if (model.bringYourOwnKey && !flow.credentialChoice) flow.selectCredentialChoice("hosted");
+        if (model.bringYourOwnKey && model.hostedModelsAvailable && !flow.credentialChoice)
+          flow.selectCredentialChoice("hosted");
         void flow.continueFromAgent();
       }}
     />

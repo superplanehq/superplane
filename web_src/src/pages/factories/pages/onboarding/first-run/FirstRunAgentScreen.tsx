@@ -1,5 +1,6 @@
 import { LoadingButton } from "@/components/ui/loading-button";
 
+import { ConnectOptionRow, IntegrationChoiceIcon } from "../onboardingSteps";
 import { AgentStep, type OnboardingAgentModelPicker } from "../AgentStep";
 import { WIZARD_STEPS, type IntegrationId } from "../onboardingFixtures";
 import {
@@ -16,6 +17,12 @@ import type { FirstRunSphereProps } from "./FirstRunSpherePane";
 
 const AGENT_STEP: { id: "agent"; label: string; purpose: string } = WIZARD_STEPS[3];
 
+export type OnboardingSubscriptionChoice = {
+  offered: boolean;
+  ready: boolean;
+  connect: () => void;
+};
+
 type AgentModelSource = {
   offered: boolean;
   choice: OnboardingAgentCredentialChoice | null;
@@ -23,6 +30,7 @@ type AgentModelSource = {
 };
 
 function agentScreenBody(modelSource: AgentModelSource, customProvider: boolean): string {
+  if (modelSource.choice === "subscription") return "Connect your ChatGPT subscription to use Codex.";
   if (modelSource.choice === "own-key") {
     return customProvider ? FIRST_RUN_COPY.agent.ownKeyBodyWithCustom : FIRST_RUN_COPY.agent.ownKeyBody;
   }
@@ -42,6 +50,7 @@ function AgentConnectionChoices({
   loading,
   showCustomProvider,
   modelSource,
+  subscription,
   providerKeysOffered,
   showProviders,
   modelPicker,
@@ -53,11 +62,41 @@ function AgentConnectionChoices({
   loading: boolean;
   showCustomProvider: boolean;
   modelSource: AgentModelSource;
+  subscription: OnboardingSubscriptionChoice;
   providerKeysOffered: boolean;
   showProviders: boolean;
   modelPicker?: OnboardingAgentModelPicker;
   onRequestConnect: (id: IntegrationId) => void;
 }) {
+  if (subscription.offered) {
+    return (
+      <fieldset disabled={saving || loading} className="mx-0 min-w-0 border-0 p-0">
+        <FirstRunPanel>
+          <div className="grid gap-2">
+            <ConnectOptionRow
+              icon={<IntegrationChoiceIcon name="openai" />}
+              title="Codex subscription"
+              detail="Use your ChatGPT subscription for Codex agent runs."
+              connectLabel="Codex"
+              selected={modelSource.choice === "subscription"}
+              connected={subscription.ready}
+              onSelect={() => modelSource.onSelect("subscription")}
+              onConnect={subscription.connect}
+            />
+            <AgentStep
+              organizationId={organizationId}
+              setup={setup}
+              showHostedCredit={false}
+              showCustomProvider={showCustomProvider}
+              modelPicker={modelSource.choice === "subscription" ? undefined : modelPicker}
+              onSelectProvider={() => modelSource.onSelect("own-key")}
+              onRequestConnect={onRequestConnect}
+            />
+          </div>
+        </FirstRunPanel>
+      </fieldset>
+    );
+  }
   return (
     <>
       {modelSource.offered ? (
@@ -99,6 +138,7 @@ export function FirstRunAgentScreen({
   providerKeysOffered,
   showCustomProvider,
   modelSource,
+  subscription,
   modelPicker,
   onRequestConnect,
   onContinue,
@@ -113,6 +153,7 @@ export function FirstRunAgentScreen({
   providerKeysOffered: boolean;
   showCustomProvider: boolean;
   modelSource: AgentModelSource;
+  subscription: OnboardingSubscriptionChoice;
   modelPicker?: OnboardingAgentModelPicker;
   onRequestConnect: (id: IntegrationId) => void;
   onContinue: () => void;
@@ -123,8 +164,12 @@ export function FirstRunAgentScreen({
     providerConnected: isAgentProviderConnected(setup.connected),
     agentReady: setup.agentReady,
     hostedAgentReady,
+    subscriptionReady: subscription.ready,
   });
-  const showProviders = providerKeysOffered && (!modelSource.offered || modelSource.choice === "own-key");
+  const showProviders =
+    providerKeysOffered &&
+    modelSource.choice !== "subscription" &&
+    (!modelSource.offered || modelSource.choice === "own-key");
   return (
     <FirstRunShell
       testId="first-run-agent"
@@ -135,7 +180,11 @@ export function FirstRunAgentScreen({
       visual="preview"
     >
       <FirstRunHeading headline={FIRST_RUN_COPY.agent.headline}>
-        <p className="text-[13px] text-muted-foreground">{agentScreenBody(modelSource, showCustomProvider)}</p>
+        <p className="text-[13px] text-muted-foreground">
+          {subscription.offered
+            ? FIRST_RUN_COPY.agent.subscriptionOrKeyBody
+            : agentScreenBody(modelSource, showCustomProvider)}
+        </p>
       </FirstRunHeading>
       <div className="mt-8 space-y-4">
         {loading ? (
@@ -150,6 +199,7 @@ export function FirstRunAgentScreen({
           loading={loading}
           showCustomProvider={showCustomProvider}
           modelSource={modelSource}
+          subscription={subscription}
           providerKeysOffered={providerKeysOffered}
           showProviders={showProviders}
           modelPicker={modelPicker}
