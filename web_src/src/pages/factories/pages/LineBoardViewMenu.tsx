@@ -40,11 +40,13 @@ export function LineBoardViewMenu({
   onViewChange,
   colorView,
   onColorViewChange,
+  onManageStages,
 }: {
   view?: ColumnAutomationView;
   onViewChange?: (view: ColumnAutomationView) => void;
   colorView: LineBoardColumnColorView;
   onColorViewChange: (view: LineBoardColumnColorView) => void;
+  onManageStages?: () => void;
 }) {
   const showAutomationView = Boolean(view && onViewChange);
 
@@ -64,6 +66,11 @@ export function LineBoardViewMenu({
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-52">
         <DropdownMenuLabel className={MENU_LABEL_CLASSNAME}>{COLUMN_AUTOMATIONS_COPY.viewOptions}</DropdownMenuLabel>
+        {onManageStages ? (
+          <DropdownMenuItem className={MENU_ITEM_CLASSNAME} onSelect={onManageStages}>
+            Manage stages
+          </DropdownMenuItem>
+        ) : null}
         {showAutomationView && view && onViewChange ? (
           <ViewOptionSub
             label={COLUMN_AUTOMATIONS_COPY.viewAutomations}

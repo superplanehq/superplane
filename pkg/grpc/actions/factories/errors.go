@@ -271,6 +271,10 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.FailedPrecondition(err, err.Error())
 	case errors.Is(err, errCustomAutomationsDisabled):
 		return grpcerrors.FailedPrecondition(err, "Custom automations are not enabled for this organization.")
+	case errors.Is(err, errFactoryCustomStagesDisabled):
+		return grpcerrors.FailedPrecondition(err, "Custom stages are not enabled for this organization.")
+	case errors.Is(err, errFactoryStageInUse):
+		return grpcerrors.FailedPrecondition(err, "Remove the stage configuration before you delete this stage.")
 	case errors.Is(err, errFactoryAutomationReserved):
 		return grpcerrors.FailedPrecondition(err, "This canvas belongs to a factory intake, line, backlog, or PR feedback handler.")
 	case errors.Is(err, errFactoryPullRequestMergeDisabled):
@@ -309,6 +313,8 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 var errInvalidArgument = errors.New("invalid argument")
 var errCodexConnectionRequired = errors.New("connect your Codex account to continue")
 var errCustomAutomationsDisabled = errors.New("custom automations are not enabled")
+var errFactoryCustomStagesDisabled = errors.New("custom stages are not enabled")
+var errFactoryStageInUse = errors.New("factory stage is in use")
 var errFactoryAutomationReserved = errors.New("factory automation is reserved")
 var errFactoryAgentResourceNotConnected = errors.New("connect this MCP server first")
 var errListMCPTools = errors.New("could not list MCP tools")

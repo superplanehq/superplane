@@ -466,6 +466,41 @@ func serializeFactoryLine(line *models.FactoryLine) *pb.FactoryLine {
 		CreatedAt:    timestamppb.New(line.CreatedAt),
 		UpdatedAt:    timestamppb.New(line.UpdatedAt),
 		ColumnColors: line.ColumnColorsValue(),
+		Stages:       serializeFactoryLineStages(line.StagesValue()),
+	}
+}
+
+func serializeFactoryLineStages(stages []models.FactoryLineStage) []*pb.FactoryLine_Stage {
+	result := make([]*pb.FactoryLine_Stage, len(stages))
+	for index, stage := range stages {
+		result[index] = &pb.FactoryLine_Stage{
+			Id:   stage.ID.String(),
+			Key:  stage.Key,
+			Name: stage.Name,
+			Kind: serializeFactoryLineStageKind(stage.Kind),
+		}
+		if stage.StepIndex != nil {
+			stepIndex := int32(*stage.StepIndex)
+			result[index].StepIndex = &stepIndex
+		}
+	}
+	return result
+}
+
+func serializeFactoryLineStageKind(kind string) pb.FactoryLine_StageKind {
+	switch kind {
+	case models.FactoryLineStageBacklog:
+		return pb.FactoryLine_STAGE_KIND_BACKLOG
+	case models.FactoryLineStagePhase:
+		return pb.FactoryLine_STAGE_KIND_PHASE
+	case models.FactoryLineStageCustom:
+		return pb.FactoryLine_STAGE_KIND_CUSTOM
+	case models.FactoryLineStageVerify:
+		return pb.FactoryLine_STAGE_KIND_VERIFY
+	case models.FactoryLineStageDone:
+		return pb.FactoryLine_STAGE_KIND_DONE
+	default:
+		return pb.FactoryLine_STAGE_KIND_UNSPECIFIED
 	}
 }
 

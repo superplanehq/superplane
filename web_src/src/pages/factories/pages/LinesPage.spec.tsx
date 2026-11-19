@@ -16,6 +16,7 @@ import type * as integrationsData from "@/hooks/useIntegrations";
 import { resetFactoryBoardLaneScrollPositions } from "@/hooks/useFactoryBoardLaneScroll";
 import {
   FEATURE_FACTORY_CUSTOM_AUTOMATIONS,
+  FEATURE_FACTORY_CUSTOM_STAGES,
   FEATURE_FACTORY_DATADOG_INTAKE,
   FEATURE_FACTORY_PRODUCTIVE_INTAKE,
   FEATURE_FACTORY_SCHEDULED_INTAKE,
@@ -818,6 +819,108 @@ describe("LinesPage board", () => {
     expect(screen.getByTestId("lines-verify-automation-rows-row-handler-discussion")).toBeInTheDocument();
     expect(screen.queryByTestId("lines-done-automations")).not.toBeInTheDocument();
     expect(screen.getByTestId("lines-board-view-menu")).toBeInTheDocument();
+  });
+
+  it("gates stage editing and renders saved custom stages", async () => {
+    const user = userEvent.setup();
+    const factory = {
+      ...REFUND_FACTORY,
+      lines: (REFUND_FACTORY.lines ?? []).map((line) =>
+        line.id === REFUND_LINE_PLAN_ID
+          ? {
+              ...line,
+              stages: [
+                { id: "backlog", key: "backlog", name: "Incoming", kind: "STAGE_KIND_BACKLOG" as const },
+                {
+                  id: "phase-0",
+                  key: "phase-0",
+                  name: "Implement",
+                  kind: "STAGE_KIND_PHASE" as const,
+                  stepIndex: 0,
+                },
+                { id: "custom", key: "custom-qa", name: "QA", kind: "STAGE_KIND_CUSTOM" as const },
+                {
+                  id: "phase-1",
+                  key: "phase-1",
+                  name: "Verify changes",
+                  kind: "STAGE_KIND_PHASE" as const,
+                  stepIndex: 1,
+                },
+                {
+                  id: "phase-2",
+                  key: "phase-2",
+                  name: "Removed step",
+                  kind: "STAGE_KIND_PHASE" as const,
+                  stepIndex: 2,
+                },
+                { id: "verify", key: "verify", name: "Check", kind: "STAGE_KIND_VERIFY" as const },
+                { id: "done", key: "done", name: "Shipped", kind: "STAGE_KIND_DONE" as const },
+              ],
+            }
+          : line,
+      ),
+    };
+
+    const disabled = renderLinesBoard(undefined, vi.fn(), factory);
+    expect(screen.getByTestId("lines-custom-stage-custom-qa")).toHaveTextContent("No tasks in this stage.");
+    expect(screen.getByTestId("lines-phase-board").children).toHaveLength(6);
+    expect(screen.queryByRole("button", { name: "Add stage" })).not.toBeInTheDocument();
+    await user.click(screen.getByTestId("lines-board-view-menu"));
+    expect(screen.queryByRole("menuitem", { name: "Manage stages" })).not.toBeInTheDocument();
+    disabled.unmount();
+
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_STAGES);
+    renderLinesBoard(undefined, vi.fn(), factory);
+    expect(screen.getByRole("button", { name: "Add stage" })).toBeInTheDocument();
+    await user.click(screen.getByTestId("lines-board-view-menu"));
+    await user.click(screen.getByRole("menuitem", { name: "Manage stages" }));
+    expect(screen.getByTestId("manage-line-stages-dialog")).toBeInTheDocument();
+  });
+
+  it("uses a persisted stage name after the line refreshes", async () => {
+    const user = userEvent.setup();
+    const factoryWithStageName = (name: string): FactoriesFactory => ({
+      ...REFUND_FACTORY,
+      lines: (REFUND_FACTORY.lines ?? []).map((line) =>
+        line.id === REFUND_LINE_PLAN_ID
+          ? {
+              ...line,
+              stages: [
+                { id: "backlog", key: "backlog", name: "Backlog", kind: "STAGE_KIND_BACKLOG" as const },
+                {
+                  id: "phase-0",
+                  key: "phase-0",
+                  name,
+                  kind: "STAGE_KIND_PHASE" as const,
+                  stepIndex: 0,
+                },
+                {
+                  id: "phase-1",
+                  key: "phase-1",
+                  name: "Verify changes",
+                  kind: "STAGE_KIND_PHASE" as const,
+                  stepIndex: 1,
+                },
+                { id: "verify", key: "verify", name: "Verify", kind: "STAGE_KIND_VERIFY" as const },
+                { id: "done", key: "done", name: "Done", kind: "STAGE_KIND_DONE" as const },
+              ],
+            }
+          : line,
+      ),
+    });
+    const path = `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}`;
+    const view = renderLinesBoard(path, vi.fn(), factoryWithStageName("Implement"));
+
+    await user.click(screen.getByTestId("lines-column-title-phase-0"));
+    const input = await screen.findByTestId("lines-column-title-phase-0-input");
+    await user.clear(input);
+    await user.type(input, "Temporary name");
+    await user.keyboard("{Enter}");
+    expect(screen.getByTestId("lines-column-title-phase-0")).toHaveTextContent("Temporary name");
+
+    view.rerender(<LinesBoardSpecHarness path={path} factory={factoryWithStageName("Saved name")} />);
+
+    expect(screen.getByTestId("lines-column-title-phase-0")).toHaveTextContent("Saved name");
   });
 
   it("puts backlog automations before the create plus and column menu", () => {
