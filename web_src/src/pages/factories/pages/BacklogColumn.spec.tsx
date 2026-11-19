@@ -101,12 +101,11 @@ describe("BacklogColumn schedule start", () => {
     );
     renderColumn();
 
-    const click = user.click(screen.getByRole("button", { name: "Run ESLint tasks" }));
+    await user.click(screen.getByRole("button", { name: "Run ESLint tasks" }));
     await waitFor(() => expect(screen.getByRole("button", { name: "Run ESLint tasks" })).toBeDisabled());
     expect(screen.getByTestId("url")).not.toHaveTextContent("automationRun=");
 
     resolveRun({ runId: "run-42" });
-    await click;
 
     await waitFor(() => expect(screen.getByTestId("url")).toHaveTextContent("automationRun=run-42"));
     const url = screen.getByTestId("url").textContent ?? "";
