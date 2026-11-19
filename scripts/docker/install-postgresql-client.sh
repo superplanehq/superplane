@@ -31,10 +31,14 @@ apt_retry() {
 }
 
 apt_retry apt-get update -y
-apt_retry apt-get install --no-install-recommends -y ca-certificates curl gnupg
+apt_retry apt-get install --no-install-recommends -y ca-certificates
+# Bootstrap certificates before HTTPS downloads to avoid unreliable HTTP mirrors.
+sed -i 's|http://archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g; s|http://security.ubuntu.com/ubuntu|https://security.ubuntu.com/ubuntu|g' /etc/apt/sources.list
+apt_retry apt-get update -y
+apt_retry apt-get install --no-install-recommends -y curl gnupg
 
 . /etc/os-release
-echo "deb http://apt.postgresql.org/pub/repos/apt ${VERSION_CODENAME}-pgdg main" > /etc/apt/sources.list.d/pgdg.list
+echo "deb https://apt.postgresql.org/pub/repos/apt ${VERSION_CODENAME}-pgdg main" > /etc/apt/sources.list.d/pgdg.list
 pg_key=$(mktemp)
 trap 'rm -f "$pg_key"' EXIT
 # Retry transport errors and import the key only after the download completes.
