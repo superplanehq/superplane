@@ -24,6 +24,10 @@ func ListIntegrations(ctx context.Context, registry *registry.Registry, orgID st
 		return nil, grpcerrors.Internal(err, "failed to list integrations")
 	}
 
+	failures, err := integrationWebhookFailures(db, integrations)
+	if err != nil {
+		return nil, grpcerrors.Internal(err, "could not load webhook failures")
+	}
 	protos := []*pb.Integration{}
 	for _, integration := range integrations {
 		proto, err := serializeIntegration(registry, &integration, []models.CanvasNodeReference{})
@@ -37,6 +41,7 @@ func ListIntegrations(ctx context.Context, registry *registry.Registry, orgID st
 			continue
 		}
 
+		proto.Status.WebhookFailures = failures[integration.ID]
 		protos = append(protos, proto)
 	}
 

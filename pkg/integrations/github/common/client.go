@@ -700,6 +700,11 @@ func (c *Client) DeleteHook(ctx context.Context, repository string, hookID int64
 	return c.underlying.Repositories.DeleteHook(ctx, owner, name, hookID)
 }
 
+func (c *Client) ListHooks(ctx context.Context, repository string, options *github.ListOptions) ([]*github.Hook, *github.Response, error) {
+	owner, name := c.ownerAndName(repository)
+	return c.underlying.Repositories.ListHooks(ctx, owner, name, options)
+}
+
 func (c *Client) GetOrganizationUsageReport() (*github.UsageReport, *github.Response, error) {
 	return c.underlying.Billing.GetOrganizationUsageReport(context.Background(), c.owner, nil)
 }
