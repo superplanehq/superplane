@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { SuperplaneComponentsNode } from "@/api-client";
+import { integrationResourcesQueryOptions } from "@/hooks/useIntegrations";
+import { getApiErrorMessage } from "@/lib/errors";
 import {
   applyPlanningReviewComponentToNode,
   canvasNodeToPlanningReviewComponent,
@@ -76,7 +78,7 @@ function createDraft(
         : agent.configuration.publishResults !== false,
     resultsBody: agent.configuration?.resultsBody !== false,
     resultsComment: agent.configuration?.resultsComment === true,
-    publishPRCheck: agent.configuration?.publishPRCheck !== false,
+    publishPRCheck: publishesPRCheck(agent, publicationNodes),
     publicationNodes,
     agentDraft,
     checks: enabledMergeChecks(expandMergeConfidenceSteps(draftSteps(agentDraft))),
@@ -86,6 +88,34 @@ function createDraft(
   };
   draft.savedSnapshot = snapshot(draft);
   return draft;
+}
+
+// Older installations store this switch only on the starting check node.
+function publishesPRCheck(agent: SuperplaneComponentsNode, publicationNodes: SuperplaneComponentsNode[]): boolean {
+  if (agent.configuration?.publishPRCheck !== undefined) return agent.configuration.publishPRCheck === true;
+  const start = publicationNodes.find((node) => node.id === "start-assessment-check");
+  return Boolean(start && start.configuration?.enabled !== false);
+}
+
+async function verifyPRCheckPermissions(current: SettingsDraft | null, context: SettingsContext): Promise<void> {
+  const integrationId = current?.publicationNodes.find((node) => node.id === "start-assessment-check")?.integration?.id;
+  if (!context.organizationId || !integrationId) {
+    throw new Error("Could not verify GitHub permissions. Reload the settings and try again.");
+  }
+  const resources = await integrationResourcesQueryOptions(
+    context.organizationId,
+    integrationId,
+    "check_run_permission",
+  )
+    .queryFn()
+    .catch((error: unknown) => {
+      throw new Error("Could not verify GitHub permissions. Try again.", { cause: error });
+    });
+  if (resources[0]?.id !== "granted") {
+    throw new Error(
+      resources[0]?.name || "Could not verify GitHub permissions. Check the GitHub integration and try again.",
+    );
+  }
 }
 
 async function updateForSave(current: SettingsDraft, context: SettingsContext): Promise<NodeConfigurationUpdate> {
@@ -129,6 +159,9 @@ export function useMergeConfidenceSettingsDraft(
   );
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string>();
+  const [checkingPRCheck, setCheckingPRCheck] = useState(false);
+  const [prCheckError, setPRCheckError] = useState<string>();
+  const checkingPRCheckRef = useRef(false);
   const draftRef = useRef(draft);
   const savingRef = useRef(false);
 
@@ -156,7 +189,8 @@ export function useMergeConfidenceSettingsDraft(
       !current ||
       current.durationInvalid ||
       (current.publishResults && !current.resultsBody && !current.resultsComment) ||
-      savingRef.current
+      savingRef.current ||
+      checkingPRCheckRef.current
     )
       return;
     if (snapshot(current) === current.savedSnapshot) {
@@ -171,8 +205,10 @@ export function useMergeConfidenceSettingsDraft(
       const updates = publicationUpdates(current, update);
       try {
         await onSave(updates);
-      } catch {
-        throw new Error("Could not save Merge confidence settings. Try saving again.");
+      } catch (error) {
+        throw new Error(getApiErrorMessage(error, "Could not save Merge confidence settings. Try saving again."), {
+          cause: error,
+        });
       }
       const component = current.agentDraft.components[0];
       const saved = {
@@ -193,16 +229,38 @@ export function useMergeConfidenceSettingsDraft(
     }
   };
 
+  const updatePublishPRCheck = async (publishPRCheck: boolean) => {
+    if (checkingPRCheckRef.current || savingRef.current) return;
+    setPRCheckError(undefined);
+    if (!publishPRCheck) {
+      patchDraft({ publishPRCheck: false });
+      return;
+    }
+    checkingPRCheckRef.current = true;
+    setCheckingPRCheck(true);
+    try {
+      await verifyPRCheckPermissions(draftRef.current, context);
+      patchDraft({ publishPRCheck: true });
+    } catch (error) {
+      setPRCheckError(getApiErrorMessage(error, "Could not verify GitHub permissions. Try again."));
+    } finally {
+      checkingPRCheckRef.current = false;
+      setCheckingPRCheck(false);
+    }
+  };
+
   return {
     draft,
     saving,
     saveError,
+    checkingPRCheck,
+    prCheckError,
     save,
     updateAgentDraft: (agentDraft: PlanningReviewDraft) => patchDraft({ agentDraft }),
     updatePublishResults: (publishResults: boolean) => patchDraft({ publishResults }),
     updateResultsBody: (resultsBody: boolean) => patchDraft({ resultsBody }),
     updateResultsComment: (resultsComment: boolean) => patchDraft({ resultsComment }),
-    updatePublishPRCheck: (publishPRCheck: boolean) => patchDraft({ publishPRCheck }),
+    updatePublishPRCheck,
     updateChecks: (check: MergeConfidenceCheck, enabled: boolean) => {
       if (!draftRef.current) return;
       const checks = enabled
@@ -274,7 +332,7 @@ function publicationDestinations(current: SettingsDraft, body: SuperplaneCompone
           {
             node: current.publicationNodes.find((node) => node.id === "start-assessment-check"),
             enabled: current.publishPRCheck,
-            wasEnabled: saved?.publishPRCheck !== false,
+            wasEnabled: publishesPRCheck(current.agentBase, current.publicationNodes),
             key: "prCheckActivationGeneration",
           },
         ]

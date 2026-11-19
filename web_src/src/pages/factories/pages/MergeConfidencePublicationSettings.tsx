@@ -20,15 +20,30 @@ export function MergeConfidencePublicationSettings({
           <div className="space-y-1">
             <Label htmlFor="merge-confidence-check">Publish PR check</Label>
             <p id="merge-confidence-check-help" className="workspace-body-text text-muted-foreground">
-              Publish assessment status to the pull request. Scores remain advisory.
+              Publish assessment status to the pull request. Scores remain advisory. Requires Checks write permission.
+              Accept any new GitHub App permissions in GitHub installation settings.
             </p>
+            {settings.checkingPRCheck ? (
+              <p role="status" className="workspace-body-text text-muted-foreground">
+                Checking GitHub permissions…
+              </p>
+            ) : null}
+            {settings.prCheckError ? (
+              <p id="merge-confidence-check-error" role="alert" className="workspace-body-text text-destructive">
+                {settings.prCheckError}
+              </p>
+            ) : null}
           </div>
           <Switch
             id="merge-confidence-check"
-            aria-describedby="merge-confidence-check-help"
+            aria-describedby={
+              settings.prCheckError
+                ? "merge-confidence-check-help merge-confidence-check-error"
+                : "merge-confidence-check-help"
+            }
             checked={draft.publishPRCheck}
-            onCheckedChange={settings.updatePublishPRCheck}
-            disabled={saving}
+            onCheckedChange={(enabled) => void settings.updatePublishPRCheck(enabled)}
+            disabled={saving || settings.checkingPRCheck}
           />
         </div>
       ) : null}

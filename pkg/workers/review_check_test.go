@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"net/http"
 	"strings"
 	"sync"
@@ -45,6 +46,8 @@ type reviewCheckHTTP struct {
 	closed             bool
 	reviews            []map[string]any
 	requestedReviewers []pulls.ReviewerIdentity
+	permissions        map[string]string
+	failPermission     bool
 	failReviews        bool
 	failWrite          bool
 	writeStatus        int
@@ -116,10 +119,19 @@ func (h *reviewCheckHTTP) Do(request *http.Request) (*http.Response, error) {
 		return response, nil
 	}
 	if strings.HasSuffix(path, "/collaborators") {
-		return mocks.GitHubResponse(200, `[{"id":2,"login":"first","type":"User","permissions":{"push":true}},{"id":3,"login":"second","type":"User","permissions":{"push":true}}]`), nil
+		return mocks.GitHubResponse(200, `[{"id":1,"login":"author","type":"User","permissions":{"push":true}},{"id":4,"login":"robot","type":"Bot","permissions":{"push":true}},{"id":5,"login":"reader","type":"User","permissions":{"pull":true}},{"id":2,"login":"first","type":"User","permissions":{"push":true}},{"id":3,"login":"second","type":"User","permissions":{"push":true}}]`), nil
 	}
 	if strings.HasSuffix(path, "/permission") {
-		return mocks.GitHubResponse(200, `{"permission":"write"}`), nil
+		if h.failPermission {
+			return mocks.GitHubResponse(503, `{"message":"unavailable"}`), nil
+		}
+		permission := "write"
+		for login, access := range h.permissions {
+			if strings.Contains(path, "/"+login+"/permission") {
+				permission = access
+			}
+		}
+		return mocks.GitHubResponse(200, fmt.Sprintf(`{"permission":%q}`, permission)), nil
 	}
 	if strings.HasSuffix(path, "/pulls/42") {
 		if h.failPR {
@@ -129,7 +141,11 @@ func (h *reviewCheckHTTP) Do(request *http.Request) (*http.Response, error) {
 		if h.closed {
 			state = "closed"
 		}
-		requested, err := json.Marshal(h.requestedReviewers)
+		requestedUsers := []map[string]any{}
+		for _, reviewer := range h.requestedReviewers {
+			requestedUsers = append(requestedUsers, map[string]any{"id": reviewer.ID, "login": reviewer.Login, "type": "User"})
+		}
+		requested, err := json.Marshal(requestedUsers)
 		require.NoError(h.t, err)
 		return mocks.GitHubResponse(200, fmt.Sprintf(`{"state":%q,"user":{"id":1,"login":"author"},"head":{"sha":%q},"requested_reviewers":%s}`, state, h.head, requested)), nil
 	}
@@ -247,11 +263,24 @@ func (f *reviewCheckFixture) refresh() error {
 	require.NoError(f.t, err)
 	return integration.HandleHook(core.IntegrationHookContext{Name: pulls.ReviewCheckHook, Parameters: map[string]any{"key": "github.review-check/testhq/hello/42/team/review"}, Integration: f.integration, HTTP: f.http})
 }
-func (f *reviewCheckFixture) webhook(eventType, action string) {
+func (f *reviewCheckFixture) webhook(eventType, action string, evidence ...map[string]any) {
 	f.t.Helper()
-	body := []byte(fmt.Sprintf(`{"action":%q,"repository":{"full_name":"testhq/hello"},"pull_request":{"number":42}}`, action))
+	payload := map[string]any{"action": action, "repository": map[string]any{"full_name": "testhq/hello"}, "pull_request": map[string]any{"number": 42, "head": map[string]any{"sha": "abc"}}}
+	if len(evidence) > 0 {
+		for key, value := range evidence[0] {
+			if key == "review" {
+				// GitHub webhook states are lowercase; REST review states are uppercase.
+				review := maps.Clone(value.(map[string]any))
+				review["state"] = strings.ToLower(review["state"].(string))
+				value = review
+			}
+			payload[key] = value
+		}
+	}
+	body, err := json.Marshal(payload)
+	require.NoError(f.t, err)
 	signature := hmac.New(sha256.New, []byte("review-hook-secret"))
-	_, err := signature.Write(body)
+	_, err = signature.Write(body)
 	require.NoError(f.t, err)
 	headers := http.Header{"X-Github-Event": {eventType}, "X-Hub-Signature-256": {"sha256=" + hex.EncodeToString(signature.Sum(nil))}}
 	code, _, err := (&pulls.SetPullRequestReviewCheck{}).HandleWebhook(core.WebhookRequestContext{Headers: headers, Body: body, Integration: f.integration, Webhook: &testcontexts.NodeWebhookContext{Secret: "review-hook-secret"}})
@@ -278,9 +307,9 @@ func reviewDecision(id int, user int64, login, state, sha string) map[string]any
 func TestReviewCheckTracksCurrentApprovals(t *testing.T) {
 	f := newReviewCheckFixture(t)
 	reviewers := []pulls.ReviewerIdentity{{ID: 2, Login: "first"}, {ID: 3, Login: "second"}}
-	f.http.reviews = []map[string]any{reviewDecision(1, 2, "first", "APPROVED", "abc"), reviewDecision(2, 3, "second", "APPROVED", "abc")}
+	f.http.reviews = []map[string]any{reviewDecision(1, 2, "first", "CHANGES_REQUESTED", "abc"), reviewDecision(2, 3, "second", "APPROVED", "abc")}
 	outcome := f.ensure(reviewers)
-	require.Zero(t, f.http.requestCount, "existing approvals on all pages cover reviewer requests")
+	require.Equal(t, 1, f.http.requestCount)
 	f.http.requestedReviewers = reviewers
 	require.NoError(t, f.apply("required_reviewers", reviewers, outcome))
 	require.NoError(t, f.refresh())
@@ -289,7 +318,7 @@ func TestReviewCheckTracksCurrentApprovals(t *testing.T) {
 	require.NotNil(t, f.record().WakeAt, "success must continue monitoring")
 
 	for _, step := range []struct{ state, sha, want string }{
-		{"COMMENTED", "abc", "success"}, {"CHANGES_REQUESTED", "abc", "failure"}, {"APPROVED", "abc", "success"}, {"DISMISSED", "abc", "pending"}, {"APPROVED", "old", "pending"}, {"APPROVED", "abc", "success"},
+		{"COMMENTED", "abc", "success"}, {"CHANGES_REQUESTED", "abc", "failure"}, {"APPROVED", "abc", "success"}, {"DISMISSED", "abc", "failure"}, {"APPROVED", "old", "failure"}, {"APPROVED", "abc", "success"},
 	} {
 		id := 10 + len(f.http.reviews)
 		decision := reviewDecision(id, 3, "second", step.state, step.sha)
@@ -306,7 +335,7 @@ func TestReviewCheckTracksCurrentApprovals(t *testing.T) {
 	var executions int64
 	require.NoError(t, f.db.Model(&models.CanvasNodeExecution{}).Where("workflow_id = ?", f.canvas.ID).Count(&executions).Error)
 	require.EqualValues(t, 2, executions, "review events must not start new executions")
-	require.Zero(t, f.http.requestCount, "tracking must not request reviews a second time")
+	require.Equal(t, 1, f.http.requestCount, "tracking must not request reviews a second time")
 	f.http.head = "new-head"
 	require.NoError(t, f.refresh())
 	require.Equal(t, "pending", f.state())
@@ -319,7 +348,7 @@ func TestReviewCheckTracksCurrentApprovals(t *testing.T) {
 	require.NotNil(t, f.record().WakeAt)
 }
 
-func TestReviewCheckPassesAfterSelectedRequestsAreRemoved(t *testing.T) {
+func TestReviewCheckFollowsHumanAssignmentsWithoutWaivingReview(t *testing.T) {
 	f := newReviewCheckFixture(t)
 	reviewers := []pulls.ReviewerIdentity{{ID: 2, Login: "first"}, {ID: 3, Login: "second"}}
 	outcome := f.ensure(reviewers)
@@ -344,8 +373,8 @@ func TestReviewCheckPassesAfterSelectedRequestsAreRemoved(t *testing.T) {
 	f.http.requestedReviewers = nil
 	f.webhook("pull_request", "review_request_removed")
 	require.NoError(t, f.processDue())
-	require.Equal(t, "success", f.state())
-	require.Equal(t, "No selected review requests remain", f.http.writes[len(f.http.writes)-1].Status.GetDescription())
+	require.Equal(t, "failure", f.state())
+	require.Contains(t, f.http.writes[len(f.http.writes)-1].Status.GetDescription(), "Review decision")
 	require.NotNil(t, f.record().WakeAt, "a selected reviewer can be requested again")
 
 	f.http.requestedReviewers = reviewers[:1]
@@ -353,18 +382,25 @@ func TestReviewCheckPassesAfterSelectedRequestsAreRemoved(t *testing.T) {
 	require.NoError(t, f.processDue())
 	require.Equal(t, "pending", f.state())
 
-	// Reconciliation also recovers a missed removal webhook. An unrelated user
-	// with a selected reviewer's login must not keep the gate pending.
+	// Reconciliation follows a human replacement, including an identity outside
+	// the original suggested selection.
 	f.http.requestedReviewers = []pulls.ReviewerIdentity{{ID: 99, Login: "first"}}
 	require.NoError(t, f.processDue())
-	require.Equal(t, "success", f.state())
+	require.Equal(t, "pending", f.state())
+	f.http.requestedReviewers = []pulls.ReviewerIdentity{{ID: 3, Login: "second"}}
+	require.NoError(t, f.refresh())
+	require.Equal(t, "pending", f.state())
+	f.http.reviews = []map[string]any{reviewDecision(1, 3, "second", "APPROVED", "abc")}
+	f.http.requestedReviewers = nil
+	require.NoError(t, f.refresh())
+	require.Equal(t, "success", f.state(), "an eligible replacement can approve")
 	var executions int64
 	require.NoError(t, f.db.Model(&models.CanvasNodeExecution{}).Where("workflow_id = ?", f.canvas.ID).Count(&executions).Error)
 	require.EqualValues(t, 2, executions, "removal and reconciliation must not start new executions")
 	require.Equal(t, 1, f.http.requestCount, "tracking must not request reviewers again")
 }
 
-func TestReviewCheckNoSelectedRequestsTakesPrecedenceOverReviews(t *testing.T) {
+func TestReviewCheckRequiresApprovalDespiteClearedRequests(t *testing.T) {
 	for _, decision := range []string{"CHANGES_REQUESTED", "COMMENTED", "DISMISSED"} {
 		t.Run(decision, func(t *testing.T) {
 			f := newReviewCheckFixture(t)
@@ -374,12 +410,16 @@ func TestReviewCheckNoSelectedRequestsTakesPrecedenceOverReviews(t *testing.T) {
 			f.http.requestedReviewers = []pulls.ReviewerIdentity{{ID: 3, Login: "second"}}
 			require.NoError(t, f.apply("required_reviewers", reviewers, outcome))
 			require.NoError(t, f.processDue())
-			require.Equal(t, "success", f.state())
+			want := "pending"
+			if decision == "CHANGES_REQUESTED" {
+				want = "failure"
+			}
+			require.Equal(t, want, f.state())
 
 			f.http.requestedReviewers = reviewers
 			f.webhook("pull_request", "review_requested")
 			require.NoError(t, f.processDue())
-			want := "pending"
+			want = "pending"
 			if decision == "CHANGES_REQUESTED" {
 				want = "failure"
 			}
@@ -397,7 +437,7 @@ func TestReviewCheckUsesFinalPullRequestForRemoval(t *testing.T) {
 		failFinalRead  bool
 		want           string
 	}{
-		{name: "removed during reads", initialRequest: true, want: "success"},
+		{name: "removed during reads", initialRequest: true, want: "failure"},
 		{name: "requested during reads", finalRequest: true, want: "pending"},
 		{name: "push before reads", pushOnRead: 1, want: "pending"},
 		{name: "push during reads", pushOnRead: 2, want: "pending"},
@@ -440,7 +480,7 @@ func TestReviewCheckUsesFinalPullRequestForRemoval(t *testing.T) {
 			if test.failFinalRead {
 				f.http.onRead, f.http.failPR = nil, false
 				require.NoError(t, f.processDue())
-				require.Equal(t, "success", f.state())
+				require.Equal(t, "failure", f.state())
 			}
 		})
 	}
@@ -1044,4 +1084,144 @@ func TestReviewCheckRechecksActivationAfterProviderLookup(t *testing.T) {
 	f.http.onRead = nil
 	require.NoError(t, f.refresh())
 	require.Equal(t, "Review request check disabled", f.http.writes[0].Status.GetDescription())
+}
+
+func TestReviewCheckAcceptsOnlyQualifyingHumanApproval(t *testing.T) {
+	for _, test := range []struct {
+		name                                      string
+		id                                        int64
+		login, permission, commit, decision, want string
+	}{
+		{"unrequested writer", 3, "second", "write", "abc", "APPROVED", "success"},
+		{"maintainer", 3, "second", "maintain", "abc", "APPROVED", "success"},
+		{"admin", 3, "second", "admin", "abc", "APPROVED", "success"},
+		{"lost write access", 3, "second", "read", "abc", "APPROVED", "pending"},
+		{"bot", 4, "robot", "write", "abc", "APPROVED", "pending"},
+		{"author", 1, "author", "write", "abc", "APPROVED", "pending"},
+		{"reader", 5, "reader", "read", "abc", "APPROVED", "pending"},
+		{"old commit", 3, "second", "write", "old", "APPROVED", "pending"},
+		{"dismissed", 3, "second", "write", "abc", "DISMISSED", "pending"},
+		{"comment only", 3, "second", "write", "abc", "COMMENTED", "pending"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			f := newReviewCheckFixture(t)
+			suggested := []pulls.ReviewerIdentity{{ID: 2, Login: "first"}}
+			outcome := f.ensure(suggested)
+			f.http.permissions = map[string]string{test.login: test.permission}
+			f.http.reviews = []map[string]any{reviewDecision(1, test.id, test.login, test.decision, test.commit)}
+			f.http.requestedReviewers = suggested
+			require.NoError(t, f.apply("required_reviewers", suggested, outcome))
+			require.NoError(t, f.refresh())
+			require.Equal(t, test.want, f.state())
+			if test.want == "success" {
+				f.http.reviews = append(f.http.reviews, reviewDecision(2, 2, "first", "CHANGES_REQUESTED", "abc"))
+				require.NoError(t, f.refresh())
+				require.Equal(t, "success", f.state(), "another human's changes request does not override an approval")
+				f.http.failPermission = true
+				require.Error(t, f.refresh())
+				require.Equal(t, "error", f.state(), "lookup failure cannot release review")
+			}
+		})
+	}
+}
+
+func TestReviewCheckDistinguishesSubmissionFromManualRemoval(t *testing.T) {
+	f := newReviewCheckFixture(t)
+	reviewers := []pulls.ReviewerIdentity{{ID: 2, Login: "first"}}
+	outcome := f.ensure(reviewers)
+	f.http.requestedReviewers = reviewers
+	require.NoError(t, f.apply("required_reviewers", reviewers, outcome))
+	require.NoError(t, f.refresh())
+	f.http.reviews = []map[string]any{reviewDecision(1, 2, "first", "COMMENTED", "abc")}
+	f.http.requestedReviewers = nil
+	for range 2 {
+		f.webhook("pull_request_review", "submitted")
+		f.webhook("pull_request", "review_request_removed", map[string]any{
+			"requested_reviewer": map[string]any{"id": 2, "login": "first", "type": "User"},
+			"pull_request":       map[string]any{"number": 42, "head": map[string]any{"sha": "abc"}, "updated_at": time.Now().Add(2 * time.Second).UTC()},
+		})
+		require.NoError(t, f.processDue())
+		require.Equal(t, "pending", f.state(), "submission clears the request without approval")
+	}
+	f.http.requestedReviewers = reviewers
+	require.NoError(t, f.refresh())
+	f.http.requestedReviewers = nil
+	require.NoError(t, f.processDue())
+	require.Equal(t, "failure", f.state(), "an earlier comment cannot excuse later manual removal")
+	f.http.reviews = append(f.http.reviews, reviewDecision(2, 2, "first", "COMMENTED", "abc"))
+	require.NoError(t, f.refresh())
+	require.Equal(t, "pending", f.state(), "a delayed provider submission resolves inferred removal")
+	require.Equal(t, 1, f.http.requestCount)
+}
+
+func TestReviewCheckDetectsRemovalBeforeFirstRefresh(t *testing.T) {
+	f := newReviewCheckFixture(t)
+	reviewers := []pulls.ReviewerIdentity{{ID: 2, Login: "first"}}
+	outcome := f.ensure(reviewers)
+	require.NoError(t, f.apply("required_reviewers", reviewers, outcome))
+	require.NoError(t, f.refresh())
+	require.Equal(t, "failure", f.state(), "the recorded request cannot disappear before monitoring starts")
+}
+
+func TestReviewCheckCorroboratesVerifiedReviewActivity(t *testing.T) {
+	f := newReviewCheckFixture(t)
+	reviewers := []pulls.ReviewerIdentity{{ID: 2, Login: "first"}}
+	outcome := f.ensure(reviewers)
+	f.http.requestedReviewers = reviewers
+	require.NoError(t, f.apply("required_reviewers", reviewers, outcome))
+	require.NoError(t, f.refresh())
+	review := reviewDecision(1, 2, "first", "COMMENTED", "abc")
+	f.http.requestedReviewers = nil
+	f.webhook("pull_request_review", "submitted", map[string]any{"review": review})
+	require.Error(t, f.refresh(), "an unpropagated review must remain unresolved")
+	require.NotEqual(t, "success", f.state())
+	f.http.reviews = []map[string]any{review}
+	require.NoError(t, f.processDue())
+	require.Equal(t, "pending", f.state())
+	review = reviewDecision(2, 2, "first", "APPROVED", "abc")
+	f.http.reviews = append(f.http.reviews, review)
+	f.webhook("pull_request_review", "submitted", map[string]any{"review": review})
+	require.NoError(t, f.refresh())
+	require.Equal(t, "success", f.state())
+	dismissed := reviewDecision(2, 2, "first", "DISMISSED", "abc")
+	f.webhook("pull_request_review", "dismissed", map[string]any{"review": dismissed})
+	require.Error(t, f.refresh(), "a stale provider approval cannot override a verified dismissal")
+	f.http.reviews[len(f.http.reviews)-1] = dismissed
+	for range 2 {
+		f.webhook("pull_request_review", "submitted", map[string]any{"review": review})
+		require.NoError(t, f.processDue())
+		require.Equal(t, "pending", f.state(), "a delayed submitted event cannot undo dismissal")
+	}
+	f.http.reviews = append(f.http.reviews, reviewDecision(3, 3, "second", "APPROVED", "abc"))
+	require.NoError(t, f.refresh())
+	require.Equal(t, "success", f.state())
+	f.webhook("pull_request_review", "submitted", map[string]any{"review": reviewDecision(4, 2, "first", "COMMENTED", "abc")})
+	require.NoError(t, f.refresh(), "another person's unpropagated review cannot override a qualifying approval")
+	require.Equal(t, "success", f.state())
+}
+
+func TestReviewCheckUsesVerifiedAssignmentHistory(t *testing.T) {
+	f := newReviewCheckFixture(t)
+	reviewers := []pulls.ReviewerIdentity{{ID: 2, Login: "first"}}
+	outcome := f.ensure(reviewers)
+	require.NoError(t, f.apply("required_reviewers", reviewers, outcome))
+	// The original reviewer comments. A person requests and removes a
+	// replacement before the first refresh. Delivery order is reversed.
+	f.http.reviews = []map[string]any{reviewDecision(1, 2, "first", "COMMENTED", "abc")}
+	at := time.Now().UTC()
+	activity := func(updated time.Time) map[string]any {
+		return map[string]any{
+			"requested_reviewer": map[string]any{"id": 3, "login": "second", "type": "User"},
+			"pull_request":       map[string]any{"number": 42, "head": map[string]any{"sha": "abc"}, "updated_at": updated},
+		}
+	}
+	f.webhook("pull_request", "review_request_removed", activity(at))
+	for range 2 {
+		f.webhook("pull_request", "review_requested", activity(at.Add(-time.Second)))
+		require.NoError(t, f.processDue())
+		require.Equal(t, "failure", f.state(), "an older assignment event cannot undo the last removal")
+	}
+	f.http.reviews = append(f.http.reviews, reviewDecision(2, 3, "second", "COMMENTED", "abc"))
+	require.NoError(t, f.processDue())
+	require.Equal(t, "pending", f.state(), "a later submission resolves the removed assignment without approving")
 }

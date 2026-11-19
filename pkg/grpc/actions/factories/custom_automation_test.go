@@ -539,7 +539,6 @@ func findComponentNode(t *testing.T, nodes []models.Node, name string) *models.N
 
 func TestVerifyCustomAutomationRunsOncePerWorkspaceRepositoryPullRequest(t *testing.T) {
 	r := support.Setup(t)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryMultiRepoTasks))
 	db := database.DB(t.Context())
 	ctx, deps := onboardingContext(r), onboardingDeps(r)
 	factory := seedHandOffFactory(t, r, db)
@@ -677,19 +676,11 @@ func TestCustomAutomationGraphUsesProviderAndFocusedSettings(t *testing.T) {
 			assert.Equal(t, runner.EnvironmentFromSourceSecret, secretSource["source"])
 			assert.Equal(t, "deploy-credentials", secretSource["secret"].(map[string]any)["secret"])
 			got := environmentVars(t, agent.Configuration["environment"])
-			if provider == models.ProviderGitHub {
-				assert.Equal(t, models.WorkspaceRepositoriesExpression, trigger.Configuration["repository"])
-				assert.Equal(t, prFeedbackEventRepositoryExpression, got["REPO"], "the run must check out the repository of its pull request")
-				assert.Equal(t, prFeedbackEventRepositoryExpression, got["SOURCE_REPO"])
-				assert.Equal(t, runner.WorkspaceContextRepoURL(provider, prFeedbackEventRepositoryExpression, ""), got["REPO_URL"])
-				assert.NotContains(t, got, "BASE")
-			} else {
-				assert.Equal(t, "acme/app", trigger.Configuration["repository"])
-				assert.Equal(t, "acme/app", got["REPO"])
-				assert.Equal(t, "acme/app", got["SOURCE_REPO"])
-				assert.Equal(t, runner.WorkspaceContextRepoURL(provider, "acme/app", ""), got["REPO_URL"])
-				assert.Equal(t, "develop", got["BASE"])
-			}
+			assert.Equal(t, models.WorkspaceRepositoriesExpression, trigger.Configuration["repository"])
+			assert.Equal(t, prFeedbackEventRepositoryExpression, got["REPO"], "the run must check out the repository of its pull request")
+			assert.Equal(t, prFeedbackEventRepositoryExpression, got["SOURCE_REPO"])
+			assert.Equal(t, runner.WorkspaceContextRepoURL(provider, prFeedbackEventRepositoryExpression, ""), got["REPO_URL"])
+			assert.NotContains(t, got, "BASE")
 			assert.Equal(t, prFeedbackPRNumberExpression(), got["PR_NUMBER"])
 			assert.Equal(t, prFeedbackPRHeadExpression(), got["PR_HEAD"])
 			_, err = structpb.NewStruct(agent.Configuration)
@@ -705,7 +696,6 @@ func TestBitbucketCustomAutomationListensOnEveryRepositoryWithMultiRepoTasks(t *
 	provider := models.ProviderBitbucket
 	integrationID := uuid.NewString()
 	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSProvider: &provider, VCSIntegrationID: &integrationID}))
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryMultiRepoTasks))
 	settings, err := parseCustomAutomationSettings(db, factory, &pb.FactoryCustomAutomation_Settings{
 		StartMode: pb.FactoryCustomAutomation_START_MODE_AUTOMATIC,
 		Agent:     &pb.FactoryAppTemplateAgent{Component: "runnerClaudeCode"},

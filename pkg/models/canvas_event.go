@@ -1,6 +1,7 @@
 package models
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -75,6 +76,7 @@ func (e *CanvasEvent) BeforeCreate(tx *gorm.DB) error {
 // CreateDeduplicatedRootEvent creates one root event for a stable external
 // identity. The advisory lock and indexed lookup keep concurrent webhook and
 // API starts idempotent without coupling deduplication to run state.
+// When reused, event receives the existing event and its run reference.
 func (n *CanvasNode) CreateDeduplicatedRootEvent(tx *gorm.DB, event *CanvasEvent, key string) (bool, error) {
 	key = strings.TrimSpace(key)
 	if key == "" {
@@ -89,14 +91,16 @@ func (n *CanvasNode) CreateDeduplicatedRootEvent(tx *gorm.DB, event *CanvasEvent
 			return err
 		}
 
-		var count int64
-		if err := inner.Model(&CanvasEvent{}).
+		var existing CanvasEvent
+		err := inner.
 			Where("workflow_id = ? AND node_id = ? AND dedup_key = ?", n.WorkflowID, n.NodeID, key).
-			Count(&count).Error; err != nil {
-			return err
-		}
-		if count > 0 {
+			Order("created_at DESC, id DESC").First(&existing).Error
+		if err == nil {
+			*event = existing
 			return nil
+		}
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
 		}
 		if err := inner.Create(event).Error; err != nil {
 			return err
@@ -132,6 +136,7 @@ type EventPayloadMatch struct {
 // CreateDeduplicatedRootEvent, an older key can start again after a different
 // key in the scope, for example when a pull request returns to an earlier
 // target.
+// When skipped, event receives the latest event that made it redundant.
 func (n *CanvasNode) CreateRootEventUnlessLatestInScope(tx *gorm.DB, event *CanvasEvent, scope RootEventScope, key string, skip func(latest CanvasEvent) bool) (bool, error) {
 	if scope.KeyPrefix == "" || !strings.HasPrefix(key, scope.KeyPrefix) {
 		return false, fmt.Errorf("dedup key %q is not in scope %q", key, scope.KeyPrefix)
@@ -150,6 +155,7 @@ func (n *CanvasNode) CreateRootEventUnlessLatestInScope(tx *gorm.DB, event *Canv
 			return err
 		}
 		if latest != nil && skip(*latest) {
+			*event = *latest
 			return nil
 		}
 		if err := inner.Create(event).Error; err != nil {
