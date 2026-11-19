@@ -385,14 +385,14 @@ func BuildConsentView(ctx context.Context, account *models.Account, selectedOrgI
 	return view, nil
 }
 
-func ResolveConsentWorkspaces(ctx context.Context, account *models.Account, organizationID string, factoryIDs []string) (uuid.UUID, uuid.UUID, []uuid.UUID, error) {
+func ResolveConsentWorkspaces(db *gorm.DB, account *models.Account, organizationID string, factoryIDs []string) (uuid.UUID, uuid.UUID, []uuid.UUID, error) {
 	orgID, err := uuid.Parse(strings.TrimSpace(organizationID))
 	if err != nil {
 		return uuid.Nil, uuid.Nil, nil, fmt.Errorf("%s", consentOrganizationError)
 	}
-	db := database.DB(ctx)
 	user, err := models.FindActiveHumanUserByAccountAndOrganization(db, orgID, account.ID)
-	if err != nil || !OrganizationAllowsPublicMCP(orgID) || !organizationAllowsFactories(orgID) {
+	enabled, featureErr := models.OrganizationHasExperimentalFeatures(db, orgID, features.FeatureSuperPlaneMCPServer, features.FeatureFactories)
+	if err != nil || featureErr != nil || !enabled {
 		return uuid.Nil, uuid.Nil, nil, fmt.Errorf("%s", consentOrganizationError)
 	}
 	parsed := make([]uuid.UUID, 0, len(factoryIDs))
@@ -412,9 +412,6 @@ func ResolveConsentWorkspaces(ctx context.Context, account *models.Account, orga
 		seen[id] = struct{}{}
 		factory, err := models.FindFactory(db, orgID, id)
 		if err != nil || factory.OrganizationID != orgID {
-			return uuid.Nil, uuid.Nil, nil, fmt.Errorf("%s", consentWorkspaceInvalid)
-		}
-		if !OrganizationAllowsPublicMCP(factory.OrganizationID) || !organizationAllowsFactories(factory.OrganizationID) {
 			return uuid.Nil, uuid.Nil, nil, fmt.Errorf("%s", consentWorkspaceInvalid)
 		}
 		parsed = append(parsed, id)

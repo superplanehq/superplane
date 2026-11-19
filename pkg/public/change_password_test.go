@@ -2,26 +2,345 @@ package public
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/jwt"
+	"github.com/superplanehq/superplane/pkg/mcp"
+	"github.com/superplanehq/superplane/pkg/mcpserver"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/supportsession"
 	"github.com/superplanehq/superplane/test/support"
+	"gorm.io/gorm"
 )
 
 const testCurrentPassword = "current-pass-123"
 const testNewPassword = "new-secure-pass-456"
+
+func passwordMCPCode(t *testing.T, server *Server, cookie *http.Cookie, org, factory, client string) string {
+	t.Helper()
+	query := url.Values{"client_id": {client}, "redirect_uri": {mcpserver.CursorRedirectURIs[0]}, "response_type": {"code"}, "code_challenge": {mcp.S256Challenge(mcpTestPKCEVerifier)}, "code_challenge_method": {"S256"}}
+	request := httptest.NewRequest(http.MethodGet, "/oauth/authorize?"+query.Encode(), nil)
+	request.Host = "localhost:8000"
+	request.AddCookie(cookie)
+	response := httptest.NewRecorder()
+	server.Router.ServeHTTP(response, request)
+	require.Equal(t, http.StatusOK, response.Code)
+	form := url.Values{"consent": {mcpConsentToken(t, response.Body.String())}, "organization_id": {org}, "workspaces_for": {org}, "factory_id": {factory}}
+	request = httptest.NewRequest(http.MethodPost, "/oauth/authorize", strings.NewReader(form.Encode()))
+	request.Host = "localhost:8000"
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	request.AddCookie(cookie)
+	response = httptest.NewRecorder()
+	server.Router.ServeHTTP(response, request)
+	require.Equal(t, http.StatusFound, response.Code, response.Body.String())
+	location, err := url.Parse(response.Header().Get("Location"))
+	require.NoError(t, err)
+	return location.Query().Get("code")
+}
+
+func passwordMCPRefresh(server *Server, refresh, client string) *httptest.ResponseRecorder {
+	form := url.Values{"grant_type": {"refresh_token"}, "refresh_token": {refresh}, "client_id": {client}, "resource": {"http://localhost:8000/mcp"}}
+	request := httptest.NewRequest(http.MethodPost, "/oauth/token", strings.NewReader(form.Encode()))
+	request.Host = "localhost:8000"
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	response := httptest.NewRecorder()
+	server.Router.ServeHTTP(response, request)
+	return response
+}
+
+func passwordMCPTokens(t *testing.T, response *httptest.ResponseRecorder) (string, string) {
+	t.Helper()
+	require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+	var body struct {
+		Access  string `json:"access_token"`
+		Refresh string `json:"refresh_token"`
+	}
+	require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body))
+	require.NotEmpty(t, body.Access)
+	require.NotEmpty(t, body.Refresh)
+	return body.Access, body.Refresh
+}
+
+func TestChangePassword_RevokeMCPLifecycle(t *testing.T) {
+	server, r, token := setupChangePasswordTestServer(t)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactories))
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureSuperPlaneMCPServer))
+	factory, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, "Password fixture", "", "PWD")
+	require.NoError(t, err)
+	task, err := factory.CreateWorkOrder(database.DB(t.Context()), "Harmless password fixture", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	cookie := &http.Cookie{Name: "account_token", Value: token}
+	code := func() string {
+		return passwordMCPCode(t, server, cookie, r.Organization.ID.String(), factory.ID.String(), mcpserver.LocalClientID)
+	}
+	exchange := func(code string) *httptest.ResponseRecorder {
+		return exchangeMCPCode(server, code, mcpserver.LocalClientID, mcpserver.CursorRedirectURIs[0])
+	}
+	access, refresh := passwordMCPTokens(t, exchange(code()))
+	readTask := func(access string, status int) {
+		t.Helper()
+		payload := mustMarshal(t, map[string]any{"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": map[string]any{"name": "get_task", "arguments": map[string]any{"task": task.ID.String()}}})
+		request := httptest.NewRequest(http.MethodPost, "/mcp", bytes.NewReader(payload))
+		request.Host = "localhost:8000"
+		request.Header.Set("Authorization", "Bearer "+access)
+		response := httptest.NewRecorder()
+		server.Router.ServeHTTP(response, request)
+		require.Equal(t, status, response.Code, response.Body.String())
+		if status == http.StatusOK {
+			var body struct {
+				Error  any `json:"error"`
+				Result struct {
+					IsError bool `json:"isError"`
+					Content []struct {
+						Text string `json:"text"`
+					} `json:"content"`
+				} `json:"result"`
+			}
+			require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body))
+			require.Nil(t, body.Error)
+			require.False(t, body.Result.IsError)
+			require.NotEmpty(t, body.Result.Content)
+			require.Contains(t, body.Result.Content[0].Text, task.ID.String())
+		}
+	}
+	readTask(access, http.StatusOK)
+	oldClaims, err := mcpserver.ParseAccessToken(server.jwt, access, "http://localhost:8000/mcp")
+	require.NoError(t, err)
+	legacyClaims := *oldClaims
+	legacyClaims.PasswordVersion = ""
+	legacy, err := mcpserver.MintAccessToken(server.jwt, legacyClaims, time.Hour)
+	require.NoError(t, err)
+	readTask(legacy, http.StatusOK)
+	pending := code()
+	delayedCode := code()
+	db := database.DB(t.Context())
+	otherOrg, err := models.CreateOrganization("password-other", "Password other")
+	require.NoError(t, err)
+	otherUser, err := models.CreateUser(otherOrg.ID, r.Account.ID, r.Account.Email, r.Account.Name)
+	require.NoError(t, err)
+	otherFactory, err := models.CreateFactory(db, otherOrg.ID, "Other fixture", "", "OTH")
+	require.NoError(t, err)
+	otherRequest := &mcpserver.AuthorizeRequest{ClientID: "dummy-other-client", RedirectURI: mcpserver.CursorRedirectURIs[0], Resource: "http://localhost:8000/mcp", CodeChallenge: mcp.S256Challenge(mcpTestPKCEVerifier), CodeChallengeMethod: "S256"}
+	otherCode, err := mcpserver.CreateAuthorizationCode(db, otherRequest, otherUser.ID, otherOrg.ID, []uuid.UUID{otherFactory.ID})
+	require.NoError(t, err)
+	_, otherRefresh := passwordMCPTokens(t, exchangeMCPCode(server, otherCode, otherRequest.ClientID, otherRequest.RedirectURI))
+	_, err = mcpserver.CreateAuthorizationCode(db, otherRequest, otherUser.ID, otherOrg.ID, []uuid.UUID{otherFactory.ID})
+	require.NoError(t, err)
+	require.NoError(t, db.Delete(otherUser).Error)
+	unrelatedAccount, err := models.CreateAccount("Unrelated", "unrelated-password@example.com")
+	require.NoError(t, err)
+	unrelatedUser, err := models.CreateUser(r.Organization.ID, unrelatedAccount.ID, unrelatedAccount.Email, unrelatedAccount.Name)
+	require.NoError(t, err)
+	unrelatedCode, err := mcpserver.CreateAuthorizationCode(db, otherRequest, unrelatedUser.ID, r.Organization.ID, []uuid.UUID{factory.ID})
+	require.NoError(t, err)
+	_, unrelatedRefresh := passwordMCPTokens(t, exchangeMCPCode(server, unrelatedCode, otherRequest.ClientID, otherRequest.RedirectURI))
+	var delayedIssue *mcpserver.TokenIssue
+	require.NoError(t, database.DB(t.Context()).Transaction(func(tx *gorm.DB) error {
+		var oauthErr *mcpserver.OAuthError
+		delayedIssue, _, oauthErr = mcpserver.ExchangeAuthorizationCode(tx, url.Values{"grant_type": {"authorization_code"}, "code": {delayedCode}, "code_verifier": {mcpTestPKCEVerifier}, "client_id": {mcpserver.LocalClientID}, "redirect_uri": {mcpserver.CursorRedirectURIs[0]}}, "http://localhost:8000/mcp")
+		if oauthErr != nil {
+			return oauthErr
+		}
+		return nil
+	}))
+	failed := sendChangePasswordRequest(server, mustMarshal(t, changePasswordRequest{CurrentPassword: "wrong", NewPassword: testNewPassword}), cookie)
+	require.Equal(t, http.StatusBadRequest, failed.Code)
+	readTask(access, http.StatusOK)
+	access, refresh = passwordMCPTokens(t, passwordMCPRefresh(server, refresh, mcpserver.LocalClientID))
+	rotated := sendChangePasswordRequest(server, mustMarshal(t, changePasswordRequest{CurrentPassword: testCurrentPassword, NewPassword: testNewPassword}), cookie)
+	require.Equal(t, http.StatusNoContent, rotated.Code)
+	for _, model := range []any{&models.MCPOAuthCode{}, &models.MCPOAuthRefreshToken{}} {
+		var remaining int64
+		require.NoError(t, db.Model(model).Where("user_id IN ?", []uuid.UUID{r.User, otherUser.ID}).Count(&remaining).Error)
+		require.Zero(t, remaining)
+	}
+	require.Equal(t, http.StatusBadRequest, passwordMCPRefresh(server, otherRefresh, otherRequest.ClientID).Code)
+	passwordMCPTokens(t, passwordMCPRefresh(server, unrelatedRefresh, otherRequest.ClientID))
+	for _, renewed := range rotated.Result().Cookies() {
+		if renewed.Name == "account_token" {
+			cookie = renewed
+		}
+	}
+	readTask(access, http.StatusUnauthorized)
+	readTask(legacy, http.StatusUnauthorized)
+	for _, rejected := range []*httptest.ResponseRecorder{passwordMCPRefresh(server, refresh, mcpserver.LocalClientID), exchange(pending)} {
+		require.Equal(t, http.StatusBadRequest, rejected.Code)
+		var body map[string]any
+		require.NoError(t, json.Unmarshal(rejected.Body.Bytes(), &body))
+		require.Equal(t, "invalid_grant", body["error"])
+	}
+	freshAccess, freshRefresh := passwordMCPTokens(t, exchange(code()))
+	readTask(freshAccess, http.StatusOK)
+	passwordMCPTokens(t, passwordMCPRefresh(server, freshRefresh, mcpserver.LocalClientID))
+	readTask(access, http.StatusUnauthorized)
+	delayedClaims := *oldClaims
+	delayedClaims.PasswordVersion = delayedIssue.PasswordVersion
+	delayed, err := mcpserver.MintAccessToken(server.jwt, delayedClaims, time.Hour)
+	require.NoError(t, err)
+	readTask(delayed, http.StatusUnauthorized)
+	// Keep a matching fresh grant and put rotation in this JWT's issuance second.
+	freshClaims, err := mcpserver.ParseAccessToken(server.jwt, freshAccess, "http://localhost:8000/mcp")
+	require.NoError(t, err)
+	sameSecond, err := mcpserver.MintAccessToken(server.jwt, *freshClaims, time.Hour)
+	require.NoError(t, err)
+	issued, err := server.jwt.ValidateAndGetClaims(sameSecond)
+	require.NoError(t, err)
+	account, err := models.FindAccountByID(r.Account.ID.String())
+	require.NoError(t, err)
+	rotationTime := time.Unix(int64(issued["iat"].(float64)), 0).Add(999999 * time.Microsecond)
+	require.NoError(t, account.MarkPasswordChangedInTransaction(db, rotationTime))
+	readTask(sameSecond, http.StatusUnauthorized)
+}
+
+func TestChangePassword_RejectsConcurrentMCPConsent(t *testing.T) {
+	server, r, token := setupChangePasswordTestServer(t)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactories))
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureSuperPlaneMCPServer))
+	factory, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, "Consent fixture", "", "CNS")
+	require.NoError(t, err)
+	consent, err := mcpserver.MintConsentToken(server.jwt, mcpserver.ConsentClaims{ClientID: mcpserver.LocalClientID, RedirectURI: mcpserver.CursorRedirectURIs[0], Resource: "http://localhost:8000/mcp", CodeChallenge: mcp.S256Challenge(mcpTestPKCEVerifier), CodeChallengeMethod: "S256", ResponseType: "code"})
+	require.NoError(t, err)
+	type consentRaceKey struct{}
+	ctx, cancel := context.WithTimeout(context.WithValue(t.Context(), consentRaceKey{}, true), 15*time.Second)
+	defer cancel()
+	paused, resume := make(chan struct{}), make(chan struct{})
+	defer close(resume)
+	callback := "password_consent_" + uuid.NewString()
+	queries := database.Conn().Callback().Query()
+	require.NoError(t, queries.Before("gorm:query").Register(callback, func(tx *gorm.DB) {
+		if tx.Statement.Context.Value(consentRaceKey{}) != true || tx.Statement.Table != "accounts" {
+			return
+		}
+		if _, locking := tx.Statement.Clauses["FOR"]; !locking {
+			return
+		}
+		close(paused)
+		select {
+		case <-resume:
+		case <-ctx.Done():
+		}
+	}))
+	defer func() { require.NoError(t, queries.Remove(callback)) }()
+	form := url.Values{"consent": {consent}, "organization_id": {r.Organization.ID.String()}, "workspaces_for": {r.Organization.ID.String()}, "factory_id": {factory.ID.String()}}
+	request := httptest.NewRequest(http.MethodPost, "/oauth/authorize", strings.NewReader(form.Encode())).WithContext(ctx)
+	request.Host = "localhost:8000"
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	cookie := &http.Cookie{Name: "account_token", Value: token}
+	request.AddCookie(cookie)
+	done := make(chan *httptest.ResponseRecorder, 1)
+	go func() {
+		response := httptest.NewRecorder()
+		server.Router.ServeHTTP(response, request)
+		done <- response
+	}()
+	select {
+	case <-paused:
+	case <-ctx.Done():
+		t.Fatal("consent did not reach the account lock")
+	}
+	rotated := sendChangePasswordRequest(server, mustMarshal(t, changePasswordRequest{CurrentPassword: testCurrentPassword, NewPassword: testNewPassword}), cookie)
+	require.Equal(t, http.StatusNoContent, rotated.Code)
+	resume <- struct{}{}
+	select {
+	case response := <-done:
+		require.Equal(t, http.StatusUnauthorized, response.Code)
+	case <-ctx.Done():
+		t.Fatal("consent did not finish")
+	}
+	var codes int64
+	require.NoError(t, database.DB(t.Context()).Model(&models.MCPOAuthCode{}).Where("user_id = ?", r.User).Count(&codes).Error)
+	require.Zero(t, codes)
+}
+
+func TestChangePassword_MCPExchangeRace(t *testing.T) {
+	for _, grant := range []string{"code", "refresh"} {
+		for _, rotationFirst := range []bool{true, false} {
+			name := grant + "/exchange-first"
+			if rotationFirst {
+				name = grant + "/rotation-first"
+			}
+			t.Run(name, func(t *testing.T) {
+				server, r, token := setupChangePasswordTestServer(t)
+				require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactories))
+				require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureSuperPlaneMCPServer))
+				factory, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, "Race fixture", "", "RAC")
+				require.NoError(t, err)
+				cookie := &http.Cookie{Name: "account_token", Value: token}
+				code := passwordMCPCode(t, server, cookie, r.Organization.ID.String(), factory.ID.String(), mcpserver.LocalClientID)
+				exchange := func() *httptest.ResponseRecorder {
+					return exchangeMCPCode(server, code, mcpserver.LocalClientID, mcpserver.CursorRedirectURIs[0])
+				}
+				if grant == "refresh" {
+					_, refresh := passwordMCPTokens(t, exchange())
+					exchange = func() *httptest.ResponseRecorder { return passwordMCPRefresh(server, refresh, mcpserver.LocalClientID) }
+				}
+				race := &acceptanceRace{t: t}
+				release := race.holdRow(&models.Account{}, r.Account.ID)
+				rotation := func() *httptest.ResponseRecorder {
+					return sendChangePasswordRequest(server, mustMarshal(t, changePasswordRequest{CurrentPassword: testCurrentPassword, NewPassword: testNewPassword}), cookie)
+				}
+				start := func(operation func() *httptest.ResponseRecorder) <-chan *httptest.ResponseRecorder {
+					done := make(chan *httptest.ResponseRecorder, 1)
+					go func() { done <- operation() }()
+					return done
+				}
+				var exchanged, rotated <-chan *httptest.ResponseRecorder
+				if rotationFirst {
+					rotated = start(rotation)
+				} else {
+					exchanged = start(exchange)
+				}
+				race.waitForLockWaiters(1)
+				if rotationFirst {
+					exchanged = start(exchange)
+				} else {
+					rotated = start(rotation)
+				}
+				race.waitForLockWaiters(2)
+				release()
+				finish := func(done <-chan *httptest.ResponseRecorder) *httptest.ResponseRecorder {
+					select {
+					case response := <-done:
+						return response
+					case <-time.After(10 * time.Second):
+						t.Fatal("MCP exchange and password rotation did not finish")
+						return nil
+					}
+				}
+				require.Equal(t, http.StatusNoContent, finish(rotated).Code)
+				response := finish(exchanged)
+				if rotationFirst {
+					require.Equal(t, http.StatusBadRequest, response.Code, response.Body.String())
+					require.Contains(t, response.Body.String(), `"error":"invalid_grant"`)
+					return
+				}
+				access, refresh := passwordMCPTokens(t, response)
+				require.Equal(t, http.StatusBadRequest, passwordMCPRefresh(server, refresh, mcpserver.LocalClientID).Code)
+				request := httptest.NewRequest(http.MethodPost, "/mcp", strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"tools/list"}`))
+				request.Host = "localhost:8000"
+				request.Header.Set("Authorization", "Bearer "+access)
+				denied := httptest.NewRecorder()
+				server.Router.ServeHTTP(denied, request)
+				require.Equal(t, http.StatusUnauthorized, denied.Code)
+			})
+		}
+	}
+}
 
 // setupChangePasswordTestServer constructs a server with password login
 // enabled and seeds a password auth row for the test account so the

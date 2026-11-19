@@ -41,13 +41,14 @@ type AuthorizeRequest struct {
 }
 
 type TokenIssue struct {
-	UserID     uuid.UUID
-	OrgID      uuid.UUID
-	FactoryID  uuid.UUID
-	FactoryIDs []uuid.UUID
-	ClientID   string
-	Resource   string
-	Scopes     []string
+	PasswordVersion string
+	UserID          uuid.UUID
+	OrgID           uuid.UUID
+	FactoryID       uuid.UUID
+	FactoryIDs      []uuid.UUID
+	ClientID        string
+	Resource        string
+	Scopes          []string
 }
 
 type OAuthError struct {
@@ -300,9 +301,13 @@ func ExchangeAuthorizationCode(tx *gorm.DB, values url.Values, resource string) 
 		return nil, "", &OAuthError{Code: "invalid_target", Description: "resource does not match this server", Status: http.StatusBadRequest}
 	}
 
+	account, err := models.LockMCPOAuthAccount(tx, &models.MCPOAuthCode{}, "code_hash", crypto.HashToken(code))
+	if err != nil {
+		return nil, "", credentialLookupError(err)
+	}
 	stored, err := models.FindMCPOAuthCode(tx, crypto.HashToken(code), time.Now())
 	if err != nil {
-		return nil, "", &OAuthError{Code: "invalid_grant", Description: "authorization code is not valid", Status: http.StatusBadRequest}
+		return nil, "", credentialLookupError(err)
 	}
 	if stored.ClientID != clientID || stored.RedirectURI != redirectURI || stored.Resource != resource {
 		return nil, "", &OAuthError{Code: "invalid_grant", Description: "authorization code is not valid", Status: http.StatusBadRequest}
@@ -321,6 +326,7 @@ func ExchangeAuthorizationCode(tx *gorm.DB, values url.Values, resource string) 
 		return nil, "", &OAuthError{Code: "invalid_grant", Description: "authorization code is not valid", Status: http.StatusBadRequest}
 	}
 
+	issue.PasswordVersion = account.PasswordVersion()
 	refresh, err := storeRefreshToken(tx, issue)
 	if err != nil {
 		return nil, "", &OAuthError{Code: "server_error", Description: "failed to issue refresh token", Status: http.StatusInternalServerError}
@@ -342,9 +348,13 @@ func RefreshTokens(tx *gorm.DB, values url.Values, resource string) (*TokenIssue
 		return nil, "", &OAuthError{Code: "invalid_target", Description: "resource does not match this server", Status: http.StatusBadRequest}
 	}
 
+	account, err := models.LockMCPOAuthAccount(tx, &models.MCPOAuthRefreshToken{}, "token_hash", crypto.HashToken(raw))
+	if err != nil {
+		return nil, "", credentialLookupError(err)
+	}
 	stored, err := models.FindMCPOAuthRefreshToken(tx, crypto.HashToken(raw), time.Now())
 	if err != nil {
-		return nil, "", &OAuthError{Code: "invalid_grant", Description: "refresh token is not valid", Status: http.StatusBadRequest}
+		return nil, "", credentialLookupError(err)
 	}
 	if stored.ClientID != clientID || stored.Resource != resource {
 		return nil, "", &OAuthError{Code: "invalid_grant", Description: "refresh token is not valid", Status: http.StatusBadRequest}
@@ -362,6 +372,7 @@ func RefreshTokens(tx *gorm.DB, values url.Values, resource string) (*TokenIssue
 	if err != nil {
 		return nil, "", &OAuthError{Code: "invalid_grant", Description: "refresh token is not valid", Status: http.StatusBadRequest}
 	}
+	issue.PasswordVersion = account.PasswordVersion()
 	refresh, err := storeRefreshToken(tx, issue)
 	if err != nil {
 		return nil, "", &OAuthError{Code: "server_error", Description: "failed to rotate refresh token", Status: http.StatusInternalServerError}
@@ -399,6 +410,13 @@ func RegisterClient(tx *gorm.DB, body []byte) (*Client, *OAuthError) {
 		return nil, &OAuthError{Code: "server_error", Description: "failed to create client", Status: http.StatusInternalServerError}
 	}
 	return &Client{ID: stored.ClientID, Name: stored.ClientName, RedirectURIs: []string(stored.RedirectURIs)}, nil
+}
+
+func credentialLookupError(err error) *OAuthError {
+	if errors.Is(err, gorm.ErrRecordNotFound) || errors.Is(err, models.ErrMCPOAuthCodeNotFound) || errors.Is(err, models.ErrMCPOAuthRefreshNotFound) {
+		return &OAuthError{Code: "invalid_grant", Description: "credential is not valid", Status: http.StatusBadRequest}
+	}
+	return &OAuthError{Code: "server_error", Description: "failed to load credential", Status: http.StatusInternalServerError}
 }
 
 func storeRefreshToken(tx *gorm.DB, issue TokenIssue) (string, error) {
@@ -444,6 +462,21 @@ func AccessGrantIsActive(tx *gorm.DB, claims *AccessClaims, now time.Time) bool 
 		}
 	}
 	return false
+}
+
+func AccessPasswordIsFresh(tx *gorm.DB, claims *AccessClaims) bool {
+	user, err := models.FindActiveUserByIDAnyOrg(tx, claims.UserID)
+	if err != nil || user.AccountID == nil {
+		return false
+	}
+	var account models.Account
+	if err := tx.Where("id = ?", *user.AccountID).First(&account).Error; err != nil {
+		return false
+	}
+	if claims.PasswordVersion == "" {
+		return account.PasswordChangedAt == nil
+	}
+	return claims.PasswordVersion == account.PasswordVersion()
 }
 
 func AuthorizationRedirect(redirectURI, code, state string) (string, error) {
