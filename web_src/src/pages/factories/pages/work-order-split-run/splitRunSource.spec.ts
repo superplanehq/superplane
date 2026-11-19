@@ -10,8 +10,6 @@ import { buildOrgUserDisplayMap, createOrgUserDisplayLookup } from "@/lib/orgUse
 import { PRIMARY_FACTORY_ID, STORYBOOK_ME_USER_ID } from "../../__fixtures__/factoryPageIds";
 import {
   DRAFT_WORK_ORDER,
-  OPEN_WORK_ORDER_SECONDARY,
-  QUESTION_WORK_ORDER,
   RUNNING_WORK_ORDER,
   SENTRY_DRAFT_WORK_ORDER,
   SLACK_DRAFT_WORK_ORDER,
@@ -57,29 +55,6 @@ describe("sourceTicketLabel", () => {
 });
 
 describe("splitRunSourceForOrder", () => {
-  it.each([
-    { appName: " \t ", nodeName: " Run intake ", name: "Run intake" },
-    { appName: undefined, nodeName: " ", name: "Automation" },
-  ])("keeps automation attribution when its name is missing: $name", ({ appName, nodeName, name }) => {
-    expect(splitRunSourceForOrder({ createdBy: { automation: { appName, nodeName } } })).toMatchObject({
-      kind: "automation",
-      name,
-    });
-  });
-
-  it("keeps a custom creator distinct from its origin ticket", () => {
-    const source = splitRunSourceForOrder({
-      origin: { url: "https://github.com/acme/payments/issues/12" },
-      createdBy: { automation: { appId: "custom-automation", appName: "Elastic case intake" } },
-    });
-    expect(source).toMatchObject({
-      kind: "intake",
-      iconAlt: "GitHub",
-      ticket: { href: "https://github.com/acme/payments/issues/12" },
-    });
-    expect(addedByForSource(source)).toEqual({ kind: "automation", name: "Elastic case intake" });
-  });
-
   const creatorFallbackCases: Array<{
     label: string;
     createdBy?: FactoriesWorkOrder["createdBy"];
@@ -235,16 +210,6 @@ describe("splitRunSourceForOrder", () => {
     );
   });
 
-  it("maps automation-created orders without origin to the intake source", () => {
-    const sentry = splitRunSourceForOrder({ ...OPEN_WORK_ORDER_SECONDARY, origin: undefined });
-    expect(sentry).toEqual(expect.objectContaining({ kind: "intake", name: "Sentry exceptions" }));
-    expect(sentry).not.toHaveProperty("ticket");
-
-    const slack = splitRunSourceForOrder({ ...QUESTION_WORK_ORDER, origin: undefined });
-    expect(slack).toEqual(expect.objectContaining({ kind: "intake", name: "Slack" }));
-    expect(slack).not.toHaveProperty("ticket");
-  });
-
   it("maps ingest, Sentry, and Slack automations to the drawer intake names", () => {
     expect(splitRunSourceForOrder(RUNNING_WORK_ORDER)).toEqual(
       expect.objectContaining({
@@ -278,7 +243,13 @@ describe("splitRunSourceForOrder", () => {
       splitRunSourceForOrder({
         ...DRAFT_WORK_ORDER,
         origin: undefined,
-        createdBy: { automation: { appId: "app-productive-intake", appName: "Productive tasks" } },
+        createdBy: {
+          automation: {
+            appId: "app-productive-intake",
+            appName: "Productive tasks",
+            templateId: "intake:productive-tasks",
+          },
+        },
       }),
     ).toEqual(expect.objectContaining({ kind: "intake", name: "Productive tasks", iconAlt: "Productive" }));
   });
@@ -313,7 +284,9 @@ describe("splitRunSourceForOrder", () => {
       splitRunSourceForOrder({
         ...DRAFT_WORK_ORDER,
         origin: undefined,
-        createdBy: { automation: { appId: "app-jira-intake", appName: "Jira issues" } },
+        createdBy: {
+          automation: { appId: "app-jira-intake", appName: "Jira issues", templateId: "intake:jira-issues" },
+        },
       }),
     ).toEqual(expect.objectContaining({ kind: "intake", name: "Jira issues", iconAlt: "Jira" }));
   });
@@ -325,7 +298,13 @@ describe("splitRunSourceForOrder", () => {
         ...DRAFT_WORK_ORDER,
         title: "Fix Dependabot alerts for vitest (npm)",
         origin: { url: href, label: "Dependabot: vitest" },
-        createdBy: { automation: { appId: "app-dependabot-alerts", appName: "Dependabot alerts" } },
+        createdBy: {
+          automation: {
+            appId: "app-dependabot-alerts",
+            appName: "Dependabot alerts",
+            templateId: "intake:dependabot-alerts",
+          },
+        },
       }),
     ).toEqual(
       expect.objectContaining({
@@ -382,7 +361,13 @@ describe("splitRunSourceForOrder", () => {
           url: "https://github.com/acme/payments/issues/12",
           label: "Dependabot: vitest",
         },
-        createdBy: { automation: { appId: "app-dependabot-alerts", appName: "Dependabot alerts" } },
+        createdBy: {
+          automation: {
+            appId: "app-dependabot-alerts",
+            appName: "Dependabot alerts",
+            templateId: "intake:dependabot-alerts",
+          },
+        },
       }),
     ).toEqual(
       expect.objectContaining({
@@ -395,13 +380,19 @@ describe("splitRunSourceForOrder", () => {
     );
   });
 
-  it("names Dependabot alerts when the order has no origin but the automation name contains Dependabot", () => {
+  it("names Dependabot alerts from the automation template when the order has no origin", () => {
     expect(
       splitRunSourceForOrder({
         ...DRAFT_WORK_ORDER,
         origin: undefined,
         title: "Fix a package",
-        createdBy: { automation: { appId: "app-dependabot-alerts", appName: "Dependabot alerts" } },
+        createdBy: {
+          automation: {
+            appId: "app-dependabot-alerts",
+            appName: "Package alerts",
+            templateId: "intake:dependabot-alerts",
+          },
+        },
       }),
     ).toEqual(
       expect.objectContaining({

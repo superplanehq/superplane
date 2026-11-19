@@ -22,7 +22,6 @@ import {
 
 import { extractArtifactUrl, toArtifactDataRecord } from "../../lib/workOrderArtifact";
 import { reviewCandidateForWorkOrderId } from "../onboarding/first-run/reviewCandidates";
-import { canvasKeyForAutomation } from "./splitRunCanvases";
 
 export const CREATED_MANUALLY = "Created manually";
 export const CREATED_BY_AUTOMATED_INTAKE = "Created by automated intake";
@@ -105,7 +104,7 @@ export const INTAKE_PRESENTATION: Record<SplitRunIntakeKind, { name: string; ico
   slack: { name: "Slack", iconSrc: slackIcon, iconAlt: "Slack" },
 };
 
-// Origin hosts and known intake names identify the external source.
+// Origin hosts identify the external source, independently of creator identity.
 const INTAKE_KIND_HINTS: Array<{ pattern: RegExp; kind: SplitRunIntakeKind }> = [
   { pattern: /dependabot/i, kind: "dependabot-alerts" },
   { pattern: /bitbucket/i, kind: "bitbucket-prs" },
@@ -257,19 +256,12 @@ function automationName(automation: FactoriesAutomationRef): string {
 }
 
 function intakeKindForAutomation(automation: FactoriesAutomationRef): SplitRunIntakeKind | undefined {
-  const key = canvasKeyForAutomation({ id: automation.appId, name: automation.appName });
-  if (key === "sentry") {
-    return "sentry-exceptions";
+  if (automation.templateId === "issue-intake") {
+    return "github-issues";
   }
-  if (key === "slack") {
-    return "slack";
-  }
-  const label = `${automation.appId ?? ""} ${automation.appName ?? ""}`;
-  const hintedKind = INTAKE_KIND_HINTS.find((hint) => hint.pattern.test(label))?.kind;
-  if (hintedKind) {
-    return hintedKind;
-  }
-  return /github|ingest/i.test(label) ? "github-issues" : undefined;
+  return (Object.keys(INTAKE_PRESENTATION) as SplitRunIntakeKind[]).find(
+    (kind) => automation.templateId === `intake:${kind}`,
+  );
 }
 
 function intakeKindFromLabel(label: string): SplitRunIntakeKind {

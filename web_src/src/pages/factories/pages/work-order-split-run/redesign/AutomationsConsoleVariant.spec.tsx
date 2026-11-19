@@ -360,14 +360,19 @@ describe("AutomationsConsoleVariant intake", () => {
       source: splitRunSourceForOrder({
         id: "custom-intake-task",
         createdBy: {
-          automation: { appId: "custom-automation", appName: "  Elastic case intake  ", nodeName: "Run agent" },
+          automation: {
+            appId: "custom-automation",
+            appName: "  GitHub incident triage  ",
+            nodeName: "Run agent",
+            templateId: "custom-verification",
+          },
         },
       }),
     });
 
     const description = within(screen.getByTestId("redesign-console-task-description"));
     expect(description.getByTestId("split-run-source")).toHaveTextContent("Created by automated intake");
-    expect(description.getByText("Elastic case intake")).toBeVisible();
+    expect(description.getByText("GitHub incident triage")).toBeVisible();
     expect(description.queryByText("Unknown member")).not.toBeInTheDocument();
     expect(description.queryByText(CREATED_MANUALLY)).not.toBeInTheDocument();
     expect(description.queryByRole("img")).not.toBeInTheDocument();

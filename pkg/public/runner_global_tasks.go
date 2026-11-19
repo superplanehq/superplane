@@ -136,9 +136,12 @@ func (s *Server) handleRunnerCreateTask(w http.ResponseWriter, r *http.Request) 
 
 	var order *models.FactoryWorkOrder
 	err = db.Transaction(func(tx *gorm.DB) error {
-		created, createErr := factoryModel.CreateWorkOrder(tx, title, description, nil, nil, &scope.CanvasRunID)
+		created, createErr := factoryModel.CreateWorkOrder(tx, title, description, nil, nil, nil)
 		if createErr != nil {
 			return createErr
+		}
+		if err := created.SetCreatorRun(tx, scope.CanvasRunID); err != nil {
+			return err
 		}
 		order = created
 		return nil

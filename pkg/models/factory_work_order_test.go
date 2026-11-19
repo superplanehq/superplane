@@ -264,7 +264,7 @@ func TestResolveFactoryWorkOrderCreatorAutomations(t *testing.T) {
 		ID:         versionID,
 		WorkflowID: canvas.ID,
 		OwnerID:    &userID,
-		Nodes:      datatypes.NewJSONSlice([]Node{}),
+		Nodes:      datatypes.NewJSONSlice([]Node{{ID: "trigger", Metadata: FactoryAppTemplateMetadata("intake:sentry-exceptions", 1)}}),
 		Edges:      datatypes.NewJSONSlice([]Edge{}),
 		CreatedAt:  &now,
 		UpdatedAt:  &now,
@@ -314,10 +314,11 @@ func TestResolveFactoryWorkOrderCreatorAutomations(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, refs, 2)
 	assert.Equal(t, &factory.AutomationRef{
-		AppID:    canvas.ID,
-		AppName:  canvas.Name,
-		NodeID:   node.NodeID,
-		NodeName: node.Name,
+		AppID:      canvas.ID,
+		AppName:    canvas.Name,
+		NodeID:     node.NodeID,
+		NodeName:   node.Name,
+		TemplateID: "intake:sentry-exceptions",
 	}, refs[firstOrderID])
 	assert.Same(t, refs[firstOrderID], refs[secondOrderID])
 

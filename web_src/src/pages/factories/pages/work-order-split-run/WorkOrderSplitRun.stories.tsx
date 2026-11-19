@@ -57,6 +57,7 @@ export const CustomAutomatedIntake: Story = {
                   appName:
                     "Elastic case intake for production services and customer-reported failures across all workspace repositories",
                   nodeName: "Run automation",
+                  templateId: "custom-verification",
                 },
               },
             },
