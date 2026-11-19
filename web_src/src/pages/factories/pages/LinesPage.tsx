@@ -32,6 +32,7 @@ import { useOrganizationUsers } from "@/hooks/useOrganizationData";
 import { useOrgUserLookup } from "@/hooks/useOrgUserLookup";
 import { getOrgUserDisplayFromUser } from "@/lib/orgUserDisplay";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useWorkspaceLoading } from "@/hooks/useWorkspaceLoading";
@@ -1658,6 +1659,7 @@ function PhaseBoard({
   const [stagePreview, setStagePreview] = useState<LineBoardStage[] | null>(null);
   const stagePreviewRef = useRef<LineBoardStage[] | null>(null);
   const [draggingStageId, setDraggingStageId] = useState<string | null>(null);
+  const dragTargetId = useRef<string | null>(null);
   const [pendingStageMove, setPendingStageMove] = useState<{
     stages: LineBoardStage[];
     movedStage: LineBoardStage;
@@ -1745,10 +1747,17 @@ function PhaseBoard({
     [displayedStageOrder, phaseByStep],
   );
   const reorderStagePreview = (stageId: string, targetId: string) => {
+    if (targetId === stageId) {
+      dragTargetId.current = null;
+      return;
+    }
+    if (dragTargetId.current === targetId) return;
+
     const current = stagePreviewRef.current ?? orderedStages;
     const next = reorderLineBoardStages(current, stageId, targetId);
     if (next === current) return;
 
+    dragTargetId.current = targetId;
     const before = new Map(
       [...stageElements.current].map(([id, element]) => [id, element.getBoundingClientRect().left]),
     );
@@ -1767,6 +1776,7 @@ function PhaseBoard({
   const startStageDrag = (event: DragEvent<HTMLButtonElement>, stage: LineBoardStage) => {
     event.dataTransfer.effectAllowed = "move";
     event.dataTransfer.setData("text/plain", stage.id);
+    dragTargetId.current = null;
     stagePreviewRef.current = orderedStages;
     setStagePreview(orderedStages);
     setDraggingStageId(stage.id);
@@ -1775,6 +1785,7 @@ function PhaseBoard({
     const next = stagePreviewRef.current;
     const movedStage = orderedStages.find((stage) => stage.id === draggingStageId);
     stagePreviewRef.current = null;
+    dragTargetId.current = null;
     setStagePreview(null);
     setDraggingStageId(null);
     if (next && movedStage && next.map((stage) => stage.id).join() !== orderedStages.map((stage) => stage.id).join()) {
@@ -2031,19 +2042,21 @@ function PhaseBoard({
             {canManageStages ? (
               <div className="flex h-6 shrink-0 items-center justify-center">
                 {stage.kind !== "STAGE_KIND_BACKLOG" && stage.kind !== "STAGE_KIND_DONE" ? (
-                  <button
+                  <Button
                     type="button"
                     draggable
+                    variant="ghost"
+                    size="icon"
                     aria-label={`Reorder ${stage.name}`}
                     title="Drag to reorder stage"
                     data-testid={`lines-stage-reorder-${stage.key}`}
-                    className="flex h-5 w-10 cursor-grab touch-none items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground active:cursor-grabbing"
+                    className="h-5 w-10 cursor-grab touch-none rounded-sm text-muted-foreground hover:text-foreground active:cursor-grabbing"
                     onDragStart={(event) => startStageDrag(event, stage)}
                     onDragEnd={finishStageDrag}
                     onKeyDown={(event) => moveStageWithKeyboard(event, stage)}
                   >
                     <GripHorizontal className="size-4" aria-hidden />
-                  </button>
+                  </Button>
                 ) : null}
               </div>
             ) : null}

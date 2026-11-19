@@ -1834,33 +1834,9 @@ describe("LinesPage board pull request", () => {
   });
 });
 
-describe("LinesPage board editing", () => {
+describe("LinesPage stage reordering", () => {
   beforeEach(async () => {
     await resetLinesBoardMocks();
-  });
-
-  it("shows the workspace name and does not rename the line", async () => {
-    const user = userEvent.setup();
-    renderLinesBoard();
-
-    const title = screen.getByTestId("workspace-page-header-title");
-    expect(title).toHaveTextContent("Semaphore");
-    expect(title).not.toHaveTextContent("Plan and Implement");
-    await user.click(title);
-    expect(screen.queryByTestId("lines-board-title-input")).not.toBeInTheDocument();
-    expect(updateFactoryLineMutateAsync).not.toHaveBeenCalled();
-  });
-
-  it("shows an emoji workspace name as stored", () => {
-    renderLinesBoard(undefined, vi.fn(), { ...REFUND_FACTORY, name: "SuperPlane Prod 🚀" });
-
-    expect(screen.getByTestId("workspace-page-header-title")).toHaveTextContent("SuperPlane Prod 🚀");
-  });
-
-  it("shows Workspace when the workspace name is empty", () => {
-    renderLinesBoard(undefined, vi.fn(), { ...REFUND_FACTORY, name: "   " });
-
-    expect(screen.getByTestId("workspace-page-header-title")).toHaveTextContent(/^Workspace$/);
   });
 
   it("confirms and saves a stage reorder", async () => {
@@ -1917,6 +1893,60 @@ describe("LinesPage board editing", () => {
       "lines-stage-shell-verify",
       "lines-stage-shell-done",
     ]);
+  });
+
+  it("keeps a drag move when the target emits repeated drag events", () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_STAGES);
+    renderLinesBoard();
+    const handle = screen.getByTestId("lines-stage-reorder-phase-0");
+    const target = screen.getByTestId("lines-stage-shell-phase-1");
+    const dataTransfer = { effectAllowed: "none", setData: vi.fn() };
+
+    fireEvent.dragStart(handle, { dataTransfer });
+    fireEvent.dragEnter(target);
+    fireEvent.dragEnter(target);
+    fireEvent.dragEnd(handle);
+
+    expect(screen.getByTestId("move-line-stage-dialog")).toBeInTheDocument();
+    expect(
+      [...screen.getByTestId("lines-phase-board").children].map((element) => element.getAttribute("data-testid")),
+    ).toEqual([
+      "lines-stage-shell-backlog",
+      "lines-stage-shell-phase-1",
+      "lines-stage-shell-phase-0",
+      "lines-stage-shell-verify",
+      "lines-stage-shell-done",
+    ]);
+  });
+});
+
+describe("LinesPage board editing", () => {
+  beforeEach(async () => {
+    await resetLinesBoardMocks();
+  });
+
+  it("shows the workspace name and does not rename the line", async () => {
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    const title = screen.getByTestId("workspace-page-header-title");
+    expect(title).toHaveTextContent("Semaphore");
+    expect(title).not.toHaveTextContent("Plan and Implement");
+    await user.click(title);
+    expect(screen.queryByTestId("lines-board-title-input")).not.toBeInTheDocument();
+    expect(updateFactoryLineMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it("shows an emoji workspace name as stored", () => {
+    renderLinesBoard(undefined, vi.fn(), { ...REFUND_FACTORY, name: "SuperPlane Prod 🚀" });
+
+    expect(screen.getByTestId("workspace-page-header-title")).toHaveTextContent("SuperPlane Prod 🚀");
+  });
+
+  it("shows Workspace when the workspace name is empty", () => {
+    renderLinesBoard(undefined, vi.fn(), { ...REFUND_FACTORY, name: "   " });
+
+    expect(screen.getByTestId("workspace-page-header-title")).toHaveTextContent(/^Workspace$/);
   });
 
   it("renames a column title on Enter", async () => {
