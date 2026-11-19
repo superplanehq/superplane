@@ -184,13 +184,11 @@ func rejectReferencedStageRemovals(tx *gorm.DB, line *models.FactoryLine, next [
 		if stage.Kind != models.FactoryLineStageCustom || retained[stage.ID] {
 			continue
 		}
-		var count int64
-		if err := tx.Model(&models.Canvas{}).
-			Where("factory_id = ? AND column_key = ?", line.FactoryID, stage.Key).
-			Count(&count).Error; err != nil {
+		referenced, err := line.IsStageReferenced(tx, stage.Key)
+		if err != nil {
 			return err
 		}
-		if count > 0 {
+		if referenced {
 			return fmt.Errorf("%w: %s", errFactoryStageInUse, stage.Name)
 		}
 	}

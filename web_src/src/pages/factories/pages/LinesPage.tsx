@@ -1608,7 +1608,6 @@ function PhaseBoard({
     normalizeColumnColors(line.columnColors),
   );
   const columnColorsRef = useRef(columnColors);
-  const [columnTitles, setColumnTitles] = useState<Record<string, string>>({});
   const [backlogSize, setBacklogSize] = useState<number | null>(null);
   const [backlogSettingsOpen, setBacklogSettingsOpen] = useState(false);
   const [parallelismByStep, setParallelismByStep] = useState<Record<number, number>>({});
@@ -1660,12 +1659,38 @@ function PhaseBoard({
     [lineId, updateLine],
   );
 
-  const setColumnTitle = useCallback((columnKey: string, title: string) => {
-    setColumnTitles((current) => ({ ...current, [columnKey]: title }));
-  }, []);
-
   const phaseNames = useMemo(() => new Map(columns.map((column) => [column.stepIndex, column.stepName])), [columns]);
   const orderedStages = useMemo(() => orderedLineBoardStages(line, phaseNames), [line, phaseNames]);
+  const stageNamesVersion = useMemo(
+    () => JSON.stringify(orderedStages.map((stage) => [stage.id, stage.name])),
+    [orderedStages],
+  );
+  const [columnTitleOverrides, setColumnTitleOverrides] = useState<{
+    stageNamesVersion: string;
+    titles: Record<string, string>;
+  }>(() => ({ stageNamesVersion, titles: {} }));
+  const columnTitles = columnTitleOverrides.stageNamesVersion === stageNamesVersion ? columnTitleOverrides.titles : {};
+  const setColumnTitle = useCallback(
+    (columnKey: string, title: string) => {
+      setColumnTitleOverrides((current) => ({
+        stageNamesVersion,
+        titles: {
+          ...(current.stageNamesVersion === stageNamesVersion ? current.titles : {}),
+          [columnKey]: title,
+        },
+      }));
+    },
+    [stageNamesVersion],
+  );
+  const phaseByStep = useMemo(() => new Map(columns.map((column) => [column.stepIndex, column])), [columns]);
+  const visibleStages = useMemo(
+    () =>
+      orderedStages.filter(
+        (stage) =>
+          stage.kind !== "STAGE_KIND_PHASE" || (stage.stepIndex !== undefined && phaseByStep.has(stage.stepIndex)),
+      ),
+    [orderedStages, phaseByStep],
+  );
   const stageName = (key: string, fallback: string) =>
     columnTitles[key] ?? orderedStages.find((stage) => stage.key === key)?.name ?? fallback;
   const backlogTitle = stageName("backlog", "Backlog");
@@ -1706,8 +1731,6 @@ function PhaseBoard({
     },
     [line.id, line.steps, updateLine],
   );
-
-  const phaseByStep = new Map(columns.map((column) => [column.stepIndex, column]));
 
   const renderStage = (stage: LineBoardStage) => {
     if (stage.kind === "STAGE_KIND_BACKLOG") {
@@ -1852,7 +1875,7 @@ function PhaseBoard({
 
   return (
     <WorkOrderKanbanBoard testId="lines-phase-board">
-      {orderedStages.flatMap((stage) => [
+      {visibleStages.flatMap((stage) => [
         stage.kind === "STAGE_KIND_DONE" && onAddStage ? <AddStageLane key="add-stage" onAdd={onAddStage} /> : null,
         <div key={stage.id} className={cn("relative flex min-h-0 self-stretch", workOrderKanbanLaneSizeClassName)}>
           {stage.kind === "STAGE_KIND_PHASE" ? (

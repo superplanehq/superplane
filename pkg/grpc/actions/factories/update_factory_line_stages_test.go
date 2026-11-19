@@ -2,8 +2,10 @@ package factories
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -154,6 +156,46 @@ func TestUpdateFactoryLineStages(t *testing.T) {
 			LineId:             line.ID.String(),
 			Steps:              []*pb.FactoryLine_Step{{}},
 			StageConfiguration: &pb.FactoryLine_StageConfiguration{Stages: factoryLineStageRequests(line.StagesValue())},
+		})
+		code, _, ok := grpcerrors.HandlerStatus(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.InvalidArgument, code)
+	})
+
+	t.Run("rejects a step update that would exceed the stage limit", func(t *testing.T) {
+		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		app, entrypoint := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "implement", "start")
+		step := models.FactoryLineStep{
+			Type:       models.FactoryLineStepTypeRunApp,
+			AppID:      app.ID,
+			Entrypoint: entrypoint,
+		}
+		line, err := factory.CreateLine(db, "ship", []models.FactoryLineStep{step})
+		require.NoError(t, err)
+
+		customStages := make([]models.FactoryLineStage, 60)
+		for index := range customStages {
+			id := uuid.New()
+			customStages[index] = models.FactoryLineStage{
+				ID:   id,
+				Key:  "custom-" + id.String(),
+				Name: fmt.Sprintf("Review %d", index+1),
+				Kind: models.FactoryLineStageCustom,
+			}
+		}
+		stages := line.StagesValue()
+		stages = append(stages[:len(stages)-1], append(customStages, stages[len(stages)-1])...)
+		require.NoError(t, line.UpdateConfiguration(db, nil, nil, nil, stages))
+
+		stepRequest := &pb.FactoryLine_Step{
+			Type: models.FactoryLineStepTypeRunApp,
+			App:  &pb.FactoryLine_AppStep{App: app.ID.String(), Entrypoint: entrypoint},
+		}
+		_, err = UpdateFactoryLine(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
+			FactoryId: factory.ID.String(),
+			LineId:    line.ID.String(),
+			Steps:     []*pb.FactoryLine_Step{stepRequest, stepRequest},
 		})
 		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)

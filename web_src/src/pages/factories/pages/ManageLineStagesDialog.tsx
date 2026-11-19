@@ -9,6 +9,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useUpdateFactoryLine } from "@/hooks/useFactoryData";
 import { getApiErrorMessage } from "@/lib/errors";
@@ -25,7 +26,7 @@ import {
 } from "@/ui/alertDialog";
 import { useListFieldDragReorder } from "@/ui/configurationFieldRenderer/useListFieldDragReorder";
 import { ArrowDown, ArrowUp, GripVertical, Lock, Plus, Trash2 } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, type MouseEvent } from "react";
 
 import { isCustomLineBoardStage, orderedLineBoardStages } from "../lib/lineBoardStages";
 import {
@@ -58,8 +59,7 @@ export function ManageLineStagesDialog({
   const [openItem, setOpenItem] = useState("");
   const rowRefs = useRef<Array<HTMLDivElement | null>>([]);
   const updateLine = useUpdateFactoryLine(organizationId, factoryId);
-  const currentSnapshot = snapshot(stages, colors);
-  const dirty = currentSnapshot !== initial.snapshot;
+  const dirty = snapshot(stages, colors) !== initial.snapshot;
   const validationError = validateStages(stages);
   const { renderedItems, startDrag } = useListFieldDragReorder({
     items: stages,
@@ -70,13 +70,7 @@ export function ManageLineStagesDialog({
     rowRefs,
   });
 
-  const requestClose = () => {
-    if (dirty) {
-      setConfirmClose(true);
-      return;
-    }
-    onClose();
-  };
+  const requestClose = () => (dirty ? setConfirmClose(true) : onClose());
 
   const save = async () => {
     if (validationError || !line.id) {
@@ -115,96 +109,32 @@ export function ManageLineStagesDialog({
           </DialogHeader>
           <div className="min-h-0 overflow-y-auto px-6">
             <ol className="divide-y divide-border" aria-label="Line stages">
-              {(renderedItems as DraftStage[]).map((stage, index) => {
-                const custom = isCustomLineBoardStage(stage);
-                return (
-                  <li key={stage.clientId}>
-                    <div
-                      ref={(element) => {
-                        rowRefs.current[index] = element;
-                      }}
-                      className="flex items-center gap-2 py-3"
-                      data-testid={`manage-stage-row-${stage.clientId}`}
-                    >
-                      {custom ? (
-                        <button
-                          type="button"
-                          className="cursor-grab rounded p-1 text-muted-foreground hover:bg-accent"
-                          aria-label={`Drag ${stage.name || "new stage"}`}
-                          onMouseDown={(event) => startDrag(event, index, openItem)}
-                        >
-                          <GripVertical className="size-4" aria-hidden />
-                        </button>
-                      ) : (
-                        <span className="p-1 text-muted-foreground" title="System stage">
-                          <Lock className="size-4" aria-hidden />
-                        </span>
-                      )}
-                      <Input
-                        value={stage.name}
-                        maxLength={64}
-                        autoFocus={addStageOnOpen && stage.clientId.startsWith("new-")}
-                        aria-label={`${stage.name || "New stage"} name`}
-                        onChange={(event) => updateStage(index, { name: event.target.value }, stages, setStages)}
-                      />
-                      <Select
-                        value={colors[stage.key ?? stage.clientId] ?? "none"}
-                        onValueChange={(value) =>
-                          setColors((current) => ({
-                            ...current,
-                            [stage.key ?? stage.clientId]: value === "none" ? null : (value as LineBoardColumnColorId),
-                          }))
-                        }
-                      >
-                        <SelectTrigger className="w-28" aria-label={`${stage.name || "New stage"} color`}>
-                          <SelectValue placeholder="Color" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">Default</SelectItem>
-                          {LINE_BOARD_COLUMN_COLORS.map((color) => (
-                            <SelectItem key={color.id} value={color.id}>
-                              {color.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      {custom ? (
-                        <div className="flex items-center">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            aria-label={`Move ${stage.name || "new stage"} up`}
-                            disabled={index <= 1}
-                            onClick={() => setStages(moveStage(stages, index, index - 1))}
-                          >
-                            <ArrowUp className="size-4" aria-hidden />
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            aria-label={`Move ${stage.name || "new stage"} down`}
-                            disabled={index >= stages.length - 2}
-                            onClick={() => setStages(moveStage(stages, index, index + 1))}
-                          >
-                            <ArrowDown className="size-4" aria-hidden />
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            aria-label={`Remove ${stage.name || "new stage"}`}
-                            onClick={() => setStages(stages.filter((_, position) => position !== index))}
-                          >
-                            <Trash2 className="size-4" aria-hidden />
-                          </Button>
-                        </div>
-                      ) : null}
-                    </div>
-                  </li>
-                );
-              })}
+              {(renderedItems as DraftStage[]).map((stage, index) => (
+                <li key={stage.clientId}>
+                  <div
+                    ref={(element) => {
+                      rowRefs.current[index] = element;
+                    }}
+                    className="flex items-center gap-2 py-3"
+                    data-testid={`manage-stage-row-${stage.clientId}`}
+                  >
+                    <StageRow
+                      stage={stage}
+                      index={index}
+                      stageCount={stages.length}
+                      color={colors[stage.key ?? stage.clientId] ?? null}
+                      autoFocus={addStageOnOpen && stage.clientId.startsWith("new-")}
+                      onDragStart={(event) => startDrag(event, index, openItem)}
+                      onNameChange={(name) => updateStage(index, { name }, stages, setStages)}
+                      onColorChange={(color) =>
+                        setColors((current) => ({ ...current, [stage.key ?? stage.clientId]: color }))
+                      }
+                      onMove={(offset) => setStages(moveStage(stages, index, index + offset))}
+                      onRemove={() => setStages(stages.filter((_, position) => position !== index))}
+                    />
+                  </div>
+                </li>
+              ))}
             </ol>
             <Button type="button" variant="ghost" className="my-2 gap-2" onClick={addStage}>
               <Plus className="size-4" aria-hidden />
@@ -216,32 +146,162 @@ export function ManageLineStagesDialog({
               </p>
             ) : null}
           </div>
-          <DialogFooter className="border-t border-border px-6 py-4">
-            <Button type="button" variant="outline" onClick={requestClose}>
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              disabled={Boolean(validationError) || updateLine.isPending}
-              onClick={() => void save()}
-            >
-              Save stages
-            </Button>
-          </DialogFooter>
+          <ManageStagesFooter
+            saveDisabled={Boolean(validationError) || updateLine.isPending}
+            onCancel={requestClose}
+            onSave={() => void save()}
+          />
         </DialogContent>
       </Dialog>
-      <AlertDialog open={confirmClose} onOpenChange={setConfirmClose}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Discard stage changes?</AlertDialogTitle>
-            <AlertDialogDescription>Your unsaved stage changes will be lost.</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Keep editing</AlertDialogCancel>
-            <AlertDialogAction onClick={onClose}>Discard changes</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <DiscardStageChangesDialog open={confirmClose} onOpenChange={setConfirmClose} onDiscard={onClose} />
+    </>
+  );
+}
+
+function ManageStagesFooter({
+  saveDisabled,
+  onCancel,
+  onSave,
+}: {
+  saveDisabled: boolean;
+  onCancel: () => void;
+  onSave: () => void;
+}) {
+  return (
+    <DialogFooter className="border-t border-border px-6 py-4">
+      <Button type="button" variant="outline" onClick={onCancel}>
+        Cancel
+      </Button>
+      <Button type="button" disabled={saveDisabled} onClick={onSave}>
+        Save stages
+      </Button>
+    </DialogFooter>
+  );
+}
+
+function DiscardStageChangesDialog({
+  open,
+  onOpenChange,
+  onDiscard,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onDiscard: () => void;
+}) {
+  return (
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Discard stage changes?</AlertDialogTitle>
+          <AlertDialogDescription>Your unsaved stage changes will be lost.</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Keep editing</AlertDialogCancel>
+          <AlertDialogAction onClick={onDiscard}>Discard changes</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
+function StageRow({
+  stage,
+  index,
+  stageCount,
+  color,
+  autoFocus,
+  onDragStart,
+  onNameChange,
+  onColorChange,
+  onMove,
+  onRemove,
+}: {
+  stage: DraftStage;
+  index: number;
+  stageCount: number;
+  color: LineBoardColumnColorId | null;
+  autoFocus: boolean;
+  onDragStart: (event: MouseEvent) => void;
+  onNameChange: (name: string) => void;
+  onColorChange: (color: LineBoardColumnColorId | null) => void;
+  onMove: (offset: -1 | 1) => void;
+  onRemove: () => void;
+}) {
+  const custom = isCustomLineBoardStage(stage);
+  const label = stage.name || "New stage";
+  const actionLabel = stage.name || "new stage";
+  const inputId = `stage-name-${stage.clientId}`;
+  return (
+    <>
+      {custom ? (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          className="size-7 cursor-grab text-muted-foreground"
+          aria-label={`Drag ${actionLabel}`}
+          onMouseDown={onDragStart}
+        >
+          <GripVertical className="size-4" aria-hidden />
+        </Button>
+      ) : (
+        <span className="p-1 text-muted-foreground" title="System stage">
+          <Lock className="size-4" aria-hidden />
+        </span>
+      )}
+      <Label htmlFor={inputId} className="sr-only">
+        {label} name
+      </Label>
+      <Input
+        id={inputId}
+        value={stage.name}
+        maxLength={64}
+        autoFocus={autoFocus}
+        onChange={(event) => onNameChange(event.target.value)}
+      />
+      <Select
+        value={color ?? "none"}
+        onValueChange={(value) => onColorChange(value === "none" ? null : (value as LineBoardColumnColorId))}
+      >
+        <SelectTrigger className="w-28" aria-label={`${label} color`}>
+          <SelectValue placeholder="Color" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="none">Default</SelectItem>
+          {LINE_BOARD_COLUMN_COLORS.map((option) => (
+            <SelectItem key={option.id} value={option.id}>
+              {option.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      {custom ? (
+        <div className="flex items-center">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            aria-label={`Move ${actionLabel} up`}
+            disabled={index <= 1}
+            onClick={() => onMove(-1)}
+          >
+            <ArrowUp className="size-4" aria-hidden />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            aria-label={`Move ${actionLabel} down`}
+            disabled={index >= stageCount - 2}
+            onClick={() => onMove(1)}
+          >
+            <ArrowDown className="size-4" aria-hidden />
+          </Button>
+          <Button type="button" variant="ghost" size="icon" aria-label={`Remove ${actionLabel}`} onClick={onRemove}>
+            <Trash2 className="size-4" aria-hidden />
+          </Button>
+        </div>
+      ) : null}
     </>
   );
 }
