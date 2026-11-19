@@ -12,6 +12,7 @@ import {
   organizationsUpdateIntegrationSecret,
   organizationsUpdateIntegrationProperty,
   organizationsUpdateIntegrationCapabilities,
+  organizationsRetryIntegrationWebhook,
 } from "@/api-client/sdk.gen";
 import type {
   IntegrationCapabilityState,
@@ -93,6 +94,7 @@ export const useConnectedIntegrations = (organizationId: string, options?: { ena
     staleTime: 2 * 60 * 1000, // 2 minutes
     gcTime: 5 * 60 * 1000, // 5 minutes
     enabled: !!organizationId && (options?.enabled ?? true),
+    refetchInterval: 30_000,
   });
 };
 
@@ -112,8 +114,24 @@ export const useIntegration = (organizationId: string, integrationId: string) =>
     staleTime: 2 * 60 * 1000, // 2 minutes
     gcTime: 5 * 60 * 1000, // 5 minutes
     enabled: !!organizationId && !!integrationId,
+    refetchInterval: 10_000,
   });
 };
+
+export function useRetryIntegrationWebhook(organizationId: string, integrationId: string, webhookId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      organizationsRetryIntegrationWebhook(
+        withOrganizationHeader({
+          organizationId,
+          path: { id: organizationId, integrationId, webhookId },
+          body: {},
+        }),
+      ),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: integrationKeys.connected(organizationId) }),
+  });
+}
 
 /**
  * Reads the default branch a repository reports. Missing inputs and an empty
