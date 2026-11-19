@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useIntegrationResources, useRetryIntegrationWebhook } from "@/hooks/useIntegrations";
 import { githubHostFromIntegration, githubRepoWebUrl } from "@/lib/githubHost";
+import { webhookSetupInProgress } from "@/lib/webhookSetup";
 
 export function WebhookFailureNotice({
   failure,
@@ -22,7 +23,7 @@ export function WebhookFailureNotice({
   onRetry: () => void;
   children?: ReactNode;
 }) {
-  const setupInProgress = retrying || failure.state === "pending" || failure.state === "provisioning";
+  const setupInProgress = retrying || webhookSetupInProgress(failure.state);
   return (
     <section role="alert" className="rounded-lg border border-amber-300 bg-background p-4 dark:border-amber-700">
       <h2 className="font-semibold">{setupInProgress ? "Retrying webhook setup" : "Webhook setup failed"}</h2>
@@ -152,7 +153,8 @@ export function IntegrationWebhookFailures({
 }) {
   const { canAct } = usePermissions();
   const failures = integration.status?.webhookFailures ?? [];
-  if (failures.length === 0) return null;
+  const setups = integration.status?.webhookSetups ?? [];
+  if (failures.length === 0 && setups.length === 0) return null;
   return (
     <div className="space-y-3">
       {failures.map((failure) => (
@@ -164,6 +166,25 @@ export function IntegrationWebhookFailures({
           canRetry={canAct("integrations", "update")}
         />
       ))}
+      {setups.length > 0 ? (
+        <details className="rounded-lg border p-4 text-sm">
+          <summary className="cursor-pointer font-semibold">Webhook setup</summary>
+          <ul className="mt-3 space-y-2">
+            {setups.map((setup) => (
+              <li key={setup.id} className="flex flex-wrap justify-between gap-x-3">
+                <span>{[setup.repositories?.join(", "), setup.events?.join(", ")].filter(Boolean).join(" · ")}</span>
+                <span>{webhookSetupLabel(setup.state)}</span>
+              </li>
+            ))}
+          </ul>
+        </details>
+      ) : null}
     </div>
   );
+}
+
+function webhookSetupLabel(state: string | undefined): string {
+  if (state === "ready") return "Registered";
+  if (state === "failed") return "Setup failed";
+  return webhookSetupInProgress(state) ? "Setup in progress" : "Status unavailable";
 }

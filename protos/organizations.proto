@@ -1350,6 +1350,13 @@ message IntegrationWebhookFailure {
   string limit_event = 6;
 }
 
+message IntegrationWebhookSetup {
+  string id = 1;
+  string state = 2;
+  repeated string repositories = 3;
+  repeated string events = 4;
+}
+
 message ListIntegrationResourcesRequest {
   string id = 1;
   string integration_id = 2;
@@ -1479,6 +1486,8 @@ message Integration {
     repeated Secret secrets = 9;
     bool legacy_setup = 10;
     repeated IntegrationWebhookFailure webhook_failures = 11;
+    // Returned when describing a GitHub integration.
+    repeated IntegrationWebhookSetup webhook_setups = 12;
   }
 
   message SetupState {

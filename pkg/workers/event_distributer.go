@@ -64,6 +64,7 @@ func (e *EventDistributer) Start() error {
 		{messages.CanvasExchange, messages.CanvasMemoryUpdatedRoutingKey, e.createHandler(eventdistributer.HandleCanvasMemoryUpdated)},
 		{messages.CanvasExchange, messages.FactoryWorkOrderUpdatedRoutingKey, e.createHandler(eventdistributer.HandleFactoryWorkOrderUpdated)},
 		{messages.CanvasExchange, messages.UserNotificationRoutingKey, e.createHandler(eventdistributer.HandleUserNotification)},
+		{messages.CanvasExchange, messages.WebhookSetupChangedRoutingKey, e.createHandler(eventdistributer.HandleWebhookSetupChanged)},
 	}
 
 	for _, routingKey := range messages.ExecutionRoutingKeys {

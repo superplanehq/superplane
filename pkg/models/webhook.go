@@ -41,6 +41,17 @@ type WebhookResource struct {
 	Name string `json:"name"`
 }
 
+func (w *Webhook) SetupError() string {
+	metadata, _ := w.Metadata.Data().(map[string]any)
+	reason, _ := metadata["setupError"].(string)
+	return strings.TrimSpace(reason)
+}
+
+func (w *Webhook) HasSetupFailure() bool {
+	return w.State == WebhookStateFailed ||
+		((w.State == WebhookStatePending || w.State == WebhookStateProvisioning) && w.SetupError() != "")
+}
+
 func (w *Webhook) Ready(tx *gorm.DB) error {
 	return tx.Model(w).
 		Update("state", WebhookStateReady).

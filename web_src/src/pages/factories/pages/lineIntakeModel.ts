@@ -297,6 +297,7 @@ export interface ConfiguredLineIntakeSource {
   health?: FactoryIntakeHealth;
   /** What the user can do when the intake cannot receive items. */
   healthMessage?: string;
+  webhookSetupState?: string;
   /** Live trigger connection. Empty when the intake is unbound. */
   integrationId?: string;
   /** Live trigger resource, such as a Jira project key. */
@@ -372,6 +373,7 @@ export function intakeSourcesFromFactoryIntakes(intakes: FactoriesFactoryIntake[
         source: { ...source, name },
         health: intake.health,
         healthMessage: intake.healthMessage?.trim() || undefined,
+        webhookSetupState: intake.webhookSetupState,
         integrationId: textFields.integrationId,
         resourceId: textFields.resourceId,
       },

@@ -94,7 +94,6 @@ export const useConnectedIntegrations = (organizationId: string, options?: { ena
     staleTime: 2 * 60 * 1000, // 2 minutes
     gcTime: 5 * 60 * 1000, // 5 minutes
     enabled: !!organizationId && (options?.enabled ?? true),
-    refetchInterval: 30_000,
   });
 };
 
@@ -114,7 +113,6 @@ export const useIntegration = (organizationId: string, integrationId: string) =>
     staleTime: 2 * 60 * 1000, // 2 minutes
     gcTime: 5 * 60 * 1000, // 5 minutes
     enabled: !!organizationId && !!integrationId,
-    refetchInterval: 10_000,
   });
 };
 

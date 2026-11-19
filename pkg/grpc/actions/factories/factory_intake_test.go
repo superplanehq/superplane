@@ -838,6 +838,7 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		require.Len(t, response.GetIntakes(), 1)
 		assert.False(t, response.GetIntakes()[0].GetHealthy())
 		assert.Equal(t, pb.FactoryIntake_HEALTH_WEBHOOK_FAILED, response.GetIntakes()[0].GetHealth())
+		assert.Equal(t, models.WebhookStateFailed, response.GetIntakes()[0].GetWebhookSetupState())
 		assert.Contains(t, response.GetIntakes()[0].GetHealthMessage(), "20 webhooks")
 	})
 
@@ -857,6 +858,17 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, models.WebhookStatePending, webhook.State)
 		assert.Equal(t, 0, webhook.RetryCount)
+
+		response, err := ListFactoryIntakes(ctx, orgID, &pb.ListFactoryIntakesRequest{FactoryId: factory.ID.String()})
+		require.NoError(t, err)
+		require.Len(t, response.GetIntakes(), 1)
+		assert.Equal(t, models.WebhookStatePending, response.GetIntakes()[0].GetWebhookSetupState())
+
+		require.NoError(t, webhook.ReadyWithMetadata(database.DB(t.Context()), map[string]any{"id": 123}))
+		response, err = ListFactoryIntakes(ctx, orgID, &pb.ListFactoryIntakesRequest{FactoryId: factory.ID.String()})
+		require.NoError(t, err)
+		require.Len(t, response.GetIntakes(), 1)
+		assert.Equal(t, models.WebhookStateReady, response.GetIntakes()[0].GetWebhookSetupState())
 	})
 
 	t.Run("an unbound GitHub intake stays healthy when listed", func(t *testing.T) {

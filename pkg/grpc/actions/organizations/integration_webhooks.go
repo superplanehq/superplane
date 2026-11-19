@@ -28,33 +28,73 @@ func integrationWebhookFailures(tx *gorm.DB, instances []models.Integration) (ma
 	}
 	byIntegration := map[uuid.UUID][]*pb.IntegrationWebhookFailure{}
 	for _, hook := range hooks {
-		failure := &pb.IntegrationWebhookFailure{
-			Id: hook.ID.String(), State: hook.State,
-			Message: "Webhook setup failed. Check the integration settings and try again.",
+		setup, err := serializeWebhookSetup(hook, providers[*hook.AppInstallationID])
+		if err != nil {
+			return nil, err
 		}
-		if providers[*hook.AppInstallationID] == "github" {
-			var config common.WebhookConfiguration
-			if err := mapstructure.Decode(hook.Configuration.Data(), &config); err != nil {
-				return nil, err
-			}
-			failure.Repositories, failure.Events = config.WebhookRepositories(), config.EventTypes
-			if len(failure.Events) == 0 && config.EventType != "" {
-				failure.Events = []string{config.EventType}
-			}
-			metadata, _ := hook.Metadata.Data().(map[string]any)
-			reason, _ := metadata["setupError"].(string)
-			failure.Message = "GitHub could not create the webhook. Check repository access and try again."
-			if limit := githubWebhookLimit.FindStringSubmatch(reason); len(limit) > 0 {
-				failure.LimitEvent = limit[1]
-				failure.Message = fmt.Sprintf("GitHub allows %s webhooks for the %s event in each repository. Remove an unused webhook, then try again.", limit[2], limit[1])
-			}
-			// In a workspace with several repositories, identify the one whose
-			// registration failed rather than directing cleanup at every repository.
-			if repository := githubWebhookRepository.FindStringSubmatch(reason); len(repository) > 0 {
-				failure.Repositories = []string{repository[1]}
-			}
-		}
-		byIntegration[*hook.AppInstallationID] = append(byIntegration[*hook.AppInstallationID], failure)
+		id := *hook.AppInstallationID
+		byIntegration[id] = append(byIntegration[id], serializeWebhookFailure(hook, setup, providers[id]))
 	}
 	return byIntegration, nil
+}
+
+func describeIntegrationWebhooks(db *gorm.DB, instance *models.Integration, status *pb.Integration_Status) error {
+	if instance.AppName != "github" {
+		failures, err := integrationWebhookFailures(db, []models.Integration{*instance})
+		status.WebhookFailures = failures[instance.ID]
+		return err
+	}
+
+	hooks, err := models.ListIntegrationWebhooks(db, instance.ID)
+	if err != nil {
+		return err
+	}
+	for _, hook := range hooks {
+		setup, err := serializeWebhookSetup(hook, instance.AppName)
+		if err != nil {
+			return err
+		}
+		status.WebhookSetups = append(status.WebhookSetups, setup)
+		if hook.HasSetupFailure() {
+			status.WebhookFailures = append(status.WebhookFailures, serializeWebhookFailure(hook, setup, instance.AppName))
+		}
+	}
+	return nil
+}
+
+func serializeWebhookSetup(hook models.Webhook, provider string) (*pb.IntegrationWebhookSetup, error) {
+	setup := &pb.IntegrationWebhookSetup{Id: hook.ID.String(), State: hook.State}
+	if provider != "github" {
+		return setup, nil
+	}
+	var config common.WebhookConfiguration
+	if err := mapstructure.Decode(hook.Configuration.Data(), &config); err != nil {
+		return nil, err
+	}
+	setup.Repositories, setup.Events = config.WebhookRepositories(), config.EventTypes
+	if len(setup.Events) == 0 && config.EventType != "" {
+		setup.Events = []string{config.EventType}
+	}
+	return setup, nil
+}
+
+func serializeWebhookFailure(hook models.Webhook, setup *pb.IntegrationWebhookSetup, provider string) *pb.IntegrationWebhookFailure {
+	failure := &pb.IntegrationWebhookFailure{
+		Id: setup.Id, State: setup.State, Repositories: setup.Repositories, Events: setup.Events,
+		Message: "Webhook setup failed. Check the integration settings and try again.",
+	}
+	if provider != "github" {
+		return failure
+	}
+	reason := hook.SetupError()
+	failure.Message = "GitHub could not create the webhook. Check repository access and try again."
+	if limit := githubWebhookLimit.FindStringSubmatch(reason); len(limit) > 0 {
+		failure.LimitEvent = limit[1]
+		failure.Message = fmt.Sprintf("GitHub allows %s webhooks for the %s event in each repository. Remove an unused webhook, then try again.", limit[2], limit[1])
+	}
+	// Direct cleanup to the repository that failed in a multi-repository setup.
+	if repository := githubWebhookRepository.FindStringSubmatch(reason); len(repository) > 0 {
+		failure.Repositories = []string{repository[1]}
+	}
+	return failure
 }

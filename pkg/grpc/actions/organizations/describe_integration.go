@@ -45,11 +45,9 @@ func DescribeIntegration(ctx context.Context, registry *registry.Registry, orgID
 		return nil, grpcerrors.Internal(err, "failed to serialize integration")
 	}
 
-	failures, err := integrationWebhookFailures(database.DB(ctx), []models.Integration{*instance})
-	if err != nil {
-		return nil, grpcerrors.Internal(err, "could not load webhook failures")
+	if err := describeIntegrationWebhooks(database.DB(ctx), instance, proto.Status); err != nil {
+		return nil, grpcerrors.Internal(err, "could not load webhook setup")
 	}
-	proto.Status.WebhookFailures = failures[instance.ID]
 	return &pb.DescribeIntegrationResponse{
 		Integration: proto,
 	}, nil
