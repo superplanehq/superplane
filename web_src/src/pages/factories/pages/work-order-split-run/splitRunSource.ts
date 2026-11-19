@@ -22,9 +22,9 @@ import {
 
 import { extractArtifactUrl, toArtifactDataRecord } from "../../lib/workOrderArtifact";
 import { reviewCandidateForWorkOrderId } from "../onboarding/first-run/reviewCandidates";
-import { canvasKeyForAutomation } from "./splitRunCanvases";
 
 export const CREATED_MANUALLY = "Created manually";
+export const CREATED_BY_AUTOMATED_INTAKE = "Created by automated intake";
 
 export type SplitRunIntakeKind =
   | "github-issues"
@@ -40,11 +40,13 @@ export type SplitRunIntakeKind =
 
 export type SplitRunAddedBy =
   | { kind: "intake"; name: string }
+  | { kind: "automation"; name: string }
   | { kind: "manual" }
   | { kind: "imported"; personName: string }
   | { kind: "mcp"; name: string };
 
 export type SplitRunSource =
+  | { kind: "automation"; name: string }
   | {
       kind: "intake";
       name: string;
@@ -67,8 +69,8 @@ export type SplitRunSource =
     };
 
 export function addedByForSource(source: SplitRunSource): SplitRunAddedBy {
-  if (source.kind === "mcp") {
-    return { kind: "mcp", name: source.name };
+  if (source.kind === "mcp" || source.kind === "automation") {
+    return { kind: source.kind, name: source.name };
   }
   if (source.addedBy) {
     return source.addedBy;
@@ -102,11 +104,7 @@ export const INTAKE_PRESENTATION: Record<SplitRunIntakeKind, { name: string; ico
   slack: { name: "Slack", iconSrc: slackIcon, iconAlt: "Slack" },
 };
 
-// Sources an intake app or a ticket link can be recognized by, before the
-// GitHub default applies. GitHub issues need no hint: the intake app is named
-// after its issues, and an issue link has no other marker. Dependabot alerts
-// share github.com, so the alert path is classified first. This hint only
-// names an automation when the task has no origin link.
+// Origin hosts identify the external source, independently of creator identity.
 const INTAKE_KIND_HINTS: Array<{ pattern: RegExp; kind: SplitRunIntakeKind }> = [
   { pattern: /dependabot/i, kind: "dependabot-alerts" },
   { pattern: /bitbucket/i, kind: "bitbucket-prs" },
@@ -174,7 +172,11 @@ export function splitRunSourceForOrder(order: FactoriesWorkOrder, resolveUser?: 
 
   const automation = order.createdBy?.automation;
   if (automation) {
-    const source = intakeSourceFromKind(intakeKindForAutomation(automation));
+    const intakeKind = intakeKindForAutomation(automation);
+    if (!intakeKind) {
+      return { kind: "automation", name: automationName(automation) };
+    }
+    const source = intakeSourceFromKind(intakeKind);
     return { ...source, addedBy: { kind: "intake", name: source.name } };
   }
 
@@ -211,7 +213,11 @@ function matchesClientName(normalizedName: string, client: string): boolean {
 }
 
 function addedByForIntakeOrder(order: FactoriesWorkOrder, intakeName: string): SplitRunAddedBy {
-  if (order.createdBy?.automation) {
+  const automation = order.createdBy?.automation;
+  if (automation) {
+    if (!intakeKindForAutomation(automation)) {
+      return { kind: "automation", name: automationName(automation) };
+    }
     return { kind: "intake", name: intakeName };
   }
   const personName = order.createdBy?.user?.name?.trim();
@@ -245,15 +251,17 @@ function intakeSourceFromHref(
   };
 }
 
-function intakeKindForAutomation(automation: FactoriesAutomationRef): SplitRunIntakeKind {
-  const key = canvasKeyForAutomation({ id: automation.appId, name: automation.appName });
-  if (key === "sentry") {
-    return "sentry-exceptions";
+function automationName(automation: FactoriesAutomationRef): string {
+  return automation.appName?.trim() || automation.nodeName?.trim() || "Automation";
+}
+
+function intakeKindForAutomation(automation: FactoriesAutomationRef): SplitRunIntakeKind | undefined {
+  if (automation.templateId === "issue-intake") {
+    return "github-issues";
   }
-  if (key === "slack") {
-    return "slack";
-  }
-  return intakeKindFromLabel(`${automation.appId ?? ""} ${automation.appName ?? ""}`);
+  return (Object.keys(INTAKE_PRESENTATION) as SplitRunIntakeKind[]).find(
+    (kind) => automation.templateId === `intake:${kind}`,
+  );
 }
 
 function intakeKindFromLabel(label: string): SplitRunIntakeKind {

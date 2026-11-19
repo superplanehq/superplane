@@ -1,13 +1,27 @@
-import { ExternalLink } from "lucide-react";
+import { Bot, ExternalLink } from "lucide-react";
 
 import { logoDarkInvertClass } from "@/lib/logoDarkMode";
 import { safeExternalUrl } from "@/lib/safeExternalUrl";
 import { cn } from "@/lib/utils";
 
 import { OrgUserReference } from "../../OrgUserReference";
-import { isMonochromeSourceLogo, type SplitRunSource } from "./splitRunSource";
+import { CREATED_BY_AUTOMATED_INTAKE, isMonochromeSourceLogo, type SplitRunSource } from "./splitRunSource";
 
 export function WorkOrderSplitRunSource({ source, compact = false }: { source: SplitRunSource; compact?: boolean }) {
+  if (source.kind === "automation") {
+    return (
+      <div
+        className={cn("flex min-w-0 w-full items-center gap-1.5 text-[11px] font-medium", !compact && "mt-2")}
+        data-testid="split-run-source"
+      >
+        <Bot className="size-4 shrink-0" aria-hidden />
+        <span className="truncate" title={source.name}>
+          {source.name}
+        </span>
+        <span className="ml-auto shrink-0 text-muted-foreground">{CREATED_BY_AUTOMATED_INTAKE}</span>
+      </div>
+    );
+  }
   if (compact) {
     return (
       <div
