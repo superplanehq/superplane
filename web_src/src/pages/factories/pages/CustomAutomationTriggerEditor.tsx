@@ -1,24 +1,28 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn, resolveIcon } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { AlarmClock, ChevronDown, GitCommitHorizontal, MousePointerClick, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 
 import {
+  AUTOMATION_ICONS,
   customAutomationColumnLabel,
   newCustomAutomationTrigger,
   type CustomAutomationColumn,
   type CustomAutomationMode,
   type CustomAutomationTrigger,
 } from "../lib/customAutomation";
+import { AUTOMATION_AGENTS, isAutomationHarness, type AutomationAgent } from "../lib/customAutomationDefinition";
 import { CustomAutomationScheduleFields } from "./CustomAutomationScheduleFields";
 import { PlanningReviewForm } from "./PlanningReviewForm";
 import type { PlanningReviewDraft } from "./planningReviewMockup";
 
 export function TriggerEditor({
   columnKey,
+  asCode,
   name,
   icon,
   triggers,
@@ -32,6 +36,7 @@ export function TriggerEditor({
   onDraftChange,
 }: {
   columnKey: CustomAutomationColumn;
+  asCode?: { agent?: AutomationAgent; onAgentChange: (agent?: AutomationAgent) => void };
   name: string;
   icon: string;
   triggers: CustomAutomationTrigger[];
@@ -70,6 +75,7 @@ export function TriggerEditor({
             />
           </div>
         </div>
+        {asCode ? <AutomationAgentFields agent={asCode.agent} onChange={asCode.onAgentChange} /> : null}
         <PlanningReviewForm
           draft={draft}
           onChange={onDraftChange}
@@ -82,6 +88,7 @@ export function TriggerEditor({
           showResources={false}
           showSteps={false}
           modelOnly
+          applyModelDefault={!asCode}
         />
       </section>
       <section className="flex flex-col gap-4">
@@ -195,56 +202,87 @@ function TriggerCard({
   );
 }
 
-const AUTOMATION_ICONS = [
-  "sparkles",
-  "shield-check",
-  "search",
-  "bug",
-  "file-code",
-  "code",
-  "terminal",
-  "eye",
-  "gauge",
-  "git-pull-request",
-  "cpu",
-  "circle-check",
-  "activity",
-  "alarm-clock",
-  "archive",
-  "bell",
-  "bolt",
-  "book",
-  "box",
-  "boxes",
-  "braces",
-  "calendar",
-  "camera",
-  "chart-line",
-  "check",
-  "clock",
-  "cloud",
-  "cog",
-  "component",
-  "container",
-  "database",
-  "factory",
-  "file-json",
-  "file-text",
-  "fingerprint",
-  "flag",
-  "folder",
-  "git-branch",
-  "git-commit",
-  "git-merge",
-  "globe",
-  "key",
-  "layers",
-  "lock",
-  "message-square",
-  "network",
-  "package",
-  "rocket",
-] as const;
+function AutomationAgentFields({
+  agent,
+  onChange,
+}: {
+  agent?: AutomationAgent;
+  onChange: (agent?: AutomationAgent) => void;
+}) {
+  return (
+    <div className="grid gap-4">
+      <div className="grid gap-2">
+        <Label htmlFor="custom-automation-agent">Agent</Label>
+        <Select
+          value={agent?.harness ?? "factory"}
+          onValueChange={(harness) => onChange(isAutomationHarness(harness) ? { harness } : undefined)}
+        >
+          <SelectTrigger id="custom-automation-agent" className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="factory">Factory default</SelectItem>
+            {Object.entries(AUTOMATION_AGENTS).map(([harness, { label }]) => (
+              <SelectItem key={harness} value={harness}>
+                {label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      {agent && agent.harness !== "superplane" ? (
+        <AutomationCredentialsFields agent={agent} onChange={onChange} />
+      ) : null}
+    </div>
+  );
+}
+
+function AutomationCredentialsFields({
+  agent,
+  onChange,
+}: {
+  agent: AutomationAgent;
+  onChange: (agent: AutomationAgent) => void;
+}) {
+  return (
+    <div className="grid gap-2">
+      <Label htmlFor="automation-credential-source">Credentials</Label>
+      <Select
+        value={agent.credentials?.source ?? "factory"}
+        onValueChange={(value) => {
+          if (value === "subscription") {
+            onChange({ harness: agent.harness, credentials: { source: "subscription" } });
+          } else if (value === "integration") {
+            onChange({ ...agent, credentials: { source: "integration", name: "" } });
+          } else {
+            onChange({ ...agent, credentials: undefined });
+          }
+        }}
+      >
+        <SelectTrigger id="automation-credential-source" className="w-full">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="factory">Factory default</SelectItem>
+          <SelectItem value="integration">Integration</SelectItem>
+          {agent.harness === "codex" ? <SelectItem value="subscription">ChatGPT subscription</SelectItem> : null}
+        </SelectContent>
+      </Select>
+      {agent.credentials?.source === "integration" ? (
+        <>
+          <Label htmlFor="automation-credential-integration">Integration name</Label>
+          <Input
+            id="automation-credential-integration"
+            value={agent.credentials.name}
+            onChange={(event) =>
+              onChange({ ...agent, credentials: { source: "integration", name: event.target.value } })
+            }
+          />
+        </>
+      ) : null}
+    </div>
+  );
+}
 
 function AutomationIconPicker({ icon, onChange }: { icon: string; onChange: (icon: string) => void }) {
   const [open, setOpen] = useState(false);

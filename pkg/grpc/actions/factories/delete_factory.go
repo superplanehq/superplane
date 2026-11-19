@@ -25,6 +25,11 @@ func DeleteFactory(ctx context.Context, organizationID, factoryID string) (*pb.D
 			return err
 		}
 
+		factory, err = models.LockAutomationFactory(tx, orgID, factory.ID)
+		if err != nil {
+			return err
+		}
+
 		if err := factory.SoftDeleteCanvases(tx); err != nil {
 			return err
 		}

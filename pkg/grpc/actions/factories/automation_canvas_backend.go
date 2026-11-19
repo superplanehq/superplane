@@ -1,0 +1,292 @@
+package factories
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"strings"
+
+	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/automations"
+	"github.com/superplanehq/superplane/pkg/automationspec"
+	"github.com/superplanehq/superplane/pkg/components/runner"
+	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
+	"github.com/superplanehq/superplane/pkg/models"
+	pb "github.com/superplanehq/superplane/pkg/protos/factories"
+	"google.golang.org/grpc/codes"
+	"gorm.io/gorm"
+)
+
+type CanvasAutomationBackend struct {
+	Deps IntakeDependencies
+}
+
+var (
+	_ automations.Backend        = CanvasAutomationBackend{}
+	_ automations.LegacyImporter = CanvasAutomationBackend{}
+)
+
+func (b CanvasAutomationBackend) Check(_ context.Context, tx *gorm.DB, placement automations.Placement, source *automationspec.Document) error {
+	_, _, err := b.compile(tx, placement, source, nil)
+	return err
+}
+
+func (b CanvasAutomationBackend) Apply(
+	ctx context.Context, tx *gorm.DB, placement automations.Placement, actor, id uuid.UUID,
+	previous automations.Artifact, source *automationspec.Document,
+) (automations.Artifact, func(), error) {
+	var canvas *models.Canvas
+	var live *models.CanvasVersion
+	if previous.ID != "" {
+		var err error
+		canvas, live, err = lockCustomAutomationArtifact(tx, placement, previous)
+		if err != nil {
+			return automations.Artifact{}, nil, err
+		}
+	}
+
+	nodes, edges, err := b.compile(tx, placement, source, live)
+	if err != nil {
+		return automations.Artifact{}, nil, err
+	}
+	name := strings.TrimSpace(source.Name)
+	if canvas == nil {
+		createCtx := authentication.SetUserIdInMetadata(ctx, actor.String())
+		_, err = canvases.CreateCanvasWithIDInTransaction(
+			createCtx, tx, id, b.Deps.Registry, b.Deps.Encryptor, b.Deps.AuthService, b.Deps.WebhookBaseURL,
+			placement.OrganizationID, name, "Run ordered prompt and Bash automation steps.", &placement.FactoryID, nodes, edges,
+		)
+		if err != nil {
+			return automations.Artifact{}, nil, automationCanvasWriteError(source, err)
+		}
+		canvas, err = models.FindCanvasInTransaction(tx, placement.OrganizationID, id)
+		if err != nil {
+			return automations.Artifact{}, nil, err
+		}
+		if err := canvas.SetColumnKey(tx, placement.Stage); err != nil {
+			return automations.Artifact{}, nil, err
+		}
+	} else {
+		if err := retireCustomAutomationSchedules(tx, canvas.ID, live.Nodes, nodes); err != nil {
+			return automations.Artifact{}, nil, err
+		}
+		err := canvases.PublishGeneratedCanvasNodes(ctx, tx, canvas, actor, "Update custom automation", nodes, edges, intakePublisherOptions(b.Deps, placement.OrganizationID))
+		if err != nil {
+			return automations.Artifact{}, nil, automationCanvasWriteError(source, err)
+		}
+		if err := canvases.UpdateCanvasInTransaction(tx, canvas, &name, nil); err != nil {
+			return automations.Artifact{}, nil, automationCanvasWriteError(source, err)
+		}
+	}
+
+	published, err := models.FindLiveCanvasVersionInTransaction(tx, canvas.ID)
+	if err != nil {
+		return automations.Artifact{}, nil, err
+	}
+	if err := checkAutomationCanvasNodes(source, published.Nodes); err != nil {
+		return automations.Artifact{}, nil, err
+	}
+	return automations.Artifact{ID: canvas.ID.String(), Revision: published.ID.String()}, func() {
+		canvases.PublishCanvasUpdated(canvas)
+	}, nil
+}
+
+func (b CanvasAutomationBackend) Remove(_ context.Context, tx *gorm.DB, placement automations.Placement, previous automations.Artifact) (func(), error) {
+	canvas, live, err := lockCustomAutomationArtifact(tx, placement, previous)
+	if err != nil {
+		return nil, err
+	}
+	if err := retireCustomAutomationSchedules(tx, canvas.ID, live.Nodes, nil); err != nil {
+		return nil, err
+	}
+	if err := canvas.SoftDeleteInTransaction(tx); err != nil {
+		return nil, err
+	}
+	return func() { canvases.PublishCanvasDeleted(canvas) }, nil
+}
+
+func (b CanvasAutomationBackend) compile(
+	tx *gorm.DB, placement automations.Placement, source *automationspec.Document, live *models.CanvasVersion,
+) ([]models.Node, []models.Edge, error) {
+	factory, err := models.FindFactory(tx, placement.OrganizationID, placement.FactoryID)
+	if err != nil {
+		return nil, nil, err
+	}
+	if err := checkAutomationRepository(tx, factory, source); err != nil {
+		return nil, nil, err
+	}
+	agent, err := resolveAutomationAgent(tx, factory, source)
+	if err != nil {
+		return nil, nil, err
+	}
+	settings, err := automationCanvasSettings(placement.Stage, source, agent)
+	if err != nil {
+		return nil, nil, err
+	}
+	if agent.subscription() {
+		settings.SubscriptionScheduleOwner, err = automationSubscriptionScheduleOwner(tx, factory, source)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+	graph, err := buildCustomAutomationCanvas(tx, factory, strings.TrimSpace(source.Name), settings)
+	if err != nil {
+		return nil, nil, err
+	}
+	if live != nil {
+		if err := preserveCustomAutomationIdentities(live, graph); err != nil {
+			return nil, nil, err
+		}
+		preserveCustomAutomationScheduleIdentities(live.Nodes, graph)
+	}
+	nodes, edges, err := graph.ParseInTransaction(b.Deps.Registry, placement.OrganizationID.String(), tx)
+	if err != nil {
+		return nil, nil, source.Diagnostic("$", "SuperPlane cannot build this automation. Check the triggers and steps.")
+	}
+	if err := checkAutomationCanvasNodes(source, nodes); err != nil {
+		return nil, nil, err
+	}
+	for i := range nodes {
+		node := &nodes[i]
+		if !isFactoryAgentHarness(node.ComponentName()) {
+			continue
+		}
+		action, err := b.Deps.Registry.GetAction(node.ComponentName())
+		if err != nil {
+			return nil, nil, err
+		}
+		if validator, ok := action.(core.NodeConfigurationValidator); ok {
+			if err := validator.ValidateNodeConfiguration(node.Configuration); err != nil {
+				return nil, nil, source.Diagnostic("agent", "SuperPlane cannot apply this agent configuration. Check the agent and its steps.")
+			}
+		}
+	}
+	return nodes, edges, nil
+}
+
+func lockCustomAutomationArtifact(
+	tx *gorm.DB, placement automations.Placement, artifact automations.Artifact,
+) (*models.Canvas, *models.CanvasVersion, error) {
+	id, err := uuid.Parse(artifact.ID)
+	if err != nil {
+		return nil, nil, gorm.ErrRecordNotFound
+	}
+	canvas, err := models.LockCanvasForUpdate(tx, placement.OrganizationID, id)
+	if err != nil {
+		return nil, nil, err
+	}
+	legacy, version, err := canvasLegacyAutomation(tx, canvas)
+	if err != nil {
+		return nil, nil, err
+	}
+	if legacy.Placement != placement {
+		return nil, nil, gorm.ErrRecordNotFound
+	}
+	if artifact.Revision != legacy.Artifact.Revision {
+		return nil, nil, grpcerrors.FailedPrecondition(nil, "The automation changed during this save. Save again to use the current version.")
+	}
+	return canvas, version, nil
+}
+
+func checkAutomationRepository(tx *gorm.DB, factory *models.Factory, source *automationspec.Document) error {
+	setup := factory.OnboardingConfigValue()
+	if strings.TrimSpace(setup.AppRepository) == "" {
+		return source.Diagnostic("triggers", "Set a repository for this factory before you save the automation.")
+	}
+	provider := setup.EffectiveVCSProvider()
+	if provider != models.ProviderGitHub && provider != models.ProviderBitbucket {
+		return source.Diagnostic("triggers", "Connect a GitHub or Bitbucket repository to this factory.")
+	}
+	id, err := uuid.Parse(setup.VCSIntegrationID)
+	if err != nil {
+		return source.Diagnostic("triggers", "Connect the factory repository before you save the automation.")
+	}
+	integration, err := models.FindIntegrationInTransaction(tx, factory.OrganizationID, id)
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return err
+	}
+	if integration == nil || integration.State != models.IntegrationStateReady || integration.AppName != provider {
+		return source.Diagnostic("triggers", "Reconnect the factory repository before you save the automation.")
+	}
+	return nil
+}
+
+func checkAutomationCanvasNodes(source *automationspec.Document, nodes []models.Node) error {
+	for i := range nodes {
+		node := &nodes[i]
+		if node.ErrorMessage == nil {
+			continue
+		}
+		switch {
+		case node.ComponentName() == "schedule":
+			template, _ := node.Metadata[models.FactoryAppTemplateMetadataKey].(map[string]any)
+			return source.Diagnostic(fmt.Sprintf("triggers[%d].config.cron", configInt(template, "triggerIndex")), "SuperPlane cannot activate this schedule. Check the cron expression and UTC offset.")
+		case node.Type == models.NodeTypeTrigger:
+			return source.Diagnostic("triggers", "SuperPlane cannot activate this trigger. Check the factory repository connection.")
+		default:
+			return source.Diagnostic("agent", "SuperPlane cannot prepare the agent. Check the agent connection and step settings.")
+		}
+	}
+	return nil
+}
+
+func automationCanvasWriteError(source *automationspec.Document, err error) error {
+	if errors.Is(err, models.ErrCanvasNameAlreadyExists) || grpcerrors.Code(err) == codes.AlreadyExists {
+		return source.Diagnostic("name", "Choose a name that another automation in this factory does not use.")
+	}
+	return err
+}
+
+func automationCanvasSettings(stage string, source *automationspec.Document, agent *intakeAgent) (*customAutomationSettings, error) {
+	input := &pb.FactoryCustomAutomation_Settings{}
+	for index, trigger := range source.Triggers {
+		start := &pb.FactoryCustomAutomation_StartTrigger{}
+		switch trigger.Use {
+		case automationspec.Manual:
+			start.StartMode = pb.FactoryCustomAutomation_START_MODE_MANUAL
+		case automationspec.TaskEntersStage, automationspec.PullRequestUpdated:
+			start.StartMode = pb.FactoryCustomAutomation_START_MODE_AUTOMATIC
+		case automationspec.Scheduled:
+			start.StartMode = pb.FactoryCustomAutomation_START_MODE_SCHEDULED
+			start.Schedule = &pb.FactoryCustomAutomation_Schedule{
+				CronExpression: trigger.Config.Cron, UtcOffset: trigger.Config.UTCOffset,
+			}
+			if _, err := parseCustomAutomationSchedule(start.Schedule); err != nil {
+				return nil, source.Diagnostic(fmt.Sprintf("triggers[%d].config.cron", index), "Use a cron expression with a future delivery time.")
+			}
+		}
+		input.Triggers = append(input.Triggers, start)
+	}
+	triggers, startMode, schedule, err := parseCustomAutomationTriggers(input)
+	if err != nil {
+		return nil, source.Diagnostic("triggers", "Check the trigger types and schedule settings.")
+	}
+	for i := range triggers {
+		if triggers[i].Schedule == nil {
+			continue
+		}
+		triggers[i].LogicalID = source.Triggers[i].ID
+		if triggers[i].LogicalID == "" {
+			triggers[i].LogicalID = "schedule"
+		}
+	}
+	steps := make([]runner.AgentStep, 0, len(source.Steps))
+	for _, step := range source.Steps {
+		translated := runner.AgentStep{Name: step.Name, WorkingDirectory: step.WorkingDirectory, Secrets: step.Secrets}
+		if step.Bash != "" {
+			translated.Type = runner.AgentStepBash
+			translated.Command = &step.Bash
+		} else {
+			translated.Type = runner.AgentStepPrompt
+			translated.Prompt = &step.Prompt
+		}
+		steps = append(steps, translated)
+	}
+	return &customAutomationSettings{
+		ColumnKey: stage, StartMode: startMode, Agent: agent, Steps: steps, Icon: source.Icon,
+		ExecutionTimeoutSeconds: source.TimeoutSeconds, Schedule: schedule, Triggers: triggers,
+	}, nil
+}

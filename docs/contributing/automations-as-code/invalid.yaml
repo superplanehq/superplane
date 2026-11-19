@@ -1,0 +1,8 @@
+apiVersion: v2
+kind: Automation
+name: Invalid automation example
+triggers:
+  - use: automatic # Use task_enters_stage or pull_request_updated.
+steps:
+  - name: Print the marker
+    bash: echo "automation-v2-marker"
