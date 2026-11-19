@@ -117,57 +117,82 @@ func TestHostedOnboardingClearsOldSubscriptionChoiceAndRejectsNewChoice(t *testi
 }
 
 func TestOnboardingSubscriptionPersistsOwnerBeforeIntakeAndCompletion(t *testing.T) {
-	r := support.Setup(t)
-	support.AssignOpenSystemTrial(t, r.Organization.ID)
-	db := database.DB(t.Context())
-	unsetOnboardingHostedDefault(t, db)
-	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
-	require.NoError(t, err)
-	vcsID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
-	appID, lineID := createOnboardingResources(t, r, factory)
-	app := createLineAppWithRunner(t, r, factory.ID, "runnerClaudeCode", "integration", "old-model")
-	connection, err := models.CreateCodexConnection(db, r.Organization.ID, r.User, time.Now())
-	require.NoError(t, err)
-	require.NoError(t, db.Model(connection).Updates(map[string]any{"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("bundle")}).Error)
-	require.NoError(t, connection.StoreUsage(db, nil, []models.CodexModel{{Model: "subscription-model"}}, time.Now()))
-	subscription := true
-	req := readyOnboardingRequest(factory.ID.String(), vcsID, "", appID, lineID)
-	harness := pb.FactoryOnboarding_AGENT_HARNESS_CODEX
-	req.AgentHarness = &harness
-	req.CodexSubscription = &subscription
-	response, err := UpdateFactoryOnboarding(onboardingContext(r), onboardingDeps(r), r.Organization.ID.String(), req)
-	require.NoError(t, err)
-	assert.True(t, response.Factory.Onboarding.CodexSubscription)
-	assert.Equal(t, r.User.String(), response.Factory.Onboarding.CodexDefaultOwnerId)
-	// Provisioning saves the branch and app references before it completes setup.
-	branch := "main"
-	factory, err = models.FindFactory(db, r.Organization.ID, factory.ID)
-	require.NoError(t, err)
-	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{DefaultBranch: &branch}))
-	response, err = UpdateFactoryOnboarding(onboardingContext(r), onboardingDeps(r), r.Organization.ID.String(), &pb.UpdateFactoryOnboardingRequest{Id: factory.ID.String(), DefaultBranch: &branch})
-	require.NoError(t, err)
-	assert.True(t, response.Factory.Onboarding.CodexSubscription)
-	assert.Equal(t, r.User.String(), response.Factory.Onboarding.CodexDefaultOwnerId)
-	intake, err := CreateFactoryIntake(onboardingContext(r), onboardingDeps(r), r.Organization.ID.String(), &pb.CreateFactoryIntakeRequest{FactoryId: factory.ID.String(), Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES, SkipInitialImport: true})
-	require.NoError(t, err)
-	assert.Equal(t, r.User.String(), intake.Intake.GetSettings().GetDefaultOwnerId())
-	complete := true
-	response, err = UpdateFactoryOnboarding(onboardingContext(r), onboardingDeps(r), r.Organization.ID.String(), &pb.UpdateFactoryOnboardingRequest{Id: factory.ID.String(), Complete: &complete})
-	require.NoError(t, err)
-	require.NotNil(t, response.Factory.Onboarding.CompletedAt)
-	assert.True(t, response.Factory.Onboarding.CodexSubscription)
-	assert.Equal(t, pb.FactoryOnboarding_AGENT_HARNESS_CODEX, response.Factory.Onboarding.AgentHarness)
-	assert.Empty(t, response.Factory.Onboarding.AgentIntegrationId)
-	live, err := models.FindLiveCanvasVersionInTransaction(db, app.ID)
-	require.NoError(t, err)
-	agent := findIntakeNode(live.Nodes, "agent")
-	require.NotNil(t, agent)
-	assert.Equal(t, "runnerCodex", agent.ComponentName())
-	assert.Equal(t, map[string]any{"source": "subscription"}, agent.Configuration["credentials"])
-	assert.Empty(t, agent.Configuration["model"])
-	_, err = UpdateFactoryOnboarding(onboardingContext(r), onboardingDeps(r), r.Organization.ID.String(), &pb.UpdateFactoryOnboardingRequest{Id: factory.ID.String(), Complete: &complete})
-	require.NoError(t, err)
-	assertCanvasLiveVersion(t, db, app.ID, live.ID)
+	for _, scenario := range []string{"new intake", "reused intake"} {
+		t.Run(scenario, func(t *testing.T) {
+			reuse := scenario == "reused intake"
+			r := support.Setup(t)
+			support.AssignOpenSystemTrial(t, r.Organization.ID)
+			db := database.DB(t.Context())
+			unsetOnboardingHostedDefault(t, db)
+			factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+			require.NoError(t, err)
+			vcsID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
+			appID, lineID := createOnboardingResources(t, r, factory)
+			app := createLineAppWithRunner(t, r, factory.ID, "runnerClaudeCode", "integration", "old-model")
+			connection, err := models.CreateCodexConnection(db, r.Organization.ID, r.User, time.Now())
+			require.NoError(t, err)
+			require.NoError(t, db.Model(connection).Updates(map[string]any{"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("bundle")}).Error)
+			require.NoError(t, connection.StoreUsage(db, nil, []models.CodexModel{{Model: "subscription-model"}}, time.Now()))
+			subscription := true
+			req := readyOnboardingRequest(factory.ID.String(), vcsID, "", appID, lineID)
+			harness := pb.FactoryOnboarding_AGENT_HARNESS_CODEX
+			req.AgentHarness = &harness
+			req.CodexSubscription = &subscription
+			var existingIntakeID string
+			if reuse {
+				require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
+				agentID := createReadyOnboardingIntegration(t, r.Organization.ID, "openai")
+				apiKeyRequest := readyOnboardingRequest(factory.ID.String(), vcsID, agentID, appID, lineID)
+				apiKeyRequest.AgentHarness = &harness
+				_, err = UpdateFactoryOnboarding(onboardingContext(r), onboardingDeps(r), r.Organization.ID.String(), apiKeyRequest)
+				require.NoError(t, err)
+				intake, err := CreateFactoryIntake(onboardingContext(r), onboardingDeps(r), r.Organization.ID.String(), &pb.CreateFactoryIntakeRequest{FactoryId: factory.ID.String(), Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES, SkipInitialImport: true})
+				require.NoError(t, err)
+				require.Empty(t, intake.Intake.GetSettings().GetDefaultOwnerId())
+				existingIntakeID = intake.Intake.GetId()
+			}
+			response, err := UpdateFactoryOnboarding(onboardingContext(r), onboardingDeps(r), r.Organization.ID.String(), req)
+			require.NoError(t, err)
+			assert.True(t, response.Factory.Onboarding.CodexSubscription)
+			assert.Equal(t, r.User.String(), response.Factory.Onboarding.CodexDefaultOwnerId)
+			// Provisioning saves the branch and app references before it completes setup.
+			branch := "main"
+			factory, err = models.FindFactory(db, r.Organization.ID, factory.ID)
+			require.NoError(t, err)
+			require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{DefaultBranch: &branch}))
+			response, err = UpdateFactoryOnboarding(onboardingContext(r), onboardingDeps(r), r.Organization.ID.String(), &pb.UpdateFactoryOnboardingRequest{Id: factory.ID.String(), DefaultBranch: &branch})
+			require.NoError(t, err)
+			assert.True(t, response.Factory.Onboarding.CodexSubscription)
+			assert.Equal(t, r.User.String(), response.Factory.Onboarding.CodexDefaultOwnerId)
+			if reuse {
+				paused := true
+				intake, err := UpdateFactoryIntake(onboardingContext(r), onboardingDeps(r), r.Organization.ID.String(), &pb.UpdateFactoryIntakeRequest{FactoryId: factory.ID.String(), IntakeId: existingIntakeID, Paused: &paused})
+				require.NoError(t, err)
+				assert.Equal(t, r.User.String(), intake.Intake.GetSettings().GetDefaultOwnerId())
+			} else {
+				intake, err := CreateFactoryIntake(onboardingContext(r), onboardingDeps(r), r.Organization.ID.String(), &pb.CreateFactoryIntakeRequest{FactoryId: factory.ID.String(), Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES, SkipInitialImport: true})
+				require.NoError(t, err)
+				assert.Equal(t, r.User.String(), intake.Intake.GetSettings().GetDefaultOwnerId())
+			}
+			complete := true
+			response, err = UpdateFactoryOnboarding(onboardingContext(r), onboardingDeps(r), r.Organization.ID.String(), &pb.UpdateFactoryOnboardingRequest{Id: factory.ID.String(), Complete: &complete})
+			require.NoError(t, err)
+			require.NotNil(t, response.Factory.Onboarding.CompletedAt)
+			assert.True(t, response.Factory.Onboarding.CodexSubscription)
+			assert.Equal(t, pb.FactoryOnboarding_AGENT_HARNESS_CODEX, response.Factory.Onboarding.AgentHarness)
+			assert.Empty(t, response.Factory.Onboarding.AgentIntegrationId)
+			live, err := models.FindLiveCanvasVersionInTransaction(db, app.ID)
+			require.NoError(t, err)
+			agent := findIntakeNode(live.Nodes, "agent")
+			require.NotNil(t, agent)
+			assert.Equal(t, "runnerCodex", agent.ComponentName())
+			assert.Equal(t, map[string]any{"source": "subscription"}, agent.Configuration["credentials"])
+			assert.Empty(t, agent.Configuration["model"])
+			_, err = UpdateFactoryOnboarding(onboardingContext(r), onboardingDeps(r), r.Organization.ID.String(), &pb.UpdateFactoryOnboardingRequest{Id: factory.ID.String(), Complete: &complete})
+			require.NoError(t, err)
+			assertCanvasLiveVersion(t, db, app.ID, live.ID)
+		})
+	}
 }
 
 func unsetOnboardingHostedDefault(t *testing.T, db *gorm.DB) {

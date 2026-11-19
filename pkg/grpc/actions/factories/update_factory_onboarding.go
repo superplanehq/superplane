@@ -113,6 +113,9 @@ func UpdateFactoryOnboarding(
 			if req.GetCodexSubscription() || config.CodexDefaultOwnerID == "" {
 				patch.CodexDefaultOwnerID = &ownerID
 				config.CodexDefaultOwnerID = ownerID
+				if _, err := replaceSubscriptionIntakeOwners(tx, factory, uuid.MustParse(ownerID), versionOwnerID(ctx)); err != nil {
+					return err
+				}
 			}
 		}
 		if !req.GetComplete() {
