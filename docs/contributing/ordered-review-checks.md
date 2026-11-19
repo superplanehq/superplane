@@ -17,7 +17,7 @@ is off by default.
 | `enabled` | Defaults to true for ordinary check nodes. Saving false releases that node's managed checks. |
 | `activationNodeId` | Optional check node in the same canvas and integration. Its admitted enabled state and generation govern participation. |
 | `phase` | `pending_selection`, `required_reviewers`, `no_review`, `selection_error`, or `disabled`. |
-| `reviewers` | Required human reviewer IDs and logins. Required for `required_reviewers`. |
+| `reviewers` | Suggested human reviewer IDs and logins for selection provenance. Required for `required_reviewers`. |
 | `reviewerRequestExecutionId` | Recorded Ensure Pull Request Reviewers execution. Required for `required_reviewers`. |
 | `reason` | Reason for the decision. |
 | `resultUrl` | Optional status details link. |
@@ -60,15 +60,32 @@ after delivery. Approval tracking continues independently.
 
 ## Status behavior
 
-All required reviewers must approve the current assessed commit. Existing
-approvals count. The client reads every review page. Comments do not change
-approval. Dismissal revokes approval. A dismissed replacement does not restore
-an older approval.
+One effective approval from a qualifying human passes this automation. The
+approver must differ from the PR author and have repository write, maintain,
+or admin access. The approval must cover the current assessed commit. The
+approver can be outside the suggested selection. Other pending requests and
+another person's changes request do not override that approval. GitHub branch
+rules can require additional approvals.
 
-Selection and missing approvals produce pending. A selected changes request
-produces failure. Selection errors and provider lookup failures produce error.
-All required approvals, explicit no-review decisions, and disabling produce
-success. Disabling uses the description `Review request check disabled`.
+The client reads every review page and uses each person's latest effective
+decision. Comments do not approve or revoke approval. Changes requests and
+dismissals revoke that person's approval. A dismissed replacement does not
+restore an older approval. Bot, author, read-only, dismissed, and old-commit
+approvals cannot pass the check.
+
+Monitoring follows all current human requests, including manual assignments
+and replacements. With no approval, a changes request produces failure.
+Otherwise, a remaining human request keeps review pending. Removing the last
+human request without an approval produces failure. A comment-only submission
+that clears a request keeps review pending. Empty requests never prove approval.
+Verified webhook activity and fresh provider reads distinguish removal from
+submission. Persisted request history also supports periodic reconciliation.
+Incomplete evidence remains unresolved.
+
+Selection and missing approvals produce pending. Selection errors and provider
+lookup failures produce error. Explicit no-review decisions pass only after
+managed withdrawal and any mandatory explanation complete. Disabling uses the
+description `Review request check disabled`.
 
 A new head produces pending until a new decision covers it. Monitoring
 continues after success. Closed or merged pull requests stop polling after
@@ -228,9 +245,18 @@ Removing a canvas or its activation node durably wakes owned publications so
 the same release path also handles checks that stopped polling on closed PRs.
 Pausing changes trigger admission and keeps existing approval tracking.
 
-The canvas registers pending before candidate discovery. It applies explicit
-no-review outcomes for all-positive reports after managed request withdrawal.
-Empty eligible candidate lists skip the selection agent and produce a selection error.
+The canvas registers pending before candidate discovery. Every current report
+reaches the decision agent, including all-positive reports and successful
+candidate lookups with no candidates. Positive reports now incur an agent run.
+The agent evaluates the immutable report, CODEOWNERS, diff, base contribution
+history, current assignments, previous selection, and Additional instructions.
+Explicit policy such as "Always require human review" applies to positive reports.
+
+A no-review decision requires a nonempty rationale, no selected reviewers,
+and a complete report with at least one check. Every check must be positive
+and must not be missing. Additional instructions cannot waive these conditions
+or reviewer eligibility. Fallback runs only for a valid required-review
+no-candidate result. Lookup and validation failures remain explicit errors.
 Existing reviewer requests are preserved when no replacement is available.
 Required-reviewer application uses the recorded Ensure reviewers execution and does not request reviewers again.
 Stale or skipped outcomes cannot publish no-review success. Failed or cancelled
@@ -296,7 +322,9 @@ but the response was lost. GitHub does not provide an atomic request ownership
 operation; a simultaneous manual request during that POST cannot be distinguished.
 A persisted withdrawal intent prevents a retry from deleting a later manual
 request after an uncertain DELETE. A request that remains after such a failure
-loses managed ownership and needs manual removal.
+loses managed ownership. Its unresolved outcome blocks release of required
+review. A fresh read can confirm absence after a lost response. Confirmed
+removals and their assessed commits remain in the durable withdrawal ledger.
 Selection, discovery, and replacement failures preserve existing requests.
 Completion and publication follow successful reconciliation only.
 
@@ -338,3 +366,34 @@ default. Organization reset applies the same default. Both resets preserve
 explicit `true` and `false` values. To change an explicit `false`, set
 `skipSetupCommands: true` on `select-reviewers` in the canvas YAML. Publish
 the canvas. Existing runs keep their saved configuration.
+
+## One human approval and withdrawal explanations
+
+The revised workflow requires one qualifying approval and follows manual
+reassignment. Review events refresh monitoring without another selection agent
+or another reviewer request.
+
+When a validated decision releases review, the workflow withdraws only pending
+requests owned by this automation. It preserves manual requests, team requests,
+other automations' requests, and submitted reviews. A mandatory managed comment
+explains the rationale, withdrawn reviewers, assessed commits, and run link.
+This comment uses its own stable key, `review-request-withdrawal`, and does not
+depend on the optional findings settings.
+
+The withdrawal ledger survives execution rollback, partial success, and lost
+DELETE responses. An unresolved withdrawal cannot complete release. The durable
+comment publisher retries the resolved explanation and reuses its marker after
+an uncertain response. Only `published` or `unchanged` permits the successful
+no-review check. The workflow acknowledges the ledger through the recorded
+comment execution after successful publication. Later decisions do not repeat
+an acknowledged explanation. Failed, exhausted, skipped, superseded, and stale-head
+publication cannot release review. No comment is needed when no owned request
+was withdrawn and no withdrawal obligation remains.
+
+After deployment, use `/admin/settings` → **Reset one automation** →
+**Review request**, or the supported organization reset. Reset installs the
+revised decision flow and mandatory comment step. It preserves Additional
+instructions, fallback reviewer, optional publication destinations and switches,
+activation generations, and GitHub connections. Explicitly cleared values stay
+cleared. Existing runs keep their saved graph. No migration, public endpoint,
+runtime dependency, or deployment configuration change is required.

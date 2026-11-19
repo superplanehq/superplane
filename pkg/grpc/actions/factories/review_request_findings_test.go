@@ -3,6 +3,7 @@ package factories
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 
@@ -185,11 +186,7 @@ func TestReviewRequestFindingsExplainEachDecision(t *testing.T) {
 					require.NotContains(t, section, "No reviewer was requested.")
 				case "no candidate", "no suitable candidate":
 					require.Contains(t, section, "**No eligible reviewer**")
-					if scenario == "no candidate" {
-						require.Contains(t, section, "No eligible candidate or fallback reviewer is available.")
-					} else {
-						require.Contains(t, section, "Security findings need review.")
-					}
+					require.Contains(t, section, "Security findings need review.")
 					require.Contains(t, section, "No reviewer was requested.")
 				}
 				if publishCheck {
@@ -451,6 +448,94 @@ func TestReviewRequestReconcilesRepeatedReportsBeforePublication(t *testing.T) {
 				integration := reviewRequestManagedIntegration{IntegrationContext: reviewRequestIntegration(), store: store}
 				require.NoError(t, pulls.RefreshReviewCheck(core.IntegrationHookContext{Parameters: map[string]any{"key": records[0].Key}, Integration: integration, HTTP: host}))
 				require.Equal(t, "success", host.statuses[len(host.statuses)-1].GetState())
+			}
+		})
+	}
+}
+
+func TestReviewWithdrawalRequiresDurableExplanation(t *testing.T) {
+	for _, scenario := range []string{"published", "comment retry", "lost comment response", "comment rejected", "head changes", "superseded", "uncertain delete", "partial withdrawal"} {
+		t.Run(scenario, func(t *testing.T) {
+			host := &reviewRequestHTTP{}
+			f, message := reviewRequestCompletedProducer(t, host, 2)
+			consumer := reviewFindingsConsumer(t, f, reviewFindingsSettings{}, "")
+			setReviewRequestCheck(t, f, consumer, true, 2)
+			selectionScenario := ""
+			if scenario == "partial withdrawal" {
+				selectionScenario = "additional reviewer"
+			}
+			_, agents, err := runReviewRequestGraph(t, f, consumer, deliverReviewRequestReport(t, f, consumer, message), host, selectionScenario)
+			require.NoError(t, err)
+			require.Equal(t, 1, agents)
+			f, message = emitReviewRequestReport(t, f, host, 5)
+			switch scenario {
+			case "comment retry", "lost comment response":
+				host.commentFails, host.commentStatus, host.commentApplied = 1, 503, scenario == "lost comment response"
+			case "comment rejected":
+				host.commentFails, host.commentStatus = 1, 403
+			case "head changes", "superseded":
+				host.holdPublications = true
+			case "uncertain delete", "partial withdrawal":
+				host.deleteFails, host.deleteApplied = 1, true
+				if scenario == "partial withdrawal" {
+					host.deleteFailLogin = "fallback-user"
+				}
+			}
+			root := deliverReviewRequestReport(t, f, consumer, message)
+			outcome, agents, err := runReviewRequestGraph(t, f, consumer, root, host, "favorable")
+			require.Equal(t, 1, agents)
+			if scenario == "uncertain delete" || scenario == "partial withdrawal" {
+				require.Error(t, err)
+				require.NotContains(t, outcome, "pr-check-unnecessary")
+				// Retry reconciliation after the response was lost. The ledger must
+				// retain earlier removals, including partial writes.
+				root = deliverReviewRequestReport(t, f, consumer, message)
+				outcome, _, err = runReviewRequestGraph(t, f, consumer, root, host, "favorable")
+			}
+			require.NoError(t, err)
+			if slices.Contains([]string{"comment retry", "lost comment response", "head changes", "superseded", "comment rejected"}, scenario) {
+				require.NotContains(t, outcome, "pr-check-unnecessary")
+				require.NotEqual(t, "success", host.statuses[len(host.statuses)-1].GetState())
+				if scenario == "comment rejected" {
+					return
+				}
+				comment := reviewFindingsExecution(t, f, root, "withdrawal-comment")
+				if scenario == "head changes" {
+					host.movedHead = true
+				}
+				if scenario == "superseded" {
+					// A new policy decision requires review before the delayed comment finishes.
+					_, _, err = runReviewRequestGraph(t, f, consumer, deliverReviewRequestReport(t, f, consumer, message), host, "favorable policy")
+					require.NoError(t, err)
+				}
+				host.holdPublications = false
+				processReviewRequestPublication(t, f, host, comment)
+				outcome, resumedAgents, resumeErr := runReviewRequestGraph(t, f, consumer, root, host, "", comment)
+				require.NoError(t, resumeErr)
+				require.Zero(t, resumedAgents, "publication retries must not repeat selection")
+				if scenario == "head changes" || scenario == "superseded" {
+					require.NotEqual(t, "success", host.statuses[len(host.statuses)-1].GetState())
+					return
+				}
+				require.Contains(t, outcome, "pr-check-unnecessary")
+			}
+			_, body := onlyComment(t, host)
+			require.Contains(t, body, "All checks are positive. Factory policy permits no review.")
+			require.Contains(t, body, "octocat")
+			require.Contains(t, body, "Assessed commit: abc")
+			require.Contains(t, body, "View Review request run")
+			require.Contains(t, body, "?run="+root.RunID.String())
+			require.NotContains(t, host.description, "superplane:review-request:start", "optional findings remain disabled")
+			require.Equal(t, "success", host.statuses[len(host.statuses)-1].GetState())
+			if scenario == "partial withdrawal" {
+				require.Contains(t, body, "fallback-user")
+			}
+			require.Empty(t, host.pendingReviewers)
+			require.Equal(t, 1, host.commentWrites, "a lost POST response must reuse the managed comment")
+			if scenario == "published" {
+				_, _, err = runReviewRequestGraph(t, f, consumer, deliverReviewRequestReport(t, f, consumer, message), host, "favorable")
+				require.NoError(t, err)
+				require.Equal(t, 1, host.commentWrites, "a confirmed explanation clears the publication obligation")
 			}
 		})
 	}
