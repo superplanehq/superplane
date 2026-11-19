@@ -32,6 +32,7 @@ import { useOrganizationUsers } from "@/hooks/useOrganizationData";
 import { useOrgUserLookup } from "@/hooks/useOrgUserLookup";
 import { getOrgUserDisplayFromUser } from "@/lib/orgUserDisplay";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useWorkspaceLoading } from "@/hooks/useWorkspaceLoading";
@@ -1917,14 +1918,15 @@ function CustomStageColumn({
 
 function AddStageLane({ onAdd }: { onAdd: () => void }) {
   return (
-    <button
+    <Button
       type="button"
+      variant="ghost"
       onClick={onAdd}
-      className="mr-3 flex min-w-40 basis-40 shrink-0 items-center justify-center gap-2 self-stretch rounded-lg border border-dashed border-border text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
+      className="mr-3 h-auto min-w-40 basis-40 shrink-0 gap-2 self-stretch rounded-lg border border-dashed border-border text-muted-foreground hover:text-foreground"
     >
       <Plus className="size-4" aria-hidden />
       Add stage
-    </button>
+    </Button>
   );
 }
 
