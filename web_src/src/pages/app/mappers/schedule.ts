@@ -33,6 +33,14 @@ interface ScheduleMetadata {
   nextTrigger?: string;
 }
 
+function formatDailySchedule(configuration: ScheduleConfiguration): string {
+  const interval = configuration.daysInterval || 1;
+  const hour = configuration.hour || 0;
+  const minute = configuration.minute || 0;
+  const time = `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`;
+  return `Every ${interval} day${interval === 1 ? "" : "s"} at ${time}`;
+}
+
 function formatWeeklySchedule(configuration: ScheduleConfiguration): string {
   const interval = configuration.weeksInterval || 1;
   const hour = configuration.hour || 0;
@@ -41,6 +49,15 @@ function formatWeeklySchedule(configuration: ScheduleConfiguration): string {
   const weekDays = configuration.weekDays || ["monday"];
   const dayLabels = weekDays.map((day) => day.charAt(0).toUpperCase() + day.slice(1).toLowerCase()).join(", ");
   return `Every ${interval} week${interval === 1 ? "" : "s"} on ${dayLabels} at ${time}`;
+}
+
+function formatMonthlySchedule(configuration: ScheduleConfiguration): string {
+  const interval = configuration.monthsInterval || 1;
+  const dayOfMonth = configuration.dayOfMonth || 1;
+  const hour = configuration.hour || 0;
+  const minute = configuration.minute || 0;
+  const time = `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`;
+  return `Every ${interval} month${interval === 1 ? "" : "s"} on day ${dayOfMonth} at ${time}`;
 }
 
 function formatScheduleDescription(configuration: ScheduleConfiguration): string {
@@ -60,22 +77,13 @@ function formatScheduleDescription(configuration: ScheduleConfiguration): string
       return `Every ${interval} hour${interval === 1 ? "" : "s"} at :${minute.toString().padStart(2, "0")}`;
     }
     case "days": {
-      const interval = configuration.daysInterval || 1;
-      const hour = configuration.hour || 0;
-      const minute = configuration.minute || 0;
-      const time = `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`;
-      return `Every ${interval} day${interval === 1 ? "" : "s"} at ${time}`;
+      return formatDailySchedule(configuration);
     }
     case "weeks": {
       return formatWeeklySchedule(configuration);
     }
     case "months": {
-      const interval = configuration.monthsInterval || 1;
-      const dayOfMonth = configuration.dayOfMonth || 1;
-      const hour = configuration.hour || 0;
-      const minute = configuration.minute || 0;
-      const time = `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`;
-      return `Every ${interval} month${interval === 1 ? "" : "s"} on day ${dayOfMonth} at ${time}`;
+      return formatMonthlySchedule(configuration);
     }
     case "cron": {
       return configuration.cronExpression ? `Cron: ${configuration.cronExpression}` : "Custom cron schedule";
