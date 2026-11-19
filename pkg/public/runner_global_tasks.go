@@ -140,6 +140,9 @@ func (s *Server) handleRunnerCreateTask(w http.ResponseWriter, r *http.Request) 
 		if createErr != nil {
 			return createErr
 		}
+		if err := created.SetCreatorRun(tx, scope.CanvasRunID); err != nil {
+			return err
+		}
 		order = created
 		return nil
 	})
