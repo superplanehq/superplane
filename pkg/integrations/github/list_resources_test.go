@@ -1,6 +1,7 @@
 package github
 
 import (
+	"net/http"
 	"testing"
 
 	"github.com/google/go-github/v84/github"
@@ -12,7 +13,31 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support/contexts"
+	mocks "github.com/superplanehq/superplane/test/support/mocks/github"
 )
+
+func TestListRepositoryWebhooksForLimitRecovery(t *testing.T) {
+	first := mocks.GitHubResponse(http.StatusOK, `[
+		{"id":11,"events":["issues"],"config":{"url":"https://other.example/issues"}},
+		{"id":12,"events":["pull_request"],"config":{"url":"https://user:password@old.example/hook?token=secret"}}
+	]`)
+	first.Header.Set("Link", `<https://api.github.com/repos/acme/api/hooks?page=2>; rel="next"`)
+	httpCtx := &contexts.HTTPContext{Responses: []*http.Response{first, mocks.GitHubResponse(http.StatusOK, `[
+		{"id":13,"events":["*"],"config":{"url":"https://current.example/webhook"}}
+	]`)}}
+	resources, err := (&GitHub{}).ListResources("repository_webhook", core.ListResourcesContext{
+		HTTP: httpCtx, Integration: mocks.IntegrationContextForNewSetupFlow(),
+		Parameters: map[string]string{"repository": "acme/api", "event": "pull_request"},
+	})
+	require.NoError(t, err)
+	require.Len(t, resources, 2, "include every page and only hooks that use the limited event")
+	require.Equal(t, "12", resources[0].ID)
+	require.Contains(t, resources[0].Name, "old.example/hook")
+	require.NotContains(t, resources[0].Name, "secret")
+	require.NotContains(t, resources[0].Name, "password")
+	require.Equal(t, "https://github.com/acme/api/settings/hooks/12", resources[0].URL)
+	require.Equal(t, "13", resources[1].ID)
+}
 
 func TestListResourcesHostedBindingReturnsOnlyGrantedRepositories(t *testing.T) {
 	t.Cleanup(withGitHubEnterpriseFlagForTest(func(uuid.UUID) bool { return false }))
