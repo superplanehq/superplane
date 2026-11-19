@@ -11,6 +11,7 @@ interface AddColumnAutomationPickerProps {
   onSelect: (entry: ColumnAutomationCatalogEntry) => void;
   catalog: ColumnAutomationCatalogEntry[];
   takenIds?: readonly string[];
+  title?: string;
 }
 
 export function AddColumnAutomationPicker({
@@ -19,6 +20,7 @@ export function AddColumnAutomationPicker({
   onSelect,
   catalog,
   takenIds = [],
+  title = COLUMN_AUTOMATIONS_COPY.pickerTitle,
 }: AddColumnAutomationPickerProps) {
   return (
     <Dialog
@@ -31,9 +33,7 @@ export function AddColumnAutomationPicker({
     >
       <DialogContent className="gap-0 p-0 sm:max-w-lg" showCloseButton data-testid="add-column-automation-picker">
         <DialogHeader className="border-b border-border px-4 py-3 text-left">
-          <DialogTitle className="text-[15px] font-semibold tracking-[-0.01em]">
-            {COLUMN_AUTOMATIONS_COPY.pickerTitle}
-          </DialogTitle>
+          <DialogTitle className="text-[15px] font-semibold tracking-[-0.01em]">{title}</DialogTitle>
           <DialogDescription className="workspace-body-text text-muted-foreground">
             {COLUMN_AUTOMATIONS_COPY.pickerDescription}
           </DialogDescription>

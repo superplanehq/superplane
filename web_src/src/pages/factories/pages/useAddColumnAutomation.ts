@@ -39,6 +39,7 @@ export function useAddColumnAutomation(args: {
   automationsFor: (key: ColumnKey) => ColumnAutomation[];
 }) {
   const [column, setColumn] = useState<ColumnKey | null>(null);
+  const [columnTitle, setColumnTitle] = useState("");
   const [naming, setNaming] = useState(false);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -54,21 +55,24 @@ export function useAddColumnAutomation(args: {
 
   const closePicker = () => {
     setColumn(null);
+    setColumnTitle("");
     setNaming(false);
   };
 
-  const openPicker = (key: ColumnKey) => {
+  const openPicker = (key: ColumnKey, title = "") => {
     const nextCatalog = catalogForColumn(key, catalogOptions);
     const nextTaken = takenCatalogIds(args.automationsFor(key), nextCatalog);
     const setupColumn = customAutomationSetupColumn(key);
-    if (setupColumn !== null && onlyCustomCatalogRemains(nextCatalog, nextTaken) && args.lineId) {
+    const customStage = key.startsWith("custom-");
+    if (!customStage && setupColumn !== null && onlyCustomCatalogRemains(nextCatalog, nextTaken) && args.lineId) {
       navigate(
         factoryCustomAutomationSetupPath(args.organizationId, args.factoryKey, args.lineId, undefined, setupColumn),
       );
       return;
     }
     setColumn(key);
-    setNaming(onlyCustomCatalogRemains(nextCatalog, nextTaken));
+    setColumnTitle(title);
+    setNaming(!customStage && onlyCustomCatalogRemains(nextCatalog, nextTaken));
   };
 
   const onSelect = async (entry: ColumnAutomationCatalogEntry) => {
@@ -123,6 +127,7 @@ export function useAddColumnAutomation(args: {
   return {
     allowCustom,
     pickerColumn: column,
+    pickerTitle: columnTitle ? `Add an automation for ${columnTitle}` : undefined,
     pickerOpen: column !== null && !naming,
     naming,
     openPicker,
@@ -278,7 +283,10 @@ async function createCustomAutomation(input: {
 }) {
   const automation = await input.mutateAsync({
     name: input.name,
-    columnKey: input.column === "verify" || input.column === "done" ? input.column : undefined,
+    columnKey:
+      input.column === "verify" || input.column === "done" || input.column.startsWith("custom-")
+        ? input.column
+        : undefined,
   });
   input.close();
   if (!automation.id) {
