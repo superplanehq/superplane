@@ -14,9 +14,8 @@ func (s *Server) handleWebhookSetupWebSocket(w http.ResponseWriter, r *http.Requ
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-	// The organization-wide stream is for browser sessions. Scoped API tokens
-	// can have narrower access than the integration and factory lists.
-	if _, scoped := middleware.GetScopedTokenClaimsFromContext(r.Context()); scoped {
+	// Scoped tokens and canvas-restricted API keys cannot read organization-wide activity.
+	if _, scoped := middleware.GetScopedTokenClaimsFromContext(r.Context()); scoped || user.HasAPIKeyCanvasScope() {
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}
