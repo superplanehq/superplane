@@ -1124,7 +1124,14 @@ function LineDetail({
   const steps = line.steps ?? [];
   const fullBoard = useMemo(() => buildLinePhaseBoard(line, workOrders ?? [], apps), [line, workOrders, apps]);
   const verifyOrders = useMemo(() => collectLineVerifyOrders(fullBoard, workOrders ?? []), [fullBoard, workOrders]);
-  const board = useMemo(() => visibleLineStageColumns(fullBoard, verifyOrders), [fullBoard, verifyOrders]);
+  const hasVerifyStage = useMemo(
+    () => orderedLineBoardStages(line).some((stage) => stage.kind === "STAGE_KIND_VERIFY"),
+    [line],
+  );
+  const board = useMemo(
+    () => visibleLineStageColumns(fullBoard, verifyOrders, hasVerifyStage),
+    [fullBoard, hasVerifyStage, verifyOrders],
+  );
   const backlogOrders = useMemo(() => collectLineBacklogOrders(workOrders ?? []), [workOrders]);
   const doneOrders = useMemo(
     () => collectLineDoneOrders(workOrders ?? [], line, fullBoard),
