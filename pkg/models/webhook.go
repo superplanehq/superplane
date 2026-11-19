@@ -113,6 +113,12 @@ func (w *Webhook) RetrySetup(tx *gorm.DB) error {
 	}
 	return tx.Model(w).Where("state = ?", WebhookStateFailed).Updates(map[string]any{
 		"state": WebhookStatePending, "retry_count": 0, "updated_at": time.Now(),
+		// Older failures have no saved error. Keep their warning visible during retry.
+		"metadata": gorm.Expr(
+			"CASE WHEN jsonb_typeof(metadata) = 'object' THEN metadata ELSE '{}'::jsonb END || "+
+				"jsonb_build_object('setupError', COALESCE(NULLIF(metadata->>'setupError', ''), ?))",
+			"Webhook setup failed",
+		),
 	}).Error
 }
 
