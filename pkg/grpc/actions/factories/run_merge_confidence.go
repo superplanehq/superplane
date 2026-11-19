@@ -119,15 +119,18 @@ func runMergeConfidence(ctx context.Context, deps IntakeDependencies, organizati
 				if err := validateChecksStartupSnapshot(pr, candidate.payload); err != nil {
 					return err
 				}
-				event, started, err := contexts.CreateFactoryPullRequestEvent(tx, trigger, pr.Provider+".pullRequest", candidate.payload)
-				if err != nil {
+				var emitted []models.CanvasEvent
+				events := contexts.NewEventContext(tx, trigger, nil, func(events []models.CanvasEvent) {
+					emitted = append(emitted, events...)
+				})
+				if err := events.Emit(pr.Provider+".pullRequest", candidate.payload); err != nil {
 					return err
 				}
-				if event == nil {
+				if len(emitted) == 0 {
 					return grpcFailedPrecondition("The merge confidence automation is no longer eligible.")
 				}
-				// Load the saved run before linking task authority.
-				event, err = models.FindCanvasEventForCanvas(tx, canvas.ID, event.ID)
+				// Reload the decoded payload before linking task authority and checking admission.
+				event, err := models.FindCanvasEventForCanvas(tx, canvas.ID, emitted[0].ID)
 				if err != nil {
 					return err
 				}
@@ -135,30 +138,11 @@ func runMergeConfidence(ctx context.Context, deps IntakeDependencies, organizati
 				if err != nil {
 					return err
 				}
-				activity, err := models.FindPullRequestActivityByRunID(tx, run.ID)
-				if err != nil && !errors.Is(err, models.ErrFactoryPullRequestActivityNotFound) {
+				if err := mergeconfidence.LinkRun(tx, canvas, event, run); err != nil {
 					return err
 				}
-				if activity != nil && activity.PullRequestID != pr.ID {
-					return models.ErrFactoryPullRequestRunAlreadyLinked
-				}
-				// Reuse keeps existing task authority without admitting another run.
-				if activity == nil {
-					// Use the locked PR without changing a reused webhook's saved payload.
-					linkEvent := *event
-					linkEvent.Data = models.NewJSONValue(map[string]any{
-						"data": map[string]any{"pullRequest": map[string]any{"id": pr.ID.String()}},
-					})
-					if err := mergeconfidence.LinkRun(tx, canvas, &linkEvent, run); err != nil {
-						return err
-					}
-				}
-				status := "reused"
-				if started {
-					status = "started"
-					created = append(created, *event)
-				}
-				result.Runs = append(result.Runs, MergeConfidenceRun{PullRequestURL: pr.URL, AutomationID: canvas.ID.String(), RunID: event.RunID.String(), EventID: event.ID.String(), Status: status})
+				created = append(created, *event)
+				result.Runs = append(result.Runs, MergeConfidenceRun{PullRequestURL: pr.URL, AutomationID: canvas.ID.String(), RunID: event.RunID.String(), EventID: event.ID.String(), Status: "started"})
 			}
 			if !found {
 				result.Skipped = append(result.Skipped, MergeConfidenceSkipped{pr.URL, "No eligible Merge confidence automation matches this pull request."})
