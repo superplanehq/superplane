@@ -575,6 +575,13 @@ func (a *Handler) handlePasswordLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Keep headerless non-browser clients supported. The legacy Origin fallback
+	// compares host and port, not scheme; modern browsers use Sec-Fetch-Site.
+	if err := new(http.CrossOriginProtection).Check(r); err != nil {
+		http.Error(w, "Cross-origin password login is not allowed", http.StatusForbidden)
+		return
+	}
+
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "Invalid form data", http.StatusBadRequest)
 		return
