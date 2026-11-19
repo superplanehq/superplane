@@ -22,6 +22,7 @@ import (
 const bodySectionRequestLease = 5 * time.Minute
 
 type bodySectionPublicationState struct {
+	ExecutionID string `json:"executionId,omitempty"`
 	// Publication is the ordered claim accepted when the step started.
 	Publication *core.OrderedWrite `json:"publication,omitempty"`
 	CommentID   int64              `json:"commentId,omitempty"`
@@ -142,6 +143,7 @@ func (a *bodySectionActionAttempt) claim(tx *gorm.DB) error {
 	if a.state.LeaseUntil != nil && a.state.LeaseUntil.After(time.Now()) {
 		return gorm.ErrRecordNotFound
 	}
+	a.state.ExecutionID = execution.ID.String()
 	a.state.SourceRunID = execution.RunID.String()
 	a.state.Attempts++
 	if err := a.resolveSource(tx); err != nil {
