@@ -30,7 +30,7 @@ func TestAdminCatalogAuthorizationAndAssignment(t *testing.T) {
 	server, r, token := setupAdminTestServer(t)
 	regular, err := models.CreateAccount("Member", "catalog-member@example.com")
 	require.NoError(t, err)
-	regularToken, err := authentication.GenerateAccountToken(jwt.NewSigner("test-client-secret"), regular.ID.String(), time.Now(), time.Hour)
+	regularToken, err := authentication.GenerateAccountToken(jwt.NewSigner("test-client-secret"), regular.ID.String(), time.Now(), time.Hour, regular.SessionGeneration)
 	require.NoError(t, err)
 	for _, route := range []struct{ method, path, body string }{
 		{"POST", "/admin/api/organizations/" + r.Organization.ID.String() + "/billing-customer/sync", ""},
@@ -292,7 +292,7 @@ func TestAdminDeleteFeatureDefinitionRequiresInstallationAdmin(t *testing.T) {
 
 	regular, err := models.CreateAccount("Feature Member", "feature-member@example.com")
 	require.NoError(t, err)
-	regularToken, err := authentication.GenerateAccountToken(jwt.NewSigner("test-client-secret"), regular.ID.String(), time.Now(), time.Hour)
+	regularToken, err := authentication.GenerateAccountToken(jwt.NewSigner("test-client-secret"), regular.ID.String(), time.Now(), time.Hour, regular.SessionGeneration)
 	require.NoError(t, err)
 	response = execRequest(server, requestParams{method: "DELETE", path: "/admin/api/feature-definitions/guarded_reports", authCookie: regularToken})
 	require.Equal(t, http.StatusNotFound, response.Code)

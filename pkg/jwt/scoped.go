@@ -1,6 +1,7 @@
 package jwt
 
 import (
+	"encoding/json"
 	"fmt"
 	"slices"
 	"strings"
@@ -13,15 +14,17 @@ const ScopedTokenType = "scoped"
 const ScopedTokenAudience = "superplane_api"
 
 type ScopedTokenClaims struct {
-	Subject   string             `json:"sub"`
-	Audience  string             `json:"aud"`
-	ExpiresAt *gojwt.NumericDate `json:"exp,omitempty"`
-	NotBefore *gojwt.NumericDate `json:"nbf,omitempty"`
-	IssuedAt  *gojwt.NumericDate `json:"iat,omitempty"`
-	TokenType string             `json:"token_type"`
-	OrgID     string             `json:"org_id"`
-	Purpose   string             `json:"purpose"`
-	Scopes    []string           `json:"scopes"`
+	// Account-owned callers must supply the generation from the owning account snapshot.
+	SessionGeneration *int64             `json:"session_generation,omitempty,string"`
+	Subject           string             `json:"sub"`
+	Audience          string             `json:"aud"`
+	ExpiresAt         *gojwt.NumericDate `json:"exp,omitempty"`
+	NotBefore         *gojwt.NumericDate `json:"nbf,omitempty"`
+	IssuedAt          *gojwt.NumericDate `json:"iat,omitempty"`
+	TokenType         string             `json:"token_type"`
+	OrgID             string             `json:"org_id"`
+	Purpose           string             `json:"purpose"`
+	Scopes            []string           `json:"scopes"`
 }
 
 type Permission struct {
@@ -31,6 +34,9 @@ type Permission struct {
 }
 
 func (s *Signer) GenerateScopedToken(claims ScopedTokenClaims, duration time.Duration) (string, error) {
+	if claims.SessionGeneration != nil && *claims.SessionGeneration < 0 {
+		return "", fmt.Errorf("invalid session generation")
+	}
 	subject := strings.TrimSpace(claims.Subject)
 	if subject == "" {
 		return "", fmt.Errorf("subject is required")
@@ -53,15 +59,16 @@ func (s *Signer) GenerateScopedToken(claims ScopedTokenClaims, duration time.Dur
 
 	now := time.Now()
 	normalizedClaims := ScopedTokenClaims{
-		Subject:   subject,
-		Audience:  ScopedTokenAudience,
-		ExpiresAt: gojwt.NewNumericDate(now.Add(duration)),
-		NotBefore: gojwt.NewNumericDate(now),
-		IssuedAt:  gojwt.NewNumericDate(now),
-		TokenType: ScopedTokenType,
-		OrgID:     orgID,
-		Purpose:   purpose,
-		Scopes:    scopes,
+		SessionGeneration: claims.SessionGeneration,
+		Subject:           subject,
+		Audience:          ScopedTokenAudience,
+		ExpiresAt:         gojwt.NewNumericDate(now.Add(duration)),
+		NotBefore:         gojwt.NewNumericDate(now),
+		IssuedAt:          gojwt.NewNumericDate(now),
+		TokenType:         ScopedTokenType,
+		OrgID:             orgID,
+		Purpose:           purpose,
+		Scopes:            scopes,
 	}
 
 	token := gojwt.NewWithClaims(gojwt.SigningMethodHS256, normalizedClaims)
@@ -124,6 +131,23 @@ func (s *Signer) ValidateScopedToken(tokenString string) (*ScopedTokenClaims, er
 	claims.Scopes = scopes
 
 	return claims, nil
+}
+
+func (c *ScopedTokenClaims) UnmarshalJSON(data []byte) error {
+	type claimsAlias ScopedTokenClaims
+	var decoded claimsAlias
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	var raw gojwt.MapClaims
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	if _, err := SessionGenerationFromClaims(raw); err != nil {
+		return err
+	}
+	*c = ScopedTokenClaims(decoded)
+	return nil
 }
 
 func (c ScopedTokenClaims) Valid() error {

@@ -143,7 +143,7 @@ func runnerLiveLogSessionGET(
 		nil,
 	)
 	req.Header.Set("x-organization-id", r.Organization.ID.String())
-	token, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), time.Now(), time.Hour)
+	token, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), time.Now(), time.Hour, r.Account.SessionGeneration)
 	require.NoError(t, err)
 	req.AddCookie(&http.Cookie{Name: "account_token", Value: token})
 	rec := httptest.NewRecorder()

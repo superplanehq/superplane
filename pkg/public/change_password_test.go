@@ -42,7 +42,7 @@ func setupChangePasswordTestServer(t *testing.T) (*Server, *support.ResourceRegi
 	_, err = models.CreateAccountPasswordAuth(r.Account.ID, hash)
 	require.NoError(t, err)
 
-	token, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), time.Now(), time.Hour)
+	token, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), time.Now(), time.Hour, r.Account.SessionGeneration)
 	require.NoError(t, err)
 
 	return server, r, token
@@ -58,7 +58,7 @@ func setupChangePasswordTestServerNoPassword(t *testing.T) (*Server, *support.Re
 	require.NoError(t, err)
 	server.RegisterWebRoutes("")
 
-	token, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), time.Now(), time.Hour)
+	token, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), time.Now(), time.Hour, r.Account.SessionGeneration)
 	require.NoError(t, err)
 
 	return server, r, token
@@ -80,7 +80,7 @@ func setupChangePasswordTestServerLoginDisabled(t *testing.T) (*Server, *support
 	_, err = models.CreateAccountPasswordAuth(r.Account.ID, hash)
 	require.NoError(t, err)
 
-	token, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), time.Now(), time.Hour)
+	token, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), time.Now(), time.Hour, r.Account.SessionGeneration)
 	require.NoError(t, err)
 
 	return server, r, token
@@ -319,7 +319,7 @@ func TestGetAccount_HasPassword(t *testing.T) {
 // in the middleware: an account_token issued before password_changed_at
 // is rejected, while a fresh one issued after is accepted.
 func TestChangePassword_InvalidatesOldCookie(t *testing.T) {
-	server, r, oldToken := setupChangePasswordTestServer(t)
+	server, _, oldToken := setupChangePasswordTestServer(t)
 
 	// Confirm the cookie works before any password change.
 	check := func(token string) int {
@@ -332,10 +332,6 @@ func TestChangePassword_InvalidatesOldCookie(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, check(oldToken))
 
-	// Wait a second so the new cookie's iat is strictly newer than the
-	// old cookie's, since JWT iat resolution is whole seconds.
-	time.Sleep(1100 * time.Millisecond)
-
 	body := mustMarshal(t, map[string]string{
 		"currentPassword": testCurrentPassword,
 		"newPassword":     testNewPassword,
@@ -346,41 +342,13 @@ func TestChangePassword_InvalidatesOldCookie(t *testing.T) {
 	// The old cookie is now stale and rejected.
 	assert.Equal(t, http.StatusUnauthorized, check(oldToken))
 
-	// A freshly minted cookie with iat after password_changed_at is accepted.
-	signer := jwt.NewSigner("test-client-secret")
-	freshToken, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), time.Now(), time.Hour)
-	require.NoError(t, err)
-	assert.Equal(t, http.StatusOK, check(freshToken))
-}
-
-// TestChangePassword_ReissuedCookieValid verifies the cookie returned
-// by the change-password handler itself is treated as fresh.
-func TestChangePassword_ReissuedCookieValid(t *testing.T) {
-	server, _, oldToken := setupChangePasswordTestServer(t)
-
-	time.Sleep(1100 * time.Millisecond)
-
-	body := mustMarshal(t, map[string]string{
-		"currentPassword": testCurrentPassword,
-		"newPassword":     testNewPassword,
-	})
-	res := sendChangePasswordRequest(server, body, &http.Cookie{Name: "account_token", Value: oldToken})
-	require.Equal(t, http.StatusNoContent, res.Code)
-
-	var newAuthCookie *http.Cookie
-	for _, c := range res.Result().Cookies() {
-		if c.Name == "account_token" {
-			newAuthCookie = c
-			break
+	for _, cookie := range res.Result().Cookies() {
+		if cookie.Name == "account_token" {
+			require.Equal(t, http.StatusOK, check(cookie.Value))
+			return
 		}
 	}
-	require.NotNil(t, newAuthCookie)
-
-	req, _ := http.NewRequest(http.MethodGet, "/account", nil)
-	req.AddCookie(newAuthCookie)
-	check := httptest.NewRecorder()
-	server.Router.ServeHTTP(check, req)
-	assert.Equal(t, http.StatusOK, check.Code)
+	t.Fatal("replacement account cookie missing")
 }
 
 // TestSetAccountCookie_Helper sanity-checks the new cookie helper so any

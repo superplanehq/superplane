@@ -63,7 +63,7 @@ func setupAdminTestServer(t *testing.T) (*testServer, *support.ResourceRegistry,
 	handlers := New(r.Encryptor, r.Registry, func() (string, string) { return server.BaseURL, server.WebhooksBaseURL })
 	server.SetBillingHTTPRegistrar(handlers)
 	require.NoError(t, models.PromoteToInstallationAdmin(r.Account.ID.String()))
-	token, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), time.Now(), time.Hour)
+	token, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), time.Now(), time.Hour, r.Account.SessionGeneration)
 	require.NoError(t, err)
 	return &testServer{Server: server, billing: handlers}, r, token
 }

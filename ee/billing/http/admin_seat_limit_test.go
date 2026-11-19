@@ -29,7 +29,7 @@ func TestAdminSeatLimit(t *testing.T) {
 	path := "/admin/api/organizations/" + r.Organization.ID.String() + "/seat-limit"
 	regular, err := models.CreateAccount("Member", "seats@example.com")
 	require.NoError(t, err)
-	regularToken, err := authentication.GenerateAccountToken(jwt.NewSigner("test-client-secret"), regular.ID.String(), time.Now(), time.Hour)
+	regularToken, err := authentication.GenerateAccountToken(jwt.NewSigner("test-client-secret"), regular.ID.String(), time.Now(), time.Hour, regular.SessionGeneration)
 	require.NoError(t, err)
 	for _, method := range []string{"GET", "PUT", "DELETE"} {
 		for _, auth := range []string{"", regularToken} {
