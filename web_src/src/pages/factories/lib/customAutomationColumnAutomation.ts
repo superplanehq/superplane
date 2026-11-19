@@ -19,6 +19,7 @@ export function customAutomationColumnAutomation(
     customAutomationIcon?: string;
     customAutomationCronExpression?: string;
     customAutomationTriggers?: Array<{ mode: CustomAutomationMode; cronExpression?: string }>;
+    customAutomationRunsOnTask?: boolean;
   },
   workOrders: FactoriesWorkOrder[],
   runningCountForApp: (appId: string | undefined, orders: FactoriesWorkOrder[]) => number,
@@ -47,7 +48,7 @@ export function customAutomationColumnAutomation(
     runningCount: runningCountForApp(id, workOrders),
     catalogId: CUSTOM_AUTOMATION_CATALOG_ID,
     canvasId: id,
-    canRunNow: columnKey === "backlog" && hasSchedule ? true : undefined,
+    canRunNow: columnKey === "backlog" && (hasSchedule || app.customAutomationRunsOnTask === false) ? true : undefined,
   };
 }
 

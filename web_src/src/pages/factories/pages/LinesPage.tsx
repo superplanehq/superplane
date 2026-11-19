@@ -1150,6 +1150,8 @@ function LineDetail({
         customAutomationIcon: app.id ? customAutomationIcons.get(app.id) : undefined,
         customAutomationCronExpression: customAutomationDetails.find(({ automationId }) => automationId === app.id)
           ?.automation.settings?.schedule?.cronExpression,
+        customAutomationRunsOnTask: customAutomationDetails.find(({ automationId }) => automationId === app.id)
+          ?.automation.settings?.runsOnTask,
         customAutomationTriggers: (() => {
           const triggers = customAutomationDetails.find(({ automationId }) => automationId === app.id)?.automation
             .settings?.triggers;
