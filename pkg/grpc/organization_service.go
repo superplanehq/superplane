@@ -360,6 +360,11 @@ func (s *OrganizationService) ListIntegrationResources(ctx context.Context, req 
 	return organizations.ListIntegrationResources(ctx, s.registry, orgID, req.IntegrationId, req.Parameters)
 }
 
+func (s *OrganizationService) RetryIntegrationWebhook(ctx context.Context, req *pb.RetryIntegrationWebhookRequest) (*pb.RetryIntegrationWebhookResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.RetryIntegrationWebhook(ctx, orgID, req.IntegrationId, req.WebhookId)
+}
+
 func (s *OrganizationService) CreateIntegration(ctx context.Context, req *pb.CreateIntegrationRequest) (*pb.CreateIntegrationResponse, error) {
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
 	return organizations.CreateIntegration(

@@ -41,6 +41,17 @@ type WebhookResource struct {
 	Name string `json:"name"`
 }
 
+func (w *Webhook) SetupError() string {
+	metadata, _ := w.Metadata.Data().(map[string]any)
+	reason, _ := metadata["setupError"].(string)
+	return strings.TrimSpace(reason)
+}
+
+func (w *Webhook) HasSetupFailure() bool {
+	return w.State == WebhookStateFailed ||
+		((w.State == WebhookStatePending || w.State == WebhookStateProvisioning) && w.SetupError() != "")
+}
+
 func (w *Webhook) Ready(tx *gorm.DB) error {
 	return tx.Model(w).
 		Update("state", WebhookStateReady).
@@ -103,6 +114,41 @@ func (w *Webhook) Fail(tx *gorm.DB, reason string) error {
 
 func (w *Webhook) HasExceededRetries() bool {
 	return w.RetryCount >= w.MaxRetries
+}
+
+// RetrySetup only requeues failures. Repeated clicks cannot restart an active
+// setup or create another remote hook after setup succeeds.
+func (w *Webhook) RetrySetup(tx *gorm.DB) error {
+	if w == nil || w.ID == uuid.Nil {
+		return fmt.Errorf("missing webhook id")
+	}
+	return tx.Model(w).Where("state = ?", WebhookStateFailed).Updates(map[string]any{
+		"state": WebhookStatePending, "retry_count": 0, "updated_at": time.Now(),
+		// Older failures have no saved error. Keep their warning visible during retry.
+		"metadata": gorm.Expr(
+			"CASE WHEN jsonb_typeof(metadata) = 'object' THEN metadata ELSE '{}'::jsonb END || "+
+				"jsonb_build_object('setupError', COALESCE(NULLIF(metadata->>'setupError', ''), ?))",
+			"Webhook setup failed",
+		),
+	}).Error
+}
+
+func FindIntegrationWebhook(tx *gorm.DB, integrationID, webhookID uuid.UUID) (*Webhook, error) {
+	var hook Webhook
+	err := tx.Where("app_installation_id = ? AND id = ?", integrationID, webhookID).First(&hook).Error
+	return &hook, err
+}
+
+// Keep a failed subscription visible during its retry until setup succeeds.
+func ListIntegrationWebhookFailures(tx *gorm.DB, integrationIDs []uuid.UUID) ([]Webhook, error) {
+	var hooks []Webhook
+	if len(integrationIDs) == 0 {
+		return hooks, nil
+	}
+	err := tx.Where("app_installation_id IN ?", integrationIDs).
+		Where("state = ? OR (state IN ? AND metadata->>'setupError' <> '')", WebhookStateFailed, []string{WebhookStatePending, WebhookStateProvisioning}).
+		Order("created_at, id").Find(&hooks).Error
+	return hooks, err
 }
 
 // UpdateConfiguration stores a new configuration and leaves the state unchanged.

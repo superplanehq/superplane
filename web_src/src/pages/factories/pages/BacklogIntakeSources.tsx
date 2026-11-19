@@ -1,4 +1,5 @@
 import { LaneListenerList, type LaneListener } from "./LaneListenerList";
+import { webhookSetupInProgress } from "@/lib/webhookSetup";
 import { LINE_INTAKE_COPY, lineIntakeListenTitle, type ConfiguredLineIntakeSource } from "./lineIntakeModel";
 
 /** Intakes at the head of Backlog: each one opens the tasks below it. */
@@ -15,7 +16,10 @@ export function BacklogIntakeSources({
 }) {
   const listeners: LaneListener[] = intakes.map((intake) => ({
     id: intake.intakeId,
-    title: lineIntakeListenTitle(intake.source, intake.paused),
+    title:
+      !intake.paused && webhookSetupInProgress(intake.webhookSetupState)
+        ? "Setting up GitHub webhook"
+        : lineIntakeListenTitle(intake.source, intake.paused),
     iconSrc: intake.source.iconSrc,
     iconAlt: intake.source.iconAlt,
     healthy: intake.health !== "HEALTH_WEBHOOK_FAILED",

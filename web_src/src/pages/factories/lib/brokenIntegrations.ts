@@ -1,6 +1,6 @@
 import type { OrganizationsIntegration } from "@/api-client";
 
-export type BrokenIntegrationReason = "error" | "incomplete";
+export type BrokenIntegrationReason = "error" | "incomplete" | "webhook";
 
 export interface BrokenIntegration {
   /** Integration instance id, used to link to the detail page. */
@@ -119,6 +119,15 @@ function classifyIntegration(integration: OrganizationsIntegration): BrokenInteg
       reason: "incomplete",
       description: description || "Setup is not finished.",
       actionLabel: "Finish setup",
+    };
+  }
+
+  if (integration.status?.webhookFailures?.length) {
+    return {
+      ...identity,
+      reason: "webhook",
+      description: integration.status.webhookFailures[0].message || "Webhook setup failed.",
+      actionLabel: "Fix webhooks",
     };
   }
 
