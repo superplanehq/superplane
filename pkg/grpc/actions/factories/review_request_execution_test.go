@@ -608,9 +608,9 @@ func runReviewRequestGraph(t *testing.T, f publicationFixture, canvas *models.Ca
 
 func TestReviewRequestFromPublishedReportToGitHub(t *testing.T) {
 	for _, publishCheck := range []bool{false, true} {
-		for _, scenario := range []string{"favorable", "favorable policy", "favorable no candidates", "concerning", "status write denied", "hosted agent", "instructions changed before dispatch", "concerning no review", "fallback", "no candidate", "no suitable candidate", "ineligible fallback", "malformed output", "reported lookup error", "agent failure", "author selected", "bot selected", "reader selected", "duplicate reviewer", "additional reviewer without reason", "additional reviewer", "discovery error", "permission error", "lost permission", "identity changed", "qualifying approval", "old approval", "withdrawn approval", "request error", "already requested", "head moved", "head moved during lookups", "stale report", "closed before selection", "closed during selection"} {
+		for _, scenario := range []string{"favorable", "favorable policy", "favorable no candidates", "concerning", "status write denied", "hosted agent", "instructions changed before dispatch", "concerning no review", "fallback", "no candidate", "no suitable candidate", "ineligible fallback", "malformed output", "reported lookup error", "agent failure", "author selected", "bot selected", "reader selected", "duplicate reviewer", "additional reviewer without reason", "additional reviewer", "discovery error", "permission error", "lost permission", "identity changed", "qualifying approval before report", "qualifying approval after run creation", "old approval", "withdrawn approval", "request error", "already requested", "head moved", "head moved during lookups", "stale report", "closed before selection", "closed during selection"} {
 			t.Run(fmt.Sprintf("publish_check=%t/%s", publishCheck, scenario), func(t *testing.T) {
-				host := &reviewRequestHTTP{}
+				host := &reviewRequestHTTP{approved: scenario == "qualifying approval before report"}
 				score := 2.0
 				if strings.HasPrefix(scenario, "favorable") {
 					score = 5
@@ -654,13 +654,30 @@ func TestReviewRequestFromPublishedReportToGitHub(t *testing.T) {
 				require.NoError(t, err)
 				onBroadcast, err := f.deps.Registry.GetTrigger("onBroadcast")
 				require.NoError(t, err)
-				require.NoError(t, onBroadcast.(core.AppTrigger).OnAppMessage(core.AppMessageContext{Message: message, Configuration: trigger.Configuration.Data(), Events: workercontexts.NewEventContext(f.db, trigger, nil, nil)}))
+				require.NoError(t, onBroadcast.Setup(core.TriggerContext{
+					Configuration: trigger.Configuration.Data(),
+					Apps:          workercontexts.NewAppContext(f.db, consumer, trigger),
+					Metadata:      workercontexts.NewNodeMetadataContext(f.db, trigger),
+				}))
+				// Deliver the persisted producer message without supplying a consumer run.
+				var pending models.AppMessage
+				require.NoError(t, f.db.Where("canvas_id = ? AND source_run_id = ?", f.canvas.ID, f.run.ID).First(&pending).Error)
+				var payload map[string]any
+				require.NoError(t, json.Unmarshal(pending.Payload, &payload))
+				message["payload"] = payload
+				events := workercontexts.NewEventContext(f.db, trigger, nil, nil).WithSourceRun(pending.SourceRunID)
+				require.NoError(t, onBroadcast.(core.AppTrigger).OnAppMessage(core.AppMessageContext{Message: message, Configuration: trigger.Configuration.Data(), Events: events}))
 				var root models.CanvasEvent
 				require.NoError(t, f.db.Where("workflow_id = ? AND node_id = ?", consumer.ID, trigger.NodeID).First(&root).Error)
+				require.NotNil(t, root.SourceRunID)
+				require.Equal(t, f.run.ID, *root.SourceRunID)
+				consumerRun, err := models.FindCanvasRunInTransaction(f.db, consumer.ID, root.RunID)
+				require.NoError(t, err, "broadcast delivery must persist the consumer run before graph execution")
+				require.Equal(t, trigger.NodeID, consumerRun.NodeID)
 				host.statusDenied = publishCheck && scenario == "status write denied"
 				host.discoveryError = scenario == "discovery error"
 				host.empty = scenario == "no candidate" || scenario == "favorable no candidates"
-				host.approved = slices.Contains([]string{"qualifying approval", "old approval", "withdrawn approval"}, scenario)
+				host.approved = host.approved || slices.Contains([]string{"qualifying approval after run creation", "old approval", "withdrawn approval"}, scenario)
 				host.oldApproval = scenario == "old approval"
 				host.withdrawnApproval = scenario == "withdrawn approval"
 				host.requestError = scenario == "request error"
@@ -690,7 +707,7 @@ func TestReviewRequestFromPublishedReportToGitHub(t *testing.T) {
 					require.Equal(t, "superplane/review-request", host.statuses[len(host.statuses)-1].GetContext())
 					want := "pending"
 					switch scenario {
-					case "favorable", "favorable no candidates", "qualifying approval":
+					case "favorable", "favorable no candidates", "qualifying approval before report", "qualifying approval after run creation":
 						want = "success"
 					case "no candidate", "no suitable candidate", "ineligible fallback", "concerning no review", "malformed output", "reported lookup error", "agent failure", "author selected", "bot selected", "reader selected", "duplicate reviewer", "additional reviewer without reason", "discovery error", "permission error", "lost permission", "identity changed", "request error":
 						want = "error"
@@ -789,9 +806,22 @@ func TestReviewRequestFromPublishedReportToGitHub(t *testing.T) {
 						require.Equal(t, 1, agents)
 						require.Contains(t, activity.Description, "Security findings need review.")
 					}
-				case "qualifying approval", "already requested":
+				case "qualifying approval before report", "qualifying approval after run creation", "already requested":
 					wantTitle = "Review already covered"
 					expected = "already_covered"
+				}
+				if strings.HasPrefix(scenario, "qualifying approval") {
+					require.Equal(t, 1, agents, "existing approval must still receive policy evaluation")
+					selection := outcome[reviewRequestAgentNodeID].(map[string]any)["result"].(map[string]any)
+					require.Contains(t, activity.Description, selection["rationale"])
+					require.Contains(t, activity.Description, "Already covered: octocat")
+					request := outcome["request-reviewers"].(map[string]any)
+					covered := request["alreadyCovered"].([]any)
+					require.Len(t, covered, 1)
+					require.Equal(t, json.Number("2"), covered[0].(map[string]any)["id"])
+					require.Equal(t, "octocat", covered[0].(map[string]any)["login"])
+					require.Empty(t, request["requested"])
+					require.Empty(t, host.reviewerRemovals)
 				}
 				if scenario == "favorable policy" {
 					require.Equal(t, 1, agents)
