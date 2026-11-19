@@ -5,8 +5,10 @@ import (
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
+	"gorm.io/gorm"
 )
 
 func UpdateFactoryLine(ctx context.Context, organizationID string, req *pb.UpdateFactoryLineRequest) (*pb.UpdateFactoryLineResponse, error) {
@@ -25,43 +27,76 @@ func UpdateFactoryLine(ctx context.Context, organizationID string, req *pb.Updat
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update factory line")
 	}
-	factoryID := factory.ID
 
-	line, err := factory.FindLine(db, lineID)
+	var line *models.FactoryLine
+	err = db.Transaction(func(tx *gorm.DB) error {
+		line, err = factory.FindLineForUpdate(tx, lineID)
+		if err != nil {
+			return err
+		}
+
+		var name *string
+		if req.Name != nil {
+			trimmed := strings.TrimSpace(req.GetName())
+			if trimmed == "" {
+				return invalidArgument("name cannot be empty")
+			}
+			name = &trimmed
+		}
+
+		if req.StageConfiguration != nil && len(req.GetSteps()) > 0 {
+			return invalidArgument("steps and stages cannot be updated together")
+		}
+
+		var stages []models.FactoryLineStage
+		var steps []models.FactoryLineStep
+		if len(req.GetSteps()) > 0 {
+			steps, err = parseLineSteps(tx, orgID, factory.ID, req.GetSteps())
+			if err != nil {
+				return err
+			}
+			stages, err = line.ReconcileStages(tx, steps)
+			if err != nil {
+				return err
+			}
+			if len(stages) > factoryLineStageMaxCount {
+				return invalidArgument("a line cannot have more than 64 stages")
+			}
+		}
+
+		var columnColors map[string]string
+		if req.ColumnColors != nil {
+			columnColors, err = parseLineColumnColors(req.GetColumnColors())
+			if err != nil {
+				return err
+			}
+		}
+
+		if req.StageConfiguration != nil {
+			organization, findErr := models.FindOrganizationByIDInTransaction(tx, orgID.String())
+			if findErr != nil {
+				return findErr
+			}
+			if !organization.HasExperimentalFeature(features.FeatureFactoryCustomStages) {
+				return errFactoryCustomStagesDisabled
+			}
+			stages, err = parseFactoryLineStages(tx, line, req.GetStageConfiguration().GetStages())
+			if err != nil {
+				return err
+			}
+			if columnColors == nil {
+				columnColors = line.ColumnColorsValue()
+			}
+			columnColors = remapNewFactoryLineStageColors(req.GetStageConfiguration().GetStages(), stages, columnColors)
+		}
+
+		if name == nil && steps == nil && columnColors == nil && stages == nil {
+			return invalidArgument("name, steps, column colors, or stages must be provided")
+		}
+
+		return line.UpdateConfiguration(tx, name, steps, columnColors, stages)
+	})
 	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to update factory line")
-	}
-
-	var name *string
-	if req.Name != nil {
-		trimmed := strings.TrimSpace(req.GetName())
-		if trimmed == "" {
-			return nil, factoryErrorToStatus(invalidArgument("name cannot be empty"), "failed to update factory line")
-		}
-		name = &trimmed
-	}
-
-	var steps []models.FactoryLineStep
-	if len(req.GetSteps()) > 0 {
-		steps, err = parseLineSteps(db, orgID, factoryID, req.GetSteps())
-		if err != nil {
-			return nil, factoryErrorToStatus(err, "failed to update factory line")
-		}
-	}
-
-	var columnColors map[string]string
-	if req.ColumnColors != nil {
-		columnColors, err = parseLineColumnColors(req.GetColumnColors())
-		if err != nil {
-			return nil, factoryErrorToStatus(err, "failed to update factory line")
-		}
-	}
-
-	if name == nil && steps == nil && columnColors == nil {
-		return nil, factoryErrorToStatus(invalidArgument("name, steps, or column colors must be provided"), "failed to update factory line")
-	}
-
-	if err := line.Update(db, name, steps, columnColors); err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update factory line")
 	}
 
