@@ -31,6 +31,8 @@ type fakeOIDC struct {
 	omitEmail       bool
 	userinfoSubject string
 	extraClaims     map[string]any
+	discoveryStatus int
+	discoveryBody   string
 }
 
 func newFakeOIDC(t *testing.T) (*fakeOIDC, *httptest.Server) {
@@ -47,6 +49,12 @@ func newFakeOIDC(t *testing.T) (*fakeOIDC, *httptest.Server) {
 func (f *fakeOIDC) serve(w http.ResponseWriter, r *http.Request) {
 	switch r.URL.Path {
 	case "/.well-known/openid-configuration":
+		if f.discoveryStatus != 0 {
+			w.Header().Set("Content-Type", "text/plain")
+			w.WriteHeader(f.discoveryStatus)
+			_, _ = w.Write([]byte(f.discoveryBody))
+			return
+		}
 		writeJSON(w, map[string]any{
 			"issuer":                                f.issuer,
 			"authorization_endpoint":                f.issuer + "/authorize",
@@ -250,9 +258,14 @@ func TestOIDCTestSignIn(t *testing.T) {
 	input.Issuer = fake.issuer
 	conn := f.put(input)
 
+	settings := "/" + f.r.Organization.Slug + "/workspaces/line/settings/organization/sso"
+
 	t.Run("refuses a test without a session", func(t *testing.T) {
-		response := f.testCallback(t, conn, fake, nil)
-		require.Contains(t, response.Header().Get("Location"), "auth_error=sso_failed")
+		response := f.testCallback(t, conn, fake, nil, settings)
+		location := response.Header().Get("Location")
+		require.Contains(t, location, "auth_error=sso_failed")
+		require.Contains(t, location, "redirect="+url.QueryEscape(settings))
+		require.NotContains(t, location, "sso_test=")
 	})
 
 	t.Run("refuses a member without permission to update SSO", func(t *testing.T) {
@@ -261,13 +274,24 @@ func TestOIDCTestSignIn(t *testing.T) {
 		user, err := models.CreateUser(f.r.Organization.ID, account.ID, account.Email, account.Name)
 		require.NoError(t, err)
 		require.NoError(t, f.r.AuthService.AssignRole(user.ID.String(), models.RoleOrgOperator, f.r.Organization.ID.String(), models.DomainTypeOrganization))
-		response := f.testCallback(t, conn, fake, account)
-		require.Contains(t, response.Header().Get("Location"), "auth_error=sso_failed")
+		response := f.testCallback(t, conn, fake, account, settings)
+		location := response.Header().Get("Location")
+		require.Contains(t, location, settings)
+		require.Contains(t, location, "sso_test=failed")
+		require.Contains(t, location, "reason=test_permission")
+		require.NotContains(t, location, "auth_error")
+		saved, err := models.FindSSOConnectionByID(database.Conn(), conn.ID)
+		require.NoError(t, err)
+		require.NotContains(t, string(saved.LastTestResult), "cannot change")
 	})
 
-	t.Run("stores the claims and does not provision", func(t *testing.T) {
-		response := f.testCallback(t, conn, fake, f.r.Account)
-		require.Contains(t, response.Header().Get("Location"), "sso_test=ok")
+	t.Run("stores the claims and returns to the requested page", func(t *testing.T) {
+		response := f.testCallback(t, conn, fake, f.r.Account, settings)
+		location, err := url.Parse(response.Header().Get("Location"))
+		require.NoError(t, err)
+		require.Equal(t, settings, location.Path)
+		require.Equal(t, "ok", location.Query().Get("sso_test"))
+		require.Empty(t, location.Query().Get("reason"))
 		saved, err := models.FindSSOConnectionByID(database.Conn(), conn.ID)
 		require.NoError(t, err)
 		require.NotNil(t, saved.LastTestedAt)
@@ -276,11 +300,46 @@ func TestOIDCTestSignIn(t *testing.T) {
 		_, err = models.FindSSOIdentityBySubject(database.Conn(), conn.ID, fake.subject)
 		require.Error(t, err)
 	})
+
+	t.Run("ignores an external redirect", func(t *testing.T) {
+		response := f.testCallback(t, conn, fake, f.r.Account, "https://evil.example/phish")
+		location := response.Header().Get("Location")
+		require.NotContains(t, location, "evil.example")
+		require.Contains(t, location, "/"+f.r.Organization.Slug+"/settings/sso")
+		require.Contains(t, location, "sso_test=ok")
+	})
+
+	t.Run("stores a discovery failure", func(t *testing.T) {
+		broken, _ := newFakeOIDC(t)
+		broken.discoveryStatus = http.StatusInternalServerError
+		broken.discoveryBody = "secret-issuer-body"
+		input := connectionInput(true)
+		input.Issuer = broken.issuer
+		failed := f.put(input)
+		response := f.testCallback(t, failed, broken, f.r.Account, settings)
+		location, err := url.Parse(response.Header().Get("Location"))
+		require.NoError(t, err)
+		require.Equal(t, settings, location.Path)
+		require.Equal(t, "failed", location.Query().Get("sso_test"))
+		require.Equal(t, "begin", location.Query().Get("reason"))
+		saved, err := models.FindSSOConnectionByID(database.Conn(), failed.ID)
+		require.NoError(t, err)
+		var result models.SSOTestResultDocument
+		require.NoError(t, json.Unmarshal(saved.LastTestResult, &result))
+		require.False(t, result.OK)
+		require.Contains(t, result.Error, "SuperPlane could not read the identity provider configuration. Check the issuer URL.")
+		require.Contains(t, result.Error, broken.issuer+"/.well-known/openid-configuration returned 500.")
+		require.NotContains(t, result.Error, "secret-issuer-body")
+	})
 }
 
-func (f *flow) testCallback(t *testing.T, conn *models.SSOConnection, fake *fakeOIDC, account *models.Account) *httptest.ResponseRecorder {
+func (f *flow) testCallback(t *testing.T, conn *models.SSOConnection, fake *fakeOIDC, account *models.Account, redirect string) *httptest.ResponseRecorder {
 	t.Helper()
-	start := httptest.NewRequest(http.MethodGet, "/auth/sso/"+conn.ID.String()+"/start?test=1", nil)
+	raw := "/auth/sso/" + conn.ID.String() + "/start?test=1"
+	if redirect != "" {
+		raw += "&redirect=" + url.QueryEscape(redirect)
+	}
+	start := httptest.NewRequest(http.MethodGet, raw, nil)
 	if account != nil {
 		token, err := authentication.GenerateAccountToken(f.service.Signer, account.ID.String(), time.Now(), time.Hour)
 		require.NoError(t, err)

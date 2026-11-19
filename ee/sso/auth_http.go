@@ -159,12 +159,13 @@ func (s *Service) start(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	test := r.URL.Query().Get("test") == "1" || r.URL.Query().Get("test") == "true"
+	redirect := validatedRedirect(r.URL.Query().Get("redirect"))
 	if test {
-		if !s.allowTest(w, r, conn) {
+		if !s.allowTest(w, r, conn, redirect) {
 			return
 		}
 		if err := requireProviderCredentials(conn); err != nil {
-			s.failLogin(w, r, core.CodeFailed, "provider", conn)
+			s.failTest(w, r, conn, "provider", redirect, nil)
 			return
 		}
 	} else if conn.Status != models.SSOStatusActive {
@@ -173,16 +174,12 @@ func (s *Service) start(w http.ResponseWriter, r *http.Request) {
 	}
 	cfg, err := conn.OIDCConfig()
 	if err != nil {
-		s.failLogin(w, r, core.CodeFailed, "config", conn)
+		s.failStart(w, r, conn, test, redirect, "config", err)
 		return
 	}
 	if iss := strings.TrimRight(r.URL.Query().Get("iss"), "/"); iss != "" && !strings.EqualFold(iss, strings.TrimRight(cfg.Issuer, "/")) {
-		s.failLogin(w, r, core.CodeFailed, "issuer", conn)
+		s.failStart(w, r, conn, test, redirect, "issuer", nil)
 		return
-	}
-	redirect := r.URL.Query().Get("redirect")
-	if !authentication.IsValidRedirectURL(redirect) {
-		redirect = ""
 	}
 	target, state, err := s.adapter.BeginLogin(r.Context(), conn, core.LoginRequest{
 		LoginHint: r.URL.Query().Get("login_hint"),
@@ -190,11 +187,11 @@ func (s *Service) start(w http.ResponseWriter, r *http.Request) {
 		Test:      test,
 	})
 	if err != nil {
-		s.failLogin(w, r, core.CodeFailed, "begin", conn)
+		s.failStart(w, r, conn, test, redirect, "begin", err)
 		return
 	}
 	if err := s.writeLoginState(w, r, state); err != nil {
-		s.failLogin(w, r, core.CodeFailed, "state", conn)
+		s.failStart(w, r, conn, test, redirect, "state", err)
 		return
 	}
 	http.Redirect(w, r, target, http.StatusFound) // #nosec G710 -- target is the authorization URL from the identity provider discovery document.
@@ -216,7 +213,7 @@ func (s *Service) callback(w http.ResponseWriter, r *http.Request) {
 	}
 	identity, err := s.adapter.HandleCallback(r.Context(), conn, r, state)
 	if state.Test {
-		s.finishTest(w, r, conn, identity, err)
+		s.finishTest(w, r, conn, state.Redirect, identity, err)
 		return
 	}
 	if err != nil {
@@ -251,26 +248,27 @@ func (s *Service) callback(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, result.Redirect, http.StatusFound)
 }
 
-func (s *Service) finishTest(w http.ResponseWriter, r *http.Request, conn *models.SSOConnection, identity *core.ExternalIdentity, err error) {
+func (s *Service) finishTest(w http.ResponseWriter, r *http.Request, conn *models.SSOConnection, redirect string, identity *core.ExternalIdentity, err error) {
 	outcome := "success"
-	query := "ok"
+	result := "ok"
+	reason := ""
 	if err != nil {
 		outcome = "failure"
-		query = "failed"
+		result = "failed"
+		reason = "callback"
 		_ = s.recordTest(r.Context(), conn, false, err.Error(), "", "", "")
 	} else {
 		_ = s.recordTest(r.Context(), conn, true, "", identity.Subject, identity.Email, identity.Name)
 	}
-	logging.AddRequestLogFields(r.Context(), map[string]any{
+	fields := map[string]any{
 		"action": "sso_test", "object": "sso_connection", "outcome": outcome,
 		"sso_connection_id": conn.ID.String(), "organization_id": conn.OrganizationID.String(),
-	})
-	org, orgErr := models.FindOrganizationByIDInTransaction(database.DB(r.Context()), conn.OrganizationID.String())
-	target := "/login?sso_test=" + query
-	if orgErr == nil {
-		target = "/" + org.Slug + "/settings/sso?sso_test=" + query
 	}
-	http.Redirect(w, r, target, http.StatusFound) // #nosec G710 -- target is an internal settings path built from the organization slug.
+	if reason != "" {
+		fields["sso_failure_reason"] = reason
+	}
+	logging.AddRequestLogFields(r.Context(), fields)
+	http.Redirect(w, r, s.testResultURL(r, conn, redirect, result, reason), http.StatusFound) // #nosec G710 -- target is an internal settings path from the request or the organization slug.
 }
 
 func (s *Service) backchannelLogout(w http.ResponseWriter, r *http.Request) {
@@ -353,25 +351,25 @@ func (s *Service) connectionFromPath(w http.ResponseWriter, r *http.Request) (*m
 	return conn, true
 }
 
-func (s *Service) allowTest(w http.ResponseWriter, r *http.Request, conn *models.SSOConnection) bool {
+func (s *Service) allowTest(w http.ResponseWriter, r *http.Request, conn *models.SSOConnection, redirect string) bool {
 	session, err := authentication.AccountSessionFromRequest(r, s.Signer)
 	if err != nil {
-		s.failLogin(w, r, core.CodeFailed, "test_session", conn)
+		s.failTestSession(w, r, conn, redirect)
 		return false
 	}
 	account, err := models.FindAccountByID(session.AccountID)
 	if err != nil {
-		s.failLogin(w, r, core.CodeFailed, "test_account", conn)
+		s.failTest(w, r, conn, "test_account", redirect, nil)
 		return false
 	}
 	user, err := models.FindActiveUserByEmail(conn.OrganizationID.String(), account.Email)
 	if err != nil {
-		s.failLogin(w, r, core.CodeFailed, "test_member", conn)
+		s.failTest(w, r, conn, "test_member", redirect, nil)
 		return false
 	}
 	allowed, err := s.Auth.CheckOrganizationPermission(r.Context(), user.ID.String(), conn.OrganizationID.String(), "sso", "update")
 	if err != nil || !allowed {
-		s.failLogin(w, r, core.CodeFailed, "test_permission", conn)
+		s.failTest(w, r, conn, "test_permission", redirect, nil)
 		return false
 	}
 	return true
@@ -441,15 +439,178 @@ func (s *Service) clearLoginState(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Service) failLogin(w http.ResponseWriter, r *http.Request, code, reason string, conn *models.SSOConnection) {
+	logSSOFailure(r, conn, "sso_login", reason)
+	http.Redirect(w, r, "/login?auth_error="+url.QueryEscape(code), http.StatusFound) // #nosec G710 -- auth_error is a fixed failure code, not a redirect target.
+}
+
+func (s *Service) failStart(w http.ResponseWriter, r *http.Request, conn *models.SSOConnection, test bool, redirect, reason string, err error) {
+	if test {
+		s.failTest(w, r, conn, reason, redirect, err)
+		return
+	}
+	s.failLogin(w, r, core.CodeFailed, reason, conn)
+}
+
+func (s *Service) failTest(w http.ResponseWriter, r *http.Request, conn *models.SSOConnection, reason, redirect string, err error) {
+	logSSOFailure(r, conn, "sso_test", reason)
+	if conn != nil && recordsTestFailure(reason) {
+		_ = s.recordTest(r.Context(), conn, false, testFailureText(reason, conn, err), "", "", "")
+	}
+	http.Redirect(w, r, s.testResultURL(r, conn, redirect, "failed", reason), http.StatusFound) // #nosec G710 -- target is an internal settings path from the request or the organization slug.
+}
+
+func (s *Service) failTestSession(w http.ResponseWriter, r *http.Request, conn *models.SSOConnection, redirect string) {
+	logSSOFailure(r, conn, "sso_test", "test_session")
+	target := "/login?auth_error=" + url.QueryEscape(core.CodeFailed)
+	if settings := s.testSettingsPath(r, conn, redirect); settings != "" {
+		target += "&redirect=" + url.QueryEscape(settings)
+	}
+	http.Redirect(w, r, target, http.StatusFound) // #nosec G710 -- target is the login page with an internal settings path.
+}
+
+func logSSOFailure(r *http.Request, conn *models.SSOConnection, action, reason string) {
 	fields := map[string]any{
-		"action": "sso_login", "object": "sso_connection", "outcome": "failure", "sso_failure_reason": reason,
+		"action": action, "object": "sso_connection", "outcome": "failure", "sso_failure_reason": reason,
 	}
 	if conn != nil {
 		fields["sso_connection_id"] = conn.ID.String()
 		fields["organization_id"] = conn.OrganizationID.String()
 	}
 	logging.AddRequestLogFields(r.Context(), fields)
-	http.Redirect(w, r, "/login?auth_error="+url.QueryEscape(code), http.StatusFound)
+}
+
+func validatedRedirect(redirect string) string {
+	if !authentication.IsValidRedirectURL(redirect) {
+		return ""
+	}
+	return redirect
+}
+
+func (s *Service) testResultURL(r *http.Request, conn *models.SSOConnection, redirect, result, reason string) string {
+	path := s.testSettingsPath(r, conn, redirect)
+	if path == "" {
+		path = "/login"
+	}
+	return withTestQuery(path, result, reason)
+}
+
+func (s *Service) testSettingsPath(r *http.Request, conn *models.SSOConnection, redirect string) string {
+	if authentication.IsValidRedirectURL(redirect) {
+		return redirect
+	}
+	if conn == nil {
+		return ""
+	}
+	org, err := models.FindOrganizationByIDInTransaction(database.DB(r.Context()), conn.OrganizationID.String())
+	if err != nil {
+		return ""
+	}
+	return organizationSettingsPath(org)
+}
+
+func organizationSettingsPath(org *models.Organization) string {
+	if org == nil {
+		return ""
+	}
+	if validOrganizationPathSegment(org.Slug) {
+		return "/" + org.Slug + "/settings/sso"
+	}
+	if org.ID == uuid.Nil || !validOrganizationPathSegment(org.ID.String()) {
+		return ""
+	}
+	return "/" + org.ID.String() + "/settings/sso"
+}
+
+func validOrganizationPathSegment(segment string) bool {
+	if segment == "" || models.IsReservedOrganizationSlug(segment) {
+		return false
+	}
+	for _, char := range segment {
+		if (char < 'a' || char > 'z') && (char < '0' || char > '9') && char != '-' {
+			return false
+		}
+	}
+	return true
+}
+
+func withTestQuery(path, result, reason string) string {
+	parsed, err := url.Parse(path)
+	if err != nil || parsed.IsAbs() || parsed.Host != "" {
+		path = "/login"
+		parsed, _ = url.Parse(path)
+	}
+	query := parsed.Query()
+	query.Set("sso_test", result)
+	if reason != "" {
+		query.Set("reason", reason)
+	}
+	parsed.RawQuery = query.Encode()
+	return parsed.RequestURI()
+}
+
+func recordsTestFailure(reason string) bool {
+	switch reason {
+	case "provider", "config", "issuer", "begin", "state":
+		return true
+	default:
+		return false
+	}
+}
+
+func testFailureText(reason string, conn *models.SSOConnection, err error) string {
+	switch reason {
+	case "test_member", "test_permission", "test_account":
+		return "Your account cannot change Single Sign-On in this organization."
+	case "provider":
+		return "Add the issuer URL, client ID and client secret first."
+	case "begin", "config", "issuer":
+		text := "SuperPlane could not read the identity provider configuration. Check the issuer URL."
+		if detail := discoveryDetail(conn, err); detail != "" {
+			return text + " " + detail
+		}
+		return text
+	default:
+		if err != nil && err.Error() != "" {
+			return err.Error()
+		}
+		return "The sign-in test failed."
+	}
+}
+
+func discoveryDetail(conn *models.SSOConnection, err error) string {
+	if conn == nil || err == nil {
+		return ""
+	}
+	cfg, cfgErr := conn.OIDCConfig()
+	if cfgErr != nil {
+		return ""
+	}
+	issuer := strings.TrimRight(strings.TrimSpace(cfg.Issuer), "/")
+	parsed, parseErr := url.Parse(issuer)
+	if parseErr != nil || parsed.Host == "" || parsed.User != nil || (parsed.Scheme != "https" && parsed.Scheme != "http") {
+		return ""
+	}
+	target := issuer + "/.well-known/openid-configuration"
+	if status := httpStatusPrefix(err.Error()); status != "" {
+		return target + " returned " + status + "."
+	}
+	return target + "."
+}
+
+func httpStatusPrefix(text string) string {
+	code, _, ok := strings.Cut(strings.TrimSpace(text), " ")
+	if !ok && len(strings.TrimSpace(text)) == 3 {
+		code = strings.TrimSpace(text)
+	}
+	if len(code) != 3 || code[0] < '1' || code[0] > '5' {
+		return ""
+	}
+	for _, char := range code {
+		if char < '0' || char > '9' {
+			return ""
+		}
+	}
+	return code
 }
 
 func writeBackchannelError(w http.ResponseWriter) {

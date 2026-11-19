@@ -315,6 +315,7 @@ function ActivationRows({
 }) {
   const result = testResultText(model.connection);
   const missingCredentials = !draft.providerReady;
+  const testFailure = model.testFailure && !result?.includes(model.testFailure) ? model.testFailure : null;
   return (
     <div className="space-y-6">
       <ActionRow
@@ -323,6 +324,7 @@ function ActivationRows({
         detail={
           <>
             {result ? <p className="text-[12px] leading-5 text-muted-foreground">{result}</p> : null}
+            {testFailure ? <p className="text-[12px] leading-5 text-muted-foreground">{testFailure}</p> : null}
             {missingCredentials ? (
               <p className="text-[12px] leading-5 text-muted-foreground">
                 Add the issuer URL, client ID and client secret first.

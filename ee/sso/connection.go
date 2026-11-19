@@ -338,7 +338,7 @@ func (s *Service) connectionView(conn *models.SSOConnection) (*enterprise.SSOCon
 }
 
 func (s *Service) recordTest(ctx context.Context, conn *models.SSOConnection, ok bool, reason, subject, email, name string) error {
-	if len(reason) > 180 || strings.Contains(strings.ToLower(reason), "token") || strings.Contains(reason, "eyJ") {
+	if len(reason) > 500 || strings.Contains(strings.ToLower(reason), "token") || strings.Contains(reason, "eyJ") {
 		reason = "The sign-in test failed."
 	}
 	document := models.SSOTestResultDocument{OK: ok, Error: reason, Subject: subject, Email: email, Name: name}

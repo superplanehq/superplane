@@ -22,7 +22,7 @@ import {
   useVerifySsoDomain,
 } from "@/hooks/useSso";
 
-import type { SsoSettingsActions, SsoSettingsModel } from "./ssoSettingsTypes";
+import { ssoTestFailureMessage, type SsoSettingsActions, type SsoSettingsModel } from "./ssoSettingsTypes";
 
 export function useSsoSettingsScreen(organizationId: string) {
   const data = useSsoSettingsData(organizationId);
@@ -62,17 +62,19 @@ function useSsoSettingsData(organizationId: string) {
 function useSsoFeedback() {
   const [revealedToken, setRevealedToken] = useState<string | null>(null);
   const [domainError, setDomainError] = useState<{ id: string; message: string } | null>(null);
+  const [testFailure, setTestFailure] = useState<string | null>(null);
   const [secretEpoch, setSecretEpoch] = useState(0);
   const [params, setParams] = useSearchParams();
   useEffect(() => {
-    readTestFlag(params, setParams);
+    applyTestFlag(params, setParams, setTestFailure);
   }, [params, setParams]);
-  return { revealedToken, setRevealedToken, domainError, setDomainError, secretEpoch, setSecretEpoch };
+  return { revealedToken, setRevealedToken, domainError, setDomainError, testFailure, secretEpoch, setSecretEpoch };
 }
 
-function readTestFlag(
+function applyTestFlag(
   params: URLSearchParams,
   setParams: (next: URLSearchParams, options: { replace: boolean }) => void,
+  setTestFailure: (message: string | null) => void,
 ) {
   const flag = params.get("sso_test");
   if (!flag) {
@@ -80,11 +82,15 @@ function readTestFlag(
   }
   if (flag === "ok") {
     showSuccessToast("The sign-in test succeeded.");
+    setTestFailure(null);
   } else {
-    showErrorToast("The sign-in test failed.");
+    const message = ssoTestFailureMessage(params.get("reason"));
+    showErrorToast(message);
+    setTestFailure(message);
   }
   const next = new URLSearchParams(params);
   next.delete("sso_test");
+  next.delete("reason");
   setParams(next, { replace: true });
 }
 
@@ -114,6 +120,7 @@ function ssoModel(data: SettingsData, feedback: SettingsFeedback): SsoSettingsMo
     tokens: data.tokensQuery.data ?? [],
     domainError: feedback.domainError,
     revealedToken: feedback.revealedToken,
+    testFailure: feedback.testFailure,
   };
 }
 
@@ -152,7 +159,8 @@ function ssoActions(data: SettingsData, feedback: SettingsFeedback): SsoSettings
     },
     onTest: () => {
       if (connection?.id) {
-        window.location.href = `/auth/sso/${connection.id}/start?test=1`;
+        const redirect = encodeURIComponent(window.location.pathname);
+        window.location.href = `/auth/sso/${connection.id}/start?test=1&redirect=${redirect}`;
       }
     },
     onActivate: () => {

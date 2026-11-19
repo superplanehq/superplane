@@ -85,6 +85,8 @@ func TestSSOConfigureTestAndSignIn(t *testing.T) {
 	s.AssertText("Verified")
 	s.Click(queries.Locator("button:text-is(\"Test connection\")"))
 	s.AssertText("The sign-in test succeeded.")
+	s.AssertText("Last test passed")
+	require.Contains(t, s.Page().URL(), "/settings/sso")
 	s.Click(queries.Locator("button:text-is(\"Activate\")"))
 	s.AssertText("Single Sign-On is active.")
 

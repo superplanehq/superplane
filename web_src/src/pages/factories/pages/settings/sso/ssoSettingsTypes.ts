@@ -14,6 +14,23 @@ export function testResultText(connection: SsoConnection | null | undefined) {
   return when ? `Last test failed on ${when}: ${error}` : `Last test failed: ${error}`;
 }
 
+export function ssoTestFailureMessage(reason: string | null) {
+  switch (reason) {
+    case "test_member":
+    case "test_permission":
+    case "test_account":
+      return "Your account cannot change Single Sign-On in this organization.";
+    case "provider":
+      return "Add the issuer URL, client ID and client secret first.";
+    case "begin":
+    case "config":
+    case "issuer":
+      return "SuperPlane could not read the identity provider configuration. Check the issuer URL.";
+    default:
+      return "The sign-in test failed.";
+  }
+}
+
 export function statusLabel(status: string | undefined) {
   if (status === "STATUS_ACTIVE") return "Active";
   if (status === "STATUS_DISABLED") return "Disabled";
@@ -30,6 +47,7 @@ export type SsoSettingsModel = {
   tokens: SsoscimToken[];
   domainError?: { id: string; message: string } | null;
   revealedToken?: string | null;
+  testFailure?: string | null;
 };
 
 export type SsoSettingsActions = {
