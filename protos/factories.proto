@@ -134,6 +134,18 @@ service Factories {
     };
   }
 
+  rpc ConnectVCSProviderInstallation(ConnectVCSProviderInstallationRequest) returns (ConnectVCSProviderInstallationResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/vcs-installations"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Connect a GitHub App installation";
+      description: "Creates the organization integration for the public GitHub App installation that owns an accessible repository";
+      tags: "Factory";
+    };
+  }
+
   rpc DeleteFactory(DeleteFactoryRequest) returns (DeleteFactoryResponse) {
     option (google.api.http) = {
       delete: "/api/v1/factories/{id}"
@@ -1196,6 +1208,10 @@ message UpdateFactoryRepositoryRequest {
   // repository move to the saved repository and branch. False keeps those
   // tasks on their current repository and branch.
   optional bool retarget_tasks = 4;
+  // Git connection (integration ID) for the workspace. When set, the
+  // workspace and its automations move to this integration. The integration
+  // must be ready, use the workspace Git host, and see the repository.
+  optional string integration_id = 5;
 }
 
 message UpdateFactoryRepositoryResponse {
@@ -1212,6 +1228,16 @@ message SelectFactoryVCSProviderRepositoryRequest {
 
 message SelectFactoryVCSProviderRepositoryResponse {
   Factory factory = 1;
+}
+
+message ConnectVCSProviderInstallationRequest {
+  // A GitHub repository that the caller can access. SuperPlane connects the
+  // public GitHub App installation that owns this repository.
+  int64 repository_id = 1;
+}
+
+message ConnectVCSProviderInstallationResponse {
+  string integration_id = 1;
 }
 
 message DeleteFactoryRequest {

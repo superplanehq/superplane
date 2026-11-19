@@ -496,7 +496,7 @@ func Test__BitbucketContextRepoWriteAccess(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 	factory := bitbucketFactory(t, r)
-	integrationID := uuid.NewString()
+	integrationID := support.CreateIntegrationID(t, r.Organization.ID, models.ProviderBitbucket)
 	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSIntegrationID: &integrationID}))
 
 	stubBitbucket := func(t *testing.T, authType string, responses ...*http.Response) *contexts.HTTPContext {
@@ -630,7 +630,7 @@ func Test__CreateFactoryAgentResourceRejectsInaccessibleContextRepo(t *testing.T
 
 	personal, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
-	personalIntegrationID := uuid.NewString()
+	personalIntegrationID := support.CreateIntegrationID(t, r.Organization.ID, models.ProviderGitHub)
 	require.NoError(t, personal.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSIntegrationID: &personalIntegrationID}))
 	personalResponse, err := CreateFactoryAgentResource(ctx, IntakeDependencies{}, r.Organization.ID.String(), &pb.CreateFactoryAgentResourceRequest{
 		FactoryId:  personal.ID.String(),
