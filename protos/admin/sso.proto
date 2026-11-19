@@ -1,0 +1,65 @@
+syntax = "proto3";
+
+package Superplane.Admin.SSO;
+
+import "google/api/annotations.proto";
+
+option go_package = "github.com/superplanehq/superplane/pkg/protos/admin/sso";
+
+service AdminSSO {
+  rpc GetOrganizationSSO(GetOrganizationSSORequest) returns (GetOrganizationSSOResponse) {
+    option (google.api.http) = {get: "/admin/api/organizations/{organization_id}/sso"};
+  }
+
+  rpc DisableOrganizationSSO(DisableOrganizationSSORequest) returns (GetOrganizationSSOResponse) {
+    option (google.api.http) = {post: "/admin/api/organizations/{organization_id}/sso/disable"};
+  }
+
+  rpc VerifyOrganizationDomain(VerifyOrganizationDomainRequest) returns (VerifyOrganizationDomainResponse) {
+    option (google.api.http) = {post: "/admin/api/organizations/{organization_id}/sso/domains/{domain_id}/verify"};
+  }
+}
+
+message AdminConnection {
+  bool exists = 1;
+  string id = 2;
+  string status = 3;
+  string enforcement = 4;
+  string display_name = 5;
+  string protocol = 6;
+}
+
+message AdminDomain {
+  string id = 1;
+  string domain = 2;
+  bool verified = 3;
+  string verification_method = 4;
+}
+
+message GetOrganizationSSORequest {
+  string organization_id = 1;
+}
+
+message GetOrganizationSSOResponse {
+  AdminConnection connection = 1;
+  repeated AdminDomain domains = 2;
+}
+
+message DisableOrganizationSSORequest {
+  string organization_id = 1;
+}
+
+message VerifyOrganizationDomainRequest {
+  string organization_id = 1;
+  string domain_id = 2;
+}
+
+message VerifyOrganizationDomainResponse {
+  string id = 1;
+  string domain = 2;
+  string verification_token = 3;
+  string txt_name = 4;
+  string txt_value = 5;
+  string verification_method = 6;
+  bool verified = 7;
+}
