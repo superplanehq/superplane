@@ -15,13 +15,14 @@ const AccessTokenTTL = time.Hour
 const ConsentTTL = 10 * time.Minute
 
 type AccessClaims struct {
-	UserID     uuid.UUID
-	OrgID      uuid.UUID
-	FactoryID  uuid.UUID
-	FactoryIDs []uuid.UUID
-	ClientID   string
-	Resource   string
-	Scopes     []string
+	PasswordVersion string
+	UserID          uuid.UUID
+	OrgID           uuid.UUID
+	FactoryID       uuid.UUID
+	FactoryIDs      []uuid.UUID
+	ClientID        string
+	Resource        string
+	Scopes          []string
 }
 
 func (c AccessClaims) WorkspaceIDs() []uuid.UUID {
@@ -56,7 +57,7 @@ func MintAccessToken(signer *jwt.Signer, claims AccessClaims, ttl time.Duration)
 	if ttl <= 0 {
 		ttl = AccessTokenTTL
 	}
-	return signer.GenerateWithClaims(ttl, map[string]string{
+	values := map[string]string{
 		"purpose":     AccessTokenPurpose,
 		"sub":         claims.UserID.String(),
 		"org_id":      claims.OrgID.String(),
@@ -65,7 +66,11 @@ func MintAccessToken(signer *jwt.Signer, claims AccessClaims, ttl time.Duration)
 		"client_id":   clientID,
 		"aud":         resource,
 		"scope":       strings.Join(normalizeScopes(claims.Scopes), " "),
-	})
+	}
+	if claims.PasswordVersion != "" {
+		values["password_version"] = claims.PasswordVersion
+	}
+	return signer.GenerateWithClaims(ttl, values)
 }
 
 func ParseAccessToken(signer *jwt.Signer, token, resource string) (*AccessClaims, error) {
@@ -105,14 +110,29 @@ func ParseAccessToken(signer *jwt.Signer, token, resource string) (*AccessClaims
 		return nil, fmt.Errorf("invalid client_id")
 	}
 	scope, _ := claims["scope"].(string)
+	version := ""
+	if raw, present := claims["password_version"]; present {
+		var ok bool
+		version, ok = raw.(string)
+		if !ok || version == "" {
+			return nil, fmt.Errorf("invalid password version")
+		}
+		if version != "never" {
+			parsed, err := time.Parse("2006-01-02T15:04:05.000000Z", version)
+			if err != nil || parsed.Format("2006-01-02T15:04:05.000000Z") != version {
+				return nil, fmt.Errorf("invalid password version")
+			}
+		}
+	}
 	return &AccessClaims{
-		UserID:     userID,
-		OrgID:      orgID,
-		FactoryID:  factoryIDs[0],
-		FactoryIDs: factoryIDs,
-		ClientID:   clientID,
-		Resource:   audience,
-		Scopes:     strings.Fields(scope),
+		PasswordVersion: version,
+		UserID:          userID,
+		OrgID:           orgID,
+		FactoryID:       factoryIDs[0],
+		FactoryIDs:      factoryIDs,
+		ClientID:        clientID,
+		Resource:        audience,
+		Scopes:          strings.Fields(scope),
 	}, nil
 }
 

@@ -52,6 +52,14 @@ func (a *Account) IsSessionFresh(issuedAt int64) bool {
 	return issuedAt >= a.PasswordChangedAt.Unix()
 }
 
+// PasswordVersion is the persisted credential version, independent of JWT iat.
+func (a *Account) PasswordVersion() string {
+	if a.PasswordChangedAt == nil {
+		return "never"
+	}
+	return a.PasswordChangedAt.UTC().Truncate(time.Microsecond).Format("2006-01-02T15:04:05.000000Z")
+}
+
 // MarkPasswordChangedInTransaction stamps the password rotation time on the
 // account. Used together with rotating the password hash and clearing API
 // tokens to invalidate every existing session for the account.
