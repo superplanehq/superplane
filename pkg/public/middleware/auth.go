@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -11,11 +12,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/enterprise"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/supportsession"
@@ -225,7 +228,22 @@ func resolveSupportSessionAccount(
 	return targetAccount, info, nil
 }
 
-func OrganizationAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
+// OrganizationSSOChecker enforces an active SSO connection on cookie sessions.
+type OrganizationSSOChecker interface {
+	CheckOrganizationAccess(ctx context.Context, user *models.User, session enterprise.SSOAccessSession) (*enterprise.SSORequired, error)
+}
+
+type ssoRequiredError struct {
+	StartURL string
+}
+
+func (e *ssoRequiredError) Error() string { return "sso_required" }
+
+func OrganizationAuthMiddleware(jwtSigner *jwt.Signer, checkers ...OrganizationSSOChecker) mux.MiddlewareFunc {
+	var checker OrganizationSSOChecker
+	if len(checkers) > 0 {
+		checker = checkers[0]
+	}
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx, span := telemetry.StartSpan(r.Context(), "auth.organization_auth")
@@ -262,10 +280,18 @@ func OrganizationAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
 			// Otherwise, we authenticate the account with the cookie,
 			// and expect an organization ID in the header or query parameters.
 			//
-			user, supportSessionInfo, err := authenticateUserByCookie(ctx, w, jwtSigner, r)
+			user, supportSessionInfo, err := authenticateUserByCookie(ctx, w, jwtSigner, r, checker)
 			if err != nil {
 				if errors.Is(err, models.ErrAccountBlocked) {
 					http.Error(w, models.AccountBlockedMessage, http.StatusForbidden)
+					return
+				}
+				var required *ssoRequiredError
+				if errors.As(err, &required) {
+					w.Header().Set("Content-Type", "application/json")
+					w.Header().Set("X-SuperPlane-SSO-Start", required.StartURL)
+					w.WriteHeader(http.StatusUnauthorized)
+					_ = json.NewEncoder(w).Encode(map[string]string{"code": "sso_required", "startUrl": required.StartURL})
 					return
 				}
 				if err.Error() == OrganizationNotFoundError {
@@ -434,6 +460,7 @@ func authenticateUserByCookie(
 	w http.ResponseWriter,
 	jwtSigner *jwt.Signer,
 	r *http.Request,
+	checker OrganizationSSOChecker,
 ) (*models.User, *SupportSessionInfo, error) {
 	ctx, span := telemetry.StartSpan(ctx, "auth.authenticate_by_cookie")
 	defer span.End()
@@ -469,6 +496,26 @@ func authenticateUserByCookie(
 	user, err = models.FindActiveUserByEmailInTransaction(database.DB(ctx), organizationID, account.Email)
 	if err != nil {
 		return nil, nil, errors.New(OrganizationNotFoundError)
+	}
+	if checker != nil {
+		session, err := authentication.AccountSessionFromRequest(r, jwtSigner)
+		if err != nil {
+			return nil, nil, err
+		}
+		accountID, err := uuid.Parse(session.AccountID)
+		if err != nil {
+			return nil, nil, err
+		}
+		required, err := checker.CheckOrganizationAccess(ctx, user, enterprise.SSOAccessSession{
+			AccountID: accountID,
+			SSO:       session.SSO,
+		})
+		if err != nil {
+			return nil, nil, err
+		}
+		if required != nil {
+			return nil, nil, &ssoRequiredError{StartURL: required.StartURL}
+		}
 	}
 
 	return user, nil, nil
