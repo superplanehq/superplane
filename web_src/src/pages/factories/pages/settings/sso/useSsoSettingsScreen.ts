@@ -4,6 +4,7 @@ import { useSearchParams } from "react-router";
 import type { SsoPutConnectionRequest } from "@/api-client/types.gen";
 import { usePermissions } from "@/contexts/usePermissions";
 import { getApiErrorMessage } from "@/lib/errors";
+import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { hasOrganizationEnterpriseFeature } from "@/lib/license";
 import { useOrganization } from "@/hooks/useOrganizationData";
 import {
@@ -26,6 +27,12 @@ import type { SsoSettingsActions, SsoSettingsModel } from "./ssoSettingsTypes";
 export function useSsoSettingsScreen(organizationId: string) {
   const data = useSsoSettingsData(organizationId);
   const feedback = useSsoFeedback();
+  const loadError = data.connectionQuery.error ?? data.domainsQuery.error ?? data.tokensQuery.error;
+  useEffect(() => {
+    if (loadError) {
+      showErrorToast(getApiErrorMessage(loadError, "Single Sign-On could not be loaded."));
+    }
+  }, [loadError]);
   const model = ssoModel(data, feedback);
   const actions = ssoActions(data, feedback);
   return { loading: data.connectionQuery.isLoading, model, actions };
@@ -54,20 +61,17 @@ function useSsoSettingsData(organizationId: string) {
 
 function useSsoFeedback() {
   const [revealedToken, setRevealedToken] = useState<string | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [domainError, setDomainError] = useState<{ id: string; message: string } | null>(null);
   const [secretEpoch, setSecretEpoch] = useState(0);
   const [params, setParams] = useSearchParams();
   useEffect(() => {
-    readTestFlag(params, setNotice, setActionError, setParams);
+    readTestFlag(params, setParams);
   }, [params, setParams]);
-  return { revealedToken, setRevealedToken, actionError, setActionError, notice, secretEpoch, setSecretEpoch };
+  return { revealedToken, setRevealedToken, domainError, setDomainError, secretEpoch, setSecretEpoch };
 }
 
 function readTestFlag(
   params: URLSearchParams,
-  setNotice: (value: string | null) => void,
-  setActionError: (value: string | null) => void,
   setParams: (next: URLSearchParams, options: { replace: boolean }) => void,
 ) {
   const flag = params.get("sso_test");
@@ -75,9 +79,9 @@ function readTestFlag(
     return;
   }
   if (flag === "ok") {
-    setNotice("The sign-in test succeeded.");
+    showSuccessToast("The sign-in test succeeded.");
   } else {
-    setActionError("The sign-in test failed.");
+    showErrorToast("The sign-in test failed.");
   }
   const next = new URLSearchParams(params);
   next.delete("sso_test");
@@ -89,7 +93,6 @@ type SettingsFeedback = ReturnType<typeof useSsoFeedback>;
 
 function ssoModel(data: SettingsData, feedback: SettingsFeedback): SsoSettingsModel {
   const connection = data.connectionQuery.data?.exists ? data.connectionQuery.data.connection : null;
-  const loadError = data.connectionQuery.error ?? data.domainsQuery.error ?? data.tokensQuery.error;
   const busy = [
     data.save,
     data.activate,
@@ -109,37 +112,42 @@ function ssoModel(data: SettingsData, feedback: SettingsFeedback): SsoSettingsMo
     connection,
     domains: data.domainsQuery.data ?? [],
     tokens: data.tokensQuery.data ?? [],
-    error:
-      feedback.actionError ?? (loadError ? getApiErrorMessage(loadError, "Single Sign-On could not be loaded.") : null),
-    notice: feedback.notice,
+    domainError: feedback.domainError,
     revealedToken: feedback.revealedToken,
   };
 }
 
 function ssoActions(data: SettingsData, feedback: SettingsFeedback): SsoSettingsActions {
   const fail = (mutationError: unknown) => {
-    feedback.setActionError(getApiErrorMessage(mutationError, "The request failed. Try again."));
+    showErrorToast(getApiErrorMessage(mutationError, "The request failed. Try again."));
   };
-  const start = () => feedback.setActionError(null);
+  const start = () => feedback.setDomainError(null);
   const connection = data.connectionQuery.data?.exists ? data.connectionQuery.data.connection : null;
   return {
     onAddDomain: (domain) => {
       start();
-      data.createDomain.mutate(domain, { onError: fail });
+      data.createDomain.mutate(domain, { onError: fail, onSuccess: () => showSuccessToast("Domain added.") });
     },
     onVerifyDomain: (id) => {
       start();
-      data.verifyDomain.mutate(id, { onError: fail });
+      data.verifyDomain.mutate(id, {
+        onError: (error) =>
+          feedback.setDomainError({ id, message: getApiErrorMessage(error, "The domain could not be verified.") }),
+        onSuccess: () => showSuccessToast("Domain verified."),
+      });
     },
     onDeleteDomain: (id) => {
       start();
-      data.deleteDomain.mutate(id, { onError: fail });
+      data.deleteDomain.mutate(id, { onError: fail, onSuccess: () => showSuccessToast("Domain deleted.") });
     },
     onSave: (input: SsoPutConnectionRequest) => {
       start();
       data.save.mutate(input, {
         onError: fail,
-        onSuccess: () => feedback.setSecretEpoch((current) => current + 1),
+        onSuccess: () => {
+          feedback.setSecretEpoch((current) => current + 1);
+          showSuccessToast("Connection saved.");
+        },
       });
     },
     onTest: () => {
@@ -149,26 +157,35 @@ function ssoActions(data: SettingsData, feedback: SettingsFeedback): SsoSettings
     },
     onActivate: () => {
       start();
-      data.activate.mutate(undefined, { onError: fail });
+      data.activate.mutate(undefined, {
+        onError: fail,
+        onSuccess: () => showSuccessToast("Single Sign-On is active."),
+      });
     },
     onDisable: () => {
       start();
-      data.disable.mutate(undefined, { onError: fail });
+      data.disable.mutate(undefined, {
+        onError: fail,
+        onSuccess: () => showSuccessToast("Single Sign-On is disabled."),
+      });
     },
     onDelete: () => {
       start();
-      data.remove.mutate(undefined, { onError: fail });
+      data.remove.mutate(undefined, { onError: fail, onSuccess: () => showSuccessToast("Connection deleted.") });
     },
     onCreateToken: (description) => {
       start();
       data.createToken.mutate(description, {
         onError: fail,
-        onSuccess: (response) => feedback.setRevealedToken(response.data?.secret ?? null),
+        onSuccess: (response) => {
+          feedback.setRevealedToken(response.data?.secret ?? null);
+          showSuccessToast("SCIM token created.");
+        },
       });
     },
     onRevokeToken: (id) => {
       start();
-      data.revokeToken.mutate(id, { onError: fail });
+      data.revokeToken.mutate(id, { onError: fail, onSuccess: () => showSuccessToast("SCIM token revoked.") });
     },
     onDismissToken: () => feedback.setRevealedToken(null),
   };

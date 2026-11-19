@@ -19,6 +19,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/test/support"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"gorm.io/gorm"
 )
 
@@ -278,6 +280,47 @@ func TestSignInRefusesAnIdentityDeactivatedBeforeTheLock(t *testing.T) {
 	saved, err := models.FindSSOIdentityBySubject(database.Conn(), conn.ID, "user-1")
 	require.NoError(t, err)
 	require.False(t, saved.Active)
+}
+
+func TestDraftConnectionShowsURLsBeforeTheProviderValues(t *testing.T) {
+	f := newFlow(t)
+	view, err := f.service.PutConnection(f.ctx(), f.r.Organization.ID, f.r.Account.ID, enterprise.SSOConnectionInput{
+		Preset:      models.SSOPresetOkta,
+		DisplayName: "Okta",
+	})
+	require.NoError(t, err)
+	require.Equal(t, models.SSOStatusDraft, view.Status)
+	require.False(t, view.ClientSecretSet)
+	id := view.ID.String()
+	require.Equal(t, "https://app.example.com/auth/sso/"+id+"/callback", view.RedirectURI)
+	require.Equal(t, "https://app.example.com/auth/sso/"+id+"/start", view.InitiateLoginURI)
+	require.Equal(t, "https://app.example.com/login", view.PostLogoutRedirectURI)
+	require.Equal(t, "https://app.example.com/auth/sso/"+id+"/backchannel-logout", view.BackChannelLogoutURI)
+
+	conn, err := models.FindSSOConnectionByOrganization(database.Conn(), f.r.Organization.ID)
+	require.NoError(t, err)
+	err = requireProviderCredentials(conn)
+	require.Equal(t, codes.FailedPrecondition, status.Code(err))
+	_, err = f.service.ActivateConnection(f.ctx(), f.r.Organization.ID)
+	require.Equal(t, codes.FailedPrecondition, status.Code(err))
+	require.Contains(t, err.Error(), "Add the issuer URL, client ID and client secret before you test the connection.")
+
+	input := connectionInput(true)
+	saved, err := f.service.PutConnection(f.ctx(), f.r.Organization.ID, f.r.Account.ID, input)
+	require.NoError(t, err)
+	require.True(t, saved.ClientSecretSet)
+	conn, err = models.FindSSOConnectionByOrganization(database.Conn(), f.r.Organization.ID)
+	require.NoError(t, err)
+	require.NoError(t, requireProviderCredentials(conn))
+
+	kept, err := f.service.PutConnection(f.ctx(), f.r.Organization.ID, f.r.Account.ID, enterprise.SSOConnectionInput{
+		Preset:      input.Preset,
+		DisplayName: input.DisplayName,
+		Issuer:      input.Issuer,
+		ClientID:    input.ClientID,
+	})
+	require.NoError(t, err)
+	require.True(t, kept.ClientSecretSet)
 }
 
 func TestConnectionAndDomainRules(t *testing.T) {

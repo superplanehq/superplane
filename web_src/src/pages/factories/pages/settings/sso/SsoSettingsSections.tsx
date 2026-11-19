@@ -1,37 +1,48 @@
-import { useId } from "react";
+import { Circle, CircleCheck, Trash2 } from "lucide-react";
 
 import type { SsoConnection, SsoDomain } from "@/api-client/types.gen";
 import { Badge } from "@/components/Badge/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { CopyButton } from "@/ui/CopyButton";
+import { Separator } from "@/components/ui/separator";
 
-import { SsoSelect, SsoSwitch } from "./SsoSettingsControls";
-import {
-  statusLabel,
-  testResultText,
-  type ConfirmRequest,
-  type SsoDraft,
-  type SsoSettingsActions,
-  type SsoSettingsModel,
-} from "./ssoSettingsTypes";
+import { FactorySettingsCard } from "../FactorySettingsCard";
+import { SsoSelect } from "./SsoSettingsControls";
+import { ActionRow, CardSave, CopyField, NeedsConnection, PermissionTip, TextField } from "./ssoSettingsFields";
+import { testResultText, type SsoDraft, type SsoSettingsActions, type SsoSettingsModel } from "./ssoSettingsTypes";
 
-const ROLES = [
-  { value: "org_admin", label: "Admin" },
-  { value: "org_maintainer", label: "Maintainer" },
-  { value: "org_operator", label: "Operator" },
+const PRESETS = [
+  { value: "PRESET_OKTA", label: "Okta" },
+  { value: "PRESET_ENTRA", label: "Microsoft Entra ID" },
+  { value: "PRESET_GENERIC", label: "Generic OIDC" },
 ];
 
-export function DomainSection({
+export function SetupCard({ draft }: { draft: SsoDraft }) {
+  const connected = draft.exists && draft.providerReady;
+  return (
+    <FactorySettingsCard title="Setup" data-testid="sso-setup">
+      <ul className="space-y-2">
+        <SetupRow done={draft.verified} label="Verify an email domain" />
+        <SetupRow done={connected} label="Connect the identity provider" />
+        <SetupRow done={draft.tested} label="Pass a connection test" />
+      </ul>
+      <p className="mt-3 text-[12px] leading-5 text-muted-foreground">
+        Members see Single Sign-On on the login page after you activate the connection.
+      </p>
+    </FactorySettingsCard>
+  );
+}
+
+function SetupRow({ done, label }: { done: boolean; label: string }) {
+  const Icon = done ? CircleCheck : Circle;
+  return (
+    <li className="flex items-center gap-2 text-[13px]">
+      <Icon className={done ? "size-4 text-foreground" : "size-4 text-muted-foreground"} aria-hidden />
+      <span className={done ? "text-foreground" : "text-muted-foreground"}>{label}</span>
+    </li>
+  );
+}
+
+export function DomainCard({
   model,
   actions,
   draft,
@@ -41,143 +52,243 @@ export function DomainSection({
   draft: SsoDraft;
 }) {
   return (
-    <section className="space-y-3">
-      <h2 className="text-base font-medium">Domains</h2>
-      <p className="text-sm text-gray-600">Add a domain. Publish the TXT record. Then verify the domain.</p>
+    <FactorySettingsCard
+      title="Email domains"
+      description="Members with an email address on a verified domain can sign in with Single Sign-On."
+      attachedList={model.domains.length > 0}
+      data-testid="sso-domains"
+    >
       <form
-        className="flex gap-2"
+        className="flex flex-wrap items-end gap-2"
         onSubmit={(event) => {
           event.preventDefault();
           if (draft.domain.trim()) actions.onAddDomain(draft.domain.trim());
         }}
       >
-        <Label className="sr-only" htmlFor="sso-domain">
-          Domain
-        </Label>
-        <Input
+        <TextField
           id="sso-domain"
+          label="Domain"
           value={draft.domain}
-          onChange={(event) => draft.setDomain(event.target.value)}
+          placeholder="example.com"
           disabled={!draft.canChange}
+          onChange={draft.setDomain}
         />
-        <Button type="submit" disabled={!draft.canChange}>
-          Add domain
-        </Button>
+        <PermissionTip permitted={draft.permitted}>
+          <Button type="submit" disabled={!draft.canChange || !draft.domain.trim()}>
+            Add domain
+          </Button>
+        </PermissionTip>
       </form>
-      {model.domains.map((item) => (
-        <DomainRow key={item.id} item={item} actions={actions} draft={draft} />
-      ))}
-    </section>
+      {model.domains.length > 0 ? (
+        <ul className="mt-4 divide-y divide-border border-t border-border">
+          {model.domains.map((item) => (
+            <DomainRow key={item.id} item={item} model={model} actions={actions} draft={draft} />
+          ))}
+        </ul>
+      ) : null}
+    </FactorySettingsCard>
   );
 }
 
-function DomainRow({ item, actions, draft }: { item: SsoDomain; actions: SsoSettingsActions; draft: SsoDraft }) {
-  return (
-    <div className="space-y-2" data-testid={`sso-domain-${item.domain}`}>
-      <div className="flex items-center gap-2">
-        <span>{item.domain}</span>
-        <Badge>{item.verifiedAt ? "Verified" : "Pending"}</Badge>
-      </div>
-      <CopyField label="TXT name" value={item.txtName ?? ""} />
-      <CopyField label="TXT value" value={item.txtValue ?? ""} />
-      <Button
-        type="button"
-        disabled={!draft.canChange || Boolean(item.verifiedAt)}
-        onClick={() => item.id && actions.onVerifyDomain(item.id)}
-      >
-        Verify
-      </Button>
-      <Button
-        type="button"
-        variant="outline"
-        disabled={!draft.canUpdate}
-        onClick={() =>
-          item.id &&
-          draft.ask("Delete domain", "Delete this domain. This action cannot be undone.", "Delete domain", () =>
-            actions.onDeleteDomain(item.id!),
-          )
-        }
-      >
-        Delete
-      </Button>
-    </div>
-  );
-}
-
-export function ProviderSection({
+function DomainRow({
+  item,
   model,
+  actions,
   draft,
 }: {
+  item: SsoDomain;
   model: SsoSettingsModel;
   actions: SsoSettingsActions;
   draft: SsoDraft;
 }) {
-  const connection = model.connection;
+  const verified = Boolean(item.verifiedAt);
+  const domainError = model.domainError;
+  const error = domainError && domainError.id === item.id ? domainError.message : null;
   return (
-    <section className="space-y-3">
-      <h2 className="text-base font-medium">Identity provider</h2>
-      <SsoSelect
-        id="sso-preset"
-        label="Preset"
-        value={draft.preset}
-        disabled={!draft.canChange}
-        onChange={draft.setPreset}
-        options={[
-          { value: "PRESET_OKTA", label: "Okta" },
-          { value: "PRESET_ENTRA", label: "Microsoft Entra ID" },
-          { value: "PRESET_GENERIC", label: "Generic OIDC" },
-        ]}
-      />
-      <Label htmlFor="sso-display-name">Display name</Label>
-      <Input
-        id="sso-display-name"
-        value={draft.displayName}
-        disabled={!draft.canChange}
-        onChange={(event) => draft.setDisplayName(event.target.value)}
-      />
-      {draft.exists ? <ProviderUrls connection={connection} /> : null}
-      <Label htmlFor="sso-issuer">Issuer URL</Label>
-      <Input
-        id="sso-issuer"
-        value={draft.issuer}
-        disabled={!draft.canChange}
-        onChange={(event) => draft.setIssuer(event.target.value)}
-      />
-      <Label htmlFor="sso-client-id">Client ID</Label>
-      <Input
-        id="sso-client-id"
-        value={draft.clientId}
-        disabled={!draft.canChange}
-        onChange={(event) => draft.setClientId(event.target.value)}
-      />
-      <Label htmlFor="sso-client-secret">Client secret</Label>
-      <Input
-        id="sso-client-secret"
-        type="password"
-        value={draft.clientSecret}
-        disabled={!draft.canChange}
-        onChange={(event) => draft.setClientSecret(event.target.value)}
-      />
-      <p>{connection?.clientSecretSet ? "Saved" : "Client secret is not saved."}</p>
-      <Button type="button" disabled={!draft.canChange} onClick={() => draft.save()}>
-        Save
-      </Button>
-    </section>
+    <li className="space-y-3 py-3" data-testid={`sso-domain-${item.domain}`}>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="truncate text-[13px] font-medium text-foreground">{item.domain}</span>
+          <Badge color={verified ? "green" : "yellow"}>{verified ? "Verified" : "Pending"}</Badge>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          {verified ? null : (
+            <Button
+              type="button"
+              size="sm"
+              disabled={!draft.canChange}
+              onClick={() => item.id && actions.onVerifyDomain(item.id)}
+            >
+              Verify
+            </Button>
+          )}
+          <PermissionTip permitted={draft.permitted}>
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              className="size-8 text-muted-foreground"
+              disabled={!draft.canUpdate}
+              aria-label={`Delete ${item.domain}`}
+              onClick={() =>
+                item.id &&
+                draft.ask("Delete domain", "Delete this domain. This action cannot be undone.", "Delete domain", () =>
+                  actions.onDeleteDomain(item.id!),
+                )
+              }
+            >
+              <Trash2 className="size-3.5" strokeWidth={1.75} aria-hidden />
+            </Button>
+          </PermissionTip>
+        </div>
+      </div>
+      {verified ? null : <PendingDomainRecord item={item} />}
+      {error ? <p className="text-[11px] text-destructive">{error}</p> : null}
+    </li>
   );
 }
 
-function ProviderUrls({ connection }: { connection?: SsoConnection | null }) {
+function PendingDomainRecord({ item }: { item: SsoDomain }) {
+  return (
+    <div className="space-y-3">
+      <p className="text-[12px] leading-5 text-muted-foreground">
+        Add this TXT record at your DNS provider. Then select Verify.
+      </p>
+      <p className="text-[12px] text-muted-foreground">Type: TXT</p>
+      <CopyField label="Name" value={item.txtName ?? ""} />
+      <CopyField label="Value" value={item.txtValue ?? ""} />
+    </div>
+  );
+}
+
+export function ProviderCard({ model, draft }: { model: SsoSettingsModel; draft: SsoDraft }) {
+  return (
+    <FactorySettingsCard title="Identity provider" data-testid="sso-provider">
+      <div className="space-y-6">
+        <ProviderIdentity draft={draft} />
+        {draft.exists ? <ProviderDetails model={model} draft={draft} /> : <CreateConnection draft={draft} />}
+      </div>
+    </FactorySettingsCard>
+  );
+}
+
+function ProviderIdentity({ draft }: { draft: SsoDraft }) {
   return (
     <>
-      <CopyField label="Redirect URI" value={connection?.redirectUri ?? ""} />
-      <CopyField label="Initiate login URI" value={connection?.initiateLoginUri ?? ""} />
-      <CopyField label="Post-logout redirect URI" value={connection?.postLogoutRedirectUri ?? ""} />
-      <CopyField label="Back-channel logout URI" value={connection?.backChannelLogoutUri ?? ""} />
+      <SsoSelect
+        id="sso-preset"
+        label="Provider"
+        value={draft.preset}
+        disabled={!draft.canChange}
+        onChange={draft.setPreset}
+        options={PRESETS}
+      />
+      <TextField
+        id="sso-display-name"
+        label="Display name"
+        value={draft.displayName}
+        disabled={!draft.canChange}
+        helper="Members see this name on the login page."
+        onChange={draft.setDisplayName}
+      />
     </>
   );
 }
 
-export function ActivationSection({
+function CreateConnection({ draft }: { draft: SsoDraft }) {
+  return (
+    <div className="space-y-2">
+      <PermissionTip permitted={draft.permitted}>
+        <Button type="button" disabled={!draft.canChange || !draft.displayName.trim()} onClick={draft.createConnection}>
+          Create connection
+        </Button>
+      </PermissionTip>
+      <p className="text-[12px] text-muted-foreground">
+        SuperPlane then shows the URLs to add to your identity provider.
+      </p>
+    </div>
+  );
+}
+
+function ProviderDetails({ model, draft }: { model: SsoSettingsModel; draft: SsoDraft }) {
+  return (
+    <>
+      <Separator />
+      <ProviderUrls connection={model.connection} preset={draft.preset} />
+      <Separator />
+      <div className="space-y-4">
+        <p className="text-[13px] font-medium text-foreground">Values from your identity provider</p>
+        <TextField
+          id="sso-issuer"
+          label="Issuer URL"
+          value={draft.issuer}
+          placeholder="https://example.okta.com"
+          disabled={!draft.canChange}
+          className="w-full max-w-md"
+          onChange={draft.setIssuer}
+        />
+        <TextField
+          id="sso-client-id"
+          label="Client ID"
+          value={draft.clientId}
+          disabled={!draft.canChange}
+          className="w-full max-w-md"
+          onChange={draft.setClientId}
+        />
+        <TextField
+          id="sso-client-secret"
+          label="Client secret"
+          type="password"
+          value={draft.clientSecret}
+          disabled={!draft.canChange}
+          helper={
+            model.connection?.clientSecretSet ? "A client secret is saved. Enter a new one to replace it." : undefined
+          }
+          className="w-full max-w-md"
+          onChange={draft.setClientSecret}
+        />
+      </div>
+      <CardSave
+        permitted={draft.permitted}
+        disabled={!draft.canChange || !draft.providerDirty}
+        busy={Boolean(model.busy)}
+        onClick={draft.saveProvider}
+        testId="sso-provider-save"
+      />
+    </>
+  );
+}
+
+function ProviderUrls({ connection, preset }: { connection?: SsoConnection | null; preset: string }) {
+  const okta = preset === "PRESET_OKTA";
+  return (
+    <div className="space-y-4">
+      <p className="text-[13px] font-medium text-foreground">Add these values to your identity provider</p>
+      <CopyField
+        label="Redirect URI"
+        value={connection?.redirectUri ?? ""}
+        helper={okta ? "In Okta: Sign-in redirect URIs." : undefined}
+      />
+      <CopyField
+        label="Initiate login URI"
+        value={connection?.initiateLoginUri ?? ""}
+        helper={okta ? "In Okta: Initiate login URI." : undefined}
+      />
+      <CopyField
+        label="Post-logout redirect URI"
+        value={connection?.postLogoutRedirectUri ?? ""}
+        helper={okta ? "In Okta: Sign-out redirect URIs." : undefined}
+      />
+      <CopyField
+        label="Back-channel logout URI"
+        value={connection?.backChannelLogoutUri ?? ""}
+        helper={okta ? "In Okta: Logout, back-channel logout URI. Turn on the session ID (sid)." : undefined}
+      />
+    </div>
+  );
+}
+
+export function ActivationCard({
   model,
   actions,
   draft,
@@ -186,27 +297,85 @@ export function ActivationSection({
   actions: SsoSettingsActions;
   draft: SsoDraft;
 }) {
-  const connection = model.connection;
   return (
-    <section className="space-y-3" data-testid="sso-activation">
-      <h2 className="text-base font-medium">Test and activate</h2>
-      <p>Status: {statusLabel(connection?.status)}</p>
-      <p data-testid="sso-test-result">{testResultText(connection, draft.tested)}</p>
-      <div className="flex flex-wrap gap-2">
-        <Button type="button" disabled={!draft.canUpdate || !draft.exists} onClick={actions.onTest}>
-          Test connection
-        </Button>
-        <Button
-          type="button"
-          disabled={!draft.canChange || !draft.tested || !draft.verified}
-          onClick={actions.onActivate}
-        >
+    <FactorySettingsCard title="Test and activate" data-testid="sso-activation">
+      {draft.exists ? <ActivationRows model={model} actions={actions} draft={draft} /> : <NeedsConnection />}
+    </FactorySettingsCard>
+  );
+}
+
+function ActivationRows({
+  model,
+  actions,
+  draft,
+}: {
+  model: SsoSettingsModel;
+  actions: SsoSettingsActions;
+  draft: SsoDraft;
+}) {
+  const result = testResultText(model.connection);
+  const missingCredentials = !draft.providerReady;
+  return (
+    <div className="space-y-6">
+      <ActionRow
+        title="Test the connection"
+        description="Sign in through the identity provider in a new window."
+        detail={
+          <>
+            {result ? <p className="text-[12px] leading-5 text-muted-foreground">{result}</p> : null}
+            {missingCredentials ? (
+              <p className="text-[12px] leading-5 text-muted-foreground">
+                Add the issuer URL, client ID and client secret first.
+              </p>
+            ) : null}
+          </>
+        }
+      >
+        <PermissionTip permitted={draft.permitted}>
+          <Button type="button" size="sm" disabled={!draft.canUpdate || missingCredentials} onClick={actions.onTest}>
+            Test connection
+          </Button>
+        </PermissionTip>
+      </ActionRow>
+      {model.connection?.status === "STATUS_ACTIVE" ? (
+        <DisableRow actions={actions} draft={draft} />
+      ) : (
+        <ActivateRow actions={actions} draft={draft} />
+      )}
+    </div>
+  );
+}
+
+function ActivateRow({ actions, draft }: { actions: SsoSettingsActions; draft: SsoDraft }) {
+  const missing = !draft.verified
+    ? "Verify an email domain first."
+    : !draft.tested
+      ? "Pass a connection test first."
+      : null;
+  return (
+    <ActionRow
+      title="Activate"
+      description="Members see Single Sign-On on the login page."
+      detail={missing ? <p className="text-[12px] leading-5 text-muted-foreground">{missing}</p> : null}
+    >
+      <PermissionTip permitted={draft.permitted}>
+        <Button type="button" size="sm" disabled={!draft.canChange || Boolean(missing)} onClick={actions.onActivate}>
           Activate
         </Button>
+      </PermissionTip>
+    </ActionRow>
+  );
+}
+
+function DisableRow({ actions, draft }: { actions: SsoSettingsActions; draft: SsoDraft }) {
+  return (
+    <ActionRow title="Disable" description="Members sign in with other methods again.">
+      <PermissionTip permitted={draft.permitted}>
         <Button
           type="button"
+          size="sm"
           variant="outline"
-          disabled={!draft.canUpdate || !draft.exists}
+          disabled={!draft.canUpdate}
           onClick={() =>
             draft.ask(
               "Disable Single Sign-On",
@@ -218,247 +387,7 @@ export function ActivationSection({
         >
           Disable
         </Button>
-        <Button
-          type="button"
-          variant="outline"
-          disabled={!draft.canUpdate || !draft.exists}
-          onClick={() =>
-            draft.ask(
-              "Delete Single Sign-On",
-              "Delete the connection and its identities.",
-              "Delete Single Sign-On",
-              actions.onDelete,
-            )
-          }
-        >
-          Delete
-        </Button>
-      </div>
-    </section>
-  );
-}
-
-export function ProvisioningSection({
-  model,
-  actions,
-  draft,
-}: {
-  model: SsoSettingsModel;
-  actions: SsoSettingsActions;
-  draft: SsoDraft;
-}) {
-  return (
-    <section className="space-y-3">
-      <h2 className="text-base font-medium">Provisioning</h2>
-      <SsoSwitch
-        id="sso-jit"
-        label="Create a member on the first sign-in"
-        checked={draft.jitEnabled}
-        disabled={!draft.canChange}
-        onCheckedChange={draft.setJitEnabled}
-      />
-      <SsoSelect
-        id="sso-role"
-        label="Default role"
-        value={draft.defaultRole}
-        disabled={!draft.canChange}
-        onChange={draft.setDefaultRole}
-        options={ROLES}
-      />
-      <CopyField label="SCIM base URL" value={model.connection?.scimBaseUrl ?? ""} />
-      <ul>
-        {model.tokens.map((token) => (
-          <li key={token.id} className="flex items-center gap-2">
-            <span>{token.description || "SCIM token"}</span>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={!draft.canUpdate}
-              onClick={() => {
-                if (!token.id) {
-                  return;
-                }
-                draft.ask(
-                  "Revoke SCIM token",
-                  "The identity provider can no longer use this token.",
-                  "Revoke SCIM token",
-                  () => actions.onRevokeToken(token.id!),
-                );
-              }}
-            >
-              Revoke
-            </Button>
-          </li>
-        ))}
-      </ul>
-      <div className="flex gap-2">
-        <Label className="sr-only" htmlFor="sso-token-description">
-          Token description
-        </Label>
-        <Input
-          id="sso-token-description"
-          value={draft.tokenDescription}
-          disabled={!draft.canChange || !draft.exists}
-          onChange={(event) => draft.setTokenDescription(event.target.value)}
-        />
-        <Button
-          type="button"
-          disabled={!draft.canChange || !draft.exists}
-          onClick={() => actions.onCreateToken(draft.tokenDescription)}
-        >
-          Create SCIM token
-        </Button>
-      </div>
-    </section>
-  );
-}
-
-export function PolicySection({ draft }: { draft: SsoDraft }) {
-  return (
-    <section className="space-y-3">
-      <h2 className="text-base font-medium">Policy</h2>
-      <SsoSelect
-        id="sso-enforcement"
-        label="Enforcement"
-        value={draft.enforcement}
-        disabled={!draft.canChange}
-        onChange={(next) => {
-          if (next === "ENFORCEMENT_REQUIRED") {
-            draft.requestRequired();
-            return;
-          }
-          draft.setEnforcement(next);
-        }}
-        options={[
-          { value: "ENFORCEMENT_OPTIONAL", label: "Optional" },
-          { value: "ENFORCEMENT_REQUIRED", label: "Required" },
-        ]}
-      />
-      <SsoSwitch
-        id="sso-owner-bypass"
-        label="Allow an owner to sign in with another method"
-        checked={draft.ownerBypass}
-        disabled={!draft.canChange}
-        onCheckedChange={draft.setOwnerBypass}
-      />
-      <Label htmlFor="sso-session-hours">Maximum session age</Label>
-      <Input
-        id="sso-session-hours"
-        value={draft.sessionHours}
-        disabled={!draft.canChange}
-        onChange={(event) => draft.setSessionHours(event.target.value)}
-      />
-      <p className="text-sm text-muted-foreground">Use hours, such as 24 or 1.5, or minutes, such as 15m.</p>
-      {draft.sessionError ? (
-        <p className="text-sm text-red-600" role="alert">
-          {draft.sessionError}
-        </p>
-      ) : null}
-      <SsoSwitch
-        id="sso-idp-logout"
-        label="Sign out from the identity provider"
-        checked={draft.idpLogout}
-        disabled={!draft.canChange}
-        onCheckedChange={draft.setIdpLogout}
-      />
-      <Button type="button" disabled={!draft.canChange} onClick={() => draft.save()}>
-        Save policy
-      </Button>
-    </section>
-  );
-}
-
-export function ConfirmDialog({ confirm, onClose }: { confirm: ConfirmRequest | null; onClose: () => void }) {
-  return (
-    <Dialog open={Boolean(confirm)} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{confirm?.title}</DialogTitle>
-          <DialogDescription>{confirm?.body}</DialogDescription>
-        </DialogHeader>
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button
-            type="button"
-            onClick={() => {
-              confirm?.run();
-              onClose();
-            }}
-          >
-            {confirm?.actionLabel || "Confirm"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-export function RequiredDialog({
-  open,
-  onOpenChange,
-  onConfirm,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onConfirm: () => void;
-}) {
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Require Single Sign-On</DialogTitle>
-          <DialogDescription>
-            Members must sign in through the identity provider to open this organization. Owners can still use another
-            method when owner bypass is on.
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button type="button" onClick={onConfirm}>
-            Require Single Sign-On
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-export function TokenDialog({ secret, onDismiss }: { secret?: string | null; onDismiss: () => void }) {
-  const id = useId();
-  return (
-    <Dialog open={Boolean(secret)} onOpenChange={(open) => !open && onDismiss()}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>SCIM token</DialogTitle>
-          <DialogDescription>Copy this token now. You cannot see it again.</DialogDescription>
-        </DialogHeader>
-        <div className="flex items-center gap-2">
-          <Label className="sr-only" htmlFor={id}>
-            SCIM token
-          </Label>
-          <Input id={id} readOnly value={secret ?? ""} />
-          <CopyButton variant="button" text={secret ?? ""} copiedLabel="Copied">
-            Copy
-          </CopyButton>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function CopyField({ label, value }: { label: string; value: string }) {
-  const id = useId();
-  return (
-    <div className="flex items-center gap-2">
-      <Label htmlFor={id}>{label}</Label>
-      <Input id={id} readOnly value={value} />
-      <CopyButton variant="button" text={value} copiedLabel="Copied">
-        Copy
-      </CopyButton>
-    </div>
+      </PermissionTip>
+    </ActionRow>
   );
 }

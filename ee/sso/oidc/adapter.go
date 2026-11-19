@@ -75,6 +75,9 @@ func (a *Adapter) ValidateConfig(ctx context.Context, conn *models.SSOConnection
 	if err != nil {
 		return err
 	}
+	if strings.TrimSpace(cfg.Issuer) == "" {
+		return nil
+	}
 	return validateIssuer(cfg.Issuer, a.allowHTTP(ctx))
 }
 

@@ -48,9 +48,6 @@ func (s *Service) PutConnection(ctx context.Context, orgID, accountID uuid.UUID,
 		}
 		conn := existing
 		if conn == nil {
-			if strings.TrimSpace(normalized.ClientSecret) == "" {
-				return invalid("The client secret is required.")
-			}
 			conn = &models.SSOConnection{
 				ID:             uuid.New(),
 				OrganizationID: orgID,
@@ -63,6 +60,14 @@ func (s *Service) PutConnection(ctx context.Context, orgID, accountID uuid.UUID,
 		previous, err := conn.OIDCConfig()
 		if err != nil {
 			return err
+		}
+		if existing != nil && conn.Status != models.SSOStatusDraft {
+			if normalized.Issuer == "" {
+				return invalid("The issuer URL is required.")
+			}
+			if normalized.ClientID == "" {
+				return invalid("The client ID is required.")
+			}
 		}
 		if err := s.applyInput(ctx, conn, normalized); err != nil {
 			return err
@@ -115,6 +120,9 @@ func (s *Service) ActivateConnection(ctx context.Context, orgID uuid.UUID) (*ent
 	}
 	current, err := s.connectionForOrg(ctx, orgID)
 	if err != nil {
+		return nil, err
+	}
+	if err := requireProviderCredentials(current); err != nil {
 		return nil, err
 	}
 	var saved *models.SSOConnection
@@ -200,13 +208,7 @@ func normalizeInput(input enterprise.SSOConnectionInput) (enterprise.SSOConnecti
 		return input, invalid("The display name is required.")
 	}
 	input.Issuer = strings.TrimRight(strings.TrimSpace(input.Issuer), "/")
-	if input.Issuer == "" {
-		return input, invalid("The issuer URL is required.")
-	}
 	input.ClientID = strings.TrimSpace(input.ClientID)
-	if input.ClientID == "" {
-		return input, invalid("The client ID is required.")
-	}
 	if input.DefaultRole == "" {
 		input.DefaultRole = models.RoleOrgOperator
 	}
@@ -266,7 +268,7 @@ func (s *Service) applyInput(ctx context.Context, conn *models.SSOConnection, in
 	}
 	secret := strings.TrimSpace(input.ClientSecret)
 	if secret == "" {
-		if len(conn.ClientSecret) == 0 {
+		if conn.Status != models.SSOStatusDraft && len(conn.ClientSecret) == 0 {
 			return invalid("The client secret is required.")
 		}
 		return nil
@@ -276,6 +278,17 @@ func (s *Service) applyInput(ctx context.Context, conn *models.SSOConnection, in
 		return err
 	}
 	conn.ClientSecret = encrypted
+	return nil
+}
+
+func requireProviderCredentials(conn *models.SSOConnection) error {
+	cfg, err := conn.OIDCConfig()
+	if err != nil {
+		return err
+	}
+	if strings.TrimSpace(cfg.Issuer) == "" || strings.TrimSpace(cfg.ClientID) == "" || len(conn.ClientSecret) == 0 {
+		return precondition("Add the issuer URL, client ID and client secret before you test the connection.")
+	}
 	return nil
 }
 

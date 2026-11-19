@@ -1,6 +1,5 @@
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 
 export function SsoSelect({
   id,
@@ -9,6 +8,8 @@ export function SsoSelect({
   disabled,
   onChange,
   options,
+  className = "w-full max-w-xs",
+  helper,
 }: {
   id: string;
   label: string;
@@ -16,12 +17,14 @@ export function SsoSelect({
   disabled?: boolean;
   onChange: (value: string) => void;
   options: { value: string; label: string }[];
+  className?: string;
+  helper?: string;
 }) {
   return (
     <div className="space-y-2">
       <Label htmlFor={id}>{label}</Label>
       <Select value={value} disabled={disabled} onValueChange={onChange}>
-        <SelectTrigger id={id}>
+        <SelectTrigger id={id} className={className}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -32,27 +35,7 @@ export function SsoSelect({
           ))}
         </SelectContent>
       </Select>
-    </div>
-  );
-}
-
-export function SsoSwitch({
-  id,
-  label,
-  checked,
-  disabled,
-  onCheckedChange,
-}: {
-  id: string;
-  label: string;
-  checked: boolean;
-  disabled?: boolean;
-  onCheckedChange: (checked: boolean) => void;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-3">
-      <Label htmlFor={id}>{label}</Label>
-      <Switch id={id} checked={checked} disabled={disabled} onCheckedChange={onCheckedChange} />
+      {helper ? <p className="text-[12px] text-muted-foreground">{helper}</p> : null}
     </div>
   );
 }

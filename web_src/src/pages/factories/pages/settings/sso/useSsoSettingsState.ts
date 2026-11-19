@@ -33,18 +33,27 @@ export function useSsoSettingsState(model: SsoSettingsModel, actions: SsoSetting
   const [sessionError, setSessionError] = useState<string | null>(null);
   const access = accessState(model);
   const set = formSetters(setForm);
-  const allowed = model.canUpdate !== false && !model.busy;
+  const permitted = model.canUpdate !== false;
+  const allowed = permitted && !model.busy;
   const ask = (title: string, body: string, actionLabel: string, run: () => void) =>
     setConfirm({ title, body, actionLabel, run });
   const requestRequired = () => setRequiredConfirm(true);
-  const save = (nextEnforcement = form.enforcement) => {
+  const createConnection = () => {
+    const seconds = sessionAgeSeconds(form.sessionHours) ?? 86400;
+    actions.onSave(
+      ssoConnectionInput({ ...form, issuer: "", clientId: "", clientSecret: "" }, form.enforcement, seconds),
+    );
+  };
+  const saveProvider = () => saveCard(actions, connection, form, "provider");
+  const saveProvisioning = () => saveCard(actions, connection, form, "provisioning");
+  const savePolicy = () => {
     const seconds = sessionAgeSeconds(form.sessionHours);
     if (seconds == null) {
       setSessionError("Enter 15 minutes to 7 days, as hours or minutes.");
       return;
     }
     setSessionError(null);
-    actions.onSave(ssoConnectionInput(form, nextEnforcement, seconds));
+    saveCard(actions, connection, form, "policy", seconds);
   };
   useEffect(() => {
     if (!model.secretEpoch) {
@@ -55,13 +64,21 @@ export function useSsoSettingsState(model: SsoSettingsModel, actions: SsoSetting
   const draft: SsoDraft = {
     canChange: Boolean(model.licensed) && allowed,
     canUpdate: allowed,
+    permitted,
+    providerDirty: isProviderDirty(form, connection),
+    provisioningDirty: isProvisioningDirty(form, connection),
+    policyDirty: isPolicyDirty(form, connection),
+    providerReady: Boolean(connection?.issuer?.trim() && connection.clientId?.trim() && connection.clientSecretSet),
     sessionError,
     ...access,
     ...form,
     ...set,
     ask,
     requestRequired,
-    save,
+    createConnection,
+    saveProvider,
+    saveProvisioning,
+    savePolicy,
   };
   return { exists: access.exists, draft, confirm, setConfirm, requiredConfirm, setRequiredConfirm };
 }
@@ -132,6 +149,71 @@ function formSetters(setForm: Dispatch<SetStateAction<SsoForm>>) {
     setIdpLogout: updateForm(setForm, "idpLogout"),
     setTokenDescription: updateForm(setForm, "tokenDescription"),
   };
+}
+
+type CardKind = "provider" | "provisioning" | "policy";
+
+function saveCard(
+  actions: SsoSettingsActions,
+  connection: SsoConnection | null | undefined,
+  form: SsoForm,
+  kind: CardKind,
+  policySeconds?: number,
+) {
+  const base = initialForm(connection);
+  const seconds = policySeconds ?? connection?.maxSessionAgeSeconds ?? 86400;
+  const next = { ...base };
+  if (kind === "provider") {
+    next.displayName = form.displayName;
+    next.preset = form.preset;
+    next.issuer = form.issuer;
+    next.clientId = form.clientId;
+    next.clientSecret = form.clientSecret;
+    next.loadedPreset = form.loadedPreset;
+    next.scopes = form.scopes;
+    next.subjectClaim = form.subjectClaim;
+    next.emailClaim = form.emailClaim;
+    next.nameClaim = form.nameClaim;
+  }
+  if (kind === "provisioning") {
+    next.jitEnabled = form.jitEnabled;
+    next.defaultRole = form.defaultRole;
+  }
+  if (kind === "policy") {
+    next.ownerBypass = form.ownerBypass;
+    next.idpLogout = form.idpLogout;
+  }
+  const enforcement = kind === "policy" ? form.enforcement : base.enforcement;
+  actions.onSave(ssoConnectionInput(next, enforcement, seconds));
+}
+
+function isProviderDirty(form: SsoForm, connection?: SsoConnection | null) {
+  const base = initialForm(connection);
+  return (
+    form.preset !== base.preset ||
+    form.displayName !== base.displayName ||
+    form.issuer !== base.issuer ||
+    form.clientId !== base.clientId ||
+    form.clientSecret !== ""
+  );
+}
+
+function isProvisioningDirty(form: SsoForm, connection?: SsoConnection | null) {
+  const base = initialForm(connection);
+  return form.jitEnabled !== base.jitEnabled || form.defaultRole !== base.defaultRole;
+}
+
+function isPolicyDirty(form: SsoForm, connection?: SsoConnection | null) {
+  const base = initialForm(connection);
+  const seconds = sessionAgeSeconds(form.sessionHours);
+  const saved = connection?.maxSessionAgeSeconds ?? 86400;
+  return (
+    form.enforcement !== base.enforcement ||
+    form.ownerBypass !== base.ownerBypass ||
+    form.idpLogout !== base.idpLogout ||
+    seconds == null ||
+    seconds !== saved
+  );
 }
 
 function updateForm<K extends keyof SsoForm>(setForm: Dispatch<SetStateAction<SsoForm>>, key: K) {

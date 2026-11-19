@@ -1,13 +1,17 @@
 import type { SsoConnection, SsoDomain, SsoPutConnectionRequest, SsoscimToken } from "@/api-client/types.gen";
 
-export function testResultText(connection: SsoConnection | null | undefined, tested: boolean) {
-  if (!connection?.lastTest) {
-    return "No test yet.";
+export function testResultText(connection: SsoConnection | null | undefined) {
+  const result = connection?.lastTest;
+  if (!result) {
+    return null;
   }
-  const outcome = tested ? "Last test succeeded." : "Last test failed.";
   const when = connection.lastTestedAt ? new Date(connection.lastTestedAt).toLocaleString() : "";
-  const detail = tested ? connection.lastTest.email : connection.lastTest.error;
-  return [outcome, when, detail].filter(Boolean).join(" ");
+  if (result.ok) {
+    const who = result.email ? ` as ${result.email}` : "";
+    return when ? `Last test passed on ${when}${who}.` : `Last test passed${who}.`;
+  }
+  const error = result.error ?? "";
+  return when ? `Last test failed on ${when}: ${error}` : `Last test failed: ${error}`;
 }
 
 export function statusLabel(status: string | undefined) {
@@ -24,8 +28,7 @@ export type SsoSettingsModel = {
   connection?: SsoConnection | null;
   domains: SsoDomain[];
   tokens: SsoscimToken[];
-  error?: string | null;
-  notice?: string | null;
+  domainError?: { id: string; message: string } | null;
   revealedToken?: string | null;
 };
 
@@ -48,6 +51,11 @@ export type ConfirmRequest = { title: string; body: string; actionLabel: string;
 export type SsoDraft = {
   canChange: boolean;
   canUpdate: boolean;
+  permitted: boolean;
+  providerDirty: boolean;
+  provisioningDirty: boolean;
+  policyDirty: boolean;
+  providerReady: boolean;
   sessionError: string | null;
   exists: boolean;
   tested: boolean;
@@ -80,7 +88,10 @@ export type SsoDraft = {
   setTokenDescription: (value: string) => void;
   ask: (title: string, body: string, actionLabel: string, run: () => void) => void;
   requestRequired: () => void;
-  save: (nextEnforcement?: string) => void;
+  createConnection: () => void;
+  saveProvider: () => void;
+  saveProvisioning: () => void;
+  savePolicy: () => void;
 };
 
 export const noopSsoActions: SsoSettingsActions = {

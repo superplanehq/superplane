@@ -163,6 +163,10 @@ func (s *Service) start(w http.ResponseWriter, r *http.Request) {
 		if !s.allowTest(w, r, conn) {
 			return
 		}
+		if err := requireProviderCredentials(conn); err != nil {
+			s.failLogin(w, r, core.CodeFailed, "provider", conn)
+			return
+		}
 	} else if conn.Status != models.SSOStatusActive {
 		s.failLogin(w, r, core.CodeNotAvailable, "status", conn)
 		return
