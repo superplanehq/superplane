@@ -3324,7 +3324,7 @@ By default, add missing requests and preserve all existing requests. Enable mana
 
 Request replacements before withdrawals. Preserve pre-existing requests, requests owned by other automations, team requests, and submitted reviews. Never infer ownership from old PR descriptions or current requests. Keep suitable reviewers across selections.
 
-Ordered publication state fences superseded runs and records partial writes for retry. Output includes requested, alreadyCovered, selected, and removed identities. GitHub reads and mutations are not atomic.
+Ordered publication state fences superseded runs and records partial writes for retry. Output includes requested, alreadyCovered, selected, and removed identities. The withdrawals ledger preserves confirmed removals and their assessed commits across retries. An uncertain withdrawal that remains requested prevents an empty selection from completing. Supply withdrawalExplanationExecutionId after the managed withdrawal comment succeeds to acknowledge its ledger without changing requests. GitHub reads and mutations are not atomic.
 
 ### Example Output
 
@@ -3347,7 +3347,8 @@ Ordered publication state fences superseded runs and records partial writes for 
         "login": "octocat"
       }
     ],
-    "status": "requested"
+    "status": "requested",
+    "withdrawals": []
   },
   "timestamp": "2026-01-01T09:00:00Z",
   "type": "github.pullRequestReviewersEnsured"
@@ -4641,6 +4642,7 @@ Temporary failures retry through scheduled requests with the resolved body. Host
   "data": {
     "attempts": 1,
     "commentId": 123,
+    "executionId": "11111111-1111-1111-1111-111111111111",
     "status": "published"
   },
   "timestamp": "2026-11-13T12:00:00Z",
@@ -4867,9 +4869,9 @@ An optional Activation Node ID binds participation to that check node in the adm
 
 Source Run ID and Attempt Root Event ID default to trusted current execution records. Cross-canvas sources require broadcast provenance. Persisted creation times and IDs determine order. Older attempts cannot replace newer state, including on the same commit. Disabled activations remain fenced. Activation Generation is a positive saved version. After disabling, use a greater activation generation to enable the check again.
 
-The check passes when no selected reviewer requests remain on the assessed current commit. Unrelated requests do not block the check. This takes precedence over recorded review decisions, including requested changes, comments, and dismissed reviews. GitHub clears requests after review submission.
+One effective approval from a human other than the PR author passes the check. The approver must have repository write, maintain, or admin access and approve the current assessed commit. Any eligible human can approve, including someone outside the suggested selection. Other pending requests or another person's requested changes do not override that approval. GitHub branch rules can require more approvals.
 
-While selected requests remain, all required reviewers must approve the assessed current commit. Comments do not change approval. Requested changes fail the check. Dismissed replacement reviews cannot revive older approvals. Requesting a selected reviewer again resumes approval evaluation. New heads stay pending for a new decision. Closed pull requests stop polling; reopening resumes monitoring.
+Follow all current human assignments, including manual replacements. Removing the last human request without approval fails the check. A comment-only submission keeps review pending. An empty request list never proves approval. Later changes requests or dismissals revoke that person's approval. Comments do not revoke approval. Dismissed replacement reviews cannot revive older approvals. New heads stay pending for a new decision. Closed pull requests stop polling; reopening resumes monitoring.
 
 Provider failures publish error and retry. Delivery is durable and at least once. A crash after a GitHub write can repeat the same status. This component does not change branch rules or start agents.
 
