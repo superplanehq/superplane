@@ -94,6 +94,26 @@ func Test__FactoryLine__Update__ReconcilesPhasesAndKeepsCustomStages(t *testing.
 	assert.Equal(t, map[string]string{"custom-qa": "teal"}, line.ColumnColorsValue())
 }
 
+func Test__FactoryLine__Update__KeepsOptionalStagesRemoved(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	app, entry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "Implement", "start")
+	steps := []models.FactoryLineStep{{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entry}}
+	line, err := factory.CreateLine(db, "ship", steps)
+	require.NoError(t, err)
+	require.NoError(t, line.UpdateConfiguration(db, nil, nil, nil, []models.FactoryLineStage{
+		line.StagesValue()[0],
+		line.StagesValue()[len(line.StagesValue())-1],
+	}))
+
+	require.NoError(t, line.Update(db, nil, steps, nil))
+
+	assert.Equal(t, []string{"backlog", "done"}, []string{line.StagesValue()[0].Key, line.StagesValue()[1].Key})
+}
+
 func Test__FactoryLine__Update__PersistsColumnColors(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())

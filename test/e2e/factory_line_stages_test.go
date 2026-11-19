@@ -19,8 +19,8 @@ func TestFactoryLineCustomStages(t *testing.T) {
 	s.start()
 	s.givenALine()
 	s.openLine()
-	s.addAndReorderStage("QA")
-	s.assertStageOrder("backlog", "phase", "custom", "verify", "done")
+	s.addStage("QA")
+	s.assertStageOrder("backlog", "phase", "verify", "custom", "done")
 	s.reloadAndAssertStageVisible()
 	s.removeStage("QA")
 	s.assertStageOrder("backlog", "phase", "verify", "done")
@@ -64,16 +64,16 @@ func (s *factoryLineStagesSteps) openLine() {
 	s.session.AssertVisible(q.TestID("lines-phase-board"))
 }
 
-func (s *factoryLineStagesSteps) addAndReorderStage(name string) {
+func (s *factoryLineStagesSteps) addStage(name string) {
 	page := s.session.Page()
 	require.NoError(s.t, page.GetByTestId("lines-board-view-menu").Click())
-	require.NoError(s.t, page.GetByRole("menuitem", pw.PageGetByRoleOptions{Name: "Manage stages", Exact: pw.Bool(true)}).Click())
-	dialog := page.GetByTestId("manage-line-stages-dialog")
+	require.NoError(s.t, page.GetByRole("menuitem", pw.PageGetByRoleOptions{Name: "Add stage", Exact: pw.Bool(true)}).Click())
+	dialog := page.GetByTestId("add-line-stage-dialog")
+	require.NoError(s.t, dialog.GetByRole("textbox", pw.LocatorGetByRoleOptions{Name: "Name", Exact: pw.Bool(true)}).Fill(name))
 	require.NoError(s.t, dialog.GetByRole("button", pw.LocatorGetByRoleOptions{Name: "Add stage", Exact: pw.Bool(true)}).Click())
-	require.NoError(s.t, dialog.GetByRole("textbox", pw.LocatorGetByRoleOptions{Name: "New stage name", Exact: pw.Bool(true)}).Fill(name))
-	require.NoError(s.t, dialog.GetByRole("button", pw.LocatorGetByRoleOptions{Name: "Move " + name + " up", Exact: pw.Bool(true)}).Click())
-	require.NoError(s.t, dialog.GetByRole("button", pw.LocatorGetByRoleOptions{Name: "Save stages", Exact: pw.Bool(true)}).Click())
 	require.NoError(s.t, dialog.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateHidden}))
+	automationDialog := page.GetByRole("dialog", pw.PageGetByRoleOptions{Name: "Add an automation for " + name, Exact: pw.Bool(true)})
+	require.NoError(s.t, automationDialog.GetByRole("button", pw.LocatorGetByRoleOptions{Name: "Close", Exact: pw.Bool(true)}).Click())
 
 	reloaded, err := s.factory.FindLine(database.DB(s.t.Context()), s.line.ID)
 	require.NoError(s.t, err)
@@ -104,11 +104,11 @@ func (s *factoryLineStagesSteps) reloadAndAssertStageVisible() {
 
 func (s *factoryLineStagesSteps) removeStage(name string) {
 	page := s.session.Page()
-	require.NoError(s.t, page.GetByTestId("lines-board-view-menu").Click())
-	require.NoError(s.t, page.GetByRole("menuitem", pw.PageGetByRoleOptions{Name: "Manage stages", Exact: pw.Bool(true)}).Click())
-	dialog := page.GetByTestId("manage-line-stages-dialog")
-	require.NoError(s.t, dialog.GetByRole("button", pw.LocatorGetByRoleOptions{Name: "Remove " + name, Exact: pw.Bool(true)}).Click())
-	require.NoError(s.t, dialog.GetByRole("button", pw.LocatorGetByRoleOptions{Name: "Save stages", Exact: pw.Bool(true)}).Click())
+	require.NoError(s.t, page.GetByTestId("lines-custom-stage-menu-"+s.stageKey).Click())
+	require.NoError(s.t, page.GetByTestId("lines-custom-stage-menu-"+s.stageKey+"-delete-stage").Click())
+	dialog := page.GetByTestId("delete-line-stage-dialog")
+	require.NoError(s.t, dialog.GetByRole("heading", pw.LocatorGetByRoleOptions{Name: "Delete " + name + "?", Exact: pw.Bool(true)}).WaitFor())
+	require.NoError(s.t, dialog.GetByRole("button", pw.LocatorGetByRoleOptions{Name: "Delete stage", Exact: pw.Bool(true)}).Click())
 	require.NoError(s.t, dialog.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateHidden}))
 }
 

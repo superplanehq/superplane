@@ -298,19 +298,27 @@ func (l *FactoryLine) ReconcileStages(tx *gorm.DB, steps []FactoryLineStep) ([]F
 		return nil, err
 	}
 
-	existingByKey := make(map[string]FactoryLineStage, len(l.Stages))
+	existingStages := l.StagesValue()
+	existingByKey := make(map[string]FactoryLineStage, len(existingStages))
+	for _, stage := range existingStages {
+		if stage.Kind != FactoryLineStageCustom {
+			existingByKey[stage.Key] = stage
+		}
+	}
+	if len(existingStages) > 0 {
+		systemStages = retainConfiguredOptionalStages(systemStages, existingByKey, len(l.Steps))
+	}
 	nextSystemKeys := make(map[string]bool, len(systemStages))
 	for _, stage := range systemStages {
 		nextSystemKeys[stage.Key] = true
 	}
 	customBefore := make(map[string][]FactoryLineStage)
 	pendingCustom := []FactoryLineStage{}
-	for _, stage := range l.StagesValue() {
+	for _, stage := range existingStages {
 		if stage.Kind == FactoryLineStageCustom {
 			pendingCustom = append(pendingCustom, stage)
 			continue
 		}
-		existingByKey[stage.Key] = stage
 		if len(pendingCustom) > 0 && nextSystemKeys[stage.Key] {
 			customBefore[stage.Key] = append(customBefore[stage.Key], pendingCustom...)
 			pendingCustom = nil
@@ -330,13 +338,46 @@ func (l *FactoryLine) ReconcileStages(tx *gorm.DB, steps []FactoryLineStep) ([]F
 	return result, nil
 }
 
-func (l *FactoryLine) IsStageReferenced(tx *gorm.DB, key string) (bool, error) {
-	var count int64
-	err := tx.Model(&Canvas{}).
-		Where("factory_id = ? AND column_key = ?", l.FactoryID, key).
-		Count(&count).
+func retainConfiguredOptionalStages(
+	stages []FactoryLineStage,
+	existingByKey map[string]FactoryLineStage,
+	oldStepCount int,
+) []FactoryLineStage {
+	result := make([]FactoryLineStage, 0, len(stages))
+	for _, stage := range stages {
+		if stage.Kind == FactoryLineStageBacklog || stage.Kind == FactoryLineStageDone {
+			result = append(result, stage)
+			continue
+		}
+		if _, ok := existingByKey[stage.Key]; ok {
+			result = append(result, stage)
+			continue
+		}
+		if stage.Kind == FactoryLineStagePhase && stage.StepIndex != nil && *stage.StepIndex >= oldStepCount {
+			result = append(result, stage)
+		}
+	}
+	return result
+}
+
+func (l *FactoryLine) DetachRemovedCustomStageAutomations(tx *gorm.DB, next []FactoryLineStage) error {
+	retained := make(map[uuid.UUID]bool, len(next))
+	for _, stage := range next {
+		retained[stage.ID] = true
+	}
+	removedKeys := make([]string, 0, len(l.Stages))
+	for _, stage := range l.StagesValue() {
+		if stage.Kind == FactoryLineStageCustom && !retained[stage.ID] {
+			removedKeys = append(removedKeys, stage.Key)
+		}
+	}
+	if len(removedKeys) == 0 {
+		return nil
+	}
+	return tx.Model(&Canvas{}).
+		Where("factory_id = ? AND column_key IN ?", l.FactoryID, removedKeys).
+		Update("column_key", nil).
 		Error
-	return count > 0, err
 }
 
 func (f *Factory) findLine(tx *gorm.DB, lineID uuid.UUID) (*FactoryLine, error) {

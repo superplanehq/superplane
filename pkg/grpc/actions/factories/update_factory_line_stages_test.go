@@ -93,22 +93,43 @@ func TestUpdateFactoryLineStages(t *testing.T) {
 		assert.Equal(t, []string{"Backlog", "Release", "Verify", "Done"}, modelStageNames(reloaded.StagesValue()))
 	})
 
-	t.Run("rejects system stage removal", func(t *testing.T) {
+	t.Run("removes optional system stages", func(t *testing.T) {
 		factory, line := newLine(t)
+		canvas := support.CreateFactoryCanvas(t, r, factory.ID, "verify")
+		require.NoError(t, canvas.SetColumnKey(db, models.CanvasColumnKeyVerify))
 		stages := factoryLineStageRequests(line.StagesValue())
 		stages = append(stages[:1], stages[2:]...)
 
-		_, err := UpdateFactoryLine(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
+		updated, err := UpdateFactoryLine(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
 			FactoryId:          factory.ID.String(),
 			LineId:             line.ID.String(),
 			StageConfiguration: &pb.FactoryLine_StageConfiguration{Stages: stages},
 		})
-		code, _, ok := grpcerrors.HandlerStatus(err)
-		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, code)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"Backlog", "Done"}, stageNames(updated.Line.Stages))
+		reloaded, err := models.FindCanvasInTransaction(db, r.Organization.ID, canvas.ID)
+		require.NoError(t, err)
+		require.NotNil(t, reloaded.ColumnKey)
+		assert.Equal(t, models.CanvasColumnKeyVerify, *reloaded.ColumnKey)
 	})
 
-	t.Run("rejects removal when a canvas references the custom stage", func(t *testing.T) {
+	t.Run("keeps Backlog and Done fixed", func(t *testing.T) {
+		factory, line := newLine(t)
+		stages := factoryLineStageRequests(line.StagesValue())
+
+		for _, invalid := range [][]*pb.FactoryLine_Stage{stages[1:], stages[:len(stages)-1]} {
+			_, err := UpdateFactoryLine(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
+				FactoryId:          factory.ID.String(),
+				LineId:             line.ID.String(),
+				StageConfiguration: &pb.FactoryLine_StageConfiguration{Stages: invalid},
+			})
+			code, _, ok := grpcerrors.HandlerStatus(err)
+			assert.True(t, ok)
+			assert.Equal(t, codes.InvalidArgument, code)
+		}
+	})
+
+	t.Run("detaches automations when their stage is removed", func(t *testing.T) {
 		factory, line := newLine(t)
 		stages := factoryLineStageRequests(line.StagesValue())
 		stages = append(stages[:1], append([]*pb.FactoryLine_Stage{{Name: "Security", Kind: pb.FactoryLine_STAGE_KIND_CUSTOM}}, stages[1:]...)...)
@@ -127,9 +148,10 @@ func TestUpdateFactoryLineStages(t *testing.T) {
 			LineId:             line.ID.String(),
 			StageConfiguration: &pb.FactoryLine_StageConfiguration{Stages: withoutCustom},
 		})
-		code, _, ok := grpcerrors.HandlerStatus(err)
-		assert.True(t, ok)
-		assert.Equal(t, codes.FailedPrecondition, code)
+		require.NoError(t, err)
+		reloaded, err := models.FindCanvasInTransaction(db, r.Organization.ID, canvas.ID)
+		require.NoError(t, err)
+		assert.Nil(t, reloaded.ColumnKey)
 	})
 
 	t.Run("requires the custom stages feature", func(t *testing.T) {

@@ -32,7 +32,6 @@ import { useOrganizationUsers } from "@/hooks/useOrganizationData";
 import { useOrgUserLookup } from "@/hooks/useOrgUserLookup";
 import { getOrgUserDisplayFromUser } from "@/lib/orgUserDisplay";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useWorkspaceLoading } from "@/hooks/useWorkspaceLoading";
@@ -98,7 +97,8 @@ type BoardPaging = {
   done: BoardColumnPaging;
 };
 import { LineBoardViewMenu } from "./LineBoardViewMenu";
-import { ManageLineStagesDialog } from "./ManageLineStagesDialog";
+import { AddLineStageDialog } from "./AddLineStageDialog";
+import { DeleteLineStageDialog } from "./DeleteLineStageDialog";
 import { columnAutomationRowsSubheader } from "./columnAutomationRowsSubheader";
 import { ColumnAutomationsHeaderSlot } from "./ColumnAutomationsIndicator";
 import { ColumnAutomationToggle } from "./ColumnAutomationDisclosure";
@@ -206,6 +206,7 @@ import {
   buildColumnAutomations,
   columnAutomationOpenPath,
   columnTitleForKey,
+  isColumnKey,
   type ColumnAutomation,
   type ColumnKey,
 } from "../lib/columnAutomations";
@@ -405,7 +406,7 @@ export function LinesPage() {
   const [scheduledIntakeOpen, setScheduledIntakeOpen] = useState(false);
   const [ownerIntakeTemplate, setOwnerIntakeTemplate] = useState<AddIntakeTemplate>();
   const [addPRFeedbackOpen, setAddPRFeedbackOpen] = useState(false);
-  const [stageDialog, setStageDialog] = useState<"manage" | "add" | null>(null);
+  const [addStageOpen, setAddStageOpen] = useState(false);
   const appRepository = factory?.onboarding?.appRepository?.trim() ?? "";
   const githubIntegrationId = factory?.onboarding?.vcsIntegrationId?.trim() ?? "";
   const githubIntegration = useIntegration(organizationId, githubIntegrationId);
@@ -805,15 +806,6 @@ export function LinesPage() {
         />
       ) : null}
       <div className={factoryKanbanPageClassName}>
-        {stageDialog ? (
-          <ManageLineStagesDialog
-            organizationId={organizationId}
-            factoryId={factoryId}
-            line={selectedLine}
-            addStageOnOpen={stageDialog === "add"}
-            onClose={() => setStageDialog(null)}
-          />
-        ) : null}
         <div className="shrink-0">
           <LineDetailHeader
             organizationId={organizationId}
@@ -831,7 +823,7 @@ export function LinesPage() {
             onAutomationViewChange={canChooseAutomationView ? setColumnAutomationView : undefined}
             colorView={columnColorView}
             onColorViewChange={setColumnColorView}
-            onManageStages={customStagesEnabled && canUpdate ? () => setStageDialog("manage") : undefined}
+            onAddStage={customStagesEnabled && canUpdate ? () => setAddStageOpen(true) : undefined}
           />
           <SubscriptionIntakeOwnerRecovery />
           {configuredIntakes
@@ -877,6 +869,9 @@ export function LinesPage() {
             cardsPending={Boolean(isPlaceholderData)}
             canCreateWorkOrder={canCreateWorkOrder || permissionsLoading}
             canUpdate={canUpdate}
+            canManageStages={customStagesEnabled && canUpdate}
+            addStageOpen={addStageOpen}
+            onCloseAddStage={() => setAddStageOpen(false)}
             onCreateWorkOrder={openCreateWorkOrder}
             intakePanel={intakePanel}
             onAddIntake={canUpdate ? () => setAddIntakeOpen(true) : undefined}
@@ -894,7 +889,6 @@ export function LinesPage() {
             showColumnAutomations={showColumnAutomations}
             showAutomationRows={showAutomationRows}
             colorView={columnColorView}
-            onAddStage={customStagesEnabled && canUpdate ? () => setStageDialog("add") : undefined}
             columnPaging={{
               backlog: {
                 hasMore: !isPlaceholderData && backlogPage.hasNextPage,
@@ -952,7 +946,7 @@ function LineDetailHeader({
   onAutomationViewChange,
   colorView,
   onColorViewChange,
-  onManageStages,
+  onAddStage,
 }: {
   organizationId: string;
   workOrders: FactoriesWorkOrder[];
@@ -965,7 +959,7 @@ function LineDetailHeader({
   onAutomationViewChange?: (view: ColumnAutomationView) => void;
   colorView: LineBoardColumnColorView;
   onColorViewChange: (view: LineBoardColumnColorView) => void;
-  onManageStages?: () => void;
+  onAddStage?: () => void;
 }) {
   const { data: orgUsers = [] } = useOrganizationUsers(organizationId);
   const searchRef = useWorkOrdersHeaderShortcuts(state);
@@ -1039,7 +1033,7 @@ function LineDetailHeader({
               onViewChange={onAutomationViewChange}
               colorView={colorView}
               onColorViewChange={onColorViewChange}
-              onManageStages={onManageStages}
+              onAddStage={onAddStage}
             />
           </>
         }
@@ -1068,6 +1062,9 @@ function LineDetail({
   cardsPending,
   canCreateWorkOrder,
   canUpdate,
+  canManageStages,
+  addStageOpen,
+  onCloseAddStage,
   onCreateWorkOrder,
   intakePanel,
   onAddIntake,
@@ -1089,7 +1086,6 @@ function LineDetail({
   onOpenWorkOrder,
   onClosePeek,
   planningEnabled,
-  onAddStage,
 }: {
   organizationId: string;
   factoryId: string;
@@ -1100,6 +1096,9 @@ function LineDetail({
   cardsPending: boolean;
   canCreateWorkOrder: boolean;
   canUpdate: boolean;
+  canManageStages: boolean;
+  addStageOpen: boolean;
+  onCloseAddStage: () => void;
   onCreateWorkOrder: () => void;
   intakePanel?: BacklogIntakePanel;
   onAddIntake?: () => void;
@@ -1121,7 +1120,6 @@ function LineDetail({
   onOpenWorkOrder: (orderId: string, order?: FactoriesWorkOrder) => void;
   onClosePeek: () => void;
   planningEnabled: boolean;
-  onAddStage?: () => void;
 }) {
   const steps = line.steps ?? [];
   const fullBoard = useMemo(() => buildLinePhaseBoard(line, workOrders ?? [], apps), [line, workOrders, apps]);
@@ -1270,6 +1268,19 @@ function LineDetail({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid="lines-detail">
+      <AddLineStageDialog
+        organizationId={organizationId}
+        factoryId={factoryId}
+        line={line}
+        open={addStageOpen}
+        onClose={onCloseAddStage}
+        onCreated={(stage) => {
+          onCloseAddStage();
+          if (isColumnKey(stage.key)) {
+            addAutomation.openPicker(stage.key, stage.name);
+          }
+        }}
+      />
       {steps.length === 0 && backlogOrders.length === 0 && doneOrders.length === 0 ? (
         <p className="text-[13px] text-muted-foreground">No phases yet. Edit this line to add app-driven phases.</p>
       ) : (
@@ -1286,6 +1297,7 @@ function LineDetail({
           columns={board}
           canCreateWorkOrder={canCreateWorkOrder}
           canRename={canUpdate}
+          canManageStages={canManageStages}
           onCreateWorkOrder={onCreateWorkOrder}
           intakePanel={intakePanel}
           onAddIntake={onAddIntake}
@@ -1303,11 +1315,20 @@ function LineDetail({
           onAddVerifyAutomation={canAddVerifyAutomation ? () => addAutomation.openPicker("verify") : undefined}
           onAddImplementAutomation={canAddColumnAutomation ? () => addAutomation.openPicker("phase-0") : undefined}
           onAddDoneAutomation={canAddColumnAutomation ? () => addAutomation.openPicker("done") : undefined}
-          onAddStage={onAddStage}
+          onAddStageAutomation={
+            showColumnAutomations && canUpdate
+              ? (key, title) => {
+                  if (isColumnKey(key)) {
+                    addAutomation.openPicker(key, title);
+                  }
+                }
+              : undefined
+          }
         />
       )}
       <AddColumnAutomationPicker
         open={addAutomation.pickerOpen}
+        title={addAutomation.pickerTitle}
         onClose={addAutomation.closePicker}
         onSelect={(entry) => {
           void addAutomation.onSelect(entry);
@@ -1555,6 +1576,7 @@ function PhaseBoard({
   columns,
   canCreateWorkOrder,
   canRename,
+  canManageStages,
   onCreateWorkOrder,
   intakePanel,
   onAddIntake,
@@ -1572,7 +1594,7 @@ function PhaseBoard({
   onAddVerifyAutomation,
   onAddImplementAutomation,
   onAddDoneAutomation,
-  onAddStage,
+  onAddStageAutomation,
 }: {
   organizationId: string;
   factoryId: string;
@@ -1586,6 +1608,7 @@ function PhaseBoard({
   columns: LinePhaseColumn[];
   canCreateWorkOrder: boolean;
   canRename: boolean;
+  canManageStages: boolean;
   onCreateWorkOrder: () => void;
   intakePanel?: BacklogIntakePanel;
   onAddIntake?: () => void;
@@ -1603,7 +1626,7 @@ function PhaseBoard({
   onAddVerifyAutomation?: () => void;
   onAddImplementAutomation?: () => void;
   onAddDoneAutomation?: () => void;
-  onAddStage?: () => void;
+  onAddStageAutomation?: (key: string, title: string) => void;
 }) {
   const [columnColors, setColumnColors] = useState<Record<string, LineBoardColumnColorId | null>>(() =>
     normalizeColumnColors(line.columnColors),
@@ -1612,6 +1635,7 @@ function PhaseBoard({
   const [backlogSize, setBacklogSize] = useState<number | null>(null);
   const [backlogSettingsOpen, setBacklogSettingsOpen] = useState(false);
   const [parallelismByStep, setParallelismByStep] = useState<Record<number, number>>({});
+  const [stageToDelete, setStageToDelete] = useState<LineBoardStage | null>(null);
   const updateLine = useUpdateFactoryLine(organizationId, factoryId);
   const lineId = line.id;
 
@@ -1802,6 +1826,7 @@ function PhaseBoard({
           automationPreferenceKey={automationPreferenceKey(columnKey)}
           onAutomationRowAction={onAutomationRowAction}
           onAddAutomation={column.stepIndex === 0 ? onAddImplementAutomation : undefined}
+          onDeleteStage={canManageStages ? () => setStageToDelete(stage) : undefined}
           paging={columnPaging.open}
           cardsPending={cardsPending}
         />
@@ -1809,7 +1834,22 @@ function PhaseBoard({
     }
 
     if (stage.kind === "STAGE_KIND_CUSTOM") {
-      return <CustomStageColumn stage={stage} colorId={columnColors[stage.key] ?? null} colorView={colorView} />;
+      const columnKey = isColumnKey(stage.key) ? stage.key : undefined;
+      const automations = columnKey && showColumnAutomations ? automationsFor(columnKey, stage.name) : undefined;
+      return (
+        <CustomStageColumn
+          stage={stage}
+          colorId={columnColors[stage.key] ?? null}
+          colorView={colorView}
+          onColorChange={(colorId) => void setColumnColor(stage.key, colorId)}
+          onDeleteStage={canManageStages ? () => setStageToDelete(stage) : undefined}
+          automations={automations}
+          automationRowCount={automationRowCount(automations)}
+          automationPreferenceKey={automationPreferenceKey(columnKey ?? `custom-${stage.id}`)}
+          onAutomationRowAction={onAutomationRowAction}
+          onAddAutomation={onAddStageAutomation ? () => onAddStageAutomation(stage.key, stage.name) : undefined}
+        />
+      );
     }
 
     if (stage.kind === "STAGE_KIND_VERIFY") {
@@ -1842,6 +1882,7 @@ function PhaseBoard({
           automationPreferenceKey={automationPreferenceKey("verify")}
           onAutomationRowAction={onAutomationRowAction}
           onAddAutomation={onAddVerifyAutomation}
+          onDeleteStage={canManageStages ? () => setStageToDelete(stage) : undefined}
           paging={columnPaging.open}
           cardsPending={cardsPending}
         />
@@ -1875,22 +1916,30 @@ function PhaseBoard({
   };
 
   return (
-    <WorkOrderKanbanBoard testId="lines-phase-board">
-      {visibleStages.flatMap((stage) => [
-        stage.kind === "STAGE_KIND_DONE" && onAddStage ? <AddStageLane key="add-stage" onAdd={onAddStage} /> : null,
-        <div key={stage.id} className={cn("relative flex min-h-0 self-stretch", workOrderKanbanLaneSizeClassName)}>
-          {stage.kind === "STAGE_KIND_PHASE" ? (
-            <span className="absolute top-[21px] left-full z-[1] h-px w-3 bg-border" aria-hidden />
-          ) : null}
-          {stage.kind === "STAGE_KIND_CUSTOM" ||
-          stage.kind === "STAGE_KIND_VERIFY" ||
-          stage.kind === "STAGE_KIND_DONE" ? (
-            <span className="absolute top-[21px] left-0 z-[1] h-px w-3 -translate-x-full bg-border" aria-hidden />
-          ) : null}
-          {renderStage(stage)}
-        </div>,
-      ])}
-    </WorkOrderKanbanBoard>
+    <>
+      <DeleteLineStageDialog
+        organizationId={organizationId}
+        factoryId={factoryId}
+        line={line}
+        stage={stageToDelete}
+        onClose={() => setStageToDelete(null)}
+      />
+      <WorkOrderKanbanBoard testId="lines-phase-board">
+        {visibleStages.map((stage) => (
+          <div key={stage.id} className={cn("relative flex min-h-0 self-stretch", workOrderKanbanLaneSizeClassName)}>
+            {stage.kind === "STAGE_KIND_PHASE" ? (
+              <span className="absolute top-[21px] left-full z-[1] h-px w-3 bg-border" aria-hidden />
+            ) : null}
+            {stage.kind === "STAGE_KIND_CUSTOM" ||
+            stage.kind === "STAGE_KIND_VERIFY" ||
+            stage.kind === "STAGE_KIND_DONE" ? (
+              <span className="absolute top-[21px] left-0 z-[1] h-px w-3 -translate-x-full bg-border" aria-hidden />
+            ) : null}
+            {renderStage(stage)}
+          </div>
+        ))}
+      </WorkOrderKanbanBoard>
+    </>
   );
 }
 
@@ -1898,12 +1947,27 @@ function CustomStageColumn({
   stage,
   colorId,
   colorView,
+  onColorChange,
+  onDeleteStage,
+  automations,
+  automationRowCount,
+  automationPreferenceKey,
+  onAutomationRowAction,
+  onAddAutomation,
 }: {
   stage: LineBoardStage;
   colorId: LineBoardColumnColorId | null;
   colorView: LineBoardColumnColorView;
+  onColorChange: (colorId: LineBoardColumnColorId | null) => void;
+  onDeleteStage?: () => void;
+  automations?: ColumnAutomation[];
+  automationRowCount?: number;
+  automationPreferenceKey: string;
+  onAutomationRowAction?: (automation: ColumnAutomation, action: ColumnAutomationRowAction) => void;
+  onAddAutomation?: () => void;
 }) {
   const lane = lineBoardColumnLaneProps(colorId, colorView, { mutedFallback: true });
+  const disclosure = useColumnAutomationCollapsePreference(automationPreferenceKey, automations?.length ?? 0);
   return (
     <WorkOrderBoardLane
       title={stage.name}
@@ -1912,21 +1976,40 @@ function CustomStageColumn({
       surfaceClassName={lane.surfaceClassName}
       className={lane.className}
       testId={`lines-custom-stage-${stage.key}`}
+      actions={
+        <div className="flex shrink-0 items-center gap-0.5">
+          {automationRowCount && automations?.length ? (
+            <ColumnAutomationToggle title={stage.name} disclosure={disclosure} />
+          ) : null}
+          {automationRowCount ? null : (
+            <ColumnAutomationsHeaderSlot
+              title={stage.name}
+              automations={automations}
+              onRowAction={onAutomationRowAction}
+              testId={`lines-custom-stage-${stage.key}-automations`}
+            />
+          )}
+          <ColumnLaneMenu
+            title={stage.name}
+            testId={`lines-custom-stage-menu-${stage.key}`}
+            colorId={colorId}
+            onColorChange={onColorChange}
+            onAddAutomation={onAddAutomation}
+            onDeleteStage={onDeleteStage}
+          />
+        </div>
+      }
+      subheaderOwnSpacing
+      subheader={columnAutomationRowsSubheader({
+        disclosure,
+        title: stage.name,
+        automations,
+        rowCount: automationRowCount,
+        onRowAction: onAutomationRowAction,
+        onAdd: onAddAutomation,
+        testId: `lines-custom-stage-${stage.key}-automation-rows`,
+      })}
     />
-  );
-}
-
-function AddStageLane({ onAdd }: { onAdd: () => void }) {
-  return (
-    <Button
-      type="button"
-      variant="ghost"
-      onClick={onAdd}
-      className="mr-3 h-auto min-w-40 basis-40 shrink-0 gap-2 self-stretch rounded-lg border border-dashed border-border text-muted-foreground hover:text-foreground"
-    >
-      <Plus className="size-4" aria-hidden />
-      Add stage
-    </Button>
   );
 }
 
@@ -1948,6 +2031,7 @@ function VerifyColumn({
   automationPreferenceKey,
   onAutomationRowAction,
   onAddAutomation,
+  onDeleteStage,
   paging,
   cardsPending,
   scrollPersistenceKey,
@@ -1969,6 +2053,7 @@ function VerifyColumn({
   automationPreferenceKey: string;
   onAutomationRowAction?: (automation: ColumnAutomation, action: ColumnAutomationRowAction) => void;
   onAddAutomation?: () => void;
+  onDeleteStage?: () => void;
   paging: BoardColumnPaging;
   cardsPending: boolean;
   scrollPersistenceKey?: string;
@@ -2027,6 +2112,7 @@ function VerifyColumn({
             colorId={colorId}
             onColorChange={onColorChange}
             onAddAutomation={onAddAutomation}
+            onDeleteStage={onDeleteStage}
           />
         </div>
       }
@@ -2218,6 +2304,7 @@ function PhaseColumn({
   automationPreferenceKey,
   onAutomationRowAction,
   onAddAutomation,
+  onDeleteStage,
   paging,
   cardsPending,
 }: {
@@ -2240,6 +2327,7 @@ function PhaseColumn({
   automationPreferenceKey: string;
   onAutomationRowAction?: (automation: ColumnAutomation, action: ColumnAutomationRowAction) => void;
   onAddAutomation?: () => void;
+  onDeleteStage?: () => void;
   paging: BoardColumnPaging;
   cardsPending: boolean;
 }) {
@@ -2310,6 +2398,7 @@ function PhaseColumn({
               colorId={colorId}
               onColorChange={onColorChange}
               onAddAutomation={onAddAutomation}
+              onDeleteStage={onDeleteStage}
             />
           </div>
         }

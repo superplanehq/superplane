@@ -6,6 +6,20 @@ import { catalogForColumn } from "../lib/columnAutomations";
 import { AddColumnAutomationPicker } from "./AddColumnAutomationPicker";
 
 describe("AddColumnAutomationPicker", () => {
+  it("uses a contextual title when supplied", () => {
+    render(
+      <AddColumnAutomationPicker
+        open
+        title="Add an automation for Deploy to prod"
+        onClose={vi.fn()}
+        onSelect={vi.fn()}
+        catalog={catalogForColumn("custom-stage-id")}
+      />,
+    );
+
+    expect(screen.getByRole("heading", { name: "Add an automation for Deploy to prod" })).toBeInTheDocument();
+  });
+
   it("offers the catalog for the column", () => {
     render(
       <AddColumnAutomationPicker

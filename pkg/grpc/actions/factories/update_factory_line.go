@@ -80,7 +80,7 @@ func UpdateFactoryLine(ctx context.Context, organizationID string, req *pb.Updat
 			if !organization.HasExperimentalFeature(features.FeatureFactoryCustomStages) {
 				return errFactoryCustomStagesDisabled
 			}
-			stages, err = parseFactoryLineStages(tx, line, req.GetStageConfiguration().GetStages())
+			stages, err = parseFactoryLineStages(line, req.GetStageConfiguration().GetStages())
 			if err != nil {
 				return err
 			}
@@ -88,6 +88,9 @@ func UpdateFactoryLine(ctx context.Context, organizationID string, req *pb.Updat
 				columnColors = line.ColumnColorsValue()
 			}
 			columnColors = remapNewFactoryLineStageColors(req.GetStageConfiguration().GetStages(), stages, columnColors)
+			if err := line.DetachRemovedCustomStageAutomations(tx, stages); err != nil {
+				return err
+			}
 		}
 
 		if name == nil && steps == nil && columnColors == nil && stages == nil {

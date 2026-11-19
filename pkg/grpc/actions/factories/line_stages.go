@@ -2,21 +2,18 @@ package factories
 
 import (
 	"fmt"
-	"slices"
 	"strings"
 	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
-	"gorm.io/gorm"
 )
 
 const factoryLineStageMaxCount = 64
 const factoryLineStageNameMaxLength = 64
 
 func parseFactoryLineStages(
-	tx *gorm.DB,
 	line *models.FactoryLine,
 	stages []*pb.FactoryLine_Stage,
 ) ([]models.FactoryLineStage, error) {
@@ -50,9 +47,6 @@ func parseFactoryLineStages(
 	}
 
 	if err := validateFactoryLineSystemStages(line.StagesValue(), result); err != nil {
-		return nil, err
-	}
-	if err := rejectReferencedStageRemovals(tx, line, result); err != nil {
 		return nil, err
 	}
 	return result, nil
@@ -157,40 +151,22 @@ func validateFactoryLineSystemStages(existing, next []models.FactoryLineStage) e
 		return invalidArgument("Done must remain the last stage")
 	}
 
-	expected := systemStageIDs(existing)
-	actual := systemStageIDs(next)
-	if !slices.Equal(expected, actual) {
-		return invalidArgument("system stages must remain present and in order")
-	}
-	return nil
-}
-
-func systemStageIDs(stages []models.FactoryLineStage) []uuid.UUID {
-	result := make([]uuid.UUID, 0, len(stages))
-	for _, stage := range stages {
-		if stage.Kind != models.FactoryLineStageCustom {
-			result = append(result, stage.ID)
-		}
-	}
-	return result
-}
-
-func rejectReferencedStageRemovals(tx *gorm.DB, line *models.FactoryLine, next []models.FactoryLineStage) error {
 	retained := make(map[uuid.UUID]bool, len(next))
 	for _, stage := range next {
 		retained[stage.ID] = true
 	}
-	for _, stage := range line.StagesValue() {
-		if stage.Kind != models.FactoryLineStageCustom || retained[stage.ID] {
+	expectedIndex := 0
+	for _, stage := range existing {
+		if stage.Kind == models.FactoryLineStageCustom || !retained[stage.ID] {
 			continue
 		}
-		referenced, err := line.IsStageReferenced(tx, stage.Key)
-		if err != nil {
-			return err
+		for expectedIndex < len(next) && next[expectedIndex].Kind == models.FactoryLineStageCustom {
+			expectedIndex++
 		}
-		if referenced {
-			return fmt.Errorf("%w: %s", errFactoryStageInUse, stage.Name)
+		if expectedIndex >= len(next) || next[expectedIndex].ID != stage.ID {
+			return invalidArgument("system stages must remain in order")
 		}
+		expectedIndex++
 	}
 	return nil
 }

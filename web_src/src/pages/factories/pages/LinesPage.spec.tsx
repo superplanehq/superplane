@@ -866,15 +866,34 @@ describe("LinesPage board", () => {
     expect(screen.getByTestId("lines-phase-board").children).toHaveLength(6);
     expect(screen.queryByRole("button", { name: "Add stage" })).not.toBeInTheDocument();
     await user.click(screen.getByTestId("lines-board-view-menu"));
-    expect(screen.queryByRole("menuitem", { name: "Manage stages" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Add stage" })).not.toBeInTheDocument();
     disabled.unmount();
 
     enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_STAGES);
+    const selectedLine = factory.lines?.find((line) => line.id === REFUND_LINE_PLAN_ID);
+    updateFactoryLineMutateAsync.mockResolvedValueOnce({
+      ...selectedLine,
+      stages: [
+        ...(selectedLine?.stages?.slice(0, -1) ?? []),
+        {
+          id: "custom-deploy",
+          key: "custom-deploy",
+          name: "Deploy to prod",
+          kind: "STAGE_KIND_CUSTOM" as const,
+        },
+        ...(selectedLine?.stages?.slice(-1) ?? []),
+      ],
+    });
     renderLinesBoard(undefined, vi.fn(), factory);
-    expect(screen.getByRole("button", { name: "Add stage" })).toBeInTheDocument();
     await user.click(screen.getByTestId("lines-board-view-menu"));
-    await user.click(screen.getByRole("menuitem", { name: "Manage stages" }));
-    expect(screen.getByTestId("manage-line-stages-dialog")).toBeInTheDocument();
+    await user.click(screen.getByRole("menuitem", { name: "Add stage" }));
+    expect(screen.getByTestId("add-line-stage-dialog")).toBeInTheDocument();
+
+    await user.type(screen.getByRole("textbox", { name: "Name" }), "Deploy to prod");
+    await user.click(screen.getByRole("button", { name: "Add stage" }));
+
+    expect(await screen.findByRole("heading", { name: "Add an automation for Deploy to prod" })).toBeInTheDocument();
+    expect(screen.getByTestId("add-column-automation-template-custom")).toBeInTheDocument();
   });
 
   it("uses a persisted stage name after the line refreshes", async () => {
