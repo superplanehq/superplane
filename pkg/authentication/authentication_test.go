@@ -1142,6 +1142,75 @@ func TestHandler_handleMagicCodeVerify_SignupDisabled(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestPasswordLoginOriginProtection(t *testing.T) {
+	handler, registry := setupAuthHandler(t, false)
+	handler.passwordLoginEnabled = true
+	password := "DummyPassword123!"
+	hash, err := crypto.HashPassword(password)
+	require.NoError(t, err)
+	_, err = models.CreateAccountPasswordAuth(registry.Account.ID, hash)
+	require.NoError(t, err)
+	router := mux.NewRouter()
+	handler.RegisterRoutes(router)
+	existingToken, err := GenerateAccountToken(handler.jwtSigner, registry.Account.ID.String(), time.Now(), time.Hour)
+	require.NoError(t, err)
+
+	for _, test := range []struct {
+		name           string
+		target         string
+		origin         string
+		fetchSite      string
+		forwarded      string
+		existingCookie bool
+		allowed        bool
+	}{
+		{name: "attacker origin", origin: "https://attacker.example.invalid"},
+		{name: "cross-site form", origin: "https://attacker.example.invalid", fetchSite: "cross-site"},
+		{name: "existing session cannot bypass rejection", origin: "https://attacker.example.invalid", existingCookie: true},
+		{name: "opaque origin", origin: "null"},
+		{name: "malformed origin", origin: "https://%invalid"},
+		{name: "cross-site without origin", fetchSite: "cross-site"},
+		{name: "same-site is not same-origin", origin: "http://app.example:8000", fetchSite: "same-site"},
+		{name: "unknown fetch metadata", fetchSite: "unknown"},
+		{name: "different port", origin: "http://app.example:9000"},
+		{name: "same-origin HTTP", origin: "http://app.example:8000", fetchSite: "same-origin", allowed: true},
+		{name: "legacy same-origin HTTP", origin: "http://app.example:8000", allowed: true},
+		{name: "same-origin HTTPS", target: "https://app.example:8000/login", origin: "https://app.example:8000", fetchSite: "same-origin", allowed: true},
+		{name: "TLS terminating proxy", origin: "https://app.example:8000", fetchSite: "same-origin", forwarded: "https", allowed: true},
+		{name: "legacy TLS terminating proxy", origin: "https://app.example:8000", forwarded: "https", allowed: true},
+		{name: "legacy scheme compatibility", origin: "https://app.example:8000", allowed: true},
+		{name: "modern cross-scheme rejected", origin: "https://app.example:8000", fetchSite: "same-site"},
+		{name: "non-browser client", allowed: true},
+		{name: "browser initiated navigation", fetchSite: "none", allowed: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			target := test.target
+			if target == "" {
+				target = "http://app.example:8000/login"
+			}
+			form := url.Values{"email": {registry.Account.Email}, "password": {password}}
+			request := httptest.NewRequest(http.MethodPost, target+"?redirect=%2Fcanvases", strings.NewReader(form.Encode()))
+			request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			request.Header.Set("Origin", test.origin)
+			request.Header.Set("Sec-Fetch-Site", test.fetchSite)
+			request.Header.Set("X-Forwarded-Proto", test.forwarded)
+			if test.existingCookie {
+				request.AddCookie(&http.Cookie{Name: "account_token", Value: existingToken})
+			}
+			recorder := httptest.NewRecorder()
+			router.ServeHTTP(recorder, request)
+			if !test.allowed {
+				assert.Equal(t, http.StatusForbidden, recorder.Code)
+				assert.True(t, len(recorder.Header().Values("Set-Cookie")) == 0, "rejection must not set or clear cookies")
+				return
+			}
+			require.Equal(t, http.StatusSeeOther, recorder.Code)
+			assert.Equal(t, "/canvases", recorder.Header().Get("Location"))
+			assert.Equal(t, registry.Account.ID.String(), sessionAccountID(t, recorder, handler.jwtSigner))
+		})
+	}
+}
+
 func TestHandler_handlePasswordSignup(t *testing.T) {
 	t.Run("should route new cloud users through welcome with original redirect", func(t *testing.T) {
 		r := support.Setup(t)
