@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 )
@@ -41,6 +42,10 @@ func UpdateFactoryLine(ctx context.Context, organizationID string, req *pb.Updat
 		name = &trimmed
 	}
 
+	if req.StageConfiguration != nil && len(req.GetSteps()) > 0 {
+		return nil, factoryErrorToStatus(invalidArgument("steps and stages cannot be updated together"), "failed to update factory line")
+	}
+
 	var steps []models.FactoryLineStep
 	if len(req.GetSteps()) > 0 {
 		steps, err = parseLineSteps(db, orgID, factoryID, req.GetSteps())
@@ -57,11 +62,30 @@ func UpdateFactoryLine(ctx context.Context, organizationID string, req *pb.Updat
 		}
 	}
 
-	if name == nil && steps == nil && columnColors == nil {
-		return nil, factoryErrorToStatus(invalidArgument("name, steps, or column colors must be provided"), "failed to update factory line")
+	var stages []models.FactoryLineStage
+	if req.StageConfiguration != nil {
+		organization, findErr := models.FindOrganizationByIDInTransaction(db, orgID.String())
+		if findErr != nil {
+			return nil, factoryErrorToStatus(findErr, "failed to update factory line")
+		}
+		if !organization.HasExperimentalFeature(features.FeatureFactoryCustomStages) {
+			return nil, factoryErrorToStatus(errFactoryCustomStagesDisabled, "failed to update factory line")
+		}
+		stages, err = parseFactoryLineStages(db, line, req.GetStageConfiguration().GetStages())
+		if err != nil {
+			return nil, factoryErrorToStatus(err, "failed to update factory line")
+		}
+		if columnColors == nil {
+			columnColors = line.ColumnColorsValue()
+		}
+		columnColors = remapNewFactoryLineStageColors(req.GetStageConfiguration().GetStages(), stages, columnColors)
 	}
 
-	if err := line.Update(db, name, steps, columnColors); err != nil {
+	if name == nil && steps == nil && columnColors == nil && stages == nil {
+		return nil, factoryErrorToStatus(invalidArgument("name, steps, column colors, or stages must be provided"), "failed to update factory line")
+	}
+
+	if err := line.UpdateConfiguration(db, name, steps, columnColors, stages); err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update factory line")
 	}
 

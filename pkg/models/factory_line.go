@@ -2,6 +2,7 @@ package models
 
 import (
 	"errors"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -13,6 +14,11 @@ import (
 
 const (
 	FactoryLineStepTypeRunApp = "runApp"
+	FactoryLineStageBacklog   = "backlog"
+	FactoryLineStagePhase     = "phase"
+	FactoryLineStageCustom    = "custom"
+	FactoryLineStageVerify    = "verify"
+	FactoryLineStageDone      = "done"
 
 	// DefaultFactoryLineStepMaxParallelism is the number of in-flight runs
 	// a step allows when maxParallelism is not set.
@@ -39,6 +45,14 @@ type FactoryLineStep struct {
 	MaxParallelism *int `json:"max_parallelism,omitempty"`
 }
 
+type FactoryLineStage struct {
+	ID        uuid.UUID `json:"id"`
+	Key       string    `json:"key"`
+	Name      string    `json:"name"`
+	Kind      string    `json:"kind"`
+	StepIndex *int      `json:"step_index,omitempty"`
+}
+
 func (s *FactoryLineStep) EffectiveMaxParallelism() int {
 	if s.MaxParallelism == nil || *s.MaxParallelism < 1 {
 		return DefaultFactoryLineStepMaxParallelism
@@ -52,12 +66,17 @@ type FactoryLine struct {
 	FactoryID      uuid.UUID
 	Name           string
 	Steps          datatypes.JSONSlice[FactoryLineStep]
+	Stages         datatypes.JSONSlice[FactoryLineStage]
 	// ColumnColors holds the board's column colors, keyed by column key
 	// ("backlog", "phase-<step index>", "verify", "done"). A missing key
 	// means the column uses the default color.
 	ColumnColors datatypes.JSONType[map[string]string]
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
+}
+
+func (l *FactoryLine) StagesValue() []FactoryLineStage {
+	return []FactoryLineStage(l.Stages)
 }
 
 // ColumnColorsValue returns the stored column colors, defaulting to an
@@ -99,7 +118,58 @@ func defaultColumnColors() map[string]string {
 	}
 }
 
+func defaultFactoryLineStages(tx *gorm.DB, steps []FactoryLineStep) ([]FactoryLineStage, error) {
+	names, err := factoryLineStepNames(tx, steps)
+	if err != nil {
+		return nil, err
+	}
+
+	stages := make([]FactoryLineStage, 0, len(steps)+3)
+	stages = append(stages, newFactoryLineStage(FactoryLineStageBacklog, "backlog", "Backlog", nil))
+	for index, step := range steps {
+		stepIndex := index
+		name := names[step.AppID]
+		if name == "" {
+			name = "Step"
+		}
+		stages = append(stages, newFactoryLineStage(FactoryLineStagePhase, "phase-"+strconv.Itoa(index), name, &stepIndex))
+	}
+	stages = append(stages,
+		newFactoryLineStage(FactoryLineStageVerify, "verify", "Verify", nil),
+		newFactoryLineStage(FactoryLineStageDone, "done", "Done", nil),
+	)
+	return stages, nil
+}
+
+func factoryLineStepNames(tx *gorm.DB, steps []FactoryLineStep) (map[uuid.UUID]string, error) {
+	ids := make([]uuid.UUID, 0, len(steps))
+	for _, step := range steps {
+		ids = append(ids, step.AppID)
+	}
+	if len(ids) == 0 {
+		return map[uuid.UUID]string{}, nil
+	}
+
+	var canvases []Canvas
+	if err := tx.Select("id", "name").Where("id IN ?", ids).Find(&canvases).Error; err != nil {
+		return nil, err
+	}
+	names := make(map[uuid.UUID]string, len(canvases))
+	for _, canvas := range canvases {
+		names[canvas.ID] = canvas.Name
+	}
+	return names, nil
+}
+
+func newFactoryLineStage(kind, key, name string, stepIndex *int) FactoryLineStage {
+	return FactoryLineStage{ID: uuid.New(), Key: key, Name: name, Kind: kind, StepIndex: stepIndex}
+}
+
 func (f *Factory) CreateLine(tx *gorm.DB, name string, steps []FactoryLineStep) (*FactoryLine, error) {
+	stages, err := defaultFactoryLineStages(tx, steps)
+	if err != nil {
+		return nil, err
+	}
 	now := time.Now()
 	line := &FactoryLine{
 		ID:             uuid.New(),
@@ -107,6 +177,7 @@ func (f *Factory) CreateLine(tx *gorm.DB, name string, steps []FactoryLineStep) 
 		FactoryID:      f.ID,
 		Name:           name,
 		Steps:          datatypes.JSONSlice[FactoryLineStep](steps),
+		Stages:         datatypes.JSONSlice[FactoryLineStage](stages),
 		ColumnColors:   datatypes.NewJSONType(defaultColumnColors()),
 		CreatedAt:      now,
 		UpdatedAt:      now,
@@ -203,6 +274,26 @@ func ListFactoryLinesByFactoryIDs(tx *gorm.DB, organizationID uuid.UUID, factory
 // valid (callers must not pass one), while an empty (non-nil) columnColors
 // map is a valid "clear all colors" request.
 func (l *FactoryLine) Update(tx *gorm.DB, name *string, steps []FactoryLineStep, columnColors map[string]string) error {
+	return l.update(tx, name, steps, columnColors, nil)
+}
+
+func (l *FactoryLine) UpdateConfiguration(
+	tx *gorm.DB,
+	name *string,
+	steps []FactoryLineStep,
+	columnColors map[string]string,
+	stages []FactoryLineStage,
+) error {
+	return l.update(tx, name, steps, columnColors, stages)
+}
+
+func (l *FactoryLine) update(
+	tx *gorm.DB,
+	name *string,
+	steps []FactoryLineStep,
+	columnColors map[string]string,
+	stages []FactoryLineStage,
+) error {
 	updates := map[string]any{
 		"updated_at": time.Now(),
 	}
@@ -211,9 +302,24 @@ func (l *FactoryLine) Update(tx *gorm.DB, name *string, steps []FactoryLineStep,
 	}
 	if steps != nil {
 		updates["steps"] = datatypes.JSONSlice[FactoryLineStep](steps)
+		if stages == nil {
+			reconciled, err := l.ReconcileStages(tx, steps)
+			if err != nil {
+				return err
+			}
+			stages = reconciled
+		}
 	}
 	if columnColors != nil {
 		updates["column_colors"] = datatypes.NewJSONType(columnColors)
+	}
+	if stages != nil {
+		if columnColors == nil {
+			columnColors = l.ColumnColorsValue()
+		}
+		columnColors = RetainFactoryLineStageColors(columnColors, stages)
+		updates["column_colors"] = datatypes.NewJSONType(columnColors)
+		updates["stages"] = datatypes.JSONSlice[FactoryLineStage](stages)
 	}
 
 	err := tx.Model(l).Updates(updates).Error
@@ -225,4 +331,56 @@ func (l *FactoryLine) Update(tx *gorm.DB, name *string, steps []FactoryLineStep,
 		Where("id = ?", l.ID).
 		First(l).
 		Error
+}
+
+func RetainFactoryLineStageColors(colors map[string]string, stages []FactoryLineStage) map[string]string {
+	keys := make(map[string]bool, len(stages))
+	for _, stage := range stages {
+		keys[stage.Key] = true
+	}
+	result := make(map[string]string, len(colors))
+	for key, color := range colors {
+		if keys[key] {
+			result[key] = color
+		}
+	}
+	return result
+}
+
+func (l *FactoryLine) ReconcileStages(tx *gorm.DB, steps []FactoryLineStep) ([]FactoryLineStage, error) {
+	systemStages, err := defaultFactoryLineStages(tx, steps)
+	if err != nil {
+		return nil, err
+	}
+
+	existingByKey := make(map[string]FactoryLineStage, len(l.Stages))
+	nextSystemKeys := make(map[string]bool, len(systemStages))
+	for _, stage := range systemStages {
+		nextSystemKeys[stage.Key] = true
+	}
+	customBefore := make(map[string][]FactoryLineStage)
+	pendingCustom := []FactoryLineStage{}
+	for _, stage := range l.StagesValue() {
+		if stage.Kind == FactoryLineStageCustom {
+			pendingCustom = append(pendingCustom, stage)
+			continue
+		}
+		existingByKey[stage.Key] = stage
+		if len(pendingCustom) > 0 && nextSystemKeys[stage.Key] {
+			customBefore[stage.Key] = append(customBefore[stage.Key], pendingCustom...)
+			pendingCustom = nil
+		}
+	}
+	customBefore["done"] = append(customBefore["done"], pendingCustom...)
+
+	result := make([]FactoryLineStage, 0, len(systemStages)+len(l.Stages))
+	for _, stage := range systemStages {
+		result = append(result, customBefore[stage.Key]...)
+		if existing, ok := existingByKey[stage.Key]; ok && existing.Kind == stage.Kind {
+			existing.StepIndex = stage.StepIndex
+			stage = existing
+		}
+		result = append(result, stage)
+	}
+	return result, nil
 }
