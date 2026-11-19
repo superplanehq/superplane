@@ -1107,3 +1107,71 @@ func TestImplementAndDoneCustomAutomationsStartFromTheTask(t *testing.T) {
 		})
 	}
 }
+
+func TestCustomAutomationWithoutTaskStartsFromTheColumn(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory := seedHandOffFactory(t, r, db)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
+	integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSIntegrationID: &integrationID}))
+	ctx, deps := onboardingContext(r), onboardingDeps(r)
+	steps := []*pb.FactoryCustomAutomation_Step{{Name: "Check", Type: pb.FactoryCustomAutomation_Step_TYPE_BASH, Command: "true"}}
+	agent := &pb.FactoryAppTemplateAgent{Component: "runnerClaudeCode"}
+	runsOnTask := true
+	_, err := CreateFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &pb.CreateFactoryCustomAutomationRequest{
+		FactoryId: factory.ID.String(),
+		Name:      "Mixed",
+		ColumnKey: "backlog",
+		Settings: &pb.FactoryCustomAutomation_Settings{
+			RunsOnTask: &runsOnTask,
+			Agent:      agent,
+			Steps:      steps,
+			Triggers: []*pb.FactoryCustomAutomation_StartTrigger{
+				{StartMode: pb.FactoryCustomAutomation_START_MODE_MANUAL},
+				{StartMode: pb.FactoryCustomAutomation_START_MODE_SCHEDULED, Schedule: &pb.FactoryCustomAutomation_Schedule{CronExpression: "0 9 * * *", UtcOffset: 0}},
+			},
+		},
+	})
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "schedule runs with no task")
+
+	runsOnTask = false
+	created, err := CreateFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &pb.CreateFactoryCustomAutomationRequest{
+		FactoryId: factory.ID.String(),
+		Name:      "Column run",
+		ColumnKey: "backlog",
+		Settings: &pb.FactoryCustomAutomation_Settings{
+			RunsOnTask: &runsOnTask,
+			StartMode:  pb.FactoryCustomAutomation_START_MODE_MANUAL,
+			Agent:      agent,
+			Steps:      steps,
+		},
+	})
+	require.NoError(t, err)
+	assert.False(t, created.GetCustomAutomation().GetSettings().GetRunsOnTask())
+	require.NotNil(t, created.GetCustomAutomation().GetSettings().RunsOnTask)
+
+	canvas, err := models.FindCanvasInTransaction(db, r.Organization.ID, uuid.MustParse(created.GetCustomAutomation().GetAutomation().GetId()))
+	require.NoError(t, err)
+	version, err := models.FindLiveCanvasVersionByCanvasInTransaction(db, canvas)
+	require.NoError(t, err)
+	trigger := customAutomationNode([]models.Node(version.Nodes), customAutomationColumnStartID)
+	require.NotNil(t, trigger)
+	assert.Equal(t, "start", trigger.ComponentName())
+	assert.Nil(t, customAutomationNode([]models.Node(version.Nodes), customAutomationTaskTriggerID))
+
+	order, err := factory.CreateWorkOrder(db, "Inspect this task", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	_, err = RunFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &pb.RunFactoryCustomAutomationRequest{
+		FactoryId: factory.ID.String(), AutomationId: canvas.ID.String(), WorkOrderId: order.ID.String(),
+	})
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "does not use manual start")
+
+	started, err := RunFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &pb.RunFactoryCustomAutomationRequest{
+		FactoryId: factory.ID.String(), AutomationId: canvas.ID.String(),
+	})
+	require.NoError(t, err)
+	require.NotEmpty(t, started.GetRunId())
+}
