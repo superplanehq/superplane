@@ -184,7 +184,7 @@ func assignOpenTrial(organizationID uuid.UUID) error {
 func (s *TestSession) Login() {
 	secret := os.Getenv("JWT_SECRET")
 	signer := spjwt.NewSigner(secret)
-	token, err := authentication.GenerateAccountToken(signer, s.Account.ID.String(), time.Now(), 24*time.Hour)
+	token, err := authentication.GenerateAccountToken(signer, s.Account.ID.String(), time.Now(), 24*time.Hour, s.Account.SessionGeneration)
 	if err != nil {
 		s.t.Fatalf("jwt: %v", err)
 	}

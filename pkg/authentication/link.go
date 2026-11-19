@@ -11,6 +11,7 @@ import (
 	"github.com/markbates/goth"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
@@ -62,7 +63,11 @@ func (a *Handler) sessionAccountFromCookie(r *http.Request) (*models.Account, er
 	}
 
 	iat, _ := claims["iat"].(float64)
-	if !account.IsSessionFresh(int64(iat)) {
+	generation, err := jwt.SessionGenerationFromClaims(claims)
+	if err != nil {
+		return nil, err
+	}
+	if !account.IsSessionGenerationCurrent(generation, int64(iat)) {
 		return nil, errors.New("session invalidated by password change")
 	}
 

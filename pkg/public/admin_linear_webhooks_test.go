@@ -22,7 +22,7 @@ func TestAdminLinearWebhooks(t *testing.T) {
 		account, err := models.CreateAccount("Regular User", "regular-linear-webhooks@example.com")
 		require.NoError(t, err)
 		signer := jwt.NewSigner("test-client-secret")
-		regularToken, err := authentication.GenerateAccountToken(signer, account.ID.String(), time.Now(), time.Hour)
+		regularToken, err := authentication.GenerateAccountToken(signer, account.ID.String(), time.Now(), time.Hour, account.SessionGeneration)
 		require.NoError(t, err)
 
 		response := execRequest(server, requestParams{

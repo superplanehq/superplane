@@ -56,7 +56,7 @@ func TestAdminOrganizationCreditBalances(t *testing.T) {
 		account, err := models.CreateAccount("Regular User", "regular-credit-balance@example.com")
 		require.NoError(t, err)
 		signer := jwt.NewSigner("test-client-secret")
-		regularToken, err := authentication.GenerateAccountToken(signer, account.ID.String(), time.Now(), time.Hour)
+		regularToken, err := authentication.GenerateAccountToken(signer, account.ID.String(), time.Now(), time.Hour, account.SessionGeneration)
 		require.NoError(t, err)
 
 		response := setBalance(regularToken, map[string]any{"bucket": "grant", "target_cents": 100})
@@ -170,7 +170,7 @@ func TestAdminCatalogPlanAssignment(t *testing.T) {
 
 	regular, err := models.CreateAccount("Catalog user", "catalog-user@example.com")
 	require.NoError(t, err)
-	regularToken, err := authentication.GenerateAccountToken(jwt.NewSigner("test-client-secret"), regular.ID.String(), time.Now(), time.Hour)
+	regularToken, err := authentication.GenerateAccountToken(jwt.NewSigner("test-client-secret"), regular.ID.String(), time.Now(), time.Hour, regular.SessionGeneration)
 	require.NoError(t, err)
 	denied := execRequest(server, requestParams{method: "GET", path: "/admin/api/billing-plans", authCookie: regularToken})
 	require.Equal(t, http.StatusNotFound, denied.Code)
@@ -716,7 +716,7 @@ func TestAdminLLMSettings(t *testing.T) {
 		account, err := models.CreateAccount("Regular User", "regular-llm@example.com")
 		require.NoError(t, err)
 		signer := jwt.NewSigner("test-client-secret")
-		regularToken, err := authentication.GenerateAccountToken(signer, account.ID.String(), time.Now(), time.Hour)
+		regularToken, err := authentication.GenerateAccountToken(signer, account.ID.String(), time.Now(), time.Hour, account.SessionGeneration)
 		require.NoError(t, err)
 
 		response := execRequest(server, requestParams{

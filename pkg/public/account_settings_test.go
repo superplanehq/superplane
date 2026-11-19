@@ -700,7 +700,7 @@ func TestDeleteAccount_RefusesLastLivingOwnerAfterDeletedOwner(t *testing.T) {
 	_, err = models.FindOrganizationByID(r.Organization.ID.String())
 	require.NoError(t, err)
 
-	otherToken, err := authentication.GenerateAccountToken(jwt.NewSigner("test-client-secret"), otherAccount.ID.String(), time.Now(), time.Hour)
+	otherToken, err := authentication.GenerateAccountToken(jwt.NewSigner("test-client-secret"), otherAccount.ID.String(), time.Now(), time.Hour, otherAccount.SessionGeneration)
 	require.NoError(t, err)
 	body, err = json.Marshal(map[string]string{"email": otherAccount.Email})
 	require.NoError(t, err)

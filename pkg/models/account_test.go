@@ -3,6 +3,7 @@ package models
 import (
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -101,6 +102,21 @@ func TestFindAccountByProvider(t *testing.T) {
 		assert.Nil(t, account)
 	})
 
+}
+
+func TestAccountPasswordRotationsAdvanceStoredGeneration(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	account, err := CreateAccount("Rotation User", "rotation@example.com")
+	require.NoError(t, err)
+	staleSnapshot := *account
+	now := time.Now()
+	require.NoError(t, account.MarkPasswordChangedInTransaction(database.Conn(), now))
+	require.EqualValues(t, 1, account.SessionGeneration)
+	require.NoError(t, staleSnapshot.MarkPasswordChangedInTransaction(database.Conn(), now))
+	require.EqualValues(t, 2, staleSnapshot.SessionGeneration)
+	persisted, err := FindAccountByID(account.ID.String())
+	require.NoError(t, err)
+	require.EqualValues(t, 2, persisted.SessionGeneration)
 }
 
 func TestAccount_UpdateEmail(t *testing.T) {

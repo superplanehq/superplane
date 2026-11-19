@@ -19,13 +19,14 @@ import (
 	"github.com/superplanehq/superplane/pkg/supportsession"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
 func TestOrganizationAuthMiddleware_CookieAuthErrors(t *testing.T) {
 	r := support.Setup(t)
 	signer := jwt.NewSigner("test-secret")
 
-	token, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), time.Now(), time.Hour)
+	token, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), time.Now(), time.Hour, r.Account.SessionGeneration)
 	require.NoError(t, err)
 
 	handler := OrganizationAuthMiddleware(signer)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -125,10 +126,11 @@ func TestOrganizationAuthMiddleware_BearerAuth(t *testing.T) {
 
 	t.Run("scoped token reaches next handler", func(t *testing.T) {
 		token, err := signer.GenerateScopedToken(jwt.ScopedTokenClaims{
-			Subject: r.User.String(),
-			OrgID:   r.Organization.ID.String(),
-			Purpose: "test-scope",
-			Scopes:  []string{"canvases:read"},
+			SessionGeneration: &r.Account.SessionGeneration,
+			Subject:           r.User.String(),
+			OrgID:             r.Organization.ID.String(),
+			Purpose:           "test-scope",
+			Scopes:            []string{"canvases:read"},
 		}, time.Minute)
 		require.NoError(t, err)
 
@@ -143,10 +145,11 @@ func TestOrganizationAuthMiddleware_BearerAuth(t *testing.T) {
 
 	t.Run("scoped token with wrong org returns unauthorized", func(t *testing.T) {
 		token, err := signer.GenerateScopedToken(jwt.ScopedTokenClaims{
-			Subject: r.User.String(),
-			OrgID:   uuid.NewString(),
-			Purpose: "test-scope",
-			Scopes:  []string{"canvases:read"},
+			SessionGeneration: &r.Account.SessionGeneration,
+			Subject:           r.User.String(),
+			OrgID:             uuid.NewString(),
+			Purpose:           "test-scope",
+			Scopes:            []string{"canvases:read"},
 		}, time.Minute)
 		require.NoError(t, err)
 
@@ -175,10 +178,11 @@ func TestOrganizationAuthMiddleware_BearerAuth(t *testing.T) {
 
 	t.Run("scoped token issued before password change is rejected", func(t *testing.T) {
 		token, err := signer.GenerateScopedToken(jwt.ScopedTokenClaims{
-			Subject: r.User.String(),
-			OrgID:   r.Organization.ID.String(),
-			Purpose: "test-scope",
-			Scopes:  []string{"canvases:read"},
+			SessionGeneration: &r.Account.SessionGeneration,
+			Subject:           r.User.String(),
+			OrgID:             r.Organization.ID.String(),
+			Purpose:           "test-scope",
+			Scopes:            []string{"canvases:read"},
 		}, time.Minute)
 		require.NoError(t, err)
 
@@ -197,10 +201,11 @@ func TestOrganizationAuthMiddleware_BearerAuth(t *testing.T) {
 
 	t.Run("scoped token for blocked account returns contact-support message", func(t *testing.T) {
 		token, err := signer.GenerateScopedToken(jwt.ScopedTokenClaims{
-			Subject: r.User.String(),
-			OrgID:   r.Organization.ID.String(),
-			Purpose: "test-scope",
-			Scopes:  []string{"canvases:read"},
+			SessionGeneration: &r.Account.SessionGeneration,
+			Subject:           r.User.String(),
+			OrgID:             r.Organization.ID.String(),
+			Purpose:           "test-scope",
+			Scopes:            []string{"canvases:read"},
 		}, time.Minute)
 		require.NoError(t, err)
 		require.NoError(t, r.Account.Block(database.Conn(), time.Now()))
@@ -418,7 +423,7 @@ func TestOrganizationAuthMiddleware_BlockedSupportSessionTargetFallsBackToAdmin(
 	_, err = models.CreateUser(r.Organization.ID, targetAccount.ID, targetAccount.Email, targetAccount.Name)
 	require.NoError(t, err)
 
-	accountToken, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), time.Now(), time.Hour)
+	accountToken, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), time.Now(), time.Hour, r.Account.SessionGeneration)
 	require.NoError(t, err)
 	supportSessionToken, err := supportsession.GenerateToken(signer, r.Account.ID.String(), targetAccount.ID.String())
 	require.NoError(t, err)
@@ -451,7 +456,7 @@ func TestAccountAuthMiddleware_BlockedSupportSessionTargetClearsCookie(t *testin
 	targetAccount, err := models.CreateAccount("Blocked Target", "blocked-account-target@example.com")
 	require.NoError(t, err)
 
-	accountToken, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), time.Now(), time.Hour)
+	accountToken, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), time.Now(), time.Hour, r.Account.SessionGeneration)
 	require.NoError(t, err)
 	supportSessionToken, err := supportsession.GenerateToken(signer, r.Account.ID.String(), targetAccount.ID.String())
 	require.NoError(t, err)
@@ -497,7 +502,7 @@ func TestAccountAuthMiddleware_FreshnessCheck(t *testing.T) {
 	})
 
 	t.Run("cookie issued before password change is rejected", func(t *testing.T) {
-		oldToken, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), time.Now(), time.Hour)
+		oldToken, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), time.Now(), time.Hour, r.Account.SessionGeneration)
 		require.NoError(t, err)
 
 		// Bump password_changed_at so the cookie's iat is now stale.
@@ -517,7 +522,7 @@ func TestAccountAuthMiddleware_FreshnessCheck(t *testing.T) {
 		// cookie's iat is newer than it.
 		require.NoError(t, r.Account.MarkPasswordChangedInTransaction(database.Conn(), time.Now().Add(-time.Hour)))
 
-		freshToken, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), time.Now(), time.Hour)
+		freshToken, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), time.Now(), time.Hour, r.Account.SessionGeneration)
 		require.NoError(t, err)
 
 		req := httptest.NewRequest(http.MethodGet, "/account", nil)
@@ -530,7 +535,7 @@ func TestAccountAuthMiddleware_FreshnessCheck(t *testing.T) {
 	})
 
 	t.Run("blocked account cookie is rejected with contact-support message", func(t *testing.T) {
-		token, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), time.Now(), time.Hour)
+		token, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), time.Now(), time.Hour, r.Account.SessionGeneration)
 		require.NoError(t, err)
 		require.NoError(t, r.Account.Block(database.Conn(), time.Now()))
 
@@ -545,6 +550,168 @@ func TestAccountAuthMiddleware_FreshnessCheck(t *testing.T) {
 			assert.Contains(t, res.Body.String(), models.AccountBlockedMessage, path)
 		}
 	})
+}
+
+func TestSessionRevocationWithinIssuanceSecond(t *testing.T) {
+	for _, transport := range []string{"cookie", "scoped"} {
+		for _, offset := range []time.Duration{500 * time.Millisecond, 2 * time.Second} {
+			t.Run(fmt.Sprintf("%s/%s", transport, offset), func(t *testing.T) {
+				r := support.Setup(t)
+				signer := jwt.NewSigner("test-secret")
+				mint := func() string {
+					if transport == "cookie" {
+						res := httptest.NewRecorder()
+						req := httptest.NewRequest(http.MethodGet, "/account", nil)
+						require.NoError(t, authentication.IssueAccountSession(res, req, signer, r.Account))
+						return res.Result().Cookies()[0].Value
+					}
+					token, err := signer.GenerateScopedToken(jwt.ScopedTokenClaims{
+						SessionGeneration: &r.Account.SessionGeneration,
+						Subject:           r.User.String(), OrgID: r.Organization.ID.String(), Purpose: "test", Scopes: []string{"canvases:read"},
+					}, time.Hour)
+					require.NoError(t, err)
+					return token
+				}
+				calls := 0
+				next := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+					calls++
+					w.WriteHeader(http.StatusNoContent)
+				})
+				handler := AccountAuthMiddleware(signer)(next)
+				if transport == "scoped" {
+					handler = OrganizationAuthMiddleware(signer)(next)
+				}
+				check := func(token string, status int) {
+					req := httptest.NewRequest(http.MethodGet, "/account", nil)
+					if transport == "cookie" {
+						req.AddCookie(&http.Cookie{Name: "account_token", Value: token})
+					} else {
+						req.Header.Set("Authorization", "Bearer "+token)
+					}
+					res := httptest.NewRecorder()
+					handler.ServeHTTP(res, req)
+					require.Equal(t, status, res.Code)
+				}
+				oldToken := mint()
+				check(oldToken, http.StatusNoContent)
+				claims, err := signer.ValidateAndGetClaims(oldToken)
+				require.NoError(t, err)
+				changedAt := time.Unix(int64(claims["iat"].(float64)), 0).Add(offset)
+				err = database.Conn().Transaction(func(tx *gorm.DB) error {
+					require.NoError(t, r.Account.MarkPasswordChangedInTransaction(tx, changedAt))
+					return fmt.Errorf("rollback rotation")
+				})
+				require.Error(t, err)
+				check(oldToken, http.StatusNoContent)
+				require.NoError(t, r.Account.MarkPasswordChangedInTransaction(database.Conn(), changedAt))
+				check(oldToken, http.StatusUnauthorized)
+				require.Equal(t, 2, calls)
+				freshClaims, err := signer.ValidateAndGetClaims(mint())
+				require.NoError(t, err)
+				// Keep replacement issuance in the same second without scheduler assumptions.
+				freshClaims["iat"] = claims["iat"]
+				freshToken, err := jwtLib.NewWithClaims(jwtLib.SigningMethodHS256, freshClaims).SignedString([]byte(signer.Secret))
+				require.NoError(t, err)
+				check(freshToken, http.StatusNoContent)
+			})
+		}
+	}
+}
+
+func TestAuthenticationSessionGenerationCompatibility(t *testing.T) {
+	for _, transport := range []string{"cookie", "scoped"} {
+		for _, scenario := range []struct {
+			name                 string
+			generation           int64
+			claim                any
+			present              bool
+			passwordChangeOffset *time.Duration
+			status               int
+		}{
+			{name: "legacy initial account", status: http.StatusNoContent},
+			{name: "explicit zero", present: true, claim: "0", status: http.StatusNoContent},
+			{name: "large generation", generation: 9007199254740993, present: true, claim: "9007199254740993", status: http.StatusNoContent},
+			{name: "legacy after rotation", generation: 1, status: http.StatusUnauthorized},
+			{name: "legacy same second change", passwordChangeOffset: durationPointer(500 * time.Millisecond), status: http.StatusUnauthorized},
+			{name: "legacy earlier second change", passwordChangeOffset: durationPointer(-time.Second), status: http.StatusNoContent},
+			{name: "missing legacy issuance", claim: "missing iat", passwordChangeOffset: durationPointer(-time.Second), status: http.StatusUnauthorized},
+			{name: "negative", present: true, claim: "-1", status: http.StatusUnauthorized},
+			{name: "fraction", present: true, claim: "0.5", status: http.StatusUnauthorized},
+			{name: "number", present: true, claim: 0, status: http.StatusUnauthorized},
+			{name: "null", present: true, claim: nil, status: http.StatusUnauthorized},
+			{name: "overflow", present: true, claim: "9223372036854775808", status: http.StatusUnauthorized},
+		} {
+			t.Run(transport+"/"+scenario.name, func(t *testing.T) {
+				r := support.Setup(t)
+				signer := jwt.NewSigner("test-secret")
+				now := time.Now().Truncate(time.Second)
+				updates := map[string]any{"session_generation": scenario.generation}
+				if scenario.passwordChangeOffset != nil {
+					updates["password_changed_at"] = now.Add(*scenario.passwordChangeOffset)
+				}
+				require.NoError(t, database.Conn().Model(r.Account).Updates(updates).Error)
+				claims := jwtLib.MapClaims{
+					"sub": r.Account.ID.String(), "iat": now.Unix(), "nbf": now.Unix(), "exp": now.Add(time.Hour).Unix(), "ses": fmt.Sprint(now.Unix()),
+				}
+				if scenario.present {
+					claims[jwt.SessionGenerationClaim] = scenario.claim
+				}
+				if scenario.claim == "missing iat" {
+					delete(claims, "iat")
+				}
+				calls := 0
+				next := countingHandler(&calls)
+				handler := AccountAuthMiddleware(signer)(next)
+				if transport == "scoped" {
+					claims["sub"] = r.User.String()
+					claims["aud"] = jwt.ScopedTokenAudience
+					claims["token_type"] = jwt.ScopedTokenType
+					claims["org_id"] = r.Organization.ID.String()
+					claims["purpose"] = "test"
+					claims["scopes"] = []string{"canvases:read"}
+					handler = OrganizationAuthMiddleware(signer)(next)
+				}
+				token, err := jwtLib.NewWithClaims(jwtLib.SigningMethodHS256, claims).SignedString([]byte(signer.Secret))
+				require.NoError(t, err)
+				req := httptest.NewRequest(http.MethodGet, "/account", nil)
+				if transport == "cookie" {
+					req.AddCookie(&http.Cookie{Name: "account_token", Value: token})
+				} else {
+					req.Header.Set("Authorization", "Bearer "+token)
+				}
+				res := httptest.NewRecorder()
+				handler.ServeHTTP(res, req)
+				require.Equal(t, scenario.status, res.Code)
+				if scenario.status == http.StatusUnauthorized {
+					require.Zero(t, calls)
+				} else {
+					require.Equal(t, 1, calls)
+				}
+			})
+		}
+	}
+}
+
+func durationPointer(duration time.Duration) *time.Duration { return &duration }
+
+func TestOrganizationAuthMiddleware_AccountlessScopedToken(t *testing.T) {
+	r := support.Setup(t)
+	signer := jwt.NewSigner("test-secret")
+	apiKey := &models.User{ID: uuid.New(), OrganizationID: r.Organization.ID, Name: "bot", Type: models.UserTypeAPIKey}
+	require.NoError(t, database.Conn().Create(apiKey).Error)
+	token, err := signer.GenerateScopedToken(jwt.ScopedTokenClaims{
+		Subject: apiKey.ID.String(), OrgID: r.Organization.ID.String(), Purpose: "test", Scopes: []string{"canvases:read"},
+	}, time.Hour)
+	require.NoError(t, err)
+	require.NoError(t, r.Account.MarkPasswordChangedInTransaction(database.Conn(), time.Now()))
+	calls := 0
+	handler := OrganizationAuthMiddleware(signer)(countingHandler(&calls))
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/canvases", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, req)
+	require.Equal(t, http.StatusNoContent, res.Code)
+	require.Equal(t, 1, calls)
 }
 
 func TestOrganizationAuthMiddleware_RefreshesSessionOnActivity(t *testing.T) {

@@ -24,7 +24,7 @@ func TestAdminPolarWebhooks(t *testing.T) {
 		account, err := models.CreateAccount("Regular User", "regular-polar-webhooks@example.com")
 		require.NoError(t, err)
 		signer := jwt.NewSigner("test-client-secret")
-		regularToken, err := authentication.GenerateAccountToken(signer, account.ID.String(), time.Now(), time.Hour)
+		regularToken, err := authentication.GenerateAccountToken(signer, account.ID.String(), time.Now(), time.Hour, account.SessionGeneration)
 		require.NoError(t, err)
 
 		response := execRequest(server, requestParams{
@@ -270,7 +270,7 @@ func TestAdminPolarWebhookEndpoints(t *testing.T) {
 		account, err := models.CreateAccount("Regular User", "regular-polar-endpoints@example.com")
 		require.NoError(t, err)
 		signer := jwt.NewSigner("test-client-secret")
-		regularToken, err := authentication.GenerateAccountToken(signer, account.ID.String(), time.Now(), time.Hour)
+		regularToken, err := authentication.GenerateAccountToken(signer, account.ID.String(), time.Now(), time.Hour, account.SessionGeneration)
 		require.NoError(t, err)
 
 		response := execRequest(server, requestParams{
