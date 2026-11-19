@@ -74,7 +74,6 @@ it("finishes with a provider key and model without a hosted default or BYOK flag
   );
 
   await user.click(await screen.findByTestId("first-run-analyze-tickets", {}, { timeout: 8000 }));
-  await user.click(await screen.findByRole("button", { name: "Use an API key" }));
   expect(await screen.findByRole("button", { name: "Connect Anthropic" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Connect OpenAI" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Connect OpenRouter" })).toBeInTheDocument();
@@ -129,16 +128,17 @@ it("connects a subscription, restores it after navigation, and provisions Codex"
   const first = mount("issues");
   await user.click(await screen.findByTestId("first-run-analyze-tickets", {}, { timeout: 8000 }));
   expect(await screen.findByRole("button", { name: "Connect Anthropic" })).toBeInTheDocument();
-  await user.click(screen.getByRole("button", { name: "Use a ChatGPT subscription" }));
+  expect(screen.getByRole("button", { name: "Connect OpenAI" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Connect OpenRouter" })).toBeInTheDocument();
   expect(screen.getByTestId("first-run-finish-setup")).toBeDisabled();
-  await user.click(screen.getByRole("button", { name: "Connect ChatGPT" }));
+  await user.click(screen.getByRole("button", { name: "Connect Codex" }));
   let dialog = await screen.findByRole("dialog");
   await user.click(within(dialog).getByRole("button", { name: "Connect ChatGPT" }));
   expect(await screen.findByTestId("first-run-codex-code")).toBeInTheDocument();
   await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
   await waitFor(() => expect(screen.queryByRole("dialog") === null).toBe(true));
   expect(screen.getByTestId("first-run-finish-setup")).toBeDisabled();
-  await user.click(screen.getByRole("button", { name: "Connect ChatGPT" }));
+  await user.click(screen.getByRole("button", { name: "Connect Codex" }));
   dialog = await screen.findByRole("dialog");
   await user.click(within(dialog).getByRole("button", { name: "Connect ChatGPT" }));
   await screen.findByTestId("first-run-codex-code");
@@ -148,16 +148,10 @@ it("connects a subscription, restores it after navigation, and provisions Codex"
   await user.click(screen.getByTestId("first-run-back"));
   expect(await screen.findByTestId("first-run-tickets")).toBeInTheDocument();
   await user.click(screen.getByTestId("first-run-analyze-tickets"));
-  expect(await screen.findByRole("button", { name: "Use a ChatGPT subscription" })).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
+  expect(await screen.findByRole("button", { name: /Codex subscription/ })).toHaveAttribute("aria-pressed", "true");
   first.unmount();
   mount("agent");
-  expect(await screen.findByRole("button", { name: "Use a ChatGPT subscription" })).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
+  expect(await screen.findByRole("button", { name: /Codex subscription/ })).toHaveAttribute("aria-pressed", "true");
   await waitFor(() => expect(screen.getByTestId("first-run-finish-setup")).toBeEnabled());
   await user.click(screen.getByTestId("first-run-finish-setup"));
   await waitFor(async () => {
@@ -207,7 +201,7 @@ it.each([
       pageOverrides={{ onboarding: OnboardingPage }}
     />,
   );
-  expect(await screen.findByRole("button", { name: "Use a ChatGPT subscription" }, { timeout: 8000 })).toHaveAttribute(
+  expect(await screen.findByRole("button", { name: /Codex subscription/ }, { timeout: 8000 })).toHaveAttribute(
     "aria-pressed",
     "true",
   );
@@ -238,8 +232,8 @@ it("ignores stale subscriptions on hosted onboarding even when BYOK is allowed",
     />,
   );
   expect(await screen.findByTestId("first-run-model-source", {}, { timeout: 8000 })).toBeInTheDocument();
-  expect(screen.queryByRole("button", { name: "Use a ChatGPT subscription" })).not.toBeInTheDocument();
-  expect(screen.queryByRole("button", { name: "Connect ChatGPT" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: /Codex subscription/ })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Connect Codex" })).not.toBeInTheDocument();
   await userEvent.setup().click(screen.getByTestId("first-run-finish-setup"));
   await waitFor(async () => {
     const saved = await factoriesDescribeFactory({ path: { id: PRIMARY_FACTORY_ID } });

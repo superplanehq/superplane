@@ -1,6 +1,6 @@
-import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
 
+import { ConnectOptionRow, IntegrationChoiceIcon } from "../onboardingSteps";
 import { AgentStep, type OnboardingAgentModelPicker } from "../AgentStep";
 import { WIZARD_STEPS, type IntegrationId } from "../onboardingFixtures";
 import {
@@ -72,45 +72,26 @@ function AgentConnectionChoices({
     return (
       <fieldset disabled={saving || loading} className="mx-0 min-w-0 border-0 p-0">
         <FirstRunPanel>
-          <div className="grid gap-4">
-            <div className="flex flex-wrap gap-2" role="group" aria-label="Model source">
-              <Button
-                type="button"
-                variant="outline"
-                aria-pressed={modelSource.choice !== "subscription"}
-                onClick={() => modelSource.onSelect("own-key")}
-              >
-                Use an API key
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                aria-pressed={modelSource.choice === "subscription"}
-                onClick={() => modelSource.onSelect("subscription")}
-              >
-                Use a ChatGPT subscription
-              </Button>
-            </div>
-            {modelSource.choice === "subscription" ? (
-              subscription.ready ? (
-                <p role="status" className="text-sm">
-                  ChatGPT connected.
-                </p>
-              ) : (
-                <Button type="button" variant="outline" onClick={subscription.connect}>
-                  Connect ChatGPT
-                </Button>
-              )
-            ) : (
-              <AgentStep
-                organizationId={organizationId}
-                setup={setup}
-                showHostedCredit={false}
-                showCustomProvider={showCustomProvider}
-                modelPicker={modelPicker}
-                onRequestConnect={onRequestConnect}
-              />
-            )}
+          <div className="grid gap-2">
+            <ConnectOptionRow
+              icon={<IntegrationChoiceIcon name="openai" />}
+              title="Codex subscription"
+              detail="Use your ChatGPT subscription for Codex agent runs."
+              connectLabel="Codex"
+              selected={modelSource.choice === "subscription"}
+              connected={subscription.ready}
+              onSelect={() => modelSource.onSelect("subscription")}
+              onConnect={subscription.connect}
+            />
+            <AgentStep
+              organizationId={organizationId}
+              setup={setup}
+              showHostedCredit={false}
+              showCustomProvider={showCustomProvider}
+              modelPicker={modelSource.choice === "subscription" ? undefined : modelPicker}
+              onSelectProvider={() => modelSource.onSelect("own-key")}
+              onRequestConnect={onRequestConnect}
+            />
           </div>
         </FirstRunPanel>
       </fieldset>
@@ -199,7 +180,11 @@ export function FirstRunAgentScreen({
       visual="preview"
     >
       <FirstRunHeading headline={FIRST_RUN_COPY.agent.headline}>
-        <p className="text-[13px] text-muted-foreground">{agentScreenBody(modelSource, showCustomProvider)}</p>
+        <p className="text-[13px] text-muted-foreground">
+          {subscription.offered
+            ? FIRST_RUN_COPY.agent.subscriptionOrKeyBody
+            : agentScreenBody(modelSource, showCustomProvider)}
+        </p>
       </FirstRunHeading>
       <div className="mt-8 space-y-4">
         {loading ? (

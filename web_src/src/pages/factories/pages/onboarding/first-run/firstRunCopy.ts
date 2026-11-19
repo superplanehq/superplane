@@ -208,6 +208,7 @@ export const FIRST_RUN_COPY = {
   },
   agent: {
     headline: "Connect agent",
+    subscriptionOrKeyBody: "Connect your ChatGPT subscription or a provider API key for agent runs.",
     modelSourceBody: "Choose the models that run your agents.",
     ownKeyBody: "Connect Anthropic, OpenAI, or OpenRouter. SuperPlane uses this key for agent runs.",
     ownKeyBodyWithCustom:
