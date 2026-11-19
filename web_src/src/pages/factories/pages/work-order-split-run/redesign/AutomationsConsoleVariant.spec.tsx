@@ -371,7 +371,9 @@ describe("AutomationsConsoleVariant intake", () => {
     });
 
     const description = within(screen.getByTestId("redesign-console-task-description"));
-    expect(description.getByTestId("split-run-source")).toHaveTextContent("Created by automated intake");
+    expect(description.getByTestId("split-run-source")).toHaveTextContent(
+      /^GitHub incident triage\s*Created by automated intake$/,
+    );
     expect(description.getByText("GitHub incident triage")).toBeVisible();
     expect(description.queryByText("Unknown member")).not.toBeInTheDocument();
     expect(description.queryByText(CREATED_MANUALLY)).not.toBeInTheDocument();

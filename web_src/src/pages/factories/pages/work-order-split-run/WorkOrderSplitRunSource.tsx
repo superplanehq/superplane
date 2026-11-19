@@ -15,10 +15,10 @@ export function WorkOrderSplitRunSource({ source, compact = false }: { source: S
         data-testid="split-run-source"
       >
         <Bot className="size-4 shrink-0" aria-hidden />
-        <span className="shrink-0">{CREATED_BY_AUTOMATED_INTAKE}</span>
-        <span className="ml-auto truncate text-muted-foreground" title={source.name}>
+        <span className="truncate" title={source.name}>
           {source.name}
         </span>
+        <span className="ml-auto shrink-0 text-muted-foreground">{CREATED_BY_AUTOMATED_INTAKE}</span>
       </div>
     );
   }
