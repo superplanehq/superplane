@@ -199,6 +199,24 @@ describe("custom automation settings", () => {
     expect(automation?.canRunNow).toBe(true);
   });
 
+  it("lets a person start a Backlog automation that runs with no task", () => {
+    const [automation] = buildColumnAutomations("backlog", {
+      columnTitle: "Backlog",
+      apps: [
+        {
+          id: "column-run",
+          name: "Column run",
+          columnKey: "backlog",
+          templateId: "custom-verification",
+          customAutomationMode: "manual",
+          customAutomationRunsOnTask: false,
+        },
+      ],
+    });
+
+    expect(automation?.canRunNow).toBe(true);
+  });
+
   it("opens an existing managed row in the focused editor", () => {
     const automation = buildColumnAutomations("verify", {
       columnTitle: "Verify",

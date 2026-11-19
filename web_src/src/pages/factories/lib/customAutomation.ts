@@ -75,10 +75,36 @@ export function customAutomationTriggers(automation?: FactoriesFactoryCustomAuto
 }
 
 export function customAutomationAllowsManualStart(settings?: FactoriesFactoryCustomAutomationSettings): boolean {
+  if (settings?.runsOnTask === false) {
+    return false;
+  }
   if (settings?.triggers && settings.triggers.length > 0) {
     return settings.triggers.some((trigger) => trigger.startMode === "START_MODE_MANUAL");
   }
   return customAutomationMode(settings?.startMode) === "manual";
+}
+
+export function customAutomationRunsOnTask(
+  saved: boolean | undefined,
+  triggers: Array<{ mode: CustomAutomationMode }>,
+): boolean {
+  if (saved !== undefined) {
+    return saved;
+  }
+  if (triggers.some((trigger) => trigger.mode === "automatic")) {
+    return true;
+  }
+  if (triggers.some((trigger) => trigger.mode === "scheduled")) {
+    return false;
+  }
+  return true;
+}
+
+export function customAutomationTriggersForRun(
+  triggers: CustomAutomationTrigger[],
+  runsOnTask: boolean,
+): CustomAutomationTrigger[] {
+  return triggers.filter((trigger) => (runsOnTask ? trigger.mode !== "scheduled" : trigger.mode !== "automatic"));
 }
 
 export function customAutomationSchedule(automation?: FactoriesFactoryCustomAutomation): CustomAutomationSchedule {
@@ -241,8 +267,10 @@ export function customAutomationSettingsForTriggers(
   triggers: CustomAutomationTrigger[],
   draft: PlanningReviewDraft,
   icon = DEFAULT_CUSTOM_AUTOMATION_ICON,
+  runsOnTask = true,
 ): FactoriesFactoryCustomAutomationSettings {
-  const current = triggers.length > 0 ? triggers : [newCustomAutomationTrigger()];
+  const active = customAutomationTriggersForRun(triggers, runsOnTask);
+  const current = active.length > 0 ? active : [newCustomAutomationTrigger()];
   const scheduled = current.filter((trigger) => trigger.mode === "scheduled");
   const primary = current.some((trigger) => trigger.mode === "automatic")
     ? "automatic"
@@ -250,14 +278,15 @@ export function customAutomationSettingsForTriggers(
       ? "scheduled"
       : "manual";
   const settings = customAutomationSettings(primary, draft, icon, scheduled[0]?.schedule);
-  if (current.length === 1) {
-    return customAutomationSettings(current[0]!.mode, draft, icon, current[0]!.schedule);
-  }
-  return {
-    ...settings,
-    schedule: scheduled.length === 1 ? scheduled[0]!.schedule : undefined,
-    triggers: current.map(triggerToApi),
-  };
+  const chosen =
+    current.length === 1
+      ? customAutomationSettings(current[0]!.mode, draft, icon, current[0]!.schedule)
+      : {
+          ...settings,
+          schedule: scheduled.length === 1 ? scheduled[0]!.schedule : undefined,
+          triggers: current.map(triggerToApi),
+        };
+  return { ...chosen, runsOnTask };
 }
 
 function triggerToApi(trigger: CustomAutomationTrigger): FactoryCustomAutomationStartTrigger {
