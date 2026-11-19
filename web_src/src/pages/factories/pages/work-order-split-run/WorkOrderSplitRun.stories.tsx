@@ -35,6 +35,39 @@ export default meta;
 
 type Story = StoryObj;
 
+export const CustomAutomatedIntake: Story = {
+  name: "Custom automated intake with a long name",
+  render: () => (
+    <FactoriesHarness
+      mode="app"
+      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/task/106?lineId=${REFUND_FACTORY_LINES[0].id}`}
+      factoriesFixture={{
+        ...lineMetricsFactoriesFixture,
+        workOrdersByFactoryId: {
+          ...lineMetricsFactoriesFixture.workOrdersByFactoryId,
+          [PRIMARY_FACTORY_ID]: [
+            {
+              ...BOARD_IMPLEMENT_FAILED_ORDER,
+              state: "STATE_OPEN",
+              result: undefined,
+              origin: undefined,
+              createdBy: {
+                automation: {
+                  appId: "custom-elastic-intake",
+                  appName:
+                    "Elastic case intake for production services and customer-reported failures across all workspace repositories",
+                  nodeName: "Run automation",
+                },
+              },
+            },
+          ],
+        },
+      }}
+      appFixture={failedImplementationCanvasFixture()}
+    />
+  ),
+};
+
 export const BacklogCustomRuns: Story = {
   name: "Backlog custom run without checks",
   render: () => {

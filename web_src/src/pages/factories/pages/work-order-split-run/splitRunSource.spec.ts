@@ -57,6 +57,29 @@ describe("sourceTicketLabel", () => {
 });
 
 describe("splitRunSourceForOrder", () => {
+  it.each([
+    { appName: " \t ", nodeName: " Run intake ", name: "Run intake" },
+    { appName: undefined, nodeName: " ", name: "Automation" },
+  ])("keeps automation attribution when its name is missing: $name", ({ appName, nodeName, name }) => {
+    expect(splitRunSourceForOrder({ createdBy: { automation: { appName, nodeName } } })).toMatchObject({
+      kind: "automation",
+      name,
+    });
+  });
+
+  it("keeps a custom creator distinct from its origin ticket", () => {
+    const source = splitRunSourceForOrder({
+      origin: { url: "https://github.com/acme/payments/issues/12" },
+      createdBy: { automation: { appId: "custom-automation", appName: "Elastic case intake" } },
+    });
+    expect(source).toMatchObject({
+      kind: "intake",
+      iconAlt: "GitHub",
+      ticket: { href: "https://github.com/acme/payments/issues/12" },
+    });
+    expect(addedByForSource(source)).toEqual({ kind: "automation", name: "Elastic case intake" });
+  });
+
   const creatorFallbackCases: Array<{
     label: string;
     createdBy?: FactoriesWorkOrder["createdBy"];
@@ -496,7 +519,7 @@ describe("splitRunSourceForOrder", () => {
           expect(source.ticket.href, order.id).toMatch(/^https?:/);
           expect(source.ticket.label, order.id).toBeTruthy();
         }
-      } else if (source.kind === "mcp") {
+      } else if (source.kind === "mcp" || source.kind === "automation") {
         expect(source.name, order.id).toBeTruthy();
       } else {
         expect(source.person.name, order.id).toBeTruthy();
