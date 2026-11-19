@@ -17,6 +17,7 @@ import type { FilesFile } from "@/api-client";
 import {
   addedByForSource,
   CREATED_MANUALLY,
+  CREATED_BY_AUTOMATED_INTAKE,
   type SplitRunAddedBy,
   type SplitRunSource,
   isMonochromeSourceLogo,
@@ -139,7 +140,7 @@ function IntakeTaskDescription({
         ) : (
           <FrameTitle className="text-[13px] font-medium">Task</FrameTitle>
         )}
-        {source ? <IntakeAddedBy source={source} /> : null}
+        {source && source.kind !== "automation" ? <IntakeAddedBy source={source} /> : null}
       </FrameHeader>
       {hasBody ? (
         <FramePanel>
@@ -163,18 +164,33 @@ function IntakeTaskDescription({
 
 function IntakeAddedBy({ source }: { source: SplitRunSource }) {
   const addedBy = addedByForSource(source);
+  const showAutomationAttribution = addedBy.kind === "automation" && source.kind === "intake";
   return (
     <span
-      className="flex shrink-0 items-center gap-1 text-[11px] font-medium text-muted-foreground"
+      className={cn(
+        "flex items-center gap-1 text-[11px] font-medium text-muted-foreground",
+        addedBy.kind === "automation" ? "min-w-0" : "shrink-0",
+      )}
       data-testid="redesign-console-intake-added-by"
     >
       {addedBy.kind === "intake" ? <Bot className="size-3" aria-hidden /> : null}
-      <span>{addedByLabel(addedBy)}</span>
+      {showAutomationAttribution ? (
+        <>
+          <Bot className="size-3 shrink-0" aria-hidden />
+          <span className="shrink-0">{CREATED_BY_AUTOMATED_INTAKE}</span>
+        </>
+      ) : null}
+      <span className="truncate" title={addedBy.kind === "automation" ? addedBy.name : undefined}>
+        {addedByLabel(addedBy)}
+      </span>
     </span>
   );
 }
 
 function addedByLabel(addedBy: SplitRunAddedBy): string {
+  if (addedBy.kind === "automation") {
+    return addedBy.name;
+  }
   if (addedBy.kind === "intake") {
     return `Intake ${addedBy.name}`;
   }
