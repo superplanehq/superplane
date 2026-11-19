@@ -54,6 +54,26 @@ func TestSignedAccountStateRejectsExternalRedirect(t *testing.T) {
 	assert.ErrorContains(t, err, "invalid link state")
 }
 
+func TestProviderLinkRejectsRevokedCookie(t *testing.T) {
+	handler, registry := setupAuthHandler(t, false)
+	token, err := GenerateAccountToken(handler.jwtSigner, registry.Account.ID.String(), time.Now(), time.Hour, registry.Account.SessionGeneration)
+	require.NoError(t, err)
+	claims, err := handler.jwtSigner.ValidateAndGetClaims(token)
+	require.NoError(t, err)
+	changedAt := time.Unix(int64(claims["iat"].(float64)), 0).Add(500 * time.Millisecond)
+	require.NoError(t, registry.Account.MarkPasswordChangedInTransaction(database.Conn(), changedAt))
+	req := httptest.NewRequest(http.MethodGet, "/auth/github/callback", nil)
+	req.AddCookie(&http.Cookie{Name: "account_token", Value: token})
+	res := httptest.NewRecorder()
+	handler.completeProviderLink(res, req, goth.User{Provider: models.ProviderGitHub, UserID: "revoked-link"}, &linkState{
+		AccountID: registry.Account.ID.String(), Provider: models.ProviderGitHub, Redirect: "/account",
+	})
+	require.Equal(t, http.StatusSeeOther, res.Code)
+	require.Contains(t, res.Header().Get("Location"), "/login?")
+	_, err = models.FindAccountByProvider(database.Conn(), models.ProviderGitHub, "revoked-link")
+	require.Error(t, err)
+}
+
 func TestHandler_InitializeProviders_UsesEmailOnlyGitHubScope(t *testing.T) {
 	handler := &Handler{}
 	handler.InitializeProviders(map[string]ProviderConfig{

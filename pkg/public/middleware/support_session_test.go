@@ -34,7 +34,7 @@ func setupSupportSession(t *testing.T) *supportSessionFixture {
 	_, err = models.CreateUser(r.Organization.ID, target.ID, target.Email, target.Name)
 	require.NoError(t, err)
 
-	accountToken, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), time.Now(), time.Hour)
+	accountToken, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), time.Now(), time.Hour, r.Account.SessionGeneration)
 	require.NoError(t, err)
 	sessionToken, err := supportsession.GenerateToken(signer, r.Account.ID.String(), target.ID.String())
 	require.NoError(t, err)
@@ -113,10 +113,11 @@ func TestOrganizationAuthMiddleware_SupportSessionIsReadOnly(t *testing.T) {
 		handler := OrganizationAuthMiddleware(f.signer)(countingHandler(&calls))
 
 		token, err := f.signer.GenerateScopedToken(jwt.ScopedTokenClaims{
-			Subject: f.registry.User.String(),
-			OrgID:   f.registry.Organization.ID.String(),
-			Purpose: "test-scope",
-			Scopes:  []string{"canvases:update"},
+			SessionGeneration: &f.registry.Account.SessionGeneration,
+			Subject:           f.registry.User.String(),
+			OrgID:             f.registry.Organization.ID.String(),
+			Purpose:           "test-scope",
+			Scopes:            []string{"canvases:update"},
 		}, time.Minute)
 		require.NoError(t, err)
 

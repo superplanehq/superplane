@@ -57,7 +57,7 @@ func TestFileContentUploadAndPublicDownload(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	token, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), time.Now(), time.Hour)
+	token, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), time.Now(), time.Hour, r.Account.SessionGeneration)
 	require.NoError(t, err)
 
 	req := httptest.NewRequest(http.MethodPut, "/api/v1/files/"+file.ID.String()+"/content", bytes.NewReader([]byte("png-bytes")))
@@ -150,7 +150,7 @@ func TestWorkspaceFileContentUploadUsesWorkOrderCreatePermission(t *testing.T) {
 		CreatedByID:    operator.ID,
 	})
 	require.NoError(t, err)
-	token, err := authentication.GenerateAccountToken(signer, operatorAccount.ID.String(), time.Now(), time.Hour)
+	token, err := authentication.GenerateAccountToken(signer, operatorAccount.ID.String(), time.Now(), time.Hour, operatorAccount.SessionGeneration)
 	require.NoError(t, err)
 
 	req := httptest.NewRequest(http.MethodPut, "/api/v1/files/"+file.ID.String()+"/content", bytes.NewReader([]byte("a,b\n1,2")))
@@ -197,7 +197,7 @@ func TestFileContentUploadRejectsOversizedContentLength(t *testing.T) {
 		CreatedByID:    r.User,
 	})
 	require.NoError(t, err)
-	token, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), time.Now(), time.Hour)
+	token, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), time.Now(), time.Hour, r.Account.SessionGeneration)
 	require.NoError(t, err)
 
 	req := httptest.NewRequest(http.MethodPut, "/api/v1/files/"+file.ID.String()+"/content", bytes.NewReader([]byte("x")))
@@ -244,7 +244,7 @@ func TestFileContentUploadAcceptsExactMaxContentLength(t *testing.T) {
 		CreatedByID:    r.User,
 	})
 	require.NoError(t, err)
-	token, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), time.Now(), time.Hour)
+	token, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), time.Now(), time.Hour, r.Account.SessionGeneration)
 	require.NoError(t, err)
 
 	body := bytes.Repeat([]byte{'a'}, int(models.MaxFileBytes))

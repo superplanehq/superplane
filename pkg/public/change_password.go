@@ -28,7 +28,7 @@ type changePasswordRequest struct {
 
 // changePassword lets the currently authenticated account rotate its
 // password. On success, the password hash is updated, the account's
-// password_changed_at is bumped (which invalidates every other cookie /
+// session generation advances (which invalidates every other cookie /
 // scoped JWT for the account via middleware checks), every API token for
 // the account is wiped, and the current device is reissued a fresh
 // account_token cookie so the user stays signed in here.
@@ -112,7 +112,7 @@ func (s *Server) changePassword(w http.ResponseWriter, r *http.Request) {
 	}
 
 	now := time.Now()
-	err = database.Conn().Transaction(func(tx *gorm.DB) error {
+	err = database.DB(r.Context()).Transaction(func(tx *gorm.DB) error {
 		if err := passwordAuth.UpdatePasswordHashInTransaction(tx, newHash); err != nil {
 			return err
 		}
@@ -143,11 +143,8 @@ func (s *Server) changePassword(w http.ResponseWriter, r *http.Request) {
 	// when one was present, but a stale cookie might still be on the wire).
 	supportsession.ClearCookie(w, r)
 
-	// Reissue the current device's cookie so the user stays signed in
-	// here. Its iat is after PasswordChangedAt, so the freshness check
-	// passes for this device only — every other device's cookie is now
-	// stale and will be rejected.
-	if err := authentication.IssueAccountSession(w, r, s.jwt, account.ID.String()); err != nil {
+	// Issue only after commit, with the generation returned by this rotation.
+	if err := authentication.IssueAccountSession(w, r, s.jwt, account); err != nil {
 		log.Errorf("Failed to issue refreshed account_token after password change for %s: %v", account.ID, err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return

@@ -119,7 +119,9 @@ CREATE TABLE public.accounts (
     password_changed_at timestamp with time zone,
     blocked_at timestamp with time zone,
     deleted_at timestamp with time zone,
-    welcome_credit_granted_at timestamp with time zone
+    welcome_credit_granted_at timestamp with time zone,
+    session_generation bigint DEFAULT 0 NOT NULL,
+    CONSTRAINT accounts_session_generation_check CHECK ((session_generation >= 0))
 );
 
 
@@ -6723,7 +6725,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261113000615	f
+20261119084444	f
 \.
 
 

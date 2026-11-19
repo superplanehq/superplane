@@ -31,7 +31,7 @@ func TestAdminDeleteOrganization(t *testing.T) {
 
 	regular, err := models.CreateAccount("Regular", uuid.NewString()+"@example.com")
 	require.NoError(t, err)
-	regularToken, err := authentication.GenerateAccountToken(jwt.NewSigner("test-client-secret"), regular.ID.String(), time.Now(), time.Hour)
+	regularToken, err := authentication.GenerateAccountToken(jwt.NewSigner("test-client-secret"), regular.ID.String(), time.Now(), time.Hour, regular.SessionGeneration)
 	require.NoError(t, err)
 	unauthenticated := execRequest(server, requestParams{method: "DELETE", path: "/admin/api/organizations/" + organization.ID.String()})
 	assert.NotEqual(t, http.StatusOK, unauthenticated.Code)

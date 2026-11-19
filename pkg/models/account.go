@@ -22,6 +22,7 @@ type Account struct {
 	Name                   string
 	InstallationAdmin      bool `gorm:"default:false"`
 	PasswordChangedAt      *time.Time
+	SessionGeneration      int64
 	BlockedAt              *time.Time
 	WelcomeCreditGrantedAt *time.Time
 	CreatedAt              *time.Time
@@ -41,9 +42,7 @@ func (a *Account) IsBlocked() bool {
 	return a != nil && a.BlockedAt != nil
 }
 
-// IsSessionFresh reports whether a token issued at the given Unix timestamp
-// is still valid relative to the most recent password change. Tokens issued
-// strictly before PasswordChangedAt are considered stale.
+// IsSessionFresh retains timestamp validation for dedicated support sessions.
 func (a *Account) IsSessionFresh(issuedAt int64) bool {
 	if a.PasswordChangedAt == nil {
 		return true
@@ -52,11 +51,24 @@ func (a *Account) IsSessionFresh(issuedAt int64) bool {
 	return issuedAt >= a.PasswordChangedAt.Unix()
 }
 
-// MarkPasswordChangedInTransaction stamps the password rotation time on the
-// account. Used together with rotating the password hash and clearing API
-// tokens to invalidate every existing session for the account.
+// IsSessionGenerationCurrent permits legacy tokens only before generation rotation.
+func (a *Account) IsSessionGenerationCurrent(generation *int64, issuedAt int64) bool {
+	if generation != nil {
+		return *generation >= 0 && *generation == a.SessionGeneration
+	}
+	if a.SessionGeneration != 0 {
+		return false
+	}
+	return a.PasswordChangedAt == nil || issuedAt > a.PasswordChangedAt.Unix()
+}
+
+// MarkPasswordChangedInTransaction records rotation and advances the stored
+// generation atomically. The receiver contains the updated generation on success.
 func (a *Account) MarkPasswordChangedInTransaction(tx *gorm.DB, now time.Time) error {
-	err := tx.Model(a).Update("password_changed_at", now).Error
+	err := tx.Model(a).Clauses(clause.Returning{}).Updates(map[string]any{
+		"password_changed_at": now,
+		"session_generation":  gorm.Expr("session_generation + 1"),
+	}).Error
 	if err != nil {
 		return err
 	}

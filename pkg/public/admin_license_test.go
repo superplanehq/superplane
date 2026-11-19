@@ -48,7 +48,7 @@ func TestAdminInstallationLicense(t *testing.T) {
 		account, err := models.CreateAccount("Regular User", "regular-license@example.com")
 		require.NoError(t, err)
 		regularToken, err := authentication.GenerateAccountToken(
-			jwt.NewSigner("test-client-secret"), account.ID.String(), time.Now(), time.Hour,
+			jwt.NewSigner("test-client-secret"), account.ID.String(), time.Now(), time.Hour, account.SessionGeneration,
 		)
 		require.NoError(t, err)
 
@@ -285,7 +285,7 @@ func TestAdminLicenseKeyList(t *testing.T) {
 
 	account, err := models.CreateAccount("Regular User", "regular-keys@example.com")
 	require.NoError(t, err)
-	regularToken, err := authentication.GenerateAccountToken(jwt.NewSigner("test-client-secret"), account.ID.String(), time.Now(), time.Hour)
+	regularToken, err := authentication.GenerateAccountToken(jwt.NewSigner("test-client-secret"), account.ID.String(), time.Now(), time.Hour, account.SessionGeneration)
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusNotFound, put(licensePath+"/keys", keyListBody(root.KeyList(2, next)), regularToken).Code)
 
