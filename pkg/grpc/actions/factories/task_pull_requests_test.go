@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/google/go-github/v84/github"
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -77,7 +76,7 @@ func TestOpenTaskPullRequest(t *testing.T) {
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
-	integrationID := uuid.NewString()
+	integrationID := support.CreateIntegrationID(t, r.Organization.ID, models.ProviderGitHub)
 	repository, branch, provider := "acme/api", "main", models.ProviderGitHub
 	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
 		VCSIntegrationID: &integrationID, AppRepository: &repository, DefaultBranch: &branch, VCSProvider: &provider,
@@ -262,7 +261,7 @@ func bitbucketTaskPullRequestWorkspace(t *testing.T, r *support.ResourceRegistry
 	t.Helper()
 	db := database.DB(t.Context())
 	factory := bitbucketFactory(t, r)
-	integrationID := uuid.NewString()
+	integrationID := support.CreateIntegrationID(t, r.Organization.ID, models.ProviderBitbucket)
 	repository, branch := "acme/api", "main"
 	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
 		VCSIntegrationID: &integrationID, AppRepository: &repository, DefaultBranch: &branch,

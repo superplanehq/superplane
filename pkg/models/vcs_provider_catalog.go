@@ -1621,9 +1621,9 @@ func SyncVCSProviderBindingRepositories(tx *gorm.DB, integrationID uuid.UUID, pr
 
 		var factories []Factory
 		if err := tx.
-			Select("onboarding_config").
+			Select("onboarding_config", "vcs_integration_id").
 			Where("deleted_at IS NULL").
-			Where("onboarding_config ->> 'vcs_integration_id' = ?", integrationID.String()).
+			Where("vcs_integration_id = ?", integrationID).
 			Find(&factories).
 			Error; err != nil {
 			return err

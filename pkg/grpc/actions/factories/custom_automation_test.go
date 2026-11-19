@@ -623,7 +623,7 @@ func TestCustomAutomationGraphUsesProviderAndFocusedSettings(t *testing.T) {
 			r := support.Setup(t)
 			db := database.DB(t.Context())
 			factory := seedHandOffFactory(t, r, db)
-			integrationID := uuid.NewString()
+			integrationID := support.CreateIntegrationID(t, r.Organization.ID, provider)
 			branch := "develop"
 			require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
 				VCSProvider:      &provider,
@@ -694,7 +694,7 @@ func TestBitbucketCustomAutomationListensOnEveryRepositoryWithMultiRepoTasks(t *
 	db := database.DB(t.Context())
 	factory := seedHandOffFactory(t, r, db)
 	provider := models.ProviderBitbucket
-	integrationID := uuid.NewString()
+	integrationID := support.CreateIntegrationID(t, r.Organization.ID, models.ProviderBitbucket)
 	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSProvider: &provider, VCSIntegrationID: &integrationID}))
 	settings, err := parseCustomAutomationSettings(db, factory, &pb.FactoryCustomAutomation_Settings{
 		StartMode: pb.FactoryCustomAutomation_START_MODE_AUTOMATIC,
@@ -719,7 +719,7 @@ func TestCustomAutomationOmitsBaseWhenWorkspaceBranchIsEmpty(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 	factory := seedHandOffFactory(t, r, db)
-	integrationID := uuid.NewString()
+	integrationID := support.CreateIntegrationID(t, r.Organization.ID, models.ProviderGitHub)
 	empty := ""
 	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
 		VCSIntegrationID: &integrationID,

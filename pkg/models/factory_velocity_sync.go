@@ -217,7 +217,7 @@ SELECT` + factoryVelocitySyncTargetColumns + `
 FROM factories f
 LEFT JOIN factory_velocity_syncs s ON s.factory_id = f.id AND s.scope_repository = lower(trim(f.onboarding_config->>'app_repository'))
 WHERE f.deleted_at IS NULL
-	AND COALESCE(f.onboarding_config->>'vcs_integration_id', '') <> ''
+	AND f.vcs_integration_id IS NOT NULL
 	AND COALESCE(f.onboarding_config->>'app_repository', '') <> ''
 ORDER BY s.synced_at ASC NULLS FIRST, f.id
 LIMIT ? OFFSET ?
@@ -250,14 +250,14 @@ FROM factories f
 LEFT JOIN factory_velocity_syncs s ON s.factory_id = f.id AND (s.scope_repository = lower(trim(f.onboarding_config->>'app_repository')) OR s.scope_repository = '')
 WHERE f.deleted_at IS NULL
 	AND f.id = ?
-	AND COALESCE(f.onboarding_config->>'vcs_integration_id', '') <> ''
+	AND f.vcs_integration_id IS NOT NULL
 	AND COALESCE(f.onboarding_config->>'app_repository', '') <> ''
 `
 
 const factoryVelocitySyncTargetColumns = `
 	f.id AS factory_id,
 	f.organization_id,
-	(f.onboarding_config->>'vcs_integration_id')::uuid AS integration_id,
+	f.vcs_integration_id AS integration_id,
 	f.onboarding_config->>'app_repository' AS repository,
 	COALESCE(f.onboarding_config->>'vcs_provider', '') AS vcs_provider,
 	COALESCE(s.repository, '') AS synced_repository,

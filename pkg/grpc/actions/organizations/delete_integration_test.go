@@ -195,7 +195,7 @@ func Test__DeleteIntegration(t *testing.T) {
 		assert.Contains(t, msg, "integration not found")
 	})
 
-	t.Run("delete refuses when a workspace still uses the integration", func(t *testing.T) {
+	t.Run("delete clears the workspace connection that uses the integration", func(t *testing.T) {
 		r.Registry.Integrations["dummy"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{
 			OnSync: func(ctx core.SyncContext) error {
 				ctx.Integration.Ready()
@@ -216,16 +216,20 @@ func Test__DeleteIntegration(t *testing.T) {
 			VCSIntegrationID: &integrationID,
 		}))
 
-		_, err = DeleteIntegration(ctx, r.Organization.ID.String(), integrationID)
-		require.Error(t, err)
-		code, msg, ok := grpcerrors.HandlerStatus(err)
-		assert.True(t, ok)
-		assert.Equal(t, codes.FailedPrecondition, code)
-		assert.Contains(t, msg, "still used by a workspace")
+		provider := models.ProviderGitHub
+		require.NoError(t, factory.UpdateOnboarding(database.Conn(), models.FactoryOnboardingPatch{VCSProvider: &provider}))
 
-		integration, err := models.FindIntegration(r.Organization.ID, uuid.MustParse(integrationID))
+		_, err = DeleteIntegration(ctx, r.Organization.ID.String(), integrationID)
 		require.NoError(t, err)
-		assert.False(t, integration.DeletedAt.Valid)
+
+		integration, err := models.FindMaybeDeletedIntegrationInTransaction(database.Conn(), uuid.MustParse(integrationID))
+		require.NoError(t, err)
+		assert.True(t, integration.DeletedAt.Valid)
+
+		factory, err = models.FindFactory(database.Conn(), r.Organization.ID, factory.ID)
+		require.NoError(t, err)
+		assert.Empty(t, factory.OnboardingConfigValue().VCSIntegrationID)
+		assert.Equal(t, provider, factory.OnboardingConfigValue().VCSProvider, "the Git host stays locked")
 	})
 
 	t.Run("delete modifies integration name to prevent name conflicts -> success", func(t *testing.T) {

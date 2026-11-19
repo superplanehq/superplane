@@ -64,6 +64,8 @@ import {
   type LineBoardColumnColorView,
 } from "../lib/lineBoardColumnColorViewPreference";
 import { useHostedCreditChrome } from "../lib/useHostedCreditEmptyBanner";
+import { workspaceNeedsGitConnection } from "../lib/brokenIntegrations";
+import { MissingGitConnectionBanner } from "../BrokenIntegrationsBanner";
 import { CreateFactoryAppDialog } from "../CreateFactoryAppDialog";
 import { AddColumnAutomationPicker } from "./AddColumnAutomationPicker";
 import { CustomAutomationSetupModal } from "./CustomAutomationSetupModal";
@@ -192,6 +194,7 @@ import {
   planningSettingsTabFromSearch,
   prFeedbackSettingsTabFromSearch,
   prFeedbackSetupKindFromSourceId,
+  factoryAgentPath,
 } from "../lib/factoryPagePaths";
 import { WorkspaceLoadingScreen } from "../layout/WorkspaceLoadingScreen";
 import {
@@ -819,6 +822,13 @@ export function LinesPage() {
             onColorViewChange={setColumnColorView}
           />
           <SubscriptionIntakeOwnerRecovery />
+          {workspaceNeedsGitConnection(factory) ? (
+            <div className="px-3 pb-3">
+              <MissingGitConnectionBanner
+                agentPath={canUpdate ? factoryAgentPath(organizationId, routeSegment) : undefined}
+              />
+            </div>
+          ) : null}
           {configuredIntakes
             .filter((intake) => intake.source.id === "github-issues" && intake.health === "HEALTH_WEBHOOK_FAILED")
             .map((intake) => (
