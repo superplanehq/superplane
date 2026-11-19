@@ -36,18 +36,33 @@ func UpdateFactoryOnboarding(
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update factory onboarding")
 	}
-	// Subscription mode is configured in Settings. Old unfinished choices must
-	// return to the model-source step without removing personal connections.
 	if !wasComplete {
-		if req.GetCodexSubscription() {
-			return nil, factoryErrorToStatus(invalidArgument("Choose hosted models or an API key during workspace setup"), "failed to update factory onboarding")
+		defaultModel, err := models.GetInstallationDefaultHostedLLMModel(db)
+		if err != nil {
+			return nil, factoryErrorToStatus(err, "failed to update factory onboarding")
 		}
-		subscription := false
-		patch.CodexSubscription = &subscription
-		if factory.OnboardingConfigValue().CodexSubscription && patch.AgentHarness == nil {
-			unset := ""
-			patch.AgentHarness = &unset
-			patch.AgentIntegrationID = &unset
+		if defaultModel.IsSet() {
+			// Hosted onboarding keeps its rollout rules and clears stale choices.
+			if req.GetCodexSubscription() {
+				return nil, factoryErrorToStatus(invalidArgument("Choose hosted models or an API key during workspace setup"), "failed to update factory onboarding")
+			}
+			subscription := false
+			patch.CodexSubscription = &subscription
+			if factory.OnboardingConfigValue().CodexSubscription && patch.AgentHarness == nil {
+				unset := ""
+				patch.AgentHarness = &unset
+				patch.AgentIntegrationID = &unset
+			}
+		} else {
+			subscription := factory.OnboardingConfigValue().CodexSubscription
+			if patch.CodexSubscription != nil {
+				subscription = *patch.CodexSubscription
+			}
+			if subscription {
+				harness, integrationID := models.FactoryOnboardingAgentHarnessCodex, ""
+				patch.AgentHarness = &harness
+				patch.AgentIntegrationID = &integrationID
+			}
 		}
 	} else {
 		patch.CodexSubscription = nil
@@ -89,26 +104,33 @@ func UpdateFactoryOnboarding(
 		}
 	}
 
-	if req.Complete != nil && *req.Complete {
-		err = db.Transaction(func(tx *gorm.DB) error {
-			if err := validateFactoryOnboardingResources(ctx, tx, orgID, factory, config); err != nil {
+	err = db.Transaction(func(tx *gorm.DB) error {
+		if !wasComplete && config.CodexSubscription {
+			ownerID, err := onboardingSubscriptionOwner(ctx, tx, factory)
+			if err != nil {
 				return err
 			}
-			if !wasComplete {
-				if err := synchronizeOnboardingSubscriptionApps(ctx, tx, deps, factory, config); err != nil {
-					return err
-				}
+			if req.GetCodexSubscription() || config.CodexDefaultOwnerID == "" {
+				patch.CodexDefaultOwnerID = &ownerID
+				config.CodexDefaultOwnerID = ownerID
 			}
-			if !wasComplete {
-				if err := ensureOnboardingDiscussionHandler(ctx, deps, organizationID, tx, factory, patch, config); err != nil {
-					return err
-				}
+		}
+		if !req.GetComplete() {
+			return factory.UpdateOnboarding(tx, patch)
+		}
+		if err := validateFactoryOnboardingResources(ctx, tx, orgID, factory, config); err != nil {
+			return err
+		}
+		if !wasComplete {
+			if err := synchronizeOnboardingSubscriptionApps(ctx, tx, deps, factory, config); err != nil {
+				return err
 			}
-			return factory.CompleteOnboarding(tx, patch)
-		})
-	} else {
-		err = factory.UpdateOnboarding(db, patch)
-	}
+			if err := ensureOnboardingDiscussionHandler(ctx, deps, organizationID, tx, factory, patch, config); err != nil {
+				return err
+			}
+		}
+		return factory.CompleteOnboarding(tx, patch)
+	})
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update factory onboarding")
 	}
@@ -147,6 +169,36 @@ func UpdateFactoryOnboarding(
 	return &pb.UpdateFactoryOnboardingResponse{
 		Factory: serialized,
 	}, nil
+}
+
+// Use the signed-in member as the initial intake owner. Settings can change
+// the owner after setup; onboarding does not need another owner selection.
+func onboardingSubscriptionOwner(ctx context.Context, tx *gorm.DB, factory *models.Factory) (string, error) {
+	callerID, err := codexCallerID(ctx)
+	if err != nil {
+		return "", err
+	}
+	if err := requireCodexConnection(tx, factory, callerID); err != nil {
+		return "", err
+	}
+	connection, err := models.FindCodexConnection(tx, factory.OrganizationID, callerID)
+	if err != nil {
+		return "", err
+	}
+	if err := connection.AttachLoginLease(tx); err != nil {
+		return "", err
+	}
+	if connection.Reserved() {
+		return "", &models.CodexConnectionBusyError{}
+	}
+	catalog, err := models.FactoryCodexAvailableSubscriptionModels(tx, factory.OrganizationID, factory.ID, callerID)
+	if err != nil {
+		return "", err
+	}
+	if len(catalog) == 0 {
+		return "", errCodexConnectionRequired
+	}
+	return callerID.String(), nil
 }
 
 func ensureOnboardingDiscussionHandler(

@@ -27,6 +27,7 @@ export function pageModel(overrides: Partial<OnboardingPageModel> = {}): Onboard
     bringYourOwnKey: false,
     bringYourOwnKeyLoading: false,
     customProvider: false,
+    subscription: { offered: false, ready: false, connect: vi.fn() },
     agentCredentialChoice: null,
     setAgentCredentialChoice: vi.fn(),
     agentLoading: false,

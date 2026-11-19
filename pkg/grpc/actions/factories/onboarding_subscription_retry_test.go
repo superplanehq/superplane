@@ -1,6 +1,7 @@
 package factories
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -9,9 +10,12 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/test/support"
+	"google.golang.org/grpc/codes"
+	"gorm.io/gorm"
 )
 
 func TestOnboardingRetryChangesSubscriptionCredentials(t *testing.T) {
@@ -82,9 +86,12 @@ func TestOnboardingRetryChangesSubscriptionCredentials(t *testing.T) {
 	}
 }
 
-func TestOnboardingClearsOldSubscriptionChoiceAndRejectsNewChoice(t *testing.T) {
+func TestHostedOnboardingClearsOldSubscriptionChoiceAndRejectsNewChoice(t *testing.T) {
 	r := support.Setup(t)
+	support.AssignOpenSystemTrial(t, r.Organization.ID)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
 	db := database.DB(t.Context())
+	upsertHostedOnboardingProvider(t, db)
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 	subscription := true
@@ -107,4 +114,125 @@ func TestOnboardingClearsOldSubscriptionChoiceAndRejectsNewChoice(t *testing.T) 
 	require.NoError(t, err)
 	assert.True(t, response.Factory.Onboarding.CodexSubscription)
 	assert.Equal(t, pb.FactoryOnboarding_AGENT_HARNESS_CODEX, response.Factory.Onboarding.AgentHarness)
+}
+
+func TestOnboardingSubscriptionPersistsOwnerBeforeIntakeAndCompletion(t *testing.T) {
+	r := support.Setup(t)
+	support.AssignOpenSystemTrial(t, r.Organization.ID)
+	db := database.DB(t.Context())
+	unsetOnboardingHostedDefault(t, db)
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	vcsID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
+	appID, lineID := createOnboardingResources(t, r, factory)
+	app := createLineAppWithRunner(t, r, factory.ID, "runnerClaudeCode", "integration", "old-model")
+	connection, err := models.CreateCodexConnection(db, r.Organization.ID, r.User, time.Now())
+	require.NoError(t, err)
+	require.NoError(t, db.Model(connection).Updates(map[string]any{"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("bundle")}).Error)
+	require.NoError(t, connection.StoreUsage(db, nil, []models.CodexModel{{Model: "subscription-model"}}, time.Now()))
+	subscription := true
+	req := readyOnboardingRequest(factory.ID.String(), vcsID, "", appID, lineID)
+	harness := pb.FactoryOnboarding_AGENT_HARNESS_CODEX
+	req.AgentHarness = &harness
+	req.CodexSubscription = &subscription
+	response, err := UpdateFactoryOnboarding(onboardingContext(r), onboardingDeps(r), r.Organization.ID.String(), req)
+	require.NoError(t, err)
+	assert.True(t, response.Factory.Onboarding.CodexSubscription)
+	assert.Equal(t, r.User.String(), response.Factory.Onboarding.CodexDefaultOwnerId)
+	// Provisioning saves the branch and app references before it completes setup.
+	branch := "main"
+	factory, err = models.FindFactory(db, r.Organization.ID, factory.ID)
+	require.NoError(t, err)
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{DefaultBranch: &branch}))
+	response, err = UpdateFactoryOnboarding(onboardingContext(r), onboardingDeps(r), r.Organization.ID.String(), &pb.UpdateFactoryOnboardingRequest{Id: factory.ID.String(), DefaultBranch: &branch})
+	require.NoError(t, err)
+	assert.True(t, response.Factory.Onboarding.CodexSubscription)
+	assert.Equal(t, r.User.String(), response.Factory.Onboarding.CodexDefaultOwnerId)
+	intake, err := CreateFactoryIntake(onboardingContext(r), onboardingDeps(r), r.Organization.ID.String(), &pb.CreateFactoryIntakeRequest{FactoryId: factory.ID.String(), Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES, SkipInitialImport: true})
+	require.NoError(t, err)
+	assert.Equal(t, r.User.String(), intake.Intake.GetSettings().GetDefaultOwnerId())
+	complete := true
+	response, err = UpdateFactoryOnboarding(onboardingContext(r), onboardingDeps(r), r.Organization.ID.String(), &pb.UpdateFactoryOnboardingRequest{Id: factory.ID.String(), Complete: &complete})
+	require.NoError(t, err)
+	require.NotNil(t, response.Factory.Onboarding.CompletedAt)
+	assert.True(t, response.Factory.Onboarding.CodexSubscription)
+	assert.Equal(t, pb.FactoryOnboarding_AGENT_HARNESS_CODEX, response.Factory.Onboarding.AgentHarness)
+	assert.Empty(t, response.Factory.Onboarding.AgentIntegrationId)
+	live, err := models.FindLiveCanvasVersionInTransaction(db, app.ID)
+	require.NoError(t, err)
+	agent := findIntakeNode(live.Nodes, "agent")
+	require.NotNil(t, agent)
+	assert.Equal(t, "runnerCodex", agent.ComponentName())
+	assert.Equal(t, map[string]any{"source": "subscription"}, agent.Configuration["credentials"])
+	assert.Empty(t, agent.Configuration["model"])
+	_, err = UpdateFactoryOnboarding(onboardingContext(r), onboardingDeps(r), r.Organization.ID.String(), &pb.UpdateFactoryOnboardingRequest{Id: factory.ID.String(), Complete: &complete})
+	require.NoError(t, err)
+	assertCanvasLiveVersion(t, db, app.ID, live.ID)
+}
+
+func unsetOnboardingHostedDefault(t *testing.T, db *gorm.DB) {
+	t.Helper()
+	settings, err := models.GetInstallationLLMSettings(db)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, database.DB(context.Background()).Model(settings).Updates(map[string]any{
+			"default_hosted_provider": settings.DefaultHostedProvider, "default_hosted_model": settings.DefaultHostedModel,
+		}).Error)
+	})
+	empty := *settings
+	empty.DefaultHostedProvider, empty.DefaultHostedModel = nil, nil
+	_, err = models.UpdateInstallationLLMSettings(db, empty)
+	require.NoError(t, err)
+}
+
+func TestOnboardingSubscriptionRequiresEligibleConnection(t *testing.T) {
+	for _, state := range []string{"missing", "pending", "disconnected", "reconnect_required", "empty-catalog", "reserved", "revoked", "no-credentials", "not-member"} {
+		t.Run(state, func(t *testing.T) {
+			r := support.Setup(t)
+			db := database.DB(t.Context())
+			unsetOnboardingHostedDefault(t, db)
+			factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+			require.NoError(t, err)
+			if state != "missing" {
+				connection, err := models.CreateCodexConnection(db, r.Organization.ID, r.User, time.Now())
+				require.NoError(t, err)
+				require.NoError(t, db.Model(connection).Updates(map[string]any{"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("bundle")}).Error)
+				if state != "empty-catalog" {
+					require.NoError(t, connection.StoreUsage(db, nil, []models.CodexModel{{Model: "subscription-model"}}, time.Now()))
+				}
+				if state == "reserved" {
+					fleet := models.DefaultInstallationRunnerFleets(models.DefaultRunnerVersion)[0]
+					require.NoError(t, fleet.Create(db))
+					task := &models.RunnerTask{ID: uuid.New(), OrganizationID: r.Organization.ID, FleetID: fleet.ID, Backend: models.RunnerTaskBackendIntegrated, State: models.RunnerTaskStateRunning, PayloadCiphertext: []byte("payload")}
+					require.NoError(t, db.Create(task).Error)
+					require.NoError(t, db.Create(&models.FactoryCodexLease{ID: uuid.New(), ConnectionID: connection.ID, TaskID: task.ID, Generation: 1, Purpose: models.CodexLeasePurposeLogin, SecretHash: uuid.NewString()}).Error)
+				}
+				switch state {
+				case "pending", "disconnected", "reconnect_required":
+					require.NoError(t, db.Model(connection).Update("status", state).Error)
+				case "revoked":
+					require.NoError(t, db.Model(connection).Update("revocation_pending_at", time.Now()).Error)
+				case "no-credentials":
+					require.NoError(t, db.Model(connection).Update("credential_version", 0).Error)
+				case "not-member":
+					require.NoError(t, db.Model(&models.User{}).Where("id = ?", r.User).Update("type", models.UserTypeAPIKey).Error)
+				}
+			}
+			subscription := true
+			_, err = UpdateFactoryOnboarding(onboardingContext(r), onboardingDeps(r), r.Organization.ID.String(), &pb.UpdateFactoryOnboardingRequest{Id: factory.ID.String(), CodexSubscription: &subscription})
+			require.Error(t, err)
+			switch state {
+			case "reserved":
+				assert.Equal(t, codes.Aborted, grpcerrors.Code(err))
+			case "not-member":
+				assert.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
+			default:
+				requireCodexConnectionRequired(t, err)
+			}
+			saved, err := models.FindFactory(db, r.Organization.ID, factory.ID)
+			require.NoError(t, err)
+			assert.False(t, saved.OnboardingConfigValue().CodexSubscription)
+			assert.Empty(t, saved.OnboardingConfigValue().CodexDefaultOwnerID)
+		})
+	}
 }

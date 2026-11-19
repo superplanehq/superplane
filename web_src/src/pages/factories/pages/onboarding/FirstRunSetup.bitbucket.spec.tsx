@@ -133,6 +133,7 @@ function pageModel(setup: OnboardingSetupApi, overrides: Partial<OnboardingPageM
     bringYourOwnKey: false,
     bringYourOwnKeyLoading: false,
     customProvider: false,
+    subscription: { offered: false, ready: false, connect: vi.fn() },
     agentCredentialChoice: null,
     setAgentCredentialChoice: vi.fn(),
     agentLoading: false,
