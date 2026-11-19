@@ -17,22 +17,30 @@ import (
 type EnsurePullRequestReviewers struct{}
 
 type ensureReviewersConfiguration struct {
-	Repository      string             `json:"repository" mapstructure:"repository"`
-	PullNumber      any                `json:"pullNumber" mapstructure:"pullNumber"`
-	Reviewers       []ReviewerIdentity `json:"reviewers" mapstructure:"reviewers"`
-	Managed         bool               `json:"managed" mapstructure:"managed"`
-	ExpectedHeadSHA string             `json:"expectedHeadSha" mapstructure:"expectedHeadSha"`
+	WithdrawalExplanationExecutionID string             `json:"withdrawalExplanationExecutionId,omitempty" mapstructure:"withdrawalExplanationExecutionId"`
+	Repository                       string             `json:"repository" mapstructure:"repository"`
+	PullNumber                       any                `json:"pullNumber" mapstructure:"pullNumber"`
+	Reviewers                        []ReviewerIdentity `json:"reviewers" mapstructure:"reviewers"`
+	Managed                          bool               `json:"managed" mapstructure:"managed"`
+	ExpectedHeadSHA                  string             `json:"expectedHeadSha" mapstructure:"expectedHeadSha"`
+}
+
+type reviewerWithdrawal struct {
+	Reviewer    ReviewerIdentity `json:"reviewer"`
+	AssessedSHA string           `json:"assessedSha"`
 }
 
 type ensureReviewersOutcome struct {
-	ExecutionID    string             `json:"executionId"`
-	Status         string             `json:"status"`
-	Reason         string             `json:"reason,omitempty"`
-	HeadSHA        string             `json:"headSha"`
-	Requested      []ReviewerIdentity `json:"requested"`
-	AlreadyCovered []ReviewerIdentity `json:"alreadyCovered"`
-	Selected       []ReviewerIdentity `json:"selected"`
-	Removed        []ReviewerIdentity `json:"removed"`
+	Requests       []observedReviewRequest `json:"requests,omitempty"`
+	Withdrawals    []reviewerWithdrawal    `json:"withdrawals"`
+	ExecutionID    string                  `json:"executionId"`
+	Status         string                  `json:"status"`
+	Reason         string                  `json:"reason,omitempty"`
+	HeadSHA        string                  `json:"headSha"`
+	Requested      []ReviewerIdentity      `json:"requested"`
+	AlreadyCovered []ReviewerIdentity      `json:"alreadyCovered"`
+	Selected       []ReviewerIdentity      `json:"selected"`
+	Removed        []ReviewerIdentity      `json:"removed"`
 }
 
 func (c *EnsurePullRequestReviewers) Name() string  { return "github.ensurePullRequestReviewers" }
@@ -47,7 +55,7 @@ By default, add missing requests and preserve all existing requests. Enable mana
 
 Request replacements before withdrawals. Preserve pre-existing requests, requests owned by other automations, team requests, and submitted reviews. Never infer ownership from old PR descriptions or current requests. Keep suitable reviewers across selections.
 
-Ordered publication state fences superseded runs and records partial writes for retry. Output includes requested, alreadyCovered, selected, and removed identities. GitHub reads and mutations are not atomic.`
+Ordered publication state fences superseded runs and records partial writes for retry. Output includes requested, alreadyCovered, selected, and removed identities. The withdrawals ledger preserves confirmed removals and their assessed commits across retries. An uncertain withdrawal that remains requested prevents an empty selection from completing. Supply withdrawalExplanationExecutionId after the managed withdrawal comment succeeds to acknowledge its ledger without changing requests. GitHub reads and mutations are not atomic.`
 }
 func (c *EnsurePullRequestReviewers) Icon() string  { return "github" }
 func (c *EnsurePullRequestReviewers) Color() string { return "gray" }
@@ -59,6 +67,7 @@ func (c *EnsurePullRequestReviewers) Configuration() []configuration.Field {
 	return append(fields,
 		reviewerConfigurationField(),
 		configuration.Field{Name: "managed", Label: "Manage reviewer requests", Type: configuration.FieldTypeBool, Description: "Reconcile requests added by this automation. An empty selection withdraws its pending requests."},
+		configuration.Field{Name: "withdrawalExplanationExecutionId", Label: "Withdrawal Explanation Execution ID", Type: configuration.FieldTypeString, Description: "A confirmed managed withdrawal comment in this attempt. Acknowledge its withdrawal ledger without changing requests."},
 		configuration.Field{Name: "expectedHeadSha", Label: "Expected Head SHA", Type: configuration.FieldTypeString, Description: "Skip the request if the current head differs from this commit."},
 	)
 }
@@ -169,7 +178,11 @@ func (c *EnsurePullRequestReviewers) Execute(ctx core.ExecutionContext) error {
 		requested := slices.ContainsFunc(pr.RequestedReviewers, func(user *github.User) bool {
 			return user.GetID() == reviewer.ID && strings.EqualFold(user.GetLogin(), reviewer.Login)
 		})
-		if requested || hasCurrentApproval(reviews, reviewer, outcome.HeadSHA) {
+		approved := hasCurrentApproval(reviews, reviewer, outcome.HeadSHA)
+		if requested || !approved {
+			outcome.Requests = append(outcome.Requests, observedReviewRequest{Reviewer: reviewer, ReviewID: reviewerSubmittedReviewID(reviews, reviewer)})
+		}
+		if requested || approved {
 			outcome.AlreadyCovered = append(outcome.AlreadyCovered, reviewer)
 			continue
 		}
@@ -187,6 +200,9 @@ func (c *EnsurePullRequestReviewers) Execute(ctx core.ExecutionContext) error {
 	return emit(outcome)
 }
 func validateReviewerSelection(config ensureReviewersConfiguration) error {
+	if config.WithdrawalExplanationExecutionID != "" && (!config.Managed || len(config.Reviewers) > 0) {
+		return fmt.Errorf("withdrawal explanation requires an empty managed selection")
+	}
 	if len(config.Reviewers) == 0 && config.Managed {
 		return nil
 	}
@@ -282,6 +298,6 @@ func (c *EnsurePullRequestReviewers) Cleanup(core.SetupContext) error    { retur
 
 func (c *EnsurePullRequestReviewers) ExampleOutput() map[string]any {
 	return map[string]any{"type": "github.pullRequestReviewersEnsured", "timestamp": "2026-01-01T09:00:00Z", "data": map[string]any{
-		"executionId": "11111111-1111-1111-1111-111111111111", "status": "requested", "headSha": "abc", "requested": []any{map[string]any{"id": 123, "login": "octocat"}}, "alreadyCovered": []any{}, "selected": []any{map[string]any{"id": 123, "login": "octocat"}}, "removed": []any{},
+		"withdrawals": []any{}, "executionId": "11111111-1111-1111-1111-111111111111", "status": "requested", "headSha": "abc", "requested": []any{map[string]any{"id": 123, "login": "octocat"}}, "alreadyCovered": []any{}, "selected": []any{map[string]any{"id": 123, "login": "octocat"}}, "removed": []any{},
 	}}
 }
