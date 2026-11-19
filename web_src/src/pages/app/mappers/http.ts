@@ -338,6 +338,14 @@ type RetrySpec = {
   intervalSeconds: number;
 };
 
+function hasHTTPPayloadContent(payload: unknown): boolean {
+  return (
+    (typeof payload === "object" && payload !== null && !Array.isArray(payload) && Object.keys(payload).length > 0) ||
+    (typeof payload === "string" && payload.length > 0) ||
+    (Array.isArray(payload) && payload.length > 0)
+  );
+}
+
 function getHTTPSpecs(node: NodeInfo): ComponentBaseSpec[] {
   const specs: ComponentBaseSpec[] = [];
   const configuration = node.configuration as Partial<HTTPConfiguration> | undefined;
@@ -382,12 +390,7 @@ function getHTTPSpecs(node: NodeInfo): ComponentBaseSpec[] {
 
   // Only show payload spec if there's actual content
   if (payload) {
-    const hasContent =
-      (typeof payload === "object" && !Array.isArray(payload) && Object.keys(payload).length > 0) ||
-      (typeof payload === "string" && payload.length > 0) ||
-      (Array.isArray(payload) && payload.length > 0);
-
-    if (hasContent) {
+    if (hasHTTPPayloadContent(payload)) {
       // For form data, show as badges like headers
       if (contentType === "application/x-www-form-urlencoded" && Array.isArray(payload)) {
         specs.push({
