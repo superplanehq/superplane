@@ -822,6 +822,28 @@ func TestAttachWorkspaceAgentResourcesSkipsSetupCommandsWhenConfigured(t *testin
 	assert.NotContains(t, paths, runner.WorkspaceSetupConfigPath)
 	assert.NotContains(t, paths["prompts/implement.txt"], "npm ci")
 	assert.Contains(t, paths["prompts/implement.txt"], "superplanehq/suss")
+
+	work := []runner.TaskCommand{
+		{Name: "Prepare agent", Kind: runner.LiveLogKindSetup, Command: "prepare-agent"},
+		{Name: "Explicit Bash", Kind: runner.LiveLogKindBash, Command: "make docs"},
+		{Name: "Implement", Kind: runner.LiveLogKindPrompt, Command: "run-agent"},
+	}
+	bash := "make docs"
+	commands := runner.ApplyFactoryCheckout(files, work, []runner.AgentStep{
+		{Name: "Explicit Bash", Type: runner.AgentStepBash, Command: &bash},
+	})
+	require.Len(t, commands, 4)
+	assert.Equal(t, work[0], commands[0])
+	assert.Equal(t, "Checkout", commands[1].Name)
+	assert.Equal(t, work[1:], commands[2:])
+	for _, command := range commands {
+		assert.NotContains(t, command.Command, "npm ci")
+	}
+	for _, file := range files {
+		if file.Path == "prompts/implement.txt" {
+			assert.NotContains(t, file.Content, "npm ci")
+		}
+	}
 }
 
 func TestAttachWorkspaceAgentResourcesSkipsSetupCommandsForOtherRepository(t *testing.T) {
