@@ -16,16 +16,13 @@ import { resolveRepositoryDefaultBranch, useConnectedIntegrations } from "@/hook
 import { useUpdateOrganization } from "@/hooks/useOrganizationData";
 import { githubHostFromIntegration } from "@/lib/githubHost";
 import { useBYOKAccess } from "@/hooks/useBYOKAccess";
-import { showErrorToast } from "@/lib/toast";
 import type { IntegrationSelections } from "@/pages/home/InstallIntegrationsSection";
-import { selectReadyIntegrationInstance, useIntegrationConnectDialog } from "@/pages/home/useIntegrationConnectDialog";
+import { useIntegrationConnectDialog } from "@/pages/home/useIntegrationConnectDialog";
 import { useInstallFactory } from "@/pages/home/useInstallFactory";
-import { Fragment, createElement, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router";
 
 import { factorySetupPath } from "../../lib/factoryPagePaths";
-import { CodexConnectionSetupDialog } from "../../codex/CodexConnectionSetupDialog";
-import { OnboardingConnectDialogs } from "./CustomProviderConnectDialog";
 import {
   runSave,
   saveBitbucketForgeRepository,
@@ -34,7 +31,8 @@ import {
   useDefaultBranchGate,
   type OnboardingRepositorySelection,
 } from "./selectOnboardingRepository";
-import { AGENT_PROVIDER_IDS, isHostedAgentReady, type OnboardingAgentPlan } from "./onboardingAgentReadiness";
+import { isHostedAgentReady, type OnboardingAgentPlan } from "./onboardingAgentReadiness";
+import { useOnboardingConnectionDialogs } from "./useOnboardingConnectionDialogs";
 import { useOnboardingIntegrationSelections } from "./useOnboardingIntegrationSelections";
 import type { IntegrationId, IssuesChoiceId, WizardStepId } from "./onboardingFixtures";
 import { useOnboardingModelSource } from "./onboardingModelSource";
@@ -391,7 +389,6 @@ export function useOnboardingPageModel(args: {
   const savedSource = savedCredentialChoice ?? (onboarding?.codexSubscription ? "subscription" : null);
   // A stored subscription choice cannot enable subscription setup on hosted installations.
   const agentCredentialChoice = savedSource === "subscription" && !bringYourOwnKey.noHostedDefault ? null : savedSource;
-  const [subscriptionDialogOpen, setSubscriptionDialogOpen] = useState(false);
   const integrations = useOnboardingIntegrationSelections(args.organizationId, onboarding);
   const { connectedIntegrations, existingIntegrationNames } = useTrimmedIntegrationNames(args.organizationId);
   const { agent, subscriptionReady, selectModel, onSelectionsChange } = useOnboardingAgentPageState({
@@ -405,7 +402,6 @@ export function useOnboardingPageModel(args: {
     connectedIntegrations,
     agentIntegrationId: onboarding?.agentIntegrationId,
   });
-  const [customProviderDialogOpen, setCustomProviderDialogOpen] = useState(false);
   const setup = useOnboardingSetupState(
     args.factory?.name ?? "",
     onboardingSetupOptions(args.factoryId, onboarding, integrations.connected, agent.remainingCreditCents),
@@ -447,18 +443,14 @@ export function useOnboardingPageModel(args: {
     agent,
   });
 
-  const requestConnect = (id: IntegrationId) => {
-    if (providerConnectionDenied(id, bringYourOwnKey)) return false;
-    if (id !== "customLlm" || !customProvider) return connect.requestConnect(id);
-    const existing = selectReadyIntegrationInstance(connectedIntegrations, integrations.selections, "customLlm");
-    if (existing) {
-      integrations.setSelections(existing);
-      // True means the browser left this page. A saved connection stays here.
-      return false;
-    }
-    setCustomProviderDialogOpen(true);
-    return false;
-  };
+  const dialogs = useOnboardingConnectionDialogs({
+    ...args,
+    bringYourOwnKey,
+    connect,
+    integrations,
+    connectedIntegrations,
+    existingIntegrationNames,
+  });
 
   return {
     setup,
@@ -471,7 +463,7 @@ export function useOnboardingPageModel(args: {
     subscription: {
       offered: bringYourOwnKey.noHostedDefault,
       ready: subscriptionReady,
-      connect: () => setSubscriptionDialogOpen(true),
+      connect: dialogs.connectSubscription,
     },
     agentCredentialChoice,
     setAgentCredentialChoice,
@@ -480,29 +472,10 @@ export function useOnboardingPageModel(args: {
     agentModelPicker: agent.modelPicker ? { ...agent.modelPicker, onChange: selectModel } : undefined,
     openSection,
     setOpenSection,
-    requestConnect,
+    requestConnect: dialogs.requestConnect,
     ...wiredVcsFields(wired, connectedIntegrations),
     ...branchGate.model,
-    integrationDialogs: createElement(
-      Fragment,
-      null,
-      createElement(OnboardingConnectDialogs, {
-        connectDialogs: connect.dialogs,
-        customProviderOpen: customProviderDialogOpen,
-        organizationId: args.organizationId,
-        existingNames: existingIntegrationNames,
-        selections: integrations.selections,
-        onSelectionsChange: integrations.setSelections,
-        onCloseCustomProvider: () => setCustomProviderDialogOpen(false),
-      }),
-      createElement(CodexConnectionSetupDialog, {
-        organizationId: args.organizationId,
-        factoryId: args.factoryId,
-        open: bringYourOwnKey.noHostedDefault && subscriptionDialogOpen,
-        onOpenChange: setSubscriptionDialogOpen,
-        onConnected: () => setSubscriptionDialogOpen(false),
-      }),
-    ),
+    integrationDialogs: dialogs.integrationDialogs,
     canConfigureWorkspace: canConfigureWorkspace(canAct),
     saving: saving || wired.installer.isInstalling || wired.createIntake.isPending,
     ...wired.saves,
@@ -513,11 +486,4 @@ export function useOnboardingPageModel(args: {
     ...wired.jira,
     ...wired.linear,
   };
-}
-
-function providerConnectionDenied(id: IntegrationId, access: ReturnType<typeof useBYOKAccess>) {
-  const providerDenied = AGENT_PROVIDER_IDS.some((provider) => provider === id) && !access.allowed;
-  if (!providerDenied && (id !== "customLlm" || access.customProviderAllowed)) return false;
-  showErrorToast("Your organization does not have access to provider credentials. Contact your administrator.");
-  return true;
 }
