@@ -130,6 +130,66 @@ func TestCustomAutomationScheduleRoundTripAndTransitions(t *testing.T) {
 	}
 }
 
+func TestCustomAutomationSkipSetupCommandsPersistence(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory := seedHandOffFactory(t, r, db)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
+	integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSIntegrationID: &integrationID}))
+	ctx, deps, orgID := onboardingContext(r), onboardingDeps(r), r.Organization.ID.String()
+	for _, test := range []struct {
+		name    string
+		initial *bool
+	}{
+		{name: "absent"},
+		{name: "enabled", initial: proto.Bool(true)},
+		{name: "disabled", initial: proto.Bool(false)},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			initial := test.initial
+			name := "Docs " + test.name
+			settings := &pb.FactoryCustomAutomation_Settings{
+				StartMode:         pb.FactoryCustomAutomation_START_MODE_MANUAL,
+				Agent:             &pb.FactoryAppTemplateAgent{Component: "runnerClaudeCode"},
+				SkipSetupCommands: initial,
+				Steps:             []*pb.FactoryCustomAutomation_Step{{Name: "Docs", Type: pb.FactoryCustomAutomation_Step_TYPE_BASH, Command: "make docs"}},
+				Triggers: []*pb.FactoryCustomAutomation_StartTrigger{
+					{StartMode: pb.FactoryCustomAutomation_START_MODE_MANUAL},
+					{StartMode: pb.FactoryCustomAutomation_START_MODE_SCHEDULED, Schedule: &pb.FactoryCustomAutomation_Schedule{CronExpression: "0 9 * * *"}},
+				},
+			}
+			created, err := CreateFactoryCustomAutomation(ctx, deps, orgID, &pb.CreateFactoryCustomAutomationRequest{
+				FactoryId: factory.ID.String(), ColumnKey: models.CanvasColumnKeyImplement, Name: name, Settings: settings,
+			})
+			require.NoError(t, err)
+			id := created.GetCustomAutomation().GetAutomation().GetId()
+			assert.Equal(t, initial, created.GetCustomAutomation().GetSettings().SkipSetupCommands)
+			expected := initial != nil && *initial
+			for _, choice := range []*bool{nil, proto.Bool(true), nil, proto.Bool(false), nil} {
+				settings.SkipSetupCommands = choice
+				if choice != nil {
+					expected = *choice
+				}
+				updated, err := UpdateFactoryCustomAutomation(ctx, deps, orgID, &pb.UpdateFactoryCustomAutomationRequest{
+					FactoryId: factory.ID.String(), AutomationId: id, Name: name, Settings: settings,
+				})
+				require.NoError(t, err)
+				assert.Equal(t, expected, updated.GetCustomAutomation().GetSettings().GetSkipSetupCommands())
+				described, err := DescribeFactoryCustomAutomation(ctx, orgID, &pb.DescribeFactoryCustomAutomationRequest{FactoryId: factory.ID.String(), AutomationId: id})
+				require.NoError(t, err)
+				assert.Equal(t, expected, described.GetCustomAutomation().GetSettings().GetSkipSetupCommands())
+				for _, runnerID := range []string{customAutomationRunnerID, customAutomationScheduleRunnerID} {
+					node, err := models.FindCanvasNode(db, uuid.MustParse(id), runnerID)
+					require.NoError(t, err)
+					configuration := node.Configuration.Data()
+					assert.Equal(t, expected, configuration[runner.SkipSetupCommandsField] == true)
+				}
+			}
+		})
+	}
+}
+
 func TestCustomAutomationSettingsAllowBashOnly(t *testing.T) {
 	r := support.Setup(t)
 	factory := seedHandOffFactory(t, r, database.DB(t.Context()))

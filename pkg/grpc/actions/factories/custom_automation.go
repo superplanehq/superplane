@@ -204,6 +204,13 @@ func UpdateFactoryCustomAutomation(
 	if canvas.ColumnKey != nil {
 		settings.ColumnKey = *canvas.ColumnKey
 	}
+	if settings.SkipSetupCommands == nil {
+		current, err := serializeCustomAutomation(db, factory, canvas)
+		if err != nil {
+			return nil, factoryErrorToStatus(err, "failed to read custom automation settings")
+		}
+		settings.SkipSetupCommands = current.GetSettings().SkipSetupCommands
+	}
 	doc, err := buildCustomAutomationCanvas(db, factory, name, settings)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update custom automation")
@@ -263,6 +270,7 @@ type customAutomationSettings struct {
 	Schedule                *pb.FactoryCustomAutomation_Schedule
 	Triggers                []customAutomationTrigger
 	RunsOnTask              *bool
+	SkipSetupCommands       *bool
 }
 
 func (settings *customAutomationSettings) runsWithoutTask() bool {
@@ -329,6 +337,7 @@ func parseCustomAutomationSettings(
 		Icon:                    strings.TrimSpace(input.GetIcon()),
 		ExecutionTimeoutSeconds: timeout,
 		RunsOnTask:              input.RunsOnTask,
+		SkipSetupCommands:       input.SkipSetupCommands,
 	}, nil
 }
 
@@ -884,6 +893,9 @@ func customAutomationRunnerConfiguration(
 		configuration["model"] = model
 	}
 	settings.Agent.applyLLMProvider(configuration)
+	if settings.SkipSetupCommands != nil {
+		configuration[runner.SkipSetupCommandsField] = *settings.SkipSetupCommands
+	}
 	return configuration
 }
 
@@ -1343,6 +1355,9 @@ func serializeCustomAutomation(
 		Icon:                    icon,
 		ExecutionTimeoutSeconds: int32(configInt(agent.Configuration, "executionTimeoutSeconds")),
 		RunsOnTask:              customAutomationRunsOnTaskMetadata(version.Nodes),
+	}
+	if skipSetup, ok := agent.Configuration[runner.SkipSetupCommandsField].(bool); ok {
+		settings.SkipSetupCommands = &skipSetup
 	}
 	if len(triggers) == 1 {
 		settings.StartMode = triggers[0].mode
