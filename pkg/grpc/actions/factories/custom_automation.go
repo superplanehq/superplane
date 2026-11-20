@@ -544,6 +544,20 @@ func customAutomationAgent(tx *gorm.DB, factory *models.Factory, input *pb.Facto
 	if agent.Component == models.SuperPlaneRunnerComponent {
 		return agent, nil
 	}
+	if source == runner.CredentialsSourceIntegration && agent.Component == "runnerOpenRouter" {
+		integration, err := models.FindIntegrationByName(tx, factory.OrganizationID, integrationName)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, invalidArgument("Select an available agent integration.")
+		}
+		if err != nil {
+			return nil, err
+		}
+		installed := intakeAgentFromIntegration(integration)
+		if installed == nil || installed.Component != agent.Component {
+			return nil, invalidArgument("Select an integration that supports this agent.")
+		}
+		agent.LLMProvider = installed.LLMProvider
+	}
 	if source != "" {
 		agent.Credentials = map[string]any{"source": source}
 		if integrationName != "" {

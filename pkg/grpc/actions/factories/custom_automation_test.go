@@ -216,6 +216,65 @@ func TestCustomAutomationSettingsAllowBashOnly(t *testing.T) {
 	assert.Equal(t, prFeedbackTimeoutSeconds, settings.ExecutionTimeoutSeconds)
 }
 
+func TestCustomAutomationExplicitIntegrationPreservesProvider(t *testing.T) {
+	for _, test := range []struct{ app, provider, model string }{
+		{models.CustomLLMAppName, models.UsageProviderCustom, "local-model"},
+		{"openrouter", models.UsageProviderOpenRouter, "openrouter-only"},
+	} {
+		t.Run(test.app, func(t *testing.T) {
+			r := support.Setup(t)
+			support.AssignOpenSystemTrial(t, r.Organization.ID)
+			for _, feature := range []string{features.FeatureFactoryCustomAutomations, features.FeatureOrganizationBYOK, features.FeatureOrganizationBYOKCustomProvider} {
+				require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, feature))
+			}
+			db := database.DB(t.Context())
+			factory := seedHandOffFactory(t, r, db)
+			vcsID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
+			require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSIntegrationID: &vcsID}))
+			integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, test.app)
+			for provider, model := range map[string]string{models.UsageProviderCustom: "local-model", models.UsageProviderOpenRouter: "openrouter-only"} {
+				_, err := models.UpsertOrganizationBYOKModelAllowlist(db, r.Organization.ID, provider, datatypes.JSONSlice[string]{model})
+				require.NoError(t, err)
+			}
+			settings := &pb.FactoryCustomAutomation_Settings{
+				StartMode: pb.FactoryCustomAutomation_START_MODE_MANUAL,
+				Agent: &pb.FactoryAppTemplateAgent{
+					Component: "runnerOpenRouter", Model: test.model, CredentialSource: runner.CredentialsSourceIntegration,
+					CredentialIntegrationName: integrationName(t, r.Organization.ID, integrationID),
+				},
+				Steps: []*pb.FactoryCustomAutomation_Step{{Name: "Inspect", Type: pb.FactoryCustomAutomation_Step_TYPE_PROMPT, Prompt: "Inspect the task."}},
+			}
+			ctx, deps, orgID := onboardingContext(r), onboardingDeps(r), r.Organization.ID.String()
+			created, err := CreateFactoryCustomAutomation(ctx, deps, orgID, &pb.CreateFactoryCustomAutomationRequest{
+				FactoryId: factory.ID.String(), Name: "Inspect task", Settings: settings,
+			})
+			require.NoError(t, err)
+			id := created.GetCustomAutomation().GetAutomation().GetId()
+			assertRunnable := func() {
+				node, err := models.FindCanvasNode(db, uuid.MustParse(id), customAutomationRunnerID)
+				require.NoError(t, err)
+				configuration := node.Configuration.Data()
+				if test.provider == models.UsageProviderCustom {
+					assert.Equal(t, models.UsageProviderCustom, configuration["llmProvider"])
+				} else {
+					assert.NotContains(t, configuration, "llmProvider")
+				}
+				model, err := models.ResolveBYOKRunnerModel(db, r.Organization.ID, &factory.ID, "runnerOpenRouter", configuration)
+				require.NoError(t, err)
+				assert.Equal(t, test.model, model)
+			}
+			assertRunnable()
+			described, err := DescribeFactoryCustomAutomation(ctx, orgID, &pb.DescribeFactoryCustomAutomationRequest{FactoryId: factory.ID.String(), AutomationId: id})
+			require.NoError(t, err)
+			_, err = UpdateFactoryCustomAutomation(ctx, deps, orgID, &pb.UpdateFactoryCustomAutomationRequest{
+				FactoryId: factory.ID.String(), AutomationId: id, Name: "Inspect task", Settings: described.GetCustomAutomation().GetSettings(),
+			})
+			require.NoError(t, err)
+			assertRunnable()
+		})
+	}
+}
+
 func TestBacklogCustomAutomationLifecycle(t *testing.T) {
 	r := support.Setup(t)
 	support.AssignOpenSystemTrial(t, r.Organization.ID)
