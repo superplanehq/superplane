@@ -10,8 +10,10 @@ import type { FactoriesFactory } from "@/api-client";
 import {
   customAutomationColumn,
   customAutomationDraft,
+  customAutomationRunsOnTask,
   customAutomationSettingsForTriggers,
   customAutomationTriggers,
+  customAutomationTriggersForRun,
   DEFAULT_CUSTOM_AUTOMATION_ICON,
   newCustomAutomationTrigger,
   workspaceAgentFromOnboarding,
@@ -37,10 +39,12 @@ export function useCustomAutomationSetupPage(args: {
   const [triggers, setTriggers] = useState<CustomAutomationTrigger[]>(() => [
     defaultCustomAutomationTrigger(args.columnKey),
   ]);
+  const [runsOnTask, setRunsOnTask] = useState(true);
   const [icon, setIcon] = useState(DEFAULT_CUSTOM_AUTOMATION_ICON);
   const agentHarness = args.factory?.onboarding?.agentHarness;
+  const codexSubscription = args.factory?.onboarding?.codexSubscription;
   const [draft, setDraft] = useState<PlanningReviewDraft>(() =>
-    customAutomationDraft({ settings: { agent: workspaceAgentFromOnboarding({ agentHarness }) } }),
+    customAutomationDraft({ settings: { agent: workspaceAgentFromOnboarding({ agentHarness, codexSubscription }) } }),
   );
   const [saveError, setSaveError] = useState("");
   const automation = described.data;
@@ -52,17 +56,22 @@ export function useCustomAutomationSetupPage(args: {
     }
     setName("Custom automation");
     setTriggers([defaultCustomAutomationTrigger(args.columnKey)]);
+    setRunsOnTask(true);
     setIcon(DEFAULT_CUSTOM_AUTOMATION_ICON);
-    setDraft(customAutomationDraft({ settings: { agent: workspaceAgentFromOnboarding({ agentHarness }) } }));
+    setDraft(
+      customAutomationDraft({ settings: { agent: workspaceAgentFromOnboarding({ agentHarness, codexSubscription }) } }),
+    );
     setSaveError("");
-  }, [args.automationId, args.columnKey, agentHarness]);
+  }, [args.automationId, args.columnKey, agentHarness, codexSubscription]);
 
   useEffect(() => {
     if (!automation) {
       return;
     }
+    const savedTriggers = customAutomationTriggers(automation);
     setName(automation.automation?.name?.trim() || "Custom automation");
-    setTriggers(customAutomationTriggers(automation));
+    setTriggers(savedTriggers);
+    setRunsOnTask(customAutomationRunsOnTask(automation.settings?.runsOnTask, savedTriggers));
     setIcon(automation.settings?.icon?.trim() || DEFAULT_CUSTOM_AUTOMATION_ICON);
     setDraft(customAutomationDraft(automation));
   }, [automation]);
@@ -73,7 +82,8 @@ export function useCustomAutomationSetupPage(args: {
   const validationError = useMemo(() => validateDraft(name, draft), [draft, name]);
 
   const save = async () => {
-    const invalidSchedule = triggers.some(
+    const activeTriggers = customAutomationTriggersForRun(triggers, runsOnTask);
+    const invalidSchedule = activeTriggers.some(
       (trigger) =>
         trigger.mode === "scheduled" &&
         (!trigger.schedule.cronExpression.trim() ||
@@ -92,7 +102,7 @@ export function useCustomAutomationSetupPage(args: {
     setSaveError("");
     const input = {
       name: name.trim(),
-      settings: customAutomationSettingsForTriggers(triggers, draft, icon),
+      settings: customAutomationSettingsForTriggers(triggers, draft, icon, runsOnTask),
     };
     try {
       if (args.automationId) {
@@ -117,6 +127,8 @@ export function useCustomAutomationSetupPage(args: {
     setName,
     triggers,
     setTriggers,
+    runsOnTask,
+    setRunsOnTask,
     icon,
     setIcon,
     draft,

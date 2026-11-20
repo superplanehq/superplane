@@ -3,12 +3,8 @@ import githubIcon from "@/assets/icons/integrations/github.svg";
 
 import { LINE_INTAKE_SOURCES } from "../pages/lineIntakeModel";
 import { availablePRFeedbackSources } from "../pages/prFeedbackSettingsModel";
-import type {
-  ColumnAutomation,
-  ColumnAutomationCatalogEntry,
-  ColumnAutomationKind,
-  ColumnKey,
-} from "./columnAutomations";
+import type { ColumnAutomation, ColumnAutomationCatalogEntry, ColumnAutomationKind } from "./columnAutomations";
+import type { ColumnKey } from "./columnKeys";
 
 export const ANALYSIS_CATALOG_ID = "analysis";
 export const AGENT_STEP_CATALOG_ID = "agent-step";
@@ -132,6 +128,9 @@ export function catalogForColumn(
   options?: { allowCustom?: boolean; allowReviewRequest?: boolean; vcsProvider?: string },
 ): ColumnAutomationCatalogEntry[] {
   const allowCustom = options?.allowCustom === true;
+  if (key.startsWith("custom-")) {
+    return [CUSTOM_ENTRY];
+  }
   if (key === "backlog") {
     return [
       ...LINE_INTAKE_SOURCES.map((source) => ({
@@ -178,6 +177,39 @@ export function catalogForColumn(
     return allowCustom ? [closureEntry, CUSTOM_AUTOMATION_ENTRY] : [closureEntry];
   }
   return phaseCatalog(key, allowCustom);
+}
+
+export function pickerCatalogForColumn(
+  key: ColumnKey,
+  options?: { allowCustom?: boolean; allowReviewRequest?: boolean; vcsProvider?: string },
+): { catalog: ColumnAutomationCatalogEntry[]; unavailableReasons: Record<string, string> } {
+  const available = catalogForColumn(key, options);
+  const groups = [
+    { label: "Backlog", catalog: [ANALYSIS_ENTRY] },
+    { label: "an app stage", catalog: phaseCatalog("phase-1", options?.allowCustom === true) },
+    { label: "Verify", catalog: catalogForColumn("verify", options) },
+    { label: "Done", catalog: catalogForColumn("done", options) },
+  ];
+  const seen = new Set<string>();
+  let hasCustomBuilder = false;
+  const catalog = [...available, ...groups.flatMap((group) => group.catalog)].filter((entry) => {
+    if (entry.kind === "custom" || entry.kind === "custom-verification") {
+      if (hasCustomBuilder) return false;
+      hasCustomBuilder = true;
+    }
+    if (seen.has(entry.id)) return false;
+    seen.add(entry.id);
+    return true;
+  });
+  const availableIds = new Set(available.map((entry) => entry.id));
+  const unavailableReasons = Object.fromEntries(
+    catalog.flatMap((entry) => {
+      if (availableIds.has(entry.id)) return [];
+      const group = groups.find((candidate) => candidate.catalog.some((item) => item.id === entry.id));
+      return group ? [[entry.id, `Available in ${group.label}.`]] : [];
+    }),
+  );
+  return { catalog, unavailableReasons };
 }
 
 function phaseCatalog(key: ColumnKey, allowCustom: boolean): ColumnAutomationCatalogEntry[] {

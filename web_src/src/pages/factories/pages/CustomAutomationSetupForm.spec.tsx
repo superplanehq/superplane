@@ -23,7 +23,10 @@ vi.mock("@/hooks/useFactoryCustomAutomationData", () => ({
   useCreateFactoryCustomAutomation: () => ({ mutateAsync: saveAutomation, isPending: false }),
   useUpdateFactoryCustomAutomation: () => ({ mutateAsync: saveAutomation, isPending: false }),
 }));
-vi.mock("./PlanningReviewForm", () => ({ PlanningReviewForm: () => null }));
+vi.mock("@/hooks/useComponentData", () => ({ useComponent: () => ({}) }));
+vi.mock("@/hooks/useByokRunnerModelDefault", () => ({ useByokRunnerModelDefault: () => undefined }));
+vi.mock("@/hooks/useExperimentalFeature", () => ({ useExperimentalFeature: () => ({ has: () => false }) }));
+vi.mock("@/hooks/useFactoryAgentResources", () => ({ useFactoryAgentResources: () => ({}) }));
 
 function Editor({ columnKey }: { columnKey?: "backlog" | "verify" }) {
   const model = useCustomAutomationSetupPage({
@@ -37,6 +40,7 @@ function Editor({ columnKey }: { columnKey?: "backlog" | "verify" }) {
       name={model.name}
       icon={model.icon}
       triggers={model.triggers}
+      runsOnTask={model.runsOnTask}
       columnKey={columnKey}
       draft={model.draft}
       organizationId="org"
@@ -48,6 +52,7 @@ function Editor({ columnKey }: { columnKey?: "backlog" | "verify" }) {
       onNameChange={model.setName}
       onIconChange={model.setIcon}
       onTriggersChange={model.setTriggers}
+      onRunsOnTaskChange={model.setRunsOnTask}
       onDraftChange={model.setDraft}
       onSave={() => void model.save()}
       onClose={() => {}}
@@ -60,6 +65,18 @@ it("selects Schedule, recovers from a save error, and reopens the saved schedule
   saveAutomation.mockRejectedValueOnce(new Error("Schedule has no future run."));
   saveAutomation.mockResolvedValueOnce({});
   const view = render(<Editor />);
+  expect(screen.getByRole("heading", { name: "Agent" })).toBeInTheDocument();
+  expect(screen.getByText("The model used for this automation.")).toBeInTheDocument();
+  expect(screen.getByText("Do not run workspace setup commands.")).toBeInTheDocument();
+  expect(screen.getByText("Do not check out the repository.")).toBeInTheDocument();
+  const skipSetup = screen.getByRole("switch", { name: "Skip setup commands" });
+  const skipCheckout = screen.getByRole("switch", { name: "Skip repository checkout" });
+  expect(skipSetup).not.toBeChecked();
+  expect(skipCheckout).not.toBeChecked();
+  await user.click(skipSetup);
+  await user.click(skipCheckout);
+  expect(saveAutomation).not.toHaveBeenCalled();
+  await user.click(screen.getByRole("tab", { name: "with no task" }));
   await user.click(screen.getByRole("button", { name: "Add trigger" }));
   await user.click(screen.getByRole("menuitem", { name: /Schedule/ }));
   await user.click(screen.getByRole("button", { name: "Remove Manual" }));
@@ -75,10 +92,15 @@ it("selects Schedule, recovers from a save error, and reopens the saved schedule
   await waitFor(() => expect(saveAutomation).toHaveBeenCalledTimes(2));
   const saved = saveAutomation.mock.calls[1]![0];
   expect(saved.settings.schedule).toEqual({ cronExpression: "30 0 9 * * MON-FRI", utcOffset: 5.75 });
+  expect(saved.settings.runsOnTask).toBe(false);
+  expect(saved.settings.skipSetupCommands).toBe(true);
+  expect(saved.settings.skipRepositoryCheckout).toBe(true);
   expect(saved.settings.steps).toEqual(automation.settings!.steps);
   view.unmount();
   automation = { automation: automation.automation, settings: saved.settings };
   render(<Editor />);
+  expect(screen.getByRole("switch", { name: "Skip setup commands" })).toBeChecked();
+  await user.click(screen.getByRole("switch", { name: "Skip setup commands" }));
   expect(screen.queryByLabelText("Cron expression")).not.toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: /^Schedule/ }));
   expect(screen.getByLabelText("Cron expression")).toHaveValue("30 0 9 * * MON-FRI");
@@ -88,6 +110,8 @@ it("selects Schedule, recovers from a save error, and reopens the saved schedule
   await user.click(screen.getByRole("button", { name: "Save" }));
   await waitFor(() => expect(saveAutomation).toHaveBeenCalledTimes(3));
   expect(saveAutomation.mock.calls[2]![0].settings.schedule.utcOffset).toBe(-3.5);
+  expect(saveAutomation.mock.calls[2]![0].settings.skipSetupCommands).toBe(false);
+  expect(saveAutomation.mock.calls[2]![0].settings.skipRepositoryCheckout).toBe(true);
   expect(screen.getByRole("button", { name: /Bash Lint/ })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: /Prompt Review/ })).toBeInTheDocument();
 });
@@ -105,6 +129,7 @@ it("saves a schedule beside the existing trigger", async () => {
   saveAutomation.mockClear();
   saveAutomation.mockResolvedValueOnce({});
   render(<Editor columnKey="backlog" />);
+  await user.click(screen.getByRole("tab", { name: "with no task" }));
   await user.click(screen.getByRole("button", { name: "Add trigger" }));
   await user.click(screen.getByRole("menuitem", { name: /Schedule/ }));
   expect(screen.queryByRole("combobox", { name: /Trigger/ })).not.toBeInTheDocument();
@@ -120,15 +145,37 @@ it("saves a schedule beside the existing trigger", async () => {
     },
   ]);
   expect(saved.settings.steps).toEqual(automation.settings!.steps);
+  expect(saved.settings.runsOnTask).toBe(false);
+});
+
+it("previews Runs on a task above the trigger list without saving the switch", async () => {
+  const user = userEvent.setup();
+  saveAutomation.mockClear();
+  saveAutomation.mockResolvedValueOnce({});
+  render(<Editor columnKey="backlog" />);
+  expect(screen.getByRole("tab", { name: "on a task" })).toHaveAttribute("aria-selected", "true");
+  await user.click(screen.getByRole("button", { name: "Add trigger" }));
+  expect(screen.getByRole("menuitem", { name: /When a task enters Backlog/ })).toBeInTheDocument();
+  expect(screen.queryByRole("menuitem", { name: /Schedule/ })).not.toBeInTheDocument();
+  await user.keyboard("{Escape}");
+  await user.click(screen.getByRole("tab", { name: "with no task" }));
+  await user.click(screen.getByRole("button", { name: "Add trigger" }));
+  expect(screen.getByRole("menuitem", { name: /Schedule/ })).toBeInTheDocument();
+  expect(screen.queryByRole("menuitem", { name: /When a task enters Backlog/ })).not.toBeInTheDocument();
+  await user.keyboard("{Escape}");
+  await user.click(screen.getByRole("button", { name: "Save" }));
+  await waitFor(() => expect(saveAutomation).toHaveBeenCalled());
+  expect(saveAutomation.mock.calls.at(-1)![0].settings.runsOnTask).toBe(false);
 });
 
 it("offers Schedule for a Backlog automation", async () => {
   const user = userEvent.setup();
   render(<Editor columnKey="backlog" />);
   expect(screen.queryByLabelText("Cron expression")).not.toBeInTheDocument();
+  await user.click(screen.getByRole("tab", { name: "with no task" }));
   await user.click(screen.getByRole("button", { name: "Add trigger" }));
   await user.click(screen.getByRole("menuitem", { name: /Schedule/ }));
-  expect(screen.getByText("A person starts each run.")).toBeInTheDocument();
+  expect(screen.getByText("A person starts each run from the column.")).toBeInTheDocument();
   expect(screen.getByLabelText("Cron expression")).toBeInTheDocument();
   expect(screen.queryByRole("link", { name: "Build a cron expression" })).not.toBeInTheDocument();
   expect(screen.getByRole("combobox", { name: "Timezone" })).toBeInTheDocument();

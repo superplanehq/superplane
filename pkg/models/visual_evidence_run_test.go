@@ -129,8 +129,11 @@ func TestMaybeLinkCustomAutomationRunShowsTheRunOnThePullRequest(t *testing.T) {
 			1,
 		)),
 	}}, nil)
-	require.NoError(t, db.Model(canvas).Update("factory_id", factoryModel.ID).Error)
-	require.NoError(t, db.Model(canvas).Update("name", "Fix Linter Issues").Error)
+	require.NoError(t, db.Model(canvas).Updates(map[string]any{
+		"factory_id": factoryModel.ID,
+		"column_key": models.CanvasColumnKeyVerify,
+		"name":       "Fix Linter Issues",
+	}).Error)
 	require.NoError(t, db.First(canvas, "id = ?", canvas.ID).Error)
 
 	run, err := models.CreateCanvasRunInTransaction(db, canvas.ID, "on-pull-request", models.CanvasRunStateStarted, "")
@@ -155,8 +158,8 @@ func TestMaybeLinkCustomAutomationRunShowsTheRunOnThePullRequest(t *testing.T) {
 	assert.Equal(t, "Fix Linter Issues", linked[pullRequest.ID][0].Title)
 }
 
-func TestMaybeLinkCustomAutomationRunLinksImplementAndDoneTasks(t *testing.T) {
-	for _, column := range []string{models.CanvasColumnKeyImplement, models.CanvasColumnKeyDone} {
+func TestMaybeLinkCustomAutomationRunLinksTaskEvents(t *testing.T) {
+	for _, column := range []string{models.CanvasColumnKeyImplement, models.CanvasColumnKeyVerify, models.CanvasColumnKeyDone} {
 		t.Run(column, func(t *testing.T) {
 			r := support.Setup(t)
 			db := database.DB(t.Context())

@@ -3,7 +3,11 @@ import { LoadingButton } from "@/components/ui/loading-button";
 import { CircleAlert } from "lucide-react";
 import { useState } from "react";
 
-import { type CustomAutomationColumn, type CustomAutomationTrigger } from "../lib/customAutomation";
+import {
+  customAutomationTriggersForRun,
+  type CustomAutomationColumn,
+  type CustomAutomationTrigger,
+} from "../lib/customAutomation";
 import { AutomationFlow } from "./customAutomationSetupFlow";
 import { StepEditor } from "./customAutomationStepEditor";
 import { TriggerEditor } from "./CustomAutomationTriggerEditor";
@@ -13,6 +17,7 @@ type CustomAutomationSetupFormProps = {
   name: string;
   icon: string;
   triggers: CustomAutomationTrigger[];
+  runsOnTask: boolean;
   columnKey?: CustomAutomationColumn;
   draft: PlanningReviewDraft;
   organizationId: string;
@@ -24,6 +29,7 @@ type CustomAutomationSetupFormProps = {
   onNameChange: (name: string) => void;
   onIconChange: (icon: string) => void;
   onTriggersChange: (triggers: CustomAutomationTrigger[]) => void;
+  onRunsOnTaskChange: (runsOnTask: boolean) => void;
   onDraftChange: (draft: PlanningReviewDraft) => void;
   onSave: () => void;
   onDelete?: () => void;
@@ -35,6 +41,7 @@ export function CustomAutomationSetupForm(props: CustomAutomationSetupFormProps)
     name,
     icon,
     triggers,
+    runsOnTask,
     columnKey = "verify",
     draft,
     organizationId,
@@ -46,6 +53,7 @@ export function CustomAutomationSetupForm(props: CustomAutomationSetupFormProps)
     onNameChange,
     onIconChange,
     onTriggersChange,
+    onRunsOnTaskChange,
     onDraftChange,
     onSave,
     onDelete,
@@ -69,7 +77,8 @@ export function CustomAutomationSetupForm(props: CustomAutomationSetupFormProps)
       <div className="flex min-h-0 flex-1">
         <AutomationFlow
           columnKey={columnKey}
-          triggers={triggers}
+          triggers={customAutomationTriggersForRun(triggers, runsOnTask)}
+          runsOnTask={runsOnTask}
           steps={steps}
           selectedStep={selectedStep}
           onSelectTrigger={() => setSelectedStep(null)}
@@ -95,7 +104,9 @@ export function CustomAutomationSetupForm(props: CustomAutomationSetupFormProps)
               name={name}
               icon={icon}
               triggers={triggers}
+              runsOnTask={runsOnTask}
               onTriggersChange={onTriggersChange}
+              onRunsOnTaskChange={onRunsOnTaskChange}
               draft={draft}
               organizationId={organizationId}
               factoryId={factoryId}

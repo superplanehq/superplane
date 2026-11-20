@@ -826,11 +826,11 @@ const (
 // already clones keeps that step and does not get a second checkout.
 // Prompt hints stay on the saved-clone instructions unless this inserts
 // the command, because only then have setup and context checkout run.
-func ApplyFactoryCheckout(files []TaskFile, commands []TaskCommand, steps []AgentStep) []TaskCommand {
+func ApplyFactoryCheckout(files []TaskFile, commands []TaskCommand, steps []AgentStep, skipCheckout bool) []TaskCommand {
 	if !taskShipsCheckout(files) {
 		return commands
 	}
-	return InsertFactoryCheckoutCommand(commands, steps, files)
+	return InsertFactoryCheckoutCommand(commands, steps, files, skipCheckout)
 }
 
 // InsertFactoryCheckoutCommand inserts checkout before the first canvas
@@ -838,12 +838,17 @@ func ApplyFactoryCheckout(files []TaskFile, commands []TaskCommand, steps []Agen
 // regular commands so the task log shows them apart. Steps that already
 // run git clone, or the checkout helper, are left unchanged so saved
 // automations keep their own clone and run setup themselves.
-func InsertFactoryCheckoutCommand(commands []TaskCommand, steps []AgentStep, files []TaskFile) []TaskCommand {
+func InsertFactoryCheckoutCommand(commands []TaskCommand, steps []AgentStep, files []TaskFile, skipCheckout bool) []TaskCommand {
 	if stepsAlreadyCheckout(steps) {
 		return commands
 	}
-	markCheckoutHintsComplete(files)
-	inserted := factoryCheckoutCommands(files)
+	inserted := factoryCheckoutCommands(files, skipCheckout)
+	if len(inserted) == 0 {
+		return commands
+	}
+	if !skipCheckout {
+		markCheckoutHintsComplete(files)
+	}
 	for i, command := range commands {
 		if command.Kind == LiveLogKindSetup {
 			continue
@@ -856,13 +861,16 @@ func InsertFactoryCheckoutCommand(commands []TaskCommand, steps []AgentStep, fil
 	return append(commands, inserted...)
 }
 
-func factoryCheckoutCommands(files []TaskFile) []TaskCommand {
-	commands := []TaskCommand{{
-		Name:    "Checkout",
-		Command: WrapAgentStepCommand("checkout"),
-		Kind:    LiveLogKindBash,
-		Preview: LiveLogText("Checkout"),
-	}}
+func factoryCheckoutCommands(files []TaskFile, skipCheckout bool) []TaskCommand {
+	commands := make([]TaskCommand, 0, 2)
+	if !skipCheckout {
+		commands = append(commands, TaskCommand{
+			Name:    "Checkout",
+			Command: WrapAgentStepCommand("checkout"),
+			Kind:    LiveLogKindBash,
+			Preview: LiveLogText("Checkout"),
+		})
+	}
 	setup := setupCommandsFromFiles(files)
 	if len(setup) == 0 {
 		return commands

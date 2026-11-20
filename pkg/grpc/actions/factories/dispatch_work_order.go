@@ -106,6 +106,7 @@ type workOrderLineDispatchResult struct {
 	startedSteps []*models.FactoryLineStepResult
 	planningStop *models.RunCancellationResult
 	fromState    string
+	leftColumn   string
 	logger       *log.Entry
 }
 
@@ -147,8 +148,44 @@ func DispatchWorkOrderOnLine(
 		result.fromState,
 		result.startedSteps,
 	)
+	startColumnLeaveAfterDispatch(db, result)
 	startImplementColumnAutomations(db, result.logger, result.factory, result.order, startIndex)
 	return result.factory, result.order, nil
+}
+
+func startColumnLeaveAfterDispatch(db *gorm.DB, result *workOrderLineDispatchResult) {
+	if result == nil || result.factory == nil || result.order == nil || result.leftColumn == "" {
+		return
+	}
+	next, err := models.WorkOrderBoardColumn(db, result.order)
+	if err != nil || next == result.leftColumn {
+		if err != nil && result.logger != nil {
+			result.logger.WithError(err).Warnf("Failed to read the column for order %s", result.order.ID)
+		}
+		return
+	}
+	if err := StartColumnLeaveCustomAutomations(db, result.factory, result.order, result.leftColumn, departureAttemptToken(result)); err != nil && result.logger != nil {
+		result.logger.WithError(err).Warnf("Failed to start %s leave automation for order %s", result.leftColumn, result.order.ID)
+	}
+}
+
+func departureAttemptToken(result *workOrderLineDispatchResult) string {
+	if result == nil {
+		return ""
+	}
+	for i := len(result.startedSteps) - 1; i >= 0; i-- {
+		step := result.startedSteps[i]
+		if step == nil {
+			continue
+		}
+		if step.Execution != nil {
+			return step.Execution.ID.String()
+		}
+		if step.QueueItem != nil {
+			return step.QueueItem.ID.String()
+		}
+	}
+	return ""
 }
 
 func startImplementColumnAutomations(db *gorm.DB, logger *log.Entry, factory *models.Factory, order *models.FactoryWorkOrder, startIndex int) {
@@ -218,8 +255,9 @@ func dispatchWorkOrderOnLineTx(
 		return nil, err
 	}
 
-	if len(currentLine.Steps) == 0 {
-		return nil, models.ErrFactoryLineHasNoSteps
+	executionPlan, err := currentLine.ExecutionPlan(tx)
+	if err != nil {
+		return nil, err
 	}
 
 	model = strings.TrimSpace(model)
@@ -236,10 +274,10 @@ func dispatchWorkOrderOnLineTx(
 	if err != nil {
 		return nil, invalidArgument(err.Error())
 	}
-	if err := validateLineThinkingLevel(tx, currentLine, normalizedThinking); err != nil {
+	if err := validateLineThinkingLevel(tx, executionPlan, normalizedThinking); err != nil {
 		return nil, err
 	}
-	if err := requireSavedBranchForImplementation(tx, factory, order, currentLine, startIndex); err != nil {
+	if err := requireSavedBranchForImplementation(tx, factory, order, executionPlan, startIndex); err != nil {
 		return nil, err
 	}
 	if resolvedWorkOrderDefaultBranch(order, factory.OnboardingConfigValue()) != "" {
@@ -249,6 +287,10 @@ func dispatchWorkOrderOnLineTx(
 	}
 
 	fromState := order.State
+	leftColumn, err := models.WorkOrderBoardColumn(tx, order)
+	if err != nil {
+		return nil, err
+	}
 	if err := fillMissingWorkOrderTitle(tx, order); err != nil {
 		return nil, err
 	}
@@ -272,6 +314,7 @@ func dispatchWorkOrderOnLineTx(
 			startedSteps: startedSteps,
 			planningStop: planningStop,
 			fromState:    fromState,
+			leftColumn:   leftColumn,
 			logger:       logger,
 		}, nil
 	}
@@ -290,7 +333,7 @@ func dispatchWorkOrderOnLineTx(
 		return nil, err
 	}
 
-	_, result, err := currentLine.DispatchFromWithModel(tx, order, startIndex, model, normalizedThinking)
+	_, results, err := currentLine.DispatchStageFromWithModel(tx, order, startIndex, model, normalizedThinking)
 	if err != nil {
 		return nil, err
 	}
@@ -298,9 +341,10 @@ func dispatchWorkOrderOnLineTx(
 	return &workOrderLineDispatchResult{
 		factory:      factory,
 		order:        order,
-		startedSteps: append(abandoned, result),
+		startedSteps: append(abandoned, results...),
 		planningStop: planningStop,
 		fromState:    fromState,
+		leftColumn:   leftColumn,
 		logger:       logger,
 	}, nil
 }
@@ -315,14 +359,14 @@ func requireSavedBranchForImplementation(
 	tx *gorm.DB,
 	factory *models.Factory,
 	order *models.FactoryWorkOrder,
-	line *models.FactoryLine,
+	steps []models.FactoryLineStep,
 	startIndex int,
 ) error {
-	if line == nil || startIndex < 0 || startIndex >= len(line.Steps) {
+	if startIndex < 0 || startIndex >= len(steps) {
 		return nil
 	}
-	appIDs := make([]uuid.UUID, 0, len(line.Steps)-startIndex)
-	for _, step := range line.Steps[startIndex:] {
+	appIDs := make([]uuid.UUID, 0, len(steps)-startIndex)
+	for _, step := range steps[startIndex:] {
 		appIDs = append(appIDs, step.AppID)
 	}
 	blocked, err := implementStepsMissingSavedBranch(tx, factory, order, appIDs)
@@ -409,11 +453,11 @@ func resolvedWorkOrderDefaultBranch(order *models.FactoryWorkOrder, config model
 	return strings.TrimSpace(config.DefaultBranch)
 }
 
-func validateLineThinkingLevel(tx *gorm.DB, line *models.FactoryLine, level string) error {
+func validateLineThinkingLevel(tx *gorm.DB, steps []models.FactoryLineStep, level string) error {
 	if level != runner.ThinkingLevelMinimal && level != runner.ThinkingLevelXHigh {
 		return nil
 	}
-	for _, step := range line.Steps {
+	for _, step := range steps {
 		if step.AppID == uuid.Nil {
 			continue
 		}

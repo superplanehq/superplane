@@ -35,9 +35,10 @@ func TestResetBuiltInAutomationPreservesImplementationSettings(t *testing.T) {
 		max          int
 		instructions string
 		canvas       *models.Canvas
+		draft        bool
 	}{
-		{provider: models.ProviderGitHub, max: 7, instructions: "Avoid new dependencies. Include API examples in pull requests."},
-		{provider: models.ProviderBitbucket, max: 9, instructions: "Document {{ example }} in the pull request."},
+		{provider: models.ProviderGitHub, max: 7, instructions: "Avoid new dependencies. Include API examples in pull requests.", draft: true},
+		{provider: models.ProviderBitbucket, max: 9, instructions: "Document {{ example }} in the pull request.", draft: true},
 		{provider: models.ProviderGitHub, max: 3, instructions: ""},
 	}
 	for i := range cases {
@@ -55,7 +56,7 @@ func TestResetBuiltInAutomationPreservesImplementationSettings(t *testing.T) {
 			agent.Configuration["disabledAgentResourceTools"] = map[string]any{"github-resource": []any{"delete_issue"}}
 			agent.Configuration["enabledAgentResourceTools"] = map[string]any{"github-resource": []any{"get_issue"}}
 			implementationStep(t, agent, "Implementation")["prompt"] = "Retired implementation prompt"
-			setResetTestDraftPullRequests(t, doc, true)
+			setResetTestDraftPullRequests(t, doc, tc.draft)
 		})
 	}
 	require.NoError(t, resetTestOrganization(t, r))
@@ -75,7 +76,7 @@ func TestResetBuiltInAutomationPreservesImplementationSettings(t *testing.T) {
 			require.NotNil(t, agent.Concurrency)
 			assert.Equal(t, tc.max, agent.Concurrency.EffectiveMax())
 			assert.Equal(t, "team", agent.Concurrency.Key)
-			assert.True(t, resetTestDraftPullRequests(t, version.Nodes))
+			assert.Equal(t, tc.draft, resetTestDraftPullRequests(t, version.Nodes))
 			assert.NotContains(t, liveCanvasJSON(t, tc.canvas), "retired implementation prompt")
 		})
 	}
@@ -170,7 +171,7 @@ func TestResetReviewRequestPreservesFallbackAndAgentSettings(t *testing.T) {
 		t.Run("fallback="+fallback, func(t *testing.T) {
 			instructions := ""
 			if fallback != "" {
-				instructions = "Prefer the security owner. Keep {{ example }} literal."
+				instructions = "Publish a detailed explanation of each reviewer. Keep {{ example }} literal."
 			}
 			r, factory := resetTestFactory(t)
 			integration, err := models.CreateIntegration(uuid.New(), r.Organization.ID, "github", "workspace-github", nil)
@@ -197,7 +198,7 @@ func TestResetReviewRequestPreservesFallbackAndAgentSettings(t *testing.T) {
 				agent.Configuration["reviewFindingsComment"] = fallback != ""
 				agent.Configuration["reviewFindingsBodyActivationGeneration"] = 4
 				agent.Configuration["reviewFindingsCommentActivationGeneration"] = 3
-				agent.Configuration["additionalInstructions"] = "Prefer the security owner. Keep {{ example }} literal."
+				agent.Configuration["additionalInstructions"] = "Publish a detailed explanation of each reviewer. Keep {{ example }} literal."
 				agent.Configuration["model"] = models.FormatHostedLLMModelKey(models.UsageProviderOpenRouter, "anthropic/claude-sonnet-4-6")
 				agent.Configuration["thinkingLevel"] = "low"
 				agent.Configuration["executionTimeoutSeconds"] = 0
@@ -230,6 +231,11 @@ func TestResetReviewRequestPreservesFallbackAndAgentSettings(t *testing.T) {
 			prompt := steps[1].(map[string]any)["prompt"].(string)
 			// The managed policy must replace an installed prompt during reset.
 			require.Contains(t, prompt, "Select a contributor to this pull request only when no eligible non-contributor is available.")
+			require.Contains(t, prompt, "publicationSummary")
+			require.Contains(t, prompt, "publicationReason")
+			if instructions != "" {
+				require.NotContains(t, prompt, instructions, "saved user instructions stay separate from the managed prompt")
+			}
 			require.Equal(t, fallback, agent.Configuration["fallbackReviewer"])
 			require.Equal(t, fallback != "", agent.Configuration["publishPRCheck"])
 			require.EqualValues(t, 7, agent.Configuration["prCheckActivationGeneration"])
@@ -240,7 +246,14 @@ func TestResetReviewRequestPreservesFallbackAndAgentSettings(t *testing.T) {
 			require.Equal(t, fallback != "", agent.Configuration["publishReviewFindings"])
 			require.Equal(t, false, agent.Configuration["reviewFindingsBody"])
 			require.Equal(t, fallback != "", agent.Configuration["reviewFindingsComment"])
+			mandatory := findIntakeNode(version.Nodes, "withdrawal-comment")
+			require.NotNil(t, mandatory)
+			require.Equal(t, true, mandatory.Configuration["enabled"], "mandatory explanations do not use optional findings settings")
+			require.NotNil(t, mandatory.IntegrationID)
+			require.Equal(t, integration.ID.String(), *mandatory.IntegrationID)
 			body, comment := findIntakeNode(version.Nodes, reviewFindingsBodyNodeID), findIntakeNode(version.Nodes, reviewFindingsCommentNode)
+			require.Contains(t, body.Configuration["body"], "publicationSummary")
+			require.Equal(t, body.Configuration["body"], comment.Configuration["body"])
 			require.Equal(t, false, body.Configuration["enabled"])
 			require.EqualValues(t, 4, body.Configuration["activationGeneration"])
 			require.Equal(t, fallback != "", comment.Configuration["enabled"])
@@ -279,6 +292,7 @@ func TestInstallationResetReviewRequestSetupCommands(t *testing.T) {
 				findYAMLNode(t, doc, reviewRequestTriggerNodeID).Configuration["app"] = source.ID.String()
 				config := findYAMLNode(t, doc, reviewRequestAgentNodeID).Configuration
 				delete(config, "skipSetupCommands")
+				config["skipRepositoryCheckout"] = true
 				if tc.saved != nil {
 					config["skipSetupCommands"] = tc.saved
 				}
@@ -291,6 +305,7 @@ func TestInstallationResetReviewRequestSetupCommands(t *testing.T) {
 			agent := findIntakeNode(resetTestLiveVersion(t, canvas).Nodes, reviewRequestAgentNodeID)
 			require.NotNil(t, agent)
 			require.Equal(t, tc.expected, agent.Configuration["skipSetupCommands"])
+			require.Equal(t, true, agent.Configuration["skipRepositoryCheckout"])
 		})
 	}
 }

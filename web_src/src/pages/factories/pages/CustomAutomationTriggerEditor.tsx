@@ -3,11 +3,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn, resolveIcon } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
-import { AlarmClock, ChevronDown, GitCommitHorizontal, MousePointerClick, Plus, Trash2 } from "lucide-react";
+import { SegmentedNav } from "@/ui/SegmentedNav";
+import { AlarmClock, ChevronDown, GitCommitHorizontal, LogOut, MousePointerClick, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 
 import {
   customAutomationColumnLabel,
+  customAutomationTriggersForRun,
   newCustomAutomationTrigger,
   type CustomAutomationColumn,
   type CustomAutomationMode,
@@ -22,7 +24,9 @@ export function TriggerEditor({
   name,
   icon,
   triggers,
+  runsOnTask,
   onTriggersChange,
+  onRunsOnTaskChange,
   draft,
   organizationId,
   factoryId,
@@ -35,7 +39,9 @@ export function TriggerEditor({
   name: string;
   icon: string;
   triggers: CustomAutomationTrigger[];
+  runsOnTask: boolean;
   onTriggersChange: (triggers: CustomAutomationTrigger[]) => void;
+  onRunsOnTaskChange: (runsOnTask: boolean) => void;
   draft: PlanningReviewDraft;
   organizationId: string;
   factoryId: string;
@@ -45,6 +51,7 @@ export function TriggerEditor({
   onDraftChange: (draft: PlanningReviewDraft) => void;
 }) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const visibleTriggers = customAutomationTriggersForRun(triggers, runsOnTask);
   const updateTrigger = (id: string, next: CustomAutomationTrigger) => {
     onTriggersChange(triggers.map((trigger) => (trigger.id === id ? next : trigger)));
   };
@@ -70,26 +77,17 @@ export function TriggerEditor({
             />
           </div>
         </div>
-        <PlanningReviewForm
-          draft={draft}
-          onChange={onDraftChange}
-          organizationId={organizationId}
-          factoryId={factoryId}
-          factoryKey={factoryKey}
-          appearance="fields"
-          view="implementation"
-          showConcurrency={false}
-          showResources={false}
-          showSteps={false}
-          modelOnly
-        />
       </section>
       <section className="flex flex-col gap-4">
-        <h3 className="text-base font-semibold text-foreground">Triggers</h3>
-        {triggers.map((trigger) => (
+        <div className="flex flex-col gap-1.5">
+          <h3 className="text-base font-semibold text-foreground">Triggers</h3>
+          <TriggerContext runsOnTask={runsOnTask} onRunsOnTaskChange={onRunsOnTaskChange} />
+        </div>
+        {visibleTriggers.map((trigger) => (
           <TriggerCard
             key={trigger.id}
             columnKey={columnKey}
+            runsOnTask={runsOnTask}
             trigger={trigger}
             triggers={triggers}
             expanded={expandedId === trigger.id}
@@ -111,18 +109,37 @@ export function TriggerEditor({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="min-w-72">
-            {(["manual", "automatic", "scheduled"] as const).map((mode) => (
-              <DropdownMenuItem
-                key={mode}
-                className="py-2.5"
-                disabled={mode !== "scheduled" && triggers.some((trigger) => trigger.mode === mode)}
-                onSelect={() => addTrigger(mode)}
-              >
-                <TriggerOption mode={mode} columnKey={columnKey} />
-              </DropdownMenuItem>
-            ))}
+            {(runsOnTask ? (["manual", "automatic", "leave"] as const) : (["manual", "scheduled"] as const)).map(
+              (mode) => (
+                <DropdownMenuItem
+                  key={mode}
+                  className="py-2.5"
+                  disabled={mode !== "scheduled" && triggers.some((trigger) => trigger.mode === mode)}
+                  onSelect={() => addTrigger(mode)}
+                >
+                  <TriggerOption mode={mode} columnKey={columnKey} runsOnTask={runsOnTask} />
+                </DropdownMenuItem>
+              ),
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
+      </section>
+      <section className="flex flex-col gap-8">
+        <h3 className="text-base font-semibold text-foreground">Agent</h3>
+        <PlanningReviewForm
+          draft={draft}
+          onChange={onDraftChange}
+          organizationId={organizationId}
+          factoryId={factoryId}
+          factoryKey={factoryKey}
+          appearance="fields"
+          view="implementation"
+          showConcurrency={false}
+          showResources={false}
+          showSteps={false}
+          modelOnly
+          modelDescription="The model used for this automation."
+        />
       </section>
     </div>
   );
@@ -130,6 +147,7 @@ export function TriggerEditor({
 
 function TriggerCard({
   columnKey,
+  runsOnTask,
   trigger,
   triggers,
   expanded,
@@ -138,6 +156,7 @@ function TriggerCard({
   onScheduleChange,
 }: {
   columnKey: CustomAutomationColumn;
+  runsOnTask: boolean;
   trigger: CustomAutomationTrigger;
   triggers: CustomAutomationTrigger[];
   expanded: boolean;
@@ -157,7 +176,7 @@ function TriggerCard({
             aria-expanded={expanded}
             onClick={onToggle}
           >
-            <TriggerOption mode={trigger.mode} columnKey={columnKey} />
+            <TriggerOption mode={trigger.mode} columnKey={columnKey} runsOnTask={runsOnTask} />
             <ChevronDown
               className={cn("ml-auto size-4 shrink-0 text-muted-foreground", !expanded && "-rotate-90")}
               aria-hidden
@@ -165,7 +184,7 @@ function TriggerCard({
           </Button>
         ) : (
           <div className="min-w-0 flex-1 px-3 py-2.5">
-            <TriggerOption mode={trigger.mode} columnKey={columnKey} />
+            <TriggerOption mode={trigger.mode} columnKey={columnKey} runsOnTask={runsOnTask} />
           </div>
         )}
         {triggers.length > 1 ? (
@@ -191,6 +210,31 @@ function TriggerCard({
           />
         </div>
       ) : null}
+    </div>
+  );
+}
+
+/** Chooses which triggers this automation can run. The choice is saved. */
+function TriggerContext({
+  runsOnTask,
+  onRunsOnTaskChange,
+}: {
+  runsOnTask: boolean;
+  onRunsOnTaskChange: (runsOnTask: boolean) => void;
+}) {
+  return (
+    <div className="flex items-center gap-2" data-testid="custom-automation-runs-on-task">
+      <span className="text-xs text-muted-foreground">Runs</span>
+      <SegmentedNav
+        ariaLabel="Runs"
+        size="xs"
+        value={runsOnTask ? "task" : "none"}
+        onValueChange={(value) => onRunsOnTaskChange(value === "task")}
+        options={[
+          { value: "task", label: "on a task" },
+          { value: "none", label: "with no task" },
+        ]}
+      />
     </div>
   );
 }
@@ -311,6 +355,7 @@ function removeTriggerLabel(
 
 function triggerTitle(mode: CustomAutomationMode, columnKey: CustomAutomationColumn): string {
   if (mode === "scheduled") return "Schedule";
+  if (mode === "leave") return `When a task leaves ${customAutomationColumnLabel(columnKey)}`;
   if (mode === "automatic") {
     return columnKey === "verify"
       ? "Every pull request commit"
@@ -319,9 +364,18 @@ function triggerTitle(mode: CustomAutomationMode, columnKey: CustomAutomationCol
   return "Manual";
 }
 
-function TriggerOption({ mode, columnKey }: { mode: CustomAutomationMode; columnKey: CustomAutomationColumn }) {
-  const automatic = mode === "automatic";
-  const Icon = mode === "scheduled" ? AlarmClock : automatic ? GitCommitHorizontal : MousePointerClick;
+function TriggerOption({
+  mode,
+  columnKey,
+  runsOnTask,
+}: {
+  mode: CustomAutomationMode;
+  columnKey: CustomAutomationColumn;
+  runsOnTask: boolean;
+}) {
+  const automatic = mode === "automatic" || mode === "leave";
+  const Icon =
+    mode === "scheduled" ? AlarmClock : mode === "leave" ? LogOut : automatic ? GitCommitHorizontal : MousePointerClick;
   return (
     <span className="flex min-w-0 items-center gap-3 text-left">
       <span
@@ -338,22 +392,28 @@ function TriggerOption({ mode, columnKey }: { mode: CustomAutomationMode; column
         <span className="text-sm font-medium text-foreground">
           {mode === "scheduled"
             ? "Schedule"
-            : automatic
-              ? columnKey === "verify"
-                ? "Every pull request commit"
-                : `When a task enters ${customAutomationColumnLabel(columnKey)}`
-              : "Manual"}
+            : mode === "leave"
+              ? `When a task leaves ${customAutomationColumnLabel(columnKey)}`
+              : automatic
+                ? columnKey === "verify"
+                  ? "Every pull request commit"
+                  : `When a task enters ${customAutomationColumnLabel(columnKey)}`
+                : "Manual"}
         </span>
         <span className="text-xs font-normal text-muted-foreground">
           {mode === "scheduled"
             ? columnKey === "backlog"
               ? "Run automation on a schedule."
               : "Runs on the repository default branch."
-            : automatic
-              ? columnKey === "verify"
-                ? "Runs after each new commit."
-                : `Runs when a task enters ${customAutomationColumnLabel(columnKey)}.`
-              : "A person starts each run."}
+            : mode === "leave"
+              ? `Runs when a task leaves ${customAutomationColumnLabel(columnKey)}.`
+              : automatic
+                ? columnKey === "verify"
+                  ? "Runs after each new commit."
+                  : `Runs when a task enters ${customAutomationColumnLabel(columnKey)}.`
+                : runsOnTask
+                  ? "A person starts each run from a task."
+                  : "A person starts each run from the column."}
         </span>
       </span>
     </span>

@@ -115,6 +115,88 @@ func Test__HandOffWorkOrder__ImplementStartsCustomStageWhenDoneFollows(t *testin
 	assert.Equal(t, pb.WorkOrderExecution_STATE_PENDING, result.Order.GetLineDispatches()[0].GetStepExecutions()[0].GetState())
 }
 
+func TestHandOffStartsBacklogLeaveAutomation(t *testing.T) {
+	for _, scenario := range []struct {
+		name   string
+		column string
+		resume bool
+	}{
+		{name: "implement", column: HandOffColumnImplement},
+		{name: "verify", column: HandOffColumnVerify},
+		{name: "resume implement", column: HandOffColumnImplement, resume: true},
+		{name: "resume verify", column: HandOffColumnVerify, resume: true},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
+			r := support.Setup(t)
+			ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+			db := database.DB(t.Context())
+			factoryModel := seedHandOffFactory(t, r, db)
+			require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
+			integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
+			require.NoError(t, factoryModel.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSIntegrationID: &integrationID}))
+			if scenario.resume {
+				subscription := true
+				require.NoError(t, factoryModel.UpdateOnboarding(db, models.FactoryOnboardingPatch{CodexSubscription: &subscription}))
+			}
+			app, entry := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "ship-step", "start-ship")
+			_, err := factoryModel.CreateLine(db, "ship", []models.FactoryLineStep{
+				{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entry},
+			})
+			require.NoError(t, err)
+			created, err := CreateFactoryCustomAutomation(onboardingContext(r), onboardingDeps(r), r.Organization.ID.String(), &pb.CreateFactoryCustomAutomationRequest{
+				FactoryId: factoryModel.ID.String(),
+				Name:      "Note leaving Backlog",
+				ColumnKey: models.CanvasColumnKeyBacklog,
+				Settings: &pb.FactoryCustomAutomation_Settings{
+					StartMode: pb.FactoryCustomAutomation_START_MODE_ON_LEAVE,
+					Agent:     &pb.FactoryAppTemplateAgent{Component: "runnerClaudeCode"},
+					Steps: []*pb.FactoryCustomAutomation_Step{
+						{Name: "Note", Type: pb.FactoryCustomAutomation_Step_TYPE_PROMPT, Prompt: "The task left Backlog.", WorkingDirectory: "repo"},
+					},
+				},
+			})
+			require.NoError(t, err)
+			canvasID := created.GetCustomAutomation().GetAutomation().GetId()
+			if scenario.column == HandOffColumnVerify {
+				useGitHub(t, openHandOffPullRequest("acme/app", 42, "feature"))
+			}
+
+			result, err := HandOffWorkOrder(ctx, IntakeDependencies{}, r.Organization.ID.String(), HandOffWorkOrderRequest{
+				FactoryID:      factoryModel.ID.String(),
+				Title:          "Leave Backlog",
+				Plan:           "# Leave",
+				Column:         scenario.column,
+				PullRequestURL: "https://github.com/acme/app/pull/42",
+				MCPClientName:  "Codex",
+			})
+			require.NoError(t, err)
+
+			var events []models.CanvasEvent
+			require.NoError(t, db.Where("workflow_id = ?", canvasID).Find(&events).Error)
+			if scenario.resume {
+				require.Empty(t, events)
+				connection, err := models.CreateCodexConnection(db, r.Organization.ID, r.User, time.Now())
+				require.NoError(t, err)
+				require.NoError(t, db.Model(connection).Updates(map[string]any{
+					"status":             models.CodexConnectionStatusReady,
+					"credential_version": 1,
+					"bundle_ciphertext":  []byte("bundle"),
+				}).Error)
+				if scenario.column == HandOffColumnVerify {
+					useGitHub(t, openHandOffPullRequest("acme/app", 42, "feature"))
+				}
+				_, err = ResumeHandOffWorkOrder(ctx, IntakeDependencies{}, r.Organization.ID.String(), &pb.ResumeHandOffWorkOrderRequest{
+					FactoryId: factoryModel.ID.String(),
+					OrderId:   result.Order.GetId(),
+				})
+				require.NoError(t, err)
+				require.NoError(t, db.Where("workflow_id = ?", canvasID).Find(&events).Error)
+			}
+			require.Len(t, events, 1)
+		})
+	}
+}
+
 func Test__HandOffWorkOrder__ImplementStartsAutomaticCustomAutomation(t *testing.T) {
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
@@ -1030,4 +1112,26 @@ func TestSubscriptionHandOffRejectsInvalidPullRequestURLBeforeSaving(t *testing.
 			assert.Empty(t, bitbucketHTTP.Requests)
 		})
 	}
+}
+
+func TestExecutionPlanIndexForLineStepAccountsForCustomStages(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	app, entrypoint := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "Implement", "start")
+	line, err := factory.CreateLine(db, "ship", []models.FactoryLineStep{{
+		Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entrypoint,
+	}})
+	require.NoError(t, err)
+	stageID := uuid.New()
+	stage := models.FactoryLineStage{ID: stageID, Key: "custom-" + stageID.String(), Name: "QA", Kind: models.FactoryLineStageCustom}
+	stages := append([]models.FactoryLineStage{line.StagesValue()[0], stage}, line.StagesValue()[1:]...)
+	require.NoError(t, line.UpdateConfiguration(db, nil, nil, nil, stages))
+	custom, _ := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "QA", "start")
+	require.NoError(t, custom.SetColumnKey(db, stage.Key))
+
+	index, err := executionPlanIndexForLineStep(db, line, 0)
+	require.NoError(t, err)
+	assert.Equal(t, 1, index)
 }

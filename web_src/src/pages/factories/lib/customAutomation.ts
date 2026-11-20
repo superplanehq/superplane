@@ -10,11 +10,12 @@ import type { PlanningReviewDraft, PlanningReviewStep } from "../pages/planningR
 
 export const CUSTOM_AUTOMATION_TEMPLATE_ID = "custom-verification";
 
-export type CustomAutomationMode = "manual" | "automatic" | "scheduled";
+export type CustomAutomationMode = "manual" | "automatic" | "scheduled" | "leave";
 const CUSTOM_AUTOMATION_START_MODES: Record<CustomAutomationMode, FactoryCustomAutomationStartMode> = {
   manual: "START_MODE_MANUAL",
   automatic: "START_MODE_AUTOMATIC",
   scheduled: "START_MODE_SCHEDULED",
+  leave: "START_MODE_ON_LEAVE",
 };
 export type CustomAutomationSchedule = { cronExpression: string; utcOffset: number };
 export type CustomAutomationColumn = "backlog" | "implement" | "verify" | "done";
@@ -75,10 +76,41 @@ export function customAutomationTriggers(automation?: FactoriesFactoryCustomAuto
 }
 
 export function customAutomationAllowsManualStart(settings?: FactoriesFactoryCustomAutomationSettings): boolean {
+  if (settings?.runsOnTask === false) {
+    return false;
+  }
   if (settings?.triggers && settings.triggers.length > 0) {
     return settings.triggers.some((trigger) => trigger.startMode === "START_MODE_MANUAL");
   }
   return customAutomationMode(settings?.startMode) === "manual";
+}
+
+export function customAutomationRunsOnTask(
+  saved: boolean | undefined,
+  triggers: Array<{ mode: CustomAutomationMode }>,
+): boolean {
+  if (saved !== undefined) {
+    return saved;
+  }
+  if (triggers.some((trigger) => trigger.mode === "automatic" || trigger.mode === "leave")) {
+    return true;
+  }
+  if (triggers.some((trigger) => trigger.mode === "scheduled")) {
+    return false;
+  }
+  return true;
+}
+
+export function customAutomationTriggersForRun(
+  triggers: CustomAutomationTrigger[],
+  runsOnTask: boolean,
+): CustomAutomationTrigger[] {
+  return triggers.filter((trigger) => {
+    if (runsOnTask) {
+      return trigger.mode !== "scheduled";
+    }
+    return trigger.mode !== "automatic" && trigger.mode !== "leave";
+  });
 }
 
 export function customAutomationSchedule(automation?: FactoriesFactoryCustomAutomation): CustomAutomationSchedule {
@@ -102,6 +134,7 @@ export const DEFAULT_CUSTOM_AUTOMATION_TIMEOUT_SECONDS = 3600;
 
 export function customAutomationMode(value: FactoryCustomAutomationStartMode | undefined): CustomAutomationMode {
   if (value === "START_MODE_SCHEDULED") return "scheduled";
+  if (value === "START_MODE_ON_LEAVE") return "leave";
   return value === "START_MODE_AUTOMATIC" ? "automatic" : "manual";
 }
 
@@ -116,6 +149,12 @@ export function customAutomationModeCopy(
     return {
       trigger: "On schedule",
       action: columnKey === "backlog" ? "Creates a task" : "Run automation on the repository default branch",
+    };
+  }
+  if (mode === "leave") {
+    return {
+      trigger: `When a task leaves ${customAutomationColumnLabel(columnKey)}`,
+      action: "Run automation automatically",
     };
   }
   if (mode === "automatic") {
@@ -135,7 +174,11 @@ export function customAutomationModeCopy(
 
 export function workspaceAgentFromOnboarding(onboarding?: {
   agentHarness?: string;
+  codexSubscription?: boolean;
 }): FactoriesFactoryCustomAutomationSettings["agent"] | undefined {
+  if (onboarding?.codexSubscription) {
+    return { component: "runnerCodex", credentialSource: "subscription" };
+  }
   switch (onboarding?.agentHarness) {
     case "AGENT_HARNESS_SUPERPLANE":
       return { component: "runnerSuperPlane" };
@@ -174,6 +217,8 @@ export function customAutomationDraft(automation?: FactoriesFactoryCustomAutomat
           ...customAutomationAgentConfiguration(agent),
           steps,
           executionTimeoutSeconds: customAutomationTimeout(settings?.executionTimeoutSeconds),
+          skipSetupCommands: settings?.skipSetupCommands === true,
+          skipRepositoryCheckout: settings?.skipRepositoryCheckout === true,
         },
         concurrency: { max: "5", key: "" },
       },
@@ -183,11 +228,12 @@ export function customAutomationDraft(automation?: FactoriesFactoryCustomAutomat
 
 function customAutomationAgentConfiguration(
   agent: FactoriesFactoryCustomAutomationSettings["agent"],
-): Record<string, string> {
+): Record<string, unknown> {
   return {
     model: agent?.model ?? "",
     credentialSource: agent?.credentialSource ?? "",
     credentialIntegrationName: agent?.credentialIntegrationName ?? "",
+    ...(agent?.credentialSource === "subscription" ? { credentials: { source: "subscription" } } : {}),
   };
 }
 
@@ -209,6 +255,8 @@ export function customAutomationSettings(
     ...(mode === "scheduled" ? { schedule } : {}),
     icon,
     executionTimeoutSeconds: customAutomationTimeout(configuration.executionTimeoutSeconds),
+    skipSetupCommands: configuration.skipSetupCommands === true,
+    skipRepositoryCheckout: configuration.skipRepositoryCheckout === true,
     agent: component?.component
       ? {
           component: component.component,
@@ -241,23 +289,28 @@ export function customAutomationSettingsForTriggers(
   triggers: CustomAutomationTrigger[],
   draft: PlanningReviewDraft,
   icon = DEFAULT_CUSTOM_AUTOMATION_ICON,
+  runsOnTask = true,
 ): FactoriesFactoryCustomAutomationSettings {
-  const current = triggers.length > 0 ? triggers : [newCustomAutomationTrigger()];
+  const active = customAutomationTriggersForRun(triggers, runsOnTask);
+  const current = active.length > 0 ? active : [newCustomAutomationTrigger()];
   const scheduled = current.filter((trigger) => trigger.mode === "scheduled");
   const primary = current.some((trigger) => trigger.mode === "automatic")
     ? "automatic"
-    : scheduled.length > 0
-      ? "scheduled"
-      : "manual";
+    : current.some((trigger) => trigger.mode === "leave")
+      ? "leave"
+      : scheduled.length > 0
+        ? "scheduled"
+        : "manual";
   const settings = customAutomationSettings(primary, draft, icon, scheduled[0]?.schedule);
-  if (current.length === 1) {
-    return customAutomationSettings(current[0]!.mode, draft, icon, current[0]!.schedule);
-  }
-  return {
-    ...settings,
-    schedule: scheduled.length === 1 ? scheduled[0]!.schedule : undefined,
-    triggers: current.map(triggerToApi),
-  };
+  const chosen =
+    current.length === 1
+      ? customAutomationSettings(current[0]!.mode, draft, icon, current[0]!.schedule)
+      : {
+          ...settings,
+          schedule: scheduled.length === 1 ? scheduled[0]!.schedule : undefined,
+          triggers: current.map(triggerToApi),
+        };
+  return { ...chosen, runsOnTask };
 }
 
 function triggerToApi(trigger: CustomAutomationTrigger): FactoryCustomAutomationStartTrigger {

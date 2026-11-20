@@ -28,6 +28,9 @@ func parseLineSteps(
 	if len(steps) == 0 {
 		return nil, invalidArgument("at least one step is required")
 	}
+	if len(steps)+3 > factoryLineStageMaxCount {
+		return nil, invalidArgument("a line cannot have more than 61 steps")
+	}
 
 	result := make([]models.FactoryLineStep, 0, len(steps))
 	for i, step := range steps {

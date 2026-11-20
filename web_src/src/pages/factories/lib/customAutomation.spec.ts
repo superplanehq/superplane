@@ -32,6 +32,9 @@ describe("custom automation settings", () => {
     expect(saved.startMode).toBe("START_MODE_SCHEDULED");
     expect(customAutomationSettings("manual", draft).steps).toEqual(saved.steps);
     expect(customAutomationSettings("automatic", draft).steps).toEqual(saved.steps);
+    expect(customAutomationSettings("leave", draft).startMode).toBe("START_MODE_ON_LEAVE");
+    expect(customAutomationMode("START_MODE_ON_LEAVE")).toBe("leave");
+    expect(customAutomationModeCopy("leave", "verify").trigger).toBe("When a task leaves Verify");
     expect(
       customAutomationSchedule({
         settings: { startMode: "START_MODE_SCHEDULED", schedule: { cronExpression: "0 9 * * *" } },
@@ -65,6 +68,8 @@ describe("custom automation settings", () => {
       startMode: "START_MODE_AUTOMATIC",
       icon: "sparkles",
       executionTimeoutSeconds: 3600,
+      skipSetupCommands: false,
+      skipRepositoryCheckout: false,
       agent: {
         component: "runnerClaudeCode",
         model: "claude-sonnet",
@@ -196,6 +201,24 @@ describe("custom automation settings", () => {
     });
 
     expect(automation?.trigger).toBe("On schedule: 0 9 * * *, When a task enters Backlog");
+    expect(automation?.canRunNow).toBe(true);
+  });
+
+  it("lets a person start a Backlog automation that runs with no task", () => {
+    const [automation] = buildColumnAutomations("backlog", {
+      columnTitle: "Backlog",
+      apps: [
+        {
+          id: "column-run",
+          name: "Column run",
+          columnKey: "backlog",
+          templateId: "custom-verification",
+          customAutomationMode: "manual",
+          customAutomationRunsOnTask: false,
+        },
+      ],
+    });
+
     expect(automation?.canRunNow).toBe(true);
   });
 

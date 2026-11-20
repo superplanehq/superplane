@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from "bun:test";
 import type { SuperplaneComponentsNode } from "@/api-client";
 import { experimentalFeaturesKeys } from "@/hooks/useExperimentalFeatures";
 import { ImplementConfiguration } from "./ImplementConfiguration";
+import { AgentRunnerSettings } from "./AgentRunnerSettings";
 import { implementConfigGraph } from "./MergeConfidenceConfigModal.spec.fixtures";
 import type { NodeConfigurationSave } from "./nodeConfigurationCanvas";
 
@@ -23,6 +24,57 @@ function renderSettings(agent: SuperplaneComponentsNode, onSave: (update: NodeCo
 }
 
 describe("ImplementConfiguration", () => {
+  it("saves skip setup with other agent settings and reopens the saved choice", async () => {
+    const onSave = vi.fn();
+    const agent = implementConfigGraph([{ name: "Implementation", type: "prompt", prompt: "Managed prompt" }])
+      .specNodes![1];
+    const view = renderSettings(agent, onSave);
+    const skipSetup = screen.getByRole("switch", { name: "Skip setup commands" });
+    expect(skipSetup).not.toBeChecked();
+    fireEvent.click(skipSetup);
+    fireEvent.change(screen.getByRole("spinbutton", { name: "Maximum run duration (minutes)" }), {
+      target: { value: "120" },
+    });
+    expect(onSave).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+    const saved = onSave.mock.calls[0]![0];
+    expect(saved.configuration).toEqual({
+      ...agent.configuration,
+      skipSetupCommands: true,
+      executionTimeoutSeconds: 7200,
+    });
+    view.unmount();
+    renderSettings({ ...agent, configuration: saved.configuration }, onSave);
+    expect(screen.getByRole("switch", { name: "Skip setup commands" })).toBeChecked();
+  });
+
+  it("saves the step agent skip setup switch immediately and can re-enable setup", async () => {
+    const onSave = vi.fn();
+    const agent = implementConfigGraph([{ name: "Implementation", type: "prompt", prompt: "Managed prompt" }])
+      .specNodes![1];
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    client.setQueryData(experimentalFeaturesKeys.registry(), { features: [] });
+    const stepSettings = (node: SuperplaneComponentsNode) => (
+      <QueryClientProvider client={client}>
+        <MemoryRouter>
+          <AgentRunnerSettings node={node} onSave={onSave} />
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+    const view = render(stepSettings(agent));
+    fireEvent.click(screen.getByRole("switch", { name: "Skip setup commands" }));
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+    const saved = onSave.mock.calls[0]![0];
+    expect(saved.configuration.skipSetupCommands).toBe(true);
+    view.unmount();
+    render(stepSettings({ ...agent, configuration: saved.configuration }));
+    expect(screen.getByRole("switch", { name: "Skip setup commands" })).toBeChecked();
+    fireEvent.click(screen.getByRole("switch", { name: "Skip setup commands" }));
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(2));
+    expect(onSave.mock.calls[1]![0].configuration.skipSetupCommands).toBe(false);
+  });
+
   it.each([false, true])("accepts refreshed instructions unless locally edited: %s", async (hasLocalEdits) => {
     const onSave = vi.fn();
     const agent = implementConfigGraph([{ name: "Implementation", type: "prompt", prompt: "Managed prompt" }])

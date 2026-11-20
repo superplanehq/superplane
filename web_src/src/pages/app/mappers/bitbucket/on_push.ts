@@ -1,6 +1,6 @@
 import { getColorClass, getBackgroundColorClass } from "@/lib/colors";
 import type React from "react";
-import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
+import type { EventInfo, TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import bitbucketIcon from "@/assets/icons/integrations/bitbucket.svg";
 import type { TriggerProps } from "@/ui/trigger";
 import type { NodeMetadata } from "./types";
@@ -149,19 +149,23 @@ export const onPushTriggerRenderer: TriggerRenderer = {
     };
 
     if (lastEvent) {
-      const eventData = lastEvent.data as BitbucketPush;
-      const firstChange = eventData?.push?.changes?.[0];
-      const shortSha = firstChange?.new?.target?.hash?.slice(0, 7) || "";
-
-      props.lastEventData = {
-        title: firstChange?.new?.target?.message?.trim() || "",
-        subtitle: buildBitbucketSubtitle(shortSha, lastEvent.createdAt),
-        receivedAt: new Date(lastEvent.createdAt!),
-        state: "triggered",
-        eventId: lastEvent.id!,
-      };
+      props.lastEventData = pushLastEventData(lastEvent);
     }
 
     return props;
   },
 };
+
+function pushLastEventData(lastEvent: NonNullable<EventInfo>): TriggerProps["lastEventData"] {
+  const eventData = lastEvent.data as BitbucketPush;
+  const firstChange = eventData?.push?.changes?.[0];
+  const shortSha = firstChange?.new?.target?.hash?.slice(0, 7) || "";
+
+  return {
+    title: firstChange?.new?.target?.message?.trim() || "",
+    subtitle: buildBitbucketSubtitle(shortSha, lastEvent.createdAt),
+    receivedAt: new Date(lastEvent.createdAt!),
+    state: "triggered",
+    eventId: lastEvent.id!,
+  };
+}
