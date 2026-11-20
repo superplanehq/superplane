@@ -186,7 +186,22 @@ function AutomationSourceDraftModal({
 
   return (
     <>
-      <AutomationDialog automationId={automationId} busy={busy} onClose={requestClose}>
+      <AutomationDialog
+        automationId={automationId}
+        busy={busy}
+        onClose={requestClose}
+        editorAction={
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={busy}
+            onClick={draft.isYamlOpen ? draft.openVisualEditor : draft.openYaml}
+          >
+            {draft.isYamlOpen ? "Open visual editor" : "Edit YAML"}
+          </Button>
+        }
+      >
         <CustomAutomationSourceEditor
           model={draft}
           stage={stage}
@@ -218,11 +233,13 @@ function AutomationDialog({
   automationId,
   busy = false,
   onClose,
+  editorAction,
   children,
 }: {
   automationId?: string;
   busy?: boolean;
   onClose: () => void;
+  editorAction?: ReactNode;
   children: ReactNode;
 }) {
   const { organizationId, factoryId } = useFactoriesLayout();
@@ -247,7 +264,10 @@ function AutomationDialog({
           className="min-h-0 flex-1"
         >
           <DialogHeader className="shrink-0 border-b border-border px-5 py-4 pr-12">
-            <DialogTitle>{editing ? "Edit automation" : "Create automation"}</DialogTitle>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <DialogTitle>{editing ? "Edit automation" : "Create automation"}</DialogTitle>
+              {tab === "automation" ? editorAction : null}
+            </div>
             {editing ? (
               <TabsList aria-label="Automation sections" className="mt-3">
                 <TabsTrigger value="automation">

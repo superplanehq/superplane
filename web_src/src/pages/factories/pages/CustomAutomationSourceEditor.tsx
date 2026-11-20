@@ -1,5 +1,4 @@
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useId } from "react";
 import type { useCustomAutomationSourceDraft } from "@/hooks/useCustomAutomationSourceDraft";
@@ -40,51 +39,10 @@ export function CustomAutomationSourceEditor({
   const { organizationId, factoryId, routeSegment } = useFactoriesLayout();
   const yamlId = useId();
   const definition = model.definition;
-  const visual = definition ? automationDefinitionCanvas(definition) : undefined;
   const form = { saving, deleting, onSave, onDelete, onClose };
-  return (
-    <Tabs value={model.tab} onValueChange={model.switchTab} activationMode="manual" className="min-h-0 flex-1">
-      <div className="shrink-0 border-b border-border px-5 py-3">
-        <TabsList aria-label="Automation editor">
-          <TabsTrigger value="canvas" disabled={saving || deleting}>
-            Canvas
-          </TabsTrigger>
-          <TabsTrigger value="yaml" disabled={saving || deleting}>
-            YAML
-          </TabsTrigger>
-        </TabsList>
-      </div>
-      <TabsContent value="canvas" className="min-h-0 flex flex-col data-[state=inactive]:hidden">
-        {model.tab === "canvas" && definition && visual ? (
-          <CustomAutomationSetupForm
-            {...form}
-            {...visual}
-            organizationId={organizationId}
-            factoryId={factoryId}
-            factoryKey={routeSegment}
-            columnKey={stage}
-            asCode
-            error={error}
-            onNameChange={(name) => model.editCanvas({ name })}
-            onIconChange={(icon) => model.editCanvas({ icon })}
-            onTriggersChange={(triggers) =>
-              model.editCanvas({ triggers: automationDefinitionTriggers(triggers, stage) })
-            }
-            onRunsOnTaskChange={(runsOnTask) => {
-              const compatible = customAutomationTriggersForRun(visual.triggers, runsOnTask);
-              model.editCanvas({
-                runs_on_task: runsOnTask,
-                triggers: automationDefinitionTriggers(
-                  compatible.length > 0 ? compatible : [newCustomAutomationTrigger()],
-                  stage,
-                ),
-              });
-            }}
-            onDraftChange={(next) => model.editCanvas(settingsEdit(visual.draft, next))}
-          />
-        ) : null}
-      </TabsContent>
-      <TabsContent value="yaml" className="min-h-0 flex flex-col data-[state=inactive]:hidden">
+  if (model.isYamlOpen || !definition) {
+    return (
+      <>
         <div className="flex min-h-0 flex-1 flex-col gap-2 p-5">
           <Label htmlFor={yamlId}>Automation YAML</Label>
           <Textarea
@@ -98,8 +56,36 @@ export function CustomAutomationSourceEditor({
           />
         </div>
         <CustomAutomationSetupFooter {...form} error={error || model.problem} />
-      </TabsContent>
-    </Tabs>
+      </>
+    );
+  }
+
+  const visual = automationDefinitionCanvas(definition);
+  return (
+    <CustomAutomationSetupForm
+      {...form}
+      {...visual}
+      organizationId={organizationId}
+      factoryId={factoryId}
+      factoryKey={routeSegment}
+      columnKey={stage}
+      asCode
+      error={error}
+      onNameChange={(name) => model.editCanvas({ name })}
+      onIconChange={(icon) => model.editCanvas({ icon })}
+      onTriggersChange={(triggers) => model.editCanvas({ triggers: automationDefinitionTriggers(triggers, stage) })}
+      onRunsOnTaskChange={(runsOnTask) => {
+        const compatible = customAutomationTriggersForRun(visual.triggers, runsOnTask);
+        model.editCanvas({
+          runs_on_task: runsOnTask,
+          triggers: automationDefinitionTriggers(
+            compatible.length > 0 ? compatible : [newCustomAutomationTrigger()],
+            stage,
+          ),
+        });
+      }}
+      onDraftChange={(next) => model.editCanvas(settingsEdit(visual.draft, next))}
+    />
   );
 }
 

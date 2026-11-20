@@ -330,13 +330,28 @@ steps:
     expect(createApp).toHaveBeenCalledTimes(1);
     expect(name).toHaveValue("Unsaved preview");
 
-    await userEvent.setup().click(screen.getByRole("tab", { name: "YAML" }));
+    await userEvent.setup().click(screen.getByRole("button", { name: "Edit YAML" }));
     fireEvent.change(screen.getByLabelText("Automation YAML"), { target: { value: savedYaml } });
     fireEvent.keyDown(screen.getByRole("button", { name: "Cancel" }), { key: "/", metaKey: true });
     expect(createApp).toHaveBeenCalledTimes(2);
   });
 
-  it("projects Canvas and YAML changes before Save and keeps the exact edited source", async () => {
+  it("opens the visual editor with an empty step list for a new automation", async () => {
+    renderModal("?customAutomation=new", undefined, "verify", true);
+    const user = userEvent.setup();
+    expect(screen.queryByLabelText("Automation YAML")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add step" })).toBeEnabled();
+    expect(screen.queryAllByRole("button", { name: "Remove step" }).length).toBe(0);
+
+    await user.click(screen.getByRole("button", { name: "Edit YAML" }));
+    const yaml = screen.getByLabelText<HTMLTextAreaElement>("Automation YAML");
+    expect(yaml.value).toMatch(/^steps: \[\]$/m);
+    fireEvent.change(yaml, { target: { value: `${yaml.value}# Draft\n` } });
+    await user.click(screen.getByRole("button", { name: "Open visual editor" }));
+    expect(screen.getByRole("button", { name: "Add step" })).toBeEnabled();
+  });
+
+  it("projects changes between the visual editor and YAML before Save and keeps the exact edited source", async () => {
     const fetch = vi
       .spyOn(globalThis, "fetch")
       .mockImplementation(async (_url, init) =>
@@ -351,19 +366,19 @@ steps:
     await user.click(screen.getByRole("button", { name: /Review.*Review the preview/ }));
     expect(screen.queryByLabelText("Working directory")).toBeNull();
 
-    await user.click(screen.getByRole("tab", { name: "YAML" }));
+    await user.click(screen.getByRole("button", { name: "Edit YAML" }));
     expect(screen.getByLabelText("Automation YAML")).toHaveValue(savedYaml);
-    await user.click(screen.getByRole("tab", { name: "Canvas" }));
+    await user.click(screen.getByRole("button", { name: "Open visual editor" }));
     fireEvent.change(screen.getByLabelText("Automation name"), { target: { value: "Board preview" } });
-    await user.click(screen.getByRole("tab", { name: "YAML" }));
+    await user.click(screen.getByRole("button", { name: "Edit YAML" }));
     const projected = (screen.getByLabelText("Automation YAML") as HTMLTextAreaElement).value;
     expect(projected).toContain("name: Board preview");
     expect(projected).toContain("model: anthropic::claude-sonnet-4-6");
     const edited = `# Unsaved comment\n${projected.replace("echo original", "echo edited")}`;
     fireEvent.change(screen.getByLabelText("Automation YAML"), { target: { value: edited } });
-    await user.click(screen.getByRole("tab", { name: "Canvas" }));
+    await user.click(screen.getByRole("button", { name: "Open visual editor" }));
     expect(screen.getByRole("button", { name: /Print marker.*echo edited/ })).toBeVisible();
-    await user.click(screen.getByRole("tab", { name: "YAML" }));
+    await user.click(screen.getByRole("button", { name: "Edit YAML" }));
     expect(screen.getByLabelText("Automation YAML")).toHaveValue(edited);
     expect(fetch).toHaveBeenCalledTimes(1);
 
@@ -379,15 +394,15 @@ steps:
     const fetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json(savedAutomation));
     const onClose = renderModal("?customAutomation=custom-1", "custom-1", "backlog", true);
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("tab", { name: "YAML" }));
+    await user.click(await screen.findByRole("button", { name: "Edit YAML" }));
     const invalid = savedYaml.replace("use: task_enters_stage", "use: pull_request_updated");
     fireEvent.change(screen.getByLabelText("Automation YAML"), { target: { value: invalid } });
-    await user.click(screen.getByRole("tab", { name: "Canvas" }));
+    await user.click(screen.getByRole("button", { name: "Open visual editor" }));
     expect(screen.getByRole("alert")).toHaveTextContent("Verify");
     expect(screen.getByLabelText("Automation YAML")).toHaveValue(invalid);
     expect(screen.queryByLabelText("Automation name")).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Automation YAML"), { target: { value: savedYaml + "# Fixed\n" } });
-    await user.click(screen.getByRole("tab", { name: "Canvas" }));
+    await user.click(screen.getByRole("button", { name: "Open visual editor" }));
     expect(screen.getByLabelText("Automation name")).toHaveValue("Preview");
     await user.click(screen.getByRole("button", { name: "Cancel" }));
     const confirmation = within(screen.getByRole("alertdialog"));
@@ -397,7 +412,7 @@ steps:
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 
-  it("saves the column run setting from Canvas in the YAML definition", async () => {
+  it("saves the column run setting from the visual editor in the YAML definition", async () => {
     const fetch = vi.spyOn(globalThis, "fetch").mockImplementation(async () => Response.json(savedAutomation));
     const onClose = renderModal("?customAutomation=custom-1", "custom-1", "backlog", true);
     const user = userEvent.setup();
@@ -431,7 +446,7 @@ steps:
       );
     const onClose = renderModal("?customAutomation=custom-1", "custom-1", "backlog", true);
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("tab", { name: "YAML" }));
+    await user.click(await screen.findByRole("button", { name: "Edit YAML" }));
     const draft = savedYaml.replace(
       "    bash: echo original\n",
       "    bash: echo original\n    secrets: [missing-secret]\n",
@@ -450,8 +465,9 @@ steps:
     vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json(savedAutomation));
     const onClose = renderModal("?customAutomation=custom-1", "custom-1", "backlog", true);
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("tab", { name: "YAML" }));
+    await user.click(await screen.findByRole("button", { name: "Edit YAML" }));
     await user.click(screen.getByRole("tab", { name: "Runs" }));
+    expect(screen.queryByRole("button", { name: "Open visual editor" })).not.toBeInTheDocument();
     await user.click(screen.getByRole("tab", { name: "Configuration" }));
     expect(screen.getByLabelText("Automation YAML")).toHaveValue(savedYaml);
     await user.click(screen.getByRole("button", { name: "Cancel" }));

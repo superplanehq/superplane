@@ -10,7 +10,7 @@ import {
 export function useCustomAutomationSourceDraft(initial: string, stage: CustomAutomationColumn) {
   const [initialSource] = useState(initial);
   const [source, setSource] = useState(initialSource);
-  const [tab, setTab] = useState<"canvas" | "yaml">("canvas");
+  const [isYamlOpen, setYamlOpen] = useState(false);
   const [problem, setProblem] = useState("");
   const [initialCanvas] = useState(() => projectSource(initialSource, stage));
   const [definition, setDefinition] = useState(initialCanvas.definition);
@@ -27,11 +27,7 @@ export function useCustomAutomationSourceDraft(initial: string, stage: CustomAut
     setDefinition(next);
     setSource(yaml);
   };
-  const switchTab = (next: string) => {
-    if (next === "yaml") {
-      setTab("yaml");
-      return;
-    }
+  const openVisualEditor = () => {
     if (!definition) {
       const projected = projectSource(source, stage);
       if (!projected.definition) {
@@ -41,17 +37,18 @@ export function useCustomAutomationSourceDraft(initial: string, stage: CustomAut
       setDefinition(projected.definition);
     }
     setProblem("");
-    setTab("canvas");
+    setYamlOpen(false);
   };
   return {
-    tab: definition ? tab : ("yaml" as const),
+    isYamlOpen: isYamlOpen || !definition,
     source,
     definition,
     dirty: source !== initialSource,
     problem: problem || (source === initialSource ? initialCanvas.problem : ""),
     editYaml,
     editCanvas,
-    switchTab,
+    openYaml: () => setYamlOpen(true),
+    openVisualEditor,
   };
 }
 
@@ -61,7 +58,7 @@ function projectSource(source: string, stage: CustomAutomationColumn) {
   } catch (error) {
     return {
       definition: undefined,
-      problem: getApiErrorMessage(error, "SuperPlane could not show this YAML on Canvas."),
+      problem: getApiErrorMessage(error, "SuperPlane could not open this YAML in the visual editor."),
     };
   }
 }

@@ -40,7 +40,7 @@ export function newAutomationDefinition(stage: CustomAutomationColumn): Automati
     kind: "Automation",
     name: "Custom automation",
     triggers: [{ use: stage === "verify" ? "manual" : "task_enters_stage" }],
-    steps: [{ name: "Hello world", bash: 'echo "hello world"' }],
+    steps: [],
   };
 }
 
@@ -108,6 +108,8 @@ export function parseAutomationForCanvas(source: string, stage: CustomAutomation
   ) {
     problem("runs_on_task", "This trigger runs on a task.");
   }
+  const steps = document.steps;
+  if (!Array.isArray(steps)) problem("steps", "Enter a list of steps.");
   return {
     apiVersion: "v2",
     kind: "Automation",
@@ -117,7 +119,7 @@ export function parseAutomationForCanvas(source: string, stage: CustomAutomation
     runs_on_task: runsOnTask,
     agent: document.agent === undefined ? undefined : parseAgent(document.agent),
     triggers,
-    steps: nonemptyList(document.steps, "steps").map(parseStep),
+    steps: steps.map(parseStep),
   };
 }
 
@@ -224,7 +226,7 @@ function optionalText(value: unknown, path: string): string | undefined {
 
 function singleLine(value: unknown, path: string): string {
   const string = text(value, path);
-  if (/[\r\n]/.test(string)) problem(path, "Enter a single line for the Canvas view.");
+  if (/[\r\n]/.test(string)) problem(path, "Enter a single line to use the visual editor.");
   return string;
 }
 
