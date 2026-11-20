@@ -197,6 +197,9 @@ func Test__NodeRequestExecutor_CustomScheduleLifecycle(t *testing.T) {
 	require.NoError(t, err)
 	current := requestForLiveTrigger()
 	assert.NotEqual(t, old.NodeID, current.NodeID)
+	var retired models.CanvasNodeRequest
+	require.NoError(t, db.First(&retired, "id = ?", old.ID).Error)
+	assert.Equal(t, models.NodeExecutionRequestStateCompleted, retired.State)
 	require.NoError(t, executor.RunNow(old))
 	count, err := models.CountCanvasEvents(db, canvasID, old.NodeID)
 	require.NoError(t, err)
@@ -205,6 +208,9 @@ func Test__NodeRequestExecutor_CustomScheduleLifecycle(t *testing.T) {
 	settings.StartMode, settings.Schedule = factorypb.FactoryCustomAutomation_START_MODE_MANUAL, nil
 	_, err = factoryactions.UpdateFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &factorypb.UpdateFactoryCustomAutomationRequest{FactoryId: factory.ID.String(), AutomationId: canvasID.String(), Name: "Scheduled tests", Settings: settings})
 	require.NoError(t, err)
+	retired = models.CanvasNodeRequest{}
+	require.NoError(t, db.First(&retired, "id = ?", current.ID).Error)
+	assert.Equal(t, models.NodeExecutionRequestStateCompleted, retired.State)
 	require.NoError(t, executor.RunNow(current))
 	count, err = models.CountCanvasEvents(db, canvasID, current.NodeID)
 	require.NoError(t, err)
