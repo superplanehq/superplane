@@ -220,5 +220,9 @@ func validateHandOffOverrides(tx *gorm.DB, f *models.Factory, o *models.FactoryW
 	if err != nil {
 		return invalidArgument(err.Error())
 	}
-	return validateLineThinkingLevel(tx, line, normalized)
+	steps, err := line.ExecutionPlan(tx)
+	if err != nil {
+		return err
+	}
+	return validateLineThinkingLevel(tx, steps, normalized)
 }

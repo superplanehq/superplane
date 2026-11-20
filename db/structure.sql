@@ -599,7 +599,8 @@ CREATE TABLE public.factory_lines (
     steps jsonb DEFAULT '[]'::jsonb NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    column_colors jsonb DEFAULT '{}'::jsonb NOT NULL
+    column_colors jsonb DEFAULT '{}'::jsonb NOT NULL,
+    stages jsonb DEFAULT '[]'::jsonb NOT NULL
 );
 
 
@@ -975,7 +976,8 @@ CREATE TABLE public.factory_work_order_line_dispatches (
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     finished_at timestamp with time zone,
     model text DEFAULT ''::text NOT NULL,
-    thinking_level text DEFAULT ''::text NOT NULL
+    thinking_level text DEFAULT ''::text NOT NULL,
+    stages jsonb DEFAULT '[]'::jsonb NOT NULL
 );
 
 
@@ -992,7 +994,8 @@ CREATE TABLE public.factory_work_order_queue_items (
     line_dispatch_id uuid NOT NULL,
     step_index integer NOT NULL,
     step_name text NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    app_id uuid NOT NULL
 );
 
 
@@ -4359,6 +4362,13 @@ CREATE INDEX idx_factory_work_order_line_dispatches_work_order ON public.factory
 
 
 --
+-- Name: idx_factory_work_order_queue_items_app; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_work_order_queue_items_app ON public.factory_work_order_queue_items USING btree (line_id, app_id, created_at);
+
+
+--
 -- Name: idx_factory_work_order_queue_items_factory; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4370,13 +4380,6 @@ CREATE INDEX idx_factory_work_order_queue_items_factory ON public.factory_work_o
 --
 
 CREATE INDEX idx_factory_work_order_queue_items_order ON public.factory_work_order_queue_items USING btree (work_order_id);
-
-
---
--- Name: idx_factory_work_order_queue_items_step; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_factory_work_order_queue_items_step ON public.factory_work_order_queue_items USING btree (line_id, step_index, created_at);
 
 
 --
@@ -6723,7 +6726,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261113000615	f
+20261120035457	f
 \.
 
 
