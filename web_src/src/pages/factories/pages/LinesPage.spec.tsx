@@ -116,6 +116,7 @@ function renderLinesBoard(
 const createFactoryLineMutateAsync = vi.fn();
 const updateFactoryLineMutateAsync = vi.fn();
 const updateLineIsPending = vi.hoisted(() => ({ value: false }));
+const permissions = vi.hoisted(() => ({ canUpdateFactories: true }));
 const idleBoardPage = () => ({ hasNextPage: false, isFetchingNextPage: false, fetchNextPage: vi.fn() });
 const useFactoryWorkOrders = vi.fn(() => ({ data: [] as FactoriesWorkOrderSummary[] }));
 const useFactoryBoardWorkOrders = vi.fn((_organizationId?: string, _factoryId?: string, _options?: unknown) => ({
@@ -257,7 +258,12 @@ vi.mock("@/pages/home/useInstallFactory", () => ({
 }));
 
 vi.mock("@/contexts/usePermissions", () => ({
-  usePermissions: () => ({ canAct: () => true, currentUserId: "storybook-user", isLoading: false }),
+  usePermissions: () => ({
+    canAct: (resource: string, action: string) =>
+      resource === "factories" && action === "update" ? permissions.canUpdateFactories : true,
+    currentUserId: "storybook-user",
+    isLoading: false,
+  }),
 }));
 
 vi.mock("@/hooks/usePageTitle", () => ({
@@ -345,6 +351,7 @@ async function resetLinesBoardMocks() {
   resetFactoryBoardLaneScrollPositions();
   updateFactoryLineMutateAsync.mockReset();
   updateLineIsPending.value = false;
+  permissions.canUpdateFactories = true;
   useFactoryWorkOrders.mockReturnValue({ data: [] });
   useFactoryBoardWorkOrders.mockImplementation(() => ({
     workOrders: useFactoryWorkOrders().data ?? [],
@@ -894,6 +901,20 @@ describe("LinesPage board", () => {
 
     expect(await screen.findByRole("heading", { name: "Add an automation for Deploy to prod" })).toBeInTheDocument();
     expect(screen.getByTestId("add-column-automation-template-custom")).toBeInTheDocument();
+  });
+
+  it("hides stage mutations without factory update permission", async () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_STAGES);
+    permissions.canUpdateFactories = false;
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    expect(screen.queryByTestId("lines-stage-reorder-phase-0")).not.toBeInTheDocument();
+    await user.click(screen.getByTestId("lines-board-view-menu"));
+    expect(screen.queryByRole("menuitem", { name: "Add stage" })).not.toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    await user.click(screen.getByTestId("lines-phase-menu-0"));
+    expect(screen.queryByTestId("lines-phase-menu-0-delete-stage")).not.toBeInTheDocument();
   });
 
   it("uses a persisted stage name after the line refreshes", async () => {
