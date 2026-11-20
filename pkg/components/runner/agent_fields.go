@@ -283,9 +283,13 @@ func AgentEnvironmentField(reservedEnv string) configuration.Field {
 	}
 }
 
-// SkipSetupCommandsField tells a factory task to check out the repository
-// and leave workspace setup commands unrun.
+// SkipSetupCommandsField tells a factory task to leave workspace setup
+// commands unrun. The repository checkout still runs.
 const SkipSetupCommandsField = "skipSetupCommands"
+
+// SkipRepositoryCheckoutField tells a factory task not to check out the
+// repository. Setup commands still run when they are enabled.
+const SkipRepositoryCheckoutField = "skipRepositoryCheckout"
 
 func AgentSkipSetupCommandsField() configuration.Field {
 	return configuration.Field{
@@ -294,8 +298,28 @@ func AgentSkipSetupCommandsField() configuration.Field {
 		Type:        configuration.FieldTypeBool,
 		Required:    false,
 		Default:     false,
-		Description: "Check out the repository. Do not run workspace setup commands.",
+		Description: "Do not run workspace setup commands.",
 	}
+}
+
+func AgentSkipRepositoryCheckoutField() configuration.Field {
+	return configuration.Field{
+		Name:        SkipRepositoryCheckoutField,
+		Label:       "Skip repository checkout",
+		Type:        configuration.FieldTypeBool,
+		Required:    false,
+		Default:     false,
+		Description: "Do not check out the repository.",
+	}
+}
+
+func SkipRepositoryCheckout(configuration any) bool {
+	config, ok := configuration.(map[string]any)
+	if !ok {
+		return false
+	}
+	enabled, ok := config[SkipRepositoryCheckoutField].(bool)
+	return ok && enabled
 }
 
 func AgentTimeoutField() configuration.Field {

@@ -281,6 +281,14 @@ func executionNode(node models.Node) models.Node {
 	node.ErrorMessage = nil
 	node.WarningMessage = nil
 
+	// An explicit false uses the same runner behavior as an omitted option.
+	node.Configuration = maps.Clone(node.Configuration)
+	for _, field := range []string{runner.SkipSetupCommandsField, runner.SkipRepositoryCheckoutField} {
+		if node.Configuration[field] == false {
+			delete(node.Configuration, field)
+		}
+	}
+
 	node.Metadata = maps.Clone(node.Metadata)
 	if node.Type == models.NodeTypeTrigger {
 		delete(node.Metadata, "appSubscriptionID")

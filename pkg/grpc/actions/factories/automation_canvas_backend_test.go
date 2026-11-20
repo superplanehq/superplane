@@ -281,6 +281,9 @@ func TestCanvasAutomationLegacyImportProtectsGraphBehavior(t *testing.T) {
 
 			require.NoError(t, models.DisableExperimentalFeature(r.Organization.ID, features.FeatureAutomationsAsCode))
 			settings := created.GetCustomAutomation().GetSettings()
+			skipWorkspaceSetup := false
+			settings.SkipSetupCommands = &skipWorkspaceSetup
+			settings.SkipRepositoryCheckout = &skipWorkspaceSetup
 			settings.Steps[0].Prompt = "Inspect the new task.\n"
 			_, err = UpdateFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &pb.UpdateFactoryCustomAutomationRequest{
 				FactoryId: factory.ID.String(), AutomationId: id.String(), Name: "Inspect latest task", Settings: settings,

@@ -701,7 +701,7 @@ func TestWorkspaceCheckoutScriptLeavesSetupCommandsForALaterStep(t *testing.T) {
 		Path:    runner.WorkspaceSetupConfigPath,
 		Content: "{\"commands\":[\"touch from-setup\"]}\n",
 	}}
-	commands := runner.InsertFactoryCheckoutCommand(nil, nil, files)
+	commands := runner.InsertFactoryCheckoutCommand(nil, nil, files, false)
 	require.Len(t, commands, 2)
 	assert.Equal(t, "Setup", commands[1].Name)
 	assert.Equal(t, "touch from-setup", commands[1].Preview)
@@ -723,7 +723,7 @@ func TestFactorySetupCommandStopsAfterAFailure(t *testing.T) {
 		Path:    runner.WorkspaceSetupConfigPath,
 		Content: "{\"commands\":[\"exit 1\",\"touch should-not-exist\"]}\n",
 	}}
-	commands := runner.InsertFactoryCheckoutCommand(nil, nil, files)
+	commands := runner.InsertFactoryCheckoutCommand(nil, nil, files, false)
 	require.Len(t, commands, 2)
 	cmd := exec.Command("bash", "--noprofile", "--norc", "-c", commands[1].Command)
 	cmd.Env = []string{
@@ -751,7 +751,7 @@ func TestInsertFactoryCheckoutCommandBeforeCanvasSteps(t *testing.T) {
 		Path:    runner.WorkspaceSetupConfigPath,
 		Content: "{\"commands\":[\"npm ci\",\"echo ready\"]}\n",
 	}}
-	out := runner.InsertFactoryCheckoutCommand(commands, steps, files)
+	out := runner.InsertFactoryCheckoutCommand(commands, steps, files, false)
 	require.Len(t, out, 4)
 	assert.Equal(t, "Auth", out[0].Name)
 	assert.Equal(t, "Checkout", out[1].Name)
@@ -778,7 +778,7 @@ func TestInsertFactoryCheckoutCommandSkipsExistingClone(t *testing.T) {
 		Content: "{\"commands\":[\"npm ci\"]}\n",
 	}}
 	for _, step := range cases {
-		out := runner.InsertFactoryCheckoutCommand(commands, []runner.AgentStep{step}, files)
+		out := runner.InsertFactoryCheckoutCommand(commands, []runner.AgentStep{step}, files, false)
 		assert.Equal(t, commands, out, step.Name)
 	}
 }
@@ -791,7 +791,7 @@ func TestApplyFactoryCheckoutKeepsInstructionsForSavedClone(t *testing.T) {
 		Command: commandPtr("git clone https://example.com/repo.git repo"),
 	}}
 	commands := []runner.TaskCommand{{Name: "Prompt", Kind: runner.LiveLogKindPrompt, Command: "do work"}}
-	out := runner.ApplyFactoryCheckout(files, commands, steps)
+	out := runner.ApplyFactoryCheckout(files, commands, steps, false)
 	assert.Equal(t, commands, out)
 	assert.Contains(t, files[0].Content, "run `checkout`")
 	assert.NotContains(t, files[0].Content, "already ran")
@@ -800,7 +800,7 @@ func TestApplyFactoryCheckoutKeepsInstructionsForSavedClone(t *testing.T) {
 func TestApplyFactoryCheckoutMarksInstructionsDone(t *testing.T) {
 	files := checkoutHintFiles()
 	commands := []runner.TaskCommand{{Name: "Prompt", Kind: runner.LiveLogKindPrompt, Command: "do work"}}
-	out := runner.ApplyFactoryCheckout(files, commands, nil)
+	out := runner.ApplyFactoryCheckout(files, commands, nil, false)
 	require.Len(t, out, 2)
 	assert.Equal(t, "Checkout", out[0].Name)
 	assert.Contains(t, files[0].Content, "Setup commands already ran in repo/ after checkout, in order: npm ci")
@@ -820,15 +820,31 @@ func checkoutHintFiles() []runner.TaskFile {
 	}
 }
 
+func TestApplyFactoryCheckoutSkipsRepositoryCheckout(t *testing.T) {
+	files := checkoutHintFiles()
+	files = append(files, runner.TaskFile{
+		Path:    runner.WorkspaceSetupConfigPath,
+		Content: "{\"commands\":[\"npm ci\"]}\n",
+	})
+	commands := []runner.TaskCommand{{Name: "Prompt", Kind: runner.LiveLogKindPrompt, Command: "do work"}}
+	out := runner.ApplyFactoryCheckout(files, commands, nil, true)
+	require.Len(t, out, 2)
+	assert.Equal(t, "Setup", out[0].Name)
+	assert.Equal(t, "Prompt", out[1].Name)
+	assert.Contains(t, files[0].Content, "run `checkout`")
+	assert.NotContains(t, files[0].Content, "already ran")
+}
+
 func TestApplyFactoryCheckoutRequiresHelperFile(t *testing.T) {
 	commands := []runner.TaskCommand{{Name: "Prompt", Kind: runner.LiveLogKindPrompt, Command: "do work"}}
-	out := runner.ApplyFactoryCheckout(nil, commands, nil)
+	out := runner.ApplyFactoryCheckout(nil, commands, nil, false)
 	assert.Equal(t, commands, out)
 
 	out = runner.ApplyFactoryCheckout(
 		[]runner.TaskFile{{Path: runner.WorkspaceCheckoutScriptPath}},
 		commands,
 		nil,
+		false,
 	)
 	require.Len(t, out, 2)
 	assert.Equal(t, "Checkout", out[0].Name)

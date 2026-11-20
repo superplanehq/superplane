@@ -1,6 +1,7 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { useByokRunnerModelDefault } from "@/hooks/useByokRunnerModelDefault";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useFactoryAgentResources } from "@/hooks/useFactoryAgentResources";
@@ -38,6 +39,7 @@ export function PlanningReviewForm({
   showResources = true,
   showConcurrency = true,
   showSteps = true,
+  showWorkspaceOptions = true,
   modelLabel,
   modelDescription,
   modelOnly = false,
@@ -60,6 +62,7 @@ export function PlanningReviewForm({
   showResources?: boolean;
   showConcurrency?: boolean;
   showSteps?: boolean;
+  showWorkspaceOptions?: boolean;
   modelLabel?: string;
   modelDescription?: string;
   modelOnly?: boolean;
@@ -96,6 +99,7 @@ export function PlanningReviewForm({
           showResources={showResources}
           showConcurrency={showConcurrency}
           showSteps={showSteps}
+          showWorkspaceOptions={showWorkspaceOptions}
           modelLabel={modelLabel}
           modelDescription={modelDescription}
           modelOnly={modelOnly}
@@ -124,6 +128,7 @@ function AgentPanel({
   showResources,
   showConcurrency,
   showSteps,
+  showWorkspaceOptions,
   modelLabel,
   modelDescription,
   modelOnly,
@@ -146,6 +151,7 @@ function AgentPanel({
   showResources: boolean;
   showConcurrency: boolean;
   showSteps: boolean;
+  showWorkspaceOptions: boolean;
   modelLabel?: string;
   modelDescription?: string;
   modelOnly: boolean;
@@ -321,6 +327,36 @@ function AgentPanel({
           <div className={appearance === "fields" ? "flex flex-col gap-2" : undefined}>
             {appearance === "fields" ? <h3 className="workspace-section-title">Model</h3> : null}
             {modelControl}
+          </div>
+        ) : null}
+        {showWorkspaceOptions ? (
+          <div className={appearance === "card" ? "col-span-2 flex flex-col gap-4" : "flex flex-col gap-8"}>
+            <ImplementSettingRow
+              label="Skip repository checkout"
+              description="Do not check out the repository."
+              htmlFor={`skip-repository-checkout-${component.id}`}
+            >
+              <Switch
+                id={`skip-repository-checkout-${component.id}`}
+                aria-describedby={`skip-repository-checkout-${component.id}-help`}
+                checked={component.configuration.skipRepositoryCheckout === true}
+                disabled={disabled}
+                onCheckedChange={(checked) => setConfigurationField("skipRepositoryCheckout", checked)}
+              />
+            </ImplementSettingRow>
+            <ImplementSettingRow
+              label="Skip setup commands"
+              description="Do not run workspace setup commands."
+              htmlFor={`skip-setup-commands-${component.id}`}
+            >
+              <Switch
+                id={`skip-setup-commands-${component.id}`}
+                aria-describedby={`skip-setup-commands-${component.id}-help`}
+                checked={component.configuration.skipSetupCommands === true}
+                disabled={disabled}
+                onCheckedChange={(checked) => setConfigurationField("skipSetupCommands", checked)}
+              />
+            </ImplementSettingRow>
           </div>
         ) : null}
       </section>

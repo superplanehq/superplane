@@ -70,6 +70,8 @@ describe("custom automation settings", () => {
       startMode: "START_MODE_AUTOMATIC",
       icon: "sparkles",
       executionTimeoutSeconds: 3600,
+      skipSetupCommands: false,
+      skipRepositoryCheckout: false,
       agent: {
         component: "runnerClaudeCode",
         model: "claude-sonnet",
