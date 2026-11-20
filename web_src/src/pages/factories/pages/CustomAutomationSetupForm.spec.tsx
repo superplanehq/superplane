@@ -28,7 +28,7 @@ vi.mock("@/hooks/useByokRunnerModelDefault", () => ({ useByokRunnerModelDefault:
 vi.mock("@/hooks/useExperimentalFeature", () => ({ useExperimentalFeature: () => ({ has: () => false }) }));
 vi.mock("@/hooks/useFactoryAgentResources", () => ({ useFactoryAgentResources: () => ({}) }));
 
-function Editor({ columnKey }: { columnKey?: "backlog" | "verify" }) {
+function Editor({ columnKey, asCode }: { columnKey?: "backlog" | "verify"; asCode?: boolean }) {
   const model = useCustomAutomationSetupPage({
     organizationId: "org",
     factoryId: "factory",
@@ -37,6 +37,7 @@ function Editor({ columnKey }: { columnKey?: "backlog" | "verify" }) {
   });
   return (
     <CustomAutomationSetupForm
+      asCode={asCode}
       name={model.name}
       icon={model.icon}
       triggers={model.triggers}
@@ -52,13 +53,19 @@ function Editor({ columnKey }: { columnKey?: "backlog" | "verify" }) {
       onNameChange={model.setName}
       onIconChange={model.setIcon}
       onTriggersChange={model.setTriggers}
-      onRunsOnTaskChange={model.setRunsOnTask}
+      onRunsOnTaskChange={(runsOnTask) => model.setRunsOnTask(runsOnTask ?? true)}
       onDraftChange={model.setDraft}
       onSave={() => void model.save()}
       onClose={() => {}}
     />
   );
 }
+
+it("omits workspace setup options that YAML cannot save", () => {
+  render(<Editor asCode />);
+  expect(screen.queryByRole("switch", { name: "Skip setup commands" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("switch", { name: "Skip repository checkout" })).not.toBeInTheDocument();
+});
 
 it("selects Schedule, recovers from a save error, and reopens the saved schedule without changing steps", async () => {
   const user = userEvent.setup();
