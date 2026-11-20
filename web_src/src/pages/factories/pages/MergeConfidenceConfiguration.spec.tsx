@@ -5,7 +5,6 @@ import { beforeEach, describe, expect, it, vi } from "bun:test";
 import { experimentalFeaturesKeys } from "@/hooks/useExperimentalFeatures";
 import type { SuperplaneComponentsNode } from "@/api-client";
 import { MergeConfidenceConfiguration } from "./MergeConfidenceConfiguration";
-import { MERGE_CONFIDENCE_CHECKS } from "./mergeConfidenceChecks";
 import type { PlanningReviewStep } from "./planningReviewMockup";
 import type { NodeConfigurationUpdate } from "./nodeConfigurationCanvas";
 
@@ -31,7 +30,7 @@ vi.mock("@/hooks/useComponentData", () => ({
     isLoading: false,
   }),
 }));
-const steps: PlanningReviewStep[] = MERGE_CONFIDENCE_CHECKS.map((id) => ({
+const steps: PlanningReviewStep[] = ["risk", "performance", "security", "correctness", "reversibility"].map((id) => ({
   name: id,
   type: "prompt",
   prompt: `Merge check: ${id}.\nSaved ${id} rules.`,
@@ -364,6 +363,7 @@ describe("Merge confidence configuration", () => {
     });
     const onSave = vi.fn().mockReturnValueOnce(pending).mockResolvedValue(undefined);
     const { onClose } = renderSettings(stored, onSave);
+    expect(screen.getByRole("switch", { name: "Correctness" })).toBeChecked();
     fireEvent.change(screen.getByDisplayValue("sonnet"), { target: { value: "opus" } });
     const concurrency = screen.getByRole("spinbutton", { name: "Maximum simultaneous runs" });
     fireEvent.change(concurrency, { target: { value: "3" } });
@@ -455,15 +455,15 @@ describe("Merge confidence configuration", () => {
     expect(onClose).toHaveBeenCalled();
   });
 
-  it("loads and inserts a newly enabled default in canonical order", async () => {
-    const security: PlanningReviewStep = {
-      name: "Default Security",
+  it("loads and inserts the newly enabled Correctness default in canonical order", async () => {
+    const correctness: PlanningReviewStep = {
+      name: "Default Correctness",
       type: "prompt",
-      prompt: "Merge check: security.\nBundled rules.",
+      prompt: "Merge check: correctness.\nBundled rules.",
     };
-    loadDefaults.mockResolvedValue([security]);
-    const { onSave } = renderSettings(steps.filter((step) => step.name !== "security"));
-    fireEvent.click(screen.getByRole("switch", { name: "Security" }));
+    loadDefaults.mockResolvedValue([correctness]);
+    const { onSave } = renderSettings(steps.filter((step) => step.name !== "correctness"));
+    fireEvent.click(screen.getByRole("switch", { name: "Correctness" }));
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
     expect(loadDefaults).toHaveBeenCalledWith({
@@ -474,7 +474,7 @@ describe("Merge confidence configuration", () => {
     });
     expect(onSave).toHaveBeenCalledWith(
       expect.objectContaining({
-        configuration: expect.objectContaining({ steps: [steps[0], steps[1], security, steps[3], steps[4]] }),
+        configuration: expect.objectContaining({ steps: [steps[0], steps[1], steps[2], correctness, steps[4]] }),
       }),
     );
   });
