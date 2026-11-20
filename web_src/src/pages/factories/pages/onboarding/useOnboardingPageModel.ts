@@ -394,7 +394,7 @@ export function useOnboardingPageModel(args: {
   const [subscriptionDialogOpen, setSubscriptionDialogOpen] = useState(false);
   const integrations = useOnboardingIntegrationSelections(args.organizationId, onboarding);
   const { connectedIntegrations, existingIntegrationNames } = useTrimmedIntegrationNames(args.organizationId);
-  const { agent, selectModel, onSelectionsChange } = useOnboardingAgentPageState({
+  const { agent, subscriptionReady, selectModel, onSelectionsChange } = useOnboardingAgentPageState({
     organizationId: args.organizationId,
     factoryId: args.factoryId,
     connected: integrations.connected,
@@ -470,12 +470,13 @@ export function useOnboardingPageModel(args: {
     customProvider,
     subscription: {
       offered: bringYourOwnKey.noHostedDefault,
-      ready: agent.plan?.credentialsSource === "subscription",
+      ready: subscriptionReady,
       connect: () => setSubscriptionDialogOpen(true),
     },
     agentCredentialChoice,
     setAgentCredentialChoice,
     agentLoading: agent.hostedModelsLoading,
+    agentProviderId: agent.plan?.providerId,
     agentModelPicker: agent.modelPicker ? { ...agent.modelPicker, onChange: selectModel } : undefined,
     openSection,
     setOpenSection,

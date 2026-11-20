@@ -55,34 +55,59 @@ it("finishes with a provider key and model without a hosted default or BYOK flag
   fixture.intakesByFactoryId = { [PRIMARY_FACTORY_ID]: [] };
   fixture.organizationBilling = { billingEnabled: false, productFeatures: { byo_key: false } };
   fixture.byokConnectedProviders = ["anthropic"];
-  localStorage.setItem(`superplane:onboarding-model-source:${PRIMARY_FACTORY_ID}`, "subscription");
+  fixture.codexConnection = { eligible: true, status: "ready", availableModels: ["subscription-model"] };
+  localStorage.setItem(`superplane:onboarding-model-source:${PRIMARY_FACTORY_ID}`, "own-key");
   fixture.factories = fixture.factories.map((factory) =>
     factory.id === PRIMARY_FACTORY_ID
       ? { ...factory, onboarding: { ...factory.onboarding, codexSubscription: true } }
       : factory,
   );
   fixture.byokCandidatesByProvider = { anthropic: ["claude-sonnet-4-6", "claude-opus-5-5"] };
-  render(
-    <FactoriesHarness
-      mode="app"
-      billingEnabled={false}
-      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/setup?step=issues`}
-      factoriesFixture={fixture}
-      orgIntegrations={CONNECTED_SETUP_INTEGRATIONS}
-      pageOverrides={{ onboarding: OnboardingPage }}
-    />,
-  );
+  const mount = (step: string) =>
+    render(
+      <FactoriesHarness
+        mode="app"
+        billingEnabled={false}
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/setup?step=${step}`}
+        factoriesFixture={fixture}
+        orgIntegrations={CONNECTED_SETUP_INTEGRATIONS}
+        pageOverrides={{ onboarding: OnboardingPage }}
+      />,
+    );
+  const first = mount("issues");
 
   await user.click(await screen.findByTestId("first-run-analyze-tickets", {}, { timeout: 8000 }));
+  const subscription = await screen.findByRole("button", { name: /Codex subscription/ });
+  await waitFor(() => expect(screen.queryByRole("button", { name: "Connect Codex" })).not.toBeInTheDocument());
+  expect(subscription).toHaveAttribute("aria-pressed", "false");
+  await user.click(subscription);
+  expect(subscription).toHaveAttribute("aria-pressed", "true");
   expect(await screen.findByRole("button", { name: "Connect Anthropic" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Connect OpenAI" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Connect OpenRouter" })).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Connect Custom provider" })).not.toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "Connect Anthropic" }));
   await waitFor(() => expect(screen.getByRole("combobox", { name: "Model" })).toBeEnabled());
+  expect(screen.queryByRole("button", { name: "Connect Codex" })).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /^Anthropic/ })).toHaveAttribute("aria-pressed", "true");
+  expect(subscription).toHaveAttribute("aria-pressed", "false");
+  await user.click(subscription);
+  expect(subscription).toHaveAttribute("aria-pressed", "true");
+  expect(screen.getByRole("button", { name: /^Anthropic/ })).toHaveAttribute("aria-pressed", "false");
+  expect(screen.queryByRole("combobox", { name: "Model" })).not.toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: /^Anthropic/ }));
+  await waitFor(() => expect(screen.getByRole("combobox", { name: "Model" })).toBeEnabled());
   expect(screen.getByRole("combobox", { name: "Model" })).not.toHaveTextContent("claude-opus-5-5");
   await user.click(screen.getByRole("combobox", { name: "Model" }));
   await user.click(screen.getByRole("option", { name: "claude-opus-5-5" }));
+  first.unmount();
+  mount("agent");
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: /^Anthropic/ })).toHaveAttribute("aria-pressed", "true"),
+  );
+  expect(screen.queryByRole("button", { name: "Connect Anthropic" })).not.toBeInTheDocument();
+  await waitFor(() => expect(screen.getByRole("combobox", { name: "Model" })).toBeEnabled());
+  expect(screen.getByRole("combobox", { name: "Model" })).toHaveTextContent("claude-opus-5-5");
   await user.click(screen.getByTestId("first-run-finish-setup"));
 
   await waitFor(async () => {

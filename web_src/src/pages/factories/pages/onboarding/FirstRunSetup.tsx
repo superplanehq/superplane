@@ -327,6 +327,7 @@ function AgentScreenHost({
       }}
       onRequestConnect={model.requestConnect}
       modelPicker={model.agentModelPicker}
+      selectedProvider={model.agentProviderId}
       onContinue={() => {
         if (model.bringYourOwnKey && model.hostedModelsAvailable && !flow.credentialChoice)
           flow.selectCredentialChoice("hosted");

@@ -5,7 +5,7 @@ import type { IntegrationSelections } from "@/pages/home/homeIntegrationStatus";
 
 import { codexSubscriptionReady, useFactoryCodexConnection } from "./useFactoryCodexConnection";
 import { useOnboardingAgentModel } from "./onboardingAgentModel";
-import type { OnboardingAgentCredentialChoice } from "./onboardingAgentReadiness";
+import { AGENT_PROVIDER_IDS, type OnboardingAgentCredentialChoice } from "./onboardingAgentReadiness";
 import type { IntegrationId } from "./onboardingFixtures";
 import { restoreSavedAgentSelection } from "./onboardingStatus";
 import { useOnboardingAgentContext } from "./useOnboardingAgentPlan";
@@ -25,10 +25,11 @@ export function useOnboardingAgentPageState(args: {
   agentIntegrationId: string | undefined;
 }) {
   const subscriptionSelected = args.subscriptionOffered && args.agentCredentialChoice === "subscription";
-  const codex = useFactoryCodexConnection(args.organizationId, args.factoryId, subscriptionSelected);
+  const codex = useFactoryCodexConnection(args.organizationId, args.factoryId, args.subscriptionOffered);
+  const subscriptionReady = onboardingSubscriptionReady(codex.query);
   const subscription = subscriptionSelected
     ? {
-        ready: onboardingSubscriptionReady(codex.query),
+        ready: subscriptionReady,
         loading: codex.query.isPending,
       }
     : undefined;
@@ -39,35 +40,45 @@ export function useOnboardingAgentPageState(args: {
     subscription,
   });
   const onSelectionsChange = useSavedAgentSelectionChange(
+    args.factoryId,
     args.setSelections,
     args.connectedIntegrations,
     args.agentIntegrationId,
   );
-  return { agent, selectModel, onSelectionsChange };
+  return { agent, subscriptionReady, selectModel, onSelectionsChange };
 }
 
 function useSavedAgentSelectionChange(
+  factoryId: string,
   setSelections: SetSelections,
   connectedIntegrations: OrganizationsIntegration[],
   agentIntegrationId: string | undefined,
 ) {
+  const storageKey = `superplane:onboarding-agent-integration:${factoryId}`;
   const connectedIntegrationsRef = useRef(connectedIntegrations);
   connectedIntegrationsRef.current = connectedIntegrations;
   const savedAgentIntegrationIdRef = useRef(agentIntegrationId);
-  savedAgentIntegrationIdRef.current = agentIntegrationId;
+  savedAgentIntegrationIdRef.current = localStorage.getItem(storageKey) ?? agentIntegrationId;
   const onSelectionsChange = useCallback(
     (next: IntegrationSelections) => {
+      const provider = AGENT_PROVIDER_IDS.find((id) => next[id]?.ready);
+      const selectedId = provider ? next[provider]?.id : undefined;
+      if (selectedId) {
+        localStorage.setItem(storageKey, selectedId);
+        savedAgentIntegrationIdRef.current = selectedId;
+      }
       setSelections(
         restoreSavedAgentSelection(next, connectedIntegrationsRef.current, savedAgentIntegrationIdRef.current) ?? next,
       );
     },
-    [setSelections],
+    [setSelections, storageKey],
   );
   useEffect(() => {
     setSelections(
-      (current) => restoreSavedAgentSelection(current, connectedIntegrations, agentIntegrationId) ?? current,
+      (current) =>
+        restoreSavedAgentSelection(current, connectedIntegrations, savedAgentIntegrationIdRef.current) ?? current,
     );
-  }, [agentIntegrationId, connectedIntegrations, setSelections]);
+  }, [agentIntegrationId, connectedIntegrations, setSelections, storageKey]);
   return onSelectionsChange;
 }
 

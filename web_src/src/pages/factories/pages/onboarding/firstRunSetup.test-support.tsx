@@ -32,6 +32,7 @@ export function pageModel(overrides: Partial<OnboardingPageModel> = {}): Onboard
     setAgentCredentialChoice: vi.fn(),
     agentLoading: false,
     agentModelPicker: undefined,
+    agentProviderId: undefined,
     openSection: "issues",
     setOpenSection: vi.fn(),
     requestConnect: vi.fn(),

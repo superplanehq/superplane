@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-import { hostedCreditGrantCopy, shouldShowHostedCreditGrant } from "./onboardingAgentReadiness";
+import { hostedCreditGrantCopy, shouldShowHostedCreditGrant, type AgentProviderId } from "./onboardingAgentReadiness";
 import { AGENT_OPTIONS, CUSTOM_PROVIDER_OPTION, type IntegrationId } from "./onboardingFixtures";
 import { ConnectOptionRow, IntegrationChoiceIcon } from "./onboardingSteps";
 import type { OnboardingSetupApi } from "./useOnboardingSetupState";
@@ -27,6 +27,7 @@ export function AgentStep({
   showCustomProvider = false,
   onRequestConnect,
   onSelectProvider,
+  selectedProvider,
   modelPicker,
 }: {
   organizationId: string;
@@ -35,6 +36,7 @@ export function AgentStep({
   showCustomProvider?: boolean;
   onRequestConnect: (id: IntegrationId) => void;
   onSelectProvider?: () => void;
+  selectedProvider?: AgentProviderId;
   modelPicker?: OnboardingAgentModelPicker;
 }) {
   const spend = useOrganizationWorkspaceUsage(organizationId);
@@ -73,6 +75,7 @@ export function AgentStep({
             detail={option.detail}
             connectLabel={option.label}
             connected={setup.connected.has(option.id)}
+            selected={selectedProvider === option.id}
             soon={option.soon}
             onSelect={() => onSelectProvider?.()}
             onConnect={() => onRequestConnect(option.id)}

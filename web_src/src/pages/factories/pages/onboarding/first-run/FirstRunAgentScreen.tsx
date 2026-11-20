@@ -6,6 +6,7 @@ import { WIZARD_STEPS, type IntegrationId } from "../onboardingFixtures";
 import {
   agentFinishReady,
   isAgentProviderConnected,
+  type AgentProviderId,
   type OnboardingAgentCredentialChoice,
 } from "../onboardingAgentReadiness";
 import type { OnboardingSetupApi } from "../useOnboardingSetupState";
@@ -54,6 +55,7 @@ function AgentConnectionChoices({
   providerKeysOffered,
   showProviders,
   modelPicker,
+  selectedProvider,
   onRequestConnect,
 }: {
   organizationId: string;
@@ -66,6 +68,7 @@ function AgentConnectionChoices({
   providerKeysOffered: boolean;
   showProviders: boolean;
   modelPicker?: OnboardingAgentModelPicker;
+  selectedProvider?: AgentProviderId;
   onRequestConnect: (id: IntegrationId) => void;
 }) {
   if (subscription.offered) {
@@ -89,6 +92,7 @@ function AgentConnectionChoices({
               showHostedCredit={false}
               showCustomProvider={showCustomProvider}
               modelPicker={modelSource.choice === "subscription" ? undefined : modelPicker}
+              selectedProvider={modelSource.choice === "subscription" ? undefined : selectedProvider}
               onSelectProvider={() => modelSource.onSelect("own-key")}
               onRequestConnect={onRequestConnect}
             />
@@ -118,6 +122,7 @@ function AgentConnectionChoices({
               showHostedCredit={modelSource.choice !== "own-key"}
               showCustomProvider={showCustomProvider}
               modelPicker={modelPicker}
+              selectedProvider={selectedProvider}
               onRequestConnect={onRequestConnect}
             />
           </FirstRunPanel>
@@ -140,6 +145,7 @@ export function FirstRunAgentScreen({
   modelSource,
   subscription,
   modelPicker,
+  selectedProvider,
   onRequestConnect,
   onContinue,
 }: {
@@ -155,6 +161,7 @@ export function FirstRunAgentScreen({
   modelSource: AgentModelSource;
   subscription: OnboardingSubscriptionChoice;
   modelPicker?: OnboardingAgentModelPicker;
+  selectedProvider?: AgentProviderId;
   onRequestConnect: (id: IntegrationId) => void;
   onContinue: () => void;
 }) {
@@ -203,6 +210,7 @@ export function FirstRunAgentScreen({
           providerKeysOffered={providerKeysOffered}
           showProviders={showProviders}
           modelPicker={modelPicker}
+          selectedProvider={selectedProvider}
           onRequestConnect={onRequestConnect}
         />
         <div className="space-y-3">

@@ -151,6 +151,7 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
     setAgentCredentialChoice: vi.fn(),
     agentLoading: false,
     agentModelPicker: undefined,
+    agentProviderId: undefined,
     openSection: "issues",
     setOpenSection: vi.fn(),
     requestConnect: vi.fn(),

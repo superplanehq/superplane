@@ -135,6 +135,7 @@ function pageModel(setup: OnboardingSetupApi, overrides: Partial<OnboardingPageM
     setAgentCredentialChoice: vi.fn(),
     agentLoading: false,
     agentModelPicker: undefined,
+    agentProviderId: undefined,
     openSection: "vcs",
     setOpenSection: vi.fn(),
     requestConnect: vi.fn(),
