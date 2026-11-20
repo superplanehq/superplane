@@ -314,42 +314,7 @@ function getWaitEventSubtitle(
       ? new Date(execution.createdAt)
       : null;
 
-  // Get expected duration from execution metadata (calculated interval)
-  let expectedDuration: number | undefined;
-
-  if (execution.metadata) {
-    try {
-      const metadata = execution.metadata as { interval_duration?: number };
-      if (metadata.interval_duration && metadata.interval_duration > 0) {
-        expectedDuration = metadata.interval_duration;
-      }
-    } catch {
-      // If parsing metadata fails, fall back to configuration-based calculation
-    }
-  }
-
-  // Fallback to configuration-based calculation if metadata is not available
-  if (!expectedDuration && configuration) {
-    if (configuration?.mode === "interval") {
-      const waitFor = configuration.waitFor as string;
-      const unit = configuration.unit as string;
-
-      // Try to parse waitFor as a number (for simple cases)
-      const value = parseInt(waitFor, 10);
-      if (!isNaN(value) && unit) {
-        const multipliers = { seconds: 1000, minutes: 60000, hours: 3600000 };
-        expectedDuration = value * (multipliers[unit as keyof typeof multipliers] || 1000);
-      }
-    } else if (configuration?.mode === "countdown") {
-      expectedDuration = countdownDurationFromConfig(configuration.waitUntil, execution.createdAt);
-    } else if (configuration?.duration) {
-      // Legacy duration format
-      const duration = configuration.duration as { value: number; unit: "seconds" | "minutes" | "hours" };
-      const { value, unit } = duration;
-      const multipliers = { seconds: 1000, minutes: 60000, hours: 3600000 };
-      expectedDuration = value * (multipliers[unit as keyof typeof multipliers] || 1000);
-    }
-  }
+  const expectedDuration = resolveExpectedWaitDuration(execution, configuration);
 
   if (executionState === "running" && execution.createdAt && expectedDuration) {
     return (
@@ -376,6 +341,55 @@ function getWaitEventSubtitle(
   }
 
   return timeAgoDate ? renderTimeAgo(timeAgoDate) : undefined;
+}
+
+function resolveExpectedWaitDuration(execution: ExecutionInfo, configuration: WaitConfiguration): number | undefined {
+  return waitDurationFromMetadata(execution) || waitDurationFromConfig(configuration, execution.createdAt);
+}
+
+function waitDurationFromMetadata(execution: ExecutionInfo): number | undefined {
+  if (!execution.metadata) {
+    return undefined;
+  }
+
+  try {
+    const metadata = execution.metadata as { interval_duration?: number };
+    if (metadata.interval_duration && metadata.interval_duration > 0) {
+      return metadata.interval_duration;
+    }
+  } catch {
+    // If metadata access fails, fall back to configuration-based calculation.
+  }
+
+  return undefined;
+}
+
+function waitDurationFromConfig(configuration: WaitConfiguration, createdAt?: string): number | undefined {
+  if (!configuration) {
+    return undefined;
+  }
+
+  if (configuration.mode === "interval") {
+    const value = parseInt(configuration.waitFor as string, 10);
+    const unit = configuration.unit;
+    return !isNaN(value) && unit ? waitDurationInMilliseconds(value, unit) : undefined;
+  }
+
+  if (configuration.mode === "countdown") {
+    return countdownDurationFromConfig(configuration.waitUntil, createdAt);
+  }
+
+  if (configuration.duration) {
+    const { value, unit } = configuration.duration;
+    return waitDurationInMilliseconds(value, unit);
+  }
+
+  return undefined;
+}
+
+function waitDurationInMilliseconds(value: number, unit: string): number {
+  const multipliers = { seconds: 1000, minutes: 60000, hours: 3600000 };
+  return value * (multipliers[unit as keyof typeof multipliers] || 1000);
 }
 
 function countdownDurationFromConfig(waitUntil?: string, createdAt?: string): number | undefined {
