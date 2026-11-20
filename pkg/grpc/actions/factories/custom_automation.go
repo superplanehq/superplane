@@ -204,12 +204,17 @@ func UpdateFactoryCustomAutomation(
 	if canvas.ColumnKey != nil {
 		settings.ColumnKey = *canvas.ColumnKey
 	}
-	if settings.SkipSetupCommands == nil {
+	if settings.SkipSetupCommands == nil || settings.SkipRepositoryCheckout == nil {
 		current, err := serializeCustomAutomation(db, factory, canvas)
 		if err != nil {
 			return nil, factoryErrorToStatus(err, "failed to read custom automation settings")
 		}
-		settings.SkipSetupCommands = current.GetSettings().SkipSetupCommands
+		if settings.SkipSetupCommands == nil {
+			settings.SkipSetupCommands = current.GetSettings().SkipSetupCommands
+		}
+		if settings.SkipRepositoryCheckout == nil {
+			settings.SkipRepositoryCheckout = current.GetSettings().SkipRepositoryCheckout
+		}
 	}
 	doc, err := buildCustomAutomationCanvas(db, factory, name, settings)
 	if err != nil {
@@ -271,6 +276,7 @@ type customAutomationSettings struct {
 	Triggers                []customAutomationTrigger
 	RunsOnTask              *bool
 	SkipSetupCommands       *bool
+	SkipRepositoryCheckout  *bool
 }
 
 func (settings *customAutomationSettings) runsWithoutTask() bool {
@@ -338,6 +344,7 @@ func parseCustomAutomationSettings(
 		ExecutionTimeoutSeconds: timeout,
 		RunsOnTask:              input.RunsOnTask,
 		SkipSetupCommands:       input.SkipSetupCommands,
+		SkipRepositoryCheckout:  input.SkipRepositoryCheckout,
 	}, nil
 }
 
@@ -896,6 +903,9 @@ func customAutomationRunnerConfiguration(
 	if settings.SkipSetupCommands != nil {
 		configuration[runner.SkipSetupCommandsField] = *settings.SkipSetupCommands
 	}
+	if settings.SkipRepositoryCheckout != nil {
+		configuration[runner.SkipRepositoryCheckoutField] = *settings.SkipRepositoryCheckout
+	}
 	return configuration
 }
 
@@ -1358,6 +1368,9 @@ func serializeCustomAutomation(
 	}
 	if skipSetup, ok := agent.Configuration[runner.SkipSetupCommandsField].(bool); ok {
 		settings.SkipSetupCommands = &skipSetup
+	}
+	if skipCheckout, ok := agent.Configuration[runner.SkipRepositoryCheckoutField].(bool); ok {
+		settings.SkipRepositoryCheckout = &skipCheckout
 	}
 	if len(triggers) == 1 {
 		settings.StartMode = triggers[0].mode

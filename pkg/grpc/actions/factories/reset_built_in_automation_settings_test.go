@@ -284,6 +284,7 @@ func TestInstallationResetReviewRequestSetupCommands(t *testing.T) {
 				findYAMLNode(t, doc, reviewRequestTriggerNodeID).Configuration["app"] = source.ID.String()
 				config := findYAMLNode(t, doc, reviewRequestAgentNodeID).Configuration
 				delete(config, "skipSetupCommands")
+				config["skipRepositoryCheckout"] = true
 				if tc.saved != nil {
 					config["skipSetupCommands"] = tc.saved
 				}
@@ -296,6 +297,7 @@ func TestInstallationResetReviewRequestSetupCommands(t *testing.T) {
 			agent := findIntakeNode(resetTestLiveVersion(t, canvas).Nodes, reviewRequestAgentNodeID)
 			require.NotNil(t, agent)
 			require.Equal(t, tc.expected, agent.Configuration["skipSetupCommands"])
+			require.Equal(t, true, agent.Configuration["skipRepositoryCheckout"])
 		})
 	}
 }

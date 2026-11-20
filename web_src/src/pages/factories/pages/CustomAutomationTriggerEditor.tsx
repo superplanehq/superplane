@@ -77,19 +77,6 @@ export function TriggerEditor({
             />
           </div>
         </div>
-        <PlanningReviewForm
-          draft={draft}
-          onChange={onDraftChange}
-          organizationId={organizationId}
-          factoryId={factoryId}
-          factoryKey={factoryKey}
-          appearance="fields"
-          view="implementation"
-          showConcurrency={false}
-          showResources={false}
-          showSteps={false}
-          modelOnly
-        />
       </section>
       <section className="flex flex-col gap-4">
         <div className="flex flex-col gap-1.5">
@@ -134,6 +121,23 @@ export function TriggerEditor({
             ))}
           </DropdownMenuContent>
         </DropdownMenu>
+      </section>
+      <section className="flex flex-col gap-8">
+        <h3 className="text-base font-semibold text-foreground">Agent</h3>
+        <PlanningReviewForm
+          draft={draft}
+          onChange={onDraftChange}
+          organizationId={organizationId}
+          factoryId={factoryId}
+          factoryKey={factoryKey}
+          appearance="fields"
+          view="implementation"
+          showConcurrency={false}
+          showResources={false}
+          showSteps={false}
+          modelOnly
+          modelDescription="The model used for this automation."
+        />
       </section>
     </div>
   );

@@ -831,7 +831,7 @@ func TestAttachWorkspaceAgentResourcesSkipsSetupCommandsWhenConfigured(t *testin
 	bash := "make docs"
 	commands := runner.ApplyFactoryCheckout(files, work, []runner.AgentStep{
 		{Name: "Explicit Bash", Type: runner.AgentStepBash, Command: &bash},
-	})
+	}, false)
 	require.Len(t, commands, 4)
 	assert.Equal(t, work[0], commands[0])
 	assert.Equal(t, "Checkout", commands[1].Name)

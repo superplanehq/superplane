@@ -150,10 +150,11 @@ func TestCustomAutomationSkipSetupCommandsPersistence(t *testing.T) {
 			initial := test.initial
 			name := "Docs " + test.name
 			settings := &pb.FactoryCustomAutomation_Settings{
-				StartMode:         pb.FactoryCustomAutomation_START_MODE_MANUAL,
-				Agent:             &pb.FactoryAppTemplateAgent{Component: "runnerClaudeCode"},
-				SkipSetupCommands: initial,
-				Steps:             []*pb.FactoryCustomAutomation_Step{{Name: "Docs", Type: pb.FactoryCustomAutomation_Step_TYPE_BASH, Command: "make docs"}},
+				StartMode:              pb.FactoryCustomAutomation_START_MODE_MANUAL,
+				Agent:                  &pb.FactoryAppTemplateAgent{Component: "runnerClaudeCode"},
+				SkipSetupCommands:      initial,
+				SkipRepositoryCheckout: initial,
+				Steps:                  []*pb.FactoryCustomAutomation_Step{{Name: "Docs", Type: pb.FactoryCustomAutomation_Step_TYPE_BASH, Command: "make docs"}},
 				Triggers: []*pb.FactoryCustomAutomation_StartTrigger{
 					{StartMode: pb.FactoryCustomAutomation_START_MODE_MANUAL},
 					{StartMode: pb.FactoryCustomAutomation_START_MODE_SCHEDULED, Schedule: &pb.FactoryCustomAutomation_Schedule{CronExpression: "0 9 * * *"}},
@@ -165,9 +166,11 @@ func TestCustomAutomationSkipSetupCommandsPersistence(t *testing.T) {
 			require.NoError(t, err)
 			id := created.GetCustomAutomation().GetAutomation().GetId()
 			assert.Equal(t, initial, created.GetCustomAutomation().GetSettings().SkipSetupCommands)
+			assert.Equal(t, initial, created.GetCustomAutomation().GetSettings().SkipRepositoryCheckout)
 			expected := initial != nil && *initial
 			for _, choice := range []*bool{nil, proto.Bool(true), nil, proto.Bool(false), nil} {
 				settings.SkipSetupCommands = choice
+				settings.SkipRepositoryCheckout = choice
 				if choice != nil {
 					expected = *choice
 				}
@@ -176,14 +179,17 @@ func TestCustomAutomationSkipSetupCommandsPersistence(t *testing.T) {
 				})
 				require.NoError(t, err)
 				assert.Equal(t, expected, updated.GetCustomAutomation().GetSettings().GetSkipSetupCommands())
+				assert.Equal(t, expected, updated.GetCustomAutomation().GetSettings().GetSkipRepositoryCheckout())
 				described, err := DescribeFactoryCustomAutomation(ctx, orgID, &pb.DescribeFactoryCustomAutomationRequest{FactoryId: factory.ID.String(), AutomationId: id})
 				require.NoError(t, err)
 				assert.Equal(t, expected, described.GetCustomAutomation().GetSettings().GetSkipSetupCommands())
+				assert.Equal(t, expected, described.GetCustomAutomation().GetSettings().GetSkipRepositoryCheckout())
 				for _, runnerID := range []string{customAutomationRunnerID, customAutomationScheduleRunnerID} {
 					node, err := models.FindCanvasNode(db, uuid.MustParse(id), runnerID)
 					require.NoError(t, err)
 					configuration := node.Configuration.Data()
 					assert.Equal(t, expected, configuration[runner.SkipSetupCommandsField] == true)
+					assert.Equal(t, expected, configuration[runner.SkipRepositoryCheckoutField] == true)
 				}
 			}
 		})

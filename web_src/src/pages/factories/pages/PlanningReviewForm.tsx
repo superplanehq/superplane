@@ -319,10 +319,23 @@ function AgentPanel({
             {modelControl}
           </div>
         ) : null}
-        <div className={appearance === "card" ? "col-span-2" : undefined}>
+        <div className={appearance === "card" ? "col-span-2 flex flex-col gap-4" : "flex flex-col gap-8"}>
+          <ImplementSettingRow
+            label="Skip repository checkout"
+            description="Do not check out the repository."
+            htmlFor={`skip-repository-checkout-${component.id}`}
+          >
+            <Switch
+              id={`skip-repository-checkout-${component.id}`}
+              aria-describedby={`skip-repository-checkout-${component.id}-help`}
+              checked={component.configuration.skipRepositoryCheckout === true}
+              disabled={disabled}
+              onCheckedChange={(checked) => setConfigurationField("skipRepositoryCheckout", checked)}
+            />
+          </ImplementSettingRow>
           <ImplementSettingRow
             label="Skip setup commands"
-            description="Check out the repository. Do not run workspace setup commands."
+            description="Do not run workspace setup commands."
             htmlFor={`skip-setup-commands-${component.id}`}
           >
             <Switch

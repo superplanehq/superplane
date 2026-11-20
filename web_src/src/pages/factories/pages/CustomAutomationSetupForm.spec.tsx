@@ -65,9 +65,16 @@ it("selects Schedule, recovers from a save error, and reopens the saved schedule
   saveAutomation.mockRejectedValueOnce(new Error("Schedule has no future run."));
   saveAutomation.mockResolvedValueOnce({});
   const view = render(<Editor />);
+  expect(screen.getByRole("heading", { name: "Agent" })).toBeInTheDocument();
+  expect(screen.getByText("The model used for this automation.")).toBeInTheDocument();
+  expect(screen.getByText("Do not run workspace setup commands.")).toBeInTheDocument();
+  expect(screen.getByText("Do not check out the repository.")).toBeInTheDocument();
   const skipSetup = screen.getByRole("switch", { name: "Skip setup commands" });
+  const skipCheckout = screen.getByRole("switch", { name: "Skip repository checkout" });
   expect(skipSetup).not.toBeChecked();
+  expect(skipCheckout).not.toBeChecked();
   await user.click(skipSetup);
+  await user.click(skipCheckout);
   expect(saveAutomation).not.toHaveBeenCalled();
   await user.click(screen.getByRole("tab", { name: "with no task" }));
   await user.click(screen.getByRole("button", { name: "Add trigger" }));
@@ -87,6 +94,7 @@ it("selects Schedule, recovers from a save error, and reopens the saved schedule
   expect(saved.settings.schedule).toEqual({ cronExpression: "30 0 9 * * MON-FRI", utcOffset: 5.75 });
   expect(saved.settings.runsOnTask).toBe(false);
   expect(saved.settings.skipSetupCommands).toBe(true);
+  expect(saved.settings.skipRepositoryCheckout).toBe(true);
   expect(saved.settings.steps).toEqual(automation.settings!.steps);
   view.unmount();
   automation = { automation: automation.automation, settings: saved.settings };
@@ -103,6 +111,7 @@ it("selects Schedule, recovers from a save error, and reopens the saved schedule
   await waitFor(() => expect(saveAutomation).toHaveBeenCalledTimes(3));
   expect(saveAutomation.mock.calls[2]![0].settings.schedule.utcOffset).toBe(-3.5);
   expect(saveAutomation.mock.calls[2]![0].settings.skipSetupCommands).toBe(false);
+  expect(saveAutomation.mock.calls[2]![0].settings.skipRepositoryCheckout).toBe(true);
   expect(screen.getByRole("button", { name: /Bash Lint/ })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: /Prompt Review/ })).toBeInTheDocument();
 });

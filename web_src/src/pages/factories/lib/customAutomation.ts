@@ -201,6 +201,7 @@ export function customAutomationDraft(automation?: FactoriesFactoryCustomAutomat
           steps,
           executionTimeoutSeconds: customAutomationTimeout(settings?.executionTimeoutSeconds),
           skipSetupCommands: settings?.skipSetupCommands === true,
+          skipRepositoryCheckout: settings?.skipRepositoryCheckout === true,
         },
         concurrency: { max: "5", key: "" },
       },
@@ -237,6 +238,7 @@ export function customAutomationSettings(
     icon,
     executionTimeoutSeconds: customAutomationTimeout(configuration.executionTimeoutSeconds),
     skipSetupCommands: configuration.skipSetupCommands === true,
+    skipRepositoryCheckout: configuration.skipRepositoryCheckout === true,
     agent: component?.component
       ? {
           component: component.component,
