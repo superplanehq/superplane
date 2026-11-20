@@ -50,6 +50,31 @@ func Test__CommitCanvasStaging__AppliesStagedCanvas(t *testing.T) {
 	assert.False(t, hasStaging)
 }
 
+func TestCommitCanvasStagingRejectsPublishedAutomationSource(t *testing.T) {
+	resources, ctx, canvas, version := setupLiveCanvasStaging(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, canvas.OrganizationID, "Automation", "", "AUTO")
+	require.NoError(t, err)
+	require.NoError(t, db.Model(canvas).Update("factory_id", factory.ID).Error)
+	require.NoError(t, (&models.AutomationSource{
+		ID: canvas.ID, OrganizationID: canvas.OrganizationID, FactoryID: factory.ID,
+		Name: canvas.Name, Source: "saved source", Revision: 1, ArtifactID: canvas.ID.String(), ArtifactRevision: version.ID.String(),
+	}).Save(db))
+
+	baseline, err := ReadRepositorySpecFile(ctx, canvas, version, CanvasYAMLRepositoryPath)
+	require.NoError(t, err)
+	_, err = PutCanvasStaging(ctx, db, canvas, []*pb.CanvasRepositoryFileOperation{
+		{Path: CanvasYAMLRepositoryPath, Content: []byte(baseline + "\n# raw edit\n")},
+	})
+	require.NoError(t, err)
+
+	_, err = CommitCanvasStaging(ctx, db, resources.Encryptor, resources.Registry, canvas, "Raw edit", "", resources.AuthService)
+	require.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
+	current, err := models.FindLiveCanvasVersionInTransaction(db, canvas.ID)
+	require.NoError(t, err)
+	require.Equal(t, version.ID, current.ID)
+}
+
 func Test__CommitCanvasStaging__IgnoresRenamedCanvasInYAML(t *testing.T) {
 	r, ctx, canvas, version := setupLiveCanvasStaging(t)
 
