@@ -1,0 +1,133 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SuperPlane Custom Automation v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "name", "triggers", "steps"],
+  "properties": {
+    "apiVersion": { "const": "v2" },
+    "kind": { "const": "Automation" },
+    "name": { "$ref": "#/$defs/nonblank" },
+    "icon": {
+      "default": "sparkles",
+      "enum": [
+        "sparkles", "shield-check", "search", "bug", "file-code", "code", "terminal",
+        "eye", "gauge", "git-pull-request", "cpu", "circle-check", "activity", "alarm-clock",
+        "archive", "bell", "bolt", "book", "box", "boxes", "braces", "calendar", "camera",
+        "chart-line", "check", "clock", "cloud", "cog", "component", "container", "database",
+        "factory", "file-json", "file-text", "fingerprint", "flag", "folder", "git-branch",
+        "git-commit", "git-merge", "globe", "key", "layers", "lock", "message-square",
+        "network", "package", "rocket"
+      ]
+    },
+    "timeout_seconds": { "type": "integer", "minimum": 1, "maximum": 86400, "default": 3600 },
+    "runs_on_task": { "type": "boolean" },
+    "agent": { "$ref": "#/$defs/agent" },
+    "triggers": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/trigger" },
+      "allOf": [
+        { "contains": { "type": "object", "required": ["use"], "properties": { "use": { "const": "manual" } } }, "minContains": 0, "maxContains": 1 },
+        { "contains": { "type": "object", "required": ["use"], "properties": { "use": { "const": "task_enters_stage" } } }, "minContains": 0, "maxContains": 1 },
+        { "contains": { "type": "object", "required": ["use"], "properties": { "use": { "const": "task_leaves_stage" } } }, "minContains": 0, "maxContains": 1 },
+        { "contains": { "type": "object", "required": ["use"], "properties": { "use": { "const": "pull_request_updated" } } }, "minContains": 0, "maxContains": 1 },
+        {
+          "if": { "contains": { "$ref": "#/$defs/isSchedule" }, "minContains": 2 },
+          "then": { "items": { "if": { "$ref": "#/$defs/isSchedule" }, "then": { "required": ["id"] } } }
+        }
+      ]
+    },
+    "steps": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/step" } }
+  },
+  "$defs": {
+    "nonblank": { "type": "string", "pattern": "[^\u0009-\u000d \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]" },
+    "trigger": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["use"],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/nonblank",
+          "description": "Use a unique ID within the automation."
+        },
+        "use": { "enum": ["manual", "task_enters_stage", "task_leaves_stage", "pull_request_updated", "schedule"] },
+        "config": true
+      },
+      "if": { "$ref": "#/$defs/isSchedule" },
+      "then": { "required": ["config"], "properties": { "config": { "$ref": "#/$defs/schedule" } } },
+      "else": { "properties": { "config": false } }
+    },
+    "isSchedule": { "type": "object", "properties": { "use": { "const": "schedule" } }, "required": ["use"] },
+    "schedule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cron"],
+      "properties": {
+        "cron": {
+          "$ref": "#/$defs/nonblank",
+          "description": "Use five cron fields, or six with seconds first."
+        },
+        "utc_offset": { "type": "number", "minimum": -12, "maximum": 14, "default": 0 }
+      }
+    },
+    "step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": { "$ref": "#/$defs/nonblank" },
+        "bash": { "$ref": "#/$defs/nonblank" },
+        "prompt": { "$ref": "#/$defs/nonblank" },
+        "working_directory": {
+          "$ref": "#/$defs/nonblank",
+          "pattern": "^[^\\r\\n\u0000]+$",
+          "description": "A relative path must stay within the runner's working directory."
+        },
+        "secrets": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/nonblank" } }
+      },
+      "if": { "required": ["bash"] },
+      "then": { "properties": { "prompt": false } },
+      "else": { "required": ["prompt"], "properties": { "secrets": false } }
+    },
+    "agent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["harness"],
+      "properties": {
+        "harness": { "enum": ["superplane", "claude-code", "codex", "openrouter"] },
+        "model": { "$ref": "#/$defs/nonblank" },
+        "credentials": { "$ref": "#/$defs/credentials" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "harness": { "const": "superplane" } } },
+          "then": { "properties": { "credentials": false } }
+        },
+        {
+          "if": {
+            "required": ["credentials"],
+            "properties": {
+              "credentials": { "type": "object", "required": ["source"], "properties": { "source": { "const": "subscription" } } }
+            }
+          },
+          "then": {
+            "properties": { "harness": { "const": "codex" }, "model": false }
+          }
+        }
+      ]
+    },
+    "credentials": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source"],
+      "properties": {
+        "source": { "enum": ["integration", "subscription"] },
+        "name": { "$ref": "#/$defs/nonblank" }
+      },
+      "if": { "properties": { "source": { "const": "integration" } } },
+      "then": { "required": ["name"] },
+      "else": { "properties": { "name": false } }
+    }
+  }
+}

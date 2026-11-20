@@ -49,7 +49,7 @@ function Editor({ columnKey }: { columnKey?: "backlog" | "verify" }) {
       onNameChange={model.setName}
       onIconChange={model.setIcon}
       onTriggersChange={model.setTriggers}
-      onRunsOnTaskChange={model.setRunsOnTask}
+      onRunsOnTaskChange={(runsOnTask) => model.setRunsOnTask(runsOnTask ?? true)}
       onDraftChange={model.setDraft}
       onSave={() => void model.save()}
       onClose={() => {}}

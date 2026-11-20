@@ -41,6 +41,7 @@ export function PlanningReviewForm({
   modelLabel,
   modelDescription,
   modelOnly = false,
+  applyModelDefault = true,
   appearance = "card",
   view = "full",
   onRestoreDefaultPrompt,
@@ -62,6 +63,7 @@ export function PlanningReviewForm({
   modelLabel?: string;
   modelDescription?: string;
   modelOnly?: boolean;
+  applyModelDefault?: boolean;
   /** `fields` matches the pull request step. `card` is the GitHub agent settings. */
   appearance?: "card" | "fields";
   view?: "full" | "implementation" | "planning" | "pr-feedback";
@@ -97,6 +99,7 @@ export function PlanningReviewForm({
           modelLabel={modelLabel}
           modelDescription={modelDescription}
           modelOnly={modelOnly}
+          applyModelDefault={applyModelDefault}
           onRestoreDefaultPrompt={onRestoreDefaultPrompt}
           restoreDefaultPromptDisabled={restoreDefaultPromptDisabled}
           restoreError={restoreError}
@@ -124,6 +127,7 @@ function AgentPanel({
   modelLabel,
   modelDescription,
   modelOnly,
+  applyModelDefault,
   onRestoreDefaultPrompt,
   restoreDefaultPromptDisabled,
   restoreError,
@@ -145,6 +149,7 @@ function AgentPanel({
   modelLabel?: string;
   modelDescription?: string;
   modelOnly: boolean;
+  applyModelDefault: boolean;
   onRestoreDefaultPrompt?: () => void;
   restoreDefaultPromptDisabled: boolean;
   restoreError?: string;
@@ -201,7 +206,7 @@ function AgentPanel({
   onChangeRef.current = onChange;
 
   useEffect(() => {
-    if (!byokModelDefault) {
+    if (!applyModelDefault || !byokModelDefault) {
       return;
     }
     const current = componentRef.current;
@@ -209,7 +214,7 @@ function AgentPanel({
       ...current,
       configuration: { ...current.configuration, model: byokModelDefault },
     });
-  }, [byokModelDefault]);
+  }, [applyModelDefault, byokModelDefault]);
 
   const modelControl = modelUsedField ? (
     <ConfigurationFieldRenderer
@@ -218,7 +223,7 @@ function AgentPanel({
       triggerClassName={
         view !== "full" ? "h-8 w-full shadow-none" : appearance === "fields" ? FLAT_FIELD_CONTROL : undefined
       }
-      value={byokModelDefault ?? component.configuration.model}
+      value={(applyModelDefault ? byokModelDefault : undefined) ?? component.configuration.model}
       onChange={(value) => setConfigurationField("model", value)}
       onValuesChange={(patch) => {
         const configuration = { ...component.configuration, ...patch };
