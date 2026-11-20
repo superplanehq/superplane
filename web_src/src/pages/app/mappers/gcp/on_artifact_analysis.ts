@@ -6,6 +6,7 @@ import { renderTimeAgo } from "@/components/TimeAgo";
 import type { MetadataItem } from "@/ui/metadataList";
 import gcpArtifactRegistryIcon from "@/assets/icons/integrations/gcp.artifactregistry.svg";
 import type { OccurrenceData } from "./artifact_registry";
+import { shortArtifactRef } from "./artifact_reference";
 
 type OnArtifactAnalysisConfiguration = {
   kinds?: string[];
@@ -113,61 +114,4 @@ function getKindLabel(kind?: string): string {
     default:
       return "Analysis";
   }
-}
-
-function shortArtifactRef(uri?: string): string | undefined {
-  if (!uri) {
-    return undefined;
-  }
-
-  let normalized = uri.trim();
-  normalized = normalized.replace(/^https?:\/\//, "");
-
-  const slashIndex = normalized.indexOf("/");
-  if (slashIndex < 0 || slashIndex === normalized.length - 1) {
-    return undefined;
-  }
-
-  const path = normalized.slice(slashIndex + 1);
-  const pathParts = path.split("/");
-  if (pathParts.length < 3) {
-    return path;
-  }
-
-  const imageWithRef = pathParts.slice(2).join("/");
-  let imagePath = imageWithRef;
-  let ref = "";
-  let refSeparator = "";
-
-  const atIndex = imageWithRef.indexOf("@");
-  if (atIndex >= 0) {
-    imagePath = imageWithRef.slice(0, atIndex);
-    ref = imageWithRef.slice(atIndex + 1);
-    refSeparator = "@";
-  } else {
-    const lastSlash = imageWithRef.lastIndexOf("/");
-    const lastColon = imageWithRef.lastIndexOf(":");
-    if (lastColon > lastSlash) {
-      imagePath = imageWithRef.slice(0, lastColon);
-      ref = imageWithRef.slice(lastColon + 1);
-      refSeparator = ":";
-    }
-  }
-
-  const imageName = imagePath.split("/").pop() || imagePath;
-  const compactBase = imageName;
-  if (!ref) {
-    return compactBase || path;
-  }
-
-  if (refSeparator === "@" && ref.startsWith("sha256:")) {
-    const digest = ref.slice("sha256:".length);
-    return `${compactBase}@${digest.slice(0, 8)}`;
-  }
-
-  if (ref.length > 12) {
-    ref = `${ref.slice(0, 12)}...`;
-  }
-
-  return `${compactBase}${refSeparator}${ref}`;
 }
