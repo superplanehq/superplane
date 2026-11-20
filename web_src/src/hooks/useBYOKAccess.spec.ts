@@ -69,6 +69,7 @@ it.each([
   productFeatures = { byo_key: permission };
   const { result } = renderHook(() => useBYOKAccess("org"));
   expect(result.current.allowed).toBe(allowed);
+  expect(result.current.noHostedDefault).toBe(false);
   expect(result.current.customProviderAllowed).toBe(false);
 });
 
@@ -96,6 +97,7 @@ it.each([false, true])("allows standard providers without a hosted default when 
   const { result } = renderHook(() => useBYOKAccess("org"));
   expect(result.current.ready).toBe(true);
   expect(result.current.allowed).toBe(true);
+  expect(result.current.noHostedDefault).toBe(true);
   expect(result.current.customProviderAllowed).toBe(false);
   expect(await result.current.verify()).toBe(true);
 });
@@ -136,6 +138,7 @@ it.each(["pending", "failed", "missing"])("does not treat a %s hosted-default lo
   const { result } = renderHook(() => useBYOKAccess("org"));
   expect(result.current.ready).toBe(false);
   expect(result.current.allowed).toBe(false);
+  expect(result.current.noHostedDefault).toBe(false);
   await expect(result.current.verify()).rejects.toThrow("could not verify");
 });
 
@@ -149,6 +152,7 @@ it.each(["pending", "failed"])("keeps permitted BYOK access when hosted-default 
   expect(result.current.ready).toBe(true);
   expect(result.current.allowed).toBe(true);
   expect(result.current.customProviderAllowed).toBe(true);
+  expect(result.current.noHostedDefault).toBe(false);
   expect(await result.current.verify()).toBe(true);
 });
 
