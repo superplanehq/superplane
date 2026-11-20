@@ -1,0 +1,256 @@
+{
+  "securityDefinitions": {
+    "AutomationBearer": {
+      "type": "apiKey", "in": "header", "name": "Authorization",
+      "description": "Send Bearer followed by a space and the API token for the organization."
+    },
+    "AutomationSession": {
+      "type": "apiKey", "in": "header", "name": "Cookie",
+      "description": "Use the account_token session cookie. Select the organization by UUID or slug in the x-organization-id header or organization_id query parameter."
+    }
+  },
+  "paths": {
+    "/api/v2/automations": {
+      "get": {
+        "tags": ["Automations"],
+        "operationId": "Automations_List",
+        "summary": "List custom automations in a factory",
+        "description": "Requires factory read permission.",
+        "security": [{ "AutomationBearer": [] }, { "AutomationSession": [] }],
+        "parameters": [
+          { "in": "query", "name": "factory_id", "required": true, "type": "string", "format": "uuid" }
+        ],
+        "responses": {
+          "200": { "description": "Factory automations", "schema": { "type": "object", "required": ["automations"], "properties": { "automations": { "type": "array", "items": { "$ref": "#/definitions/AutomationV2Summary" } } } } },
+          "400": { "$ref": "#/responses/AutomationV2BadRequest" },
+          "401": { "$ref": "#/responses/AutomationV2Unauthorized" },
+          "403": { "$ref": "#/responses/AutomationV2Forbidden" },
+          "404": { "$ref": "#/responses/AutomationV2NotFound" },
+          "default": { "$ref": "#/responses/AutomationV2Failure" }
+        }
+      },
+      "post": {
+        "tags": ["Automations"],
+        "operationId": "Automations_Create",
+        "summary": "Create a custom automation from YAML",
+        "description": "Requires factory update permission. Supply the factory and board stage outside the YAML document. The response includes the submitted YAML and the ID used by the board.",
+        "security": [{ "AutomationBearer": [] }, { "AutomationSession": [] }],
+        "parameters": [{ "$ref": "#/parameters/AutomationV2CreateBody" }],
+        "responses": {
+          "201": { "description": "Created automation", "schema": { "$ref": "#/definitions/AutomationV2Resource" } },
+          "400": { "$ref": "#/responses/AutomationV2BadRequest" },
+          "401": { "$ref": "#/responses/AutomationV2Unauthorized" },
+          "403": { "$ref": "#/responses/AutomationV2Forbidden" },
+          "404": { "$ref": "#/responses/AutomationV2NotFound" },
+          "429": { "$ref": "#/responses/AutomationV2BodyLimit" },
+          "default": { "$ref": "#/responses/AutomationV2Failure" }
+        }
+      }
+    },
+    "/api/v2/automations:validate": {
+      "post": {
+        "tags": ["Automations"],
+        "operationId": "Automations_Validate",
+        "summary": "Validate YAML in the selected factory and stage without saving",
+        "description": "Requires factory update permission.",
+        "security": [{ "AutomationBearer": [] }, { "AutomationSession": [] }],
+        "parameters": [{ "$ref": "#/parameters/AutomationV2CreateBody" }],
+        "responses": {
+          "200": { "description": "Validated definition with defaults applied", "schema": { "type": "object", "required": ["definition"], "properties": { "definition": { "$ref": "#/definitions/AutomationV2Definition" } } } },
+          "400": { "$ref": "#/responses/AutomationV2BadRequest" },
+          "401": { "$ref": "#/responses/AutomationV2Unauthorized" },
+          "403": { "$ref": "#/responses/AutomationV2Forbidden" },
+          "404": { "$ref": "#/responses/AutomationV2NotFound" },
+          "429": { "$ref": "#/responses/AutomationV2BodyLimit" },
+          "default": { "$ref": "#/responses/AutomationV2Failure" }
+        }
+      }
+    },
+    "/api/v2/automations/{id}": {
+      "parameters": [{ "in": "path", "name": "id", "required": true, "type": "string", "format": "uuid" }],
+      "get": {
+        "tags": ["Automations"],
+        "operationId": "Automations_Get",
+        "summary": "Read a custom automation as YAML",
+        "description": "Requires factory read permission. For an existing automation, SuperPlane translates the current canvas to YAML when the translation preserves its behavior.",
+        "security": [{ "AutomationBearer": [] }, { "AutomationSession": [] }],
+        "responses": {
+          "200": { "description": "Current automation", "schema": { "$ref": "#/definitions/AutomationV2Resource" } },
+          "400": {
+            "description": "Invalid ID or the automation cannot be read as YAML. When can_edit_in_form is true, use live_version_id as expectedLiveVersionId when saving through the existing form.",
+            "schema": {
+              "allOf": [
+                { "$ref": "#/definitions/AutomationV2Error" },
+                { "type": "object", "properties": {
+                  "can_edit_in_form": { "type": "boolean", "description": "Present and true when the form preserves the current canvas behavior." },
+                  "live_version_id": { "type": "string", "format": "uuid", "description": "Present with can_edit_in_form." }
+                } }
+              ]
+            }
+          },
+          "401": { "$ref": "#/responses/AutomationV2Unauthorized" },
+          "403": { "$ref": "#/responses/AutomationV2Forbidden" },
+          "404": { "$ref": "#/responses/AutomationV2NotFound" },
+          "default": { "$ref": "#/responses/AutomationV2Failure" }
+        }
+      },
+      "put": {
+        "tags": ["Automations"],
+        "operationId": "Automations_Update",
+        "summary": "Replace an automation's YAML at its current board stage",
+        "description": "Requires factory update permission. Omit factory_id and stage.",
+        "security": [{ "AutomationBearer": [] }, { "AutomationSession": [] }],
+        "parameters": [{ "in": "body", "name": "body", "required": true, "schema": { "type": "object", "additionalProperties": false, "required": ["yaml"], "properties": { "yaml": { "type": "string" } } } }],
+        "responses": {
+          "200": { "description": "Updated automation", "schema": { "$ref": "#/definitions/AutomationV2Resource" } },
+          "400": { "$ref": "#/responses/AutomationV2BadRequest" },
+          "401": { "$ref": "#/responses/AutomationV2Unauthorized" },
+          "403": { "$ref": "#/responses/AutomationV2Forbidden" },
+          "404": { "$ref": "#/responses/AutomationV2NotFound" },
+          "429": { "$ref": "#/responses/AutomationV2BodyLimit" },
+          "default": { "$ref": "#/responses/AutomationV2Failure" }
+        }
+      },
+      "delete": {
+        "tags": ["Automations"],
+        "operationId": "Automations_Delete",
+        "summary": "Delete a custom automation",
+        "description": "Requires factory update permission.",
+        "security": [{ "AutomationBearer": [] }, { "AutomationSession": [] }],
+        "responses": {
+          "204": { "description": "Deleted automation" },
+          "400": { "$ref": "#/responses/AutomationV2BadRequest" },
+          "401": { "$ref": "#/responses/AutomationV2Unauthorized" },
+          "403": { "$ref": "#/responses/AutomationV2Forbidden" },
+          "404": { "$ref": "#/responses/AutomationV2NotFound" },
+          "default": { "$ref": "#/responses/AutomationV2Failure" }
+        }
+      }
+    }
+  },
+  "parameters": {
+    "AutomationV2CreateBody": {
+      "in": "body", "name": "body", "required": true,
+      "schema": {
+        "type": "object", "additionalProperties": false, "required": ["factory_id", "stage", "yaml"],
+        "properties": {
+          "factory_id": { "type": "string", "format": "uuid" },
+          "stage": { "type": "string", "enum": ["backlog", "implement", "verify", "done"] },
+          "yaml": {
+            "type": "string",
+            "example": "apiVersion: v2\nkind: Automation\nname: Inspect task\ntriggers: [{use: manual}]\nsteps: [{name: Inspect, bash: pwd}]\n"
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "AutomationV2Summary": {
+      "type": "object", "required": ["id", "factory_id", "stage", "name"],
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "factory_id": { "type": "string", "format": "uuid" },
+        "stage": { "type": "string", "enum": ["backlog", "implement", "verify", "done"] },
+        "name": { "type": "string" }
+      }
+    },
+    "AutomationV2Resource": {
+      "allOf": [
+        { "$ref": "#/definitions/AutomationV2Summary" },
+        { "type": "object", "required": ["yaml", "revision"], "properties": { "yaml": { "type": "string" }, "revision": { "type": "integer", "format": "int64" } } }
+      ]
+    },
+    "AutomationV2Definition": {
+      "type": "object", "required": ["apiVersion", "kind", "name", "icon", "timeout_seconds", "triggers", "steps"],
+      "properties": {
+        "apiVersion": { "type": "string", "enum": ["v2"] },
+        "kind": { "type": "string", "enum": ["Automation"] },
+        "name": { "type": "string" },
+        "icon": { "type": "string", "default": "sparkles" },
+        "timeout_seconds": { "type": "integer", "default": 3600 },
+        "runs_on_task": { "type": "boolean" },
+        "skip_repository_checkout": { "type": "boolean" },
+        "skip_setup_commands": { "type": "boolean" },
+        "agent": {
+          "type": "object",
+          "description": "Choose a model from the configured source. New automations use the workspace source. Existing automations use their current source.",
+          "properties": {
+            "harness": { "type": "string", "enum": ["superplane", "claude-code", "codex", "openrouter"], "description": "If specified, the harness must match the configured agent." },
+            "model": { "type": "string", "description": "For SuperPlane-hosted models, use provider::model (for example, openai::gpt-5.4). For a Codex subscription, use the model ID. Omit this field to use the default." },
+            "credentials": {
+              "type": "object", "required": ["source"],
+              "description": "If specified, the credentials must match the configured source and connection.",
+              "properties": {
+                "source": { "type": "string", "enum": ["integration", "subscription", "hosted"] },
+                "name": { "type": "string" }
+              }
+            }
+          }
+        },
+        "triggers": {
+          "type": "array", "items": {
+            "type": "object", "required": ["use"],
+            "properties": {
+              "use": { "type": "string", "enum": ["manual", "task_enters_stage", "task_leaves_stage", "pull_request_updated", "schedule"] },
+              "id": { "type": "string" },
+              "config": {
+                "type": "object", "required": ["cron", "utc_offset"],
+                "properties": { "cron": { "type": "string" }, "utc_offset": { "type": "number" } }
+              }
+            }
+          }
+        },
+        "steps": {
+          "type": "array", "items": {
+            "type": "object", "required": ["name"],
+            "properties": {
+              "name": { "type": "string" }, "working_directory": { "type": "string" },
+              "bash": { "type": "string" }, "prompt": { "type": "string" },
+              "secrets": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        }
+      }
+    },
+    "AutomationV2Error": {
+      "type": "object", "required": ["message"],
+      "properties": { "message": { "type": "string" } }
+    },
+    "AutomationV2Diagnostic": {
+      "type": "object", "required": ["path", "line", "column", "message"],
+      "properties": {
+        "path": { "type": "string" }, "line": { "type": "integer", "minimum": 1 },
+        "column": { "type": "integer", "minimum": 1 }, "message": { "type": "string" }
+      }
+    }
+  },
+  "responses": {
+    "AutomationV2BadRequest": {
+      "description": "Invalid request or the operation cannot be applied. A YAML error includes its field path, line and column.",
+      "schema": {
+        "allOf": [
+          { "$ref": "#/definitions/AutomationV2Error" },
+          { "type": "object", "properties": { "diagnostics": { "type": "array", "items": { "$ref": "#/definitions/AutomationV2Diagnostic" } } } }
+        ]
+      }
+    },
+    "AutomationV2Unauthorized": {
+      "description": "Authentication is missing or invalid. The authentication middleware returns plain text."
+    },
+    "AutomationV2Forbidden": {
+      "description": "The authenticated account or session cannot perform this operation. The authentication middleware returns plain text."
+    },
+    "AutomationV2NotFound": {
+      "description": "The resource is unavailable, the account lacks the required factory permission, or the organization has not enabled Factories, Custom Automations and Automations as code. An unavailable session organization returns plain text.",
+      "schema": { "$ref": "#/definitions/AutomationV2Error" }
+    },
+    "AutomationV2BodyLimit": {
+      "description": "The JSON request body exceeds 1 MiB.",
+      "schema": { "$ref": "#/definitions/AutomationV2Error" }
+    },
+    "AutomationV2Failure": {
+      "description": "The automation request failed.",
+      "schema": { "$ref": "#/definitions/AutomationV2Error" }
+    }
+  }
+}
