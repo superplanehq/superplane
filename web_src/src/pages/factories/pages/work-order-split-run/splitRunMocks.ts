@@ -181,7 +181,7 @@ export interface SplitRunPhase {
   /** Start thinking level from the dispatch that owns this run. Hidden when empty or Auto. */
   thinkingLevel?: string;
   /** Board column this app sits on, when it is a column automation. */
-  columnKey?: SplitRunBoardColumn;
+  columnKey?: string;
   /** Pull request and revision that started this activity. */
   pullRequestActivity?: {
     pullRequest?: FactoriesFactoryPullRequest;
@@ -255,6 +255,8 @@ export interface SplitRunFixture {
   footer: SplitRunFooter;
   footerTone: SplitRunFooterTone;
   source?: SplitRunSource;
+  /** Ordered board stages snapshotted when the active dispatch started. */
+  stageColumns?: Array<{ id: string; title: string }>;
 }
 
 export { SPLIT_RUN_RUNNING };
@@ -521,6 +523,7 @@ function mappedWorkOrderFixture(order: FactoriesWorkOrder, options?: SplitRunFix
     ...closurePhaseForOrder(order, displayStatus, options?.closer),
   ];
   const activeAutomationId = activeAutomationPhaseId(phases);
+  const visibleDispatch = visibleDispatchForLine(order, options?.lineId);
   const fixture: SplitRunFixture = {
     title: order.title ?? "Task",
     identifier: order.key?.trim() ?? "",
@@ -552,6 +555,11 @@ function mappedWorkOrderFixture(order: FactoriesWorkOrder, options?: SplitRunFix
     openPhaseId: activeAutomationId,
     phases,
     source: splitRunSourceForOrder(order, options?.resolveUser),
+    stageColumns: visibleDispatch?.stages?.flatMap((stage) => {
+      const id = stage.key?.trim();
+      const title = stage.name?.trim();
+      return id && title ? [{ id, title }] : [];
+    }),
     ...reviewSurfaces(order, displayStatus, {
       lineId: options?.lineId,
       phases,
@@ -1795,7 +1803,8 @@ function executionToPhase(
 ): SplitRunPhase {
   const status = statusForExecution(execution);
   const presentation = lineAutomationPresentation(execution.run, execution.step);
-  const name = presentation.name;
+  const stage = stageForExecution(order, execution);
+  const name = stage?.name?.trim() || presentation.name;
   const componentName = automationCardName(execution.run?.appName, presentation.componentName);
   const duration = durationForExecution(execution, status);
   const artifacts = demoArtifacts ? artifactsForLineExecution(order, execution) : [];
@@ -1833,7 +1842,16 @@ function executionToPhase(
     totalTokens: execution.totalTokens,
     model: modelsForExecution(order, execution),
     thinkingLevel: thinkingLevelForExecution(order, execution),
+    columnKey: execution.stageKey?.trim() || undefined,
   };
+}
+
+function stageForExecution(order: FactoriesWorkOrder, execution: FactoriesWorkOrderExecution) {
+  const stageKey = execution.stageKey?.trim();
+  if (!stageKey) return undefined;
+  return (order.lineDispatches ?? [])
+    .find((dispatch) => dispatch.stepExecutions?.some((item) => item.id === execution.id))
+    ?.stages?.find((stage) => stage.key === stageKey);
 }
 
 function checksForLineExecution(

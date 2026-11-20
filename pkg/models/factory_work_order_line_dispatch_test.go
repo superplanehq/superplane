@@ -62,6 +62,132 @@ func Test__FactoryLine__Dispatch__SnapshotsLineAndStartsStepZero(t *testing.T) {
 	assert.Equal(t, models.FactoryWorkOrderExecutionStatusPending, execution.Status)
 }
 
+func Test__FactoryLine__Dispatch__StartsCustomStageBeforeLineStep(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	order, err := factory.CreateWorkOrder(db, "Order", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	phaseApp, phaseEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "Implement", "start")
+	line, err := factory.CreateLine(db, "ship", []models.FactoryLineStep{{
+		Type: models.FactoryLineStepTypeRunApp, AppID: phaseApp.ID, Entrypoint: phaseEntry,
+	}})
+	require.NoError(t, err)
+
+	stageID := uuid.New()
+	customStage := models.FactoryLineStage{
+		ID: stageID, Key: "custom-" + stageID.String(), Name: "QA", Kind: models.FactoryLineStageCustom,
+	}
+	stages := append([]models.FactoryLineStage{line.StagesValue()[0], customStage}, line.StagesValue()[1:]...)
+	require.NoError(t, line.UpdateConfiguration(db, nil, nil, nil, stages))
+	first, firstEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "Lint", "lint")
+	second, secondEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "Test", "test")
+	require.NoError(t, first.SetColumnKey(db, customStage.Key))
+	require.NoError(t, second.SetColumnKey(db, customStage.Key))
+
+	var dispatch *models.FactoryWorkOrderLineDispatch
+	var results []*models.FactoryLineStepResult
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		var dispatchErr error
+		dispatch, results, dispatchErr = line.DispatchStage(tx, order)
+		return dispatchErr
+	}))
+
+	require.Len(t, dispatch.StagesValue(), len(stages))
+	require.Len(t, []models.FactoryLineStep(dispatch.Steps), 3)
+	assert.Equal(t, []uuid.UUID{first.ID, second.ID, phaseApp.ID}, []uuid.UUID{
+		dispatch.Steps[0].AppID,
+		dispatch.Steps[1].AppID,
+		dispatch.Steps[2].AppID,
+	})
+	assert.Equal(t, customStage.Key, dispatch.Steps[0].StageKey)
+	assert.Equal(t, customStage.Key, dispatch.Steps[1].StageKey)
+	assert.Equal(t, "phase-0", dispatch.Steps[2].StageKey)
+	require.Len(t, results, 2)
+	assert.Equal(t, firstEntry, results[0].Run.NodeID)
+	assert.Equal(t, secondEntry, results[1].Run.NodeID)
+	assert.Equal(t, []int{0, 1}, []int{results[0].Execution.StepIndex, results[1].Execution.StepIndex})
+}
+
+func Test__FactoryWorkOrder__RetryLineStep__KeepsCustomStageSiblingsRunning(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	order, err := factory.CreateWorkOrder(db, "Order", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	phase, entrypoint := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "Implement", "start")
+	line, err := factory.CreateLine(db, "ship", []models.FactoryLineStep{{
+		Type: models.FactoryLineStepTypeRunApp, AppID: phase.ID, Entrypoint: entrypoint,
+	}})
+	require.NoError(t, err)
+	stageID := uuid.New()
+	stage := models.FactoryLineStage{ID: stageID, Key: "custom-" + stageID.String(), Name: "QA", Kind: models.FactoryLineStageCustom}
+	stages := append([]models.FactoryLineStage{line.StagesValue()[0], stage}, line.StagesValue()[1:]...)
+	require.NoError(t, line.UpdateConfiguration(db, nil, nil, nil, stages))
+	first, _ := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "Lint", "start")
+	second, _ := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "Test", "start")
+	require.NoError(t, first.SetColumnKey(db, stage.Key))
+	require.NoError(t, second.SetColumnKey(db, stage.Key))
+
+	var runs []*models.FactoryLineStepResult
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		_, runs, err = line.DispatchStage(tx, order)
+		return err
+	}))
+	require.Len(t, runs, 2)
+	require.NoError(t, runs[0].Execution.MarkFinished(db, models.CanvasRunResultFailed))
+
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		_, _, err = order.RetryLineStep(tx, line, 0)
+		return err
+	}))
+	sibling, err := models.FindWorkOrderExecutionByRunID(db, runs[1].Run.ID)
+	require.NoError(t, err)
+	assert.NotEqual(t, models.FactoryWorkOrderExecutionStatusFinished, sibling.Status)
+}
+
+func Test__FactoryLine__Queue__KeepsRepeatedAppStageLimitsSeparate(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	app, entrypoint := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "Repeated", "start")
+	one := 1
+	ten := 10
+	line, err := factory.CreateLine(db, "ship", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entrypoint, MaxParallelism: &ten},
+		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entrypoint, MaxParallelism: &one},
+	})
+	require.NoError(t, err)
+	first, err := factory.CreateWorkOrder(db, "First", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	second, err := factory.CreateWorkOrder(db, "Second", "", &r.User, nil, nil)
+	require.NoError(t, err)
+
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		firstDispatch, _, dispatchErr := line.Dispatch(tx, first)
+		if dispatchErr != nil {
+			return dispatchErr
+		}
+		if _, startErr := firstDispatch.EnqueueOrStartStep(tx, first, 1); startErr != nil {
+			return startErr
+		}
+		secondDispatch, _, dispatchErr := line.Dispatch(tx, second)
+		if dispatchErr != nil {
+			return dispatchErr
+		}
+		result, startErr := secondDispatch.EnqueueOrStartStep(tx, second, 1)
+		if startErr != nil {
+			return startErr
+		}
+		require.NotNil(t, result.QueueItem)
+		return nil
+	}))
+}
+
 func Test__FactoryLine__DispatchFrom__StartsRequestedStep(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())

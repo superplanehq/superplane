@@ -832,7 +832,7 @@ func TestMemberRemovalCleansQueuedWorkWithoutARunnerLease(t *testing.T) {
 	require.NoError(t, err)
 	dispatch := &models.FactoryWorkOrderLineDispatch{ID: uuid.New(), OrganizationID: f.OrganizationID, FactoryID: f.ID, WorkOrderID: order.ID, LineID: line.ID, LineName: line.Name, State: models.FactoryWorkOrderLineDispatchStateActive}
 	require.NoError(t, db.Create(dispatch).Error)
-	item := &models.FactoryWorkOrderQueueItem{ID: uuid.New(), OrganizationID: f.OrganizationID, FactoryID: f.ID, WorkOrderID: order.ID, LineID: line.ID, LineDispatchID: dispatch.ID, StepIndex: 0, StepName: "Implement", CreatedAt: time.Now()}
+	item := &models.FactoryWorkOrderQueueItem{ID: uuid.New(), OrganizationID: f.OrganizationID, FactoryID: f.ID, WorkOrderID: order.ID, LineID: line.ID, LineDispatchID: dispatch.ID, AppID: uuid.New(), StepIndex: 0, StepName: "Implement", CreatedAt: time.Now()}
 	require.NoError(t, db.Create(item).Error)
 	assert.Empty(t, codexLeases(t, db, connection.ID))
 	member, err := models.FindActiveUserByIDInTransaction(db, f.OrganizationID.String(), connection.OwnerUserID.String())

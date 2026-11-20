@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -154,7 +155,11 @@ func (c *Canvas) SoftDelete() error {
 }
 
 func ValidCanvasColumnKey(key string) bool {
-	return key == CanvasColumnKeyBacklog || key == CanvasColumnKeyImplement || key == CanvasColumnKeyVerify || key == CanvasColumnKeyDone
+	if key == CanvasColumnKeyBacklog || key == CanvasColumnKeyImplement || key == CanvasColumnKeyVerify || key == CanvasColumnKeyDone {
+		return true
+	}
+	_, err := uuid.Parse(strings.TrimPrefix(key, "custom-"))
+	return strings.HasPrefix(key, "custom-") && err == nil
 }
 
 // SetColumnKey attaches this factory canvas to a board column. An empty key

@@ -185,7 +185,7 @@ func TestSuspensionDoesNotFinishDispatchConcurrentlyAdmittedFromQueue(t *testing
 	require.NoError(t, db.Model(running.Execution).Update("status", models.FactoryWorkOrderExecutionStatusFinished).Error)
 	admission := db.Begin()
 	defer admission.Rollback()
-	admitted, err := models.AdmitQueuedForStep(admission, line.ID, 0)
+	admitted, err := models.AdmitQueuedForStep(admission, line.ID, app.ID, dispatch.Steps[0].StageKey)
 	require.NoError(t, err)
 	require.Len(t, admitted, 1)
 	done := make(chan error, 1)
@@ -335,7 +335,7 @@ func TestSuspensionDiscardsQueuesPreservesSchedulesAndWaitsForRunFinalization(t 
 	require.NoError(t, err)
 	dispatch := models.FactoryWorkOrderLineDispatch{ID: uuid.New(), OrganizationID: r.Organization.ID, FactoryID: factory.ID, WorkOrderID: order.ID, LineID: line.ID, LineName: line.Name, State: models.FactoryWorkOrderLineDispatchStateActive}
 	require.NoError(t, db.Create(&dispatch).Error)
-	item := models.FactoryWorkOrderQueueItem{ID: uuid.New(), OrganizationID: r.Organization.ID, FactoryID: factory.ID, WorkOrderID: order.ID, LineID: line.ID, LineDispatchID: dispatch.ID, StepName: "Build", CreatedAt: time.Now()}
+	item := models.FactoryWorkOrderQueueItem{ID: uuid.New(), OrganizationID: r.Organization.ID, FactoryID: factory.ID, WorkOrderID: order.ID, LineID: line.ID, LineDispatchID: dispatch.ID, AppID: canvas.ID, StepName: "Build", CreatedAt: time.Now()}
 	require.NoError(t, db.Create(&item).Error)
 	require.NoError(t, r.Organization.Suspend(db, uuid.New(), "Stop queued work"))
 	w := NewOrganizationSuspensionWorker()

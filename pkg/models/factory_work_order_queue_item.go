@@ -21,6 +21,8 @@ type FactoryWorkOrderQueueItem struct {
 	WorkOrderID    uuid.UUID
 	LineID         uuid.UUID
 	LineDispatchID uuid.UUID
+	AppID          uuid.UUID
+	StageKey       string
 	StepIndex      int
 	StepName       string
 	CreatedAt      time.Time
@@ -31,7 +33,7 @@ func (i *FactoryWorkOrderQueueItem) Delete(tx *gorm.DB) error {
 }
 
 // FactoryWorkOrderQueueItemRecord is a queue item joined with its 1-based
-// position inside the step's queue, for API serialization.
+// position inside the automation's queue, for API serialization.
 type FactoryWorkOrderQueueItemRecord struct {
 	FactoryWorkOrderQueueItem
 	Position int
@@ -59,7 +61,8 @@ func ListFactoryWorkOrderQueueItemsByLineDispatchIDs(
 				SELECT COUNT(*)
 				FROM factory_work_order_queue_items ahead
 				WHERE ahead.line_id = q.line_id
-				  AND ahead.step_index = q.step_index
+				  AND ahead.app_id = q.app_id
+				  AND ahead.stage_key = q.stage_key
 				  AND (ahead.created_at, ahead.id) < (q.created_at, q.id)
 			) + 1 AS position
 		`).
@@ -100,12 +103,13 @@ func lockFactoryLineForStepAdmission(tx *gorm.DB, lineID uuid.UUID) (*FactoryLin
 
 // countQueuedFactoryStepItems counts the dispatches waiting in the step's
 // queue across all work orders of the line.
-func countQueuedFactoryStepItems(tx *gorm.DB, lineID uuid.UUID, stepIndex int) (int64, error) {
+func countQueuedFactoryStepItems(tx *gorm.DB, lineID, appID uuid.UUID, stageKey string) (int64, error) {
 	var count int64
 	err := tx.
 		Model(&FactoryWorkOrderQueueItem{}).
 		Where("line_id = ?", lineID).
-		Where("step_index = ?", stepIndex).
+		Where("app_id = ?", appID).
+		Where("stage_key = ?", stageKey).
 		Count(&count).
 		Error
 	if err != nil {
@@ -118,13 +122,16 @@ func countQueuedFactoryStepItems(tx *gorm.DB, lineID uuid.UUID, stepIndex int) (
 // countActiveFactoryStepExecutions counts the step's in-flight runs across
 // all work orders and dispatches of the line — the number a step's
 // maxParallelism caps.
-func countActiveFactoryStepExecutions(tx *gorm.DB, lineID uuid.UUID, stepIndex int) (int64, error) {
+func countActiveFactoryStepExecutions(tx *gorm.DB, lineID, appID uuid.UUID, stageKey string) (int64, error) {
 	var count int64
 	err := tx.
 		Model(&FactoryWorkOrderExecution{}).
-		Where("line_id = ?", lineID).
-		Where("step_index = ?", stepIndex).
-		Where("status IN ?", []string{
+		Joins("JOIN workflow_runs ON workflow_runs.id = factory_work_order_executions.run_id").
+		Joins("JOIN factory_work_order_line_dispatches ON factory_work_order_line_dispatches.id = factory_work_order_executions.line_dispatch_id").
+		Where("factory_work_order_executions.line_id = ?", lineID).
+		Where("workflow_runs.workflow_id = ?", appID).
+		Where("COALESCE(factory_work_order_line_dispatches.steps -> factory_work_order_executions.step_index ->> 'stage_key', '') = ?", stageKey).
+		Where("factory_work_order_executions.status IN ?", []string{
 			FactoryWorkOrderExecutionStatusPending,
 			FactoryWorkOrderExecutionStatusRunning,
 		}).
@@ -144,19 +151,31 @@ func countActiveFactoryStepExecutions(tx *gorm.DB, lineID uuid.UUID, stepIndex i
 // in-flight traversals immediately; the dispatch snapshot is the fallback
 // when the live line got shorter.
 func admissionStep(liveLine *FactoryLine, dispatch *FactoryWorkOrderLineDispatch, stepIndex int) *FactoryLineStep {
+	snapshotSteps := []FactoryLineStep(dispatch.Steps)
+	snapshot := &snapshotSteps[stepIndex]
 	liveSteps := []FactoryLineStep(liveLine.Steps)
-	if stepIndex < len(liveSteps) {
+	if snapshot.StageKey != "" {
+		for _, stage := range liveLine.StagesValue() {
+			if stage.Key == snapshot.StageKey && stage.StepIndex != nil && *stage.StepIndex < len(liveSteps) {
+				return &liveSteps[*stage.StepIndex]
+			}
+		}
+	}
+	if stepIndex < len(liveSteps) && liveSteps[stepIndex].AppID == snapshot.AppID {
 		return &liveSteps[stepIndex]
 	}
-
-	snapshotSteps := []FactoryLineStep(dispatch.Steps)
-	return &snapshotSteps[stepIndex]
+	for index := range liveSteps {
+		if liveSteps[index].AppID == snapshot.AppID {
+			return &liveSteps[index]
+		}
+	}
+	return snapshot
 }
 
-func findOldestFactoryWorkOrderQueueItem(tx *gorm.DB, lineID uuid.UUID, stepIndex int) (*FactoryWorkOrderQueueItem, error) {
+func findOldestFactoryWorkOrderQueueItem(tx *gorm.DB, lineID, appID uuid.UUID, stageKey string) (*FactoryWorkOrderQueueItem, error) {
 	var item FactoryWorkOrderQueueItem
 	err := tx.
-		Where("line_id = ? AND step_index = ?", lineID, stepIndex).
+		Where("line_id = ? AND app_id = ? AND stage_key = ?", lineID, appID, stageKey).
 		Order("created_at ASC").
 		Order("id ASC").
 		First(&item).
@@ -231,14 +250,14 @@ func (o *FactoryWorkOrder) dropQueuedLineWork(tx *gorm.DB) error {
 	return nil
 }
 
-// AdmitQueuedForStep admits queued dispatches of (lineID, stepIndex) in
+// AdmitQueuedForStep admits queued dispatches of (lineID, appID) in
 // FIFO order, oldest first, while the step has free slots — normally one
 // per finished run, more when the step's maxParallelism was raised
 // mid-flight and a finished run reveals the extra capacity. Queue items
 // whose work order is no longer open are dropped (their dispatch finishes
 // as cancelled) without using a slot. Returns one result per admitted
 // dispatch, oldest first; empty when nothing was admitted.
-func AdmitQueuedForStep(tx *gorm.DB, lineID uuid.UUID, stepIndex int) ([]*FactoryLineStepResult, error) {
+func AdmitQueuedForStep(tx *gorm.DB, lineID, appID uuid.UUID, stageKey string) ([]*FactoryLineStepResult, error) {
 	line, err := lockFactoryLineForStepAdmission(tx, lineID)
 	if err != nil {
 		return nil, err
@@ -246,7 +265,7 @@ func AdmitQueuedForStep(tx *gorm.DB, lineID uuid.UUID, stepIndex int) ([]*Factor
 
 	var admitted []*FactoryLineStepResult
 	for {
-		item, err := findOldestFactoryWorkOrderQueueItem(tx, lineID, stepIndex)
+		item, err := findOldestFactoryWorkOrderQueueItem(tx, lineID, appID, stageKey)
 		if err != nil {
 			return nil, err
 		}
@@ -259,8 +278,8 @@ func AdmitQueuedForStep(tx *gorm.DB, lineID uuid.UUID, stepIndex int) ([]*Factor
 			return nil, err
 		}
 
-		step := admissionStep(line, dispatch, stepIndex)
-		active, err := countActiveFactoryStepExecutions(tx, lineID, stepIndex)
+		step := admissionStep(line, dispatch, item.StepIndex)
+		active, err := countActiveFactoryStepExecutions(tx, lineID, appID, stageKey)
 		if err != nil {
 			return nil, err
 		}
