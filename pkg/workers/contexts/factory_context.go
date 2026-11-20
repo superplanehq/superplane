@@ -718,6 +718,7 @@ func (c *FactoryContext) UpdateWorkOrderStatus(params core.UpdateWorkOrderStatus
 		}
 		result = pullRequestResult
 	}
+	leftColumn, leftErr := models.WorkOrderBoardColumn(c.tx, order)
 	changed, err := order.UpdateStatus(c.tx, models.FactoryWorkOrderStatusUpdate{
 		ToState:         params.State,
 		Result:          result,
@@ -737,6 +738,7 @@ func (c *FactoryContext) UpdateWorkOrderStatus(params core.UpdateWorkOrderStatus
 	if !changed {
 		return workOrderToCore(order), false, nil
 	}
+	c.emitColumnLeave(order, leftColumn, leftErr)
 	if order.State == models.FactoryWorkOrderStateClosed {
 		factoryModel, findErr := models.FindFactory(c.tx, order.OrganizationID, order.FactoryID)
 		if findErr != nil {
@@ -764,6 +766,39 @@ func (c *FactoryContext) UpdateWorkOrderStatus(params core.UpdateWorkOrderStatus
 	})
 	c.captureAutomationClose(order)
 	return workOrderToCore(order), true, nil
+}
+
+func (c *FactoryContext) emitColumnLeave(order *models.FactoryWorkOrder, leftColumn string, leftErr error) {
+	if leftErr != nil {
+		log.WithError(leftErr).Warnf("failed to read the column for task %s", order.ID)
+		return
+	}
+	if leftColumn == "" {
+		return
+	}
+	next, err := models.WorkOrderBoardColumn(c.tx, order)
+	if err != nil || next == leftColumn {
+		if err != nil {
+			log.WithError(err).Warnf("failed to read the column for task %s", order.ID)
+		}
+		return
+	}
+	factoryModel, err := models.FindFactory(c.tx, order.OrganizationID, order.FactoryID)
+	if err != nil {
+		log.WithError(err).Warnf("failed to load factory for leave automation on task %s", order.ID)
+		return
+	}
+	events, err := EmitColumnLeaveCustomAutomations(
+		c.tx, factoryModel, order, leftColumn,
+		ColumnLeaveDedupKey(order.ID, leftColumn, order.UpdatedAt.UTC().Format(time.RFC3339Nano)),
+	)
+	if err != nil {
+		log.WithError(err).Warnf("failed to start %s leave automation for task %s", leftColumn, order.ID)
+		return
+	}
+	if c.onNewEvents != nil {
+		c.onNewEvents(events)
+	}
 }
 
 func (c *FactoryContext) captureAutomationClose(order *models.FactoryWorkOrder) {

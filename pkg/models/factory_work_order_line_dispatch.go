@@ -915,6 +915,34 @@ func WorkOrderIsWaitingAfterPassedStage(tx *gorm.DB, workOrderID uuid.UUID) (boo
 		furthest.Result == CanvasRunResultPassed, nil
 }
 
+// WorkOrderBoardColumn is the board column that currently shows this task.
+// An archived task is not on the board.
+func WorkOrderBoardColumn(tx *gorm.DB, order *FactoryWorkOrder) (string, error) {
+	if order == nil {
+		return "", nil
+	}
+	switch order.State {
+	case FactoryWorkOrderStateDraft:
+		return CanvasColumnKeyBacklog, nil
+	case FactoryWorkOrderStateClosed:
+		if order.Result == FactoryWorkOrderResultArchived {
+			return "", nil
+		}
+		return CanvasColumnKeyDone, nil
+	case FactoryWorkOrderStateOpen:
+		inVerify, err := WorkOrderIsWaitingAfterPassedStage(tx, order.ID)
+		if err != nil {
+			return "", err
+		}
+		if inVerify {
+			return CanvasColumnKeyVerify, nil
+		}
+		return CanvasColumnKeyImplement, nil
+	default:
+		return "", nil
+	}
+}
+
 // rejectStepAdmission records a failed attempt without a run for confirmed
 // subscription failures. Contention and database errors still abort the
 // caller's transaction so the preceding completion can retry unchanged.
