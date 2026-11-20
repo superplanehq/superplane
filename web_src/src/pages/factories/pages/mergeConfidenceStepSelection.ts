@@ -10,8 +10,11 @@ const NO_CHECKS_STEP: PlanningReviewStep = {
     "Enabled checks: none.\nNo merge confidence checks are enabled. Do not inspect the repository or call the report_merge_check tool.",
 };
 
-function isKnownCheck(id: string | null): id is MergeConfidenceCheck {
-  return MERGE_CONFIDENCE_CHECKS.some((check) => check === id);
+function builtInCheckId(step: PlanningReviewStep): MergeConfidenceCheck | undefined {
+  const id = mergeCheckId(step.prompt);
+  // Old and new prompts share the same switch. Keep each saved prompt's scoring scale.
+  if (id === "correctness") return "drift";
+  return MERGE_CONFIDENCE_CHECKS.find((check) => check === id);
 }
 
 function isPlaceholder(step: PlanningReviewStep): boolean {
@@ -21,7 +24,7 @@ function isPlaceholder(step: PlanningReviewStep): boolean {
 }
 
 export function enabledMergeChecks(steps: readonly PlanningReviewStep[]): MergeConfidenceCheck[] {
-  const ids = new Set(steps.map((step) => mergeCheckId(step.prompt)));
+  const ids = new Set(steps.map(builtInCheckId));
   return MERGE_CONFIDENCE_CHECKS.filter((id) => ids.has(id));
 }
 
@@ -33,20 +36,17 @@ export function stepsWithMergeChecks(
 ): PlanningReviewStep[] {
   const selected = MERGE_CONFIDENCE_CHECKS.filter((id) => enabled.includes(id)).map((id) => {
     const step =
-      steps.find((step) => mergeCheckId(step.prompt) === id) ??
-      defaults.find((step) => mergeCheckId(step.prompt) === id);
+      steps.find((step) => builtInCheckId(step) === id) ?? defaults.find((step) => builtInCheckId(step) === id);
     if (step) return step;
     const label = MERGE_CONFIDENCE_CHECK_COPY.find((check) => check.id === id)?.label ?? id;
     throw new Error(`Could not load the default ${label} check. Try saving again.`);
   });
-  const checkSlots = steps.flatMap((step, index) =>
-    isKnownCheck(mergeCheckId(step.prompt)) || isPlaceholder(step) ? [index] : [],
-  );
+  const checkSlots = steps.flatMap((step, index) => (builtInCheckId(step) || isPlaceholder(step) ? [index] : []));
   const lastCheckSlot = checkSlots[checkSlots.length - 1] ?? -1;
   const result: PlanningReviewStep[] = [];
   let nextCheck = 0;
   steps.forEach((step, index) => {
-    if (!isKnownCheck(mergeCheckId(step.prompt)) && !isPlaceholder(step)) {
+    if (!builtInCheckId(step) && !isPlaceholder(step)) {
       result.push(step);
       return;
     }
