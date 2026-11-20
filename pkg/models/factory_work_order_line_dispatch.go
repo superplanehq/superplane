@@ -182,7 +182,7 @@ func (l *FactoryWorkOrderLineDispatch) StartStage(
 
 	results := make([]*FactoryLineStepResult, 0, 2)
 	for index := stepIndex; index < len(steps) && steps[index].StageKey == stageKey; index++ {
-		result, err := l.StartStep(tx, order, index)
+		result, err := l.EnqueueOrStartStep(tx, order, index)
 		if err != nil {
 			return nil, err
 		}
@@ -648,15 +648,18 @@ func (o *FactoryWorkOrder) RetryLineStep(tx *gorm.DB, line *FactoryLine, stepInd
 	}
 
 	customStage := target.Steps[stepIndex].StageKind == FactoryLineStageCustom
-	if !customStage {
-		// Release before reactivate, so every path takes the line admission
-		// lock before the dispatch row and the two cannot deadlock.
-		released, err := target.releaseOpenWorkFrom(tx, stepIndex)
-		if err != nil {
-			return nil, nil, err
-		}
-		started = append(started, released...)
+	// Release before reactivate, so every path takes the line admission
+	// lock before the dispatch row and the two cannot deadlock.
+	var released []*FactoryLineStepResult
+	if customStage {
+		released, err = target.releaseOpenWorkForCustomRetry(tx, stepIndex)
+	} else {
+		released, err = target.releaseOpenWorkFrom(tx, stepIndex)
 	}
+	if err != nil {
+		return nil, nil, err
+	}
+	started = append(started, released...)
 
 	if err := target.Reactivate(tx); err != nil {
 		return nil, nil, err
@@ -690,7 +693,7 @@ func lineStepExecutionResults(results ...*FactoryLineStepResult) []*FactoryLineS
 // parallelism slots let in. The caller must publish the returned runs
 // after commit.
 func (l *FactoryWorkOrderLineDispatch) releaseOpenWorkFrom(tx *gorm.DB, stepIndex int) ([]*FactoryLineStepResult, error) {
-	if err := l.settleOpenWorkFrom(tx, stepIndex); err != nil {
+	if err := l.settleOpenWorkRange(tx, stepIndex, len(l.Steps)); err != nil {
 		return nil, err
 	}
 
@@ -706,16 +709,47 @@ func (l *FactoryWorkOrderLineDispatch) releaseOpenWorkFrom(tx *gorm.DB, stepInde
 	return started, nil
 }
 
-func (l *FactoryWorkOrderLineDispatch) settleOpenWorkFrom(tx *gorm.DB, stepIndex int) error {
+// releaseOpenWorkForCustomRetry restarts one automation without interrupting
+// its sibling automations in the same stage. Work in later stages cannot stay
+// open because it could advance the traversal independently of the retry.
+func (l *FactoryWorkOrderLineDispatch) releaseOpenWorkForCustomRetry(tx *gorm.DB, stepIndex int) ([]*FactoryLineStepResult, error) {
+	_, stageEnd := l.StageStepRange(stepIndex)
+	if err := l.settleOpenWorkRange(tx, stepIndex, stepIndex+1); err != nil {
+		return nil, err
+	}
+	if err := l.settleOpenWorkRange(tx, stageEnd, len(l.Steps)); err != nil {
+		return nil, err
+	}
+
+	indices := []int{stepIndex}
+	for index := stageEnd; index < len(l.Steps); index++ {
+		indices = append(indices, index)
+	}
+
+	var started []*FactoryLineStepResult
+	for _, index := range indices {
+		admitted, err := AdmitQueuedForStep(tx, l.LineID, l.Steps[index].AppID, l.Steps[index].StageKey)
+		if err != nil {
+			return nil, err
+		}
+		started = append(started, lineStepExecutionResults(admitted...)...)
+	}
+	return started, nil
+}
+
+func (l *FactoryWorkOrderLineDispatch) settleOpenWorkRange(tx *gorm.DB, start, end int) error {
+	if start >= end {
+		return nil
+	}
 	if err := tx.
-		Where("line_dispatch_id = ? AND step_index >= ?", l.ID, stepIndex).
+		Where("line_dispatch_id = ? AND step_index >= ? AND step_index < ?", l.ID, start, end).
 		Delete(&FactoryWorkOrderQueueItem{}).Error; err != nil {
 		return err
 	}
 
 	var executions []FactoryWorkOrderExecution
 	err := tx.
-		Where("line_dispatch_id = ? AND step_index >= ?", l.ID, stepIndex).
+		Where("line_dispatch_id = ? AND step_index >= ? AND step_index < ?", l.ID, start, end).
 		Where("status IN ?", []string{
 			FactoryWorkOrderExecutionStatusPending,
 			FactoryWorkOrderExecutionStatusRunning,

@@ -3,6 +3,7 @@ import type {
   FactoriesWorkOrder,
   FactoriesWorkOrderExecution,
   FactoriesWorkOrderLineDispatch,
+  FactoryLineStage,
 } from "@/api-client";
 import { automationNameForLineStep, lineStepParallelism } from "./factoryLineFormShared";
 import { factoryAppPath, factoryAppRunPath, factoryHomePath, factoryLineDetailPath } from "./factoryPagePaths";
@@ -107,7 +108,7 @@ export function buildLinePhaseBoard(
     tick: null,
   }));
 
-  const runsByStep = collectCurrentRunsByStep(lineId, steps, workOrders);
+  const runsByStep = collectCurrentRunsByStep(lineId, steps, line.stages ?? [], workOrders);
   for (const column of columns) {
     column.runs = runsByStep.get(column.stepIndex) ?? [];
     column.tick = resolvePhaseTick(column.runs);
@@ -372,11 +373,12 @@ export function resolveRunGlyph(run: LinePhaseRunCard): PhaseGlyphKind {
 function collectCurrentRunsByStep(
   lineId: string,
   steps: NonNullable<FactoriesFactoryLine["steps"]>,
+  stages: FactoryLineStage[],
   workOrders: FactoriesWorkOrder[],
 ): Map<number, LinePhaseRunCard[]> {
   const runsByStep = new Map<number, LinePhaseRunCard[]>();
   for (const order of workOrders) {
-    appendCurrentRunForOrder(order, lineId, steps, runsByStep);
+    appendCurrentRunForOrder(order, lineId, steps, stages, runsByStep);
   }
   for (const runs of runsByStep.values()) {
     runs.sort(compareRunsNewestFirst);
@@ -393,11 +395,25 @@ function executionStepIndex(execution: FactoriesWorkOrderExecution): number | un
 
 function liveColumnIndexForExecution(
   steps: NonNullable<FactoriesFactoryLine["steps"]>,
+  stages: FactoryLineStage[],
   execution: FactoriesWorkOrderExecution,
 ): number | undefined {
   const stepIndex = executionStepIndex(execution);
   if (stepIndex == null) {
     return undefined;
+  }
+
+  // Dispatch step indexes count custom automations, so the saved stage key
+  // decides the phase lane. Custom stage lanes come from collectCustomStageRuns.
+  const stageKey = execution.stageKey?.trim();
+  if (stageKey) {
+    const stage = stages.find((candidate) => candidate.key === stageKey);
+    if (stage?.kind === "STAGE_KIND_CUSTOM" || stageKey.startsWith("custom-")) {
+      return undefined;
+    }
+    if (stage?.stepIndex != null && stage.stepIndex >= 0 && stage.stepIndex < steps.length) {
+      return stage.stepIndex;
+    }
   }
 
   // Dispatch stepIndex is a snapshot. A later line edit can move that
@@ -441,6 +457,7 @@ function appendCurrentRunForOrder(
   order: FactoriesWorkOrder,
   lineId: string,
   steps: NonNullable<FactoriesFactoryLine["steps"]>,
+  stages: FactoryLineStage[],
   runsByStep: Map<number, LinePhaseRunCard[]>,
 ): void {
   if (!order.id || order.state === "STATE_CLOSED" || order.state === "STATE_DRAFT") {
@@ -462,7 +479,7 @@ function appendCurrentRunForOrder(
   }
 
   const currentExecution = pickCurrentLineExecution(lineExecutions);
-  const stepIndex = currentExecution ? liveColumnIndexForExecution(steps, currentExecution) : undefined;
+  const stepIndex = currentExecution ? liveColumnIndexForExecution(steps, stages, currentExecution) : undefined;
   if (!currentExecution || stepIndex == null) {
     return;
   }

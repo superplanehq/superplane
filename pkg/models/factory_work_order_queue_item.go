@@ -62,7 +62,7 @@ func ListFactoryWorkOrderQueueItemsByLineDispatchIDs(
 				FROM factory_work_order_queue_items ahead
 				WHERE ahead.line_id = q.line_id
 				  AND ahead.app_id = q.app_id
-				  AND ahead.stage_key = q.stage_key
+				  AND (ahead.stage_key = q.stage_key OR ahead.stage_key = '' OR q.stage_key = '')
 				  AND (ahead.created_at, ahead.id) < (q.created_at, q.id)
 			) + 1 AS position
 		`).
@@ -105,11 +105,12 @@ func lockFactoryLineForStepAdmission(tx *gorm.DB, lineID uuid.UUID) (*FactoryLin
 // queue across all work orders of the line.
 func countQueuedFactoryStepItems(tx *gorm.DB, lineID, appID uuid.UUID, stageKey string) (int64, error) {
 	var count int64
-	err := tx.
+	query := tx.
 		Model(&FactoryWorkOrderQueueItem{}).
 		Where("line_id = ?", lineID).
-		Where("app_id = ?", appID).
-		Where("stage_key = ?", stageKey).
+		Where("app_id = ?", appID)
+	query = includeLegacyStageKey(query, "stage_key", stageKey)
+	err := query.
 		Count(&count).
 		Error
 	if err != nil {
@@ -124,13 +125,18 @@ func countQueuedFactoryStepItems(tx *gorm.DB, lineID, appID uuid.UUID, stageKey 
 // maxParallelism caps.
 func countActiveFactoryStepExecutions(tx *gorm.DB, lineID, appID uuid.UUID, stageKey string) (int64, error) {
 	var count int64
-	err := tx.
+	query := tx.
 		Model(&FactoryWorkOrderExecution{}).
 		Joins("JOIN workflow_runs ON workflow_runs.id = factory_work_order_executions.run_id").
 		Joins("JOIN factory_work_order_line_dispatches ON factory_work_order_line_dispatches.id = factory_work_order_executions.line_dispatch_id").
 		Where("factory_work_order_executions.line_id = ?", lineID).
-		Where("workflow_runs.workflow_id = ?", appID).
-		Where("COALESCE(factory_work_order_line_dispatches.steps -> factory_work_order_executions.step_index ->> 'stage_key', '') = ?", stageKey).
+		Where("workflow_runs.workflow_id = ?", appID)
+	query = includeLegacyStageKey(
+		query,
+		"COALESCE(factory_work_order_line_dispatches.steps -> factory_work_order_executions.step_index ->> 'stage_key', '')",
+		stageKey,
+	)
+	err := query.
 		Where("factory_work_order_executions.status IN ?", []string{
 			FactoryWorkOrderExecutionStatusPending,
 			FactoryWorkOrderExecutionStatusRunning,
@@ -144,6 +150,17 @@ func countActiveFactoryStepExecutions(tx *gorm.DB, lineID, appID uuid.UUID, stag
 	return count, nil
 }
 
+// includeLegacyStageKey keeps work created before stage snapshots in the
+// matching app's capacity pool until that work drains. Legacy records have an
+// empty stage key. Counting them conservatively can briefly share capacity
+// between repeated uses of one app, but it never lets a stage exceed its cap.
+func includeLegacyStageKey(query *gorm.DB, expression, stageKey string) *gorm.DB {
+	if stageKey == "" {
+		return query.Where(expression + " = ''")
+	}
+	return query.Where(expression+" IN ?", []string{"", stageKey})
+}
+
 // admissionStep resolves which step definition governs admission — what
 // the dispatch is snapshotted to run stays fixed, but the capacity cap is
 // a live line resource. The live line wins when it still has a step at
@@ -153,6 +170,9 @@ func countActiveFactoryStepExecutions(tx *gorm.DB, lineID, appID uuid.UUID, stag
 func admissionStep(liveLine *FactoryLine, dispatch *FactoryWorkOrderLineDispatch, stepIndex int) *FactoryLineStep {
 	snapshotSteps := []FactoryLineStep(dispatch.Steps)
 	snapshot := &snapshotSteps[stepIndex]
+	if snapshot.StageKind == FactoryLineStageCustom {
+		return snapshot
+	}
 	liveSteps := []FactoryLineStep(liveLine.Steps)
 	if snapshot.StageKey != "" {
 		for _, stage := range liveLine.StagesValue() {
@@ -174,8 +194,9 @@ func admissionStep(liveLine *FactoryLine, dispatch *FactoryWorkOrderLineDispatch
 
 func findOldestFactoryWorkOrderQueueItem(tx *gorm.DB, lineID, appID uuid.UUID, stageKey string) (*FactoryWorkOrderQueueItem, error) {
 	var item FactoryWorkOrderQueueItem
-	err := tx.
-		Where("line_id = ? AND app_id = ? AND stage_key = ?", lineID, appID, stageKey).
+	query := tx.Where("line_id = ? AND app_id = ?", lineID, appID)
+	query = includeLegacyStageKey(query, "stage_key", stageKey)
+	err := query.
 		Order("created_at ASC").
 		Order("id ASC").
 		First(&item).

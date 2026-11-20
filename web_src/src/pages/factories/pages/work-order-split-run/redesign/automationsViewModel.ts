@@ -283,7 +283,27 @@ export function stagesByConsoleColumn(
     }
     (columns[consoleColumnIdForStage(stage)] ??= []).push(stage);
   }
+  foldImplementIntoFirstPhase(columns, columnIds);
   return columns;
+}
+
+/**
+ * Saved stages name Implement `phase-0`, but Implement column apps and
+ * older runs still report `implement`. Keep their activity visible.
+ */
+function foldImplementIntoFirstPhase(
+  columns: Record<ConsoleColumnId, AutomationStage[]>,
+  columnIds: readonly string[],
+): void {
+  if (columnIds.includes("implement")) {
+    return;
+  }
+  const firstPhase = columnIds.find((id) => id.startsWith("phase-"));
+  if (!firstPhase) {
+    return;
+  }
+  columns[firstPhase] = [...columns[firstPhase], ...columns.implement];
+  columns.implement = [];
 }
 
 export function stageFromPhase(phase: SplitRunPhase): AutomationStage {

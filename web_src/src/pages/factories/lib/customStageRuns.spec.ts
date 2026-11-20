@@ -96,4 +96,40 @@ describe("collectCustomStageRuns", () => {
     expect(board[0]?.runs).toHaveLength(0);
     expect(collectCustomStageRuns("line-1", "custom-qa", [task])).toHaveLength(1);
   });
+
+  it("places a repeated app by its saved phase key, not the shifted step index", () => {
+    const task: FactoriesWorkOrder = {
+      id: "wo-repeated",
+      state: "STATE_OPEN",
+      lineDispatches: [
+        {
+          line: { id: "line-1" },
+          stepExecutions: [
+            {
+              id: "phase-0-running",
+              stepIndex: 1,
+              stageKey: "phase-0",
+              state: "STATE_STARTED",
+              run: { appId: "app-repeated" },
+            },
+          ],
+        },
+      ],
+    };
+    const board = buildLinePhaseBoard(
+      {
+        id: "line-1",
+        steps: [{ app: { app: "app-repeated" } }, { app: { app: "app-repeated" } }],
+        stages: [
+          { key: "custom-qa", kind: "STAGE_KIND_CUSTOM" },
+          { key: "phase-0", kind: "STAGE_KIND_PHASE", stepIndex: 0 },
+          { key: "phase-1", kind: "STAGE_KIND_PHASE", stepIndex: 1 },
+        ],
+      },
+      [task],
+      [{ id: "app-repeated", name: "Repeated" }],
+    );
+
+    expect(board.map((column) => column.runs.length)).toEqual([1, 0]);
+  });
 });
