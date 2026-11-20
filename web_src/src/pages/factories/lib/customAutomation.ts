@@ -200,6 +200,7 @@ export function customAutomationDraft(automation?: FactoriesFactoryCustomAutomat
           ...customAutomationAgentConfiguration(agent),
           steps,
           executionTimeoutSeconds: customAutomationTimeout(settings?.executionTimeoutSeconds),
+          skipSetupCommands: settings?.skipSetupCommands === true,
         },
         concurrency: { max: "5", key: "" },
       },
@@ -235,6 +236,7 @@ export function customAutomationSettings(
     ...(mode === "scheduled" ? { schedule } : {}),
     icon,
     executionTimeoutSeconds: customAutomationTimeout(configuration.executionTimeoutSeconds),
+    skipSetupCommands: configuration.skipSetupCommands === true,
     agent: component?.component
       ? {
           component: component.component,

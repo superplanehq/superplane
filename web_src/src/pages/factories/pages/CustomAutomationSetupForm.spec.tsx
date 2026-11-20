@@ -23,7 +23,10 @@ vi.mock("@/hooks/useFactoryCustomAutomationData", () => ({
   useCreateFactoryCustomAutomation: () => ({ mutateAsync: saveAutomation, isPending: false }),
   useUpdateFactoryCustomAutomation: () => ({ mutateAsync: saveAutomation, isPending: false }),
 }));
-vi.mock("./PlanningReviewForm", () => ({ PlanningReviewForm: () => null }));
+vi.mock("@/hooks/useComponentData", () => ({ useComponent: () => ({}) }));
+vi.mock("@/hooks/useByokRunnerModelDefault", () => ({ useByokRunnerModelDefault: () => undefined }));
+vi.mock("@/hooks/useExperimentalFeature", () => ({ useExperimentalFeature: () => ({ has: () => false }) }));
+vi.mock("@/hooks/useFactoryAgentResources", () => ({ useFactoryAgentResources: () => ({}) }));
 
 function Editor({ columnKey }: { columnKey?: "backlog" | "verify" }) {
   const model = useCustomAutomationSetupPage({
@@ -62,6 +65,10 @@ it("selects Schedule, recovers from a save error, and reopens the saved schedule
   saveAutomation.mockRejectedValueOnce(new Error("Schedule has no future run."));
   saveAutomation.mockResolvedValueOnce({});
   const view = render(<Editor />);
+  const skipSetup = screen.getByRole("switch", { name: "Skip setup commands" });
+  expect(skipSetup).not.toBeChecked();
+  await user.click(skipSetup);
+  expect(saveAutomation).not.toHaveBeenCalled();
   await user.click(screen.getByRole("tab", { name: "with no task" }));
   await user.click(screen.getByRole("button", { name: "Add trigger" }));
   await user.click(screen.getByRole("menuitem", { name: /Schedule/ }));
@@ -79,10 +86,13 @@ it("selects Schedule, recovers from a save error, and reopens the saved schedule
   const saved = saveAutomation.mock.calls[1]![0];
   expect(saved.settings.schedule).toEqual({ cronExpression: "30 0 9 * * MON-FRI", utcOffset: 5.75 });
   expect(saved.settings.runsOnTask).toBe(false);
+  expect(saved.settings.skipSetupCommands).toBe(true);
   expect(saved.settings.steps).toEqual(automation.settings!.steps);
   view.unmount();
   automation = { automation: automation.automation, settings: saved.settings };
   render(<Editor />);
+  expect(screen.getByRole("switch", { name: "Skip setup commands" })).toBeChecked();
+  await user.click(screen.getByRole("switch", { name: "Skip setup commands" }));
   expect(screen.queryByLabelText("Cron expression")).not.toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: /^Schedule/ }));
   expect(screen.getByLabelText("Cron expression")).toHaveValue("30 0 9 * * MON-FRI");
@@ -92,6 +102,7 @@ it("selects Schedule, recovers from a save error, and reopens the saved schedule
   await user.click(screen.getByRole("button", { name: "Save" }));
   await waitFor(() => expect(saveAutomation).toHaveBeenCalledTimes(3));
   expect(saveAutomation.mock.calls[2]![0].settings.schedule.utcOffset).toBe(-3.5);
+  expect(saveAutomation.mock.calls[2]![0].settings.skipSetupCommands).toBe(false);
   expect(screen.getByRole("button", { name: /Bash Lint/ })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: /Prompt Review/ })).toBeInTheDocument();
 });
