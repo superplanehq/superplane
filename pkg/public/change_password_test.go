@@ -19,12 +19,16 @@ import (
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/factories"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/mcp"
 	"github.com/superplanehq/superplane/pkg/mcpserver"
 	"github.com/superplanehq/superplane/pkg/models"
+	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/pkg/supportsession"
 	"github.com/superplanehq/superplane/test/support"
+	"google.golang.org/grpc/codes"
 	"gorm.io/gorm"
 )
 
@@ -265,6 +269,65 @@ func TestChangePassword_RejectsConcurrentMCPConsent(t *testing.T) {
 	var codes int64
 	require.NoError(t, database.DB(t.Context()).Model(&models.MCPOAuthCode{}).Where("user_id = ?", r.User).Count(&codes).Error)
 	require.Zero(t, codes)
+}
+
+func TestChangePassword_MCPRevocationRace(t *testing.T) {
+	for _, rotationFirst := range []bool{true, false} {
+		name := "revocation-first"
+		if rotationFirst {
+			name = "rotation-first"
+		}
+		t.Run(name, func(t *testing.T) {
+			server, r, token := setupChangePasswordTestServer(t)
+			require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactories))
+			require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureSuperPlaneMCPServer))
+			db := database.DB(t.Context())
+			factory, err := models.CreateFactory(db, r.Organization.ID, "Revocation fixture", "", "REV")
+			require.NoError(t, err)
+			cookie := &http.Cookie{Name: "account_token", Value: token}
+			authorize := func() string {
+				return passwordMCPCode(t, server, cookie, r.Organization.ID.String(), factory.ID.String(), mcpserver.LocalClientID)
+			}
+			_, refresh := passwordMCPTokens(t, exchangeMCPCode(server, authorize(), mcpserver.LocalClientID, mcpserver.CursorRedirectURIs[0]))
+			pending := authorize()
+			stored, err := models.FindMCPOAuthRefreshToken(db, crypto.HashToken(refresh), time.Now())
+			require.NoError(t, err)
+			revoke := func() error {
+				_, err := factories.RevokeFactoryMCPClient(t.Context(), r.Organization.ID.String(), &pb.RevokeFactoryMCPClientRequest{
+					FactoryId: factory.ID.String(), ClientId: stored.ID.String(),
+				})
+				return err
+			}
+			body := mustMarshal(t, changePasswordRequest{CurrentPassword: testCurrentPassword, NewPassword: testNewPassword})
+			var rotated *httptest.ResponseRecorder
+			rotate := func() error {
+				rotated = sendChangePasswordRequest(server, body, cookie)
+				return nil
+			}
+			race := &acceptanceRace{t: t}
+			release := race.holdRow(&models.Account{}, r.Account.ID)
+			first, second := revoke, rotate
+			if rotationFirst {
+				first, second = rotate, revoke
+			}
+			firstDone := run(first)
+			race.waitForLockWaiters(1)
+			secondDone := run(second)
+			race.waitForLockWaiters(2)
+			release()
+			require.NoError(t, finished(t, firstDone))
+			err = finished(t, secondDone)
+			if rotationFirst {
+				require.Error(t, err)
+				assert.Equal(t, codes.NotFound, grpcerrors.Code(err))
+			} else {
+				require.NoError(t, err)
+			}
+			require.Equal(t, http.StatusNoContent, rotated.Code, rotated.Body.String())
+			require.Equal(t, http.StatusBadRequest, passwordMCPRefresh(server, refresh, mcpserver.LocalClientID).Code)
+			require.Equal(t, http.StatusBadRequest, exchangeMCPCode(server, pending, mcpserver.LocalClientID, mcpserver.CursorRedirectURIs[0]).Code)
+		})
+	}
 }
 
 func TestChangePassword_MCPExchangeRace(t *testing.T) {

@@ -147,13 +147,13 @@ func DeleteMCPOAuthCode(tx *gorm.DB, code *MCPOAuthCode) error {
 }
 
 // LockMCPOAuthAccount discovers ownership without locking a credential row.
-// Exchanges must take the account lock before re-reading and locking the grant.
-func LockMCPOAuthAccount(tx *gorm.DB, credential any, hashColumn, hash string) (*Account, error) {
+// Exchanges and revocations must lock the account before re-reading the grant.
+func LockMCPOAuthAccount(tx *gorm.DB, credential any, lookupColumn, value string) (*Account, error) {
 	var owner struct{ AccountID uuid.UUID }
 	err := tx.Model(credential).
 		Select("users.account_id").
 		Joins("JOIN users ON users.id = user_id").
-		Where(clause.Eq{Column: clause.Column{Table: clause.CurrentTable, Name: hashColumn}, Value: hash}).
+		Where(clause.Eq{Column: clause.Column{Table: clause.CurrentTable, Name: lookupColumn}, Value: value}).
 		Scan(&owner).Error
 	if err != nil {
 		return nil, err
