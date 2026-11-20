@@ -1,127 +1,80 @@
-import type { FactoriesFactoryLine, FactoryLineStage } from "@/api-client";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { LoadingButton } from "@/components/ui/loading-button";
-import { useUpdateFactoryLine } from "@/hooks/useFactoryData";
-import { getApiErrorMessage } from "@/lib/errors";
 import { useState } from "react";
 
-import { orderedLineBoardStages, type LineBoardStage } from "../lib/lineBoardStages";
+import type { LineBoardStage } from "../lib/lineBoardStages";
 
+/** Names a draft stage. The stage is created when the stage edits are saved. */
 export function AddLineStageDialog({
-  organizationId,
-  factoryId,
-  line,
+  stages,
   open,
   onClose,
-  onCreated,
+  onAdd,
 }: {
-  organizationId: string;
-  factoryId: string;
-  line: FactoriesFactoryLine;
+  stages: LineBoardStage[];
   open: boolean;
   onClose: () => void;
-  onCreated: (stage: LineBoardStage) => void;
+  onAdd: (name: string) => void;
 }) {
   const [name, setName] = useState("");
-  const [error, setError] = useState("");
-  const updateLine = useUpdateFactoryLine(organizationId, factoryId);
-  const stages = orderedLineBoardStages(line);
   const trimmedName = name.trim();
   const duplicate = stages.some((stage) => stage.name.toLocaleLowerCase() === trimmedName.toLocaleLowerCase());
 
   const close = () => {
-    if (updateLine.isPending) {
-      return;
-    }
     setName("");
-    setError("");
     onClose();
   };
 
-  const create = async () => {
-    if (!line.id || !trimmedName || duplicate) {
+  const add = () => {
+    if (!trimmedName || duplicate) {
       return;
     }
-    setError("");
-    const temporaryKey = `new-${crypto.randomUUID()}`;
-    const next = insertBeforeDone(stages, {
-      id: "",
-      key: temporaryKey,
-      name: trimmedName,
-      kind: "STAGE_KIND_CUSTOM",
-    });
-    try {
-      const updated = await updateLine.mutateAsync({
-        lineId: line.id,
-        stageConfiguration: { stages: next },
-      });
-      const created = orderedLineBoardStages(updated).find(
-        (stage) => stage.kind === "STAGE_KIND_CUSTOM" && !stages.some((existing) => existing.id === stage.id),
-      );
-      if (!created) {
-        setError("SuperPlane could not find the new stage.");
-        return;
-      }
-      setName("");
-      onCreated(created);
-    } catch (createError) {
-      setError(getApiErrorMessage(createError, "SuperPlane could not add the stage."));
-    }
+    setName("");
+    onAdd(trimmedName);
   };
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && close()}>
-      <DialogContent
-        className="sm:max-w-md"
-        showCloseButton={!updateLine.isPending}
-        data-testid="add-line-stage-dialog"
-      >
+      <DialogContent className="sm:max-w-md" data-testid="add-line-stage-dialog">
         <DialogHeader>
           <DialogTitle>Add stage</DialogTitle>
+          <DialogDescription>The stage goes before Done. It is created when you save your changes.</DialogDescription>
         </DialogHeader>
-        <div className="space-y-2">
+        <form
+          className="space-y-2"
+          onSubmit={(event) => {
+            event.preventDefault();
+            add();
+          }}
+        >
           <Label htmlFor="line-stage-name">Name</Label>
           <Input
             id="line-stage-name"
             value={name}
             maxLength={64}
             autoFocus
-            onChange={(event) => {
-              setName(event.target.value);
-              setError("");
-            }}
+            onChange={(event) => setName(event.target.value)}
           />
           {duplicate ? <p className="text-sm text-destructive">Stage names must be unique.</p> : null}
-          {error ? (
-            <p role="alert" className="text-sm text-destructive">
-              {error}
-            </p>
-          ) : null}
-        </div>
+        </form>
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={close} disabled={updateLine.isPending}>
+          <Button type="button" variant="outline" onClick={close}>
             Cancel
           </Button>
-          <LoadingButton
-            type="button"
-            onClick={() => void create()}
-            disabled={!trimmedName || duplicate}
-            loading={updateLine.isPending}
-            loadingText="Adding..."
-          >
+          <Button type="button" onClick={add} disabled={!trimmedName || duplicate}>
             Add stage
-          </LoadingButton>
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
-}
-
-function insertBeforeDone(stages: LineBoardStage[], stage: FactoryLineStage): FactoryLineStage[] {
-  const doneIndex = stages.findIndex((entry) => entry.kind === "STAGE_KIND_DONE");
-  const index = doneIndex < 0 ? stages.length : doneIndex;
-  return [...stages.slice(0, index), stage, ...stages.slice(index)];
 }

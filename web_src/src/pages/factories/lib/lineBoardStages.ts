@@ -66,3 +66,51 @@ export function reorderLineBoardStages(stages: LineBoardStage[], stageId: string
   next.splice(toIndex, 0, moved);
   return next;
 }
+
+const NEW_STAGE_KEY_PREFIX = "new-";
+
+/** A stage added in edit mode. The server creates it on save. */
+export function isDraftLineBoardStage(stage: Pick<LineBoardStage, "key">): boolean {
+  return stage.key.startsWith(NEW_STAGE_KEY_PREFIX);
+}
+
+export function insertStageBeforeDone(stages: LineBoardStage[], name: string): LineBoardStage[] {
+  const key = `${NEW_STAGE_KEY_PREFIX}${crypto.randomUUID()}`;
+  const stage: LineBoardStage = { id: key, key, name: name.trim(), kind: "STAGE_KIND_CUSTOM" };
+  const doneIndex = stages.findIndex((entry) => entry.kind === "STAGE_KIND_DONE");
+  const index = doneIndex < 0 ? stages.length : doneIndex;
+  return [...stages.slice(0, index), stage, ...stages.slice(index)];
+}
+
+export function removeLineBoardStage(stages: LineBoardStage[], stageId: string): LineBoardStage[] {
+  return stages.filter(
+    (stage) => stage.id !== stageId || stage.kind === "STAGE_KIND_BACKLOG" || stage.kind === "STAGE_KIND_DONE",
+  );
+}
+
+export type LineStageChanges = {
+  added: LineBoardStage[];
+  removed: LineBoardStage[];
+  reordered: boolean;
+};
+
+export function lineStageChanges(saved: LineBoardStage[], draft: LineBoardStage[]): LineStageChanges {
+  const draftIds = new Set(draft.map((stage) => stage.id));
+  const savedIds = new Set(saved.map((stage) => stage.id));
+  const keptSavedOrder = saved.filter((stage) => draftIds.has(stage.id)).map((stage) => stage.id);
+  const keptDraftOrder = draft.filter((stage) => savedIds.has(stage.id)).map((stage) => stage.id);
+  return {
+    added: draft.filter(isDraftLineBoardStage),
+    removed: saved.filter((stage) => !draftIds.has(stage.id)),
+    reordered: keptSavedOrder.join() !== keptDraftOrder.join(),
+  };
+}
+
+export function hasLineStageChanges(changes: LineStageChanges): boolean {
+  return changes.added.length > 0 || changes.removed.length > 0 || changes.reordered;
+}
+
+/** New stages go out without an id, so the server assigns their id and key. */
+export function stagesForSave(draft: LineBoardStage[]): FactoryLineStage[] {
+  return draft.map((stage) => (isDraftLineBoardStage(stage) ? { ...stage, id: "" } : stage));
+}
