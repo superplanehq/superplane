@@ -500,6 +500,17 @@ func (w *RunFinalizer) startAutomaticCustomAutomationsForRun(runID uuid.UUID) {
 	if err := factoryactions.StartAutomaticCustomAutomations(context.Background(), w.factoryIntakeDeps(), factory, order); err != nil {
 		w.logger.WithError(err).Warnf("custom automation: failed to start automatic automations for order %s", order.ID)
 	}
+	column, columnErr := models.WorkOrderBoardColumn(db, order)
+	if columnErr != nil {
+		w.logger.WithError(columnErr).Warnf("custom automation: failed to read the column for order %s", order.ID)
+		return
+	}
+	if column != models.CanvasColumnKeyVerify {
+		return
+	}
+	if err := factoryactions.StartColumnLeaveCustomAutomations(db, factory, order, models.CanvasColumnKeyImplement, execution.ID.String()); err != nil {
+		w.logger.WithError(err).Warnf("custom automation: failed to start Implement leave automation for order %s", order.ID)
+	}
 }
 
 func (w *RunFinalizer) maybeFinalizeRun(tx *gorm.DB, runID uuid.UUID, trigger string, eventCollector func([]models.CanvasEvent), executionCollector func([]models.CanvasNodeExecution)) (bool, string, error) {

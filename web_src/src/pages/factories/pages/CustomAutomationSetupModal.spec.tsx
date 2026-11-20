@@ -178,6 +178,18 @@ describe("custom automation configuration run history", () => {
   });
 
   it.each([
+    ["backlog", "Backlog"],
+    ["implement", "Implement"],
+    ["verify", "Verify"],
+    ["done", "Done"],
+  ] as const)("offers a leave trigger on %s", async (columnKey, label) => {
+    hooks.describe.mockReturnValue({});
+    renderModal("?customAutomation=new", undefined, columnKey);
+    await userEvent.setup().click(screen.getByRole("button", { name: "Add trigger" }));
+    expect(screen.getByRole("menuitem", { name: new RegExp(`When a task leaves ${label}`) })).toBeEnabled();
+  });
+
+  it.each([
     ["backlog", "When a task enters Backlog", "Manual"],
     ["implement", "When a task enters Implement", "Manual"],
     ["done", "When a task enters Done", "Manual"],

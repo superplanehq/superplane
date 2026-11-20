@@ -1,6 +1,7 @@
 package runner_test
 
 import (
+	"strconv"
 	"testing"
 	"time"
 
@@ -25,12 +26,12 @@ func TestClosedDoneAutomationReceivesRunnerToken(t *testing.T) {
 
 	t.Run("closed task", func(t *testing.T) {
 		order := closedTask(t, db, factory, r, models.FactoryWorkOrderResultFailed)
-		assert.True(t, runner.HasRunnerToken(runnerTokenEnv(t, db, r, factory, canvas, order)))
+		assert.True(t, runner.HasRunnerToken(runnerTokenEnv(t, db, r, factory, canvas, order, "")))
 	})
 
 	t.Run("archived task", func(t *testing.T) {
 		order := closedTask(t, db, factory, r, models.FactoryWorkOrderResultArchived)
-		assert.False(t, runner.HasRunnerToken(runnerTokenEnv(t, db, r, factory, canvas, order)))
+		assert.False(t, runner.HasRunnerToken(runnerTokenEnv(t, db, r, factory, canvas, order, "")))
 	})
 
 	t.Run("closed task on Verify", func(t *testing.T) {
@@ -39,8 +40,30 @@ func TestClosedDoneAutomationReceivesRunnerToken(t *testing.T) {
 		t.Cleanup(func() {
 			require.NoError(t, db.Model(canvas).Update("column_key", models.CanvasColumnKeyDone).Error)
 		})
-		assert.False(t, runner.HasRunnerToken(runnerTokenEnv(t, db, r, factory, canvas, order)))
+		assert.False(t, runner.HasRunnerToken(runnerTokenEnv(t, db, r, factory, canvas, order, "")))
 	})
+}
+
+func TestLeaveAutomationKeepsRunnerAccessAfterTheTaskCloses(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	t.Setenv("JWT_SECRET", "test")
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	canvas := doneAutomationCanvas(t, r, factory)
+	require.NoError(t, db.Model(canvas).Update("column_key", models.CanvasColumnKeyBacklog).Error)
+
+	for _, result := range []string{models.FactoryWorkOrderResultFailed, models.FactoryWorkOrderResultArchived} {
+		t.Run(result, func(t *testing.T) {
+			order := closedTask(t, db, factory, r, result)
+			env := runnerTokenEnv(t, db, r, factory, canvas, order, order.ID.String()+"|leave|backlog|1")
+			assert.True(t, runner.HasRunnerToken(env))
+			assert.Contains(t, env, runner.TaskEnvironmentVariable{
+				Name:  runner.EnvSuperplaneTaskID,
+				Value: strconv.FormatInt(order.Number, 10),
+			})
+		})
+	}
 }
 
 func runnerTokenEnv(
@@ -50,6 +73,7 @@ func runnerTokenEnv(
 	factory *models.Factory,
 	canvas *models.Canvas,
 	order *models.FactoryWorkOrder,
+	dedupKey string,
 ) []runner.TaskEnvironmentVariable {
 	t.Helper()
 	now := time.Now()
@@ -62,6 +86,9 @@ func runnerTokenEnv(
 		}),
 		State:     models.CanvasEventStatePending,
 		CreatedAt: &now,
+	}
+	if dedupKey != "" {
+		event.DedupKey = &dedupKey
 	}
 	require.NoError(t, db.Create(event).Error)
 	run, err := models.CreateCanvasRunInTransaction(db, canvas.ID, "on-task", models.CanvasRunStateStarted, "")
