@@ -313,4 +313,44 @@ steps:
 	ownerID, err := models.RequireSubscriptionRunOwner(db, r.Organization.ID, factory.ID, uuid.MustParse(result.GetRunId()))
 	require.NoError(t, err)
 	require.Equal(t, r.User, ownerID)
+
+	// Simulate a raw version that predates YAML adoption with matching owner metadata.
+	published, err := models.FindLiveCanvasVersionInTransaction(db, created.ID)
+	require.NoError(t, err)
+	raw := *published
+	raw.ID = uuid.New()
+	raw.AutomationManaged = false
+	require.NoError(t, db.Create(&raw).Error)
+	rawRun, err := models.CreateCanvasRunInTransaction(db, created.ID, published.Nodes[0].ID, models.CanvasRunStateStarted, "")
+	require.NoError(t, err)
+	require.NoError(t, db.Model(rawRun).Update("version_id", raw.ID).Error)
+	_, err = models.RequireSubscriptionRunOwner(db, r.Organization.ID, factory.ID, rawRun.ID)
+	require.ErrorIs(t, err, models.ErrSubscriptionTaskAssociation)
+
+	// A later YAML save must keep the original validated run authorized.
+	_, err = service.Update(ctx, r.Organization.ID, created.ID, r.User, source)
+	require.NoError(t, err)
+	ownerID, err = models.RequireSubscriptionRunOwner(db, r.Organization.ID, factory.ID, uuid.MustParse(result.GetRunId()))
+	require.NoError(t, err)
+	require.Equal(t, r.User, ownerID)
+
+	// Form saves use the generated publisher and must retain validated provenance.
+	described, err := DescribeFactoryCustomAutomation(ctx, r.Organization.ID.String(), &pb.DescribeFactoryCustomAutomationRequest{
+		FactoryId: factory.ID.String(), AutomationId: created.ID.String(),
+	})
+	require.NoError(t, err)
+	settings := described.GetCustomAutomation().GetSettings()
+	settings.Steps[0].Prompt = "Look for new tasks."
+	_, err = UpdateFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &pb.UpdateFactoryCustomAutomationRequest{
+		FactoryId: factory.ID.String(), AutomationId: created.ID.String(), Name: created.Name, Settings: settings,
+	})
+	require.NoError(t, err)
+	formRun, err := RunFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &pb.RunFactoryCustomAutomationRequest{
+		FactoryId: factory.ID.String(), AutomationId: created.ID.String(),
+	})
+	require.NoError(t, err)
+	ownerID, err = models.RequireSubscriptionRunOwner(db, r.Organization.ID, factory.ID, uuid.MustParse(formRun.GetRunId()))
+	require.NoError(t, err)
+	require.Equal(t, r.User, ownerID)
+
 }

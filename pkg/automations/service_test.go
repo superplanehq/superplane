@@ -120,6 +120,49 @@ func TestServiceKeepsSourceAndBackendRevisionTogether(t *testing.T) {
 	require.Empty(t, currentFactory.Description)
 }
 
+func TestServiceValidatesSecretsInOneOrganizationScopedQuery(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, "Secrets", "", "SEC")
+	require.NoError(t, err)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureAutomationsAsCode))
+	for _, name := range []string{"FIRST", "SECOND"} {
+		_, err := models.CreateSecret(name, "local", r.User.String(), models.DomainTypeOrganization, r.Organization.ID, []byte("{}"))
+		require.NoError(t, err)
+	}
+	_, err = models.CreateSecret("FOREIGN", "local", r.User.String(), models.DomainTypeOrganization, uuid.New(), []byte("{}"))
+	require.NoError(t, err)
+
+	type queryScope struct{}
+	ctx := context.WithValue(t.Context(), queryScope{}, true)
+	queries := 0
+	callback := "test:automation_secret_queries"
+	require.NoError(t, db.Callback().Query().After("gorm:query").Register(callback, func(query *gorm.DB) {
+		if query.Statement.Context.Value(queryScope{}) == true && query.Statement.Table == "secrets" {
+			queries++
+		}
+	}))
+	t.Cleanup(func() { require.NoError(t, db.Callback().Query().Remove(callback)) })
+	service := automations.Service{Backend: backendWithoutCanvases{}}
+	placement := automations.Placement{OrganizationID: r.Organization.ID, FactoryID: factory.ID, Stage: string(automationspec.Backlog)}
+	source := automationSource + "    secrets: [FIRST, SECOND]\n  - name: Again\n    bash: echo again\n    secrets: [FIRST]\n"
+	_, err = service.Validate(ctx, placement, source)
+	require.NoError(t, err)
+	require.Equal(t, 1, queries)
+
+	queries = 0
+	_, err = service.Validate(ctx, placement, strings.Replace(source, "[FIRST]", "[FOREIGN]", 1))
+	require.ErrorContains(t, err, "steps[1].secrets[0]")
+	require.ErrorContains(t, err, "FOREIGN")
+	require.Equal(t, 1, queries)
+
+	queries = 0
+	_, err = service.Validate(ctx, placement, automationSource)
+	require.NoError(t, err)
+	require.Zero(t, queries)
+}
+
 var errCannotPublish = errors.New("backend could not publish")
 
 type backendWithoutCanvases struct{}

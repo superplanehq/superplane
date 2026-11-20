@@ -25,6 +25,9 @@ type CanvasVersion struct {
 	CommitSHA     string
 	CreatedAt     *time.Time
 	UpdatedAt     *time.Time
+
+	// AutomationManaged records validated publication outside editable node metadata.
+	AutomationManaged bool
 }
 
 type CanvasVersionMetadata struct {
@@ -38,6 +41,14 @@ type CanvasVersionMetadata struct {
 
 func (c *CanvasVersion) TableName() string {
 	return "workflow_versions"
+}
+
+func (c *CanvasVersion) MarkAutomationManaged(tx *gorm.DB) error {
+	if err := tx.Model(c).Update("automation_managed", true).Error; err != nil {
+		return err
+	}
+	c.AutomationManaged = true
+	return nil
 }
 
 func FindCanvasVersion(workflowID, versionID uuid.UUID) (*CanvasVersion, error) {

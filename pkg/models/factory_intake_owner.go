@@ -84,7 +84,7 @@ func customAutomationScheduleSubscriptionOwner(tx *gorm.DB, canvas *Canvas, vers
 	if err != nil {
 		return uuid.Nil, err
 	}
-	if !managed {
+	if !managed || !version.AutomationManaged {
 		return uuid.Nil, gorm.ErrRecordNotFound
 	}
 	var owner uuid.UUID
@@ -107,7 +107,6 @@ func customAutomationScheduleSubscriptionOwner(tx *gorm.DB, canvas *Canvas, vers
 	if err != nil {
 		return uuid.Nil, err
 	}
-	// A raw graph published before adoption cannot grant a subscription.
 	config := factory.OnboardingConfigValue()
 	if !config.CodexSubscription || config.CodexDefaultOwnerID != owner.String() {
 		return uuid.Nil, ErrSubscriptionOwnerInvalid

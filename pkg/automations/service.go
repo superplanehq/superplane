@@ -222,14 +222,27 @@ func (s Service) check(ctx context.Context, tx *gorm.DB, placement Placement, do
 		return err
 	}
 
+	var names []string
+	secrets := make(map[string]bool)
+	for _, step := range doc.Steps {
+		for _, name := range step.Secrets {
+			if _, seen := secrets[name]; !seen {
+				names = append(names, name)
+				secrets[name] = false
+			}
+		}
+	}
+	existing, err := models.FindExistingSecretNames(tx, models.DomainTypeOrganization, placement.OrganizationID, names)
+	if err != nil {
+		return err
+	}
+	for _, name := range existing {
+		secrets[name] = true
+	}
 	for i, step := range doc.Steps {
 		for j, name := range step.Secrets {
-			_, err := models.FindSecretByNameInTransaction(tx, models.DomainTypeOrganization, placement.OrganizationID, name)
-			if errors.Is(err, gorm.ErrRecordNotFound) {
+			if !secrets[name] {
 				return doc.Diagnostic(fmt.Sprintf("steps[%d].secrets[%d]", i, j), fmt.Sprintf("Create the organization secret %q or select an existing secret.", name))
-			}
-			if err != nil {
-				return err
 			}
 		}
 	}

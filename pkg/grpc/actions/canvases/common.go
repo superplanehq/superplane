@@ -147,6 +147,8 @@ func PublishGeneratedCanvasNodesWithOwner(
 		ConsoleLayout: datatypes.NewJSONType(slices.Clone(liveVersion.ConsoleLayout.Data())),
 		CreatedAt:     &now,
 		UpdatedAt:     &now,
+
+		AutomationManaged: liveVersion.AutomationManaged,
 	}
 
 	if err := tx.Create(nextVersion).Error; err != nil {

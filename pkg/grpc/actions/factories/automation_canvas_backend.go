@@ -115,6 +115,9 @@ func (b CanvasAutomationBackend) Apply(
 	if err := checkAutomationCanvasNodes(source, published.Nodes); err != nil {
 		return automations.Artifact{}, nil, err
 	}
+	if err := published.MarkAutomationManaged(tx); err != nil {
+		return automations.Artifact{}, nil, err
+	}
 	return automations.Artifact{ID: canvas.ID.String(), Revision: published.ID.String()}, func() {
 		canvases.PublishCanvasUpdated(canvas)
 	}, nil
