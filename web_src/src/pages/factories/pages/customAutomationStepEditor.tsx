@@ -83,20 +83,6 @@ export function StepEditor({
           </SelectContent>
         </Select>
       </ImplementSettingRow>
-      {asCode ? (
-        <ImplementSettingRow
-          label="Working directory"
-          description="Leave blank to use the runner's working directory."
-          htmlFor="custom-automation-working-directory"
-        >
-          <Input
-            id="custom-automation-working-directory"
-            value={step.workingDirectory ?? ""}
-            onChange={(event) => onChange({ ...step, workingDirectory: event.target.value })}
-            className="w-full shadow-none"
-          />
-        </ImplementSettingRow>
-      ) : null}
       <div className="flex flex-col gap-2">
         <div className="flex flex-col gap-1.5">
           <Label>{step.type === "prompt" ? "Prompt" : "Commands"}</Label>

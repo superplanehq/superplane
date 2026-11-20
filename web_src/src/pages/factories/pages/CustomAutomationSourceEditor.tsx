@@ -72,7 +72,7 @@ export function CustomAutomationSourceEditor({
             factoryId={factoryId}
             factoryKey={routeSegment}
             columnKey={stage}
-            asCode={{ agent: definition.agent, onAgentChange: (agent) => model.editCanvas({ agent }) }}
+            asCode
             error={error}
             onNameChange={(name) => model.editCanvas({ name })}
             onIconChange={(icon) => model.editCanvas({ icon })}

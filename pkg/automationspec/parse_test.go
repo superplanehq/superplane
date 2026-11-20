@@ -39,7 +39,6 @@ steps:
     bash: |
       git status --short
         # Indentation and the final newline matter.
-    working_directory: /tmp
     secrets: [REPORT_TOKEN]
   - name: Inspect
     prompt: |-
@@ -113,7 +112,7 @@ func TestParseRejectsInvalidDefinitionAtItsSource(t *testing.T) {
 		{"two step actions", definitionHeader + manualTrigger + bashStep + "    prompt: Summarize changes\n", "steps[0].prompt", 9, 13},
 		{"secrets on prompt", definitionHeader + manualTrigger + "steps:\n  - name: Inspect\n    prompt: Inspect\n    secrets: [TOKEN]\n", "steps[0].secrets", 9, 14},
 		{"duplicate secrets", definitionHeader + manualTrigger + bashStep + "    secrets: [TOKEN, TOKEN]\n", "steps[0].secrets[1]", 9, 22},
-		{"escaping working directory", definitionHeader + manualTrigger + bashStep + "    working_directory: repo/../../other\n", "steps[0].working_directory", 9, 24},
+		{"removed working directory", definitionHeader + manualTrigger + bashStep + "    working_directory: repo\n", "steps[0].working_directory", 9, 5},
 		{"name on subscription", definitionHeader + manualTrigger + bashStep + "agent: {harness: codex, credentials: {source: subscription, name: shared}}\n", "agent.credentials.name", 9, 67},
 		{"model on subscription", definitionHeader + manualTrigger + bashStep + "agent: {harness: codex, model: x, credentials: {source: subscription}}\n", "agent.model", 9, 32},
 		{"missing integration name", definitionHeader + manualTrigger + bashStep + "agent: {harness: codex, credentials: {source: integration}}\n", "agent.credentials.name", 9, 38},

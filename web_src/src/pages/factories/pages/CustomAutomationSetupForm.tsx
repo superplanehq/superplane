@@ -13,8 +13,6 @@ import { StepEditor } from "./customAutomationStepEditor";
 import { TriggerEditor } from "./CustomAutomationTriggerEditor";
 import type { PlanningReviewDraft, PlanningReviewStep } from "./planningReviewMockup";
 
-import type { AutomationAgent } from "../lib/customAutomationDefinition";
-
 type CustomAutomationSetupFormProps = {
   name: string;
   icon: string;
@@ -28,11 +26,11 @@ type CustomAutomationSetupFormProps = {
   saving: boolean;
   deleting: boolean;
   error: string;
-  asCode?: { agent?: AutomationAgent; onAgentChange: (agent?: AutomationAgent) => void };
+  asCode?: boolean;
   onNameChange: (name: string) => void;
   onIconChange: (icon: string) => void;
   onTriggersChange: (triggers: CustomAutomationTrigger[]) => void;
-  onRunsOnTaskChange: (runsOnTask: boolean | undefined) => void;
+  onRunsOnTaskChange: (runsOnTask: boolean) => void;
   onDraftChange: (draft: PlanningReviewDraft) => void;
   onSave: () => void;
   onDelete?: () => void;
@@ -80,7 +78,7 @@ export function CustomAutomationSetupForm(props: CustomAutomationSetupFormProps)
       <div className="flex min-h-0 flex-1" inert={saving || deleting}>
         <AutomationFlow
           columnKey={columnKey}
-          asCode={Boolean(asCode)}
+          asCode={asCode}
           triggers={customAutomationTriggersForRun(triggers, runsOnTask)}
           runsOnTask={runsOnTask !== false}
           steps={steps}
@@ -101,7 +99,7 @@ export function CustomAutomationSetupForm(props: CustomAutomationSetupFormProps)
               onMove={(offset) => selectedStep !== null && moveStepAt(selectedStep, offset)}
               onRemove={() => selectedStep !== null && removeStepAt(selectedStep)}
               organizationId={organizationId}
-              asCode={Boolean(asCode)}
+              asCode={asCode}
             />
           ) : (
             <TriggerEditor

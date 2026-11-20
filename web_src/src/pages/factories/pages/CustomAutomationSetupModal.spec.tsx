@@ -259,11 +259,18 @@ describe("custom automation YAML draft", () => {
 apiVersion: v2
 kind: Automation
 name: Preview
+agent:
+  harness: claude-code
+  credentials:
+    source: integration
+    name: Preview connection
 triggers:
   - use: task_enters_stage
 steps:
   - name: Print marker
     bash: echo original
+  - name: Review
+    prompt: Review the preview.
 `;
   const savedAutomation = {
     id: "custom-1",
@@ -287,6 +294,10 @@ steps:
     const user = userEvent.setup();
     expect(await screen.findByLabelText("Automation name")).toHaveValue("Preview");
     expect(screen.getAllByText("When a task enters Backlog").length).toBeGreaterThan(0);
+    expect(screen.queryByRole("combobox", { name: "Agent" })).toBeNull();
+    expect(screen.queryByRole("combobox", { name: "Credentials" })).toBeNull();
+    await user.click(screen.getByRole("button", { name: /Review.*Review the preview/ }));
+    expect(screen.queryByLabelText("Working directory")).toBeNull();
 
     await user.click(screen.getByRole("tab", { name: "YAML" }));
     expect(screen.getByLabelText("Automation YAML")).toHaveValue(savedYaml);
@@ -295,6 +306,7 @@ steps:
     await user.click(screen.getByRole("tab", { name: "YAML" }));
     const projected = (screen.getByLabelText("Automation YAML") as HTMLTextAreaElement).value;
     expect(projected).toContain("name: Board preview");
+    expect(projected).toContain("name: Preview connection");
     const edited = `# Unsaved comment\n${projected.replace("echo original", "echo edited")}`;
     fireEvent.change(screen.getByLabelText("Automation YAML"), { target: { value: edited } });
     await user.click(screen.getByRole("tab", { name: "Canvas" }));
@@ -338,7 +350,10 @@ steps:
     const onClose = renderModal("?customAutomation=custom-1", "custom-1", "backlog", true);
     const user = userEvent.setup();
 
-    await user.click(await screen.findByRole("tab", { name: "with no task" }));
+    const runs = within(await screen.findByRole("tablist", { name: "Runs" }));
+    expect(runs.getAllByRole("tab")).toHaveLength(2);
+    expect(runs.getByRole("tab", { name: "on a task", selected: true })).toBeVisible();
+    await user.click(runs.getByRole("tab", { name: "with no task" }));
     await user.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
@@ -365,7 +380,10 @@ steps:
     const onClose = renderModal("?customAutomation=custom-1", "custom-1", "backlog", true);
     const user = userEvent.setup();
     await user.click(await screen.findByRole("tab", { name: "YAML" }));
-    const draft = savedYaml + "    secrets: [missing-secret]\n";
+    const draft = savedYaml.replace(
+      "    bash: echo original\n",
+      "    bash: echo original\n    secrets: [missing-secret]\n",
+    );
     fireEvent.change(screen.getByLabelText("Automation YAML"), { target: { value: draft } });
     await user.click(screen.getByRole("button", { name: "Save" }));
     expect(await screen.findByRole("alert")).toHaveTextContent(

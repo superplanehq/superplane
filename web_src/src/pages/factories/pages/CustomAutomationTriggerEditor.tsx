@@ -1,7 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn, resolveIcon } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { SegmentedNav } from "@/ui/SegmentedNav";
@@ -17,14 +16,13 @@ import {
   type CustomAutomationMode,
   type CustomAutomationTrigger,
 } from "../lib/customAutomation";
-import { AUTOMATION_AGENTS, isAutomationHarness, type AutomationAgent } from "../lib/customAutomationDefinition";
 import { CustomAutomationScheduleFields } from "./CustomAutomationScheduleFields";
 import { PlanningReviewForm } from "./PlanningReviewForm";
 import type { PlanningReviewDraft } from "./planningReviewMockup";
 
 export function TriggerEditor({
   columnKey,
-  asCode,
+  asCode = false,
   name,
   icon,
   triggers,
@@ -40,13 +38,13 @@ export function TriggerEditor({
   onDraftChange,
 }: {
   columnKey: CustomAutomationColumn;
-  asCode?: { agent?: AutomationAgent; onAgentChange: (agent?: AutomationAgent) => void };
+  asCode?: boolean;
   name: string;
   icon: string;
   triggers: CustomAutomationTrigger[];
   runsOnTask?: boolean;
   onTriggersChange: (triggers: CustomAutomationTrigger[]) => void;
-  onRunsOnTaskChange: (runsOnTask: boolean | undefined) => void;
+  onRunsOnTaskChange: (runsOnTask: boolean) => void;
   draft: PlanningReviewDraft;
   organizationId: string;
   factoryId: string;
@@ -85,7 +83,6 @@ export function TriggerEditor({
             />
           </div>
         </div>
-        {asCode ? <AutomationAgentFields agent={asCode.agent} onChange={asCode.onAgentChange} /> : null}
         <PlanningReviewForm
           draft={draft}
           onChange={onDraftChange}
@@ -104,7 +101,7 @@ export function TriggerEditor({
       <section className="flex flex-col gap-4">
         <div className="flex flex-col gap-1.5">
           <h3 className="text-base font-semibold text-foreground">Triggers</h3>
-          <TriggerContext runsOnTask={runsOnTask} byTrigger={Boolean(asCode)} onRunsOnTaskChange={onRunsOnTaskChange} />
+          <TriggerContext runsOnTask={runsOnTask} onRunsOnTaskChange={onRunsOnTaskChange} />
         </div>
         {visibleTriggers.map((trigger) => (
           <TriggerCard
@@ -218,50 +215,13 @@ function TriggerCard({
   );
 }
 
-function AutomationAgentFields({
-  agent,
-  onChange,
-}: {
-  agent?: AutomationAgent;
-  onChange: (agent?: AutomationAgent) => void;
-}) {
-  return (
-    <div className="grid gap-4">
-      <div className="grid gap-2">
-        <Label htmlFor="custom-automation-agent">Agent</Label>
-        <Select
-          value={agent?.harness ?? "factory"}
-          onValueChange={(harness) => onChange(isAutomationHarness(harness) ? { harness } : undefined)}
-        >
-          <SelectTrigger id="custom-automation-agent" className="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="factory">Factory default</SelectItem>
-            {Object.entries(AUTOMATION_AGENTS).map(([harness, { label }]) => (
-              <SelectItem key={harness} value={harness}>
-                {label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-      {agent && agent.harness !== "superplane" ? (
-        <AutomationCredentialsFields agent={agent} onChange={onChange} />
-      ) : null}
-    </div>
-  );
-}
-
 /** Chooses which triggers this automation can run. The choice is saved. */
 function TriggerContext({
   runsOnTask,
-  byTrigger,
   onRunsOnTaskChange,
 }: {
   runsOnTask?: boolean;
-  byTrigger: boolean;
-  onRunsOnTaskChange: (runsOnTask: boolean | undefined) => void;
+  onRunsOnTaskChange: (runsOnTask: boolean) => void;
 }) {
   return (
     <div className="flex items-center gap-2" data-testid="custom-automation-runs-on-task">
@@ -269,61 +229,13 @@ function TriggerContext({
       <SegmentedNav
         ariaLabel="Runs"
         size="xs"
-        value={runsOnTask === undefined ? "trigger" : runsOnTask ? "task" : "none"}
-        onValueChange={(value) => onRunsOnTaskChange(value === "trigger" ? undefined : value === "task")}
+        value={runsOnTask === undefined ? "" : runsOnTask ? "task" : "none"}
+        onValueChange={(value) => onRunsOnTaskChange(value === "task")}
         options={[
           { value: "task", label: "on a task" },
           { value: "none", label: "with no task" },
-          ...(byTrigger ? [{ value: "trigger", label: "by trigger" }] : []),
         ]}
       />
-    </div>
-  );
-}
-
-function AutomationCredentialsFields({
-  agent,
-  onChange,
-}: {
-  agent: AutomationAgent;
-  onChange: (agent: AutomationAgent) => void;
-}) {
-  return (
-    <div className="grid gap-2">
-      <Label htmlFor="automation-credential-source">Credentials</Label>
-      <Select
-        value={agent.credentials?.source ?? "factory"}
-        onValueChange={(value) => {
-          if (value === "subscription") {
-            onChange({ harness: agent.harness, credentials: { source: "subscription" } });
-          } else if (value === "integration") {
-            onChange({ ...agent, credentials: { source: "integration", name: "" } });
-          } else {
-            onChange({ ...agent, credentials: undefined });
-          }
-        }}
-      >
-        <SelectTrigger id="automation-credential-source" className="w-full">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="factory">Factory default</SelectItem>
-          <SelectItem value="integration">Integration</SelectItem>
-          {agent.harness === "codex" ? <SelectItem value="subscription">ChatGPT subscription</SelectItem> : null}
-        </SelectContent>
-      </Select>
-      {agent.credentials?.source === "integration" ? (
-        <>
-          <Label htmlFor="automation-credential-integration">Integration name</Label>
-          <Input
-            id="automation-credential-integration"
-            value={agent.credentials.name}
-            onChange={(event) =>
-              onChange({ ...agent, credentials: { source: "integration", name: event.target.value } })
-            }
-          />
-        </>
-      ) : null}
     </div>
   );
 }

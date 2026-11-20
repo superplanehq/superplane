@@ -309,7 +309,7 @@ func automationCanvasSettings(stage string, source *automationspec.Document, age
 	}
 	steps := make([]runner.AgentStep, 0, len(source.Steps))
 	for _, step := range source.Steps {
-		translated := runner.AgentStep{Name: step.Name, WorkingDirectory: step.WorkingDirectory, Secrets: step.Secrets}
+		translated := runner.AgentStep{Name: step.Name, Secrets: step.Secrets}
 		if step.Bash != "" {
 			translated.Type = runner.AgentStepBash
 			translated.Command = &step.Bash

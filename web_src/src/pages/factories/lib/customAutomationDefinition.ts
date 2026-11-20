@@ -10,16 +10,16 @@ import {
   type CustomAutomationTrigger,
 } from "./customAutomation";
 
-export const AUTOMATION_AGENTS = {
-  superplane: { label: "SuperPlane", component: "runnerSuperPlane" },
-  "claude-code": { label: "Claude Code", component: "runnerClaudeCode" },
-  codex: { label: "Codex", component: "runnerCodex" },
-  openrouter: { label: "OpenRouter", component: "runnerOpenRouter" },
+const AUTOMATION_AGENT_COMPONENTS = {
+  superplane: "runnerSuperPlane",
+  "claude-code": "runnerClaudeCode",
+  codex: "runnerCodex",
+  openrouter: "runnerOpenRouter",
 };
 
-export type AutomationHarness = keyof typeof AUTOMATION_AGENTS;
-export type AutomationCredentials = { source: "integration"; name: string } | { source: "subscription" };
-export type AutomationAgent = {
+export type AutomationHarness = keyof typeof AUTOMATION_AGENT_COMPONENTS;
+type AutomationCredentials = { source: "integration"; name: string } | { source: "subscription" };
+type AutomationAgent = {
   harness: AutomationHarness;
   model?: string;
   credentials?: AutomationCredentials;
@@ -31,7 +31,6 @@ type AutomationStep = {
   name: string;
   bash?: string;
   prompt?: string;
-  working_directory?: string;
   secrets?: string[];
 };
 export type AutomationDefinition = {
@@ -52,7 +51,7 @@ export function newAutomationDefinition(stage: CustomAutomationColumn): Automati
     kind: "Automation",
     name: "Custom automation",
     triggers: [{ use: stage === "verify" ? "manual" : "task_enters_stage" }],
-    steps: [{ name: "Hello world", bash: 'echo "hello world"', working_directory: "repo" }],
+    steps: [{ name: "Hello world", bash: 'echo "hello world"' }],
   };
 }
 
@@ -215,23 +214,19 @@ function parseAgent(value: unknown): AutomationAgent {
 
 function parseStep(value: unknown, index: number): AutomationStep {
   const path = `steps[${index}]`;
-  const entry = mapping(value, path, ["name", "bash", "prompt", "working_directory", "secrets"]);
+  const entry = mapping(value, path, ["name", "bash", "prompt", "secrets"]);
   const name = singleLine(entry.name, `${path}.name`);
   const bash = optionalText(entry.bash, `${path}.bash`);
   const prompt = optionalText(entry.prompt, `${path}.prompt`);
   if ((bash === undefined) === (prompt === undefined)) {
     problem(path, "Enter either bash or prompt.");
   }
-  const workingDirectory =
-    entry.working_directory === undefined
-      ? undefined
-      : singleLine(entry.working_directory, `${path}.working_directory`);
-  if (entry.secrets === undefined) return { name, bash, prompt, working_directory: workingDirectory };
+  if (entry.secrets === undefined) return { name, bash, prompt };
   if (!bash) problem(`${path}.secrets`, "Only Bash steps can reference secrets.");
   if (!Array.isArray(entry.secrets)) problem(`${path}.secrets`, "Enter a list of secret names.");
   const secrets = entry.secrets.map((secret, i) => singleLine(secret, `${path}.secrets[${i}]`));
   if (secrets.length !== new Set(secrets).size) problem(`${path}.secrets`, "Use each secret name once.");
-  return { name, bash, working_directory: workingDirectory, secrets };
+  return { name, bash, secrets };
 }
 
 function mapping(value: unknown, path: string, fields: string[]): Record<string, unknown> {
@@ -266,13 +261,13 @@ function problem(path: string, reason: string): never {
   throw new Error(`${path} · ${reason}`);
 }
 
-export function isAutomationHarness(harness: string): harness is AutomationHarness {
-  return Object.prototype.hasOwnProperty.call(AUTOMATION_AGENTS, harness);
+function isAutomationHarness(harness: string): harness is AutomationHarness {
+  return Object.prototype.hasOwnProperty.call(AUTOMATION_AGENT_COMPONENTS, harness);
 }
 
 export function automationHarnessForComponent(component?: string): AutomationHarness | undefined {
-  const harnesses = Object.keys(AUTOMATION_AGENTS) as AutomationHarness[];
-  return harnesses.find((harness) => AUTOMATION_AGENTS[harness].component === component);
+  const harnesses = Object.keys(AUTOMATION_AGENT_COMPONENTS) as AutomationHarness[];
+  return harnesses.find((harness) => AUTOMATION_AGENT_COMPONENTS[harness] === component);
 }
 
 export function automationDefinitionCanvas(
@@ -281,7 +276,7 @@ export function automationDefinitionCanvas(
   connections: OrganizationsIntegration[] = [],
 ) {
   const agent = definition.agent;
-  const component = agent ? AUTOMATION_AGENTS[agent.harness].component : workspaceHarness;
+  const component = agent ? AUTOMATION_AGENT_COMPONENTS[agent.harness] : workspaceHarness;
   const draft = customAutomationDraft({
     settings: {
       agent: { component, model: agent?.model },
@@ -291,7 +286,6 @@ export function automationDefinitionCanvas(
         type: step.bash !== undefined ? "TYPE_BASH" : "TYPE_PROMPT",
         command: step.bash,
         prompt: step.prompt,
-        workingDirectory: step.working_directory,
         secrets: step.secrets,
       })),
     },
@@ -311,10 +305,18 @@ export function automationDefinitionCanvas(
   return {
     name: definition.name,
     icon: definition.icon ?? DEFAULT_CUSTOM_AUTOMATION_ICON,
-    runsOnTask: definition.runs_on_task,
+    runsOnTask: automationDefinitionRunContext(definition),
     triggers: definition.triggers.map(canvasTrigger),
     draft,
   };
+}
+
+function automationDefinitionRunContext(definition: AutomationDefinition): boolean | undefined {
+  if (definition.runs_on_task !== undefined) return definition.runs_on_task;
+  if (definition.triggers.every(({ use }) => use !== "schedule")) return true;
+  if (definition.triggers.every(({ use }) => use === "schedule")) return false;
+  // Keep both task and schedule triggers when the YAML already combines them.
+  return undefined;
 }
 
 function canvasTrigger(trigger: AutomationTrigger, index: number): CustomAutomationTrigger {
@@ -370,7 +372,6 @@ export function automationDefinitionSteps(steps: PlanningReviewStep[]): Automati
     name: step.name,
     bash: step.type === "bash" ? (step.command ?? "") : undefined,
     prompt: step.type === "prompt" ? (step.prompt ?? "") : undefined,
-    working_directory: step.workingDirectory || undefined,
     secrets: step.type === "bash" ? step.secrets : undefined,
   }));
 }

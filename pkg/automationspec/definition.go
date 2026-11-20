@@ -50,11 +50,10 @@ type Schedule struct {
 }
 
 type Step struct {
-	Name             string   `yaml:"name" json:"name"`
-	Bash             string   `yaml:"bash,omitempty" json:"bash,omitempty"`
-	Prompt           string   `yaml:"prompt,omitempty" json:"prompt,omitempty"`
-	WorkingDirectory string   `yaml:"working_directory,omitempty" json:"working_directory,omitempty"`
-	Secrets          []string `yaml:"secrets,omitempty" json:"secrets,omitempty"`
+	Name    string   `yaml:"name" json:"name"`
+	Bash    string   `yaml:"bash,omitempty" json:"bash,omitempty"`
+	Prompt  string   `yaml:"prompt,omitempty" json:"prompt,omitempty"`
+	Secrets []string `yaml:"secrets,omitempty" json:"secrets,omitempty"`
 }
 
 type Agent struct {

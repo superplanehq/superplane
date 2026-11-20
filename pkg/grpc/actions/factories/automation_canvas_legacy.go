@@ -119,7 +119,7 @@ func importAutomationCanvas(tx *gorm.DB, factory *models.Factory, canvas *models
 	}
 	for _, step := range settings.GetSteps() {
 		item := automationspec.Step{
-			Name: step.GetName(), WorkingDirectory: step.GetWorkingDirectory(), Secrets: step.GetSecrets(),
+			Name: step.GetName(), Secrets: step.GetSecrets(),
 		}
 		if step.GetType() == pb.FactoryCustomAutomation_Step_TYPE_BASH {
 			item.Bash = step.GetCommand()

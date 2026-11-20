@@ -79,11 +79,6 @@
         "name": { "$ref": "#/$defs/nonblank" },
         "bash": { "$ref": "#/$defs/nonblank" },
         "prompt": { "$ref": "#/$defs/nonblank" },
-        "working_directory": {
-          "$ref": "#/$defs/nonblank",
-          "pattern": "^[^\\r\\n\u0000]+$",
-          "description": "A relative path must stay within the runner's working directory."
-        },
         "secrets": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/nonblank" } }
       },
       "if": { "required": ["bash"] },

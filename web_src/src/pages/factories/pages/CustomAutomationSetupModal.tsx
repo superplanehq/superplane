@@ -99,7 +99,7 @@ function LegacyAutomationModal({ lineId, automationId, columnKey, onClose }: Cus
           onNameChange={model.setName}
           onIconChange={model.setIcon}
           onTriggersChange={model.setTriggers}
-          onRunsOnTaskChange={(runsOnTask) => model.setRunsOnTask(runsOnTask ?? true)}
+          onRunsOnTaskChange={model.setRunsOnTask}
           onDraftChange={model.setDraft}
           onSave={() => void model.save().then((saved) => saved && onClose())}
           onDelete={automationId ? () => void handleDelete() : undefined}

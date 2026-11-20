@@ -2,7 +2,6 @@ package automationspec
 
 import (
 	"fmt"
-	"path"
 	"strings"
 
 	"github.com/robfig/cron/v3"
@@ -25,12 +24,6 @@ func (d *Document) validateSemantics() error {
 		}
 	}
 
-	for index, step := range d.Steps {
-		cleaned := path.Clean(step.WorkingDirectory)
-		if cleaned == ".." || strings.HasPrefix(cleaned, "../") {
-			return d.Diagnostic(itemPath("steps", index)+".working_directory", "Keep the relative path within the runner's working directory.")
-		}
-	}
 	return nil
 }
 
