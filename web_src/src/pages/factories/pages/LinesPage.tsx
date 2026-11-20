@@ -2064,7 +2064,7 @@ function PhaseBoard({
                     aria-label={`Reorder ${stage.name}`}
                     title="Drag to reorder stage"
                     data-testid={`lines-stage-reorder-${stage.key}`}
-                    className="h-6 w-full cursor-grab touch-none rounded-sm text-muted-foreground hover:text-foreground active:cursor-grabbing"
+                    className="h-6 w-16 cursor-grab touch-none rounded-sm text-muted-foreground hover:text-foreground active:cursor-grabbing"
                     onDragStart={(event) => startStageDrag(event, stage)}
                     onDragEnd={finishStageDrag}
                     onKeyDown={(event) => moveStageWithKeyboard(event, stage)}
