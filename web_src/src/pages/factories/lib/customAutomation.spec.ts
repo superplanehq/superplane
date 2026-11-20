@@ -3,6 +3,8 @@ import { describe, expect, it } from "bun:test";
 import { buildColumnAutomations, columnAutomationOpenPath } from "./columnAutomations";
 import {
   customAutomationDraft,
+  customAutomationTriggersForRun,
+  newCustomAutomationTrigger,
   customAutomationModeCopy,
   customAutomationSettings,
   customAutomationSchedule,
@@ -32,6 +34,9 @@ describe("custom automation settings", () => {
     expect(saved.startMode).toBe("START_MODE_SCHEDULED");
     expect(customAutomationSettings("manual", draft).steps).toEqual(saved.steps);
     expect(customAutomationSettings("automatic", draft).steps).toEqual(saved.steps);
+    expect(customAutomationSettings("leave", draft).startMode).toBe("START_MODE_ON_LEAVE");
+    expect(customAutomationMode("START_MODE_ON_LEAVE")).toBe("leave");
+    expect(customAutomationModeCopy("leave", "verify").trigger).toBe("When a task leaves Verify");
     expect(
       customAutomationSchedule({
         settings: { startMode: "START_MODE_SCHEDULED", schedule: { cronExpression: "0 9 * * *" } },
@@ -244,5 +249,18 @@ describe("custom automation settings", () => {
     expect(customAutomationIdFromSearch("?customAutomation=review-1")).toBe("review-1");
     expect(customAutomationIdFromSearch("?customVerification=review-1")).toBe("review-1");
     expect(customAutomationIdFromSearch("")).toBeUndefined();
+  });
+});
+
+describe("trigger run context", () => {
+  it.each([
+    [undefined, ["manual", "automatic", "leave", "scheduled"]],
+    [true, ["manual", "automatic", "leave"]],
+    [false, ["manual", "scheduled"]],
+  ] as const)("filters triggers for runsOnTask=%s", (runsOnTask, expected) => {
+    const triggers = (["manual", "automatic", "leave", "scheduled"] as const).map((mode) =>
+      newCustomAutomationTrigger(mode),
+    );
+    expect(customAutomationTriggersForRun(triggers, runsOnTask).map(({ mode }) => mode)).toEqual([...expected]);
   });
 });

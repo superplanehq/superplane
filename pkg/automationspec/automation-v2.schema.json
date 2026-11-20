@@ -30,6 +30,7 @@
       "allOf": [
         { "contains": { "type": "object", "required": ["use"], "properties": { "use": { "const": "manual" } } }, "minContains": 0, "maxContains": 1 },
         { "contains": { "type": "object", "required": ["use"], "properties": { "use": { "const": "task_enters_stage" } } }, "minContains": 0, "maxContains": 1 },
+        { "contains": { "type": "object", "required": ["use"], "properties": { "use": { "const": "task_leaves_stage" } } }, "minContains": 0, "maxContains": 1 },
         { "contains": { "type": "object", "required": ["use"], "properties": { "use": { "const": "pull_request_updated" } } }, "minContains": 0, "maxContains": 1 },
         {
           "if": { "contains": { "$ref": "#/$defs/isSchedule" }, "minContains": 2 },
@@ -50,7 +51,7 @@
           "$ref": "#/$defs/nonblank",
           "description": "Use a unique ID within the automation."
         },
-        "use": { "enum": ["manual", "task_enters_stage", "pull_request_updated", "schedule"] },
+        "use": { "enum": ["manual", "task_enters_stage", "task_leaves_stage", "pull_request_updated", "schedule"] },
         "config": true
       },
       "if": { "$ref": "#/$defs/isSchedule" },

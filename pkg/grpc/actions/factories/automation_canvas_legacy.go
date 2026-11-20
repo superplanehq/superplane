@@ -184,6 +184,8 @@ func legacyAutomationTriggers(stage string, nodes []models.Node) ([]automationsp
 				use = automationspec.PullRequestUpdated
 			}
 			result = append(result, automationspec.Trigger{Use: use})
+		case pb.FactoryCustomAutomation_START_MODE_ON_LEAVE:
+			result = append(result, automationspec.Trigger{Use: automationspec.TaskLeavesStage})
 		case pb.FactoryCustomAutomation_START_MODE_SCHEDULED:
 			result = append(result, automationspec.Trigger{
 				ID: customAutomationScheduleLogicalID(trigger.node, count), Use: automationspec.Scheduled,

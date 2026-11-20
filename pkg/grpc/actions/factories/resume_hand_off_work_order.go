@@ -108,10 +108,14 @@ func ResumeHandOffWorkOrder(ctx context.Context, deps IntakeDependencies, organi
 	}
 	if dispatched != nil {
 		publishDispatchedWorkOrder(dispatched.logger, orgID, factory.ID, order, &actor, dispatched.fromState, dispatched.startedSteps)
+		startColumnLeaveAfterDispatch(db, dispatched)
 		startImplementColumnAutomations(db, dispatched.logger, dispatched.factory, dispatched.order, startIndex)
 	} else {
 		if _, err := publishVerificationHandOff(ctx, deps, db, factory, order); err != nil {
 			return nil, factoryErrorToStatus(err, "failed to refresh pull request")
+		}
+		if err := StartColumnLeaveCustomAutomations(db, factory, order, models.CanvasColumnKeyBacklog, ""); err != nil {
+			log.WithError(err).Warnf("Failed to start Backlog leave automation for order %s", order.ID)
 		}
 	}
 	serialized, err := loadAndSerializeWorkOrder(ctx, factory, order)

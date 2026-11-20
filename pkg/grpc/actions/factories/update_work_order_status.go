@@ -69,6 +69,7 @@ func UpdateWorkOrderStatus(
 	var order *models.FactoryWorkOrder
 	var fromState string
 	var changed bool
+	var leftColumn string
 	var backlogEvents []models.CanvasEvent
 	err = db.Transaction(func(tx *gorm.DB) error {
 		factory, err := models.FindFactory(tx, orgID, factoryID)
@@ -82,6 +83,10 @@ func UpdateWorkOrderStatus(
 		}
 
 		fromState = order.State
+		leftColumn, err = models.WorkOrderBoardColumn(tx, order)
+		if err != nil {
+			return err
+		}
 		changed, err = order.UpdateStatus(tx, models.FactoryWorkOrderStatusUpdate{
 			ToState: toState,
 			Result:  result,
@@ -116,6 +121,14 @@ func UpdateWorkOrderStatus(
 	}
 
 	if changed {
+		nextColumn, columnErr := models.WorkOrderBoardColumn(db, order)
+		if columnErr != nil {
+			log.WithError(columnErr).Warnf("Failed to read the column for order %s", order.ID)
+		} else if leftColumn != "" && leftColumn != nextColumn {
+			if err := StartColumnLeaveCustomAutomations(db, factory, order, leftColumn, ""); err != nil {
+				log.WithError(err).Warnf("Failed to start %s leave automation for order %s", leftColumn, order.ID)
+			}
+		}
 		if toState == models.FactoryWorkOrderStateClosed {
 			messages.PublishWorkOrderRunCancellations(db, order)
 			if err := StartAutomaticTaskColumnCustomAutomations(db, factory, order, models.CanvasColumnKeyDone); err != nil {

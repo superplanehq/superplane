@@ -39,6 +39,7 @@ type TriggerUse string
 const (
 	Manual             TriggerUse = "manual"
 	TaskEntersStage    TriggerUse = "task_enters_stage"
+	TaskLeavesStage    TriggerUse = "task_leaves_stage"
 	PullRequestUpdated TriggerUse = "pull_request_updated"
 	Scheduled          TriggerUse = "schedule"
 )

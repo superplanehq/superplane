@@ -25,7 +25,7 @@ export type AutomationAgent = {
   credentials?: AutomationCredentials;
 };
 type AutomationTrigger =
-  | { id?: string; use: "manual" | "task_enters_stage" | "pull_request_updated" }
+  | { id?: string; use: "manual" | "task_enters_stage" | "task_leaves_stage" | "pull_request_updated" }
   | { id?: string; use: "schedule"; config: { cron: string; utc_offset?: number } };
 type AutomationStep = {
   name: string;
@@ -114,7 +114,9 @@ export function parseAutomationForCanvas(source: string, stage: CustomAutomation
   }
   if (
     runsOnTask === false &&
-    triggers.some(({ use }) => use === "task_enters_stage" || use === "pull_request_updated")
+    triggers.some(
+      ({ use }) => use === "task_enters_stage" || use === "task_leaves_stage" || use === "pull_request_updated",
+    )
   ) {
     problem("runs_on_task", "This trigger runs on a task.");
   }
@@ -157,6 +159,7 @@ function parseTrigger(value: unknown, path: string, stage: CustomAutomationColum
       if (stage === "verify") problem(`${path}.use`, "Use pull_request_updated in Verify.");
       break;
     case "manual":
+    case "task_leaves_stage":
       break;
     default:
       problem(`${path}.use`, "Choose a supported trigger.");
@@ -318,7 +321,14 @@ function canvasTrigger(trigger: AutomationTrigger, index: number): CustomAutomat
   return {
     id: trigger.id === undefined ? `implicit:${index}` : `public:${trigger.id}`,
     publicId: trigger.id,
-    mode: trigger.use === "schedule" ? "scheduled" : trigger.use === "manual" ? "manual" : "automatic",
+    mode:
+      trigger.use === "schedule"
+        ? "scheduled"
+        : trigger.use === "manual"
+          ? "manual"
+          : trigger.use === "task_leaves_stage"
+            ? "leave"
+            : "automatic",
     schedule:
       trigger.use === "schedule"
         ? { cronExpression: trigger.config.cron, utcOffset: trigger.config.utc_offset ?? 0 }
@@ -343,6 +353,7 @@ export function automationDefinitionTriggers(
       };
     }
     if (mode === "manual") return { id: publicId, use: "manual" };
+    if (mode === "leave") return { id: publicId, use: "task_leaves_stage" };
     return { id: publicId, use: stage === "verify" ? "pull_request_updated" : "task_enters_stage" };
   });
 }

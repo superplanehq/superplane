@@ -278,6 +278,8 @@ func automationCanvasSettings(stage string, source *automationspec.Document, age
 			start.StartMode = pb.FactoryCustomAutomation_START_MODE_MANUAL
 		case automationspec.TaskEntersStage, automationspec.PullRequestUpdated:
 			start.StartMode = pb.FactoryCustomAutomation_START_MODE_AUTOMATIC
+		case automationspec.TaskLeavesStage:
+			start.StartMode = pb.FactoryCustomAutomation_START_MODE_ON_LEAVE
 		case automationspec.Scheduled:
 			start.StartMode = pb.FactoryCustomAutomation_START_MODE_SCHEDULED
 			start.Schedule = &pb.FactoryCustomAutomation_Schedule{

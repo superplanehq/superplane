@@ -193,80 +193,98 @@ func TestCanvasAutomationSchedulesRetainPendingDelivery(t *testing.T) {
 }
 
 func TestCanvasAutomationLegacyImportProtectsGraphBehavior(t *testing.T) {
-	r := support.Setup(t)
-	db := database.DB(t.Context())
-	factory := seedHandOffFactory(t, r, db)
-	vcsID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
-	agentID := createReadyOnboardingIntegration(t, r.Organization.ID, "claude")
-	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
-		VCSIntegrationID: &vcsID, AgentIntegrationID: &agentID,
-	}))
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureAutomationsAsCode))
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
-	support.AssignOpenSystemTrial(t, r.Organization.ID)
-	_, err := models.UpsertOrganizationBYOKModelAllowlist(db, r.Organization.ID, models.UsageProviderAnthropic, datatypes.JSONSlice[string]{"claude-sonnet-4-6"})
-	require.NoError(t, err)
-	ctx, deps := onboardingContext(r), onboardingDeps(r)
-	runsOnTask := false
-	created, err := CreateFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &pb.CreateFactoryCustomAutomationRequest{
-		FactoryId: factory.ID.String(), ColumnKey: models.CanvasColumnKeyBacklog, Name: "Inspect task",
-		Settings: &pb.FactoryCustomAutomation_Settings{
-			StartMode:  pb.FactoryCustomAutomation_START_MODE_MANUAL,
-			RunsOnTask: &runsOnTask,
-			Agent:      &pb.FactoryAppTemplateAgent{Component: "runnerClaudeCode", Model: "claude-sonnet-4-6"},
-			Steps: []*pb.FactoryCustomAutomation_Step{
-				{Name: "Inspect", Type: pb.FactoryCustomAutomation_Step_TYPE_PROMPT, Prompt: "  Inspect the task.\n"},
-			},
-		},
-	})
-	require.NoError(t, err)
-	id := uuid.MustParse(created.GetCustomAutomation().GetAutomation().GetId())
-	backend := CanvasAutomationBackend{Deps: deps}
-	legacy, err := backend.FindLegacy(ctx, db, r.Organization.ID, id)
-	require.NoError(t, err)
-	source, err := backend.ImportLegacy(ctx, db, legacy)
-	require.NoError(t, err)
-	doc, err := automationspec.Parse(source)
-	require.NoError(t, err)
-	require.NotNil(t, doc.RunsOnTask)
-	require.False(t, *doc.RunsOnTask)
-	require.Equal(t, "  Inspect the task.\n", doc.Steps[0].Prompt)
-	version, err := models.FindLiveCanvasVersionInTransaction(db, id)
-	require.NoError(t, err)
-	require.Equal(t, version.ID.String(), legacy.Artifact.Revision)
-	customAutomationAgentForRunner(version.Nodes, customAutomationRunnerID).Configuration["skipSetupCommands"] = true
-	require.NoError(t, db.Save(version).Error)
-	_, err = backend.ImportLegacy(ctx, db, legacy)
-	require.ErrorContains(t, err, "cannot be represented in YAML")
+	for _, tc := range []struct {
+		name       string
+		mode       pb.FactoryCustomAutomation_StartMode
+		use        automationspec.TriggerUse
+		runsOnTask bool
+	}{
+		{"manual", pb.FactoryCustomAutomation_START_MODE_MANUAL, automationspec.Manual, false},
+		{"leave", pb.FactoryCustomAutomation_START_MODE_ON_LEAVE, automationspec.TaskLeavesStage, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := support.Setup(t)
+			db := database.DB(t.Context())
+			factory := seedHandOffFactory(t, r, db)
+			vcsID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
+			agentID := createReadyOnboardingIntegration(t, r.Organization.ID, "claude")
+			require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
+				VCSIntegrationID: &vcsID, AgentIntegrationID: &agentID,
+			}))
+			require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
+			require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureAutomationsAsCode))
+			require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
+			support.AssignOpenSystemTrial(t, r.Organization.ID)
+			_, err := models.UpsertOrganizationBYOKModelAllowlist(db, r.Organization.ID, models.UsageProviderAnthropic, datatypes.JSONSlice[string]{"claude-sonnet-4-6"})
+			require.NoError(t, err)
+			ctx, deps := onboardingContext(r), onboardingDeps(r)
+			runsOnTask := tc.runsOnTask
+			created, err := CreateFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &pb.CreateFactoryCustomAutomationRequest{
+				FactoryId: factory.ID.String(), ColumnKey: models.CanvasColumnKeyBacklog, Name: "Inspect task",
+				Settings: &pb.FactoryCustomAutomation_Settings{
+					StartMode:  tc.mode,
+					RunsOnTask: &runsOnTask,
+					Agent:      &pb.FactoryAppTemplateAgent{Component: "runnerClaudeCode", Model: "claude-sonnet-4-6"},
+					Steps: []*pb.FactoryCustomAutomation_Step{
+						{Name: "Inspect", Type: pb.FactoryCustomAutomation_Step_TYPE_PROMPT, Prompt: "  Inspect the task.\n"},
+					},
+				},
+			})
+			require.NoError(t, err)
+			id := uuid.MustParse(created.GetCustomAutomation().GetAutomation().GetId())
+			backend := CanvasAutomationBackend{Deps: deps}
+			legacy, err := backend.FindLegacy(ctx, db, r.Organization.ID, id)
+			require.NoError(t, err)
+			source, err := backend.ImportLegacy(ctx, db, legacy)
+			require.NoError(t, err)
+			doc, err := automationspec.Parse(source)
+			require.NoError(t, err)
+			require.NotNil(t, doc.RunsOnTask)
+			require.Equal(t, tc.runsOnTask, *doc.RunsOnTask)
+			require.Equal(t, tc.use, doc.Triggers[0].Use)
+			require.Equal(t, "  Inspect the task.\n", doc.Steps[0].Prompt)
+			version, err := models.FindLiveCanvasVersionInTransaction(db, id)
+			require.NoError(t, err)
+			require.Equal(t, version.ID.String(), legacy.Artifact.Revision)
+			customAutomationAgentForRunner(version.Nodes, customAutomationRunnerID).Configuration["skipSetupCommands"] = true
+			require.NoError(t, db.Save(version).Error)
+			_, err = backend.ImportLegacy(ctx, db, legacy)
+			require.ErrorContains(t, err, "cannot be represented in YAML")
 
-	delete(customAutomationAgentForRunner(version.Nodes, customAutomationRunnerID).Configuration, "skipSetupCommands")
-	require.NoError(t, db.Save(version).Error)
-	service := automations.Service{Backend: backend}
-	adopted, err := service.Update(ctx, r.Organization.ID, id, r.User, source)
-	require.NoError(t, err)
-	require.Equal(t, id, adopted.ID)
-	require.Equal(t, int64(1), adopted.Revision)
-	started, err := RunFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &pb.RunFactoryCustomAutomationRequest{
-		FactoryId: factory.ID.String(), AutomationId: id.String(),
-	})
-	require.NoError(t, err)
-	require.NotEmpty(t, started.GetRunId())
-	require.NoError(t, models.DisableExperimentalFeature(r.Organization.ID, features.FeatureAutomationsAsCode))
-	settings := created.GetCustomAutomation().GetSettings()
-	settings.Steps[0].Prompt = "Inspect the new task.\n"
-	_, err = UpdateFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &pb.UpdateFactoryCustomAutomationRequest{
-		FactoryId: factory.ID.String(), AutomationId: id.String(), Name: "Inspect latest task", Settings: settings,
-	})
-	require.NoError(t, err)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureAutomationsAsCode))
-	reopened, err := service.Read(ctx, r.Organization.ID, id)
-	require.NoError(t, err)
-	doc, err = automationspec.Parse(reopened.YAML)
-	require.NoError(t, err)
-	require.Equal(t, "Inspect latest task", reopened.Name)
-	require.Equal(t, "Inspect the new task.\n", doc.Steps[0].Prompt)
-	require.Equal(t, int64(2), reopened.Revision)
+			delete(customAutomationAgentForRunner(version.Nodes, customAutomationRunnerID).Configuration, "skipSetupCommands")
+			require.NoError(t, db.Save(version).Error)
+			service := automations.Service{Backend: backend}
+			adopted, err := service.Update(ctx, r.Organization.ID, id, r.User, source)
+			require.NoError(t, err)
+			require.Equal(t, id, adopted.ID)
+			require.Equal(t, int64(1), adopted.Revision)
+			if tc.mode == pb.FactoryCustomAutomation_START_MODE_MANUAL {
+				started, err := RunFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &pb.RunFactoryCustomAutomationRequest{
+					FactoryId: factory.ID.String(), AutomationId: id.String(),
+				})
+				require.NoError(t, err)
+				require.NotEmpty(t, started.GetRunId())
+			}
+
+			require.NoError(t, models.DisableExperimentalFeature(r.Organization.ID, features.FeatureAutomationsAsCode))
+			settings := created.GetCustomAutomation().GetSettings()
+			settings.Steps[0].Prompt = "Inspect the new task.\n"
+			_, err = UpdateFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &pb.UpdateFactoryCustomAutomationRequest{
+				FactoryId: factory.ID.String(), AutomationId: id.String(), Name: "Inspect latest task", Settings: settings,
+			})
+			require.NoError(t, err)
+			require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureAutomationsAsCode))
+			reopened, err := service.Read(ctx, r.Organization.ID, id)
+			require.NoError(t, err)
+			doc, err = automationspec.Parse(reopened.YAML)
+			require.NoError(t, err)
+			require.Equal(t, "Inspect latest task", reopened.Name)
+			require.Equal(t, "Inspect the new task.\n", doc.Steps[0].Prompt)
+			require.Equal(t, int64(2), reopened.Revision)
+			require.Equal(t, tc.use, doc.Triggers[0].Use)
+
+		})
+	}
 }
 
 func TestCanvasAutomationScheduleUsesFactorySubscriptionOwner(t *testing.T) {

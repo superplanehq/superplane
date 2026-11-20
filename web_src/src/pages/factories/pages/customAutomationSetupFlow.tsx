@@ -216,6 +216,7 @@ function sidebarTriggerDescription(
 
 function triggerTitle(mode: CustomAutomationTrigger["mode"], columnKey: CustomAutomationColumn): string {
   if (mode === "scheduled") return "Schedule";
+  if (mode === "leave") return `When a task leaves ${customAutomationColumnLabel(columnKey)}`;
   if (mode === "automatic") {
     return columnKey === "verify"
       ? "Every pull request commit"
@@ -231,6 +232,9 @@ function triggerDescription(
 ): string {
   if (mode === "scheduled") {
     return columnKey === "backlog" ? "Run automation on a schedule." : "Runs on the repository default branch.";
+  }
+  if (mode === "leave") {
+    return `Runs when a task leaves ${customAutomationColumnLabel(columnKey)}.`;
   }
   if (mode === "automatic") {
     return columnKey === "verify"
