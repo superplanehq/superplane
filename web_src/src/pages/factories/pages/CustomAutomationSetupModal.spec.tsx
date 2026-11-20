@@ -325,9 +325,8 @@ steps:
   });
 
   it("protects a custom graph that the form cannot preserve", async () => {
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      Response.json({ message: "Open the developer canvas." }, { status: 409 }),
-    );
+    const conflict = Response.json({ message: "Open the developer canvas." }, { status: 409 });
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(conflict);
     renderModal("?customAutomation=custom-1", "custom-1", "verify", true);
     expect(await screen.findByRole("alert")).toBeVisible();
     expect(screen.queryByRole("button", { name: "Edit in form" })).not.toBeInTheDocument();
