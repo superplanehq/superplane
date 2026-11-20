@@ -115,9 +115,6 @@ func (b CanvasAutomationBackend) Apply(
 	if err := checkAutomationCanvasNodes(source, published.Nodes); err != nil {
 		return automations.Artifact{}, nil, err
 	}
-	if err := published.MarkAutomationManaged(tx); err != nil {
-		return automations.Artifact{}, nil, err
-	}
 	return automations.Artifact{ID: canvas.ID.String(), Revision: published.ID.String()}, func() {
 		canvases.PublishCanvasUpdated(canvas)
 	}, nil
@@ -154,12 +151,6 @@ func (b CanvasAutomationBackend) compile(
 	settings, err := automationCanvasSettings(placement.Stage, source, agent)
 	if err != nil {
 		return nil, nil, err
-	}
-	if agent.subscription() {
-		settings.SubscriptionScheduleOwner, err = automationSubscriptionScheduleOwner(tx, factory, source)
-		if err != nil {
-			return nil, nil, err
-		}
 	}
 	graph, err := buildCustomAutomationCanvas(tx, factory, strings.TrimSpace(source.Name), settings)
 	if err != nil {

@@ -197,6 +197,12 @@ func rewriteCanvasAgents(
 	if err != nil {
 		return false, err
 	}
+	if models.FactoryAppTemplateID(live.Nodes) == models.FactoryAppTemplateCustomAutomationID {
+		managed, err := models.IsAutomationManagedArtifact(tx, canvas.OrganizationID, canvas.ID.String())
+		if err != nil || managed {
+			return false, err
+		}
+	}
 
 	nodes := slices.Clone(live.Nodes)
 	rewritten := make([]models.Node, 0)
@@ -225,9 +231,6 @@ func rewriteCanvasAgents(
 		return false, err
 	}
 	if err := models.PromoteToLiveInTransaction(tx, version, nodes, live.Edges); err != nil {
-		return false, err
-	}
-	if err := models.RefreshAutomationArtifactRevision(tx, canvas.OrganizationID, canvas.ID.String(), version.ID.String()); err != nil {
 		return false, err
 	}
 

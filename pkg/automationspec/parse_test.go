@@ -113,9 +113,8 @@ func TestParseRejectsInvalidDefinitionAtItsSource(t *testing.T) {
 		{"secrets on prompt", definitionHeader + manualTrigger + "steps:\n  - name: Inspect\n    prompt: Inspect\n    secrets: [TOKEN]\n", "steps[0].secrets", 9, 14},
 		{"duplicate secrets", definitionHeader + manualTrigger + bashStep + "    secrets: [TOKEN, TOKEN]\n", "steps[0].secrets[1]", 9, 22},
 		{"removed working directory", definitionHeader + manualTrigger + bashStep + "    working_directory: repo\n", "steps[0].working_directory", 9, 5},
-		{"name on subscription", definitionHeader + manualTrigger + bashStep + "agent: {harness: codex, credentials: {source: subscription, name: shared}}\n", "agent.credentials.name", 9, 67},
-		{"model on subscription", definitionHeader + manualTrigger + bashStep + "agent: {harness: codex, model: x, credentials: {source: subscription}}\n", "agent.model", 9, 32},
-		{"missing integration name", definitionHeader + manualTrigger + bashStep + "agent: {harness: codex, credentials: {source: integration}}\n", "agent.credentials.name", 9, 38},
+		{"non-hosted agent", definitionHeader + manualTrigger + bashStep + "agent: {harness: codex}\n", "agent.harness", 9, 18},
+		{"agent credentials", definitionHeader + manualTrigger + bashStep + "agent: {harness: superplane, credentials: {source: subscription}}\n", "agent.credentials", 9, 30},
 		{"extra document", definitionHeader + manualTrigger + bashStep + "---\nname: extra\n", "$", 9, 1},
 	}
 	for _, test := range cases {

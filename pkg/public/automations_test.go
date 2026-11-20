@@ -1,6 +1,7 @@
 package public
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -99,13 +100,28 @@ func TestAutomationAPIPublishesInTheSelectedStage(t *testing.T) {
 	orgID := resources.Organization.ID
 	for _, feature := range []string{
 		features.FeatureFactories, features.FeatureFactoryCustomAutomations,
-		features.FeatureAutomationsAsCode, features.FeatureOrganizationBYOK,
+		features.FeatureAutomationsAsCode,
 	} {
 		require.NoError(t, models.EnableExperimentalFeature(orgID, feature))
 	}
 	support.AssignOpenSystemTrial(t, orgID)
-	_, err := models.UpsertOrganizationBYOKModelAllowlist(db, orgID, models.UsageProviderAnthropic,
-		datatypes.JSONSlice[string]{"claude-sonnet-4-6"})
+	provider, model := models.UsageProviderAnthropic, "claude-sonnet-4-6"
+	_, err := models.UpsertHostedLLMProvider(db, models.HostedLLMProvider{
+		Provider: provider, Enabled: true, APIKey: []byte("test-hosted-key"),
+		AllowedModels: datatypes.JSONSlice[string]{model},
+	})
+	require.NoError(t, err)
+	previous, err := models.GetInstallationLLMSettings(db)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, database.DB(context.Background()).Model(previous).Updates(map[string]any{
+			"default_hosted_provider": previous.DefaultHostedProvider,
+			"default_hosted_model":    previous.DefaultHostedModel,
+		}).Error)
+	})
+	_, err = models.UpdateInstallationLLMSettings(db, models.InstallationLLMSettings{
+		DefaultHostedProvider: &provider, DefaultHostedModel: &model,
+	})
 	require.NoError(t, err)
 	factory, err := models.CreateFactory(db, orgID, "Automation API test", "", "AAP")
 	require.NoError(t, err)
@@ -116,9 +132,9 @@ func TestAutomationAPIPublishesInTheSelectedStage(t *testing.T) {
 		require.NoError(t, db.Model(connection).Update("state", models.IntegrationStateReady).Error)
 		return connection.ID.String()
 	}
-	vcs, agent, repository := createConnection("github"), createConnection("claude"), "demo/example"
+	vcs, repository := createConnection("github"), "demo/example"
 	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
-		VCSIntegrationID: &vcs, AgentIntegrationID: &agent, AppRepository: &repository,
+		VCSIntegrationID: &vcs, AppRepository: &repository,
 	}))
 
 	const collection = "/api/v2/automations"
@@ -142,6 +158,9 @@ func TestAutomationAPIPublishesInTheSelectedStage(t *testing.T) {
 apiVersion: v2
 kind: Automation
 name: Print a marker
+agent:
+  harness: superplane
+  model: anthropic::claude-sonnet-4-6
 triggers:
   - use: manual
 steps:
@@ -177,7 +196,7 @@ steps:
 			require.Equal(t, "onWorkOrder", node.ComponentName())
 		}
 		if node.ID == live.Edges[0].TargetID {
-			require.Equal(t, "runnerClaudeCode", node.ComponentName())
+			require.Equal(t, models.SuperPlaneRunnerComponent, node.ComponentName())
 			steps, err := json.Marshal(node.Configuration["steps"])
 			require.NoError(t, err)
 			require.Contains(t, string(steps), "echo second")

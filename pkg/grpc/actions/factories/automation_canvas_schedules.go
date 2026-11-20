@@ -15,18 +15,9 @@ import (
 
 const customAutomationScheduleLogicalIDKey = "automationTriggerId"
 
-func hasCustomAutomationSchedule(triggers []customAutomationTrigger) bool {
-	return slices.ContainsFunc(triggers, func(trigger customAutomationTrigger) bool {
-		return trigger.Schedule != nil
-	})
-}
-
-func setCustomAutomationScheduleMetadata(template map[string]any, trigger customAutomationTrigger, owner string) {
+func setCustomAutomationScheduleMetadata(template map[string]any, trigger customAutomationTrigger) {
 	if trigger.LogicalID != "" {
 		template[customAutomationScheduleLogicalIDKey] = trigger.LogicalID
-	}
-	if owner != "" {
-		template[models.FactoryAppTemplateSubscriptionScheduleOwnerKey] = owner
 	}
 }
 

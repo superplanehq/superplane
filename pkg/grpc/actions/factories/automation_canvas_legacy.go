@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"maps"
-	"slices"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/automations"
@@ -113,10 +112,11 @@ func importAutomationCanvas(tx *gorm.DB, factory *models.Factory, canvas *models
 	if err != nil {
 		return "", unrepresentableAutomationCanvas()
 	}
-	definition.Agent, err = legacyAutomationAgent(tx, factory, settings.GetAgent())
-	if err != nil {
-		return "", err
+	savedAgent := settings.GetAgent()
+	if savedAgent.GetComponent() != models.SuperPlaneRunnerComponent || savedAgent.GetCredentialSource() != "" {
+		return "", unrepresentableAutomationCanvas()
 	}
+	definition.Agent = &automationspec.Agent{Harness: automationspec.SuperPlane, Model: savedAgent.GetModel()}
 	for _, step := range settings.GetSteps() {
 		item := automationspec.Step{
 			Name: step.GetName(), Secrets: step.GetSecrets(),
@@ -139,15 +139,11 @@ func importAutomationCanvas(tx *gorm.DB, factory *models.Factory, canvas *models
 
 	// Rebuild the supported graph and compare all execution settings and edges.
 	// Ignore presentation and metadata written by trigger setup.
-	agent := legacyCanvasAgentForBuilder(tx, factory, definition.Agent)
-	if agent == nil {
-		return "", unrepresentableAutomationCanvas()
-	}
+	agent := &intakeAgent{Component: models.SuperPlaneRunnerComponent, Model: definition.Agent.Model}
 	rebuild, err := automationCanvasSettings(*canvas.ColumnKey, document, agent)
 	if err != nil {
 		return "", unrepresentableAutomationCanvas()
 	}
-	rebuild.SubscriptionScheduleOwner = legacyScheduleOwner(version.Nodes)
 	expected, err := buildCustomAutomationCanvas(tx, factory, canvas.Name, rebuild)
 	if err != nil {
 		return "", unrepresentableAutomationCanvas()
@@ -194,57 +190,6 @@ func legacyAutomationTriggers(stage string, nodes []models.Node) ([]automationsp
 		}
 	}
 	return result, nil
-}
-
-func legacyAutomationAgent(tx *gorm.DB, factory *models.Factory, saved *pb.FactoryAppTemplateAgent) (*automationspec.Agent, error) {
-	for harness, component := range automationHarnesses {
-		if component != saved.GetComponent() {
-			continue
-		}
-		agent := &automationspec.Agent{Harness: harness, Model: saved.GetModel()}
-		switch saved.GetCredentialSource() {
-		case "":
-		case runner.CredentialsSourceIntegration:
-			agent.Credentials = &automationspec.Credentials{
-				Source: automationspec.Integration, Name: saved.GetCredentialIntegrationName(),
-			}
-		case runner.CredentialsSourceSubscription:
-			agent.Credentials = &automationspec.Credentials{Source: automationspec.Subscription}
-		default:
-			workspace := resolveIntakeAgent(tx, factory)
-			if workspace == nil || workspace.Component != component || workspace.Credentials["source"] != saved.GetCredentialSource() {
-				return nil, unrepresentableAutomationCanvas()
-			}
-		}
-		return agent, nil
-	}
-	return nil, unrepresentableAutomationCanvas()
-}
-
-func legacyCanvasAgentForBuilder(tx *gorm.DB, factory *models.Factory, spec *automationspec.Agent) *intakeAgent {
-	component := automationHarnesses[spec.Harness]
-	agent := &intakeAgent{Component: component, Model: spec.Model}
-	switch cred := spec.Credentials; {
-	case component == models.SuperPlaneRunnerComponent:
-	case cred == nil:
-		workspace := resolveIntakeAgent(tx, factory)
-		if workspace == nil || workspace.Component != component {
-			return nil
-		}
-		agent.Credentials = workspace.Credentials
-		agent.LLMProvider = workspace.LLMProvider
-	case cred.Source == automationspec.Subscription:
-		agent.Credentials = map[string]any{"source": runner.CredentialsSourceSubscription}
-	case cred.Source == automationspec.Integration:
-		agent.Credentials = map[string]any{
-			"source": runner.CredentialsSourceIntegration, "integration": map[string]any{"name": cred.Name},
-		}
-		connection, err := models.FindIntegrationByName(tx, factory.OrganizationID, cred.Name)
-		if err == nil && connection.AppName == models.CustomLLMAppName && component == "runnerOpenRouter" {
-			agent.LLMProvider = models.UsageProviderCustom
-		}
-	}
-	return agent
 }
 
 func equalAutomationExecutionGraph(live *models.CanvasVersion, expected *yaml.Canvas) bool {
@@ -318,15 +263,6 @@ func equalCanvasJSON(a, b any) bool {
 	first, firstErr := json.Marshal(a)
 	second, secondErr := json.Marshal(b)
 	return firstErr == nil && secondErr == nil && bytes.Equal(first, second)
-}
-
-func legacyScheduleOwner(nodes []models.Node) string {
-	index := slices.IndexFunc(nodes, func(node models.Node) bool { return node.ComponentName() == "schedule" })
-	if index < 0 {
-		return ""
-	}
-	template, _ := nodes[index].Metadata[models.FactoryAppTemplateMetadataKey].(map[string]any)
-	return configString(template, models.FactoryAppTemplateSubscriptionScheduleOwnerKey)
 }
 
 func unrepresentableAutomationCanvas() error {

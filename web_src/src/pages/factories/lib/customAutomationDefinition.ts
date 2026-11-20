@@ -1,5 +1,4 @@
 import { CORE_SCHEMA, dump, load, YAMLException } from "js-yaml";
-import type { OrganizationsIntegration } from "@/api-client";
 import type { PlanningReviewStep } from "../pages/planningReviewMockup";
 import {
   AUTOMATION_ICONS,
@@ -10,19 +9,9 @@ import {
   type CustomAutomationTrigger,
 } from "./customAutomation";
 
-const AUTOMATION_AGENT_COMPONENTS = {
-  superplane: "runnerSuperPlane",
-  "claude-code": "runnerClaudeCode",
-  codex: "runnerCodex",
-  openrouter: "runnerOpenRouter",
-};
-
-export type AutomationHarness = keyof typeof AUTOMATION_AGENT_COMPONENTS;
-type AutomationCredentials = { source: "integration"; name: string } | { source: "subscription" };
 type AutomationAgent = {
-  harness: AutomationHarness;
+  harness: "superplane";
   model?: string;
-  credentials?: AutomationCredentials;
 };
 type AutomationTrigger =
   | { id?: string; use: "manual" | "task_enters_stage" | "task_leaves_stage" | "pull_request_updated" }
@@ -187,29 +176,11 @@ function validateTriggerIdentities(triggers: AutomationTrigger[]) {
 }
 
 function parseAgent(value: unknown): AutomationAgent {
-  const entry = mapping(value, "agent", ["harness", "model", "credentials"]);
-  const harness = entry.harness;
-  if (typeof harness !== "string" || !isAutomationHarness(harness)) {
-    problem("agent.harness", "Choose a supported agent.");
+  const entry = mapping(value, "agent", ["harness", "model"]);
+  if (entry.harness !== "superplane") {
+    problem("agent.harness", "Use the superplane agent harness.");
   }
-  const model = optionalText(entry.model, "agent.model");
-  if (entry.credentials === undefined) return { harness, model };
-  if (harness === "superplane") problem("agent.credentials", "SuperPlane uses workspace credentials.");
-  const credentials = mapping(entry.credentials, "agent.credentials", ["source", "name"]);
-  if (credentials.source === "integration") {
-    return {
-      harness,
-      model,
-      credentials: { source: "integration", name: singleLine(credentials.name, "agent.credentials.name") },
-    };
-  }
-  if (credentials.source === "subscription") {
-    if (harness !== "codex") problem("agent.credentials.source", "A ChatGPT subscription requires Codex.");
-    if (credentials.name !== undefined) problem("agent.credentials.name", "Remove the subscription name.");
-    if (model !== undefined) problem("agent.model", "Remove the model when using a ChatGPT subscription.");
-    return { harness, credentials: { source: "subscription" } };
-  }
-  return problem("agent.credentials.source", "Use integration or subscription.");
+  return { harness: entry.harness, model: optionalText(entry.model, "agent.model") };
 }
 
 function parseStep(value: unknown, index: number): AutomationStep {
@@ -261,25 +232,10 @@ function problem(path: string, reason: string): never {
   throw new Error(`${path} · ${reason}`);
 }
 
-function isAutomationHarness(harness: string): harness is AutomationHarness {
-  return Object.prototype.hasOwnProperty.call(AUTOMATION_AGENT_COMPONENTS, harness);
-}
-
-export function automationHarnessForComponent(component?: string): AutomationHarness | undefined {
-  const harnesses = Object.keys(AUTOMATION_AGENT_COMPONENTS) as AutomationHarness[];
-  return harnesses.find((harness) => AUTOMATION_AGENT_COMPONENTS[harness] === component);
-}
-
-export function automationDefinitionCanvas(
-  definition: AutomationDefinition,
-  workspaceHarness?: string,
-  connections: OrganizationsIntegration[] = [],
-) {
-  const agent = definition.agent;
-  const component = agent ? AUTOMATION_AGENT_COMPONENTS[agent.harness] : workspaceHarness;
+export function automationDefinitionCanvas(definition: AutomationDefinition) {
   const draft = customAutomationDraft({
     settings: {
-      agent: { component, model: agent?.model },
+      agent: { component: "runnerSuperPlane", model: definition.agent?.model },
       executionTimeoutSeconds: definition.timeout_seconds,
       steps: definition.steps.map((step) => ({
         name: step.name,
@@ -290,18 +246,6 @@ export function automationDefinitionCanvas(
       })),
     },
   });
-  const visualAgent = draft.components[0];
-  if (visualAgent) {
-    visualAgent.configuration.credentials = agent?.credentials;
-    if (agent?.harness === "openrouter" && agent.credentials?.source === "integration") {
-      const name = agent.credentials.name;
-      const connection = connections.find((connection) => connection.metadata?.name === name);
-      if (connection?.metadata?.integrationName === "customLlm") {
-        visualAgent.configuration.llmProvider = "custom";
-      }
-    }
-    if (agent?.credentials?.source === "subscription") visualAgent.component = undefined;
-  }
   return {
     name: definition.name,
     icon: definition.icon ?? DEFAULT_CUSTOM_AUTOMATION_ICON,

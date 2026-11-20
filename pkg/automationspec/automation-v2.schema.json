@@ -90,39 +90,9 @@
       "additionalProperties": false,
       "required": ["harness"],
       "properties": {
-        "harness": { "enum": ["superplane", "claude-code", "codex", "openrouter"] },
-        "model": { "$ref": "#/$defs/nonblank" },
-        "credentials": { "$ref": "#/$defs/credentials" }
-      },
-      "allOf": [
-        {
-          "if": { "properties": { "harness": { "const": "superplane" } } },
-          "then": { "properties": { "credentials": false } }
-        },
-        {
-          "if": {
-            "required": ["credentials"],
-            "properties": {
-              "credentials": { "type": "object", "required": ["source"], "properties": { "source": { "const": "subscription" } } }
-            }
-          },
-          "then": {
-            "properties": { "harness": { "const": "codex" }, "model": false }
-          }
-        }
-      ]
-    },
-    "credentials": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["source"],
-      "properties": {
-        "source": { "enum": ["integration", "subscription"] },
-        "name": { "$ref": "#/$defs/nonblank" }
-      },
-      "if": { "properties": { "source": { "const": "integration" } } },
-      "then": { "required": ["name"] },
-      "else": { "properties": { "name": false } }
+        "harness": { "const": "superplane" },
+        "model": { "$ref": "#/$defs/nonblank" }
+      }
     }
   }
 }

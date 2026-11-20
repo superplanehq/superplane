@@ -8,8 +8,6 @@ import (
 	"gorm.io/gorm"
 )
 
-const FactoryAppTemplateSubscriptionScheduleOwnerKey = "subscriptionScheduleOwnerId"
-
 // FindSubscriptionIntakeOwnerForRun reads ownership from the run's persisted
 // version. Event input and agent-supplied owner IDs cannot authorize intake.
 // An unrelated automation returns gorm.ErrRecordNotFound.
@@ -38,9 +36,6 @@ func FindSubscriptionIntakeOwnerForRun(tx *gorm.DB, organizationID, factoryID, r
 			return uuid.Nil, ErrSubscriptionTaskAssociation
 		}
 	} else {
-		if FactoryAppTemplateID(version.Nodes) == FactoryAppTemplateCustomAutomationID {
-			return customAutomationScheduleSubscriptionOwner(tx, canvas, version, run.NodeID)
-		}
 		if FactoryAppTemplateID(version.Nodes) != "scheduled-intake" {
 			return uuid.Nil, gorm.ErrRecordNotFound
 		}
@@ -77,47 +72,6 @@ func FindSubscriptionIntakeOwnerForRun(tx *gorm.DB, organizationID, factoryID, r
 		return uuid.Nil, err
 	}
 	return ownerID, nil
-}
-
-func customAutomationScheduleSubscriptionOwner(tx *gorm.DB, canvas *Canvas, version *CanvasVersion, triggerID string) (uuid.UUID, error) {
-	managed, err := IsAutomationManagedArtifact(tx, canvas.OrganizationID, canvas.ID.String())
-	if err != nil {
-		return uuid.Nil, err
-	}
-	if !managed || !version.AutomationManaged {
-		return uuid.Nil, gorm.ErrRecordNotFound
-	}
-	var owner uuid.UUID
-	for _, node := range version.Nodes {
-		if node.ID != triggerID || node.ComponentName() != "schedule" {
-			continue
-		}
-		template, _ := node.Metadata[FactoryAppTemplateMetadataKey].(map[string]any)
-		if template["id"] != FactoryAppTemplateCustomAutomationID {
-			return uuid.Nil, ErrSubscriptionTaskAssociation
-		}
-		value, _ := template[FactoryAppTemplateSubscriptionScheduleOwnerKey].(string)
-		owner, _ = uuid.Parse(value)
-		break
-	}
-	if owner == uuid.Nil {
-		return uuid.Nil, ErrSubscriptionOwnerRequired
-	}
-	factory, err := FindFactory(tx, canvas.OrganizationID, *canvas.FactoryID)
-	if err != nil {
-		return uuid.Nil, err
-	}
-	config := factory.OnboardingConfigValue()
-	if !config.CodexSubscription || config.CodexDefaultOwnerID != owner.String() {
-		return uuid.Nil, ErrSubscriptionOwnerInvalid
-	}
-	if _, err := ActiveCodexMember(tx, canvas.OrganizationID, owner); err != nil {
-		if errors.Is(err, ErrCodexConnectionNotEligible) {
-			return uuid.Nil, ErrSubscriptionOwnerInvalid
-		}
-		return uuid.Nil, err
-	}
-	return owner, nil
 }
 
 // RunUsesSupersededVersion reports whether a newer live version replaced the

@@ -260,10 +260,8 @@ apiVersion: v2
 kind: Automation
 name: Preview
 agent:
-  harness: claude-code
-  credentials:
-    source: integration
-    name: Preview connection
+  harness: superplane
+  model: anthropic::claude-sonnet-4-6
 triggers:
   - use: task_enters_stage
 steps:
@@ -306,7 +304,7 @@ steps:
     await user.click(screen.getByRole("tab", { name: "YAML" }));
     const projected = (screen.getByLabelText("Automation YAML") as HTMLTextAreaElement).value;
     expect(projected).toContain("name: Board preview");
-    expect(projected).toContain("name: Preview connection");
+    expect(projected).toContain("model: anthropic::claude-sonnet-4-6");
     const edited = `# Unsaved comment\n${projected.replace("echo original", "echo edited")}`;
     fireEvent.change(screen.getByLabelText("Automation YAML"), { target: { value: edited } });
     await user.click(screen.getByRole("tab", { name: "Canvas" }));

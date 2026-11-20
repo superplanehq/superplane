@@ -2,7 +2,6 @@ package factories
 
 import (
 	"slices"
-	"strings"
 	"testing"
 	"time"
 
@@ -90,17 +89,12 @@ func TestCanvasAutomationSchedulesRetainPendingDelivery(t *testing.T) {
 	db := database.DB(t.Context())
 	factory := seedHandOffFactory(t, r, db)
 	vcsID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
-	agentID := createReadyOnboardingIntegration(t, r.Organization.ID, "claude")
-	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
-		VCSIntegrationID: &vcsID, AgentIntegrationID: &agentID,
-	}))
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSIntegrationID: &vcsID}))
 	r.Registry.Integrations[models.ProviderGitHub] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{
 		Triggers: []core.Trigger{impl.NewDummyIntegrationTrigger(impl.DummyIntegrationTriggerOptions{Name: prFeedbackTriggerComponent(models.ProviderGitHub)})},
 	})
 	support.AssignOpenSystemTrial(t, r.Organization.ID)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
-	_, err := models.UpsertOrganizationBYOKModelAllowlist(db, r.Organization.ID, models.UsageProviderAnthropic, datatypes.JSONSlice[string]{"claude-sonnet-4-6"})
-	require.NoError(t, err)
+	upsertHostedOnboardingProvider(t, db)
 
 	ctx := onboardingContext(r)
 	backend := CanvasAutomationBackend{Deps: onboardingDeps(r)}
@@ -109,7 +103,6 @@ func TestCanvasAutomationSchedulesRetainPendingDelivery(t *testing.T) {
 	actorID := uuid.MustParse(r.User.String())
 	definition := automationspec.Definition{
 		APIVersion: "v2", Kind: "Automation", Name: "Inspect changes", Icon: "search", TimeoutSeconds: 900,
-		Agent: &automationspec.Agent{Harness: automationspec.ClaudeCode, Model: "claude-sonnet-4-6"},
 		Triggers: []automationspec.Trigger{
 			{Use: automationspec.Manual},
 			{ID: "morning", Use: automationspec.Scheduled, Config: &automationspec.Schedule{Cron: "0 9 * * *"}},
@@ -213,16 +206,11 @@ func TestCanvasAutomationLegacyImportProtectsGraphBehavior(t *testing.T) {
 			db := database.DB(t.Context())
 			factory := seedHandOffFactory(t, r, db)
 			vcsID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
-			agentID := createReadyOnboardingIntegration(t, r.Organization.ID, "claude")
-			require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
-				VCSIntegrationID: &vcsID, AgentIntegrationID: &agentID,
-			}))
+			require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSIntegrationID: &vcsID}))
 			require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
 			require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureAutomationsAsCode))
-			require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
 			support.AssignOpenSystemTrial(t, r.Organization.ID)
-			_, err := models.UpsertOrganizationBYOKModelAllowlist(db, r.Organization.ID, models.UsageProviderAnthropic, datatypes.JSONSlice[string]{"claude-sonnet-4-6"})
-			require.NoError(t, err)
+			upsertHostedOnboardingProvider(t, db)
 			r.Registry.Integrations[models.ProviderGitHub] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{
 				Triggers: []core.Trigger{impl.NewDummyIntegrationTrigger(impl.DummyIntegrationTriggerOptions{Name: prFeedbackTriggerComponent(models.ProviderGitHub)})},
 			})
@@ -236,7 +224,7 @@ func TestCanvasAutomationLegacyImportProtectsGraphBehavior(t *testing.T) {
 					StartMode:  tc.mode,
 					Triggers:   triggers,
 					RunsOnTask: &runsOnTask,
-					Agent:      &pb.FactoryAppTemplateAgent{Component: "runnerClaudeCode", Model: "claude-sonnet-4-6"},
+					Agent:      &pb.FactoryAppTemplateAgent{Component: models.SuperPlaneRunnerComponent},
 					Steps: []*pb.FactoryCustomAutomation_Step{
 						{Name: "Inspect", Type: pb.FactoryCustomAutomation_Step_TYPE_PROMPT, Prompt: "  Inspect the task.\n"},
 					},
@@ -304,93 +292,7 @@ func TestCanvasAutomationLegacyImportProtectsGraphBehavior(t *testing.T) {
 	}
 }
 
-func TestCanvasAutomationScheduleUsesFactorySubscriptionOwner(t *testing.T) {
-	r := support.Setup(t)
-	db := database.DB(t.Context())
-	factory := seedHandOffFactory(t, r, db)
-	vcsID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
-	subscription, owner := true, r.User.String()
-	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
-		VCSIntegrationID: &vcsID, CodexSubscription: &subscription, CodexDefaultOwnerID: &owner,
-	}))
-	connection, err := models.CreateCodexConnection(db, r.Organization.ID, r.User, time.Now())
-	require.NoError(t, err)
-	require.NoError(t, db.Model(connection).Updates(map[string]any{
-		"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("test-bundle"),
-	}).Error)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureAutomationsAsCode))
-	ctx, deps := onboardingContext(r), onboardingDeps(r)
-	service := automations.Service{Backend: CanvasAutomationBackend{Deps: deps}}
-	source := `apiVersion: v2
-kind: Automation
-name: Find tasks
-agent:
-  harness: codex
-  credentials:
-    source: subscription
-triggers:
-  - use: schedule
-    config:
-      cron: "0 9 * * *"
-steps:
-  - name: Inspect
-    prompt: Look for tasks.
-`
-	created, err := service.Create(ctx, automations.Placement{
-		OrganizationID: r.Organization.ID, FactoryID: factory.ID, Stage: models.CanvasColumnKeyBacklog,
-	}, r.User, source)
-	require.NoError(t, err)
-	result, err := RunFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &pb.RunFactoryCustomAutomationRequest{
-		FactoryId: factory.ID.String(), AutomationId: created.ID.String(),
-	})
-	require.NoError(t, err)
-	ownerID, err := models.RequireSubscriptionRunOwner(db, r.Organization.ID, factory.ID, uuid.MustParse(result.GetRunId()))
-	require.NoError(t, err)
-	require.Equal(t, r.User, ownerID)
-
-	// Simulate a raw version that predates YAML adoption with matching owner metadata.
-	published, err := models.FindLiveCanvasVersionInTransaction(db, created.ID)
-	require.NoError(t, err)
-	raw := *published
-	raw.ID = uuid.New()
-	raw.AutomationManaged = false
-	require.NoError(t, db.Create(&raw).Error)
-	rawRun, err := models.CreateCanvasRunInTransaction(db, created.ID, published.Nodes[0].ID, models.CanvasRunStateStarted, "")
-	require.NoError(t, err)
-	require.NoError(t, db.Model(rawRun).Update("version_id", raw.ID).Error)
-	_, err = models.RequireSubscriptionRunOwner(db, r.Organization.ID, factory.ID, rawRun.ID)
-	require.ErrorIs(t, err, models.ErrSubscriptionTaskAssociation)
-
-	// A later YAML save must keep the original validated run authorized.
-	_, err = service.Update(ctx, r.Organization.ID, created.ID, r.User, source)
-	require.NoError(t, err)
-	ownerID, err = models.RequireSubscriptionRunOwner(db, r.Organization.ID, factory.ID, uuid.MustParse(result.GetRunId()))
-	require.NoError(t, err)
-	require.Equal(t, r.User, ownerID)
-
-	// Form saves use the generated publisher and must retain validated provenance.
-	described, err := DescribeFactoryCustomAutomation(ctx, r.Organization.ID.String(), &pb.DescribeFactoryCustomAutomationRequest{
-		FactoryId: factory.ID.String(), AutomationId: created.ID.String(),
-	})
-	require.NoError(t, err)
-	settings := described.GetCustomAutomation().GetSettings()
-	settings.Steps[0].Prompt = "Look for new tasks."
-	_, err = UpdateFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &pb.UpdateFactoryCustomAutomationRequest{
-		FactoryId: factory.ID.String(), AutomationId: created.ID.String(), Name: created.Name, Settings: settings,
-	})
-	require.NoError(t, err)
-	formRun, err := RunFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &pb.RunFactoryCustomAutomationRequest{
-		FactoryId: factory.ID.String(), AutomationId: created.ID.String(),
-	})
-	require.NoError(t, err)
-	ownerID, err = models.RequireSubscriptionRunOwner(db, r.Organization.ID, factory.ID, uuid.MustParse(formRun.GetRunId()))
-	require.NoError(t, err)
-	require.Equal(t, r.User, ownerID)
-
-}
-
-func TestCanvasAutomationRemainsEditableAfterModelSourceSwitch(t *testing.T) {
+func TestCanvasAutomationStaysHostedAfterModelSourceSwitch(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 	factory := seedHandOffFactory(t, r, db)
@@ -401,6 +303,7 @@ func TestCanvasAutomationRemainsEditableAfterModelSourceSwitch(t *testing.T) {
 	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureAutomationsAsCode))
 	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
 	support.AssignOpenSystemTrial(t, r.Organization.ID)
+	upsertHostedOnboardingProvider(t, db)
 	_, err := models.UpsertOrganizationBYOKModelAllowlist(db, r.Organization.ID, models.UsageProviderAnthropic, datatypes.JSONSlice[string]{"claude-sonnet-4-6"})
 	require.NoError(t, err)
 	ctx := onboardingContext(r)
@@ -408,9 +311,6 @@ func TestCanvasAutomationRemainsEditableAfterModelSourceSwitch(t *testing.T) {
 	const source = `apiVersion: v2
 kind: Automation
 name: Inspect task
-agent:
-  harness: claude-code
-  model: claude-sonnet-4-6
 triggers:
   - use: manual
 steps:
@@ -422,13 +322,17 @@ steps:
 	stubProviderModels(r.Registry, "openai", []string{"gpt-5"})
 	changed, _, err := SwitchFactoryModelSourceInTransaction(ctx, r.Registry, r.Organization.ID.String(), factory.ID.String(), modelSourceOpenAI, "sk-test", "", "")
 	require.NoError(t, err)
-	require.True(t, slices.Contains(changed, created.ID))
+	require.False(t, slices.Contains(changed, created.ID))
+	live, err := models.FindLiveCanvasVersionInTransaction(db, created.ID)
+	require.NoError(t, err)
+	agent := selectCustomAutomationAgent(live.Nodes)
+	require.NotNil(t, agent)
+	require.Equal(t, models.SuperPlaneRunnerComponent, agent.ComponentName())
 	reopened, err := service.Read(ctx, r.Organization.ID, created.ID)
 	require.NoError(t, err)
 	require.Equal(t, created.YAML, reopened.YAML)
 	require.Equal(t, created.Revision, reopened.Revision)
-	updatedSource := strings.ReplaceAll(strings.ReplaceAll(reopened.YAML, "claude-code", "codex"), "claude-sonnet-4-6", "gpt-5")
-	_, err = service.Update(ctx, r.Organization.ID, created.ID, r.User, updatedSource)
+	_, err = service.Update(ctx, r.Organization.ID, created.ID, r.User, reopened.YAML)
 	require.NoError(t, err)
 	stubProviderModels(r.Registry, "claude", []string{"claude-sonnet-4-6"})
 	_, _, err = SwitchFactoryModelSourceInTransaction(ctx, r.Registry, r.Organization.ID.String(), factory.ID.String(), modelSourceAnthropic, "sk-test", "", "")

@@ -241,11 +241,8 @@ func UpdateFactoryCustomAutomation(
 				settings.SkipRepositoryCheckout = previous.GetSettings().SkipRepositoryCheckout
 			}
 		}
-		if authored != nil && settings.Agent.subscription() && hasCustomAutomationSchedule(settings.Triggers) {
-			settings.SubscriptionScheduleOwner, err = resolveAutomationSubscriptionScheduleOwner(tx, factory)
-			if err != nil {
-				return err
-			}
+		if authored != nil && settings.Agent.component() != models.SuperPlaneRunnerComponent {
+			return invalidArgument("Select a SuperPlane-hosted model for this automation.")
 		}
 		doc, err := buildCustomAutomationCanvas(tx, factory, name, settings)
 		if err != nil {
@@ -302,18 +299,17 @@ type customAutomationTrigger struct {
 }
 
 type customAutomationSettings struct {
-	ColumnKey                 string
-	StartMode                 pb.FactoryCustomAutomation_StartMode
-	Agent                     *intakeAgent
-	Steps                     []runner.AgentStep
-	Icon                      string
-	ExecutionTimeoutSeconds   int
-	Schedule                  *pb.FactoryCustomAutomation_Schedule
-	Triggers                  []customAutomationTrigger
-	SubscriptionScheduleOwner string
-	RunsOnTask                *bool
-	SkipSetupCommands         *bool
-	SkipRepositoryCheckout    *bool
+	ColumnKey               string
+	StartMode               pb.FactoryCustomAutomation_StartMode
+	Agent                   *intakeAgent
+	Steps                   []runner.AgentStep
+	Icon                    string
+	ExecutionTimeoutSeconds int
+	Schedule                *pb.FactoryCustomAutomation_Schedule
+	Triggers                []customAutomationTrigger
+	RunsOnTask              *bool
+	SkipSetupCommands       *bool
+	SkipRepositoryCheckout  *bool
 }
 
 func (settings *customAutomationSettings) runsWithoutTask() bool {
@@ -601,7 +597,7 @@ func buildCustomAutomationCanvas(
 			"timezone": strconv.FormatFloat(settings.Schedule.GetUtcOffset(), 'f', -1, 64),
 		}
 		if len(settings.Triggers) == 1 {
-			setCustomAutomationScheduleMetadata(template, settings.Triggers[0], settings.SubscriptionScheduleOwner)
+			setCustomAutomationScheduleMetadata(template, settings.Triggers[0])
 		}
 	}
 	runnerConfiguration := customAutomationRunnerConfiguration(
@@ -851,7 +847,7 @@ func buildMultiTriggerCustomAutomationCanvas(
 				Metadata: customAutomationNodeMetadata(provider, settings.Icon, settings.RunsOnTask, func(template map[string]any) {
 					template["startMode"] = "scheduled"
 					template["triggerIndex"] = schedule.Index
-					setCustomAutomationScheduleMetadata(template, schedule, settings.SubscriptionScheduleOwner)
+					setCustomAutomationScheduleMetadata(template, schedule)
 				}),
 				Position: yaml.Position{X: 120, Y: 240 + (offset+1)*180},
 			})

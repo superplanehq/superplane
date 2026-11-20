@@ -57,31 +57,11 @@ type Step struct {
 }
 
 type Agent struct {
-	Harness     Harness      `yaml:"harness" json:"harness"`
-	Model       string       `yaml:"model,omitempty" json:"model,omitempty"`
-	Credentials *Credentials `yaml:"credentials,omitempty" json:"credentials,omitempty"`
+	Harness string `yaml:"harness" json:"harness"`
+	Model   string `yaml:"model,omitempty" json:"model,omitempty"`
 }
 
-type Harness string
-
-const (
-	SuperPlane Harness = "superplane"
-	ClaudeCode Harness = "claude-code"
-	Codex      Harness = "codex"
-	OpenRouter Harness = "openrouter"
-)
-
-type Credentials struct {
-	Source CredentialSource `yaml:"source" json:"source"`
-	Name   string           `yaml:"name,omitempty" json:"name,omitempty"`
-}
-
-type CredentialSource string
-
-const (
-	Integration  CredentialSource = "integration"
-	Subscription CredentialSource = "subscription"
-)
+const SuperPlane = "superplane"
 
 type Stage string
 

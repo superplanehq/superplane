@@ -3,21 +3,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useId } from "react";
 import type { useCustomAutomationSourceDraft } from "@/hooks/useCustomAutomationSourceDraft";
-import { useConnectedIntegrations } from "@/hooks/useIntegrations";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import {
   customAutomationTriggersForRun,
   newCustomAutomationTrigger,
-  workspaceAgentFromOnboarding,
   type CustomAutomationColumn,
 } from "../lib/customAutomation";
 import {
   automationDefinitionCanvas,
   automationDefinitionSteps,
   automationDefinitionTriggers,
-  automationHarnessForComponent,
   type AutomationDefinition,
-  type AutomationHarness,
 } from "../lib/customAutomationDefinition";
 import { CustomAutomationSetupFooter, CustomAutomationSetupForm } from "./CustomAutomationSetupForm";
 import type { PlanningReviewDraft, PlanningReviewStep } from "./planningReviewMockup";
@@ -41,15 +37,10 @@ export function CustomAutomationSourceEditor({
   onDelete?: () => void;
   onClose: () => void;
 }) {
-  const { organizationId, factoryId, routeSegment, factory } = useFactoriesLayout();
+  const { organizationId, factoryId, routeSegment } = useFactoriesLayout();
   const yamlId = useId();
   const definition = model.definition;
-  const agent = definition?.agent;
-  const connections = useConnectedIntegrations(organizationId, {
-    enabled: agent?.harness === "openrouter" && agent.credentials?.source === "integration",
-  });
-  const workspaceComponent = workspaceAgentFromOnboarding(factory?.onboarding)?.component;
-  const visual = definition ? automationDefinitionCanvas(definition, workspaceComponent, connections.data) : undefined;
+  const visual = definition ? automationDefinitionCanvas(definition) : undefined;
   const form = { saving, deleting, onSave, onDelete, onClose };
   return (
     <Tabs value={model.tab} onValueChange={model.switchTab} activationMode="manual" className="min-h-0 flex-1">
@@ -89,11 +80,7 @@ export function CustomAutomationSourceEditor({
                 ),
               });
             }}
-            onDraftChange={(next) =>
-              model.editCanvas(
-                settingsEdit(definition, visual.draft, next, automationHarnessForComponent(workspaceComponent)),
-              )
-            }
+            onDraftChange={(next) => model.editCanvas(settingsEdit(visual.draft, next))}
           />
         ) : null}
       </TabsContent>
@@ -116,12 +103,7 @@ export function CustomAutomationSourceEditor({
   );
 }
 
-function settingsEdit(
-  definition: AutomationDefinition,
-  previous: PlanningReviewDraft,
-  next: PlanningReviewDraft,
-  workspaceHarness?: AutomationHarness,
-): Partial<AutomationDefinition> {
+function settingsEdit(previous: PlanningReviewDraft, next: PlanningReviewDraft): Partial<AutomationDefinition> {
   const before = previous.components[0]?.configuration;
   const after = next.components[0]?.configuration;
   if (!before || !after) return {};
@@ -135,9 +117,8 @@ function settingsEdit(
   ) {
     patch.timeout_seconds = after.executionTimeoutSeconds;
   }
-  const harness = definition.agent?.harness ?? workspaceHarness;
-  if (harness && after.model !== before.model && typeof after.model === "string") {
-    patch.agent = { ...definition.agent, harness, model: after.model || undefined };
+  if (after.model !== before.model && typeof after.model === "string") {
+    patch.agent = { harness: "superplane", model: after.model || undefined };
   }
   return patch;
 }
