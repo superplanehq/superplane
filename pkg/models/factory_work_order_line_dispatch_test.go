@@ -207,6 +207,50 @@ func Test__FactoryLine__DispatchStage__QueuesCustomStageAboveLimit(t *testing.T)
 	assert.Equal(t, min(last[0].QueueItem.StepIndex, last[1].QueueItem.StepIndex), byDispatch[lastDispatch.ID].StepIndex)
 }
 
+func Test__FactoryWorkOrder__RetryLineStep__QueuesCustomStageRetryAtLimit(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	phase, entrypoint := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "Implement", "start")
+	line, err := factory.CreateLine(db, "ship", []models.FactoryLineStep{{
+		Type: models.FactoryLineStepTypeRunApp, AppID: phase.ID, Entrypoint: entrypoint,
+	}})
+	require.NoError(t, err)
+	stageID := uuid.New()
+	stage := models.FactoryLineStage{ID: stageID, Key: "custom-" + stageID.String(), Name: "QA", Kind: models.FactoryLineStageCustom}
+	stages := append([]models.FactoryLineStage{line.StagesValue()[0], stage}, line.StagesValue()[1:]...)
+	require.NoError(t, line.UpdateConfiguration(db, nil, nil, nil, stages))
+	lint, _ := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "Lint", "start")
+	require.NoError(t, lint.SetColumnKey(db, stage.Key))
+
+	var first *models.FactoryWorkOrder
+	for index := 0; index <= models.DefaultFactoryLineStepMaxParallelism; index++ {
+		order, err := factory.CreateWorkOrder(db, fmt.Sprintf("Order %d", index), "", &r.User, nil, nil)
+		require.NoError(t, err)
+		if first == nil {
+			first = order
+		}
+		require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+			if openErr := order.TransitionOnDispatch(tx, &r.User); openErr != nil {
+				return openErr
+			}
+			_, _, dispatchErr := line.DispatchStage(tx, order)
+			return dispatchErr
+		}))
+	}
+
+	var retried *models.FactoryLineStepResult
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		var retryErr error
+		retried, _, retryErr = first.RetryLineStep(tx, line, 0)
+		return retryErr
+	}))
+
+	assert.Nil(t, retried.Execution)
+	require.NotNil(t, retried.QueueItem)
+}
+
 func Test__FactoryLine__Queue__KeepsRepeatedAppStageLimitsSeparate(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())

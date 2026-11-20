@@ -559,7 +559,9 @@ function mappedWorkOrderFixture(order: FactoriesWorkOrder, options?: SplitRunFix
     openPhaseId: activeAutomationId,
     phases,
     source: splitRunSourceForOrder(order, options?.resolveUser),
-    stageColumns: stageColumnsForStages(taskHistoryStages(order, visibleDispatch, options?.lineStages)),
+    stageColumns: stageColumnsForStages(
+      taskHistoryStages(order, visibleDispatch, options?.lineStages, options?.lineId),
+    ),
     ...reviewSurfaces(order, displayStatus, {
       lineId: options?.lineId,
       phases,
@@ -2058,12 +2060,42 @@ function taskHistoryStages(
   order: FactoriesWorkOrder,
   dispatch: FactoriesWorkOrderLineDispatch | undefined,
   lineStages: FactoryLineStage[] = [],
+  lineId?: string | null,
 ): FactoryLineStage[] {
   const saved = dispatch?.stages ?? [];
   if (order.state !== "STATE_DRAFT" && saved.length > 0) {
-    return saved;
+    return withEarlierDispatchStages(saved, order, lineId);
   }
-  return lineStages.length > 0 ? lineStages : saved;
+  return withEarlierDispatchStages(lineStages.length > 0 ? lineStages : saved, order, lineId);
+}
+
+// Earlier runs keep their saved stage keys. Keep a column for each stage they
+// ran in, even after the stage was deleted from the line.
+function withEarlierDispatchStages(
+  stages: FactoryLineStage[],
+  order: FactoriesWorkOrder,
+  lineId?: string | null,
+): FactoryLineStage[] {
+  const keys = new Set(stages.map((stage) => stage.key));
+  const earlier: FactoryLineStage[] = [];
+  for (const dispatch of order.lineDispatches ?? []) {
+    if (lineId && dispatch.line?.id !== lineId) {
+      continue;
+    }
+    const ranKeys = new Set((dispatch.stepExecutions ?? []).map((execution) => execution.stageKey));
+    for (const stage of dispatch.stages ?? []) {
+      if (stage.key && ranKeys.has(stage.key) && !keys.has(stage.key)) {
+        keys.add(stage.key);
+        earlier.push(stage);
+      }
+    }
+  }
+  if (earlier.length === 0) {
+    return stages;
+  }
+  const doneIndex = stages.findIndex((stage) => stage.key === "done");
+  const insertAt = doneIndex >= 0 ? doneIndex : stages.length;
+  return [...stages.slice(0, insertAt), ...earlier, ...stages.slice(insertAt)];
 }
 
 function stageColumnsForStages(stages: FactoryLineStage[]): SplitRunFixture["stageColumns"] {

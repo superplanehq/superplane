@@ -665,12 +665,7 @@ func (o *FactoryWorkOrder) RetryLineStep(tx *gorm.DB, line *FactoryLine, stepInd
 		return nil, nil, err
 	}
 
-	var result *FactoryLineStepResult
-	if customStage {
-		result, err = target.StartStep(tx, o, stepIndex)
-	} else {
-		result, err = target.EnqueueOrStartStep(tx, o, stepIndex)
-	}
+	result, err := target.EnqueueOrStartStep(tx, o, stepIndex)
 	if err != nil {
 		return nil, nil, err
 	}

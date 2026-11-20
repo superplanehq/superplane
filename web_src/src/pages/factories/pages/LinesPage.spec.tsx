@@ -827,7 +827,6 @@ describe("LinesPage board", () => {
     expect(screen.queryByTestId("lines-done-automations")).not.toBeInTheDocument();
     expect(screen.getByTestId("lines-board-view-menu")).toBeInTheDocument();
   });
-
 });
 
 describe("LinesPage board stages", () => {
