@@ -66,6 +66,11 @@ describe("collectLineVerifyOrders", () => {
 
     expect(verify.map((entry) => entry.id)).toEqual(["wo-wait"]);
     expect(visibleLineStageColumns(board, verify).flatMap((column) => column.runs)).toEqual([]);
+    expect(
+      visibleLineStageColumns(board, verify, false)
+        .flatMap((column) => column.runs)
+        .map((run) => run.workOrderId),
+    ).toEqual(["wo-wait"]);
   });
 
   it("keeps a failed last stage on the stage column", () => {
