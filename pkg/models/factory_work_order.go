@@ -80,8 +80,6 @@ type FactoryWorkOrder struct {
 	Result          string
 	CreatedByID     *uuid.UUID
 	SourceRunID     *uuid.UUID
-	// CreatorRunID identifies an automation without assigning its costs to this task.
-	CreatorRunID    *uuid.UUID
 	OriginURL       *string
 	OriginLabel     *string
 	Repository      *string
@@ -248,7 +246,7 @@ func FindUnscopedWorkOrder(db *gorm.DB, id uuid.UUID) (*FactoryWorkOrder, error)
 }
 
 // ListWorkOrdersBySourceRunIDs returns the work order each run created, keyed
-// by run id. A run creates at most one work order.
+// by run id. Runs that created multiple work orders are omitted.
 func ListWorkOrdersBySourceRunIDs(tx *gorm.DB, factoryID uuid.UUID, runIDs []uuid.UUID) (map[uuid.UUID]FactoryWorkOrder, error) {
 	ordersByRunID := make(map[uuid.UUID]FactoryWorkOrder, len(runIDs))
 	if len(runIDs) == 0 {
@@ -256,9 +254,14 @@ func ListWorkOrdersBySourceRunIDs(tx *gorm.DB, factoryID uuid.UUID, runIDs []uui
 	}
 
 	var orders []FactoryWorkOrder
+	uniqueSourceRuns := tx.Model(&FactoryWorkOrder{}).
+		Select("source_run_id").
+		Where("factory_id = ? AND source_run_id IN ?", factoryID, runIDs).
+		Group("source_run_id").
+		Having("COUNT(*) = 1")
 	err := tx.
 		Where("factory_id = ?", factoryID).
-		Where("source_run_id IN ?", runIDs).
+		Where("source_run_id IN (?)", uniqueSourceRuns).
 		Find(&orders).
 		Error
 	if err != nil {
@@ -281,15 +284,11 @@ func ResolveFactoryWorkOrderCreatorAutomations(
 	orderIDsByRunID := map[uuid.UUID][]uuid.UUID{}
 	runIDs := make([]uuid.UUID, 0, len(orders))
 	for i := range orders {
-		creatorRunID := orders[i].CreatorRunID
-		if creatorRunID == nil {
-			creatorRunID = orders[i].SourceRunID
-		}
-		if creatorRunID == nil {
+		if orders[i].SourceRunID == nil {
 			continue
 		}
 
-		runID := *creatorRunID
+		runID := *orders[i].SourceRunID
 		if _, exists := orderIDsByRunID[runID]; !exists {
 			runIDs = append(runIDs, runID)
 		}
@@ -365,14 +364,6 @@ func (o *FactoryWorkOrder) UpdateContent(tx *gorm.DB, title *string, description
 	o.UpdatedAt = now
 	updates["updated_at"] = now
 	return tx.Model(o).Omit(clause.Associations).Updates(updates).Error
-}
-
-func (o *FactoryWorkOrder) SetCreatorRun(tx *gorm.DB, runID uuid.UUID) error {
-	if err := tx.Model(o).Omit(clause.Associations).Update("creator_run_id", runID).Error; err != nil {
-		return err
-	}
-	o.CreatorRunID = &runID
-	return nil
 }
 
 func (o *FactoryWorkOrder) UpdateAssignees(tx *gorm.DB, assigneeIDs []uuid.UUID, updatedBy uuid.UUID) error {

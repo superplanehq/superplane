@@ -1035,7 +1035,6 @@ CREATE TABLE public.factory_work_orders (
     vcs_provider text,
     refinement_model text,
     pending_handoff jsonb,
-    creator_run_id uuid,
     CONSTRAINT factory_work_orders_number_positive_check CHECK ((number > 0))
 );
 
@@ -5941,14 +5940,6 @@ ALTER TABLE ONLY public.factory_work_orders
 
 
 --
--- Name: factory_work_orders factory_work_orders_creator_run_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.factory_work_orders
-    ADD CONSTRAINT factory_work_orders_creator_run_id_fkey FOREIGN KEY (creator_run_id) REFERENCES public.workflow_runs(id) ON DELETE SET NULL;
-
-
---
 -- Name: factory_work_orders factory_work_orders_factory_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -6732,7 +6723,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261119110336	f
+20261113000615	f
 \.
 
 

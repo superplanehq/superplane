@@ -113,8 +113,7 @@ func TestScheduleAutomationCreatesATaskWithoutAnExistingTask(t *testing.T) {
 	assert.Equal(t, "draft", created.State)
 	order, err := factory.FindWorkOrder(db, uuid.MustParse(created.ID))
 	require.NoError(t, err)
-	assert.Nil(t, order.SourceRunID)
-	assert.Equal(t, &run.ID, order.CreatorRunID)
+	assert.Equal(t, &run.ID, order.SourceRunID)
 	assert.Nil(t, order.CreatedByID)
 	assignees, err := order.ListAssignees(db)
 	require.NoError(t, err)
@@ -129,22 +128,34 @@ func TestScheduleAutomationCreatesATaskWithoutAnExistingTask(t *testing.T) {
 	assert.Equal(t, canvas.Name, automation.GetAppName())
 	assert.Equal(t, "Run automation", automation.GetNodeName())
 	assert.Equal(t, models.FactoryAppTemplateCustomAutomationID, automation.GetTemplateId())
+	labels, err := models.ResolveCanvasRunTasks(db, canvas, []models.CanvasRun{*run})
+	require.NoError(t, err)
+	assert.Equal(t, order.ID, labels[run.ID].ID)
+	recordUsage("first-task")
 
 	rec = runnerRequest(t, server, http.MethodPost, token, "/api/v1/runner/tasks", `{"title":"Fix the build"}`)
 	require.Equal(t, http.StatusCreated, rec.Code, rec.Body.String())
 	second := decodeRunnerTask(t, rec.Body.Bytes())
+	secondOrder, err := factory.FindWorkOrder(db, uuid.MustParse(second.ID))
+	require.NoError(t, err)
+	assert.Equal(t, &run.ID, secondOrder.SourceRunID)
 	detail, err = factoryactions.DescribeWorkOrder(t.Context(), r.Organization.ID.String(), &pb.DescribeWorkOrderRequest{
 		FactoryId: factory.ID.String(), OrderId: second.ID,
 	})
 	require.NoError(t, err)
 	assert.Equal(t, canvas.ID.String(), detail.GetOrder().GetCreatedBy().GetAutomation().GetAppId())
-	labels, err := models.ResolveCanvasRunTasks(db, canvas, []models.CanvasRun{*run})
+	labels, err = models.ResolveCanvasRunTasks(db, canvas, []models.CanvasRun{*run})
 	require.NoError(t, err)
 	assert.Empty(t, labels, "a shared creator run must not select one of its tasks")
+	for _, task := range []*models.FactoryWorkOrder{order, secondOrder} {
+		runs, err := task.ListRuns(db)
+		require.NoError(t, err)
+		assert.Empty(t, runs, "neither task receives the shared run")
+	}
 	recordUsage("after")
 	var usage []models.WorkspaceUsageEvent
 	require.NoError(t, db.Where("canvas_run_id = ?", run.ID).Find(&usage).Error)
-	require.Len(t, usage, 2)
+	require.Len(t, usage, 3)
 	for _, event := range usage {
 		assert.Equal(t, &factory.ID, event.FactoryID)
 		assert.Nil(t, event.WorkOrderID, "shared intake costs stay at workspace scope")
