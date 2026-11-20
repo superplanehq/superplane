@@ -23,6 +23,7 @@ type Artifact struct {
 // Apply and Remove write through the supplied transaction. They can return a
 // callback for notifications that the service sends after a successful commit.
 type Backend interface {
+	ArtifactStages(*gorm.DB, Placement, []string) (map[string]string, error)
 	Check(context.Context, *gorm.DB, Placement, *automationspec.Document) error
 	Apply(context.Context, *gorm.DB, Placement, uuid.UUID, uuid.UUID, Artifact, *automationspec.Document) (Artifact, func(), error)
 	Remove(context.Context, *gorm.DB, Placement, Artifact) (func(), error)

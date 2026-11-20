@@ -29,6 +29,32 @@ var (
 	_ automations.LegacyImporter = CanvasAutomationBackend{}
 )
 
+func (b CanvasAutomationBackend) ArtifactStages(tx *gorm.DB, placement automations.Placement, artifactIDs []string) (map[string]string, error) {
+	canvasIDs := make([]uuid.UUID, 0, len(artifactIDs))
+	for _, artifactID := range artifactIDs {
+		id, err := uuid.Parse(artifactID)
+		if err != nil {
+			return nil, err
+		}
+		canvasIDs = append(canvasIDs, id)
+	}
+	if len(canvasIDs) == 0 {
+		return nil, nil
+	}
+
+	canvases, err := models.FindFactoryCanvasesByIDs(tx, placement.OrganizationID, placement.FactoryID, canvasIDs)
+	if err != nil {
+		return nil, err
+	}
+	stages := make(map[string]string, len(canvases))
+	for _, canvas := range canvases {
+		if canvas.ColumnKey != nil {
+			stages[canvas.ID.String()] = *canvas.ColumnKey
+		}
+	}
+	return stages, nil
+}
+
 func (b CanvasAutomationBackend) Check(_ context.Context, tx *gorm.DB, placement automations.Placement, source *automationspec.Document) error {
 	_, _, err := b.compile(tx, placement, source, nil)
 	return err

@@ -13,12 +13,15 @@ type AutomationSource struct {
 	ID               uuid.UUID
 	OrganizationID   uuid.UUID
 	FactoryID        uuid.UUID
-	Stage            string
 	Name             string
 	Source           string
 	Revision         int64
 	ArtifactID       string
 	ArtifactRevision string
+}
+
+func (a *AutomationSource) TableName() string {
+	return "automations_as_code"
 }
 
 func (a *AutomationSource) Save(tx *gorm.DB) error {

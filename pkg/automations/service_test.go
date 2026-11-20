@@ -124,6 +124,14 @@ var errCannotPublish = errors.New("backend could not publish")
 
 type backendWithoutCanvases struct{}
 
+func (backendWithoutCanvases) ArtifactStages(_ *gorm.DB, _ automations.Placement, artifactIDs []string) (map[string]string, error) {
+	stages := make(map[string]string, len(artifactIDs))
+	for _, id := range artifactIDs {
+		stages[id] = strings.TrimPrefix(id, "runner://artifact/")
+	}
+	return stages, nil
+}
+
 func (backendWithoutCanvases) Check(context.Context, *gorm.DB, automations.Placement, *automationspec.Document) error {
 	return nil
 }
@@ -143,7 +151,7 @@ func (backendWithoutCanvases) Apply(
 		return automations.Artifact{}, nil, errCannotPublish
 	}
 	if previous.ID == "" {
-		previous.ID = "runner://artifact/91"
+		previous.ID = "runner://artifact/" + placement.Stage
 	}
 	previous.Revision = uuid.NewString()
 	return previous, nil, nil

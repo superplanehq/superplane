@@ -160,12 +160,6 @@ steps:
 
 	path := collection + "/" + first.ID.String()
 	require.JSONEq(t, created.Body.String(), call(http.MethodGet, path, nil, http.StatusOK).Body.String())
-	listed := call(http.MethodGet, collection+"?factory_id="+factory.ID.String(), nil, http.StatusOK)
-	var list struct {
-		Automations []automations.Summary `json:"automations"`
-	}
-	require.NoError(t, json.Unmarshal(listed.Body.Bytes(), &list))
-	require.Equal(t, []automations.Summary{first.Summary}, list.Automations)
 
 	source = strings.Replace(source, "echo first", "echo second", 1)
 	updated := call(http.MethodPut, path, &automationWriteRequest{YAML: source}, http.StatusOK)
@@ -189,6 +183,22 @@ steps:
 			require.Contains(t, string(steps), "echo second")
 		}
 	}
+
+	canvas, err := models.FindCanvasInTransaction(db, orgID, first.ID)
+	require.NoError(t, err)
+	require.NoError(t, canvas.SetColumnKey(db, models.CanvasColumnKeyVerify))
+	second.Stage = models.CanvasColumnKeyVerify
+	var read automations.Automation
+	require.NoError(t, json.Unmarshal(call(http.MethodGet, path, nil, http.StatusOK).Body.Bytes(), &read))
+	require.Equal(t, second, read)
+	listed := call(http.MethodGet, collection+"?factory_id="+factory.ID.String(), nil, http.StatusOK)
+	var list struct {
+		Automations []automations.Summary `json:"automations"`
+	}
+	require.NoError(t, json.Unmarshal(listed.Body.Bytes(), &list))
+	require.Equal(t, []automations.Summary{second.Summary}, list.Automations)
+	stageEntry := strings.Replace(source, "use: manual", "use: task_enters_stage", 1)
+	call(http.MethodPut, path, &automationWriteRequest{YAML: stageEntry}, http.StatusBadRequest)
 	call(http.MethodDelete, path, nil, http.StatusNoContent)
 	call(http.MethodGet, path, nil, http.StatusNotFound)
 }

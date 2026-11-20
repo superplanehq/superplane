@@ -243,21 +243,19 @@ CREATE TABLE public.application_encryption_migrations (
 
 
 --
--- Name: automation_sources; Type: TABLE; Schema: public; Owner: -
+-- Name: automations_as_code; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.automation_sources (
+CREATE TABLE public.automations_as_code (
     id uuid NOT NULL,
     organization_id uuid NOT NULL,
     factory_id uuid NOT NULL,
-    stage text NOT NULL,
     name text NOT NULL,
     source text NOT NULL,
     revision bigint NOT NULL,
     artifact_id text NOT NULL,
     artifact_revision text NOT NULL,
-    CONSTRAINT automation_sources_revision_check CHECK ((revision > 0)),
-    CONSTRAINT automation_sources_stage_check CHECK ((stage = ANY (ARRAY['backlog'::text, 'implement'::text, 'verify'::text, 'done'::text])))
+    CONSTRAINT automations_as_code_revision_check CHECK ((revision > 0))
 );
 
 
@@ -2606,19 +2604,19 @@ ALTER TABLE ONLY public.application_encryption_migrations
 
 
 --
--- Name: automation_sources automation_sources_organization_id_artifact_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: automations_as_code automations_as_code_organization_id_artifact_id_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.automation_sources
-    ADD CONSTRAINT automation_sources_organization_id_artifact_id_key UNIQUE (organization_id, artifact_id);
+ALTER TABLE ONLY public.automations_as_code
+    ADD CONSTRAINT automations_as_code_organization_id_artifact_id_key UNIQUE (organization_id, artifact_id);
 
 
 --
--- Name: automation_sources automation_sources_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: automations_as_code automations_as_code_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.automation_sources
-    ADD CONSTRAINT automation_sources_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.automations_as_code
+    ADD CONSTRAINT automations_as_code_pkey PRIMARY KEY (id);
 
 
 --
@@ -3764,10 +3762,10 @@ CREATE UNIQUE INDEX application_encryption_migrations_unfinished ON public.appli
 
 
 --
--- Name: automation_sources_factory_id_idx; Type: INDEX; Schema: public; Owner: -
+-- Name: automations_as_code_factory_id_idx; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX automation_sources_factory_id_idx ON public.automation_sources USING btree (factory_id);
+CREATE INDEX automations_as_code_factory_id_idx ON public.automations_as_code USING btree (factory_id);
 
 
 --
@@ -5422,19 +5420,19 @@ ALTER TABLE ONLY public.application_encryption_migrations
 
 
 --
--- Name: automation_sources automation_sources_factory_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: automations_as_code automations_as_code_factory_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.automation_sources
-    ADD CONSTRAINT automation_sources_factory_id_fkey FOREIGN KEY (factory_id) REFERENCES public.factories(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.automations_as_code
+    ADD CONSTRAINT automations_as_code_factory_id_fkey FOREIGN KEY (factory_id) REFERENCES public.factories(id) ON DELETE CASCADE;
 
 
 --
--- Name: automation_sources automation_sources_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: automations_as_code automations_as_code_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.automation_sources
-    ADD CONSTRAINT automation_sources_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.automations_as_code
+    ADD CONSTRAINT automations_as_code_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
 
 
 --
@@ -6781,7 +6779,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261119190331	f
+20261120113824	f
 \.
 
 

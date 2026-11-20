@@ -48,10 +48,20 @@ func (s Service) List(ctx context.Context, placement Placement) ([]Summary, erro
 		if err != nil {
 			return err
 		}
+		artifactIDs := make([]string, 0, len(sources))
 		adopted := make(map[string]bool, len(sources))
 		for _, source := range sources {
-			result = append(result, summarize(&source))
+			artifactIDs = append(artifactIDs, source.ArtifactID)
 			adopted[source.ArtifactID] = true
+		}
+		stages, err := s.Backend.ArtifactStages(tx, placement, artifactIDs)
+		if err != nil {
+			return err
+		}
+		for _, source := range sources {
+			if stage, ok := stages[source.ArtifactID]; ok {
+				result = append(result, summarize(&source, stage))
+			}
 		}
 
 		if importer, ok := s.Backend.(LegacyImporter); ok {
@@ -90,13 +100,17 @@ func (s Service) Read(ctx context.Context, organizationID, id uuid.UUID) (Automa
 		if _, err := models.FindFactory(tx, organizationID, record.FactoryID); err != nil {
 			return factoryError(err)
 		}
+		placement, err := s.artifactPlacement(tx, record, legacy)
+		if err != nil {
+			return err
+		}
 		if legacy != nil {
 			record.Source, err = s.Backend.(LegacyImporter).ImportLegacy(ctx, tx, *legacy)
 			if err != nil {
 				return err
 			}
 		}
-		result = fromRecord(record)
+		result = fromRecord(record, placement.Stage)
 		return nil
 	})
 	return result, err
@@ -122,14 +136,11 @@ func (s Service) Validate(ctx context.Context, placement Placement, source strin
 }
 
 func (s Service) Create(ctx context.Context, placement Placement, actor uuid.UUID, source string) (Automation, error) {
-	record := &models.AutomationSource{
-		ID: uuid.New(), OrganizationID: placement.OrganizationID, FactoryID: placement.FactoryID, Stage: placement.Stage,
-	}
-	return s.save(ctx, actor, source, record, false)
+	return s.save(ctx, actor, uuid.New(), placement, source, false)
 }
 
 func (s Service) Update(ctx context.Context, organizationID, id, actor uuid.UUID, source string) (Automation, error) {
-	return s.save(ctx, actor, source, &models.AutomationSource{ID: id, OrganizationID: organizationID}, true)
+	return s.save(ctx, actor, id, Placement{OrganizationID: organizationID}, source, true)
 }
 
 func (s Service) Delete(ctx context.Context, organizationID, id uuid.UUID) error {
@@ -137,11 +148,15 @@ func (s Service) Delete(ctx context.Context, organizationID, id uuid.UUID) error
 		if err := requireFeatures(tx, organizationID); err != nil {
 			return nil, err
 		}
-		record, _, err := s.lockExisting(ctx, tx, organizationID, id)
+		record, legacy, err := s.lockExisting(ctx, tx, organizationID, id)
 		if err != nil {
 			return nil, err
 		}
-		notify, err := s.Backend.Remove(ctx, tx, placementOf(record), artifactOf(record))
+		placement, err := s.artifactPlacement(tx, record, legacy)
+		if err != nil {
+			return nil, err
+		}
+		notify, err := s.Backend.Remove(ctx, tx, placement, artifactOf(record))
 		if err != nil {
 			return nil, err
 		}
@@ -152,7 +167,8 @@ func (s Service) Delete(ctx context.Context, organizationID, id uuid.UUID) error
 	})
 }
 
-func (s Service) save(ctx context.Context, actor uuid.UUID, source string, record *models.AutomationSource, updating bool) (Automation, error) {
+func (s Service) save(ctx context.Context, actor, id uuid.UUID, placement Placement, source string, updating bool) (Automation, error) {
+	record := &models.AutomationSource{ID: id, OrganizationID: placement.OrganizationID, FactoryID: placement.FactoryID}
 	err := write(ctx, func(tx *gorm.DB) (func(), error) {
 		if err := requireFeatures(tx, record.OrganizationID); err != nil {
 			return nil, err
@@ -167,6 +183,10 @@ func (s Service) save(ctx context.Context, actor uuid.UUID, source string, recor
 			if err != nil {
 				return nil, err
 			}
+			placement, err = s.artifactPlacement(tx, record, legacy)
+			if err != nil {
+				return nil, err
+			}
 			if legacy != nil {
 				if _, err := s.Backend.(LegacyImporter).ImportLegacy(ctx, tx, *legacy); err != nil {
 					return nil, err
@@ -176,7 +196,6 @@ func (s Service) save(ctx context.Context, actor uuid.UUID, source string, recor
 			return nil, factoryError(err)
 		}
 
-		placement := placementOf(record)
 		if err := s.check(ctx, tx, placement, doc); err != nil {
 			return nil, err
 		}
@@ -195,7 +214,7 @@ func (s Service) save(ctx context.Context, actor uuid.UUID, source string, recor
 	if err != nil {
 		return Automation{}, err
 	}
-	return fromRecord(record), nil
+	return fromRecord(record, placement.Stage), nil
 }
 
 func (s Service) check(ctx context.Context, tx *gorm.DB, placement Placement, doc *automationspec.Document) error {
@@ -252,8 +271,25 @@ func (s Service) find(ctx context.Context, tx *gorm.DB, organizationID, id uuid.
 	}
 	return &models.AutomationSource{
 		ID: legacy.ID, OrganizationID: organizationID, FactoryID: legacy.Placement.FactoryID,
-		Stage: legacy.Placement.Stage, Name: legacy.Name, ArtifactID: legacy.Artifact.ID, ArtifactRevision: legacy.Artifact.Revision,
+		Name: legacy.Name, ArtifactID: legacy.Artifact.ID, ArtifactRevision: legacy.Artifact.Revision,
 	}, &legacy, nil
+}
+
+func (s Service) artifactPlacement(tx *gorm.DB, record *models.AutomationSource, legacy *LegacyAutomation) (Placement, error) {
+	if legacy != nil {
+		return legacy.Placement, nil
+	}
+	placement := Placement{OrganizationID: record.OrganizationID, FactoryID: record.FactoryID}
+	stages, err := s.Backend.ArtifactStages(tx, placement, []string{record.ArtifactID})
+	if err != nil {
+		return Placement{}, err
+	}
+	stage, ok := stages[record.ArtifactID]
+	if !ok {
+		return Placement{}, grpcerrors.NotFound(gorm.ErrRecordNotFound, "Automation not found.")
+	}
+	placement.Stage = stage
+	return placement, nil
 }
 
 func requireFeatures(tx *gorm.DB, organizationID uuid.UUID) error {
@@ -292,18 +328,14 @@ func factoryError(err error) error {
 	return err
 }
 
-func placementOf(record *models.AutomationSource) Placement {
-	return Placement{record.OrganizationID, record.FactoryID, record.Stage}
-}
-
 func artifactOf(record *models.AutomationSource) Artifact {
 	return Artifact{record.ArtifactID, record.ArtifactRevision}
 }
 
-func summarize(record *models.AutomationSource) Summary {
-	return Summary{record.ID, record.FactoryID, record.Stage, record.Name}
+func summarize(record *models.AutomationSource, stage string) Summary {
+	return Summary{record.ID, record.FactoryID, stage, record.Name}
 }
 
-func fromRecord(record *models.AutomationSource) Automation {
-	return Automation{summarize(record), record.Source, record.Revision}
+func fromRecord(record *models.AutomationSource, stage string) Automation {
+	return Automation{summarize(record, stage), record.Source, record.Revision}
 }
