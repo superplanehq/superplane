@@ -97,13 +97,13 @@ const CONFIDENCE_BAND_LABEL: Record<ConfidenceBand, (typeof LEVEL_LABEL)[WorkOrd
 
 /**
  * Words for a merge-confidence or planning-review result. "Healthy" does not
- * say whether drift is small or whether the task is clear.
+ * say whether the change meets the task or whether the task is clear.
  */
 const CHECK_RESULT_LABEL: Record<string, Record<WorkOrderCheckLevel, string>> = {
   "risk-review": { positive: "Low", neutral: "Moderate", caution: "Moderate", critical: "High" },
   "performance-review": { positive: "Met", neutral: "Partial", caution: "Partial", critical: "Missed" },
   "security-review": { positive: "Met", neutral: "Partial", caution: "Partial", critical: "Missed" },
-  "drift-review": { positive: "Close", neutral: "Moderate", caution: "Moderate", critical: "Far" },
+  "correctness-review": { positive: "Pass", neutral: "Not assessed", caution: "Needs review", critical: "Fail" },
   "reversibility-review": { positive: "Easy", neutral: "Partial", caution: "Partial", critical: "Hard" },
   clarity: { positive: "Clear", neutral: "Partial", caution: "Partial", critical: "Unclear" },
   complexity: { positive: "Easy", neutral: "Moderate", caution: "Moderate", critical: "Hard" },
@@ -118,6 +118,7 @@ const CHECK_RESULT_KEY_BY_NAME: Record<string, string> = {
   Security: "security-review",
   Drift: "drift-review",
   "Drift from Specification": "drift-review",
+  Correctness: "correctness-review",
   Reversibility: "reversibility-review",
   Clarity: "clarity",
   Complexity: "complexity",
@@ -127,7 +128,7 @@ const CHECK_RESULT_KEY_BY_NAME: Record<string, string> = {
 
 const CHECK_DISPLAY_NAME_BY_KEY: Record<string, string> = {
   "risk-review": "Blast radius",
-  "drift-review": "Drift from Specification",
+  "drift-review": "Correctness",
   "reversibility-review": "Reversibility",
 };
 
@@ -151,7 +152,8 @@ export function workOrderCheckStatus(
     return base;
   }
   const key = check.key ?? CHECK_RESULT_KEY_BY_NAME[check.name];
-  const label = key ? CHECK_RESULT_LABEL[key]?.[check.level] : undefined;
+  const resultKey = key === "drift-review" ? "correctness-review" : key;
+  const label = resultKey ? CHECK_RESULT_LABEL[resultKey]?.[check.level] : undefined;
   return label ? { ...base, label } : base;
 }
 
@@ -160,17 +162,22 @@ export function booleanCheckVerdict(score: number): "Pass" | "Fail" {
   return score > 0 ? "Pass" : "Fail";
 }
 
-export function formatCheckScore(check: Pick<WorkOrderCheckPresentation, "score" | "maxScore" | "format">): {
-  value: string;
-  scale: string;
-} {
+export function formatCheckScore(
+  check: Pick<WorkOrderCheckPresentation, "key" | "score" | "maxScore" | "format" | "previousScore">,
+) {
+  // Legacy Drift reports store severity. Convert both ends of the trend to the Correctness scale.
+  const legacyDrift =
+    check.key === "drift-review" && check.maxScore === 5 && (check.format ?? "fraction") === "fraction";
+  const display = (score: number) => (legacyDrift && score >= 1 && score <= 5 ? 6 - score : score);
+  const score = display(check.score);
+  const previousScore = check.previousScore == null ? undefined : display(check.previousScore);
   if (check.format === "boolean") {
-    return { value: booleanCheckVerdict(check.score), scale: "" };
+    return { score, previousScore, value: booleanCheckVerdict(score), scale: "" };
   }
   if (check.format === "percent") {
-    return { value: String(check.score), scale: "%" };
+    return { score, previousScore, value: String(score), scale: "%" };
   }
-  return { value: String(check.score), scale: `/${check.maxScore}` };
+  return { score, previousScore, value: String(score), scale: `/${check.maxScore}` };
 }
 
 const LEVEL_FROM_API: Partial<Record<ApiWorkOrderCheckLevel, WorkOrderCheckLevel>> = {
