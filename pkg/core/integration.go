@@ -286,6 +286,13 @@ type HTTPRequestContext struct {
 	Integration      IntegrationContext
 	Capabilities     CapabilityContext
 	IntegrationSetup IntegrationSetupContext
+	Creation         *IntegrationCreationCallbacks
+}
+
+// IntegrationCreationCallbacks separates a durable claim from transactional writes.
+type IntegrationCreationCallbacks struct {
+	Claim    func(HTTPRequestContext, string) (HTTPRequestContext, error)
+	Finalize func(func(HTTPRequestContext)) error
 }
 
 /*
