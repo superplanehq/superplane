@@ -104,9 +104,11 @@ export function useFactoryAppSplitRunPage() {
     columnAppCheckRuns,
   } = useSplitRunWorkOrderExtras(organizationId, factoryId, order, liveWorkOrder.data);
   const { resolveUser } = useOrgUserLookup(organizationId);
+  const lineStages = factory?.lines?.find((line) => line.id === query.lineId)?.stages;
   const fixture = useMemo(
     () =>
       fixtureForSplitRunPage(order, orderChecks, query.lineId, {
+        lineStages,
         prFeedbackRuns,
         analysisRuns,
         columnApps,
@@ -126,6 +128,7 @@ export function useFactoryAppSplitRunPage() {
       isAnalyzing,
       pullRequests,
       query.lineId,
+      lineStages,
       resolveUser,
       columnAppCheckRuns.lookup,
     ],

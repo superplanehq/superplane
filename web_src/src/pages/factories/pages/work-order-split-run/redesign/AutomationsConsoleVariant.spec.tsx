@@ -18,6 +18,24 @@ import { SPLIT_RUN_RUNNING, splitRunFixtureForWorkOrder } from "../splitRunMocks
 import { CREATED_MANUALLY, splitRunSourceForOrder } from "../splitRunSource";
 
 describe("AutomationsConsoleVariant timeline markers", () => {
+  it("shows custom stages and their automation runs", () => {
+    renderConsole({
+      ...SPLIT_RUN_RUNNING,
+      stageColumns: [
+        { id: "backlog", title: "Backlog" },
+        { id: "custom-pastel", title: "Pastel" },
+        { id: "implement", title: "Implement" },
+        { id: "done", title: "Done" },
+      ],
+      phases: SPLIT_RUN_RUNNING.phases.map((phase) =>
+        phase.id === "implement" ? { ...phase, name: "Pastel", columnKey: "custom-pastel" } : phase,
+      ),
+    });
+
+    const custom = screen.getByTestId("redesign-console-column-custom-pastel");
+    expect(within(custom).getByRole("heading", { name: "Pastel" })).toBeInTheDocument();
+  });
+
   it("fills finished columns and spins the live column", () => {
     renderConsole(SPLIT_RUN_RUNNING);
 

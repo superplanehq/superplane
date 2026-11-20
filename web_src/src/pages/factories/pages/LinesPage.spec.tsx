@@ -16,6 +16,7 @@ import type * as integrationsData from "@/hooks/useIntegrations";
 import { resetFactoryBoardLaneScrollPositions } from "@/hooks/useFactoryBoardLaneScroll";
 import {
   FEATURE_FACTORY_CUSTOM_AUTOMATIONS,
+  FEATURE_FACTORY_CUSTOM_STAGES,
   FEATURE_FACTORY_DATADOG_INTAKE,
   FEATURE_FACTORY_PRODUCTIVE_INTAKE,
   FEATURE_FACTORY_SCHEDULED_INTAKE,
@@ -115,6 +116,7 @@ function renderLinesBoard(
 const createFactoryLineMutateAsync = vi.fn();
 const updateFactoryLineMutateAsync = vi.fn();
 const updateLineIsPending = vi.hoisted(() => ({ value: false }));
+const permissions = vi.hoisted(() => ({ canUpdateFactories: true }));
 const idleBoardPage = () => ({ hasNextPage: false, isFetchingNextPage: false, fetchNextPage: vi.fn() });
 const useFactoryWorkOrders = vi.fn(() => ({ data: [] as FactoriesWorkOrderSummary[] }));
 const useFactoryBoardWorkOrders = vi.fn((_organizationId?: string, _factoryId?: string, _options?: unknown) => ({
@@ -256,7 +258,12 @@ vi.mock("@/pages/home/useInstallFactory", () => ({
 }));
 
 vi.mock("@/contexts/usePermissions", () => ({
-  usePermissions: () => ({ canAct: () => true, currentUserId: "storybook-user", isLoading: false }),
+  usePermissions: () => ({
+    canAct: (resource: string, action: string) =>
+      resource === "factories" && action === "update" ? permissions.canUpdateFactories : true,
+    currentUserId: "storybook-user",
+    isLoading: false,
+  }),
 }));
 
 vi.mock("@/hooks/usePageTitle", () => ({
@@ -344,6 +351,7 @@ async function resetLinesBoardMocks() {
   resetFactoryBoardLaneScrollPositions();
   updateFactoryLineMutateAsync.mockReset();
   updateLineIsPending.value = false;
+  permissions.canUpdateFactories = true;
   useFactoryWorkOrders.mockReturnValue({ data: [] });
   useFactoryBoardWorkOrders.mockImplementation(() => ({
     workOrders: useFactoryWorkOrders().data ?? [],
@@ -818,6 +826,162 @@ describe("LinesPage board", () => {
     expect(screen.getByTestId("lines-verify-automation-rows-row-handler-discussion")).toBeInTheDocument();
     expect(screen.queryByTestId("lines-done-automations")).not.toBeInTheDocument();
     expect(screen.getByTestId("lines-board-view-menu")).toBeInTheDocument();
+  });
+});
+
+describe("LinesPage board stages", () => {
+  beforeEach(async () => {
+    await resetLinesBoardMocks();
+  });
+
+  it("gates stage editing and renders saved custom stages", async () => {
+    const user = userEvent.setup();
+    const factory = {
+      ...REFUND_FACTORY,
+      lines: (REFUND_FACTORY.lines ?? []).map((line) =>
+        line.id === REFUND_LINE_PLAN_ID
+          ? {
+              ...line,
+              stages: [
+                { id: "backlog", key: "backlog", name: "Incoming", kind: "STAGE_KIND_BACKLOG" as const },
+                {
+                  id: "phase-0",
+                  key: "phase-0",
+                  name: "Implement",
+                  kind: "STAGE_KIND_PHASE" as const,
+                  stepIndex: 0,
+                },
+                { id: "custom", key: "custom-qa", name: "QA", kind: "STAGE_KIND_CUSTOM" as const },
+                {
+                  id: "phase-1",
+                  key: "phase-1",
+                  name: "Verify changes",
+                  kind: "STAGE_KIND_PHASE" as const,
+                  stepIndex: 1,
+                },
+                {
+                  id: "phase-2",
+                  key: "phase-2",
+                  name: "Removed step",
+                  kind: "STAGE_KIND_PHASE" as const,
+                  stepIndex: 2,
+                },
+                { id: "verify", key: "verify", name: "Check", kind: "STAGE_KIND_VERIFY" as const },
+                { id: "done", key: "done", name: "Shipped", kind: "STAGE_KIND_DONE" as const },
+              ],
+            }
+          : line,
+      ),
+    };
+
+    const disabled = renderLinesBoard(undefined, vi.fn(), factory);
+    expect(screen.getByTestId("lines-custom-stage-custom-qa")).toHaveTextContent("No tasks in this stage.");
+    expect(screen.getByTestId("lines-phase-board").children).toHaveLength(6);
+    await user.click(screen.getByTestId("lines-board-view-menu"));
+    expect(screen.queryByRole("menuitem", { name: "Edit stages" })).not.toBeInTheDocument();
+    disabled.unmount();
+
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_STAGES);
+    const selectedLine = factory.lines?.find((line) => line.id === REFUND_LINE_PLAN_ID);
+    updateFactoryLineMutateAsync.mockResolvedValueOnce({
+      ...selectedLine,
+      stages: [
+        ...(selectedLine?.stages?.slice(0, -1) ?? []),
+        {
+          id: "custom-deploy",
+          key: "custom-deploy",
+          name: "Deploy to prod",
+          kind: "STAGE_KIND_CUSTOM" as const,
+        },
+        ...(selectedLine?.stages?.slice(-1) ?? []),
+      ],
+    });
+    renderLinesBoard(undefined, vi.fn(), factory);
+    await user.click(screen.getByTestId("lines-board-view-menu"));
+    await user.click(screen.getByRole("menuitem", { name: "Edit stages" }));
+    await user.click(screen.getByRole("button", { name: "Add stage" }));
+    const addDialog = screen.getByTestId("add-line-stage-dialog");
+    await user.type(within(addDialog).getByRole("textbox", { name: "Name" }), "Deploy to prod");
+    await user.click(within(addDialog).getByRole("button", { name: "Add stage" }));
+
+    expect(screen.getByTestId("lines-draft-stage-Deploy to prod")).toBeInTheDocument();
+    expect(updateFactoryLineMutateAsync).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+    const saveDialog = screen.getByTestId("save-line-stages-dialog");
+    expect(within(saveDialog).getByTestId("save-line-stages-summary")).toHaveTextContent("Deploy to prod");
+    await user.click(within(saveDialog).getByRole("button", { name: "Save changes" }));
+
+    expect(await screen.findByRole("heading", { name: "Add an automation for Deploy to prod" })).toBeInTheDocument();
+    const savedStages = updateFactoryLineMutateAsync.mock.calls[0][0].stageConfiguration.stages;
+    expect(savedStages.at(-2)).toMatchObject({ id: "", name: "Deploy to prod", kind: "STAGE_KIND_CUSTOM" });
+    expect(screen.queryByTestId("line-stage-edit-toolbar")).not.toBeInTheDocument();
+    expect(screen.getByTestId("add-column-automation-template-custom")).toBeInTheDocument();
+  });
+
+  it("hides stage mutations without factory update permission", async () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_STAGES);
+    permissions.canUpdateFactories = false;
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    expect(screen.queryByTestId("lines-stage-reorder-phase-0")).not.toBeInTheDocument();
+    await user.click(screen.getByTestId("lines-board-view-menu"));
+    expect(screen.queryByRole("menuitem", { name: "Edit stages" })).not.toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    await user.click(screen.getByTestId("lines-phase-menu-0"));
+    expect(screen.queryByTestId("lines-phase-menu-0-delete-stage")).not.toBeInTheDocument();
+  });
+
+  it("uses a persisted stage name after the line refreshes", async () => {
+    const user = userEvent.setup();
+    const factoryWithStageName = (name: string): FactoriesFactory => ({
+      ...REFUND_FACTORY,
+      lines: (REFUND_FACTORY.lines ?? []).map((line) =>
+        line.id === REFUND_LINE_PLAN_ID
+          ? {
+              ...line,
+              stages: [
+                { id: "backlog", key: "backlog", name: "Backlog", kind: "STAGE_KIND_BACKLOG" as const },
+                {
+                  id: "phase-0",
+                  key: "phase-0",
+                  name,
+                  kind: "STAGE_KIND_PHASE" as const,
+                  stepIndex: 0,
+                },
+                {
+                  id: "phase-1",
+                  key: "phase-1",
+                  name: "Verify changes",
+                  kind: "STAGE_KIND_PHASE" as const,
+                  stepIndex: 1,
+                },
+                { id: "verify", key: "verify", name: "Verify", kind: "STAGE_KIND_VERIFY" as const },
+                { id: "done", key: "done", name: "Done", kind: "STAGE_KIND_DONE" as const },
+              ],
+            }
+          : line,
+      ),
+    });
+    const path = `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}`;
+    const view = renderLinesBoard(path, vi.fn(), factoryWithStageName("Implement"));
+
+    await user.click(screen.getByTestId("lines-column-title-phase-0"));
+    const input = await screen.findByTestId("lines-column-title-phase-0-input");
+    await user.clear(input);
+    await user.type(input, "Temporary name");
+    await user.keyboard("{Enter}");
+    expect(screen.getByTestId("lines-column-title-phase-0")).toHaveTextContent("Temporary name");
+
+    view.rerender(<LinesBoardSpecHarness path={path} factory={factoryWithStageName("Saved name")} />);
+
+    expect(screen.getByTestId("lines-column-title-phase-0")).toHaveTextContent("Saved name");
+  });
+});
+
+describe("LinesPage board automations", () => {
+  beforeEach(async () => {
+    await resetLinesBoardMocks();
   });
 
   it("puts backlog automations before the create plus and column menu", () => {
@@ -1709,6 +1873,159 @@ describe("LinesPage board pull request", () => {
     const pill = within(card).getByRole("link", { name: "Closed pull request #114." });
     expect(pill).toHaveTextContent("Closed #114");
     expect(pill).toHaveAttribute("href", "https://github.com/acme/payments/pull/114");
+  });
+});
+
+describe("LinesPage stage editing", () => {
+  beforeEach(async () => {
+    await resetLinesBoardMocks();
+  });
+
+  const stageShellOrder = () =>
+    [...screen.getByTestId("lines-phase-board").children].map((element) => element.getAttribute("data-testid"));
+
+  const enterStageEditing = async (user: ReturnType<typeof userEvent.setup>) => {
+    await user.click(screen.getByTestId("lines-board-view-menu"));
+    await user.click(screen.getByRole("menuitem", { name: "Edit stages" }));
+  };
+
+  it("shows reorder handles only while editing stages", async () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_STAGES);
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    expect(screen.queryByTestId("lines-stage-reorder-phase-0")).not.toBeInTheDocument();
+    await enterStageEditing(user);
+
+    expect(screen.getByTestId("lines-stage-reorder-phase-0")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Reorder Backlog" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Reorder Done" })).not.toBeInTheDocument();
+  });
+
+  it("offers Save only after a change and exits with Done when nothing changed", async () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_STAGES);
+    const user = userEvent.setup();
+    renderLinesBoard();
+    await enterStageEditing(user);
+
+    expect(screen.queryByRole("button", { name: "Save changes" })).not.toBeInTheDocument();
+    await user.type(screen.getByTestId("lines-stage-reorder-phase-0"), "{ArrowRight}");
+    expect(screen.getByRole("button", { name: "Save changes" })).toBeInTheDocument();
+    await user.type(screen.getByTestId("lines-stage-reorder-phase-0"), "{ArrowLeft}");
+
+    await user.click(screen.getByRole("button", { name: "Done" }));
+    expect(screen.queryByTestId("line-stage-edit-toolbar")).not.toBeInTheDocument();
+    expect(updateFactoryLineMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it("saves the reordered draft once after confirmation", async () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_STAGES);
+    updateFactoryLineMutateAsync.mockResolvedValueOnce({});
+    const user = userEvent.setup();
+    renderLinesBoard();
+    await enterStageEditing(user);
+
+    await user.type(screen.getByTestId("lines-stage-reorder-phase-0"), "{ArrowRight}");
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(updateFactoryLineMutateAsync).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+    const saveDialog = screen.getByTestId("save-line-stages-dialog");
+    expect(within(saveDialog).getByTestId("save-line-stages-summary")).toHaveTextContent("Stage order changes");
+    await user.click(within(saveDialog).getByRole("button", { name: "Save changes" }));
+
+    await waitFor(() => expect(updateFactoryLineMutateAsync).toHaveBeenCalledTimes(1));
+    const stages = updateFactoryLineMutateAsync.mock.calls[0][0].stageConfiguration.stages;
+    expect(stages.map((stage: { key: string }) => stage.key)).toEqual([
+      "backlog",
+      "phase-1",
+      "phase-0",
+      "verify",
+      "done",
+    ]);
+    await waitFor(() => expect(screen.queryByTestId("line-stage-edit-toolbar")).not.toBeInTheDocument());
+  });
+
+  it("restores the saved order when changes are discarded", async () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_STAGES);
+    const user = userEvent.setup();
+    renderLinesBoard();
+    await enterStageEditing(user);
+
+    await user.type(screen.getByTestId("lines-stage-reorder-phase-0"), "{ArrowRight}");
+    await user.click(screen.getByRole("button", { name: "Discard" }));
+    await user.click(screen.getByRole("button", { name: "Discard changes" }));
+
+    expect(updateFactoryLineMutateAsync).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("line-stage-edit-toolbar")).not.toBeInTheDocument();
+    expect(stageShellOrder()).toEqual([
+      "lines-stage-shell-backlog",
+      "lines-stage-shell-phase-0",
+      "lines-stage-shell-phase-1",
+      "lines-stage-shell-verify",
+      "lines-stage-shell-done",
+    ]);
+  });
+
+  it("leaves a deleted draft stage out of the save", async () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_STAGES);
+    updateFactoryLineMutateAsync.mockResolvedValueOnce({});
+    const user = userEvent.setup();
+    renderLinesBoard();
+    await enterStageEditing(user);
+
+    await user.click(screen.getByTestId("lines-stage-delete-phase-1"));
+    expect(screen.queryByTestId("lines-stage-shell-phase-1")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+    await user.click(
+      within(screen.getByTestId("save-line-stages-dialog")).getByRole("button", { name: "Save changes" }),
+    );
+
+    await waitFor(() => expect(updateFactoryLineMutateAsync).toHaveBeenCalledTimes(1));
+    const stages = updateFactoryLineMutateAsync.mock.calls[0][0].stageConfiguration.stages;
+    expect(stages.map((stage: { key: string }) => stage.key)).toEqual(["backlog", "phase-0", "verify", "done"]);
+  });
+
+  it("deletes a stage from the column menu only in the draft", async () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_STAGES);
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    await user.click(screen.getByTestId("lines-phase-menu-1"));
+    expect(screen.queryByTestId("lines-phase-menu-1-delete-stage")).not.toBeInTheDocument();
+    await user.keyboard("{Escape}");
+
+    await enterStageEditing(user);
+    await user.click(screen.getByTestId("lines-phase-menu-1"));
+    await user.click(screen.getByTestId("lines-phase-menu-1-delete-stage"));
+
+    expect(screen.queryByTestId("lines-stage-shell-phase-1")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save changes" })).toBeInTheDocument();
+    expect(updateFactoryLineMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it("keeps a drag move in the draft when the target emits repeated drag events", async () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_STAGES);
+    const user = userEvent.setup();
+    renderLinesBoard();
+    await enterStageEditing(user);
+    const handle = screen.getByTestId("lines-stage-reorder-phase-0");
+    const target = screen.getByTestId("lines-stage-shell-phase-1");
+    const dataTransfer = { effectAllowed: "none", setData: vi.fn() };
+
+    fireEvent.dragStart(handle, { dataTransfer });
+    fireEvent.dragEnter(target);
+    fireEvent.dragEnter(target);
+    fireEvent.dragEnd(handle);
+
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(stageShellOrder()).toEqual([
+      "lines-stage-shell-backlog",
+      "lines-stage-shell-phase-1",
+      "lines-stage-shell-phase-0",
+      "lines-stage-shell-verify",
+      "lines-stage-shell-done",
+    ]);
   });
 });
 

@@ -6,6 +6,29 @@ import { describe, expect, it, vi } from "bun:test";
 import { ColumnLaneMenu } from "./ColumnLaneMenu";
 
 describe("ColumnLaneMenu", () => {
+  it("puts stage deletion below the color settings", async () => {
+    const onDeleteStage = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <ColumnLaneMenu
+          title="Verify"
+          testId="lines-verify-menu"
+          colorId={null}
+          onColorChange={vi.fn()}
+          onDeleteStage={onDeleteStage}
+        />
+      </MemoryRouter>,
+    );
+
+    await user.click(screen.getByTestId("lines-verify-menu"));
+    const colorPicker = screen.getByTestId("lines-verify-menu-color-picker");
+    const deleteStage = screen.getByTestId("lines-verify-menu-delete-stage");
+    expect(colorPicker.compareDocumentPosition(deleteStage) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    await user.click(deleteStage);
+    expect(onDeleteStage).toHaveBeenCalledTimes(1);
+  });
+
   it("offers colour swatches and applies a selection", async () => {
     const onColorChange = vi.fn();
     const user = userEvent.setup();

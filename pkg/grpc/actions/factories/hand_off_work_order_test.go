@@ -1113,3 +1113,25 @@ func TestSubscriptionHandOffRejectsInvalidPullRequestURLBeforeSaving(t *testing.
 		})
 	}
 }
+
+func TestExecutionPlanIndexForLineStepAccountsForCustomStages(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	app, entrypoint := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "Implement", "start")
+	line, err := factory.CreateLine(db, "ship", []models.FactoryLineStep{{
+		Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entrypoint,
+	}})
+	require.NoError(t, err)
+	stageID := uuid.New()
+	stage := models.FactoryLineStage{ID: stageID, Key: "custom-" + stageID.String(), Name: "QA", Kind: models.FactoryLineStageCustom}
+	stages := append([]models.FactoryLineStage{line.StagesValue()[0], stage}, line.StagesValue()[1:]...)
+	require.NoError(t, line.UpdateConfiguration(db, nil, nil, nil, stages))
+	custom, _ := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "QA", "start")
+	require.NoError(t, custom.SetColumnKey(db, stage.Key))
+
+	index, err := executionPlanIndexForLineStep(db, line, 0)
+	require.NoError(t, err)
+	assert.Equal(t, 1, index)
+}

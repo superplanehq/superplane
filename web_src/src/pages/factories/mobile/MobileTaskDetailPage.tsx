@@ -174,6 +174,7 @@ function useMobileTaskModel(
     artifacts,
     lineId,
     lineName,
+    lineStages: factory?.lines?.find((line) => line.id === lineId)?.stages,
     demoArtifacts: false,
     prFeedbackRuns,
     analysisRuns,
