@@ -1,10 +1,11 @@
-import { act, render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, renderHook, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type * as ReactRouterDom from "react-router";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 import type { FactoriesFactory } from "@/api-client";
+import { useBYOKAccess } from "@/hooks/useBYOKAccess";
 import { unmockedPackage } from "@/test/unmockedModule";
 
 import { billingState, defaultBillingState, refetchBilling } from "./FirstRunSetup.chrome.spec.billing";
@@ -262,12 +263,20 @@ describe("FirstRunSetup chrome", () => {
     expect(screen.getByTestId("first-run-choose")).toBeInTheDocument();
   });
 
-  it("keeps SuperPlane-hosted models as the choice and own key as a link", () => {
+  it("keeps hosted choices without subscriptions when hosted BYOK access is allowed", () => {
+    billingState.byok = true;
+    const { result } = renderHook(() => useBYOKAccess("org-1"));
     renderSetup(
-      pageModel({ hostedModelsAvailable: true, bringYourOwnKey: true }),
+      pageModel({
+        hostedModelsAvailable: true,
+        bringYourOwnKey: result.current.allowed,
+        subscription: { offered: result.current.noHostedDefault, ready: false, connect: vi.fn() },
+      }),
       "/org-1/workspaces/PAY/setup?step=agent",
     );
 
+    expect(screen.queryByRole("button", { name: "Use a ChatGPT subscription" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Connect ChatGPT" })).not.toBeInTheDocument();
     const source = screen.getByTestId("first-run-model-source");
     const buttons = within(source).getAllByRole("button");
     expect(buttons[0]).toHaveAccessibleName(new RegExp(FIRST_RUN_COPY.agent.hostedModels));

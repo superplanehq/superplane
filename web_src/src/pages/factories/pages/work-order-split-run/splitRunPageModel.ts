@@ -3,6 +3,7 @@ import type {
   FactoriesWorkOrder,
   FactoriesWorkOrderArtifact,
   FactoriesWorkOrderCheck,
+  FactoryLineStage,
 } from "@/api-client";
 import type { OrgUserDisplayLookup } from "@/lib/orgUserDisplay";
 
@@ -48,6 +49,7 @@ export function resolveSplitRunOrder(
 }
 
 export type FixtureForSplitRunPageOptions = {
+  lineStages?: FactoryLineStage[];
   prFeedbackRuns?: PRFeedbackLogRun[];
   analysisRuns?: BacklogAnalysisRun[];
   columnApps?: SplitRunColumnApp[];
@@ -75,6 +77,7 @@ export function fixtureForSplitRunPage(
   return splitRunFixtureForWorkOrder(order, {
     checks: orderChecks,
     lineId,
+    lineStages: options?.lineStages,
     demoArtifacts: false,
     prFeedbackRuns: options?.prFeedbackRuns,
     analysisRuns: options?.analysisRuns,

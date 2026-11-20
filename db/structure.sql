@@ -616,7 +616,8 @@ CREATE TABLE public.factory_lines (
     steps jsonb DEFAULT '[]'::jsonb NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    column_colors jsonb DEFAULT '{}'::jsonb NOT NULL
+    column_colors jsonb DEFAULT '{}'::jsonb NOT NULL,
+    stages jsonb DEFAULT '[]'::jsonb NOT NULL
 );
 
 
@@ -993,7 +994,8 @@ CREATE TABLE public.factory_work_order_line_dispatches (
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     finished_at timestamp with time zone,
     model text DEFAULT ''::text NOT NULL,
-    thinking_level text DEFAULT ''::text NOT NULL
+    thinking_level text DEFAULT ''::text NOT NULL,
+    stages jsonb DEFAULT '[]'::jsonb NOT NULL
 );
 
 
@@ -1010,7 +1012,9 @@ CREATE TABLE public.factory_work_order_queue_items (
     line_dispatch_id uuid NOT NULL,
     step_index integer NOT NULL,
     step_name text NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    app_id uuid NOT NULL,
+    stage_key text DEFAULT ''::text NOT NULL
 );
 
 
@@ -2981,11 +2985,11 @@ ALTER TABLE ONLY public.factory_work_order_line_dispatches
 
 
 --
--- Name: factory_work_order_queue_items factory_work_order_queue_items_line_dispatch_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: factory_work_order_queue_items factory_work_order_queue_items_line_dispatch_step_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.factory_work_order_queue_items
-    ADD CONSTRAINT factory_work_order_queue_items_line_dispatch_id_key UNIQUE (line_dispatch_id);
+    ADD CONSTRAINT factory_work_order_queue_items_line_dispatch_step_key UNIQUE (line_dispatch_id, step_index);
 
 
 --
@@ -4414,10 +4418,10 @@ CREATE INDEX idx_factory_work_order_queue_items_order ON public.factory_work_ord
 
 
 --
--- Name: idx_factory_work_order_queue_items_step; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_factory_work_order_queue_items_stage; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_factory_work_order_queue_items_step ON public.factory_work_order_queue_items USING btree (line_id, step_index, created_at);
+CREATE INDEX idx_factory_work_order_queue_items_stage ON public.factory_work_order_queue_items USING btree (line_id, app_id, stage_key, created_at);
 
 
 --
@@ -6780,7 +6784,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261120160648	f
+20261120182307	f
 \.
 
 

@@ -1323,6 +1323,27 @@ message FactoryPlanning {
 }
 
 message FactoryLine {
+  enum StageKind {
+    STAGE_KIND_UNSPECIFIED = 0;
+    STAGE_KIND_BACKLOG = 1;
+    STAGE_KIND_PHASE = 2;
+    STAGE_KIND_CUSTOM = 3;
+    STAGE_KIND_VERIFY = 4;
+    STAGE_KIND_DONE = 5;
+  }
+
+  message Stage {
+    string id = 1;
+    string key = 2;
+    string name = 3;
+    StageKind kind = 4;
+    optional int32 step_index = 5;
+  }
+
+  message StageConfiguration {
+    repeated Stage stages = 1;
+  }
+
   message Step {
     string type = 1;
     optional AppStep app = 2;
@@ -1348,6 +1369,7 @@ message FactoryLine {
   // index>", "verify", "done"). Value is a color id. Missing keys use the
   // default color.
   map<string, string> column_colors = 7;
+  repeated Stage stages = 8;
 }
 
 message CreateFactoryLineRequest {
@@ -1368,6 +1390,8 @@ message UpdateFactoryLineRequest {
   // Full replacement of the board column colors. Absent means "do not
   // change"; present (including an empty map) replaces the stored map.
   map<string, string> column_colors = 5;
+  // Full ordered stage configuration. Absent means "do not change".
+  optional FactoryLine.StageConfiguration stage_configuration = 6;
 }
 
 message UpdateFactoryLineResponse {
@@ -2387,6 +2411,9 @@ message WorkOrderLineDispatch {
   // Thinking chosen at Start. Empty means Auto: each runner keeps the
   // thinking level stored on the live automation canvas.
   string thinking_level = 11;
+  // Ordered stage snapshot used by task history. It stays stable when the
+  // line is edited after this dispatch starts.
+  repeated FactoryLine.Stage stages = 12;
 }
 
 // WorkOrderQueueItem is a line dispatch waiting for admission into a step
@@ -2406,6 +2433,7 @@ message WorkOrderQueueItem {
   // snapshot. Lets the UI place the queued work order on the correct
   // board column even after a line edit moved the step.
   string app_id = 6;
+  string stage_key = 7;
 }
 
 message WorkOrderExecution {
@@ -2454,11 +2482,13 @@ message WorkOrderExecution {
   // hosted credit failures: no_hosted_credit,
   // hosted_subscription_required, payment_past_due, or workspace_budget_empty.
   string failure_reason = 14;
+  string stage_key = 15;
 }
 
 message WorkOrderExecutionStep {
   string name = 1;
   int32 step_index = 2;
+  string stage_key = 3;
 }
 
 message DescribeWorkOrderRequest {

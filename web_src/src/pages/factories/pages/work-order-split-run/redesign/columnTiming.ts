@@ -9,14 +9,7 @@ export type ColumnTiming = {
   durationMs?: number;
 };
 
-const COLUMN_ORDER: ConsoleColumnId[] = ["backlog", "implement", "verify", "done"];
-
-const NEXT_COLUMN: Record<ConsoleColumnId, ConsoleColumnId | undefined> = {
-  backlog: "implement",
-  implement: "verify",
-  verify: "done",
-  done: undefined,
-};
+const DEFAULT_COLUMN_ORDER: ConsoleColumnId[] = ["backlog", "implement", "verify", "done"];
 
 /** Arrival and dwell for each reached console column. */
 export function timingsForConsoleColumns(
@@ -29,14 +22,15 @@ export function timingsForConsoleColumns(
   if (intakeEntered != null) {
     result.intake = { enteredAt: new Date(intakeEntered).toISOString() };
   }
-  for (const column of COLUMN_ORDER) {
+  const columnOrder = fixture.stageColumns?.map((column) => column.id) ?? DEFAULT_COLUMN_ORDER;
+  for (const [index, column] of columnOrder.entries()) {
     const entered = enteredMs[column];
     if (entered == null) {
       continue;
     }
     const timing: ColumnTiming = { enteredAt: new Date(entered).toISOString() };
     if (column !== "done") {
-      const next = NEXT_COLUMN[column];
+      const next = columnOrder[index + 1];
       const nextEntered = next ? enteredMs[next] : undefined;
       const end = nextEntered ?? dwellEndMs(column, fixture, nowMs);
       const durationMs = Math.max(0, end - entered);
