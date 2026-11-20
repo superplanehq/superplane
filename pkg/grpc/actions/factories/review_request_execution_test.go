@@ -502,13 +502,26 @@ func runReviewRequestGraph(t *testing.T, f publicationFixture, canvas *models.Ca
 					task := &models.RunnerTask{ID: uuid.MustParse(tasks.CreatedID), OrganizationID: canvas.OrganizationID}
 					require.NoError(t, task.RequireModelPolicyAdmission(f.db))
 				}
-				decision := map[string]any{"reviewRequired": true, "rationale": "Security findings need review.", "noCandidate": false, "reviewers": []any{map[string]any{"id": 2, "login": "octocat", "reason": "Owns the changed security code."}}}
+				decision := map[string]any{
+					"reviewRequired": true,
+					"rationale": "Security findings need review. Policy evaluation requires platform ownership. " +
+						"Eligibility checks exclude all contributors. Contribution history: 0123456789abcdef0123456789abcdef01234567.",
+					"publicationSummary": "Security findings require human review.",
+					"noCandidate":        false,
+					"reviewers": []any{map[string]any{
+						"id": 2, "login": "octocat",
+						"reason": "Owns the changed security code. Eligible non-contributor with write access. " +
+							"Prior commit: 0123456789abcdef0123456789abcdef01234567.",
+						"publicationReason": "Retained for security ownership.",
+					}},
+				}
 				switch scenario {
 				case "favorable", "favorable no candidates":
 					decision["reviewRequired"], decision["reviewers"], decision["rationale"] = false, []any{}, "All checks are positive. Factory policy permits no review."
+					decision["publicationSummary"] = "All checks are positive and policy permits no review."
 				case "replacement":
 					decision["rationale"] = "The previous reviewer is unavailable. Select the authorization owner."
-					decision["reviewers"] = []any{map[string]any{"id": 3, "login": "fallback-user", "reason": "The previous reviewer is unavailable. Owns authorization changes."}}
+					decision["reviewers"] = []any{map[string]any{"id": 3, "login": "fallback-user", "reason": "The previous reviewer is unavailable. Owns authorization changes.", "publicationReason": "Selected for authorization ownership."}}
 				case "fallback", "no candidate", "no suitable candidate", "ineligible fallback":
 					decision["noCandidate"], decision["reviewers"] = true, []any{}
 				case "malformed output":
@@ -519,19 +532,28 @@ func runReviewRequestGraph(t *testing.T, f publicationFixture, canvas *models.Ca
 				case "concerning no review":
 					decision["reviewRequired"], decision["reviewers"] = false, []any{}
 				case "author selected":
-					decision["reviewers"] = []any{map[string]any{"id": 1, "login": "author", "reason": "Author"}}
+					decision["reviewers"] = []any{map[string]any{"id": 1, "login": "author", "reason": "Author", "publicationReason": "Author"}}
 				case "bot selected":
-					decision["reviewers"] = []any{map[string]any{"id": 4, "login": "agent[bot]", "reason": "Bot"}}
+					decision["reviewers"] = []any{map[string]any{"id": 4, "login": "agent[bot]", "reason": "Bot", "publicationReason": "Bot"}}
 				case "reader selected":
-					decision["reviewers"] = []any{map[string]any{"id": 5, "login": "reader", "reason": "Read access"}}
+					decision["reviewers"] = []any{map[string]any{"id": 5, "login": "reader", "reason": "Read access", "publicationReason": "Read access"}}
 				case "duplicate reviewer":
 					decision["reviewers"] = append(decision["reviewers"].([]any), decision["reviewers"].([]any)[0])
-				case "additional reviewer", "additional reviewer without reason":
+				case "additional reviewer", "additional reviewer without reason", "detailed explanation":
 					reason := "Owns separate authorization changes."
 					if scenario == "additional reviewer without reason" {
 						reason = ""
 					}
-					decision["reviewers"] = append(decision["reviewers"].([]any), map[string]any{"id": 3, "login": "fallback-user", "reason": reason})
+					decision["reviewers"] = append(decision["reviewers"].([]any), map[string]any{"id": 3, "login": "fallback-user", "reason": reason, "publicationReason": "Added to satisfy the platform review policy."})
+				}
+				if scenario == "detailed explanation" {
+					require.Contains(t, instructions, "Publish a detailed explanation")
+					decision["publicationSummary"] = "Security findings require human review. Subscription credential changes affect platform access and onboarding, so policy requires a platform reviewer."
+					decision["reviewers"].([]any)[0].(map[string]any)["publicationReason"] = "Retained for security ownership. Previous authorization work provides relevant experience with subscription credentials."
+				}
+				if scenario == "escaped explanation" {
+					decision["publicationSummary"] = "Review [credentials] | @team."
+					decision["reviewers"].([]any)[0].(map[string]any)["publicationReason"] = "Owns <access> & @security."
 				}
 				result, err := json.Marshal(decision)
 				require.NoError(t, err)
