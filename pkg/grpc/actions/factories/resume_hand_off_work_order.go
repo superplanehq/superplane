@@ -52,6 +52,7 @@ func ResumeHandOffWorkOrder(ctx context.Context, deps IntakeDependencies, organi
 	}
 	var dispatched *workOrderLineDispatchResult
 	var startIndex int
+	var implementIndex int
 	err = db.Transaction(func(tx *gorm.DB) error {
 		if err := order.LockForUpdate(tx); err != nil {
 			return err
@@ -75,7 +76,10 @@ func ResumeHandOffWorkOrder(ctx context.Context, deps IntakeDependencies, organi
 		}
 		switch intent.Column {
 		case HandOffColumnImplement:
-			startIndex, err = resolveImplementationStageIndex(stages)
+			implementIndex, err = resolveImplementationStageIndex(stages)
+			if err == nil {
+				startIndex, err = executionPlanIndexForLineStep(tx, line, implementIndex)
+			}
 		case HandOffColumnVerify:
 			startIndex, err = resolveVerifyStageIndex(stages)
 		default:
@@ -108,7 +112,7 @@ func ResumeHandOffWorkOrder(ctx context.Context, deps IntakeDependencies, organi
 	}
 	if dispatched != nil {
 		publishDispatchedWorkOrder(dispatched.logger, orgID, factory.ID, order, &actor, dispatched.fromState, dispatched.startedSteps)
-		startImplementColumnAutomations(db, dispatched.logger, dispatched.factory, dispatched.order, startIndex)
+		startImplementColumnAutomations(db, dispatched.logger, dispatched.factory, dispatched.order, implementIndex)
 	} else {
 		if _, err := publishVerificationHandOff(ctx, deps, db, factory, order); err != nil {
 			return nil, factoryErrorToStatus(err, "failed to refresh pull request")
@@ -220,5 +224,9 @@ func validateHandOffOverrides(tx *gorm.DB, f *models.Factory, o *models.FactoryW
 	if err != nil {
 		return invalidArgument(err.Error())
 	}
-	return validateLineThinkingLevel(tx, line, normalized)
+	steps, err := line.ExecutionPlan(tx)
+	if err != nil {
+		return err
+	}
+	return validateLineThinkingLevel(tx, steps, normalized)
 }

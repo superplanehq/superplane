@@ -606,6 +606,65 @@ func Test__RunFinalizer__ExecuteNextFactoryLineStep(t *testing.T) {
 		"a passed step with a next step in the snapshot leaves the traversal active")
 }
 
+func Test__RunFinalizer__WaitsForEveryCustomStageAutomation(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	db := database.Conn()
+
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	order, err := factory.CreateWorkOrder(db, "Ship feature", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	dispatchWorkOrderForTest(t, order)
+
+	implement, implementEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "implement", "start")
+	first, _ := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "lint", "start")
+	second, _ := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "test", "start")
+	line, err := factory.CreateLine(db, "ship", []models.FactoryLineStep{{
+		Type: models.FactoryLineStepTypeRunApp, AppID: implement.ID, Entrypoint: implementEntry,
+	}})
+	require.NoError(t, err)
+
+	stageID := uuid.New()
+	stageKey := "custom-" + stageID.String()
+	stages := line.StagesValue()
+	stages = append(stages[:1], append([]models.FactoryLineStage{{
+		ID: stageID, Key: stageKey, Name: "QA", Kind: models.FactoryLineStageCustom,
+	}}, stages[1:]...)...)
+	require.NoError(t, line.UpdateConfiguration(db, nil, nil, nil, stages))
+	require.NoError(t, first.SetColumnKey(db, stageKey))
+	require.NoError(t, second.SetColumnKey(db, stageKey))
+
+	var customRuns []*models.FactoryLineStepResult
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		_, customRuns, err = line.DispatchStage(tx, order)
+		return err
+	}))
+	require.Len(t, customRuns, 2)
+
+	amqpURL, _ := config.RabbitMQURL()
+	finalizer := NewRunFinalizer(amqpURL, r.Registry)
+	finish := func(result *models.FactoryLineStepResult) []factoryLinePendingRun {
+		t.Helper()
+		now := time.Now()
+		require.NoError(t, db.Model(result.Run).Updates(map[string]any{
+			"state": models.CanvasRunStateFinished, "result": models.CanvasRunResultPassed,
+			"updated_at": &now, "finished_at": &now,
+		}).Error)
+		var pending []factoryLinePendingRun
+		require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+			pending, _, err = finalizer.executeNextFactoryLineStep(tx, result.Run.ID)
+			return err
+		}))
+		return pending
+	}
+
+	assert.Empty(t, finish(customRuns[0]), "the stage waits for its other automation")
+	pending := finish(customRuns[1])
+	require.Len(t, pending, 1)
+	assert.Equal(t, implement.ID, pending[0].workflowID)
+}
+
 func Test__RunFinalizer__ExecuteNextFactoryLineStep__StopsImplementWhenNoBranchIsSaved(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
