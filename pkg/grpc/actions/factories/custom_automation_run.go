@@ -500,7 +500,7 @@ func requireWorkOrderInVerify(tx *gorm.DB, order *models.FactoryWorkOrder) error
 	if order == nil {
 		return grpcFailedPrecondition("The task is not in Verify.")
 	}
-	inVerify, err := models.WorkOrderIsWaitingAfterPassedStage(tx, order.ID)
+	inVerify, err := order.IsWaitingAfterPassedStage(tx)
 	if err != nil {
 		return err
 	}

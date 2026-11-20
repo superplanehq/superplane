@@ -312,7 +312,7 @@ func implementColumnDedupKey(tx *gorm.DB, order *models.FactoryWorkOrder) (strin
 	if order.State != models.FactoryWorkOrderStateOpen {
 		return "", errors.New("task is not in Implement")
 	}
-	inVerify, err := models.WorkOrderIsWaitingAfterPassedStage(tx, order.ID)
+	inVerify, err := order.IsWaitingAfterPassedStage(tx)
 	if err != nil {
 		return "", err
 	}

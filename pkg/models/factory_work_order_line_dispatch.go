@@ -880,14 +880,18 @@ func WorkOrderIsWaitingAfterPassedStage(tx *gorm.DB, workOrderID uuid.UUID) (boo
 	if err := tx.Where("id = ?", workOrderID).First(&order).Error; err != nil {
 		return false, err
 	}
-	if order.State != FactoryWorkOrderStateOpen {
+	return order.IsWaitingAfterPassedStage(tx)
+}
+
+func (order *FactoryWorkOrder) IsWaitingAfterPassedStage(tx *gorm.DB) (bool, error) {
+	if order == nil || order.State != FactoryWorkOrderStateOpen {
 		return false, nil
 	}
-	grouped, err := ListWorkOrderLineDispatchesByWorkOrderIDs(tx, []uuid.UUID{workOrderID})
+	grouped, err := ListWorkOrderLineDispatchesByWorkOrderIDs(tx, []uuid.UUID{order.ID})
 	if err != nil {
 		return false, err
 	}
-	dispatches := grouped[workOrderID]
+	dispatches := grouped[order.ID]
 	if len(dispatches) == 0 {
 		return false, nil
 	}
@@ -930,7 +934,7 @@ func WorkOrderBoardColumn(tx *gorm.DB, order *FactoryWorkOrder) (string, error) 
 		}
 		return CanvasColumnKeyDone, nil
 	case FactoryWorkOrderStateOpen:
-		inVerify, err := WorkOrderIsWaitingAfterPassedStage(tx, order.ID)
+		inVerify, err := order.IsWaitingAfterPassedStage(tx)
 		if err != nil {
 			return "", err
 		}
