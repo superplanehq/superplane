@@ -1376,6 +1376,7 @@ function LineDetail({
           factoryKey={factoryKey}
           lineId={line.id}
           lineName={line.name}
+          lineStages={line.stages}
           peekOrderId={peekOrderId}
           peekOrder={peekOrder}
           canDispatch={workOrderCardContext.canDispatch}
@@ -1399,6 +1400,7 @@ function LineBoardSplitRunPopup({
   factoryKey,
   lineId,
   lineName,
+  lineStages,
   peekOrderId,
   peekOrder,
   canDispatch,
@@ -1416,6 +1418,7 @@ function LineBoardSplitRunPopup({
   factoryKey: string;
   lineId: string | undefined;
   lineName: string | undefined;
+  lineStages: FactoriesFactoryLine["stages"];
   peekOrderId: string;
   peekOrder: FactoriesWorkOrderSummary;
   canDispatch: boolean;
@@ -1456,6 +1459,7 @@ function LineBoardSplitRunPopup({
           artifacts: peekArtifacts,
           lineId,
           lineName: resolvedLineName,
+          lineStages,
           demoArtifacts: false,
           prFeedbackRuns,
           analysisRuns,
