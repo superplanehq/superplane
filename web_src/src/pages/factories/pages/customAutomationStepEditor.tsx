@@ -22,6 +22,7 @@ export function StepEditor({
   onMove,
   onRemove,
   organizationId,
+  asCode = false,
 }: {
   step: PlanningReviewStep;
   position: number;
@@ -30,8 +31,10 @@ export function StepEditor({
   onMove: (offset: -1 | 1) => void;
   onRemove: () => void;
   organizationId: string;
+  asCode?: boolean;
 }) {
-  const value = step.type === "prompt" ? mergeCheckPromptBody(step.prompt) : (step.command ?? "");
+  const prompt = asCode ? (step.prompt ?? "") : mergeCheckPromptBody(step.prompt);
+  const value = step.type === "prompt" ? prompt : (step.command ?? "");
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-8 py-10">
       <StepEditorToolbar
@@ -80,6 +83,20 @@ export function StepEditor({
           </SelectContent>
         </Select>
       </ImplementSettingRow>
+      {asCode ? (
+        <ImplementSettingRow
+          label="Working directory"
+          description="Leave blank to use the runner's working directory."
+          htmlFor="custom-automation-working-directory"
+        >
+          <Input
+            id="custom-automation-working-directory"
+            value={step.workingDirectory ?? ""}
+            onChange={(event) => onChange({ ...step, workingDirectory: event.target.value })}
+            className="w-full shadow-none"
+          />
+        </ImplementSettingRow>
+      ) : null}
       <div className="flex flex-col gap-2">
         <div className="flex flex-col gap-1.5">
           <Label>{step.type === "prompt" ? "Prompt" : "Commands"}</Label>
@@ -93,7 +110,7 @@ export function StepEditor({
           onChange={(next) =>
             onChange(
               step.type === "prompt"
-                ? { ...step, prompt: withMergeCheckHeader(step.prompt, next) }
+                ? { ...step, prompt: asCode ? next : withMergeCheckHeader(step.prompt, next) }
                 : { ...step, command: next },
             )
           }
@@ -194,7 +211,7 @@ function BashStepSecrets({
     <div className="flex flex-col gap-2">
       <div className="flex flex-col gap-1.5">
         <Label>Secrets</Label>
-        <p className="text-xs text-muted-foreground">Give this step access to stored credentials.</p>
+        <p className="text-xs text-muted-foreground">The entire run can access the secrets that you select.</p>
       </div>
       <div className="flex flex-col gap-1">
         {selected.map((name) => (

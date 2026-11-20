@@ -40,6 +40,7 @@ export function customAutomationColumnLabel(column: CustomAutomationColumn): str
 }
 export type CustomAutomationTrigger = {
   id: string;
+  publicId?: string;
   mode: CustomAutomationMode;
   schedule: CustomAutomationSchedule;
 };
@@ -102,8 +103,9 @@ export function customAutomationRunsOnTask(
 
 export function customAutomationTriggersForRun(
   triggers: CustomAutomationTrigger[],
-  runsOnTask: boolean,
+  runsOnTask: boolean | undefined,
 ): CustomAutomationTrigger[] {
+  if (runsOnTask === undefined) return triggers;
   return triggers.filter((trigger) => (runsOnTask ? trigger.mode !== "scheduled" : trigger.mode !== "automatic"));
 }
 
@@ -122,6 +124,57 @@ export type ManualCustomAutomation = {
   icon?: string;
   columnKey?: CustomAutomationColumn;
 };
+
+export const AUTOMATION_ICONS = [
+  "sparkles",
+  "shield-check",
+  "search",
+  "bug",
+  "file-code",
+  "code",
+  "terminal",
+  "eye",
+  "gauge",
+  "git-pull-request",
+  "cpu",
+  "circle-check",
+  "activity",
+  "alarm-clock",
+  "archive",
+  "bell",
+  "bolt",
+  "book",
+  "box",
+  "boxes",
+  "braces",
+  "calendar",
+  "camera",
+  "chart-line",
+  "check",
+  "clock",
+  "cloud",
+  "cog",
+  "component",
+  "container",
+  "database",
+  "factory",
+  "file-json",
+  "file-text",
+  "fingerprint",
+  "flag",
+  "folder",
+  "git-branch",
+  "git-commit",
+  "git-merge",
+  "globe",
+  "key",
+  "layers",
+  "lock",
+  "message-square",
+  "network",
+  "package",
+  "rocket",
+] as const;
 
 export const DEFAULT_CUSTOM_AUTOMATION_ICON = "sparkles";
 export const DEFAULT_CUSTOM_AUTOMATION_TIMEOUT_SECONDS = 3600;
