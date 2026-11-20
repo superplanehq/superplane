@@ -2,6 +2,7 @@ package public
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"strings"
@@ -94,26 +95,47 @@ func (s *Server) handleMCPAuthorize(w http.ResponseWriter, r *http.Request) {
 		s.writeConsentPage(w, r, account, consentClientName(client), token, organizationID, "", http.StatusOK)
 		return
 	}
-	userID, orgID, factoryIDs, err := mcpserver.ResolveConsentWorkspaces(r.Context(), account, organizationID, r.PostForm["factory_id"])
-	if err != nil {
+	var code string
+	staleAccount := errors.New("account credentials changed")
+	var consentErr error
+	err = db.Transaction(func(tx *gorm.DB) error {
+		locked, err := models.LockAccount(tx, account.ID)
+		if err != nil {
+			return err
+		}
+		if locked.IsBlocked() || locked.PasswordVersion() != account.PasswordVersion() {
+			return staleAccount
+		}
+		userID, orgID, factoryIDs, err := mcpserver.ResolveConsentWorkspaces(tx, locked, organizationID, r.PostForm["factory_id"])
+		if err != nil {
+			consentErr = err
+			return err
+		}
+		code, err = mcpserver.CreateAuthorizationCode(tx, &mcpserver.AuthorizeRequest{
+			ClientID:            consent.ClientID,
+			RedirectURI:         consent.RedirectURI,
+			State:               consent.State,
+			CodeChallenge:       consent.CodeChallenge,
+			CodeChallengeMethod: consent.CodeChallengeMethod,
+			Resource:            consent.Resource,
+			ResponseType:        consent.ResponseType,
+		}, userID, orgID, factoryIDs)
+		return err
+	})
+	if errors.Is(err, staleAccount) {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	if consentErr != nil {
 		token, mintErr := mcpserver.MintConsentToken(s.jwt, *consent)
 		if mintErr != nil {
 			http.Error(w, "failed to start authorization", http.StatusInternalServerError)
 			return
 		}
-		s.writeConsentPage(w, r, account, consentClientName(client), token, organizationID, err.Error(), http.StatusBadRequest)
+		s.writeConsentPage(w, r, account, consentClientName(client), token, organizationID, consentErr.Error(), http.StatusBadRequest)
 		return
 	}
 
-	code, err := mcpserver.CreateAuthorizationCode(db, &mcpserver.AuthorizeRequest{
-		ClientID:            consent.ClientID,
-		RedirectURI:         consent.RedirectURI,
-		State:               consent.State,
-		CodeChallenge:       consent.CodeChallenge,
-		CodeChallengeMethod: consent.CodeChallengeMethod,
-		Resource:            consent.Resource,
-		ResponseType:        consent.ResponseType,
-	}, userID, orgID, factoryIDs)
 	if err != nil {
 		http.Error(w, "failed to create authorization code", http.StatusInternalServerError)
 		return
@@ -177,7 +199,7 @@ func (s *Server) handleMCPToken(w http.ResponseWriter, r *http.Request) {
 			}
 			return nil
 		})
-		if txErr != nil && oauthErr == nil {
+		if txErr != nil {
 			writeOAuthError(w, &mcpserver.OAuthError{Code: "server_error", Description: "failed to exchange code", Status: http.StatusInternalServerError})
 			return
 		}
@@ -191,7 +213,7 @@ func (s *Server) handleMCPToken(w http.ResponseWriter, r *http.Request) {
 			}
 			return nil
 		})
-		if txErr != nil && oauthErr == nil {
+		if txErr != nil {
 			writeOAuthError(w, &mcpserver.OAuthError{Code: "server_error", Description: "failed to refresh token", Status: http.StatusInternalServerError})
 			return
 		}
@@ -205,13 +227,14 @@ func (s *Server) handleMCPToken(w http.ResponseWriter, r *http.Request) {
 	}
 
 	access, err := mcpserver.MintAccessToken(s.jwt, mcpserver.AccessClaims{
-		UserID:     issue.UserID,
-		OrgID:      issue.OrgID,
-		FactoryID:  issue.FactoryID,
-		FactoryIDs: issue.FactoryIDs,
-		ClientID:   issue.ClientID,
-		Resource:   issue.Resource,
-		Scopes:     issue.Scopes,
+		PasswordVersion: issue.PasswordVersion,
+		UserID:          issue.UserID,
+		OrgID:           issue.OrgID,
+		FactoryID:       issue.FactoryID,
+		FactoryIDs:      issue.FactoryIDs,
+		ClientID:        issue.ClientID,
+		Resource:        issue.Resource,
+		Scopes:          issue.Scopes,
 	}, mcpserver.AccessTokenTTL)
 	if err != nil {
 		writeOAuthError(w, &mcpserver.OAuthError{Code: "server_error", Description: "failed to mint access token", Status: http.StatusInternalServerError})
@@ -264,7 +287,7 @@ func (s *Server) handleMCP(w http.ResponseWriter, r *http.Request) {
 		"organization_id": claims.OrgID.String(),
 		"object":          "mcp",
 	})
-	if mcpserver.UserAccountBlocked(database.DB(r.Context()), claims.UserID) {
+	if mcpserver.UserAccountBlocked(database.DB(r.Context()), claims.UserID) || !mcpserver.AccessPasswordIsFresh(database.DB(r.Context()), claims) {
 		w.Header().Set("WWW-Authenticate", mcpserver.WWWAuthenticate(origin))
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
