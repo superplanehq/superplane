@@ -113,7 +113,7 @@ export function AutomationsConsoleVariant({
   const outcome = outcomeSummary(fixture);
   const groups = stagesFromFixture(fixture);
   const stages = allStages(groups);
-  const columns = consoleColumns(groups, fixture.footer.run?.appId);
+  const columns = consoleColumns(groups, fixture.footer.run?.appId, fixture.stageColumns);
   const currentColumn = reachedColumns(columns);
   const markers = columns.map((column, index) => columnMarker(column, index, currentColumn));
   const anyLive = hasLiveAutomation(columns);
@@ -199,9 +199,18 @@ function liveRunStop(
  * event shows it. Pull request activity sits in Verify, except factory
  * PR Closure and an app installed on another column.
  */
-function consoleColumns(groups: ReturnType<typeof stagesFromFixture>, closerAppId?: string): ConsoleColumn[] {
-  const byColumn = stagesByConsoleColumn(groups, closerAppId);
-  return CONSOLE_COLUMNS.map((column) => ({
+function consoleColumns(
+  groups: ReturnType<typeof stagesFromFixture>,
+  closerAppId?: string,
+  stageColumns?: Array<{ id: string; title: string }>,
+): ConsoleColumn[] {
+  const orderedColumns = stageColumns?.length ? stageColumns : [...CONSOLE_COLUMNS];
+  const byColumn = stagesByConsoleColumn(
+    groups,
+    closerAppId,
+    orderedColumns.map((column) => column.id),
+  );
+  return orderedColumns.map((column) => ({
     id: column.id,
     title: column.title,
     automations: automationsFromStages(byColumn[column.id].filter((stage) => !isConsoleCreationStage(stage))),

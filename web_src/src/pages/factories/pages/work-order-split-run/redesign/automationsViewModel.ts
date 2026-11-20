@@ -191,7 +191,7 @@ export function allStages(groups: AutomationStageGroups): AutomationStage[] {
   return [...groups.taskStages, ...groups.pullRequestGroups.flatMap((group) => group.stages)];
 }
 
-export type ConsoleColumnId = "backlog" | "implement" | "verify" | "done";
+export type ConsoleColumnId = string;
 
 /**
  * Task stages sit in the column named after them. A column app uses the
@@ -266,26 +266,44 @@ function consoleAutomationDomId(name: string, key: string): string {
 export function stagesByConsoleColumn(
   groups: AutomationStageGroups,
   closerAppId?: string,
+  columnIds: readonly string[] = ["backlog", "implement", "verify", "done"],
 ): Record<ConsoleColumnId, AutomationStage[]> {
   const pullRequestStages = groups.pullRequestGroups.flatMap((group) => group.stages).filter((stage) => stage.appId);
   const closedBy = (stage: AutomationStage) => Boolean(closerAppId) && stage.appId === closerAppId;
-  const columns: Record<ConsoleColumnId, AutomationStage[]> = {
-    backlog: [],
-    implement: [],
-    verify: [],
-    done: [],
-  };
+  const columns: Record<ConsoleColumnId, AutomationStage[]> = Object.fromEntries(
+    [...new Set([...columnIds, "backlog", "implement", "verify", "done"])].map((id) => [id, []]),
+  );
   for (const stage of groups.taskStages.filter(isConsoleTaskStage)) {
-    columns[consoleColumnIdForStage(stage)].push(stage);
+    (columns[consoleColumnIdForStage(stage)] ??= []).push(stage);
   }
   for (const stage of pullRequestStages) {
     if (closedBy(stage)) {
       columns.done.push(stage);
       continue;
     }
-    columns[consoleColumnIdForStage(stage)].push(stage);
+    (columns[consoleColumnIdForStage(stage)] ??= []).push(stage);
   }
+  foldImplementIntoFirstPhase(columns, columnIds);
   return columns;
+}
+
+/**
+ * Saved stages name Implement `phase-0`, but Implement column apps and
+ * older runs still report `implement`. Keep their activity visible.
+ */
+function foldImplementIntoFirstPhase(
+  columns: Record<ConsoleColumnId, AutomationStage[]>,
+  columnIds: readonly string[],
+): void {
+  if (columnIds.includes("implement")) {
+    return;
+  }
+  const firstPhase = columnIds.find((id) => id.startsWith("phase-"));
+  if (!firstPhase) {
+    return;
+  }
+  columns[firstPhase] = [...columns[firstPhase], ...columns.implement];
+  columns.implement = [];
 }
 
 export function stageFromPhase(phase: SplitRunPhase): AutomationStage {
