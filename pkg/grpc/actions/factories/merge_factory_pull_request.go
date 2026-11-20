@@ -167,6 +167,7 @@ func MergeFactoryPullRequest(
 			closeOutcome.fromState,
 			closeOutcome.result,
 			false,
+			closeOutcome.leftColumn,
 		)
 	}
 	captureFactoryProductEvent(

@@ -57,13 +57,18 @@ func CloseWorkOrder(ctx context.Context, organizationID string, req *pb.CloseWor
 	logger = logging.WithWorkOrder(logger, *order)
 	fromState := order.State
 	wasClosed := order.IsClosed()
+	leftColumn, columnErr := models.WorkOrderBoardColumn(db, order)
+	if columnErr != nil {
+		logger.WithError(columnErr).Warnf("Failed to read the column for order %s", order.ID)
+		leftColumn = ""
+	}
 	order, err = order.Close(db, result, &closedBy)
 	if err != nil {
 		logger.WithError(err).Error("close work order failed")
 		return nil, factoryErrorToStatus(err, "failed to close work order")
 	}
 
-	publishWorkOrderClosed(db, orgID, factory, order, &closedBy, fromState, result, wasClosed)
+	publishWorkOrderClosed(db, orgID, factory, order, &closedBy, fromState, result, wasClosed, leftColumn)
 	if !wasClosed {
 		if eventName, properties, ok := factoryCloseEvent(result); ok {
 			captureFactoryProductEvent(
@@ -103,6 +108,7 @@ func publishWorkOrderClosed(
 	fromState string,
 	result string,
 	wasClosed bool,
+	leftColumn string,
 ) {
 	logger := logging.WithWorkOrder(logging.ForFactory(*factory), *order)
 	if err := messages.PublishFactoryWorkOrderUpdated(
@@ -118,6 +124,15 @@ func publishWorkOrderClosed(
 	}
 	if err := StartAutomaticTaskColumnCustomAutomations(db, factory, order, models.CanvasColumnKeyDone); err != nil {
 		logger.WithError(err).Warnf("Failed to start Done custom automation for order %s", order.ID)
+	}
+	nextColumn := models.CanvasColumnKeyDone
+	if result == models.FactoryWorkOrderResultArchived {
+		nextColumn = ""
+	}
+	if leftColumn != "" && leftColumn != nextColumn {
+		if err := StartColumnLeaveCustomAutomations(db, factory, order, leftColumn, ""); err != nil {
+			logger.WithError(err).Warnf("Failed to start %s leave automation for order %s", leftColumn, order.ID)
+		}
 	}
 
 	notification := messages.FactoryWorkOrderNotificationMessage{
