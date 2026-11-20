@@ -33,6 +33,48 @@ beforeEach(() => {
   describeIntegration.mockResolvedValue({ data: { integration: { metadata: { name: "workspace-vcs" } } } });
 });
 
+describe("add custom stage automation", () => {
+  it("opens the picker with the stage name", () => {
+    const { result } = renderHook(
+      () =>
+        useAddColumnAutomation({
+          organizationId: "org",
+          factoryId: "factory",
+          factoryKey: "workspace",
+          lineId: "line",
+          appRepository: "acme/app",
+          backlogRepository: "acme/app",
+          defaultBranch: "main",
+          githubIntegrationId: "vcs-integration",
+          automationsFor: () => [],
+        }),
+      {
+        wrapper: ({ children }: { children: ReactNode }) => (
+          <QueryClientProvider client={new QueryClient()}>
+            <MemoryRouter>{children}</MemoryRouter>
+          </QueryClientProvider>
+        ),
+      },
+    );
+
+    act(() => result.current.openPicker("custom-stage-id", "Deploy to prod"));
+
+    expect(result.current.pickerOpen).toBe(true);
+    expect(result.current.pickerTitle).toBe("Add an automation for Deploy to prod");
+    expect(result.current.catalog.map((entry) => entry.id)).toEqual([
+      "custom",
+      "analysis",
+      "agent-step",
+      "discussion",
+      "checks",
+      "risk-score",
+      "visual-evidence",
+      "pr-closure",
+    ]);
+    expect(result.current.unavailableReasons.checks).toBe("Available in Verify.");
+  });
+});
+
 describe("add pull request closure", () => {
   for (const provider of ["github", "bitbucket"]) {
     it(`installs with ${provider} and stays on the board`, async () => {
