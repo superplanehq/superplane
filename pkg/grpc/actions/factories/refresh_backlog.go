@@ -256,6 +256,7 @@ func archiveDraftWorkOrderIfCurrent(
 		models.FactoryWorkOrderStateDraft,
 		models.FactoryWorkOrderResultArchived,
 		false,
+		models.CanvasColumnKeyBacklog,
 	)
 	return true, false
 }

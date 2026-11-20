@@ -47,15 +47,7 @@ export const getDropletMapper: ComponentBaseMapper = {
 
     const ip = droplet.networks?.v4?.find((n) => n.type === "public")?.ip_address;
 
-    details["Droplet ID"] = droplet.id?.toString() || "-";
-    details["Name"] = droplet.name || "-";
-    details["Status"] = droplet.status || "-";
-    details["Region"] = droplet.region?.name || droplet.region?.slug || "-";
-    details["Size"] = droplet.size_slug || "-";
-    details["OS"] = droplet.image?.name || droplet.image?.slug || "-";
-    details["Memory"] = droplet.memory ? `${droplet.memory} MB` : "-";
-    details["vCPUs"] = droplet.vcpus?.toString() || "-";
-    details["Disk"] = droplet.disk ? `${droplet.disk} GB` : "-";
+    Object.assign(details, dropletIdentityDetails(droplet), dropletHardwareDetails(droplet));
 
     if (ip) {
       details["IP Address"] = ip;
@@ -73,6 +65,25 @@ export const getDropletMapper: ComponentBaseMapper = {
     return renderTimeAgo(new Date(context.execution.createdAt));
   },
 };
+
+function dropletIdentityDetails(droplet: DropletPayload): Record<string, string> {
+  return {
+    "Droplet ID": droplet.id?.toString() || "-",
+    Name: droplet.name || "-",
+    Status: droplet.status || "-",
+    Region: droplet.region?.name || droplet.region?.slug || "-",
+    Size: droplet.size_slug || "-",
+  };
+}
+
+function dropletHardwareDetails(droplet: DropletPayload): Record<string, string> {
+  return {
+    OS: droplet.image?.name || droplet.image?.slug || "-",
+    Memory: droplet.memory ? `${droplet.memory} MB` : "-",
+    vCPUs: droplet.vcpus?.toString() || "-",
+    Disk: droplet.disk ? `${droplet.disk} GB` : "-",
+  };
+}
 
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];

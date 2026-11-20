@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -27,8 +28,10 @@ const (
 	customAutomationDefaultName      = "Custom automation"
 	customAutomationTriggerID        = "on-pull-request"
 	customAutomationTaskTriggerID    = "on-task"
+	customAutomationColumnStartID    = "column-start"
 	customAutomationRunnerID         = "verify"
 	customAutomationScheduleRunnerID = "schedule-run"
+	customAutomationLeaveRunnerID    = "leave-run"
 	customAutomationVersion          = 1
 	backlogTaskRunnerName            = "Run automation"
 )
@@ -261,6 +264,11 @@ type customAutomationSettings struct {
 	ExecutionTimeoutSeconds int
 	Schedule                *pb.FactoryCustomAutomation_Schedule
 	Triggers                []customAutomationTrigger
+	RunsOnTask              *bool
+}
+
+func (settings *customAutomationSettings) runsWithoutTask() bool {
+	return settings != nil && settings.RunsOnTask != nil && !*settings.RunsOnTask
 }
 
 func parseCustomAutomationSettings(
@@ -273,6 +281,9 @@ func parseCustomAutomationSettings(
 	}
 	triggers, startMode, scheduleSettings, err := parseCustomAutomationTriggers(input)
 	if err != nil {
+		return nil, err
+	}
+	if err := validateCustomAutomationRunContext(input.RunsOnTask, triggers); err != nil {
 		return nil, err
 	}
 
@@ -319,7 +330,24 @@ func parseCustomAutomationSettings(
 		Steps:                   steps,
 		Icon:                    strings.TrimSpace(input.GetIcon()),
 		ExecutionTimeoutSeconds: timeout,
+		RunsOnTask:              input.RunsOnTask,
 	}, nil
+}
+
+func validateCustomAutomationRunContext(runsOnTask *bool, triggers []customAutomationTrigger) error {
+	if runsOnTask == nil {
+		return nil
+	}
+	for _, trigger := range triggers {
+		if *runsOnTask && trigger.Mode == pb.FactoryCustomAutomation_START_MODE_SCHEDULED {
+			return invalidArgument("A schedule runs with no task.")
+		}
+		if !*runsOnTask && (trigger.Mode == pb.FactoryCustomAutomation_START_MODE_AUTOMATIC ||
+			trigger.Mode == pb.FactoryCustomAutomation_START_MODE_ON_LEAVE) {
+			return invalidArgument("This trigger runs on a task.")
+		}
+	}
+	return nil
 }
 
 func parseCustomAutomationTriggers(
@@ -328,8 +356,9 @@ func parseCustomAutomationTriggers(
 	if len(input.GetTriggers()) == 0 {
 		if input.GetStartMode() != pb.FactoryCustomAutomation_START_MODE_MANUAL &&
 			input.GetStartMode() != pb.FactoryCustomAutomation_START_MODE_AUTOMATIC &&
-			input.GetStartMode() != pb.FactoryCustomAutomation_START_MODE_SCHEDULED {
-			return nil, 0, nil, invalidArgument("Choose Manual, Automatic, or Schedule.")
+			input.GetStartMode() != pb.FactoryCustomAutomation_START_MODE_SCHEDULED &&
+			input.GetStartMode() != pb.FactoryCustomAutomation_START_MODE_ON_LEAVE {
+			return nil, 0, nil, invalidArgument("Choose Manual, Automatic, Schedule, or When a task leaves the column.")
 		}
 		var schedule *pb.FactoryCustomAutomation_Schedule
 		if input.GetStartMode() == pb.FactoryCustomAutomation_START_MODE_SCHEDULED {
@@ -347,9 +376,11 @@ func parseCustomAutomationTriggers(
 	triggers := make([]customAutomationTrigger, 0, len(input.GetTriggers()))
 	manualCount := 0
 	automaticCount := 0
+	leaveCount := 0
 	var onlySchedule *pb.FactoryCustomAutomation_Schedule
 	scheduledCount := 0
 	hasAutomatic := false
+	hasLeave := false
 	hasManual := false
 	for index, trigger := range input.GetTriggers() {
 		mode := trigger.GetStartMode()
@@ -361,6 +392,9 @@ func parseCustomAutomationTriggers(
 		case pb.FactoryCustomAutomation_START_MODE_AUTOMATIC:
 			automaticCount++
 			hasAutomatic = true
+		case pb.FactoryCustomAutomation_START_MODE_ON_LEAVE:
+			leaveCount++
+			hasLeave = true
 		case pb.FactoryCustomAutomation_START_MODE_SCHEDULED:
 			parsed, err := parseCustomAutomationSchedule(trigger.GetSchedule())
 			if err != nil {
@@ -370,16 +404,18 @@ func parseCustomAutomationTriggers(
 			scheduledCount++
 			onlySchedule = parsed
 		default:
-			return nil, 0, nil, invalidArgument("Choose Manual, Automatic, or Schedule.")
+			return nil, 0, nil, invalidArgument("Choose Manual, Automatic, Schedule, or When a task leaves the column.")
 		}
 		triggers = append(triggers, customAutomationTrigger{Index: index, Mode: mode, Schedule: schedule})
 	}
-	if manualCount > 1 || automaticCount > 1 {
+	if manualCount > 1 || automaticCount > 1 || leaveCount > 1 {
 		return nil, 0, nil, invalidArgument("Choose each event trigger once.")
 	}
 	startMode := pb.FactoryCustomAutomation_START_MODE_MANUAL
 	if hasAutomatic {
 		startMode = pb.FactoryCustomAutomation_START_MODE_AUTOMATIC
+	} else if hasLeave {
+		startMode = pb.FactoryCustomAutomation_START_MODE_ON_LEAVE
 	} else if scheduledCount > 0 {
 		startMode = pb.FactoryCustomAutomation_START_MODE_SCHEDULED
 	} else if !hasManual {
@@ -485,6 +521,9 @@ func buildCustomAutomationCanvas(
 	)
 	template := metadata[models.FactoryAppTemplateMetadataKey].(map[string]any)
 	template["startMode"] = mode
+	if settings.RunsOnTask != nil {
+		template["runsOnTask"] = *settings.RunsOnTask
+	}
 	if settings.Icon != "" {
 		template["icon"] = settings.Icon
 	}
@@ -549,11 +588,29 @@ func buildCustomAutomationCanvas(
 			},
 		},
 	}
+	if settings.runsWithoutTask() && settings.StartMode == pb.FactoryCustomAutomation_START_MODE_MANUAL {
+		trigger := &doc.Spec.Nodes[0]
+		trigger.ID = customAutomationColumnStartID
+		trigger.Name = "Manual"
+		trigger.Component = "start"
+		trigger.Configuration = columnStartConfiguration()
+		trigger.Integration = nil
+		doc.Spec.Edges[0].SourceID = trigger.ID
+		doc.Spec.Nodes[1].Name = "Run automation"
+		doc.Metadata.Description = "Run prompt and Bash steps with no task."
+		runnerConfiguration["environment"] = customAutomationCheckoutEnvironment(
+			factory, pb.FactoryCustomAutomation_START_MODE_SCHEDULED, githubHostForFactory(tx, factory), false,
+		)
+		if settings.ColumnKey == models.CanvasColumnKeyBacklog {
+			attachBacklogScheduleTask(doc, customAutomationRunnerID, provider, settings.Icon, runnerConfiguration)
+		}
+		return doc, nil
+	}
 	if settings.ColumnKey == models.CanvasColumnKeyBacklog && settings.StartMode == pb.FactoryCustomAutomation_START_MODE_SCHEDULED {
 		attachBacklogScheduleTask(doc, customAutomationRunnerID, provider, settings.Icon, runnerConfiguration)
 		return doc, nil
 	}
-	if customAutomationUsesTaskTrigger(settings.ColumnKey) && settings.StartMode != pb.FactoryCustomAutomation_START_MODE_SCHEDULED {
+	if customAutomationListensForTask(settings.ColumnKey, settings.StartMode) {
 		trigger := &doc.Spec.Nodes[0]
 		trigger.ID = customAutomationTaskTriggerID
 		trigger.Name = "On Task"
@@ -563,6 +620,9 @@ func buildCustomAutomationCanvas(
 		doc.Spec.Edges[0].SourceID = trigger.ID
 		doc.Spec.Nodes[1].Name = "Run automation"
 		doc.Metadata.Description = taskColumnRunDescription(settings.ColumnKey)
+		if settings.StartMode == pb.FactoryCustomAutomation_START_MODE_ON_LEAVE {
+			doc.Metadata.Description = "Run prompt and Bash steps when a task leaves this column."
+		}
 		runnerConfiguration["environment"] = taskColumnCheckoutEnvironment()
 	}
 	return doc, nil
@@ -579,6 +639,13 @@ func customAutomationColumnAllowed(column string) bool {
 
 func customAutomationUsesTaskTrigger(column string) bool {
 	return column == models.CanvasColumnKeyBacklog || column == models.CanvasColumnKeyImplement || column == models.CanvasColumnKeyDone
+}
+
+func customAutomationListensForTask(column string, mode pb.FactoryCustomAutomation_StartMode) bool {
+	if mode == pb.FactoryCustomAutomation_START_MODE_SCHEDULED {
+		return false
+	}
+	return customAutomationUsesTaskTrigger(column) || mode == pb.FactoryCustomAutomation_START_MODE_ON_LEAVE
 }
 
 func taskColumnRunDescription(column string) string {
@@ -614,13 +681,26 @@ func buildMultiTriggerCustomAutomationCanvas(
 	var taskKinds []string
 	var taskIndexes []any
 	var schedules []customAutomationTrigger
+	var columnManual []customAutomationTrigger
+	var verifyLeaves []customAutomationTrigger
 	for _, trigger := range settings.Triggers {
 		switch trigger.Mode {
 		case pb.FactoryCustomAutomation_START_MODE_MANUAL:
+			if settings.runsWithoutTask() {
+				columnManual = append(columnManual, trigger)
+				continue
+			}
 			taskKinds = append(taskKinds, "manual")
 			taskIndexes = append(taskIndexes, trigger.Index)
 		case pb.FactoryCustomAutomation_START_MODE_AUTOMATIC:
 			taskKinds = append(taskKinds, "automatic")
+			taskIndexes = append(taskIndexes, trigger.Index)
+		case pb.FactoryCustomAutomation_START_MODE_ON_LEAVE:
+			if settings.ColumnKey == models.CanvasColumnKeyVerify {
+				verifyLeaves = append(verifyLeaves, trigger)
+				continue
+			}
+			taskKinds = append(taskKinds, "leave")
 			taskIndexes = append(taskIndexes, trigger.Index)
 		default:
 			schedules = append(schedules, trigger)
@@ -675,9 +755,11 @@ func buildMultiTriggerCustomAutomationCanvas(
 			Component:     taskComponent,
 			Configuration: taskConfiguration,
 			Integration:   taskIntegration,
-			Metadata: customAutomationNodeMetadata(provider, settings.Icon, func(template map[string]any) {
+			Metadata: customAutomationNodeMetadata(provider, settings.Icon, settings.RunsOnTask, func(template map[string]any) {
 				if hasAutomatic {
 					template["startMode"] = "automatic"
+				} else if !hasManual && slices.Contains(taskKinds, "leave") {
+					template["startMode"] = "leave"
 				} else {
 					template["startMode"] = "manual"
 				}
@@ -712,13 +794,28 @@ func buildMultiTriggerCustomAutomationCanvas(
 					"type": "cron", "cronExpression": schedule.Schedule.GetCronExpression(),
 					"timezone": strconv.FormatFloat(schedule.Schedule.GetUtcOffset(), 'f', -1, 64),
 				},
-				Metadata: customAutomationNodeMetadata(provider, settings.Icon, func(template map[string]any) {
+				Metadata: customAutomationNodeMetadata(provider, settings.Icon, settings.RunsOnTask, func(template map[string]any) {
 					template["startMode"] = "scheduled"
 					template["triggerIndex"] = schedule.Index
 				}),
 				Position: yaml.Position{X: 120, Y: 240 + (offset+1)*180},
 			})
 			edges = append(edges, yaml.Edge{SourceID: triggerID, TargetID: scheduleRunnerID, Channel: "default"})
+		}
+		for _, manual := range columnManual {
+			nodes = append(nodes, yaml.Node{
+				ID:            customAutomationColumnStartID,
+				Name:          "Manual",
+				Type:          yaml.NodeTypeTrigger,
+				Component:     "start",
+				Configuration: columnStartConfiguration(),
+				Metadata: customAutomationNodeMetadata(provider, settings.Icon, settings.RunsOnTask, func(template map[string]any) {
+					template["startMode"] = "manual"
+					template["triggerIndex"] = manual.Index
+				}),
+				Position: yaml.Position{X: 120, Y: 80},
+			})
+			edges = append(edges, yaml.Edge{SourceID: customAutomationColumnStartID, TargetID: scheduleRunnerID, Channel: "default"})
 		}
 		if !shareRunner {
 			scheduleConfiguration := customAutomationRunnerConfiguration(
@@ -736,6 +833,33 @@ func buildMultiTriggerCustomAutomationCanvas(
 			}
 			nodes = append(nodes, customAutomationRunnerNode(scheduleRunnerID, runnerName, settings, scheduleConfiguration, 480))
 		}
+	}
+	if len(verifyLeaves) > 0 {
+		leaveIndexes := make([]any, 0, len(verifyLeaves))
+		for _, leave := range verifyLeaves {
+			leaveIndexes = append(leaveIndexes, leave.Index)
+		}
+		nodes = append(nodes, yaml.Node{
+			ID:            customAutomationTaskTriggerID,
+			Name:          "On Task",
+			Type:          yaml.NodeTypeTrigger,
+			Component:     factorycomponent.OnWorkOrderTriggerName,
+			Configuration: map[string]any{},
+			Metadata: customAutomationNodeMetadata(provider, settings.Icon, settings.RunsOnTask, func(template map[string]any) {
+				template["startMode"] = "leave"
+				template["triggerKinds"] = stringsToAny([]string{"leave"})
+				template["triggerIndexes"] = leaveIndexes
+			}),
+			Position: yaml.Position{X: 120, Y: 600},
+		})
+		edges = append(edges, yaml.Edge{SourceID: customAutomationTaskTriggerID, TargetID: customAutomationLeaveRunnerID, Channel: "default"})
+		nodes = append(nodes, customAutomationRunnerNode(
+			customAutomationLeaveRunnerID,
+			"Run automation",
+			settings,
+			customAutomationRunnerConfiguration(tx, factory, settings, taskColumnCheckoutEnvironment()),
+			600,
+		))
 	}
 
 	description := "Run ordered prompt and Bash automation steps."
@@ -821,7 +945,7 @@ func customAutomationRunnerConfiguration(
 	return configuration
 }
 
-func customAutomationNodeMetadata(provider, icon string, apply func(map[string]any)) map[string]any {
+func customAutomationNodeMetadata(provider, icon string, runsOnTask *bool, apply func(map[string]any)) map[string]any {
 	metadata := models.FactoryAppTemplateMetadataFor(
 		models.FactoryAppTemplateCustomAutomationID,
 		customAutomationVersion,
@@ -832,7 +956,18 @@ func customAutomationNodeMetadata(provider, icon string, apply func(map[string]a
 		template["icon"] = icon
 	}
 	apply(template)
+	if runsOnTask != nil {
+		template["runsOnTask"] = *runsOnTask
+	}
 	return metadata
+}
+
+func columnStartConfiguration() map[string]any {
+	return map[string]any{
+		"templates": []any{
+			map[string]any{"name": "Run", "payload": map[string]any{}},
+		},
+	}
 }
 
 func stringsToAny(values []string) []any {
@@ -855,7 +990,7 @@ func attachBacklogScheduleTask(doc *yaml.Canvas, runnerID, provider, icon string
 		return
 	}
 	runner.Name = backlogTaskRunnerName
-	runner.Metadata = customAutomationNodeMetadata(provider, icon, func(template map[string]any) {
+	runner.Metadata = customAutomationNodeMetadata(provider, icon, nil, func(template map[string]any) {
 		template["startMode"] = "scheduled"
 	})
 	max := 1
@@ -1265,6 +1400,7 @@ func serializeCustomAutomation(
 		Steps:                   steps,
 		Icon:                    icon,
 		ExecutionTimeoutSeconds: int32(configInt(agent.Configuration, "executionTimeoutSeconds")),
+		RunsOnTask:              customAutomationRunsOnTaskMetadata(version.Nodes),
 	}
 	if len(triggers) == 1 {
 		settings.StartMode = triggers[0].mode
@@ -1280,9 +1416,14 @@ func serializeCustomAutomation(
 			switch trigger.mode {
 			case pb.FactoryCustomAutomation_START_MODE_AUTOMATIC:
 				settings.StartMode = pb.FactoryCustomAutomation_START_MODE_AUTOMATIC
+			case pb.FactoryCustomAutomation_START_MODE_ON_LEAVE:
+				if settings.StartMode != pb.FactoryCustomAutomation_START_MODE_AUTOMATIC {
+					settings.StartMode = pb.FactoryCustomAutomation_START_MODE_ON_LEAVE
+				}
 			case pb.FactoryCustomAutomation_START_MODE_SCHEDULED:
 				scheduled++
-				if settings.StartMode != pb.FactoryCustomAutomation_START_MODE_AUTOMATIC {
+				if settings.StartMode != pb.FactoryCustomAutomation_START_MODE_AUTOMATIC &&
+					settings.StartMode != pb.FactoryCustomAutomation_START_MODE_ON_LEAVE {
 					settings.StartMode = pb.FactoryCustomAutomation_START_MODE_SCHEDULED
 				}
 				if scheduled == 1 {
@@ -1307,6 +1448,21 @@ func serializeCustomAutomation(
 		Settings:   settings,
 		Provider:   factory.OnboardingConfigValue().EffectiveVCSProvider(),
 	}, nil
+}
+
+func customAutomationRunsOnTaskMetadata(nodes []models.Node) *bool {
+	for i := range nodes {
+		if nodes[i].Type != models.NodeTypeTrigger {
+			continue
+		}
+		template, _ := nodes[i].Metadata[models.FactoryAppTemplateMetadataKey].(map[string]any)
+		value, ok := template["runsOnTask"].(bool)
+		if !ok {
+			continue
+		}
+		return &value
+	}
+	return nil
 }
 
 func customAutomationProtoSteps(raw any) ([]*pb.FactoryCustomAutomation_Step, error) {
@@ -1353,21 +1509,27 @@ func configInt(configuration map[string]any, key string) int {
 }
 
 func customAutomationStartModeName(mode pb.FactoryCustomAutomation_StartMode) string {
-	if mode == pb.FactoryCustomAutomation_START_MODE_SCHEDULED {
+	switch mode {
+	case pb.FactoryCustomAutomation_START_MODE_SCHEDULED:
 		return "scheduled"
-	}
-	if mode == pb.FactoryCustomAutomation_START_MODE_AUTOMATIC {
+	case pb.FactoryCustomAutomation_START_MODE_AUTOMATIC:
 		return "automatic"
+	case pb.FactoryCustomAutomation_START_MODE_ON_LEAVE:
+		return "leave"
+	default:
+		return "manual"
 	}
-	return "manual"
 }
 
 func customAutomationStartMode(mode string) pb.FactoryCustomAutomation_StartMode {
-	if strings.TrimSpace(mode) == "scheduled" {
+	switch strings.TrimSpace(mode) {
+	case "scheduled":
 		return pb.FactoryCustomAutomation_START_MODE_SCHEDULED
-	}
-	if strings.TrimSpace(mode) == "automatic" {
+	case "automatic":
 		return pb.FactoryCustomAutomation_START_MODE_AUTOMATIC
+	case "leave":
+		return pb.FactoryCustomAutomation_START_MODE_ON_LEAVE
+	default:
+		return pb.FactoryCustomAutomation_START_MODE_MANUAL
 	}
-	return pb.FactoryCustomAutomation_START_MODE_MANUAL
 }

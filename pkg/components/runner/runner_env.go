@@ -192,15 +192,30 @@ func findOpenTask(db *gorm.DB, scope *RunnerScope) (*models.FactoryWorkOrder, er
 		return nil, err
 	}
 	if order.Result == models.FactoryWorkOrderResultArchived {
+		if leaveCustomAutomationRun(db, scope) {
+			return order, nil
+		}
 		return nil, fmt.Errorf("task is archived")
 	}
 	if order.State != models.FactoryWorkOrderStateClosed {
 		return order, nil
 	}
-	if doneCustomAutomationCanvas(db, scope) {
+	if doneCustomAutomationCanvas(db, scope) || leaveCustomAutomationRun(db, scope) {
 		return order, nil
 	}
 	return nil, fmt.Errorf("task is closed or archived")
+}
+
+func leaveCustomAutomationRun(db *gorm.DB, scope *RunnerScope) bool {
+	matches, err := models.CanvasHasFactoryAppTemplate(db, scope.CanvasID, models.FactoryAppTemplateCustomAutomationID)
+	if err != nil || !matches {
+		return false
+	}
+	event, err := models.FindRootEventForRun(db, scope.CanvasRunID)
+	if err != nil || event.DedupKey == nil {
+		return false
+	}
+	return strings.Contains(*event.DedupKey, "|leave|")
 }
 
 func doneCustomAutomationCanvas(db *gorm.DB, scope *RunnerScope) bool {
