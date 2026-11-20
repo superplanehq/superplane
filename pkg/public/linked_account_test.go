@@ -81,7 +81,7 @@ func newLinkedAccountServer(t *testing.T) (*Server, *support.ResourceRegistry, s
 		false,
 	)
 	require.NoError(t, err)
-	token, err := authentication.GenerateAccountToken(signer, registry.Account.ID.String(), time.Now(), time.Hour)
+	token, err := authentication.GenerateAccountToken(signer, registry.Account.ID.String(), time.Now(), time.Hour, registry.Account.SessionGeneration)
 	require.NoError(t, err)
 	return server, registry, token
 }

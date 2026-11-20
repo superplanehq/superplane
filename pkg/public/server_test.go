@@ -686,7 +686,7 @@ func Test__CreateOrganization(t *testing.T) {
 		signer := jwt.NewSigner("test")
 		account, err := models.CreateAccount("test@example.com", "Test User")
 		require.NoError(t, err)
-		token, err := authentication.GenerateAccountToken(signer, account.ID.String(), time.Now(), time.Hour)
+		token, err := authentication.GenerateAccountToken(signer, account.ID.String(), time.Now(), time.Hour, account.SessionGeneration)
 		require.NoError(t, err)
 
 		//
@@ -742,7 +742,7 @@ func Test__CreateOrganization(t *testing.T) {
 		account, err := models.CreateAccount("success@example.com", "Success User")
 		require.NoError(t, err)
 		signer := jwt.NewSigner("test")
-		token, err := authentication.GenerateAccountToken(signer, account.ID.String(), time.Now(), time.Hour)
+		token, err := authentication.GenerateAccountToken(signer, account.ID.String(), time.Now(), time.Hour, account.SessionGeneration)
 		require.NoError(t, err)
 
 		//
@@ -809,7 +809,7 @@ func Test__CreateOrganization(t *testing.T) {
 		account, err := models.CreateAccount("duplicate@example.com", "Duplicate User")
 		require.NoError(t, err)
 		signer := jwt.NewSigner("test")
-		token, err := authentication.GenerateAccountToken(signer, account.ID.String(), time.Now(), time.Hour)
+		token, err := authentication.GenerateAccountToken(signer, account.ID.String(), time.Now(), time.Hour, account.SessionGeneration)
 		require.NoError(t, err)
 
 		authService, err := authorization.NewAuthService()
@@ -883,7 +883,7 @@ func Test__GetOrganizationCreationStatus(t *testing.T) {
 	account, err := models.CreateAccount("status-ok@example.com", "Status Ok")
 	require.NoError(t, err)
 	signer := jwt.NewSigner("test")
-	token, err := authentication.GenerateAccountToken(signer, account.ID.String(), time.Now(), time.Hour)
+	token, err := authentication.GenerateAccountToken(signer, account.ID.String(), time.Now(), time.Hour, account.SessionGeneration)
 	require.NoError(t, err)
 
 	authService, err := authorization.NewAuthService()

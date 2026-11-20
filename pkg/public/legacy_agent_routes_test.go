@@ -23,7 +23,7 @@ func TestLegacyAgentEndpointsAreNotRegistered(t *testing.T) {
 	require.NoError(t, err)
 	registerTestGRPCGateway(t, server, r.AuthService, r.Registry, r.Encryptor, oidcProvider)
 	server.RegisterWebSocketRoutes()
-	token, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), time.Now(), time.Hour)
+	token, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), time.Now(), time.Hour, r.Account.SessionGeneration)
 	require.NoError(t, err)
 
 	for _, endpoint := range []struct{ method, path string }{

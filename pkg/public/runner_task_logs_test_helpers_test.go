@@ -61,6 +61,7 @@ func runnerLogEndpointGETAs(
 		accountID.String(),
 		time.Now(),
 		time.Hour,
+		0,
 	)
 	require.NoError(t, err)
 	request.AddCookie(&http.Cookie{Name: "account_token", Value: token})

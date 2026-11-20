@@ -161,6 +161,30 @@ func TestMaybeRefreshAccountSession(t *testing.T) {
 		assert.Empty(t, res.Result().Cookies())
 		assert.False(t, IsAccountSessionWithinMaxAge(mustClaims(t, signer, oldToken)))
 	})
+
+	t.Run("refresh preserves the token generation rather than the account snapshot", func(t *testing.T) {
+		for _, generation := range []*int64{nil, new(int64)} {
+			issuedAt := time.Now().Add(-2 * time.Minute)
+			oldToken := mintAccountToken(t, signer, r.Account.ID.String(), issuedAt, issuedAt, time.Hour)
+			claims := mustClaims(t, signer, oldToken)
+			if generation != nil {
+				claims[jwt.SessionGenerationClaim] = "0"
+			}
+			oldToken, err := jwtLib.NewWithClaims(jwtLib.SigningMethodHS256, claims).SignedString([]byte(signer.Secret))
+			require.NoError(t, err)
+			account := *r.Account
+			account.SessionGeneration = 1
+			req := httptest.NewRequest(http.MethodGet, "/account", nil)
+			req.AddCookie(&http.Cookie{Name: "account_token", Value: oldToken})
+			res := httptest.NewRecorder()
+			MaybeRefreshAccountSession(res, req, signer, &account)
+			cookies := res.Result().Cookies()
+			require.Len(t, cookies, 1)
+			refreshedGeneration, err := jwt.SessionGenerationFromClaims(mustClaims(t, signer, cookies[0].Value))
+			require.NoError(t, err)
+			require.Equal(t, generation, refreshedGeneration)
+		}
+	})
 }
 
 func mustClaims(t *testing.T, signer *jwt.Signer, token string) jwtLib.MapClaims {

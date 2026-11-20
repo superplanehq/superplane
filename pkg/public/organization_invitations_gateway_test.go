@@ -69,7 +69,7 @@ func TestInvitationGatewayPermissionsAndCapacityDetails(t *testing.T) {
 	require.NoError(t, err)
 	member, err := models.CreateUser(r.Organization.ID, account.ID, account.Email, account.Name)
 	require.NoError(t, err)
-	token, err = authentication.GenerateAccountToken(server.jwt, account.ID.String(), time.Now(), time.Hour)
+	token, err = authentication.GenerateAccountToken(server.jwt, account.ID.String(), time.Now(), time.Hour, account.SessionGeneration)
 	require.NoError(t, err)
 	for _, tc := range []struct{ method, path, body string }{
 		{http.MethodPost, path, `{"email":"second@example.com"}`},
@@ -105,7 +105,7 @@ func TestInvitationGatewayPermissionsAndCapacityDetails(t *testing.T) {
 		{name: "update scope can grant Admin", scopes: []string{"members:create", "members:update"}, email: "scoped-admin@example.com", role: models.RoleOrgAdmin, status: http.StatusOK},
 	} {
 		t.Run(scenario.name, func(t *testing.T) {
-			scopedToken, err := server.jwt.GenerateScopedToken(jwt.ScopedTokenClaims{Subject: r.User.String(), OrgID: r.Organization.ID.String(), Purpose: "invitations", Scopes: scenario.scopes}, time.Hour)
+			scopedToken, err := server.jwt.GenerateScopedToken(jwt.ScopedTokenClaims{SessionGeneration: &r.Account.SessionGeneration, Subject: r.User.String(), OrgID: r.Organization.ID.String(), Purpose: "invitations", Scopes: scenario.scopes}, time.Hour)
 			require.NoError(t, err)
 			payload, err := json.Marshal(map[string]string{"email": scenario.email, "role": scenario.role})
 			require.NoError(t, err)

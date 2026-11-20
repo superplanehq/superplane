@@ -20,7 +20,7 @@ func TestRequireInstallationAdmin(t *testing.T) {
 	r := support.Setup(t)
 	signer := jwt.NewSigner("test-secret")
 
-	token, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), time.Now(), time.Hour)
+	token, err := authentication.GenerateAccountToken(signer, r.Account.ID.String(), time.Now(), time.Hour, r.Account.SessionGeneration)
 	require.NoError(t, err)
 
 	// Chain: AccountAuthMiddleware → RequireInstallationAdmin → final handler

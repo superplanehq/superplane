@@ -133,7 +133,7 @@ func (s *Server) setupOwner(w http.ResponseWriter, r *http.Request) {
 	middleware.MarkOwnerSetupCompleted()
 	s.registry.HTTPContext().InvalidatePolicyCache()
 
-	if err := authentication.IssueAccountSession(w, r, s.jwt, account.ID.String()); err != nil {
+	if err := authentication.IssueAccountSession(w, r, s.jwt, account); err != nil {
 		log.Errorf("Failed to generate account token for owner: %v", err)
 		http.Error(w, "Failed to create owner session", http.StatusInternalServerError)
 		return

@@ -46,7 +46,7 @@ func TestAcceptInvitationGatewayAuthenticatesRecipientWithoutMembership(t *testi
 	require.Equal(t, "superplane.com", info.Domain)
 	require.Equal(t, "INVITATION_EMAIL_MISMATCH", info.Reason)
 	require.Equal(t, map[string]string{"invited_email": "i***@example.com"}, info.Metadata)
-	cookie, err := authentication.GenerateAccountToken(server.jwt, account.ID.String(), time.Now(), time.Hour)
+	cookie, err := authentication.GenerateAccountToken(server.jwt, account.ID.String(), time.Now(), time.Hour, account.SessionGeneration)
 	require.NoError(t, err)
 	response = execRequest(server, requestParams{method: http.MethodPost, path: path, authCookie: cookie})
 	require.Equal(t, http.StatusOK, response.Code, response.Body.String())
@@ -82,7 +82,7 @@ func TestInvitationGatewayReportsPastDuePayment(t *testing.T) {
 	hash := crypto.HashToken(token)
 	invitation := models.OrganizationInvitation{OrganizationID: r.Organization.ID, Email: account.Email, Role: models.RoleOrgOperator, InvitedBy: r.User, State: models.InvitationStatePending, TokenHash: &hash, SentAt: time.Now(), ExpiresAt: time.Now().Add(time.Hour)}
 	require.NoError(t, invitation.Save(db))
-	cookie, err := authentication.GenerateAccountToken(server.jwt, account.ID.String(), time.Now(), time.Hour)
+	cookie, err := authentication.GenerateAccountToken(server.jwt, account.ID.String(), time.Now(), time.Hour, account.SessionGeneration)
 	require.NoError(t, err)
 	response := execRequest(server, requestParams{method: http.MethodPost, path: "/api/v1/invitations/" + token + "/accept", authCookie: cookie})
 	require.Equal(t, http.StatusBadRequest, response.Code, response.Body.String())

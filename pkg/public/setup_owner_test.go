@@ -301,7 +301,7 @@ func TestSetupOwnerProgressRejectsNonAdmin(t *testing.T) {
 	require.NoError(t, err)
 
 	signer := jwt.NewSigner("test-client-secret")
-	token, err := authentication.GenerateAccountToken(signer, account.ID.String(), time.Now(), time.Hour)
+	token, err := authentication.GenerateAccountToken(signer, account.ID.String(), time.Now(), time.Hour, account.SessionGeneration)
 	require.NoError(t, err)
 
 	response := patchSetupOwnerProgress(t, server, token, models.OwnerSetupStepSMTP)

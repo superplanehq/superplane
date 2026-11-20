@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	jwtLib "github.com/golang-jwt/jwt/v4"
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
@@ -421,7 +422,11 @@ func authenticateUserByScopedToken(ctx context.Context, token string, jwtSigner 
 		if account.IsBlocked() {
 			return nil, nil, models.ErrAccountBlocked
 		}
-		if claims.IssuedAt != nil && !account.IsSessionFresh(claims.IssuedAt.Unix()) {
+		var issuedAt int64
+		if claims.IssuedAt != nil {
+			issuedAt = claims.IssuedAt.Unix()
+		}
+		if !account.IsSessionGenerationCurrent(claims.SessionGeneration, issuedAt) {
 			return nil, nil, fmt.Errorf("scoped token invalidated by password change")
 		}
 	}
@@ -653,34 +658,32 @@ func isAccountAPIPath(path string) bool {
 	}
 }
 
-func getAccountFromCookie(r *http.Request, jwtSigner *jwt.Signer) (string, int64, error) {
+func getAccountFromCookie(r *http.Request, jwtSigner *jwt.Signer) (string, jwtLib.MapClaims, error) {
 	cookie, err := r.Cookie("account_token")
 	if err != nil {
-		return "", 0, fmt.Errorf("account token cookie not found")
+		return "", nil, fmt.Errorf("account token cookie not found")
 	}
 
 	claims, err := jwtSigner.ValidateAndGetClaims(cookie.Value)
 	if err != nil {
-		return "", 0, fmt.Errorf("invalid account token: %v", err)
+		return "", nil, fmt.Errorf("invalid account token: %v", err)
 	}
 
 	if !authentication.IsAccountSessionWithinMaxAge(claims) {
-		return "", 0, fmt.Errorf("session exceeded maximum age")
+		return "", nil, fmt.Errorf("session exceeded maximum age")
 	}
 
 	accountClaim, exists := claims["sub"]
 	if !exists {
-		return "", 0, fmt.Errorf("account ID missing from token")
+		return "", nil, fmt.Errorf("account ID missing from token")
 	}
 
 	accountID, ok := accountClaim.(string)
 	if !ok {
-		return "", 0, fmt.Errorf("invalid account ID in token")
+		return "", nil, fmt.Errorf("invalid account ID in token")
 	}
 
-	iat, _ := claims["iat"].(float64)
-
-	return accountID, int64(iat), nil
+	return accountID, claims, nil
 }
 
 // AccountFromRequest returns the signed-in account when the session cookie is
@@ -697,11 +700,10 @@ func AccountFromRequest(r *http.Request, jwtSigner *jwt.Signer) (*models.Account
 }
 
 // getValidatedAccountFromCookie reads the account_token cookie, loads the
-// matching account, and rejects the request if the token's iat is older
-// than the account's PasswordChangedAt. Use this anywhere a cookie-based
-// account session needs to be validated end-to-end.
+// matching account, and rejects sessions from an earlier generation.
+// Use this anywhere a cookie-based account session needs end-to-end validation.
 func getValidatedAccountFromCookie(r *http.Request, jwtSigner *jwt.Signer) (*models.Account, error) {
-	accountID, iat, err := getAccountFromCookie(r, jwtSigner)
+	accountID, claims, err := getAccountFromCookie(r, jwtSigner)
 	if err != nil {
 		return nil, err
 	}
@@ -715,7 +717,12 @@ func getValidatedAccountFromCookie(r *http.Request, jwtSigner *jwt.Signer) (*mod
 		return nil, models.ErrAccountBlocked
 	}
 
-	if !account.IsSessionFresh(iat) {
+	generation, err := jwt.SessionGenerationFromClaims(claims)
+	if err != nil {
+		return nil, err
+	}
+	iat, _ := claims["iat"].(float64)
+	if !account.IsSessionGenerationCurrent(generation, int64(iat)) {
 		return nil, fmt.Errorf("session invalidated by password change")
 	}
 

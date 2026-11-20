@@ -91,16 +91,22 @@ func IsAccountSessionWithinMaxAge(claims jwtLib.MapClaims) bool {
 }
 
 // GenerateAccountToken creates a signed account_token JWT with session tracking.
-func GenerateAccountToken(jwtSigner *jwt.Signer, accountID string, sessionStart time.Time, ttl time.Duration) (string, error) {
+func GenerateAccountToken(jwtSigner *jwt.Signer, accountID string, sessionStart time.Time, ttl time.Duration, generation int64) (string, error) {
+	if generation < 0 {
+		return "", fmt.Errorf("invalid session generation")
+	}
 	return jwtSigner.GenerateWithClaims(ttl, map[string]string{
-		"sub":             accountID,
-		sessionStartClaim: fmt.Sprintf("%d", sessionStart.Unix()),
+		jwt.SessionGenerationClaim: strconv.FormatInt(generation, 10),
+		"sub":                      accountID,
+		sessionStartClaim:          fmt.Sprintf("%d", sessionStart.Unix()),
 	})
 }
 
 // IssueAccountSession mints a fresh account_token for a new login session.
-func IssueAccountSession(w http.ResponseWriter, r *http.Request, jwtSigner *jwt.Signer, accountID string) error {
-	err := issueAccountSession(w, r, jwtSigner, accountID, time.Now())
+func IssueAccountSession(w http.ResponseWriter, r *http.Request, jwtSigner *jwt.Signer, account *models.Account) error {
+	accountID := account.ID.String()
+	generation := account.SessionGeneration
+	err := issueAccountSession(w, r, jwtSigner, accountID, time.Now(), &generation)
 	if err == nil {
 		logging.AddRequestLogFields(r.Context(), log.Fields{
 			"account_id": accountID,
@@ -112,9 +118,13 @@ func IssueAccountSession(w http.ResponseWriter, r *http.Request, jwtSigner *jwt.
 	return err
 }
 
-func issueAccountSession(w http.ResponseWriter, r *http.Request, jwtSigner *jwt.Signer, accountID string, sessionStart time.Time) error {
+func issueAccountSession(w http.ResponseWriter, r *http.Request, jwtSigner *jwt.Signer, accountID string, sessionStart time.Time, generation *int64) error {
 	ttl := AccountSessionTTL()
-	token, err := GenerateAccountToken(jwtSigner, accountID, sessionStart, ttl)
+	claims := map[string]string{"sub": accountID, sessionStartClaim: strconv.FormatInt(sessionStart.Unix(), 10)}
+	if generation != nil {
+		claims[jwt.SessionGenerationClaim] = strconv.FormatInt(*generation, 10)
+	}
+	token, err := jwtSigner.GenerateWithClaims(ttl, claims)
 	if err != nil {
 		return err
 	}
@@ -155,5 +165,9 @@ func MaybeRefreshAccountSession(w http.ResponseWriter, r *http.Request, jwtSigne
 		return
 	}
 
-	_ = issueAccountSession(w, r, jwtSigner, account.ID.String(), sessionStart)
+	generation, err := jwt.SessionGenerationFromClaims(claims)
+	if err != nil {
+		return
+	}
+	_ = issueAccountSession(w, r, jwtSigner, account.ID.String(), sessionStart, generation)
 }

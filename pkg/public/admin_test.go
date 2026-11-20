@@ -44,7 +44,7 @@ func TestAdminListOrganizations(t *testing.T) {
 		account, err := models.CreateAccount("Regular User", "regular@example.com")
 		require.NoError(t, err)
 		signer := jwt.NewSigner("test-client-secret")
-		regularToken, err := authentication.GenerateAccountToken(signer, account.ID.String(), time.Now(), time.Hour)
+		regularToken, err := authentication.GenerateAccountToken(signer, account.ID.String(), time.Now(), time.Hour, account.SessionGeneration)
 		require.NoError(t, err)
 
 		response := execRequest(server, requestParams{
@@ -505,7 +505,7 @@ func TestAdminGetOrganization(t *testing.T) {
 		account, err := models.CreateAccount("Regular User", "regular-org-get@example.com")
 		require.NoError(t, err)
 		signer := jwt.NewSigner("test-client-secret")
-		regularToken, err := authentication.GenerateAccountToken(signer, account.ID.String(), time.Now(), time.Hour)
+		regularToken, err := authentication.GenerateAccountToken(signer, account.ID.String(), time.Now(), time.Hour, account.SessionGeneration)
 		require.NoError(t, err)
 
 		response := execRequest(server, requestParams{
@@ -620,7 +620,7 @@ func TestAdminOrganizationPins(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, models.PromoteToInstallationAdmin(otherAccount.ID.String()))
 		signer := jwt.NewSigner("test-client-secret")
-		otherToken, err := authentication.GenerateAccountToken(signer, otherAccount.ID.String(), time.Now(), time.Hour)
+		otherToken, err := authentication.GenerateAccountToken(signer, otherAccount.ID.String(), time.Now(), time.Hour, otherAccount.SessionGeneration)
 		require.NoError(t, err)
 
 		require.Equal(t, http.StatusOK, pinAdminOrganization(t, server, token, r.Organization.ID).Code)
@@ -680,7 +680,7 @@ func TestAdminOrganizationPins(t *testing.T) {
 		account, err := models.CreateAccount("Regular Pin User", "regular-pin@example.com")
 		require.NoError(t, err)
 		signer := jwt.NewSigner("test-client-secret")
-		regularToken, err := authentication.GenerateAccountToken(signer, account.ID.String(), time.Now(), time.Hour)
+		regularToken, err := authentication.GenerateAccountToken(signer, account.ID.String(), time.Now(), time.Hour, account.SessionGeneration)
 		require.NoError(t, err)
 
 		response := execRequest(server, requestParams{
@@ -1490,7 +1490,7 @@ func TestSupportSessionSecurityGuardrails(t *testing.T) {
 	signer := jwt.NewSigner("test-client-secret")
 
 	t.Run("non-admin with support session cookie is ignored", func(t *testing.T) {
-		regularToken, err := authentication.GenerateAccountToken(signer, otherAccount.ID.String(), time.Now(), time.Hour)
+		regularToken, err := authentication.GenerateAccountToken(signer, otherAccount.ID.String(), time.Now(), time.Hour, otherAccount.SessionGeneration)
 		require.NoError(t, err)
 
 		sessionToken, err := signer.GenerateWithClaims(time.Hour, map[string]string{
