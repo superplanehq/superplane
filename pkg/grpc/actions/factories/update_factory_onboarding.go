@@ -2,6 +2,7 @@ package factories
 
 import (
 	"context"
+	"errors"
 	"slices"
 	"strings"
 
@@ -181,25 +182,24 @@ func onboardingSubscriptionOwner(ctx context.Context, tx *gorm.DB, factory *mode
 	if err != nil {
 		return "", err
 	}
-	if err := requireCodexConnection(tx, factory, callerID); err != nil {
+	if _, err := models.ActiveCodexMember(tx, factory.OrganizationID, callerID); err != nil {
 		return "", err
 	}
 	connection, err := models.FindCodexConnection(tx, factory.OrganizationID, callerID)
+	if errors.Is(err, models.ErrCodexConnectionNotFound) {
+		return "", errCodexConnectionRequired
+	}
 	if err != nil {
 		return "", err
+	}
+	if len(connection.AvailableSubscriptionModels()) == 0 {
+		return "", errCodexConnectionRequired
 	}
 	if err := connection.AttachLoginLease(tx); err != nil {
 		return "", err
 	}
 	if connection.Reserved() {
 		return "", &models.CodexConnectionBusyError{}
-	}
-	catalog, err := models.FactoryCodexAvailableSubscriptionModels(tx, factory.OrganizationID, factory.ID, callerID)
-	if err != nil {
-		return "", err
-	}
-	if len(catalog) == 0 {
-		return "", errCodexConnectionRequired
 	}
 	return callerID.String(), nil
 }

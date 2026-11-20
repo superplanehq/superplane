@@ -2,6 +2,7 @@ package factories
 
 import (
 	"context"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -151,8 +152,19 @@ func TestOnboardingSubscriptionPersistsOwnerBeforeIntakeAndCompletion(t *testing
 				require.Empty(t, intake.Intake.GetSettings().GetDefaultOwnerId())
 				existingIntakeID = intake.Intake.GetId()
 			}
-			response, err := UpdateFactoryOnboarding(onboardingContext(r), onboardingDeps(r), r.Organization.ID.String(), req)
+			type connectionReadsKey struct{}
+			const callback = "test:onboarding_connection_reads"
+			require.NoError(t, db.Callback().Query().After("gorm:query").Register(callback, func(tx *gorm.DB) {
+				if count, ok := tx.Statement.Context.Value(connectionReadsKey{}).(*atomic.Int64); ok && tx.Statement.Table == "factory_codex_connections" {
+					count.Add(1)
+				}
+			}))
+			t.Cleanup(func() { require.NoError(t, db.Callback().Query().Remove(callback)) })
+			var connectionReads atomic.Int64
+			ctx := context.WithValue(onboardingContext(r), connectionReadsKey{}, &connectionReads)
+			response, err := UpdateFactoryOnboarding(ctx, onboardingDeps(r), r.Organization.ID.String(), req)
 			require.NoError(t, err)
+			assert.EqualValues(t, 1, connectionReads.Load(), "subscription validation must reuse the loaded connection")
 			assert.True(t, response.Factory.Onboarding.CodexSubscription)
 			assert.Equal(t, r.User.String(), response.Factory.Onboarding.CodexDefaultOwnerId)
 			// Provisioning saves the branch and app references before it completes setup.
