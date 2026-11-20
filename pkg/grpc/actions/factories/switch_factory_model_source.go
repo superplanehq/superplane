@@ -264,7 +264,7 @@ func refreshSwitchedAutomationSource(tx *gorm.DB, canvas *models.Canvas, previou
 		// Preserve the revision check for edits made directly on the canvas.
 		return nil
 	}
-	agent, err := automationAgentDefinition(intakeAgentFromCanvasNodes(version.Nodes))
+	agent, err := exportAutomationAgent(tx, source.OrganizationID, source.FactoryID, intakeAgentFromCanvasNodes(version.Nodes))
 	if err != nil {
 		return err
 	}

@@ -4,6 +4,7 @@ import { useId, useState } from "react";
 import { useCustomAutomationEditorAgent } from "@/hooks/useCustomAutomationEditorAgent";
 import { useFactoryCustomAutomation } from "@/hooks/useFactoryCustomAutomationData";
 import type { useCustomAutomationSourceDraft } from "@/hooks/useCustomAutomationSourceDraft";
+import { useSelectableLLMModels } from "@/hooks/useSelectableLLMModels";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import {
   customAutomationTriggersForRun,
@@ -13,11 +14,11 @@ import {
 } from "../lib/customAutomation";
 import {
   automationDefinitionCanvas,
-  automationDefinitionModel,
   automationDefinitionSteps,
   automationDefinitionTriggers,
   type AutomationDefinition,
 } from "../lib/customAutomationDefinition";
+import { hostedModelForYaml, type AutomationHostedModels } from "../lib/customAutomationHostedModels";
 import { CustomAutomationSetupFooter, CustomAutomationSetupForm } from "./CustomAutomationSetupForm";
 import type { PlanningReviewDraft, PlanningReviewStep } from "./planningReviewMockup";
 
@@ -54,6 +55,14 @@ export function CustomAutomationSourceEditor({
   );
   const [formTriggers, setFormTriggers] = useState<CustomAutomationTrigger[]>();
 
+  const isHosted = agent?.component === "runnerSuperPlane";
+  const { data: hostedModels } = useSelectableLLMModels(organizationId, {
+    factoryId,
+    sources: ["hosted"],
+    enabled: isHosted && !model.isYamlOpen,
+  });
+  const hosted = isHosted ? { models: hostedModels ?? [], savedKey: agent.model } : undefined;
+
   const form = { saving, deleting, onSave, onDelete, onClose };
   if (model.isYamlOpen || !definition) {
     return (
@@ -78,7 +87,7 @@ export function CustomAutomationSourceEditor({
     );
   }
 
-  const visual = automationDefinitionCanvas(definition, agent, customProvider);
+  const visual = automationDefinitionCanvas(definition, agent, customProvider, hosted);
   const triggers = formTriggers ?? visual.triggers;
 
   const editTriggers = (next: CustomAutomationTrigger[], runsOnTask?: boolean) => {
@@ -106,7 +115,7 @@ export function CustomAutomationSourceEditor({
       onIconChange={(icon) => model.editCanvas({ icon })}
       onTriggersChange={(next) => editTriggers(next, visual.runsOnTask)}
       onRunsOnTaskChange={(runsOnTask) => editTriggers(triggers, runsOnTask)}
-      onDraftChange={(next) => model.editCanvas(settingsEdit(visual.draft, next, definition.agent))}
+      onDraftChange={(next) => model.editCanvas(settingsEdit(visual.draft, next, definition.agent, hosted))}
     />
   );
 }
@@ -115,6 +124,7 @@ function settingsEdit(
   previous: PlanningReviewDraft,
   next: PlanningReviewDraft,
   agent: AutomationDefinition["agent"],
+  hosted?: AutomationHostedModels,
 ): Partial<AutomationDefinition> {
   const before = previous.components[0]?.configuration;
   const after = next.components[0]?.configuration;
@@ -136,7 +146,7 @@ function settingsEdit(
     patch.skip_repository_checkout = after.skipRepositoryCheckout === true;
   }
   if (after.model !== before.model) {
-    const model = automationDefinitionModel(next.components[0]?.component, after.model);
+    const model = hostedModelForYaml(after.model, hosted);
     patch.agent = model || agent?.harness ? { ...agent, model } : undefined;
   }
   return patch;

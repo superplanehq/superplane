@@ -159,7 +159,7 @@ func TestCanvasAutomationLegacyImportProtectsGraphBehavior(t *testing.T) {
 			require.NoError(t, err)
 			doc, err := automationspec.Parse(source)
 			require.NoError(t, err)
-			require.Equal(t, "anthropic::sonnet", doc.Agent.Model)
+			require.Equal(t, "sonnet", doc.Agent.Model)
 			require.NotNil(t, doc.RunsOnTask)
 			require.Equal(t, tc.runsOnTask, *doc.RunsOnTask)
 			require.Equal(t, tc.use, doc.Triggers[0].Use)

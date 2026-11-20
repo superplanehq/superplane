@@ -38,6 +38,7 @@ vi.mock("@/hooks/useCanvasData", () => ({
 }));
 vi.mock("@/hooks/useCanvasWebsocket", () => ({ useCanvasRuntimeWebsocket: hooks.runtime }));
 // Agent model controls have separate coverage; retain the real setup form and step selection.
+vi.mock("@/hooks/useSelectableLLMModels", () => ({ useSelectableLLMModels: () => ({}) }));
 vi.mock("./PlanningReviewForm", () => ({ PlanningReviewForm: () => null }));
 
 const automation: FactoriesFactoryCustomAutomation = {

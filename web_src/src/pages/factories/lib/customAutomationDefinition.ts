@@ -1,5 +1,6 @@
 import { CORE_SCHEMA, dump, load, YAMLException } from "js-yaml";
 import type { FactoriesFactoryAppTemplateAgent } from "@/api-client";
+import { hostedModelForPicker, type AutomationHostedModels } from "./customAutomationHostedModels";
 import type { PlanningReviewStep } from "../pages/planningReviewMockup";
 import {
   AUTOMATION_ICONS,
@@ -270,20 +271,16 @@ function problem(path: string, reason: string): never {
   throw new Error(`${path} · ${reason}`);
 }
 
-export function automationDefinitionModel(component: string | undefined, value: unknown): string | undefined {
-  if (typeof value !== "string" || !value) return undefined;
-  return component === "runnerSuperPlane" ? value.replace(/^hosted::/, "") : value;
-}
-
 export function automationDefinitionCanvas(
   definition: AutomationDefinition,
   agent?: FactoriesFactoryAppTemplateAgent,
   customProvider = false,
+  hosted?: AutomationHostedModels,
 ) {
   const draft = customAutomationDraft(
     {
       settings: {
-        agent: { ...agent, model: automationDefinitionModel(agent?.component, definition.agent?.model) },
+        agent: { ...agent, model: hostedModelForPicker(definition.agent?.model, hosted) },
         executionTimeoutSeconds: definition.timeout_seconds,
         skipSetupCommands: definition.skip_setup_commands,
         skipRepositoryCheckout: definition.skip_repository_checkout,

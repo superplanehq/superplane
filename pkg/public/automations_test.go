@@ -105,10 +105,10 @@ func TestAutomationAPIPublishesInTheSelectedStage(t *testing.T) {
 		require.NoError(t, models.EnableExperimentalFeature(orgID, feature))
 	}
 	support.AssignOpenSystemTrial(t, orgID)
-	provider, model := models.UsageProviderAnthropic, "claude-sonnet-4-6"
-	const pinnedModel = "claude-opus-5-5::revision"
+	provider, model := models.UsageProviderOpenRouter, "anthropic/claude-sonnet-4-6"
+	const pinnedModel = "anthropic/claude-opus-5-5::revision"
 	_, err := models.UpsertHostedLLMProvider(db, models.HostedLLMProvider{
-		Provider: provider, Enabled: true, APIKey: []byte("test-hosted-key"),
+		Provider: provider, Enabled: true, APIKey: []byte("test-hosted-key"), ManagementKey: []byte("test-management-key"),
 		AllowedModels: datatypes.JSONSlice[string]{model, pinnedModel},
 	})
 	require.NoError(t, err)
@@ -168,12 +168,14 @@ steps:
     bash: echo first
 `
 	input := &automationWriteRequest{FactoryID: factory.ID.String(), Stage: "backlog", YAML: source}
-	for _, invalidAgent := range []string{"harness: codex", "model: unavailable", "model: byok::anthropic::claude-opus-5-5"} {
+	for _, invalidAgent := range []string{"harness: codex", "model: unavailable", "model: byok::openrouter::" + pinnedModel} {
 		invalid := *input
 		invalid.YAML = strings.Replace(source, "harness: superplane", invalidAgent, 1)
 		call(http.MethodPost, collection+":validate", &invalid, http.StatusBadRequest)
 		call(http.MethodPost, collection, &invalid, http.StatusBadRequest)
 	}
+	source = strings.Replace(source, "harness: superplane", "model: "+model, 1)
+	input.YAML = source
 	call(http.MethodPost, collection+":validate", input, http.StatusOK)
 	created := call(http.MethodPost, collection, input, http.StatusCreated)
 	var first automations.Automation
@@ -188,10 +190,12 @@ steps:
 
 	source = strings.Replace(source, "echo first", "echo second", 1)
 	hostedKey := models.FormatSelectableLLMModelKey(models.UsageFundingSourceHosted, provider, pinnedModel)
-	legacy := *input
-	legacy.YAML = strings.Replace(source, "harness: superplane", "model: "+hostedKey, 1)
-	call(http.MethodPost, collection+":validate", &legacy, http.StatusOK)
-	source = strings.Replace(source, "harness: superplane", "model: "+models.FormatHostedLLMModelKey(provider, pinnedModel), 1)
+	for _, key := range []string{models.FormatHostedLLMModelKey(provider, pinnedModel), hostedKey} {
+		legacy := *input
+		legacy.YAML = strings.Replace(source, "model: "+model, "model: "+key, 1)
+		call(http.MethodPost, collection+":validate", &legacy, http.StatusOK)
+	}
+	source = strings.Replace(source, "model: "+model, "model: "+pinnedModel, 1)
 	updated := call(http.MethodPut, path, &automationWriteRequest{YAML: source}, http.StatusOK)
 	var second automations.Automation
 	require.NoError(t, json.Unmarshal(updated.Body.Bytes(), &second))

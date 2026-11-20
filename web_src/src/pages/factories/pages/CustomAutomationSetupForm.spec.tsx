@@ -10,6 +10,7 @@ import { CustomAutomationSetupForm } from "./CustomAutomationSetupForm";
 import { useCustomAutomationSetupPage } from "./useCustomAutomationSetupPage";
 
 const saveAutomation = vi.fn();
+let sharedHostedId = false;
 let automation: FactoriesFactoryCustomAutomation = {
   automation: { id: "automation", name: "Repository review" },
   settings: {
@@ -43,12 +44,16 @@ vi.mock("@/hooks/useCanvasData", () => ({ useCanvas: () => ({}) }));
 vi.mock("@/hooks/useOrganizationWorkspaceUsage", () => ({ useOrganizationWorkspaceUsage: () => ({}) }));
 vi.mock("@/hooks/useSelectableLLMModels", () => ({
   useSelectableLLMModels: (_organization: string, { sources }: { sources: SelectableLLMSourceID[] }) => ({
-    data: sources.map((source) => ({
-      provider: { id: "openai" },
-      model: { id: source + "-model", name: source + "-model" },
-      key: source + "::openai::" + source + "-model",
-      label: source + "-model",
-    })),
+    data: sources.flatMap((source) => {
+      const id = source === "hosted" ? "anthropic/claude-test" : source + "-model";
+      const providers = source === "hosted" ? (sharedHostedId ? ["openai", "openrouter"] : ["openrouter"]) : ["openai"];
+      return providers.map((provider) => ({
+        provider: { id: provider },
+        model: { id, name: id },
+        key: source + "::" + provider + "::" + id,
+        label: provider + "/" + id,
+      }));
+    }),
   }),
 }));
 vi.mock("@/hooks/useByokRunnerModelDefault", () => ({ useByokRunnerModelDefault: () => undefined }));
@@ -123,10 +128,15 @@ function SourceEditor({
 }
 
 it.each([
-  { source: "hosted", initialModel: "", model: "openai::hosted-model" },
-  { source: "hosted", initialModel: "hosted::openai::hosted-model", model: "openai::hosted-model" },
-  { source: "subscription", initialModel: "", model: "subscription-model" },
-] as const)("saves and clears a $source model from '$initialModel'", async ({ source, initialModel, model }) => {
+  { source: "hosted", initialModel: "", model: "anthropic/claude-test", label: "openrouter/anthropic/claude-test" },
+  {
+    source: "hosted",
+    initialModel: "hosted::openrouter::anthropic/claude-test",
+    model: "anthropic/claude-test",
+    label: "openrouter/anthropic/claude-test",
+  },
+  { source: "subscription", initialModel: "", model: "subscription-model", label: "subscription-model" },
+] as const)("saves and clears a $source model from '$initialModel'", async ({ source, initialModel, model, label }) => {
   onboarding = source === "hosted" ? { agentHarness: "AGENT_HARNESS_SUPERPLANE" } : { codexSubscription: true };
   const yaml = `apiVersion: v2
 kind: Automation
@@ -141,17 +151,46 @@ steps: [{name: Review, prompt: Review the changes.}]
   const picker = screen.getByTestId("field-model-hosted-model");
   await user.click(picker);
   expect(screen.getAllByRole("menuitem")).toHaveLength(initialModel ? 2 : 1);
-  await user.click(screen.getByRole("menuitem", { name: source + "-model" }));
-  expect(picker).toHaveAccessibleName(source + "-model");
+  await user.click(screen.getByRole("menuitem", { name: label }));
+  expect(picker).toHaveAccessibleName(label);
   await user.click(screen.getByRole("button", { name: "Save" }));
   expect(save).toHaveBeenLastCalledWith({ ...(load(yaml) as object), agent: { model } });
   view.unmount();
   render(<SourceEditor source={yaml + "agent: {model: '" + model + "'}\n"} save={save} />);
-  await user.click(screen.getByRole("button", { name: source + "-model" }));
+  await user.click(screen.getByRole("button", { name: label }));
   await user.click(screen.getByRole("menuitem", { name: "Use default model" }));
   await user.click(screen.getByRole("button", { name: "Save" }));
   expect(save).toHaveBeenLastCalledWith(load(yaml));
   onboarding = undefined;
+});
+
+it("keeps the selected provider when two hosted providers offer the same model ID", async () => {
+  const previous = automation;
+  sharedHostedId = true;
+  automation = {
+    settings: { agent: { component: "runnerSuperPlane", model: "hosted::openai::anthropic/claude-test" } },
+  };
+  const yaml = `apiVersion: v2
+kind: Automation
+name: Review
+agent: {model: anthropic/claude-test}
+triggers: [{use: manual}]
+steps: [{name: Review, prompt: Review the changes.}]
+`;
+  const save = vi.fn();
+  try {
+    render(<SourceEditor source={yaml} save={save} automationId="saved" />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "openai/anthropic/claude-test" }));
+    await user.click(screen.getByRole("menuitem", { name: "openrouter/anthropic/claude-test" }));
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    expect(save).toHaveBeenLastCalledWith(
+      expect.objectContaining({ agent: { model: "openrouter::anthropic/claude-test" } }),
+    );
+  } finally {
+    automation = previous;
+    sharedHostedId = false;
+  }
 });
 
 it("keeps the saved automation's subscription when the workspace uses hosted models", async () => {

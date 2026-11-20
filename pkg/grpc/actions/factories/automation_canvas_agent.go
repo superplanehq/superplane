@@ -3,6 +3,7 @@ package factories
 import (
 	"errors"
 	"reflect"
+	"slices"
 	"strings"
 
 	"github.com/google/uuid"
@@ -41,40 +42,46 @@ func validateCustomAutomationModel(tx *gorm.DB, factory *models.Factory, agent *
 	return models.RunnerAcceptsModel(tx, factory.OrganizationID, &factory.ID, agent.Component, config, agent.Model)
 }
 
-func automationAgentSettings(spec *automationspec.Agent) *pb.FactoryAppTemplateAgent {
+func automationAgentSettings(tx *gorm.DB, factory *models.Factory, document *automationspec.Document) (*pb.FactoryAppTemplateAgent, error) {
+	spec := document.Agent
 	if spec == nil {
-		return nil
+		return nil, nil
 	}
 	agent := &pb.FactoryAppTemplateAgent{Component: automationHarnesses[spec.Harness], Model: spec.Model}
-	if spec.Harness == automationspec.SuperPlane {
-		agent.Model = automationCanvasHostedModel(spec.Model)
+	if spec.Harness == automationspec.SuperPlane && spec.Model != "" {
+		model, err := resolveAutomationHostedModel(tx, factory, document, "")
+		if err != nil {
+			return nil, err
+		}
+		agent.Model = model
 	}
 	if spec.Credentials != nil {
 		agent.CredentialSource = string(spec.Credentials.Source)
 		agent.CredentialIntegrationName = spec.Credentials.Name
 	}
-	return agent
+	return agent, nil
 }
 
-func configuredAutomationAgent(tx *gorm.DB, factory *models.Factory, live *models.CanvasVersion) *intakeAgent {
+func configuredAutomationAgent(tx *gorm.DB, factory *models.Factory, live *models.CanvasVersion) (*intakeAgent, string) {
 	workspace := resolveIntakeAgent(tx, factory)
 	if live == nil {
-		return workspace
+		return workspace, ""
 	}
 	current := intakeAgentFromCanvasNodes(live.Nodes)
 	if current == nil {
-		return nil
+		return nil, ""
 	}
+	savedModel := current.Model
 	if workspace != nil && workspace.Component == current.Component && reflect.DeepEqual(workspace.Credentials, current.Credentials) {
-		return workspace
+		return workspace, savedModel
 	}
 	// Keep the saved source. An omitted model uses that source's default.
 	current.Model = ""
-	return current
+	return current, savedModel
 }
 
 func resolveAutomationAgent(tx *gorm.DB, factory *models.Factory, source *automationspec.Document, live *models.CanvasVersion, callerID uuid.UUID) (*intakeAgent, error) {
-	agent := configuredAutomationAgent(tx, factory, live)
+	agent, savedModel := configuredAutomationAgent(tx, factory, live)
 	if agent == nil {
 		if live != nil {
 			return nil, unrepresentableAutomationCanvas()
@@ -126,7 +133,10 @@ func resolveAutomationAgent(tx *gorm.DB, factory *models.Factory, source *automa
 		return agent, err
 	}
 	if agent.Component == models.SuperPlaneRunnerComponent {
-		model = automationCanvasHostedModel(model)
+		model, err = resolveAutomationHostedModel(tx, factory, source, savedModel)
+		if err != nil {
+			return nil, err
+		}
 	}
 	if funding := agent.Credentials["source"]; funding == runner.CredentialsSourceIntegration || funding == runner.CredentialsSourceSecret {
 		// Let the execution policy select a permitted BYOK default when YAML omits a model.
@@ -156,7 +166,7 @@ func resolveAutomationAgent(tx *gorm.DB, factory *models.Factory, source *automa
 	return agent, nil
 }
 
-// YAML names the provider and its native model ID. The canvas uses a catalog key.
+// Accept the provider-qualified YAML spelling used by older editors.
 func automationCanvasHostedModel(model string) string {
 	provider, id, _ := strings.Cut(model, "::")
 	hosted, err := models.NormalizeDefaultHostedLLMModel(provider, id)
@@ -164,6 +174,56 @@ func automationCanvasHostedModel(model string) string {
 		return model
 	}
 	return models.FormatSelectableLLMModelKey(models.UsageFundingSourceHosted, hosted.Provider, hosted.Model)
+}
+
+func resolveAutomationHostedModel(tx *gorm.DB, factory *models.Factory, source *automationspec.Document, savedModel string) (string, error) {
+	id := strings.TrimSpace(source.Agent.Model)
+	if isQualifiedAutomationHostedModel(id) {
+		return automationCanvasHostedModel(id), nil
+	}
+	// Keep the route pinned on the live canvas, even if a second provider now offers this ID.
+	if saved, err := models.ParseHostedLLMModelKey(savedModel); err == nil && saved.Model == id {
+		return models.FormatSelectableLLMModelKey(models.UsageFundingSourceHosted, saved.Provider, id), nil
+	}
+	providers, err := automationHostedModelProviders(tx, factory.OrganizationID, factory.ID, id)
+	if err != nil {
+		return "", err
+	}
+	switch len(providers) {
+	case 0:
+		return "", source.Diagnostic("agent.model", "Select an available model for the configured agent.")
+	case 1:
+		return models.FormatSelectableLLMModelKey(models.UsageFundingSourceHosted, providers[0], id), nil
+	default:
+		return "", source.Diagnostic("agent.model", "Multiple hosted providers offer this model ("+strings.Join(providers, ", ")+"). Use provider::model to choose one.")
+	}
+}
+
+func isQualifiedAutomationHostedModel(model string) bool {
+	prefix, _, found := strings.Cut(model, "::")
+	if !found {
+		return false
+	}
+	prefix = strings.ToLower(strings.TrimSpace(prefix))
+	switch prefix {
+	case models.UsageFundingSourceHosted, models.UsageFundingSourceBYOK, models.UsageFundingSourceSubscription:
+		return true
+	}
+	return slices.Contains(models.KnownHostedLLMProviders(), prefix)
+}
+
+func automationHostedModelProviders(tx *gorm.DB, orgID, factoryID uuid.UUID, modelID string) ([]string, error) {
+	var providers []string
+	for _, provider := range models.KnownHostedLLMProviders() {
+		allowed, err := models.ModelIsSelectable(tx, orgID, &factoryID, provider, models.UsageFundingSourceHosted, modelID)
+		if err != nil {
+			return nil, err
+		}
+		if allowed {
+			providers = append(providers, provider)
+		}
+	}
+	return providers, nil
 }
 
 func automationAgentDefinition(agent *intakeAgent) (*automationspec.Agent, error) {
@@ -175,11 +235,6 @@ func automationAgentDefinition(agent *intakeAgent) (*automationspec.Agent, error
 			continue
 		}
 		result := &automationspec.Agent{Harness: harness, Model: agent.Model}
-		if harness == automationspec.SuperPlane && agent.Model != "" {
-			if hosted, err := models.ParseHostedLLMModelKey(agent.Model); err == nil && hosted.IsSet() {
-				result.Model = models.FormatHostedLLMModelKey(hosted.Provider, hosted.Model)
-			}
-		}
 		source := configString(agent.Credentials, "source")
 		switch source {
 		case "":
@@ -194,4 +249,27 @@ func automationAgentDefinition(agent *intakeAgent) (*automationspec.Agent, error
 		return result, nil
 	}
 	return nil, unrepresentableAutomationCanvas()
+}
+
+func exportAutomationAgent(tx *gorm.DB, orgID, factoryID uuid.UUID, agent *intakeAgent) (*automationspec.Agent, error) {
+	spec, err := automationAgentDefinition(agent)
+	if err != nil || spec.Harness != automationspec.SuperPlane || spec.Model == "" {
+		return spec, err
+	}
+	hosted, err := models.ParseHostedLLMModelKey(spec.Model)
+	if err != nil || !hosted.IsSet() {
+		return spec, nil
+	}
+	spec.Model = models.FormatHostedLLMModelKey(hosted.Provider, hosted.Model)
+	if isQualifiedAutomationHostedModel(hosted.Model) {
+		return spec, nil
+	}
+	providers, err := automationHostedModelProviders(tx, orgID, factoryID, hosted.Model)
+	if err != nil {
+		return nil, err
+	}
+	if len(providers) == 1 && providers[0] == hosted.Provider {
+		spec.Model = hosted.Model
+	}
+	return spec, nil
 }

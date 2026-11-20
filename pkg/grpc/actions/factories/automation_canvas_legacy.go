@@ -149,7 +149,7 @@ func importAutomationCanvas(tx *gorm.DB, factory *models.Factory, canvas *models
 		stripCustomAutomationBacklogPrompt(settings.Steps)
 	}
 	agent := intakeAgentFromCanvasNodes(version.Nodes)
-	definition.Agent, err = automationAgentDefinition(agent)
+	definition.Agent, err = exportAutomationAgent(tx, factory.OrganizationID, factory.ID, agent)
 	if err != nil {
 		return "", err
 	}
@@ -175,7 +175,15 @@ func importAutomationCanvas(tx *gorm.DB, factory *models.Factory, canvas *models
 
 	// Rebuild the supported graph and compare all execution settings and edges.
 	// Ignore presentation and metadata written by trigger setup.
-	agent, err = customAutomationAgent(tx, factory, automationAgentSettings(definition.Agent))
+	agentSettings, err := automationAgentSettings(tx, factory, document)
+	if err != nil {
+		var diagnostic *automationspec.Diagnostic
+		if errors.As(err, &diagnostic) {
+			return "", unrepresentableAutomationCanvas()
+		}
+		return "", err
+	}
+	agent, err = customAutomationAgent(tx, factory, agentSettings)
 	if err != nil || agent == nil {
 		return "", unrepresentableAutomationCanvas()
 	}
