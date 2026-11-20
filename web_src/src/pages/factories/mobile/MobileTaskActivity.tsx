@@ -155,8 +155,13 @@ export function MobileTaskActivity({
  */
 function mobileConsoleColumns(fixture: SplitRunFixture): MobileConsoleColumn[] {
   const groups = stagesFromFixture(fixture);
-  const byColumn = stagesByConsoleColumn(groups, fixture.footer.run?.appId);
-  return CONSOLE_COLUMNS.flatMap((column) => {
+  const orderedColumns = fixture.stageColumns?.length ? fixture.stageColumns : [...CONSOLE_COLUMNS];
+  const byColumn = stagesByConsoleColumn(
+    groups,
+    fixture.footer.run?.appId,
+    orderedColumns.map((column) => column.id),
+  );
+  return orderedColumns.flatMap((column) => {
     const automations = automationsFromStages(byColumn[column.id].filter((stage) => !isConsoleCreationStage(stage)));
     if (automations.length === 0) {
       return [];
