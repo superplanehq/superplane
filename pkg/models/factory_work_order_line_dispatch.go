@@ -883,15 +883,15 @@ func WorkOrderIsWaitingAfterPassedStage(tx *gorm.DB, workOrderID uuid.UUID) (boo
 	return order.IsWaitingAfterPassedStage(tx)
 }
 
-func (order *FactoryWorkOrder) IsWaitingAfterPassedStage(tx *gorm.DB) (bool, error) {
-	if order == nil || order.State != FactoryWorkOrderStateOpen {
+func (o *FactoryWorkOrder) IsWaitingAfterPassedStage(tx *gorm.DB) (bool, error) {
+	if o == nil || o.State != FactoryWorkOrderStateOpen {
 		return false, nil
 	}
-	grouped, err := ListWorkOrderLineDispatchesByWorkOrderIDs(tx, []uuid.UUID{order.ID})
+	grouped, err := ListWorkOrderLineDispatchesByWorkOrderIDs(tx, []uuid.UUID{o.ID})
 	if err != nil {
 		return false, err
 	}
-	dispatches := grouped[order.ID]
+	dispatches := grouped[o.ID]
 	if len(dispatches) == 0 {
 		return false, nil
 	}
