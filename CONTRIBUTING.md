@@ -47,6 +47,10 @@ Before you begin, make sure you have the following:
 - [Make](https://www.gnu.org/software/make/)
 - [Docker](https://www.docker.com/)
 
+Docker must provide a working `docker compose` command. The development
+container provides Go `1.27.3` (pinned in `go.mod`), Node.js, npm, and Bun.
+Build, lint, test, and run commands execute inside containers.
+
 ### Forking and Cloning the Repository
 
 To begin working with SuperPlane, you'll need to fork and clone the repository:
@@ -75,6 +79,24 @@ After the first setup, run `make dev.up` when the stack is not running, then
 `make dev.server.fg` for foreground logs). Re-run `make dev.setup` when you
 need a fresh `npm install`, codegen, or migrations.
 
+The first `make dev.up` builds the images in approximately 3–5 minutes.
+Later runs reuse them. Local startup requires 15 GB free on the Docker
+filesystem. If space is low or the disk probe reports a full disk, startup
+removes unused build cache and checks again before building.
+This cleanup never removes images, containers, or database volumes. CI
+skips the cleanup. If space remains low, increase Docker disk space or
+remove unused images manually. Run `make test.dev.disk` to test recovery.
+
+Re-run `make dev.setup` after proto, Go module, or frontend dependency
+changes. By default, setup creates and migrates only `superplane_dev`.
+For E2E, include the test database:
+
+```sh
+DEV_SETUP_DBS="superplane_dev superplane_test" make dev.setup
+```
+
+Backend CI sets `DEV_SETUP_DBS` through the environment.
+
 Billing stays enabled in local development. With `APP_ENV=development`,
 owner setup gives the Demo organization a manual Business plan and $1,000
 in development credit. This uses local billing records and does not create
@@ -88,7 +110,13 @@ environment values.
 
 When `make dev.server` reports the app as healthy, open SuperPlane at [http://localhost:8000](http://localhost:8000).
 
-`make dev.setup` creates the local installation fleet. After owner setup, the
+The health endpoint is `http://localhost:8000/health`. The API uses `air`
+for Go hot-reload. On first UI load, owner setup is enabled
+(`OWNER_SETUP_ENABLED=yes`) and asks you to create an admin account.
+Open registration is disabled by default (`BLOCK_SIGNUP=yes`).
+
+`make dev.setup` creates or updates the local `e1-large-amd64` installation
+fleet. After owner setup, the
 Docker Fleet Manager generates its credentials and creates ephemeral runners
 for integrated tasks. Set `INSTALLATION_ADMIN_TOKEN` in `.env` only to override
 the generated credentials. The `new_runners` feature is enabled for every organization.
@@ -100,20 +128,34 @@ See [Local database snapshot](docs/contributing/local-database-snapshot.md).
 
 `make dev.up`, `make dev.setup`, and `make dev.server` use the integrated
 runner API and Docker Fleet Manager. Historical tasks use SuperPlane task
-records and archived logs in platform blob storage.
+records and archived logs in platform blob storage. Historical and integrated
+tasks use the same task database and blob storage. The legacy runner source
+is in [superplanehq/runner](https://github.com/superplanehq/runner).
 
 The local worker image includes Claude Code, Codex, OpenCode, git, `gh`, and
-`jq` so factory line apps can run locally. Do not install those CLIs on the
+`jq`. It also includes ffmpeg, ffprobe, whisper-cli, yt-dlp, and the Whisper
+tiny model so factory line apps can run locally. Do not install those CLIs on the
 host. Connect GitHub and Claude integrations in the organization before you
 dispatch a factory line. Factory nodes use those integrations, not `.env`
 `ANTHROPIC_API_KEY`. After you change `release/runner/Dockerfile`, run
 `make dev.up` again. Check tools with `make doctor-local` after
 `make dev.server`. OpenCode must be on the runner `PATH` for Run OpenRouter
-Agent.
+Agent. SuperPlane does not download OpenCode in the prompt prepare step.
+
+Video and audio task files require ffmpeg, ffprobe, whisper-cli, and the
+baked Whisper model. Hosted video links also require the pinned yt-dlp.
+Missing media tools fail the setup step. Do not download models during a task.
 
 Local hosted OpenRouter is optional. Set `SUPERPLANE_DEV_HOSTED_OPENROUTER`
 in `.env` only when you need the SuperPlane-hosted provider. See
 [Connecting to third-party services](docs/contributing/connecting-to-3rdparty-services-from-development.md).
+
+### Go module cache recovery
+
+If `go mod download` or `go build` reports missing or corrupt cache files,
+run `make dev.clean.go.cache`, then `make dev.setup.go`.
+The cache uses the `go-pkg-cache` Docker volume mounted at `/go/pkg/mod`.
+Disk-full errors or interrupted downloads can corrupt this cache.
 
 ## Fleet and runner CLI migration
 
