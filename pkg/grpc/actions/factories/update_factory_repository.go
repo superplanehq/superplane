@@ -455,7 +455,7 @@ func reconcileFactoryRepository(
 			if err != nil {
 				return err
 			}
-			if err := models.RefreshAutomationArtifactRevision(tx, canvas.OrganizationID, canvas.ID.String(), published.ID.String()); err != nil {
+			if err := models.RefreshAutomationArtifactRevision(tx, canvas.OrganizationID, canvas.ID.String(), liveVersion.ID.String(), published.ID.String()); err != nil {
 				return err
 			}
 		}

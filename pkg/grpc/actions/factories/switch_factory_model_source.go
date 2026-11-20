@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/automationspec"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -197,13 +198,6 @@ func rewriteCanvasAgents(
 	if err != nil {
 		return false, err
 	}
-	if models.FactoryAppTemplateID(live.Nodes) == models.FactoryAppTemplateCustomAutomationID {
-		managed, err := models.IsAutomationManagedArtifact(tx, canvas.OrganizationID, canvas.ID.String())
-		if err != nil || managed {
-			return false, err
-		}
-	}
-
 	nodes := slices.Clone(live.Nodes)
 	rewritten := make([]models.Node, 0)
 	for i := range nodes {
@@ -234,6 +228,12 @@ func rewriteCanvasAgents(
 		return false, err
 	}
 
+	if models.FactoryAppTemplateID(nodes) == models.FactoryAppTemplateCustomAutomationID {
+		if err := refreshSwitchedAutomationSource(tx, canvas, live.ID, version); err != nil {
+			return false, err
+		}
+	}
+
 	now := time.Now()
 	for _, node := range rewritten {
 		if err := freezeActiveExecutionComponent(tx, canvas.ID, node.ID); err != nil {
@@ -253,6 +253,31 @@ func rewriteCanvasAgents(
 		}
 	}
 	return true, nil
+}
+
+func refreshSwitchedAutomationSource(tx *gorm.DB, canvas *models.Canvas, previous uuid.UUID, version *models.CanvasVersion) error {
+	source, err := findLegacyAutomationSource(tx, canvas)
+	if err != nil || source == nil {
+		return err
+	}
+	if source.ArtifactRevision != previous.String() {
+		// Preserve the revision check for edits made directly on the canvas.
+		return nil
+	}
+	agent, err := automationAgentDefinition(intakeAgentFromCanvasNodes(version.Nodes))
+	if err != nil {
+		return err
+	}
+	updated, err := automationspec.ReplaceExplicitAgent(source.Source, agent)
+	if err != nil {
+		return err
+	}
+	if updated != source.Source {
+		source.Source = updated
+		source.Revision++
+	}
+	source.ArtifactRevision = version.ID.String()
+	return source.Save(tx)
 }
 
 func freezeActiveExecutionComponent(tx *gorm.DB, canvasID uuid.UUID, nodeID string) error {

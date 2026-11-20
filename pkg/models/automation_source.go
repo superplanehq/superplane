@@ -50,11 +50,11 @@ func ListAutomationSources(tx *gorm.DB, organizationID, factoryID uuid.UUID) ([]
 	return sources, err
 }
 
-// RefreshAutomationArtifactRevision records a factory-driven refresh of the
-// generated artifact. The stored YAML and its public revision stay the same.
-func RefreshAutomationArtifactRevision(tx *gorm.DB, organizationID uuid.UUID, artifactID, revision string) error {
+// RefreshAutomationArtifactRevision advances the source only if it tracked the
+// artifact before the factory refresh. Independent canvas edits stay protected.
+func RefreshAutomationArtifactRevision(tx *gorm.DB, organizationID uuid.UUID, artifactID, previous, revision string) error {
 	return tx.Model(&AutomationSource{}).
-		Where("organization_id = ? AND artifact_id = ?", organizationID, artifactID).
+		Where("organization_id = ? AND artifact_id = ? AND artifact_revision = ?", organizationID, artifactID, previous).
 		Update("artifact_revision", revision).Error
 }
 

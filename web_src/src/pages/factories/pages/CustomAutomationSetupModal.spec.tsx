@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { load } from "js-yaml";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Link, MemoryRouter, useLocation, useNavigate } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
@@ -274,14 +275,18 @@ apiVersion: v2
 kind: Automation
 name: Preview
 agent:
-  harness: superplane
-  model: anthropic::claude-sonnet-4-6
+  harness: codex
+  model: gpt-5
+  credentials: {source: integration, name: code-review}
+skip_setup_commands: true
+skip_repository_checkout: true
 triggers:
   - use: task_enters_stage
 steps:
   - name: Print marker
     bash: echo original
   - name: Review
+    working_directory: repo
     prompt: Review the preview.
 `;
   const savedAutomation = {
@@ -296,11 +301,14 @@ steps:
   beforeEach(() => hooks.runs.mockReturnValue({ data: { pages: [] } }));
   afterEach(() => vi.restoreAllMocks());
 
-  it("opens and saves the form editor when an existing automation cannot be imported as YAML", async () => {
+  it("opens the form editor when the server verifies it can preserve the automation", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      Response.json({ message: "This automation cannot be represented as YAML." }, { status: 409 }),
+      Response.json(
+        { message: "Open this automation in the form.", can_edit_in_form: true, live_version_id: "version-42" },
+        { status: 409 },
+      ),
     );
-    hooks.describe.mockReturnValue({ data: automation });
+    hooks.describe.mockReturnValue({ data: automation, isFetchedAfterMount: true });
     hooks.update.mockResolvedValue(automation);
     const onClose = renderModal("?customAutomation=custom-1", "custom-1", "verify", true);
     const user = userEvent.setup();
@@ -310,7 +318,18 @@ steps:
     await user.type(screen.getByLabelText("Automation name"), "Updated preview");
     await user.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
-    expect(hooks.update).toHaveBeenCalledWith(expect.objectContaining({ name: "Updated preview" }));
+    expect(hooks.update).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "Updated preview", expectedLiveVersionId: "version-42" }),
+    );
+  });
+
+  it("protects a custom graph that the form cannot preserve", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      Response.json({ message: "Open the developer canvas." }, { status: 409 }),
+    );
+    renderModal("?customAutomation=custom-1", "custom-1", "verify", true);
+    expect(await screen.findByRole("alert")).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Edit in form" })).not.toBeInTheDocument();
   });
 
   it("blocks the app creation shortcut only while the automation draft is dirty", async () => {
@@ -361,19 +380,22 @@ steps:
     const user = userEvent.setup();
     expect(await screen.findByLabelText("Automation name")).toHaveValue("Preview");
     expect(screen.getAllByText("When a task enters Backlog").length).toBeGreaterThan(0);
-    expect(screen.queryByRole("combobox", { name: "Agent" })).toBeNull();
-    expect(screen.queryByRole("combobox", { name: "Credentials" })).toBeNull();
     await user.click(screen.getByRole("button", { name: /Review.*Review the preview/ }));
-    expect(screen.queryByLabelText("Working directory")).toBeNull();
+    fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Review changes" } });
 
     await user.click(screen.getByRole("button", { name: "Edit YAML" }));
-    expect(screen.getByLabelText("Automation YAML")).toHaveValue(savedYaml);
+    expect(screen.getByLabelText<HTMLTextAreaElement>("Automation YAML").value).toContain("Review changes");
     await user.click(screen.getByRole("button", { name: "Open visual editor" }));
     fireEvent.change(screen.getByLabelText("Automation name"), { target: { value: "Board preview" } });
     await user.click(screen.getByRole("button", { name: "Edit YAML" }));
     const projected = (screen.getByLabelText("Automation YAML") as HTMLTextAreaElement).value;
     expect(projected).toContain("name: Board preview");
-    expect(projected).toContain("model: anthropic::claude-sonnet-4-6");
+    expect(load(projected)).toMatchObject({
+      agent: { harness: "codex", model: "gpt-5", credentials: { source: "integration", name: "code-review" } },
+      skip_setup_commands: true,
+      skip_repository_checkout: true,
+      steps: [{ name: "Print marker" }, { name: "Review changes", working_directory: "repo" }],
+    });
     const edited = `# Unsaved comment\n${projected.replace("echo original", "echo edited")}`;
     fireEvent.change(screen.getByLabelText("Automation YAML"), { target: { value: edited } });
     await user.click(screen.getByRole("button", { name: "Open visual editor" }));

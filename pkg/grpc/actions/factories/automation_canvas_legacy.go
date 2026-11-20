@@ -5,7 +5,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"maps"
+	"slices"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/automations"
@@ -71,7 +73,34 @@ func (b CanvasAutomationBackend) ImportLegacy(_ context.Context, tx *gorm.DB, le
 	if current.Artifact != legacy.Artifact || current.Placement != legacy.Placement {
 		return "", grpcerrors.FailedPrecondition(nil, "The automation changed. Reload it and try again.")
 	}
-	return importAutomationCanvas(tx, factory, canvas, version)
+	source, err := importAutomationCanvas(tx, factory, canvas, version)
+	if errors.Is(err, errUnrepresentableAutomation) && legacyFormPreservesCanvas(tx, factory, canvas, version) {
+		return "", grpcerrors.FailedPrecondition(&AutomationFormFallback{LiveVersionID: version.ID}, "Open the form to edit this automation.")
+	}
+	return source, err
+}
+
+// AutomationFormFallback identifies a version the existing form can edit losslessly.
+type AutomationFormFallback struct{ LiveVersionID uuid.UUID }
+
+func (*AutomationFormFallback) Error() string { return "automation requires the form editor" }
+
+func legacyFormPreservesCanvas(tx *gorm.DB, factory *models.Factory, canvas *models.Canvas, version *models.CanvasVersion) bool {
+	saved, err := serializeCustomAutomationVersion(factory, canvas, version)
+	if err != nil || saved.Settings.RunsOnTask == nil {
+		// The legacy form infers a single run context when this setting is absent.
+		return false
+	}
+	settings, err := parseCustomAutomationSettings(tx, factory, saved.Settings)
+	if err != nil {
+		return false
+	}
+	settings.ColumnKey = *canvas.ColumnKey
+	expected, err := buildCustomAutomationCanvas(tx, factory, canvas.Name, settings)
+	if err != nil || preserveCustomAutomationIdentities(version, expected) != nil {
+		return false
+	}
+	return equalAutomationExecutionGraph(version, expected)
 }
 
 func canvasLegacyAutomation(tx *gorm.DB, canvas *models.Canvas) (automations.LegacyAutomation, *models.CanvasVersion, error) {
@@ -99,27 +128,34 @@ func legacyCanvasMetadata(canvas *models.Canvas) automations.LegacyAutomation {
 }
 
 func importAutomationCanvas(tx *gorm.DB, factory *models.Factory, canvas *models.Canvas, version *models.CanvasVersion) (string, error) {
-	saved, err := serializeCustomAutomationVersion(factory, canvas, version)
+	saved, err := readCustomAutomationVersion(factory, canvas, version)
 	if err != nil {
 		return "", unrepresentableAutomationCanvas()
 	}
 	settings := saved.GetSettings()
 	definition := automationspec.Definition{
 		Name: canvas.Name, Icon: settings.GetIcon(), TimeoutSeconds: int(settings.GetExecutionTimeoutSeconds()),
-		RunsOnTask: settings.RunsOnTask,
+		RunsOnTask:        settings.RunsOnTask,
+		SkipSetupCommands: settings.SkipSetupCommands, SkipRepositoryCheckout: settings.SkipRepositoryCheckout,
 	}
 	definition.Triggers, err = legacyAutomationTriggers(*canvas.ColumnKey, version.Nodes)
 	if err != nil {
 		return "", unrepresentableAutomationCanvas()
 	}
-	savedAgent := settings.GetAgent()
-	if savedAgent.GetComponent() != models.SuperPlaneRunnerComponent || savedAgent.GetCredentialSource() != "" {
-		return "", unrepresentableAutomationCanvas()
+	hasSchedule := slices.ContainsFunc(definition.Triggers, func(trigger automationspec.Trigger) bool {
+		return trigger.Use == automationspec.Scheduled
+	})
+	if *canvas.ColumnKey == models.CanvasColumnKeyBacklog && ((settings.RunsOnTask != nil && !*settings.RunsOnTask) || hasSchedule) {
+		stripCustomAutomationBacklogPrompt(settings.Steps)
 	}
-	definition.Agent = &automationspec.Agent{Harness: automationspec.SuperPlane, Model: savedAgent.GetModel()}
+	agent := intakeAgentFromCanvasNodes(version.Nodes)
+	definition.Agent, err = automationAgentDefinition(agent)
+	if err != nil {
+		return "", err
+	}
 	for _, step := range settings.GetSteps() {
 		item := automationspec.Step{
-			Name: step.GetName(), Secrets: step.GetSecrets(),
+			Name: step.GetName(), Secrets: step.GetSecrets(), WorkingDirectory: step.GetWorkingDirectory(),
 		}
 		if step.GetType() == pb.FactoryCustomAutomation_Step_TYPE_BASH {
 			item.Bash = step.GetCommand()
@@ -139,7 +175,19 @@ func importAutomationCanvas(tx *gorm.DB, factory *models.Factory, canvas *models
 
 	// Rebuild the supported graph and compare all execution settings and edges.
 	// Ignore presentation and metadata written by trigger setup.
-	agent := &intakeAgent{Component: models.SuperPlaneRunnerComponent, Model: definition.Agent.Model}
+	agent, err = customAutomationAgent(tx, factory, automationAgentSettings(definition.Agent))
+	if err != nil || agent == nil {
+		return "", unrepresentableAutomationCanvas()
+	}
+	if credentials := definition.Agent.Credentials; credentials != nil && credentials.Source == automationspec.Integration {
+		connection, err := models.FindIntegrationByName(tx, factory.OrganizationID, credentials.Name)
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			return "", err
+		}
+		if connection != nil && connection.AppName == models.CustomLLMAppName && agent.Component == "runnerOpenRouter" {
+			agent.LLMProvider = models.UsageProviderCustom
+		}
+	}
 	rebuild, err := automationCanvasSettings(*canvas.ColumnKey, document, agent)
 	if err != nil {
 		return "", unrepresentableAutomationCanvas()
@@ -151,7 +199,6 @@ func importAutomationCanvas(tx *gorm.DB, factory *models.Factory, canvas *models
 	if err := preserveCustomAutomationIdentities(version, expected); err != nil {
 		return "", unrepresentableAutomationCanvas()
 	}
-	preserveCustomAutomationScheduleIdentities(version.Nodes, expected)
 	if !equalAutomationExecutionGraph(version, expected) {
 		return "", unrepresentableAutomationCanvas()
 	}
@@ -164,12 +211,6 @@ func legacyAutomationTriggers(stage string, nodes []models.Node) ([]automationsp
 		return nil, err
 	}
 	var result []automationspec.Trigger
-	count := 0
-	for _, trigger := range decoded {
-		if trigger.schedule != nil {
-			count++
-		}
-	}
 	for _, trigger := range decoded {
 		switch trigger.mode {
 		case pb.FactoryCustomAutomation_START_MODE_MANUAL:
@@ -184,7 +225,7 @@ func legacyAutomationTriggers(stage string, nodes []models.Node) ([]automationsp
 			result = append(result, automationspec.Trigger{Use: automationspec.TaskLeavesStage})
 		case pb.FactoryCustomAutomation_START_MODE_SCHEDULED:
 			result = append(result, automationspec.Trigger{
-				ID: customAutomationScheduleLogicalID(trigger.node, count), Use: automationspec.Scheduled,
+				Use:    automationspec.Scheduled,
 				Config: &automationspec.Schedule{Cron: trigger.schedule.GetCronExpression(), UTCOffset: trigger.schedule.GetUtcOffset()},
 			})
 		}
@@ -197,12 +238,24 @@ func equalAutomationExecutionGraph(live *models.CanvasVersion, expected *yaml.Ca
 		return false
 	}
 	nodes := make(map[string]models.Node, len(live.Nodes))
+	triggerIDs := make(map[string]string)
 	for _, node := range live.Nodes {
 		nodes[node.ID] = executionNode(node)
+		if key := generatedTriggerKey(node); key != "" {
+			triggerIDs[key] = node.ID
+		}
 	}
+	// The builder may generate fresh trigger IDs on save. Compare the trigger
+	// and its outgoing edges using its live ID without publishing the graph.
+	liveIDByGeneratedID := make(map[string]string)
 	for _, node := range expected.Spec.Nodes {
-		existing, ok := nodes[node.ID]
-		if !ok || !equalCanvasJSON(existing, executionNode(node.Model())) {
+		candidate := node.Model()
+		if key := generatedTriggerKey(candidate); key != "" {
+			candidate.ID = triggerIDs[key]
+			liveIDByGeneratedID[node.ID] = candidate.ID
+		}
+		existing, ok := nodes[candidate.ID]
+		if !ok || !equalCanvasJSON(existing, executionNode(candidate)) {
 			return false
 		}
 	}
@@ -212,12 +265,27 @@ func equalAutomationExecutionGraph(live *models.CanvasVersion, expected *yaml.Ca
 	}
 	for _, edge := range expected.Spec.Edges {
 		key := edge.Model()
+		if id, ok := liveIDByGeneratedID[key.SourceID]; ok {
+			key.SourceID = id
+		}
 		if edges[key] == 0 {
 			return false
 		}
 		edges[key]--
 	}
 	return true
+}
+
+func generatedTriggerKey(node models.Node) string {
+	switch node.ComponentName() {
+	case "schedule":
+		template, _ := node.Metadata[models.FactoryAppTemplateMetadataKey].(map[string]any)
+		return fmt.Sprintf("schedule-%d", configInt(template, "triggerIndex"))
+	case "github.onPullRequest", "bitbucket.onPullRequest":
+		return node.ComponentName()
+	default:
+		return ""
+	}
 }
 
 func executionNode(node models.Node) models.Node {
@@ -233,6 +301,11 @@ func executionNode(node models.Node) models.Node {
 			delete(node.Configuration, field)
 		}
 	}
+	// A workspace switch stores a blank model for subscriptions. The form omits it.
+	credentials, _ := node.Configuration["credentials"].(map[string]any)
+	if node.ComponentName() == "runnerCodex" && credentials["source"] == runner.CredentialsSourceSubscription && node.Configuration["model"] == "" {
+		delete(node.Configuration, "model")
+	}
 
 	node.Metadata = maps.Clone(node.Metadata)
 	if node.Type == models.NodeTypeTrigger {
@@ -247,7 +320,7 @@ func executionNode(node models.Node) models.Node {
 	}
 	if template, ok := node.Metadata[models.FactoryAppTemplateMetadataKey].(map[string]any); ok {
 		template = maps.Clone(template)
-		delete(template, customAutomationScheduleLogicalIDKey)
+		delete(template, "automationTriggerId")
 		if configString(template, "icon") == automationspec.DefaultIcon {
 			delete(template, "icon")
 		}
@@ -265,8 +338,10 @@ func equalCanvasJSON(a, b any) bool {
 	return firstErr == nil && secondErr == nil && bytes.Equal(first, second)
 }
 
+var errUnrepresentableAutomation = errors.New("automation has unsupported canvas behavior")
+
 func unrepresentableAutomationCanvas() error {
-	return grpcerrors.FailedPrecondition(nil, "This automation has canvas behavior that cannot be represented in YAML. Open the developer canvas to inspect it.")
+	return grpcerrors.FailedPrecondition(errUnrepresentableAutomation, "This automation has canvas behavior that cannot be represented in YAML. Open the developer canvas to inspect it.")
 }
 
 func refreshLegacyAutomationSource(

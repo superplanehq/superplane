@@ -4,6 +4,7 @@ package automationspec
 import (
 	"bytes"
 	"fmt"
+	"reflect"
 
 	"gopkg.in/yaml.v3"
 )
@@ -17,15 +18,17 @@ const (
 )
 
 type Definition struct {
-	APIVersion     string    `yaml:"apiVersion" json:"apiVersion"`
-	Kind           string    `yaml:"kind" json:"kind"`
-	Name           string    `yaml:"name" json:"name"`
-	Icon           string    `yaml:"icon,omitempty" json:"icon"`
-	TimeoutSeconds int       `yaml:"timeout_seconds,omitempty" json:"timeout_seconds"`
-	RunsOnTask     *bool     `yaml:"runs_on_task,omitempty" json:"runs_on_task,omitempty"`
-	Agent          *Agent    `yaml:"agent,omitempty" json:"agent,omitempty"`
-	Triggers       []Trigger `yaml:"triggers" json:"triggers"`
-	Steps          []Step    `yaml:"steps" json:"steps"`
+	APIVersion             string    `yaml:"apiVersion" json:"apiVersion"`
+	Kind                   string    `yaml:"kind" json:"kind"`
+	Name                   string    `yaml:"name" json:"name"`
+	Icon                   string    `yaml:"icon,omitempty" json:"icon"`
+	TimeoutSeconds         int       `yaml:"timeout_seconds,omitempty" json:"timeout_seconds"`
+	RunsOnTask             *bool     `yaml:"runs_on_task,omitempty" json:"runs_on_task,omitempty"`
+	SkipRepositoryCheckout *bool     `yaml:"skip_repository_checkout,omitempty" json:"skip_repository_checkout,omitempty"`
+	SkipSetupCommands      *bool     `yaml:"skip_setup_commands,omitempty" json:"skip_setup_commands,omitempty"`
+	Agent                  *Agent    `yaml:"agent,omitempty" json:"agent,omitempty"`
+	Triggers               []Trigger `yaml:"triggers" json:"triggers"`
+	Steps                  []Step    `yaml:"steps" json:"steps"`
 }
 
 type Trigger struct {
@@ -50,18 +53,40 @@ type Schedule struct {
 }
 
 type Step struct {
-	Name    string   `yaml:"name" json:"name"`
-	Bash    string   `yaml:"bash,omitempty" json:"bash,omitempty"`
-	Prompt  string   `yaml:"prompt,omitempty" json:"prompt,omitempty"`
-	Secrets []string `yaml:"secrets,omitempty" json:"secrets,omitempty"`
+	Name             string   `yaml:"name" json:"name"`
+	WorkingDirectory string   `yaml:"working_directory,omitempty" json:"working_directory,omitempty"`
+	Bash             string   `yaml:"bash,omitempty" json:"bash,omitempty"`
+	Prompt           string   `yaml:"prompt,omitempty" json:"prompt,omitempty"`
+	Secrets          []string `yaml:"secrets,omitempty" json:"secrets,omitempty"`
 }
 
 type Agent struct {
-	Harness string `yaml:"harness" json:"harness"`
-	Model   string `yaml:"model,omitempty" json:"model,omitempty"`
+	Harness     Harness      `yaml:"harness" json:"harness"`
+	Model       string       `yaml:"model,omitempty" json:"model,omitempty"`
+	Credentials *Credentials `yaml:"credentials,omitempty" json:"credentials,omitempty"`
 }
 
-const SuperPlane = "superplane"
+type Harness string
+
+const (
+	SuperPlane Harness = "superplane"
+	ClaudeCode Harness = "claude-code"
+	Codex      Harness = "codex"
+	OpenRouter Harness = "openrouter"
+)
+
+type Credentials struct {
+	Source CredentialSource `yaml:"source" json:"source"`
+	Name   string           `yaml:"name,omitempty" json:"name,omitempty"`
+}
+
+type CredentialSource string
+
+const (
+	Integration  CredentialSource = "integration"
+	Subscription CredentialSource = "subscription"
+	Hosted       CredentialSource = "hosted"
+)
 
 type Stage string
 
@@ -80,12 +105,43 @@ func Encode(definition Definition) (string, error) {
 	if definition.Kind == "" {
 		definition.Kind = Kind
 	}
+	return encodeYAML(definition)
+}
+
+// ReplaceExplicitAgent updates a stored override after the factory switches providers.
+// A definition that inherits its agent keeps its exact authored source.
+func ReplaceExplicitAgent(source string, agent *Agent) (string, error) {
+	var root yaml.Node
+	if err := yaml.Unmarshal([]byte(source), &root); err != nil {
+		return "", err
+	}
+	if len(root.Content) == 0 {
+		return "", fmt.Errorf("empty automation definition")
+	}
+	field := mappingProperty(root.Content[0], "agent").value
+	if field == nil {
+		return source, nil
+	}
+	var previous Agent
+	if err := field.Decode(&previous); err != nil {
+		return "", err
+	}
+	if reflect.DeepEqual(&previous, agent) {
+		return source, nil
+	}
+	if err := field.Encode(agent); err != nil {
+		return "", err
+	}
+	return encodeYAML(&root)
+}
+
+func encodeYAML(value any) (string, error) {
 	var source bytes.Buffer
 	encoder := yaml.NewEncoder(&source)
 	// The YAML emitter's four-space indentation loses leading spaces in
 	// literal blocks inside sequence items.
 	encoder.SetIndent(2)
-	if err := encoder.Encode(definition); err != nil {
+	if err := encoder.Encode(value); err != nil {
 		return "", fmt.Errorf("encode automation definition: %w", err)
 	}
 	if err := encoder.Close(); err != nil {

@@ -8,9 +8,11 @@ import {
 } from "./customAutomationDefinition";
 
 describe("automation Canvas agent configuration", () => {
-  it("uses the SuperPlane agent when YAML omits the agent", () => {
-    const visual = automationDefinitionCanvas(newAutomationDefinition("backlog"));
-    expect(visual.draft.components[0]?.component).toBe("runnerSuperPlane");
+  it("uses the workspace agent when YAML omits the agent", () => {
+    const visual = automationDefinitionCanvas(newAutomationDefinition("backlog"), {
+      agentHarness: "AGENT_HARNESS_CODEX",
+    });
+    expect(visual.draft.components[0]?.component).toBe("runnerCodex");
   });
 });
 

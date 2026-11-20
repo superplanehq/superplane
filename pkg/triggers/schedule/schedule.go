@@ -391,7 +391,7 @@ func (s *Schedule) Setup(ctx core.TriggerContext) error {
 	//
 	// Always schedule the next and save the next trigger in the metadata.
 	//
-	err = ctx.Requests.ScheduleActionCall("emitEvent", map[string]any{}, max(time.Second, time.Until(*nextTrigger)))
+	err = ctx.Requests.ScheduleActionCall("emitEvent", map[string]any{}, time.Until(*nextTrigger))
 	if err != nil {
 		return err
 	}
@@ -478,7 +478,7 @@ func (s *Schedule) emitEvent(ctx core.TriggerHookContext) error {
 		return err
 	}
 
-	err = ctx.Requests.ScheduleActionCall("emitEvent", map[string]any{}, max(time.Second, time.Until(*nextTrigger)))
+	err = ctx.Requests.ScheduleActionCall("emitEvent", map[string]any{}, time.Until(*nextTrigger))
 	if err != nil {
 		return err
 	}
@@ -802,9 +802,6 @@ func nextCronTrigger(cronExpression string, now time.Time) (*time.Time, error) {
 	}
 
 	nextTime := schedule.Next(now)
-	if nextTime.IsZero() {
-		return nil, fmt.Errorf("cron expression has no future delivery time")
-	}
 	// Convert result back to UTC for consistent API
 	utcResult := nextTime.UTC()
 	return &utcResult, nil

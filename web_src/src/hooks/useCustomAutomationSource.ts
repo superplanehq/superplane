@@ -23,7 +23,18 @@ type AutomationSourceDiagnostic = {
   message: string;
 };
 
+export class AutomationSourceError extends Error {
+  constructor(
+    message: string,
+    readonly formVersion?: string,
+  ) {
+    super(message);
+  }
+}
+
 type AutomationSourceProblem = {
+  can_edit_in_form?: boolean;
+  live_version_id?: string;
   message?: string;
   diagnostics?: AutomationSourceDiagnostic[];
 };
@@ -87,8 +98,9 @@ async function automationSourceRequest<T>(organizationId: string, automationId: 
       const location = line > 0 && column > 0 ? `Line ${line}, column ${column}` : "";
       return [path, location, message].filter(Boolean).join(" · ");
     });
-    throw new Error(
+    throw new AutomationSourceError(
       details?.length ? details.join("\n") : getApiErrorMessage(problem, "SuperPlane could not complete the request."),
+      problem?.can_edit_in_form === true ? problem.live_version_id : undefined,
     );
   }
   return init.method === "DELETE" ? (undefined as T) : ((await response.json()) as T);

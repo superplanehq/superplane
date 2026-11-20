@@ -27,6 +27,7 @@ type CustomAutomationSetupFormProps = {
   deleting: boolean;
   error: string;
   asCode?: boolean;
+  showModel?: boolean;
   onNameChange: (name: string) => void;
   onIconChange: (icon: string) => void;
   onTriggersChange: (triggers: CustomAutomationTrigger[]) => void;
@@ -52,6 +53,7 @@ export function CustomAutomationSetupForm(props: CustomAutomationSetupFormProps)
     deleting,
     error,
     asCode,
+    showModel,
     onNameChange,
     onIconChange,
     onTriggersChange,
@@ -105,6 +107,7 @@ export function CustomAutomationSetupForm(props: CustomAutomationSetupFormProps)
             <TriggerEditor
               columnKey={columnKey}
               asCode={asCode}
+              showModel={showModel}
               name={name}
               icon={icon}
               triggers={triggers}

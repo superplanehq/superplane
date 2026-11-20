@@ -25,13 +25,11 @@ const bashStep = `steps:
 func TestParseKeepsStepOrderAndText(t *testing.T) {
 	source := definitionHeader + `# Comments are allowed in the source.
 triggers:
-  - id: morning
-    use: schedule
+  - use: schedule
     config:
-      cron: "0 9 * * 1-5"
+      cron: "0 9 ? * 1-5"
       utc_offset: 5.5
-  - id: afternoon
-    use: schedule
+  - use: schedule
     config:
       cron: "0 30 16 * * 5"
 steps:
@@ -52,7 +50,7 @@ steps:
 	if document.Icon != "sparkles" || document.TimeoutSeconds != 3600 || document.Agent != nil {
 		t.Fatalf("unexpected defaults: %+v", document.Definition)
 	}
-	if len(document.Triggers) != 2 || document.Triggers[0].ID != "morning" ||
+	if len(document.Triggers) != 2 || document.Triggers[0].ID != "" || document.Triggers[1].ID != "" ||
 		document.Triggers[0].Config.UTCOffset != 5.5 || document.Triggers[1].Config.UTCOffset != 0 {
 		t.Fatalf("unexpected schedules: %+v", document.Triggers)
 	}
@@ -104,7 +102,6 @@ func TestParseRejectsInvalidDefinitionAtItsSource(t *testing.T) {
 		{"event configuration", definitionHeader + manualTrigger + "    config: {}\n" + bashStep, "triggers[0].config", 6, 13},
 		{"duplicate event", definitionHeader + manualTrigger + "  - use: manual\n" + bashStep, "triggers[1].use", 6, 10},
 		{"duplicate trigger ID", definitionHeader + "triggers:\n  - {id: same, use: manual}\n  - {id: same, use: task_enters_stage}\n" + bashStep, "triggers[1].id", 6, 10},
-		{"missing schedule ID", definitionHeader + schedule + "  - {id: later, use: schedule, config: {cron: '0 12 * * *'}}\n" + bashStep, "triggers[0].id", 5, 5},
 		{"invalid cron", definitionHeader + strings.Replace(schedule, "0 9 * * *", "0 99 * * *", 1) + bashStep, "triggers[0].config.cron", 7, 13},
 		{"out of range offset", definitionHeader + schedule + "      utc_offset: 14.25\n" + bashStep, "triggers[0].config.utc_offset", 8, 19},
 		{"nonfinite offset", definitionHeader + schedule + "      utc_offset: .nan\n" + bashStep, "triggers[0].config.utc_offset", 8, 19},
@@ -112,9 +109,11 @@ func TestParseRejectsInvalidDefinitionAtItsSource(t *testing.T) {
 		{"two step actions", definitionHeader + manualTrigger + bashStep + "    prompt: Summarize changes\n", "steps[0].prompt", 9, 13},
 		{"secrets on prompt", definitionHeader + manualTrigger + "steps:\n  - name: Inspect\n    prompt: Inspect\n    secrets: [TOKEN]\n", "steps[0].secrets", 9, 14},
 		{"duplicate secrets", definitionHeader + manualTrigger + bashStep + "    secrets: [TOKEN, TOKEN]\n", "steps[0].secrets[1]", 9, 22},
-		{"removed working directory", definitionHeader + manualTrigger + bashStep + "    working_directory: repo\n", "steps[0].working_directory", 9, 5},
-		{"non-hosted agent", definitionHeader + manualTrigger + bashStep + "agent: {harness: codex}\n", "agent.harness", 9, 18},
-		{"agent credentials", definitionHeader + manualTrigger + bashStep + "agent: {harness: superplane, credentials: {source: subscription}}\n", "agent.credentials", 9, 30},
+		{"invalid working directory type", definitionHeader + manualTrigger + bashStep + "    working_directory: false\n", "steps[0].working_directory", 9, 24},
+		{"name on subscription", definitionHeader + manualTrigger + bashStep + "agent: {harness: codex, credentials: {source: subscription, name: shared}}\n", "agent.credentials.name", 9, 67},
+		{"model on subscription", definitionHeader + manualTrigger + bashStep + "agent: {harness: codex, model: x, credentials: {source: subscription}}\n", "agent.model", 9, 32},
+		{"missing integration name", definitionHeader + manualTrigger + bashStep + "agent: {harness: codex, credentials: {source: integration}}\n", "agent.credentials.name", 9, 38},
+		{"hosted model override", definitionHeader + manualTrigger + bashStep + "agent: {harness: superplane, model: pinned}\n", "agent.model", 9, 37},
 		{"extra document", definitionHeader + manualTrigger + bashStep + "---\nname: extra\n", "$", 9, 1},
 	}
 	for _, test := range cases {

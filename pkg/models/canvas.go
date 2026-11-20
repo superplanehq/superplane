@@ -264,11 +264,6 @@ func FindCanvasWithoutOrgScopeInTransaction(tx *gorm.DB, id uuid.UUID) (*Canvas,
 	return &canvas, nil
 }
 
-func LockCanvasForScheduleDelivery(tx *gorm.DB, id uuid.UUID) error {
-	_, err := FindCanvasWithoutOrgScopeInTransaction(tx.Clauses(clause.Locking{Strength: "UPDATE"}), id)
-	return err
-}
-
 func FindUnscopedCanvas(id uuid.UUID) (*Canvas, error) {
 	return FindUnscopedCanvasInTransaction(database.Conn(), id)
 }

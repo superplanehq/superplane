@@ -96,9 +96,6 @@ func (b CanvasAutomationBackend) Apply(
 			return automations.Artifact{}, nil, err
 		}
 	} else {
-		if err := retireCustomAutomationSchedules(tx, canvas.ID, live.Nodes, nodes); err != nil {
-			return automations.Artifact{}, nil, err
-		}
 		err := canvases.PublishGeneratedCanvasNodes(ctx, tx, canvas, actor, "Update custom automation", nodes, edges, intakePublisherOptions(b.Deps, placement.OrganizationID))
 		if err != nil {
 			return automations.Artifact{}, nil, automationCanvasWriteError(source, err)
@@ -121,12 +118,16 @@ func (b CanvasAutomationBackend) Apply(
 }
 
 func (b CanvasAutomationBackend) Remove(_ context.Context, tx *gorm.DB, placement automations.Placement, previous automations.Artifact) (func(), error) {
-	canvas, live, err := lockCustomAutomationArtifact(tx, placement, previous)
+	canvas, _, err := lockCustomAutomationArtifact(tx, placement, previous)
 	if err != nil {
 		return nil, err
 	}
-	if err := retireCustomAutomationSchedules(tx, canvas.ID, live.Nodes, nil); err != nil {
+	factory, err := models.FindFactory(tx, placement.OrganizationID, placement.FactoryID)
+	if err != nil {
 		return nil, err
+	}
+	if err := rejectReservedFactoryAutomation(tx, factory, canvas); err != nil {
+		return nil, factoryErrorToStatus(err, "failed to delete factory automation")
 	}
 	if err := canvas.SoftDeleteInTransaction(tx); err != nil {
 		return nil, err
@@ -160,7 +161,6 @@ func (b CanvasAutomationBackend) compile(
 		if err := preserveCustomAutomationIdentities(live, graph); err != nil {
 			return nil, nil, err
 		}
-		preserveCustomAutomationScheduleIdentities(live.Nodes, graph)
 	}
 	nodes, edges, err := graph.ParseInTransaction(b.Deps.Registry, placement.OrganizationID.String(), tx)
 	if err != nil {
@@ -262,7 +262,7 @@ func automationCanvasWriteError(source *automationspec.Document, err error) erro
 
 func automationCanvasSettings(stage string, source *automationspec.Document, agent *intakeAgent) (*customAutomationSettings, error) {
 	input := &pb.FactoryCustomAutomation_Settings{}
-	for index, trigger := range source.Triggers {
+	for _, trigger := range source.Triggers {
 		start := &pb.FactoryCustomAutomation_StartTrigger{}
 		switch trigger.Use {
 		case automationspec.Manual:
@@ -276,9 +276,6 @@ func automationCanvasSettings(stage string, source *automationspec.Document, age
 			start.Schedule = &pb.FactoryCustomAutomation_Schedule{
 				CronExpression: trigger.Config.Cron, UtcOffset: trigger.Config.UTCOffset,
 			}
-			if _, err := parseCustomAutomationSchedule(start.Schedule); err != nil {
-				return nil, source.Diagnostic(fmt.Sprintf("triggers[%d].config.cron", index), "Use a cron expression with a future delivery time.")
-			}
 		}
 		input.Triggers = append(input.Triggers, start)
 	}
@@ -289,18 +286,13 @@ func automationCanvasSettings(stage string, source *automationspec.Document, age
 	if err := validateCustomAutomationRunContext(source.RunsOnTask, triggers); err != nil {
 		return nil, source.Diagnostic("runs_on_task", grpcerrors.StatusMessage(err))
 	}
-	for i := range triggers {
-		if triggers[i].Schedule == nil {
-			continue
-		}
-		triggers[i].LogicalID = source.Triggers[i].ID
-		if triggers[i].LogicalID == "" {
-			triggers[i].LogicalID = "schedule"
-		}
-	}
 	steps := make([]runner.AgentStep, 0, len(source.Steps))
-	for _, step := range source.Steps {
-		translated := runner.AgentStep{Name: step.Name, Secrets: step.Secrets}
+	for index, step := range source.Steps {
+		directory := strings.TrimSpace(step.WorkingDirectory)
+		if err := runner.ValidateStepWorkingDirectory(directory); err != nil {
+			return nil, source.Diagnostic(fmt.Sprintf("steps[%d].working_directory", index), "The working directory "+err.Error()+".")
+		}
+		translated := runner.AgentStep{Name: strings.TrimSpace(step.Name), Secrets: step.Secrets, WorkingDirectory: directory}
 		if step.Bash != "" {
 			translated.Type = runner.AgentStepBash
 			translated.Command = &step.Bash
@@ -313,6 +305,7 @@ func automationCanvasSettings(stage string, source *automationspec.Document, age
 	return &customAutomationSettings{
 		ColumnKey: stage, StartMode: startMode, Agent: agent, Steps: steps, Icon: source.Icon,
 		ExecutionTimeoutSeconds: source.TimeoutSeconds, Schedule: schedule, Triggers: triggers,
-		RunsOnTask: source.RunsOnTask,
+		RunsOnTask:        source.RunsOnTask,
+		SkipSetupCommands: source.SkipSetupCommands, SkipRepositoryCheckout: source.SkipRepositoryCheckout,
 	}, nil
 }

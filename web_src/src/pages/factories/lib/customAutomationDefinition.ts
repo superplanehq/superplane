@@ -1,4 +1,5 @@
 import { CORE_SCHEMA, dump, load, YAMLException } from "js-yaml";
+import type { FactoriesFactoryOnboarding, OrganizationsIntegration } from "@/api-client";
 import type { PlanningReviewStep } from "../pages/planningReviewMockup";
 import {
   AUTOMATION_ICONS,
@@ -7,11 +8,22 @@ import {
   DEFAULT_CUSTOM_AUTOMATION_ICON,
   type CustomAutomationColumn,
   type CustomAutomationTrigger,
+  workspaceAgentFromOnboarding,
 } from "./customAutomation";
 
+const AUTOMATION_AGENT_COMPONENTS = {
+  superplane: "runnerSuperPlane",
+  "claude-code": "runnerClaudeCode",
+  codex: "runnerCodex",
+  openrouter: "runnerOpenRouter",
+};
+
+type AutomationHarness = keyof typeof AUTOMATION_AGENT_COMPONENTS;
+type AutomationCredentials = { source: "integration"; name: string } | { source: "subscription" | "hosted" };
 type AutomationAgent = {
-  harness: "superplane";
+  harness: AutomationHarness;
   model?: string;
+  credentials?: AutomationCredentials;
 };
 type AutomationTrigger =
   | { id?: string; use: "manual" | "task_enters_stage" | "task_leaves_stage" | "pull_request_updated" }
@@ -21,6 +33,7 @@ type AutomationStep = {
   bash?: string;
   prompt?: string;
   secrets?: string[];
+  working_directory?: string;
 };
 export type AutomationDefinition = {
   apiVersion: "v2";
@@ -29,6 +42,8 @@ export type AutomationDefinition = {
   icon?: string;
   timeout_seconds?: number;
   runs_on_task?: boolean;
+  skip_setup_commands?: boolean;
+  skip_repository_checkout?: boolean;
   agent?: AutomationAgent;
   triggers: AutomationTrigger[];
   steps: AutomationStep[];
@@ -73,6 +88,8 @@ export function parseAutomationForCanvas(source: string, stage: CustomAutomation
     "icon",
     "timeout_seconds",
     "runs_on_task",
+    "skip_setup_commands",
+    "skip_repository_checkout",
     "agent",
     "triggers",
     "steps",
@@ -95,8 +112,7 @@ export function parseAutomationForCanvas(source: string, stage: CustomAutomation
     parseTrigger(trigger, `triggers[${index}]`, stage),
   );
   validateTriggerIdentities(triggers);
-  const runsOnTask = document.runs_on_task;
-  if (runsOnTask !== undefined && typeof runsOnTask !== "boolean") problem("runs_on_task", "Use true or false.");
+  const runsOnTask = optionalBoolean(document.runs_on_task, "runs_on_task");
   if (runsOnTask === true && triggers.some(({ use }) => use === "schedule")) {
     problem("runs_on_task", "A schedule runs with no task.");
   }
@@ -117,6 +133,8 @@ export function parseAutomationForCanvas(source: string, stage: CustomAutomation
     icon,
     timeout_seconds: timeout,
     runs_on_task: runsOnTask,
+    skip_setup_commands: optionalBoolean(document.skip_setup_commands, "skip_setup_commands"),
+    skip_repository_checkout: optionalBoolean(document.skip_repository_checkout, "skip_repository_checkout"),
     agent: document.agent === undefined ? undefined : parseAgent(document.agent),
     triggers,
     steps: steps.map(parseStep),
@@ -161,12 +179,9 @@ function parseTrigger(value: unknown, path: string, stage: CustomAutomationColum
 function validateTriggerIdentities(triggers: AutomationTrigger[]) {
   const ids = new Set<string>();
   const events = new Set<string>();
-  const multipleSchedules = triggers.filter(({ use }) => use === "schedule").length > 1;
   triggers.forEach(({ id, use }, index) => {
     const path = `triggers[${index}]`;
-    if (use === "schedule") {
-      if (multipleSchedules && !id) problem(`${path}.id`, "Give each schedule a unique ID.");
-    } else {
+    if (use !== "schedule") {
       if (events.has(use)) problem(`${path}.use`, "Use this trigger once.");
       events.add(use);
     }
@@ -178,28 +193,52 @@ function validateTriggerIdentities(triggers: AutomationTrigger[]) {
 }
 
 function parseAgent(value: unknown): AutomationAgent {
-  const entry = mapping(value, "agent", ["harness", "model"]);
-  if (entry.harness !== "superplane") {
-    problem("agent.harness", "Use the superplane agent harness.");
+  const entry = mapping(value, "agent", ["harness", "model", "credentials"]);
+  const harness = entry.harness;
+  if (typeof harness !== "string" || !isAutomationHarness(harness)) {
+    problem("agent.harness", "Choose a supported agent.");
   }
-  return { harness: entry.harness, model: optionalText(entry.model, "agent.model") };
+  const model = optionalText(entry.model, "agent.model");
+  if (harness === "superplane" && model !== undefined) problem("agent.model", "SuperPlane uses the workspace model.");
+  if (entry.credentials === undefined) return { harness, model };
+  if (harness === "superplane") problem("agent.credentials", "SuperPlane uses workspace credentials.");
+  const credentials = mapping(entry.credentials, "agent.credentials", ["source", "name"]);
+  if (credentials.source === "integration") {
+    return {
+      harness,
+      model,
+      credentials: { source: "integration", name: singleLine(credentials.name, "agent.credentials.name") },
+    };
+  }
+  if (credentials.source === "subscription") {
+    if (harness !== "codex") problem("agent.credentials.source", "A ChatGPT subscription requires Codex.");
+    if (credentials.name !== undefined) problem("agent.credentials.name", "Remove the subscription name.");
+    if (model !== undefined) problem("agent.model", "Remove the model when using a ChatGPT subscription.");
+    return { harness, credentials: { source: "subscription" } };
+  }
+  if (credentials.source === "hosted") {
+    if (credentials.name !== undefined) problem("agent.credentials.name", "Remove the hosted connection name.");
+    return { harness, model, credentials: { source: "hosted" } };
+  }
+  return problem("agent.credentials.source", "Use integration, hosted, or subscription.");
 }
 
 function parseStep(value: unknown, index: number): AutomationStep {
   const path = `steps[${index}]`;
-  const entry = mapping(value, path, ["name", "bash", "prompt", "secrets"]);
+  const entry = mapping(value, path, ["name", "bash", "prompt", "secrets", "working_directory"]);
   const name = singleLine(entry.name, `${path}.name`);
   const bash = optionalText(entry.bash, `${path}.bash`);
   const prompt = optionalText(entry.prompt, `${path}.prompt`);
   if ((bash === undefined) === (prompt === undefined)) {
     problem(path, "Enter either bash or prompt.");
   }
-  if (entry.secrets === undefined) return { name, bash, prompt };
+  const working_directory = optionalText(entry.working_directory, `${path}.working_directory`);
+  if (entry.secrets === undefined) return { name, bash, prompt, working_directory };
   if (!bash) problem(`${path}.secrets`, "Only Bash steps can reference secrets.");
   if (!Array.isArray(entry.secrets)) problem(`${path}.secrets`, "Enter a list of secret names.");
   const secrets = entry.secrets.map((secret, i) => singleLine(secret, `${path}.secrets[${i}]`));
   if (secrets.length !== new Set(secrets).size) problem(`${path}.secrets`, "Use each secret name once.");
-  return { name, bash, secrets };
+  return { name, bash, secrets, working_directory };
 }
 
 function mapping(value: unknown, path: string, fields: string[]): Record<string, unknown> {
@@ -224,6 +263,12 @@ function optionalText(value: unknown, path: string): string | undefined {
   return value === undefined ? undefined : text(value, path);
 }
 
+function optionalBoolean(value: unknown, path: string): boolean | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== "boolean") problem(path, "Use true or false.");
+  return value;
+}
+
 function singleLine(value: unknown, path: string): string {
   const string = text(value, path);
   if (/[\r\n]/.test(string)) problem(path, "Enter a single line to use the visual editor.");
@@ -234,24 +279,78 @@ function problem(path: string, reason: string): never {
   throw new Error(`${path} · ${reason}`);
 }
 
-export function automationDefinitionCanvas(definition: AutomationDefinition) {
+function isAutomationHarness(harness: string): harness is AutomationHarness {
+  return Object.prototype.hasOwnProperty.call(AUTOMATION_AGENT_COMPONENTS, harness);
+}
+
+function workspaceRunnerComponent(workspace: FactoriesFactoryOnboarding | undefined, provider?: string) {
+  if (workspace?.codexSubscription) return "runnerCodex";
+  if (provider === "openrouter" || provider === "customLlm") return "runnerOpenRouter";
+  return workspaceAgentFromOnboarding(workspace)?.component;
+}
+
+function editorAgent(
+  authored: AutomationAgent | undefined,
+  workspace: FactoriesFactoryOnboarding | undefined,
+  connections: OrganizationsIntegration[],
+) {
+  const workspaceConnection = workspace?.agentIntegrationId
+    ? connections.find((entry) => entry.metadata?.id === workspace.agentIntegrationId)
+    : undefined;
+  const component = authored
+    ? AUTOMATION_AGENT_COMPONENTS[authored.harness]
+    : workspaceRunnerComponent(workspace, workspaceConnection?.metadata?.integrationName);
+  const harnesses = Object.keys(AUTOMATION_AGENT_COMPONENTS) as AutomationHarness[];
+  const harness = harnesses.find((harness) => AUTOMATION_AGENT_COMPONENTS[harness] === component);
+  const credentials = authored?.credentials;
+  const hasSubscription =
+    credentials?.source === "subscription" || (!credentials && workspace?.codexSubscription && harness === "codex");
+  const modelAgent = harness && harness !== "superplane" && !hasSubscription ? (authored ?? { harness }) : undefined;
+  let connection = credentials ? undefined : workspaceConnection;
+  if (credentials?.source === "integration")
+    connection = connections.find((entry) => entry.metadata?.name === credentials.name);
+  return {
+    component,
+    modelAgent,
+    customProvider: component === "runnerOpenRouter" && connection?.metadata?.integrationName === "customLlm",
+  };
+}
+
+export function automationDefinitionCanvas(
+  definition: AutomationDefinition,
+  workspace?: FactoriesFactoryOnboarding,
+  connections: OrganizationsIntegration[] = [],
+) {
+  const agent = definition.agent;
+  const { component, customProvider, modelAgent } = editorAgent(agent, workspace, connections);
   const draft = customAutomationDraft({
     settings: {
-      agent: { component: "runnerSuperPlane", model: definition.agent?.model },
+      agent: { component, model: agent?.model },
       executionTimeoutSeconds: definition.timeout_seconds,
+      skipSetupCommands: definition.skip_setup_commands,
+      skipRepositoryCheckout: definition.skip_repository_checkout,
       steps: definition.steps.map((step) => ({
         name: step.name,
         type: step.bash !== undefined ? "TYPE_BASH" : "TYPE_PROMPT",
         command: step.bash,
         prompt: step.prompt,
         secrets: step.secrets,
+        workingDirectory: step.working_directory,
       })),
     },
   });
+  const visualAgent = draft.components[0];
+  if (visualAgent) {
+    visualAgent.configuration.credentials = agent?.credentials;
+    if (customProvider) {
+      visualAgent.configuration.llmProvider = "custom";
+    }
+  }
   return {
     name: definition.name,
     icon: definition.icon ?? DEFAULT_CUSTOM_AUTOMATION_ICON,
     runsOnTask: automationDefinitionRunContext(definition),
+    modelAgent,
     triggers: definition.triggers.map(canvasTrigger),
     draft,
   };
@@ -288,14 +387,10 @@ export function automationDefinitionTriggers(
   triggers: CustomAutomationTrigger[],
   stage: CustomAutomationColumn,
 ): AutomationTrigger[] {
-  const ids = new Set(triggers.flatMap(({ publicId }) => (publicId === undefined ? [] : [publicId])));
-  const multipleSchedules = triggers.filter(({ mode }) => mode === "scheduled").length > 1;
-  return triggers.map(({ id, publicId, mode, schedule }) => {
+  return triggers.map(({ publicId, mode, schedule }) => {
     if (mode === "scheduled") {
-      const candidate = id.startsWith("implicit:") ? "schedule" : `schedule-${id}`;
-      const logicalId = publicId ?? (multipleSchedules ? availableTriggerId(ids, candidate) : undefined);
       return {
-        id: logicalId,
+        id: publicId,
         use: "schedule",
         config: { cron: schedule.cronExpression, utc_offset: schedule.utcOffset },
       };
@@ -306,18 +401,12 @@ export function automationDefinitionTriggers(
   });
 }
 
-function availableTriggerId(ids: Set<string>, candidate: string): string {
-  let id = candidate;
-  for (let suffix = 2; ids.has(id); suffix++) id = `${candidate}-${suffix}`;
-  ids.add(id);
-  return id;
-}
-
 export function automationDefinitionSteps(steps: PlanningReviewStep[]): AutomationStep[] {
   return steps.map((step) => ({
     name: step.name,
     bash: step.type === "bash" ? (step.command ?? "") : undefined,
     prompt: step.type === "prompt" ? (step.prompt ?? "") : undefined,
     secrets: step.type === "bash" ? step.secrets : undefined,
+    working_directory: step.workingDirectory,
   }));
 }

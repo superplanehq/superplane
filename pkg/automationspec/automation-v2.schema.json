@@ -22,6 +22,8 @@
     },
     "timeout_seconds": { "type": "integer", "minimum": 1, "maximum": 86400, "default": 3600 },
     "runs_on_task": { "type": "boolean" },
+    "skip_repository_checkout": { "type": "boolean" },
+    "skip_setup_commands": { "type": "boolean" },
     "agent": { "$ref": "#/$defs/agent" },
     "triggers": {
       "type": "array",
@@ -31,11 +33,7 @@
         { "contains": { "type": "object", "required": ["use"], "properties": { "use": { "const": "manual" } } }, "minContains": 0, "maxContains": 1 },
         { "contains": { "type": "object", "required": ["use"], "properties": { "use": { "const": "task_enters_stage" } } }, "minContains": 0, "maxContains": 1 },
         { "contains": { "type": "object", "required": ["use"], "properties": { "use": { "const": "task_leaves_stage" } } }, "minContains": 0, "maxContains": 1 },
-        { "contains": { "type": "object", "required": ["use"], "properties": { "use": { "const": "pull_request_updated" } } }, "minContains": 0, "maxContains": 1 },
-        {
-          "if": { "contains": { "$ref": "#/$defs/isSchedule" }, "minContains": 2 },
-          "then": { "items": { "if": { "$ref": "#/$defs/isSchedule" }, "then": { "required": ["id"] } } }
-        }
+        { "contains": { "type": "object", "required": ["use"], "properties": { "use": { "const": "pull_request_updated" } } }, "minContains": 0, "maxContains": 1 }
       ]
     },
     "steps": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/step" } }
@@ -78,6 +76,7 @@
       "properties": {
         "name": { "$ref": "#/$defs/nonblank" },
         "bash": { "$ref": "#/$defs/nonblank" },
+        "working_directory": { "$ref": "#/$defs/nonblank" },
         "prompt": { "$ref": "#/$defs/nonblank" },
         "secrets": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/nonblank" } }
       },
@@ -90,9 +89,39 @@
       "additionalProperties": false,
       "required": ["harness"],
       "properties": {
-        "harness": { "const": "superplane" },
-        "model": { "$ref": "#/$defs/nonblank" }
-      }
+        "harness": { "enum": ["superplane", "claude-code", "codex", "openrouter"] },
+        "model": { "$ref": "#/$defs/nonblank" },
+        "credentials": { "$ref": "#/$defs/credentials" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "harness": { "const": "superplane" } } },
+          "then": { "properties": { "credentials": false, "model": false } }
+        },
+        {
+          "if": {
+            "required": ["credentials"],
+            "properties": {
+              "credentials": { "type": "object", "required": ["source"], "properties": { "source": { "const": "subscription" } } }
+            }
+          },
+          "then": {
+            "properties": { "harness": { "const": "codex" }, "model": false }
+          }
+        }
+      ]
+    },
+    "credentials": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source"],
+      "properties": {
+        "source": { "enum": ["integration", "subscription", "hosted"] },
+        "name": { "$ref": "#/$defs/nonblank" }
+      },
+      "if": { "properties": { "source": { "const": "integration" } } },
+      "then": { "required": ["name"] },
+      "else": { "properties": { "name": false } }
     }
   }
 }

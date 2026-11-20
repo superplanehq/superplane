@@ -39,7 +39,7 @@ export function PlanningReviewForm({
   showResources = true,
   showConcurrency = true,
   showSteps = true,
-  showWorkspaceOptions = true,
+  showModel = true,
   modelLabel,
   modelDescription,
   modelOnly = false,
@@ -62,7 +62,7 @@ export function PlanningReviewForm({
   showResources?: boolean;
   showConcurrency?: boolean;
   showSteps?: boolean;
-  showWorkspaceOptions?: boolean;
+  showModel?: boolean;
   modelLabel?: string;
   modelDescription?: string;
   modelOnly?: boolean;
@@ -99,7 +99,7 @@ export function PlanningReviewForm({
           showResources={showResources}
           showConcurrency={showConcurrency}
           showSteps={showSteps}
-          showWorkspaceOptions={showWorkspaceOptions}
+          showModel={showModel}
           modelLabel={modelLabel}
           modelDescription={modelDescription}
           modelOnly={modelOnly}
@@ -128,7 +128,7 @@ function AgentPanel({
   showResources,
   showConcurrency,
   showSteps,
-  showWorkspaceOptions,
+  showModel,
   modelLabel,
   modelDescription,
   modelOnly,
@@ -151,7 +151,7 @@ function AgentPanel({
   showResources: boolean;
   showConcurrency: boolean;
   showSteps: boolean;
-  showWorkspaceOptions: boolean;
+  showModel: boolean;
   modelLabel?: string;
   modelDescription?: string;
   modelOnly: boolean;
@@ -222,32 +222,33 @@ function AgentPanel({
     });
   }, [applyModelDefault, byokModelDefault]);
 
-  const modelControl = modelUsedField ? (
-    <ConfigurationFieldRenderer
-      field={view !== "full" ? { ...modelUsedField, label: "Default model" } : modelUsedField}
-      hideLabel={appearance === "fields"}
-      triggerClassName={
-        view !== "full" ? "h-8 w-full shadow-none" : appearance === "fields" ? FLAT_FIELD_CONTROL : undefined
-      }
-      value={(applyModelDefault ? byokModelDefault : undefined) ?? component.configuration.model}
-      onChange={(value) => setConfigurationField("model", value)}
-      onValuesChange={(patch) => {
-        const configuration = { ...component.configuration, ...patch };
-        if (!patch.thinkingLevel) {
-          delete configuration.thinkingLevel;
+  const modelControl =
+    showModel && modelUsedField ? (
+      <ConfigurationFieldRenderer
+        field={view !== "full" ? { ...modelUsedField, label: "Default model" } : modelUsedField}
+        hideLabel={appearance === "fields"}
+        triggerClassName={
+          view !== "full" ? "h-8 w-full shadow-none" : appearance === "fields" ? FLAT_FIELD_CONTROL : undefined
         }
-        onChange({ ...component, configuration });
-      }}
-      allValues={component.configuration}
-      organizationId={organizationId}
-      factoryId={factoryId}
-      allowExpressions={view === "full"}
-      autocompleteExampleObj={EXPRESSION_CONTEXT}
-      fieldPath="model"
-      readOnly={disabled}
-      modelOnly={modelOnly}
-    />
-  ) : null;
+        value={(applyModelDefault ? byokModelDefault : undefined) ?? component.configuration.model}
+        onChange={(value) => setConfigurationField("model", value)}
+        onValuesChange={(patch) => {
+          const configuration = { ...component.configuration, ...patch };
+          if (!patch.thinkingLevel) {
+            delete configuration.thinkingLevel;
+          }
+          onChange({ ...component, configuration });
+        }}
+        allValues={component.configuration}
+        organizationId={organizationId}
+        factoryId={factoryId}
+        allowExpressions={view === "full"}
+        autocompleteExampleObj={EXPRESSION_CONTEXT}
+        fieldPath="model"
+        readOnly={disabled}
+        modelOnly={modelOnly}
+      />
+    ) : null;
 
   const concurrencyControl = (
     <Input
@@ -329,36 +330,34 @@ function AgentPanel({
             {modelControl}
           </div>
         ) : null}
-        {showWorkspaceOptions ? (
-          <div className={appearance === "card" ? "col-span-2 flex flex-col gap-4" : "flex flex-col gap-8"}>
-            <ImplementSettingRow
-              label="Skip repository checkout"
-              description="Do not check out the repository."
-              htmlFor={`skip-repository-checkout-${component.id}`}
-            >
-              <Switch
-                id={`skip-repository-checkout-${component.id}`}
-                aria-describedby={`skip-repository-checkout-${component.id}-help`}
-                checked={component.configuration.skipRepositoryCheckout === true}
-                disabled={disabled}
-                onCheckedChange={(checked) => setConfigurationField("skipRepositoryCheckout", checked)}
-              />
-            </ImplementSettingRow>
-            <ImplementSettingRow
-              label="Skip setup commands"
-              description="Do not run workspace setup commands."
-              htmlFor={`skip-setup-commands-${component.id}`}
-            >
-              <Switch
-                id={`skip-setup-commands-${component.id}`}
-                aria-describedby={`skip-setup-commands-${component.id}-help`}
-                checked={component.configuration.skipSetupCommands === true}
-                disabled={disabled}
-                onCheckedChange={(checked) => setConfigurationField("skipSetupCommands", checked)}
-              />
-            </ImplementSettingRow>
-          </div>
-        ) : null}
+        <div className={appearance === "card" ? "col-span-2 flex flex-col gap-4" : "flex flex-col gap-8"}>
+          <ImplementSettingRow
+            label="Skip repository checkout"
+            description="Do not check out the repository."
+            htmlFor={`skip-repository-checkout-${component.id}`}
+          >
+            <Switch
+              id={`skip-repository-checkout-${component.id}`}
+              aria-describedby={`skip-repository-checkout-${component.id}-help`}
+              checked={component.configuration.skipRepositoryCheckout === true}
+              disabled={disabled}
+              onCheckedChange={(checked) => setConfigurationField("skipRepositoryCheckout", checked)}
+            />
+          </ImplementSettingRow>
+          <ImplementSettingRow
+            label="Skip setup commands"
+            description="Do not run workspace setup commands."
+            htmlFor={`skip-setup-commands-${component.id}`}
+          >
+            <Switch
+              id={`skip-setup-commands-${component.id}`}
+              aria-describedby={`skip-setup-commands-${component.id}-help`}
+              checked={component.configuration.skipSetupCommands === true}
+              disabled={disabled}
+              onCheckedChange={(checked) => setConfigurationField("skipSetupCommands", checked)}
+            />
+          </ImplementSettingRow>
+        </div>
       </section>
       {view === "full" && showSteps ? beforeSteps : null}
       {view === "full" && showSteps ? (

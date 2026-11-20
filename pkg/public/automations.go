@@ -164,6 +164,13 @@ func writeAutomationError(w http.ResponseWriter, r *http.Request, err error) {
 		return
 	}
 	safe := status.Convert(grpc.SanitizeError(r.Context(), err))
+	var fallback *factoryactions.AutomationFormFallback
+	if r.Method == http.MethodGet && errors.As(err, &fallback) {
+		_ = writeJSON(w, runtime.HTTPStatusFromCode(safe.Code()), map[string]any{
+			"message": safe.Message(), "can_edit_in_form": true, "live_version_id": fallback.LiveVersionID,
+		})
+		return
+	}
 	if safe.Code() == codes.Internal {
 		log.WithError(err).Error("automation API request failed")
 	}

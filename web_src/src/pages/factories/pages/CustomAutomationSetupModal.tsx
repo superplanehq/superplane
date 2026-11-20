@@ -4,6 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { History, Settings } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import {
+  AutomationSourceError,
   useCustomAutomationSource,
   useDeleteCustomAutomationSource,
   useSaveCustomAutomationSource,
@@ -45,7 +46,13 @@ export function CustomAutomationSetupModal(props: CustomAutomationSetupModalProp
   return props.yamlEnabled ? <AutomationSourceModal {...props} /> : <LegacyAutomationModal {...props} />;
 }
 
-function LegacyAutomationModal({ lineId, automationId, columnKey, onClose }: CustomAutomationSetupModalProps) {
+function LegacyAutomationModal({
+  lineId,
+  automationId,
+  columnKey,
+  onClose,
+  expectedLiveVersionId,
+}: CustomAutomationSetupModalProps & { expectedLiveVersionId?: string }) {
   const { organizationId, factoryId, routeSegment, factory } = useFactoriesLayout();
   const model = useCustomAutomationSetupPage({
     organizationId,
@@ -54,6 +61,7 @@ function LegacyAutomationModal({ lineId, automationId, columnKey, onClose }: Cus
     factory: factory ?? undefined,
     lineId,
     automationId,
+    expectedLiveVersionId,
     columnKey,
   });
   const deleteAutomation = useDeleteFactoryAutomation(organizationId, factoryId);
@@ -71,7 +79,11 @@ function LegacyAutomationModal({ lineId, automationId, columnKey, onClose }: Cus
     }
   };
 
-  const loading = Boolean(automationId && model.described.isPending);
+  const loading = Boolean(
+    automationId &&
+      (model.described.isPending ||
+        (expectedLiveVersionId && !model.described.isFetchedAfterMount && !model.described.isError)),
+  );
   const failure = automationId && model.described.isError ? model.described.error : null;
   return (
     <AutomationDialog automationId={automationId} busy={model.saving || deleting} onClose={onClose}>
@@ -112,10 +124,11 @@ function LegacyAutomationModal({ lineId, automationId, columnKey, onClose }: Cus
 
 function AutomationSourceModal(props: CustomAutomationSetupModalProps) {
   const { automationId, columnKey = "verify", onClose } = props;
-  const [useForm, setUseForm] = useState(false);
+  const [formVersion, setFormVersion] = useState<string>();
   const { organizationId, factoryId } = useFactoriesLayout();
   const source = useCustomAutomationSource(organizationId, factoryId, automationId);
-  if (useForm) return <LegacyAutomationModal {...props} />;
+  if (formVersion) return <LegacyAutomationModal {...props} expectedLiveVersionId={formVersion} />;
+  const safeFormVersion = source.error instanceof AutomationSourceError ? source.error.formVersion : undefined;
 
   if (automationId && (!source.data || !source.isFetchedAfterMount)) {
     return (
@@ -125,7 +138,7 @@ function AutomationSourceModal(props: CustomAutomationSetupModalProps) {
           error={source.error}
           onClose={onClose}
           onRetry={() => void source.refetch()}
-          onEditInForm={() => setUseForm(true)}
+          onEditInForm={safeFormVersion ? () => setFormVersion(safeFormVersion) : undefined}
         />
       </AutomationDialog>
     );

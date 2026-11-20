@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"maps"
-	"reflect"
 	"strings"
 	"time"
 
@@ -383,14 +382,6 @@ func (p *CanvasPublisher) updateNode(ctx context.Context, change *Change) error 
 		return fmt.Errorf("cannot change node %s implementation; delete the node and add a new one instead", updatedNode.ID)
 	}
 
-	if unchangedCustomAutomationSchedule(existingNode, updatedNode) {
-		// The schedule worker owns the delivery and its metadata. Publish the
-		// authored order and presentation without rewriting that worker state.
-		updatedNode.Metadata = mergeNodeMetadata(existingNode.Metadata.Data(), updatedNode.Metadata)
-		p.finalNodes[updatedNode.ID] = updatedNode
-		return nil
-	}
-
 	appInstallationID, err := p.getNodeIntegrationID(updatedNode)
 	if err != nil {
 		return err
@@ -455,13 +446,6 @@ func (p *CanvasPublisher) updateNode(ctx context.Context, change *Change) error 
 	})
 	p.finalNodes[existingNode.NodeID] = updatedNode
 	return nil
-}
-
-func unchangedCustomAutomationSchedule(existing models.CanvasNode, updated models.Node) bool {
-	return updated.ComponentName() == "schedule" &&
-		models.FactoryAppTemplateID([]models.Node{updated}) == models.FactoryAppTemplateCustomAutomationID &&
-		existing.State == models.CanvasNodeStateReady && !existing.DeletedAt.Valid &&
-		updated.ErrorMessage == nil && reflect.DeepEqual(existing.Configuration.Data(), updated.Configuration)
 }
 
 func (p *CanvasPublisher) runPendingSetups(ctx context.Context) error {

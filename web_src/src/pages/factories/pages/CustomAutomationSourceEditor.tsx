@@ -1,12 +1,14 @@
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { useId } from "react";
+import { useId, useState } from "react";
+import { useConnectedIntegrations } from "@/hooks/useIntegrations";
 import type { useCustomAutomationSourceDraft } from "@/hooks/useCustomAutomationSourceDraft";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import {
   customAutomationTriggersForRun,
   newCustomAutomationTrigger,
   type CustomAutomationColumn,
+  type CustomAutomationTrigger,
 } from "../lib/customAutomation";
 import {
   automationDefinitionCanvas,
@@ -36,9 +38,18 @@ export function CustomAutomationSourceEditor({
   onDelete?: () => void;
   onClose: () => void;
 }) {
-  const { organizationId, factoryId, routeSegment } = useFactoriesLayout();
+  const { organizationId, factoryId, routeSegment, factory } = useFactoriesLayout();
   const yamlId = useId();
   const definition = model.definition;
+  const agent = definition?.agent;
+  const onboarding = factory?.onboarding;
+  const credentials = agent?.credentials;
+  const needsWorkspaceConnection = Boolean(onboarding?.agentIntegrationId && !credentials);
+  const connections = useConnectedIntegrations(organizationId, {
+    enabled: needsWorkspaceConnection || (agent?.harness === "openrouter" && credentials?.source === "integration"),
+  });
+  const [formTriggers, setFormTriggers] = useState<CustomAutomationTrigger[]>();
+
   const form = { saving, deleting, onSave, onDelete, onClose };
   if (model.isYamlOpen || !definition) {
     return (
@@ -48,7 +59,10 @@ export function CustomAutomationSourceEditor({
           <Textarea
             id={yamlId}
             value={model.source}
-            onChange={(event) => model.editYaml(event.target.value)}
+            onChange={(event) => {
+              setFormTriggers(undefined);
+              model.editYaml(event.target.value);
+            }}
             readOnly={saving || deleting}
             spellCheck={false}
             data-global-shortcuts="ignore"
@@ -60,11 +74,24 @@ export function CustomAutomationSourceEditor({
     );
   }
 
-  const visual = automationDefinitionCanvas(definition);
+  const { modelAgent, ...visual } = automationDefinitionCanvas(definition, onboarding, connections.data);
+  const triggers = formTriggers ?? visual.triggers;
+
+  const editTriggers = (next: CustomAutomationTrigger[], runsOnTask?: boolean) => {
+    // Keep hidden triggers in the form draft when switching between task and column runs.
+    setFormTriggers(next);
+    const active = customAutomationTriggersForRun(next, runsOnTask);
+    model.editCanvas({
+      runs_on_task: runsOnTask,
+      triggers: automationDefinitionTriggers(active.length ? active : [newCustomAutomationTrigger()], stage),
+    });
+  };
   return (
     <CustomAutomationSetupForm
       {...form}
       {...visual}
+      triggers={triggers}
+      showModel={Boolean(modelAgent)}
       organizationId={organizationId}
       factoryId={factoryId}
       factoryKey={routeSegment}
@@ -73,23 +100,18 @@ export function CustomAutomationSourceEditor({
       error={error}
       onNameChange={(name) => model.editCanvas({ name })}
       onIconChange={(icon) => model.editCanvas({ icon })}
-      onTriggersChange={(triggers) => model.editCanvas({ triggers: automationDefinitionTriggers(triggers, stage) })}
-      onRunsOnTaskChange={(runsOnTask) => {
-        const compatible = customAutomationTriggersForRun(visual.triggers, runsOnTask);
-        model.editCanvas({
-          runs_on_task: runsOnTask,
-          triggers: automationDefinitionTriggers(
-            compatible.length > 0 ? compatible : [newCustomAutomationTrigger()],
-            stage,
-          ),
-        });
-      }}
-      onDraftChange={(next) => model.editCanvas(settingsEdit(visual.draft, next))}
+      onTriggersChange={(next) => editTriggers(next, visual.runsOnTask)}
+      onRunsOnTaskChange={(runsOnTask) => editTriggers(triggers, runsOnTask)}
+      onDraftChange={(next) => model.editCanvas(settingsEdit(visual.draft, next, modelAgent))}
     />
   );
 }
 
-function settingsEdit(previous: PlanningReviewDraft, next: PlanningReviewDraft): Partial<AutomationDefinition> {
+function settingsEdit(
+  previous: PlanningReviewDraft,
+  next: PlanningReviewDraft,
+  agent: AutomationDefinition["agent"],
+): Partial<AutomationDefinition> {
   const before = previous.components[0]?.configuration;
   const after = next.components[0]?.configuration;
   if (!before || !after) return {};
@@ -103,8 +125,14 @@ function settingsEdit(previous: PlanningReviewDraft, next: PlanningReviewDraft):
   ) {
     patch.timeout_seconds = after.executionTimeoutSeconds;
   }
-  if (after.model !== before.model && typeof after.model === "string") {
-    patch.agent = { harness: "superplane", model: after.model || undefined };
+  if (after.skipSetupCommands !== before.skipSetupCommands) {
+    patch.skip_setup_commands = after.skipSetupCommands === true;
+  }
+  if (after.skipRepositoryCheckout !== before.skipRepositoryCheckout) {
+    patch.skip_repository_checkout = after.skipRepositoryCheckout === true;
+  }
+  if (agent && after.model !== before.model && typeof after.model === "string") {
+    patch.agent = { ...agent, model: after.model || undefined };
   }
   return patch;
 }

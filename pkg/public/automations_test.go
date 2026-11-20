@@ -160,7 +160,6 @@ kind: Automation
 name: Print a marker
 agent:
   harness: superplane
-  model: anthropic::claude-sonnet-4-6
 triggers:
   - use: manual
 steps:
@@ -218,6 +217,13 @@ steps:
 	require.Equal(t, []automations.Summary{second.Summary}, list.Automations)
 	stageEntry := strings.Replace(source, "use: manual", "use: task_enters_stage", 1)
 	call(http.MethodPut, path, &automationWriteRequest{YAML: stageEntry}, http.StatusBadRequest)
+	line, err := factory.CreateLine(db, "Ship", []models.FactoryLineStep{{
+		Type: models.FactoryLineStepTypeRunApp, AppID: first.ID, Entrypoint: live.Edges[0].SourceID,
+	}})
+	require.NoError(t, err)
+	call(http.MethodDelete, path, nil, http.StatusBadRequest)
+	call(http.MethodGet, path, nil, http.StatusOK)
+	require.NoError(t, line.Update(db, nil, []models.FactoryLineStep{}, nil))
 	call(http.MethodDelete, path, nil, http.StatusNoContent)
 	call(http.MethodGet, path, nil, http.StatusNotFound)
 }
