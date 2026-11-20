@@ -39,7 +39,8 @@ var mergeConfidenceChecks = []mergeConfidenceCheck{
 	{name: "risk", key: "risk-review", label: "Blast radius", direction: CheckDirectionLowerIsBetter, cautionAt: 3, criticalAt: 4},
 	{name: "performance", key: "performance-review", label: "Performance", direction: CheckDirectionHigherIsBetter, cautionAt: 3, criticalAt: 2},
 	{name: "security", key: "security-review", label: "Security", direction: CheckDirectionHigherIsBetter, cautionAt: 3, criticalAt: 2},
-	{name: "drift", key: "drift-review", label: "Drift from Specification", direction: CheckDirectionLowerIsBetter, cautionAt: 3, criticalAt: 4},
+	{name: "correctness", key: "correctness-review", label: "Correctness", direction: CheckDirectionHigherIsBetter, cautionAt: 3, criticalAt: 2},
+	{name: "drift", key: "drift-review", label: "Correctness", direction: CheckDirectionLowerIsBetter, cautionAt: 3, criticalAt: 4},
 	{name: "reversibility", key: "reversibility-review", label: "Reversibility", direction: CheckDirectionHigherIsBetter, cautionAt: 3, criticalAt: 2},
 }
 

@@ -70,9 +70,16 @@ func configureMergeConfidenceChecks(node *yaml.Node, raw any) error {
 	custom := savedMergeCheckSteps(raw)
 	selected := make([]any, 0, len(ids))
 	for _, id := range ids {
-		step := defaults[id]
+		defaultID := id
+		if id == "drift" {
+			if slices.Contains(ids, "correctness") {
+				continue
+			}
+			defaultID = "correctness"
+		}
+		step := defaults[defaultID]
 		if step == nil {
-			if slices.Contains(strings.Split(defaultMergeConfidenceChecks, ", "), id) {
+			if slices.Contains(strings.Split(defaultMergeConfidenceChecks, ", "), defaultID) {
 				return fmt.Errorf("merge confidence check %q is no longer available; review the selected checks before resetting", id)
 			}
 			step = custom[id]
