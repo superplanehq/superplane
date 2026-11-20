@@ -53,7 +53,6 @@ func resolveAutomationAgent(tx *gorm.DB, factory *models.Factory, source *automa
 			return nil, source.Diagnostic("agent.credentials.name", "Select a connection that supports this agent.")
 		}
 		agent.LLMProvider = configured.LLMProvider
-		agent = fillCustomProviderModel(tx, factory, agent)
 	}
 
 	if agent.subscription() {
@@ -72,16 +71,28 @@ func resolveAutomationAgent(tx *gorm.DB, factory *models.Factory, source *automa
 		}
 		return agent, err
 	}
-	if settings.GetModel() != "" {
-		config := map[string]any{"credentials": agent.credentials()}
-		agent.applyLLMProvider(config)
-		allowed, err := models.RunnerAcceptsModel(tx, factory.OrganizationID, &factory.ID, agent.Component, config, agent.Model)
+	config := map[string]any{"credentials": agent.credentials(), "model": agent.model()}
+	agent.applyLLMProvider(config)
+	if agent.Credentials["source"] == runner.CredentialsSourceIntegration || agent.Credentials["source"] == runner.CredentialsSourceSecret {
+		if settings.GetModel() == "" {
+			// Omitted YAML models must not inherit a fixed default outside the current policy.
+			config["model"] = ""
+		}
+		model, err := models.ResolveBYOKRunnerModel(tx, factory.OrganizationID, &factory.ID, agent.Component, config)
+		if errors.Is(err, models.ErrSelectableLLMModelNotAllowed) {
+			return nil, source.Diagnostic("agent.model", "Select a model available for this agent in the factory.")
+		}
 		if err != nil {
 			return nil, err
 		}
-		if !allowed {
-			return nil, source.Diagnostic("agent.model", "Select a model available for this agent in the factory.")
-		}
+		agent.Model = model
+	}
+	allowed, err := models.RunnerAcceptsModel(tx, factory.OrganizationID, &factory.ID, agent.Component, config, agent.model())
+	if err != nil {
+		return nil, err
+	}
+	if !allowed {
+		return nil, source.Diagnostic("agent.model", "Select a model available for this agent in the factory.")
 	}
 	return agent, nil
 }

@@ -384,3 +384,66 @@ func TestCanvasAutomationImportsSwitchedSubscription(t *testing.T) {
 	_, err = service.Update(ctx, r.Organization.ID, id, r.User, read.YAML)
 	require.NoError(t, err)
 }
+
+func TestCanvasAutomationResolvesAllowedDefaultModel(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory := seedHandOffFactory(t, r, db)
+	vcsID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
+	agentID := createReadyOnboardingIntegration(t, r.Organization.ID, "openai")
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSIntegrationID: &vcsID, AgentIntegrationID: &agentID}))
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureAutomationsAsCode))
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
+	support.AssignOpenSystemTrial(t, r.Organization.ID)
+	_, err := models.UpsertOrganizationBYOKModelAllowlist(db, r.Organization.ID, models.UsageProviderOpenAI, datatypes.JSONSlice[string]{"gpt-5-mini", "gpt-5-nano"})
+	require.NoError(t, err)
+	_, err = models.UpsertFactoryLLMModelAllowlist(db, r.Organization.ID, factory.ID, models.UsageProviderOpenAI, models.UsageFundingSourceBYOK, datatypes.JSONSlice[string]{"gpt-5-nano"})
+	require.NoError(t, err)
+	connection, err := models.FindIntegrationInTransaction(db, r.Organization.ID, uuid.MustParse(agentID))
+	require.NoError(t, err)
+	ctx := onboardingContext(r)
+	service := automations.Service{Backend: CanvasAutomationBackend{Deps: onboardingDeps(r)}}
+	placement := automations.Placement{OrganizationID: r.Organization.ID, FactoryID: factory.ID, Stage: models.CanvasColumnKeyBacklog}
+	const source = `apiVersion: v2
+kind: Automation
+name: Inspect task
+triggers:
+  - use: manual
+steps:
+  - name: Inspect
+    prompt: Inspect the task.
+`
+	for _, tc := range []struct{ name, agent string }{
+		{"named integration", "agent: {harness: codex, credentials: {source: integration, name: " + connection.InstallationName + "}}\n"},
+		{"workspace agent", ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			yaml := strings.Replace(source, "triggers:", tc.agent+"triggers:", 1)
+			_, err := service.Validate(ctx, placement, yaml)
+			require.NoError(t, err)
+			created, err := service.Create(ctx, placement, r.User, yaml)
+			require.NoError(t, err)
+			t.Cleanup(func() { require.NoError(t, service.Delete(ctx, r.Organization.ID, created.ID)) })
+			live, err := models.FindLiveCanvasVersionInTransaction(db, created.ID)
+			require.NoError(t, err)
+			node := selectCustomAutomationAgent(live.Nodes)
+			require.NotNil(t, node)
+			require.Equal(t, "gpt-5-nano", node.Configuration["model"])
+			resolved, err := models.ResolveBYOKRunnerModel(db, r.Organization.ID, &factory.ID, node.ComponentName(), node.Configuration)
+			require.NoError(t, err)
+			require.Equal(t, "gpt-5-nano", resolved)
+		})
+	}
+
+	explicit := strings.Replace(source, "triggers:", "agent: {harness: codex, model: gpt-5-mini, credentials: {source: integration, name: "+connection.InstallationName+"}}\ntriggers:", 1)
+	_, err = service.Validate(ctx, placement, explicit)
+	require.ErrorContains(t, err, "agent.model")
+
+	_, err = models.UpsertOrganizationBYOKModelAllowlist(db, r.Organization.ID, models.UsageProviderOpenAI, nil)
+	require.NoError(t, err)
+	_, err = service.Validate(ctx, placement, source)
+	require.ErrorContains(t, err, "agent.model")
+	_, err = service.Create(ctx, placement, r.User, source)
+	require.ErrorContains(t, err, "agent.model")
+}
