@@ -13,10 +13,11 @@ import (
 )
 
 type factoryPullRequestCloseResult struct {
-	order     *models.FactoryWorkOrder
-	fromState string
-	result    string
-	closed    bool
+	order      *models.FactoryWorkOrder
+	fromState  string
+	result     string
+	closed     bool
+	leftColumn string
 }
 
 func closeFactoryWorkOrdersFromGitHubPullRequestClosed(
@@ -118,6 +119,7 @@ func closeFactoryWorkOrdersFromGitHubPullRequestClosed(
 			outcome.fromState,
 			outcome.result,
 			false,
+			outcome.leftColumn,
 		)
 	}
 }
@@ -213,6 +215,11 @@ func closeFactoryWorkOrderForPullRequest(
 		return outcome, nil
 	}
 	outcome.result = result
+	leftColumn, err := models.WorkOrderBoardColumn(tx, order)
+	if err != nil {
+		return nil, err
+	}
+	outcome.leftColumn = leftColumn
 
 	if _, err := order.UpdateStatus(tx, models.FactoryWorkOrderStatusUpdate{
 		ToState:    models.FactoryWorkOrderStateClosed,

@@ -4,7 +4,7 @@ import { Label } from "@/components/ui/label";
 import { cn, resolveIcon } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { SegmentedNav } from "@/ui/SegmentedNav";
-import { AlarmClock, ChevronDown, GitCommitHorizontal, MousePointerClick, Plus, Trash2 } from "lucide-react";
+import { AlarmClock, ChevronDown, GitCommitHorizontal, LogOut, MousePointerClick, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 
 import {
@@ -122,16 +122,18 @@ export function TriggerEditor({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="min-w-72">
-            {(runsOnTask ? (["manual", "automatic"] as const) : (["manual", "scheduled"] as const)).map((mode) => (
-              <DropdownMenuItem
-                key={mode}
-                className="py-2.5"
-                disabled={mode !== "scheduled" && triggers.some((trigger) => trigger.mode === mode)}
-                onSelect={() => addTrigger(mode)}
-              >
-                <TriggerOption mode={mode} columnKey={columnKey} runsOnTask={runsOnTask} />
-              </DropdownMenuItem>
-            ))}
+            {(runsOnTask ? (["manual", "automatic", "leave"] as const) : (["manual", "scheduled"] as const)).map(
+              (mode) => (
+                <DropdownMenuItem
+                  key={mode}
+                  className="py-2.5"
+                  disabled={mode !== "scheduled" && triggers.some((trigger) => trigger.mode === mode)}
+                  onSelect={() => addTrigger(mode)}
+                >
+                  <TriggerOption mode={mode} columnKey={columnKey} runsOnTask={runsOnTask} />
+                </DropdownMenuItem>
+              ),
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       </section>
@@ -349,6 +351,7 @@ function removeTriggerLabel(
 
 function triggerTitle(mode: CustomAutomationMode, columnKey: CustomAutomationColumn): string {
   if (mode === "scheduled") return "Schedule";
+  if (mode === "leave") return `When a task leaves ${customAutomationColumnLabel(columnKey)}`;
   if (mode === "automatic") {
     return columnKey === "verify"
       ? "Every pull request commit"
@@ -366,8 +369,9 @@ function TriggerOption({
   columnKey: CustomAutomationColumn;
   runsOnTask: boolean;
 }) {
-  const automatic = mode === "automatic";
-  const Icon = mode === "scheduled" ? AlarmClock : automatic ? GitCommitHorizontal : MousePointerClick;
+  const automatic = mode === "automatic" || mode === "leave";
+  const Icon =
+    mode === "scheduled" ? AlarmClock : mode === "leave" ? LogOut : automatic ? GitCommitHorizontal : MousePointerClick;
   return (
     <span className="flex min-w-0 items-center gap-3 text-left">
       <span
@@ -384,24 +388,28 @@ function TriggerOption({
         <span className="text-sm font-medium text-foreground">
           {mode === "scheduled"
             ? "Schedule"
-            : automatic
-              ? columnKey === "verify"
-                ? "Every pull request commit"
-                : `When a task enters ${customAutomationColumnLabel(columnKey)}`
-              : "Manual"}
+            : mode === "leave"
+              ? `When a task leaves ${customAutomationColumnLabel(columnKey)}`
+              : automatic
+                ? columnKey === "verify"
+                  ? "Every pull request commit"
+                  : `When a task enters ${customAutomationColumnLabel(columnKey)}`
+                : "Manual"}
         </span>
         <span className="text-xs font-normal text-muted-foreground">
           {mode === "scheduled"
             ? columnKey === "backlog"
               ? "Run automation on a schedule."
               : "Runs on the repository default branch."
-            : automatic
-              ? columnKey === "verify"
-                ? "Runs after each new commit."
-                : `Runs when a task enters ${customAutomationColumnLabel(columnKey)}.`
-              : runsOnTask
-                ? "A person starts each run from a task."
-                : "A person starts each run from the column."}
+            : mode === "leave"
+              ? `Runs when a task leaves ${customAutomationColumnLabel(columnKey)}.`
+              : automatic
+                ? columnKey === "verify"
+                  ? "Runs after each new commit."
+                  : `Runs when a task enters ${customAutomationColumnLabel(columnKey)}.`
+                : runsOnTask
+                  ? "A person starts each run from a task."
+                  : "A person starts each run from the column."}
         </span>
       </span>
     </span>
