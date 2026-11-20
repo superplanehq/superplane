@@ -1,4 +1,4 @@
-import { Check, MoreHorizontal, Pencil, Plus, RefreshCw, SlidersHorizontal, XIcon } from "lucide-react";
+import { Check, MoreHorizontal, Pencil, Plus, RefreshCw, SlidersHorizontal, Trash2, XIcon } from "lucide-react";
 import { useNavigate } from "react-router";
 
 import { cn } from "@/lib/utils";
@@ -37,6 +37,7 @@ interface ColumnLaneMenuProps {
   refreshBacklogPending?: boolean;
   colorId: LineBoardColumnColorId | null;
   onColorChange: (colorId: LineBoardColumnColorId | null) => void;
+  onDeleteStage?: () => void;
 }
 
 /**
@@ -56,6 +57,7 @@ export function ColumnLaneMenu({
   refreshBacklogPending = false,
   colorId,
   onColorChange,
+  onDeleteStage,
 }: ColumnLaneMenuProps) {
   const navigate = useNavigate();
   const canEdit = Boolean(onEdit || editHref);
@@ -102,6 +104,21 @@ export function ColumnLaneMenu({
           </>
         ) : null}
         <ColumnLaneColorPicker title={title} testId={testId} colorId={colorId} onColorChange={onColorChange} />
+        {onDeleteStage ? (
+          <>
+            <DropdownMenuSeparator className="my-0" />
+            <div className="p-1">
+              <DropdownMenuItem
+                className="text-destructive focus:text-destructive"
+                onSelect={onDeleteStage}
+                data-testid={`${testId}-delete-stage`}
+              >
+                <Trash2 className="size-3.5" aria-hidden />
+                Delete stage
+              </DropdownMenuItem>
+            </div>
+          </>
+        ) : null}
       </DropdownMenuContent>
     </DropdownMenu>
   );

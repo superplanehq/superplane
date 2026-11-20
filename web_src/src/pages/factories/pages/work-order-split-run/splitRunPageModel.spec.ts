@@ -94,6 +94,19 @@ describe("fixtureForSplitRunPage", () => {
     });
   });
 
+  it("shows the live line stages on a backlog task", () => {
+    const fixture = fixtureForSplitRunPage(DRAFT_WORK_ORDER, [], null, {
+      lineStages: [
+        { key: "backlog", name: "Backlog", kind: "STAGE_KIND_BACKLOG" },
+        { key: "custom-qa", name: "QA", kind: "STAGE_KIND_CUSTOM" },
+        { key: "phase-0", name: "Implement", kind: "STAGE_KIND_PHASE", stepIndex: 0 },
+        { key: "done", name: "Done", kind: "STAGE_KIND_DONE" },
+      ],
+    });
+
+    expect(fixture?.stageColumns?.map((column) => column.id)).toEqual(["backlog", "custom-qa", "phase-0", "done"]);
+  });
+
   it("passes the pending analyzing flag into the draft footer", () => {
     const fixture = fixtureForSplitRunPage(DRAFT_WORK_ORDER, [], null, { analysisRuns: [], isAnalyzing: true });
 

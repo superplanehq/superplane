@@ -380,5 +380,9 @@ func (w *RunInitializer) finishFactoryWorkOrderExecutionForRun(tx *gorm.DB, runI
 		return nil, err
 	}
 
-	return models.AdmitQueuedForStep(tx, execution.LineID, execution.StepIndex)
+	if execution.StepIndex < 0 || execution.StepIndex >= len(dispatch.Steps) {
+		return nil, nil
+	}
+	step := dispatch.Steps[execution.StepIndex]
+	return models.AdmitQueuedForStep(tx, execution.LineID, step.AppID, step.StageKey)
 }
