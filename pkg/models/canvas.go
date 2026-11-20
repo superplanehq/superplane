@@ -224,6 +224,13 @@ func FindCanvasInTransaction(tx *gorm.DB, orgID, id uuid.UUID) (*Canvas, error) 
 	return &canvas, nil
 }
 
+func FindFactoryCanvasesByIDs(tx *gorm.DB, organizationID, factoryID uuid.UUID, ids []uuid.UUID) ([]Canvas, error) {
+	var canvases []Canvas
+	err := tx.Where("organization_id = ? AND factory_id = ? AND id IN ?", organizationID, factoryID, ids).
+		Find(&canvases).Error
+	return canvases, err
+}
+
 func CheckCanvasExistence(tx *gorm.DB, orgID, id uuid.UUID) (bool, error) {
 	var count int64
 

@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 << 'DOCS'
   Generate OpenAPI specs from internal_api definitions.
@@ -42,3 +43,15 @@ do
 done
 
 generate_openapi_spec $ALL_MODULE_PATHS
+
+# The v2 automation endpoints serve authored YAML through HTTP handlers.
+node - "$OPENAPI_OUT/$MERGE_FILE_NAME.json" "$PROTO_DIR/automations_http.swagger.json" <<'NODE'
+const fs = require("node:fs");
+const [specPath, httpPath] = process.argv.slice(2);
+const spec = JSON.parse(fs.readFileSync(specPath, "utf8"));
+const http = JSON.parse(fs.readFileSync(httpPath, "utf8"));
+for (const [section, entries] of Object.entries(http)) {
+  spec[section] = { ...spec[section], ...entries };
+}
+fs.writeFileSync(specPath, JSON.stringify(spec, null, 2) + "\n");
+NODE

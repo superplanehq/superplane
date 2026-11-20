@@ -1,3 +1,6 @@
+import { load } from "js-yaml";
+import { useCustomAutomationSourceDraft } from "@/hooks/useCustomAutomationSourceDraft";
+import { CustomAutomationSourceEditor } from "./CustomAutomationSourceEditor";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, it, vi } from "bun:test";
@@ -52,13 +55,70 @@ function Editor({ columnKey }: { columnKey?: "backlog" | "verify" }) {
       onNameChange={model.setName}
       onIconChange={model.setIcon}
       onTriggersChange={model.setTriggers}
-      onRunsOnTaskChange={model.setRunsOnTask}
+      onRunsOnTaskChange={(runsOnTask) => model.setRunsOnTask(runsOnTask ?? true)}
       onDraftChange={model.setDraft}
       onSave={() => void model.save()}
       onClose={() => {}}
     />
   );
 }
+
+vi.mock("@/hooks/useIntegrations", () => ({ useConnectedIntegrations: () => ({}) }));
+vi.mock("../layout/factoriesLayoutContext", () => ({
+  useFactoriesLayout: () => ({ organizationId: "org", factoryId: "factory", routeSegment: "workspace" }),
+}));
+
+it("preserves the original schedule when changing run context and editing workspace settings", async () => {
+  const source = `apiVersion: v2
+kind: Automation
+name: Daily build
+triggers:
+  - use: schedule
+    config: { cron: "0 9 * * MON-FRI", utc_offset: 5.5 }
+  - use: schedule
+    id: weekend
+    config: { cron: "0 10 * * SAT", utc_offset: 0 }
+steps:
+  - name: Inspect
+    prompt: Review the build.
+skip_setup_commands: true
+`;
+  const save = vi.fn();
+  function SourceEditor() {
+    const draft = useCustomAutomationSourceDraft(source, "backlog");
+    return (
+      <CustomAutomationSourceEditor
+        model={draft}
+        stage="backlog"
+        saving={false}
+        deleting={false}
+        error=""
+        onSave={() => save(load(draft.source))}
+        onClose={() => {}}
+      />
+    );
+  }
+  render(<SourceEditor />);
+  const user = userEvent.setup();
+  await user.click(screen.getByRole("tab", { name: "on a task" }));
+  await user.click(screen.getByRole("tab", { name: "with no task" }));
+  const skipSetup = screen.getByRole("switch", { name: "Skip setup commands" });
+  expect(skipSetup).toBeChecked();
+  await user.click(skipSetup);
+  await user.click(screen.getByRole("switch", { name: "Skip repository checkout" }));
+  await user.click(screen.getByRole("button", { name: "Save" }));
+  expect(save).toHaveBeenCalledWith(
+    expect.objectContaining({
+      runs_on_task: false,
+      triggers: [
+        { use: "schedule", config: { cron: "0 9 * * MON-FRI", utc_offset: 5.5 } },
+        { id: "weekend", use: "schedule", config: { cron: "0 10 * * SAT", utc_offset: 0 } },
+      ],
+      skip_setup_commands: false,
+      skip_repository_checkout: true,
+    }),
+  );
+});
 
 it("selects Schedule, recovers from a save error, and reopens the saved schedule without changing steps", async () => {
   const user = userEvent.setup();
