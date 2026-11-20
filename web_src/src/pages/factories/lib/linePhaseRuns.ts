@@ -247,7 +247,11 @@ export function lineStageColumns(columns: LinePhaseColumn[]): LinePhaseColumn[] 
 export function visibleLineStageColumns(
   columns: LinePhaseColumn[],
   verifyOrders: FactoriesWorkOrder[],
+  moveWaitingOrdersToVerify = true,
 ): LinePhaseColumn[] {
+  if (!moveWaitingOrdersToVerify) {
+    return lineStageColumns(columns);
+  }
   const verifyIds = new Set(verifyOrders.flatMap((order) => (order.id ? [order.id] : [])));
   return lineStageColumns(columns).map((column) => {
     const runs = column.runs.filter((run) => !verifyIds.has(run.workOrderId));
