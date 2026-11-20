@@ -68,10 +68,8 @@ func resolveAutomationAgent(tx *gorm.DB, factory *models.Factory, source *automa
 		}
 		return agent, nil
 	}
-	if agent.component() == models.SuperPlaneRunnerComponent {
-		if override != "" {
-			return nil, source.Diagnostic("agent.model", "Remove the model override to use the factory's SuperPlane model.")
-		}
+	component := agent.component()
+	if component == models.SuperPlaneRunnerComponent && override == "" {
 		_, err := models.ResolveRunnableHostedLLMModel(tx, factory.OrganizationID, &factory.ID)
 		if errors.Is(err, models.ErrSuperPlaneRunnerNoModel) || errors.Is(err, models.ErrSuperPlaneRunnerModelNotAllowed) {
 			return nil, source.Diagnostic("agent.harness", "Enable a SuperPlane model for this factory or select another agent.")
@@ -82,20 +80,23 @@ func resolveAutomationAgent(tx *gorm.DB, factory *models.Factory, source *automa
 	config := map[string]any{"credentials": agent.credentials(), "model": agent.model()}
 	agent.applyLLMProvider(config)
 	if override != "" {
-		allowed, err := models.RunnerAcceptsModel(tx, factory.OrganizationID, &factory.ID, agent.component(), config, override)
+		allowed, err := models.RunnerAcceptsModel(tx, factory.OrganizationID, &factory.ID, component, config, override)
 		if err != nil {
 			return nil, err
 		}
 		if !allowed {
+			if component == models.SuperPlaneRunnerComponent {
+				return nil, source.Diagnostic("agent.model", "Select a hosted model available in the workspace. Use provider::model format.")
+			}
 			return nil, source.Diagnostic("agent.model", "Select a model available for this connection in the factory.")
 		}
 		agent.Model = override
 		return agent, nil
 	}
-	model, err := models.ResolveBYOKRunnerModel(tx, factory.OrganizationID, &factory.ID, agent.component(), config)
+	model, err := models.ResolveBYOKRunnerModel(tx, factory.OrganizationID, &factory.ID, component, config)
 	if errors.Is(err, models.ErrSelectableLLMModelNotAllowed) {
 		config["model"] = ""
-		model, err = models.ResolveBYOKRunnerModel(tx, factory.OrganizationID, &factory.ID, agent.component(), config)
+		model, err = models.ResolveBYOKRunnerModel(tx, factory.OrganizationID, &factory.ID, component, config)
 	}
 	if errors.Is(err, models.ErrSelectableLLMModelNotAllowed) {
 		return nil, source.Diagnostic("agent.model", "Enable a model for this agent in the factory settings.")

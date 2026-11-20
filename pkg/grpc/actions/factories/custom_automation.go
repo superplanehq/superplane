@@ -850,10 +850,13 @@ func customAutomationRunnerConfiguration(
 		"environmentFrom":         environmentFrom,
 		"environment":             environment,
 	}
-	if credentials := settings.Agent.credentials(); credentials != nil && settings.Agent.component() != models.SuperPlaneRunnerComponent {
+	model := settings.Agent.model()
+	if settings.Agent.component() == models.SuperPlaneRunnerComponent {
+		model = settings.Agent.Model
+	} else if credentials := settings.Agent.credentials(); credentials != nil {
 		configuration["credentials"] = credentials
 	}
-	if model := settings.Agent.model(); model != "" {
+	if model != "" {
 		configuration["model"] = model
 	}
 	settings.Agent.applyLLMProvider(configuration)

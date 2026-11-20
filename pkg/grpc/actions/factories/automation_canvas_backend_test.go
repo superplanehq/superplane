@@ -19,6 +19,70 @@ import (
 	"gorm.io/gorm"
 )
 
+func TestCanvasAutomationPinsHostedModel(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory := seedHandOffFactory(t, r, db)
+	vcsID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSIntegrationID: &vcsID}))
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureAutomationsAsCode))
+	support.AssignOpenSystemTrial(t, r.Organization.ID)
+	upsertHostedOnboardingProvider(t, db)
+
+	const model = "deepseek/deepseek-v4.1-flash-1017"
+	_, err := models.UpsertHostedLLMProvider(db, models.HostedLLMProvider{
+		Provider: models.UsageProviderOpenRouter, Enabled: true,
+		APIKey: []byte("test-hosted-key"), ManagementKey: []byte("test-management-key"),
+		AllowedModels: datatypes.JSONSlice[string]{model},
+	})
+	require.NoError(t, err)
+
+	ctx := onboardingContext(r)
+	backend := CanvasAutomationBackend{Deps: onboardingDeps(r)}
+	service := automations.Service{Backend: backend}
+	placement := automations.Placement{
+		OrganizationID: r.Organization.ID, FactoryID: factory.ID, Stage: models.CanvasColumnKeyBacklog,
+	}
+	const source = `apiVersion: v2
+kind: Automation
+name: Inspect task with a hosted model
+agent:
+  harness: superplane
+  model: openrouter::deepseek/deepseek-v4.1-flash-1017
+triggers:
+  - use: manual
+steps:
+  - name: Inspect
+    prompt: Summarize the task.
+`
+	created, err := service.Create(ctx, placement, r.User, source)
+	require.NoError(t, err)
+	live, err := models.FindLiveCanvasVersionInTransaction(db, created.ID)
+	require.NoError(t, err)
+	node := selectCustomAutomationAgent(live.Nodes)
+	require.NotNil(t, node)
+	require.Equal(t, models.SuperPlaneRunnerComponent, node.ComponentName())
+	require.Equal(t, "openrouter::"+model, node.Configuration["model"])
+
+	legacy, err := backend.FindLegacy(ctx, db, r.Organization.ID, created.ID)
+	require.NoError(t, err)
+	imported, err := backend.ImportLegacy(ctx, db, legacy)
+	require.NoError(t, err)
+	document, err := automationspec.Parse(imported)
+	require.NoError(t, err)
+	require.Equal(t, "openrouter::"+model, document.Agent.Model)
+
+	inherit := false
+	_, err = models.UpsertFactoryLLMModelAllowlist(db, r.Organization.ID, factory.ID,
+		models.UsageProviderOpenRouter, models.UsageFundingSourceHosted, nil, &inherit)
+	require.NoError(t, err)
+	_, err = service.Validate(ctx, placement, source)
+	var diagnostic *automationspec.Diagnostic
+	require.ErrorAs(t, err, &diagnostic)
+	require.Equal(t, "agent.model", diagnostic.Path)
+}
+
 func TestCanvasAutomationSchedulesRetainPendingDelivery(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())

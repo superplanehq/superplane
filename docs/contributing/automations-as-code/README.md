@@ -76,6 +76,16 @@ organization names and keep their values out of YAML.
 | `credentials.source` | Required in `credentials`. Use `integration` or `subscription`. |
 | `credentials.name` | Required with `integration`. Enter the name of a ready, compatible integration in the organization. |
 
+For `harness: superplane`, set `model` to a hosted model key in
+`provider::model` format. The model must be available in the workspace.
+This example selects DeepSeek V4.1 Flash through hosted OpenRouter.
+
+```yaml
+agent:
+  harness: superplane
+  model: openrouter::deepseek/deepseek-v4.1-flash-1017
+```
+
 To use a configured ChatGPT subscription, set `harness` to `codex` and set
 `credentials.source` to `subscription`. Omit `credentials.name` and `model`.
 
