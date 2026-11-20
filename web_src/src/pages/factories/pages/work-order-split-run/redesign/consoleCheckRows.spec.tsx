@@ -49,7 +49,7 @@ describe("ConsoleCheckRows", () => {
       within(screen.getByTestId("split-run-check-security")).getByRole("img", { name: "Needs attention" }),
     ).toBeInTheDocument();
     expect(screen.getByText("The retry endpoint does not check workspace membership.")).toBeInTheDocument();
-    expect(screen.getByText("Drift from Specification")).toBeInTheDocument();
+    expect(screen.getByText("Correctness")).toBeInTheDocument();
     expect(screen.queryByText("Missed")).not.toBeInTheDocument();
     expect(screen.queryByText("2/5")).not.toBeInTheDocument();
 

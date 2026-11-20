@@ -88,6 +88,7 @@ export interface WorkOrderTimelineArtifact {
 
 /** Score snapshot carried by an `order.check.reported` event. */
 export interface WorkOrderTimelineCheck {
+  key?: string;
   name: string;
   score: number;
   maxScore: number;

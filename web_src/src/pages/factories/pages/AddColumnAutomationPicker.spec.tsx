@@ -23,7 +23,7 @@ describe("AddColumnAutomationPicker", () => {
     expect(screen.getByTestId("add-column-automation-template-checks")).toHaveTextContent("Pull request checks");
     expect(screen.getByTestId("add-column-automation-template-risk-score")).toHaveTextContent("Merge confidence");
     expect(screen.getByTestId("add-column-automation-template-risk-score")).toHaveTextContent(
-      "Score risk, performance, security, and drift on a pull request.",
+      "Review a pull request for correctness, performance, security, blast radius, and reversibility.",
     );
     expect(screen.getByTestId("add-column-automation-template-visual-evidence")).toHaveTextContent("Visual Evidence");
     expect(screen.getByTestId("add-column-automation-template-visual-evidence")).toHaveTextContent(

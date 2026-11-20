@@ -252,9 +252,14 @@ func ListChecksForWorkOrders(tx *gorm.DB, workOrderIDs []uuid.UUID) (map[uuid.UU
 		return grouped, nil
 	}
 
-	var checks []FactoryWorkOrderCheck
-	err := tx.
+	// Drift and Correctness are two scales for the same check. Select the latest
+	// per task and repository before the board drops repository and timestamps.
+	latest := tx.Model(&FactoryWorkOrderCheck{}).
+		Select("DISTINCT ON (work_order_id, repository, check_key) *, CASE WHEN key = 'drift-review' THEN 'correctness-review' ELSE key END AS check_key").
 		Where("work_order_id IN ?", workOrderIDs).
+		Order("work_order_id, repository, check_key, updated_at DESC, id DESC")
+	var checks []FactoryWorkOrderCheck
+	err := tx.Table("(?) AS latest_checks", latest).
 		Order("created_at ASC").
 		Order("id ASC").
 		Find(&checks).
@@ -301,6 +306,12 @@ func (o *FactoryWorkOrder) reportCheck(
 ) (*FactoryWorkOrderCheck, error) {
 	var check *FactoryWorkOrderCheck
 	err := db.Transaction(func(tx *gorm.DB) error {
+		otherKey := otherCorrectnessKey(normalized.Key)
+		if otherKey != "" {
+			if err := o.LockForUpdate(tx); err != nil {
+				return err
+			}
+		}
 		existing, findErr := o.findCheck(tx, normalized.Repository, normalized.Key)
 		if findErr != nil {
 			return findErr
@@ -310,17 +321,44 @@ func (o *FactoryWorkOrder) reportCheck(
 			return fmt.Errorf("%w: %s", ErrFactoryWorkOrderCheckOwned, normalized.Key)
 		}
 
+		previous := existing
+		if otherKey != "" {
+			other, err := o.findCheck(tx, normalized.Repository, otherKey)
+			if err != nil {
+				return err
+			}
+			if other != nil && other.Repository != normalized.Repository {
+				// Claim repository-less legacy results just as a same-key report would.
+				if err := tx.Model(other).UpdateColumn("repository", normalized.Repository).Error; err != nil {
+					return err
+				}
+			}
+			if other != nil && (previous == nil || other.UpdatedAt.After(previous.UpdatedAt)) {
+				// Prior scores on this report use the incoming scale. Keep stored history intact.
+				other.Score = 6 - other.Score
+				for i, score := range other.RecentScores {
+					other.RecentScores[i] = 6 - score
+				}
+				previous = other
+			}
+		}
+		var previousScore *float64
+		recent := datatypes.NewJSONSlice([]float64{normalized.Score})
+		if previous != nil {
+			score := previous.Score
+			previousScore = &score
+			recent = appendRecentCheckScore(previous.RecentScores, score, normalized.Score)
+		}
 		now := time.Now()
 		if existing != nil {
-			previousScore := existing.Score
 			existing.Repository = normalized.Repository
 			existing.Name = normalized.Name
 			existing.Score = normalized.Score
 			existing.MaxScore = normalized.MaxScore
 			existing.Format = normalized.Format
 			existing.Level = normalized.Level
-			existing.PreviousScore = &previousScore
-			existing.RecentScores = appendRecentCheckScore(existing.RecentScores, previousScore, normalized.Score)
+			existing.PreviousScore = previousScore
+			existing.RecentScores = recent
 			existing.Summary = normalized.Summary
 			existing.Analysis = normalized.Analysis
 			existing.Automation = automationJSON
@@ -344,7 +382,8 @@ func (o *FactoryWorkOrder) reportCheck(
 				MaxScore:       normalized.MaxScore,
 				Format:         normalized.Format,
 				Level:          normalized.Level,
-				RecentScores:   datatypes.NewJSONSlice([]float64{normalized.Score}),
+				PreviousScore:  previousScore,
+				RecentScores:   recent,
 				Summary:        normalized.Summary,
 				Analysis:       normalized.Analysis,
 				Automation:     automationJSON,
@@ -366,6 +405,17 @@ func (o *FactoryWorkOrder) reportCheck(
 	}
 
 	return check, nil
+}
+
+func otherCorrectnessKey(key string) string {
+	switch key {
+	case "drift-review":
+		return "correctness-review"
+	case "correctness-review":
+		return "drift-review"
+	default:
+		return ""
+	}
 }
 
 // findCheck returns the row a report updates, or nil for a first report.
