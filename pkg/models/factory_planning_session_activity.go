@@ -94,7 +94,7 @@ func (s *FactoryPlanningSession) UpsertActivity(tx *gorm.DB, activity PlanningSe
 			"schema_version", "provider", "status", "last_sequence", "snapshot", "started_at", "completed_at", "updated_at",
 		}),
 		Where: clause.Where{Exprs: []clause.Expression{clause.Expr{
-			SQL: "factory_planning_session_activities.last_sequence < EXCLUDED.last_sequence",
+			SQL: "factory_planning_session_activities.session_id = EXCLUDED.session_id AND factory_planning_session_activities.last_sequence < EXCLUDED.last_sequence",
 		}}},
 	}).Create(&activity)
 	if result.Error != nil {
