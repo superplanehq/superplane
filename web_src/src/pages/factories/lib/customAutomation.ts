@@ -174,7 +174,11 @@ export function customAutomationModeCopy(
 
 export function workspaceAgentFromOnboarding(onboarding?: {
   agentHarness?: string;
+  codexSubscription?: boolean;
 }): FactoriesFactoryCustomAutomationSettings["agent"] | undefined {
+  if (onboarding?.codexSubscription) {
+    return { component: "runnerCodex", credentialSource: "subscription" };
+  }
   switch (onboarding?.agentHarness) {
     case "AGENT_HARNESS_SUPERPLANE":
       return { component: "runnerSuperPlane" };
@@ -224,11 +228,12 @@ export function customAutomationDraft(automation?: FactoriesFactoryCustomAutomat
 
 function customAutomationAgentConfiguration(
   agent: FactoriesFactoryCustomAutomationSettings["agent"],
-): Record<string, string> {
+): Record<string, unknown> {
   return {
     model: agent?.model ?? "",
     credentialSource: agent?.credentialSource ?? "",
     credentialIntegrationName: agent?.credentialIntegrationName ?? "",
+    ...(agent?.credentialSource === "subscription" ? { credentials: { source: "subscription" } } : {}),
   };
 }
 
