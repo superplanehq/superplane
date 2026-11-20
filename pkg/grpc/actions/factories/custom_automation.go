@@ -1203,7 +1203,8 @@ func findCustomAutomationCanvas(tx *gorm.DB, factory *models.Factory, rawID stri
 
 func preserveCustomAutomationIdentities(version *models.CanvasVersion, doc *yaml.Canvas) error {
 	for i := range version.Nodes {
-		if version.Nodes[i].Type == models.NodeTypeTrigger && version.Nodes[i].ComponentName() != "schedule" {
+		if version.Nodes[i].Type == models.NodeTypeTrigger &&
+			(version.Nodes[i].ComponentName() == "github.onPullRequest" || version.Nodes[i].ComponentName() == "bitbucket.onPullRequest") {
 			preserveCustomAutomationPRTriggerIdentity(&version.Nodes[i], doc)
 		}
 	}

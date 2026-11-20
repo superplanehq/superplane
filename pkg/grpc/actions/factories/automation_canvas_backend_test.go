@@ -1,6 +1,8 @@
 package factories
 
 import (
+	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -194,13 +196,17 @@ func TestCanvasAutomationSchedulesRetainPendingDelivery(t *testing.T) {
 
 func TestCanvasAutomationLegacyImportProtectsGraphBehavior(t *testing.T) {
 	for _, tc := range []struct {
-		name       string
-		mode       pb.FactoryCustomAutomation_StartMode
-		use        automationspec.TriggerUse
-		runsOnTask bool
+		name          string
+		mode          pb.FactoryCustomAutomation_StartMode
+		use           automationspec.TriggerUse
+		runsOnTask    bool
+		stage         string
+		extraTriggers []*pb.FactoryCustomAutomation_StartTrigger
 	}{
-		{"manual", pb.FactoryCustomAutomation_START_MODE_MANUAL, automationspec.Manual, false},
-		{"leave", pb.FactoryCustomAutomation_START_MODE_ON_LEAVE, automationspec.TaskLeavesStage, true},
+		{"manual", pb.FactoryCustomAutomation_START_MODE_MANUAL, automationspec.Manual, false, models.CanvasColumnKeyBacklog, nil},
+		{"leave", pb.FactoryCustomAutomation_START_MODE_ON_LEAVE, automationspec.TaskLeavesStage, true, models.CanvasColumnKeyBacklog, nil},
+		{"verify PR and leave", pb.FactoryCustomAutomation_START_MODE_AUTOMATIC, automationspec.PullRequestUpdated, true, models.CanvasColumnKeyVerify, []*pb.FactoryCustomAutomation_StartTrigger{{StartMode: pb.FactoryCustomAutomation_START_MODE_ON_LEAVE}}},
+		{"verify leave and PR", pb.FactoryCustomAutomation_START_MODE_ON_LEAVE, automationspec.TaskLeavesStage, true, models.CanvasColumnKeyVerify, []*pb.FactoryCustomAutomation_StartTrigger{{StartMode: pb.FactoryCustomAutomation_START_MODE_AUTOMATIC}}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			r := support.Setup(t)
@@ -217,12 +223,18 @@ func TestCanvasAutomationLegacyImportProtectsGraphBehavior(t *testing.T) {
 			support.AssignOpenSystemTrial(t, r.Organization.ID)
 			_, err := models.UpsertOrganizationBYOKModelAllowlist(db, r.Organization.ID, models.UsageProviderAnthropic, datatypes.JSONSlice[string]{"claude-sonnet-4-6"})
 			require.NoError(t, err)
+			r.Registry.Integrations[models.ProviderGitHub] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{
+				Triggers: []core.Trigger{impl.NewDummyIntegrationTrigger(impl.DummyIntegrationTriggerOptions{Name: prFeedbackTriggerComponent(models.ProviderGitHub)})},
+			})
 			ctx, deps := onboardingContext(r), onboardingDeps(r)
+			triggers := []*pb.FactoryCustomAutomation_StartTrigger{{StartMode: tc.mode}}
+			triggers = append(triggers, tc.extraTriggers...)
 			runsOnTask := tc.runsOnTask
 			created, err := CreateFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &pb.CreateFactoryCustomAutomationRequest{
-				FactoryId: factory.ID.String(), ColumnKey: models.CanvasColumnKeyBacklog, Name: "Inspect task",
+				FactoryId: factory.ID.String(), ColumnKey: tc.stage, Name: "Inspect task",
 				Settings: &pb.FactoryCustomAutomation_Settings{
 					StartMode:  tc.mode,
+					Triggers:   triggers,
 					RunsOnTask: &runsOnTask,
 					Agent:      &pb.FactoryAppTemplateAgent{Component: "runnerClaudeCode", Model: "claude-sonnet-4-6"},
 					Steps: []*pb.FactoryCustomAutomation_Step{
@@ -242,6 +254,7 @@ func TestCanvasAutomationLegacyImportProtectsGraphBehavior(t *testing.T) {
 			require.NotNil(t, doc.RunsOnTask)
 			require.Equal(t, tc.runsOnTask, *doc.RunsOnTask)
 			require.Equal(t, tc.use, doc.Triggers[0].Use)
+			require.Len(t, doc.Triggers, len(triggers))
 			require.Equal(t, "  Inspect the task.\n", doc.Steps[0].Prompt)
 			version, err := models.FindLiveCanvasVersionInTransaction(db, id)
 			require.NoError(t, err)
@@ -282,6 +295,7 @@ func TestCanvasAutomationLegacyImportProtectsGraphBehavior(t *testing.T) {
 			require.Equal(t, "Inspect the new task.\n", doc.Steps[0].Prompt)
 			require.Equal(t, int64(2), reopened.Revision)
 			require.Equal(t, tc.use, doc.Triggers[0].Use)
+			require.Len(t, doc.Triggers, len(triggers))
 
 		})
 	}
@@ -371,4 +385,50 @@ steps:
 	require.NoError(t, err)
 	require.Equal(t, r.User, ownerID)
 
+}
+
+func TestCanvasAutomationRemainsEditableAfterModelSourceSwitch(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory := seedHandOffFactory(t, r, db)
+	vcsID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
+	agentID := createReadyOnboardingIntegration(t, r.Organization.ID, "claude")
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSIntegrationID: &vcsID, AgentIntegrationID: &agentID}))
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureAutomationsAsCode))
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
+	support.AssignOpenSystemTrial(t, r.Organization.ID)
+	_, err := models.UpsertOrganizationBYOKModelAllowlist(db, r.Organization.ID, models.UsageProviderAnthropic, datatypes.JSONSlice[string]{"claude-sonnet-4-6"})
+	require.NoError(t, err)
+	ctx := onboardingContext(r)
+	service := automations.Service{Backend: CanvasAutomationBackend{Deps: onboardingDeps(r)}}
+	const source = `apiVersion: v2
+kind: Automation
+name: Inspect task
+agent:
+  harness: claude-code
+  model: claude-sonnet-4-6
+triggers:
+  - use: manual
+steps:
+  - name: Inspect
+    prompt: Inspect the task.
+`
+	created, err := service.Create(ctx, automations.Placement{OrganizationID: r.Organization.ID, FactoryID: factory.ID, Stage: models.CanvasColumnKeyBacklog}, r.User, source)
+	require.NoError(t, err)
+	stubProviderModels(r.Registry, "openai", []string{"gpt-5"})
+	changed, _, err := SwitchFactoryModelSourceInTransaction(ctx, r.Registry, r.Organization.ID.String(), factory.ID.String(), modelSourceOpenAI, "sk-test", "", "")
+	require.NoError(t, err)
+	require.True(t, slices.Contains(changed, created.ID))
+	reopened, err := service.Read(ctx, r.Organization.ID, created.ID)
+	require.NoError(t, err)
+	require.Equal(t, created.YAML, reopened.YAML)
+	require.Equal(t, created.Revision, reopened.Revision)
+	updatedSource := strings.ReplaceAll(strings.ReplaceAll(reopened.YAML, "claude-code", "codex"), "claude-sonnet-4-6", "gpt-5")
+	_, err = service.Update(ctx, r.Organization.ID, created.ID, r.User, updatedSource)
+	require.NoError(t, err)
+	stubProviderModels(r.Registry, "claude", []string{"claude-sonnet-4-6"})
+	_, _, err = SwitchFactoryModelSourceInTransaction(ctx, r.Registry, r.Organization.ID.String(), factory.ID.String(), modelSourceAnthropic, "sk-test", "", "")
+	require.NoError(t, err)
+	require.NoError(t, service.Delete(ctx, r.Organization.ID, created.ID))
 }
