@@ -5,6 +5,7 @@ import { BrowserRouter, Link, MemoryRouter, useLocation, useNavigate } from "rea
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import { useState, type ReactNode } from "react";
 import type { CanvasesCanvasRun, FactoriesFactoryCustomAutomation } from "@/api-client";
+import { useCommandPaletteShortcuts } from "@/components/GlobalCommandPalette/hooks";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { FactoriesLayoutContext } from "../layout/factoriesLayoutContext";
 import { CustomAutomationSetupModal } from "./CustomAutomationSetupModal";
@@ -53,7 +54,20 @@ const run: CanvasesCanvasRun = {
   task: { id: "task-1", key: "SP-123", title: "Preview settings" },
 };
 
+const createApp = vi.fn(async () => {});
+
 function BrowserControls() {
+  useCommandPaletteShortcuts({
+    createCanvas: createApp,
+    createCanvasDisabled: false,
+    enabled: true,
+    open: false,
+    page: "root",
+    search: "",
+    setOpen: () => {},
+    setPage: () => {},
+    setSearch: () => {},
+  });
   const location = useLocation();
   const navigate = useNavigate();
   return (
@@ -281,6 +295,46 @@ steps:
 
   beforeEach(() => hooks.runs.mockReturnValue({ data: { pages: [] } }));
   afterEach(() => vi.restoreAllMocks());
+
+  it("opens and saves the form editor when an existing automation cannot be imported as YAML", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      Response.json({ message: "This automation cannot be represented as YAML." }, { status: 409 }),
+    );
+    hooks.describe.mockReturnValue({ data: automation });
+    hooks.update.mockResolvedValue(automation);
+    const onClose = renderModal("?customAutomation=custom-1", "custom-1", "verify", true);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Edit in form" }));
+    expect(screen.getByLabelText("Automation name")).toHaveValue("Deploy preview");
+    await user.clear(screen.getByLabelText("Automation name"));
+    await user.type(screen.getByLabelText("Automation name"), "Updated preview");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+    expect(hooks.update).toHaveBeenCalledWith(expect.objectContaining({ name: "Updated preview" }));
+  });
+
+  it("blocks the app creation shortcut only while the automation draft is dirty", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json(savedAutomation));
+    createApp.mockClear();
+    renderModal("?customAutomation=custom-1", "custom-1", "backlog", true);
+    const name = await screen.findByLabelText("Automation name");
+    const cancel = screen.getByRole("button", { name: "Cancel" });
+    cancel.focus();
+    fireEvent.keyDown(cancel, { key: "/", ctrlKey: true });
+    expect(createApp).toHaveBeenCalledTimes(1);
+
+    fireEvent.change(name, { target: { value: "Unsaved preview" } });
+    cancel.focus();
+    fireEvent.keyDown(cancel, { key: "/", ctrlKey: true });
+    fireEvent.keyDown(cancel, { key: "/", metaKey: true });
+    expect(createApp).toHaveBeenCalledTimes(1);
+    expect(name).toHaveValue("Unsaved preview");
+
+    await userEvent.setup().click(screen.getByRole("tab", { name: "YAML" }));
+    fireEvent.change(screen.getByLabelText("Automation YAML"), { target: { value: savedYaml } });
+    fireEvent.keyDown(screen.getByRole("button", { name: "Cancel" }), { key: "/", metaKey: true });
+    expect(createApp).toHaveBeenCalledTimes(2);
+  });
 
   it("projects Canvas and YAML changes before Save and keeps the exact edited source", async () => {
     const fetch = vi

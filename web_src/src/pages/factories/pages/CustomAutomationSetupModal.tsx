@@ -110,9 +110,13 @@ function LegacyAutomationModal({ lineId, automationId, columnKey, onClose }: Cus
   );
 }
 
-function AutomationSourceModal({ automationId, columnKey = "verify", onClose }: CustomAutomationSetupModalProps) {
+function AutomationSourceModal(props: CustomAutomationSetupModalProps) {
+  const { automationId, columnKey = "verify", onClose } = props;
+  const [useForm, setUseForm] = useState(false);
   const { organizationId, factoryId } = useFactoriesLayout();
   const source = useCustomAutomationSource(organizationId, factoryId, automationId);
+  if (useForm) return <LegacyAutomationModal {...props} />;
+
   if (automationId && (!source.data || !source.isFetchedAfterMount)) {
     return (
       <AutomationDialog automationId={automationId} onClose={onClose}>
@@ -121,6 +125,7 @@ function AutomationSourceModal({ automationId, columnKey = "verify", onClose }: 
           error={source.error}
           onClose={onClose}
           onRetry={() => void source.refetch()}
+          onEditInForm={() => setUseForm(true)}
         />
       </AutomationDialog>
     );
@@ -286,11 +291,13 @@ function AutomationLoadState({
   error,
   onClose,
   onRetry,
+  onEditInForm,
 }: {
   loading: boolean;
   error: unknown;
   onClose: () => void;
   onRetry: () => void;
+  onEditInForm?: () => void;
 }) {
   if (loading) {
     return (
@@ -310,6 +317,11 @@ function AutomationLoadState({
           <Button type="button" variant="outline" onClick={onClose}>
             Close
           </Button>
+          {onEditInForm ? (
+            <Button type="button" variant="outline" onClick={onEditInForm}>
+              Edit in form
+            </Button>
+          ) : null}
           <Button type="button" onClick={onRetry}>
             Try again
           </Button>

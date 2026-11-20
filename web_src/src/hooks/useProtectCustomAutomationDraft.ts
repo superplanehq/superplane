@@ -13,6 +13,13 @@ export function useProtectCustomAutomationDraft(dirty: boolean) {
     const editorState: unknown = window.history.state;
     const editorIndex = historyIndex(editorState);
 
+    // App creation navigates away before the draft can confirm dismissal.
+    const onShortcut = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key === "/") {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+      }
+    };
     const onUnload = (event: BeforeUnloadEvent) => event.preventDefault();
     const onHistoryChange = (event: PopStateEvent) => {
       const sameEditor =
@@ -31,9 +38,11 @@ export function useProtectCustomAutomationDraft(dirty: boolean) {
       window.history.pushState(editorState, "", editorURL);
     };
 
+    window.addEventListener("keydown", onShortcut, true);
     window.addEventListener("beforeunload", onUnload);
     window.addEventListener("popstate", onHistoryChange, true);
     return () => {
+      window.removeEventListener("keydown", onShortcut, true);
       window.removeEventListener("beforeunload", onUnload);
       window.removeEventListener("popstate", onHistoryChange, true);
     };
