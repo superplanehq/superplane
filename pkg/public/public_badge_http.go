@@ -56,7 +56,7 @@ func (s *Server) handlePublicBadge(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", badgeCacheControl)
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write([]byte(body))
+	_, _ = w.Write([]byte(body)) // #nosec G705 -- the SVG renderer XML-escapes all dynamic text and normalizes colors.
 }
 
 const badgeCacheControl = "private, no-store"

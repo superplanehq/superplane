@@ -3,13 +3,18 @@ import { cn } from "@/lib/utils";
 import { ArrowDown, ArrowUp, MessageSquareText, Plus, Terminal, Trash2, Zap } from "lucide-react";
 import type { ReactNode } from "react";
 
-import type { CustomAutomationColumn, CustomAutomationTrigger } from "../lib/customAutomation";
+import {
+  customAutomationColumnLabel,
+  type CustomAutomationColumn,
+  type CustomAutomationTrigger,
+} from "../lib/customAutomation";
 import { mergeCheckPromptBody } from "./mergeConfidenceSteps";
 import type { PlanningReviewStep, PlanningReviewStepKind } from "./planningReviewMockup";
 
 export function AutomationFlow({
   columnKey = "verify",
   triggers,
+  runsOnTask,
   steps,
   selectedStep,
   onSelectTrigger,
@@ -20,6 +25,7 @@ export function AutomationFlow({
 }: {
   columnKey?: CustomAutomationColumn;
   triggers: CustomAutomationTrigger[];
+  runsOnTask: boolean;
   steps: PlanningReviewStep[];
   selectedStep: number | null;
   onSelectTrigger: () => void;
@@ -35,7 +41,9 @@ export function AutomationFlow({
         <FlowCard selected={selectedStep === null} onClick={onSelectTrigger}>
           <FlowBadge kind="trigger" />
           <p className="mt-3 text-sm font-semibold text-foreground">{sidebarTriggerTitle(triggers, columnKey)}</p>
-          <p className="mt-1 text-xs text-muted-foreground">{sidebarTriggerDescription(triggers, columnKey)}</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {sidebarTriggerDescription(triggers, columnKey, runsOnTask)}
+          </p>
         </FlowCard>
         {steps.map((step, index) => (
           <div className="flex w-full flex-col items-center" key={index}>
@@ -177,13 +185,17 @@ function sidebarTriggerTitle(triggers: CustomAutomationTrigger[], columnKey: Cus
   return triggerTitle(trigger.mode, columnKey);
 }
 
-function sidebarTriggerDescription(triggers: CustomAutomationTrigger[], columnKey: CustomAutomationColumn): string {
+function sidebarTriggerDescription(
+  triggers: CustomAutomationTrigger[],
+  columnKey: CustomAutomationColumn,
+  runsOnTask: boolean,
+): string {
   const trigger = triggers[0];
   if (!trigger) {
     return "Add a trigger.";
   }
   if (triggers.length === 1) {
-    return triggerDescription(trigger.mode, columnKey);
+    return triggerDescription(trigger.mode, columnKey, runsOnTask);
   }
   const titles = triggers.map((item) => triggerTitle(item.mode, columnKey));
   const titlesRepeat = new Set(titles).size !== titles.length;
@@ -198,18 +210,32 @@ function sidebarTriggerDescription(triggers: CustomAutomationTrigger[], columnKe
 
 function triggerTitle(mode: CustomAutomationTrigger["mode"], columnKey: CustomAutomationColumn): string {
   if (mode === "scheduled") return "Schedule";
-  if (mode === "automatic") return columnKey === "backlog" ? "When a task enters Backlog" : "Every pull request commit";
+  if (mode === "leave") return `When a task leaves ${customAutomationColumnLabel(columnKey)}`;
+  if (mode === "automatic") {
+    return columnKey === "verify"
+      ? "Every pull request commit"
+      : `When a task enters ${customAutomationColumnLabel(columnKey)}`;
+  }
   return "Manual";
 }
 
-function triggerDescription(mode: CustomAutomationTrigger["mode"], columnKey: CustomAutomationColumn): string {
+function triggerDescription(
+  mode: CustomAutomationTrigger["mode"],
+  columnKey: CustomAutomationColumn,
+  runsOnTask: boolean,
+): string {
   if (mode === "scheduled") {
     return columnKey === "backlog" ? "Run automation on a schedule." : "Runs on the repository default branch.";
   }
-  if (mode === "automatic") {
-    return columnKey === "backlog" ? "Runs when a task enters Backlog." : "Runs for every new pull request commit.";
+  if (mode === "leave") {
+    return `Runs when a task leaves ${customAutomationColumnLabel(columnKey)}.`;
   }
-  return "Runs when you start it from a task.";
+  if (mode === "automatic") {
+    return columnKey === "verify"
+      ? "Runs for every new pull request commit."
+      : `Runs when a task enters ${customAutomationColumnLabel(columnKey)}.`;
+  }
+  return runsOnTask ? "Runs when you start it from a task." : "Runs when you start it from the column.";
 }
 
 function FlowConnector() {

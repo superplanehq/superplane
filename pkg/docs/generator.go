@@ -64,7 +64,7 @@ func GenerateFiles() ([]File, error) {
 }
 
 func WriteFiles(outputDir string) error {
-	if err := os.MkdirAll(outputDir, 0o755); err != nil {
+	if err := os.MkdirAll(outputDir, 0o755); err != nil { // #nosec G301 -- generated documentation is a public build artifact.
 		return err
 	}
 
@@ -74,7 +74,7 @@ func WriteFiles(outputDir string) error {
 	}
 
 	for _, file := range files {
-		if err := os.WriteFile(filepath.Join(outputDir, file.Name), file.Content, 0o644); err != nil {
+		if err := os.WriteFile(filepath.Join(outputDir, file.Name), file.Content, 0o644); err != nil { // #nosec G306 -- generated documentation is a public build artifact.
 			return err
 		}
 	}

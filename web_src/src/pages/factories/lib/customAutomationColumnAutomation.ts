@@ -2,7 +2,12 @@ import type { FactoriesWorkOrder } from "@/api-client";
 
 import { CUSTOM_AUTOMATION_CATALOG_ID } from "./columnAutomationCatalog";
 import type { ColumnAutomation } from "./columnAutomations";
-import { customAutomationModeCopy, type CustomAutomationMode } from "./customAutomation";
+import {
+  customAutomationColumn,
+  customAutomationModeCopy,
+  type CustomAutomationColumn,
+  type CustomAutomationMode,
+} from "./customAutomation";
 
 export function customAutomationColumnAutomation(
   app: {
@@ -14,6 +19,7 @@ export function customAutomationColumnAutomation(
     customAutomationIcon?: string;
     customAutomationCronExpression?: string;
     customAutomationTriggers?: Array<{ mode: CustomAutomationMode; cronExpression?: string }>;
+    customAutomationRunsOnTask?: boolean;
   },
   workOrders: FactoriesWorkOrder[],
   runningCountForApp: (appId: string | undefined, orders: FactoriesWorkOrder[]) => number,
@@ -22,7 +28,7 @@ export function customAutomationColumnAutomation(
   if (!id) {
     return null;
   }
-  const columnKey = app.columnKey === "backlog" ? "backlog" : "verify";
+  const columnKey = customAutomationColumn(app.columnKey);
   const listed = app.customAutomationTriggers ?? [];
   const hasSchedule =
     listed.some((trigger) => trigger.mode === "scheduled") || app.customAutomationMode === "scheduled";
@@ -42,7 +48,7 @@ export function customAutomationColumnAutomation(
     runningCount: runningCountForApp(id, workOrders),
     catalogId: CUSTOM_AUTOMATION_CATALOG_ID,
     canvasId: id,
-    canRunNow: columnKey === "backlog" && hasSchedule ? true : undefined,
+    canRunNow: columnKey === "backlog" && (hasSchedule || app.customAutomationRunsOnTask === false) ? true : undefined,
   };
 }
 
@@ -53,6 +59,9 @@ function primaryCustomAutomationMode(
   if (listed.some((trigger) => trigger.mode === "automatic")) {
     return "automatic";
   }
+  if (listed.some((trigger) => trigger.mode === "leave")) {
+    return "leave";
+  }
   if (listed.some((trigger) => trigger.mode === "scheduled")) {
     return "scheduled";
   }
@@ -62,7 +71,7 @@ function primaryCustomAutomationMode(
 function customAutomationTriggerSummary(
   app: { customAutomationMode?: CustomAutomationMode; customAutomationCronExpression?: string },
   listed: Array<{ mode: CustomAutomationMode; cronExpression?: string }>,
-  columnKey: "backlog" | "verify",
+  columnKey: CustomAutomationColumn,
   fallback: string,
 ): string {
   if (listed.length > 1) {
@@ -76,7 +85,7 @@ function customAutomationTriggerSummary(
 
 function customAutomationTriggerLabel(
   item: { mode: CustomAutomationMode; cronExpression?: string },
-  columnKey: "backlog" | "verify",
+  columnKey: CustomAutomationColumn,
 ): string {
   if (item.mode === "scheduled" && item.cronExpression) {
     return `On schedule: ${item.cronExpression}`;

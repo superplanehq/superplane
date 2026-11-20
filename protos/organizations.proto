@@ -594,6 +594,9 @@ message Organization {
 
   Metadata metadata = 1;
   Spec spec = 2;
+  // Enterprise features this organization can use. Any member can read
+  // this list. It does not include license details.
+  repeated string enterprise_features = 3;
 }
 
 message DescribeOrganizationRequest {

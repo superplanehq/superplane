@@ -4,6 +4,7 @@ import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 import { FIRST_RUN_COPY } from "./first-run/firstRunCopy";
+import { withFirstRunQuery } from "./firstRunTestQuery";
 import { EMPTY_LINEAR_INTAKE_SCOPE } from "../linearIntakeScope";
 import { FirstRunSetup } from "./FirstRunSetup";
 import {
@@ -188,9 +189,11 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
 
 function renderSetup(model: OnboardingPageModel, path = "/org-1/workspaces/PAY/setup?step=vcs") {
   return render(
-    <MemoryRouter initialEntries={[path]}>
-      <FirstRunSetup model={model} />
-    </MemoryRouter>,
+    withFirstRunQuery(
+      <MemoryRouter initialEntries={[path]}>
+        <FirstRunSetup model={model} />
+      </MemoryRouter>,
+    ),
   );
 }
 
@@ -358,9 +361,11 @@ describe("FirstRunSetup GitHub catalog", () => {
     expect(await screen.findByTestId("first-run-choose")).toBeInTheDocument();
 
     view.rerender(
-      <MemoryRouter initialEntries={[path]}>
-        <FirstRunSetup model={{ ...model, setup: { ...model.setup, selectedRepo: null } }} />
-      </MemoryRouter>,
+      withFirstRunQuery(
+        <MemoryRouter initialEntries={[path]}>
+          <FirstRunSetup model={{ ...model, setup: { ...model.setup, selectedRepo: null } }} />
+        </MemoryRouter>,
+      ),
     );
 
     expect(screen.getByTestId("first-run-choose")).toBeInTheDocument();
@@ -531,9 +536,11 @@ describe("FirstRunSetup GitHub catalog", () => {
 
     github.error = { message: "Not Found" };
     view.rerender(
-      <MemoryRouter initialEntries={["/org-1/workspaces/PAY/setup?step=vcs"]}>
-        <FirstRunSetup model={model} />
-      </MemoryRouter>,
+      withFirstRunQuery(
+        <MemoryRouter initialEntries={["/org-1/workspaces/PAY/setup?step=vcs"]}>
+          <FirstRunSetup model={model} />
+        </MemoryRouter>,
+      ),
     );
 
     await waitFor(() => expect(github.calls.length).toBeGreaterThan(1));

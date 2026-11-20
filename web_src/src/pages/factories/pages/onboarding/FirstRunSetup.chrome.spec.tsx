@@ -10,6 +10,7 @@ import { unmockedPackage } from "@/test/unmockedModule";
 import { billingState, defaultBillingState, refetchBilling } from "./FirstRunSetup.chrome.spec.billing";
 import { hostedVcsModel, pageModel, setupState } from "./FirstRunSetup.chrome.spec.fixtures";
 import { FIRST_RUN_COPY } from "./first-run/firstRunCopy";
+import { withFirstRunQuery } from "./firstRunTestQuery";
 import { FirstRunSetup } from "./FirstRunSetup";
 import { NavigableSetup, StatefulSetup } from "./firstRunSetupComponents.test-support";
 import { renderSetup } from "./FirstRunSetup.chrome.spec.render";
@@ -92,9 +93,11 @@ vi.mock("./AgentStep", () => ({
 function renderStatefulSetup(overrides: Partial<OnboardingPageModel>) {
   billingState.byok = overrides.bringYourOwnKey ?? false;
   render(
-    <MemoryRouter initialEntries={["/org-1/workspaces/PAY/setup?step=agent"]}>
-      <StatefulSetup model={pageModel({ openSection: "agent", ...overrides })} />
-    </MemoryRouter>,
+    withFirstRunQuery(
+      <MemoryRouter initialEntries={["/org-1/workspaces/PAY/setup?step=agent"]}>
+        <StatefulSetup model={pageModel({ openSection: "agent", ...overrides })} />
+      </MemoryRouter>,
+    ),
   );
 }
 
@@ -196,9 +199,11 @@ describe("FirstRunSetup chrome", () => {
     const { rerender } = renderSetup(model, path);
     githubState.pending = false;
     rerender(
-      <MemoryRouter initialEntries={[path]}>
-        <FirstRunSetup model={model} />
-      </MemoryRouter>,
+      withFirstRunQuery(
+        <MemoryRouter initialEntries={[path]}>
+          <FirstRunSetup model={model} />
+        </MemoryRouter>,
+      ),
     );
 
     expect(screen.getByTestId("first-run-welcome")).toBeInTheDocument();
@@ -215,9 +220,11 @@ describe("FirstRunSetup chrome", () => {
     const user = userEvent.setup();
     const model = pageModel({ hostedModelsAvailable: true, bringYourOwnKey: true, openSection: "vcs" });
     render(
-      <MemoryRouter initialEntries={["/org-1/workspaces/PAY/setup?step=welcome"]}>
-        <NavigableSetup model={model} />
-      </MemoryRouter>,
+      withFirstRunQuery(
+        <MemoryRouter initialEntries={["/org-1/workspaces/PAY/setup?step=welcome"]}>
+          <NavigableSetup model={model} />
+        </MemoryRouter>,
+      ),
     );
 
     await user.click(screen.getByTestId("first-run-get-started"));
@@ -470,9 +477,11 @@ describe("FirstRunSetup chrome", () => {
     permissionsLoading = false;
     canManageBilling = true;
     rerender(
-      <MemoryRouter initialEntries={[path]}>
-        <FirstRunSetup model={model} />
-      </MemoryRouter>,
+      withFirstRunQuery(
+        <MemoryRouter initialEntries={[path]}>
+          <FirstRunSetup model={model} />
+        </MemoryRouter>,
+      ),
     );
     expect(await screen.findByTestId("first-run-card")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Continue with Pay-as-you-go" })).toBeEnabled();
@@ -492,9 +501,11 @@ describe("FirstRunSetup chrome", () => {
 
       const restored = { ...model, setup: { ...model.setup, connected: new Set(["github"] as const) } };
       rerender(
-        <MemoryRouter initialEntries={[path]}>
-          <FirstRunSetup model={restored} />
-        </MemoryRouter>,
+        withFirstRunQuery(
+          <MemoryRouter initialEntries={[path]}>
+            <FirstRunSetup model={restored} />
+          </MemoryRouter>,
+        ),
       );
       await waitFor(() => expect(model.finish).toHaveBeenCalledTimes(1));
       expect(activateOnboardingPlan).not.toHaveBeenCalled();

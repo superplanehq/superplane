@@ -379,8 +379,11 @@ describe("catalogForColumn", () => {
     expect(catalogForColumn("done").map((entry) => entry.id)).toEqual(["pr-closure"]);
   });
 
-  it("offers a custom canvas in the done catalog when the feature is on", () => {
-    expect(catalogForColumn("done", { allowCustom: true }).map((entry) => entry.id)).toEqual(["pr-closure", "custom"]);
+  it("offers a custom automation in the done catalog when the feature is on", () => {
+    expect(catalogForColumn("done", { allowCustom: true }).map((entry) => entry.id)).toEqual([
+      "pr-closure",
+      "custom-verification",
+    ]);
   });
 
   it("keeps phase catalog entries available after one agent exists", () => {
@@ -392,13 +395,6 @@ describe("catalogForColumn", () => {
 
     expect(takenCatalogIds(automations, catalog)).toEqual([]);
     expect(catalog.map((entry) => entry.id)).toEqual(["agent-step"]);
-  });
-
-  it("offers a custom canvas in the phase catalog when the feature is on", () => {
-    expect(catalogForColumn("phase-0", { allowCustom: true }).map((entry) => entry.id)).toEqual([
-      "agent-step",
-      "custom",
-    ]);
   });
 });
 
@@ -530,4 +526,28 @@ it("keeps a renamed scheduled intake visible and opens its saved automation", ()
   expect(columnAutomationOpenPath(rows[0], { organizationId: "org", factoryKey: "workspace" })).toBe(
     factoryColumnAutomationViewPath("org", "workspace", undefined, "scheduled-app"),
   );
+});
+
+it("keeps a renamed Review request visible without discovery and avoids a duplicate custom row", () => {
+  const rows = buildColumnAutomations("verify", {
+    columnTitle: "Verify",
+    apps: [
+      {
+        id: "review-request-app",
+        name: "Request engineering review",
+        templateId: "review-request",
+        columnKey: "verify",
+      },
+    ],
+  });
+  expect(rows).toHaveLength(1);
+  expect(rows[0]).toMatchObject({
+    kind: "review-request",
+    canvasId: "review-request-app",
+    name: "Request engineering review",
+  });
+  expect(columnAutomationOpenPath(rows[0], { organizationId: "org", factoryKey: "workspace" })).toBe(
+    factoryColumnAutomationViewPath("org", "workspace", undefined, "review-request-app"),
+  );
+  expect(catalogForColumn("verify").some((entry) => entry.id === "review-request")).toBe(false);
 });

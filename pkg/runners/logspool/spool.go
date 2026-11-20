@@ -309,7 +309,7 @@ func (s *Spool) openCurrentLocked() {
 		s.config.Directory,
 		fmt.Sprintf("%020d.ndjson.tmp", s.nextSequence),
 	)
-	file, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600) // #nosec G304 -- path is generated beneath the configured spool directory.
 	if err != nil {
 		s.failLocked(fmt.Errorf("create log spool chunk: %w", err))
 		return
@@ -425,7 +425,7 @@ func (s *Spool) nextFlushInterval() time.Duration {
 	}
 	span := maximum - minimum
 	return minimum +
-		time.Duration(rand.Int64N(int64(span)+1))
+		time.Duration(rand.Int64N(int64(span)+1)) // #nosec G404 -- flush jitter is not security-sensitive.
 }
 
 func (s *Spool) retryDelay() time.Duration {
@@ -485,7 +485,7 @@ func (e *uploadRetryError) Unwrap() error {
 }
 
 func (s *Spool) upload(path string) (uploadOutcome, error) {
-	file, err := os.Open(path)
+	file, err := os.Open(path) // #nosec G304 -- path is generated beneath the configured spool directory.
 	if err != nil {
 		return uploadOutcome{}, fmt.Errorf("open log spool chunk: %w", err)
 	}

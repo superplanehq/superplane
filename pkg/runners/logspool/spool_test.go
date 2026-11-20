@@ -357,3 +357,11 @@ func TestSpoolWaitHonorsContext(t *testing.T) {
 		t.Fatal("expected context error")
 	}
 }
+
+func TestEncodeRecordDoesNotPromoteModelCallStdout(t *testing.T) {
+	encoded := encodeRecord([]byte(`{"type":"model_call","provider":"openai","model":"gpt-5","outcome":"attempt_1","sequence":2,"secret":"no"}`))
+	var record map[string]any
+	require.NoError(t, json.Unmarshal([]byte(strings.TrimSpace(string(encoded))), &record))
+	assert.Equal(t, "line", record["type"])
+	assert.Contains(t, record["text"], `"type":"model_call"`)
+}

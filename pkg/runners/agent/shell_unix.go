@@ -5,10 +5,10 @@ package agent
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"io"
-	"math/rand"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -51,7 +51,7 @@ func runHostShellDirectiveList(ctx context.Context, maxOut int, workDir string, 
 	// Apple bash 3.2 mishandles `+m` together with `--noediting` (option parsing surfaces as
 	// `/bin/bash: --: invalid option`). Keep job-control off (`+m`) for non-interactive scripts but
 	// omit `--noediting`; readline editing is irrelevant on our PTY-driven line protocol anyway.
-	cmd := exec.Command(bash, "--norc", "--noprofile", "+m", "-i")
+	cmd := exec.Command(bash, "--norc", "--noprofile", "+m", "-i") // #nosec G204 -- the runner intentionally executes the configured shell.
 	cmd.Dir = workDir
 	if env != nil {
 		cmd.Env = env
@@ -153,7 +153,7 @@ func runHostShellDirectivesPipe(ctx context.Context, maxOut int, workDir string,
 		return 1, "", err
 	}
 
-	cmd := exec.CommandContext(ctx, bash, "--norc", "--noprofile", metaPath)
+	cmd := exec.CommandContext(ctx, bash, "--norc", "--noprofile", metaPath) // #nosec G204 -- the runner intentionally executes its generated shell metadata script.
 	cmd.Dir = workDir
 	prepareTaskProcessGroup(cmd)
 	defer killTaskProcessGroup(cmd)
@@ -186,7 +186,7 @@ func runHostShellDirectivesPipe(ctx context.Context, maxOut int, workDir string,
 
 func resolveBash() (string, error) {
 	if p := strings.TrimSpace(os.Getenv("RUNNER_SHELL")); p != "" {
-		if st, err := os.Stat(p); err == nil && !st.IsDir() {
+		if st, err := os.Stat(p); err == nil && !st.IsDir() { // #nosec G703 -- RUNNER_SHELL is trusted runner process configuration.
 			return p, nil
 		}
 	}
@@ -268,7 +268,7 @@ func (s *shellSession) writeLine(line string) error {
 }
 
 func randomMark(prefix string) string {
-	return fmt.Sprintf("%s-%016x-%016x", prefix, rand.Uint64(), rand.Uint64())
+	return prefix + "-" + rand.Text()
 }
 
 func killShellProcess(shellCmd *exec.Cmd) {

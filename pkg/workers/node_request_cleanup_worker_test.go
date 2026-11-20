@@ -1,6 +1,8 @@
 package workers
 
 import (
+	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -11,6 +13,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
 func Test__NodeRequestCleanupWorker_DeletesExpiredCompletedRequests(t *testing.T) {
@@ -83,6 +86,100 @@ func Test__NodeRequestCleanupWorker_RespectsPerTickBudget(t *testing.T) {
 		Where("workflow_id = ? AND state = ?", canvas.ID, models.NodeExecutionRequestStateCompleted).
 		Count(&remaining).Error)
 	assert.Equal(t, int64(2), remaining)
+}
+
+func Test__NodeRequestCleanupWorker_DeletesExpiredHostedModelCallOutcomes(t *testing.T) {
+	support.Setup(t)
+	db := database.DB(t.Context())
+	t.Cleanup(func() {
+		_ = db.Where("runner_task_id IN ?", []string{"model-status-old", "model-status-new"}).
+			Delete(&models.HostedModelCallOutcome{}).Error
+	})
+
+	now := time.Now()
+	inputs := make([]models.HostedModelCallOutcomeInput, 0, expiredRecordCleanupBatch+2)
+	for sequence := 1; sequence <= expiredRecordCleanupBatch+1; sequence++ {
+		inputs = append(inputs, models.HostedModelCallOutcomeInput{
+			Provider:     models.UsageProviderOpenAI,
+			Model:        "gpt-5",
+			Outcome:      models.HostedModelCallOutcomeAttempt1,
+			OccurredAt:   now.Add(-26 * time.Hour),
+			RunnerTaskID: "model-status-old",
+			Sequence:     sequence,
+		})
+	}
+	inputs = append(inputs, models.HostedModelCallOutcomeInput{
+		Provider:     models.UsageProviderOpenAI,
+		Model:        "gpt-5",
+		Outcome:      models.HostedModelCallOutcomeAttempt1,
+		OccurredAt:   now.Add(-time.Hour),
+		RunnerTaskID: "model-status-new",
+		Sequence:     1,
+	})
+	require.NoError(t, models.InsertHostedModelCallOutcomes(db, inputs))
+
+	previous := deleteExpiredHostedModelCallOutcomesBatch
+	var batches []int64
+	deleteExpiredHostedModelCallOutcomesBatch = func(tx *gorm.DB, before time.Time, limit int) (int64, error) {
+		deleted, err := previous(tx, before, limit)
+		batches = append(batches, deleted)
+		return deleted, err
+	}
+	t.Cleanup(func() { deleteExpiredHostedModelCallOutcomesBatch = previous })
+
+	worker := NewNodeRequestCleanupWorker()
+	worker.pauseBetweenBatches = 0
+	worker.tick(context.Background())
+	assert.Equal(t, []int64{int64(expiredRecordCleanupBatch), 1}, batches)
+
+	var oldCount int64
+	require.NoError(t, db.Model(&models.HostedModelCallOutcome{}).Where("runner_task_id = ?", "model-status-old").Count(&oldCount).Error)
+	assert.Zero(t, oldCount)
+
+	var newCount int64
+	require.NoError(t, db.Model(&models.HostedModelCallOutcome{}).Where("runner_task_id = ?", "model-status-new").Count(&newCount).Error)
+	assert.Equal(t, int64(1), newCount)
+}
+
+func Test__NodeRequestCleanupWorker_ContinuesAfterHostedModelCallOutcomeCleanupFails(t *testing.T) {
+	support.Setup(t)
+	previous := deleteExpiredHostedModelCallOutcomesBatch
+	t.Cleanup(func() { deleteExpiredHostedModelCallOutcomesBatch = previous })
+
+	failures := []struct {
+		name string
+		fn   func(*gorm.DB, time.Time, int) (int64, error)
+	}{
+		{
+			name: "error",
+			fn: func(*gorm.DB, time.Time, int) (int64, error) {
+				return 0, errors.New("model status cleanup failed")
+			},
+		},
+		{
+			name: "panic",
+			fn: func(*gorm.DB, time.Time, int) (int64, error) {
+				panic("model status cleanup panic")
+			},
+		},
+	}
+	for _, failure := range failures {
+		t.Run(failure.name, func(t *testing.T) {
+			expired := createSentryReceiptForCleanup(t, time.Now().UTC().Add(-models.SentryWebhookReceiptRetention-time.Hour))
+			calls := 0
+			deleteExpiredHostedModelCallOutcomesBatch = func(tx *gorm.DB, before time.Time, limit int) (int64, error) {
+				calls++
+				return failure.fn(tx, before, limit)
+			}
+
+			worker := NewNodeRequestCleanupWorker()
+			worker.pauseBetweenBatches = 0
+			worker.tick(context.Background())
+
+			assert.Equal(t, 1, calls)
+			assert.Zero(t, countSentryReceiptsByID(t, expired))
+		})
+	}
 }
 
 func Test__NodeRequestCleanupWorker_DeletesExpiredSentryWebhookReceipts(t *testing.T) {

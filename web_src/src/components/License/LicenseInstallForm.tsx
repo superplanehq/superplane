@@ -20,6 +20,7 @@ type LicenseInstallFormProps = {
   onInstalled: (license: InstallationLicense) => void;
   onInstallingChange?: (installing: boolean) => void;
   secondaryAction?: React.ReactNode;
+  installLicense?: (license: string) => Promise<InstallationLicense | null>;
 };
 
 const formatFileSize = (bytes: number) => (bytes < 1024 ? `${bytes} B` : `${(bytes / 1024).toFixed(1)} KB`);
@@ -126,6 +127,7 @@ export const LicenseInstallForm: React.FC<LicenseInstallFormProps> = ({
   onInstalled,
   onInstallingChange,
   secondaryAction,
+  installLicense = installInstallationLicense,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const choiceRef = useRef(0);
@@ -174,7 +176,8 @@ export const LicenseInstallForm: React.FC<LicenseInstallFormProps> = ({
     onInstallingChange?.(true);
 
     try {
-      const license = await installInstallationLicense(licenseText);
+      const license = await installLicense(licenseText);
+      if (!license) return;
       setPasted("");
       clearFile();
       onInstalled(license);

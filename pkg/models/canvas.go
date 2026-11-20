@@ -23,9 +23,10 @@ var canvasNameUniqueConstraints = []string{
 }
 
 const (
-	CanvasColumnKeyBacklog = "backlog"
-	CanvasColumnKeyVerify  = "verify"
-	CanvasColumnKeyDone    = "done"
+	CanvasColumnKeyBacklog   = "backlog"
+	CanvasColumnKeyImplement = "implement"
+	CanvasColumnKeyVerify    = "verify"
+	CanvasColumnKeyDone      = "done"
 )
 
 type Canvas struct {
@@ -153,7 +154,7 @@ func (c *Canvas) SoftDelete() error {
 }
 
 func ValidCanvasColumnKey(key string) bool {
-	return key == CanvasColumnKeyBacklog || key == CanvasColumnKeyVerify || key == CanvasColumnKeyDone
+	return key == CanvasColumnKeyBacklog || key == CanvasColumnKeyImplement || key == CanvasColumnKeyVerify || key == CanvasColumnKeyDone
 }
 
 // SetColumnKey attaches this factory canvas to a board column. An empty key
@@ -184,10 +185,7 @@ func (c *Canvas) SoftDeleteInTransaction(tx *gorm.DB) error {
 	timestamp := now.Unix()
 
 	newName := fmt.Sprintf("%s (deleted-%d)", c.Name, timestamp)
-	return tx.Model(c).Updates(map[string]any{
-		"name":       newName,
-		"deleted_at": now,
-	}).Error
+	return tx.Model(c).Updates(map[string]any{"name": newName, "deleted_at": now}).Error
 }
 
 func FindCanvas(orgID, id uuid.UUID) (*Canvas, error) {

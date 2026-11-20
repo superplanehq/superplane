@@ -37,16 +37,23 @@ const FeatureFactoryDatadogIntake = "factory_datadog_intake"
 
 const FeatureFactoryScheduledIntake = "factory_scheduled_intake"
 
+// FeatureFactoryReviewRequest gates new reviewer-request automations. Existing
+// automations continue to run when the organization disables discovery.
+const FeatureFactoryReviewRequest = "factory_review_request"
+
 // FeatureOrganizationBYOK gates the organization Models settings page
 // until the BYOK UX is ready for general use.
 const FeatureOrganizationBYOK = "organization_byok"
+
+// FeatureModelStatus gates the hosted Model status page in organization settings.
+const FeatureModelStatus = "model_status"
 
 // FeatureOrganizationBYOKCustomProvider gates a custom model provider on the
 // organization Models page. It requires FeatureOrganizationBYOK as well.
 const FeatureOrganizationBYOKCustomProvider = "organization_byok_custom_provider"
 
-// FeatureFactoryCustomAutomations gates custom automations on Verify, Done,
-// and phase columns until the flow is generally available.
+// FeatureFactoryCustomAutomations gates custom automations on Backlog,
+// Implement, Verify, and Done until the flow is generally available.
 const FeatureFactoryCustomAutomations = "factory_custom_automations"
 
 // FeatureWorkspaceSkills gates workspace skill settings, skill APIs, and skill attach.
@@ -59,14 +66,6 @@ const FeatureFactoryPullRequestImport = "factory_pull_request_import"
 // the Merge button on pull request review until the feature is generally
 // available.
 const FeatureFactoryPullRequestMerge = "factory_pull_request_merge"
-
-// FeatureFactoryMultiRepoTasks lets agents change every Read & Write
-// workspace repository and open one pull request per repository. Without
-// it, context repositories stay read-only and the Implement app opens the
-// pull request from the canvas. The admin toggle republishes the Implement
-// apps of the organization. Releasing the flag does not: run the
-// installation-wide reset of "line-implementation" after the release.
-const FeatureFactoryMultiRepoTasks = "factory_multi_repo_tasks"
 
 // FeatureSuperPlaneMCPServer is released. Every organization can authorize
 // Cursor and other MCP clients against one workspace. The factories flag
@@ -103,15 +102,16 @@ var registry = []Feature{
 	{ID: FeatureNewIntegrationSetupFlow, Label: "New Integration Setup Flow", Description: "Use the multi-step SetupProvider wizard when connecting integrations such as GitHub"},
 	{ID: FeatureFactoryProductiveIntake, Label: "Factory Productive Intake", Description: "Add Productive intake from the Backlog column menu"},
 	{ID: FeatureFactoryScheduledIntake, Label: "Scheduled Intake", Description: "Propose backlog tasks on a schedule"},
+	{ID: FeatureFactoryReviewRequest, Label: "Review request", Description: "Request human reviews after Merge confidence completes"},
 	{ID: FeatureFactoryDatadogIntake, Label: "Factory Datadog Intake", Description: "Add Datadog intake from the Backlog column menu"},
 	{ID: FeatureOrganizationBYOK, Label: "Organization BYOK", Description: "Show the organization Models settings page"},
+	{ID: FeatureModelStatus, Label: "Model status", Description: "Show the hosted Model status page in organization settings"},
 	{ID: FeatureOrganizationBYOKCustomProvider, Label: "Organization BYOK Custom Provider", Description: "Add a custom model provider with a URL, token, and API type"},
 	{ID: FeatureFactoryCustomAutomations, Label: "Custom Automations", Description: "Add custom automations to board columns"},
 	{ID: FeatureWorkspaceSkills, Label: "Workspace Skills", Description: "Add skills for workspace agents"},
 	{ID: FeatureFactoryPullRequestMerge, Label: "Pull Request Merge", Description: "Show the Mergeable chip on task cards and the Merge button on pull request review"},
 	{ID: FeatureSuperPlaneMCPServer, Label: "MCP Server", Description: "Allow Cursor and other MCP clients to connect to workspaces in this organization", Released: released()},
 	{ID: FeatureFactoryStepActions, Label: "Step actions", Description: "Show agent action reasons on the step card"},
-	{ID: FeatureFactoryMultiRepoTasks, Label: "Multi-repo tasks", Description: "Let agents change every Read & Write workspace repository and open one pull request per repository"},
 }
 
 func All() []Feature {

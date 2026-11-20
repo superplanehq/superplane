@@ -8,9 +8,12 @@ The GitHub integration stays `github`. An empty host is github.com.
 ## Enable the feature
 
 GitHub Enterprise Cloud needs a SuperPlane Enterprise license that grants
-`github_enterprise`. During rollout, an installation admin also turns on the
+`github_enterprise`, and a grant of that feature for the organization. Enable
+it under Installation Admin > Organizations > [organization] > Enterprise
+features. During rollout, an installation admin also turns on the
 organization experimental feature `github_enterprise`. SuperPlane then accepts
-a GitHub Enterprise Cloud hostname during setup.
+a GitHub Enterprise Cloud hostname during setup. A grant for one organization
+does not enable the feature in another organization.
 
 ## Hostname allowlist
 

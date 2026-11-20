@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/components/runner"
+	"github.com/superplanehq/superplane/pkg/factories/mergeconfidence"
 	"github.com/superplanehq/superplane/pkg/integrations/prbody"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
@@ -41,12 +42,10 @@ type factoryTemplateKey struct {
 }
 
 type factoryAppTemplate struct {
-	id               string
-	provider         string
-	entrypointNodeID string
-	canvasFile       string
-	// multiRepoCanvasFile replaces canvasFile for organizations with multi-repo tasks.
-	multiRepoCanvasFile   string
+	id                    string
+	provider              string
+	entrypointNodeID      string
+	canvasFile            string
 	consoleFile           string
 	componentIntegrations map[string]string
 	// columnKey attaches the canvas to Verify or Done when the template is installed.
@@ -66,29 +65,31 @@ func bitbucketFactoryTemplate(template factoryAppTemplate) factoryAppTemplate {
 var factoryAppTemplates = map[factoryTemplateKey]factoryAppTemplate{
 	{id: scheduledIntakeTemplateID, provider: models.ProviderGitHub}:    scheduledIntakeTemplate(models.ProviderGitHub),
 	{id: scheduledIntakeTemplateID, provider: models.ProviderBitbucket}: scheduledIntakeTemplate(models.ProviderBitbucket),
-	{id: "line-implementation", provider: models.ProviderGitHub}: githubFactoryTemplate(factoryAppTemplate{
-		id:                  "line-implementation",
-		entrypointNodeID:    "onrun-implement",
-		canvasFile:          "templates/github/line-implementation.canvas.yaml",
-		multiRepoCanvasFile: "templates/github/line-implementation-multi-repo.canvas.yaml",
-		consoleFile:         "templates/github/line-app.console.yaml",
+	{id: reviewRequestTemplateID, provider: models.ProviderGitHub}: githubFactoryTemplate(factoryAppTemplate{
+		id:               reviewRequestTemplateID,
+		entrypointNodeID: reviewRequestTriggerNodeID,
+		canvasFile:       "templates/github/review-request.canvas.yaml",
+		consoleFile:      "templates/github/review-request.console.yaml",
+		columnKey:        models.CanvasColumnKeyVerify,
 		componentIntegrations: map[string]string{
-			"github.createPullRequest": "github",
-			"github.findPullRequest":   "github",
-			"github.updatePullRequest": "github",
+			"github.listPullRequestReviewCandidates": "github",
+			"github.setPullRequestReviewCheck":       "github",
+			"github.ensurePullRequestReviewers":      "github",
+			"github.updatePullRequestBodySection":    "github",
+			"github.publishPullRequestComment":       "github",
 		},
 	}),
+	{id: "line-implementation", provider: models.ProviderGitHub}: githubFactoryTemplate(factoryAppTemplate{
+		id:               "line-implementation",
+		entrypointNodeID: "onrun-implement",
+		canvasFile:       "templates/github/line-implementation-multi-repo.canvas.yaml",
+		consoleFile:      "templates/github/line-app.console.yaml",
+	}),
 	{id: "line-implementation", provider: models.ProviderBitbucket}: bitbucketFactoryTemplate(factoryAppTemplate{
-		id:                  "line-implementation",
-		entrypointNodeID:    "onrun-implement",
-		canvasFile:          "templates/bitbucket/line-implementation.canvas.yaml",
-		multiRepoCanvasFile: "templates/bitbucket/line-implementation-multi-repo.canvas.yaml",
-		consoleFile:         "templates/bitbucket/line-app.console.yaml",
-		componentIntegrations: map[string]string{
-			"bitbucket.createPullRequest": "bitbucket",
-			"bitbucket.findPullRequest":   "bitbucket",
-			"bitbucket.updatePullRequest": "bitbucket",
-		},
+		id:               "line-implementation",
+		entrypointNodeID: "onrun-implement",
+		canvasFile:       "templates/bitbucket/line-implementation-multi-repo.canvas.yaml",
+		consoleFile:      "templates/bitbucket/line-app.console.yaml",
 	}),
 	{id: "pr-closure", provider: models.ProviderGitHub}: githubFactoryTemplate(factoryAppTemplate{
 		id:               "pr-closure",
@@ -128,6 +129,8 @@ var factoryAppTemplates = map[factoryTemplateKey]factoryAppTemplate{
 		componentIntegrations: map[string]string{
 			"github.onPullRequest":                "github",
 			"github.updatePullRequestBodySection": "github",
+			"github.setPullRequestCheckRun":       "github",
+			"github.publishPullRequestComment":    "github",
 		},
 	}),
 	{id: "visual-evidence", provider: models.ProviderGitHub}: githubFactoryTemplate(factoryAppTemplate{
@@ -174,7 +177,6 @@ type factoryTemplateInput struct {
 	agentSettings         map[string]*factoryAgentSettings
 	triggerSettings       *factoryTriggerSettings
 	draftPullRequests     *bool
-	multiRepo             bool
 	mergeCheckSteps       any
 	bodySectionSettings   map[string]map[string]any
 }
@@ -247,11 +249,7 @@ func materializeFactoryTemplate(templateID, provider string, input factoryTempla
 		return nil, invalidArgument("unknown factory app template")
 	}
 
-	canvasFile := template.canvasFile
-	if input.multiRepo && template.multiRepoCanvasFile != "" {
-		canvasFile = template.multiRepoCanvasFile
-	}
-	raw, err := factoryTemplateFiles.ReadFile(canvasFile)
+	raw, err := factoryTemplateFiles.ReadFile(template.canvasFile)
 	if err != nil {
 		return nil, fmt.Errorf("read factory app template: %w", err)
 	}
@@ -291,9 +289,23 @@ func materializeFactoryTemplate(templateID, provider string, input factoryTempla
 			return nil, err
 		}
 	}
+	if template.id == reviewRequestTemplateID {
+		configureReviewRequest(canvas, params)
+	}
 	canvas.Metadata.ID = input.appID
 	canvas.Metadata.Name = input.appName
 	wireFactoryTemplate(canvas, template, input)
+	if template.id == "risk-score" {
+		if err := configureMergeConfidencePublication(canvas); err != nil {
+			return nil, &BuiltInAutomationSettingsError{cause: err}
+		}
+	}
+	if template.id == reviewRequestTemplateID {
+		configureReviewRequestCheck(canvas)
+		if err := configureReviewRequestFindings(canvas); err != nil {
+			return nil, &BuiltInAutomationSettingsError{cause: err}
+		}
+	}
 	markFactoryTemplate(canvas, template)
 
 	canvasYAML, err := goyaml.Marshal(canvas)
@@ -341,7 +353,7 @@ func filterDisabledMergeChecks(canvas *yaml.Canvas, enabled string) {
 				continue
 			}
 			prompt, _ := item["prompt"].(string)
-			id := runner.MergeCheckID(prompt)
+			id := mergeconfidence.MergeCheckID(prompt)
 			if id == "" || allowed[id] {
 				kept = append(kept, step)
 			}
@@ -620,6 +632,13 @@ func deriveFactoryTemplateInput(
 		if template.id == "risk-score" {
 			input.mergeCheckSteps = settings.agentSteps["assess-risk"]
 			input.bodySectionSettings = settings.bodySections
+		}
+	}
+	if template.id == reviewRequestTemplateID {
+		for _, node := range version.Nodes {
+			if node.ID == reviewRequestTriggerNodeID {
+				input.installParams["mergeConfidenceAppId"] = configString(node.Configuration, "app")
+			}
 		}
 	}
 
@@ -1120,10 +1139,6 @@ func materializeNonIntakeFactoryAppDefaults(
 		return nil, invalidArgument("factory app has no bundled defaults")
 	}
 	input := deriveFactoryTemplateInput(tx, factory, canvas, version, resolved, savedSettings)
-	input.multiRepo, err = factory.MultiRepoTasksEnabled(tx)
-	if err != nil {
-		return nil, err
-	}
 	// Reset uses the provider saved on the app. A later workspace host change
 	// must not select a template the app was not installed with.
 	return materializeFactoryTemplate(resolved.id, resolved.provider, input)

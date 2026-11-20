@@ -1,18 +1,27 @@
 import { Bot, ChevronDown } from "lucide-react";
+import { useMemo } from "react";
 
 import { Button } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/ui/dropdownMenu";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from "@/ui/dropdownMenu";
 import { DropdownMenuValueSub } from "@/ui/dropdownMenu/DropdownMenuValueSub";
 
 import { useFactoryLineRunnerModels } from "@/hooks/useFactoryLineRunnerModels";
-import {
-  THINKING_LEVEL_HIGH,
-  THINKING_LEVEL_LOW,
-  THINKING_LEVEL_MEDIUM,
-  modelNameWithThinking,
-} from "@/lib/thinkingLevel";
+import { THINKING_LEVEL_HIGH, THINKING_LEVEL_LOW, THINKING_LEVEL_MEDIUM } from "@/lib/thinkingLevel";
 
-import { DRAFT_START_MODEL_AUTO } from "./draftStartModel";
+import {
+  draftStartDefaultLabels,
+  draftStartModelOptions,
+  resolveDraftStartSelection,
+  type DraftStartSelection,
+} from "./draftStartModel";
+import { draftStartDefaultsStatus, type DraftStartDefaults } from "@/hooks/useDraftStartDefaults";
+import { DraftStartSelectionLabel } from "./DraftStartSelectionLabel";
 
 type Appearance = "icon" | "labeled" | "ghost";
 
@@ -49,6 +58,7 @@ export function DraftStartModelSelect({
   orderId,
   model,
   thinkingLevel,
+  defaults,
   onChange,
   disabled = false,
   appearance = "icon",
@@ -57,20 +67,24 @@ export function DraftStartModelSelect({
   factoryId?: string;
   lineName?: string;
   orderId?: string;
-  model: string;
-  thinkingLevel: string;
-  onChange: (next: { model: string; thinkingLevel: string }) => void;
+  model?: string;
+  thinkingLevel?: string;
+  defaults: DraftStartDefaults;
+  onChange: (next: DraftStartSelection) => void;
   disabled?: boolean;
   appearance?: Appearance;
 }) {
   const models = useFactoryLineRunnerModels(organizationId, factoryId, lineName, true, orderId);
-  const selectedName =
-    model === DRAFT_START_MODEL_AUTO
-      ? "Auto"
-      : (models.data?.models ?? []).find((item) => item.id === model)?.name ||
-        (models.isLoading ? model : `${model} (unavailable)`);
-  const closedLabel = modelNameWithThinking(selectedName, thinkingLevel);
+  const catalog = models.data?.models;
+  const modelOptions = useMemo(() => draftStartModelOptions(catalog), [catalog]);
+  const resolved = resolveDraftStartSelection(
+    { model, thinkingLevel },
+    defaults.values ?? {},
+    modelOptions,
+    defaults.values ? undefined : draftStartDefaultsStatus(defaults),
+  );
   const showName = appearance !== "icon";
+  const defaultLabels = draftStartDefaultLabels(defaults.values, modelOptions);
 
   return (
     <DropdownMenu>
@@ -79,36 +93,42 @@ export function DraftStartModelSelect({
           type="button"
           size={showName ? "sm" : "icon-xs"}
           variant={TRIGGER_VARIANT[appearance]}
-          aria-label={`Model: ${closedLabel}`}
+          aria-label={resolved.accessibleLabel}
           data-testid="split-run-draft-model"
           disabled={disabled}
-          className={TRIGGER_CLASS[appearance]}
+          className={`${TRIGGER_CLASS[appearance]} min-w-0 max-w-full`}
         >
           {appearance === "ghost" ? <Bot className="size-4" aria-hidden /> : null}
-          {showName ? closedLabel : null}
+          {showName ? <DraftStartSelectionLabel resolved={resolved} thinkingLevel={thinkingLevel} /> : null}
           <ChevronDown className={showName ? "size-3 opacity-60" : "size-3.5"} aria-hidden />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" side="top" className="min-w-44">
+      <DropdownMenuContent align="end" side="top" className="min-w-44 max-w-[calc(100vw-1rem)]">
+        {!defaults.values ? (
+          <DropdownMenuItem onSelect={defaults.retry}>Retry Implementation defaults</DropdownMenuItem>
+        ) : null}
         <DropdownMenuValueSub
           label="Model"
           testId="split-run-draft-model-list"
-          value={model}
-          options={[
-            { value: DRAFT_START_MODEL_AUTO, label: "Auto" },
-            ...(models.data?.models ?? [])
-              .filter((item) => (item.id ?? "") !== "")
-              .map((item) => ({ value: item.id ?? "", label: item.name || item.id || "" })),
-          ]}
-          onValueChange={(nextModel) => onChange({ model: nextModel, thinkingLevel })}
+          value={model ?? ""}
+          displayedValue={resolved.modelLabel}
+          options={[{ value: "", label: defaultLabels.model }, ...modelOptions]}
+          onValueChange={(nextModel) => onChange({ model: nextModel || undefined, thinkingLevel })}
         />
         <DropdownMenuValueSub
           label="Thinking"
           testId="split-run-draft-thinking"
-          value={thinkingLevel}
-          options={START_THINKING_LEVELS}
-          onValueChange={(nextThinking) => onChange({ model, thinkingLevel: nextThinking })}
+          value={thinkingLevel ?? ""}
+          displayedValue={resolved.thinkingLabel}
+          options={[{ value: "", label: defaultLabels.thinking }, ...START_THINKING_LEVELS]}
+          onValueChange={(nextThinking) => onChange({ model, thinkingLevel: nextThinking || undefined })}
         />
+        {resolved.hasOverrides ? (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={() => onChange({})}>Use defaults</DropdownMenuItem>
+          </>
+        ) : null}
       </DropdownMenuContent>
     </DropdownMenu>
   );

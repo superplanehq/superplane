@@ -30,14 +30,15 @@ func (VCSProviderInstallation) TableName() string {
 }
 
 type VCSProviderRepository struct {
-	Provider       string `gorm:"primaryKey"`
-	RepositoryID   int64  `gorm:"primaryKey"`
-	InstallationID int64
-	FullName       string
-	Private        bool
-	DefaultBranch  string
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
+	Provider              string `gorm:"primaryKey"`
+	RepositoryID          int64  `gorm:"primaryKey"`
+	InstallationID        int64
+	FullName              string
+	Private               bool
+	DefaultBranch         string
+	CollaboratorsSyncedAt *time.Time
+	CreatedAt             time.Time
+	UpdatedAt             time.Time
 }
 
 func (VCSProviderRepository) TableName() string {
@@ -150,6 +151,26 @@ type VCSProviderReconcileJob struct {
 
 func (VCSProviderReconcileJob) TableName() string {
 	return "vcs_provider_reconcile_jobs"
+}
+
+type VCSProviderCatalogScheduleKind string
+
+const (
+	VCSProviderCatalogScheduleReconcile VCSProviderCatalogScheduleKind = "reconcile"
+	VCSProviderCatalogScheduleSweep     VCSProviderCatalogScheduleKind = "sweep"
+)
+
+// VCSProviderCatalogSchedule holds the next run of each periodic catalog
+// task. Worker replicas share it, so one replica runs each task per interval.
+type VCSProviderCatalogSchedule struct {
+	Provider        string `gorm:"primaryKey"`
+	NextReconcileAt time.Time
+	NextSweepAt     time.Time
+	UpdatedAt       time.Time
+}
+
+func (VCSProviderCatalogSchedule) TableName() string {
+	return "vcs_provider_catalog_schedules"
 }
 
 type VCSProviderIntegrationBinding struct {
@@ -732,6 +753,54 @@ func RetryVCSProviderReconciliation(
 		Error
 }
 
+// ClaimVCSProviderCatalogSchedule moves the next run of a periodic task to
+// now + interval when the task is due. It returns true only for the caller
+// that moved it, so one worker replica runs the task per interval.
+func ClaimVCSProviderCatalogSchedule(
+	tx *gorm.DB,
+	provider string,
+	kind VCSProviderCatalogScheduleKind,
+	now time.Time,
+	interval time.Duration,
+) (bool, error) {
+	provider, err := normalizeVCSProvider(provider)
+	if err != nil {
+		return false, err
+	}
+	column, err := vcsProviderCatalogScheduleColumn(kind)
+	if err != nil {
+		return false, err
+	}
+
+	schedule := VCSProviderCatalogSchedule{
+		Provider:        provider,
+		NextReconcileAt: now,
+		NextSweepAt:     now,
+		UpdatedAt:       now,
+	}
+	next := now.Add(interval)
+	if kind == VCSProviderCatalogScheduleReconcile {
+		schedule.NextReconcileAt = next
+	} else {
+		schedule.NextSweepAt = next
+	}
+
+	result := tx.Clauses(clause.OnConflict{
+		Columns: []clause.Column{{Name: "provider"}},
+		DoUpdates: clause.Assignments(map[string]any{
+			column:       next,
+			"updated_at": now,
+		}),
+		Where: clause.Where{Exprs: []clause.Expression{
+			clause.Expr{SQL: "vcs_provider_catalog_schedules." + column + " <= ?", Vars: []any{now}},
+		}},
+	}).Create(&schedule)
+	if result.Error != nil {
+		return false, result.Error
+	}
+	return result.RowsAffected > 0, nil
+}
+
 func ReplaceVCSProviderRepositoryCollaborators(
 	tx *gorm.DB,
 	provider string,
@@ -744,6 +813,12 @@ func ReplaceVCSProviderRepositoryCollaborators(
 	}
 	return tx.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Where("provider = ? AND repository_id = ?", provider, repositoryID).Delete(&VCSProviderRepositoryCollaborator{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Model(&VCSProviderRepository{}).
+			Where("provider = ? AND repository_id = ?", provider, repositoryID).
+			UpdateColumn("collaborators_synced_at", time.Now()).
+			Error; err != nil {
 			return err
 		}
 
@@ -1080,6 +1155,168 @@ func DelayVCSProviderRepositorySync(
 	)
 }
 
+// DelayVCSProviderInstallationRepositorySyncs queues a delayed collaborator
+// sync for every repository of the installation, with the same debounce as
+// DelayVCSProviderRepositorySync.
+func DelayVCSProviderInstallationRepositorySyncs(
+	tx *gorm.DB,
+	provider string,
+	installationID int64,
+	runAt time.Time,
+	priority VCSProviderRepositorySyncPriority,
+) error {
+	provider, err := normalizeVCSProvider(provider)
+	if err != nil {
+		return err
+	}
+	var repositoryIDs []int64
+	if err := tx.Model(&VCSProviderRepository{}).
+		Where("provider = ? AND installation_id = ?", provider, installationID).
+		Pluck("repository_id", &repositoryIDs).
+		Error; err != nil {
+		return err
+	}
+	return enqueueVCSProviderRepositorySyncs(
+		tx,
+		provider,
+		repositoryIDs,
+		runAt,
+		priority,
+		vcsProviderRepositoryScheduleDelayed,
+	)
+}
+
+// EnqueueUnsyncedVCSProviderRepositories queues a collaborator sync for each
+// repository of the installation that has never been synced. It does not move
+// jobs that are already queued.
+func EnqueueUnsyncedVCSProviderRepositories(
+	tx *gorm.DB,
+	provider string,
+	installationID int64,
+	runAt time.Time,
+	priority VCSProviderRepositorySyncPriority,
+) error {
+	provider, err := normalizeVCSProvider(provider)
+	if err != nil {
+		return err
+	}
+	return tx.Exec(`
+		INSERT INTO vcs_provider_repository_sync_jobs
+			(provider, repository_id, run_at, priority, created_at, updated_at)
+		SELECT repository.provider, repository.repository_id, @run_at, @priority, @now, @now
+		FROM vcs_provider_repositories AS repository
+		WHERE repository.provider = @provider
+			AND repository.installation_id = @installation_id
+			AND repository.collaborators_synced_at IS NULL
+		ON CONFLICT (provider, repository_id) DO UPDATE
+			SET priority = EXCLUDED.priority
+			WHERE vcs_provider_repository_sync_jobs.priority < EXCLUDED.priority
+	`, map[string]any{
+		"provider":        provider,
+		"installation_id": installationID,
+		"run_at":          runAt,
+		"priority":        priority,
+		"now":             time.Now(),
+	}).Error
+}
+
+// EnqueueVCSProviderInstallationsRepositorySyncs queues a collaborator sync
+// for every repository of the installations, with the same rules as
+// EnqueueVCSProviderRepositorySync.
+func EnqueueVCSProviderInstallationsRepositorySyncs(
+	tx *gorm.DB,
+	provider string,
+	installationIDs []int64,
+	runAt time.Time,
+	priority VCSProviderRepositorySyncPriority,
+) error {
+	if len(installationIDs) == 0 {
+		return nil
+	}
+	provider, err := normalizeVCSProvider(provider)
+	if err != nil {
+		return err
+	}
+	now := time.Now()
+	return tx.Exec(`
+		INSERT INTO vcs_provider_repository_sync_jobs
+			(provider, repository_id, run_at, priority, created_at, updated_at)
+		SELECT repository.provider, repository.repository_id, ?, ?, ?, ?
+		FROM vcs_provider_repositories AS repository
+		WHERE repository.provider = ? AND repository.installation_id IN ?
+		ON CONFLICT (provider, repository_id) DO UPDATE SET
+			run_at = ?,
+			priority = GREATEST(vcs_provider_repository_sync_jobs.priority, EXCLUDED.priority),
+			last_error = '',
+			updated_at = GREATEST(
+				EXCLUDED.updated_at,
+				COALESCE(vcs_provider_repository_sync_jobs.locked_at + INTERVAL '1 microsecond', EXCLUDED.updated_at)
+			)
+	`,
+		runAt, priority, now, now,
+		provider, installationIDs,
+		repositorySyncRunAtExpression(vcsProviderRepositoryScheduleEarliest, runAt),
+	).Error
+}
+
+// EnqueueStaleVCSProviderRepositorySyncs queues a background collaborator
+// sync for at most limit repositories last synced before staleBefore, oldest
+// first. It skips repositories that already have a queued job.
+func EnqueueStaleVCSProviderRepositorySyncs(
+	tx *gorm.DB,
+	provider string,
+	staleBefore time.Time,
+	limit int,
+	runAt time.Time,
+) (int64, error) {
+	provider, err := normalizeVCSProvider(provider)
+	if err != nil {
+		return 0, err
+	}
+	if limit <= 0 {
+		return 0, nil
+	}
+	result := tx.Exec(`
+		INSERT INTO vcs_provider_repository_sync_jobs
+			(provider, repository_id, run_at, priority, created_at, updated_at)
+		SELECT repository.provider, repository.repository_id, @run_at, @priority, @now, @now
+		FROM vcs_provider_repositories AS repository
+		JOIN vcs_provider_installations AS installation
+			ON installation.provider = repository.provider
+			AND installation.installation_id = repository.installation_id
+		WHERE repository.provider = @provider
+			AND repository.collaborators_synced_at < @stale_before
+			AND installation.suspended_at IS NULL
+			AND NOT EXISTS (
+				SELECT 1
+				FROM vcs_provider_repository_sync_jobs AS job
+				WHERE job.provider = repository.provider
+					AND job.repository_id = repository.repository_id
+			)
+		ORDER BY repository.collaborators_synced_at ASC
+		LIMIT @limit
+		ON CONFLICT (provider, repository_id) DO NOTHING
+	`, map[string]any{
+		"provider":     provider,
+		"stale_before": staleBefore,
+		"limit":        limit,
+		"run_at":       runAt,
+		"priority":     VCSProviderRepositorySyncPriorityBackground,
+		"now":          time.Now(),
+	})
+	return result.RowsAffected, result.Error
+}
+
+func CountVCSProviderRepositories(tx *gorm.DB, provider string) (int64, error) {
+	provider, err := normalizeVCSProvider(provider)
+	if err != nil {
+		return 0, err
+	}
+	var count int64
+	err = tx.Model(&VCSProviderRepository{}).Where("provider = ?", provider).Count(&count).Error
+	return count, err
+}
+
 type vcsProviderRepositorySchedule int
 
 const (
@@ -1099,11 +1336,28 @@ func enqueueVCSProviderRepositorySync(
 	if err != nil {
 		return err
 	}
-	job := VCSProviderRepositorySyncJob{
-		Provider:     provider,
-		RepositoryID: repositoryID,
-		RunAt:        runAt,
-		Priority:     priority,
+	return enqueueVCSProviderRepositorySyncs(tx, provider, []int64{repositoryID}, runAt, priority, schedule)
+}
+
+func enqueueVCSProviderRepositorySyncs(
+	tx *gorm.DB,
+	provider string,
+	repositoryIDs []int64,
+	runAt time.Time,
+	priority VCSProviderRepositorySyncPriority,
+	schedule vcsProviderRepositorySchedule,
+) error {
+	if len(repositoryIDs) == 0 {
+		return nil
+	}
+	jobs := make([]VCSProviderRepositorySyncJob, 0, len(repositoryIDs))
+	for _, repositoryID := range repositoryIDs {
+		jobs = append(jobs, VCSProviderRepositorySyncJob{
+			Provider:     provider,
+			RepositoryID: repositoryID,
+			RunAt:        runAt,
+			Priority:     priority,
+		})
 	}
 	updatedAt := time.Now()
 	return tx.Clauses(clause.OnConflict{
@@ -1120,7 +1374,7 @@ func enqueueVCSProviderRepositorySync(
 				updatedAt,
 			),
 		}),
-	}).Create(&job).Error
+	}).CreateInBatches(&jobs, 500).Error
 }
 
 func repositorySyncRunAtExpression(schedule vcsProviderRepositorySchedule, runAt time.Time) clause.Expr {
@@ -1534,6 +1788,16 @@ func normalizeVCSProvider(provider string) (string, error) {
 		return "", errors.New("VCS provider is required")
 	}
 	return provider, nil
+}
+
+func vcsProviderCatalogScheduleColumn(kind VCSProviderCatalogScheduleKind) (string, error) {
+	switch kind {
+	case VCSProviderCatalogScheduleReconcile:
+		return "next_reconcile_at", nil
+	case VCSProviderCatalogScheduleSweep:
+		return "next_sweep_at", nil
+	}
+	return "", fmt.Errorf("unknown VCS provider catalog schedule %q", kind)
 }
 
 // The caller holds installation row locks until status updates and catalog

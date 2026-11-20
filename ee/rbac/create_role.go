@@ -7,6 +7,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/grpc/errors"
+	"github.com/superplanehq/superplane/pkg/logging"
 	pb "github.com/superplanehq/superplane/pkg/protos/roles"
 )
 
@@ -83,5 +84,10 @@ func createRole(ctx context.Context, domainType string, domainID string, role *p
 
 	log.Infof("created custom role %s in domain %s (%s)", role.Metadata.Name, domainID, domainType)
 
+	logging.AddRequestLogFields(ctx, log.Fields{
+		"role_name":   role.Metadata.Name,
+		"domain_id":   domainID,
+		"domain_type": domainType,
+	})
 	return &pb.CreateRoleResponse{}, nil
 }

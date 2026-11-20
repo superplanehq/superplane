@@ -145,15 +145,32 @@ func ValidateEnvironmentFrom(environmentFrom []EnvironmentFromEntry) error {
 	return nil
 }
 
-type IntegrationSetup struct {
-	Name   string
-	Script string
-}
+type IntegrationSetup = core.IntegrationSetup
 
-type ResolvedEnvironment struct {
-	Variables []TaskEnvironmentVariable
-	Usage     string
-	Setups    []IntegrationSetup
+type ResolvedEnvironment = core.ResolvedEnvironment
+
+// ResolveExecutionEnvironment reuses startup data prepared for the current execution.
+func ResolveExecutionEnvironment(
+	ctx core.ExecutionContext,
+	environmentFrom []EnvironmentFromEntry,
+	environment []EnvironmentVariable,
+) (ResolvedEnvironment, error) {
+	var resolved ResolvedEnvironment
+	if ctx.ResolvedEnvironment != nil {
+		resolved = *ctx.ResolvedEnvironment
+	} else {
+		var err error
+		resolved, err = ResolveEnvironment(ctx.Secrets, environmentFrom, environment)
+		if err != nil {
+			return ResolvedEnvironment{}, err
+		}
+	}
+	// Read decision uses the fallback saved for this attempt, including a cleared value.
+	config, _ := ctx.Configuration.(map[string]any)
+	if fallback, ok := config["fallbackReviewer"].(string); ok {
+		resolved.Variables = upsertEnvironment(slices.Clone(resolved.Variables), "SUPERPLANE_REVIEW_REQUEST_FALLBACK", fallback)
+	}
+	return resolved, nil
 }
 
 func ResolveEnvironment(

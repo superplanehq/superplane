@@ -15,6 +15,7 @@ import type {
   FactoriesFactoryPullRequest,
   FactoriesWorkOrderRunUsageRow,
   MeDescribeVcsProviderOnboardingResponse,
+  MeModelStatusCell,
   MeNotificationSettings,
   FactoriesWorkOrder,
   FactoriesWorkOrderArtifact,
@@ -392,6 +393,12 @@ export interface FactoriesFixture {
   codexMembersDelayMs?: number;
   /** Per-user notification settings backing `/api/v1/me/notification-settings`. */
   notificationSettings?: MeNotificationSettings;
+  /** Installation-wide hosted model scores for Organization · Model status. */
+  modelStatusCells?: MeModelStatusCell[];
+  /** When true, the model status request fails. */
+  modelStatusError?: boolean;
+  /** Delays the model status request so a story can show loading. */
+  modelStatusDelayMs?: number;
   /** Global GitHub App catalog state for Factory onboarding. */
   githubOnboarding?: MeDescribeVcsProviderOnboardingResponse;
   /**

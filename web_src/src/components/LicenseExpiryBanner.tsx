@@ -24,6 +24,10 @@ const LicenseExpiryBanner: React.FC = () => {
   const message = warning.expired
     ? "The Enterprise license for this installation has expired. Enterprise features are not available."
     : `The Enterprise license for this installation expires in ${warning.daysLeft} ${warning.daysLeft === 1 ? "day" : "days"}.`;
+  const organizationWarning =
+    (license?.organization_count ?? 0) > 1
+      ? " When the license expires, all organizations lose their Enterprise features."
+      : "";
 
   const dismiss = () => {
     sessionStorage.setItem(DISMISSED_KEY, dismissalKey);
@@ -33,7 +37,10 @@ const LicenseExpiryBanner: React.FC = () => {
   return (
     <div className="shrink-0" data-testid="license-expiry-banner">
       <div className="flex items-center justify-center gap-3 bg-amber-100 px-4 py-2 text-center text-sm text-amber-900 dark:bg-amber-950/60 dark:text-amber-100">
-        <span>{message}</span>
+        <span>
+          {message}
+          {organizationWarning}
+        </span>
         <Link to="/admin/license" className="font-medium underline underline-offset-2">
           Manage license
         </Link>

@@ -129,8 +129,11 @@ func TestMaybeLinkCustomAutomationRunShowsTheRunOnThePullRequest(t *testing.T) {
 			1,
 		)),
 	}}, nil)
-	require.NoError(t, db.Model(canvas).Update("factory_id", factoryModel.ID).Error)
-	require.NoError(t, db.Model(canvas).Update("name", "Fix Linter Issues").Error)
+	require.NoError(t, db.Model(canvas).Updates(map[string]any{
+		"factory_id": factoryModel.ID,
+		"column_key": models.CanvasColumnKeyVerify,
+		"name":       "Fix Linter Issues",
+	}).Error)
 	require.NoError(t, db.First(canvas, "id = ?", canvas.ID).Error)
 
 	run, err := models.CreateCanvasRunInTransaction(db, canvas.ID, "on-pull-request", models.CanvasRunStateStarted, "")
@@ -153,4 +156,48 @@ func TestMaybeLinkCustomAutomationRunShowsTheRunOnThePullRequest(t *testing.T) {
 	require.Len(t, linked[pullRequest.ID], 1)
 	assert.Equal(t, run.ID, linked[pullRequest.ID][0].Run.ID)
 	assert.Equal(t, "Fix Linter Issues", linked[pullRequest.ID][0].Title)
+}
+
+func TestMaybeLinkCustomAutomationRunLinksTaskEvents(t *testing.T) {
+	for _, column := range []string{models.CanvasColumnKeyImplement, models.CanvasColumnKeyVerify, models.CanvasColumnKeyDone} {
+		t.Run(column, func(t *testing.T) {
+			r := support.Setup(t)
+			db := database.DB(t.Context())
+			factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+			require.NoError(t, err)
+			order, err := factoryModel.CreateWorkOrder(db, "Inspect the task", "", &r.User, nil, nil)
+			require.NoError(t, err)
+			canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{{
+				NodeID: "on-task",
+				Name:   "On Task",
+				Type:   models.NodeTypeTrigger,
+				Metadata: datatypes.NewJSONType(models.FactoryAppTemplateMetadata(
+					models.FactoryAppTemplateCustomAutomationID,
+					1,
+				)),
+			}}, nil)
+			require.NoError(t, db.Model(canvas).Updates(map[string]any{
+				"factory_id": factoryModel.ID,
+				"column_key": column,
+				"name":       column + " automation",
+			}).Error)
+			require.NoError(t, db.First(canvas, "id = ?", canvas.ID).Error)
+			run, err := models.CreateCanvasRunInTransaction(db, canvas.ID, "on-task", models.CanvasRunStateStarted, "")
+			require.NoError(t, err)
+			event := &models.CanvasEvent{
+				WorkflowID: canvas.ID,
+				NodeID:     "on-task",
+				Data: models.NewJSONValue(map[string]any{
+					"data": map[string]any{"workOrder": map[string]any{"id": order.ID.String()}},
+				}),
+			}
+
+			require.NoError(t, models.MaybeLinkCustomAutomationRun(db, canvas, event, run))
+
+			var links []models.FactoryWorkOrderRefinementRun
+			require.NoError(t, db.Where("run_id = ?", run.ID).Find(&links).Error)
+			require.Len(t, links, 1)
+			assert.Equal(t, order.ID, links[0].WorkOrderID)
+		})
+	}
 }

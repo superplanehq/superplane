@@ -86,22 +86,35 @@ func TestValidateToken(t *testing.T) {
 }
 
 func TestSetCookie(t *testing.T) {
-	t.Run("sets support session cookie with correct attributes", func(t *testing.T) {
-		w := httptest.NewRecorder()
-		r := httptest.NewRequest(http.MethodPost, "/admin/api/support-session/start", nil)
+	for _, test := range []struct {
+		name   string
+		url    string
+		header string
+		secure bool
+	}{
+		{name: "local HTTP", url: "http://superplane.test/admin/api/support-session/start", secure: false},
+		{name: "direct HTTPS", url: "https://superplane.test/admin/api/support-session/start", secure: true},
+		{name: "forwarded HTTPS", url: "http://superplane.test/admin/api/support-session/start", header: "https", secure: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			r := httptest.NewRequest(http.MethodPost, test.url, nil)
+			r.Header.Set("X-Forwarded-Proto", test.header)
 
-		SetCookie(w, r, "test-token-value")
+			SetCookie(w, r, "test-token-value")
 
-		cookies := w.Result().Cookies()
-		require.Len(t, cookies, 1)
+			cookies := w.Result().Cookies()
+			require.Len(t, cookies, 1)
 
-		cookie := cookies[0]
-		assert.Equal(t, CookieName, cookie.Name)
-		assert.Equal(t, "test-token-value", cookie.Value)
-		assert.Equal(t, "/", cookie.Path)
-		assert.Equal(t, int(TTL.Seconds()), cookie.MaxAge)
-		assert.True(t, cookie.HttpOnly)
-	})
+			cookie := cookies[0]
+			assert.Equal(t, CookieName, cookie.Name)
+			assert.Equal(t, "test-token-value", cookie.Value)
+			assert.Equal(t, "/", cookie.Path)
+			assert.Equal(t, int(TTL.Seconds()), cookie.MaxAge)
+			assert.True(t, cookie.HttpOnly)
+			assert.Equal(t, test.secure, cookie.Secure)
+		})
+	}
 }
 
 func TestClearCookie(t *testing.T) {

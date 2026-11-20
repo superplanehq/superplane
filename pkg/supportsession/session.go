@@ -3,6 +3,7 @@ package supportsession
 import (
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/superplanehq/superplane/pkg/jwt"
@@ -65,28 +66,32 @@ func ValidateToken(signer *jwt.Signer, tokenString string) (*Claims, error) {
 
 // SetCookie writes the support session cookie to the response.
 func SetCookie(w http.ResponseWriter, r *http.Request, token string) {
-	http.SetCookie(w, &http.Cookie{
+	http.SetCookie(w, &http.Cookie{ // #nosec G124 -- local HTTP development must accept the cookie; forwarded HTTPS is detected.
 		Name:     CookieName,
 		Value:    token,
 		Path:     "/",
 		MaxAge:   int(TTL.Seconds()),
 		HttpOnly: true,
-		Secure:   r.TLS != nil,
+		Secure:   requestUsesHTTPS(r),
 		SameSite: http.SameSiteLaxMode,
 	})
 }
 
 // ClearCookie deletes the support session cookie.
 func ClearCookie(w http.ResponseWriter, r *http.Request) {
-	http.SetCookie(w, &http.Cookie{
+	http.SetCookie(w, &http.Cookie{ // #nosec G124 -- local HTTP development must accept the cookie; forwarded HTTPS is detected.
 		Name:     CookieName,
 		Value:    "",
 		Path:     "/",
 		MaxAge:   -1,
 		HttpOnly: true,
-		Secure:   r.TLS != nil,
+		Secure:   requestUsesHTTPS(r),
 		SameSite: http.SameSiteLaxMode,
 	})
+}
+
+func requestUsesHTTPS(r *http.Request) bool {
+	return r.TLS != nil || strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https")
 }
 
 // ReadCookie extracts the support session token from the request, if present.

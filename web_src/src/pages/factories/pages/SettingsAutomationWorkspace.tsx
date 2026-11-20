@@ -17,6 +17,7 @@ export type RunSelectionChange = (runId: string | null, options?: { replace?: bo
 
 interface SettingsAutomationWorkspaceProps {
   graph: IntakeAutomationGraph;
+  prepareDisplayGraph?: (graph: IntakeAutomationGraph) => IntakeAutomationGraph;
   testId: string;
   canvasId?: string;
   runHrefFor?: RunsSidebarHrefForRun;
@@ -79,6 +80,7 @@ export function SettingsAutomationCanvasEdit({ href, label, testId }: { href: st
 /** Read-only automation canvas with the factory task-card runs sidebar. */
 export function SettingsAutomationWorkspace({
   graph,
+  prepareDisplayGraph,
   testId,
   canvasId,
   runHrefFor,
@@ -111,6 +113,7 @@ export function SettingsAutomationWorkspace({
   return (
     <AutomationWorkspaceLayout
       graph={graph}
+      prepareDisplayGraph={prepareDisplayGraph}
       testId={testId}
       canvasId={canvasId}
       runHrefFor={runHrefFor}
@@ -174,6 +177,7 @@ function useAutomationRuns({
 
 function AutomationWorkspaceLayout({
   graph,
+  prepareDisplayGraph,
   testId,
   canvasId,
   runHrefFor,
@@ -192,6 +196,7 @@ function AutomationWorkspaceLayout({
   className,
 }: {
   graph: IntakeAutomationGraph;
+  prepareDisplayGraph?: (graph: IntakeAutomationGraph) => IntakeAutomationGraph;
   testId: string;
   canvasId?: string;
   runHrefFor?: RunsSidebarHrefForRun;
@@ -229,7 +234,7 @@ function AutomationWorkspaceLayout({
         ) : null}
         <div className="min-h-0 min-w-0 flex-1">
           <SettingsAutomationCanvas
-            graph={runs.runCanvas.graph}
+            graph={prepareDisplayGraph ? prepareDisplayGraph(runs.runCanvas.graph) : runs.runCanvas.graph}
             isRunInspectionMode={runs.runCanvas.isRunInspectionMode}
             runCanvasLoading={runs.runCanvas.runCanvasLoading}
             selectedRun={runs.runCanvas.selectedRun}

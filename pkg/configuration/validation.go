@@ -308,6 +308,12 @@ func validateObject(field Field, value any) error {
 }
 
 func validateList(field Field, value any) error {
+	if expression, ok := value.(string); ok {
+		expression = strings.TrimSpace(expression)
+		if match := ExpressionPlaceholderRegex.FindString(expression); match != "" && match == expression {
+			return nil // List values are available after expression resolution.
+		}
+	}
 	list, ok := value.([]any)
 	if !ok {
 		return fmt.Errorf("must be a list of values")

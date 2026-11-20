@@ -4,6 +4,7 @@ import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 import { EMPTY_LINEAR_INTAKE_SCOPE } from "../linearIntakeScope";
+import { withFirstRunQuery } from "./firstRunTestQuery";
 import { FirstRunSetup } from "./FirstRunSetup";
 import type { IntegrationId } from "./onboardingFixtures";
 import { useOnboardingSetupState, type OnboardingSetupApi } from "./useOnboardingSetupState";
@@ -194,9 +195,11 @@ function StatefulSetup({
 
 function renderSetup(connected: Set<IntegrationId>, overrides: Partial<OnboardingPageModel> = {}) {
   return render(
-    <MemoryRouter initialEntries={["/org-1/workspaces/PAY/setup?step=welcome"]}>
-      <StatefulSetup connected={connected} overrides={overrides} />
-    </MemoryRouter>,
+    withFirstRunQuery(
+      <MemoryRouter initialEntries={["/org-1/workspaces/PAY/setup?step=welcome"]}>
+        <StatefulSetup connected={connected} overrides={overrides} />
+      </MemoryRouter>,
+    ),
   );
 }
 
@@ -297,9 +300,11 @@ describe("FirstRunSetup Bitbucket", () => {
     bitbucketOnboarding.installedWorkspaces = [{ slug: "acme-team" }];
     bitbucketOnboarding.repositories = [{ fullName: "acme-team/api" }];
     rerender(
-      <MemoryRouter initialEntries={["/org-1/workspaces/PAY/setup?step=welcome"]}>
-        <StatefulSetup connected={new Set()} overrides={{}} />
-      </MemoryRouter>,
+      withFirstRunQuery(
+        <MemoryRouter initialEntries={["/org-1/workspaces/PAY/setup?step=welcome"]}>
+          <StatefulSetup connected={new Set()} overrides={{}} />
+        </MemoryRouter>,
+      ),
     );
 
     await user.click(await screen.findByRole("button", { name: "Use acme-team" }));

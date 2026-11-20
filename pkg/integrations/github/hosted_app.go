@@ -1,6 +1,7 @@
 package github
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/google/uuid"
@@ -64,7 +65,7 @@ func WizardCreateConfiguration(orgID uuid.UUID, configMap map[string]any, httpCt
 		return nil, err
 	}
 	if !host.IsDotCom() {
-		if err := authorizeGitHubEnterpriseHost(setupDB(httpCtx), orgID, host); err != nil {
+		if err := authorizeGitHubEnterpriseHost(context.Background(), setupDB(httpCtx), orgID, host); err != nil {
 			return nil, err
 		}
 		if !hostAllowed(host) {

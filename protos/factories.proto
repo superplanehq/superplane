@@ -1406,6 +1406,7 @@ message FactoryCustomAutomation {
     START_MODE_MANUAL = 1;
     START_MODE_AUTOMATIC = 2;
     START_MODE_SCHEDULED = 3;
+    START_MODE_ON_LEAVE = 4;
   }
 
   message Step {
@@ -1441,6 +1442,8 @@ message FactoryCustomAutomation {
     int32 execution_timeout_seconds = 5;
     Schedule schedule = 6;
     repeated StartTrigger triggers = 7;
+    // Absent on automations saved before this choice. True runs on a task.
+    optional bool runs_on_task = 8;
   }
 
   Factory.Automation automation = 1;

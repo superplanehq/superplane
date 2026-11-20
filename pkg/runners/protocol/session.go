@@ -525,7 +525,7 @@ func (s *Session) reconnectDelay() time.Duration {
 	if span <= 0 {
 		return s.config.ReconnectMin
 	}
-	return s.config.ReconnectMin + time.Duration(rand.Int64N(int64(span)+1))
+	return s.config.ReconnectMin + time.Duration(rand.Int64N(int64(span)+1)) // #nosec G404 -- reconnect jitter is not security-sensitive.
 }
 
 func connectURL(baseURL string) (string, error) {

@@ -1,9 +1,8 @@
 import type { SuperplaneComponentsNode } from "@/api-client";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { AgentRunnerSettings } from "./AgentRunnerSettings";
 import { ImplementDurationDraftProvider } from "./ImplementDurationDraft";
+import { MergeConfidencePublicationSettings } from "./MergeConfidencePublicationSettings";
 import { MergeConfidenceCheckList } from "./MergeConfidenceCheckList";
 import { MERGE_CONFIDENCE_SETTINGS_COPY } from "./mergeConfidenceCopy";
 import { useMergeConfidenceSettingsDraft } from "./mergeConfidenceSettingsDraft";
@@ -12,6 +11,7 @@ import type { NodeConfigurationSave } from "./nodeConfigurationCanvas";
 type ConfigurationProps = {
   agent: SuperplaneComponentsNode;
   publishing?: SuperplaneComponentsNode;
+  publicationNodes?: SuperplaneComponentsNode[];
   organizationId?: string;
   factoryId?: string;
   factoryKey?: string;
@@ -28,7 +28,7 @@ export function MergeConfidenceConfiguration(
 }
 
 function OwnedMergeConfidenceConfiguration(props: ConfigurationProps) {
-  const settings = useMergeConfidenceSettingsDraft(props.agent, props, props.publishing);
+  const settings = useMergeConfidenceSettingsDraft(props.agent, props, props.publishing, props.publicationNodes);
   return <MergeConfidenceConfigurationView {...props} settings={settings} />;
 }
 
@@ -42,6 +42,7 @@ function MergeConfidenceConfigurationView({
 }: ConfigurationProps & { settings: ReturnType<typeof useMergeConfidenceSettingsDraft> }) {
   const { draft, saving, saveError } = settings;
   if (!draft) return null;
+  const missingDestination = draft.publishResults && !draft.resultsBody && !draft.resultsComment;
   return (
     <ImplementDurationDraftProvider
       minutes={draft.durationMinutes}
@@ -84,23 +85,7 @@ function MergeConfidenceConfigurationView({
                 disabled={saving}
               />
             </section>
-            {draft.publishingBase ? (
-              <div className="flex items-start justify-between gap-6">
-                <div className="space-y-1">
-                  <Label htmlFor="merge-confidence-publish">Publish results to pull request</Label>
-                  <p id="merge-confidence-publish-help" className="workspace-body-text text-muted-foreground">
-                    When off, results stay in SuperPlane. Any existing pull request report stays in place.
-                  </p>
-                </div>
-                <Switch
-                  id="merge-confidence-publish"
-                  aria-describedby="merge-confidence-publish-help"
-                  checked={draft.publishResults}
-                  onCheckedChange={settings.updatePublishResults}
-                  disabled={saving}
-                />
-              </div>
-            ) : null}
+            <MergeConfidencePublicationSettings settings={settings} />
           </div>
         </section>
         <footer className="flex shrink-0 items-center justify-end gap-3 border-t border-border px-5 py-3">
@@ -111,7 +96,7 @@ function MergeConfidenceConfigurationView({
           ) : null}
           <Button
             type="button"
-            disabled={saving || draft.durationInvalid}
+            disabled={saving || settings.checkingPRCheck || draft.durationInvalid || missingDestination}
             onClick={() => void settings.save(onSave, onClose)}
             data-testid="merge-confidence-settings-save"
           >

@@ -39,10 +39,10 @@ func TestGlobalRunnerToolsOverStdio(t *testing.T) {
 	server := newRunnerArtifactTestServer(t, r, jwt.NewSigner("test"))
 	ctx, factory, order := mustTaskLinkedAgentRun(t, r)
 	member := mustTaskOwnerMember(t, r, "contract-dev")
-	env := runner.AttachRunnerEnv(ctx, nil, 60, nil)
+	env := runner.AttachRunnerEnv(ctx, nil, 60)
 	mcp := startGlobalMCP(t, server, runnerTokenFrom(env), runner.AppendGlobalMCP(env, nil))
 
-	assert.ElementsMatch(t, everyGlobalRunnerTool, mcp.toolNames())
+	assert.ElementsMatch(t, globalRunnerToolsWith("open_pull_request", "list_pull_requests"), mcp.toolNames())
 
 	members := mcp.call("list_members", map[string]any{})["members"].([]any)
 	assert.Contains(t, fieldValues(members, "user_id"), member.ID.String())

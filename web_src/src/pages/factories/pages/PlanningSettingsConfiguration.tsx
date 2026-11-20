@@ -91,11 +91,13 @@ export function PlanningSettingsFooter({
   saving,
   disabled,
   onSave,
+  testId = "planning-settings-save",
 }: {
   error?: string;
   saving: boolean;
   disabled: boolean;
   onSave: () => void;
+  testId?: string;
 }) {
   return (
     <footer className="flex shrink-0 items-center justify-end gap-3 border-t border-border px-5 py-3">
@@ -104,7 +106,7 @@ export function PlanningSettingsFooter({
           {error}
         </p>
       ) : null}
-      <Button type="button" disabled={disabled} onClick={onSave} data-testid="planning-settings-save">
+      <Button type="button" disabled={disabled} onClick={onSave} data-testid={testId}>
         {saving ? PLANNING_SETTINGS_COPY.saving : PLANNING_SETTINGS_COPY.save}
       </Button>
     </footer>

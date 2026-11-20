@@ -8,12 +8,16 @@ import { useEffect, useMemo, useState } from "react";
 
 import type { FactoriesFactory } from "@/api-client";
 import {
+  customAutomationColumn,
   customAutomationDraft,
+  customAutomationRunsOnTask,
   customAutomationSettingsForTriggers,
   customAutomationTriggers,
+  customAutomationTriggersForRun,
   DEFAULT_CUSTOM_AUTOMATION_ICON,
   newCustomAutomationTrigger,
   workspaceAgentFromOnboarding,
+  type CustomAutomationColumn,
   type CustomAutomationTrigger,
 } from "../lib/customAutomation";
 import { factoryHomePath, factoryLineDetailPath, firstFactoryLineId } from "../lib/factoryPagePaths";
@@ -26,13 +30,16 @@ export function useCustomAutomationSetupPage(args: {
   factory?: FactoriesFactory;
   lineId?: string;
   automationId?: string;
-  columnKey?: "backlog" | "verify";
+  columnKey?: "backlog" | "implement" | "verify" | "done";
 }) {
   const described = useFactoryCustomAutomation(args.organizationId, args.factoryId, args.automationId);
   const create = useCreateFactoryCustomAutomation(args.organizationId, args.factoryId);
   const update = useUpdateFactoryCustomAutomation(args.organizationId, args.factoryId, args.automationId ?? "");
   const [name, setName] = useState("Custom automation");
-  const [triggers, setTriggers] = useState<CustomAutomationTrigger[]>(() => [newCustomAutomationTrigger()]);
+  const [triggers, setTriggers] = useState<CustomAutomationTrigger[]>(() => [
+    defaultCustomAutomationTrigger(args.columnKey),
+  ]);
+  const [runsOnTask, setRunsOnTask] = useState(true);
   const [icon, setIcon] = useState(DEFAULT_CUSTOM_AUTOMATION_ICON);
   const agentHarness = args.factory?.onboarding?.agentHarness;
   const [draft, setDraft] = useState<PlanningReviewDraft>(() =>
@@ -40,30 +47,28 @@ export function useCustomAutomationSetupPage(args: {
   );
   const [saveError, setSaveError] = useState("");
   const automation = described.data;
-  const columnKey =
-    automation?.automation?.columnKey === "backlog"
-      ? "backlog"
-      : args.automationId
-        ? "verify"
-        : (args.columnKey ?? "verify");
+  const columnKey = customAutomationColumn(automation?.automation?.columnKey ?? args.columnKey);
 
   useEffect(() => {
     if (args.automationId) {
       return;
     }
     setName("Custom automation");
-    setTriggers([newCustomAutomationTrigger()]);
+    setTriggers([defaultCustomAutomationTrigger(args.columnKey)]);
+    setRunsOnTask(true);
     setIcon(DEFAULT_CUSTOM_AUTOMATION_ICON);
     setDraft(customAutomationDraft({ settings: { agent: workspaceAgentFromOnboarding({ agentHarness }) } }));
     setSaveError("");
-  }, [args.automationId, agentHarness]);
+  }, [args.automationId, args.columnKey, agentHarness]);
 
   useEffect(() => {
     if (!automation) {
       return;
     }
+    const savedTriggers = customAutomationTriggers(automation);
     setName(automation.automation?.name?.trim() || "Custom automation");
-    setTriggers(customAutomationTriggers(automation));
+    setTriggers(savedTriggers);
+    setRunsOnTask(customAutomationRunsOnTask(automation.settings?.runsOnTask, savedTriggers));
     setIcon(automation.settings?.icon?.trim() || DEFAULT_CUSTOM_AUTOMATION_ICON);
     setDraft(customAutomationDraft(automation));
   }, [automation]);
@@ -74,7 +79,8 @@ export function useCustomAutomationSetupPage(args: {
   const validationError = useMemo(() => validateDraft(name, draft), [draft, name]);
 
   const save = async () => {
-    const invalidSchedule = triggers.some(
+    const activeTriggers = customAutomationTriggersForRun(triggers, runsOnTask);
+    const invalidSchedule = activeTriggers.some(
       (trigger) =>
         trigger.mode === "scheduled" &&
         (!trigger.schedule.cronExpression.trim() ||
@@ -93,7 +99,7 @@ export function useCustomAutomationSetupPage(args: {
     setSaveError("");
     const input = {
       name: name.trim(),
-      settings: customAutomationSettingsForTriggers(triggers, draft, icon),
+      settings: customAutomationSettingsForTriggers(triggers, draft, icon, runsOnTask),
     };
     try {
       if (args.automationId) {
@@ -118,6 +124,8 @@ export function useCustomAutomationSetupPage(args: {
     setName,
     triggers,
     setTriggers,
+    runsOnTask,
+    setRunsOnTask,
     icon,
     setIcon,
     draft,
@@ -126,6 +134,10 @@ export function useCustomAutomationSetupPage(args: {
     saving: create.isPending || update.isPending,
     save,
   };
+}
+
+function defaultCustomAutomationTrigger(column: CustomAutomationColumn | undefined): CustomAutomationTrigger {
+  return newCustomAutomationTrigger(column && column !== "verify" ? "automatic" : "manual");
 }
 
 function saveFallback(editing: boolean): string {

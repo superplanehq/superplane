@@ -17,6 +17,7 @@ const (
 
 	IntegrationRequestStatePending   = "pending"
 	IntegrationRequestStateCompleted = "completed"
+	IntegrationRequestStateFailed    = "failed"
 )
 
 type IntegrationRequest struct {
@@ -36,6 +37,22 @@ func (r *IntegrationRequest) TableName() string {
 
 type IntegrationRequestSpec struct {
 	InvokeAction *IntegrationInvokeAction `json:"invoke_action,omitempty"`
+	Attempts     int                      `json:"attempts,omitempty"`
+	LastError    string                   `json:"last_error,omitempty"`
+}
+
+// Retry preserves the lease fence so an expired owner cannot change a successor.
+func (r *IntegrationRequest) Retry(tx *gorm.DB, cause error) error {
+	spec := r.Spec.Data()
+	spec.Attempts++
+	spec.LastError = cause.Error()
+	state := IntegrationRequestStatePending
+	if spec.Attempts >= 10 {
+		state = IntegrationRequestStateFailed
+	}
+	delay := min(time.Second*time.Duration(1<<min(spec.Attempts, 8)), time.Minute)
+	return tx.Model(r).Where("state = ? AND run_at = ?", IntegrationRequestStatePending, r.RunAt).
+		Updates(map[string]any{"state": state, "spec": datatypes.NewJSONType(spec), "run_at": time.Now().Add(delay), "updated_at": time.Now()}).Error
 }
 
 type IntegrationInvokeAction struct {

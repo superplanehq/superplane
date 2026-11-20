@@ -157,7 +157,7 @@ func (d *DockerExecutor) Execute(ctx context.Context, task *api.TaskPayload, liv
 		)
 	}
 	if rp := strings.TrimSpace(resultHostPath); rp != "" {
-		f, ferr := os.OpenFile(rp, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0600)
+		f, ferr := os.OpenFile(rp, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600) // #nosec G304 -- the path is generated for the current runner task.
 		if ferr != nil {
 			return 1, "", fmt.Errorf("result file: %w", ferr)
 		}
@@ -320,7 +320,7 @@ func dockerExecBashScript(ctx context.Context, name string, task *api.TaskPayloa
 }
 
 func runDockerExec(ctx context.Context, args []string, live io.Writer) (int, string, error) {
-	cmd := exec.CommandContext(ctx, "docker", args...)
+	cmd := exec.CommandContext(ctx, "docker", args...) // #nosec G204 -- the runner intentionally invokes Docker with structured task arguments.
 	var buf bytes.Buffer
 	if live != nil {
 		mw := io.MultiWriter(&buf, live)
@@ -513,16 +513,16 @@ func isLiveLogControlLine(line string) bool {
 }
 
 func captureDocker(ctx context.Context, args ...string) ([]byte, error) {
-	return exec.CommandContext(ctx, "docker", args...).CombinedOutput()
+	return exec.CommandContext(ctx, "docker", args...).CombinedOutput() // #nosec G204 -- the runner intentionally invokes Docker with structured arguments.
 }
 
 // stopAndRemoveContainer is the cleanup path. Both calls are best-effort:
 // if the container was never created `stop` returns non-zero and we proceed;
 // `rm -f` removes it whether it is running or stopped.
 func stopAndRemoveContainer(ctx context.Context, name string) {
-	_ = exec.CommandContext(ctx, "docker",
+	_ = exec.CommandContext(ctx, "docker", // #nosec G204 -- cleanup invokes Docker with a validated runner-owned container name.
 		"stop", "--time", fmt.Sprintf("%d", dockerStopGraceSeconds), name).Run()
-	_ = exec.CommandContext(ctx, "docker", "rm", "-f", name).Run()
+	_ = exec.CommandContext(ctx, "docker", "rm", "-f", name).Run() // #nosec G204 -- cleanup uses a validated runner-owned container name.
 }
 
 // SweepDockerOrphans removes containers left over from previous runs of this
@@ -541,12 +541,12 @@ func SweepDockerOrphans(ctx context.Context, runnerID string) (removed int, err 
 	// name=^/… anchors to container names from the engine root; requires a
 	// reasonably current Docker/Moby CLI (same era as docker compose v2).
 	filter := "name=^/" + dockerNamePrefix + sanitizeDockerName(runnerID) + "-"
-	listOut, lerr := exec.CommandContext(ctx, "docker", "ps", "-aq", "--filter", filter).Output()
+	listOut, lerr := exec.CommandContext(ctx, "docker", "ps", "-aq", "--filter", filter).Output() // #nosec G204 -- the filter contains only a sanitized runner identifier.
 	if lerr != nil {
 		return 0, lerr
 	}
 	for _, id := range strings.Fields(string(listOut)) {
-		if rerr := exec.CommandContext(ctx, "docker", "rm", "-f", id).Run(); rerr == nil {
+		if rerr := exec.CommandContext(ctx, "docker", "rm", "-f", id).Run(); rerr == nil { // #nosec G204 -- IDs come from the Docker CLI response.
 			removed++
 		}
 	}

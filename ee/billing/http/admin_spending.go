@@ -42,7 +42,7 @@ func (s *Server) adminGetOrganizationSpendingReport(w http.ResponseWriter, r *ht
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write(body)
+	_, _ = w.Write(body) // #nosec G705 -- protojson produces JSON and the response content type is fixed above.
 }
 
 func spendingReportRequestFromQuery(r *http.Request, orgID string) (*pb.DescribeOrganizationSpendingReportRequest, error) {

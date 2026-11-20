@@ -306,3 +306,8 @@ type WorkOrderCheck struct {
 	// ending with Score, capped server-side.
 	RecentScores []float64 `json:"recentScores,omitempty"`
 }
+
+// FactoryPullRequestEventContext owns PR producer admission when available.
+type FactoryPullRequestEventContext interface {
+	EmitPullRequestEvent(nodeID, payloadType string, payload any) error
+}

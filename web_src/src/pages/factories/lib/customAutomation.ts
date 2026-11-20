@@ -10,14 +10,35 @@ import type { PlanningReviewDraft, PlanningReviewStep } from "../pages/planningR
 
 export const CUSTOM_AUTOMATION_TEMPLATE_ID = "custom-verification";
 
-export type CustomAutomationMode = "manual" | "automatic" | "scheduled";
+export type CustomAutomationMode = "manual" | "automatic" | "scheduled" | "leave";
 const CUSTOM_AUTOMATION_START_MODES: Record<CustomAutomationMode, FactoryCustomAutomationStartMode> = {
   manual: "START_MODE_MANUAL",
   automatic: "START_MODE_AUTOMATIC",
   scheduled: "START_MODE_SCHEDULED",
+  leave: "START_MODE_ON_LEAVE",
 };
 export type CustomAutomationSchedule = { cronExpression: string; utcOffset: number };
-export type CustomAutomationColumn = "backlog" | "verify";
+export type CustomAutomationColumn = "backlog" | "implement" | "verify" | "done";
+
+export function customAutomationColumn(value: string | null | undefined): CustomAutomationColumn {
+  if (value === "backlog" || value === "implement" || value === "done" || value === "verify") {
+    return value;
+  }
+  return "verify";
+}
+
+export function customAutomationColumnLabel(column: CustomAutomationColumn): string {
+  switch (column) {
+    case "backlog":
+      return "Backlog";
+    case "implement":
+      return "Implement";
+    case "done":
+      return "Done";
+    default:
+      return "Verify";
+  }
+}
 export type CustomAutomationTrigger = {
   id: string;
   mode: CustomAutomationMode;
@@ -55,10 +76,41 @@ export function customAutomationTriggers(automation?: FactoriesFactoryCustomAuto
 }
 
 export function customAutomationAllowsManualStart(settings?: FactoriesFactoryCustomAutomationSettings): boolean {
+  if (settings?.runsOnTask === false) {
+    return false;
+  }
   if (settings?.triggers && settings.triggers.length > 0) {
     return settings.triggers.some((trigger) => trigger.startMode === "START_MODE_MANUAL");
   }
   return customAutomationMode(settings?.startMode) === "manual";
+}
+
+export function customAutomationRunsOnTask(
+  saved: boolean | undefined,
+  triggers: Array<{ mode: CustomAutomationMode }>,
+): boolean {
+  if (saved !== undefined) {
+    return saved;
+  }
+  if (triggers.some((trigger) => trigger.mode === "automatic" || trigger.mode === "leave")) {
+    return true;
+  }
+  if (triggers.some((trigger) => trigger.mode === "scheduled")) {
+    return false;
+  }
+  return true;
+}
+
+export function customAutomationTriggersForRun(
+  triggers: CustomAutomationTrigger[],
+  runsOnTask: boolean,
+): CustomAutomationTrigger[] {
+  return triggers.filter((trigger) => {
+    if (runsOnTask) {
+      return trigger.mode !== "scheduled";
+    }
+    return trigger.mode !== "automatic" && trigger.mode !== "leave";
+  });
 }
 
 export function customAutomationSchedule(automation?: FactoriesFactoryCustomAutomation): CustomAutomationSchedule {
@@ -82,6 +134,7 @@ export const DEFAULT_CUSTOM_AUTOMATION_TIMEOUT_SECONDS = 3600;
 
 export function customAutomationMode(value: FactoryCustomAutomationStartMode | undefined): CustomAutomationMode {
   if (value === "START_MODE_SCHEDULED") return "scheduled";
+  if (value === "START_MODE_ON_LEAVE") return "leave";
   return value === "START_MODE_AUTOMATIC" ? "automatic" : "manual";
 }
 
@@ -98,14 +151,23 @@ export function customAutomationModeCopy(
       action: columnKey === "backlog" ? "Creates a task" : "Run automation on the repository default branch",
     };
   }
+  if (mode === "leave") {
+    return {
+      trigger: `When a task leaves ${customAutomationColumnLabel(columnKey)}`,
+      action: "Run automation automatically",
+    };
+  }
   if (mode === "automatic") {
     return {
-      trigger: columnKey === "backlog" ? "When a task enters Backlog" : "On Verify and new commits",
+      trigger:
+        columnKey === "verify"
+          ? "On Verify and new commits"
+          : `When a task enters ${customAutomationColumnLabel(columnKey)}`,
       action: "Run automation automatically",
     };
   }
   return {
-    trigger: columnKey === "backlog" ? "Manual start on a Backlog task" : "Manual start on a Verify task",
+    trigger: `Manual start on a ${customAutomationColumnLabel(columnKey)} task`,
     action: "Run automation on demand",
   };
 }
@@ -218,23 +280,28 @@ export function customAutomationSettingsForTriggers(
   triggers: CustomAutomationTrigger[],
   draft: PlanningReviewDraft,
   icon = DEFAULT_CUSTOM_AUTOMATION_ICON,
+  runsOnTask = true,
 ): FactoriesFactoryCustomAutomationSettings {
-  const current = triggers.length > 0 ? triggers : [newCustomAutomationTrigger()];
+  const active = customAutomationTriggersForRun(triggers, runsOnTask);
+  const current = active.length > 0 ? active : [newCustomAutomationTrigger()];
   const scheduled = current.filter((trigger) => trigger.mode === "scheduled");
   const primary = current.some((trigger) => trigger.mode === "automatic")
     ? "automatic"
-    : scheduled.length > 0
-      ? "scheduled"
-      : "manual";
+    : current.some((trigger) => trigger.mode === "leave")
+      ? "leave"
+      : scheduled.length > 0
+        ? "scheduled"
+        : "manual";
   const settings = customAutomationSettings(primary, draft, icon, scheduled[0]?.schedule);
-  if (current.length === 1) {
-    return customAutomationSettings(current[0]!.mode, draft, icon, current[0]!.schedule);
-  }
-  return {
-    ...settings,
-    schedule: scheduled.length === 1 ? scheduled[0]!.schedule : undefined,
-    triggers: current.map(triggerToApi),
-  };
+  const chosen =
+    current.length === 1
+      ? customAutomationSettings(current[0]!.mode, draft, icon, current[0]!.schedule)
+      : {
+          ...settings,
+          schedule: scheduled.length === 1 ? scheduled[0]!.schedule : undefined,
+          triggers: current.map(triggerToApi),
+        };
+  return { ...chosen, runsOnTask };
 }
 
 function triggerToApi(trigger: CustomAutomationTrigger): FactoryCustomAutomationStartTrigger {

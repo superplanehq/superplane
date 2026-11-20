@@ -9,11 +9,48 @@ import (
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/components/runner"
+	"github.com/superplanehq/superplane/pkg/factories/mergeconfidence"
 	"github.com/superplanehq/superplane/pkg/yaml"
 )
 
 // This is the rules line written by the risk-category settings form.
 var mergeRiskRulesLine = regexp.MustCompile(`(?m)^(?:[^=\n]+? = [1-5] \((?:very_low|low|medium|high|critical)\)\.\s*)+$`)
+
+// Legacy installations keep their body switch until the agent owns these settings.
+func configureMergeConfidencePublication(canvas *yaml.Canvas) error {
+	var agent, body map[string]any
+	for _, node := range canvas.Spec.Nodes {
+		switch node.ID {
+		case "assess-risk":
+			agent = node.Configuration
+		case "publish-merge-confidence":
+			body = node.Configuration
+		}
+	}
+	publish := body["enabled"] != false
+	if saved, present := agent["publishResults"]; present {
+		publish = saved != false
+	}
+	bodyEnabled, commentEnabled := agent["resultsBody"] != false, agent["resultsComment"] == true
+	if publish && !bodyEnabled && !commentEnabled {
+		return fmt.Errorf("select at least one destination for merge confidence results")
+	}
+	for i := range canvas.Spec.Nodes {
+		node := &canvas.Spec.Nodes[i]
+		switch node.ID {
+		case "start-assessment-check":
+			node.Configuration["enabled"] = agent["publishPRCheck"] == true
+			node.Configuration["activationGeneration"] = savedActivationGeneration(agent["prCheckActivationGeneration"])
+		case "publish-merge-confidence":
+			node.Configuration["enabled"] = publish && bodyEnabled
+			node.Configuration["activationGeneration"] = savedActivationGeneration(agent["resultsBodyActivationGeneration"])
+		case "comment-merge-confidence":
+			node.Configuration["enabled"] = publish && commentEnabled
+			node.Configuration["activationGeneration"] = savedActivationGeneration(agent["resultsCommentActivationGeneration"])
+		}
+	}
+	return nil
+}
 
 func configureMergeConfidenceChecks(node *yaml.Node, raw any) error {
 	if raw == nil {
@@ -27,7 +64,7 @@ func configureMergeConfidenceChecks(node *yaml.Node, raw any) error {
 	if err := json.Unmarshal(encoded, &savedSteps); err != nil {
 		return fmt.Errorf("read saved merge confidence checks: %w", err)
 	}
-	ids, labels := runner.MergeConfidenceChecksFromSteps(savedSteps)
+	ids, labels := mergeconfidence.MergeConfidenceChecksFromSteps(savedSteps)
 	generated, _ := node.Configuration["steps"].([]any)
 	defaults := mergeCheckStepsByID(generated)
 	custom := savedMergeCheckSteps(raw)
@@ -68,7 +105,7 @@ func mergeCheckStepsByID(steps []any) map[string]map[string]any {
 	for _, item := range steps {
 		step := cloneMergeCheckStep(item)
 		prompt, _ := step["prompt"].(string)
-		if id := runner.MergeCheckID(prompt); id != "" {
+		if id := mergeconfidence.MergeCheckID(prompt); id != "" {
 			checks[id] = step
 		}
 	}
@@ -86,7 +123,7 @@ func replaceMergeCheckSteps(generated, selected []any) []any {
 	for _, item := range generated {
 		step, _ := item.(map[string]any)
 		prompt, _ := step["prompt"].(string)
-		if runner.MergeCheckID(prompt) != "" {
+		if mergeconfidence.MergeCheckID(prompt) != "" {
 			if !inserted {
 				result = append(result, selected...)
 				inserted = true

@@ -33,6 +33,7 @@ func SanitizedGatewayErrorHandler(
 	r *http.Request,
 	err error,
 ) {
+	RecordGatewayRequest(ctx)
 	sanitized := SanitizeError(r.Context(), err)
 	noteReportableServerError(r.Context(), err, sanitized)
 	runtime.DefaultHTTPErrorHandler(ctx, mux, marshaler, w, r, sanitized)

@@ -386,18 +386,33 @@ func TestChangePassword_ReissuedCookieValid(t *testing.T) {
 // TestSetAccountCookie_Helper sanity-checks the new cookie helper so any
 // future drift in cookie attributes is caught explicitly.
 func TestSetAccountCookie_Helper(t *testing.T) {
-	w := httptest.NewRecorder()
-	r := httptest.NewRequest(http.MethodGet, "/account", nil)
+	for _, test := range []struct {
+		name   string
+		url    string
+		header string
+		secure bool
+	}{
+		{name: "local HTTP", url: "http://superplane.test/account", secure: false},
+		{name: "direct HTTPS", url: "https://superplane.test/account", secure: true},
+		{name: "forwarded HTTPS", url: "http://superplane.test/account", header: "https", secure: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			r := httptest.NewRequest(http.MethodGet, test.url, nil)
+			r.Header.Set("X-Forwarded-Proto", test.header)
 
-	authentication.SetAccountCookie(w, r, "abc", time.Hour)
+			authentication.SetAccountCookie(w, r, "abc", time.Hour)
 
-	cookies := w.Result().Cookies()
-	require.Len(t, cookies, 1)
-	c := cookies[0]
-	assert.Equal(t, "account_token", c.Name)
-	assert.Equal(t, "abc", c.Value)
-	assert.Equal(t, "/", c.Path)
-	assert.True(t, c.HttpOnly)
-	assert.Equal(t, http.SameSiteLaxMode, c.SameSite)
-	assert.Equal(t, int(time.Hour.Seconds()), c.MaxAge)
+			cookies := w.Result().Cookies()
+			require.Len(t, cookies, 1)
+			c := cookies[0]
+			assert.Equal(t, "account_token", c.Name)
+			assert.Equal(t, "abc", c.Value)
+			assert.Equal(t, "/", c.Path)
+			assert.True(t, c.HttpOnly)
+			assert.Equal(t, http.SameSiteLaxMode, c.SameSite)
+			assert.Equal(t, int(time.Hour.Seconds()), c.MaxAge)
+			assert.Equal(t, test.secure, c.Secure)
+		})
+	}
 }

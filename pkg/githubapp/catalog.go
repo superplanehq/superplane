@@ -78,7 +78,7 @@ func (c *Catalog) Reconcile(ctx context.Context, priority models.VCSProviderRepo
 			continue
 		}
 		seen[installation.GetID()] = struct{}{}
-		if err := c.reconcileInstallation(ctx, installation, priority); err != nil {
+		if err := c.reconcileCatalogInstallation(ctx, installation, priority); err != nil {
 			reconcileErrors = append(
 				reconcileErrors,
 				fmt.Errorf("reconcile GitHub installation %d: %w", installation.GetID(), err),
@@ -123,7 +123,11 @@ func (c *Catalog) ReconcileInstallation(
 	if err != nil {
 		return fmt.Errorf("get GitHub App installation %d: %w", installationID, err)
 	}
-	return c.reconcileInstallation(ctx, installation, priority)
+	repositories, err := c.saveInstallation(ctx, installation)
+	if err != nil {
+		return err
+	}
+	return enqueueRepositories(c.db, repositories, c.now(), priority)
 }
 
 // VerifyInstallation reads one installation from GitHub without its
@@ -181,36 +185,54 @@ func (c *Catalog) HasInstallationRequest(ctx context.Context, installationID int
 	)
 }
 
-func (c *Catalog) reconcileInstallation(
+// reconcileCatalogInstallation refreshes one installation during the
+// catalog-wide reconcile. Known repositories keep their collaborators: the
+// staleness sweep and webhooks refresh them, so only new repositories and
+// repositories without a first sync are queued here.
+func (c *Catalog) reconcileCatalogInstallation(
 	ctx context.Context,
 	installation *gh.Installation,
 	priority models.VCSProviderRepositorySyncPriority,
 ) error {
+	repositories, err := c.saveInstallation(ctx, installation)
+	if err != nil || len(repositories) == 0 {
+		return err
+	}
+	return models.EnqueueUnsyncedVCSProviderRepositories(
+		c.db,
+		models.ProviderGitHub,
+		installation.GetID(),
+		c.now(),
+		priority,
+	)
+}
+
+// saveInstallation stores the installation and its repository list. It
+// returns no repositories for a suspended installation.
+func (c *Catalog) saveInstallation(
+	ctx context.Context,
+	installation *gh.Installation,
+) ([]models.VCSProviderRepository, error) {
 	model := installationModel(installation)
 	if err := models.UpsertVCSProviderInstallation(c.db, &model); err != nil {
-		return fmt.Errorf("save GitHub App installation %d: %w", model.InstallationID, err)
+		return nil, fmt.Errorf("save GitHub App installation %d: %w", model.InstallationID, err)
 	}
 	if err := models.DeleteVCSProviderInstallRequestsForAccount(c.db, models.ProviderGitHub, model.AccountID, model.AccountLogin); err != nil {
-		return fmt.Errorf("remove approved GitHub App request: %w", err)
+		return nil, fmt.Errorf("remove approved GitHub App request: %w", err)
 	}
 	if model.SuspendedAt != nil {
-		return nil
+		return nil, nil
 	}
 
 	repositories, err := c.listRepositories(ctx, model.InstallationID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	repositoryModels := repositoryModels(model.InstallationID, repositories)
 	if err := models.ReplaceVCSProviderRepositories(c.db, models.ProviderGitHub, model.InstallationID, repositoryModels); err != nil {
-		return fmt.Errorf("save GitHub App repositories: %w", err)
+		return nil, fmt.Errorf("save GitHub App repositories: %w", err)
 	}
-	return enqueueRepositories(
-		c.db,
-		repositoryModels,
-		c.now(),
-		priority,
-	)
+	return repositoryModels, nil
 }
 
 func (c *Catalog) SyncRepositoryCollaborators(ctx context.Context, repositoryID int64) error {

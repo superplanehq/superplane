@@ -187,6 +187,30 @@ func TestListIntegrationsIncludesExamplePayloadsForSetupProviderCapabilities(t *
 	require.Equal(t, "push", resp.Integrations[0].Capabilities[1].GetExampleData().GetFields()["kind"].GetStringValue())
 }
 
+func TestListIntegrationsIncludesGitHubReviewRequestComponents(t *testing.T) {
+	r := &registry.Registry{
+		Integrations:   map[string]core.Integration{"github": &ghub.GitHub{}},
+		SetupProviders: map[string]core.IntegrationSetupProvider{"github": &ghub.SetupProvider{}},
+	}
+	resp, err := ListIntegrations(contextWithOrganizationID(uuid.New().String()), r)
+	require.NoError(t, err)
+	require.Len(t, resp.Integrations, 1)
+	for _, name := range []string{"github.listPullRequestReviewCandidates", "github.ensurePullRequestReviewers"} {
+		t.Run(name, func(t *testing.T) {
+			for _, capability := range resp.Integrations[0].Capabilities {
+				if capability.Name != name {
+					continue
+				}
+				require.NotEmpty(t, capability.Label)
+				require.NotEqual(t, name, capability.Label)
+				require.NotEmpty(t, capability.Configuration)
+				return
+			}
+			t.Fatalf("GitHub component %s is missing from the catalog", name)
+		})
+	}
+}
+
 func TestListIntegrationsAddsGlobalFieldsToSetupProviderTriggerCapabilities(t *testing.T) {
 	r := &registry.Registry{
 		Integrations: map[string]core.Integration{

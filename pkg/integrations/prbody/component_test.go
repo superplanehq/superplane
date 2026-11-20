@@ -68,7 +68,11 @@ func TestIntegrationBodySectionPublication(t *testing.T) {
 				var outcome map[string]any
 				require.NoError(t, json.Unmarshal(encoded, &outcome))
 				if scenario != "publish" {
-					assert.Equal(t, "skipped", outcome["status"])
+					expectedStatus := "skipped"
+					if scenario == "unchanged" {
+						expectedStatus = "unchanged"
+					}
+					assert.Equal(t, expectedStatus, outcome["status"])
 					expectedCalls := 1
 					if scenario == "disabled" {
 						expectedCalls = 0

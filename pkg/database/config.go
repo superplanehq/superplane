@@ -41,6 +41,6 @@ func durationFromEnv(key string, defaultDur time.Duration) time.Duration {
 	if ms, err := strconv.ParseInt(s, 10, 64); err == nil && ms >= 0 {
 		return time.Duration(ms) * time.Millisecond
 	}
-	log.Printf("[database] invalid %s=%q, using default %v", key, s, defaultDur)
+	log.Printf("[database] invalid %s=%q, using default %v", key, s, defaultDur) // #nosec G706 -- the constant format quotes and escapes the untrusted value.
 	return defaultDur
 }

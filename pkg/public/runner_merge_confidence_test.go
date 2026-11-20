@@ -2,6 +2,7 @@ package public
 
 import (
 	"fmt"
+	"github.com/superplanehq/superplane/pkg/factories/mergeconfidence"
 	"net/http"
 	"testing"
 	"time"
@@ -43,13 +44,14 @@ func TestRunnerMergeConfidenceCheck(t *testing.T) {
 
 	t.Setenv("JWT_SECRET", "test")
 	ctx := core.ExecutionContext{ID: nodeExecution.ID, RunID: run.ID, WorkflowID: canvas.ID.String(), OrganizationID: r.Organization.ID.String(), NodeID: nodeID, BaseURL: "http://app.test"}
-	token := runnerTokenFrom(runneraction.AttachRunnerEnv(ctx, nil, 60, &runneraction.MergeConfidenceScope{
+	token := runnerTokenFrom(runneraction.AttachScopedRunnerEnv(db, ctx, nil, 60, &runneraction.RunnerScope{
+		CanvasID: canvas.ID, NodeID: nodeID, Flow: runneraction.RunnerFlowMergeConfidence,
 		OrganizationID:  r.Organization.ID,
 		FactoryID:       factoryModel.ID,
 		WorkOrderID:     order.ID,
 		CanvasRunID:     run.ID,
 		NodeExecutionID: nodeExecution.ID,
-		EnabledChecks:   []string{"risk"},
+		MergeChecks:     []string{"risk"},
 	}))
 	require.NotEmpty(t, token)
 	parsed, err := runneraction.ParseRunnerToken(signer, token)
@@ -159,12 +161,9 @@ func testRunnerMergeConfidenceCheckKeepsEachRepositoryApart(t *testing.T, pullRe
 		require.NoError(t, db.Model(execution).Update("state", models.CanvasNodeExecutionStateStarted).Error)
 		ctx := core.ExecutionContext{ID: execution.ID, RunID: run.ID, WorkflowID: canvas.ID.String(), OrganizationID: r.Organization.ID.String(), NodeID: nodeID, BaseURL: "http://app.test"}
 		prompt := "Merge check: risk.\nScore the diff."
-		environment, scope, err := runneraction.AttachMergeConfidenceEnv(ctx, []runneraction.TaskEnvironmentVariable{
-			{Name: runneraction.EnvSuperplaneMergeConfidenceOrderID, Value: order.ID.String()},
-		}, []runneraction.AgentStep{{Name: "Blast radius", Type: runneraction.AgentStepPrompt, Prompt: &prompt}})
-		require.NoError(t, err)
-		require.NotNil(t, scope)
-		return runnerTokenFrom(runneraction.AttachRunnerEnv(ctx, environment, 60, scope))
+		ctx.Configuration = map[string]any{"environment": []map[string]any{{"name": runneraction.EnvSuperplaneMergeConfidenceOrderID, "value": order.ID.String(), "valueSource": "literal"}}, "steps": []runneraction.AgentStep{{Name: "Blast radius", Type: runneraction.AgentStepPrompt, Prompt: &prompt}}, "executionTimeoutSeconds": 60}
+		require.NoError(t, mergeconfidence.PrepareRunner(db, &ctx))
+		return runnerTokenFrom(runneraction.AttachRunnerEnv(ctx, nil, 60))
 	}
 
 	const reportPath = "/api/v1/runner/task/merge-checks"

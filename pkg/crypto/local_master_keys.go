@@ -80,7 +80,7 @@ func (k *LocalMasterKeys) Wrap(_ context.Context, reference string, plain, assoc
 	if !ok {
 		return nil, fmt.Errorf("local master key %q is not configured", reference)
 	}
-	return aead.Seal(nil, nil, plain, associatedData), nil
+	return aead.Seal(nil, nil, plain, associatedData), nil // #nosec G407 -- NewGCMWithRandomNonce generates and prepends a random nonce.
 }
 
 func (k *LocalMasterKeys) Unwrap(_ context.Context, reference string, wrapped, associatedData []byte) ([]byte, error) {

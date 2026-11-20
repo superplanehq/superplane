@@ -28,7 +28,7 @@ func (s *Server) HandleMCPOAuthCallback(w http.ResponseWriter, r *http.Request) 
 		r.URL.Query().Get("error"),
 	)
 	if status == http.StatusFound && path != "" {
-		http.Redirect(w, r, path, http.StatusFound)
+		http.Redirect(w, r, path, http.StatusFound) // #nosec G710 -- path is generated from the stored internal factory agent route.
 		return
 	}
 	if message == "" {

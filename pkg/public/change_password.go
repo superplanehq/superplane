@@ -12,6 +12,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
 	"github.com/superplanehq/superplane/pkg/supportsession"
@@ -44,6 +45,10 @@ func (s *Server) changePassword(w http.ResponseWriter, r *http.Request) {
 	// Always operate on the real account, never the support session target.
 	// An installation admin must not be able to silently rewrite the
 	// password of a user in their support session.
+	logging.AddRequestLogFields(r.Context(), log.Fields{
+		"action": "change_password",
+		"object": "account",
+	})
 	account, ok := middleware.GetAccountFromContext(r.Context())
 	if !ok {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -128,6 +133,11 @@ func (s *Server) changePassword(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
+
+	logging.AddRequestLogFields(r.Context(), log.Fields{
+		"object_id":        account.ID.String(),
+		"settings_updated": []string{"password"},
+	})
 
 	// Drop any support session cookie defensively (we already refused above
 	// when one was present, but a stale cookie might still be on the wire).

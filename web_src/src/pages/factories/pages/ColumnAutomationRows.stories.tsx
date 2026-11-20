@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { MoreHorizontal, Plus } from "lucide-react";
 import { useState } from "react";
-import { expect, userEvent, within } from "storybook/test";
+import { expect, userEvent, within, waitFor } from "storybook/test";
 
 import githubIcon from "@/assets/icons/integrations/github.svg";
 
@@ -10,6 +10,9 @@ import { withFactoriesTheme } from "../__fixtures__/factoriesStoryTheme";
 import type { ColumnAutomation } from "../lib/columnAutomations";
 import { WorkOrderBoardLane, WorkOrderKanbanBoard } from "../workOrders/WorkOrderBoardChrome";
 import { ColumnAutomationRows } from "./ColumnAutomationRows";
+import { useColumnAutomationCollapsePreference } from "@/hooks/useColumnAutomationCollapsePreference";
+import { ColumnAutomationToggle } from "./ColumnAutomationDisclosure";
+import { columnAutomationRowsSubheader } from "./columnAutomationRowsSubheader";
 import { lineBoardColumnLaneClassName } from "./lineBoardColumnColors";
 
 const GITHUB_INTAKE: ColumnAutomation = {
@@ -57,6 +60,12 @@ const VERIFY: ColumnAutomation = {
   action: "Run the Verify agent",
 };
 
+const VERIFY_AUTOMATIONS: ColumnAutomation[] = [
+  { ...GITHUB_INTAKE, id: "pr-comments", kind: "pr-discussion", name: "Pull request comments" },
+  { ...GITHUB_INTAKE, id: "pr-checks", kind: "pr-checks", name: "Status checks" },
+  { ...ANALYSIS, id: "merge-confidence", kind: "risk-score", name: "Merge confidence" },
+];
+
 const meta = {
   title: "Factories/Components/ColumnAutomationRows",
   component: ColumnAutomationRows,
@@ -77,6 +86,37 @@ type Story = StoryObj;
 
 export const SettingsRows: Story = {
   name: "Settings rows",
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const verify = within(canvas.getByRole("region", { name: "Verify" }));
+    for (const title of ["Backlog", "Implement", "Verify"]) {
+      const lane = within(canvas.getByRole("region", { name: title }));
+      const expand = lane.queryByRole("button", { name: `Expand automations for ${title}` });
+      if (expand) await userEvent.click(expand);
+      await waitFor(() => expect(lane.getByRole("list", { name: `${title} automations` })).toBeVisible());
+    }
+    await Promise.all(canvasElement.getAnimations({ subtree: true }).map((animation) => animation.finished));
+    const labelOffsets: number[] = [];
+    const cardTops: number[] = [];
+    for (const title of ["Backlog", "Implement", "Verify", "Review"]) {
+      const lane = within(canvas.getByRole("region", { name: title }));
+      const titleLeft = lane.getByRole("heading", { name: title }).getBoundingClientRect().left;
+      const rows = within(lane.getByRole("list", { name: `${title} automations` }));
+      for (const button of rows.getAllByRole("button", { name: /^(Open automation:|Add automation)/ })) {
+        const icon = button.querySelector("img, svg");
+        const label = button.lastElementChild;
+        if (!icon || !label) throw new Error("The automation row is missing its icon or label.");
+        expect(Math.abs(icon.getBoundingClientRect().left - titleLeft)).toBeLessThanOrEqual(1);
+        labelOffsets.push(label.getBoundingClientRect().left - titleLeft);
+      }
+      cardTops.push(lane.getAllByRole("listitem").at(-1)!.getBoundingClientRect().top);
+    }
+    expect(Math.max(...labelOffsets) - Math.min(...labelOffsets)).toBeLessThanOrEqual(1);
+    expect(cardTops[2]).toBeGreaterThan(cardTops[0]);
+    await userEvent.click(verify.getByRole("button", { name: "Collapse automations for Verify" }));
+    await expect(verify.queryByRole("list", { name: "Verify automations" })).not.toBeInTheDocument();
+    await expect(canvas.getByRole("list", { name: "Backlog automations" })).toBeVisible();
+  },
   render: () => <Board />,
 };
 
@@ -163,18 +203,20 @@ function Board() {
         />
         <Lane
           title="Implement"
-          automations={[IMPLEMENT]}
+          automations={[
+            { ...IMPLEMENT, name: "Scheduled repository implementation and documentation review", canRunNow: true },
+          ]}
           cards={[{ title: "Notify on status change after a refund", meta: "Draft #114" }]}
         />
         <Lane
           title="Verify"
-          automations={[VERIFY]}
+          automations={VERIFY_AUTOMATIONS}
           cards={[{ title: "Add refund reason enum to schema", meta: "Draft #1022" }]}
         />
         <Lane
           title="Review"
           automations={[]}
-          onAdd={() => undefined}
+          onAdd={() => console.log("Add automation", "Review")}
           cards={[{ title: "Ship idempotent refund retries", meta: "Review #6812" }]}
         />
       </WorkOrderKanbanBoard>
@@ -197,6 +239,10 @@ function Lane({
   onAdd?: () => void;
   cards: Array<{ title: string; meta: string }>;
 }) {
+  const disclosure = useColumnAutomationCollapsePreference(
+    JSON.stringify(["storybook", "automation-rows", "board", title.toLowerCase()]),
+    automations.length,
+  );
   return (
     <WorkOrderBoardLane
       title={title}
@@ -207,6 +253,7 @@ function Lane({
       className={colorId ? undefined : "bg-muted"}
       actions={
         <div className="flex shrink-0 items-center gap-0.5">
+          {automations.length ? <ColumnAutomationToggle title={title} disclosure={disclosure} /> : null}
           {showAdd ? (
             <span className="flex size-6 items-center justify-center rounded-md text-muted-foreground">
               <Plus className="size-3.5" aria-hidden />
@@ -217,16 +264,17 @@ function Lane({
           </span>
         </div>
       }
-      subheader={
-        <ColumnAutomationRows
-          title={title}
-          automations={automations}
-          rowCount={2}
-          onRowAction={() => undefined}
-          onAdd={onAdd}
-          testId={`${title.toLowerCase()}-rows`}
-        />
-      }
+      subheaderOwnSpacing
+      subheader={columnAutomationRowsSubheader({
+        title,
+        automations,
+        disclosure,
+        rowCount: Math.max(1, automations.length),
+        onRowAction: (automation, action) => console.log("Automation action", automation.id, action),
+        onRun: (automation) => console.log("Run automation", automation.id),
+        onAdd,
+        testId: `${title.toLowerCase()}-rows`,
+      })}
       testId={`${title.toLowerCase()}-lane`}
     >
       <ul className="flex flex-col gap-2 p-0.5">

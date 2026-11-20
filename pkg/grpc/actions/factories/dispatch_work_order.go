@@ -106,6 +106,7 @@ type workOrderLineDispatchResult struct {
 	startedSteps []*models.FactoryLineStepResult
 	planningStop *models.RunCancellationResult
 	fromState    string
+	leftColumn   string
 	logger       *log.Entry
 }
 
@@ -147,7 +148,53 @@ func DispatchWorkOrderOnLine(
 		result.fromState,
 		result.startedSteps,
 	)
+	startColumnLeaveAfterDispatch(db, result)
+	startImplementColumnAutomations(db, result.logger, result.factory, result.order, startIndex)
 	return result.factory, result.order, nil
+}
+
+func startColumnLeaveAfterDispatch(db *gorm.DB, result *workOrderLineDispatchResult) {
+	if result == nil || result.factory == nil || result.order == nil || result.leftColumn == "" {
+		return
+	}
+	next, err := models.WorkOrderBoardColumn(db, result.order)
+	if err != nil || next == result.leftColumn {
+		if err != nil && result.logger != nil {
+			result.logger.WithError(err).Warnf("Failed to read the column for order %s", result.order.ID)
+		}
+		return
+	}
+	if err := StartColumnLeaveCustomAutomations(db, result.factory, result.order, result.leftColumn, departureAttemptToken(result)); err != nil && result.logger != nil {
+		result.logger.WithError(err).Warnf("Failed to start %s leave automation for order %s", result.leftColumn, result.order.ID)
+	}
+}
+
+func departureAttemptToken(result *workOrderLineDispatchResult) string {
+	if result == nil {
+		return ""
+	}
+	for i := len(result.startedSteps) - 1; i >= 0; i-- {
+		step := result.startedSteps[i]
+		if step == nil {
+			continue
+		}
+		if step.Execution != nil {
+			return step.Execution.ID.String()
+		}
+		if step.QueueItem != nil {
+			return step.QueueItem.ID.String()
+		}
+	}
+	return ""
+}
+
+func startImplementColumnAutomations(db *gorm.DB, logger *log.Entry, factory *models.Factory, order *models.FactoryWorkOrder, startIndex int) {
+	if startIndex != 0 || db == nil || factory == nil || order == nil {
+		return
+	}
+	if err := StartAutomaticTaskColumnCustomAutomations(db, factory, order, models.CanvasColumnKeyImplement); err != nil && logger != nil {
+		logger.WithError(err).Warnf("Failed to start Implement custom automation for order %s", order.ID)
+	}
 }
 
 func dispatchWorkOrderOnLineTx(
@@ -239,6 +286,10 @@ func dispatchWorkOrderOnLineTx(
 	}
 
 	fromState := order.State
+	leftColumn, err := models.WorkOrderBoardColumn(tx, order)
+	if err != nil {
+		return nil, err
+	}
 	if err := fillMissingWorkOrderTitle(tx, order); err != nil {
 		return nil, err
 	}
@@ -262,6 +313,7 @@ func dispatchWorkOrderOnLineTx(
 			startedSteps: startedSteps,
 			planningStop: planningStop,
 			fromState:    fromState,
+			leftColumn:   leftColumn,
 			logger:       logger,
 		}, nil
 	}
@@ -291,6 +343,7 @@ func dispatchWorkOrderOnLineTx(
 		startedSteps: append(abandoned, result),
 		planningStop: planningStop,
 		fromState:    fromState,
+		leftColumn:   leftColumn,
 		logger:       logger,
 	}, nil
 }

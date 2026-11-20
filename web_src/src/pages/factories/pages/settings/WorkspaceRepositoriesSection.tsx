@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { ChevronDown, GitBranch, Trash2 } from "lucide-react";
 
 import { PermissionTooltip } from "@/components/PermissionGate";
@@ -22,10 +22,12 @@ import { useGitHubOnboarding } from "../onboarding/useGitHubOnboarding";
 import { navigateGitHubWindow, openGitHubWindow } from "../onboarding/useFirstRunGitHub";
 import { AGENT_RESOURCES_COPY } from "./agentResourceCopy";
 import { FactorySettingsCard } from "./FactorySettingsCard";
+import { PrimaryRepositoryListItem } from "./PrimaryRepositoryEditor";
 import { useRepositoryBranchesPrefetch, useRepositoryDefaultBranch } from "./useRepositoryDefaultBranch";
 import { useWorkspaceRepositoryChoices } from "./useWorkspaceRepositoryChoices";
 import { RepositoryAccessField, WorkspaceRepositoryFields } from "./WorkspaceRepositoryFields";
 import {
+  isWorkspaceMainRepository,
   workspaceRepositoryAccess,
   workspaceRepositorySummary,
   type WorkspaceRepositorySettings,
@@ -50,12 +52,6 @@ function workspaceDefaultBranch(factory: RepositoryWorkspace | null | undefined)
   return factory?.onboarding?.defaultBranch?.trim() ?? "";
 }
 
-function isWorkspaceMainRepository(name: string, appRepository: string | undefined): boolean {
-  const main = appRepository?.trim().toLowerCase() ?? "";
-  if (!main) return false;
-  return name.trim().toLowerCase() === main;
-}
-
 type ContextRepoResource = {
   id?: string | null;
   name?: string | null;
@@ -69,13 +65,12 @@ type CatalogRepositories = ReturnType<typeof useWorkspaceRepositoryChoices>["cat
 type ContextRepoListProps = {
   organizationId: string;
   integrationId: string;
-  primaryRepository: string;
-  primaryBranch: string;
   catalogRepositories: CatalogRepositories;
   resources: ContextRepoResource[];
   host: VcsHostId;
   canUpdate: boolean;
   isSaving: boolean;
+  primary: ReactNode;
   onRemove: (resourceId: string) => void;
   onUpdate: (resourceId: string, changed: Partial<WorkspaceRepositorySettings>) => void;
 };
@@ -87,19 +82,7 @@ function ContextRepoList(props: ContextRepoListProps) {
       className="divide-y divide-border overflow-hidden rounded-lg border border-border"
       data-testid="agent-cross-repo-list"
     >
-      {props.primaryRepository ? (
-        <li className="flex min-w-0 items-center gap-3 px-3 py-2.5" data-testid="agent-cross-repo-primary">
-          <IntegrationChoiceIcon name={props.host} />
-          <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{props.primaryRepository}</span>
-          <span
-            className="shrink-0 truncate text-[12px] text-muted-foreground"
-            title={AGENT_RESOURCES_COPY.primaryRepositoryHint}
-          >
-            {props.primaryBranch ? `${props.primaryBranch} · ` : ""}
-            {AGENT_RESOURCES_COPY.primaryRepository}
-          </span>
-        </li>
-      ) : null}
+      {props.primary}
       {props.resources.map((resource) => (
         <ContextRepoRow
           key={resource.id ?? contextRepoName(resource)}
@@ -306,8 +289,6 @@ export function WorkspaceRepositoriesCard({
           <ContextRepoList
             organizationId={organizationId}
             integrationId={choices.integrationId}
-            primaryRepository={primaryRepository}
-            primaryBranch={workspaceDefaultBranch(factory)}
             catalogRepositories={choices.catalogRepositories}
             resources={otherRepos}
             host={choices.host}
@@ -315,6 +296,16 @@ export function WorkspaceRepositoriesCard({
             isSaving={isSaving}
             onRemove={edits.remove}
             onUpdate={edits.update}
+            primary={
+              <PrimaryRepositoryListItem
+                organizationId={organizationId}
+                factoryId={factoryId}
+                repository={primaryRepository}
+                branch={workspaceDefaultBranch(factory)}
+                choices={choices}
+                canUpdate={canUpdate}
+              />
+            }
           />
         ) : null}
       </FactorySettingsCard>
@@ -455,7 +446,7 @@ function useGrantVcsAccess(organizationId: string, bitbucket: boolean) {
   return { grantAccess, granting };
 }
 
-function RepositoryChoice({
+export function RepositoryChoice({
   organizationId,
   host,
   bitbucket,

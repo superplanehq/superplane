@@ -2,7 +2,7 @@ package cloudsmith
 
 import (
 	"crypto/hmac"
-	"crypto/sha1"
+	"crypto/sha1" // #nosec G505 -- Cloudsmith webhook signatures use the documented HMAC-SHA1 protocol.
 	"encoding/hex"
 	"encoding/json"
 	"fmt"

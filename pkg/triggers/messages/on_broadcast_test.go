@@ -178,3 +178,45 @@ func TestOnBroadcast_OnAppMessage(t *testing.T) {
 	require.Equal(t, "app.broadcast", events.Payloads[0].Type)
 	require.Equal(t, message, events.Payloads[0].Data)
 }
+
+// Delivery filtering owns acceptance before a trigger event or run exists.
+func TestOnBroadcast_Filter(t *testing.T) {
+	message := map[string]any{"app": map[string]any{"id": "source"}, "node": map[string]any{"id": "producer"}, "payload": map[string]any{"type": "completed"}}
+	for _, test := range []struct {
+		name, filter string
+		emits, fails bool
+	}{
+		{name: "omitted", emits: true},
+		{name: "blank", filter: "  ", emits: true},
+		{name: "match", filter: `message.payload.type == "completed"`, emits: true},
+		{name: "nonmatch", filter: `message.payload.type == "other"`},
+		{name: "nonboolean", filter: `message.payload.type`, fails: true},
+		{name: "runtime error", filter: `len(message.payload.absent.value) > 0`, fails: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			events := &contexts.EventContext{}
+			err := (&OnBroadcast{}).OnAppMessage(core.AppMessageContext{Message: message, Configuration: map[string]any{"filter": test.filter}, Events: events})
+			if test.fails {
+				require.Error(t, err)
+				require.Empty(t, events.Payloads)
+				return
+			}
+			require.NoError(t, err)
+			if !test.emits {
+				require.Empty(t, events.Payloads)
+				return
+			}
+			require.Len(t, events.Payloads, 1)
+			require.Equal(t, message, events.Payloads[0].Data)
+		})
+	}
+}
+
+func TestOnBroadcast_RejectsInvalidFilterBeforeSubscription(t *testing.T) {
+	for _, filter := range []string{`message.payload.type ==`, `run().id == "x"`, `$["node"].data == true`, `root().data == true`, `42`} {
+		apps := &contexts.AppContext{}
+		err := (&OnBroadcast{}).Setup(core.TriggerContext{Configuration: map[string]any{"app": "source", "filter": filter}, Apps: apps, Metadata: &contexts.MetadataContext{}})
+		require.ErrorContains(t, err, "filter")
+		require.Empty(t, apps.SubscribeCalls)
+	}
+}

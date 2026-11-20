@@ -19,11 +19,17 @@ const (
 	nodeRequestCleanupMaxDeletesPerTick   = 5000
 	nodeRequestCleanupPauseBetweenBatches = 50 * time.Millisecond
 	expiredRecordCleanupBatch             = 500
+	hostedModelCallOutcomeRetention       = 25 * time.Hour
+	hostedModelCallOutcomeCleanupBatches  = 10
 )
 
+// deleteExpiredHostedModelCallOutcomesBatch is replaced in tests so a model
+// status failure can be forced without stopping the rest of the tick.
+var deleteExpiredHostedModelCallOutcomesBatch = models.DeleteExpiredHostedModelCallOutcomesBatch
+
 // NodeRequestCleanupWorker deletes old rows that otherwise grow without bound.
-// It removes completed workflow node requests, expired webhook receipts, and
-// expired organization invitation sends.
+// It removes completed workflow node requests, expired webhook receipts,
+// expired organization invitation sends, and hosted model call samples.
 type NodeRequestCleanupWorker struct {
 	logger              *log.Entry
 	retentionDays       int
@@ -61,6 +67,7 @@ func (w *NodeRequestCleanupWorker) tick(ctx context.Context) {
 		return
 	}
 
+	w.deleteExpiredHostedModelCallOutcomes()
 	w.deleteExpiredSentryWebhookReceipts()
 	w.deleteExpiredDatadogWebhookReceipts()
 	w.deleteExpiredLinearWebhookReceipts()
@@ -90,6 +97,49 @@ func (w *NodeRequestCleanupWorker) tick(ctx context.Context) {
 	}
 
 	logger.Info("Deleted completed node requests")
+}
+
+func (w *NodeRequestCleanupWorker) deleteExpiredHostedModelCallOutcomes() {
+	// A panic here must not stop the other cleanups in this tick.
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			w.logger.WithField("step", "hosted_model_call_outcomes").
+				WithField("panic", recovered).
+				Warn("panic deleting expired hosted model call outcomes")
+		}
+	}()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	before := time.Now().Add(-hostedModelCallOutcomeRetention)
+	db := database.Conn().WithContext(ctx)
+	var deleted int64
+	for batch := 0; batch < hostedModelCallOutcomeCleanupBatches; batch++ {
+		if err := ctx.Err(); err != nil {
+			w.logger.WithField("step", "hosted_model_call_outcomes").WithError(err).
+				Warn("failed to delete expired hosted model call outcomes")
+			return
+		}
+		n, err := deleteExpiredHostedModelCallOutcomesBatch(db, before, expiredRecordCleanupBatch)
+		if err != nil {
+			w.logger.WithField("step", "hosted_model_call_outcomes").WithError(err).
+				Warn("failed to delete expired hosted model call outcomes")
+			return
+		}
+		deleted += n
+		if n < int64(expiredRecordCleanupBatch) {
+			break
+		}
+		if w.pauseBetweenBatches > 0 && batch+1 < hostedModelCallOutcomeCleanupBatches {
+			time.Sleep(w.pauseBetweenBatches)
+		}
+	}
+	if deleted == 0 {
+		return
+	}
+	w.logger.WithField("step", "hosted_model_call_outcomes").
+		Infof("Deleted %d expired hosted model call outcomes", deleted)
 }
 
 func (w *NodeRequestCleanupWorker) deleteExpiredSentryWebhookReceipts() {

@@ -1,8 +1,8 @@
 import type { LucideIcon } from "lucide-react";
 import {
+  Activity,
   BarChart3,
   Bell,
-  Blocks,
   CircleDollarSign,
   CircleUser,
   Cpu,
@@ -29,6 +29,7 @@ export type FactorySettingsSection =
   | "mcp"
   | "skills"
   | "models"
+  | "model-status"
   | "spending"
   | "usage"
   | "billing"
@@ -156,23 +157,6 @@ export const FACTORY_SETTINGS_NAV_GROUPS: FactorySettingsNavGroup[] = [
         ],
       },
       {
-        id: "workspace-repository",
-        label: "Repository",
-        Icon: Blocks,
-        scope: "workspace",
-        section: "repository",
-        permission: { resource: "factories", action: "update" },
-        keywords: [
-          "github repository",
-          "repo",
-          "git",
-          "github",
-          "issue intake",
-          "pull request automations",
-          "save repository",
-        ],
-      },
-      {
         id: "workspace-models",
         label: "Models",
         Icon: Cpu,
@@ -268,6 +252,24 @@ export const FACTORY_SETTINGS_NAV_GROUPS: FactorySettingsNavGroup[] = [
         section: "integrations",
         permission: { resource: "integrations", action: "read" },
         keywords: ["connect", "filter integrations", "github", "slack", "request it"],
+      },
+      {
+        id: "organization-model-status",
+        label: "Model status",
+        Icon: Activity,
+        scope: "organization",
+        section: "model-status",
+        permission: { resource: "org", action: "read" },
+        keywords: [
+          "availability",
+          "hosted models",
+          "anthropic",
+          "openai",
+          "openrouter",
+          "score",
+          "degraded",
+          "unavailable",
+        ],
       },
       {
         id: "organization-api-keys",

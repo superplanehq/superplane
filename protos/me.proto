@@ -55,6 +55,17 @@ service Me {
     };
   }
 
+  rpc ListModelStatus(ListModelStatusRequest) returns (ListModelStatusResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/me/model-status"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List model status";
+      description: "Returns SuperPlane-hosted model availability scores from recent agent calls";
+      tags: "Me";
+    };
+  }
+
   //
   // Endpoint for getting the currently authenticated user.
   //
@@ -251,6 +262,22 @@ message ListCodexUsageRequest {}
 
 message ListCodexUsageResponse {
   repeated CodexUsageConnection connections = 1;
+}
+
+message ListModelStatusRequest {
+  // Window of recent calls. One of 5m, 15m, 1h, 24h. Empty uses 1h.
+  string window = 1;
+}
+
+message ListModelStatusResponse {
+  repeated ModelStatusCell cells = 1;
+  string window = 2;
+}
+
+message ModelStatusCell {
+  string provider = 1;
+  string model = 2;
+  optional int32 score = 3;
 }
 
 message CodexUsageConnection {

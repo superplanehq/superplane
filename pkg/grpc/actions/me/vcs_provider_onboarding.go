@@ -3,6 +3,7 @@ package me
 import (
 	"context"
 	"errors"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -262,6 +263,11 @@ func RefreshVCSProviderOnboarding(
 	if err := models.EnqueueVCSProviderReconciliation(database.DB(ctx), provider, now); err != nil {
 		return nil, grpcerrors.Internal(err, "failed to queue provider reconciliation")
 	}
+	if repositoryID == nil {
+		if err := refreshLinkedVCSProviderInstallations(ctx, provider, repositories, now); err != nil {
+			return nil, err
+		}
+	}
 	found := repositoryID == nil
 	for _, repository := range repositories {
 		if repositoryID != nil && repository.RepositoryID != *repositoryID {
@@ -282,6 +288,34 @@ func RefreshVCSProviderOnboarding(
 		return nil, grpcerrors.PermissionDenied(nil, "repository is not accessible")
 	}
 	return &pb.RefreshVCSProviderOnboardingResponse{}, nil
+}
+
+// The catalog reconcile only queues repositories without a first sync. If
+// GitHub grants access to a synced repository and the webhook is lost, the
+// user does not see it. A refresh re-syncs every repository of the
+// installations where the user already sees a repository.
+func refreshLinkedVCSProviderInstallations(
+	ctx context.Context,
+	provider string,
+	repositories []models.AccessibleVCSProviderRepository,
+	now time.Time,
+) error {
+	installationIDs := make([]int64, 0, len(repositories))
+	for _, repository := range repositories {
+		if !slices.Contains(installationIDs, repository.InstallationID) {
+			installationIDs = append(installationIDs, repository.InstallationID)
+		}
+	}
+	if err := models.EnqueueVCSProviderInstallationsRepositorySyncs(
+		database.DB(ctx),
+		provider,
+		installationIDs,
+		now,
+		models.VCSProviderRepositorySyncPriorityInteractive,
+	); err != nil {
+		return grpcerrors.Internal(err, "failed to queue installation refresh")
+	}
+	return nil
 }
 
 type vcsProviderIdentity struct {

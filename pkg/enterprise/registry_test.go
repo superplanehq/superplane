@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	pbGroups "github.com/superplanehq/superplane/pkg/protos/groups"
 	pbRoles "github.com/superplanehq/superplane/pkg/protos/roles"
@@ -24,7 +25,7 @@ func TestNewRegistryReturnsCommunityGitHubEnterprise(t *testing.T) {
 
 	githubEnterprise, err := Get[GitHubEnterprise](registry, GitHubEnterpriseCapability)
 	require.NoError(t, err)
-	require.Error(t, githubEnterprise.AuthorizeHost("acme.ghe.com"))
+	require.Error(t, githubEnterprise.AuthorizeHost(t.Context(), uuid.New(), "acme.ghe.com"))
 }
 
 func TestGetRejectsAMissingOrWrongCapability(t *testing.T) {

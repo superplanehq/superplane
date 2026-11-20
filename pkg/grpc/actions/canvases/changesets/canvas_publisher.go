@@ -150,6 +150,12 @@ func NewCanvasPublisher(tx *gorm.DB, canvas *models.Canvas, draft *models.Canvas
 }
 
 func (p *CanvasPublisher) Publish(ctx context.Context) error {
+	if err := validateMergeConfidencePublication(p.canvas, p.draft); err != nil {
+		return err
+	}
+	if err := p.validateMergeConfidenceCheckPermissions(ctx); err != nil {
+		return err
+	}
 	if err := models.ValidateSubscriptionIntakeOwners(p.tx, p.canvas, p.draft, p.live); err != nil {
 		return err
 	}
@@ -647,6 +653,8 @@ func (p *CanvasPublisher) setupAction(ctx context.Context, node *models.CanvasNo
 
 	logger := logging.ForNode(*node)
 	setupCtx := core.SetupContext{
+		WorkflowID:    node.WorkflowID.String(),
+		NodeID:        node.NodeID,
 		Configuration: node.Configuration.Data(),
 		HTTP:          p.options.Registry.HTTPContextInTransaction(p.tx),
 		Metadata:      contexts.NewNodeMetadataContext(p.tx, node),

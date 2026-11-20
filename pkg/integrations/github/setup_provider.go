@@ -232,7 +232,8 @@ func (g *SetupProvider) OnSecretUpdate(ctx core.SecretUpdateContext) (*core.Setu
 
 func (g *SetupProvider) FirstStep(ctx core.SetupStepContext) core.SetupStep {
 	host := hostFromSetupConfiguration(ctx)
-	enterprise := (githubEnterpriseEnabledForOrg(setupDB(ctx.HTTP), ctx.OrganizationID) && gitHubEnterpriseLicensed()) || !host.IsDotCom()
+	orgID, _ := uuid.Parse(ctx.OrganizationID)
+	enterprise := (githubEnterpriseEnabledForOrg(setupDB(ctx.HTTP), ctx.OrganizationID) && gitHubEnterpriseLicensed(context.Background(), orgID)) || !host.IsDotCom()
 	ownerDefault := common.OwnerTypeUser
 	locationDefault := common.GitHubLocationDotCom
 	if !host.IsDotCom() {
@@ -415,7 +416,7 @@ func (g *SetupProvider) onSelectOwnerSubmit(input any, ctx core.SetupStepContext
 		if parseErr != nil {
 			return nil, fmt.Errorf("invalid organization")
 		}
-		if err := authorizeGitHubEnterpriseHost(setupDB(ctx.HTTP), orgID, host); err != nil {
+		if err := authorizeGitHubEnterpriseHost(context.Background(), setupDB(ctx.HTTP), orgID, host); err != nil {
 			return nil, err
 		}
 		if ownerType != common.OwnerTypeOrganization {

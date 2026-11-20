@@ -16,7 +16,6 @@ import (
 	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/mcp"
 	"github.com/superplanehq/superplane/pkg/models"
-	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -133,7 +132,7 @@ func AttachWorkspaceAgentResources(
 			skills = nil
 		}
 	}
-	setupCommands, contextRepos, multiRepo, err := loadWorkspaceSetupAndContext(db, factory)
+	setupCommands, contextRepos, err := loadWorkspaceSetupAndContext(db, factory)
 	if err != nil {
 		logger.WithError(err).Warn("skip workspace setup and context: list failed")
 		setupCommands = nil
@@ -147,7 +146,7 @@ func AttachWorkspaceAgentResources(
 	skills = rejectDisabledAgentResources(skills, disabled)
 	contextRepos = rejectDisabledAgentResources(contextRepos, disabled)
 	setupCommands = rejectDisabledSetupCommands(db, factory, setupCommands, disabled)
-	if skipSetupCommands(ctx.Configuration) {
+	if skipSetupCommands(ctx.Configuration) || taskTargetsOtherRepository(environment, factory) {
 		setupCommands = nil
 	}
 
@@ -155,32 +154,21 @@ func AttachWorkspaceAgentResources(
 	environment, files, mcpNames = attachWorkspaceMCPServers(ctx, db, mcpServers, disabledTools, enabledTools, environment, files)
 	files = appendWorkspaceSkillFiles(skills, files)
 	files = appendWorkspaceSetupFiles(setupCommands, files)
-	files = appendWorkspaceContextFiles(db, factory, contextRepos, multiRepo, files)
+	files = appendWorkspaceContextFiles(db, factory, contextRepos, files)
 	files = appendWorkspaceAgentResourcesHint(files, mcpNames, setupCommands, contextRepos)
 	return environment, files
 }
 
-func loadWorkspaceSetupAndContext(db *gorm.DB, factory *models.Factory) ([]string, []models.FactoryAgentResource, bool, error) {
+func loadWorkspaceSetupAndContext(db *gorm.DB, factory *models.Factory) ([]string, []models.FactoryAgentResource, error) {
 	commands, err := factory.ListEnabledSetupCommands(db)
 	if err != nil {
-		return nil, nil, false, err
+		return nil, nil, err
 	}
 	repos, err := factory.ListEnabledContextRepos(db)
 	if err != nil {
-		return nil, nil, false, err
+		return nil, nil, err
 	}
-	multiRepo, err := factory.MultiRepoTasksEnabled(db)
-	if err != nil {
-		return nil, nil, false, err
-	}
-	if !multiRepo {
-		for i := range repos {
-			config := repos[i].Config.Data()
-			config.Access = models.FactoryContextRepoAccessRead
-			repos[i].Config = datatypes.NewJSONType(config)
-		}
-	}
-	return commands, repos, multiRepo, nil
+	return commands, repos, nil
 }
 
 func rejectDisabledSetupCommands(db *gorm.DB, factory *models.Factory, commands []string, disabled map[string]struct{}) []string {
@@ -317,7 +305,7 @@ func WorkspaceContextRepoDirectory(repository string) string {
 	return "context/" + repository
 }
 
-func appendWorkspaceContextFiles(db *gorm.DB, factory *models.Factory, resources []models.FactoryAgentResource, multiRepo bool, files []TaskFile) []TaskFile {
+func appendWorkspaceContextFiles(db *gorm.DB, factory *models.Factory, resources []models.FactoryAgentResource, files []TaskFile) []TaskFile {
 	if len(resources) == 0 {
 		return files
 	}
@@ -352,7 +340,7 @@ func appendWorkspaceContextFiles(db *gorm.DB, factory *models.Factory, resources
 			Directory:   WorkspaceContextRepoDirectory(repository),
 			Branch:      strings.TrimSpace(config.Ref),
 			ReadOnly:    readOnly,
-			PushBlocked: multiRepo && readOnly && strings.EqualFold(provider, models.ProviderBitbucket),
+			PushBlocked: readOnly && strings.EqualFold(provider, models.ProviderBitbucket),
 		})
 	}
 	if len(repos) == 0 {
@@ -493,7 +481,8 @@ clone_default_branch() {
   fi
   rm -rf repo
   heads="$(git ls-remote --heads "${REPO_URL}")" || exit 1
-  if [ -n "$requested_branch" ] && printf '%s\n' "$heads" | awk '{print $2}' | grep -Fxq "refs/heads/${requested_branch}"; then
+  # Read all heads so an early match cannot cause SIGPIPE under pipefail.
+  if [ -n "$requested_branch" ] && printf '%s\n' "$heads" | awk -v ref="refs/heads/${requested_branch}" '$2 == ref {found=1} END {exit !found}'; then
     git clone --depth 1 --branch "${requested_branch}" "${REPO_URL}" repo
     branch="$requested_branch"
     return 0
@@ -959,6 +948,31 @@ func skipSetupCommands(configuration any) bool {
 	}
 	enabled, ok := config[SkipSetupCommandsField].(bool)
 	return ok && enabled
+}
+
+// taskTargetsOtherRepository reports whether repo/ holds a workspace
+// repository other than the primary. Setup steps are written for the
+// primary repository, so they must not run in another repository.
+func taskTargetsOtherRepository(environment []TaskEnvironmentVariable, factory *models.Factory) bool {
+	primary := models.CanonicalContextRepo(factory.OnboardingConfigValue().AppRepository)
+	repository, _ := environmentValue(environment, "REPO")
+	repository = models.CanonicalContextRepo(repository)
+	if repository == "" {
+		url, _ := environmentValue(environment, "REPO_URL")
+		repository = repositoryFromCloneURL(url)
+	}
+	return primary != "" && repository != "" && repository != primary
+}
+
+// repositoryFromCloneURL returns the owner/name of a clone URL in lower case.
+func repositoryFromCloneURL(url string) string {
+	parts := strings.FieldsFunc(strings.TrimSuffix(strings.TrimSpace(url), ".git"), func(r rune) bool {
+		return r == '/' || r == ':'
+	})
+	if len(parts) < 2 {
+		return ""
+	}
+	return models.CanonicalContextRepo(parts[len(parts)-2] + "/" + parts[len(parts)-1])
 }
 
 func workspaceMCPAccessTokenLifetime(configuration any) time.Duration {

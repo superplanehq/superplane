@@ -45,7 +45,7 @@ func writeBashTaskFiles(dir, userScript string, messageChain json.RawMessage) (b
 	}
 	scriptPath := filepath.Join(dir, bashProgramName)
 	payloadPath := filepath.Join(dir, bashPayloadName)
-	if err := os.WriteFile(scriptPath, []byte(userScript), 0700); err != nil {
+	if err := os.WriteFile(scriptPath, []byte(userScript), 0o700); err != nil { // #nosec G306 -- the generated task script must be executable by its owner.
 		return bashTaskFiles{}, err
 	}
 	if err := os.WriteFile(payloadPath, chain, 0600); err != nil {
@@ -85,7 +85,7 @@ func runBashHost(
 	}
 	defer os.RemoveAll(scriptDir)
 
-	cmd := exec.CommandContext(ctx, bash, files.scriptPath)
+	cmd := exec.CommandContext(ctx, bash, files.scriptPath) // #nosec G204 -- the runner intentionally executes the generated task script.
 	cmd.Dir = workDir
 	prepareTaskProcessGroup(cmd)
 	defer killTaskProcessGroup(cmd)

@@ -20,6 +20,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/licensing"
+	"github.com/superplanehq/superplane/pkg/licensing/licensingtest"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"github.com/superplanehq/superplane/pkg/services"
@@ -364,7 +365,7 @@ func TestExpiredInvitationRequiresSeatOnResend(t *testing.T) {
 
 type invitationEntitlements bool
 
-func (e invitationEntitlements) IsEntitled(feature licensing.Feature) bool {
+func (e invitationEntitlements) IsEntitled(_ context.Context, _ uuid.UUID, feature licensing.Feature) bool {
 	return bool(e) && feature == licensing.FeatureCustomRoles
 }
 
@@ -376,6 +377,11 @@ func TestInvitationCustomRoleEntitlement(t *testing.T) {
 	s := InvitationService{AuthService: r.AuthService, BaseURL: "https://example.com"}
 	req := &pb.CreateInvitationRequest{Email: "custom@example.com", Role: "support"}
 	_, err := s.Create(context.Background(), r.Organization.ID.String(), r.User.String(), req)
+	require.Equal(t, codes.PermissionDenied, grpcerrors.Code(err))
+	s.Entitlements = licensingtest.OrganizationEntitlements{
+		uuid.New(): {licensing.FeatureCustomRoles},
+	}
+	_, err = s.Create(context.Background(), r.Organization.ID.String(), r.User.String(), req)
 	require.Equal(t, codes.PermissionDenied, grpcerrors.Code(err))
 	s.Entitlements = invitationEntitlements(true)
 	resp, err := s.Create(context.Background(), r.Organization.ID.String(), r.User.String(), req)

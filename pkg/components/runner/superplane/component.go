@@ -143,19 +143,14 @@ func (c *RunSuperPlane) Execute(ctx core.ExecutionContext) error {
 
 	recordSuperPlaneRunOnConfiguration(ctx.Configuration, runModel)
 
-	resolved, err := runner.ResolveEnvironment(ctx.Secrets, spec.EnvironmentFrom, spec.Environment)
+	resolved, err := runner.ResolveExecutionEnvironment(ctx, spec.EnvironmentFrom, spec.Environment)
 	if err != nil {
 		return err
 	}
 
 	environment := runner.AttachPlanningSessionEnv(ctx, resolved.Variables, spec.ExecutionTimeoutSeconds)
 	environment = runner.AttachArtifactUploadEnv(ctx, environment, spec.ExecutionTimeoutSeconds, spec.IncludeVisualEvidence)
-	var merge *runner.MergeConfidenceScope
-	environment, merge, err = runner.AttachMergeConfidenceEnv(ctx, environment, spec.Steps)
-	if err != nil {
-		return err
-	}
-	environment = runner.AttachRunnerEnv(ctx, environment, spec.ExecutionTimeoutSeconds, merge)
+	environment = runner.AttachRunnerEnv(ctx, environment, spec.ExecutionTimeoutSeconds)
 	environment = runner.AttachExecutionTimeoutEnv(environment, spec.ExecutionTimeoutSeconds)
 	dispatched, err := runner.MintDispatchForRun(ctx, spec.ExecutionTimeoutSeconds, spec.Steps)
 	if err != nil {

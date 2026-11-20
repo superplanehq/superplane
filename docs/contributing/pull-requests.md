@@ -226,3 +226,29 @@ Add the Go binary directory to your `PATH`.
 Use the Go version from `go.mod` and generate the API clients before Go call analysis.
 The vulnerability script also requires Node.js to apply the severity policy.
 Run `bash scripts/vulnerability-check.sh` or `bash scripts/license-check.sh`.
+
+## Go Security Checks
+
+Run `make check.gosec` after development setup to scan Go application code.
+After a tooling update, run `make dev.up` to rebuild the development image.
+The image installs gosec v2.30.0 in `/usr/local/bin`, outside the persistent Go
+cache volume.
+
+The scan covers `cmd/`, `pkg/`, and `ee/`. It excludes generated code and test
+files. Findings and scan errors fail the check. The scan excludes G101, G104,
+G115, and G117 because these rules produce high-volume legacy findings. Secret
+scanning remains the control for committed credentials.
+
+Use `#nosec` only for a reviewed false positive or an intentional trust
+boundary. Name each suppressed rule and add a justification after `--`. The
+check rejects suppressions without both fields and records suppressions in the
+JSON report.
+
+One accepted exception requires operational care. The SSH component does not
+verify server host keys, so it is vulnerable to an on-path server impersonation.
+The development pprof server uses a dedicated HTTP server and is published on
+`127.0.0.1` only.
+
+The Semaphore Go SAST job runs the same check after Go setup. Findings appear
+in the job log. The job uploads `tmp/gosec/report.json` as an artifact, including
+when findings fail the job.

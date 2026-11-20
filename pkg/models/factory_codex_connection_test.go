@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/factories/mergeconfidence"
 	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
@@ -347,8 +348,8 @@ func TestSubscriptionReservationUsesStoredTaskAssociations(t *testing.T) {
 	merge := newRun()
 	// The stored PR selects the task even when the event names a different task.
 	event := &models.CanvasEvent{WorkflowID: canvas.ID, Data: models.NewJSONValue(map[string]any{"data": map[string]any{"pullRequest": map[string]any{"id": pr.ID.String()}, "workOrder": map[string]any{"id": uuid.NewString()}}})}
-	require.NoError(t, models.MaybeLinkMergeConfidenceRun(db, canvas, event, merge))
-	require.NoError(t, models.MaybeLinkMergeConfidenceRun(db, canvas, event, merge))
+	require.NoError(t, mergeconfidence.LinkRun(db, canvas, event, merge))
+	require.NoError(t, mergeconfidence.LinkRun(db, canvas, event, merge))
 	child := newRun()
 	require.NoError(t, db.Model(child).Update("parent_run_id", merge.ID).Error)
 	for _, run := range []*models.CanvasRun{lineRun, refineRun, feedback, merge, child} {

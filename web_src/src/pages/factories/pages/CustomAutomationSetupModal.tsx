@@ -20,7 +20,7 @@ export function CustomAutomationSetupModal({
 }: {
   lineId: string;
   automationId?: string;
-  columnKey?: "backlog" | "verify";
+  columnKey?: "backlog" | "implement" | "verify" | "done";
   onClose: () => void;
 }) {
   const { organizationId, factoryId, routeSegment, factory } = useFactoriesLayout();
@@ -161,6 +161,7 @@ function CustomAutomationConfiguration({
       name={model.name}
       icon={model.icon}
       triggers={model.triggers}
+      runsOnTask={model.runsOnTask}
       columnKey={model.columnKey}
       draft={model.draft}
       organizationId={organizationId}
@@ -172,6 +173,7 @@ function CustomAutomationConfiguration({
       onNameChange={model.setName}
       onIconChange={model.setIcon}
       onTriggersChange={model.setTriggers}
+      onRunsOnTaskChange={model.setRunsOnTask}
       onDraftChange={model.setDraft}
       onSave={() => void model.save().then((saved) => saved && onClose())}
       onDelete={onDelete}

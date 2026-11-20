@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
@@ -12,6 +13,7 @@ import (
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/licensing"
+	"github.com/superplanehq/superplane/pkg/licensing/licensingtest"
 	"github.com/superplanehq/superplane/pkg/models"
 	pbGroups "github.com/superplanehq/superplane/pkg/protos/groups"
 	pbRoles "github.com/superplanehq/superplane/pkg/protos/roles"
@@ -21,7 +23,7 @@ import (
 
 type fakeEntitlements map[licensing.Feature]bool
 
-func (e fakeEntitlements) IsEntitled(feature licensing.Feature) bool {
+func (e fakeEntitlements) IsEntitled(_ context.Context, _ uuid.UUID, feature licensing.Feature) bool {
 	return e[feature]
 }
 
@@ -133,6 +135,19 @@ func TestAssignRoleRequiresLicenseForCustomRoles(t *testing.T) {
 
 	t.Run("Community rejects custom roles", func(t *testing.T) {
 		roles, err := NewRoleService(r.AuthService, licensing.Community, enterprise.NewRegistry())
+		require.NoError(t, err)
+
+		_, err = roles.AssignRole(ctx, &pbRoles.AssignRoleRequest{
+			RoleName: "custom-role",
+			UserId:   newUser.ID.String(),
+		})
+		assertNotLicensed(t, err)
+	})
+
+	t.Run("a grant for another organization does not assign the role", func(t *testing.T) {
+		roles, err := NewRoleService(r.AuthService, licensingtest.OrganizationEntitlements{
+			uuid.New(): {licensing.FeatureCustomRoles},
+		}, enterprise.NewRegistry())
 		require.NoError(t, err)
 
 		_, err = roles.AssignRole(ctx, &pbRoles.AssignRoleRequest{

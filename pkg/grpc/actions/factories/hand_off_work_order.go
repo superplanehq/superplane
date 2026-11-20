@@ -285,10 +285,15 @@ func HandOffWorkOrder(
 			dispatched.fromState,
 			dispatched.startedSteps,
 		)
+		startColumnLeaveAfterDispatch(db, dispatched)
+		startImplementColumnAutomations(db, dispatched.logger, dispatched.factory, dispatched.order, implementIndex)
 	} else if !deferred {
 		trackedPRs, err = publishVerificationHandOff(ctx, deps, db, factory, order)
 		if err != nil {
 			return nil, factoryErrorToStatus(err, "failed to hand off work order")
+		}
+		if err := StartColumnLeaveCustomAutomations(db, factory, order, models.CanvasColumnKeyBacklog, ""); err != nil {
+			log.WithError(err).Warnf("Failed to start Backlog leave automation for order %s", order.ID)
 		}
 	} else {
 		if err := messages.PublishFactoryWorkOrderUpdated(factory.ID.String(), order.ID.String(), factoryevents.EventTypeOrderUpdated); err != nil {
