@@ -2513,6 +2513,15 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !s.requireCanvasRead(r.Context(), w, parsedWorkflowID) {
+		telemetry.RecordWebSocketConnectionOutcome(
+			r.Context(),
+			ws.KindCanvas,
+			telemetry.WebSocketConnectionOutcomeAuthError,
+		)
+		return
+	}
+
 	_, err = models.FindCanvas(user.OrganizationID, parsedWorkflowID)
 	if err != nil {
 		telemetry.RecordWebSocketConnectionOutcome(

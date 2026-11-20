@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -548,4 +549,120 @@ func TestRunnerLogsAuthorizeCanvasExecutionAndTask(t *testing.T) {
 				})).Error)
 		})
 	}
+}
+
+func TestRunnerLogReadsCanvasScopes(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	server, signer := mustRunnerLiveLogServer(t, r)
+	task := createSessionRunnerTask(t, r)
+	metadata := map[string]any{runneraction.ExecutionMetadataBrokerTaskID: task.ID.String()}
+	canvasA, executionA := createCanvasWithComponentExecution(t, r, "runner", "scope-a", metadata)
+	canvasB, executionB := createCanvasWithComponentExecution(t, r, "runner", "scope-b", metadata)
+	credentials := canvasReadCredentials(t, r, signer, canvasA)
+	active := &observedCanvasLogStore{}
+	archived := &observedCanvasLogBlob{}
+	previousActive, previousBlob := runnerlogs.Current(), blob.Current()
+	runnerlogs.SetCurrent(active)
+	blob.SetCurrent(archived)
+	t.Cleanup(func() { runnerlogs.SetCurrent(previousActive); blob.SetCurrent(previousBlob) })
+	require.NoError(t, database.DB(t.Context()).Create(&models.RunnerTaskLogLifecycle{
+		TaskID: task.ID, ActiveStore: runnerlogs.StoreFS, State: models.RunnerTaskLogStateActive,
+		CreatedAt: time.Now(), UpdatedAt: time.Now(),
+	}).Error)
+	for _, state := range []string{models.RunnerTaskLogStateActive, models.RunnerTaskLogStateArchived, "archived bytes", "historical"} {
+		t.Run(state, func(t *testing.T) {
+			archived.signUnsupported = state == "archived bytes"
+			if state == "historical" {
+				require.NoError(t, database.DB(t.Context()).Where("task_id = ?", task.ID).Delete(&models.RunnerTaskLogLifecycle{}).Error)
+				require.NoError(t, database.DB(t.Context()).Model(&task).Updates(map[string]any{"backend": models.RunnerTaskBackendLegacy, "state": models.RunnerTaskStateSucceeded}).Error)
+			} else {
+				lifecycleState := state
+				if state == "archived bytes" {
+					lifecycleState = models.RunnerTaskLogStateArchived
+				}
+				require.NoError(t, database.DB(t.Context()).Model(&models.RunnerTaskLogLifecycle{}).Where("task_id = ?", task.ID).Update("state", lifecycleState).Error)
+			}
+			for _, credential := range credentials {
+				t.Run(credential.name, func(t *testing.T) {
+					queries := observeCanvasReadQueries(t)
+					for _, item := range []struct {
+						canvas, execution uuid.UUID
+						allowed           bool
+					}{{canvasA, executionA, credential.allowedA}, {canvasB, executionB, credential.allowedB}} {
+						for _, endpoint := range []string{"runner-live-logs/session", "runner-logs"} {
+							*queries = nil
+							active.reads, archived.heads, archived.gets, archived.signs = 0, 0, 0, 0
+							response := canvasReadGET(server, credential.token, fmt.Sprintf("/api/v1/canvases/%s/node-executions/%s/%s", item.canvas, item.execution, endpoint))
+							if !item.allowed {
+								require.Equal(t, http.StatusForbidden, response.Code, response.Body.String())
+								require.Empty(t, *queries, "denial must precede execution, task, lifecycle, and pricing reads")
+								require.Zero(t, active.reads)
+								require.Zero(t, archived.heads)
+								require.Zero(t, archived.gets)
+								require.Zero(t, archived.signs)
+								require.Empty(t, response.Header().Get(runnerlogs.HeaderURL))
+								continue
+							}
+							require.Contains(t, []int{http.StatusOK, http.StatusNoContent}, response.Code, response.Body.String())
+							require.NotEmpty(t, *queries)
+							if endpoint == "runner-live-logs/session" {
+								require.Contains(t, response.Body.String(), "/runner-logs")
+								continue
+							}
+							if state == models.RunnerTaskLogStateActive {
+								require.Equal(t, "dummy retained log\n", response.Body.String())
+								require.Equal(t, 1, active.reads)
+								continue
+							}
+							if archived.signUnsupported {
+								require.Equal(t, "dummy retained log\n", response.Body.String())
+								require.Equal(t, 1, archived.gets)
+							} else {
+								require.Equal(t, "https://storage.example/dummy-log", response.Header().Get(runnerlogs.HeaderURL))
+							}
+							require.Equal(t, 1, archived.heads)
+							require.Equal(t, 1, archived.signs)
+						}
+					}
+				})
+			}
+		})
+	}
+}
+
+type observedCanvasLogStore struct {
+	runnerlogs.Store
+	reads int
+}
+
+func (*observedCanvasLogStore) Name() string { return runnerlogs.StoreFS }
+
+func (s *observedCanvasLogStore) ReadAfter(context.Context, uuid.UUID, string) (*runnerlogs.ReadResult, error) {
+	s.reads++
+	return &runnerlogs.ReadResult{Content: io.NopCloser(strings.NewReader("dummy retained log\n")), Cursor: "19"}, nil
+}
+
+type observedCanvasLogBlob struct {
+	blob.Provider
+	heads, gets, signs int
+	signUnsupported    bool
+}
+
+func (p *observedCanvasLogBlob) Head(context.Context, string) (*blob.ObjectInfo, error) {
+	p.heads++
+	return &blob.ObjectInfo{Size: 19}, nil
+}
+
+func (p *observedCanvasLogBlob) Get(context.Context, string) (io.ReadCloser, error) {
+	p.gets++
+	return io.NopCloser(strings.NewReader("dummy retained log\n")), nil
+}
+
+func (p *observedCanvasLogBlob) SignedGetURL(context.Context, string, time.Duration) (string, error) {
+	p.signs++
+	if p.signUnsupported {
+		return "", blob.ErrSignedURLUnsupported
+	}
+	return "https://storage.example/dummy-log", nil
 }

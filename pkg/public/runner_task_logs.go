@@ -26,23 +26,6 @@ func (s *Server) handleRunnerTaskLogs(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-	allowed, err := s.authService.CheckOrganizationPermission(
-		r.Context(),
-		user.ID.String(),
-		user.OrganizationID.String(),
-		"canvases",
-		"read",
-	)
-	if err != nil {
-		middleware.SetServerError(r.Context(), err, nil)
-		http.Error(w, "Authorization check failed", http.StatusInternalServerError)
-		return
-	}
-	if !allowed {
-		http.Error(w, "Forbidden", http.StatusForbidden)
-		return
-	}
-
 	vars := mux.Vars(r)
 	canvasID, err := uuid.Parse(strings.TrimSpace(vars["canvas_id"]))
 	if err != nil {
@@ -52,6 +35,9 @@ func (s *Server) handleRunnerTaskLogs(w http.ResponseWriter, r *http.Request) {
 	executionID, err := uuid.Parse(strings.TrimSpace(vars["execution_id"]))
 	if err != nil {
 		http.Error(w, "Invalid execution id", http.StatusBadRequest)
+		return
+	}
+	if !s.requireCanvasRead(r.Context(), w, canvasID) {
 		return
 	}
 	access, err := runneraction.ResolveLiveLogAccess(database.DB(r.Context()), user.OrganizationID, canvasID, executionID)
