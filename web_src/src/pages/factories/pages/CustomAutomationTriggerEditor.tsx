@@ -22,7 +22,6 @@ import type { PlanningReviewDraft } from "./planningReviewMockup";
 
 export function TriggerEditor({
   columnKey,
-  asCode = false,
   showModel = true,
   name,
   icon,
@@ -39,7 +38,6 @@ export function TriggerEditor({
   onDraftChange,
 }: {
   columnKey: CustomAutomationColumn;
-  asCode?: boolean;
   showModel?: boolean;
   name: string;
   icon: string;
@@ -144,7 +142,7 @@ export function TriggerEditor({
           showResources={false}
           showSteps={false}
           modelOnly
-          applyModelDefault={!asCode}
+          applyModelDefault={false}
           showModel={showModel}
           modelDescription="The model used for this automation."
         />

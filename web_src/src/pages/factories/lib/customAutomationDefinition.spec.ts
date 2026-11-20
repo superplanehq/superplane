@@ -10,7 +10,8 @@ import {
 describe("automation Canvas agent configuration", () => {
   it("uses the workspace agent when YAML omits the agent", () => {
     const visual = automationDefinitionCanvas(newAutomationDefinition("backlog"), {
-      agentHarness: "AGENT_HARNESS_CODEX",
+      component: "runnerCodex",
+      credentialSource: "subscription",
     });
     expect(visual.draft.components[0]?.component).toBe("runnerCodex");
   });

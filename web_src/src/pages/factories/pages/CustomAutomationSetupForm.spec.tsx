@@ -4,7 +4,8 @@ import { CustomAutomationSourceEditor } from "./CustomAutomationSourceEditor";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, it, vi } from "bun:test";
-import type { FactoriesFactoryCustomAutomation } from "@/api-client";
+import type { FactoriesFactoryCustomAutomation, FactoriesFactoryOnboarding } from "@/api-client";
+import type { SelectableLLMSourceID } from "@/lib/selectableLLMModels";
 import { CustomAutomationSetupForm } from "./CustomAutomationSetupForm";
 import { useCustomAutomationSetupPage } from "./useCustomAutomationSetupPage";
 
@@ -22,11 +23,34 @@ let automation: FactoriesFactoryCustomAutomation = {
 };
 
 vi.mock("@/hooks/useFactoryCustomAutomationData", () => ({
-  useFactoryCustomAutomation: () => ({ data: automation }),
+  useFactoryCustomAutomation: () => ({ data: automation, isFetchedAfterMount: true }),
   useCreateFactoryCustomAutomation: () => ({ mutateAsync: saveAutomation, isPending: false }),
   useUpdateFactoryCustomAutomation: () => ({ mutateAsync: saveAutomation, isPending: false }),
 }));
-vi.mock("@/hooks/useComponentData", () => ({ useComponent: () => ({}) }));
+vi.mock("@/hooks/useComponentData", () => ({
+  useComponent: (_organization: string, component: string) => {
+    const providers: Record<string, string> = {
+      runnerSuperPlane: "all",
+      runnerCodex: "openai",
+      runnerClaudeCode: "anthropic",
+    };
+    const provider = providers[component];
+    const model = { name: "model", type: "hosted-model", typeOptions: { hostedModel: { provider } } };
+    return { data: { configuration: [model] } };
+  },
+}));
+vi.mock("@/hooks/useCanvasData", () => ({ useCanvas: () => ({}) }));
+vi.mock("@/hooks/useOrganizationWorkspaceUsage", () => ({ useOrganizationWorkspaceUsage: () => ({}) }));
+vi.mock("@/hooks/useSelectableLLMModels", () => ({
+  useSelectableLLMModels: (_organization: string, { sources }: { sources: SelectableLLMSourceID[] }) => ({
+    data: sources.map((source) => ({
+      provider: { id: "openai" },
+      model: { id: source + "-model", name: source + "-model" },
+      key: source + "::openai::" + source + "-model",
+      label: source + "-model",
+    })),
+  }),
+}));
 vi.mock("@/hooks/useByokRunnerModelDefault", () => ({ useByokRunnerModelDefault: () => undefined }));
 vi.mock("@/hooks/useExperimentalFeature", () => ({ useExperimentalFeature: () => ({ has: () => false }) }));
 vi.mock("@/hooks/useFactoryAgentResources", () => ({ useFactoryAgentResources: () => ({}) }));
@@ -64,9 +88,98 @@ function Editor({ columnKey }: { columnKey?: "backlog" | "verify" }) {
 }
 
 vi.mock("@/hooks/useIntegrations", () => ({ useConnectedIntegrations: () => ({}) }));
+let onboarding: FactoriesFactoryOnboarding | undefined;
 vi.mock("../layout/factoriesLayoutContext", () => ({
-  useFactoriesLayout: () => ({ organizationId: "org", factoryId: "factory", routeSegment: "workspace" }),
+  useFactoriesLayout: () => ({
+    organizationId: "org",
+    factoryId: "factory",
+    routeSegment: "workspace",
+    factory: { onboarding },
+  }),
 }));
+
+function SourceEditor({
+  source,
+  save,
+  automationId,
+}: {
+  source: string;
+  save: (definition: unknown) => void;
+  automationId?: string;
+}) {
+  const draft = useCustomAutomationSourceDraft(source, "backlog");
+  return (
+    <CustomAutomationSourceEditor
+      model={draft}
+      automationId={automationId}
+      stage="backlog"
+      saving={false}
+      deleting={false}
+      error=""
+      onSave={() => save(load(draft.source))}
+      onClose={() => {}}
+    />
+  );
+}
+
+it.each([
+  { source: "hosted", agentHarness: "AGENT_HARNESS_SUPERPLANE", model: "hosted::openai::hosted-model" },
+  { source: "subscription", agentHarness: "AGENT_HARNESS_CODEX", model: "subscription-model" },
+] as const)("saves and clears a model from the workspace $source source", async ({ source, agentHarness, model }) => {
+  onboarding = { agentHarness, codexSubscription: source === "subscription" };
+  const yaml = `apiVersion: v2
+kind: Automation
+name: Review
+triggers: [{use: manual}]
+steps: [{name: Review, prompt: Review the changes.}]
+`;
+  const save = vi.fn();
+  const view = render(<SourceEditor source={yaml} save={save} />);
+  const user = userEvent.setup();
+  const picker = screen.getByTestId("field-model-hosted-model");
+  await user.click(picker);
+  expect(screen.getAllByRole("menuitem")).toHaveLength(1);
+  await user.click(screen.getByRole("menuitem", { name: source + "-model" }));
+  await user.click(screen.getByRole("button", { name: "Save" }));
+  expect(save).toHaveBeenLastCalledWith({ ...(load(yaml) as object), agent: { model } });
+  view.unmount();
+  render(<SourceEditor source={yaml + "agent: {model: '" + model + "'}\n"} save={save} />);
+  await user.click(screen.getByRole("button", { name: source + "-model" }));
+  await user.click(screen.getByRole("menuitem", { name: "Use default model" }));
+  await user.click(screen.getByRole("button", { name: "Save" }));
+  expect(save).toHaveBeenLastCalledWith(load(yaml));
+  onboarding = undefined;
+});
+
+it("keeps the saved automation's subscription when the workspace uses hosted models", async () => {
+  onboarding = { agentHarness: "AGENT_HARNESS_SUPERPLANE" };
+  const previous = automation;
+  automation = { settings: { agent: { component: "runnerCodex", credentialSource: "subscription" } } };
+  const yaml = `apiVersion: v2
+kind: Automation
+name: Review
+agent: {harness: codex, credentials: {source: subscription}}
+triggers: [{use: manual}]
+steps: [{name: Review, prompt: Review the changes.}]
+`;
+  const save = vi.fn();
+  render(<SourceEditor source={yaml} save={save} automationId="saved" />);
+  const user = userEvent.setup();
+  await user.click(screen.getByTestId("field-model-hosted-model"));
+  await user.click(screen.getByRole("menuitem", { name: "subscription-model" }));
+  await user.click(screen.getByRole("button", { name: "Save" }));
+  expect(save).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      agent: {
+        harness: "codex",
+        credentials: { source: "subscription" },
+        model: "subscription-model",
+      },
+    }),
+  );
+  onboarding = undefined;
+  automation = previous;
+});
 
 it("preserves the original schedule when changing run context and editing workspace settings", async () => {
   const source = `apiVersion: v2
@@ -84,21 +197,7 @@ steps:
 skip_setup_commands: true
 `;
   const save = vi.fn();
-  function SourceEditor() {
-    const draft = useCustomAutomationSourceDraft(source, "backlog");
-    return (
-      <CustomAutomationSourceEditor
-        model={draft}
-        stage="backlog"
-        saving={false}
-        deleting={false}
-        error=""
-        onSave={() => save(load(draft.source))}
-        onClose={() => {}}
-      />
-    );
-  }
-  render(<SourceEditor />);
+  render(<SourceEditor source={source} save={save} />);
   const user = userEvent.setup();
   await user.click(screen.getByRole("tab", { name: "on a task" }));
   await user.click(screen.getByRole("tab", { name: "with no task" }));

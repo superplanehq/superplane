@@ -55,8 +55,8 @@ func (b CanvasAutomationBackend) ArtifactStages(tx *gorm.DB, placement automatio
 	return stages, nil
 }
 
-func (b CanvasAutomationBackend) Check(_ context.Context, tx *gorm.DB, placement automations.Placement, source *automationspec.Document) error {
-	_, _, err := b.compile(tx, placement, source, nil)
+func (b CanvasAutomationBackend) Check(ctx context.Context, tx *gorm.DB, placement automations.Placement, source *automationspec.Document) error {
+	_, _, err := b.compile(tx, placement, source, nil, versionOwnerID(ctx))
 	return err
 }
 
@@ -74,7 +74,7 @@ func (b CanvasAutomationBackend) Apply(
 		}
 	}
 
-	nodes, edges, err := b.compile(tx, placement, source, live)
+	nodes, edges, err := b.compile(tx, placement, source, live, actor)
 	if err != nil {
 		return automations.Artifact{}, nil, err
 	}
@@ -136,7 +136,7 @@ func (b CanvasAutomationBackend) Remove(_ context.Context, tx *gorm.DB, placemen
 }
 
 func (b CanvasAutomationBackend) compile(
-	tx *gorm.DB, placement automations.Placement, source *automationspec.Document, live *models.CanvasVersion,
+	tx *gorm.DB, placement automations.Placement, source *automationspec.Document, live *models.CanvasVersion, callerID uuid.UUID,
 ) ([]models.Node, []models.Edge, error) {
 	factory, err := models.FindFactory(tx, placement.OrganizationID, placement.FactoryID)
 	if err != nil {
@@ -145,7 +145,7 @@ func (b CanvasAutomationBackend) compile(
 	if err := checkAutomationRepository(tx, factory, source); err != nil {
 		return nil, nil, err
 	}
-	agent, err := resolveAutomationAgent(tx, factory, source)
+	agent, err := resolveAutomationAgent(tx, factory, source, live, callerID)
 	if err != nil {
 		return nil, nil, err
 	}

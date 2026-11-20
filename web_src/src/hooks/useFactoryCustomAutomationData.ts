@@ -40,6 +40,7 @@ export function useFactoryCustomAutomation(
     queryKey: factoryCustomAutomationKey(organizationId, factoryId, automationId ?? ""),
     queryFn: () => fetchFactoryCustomAutomation(organizationId, factoryId, automationId ?? ""),
     enabled: Boolean(organizationId && factoryId && automationId),
+    refetchOnMount: "always",
   });
 }
 

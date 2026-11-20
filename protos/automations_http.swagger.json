@@ -172,12 +172,14 @@
         "skip_repository_checkout": { "type": "boolean" },
         "skip_setup_commands": { "type": "boolean" },
         "agent": {
-          "type": "object", "required": ["harness"],
+          "type": "object",
+          "description": "Choose a model from the configured source. New automations use the workspace source. Existing automations use their current source.",
           "properties": {
-            "harness": { "type": "string", "enum": ["superplane", "claude-code", "codex", "openrouter"] },
-            "model": { "type": "string" },
+            "harness": { "type": "string", "enum": ["superplane", "claude-code", "codex", "openrouter"], "description": "If specified, the harness must match the configured agent." },
+            "model": { "type": "string", "description": "Select an available model, or omit this field to use the default." },
             "credentials": {
               "type": "object", "required": ["source"],
+              "description": "If specified, the credentials must match the configured source and connection.",
               "properties": {
                 "source": { "type": "string", "enum": ["integration", "subscription", "hosted"] },
                 "name": { "type": "string" }

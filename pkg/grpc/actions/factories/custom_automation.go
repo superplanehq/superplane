@@ -83,7 +83,7 @@ func CreateFactoryCustomAutomation(
 	if !customAutomationColumnAllowed(column) {
 		return nil, factoryErrorToStatus(invalidArgument("column must be backlog, implement, verify, or done"), "failed to create custom automation")
 	}
-	settings, err := parseCustomAutomationSettings(db, factory, req.GetSettings())
+	settings, err := customAutomationSettingsForSave(db, factory, req.GetSettings(), versionOwnerID(ctx))
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create custom automation")
 	}
@@ -225,7 +225,7 @@ func UpdateFactoryCustomAutomation(
 		if err != nil {
 			return err
 		}
-		settings, err := parseCustomAutomationSettings(tx, factory, req.GetSettings())
+		settings, err := customAutomationSettingsForSave(tx, factory, req.GetSettings(), ownerID)
 		if err != nil {
 			return err
 		}
@@ -307,6 +307,38 @@ type customAutomationSettings struct {
 
 func (settings *customAutomationSettings) runsWithoutTask() bool {
 	return settings != nil && settings.RunsOnTask != nil && !*settings.RunsOnTask
+}
+
+// A custom automation can select a model for its workspace agent.
+func (settings *customAutomationSettings) model() string {
+	if settings.Agent != nil && settings.Agent.Model != "" {
+		return settings.Agent.Model
+	}
+	return settings.Agent.model()
+}
+
+func customAutomationSettingsForSave(
+	tx *gorm.DB,
+	factory *models.Factory,
+	input *pb.FactoryCustomAutomation_Settings,
+	callerID uuid.UUID,
+) (*customAutomationSettings, error) {
+	settings, err := parseCustomAutomationSettings(tx, factory, input)
+	if err != nil {
+		return nil, err
+	}
+	agent := settings.Agent
+	if strings.TrimSpace(input.GetAgent().GetModel()) == "" || (agent.Component != models.SuperPlaneRunnerComponent && !agent.subscription()) {
+		return settings, nil
+	}
+	allowed, err := validateCustomAutomationModel(tx, factory, agent, callerID)
+	if err != nil {
+		return nil, err
+	}
+	if !allowed {
+		return nil, invalidArgument("Select a model available for this agent in the factory.")
+	}
+	return settings, nil
 }
 
 func parseCustomAutomationSettings(
@@ -978,7 +1010,7 @@ func customAutomationRunnerConfiguration(
 	if credentials := settings.Agent.credentials(); credentials != nil && settings.Agent.component() != models.SuperPlaneRunnerComponent {
 		configuration["credentials"] = credentials
 	}
-	if model := settings.Agent.model(); model != "" {
+	if model := settings.model(); model != "" {
 		configuration["model"] = model
 	}
 	settings.Agent.applyLLMProvider(configuration)

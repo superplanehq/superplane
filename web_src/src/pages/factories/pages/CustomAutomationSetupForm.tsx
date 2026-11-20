@@ -106,7 +106,6 @@ export function CustomAutomationSetupForm(props: CustomAutomationSetupFormProps)
           ) : (
             <TriggerEditor
               columnKey={columnKey}
-              asCode={asCode}
               showModel={showModel}
               name={name}
               icon={icon}

@@ -334,6 +334,21 @@ steps:
 	_, err = service.Update(ctx, r.Organization.ID, created.ID, r.User, reopened.YAML)
 	require.NoError(t, err)
 
+	// Existing automations can use a connection different from the workspace default.
+	otherID := createReadyOnboardingIntegration(t, r.Organization.ID, "claude")
+	other, err := models.FindIntegrationInTransaction(db, r.Organization.ID, uuid.MustParse(otherID))
+	require.NoError(t, err)
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{AgentIntegrationID: &otherID}))
+	_, err = service.Update(ctx, r.Organization.ID, created.ID, r.User, strings.Replace(reopened.YAML, connection.InstallationName, other.InstallationName, 1))
+	require.ErrorContains(t, err, "configured credentials")
+	_, err = service.Update(ctx, r.Organization.ID, created.ID, r.User, created.YAML)
+	require.NoError(t, err)
+	live, err = models.FindLiveCanvasVersionInTransaction(db, created.ID)
+	require.NoError(t, err)
+	savedAgent, err := automationAgentDefinition(intakeAgentFromCanvasNodes(live.Nodes))
+	require.NoError(t, err)
+	require.Equal(t, connection.InstallationName, savedAgent.Credentials.Name)
+
 	// A separate canvas publication must still protect its changes from a stale YAML save.
 	edited, err := models.CreateCommitVersionWithSpecInTransaction(db, created.ID, r.User, "Edit in canvas", nil, nil)
 	require.NoError(t, err)
@@ -357,6 +372,7 @@ func TestCanvasAutomationImportsSwitchedSubscription(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, db.Model(connection).Updates(map[string]any{
 		"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("test-bundle"),
+		"available_models": datatypes.JSONSlice[models.CodexModel]{{Model: "gpt-5.4"}},
 	}).Error)
 	ctx, deps := onboardingContext(r), onboardingDeps(r)
 	created, err := CreateFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &pb.CreateFactoryCustomAutomationRequest{
@@ -381,8 +397,35 @@ func TestCanvasAutomationImportsSwitchedSubscription(t *testing.T) {
 	require.Equal(t, &automationspec.Agent{
 		Harness: automationspec.Codex, Credentials: &automationspec.Credentials{Source: automationspec.Subscription},
 	}, doc.Agent)
+	read, err = service.Update(ctx, r.Organization.ID, id, r.User, read.YAML)
+	require.NoError(t, err)
+	doc.Agent = &automationspec.Agent{Model: "gpt-5.4"}
+	selected, err := automationspec.Encode(doc.Definition)
+	require.NoError(t, err)
+	_, err = service.Validate(ctx, automations.Placement{OrganizationID: r.Organization.ID, FactoryID: factory.ID, Stage: read.Stage}, selected)
+	require.NoError(t, err)
+	_, err = service.Update(ctx, r.Organization.ID, id, r.User, selected)
+	require.NoError(t, err)
+	live, err := models.FindLiveCanvasVersionInTransaction(db, id)
+	require.NoError(t, err)
+	agent := intakeAgentFromCanvasNodes(live.Nodes)
+	require.True(t, agent.subscription())
+	require.Equal(t, "gpt-5.4", agent.Model)
+	for _, changed := range []string{
+		strings.Replace(selected, "gpt-5.4", "unavailable", 1),
+		strings.Replace(selected, "model: gpt-5.4", "harness: superplane", 1),
+		strings.Replace(selected, "model: gpt-5.4", "harness: codex\n  credentials: {source: hosted}", 1),
+	} {
+		_, err = service.Update(ctx, r.Organization.ID, id, r.User, changed)
+		require.Error(t, err)
+	}
 	_, err = service.Update(ctx, r.Organization.ID, id, r.User, read.YAML)
 	require.NoError(t, err)
+	live, err = models.FindLiveCanvasVersionInTransaction(db, id)
+	require.NoError(t, err)
+	agent = intakeAgentFromCanvasNodes(live.Nodes)
+	require.True(t, agent.subscription())
+	require.Empty(t, agent.Model)
 }
 
 func TestCanvasAutomationResolvesAllowedDefaultModel(t *testing.T) {

@@ -2,8 +2,10 @@ package factories
 
 import (
 	"errors"
+	"reflect"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/automationspec"
 	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -18,6 +20,27 @@ var automationHarnesses = map[automationspec.Harness]string{
 	automationspec.OpenRouter: "runnerOpenRouter",
 }
 
+// validateCustomAutomationModel uses the same catalog as the model picker.
+// A subscription's catalog belongs to the member editing the automation.
+func validateCustomAutomationModel(tx *gorm.DB, factory *models.Factory, agent *intakeAgent, callerID uuid.UUID) (bool, error) {
+	config := map[string]any{"credentials": agent.credentials()}
+	agent.applyLLMProvider(config)
+	if agent.subscription() {
+		member, err := models.FindActiveUserByIDInTransaction(tx, factory.OrganizationID.String(), callerID.String())
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return false, nil
+		}
+		if err != nil {
+			return false, err
+		}
+		if member.Type != models.UserTypeHuman {
+			return false, nil
+		}
+		return models.RunnerAcceptsModel(tx, factory.OrganizationID, &factory.ID, agent.Component, config, agent.Model, callerID)
+	}
+	return models.RunnerAcceptsModel(tx, factory.OrganizationID, &factory.ID, agent.Component, config, agent.Model)
+}
+
 func automationAgentSettings(spec *automationspec.Agent) *pb.FactoryAppTemplateAgent {
 	if spec == nil {
 		return nil
@@ -30,69 +53,99 @@ func automationAgentSettings(spec *automationspec.Agent) *pb.FactoryAppTemplateA
 	return agent
 }
 
-func resolveAutomationAgent(tx *gorm.DB, factory *models.Factory, source *automationspec.Document) (*intakeAgent, error) {
-	settings := automationAgentSettings(source.Agent)
-	agent, err := customAutomationAgent(tx, factory, settings)
+func configuredAutomationAgent(tx *gorm.DB, factory *models.Factory, live *models.CanvasVersion) *intakeAgent {
+	workspace := resolveIntakeAgent(tx, factory)
+	if live == nil {
+		return workspace
+	}
+	current := intakeAgentFromCanvasNodes(live.Nodes)
+	if current == nil {
+		return nil
+	}
+	if workspace != nil && workspace.Component == current.Component && reflect.DeepEqual(workspace.Credentials, current.Credentials) {
+		return workspace
+	}
+	// Keep the saved source. An omitted model uses that source's default.
+	current.Model = ""
+	return current
+}
+
+func resolveAutomationAgent(tx *gorm.DB, factory *models.Factory, source *automationspec.Document, live *models.CanvasVersion, callerID uuid.UUID) (*intakeAgent, error) {
+	agent := configuredAutomationAgent(tx, factory, live)
+	if agent == nil {
+		if live != nil {
+			return nil, unrepresentableAutomationCanvas()
+		}
+		return nil, source.Diagnostic("agent", "Configure an agent for this workspace.")
+	}
+	configured, err := automationAgentDefinition(agent)
 	if err != nil {
 		return nil, err
 	}
-	if agent == nil {
-		return nil, source.Diagnostic("agent", "Configure an agent for this factory or select a ready agent connection.")
+	settings := source.Agent
+	if settings != nil {
+		if settings.Harness != "" && settings.Harness != configured.Harness {
+			return nil, source.Diagnostic("agent.harness", "Use the configured agent. Change the model source in workspace settings.")
+		}
+		if settings.Credentials != nil && (configured.Credentials == nil || *settings.Credentials != *configured.Credentials) {
+			return nil, source.Diagnostic("agent.credentials", "Use the configured credentials. Change the model source in workspace settings.")
+		}
 	}
-
-	if settings.GetCredentialSource() == runner.CredentialsSourceIntegration {
-		connection, err := models.FindIntegrationByName(tx, factory.OrganizationID, strings.TrimSpace(settings.GetCredentialIntegrationName()))
+	if credentials := configured.Credentials; credentials != nil && credentials.Source == automationspec.Integration {
+		connection, err := models.FindIntegrationByName(tx, factory.OrganizationID, credentials.Name)
 		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, err
 		}
 		if connection == nil || connection.State != models.IntegrationStateReady {
-			return nil, source.Diagnostic("agent.credentials.name", "Select a ready connection in this organization.")
+			return nil, source.Diagnostic("agent", "Reconnect the configured agent in this workspace.")
 		}
-		configured := intakeAgentFromIntegration(connection)
-		if configured == nil || configured.Component != agent.Component {
-			return nil, source.Diagnostic("agent.credentials.name", "Select a connection that supports this agent.")
+		installed := intakeAgentFromIntegration(connection)
+		if installed == nil || installed.Component != agent.Component {
+			return nil, source.Diagnostic("agent", "The configured connection must support this agent.")
 		}
-		agent.LLMProvider = configured.LLMProvider
+		agent.LLMProvider = installed.LLMProvider
 	}
-
-	if agent.subscription() {
-		if !factory.OnboardingConfigValue().CodexSubscription {
-			return nil, source.Diagnostic("agent.credentials.source", "Configure a ChatGPT subscription for this factory.")
-		}
-		if settings.GetModel() != "" {
-			return nil, source.Diagnostic("agent.model", "Remove the model override when you use a ChatGPT subscription.")
-		}
-		return agent, nil
+	if agent.subscription() && !factory.OnboardingConfigValue().CodexSubscription {
+		return nil, source.Diagnostic("agent", "Configure a ChatGPT subscription for this workspace.")
 	}
-	if agent.Component == models.SuperPlaneRunnerComponent {
+	model := ""
+	if settings != nil {
+		model = strings.TrimSpace(settings.Model)
+	}
+	if model == "" && agent.subscription() {
+		return agent, nil // The task owner's subscription supplies the default at run time.
+	}
+	if model == "" && agent.Component == models.SuperPlaneRunnerComponent {
 		_, err := models.ResolveRunnableHostedLLMModel(tx, factory.OrganizationID, &factory.ID)
 		if errors.Is(err, models.ErrSuperPlaneRunnerNoModel) || errors.Is(err, models.ErrSuperPlaneRunnerModelNotAllowed) {
-			return nil, source.Diagnostic("agent", "Enable a SuperPlane-hosted model for this factory.")
+			return nil, source.Diagnostic("agent", "Enable a SuperPlane-hosted model for this workspace.")
 		}
 		return agent, err
 	}
-	config := map[string]any{"credentials": agent.credentials(), "model": agent.model()}
-	agent.applyLLMProvider(config)
-	if agent.Credentials["source"] == runner.CredentialsSourceIntegration || agent.Credentials["source"] == runner.CredentialsSourceSecret {
-		if settings.GetModel() == "" {
-			// Omitted YAML models must not inherit a fixed default outside the current policy.
-			config["model"] = ""
-		}
-		model, err := models.ResolveBYOKRunnerModel(tx, factory.OrganizationID, &factory.ID, agent.Component, config)
+	if funding := agent.Credentials["source"]; funding == runner.CredentialsSourceIntegration || funding == runner.CredentialsSourceSecret {
+		// Let the execution policy select a permitted BYOK default when YAML omits a model.
+		config := map[string]any{"credentials": agent.credentials(), "model": model}
+		agent.applyLLMProvider(config)
+		resolved, err := models.ResolveBYOKRunnerModel(tx, factory.OrganizationID, &factory.ID, agent.Component, config)
 		if errors.Is(err, models.ErrSelectableLLMModelNotAllowed) {
-			return nil, source.Diagnostic("agent.model", "Select a model available for this agent in the factory.")
+			return nil, source.Diagnostic("agent.model", "Select an available model for the configured agent.")
 		}
 		if err != nil {
 			return nil, err
 		}
-		agent.Model = model
+		agent.Model = resolved
+		return agent, nil
 	}
-	allowed, err := models.RunnerAcceptsModel(tx, factory.OrganizationID, &factory.ID, agent.Component, config, agent.model())
+	if model == "" {
+		model = agent.model()
+	}
+	agent.Model = model
+	allowed, err := validateCustomAutomationModel(tx, factory, agent, callerID)
 	if err != nil {
 		return nil, err
 	}
 	if !allowed {
-		return nil, source.Diagnostic("agent.model", "Select a model available for this agent in the factory.")
+		return nil, source.Diagnostic("agent.model", "Select an available model for the configured agent.")
 	}
 	return agent, nil
 }

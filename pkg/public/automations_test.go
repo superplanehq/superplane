@@ -106,9 +106,10 @@ func TestAutomationAPIPublishesInTheSelectedStage(t *testing.T) {
 	}
 	support.AssignOpenSystemTrial(t, orgID)
 	provider, model := models.UsageProviderAnthropic, "claude-sonnet-4-6"
+	pinnedModel := models.FormatSelectableLLMModelKey(models.UsageFundingSourceHosted, provider, "claude-opus-5-5")
 	_, err := models.UpsertHostedLLMProvider(db, models.HostedLLMProvider{
 		Provider: provider, Enabled: true, APIKey: []byte("test-hosted-key"),
-		AllowedModels: datatypes.JSONSlice[string]{model},
+		AllowedModels: datatypes.JSONSlice[string]{model, "claude-opus-5-5"},
 	})
 	require.NoError(t, err)
 	previous, err := models.GetInstallationLLMSettings(db)
@@ -167,6 +168,12 @@ steps:
     bash: echo first
 `
 	input := &automationWriteRequest{FactoryID: factory.ID.String(), Stage: "backlog", YAML: source}
+	for _, invalidAgent := range []string{"harness: codex", "model: unavailable", "model: byok::anthropic::claude-opus-5-5"} {
+		invalid := *input
+		invalid.YAML = strings.Replace(source, "harness: superplane", invalidAgent, 1)
+		call(http.MethodPost, collection+":validate", &invalid, http.StatusBadRequest)
+		call(http.MethodPost, collection, &invalid, http.StatusBadRequest)
+	}
 	call(http.MethodPost, collection+":validate", input, http.StatusOK)
 	created := call(http.MethodPost, collection, input, http.StatusCreated)
 	var first automations.Automation
@@ -180,6 +187,7 @@ steps:
 	require.JSONEq(t, created.Body.String(), call(http.MethodGet, path, nil, http.StatusOK).Body.String())
 
 	source = strings.Replace(source, "echo first", "echo second", 1)
+	source = strings.Replace(source, "harness: superplane", "model: "+pinnedModel, 1)
 	updated := call(http.MethodPut, path, &automationWriteRequest{YAML: source}, http.StatusOK)
 	var second automations.Automation
 	require.NoError(t, json.Unmarshal(updated.Body.Bytes(), &second))
@@ -196,6 +204,8 @@ steps:
 		}
 		if node.ID == live.Edges[0].TargetID {
 			require.Equal(t, models.SuperPlaneRunnerComponent, node.ComponentName())
+			require.Equal(t, pinnedModel, node.Configuration["model"])
+			require.NotContains(t, node.Configuration, "credentials")
 			steps, err := json.Marshal(node.Configuration["steps"])
 			require.NoError(t, err)
 			require.Contains(t, string(steps), "echo second")
@@ -226,6 +236,39 @@ steps:
 	require.NoError(t, line.Update(db, nil, []models.FactoryLineStep{}, nil))
 	call(http.MethodDelete, path, nil, http.StatusNoContent)
 	call(http.MethodGet, path, nil, http.StatusNotFound)
+
+	t.Run("validate a model from the authenticated member's subscription", func(t *testing.T) {
+		connection, err := models.CreateCodexConnection(db, orgID, resources.User, time.Now())
+		require.NoError(t, err)
+		const modelID = "gpt-5.4"
+		require.NoError(t, db.Model(connection).Updates(map[string]any{
+			"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("test-bundle"),
+			"available_models": datatypes.JSONSlice[models.CodexModel]{{Model: modelID}},
+		}).Error)
+		subscription := true
+		require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{CodexSubscription: &subscription}))
+		request := &automationWriteRequest{FactoryID: factory.ID.String(), Stage: "backlog", YAML: `apiVersion: v2
+kind: Automation
+name: Review task
+agent: {model: gpt-5.4}
+triggers: [{use: manual}]
+steps: [{name: Review, prompt: Review the changes.}]
+`}
+		body, err := json.Marshal(request)
+		require.NoError(t, err)
+		validated := execRequest(server, requestParams{
+			method: http.MethodPost, path: collection + ":validate", body: body, contentType: "application/json",
+			authCookie: token, headers: map[string]string{"X-Organization-Id": orgID.String()},
+		})
+		require.Equal(t, http.StatusOK, validated.Code, validated.Body.String())
+		var result struct {
+			Definition struct {
+				Agent map[string]string `json:"agent"`
+			} `json:"definition"`
+		}
+		require.NoError(t, json.Unmarshal(validated.Body.Bytes(), &result))
+		require.Equal(t, map[string]string{"model": modelID}, result.Definition.Agent)
+	})
 }
 
 func automationAPITestServer(t *testing.T, resources *support.ResourceRegistry) (*Server, string) {

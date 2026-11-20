@@ -197,6 +197,7 @@ function AgentPanel({
   const credentials = component.configuration.credentials as { source?: string } | undefined;
   const byokModelDefault = useByokRunnerModelDefault({
     enabled:
+      applyModelDefault &&
       credentials?.source !== "subscription" &&
       modelUsedField?.type === "hosted-model" &&
       modelProvider !== "" &&
@@ -223,7 +224,7 @@ function AgentPanel({
   }, [applyModelDefault, byokModelDefault]);
 
   const modelControl =
-    showModel && modelUsedField ? (
+    showModel && modelUsedField && (!modelOnly || modelUsedField.type === "hosted-model") ? (
       <ConfigurationFieldRenderer
         field={view !== "full" ? { ...modelUsedField, label: "Default model" } : modelUsedField}
         hideLabel={appearance === "fields"}

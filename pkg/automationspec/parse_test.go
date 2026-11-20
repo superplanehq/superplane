@@ -111,9 +111,8 @@ func TestParseRejectsInvalidDefinitionAtItsSource(t *testing.T) {
 		{"duplicate secrets", definitionHeader + manualTrigger + bashStep + "    secrets: [TOKEN, TOKEN]\n", "steps[0].secrets[1]", 9, 22},
 		{"invalid working directory type", definitionHeader + manualTrigger + bashStep + "    working_directory: false\n", "steps[0].working_directory", 9, 24},
 		{"name on subscription", definitionHeader + manualTrigger + bashStep + "agent: {harness: codex, credentials: {source: subscription, name: shared}}\n", "agent.credentials.name", 9, 67},
-		{"model on subscription", definitionHeader + manualTrigger + bashStep + "agent: {harness: codex, model: x, credentials: {source: subscription}}\n", "agent.model", 9, 32},
 		{"missing integration name", definitionHeader + manualTrigger + bashStep + "agent: {harness: codex, credentials: {source: integration}}\n", "agent.credentials.name", 9, 38},
-		{"hosted model override", definitionHeader + manualTrigger + bashStep + "agent: {harness: superplane, model: pinned}\n", "agent.model", 9, 37},
+		{"hosted credentials override", definitionHeader + manualTrigger + bashStep + "agent: {harness: superplane, credentials: {source: hosted}}\n", "agent.credentials", 9, 43},
 		{"extra document", definitionHeader + manualTrigger + bashStep + "---\nname: extra\n", "$", 9, 1},
 	}
 	for _, test := range cases {

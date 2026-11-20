@@ -130,7 +130,10 @@ func (s Service) Validate(ctx context.Context, placement Placement, source strin
 		if _, err := models.FindFactory(tx, placement.OrganizationID, placement.FactoryID); err != nil {
 			return factoryError(err)
 		}
-		return s.check(ctx, tx, placement, doc)
+		if err := checkAutomationReferences(tx, placement, doc); err != nil {
+			return err
+		}
+		return s.Backend.Check(ctx, tx, placement, doc)
 	})
 	return doc, err
 }
@@ -196,7 +199,7 @@ func (s Service) save(ctx context.Context, actor, id uuid.UUID, placement Placem
 			return nil, factoryError(err)
 		}
 
-		if err := s.check(ctx, tx, placement, doc); err != nil {
+		if err := checkAutomationReferences(tx, placement, doc); err != nil {
 			return nil, err
 		}
 		artifact, notify, err := s.Backend.Apply(ctx, tx, placement, actor, record.ID, artifactOf(record), doc)
@@ -217,7 +220,7 @@ func (s Service) save(ctx context.Context, actor, id uuid.UUID, placement Placem
 	return fromRecord(record, placement.Stage), nil
 }
 
-func (s Service) check(ctx context.Context, tx *gorm.DB, placement Placement, doc *automationspec.Document) error {
+func checkAutomationReferences(tx *gorm.DB, placement Placement, doc *automationspec.Document) error {
 	if err := automationspec.ValidateStage(doc, automationspec.Stage(placement.Stage)); err != nil {
 		return err
 	}
@@ -247,7 +250,7 @@ func (s Service) check(ctx context.Context, tx *gorm.DB, placement Placement, do
 		}
 	}
 
-	return s.Backend.Check(ctx, tx, placement, doc)
+	return nil
 }
 
 func (s Service) lockExisting(ctx context.Context, tx *gorm.DB, organizationID, id uuid.UUID) (*models.AutomationSource, *LegacyAutomation, error) {

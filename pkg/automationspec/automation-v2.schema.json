@@ -87,7 +87,8 @@
     "agent": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["harness"],
+      "anyOf": [{ "required": ["model"] }, { "required": ["harness"] }],
+      "dependentRequired": { "credentials": ["harness"] },
       "properties": {
         "harness": { "enum": ["superplane", "claude-code", "codex", "openrouter"] },
         "model": { "$ref": "#/$defs/nonblank" },
@@ -95,8 +96,8 @@
       },
       "allOf": [
         {
-          "if": { "properties": { "harness": { "const": "superplane" } } },
-          "then": { "properties": { "credentials": false, "model": false } }
+          "if": { "required": ["harness"], "properties": { "harness": { "const": "superplane" } } },
+          "then": { "properties": { "credentials": false } }
         },
         {
           "if": {
@@ -106,7 +107,7 @@
             }
           },
           "then": {
-            "properties": { "harness": { "const": "codex" }, "model": false }
+            "properties": { "harness": { "const": "codex" } }
           }
         }
       ]

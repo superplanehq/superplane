@@ -1,7 +1,8 @@
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useId, useState } from "react";
-import { useConnectedIntegrations } from "@/hooks/useIntegrations";
+import { useCustomAutomationEditorAgent } from "@/hooks/useCustomAutomationEditorAgent";
+import { useFactoryCustomAutomation } from "@/hooks/useFactoryCustomAutomationData";
 import type { useCustomAutomationSourceDraft } from "@/hooks/useCustomAutomationSourceDraft";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import {
@@ -21,6 +22,7 @@ import type { PlanningReviewDraft, PlanningReviewStep } from "./planningReviewMo
 
 export function CustomAutomationSourceEditor({
   model,
+  automationId,
   stage,
   saving,
   deleting,
@@ -30,6 +32,7 @@ export function CustomAutomationSourceEditor({
   onClose,
 }: {
   model: ReturnType<typeof useCustomAutomationSourceDraft>;
+  automationId?: string;
   stage: CustomAutomationColumn;
   saving: boolean;
   deleting: boolean;
@@ -41,13 +44,13 @@ export function CustomAutomationSourceEditor({
   const { organizationId, factoryId, routeSegment, factory } = useFactoriesLayout();
   const yamlId = useId();
   const definition = model.definition;
-  const agent = definition?.agent;
-  const onboarding = factory?.onboarding;
-  const credentials = agent?.credentials;
-  const needsWorkspaceConnection = Boolean(onboarding?.agentIntegrationId && !credentials);
-  const connections = useConnectedIntegrations(organizationId, {
-    enabled: needsWorkspaceConnection || (agent?.harness === "openrouter" && credentials?.source === "integration"),
-  });
+  const live = useFactoryCustomAutomation(organizationId, factoryId, automationId);
+  const { agent, customProvider, ready } = useCustomAutomationEditorAgent(
+    organizationId,
+    factory?.onboarding,
+    automationId,
+    live.isFetchedAfterMount && !live.isError ? live.data?.settings?.agent : undefined,
+  );
   const [formTriggers, setFormTriggers] = useState<CustomAutomationTrigger[]>();
 
   const form = { saving, deleting, onSave, onDelete, onClose };
@@ -74,7 +77,7 @@ export function CustomAutomationSourceEditor({
     );
   }
 
-  const { modelAgent, ...visual } = automationDefinitionCanvas(definition, onboarding, connections.data);
+  const visual = automationDefinitionCanvas(definition, agent, customProvider);
   const triggers = formTriggers ?? visual.triggers;
 
   const editTriggers = (next: CustomAutomationTrigger[], runsOnTask?: boolean) => {
@@ -91,7 +94,7 @@ export function CustomAutomationSourceEditor({
       {...form}
       {...visual}
       triggers={triggers}
-      showModel={Boolean(modelAgent)}
+      showModel={ready}
       organizationId={organizationId}
       factoryId={factoryId}
       factoryKey={routeSegment}
@@ -102,7 +105,7 @@ export function CustomAutomationSourceEditor({
       onIconChange={(icon) => model.editCanvas({ icon })}
       onTriggersChange={(next) => editTriggers(next, visual.runsOnTask)}
       onRunsOnTaskChange={(runsOnTask) => editTriggers(triggers, runsOnTask)}
-      onDraftChange={(next) => model.editCanvas(settingsEdit(visual.draft, next, modelAgent))}
+      onDraftChange={(next) => model.editCanvas(settingsEdit(visual.draft, next, definition.agent))}
     />
   );
 }
@@ -131,8 +134,9 @@ function settingsEdit(
   if (after.skipRepositoryCheckout !== before.skipRepositoryCheckout) {
     patch.skip_repository_checkout = after.skipRepositoryCheckout === true;
   }
-  if (agent && after.model !== before.model && typeof after.model === "string") {
-    patch.agent = { ...agent, model: after.model || undefined };
+  if (after.model !== before.model) {
+    const model = typeof after.model === "string" && after.model ? after.model : undefined;
+    patch.agent = model || agent?.harness ? { ...agent, model } : undefined;
   }
   return patch;
 }

@@ -122,13 +122,18 @@ describe("custom automation settings", () => {
       model: "",
     });
 
-    draft.components[0]!.configuration.credentialSource = "hosted";
+    draft.components[0]!.configuration.credentials = { source: "hosted" };
     expect(customAutomationSettings("automatic", draft).agent?.credentialSource).toBeUndefined();
   });
 
   it("fills an empty create draft from the workspace agent", () => {
     const draft = customAutomationDraft({
-      settings: { agent: workspaceAgentFromOnboarding({ agentHarness: "AGENT_HARNESS_CLAUDE_CODE" }) },
+      settings: {
+        agent: workspaceAgentFromOnboarding(
+          { agentHarness: "AGENT_HARNESS_CLAUDE_CODE", agentIntegrationId: "claude" },
+          [{ metadata: { id: "claude", name: "team", integrationName: "claude" }, status: { state: "ready" } }],
+        ),
+      },
     });
 
     expect(draft.components[0]?.component).toBe("runnerClaudeCode");

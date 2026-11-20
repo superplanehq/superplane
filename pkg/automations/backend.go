@@ -19,7 +19,8 @@ type Artifact struct {
 	Revision string
 }
 
-// Backend checks and manages the executable form of a public definition.
+// Check validates a new automation for the destination. Apply validates and
+// publishes against the current artifact when updating an existing automation.
 // Apply and Remove write through the supplied transaction. They can return a
 // callback for notifications that the service sends after a successful commit.
 type Backend interface {

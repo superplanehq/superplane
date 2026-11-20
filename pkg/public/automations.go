@@ -10,6 +10,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/automations"
 	"github.com/superplanehq/superplane/pkg/automationspec"
@@ -96,6 +97,7 @@ func serveAutomation(w http.ResponseWriter, r *http.Request, route authorization
 		writeAutomationError(w, r, grpcerrors.Unauthenticated(err, "Sign in to an organization."))
 		return
 	}
+	ctx = authentication.SetUserIdInMetadata(ctx, actor.String())
 	if r.Method == http.MethodPut {
 		if input.FactoryID != "" || input.Stage != "" {
 			writeAutomationError(w, r, grpcerrors.InvalidArgument(nil, "Omit factory_id and stage when you update an automation."))

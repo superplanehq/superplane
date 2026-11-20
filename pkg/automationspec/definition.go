@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"fmt"
 	"reflect"
+	"slices"
 
 	"gopkg.in/yaml.v3"
 )
@@ -61,7 +62,7 @@ type Step struct {
 }
 
 type Agent struct {
-	Harness     Harness      `yaml:"harness" json:"harness"`
+	Harness     Harness      `yaml:"harness,omitempty" json:"harness,omitempty"`
 	Model       string       `yaml:"model,omitempty" json:"model,omitempty"`
 	Credentials *Credentials `yaml:"credentials,omitempty" json:"credentials,omitempty"`
 }
@@ -118,18 +119,28 @@ func ReplaceExplicitAgent(source string, agent *Agent) (string, error) {
 	if len(root.Content) == 0 {
 		return "", fmt.Errorf("empty automation definition")
 	}
-	field := mappingProperty(root.Content[0], "agent").value
-	if field == nil {
+	document := root.Content[0]
+	field := mappingProperty(document, "agent")
+	if field.value == nil {
 		return source, nil
 	}
 	var previous Agent
-	if err := field.Decode(&previous); err != nil {
+	if err := field.value.Decode(&previous); err != nil {
 		return "", err
+	}
+	if previous.Harness == "" && previous.Credentials == nil {
+		// Keep a model-only selection independent of the workspace's source.
+		if agent.Model == "" {
+			i := slices.Index(document.Content, field.key)
+			document.Content = slices.Delete(document.Content, i, i+2)
+			return encodeYAML(&root)
+		}
+		agent = &Agent{Model: agent.Model}
 	}
 	if reflect.DeepEqual(&previous, agent) {
 		return source, nil
 	}
-	if err := field.Encode(agent); err != nil {
+	if err := field.value.Encode(agent); err != nil {
 		return "", err
 	}
 	return encodeYAML(&root)

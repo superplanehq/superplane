@@ -22,7 +22,7 @@ const hooks = vi.hoisted(() => ({
 }));
 vi.mock("@/hooks/useFactoryCustomAutomationData", () => ({
   factoryCustomAutomationKey: (...parts: string[]) => ["custom", ...parts],
-  useFactoryCustomAutomation: (...args: unknown[]) => hooks.describe(...args),
+  useFactoryCustomAutomation: (...args: unknown[]) => hooks.describe(...args) ?? {},
   useCreateFactoryCustomAutomation: () => ({ mutateAsync: hooks.create }),
   useUpdateFactoryCustomAutomation: () => ({ mutateAsync: hooks.update }),
 }));

@@ -102,6 +102,7 @@ function LegacyAutomationModal({
           runsOnTask={model.runsOnTask}
           columnKey={model.columnKey}
           draft={model.draft}
+          showModel={model.showModel}
           organizationId={organizationId}
           factoryId={factoryId}
           factoryKey={routeSegment}
@@ -216,6 +217,7 @@ function AutomationSourceDraftModal({
         }
       >
         <CustomAutomationSourceEditor
+          automationId={automationId}
           model={draft}
           stage={stage}
           saving={save.isPending}
