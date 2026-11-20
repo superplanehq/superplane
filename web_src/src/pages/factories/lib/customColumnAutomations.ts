@@ -15,6 +15,7 @@ export type ColumnAutomationApp = {
   customAutomationIcon?: string;
   customAutomationCronExpression?: string;
   customAutomationTriggers?: Array<{ mode: CustomAutomationMode; cronExpression?: string }>;
+  customAutomationRunsOnTask?: boolean;
 };
 
 export function customColumnAutomations(

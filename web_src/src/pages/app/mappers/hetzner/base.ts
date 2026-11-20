@@ -25,6 +25,19 @@ type HetznerConfiguration = {
   sshKeys?: unknown;
 };
 
+const metadataFields: Array<{ key: keyof HetznerConfiguration; icon: MetadataItem["icon"]; label: string }> = [
+  { key: "serverType", icon: "cpu", label: "Type" },
+  { key: "image", icon: "hard-drive", label: "Image" },
+  { key: "description", icon: "camera", label: "Snapshot" },
+  { key: "snapshot", icon: "hard-drive", label: "Snapshot image" },
+  { key: "location", icon: "map-pin", label: "Location" },
+  { key: "firewall", icon: "shield", label: "Firewall" },
+  { key: "server", icon: "server", label: "Server" },
+  { key: "loadBalancer", icon: "route", label: "Load Balancer" },
+  { key: "loadBalancerType", icon: "cpu", label: "LB Type" },
+  { key: "algorithm", icon: "shuffle", label: "Algorithm" },
+];
+
 function getConfigValue(value: unknown): string | undefined {
   if (typeof value === "string") {
     const trimmed = value.trim();
@@ -58,57 +71,25 @@ function getConfigValue(value: unknown): string | undefined {
   return undefined;
 }
 
+function formatImageName(image: string, execution?: ExecutionInfo): string {
+  const output = execution?.outputs as { default?: Array<{ data?: Record<string, unknown> }> } | undefined;
+  const outputImageName = getConfigValue(output?.default?.[0]?.data?.imageName);
+  return outputImageName && outputImageName !== image ? `${outputImageName} (${image})` : outputImageName || image;
+}
+
 function metadataList(node: NodeInfo, execution?: ExecutionInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
   const configuration = (node.configuration as HetznerConfiguration | undefined) ?? {};
-  const output = execution?.outputs as { default?: Array<{ data?: Record<string, unknown> }> } | undefined;
-  const outputData = output?.default?.[0]?.data;
 
-  const serverType = getConfigValue(configuration.serverType);
-  const image = getConfigValue(configuration.image);
-  const outputImageName = getConfigValue(outputData?.imageName);
-  const snapshot = getConfigValue(configuration.snapshot);
-  const description = getConfigValue(configuration.description);
-  const location = getConfigValue(configuration.location);
-  const firewall = getConfigValue(configuration.firewall);
-  const server = getConfigValue(configuration.server);
-  const loadBalancer = getConfigValue(configuration.loadBalancer);
-  const loadBalancerType = getConfigValue(configuration.loadBalancerType);
-  const algorithm = getConfigValue(configuration.algorithm);
+  for (const { key, icon, label } of metadataFields) {
+    const value = getConfigValue(configuration[key]);
+    if (value === undefined) continue;
+
+    const displayValue = key === "image" ? formatImageName(value, execution) : value;
+    metadata.push({ icon, label: `${label}: ${displayValue}` });
+  }
+
   const sshKeys = Array.isArray(configuration.sshKeys) ? configuration.sshKeys : [];
-
-  if (serverType) {
-    metadata.push({ icon: "cpu", label: `Type: ${serverType}` });
-  }
-  if (image) {
-    const imageLabel =
-      outputImageName && outputImageName !== image ? `${outputImageName} (${image})` : outputImageName || image;
-    metadata.push({ icon: "hard-drive", label: `Image: ${imageLabel}` });
-  }
-  if (description) {
-    metadata.push({ icon: "camera", label: `Snapshot: ${description}` });
-  }
-  if (snapshot) {
-    metadata.push({ icon: "hard-drive", label: `Snapshot image: ${snapshot}` });
-  }
-  if (location) {
-    metadata.push({ icon: "map-pin", label: `Location: ${location}` });
-  }
-  if (firewall) {
-    metadata.push({ icon: "shield", label: `Firewall: ${firewall}` });
-  }
-  if (server) {
-    metadata.push({ icon: "server", label: `Server: ${server}` });
-  }
-  if (loadBalancer) {
-    metadata.push({ icon: "route", label: `Load Balancer: ${loadBalancer}` });
-  }
-  if (loadBalancerType) {
-    metadata.push({ icon: "cpu", label: `LB Type: ${loadBalancerType}` });
-  }
-  if (algorithm) {
-    metadata.push({ icon: "shuffle", label: `Algorithm: ${algorithm}` });
-  }
   if (sshKeys.length > 0) {
     metadata.push({ icon: "key", label: `SSH keys: ${sshKeys.length}` });
   }
