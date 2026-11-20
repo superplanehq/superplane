@@ -22,12 +22,24 @@ func TestFactoryLineStagesMigrationBackfillsExistingLines(t *testing.T) {
 		Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entry,
 	}})
 	require.NoError(t, err)
-	migration, err := os.ReadFile("../../db/migrations/20261119142709_add-factory-line-stages.up.sql")
+	migration, err := os.ReadFile("../../db/migrations/20261120150841_add-custom-line-stages.up.sql")
 	require.NoError(t, err)
 
 	tx := db.Begin()
 	defer tx.Rollback()
-	require.NoError(t, tx.Exec("ALTER TABLE factory_lines DROP COLUMN stages").Error)
+	require.NoError(t, tx.Exec(`
+		DELETE FROM factory_work_order_queue_items;
+		ALTER TABLE factory_lines DROP COLUMN stages;
+		ALTER TABLE factory_work_order_line_dispatches DROP COLUMN stages;
+		DROP INDEX idx_factory_work_order_queue_items_stage;
+		ALTER TABLE factory_work_order_queue_items
+		  DROP CONSTRAINT factory_work_order_queue_items_line_dispatch_step_key,
+		  DROP COLUMN app_id,
+		  DROP COLUMN stage_key,
+		  ADD CONSTRAINT factory_work_order_queue_items_line_dispatch_id_key UNIQUE (line_dispatch_id);
+		CREATE INDEX idx_factory_work_order_queue_items_step
+		  ON factory_work_order_queue_items (line_id, step_index, created_at);
+	`).Error)
 	require.NoError(t, tx.Exec(string(migration)).Error)
 	var encoded string
 	require.NoError(t, tx.Raw("SELECT stages FROM factory_lines WHERE id = ?", line.ID).Scan(&encoded).Error)
