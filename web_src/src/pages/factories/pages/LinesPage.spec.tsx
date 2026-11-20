@@ -1890,6 +1890,22 @@ describe("LinesPage stage editing", () => {
     expect(screen.queryByRole("button", { name: "Reorder Done" })).not.toBeInTheDocument();
   });
 
+  it("offers Save only after a change and exits with Done when nothing changed", async () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_STAGES);
+    const user = userEvent.setup();
+    renderLinesBoard();
+    await enterStageEditing(user);
+
+    expect(screen.queryByRole("button", { name: "Save changes" })).not.toBeInTheDocument();
+    await user.type(screen.getByTestId("lines-stage-reorder-phase-0"), "{ArrowRight}");
+    expect(screen.getByRole("button", { name: "Save changes" })).toBeInTheDocument();
+    await user.type(screen.getByTestId("lines-stage-reorder-phase-0"), "{ArrowLeft}");
+
+    await user.click(screen.getByRole("button", { name: "Done" }));
+    expect(screen.queryByTestId("line-stage-edit-toolbar")).not.toBeInTheDocument();
+    expect(updateFactoryLineMutateAsync).not.toHaveBeenCalled();
+  });
+
   it("saves the reordered draft once after confirmation", async () => {
     enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_STAGES);
     updateFactoryLineMutateAsync.mockResolvedValueOnce({});

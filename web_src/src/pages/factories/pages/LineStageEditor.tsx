@@ -1,5 +1,7 @@
 import { Button } from "@/components/ui/button";
+import { Kbd } from "@/components/ui/kbd";
 import { LoadingButton } from "@/components/ui/loading-button";
+import { Separator } from "@/components/ui/separator";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -10,7 +12,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/ui/alertDialog";
-import { GripHorizontal, Lock, Plus, Trash2 } from "lucide-react";
+import { Check, GripHorizontal, Lock, Plus, Trash2 } from "lucide-react";
 import type { DragEvent, KeyboardEvent } from "react";
 
 import type { LineBoardStage, LineStageChanges } from "../lib/lineBoardStages";
@@ -36,26 +38,48 @@ export function LineStageEditToolbar({
       className="mb-3 flex shrink-0 flex-wrap items-center gap-3"
     >
       <div className="min-w-0 flex-1">
-        <p className="text-[13px] font-medium text-foreground">Editing stages</p>
+        <div className="flex items-center gap-2">
+          <p className="text-[13px] font-medium text-foreground">Editing stages</p>
+          {hasChanges ? (
+            <span
+              className="inline-flex items-center gap-1.5 text-xs text-muted-foreground"
+              data-testid="line-stage-edit-unsaved"
+            >
+              <span className="size-1.5 rounded-full bg-amber-500" aria-hidden />
+              Unsaved changes
+            </span>
+          ) : null}
+        </div>
         <p className="text-xs text-muted-foreground">Drag stages to reorder. Backlog and Done stay in place.</p>
       </div>
-      <Button type="button" variant="outline" size="sm" onClick={onAddStage} disabled={saving}>
-        <Plus className="size-3.5" aria-hidden />
-        Add stage
-      </Button>
-      <Button type="button" variant="ghost" size="sm" onClick={onDiscard} disabled={saving}>
-        Discard
-      </Button>
-      <LoadingButton
-        type="button"
-        size="sm"
-        onClick={onSave}
-        disabled={!hasChanges}
-        loading={saving}
-        loadingText="Saving..."
-      >
-        Save changes
-      </LoadingButton>
+      <div className="flex items-center gap-2">
+        <Button type="button" variant="ghost" size="sm" onClick={onAddStage} disabled={saving}>
+          <Plus className="size-3.5" aria-hidden />
+          Add stage
+        </Button>
+        <Separator orientation="vertical" className="data-[orientation=vertical]:h-5" />
+        {hasChanges ? (
+          <>
+            <Button type="button" variant="ghost" size="sm" onClick={onDiscard} disabled={saving}>
+              Discard
+              <Kbd className="hidden sm:inline-flex" aria-hidden>
+                Esc
+              </Kbd>
+            </Button>
+            <LoadingButton type="button" size="sm" onClick={onSave} loading={saving} loadingText="Saving...">
+              <Check className="size-3.5" aria-hidden />
+              Save changes
+            </LoadingButton>
+          </>
+        ) : (
+          <Button type="button" variant="outline" size="sm" onClick={onDiscard}>
+            Done
+            <Kbd className="hidden sm:inline-flex" aria-hidden>
+              Esc
+            </Kbd>
+          </Button>
+        )}
+      </div>
     </div>
   );
 }
