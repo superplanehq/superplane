@@ -65,6 +65,9 @@ func MergeConfidenceChecksFromSteps(steps []runner.AgentStep) ([]string, map[str
 		}
 		ids = append(ids, id)
 		label := strings.TrimSpace(step.Name)
+		if id == "drift" && label == "Drift from Specification" {
+			label = checkLabel(id)
+		}
 		if label == "" {
 			label = id
 		}
