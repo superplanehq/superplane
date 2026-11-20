@@ -355,6 +355,32 @@ describe("AutomationsConsoleVariant summary strip", () => {
 });
 
 describe("AutomationsConsoleVariant intake", () => {
+  it("identifies custom automated intake without inventing a source or member", () => {
+    renderConsole(SPLIT_RUN_RUNNING, {
+      source: splitRunSourceForOrder({
+        id: "custom-intake-task",
+        createdBy: {
+          automation: {
+            appId: "custom-automation",
+            appName: "  GitHub incident triage  ",
+            nodeName: "Run agent",
+            templateId: "custom-verification",
+          },
+        },
+      }),
+    });
+
+    const description = within(screen.getByTestId("redesign-console-task-description"));
+    expect(description.getByTestId("split-run-source")).toHaveTextContent(
+      /^GitHub incident triage\s*Created by automated intake$/,
+    );
+    expect(description.getByText("GitHub incident triage")).toBeVisible();
+    expect(description.queryByText("Unknown member")).not.toBeInTheDocument();
+    expect(description.queryByText(CREATED_MANUALLY)).not.toBeInTheDocument();
+    expect(description.queryByRole("img")).not.toBeInTheDocument();
+    expect(description.queryByTestId("split-run-source-ticket")).not.toBeInTheDocument();
+  });
+
   it("labels an automatic start without a person avatar", () => {
     renderConsole(splitRunFixtureForWorkOrder({ ...OPEN_WORK_ORDER, startedBy: undefined, autoStarted: true }));
     const summary = within(screen.getByTestId("redesign-console-summary"));

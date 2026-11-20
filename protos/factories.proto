@@ -2623,6 +2623,7 @@ message AutomationRef {
   string node_name = 2;
   string app_id = 3;
   string app_name = 4;
+  string template_id = 5;
 }
 
 message ListWorkOrderArtifactsRequest {

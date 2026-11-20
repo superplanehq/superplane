@@ -12,8 +12,10 @@ import (
 	runner "github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
+	factoryactions "github.com/superplanehq/superplane/pkg/grpc/actions/factories"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
+	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
 )
@@ -88,15 +90,76 @@ func TestScheduleAutomationCreatesATaskWithoutAnExistingTask(t *testing.T) {
 		},
 	})
 	require.NoError(t, db.Save(node).Error)
+	var version models.CanvasVersion
+	require.NoError(t, db.Where("id = ?", run.VersionID).First(&version).Error)
+	version.Nodes = append(version.Nodes, models.Node{ID: "agent", Metadata: node.Metadata.Data()})
+	require.NoError(t, db.Save(&version).Error)
 
 	token := runnerTokenFrom(runner.AttachRunnerEnv(ctx, nil, 60))
 	require.NotEmpty(t, token)
 	assert.Equal(t, []string{"list_tasks", "create_task"}, listRunnerTools(t, server, token))
+	recordUsage := func(key string) {
+		require.NoError(t, models.RecordUsage(db, models.WorkspaceUsageEventInput{
+			CanvasRunID: run.ID, NodeExecutionID: execution.ID, NodeID: "agent",
+			Provider: models.UsageProviderAnthropic, Model: "claude-sonnet-4-6", InputTokens: 10,
+			IdempotencyKey: key,
+		}))
+	}
+	recordUsage("before")
 	rec := runnerRequest(t, server, http.MethodPost, token, "/api/v1/runner/tasks", `{"title":"Fix the lint","description":"Clean the reported errors."}`)
 	require.Equal(t, http.StatusCreated, rec.Code, rec.Body.String())
 	created := decodeRunnerTask(t, rec.Body.Bytes())
 	assert.Equal(t, "Fix the lint", created.Title)
 	assert.Equal(t, "draft", created.State)
+	order, err := factory.FindWorkOrder(db, uuid.MustParse(created.ID))
+	require.NoError(t, err)
+	assert.Equal(t, &run.ID, order.SourceRunID)
+	assert.Nil(t, order.CreatedByID)
+	assignees, err := order.ListAssignees(db)
+	require.NoError(t, err)
+	assert.Empty(t, assignees)
+	detail, err := factoryactions.DescribeWorkOrder(t.Context(), r.Organization.ID.String(), &pb.DescribeWorkOrderRequest{
+		FactoryId: factory.ID.String(), OrderId: created.ID,
+	})
+	require.NoError(t, err)
+	automation := detail.GetOrder().GetCreatedBy().GetAutomation()
+	require.NotNil(t, automation)
+	assert.Equal(t, canvas.ID.String(), automation.GetAppId())
+	assert.Equal(t, canvas.Name, automation.GetAppName())
+	assert.Equal(t, "Run automation", automation.GetNodeName())
+	assert.Equal(t, models.FactoryAppTemplateCustomAutomationID, automation.GetTemplateId())
+	labels, err := models.ResolveCanvasRunTasks(db, canvas, []models.CanvasRun{*run})
+	require.NoError(t, err)
+	assert.Equal(t, order.ID, labels[run.ID].ID)
+	recordUsage("first-task")
+
+	rec = runnerRequest(t, server, http.MethodPost, token, "/api/v1/runner/tasks", `{"title":"Fix the build"}`)
+	require.Equal(t, http.StatusCreated, rec.Code, rec.Body.String())
+	second := decodeRunnerTask(t, rec.Body.Bytes())
+	secondOrder, err := factory.FindWorkOrder(db, uuid.MustParse(second.ID))
+	require.NoError(t, err)
+	assert.Equal(t, &run.ID, secondOrder.SourceRunID)
+	detail, err = factoryactions.DescribeWorkOrder(t.Context(), r.Organization.ID.String(), &pb.DescribeWorkOrderRequest{
+		FactoryId: factory.ID.String(), OrderId: second.ID,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, canvas.ID.String(), detail.GetOrder().GetCreatedBy().GetAutomation().GetAppId())
+	labels, err = models.ResolveCanvasRunTasks(db, canvas, []models.CanvasRun{*run})
+	require.NoError(t, err)
+	assert.Empty(t, labels, "a shared creator run must not select one of its tasks")
+	for _, task := range []*models.FactoryWorkOrder{order, secondOrder} {
+		runs, err := task.ListRuns(db)
+		require.NoError(t, err)
+		assert.Empty(t, runs, "neither task receives the shared run")
+	}
+	recordUsage("after")
+	var usage []models.WorkspaceUsageEvent
+	require.NoError(t, db.Where("canvas_run_id = ?", run.ID).Find(&usage).Error)
+	require.Len(t, usage, 3)
+	for _, event := range usage {
+		assert.Equal(t, &factory.ID, event.FactoryID)
+		assert.Nil(t, event.WorkOrderID, "shared intake costs stay at workspace scope")
+	}
 	rec = runnerRequest(t, server, http.MethodPost, token, "/api/v1/runner/task/close", `{}`)
 	assert.Equal(t, http.StatusForbidden, rec.Code)
 }

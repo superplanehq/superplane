@@ -82,7 +82,7 @@ describe("WorkOrderCard source icon", () => {
   it("shows a Sentry icon without a link when only automation is present", () => {
     renderCard({
       ...baseOrder,
-      createdBy: { automation: { appId: "sentry-intake", appName: "Sentry" } },
+      createdBy: { automation: { appId: "sentry-intake", appName: "Sentry", templateId: "intake:sentry-exceptions" } },
     });
 
     const icon = screen.getByTestId("work-order-card-source-wo-1");
@@ -122,7 +122,7 @@ describe("WorkOrderCard source icon", () => {
   it("shows the Datadog icon when only the Datadog automation is present", () => {
     renderCard({
       ...baseOrder,
-      createdBy: { automation: { appId: "datadog-intake", appName: "Datadog" } },
+      createdBy: { automation: { appId: "datadog-intake", appName: "Datadog", templateId: "intake:datadog" } },
     });
 
     const icon = screen.getByTestId("work-order-card-source-wo-1");
