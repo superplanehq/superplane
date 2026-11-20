@@ -58,7 +58,11 @@ function useSavedAgentSelectionChange(
   const connectedIntegrationsRef = useRef(connectedIntegrations);
   connectedIntegrationsRef.current = connectedIntegrations;
   const savedAgentIntegrationIdRef = useRef(agentIntegrationId);
-  savedAgentIntegrationIdRef.current = localStorage.getItem(storageKey) ?? agentIntegrationId;
+  const rememberedId = localStorage.getItem(storageKey) ?? undefined;
+  const rememberedIntegrationReady = connectedIntegrations.some(
+    (instance) => instance.metadata?.id === rememberedId && instance.status?.state === "ready",
+  );
+  savedAgentIntegrationIdRef.current = rememberedIntegrationReady ? rememberedId : agentIntegrationId;
   const onSelectionsChange = useCallback(
     (next: IntegrationSelections) => {
       const provider = AGENT_PROVIDER_IDS.find((id) => next[id]?.ready);

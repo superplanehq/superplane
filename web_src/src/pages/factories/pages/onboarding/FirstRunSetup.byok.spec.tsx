@@ -128,6 +128,42 @@ it("finishes with a provider key and model without a hosted default or BYOK flag
   );
 }, 10000);
 
+it.each(["missing", "not-ready"])(
+  "restores the saved provider key when the browser connection is %s",
+  async (state) => {
+    const fixture = factoriesFixtureWithSetupAnswers(SETUP_ANSWERS.agent, {
+      organizationWorkspaceUsage: NO_GRANT_USAGE_REPORT,
+    });
+    fixture.organizationBilling = { billingEnabled: false, productFeatures: { byo_key: false } };
+    fixture.byokConnectedProviders = ["anthropic"];
+    localStorage.setItem(`superplane:onboarding-agent-integration:${PRIMARY_FACTORY_ID}`, "stale-key");
+    render(
+      <FactoriesHarness
+        mode="app"
+        billingEnabled={false}
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/setup?step=agent`}
+        factoriesFixture={fixture}
+        orgIntegrations={[
+          ...CONNECTED_SETUP_INTEGRATIONS,
+          ...(state === "not-ready"
+            ? [
+                {
+                  metadata: { id: "stale-key", name: "stale-key", integrationName: "claude" },
+                  status: { state: "error" as const },
+                },
+              ]
+            : []),
+        ]}
+        pageOverrides={{ onboarding: OnboardingPage }}
+      />,
+    );
+
+    const provider = await screen.findByRole("button", { name: /^Anthropic/ }, { timeout: 8000 });
+    expect(provider.getAttribute("aria-pressed")).toBe("true");
+    await waitFor(() => expect(screen.getByTestId("first-run-finish-setup")).toBeEnabled());
+  },
+);
+
 it("connects a subscription, restores it after navigation, and provisions Codex", async () => {
   const user = userEvent.setup();
   const fixture = factoriesFixtureWithSetupAnswers(SETUP_ANSWERS.issues, {
