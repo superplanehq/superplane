@@ -143,7 +143,6 @@ describe("fixtureForSplitRunPage", () => {
       },
       [],
       null,
-      { lineId: "line-1" },
     );
 
     expect(fixture?.stageColumns?.map((column) => column.id)).toEqual(["backlog", "phase-0", "custom-qa", "done"]);
