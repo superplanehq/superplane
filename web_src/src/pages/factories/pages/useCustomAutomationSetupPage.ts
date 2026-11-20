@@ -42,8 +42,9 @@ export function useCustomAutomationSetupPage(args: {
   const [runsOnTask, setRunsOnTask] = useState(true);
   const [icon, setIcon] = useState(DEFAULT_CUSTOM_AUTOMATION_ICON);
   const agentHarness = args.factory?.onboarding?.agentHarness;
+  const codexSubscription = args.factory?.onboarding?.codexSubscription;
   const [draft, setDraft] = useState<PlanningReviewDraft>(() =>
-    customAutomationDraft({ settings: { agent: workspaceAgentFromOnboarding({ agentHarness }) } }),
+    customAutomationDraft({ settings: { agent: workspaceAgentFromOnboarding({ agentHarness, codexSubscription }) } }),
   );
   const [saveError, setSaveError] = useState("");
   const automation = described.data;
@@ -57,9 +58,11 @@ export function useCustomAutomationSetupPage(args: {
     setTriggers([defaultCustomAutomationTrigger(args.columnKey)]);
     setRunsOnTask(true);
     setIcon(DEFAULT_CUSTOM_AUTOMATION_ICON);
-    setDraft(customAutomationDraft({ settings: { agent: workspaceAgentFromOnboarding({ agentHarness }) } }));
+    setDraft(
+      customAutomationDraft({ settings: { agent: workspaceAgentFromOnboarding({ agentHarness, codexSubscription }) } }),
+    );
     setSaveError("");
-  }, [args.automationId, args.columnKey, agentHarness]);
+  }, [args.automationId, args.columnKey, agentHarness, codexSubscription]);
 
   useEffect(() => {
     if (!automation) {
