@@ -20,10 +20,11 @@ import { showErrorToast } from "@/lib/toast";
 import type { IntegrationSelections } from "@/pages/home/InstallIntegrationsSection";
 import { selectReadyIntegrationInstance, useIntegrationConnectDialog } from "@/pages/home/useIntegrationConnectDialog";
 import { useInstallFactory } from "@/pages/home/useInstallFactory";
-import { createElement, useEffect, useMemo, useState } from "react";
+import { Fragment, createElement, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router";
 
 import { factorySetupPath } from "../../lib/factoryPagePaths";
+import { CodexConnectionSetupDialog } from "../../codex/CodexConnectionSetupDialog";
 import { OnboardingConnectDialogs } from "./CustomProviderConnectDialog";
 import {
   runSave,
@@ -141,6 +142,7 @@ function useSectionSaves(args: {
     return runSave(args.setSaving, () =>
       args.updateOnboarding({
         agentHarness: plan.harness,
+        codexSubscription: plan.credentialsSource === "subscription",
         agentIntegrationId: plan.credentialsSource === "integration" ? integration?.id : "",
       }),
     );
@@ -384,16 +386,21 @@ export function useOnboardingPageModel(args: {
   const { canAct } = usePermissions();
   const bringYourOwnKey = useBYOKAccess(args.organizationId);
   const customProvider = bringYourOwnKey.customProviderAllowed;
-  const [agentCredentialChoice, setAgentCredentialChoice] = useOnboardingModelSource(args.factoryId);
+  const [savedCredentialChoice, setAgentCredentialChoice] = useOnboardingModelSource(args.factoryId);
   const onboarding = args.factory?.onboarding;
+  const savedSource = savedCredentialChoice ?? (onboarding?.codexSubscription ? "subscription" : null);
+  // A stored subscription choice cannot enable subscription setup on hosted installations.
+  const agentCredentialChoice = savedSource === "subscription" && !bringYourOwnKey.noHostedDefault ? null : savedSource;
+  const [subscriptionDialogOpen, setSubscriptionDialogOpen] = useState(false);
   const integrations = useOnboardingIntegrationSelections(args.organizationId, onboarding);
   const { connectedIntegrations, existingIntegrationNames } = useTrimmedIntegrationNames(args.organizationId);
-  const { agent, selectModel, onSelectionsChange } = useOnboardingAgentPageState({
+  const { agent, subscriptionReady, selectModel, onSelectionsChange } = useOnboardingAgentPageState({
     organizationId: args.organizationId,
     factoryId: args.factoryId,
     connected: integrations.connected,
     customProvider,
     agentCredentialChoice,
+    subscriptionOffered: bringYourOwnKey.noHostedDefault,
     setSelections: integrations.setSelections,
     connectedIntegrations,
     agentIntegrationId: onboarding?.agentIntegrationId,
@@ -461,24 +468,41 @@ export function useOnboardingPageModel(args: {
     bringYourOwnKey: bringYourOwnKey.allowed,
     bringYourOwnKeyLoading: !bringYourOwnKey.ready,
     customProvider,
+    subscription: {
+      offered: bringYourOwnKey.noHostedDefault,
+      ready: subscriptionReady,
+      connect: () => setSubscriptionDialogOpen(true),
+    },
     agentCredentialChoice,
     setAgentCredentialChoice,
     agentLoading: agent.hostedModelsLoading,
+    agentProviderId: agent.plan?.providerId,
     agentModelPicker: agent.modelPicker ? { ...agent.modelPicker, onChange: selectModel } : undefined,
     openSection,
     setOpenSection,
     requestConnect,
     ...wiredVcsFields(wired, connectedIntegrations),
     ...branchGate.model,
-    integrationDialogs: createElement(OnboardingConnectDialogs, {
-      connectDialogs: connect.dialogs,
-      customProviderOpen: customProviderDialogOpen,
-      organizationId: args.organizationId,
-      existingNames: existingIntegrationNames,
-      selections: integrations.selections,
-      onSelectionsChange: integrations.setSelections,
-      onCloseCustomProvider: () => setCustomProviderDialogOpen(false),
-    }),
+    integrationDialogs: createElement(
+      Fragment,
+      null,
+      createElement(OnboardingConnectDialogs, {
+        connectDialogs: connect.dialogs,
+        customProviderOpen: customProviderDialogOpen,
+        organizationId: args.organizationId,
+        existingNames: existingIntegrationNames,
+        selections: integrations.selections,
+        onSelectionsChange: integrations.setSelections,
+        onCloseCustomProvider: () => setCustomProviderDialogOpen(false),
+      }),
+      createElement(CodexConnectionSetupDialog, {
+        organizationId: args.organizationId,
+        factoryId: args.factoryId,
+        open: bringYourOwnKey.noHostedDefault && subscriptionDialogOpen,
+        onOpenChange: setSubscriptionDialogOpen,
+        onConnected: () => setSubscriptionDialogOpen(false),
+      }),
+    ),
     canConfigureWorkspace: canConfigureWorkspace(canAct),
     saving: saving || wired.installer.isInstalling || wired.createIntake.isPending,
     ...wired.saves,
