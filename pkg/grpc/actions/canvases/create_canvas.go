@@ -35,7 +35,7 @@ func CreateCanvas(
 	nodes []models.Node,
 	edges []models.Edge,
 ) (*pb.CreateCanvasResponse, error) {
-	return createCanvas(ctx, nil, registry, encryptor, authService, webhookBaseURL, organizationID, name, description, factoryID, nodes, edges)
+	return createCanvas(ctx, nil, uuid.New(), registry, encryptor, authService, webhookBaseURL, organizationID, name, description, factoryID, nodes, edges)
 }
 
 func CreateCanvasInTransaction(
@@ -52,12 +52,31 @@ func CreateCanvasInTransaction(
 	nodes []models.Node,
 	edges []models.Edge,
 ) (*pb.CreateCanvasResponse, error) {
-	return createCanvas(ctx, tx, registry, encryptor, authService, webhookBaseURL, organizationID, name, description, factoryID, nodes, edges)
+	return createCanvas(ctx, tx, uuid.New(), registry, encryptor, authService, webhookBaseURL, organizationID, name, description, factoryID, nodes, edges)
+}
+
+func CreateCanvasWithIDInTransaction(
+	ctx context.Context,
+	tx *gorm.DB,
+	canvasID uuid.UUID,
+	registry *registry.Registry,
+	encryptor crypto.Encryptor,
+	authService authorization.Authorization,
+	webhookBaseURL string,
+	organizationID uuid.UUID,
+	name string,
+	description string,
+	factoryID *uuid.UUID,
+	nodes []models.Node,
+	edges []models.Edge,
+) (*pb.CreateCanvasResponse, error) {
+	return createCanvas(ctx, tx, canvasID, registry, encryptor, authService, webhookBaseURL, organizationID, name, description, factoryID, nodes, edges)
 }
 
 func createCanvas(
 	ctx context.Context,
 	tx *gorm.DB,
+	canvasID uuid.UUID,
 	registry *registry.Registry,
 	encryptor crypto.Encryptor,
 	authService authorization.Authorization,
@@ -84,7 +103,6 @@ func createCanvas(
 		return nil, grpcerrors.Unauthenticated(err, "user not authenticated")
 	}
 
-	canvasID := uuid.New()
 	versionID := uuid.New()
 
 	now := time.Now()
