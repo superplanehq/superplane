@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/test/support/contexts"
@@ -236,4 +238,25 @@ func TestClaude_ListResources(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestClaudeModelResourcesPreserveEffortMetadata(t *testing.T) {
+	httpCtx := &contexts.HTTPContext{Responses: []*http.Response{{
+		StatusCode: http.StatusOK,
+		Body: io.NopCloser(bytes.NewBufferString(`{"data":[
+			{"id":"claude-sonnet-5-5","capabilities":{"effort":{"supported":true,"high":{"supported":true}}}},
+			{"id":"claude-no-effort","capabilities":{"effort":{"supported":false}}},
+			{"id":"legacy-model"}
+		]}`)),
+	}}}
+	resources, err := (&Claude{}).ListResources("model", core.ListResourcesContext{
+		HTTP:        httpCtx,
+		Integration: &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "test-key"}},
+	})
+	require.NoError(t, err)
+	require.Len(t, resources, 3)
+	assert.Equal(t, []string{"high"}, resources[0].ThinkingLevels)
+	assert.NotNil(t, resources[1].ThinkingLevels)
+	assert.Empty(t, resources[1].ThinkingLevels)
+	assert.Nil(t, resources[2].ThinkingLevels)
 }
