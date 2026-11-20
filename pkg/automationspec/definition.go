@@ -22,6 +22,7 @@ type Definition struct {
 	Name           string    `yaml:"name" json:"name"`
 	Icon           string    `yaml:"icon,omitempty" json:"icon"`
 	TimeoutSeconds int       `yaml:"timeout_seconds,omitempty" json:"timeout_seconds"`
+	RunsOnTask     *bool     `yaml:"runs_on_task,omitempty" json:"runs_on_task,omitempty"`
 	Agent          *Agent    `yaml:"agent,omitempty" json:"agent,omitempty"`
 	Triggers       []Trigger `yaml:"triggers" json:"triggers"`
 	Steps          []Step    `yaml:"steps" json:"steps"`

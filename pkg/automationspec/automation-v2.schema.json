@@ -21,6 +21,7 @@
       ]
     },
     "timeout_seconds": { "type": "integer", "minimum": 1, "maximum": 86400, "default": 3600 },
+    "runs_on_task": { "type": "boolean" },
     "agent": { "$ref": "#/$defs/agent" },
     "triggers": {
       "type": "array",

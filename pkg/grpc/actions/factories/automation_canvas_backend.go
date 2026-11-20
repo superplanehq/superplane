@@ -290,6 +290,9 @@ func automationCanvasSettings(stage string, source *automationspec.Document, age
 	if err != nil {
 		return nil, source.Diagnostic("triggers", "Check the trigger types and schedule settings.")
 	}
+	if err := validateCustomAutomationRunContext(source.RunsOnTask, triggers); err != nil {
+		return nil, source.Diagnostic("runs_on_task", grpcerrors.StatusMessage(err))
+	}
 	for i := range triggers {
 		if triggers[i].Schedule == nil {
 			continue
@@ -314,5 +317,6 @@ func automationCanvasSettings(stage string, source *automationspec.Document, age
 	return &customAutomationSettings{
 		ColumnKey: stage, StartMode: startMode, Agent: agent, Steps: steps, Icon: source.Icon,
 		ExecutionTimeoutSeconds: source.TimeoutSeconds, Schedule: schedule, Triggers: triggers,
+		RunsOnTask: source.RunsOnTask,
 	}, nil
 }

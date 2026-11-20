@@ -208,11 +208,13 @@ func TestCanvasAutomationLegacyImportProtectsGraphBehavior(t *testing.T) {
 	_, err := models.UpsertOrganizationBYOKModelAllowlist(db, r.Organization.ID, models.UsageProviderAnthropic, datatypes.JSONSlice[string]{"claude-sonnet-4-6"})
 	require.NoError(t, err)
 	ctx, deps := onboardingContext(r), onboardingDeps(r)
+	runsOnTask := false
 	created, err := CreateFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &pb.CreateFactoryCustomAutomationRequest{
 		FactoryId: factory.ID.String(), ColumnKey: models.CanvasColumnKeyBacklog, Name: "Inspect task",
 		Settings: &pb.FactoryCustomAutomation_Settings{
-			StartMode: pb.FactoryCustomAutomation_START_MODE_MANUAL,
-			Agent:     &pb.FactoryAppTemplateAgent{Component: "runnerClaudeCode", Model: "claude-sonnet-4-6"},
+			StartMode:  pb.FactoryCustomAutomation_START_MODE_MANUAL,
+			RunsOnTask: &runsOnTask,
+			Agent:      &pb.FactoryAppTemplateAgent{Component: "runnerClaudeCode", Model: "claude-sonnet-4-6"},
 			Steps: []*pb.FactoryCustomAutomation_Step{
 				{Name: "Inspect", Type: pb.FactoryCustomAutomation_Step_TYPE_PROMPT, Prompt: "  Inspect the task.\n"},
 			},
@@ -227,6 +229,8 @@ func TestCanvasAutomationLegacyImportProtectsGraphBehavior(t *testing.T) {
 	require.NoError(t, err)
 	doc, err := automationspec.Parse(source)
 	require.NoError(t, err)
+	require.NotNil(t, doc.RunsOnTask)
+	require.False(t, *doc.RunsOnTask)
 	require.Equal(t, "  Inspect the task.\n", doc.Steps[0].Prompt)
 	version, err := models.FindLiveCanvasVersionInTransaction(db, id)
 	require.NoError(t, err)
@@ -243,6 +247,11 @@ func TestCanvasAutomationLegacyImportProtectsGraphBehavior(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, id, adopted.ID)
 	require.Equal(t, int64(1), adopted.Revision)
+	started, err := RunFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &pb.RunFactoryCustomAutomationRequest{
+		FactoryId: factory.ID.String(), AutomationId: id.String(),
+	})
+	require.NoError(t, err)
+	require.NotEmpty(t, started.GetRunId())
 	require.NoError(t, models.DisableExperimentalFeature(r.Organization.ID, features.FeatureAutomationsAsCode))
 	settings := created.GetCustomAutomation().GetSettings()
 	settings.Steps[0].Prompt = "Inspect the new task.\n"

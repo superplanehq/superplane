@@ -39,6 +39,7 @@ export type AutomationDefinition = {
   name: string;
   icon?: string;
   timeout_seconds?: number;
+  runs_on_task?: boolean;
   agent?: AutomationAgent;
   triggers: AutomationTrigger[];
   steps: AutomationStep[];
@@ -82,6 +83,7 @@ export function parseAutomationForCanvas(source: string, stage: CustomAutomation
     "name",
     "icon",
     "timeout_seconds",
+    "runs_on_task",
     "agent",
     "triggers",
     "steps",
@@ -104,12 +106,24 @@ export function parseAutomationForCanvas(source: string, stage: CustomAutomation
     parseTrigger(trigger, `triggers[${index}]`, stage),
   );
   validateTriggerIdentities(triggers);
+  const runsOnTask = document.runs_on_task;
+  if (runsOnTask !== undefined && typeof runsOnTask !== "boolean") problem("runs_on_task", "Use true or false.");
+  if (runsOnTask === true && triggers.some(({ use }) => use === "schedule")) {
+    problem("runs_on_task", "A schedule runs with no task.");
+  }
+  if (
+    runsOnTask === false &&
+    triggers.some(({ use }) => use === "task_enters_stage" || use === "pull_request_updated")
+  ) {
+    problem("runs_on_task", "This trigger runs on a task.");
+  }
   return {
     apiVersion: "v2",
     kind: "Automation",
     name,
     icon,
     timeout_seconds: timeout,
+    runs_on_task: runsOnTask,
     agent: document.agent === undefined ? undefined : parseAgent(document.agent),
     triggers,
     steps: nonemptyList(document.steps, "steps").map(parseStep),
@@ -282,6 +296,7 @@ export function automationDefinitionCanvas(definition: AutomationDefinition, wor
   return {
     name: definition.name,
     icon: definition.icon ?? DEFAULT_CUSTOM_AUTOMATION_ICON,
+    runsOnTask: definition.runs_on_task,
     triggers: definition.triggers.map(canvasTrigger),
     draft,
   };

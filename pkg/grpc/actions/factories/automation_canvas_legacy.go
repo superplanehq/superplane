@@ -107,6 +107,7 @@ func importAutomationCanvas(tx *gorm.DB, factory *models.Factory, canvas *models
 	settings := saved.GetSettings()
 	definition := automationspec.Definition{
 		Name: canvas.Name, Icon: settings.GetIcon(), TimeoutSeconds: int(settings.GetExecutionTimeoutSeconds()),
+		RunsOnTask: settings.RunsOnTask,
 	}
 	definition.Triggers, err = legacyAutomationTriggers(*canvas.ColumnKey, version.Nodes)
 	if err != nil {

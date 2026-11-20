@@ -321,6 +321,21 @@ steps:
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 
+  it("saves the column run setting from Canvas in the YAML definition", async () => {
+    const fetch = vi.spyOn(globalThis, "fetch").mockImplementation(async () => Response.json(savedAutomation));
+    const onClose = renderModal("?customAutomation=custom-1", "custom-1", "backlog", true);
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("tab", { name: "with no task" }));
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+    const saved = JSON.parse(String(fetch.mock.calls.at(-1)?.[1]?.body)).yaml;
+    expect(saved).toContain("runs_on_task: false");
+    expect(saved).toContain("use: manual");
+    expect(saved).not.toContain("use: task_enters_stage");
+  });
+
   it("retains a rejected draft and shows the server diagnostic", async () => {
     const fetch = vi
       .spyOn(globalThis, "fetch")

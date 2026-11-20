@@ -20,6 +20,7 @@ Use the same schema for editor completion.
 | `name` | Required. Enter a nonblank display name. |
 | `icon` | Optional. Use a key from the automation icon picker. The default is `sparkles`. |
 | `timeout_seconds` | Optional. Enter an integer from `1` through `86400`. The default is `3600`. The timeout covers setup and all steps. |
+| `runs_on_task` | Optional. Use `true` for task runs or `false` for column and schedule runs. Omit this field to use the context of each trigger. |
 | `agent` | Optional. The factory agent applies if you omit this field. |
 | `triggers` | Required. Enter one or more triggers. Any trigger can start the automation. |
 | `steps` | Required. Enter one or more steps in execution order. All triggers use these steps. |
@@ -42,6 +43,10 @@ Use each event trigger once. To give a trigger a public identifier, set its
 optional `id` to a unique, nonblank string. Give each schedule an ID when the
 automation contains multiple schedules. Keep a schedule's ID to preserve its
 identity when you reorder triggers.
+
+Schedules require a run with no task. Stage-entry and pull request triggers
+require a task. With `runs_on_task: false`, `manual` starts from the column.
+With `runs_on_task: true` or an omitted field, `manual` starts from a task.
 
 Use `config` on schedule triggers. Set `config.cron` to a string of five cron
 fields, or six with seconds first. Set the optional `config.utc_offset` to a

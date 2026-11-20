@@ -4,7 +4,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { useId } from "react";
 import type { useCustomAutomationSourceDraft } from "@/hooks/useCustomAutomationSourceDraft";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
-import { workspaceAgentFromOnboarding, type CustomAutomationColumn } from "../lib/customAutomation";
+import {
+  customAutomationTriggersForRun,
+  newCustomAutomationTrigger,
+  workspaceAgentFromOnboarding,
+  type CustomAutomationColumn,
+} from "../lib/customAutomation";
 import {
   automationDefinitionCanvas,
   automationDefinitionSteps,
@@ -69,6 +74,16 @@ export function CustomAutomationSourceEditor({
             onTriggersChange={(triggers) =>
               model.editCanvas({ triggers: automationDefinitionTriggers(triggers, stage) })
             }
+            onRunsOnTaskChange={(runsOnTask) => {
+              const compatible = customAutomationTriggersForRun(visual.triggers, runsOnTask);
+              model.editCanvas({
+                runs_on_task: runsOnTask,
+                triggers: automationDefinitionTriggers(
+                  compatible.length > 0 ? compatible : [newCustomAutomationTrigger()],
+                  stage,
+                ),
+              });
+            }}
             onDraftChange={(next) =>
               model.editCanvas(
                 settingsEdit(definition, visual.draft, next, automationHarnessForComponent(workspaceComponent)),

@@ -37,6 +37,7 @@ function Editor({ columnKey }: { columnKey?: "backlog" | "verify" }) {
       name={model.name}
       icon={model.icon}
       triggers={model.triggers}
+      runsOnTask={model.runsOnTask}
       columnKey={columnKey}
       draft={model.draft}
       organizationId="org"
@@ -48,6 +49,7 @@ function Editor({ columnKey }: { columnKey?: "backlog" | "verify" }) {
       onNameChange={model.setName}
       onIconChange={model.setIcon}
       onTriggersChange={model.setTriggers}
+      onRunsOnTaskChange={(runsOnTask) => model.setRunsOnTask(runsOnTask ?? true)}
       onDraftChange={model.setDraft}
       onSave={() => void model.save()}
       onClose={() => {}}
@@ -60,6 +62,7 @@ it("selects Schedule, recovers from a save error, and reopens the saved schedule
   saveAutomation.mockRejectedValueOnce(new Error("Schedule has no future run."));
   saveAutomation.mockResolvedValueOnce({});
   const view = render(<Editor />);
+  await user.click(screen.getByRole("tab", { name: "with no task" }));
   await user.click(screen.getByRole("button", { name: "Add trigger" }));
   await user.click(screen.getByRole("menuitem", { name: /Schedule/ }));
   await user.click(screen.getByRole("button", { name: "Remove Manual" }));
@@ -75,6 +78,7 @@ it("selects Schedule, recovers from a save error, and reopens the saved schedule
   await waitFor(() => expect(saveAutomation).toHaveBeenCalledTimes(2));
   const saved = saveAutomation.mock.calls[1]![0];
   expect(saved.settings.schedule).toEqual({ cronExpression: "30 0 9 * * MON-FRI", utcOffset: 5.75 });
+  expect(saved.settings.runsOnTask).toBe(false);
   expect(saved.settings.steps).toEqual(automation.settings!.steps);
   view.unmount();
   automation = { automation: automation.automation, settings: saved.settings };
@@ -105,6 +109,7 @@ it("saves a schedule beside the existing trigger", async () => {
   saveAutomation.mockClear();
   saveAutomation.mockResolvedValueOnce({});
   render(<Editor columnKey="backlog" />);
+  await user.click(screen.getByRole("tab", { name: "with no task" }));
   await user.click(screen.getByRole("button", { name: "Add trigger" }));
   await user.click(screen.getByRole("menuitem", { name: /Schedule/ }));
   expect(screen.queryByRole("combobox", { name: /Trigger/ })).not.toBeInTheDocument();
@@ -120,15 +125,37 @@ it("saves a schedule beside the existing trigger", async () => {
     },
   ]);
   expect(saved.settings.steps).toEqual(automation.settings!.steps);
+  expect(saved.settings.runsOnTask).toBe(false);
+});
+
+it("previews Runs on a task above the trigger list without saving the switch", async () => {
+  const user = userEvent.setup();
+  saveAutomation.mockClear();
+  saveAutomation.mockResolvedValueOnce({});
+  render(<Editor columnKey="backlog" />);
+  expect(screen.getByRole("tab", { name: "on a task" })).toHaveAttribute("aria-selected", "true");
+  await user.click(screen.getByRole("button", { name: "Add trigger" }));
+  expect(screen.getByRole("menuitem", { name: /When a task enters Backlog/ })).toBeInTheDocument();
+  expect(screen.queryByRole("menuitem", { name: /Schedule/ })).not.toBeInTheDocument();
+  await user.keyboard("{Escape}");
+  await user.click(screen.getByRole("tab", { name: "with no task" }));
+  await user.click(screen.getByRole("button", { name: "Add trigger" }));
+  expect(screen.getByRole("menuitem", { name: /Schedule/ })).toBeInTheDocument();
+  expect(screen.queryByRole("menuitem", { name: /When a task enters Backlog/ })).not.toBeInTheDocument();
+  await user.keyboard("{Escape}");
+  await user.click(screen.getByRole("button", { name: "Save" }));
+  await waitFor(() => expect(saveAutomation).toHaveBeenCalled());
+  expect(saveAutomation.mock.calls.at(-1)![0].settings.runsOnTask).toBe(false);
 });
 
 it("offers Schedule for a Backlog automation", async () => {
   const user = userEvent.setup();
   render(<Editor columnKey="backlog" />);
   expect(screen.queryByLabelText("Cron expression")).not.toBeInTheDocument();
+  await user.click(screen.getByRole("tab", { name: "with no task" }));
   await user.click(screen.getByRole("button", { name: "Add trigger" }));
   await user.click(screen.getByRole("menuitem", { name: /Schedule/ }));
-  expect(screen.getByText("A person starts each run.")).toBeInTheDocument();
+  expect(screen.getByText("A person starts each run from the column.")).toBeInTheDocument();
   expect(screen.getByLabelText("Cron expression")).toBeInTheDocument();
   expect(screen.queryByRole("link", { name: "Build a cron expression" })).not.toBeInTheDocument();
   expect(screen.getByRole("combobox", { name: "Timezone" })).toBeInTheDocument();
