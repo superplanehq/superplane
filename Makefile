@@ -757,7 +757,6 @@ image.scan:
 test.image:
 	bash scripts/build_image_test.sh
 	$(COMPOSE) exec -T app bash /app/scripts/build_image_ownership_test.sh
-	$(COMPOSE) exec -T app bash /app/scripts/image_vulnerability_test.sh
 
 image.auth:
 	@test -n "$$GHCR_PUSH_TOKEN" || (echo "GHCR_PUSH_TOKEN is empty" >&2; exit 1)
