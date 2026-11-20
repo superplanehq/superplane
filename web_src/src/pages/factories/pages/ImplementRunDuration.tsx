@@ -31,11 +31,7 @@ export function ImplementRunDuration({
 
   return (
     <div className="flex flex-col gap-2">
-      <ImplementSettingRow
-        label="Maximum run duration"
-        description="Includes setup. Runs stop when the limit is reached."
-        htmlFor={id}
-      >
+      <ImplementSettingRow label="Maximum run duration" description="Runs stop when the limit is reached." htmlFor={id}>
         <Input
           id={id}
           name="implementationRunDuration"

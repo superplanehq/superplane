@@ -8,7 +8,7 @@ export function ImplementSettingRow({
   children,
 }: {
   label: string;
-  description: string;
+  description?: string;
   htmlFor?: string;
   children: ReactNode;
 }) {
@@ -22,9 +22,11 @@ export function ImplementSettingRow({
         ) : (
           <p className="text-base font-medium sm:text-sm">{label}</p>
         )}
-        <p id={htmlFor ? `${htmlFor}-help` : undefined} className="text-xs text-muted-foreground">
-          {description}
-        </p>
+        {description ? (
+          <p id={htmlFor ? `${htmlFor}-help` : undefined} className="text-xs text-muted-foreground">
+            {description}
+          </p>
+        ) : null}
       </div>
       <div className="flex min-h-8 w-full shrink-0 items-center gap-2 sm:w-64 sm:justify-end">{children}</div>
     </div>

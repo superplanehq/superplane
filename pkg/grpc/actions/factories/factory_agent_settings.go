@@ -20,7 +20,7 @@ var factoryAgentSettingFields = []string{
 	"model", "thinkingLevel", "hostedProvider", "credentials", "llmProvider",
 	"machineType", "executionTimeoutSeconds", "workingDirectory", "maxTurns",
 	"includeVisualEvidence", "disabledAgentResourceIds", "disabledAgentResourceTools",
-	"enabledAgentResourceTools", "skipSetupCommands", "environmentFrom",
+	"enabledAgentResourceTools", "skipSetupCommands", "skipRepositoryCheckout", "environmentFrom",
 	"additionalInstructions",
 	"fallbackReviewer", "publishPRCheck", "prCheckActivationGeneration",
 	"publishReviewFindings", "reviewFindingsBody", "reviewFindingsComment",
