@@ -164,13 +164,28 @@ func startColumnLeaveAfterDispatch(db *gorm.DB, result *workOrderLineDispatchRes
 		}
 		return
 	}
-	token := ""
-	if dispatch, findErr := result.order.FindActiveLineDispatch(db); findErr == nil {
-		token = dispatch.ID.String()
-	}
-	if err := StartColumnLeaveCustomAutomations(db, result.factory, result.order, result.leftColumn, token); err != nil && result.logger != nil {
+	if err := StartColumnLeaveCustomAutomations(db, result.factory, result.order, result.leftColumn, departureAttemptToken(result)); err != nil && result.logger != nil {
 		result.logger.WithError(err).Warnf("Failed to start %s leave automation for order %s", result.leftColumn, result.order.ID)
 	}
+}
+
+func departureAttemptToken(result *workOrderLineDispatchResult) string {
+	if result == nil {
+		return ""
+	}
+	for i := len(result.startedSteps) - 1; i >= 0; i-- {
+		step := result.startedSteps[i]
+		if step == nil {
+			continue
+		}
+		if step.Execution != nil {
+			return step.Execution.ID.String()
+		}
+		if step.QueueItem != nil {
+			return step.QueueItem.ID.String()
+		}
+	}
+	return ""
 }
 
 func startImplementColumnAutomations(db *gorm.DB, logger *log.Entry, factory *models.Factory, order *models.FactoryWorkOrder, startIndex int) {

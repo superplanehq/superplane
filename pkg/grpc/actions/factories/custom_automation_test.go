@@ -1259,9 +1259,18 @@ func TestColumnLeaveAutomationStartsWhenTheTaskLeavesBacklog(t *testing.T) {
 
 	reloaded, err := factory.FindWorkOrder(db, order.ID)
 	require.NoError(t, err)
-	dispatch, err := reloaded.FindActiveLineDispatch(db)
+	grouped, err := models.ListWorkOrderLineDispatchesByWorkOrderIDs(db, []uuid.UUID{reloaded.ID})
 	require.NoError(t, err)
-	require.NoError(t, StartColumnLeaveCustomAutomations(db, factory, reloaded, models.CanvasColumnKeyBacklog, dispatch.ID.String()))
+	records := grouped[reloaded.ID]
+	require.NotEmpty(t, records)
+	require.NotEmpty(t, records[len(records)-1].Executions)
+	attempt := records[len(records)-1].Executions[0].ID.String()
+	require.NotNil(t, events[0].DedupKey)
+	assert.Contains(t, *events[0].DedupKey, attempt)
+	require.NoError(t, StartColumnLeaveCustomAutomations(db, factory, reloaded, models.CanvasColumnKeyBacklog, attempt))
 	require.NoError(t, db.Where("workflow_id = ?", canvasID).Find(&events).Error)
 	require.Len(t, events, 1)
+	require.NoError(t, StartColumnLeaveCustomAutomations(db, factory, reloaded, models.CanvasColumnKeyBacklog, uuid.NewString()))
+	require.NoError(t, db.Where("workflow_id = ?", canvasID).Find(&events).Error)
+	require.Len(t, events, 2)
 }
