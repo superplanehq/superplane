@@ -46,6 +46,9 @@ func automationAgentSettings(spec *automationspec.Agent) *pb.FactoryAppTemplateA
 		return nil
 	}
 	agent := &pb.FactoryAppTemplateAgent{Component: automationHarnesses[spec.Harness], Model: spec.Model}
+	if spec.Harness == automationspec.SuperPlane {
+		agent.Model = automationCanvasHostedModel(spec.Model)
+	}
 	if spec.Credentials != nil {
 		agent.CredentialSource = string(spec.Credentials.Source)
 		agent.CredentialIntegrationName = spec.Credentials.Name
@@ -122,6 +125,9 @@ func resolveAutomationAgent(tx *gorm.DB, factory *models.Factory, source *automa
 		}
 		return agent, err
 	}
+	if agent.Component == models.SuperPlaneRunnerComponent {
+		model = automationCanvasHostedModel(model)
+	}
 	if funding := agent.Credentials["source"]; funding == runner.CredentialsSourceIntegration || funding == runner.CredentialsSourceSecret {
 		// Let the execution policy select a permitted BYOK default when YAML omits a model.
 		config := map[string]any{"credentials": agent.credentials(), "model": model}
@@ -150,6 +156,16 @@ func resolveAutomationAgent(tx *gorm.DB, factory *models.Factory, source *automa
 	return agent, nil
 }
 
+// YAML names the provider and its native model ID. The canvas uses a catalog key.
+func automationCanvasHostedModel(model string) string {
+	provider, id, _ := strings.Cut(model, "::")
+	hosted, err := models.NormalizeDefaultHostedLLMModel(provider, id)
+	if err != nil || !hosted.IsSet() {
+		return model
+	}
+	return models.FormatSelectableLLMModelKey(models.UsageFundingSourceHosted, hosted.Provider, hosted.Model)
+}
+
 func automationAgentDefinition(agent *intakeAgent) (*automationspec.Agent, error) {
 	if agent == nil {
 		return nil, unrepresentableAutomationCanvas()
@@ -159,6 +175,11 @@ func automationAgentDefinition(agent *intakeAgent) (*automationspec.Agent, error
 			continue
 		}
 		result := &automationspec.Agent{Harness: harness, Model: agent.Model}
+		if harness == automationspec.SuperPlane && agent.Model != "" {
+			if hosted, err := models.ParseHostedLLMModelKey(agent.Model); err == nil && hosted.IsSet() {
+				result.Model = models.FormatHostedLLMModelKey(hosted.Provider, hosted.Model)
+			}
+		}
 		source := configString(agent.Credentials, "source")
 		switch source {
 		case "":

@@ -106,10 +106,10 @@ func TestAutomationAPIPublishesInTheSelectedStage(t *testing.T) {
 	}
 	support.AssignOpenSystemTrial(t, orgID)
 	provider, model := models.UsageProviderAnthropic, "claude-sonnet-4-6"
-	pinnedModel := models.FormatSelectableLLMModelKey(models.UsageFundingSourceHosted, provider, "claude-opus-5-5")
+	const pinnedModel = "claude-opus-5-5::revision"
 	_, err := models.UpsertHostedLLMProvider(db, models.HostedLLMProvider{
 		Provider: provider, Enabled: true, APIKey: []byte("test-hosted-key"),
-		AllowedModels: datatypes.JSONSlice[string]{model, "claude-opus-5-5"},
+		AllowedModels: datatypes.JSONSlice[string]{model, pinnedModel},
 	})
 	require.NoError(t, err)
 	previous, err := models.GetInstallationLLMSettings(db)
@@ -187,7 +187,11 @@ steps:
 	require.JSONEq(t, created.Body.String(), call(http.MethodGet, path, nil, http.StatusOK).Body.String())
 
 	source = strings.Replace(source, "echo first", "echo second", 1)
-	source = strings.Replace(source, "harness: superplane", "model: "+pinnedModel, 1)
+	hostedKey := models.FormatSelectableLLMModelKey(models.UsageFundingSourceHosted, provider, pinnedModel)
+	legacy := *input
+	legacy.YAML = strings.Replace(source, "harness: superplane", "model: "+hostedKey, 1)
+	call(http.MethodPost, collection+":validate", &legacy, http.StatusOK)
+	source = strings.Replace(source, "harness: superplane", "model: "+models.FormatHostedLLMModelKey(provider, pinnedModel), 1)
 	updated := call(http.MethodPut, path, &automationWriteRequest{YAML: source}, http.StatusOK)
 	var second automations.Automation
 	require.NoError(t, json.Unmarshal(updated.Body.Bytes(), &second))
@@ -204,7 +208,7 @@ steps:
 		}
 		if node.ID == live.Edges[0].TargetID {
 			require.Equal(t, models.SuperPlaneRunnerComponent, node.ComponentName())
-			require.Equal(t, pinnedModel, node.Configuration["model"])
+			require.Equal(t, hostedKey, node.Configuration["model"])
 			require.NotContains(t, node.Configuration, "credentials")
 			steps, err := json.Marshal(node.Configuration["steps"])
 			require.NoError(t, err)

@@ -13,6 +13,7 @@ import {
 } from "../lib/customAutomation";
 import {
   automationDefinitionCanvas,
+  automationDefinitionModel,
   automationDefinitionSteps,
   automationDefinitionTriggers,
   type AutomationDefinition,
@@ -135,7 +136,7 @@ function settingsEdit(
     patch.skip_repository_checkout = after.skipRepositoryCheckout === true;
   }
   if (after.model !== before.model) {
-    const model = typeof after.model === "string" && after.model ? after.model : undefined;
+    const model = automationDefinitionModel(next.components[0]?.component, after.model);
     patch.agent = model || agent?.harness ? { ...agent, model } : undefined;
   }
   return patch;

@@ -294,8 +294,14 @@ func executionNode(node models.Node) models.Node {
 	node.ErrorMessage = nil
 	node.WarningMessage = nil
 
-	// An explicit false uses the same runner behavior as an omitted option.
 	node.Configuration = maps.Clone(node.Configuration)
+	if node.ComponentName() == models.SuperPlaneRunnerComponent {
+		// Compare hosted key spellings using the runner's own parser.
+		if hosted, err := models.ParseHostedLLMModelKey(configString(node.Configuration, "model")); err == nil && hosted.IsSet() {
+			node.Configuration["model"] = models.FormatSelectableLLMModelKey(models.UsageFundingSourceHosted, hosted.Provider, hosted.Model)
+		}
+	}
+	// An explicit false uses the same runner behavior as an omitted option.
 	for _, field := range []string{runner.SkipSetupCommandsField, runner.SkipRepositoryCheckoutField} {
 		if node.Configuration[field] == false {
 			delete(node.Configuration, field)

@@ -144,7 +144,7 @@ func TestCanvasAutomationLegacyImportProtectsGraphBehavior(t *testing.T) {
 					RunsOnTask:             &runsOnTask,
 					SkipRepositoryCheckout: &skip,
 					SkipSetupCommands:      &skip,
-					Agent:                  &pb.FactoryAppTemplateAgent{Component: models.SuperPlaneRunnerComponent},
+					Agent:                  &pb.FactoryAppTemplateAgent{Component: models.SuperPlaneRunnerComponent, Model: "hosted::anthropic::sonnet"},
 					Steps: []*pb.FactoryCustomAutomation_Step{
 						{Name: "Inspect", Type: pb.FactoryCustomAutomation_Step_TYPE_PROMPT, Prompt: prompt, WorkingDirectory: "/tmp"},
 					},
@@ -159,6 +159,7 @@ func TestCanvasAutomationLegacyImportProtectsGraphBehavior(t *testing.T) {
 			require.NoError(t, err)
 			doc, err := automationspec.Parse(source)
 			require.NoError(t, err)
+			require.Equal(t, "anthropic::sonnet", doc.Agent.Model)
 			require.NotNil(t, doc.RunsOnTask)
 			require.Equal(t, tc.runsOnTask, *doc.RunsOnTask)
 			require.Equal(t, tc.use, doc.Triggers[0].Use)

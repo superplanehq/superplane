@@ -123,10 +123,11 @@ function SourceEditor({
 }
 
 it.each([
-  { source: "hosted", agentHarness: "AGENT_HARNESS_SUPERPLANE", model: "hosted::openai::hosted-model" },
-  { source: "subscription", agentHarness: "AGENT_HARNESS_CODEX", model: "subscription-model" },
-] as const)("saves and clears a model from the workspace $source source", async ({ source, agentHarness, model }) => {
-  onboarding = { agentHarness, codexSubscription: source === "subscription" };
+  { source: "hosted", initialModel: "", model: "openai::hosted-model" },
+  { source: "hosted", initialModel: "hosted::openai::hosted-model", model: "openai::hosted-model" },
+  { source: "subscription", initialModel: "", model: "subscription-model" },
+] as const)("saves and clears a $source model from '$initialModel'", async ({ source, initialModel, model }) => {
+  onboarding = source === "hosted" ? { agentHarness: "AGENT_HARNESS_SUPERPLANE" } : { codexSubscription: true };
   const yaml = `apiVersion: v2
 kind: Automation
 name: Review
@@ -134,12 +135,14 @@ triggers: [{use: manual}]
 steps: [{name: Review, prompt: Review the changes.}]
 `;
   const save = vi.fn();
-  const view = render(<SourceEditor source={yaml} save={save} />);
+  const initial = initialModel ? yaml + "agent: {model: '" + initialModel + "'}\n" : yaml;
+  const view = render(<SourceEditor source={initial} save={save} />);
   const user = userEvent.setup();
   const picker = screen.getByTestId("field-model-hosted-model");
   await user.click(picker);
-  expect(screen.getAllByRole("menuitem")).toHaveLength(1);
+  expect(screen.getAllByRole("menuitem")).toHaveLength(initialModel ? 2 : 1);
   await user.click(screen.getByRole("menuitem", { name: source + "-model" }));
+  expect(picker).toHaveAccessibleName(source + "-model");
   await user.click(screen.getByRole("button", { name: "Save" }));
   expect(save).toHaveBeenLastCalledWith({ ...(load(yaml) as object), agent: { model } });
   view.unmount();
