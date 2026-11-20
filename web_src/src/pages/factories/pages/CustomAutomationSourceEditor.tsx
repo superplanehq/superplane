@@ -3,6 +3,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useId } from "react";
 import type { useCustomAutomationSourceDraft } from "@/hooks/useCustomAutomationSourceDraft";
+import { useConnectedIntegrations } from "@/hooks/useIntegrations";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import {
   customAutomationTriggersForRun,
@@ -43,8 +44,12 @@ export function CustomAutomationSourceEditor({
   const { organizationId, factoryId, routeSegment, factory } = useFactoriesLayout();
   const yamlId = useId();
   const definition = model.definition;
+  const agent = definition?.agent;
+  const connections = useConnectedIntegrations(organizationId, {
+    enabled: agent?.harness === "openrouter" && agent.credentials?.source === "integration",
+  });
   const workspaceComponent = workspaceAgentFromOnboarding(factory?.onboarding)?.component;
-  const visual = definition ? automationDefinitionCanvas(definition, workspaceComponent) : undefined;
+  const visual = definition ? automationDefinitionCanvas(definition, workspaceComponent, connections.data) : undefined;
   const form = { saving, deleting, onSave, onDelete, onClose };
   return (
     <Tabs value={model.tab} onValueChange={model.switchTab} activationMode="manual" className="min-h-0 flex-1">

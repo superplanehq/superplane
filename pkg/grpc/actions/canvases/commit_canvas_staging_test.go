@@ -57,7 +57,7 @@ func TestCommitCanvasStagingRejectsPublishedAutomationSource(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, db.Model(canvas).Update("factory_id", factory.ID).Error)
 	require.NoError(t, (&models.AutomationSource{
-		ID: canvas.ID, OrganizationID: canvas.OrganizationID, FactoryID: factory.ID, Stage: "backlog",
+		ID: canvas.ID, OrganizationID: canvas.OrganizationID, FactoryID: factory.ID,
 		Name: canvas.Name, Source: "saved source", Revision: 1, ArtifactID: canvas.ID.String(), ArtifactRevision: version.ID.String(),
 	}).Save(db))
 

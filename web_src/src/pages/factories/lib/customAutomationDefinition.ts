@@ -1,4 +1,5 @@
 import { CORE_SCHEMA, dump, load, YAMLException } from "js-yaml";
+import type { OrganizationsIntegration } from "@/api-client";
 import type { PlanningReviewStep } from "../pages/planningReviewMockup";
 import {
   AUTOMATION_ICONS,
@@ -271,7 +272,11 @@ export function automationHarnessForComponent(component?: string): AutomationHar
   return harnesses.find((harness) => AUTOMATION_AGENTS[harness].component === component);
 }
 
-export function automationDefinitionCanvas(definition: AutomationDefinition, workspaceHarness?: string) {
+export function automationDefinitionCanvas(
+  definition: AutomationDefinition,
+  workspaceHarness?: string,
+  connections: OrganizationsIntegration[] = [],
+) {
   const agent = definition.agent;
   const component = agent ? AUTOMATION_AGENTS[agent.harness].component : workspaceHarness;
   const draft = customAutomationDraft({
@@ -291,6 +296,13 @@ export function automationDefinitionCanvas(definition: AutomationDefinition, wor
   const visualAgent = draft.components[0];
   if (visualAgent) {
     visualAgent.configuration.credentials = agent?.credentials;
+    if (agent?.harness === "openrouter" && agent.credentials?.source === "integration") {
+      const name = agent.credentials.name;
+      const connection = connections.find((connection) => connection.metadata?.name === name);
+      if (connection?.metadata?.integrationName === "customLlm") {
+        visualAgent.configuration.llmProvider = "custom";
+      }
+    }
     if (agent?.credentials?.source === "subscription") visualAgent.component = undefined;
   }
   return {
