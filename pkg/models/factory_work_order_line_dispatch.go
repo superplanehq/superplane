@@ -279,7 +279,7 @@ func (l *FactoryWorkOrderLineDispatch) EnqueueOrStartStep(tx *gorm.DB, order *Fa
 		return nil, err
 	}
 
-	queued, err := countQueuedFactoryStepItems(tx, l.LineID, steps[stepIndex].AppID)
+	queued, err := countQueuedFactoryStepItems(tx, l.LineID, steps[stepIndex].AppID, steps[stepIndex].StageKey)
 	if err != nil {
 		return nil, err
 	}
@@ -288,7 +288,7 @@ func (l *FactoryWorkOrderLineDispatch) EnqueueOrStartStep(tx *gorm.DB, order *Fa
 	}
 
 	step := admissionStep(line, l, stepIndex)
-	active, err := countActiveFactoryStepExecutions(tx, l.LineID, steps[stepIndex].AppID)
+	active, err := countActiveFactoryStepExecutions(tx, l.LineID, steps[stepIndex].AppID, steps[stepIndex].StageKey)
 	if err != nil {
 		return nil, err
 	}
@@ -319,6 +319,7 @@ func (l *FactoryWorkOrderLineDispatch) enqueueStep(tx *gorm.DB, order *FactoryWo
 		LineID:         l.LineID,
 		LineDispatchID: l.ID,
 		AppID:          step.AppID,
+		StageKey:       step.StageKey,
 		StepIndex:      stepIndex,
 		StepName:       canvas.Name,
 		CreatedAt:      time.Now(),
@@ -646,20 +647,23 @@ func (o *FactoryWorkOrder) RetryLineStep(tx *gorm.DB, line *FactoryLine, stepInd
 		return nil, nil, err
 	}
 
-	// Release before reactivate, so every path takes the line admission
-	// lock before the dispatch row and the two cannot deadlock.
-	released, err := target.releaseOpenWorkFrom(tx, stepIndex)
-	if err != nil {
-		return nil, nil, err
+	customStage := target.Steps[stepIndex].StageKind == FactoryLineStageCustom
+	if !customStage {
+		// Release before reactivate, so every path takes the line admission
+		// lock before the dispatch row and the two cannot deadlock.
+		released, err := target.releaseOpenWorkFrom(tx, stepIndex)
+		if err != nil {
+			return nil, nil, err
+		}
+		started = append(started, released...)
 	}
-	started = append(started, released...)
 
 	if err := target.Reactivate(tx); err != nil {
 		return nil, nil, err
 	}
 
 	var result *FactoryLineStepResult
-	if target.Steps[stepIndex].StageKind == FactoryLineStageCustom {
+	if customStage {
 		result, err = target.StartStep(tx, o, stepIndex)
 	} else {
 		result, err = target.EnqueueOrStartStep(tx, o, stepIndex)
@@ -692,7 +696,7 @@ func (l *FactoryWorkOrderLineDispatch) releaseOpenWorkFrom(tx *gorm.DB, stepInde
 
 	var started []*FactoryLineStepResult
 	for index := stepIndex; index < len(l.Steps); index++ {
-		admitted, err := AdmitQueuedForStep(tx, l.LineID, l.Steps[index].AppID)
+		admitted, err := AdmitQueuedForStep(tx, l.LineID, l.Steps[index].AppID, l.Steps[index].StageKey)
 		if err != nil {
 			return nil, err
 		}

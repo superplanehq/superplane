@@ -456,9 +456,7 @@ function appendCurrentRunForOrder(
   }
   const currentDispatch = pickMostRecentDispatch(dispatchesForLine);
 
-  const lineExecutions = dispatchStepRows(currentDispatch).filter(
-    (execution) => liveColumnIndexForExecution(steps, execution) != null,
-  );
+  const lineExecutions = dispatchStepRows(currentDispatch);
   if (lineExecutions.length === 0) {
     return;
   }

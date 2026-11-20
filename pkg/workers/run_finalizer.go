@@ -660,7 +660,15 @@ func (w *RunFinalizer) executeNextFactoryLineStep(tx *gorm.DB, runID uuid.UUID) 
 	// while slots are free. Failed and cancelled runs free their slot the
 	// same way passed runs do.
 	//
-	admitted, err := models.AdmitQueuedForStep(tx, execution.LineID, run.WorkflowID)
+	dispatchSnapshot, err := models.FindWorkOrderLineDispatch(tx, execution.LineDispatchID)
+	if err != nil {
+		return nil, nil, err
+	}
+	stageKey := ""
+	if execution.StepIndex >= 0 && execution.StepIndex < len(dispatchSnapshot.Steps) {
+		stageKey = dispatchSnapshot.Steps[execution.StepIndex].StageKey
+	}
+	admitted, err := models.AdmitQueuedForStep(tx, execution.LineID, run.WorkflowID, stageKey)
 	if err != nil {
 		return nil, nil, err
 	}

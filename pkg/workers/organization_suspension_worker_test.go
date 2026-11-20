@@ -185,7 +185,7 @@ func TestSuspensionDoesNotFinishDispatchConcurrentlyAdmittedFromQueue(t *testing
 	require.NoError(t, db.Model(running.Execution).Update("status", models.FactoryWorkOrderExecutionStatusFinished).Error)
 	admission := db.Begin()
 	defer admission.Rollback()
-	admitted, err := models.AdmitQueuedForStep(admission, line.ID, app.ID)
+	admitted, err := models.AdmitQueuedForStep(admission, line.ID, app.ID, dispatch.Steps[0].StageKey)
 	require.NoError(t, err)
 	require.Len(t, admitted, 1)
 	done := make(chan error, 1)

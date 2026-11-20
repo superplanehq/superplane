@@ -473,6 +473,7 @@ CREATE TABLE public.factories (
     public_badge_show_cost boolean DEFAULT false NOT NULL,
     public_badge_token text,
     url_id text NOT NULL,
+    vcs_integration_id uuid,
     CONSTRAINT factories_hosted_spend_budget_non_negative CHECK (((hosted_spend_budget_cents IS NULL) OR (hosted_spend_budget_cents >= 0))),
     CONSTRAINT factories_key_format_check CHECK (((key)::text ~ '^[A-Z]{2,5}$'::text)),
     CONSTRAINT factories_url_id_format_check CHECK ((url_id ~ '^[a-z0-9]{8}$'::text))
@@ -995,7 +996,8 @@ CREATE TABLE public.factory_work_order_queue_items (
     step_index integer NOT NULL,
     step_name text NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    app_id uuid NOT NULL
+    app_id uuid NOT NULL,
+    stage_key text DEFAULT ''::text NOT NULL
 );
 
 
@@ -4005,6 +4007,13 @@ CREATE INDEX idx_factories_organization_id ON public.factories USING btree (orga
 
 
 --
+-- Name: idx_factories_vcs_integration_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factories_vcs_integration_id ON public.factories USING btree (vcs_integration_id);
+
+
+--
 -- Name: idx_factory_agent_resource_secrets_resource_name; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4362,13 +4371,6 @@ CREATE INDEX idx_factory_work_order_line_dispatches_work_order ON public.factory
 
 
 --
--- Name: idx_factory_work_order_queue_items_app; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_factory_work_order_queue_items_app ON public.factory_work_order_queue_items USING btree (line_id, app_id, created_at);
-
-
---
 -- Name: idx_factory_work_order_queue_items_factory; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4380,6 +4382,13 @@ CREATE INDEX idx_factory_work_order_queue_items_factory ON public.factory_work_o
 --
 
 CREATE INDEX idx_factory_work_order_queue_items_order ON public.factory_work_order_queue_items USING btree (work_order_id);
+
+
+--
+-- Name: idx_factory_work_order_queue_items_stage; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_work_order_queue_items_stage ON public.factory_work_order_queue_items USING btree (line_id, app_id, stage_key, created_at);
 
 
 --
@@ -5428,6 +5437,14 @@ ALTER TABLE ONLY public.canvas_subscriptions
 
 ALTER TABLE ONLY public.factories
     ADD CONSTRAINT factories_planning_auto_start_line_id_fkey FOREIGN KEY (planning_auto_start_line_id) REFERENCES public.factory_lines(id) ON DELETE SET NULL;
+
+
+--
+-- Name: factories factories_vcs_integration_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factories
+    ADD CONSTRAINT factories_vcs_integration_id_fkey FOREIGN KEY (vcs_integration_id) REFERENCES public.app_installations(id) ON DELETE SET NULL;
 
 
 --
@@ -6726,7 +6743,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261120035457	f
+20261120050111	f
 \.
 
 

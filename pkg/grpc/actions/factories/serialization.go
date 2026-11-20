@@ -837,8 +837,9 @@ func serializeWorkOrderQueueItem(
 		Position:  int32(item.Position),
 		CreatedAt: timestamppb.New(item.CreatedAt),
 		AppId:     item.AppID.String(),
+		StageKey:  item.StageKey,
 	}
-	if item.StepIndex >= 0 && item.StepIndex < len(steps) {
+	if result.StageKey == "" && item.StepIndex >= 0 && item.StepIndex < len(steps) {
 		result.StageKey = steps[item.StepIndex].StageKey
 	}
 	return result
