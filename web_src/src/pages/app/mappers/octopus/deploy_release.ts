@@ -107,21 +107,22 @@ export const deployReleaseMapper: ComponentBaseMapper = {
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const outputs = context.execution.outputs as { success?: OutputPayload[]; failed?: OutputPayload[] } | undefined;
-    const result =
+    const result: DeployReleaseOutput =
       (outputs?.success?.[0]?.data as DeployReleaseOutput | undefined) ??
-      (outputs?.failed?.[0]?.data as DeployReleaseOutput | undefined);
+      (outputs?.failed?.[0]?.data as DeployReleaseOutput | undefined) ??
+      {};
 
-    const nodeMetadata = context.node.metadata as OctopusNodeMetadata | undefined;
+    const nodeMetadata: OctopusNodeMetadata = (context.node.metadata as OctopusNodeMetadata | undefined) ?? {};
 
     return {
-      "Deployment ID": stringOrDash(result?.deploymentId),
-      "Task State": stringOrDash(result?.taskState),
-      Project: stringOrDash(nodeMetadata?.projectName || result?.projectId),
-      Environment: stringOrDash(nodeMetadata?.environmentName || result?.environmentId),
-      Release: stringOrDash(nodeMetadata?.releaseName || result?.releaseId),
-      Created: formatTimestamp(result?.created, context.execution.createdAt),
-      "Completed At": formatTimestamp(result?.completedTime),
-      Duration: stringOrDash(result?.duration),
+      "Deployment ID": stringOrDash(result.deploymentId),
+      "Task State": stringOrDash(result.taskState),
+      Project: stringOrDash(nodeMetadata.projectName || result.projectId),
+      Environment: stringOrDash(nodeMetadata.environmentName || result.environmentId),
+      Release: stringOrDash(nodeMetadata.releaseName || result.releaseId),
+      Created: formatTimestamp(result.created, context.execution.createdAt),
+      "Completed At": formatTimestamp(result.completedTime),
+      Duration: stringOrDash(result.duration),
     };
   },
 
