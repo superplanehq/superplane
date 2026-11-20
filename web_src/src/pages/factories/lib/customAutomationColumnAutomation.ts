@@ -59,6 +59,9 @@ function primaryCustomAutomationMode(
   if (listed.some((trigger) => trigger.mode === "automatic")) {
     return "automatic";
   }
+  if (listed.some((trigger) => trigger.mode === "leave")) {
+    return "leave";
+  }
   if (listed.some((trigger) => trigger.mode === "scheduled")) {
     return "scheduled";
   }

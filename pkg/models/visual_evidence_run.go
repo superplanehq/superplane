@@ -19,7 +19,7 @@ func MaybeLinkVisualEvidenceRun(tx *gorm.DB, canvas *Canvas, event *CanvasEvent,
 }
 
 // MaybeLinkCustomAutomationRun stores task authority for a custom automation.
-// Backlog, Implement, and Done runs use a task link. Verify runs use pull-request activity.
+// Task events use a task link. Verify pull-request events use pull-request activity.
 func MaybeLinkCustomAutomationRun(tx *gorm.DB, canvas *Canvas, event *CanvasEvent, run *CanvasRun) error {
 	title := customAutomationRunTitle
 	if canvas != nil {
@@ -27,10 +27,28 @@ func MaybeLinkCustomAutomationRun(tx *gorm.DB, canvas *Canvas, event *CanvasEven
 			title = name
 		}
 	}
-	if canvasUsesTaskCustomAutomationLink(canvas) {
+	if customAutomationUsesTaskLink(canvas, event) {
 		return maybeLinkTaskCustomAutomationRun(tx, canvas, event, run, title)
 	}
 	return LinkFactoryColumnAppRun(tx, canvas, event, run, FactoryAppTemplateCustomAutomationID, title)
+}
+
+func customAutomationUsesTaskLink(canvas *Canvas, event *CanvasEvent) bool {
+	if canvasUsesTaskCustomAutomationLink(canvas) {
+		return true
+	}
+	if canvas == nil || canvas.ColumnKey == nil || *canvas.ColumnKey != CanvasColumnKeyVerify || event == nil {
+		return false
+	}
+	if visualEvidencePullRequestID(event.Data.Data()) != uuid.Nil {
+		return false
+	}
+	payload, ok := objectMap(RootEventSourcePayload(event.Data.Data()))
+	if !ok {
+		return false
+	}
+	_, ok = objectMap(payload["workOrder"])
+	return ok
 }
 
 func canvasUsesTaskCustomAutomationLink(canvas *Canvas) bool {

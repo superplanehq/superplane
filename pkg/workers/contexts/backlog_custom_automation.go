@@ -178,6 +178,108 @@ func EmitAutomaticTaskColumnCustomAutomations(tx *gorm.DB, factoryModel *models.
 	return emitted, nil
 }
 
+// ColumnLeaveDedupKey identifies one departure from a column.
+func ColumnLeaveDedupKey(orderID uuid.UUID, column, token string) string {
+	return orderID.String() + "|leave|" + column + "|" + token
+}
+
+// EmitColumnLeaveCustomAutomations starts every leave automation on the column a task just left.
+func EmitColumnLeaveCustomAutomations(tx *gorm.DB, factoryModel *models.Factory, order *models.FactoryWorkOrder, column, dedupKey string) ([]models.CanvasEvent, error) {
+	if factoryModel == nil || order == nil || dedupKey == "" || !columnLeaveAllowed(column) {
+		return nil, nil
+	}
+	canvases, err := factoryModel.ListCanvases(tx)
+	if err != nil {
+		return nil, err
+	}
+	live := make([]models.Canvas, 0, len(canvases))
+	ids := make([]uuid.UUID, 0, len(canvases))
+	for i := range canvases {
+		if canvases[i].LiveVersionID == nil || canvases[i].ColumnKey == nil || *canvases[i].ColumnKey != column {
+			continue
+		}
+		live = append(live, canvases[i])
+		ids = append(ids, canvases[i].ID)
+	}
+	if len(live) == 0 {
+		return nil, nil
+	}
+	specs, err := models.FindLiveCanvasSpecsByCanvasIDs(tx, ids)
+	if err != nil {
+		return nil, err
+	}
+	emitted := []models.CanvasEvent{}
+	for i := range live {
+		spec, ok := specs[live[i].ID]
+		if !ok || models.FactoryAppTemplateID(spec.Nodes) != models.FactoryAppTemplateCustomAutomationID || !customAutomationSpecHasMode(spec.Nodes, "leave") {
+			continue
+		}
+		event, err := startColumnLeaveCustomAutomation(tx, factoryModel, &live[i], order, dedupKey)
+		if err != nil {
+			log.WithError(err).Warnf("failed to start %s leave automation %s for work order %s", column, live[i].ID, order.ID)
+			continue
+		}
+		if event != nil {
+			emitted = append(emitted, *event)
+		}
+	}
+	return emitted, nil
+}
+
+func columnLeaveAllowed(column string) bool {
+	switch column {
+	case models.CanvasColumnKeyBacklog, models.CanvasColumnKeyImplement, models.CanvasColumnKeyVerify, models.CanvasColumnKeyDone:
+		return true
+	default:
+		return false
+	}
+}
+
+func startColumnLeaveCustomAutomation(tx *gorm.DB, factoryModel *models.Factory, canvas *models.Canvas, order *models.FactoryWorkOrder, dedupKey string) (*models.CanvasEvent, error) {
+	if factoryModel == nil || canvas == nil || canvas.FactoryID == nil || *canvas.FactoryID != factoryModel.ID || order == nil {
+		return nil, grpcerrors.FailedPrecondition(errors.New("task leave automation is incomplete"), "The task leave automation is incomplete.")
+	}
+	node, err := models.FindCanvasNode(tx, canvas.ID, "on-task")
+	if err != nil {
+		return nil, err
+	}
+	var created []models.CanvasEvent
+	err = tx.Transaction(func(db *gorm.DB) error {
+		if err := order.LockForUpdate(db); err != nil {
+			return err
+		}
+		if err := order.RequireExecutionOwner(db, true); err != nil {
+			return err
+		}
+		if err := order.ValidateSubscriptionCanvasModels(db, canvas.ID, ""); err != nil {
+			return err
+		}
+		events := NewEventContext(db, node, nil, func(events []models.CanvasEvent) { created = append(created, events...) })
+		if err := events.EmitDeduplicated(factory.OnWorkOrderPayloadType, workOrderCreatedPayload(db, order), dedupKey); err != nil {
+			return err
+		}
+		for i := range created {
+			event, err := models.FindCanvasEventForCanvas(db, canvas.ID, created[i].ID)
+			if err != nil {
+				return err
+			}
+			created[i] = *event
+			run, err := models.FindCanvasRunInTransaction(db, canvas.ID, created[i].RunID)
+			if err != nil {
+				return err
+			}
+			if err := models.MaybeLinkCustomAutomationRun(db, canvas, &created[i], run); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil || len(created) == 0 {
+		return nil, err
+	}
+	return &created[0], nil
+}
+
 func taskColumnAutomation(canvas *models.Canvas, factoryModel *models.Factory, order *models.FactoryWorkOrder) (string, string, bool) {
 	if factoryModel == nil || canvas == nil || canvas.FactoryID == nil || *canvas.FactoryID != factoryModel.ID || canvas.ColumnKey == nil || order == nil {
 		return "", "", false
@@ -210,7 +312,7 @@ func implementColumnDedupKey(tx *gorm.DB, order *models.FactoryWorkOrder) (strin
 	if order.State != models.FactoryWorkOrderStateOpen {
 		return "", errors.New("task is not in Implement")
 	}
-	inVerify, err := models.WorkOrderIsWaitingAfterPassedStage(tx, order.ID)
+	inVerify, err := order.IsWaitingAfterPassedStage(tx)
 	if err != nil {
 		return "", err
 	}
@@ -258,14 +360,18 @@ func currentImplementStep(record models.FactoryWorkOrderLineDispatchRecord) (int
 }
 
 func customAutomationSpecIsAutomatic(nodes []models.Node) bool {
+	return customAutomationSpecHasMode(nodes, "automatic")
+}
+
+func customAutomationSpecHasMode(nodes []models.Node, mode string) bool {
 	for _, node := range nodes {
 		template, _ := node.Metadata[models.FactoryAppTemplateMetadataKey].(map[string]any)
-		if template["startMode"] == "automatic" {
+		if template["startMode"] == mode {
 			return true
 		}
 		kinds, _ := template["triggerKinds"].([]any)
 		for _, kind := range kinds {
-			if kind == "automatic" {
+			if kind == mode {
 				return true
 			}
 		}

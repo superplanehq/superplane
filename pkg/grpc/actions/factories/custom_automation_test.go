@@ -1,10 +1,13 @@
 package factories
 
 import (
+	"context"
 	"math"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/superplanehq/superplane/pkg/authentication"
 
 	"github.com/google/go-github/v84/github"
 	"github.com/google/uuid"
@@ -1174,4 +1177,100 @@ func TestCustomAutomationWithoutTaskStartsFromTheColumn(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.NotEmpty(t, started.GetRunId())
+}
+
+func TestColumnLeaveAutomationListensForTheTaskOnEveryColumn(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory := seedHandOffFactory(t, r, db)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
+	integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSIntegrationID: &integrationID}))
+	ctx, deps := onboardingContext(r), onboardingDeps(r)
+	for _, column := range []string{models.CanvasColumnKeyBacklog, models.CanvasColumnKeyImplement, models.CanvasColumnKeyVerify, models.CanvasColumnKeyDone} {
+		t.Run(column, func(t *testing.T) {
+			created, err := CreateFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &pb.CreateFactoryCustomAutomationRequest{
+				FactoryId: factory.ID.String(),
+				Name:      column + " leave",
+				ColumnKey: column,
+				Settings: &pb.FactoryCustomAutomation_Settings{
+					StartMode: pb.FactoryCustomAutomation_START_MODE_ON_LEAVE,
+					Agent:     &pb.FactoryAppTemplateAgent{Component: "runnerClaudeCode"},
+					Steps: []*pb.FactoryCustomAutomation_Step{
+						{Name: "Note", Type: pb.FactoryCustomAutomation_Step_TYPE_PROMPT, Prompt: "Note the task.", WorkingDirectory: "repo"},
+					},
+				},
+			})
+			require.NoError(t, err)
+			assert.Equal(t, pb.FactoryCustomAutomation_START_MODE_ON_LEAVE, created.GetCustomAutomation().GetSettings().GetStartMode())
+			canvas, err := models.FindCanvasInTransaction(db, r.Organization.ID, uuid.MustParse(created.GetCustomAutomation().GetAutomation().GetId()))
+			require.NoError(t, err)
+			version, err := models.FindLiveCanvasVersionByCanvasInTransaction(db, canvas)
+			require.NoError(t, err)
+			trigger := customAutomationNode([]models.Node(version.Nodes), customAutomationTaskTriggerID)
+			require.NotNil(t, trigger)
+			assert.Equal(t, "onWorkOrder", trigger.ComponentName())
+		})
+	}
+}
+
+func TestColumnLeaveAutomationStartsWhenTheTaskLeavesBacklog(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+	factory := seedHandOffFactory(t, r, db)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
+	integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSIntegrationID: &integrationID}))
+	app, entry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "ship-step", "start-ship")
+	line, err := factory.CreateLine(db, "ship", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entry},
+	})
+	require.NoError(t, err)
+	created, err := CreateFactoryCustomAutomation(onboardingContext(r), onboardingDeps(r), r.Organization.ID.String(), &pb.CreateFactoryCustomAutomationRequest{
+		FactoryId: factory.ID.String(),
+		Name:      "Note leaving Backlog",
+		ColumnKey: models.CanvasColumnKeyBacklog,
+		Settings: &pb.FactoryCustomAutomation_Settings{
+			StartMode: pb.FactoryCustomAutomation_START_MODE_ON_LEAVE,
+			Agent:     &pb.FactoryAppTemplateAgent{Component: "runnerClaudeCode"},
+			Steps: []*pb.FactoryCustomAutomation_Step{
+				{Name: "Note", Type: pb.FactoryCustomAutomation_Step_TYPE_PROMPT, Prompt: "The task left Backlog.", WorkingDirectory: "repo"},
+			},
+		},
+	})
+	require.NoError(t, err)
+	canvasID := created.GetCustomAutomation().GetAutomation().GetId()
+	order, err := factory.CreateWorkOrder(db, "Leave Backlog", "Task context", &r.User, nil, nil)
+	require.NoError(t, err)
+
+	var events []models.CanvasEvent
+	require.NoError(t, db.Where("workflow_id = ?", canvasID).Find(&events).Error)
+	require.Empty(t, events)
+
+	_, err = DispatchWorkOrder(ctx, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
+		FactoryId: factory.ID.String(),
+		OrderId:   order.ID.String(),
+		LineName:  line.Name,
+	})
+	require.NoError(t, err)
+	require.NoError(t, db.Where("workflow_id = ?", canvasID).Find(&events).Error)
+	require.Len(t, events, 1)
+
+	reloaded, err := factory.FindWorkOrder(db, order.ID)
+	require.NoError(t, err)
+	grouped, err := models.ListWorkOrderLineDispatchesByWorkOrderIDs(db, []uuid.UUID{reloaded.ID})
+	require.NoError(t, err)
+	records := grouped[reloaded.ID]
+	require.NotEmpty(t, records)
+	require.NotEmpty(t, records[len(records)-1].Executions)
+	attempt := records[len(records)-1].Executions[0].ID.String()
+	require.NotNil(t, events[0].DedupKey)
+	assert.Contains(t, *events[0].DedupKey, attempt)
+	require.NoError(t, StartColumnLeaveCustomAutomations(db, factory, reloaded, models.CanvasColumnKeyBacklog, attempt))
+	require.NoError(t, db.Where("workflow_id = ?", canvasID).Find(&events).Error)
+	require.Len(t, events, 1)
+	require.NoError(t, StartColumnLeaveCustomAutomations(db, factory, reloaded, models.CanvasColumnKeyBacklog, uuid.NewString()))
+	require.NoError(t, db.Where("workflow_id = ?", canvasID).Find(&events).Error)
+	require.Len(t, events, 2)
 }
