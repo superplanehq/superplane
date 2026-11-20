@@ -1406,6 +1406,7 @@ message FactoryCustomAutomation {
     START_MODE_MANUAL = 1;
     START_MODE_AUTOMATIC = 2;
     START_MODE_SCHEDULED = 3;
+    START_MODE_ON_LEAVE = 4;
   }
 
   message Step {

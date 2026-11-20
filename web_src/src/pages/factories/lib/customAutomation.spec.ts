@@ -32,6 +32,9 @@ describe("custom automation settings", () => {
     expect(saved.startMode).toBe("START_MODE_SCHEDULED");
     expect(customAutomationSettings("manual", draft).steps).toEqual(saved.steps);
     expect(customAutomationSettings("automatic", draft).steps).toEqual(saved.steps);
+    expect(customAutomationSettings("leave", draft).startMode).toBe("START_MODE_ON_LEAVE");
+    expect(customAutomationMode("START_MODE_ON_LEAVE")).toBe("leave");
+    expect(customAutomationModeCopy("leave", "verify").trigger).toBe("When a task leaves Verify");
     expect(
       customAutomationSchedule({
         settings: { startMode: "START_MODE_SCHEDULED", schedule: { cronExpression: "0 9 * * *" } },
