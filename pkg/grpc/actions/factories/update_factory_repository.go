@@ -82,10 +82,11 @@ func UpdateFactoryRepository(
 		if _, err := factory.OnboardingConfigAfter(models.FactoryOnboardingPatch{AppRepository: &repository}); err != nil {
 			return err
 		}
-		if previous.VCSIntegrationID == "" {
+		integrationID := requestedIntegrationID(req, previous.VCSIntegrationID)
+		if integrationID == "" {
 			return invalidArgument("connect GitHub before selecting a repository")
 		}
-		integration, err := findReadyOnboardingIntegration(tx, orgID, previous.VCSIntegrationID)
+		integration, err := findReadyOnboardingIntegration(tx, orgID, integrationID)
 		if err != nil {
 			return err
 		}
@@ -127,6 +128,9 @@ func UpdateFactoryRepository(
 			if findErr != nil {
 				return findErr
 			}
+			if req.IntegrationId != nil && selectedIntegration.ID != integration.ID {
+				return invalidArgument("the selected connection cannot access this repository. Choose another repository")
+			}
 			selectedRepository = catalogRepository.FullName
 			selectedRepositoryID = catalogRepository.RepositoryID
 			installationID = catalogRepository.InstallationID
@@ -153,8 +157,11 @@ func UpdateFactoryRepository(
 		}
 		if !repositoryChanged {
 			selectedRepository = previous.AppRepository
-			selectedRepositoryID = previous.AppRepositoryID
 			selectedIntegration = integration
+			// A private App or PAT connection saves no catalog repository ID.
+			if bindingErr != nil {
+				selectedRepositoryID = previous.AppRepositoryID
+			}
 		}
 
 		previousBranch, err := currentFactoryDefaultBranch(tx, factory, previous.DefaultBranch)
@@ -166,18 +173,23 @@ func UpdateFactoryRepository(
 		}
 
 		selectedIntegrationID := selectedIntegration.ID.String()
+		integrationChanged := selectedIntegrationID != previous.VCSIntegrationID
 		patch := models.FactoryOnboardingPatch{DefaultBranch: &selectedDefaultBranch}
-		if repositoryChanged {
+		if repositoryChanged || integrationChanged {
 			patch.VCSIntegrationID = &selectedIntegrationID
-			patch.AppRepository = &selectedRepository
 			patch.AppRepositoryID = &selectedRepositoryID
-			patch.BacklogRepository = &selectedRepository
+		}
+		if repositoryChanged || (integrationChanged && sameRepository(previous.BacklogRepository, selectedRepository)) {
 			patch.BacklogRepositoryID = &selectedRepositoryID
+		}
+		if repositoryChanged {
+			patch.AppRepository = &selectedRepository
+			patch.BacklogRepository = &selectedRepository
 		}
 		if err := factory.UpdateOnboarding(tx, patch); err != nil {
 			return err
 		}
-		if repositoryChanged && bindingErr == nil {
+		if (repositoryChanged || integrationChanged) && bindingErr == nil {
 			if err := syncFactoryVCSProviderBindings(
 				tx,
 				models.ProviderGitHub,
@@ -262,6 +274,15 @@ func factoryDefaultBranchFromNodes(nodes []models.Node) string {
 	return defaultBranch
 }
 
+// requestedIntegrationID returns the Git connection from the request, or the
+// saved connection when the request leaves it unset.
+func requestedIntegrationID(req *pb.UpdateFactoryRepositoryRequest, saved string) string {
+	if req.IntegrationId != nil {
+		return strings.TrimSpace(req.GetIntegrationId())
+	}
+	return saved
+}
+
 func retargetTasksRequested(flag *bool) bool {
 	if flag == nil {
 		return true
@@ -307,25 +328,15 @@ func reconcileFactoryRepository(
 			return err
 		}
 	}
-	previousIntegrationName, integrationName := "", ""
-	if previousVCSIntegrationID != "" && previousVCSIntegrationID != vcsIntegrationID {
-		previousID, err := uuid.Parse(previousVCSIntegrationID)
-		if err != nil {
-			return err
-		}
-		previousIntegration, err := models.FindIntegrationInTransaction(tx, factory.OrganizationID, previousID)
-		if err != nil {
-			return err
-		}
-		selectedID, err := uuid.Parse(vcsIntegrationID)
-		if err != nil {
-			return err
-		}
-		integration, err := models.FindIntegrationInTransaction(tx, factory.OrganizationID, selectedID)
-		if err != nil {
-			return err
-		}
-		previousIntegrationName, integrationName = previousIntegration.InstallationName, integration.InstallationName
+	previousIntegrationIDs, previousIntegrationNames, integrationName, err := previousVCSIntegrations(
+		tx,
+		factory.OrganizationID,
+		previousVCSIntegrationID,
+		vcsIntegrationID,
+		config,
+	)
+	if err != nil {
+		return err
 	}
 
 	intakeCanvasIDs := make(map[uuid.UUID]struct{}, len(intakes))
@@ -421,13 +432,13 @@ func reconcileFactoryRepository(
 		changed = replaceVCSNodeIntegration(
 			nodes,
 			managedVCSNodeIDs,
-			previousVCSIntegrationID,
+			previousIntegrationIDs,
 			vcsIntegrationID,
 			previousAppRepository,
 			previousBacklogRepository,
 			repository,
 		) || changed
-		changed = replaceRunnerVCSIntegration(nodes, managedRunnerNodeIDs, previousIntegrationName, integrationName) || changed
+		changed = replaceRunnerVCSIntegration(nodes, managedRunnerNodeIDs, previousIntegrationNames, integrationName) || changed
 		if !changed {
 			continue
 		}
@@ -534,22 +545,75 @@ func addPRFeedbackGitHubNodeIDs(nodeIDs map[string]bool, graph prFeedbackGraph) 
 	nodeIDs[prFeedbackAcknowledgeReviewReplyNodeID] = true
 }
 
+// previousVCSIntegrations returns the integration IDs and names whose canvas
+// references move to the selected integration. A workspace whose connection
+// was deleted has no previous ID, so references to the deleted connection it
+// saved, and to every soft-deleted integration of the same app, move.
+func previousVCSIntegrations(
+	tx *gorm.DB,
+	organizationID uuid.UUID,
+	previousID, selectedID string,
+	config models.FactoryOnboardingConfig,
+) ([]string, []string, string, error) {
+	if selectedID == "" || previousID == selectedID {
+		return nil, nil, "", nil
+	}
+	selected, err := findOrganizationIntegration(tx, organizationID, selectedID)
+	if err != nil {
+		return nil, nil, "", err
+	}
+	if previousID != "" {
+		id, err := uuid.Parse(previousID)
+		if err != nil {
+			return nil, nil, "", err
+		}
+		previous, err := models.FindMaybeDeletedIntegrationInTransaction(tx, id)
+		if err != nil {
+			return nil, nil, "", err
+		}
+		return []string{previousID}, []string{previous.NameBeforeDelete()}, selected.InstallationName, nil
+	}
+
+	integrations, err := models.ListMaybeDeletedIntegrationsByOrganizationInTransaction(tx, organizationID)
+	if err != nil {
+		return nil, nil, "", err
+	}
+	ids, names := []string{}, []string{}
+	if config.DeletedVCSIntegrationID != "" {
+		ids = append(ids, config.DeletedVCSIntegrationID)
+		names = append(names, config.DeletedVCSIntegrationName)
+	}
+	for _, integration := range integrations {
+		if integration.DeletedAt.Valid && integration.AppName == selected.AppName {
+			ids = append(ids, integration.ID.String())
+			names = append(names, integration.NameBeforeDelete())
+		}
+	}
+	return ids, names, selected.InstallationName, nil
+}
+
+func findOrganizationIntegration(tx *gorm.DB, organizationID uuid.UUID, integrationID string) (*models.Integration, error) {
+	id, err := uuid.Parse(integrationID)
+	if err != nil {
+		return nil, err
+	}
+	return models.FindIntegrationInTransaction(tx, organizationID, id)
+}
+
 func replaceVCSNodeIntegration(
 	nodes []models.Node,
 	managedNodeIDs map[string]bool,
-	previousIntegrationID, integrationID, previousAppRepository, previousBacklogRepository, repository string,
+	previousIntegrationIDs []string,
+	integrationID, previousAppRepository, previousBacklogRepository, repository string,
 ) bool {
-	if previousIntegrationID == "" || previousIntegrationID == integrationID {
-		return false
-	}
-
 	changed := false
 	for i := range nodes {
 		component := nodes[i].ComponentName()
 		if (!strings.HasPrefix(component, "github.") && !strings.HasPrefix(component, "bitbucket.")) || nodes[i].IntegrationID == nil {
 			continue
 		}
-		if strings.TrimSpace(*nodes[i].IntegrationID) != previousIntegrationID {
+		current := strings.TrimSpace(*nodes[i].IntegrationID)
+		if current == integrationID || !slices.Contains(previousIntegrationIDs, current) {
 			continue
 		}
 		if !managedNodeIDs[nodes[i].ID] && !configurationContainsRepository(
@@ -566,10 +630,7 @@ func replaceVCSNodeIntegration(
 	return changed
 }
 
-func replaceRunnerVCSIntegration(nodes []models.Node, managedNodeIDs map[string]bool, previousName, name string) bool {
-	if previousName == "" || previousName == name {
-		return false
-	}
+func replaceRunnerVCSIntegration(nodes []models.Node, managedNodeIDs map[string]bool, previousNames []string, name string) bool {
 	changed := false
 	for i := range nodes {
 		if !managedNodeIDs[nodes[i].ID] || !strings.HasPrefix(nodes[i].ComponentName(), "runner") {
@@ -587,7 +648,8 @@ func replaceRunnerVCSIntegration(nodes []models.Node, managedNodeIDs map[string]
 				continue
 			}
 			ref, ok := entry["integration"].(map[string]any)
-			if !ok || ref["name"] != previousName {
+			refName, _ := ref["name"].(string)
+			if !ok || refName == name || !slices.Contains(previousNames, refName) {
 				continue
 			}
 			ref = maps.Clone(ref)
