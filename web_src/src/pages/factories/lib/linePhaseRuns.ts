@@ -3,6 +3,7 @@ import type {
   FactoriesWorkOrder,
   FactoriesWorkOrderExecution,
   FactoriesWorkOrderLineDispatch,
+  FactoryLineStage,
 } from "@/api-client";
 import { automationNameForLineStep, lineStepParallelism } from "./factoryLineFormShared";
 import { factoryAppPath, factoryAppRunPath, factoryHomePath, factoryLineDetailPath } from "./factoryPagePaths";
@@ -107,13 +108,45 @@ export function buildLinePhaseBoard(
     tick: null,
   }));
 
-  const runsByStep = collectCurrentRunsByStep(lineId, steps, workOrders);
+  const runsByStep = collectCurrentRunsByStep(lineId, steps, line.stages ?? [], workOrders);
   for (const column of columns) {
     column.runs = runsByStep.get(column.stepIndex) ?? [];
     column.tick = resolvePhaseTick(column.runs);
   }
 
   return columns;
+}
+
+/** Current task cards for a custom stage. Parallel runs still produce one card per task. */
+export function collectCustomStageRuns(
+  lineId: string,
+  stageKey: string,
+  workOrders: FactoriesWorkOrder[],
+): LinePhaseRunCard[] {
+  const runs: LinePhaseRunCard[] = [];
+  for (const order of workOrders) {
+    if (!order.id || order.state === "STATE_CLOSED" || order.state === "STATE_DRAFT") continue;
+    const dispatches = (order.lineDispatches ?? []).filter((dispatch) => dispatch.line?.id === lineId);
+    if (dispatches.length === 0) continue;
+    const executions = dispatchStepRows(pickMostRecentDispatch(dispatches));
+    const current = pickCurrentLineExecution(executions);
+    if (!current || current.stageKey !== stageKey) continue;
+    const stageExecutions = executions.filter((execution) => execution.stageKey === stageKey);
+    const failed = stageExecutions.filter(
+      (execution) =>
+        execution.state === "STATE_FINISHED" &&
+        execution.result !== "RESULT_PASSED" &&
+        execution.result !== "RESULT_UNKNOWN",
+    );
+    const representative = pickCurrentLineExecution(failed) ?? current;
+    runs.push({
+      executionId: representative.id ?? `${order.id}-${stageKey}-${representative.createdAt ?? ""}`,
+      workOrderId: order.id,
+      order,
+      execution: representative,
+    });
+  }
+  return runs.sort(compareRunsNewestFirst);
 }
 
 /**
@@ -247,7 +280,11 @@ export function lineStageColumns(columns: LinePhaseColumn[]): LinePhaseColumn[] 
 export function visibleLineStageColumns(
   columns: LinePhaseColumn[],
   verifyOrders: FactoriesWorkOrder[],
+  moveWaitingOrdersToVerify = true,
 ): LinePhaseColumn[] {
+  if (!moveWaitingOrdersToVerify) {
+    return lineStageColumns(columns);
+  }
   const verifyIds = new Set(verifyOrders.flatMap((order) => (order.id ? [order.id] : [])));
   return lineStageColumns(columns).map((column) => {
     const runs = column.runs.filter((run) => !verifyIds.has(run.workOrderId));
@@ -336,11 +373,12 @@ export function resolveRunGlyph(run: LinePhaseRunCard): PhaseGlyphKind {
 function collectCurrentRunsByStep(
   lineId: string,
   steps: NonNullable<FactoriesFactoryLine["steps"]>,
+  stages: FactoryLineStage[],
   workOrders: FactoriesWorkOrder[],
 ): Map<number, LinePhaseRunCard[]> {
   const runsByStep = new Map<number, LinePhaseRunCard[]>();
   for (const order of workOrders) {
-    appendCurrentRunForOrder(order, lineId, steps, runsByStep);
+    appendCurrentRunForOrder(order, lineId, steps, stages, runsByStep);
   }
   for (const runs of runsByStep.values()) {
     runs.sort(compareRunsNewestFirst);
@@ -357,11 +395,25 @@ function executionStepIndex(execution: FactoriesWorkOrderExecution): number | un
 
 function liveColumnIndexForExecution(
   steps: NonNullable<FactoriesFactoryLine["steps"]>,
+  stages: FactoryLineStage[],
   execution: FactoriesWorkOrderExecution,
 ): number | undefined {
   const stepIndex = executionStepIndex(execution);
   if (stepIndex == null) {
     return undefined;
+  }
+
+  // Dispatch step indexes count custom automations, so the saved stage key
+  // decides the phase lane. Custom stage lanes come from collectCustomStageRuns.
+  const stageKey = execution.stageKey?.trim();
+  if (stageKey) {
+    const stage = stages.find((candidate) => candidate.key === stageKey);
+    if (stage?.kind === "STAGE_KIND_CUSTOM" || stageKey.startsWith("custom-")) {
+      return undefined;
+    }
+    if (stage?.stepIndex != null && stage.stepIndex >= 0 && stage.stepIndex < steps.length) {
+      return stage.stepIndex;
+    }
   }
 
   // Dispatch stepIndex is a snapshot. A later line edit can move that
@@ -405,6 +457,7 @@ function appendCurrentRunForOrder(
   order: FactoriesWorkOrder,
   lineId: string,
   steps: NonNullable<FactoriesFactoryLine["steps"]>,
+  stages: FactoryLineStage[],
   runsByStep: Map<number, LinePhaseRunCard[]>,
 ): void {
   if (!order.id || order.state === "STATE_CLOSED" || order.state === "STATE_DRAFT") {
@@ -420,15 +473,13 @@ function appendCurrentRunForOrder(
   }
   const currentDispatch = pickMostRecentDispatch(dispatchesForLine);
 
-  const lineExecutions = dispatchStepRows(currentDispatch).filter(
-    (execution) => liveColumnIndexForExecution(steps, execution) != null,
-  );
+  const lineExecutions = dispatchStepRows(currentDispatch);
   if (lineExecutions.length === 0) {
     return;
   }
 
   const currentExecution = pickCurrentLineExecution(lineExecutions);
-  const stepIndex = currentExecution ? liveColumnIndexForExecution(steps, currentExecution) : undefined;
+  const stepIndex = currentExecution ? liveColumnIndexForExecution(steps, stages, currentExecution) : undefined;
   if (!currentExecution || stepIndex == null) {
     return;
   }

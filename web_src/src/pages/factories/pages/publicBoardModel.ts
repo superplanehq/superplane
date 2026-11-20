@@ -231,6 +231,9 @@ export function columnEmptyDescription(column: PublicBoardColumn, narrowed: bool
   if (column.key === "done") {
     return "No tasks in Done.";
   }
+  if (column.key.startsWith("custom-")) {
+    return "No tasks in this stage.";
+  }
   return "Nothing here.";
 }
 

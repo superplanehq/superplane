@@ -7,6 +7,8 @@ import type {
   FactoriesWorkOrderArtifact,
   FactoriesWorkOrderCheck,
   FactoriesWorkOrderExecution,
+  FactoriesWorkOrderLineDispatch,
+  FactoryLineStage,
 } from "@/api-client";
 import { formatMinutesSecondsDuration } from "@/lib/duration";
 import {
@@ -181,7 +183,7 @@ export interface SplitRunPhase {
   /** Start thinking level from the dispatch that owns this run. Hidden when empty or Auto. */
   thinkingLevel?: string;
   /** Board column this app sits on, when it is a column automation. */
-  columnKey?: SplitRunBoardColumn;
+  columnKey?: string;
   /** Pull request and revision that started this activity. */
   pullRequestActivity?: {
     pullRequest?: FactoriesFactoryPullRequest;
@@ -255,6 +257,8 @@ export interface SplitRunFixture {
   footer: SplitRunFooter;
   footerTone: SplitRunFooterTone;
   source?: SplitRunSource;
+  /** Ordered board stages snapshotted when the active dispatch started. */
+  stageColumns?: Array<{ id: string; title: string }>;
 }
 
 export { SPLIT_RUN_RUNNING };
@@ -429,6 +433,8 @@ export type SplitRunFixtureOptions = {
   checks?: FactoriesWorkOrderCheck[];
   lineId?: string | null;
   lineName?: string;
+  /** Live line stages. Backlog tasks show these columns before Start saves them. */
+  lineStages?: FactoryLineStage[];
   /** Storybook keeps invented files and pull requests. Live orders do not. */
   demoArtifacts?: boolean;
   /** PR-feedback canvas runs for this task, shown as extra Log phases. */
@@ -521,6 +527,7 @@ function mappedWorkOrderFixture(order: FactoriesWorkOrder, options?: SplitRunFix
     ...closurePhaseForOrder(order, displayStatus, options?.closer),
   ];
   const activeAutomationId = activeAutomationPhaseId(phases);
+  const visibleDispatch = visibleDispatchForLine(order, options?.lineId);
   const fixture: SplitRunFixture = {
     title: order.title ?? "Task",
     identifier: order.key?.trim() ?? "",
@@ -552,6 +559,7 @@ function mappedWorkOrderFixture(order: FactoriesWorkOrder, options?: SplitRunFix
     openPhaseId: activeAutomationId,
     phases,
     source: splitRunSourceForOrder(order, options?.resolveUser),
+    stageColumns: stageColumnsForStages(taskHistoryStages(order, visibleDispatch, options?.lineStages)),
     ...reviewSurfaces(order, displayStatus, {
       lineId: options?.lineId,
       phases,
@@ -1795,7 +1803,8 @@ function executionToPhase(
 ): SplitRunPhase {
   const status = statusForExecution(execution);
   const presentation = lineAutomationPresentation(execution.run, execution.step);
-  const name = presentation.name;
+  const stage = stageForExecution(order, execution);
+  const name = stage?.name?.trim() || presentation.name;
   const componentName = automationCardName(execution.run?.appName, presentation.componentName);
   const duration = durationForExecution(execution, status);
   const artifacts = demoArtifacts ? artifactsForLineExecution(order, execution) : [];
@@ -1833,7 +1842,16 @@ function executionToPhase(
     totalTokens: execution.totalTokens,
     model: modelsForExecution(order, execution),
     thinkingLevel: thinkingLevelForExecution(order, execution),
+    columnKey: execution.stageKey?.trim() || undefined,
   };
+}
+
+function stageForExecution(order: FactoriesWorkOrder, execution: FactoriesWorkOrderExecution) {
+  const stageKey = execution.stageKey?.trim();
+  if (!stageKey) return undefined;
+  return (order.lineDispatches ?? [])
+    .find((dispatch) => dispatch.stepExecutions?.some((item) => item.id === execution.id))
+    ?.stages?.find((stage) => stage.key === stageKey);
 }
 
 function checksForLineExecution(
@@ -2033,6 +2051,28 @@ function phaseIdForExecution(
     return base;
   }
   return `${base}-${execution.id ?? String(sameStep.indexOf(execution))}`;
+}
+
+/** Backlog tasks follow the live line. Started tasks keep the stages saved at Start. */
+function taskHistoryStages(
+  order: FactoriesWorkOrder,
+  dispatch: FactoriesWorkOrderLineDispatch | undefined,
+  lineStages: FactoryLineStage[] = [],
+): FactoryLineStage[] {
+  const saved = dispatch?.stages ?? [];
+  if (order.state !== "STATE_DRAFT" && saved.length > 0) {
+    return saved;
+  }
+  return lineStages.length > 0 ? lineStages : saved;
+}
+
+function stageColumnsForStages(stages: FactoryLineStage[]): SplitRunFixture["stageColumns"] {
+  const columns = stages.flatMap((stage) => {
+    const id = stage.key?.trim();
+    const title = stage.name?.trim();
+    return id && title ? [{ id, title }] : [];
+  });
+  return columns.length > 0 ? columns : undefined;
 }
 
 function visibleDispatchForLine(order: FactoriesWorkOrder, lineId?: string | null) {
