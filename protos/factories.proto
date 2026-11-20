@@ -1468,6 +1468,8 @@ message FactoryCustomAutomation {
     repeated StartTrigger triggers = 7;
     // Absent on automations saved before this choice. True runs on a task.
     optional bool runs_on_task = 8;
+    optional bool skip_setup_commands = 9;
+    optional bool skip_repository_checkout = 10;
   }
 
   Factory.Automation automation = 1;

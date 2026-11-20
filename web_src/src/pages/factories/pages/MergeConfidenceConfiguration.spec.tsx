@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 import { experimentalFeaturesKeys } from "@/hooks/useExperimentalFeatures";
@@ -123,9 +123,11 @@ describe("Merge confidence configuration", () => {
       fireEvent.click(toggle);
       expect(toggle).toBeDisabled();
       expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
-      if (access === "unavailable") failCheck(new Error("GitHub unavailable"));
-      else finishCheck([{ id: access, name: "Accept the new GitHub App permissions, then try again." }]);
-      await waitFor(() => expect(toggle).not.toBeDisabled());
+      await act(async () => {
+        if (access === "unavailable") failCheck(new Error("GitHub unavailable"));
+        else finishCheck([{ id: access, name: "Accept the new GitHub App permissions, then try again." }]);
+      });
+      expect(toggle).not.toBeDisabled();
       if (access !== "granted") {
         expect(toggle).not.toBeChecked();
         expect(screen.getByRole("alert")).toHaveTextContent(
@@ -133,8 +135,8 @@ describe("Merge confidence configuration", () => {
         );
         expect(onSave).not.toHaveBeenCalled();
         checkPermissions.mockResolvedValue([{ id: "granted" }]);
-        fireEvent.click(toggle);
-        await waitFor(() => expect(toggle).toBeChecked());
+        await act(async () => fireEvent.click(toggle));
+        expect(toggle).toBeChecked();
       }
       expect(toggle).toBeChecked();
       fireEvent.click(screen.getByRole("button", { name: "Save" }));

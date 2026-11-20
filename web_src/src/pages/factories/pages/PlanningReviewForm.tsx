@@ -1,6 +1,7 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { useByokRunnerModelDefault } from "@/hooks/useByokRunnerModelDefault";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useFactoryAgentResources } from "@/hooks/useFactoryAgentResources";
@@ -318,6 +319,34 @@ function AgentPanel({
             {modelControl}
           </div>
         ) : null}
+        <div className={appearance === "card" ? "col-span-2 flex flex-col gap-4" : "flex flex-col gap-8"}>
+          <ImplementSettingRow
+            label="Skip repository checkout"
+            description="Do not check out the repository."
+            htmlFor={`skip-repository-checkout-${component.id}`}
+          >
+            <Switch
+              id={`skip-repository-checkout-${component.id}`}
+              aria-describedby={`skip-repository-checkout-${component.id}-help`}
+              checked={component.configuration.skipRepositoryCheckout === true}
+              disabled={disabled}
+              onCheckedChange={(checked) => setConfigurationField("skipRepositoryCheckout", checked)}
+            />
+          </ImplementSettingRow>
+          <ImplementSettingRow
+            label="Skip setup commands"
+            description="Do not run workspace setup commands."
+            htmlFor={`skip-setup-commands-${component.id}`}
+          >
+            <Switch
+              id={`skip-setup-commands-${component.id}`}
+              aria-describedby={`skip-setup-commands-${component.id}-help`}
+              checked={component.configuration.skipSetupCommands === true}
+              disabled={disabled}
+              onCheckedChange={(checked) => setConfigurationField("skipSetupCommands", checked)}
+            />
+          </ImplementSettingRow>
+        </div>
       </section>
       {view === "full" && showSteps ? beforeSteps : null}
       {view === "full" && showSteps ? (

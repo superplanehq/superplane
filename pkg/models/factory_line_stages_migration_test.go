@@ -22,7 +22,7 @@ func TestFactoryLineStagesMigrationBackfillsExistingLines(t *testing.T) {
 		Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entry,
 	}})
 	require.NoError(t, err)
-	migration, err := os.ReadFile("../../db/migrations/20261120150841_add-custom-line-stages.up.sql")
+	migration, err := os.ReadFile("../../db/migrations/20261120161421_add-custom-line-stages.up.sql")
 	require.NoError(t, err)
 
 	tx := db.Begin()
