@@ -110,16 +110,16 @@ export function WorkOrderCheckCard({
 
 /** Numeric score: value with scale, trend delta, and a proportional meter. */
 function ScoredCheckCardBody({ check }: { check: WorkOrderCheckPresentation }) {
-  const { value, scale } = formatCheckScore(check);
-  const ratio = check.maxScore > 0 ? Math.min(Math.max(check.score / check.maxScore, 0), 1) : 0;
+  const formatted = formatCheckScore(check);
+  const ratio = check.maxScore > 0 ? Math.min(Math.max(formatted.score / check.maxScore, 0), 1) : 0;
 
   return (
     <>
       <span className="mt-1 flex items-baseline justify-between gap-2">
         <span className="flex items-baseline gap-0.5">
-          <span className="text-xl font-semibold tabular-nums tracking-tight text-foreground">{value}</span>
-          <span className="text-[12px] text-muted-foreground">{scale}</span>
-          <CheckTrendDelta check={check} />
+          <span className="text-xl font-semibold tabular-nums tracking-tight text-foreground">{formatted.value}</span>
+          <span className="text-[12px] text-muted-foreground">{formatted.scale}</span>
+          <CheckTrendDelta check={formatted} />
         </span>
         <span className={cn("truncate text-[11px] font-medium", workOrderCheckStatus(check).className)}>
           {workOrderCheckStatus(check).label}

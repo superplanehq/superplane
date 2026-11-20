@@ -350,7 +350,12 @@ describe("Merge confidence configuration", () => {
   });
 
   it("saves runner options without rewriting stored prompts and retries a failed save", async () => {
-    const stored = [steps[2], custom, { name: "Setup", type: "bash" as const, command: "git status" }, steps[0]];
+    const drift = {
+      name: "Drift from Specification",
+      type: "prompt" as const,
+      prompt: "Merge check: drift.\nSaved rules.",
+    };
+    const stored = [steps[2], custom, { name: "Setup", type: "bash" as const, command: "git status" }, steps[0], drift];
     let rejectSave = (_error: Error) => {};
     const pending = new Promise<void>((_resolve, reject) => {
       rejectSave = reject;
@@ -391,7 +396,7 @@ describe("Merge confidence configuration", () => {
     expect(screen.getByRole("switch", { name: "Blast radius" })).toBeChecked();
     expect(screen.getByRole("switch", { name: "Security" })).toBeChecked();
     expect(screen.getByRole("switch", { name: "Performance" })).not.toBeChecked();
-    expect(screen.getByRole("switch", { name: "Drift from Specification" })).not.toBeChecked();
+    expect(screen.getByRole("switch", { name: "Correctness" })).not.toBeChecked();
     expect(screen.getByRole("switch", { name: "Reversibility" })).not.toBeChecked();
 
     fireEvent.change(screen.getByDisplayValue("sonnet"), { target: { value: "opus" } });
