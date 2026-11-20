@@ -1,5 +1,4 @@
 import { Button } from "@/components/ui/button";
-import { Kbd } from "@/components/ui/kbd";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -62,9 +61,6 @@ export function LineStageEditToolbar({
           <>
             <Button type="button" variant="ghost" size="sm" onClick={onDiscard} disabled={saving}>
               Discard
-              <Kbd className="hidden sm:inline-flex" aria-hidden>
-                Esc
-              </Kbd>
             </Button>
             <LoadingButton type="button" size="sm" onClick={onSave} loading={saving} loadingText="Saving...">
               <Check className="size-3.5" aria-hidden />
@@ -74,9 +70,6 @@ export function LineStageEditToolbar({
         ) : (
           <Button type="button" variant="outline" size="sm" onClick={onDiscard}>
             Done
-            <Kbd className="hidden sm:inline-flex" aria-hidden>
-              Esc
-            </Kbd>
           </Button>
         )}
       </div>
