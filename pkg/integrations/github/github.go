@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -33,6 +34,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations/github/components/statuses"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"gorm.io/gorm"
 )
 
 const (
@@ -601,6 +603,21 @@ func (g *GitHub) afterAppCreation(ctx core.HTTPRequestContext) {
 		http.Error(ctx.Response, "missing code or state", http.StatusBadRequest)
 		return
 	}
+	if ctx.Creation == nil {
+		http.Error(ctx.Response, "invalid GitHub App creation attempt", http.StatusBadRequest)
+		return
+	}
+	claimed, err := ctx.Creation.Claim(ctx, state)
+	if err != nil {
+		ctx.Logger.WithError(err).Error("failed to claim GitHub App creation attempt")
+		status := http.StatusInternalServerError
+		if errors.Is(err, models.ErrInvalidGitHubAppCreation) || errors.Is(err, gorm.ErrRecordNotFound) {
+			status = http.StatusBadRequest
+		}
+		http.Error(ctx.Response, "cannot claim GitHub App creation attempt", status)
+		return
+	}
+	ctx = claimed
 
 	appData, err := g.createAppFromManifest(ctx.HTTP, common.HostFromIntegration(ctx.Integration), code)
 	if err != nil {
@@ -609,10 +626,37 @@ func (g *GitHub) afterAppCreation(ctx core.HTTPRequestContext) {
 		return
 	}
 
-	if ctx.Integration.LegacySetup() {
-		g.afterAppCreationLegacy(ctx, appData, state)
-		return
+	err = ctx.Creation.Finalize(func(final core.HTTPRequestContext) {
+		installationState, err := crypto.Base64String(32)
+		if err != nil {
+			http.Error(final.Response, "internal server error", http.StatusInternalServerError)
+			return
+		}
+		if final.Integration.LegacySetup() {
+			g.afterAppCreationLegacy(final, appData, installationState)
+			return
+		}
+		if err := final.Integration.Properties().Delete(common.PropertyAppState); err != nil {
+			http.Error(final.Response, "internal server error", http.StatusInternalServerError)
+			return
+		}
+		if err := final.Integration.Properties().Create(core.IntegrationPropertyDefinition{Name: common.PropertyAppState, Label: "GitHub App State", Type: core.IntegrationPropertyTypeString, Value: installationState}); err != nil {
+			http.Error(final.Response, "internal server error", http.StatusInternalServerError)
+			return
+		}
+		g.finishAppCreation(final, appData, installationState)
+	})
+	if err != nil {
+		ctx.Logger.WithError(err).Error("failed to finalize GitHub App creation attempt")
+		status := http.StatusInternalServerError
+		if errors.Is(err, models.ErrInvalidGitHubAppCreation) || errors.Is(err, gorm.ErrRecordNotFound) {
+			status = http.StatusBadRequest
+		}
+		http.Error(ctx.Response, "cannot finalize GitHub App creation attempt", status)
 	}
+}
+
+func (g *GitHub) finishAppCreation(ctx core.HTTPRequestContext, appData *GitHubAppData, state string) {
 
 	//
 	// Save app properties
@@ -719,6 +763,7 @@ func (g *GitHub) afterAppCreationLegacy(ctx core.HTTPRequestContext, appData *Gi
 		Slug:     appData.Slug,
 		ClientID: appData.ClientID,
 	}
+	metadata.State = state
 
 	ctx.Integration.SetMetadata(metadata)
 
@@ -1021,6 +1066,9 @@ func (g *GitHub) createAppFromManifest(httpCtx core.HTTPContext, host common.Hos
 
 	defer response.Body.Close()
 
+	if response.StatusCode != http.StatusCreated {
+		return nil, fmt.Errorf("manifest conversion returned status %d", response.StatusCode)
+	}
 	body, err := io.ReadAll(response.Body)
 	if err != nil {
 		return nil, err
@@ -1030,6 +1078,9 @@ func (g *GitHub) createAppFromManifest(httpCtx core.HTTPContext, host common.Hos
 	err = json.Unmarshal(body, &appData)
 	if err != nil {
 		return nil, err
+	}
+	if appData.ID <= 0 || appData.Slug == "" || appData.ClientID == "" || appData.ClientSecret == "" || appData.WebhookSecret == "" || appData.PEM == "" {
+		return nil, fmt.Errorf("manifest conversion returned incomplete App configuration")
 	}
 
 	return &appData, nil
