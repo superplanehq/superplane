@@ -20,6 +20,24 @@ import { CustomAutomationScheduleFields } from "./CustomAutomationScheduleFields
 import { PlanningReviewForm } from "./PlanningReviewForm";
 import type { PlanningReviewDraft } from "./planningReviewMockup";
 
+type TriggerEditorProps = {
+  showModel?: boolean;
+  columnKey: CustomAutomationColumn;
+  name: string;
+  icon: string;
+  triggers: CustomAutomationTrigger[];
+  runsOnTask?: boolean;
+  onTriggersChange: (triggers: CustomAutomationTrigger[]) => void;
+  onRunsOnTaskChange: (runsOnTask: boolean) => void;
+  draft: PlanningReviewDraft;
+  organizationId: string;
+  factoryId: string;
+  factoryKey: string;
+  onNameChange: (name: string) => void;
+  onIconChange: (icon: string) => void;
+  onDraftChange: (draft: PlanningReviewDraft) => void;
+};
+
 export function TriggerEditor({
   columnKey,
   showModel = true,
@@ -36,23 +54,7 @@ export function TriggerEditor({
   onNameChange,
   onIconChange,
   onDraftChange,
-}: {
-  columnKey: CustomAutomationColumn;
-  showModel?: boolean;
-  name: string;
-  icon: string;
-  triggers: CustomAutomationTrigger[];
-  runsOnTask?: boolean;
-  onTriggersChange: (triggers: CustomAutomationTrigger[]) => void;
-  onRunsOnTaskChange: (runsOnTask: boolean) => void;
-  draft: PlanningReviewDraft;
-  organizationId: string;
-  factoryId: string;
-  factoryKey: string;
-  onNameChange: (name: string) => void;
-  onIconChange: (icon: string) => void;
-  onDraftChange: (draft: PlanningReviewDraft) => void;
-}) {
+}: TriggerEditorProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const visibleTriggers = customAutomationTriggersForRun(triggers, runsOnTask);
   const triggerModes: CustomAutomationMode[] = ["manual"];
@@ -344,17 +346,7 @@ function TriggerOption({
         <Icon className="size-4" aria-hidden />
       </span>
       <span className="flex min-w-0 flex-col">
-        <span className="text-sm font-medium text-foreground">
-          {mode === "scheduled"
-            ? "Schedule"
-            : mode === "leave"
-              ? `When a task leaves ${customAutomationColumnLabel(columnKey)}`
-              : automatic
-                ? columnKey === "verify"
-                  ? "Every pull request commit"
-                  : `When a task enters ${customAutomationColumnLabel(columnKey)}`
-                : "Manual"}
-        </span>
+        <span className="text-sm font-medium text-foreground">{triggerTitle(mode, columnKey)}</span>
         <span className="text-xs font-normal text-muted-foreground">
           {mode === "scheduled"
             ? columnKey === "backlog"

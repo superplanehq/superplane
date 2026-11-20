@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { ArrowDown, ArrowUp, MessageSquareText, Plus, Terminal, Trash2, Zap } from "lucide-react";
-import type { ReactNode } from "react";
+import { GripVertical, MessageSquareText, Plus, Terminal, Trash2, Zap } from "lucide-react";
+import type { MouseEvent, MutableRefObject, ReactNode } from "react";
 
 import {
   customAutomationColumnLabel,
@@ -20,7 +20,8 @@ export function AutomationFlow({
   selectedStep,
   onSelectTrigger,
   onSelectStep,
-  onMoveStep,
+  onStartDrag,
+  rowRefs,
   onRemoveStep,
   onAddStep,
 }: {
@@ -32,7 +33,8 @@ export function AutomationFlow({
   selectedStep: number | null;
   onSelectTrigger: () => void;
   onSelectStep: (index: number) => void;
-  onMoveStep: (index: number, offset: -1 | 1) => void;
+  onStartDrag: (event: MouseEvent, index: number) => void;
+  rowRefs: MutableRefObject<Array<HTMLDivElement | null>>;
   onRemoveStep: (index: number) => void;
   onAddStep: () => void;
 }) {
@@ -48,16 +50,23 @@ export function AutomationFlow({
           </p>
         </FlowCard>
         {steps.map((step, index) => (
-          <div className="flex w-full flex-col items-center" key={index}>
+          <div
+            className="flex w-full flex-col items-center"
+            key={index}
+            data-testid="custom-automation-step-row"
+            ref={(element) => {
+              rowRefs.current[index] = element;
+            }}
+          >
             <FlowConnector />
             <FlowCard
               selected={selectedStep === index}
               onClick={() => onSelectStep(index)}
               actions={
                 <StepCardActions
-                  position={index}
+                  label={step.name || `Step ${index + 1}`}
                   stepCount={steps.length}
-                  onMove={(offset) => onMoveStep(index, offset)}
+                  onStartDrag={(event) => onStartDrag(event, index)}
                   onRemove={() => onRemoveStep(index)}
                 />
               }
@@ -118,6 +127,7 @@ function FlowCard({
       <button
         type="button"
         onClick={onClick}
+        aria-pressed={selected}
         className={cn(
           "w-full rounded-xl border bg-card px-4 py-4 text-left shadow-sm transition-colors hover:border-foreground/30",
           selected ? "border-primary ring-2 ring-primary/15" : "border-border",
@@ -135,40 +145,31 @@ function FlowCard({
 }
 
 function StepCardActions({
-  position,
+  label,
   stepCount,
-  onMove,
+  onStartDrag,
   onRemove,
 }: {
-  position: number;
+  label: string;
   stepCount: number;
-  onMove: (offset: -1 | 1) => void;
+  onStartDrag: (event: MouseEvent) => void;
   onRemove: () => void;
 }) {
   return (
     <>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon-xs"
-        className="size-6 text-muted-foreground/60 hover:bg-muted hover:text-foreground"
-        aria-label="Move step up"
-        disabled={position === 0}
-        onClick={() => onMove(-1)}
-      >
-        <ArrowUp className="size-3.5" aria-hidden />
-      </Button>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon-xs"
-        className="size-6 text-muted-foreground/60 hover:bg-muted hover:text-foreground"
-        aria-label="Move step down"
-        disabled={position === stepCount - 1}
-        onClick={() => onMove(1)}
-      >
-        <ArrowDown className="size-3.5" aria-hidden />
-      </Button>
+      {stepCount > 1 ? (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-xs"
+          className="size-6 cursor-grab text-muted-foreground/60 hover:bg-muted hover:text-foreground active:cursor-grabbing"
+          aria-label={`Reorder ${label}`}
+          onMouseDown={onStartDrag}
+          onClick={(event) => event.stopPropagation()}
+        >
+          <GripVertical className="size-3.5" aria-hidden />
+        </Button>
+      ) : null}
       <Button
         type="button"
         variant="ghost"

@@ -1,7 +1,9 @@
 import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { CircleAlert } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { reorderListItems } from "@/lib/reorderListItems";
+import { useListFieldDragReorder } from "@/ui/configurationFieldRenderer/useListFieldDragReorder";
 
 import {
   customAutomationTriggersForRun,
@@ -67,13 +69,26 @@ export function CustomAutomationSetupForm(props: CustomAutomationSetupFormProps)
   const component = draft.components[0];
   const steps = (component?.configuration.steps as PlanningReviewStep[] | undefined) ?? [];
   const activeStep = selectedStep === null ? undefined : steps[selectedStep];
-  const { updateStep, addStep, removeStepAt, moveStepAt } = useStepList(
+  const { updateStep, addStep, removeStepAt, moveStepAt, reorderSteps } = useStepList(
     draft,
     component,
     selectedStep,
     setSelectedStep,
     onDraftChange,
   );
+  const rowRefs = useRef<Array<HTMLDivElement | null>>([]);
+  const [, setOpenItem] = useState("");
+  const { renderedItems, startDrag } = useListFieldDragReorder({
+    items: steps,
+    allowReorder: true,
+    useAccordion: false,
+    onChange: (next) => reorderSteps(next as PlanningReviewStep[]),
+    setOpenItem,
+    rowRefs,
+  });
+  const renderedSteps = renderedItems as PlanningReviewStep[];
+  // Preview positions change, but the editor continues to use the selected draft object.
+  const previewSelection = activeStep ? renderedSteps.indexOf(activeStep) : null;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid="custom-automation-setup">
@@ -83,12 +98,13 @@ export function CustomAutomationSetupForm(props: CustomAutomationSetupFormProps)
           asCode={asCode}
           triggers={customAutomationTriggersForRun(triggers, runsOnTask)}
           runsOnTask={runsOnTask !== false}
-          steps={steps}
-          selectedStep={selectedStep}
+          steps={renderedSteps}
+          selectedStep={previewSelection}
+          rowRefs={rowRefs}
           onSelectTrigger={() => setSelectedStep(null)}
-          onSelectStep={setSelectedStep}
-          onMoveStep={moveStepAt}
-          onRemoveStep={removeStepAt}
+          onSelectStep={(index) => setSelectedStep(steps.indexOf(renderedSteps[index]))}
+          onStartDrag={(event, index) => startDrag(event, index, "")}
+          onRemoveStep={(index) => removeStepAt(steps.indexOf(renderedSteps[index]))}
           onAddStep={addStep}
         />
         <div className="min-h-0 min-w-0 flex-1 overflow-y-auto bg-background">
@@ -153,7 +169,15 @@ function useStepList(
       ),
     });
   };
+  const reorderSteps = (nextSteps: PlanningReviewStep[]) => {
+    if (nextSteps.every((step, index) => step === steps[index])) return;
+    updateSteps(nextSteps);
+    if (selectedStep !== null) {
+      setSelectedStep(nextSteps.indexOf(steps[selectedStep]));
+    }
+  };
   return {
+    reorderSteps,
     updateStep: (nextStep: PlanningReviewStep) => {
       if (selectedStep === null) return;
       updateSteps(steps.map((step, index) => (index === selectedStep ? nextStep : step)));
@@ -171,16 +195,7 @@ function useStepList(
       }
     },
     moveStepAt: (position: number, offset: -1 | 1) => {
-      const destination = position + offset;
-      if (destination < 0 || destination >= steps.length) return;
-      const nextSteps = [...steps];
-      [nextSteps[position], nextSteps[destination]] = [nextSteps[destination], nextSteps[position]];
-      updateSteps(nextSteps);
-      if (selectedStep === position) {
-        setSelectedStep(destination);
-      } else if (selectedStep === destination) {
-        setSelectedStep(position);
-      }
+      reorderSteps(reorderListItems(steps, position, position + offset));
     },
   };
 }

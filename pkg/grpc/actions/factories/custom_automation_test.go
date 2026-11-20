@@ -881,69 +881,96 @@ func TestCustomAutomationOmitsBaseWhenWorkspaceBranchIsEmpty(t *testing.T) {
 }
 
 func TestCustomAutomationPreservesSubscriptionAgentOnUpdate(t *testing.T) {
-	r := support.Setup(t)
-	db := database.DB(t.Context())
-	factory := seedHandOffFactory(t, r, db)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
-	integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
-	subscription := true
-	harness := models.FactoryOnboardingAgentHarnessCodex
-	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
-		VCSIntegrationID:  &integrationID,
-		AgentHarness:      &harness,
-		CodexSubscription: &subscription,
-	}))
-	// GitHub setup is external to saving the agent configuration.
-	r.Registry.Integrations["github"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{
-		Triggers: []core.Trigger{impl.NewDummyIntegrationTrigger(impl.DummyIntegrationTriggerOptions{Name: "github.onPullRequest"})},
-	})
-	ctx := onboardingContext(r)
-	deps := onboardingDeps(r)
-	organizationID := r.Organization.ID.String()
-	created, err := CreateFactoryCustomAutomation(ctx, deps, organizationID, &pb.CreateFactoryCustomAutomationRequest{
-		FactoryId: factory.ID.String(),
-		Name:      "Review changes",
-		Settings: &pb.FactoryCustomAutomation_Settings{
-			StartMode: pb.FactoryCustomAutomation_START_MODE_MANUAL,
-			Steps:     []*pb.FactoryCustomAutomation_Step{{Name: "Review", Type: pb.FactoryCustomAutomation_Step_TYPE_PROMPT, Prompt: "Review the pull request."}},
-		},
-	})
-	require.NoError(t, err)
-	automationID := created.GetCustomAutomation().GetAutomation().GetId()
-	described, err := DescribeFactoryCustomAutomation(ctx, organizationID, &pb.DescribeFactoryCustomAutomationRequest{
-		FactoryId: factory.ID.String(), AutomationId: automationID,
-	})
-	require.NoError(t, err)
-	settings := described.GetCustomAutomation().GetSettings()
-	require.Equal(t, "runnerCodex", settings.GetAgent().GetComponent())
-	require.Equal(t, runner.CredentialsSourceSubscription, settings.GetAgent().GetCredentialSource())
-	require.Empty(t, settings.GetAgent().GetModel())
-	connection, err := models.CreateCodexConnection(db, r.Organization.ID, r.User, time.Now())
-	require.NoError(t, err)
-	require.NoError(t, connection.StoreUsage(db, nil, []models.CodexModel{{Model: "gpt-5.4"}}, time.Now()))
-	require.NoError(t, db.Model(connection).Updates(map[string]any{
-		"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("test-bundle"),
-	}).Error)
-	settings.Steps[0].Prompt = "Review the changed files."
-	settings.Agent.Model = "gpt-5.4"
-	_, err = UpdateFactoryCustomAutomation(ctx, deps, organizationID, &pb.UpdateFactoryCustomAutomationRequest{
-		FactoryId: factory.ID.String(), AutomationId: automationID, Name: "Review changed files", Settings: settings,
-	})
-	require.NoError(t, err)
-	saved, err := DescribeFactoryCustomAutomation(ctx, organizationID, &pb.DescribeFactoryCustomAutomationRequest{
-		FactoryId: factory.ID.String(), AutomationId: automationID,
-	})
-	require.NoError(t, err)
-	assert.Equal(t, "Review changed files", saved.GetCustomAutomation().GetAutomation().GetName())
-	assert.Equal(t, "Review the changed files.", saved.GetCustomAutomation().GetSettings().GetSteps()[0].GetPrompt())
-	assert.Equal(t, "runnerCodex", saved.GetCustomAutomation().GetSettings().GetAgent().GetComponent())
-	assert.Equal(t, "gpt-5.4", saved.GetCustomAutomation().GetSettings().GetAgent().GetModel())
-	assert.Equal(t, runner.CredentialsSourceSubscription, saved.GetCustomAutomation().GetSettings().GetAgent().GetCredentialSource())
-	settings.Agent.Model = "outside-the-subscription"
-	_, err = UpdateFactoryCustomAutomation(ctx, deps, organizationID, &pb.UpdateFactoryCustomAutomationRequest{
-		FactoryId: factory.ID.String(), AutomationId: automationID, Name: "Review changed files", Settings: settings,
-	})
-	require.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
+	for _, model := range []string{"", "gpt-5.4"} {
+		t.Run("model="+model, func(t *testing.T) {
+			r := support.Setup(t)
+			db := database.DB(t.Context())
+			factory := seedHandOffFactory(t, r, db)
+			require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
+			integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
+			subscription := true
+			harness := models.FactoryOnboardingAgentHarnessCodex
+			require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
+				VCSIntegrationID:  &integrationID,
+				AgentHarness:      &harness,
+				CodexSubscription: &subscription,
+			}))
+			// GitHub setup is external to saving the agent configuration.
+			r.Registry.Integrations["github"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{
+				Triggers: []core.Trigger{impl.NewDummyIntegrationTrigger(impl.DummyIntegrationTriggerOptions{Name: "github.onPullRequest"})},
+			})
+			ctx := onboardingContext(r)
+			deps := onboardingDeps(r)
+			organizationID := r.Organization.ID.String()
+			connection, err := models.CreateCodexConnection(db, r.Organization.ID, r.User, time.Now())
+			require.NoError(t, err)
+			require.NoError(t, connection.StoreUsage(db, nil, []models.CodexModel{
+				{Model: "gpt-5.4"}, {Model: "gpt-5.5"},
+			}, time.Now()))
+			require.NoError(t, db.Model(connection).Updates(map[string]any{
+				"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("test-bundle"),
+			}).Error)
+
+			var agent *pb.FactoryAppTemplateAgent
+			if model != "" {
+				agent = &pb.FactoryAppTemplateAgent{
+					Component: "runnerCodex", Model: model, CredentialSource: runner.CredentialsSourceSubscription,
+				}
+			}
+			created, err := CreateFactoryCustomAutomation(ctx, deps, organizationID, &pb.CreateFactoryCustomAutomationRequest{
+				FactoryId: factory.ID.String(),
+				Name:      "Review changes",
+				Settings: &pb.FactoryCustomAutomation_Settings{
+					StartMode: pb.FactoryCustomAutomation_START_MODE_MANUAL,
+					Agent:     agent,
+					Steps:     []*pb.FactoryCustomAutomation_Step{{Name: "Review", Type: pb.FactoryCustomAutomation_Step_TYPE_PROMPT, Prompt: "Review the pull request."}},
+				},
+			})
+			require.NoError(t, err)
+			automationID := created.GetCustomAutomation().GetAutomation().GetId()
+			described, err := DescribeFactoryCustomAutomation(ctx, organizationID, &pb.DescribeFactoryCustomAutomationRequest{
+				FactoryId: factory.ID.String(), AutomationId: automationID,
+			})
+			require.NoError(t, err)
+			settings := described.GetCustomAutomation().GetSettings()
+			require.Equal(t, "runnerCodex", settings.GetAgent().GetComponent())
+			require.Equal(t, runner.CredentialsSourceSubscription, settings.GetAgent().GetCredentialSource())
+			require.Equal(t, model, settings.GetAgent().GetModel())
+			settings.Agent.Model = "gpt-5.5"
+			settings.Steps[0].Prompt = "Review the changed files."
+			_, err = UpdateFactoryCustomAutomation(ctx, deps, organizationID, &pb.UpdateFactoryCustomAutomationRequest{
+				FactoryId: factory.ID.String(), AutomationId: automationID, Name: "Review changed files", Settings: settings,
+			})
+			require.NoError(t, err)
+			saved, err := DescribeFactoryCustomAutomation(ctx, organizationID, &pb.DescribeFactoryCustomAutomationRequest{
+				FactoryId: factory.ID.String(), AutomationId: automationID,
+			})
+			require.NoError(t, err)
+			assert.Equal(t, "Review changed files", saved.GetCustomAutomation().GetAutomation().GetName())
+			assert.Equal(t, "Review the changed files.", saved.GetCustomAutomation().GetSettings().GetSteps()[0].GetPrompt())
+			assert.Equal(t, "runnerCodex", saved.GetCustomAutomation().GetSettings().GetAgent().GetComponent())
+			assert.Equal(t, runner.CredentialsSourceSubscription, saved.GetCustomAutomation().GetSettings().GetAgent().GetCredentialSource())
+			assert.Equal(t, "gpt-5.5", saved.GetCustomAutomation().GetSettings().GetAgent().GetModel())
+			node, err := models.FindCanvasNode(db, uuid.MustParse(automationID), customAutomationRunnerID)
+			require.NoError(t, err)
+			assert.Equal(t, "gpt-5.5", node.Configuration.Data()["model"])
+
+			settings.Agent.Model = "outside-the-subscription"
+			_, err = UpdateFactoryCustomAutomation(ctx, deps, organizationID, &pb.UpdateFactoryCustomAutomationRequest{
+				FactoryId: factory.ID.String(), AutomationId: automationID, Name: "Review changed files", Settings: settings,
+			})
+			require.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
+
+			settings.Agent.Model = ""
+			_, err = UpdateFactoryCustomAutomation(ctx, deps, organizationID, &pb.UpdateFactoryCustomAutomationRequest{
+				FactoryId: factory.ID.String(), AutomationId: automationID, Name: "Review changed files", Settings: settings,
+			})
+			require.NoError(t, err)
+			node, err = models.FindCanvasNode(db, uuid.MustParse(automationID), customAutomationRunnerID)
+			require.NoError(t, err)
+			assert.NotContains(t, node.Configuration.Data(), "model", "Default must not apply a BYOK model")
+		})
+	}
 }
 
 func TestCustomAutomationUsesTheWorkspaceAgentWhenTheHarnessDiffers(t *testing.T) {
