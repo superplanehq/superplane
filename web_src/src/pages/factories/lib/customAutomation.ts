@@ -2,6 +2,8 @@ import type {
   FactoriesFactoryCustomAutomation,
   FactoriesFactoryCustomAutomationSettings,
   FactoriesFactoryCustomAutomationStep,
+  FactoriesFactoryOnboarding,
+  OrganizationsIntegration,
   FactoryCustomAutomationStartTrigger,
   FactoryCustomAutomationStartMode,
 } from "@/api-client";
@@ -41,6 +43,7 @@ export function customAutomationColumnLabel(column: CustomAutomationColumn): str
 }
 export type CustomAutomationTrigger = {
   id: string;
+  publicId?: string;
   mode: CustomAutomationMode;
   schedule: CustomAutomationSchedule;
 };
@@ -103,12 +106,11 @@ export function customAutomationRunsOnTask(
 
 export function customAutomationTriggersForRun(
   triggers: CustomAutomationTrigger[],
-  runsOnTask: boolean,
+  runsOnTask: boolean | undefined,
 ): CustomAutomationTrigger[] {
+  if (runsOnTask === undefined) return triggers;
   return triggers.filter((trigger) => {
-    if (runsOnTask) {
-      return trigger.mode !== "scheduled";
-    }
+    if (runsOnTask) return trigger.mode !== "scheduled";
     return trigger.mode !== "automatic" && trigger.mode !== "leave";
   });
 }
@@ -128,6 +130,57 @@ export type ManualCustomAutomation = {
   icon?: string;
   columnKey?: CustomAutomationColumn;
 };
+
+export const AUTOMATION_ICONS = [
+  "sparkles",
+  "shield-check",
+  "search",
+  "bug",
+  "file-code",
+  "code",
+  "terminal",
+  "eye",
+  "gauge",
+  "git-pull-request",
+  "cpu",
+  "circle-check",
+  "activity",
+  "alarm-clock",
+  "archive",
+  "bell",
+  "bolt",
+  "book",
+  "box",
+  "boxes",
+  "braces",
+  "calendar",
+  "camera",
+  "chart-line",
+  "check",
+  "clock",
+  "cloud",
+  "cog",
+  "component",
+  "container",
+  "database",
+  "factory",
+  "file-json",
+  "file-text",
+  "fingerprint",
+  "flag",
+  "folder",
+  "git-branch",
+  "git-commit",
+  "git-merge",
+  "globe",
+  "key",
+  "layers",
+  "lock",
+  "message-square",
+  "network",
+  "package",
+  "rocket",
+] as const;
 
 export const DEFAULT_CUSTOM_AUTOMATION_ICON = "sparkles";
 export const DEFAULT_CUSTOM_AUTOMATION_TIMEOUT_SECONDS = 3600;
@@ -172,22 +225,43 @@ export function customAutomationModeCopy(
   };
 }
 
-export function workspaceAgentFromOnboarding(onboarding?: {
-  agentHarness?: string;
-}): FactoriesFactoryCustomAutomationSettings["agent"] | undefined {
-  switch (onboarding?.agentHarness) {
-    case "AGENT_HARNESS_SUPERPLANE":
-      return { component: "runnerSuperPlane" };
-    case "AGENT_HARNESS_CODEX":
-      return { component: "runnerCodex" };
-    case "AGENT_HARNESS_CLAUDE_CODE":
-      return { component: "runnerClaudeCode" };
-    default:
-      return undefined;
+const integrationAgentComponents = new Map([
+  ["claude", "runnerClaudeCode"],
+  ["openai", "runnerCodex"],
+  ["openrouter", "runnerOpenRouter"],
+  ["customLlm", "runnerOpenRouter"],
+]);
+
+export function workspaceAgentFromOnboarding(
+  onboarding?: FactoriesFactoryOnboarding,
+  connections?: OrganizationsIntegration[],
+): FactoriesFactoryCustomAutomationSettings["agent"] {
+  if (!onboarding) return undefined;
+  if (onboarding.codexSubscription) return { component: "runnerCodex", credentialSource: "subscription" };
+  const hosted = { component: "runnerSuperPlane" };
+  if (!onboarding.agentIntegrationId && onboarding.agentHarness === "AGENT_HARNESS_SUPERPLANE") return hosted;
+  if (!connections) return undefined;
+  const ready = connections.filter(
+    ({ metadata, status }) =>
+      status?.state === "ready" && integrationAgentComponents.has(metadata?.integrationName ?? ""),
+  );
+  let selected = ready.find(({ metadata }) => metadata?.id === onboarding.agentIntegrationId);
+  if (!selected && onboarding.agentHarness !== "AGENT_HARNESS_SUPERPLANE") {
+    // Use the same integration priority as existing custom automations in older workspaces.
+    for (const provider of integrationAgentComponents.keys()) {
+      selected = ready.find(({ metadata }) => metadata?.integrationName === provider);
+      if (selected) break;
+    }
   }
+  const component = integrationAgentComponents.get(selected?.metadata?.integrationName ?? "");
+  if (!component) return hosted;
+  return { component, credentialSource: "integration", credentialIntegrationName: selected?.metadata?.name };
 }
 
-export function customAutomationDraft(automation?: FactoriesFactoryCustomAutomation): PlanningReviewDraft {
+export function customAutomationDraft(
+  automation?: FactoriesFactoryCustomAutomation,
+  customProvider = false,
+): PlanningReviewDraft {
   const settings = automation?.settings;
   const agent = settings?.agent;
   const steps = settings
@@ -210,7 +284,9 @@ export function customAutomationDraft(automation?: FactoriesFactoryCustomAutomat
         expanded: true,
         component: agent?.component,
         configuration: {
-          ...customAutomationAgentConfiguration(agent),
+          model: agent?.model ?? "",
+          credentials: customAutomationCredentials(agent),
+          ...(customProvider ? { llmProvider: "custom" } : {}),
           steps,
           executionTimeoutSeconds: customAutomationTimeout(settings?.executionTimeoutSeconds),
           skipSetupCommands: settings?.skipSetupCommands === true,
@@ -222,14 +298,10 @@ export function customAutomationDraft(automation?: FactoriesFactoryCustomAutomat
   };
 }
 
-function customAutomationAgentConfiguration(
-  agent: FactoriesFactoryCustomAutomationSettings["agent"],
-): Record<string, string> {
-  return {
-    model: agent?.model ?? "",
-    credentialSource: agent?.credentialSource ?? "",
-    credentialIntegrationName: agent?.credentialIntegrationName ?? "",
-  };
+export function customAutomationCredentials(agent: FactoriesFactoryCustomAutomationSettings["agent"]) {
+  return agent?.credentialSource
+    ? { source: agent.credentialSource, integration: { name: agent.credentialIntegrationName } }
+    : undefined;
 }
 
 export function customAutomationSettings(
@@ -241,9 +313,7 @@ export function customAutomationSettings(
   const component = draft.components[0];
   const configuration = component?.configuration ?? {};
   const steps = Array.isArray(configuration.steps) ? (configuration.steps as PlanningReviewStep[]) : [];
-  const credentialSource = typeof configuration.credentialSource === "string" ? configuration.credentialSource : "";
-  const credentialIntegrationName =
-    typeof configuration.credentialIntegrationName === "string" ? configuration.credentialIntegrationName : "";
+  const credentials = configuration.credentials as { source?: string; integration?: { name?: string } } | undefined;
   const superPlaneAgent = component?.component === "runnerSuperPlane";
   return {
     startMode: CUSTOM_AUTOMATION_START_MODES[mode],
@@ -256,8 +326,8 @@ export function customAutomationSettings(
       ? {
           component: component.component,
           model: typeof configuration.model === "string" ? configuration.model : "",
-          ...(!superPlaneAgent && credentialSource
-            ? { credentialSource, credentialIntegrationName: credentialIntegrationName || undefined }
+          ...(!superPlaneAgent && credentials?.source
+            ? { credentialSource: credentials.source, credentialIntegrationName: credentials.integration?.name }
             : {}),
         }
       : undefined,
