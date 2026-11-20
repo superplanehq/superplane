@@ -2951,11 +2951,11 @@ ALTER TABLE ONLY public.factory_work_order_line_dispatches
 
 
 --
--- Name: factory_work_order_queue_items factory_work_order_queue_items_line_dispatch_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: factory_work_order_queue_items factory_work_order_queue_items_line_dispatch_step_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.factory_work_order_queue_items
-    ADD CONSTRAINT factory_work_order_queue_items_line_dispatch_id_key UNIQUE (line_dispatch_id);
+    ADD CONSTRAINT factory_work_order_queue_items_line_dispatch_step_key UNIQUE (line_dispatch_id, step_index);
 
 
 --
@@ -6727,7 +6727,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261120050111	f
+20261120141140	f
 \.
 
 

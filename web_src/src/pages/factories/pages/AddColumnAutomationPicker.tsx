@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { logoDarkInvertClass } from "@/lib/logoDarkMode";
 import { cn } from "@/lib/utils";
@@ -51,20 +52,13 @@ export function AddColumnAutomationPicker({
             const disabled = taken || Boolean(unavailableReason);
             return (
               <li key={entry.id}>
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
                   disabled={disabled}
-                  onClick={() => {
-                    if (disabled) {
-                      return;
-                    }
-                    onSelect(entry);
-                  }}
+                  onClick={() => onSelect(entry)}
                   data-testid={`add-column-automation-template-${entry.id}`}
-                  className={cn(
-                    "flex h-full min-h-24 w-full flex-col items-start gap-1 rounded-lg border border-border bg-card px-3 py-2.5 text-left shadow-sm transition-colors",
-                    disabled ? "cursor-not-allowed opacity-60" : "hover:border-foreground/20 hover:bg-accent/40",
-                  )}
+                  className="h-full min-h-24 w-full flex-col items-start justify-start gap-1 whitespace-normal rounded-lg border border-border bg-card px-3 py-2.5 text-left font-normal shadow-sm hover:border-foreground/20 hover:bg-accent/40 disabled:opacity-60 dark:text-foreground dark:hover:bg-accent/40"
                 >
                   <CatalogGlyph entry={entry} />
                   <span className="text-[13px] font-medium tracking-[-0.01em] leading-5 text-foreground">
@@ -73,7 +67,7 @@ export function AddColumnAutomationPicker({
                   <span className="workspace-body-text text-muted-foreground">
                     {taken ? COLUMN_AUTOMATIONS_COPY.sourceTaken : (unavailableReason ?? entry.description)}
                   </span>
-                </button>
+                </Button>
               </li>
             );
           })}

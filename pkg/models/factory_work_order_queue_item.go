@@ -12,8 +12,9 @@ import (
 // FactoryWorkOrderQueueItem is a line dispatch waiting for admission into
 // a step that is at its maxParallelism. No run or execution exists for it
 // yet; both are created when the step admits the dispatch, and the queue
-// item is deleted. A dispatch waits at no more than one step at a time
-// (line_dispatch_id is unique).
+// item is deleted. A dispatch waits at one stage at a time, with at most
+// one item per step: a custom stage can queue several of its automations
+// (line_dispatch_id and step_index are unique together).
 type FactoryWorkOrderQueueItem struct {
 	ID             uuid.UUID
 	OrganizationID uuid.UUID
@@ -42,7 +43,9 @@ type FactoryWorkOrderQueueItemRecord struct {
 // ListFactoryWorkOrderQueueItemsByLineDispatchIDs bulk-loads queue items
 // for the given line dispatches, keyed by line_dispatch_id. Position is
 // the item's 1-based place in its step's FIFO queue across all work
-// orders of the line, so the UI can render "3rd in queue".
+// orders of the line, so the UI can render "3rd in queue". When a custom
+// stage queues several automations, the item with the lowest step index
+// represents the dispatch.
 func ListFactoryWorkOrderQueueItemsByLineDispatchIDs(
 	tx *gorm.DB,
 	lineDispatchIDs []uuid.UUID,
@@ -67,6 +70,7 @@ func ListFactoryWorkOrderQueueItemsByLineDispatchIDs(
 			) + 1 AS position
 		`).
 		Where("q.line_dispatch_id IN ?", lineDispatchIDs).
+		Order("q.step_index ASC").
 		Scan(&records).
 		Error
 	if err != nil {
@@ -74,7 +78,9 @@ func ListFactoryWorkOrderQueueItemsByLineDispatchIDs(
 	}
 
 	for _, record := range records {
-		result[record.LineDispatchID] = record
+		if _, exists := result[record.LineDispatchID]; !exists {
+			result[record.LineDispatchID] = record
+		}
 	}
 
 	return result, nil
@@ -278,12 +284,49 @@ func (o *FactoryWorkOrder) dropQueuedLineWork(tx *gorm.DB) error {
 // whose work order is no longer open are dropped (their dispatch finishes
 // as cancelled) without using a slot. Returns one result per admitted
 // dispatch, oldest first; empty when nothing was admitted.
+//
+// A run without a stage key predates stage snapshots. It counts against
+// every stage of its app, so when it ends, each of those stages can have
+// a free slot.
 func AdmitQueuedForStep(tx *gorm.DB, lineID, appID uuid.UUID, stageKey string) ([]*FactoryLineStepResult, error) {
 	line, err := lockFactoryLineForStepAdmission(tx, lineID)
 	if err != nil {
 		return nil, err
 	}
 
+	stageKeys := []string{stageKey}
+	if stageKey == "" {
+		stageKeys, err = queuedFactoryStageKeys(tx, lineID, appID)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	var admitted []*FactoryLineStepResult
+	for _, key := range stageKeys {
+		results, err := admitQueuedForStage(tx, line, appID, key)
+		if err != nil {
+			return nil, err
+		}
+		admitted = append(admitted, results...)
+	}
+	return admitted, nil
+}
+
+func queuedFactoryStageKeys(tx *gorm.DB, lineID, appID uuid.UUID) ([]string, error) {
+	var keys []string
+	err := tx.
+		Model(&FactoryWorkOrderQueueItem{}).
+		Distinct().
+		Where("line_id = ? AND app_id = ?", lineID, appID).
+		Order("stage_key").
+		Pluck("stage_key", &keys).
+		Error
+	return keys, err
+}
+
+func admitQueuedForStage(tx *gorm.DB, line *FactoryLine, appID uuid.UUID, stageKey string) ([]*FactoryLineStepResult, error) {
+	lineID := line.ID
 	var admitted []*FactoryLineStepResult
 	for {
 		item, err := findOldestFactoryWorkOrderQueueItem(tx, lineID, appID, stageKey)

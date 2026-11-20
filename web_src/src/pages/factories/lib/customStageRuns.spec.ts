@@ -132,4 +132,42 @@ describe("collectCustomStageRuns", () => {
 
     expect(board.map((column) => column.runs.length)).toEqual([1, 0]);
   });
+
+  it("keeps a running task with its app after the steps are reordered", () => {
+    const task: FactoriesWorkOrder = {
+      id: "wo-reordered",
+      state: "STATE_OPEN",
+      lineDispatches: [
+        {
+          line: { id: "line-1" },
+          stepExecutions: [
+            {
+              id: "app-a-running",
+              stepIndex: 0,
+              stageKey: "phase-0",
+              state: "STATE_STARTED",
+              run: { appId: "app-a" },
+            },
+          ],
+        },
+      ],
+    };
+    const board = buildLinePhaseBoard(
+      {
+        id: "line-1",
+        steps: [{ app: { app: "app-b" } }, { app: { app: "app-a" } }],
+        stages: [
+          { key: "phase-0", kind: "STAGE_KIND_PHASE", stepIndex: 0 },
+          { key: "phase-1", kind: "STAGE_KIND_PHASE", stepIndex: 1 },
+        ],
+      },
+      [task],
+      [
+        { id: "app-a", name: "A" },
+        { id: "app-b", name: "B" },
+      ],
+    );
+
+    expect(board.map((column) => column.runs.length)).toEqual([0, 1]);
+  });
 });

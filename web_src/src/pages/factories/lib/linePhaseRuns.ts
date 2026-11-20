@@ -403,15 +403,25 @@ function liveColumnIndexForExecution(
     return undefined;
   }
 
+  const executionAppId = execution.run?.appId?.trim();
+  const runsExecutionApp = (index: number) => !executionAppId || steps[index]?.app?.app?.trim() === executionAppId;
+
   // Dispatch step indexes count custom automations, so the saved stage key
   // decides the phase lane. Custom stage lanes come from collectCustomStageRuns.
+  // Phase keys follow step positions, so a step reorder can give the key to
+  // another app; the app check below handles that case.
   const stageKey = execution.stageKey?.trim();
   if (stageKey) {
     const stage = stages.find((candidate) => candidate.key === stageKey);
     if (stage?.kind === "STAGE_KIND_CUSTOM" || stageKey.startsWith("custom-")) {
       return undefined;
     }
-    if (stage?.stepIndex != null && stage.stepIndex >= 0 && stage.stepIndex < steps.length) {
+    if (
+      stage?.stepIndex != null &&
+      stage.stepIndex >= 0 &&
+      stage.stepIndex < steps.length &&
+      runsExecutionApp(stage.stepIndex)
+    ) {
       return stage.stepIndex;
     }
   }
@@ -420,9 +430,7 @@ function liveColumnIndexForExecution(
   // index onto a different automation. Keep the snapshot index when the
   // app still matches; otherwise place the card on the live column with
   // the same app.
-  const executionAppId = execution.run?.appId?.trim();
-  const liveAppId = steps[stepIndex]?.app?.app?.trim();
-  if (stepIndex < steps.length && (!executionAppId || liveAppId === executionAppId)) {
+  if (stepIndex < steps.length && runsExecutionApp(stepIndex)) {
     return stepIndex;
   }
 

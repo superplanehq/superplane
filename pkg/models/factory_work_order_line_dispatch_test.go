@@ -178,25 +178,33 @@ func Test__FactoryLine__DispatchStage__QueuesCustomStageAboveLimit(t *testing.T)
 	stage := models.FactoryLineStage{ID: stageID, Key: "custom-" + stageID.String(), Name: "QA", Kind: models.FactoryLineStageCustom}
 	stages := append([]models.FactoryLineStage{line.StagesValue()[0], stage}, line.StagesValue()[1:]...)
 	require.NoError(t, line.UpdateConfiguration(db, nil, nil, nil, stages))
-	custom, _ := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "Lint", "start")
-	require.NoError(t, custom.SetColumnKey(db, stage.Key))
+	lint, _ := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "Lint", "start")
+	require.NoError(t, lint.SetColumnKey(db, stage.Key))
+	tests, _ := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "Tests", "start")
+	require.NoError(t, tests.SetColumnKey(db, stage.Key))
 
 	limit := models.DefaultFactoryLineStepMaxParallelism
+	var lastDispatch *models.FactoryWorkOrderLineDispatch
 	var last []*models.FactoryLineStepResult
 	for index := 0; index <= limit; index++ {
 		order, err := factory.CreateWorkOrder(db, fmt.Sprintf("Order %d", index), "", &r.User, nil, nil)
 		require.NoError(t, err)
 		require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
 			var dispatchErr error
-			_, last, dispatchErr = line.DispatchStage(tx, order)
+			lastDispatch, last, dispatchErr = line.DispatchStage(tx, order)
 			return dispatchErr
 		}))
 	}
 
-	require.Len(t, last, 1)
-	assert.Nil(t, last[0].Execution)
-	require.NotNil(t, last[0].QueueItem)
-	assert.Equal(t, stage.Key, last[0].QueueItem.StageKey)
+	require.Len(t, last, 2)
+	for _, result := range last {
+		assert.Nil(t, result.Execution)
+		require.NotNil(t, result.QueueItem)
+		assert.Equal(t, stage.Key, result.QueueItem.StageKey)
+	}
+	byDispatch, err := models.ListFactoryWorkOrderQueueItemsByLineDispatchIDs(db, []uuid.UUID{lastDispatch.ID})
+	require.NoError(t, err)
+	assert.Equal(t, min(last[0].QueueItem.StepIndex, last[1].QueueItem.StepIndex), byDispatch[lastDispatch.ID].StepIndex)
 }
 
 func Test__FactoryLine__Queue__KeepsRepeatedAppStageLimitsSeparate(t *testing.T) {
@@ -302,6 +310,64 @@ func Test__FactoryLine__Queue__IncludesWorkWithoutStageSnapshots(t *testing.T) {
 	}))
 	require.Len(t, admitted, 1)
 	assert.Equal(t, secondDispatch.ID, admitted[0].Execution.LineDispatchID)
+}
+
+func Test__FactoryLine__Queue__AdmitsStageWorkWhenWorkWithoutStageSnapshotEnds(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	app, entrypoint := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "Implement", "start")
+	limit := 1
+	line, err := factory.CreateLine(db, "ship", []models.FactoryLineStep{{
+		Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entrypoint, MaxParallelism: &limit,
+	}})
+	require.NoError(t, err)
+	legacy, err := factory.CreateWorkOrder(db, "Legacy", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	waiting, err := factory.CreateWorkOrder(db, "Waiting", "", &r.User, nil, nil)
+	require.NoError(t, err)
+
+	var legacyRun *models.FactoryLineStepResult
+	var waitingDispatch *models.FactoryWorkOrderLineDispatch
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		for _, order := range []*models.FactoryWorkOrder{legacy, waiting} {
+			if openErr := order.TransitionOnDispatch(tx, &r.User); openErr != nil {
+				return openErr
+			}
+		}
+		legacyDispatch, result, dispatchErr := line.Dispatch(tx, legacy)
+		if dispatchErr != nil {
+			return dispatchErr
+		}
+		legacyRun = result
+		legacyDispatch.Steps[0].StageKey = ""
+		legacyDispatch.Steps[0].StageName = ""
+		legacyDispatch.Steps[0].StageKind = ""
+		if updateErr := tx.Model(legacyDispatch).Update("steps", legacyDispatch.Steps).Error; updateErr != nil {
+			return updateErr
+		}
+
+		var queued *models.FactoryLineStepResult
+		waitingDispatch, queued, dispatchErr = line.Dispatch(tx, waiting)
+		if dispatchErr != nil {
+			return dispatchErr
+		}
+		if queued.QueueItem == nil || queued.QueueItem.StageKey != "phase-0" {
+			return fmt.Errorf("expected the new task to wait in phase-0")
+		}
+		return nil
+	}))
+
+	require.NoError(t, legacyRun.Execution.MarkFinished(db, models.CanvasRunResultPassed))
+	var admitted []*models.FactoryLineStepResult
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		var admitErr error
+		admitted, admitErr = models.AdmitQueuedForStep(tx, line.ID, app.ID, "")
+		return admitErr
+	}))
+	require.Len(t, admitted, 1)
+	assert.Equal(t, waitingDispatch.ID, admitted[0].Execution.LineDispatchID)
 }
 
 func Test__FactoryLine__DispatchFrom__StartsRequestedStep(t *testing.T) {

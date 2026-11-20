@@ -1,0 +1,5 @@
+ALTER TABLE factory_work_order_queue_items
+  DROP CONSTRAINT factory_work_order_queue_items_line_dispatch_id_key;
+
+ALTER TABLE factory_work_order_queue_items
+  ADD CONSTRAINT factory_work_order_queue_items_line_dispatch_step_key UNIQUE (line_dispatch_id, step_index);
