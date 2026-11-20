@@ -24,7 +24,11 @@ func UpdateCanvas(
 	description *string,
 ) (*pb.UpdateCanvasResponse, error) {
 	err := db.Transaction(func(tx *gorm.DB) error {
-		return UpdateCanvasInTransaction(tx, canvas, name, description)
+		locked, err := lockEditableCanvas(tx, canvas)
+		if err != nil {
+			return err
+		}
+		return saveCanvasMetadata(tx, locked, name, description)
 	})
 
 	if err != nil {
@@ -97,6 +101,10 @@ func updateCanvasInTransaction(
 		return err
 	}
 
+	return saveCanvasMetadata(tx, canvas, name, description)
+}
+
+func saveCanvasMetadata(tx *gorm.DB, canvas *models.Canvas, name *string, description *string) error {
 	updates, err := buildCanvasMetadataUpdates(canvas, name, description)
 	if err != nil {
 		return err
@@ -110,7 +118,7 @@ func updateCanvasInTransaction(
 
 	return mapCanvasNameUniqueConstraintError(
 		tx.Model(&models.Canvas{}).
-			Where("organization_id = ? AND id = ?", organizationUUID, canvasID).
+			Where("organization_id = ? AND id = ?", canvas.OrganizationID, canvas.ID).
 			Updates(updates).Error,
 	)
 }

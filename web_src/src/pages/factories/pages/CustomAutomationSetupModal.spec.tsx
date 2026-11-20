@@ -1,8 +1,12 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, useLocation, useNavigate } from "react-router";
-import { beforeEach, describe, expect, it, vi } from "bun:test";
+import { load } from "js-yaml";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { BrowserRouter, Link, MemoryRouter, useLocation, useNavigate } from "react-router";
+import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
+import { useState, type ReactNode } from "react";
 import type { CanvasesCanvasRun, FactoriesFactoryCustomAutomation } from "@/api-client";
+import { useCommandPaletteShortcuts } from "@/components/GlobalCommandPalette/hooks";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { FactoriesLayoutContext } from "../layout/factoriesLayoutContext";
 import { CustomAutomationSetupModal } from "./CustomAutomationSetupModal";
@@ -17,11 +21,13 @@ const hooks = vi.hoisted(() => ({
   runtime: vi.fn(),
 }));
 vi.mock("@/hooks/useFactoryCustomAutomationData", () => ({
+  factoryCustomAutomationKey: (...parts: string[]) => ["custom", ...parts],
   useFactoryCustomAutomation: (...args: unknown[]) => hooks.describe(...args),
   useCreateFactoryCustomAutomation: () => ({ mutateAsync: hooks.create }),
   useUpdateFactoryCustomAutomation: () => ({ mutateAsync: hooks.update }),
 }));
 vi.mock("@/hooks/useFactoryData", () => ({
+  factoryAppsKey: (...parts: string[]) => ["factory-apps", ...parts],
   useDeleteFactoryAutomation: () => ({ mutateAsync: hooks.delete }),
 }));
 vi.mock("@/hooks/useCanvasData", () => ({
@@ -49,7 +55,20 @@ const run: CanvasesCanvasRun = {
   task: { id: "task-1", key: "SP-123", title: "Preview settings" },
 };
 
+const createApp = vi.fn(async () => {});
+
 function BrowserControls() {
+  useCommandPaletteShortcuts({
+    createCanvas: createApp,
+    createCanvasDisabled: false,
+    enabled: true,
+    open: false,
+    page: "root",
+    search: "",
+    setOpen: () => {},
+    setPage: () => {},
+    setSearch: () => {},
+  });
   const location = useLocation();
   const navigate = useNavigate();
   return (
@@ -65,33 +84,44 @@ function renderModal(
   search = "?customAutomation=custom-1",
   automationId: string | undefined = search.includes("customAutomation=new") ? undefined : "custom-1",
   columnKey?: "backlog" | "implement" | "verify" | "done",
+  yamlEnabled = false,
 ) {
   const onClose = vi.fn();
   render(
     <MemoryRouter initialEntries={[`/org/workspaces/sp/lines/line${search}`]}>
       <BrowserControls />
-      <FactoriesLayoutContext.Provider
-        value={{
-          organizationId: "org",
-          factoryId: "factory",
-          factoryKey: "sp",
-          factory: null,
-          factories: [],
-          openCreateWorkOrder: vi.fn(),
-        }}
-      >
-        <ThemeProvider>
-          <CustomAutomationSetupModal
-            lineId="line"
-            automationId={automationId}
-            columnKey={columnKey}
-            onClose={onClose}
-          />
-        </ThemeProvider>
-      </FactoriesLayoutContext.Provider>
+      <AutomationModalProviders>
+        <CustomAutomationSetupModal
+          lineId="line"
+          automationId={automationId}
+          columnKey={columnKey}
+          yamlEnabled={yamlEnabled}
+          onClose={onClose}
+        />
+      </AutomationModalProviders>
     </MemoryRouter>,
   );
   return onClose;
+}
+
+function AutomationModalProviders({ children }: { children: ReactNode }) {
+  const [client] = useState(() => new QueryClient({ defaultOptions: { queries: { retry: false } } }));
+  return (
+    <FactoriesLayoutContext.Provider
+      value={{
+        organizationId: "org",
+        factoryId: "factory",
+        factoryKey: "sp",
+        factory: null,
+        factories: [],
+        openCreateWorkOrder: vi.fn(),
+      }}
+    >
+      <QueryClientProvider client={client}>
+        <ThemeProvider>{children}</ThemeProvider>
+      </QueryClientProvider>
+    </FactoriesLayoutContext.Provider>
+  );
 }
 
 describe("custom automation configuration run history", () => {
@@ -236,5 +266,274 @@ describe("custom automation configuration run history", () => {
     await user.click(screen.getByRole("button", { name: "Delete" }));
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
     expect(hooks.delete).toHaveBeenCalledWith("custom-1");
+  });
+});
+
+describe("custom automation YAML draft", () => {
+  const savedYaml = `# Saved from HTTP
+apiVersion: v2
+kind: Automation
+name: Preview
+agent:
+  harness: codex
+  model: gpt-5
+  credentials: {source: integration, name: code-review}
+skip_setup_commands: true
+skip_repository_checkout: true
+triggers:
+  - use: task_enters_stage
+steps:
+  - name: Print marker
+    bash: echo original
+  - name: Review
+    working_directory: repo
+    prompt: Review the preview.
+`;
+  const savedAutomation = {
+    id: "custom-1",
+    factory_id: "factory",
+    stage: "backlog",
+    name: "Preview",
+    yaml: savedYaml,
+    revision: 1,
+  };
+
+  beforeEach(() => hooks.runs.mockReturnValue({ data: { pages: [] } }));
+  afterEach(() => vi.restoreAllMocks());
+
+  it("opens the form editor when the server verifies it can preserve the automation", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      Response.json(
+        { message: "Open this automation in the form.", can_edit_in_form: true, live_version_id: "version-42" },
+        { status: 409 },
+      ),
+    );
+    hooks.describe.mockReturnValue({ data: automation, isFetchedAfterMount: true });
+    hooks.update.mockResolvedValue(automation);
+    const onClose = renderModal("?customAutomation=custom-1", "custom-1", "verify", true);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Edit in form" }));
+    expect(screen.getByLabelText("Automation name")).toHaveValue("Deploy preview");
+    await user.clear(screen.getByLabelText("Automation name"));
+    await user.type(screen.getByLabelText("Automation name"), "Updated preview");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+    expect(hooks.update).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "Updated preview", expectedLiveVersionId: "version-42" }),
+    );
+  });
+
+  it("protects a custom graph that the form cannot preserve", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      Response.json({ message: "Open the developer canvas." }, { status: 409 }),
+    );
+    renderModal("?customAutomation=custom-1", "custom-1", "verify", true);
+    expect(await screen.findByRole("alert")).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Edit in form" })).not.toBeInTheDocument();
+  });
+
+  it("blocks the app creation shortcut only while the automation draft is dirty", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json(savedAutomation));
+    createApp.mockClear();
+    renderModal("?customAutomation=custom-1", "custom-1", "backlog", true);
+    const name = await screen.findByLabelText("Automation name");
+    const cancel = screen.getByRole("button", { name: "Cancel" });
+    cancel.focus();
+    fireEvent.keyDown(cancel, { key: "/", ctrlKey: true });
+    expect(createApp).toHaveBeenCalledTimes(1);
+
+    fireEvent.change(name, { target: { value: "Unsaved preview" } });
+    cancel.focus();
+    fireEvent.keyDown(cancel, { key: "/", ctrlKey: true });
+    fireEvent.keyDown(cancel, { key: "/", metaKey: true });
+    expect(createApp).toHaveBeenCalledTimes(1);
+    expect(name).toHaveValue("Unsaved preview");
+
+    await userEvent.setup().click(screen.getByRole("button", { name: "Edit YAML" }));
+    fireEvent.change(screen.getByLabelText("Automation YAML"), { target: { value: savedYaml } });
+    fireEvent.keyDown(screen.getByRole("button", { name: "Cancel" }), { key: "/", metaKey: true });
+    expect(createApp).toHaveBeenCalledTimes(2);
+  });
+
+  it("opens the visual editor with an empty step list for a new automation", async () => {
+    renderModal("?customAutomation=new", undefined, "verify", true);
+    const user = userEvent.setup();
+    expect(screen.queryByLabelText("Automation YAML")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add step" })).toBeEnabled();
+    expect(screen.queryAllByRole("button", { name: "Remove step" }).length).toBe(0);
+
+    await user.click(screen.getByRole("button", { name: "Edit YAML" }));
+    const yaml = screen.getByLabelText<HTMLTextAreaElement>("Automation YAML");
+    expect(yaml.value).toMatch(/^steps: \[\]$/m);
+    fireEvent.change(yaml, { target: { value: `${yaml.value}# Draft\n` } });
+    await user.click(screen.getByRole("button", { name: "Open visual editor" }));
+    expect(screen.getByRole("button", { name: "Add step" })).toBeEnabled();
+  });
+
+  it("projects changes between the visual editor and YAML before Save and keeps the exact edited source", async () => {
+    const fetch = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(async (_url, init) =>
+        Response.json(init?.method === "PUT" ? { ...savedAutomation, revision: 2 } : savedAutomation),
+      );
+    const onClose = renderModal("?customAutomation=custom-1", "custom-1", "verify", true);
+    const user = userEvent.setup();
+    expect(await screen.findByLabelText("Automation name")).toHaveValue("Preview");
+    expect(screen.getAllByText("When a task enters Backlog").length).toBeGreaterThan(0);
+    await user.click(screen.getByRole("button", { name: /Review.*Review the preview/ }));
+    fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Review changes" } });
+
+    await user.click(screen.getByRole("button", { name: "Edit YAML" }));
+    expect(screen.getByLabelText<HTMLTextAreaElement>("Automation YAML").value).toContain("Review changes");
+    await user.click(screen.getByRole("button", { name: "Open visual editor" }));
+    fireEvent.change(screen.getByLabelText("Automation name"), { target: { value: "Board preview" } });
+    await user.click(screen.getByRole("button", { name: "Edit YAML" }));
+    const projected = (screen.getByLabelText("Automation YAML") as HTMLTextAreaElement).value;
+    expect(projected).toContain("name: Board preview");
+    expect(load(projected)).toMatchObject({
+      agent: { harness: "codex", model: "gpt-5", credentials: { source: "integration", name: "code-review" } },
+      skip_setup_commands: true,
+      skip_repository_checkout: true,
+      steps: [{ name: "Print marker" }, { name: "Review changes", working_directory: "repo" }],
+    });
+    const edited = `# Unsaved comment\n${projected.replace("echo original", "echo edited")}`;
+    fireEvent.change(screen.getByLabelText("Automation YAML"), { target: { value: edited } });
+    await user.click(screen.getByRole("button", { name: "Open visual editor" }));
+    expect(screen.getByRole("button", { name: /Print marker.*echo edited/ })).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Edit YAML" }));
+    expect(screen.getByLabelText("Automation YAML")).toHaveValue(edited);
+    expect(fetch).toHaveBeenCalledTimes(1);
+
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+    expect(fetch).toHaveBeenLastCalledWith(
+      "/api/v2/automations/custom-1",
+      expect.objectContaining({ method: "PUT", body: JSON.stringify({ yaml: edited }) }),
+    );
+  });
+
+  it("keeps invalid YAML editable and confirms before discarding changes", async () => {
+    const fetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json(savedAutomation));
+    const onClose = renderModal("?customAutomation=custom-1", "custom-1", "backlog", true);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Edit YAML" }));
+    const invalid = savedYaml.replace("use: task_enters_stage", "use: pull_request_updated");
+    fireEvent.change(screen.getByLabelText("Automation YAML"), { target: { value: invalid } });
+    await user.click(screen.getByRole("button", { name: "Open visual editor" }));
+    expect(screen.getByRole("alert")).toHaveTextContent("Verify");
+    expect(screen.getByLabelText("Automation YAML")).toHaveValue(invalid);
+    expect(screen.queryByLabelText("Automation name")).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Automation YAML"), { target: { value: savedYaml + "# Fixed\n" } });
+    await user.click(screen.getByRole("button", { name: "Open visual editor" }));
+    expect(screen.getByLabelText("Automation name")).toHaveValue("Preview");
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    const confirmation = within(screen.getByRole("alertdialog"));
+    expect(onClose).not.toHaveBeenCalled();
+    await user.click(confirmation.getByRole("button", { name: "Discard changes" }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("saves the column run setting from the visual editor in the YAML definition", async () => {
+    const fetch = vi.spyOn(globalThis, "fetch").mockImplementation(async () => Response.json(savedAutomation));
+    const onClose = renderModal("?customAutomation=custom-1", "custom-1", "backlog", true);
+    const user = userEvent.setup();
+
+    const runs = within(await screen.findByRole("tablist", { name: "Runs" }));
+    expect(runs.getAllByRole("tab")).toHaveLength(2);
+    expect(runs.getByRole("tab", { name: "on a task", selected: true })).toBeVisible();
+    await user.click(runs.getByRole("tab", { name: "with no task" }));
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+    const saved = JSON.parse(String(fetch.mock.calls.at(-1)?.[1]?.body)).yaml;
+    expect(saved).toContain("runs_on_task: false");
+    expect(saved).toContain("use: manual");
+    expect(saved).not.toContain("use: task_enters_stage");
+  });
+
+  it("retains a rejected draft and shows the server diagnostic", async () => {
+    const fetch = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(Response.json(savedAutomation))
+      .mockResolvedValueOnce(
+        Response.json(
+          {
+            diagnostics: [
+              { path: "steps[0].secrets[0]", line: 10, column: 15, message: "Create this secret in the organization." },
+            ],
+          },
+          { status: 400 },
+        ),
+      );
+    const onClose = renderModal("?customAutomation=custom-1", "custom-1", "backlog", true);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Edit YAML" }));
+    const draft = savedYaml.replace(
+      "    bash: echo original\n",
+      "    bash: echo original\n    secrets: [missing-secret]\n",
+    );
+    fireEvent.change(screen.getByLabelText("Automation YAML"), { target: { value: draft } });
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "steps[0].secrets[0] · Line 10, column 15 · Create this secret in the organization.",
+    );
+    expect(screen.getByLabelText("Automation YAML")).toHaveValue(draft);
+    expect(onClose).not.toHaveBeenCalled();
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("closes cleanly after visiting YAML and Runs without edits", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json(savedAutomation));
+    const onClose = renderModal("?customAutomation=custom-1", "custom-1", "backlog", true);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Edit YAML" }));
+    await user.click(screen.getByRole("tab", { name: "Runs" }));
+    expect(screen.queryByRole("button", { name: "Open visual editor" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("tab", { name: "Configuration" }));
+    expect(screen.getByLabelText("Automation YAML")).toHaveValue(savedYaml);
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+  });
+
+  it("preserves a dirty draft when the browser Back confirmation is declined", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json(savedAutomation));
+    const confirm = vi.spyOn(window, "confirm").mockReturnValueOnce(false).mockReturnValueOnce(true);
+    const boardPath = "/org/workspaces/sp/lines/line";
+    window.history.replaceState(null, "", boardPath);
+
+    function Board() {
+      const { search } = useLocation();
+      return search ? (
+        <CustomAutomationSetupModal lineId="line" automationId="custom-1" yamlEnabled onClose={() => {}} />
+      ) : (
+        <Link to="?customAutomation=custom-1">Open automation</Link>
+      );
+    }
+
+    render(
+      <BrowserRouter>
+        <AutomationModalProviders>
+          <Board />
+        </AutomationModalProviders>
+      </BrowserRouter>,
+    );
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("link", { name: "Open automation" }));
+    fireEvent.change(await screen.findByLabelText("Automation name"), { target: { value: "Unsaved preview" } });
+    await user.click(screen.getByRole("tab", { name: "Runs" }));
+    await act(async () => window.history.back());
+    expect(await screen.findByLabelText("Automation name")).toHaveValue("Unsaved preview");
+    expect(confirm).not.toHaveBeenCalled();
+
+    await act(async () => window.history.back());
+    await waitFor(() => expect(confirm).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(window.location.search).toBe("?customAutomation=custom-1"));
+    expect(screen.getByLabelText("Automation name")).toHaveValue("Unsaved preview");
+
+    await act(async () => window.history.back());
+    expect(await screen.findByRole("link", { name: "Open automation" })).toBeVisible();
+    expect(confirm).toHaveBeenCalledTimes(2);
   });
 });

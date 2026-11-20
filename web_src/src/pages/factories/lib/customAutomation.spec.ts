@@ -3,6 +3,8 @@ import { describe, expect, it } from "bun:test";
 import { buildColumnAutomations, columnAutomationOpenPath } from "./columnAutomations";
 import {
   customAutomationDraft,
+  customAutomationTriggersForRun,
+  newCustomAutomationTrigger,
   customAutomationModeCopy,
   customAutomationSettings,
   customAutomationSchedule,
@@ -249,5 +251,18 @@ describe("custom automation settings", () => {
     expect(customAutomationIdFromSearch("?customAutomation=review-1")).toBe("review-1");
     expect(customAutomationIdFromSearch("?customVerification=review-1")).toBe("review-1");
     expect(customAutomationIdFromSearch("")).toBeUndefined();
+  });
+});
+
+describe("trigger run context", () => {
+  it.each([
+    [undefined, ["manual", "automatic", "leave", "scheduled"]],
+    [true, ["manual", "automatic", "leave"]],
+    [false, ["manual", "scheduled"]],
+  ] as const)("filters triggers for runsOnTask=%s", (runsOnTask, expected) => {
+    const triggers = (["manual", "automatic", "leave", "scheduled"] as const).map((mode) =>
+      newCustomAutomationTrigger(mode),
+    );
+    expect(customAutomationTriggersForRun(triggers, runsOnTask).map(({ mode }) => mode)).toEqual([...expected]);
   });
 });

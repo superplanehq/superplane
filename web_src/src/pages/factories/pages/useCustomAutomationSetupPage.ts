@@ -30,6 +30,7 @@ export function useCustomAutomationSetupPage(args: {
   factory?: FactoriesFactory;
   lineId?: string;
   automationId?: string;
+  expectedLiveVersionId?: string;
   columnKey?: "backlog" | "implement" | "verify" | "done";
 }) {
   const described = useFactoryCustomAutomation(args.organizationId, args.factoryId, args.automationId);
@@ -103,7 +104,7 @@ export function useCustomAutomationSetupPage(args: {
     };
     try {
       if (args.automationId) {
-        await update.mutateAsync(input);
+        await update.mutateAsync({ ...input, expectedLiveVersionId: args.expectedLiveVersionId });
       } else {
         await create.mutateAsync({ ...input, columnKey });
       }

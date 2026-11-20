@@ -1502,6 +1502,8 @@ message UpdateFactoryCustomAutomationRequest {
   string automation_id = 2;
   string name = 3;
   FactoryCustomAutomation.Settings settings = 4;
+  // Use the version verified for editing when opening the fallback form.
+  string expected_live_version_id = 5;
 }
 
 message UpdateFactoryCustomAutomationResponse {
