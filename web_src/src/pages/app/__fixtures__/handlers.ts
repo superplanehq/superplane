@@ -242,6 +242,24 @@ function canvasDetailResponse(fixture: CanvasAppFixture) {
   return { canvas: { ...canvas, metadata: { ...metadata, liveVersionId } } };
 }
 
+// Draft-version listing must stay empty (no open drafts); every other version
+// query returns the captured history. `?limit=1` resolves against the
+// `versionsLatest` slot when the fixture provides one; otherwise it falls
+// back to slicing the general versions list so a caller can seed both from
+// a single field.
+function resolveCanvasVersions(fixture: CanvasAppFixture, url: URL): FixtureResult {
+  if (url.searchParams.get("state") === "STATE_DRAFT") {
+    return { json: { versions: [], totalCount: 0, hasNextPage: false } };
+  }
+  const limit = Number.parseInt(url.searchParams.get("limit") ?? "", 10);
+  if (limit === 1) {
+    if (fixture.versionsLatest) return { json: fixture.versionsLatest };
+    const versionsFallback = fixture.versions?.versions?.slice(0, 1) ?? [];
+    return { json: { versions: versionsFallback, totalCount: versionsFallback.length, hasNextPage: false } };
+  }
+  return { json: fixture.versions ?? { versions: [], totalCount: 0, hasNextPage: false } };
+}
+
 const re = (pattern: string): RegExp => new RegExp(`^${pattern}$`);
 
 const CANVAS = "/api/v1/canvases/[^/]+";
@@ -272,25 +290,9 @@ function buildRoutes(fixture: CanvasAppFixture): Route[] {
     },
     { pattern: re("/api/v1/api-keys"), resolve: () => ({ json: { apiKeys: [] } }) },
 
-    // Draft-version listing must stay empty (no open drafts); every other version
-    // query returns the captured history. `?limit=1` resolves against the
-    // `versionsLatest` slot when the fixture provides one; otherwise it falls
-    // back to slicing the general versions list so a caller can seed both from
-    // a single field.
     {
       pattern: re(`${CANVAS}/versions`),
-      resolve: (_m, url) => {
-        if (url.searchParams.get("state") === "STATE_DRAFT") {
-          return { json: { versions: [], totalCount: 0, hasNextPage: false } };
-        }
-        const limit = Number.parseInt(url.searchParams.get("limit") ?? "", 10);
-        if (limit === 1) {
-          if (fixture.versionsLatest) return { json: fixture.versionsLatest };
-          const versionsFallback = fixture.versions?.versions?.slice(0, 1) ?? [];
-          return { json: { versions: versionsFallback, totalCount: versionsFallback.length, hasNextPage: false } };
-        }
-        return { json: fixture.versions ?? { versions: [], totalCount: 0, hasNextPage: false } };
-      },
+      resolve: (_m, url) => resolveCanvasVersions(fixture, url),
     },
     // Single-version detail reuses the live canvas spec (we only captured metadata
     // for the version list, which is all the versions sidebar needs).
