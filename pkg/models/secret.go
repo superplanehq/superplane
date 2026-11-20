@@ -101,6 +101,18 @@ func FindSecretByNameInTransaction(tx *gorm.DB, domainType string, domainID uuid
 	return &secret, nil
 }
 
+// FindExistingSecretNames checks references without loading secret values.
+func FindExistingSecretNames(tx *gorm.DB, domainType string, domainID uuid.UUID, names []string) ([]string, error) {
+	if len(names) == 0 {
+		return nil, nil
+	}
+	var existing []string
+	err := tx.Model(&Secret{}).
+		Where("domain_type = ? AND domain_id = ? AND name IN ?", domainType, domainID, names).
+		Pluck("name", &existing).Error
+	return existing, err
+}
+
 func FindSecretByID(domainType string, domainID uuid.UUID, id string) (*Secret, error) {
 	return FindSecretByIDInTransaction(database.Conn(), domainType, domainID, id)
 }

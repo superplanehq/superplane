@@ -39,9 +39,11 @@ export function PlanningReviewForm({
   showResources = true,
   showConcurrency = true,
   showSteps = true,
+  showWorkspaceOptions = true,
   modelLabel,
   modelDescription,
   modelOnly = false,
+  applyModelDefault = true,
   appearance = "card",
   view = "full",
   onRestoreDefaultPrompt,
@@ -60,9 +62,11 @@ export function PlanningReviewForm({
   showResources?: boolean;
   showConcurrency?: boolean;
   showSteps?: boolean;
+  showWorkspaceOptions?: boolean;
   modelLabel?: string;
   modelDescription?: string;
   modelOnly?: boolean;
+  applyModelDefault?: boolean;
   /** `fields` matches the pull request step. `card` is the GitHub agent settings. */
   appearance?: "card" | "fields";
   view?: "full" | "implementation" | "planning" | "pr-feedback";
@@ -95,9 +99,11 @@ export function PlanningReviewForm({
           showResources={showResources}
           showConcurrency={showConcurrency}
           showSteps={showSteps}
+          showWorkspaceOptions={showWorkspaceOptions}
           modelLabel={modelLabel}
           modelDescription={modelDescription}
           modelOnly={modelOnly}
+          applyModelDefault={applyModelDefault}
           onRestoreDefaultPrompt={onRestoreDefaultPrompt}
           restoreDefaultPromptDisabled={restoreDefaultPromptDisabled}
           restoreError={restoreError}
@@ -122,9 +128,11 @@ function AgentPanel({
   showResources,
   showConcurrency,
   showSteps,
+  showWorkspaceOptions,
   modelLabel,
   modelDescription,
   modelOnly,
+  applyModelDefault,
   onRestoreDefaultPrompt,
   restoreDefaultPromptDisabled,
   restoreError,
@@ -143,9 +151,11 @@ function AgentPanel({
   showResources: boolean;
   showConcurrency: boolean;
   showSteps: boolean;
+  showWorkspaceOptions: boolean;
   modelLabel?: string;
   modelDescription?: string;
   modelOnly: boolean;
+  applyModelDefault: boolean;
   onRestoreDefaultPrompt?: () => void;
   restoreDefaultPromptDisabled: boolean;
   restoreError?: string;
@@ -202,7 +212,7 @@ function AgentPanel({
   onChangeRef.current = onChange;
 
   useEffect(() => {
-    if (!byokModelDefault) {
+    if (!applyModelDefault || !byokModelDefault) {
       return;
     }
     const current = componentRef.current;
@@ -210,7 +220,7 @@ function AgentPanel({
       ...current,
       configuration: { ...current.configuration, model: byokModelDefault },
     });
-  }, [byokModelDefault]);
+  }, [applyModelDefault, byokModelDefault]);
 
   const modelControl = modelUsedField ? (
     <ConfigurationFieldRenderer
@@ -219,7 +229,7 @@ function AgentPanel({
       triggerClassName={
         view !== "full" ? "h-8 w-full shadow-none" : appearance === "fields" ? FLAT_FIELD_CONTROL : undefined
       }
-      value={byokModelDefault ?? component.configuration.model}
+      value={(applyModelDefault ? byokModelDefault : undefined) ?? component.configuration.model}
       onChange={(value) => setConfigurationField("model", value)}
       onValuesChange={(patch) => {
         const configuration = { ...component.configuration, ...patch };
@@ -319,34 +329,36 @@ function AgentPanel({
             {modelControl}
           </div>
         ) : null}
-        <div className={appearance === "card" ? "col-span-2 flex flex-col gap-4" : "flex flex-col gap-8"}>
-          <ImplementSettingRow
-            label="Skip repository checkout"
-            description="Do not check out the repository."
-            htmlFor={`skip-repository-checkout-${component.id}`}
-          >
-            <Switch
-              id={`skip-repository-checkout-${component.id}`}
-              aria-describedby={`skip-repository-checkout-${component.id}-help`}
-              checked={component.configuration.skipRepositoryCheckout === true}
-              disabled={disabled}
-              onCheckedChange={(checked) => setConfigurationField("skipRepositoryCheckout", checked)}
-            />
-          </ImplementSettingRow>
-          <ImplementSettingRow
-            label="Skip setup commands"
-            description="Do not run workspace setup commands."
-            htmlFor={`skip-setup-commands-${component.id}`}
-          >
-            <Switch
-              id={`skip-setup-commands-${component.id}`}
-              aria-describedby={`skip-setup-commands-${component.id}-help`}
-              checked={component.configuration.skipSetupCommands === true}
-              disabled={disabled}
-              onCheckedChange={(checked) => setConfigurationField("skipSetupCommands", checked)}
-            />
-          </ImplementSettingRow>
-        </div>
+        {showWorkspaceOptions ? (
+          <div className={appearance === "card" ? "col-span-2 flex flex-col gap-4" : "flex flex-col gap-8"}>
+            <ImplementSettingRow
+              label="Skip repository checkout"
+              description="Do not check out the repository."
+              htmlFor={`skip-repository-checkout-${component.id}`}
+            >
+              <Switch
+                id={`skip-repository-checkout-${component.id}`}
+                aria-describedby={`skip-repository-checkout-${component.id}-help`}
+                checked={component.configuration.skipRepositoryCheckout === true}
+                disabled={disabled}
+                onCheckedChange={(checked) => setConfigurationField("skipRepositoryCheckout", checked)}
+              />
+            </ImplementSettingRow>
+            <ImplementSettingRow
+              label="Skip setup commands"
+              description="Do not run workspace setup commands."
+              htmlFor={`skip-setup-commands-${component.id}`}
+            >
+              <Switch
+                id={`skip-setup-commands-${component.id}`}
+                aria-describedby={`skip-setup-commands-${component.id}-help`}
+                checked={component.configuration.skipSetupCommands === true}
+                disabled={disabled}
+                onCheckedChange={(checked) => setConfigurationField("skipSetupCommands", checked)}
+              />
+            </ImplementSettingRow>
+          </div>
+        ) : null}
       </section>
       {view === "full" && showSteps ? beforeSteps : null}
       {view === "full" && showSteps ? (
