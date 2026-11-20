@@ -127,6 +127,18 @@ func (c *FactoryCodexConnection) Reserved() bool {
 	return c != nil && c.LoginLease != nil
 }
 
+// AvailableSubscriptionModels returns the native catalog of a ready connection.
+func (c *FactoryCodexConnection) AvailableSubscriptionModels() []string {
+	if c.Status != CodexConnectionStatusReady || c.RevocationPendingAt != nil || c.CredentialVersion < 1 || len(c.BundleCiphertext) == 0 {
+		return nil
+	}
+	models := make([]string, 0, len(c.AvailableModels))
+	for _, model := range c.AvailableModels {
+		models = append(models, model.Model)
+	}
+	return CompactModelIDs(models)
+}
+
 func FindCodexConnection(tx *gorm.DB, organizationID, ownerID uuid.UUID) (*FactoryCodexConnection, error) {
 	var connection FactoryCodexConnection
 	err := tx.
@@ -905,14 +917,7 @@ func FactoryCodexAvailableSubscriptionModels(tx *gorm.DB, organizationID, factor
 	if err != nil {
 		return nil, err
 	}
-	if connection.Status != CodexConnectionStatusReady || connection.RevocationPendingAt != nil || connection.CredentialVersion < 1 || len(connection.BundleCiphertext) == 0 {
-		return nil, nil
-	}
-	models := make([]string, 0, len(connection.AvailableModels))
-	for _, model := range connection.AvailableModels {
-		models = append(models, model.Model)
-	}
-	return CompactModelIDs(models), nil
+	return connection.AvailableSubscriptionModels(), nil
 }
 
 // ResolveFactoryCodexSubscriptionModel preserves the native default while

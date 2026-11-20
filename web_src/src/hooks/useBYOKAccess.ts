@@ -16,6 +16,7 @@ export function useBYOKAccess(organizationId: string | undefined) {
   const ready = allowed || (hostedDefaultReady && product.ready);
   return {
     allowed,
+    noHostedDefault,
     customProviderAllowed: product.allowed && rollout.has(FEATURE_ORGANIZATION_BYOK_CUSTOM_PROVIDER),
     isLoading: !ready && (usage.isPending || rollout.isLoading || billing.isPending),
     ready,
