@@ -121,6 +121,7 @@ import {
   buildLinePhaseBoard,
   collectLineBacklogOrders,
   collectLineDoneOrders,
+  collectCustomStageRuns,
   collectLineVerifyOrders,
   findBacklogAutomationApp,
   findClosureAutomationApp,
@@ -1308,6 +1309,7 @@ function LineDetail({
           factoryId={factoryId}
           factoryKey={factoryKey}
           line={line}
+          workOrders={workOrders}
           backlogOrders={backlogOrders}
           verifyOrders={verifyOrders}
           doneOrders={doneOrders}
@@ -1588,6 +1590,7 @@ function PhaseBoard({
   factoryId,
   factoryKey,
   line,
+  workOrders,
   backlogOrders,
   verifyOrders,
   doneOrders,
@@ -1620,6 +1623,7 @@ function PhaseBoard({
   factoryId: string;
   factoryKey: string;
   line: FactoriesFactoryLine;
+  workOrders: FactoriesWorkOrder[];
   backlogOrders: FactoriesWorkOrder[];
   verifyOrders: FactoriesWorkOrder[];
   doneOrders: FactoriesWorkOrder[];
@@ -1925,6 +1929,10 @@ function PhaseBoard({
       return (
         <CustomStageColumn
           stage={stage}
+          runs={lineId ? collectCustomStageRuns(lineId, stage.key, workOrders) : []}
+          cardsPending={cardsPending}
+          workOrderCardContext={workOrderCardContext}
+          onOpenWorkOrder={onOpenWorkOrder}
           colorId={columnColors[stage.key] ?? null}
           colorView={colorView}
           onColorChange={(colorId) => void setColumnColor(stage.key, colorId)}
@@ -2050,7 +2058,7 @@ function PhaseBoard({
                     aria-label={`Reorder ${stage.name}`}
                     title="Drag to reorder stage"
                     data-testid={`lines-stage-reorder-${stage.key}`}
-                    className="h-5 w-16 cursor-grab touch-none rounded-sm text-muted-foreground hover:text-foreground active:cursor-grabbing"
+                    className="h-6 w-full cursor-grab touch-none rounded-sm text-muted-foreground hover:text-foreground active:cursor-grabbing"
                     onDragStart={(event) => startStageDrag(event, stage)}
                     onDragEnd={finishStageDrag}
                     onKeyDown={(event) => moveStageWithKeyboard(event, stage)}
@@ -2090,6 +2098,10 @@ function PhaseBoard({
 
 function CustomStageColumn({
   stage,
+  runs,
+  cardsPending,
+  workOrderCardContext,
+  onOpenWorkOrder,
   colorId,
   colorView,
   onColorChange,
@@ -2101,6 +2113,10 @@ function CustomStageColumn({
   onAddAutomation,
 }: {
   stage: LineBoardStage;
+  runs: LinePhaseRunCard[];
+  cardsPending: boolean;
+  workOrderCardContext: WorkOrderCardContext;
+  onOpenWorkOrder: (orderId: string, order?: FactoriesWorkOrder) => void;
   colorId: LineBoardColumnColorId | null;
   colorView: LineBoardColumnColorView;
   onColorChange: (colorId: LineBoardColumnColorId | null) => void;
@@ -2116,8 +2132,9 @@ function CustomStageColumn({
   return (
     <WorkOrderBoardLane
       title={stage.name}
-      count={0}
+      count={runs.length}
       emptyDescription="No tasks in this stage."
+      keepChildrenWhenEmpty={cardsPending}
       surfaceClassName={lane.surfaceClassName}
       className={lane.className}
       testId={`lines-custom-stage-${stage.key}`}
@@ -2154,7 +2171,15 @@ function CustomStageColumn({
         onAdd: onAddAutomation,
         testId: `lines-custom-stage-${stage.key}-automation-rows`,
       })}
-    />
+    >
+      <LineBoardColumnCardList pending={cardsPending} className={workOrderKanbanLaneScrollClassName}>
+        {runs.map((run) => (
+          <li key={run.executionId}>
+            <PhaseRunCard run={run} workOrderCardContext={workOrderCardContext} onOpenWorkOrder={onOpenWorkOrder} />
+          </li>
+        ))}
+      </LineBoardColumnCardList>
+    </WorkOrderBoardLane>
   );
 }
 

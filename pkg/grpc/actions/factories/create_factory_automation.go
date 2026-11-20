@@ -97,6 +97,17 @@ func CreateFactoryAutomation(
 	var nodes []models.Node
 	var edges []models.Edge
 	description := ""
+	if customStageColumn {
+		nodes = []models.Node{{
+			ID:            "on-run",
+			Name:          "On Run",
+			Type:          models.NodeTypeTrigger,
+			Ref:           models.NodeRef{Trigger: &models.TriggerRef{Name: "onRun"}},
+			Configuration: map[string]any{},
+			Metadata:      map[string]any{},
+			Position:      models.Position{X: 0, Y: 0},
+		}}
+	}
 	if templateID == scheduledIntakeTemplateID {
 		doc, buildErr := scheduledIntakeCanvas(db, factory, name, req.GetInstallParams())
 		if buildErr != nil {

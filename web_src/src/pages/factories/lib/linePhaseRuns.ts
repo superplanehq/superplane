@@ -116,6 +116,38 @@ export function buildLinePhaseBoard(
   return columns;
 }
 
+/** Current task cards for a custom stage. Parallel runs still produce one card per task. */
+export function collectCustomStageRuns(
+  lineId: string,
+  stageKey: string,
+  workOrders: FactoriesWorkOrder[],
+): LinePhaseRunCard[] {
+  const runs: LinePhaseRunCard[] = [];
+  for (const order of workOrders) {
+    if (!order.id || order.state === "STATE_CLOSED" || order.state === "STATE_DRAFT") continue;
+    const dispatches = (order.lineDispatches ?? []).filter((dispatch) => dispatch.line?.id === lineId);
+    if (dispatches.length === 0) continue;
+    const executions = dispatchStepRows(pickMostRecentDispatch(dispatches));
+    const current = pickCurrentLineExecution(executions);
+    if (!current || current.stageKey !== stageKey) continue;
+    const stageExecutions = executions.filter((execution) => execution.stageKey === stageKey);
+    const failed = stageExecutions.filter(
+      (execution) =>
+        execution.state === "STATE_FINISHED" &&
+        execution.result !== "RESULT_PASSED" &&
+        execution.result !== "RESULT_UNKNOWN",
+    );
+    const representative = pickCurrentLineExecution(failed) ?? current;
+    runs.push({
+      executionId: representative.id ?? `${order.id}-${stageKey}-${representative.createdAt ?? ""}`,
+      workOrderId: order.id,
+      order,
+      execution: representative,
+    });
+  }
+  return runs.sort(compareRunsNewestFirst);
+}
+
 /**
  * True when the last step is the line's own Done automation. Such a line keeps
  * finished tasks on that step; every other line hands them to the board

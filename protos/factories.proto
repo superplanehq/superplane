@@ -2404,6 +2404,9 @@ message WorkOrderLineDispatch {
   // Thinking chosen at Start. Empty means Auto: each runner keeps the
   // thinking level stored on the live automation canvas.
   string thinking_level = 11;
+  // Ordered stage snapshot used by task history. It stays stable when the
+  // line is edited after this dispatch starts.
+  repeated FactoryLine.Stage stages = 12;
 }
 
 // WorkOrderQueueItem is a line dispatch waiting for admission into a step
@@ -2423,6 +2426,7 @@ message WorkOrderQueueItem {
   // snapshot. Lets the UI place the queued work order on the correct
   // board column even after a line edit moved the step.
   string app_id = 6;
+  string stage_key = 7;
 }
 
 message WorkOrderExecution {
@@ -2471,11 +2475,13 @@ message WorkOrderExecution {
   // hosted credit failures: no_hosted_credit,
   // hosted_subscription_required, payment_past_due, or workspace_budget_empty.
   string failure_reason = 14;
+  string stage_key = 15;
 }
 
 message WorkOrderExecutionStep {
   string name = 1;
   int32 step_index = 2;
+  string stage_key = 3;
 }
 
 message DescribeWorkOrderRequest {

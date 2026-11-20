@@ -38,6 +38,11 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.FailedPrecondition(err, datadogAPIErr.Error())
 	}
 
+	var stageAutomationErr *models.FactoryLineStageAutomationError
+	if errors.As(err, &stageAutomationErr) {
+		return grpcerrors.FailedPrecondition(err, stageAutomationErr.Error())
+	}
+
 	switch {
 	case errors.Is(err, errCodexConnectionRequired):
 		return grpcerrors.FailedPreconditionWithReason("Connect your Codex account to take ownership of this task.", "CODEX_CONNECTION_REQUIRED")

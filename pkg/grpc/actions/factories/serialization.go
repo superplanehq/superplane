@@ -809,10 +809,11 @@ func serializeWorkOrderLineDispatch(
 			Name: dispatch.LineName,
 		},
 		Steps:          serializeExecutionSteps(dispatch.Steps, dispatch.Executions),
+		Stages:         serializeFactoryLineStages(dispatch.StagesValue()),
 		State:          serializeLineDispatchState(dispatch.State),
 		Result:         serializeLineDispatchResult(dispatch.Result),
 		CreatedAt:      timestamppb.New(dispatch.CreatedAt),
-		StepExecutions: serializeWorkOrderExecutions(dispatch.Executions, modelsByExecution),
+		StepExecutions: serializeWorkOrderExecutions(dispatch.Executions, dispatch.Steps, modelsByExecution),
 		Model:          dispatch.Model,
 		ThinkingLevel:  dispatch.ThinkingLevel,
 	}
@@ -835,9 +836,10 @@ func serializeWorkOrderQueueItem(
 		StepIndex: int32(item.StepIndex),
 		Position:  int32(item.Position),
 		CreatedAt: timestamppb.New(item.CreatedAt),
+		AppId:     item.AppID.String(),
 	}
 	if item.StepIndex >= 0 && item.StepIndex < len(steps) {
-		result.AppId = steps[item.StepIndex].AppID.String()
+		result.StageKey = steps[item.StepIndex].StageKey
 	}
 	return result
 }
@@ -868,11 +870,16 @@ func serializeLineDispatchResult(result string) pb.WorkOrderLineDispatch_Result 
 
 func serializeWorkOrderExecutions(
 	executions []models.FactoryWorkOrderExecutionRecord,
+	steps []models.FactoryLineStep,
 	modelsByExecution map[uuid.UUID][]string,
 ) []*pb.WorkOrderExecution {
 	result := make([]*pb.WorkOrderExecution, 0, len(executions))
 	for _, execution := range executions {
-		result = append(result, serializeWorkOrderExecution(execution, modelsByExecution[execution.ID]))
+		item := serializeWorkOrderExecution(execution, modelsByExecution[execution.ID])
+		if execution.StepIndex >= 0 && execution.StepIndex < len(steps) {
+			item.StageKey = steps[execution.StepIndex].StageKey
+		}
+		result = append(result, item)
 	}
 	return result
 }
@@ -931,9 +938,14 @@ func serializeExecutionSteps(
 
 	result := make([]*pb.WorkOrderExecutionStep, len(steps))
 	for i := range steps {
+		name := nameByIndex[i]
+		if name == "" {
+			name = steps[i].StageName
+		}
 		result[i] = &pb.WorkOrderExecutionStep{
-			Name:      nameByIndex[i],
+			Name:      name,
 			StepIndex: int32(i),
+			StageKey:  steps[i].StageKey,
 		}
 	}
 	return result

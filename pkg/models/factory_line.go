@@ -2,7 +2,9 @@ package models
 
 import (
 	"errors"
+	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -39,10 +41,22 @@ type FactoryLineStep struct {
 	Type       string    `json:"type"`
 	AppID      uuid.UUID `json:"app_id"`
 	Entrypoint string    `json:"entrypoint"`
+	StageKey   string    `json:"stage_key,omitempty"`
+	StageName  string    `json:"stage_name,omitempty"`
+	StageKind  string    `json:"stage_kind,omitempty"`
 	// MaxParallelism caps the step's in-flight runs across all work
 	// orders on the line. Unset means the default of 10; there is no
 	// unbounded setting.
 	MaxParallelism *int `json:"max_parallelism,omitempty"`
+}
+
+type FactoryLineStageAutomationError struct {
+	AutomationName string
+	Reason         string
+}
+
+func (e *FactoryLineStageAutomationError) Error() string {
+	return fmt.Sprintf("Automation %q %s", e.AutomationName, e.Reason)
 }
 
 type FactoryLineStage struct {
@@ -77,6 +91,107 @@ type FactoryLine struct {
 
 func (l *FactoryLine) StagesValue() []FactoryLineStage {
 	return []FactoryLineStage(l.Stages)
+}
+
+func (l *FactoryLine) executionStages(tx *gorm.DB) ([]FactoryLineStage, error) {
+	stages := l.StagesValue()
+	if len(stages) > 0 {
+		return stages, nil
+	}
+	return defaultFactoryLineStages(tx, l.Steps)
+}
+
+func (l *FactoryLine) ExecutionPlan(tx *gorm.DB) ([]FactoryLineStep, error) {
+	var canvases []Canvas
+	if err := tx.
+		Where("factory_id = ? AND column_key IS NOT NULL", l.FactoryID).
+		Order("created_at ASC").
+		Order("id ASC").
+		Find(&canvases).Error; err != nil {
+		return nil, err
+	}
+
+	canvasIDs := make([]uuid.UUID, 0, len(canvases))
+	canvasesByStage := make(map[string][]Canvas)
+	for _, canvas := range canvases {
+		if canvas.ColumnKey == nil || !strings.HasPrefix(*canvas.ColumnKey, "custom-") {
+			continue
+		}
+		canvasIDs = append(canvasIDs, canvas.ID)
+		canvasesByStage[*canvas.ColumnKey] = append(canvasesByStage[*canvas.ColumnKey], canvas)
+	}
+	specs, err := FindLiveCanvasSpecsByCanvasIDs(tx, canvasIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	stages, err := l.executionStages(tx)
+	if err != nil {
+		return nil, err
+	}
+	steps := make([]FactoryLineStep, 0, len(l.Steps)+len(canvases))
+	for _, stage := range stages {
+		switch stage.Kind {
+		case FactoryLineStagePhase:
+			if stage.StepIndex == nil || *stage.StepIndex < 0 || *stage.StepIndex >= len(l.Steps) {
+				continue
+			}
+			step := l.Steps[*stage.StepIndex]
+			step.StageKey = stage.Key
+			step.StageName = stage.Name
+			step.StageKind = stage.Kind
+			steps = append(steps, step)
+		case FactoryLineStageCustom:
+			for _, canvas := range canvasesByStage[stage.Key] {
+				entrypoint, err := customStageEntrypoint(canvas, specs[canvas.ID])
+				if err != nil {
+					return nil, err
+				}
+				steps = append(steps, FactoryLineStep{
+					Type:       FactoryLineStepTypeRunApp,
+					AppID:      canvas.ID,
+					Entrypoint: entrypoint,
+					StageKey:   stage.Key,
+					StageName:  stage.Name,
+					StageKind:  stage.Kind,
+				})
+			}
+		}
+	}
+
+	if len(steps) == 0 {
+		return nil, ErrFactoryLineHasNoSteps
+	}
+	return steps, nil
+}
+
+func customStageEntrypoint(canvas Canvas, spec LiveCanvasSpec) (string, error) {
+	if canvas.LiveVersionID == nil {
+		return "", &FactoryLineStageAutomationError{
+			AutomationName: canvas.Name,
+			Reason:         "must be published before this task can start.",
+		}
+	}
+	entrypoint := ""
+	for _, node := range spec.Nodes {
+		if node.Ref.Trigger == nil || node.Ref.Trigger.Name != onRunTriggerName {
+			continue
+		}
+		if entrypoint != "" {
+			return "", &FactoryLineStageAutomationError{
+				AutomationName: canvas.Name,
+				Reason:         "must have one On Run trigger before this task can start.",
+			}
+		}
+		entrypoint = node.ID
+	}
+	if entrypoint == "" {
+		return "", &FactoryLineStageAutomationError{
+			AutomationName: canvas.Name,
+			Reason:         "must have one On Run trigger before this task can start.",
+		}
+	}
+	return entrypoint, nil
 }
 
 // ColumnColorsValue returns the stored column colors, defaulting to an

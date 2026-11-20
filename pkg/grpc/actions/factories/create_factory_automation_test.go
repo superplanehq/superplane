@@ -82,6 +82,14 @@ func Test__CreateFactoryAutomation(t *testing.T) {
 		)
 		require.NoError(t, err)
 		assert.Equal(t, stageKey, response.GetAutomation().GetColumnKey())
+
+		canvasID := uuid.MustParse(response.GetAutomation().GetId())
+		specs, err := models.FindLiveCanvasSpecsByCanvasIDs(db, []uuid.UUID{canvasID})
+		require.NoError(t, err)
+		require.Len(t, specs[canvasID].Nodes, 1)
+		assert.Equal(t, models.NodeTypeTrigger, specs[canvasID].Nodes[0].Type)
+		require.NotNil(t, specs[canvasID].Nodes[0].Ref.Trigger)
+		assert.Equal(t, "onRun", specs[canvasID].Nodes[0].Ref.Trigger.Name)
 	})
 
 }
