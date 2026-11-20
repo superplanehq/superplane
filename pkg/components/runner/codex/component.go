@@ -107,6 +107,7 @@ func (c *RunCodex) Configuration() []configuration.Field {
 		runner.EnvironmentFromConfigurationField(),
 		runner.AgentEnvironmentField(envOpenAIAPIKey),
 		runner.AgentSkipSetupCommandsField(),
+		runner.AgentSkipRepositoryCheckoutField(),
 		runner.AgentTimeoutField(),
 	}
 }
@@ -166,7 +167,7 @@ func (c *RunCodex) Execute(ctx core.ExecutionContext) error {
 	task.Files = runner.AppendGlobalMCP(environment, task.Files)
 	task.Files = runner.AppendPlanningSessionContinuation(ctx, environment, task.Files)
 	environment, task.Files = runner.AttachWorkspaceAgentResources(ctx, environment, task.Files)
-	task.Commands = runner.ApplyFactoryCheckout(task.Files, task.Commands, spec.Steps)
+	task.Commands = runner.ApplyFactoryCheckout(task.Files, task.Commands, spec.Steps, runner.SkipRepositoryCheckout(ctx.Configuration))
 	environment, task.Files = runner.AttachFactoryCommitIdentity(ctx, environment, task.Files)
 	createdTaskID, err := runner.CreateTask(ctx.RunnerTasks, runner.CreateTaskParams{
 		TaskID:         taskID.String(),
