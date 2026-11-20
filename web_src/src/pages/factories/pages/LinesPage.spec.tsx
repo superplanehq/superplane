@@ -828,6 +828,13 @@ describe("LinesPage board", () => {
     expect(screen.getByTestId("lines-board-view-menu")).toBeInTheDocument();
   });
 
+});
+
+describe("LinesPage board stages", () => {
+  beforeEach(async () => {
+    await resetLinesBoardMocks();
+  });
+
   it("gates stage editing and renders saved custom stages", async () => {
     const user = userEvent.setup();
     const factory = {
@@ -970,6 +977,12 @@ describe("LinesPage board", () => {
     view.rerender(<LinesBoardSpecHarness path={path} factory={factoryWithStageName("Saved name")} />);
 
     expect(screen.getByTestId("lines-column-title-phase-0")).toHaveTextContent("Saved name");
+  });
+});
+
+describe("LinesPage board automations", () => {
+  beforeEach(async () => {
+    await resetLinesBoardMocks();
   });
 
   it("puts backlog automations before the create plus and column menu", () => {
