@@ -108,7 +108,6 @@ type BoardPaging = {
 };
 import { LineBoardViewMenu } from "./LineBoardViewMenu";
 import { AddLineStageDialog } from "./AddLineStageDialog";
-import { DeleteLineStageDialog } from "./DeleteLineStageDialog";
 import {
   DiscardLineStagesDialog,
   LineStageEditStrip,
@@ -1685,7 +1684,6 @@ function PhaseBoard({
   const [backlogSize, setBacklogSize] = useState<number | null>(null);
   const [backlogSettingsOpen, setBacklogSettingsOpen] = useState(false);
   const [parallelismByStep, setParallelismByStep] = useState<Record<number, number>>({});
-  const [stageToDelete, setStageToDelete] = useState<LineBoardStage | null>(null);
   const [stagePreview, setStagePreview] = useState<LineBoardStage[] | null>(null);
   const stagePreviewRef = useRef<LineBoardStage[] | null>(null);
   const [draggingStageId, setDraggingStageId] = useState<string | null>(null);
@@ -1811,11 +1809,8 @@ function PhaseBoard({
     }
   };
   const requestDeleteStage = (stage: LineBoardStage) => {
-    if (draftStages) {
-      setDraftStages(removeLineBoardStage(draftStages, stage.id));
-      return;
-    }
-    setStageToDelete(stage);
+    if (!draftStages) return;
+    setDraftStages(removeLineBoardStage(draftStages, stage.id));
   };
   const requestDiscardStages = () => {
     if (stagesChanged) {
@@ -2013,7 +2008,7 @@ function PhaseBoard({
           automationPreferenceKey={automationPreferenceKey(columnKey)}
           onAutomationRowAction={onAutomationRowAction}
           onAddAutomation={column.stepIndex === 0 ? onAddImplementAutomation : undefined}
-          onDeleteStage={canManageStages ? () => requestDeleteStage(stage) : undefined}
+          onDeleteStage={editingStages ? () => requestDeleteStage(stage) : undefined}
           paging={columnPaging.open}
           cardsPending={cardsPending}
         />
@@ -2045,7 +2040,7 @@ function PhaseBoard({
           colorId={columnColors[stage.key] ?? null}
           colorView={colorView}
           onColorChange={(colorId) => void setColumnColor(stage.key, colorId)}
-          onDeleteStage={canManageStages ? () => requestDeleteStage(stage) : undefined}
+          onDeleteStage={editingStages ? () => requestDeleteStage(stage) : undefined}
           automations={automations}
           automationRowCount={automationRowCount(automations)}
           automationPreferenceKey={automationPreferenceKey(columnKey ?? `custom-${stage.id}`)}
@@ -2085,7 +2080,7 @@ function PhaseBoard({
           automationPreferenceKey={automationPreferenceKey("verify")}
           onAutomationRowAction={onAutomationRowAction}
           onAddAutomation={onAddVerifyAutomation}
-          onDeleteStage={canManageStages ? () => requestDeleteStage(stage) : undefined}
+          onDeleteStage={editingStages ? () => requestDeleteStage(stage) : undefined}
           paging={columnPaging.open}
           cardsPending={cardsPending}
         />
@@ -2120,13 +2115,6 @@ function PhaseBoard({
 
   return (
     <>
-      <DeleteLineStageDialog
-        organizationId={organizationId}
-        factoryId={factoryId}
-        line={line}
-        stage={stageToDelete}
-        onClose={() => setStageToDelete(null)}
-      />
       {draftStages ? (
         <>
           <LineStageEditToolbar

@@ -24,7 +24,7 @@ func TestFactoryLineCustomStages(t *testing.T) {
 	s.moveStage()
 	s.assertStageOrder("backlog", "custom", "phase", "verify", "done")
 	s.reloadAndAssertStageVisible()
-	s.removeStage("QA")
+	s.removeStage()
 	s.assertStageOrder("backlog", "phase", "verify", "done")
 	s.reloadAndAssertStageHidden()
 }
@@ -131,14 +131,11 @@ func (s *factoryLineStagesSteps) reloadAndAssertStageVisible() {
 	s.session.AssertVisible(q.TestID("lines-custom-stage-" + s.stageKey))
 }
 
-func (s *factoryLineStagesSteps) removeStage(name string) {
+func (s *factoryLineStagesSteps) removeStage() {
 	page := s.session.Page()
-	require.NoError(s.t, page.GetByTestId("lines-custom-stage-menu-"+s.stageKey).Click())
-	require.NoError(s.t, page.GetByTestId("lines-custom-stage-menu-"+s.stageKey+"-delete-stage").Click())
-	dialog := page.GetByTestId("delete-line-stage-dialog")
-	require.NoError(s.t, dialog.GetByRole("heading", pw.LocatorGetByRoleOptions{Name: "Delete " + name + "?", Exact: pw.Bool(true)}).WaitFor())
-	require.NoError(s.t, dialog.GetByRole("button", pw.LocatorGetByRoleOptions{Name: "Delete stage", Exact: pw.Bool(true)}).Click())
-	require.NoError(s.t, dialog.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateHidden}))
+	s.enterStageEditing()
+	require.NoError(s.t, page.GetByTestId("lines-stage-delete-"+s.stageKey).Click())
+	s.saveStageChanges()
 }
 
 func (s *factoryLineStagesSteps) reloadAndAssertStageHidden() {

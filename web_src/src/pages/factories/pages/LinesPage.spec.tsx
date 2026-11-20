@@ -1986,6 +1986,24 @@ describe("LinesPage stage editing", () => {
     expect(stages.map((stage: { key: string }) => stage.key)).toEqual(["backlog", "phase-0", "verify", "done"]);
   });
 
+  it("deletes a stage from the column menu only in the draft", async () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_STAGES);
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    await user.click(screen.getByTestId("lines-phase-menu-1"));
+    expect(screen.queryByTestId("lines-phase-menu-1-delete-stage")).not.toBeInTheDocument();
+    await user.keyboard("{Escape}");
+
+    await enterStageEditing(user);
+    await user.click(screen.getByTestId("lines-phase-menu-1"));
+    await user.click(screen.getByTestId("lines-phase-menu-1-delete-stage"));
+
+    expect(screen.queryByTestId("lines-stage-shell-phase-1")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save changes" })).toBeInTheDocument();
+    expect(updateFactoryLineMutateAsync).not.toHaveBeenCalled();
+  });
+
   it("keeps a drag move in the draft when the target emits repeated drag events", async () => {
     enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_STAGES);
     const user = userEvent.setup();
