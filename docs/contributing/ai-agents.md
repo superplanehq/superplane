@@ -14,8 +14,8 @@ for here. Don't just use AI to do the same work faster. Use it to do work you co
 The repository includes `AGENTS.md` files that contain guidelines, coding standards, and project structure
 information for AI agents:
 
-- **[AGENTS.md](../../AGENTS.md)** - Repository guidelines. Read this file in full. It states that generated SDK and proto output is gitignored.
-- **[pkg/models/AGENTS.md](../../pkg/models/AGENTS.md)** - Database transaction and model API rules. Read this when you edit `pkg/models`.
+- **[AGENTS.md](../../AGENTS.md)** - Concise repository entry point. Read this file in full, then follow its task-specific reading conditions. Generated SDK and proto output is gitignored.
+- **[pkg/models/AGENTS.md](../../pkg/models/AGENTS.md)** - Database transaction and model API rules. Read this for `pkg/models` changes or new database access.
 - **[web_src/AGENTS.md](../../web_src/AGENTS.md)** - Frontend-specific guidelines for TypeScript/React work
 - **[cursor-cloud.md](cursor-cloud.md)** - Docker-in-Docker notes for Cursor Cloud VMs only
 

@@ -1,320 +1,130 @@
 # Repository Guidelines
 
-Guidance for AI coding agents and human contributors working in this repository.
+**Read this file in full.** Do not truncate it with `head`, `sed`, or a partial Read.
 
-**Read this file in full.** Do not truncate it with `head`, `sed`, or a partial
-Read. Facts you need after setup (generated files, CI path, what not to commit)
-are in this file. A prefix is not enough.
+SuperPlane is an open-source automation engine for AI-driven engineering, with durable execution, approvals, and an operational UI.
+The stack uses Go (gRPC and REST/OpenAPI), TypeScript/React/Vite, PostgreSQL, and RabbitMQ.
+Use **SuperPlane** in all user-facing text.
 
-Read more only when the task needs it:
+## Generated files and build system
 
-- UI: [web_src/AGENTS.md](web_src/AGENTS.md),
-  [.agents/skills/ui-copy/SKILL.md](.agents/skills/ui-copy/SKILL.md), and
-  [.agents/skills/simplified-technical-english/SKILL.md](.agents/skills/simplified-technical-english/SKILL.md)
-- `pkg/models` or new database access: [pkg/models/AGENTS.md](pkg/models/AGENTS.md)
-- Local factory GitHub App: [docs/contributing/connecting-to-3rdparty-services-from-development.md](docs/contributing/connecting-to-3rdparty-services-from-development.md)
-
-## Read this first
-
-### Generated files are not in Git
-
-`make pb.gen` writes the paths below. Git ignores them. They will not appear in
-`git status` or `git diff`. Do not search Git history or the working tree for
-them as tracked changes. Do not commit them. Do not hand-edit them. Edit
-`protos/` and run `make pb.gen` again.
+`make pb.gen` generates these paths. Git ignores them:
 
 - `pkg/protos/` — Go code from `protos/*.proto`
-- `pkg/openapi_client/` — generated Go SDK for the CLI
-- `web_src/src/api-client/` — generated TypeScript SDK for the UI
-- `api/` — generated OpenAPI/swagger spec
+- `pkg/openapi_client/` — Go SDK for the CLI
+- `web_src/src/api-client/` — TypeScript SDK for the UI
+- `api/` — OpenAPI/swagger spec
 
-A clean clone does not contain these files until `make dev.setup` or
-`make pb.gen` runs. CI is Semaphore (`.semaphore/`), not GitHub Actions. CI
-runs `make dev.setup`, which includes `pb.gen`.
+Never hand-edit or commit generated files. Edit `protos/`, then run `make pb.gen`.
+A clean clone lacks these files until `make dev.setup` or `make pb.gen` runs.
+They do not appear in `git status` or `git diff`.
+Do not search Git history or the working tree for them as tracked changes.
 
-### Do not rediscover the build system
+Development is entirely Docker-based. Build, lint, test, and run commands execute in containers through Make and Docker Compose.
+Use the Make targets below. Do not probe for raw Docker Compose filenames or `.github/workflows`.
+CI uses Semaphore (`.semaphore/`) and runs `make dev.setup`, which includes `pb.gen`.
 
-Use the `make` targets in this file. Do not probe for `.github/workflows` or
-raw `docker compose` file names.
+## Read before the relevant task
 
-## Project Overview
+- Setup, local runners, factory dispatch, or tool/cache failures: [Development Quickstart](CONTRIBUTING.md#development-quickstart).
+- Local third-party services, factory GitHub/Sentry apps, or hosted OpenRouter: [service connections](docs/contributing/connecting-to-3rdparty-services-from-development.md).
+- Cursor Cloud VMs: [cloud setup](docs/contributing/cursor-cloud.md).
+- Codebase navigation: [directory structure](docs/contributing/architecture.md#directory-structure).
+- Backend extensions: [backend extension rules](docs/contributing/architecture.md#backend-extension-rules).
+- Add or activate runtime dependencies, including removal of flags or guards: [deployment dependencies](docs/contributing/runtime-configuration.md#deployment-dependencies).
+- `pkg/models` changes or new database access: [model rules](pkg/models/AGENTS.md).
+- Built-in automation settings, including UI: [factory rules](pkg/grpc/actions/factories/AGENTS.md). Preserve settings through admin reset and add regression coverage.
+- UI work: [frontend rules](web_src/AGENTS.md), [UI copy](.agents/skills/ui-copy/SKILL.md), and [STE](.agents/skills/simplified-technical-english/SKILL.md).
+- New components/triggers: [implementation](docs/contributing/component-implementations.md) and [design](docs/contributing/component-design.md).
+- E2E authoring: [E2E guide](docs/contributing/e2e-tests.md).
+- Dev server profiling: [profiling guide](docs/contributing/profiling.md).
+- Write, change, review, or sweep tests: load [test-audit](.agents/skills/test-audit/SKILL.md).
+- Commit messages or PR titles/descriptions: [commit-and-pr-messages](.agents/skills/commit-and-pr-messages/SKILL.md).
+- Documentation, UI copy, or other reviewer/user-facing technical text: [STE](.agents/skills/simplified-technical-english/SKILL.md).
 
-SuperPlane is an open-source automation engine for AI-driven engineering. It
-orchestrates workflows across the tools teams already use (Git, LLMs, CI/CD,
-observability, incident, and infrastructure tools) with durable execution,
-approvals, and an operational UI.
+## Setup and required checks
 
-- **Backend**: Go, exposing a gRPC API with a REST/OpenAPI gateway.
-- **Frontend**: TypeScript + React, built with Vite.
-- **Infrastructure**: PostgreSQL (state) and RabbitMQ (messaging), run via Docker.
-- The application name is **SuperPlane** (not "Superplane") in all user-facing text.
+Run initial setup in order:
 
-## Repository Layout
+1. `make dev.up` — build images and start dependency containers.
+2. `make dev.setup` — install dependencies, generate code, and migrate `superplane_dev`.
+3. `make dev.server` — start the API, Vite, and Docker Fleet Manager.
 
-- `cmd/` — Go entrypoints (server, workers, CLI).
-- `pkg/` — Go application code. Notable packages:
-  - `pkg/grpc/actions` — gRPC API implementation.
-  - `pkg/models` — database models (see [pkg/models/AGENTS.md](pkg/models/AGENTS.md)).
-  - `pkg/workers` — background workers.
-  - `pkg/integrations/<integration>/` — integration component implementations.
-- `web_src/` — TypeScript/React frontend (Vite). UI component mappers live in
-  `web_src/src/pages/app/mappers/<integration>/`.
-- `protos/` — protobuf definitions for the API. Generated output is gitignored
-  (see [Read this first](#read-this-first)).
-- `db/` — database structure and migrations.
-- `scripts/` — codegen, DB, and CI helper scripts.
-- `test/` — backend and end-to-end tests.
-- `docs/` — Markdown documentation (see `docs/contributing/`).
-- `cmd/runner`, `cmd/fleetmanager`, `pkg/runners`, and `pkg/fleets` — the
-  integrated runner and Fleet Manager. Local development uses this stack.
-- Legacy runner source lives in
-  [superplanehq/runner](https://github.com/superplanehq/runner). The application
-  reads historical task records and archived logs from SuperPlane storage.
-- `Makefile` — the entrypoint for all common tasks.
-- `.semaphore/` — CI pipelines. There is no `.github/workflows/` directory.
+Read the quickstart before setup or recovery. Re-run `make dev.setup` after proto, Go module, or frontend dependency changes.
 
-## Prerequisites & Setup
+Run the relevant checks after edits and before submission:
 
-The development environment is **entirely Docker-based**: build, lint, test, and
-run commands execute inside containers via `docker compose`. You do not need Go
-or Node installed on the host, only Docker.
+| Change | Required commands, in order |
+| --- | --- |
+| Go | `make format.go`, `make lint`, `make check.build.app`, `make test` |
+| JS/TS | `make format.js`, `make check.lint.ui`, `make check.build.ui` |
+| Protos | `make pb.gen`, `make check.proto.field.numbers` |
+| Admin API routes | `make check.admin.routes` |
 
-- Go `1.27.3` (pinned in `go.mod`; provided by the dev container).
-- Node.js, npm, and Bun (provided by the dev container; used by Vite/frontend).
-- Docker with a working `docker compose`.
+Do not run `go build ./...`; `scripts/` contains multiple `main` packages. Use `make check.build.app`.
+Run UI lint locally before opening a PR. CI fails when the ESLint budget grows.
+Code generation requires the running `app` container from `make dev.up`.
+After removing proto fields, renumber the remaining fields contiguously. Do not leave gaps or `reserved` markers.
+These protos serve JSON conversion, not wire compatibility.
 
-Run these three steps once, in order:
+Test commands:
 
-1. `make dev.up` — builds the app and runner images and starts dependency
-   containers (app shell, db, rabbitmq). The first run builds the images
-   (~3-5 min); later runs reuse them. After you change
-   `release/runner/Dockerfile`, run `make dev.up` again.
-   Local startup requires 15 GB free on the Docker filesystem. If space is
-   low, it removes unused build cache and checks again before building.
-   It also attempts this cleanup if the disk probe reports a full disk.
-   This cleanup never removes images, containers, or database volumes.
-   If space is still low, increase Docker disk space or remove unused images
-   manually. CI skips this cleanup. Run `make test.dev.disk` to test recovery.
-2. `make dev.setup` — installs npm deps, downloads Go modules, runs protobuf
-   codegen, and creates + migrates `superplane_dev`. Re-run when protos, Go
-   modules, or frontend deps change. By
-   default only `superplane_dev` is migrated; use
-   `DEV_SETUP_DBS="superplane_dev superplane_test"` when you also need
-   `superplane_test` (E2E; backend CI sets this via the environment).
-3. `make dev.server` — starts the API (Go hot-reload via `air`), the Vite
-   dev server, and the Docker Fleet Manager. UI at http://localhost:8000;
-   health check at http://localhost:8000/health. `make dev.setup` creates or
-   updates the local `e1-large-amd64` fleet. Fleet Manager waits for owner
-   setup and creates its local development token. Use `make dev.server.fg` for
-   foreground logs.
+- Backend: `make test`; targeted: `make test PKG_TEST_PACKAGES=./pkg/workers`.
+- E2E: `E2E_TEST_PACKAGES=./test/e2e/workflows make test.e2e`.
+  Single test: `make test.e2e.single FILE=test/e2e/foo_test.go LINE=19`.
+  Semaphore runs E2E only on `main`; local commands work on all branches.
+- UI (Bun + Happy DOM): `make check.test.ui`.
+  Targeted: `make check.test.ui FILES=src/lib/duration.spec.ts`. `FILES` paths are relative to `web_src/`.
 
-Factory workspace onboarding needs a GitHub App on a
-stable tunnel. Cloud holds `SUPERPLANE_GITHUB_APP_*`. Self-host and local
-development can create a public GitHub App from workspace Connect. Other
-GitHub accounts can install that app. It is not listed in GitHub
-Marketplace. Factory Sentry intake uses a public SuperPlane Sentry app.
-Without `SUPERPLANE_SENTRY_APP_*` in `.env`, SuperPlane asks for a personal
-token. See
-[docs/contributing/connecting-to-3rdparty-services-from-development.md](docs/contributing/connecting-to-3rdparty-services-from-development.md).
+## Database safeguards
 
-`make dev.up`, `make dev.setup`, and `make dev.server` use the integrated
-runner API and Docker Fleet Manager. Historical tasks use the same task
-database and blob storage as integrated tasks.
+Never create or edit migration files by hand. Use `make db.migration.create NAME=<name>` with dashes, not underscores.
+Leave `*.down.sql` empty; we do not write rollbacks.
+After adding a migration, run `make db.migrate DB_NAME=<DB_NAME>` with the `app` container running.
+Use `superplane_dev` or `superplane_test` for `DB_NAME`.
 
-The local worker image includes Claude Code, Codex, OpenCode, git, `gh`,
-`jq`, ffmpeg, ffprobe, whisper-cli, yt-dlp, and the Whisper tiny model. Factory
-line apps run on that worker. Do not install those CLIs on the host.
-Connect GitHub and Claude integrations in the organization before you
-dispatch a factory line. Factory nodes use those integrations, not `.env`
-`ANTHROPIC_API_KEY`. Check tools with `make doctor-local` after `make
-dev.server`. OpenCode must be on the runner `PATH` for Run OpenRouter Agent.
-SuperPlane does not download OpenCode in the prompt prepare step.
-Video and audio task files need ffmpeg, ffprobe, whisper-cli, and the baked
-Whisper model. Hosted video links also need the pinned yt-dlp. Missing media tools fail the setup step. Do not download
-models during a task.
+Never drop or recreate local databases without an explicit user request. This includes:
 
-Local hosted OpenRouter is optional. Set `SUPERPLANE_DEV_HOSTED_OPENROUTER`
-in `.env` only when you need the SuperPlane-hosted provider. See
-[docs/contributing/connecting-to-3rdparty-services-from-development.md](docs/contributing/connecting-to-3rdparty-services-from-development.md).
+- `make db.delete`
+- `make db.recreate.all.dangerous`
+- `make dev.setup.no.cache`
+- `make dev.pr.clean.checkout`
+- `dropdb` or `DROP DATABASE`
 
-On first UI load, owner setup is enabled (`OWNER_SETUP_ENABLED=yes`), so you are
-prompted to create an admin account. Open registration is disabled by default
-(`BLOCK_SIGNUP=yes`).
+`make db.migrate.all` applies pending migrations and rewrites `db/structure.sql` without dropping data.
+Do not pair it with `db.delete`.
+If migration fails (for example, `no migration found for version`), stop and ask.
+Do not recreate `superplane_dev` as a workaround.
 
-If `go mod download` / `go build` fail with missing or corrupt files in the Go
-module cache (the `go-pkg-cache` Docker volume mounted at `/go/pkg/mod`, often
-after a disk-full or interrupted download), run `make dev.clean.go.cache` then
-`make dev.setup.go`.
+## Coding and file protections
 
-## Build, Test & Lint Commands
+- Work test-first by default. Keep names clear, functions focused, side effects explicit, control flow shallow, and error handling useful.
+  Prefer early returns over `else` blocks.
+- Test observable behavior, not incidental presentation. Follow the test-audit authoring gate and retention rules.
+  Preserve visibility, accessibility, theme, and other functional coverage.
+  Prefer accessible roles and stable test IDs. Assert exact UI text only when wording is the behavior under test.
+  Avoid repeated copy, CSS, layout, or DOM assertions. Prefer real behavior over duplicate private-helper or generated-source assertions.
+  Before removing overlapping coverage, confirm the retained test catches the same regression and runs in CI.
+- Go tests end with `_test.go`. Base specific test timestamps on `time.Now()`, not absolute `time.Date` values.
+- Go: use `any` instead of `interface{}`. Use `slices.Contains` or `slices.ContainsFunc` for slice membership.
+  Avoid type suffixes such as `*Str` or `*UUID` in variable names.
+- Name non-obvious UI state decisions. Extract conditions that combine states or exceptions into named functions.
+  Comment when the product reason is unclear.
+- Do not create or use `web_src/src/utils/*` or `utils.ts`.
+  Put shared non-React helpers in `web_src/src/lib/` and reusable React logic in `web_src/src/hooks/`.
+- Never commit real secrets or a populated `.env`. `.env.example` and `.env.multi-instance.example` are templates.
+- Do not edit `web_src/node_modules/` or the Go module cache under `tmp/go/`.
 
-- One-shot backend tests: `make test` (Go).
-- Targeted backend tests: `make test PKG_TEST_PACKAGES=./pkg/workers`
-- Targeted E2E tests: `E2E_TEST_PACKAGES=./test/e2e/workflows make test.e2e`
-  (or `make test.e2e.single FILE=test/e2e/foo_test.go LINE=19` for a single test).
-  Semaphore runs E2E tests only on `main`. Local E2E commands work on all branches.
-- UI unit tests: `make check.test.ui` (Bun + Happy DOM).
-  Targeted UI tests: `make check.test.ui FILES=src/lib/duration.spec.ts`.
-  Paths in `FILES` are relative to `web_src/`.
-- After editing Go code: `make format.go`, then `make lint && make check.build.app`.
- Do not run `go build ./...` — `scripts/` has more than one `main` package.
- Use `make check.build.app`.
-- After editing JS/TS code: `make format.js`, then `make check.lint.ui` and
-  `make check.build.ui`. Run `make check.lint.ui` locally before you open a
-  pull request. CI fails when the ESLint budget grows.
-- After updating `protos/`: regenerate protos, the OpenAPI spec, and the CLI/UI
-  SDKs with `make pb.gen` (requires a running `app` container from `make dev.up`).
-  Generated files stay gitignored; a clean `git status` after `pb.gen` is
-  expected. After removing proto fields, renumber remaining fields so message
-  field numbers stay contiguous (no gaps or `reserved` markers — these protos
-  are used for JSON conversion, not wire compatibility), then run
-  `make check.proto.field.numbers`.
-- **NEVER MANUALLY CREATE MIGRATION FILES.** Use `make db.migration.create NAME=<name>`
-  (dashes, not underscores). We do not write rollbacks, so leave `*.down.sql`
-  empty. After adding a migration, run `make db.migrate DB_NAME=<DB_NAME>` where
-  `DB_NAME` is `superplane_dev` or `superplane_test` (requires a running app
-  container).
-- **NEVER DROP LOCAL DATABASES WITHOUT ASKING.** Do not run `make db.delete`,
-  `make db.recreate.all.dangerous`, `make dev.setup.no.cache`,
-  `make dev.pr.clean.checkout`, `dropdb`, or `DROP DATABASE` unless the user
-  explicitly asked. `make db.migrate.all` applies pending migrations and
-  rewrites `db/structure.sql`. It does not drop data. Do not pair it with
-  `db.delete`. If migrate fails (for example `no migration found for version`),
-  stop and ask. Do not recreate `superplane_dev` as a workaround.
+## Commits and pull requests
 
-Cross-cutting rules when extending the backend:
+Follow the required writing skills above. Use short sentences, active voice, imperative instructions, and stable terminology.
+Do not use contractions, slang, or idioms.
 
-- When validating enum fields in protobuf requests, ensure enums are mapped to
-  constants in `pkg/models`. Check the `Proto*` and `*ToProto` functions in
-  `pkg/grpc/actions/common.go`.
-- When adding a new worker in `pkg/workers`, add its startup to
-  `pkg/server/server.go` and update the docker compose files with any new
-  environment variables. `cmd/server/main.go` calls `server.Start()`.
-- After adding new API endpoints, ensure they are covered in
-  `pkg/authorization/interceptor.go`.
-- Define all new admin API endpoints in `protos/admin/`. Register them with
-  the admin gRPC gateway behind the existing admin authentication middleware.
-  Do not add manual admin HTTP handlers in core or `ee/`. Existing handlers
-  remain until they migrate. Run `make check.admin.routes` to check this rule.
-  Remove migrated routes from `.admin-http-routes-baseline.txt`. Do not add
-  new routes to the baseline.
-
-Further reading:
-
-- Models and transactions: [pkg/models/AGENTS.md](pkg/models/AGENTS.md)
-- E2E test authoring: [docs/contributing/e2e-tests.md](docs/contributing/e2e-tests.md)
-- Dev server profiling: [docs/contributing/profiling.md](docs/contributing/profiling.md)
-- New components/triggers: [docs/contributing/component-implementations.md](docs/contributing/component-implementations.md)
-- Component design & quality: [docs/contributing/component-design.md](docs/contributing/component-design.md)
-- UI component workflow: [web_src/AGENTS.md](web_src/AGENTS.md)
-
-## Deployment dependencies
-
-Before a change adds or activates a runtime dependency, trace which processes
-need its configuration. This includes removing feature flags or guards around
-existing code.
-
-- Identify the required service endpoints, environment variables, and Secret
-  keys for each affected API, worker, and runner process.
-- Check local Docker Compose, `release/superplane-helm-chart/helm`, the hosted
-  chart in [superplanehq/helm-chart](https://github.com/superplanehq/helm-chart),
-  and environment values and Secret references in
-  [superplanehq/launchpad](https://github.com/superplanehq/launchpad).
-  The two charts are separate. Configuration on API pods does not configure
-  workers. Tests that supply credentials do not verify deployment configuration.
-- Update each affected deployment source. If a required repository or live
-  configuration is unavailable, flag the missing change or verification.
-- In the PR Summary, name the affected processes, required configuration keys,
-  companion PRs, and rollout order. Explicitly flag deployment changes required
-  before the new code path is activated.
-
-Keep credential values out of code and PR text. Distinguish prepared changes
-from published charts and verified deployed configuration.
-
-## Coding Style & Naming Conventions
-
-- Always write clean code: work test-first by default, then keep names clear,
-  functions focused, side effects explicit, control flow shallow, and error
-  handling useful. Load
-  [.agents/skills/test-audit/SKILL.md](.agents/skills/test-audit/SKILL.md)
-  when you write, change, review, or sweep tests.
-- When adding or changing a built-in automation setting, including its UI,
-  preserve it through admin reset and add regression coverage. Follow
-  [pkg/grpc/actions/factories/AGENTS.md](pkg/grpc/actions/factories/AGENTS.md).
-- Before adding a test, identify the observable behavior and a credible
-  regression that existing coverage does not catch.
-- Test observable behavior, not incidental presentation. Prefer accessible
-  roles and stable test IDs. Assert exact UI text only when its wording is the
-  behavior under test. Avoid repeated assertions about copy, CSS classes,
-  layout, or DOM structure. Preserve checks for visibility, accessibility,
-  theme behavior, and other functional requirements.
-- Prefer tests that execute the real behavior over duplicate private-helper
-  or generated-source assertions. Before removing overlapping coverage,
-  confirm that the retained test exercises the same regression and runs in CI.
-- Tests end with `_test.go`.
-- Always prefer early returns over else blocks when possible.
-- Name non-obvious UI state rules. If a condition combines several states or
-  exceptions, extract it into a function that names the decision. Add a short
-  comment when the product reason is not clear from the code.
-- Go: prefer `any` over `interface{}`.
-- Go: to check membership in a slice, use `slices.Contains` or `slices.ContainsFunc`.
-- Avoid variable names like `*Str` or `*UUID`; Go is typed, so types don't belong
-  in variable names.
-- In tests needing specific timestamps, base them off `time.Now()` rather than
-  absolute times from `time.Date`.
-- The name of the application is "SuperPlane", not "Superplane", in all
-  user-facing text (UIs, emails, notifications, documentation).
-- Frontend: do not create or use `web_src/src/utils/*` or `utils.ts` files. Put
-  shared non-React helpers in `web_src/src/lib/`, and React-specific reusable
-  logic in `web_src/src/hooks/`.
-
-## Files & Directories Not to Modify by Hand
-
-- **Generated code** — see [Read this first](#read-this-first). All produced by
-  `make pb.gen`. Git ignores the output. Never hand-edit it.
-- **Database migrations** — never create or edit migration files by hand; use
-  `make db.migration.create NAME=<name>` (see the Build section).
-- **Secrets & local config** — never commit real secrets. `.env.example` and
-  `.env.multi-instance.example` are templates; do not check in a populated
-  `.env`.
-- **Vendored / cached dependencies** — do not edit `web_src/node_modules/` or the
-  Go module cache under `tmp/go/`.
-
-## Commit & Pull Request Guidelines
-
-Follow [.agents/skills/commit-and-pr-messages/SKILL.md](.agents/skills/commit-and-pr-messages/SKILL.md)
-for commit subjects/bodies and for every PR title and description. That skill
-encodes the Chris Beams / Tim Pope conventions (imperative subject, ~50-char
-summary, blank line before body, wrap at 72, explain why not how) plus
-SuperPlane's CI and DCO rules.
-
-Write commit bodies, PR descriptions, UI copy, and other reviewer/user-facing
-technical text in ASD-STE100 Simplified Technical English style. Follow
-[.agents/skills/simplified-technical-english/SKILL.md](.agents/skills/simplified-technical-english/SKILL.md)
-(short sentences, active voice, imperative instructions, stable terminology; no
-contractions, slang, or idioms).
-
-- PR titles must follow Conventional Commits with a release-type prefix that CI
-  enforces: `feat:`, `fix:`, `chore:`, or `docs:`. After the prefix, use an
-  imperative, capitalized summary with no trailing period
-  (e.g. `feat: Add empty-state copy for integrations`).
-- PR descriptions must explain **why** the change exists (problem, motivation,
-  user/system impact), not narrate the diff. Use a short STE Summary only.
-  Do not add a Test plan or other checklist of checks that the author already ran.
-  Avoid empty or placeholder bodies when context matters.
-- Commit subjects use the same imperative style; put motivation and trade-offs
-  in the body. Separate subject and body with a blank line; wrap the body at
-  72 characters.
-- All commits must include a DCO sign-off trailer
-  (`Signed-off-by: Name <email>`). Use `git commit -s` (or `git commit --amend -s`).
-- Before submitting, run the checks relevant to your change:
-  - Backend: `make format.go`, `make lint`, `make check.build.app`, `make test`.
-  - Frontend: `make format.js`, `make check.lint.ui`, `make check.build.ui`.
-    Run ESLint locally (`make check.lint.ui`) before you open a pull request.
-  - Protos: `make pb.gen` and `make check.proto.field.numbers`.
-
-For user-facing UI strings while designing or implementing frontend work, follow
-[.agents/skills/ui-copy/SKILL.md](.agents/skills/ui-copy/SKILL.md) together with
-the STE skill above.
-
-Cursor Cloud VMs only: [docs/contributing/cursor-cloud.md](docs/contributing/cursor-cloud.md).
+- PR titles require `feat:`, `fix:`, `chore:`, or `docs:`.
+  Use an imperative, capitalized summary after the prefix, with no trailing period.
+- Use a short STE `Summary` only. Explain the problem, motivation, and user/system impact rather than narrating the diff.
+  Do not add a Test plan or a checklist of completed checks. Avoid empty or placeholder bodies.
+- Commit subjects use the same imperative style, approximately 50 characters.
+  Separate the body with a blank line, wrap at 72 characters, and explain motivation and trade-offs.
+- All commits require a DCO sign-off (`Signed-off-by: Name <email>`). Use `git commit -s`.
+- Run the relevant commands in [Setup and required checks](#setup-and-required-checks) before submission.

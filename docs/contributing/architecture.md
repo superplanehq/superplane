@@ -124,10 +124,12 @@ Organization (1) ──→ (N) Integrations
 
   - `cmd/server/` - Main server entry point
   - `cmd/cli/` - CLI tool entry point
+  - `cmd/runner/`, `cmd/fleetmanager/` - Integrated runner and Docker Fleet Manager entry points for local development
 
 - **`pkg/`** - Core Go packages
 
   - `pkg/grpc/` - gRPC service implementations
+  - `pkg/grpc/actions/` - gRPC API implementation
   - `pkg/workers/` - Background worker processes
   - `pkg/models/` - Database models and ORM logic
   - `pkg/components/` - Workflow component implementations
@@ -137,11 +139,13 @@ Organization (1) ──→ (N) Integrations
   - `pkg/registry/` - Component and trigger registry
   - `pkg/authentication/` - User authentication logic
   - `pkg/authorization/` - RBAC and permission checks
+  - `pkg/runners/`, `pkg/fleets/` - Integrated runner and fleet implementation
 
 - **`web_src/`** - Frontend React application
 
-  - `web_src/src/` - React source code (pages, components, hooks, utils)
-  - `web_src/src/api/` - Auto-generated TypeScript API client
+  - `web_src/src/` - React source code (pages, components, hooks, lib)
+  - `web_src/src/api-client/` - Auto-generated TypeScript API client
+  - `web_src/src/pages/app/mappers/<integration>/` - UI component mappers
 
 - **`protos/`** - Protocol Buffer definitions for the API (workflows, components, integrations, users, etc.)
 
@@ -156,3 +160,23 @@ Organization (1) ──→ (N) Integrations
   - `test/support/` - Test support utilities
 
 - **`docs/`** - Documentation (concepts, contributing guides, examples)
+- **`scripts/`** - Code generation, database, and CI helper scripts
+- **`Makefile`** - Entry point for common development commands
+- **`.semaphore/`** - CI pipelines. There is no `.github/workflows/` directory.
+
+## Backend extension rules
+
+Read this section before extending the backend.
+
+- When validating protobuf request enums, map them to constants in `pkg/models`.
+  Check the `Proto*` and `*ToProto` functions in `pkg/grpc/actions/common.go`.
+- When adding a worker in `pkg/workers`, add its startup to `pkg/server/server.go`.
+  Update Docker Compose files with new environment variables.
+  `cmd/server/main.go` calls `server.Start()`.
+- Cover new API endpoints in `pkg/authorization/interceptor.go`.
+- Define new admin API endpoints in `protos/admin/`.
+  Register them with the admin gRPC gateway behind the existing admin authentication middleware.
+  Do not add manual admin HTTP handlers in core or `ee/`.
+  Existing handlers remain until they migrate. Run `make check.admin.routes`.
+  Remove migrated routes from `.admin-http-routes-baseline.txt`.
+  Do not add new routes to the baseline.

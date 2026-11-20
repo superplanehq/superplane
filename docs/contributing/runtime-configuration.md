@@ -24,3 +24,28 @@ They then become `queued` and ready for a runner. Fleet Manager scales for
 queued tasks. Queue-wait metrics exclude time spent pending.
 
 Set `START_RUNNER_TASK_SCHEDULER=yes` on runner-worker processes.
+
+## Deployment dependencies
+
+Read this section before a change adds or activates a runtime dependency.
+This includes removing feature flags or guards around existing code.
+Trace which processes need the configuration.
+
+- Identify required service endpoints, environment variables, and Secret keys
+  for each affected API, worker, and runner process.
+- Check each deployment source:
+  - Local Docker Compose.
+  - `release/superplane-helm-chart/helm` in this repository.
+  - The hosted chart in [superplanehq/helm-chart](https://github.com/superplanehq/helm-chart).
+  - Environment values and Secret references in [superplanehq/launchpad](https://github.com/superplanehq/launchpad).
+
+  The two charts are separate. Configuration on API pods does not configure workers.
+  Tests that supply credentials do not verify deployment configuration.
+- Update each affected deployment source.
+  If a required repository or live configuration is unavailable, flag the missing change or verification.
+- In the PR Summary, name affected processes, required configuration keys,
+  companion PRs, and rollout order.
+  Explicitly flag deployment changes required before the new code path is activated.
+
+Keep credential values out of code and PR text.
+Distinguish prepared changes from published charts and verified deployed configuration.
