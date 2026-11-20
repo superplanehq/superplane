@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"regexp"
-	"slices"
 	"strconv"
 	"strings"
 
@@ -14,7 +13,7 @@ import (
 
 type Document struct {
 	Definition
-	locations map[string]*yaml.Node
+	root *yaml.Node
 }
 
 type Diagnostic struct {
@@ -30,17 +29,12 @@ func (d *Diagnostic) Error() string {
 
 // Diagnostic locates a public field, or its containing mapping if it is missing.
 func (d *Document) Diagnostic(path, message string) *Diagnostic {
-	for candidate := path; candidate != ""; {
-		if node := d.locations[candidate]; node != nil {
-			return at(path, node, message)
-		}
-		end := strings.LastIndexAny(candidate, ".[")
-		if end < 0 {
-			break
-		}
-		candidate = candidate[:end]
+	if path == "$" {
+		return at(path, d.root, message)
 	}
-	return at(path, d.locations["$"], message)
+	segments := strings.FieldsFunc(path, func(r rune) bool { return r == '.' || r == '[' || r == ']' })
+	_, location := d.sourceAt(segments)
+	return at(path, location.value, message)
 }
 
 func at(path string, node *yaml.Node, message string) *Diagnostic {
@@ -69,14 +63,18 @@ func Parse(source string) (*Document, error) {
 	}
 
 	root := parsed.Content[0]
-	document := &Document{locations: make(map[string]*yaml.Node)}
-	if err := document.validateShape("$", root, objectField(definitionFields)); err != nil {
+	document := &Document{root: root}
+	value, err := document.readValue(nil, root)
+	if err != nil {
+		return nil, err
+	}
+	if err := document.validateSchema(value); err != nil {
 		return nil, err
 	}
 	if err := root.Decode(&document.Definition); err != nil {
 		return nil, syntaxDiagnostic(source, err)
 	}
-	if err := document.validateDefinition(); err != nil {
+	if err := document.validateSemantics(); err != nil {
 		return nil, err
 	}
 
@@ -104,133 +102,119 @@ func syntaxDiagnostic(source string, err error) *Diagnostic {
 	return diagnostic
 }
 
-type fieldShape struct {
-	types  []string
-	entry  *fieldShape
-	fields map[string]fieldShape
-}
-
-func scalarField(types ...string) fieldShape {
-	return fieldShape{types: types}
-}
-
-func objectField(fields map[string]fieldShape) fieldShape {
-	return fieldShape{fields: fields}
-}
-
-func listField(entry fieldShape) fieldShape {
-	return fieldShape{entry: &entry}
-}
-
-var (
-	textField        = scalarField("!!str")
-	definitionFields = map[string]fieldShape{
-		"apiVersion":      textField,
-		"kind":            textField,
-		"name":            textField,
-		"icon":            textField,
-		"timeout_seconds": scalarField("!!int"),
-		"agent": objectField(map[string]fieldShape{
-			"harness": textField,
-			"model":   textField,
-			"credentials": objectField(map[string]fieldShape{
-				"source": textField,
-				"name":   textField,
-			}),
-		}),
-		"triggers": listField(objectField(map[string]fieldShape{
-			"id":  textField,
-			"use": textField,
-			"config": objectField(map[string]fieldShape{
-				"cron":       textField,
-				"utc_offset": scalarField("!!int", "!!float"),
-			}),
-		})),
-		"steps": listField(objectField(map[string]fieldShape{
-			"name":              textField,
-			"bash":              textField,
-			"prompt":            textField,
-			"working_directory": textField,
-			"secrets":           listField(textField),
-		})),
+// readValue converts YAML to JSON-compatible values without resolving aliases.
+func (d *Document) readValue(segments []string, node *yaml.Node) (any, error) {
+	if node.Kind == yaml.AliasNode {
+		path, _ := d.sourceAt(segments)
+		return nil, at(path, node, "Enter the value directly. YAML aliases are unsupported.")
 	}
-)
-
-func (d *Document) validateShape(path string, node *yaml.Node, shape fieldShape) error {
-	d.locations[path] = node
-	switch {
-	case node.ShortTag() == "!!null":
-		return at(path, node, "Replace null with a value.")
-	case node.Kind == yaml.AliasNode:
-		return at(path, node, "Enter the value directly. YAML aliases are unsupported.")
-	case shape.fields != nil:
-		return d.validateMapping(path, node, shape.fields)
-	case shape.entry != nil:
-		return d.validateList(path, node, *shape.entry)
-	default:
-		return validateScalar(path, node, shape.types)
+	switch node.ShortTag() {
+	case "!!map":
+		if node.Kind == yaml.MappingNode {
+			return d.readMapping(segments, node)
+		}
+	case "!!seq":
+		if node.Kind == yaml.SequenceNode {
+			return d.readList(segments, node)
+		}
+	case "!!str", "!!bool", "!!int", "!!float", "!!null":
+		if node.Kind == yaml.ScalarNode {
+			var value any
+			if err := node.Decode(&value); err == nil {
+				return value, nil
+			}
+		}
 	}
+	path, _ := d.sourceAt(segments)
+	return nil, at(path, node, "Use a YAML value that can be represented in JSON.")
 }
 
-func (d *Document) validateMapping(path string, node *yaml.Node, fields map[string]fieldShape) error {
-	if node.Kind != yaml.MappingNode || node.ShortTag() != "!!map" {
-		return at(path, node, "Enter a mapping with named fields.")
-	}
+func (d *Document) readMapping(segments []string, node *yaml.Node) (map[string]any, error) {
+	values := make(map[string]any, len(node.Content)/2)
 	for index := 0; index < len(node.Content); index += 2 {
 		key, value := node.Content[index], node.Content[index+1]
 		if key.Kind != yaml.ScalarNode || key.ShortTag() != "!!str" {
-			return at(path, key, "Use a string for each field name.")
+			path, _ := d.sourceAt(segments)
+			return nil, at(path, key, "Use a string for each field name.")
 		}
-		childPath := key.Value
-		if path != "$" {
-			childPath = path + "." + key.Value
+		child := append(segments, key.Value)
+		if _, exists := values[key.Value]; exists {
+			path, _ := d.sourceAt(child)
+			return nil, at(path, key, "Enter this field once.")
 		}
-		if _, exists := d.locations[childPath]; exists {
-			return at(childPath, key, "Enter this field once.")
+		decoded, err := d.readValue(child, value)
+		if err != nil {
+			return nil, err
 		}
-		field, exists := fields[key.Value]
-		if !exists {
-			return at(childPath, key, "Remove this unknown field or correct its name.")
-		}
-		if err := d.validateShape(childPath, value, field); err != nil {
-			return err
-		}
+		values[key.Value] = decoded
 	}
-	return nil
+	return values, nil
 }
 
-func (d *Document) validateList(path string, node *yaml.Node, entry fieldShape) error {
-	if node.Kind != yaml.SequenceNode || node.ShortTag() != "!!seq" {
-		return at(path, node, "Enter a list.")
-	}
+func (d *Document) readList(segments []string, node *yaml.Node) ([]any, error) {
+	values := make([]any, len(node.Content))
 	for index, value := range node.Content {
-		if err := d.validateShape(itemPath(path, index), value, entry); err != nil {
-			return err
+		decoded, err := d.readValue(append(segments, strconv.Itoa(index)), value)
+		if err != nil {
+			return nil, err
 		}
+		values[index] = decoded
 	}
-	return nil
+	return values, nil
 }
 
-func validateScalar(path string, node *yaml.Node, tags []string) error {
-	matches := node.Kind == yaml.ScalarNode && slices.Contains(tags, node.ShortTag())
-	switch {
-	case len(tags) > 1:
-		var number float64
-		if matches && node.Decode(&number) == nil {
-			return nil
+type sourceLocation struct {
+	key   *yaml.Node
+	value *yaml.Node
+}
+
+// sourceAt maps JSON Schema location segments to YAML positions and public paths.
+func (d *Document) sourceAt(segments []string) (string, sourceLocation) {
+	var path strings.Builder
+	location := sourceLocation{value: d.root}
+	for _, segment := range segments {
+		if location.value == nil {
+			break
 		}
-		return at(path, node, "Enter a number.")
-	case tags[0] == "!!int":
-		var number int
-		if matches && node.Decode(&number) == nil {
-			return nil
+		if location.value.Kind == yaml.SequenceNode {
+			fmt.Fprintf(&path, "[%s]", segment)
+			index, err := strconv.Atoi(segment)
+			if err != nil || index < 0 || index >= len(location.value.Content) {
+				break
+			}
+			location = sourceLocation{value: location.value.Content[index]}
+			continue
 		}
-		return at(path, node, "Enter an integer.")
-	case !matches:
-		return at(path, node, "Enter a string.")
-	default:
-		return nil
+
+		if segment == "" || strings.ContainsAny(segment, ".$[]") {
+			fmt.Fprintf(&path, "[%q]", segment)
+		} else {
+			if path.Len() > 0 {
+				path.WriteByte('.')
+			}
+			path.WriteString(segment)
+		}
+		property := mappingProperty(location.value, segment)
+		if property.value == nil {
+			break
+		}
+		location = property
 	}
+	if path.Len() == 0 {
+		return "$", location
+	}
+	return path.String(), location
+}
+
+func mappingProperty(node *yaml.Node, name string) sourceLocation {
+	if node.Kind == yaml.MappingNode {
+		for index := 0; index < len(node.Content); index += 2 {
+			if key := node.Content[index]; key.Value == name {
+				return sourceLocation{key: key, value: node.Content[index+1]}
+			}
+		}
+	}
+	return sourceLocation{}
 }
 
 func itemPath(path string, index int) string {

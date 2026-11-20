@@ -1,8 +1,9 @@
 # Custom automation YAML v2
 
 Each file defines one custom automation. Select its factory and stage on the
-board or supply them in the API request. Use [the schema](automation-v2.schema.json)
-for editor completion.
+board or supply them in the API request. SuperPlane validates the definition
+with the [JSON Schema](../../../pkg/automationspec/automation-v2.schema.json).
+Use the same schema for editor completion.
 
 - [Backlog example](backlog.yaml) adds manual and stage-entry triggers. Its
   steps inspect the checkout and summarize the task.

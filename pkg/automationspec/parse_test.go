@@ -74,6 +74,16 @@ steps:
 	}
 }
 
+func TestParseAcceptsIntegralTimeout(t *testing.T) {
+	document, err := automationspec.Parse(definitionHeader + "timeout_seconds: 900.0\n" + manualTrigger + bashStep)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if document.TimeoutSeconds != 900 {
+		t.Fatalf("expected a 900-second timeout, got %d", document.TimeoutSeconds)
+	}
+}
+
 func TestParseRejectsInvalidDefinitionAtItsSource(t *testing.T) {
 	schedule := "triggers:\n  - use: schedule\n    config:\n      cron: \"0 9 * * *\"\n"
 	cases := []struct {
