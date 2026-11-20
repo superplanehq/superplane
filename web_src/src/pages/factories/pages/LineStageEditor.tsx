@@ -33,7 +33,7 @@ export function LineStageEditToolbar({
       role="toolbar"
       aria-label="Edit stages"
       data-testid="line-stage-edit-toolbar"
-      className="mb-3 flex shrink-0 flex-wrap items-center gap-3 rounded-md border border-border bg-muted/40 px-3 py-2"
+      className="mb-3 flex shrink-0 flex-wrap items-center gap-3"
     >
       <div className="min-w-0 flex-1">
         <p className="text-[13px] font-medium text-foreground">Editing stages</p>
