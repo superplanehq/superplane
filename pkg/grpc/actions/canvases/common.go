@@ -67,6 +67,27 @@ func loadCanvasStatus(ctx context.Context, db *gorm.DB, canvasID uuid.UUID) (can
 	}, nil
 }
 
+func lockEditableCanvas(tx *gorm.DB, canvas *models.Canvas) (*models.Canvas, error) {
+	locked, err := models.LockCanvasForUpdate(tx, canvas.OrganizationID, canvas.ID)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, grpcerrors.NotFound(err, "canvas not found")
+	}
+	if err != nil {
+		return nil, err
+	}
+	if locked.FactoryID == nil {
+		return locked, nil
+	}
+	managed, err := models.IsAutomationManagedArtifact(tx, locked.OrganizationID, locked.ID.String())
+	if err != nil {
+		return nil, err
+	}
+	if managed {
+		return nil, grpcerrors.FailedPrecondition(nil, "Edit this automation from the factory board or the v2 automation API.")
+	}
+	return locked, nil
+}
+
 func mapCanvasNameUniqueConstraintError(err error) error {
 	if err == nil {
 		return nil
@@ -126,6 +147,8 @@ func PublishGeneratedCanvasNodesWithOwner(
 		ConsoleLayout: datatypes.NewJSONType(slices.Clone(liveVersion.ConsoleLayout.Data())),
 		CreatedAt:     &now,
 		UpdatedAt:     &now,
+
+		AutomationManaged: liveVersion.AutomationManaged,
 	}
 
 	if err := tx.Create(nextVersion).Error; err != nil {

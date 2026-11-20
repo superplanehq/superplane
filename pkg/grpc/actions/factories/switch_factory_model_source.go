@@ -227,6 +227,9 @@ func rewriteCanvasAgents(
 	if err := models.PromoteToLiveInTransaction(tx, version, nodes, live.Edges); err != nil {
 		return false, err
 	}
+	if err := models.RefreshAutomationArtifactRevision(tx, canvas.OrganizationID, canvas.ID.String(), version.ID.String()); err != nil {
+		return false, err
+	}
 
 	now := time.Now()
 	for _, node := range rewritten {
