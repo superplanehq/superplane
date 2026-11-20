@@ -10,6 +10,13 @@ export const RESTORE_DEFAULT_PROMPT_COPY = {
   confirmAction: "Restore default prompt",
 } as const;
 
+export class DefaultPromptUnavailableError extends Error {
+  constructor() {
+    super(RESTORE_DEFAULT_PROMPT_COPY.error);
+    this.name = "DefaultPromptUnavailableError";
+  }
+}
+
 type CanvasSpec = CanvasesCanvas["spec"];
 
 export function defaultAgentSteps(
