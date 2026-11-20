@@ -187,7 +187,6 @@ func TestHasRequiredScopedTokenPermissionForScopes(t *testing.T) {
 }
 
 func TestGatewayAuthorizerAllowsLegacyCanvasUpdateVersionOnlyForStagingDraftWrites(t *testing.T) {
-	clearOrganizationPermissionCacheForTest()
 	authorizer := NewGatewayAuthorizer(actionPermissionChecker{
 		"canvases:update_version": true,
 	})
@@ -627,7 +626,6 @@ func TestPullRequestImportAuthorization(t *testing.T) {
 	org, err := models.CreateOrganization("pr-import-"+uuid.NewString(), "")
 	require.NoError(t, err)
 	orgID := org.ID.String()
-	t.Cleanup(clearOrganizationPermissionCacheForTest)
 	t.Cleanup(clearOrgExperimentalFeatureCacheForTest)
 	for _, scenario := range []struct {
 		name, method, path string
@@ -646,7 +644,6 @@ func TestPullRequestImportAuthorization(t *testing.T) {
 		{"flag off denies import", "POST", "", actionPermissionChecker{"work_orders:create": true, "work_orders:update": true}, nil, false, false},
 	} {
 		t.Run(scenario.name, func(t *testing.T) {
-			clearOrganizationPermissionCacheForTest()
 			SetOrgExperimentalFeatureCache(uuid.MustParse(orgID), features.FeatureFactories, true)
 			SetOrgExperimentalFeatureCache(uuid.MustParse(orgID), features.FeatureFactoryPullRequestImport, scenario.enabled)
 			headers := map[string]string{"x-user-id": "22222222-2222-4222-8222-222222222222", "x-organization-id": orgID}
