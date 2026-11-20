@@ -255,8 +255,9 @@ func dispatchWorkOrderOnLineTx(
 		return nil, err
 	}
 
-	if len(currentLine.Steps) == 0 {
-		return nil, models.ErrFactoryLineHasNoSteps
+	executionPlan, err := currentLine.ExecutionPlan(tx)
+	if err != nil {
+		return nil, err
 	}
 
 	model = strings.TrimSpace(model)
@@ -273,10 +274,10 @@ func dispatchWorkOrderOnLineTx(
 	if err != nil {
 		return nil, invalidArgument(err.Error())
 	}
-	if err := validateLineThinkingLevel(tx, currentLine, normalizedThinking); err != nil {
+	if err := validateLineThinkingLevel(tx, executionPlan, normalizedThinking); err != nil {
 		return nil, err
 	}
-	if err := requireSavedBranchForImplementation(tx, factory, order, currentLine, startIndex); err != nil {
+	if err := requireSavedBranchForImplementation(tx, factory, order, executionPlan, startIndex); err != nil {
 		return nil, err
 	}
 	if resolvedWorkOrderDefaultBranch(order, factory.OnboardingConfigValue()) != "" {
@@ -332,7 +333,7 @@ func dispatchWorkOrderOnLineTx(
 		return nil, err
 	}
 
-	_, result, err := currentLine.DispatchFromWithModel(tx, order, startIndex, model, normalizedThinking)
+	_, results, err := currentLine.DispatchStageFromWithModel(tx, order, startIndex, model, normalizedThinking)
 	if err != nil {
 		return nil, err
 	}
@@ -340,7 +341,7 @@ func dispatchWorkOrderOnLineTx(
 	return &workOrderLineDispatchResult{
 		factory:      factory,
 		order:        order,
-		startedSteps: append(abandoned, result),
+		startedSteps: append(abandoned, results...),
 		planningStop: planningStop,
 		fromState:    fromState,
 		leftColumn:   leftColumn,
@@ -358,14 +359,14 @@ func requireSavedBranchForImplementation(
 	tx *gorm.DB,
 	factory *models.Factory,
 	order *models.FactoryWorkOrder,
-	line *models.FactoryLine,
+	steps []models.FactoryLineStep,
 	startIndex int,
 ) error {
-	if line == nil || startIndex < 0 || startIndex >= len(line.Steps) {
+	if startIndex < 0 || startIndex >= len(steps) {
 		return nil
 	}
-	appIDs := make([]uuid.UUID, 0, len(line.Steps)-startIndex)
-	for _, step := range line.Steps[startIndex:] {
+	appIDs := make([]uuid.UUID, 0, len(steps)-startIndex)
+	for _, step := range steps[startIndex:] {
 		appIDs = append(appIDs, step.AppID)
 	}
 	blocked, err := implementStepsMissingSavedBranch(tx, factory, order, appIDs)
@@ -452,11 +453,11 @@ func resolvedWorkOrderDefaultBranch(order *models.FactoryWorkOrder, config model
 	return strings.TrimSpace(config.DefaultBranch)
 }
 
-func validateLineThinkingLevel(tx *gorm.DB, line *models.FactoryLine, level string) error {
+func validateLineThinkingLevel(tx *gorm.DB, steps []models.FactoryLineStep, level string) error {
 	if level != runner.ThinkingLevelMinimal && level != runner.ThinkingLevelXHigh {
 		return nil
 	}
-	for _, step := range line.Steps {
+	for _, step := range steps {
 		if step.AppID == uuid.Nil {
 			continue
 		}

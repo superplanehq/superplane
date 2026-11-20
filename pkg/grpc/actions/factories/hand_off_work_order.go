@@ -161,9 +161,14 @@ func HandOffWorkOrder(
 	}
 
 	var implementIndex int
+	var implementStartIndex int
 	var verifyIndex int
 	if column == HandOffColumnImplement {
 		implementIndex, err = resolveImplementationStageIndex(stages)
+		if err != nil {
+			return nil, factoryErrorToStatus(err, "failed to hand off work order")
+		}
+		implementStartIndex, err = executionPlanIndexForLineStep(db, line, implementIndex)
 		if err != nil {
 			return nil, factoryErrorToStatus(err, "failed to hand off work order")
 		}
@@ -235,7 +240,7 @@ func HandOffWorkOrder(
 			return order.SetPendingHandOff(tx, models.NewPendingHandOff(line.ID, column, pullRequestURLs))
 		}
 		if column == HandOffColumnImplement {
-			started, err := dispatchWorkOrderOnLineTx(tx, factory, order.ID, line, &actor, implementIndex, false, "", "")
+			started, err := dispatchWorkOrderOnLineTx(tx, factory, order.ID, line, &actor, implementStartIndex, false, "", "")
 			if err != nil {
 				return err
 			}
@@ -683,6 +688,23 @@ func resolveImplementationStageIndex(stages []handOffStage) (int, error) {
 		return matches[0].Index, nil
 	}
 	return 0, invalidArgument("Cannot choose an implementation stage. Stages: " + joinStageNames(stages))
+}
+
+func executionPlanIndexForLineStep(tx *gorm.DB, line *models.FactoryLine, lineStepIndex int) (int, error) {
+	if lineStepIndex < 0 || lineStepIndex >= len(line.Steps) {
+		return 0, models.ErrFactoryLineStepOutOfRange
+	}
+	steps, err := line.ExecutionPlan(tx)
+	if err != nil {
+		return 0, err
+	}
+	stageKey := fmt.Sprintf("phase-%d", lineStepIndex)
+	for index, step := range steps {
+		if step.StageKey == stageKey && step.AppID == line.Steps[lineStepIndex].AppID {
+			return index, nil
+		}
+	}
+	return 0, invalidArgument("The implementation stage is not active on this line.")
 }
 
 func resolveVerifyStageIndex(stages []handOffStage) (int, error) {

@@ -94,6 +94,60 @@ describe("fixtureForSplitRunPage", () => {
     });
   });
 
+  it("shows the live line stages on a backlog task", () => {
+    const fixture = fixtureForSplitRunPage(DRAFT_WORK_ORDER, [], null, {
+      lineStages: [
+        { key: "backlog", name: "Backlog", kind: "STAGE_KIND_BACKLOG" },
+        { key: "custom-qa", name: "QA", kind: "STAGE_KIND_CUSTOM" },
+        { key: "phase-0", name: "Implement", kind: "STAGE_KIND_PHASE", stepIndex: 0 },
+        { key: "done", name: "Done", kind: "STAGE_KIND_DONE" },
+      ],
+    });
+
+    expect(fixture?.stageColumns?.map((column) => column.id)).toEqual(["backlog", "custom-qa", "phase-0", "done"]);
+  });
+
+  it("keeps a column for a deleted stage that earlier runs used", () => {
+    const fixture = fixtureForSplitRunPage(
+      {
+        ...RUNNING_WORK_ORDER,
+        lineDispatches: [
+          {
+            id: "dispatch-old",
+            line: { id: "line-1" },
+            state: "STATE_FINISHED",
+            createdAt: "2026-08-26T10:00:00Z",
+            stages: [
+              { key: "backlog", name: "Backlog", kind: "STAGE_KIND_BACKLOG" },
+              { key: "custom-qa", name: "QA", kind: "STAGE_KIND_CUSTOM" },
+              { key: "phase-0", name: "Implement", kind: "STAGE_KIND_PHASE", stepIndex: 0 },
+              { key: "done", name: "Done", kind: "STAGE_KIND_DONE" },
+            ],
+            stepExecutions: [
+              { id: "qa-run", stepIndex: 0, stageKey: "custom-qa", state: "STATE_FINISHED", result: "RESULT_PASSED" },
+            ],
+          },
+          {
+            id: "dispatch-new",
+            line: { id: "line-1" },
+            state: "STATE_ACTIVE",
+            createdAt: "2026-08-26T11:00:00Z",
+            stages: [
+              { key: "backlog", name: "Backlog", kind: "STAGE_KIND_BACKLOG" },
+              { key: "phase-0", name: "Implement", kind: "STAGE_KIND_PHASE", stepIndex: 0 },
+              { key: "done", name: "Done", kind: "STAGE_KIND_DONE" },
+            ],
+            stepExecutions: [{ id: "implement-run", stepIndex: 0, stageKey: "phase-0", state: "STATE_STARTED" }],
+          },
+        ],
+      },
+      [],
+      null,
+    );
+
+    expect(fixture?.stageColumns?.map((column) => column.id)).toEqual(["backlog", "phase-0", "custom-qa", "done"]);
+  });
+
   it("passes the pending analyzing flag into the draft footer", () => {
     const fixture = fixtureForSplitRunPage(DRAFT_WORK_ORDER, [], null, { analysisRuns: [], isAnalyzing: true });
 

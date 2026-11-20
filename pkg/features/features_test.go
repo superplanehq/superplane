@@ -185,6 +185,7 @@ func Test__Exists(t *testing.T) {
 	assert.True(t, Exists(FeatureOrganizationBYOK))
 	assert.True(t, Exists(FeatureOrganizationBYOKCustomProvider))
 	assert.True(t, Exists(FeatureFactoryCustomAutomations))
+	assert.True(t, Exists(FeatureFactoryCustomStages))
 	assert.False(t, Exists("workspace_agent"))
 	assert.True(t, Exists(FeatureWorkspaceSkills))
 	assert.True(t, Exists(FeatureFactoryPullRequestMerge))

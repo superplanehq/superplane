@@ -19,6 +19,7 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/pkg/workers/eventdistributer"
 	"github.com/superplanehq/superplane/test/support"
+	"gorm.io/datatypes"
 )
 
 func TestPublicFactoryBoardHidesPrivateWorkspace(t *testing.T) {
@@ -272,6 +273,33 @@ func TestAssemblePublicBoardListsColumnAutomations(t *testing.T) {
 	body, err := json.Marshal(board)
 	require.NoError(t, err)
 	assert.NotContains(t, string(body), appID.String())
+}
+
+func TestAssemblePublicBoardUsesSavedStageOrder(t *testing.T) {
+	factory := &models.Factory{Name: "Instabot", Key: "NEWWO"}
+	line := &models.FactoryLine{
+		Name: "implement",
+		Stages: datatypes.JSONSlice[models.FactoryLineStage]{
+			{ID: uuid.New(), Key: "backlog", Name: "Incoming", Kind: models.FactoryLineStageBacklog},
+			{ID: uuid.New(), Key: "custom-qa", Name: "QA", Kind: models.FactoryLineStageCustom},
+			{ID: uuid.New(), Key: "verify", Name: "Check", Kind: models.FactoryLineStageVerify},
+			{ID: uuid.New(), Key: "done", Name: "Shipped", Kind: models.FactoryLineStageDone},
+		},
+		ColumnColors: datatypes.NewJSONType(map[string]string{"custom-qa": "purple"}),
+	}
+
+	board := assemblePublicBoard(factory, line, nil, nil, nil, nil, nil, nil, nil, nil)
+
+	require.Len(t, board.Columns, 4)
+	assert.Equal(t, []string{"backlog", "custom-qa", "verify", "done"}, []string{
+		board.Columns[0].Key,
+		board.Columns[1].Key,
+		board.Columns[2].Key,
+		board.Columns[3].Key,
+	})
+	assert.Equal(t, "QA", board.Columns[1].Title)
+	assert.Equal(t, "purple", board.Columns[1].Color)
+	assert.Empty(t, board.Columns[1].Cards)
 }
 
 func TestPublicBoardDependabotIntakeUsesDependabotIcon(t *testing.T) {
