@@ -20,6 +20,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/productanalytics"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/triggers/schedule"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
 )
 
@@ -143,6 +144,18 @@ func (e *NodeRequestExecutor) execute(
 	runCancellations := &RunCancellationNotifier{}
 
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+		action := request.Spec.Data().InvokeAction
+		if request.Type == models.NodeRequestTypeInvokeAction && request.ExecutionID == nil && action != nil && action.ActionName == schedule.HookEmitEvent {
+			// Publication locks the canvas before it retires a schedule's
+			// pending request. Use the same order when a delivery claims it.
+			err := models.LockCanvasForScheduleDelivery(tx, request.WorkflowID)
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return nil
+			}
+			if err != nil {
+				return err
+			}
+		}
 		r, err := lockRequest(tx, request.ID)
 		if err == nil {
 			return e.processRequest(logger, tx, r, onNewEvents, runCancellations, onFactoryWorkOrderUpdated, onGitHubPullRequestRecorded, onFileBindCleanup, onProductAnalytics)
