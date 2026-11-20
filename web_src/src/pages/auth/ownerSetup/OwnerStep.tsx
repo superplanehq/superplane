@@ -27,6 +27,7 @@ type OwnerStepProps = {
 };
 
 const fieldLabelClass = "mb-2 block text-left text-[13px] font-medium text-foreground dark:text-foreground";
+const ownerFormClass = "mt-8 space-y-4 text-left [&_input[type=password][data-slot=input]]:placeholder:text-[#b8b6af]!";
 
 function InstallReportChoice({ checked, onChange }: { checked: boolean; onChange: (value: boolean) => void }) {
   return (
@@ -68,10 +69,7 @@ export const OwnerStep: React.FC<OwnerStepProps> = ({
     <FirstRunHeading headline="Create the owner account" size="display">
       <p className="text-[15px] leading-6 text-muted-foreground">This account administers the installation.</p>
     </FirstRunHeading>
-    <form
-      onSubmit={onSubmit}
-      className="mt-8 space-y-4 text-left [&_input[type=password][data-slot=input]]:placeholder:text-[#b8b6af]!"
-    >
+    <form onSubmit={onSubmit} className={ownerFormClass}>
       <ErrorBanner message={error} />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
