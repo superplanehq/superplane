@@ -1,4 +1,4 @@
-CREATE TABLE automation_sources (
+CREATE TABLE automations_as_code (
     id uuid PRIMARY KEY,
     organization_id uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
     factory_id uuid NOT NULL REFERENCES factories(id) ON DELETE CASCADE,
@@ -10,4 +10,4 @@ CREATE TABLE automation_sources (
     UNIQUE (organization_id, artifact_id)
 );
 
-CREATE INDEX automation_sources_factory_id_idx ON automation_sources (factory_id);
+CREATE INDEX automations_as_code_factory_id_idx ON automations_as_code (factory_id);
