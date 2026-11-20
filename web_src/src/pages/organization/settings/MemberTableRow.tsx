@@ -40,6 +40,7 @@ export function MemberIdentity({
   initials,
   avatar,
   isOwner,
+  provisionedBy,
   details,
 }: {
   name?: string;
@@ -47,6 +48,7 @@ export function MemberIdentity({
   initials: string;
   avatar?: string;
   isOwner?: boolean;
+  provisionedBy?: string;
   details?: ReactNode;
 }) {
   return (
@@ -61,6 +63,8 @@ export function MemberIdentity({
               {name}
             </span>
             {isOwner && <Badge color="yellow">Owner</Badge>}
+            {provisionedBy === "scim" && <Badge>SCIM</Badge>}
+            {provisionedBy === "jit" && <Badge>SSO</Badge>}
           </div>
         )}
         <p

@@ -1427,6 +1427,25 @@ CREATE TABLE public.organization_byok_model_allowlists (
 
 
 --
+-- Name: organization_domains; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.organization_domains (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id uuid NOT NULL,
+    domain text NOT NULL,
+    verification_token text NOT NULL,
+    verified_at timestamp with time zone,
+    verification_method text,
+    verified_by uuid,
+    created_by uuid,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT organization_domains_method_check CHECK (((verification_method IS NULL) OR (verification_method = ANY (ARRAY['dns'::text, 'admin'::text]))))
+);
+
+
+--
 -- Name: organization_enterprise_features; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1830,6 +1849,22 @@ CREATE TABLE public.schema_migrations (
 
 
 --
+-- Name: scim_tokens; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.scim_tokens (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    connection_id uuid NOT NULL,
+    token_hash text NOT NULL,
+    description text,
+    created_by uuid,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    last_used_at timestamp with time zone,
+    revoked_at timestamp with time zone
+);
+
+
+--
 -- Name: secrets; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1882,6 +1917,81 @@ CREATE TABLE public.sentry_webhook_receipts (
     outcome text NOT NULL,
     integration_count integer DEFAULT 0 NOT NULL,
     task_ids text DEFAULT ''::text NOT NULL
+);
+
+
+--
+-- Name: sso_connections; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.sso_connections (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id uuid NOT NULL,
+    protocol text NOT NULL,
+    preset text DEFAULT 'generic'::text NOT NULL,
+    display_name text NOT NULL,
+    status text DEFAULT 'draft'::text NOT NULL,
+    enforcement text DEFAULT 'optional'::text NOT NULL,
+    allow_owner_bypass boolean DEFAULT true NOT NULL,
+    jit_enabled boolean DEFAULT true NOT NULL,
+    default_role text DEFAULT 'org_operator'::text NOT NULL,
+    max_session_age_seconds integer DEFAULT 86400 NOT NULL,
+    idp_logout_enabled boolean DEFAULT false NOT NULL,
+    config jsonb DEFAULT '{}'::jsonb NOT NULL,
+    client_secret bytea,
+    last_tested_at timestamp with time zone,
+    last_test_result jsonb,
+    created_by uuid,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT sso_connections_enforcement_check CHECK ((enforcement = ANY (ARRAY['optional'::text, 'required'::text]))),
+    CONSTRAINT sso_connections_preset_check CHECK ((preset = ANY (ARRAY['okta'::text, 'entra'::text, 'generic'::text]))),
+    CONSTRAINT sso_connections_protocol_check CHECK ((protocol = 'oidc'::text)),
+    CONSTRAINT sso_connections_session_age_check CHECK (((max_session_age_seconds >= 900) AND (max_session_age_seconds <= 604800))),
+    CONSTRAINT sso_connections_status_check CHECK ((status = ANY (ARRAY['draft'::text, 'active'::text, 'disabled'::text])))
+);
+
+
+--
+-- Name: sso_identities; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.sso_identities (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    connection_id uuid NOT NULL,
+    organization_id uuid NOT NULL,
+    account_id uuid NOT NULL,
+    user_id uuid,
+    subject text,
+    idp_subject text,
+    external_id text,
+    scim_user_name text,
+    email text NOT NULL,
+    name text,
+    active boolean DEFAULT true NOT NULL,
+    provisioned_by text NOT NULL,
+    idp_session_id text,
+    id_token bytea,
+    last_login_at timestamp with time zone,
+    sessions_revoked_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT sso_identities_provisioned_by_check CHECK ((provisioned_by = ANY (ARRAY['jit'::text, 'scim'::text])))
+);
+
+
+--
+-- Name: sso_identity_sessions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.sso_identity_sessions (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    connection_id uuid NOT NULL,
+    identity_id uuid NOT NULL,
+    idp_session_id text NOT NULL,
+    expires_at timestamp with time zone NOT NULL,
+    revoked_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
@@ -1999,7 +2109,9 @@ CREATE TABLE public.users (
     created_by uuid,
     api_key_expires_at timestamp without time zone,
     api_key_canvas_ids jsonb DEFAULT '[]'::jsonb NOT NULL,
-    is_owner boolean DEFAULT false NOT NULL
+    is_owner boolean DEFAULT false NOT NULL,
+    provisioned_by text,
+    CONSTRAINT users_provisioned_by_check CHECK ((provisioned_by = ANY (ARRAY['jit'::text, 'scim'::text])))
 );
 
 
@@ -3168,6 +3280,14 @@ ALTER TABLE ONLY public.organization_byok_model_allowlists
 
 
 --
+-- Name: organization_domains organization_domains_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_domains
+    ADD CONSTRAINT organization_domains_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: organization_enterprise_features organization_enterprise_features_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3392,6 +3512,22 @@ ALTER TABLE ONLY public.schema_migrations
 
 
 --
+-- Name: scim_tokens scim_tokens_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.scim_tokens
+    ADD CONSTRAINT scim_tokens_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: scim_tokens scim_tokens_token_hash_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.scim_tokens
+    ADD CONSTRAINT scim_tokens_token_hash_key UNIQUE (token_hash);
+
+
+--
 -- Name: secrets secrets_domain_id_name_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3421,6 +3557,30 @@ ALTER TABLE ONLY public.sentry_app_install_grants
 
 ALTER TABLE ONLY public.sentry_webhook_receipts
     ADD CONSTRAINT sentry_webhook_receipts_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: sso_connections sso_connections_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.sso_connections
+    ADD CONSTRAINT sso_connections_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: sso_identities sso_identities_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.sso_identities
+    ADD CONSTRAINT sso_identities_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: sso_identity_sessions sso_identity_sessions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.sso_identity_sessions
+    ADD CONSTRAINT sso_identity_sessions_pkey PRIMARY KEY (id);
 
 
 --
@@ -4980,6 +5140,20 @@ CREATE INDEX organization_billing_plans_catalog ON public.organization_billing_p
 
 
 --
+-- Name: organization_domains_org_domain; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX organization_domains_org_domain ON public.organization_domains USING btree (organization_id, domain);
+
+
+--
+-- Name: organization_domains_verified_domain; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX organization_domains_verified_domain ON public.organization_domains USING btree (domain) WHERE (verified_at IS NOT NULL);
+
+
+--
 -- Name: organization_enterprise_features_feature_key_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -5131,6 +5305,83 @@ CREATE INDEX runners_fleet_state_idx ON public.runners USING btree (fleet_id, st
 --
 
 CREATE INDEX runners_last_seen_idx ON public.runners USING btree (last_seen_at) WHERE ((state)::text = ANY ((ARRAY['idle'::character varying, 'busy'::character varying])::text[]));
+
+
+--
+-- Name: scim_tokens_connection_active; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX scim_tokens_connection_active ON public.scim_tokens USING btree (connection_id) WHERE (revoked_at IS NULL);
+
+
+--
+-- Name: sso_connections_one_per_org; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX sso_connections_one_per_org ON public.sso_connections USING btree (organization_id);
+
+
+--
+-- Name: sso_identities_account; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX sso_identities_account ON public.sso_identities USING btree (connection_id, account_id);
+
+
+--
+-- Name: sso_identities_connection_email; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX sso_identities_connection_email ON public.sso_identities USING btree (connection_id, lower(email));
+
+
+--
+-- Name: sso_identities_connection_user_name; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX sso_identities_connection_user_name ON public.sso_identities USING btree (connection_id, lower(scim_user_name)) WHERE ((scim_user_name IS NOT NULL) AND (scim_user_name <> ''::text));
+
+
+--
+-- Name: sso_identities_external_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX sso_identities_external_id ON public.sso_identities USING btree (connection_id, external_id) WHERE (external_id IS NOT NULL);
+
+
+--
+-- Name: sso_identities_idp_session; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX sso_identities_idp_session ON public.sso_identities USING btree (connection_id, idp_session_id) WHERE (idp_session_id IS NOT NULL);
+
+
+--
+-- Name: sso_identities_idp_subject; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX sso_identities_idp_subject ON public.sso_identities USING btree (connection_id, idp_subject) WHERE (idp_subject IS NOT NULL);
+
+
+--
+-- Name: sso_identities_subject; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX sso_identities_subject ON public.sso_identities USING btree (connection_id, subject) WHERE (subject IS NOT NULL);
+
+
+--
+-- Name: sso_identity_sessions_active_session; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX sso_identity_sessions_active_session ON public.sso_identity_sessions USING btree (connection_id, idp_session_id) WHERE (revoked_at IS NULL);
+
+
+--
+-- Name: sso_identity_sessions_identity; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX sso_identity_sessions_identity ON public.sso_identity_sessions USING btree (identity_id) WHERE (revoked_at IS NULL);
 
 
 --
@@ -6089,6 +6340,30 @@ ALTER TABLE ONLY public.organization_billing_plans
 
 
 --
+-- Name: organization_domains organization_domains_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_domains
+    ADD CONSTRAINT organization_domains_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.accounts(id);
+
+
+--
+-- Name: organization_domains organization_domains_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_domains
+    ADD CONSTRAINT organization_domains_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: organization_domains organization_domains_verified_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_domains
+    ADD CONSTRAINT organization_domains_verified_by_fkey FOREIGN KEY (verified_by) REFERENCES public.accounts(id);
+
+
+--
 -- Name: organization_enterprise_features organization_enterprise_features_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -6270,6 +6545,86 @@ ALTER TABLE ONLY public.runner_tasks
 
 ALTER TABLE ONLY public.runners
     ADD CONSTRAINT runners_fleet_id_fkey FOREIGN KEY (fleet_id) REFERENCES public.runner_fleets(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: scim_tokens scim_tokens_connection_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.scim_tokens
+    ADD CONSTRAINT scim_tokens_connection_id_fkey FOREIGN KEY (connection_id) REFERENCES public.sso_connections(id) ON DELETE CASCADE;
+
+
+--
+-- Name: scim_tokens scim_tokens_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.scim_tokens
+    ADD CONSTRAINT scim_tokens_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.accounts(id);
+
+
+--
+-- Name: sso_connections sso_connections_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.sso_connections
+    ADD CONSTRAINT sso_connections_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.accounts(id);
+
+
+--
+-- Name: sso_connections sso_connections_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.sso_connections
+    ADD CONSTRAINT sso_connections_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: sso_identities sso_identities_account_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.sso_identities
+    ADD CONSTRAINT sso_identities_account_id_fkey FOREIGN KEY (account_id) REFERENCES public.accounts(id);
+
+
+--
+-- Name: sso_identities sso_identities_connection_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.sso_identities
+    ADD CONSTRAINT sso_identities_connection_id_fkey FOREIGN KEY (connection_id) REFERENCES public.sso_connections(id) ON DELETE CASCADE;
+
+
+--
+-- Name: sso_identities sso_identities_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.sso_identities
+    ADD CONSTRAINT sso_identities_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: sso_identities sso_identities_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.sso_identities
+    ADD CONSTRAINT sso_identities_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE SET NULL;
+
+
+--
+-- Name: sso_identity_sessions sso_identity_sessions_connection_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.sso_identity_sessions
+    ADD CONSTRAINT sso_identity_sessions_connection_id_fkey FOREIGN KEY (connection_id) REFERENCES public.sso_connections(id) ON DELETE CASCADE;
+
+
+--
+-- Name: sso_identity_sessions sso_identity_sessions_identity_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.sso_identity_sessions
+    ADD CONSTRAINT sso_identity_sessions_identity_id_fkey FOREIGN KEY (identity_id) REFERENCES public.sso_identities(id) ON DELETE CASCADE;
 
 
 --

@@ -19,7 +19,7 @@ func TestLegacyAgentEndpointsAreNotRegistered(t *testing.T) {
 	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
 	signer := jwt.NewSigner("legacy-route-test")
 	oidcProvider := support.NewOIDCProvider()
-	server, err := NewServer(r.Encryptor, r.Registry, signer, oidcProvider, "", "", "", "test", "/app/templates", r.AuthService, false)
+	server, err := NewServer(r.Encryptor, r.Registry, signer, oidcProvider, "", "", "", "test", "/app/templates", r.AuthService, false, nil)
 	require.NoError(t, err)
 	registerTestGRPCGateway(t, server, r.AuthService, r.Registry, r.Encryptor, oidcProvider)
 	server.RegisterWebSocketRoutes()
