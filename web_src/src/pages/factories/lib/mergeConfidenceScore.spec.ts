@@ -9,7 +9,12 @@ import {
   mergeConfidenceScore,
   splitMergeChecksByPullRequest,
 } from "./mergeConfidenceScore";
-import type { WorkOrderCheckPresentation } from "./workOrderChecks";
+import {
+  formatCheckScore,
+  presentWorkOrderCheck,
+  workOrderCheckStatus,
+  type WorkOrderCheckPresentation,
+} from "./workOrderChecks";
 
 function check(
   overrides: Partial<WorkOrderCheckPresentation> & Pick<WorkOrderCheckPresentation, "id" | "key" | "name">,
@@ -23,6 +28,31 @@ function check(
 }
 
 describe("mergeConfidenceScore", () => {
+  it.each([
+    [1, 5, "Pass"],
+    [2, 4, "Pass"],
+    [3, 3, "Needs review"],
+    [4, 2, "Fail"],
+    [5, 1, "Fail"],
+  ] as const)(
+    "shows legacy severity %i and new Correctness %i with the same verdict (%s)",
+    (legacy, displayed, verdict) => {
+      for (const [key, score] of [
+        ["drift-review", legacy],
+        ["correctness-review", displayed],
+      ] as const) {
+        const correctness = presentWorkOrderCheck({ key, name: "Correctness", score, maxScore: 5 });
+        correctness.level = mergeConfidenceCheckLevel(key, score);
+        const metrics = [correctness, check({ id: "security", key: "security-review", name: "Security" })];
+
+        expect(formatCheckScore(correctness).value).toBe(String(displayed));
+        expect(workOrderCheckStatus(correctness).label).toBe(verdict);
+        expect(mergeConfidenceScore(metrics).score).toBe(displayed);
+        expect(mergeConfidenceHeadline(metrics)?.score).toBe(displayed);
+      }
+    },
+  );
+
   it("uses the weakest metric so a caution stays on the headline", () => {
     const score = mergeConfidenceScore([
       check({ id: "risk", key: "risk-review", name: "Risk score", score: 3, level: "caution" }),
@@ -72,21 +102,21 @@ describe("mergeConfidenceHeadline", () => {
     expect(headline).toMatchObject({
       score: 5,
       checks: [
-        { key: "risk-review", name: "Blast radius" },
         { key: "security-review", name: "Security" },
+        { key: "risk-review", name: "Blast radius" },
       ],
     });
   });
 
-  it("lists a check once with its weakest score across repositories", () => {
+  it("lists Correctness once with its weakest score across repositories using either scale", () => {
     const headline = mergeConfidenceHeadline([
-      { key: "risk-review", name: "Blast radius", score: 1, maxScore: 5 },
-      { key: "risk-review", name: "Blast radius", score: 4, maxScore: 5 },
+      { key: "correctness-review", name: "Correctness", score: 5, maxScore: 5 },
+      { key: "drift-review", name: "Drift", score: 4, maxScore: 5 },
     ]);
 
     expect(headline).toMatchObject({
       score: 2,
-      checks: [{ key: "risk-review", score: 4 }],
+      checks: [{ key: "drift-review", score: 4 }],
     });
     expect(headline?.checks).toHaveLength(1);
   });
@@ -141,12 +171,12 @@ describe("splitMergeChecksByPullRequest", () => {
   it("attaches a check without a repository to the only pull request repository", () => {
     const split = splitMergeChecksByPullRequest([api, task], ["acme/api", "ACME/api"]);
 
-    expect(ids(split.byRepository.get("acme/api"))).toEqual(["api", "task"]);
+    expect(ids(split.byRepository.get("acme/api"))).toEqual(["task", "api"]);
     expect(split.unattached).toEqual([]);
   });
 
   it("leaves every check unattached without pull requests", () => {
-    expect(ids(splitMergeChecksByPullRequest([api, task], []).unattached)).toEqual(["api", "task"]);
+    expect(ids(splitMergeChecksByPullRequest([api, task], []).unattached)).toEqual(["task", "api"]);
   });
 });
 
@@ -161,7 +191,7 @@ describe("consoleCheckList", () => {
 
     expect(items).toMatchObject({
       check: { score: 3, level: "caution" },
-      metrics: [{ name: "Risk score" }, { name: "Drift" }],
+      metrics: [{ name: "Drift" }, { name: "Risk score" }],
     });
   });
 });
