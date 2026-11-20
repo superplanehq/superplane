@@ -44,9 +44,12 @@ func FindAutomationSourceByArtifact(tx *gorm.DB, organizationID uuid.UUID, artif
 	return &source, err
 }
 
+// ListAutomationSources loads only the fields needed to build automation summaries.
 func ListAutomationSources(tx *gorm.DB, organizationID, factoryID uuid.UUID) ([]AutomationSource, error) {
 	var sources []AutomationSource
-	err := tx.Where("organization_id = ? AND factory_id = ?", organizationID, factoryID).Find(&sources).Error
+	err := tx.Select("id", "factory_id", "name", "artifact_id").
+		Where("organization_id = ? AND factory_id = ?", organizationID, factoryID).
+		Find(&sources).Error
 	return sources, err
 }
 
