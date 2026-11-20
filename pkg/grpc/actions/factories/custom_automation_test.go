@@ -902,6 +902,15 @@ func TestCustomAutomationPreservesSubscriptionAgentOnUpdate(t *testing.T) {
 			ctx := onboardingContext(r)
 			deps := onboardingDeps(r)
 			organizationID := r.Organization.ID.String()
+			connection, err := models.CreateCodexConnection(db, r.Organization.ID, r.User, time.Now())
+			require.NoError(t, err)
+			require.NoError(t, connection.StoreUsage(db, nil, []models.CodexModel{
+				{Model: "gpt-5.4"}, {Model: "gpt-5.5"},
+			}, time.Now()))
+			require.NoError(t, db.Model(connection).Updates(map[string]any{
+				"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("test-bundle"),
+			}).Error)
+
 			var agent *pb.FactoryAppTemplateAgent
 			if model != "" {
 				agent = &pb.FactoryAppTemplateAgent{
@@ -945,6 +954,12 @@ func TestCustomAutomationPreservesSubscriptionAgentOnUpdate(t *testing.T) {
 			node, err := models.FindCanvasNode(db, uuid.MustParse(automationID), customAutomationRunnerID)
 			require.NoError(t, err)
 			assert.Equal(t, "gpt-5.5", node.Configuration.Data()["model"])
+
+			settings.Agent.Model = "outside-the-subscription"
+			_, err = UpdateFactoryCustomAutomation(ctx, deps, organizationID, &pb.UpdateFactoryCustomAutomationRequest{
+				FactoryId: factory.ID.String(), AutomationId: automationID, Name: "Review changed files", Settings: settings,
+			})
+			require.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
 
 			settings.Agent.Model = ""
 			_, err = UpdateFactoryCustomAutomation(ctx, deps, organizationID, &pb.UpdateFactoryCustomAutomationRequest{
@@ -1014,11 +1029,12 @@ func TestCustomAutomationSuperPlaneAgentOmitsCredentials(t *testing.T) {
 	support.AssignOpenSystemTrial(t, r.Organization.ID)
 	anthropic := models.UsageProviderAnthropic
 	modelName := "claude-sonnet-4-6"
+	const selectedModel = "claude-opus-4-6"
 	_, err := models.UpsertHostedLLMProvider(db, models.HostedLLMProvider{
 		Provider:      anthropic,
 		Enabled:       true,
 		APIKey:        []byte("test-hosted-key"),
-		AllowedModels: datatypes.JSONSlice[string]{modelName},
+		AllowedModels: datatypes.JSONSlice[string]{modelName, selectedModel},
 	})
 	require.NoError(t, err)
 	_, err = models.UpdateInstallationLLMSettings(db, models.InstallationLLMSettings{
@@ -1056,6 +1072,7 @@ func TestCustomAutomationSuperPlaneAgentOmitsCredentials(t *testing.T) {
 	assert.Equal(t, models.CanvasNodeStateReady, node.State)
 	assert.Nil(t, node.StateReason)
 	assert.NotContains(t, node.Configuration.Data(), "credentials")
+	assert.NotContains(t, node.Configuration.Data(), "model")
 
 	reason := "credentials is not supported on Run SuperPlane Agent"
 	broken := node.Configuration.Data()
@@ -1065,6 +1082,7 @@ func TestCustomAutomationSuperPlaneAgentOmitsCredentials(t *testing.T) {
 	node.StateReason = &reason
 	require.NoError(t, db.Save(node).Error)
 
+	settings.Agent.Model = models.FormatSelectableLLMModelKey(models.UsageFundingSourceHosted, anthropic, selectedModel)
 	_, err = UpdateFactoryCustomAutomation(ctx, deps, organizationID, &pb.UpdateFactoryCustomAutomationRequest{
 		FactoryId:    factory.ID.String(),
 		AutomationId: automationID,
@@ -1077,6 +1095,7 @@ func TestCustomAutomationSuperPlaneAgentOmitsCredentials(t *testing.T) {
 	assert.Equal(t, models.CanvasNodeStateReady, repaired.State)
 	assert.Nil(t, repaired.StateReason)
 	assert.NotContains(t, repaired.Configuration.Data(), "credentials")
+	assert.Equal(t, settings.Agent.Model, repaired.Configuration.Data()["model"])
 }
 
 func TestTaskCustomAutomationTriggerSkipsTheSchedule(t *testing.T) {
