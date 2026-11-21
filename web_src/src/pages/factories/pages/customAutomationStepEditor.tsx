@@ -1,4 +1,6 @@
 import { Button } from "@/components/ui/button";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -101,13 +103,11 @@ export function StepEditor({
           testId={`custom-automation-step-body-${position}`}
         />
       </div>
-      {step.type === "bash" ? (
-        <BashStepSecrets
-          organizationId={organizationId}
-          selected={step.secrets ?? []}
-          onChange={(secrets) => onChange({ ...step, secrets })}
-        />
-      ) : null}
+      <StepSecrets
+        organizationId={organizationId}
+        selected={step.secrets ?? []}
+        onChange={(secrets) => onChange({ ...step, secrets })}
+      />
     </div>
   );
 }
@@ -165,7 +165,7 @@ function StepEditorToolbar({
   );
 }
 
-function BashStepSecrets({
+function StepSecrets({
   organizationId,
   selected,
   onChange,
@@ -194,7 +194,9 @@ function BashStepSecrets({
     <div className="flex flex-col gap-2">
       <div className="flex flex-col gap-1.5">
         <Label>Secrets</Label>
-        <p className="text-xs text-muted-foreground">Give this step access to stored credentials.</p>
+        <p className="text-xs text-muted-foreground">
+          Import secret keys as environment variables shared by all steps in this run.
+        </p>
       </div>
       <div className="flex flex-col gap-1">
         {selected.map((name) => (
@@ -252,29 +254,44 @@ function SecretPickerMenu({
   onCreate: () => void;
   onSelect: (name: string) => void;
 }) {
+  const [search, setSearch] = useState("");
+  const closeMenu = () => {
+    onMenuOpenChange(false);
+    setSearch("");
+  };
   return (
-    <div className="relative w-fit">
-      <Button
-        type="button"
-        variant="ghost"
-        size="xs"
-        className="h-7 justify-start gap-1 px-1.5 text-muted-foreground"
-        aria-expanded={menuOpen}
-        onClick={() => onMenuOpenChange(!menuOpen)}
-      >
-        <Plus className="size-3" aria-hidden />
-        Add
-      </Button>
-      {menuOpen ? (
-        <div className="absolute top-full left-0 z-30 mt-1 min-w-56 rounded-md border bg-popover p-1 text-popover-foreground shadow-sm">
-          {isLoading ? <p className="px-2 py-1.5 text-sm text-muted-foreground">Loading secrets…</p> : null}
+    <Popover
+      open={menuOpen}
+      onOpenChange={(open) => {
+        onMenuOpenChange(open);
+        if (!open) setSearch("");
+      }}
+    >
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="xs"
+          className="h-7 justify-start gap-1 px-1.5 text-muted-foreground"
+          aria-expanded={menuOpen}
+          role="combobox"
+          aria-label="Add secret"
+          aria-haspopup="listbox"
+        >
+          <Plus className="size-3" aria-hidden />
+          Add
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-72 p-0">
+        <Command shouldFilter={false}>
+          <CommandInput placeholder="Find a secret" autoFocus value={search} onValueChange={setSearch} />
           {canCreate ? (
             <Button
               type="button"
               variant="ghost"
               className="h-8 w-full justify-start gap-2 px-2 font-normal"
               onClick={() => {
-                onMenuOpenChange(false);
+                closeMenu();
                 onCreate();
               }}
             >
@@ -282,29 +299,34 @@ function SecretPickerMenu({
               Create new secret
             </Button>
           ) : null}
-          {canCreate && options.length > 0 ? <div className="my-1 border-t border-border" /> : null}
-          {!isLoading
-            ? options.map((name) => (
-                <Button
-                  key={name}
-                  type="button"
-                  variant="ghost"
-                  className="h-8 w-full justify-start gap-2 px-2 font-normal"
-                  onClick={() => {
-                    onSelect(name);
-                    onMenuOpenChange(false);
-                  }}
-                >
-                  <KeyRound className="size-3.5 text-muted-foreground" aria-hidden />
-                  {name}
-                </Button>
-              ))
-            : null}
-          {!isLoading && options.length === 0 && !canCreate ? (
-            <p className="px-2 py-1.5 text-sm text-muted-foreground">No organization secrets</p>
-          ) : null}
-        </div>
-      ) : null}
-    </div>
+          <CommandList className="max-h-60 overflow-y-auto">
+            {isLoading ? (
+              <p className="px-2 py-1.5 text-sm text-muted-foreground">Loading secrets…</p>
+            ) : (
+              <CommandEmpty>No matching secrets.</CommandEmpty>
+            )}
+            <CommandGroup>
+              {!isLoading
+                ? options
+                    .filter((name) => name.toLowerCase().includes(search.trim().toLowerCase()))
+                    .map((name) => (
+                      <CommandItem
+                        key={name}
+                        value={name}
+                        onSelect={() => {
+                          onSelect(name);
+                          closeMenu();
+                        }}
+                      >
+                        <KeyRound className="size-3.5 text-muted-foreground" aria-hidden />
+                        {name}
+                      </CommandItem>
+                    ))
+                : null}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   );
 }

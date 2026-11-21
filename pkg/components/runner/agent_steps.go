@@ -54,21 +54,21 @@ func ValidateAgentSteps(steps []AgentStep) error {
 			if step.Command == nil || strings.TrimSpace(*step.Command) == "" {
 				return fmt.Errorf("steps[%d].command is required for bash steps", i)
 			}
-			seenSecrets := make(map[string]struct{}, len(step.Secrets))
-			for j, secret := range step.Secrets {
-				name := strings.TrimSpace(secret)
-				if name == "" {
-					return fmt.Errorf("steps[%d].secrets[%d] is required", i, j)
-				}
-				if _, ok := seenSecrets[name]; ok {
-					return fmt.Errorf("steps[%d] has duplicate secret: %s", i, name)
-				}
-				seenSecrets[name] = struct{}{}
-			}
 		case AgentStepPrompt:
 			if step.Prompt == nil || strings.TrimSpace(*step.Prompt) == "" {
 				return fmt.Errorf("steps[%d].prompt is required for prompt steps", i)
 			}
+		}
+		seenSecrets := make(map[string]struct{}, len(step.Secrets))
+		for j, secret := range step.Secrets {
+			name := strings.TrimSpace(secret)
+			if name == "" {
+				return fmt.Errorf("steps[%d].secrets[%d] is required", i, j)
+			}
+			if _, ok := seenSecrets[name]; ok {
+				return fmt.Errorf("steps[%d] has duplicate secret: %s", i, name)
+			}
+			seenSecrets[name] = struct{}{}
 		}
 	}
 	return nil
