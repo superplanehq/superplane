@@ -1009,7 +1009,7 @@ func (s *Server) dispatchIntegrationRequest(w http.ResponseWriter, r *http.Reque
 	if !deliver {
 		return
 	}
-	integration.HandleRequest(core.HTTPRequestContext{
+	requestCtx := core.HTTPRequestContext{
 		Logger:           logging.ForIntegration(*integrationInstance),
 		Request:          request,
 		Response:         response,
@@ -1027,7 +1027,13 @@ func (s *Server) dispatchIntegrationRequest(w http.ResponseWriter, r *http.Reque
 			s.registry,
 			onNewEvents,
 		),
-	})
+	}
+	if integrationInstance.AppName == "github" && strings.HasSuffix(r.URL.Path, "/redirect") {
+		requestCtx.Creation = s.gitHubAppCreationCallbacks(r, w, integrationInstance)
+		integration.HandleRequest(requestCtx)
+		return
+	}
+	integration.HandleRequest(requestCtx)
 
 	integrationInstance.Capabilities = capabilityCtx.States()
 	err = database.Conn().Save(integrationInstance).Error

@@ -238,7 +238,8 @@ func TestGitHubClientUsesEnterpriseURLs(t *testing.T) {
 		case r.URL.Path == "/graphql":
 			_, _ = w.Write([]byte(`{"data":{"viewer":{"login":"octocat"}}}`))
 		case strings.HasPrefix(r.URL.Path, "/app-manifests/") && strings.HasSuffix(r.URL.Path, "/conversions"):
-			_, _ = w.Write([]byte(`{"id":99,"slug":"superplane","pem":"pem","webhook_secret":"whsec"}`))
+			w.WriteHeader(http.StatusCreated)
+			_, _ = w.Write([]byte(`{"id":99,"slug":"superplane","client_id":"dummy-client","client_secret":"dummy-secret","pem":"pem","webhook_secret":"whsec"}`))
 		default:
 			http.NotFound(w, r)
 		}
