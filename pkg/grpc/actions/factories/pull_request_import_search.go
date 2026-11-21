@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/google/go-github/v84/github"
 	"github.com/google/uuid"
@@ -14,6 +15,9 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"gorm.io/gorm"
 )
+
+// Conservatively budget the complete decoded query, including qualifiers and escaping.
+const gitHubPullRequestSearchQueryLimit = 256
 
 type pullRequestImportGitHubSearch interface {
 	ListPullRequests(context.Context, string, *github.PullRequestListOptions) ([]*github.PullRequest, *github.Response, error)
@@ -118,7 +122,11 @@ func searchPullRequestImportItems(ctx context.Context, db *gorm.DB, deps IntakeD
 	}
 	// Quoting prevents user text from adding repository or state qualifiers.
 	escaped := strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(query)
-	results, _, err := search.SearchIssues(ctx, fmt.Sprintf(`repo:%s is:pr is:open in:title "%s"`, repository, escaped), &github.SearchOptions{Sort: "created", Order: "desc", ListOptions: github.ListOptions{PerPage: limit}})
+	searchQuery := fmt.Sprintf(`repo:%s is:pr is:open in:title "%s"`, repository, escaped)
+	if utf8.RuneCountInString(searchQuery) > gitHubPullRequestSearchQueryLimit {
+		return nil, invalidArgument("The pull request search is too long. Shorten the search and try again.")
+	}
+	results, _, err := search.SearchIssues(ctx, searchQuery, &github.SearchOptions{Sort: "created", Order: "desc", ListOptions: github.ListOptions{PerPage: limit}})
 	if err != nil {
 		return nil, err
 	}
