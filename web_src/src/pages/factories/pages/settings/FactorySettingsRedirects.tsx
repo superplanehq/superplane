@@ -33,6 +33,7 @@ const LEGACY_WORKSPACE_SETTINGS: Record<string, FactorySettingsDestination> = {
   "linked-accounts": { scope: "account", section: "profile" },
   notifications: { scope: "account", section: "notifications" },
   members: { scope: "organization", section: "members" },
+  sso: { scope: "organization", section: "sso" },
   integrations: { scope: "organization", section: "integrations" },
   secrets: { scope: "organization", section: "secrets" },
 };
@@ -41,6 +42,7 @@ const LEGACY_ORGANIZATION_SETTINGS: Record<string, FactorySettingsDestination> =
   models: { scope: "workspace", section: "models" },
   general: { scope: "organization", section: "general" },
   members: { scope: "organization", section: "members" },
+  sso: { scope: "organization", section: "sso" },
   "api-keys": { scope: "organization", section: "api-keys" },
   integrations: { scope: "organization", section: "integrations" },
   spending: { scope: "organization", section: "spending" },
