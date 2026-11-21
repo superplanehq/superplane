@@ -149,34 +149,11 @@ export const loopMapper: ComponentBaseMapper = {
       "Timeout (s)": configuration.timeoutSeconds ?? 3600,
     };
 
-    if (typeof sessionMetadata?.iteration === "number") {
-      details["Current iteration"] = sessionMetadata.iteration;
-    }
-    if (typeof sessionMetadata?.active === "boolean") {
-      details.Active = sessionMetadata.active;
-    }
-    if (sessionMetadata?.waitingBetweenIterations) {
-      details["Waiting between iterations"] = true;
-    }
-
-    const doneOutput = (context.execution.outputs as LoopOutputs | undefined)?.done?.[0]?.data as
-      | {
-          done?: {
-            iterations?: number;
-            stopReason?: string;
-            elapsedMs?: number;
-          };
-        }
-      | undefined;
-    if (typeof doneOutput?.done?.iterations === "number") {
-      details.Iterations = doneOutput.done.iterations;
-    }
-    if (doneOutput?.done?.stopReason) {
-      details["Stop reason"] = doneOutput.done.stopReason;
-    }
-    if (typeof doneOutput?.done?.elapsedMs === "number") {
-      details["Elapsed (ms)"] = doneOutput.done.elapsedMs;
-    }
+    Object.assign(
+      details,
+      formatLoopSessionDetails(sessionMetadata),
+      formatCompletedLoopDetails(context.execution.outputs as LoopOutputs | undefined),
+    );
 
     if (configuration.delayBetweenIterations?.enabled) {
       const strategy = configuration.delayBetweenIterations.strategy ?? "fixed";
@@ -191,6 +168,45 @@ export const loopMapper: ComponentBaseMapper = {
 
 function isLoopSessionMetadata(metadata: unknown): metadata is LoopMetadata {
   return typeof metadata === "object" && metadata !== null && "active" in metadata;
+}
+
+function formatLoopSessionDetails(
+  sessionMetadata: LoopMetadata | undefined,
+): Record<string, string | number | boolean> {
+  const details: Record<string, string | number | boolean> = {};
+  if (typeof sessionMetadata?.iteration === "number") {
+    details["Current iteration"] = sessionMetadata.iteration;
+  }
+  if (typeof sessionMetadata?.active === "boolean") {
+    details.Active = sessionMetadata.active;
+  }
+  if (sessionMetadata?.waitingBetweenIterations) {
+    details["Waiting between iterations"] = true;
+  }
+  return details;
+}
+
+function formatCompletedLoopDetails(outputs: LoopOutputs | undefined): Record<string, string | number | boolean> {
+  const details: Record<string, string | number | boolean> = {};
+  const doneOutput = outputs?.done?.[0]?.data as
+    | {
+        done?: {
+          iterations?: number;
+          stopReason?: string;
+          elapsedMs?: number;
+        };
+      }
+    | undefined;
+  if (typeof doneOutput?.done?.iterations === "number") {
+    details.Iterations = doneOutput.done.iterations;
+  }
+  if (doneOutput?.done?.stopReason) {
+    details["Stop reason"] = doneOutput.done.stopReason;
+  }
+  if (typeof doneOutput?.done?.elapsedMs === "number") {
+    details["Elapsed (ms)"] = doneOutput.done.elapsedMs;
+  }
+  return details;
 }
 
 function getLoopEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
