@@ -111,3 +111,33 @@ test("flow tools reject invalid input before they call the backend", async () =>
   await assert.rejects(call("report_merge_check", { check: "risk", score: 2 }, value.client), /summary is required/);
   assert.deepEqual(value.requests, []);
 });
+
+test("propose_plan rejects a plan it cannot save instead of publishing only the scores", async () => {
+  const value = taskFixture();
+  value.client.env.SUPERPLANE_ANALYSIS_SPEC_FILE = path.join(value.taskDir, "spec.md");
+  const scores = {
+    clarity: { score: 3, summary: "The task is clear." },
+    complexity: { score: 2, summary: "Two packages change." },
+    verifiability: { score: 3, summary: "Unit tests cover it." },
+  };
+
+  await assert.rejects(
+    call("propose_plan", { scores, plan: "# Plan" }, value.client),
+    /unknown argument: plan\b.*pass the specification markdown as spec/,
+  );
+  await assert.rejects(
+    call("propose_plan", { scores, specification: "# Plan" }, value.client),
+    /unknown argument: specification\b/,
+  );
+  await assert.rejects(
+    call("propose_plan", { scores, spec: { markdown: "# Plan" } }, value.client),
+    /spec must be the specification markdown as a string/,
+  );
+  assert.deepEqual(value.requests, []);
+
+  await call("propose_plan", { scores, spec: "# Plan" }, value.client);
+  assert.deepEqual(
+    value.requests.map((request) => [request.method, request.path, request.body.spec]),
+    [["PUT", "/api/v1/runner/task/plan", "# Plan"]],
+  );
+});
