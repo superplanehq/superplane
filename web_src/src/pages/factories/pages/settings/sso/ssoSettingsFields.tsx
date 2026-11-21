@@ -85,7 +85,9 @@ export function SwitchRow({
   return (
     <div className="flex items-start justify-between gap-6">
       <div className="min-w-0 flex-1 space-y-0.5">
-        <p className="text-[13px] font-medium text-foreground">{title}</p>
+        <Label htmlFor={id} className="text-[13px] font-medium text-foreground">
+          {title}
+        </Label>
         <p className="text-[12px] leading-5 text-muted-foreground">{description}</p>
       </div>
       <Switch
