@@ -12,6 +12,7 @@ import { Header } from "./Header";
 import { IntegrationTabs } from "./IntegrationTabs";
 import { useIntegrationDetailsState } from "./useIntegrationDetailsState";
 import { useState } from "react";
+import { IntegrationWebhookFailures } from "../IntegrationWebhookFailures";
 import { useNavigate, type NavigateFunction } from "react-router";
 
 interface CapabilityBasedIntegrationDetailsProps {
@@ -95,6 +96,7 @@ export function CapabilityBasedIntegrationDetails({
       />
 
       <div className="space-y-6">
+        <IntegrationWebhookFailures organizationId={organizationId} integration={integration} />
         {integration.status?.state === "error" && integration.status?.stateDescription && (
           <Alert variant="destructive" className="[&>svg+div]:translate-y-0 [&>svg]:top-[14px]">
             <CircleX className="h-4 w-4" />

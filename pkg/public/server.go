@@ -658,8 +658,7 @@ func (s *Server) RegisterOpenAPIHandler() {
 	log.Infof("Raw API JSON available at %s", swaggerFilesPath+"/superplane.swagger.json")
 }
 
-// RegisterWebSocketRoutes registers canvas, factory, and
-// user-notification WebSocket endpoints.
+// RegisterWebSocketRoutes registers the live update endpoints.
 func (s *Server) RegisterWebSocketRoutes() {
 	log.Info("Registering websocket routes")
 
@@ -688,6 +687,11 @@ func (s *Server) RegisterWebSocketRoutes() {
 		"/ws/users/notifications",
 		middleware.OrganizationAuthMiddleware(s.jwt).
 			Middleware(http.HandlerFunc(s.handleUserNotificationsWebSocket)),
+	)
+	s.Router.Handle(
+		"/ws/integrations/webhook-setup",
+		middleware.OrganizationAuthMiddleware(s.jwt).
+			Middleware(http.HandlerFunc(s.handleWebhookSetupWebSocket)),
 	)
 }
 
