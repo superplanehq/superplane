@@ -389,17 +389,7 @@ function TriggerOption({
         <Icon className="size-4" aria-hidden />
       </span>
       <span className="flex min-w-0 flex-col">
-        <span className="text-sm font-medium text-foreground">
-          {mode === "scheduled"
-            ? "Schedule"
-            : mode === "leave"
-              ? `When a task leaves ${customAutomationColumnLabel(columnKey)}`
-              : automatic
-                ? columnKey === "verify"
-                  ? "Every pull request commit"
-                  : `When a task enters ${customAutomationColumnLabel(columnKey)}`
-                : "Manual"}
-        </span>
+        <span className="text-sm font-medium text-foreground">{triggerTitle(mode, columnKey)}</span>
         <span className="text-xs font-normal text-muted-foreground">
           {mode === "scheduled"
             ? columnKey === "backlog"
