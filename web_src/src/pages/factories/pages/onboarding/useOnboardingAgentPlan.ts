@@ -6,7 +6,12 @@ import { parseWorkOrderMetric } from "@/pages/factories/lib/workOrderUsage";
 import type { FactoryAgentRewrite } from "@/pages/home/factories";
 import type { IntegrationSelections } from "@/pages/home/InstallIntegrationsSection";
 
-import { AGENT_PROVIDER_IDS, resolveOnboardingAgent, type OnboardingAgentPlan } from "./onboardingAgentReadiness";
+import {
+  AGENT_PROVIDER_IDS,
+  resolveOnboardingAgent,
+  type AgentProviderId,
+  type OnboardingAgentPlan,
+} from "./onboardingAgentReadiness";
 import type { IntegrationId } from "./onboardingFixtures";
 
 type HostedAgentDefaults = {
@@ -51,9 +56,7 @@ export function useOnboardingAgentPlan(
     preferOwnKey: access.allowed && defaultHosted.preferOwnKey,
     subscription: defaultHosted.subscription,
   });
-  const providerId = plan?.providerId ?? AGENT_PROVIDER_IDS.find((id) => connectedForPlan.has(id));
-  const query =
-    !defaultHosted.subscription && plan?.credentialsSource !== "hosted" && providerId ? queries[providerId] : undefined;
+  const query = selectOnboardingModelQuery(plan, connectedForPlan, defaultHosted.subscription, queries);
   return {
     remainingCreditCents,
     hostedModelsAvailable: hasHostedDefaultModel({
@@ -64,6 +67,18 @@ export function useOnboardingAgentPlan(
     hostedModelsLoading: defaultHosted.subscription?.loading ?? Boolean(query && !query.isFetched),
     ...onboardingModelChoice(plan, query, defaultHosted.selectedModel),
   };
+}
+
+function selectOnboardingModelQuery(
+  plan: OnboardingAgentPlan | undefined,
+  connectedForPlan: Set<IntegrationId>,
+  subscription: HostedAgentDefaults["subscription"],
+  queries: Record<AgentProviderId, ReturnType<typeof useBYOKLLMModels>>,
+): ReturnType<typeof useBYOKLLMModels> | undefined {
+  if (subscription || plan?.credentialsSource === "hosted") return undefined;
+  const providerId = plan?.providerId ?? AGENT_PROVIDER_IDS.find((id) => connectedForPlan.has(id));
+  if (!providerId) return undefined;
+  return queries[providerId];
 }
 
 function onboardingModelChoice(
