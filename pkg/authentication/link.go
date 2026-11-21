@@ -43,6 +43,9 @@ func (a *Handler) sessionAccountFromCookie(r *http.Request) (*models.Account, er
 	if err != nil {
 		return nil, err
 	}
+	if !IsAccountSessionWithinMaxAge(claims) {
+		return nil, errors.New("session exceeded maximum age")
+	}
 
 	accountID, _ := claims["sub"].(string)
 	if accountID == "" {
