@@ -276,7 +276,7 @@ function ModelThinkingSelect({
           <Button
             type="button"
             variant="outline"
-            disabled={readOnly || options.length === 0}
+            disabled={readOnly || (options.length === 0 && !(modelOnly && committedModel))}
             aria-invalid={(unavailable && unavailableSeverity === "error") || undefined}
             data-testid={modelFieldTestId(fieldName, "model")}
             className={cn(
@@ -292,6 +292,9 @@ function ModelThinkingSelect({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="min-w-44" data-testid={modelOnly ? modelListTestId : undefined}>
+          {modelOnly && committedModel ? (
+            <DropdownMenuItem onSelect={() => onCommit("", thinkingLevel)}>Use default model</DropdownMenuItem>
+          ) : null}
           {modelOnly
             ? options.map((option) => (
                 <DropdownMenuItem key={option.value} onSelect={() => onCommit(option.value, thinkingLevel)}>

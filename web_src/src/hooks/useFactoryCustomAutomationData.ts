@@ -40,6 +40,7 @@ export function useFactoryCustomAutomation(
     queryKey: factoryCustomAutomationKey(organizationId, factoryId, automationId ?? ""),
     queryFn: () => fetchFactoryCustomAutomation(organizationId, factoryId, automationId ?? ""),
     enabled: Boolean(organizationId && factoryId && automationId),
+    refetchOnMount: "always",
   });
 }
 
@@ -94,7 +95,7 @@ export function useCreateFactoryCustomAutomation(organizationId: string, factory
 export function useUpdateFactoryCustomAutomation(organizationId: string, factoryId: string, automationId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (input: CustomAutomationInput) => {
+    mutationFn: async (input: CustomAutomationInput & { expectedLiveVersionId?: string }) => {
       const response = await factoriesUpdateFactoryCustomAutomation(
         withOrganizationHeader({
           organizationId,
