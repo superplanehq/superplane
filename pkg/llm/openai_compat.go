@@ -266,8 +266,15 @@ func (u openAIUsage) toUsage() Usage {
 	if total == 0 {
 		total = u.PromptTokens + u.CompletionTokens
 	}
+	// prompt_tokens includes prompt_tokens_details.cached_tokens. Keep the
+	// buckets disjoint so pricing doesn't bill cached input twice (#9049),
+	// matching pkg/integrations/openai/text_prompt.go.
+	input := u.PromptTokens
+	if cached := u.PromptTokensDetails.CachedTokens; cached > 0 && cached <= input {
+		input -= cached
+	}
 	usage := Usage{
-		InputTokens:     u.PromptTokens,
+		InputTokens:     input,
 		OutputTokens:    u.CompletionTokens,
 		CacheReadTokens: u.PromptTokensDetails.CachedTokens,
 		ReasoningTokens: u.CompletionTokensDetails.ReasoningTokens,
