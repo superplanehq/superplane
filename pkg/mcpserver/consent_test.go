@@ -53,11 +53,11 @@ func TestResolveConsentWorkspacesRequiresFactories(t *testing.T) {
 	require.NoError(t, models.DisableExperimentalFeature(r.Organization.ID, features.FeatureFactories))
 	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureSuperPlaneMCPServer))
 
-	_, _, _, err = ResolveConsentWorkspaces(ctx, r.Account, r.Organization.ID.String(), []string{factory.ID.String()})
+	_, _, _, err = ResolveConsentWorkspaces(database.DB(ctx), r.Account, r.Organization.ID.String(), []string{factory.ID.String()})
 	require.EqualError(t, err, consentOrganizationError)
 
 	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactories))
-	userID, orgID, factoryIDs, err := ResolveConsentWorkspaces(ctx, r.Account, r.Organization.ID.String(), []string{factory.ID.String()})
+	userID, orgID, factoryIDs, err := ResolveConsentWorkspaces(database.DB(ctx), r.Account, r.Organization.ID.String(), []string{factory.ID.String()})
 	require.NoError(t, err)
 	assert.Equal(t, r.User, userID)
 	assert.Equal(t, r.Organization.ID, orgID)
@@ -80,16 +80,16 @@ func TestResolveConsentWorkspacesAcceptsTwoAndRejectsOutsideOrganization(t *test
 	outside, err := models.CreateFactory(db, otherOrg.ID, "Outside", "", "OUT")
 	require.NoError(t, err)
 
-	_, _, ids, err := ResolveConsentWorkspaces(ctx, r.Account, r.Organization.ID.String(), []string{second.ID.String(), first.ID.String()})
+	_, _, ids, err := ResolveConsentWorkspaces(database.DB(ctx), r.Account, r.Organization.ID.String(), []string{second.ID.String(), first.ID.String()})
 	require.NoError(t, err)
 	assert.ElementsMatch(t, []uuid.UUID{first.ID, second.ID}, ids)
 	assert.Equal(t, ids, mustSorted(t, ids))
 
-	_, _, _, err = ResolveConsentWorkspaces(ctx, r.Account, r.Organization.ID.String(), []string{outside.ID.String()})
+	_, _, _, err = ResolveConsentWorkspaces(database.DB(ctx), r.Account, r.Organization.ID.String(), []string{outside.ID.String()})
 	require.EqualError(t, err, consentWorkspaceInvalid)
-	_, _, _, err = ResolveConsentWorkspaces(ctx, r.Account, "", nil)
+	_, _, _, err = ResolveConsentWorkspaces(database.DB(ctx), r.Account, "", nil)
 	require.EqualError(t, err, consentOrganizationError)
-	_, _, _, err = ResolveConsentWorkspaces(ctx, r.Account, r.Organization.ID.String(), nil)
+	_, _, _, err = ResolveConsentWorkspaces(database.DB(ctx), r.Account, r.Organization.ID.String(), nil)
 	require.EqualError(t, err, consentWorkspaceRequired)
 }
 

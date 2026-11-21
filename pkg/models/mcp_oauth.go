@@ -146,6 +146,32 @@ func DeleteMCPOAuthCode(tx *gorm.DB, code *MCPOAuthCode) error {
 	return tx.Delete(code).Error
 }
 
+// LockMCPOAuthAccount discovers ownership without locking a credential row.
+// Exchanges and revocations must lock the account before re-reading the grant.
+func LockMCPOAuthAccount(tx *gorm.DB, credential any, lookupColumn, value string) (*Account, error) {
+	var owner struct{ AccountID uuid.UUID }
+	err := tx.Model(credential).
+		Select("users.account_id").
+		Joins("JOIN users ON users.id = user_id").
+		Where(clause.Eq{Column: clause.Column{Table: clause.CurrentTable, Name: lookupColumn}, Value: value}).
+		Scan(&owner).Error
+	if err != nil {
+		return nil, err
+	}
+	if owner.AccountID == uuid.Nil {
+		return nil, gorm.ErrRecordNotFound
+	}
+	return LockAccount(tx, owner.AccountID)
+}
+
+func DeleteMCPOAuthCredentialsForAccount(tx *gorm.DB, accountID uuid.UUID) error {
+	users := tx.Unscoped().Model(&User{}).Select("id").Where("account_id = ?", accountID)
+	if err := tx.Where("user_id IN (?)", users).Delete(&MCPOAuthCode{}).Error; err != nil {
+		return err
+	}
+	return tx.Where("user_id IN (?)", users).Delete(&MCPOAuthRefreshToken{}).Error
+}
+
 func CreateMCPOAuthRefreshToken(tx *gorm.DB, token *MCPOAuthRefreshToken) error {
 	if token.ID == uuid.Nil {
 		token.ID = uuid.New()
