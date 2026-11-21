@@ -34,24 +34,9 @@ export function getDetailsForIncident(
   incident: StatuspageIncident,
   options?: GetDetailsForIncidentOptions,
 ): Record<string, string> {
-  const details: Record<string, string> = {};
   const componentName = options?.componentName;
   const execution = options?.execution;
-
-  // Timestamp first (single timestamp per component). Always show at least one timestamp per component-design.
-  if (componentName === "statuspage.createIncident" && incident?.created_at) {
-    details["Created At"] = new Date(incident.created_at).toLocaleString();
-  } else if (componentName === "statuspage.getIncident" && execution?.createdAt) {
-    details["Fetched At"] = new Date(execution.createdAt).toLocaleString();
-  } else if (componentName === "statuspage.updateIncident" && incident?.updated_at) {
-    details["Updated At"] = new Date(incident.updated_at).toLocaleString();
-  } else if (!componentName && incident?.created_at) {
-    // Fallback when options not passed (e.g. from tests)
-    details["Created At"] = new Date(incident.created_at).toLocaleString();
-  } else if (execution?.createdAt) {
-    // Fallback: always show timestamp when incident is null or timestamp fields missing
-    details["Started At"] = new Date(execution.createdAt).toLocaleString();
-  }
+  const details = getTimestampDetailsForIncident(incident, componentName, execution);
 
   details["ID"] = stringOrDash(incident?.id);
   details["Name"] = stringOrDash(incident?.name);
@@ -78,6 +63,31 @@ export function getDetailsForIncident(
       return `${status} (${timestamp}): ${comment}`;
     })
     .join(" | ");
+
+  return details;
+}
+
+function getTimestampDetailsForIncident(
+  incident: StatuspageIncident,
+  componentName: string | undefined,
+  execution: ExecutionInfo | undefined,
+): Record<string, string> {
+  const details: Record<string, string> = {};
+
+  // Select a single timestamp. Omit it when no eligible source exists.
+  if (componentName === "statuspage.createIncident" && incident?.created_at) {
+    details["Created At"] = new Date(incident.created_at).toLocaleString();
+  } else if (componentName === "statuspage.getIncident" && execution?.createdAt) {
+    details["Fetched At"] = new Date(execution.createdAt).toLocaleString();
+  } else if (componentName === "statuspage.updateIncident" && incident?.updated_at) {
+    details["Updated At"] = new Date(incident.updated_at).toLocaleString();
+  } else if (!componentName && incident?.created_at) {
+    // Fallback when options not passed (e.g. from tests)
+    details["Created At"] = new Date(incident.created_at).toLocaleString();
+  } else if (execution?.createdAt) {
+    // Fallback: always show timestamp when incident is null or timestamp fields missing
+    details["Started At"] = new Date(execution.createdAt).toLocaleString();
+  }
 
   return details;
 }
