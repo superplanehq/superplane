@@ -34,6 +34,7 @@ export type FactorySettingsSection =
   | "usage"
   | "billing"
   | "members"
+  | "sso"
   | "fleets"
   | "integrations"
   | "api-keys"
@@ -234,6 +235,15 @@ export const FACTORY_SETTINGS_NAV_GROUPS: FactorySettingsNavGroup[] = [
         section: "members",
         permission: { resource: "members", action: "read" },
         keywords: ["invite", "copy link", "people", "team", "role", "email", "name", "remove", "owner", "admin"],
+      },
+      {
+        id: "organization-sso",
+        label: "Single Sign-On",
+        Icon: KeyRound,
+        scope: "organization",
+        section: "sso",
+        permission: { resource: "sso", action: "read" },
+        keywords: ["sso", "saml", "oidc", "okta", "scim", "single sign-on", "identity provider"],
       },
       {
         id: "organization-fleets",
