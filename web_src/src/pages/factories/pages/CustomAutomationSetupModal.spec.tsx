@@ -31,6 +31,9 @@ vi.mock("@/hooks/useCanvasData", () => ({
   useCanvasVersion: () => ({ data: { spec: { nodes: [] } } }),
 }));
 vi.mock("@/hooks/useCanvasWebsocket", () => ({ useCanvasRuntimeWebsocket: hooks.runtime }));
+vi.mock("@/hooks/useSecrets", () => ({
+  useSecrets: () => ({ data: [], isLoading: false }),
+}));
 // Agent model controls have separate coverage; retain the real setup form and step selection.
 vi.mock("./PlanningReviewForm", () => ({ PlanningReviewForm: () => null }));
 
