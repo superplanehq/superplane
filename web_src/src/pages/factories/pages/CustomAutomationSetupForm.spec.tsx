@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { expect, it, vi } from "bun:test";
 import type { FactoriesFactoryCustomAutomation } from "@/api-client";
 import { CustomAutomationSetupForm } from "./CustomAutomationSetupForm";
+import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { useCustomAutomationSetupPage } from "./useCustomAutomationSetupPage";
 
 const saveAutomation = vi.fn();
@@ -24,9 +25,17 @@ vi.mock("@/hooks/useFactoryCustomAutomationData", () => ({
   useUpdateFactoryCustomAutomation: () => ({ mutateAsync: saveAutomation, isPending: false }),
 }));
 vi.mock("@/hooks/useComponentData", () => ({ useComponent: () => ({}) }));
+vi.mock("@monaco-editor/react", () => ({ Editor: () => null }));
 vi.mock("@/hooks/useByokRunnerModelDefault", () => ({ useByokRunnerModelDefault: () => undefined }));
 vi.mock("@/hooks/useExperimentalFeature", () => ({ useExperimentalFeature: () => ({ has: () => false }) }));
 vi.mock("@/hooks/useFactoryAgentResources", () => ({ useFactoryAgentResources: () => ({}) }));
+vi.mock("@/contexts/usePermissions", () => ({ usePermissions: () => ({ canAct: () => false }) }));
+vi.mock("@/hooks/useSecrets", () => ({
+  useSecrets: () => ({
+    data: [{ metadata: { name: "figma-api-key" } }, { metadata: { name: "deploy" } }],
+    isLoading: false,
+  }),
+}));
 
 function Editor({ columnKey }: { columnKey?: "backlog" | "verify" }) {
   const model = useCustomAutomationSetupPage({
@@ -36,29 +45,70 @@ function Editor({ columnKey }: { columnKey?: "backlog" | "verify" }) {
     automationId: "automation",
   });
   return (
-    <CustomAutomationSetupForm
-      name={model.name}
-      icon={model.icon}
-      triggers={model.triggers}
-      runsOnTask={model.runsOnTask}
-      columnKey={columnKey}
-      draft={model.draft}
-      organizationId="org"
-      factoryId="factory"
-      factoryKey="workspace"
-      saving={model.saving}
-      deleting={false}
-      error={model.saveError}
-      onNameChange={model.setName}
-      onIconChange={model.setIcon}
-      onTriggersChange={model.setTriggers}
-      onRunsOnTaskChange={model.setRunsOnTask}
-      onDraftChange={model.setDraft}
-      onSave={() => void model.save()}
-      onClose={() => {}}
-    />
+    <ThemeProvider>
+      <CustomAutomationSetupForm
+        name={model.name}
+        icon={model.icon}
+        triggers={model.triggers}
+        runsOnTask={model.runsOnTask}
+        columnKey={columnKey}
+        draft={model.draft}
+        organizationId="org"
+        factoryId="factory"
+        factoryKey="workspace"
+        saving={model.saving}
+        deleting={false}
+        error={model.saveError}
+        onNameChange={model.setName}
+        onIconChange={model.setIcon}
+        onTriggersChange={model.setTriggers}
+        onRunsOnTaskChange={model.setRunsOnTask}
+        onDraftChange={model.setDraft}
+        onSave={() => void model.save()}
+        onClose={() => {}}
+      />
+    </ThemeProvider>
   );
 }
+
+it("searches prompt and bash secrets and preserves selections through save and reopen", async () => {
+  const user = userEvent.setup();
+  saveAutomation.mockClear();
+  saveAutomation.mockResolvedValue({});
+  let view = render(<Editor />);
+  await user.click(screen.getByRole("button", { name: /Prompt Review/ }));
+  await user.click(screen.getByRole("combobox", { name: "Add secret" }));
+  expect(screen.queryByText("Create new secret")).not.toBeInTheDocument();
+  await user.type(screen.getByPlaceholderText("Find a secret"), "unmatched");
+  expect(screen.getByText("No matching secrets.")).toBeVisible();
+  await user.clear(screen.getByPlaceholderText("Find a secret"));
+  await user.type(screen.getByPlaceholderText("Find a secret"), "FIGMA");
+  await user.keyboard("{ArrowDown}{Enter}");
+  expect(screen.getByRole("button", { name: "Remove figma-api-key" })).toBeVisible();
+  await user.click(screen.getByRole("combobox", { name: "Type" }));
+  await user.click(screen.getByRole("option", { name: "Bash" }));
+  await user.click(screen.getByRole("combobox", { name: "Add secret" }));
+  expect(screen.getByPlaceholderText("Find a secret")).toHaveValue("");
+  expect(screen.queryByRole("option", { name: "figma-api-key" })).not.toBeInTheDocument();
+  await user.type(screen.getByPlaceholderText("Find a secret"), "DEPLOY");
+  await user.click(screen.getByRole("option", { name: "deploy" }));
+  await user.click(screen.getByRole("combobox", { name: "Type" }));
+  await user.click(screen.getByRole("option", { name: "Prompt" }));
+  await user.click(screen.getByRole("button", { name: "Save" }));
+  await waitFor(() => expect(saveAutomation).toHaveBeenCalled());
+  const saved = saveAutomation.mock.calls.at(-1)![0];
+  expect(saved.settings.steps[1].secrets).toEqual(["figma-api-key", "deploy"]);
+  view.unmount();
+  automation = { automation: automation.automation, settings: saved.settings };
+  view = render(<Editor />);
+  await user.click(screen.getByRole("button", { name: /Prompt Review/ }));
+  await user.click(screen.getByRole("button", { name: "Remove figma-api-key" }));
+  await user.click(screen.getByRole("button", { name: "Save" }));
+  await waitFor(() => expect(saveAutomation).toHaveBeenCalledTimes(2));
+  expect(saveAutomation.mock.calls.at(-1)![0].settings.steps[1].secrets).toEqual(["deploy"]);
+  view.unmount();
+  saveAutomation.mockClear();
+});
 
 it("selects Schedule, recovers from a save error, and reopens the saved schedule without changing steps", async () => {
   const user = userEvent.setup();

@@ -327,6 +327,6 @@ function stepToApi(step: PlanningReviewStep): FactoriesFactoryCustomAutomationSt
     prompt: step.type === "prompt" ? (step.prompt ?? "") : undefined,
     command: step.type === "bash" ? (step.command ?? "") : undefined,
     workingDirectory: step.workingDirectory,
-    secrets: step.type === "bash" ? step.secrets : undefined,
+    secrets: step.secrets,
   };
 }
