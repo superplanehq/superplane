@@ -6,7 +6,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"path"
 	"slices"
 	"strings"
 	"time"
@@ -63,8 +62,9 @@ func IsJiraAttachmentURL(raw string) bool {
 		strings.Contains(lowerPath, "/rest/api/3/attachment/thumbnail/")
 }
 
-// IssueFiles downloads the files attached to an issue, plus Jira attachment
-// URLs already written in description. OAuth credentials stay on the request.
+// IssueFiles downloads only attachments listed by a fresh source issue read.
+// Description URLs select replacements for those attachments.
+// OAuth credentials stay on the request.
 func (c *Client) IssueFiles(ctx context.Context, issueKey, description string) ([]IssueFile, error) {
 	attachments, err := c.ListIssueAttachments(issueKey)
 	if err != nil {
@@ -198,6 +198,9 @@ func planIssueDownloads(description string, attachments []IssueAttachment) []pla
 	}
 
 	for _, attachment := range attachments {
+		if strings.TrimSpace(attachment.ID) == "" {
+			continue
+		}
 		replace := descriptionReferencesAttachment(description, attachment)
 		add(attachment.ID, attachment.ContentURL, attachment.Filename, attachment.MIMEType, replace)
 		if attachment.ThumbnailURL != "" && strings.Contains(description, attachment.ThumbnailURL) {
@@ -208,7 +211,14 @@ func planIssueDownloads(description string, attachments []IssueAttachment) []pla
 		if !IsJiraAttachmentURL(rawURL) {
 			continue
 		}
-		add(attachmentIDFromURL(rawURL), rawURL, path.Base(rawURL), "", true)
+		// Description links cannot authorize downloads outside the source issue.
+		item, exists := byID[strings.TrimSpace(attachmentIDFromURL(rawURL))]
+		if !exists {
+			continue
+		}
+		if !slices.Contains(item.replaceURLs, rawURL) {
+			item.replaceURLs = append(item.replaceURLs, rawURL)
+		}
 	}
 
 	result := make([]plannedIssueDownload, 0, len(planned))
