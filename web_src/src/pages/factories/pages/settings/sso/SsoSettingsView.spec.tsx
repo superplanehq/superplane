@@ -106,6 +106,18 @@ describe("SsoSettingsView", () => {
     expect(screen.getByText("Add this TXT record at your DNS provider. Then select Verify.")).toBeInTheDocument();
   });
 
+  it("names each settings switch", () => {
+    renderSettings({
+      licensed: true,
+      domains: [],
+      tokens: [],
+      connection: draftConnection,
+    });
+    expect(screen.getByRole("switch", { name: "Create members on first sign-in" })).toBeInTheDocument();
+    expect(screen.getByRole("switch", { name: "Owner bypass" })).toBeInTheDocument();
+    expect(screen.getByRole("switch", { name: "Sign out from the identity provider" })).toBeInTheDocument();
+  });
+
   it("creates a connection before the provider values exist", async () => {
     const user = userEvent.setup();
     const calls = renderSettings({ licensed: true, domains: [], tokens: [] });
