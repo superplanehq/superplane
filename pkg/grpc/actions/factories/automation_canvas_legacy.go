@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"reflect"
 	"slices"
 
 	"github.com/google/uuid"
@@ -210,7 +211,15 @@ func importAutomationCanvas(tx *gorm.DB, factory *models.Factory, canvas *models
 	if !equalAutomationExecutionGraph(version, expected) {
 		return "", unrepresentableAutomationCanvas()
 	}
-	return source, nil
+	workspace := resolveIntakeAgent(tx, factory)
+	if workspace != nil && workspace.Component == agent.Component && reflect.DeepEqual(workspace.Credentials, agent.Credentials) {
+		definition.Agent.Harness = ""
+		definition.Agent.Credentials = nil
+		if definition.Agent.Model == "" {
+			definition.Agent = nil
+		}
+	}
+	return automationspec.Encode(definition)
 }
 
 func legacyAutomationTriggers(stage string, nodes []models.Node) ([]automationspec.Trigger, error) {

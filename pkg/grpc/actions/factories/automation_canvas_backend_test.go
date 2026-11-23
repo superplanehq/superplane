@@ -89,6 +89,9 @@ func TestCanvasAutomationScheduleEditMatchesForm(t *testing.T) {
 		}
 		source, err := service.Read(ctx, r.Organization.ID, id)
 		require.NoError(t, err)
+		doc, err := automationspec.Parse(source.YAML)
+		require.NoError(t, err)
+		require.Nil(t, doc.Agent)
 		edited := strings.Replace(source.YAML, "Check the changes.", "Review the changes.", 1)
 		require.NotEqual(t, source.YAML, edited)
 		_, err = service.Update(ctx, r.Organization.ID, id, r.User, edited)
@@ -159,7 +162,7 @@ func TestCanvasAutomationLegacyImportProtectsGraphBehavior(t *testing.T) {
 			require.NoError(t, err)
 			doc, err := automationspec.Parse(source)
 			require.NoError(t, err)
-			require.Equal(t, "sonnet", doc.Agent.Model)
+			require.Equal(t, &automationspec.Agent{Model: "sonnet"}, doc.Agent)
 			require.NotNil(t, doc.RunsOnTask)
 			require.Equal(t, tc.runsOnTask, *doc.RunsOnTask)
 			require.Equal(t, tc.use, doc.Triggers[0].Use)
@@ -340,6 +343,15 @@ steps:
 	other, err := models.FindIntegrationInTransaction(db, r.Organization.ID, uuid.MustParse(otherID))
 	require.NoError(t, err)
 	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{AgentIntegrationID: &otherID}))
+	backend := CanvasAutomationBackend{Deps: onboardingDeps(r)}
+	legacy, err := backend.FindLegacy(ctx, db, r.Organization.ID, created.ID)
+	require.NoError(t, err)
+	exported, err := backend.ImportLegacy(ctx, db, legacy)
+	require.NoError(t, err)
+	doc, err = automationspec.Parse(exported)
+	require.NoError(t, err)
+	require.Equal(t, automationspec.ClaudeCode, doc.Agent.Harness)
+	require.Equal(t, connection.InstallationName, doc.Agent.Credentials.Name)
 	_, err = service.Update(ctx, r.Organization.ID, created.ID, r.User, strings.Replace(reopened.YAML, connection.InstallationName, other.InstallationName, 1))
 	require.ErrorContains(t, err, "configured credentials")
 	_, err = service.Update(ctx, r.Organization.ID, created.ID, r.User, created.YAML)
@@ -395,9 +407,7 @@ func TestCanvasAutomationImportsSwitchedSubscription(t *testing.T) {
 	require.NoError(t, err)
 	doc, err := automationspec.Parse(read.YAML)
 	require.NoError(t, err)
-	require.Equal(t, &automationspec.Agent{
-		Harness: automationspec.Codex, Credentials: &automationspec.Credentials{Source: automationspec.Subscription},
-	}, doc.Agent)
+	require.Nil(t, doc.Agent)
 	read, err = service.Update(ctx, r.Organization.ID, id, r.User, read.YAML)
 	require.NoError(t, err)
 	doc.Agent = &automationspec.Agent{Model: "gpt-5.4"}
