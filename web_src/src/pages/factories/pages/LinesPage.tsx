@@ -2339,13 +2339,18 @@ function PhaseBoard({
                   onDragEnd={finishStageDrag}
                   onKeyDown={(event) => moveStageWithKeyboard(event, stage)}
                   onDelete={() => requestDeleteStage(stage)}
+                  onAutoAdvanceChange={(autoAdvance) =>
+                    setDraftStages(
+                      baseStages.map((entry) => (entry.id === stage.id ? { ...entry, autoAdvance } : entry)),
+                    )
+                  }
                 />
               ) : null}
               {stage.kind === "STAGE_KIND_PHASE" ? (
                 <span
                   className={cn(
                     "absolute left-full z-[1] h-px w-3 bg-border",
-                    draftStages ? "top-[49px]" : "top-[21px]",
+                    draftStages ? "top-[69px]" : "top-[21px]",
                   )}
                   aria-hidden
                 />
@@ -2356,7 +2361,7 @@ function PhaseBoard({
                 <span
                   className={cn(
                     "absolute left-0 z-[1] h-px w-3 -translate-x-full bg-border",
-                    draftStages ? "top-[49px]" : "top-[21px]",
+                    draftStages ? "top-[69px]" : "top-[21px]",
                   )}
                   aria-hidden
                 />

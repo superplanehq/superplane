@@ -3,9 +3,11 @@ import { describe, expect, it } from "bun:test";
 import {
   insertStageBeforeDone,
   lineStageChanges,
+  hasLineStageChanges,
   removeLineBoardStage,
   reorderLineBoardStages,
   stagesForSave,
+  stageAutoAdvances,
   type LineBoardStage,
 } from "./lineBoardStages";
 
@@ -24,6 +26,7 @@ describe("line stage drafts", () => {
     expect(draft.map((stage) => stage.name)).toEqual(["Backlog", "Implement", "QA", "Verify", "Deploy", "Done"]);
     const saved = stagesForSave(draft);
     expect(saved[4]).toMatchObject({ id: "", name: "Deploy", kind: "STAGE_KIND_CUSTOM" });
+    expect(saved[4]?.autoAdvance).toBe(true);
     expect(saved[4]?.key).toMatch(/^new-/);
     expect(saved[2]).toMatchObject({ id: "qa", key: "custom-qa" });
   });
@@ -49,5 +52,19 @@ describe("line stage drafts", () => {
   it("keeps Backlog and Done", () => {
     expect(removeLineBoardStage(SAVED, "done")).toEqual(SAVED);
     expect(removeLineBoardStage(SAVED, "backlog")).toEqual(SAVED);
+  });
+
+  it("defaults regular stages on and Verify off", () => {
+    expect(stageAutoAdvances(SAVED[1]!)).toBe(true);
+    expect(stageAutoAdvances(SAVED[2]!)).toBe(true);
+    expect(stageAutoAdvances(SAVED[3]!)).toBe(false);
+  });
+
+  it("tracks an auto-advance change", () => {
+    const draft = SAVED.map((stage) => (stage.id === "qa" ? { ...stage, autoAdvance: false } : stage));
+    const changes = lineStageChanges(SAVED, draft);
+
+    expect(changes.autoAdvanceChanged.map(({ stage }) => stage.id)).toEqual(["qa"]);
+    expect(hasLineStageChanges(changes)).toBe(true);
   });
 });
