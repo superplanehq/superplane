@@ -87,6 +87,7 @@ function withWaitingPrReview(order: FactoriesWorkOrder): FactoriesWorkOrder {
       {
         ...dispatch,
         result: "RESULT_UNKNOWN",
+        reviewReady: true,
         stepExecutions: [
           ...(dispatch.stepExecutions ?? []).map((execution) =>
             execution.step === "Implement" ? { ...execution, result: "RESULT_PASSED" as const } : execution,
