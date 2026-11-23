@@ -31,7 +31,9 @@ import { factoryBoardLaneScrollKey, useFactoryBoardLaneScroll } from "@/hooks/us
 import { useOrganizationUsers } from "@/hooks/useOrganizationData";
 import { useOrgUserLookup } from "@/hooks/useOrgUserLookup";
 import { getOrgUserDisplayFromUser } from "@/lib/orgUserDisplay";
+import { Link } from "@/components/Link/link";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useWorkspaceLoading } from "@/hooks/useWorkspaceLoading";
@@ -47,7 +49,7 @@ import {
   FEATURE_FACTORY_PULL_REQUEST_MERGE,
 } from "@/lib/experimentalFeatures";
 import { useAutoLoadMoreOnScroll } from "@/hooks/useAutoLoadMoreOnScroll";
-import { Clock, Plus } from "lucide-react";
+import { Clock, Pencil, Plus } from "lucide-react";
 import {
   useCallback,
   useEffect,
@@ -186,6 +188,7 @@ import { columnAppsFromFactoryApps, splitRunFixtureForWorkOrder } from "./work-o
 import { useColumnAppCheckRuns } from "./work-order-split-run/useColumnAppCheckRuns";
 import { useSplitRunFooterCloser } from "./work-order-split-run/useSplitRunFooterCloser";
 import {
+  editFactoryLinePath,
   factoryAppConfigurePath,
   factoryAppRunPath,
   factoryColumnAutomationViewPath,
@@ -867,6 +870,11 @@ export function LinesPage() {
                 ? () => setStageEditingLineId(selectedLine.id ?? null)
                 : undefined
             }
+            editHref={
+              canUpdate && selectedLine.id
+                ? editFactoryLinePath(organizationId, routeSegment, selectedLine.id)
+                : undefined
+            }
           />
           <SubscriptionIntakeOwnerRecovery />
           {configuredIntakes
@@ -990,6 +998,7 @@ function LineDetailHeader({
   colorView,
   onColorViewChange,
   onEditStages,
+  editHref,
 }: {
   organizationId: string;
   workOrders: FactoriesWorkOrder[];
@@ -1003,6 +1012,8 @@ function LineDetailHeader({
   colorView: LineBoardColumnColorView;
   onColorViewChange: (view: LineBoardColumnColorView) => void;
   onEditStages?: () => void;
+  /** Line editor. Hidden when the user cannot update the workspace. */
+  editHref?: string;
 }) {
   const { data: orgUsers = [] } = useOrganizationUsers(organizationId);
   const searchRef = useWorkOrdersHeaderShortcuts(state);
@@ -1078,6 +1089,14 @@ function LineDetailHeader({
               onColorViewChange={onColorViewChange}
               onEditStages={onEditStages}
             />
+            {editHref ? (
+              <Button asChild variant="outline" size="sm" className="h-8 gap-1.5">
+                <Link href={editHref} data-testid="lines-edit-line">
+                  <Pencil className="size-3.5" aria-hidden />
+                  Edit line
+                </Link>
+              </Button>
+            ) : null}
           </>
         }
         belowRow={
