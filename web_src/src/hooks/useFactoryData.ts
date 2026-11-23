@@ -1110,7 +1110,13 @@ export function useUpdateFactoryLine(organizationId: string, factoryId: string) 
       }
       return response.data.line;
     },
-    onSuccess: (line) => {
+    onSuccess: (line, input) => {
+      if (input.stageConfiguration?.automationMoves?.length) {
+        void queryClient.invalidateQueries({ queryKey: factoryAppsKey(organizationId, factoryId) });
+        void queryClient.invalidateQueries({
+          queryKey: ["factories", organizationId, factoryId, "custom-automations"],
+        });
+      }
       queryClient.setQueryData<FactoriesFactory>(factoryDetailKey(organizationId, factoryId), (current) => {
         if (!current?.lines) {
           return current;

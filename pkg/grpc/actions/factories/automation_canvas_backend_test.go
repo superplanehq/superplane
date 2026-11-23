@@ -225,7 +225,22 @@ func TestCanvasAutomationLegacyImportProtectsGraphBehavior(t *testing.T) {
 			require.Equal(t, int64(2), reopened.Revision)
 			require.Equal(t, tc.use, doc.Triggers[0].Use)
 			require.Len(t, doc.Triggers, len(triggers))
-
+			if tc.name == "leave" {
+				require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomStages))
+				line, err := factory.CreateLine(db, "Move test", nil)
+				require.NoError(t, err)
+				_, err = UpdateFactoryLine(ctx, deps, r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
+					FactoryId: factory.ID.String(), LineId: line.ID.String(), StageConfiguration: &pb.FactoryLine_StageConfiguration{
+						Stages: factoryLineStageRequests(line.StagesValue()), AutomationMoves: []*pb.FactoryLine_AutomationMove{{Type: "canvas", AutomationId: id.String(), SourceKey: "backlog", DestinationKey: "done"}},
+					},
+				})
+				require.NoError(t, err)
+				moved, err := service.Read(ctx, r.Organization.ID, id)
+				require.NoError(t, err)
+				require.Equal(t, reopened.YAML, moved.YAML)
+				require.Equal(t, reopened.Revision+1, moved.Revision)
+				require.Equal(t, "done", moved.Stage)
+			}
 		})
 	}
 }

@@ -969,7 +969,7 @@ describe("LinesPage board stages", () => {
     expect(updateFactoryLineMutateAsync).not.toHaveBeenCalled();
   });
 
-  it("includes a rename-only draft in the save summary and persists it", async () => {
+  it.each([false, true])("saves a custom stage rename with pending card move: %s", async (moveCard) => {
     enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_STAGES);
     const user = userEvent.setup();
     const savedFactory = customStageFactory("Quality review");
@@ -978,6 +978,10 @@ describe("LinesPage board stages", () => {
     );
     const view = renderLinesBoard(undefined, vi.fn(), customStageFactory());
     await editStages();
+    if (moveCard) {
+      const source = within(screen.getByTestId("lines-stage-shell-phase-0"));
+      fireEvent.keyDown(source.getByRole("button", { name: /^Move / }), { key: "ArrowLeft" });
+    }
     renameCustomStage("Quality review");
     expect(updateFactoryLineMutateAsync).not.toHaveBeenCalled();
     await user.click(screen.getByRole("button", { name: "Save changes" }));
@@ -988,6 +992,16 @@ describe("LinesPage board stages", () => {
     expect(updateFactoryLineMutateAsync.mock.calls[0][0].stageConfiguration.stages).toEqual(
       savedFactory.lines?.find((line) => line.id === REFUND_LINE_PLAN_ID)?.stages,
     );
+    if (moveCard) {
+      expect(updateFactoryLineMutateAsync.mock.calls[0][0].stageConfiguration.automationMoves).toEqual([
+        expect.objectContaining({
+          type: "agent-step",
+          executionKey: "phase-0",
+          sourceKey: "phase-0",
+          destinationKey: "backlog",
+        }),
+      ]);
+    }
     view.rerender(<LinesBoardSpecHarness factory={savedFactory} />);
     expect(screen.getByTestId("lines-column-title-custom-qa")).toHaveTextContent("Quality review");
   });
@@ -1195,6 +1209,45 @@ describe("LinesPage board automations", () => {
   beforeEach(async () => {
     await resetLinesBoardMocks();
   });
+
+  it.each([
+    { columnKey: "verify", templateId: "risk-score", cardId: "risk-score-moved-app", sourceKey: "verify" },
+    { columnKey: "implement", cardId: "custom-moved-app", sourceKey: "phase-0" },
+    { columnKey: "custom-source", cardId: "custom-moved-app", sourceKey: "custom-source" },
+  ])(
+    "shows a moved $columnKey workspace card on a line without its source stage",
+    ({ columnKey, templateId, cardId, sourceKey }) => {
+      const destinationKey = columnKey === "custom-source" ? "custom-target" : "backlog";
+      useFactoryAutomations.mockReturnValue({
+        data: [
+          { id: "moved-app", name: "Moved automation", columnKey, templateId, displayColumnKey: destinationKey },
+          { id: "unmoved-app", name: "Unmoved automation", columnKey, templateId },
+        ],
+      });
+      const factory: FactoriesFactory = {
+        ...REFUND_FACTORY,
+        lines: (REFUND_FACTORY.lines ?? []).map((line) => ({
+          ...line,
+          stages: [
+            { id: "backlog", key: "backlog", name: "Backlog", kind: "STAGE_KIND_BACKLOG" },
+            { id: "phase-1", key: "phase-1", name: "Check", kind: "STAGE_KIND_PHASE", stepIndex: 1 },
+            { id: "custom-target", key: "custom-target", name: "QA", kind: "STAGE_KIND_CUSTOM" },
+            { id: "done", key: "done", name: "Done", kind: "STAGE_KIND_DONE" },
+          ],
+        })),
+      };
+      renderLinesBoard(undefined, vi.fn(), factory);
+
+      expect(screen.queryByTestId(`lines-stage-shell-${sourceKey}`)).not.toBeInTheDocument();
+      const destinationTestId = destinationKey === "backlog" ? "lines-backlog" : `lines-custom-stage-${destinationKey}`;
+      expect(
+        within(screen.getByTestId(`lines-stage-shell-${destinationKey}`)).getByTestId(
+          `${destinationTestId}-automation-rows-row-${cardId}`,
+        ),
+      ).toBeInTheDocument();
+      expect(screen.queryByText("Unmoved automation")).not.toBeInTheDocument();
+    },
+  );
 
   it("puts backlog automations before the create plus and column menu", () => {
     useFactoryIntakes.mockReturnValue({ data: [GITHUB_ISSUES_INTAKE] });
@@ -2112,6 +2165,47 @@ describe("LinesPage stage editing", () => {
     expect(screen.getByTestId("lines-stage-reorder-phase-0")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Reorder Backlog" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Reorder Done" })).not.toBeInTheDocument();
+  });
+
+  it("moves an agent without reordering stages and saves only the confirmed placement", async () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_STAGES);
+    const user = userEvent.setup();
+    renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, ICON_VIEW);
+    await enterStageEditing(user);
+    const order = stageShellOrder();
+    const source = within(screen.getByTestId("lines-stage-shell-phase-0"));
+    const target = screen.getByTestId("lines-stage-shell-backlog");
+    const handle = source.getByRole("button", { name: /^Move / });
+    const label = handle.getAttribute("aria-label")!;
+    const dataTransfer = { effectAllowed: "none", setData: vi.fn() };
+    fireEvent.dragStart(handle, { dataTransfer });
+    fireEvent.dragEnter(target);
+    fireEvent.dragEnd(handle);
+    expect(screen.queryByRole("button", { name: "Save changes" })).not.toBeInTheDocument();
+    fireEvent.dragStart(handle, { dataTransfer });
+    fireEvent.dragOver(target);
+    fireEvent.drop(target);
+    expect(stageShellOrder()).toEqual(order);
+    expect(source.queryByRole("button", { name: label })).not.toBeInTheDocument();
+    fireEvent.keyDown(within(target).getByRole("button", { name: label }), { key: "ArrowRight" });
+    expect(screen.queryByRole("button", { name: "Save changes" })).not.toBeInTheDocument();
+    fireEvent.keyDown(source.getByRole("button", { name: label }), { key: "ArrowLeft" });
+    await user.click(screen.getByRole("button", { name: "Discard" }));
+    await user.click(screen.getByRole("button", { name: "Discard changes" }));
+    await enterStageEditing(user);
+    fireEvent.keyDown(source.getByRole("button", { name: label }), { key: "ArrowLeft" });
+    expect(updateFactoryLineMutateAsync).not.toHaveBeenCalled();
+    updateFactoryLineMutateAsync.mockResolvedValueOnce({});
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+    await user.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Save changes" }));
+    expect(updateFactoryLineMutateAsync.mock.calls[0][0].stageConfiguration.automationMoves).toEqual([
+      expect.objectContaining({
+        type: "agent-step",
+        executionKey: "phase-0",
+        sourceKey: "phase-0",
+        destinationKey: "backlog",
+      }),
+    ]);
   });
 
   it("offers Save only after a change and exits with Done when nothing changed", async () => {

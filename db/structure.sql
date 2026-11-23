@@ -2414,7 +2414,8 @@ CREATE TABLE public.workflows (
     live_version_id uuid NOT NULL,
     description text DEFAULT ''::text NOT NULL,
     factory_id uuid,
-    column_key text
+    column_key text,
+    display_column_key text DEFAULT ''::text NOT NULL
 );
 
 
@@ -6784,7 +6785,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261120182307	f
+20261123125259	f
 \.
 
 

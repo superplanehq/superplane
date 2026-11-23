@@ -39,11 +39,12 @@ type Canvas struct {
 	Description    string
 	// ColumnKey is the line-board column this factory event automation is
 	// shown on. Empty when the canvas is not attached to Verify or Done.
-	ColumnKey *string
-	CreatedBy *uuid.UUID
-	CreatedAt *time.Time
-	UpdatedAt *time.Time
-	DeletedAt gorm.DeletedAt `gorm:"index"`
+	ColumnKey        *string
+	DisplayColumnKey string
+	CreatedBy        *uuid.UUID
+	CreatedAt        *time.Time
+	UpdatedAt        *time.Time
+	DeletedAt        gorm.DeletedAt `gorm:"index"`
 }
 
 func (c *Canvas) TableName() string {
@@ -183,6 +184,10 @@ func (c *Canvas) SetColumnKey(tx *gorm.DB, key string) error {
 	c.ColumnKey = stored
 	c.UpdatedAt = &now
 	return nil
+}
+
+func (c *Canvas) SetDisplayColumn(tx *gorm.DB, key string) error {
+	return tx.Model(c).Update("display_column_key", key).Error
 }
 
 func (c *Canvas) SoftDeleteInTransaction(tx *gorm.DB) error {

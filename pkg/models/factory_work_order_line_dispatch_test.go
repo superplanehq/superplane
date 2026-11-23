@@ -81,6 +81,10 @@ func Test__FactoryLine__Dispatch__StartsCustomStageBeforeLineStep(t *testing.T) 
 		ID: stageID, Key: "custom-" + stageID.String(), Name: "QA", Kind: models.FactoryLineStageCustom,
 	}
 	stages := append([]models.FactoryLineStage{line.StagesValue()[0], customStage}, line.StagesValue()[1:]...)
+	stages[2].AgentDisplayKey = customStage.Key
+	eventCanvas := support.CreateFactoryCanvas(t, r, factory.ID, "PR checks")
+	require.NoError(t, eventCanvas.SetColumnKey(db, "verify"))
+	require.NoError(t, eventCanvas.SetDisplayColumn(db, customStage.Key))
 	require.NoError(t, line.UpdateConfiguration(db, nil, nil, nil, stages))
 	first, firstEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "Lint", "lint")
 	second, secondEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "Test", "test")
