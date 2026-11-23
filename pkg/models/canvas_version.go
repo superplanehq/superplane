@@ -256,9 +256,6 @@ func PromoteToLiveInTransaction(tx *gorm.DB, version *CanvasVersion, nodes []Nod
 		return err
 	}
 
-	if err := ValidateFactoryIntakePublication(tx, canvas.ID, nodes); err != nil {
-		return err
-	}
 	now := time.Now()
 	version.Nodes = datatypes.NewJSONSlice(nodes)
 	version.Edges = datatypes.NewJSONSlice(edges)

@@ -61,7 +61,7 @@ func (s *EventContext) emit(payloadType string, payload any, dedupKey string) er
 		err = s.tx.Create(event).Error
 	}
 	if err != nil {
-		if s.run == nil && (errors.Is(err, gorm.ErrRecordNotFound) || errors.Is(err, models.ErrFactoryIntakeRetired)) {
+		if s.run == nil && errors.Is(err, gorm.ErrRecordNotFound) {
 			canvas, findErr := models.FindUnscopedCanvasInTransaction(s.tx, s.node.WorkflowID)
 			if findErr != nil {
 				canvas = nil

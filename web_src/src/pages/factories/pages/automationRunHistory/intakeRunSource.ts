@@ -23,8 +23,6 @@ export function intakeRunSource(
       const issue = record(payload.issue);
       return source(text(issue.key) || "Jira issue", record(issue.fields).summary, payload.url);
     }
-    case "productive-tasks":
-      return productiveSource(payload);
     case "pagerduty-incidents": {
       const incident = record(payload.incident);
       return source(
@@ -38,11 +36,6 @@ export function intakeRunSource(
     case "scheduled-intake":
       return { reference: "Schedule", title: "Scheduled review" };
   }
-}
-
-function productiveSource(payload: Record<string, unknown>): AutomationRun["source"] {
-  const task = record(payload.data);
-  return source(task.id ? `#${text(task.id)}` : "Productive task", record(task.attributes).title, payload.url);
 }
 
 function datadogSource(payload: Record<string, unknown>): AutomationRun["source"] {

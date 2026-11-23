@@ -54,9 +54,6 @@ func (d IntakeDependencies) itemSource(
 	tx *gorm.DB,
 	intake *models.FactoryIntake,
 ) (intakeItemSource, error) {
-	if intake.Source == models.RetiredProductiveIntakeSource {
-		return nil, models.ErrFactoryIntakeRetired
-	}
 	if d.NewItemSource != nil {
 		return d.NewItemSource(ctx, tx, intake)
 	}

@@ -287,15 +287,6 @@ func DeleteCanvasNodeWithResult(tx *gorm.DB, node CanvasNode) (DeleteCanvasNodeR
 	return result, SoftDeleteWebhookIfUnreferenced(tx, *node.WebhookID)
 }
 
-// DetachWebhook clears the reference even when the node is already deleted.
-func (c *CanvasNode) DetachWebhook(tx *gorm.DB) error {
-	if err := tx.Unscoped().Model(c).Update("webhook_id", nil).Error; err != nil {
-		return err
-	}
-	c.WebhookID = nil
-	return nil
-}
-
 func FindCanvasNode(tx *gorm.DB, canvasID uuid.UUID, nodeID string) (*CanvasNode, error) {
 	var node CanvasNode
 	err := tx.

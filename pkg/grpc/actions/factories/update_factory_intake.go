@@ -45,10 +45,6 @@ func UpdateFactoryIntake(
 		return nil, factoryErrorToStatus(err, "failed to update factory intake")
 	}
 
-	if intake.Source == models.RetiredProductiveIntakeSource {
-		return nil, factoryErrorToStatus(models.ErrFactoryIntakeRetired, "Productive intake is retired")
-	}
-
 	canvas, err := models.FindCanvasInTransaction(db, orgID, intake.CanvasID)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update factory intake")

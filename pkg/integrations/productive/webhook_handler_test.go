@@ -208,27 +208,6 @@ func Test__ProductiveWebhookHandler__Cleanup(t *testing.T) {
 		assert.Contains(t, httpContext.Requests[0].URL.String(), "/webhooks/555")
 	})
 
-	t.Run("retries both registrations after a partial remote failure", func(t *testing.T) {
-		response := func(status int) *http.Response {
-			return &http.Response{StatusCode: status, Body: io.NopCloser(strings.NewReader(`{}`))}
-		}
-		httpContext := &contexts.HTTPContext{Responses: []*http.Response{
-			response(http.StatusNoContent), response(http.StatusInternalServerError),
-			response(http.StatusNotFound), response(http.StatusNoContent),
-		}}
-		ctx := core.WebhookHandlerContext{
-			HTTP: httpContext, Integration: authorizedIntegration(),
-			Webhook: &contexts.WebhookContext{Metadata: WebhookMetadata{IDs: []string{"555", "556"}, ID: "555"}},
-		}
-		require.Error(t, handler.Cleanup(ctx))
-		require.NoError(t, handler.Cleanup(ctx))
-		require.Len(t, httpContext.Requests, 4)
-		for i, id := range []string{"555", "556", "555", "556"} {
-			require.Equal(t, http.MethodDelete, httpContext.Requests[i].Method)
-			require.Contains(t, httpContext.Requests[i].URL.Path, "/webhooks/"+id)
-		}
-	})
-
 	// A failed Setup (e.g. webhooks_limit_exceeded) leaves the webhook record
 	// without a Productive.io id, so there is nothing to delete remotely.
 	t.Run("skips the API call when no webhook was ever created", func(t *testing.T) {
@@ -247,7 +226,7 @@ func Test__ProductiveWebhookHandler__Cleanup(t *testing.T) {
 		assert.Empty(t, httpContext.Requests, "must not call Productive.io with an empty webhook id")
 	})
 
-	t.Run("an already deleted registration succeeds", func(t *testing.T) {
+	t.Run("delete failure is surfaced", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
 				{
@@ -266,7 +245,7 @@ func Test__ProductiveWebhookHandler__Cleanup(t *testing.T) {
 			},
 		})
 
-		require.NoError(t, err)
+		require.Error(t, err)
 	})
 }
 

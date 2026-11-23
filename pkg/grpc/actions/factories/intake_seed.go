@@ -129,9 +129,6 @@ func SeedExistingIntake(
 	tx *gorm.DB,
 	intake *models.FactoryIntake,
 ) error {
-	if intake.Source == models.RetiredProductiveIntakeSource {
-		return models.ErrFactoryIntakeRetired
-	}
 	binding, err := liveIntakeBinding(tx, intake)
 	if err != nil {
 		return err

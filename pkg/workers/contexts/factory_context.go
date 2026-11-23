@@ -170,17 +170,8 @@ func (c *FactoryContext) WithRemoteImageFetch(fetch storedfiles.FetchFunc) *Fact
 }
 
 func (c *FactoryContext) CreateWorkOrder(params core.WorkOrderParams) (*core.WorkOrder, bool, error) {
-	// Stored intake identity blocks work from old versions before and after retirement.
-	retired, err := models.IsRetiredFactoryIntakeCanvas(c.tx, c.canvas.ID)
-	if err != nil {
-		return nil, false, err
-	}
-	if retired {
-		return nil, false, models.ErrFactoryIntakeRetired
-	}
-
 	// A run already tied to another work order must not spawn a new one.
-	_, err = models.FindWorkOrderExecutionByRunID(c.tx, c.execution.RunID)
+	_, err := models.FindWorkOrderExecutionByRunID(c.tx, c.execution.RunID)
 	if err == nil {
 		return nil, false, errors.New("cannot create work order while executing another work order")
 	}

@@ -138,11 +138,6 @@ func (w *WebhookCleanupWorker) processAppInstallationWebhook(tx *gorm.DB, logger
 	})
 
 	if err != nil {
-		// Productive stores multiple remote registrations. Keep their IDs until
-		// every deletion succeeds, including a retry after partial deletion.
-		if instance.AppName == "productive" {
-			return err
-		}
 		logger.Errorf("Best-effort cleanup failed for webhook: %v", err)
 	}
 

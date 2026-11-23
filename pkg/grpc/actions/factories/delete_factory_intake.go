@@ -32,10 +32,6 @@ func DeleteFactoryIntake(ctx context.Context, organizationID string, req *pb.Del
 			return err
 		}
 
-		if intake.Source == models.RetiredProductiveIntakeSource {
-			return models.ErrFactoryIntakeRetired
-		}
-
 		// The canvas exists only to run this intake, so it goes with it. The
 		// cleanup worker hard-deletes it once its runs are gone.
 		canvas, err := models.FindCanvasInTransaction(tx, orgID, intake.CanvasID)

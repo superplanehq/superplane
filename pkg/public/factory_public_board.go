@@ -259,7 +259,7 @@ func buildPublicBoard(db *gorm.DB, factory *models.Factory, line *models.Factory
 	if err != nil {
 		return nil, err
 	}
-	canvases, err := factory.ListActiveAutomations(db)
+	canvases, err := factory.ListCanvases(db)
 	if err != nil {
 		return nil, err
 	}

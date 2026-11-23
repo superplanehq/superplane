@@ -83,7 +83,6 @@ func (w *CanvasCleanupWorker) LockAndProcessCanvas(canvas models.Canvas) error {
 		if err != nil {
 			return err
 		}
-		canvas = *locked
 		publicationsWoken, err = locked.WakePublications(tx, w.maxResourcesPerTick)
 		return err
 	})
@@ -172,19 +171,6 @@ func (w *CanvasCleanupWorker) cleanCanvasRuns(db *gorm.DB, canvas models.Canvas)
 		// used elsewhere (EventRouter, NodeExecutor).
 		var summary *models.RunDeletionSummary
 		err := db.Transaction(func(tx *gorm.DB) error {
-			// Retirement restores the canvas under this same lock. Never delete
-			// history based on the snapshot selected before that restoration.
-			lockedCanvas, err := models.LockCanvas(tx, canvas.ID)
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return nil
-			}
-			if err != nil {
-				return fmt.Errorf("lock canvas for run cleanup: %w", err)
-			}
-			if deletedResourceWithinGracePeriod(lockedCanvas.DeletedAt.Time, time.Now()) {
-				return nil
-			}
-
 			locked, err := models.LockCanvasRun(tx, canvas.ID, run.ID)
 			if err != nil {
 				return fmt.Errorf("lock run %s: %w", run.ID, err)
@@ -226,18 +212,7 @@ func (w *CanvasCleanupWorker) cleanRemainingResources(canvas models.Canvas) (boo
 	var complete bool
 
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
-		locked, err := models.LockCanvas(tx, canvas.ID)
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil
-		}
-		if err != nil {
-			return err
-		}
-		if deletedResourceWithinGracePeriod(locked.DeletedAt.Time, time.Now()) {
-			return nil
-		}
-
-		summary, done, err := locked.DeleteRemainingResources(tx, w.maxResourcesPerTick)
+		summary, done, err := canvas.DeleteRemainingResources(tx, w.maxResourcesPerTick)
 		if err != nil {
 			return err
 		}

@@ -30,7 +30,7 @@ func ListFactoryAutomations(ctx context.Context, organizationID string, req *pb.
 		}
 		canvases, err = factory.ListCanvasesMentioningSkill(db, command)
 	} else {
-		canvases, err = factory.ListActiveAutomations(db)
+		canvases, err = factory.ListCanvases(db)
 	}
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to list factory automations")

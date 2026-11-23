@@ -287,8 +287,6 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.FailedPrecondition(err, "MCP Server is not enabled for this organization.")
 	case errors.Is(err, models.ErrMCPOAuthRefreshNotFound):
 		return grpcerrors.NotFound(err, "MCP client not found")
-	case errors.Is(err, models.ErrFactoryIntakeRetired):
-		return grpcerrors.FailedPrecondition(err, err.Error())
 	case errors.Is(err, errInvalidArgument):
 		return grpcerrors.InvalidArgument(err, err.Error())
 	case errors.Is(err, models.ErrFactoryWorkOrderCheckOwned):

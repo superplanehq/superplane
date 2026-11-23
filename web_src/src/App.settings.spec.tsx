@@ -172,13 +172,6 @@ describe("App legacy settings routes", () => {
     expect(access.useFactories).not.toHaveBeenCalled();
   });
 
-  it("sends a retired Productive setup bookmark through the route fallback", async () => {
-    access.authenticated = false;
-    visit("/org-123/workspaces/demo/lines/line-1/setup/productive");
-    expect(await screen.findByText("Login page")).toBeInTheDocument();
-    expect(new URLSearchParams(window.location.search).get("redirect")).toBe("/");
-  });
-
   for (const suffix of ["/general", "/llm-spend"]) {
     it(`waits for feature access before mounting or redirecting settings${suffix}`, async () => {
       access.registryLoading = true;

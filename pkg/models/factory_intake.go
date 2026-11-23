@@ -206,7 +206,6 @@ func FindFactoryIntakeByCanvasID(tx *gorm.DB, canvasID uuid.UUID) (*FactoryIntak
 func (f *Factory) ListIntakes(tx *gorm.DB) ([]FactoryIntake, error) {
 	var intakes []FactoryIntake
 	err := liveCanvasIntakes(tx).
-		Where("factory_intakes.source <> ?", RetiredProductiveIntakeSource).
 		Where("factory_intakes.organization_id = ? AND factory_intakes.factory_id = ?", f.OrganizationID, f.ID).
 		Order("factory_intakes.created_at ASC").
 		Order("factory_intakes.id ASC").

@@ -178,20 +178,7 @@ func CreateCanvasRunInTransaction(tx *gorm.DB, workflowID uuid.UUID, nodeID, sta
 		return nil, fmt.Errorf("node id is required")
 	}
 
-	canvas, err := FindCanvasWithoutOrgScopeInTransaction(tx, workflowID)
-	if err != nil {
-		return nil, err
-	}
-	if canvas.FactoryID != nil {
-		retired, err := IsRetiredFactoryIntakeCanvas(tx, workflowID)
-		if err != nil {
-			return nil, err
-		}
-		if retired {
-			return nil, ErrFactoryIntakeRetired
-		}
-	}
-	liveVersion, err := FindLiveCanvasVersionByCanvasInTransaction(tx, canvas)
+	liveVersion, err := FindLiveCanvasVersionInTransaction(tx, workflowID)
 	if err != nil {
 		return nil, err
 	}
