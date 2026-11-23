@@ -18,12 +18,14 @@ import type { LineBoardStage, LineStageChanges } from "../lib/lineBoardStages";
 
 export function LineStageEditToolbar({
   hasChanges,
+  canMoveCards = false,
   saving,
   onAddStage,
   onDiscard,
   onSave,
 }: {
   hasChanges: boolean;
+  canMoveCards?: boolean;
   saving: boolean;
   onAddStage: () => void;
   onDiscard: () => void;
@@ -49,7 +51,12 @@ export function LineStageEditToolbar({
             </span>
           ) : null}
         </div>
-        <p className="text-xs text-muted-foreground">Drag stages to reorder. Backlog and Done stay in place.</p>
+        <p className="text-xs text-muted-foreground">
+          {canMoveCards
+            ? "Drag stages to reorder them or move automation cards between stages."
+            : "Drag stages to reorder."}{" "}
+          Backlog and Done stay in place.
+        </p>
       </div>
       <div className="flex items-center gap-2">
         <Button type="button" variant="ghost" size="sm" onClick={onAddStage} disabled={saving}>
@@ -137,6 +144,7 @@ export function LineStageEditStrip({
 }
 
 export function SaveLineStagesDialog({
+  moves = [],
   changes,
   saving,
   error,
@@ -144,6 +152,7 @@ export function SaveLineStagesDialog({
   onConfirm,
 }: {
   changes: LineStageChanges | null;
+  moves?: Array<{ type: string }>;
   saving: boolean;
   error: string;
   onCancel: () => void;
@@ -168,6 +177,14 @@ export function SaveLineStagesDialog({
               <li key={stage.id}>Delete: {stage.name}</li>
             ))}
             {changes.reordered ? <li>Stage order changes</li> : null}
+            {moves.length > 0 && (
+              <li>
+                Move {moves.length} automation {moves.length === 1 ? "card" : "cards"}.
+              </li>
+            )}
+            {moves.some((move) => move.type !== "agent-step") && (
+              <li>Workspace automation moves apply to all lines that have the destination stage.</li>
+            )}
           </ul>
         ) : null}
         {error ? (

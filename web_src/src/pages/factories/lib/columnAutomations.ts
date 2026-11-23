@@ -70,6 +70,9 @@ export type ColumnAutomation = {
   runningCount: number;
   catalogId: string;
   canvasId?: string;
+  displayColumnKey?: string;
+  executionKey?: string;
+  taskStageTargets?: string[];
   /** Backlog run with no task. A person can start it from the column. */
   canRunNow?: boolean;
   activity?: ColumnAutomationActivity;
@@ -131,11 +134,19 @@ export function columnAutomationsNeedRepair(automations: ColumnAutomation[]): bo
 
 export function buildColumnAutomations(key: ColumnKey, input: ColumnAutomationsInput): ColumnAutomation[] {
   const workOrders = input.workOrders ?? [];
-  if (key.startsWith("custom-")) {
-    return customColumnAutomations(input.apps ?? [], key, workOrders, new Set(), runningCountForApp);
-  }
-  const automations = automationsForColumn(key, input, workOrders);
-  return automations.map((automation) => attachAutomationActivity(automation, workOrders));
+  const automations = key.startsWith("custom-")
+    ? customColumnAutomations(input.apps ?? [], key, workOrders, new Set(), runningCountForApp)
+    : automationsForColumn(key, input, workOrders);
+  return automations.map((automation) => ({
+    ...automation,
+    activity: buildColumnAutomationActivity({
+      canvasId: automation.canvasId,
+      workOrders,
+      runningCount: automation.runningCount,
+    }),
+    executionKey: key,
+    displayColumnKey: input.apps?.find((app) => app.id === automation.canvasId)?.displayColumnKey,
+  }));
 }
 
 function automationsForColumn(
@@ -173,17 +184,6 @@ function automationsForColumn(
     return [...closure, ...customColumnAutomations(input.apps ?? [], "done", workOrders, skip, runningCountForApp)];
   }
   return firstPhaseAutomations(key, input, workOrders, agentStepAutomation, runningCountForApp);
-}
-
-function attachAutomationActivity(automation: ColumnAutomation, workOrders: FactoriesWorkOrder[]): ColumnAutomation {
-  return {
-    ...automation,
-    activity: buildColumnAutomationActivity({
-      canvasId: automation.canvasId,
-      workOrders,
-      runningCount: automation.runningCount,
-    }),
-  };
 }
 
 function intakeAutomations(intakes: FactoriesFactoryIntake[], workOrders: FactoriesWorkOrder[]): ColumnAutomation[] {
@@ -276,11 +276,12 @@ function prFeedbackAutomations(
   });
 }
 
-function isRiskScoreApp(app: { name?: string; columnKey?: string }): boolean {
+function isRiskScoreApp(app: ColumnAutomationApp): boolean {
   if (app.columnKey !== "verify") {
     return false;
   }
   const name = app.name?.trim() ?? "";
+  if (app.templateId) return app.templateId === "risk-score";
   return (
     name === RISK_SCORE_ENTRY.name ||
     name === "Risk score" ||
@@ -289,11 +290,12 @@ function isRiskScoreApp(app: { name?: string; columnKey?: string }): boolean {
   );
 }
 
-function isVisualEvidenceApp(app: { name?: string; columnKey?: string }): boolean {
+function isVisualEvidenceApp(app: ColumnAutomationApp): boolean {
   if (app.columnKey !== "verify") {
     return false;
   }
   const name = app.name?.trim() ?? "";
+  if (app.templateId) return app.templateId === "visual-evidence";
   return name === VISUAL_EVIDENCE_ENTRY.name || /^Visual Evidence \(\d+\)$/.test(name);
 }
 

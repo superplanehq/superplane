@@ -1,4 +1,6 @@
-import { Loader2, Play, Plus, Settings2 } from "lucide-react";
+import { GripVertical, Loader2, Play, Plus, Settings2 } from "lucide-react";
+import { useContext } from "react";
+import { AutomationRowContext } from "./AutomationRowContext";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -107,6 +109,8 @@ function ColumnAutomationRow({
   testId: string;
 }) {
   const disabled = automation.health === "disabled";
+  const board = useContext(AutomationRowContext);
+  const run = board.onRun ?? onRun;
   const needsRepair = automation.health === "needs-repair";
   const headline = columnAutomationHeadline(automation);
   const className = cn(
@@ -130,8 +134,9 @@ function ColumnAutomationRow({
       ) : null}
     </>
   );
-  const showRun = Boolean(onRun && automation.canRunNow);
-  const starting = Boolean(runningAutomationId && runningAutomationId === automation.canvasId);
+  const showRun = Boolean(run && automation.canRunNow);
+  const runningId = board.runningAutomationId ?? runningAutomationId;
+  const starting = Boolean(runningId && runningId === automation.canvasId);
 
   return (
     <div
@@ -141,6 +146,34 @@ function ColumnAutomationRow({
       data-testid={`${testId}-row-${automation.id}`}
       onClick={onRowAction ? () => onRowAction(automation, "settings") : undefined}
     >
+      {board.move && (
+        <Button
+          type="button"
+          draggable
+          variant="ghost"
+          size="icon-xs"
+          className="size-4 shrink-0 cursor-grab"
+          aria-label={`Move ${automation.name}`}
+          title="Drag to another stage, or use the left and right arrow keys."
+          data-automation-handle={automation.id}
+          onClick={(event) => event.stopPropagation()}
+          onDragStart={(event) => {
+            event.stopPropagation();
+            event.dataTransfer.effectAllowed = "move";
+            event.dataTransfer.setData("application/x-superplane-automation", automation.id);
+            board.move?.start(automation);
+          }}
+          onDragEnd={() => board.move?.end()}
+          onKeyDown={(event) => {
+            if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+              event.preventDefault();
+              board.move?.keyboard(automation, event.key === "ArrowLeft" ? -1 : 1);
+            }
+          }}
+        >
+          <GripVertical aria-hidden />
+        </Button>
+      )}
       {onRowAction ? (
         <Button
           variant="ghost"
@@ -162,12 +195,12 @@ function ColumnAutomationRow({
             size="icon-xs"
             type="button"
             aria-label={`Run ${automation.name}`}
-            disabled={runPending}
+            disabled={board.runPending ?? runPending}
             aria-busy={starting}
             data-testid={`${testId}-run-${automation.id}`}
             onClick={(event) => {
               event.stopPropagation();
-              onRun?.(automation);
+              run?.(automation);
             }}
             className="size-4 shrink-0 p-0 text-muted-foreground hover:text-foreground"
           >
