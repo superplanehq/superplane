@@ -11,7 +11,6 @@ import (
 	ghcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 	ghdependabot "github.com/superplanehq/superplane/pkg/integrations/github/dependabot"
 	"github.com/superplanehq/superplane/pkg/integrations/jira"
-	"github.com/superplanehq/superplane/pkg/integrations/productive"
 	"github.com/superplanehq/superplane/pkg/integrations/sentry"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
@@ -288,6 +287,8 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.FailedPrecondition(err, "MCP Server is not enabled for this organization.")
 	case errors.Is(err, models.ErrMCPOAuthRefreshNotFound):
 		return grpcerrors.NotFound(err, "MCP client not found")
+	case errors.Is(err, models.ErrFactoryIntakeRetired):
+		return grpcerrors.FailedPrecondition(err, err.Error())
 	case errors.Is(err, errInvalidArgument):
 		return grpcerrors.InvalidArgument(err, err.Error())
 	case errors.Is(err, models.ErrFactoryWorkOrderCheckOwned):
@@ -363,7 +364,7 @@ func liveIntakeSourceStatus(err error) (int, bool) {
 	if status, ok := sentry.StatusCode(err); ok {
 		return status, true
 	}
-	return productive.StatusCode(err)
+	return 0, false
 }
 
 func invalidArgument(message string) error {

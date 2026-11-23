@@ -328,7 +328,7 @@ func intakeRunTitle(source string, event models.CanvasEvent) string {
 		return nestedString(payload, "data", "issue", "title")
 	case models.FactoryIntakeSourcePagerDutyIncidents:
 		return nestedString(payload, "incident", "title")
-	case models.FactoryIntakeSourceProductiveTasks:
+	case "productive-tasks":
 		return nestedString(payload, "data", "attributes", "title")
 	case models.FactoryIntakeSourceDependabotAlerts:
 		name := nestedString(payload, "alert", "dependency", "package", "name")

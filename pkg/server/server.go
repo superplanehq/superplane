@@ -833,6 +833,15 @@ func Start() {
 	if err != nil {
 		panic(fmt.Sprintf("failed to create registry: %v", err))
 	}
+	// Maintenance is explicit so operators can deploy the blocks everywhere first.
+	if len(os.Args) == 2 && os.Args[1] == "retire-productive-intakes" {
+		if err := factoryactions.RetireProductiveIntakes(context.Background(), factoryactions.IntakeDependencies{
+			Registry: registry, Encryptor: encryptorInstance, AuthService: authService, WebhookBaseURL: webhooksBaseURL,
+		}); err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
 	go func() {
 		if err := factoryactions.UpgradeGitHubIntakeAuthorGates(context.Background(), factoryactions.IntakeDependencies{
 			Registry: registry, Encryptor: encryptorInstance, AuthService: authService, WebhookBaseURL: webhooksBaseURL,

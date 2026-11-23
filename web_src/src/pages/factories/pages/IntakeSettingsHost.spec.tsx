@@ -11,7 +11,6 @@ import {
   DEPENDABOT_INTAKE_CANVAS,
   deleteIntake,
   LINEAR_INTAKE,
-  PRODUCTIVE_INTAKE,
   renderHost,
   resetHostMocks,
   updateIntake,
@@ -325,23 +324,6 @@ describe("IntakeSettingsHost", () => {
     expect(screen.getByTestId("intake-delete-dialog")).toHaveTextContent(INTAKE_SETTINGS_COPY.deleteDescription);
     await user.click(screen.getByTestId("intake-delete-confirm"));
     expect(deleteIntake).toHaveBeenCalledWith("intake-jira");
-    expect(onClose).toHaveBeenCalledTimes(1);
-  });
-
-  it("deletes a Productive.io intake from settings", async () => {
-    const onClose = vi.fn();
-    const user = userEvent.setup();
-    renderHost({
-      intake: PRODUCTIVE_INTAKE,
-      onClose,
-    });
-
-    expect(screen.queryByTestId("intake-connection")).not.toBeInTheDocument();
-    await user.click(screen.getByTestId("intake-source-settings-delete"));
-    expect(screen.getByTestId("intake-delete-dialog")).toBeInTheDocument();
-    expect(screen.getByTestId("intake-delete-dialog")).toHaveTextContent(INTAKE_SETTINGS_COPY.deleteDescription);
-    await user.click(screen.getByTestId("intake-delete-confirm"));
-    expect(deleteIntake).toHaveBeenCalledWith("intake-productive");
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 

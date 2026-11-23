@@ -28,7 +28,6 @@ describe("intakeSourceSettingsModel", () => {
       "jira-issues",
       "dependabot-alerts",
       "pagerduty-incidents",
-      "productive-tasks",
       "datadog",
       "linear-issues",
     ] as const) {
@@ -242,30 +241,6 @@ describe("intakeSourceSettingsModel", () => {
     expect(settings.sentryLevels).toEqual([]);
   });
 
-  it("defaults excludeKeyTasks on when the API omits it", () => {
-    const settings = intakeSettingsFromApi("Productive tasks", {});
-
-    expect(settings.excludeKeyTasks).toBe(true);
-    expect(intakeSettingsToApi(settings).excludeKeyTasks).toBe(true);
-  });
-
-  it("round-trips excludeKeyTasks through the API shape", () => {
-    const settings = intakeSettingsFromApi("Productive tasks", { excludeKeyTasks: false });
-
-    expect(settings.excludeKeyTasks).toBe(false);
-    expect(intakeSettingsToApi(settings).excludeKeyTasks).toBe(false);
-  });
-
-  it("round-trips selected Productive.io task lists and drops blanks", () => {
-    const settings = intakeSettingsFromApi("Productive tasks", {
-      taskListIds: [" list-a ", "list-a", "", "list-b"],
-    });
-
-    expect(settings.taskListIds).toEqual(["list-a", "list-b"]);
-    expect(intakeSettingsToApi(settings).taskListIds).toEqual(["list-a", "list-b"]);
-    expect(intakeSettingsFromApi("Productive tasks", {}).taskListIds).toEqual([]);
-  });
-
   it("round-trips Datadog alert types and environments through the API shape", () => {
     const settings = intakeSettingsFromApi("Datadog errors", {
       datadogTriggeredAlerts: false,
@@ -301,12 +276,11 @@ describe("intakeSourceSettingsModel", () => {
     expect(intakeSettingsToApi(settings)).not.toHaveProperty("datadogService");
   });
 
-  it("offers delete for GitHub, Sentry, Jira, Productive.io, and Datadog intakes", () => {
+  it("offers delete for GitHub, Sentry, Jira, and Datadog intakes", () => {
     expect(intakeSupportsDelete("github-issues")).toBe(true);
     expect(intakeSupportsDelete("dependabot-alerts")).toBe(true);
     expect(intakeSupportsDelete("sentry-exceptions")).toBe(true);
     expect(intakeSupportsDelete("jira-issues")).toBe(true);
-    expect(intakeSupportsDelete("productive-tasks")).toBe(true);
     expect(intakeSupportsDelete("datadog")).toBe(true);
     expect(intakeSupportsDelete("pagerduty-incidents")).toBe(false);
   });
