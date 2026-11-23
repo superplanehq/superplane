@@ -946,16 +946,12 @@ func TestFactoryContext_CreateWorkOrder_SkipsDuplicateProductiveTask(t *testing.
 			factoryModel.ID,
 			productivePayload("77", pageURL),
 		)
-		_, err = factoryModel.CreateIntake(database.Conn(), canvas.ID, models.FactoryIntakeSourceProductiveTasks)
-		require.NoError(t, err)
 		ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
 
 		order, created, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "New productive task"})
 		require.NoError(t, err)
 		require.True(t, created)
 		require.NotNil(t, order)
-		require.NotNil(t, order.Origin)
-		assert.Equal(t, pageURL, order.Origin.URL)
 		assert.Equal(t, 1, countOrders(factoryModel))
 	})
 }

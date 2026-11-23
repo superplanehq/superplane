@@ -26,11 +26,6 @@ const FeatureFactories = "factories"
 // still uses the legacy IntegrationCreateDialog path.
 const FeatureNewIntegrationSetupFlow = "new_integration_setup_flow"
 
-// FeatureFactoryProductiveIntake gates the manual "Add intake" entry for
-// Productive.io in the Backlog column menu until the flow is generally
-// available.
-const FeatureFactoryProductiveIntake = "factory_productive_intake"
-
 // FeatureFactoryDatadogIntake gates Datadog Error Tracking intake from the
 // Backlog column menu until the flow is generally available.
 const FeatureFactoryDatadogIntake = "factory_datadog_intake"
@@ -105,7 +100,6 @@ var registry = []Feature{
 	{ID: FeatureOrganizationRunners, Label: "Organization runners", Description: "Manage self-hosted fleets and runners for an organization"},
 	{ID: FeatureFactories, Label: "Factories", Description: "Software factories for work orders and production workflows"},
 	{ID: FeatureNewIntegrationSetupFlow, Label: "New Integration Setup Flow", Description: "Use the multi-step SetupProvider wizard when connecting integrations such as GitHub"},
-	{ID: FeatureFactoryProductiveIntake, Label: "Factory Productive Intake", Description: "Add Productive intake from the Backlog column menu"},
 	{ID: FeatureFactoryScheduledIntake, Label: "Scheduled Intake", Description: "Propose backlog tasks on a schedule"},
 	{ID: FeatureFactoryReviewRequest, Label: "Review request", Description: "Request human reviews after Merge confidence completes"},
 	{ID: FeatureFactoryDatadogIntake, Label: "Factory Datadog Intake", Description: "Add Datadog intake from the Backlog column menu"},

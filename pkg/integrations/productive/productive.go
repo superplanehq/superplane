@@ -38,7 +38,7 @@ func (p *Productive) Icon() string {
 }
 
 func (p *Productive) Description() string {
-	return "Create backlog items from tasks in Productive"
+	return "Start workflows from task events in Productive"
 }
 
 func (p *Productive) Instructions() string {

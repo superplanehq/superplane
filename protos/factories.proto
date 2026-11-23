@@ -1585,7 +1585,6 @@ message FactoryIntake {
     SOURCE_GITHUB_ISSUES = 1;
     SOURCE_SENTRY_EXCEPTIONS = 2;
     SOURCE_PAGERDUTY_INCIDENTS = 3;
-    SOURCE_PRODUCTIVE_TASKS = 4;
     SOURCE_JIRA_ISSUES = 5;
     SOURCE_DEPENDABOT_ALERTS = 6;
     SOURCE_DATADOG = 7;
@@ -1663,44 +1662,38 @@ message FactoryIntake {
     // Issue levels that still create a task. Empty means every level.
     // Sentry exception intakes only.
     repeated string sentry_levels = 14;
-    // When true, skip Productive.io key tasks (milestones). Productive task
-    // intakes only.
-    optional bool exclude_key_tasks = 15;
-    // Task list ids that still create a task. Empty means every task list.
-    // Productive task intakes only.
-    repeated string task_list_ids = 16;
     // Severities that still create a task. Empty means every severity.
     // Dependabot alert intakes only. Values: critical, high, medium, low.
-    repeated string dependabot_severities = 17;
+    repeated string dependabot_severities = 15;
     // Listen for Triggered Datadog Error Tracking alerts. Datadog intakes only.
     // On by default. An empty selection still listens for Triggered.
-    optional bool datadog_triggered_alerts = 18;
+    optional bool datadog_triggered_alerts = 16;
     // Listen for Re-Triggered Datadog Error Tracking alerts. Datadog intakes
     // only. Off by default.
-    optional bool datadog_retriggered_alerts = 19;
+    optional bool datadog_retriggered_alerts = 17;
     // Environments that still create a task. Empty means every environment.
     // Datadog intakes only.
-    repeated string datadog_environments = 20;
+    repeated string datadog_environments = 18;
     // Projects that still create a task. Optional for a Linear intake that
     // has a team. Empty means every project in the team.
     // Linear issue intakes only.
-    repeated string linear_project_ids = 21;
+    repeated string linear_project_ids = 19;
     // Label names that still create a task. Empty means every label.
     // Linear issue intakes only.
-    repeated string linear_labels = 22;
+    repeated string linear_labels = 20;
     // Projects that still create a task. Required for a Sentry intake.
     // Sentry exception intakes only. Values are project slugs.
-    repeated string sentry_project_ids = 23;
+    repeated string sentry_project_ids = 21;
     // Organization user ID. Omitted updates preserve the selection; empty clears it.
-    optional string default_owner_id = 24;
+    optional string default_owner_id = 22;
     // Linear team that the intake listens to. Required for a new Linear
     // intake. An older intake that has projects and no team still works.
     // Linear issue intakes only.
-    string linear_team_id = 25;
+    string linear_team_id = 23;
     // Create a task for an issue that has no project. Applies only when
     // linear_project_ids is not empty. Omitted means true.
     // Linear issue intakes only.
-    optional bool linear_include_issues_without_project = 26;
+    optional bool linear_include_issues_without_project = 24;
   }
 
   string id = 1;

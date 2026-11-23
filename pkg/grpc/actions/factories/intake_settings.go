@@ -76,14 +76,9 @@ type intakeSettings struct {
 	SentryLevels []string
 	// Projects that still create a task. Sentry exception intakes only.
 	SentryProjectIDs []string
-	// Skip Productive.io key tasks (milestones). Productive task intakes only.
-	ExcludeKeyTasks bool
 	// Severities that still create a task. Empty means every severity.
 	// Dependabot alert intakes only.
 	DependabotSeverities []string
-	// Task list ids that still create a task. Empty means every task list.
-	// Productive task intakes only.
-	TaskListIDs []string
 	// Listen for Triggered Datadog Error Tracking alerts. Datadog intakes only.
 	DatadogTriggeredAlerts bool
 	// Listen for Re-Triggered Datadog Error Tracking alerts. Datadog intakes only.
@@ -125,7 +120,6 @@ func defaultIntakeSettings() intakeSettings {
 		// creates a task and adding a label does not.
 		SuperplaneLabelAdded: false,
 		JiraMoveOnComplete:   true,
-		ExcludeKeyTasks:      true,
 		// A new GitHub intake accepts an issue only when the author can
 		// access the repository. The gate is installed when the intake
 		// already has a repository.
@@ -153,13 +147,6 @@ func defaultSentryIntakeSettings() intakeSettings {
 	return settings
 }
 
-func defaultProductiveIntakeSettings() intakeSettings {
-	settings := defaultIntakeSettings()
-	settings.AuthorsWithAccess = false
-	settings.ExcludeKeyTasks = true
-	return settings
-}
-
 func defaultDependabotIntakeSettings() intakeSettings {
 	settings := defaultIntakeSettings()
 	settings.AuthorsWithAccess = false
@@ -180,7 +167,6 @@ func intakeSourceHasFilterNode(source string) bool {
 	return source == models.FactoryIntakeSourceGitHubIssues ||
 		source == models.FactoryIntakeSourceJiraIssues ||
 		source == models.FactoryIntakeSourceSentryExceptions ||
-		source == models.FactoryIntakeSourceProductiveTasks ||
 		source == models.FactoryIntakeSourceDependabotAlerts ||
 		source == models.FactoryIntakeSourceDatadog ||
 		source == models.FactoryIntakeSourceLinearIssues
@@ -208,25 +194,12 @@ func (s intakeSettings) normalized() intakeSettings {
 	s.SentryLevels = normalizeSentryLevels(s.SentryLevels)
 	s.SentryProjectIDs = normalizeSentryProjectIDs(s.SentryProjectIDs)
 	s.DependabotSeverities = normalizeDependabotSeverities(s.DependabotSeverities)
-	s.TaskListIDs = normalizeTaskListIDs(s.TaskListIDs)
 	s.DatadogEnvironments = normalizeDatadogEnvironments(s.DatadogEnvironments)
 	s.LinearTeamID = strings.TrimSpace(s.LinearTeamID)
 	s.LinearProjectIDs = normalizeLinearValues(s.LinearProjectIDs)
 	s.LinearLabels = normalizeLinearValues(s.LinearLabels)
 
 	return s
-}
-
-func normalizeTaskListIDs(ids []string) []string {
-	normalized := make([]string, 0, len(ids))
-	for _, id := range ids {
-		id = strings.TrimSpace(id)
-		if id == "" || slices.Contains(normalized, id) {
-			continue
-		}
-		normalized = append(normalized, id)
-	}
-	return normalized
 }
 
 func normalizeSentryLevels(levels []string) []string {
@@ -286,8 +259,6 @@ func intakeFilterExpressionFor(source string, settings intakeSettings) string {
 		return intakeJiraFilterExpression(settings)
 	case models.FactoryIntakeSourceSentryExceptions:
 		return intakeSentryFilterExpression(settings)
-	case models.FactoryIntakeSourceProductiveTasks:
-		return intakeProductiveFilterExpression(settings)
 	case models.FactoryIntakeSourceDependabotAlerts:
 		return intakeDependabotFilterExpression(settings)
 	case models.FactoryIntakeSourceDatadog:
@@ -416,43 +387,6 @@ func intakeSentryFilterExpression(settings intakeSettings) string {
 	return fmt.Sprintf(`(root().data.data.issue?.level ?? "") in %s`, levels)
 }
 
-const intakeProductiveExcludeKeyTasksCondition = "root().data.data.attributes.type_id != 3"
-
-func intakeProductiveFilterExpression(settings intakeSettings) string {
-	conditions := []string{}
-	if settings.ExcludeKeyTasks {
-		conditions = append(conditions, intakeProductiveExcludeKeyTasksCondition)
-	}
-	if condition := intakeProductiveTaskListCondition(settings.TaskListIDs); condition != "" {
-		conditions = append(conditions, condition)
-	}
-	if len(conditions) == 0 {
-		return "true"
-	}
-	return strings.Join(conditions, " && ")
-}
-
-// intakeProductiveTaskListCondition keeps a task that is created on a
-// selected list, or an update that moves the task onto one. An edit that
-// leaves the task on the same list does not match.
-func intakeProductiveTaskListCondition(ids []string) string {
-	if len(ids) == 0 {
-		return ""
-	}
-	encoded, err := json.Marshal(ids)
-	if err != nil {
-		return ""
-	}
-
-	onList := fmt.Sprintf(`(root().data.data.relationships.task_list.data.id ?? "") in %s`, encoded)
-	createdOnList := fmt.Sprintf(`(root().data.meta?.event ?? "") != "task.updated" && %s`, onList)
-	movedOntoList := fmt.Sprintf(
-		`(root().data.meta?.event ?? "") == "task.updated" && (root().data.meta?.task_list_move?.to ?? "") in %s && (root().data.meta?.task_list_move?.from ?? "") != (root().data.meta?.task_list_move?.to ?? "")`,
-		encoded,
-	)
-	return fmt.Sprintf(`(%s || %s)`, createdOnList, movedOntoList)
-}
-
 // deriveGitHubIssueListening keeps the GitHub intake trigger in step with
 // the label filter. Selected labels start a task when one of them is added,
 // and they also limit a re-opened issue. With no labels, a new issue starts
@@ -473,18 +407,6 @@ func intakeTriggerActionsFor(settings intakeSettings) []any {
 	}
 	if settings.SuperplaneLabelAdded {
 		actions = append(actions, "labeled")
-	}
-	return actions
-}
-
-// intakeProductiveTriggerActions listens for new tasks, and also for updates
-// when a task list filter is set. The filter keeps an update only when the
-// task list changed, so an edit of a task already on the list does not
-// create a task.
-func intakeProductiveTriggerActions(settings intakeSettings) []any {
-	actions := []any{"created"}
-	if len(settings.TaskListIDs) > 0 {
-		actions = append(actions, "updated")
 	}
 	return actions
 }
@@ -545,9 +467,6 @@ func intakeSettingsChangeTrigger(source string, current, updated intakeSettings)
 			!slices.Equal(current.LinearProjectIDs, updated.LinearProjectIDs) ||
 			!slices.Equal(current.LinearLabels, updated.LinearLabels)
 	}
-	if source == models.FactoryIntakeSourceProductiveTasks {
-		return (len(current.TaskListIDs) == 0) != (len(updated.TaskListIDs) == 0)
-	}
 	return current.NewIssues != updated.NewIssues ||
 		current.ReopenedIssues != updated.ReopenedIssues ||
 		current.SuperplaneLabelAdded != updated.SuperplaneLabelAdded
@@ -588,10 +507,7 @@ func intakeSettingsChangeFilters(current, updated intakeSettings) bool {
 	if !slices.Equal(current.LinearLabels, updated.LinearLabels) {
 		return true
 	}
-	if !slices.Equal(current.TaskListIDs, updated.TaskListIDs) {
-		return true
-	}
-	return current.ExcludeKeyTasks != updated.ExcludeKeyTasks
+	return false
 }
 
 // The second alternative is the expression built before the label filter was
@@ -617,10 +533,6 @@ var intakeDatadogEnvironmentsPattern = regexp.MustCompile(
 	`\(root\(\)\.data\.environment \?\? ""\) in (\[[^\]]*\])`,
 )
 
-var intakeProductiveTaskListsPattern = regexp.MustCompile(
-	`\(root\(\)\.data\.data\.relationships\.task_list\.data\.id \?\? ""\) in (\[[^\]]*\])`,
-)
-
 // intakeSettingsFromGraph reads the settings back out of the filter
 // expression. A hand-edited expression that no longer matches reports defaults
 // rather than a wrong value.
@@ -631,8 +543,6 @@ func intakeSettingsFromGraph(source string, graph intakeGraph, spec models.LiveC
 		settings = defaultJiraIntakeSettings()
 	case models.FactoryIntakeSourceSentryExceptions:
 		settings = defaultSentryIntakeSettings()
-	case models.FactoryIntakeSourceProductiveTasks:
-		settings = defaultProductiveIntakeSettings()
 	case models.FactoryIntakeSourceDependabotAlerts:
 		settings = defaultDependabotIntakeSettings()
 	case models.FactoryIntakeSourceDatadog:
@@ -724,17 +634,6 @@ func intakeSettingsFromGraph(source string, graph intakeGraph, spec models.LiveC
 		return settings.normalized()
 	}
 
-	if source == models.FactoryIntakeSourceProductiveTasks {
-		settings.ExcludeKeyTasks = strings.Contains(expression, intakeProductiveExcludeKeyTasksCondition)
-		if match := intakeProductiveTaskListsPattern.FindStringSubmatch(expression); match != nil {
-			var ids []string
-			if err := json.Unmarshal([]byte(match[1]), &ids); err == nil {
-				settings.TaskListIDs = ids
-			}
-		}
-		return settings.normalized()
-	}
-
 	if source == models.FactoryIntakeSourceJiraIssues {
 		if match := intakeJiraLabelsPattern.FindStringSubmatch(expression); match != nil {
 			var labels []string
@@ -805,10 +704,6 @@ func serializeIntakeSettings(source string, settings intakeSettings) *pb.Factory
 		serialized.SentryAssignedIssues = proto.Bool(settings.SentryAssignedIssues)
 		serialized.SentryLevels = settings.SentryLevels
 		serialized.SentryProjectIds = settings.SentryProjectIDs
-	}
-	if source == models.FactoryIntakeSourceProductiveTasks {
-		serialized.ExcludeKeyTasks = proto.Bool(settings.ExcludeKeyTasks)
-		serialized.TaskListIds = settings.TaskListIDs
 	}
 	if source == models.FactoryIntakeSourceDependabotAlerts {
 		serialized.DependabotSeverities = settings.DependabotSeverities
@@ -881,10 +776,6 @@ func parseIntakeSettings(current intakeSettings, requested *pb.FactoryIntake_Set
 		updated.SentryProjectIDs = requested.SentryProjectIds
 	}
 	updated.DependabotSeverities = requested.GetDependabotSeverities()
-	if requested.ExcludeKeyTasks != nil {
-		updated.ExcludeKeyTasks = requested.GetExcludeKeyTasks()
-	}
-	updated.TaskListIDs = requested.GetTaskListIds()
 	if requested.DatadogTriggeredAlerts != nil {
 		updated.DatadogTriggeredAlerts = requested.GetDatadogTriggeredAlerts()
 	}

@@ -16,7 +16,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
 	ghdependabot "github.com/superplanehq/superplane/pkg/integrations/github/dependabot"
 	"github.com/superplanehq/superplane/pkg/integrations/jira"
-	"github.com/superplanehq/superplane/pkg/integrations/productive"
 	"github.com/superplanehq/superplane/pkg/integrations/sentry"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
@@ -42,10 +41,6 @@ const (
 	// intakeSentrySeedEventWindow is how many recent trigger events a reseed
 	// reads so it can drop issues that already sit on the intake.
 	intakeSentrySeedEventWindow = 200
-
-	// intakeProductiveSeedSize is how many open Productive.io tasks a new
-	// intake imports. The wizard tells the user this number.
-	intakeProductiveSeedSize = 3
 
 	// intakeJiraSeedSize is how many unresolved Jira issues a new intake
 	// imports. The wizard tells the user this number.
@@ -110,8 +105,6 @@ func seedIntake(
 	switch source {
 	case models.FactoryIntakeSourceGitHubIssues:
 		return seedGitHubIssues(ctx, deps, tx, canvasID, binding, installation)
-	case models.FactoryIntakeSourceProductiveTasks:
-		return seedProductiveTasks(deps, tx, canvasID, binding, installation)
 	case models.FactoryIntakeSourceSentryExceptions:
 		return seedSentryIssues(deps, tx, canvasID, binding, installation)
 	case models.FactoryIntakeSourceJiraIssues:
@@ -383,65 +376,6 @@ func jiraIssueKeysOnTrigger(tx *gorm.DB, canvasID uuid.UUID) (map[string]bool, e
 	return seen, nil
 }
 
-func seedProductiveTasks(
-	deps IntakeDependencies,
-	tx *gorm.DB,
-	canvasID uuid.UUID,
-	binding *intakeBinding,
-	installation *models.Integration,
-) (intakeSeedResult, error) {
-	client, err := newIntakeProductiveClient(deps, tx, installation)
-	if err != nil {
-		return intakeSeedResult{}, err
-	}
-
-	project, _ := binding.Configuration["project"].(string)
-	settings := productiveIntakeSettings(tx, canvasID)
-	documents, err := newestProductiveSeedDocuments(
-		client,
-		project,
-		settings.ExcludeKeyTasks,
-		settings.TaskListIDs,
-	)
-	if err != nil {
-		return intakeSeedResult{}, fmt.Errorf("failed to list the tasks of project %s: %w", project, err)
-	}
-
-	if err := emitIntakeEvents(tx, canvasID, productive.TaskPayloadType, productiveTaskEvents(documents, client.OrganizationID)); err != nil {
-		return intakeSeedResult{}, err
-	}
-	return intakeSeedResult{itemCount: len(documents)}, nil
-}
-
-func newestProductiveSeedDocuments(
-	client *productive.Client,
-	project string,
-	regularOnly bool,
-	taskListIDs []string,
-) ([]map[string]any, error) {
-	return client.ListNewestOpenTaskDocuments(project, intakeProductiveSeedSize, regularOnly, taskListIDs)
-}
-
-// productiveTaskEvents shapes each task of a newest-first page like the event
-// the trigger emits when it polls, so the rest of the graph cannot tell a
-// seeded task from a polled one.
-func productiveTaskEvents(documents []map[string]any, organizationID string) []map[string]any {
-	events := make([]map[string]any, 0, len(documents))
-	for _, document := range documents {
-		events = append(events, productive.TaskEnvelope(productive.TaskCreatedEvent, document, organizationID))
-	}
-
-	// The intake lists its runs newest first. Emitting the oldest task first
-	// keeps the newest task at the top, where the reader expects it.
-	slices.Reverse(events)
-
-	return events
-}
-
-func productiveIntakeSettings(tx *gorm.DB, canvasID uuid.UUID) intakeSettings {
-	return liveIntakeSettings(tx, models.FactoryIntakeSourceProductiveTasks, canvasID, defaultProductiveIntakeSettings())
-}
-
 // liveIntakeSettings reads the settings out of the intake's live canvas. It
 // returns fallback when the canvas cannot be read.
 func liveIntakeSettings(tx *gorm.DB, source string, canvasID uuid.UUID, fallback intakeSettings) intakeSettings {
@@ -660,28 +594,6 @@ func newIntakeJiraClient(
 	client, err := jira.NewClient(deps.Registry.HTTPContext(), integrationContext)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build Jira client: %w", err)
-	}
-
-	return client, nil
-}
-
-func newIntakeProductiveClient(
-	deps IntakeDependencies,
-	tx *gorm.DB,
-	integration *models.Integration,
-) (*productive.Client, error) {
-	if deps.Registry == nil {
-		return nil, fmt.Errorf("integration registry is unavailable")
-	}
-
-	if integration.State != models.IntegrationStateReady {
-		return nil, fmt.Errorf("integration %s is not ready", integration.ID)
-	}
-
-	integrationContext := contexts.NewIntegrationContext(tx, nil, integration, deps.Encryptor, deps.Registry, nil)
-	client, err := productive.NewClient(deps.Registry.HTTPContext(), integrationContext)
-	if err != nil {
-		return nil, fmt.Errorf("failed to build Productive client: %w", err)
 	}
 
 	return client, nil

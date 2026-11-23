@@ -35,6 +35,7 @@ func TestListExperimentalFeatures(t *testing.T) {
 		}
 		assert.Contains(t, ids, "factories")
 		assert.Contains(t, ids, "github_enterprise")
+		assert.NotContains(t, ids, "factory_productive_intake")
 		assert.NotContains(t, ids, "claude_managed_agents")
 		assert.NotContains(t, ids, "github_enterprise_server")
 	})
