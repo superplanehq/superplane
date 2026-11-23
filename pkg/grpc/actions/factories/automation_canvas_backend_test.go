@@ -9,11 +9,14 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/automations"
 	"github.com/superplanehq/superplane/pkg/automationspec"
+	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
+	"github.com/superplanehq/superplane/pkg/workers/contexts"
 	"github.com/superplanehq/superplane/test/support"
 	"github.com/superplanehq/superplane/test/support/impl"
 	"gorm.io/datatypes"
@@ -103,6 +106,173 @@ func TestCanvasAutomationScheduleEditMatchesForm(t *testing.T) {
 			require.Contains(t, yaml, cron)
 			require.WithinDuration(t, form[cron].RunAt, yaml[cron].RunAt, time.Second)
 		}
+	}
+}
+
+func TestCanvasAutomationCustomStageRoundTripAndAdmission(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory := seedHandOffFactory(t, r, db)
+	vcsID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSIntegrationID: &vcsID}))
+	for _, feature := range []string{features.FeatureFactoryCustomAutomations, features.FeatureAutomationsAsCode, features.FeatureFactoryCustomStages} {
+		require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, feature))
+	}
+	support.AssignOpenSystemTrial(t, r.Organization.ID)
+	upsertHostedOnboardingProvider(t, db)
+	line, err := factory.CreateLine(db, "QA line", nil)
+	require.NoError(t, err)
+	stageID := uuid.New()
+	stageKey := "custom-" + stageID.String()
+	stages := line.StagesValue()
+	stages = append(stages[:1], append([]models.FactoryLineStage{{ID: stageID, Key: stageKey, Name: "QA", Kind: models.FactoryLineStageCustom}}, stages[1:]...)...)
+	require.NoError(t, line.UpdateConfiguration(db, nil, nil, nil, stages))
+	service := automations.Service{Backend: CanvasAutomationBackend{Deps: onboardingDeps(r)}}
+	ctx := onboardingContext(r)
+	source := "apiVersion: v2\nkind: Automation\nname: QA check\nruns_on_task: true\ntriggers:\n  - use: task_enters_stage\n  - use: manual\n  - use: task_leaves_stage\nsteps:\n  - name: Inspect\n    prompt: Check the changes.\n"
+	placement := automations.Placement{OrganizationID: r.Organization.ID, FactoryID: factory.ID, Stage: stageKey}
+	invalid := placement
+	invalid.Stage = "custom-" + uuid.NewString()
+	_, err = service.Create(ctx, invalid, r.User, source)
+	require.ErrorContains(t, err, "custom stage in this factory")
+	created, err := service.Create(ctx, placement, r.User, source)
+	require.NoError(t, err)
+	read, err := service.Read(ctx, r.Organization.ID, created.ID)
+	require.NoError(t, err)
+	require.Equal(t, stageKey, read.Stage)
+	require.Equal(t, source, read.YAML)
+	updated, err := service.Update(ctx, r.Organization.ID, created.ID, r.User, strings.Replace(source, "Check the changes.", "Review the changes.", 1))
+	require.NoError(t, err)
+	require.Equal(t, created.ID, updated.ID)
+	foreignFactory, err := models.CreateFactory(db, r.Organization.ID, "Other factory", "", "")
+	require.NoError(t, err)
+	invalid.FactoryID = foreignFactory.ID
+	invalid.Stage = stageKey
+	_, err = service.Create(ctx, invalid, r.User, source)
+	require.ErrorContains(t, err, "custom stage in this factory")
+	_, err = service.Validate(ctx, placement, strings.Replace(source, "task_enters_stage", "pull_request_updated", 1))
+	require.ErrorContains(t, err, "requires Verify")
+	scheduledSource := "apiVersion: v2\nkind: Automation\nname: Scheduled QA\nruns_on_task: false\ntriggers:\n  - use: schedule\n    config:\n      cron: '0 9 * * *'\nsteps:\n  - name: Inspect\n    prompt: Check the changes.\n"
+	scheduled, err := service.Create(ctx, placement, r.User, scheduledSource)
+	require.NoError(t, err)
+	scheduledRead, err := service.Read(ctx, r.Organization.ID, scheduled.ID)
+	require.NoError(t, err)
+	require.Equal(t, scheduledSource, scheduledRead.YAML)
+	scheduledCanvas, err := models.FindCanvasInTransaction(db, r.Organization.ID, scheduled.ID)
+	require.NoError(t, err)
+	// Keep this independent schedule out of this test's stage admission.
+	require.NoError(t, scheduledCanvas.SetColumnKey(db, ""))
+	legacyCanvas, _ := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "Existing QA", "existing-start")
+	require.NoError(t, legacyCanvas.SetColumnKey(db, stageKey))
+	version, err := models.FindLiveCanvasVersionInTransaction(db, legacyCanvas.ID)
+	require.NoError(t, err)
+	modernVersion, err := models.FindLiveCanvasVersionInTransaction(db, created.ID)
+	require.NoError(t, err)
+	for _, node := range modernVersion.Nodes {
+		if node.ID != "stage-run" {
+			continue
+		}
+		node.ID = "existing-agent"
+		node.Configuration["executionTimeoutSeconds"] = 7200
+		version.Nodes = append(version.Nodes, node)
+	}
+	version.Edges = []models.Edge{{SourceID: "existing-start", TargetID: "existing-agent", Channel: "default"}}
+	require.NoError(t, canvases.PublishGeneratedCanvasNodes(ctx, db, legacyCanvas, r.User, "Configure existing QA", version.Nodes, version.Edges, intakePublisherOptions(onboardingDeps(r), r.Organization.ID)))
+	version, err = models.FindLiveCanvasVersionInTransaction(db, legacyCanvas.ID)
+	require.NoError(t, err)
+	legacyRead, err := service.Read(ctx, r.Organization.ID, legacyCanvas.ID)
+	require.NoError(t, err)
+	require.Contains(t, legacyRead.YAML, "task_enters_stage")
+	unchanged, err := models.FindLiveCanvasVersionInTransaction(db, legacyCanvas.ID)
+	require.NoError(t, err)
+	require.Equal(t, version.ID, unchanged.ID, "opening does not publish")
+	_, err = service.Update(ctx, r.Organization.ID, legacyCanvas.ID, r.User, strings.Replace(legacyRead.YAML, "Review the changes.", "Inspect the changes.", 1))
+	require.NoError(t, err)
+	preserved, err := models.FindLiveCanvasVersionInTransaction(db, legacyCanvas.ID)
+	require.NoError(t, err)
+	require.Equal(t, version.Edges, preserved.Edges)
+	require.Len(t, preserved.Nodes, 2, "an unrelated edit adds no event triggers")
+	for _, name := range []string{"retired-secret", "kept-secret", "canvas-secret"} {
+		_, err := models.CreateSecret(name, "local", r.User.String(), models.DomainTypeOrganization, r.Organization.ID, []byte("{}"))
+		require.NoError(t, err)
+	}
+	for _, id := range []uuid.UUID{created.ID, legacyCanvas.ID} {
+		t.Run(id.String(), func(t *testing.T) {
+			bashSource := strings.Replace(source, "prompt: Check the changes.", "bash: make lint", 1)
+			if id == legacyCanvas.ID {
+				bashSource = strings.Replace(bashSource, "name: QA check", "name: Existing QA", 1)
+				bashSource = strings.Replace(bashSource, "  - use: manual\n  - use: task_leaves_stage\n", "", 1)
+			}
+			withSettings := strings.Replace(bashSource, "runs_on_task: true", "runs_on_task: true\nskip_setup_commands: true\nskip_repository_checkout: true", 1)
+			withSettings = strings.Replace(withSettings, "bash: make lint", "bash: make lint\n    secrets: [retired-secret, kept-secret]", 1)
+			_, err := service.Update(ctx, r.Organization.ID, id, r.User, withSettings)
+			require.NoError(t, err)
+			version, err := models.FindLiveCanvasVersionInTransaction(db, id)
+			require.NoError(t, err)
+			for i := range version.Nodes {
+				node := &version.Nodes[i]
+				if node.ID == "stage-run" || node.ID == "existing-agent" {
+					node.Configuration["environmentFrom"] = append(node.Configuration["environmentFrom"].([]any), map[string]any{"source": runner.EnvironmentFromSourceSecret, "secret": map[string]any{"secret": "canvas-secret"}})
+				}
+			}
+			require.NoError(t, db.Save(version).Error)
+			withoutSettings := strings.Replace(bashSource, "bash: make lint", "bash: make lint\n    secrets: [kept-secret]", 1)
+			_, err = service.Update(ctx, r.Organization.ID, id, r.User, withoutSettings)
+			require.NoError(t, err)
+			version, err = models.FindLiveCanvasVersionInTransaction(db, id)
+			require.NoError(t, err)
+			for _, node := range version.Nodes {
+				if !isFactoryAgentHarness(node.ComponentName()) {
+					continue
+				}
+				require.NotContains(t, node.Configuration, "skipSetupCommands")
+				require.NotContains(t, node.Configuration, "skipRepositoryCheckout")
+				var secrets []string
+				for _, source := range node.Configuration["environmentFrom"].([]any) {
+					entry := source.(map[string]any)
+					if entry["source"] == runner.EnvironmentFromSourceSecret {
+						secrets = append(secrets, entry["secret"].(map[string]any)["secret"].(string))
+					}
+				}
+				require.NotContains(t, secrets, "retired-secret")
+				require.Contains(t, secrets, "kept-secret")
+				if node.ID == "stage-run" || node.ID == "existing-agent" {
+					require.Contains(t, secrets, "canvas-secret")
+				}
+			}
+		})
+	}
+	require.NoError(t, legacyCanvas.SetColumnKey(db, ""))
+	order, err := factory.CreateWorkOrder(db, "Check QA", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	require.NoError(t, order.TransitionOnDispatch(db, &r.User))
+	repository, branch := "acme/task-repository", "task-changes"
+	require.NoError(t, db.Model(order).Updates(map[string]any{"repository": repository, "default_branch": branch}).Error)
+	var runs []*models.FactoryLineStepResult
+	_, runs, err = line.DispatchStage(db, order)
+	require.NoError(t, err)
+	require.Len(t, runs, 1)
+	require.Equal(t, "on-run", runs[0].Run.NodeID)
+	require.Equal(t, order.ID.String(), runs[0].Run.Input.Data().(map[string]any)["work_order"].(map[string]any)["id"])
+	version, err = models.FindLiveCanvasVersionInTransaction(db, created.ID)
+	require.NoError(t, err)
+	root := support.EmitCanvasEventForNodeWithData(t, created.ID, runs[0].Run.NodeID, "default", nil, runs[0].Run.Input.Data().(map[string]any))
+	require.NoError(t, db.Model(root).Update("run_id", runs[0].Run.ID).Error)
+	builder := contexts.NewNodeConfigurationBuilder(db, created.ID).WithRootEvent(&root.ID)
+	for _, node := range version.Nodes {
+		if node.ID != "stage-run" {
+			continue
+		}
+		configuration, err := builder.Build(node.Configuration)
+		require.NoError(t, err)
+		environment := map[string]string{}
+		for _, value := range configuration["environment"].([]any) {
+			entry := value.(map[string]any)
+			environment[entry["name"].(string)] = entry["value"].(string)
+		}
+		require.Equal(t, repository, environment["REPO"])
+		require.Equal(t, "https://github.com/"+repository+".git", environment["REPO_URL"])
+		require.Equal(t, branch, environment["BASE"])
 	}
 }
 

@@ -142,6 +142,51 @@ func TestCustomAutomationScheduleRoundTripAndTransitions(t *testing.T) {
 	}
 }
 
+func TestCustomAutomationCustomStageFormRoundTrip(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory := seedHandOffFactory(t, r, db)
+	for _, feature := range []string{features.FeatureFactoryCustomAutomations, features.FeatureFactoryCustomStages} {
+		require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, feature))
+	}
+	vcsID := createReadyOnboardingIntegration(t, r.Organization.ID, models.ProviderGitHub)
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSIntegrationID: &vcsID}))
+	line, err := factory.CreateLine(db, "QA", nil)
+	require.NoError(t, err)
+	stageID := uuid.New()
+	stage := models.FactoryLineStage{ID: stageID, Key: "custom-" + stageID.String(), Name: "QA", Kind: models.FactoryLineStageCustom}
+	require.NoError(t, line.UpdateConfiguration(db, nil, nil, nil, append(line.StagesValue(), stage)))
+	settings := &pb.FactoryCustomAutomation_Settings{
+		StartMode:               pb.FactoryCustomAutomation_START_MODE_AUTOMATIC,
+		ExecutionTimeoutSeconds: 3600,
+		Agent:                   &pb.FactoryAppTemplateAgent{Component: "runnerClaudeCode", Model: "claude-sonnet-4-6"},
+		Steps:                   []*pb.FactoryCustomAutomation_Step{{Name: "Inspect", Type: pb.FactoryCustomAutomation_Step_TYPE_PROMPT, Prompt: "Inspect the changes."}},
+	}
+	ctx, deps := onboardingContext(r), onboardingDeps(r)
+	request := &pb.CreateFactoryCustomAutomationRequest{FactoryId: factory.ID.String(), ColumnKey: "custom-" + uuid.NewString(), Name: "QA automation", Settings: settings}
+	_, err = CreateFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), request)
+	require.Error(t, err)
+	request.ColumnKey = stage.Key
+	created, err := CreateFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), request)
+	require.NoError(t, err)
+	id := created.GetCustomAutomation().GetAutomation().GetId()
+	settings.Steps[0].Prompt = "Review the changes."
+	updated, err := UpdateFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &pb.UpdateFactoryCustomAutomationRequest{FactoryId: factory.ID.String(), AutomationId: id, Name: "QA automation", Settings: settings})
+	require.NoError(t, err)
+	require.Equal(t, id, updated.GetCustomAutomation().GetAutomation().GetId())
+	require.Equal(t, stage.Key, updated.GetCustomAutomation().GetAutomation().GetColumnKey())
+	require.True(t, proto.Equal(settings, updated.GetCustomAutomation().GetSettings()))
+	version, err := models.FindLiveCanvasVersionInTransaction(db, uuid.MustParse(id))
+	require.NoError(t, err)
+	gateCount := 0
+	for _, node := range version.Nodes {
+		if node.ComponentName() == "onRun" {
+			gateCount++
+		}
+	}
+	require.Equal(t, 1, gateCount)
+}
+
 func TestCustomAutomationSkipSetupCommandsPersistence(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())

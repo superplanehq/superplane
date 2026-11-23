@@ -247,7 +247,7 @@ func emitColumnCustomAutomation(db *gorm.DB, canvas *models.Canvas, triggerID st
 
 func taskCustomAutomationTriggerID(version *models.CanvasVersion) string {
 	for _, node := range version.Nodes {
-		if node.Type == models.NodeTypeTrigger && node.ComponentName() != "schedule" {
+		if node.Type == models.NodeTypeTrigger && node.ComponentName() != "schedule" && node.ComponentName() != "onRun" {
 			return node.ID
 		}
 	}
@@ -287,7 +287,7 @@ func startCustomAutomation(
 		}
 		return []*models.CanvasEvent{event}, nil
 	}
-	if column == models.CanvasColumnKeyImplement || column == models.CanvasColumnKeyDone {
+	if column == models.CanvasColumnKeyImplement || column == models.CanvasColumnKeyDone || strings.HasPrefix(column, "custom-") {
 		event, err := contexts.StartTaskColumnCustomAutomation(db, factory, canvas, order, automatic)
 		if err != nil || event == nil {
 			return nil, err
