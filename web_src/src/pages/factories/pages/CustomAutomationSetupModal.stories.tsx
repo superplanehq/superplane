@@ -24,6 +24,7 @@ function customAutomationHandlers({
   runsState = "ready",
 }: { empty?: boolean; automatic?: boolean; runsState?: "ready" | "loading" | "error" } = {}) {
   return [
+    http.get("/api/v1/secrets", () => HttpResponse.json({ secrets: [] })),
     http.get(`${api}/${automationId}`, () =>
       HttpResponse.json({
         customAutomation: {
@@ -31,7 +32,12 @@ function customAutomationHandlers({
           settings: {
             startMode: automatic ? "START_MODE_AUTOMATIC" : "START_MODE_MANUAL",
             agent: { component: "runnerSuperPlane" },
-            steps: [{ name: "Deploy preview", type: "TYPE_PROMPT", prompt: "Deploy a preview for this task." }],
+            steps: [
+              { name: "Install dependencies", type: "TYPE_BASH", command: "npm ci", workingDirectory: "repo" },
+              { name: "Run checks", type: "TYPE_BASH", command: "npm test", workingDirectory: "repo" },
+              { name: "Deploy preview", type: "TYPE_PROMPT", prompt: "Deploy a preview for this task." },
+              { name: "Review preview", type: "TYPE_PROMPT", prompt: "Check the preview and report the result." },
+            ],
           },
         },
       }),

@@ -46,8 +46,8 @@ func ValidateAgentSteps(steps []AgentStep) error {
 		if strings.TrimSpace(step.Name) == "" {
 			return fmt.Errorf("steps[%d].name is required", i)
 		}
-		if err := validateStepWorkingDirectory(i, step.WorkingDirectory); err != nil {
-			return err
+		if err := ValidateStepWorkingDirectory(step.WorkingDirectory); err != nil {
+			return fmt.Errorf("steps[%d].workingDirectory %w", i, err)
 		}
 		switch NormalizeAgentStepType(step.Type) {
 		case AgentStepBash:
@@ -74,20 +74,21 @@ func ValidateAgentSteps(steps []AgentStep) error {
 	return nil
 }
 
-func validateStepWorkingDirectory(index int, dir string) error {
+// ValidateStepWorkingDirectory checks the working directory accepted by runner steps.
+func ValidateStepWorkingDirectory(dir string) error {
 	dir = strings.TrimSpace(dir)
 	if dir == "" {
 		return nil
 	}
 	if strings.ContainsAny(dir, "\n\r") {
-		return fmt.Errorf("steps[%d].workingDirectory must be a single path", index)
+		return fmt.Errorf("must be a single path")
 	}
 	if filepath.IsAbs(dir) {
 		return nil
 	}
 	cleaned := filepath.ToSlash(filepath.Clean(dir))
 	if cleaned == ".." || strings.HasPrefix(cleaned, "../") {
-		return fmt.Errorf("steps[%d].workingDirectory must not contain parent path segments", index)
+		return fmt.Errorf("must not contain parent path segments")
 	}
 	return nil
 }

@@ -225,6 +225,65 @@ func TestCustomAutomationSettingsAllowBashOnly(t *testing.T) {
 	assert.Equal(t, prFeedbackTimeoutSeconds, settings.ExecutionTimeoutSeconds)
 }
 
+func TestCustomAutomationExplicitIntegrationPreservesProvider(t *testing.T) {
+	for _, test := range []struct{ app, provider, model string }{
+		{models.CustomLLMAppName, models.UsageProviderCustom, "local-model"},
+		{"openrouter", models.UsageProviderOpenRouter, "openrouter-only"},
+	} {
+		t.Run(test.app, func(t *testing.T) {
+			r := support.Setup(t)
+			support.AssignOpenSystemTrial(t, r.Organization.ID)
+			for _, feature := range []string{features.FeatureFactoryCustomAutomations, features.FeatureOrganizationBYOK, features.FeatureOrganizationBYOKCustomProvider} {
+				require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, feature))
+			}
+			db := database.DB(t.Context())
+			factory := seedHandOffFactory(t, r, db)
+			vcsID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
+			require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSIntegrationID: &vcsID}))
+			integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, test.app)
+			for provider, model := range map[string]string{models.UsageProviderCustom: "local-model", models.UsageProviderOpenRouter: "openrouter-only"} {
+				_, err := models.UpsertOrganizationBYOKModelAllowlist(db, r.Organization.ID, provider, datatypes.JSONSlice[string]{model})
+				require.NoError(t, err)
+			}
+			settings := &pb.FactoryCustomAutomation_Settings{
+				StartMode: pb.FactoryCustomAutomation_START_MODE_MANUAL,
+				Agent: &pb.FactoryAppTemplateAgent{
+					Component: "runnerOpenRouter", Model: test.model, CredentialSource: runner.CredentialsSourceIntegration,
+					CredentialIntegrationName: integrationName(t, r.Organization.ID, integrationID),
+				},
+				Steps: []*pb.FactoryCustomAutomation_Step{{Name: "Inspect", Type: pb.FactoryCustomAutomation_Step_TYPE_PROMPT, Prompt: "Inspect the task."}},
+			}
+			ctx, deps, orgID := onboardingContext(r), onboardingDeps(r), r.Organization.ID.String()
+			created, err := CreateFactoryCustomAutomation(ctx, deps, orgID, &pb.CreateFactoryCustomAutomationRequest{
+				FactoryId: factory.ID.String(), Name: "Inspect task", Settings: settings,
+			})
+			require.NoError(t, err)
+			id := created.GetCustomAutomation().GetAutomation().GetId()
+			assertRunnable := func() {
+				node, err := models.FindCanvasNode(db, uuid.MustParse(id), customAutomationRunnerID)
+				require.NoError(t, err)
+				configuration := node.Configuration.Data()
+				if test.provider == models.UsageProviderCustom {
+					assert.Equal(t, models.UsageProviderCustom, configuration["llmProvider"])
+				} else {
+					assert.NotContains(t, configuration, "llmProvider")
+				}
+				model, err := models.ResolveBYOKRunnerModel(db, r.Organization.ID, &factory.ID, "runnerOpenRouter", configuration)
+				require.NoError(t, err)
+				assert.Equal(t, test.model, model)
+			}
+			assertRunnable()
+			described, err := DescribeFactoryCustomAutomation(ctx, orgID, &pb.DescribeFactoryCustomAutomationRequest{FactoryId: factory.ID.String(), AutomationId: id})
+			require.NoError(t, err)
+			_, err = UpdateFactoryCustomAutomation(ctx, deps, orgID, &pb.UpdateFactoryCustomAutomationRequest{
+				FactoryId: factory.ID.String(), AutomationId: id, Name: "Inspect task", Settings: described.GetCustomAutomation().GetSettings(),
+			})
+			require.NoError(t, err)
+			assertRunnable()
+		})
+	}
+}
+
 func TestBacklogCustomAutomationLifecycle(t *testing.T) {
 	r := support.Setup(t)
 	support.AssignOpenSystemTrial(t, r.Organization.ID)
@@ -911,6 +970,15 @@ func TestCustomAutomationPreservesSubscriptionAgentOnUpdate(t *testing.T) {
 			ctx := onboardingContext(r)
 			deps := onboardingDeps(r)
 			organizationID := r.Organization.ID.String()
+			connection, err := models.CreateCodexConnection(db, r.Organization.ID, r.User, time.Now())
+			require.NoError(t, err)
+			require.NoError(t, connection.StoreUsage(db, nil, []models.CodexModel{
+				{Model: "gpt-5.4"}, {Model: "gpt-5.5"},
+			}, time.Now()))
+			require.NoError(t, db.Model(connection).Updates(map[string]any{
+				"status": models.CodexConnectionStatusReady, "credential_version": 1, "bundle_ciphertext": []byte("test-bundle"),
+			}).Error)
+
 			var agent *pb.FactoryAppTemplateAgent
 			if model != "" {
 				agent = &pb.FactoryAppTemplateAgent{
@@ -954,6 +1022,12 @@ func TestCustomAutomationPreservesSubscriptionAgentOnUpdate(t *testing.T) {
 			node, err := models.FindCanvasNode(db, uuid.MustParse(automationID), customAutomationRunnerID)
 			require.NoError(t, err)
 			assert.Equal(t, "gpt-5.5", node.Configuration.Data()["model"])
+
+			settings.Agent.Model = "outside-the-subscription"
+			_, err = UpdateFactoryCustomAutomation(ctx, deps, organizationID, &pb.UpdateFactoryCustomAutomationRequest{
+				FactoryId: factory.ID.String(), AutomationId: automationID, Name: "Review changed files", Settings: settings,
+			})
+			require.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
 
 			settings.Agent.Model = ""
 			_, err = UpdateFactoryCustomAutomation(ctx, deps, organizationID, &pb.UpdateFactoryCustomAutomationRequest{
@@ -1023,11 +1097,12 @@ func TestCustomAutomationSuperPlaneAgentOmitsCredentials(t *testing.T) {
 	support.AssignOpenSystemTrial(t, r.Organization.ID)
 	anthropic := models.UsageProviderAnthropic
 	modelName := "claude-sonnet-4-6"
+	const selectedModel = "claude-opus-4-6"
 	_, err := models.UpsertHostedLLMProvider(db, models.HostedLLMProvider{
 		Provider:      anthropic,
 		Enabled:       true,
 		APIKey:        []byte("test-hosted-key"),
-		AllowedModels: datatypes.JSONSlice[string]{modelName},
+		AllowedModels: datatypes.JSONSlice[string]{modelName, selectedModel},
 	})
 	require.NoError(t, err)
 	_, err = models.UpdateInstallationLLMSettings(db, models.InstallationLLMSettings{
@@ -1065,6 +1140,7 @@ func TestCustomAutomationSuperPlaneAgentOmitsCredentials(t *testing.T) {
 	assert.Equal(t, models.CanvasNodeStateReady, node.State)
 	assert.Nil(t, node.StateReason)
 	assert.NotContains(t, node.Configuration.Data(), "credentials")
+	assert.NotContains(t, node.Configuration.Data(), "model")
 
 	reason := "credentials is not supported on Run SuperPlane Agent"
 	broken := node.Configuration.Data()
@@ -1074,6 +1150,7 @@ func TestCustomAutomationSuperPlaneAgentOmitsCredentials(t *testing.T) {
 	node.StateReason = &reason
 	require.NoError(t, db.Save(node).Error)
 
+	settings.Agent.Model = models.FormatSelectableLLMModelKey(models.UsageFundingSourceHosted, anthropic, selectedModel)
 	_, err = UpdateFactoryCustomAutomation(ctx, deps, organizationID, &pb.UpdateFactoryCustomAutomationRequest{
 		FactoryId:    factory.ID.String(),
 		AutomationId: automationID,
@@ -1086,6 +1163,7 @@ func TestCustomAutomationSuperPlaneAgentOmitsCredentials(t *testing.T) {
 	assert.Equal(t, models.CanvasNodeStateReady, repaired.State)
 	assert.Nil(t, repaired.StateReason)
 	assert.NotContains(t, repaired.Configuration.Data(), "credentials")
+	assert.Equal(t, settings.Agent.Model, repaired.Configuration.Data()["model"])
 }
 
 func TestTaskCustomAutomationTriggerSkipsTheSchedule(t *testing.T) {
