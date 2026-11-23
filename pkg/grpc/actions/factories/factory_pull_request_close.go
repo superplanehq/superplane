@@ -110,7 +110,7 @@ func closeFactoryWorkOrdersFromGitHubPullRequestClosed(
 				productanalytics.Properties{"rejection_source": "pull_request_closed"},
 			)
 		}
-		publishWorkOrderClosed(
+		PublishWorkOrderClosed(
 			db,
 			factory.OrganizationID,
 			factory,

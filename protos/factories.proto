@@ -1342,6 +1342,9 @@ message FactoryLine {
     optional int32 step_index = 5;
     // Display override for the agent occurrence at this stage.
     string agent_display_key = 6;
+    // Whether a task moves to the next stage after all synchronous
+    // automations pass. Unset uses the stage-kind default.
+    optional bool auto_advance = 7;
   }
 
   message AutomationMove {
@@ -2429,6 +2432,9 @@ message WorkOrderLineDispatch {
   // Ordered stage snapshot used by task history. It stays stable when the
   // line is edited after this dispatch starts.
   repeated FactoryLine.Stage stages = 12;
+  // Stage that currently owns the task, or the terminal stage where this
+  // dispatch stopped. Empty on historical dispatches created before this field.
+  string current_stage_key = 13;
 }
 
 // WorkOrderQueueItem is a line dispatch waiting for admission into a step
