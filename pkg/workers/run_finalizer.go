@@ -741,6 +741,7 @@ func (w *RunFinalizer) executeNextFactoryLineStep(tx *gorm.DB, runID uuid.UUID) 
 
 	_, nextIndex := dispatch.StageStepRange(execution.StepIndex)
 	if nextIndex >= len(dispatch.Steps) {
+		// Finish records review readiness only after the saved final stage passes.
 		return pendingRuns, orderUpdates, dispatch.Finish(tx, models.CanvasRunResultPassed)
 	}
 

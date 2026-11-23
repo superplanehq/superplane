@@ -25,6 +25,39 @@ const DONE_ORDER: FactoriesWorkOrder = {
 };
 
 describe("buildMobileBoardColumns", () => {
+  it("moves stored readiness to a renamed Verify stage and keeps the missing-column fallback", () => {
+    const ready: FactoriesWorkOrder = {
+      id: "ready",
+      state: "STATE_OPEN",
+      lineDispatches: [
+        {
+          id: "dispatch",
+          line: { id: PLAN_LINE.id },
+          reviewReady: true,
+          stepExecutions: [
+            { id: "execution", stepIndex: 0, stageKey: "custom-qa", state: "STATE_FINISHED", result: "RESULT_PASSED" },
+          ],
+        },
+      ],
+    };
+    const line = {
+      ...PLAN_LINE,
+      stages: [
+        { id: "verify", key: "verify", name: "Review", kind: "STAGE_KIND_VERIFY" as const },
+        { id: "custom", key: "custom-qa", name: "QA", kind: "STAGE_KIND_CUSTOM" as const },
+      ],
+    };
+    const columns = buildMobileBoardColumns(line, [ready], REFUND_FACTORY_APPS);
+    expect(columns[0].title).toBe("Review");
+    expect(columns[0].cards.map((card) => card.order.id)).toEqual(["ready"]);
+    expect(columns[1].cards).toEqual([]);
+    const withoutVerify = buildMobileBoardColumns(
+      { ...line, stages: line.stages.slice(1) },
+      [ready],
+      REFUND_FACTORY_APPS,
+    );
+    expect(withoutVerify.flatMap((column) => column.cards.map((card) => card.order.id))).toEqual(["ready"]);
+  });
   it("lays out Backlog, each line phase, Verify, and Done as one flat swipe order", () => {
     const columns = buildMobileBoardColumns(PLAN_LINE, [BACKLOG_DRAFT, DONE_ORDER], REFUND_FACTORY_APPS);
 

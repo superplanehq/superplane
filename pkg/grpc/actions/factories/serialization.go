@@ -816,6 +816,7 @@ func serializeWorkOrderLineDispatch(
 		StepExecutions: serializeWorkOrderExecutions(dispatch.Executions, dispatch.Steps, modelsByExecution),
 		Model:          dispatch.Model,
 		ThinkingLevel:  dispatch.ThinkingLevel,
+		ReviewReady:    dispatch.ReviewReady,
 	}
 	if dispatch.FinishedAt != nil {
 		item.FinishedAt = timestamppb.New(*dispatch.FinishedAt)

@@ -2414,6 +2414,8 @@ message WorkOrderLineDispatch {
   // Ordered stage snapshot used by task history. It stays stable when the
   // line is edited after this dispatch starts.
   repeated FactoryLine.Stage stages = 12;
+  // Successful traversal completion. This does not start Verify automations.
+  bool review_ready = 13;
 }
 
 // WorkOrderQueueItem is a line dispatch waiting for admission into a step

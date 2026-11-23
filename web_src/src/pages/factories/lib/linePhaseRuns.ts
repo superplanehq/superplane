@@ -7,7 +7,6 @@ import type {
 } from "@/api-client";
 import { automationNameForLineStep, lineStepParallelism } from "./factoryLineFormShared";
 import { factoryAppPath, factoryAppRunPath, factoryHomePath, factoryLineDetailPath } from "./factoryPagePaths";
-import { orderedLineBoardStages } from "./lineBoardStages";
 import { getWorkOrderDisplayStatus } from "./workOrderProgress";
 import { dispatchStepRows, isActiveWorkOrderExecution, type WorkOrderStepRow } from "./workOrderExecutions";
 import { resolvePhaseRunStatus } from "./linePhaseRunStatus";
@@ -217,42 +216,21 @@ export function collectLineDoneOrders(
  * assignee saves bump updated_at and would jump cards on every render.
  */
 export function collectLineVerifyOrders(
-  board: LinePhaseColumn[],
   sourceOrders: FactoriesWorkOrder[],
-  line?: FactoriesFactoryLine,
+  line: FactoriesFactoryLine,
 ): FactoriesWorkOrder[] {
   const verifyById = new Map<string, FactoriesWorkOrder>();
-  for (const run of lastWorkStageRuns(board, sourceOrders, line)) {
-    if (!run.order.id || !isWaitingAfterPassedStage(run)) {
+  for (const order of sourceOrders) {
+    if (!order.id || order.state !== "STATE_OPEN" || order.result === "RESULT_ARCHIVED") {
       continue;
     }
-    verifyById.set(run.order.id, run.order);
+    const dispatches = (order.lineDispatches ?? []).filter((dispatch) => dispatch.line?.id === line.id);
+    if (dispatches.length > 0 && pickMostRecentDispatch(dispatches).reviewReady) {
+      verifyById.set(order.id, order);
+    }
   }
 
   return ordersInSourceListOrder(sourceOrders, verifyById);
-}
-
-/**
- * Runs on the last step column and on custom stages after the last step.
- * A custom stage without an automation has no runs, so its tasks finish on the step before it.
- */
-function lastWorkStageRuns(
-  board: LinePhaseColumn[],
-  sourceOrders: FactoriesWorkOrder[],
-  line: FactoriesFactoryLine | undefined,
-): LinePhaseRunCard[] {
-  const lastStepRuns = lineStageColumns(board).at(-1)?.runs ?? [];
-  const lineId = line?.id;
-  if (!line || !lineId) {
-    return lastStepRuns;
-  }
-  const stages = orderedLineBoardStages(line);
-  const lastPhaseIndex = stages.map((stage) => stage.kind).lastIndexOf("STAGE_KIND_PHASE");
-  const trailingCustomRuns = stages
-    .slice(lastPhaseIndex + 1)
-    .filter((stage) => stage.kind === "STAGE_KIND_CUSTOM")
-    .flatMap((stage) => collectCustomStageRuns(lineId, stage.key, sourceOrders));
-  return [...lastStepRuns, ...trailingCustomRuns];
 }
 
 /**
@@ -279,16 +257,6 @@ function ordersInSourceListOrder(
     ordered.push(order);
   }
   return ordered;
-}
-
-function isWaitingAfterPassedStage(run: LinePhaseRunCard): boolean {
-  if (run.order.state === "STATE_CLOSED") {
-    return false;
-  }
-  if (getWorkOrderDisplayStatus(run.order) !== "waiting") {
-    return false;
-  }
-  return run.execution.state === "STATE_FINISHED" && run.execution.result === "RESULT_PASSED";
 }
 
 /** Stage columns only. Done is a fixed bookend, not a line step. */
@@ -530,7 +498,8 @@ function pickMostRecentDispatch(dispatches: FactoriesWorkOrderLineDispatch[]): F
   return dispatches.reduce((latest, candidate) => {
     const latestAt = Date.parse(latest.createdAt ?? "") || 0;
     const candidateAt = Date.parse(candidate.createdAt ?? "") || 0;
-    return candidateAt >= latestAt ? candidate : latest;
+    if (candidateAt !== latestAt) return candidateAt > latestAt ? candidate : latest;
+    return (candidate.id ?? "") > (latest.id ?? "") ? candidate : latest;
   });
 }
 
