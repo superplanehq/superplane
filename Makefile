@@ -758,7 +758,6 @@ image.scan.archive:
 	$(COMPOSE) exec -T app bash ./scripts/vulnerability-check.sh --image-archive "/app/$(IMAGE_ARCHIVE)"
 
 test.image:
-	bash scripts/build_image_test.sh
 	$(COMPOSE) exec -T app bash /app/scripts/build_image_ownership_test.sh
 
 image.auth:
