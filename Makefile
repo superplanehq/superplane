@@ -727,7 +727,7 @@ image.build:
 IMAGE_PLATFORM?=linux/amd64
 IMAGE_BUILD_DIR?=tmp/image-artifacts
 
-.PHONY: image.ci.up image.prepare image.package test.image
+.PHONY: image.ci.up image.prepare image.package image.scan image.scan.archive test.image
 image.ci.up: ci.app.up
 
 image.prepare:
@@ -747,8 +747,17 @@ image.package:
 	  --build-arg ARTIFACTS_STAGE=prebuilt \
 	  --progress plain -t $(IMAGE):$(IMAGE_TAG) "$(IMAGE_BUILD_DIR)"
 
+image.scan:
+	@mkdir -p tmp
+	@set -eu; archive=$$(mktemp tmp/image-scan.XXXXXX); \
+	  trap 'rm -f "$$archive"' EXIT; \
+	  docker save --output "$$archive" $(IMAGE):$(IMAGE_TAG); \
+	  $(MAKE) image.scan.archive IMAGE_ARCHIVE="$$archive"
+
+image.scan.archive:
+	$(COMPOSE) exec -T app bash ./scripts/vulnerability-check.sh --image-archive "/app/$(IMAGE_ARCHIVE)"
+
 test.image:
-	bash scripts/build_image_test.sh
 	$(COMPOSE) exec -T app bash /app/scripts/build_image_ownership_test.sh
 
 image.auth:
