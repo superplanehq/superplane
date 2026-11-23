@@ -984,6 +984,45 @@ describe("LinesPage board automations", () => {
     await resetLinesBoardMocks();
   });
 
+  it.each([
+    { columnKey: "verify", templateId: "risk-score", cardId: "risk-score-moved-app", sourceKey: "verify" },
+    { columnKey: "implement", cardId: "custom-moved-app", sourceKey: "phase-0" },
+    { columnKey: "custom-source", cardId: "custom-moved-app", sourceKey: "custom-source" },
+  ])(
+    "shows a moved $columnKey workspace card on a line without its source stage",
+    ({ columnKey, templateId, cardId, sourceKey }) => {
+      const destinationKey = columnKey === "custom-source" ? "custom-target" : "backlog";
+      useFactoryAutomations.mockReturnValue({
+        data: [
+          { id: "moved-app", name: "Moved automation", columnKey, templateId, displayColumnKey: destinationKey },
+          { id: "unmoved-app", name: "Unmoved automation", columnKey, templateId },
+        ],
+      });
+      const factory: FactoriesFactory = {
+        ...REFUND_FACTORY,
+        lines: (REFUND_FACTORY.lines ?? []).map((line) => ({
+          ...line,
+          stages: [
+            { id: "backlog", key: "backlog", name: "Backlog", kind: "STAGE_KIND_BACKLOG" },
+            { id: "phase-1", key: "phase-1", name: "Check", kind: "STAGE_KIND_PHASE", stepIndex: 1 },
+            { id: "custom-target", key: "custom-target", name: "QA", kind: "STAGE_KIND_CUSTOM" },
+            { id: "done", key: "done", name: "Done", kind: "STAGE_KIND_DONE" },
+          ],
+        })),
+      };
+      renderLinesBoard(undefined, vi.fn(), factory);
+
+      expect(screen.queryByTestId(`lines-stage-shell-${sourceKey}`)).not.toBeInTheDocument();
+      const destinationTestId = destinationKey === "backlog" ? "lines-backlog" : `lines-custom-stage-${destinationKey}`;
+      expect(
+        within(screen.getByTestId(`lines-stage-shell-${destinationKey}`)).getByTestId(
+          `${destinationTestId}-automation-rows-row-${cardId}`,
+        ),
+      ).toBeInTheDocument();
+      expect(screen.queryByText("Unmoved automation")).not.toBeInTheDocument();
+    },
+  );
+
   it("puts backlog automations before the create plus and column menu", () => {
     useFactoryIntakes.mockReturnValue({ data: [GITHUB_ISSUES_INTAKE] });
     renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, ICON_VIEW);

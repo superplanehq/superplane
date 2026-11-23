@@ -30,7 +30,10 @@ export function supportsCard(stage: LineBoardStage, card: ColumnAutomation) {
   return !card.taskStageTargets || card.taskStageTargets.includes(stage.key);
 }
 
-export function savedCardStage(card: ColumnAutomation, origin: LineBoardStage, saved: LineBoardStage[]) {
-  const key = card.kind === "agent-step" ? origin.agentDisplayKey : card.displayColumnKey;
-  return key && saved.some((stage) => stage.key === key) ? key : origin.key;
+export function savedCardStage(card: ColumnAutomation, originKey: string, saved: LineBoardStage[]) {
+  const key =
+    card.kind === "agent-step"
+      ? saved.find((stage) => stage.key === originKey)?.agentDisplayKey
+      : card.displayColumnKey;
+  return key && saved.some((stage) => stage.key === key) ? key : originKey;
 }

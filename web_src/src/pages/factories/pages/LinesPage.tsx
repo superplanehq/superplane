@@ -1276,6 +1276,14 @@ function LineDetail({
     },
     [automationApps, board, factoryIntakes, overlay, planningEnabled, prFeedbackHandlers, vcsProvider, workOrders],
   );
+  const workspaceAutomationKeys = useMemo(
+    () =>
+      apps.flatMap((app) => {
+        const key = app.columnKey === "implement" ? "phase-0" : app.columnKey;
+        return isColumnKey(key) ? [key] : [];
+      }),
+    [apps],
+  );
 
   const addAutomation = useAddColumnAutomation({
     organizationId,
@@ -1361,6 +1369,7 @@ function LineDetail({
           showAutomationRows={showAutomationRows}
           colorView={colorView}
           automationsFor={automationsFor}
+          workspaceAutomationKeys={workspaceAutomationKeys}
           onAutomationRowAction={handleRowAction}
           onAddVerifyAutomation={canAddVerifyAutomation ? () => addAutomation.openPicker("verify") : undefined}
           onAddImplementAutomation={canAddColumnAutomation ? () => addAutomation.openPicker("phase-0") : undefined}
@@ -1649,6 +1658,7 @@ function PhaseBoard({
   showAutomationRows,
   colorView,
   automationsFor,
+  workspaceAutomationKeys,
   onAutomationRowAction,
   onAddVerifyAutomation,
   onAddImplementAutomation,
@@ -1685,6 +1695,7 @@ function PhaseBoard({
   showAutomationRows: boolean;
   colorView: LineBoardColumnColorView;
   automationsFor: (key: ColumnKey, columnTitle: string) => ColumnAutomation[];
+  workspaceAutomationKeys: ColumnKey[];
   onAutomationRowAction: (automation: ColumnAutomation, action: ColumnAutomationRowAction) => void;
   onAddVerifyAutomation?: () => void;
   onAddImplementAutomation?: () => void;
@@ -1939,12 +1950,20 @@ function PhaseBoard({
   const doneTitle = stageName("done", "Done");
   const rowsByStage = new Map<string, ColumnAutomation[]>();
   const savedSource = new Map<string, string>();
-  for (const origin of orderedStages) {
-    if (!showColumnAutomations || !isColumnKey(origin.key)) continue;
-    for (const card of automationsFor(origin.key, stageName(origin.key, origin.name))) {
-      const source = moves[card.id]?.sourceKey ?? savedCardStage(card, origin, orderedStages);
+  // Workspace cards can move to a line that does not contain their execution stage.
+  const automationOriginKeys = new Set([
+    ...orderedStages.map((stage) => stage.key),
+    "backlog",
+    "verify",
+    "done",
+    ...workspaceAutomationKeys,
+  ]);
+  for (const originKey of automationOriginKeys) {
+    if (!showColumnAutomations || !isColumnKey(originKey)) continue;
+    for (const card of automationsFor(originKey, stageName(originKey, columnTitleForKey(originKey, columns)))) {
+      const source = moves[card.id]?.sourceKey ?? savedCardStage(card, originKey, orderedStages);
       savedSource.set(card.id, source);
-      const key = moves[card.id]?.destinationKey ?? (baseStages.some((s) => s.key === source) ? source : origin.key);
+      const key = moves[card.id]?.destinationKey ?? (baseStages.some((s) => s.key === source) ? source : originKey);
       const rows = rowsByStage.get(key) ?? [];
       rows.push(card);
       rowsByStage.set(key, rows);
