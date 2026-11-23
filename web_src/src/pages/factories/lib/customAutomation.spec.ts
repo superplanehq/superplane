@@ -161,6 +161,7 @@ describe("custom automation settings", () => {
           id: "automatic-review",
           name: "Policy review",
           columnKey: "verify",
+          displayColumnKey: "backlog",
           templateId: "custom-verification",
           customAutomationMode: "automatic",
         },
@@ -184,6 +185,8 @@ describe("custom automation settings", () => {
       expect.objectContaining({
         kind: "custom-verification",
         name: "Policy review",
+        displayColumnKey: "backlog",
+        trigger: "On Verify and new commits",
         action: "Run automation automatically",
       }),
       expect.objectContaining({

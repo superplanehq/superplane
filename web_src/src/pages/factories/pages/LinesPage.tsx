@@ -99,6 +99,9 @@ import {
   workspaceNextSteps,
 } from "./workspaceNextStepCatalog";
 import { BacklogColumn, type BacklogIntakePanel } from "./BacklogColumn";
+import { useBacklogScheduleRun } from "@/hooks/useBacklogScheduleRun";
+import { AutomationRowContext } from "./AutomationRowContext";
+import { cardMove, savedCardStage, supportsCard, type AutomationMove } from "../lib/automationPlacement";
 
 type BoardColumnPaging = {
   hasMore: boolean;
@@ -1277,6 +1280,14 @@ function LineDetail({
     },
     [automationApps, board, factoryIntakes, overlay, planningEnabled, prFeedbackHandlers, vcsProvider, workOrders],
   );
+  const workspaceAutomationKeys = useMemo(
+    () =>
+      apps.flatMap((app) => {
+        const key = app.columnKey === "implement" ? "phase-0" : app.columnKey;
+        return isColumnKey(key) ? [key] : [];
+      }),
+    [apps],
+  );
 
   const addAutomation = useAddColumnAutomation({
     organizationId,
@@ -1327,6 +1338,7 @@ function LineDetail({
         <p className="text-[13px] text-muted-foreground">No phases yet. Edit this line to add app-driven phases.</p>
       ) : (
         <PhaseBoard
+          key={line.id}
           organizationId={organizationId}
           factoryId={factoryId}
           factoryKey={factoryKey}
@@ -1361,6 +1373,7 @@ function LineDetail({
           showAutomationRows={showAutomationRows}
           colorView={colorView}
           automationsFor={automationsFor}
+          workspaceAutomationKeys={workspaceAutomationKeys}
           onAutomationRowAction={handleRowAction}
           onAddVerifyAutomation={canAddVerifyAutomation ? () => addAutomation.openPicker("verify") : undefined}
           onAddImplementAutomation={canAddColumnAutomation ? () => addAutomation.openPicker("phase-0") : undefined}
@@ -1649,6 +1662,7 @@ function PhaseBoard({
   showAutomationRows,
   colorView,
   automationsFor,
+  workspaceAutomationKeys,
   onAutomationRowAction,
   onAddVerifyAutomation,
   onAddImplementAutomation,
@@ -1685,6 +1699,7 @@ function PhaseBoard({
   showAutomationRows: boolean;
   colorView: LineBoardColumnColorView;
   automationsFor: (key: ColumnKey, columnTitle: string) => ColumnAutomation[];
+  workspaceAutomationKeys: ColumnKey[];
   onAutomationRowAction: (automation: ColumnAutomation, action: ColumnAutomationRowAction) => void;
   onAddVerifyAutomation?: () => void;
   onAddImplementAutomation?: () => void;
@@ -1701,8 +1716,13 @@ function PhaseBoard({
   const [stagePreview, setStagePreview] = useState<LineBoardStage[] | null>(null);
   const stagePreviewRef = useRef<LineBoardStage[] | null>(null);
   const [draggingStageId, setDraggingStageId] = useState<string | null>(null);
+  const [draggingCard, setDraggingCard] = useState<ColumnAutomation | null>(null);
   const dragTargetId = useRef<string | null>(null);
-  const [stageDraft, setStageDraft] = useState<{ lineId: string | undefined; stages: LineBoardStage[] } | null>(null);
+  const [stageDraft, setStageDraft] = useState<{
+    lineId: string | undefined;
+    stages: LineBoardStage[];
+    moves: Record<string, AutomationMove>;
+  } | null>(null);
   const [addStageOpen, setAddStageOpen] = useState(false);
   const [saveStagesOpen, setSaveStagesOpen] = useState(false);
   const [discardStagesOpen, setDiscardStagesOpen] = useState(false);
@@ -1712,6 +1732,8 @@ function PhaseBoard({
   const stageElements = useRef(new Map<string, HTMLDivElement>());
   const updateLine = useUpdateFactoryLine(organizationId, factoryId);
   const lineId = line.id;
+  const scheduleRun = useBacklogScheduleRun(organizationId, factoryId, factoryKey, lineId);
+  const { canAct } = usePermissions();
 
   // The line query is the source of truth for persisted colors. Resync when
   // it changes, but skip while a color save is in flight so a stale refetch
@@ -1799,10 +1821,19 @@ function PhaseBoard({
     () => (draftStages ? lineStageChanges(orderedStages, draftStages) : null),
     [draftStages, orderedStages],
   );
-  const stagesChanged = stageChanges ? hasLineStageChanges(stageChanges) : false;
+  const moves = editingStages && stageDraft?.lineId === lineId ? (stageDraft?.moves ?? {}) : {};
+  const pendingMoves = Object.values(moves);
+  const stagesChanged = pendingMoves.length > 0 || (stageChanges ? hasLineStageChanges(stageChanges) : false);
   const stageSaveBusy = savingStages || updateLine.isPending;
   const canRenameCustomStages = canManageStages && !stageSaveBusy;
-  const setDraftStages = (stages: LineBoardStage[]) => setStageDraft({ lineId, stages });
+  const setDraftStages = (stages: LineBoardStage[]) =>
+    setStageDraft({
+      lineId,
+      stages,
+      moves: Object.fromEntries(
+        Object.entries(moves).filter(([, move]) => stages.some((stage) => stage.key === move.destinationKey)),
+      ),
+    });
   const renameCustomStage = async (stage: LineBoardStage, name: string) => {
     if (!canManageStages || !lineId || stageSaveInFlight.current || updateLine.isPending) return;
     if (name === stage.name || lineStageNameError(name, baseStages, stage.id)) return;
@@ -1824,6 +1855,7 @@ function PhaseBoard({
   };
   const exitStageEditing = () => {
     setStageDraft(null);
+    setDraggingCard(null);
     setDiscardStagesOpen(false);
     setSaveStagesOpen(false);
     setStageSaveError("");
@@ -1837,14 +1869,17 @@ function PhaseBoard({
     try {
       const updated = await updateLine.mutateAsync({
         lineId,
-        stageConfiguration: { stages: stagesForSave(draftStages) },
+        stageConfiguration: {
+          stages: stagesForSave(draftStages),
+          ...(pendingMoves.length > 0 && { automationMoves: pendingMoves }),
+        },
       });
       const savedIds = new Set(orderedStages.map((stage) => stage.id));
       const created = orderedLineBoardStages(updated).find(
         (stage) => stage.kind === "STAGE_KIND_CUSTOM" && !savedIds.has(stage.id),
       );
       exitStageEditing();
-      onStagesSaved(created);
+      onStagesSaved(pendingMoves.length ? undefined : created);
     } catch (error) {
       setStageSaveError(getApiErrorMessage(error, "SuperPlane could not save the stages."));
     } finally {
@@ -1947,16 +1982,54 @@ function PhaseBoard({
   const backlogTitle = stageName("backlog", "Backlog");
   const verifyTitle = stageName("verify", "Verify");
   const doneTitle = stageName("done", "Done");
-  const phaseTitle = (column: LinePhaseColumn) => stageName(`phase-${column.stepIndex}`, column.stepName);
-  const backlogAutomations = showColumnAutomations ? automationsFor("backlog", backlogTitle) : undefined;
-  const phaseAutomations = columns.map((column) =>
-    showColumnAutomations ? automationsFor(`phase-${column.stepIndex}`, phaseTitle(column)) : undefined,
-  );
-  const phaseAutomationsByStep = new Map(columns.map((column, index) => [column.stepIndex, phaseAutomations[index]]));
-  const verifyAutomations = showColumnAutomations ? automationsFor("verify", verifyTitle) : undefined;
-  const doneAutomations = showColumnAutomations ? automationsFor("done", doneTitle) : undefined;
+  const rowsByStage = new Map<string, ColumnAutomation[]>();
+  const savedSource = new Map<string, string>();
+  // Workspace cards can move to a line that does not contain their execution stage.
+  const automationOriginKeys = new Set([
+    ...orderedStages.map((stage) => stage.key),
+    "backlog",
+    "verify",
+    "done",
+    ...workspaceAutomationKeys,
+  ]);
+  for (const originKey of automationOriginKeys) {
+    if (!showColumnAutomations || !isColumnKey(originKey)) continue;
+    for (const card of automationsFor(originKey, stageName(originKey, columnTitleForKey(originKey, columns)))) {
+      const source = moves[card.id]?.sourceKey ?? savedCardStage(card, originKey, orderedStages);
+      savedSource.set(card.id, source);
+      const key = moves[card.id]?.destinationKey ?? (baseStages.some((s) => s.key === source) ? source : originKey);
+      const rows = rowsByStage.get(key) ?? [];
+      rows.push(card);
+      rowsByStage.set(key, rows);
+    }
+  }
+  const rowsFor = (key: string) => (showColumnAutomations ? (rowsByStage.get(key) ?? []) : undefined);
+  const moveCard = (card: ColumnAutomation, stage: LineBoardStage) => {
+    const source = savedSource.get(card.id);
+    if (!draftStages || !source || !supportsCard(stage, card)) return;
+    const move = cardMove(card, source, stage.key);
+    if (!move) return;
+    const next = { ...moves };
+    if (source === stage.key) delete next[card.id];
+    else next[card.id] = move;
+    setStageDraft({ lineId, stages: draftStages, moves: next });
+  };
+  const moveCardWithKeyboard = (card: ColumnAutomation, direction: number) => {
+    const stages = visibleStages.filter((stage) => supportsCard(stage, card));
+    const current = moves[card.id]?.destinationKey ?? savedSource.get(card.id);
+    const target = stages[stages.findIndex((stage) => stage.key === current) + direction];
+    if (!target) return;
+    flushSync(() => moveCard(card, target));
+    stageElements.current
+      .get(target.id)
+      ?.querySelector<HTMLButtonElement>(`[data-automation-handle="${CSS.escape(card.id)}"]`)
+      ?.focus();
+  };
+  const backlogAutomations = rowsFor("backlog");
+  const verifyAutomations = rowsFor("verify");
+  const doneAutomations = rowsFor("done");
   const automationRowCount = (automations?: ColumnAutomation[]) =>
-    showAutomationRows ? Math.max(1, automations?.length ?? 0) : undefined;
+    showAutomationRows || (editingStages && showColumnAutomations) ? Math.max(1, automations?.length ?? 0) : undefined;
   const automationPreferenceKey = (columnKey: ColumnKey) =>
     JSON.stringify([organizationId, factoryId, lineId, columnKey]);
 
@@ -2030,7 +2103,7 @@ function PhaseBoard({
         return null;
       }
       const columnKey: ColumnKey = `phase-${column.stepIndex}`;
-      const automations = phaseAutomationsByStep.get(column.stepIndex);
+      const automations = rowsFor(stage.key);
       return (
         <PhaseColumn
           organizationId={organizationId}
@@ -2070,6 +2143,13 @@ function PhaseBoard({
           titleTestId={`lines-column-title-${stage.key}`}
           count={0}
           emptyDescription="New stage. It is created when you save."
+          subheader={columnAutomationRowsSubheader({
+            title: stage.name,
+            automations: rowsFor(stage.key),
+            rowCount: automationRowCount(rowsFor(stage.key)),
+            onRowAction: onAutomationRowAction,
+            testId: `lines-draft-${stage.key}-rows`,
+          })}
           className="border-dashed border-muted-foreground/40"
           testId={`lines-draft-stage-${stage.key}`}
         />
@@ -2078,7 +2158,7 @@ function PhaseBoard({
 
     if (stage.kind === "STAGE_KIND_CUSTOM") {
       const columnKey = isColumnKey(stage.key) ? stage.key : undefined;
-      const automations = columnKey && showColumnAutomations ? automationsFor(columnKey, stage.name) : undefined;
+      const automations = rowsFor(stage.key);
       return (
         <CustomStageColumn
           stage={stage}
@@ -2177,6 +2257,7 @@ function PhaseBoard({
       {draftStages ? (
         <>
           <LineStageEditToolbar
+            canMoveCards={showColumnAutomations}
             hasChanges={stagesChanged}
             saving={savingStages}
             onAddStage={() => setAddStageOpen(true)}
@@ -2196,6 +2277,7 @@ function PhaseBoard({
             }}
           />
           <SaveLineStagesDialog
+            moves={pendingMoves}
             changes={saveStagesOpen ? stageChanges : null}
             saving={savingStages}
             error={stageSaveError}
@@ -2209,57 +2291,81 @@ function PhaseBoard({
           />
         </>
       ) : null}
-      <WorkOrderKanbanBoard testId="lines-phase-board">
-        {visibleStages.map((stage) => (
-          <div
-            key={stage.id}
-            ref={(element) => {
-              if (element) stageElements.current.set(stage.id, element);
-              else stageElements.current.delete(stage.id);
-            }}
-            data-testid={`lines-stage-shell-${stage.key}`}
-            className={cn(
-              "relative flex h-full min-h-0 flex-col self-stretch [&>section]:flex-1",
-              draggingStageId === stage.id && "z-10 opacity-60",
-              workOrderKanbanLaneSizeClassName,
-            )}
-            onDragEnter={() => {
-              if (draggingStageId) reorderStagePreview(draggingStageId, stage.id);
-            }}
-            onDragOver={(event) => {
-              if (draggingStageId) event.preventDefault();
-            }}
-          >
-            {draftStages ? (
-              <LineStageEditStrip
-                stage={stage}
-                onDragStart={(event) => startStageDrag(event, stage)}
-                onDragEnd={finishStageDrag}
-                onKeyDown={(event) => moveStageWithKeyboard(event, stage)}
-                onDelete={() => requestDeleteStage(stage)}
-              />
-            ) : null}
-            {stage.kind === "STAGE_KIND_PHASE" ? (
-              <span
-                className={cn("absolute left-full z-[1] h-px w-3 bg-border", draftStages ? "top-[49px]" : "top-[21px]")}
-                aria-hidden
-              />
-            ) : null}
-            {stage.kind === "STAGE_KIND_CUSTOM" ||
-            stage.kind === "STAGE_KIND_VERIFY" ||
-            stage.kind === "STAGE_KIND_DONE" ? (
-              <span
-                className={cn(
-                  "absolute left-0 z-[1] h-px w-3 -translate-x-full bg-border",
-                  draftStages ? "top-[49px]" : "top-[21px]",
-                )}
-                aria-hidden
-              />
-            ) : null}
-            {renderStage(stage)}
-          </div>
-        ))}
-      </WorkOrderKanbanBoard>
+      <AutomationRowContext.Provider
+        value={{
+          ...scheduleRun,
+          onRun: canAct("work_orders", "update") ? scheduleRun.onRun : undefined,
+          move:
+            editingStages && showColumnAutomations
+              ? { start: setDraggingCard, end: () => setDraggingCard(null), keyboard: moveCardWithKeyboard }
+              : undefined,
+        }}
+      >
+        <WorkOrderKanbanBoard testId="lines-phase-board">
+          {visibleStages.map((stage) => (
+            <div
+              key={stage.id}
+              ref={(element) => {
+                if (element) stageElements.current.set(stage.id, element);
+                else stageElements.current.delete(stage.id);
+              }}
+              data-testid={`lines-stage-shell-${stage.key}`}
+              className={cn(
+                "relative flex h-full min-h-0 flex-col self-stretch [&>section]:flex-1",
+                draggingStageId === stage.id && "z-10 opacity-60",
+                draggingCard &&
+                  supportsCard(stage, draggingCard) &&
+                  !rowsFor(stage.key)?.some((card) => card.id === draggingCard.id) &&
+                  "ring-2 ring-primary/50",
+                workOrderKanbanLaneSizeClassName,
+              )}
+              onDragEnter={() => {
+                if (draggingStageId) reorderStagePreview(draggingStageId, stage.id);
+              }}
+              onDragOver={(event) => {
+                if (draggingStageId || (draggingCard && supportsCard(stage, draggingCard))) event.preventDefault();
+              }}
+              onDrop={(event) => {
+                if (!draggingCard) return;
+                event.preventDefault();
+                moveCard(draggingCard, stage);
+                setDraggingCard(null);
+              }}
+            >
+              {draftStages ? (
+                <LineStageEditStrip
+                  stage={stage}
+                  onDragStart={(event) => startStageDrag(event, stage)}
+                  onDragEnd={finishStageDrag}
+                  onKeyDown={(event) => moveStageWithKeyboard(event, stage)}
+                  onDelete={() => requestDeleteStage(stage)}
+                />
+              ) : null}
+              {stage.kind === "STAGE_KIND_PHASE" ? (
+                <span
+                  className={cn(
+                    "absolute left-full z-[1] h-px w-3 bg-border",
+                    draftStages ? "top-[49px]" : "top-[21px]",
+                  )}
+                  aria-hidden
+                />
+              ) : null}
+              {stage.kind === "STAGE_KIND_CUSTOM" ||
+              stage.kind === "STAGE_KIND_VERIFY" ||
+              stage.kind === "STAGE_KIND_DONE" ? (
+                <span
+                  className={cn(
+                    "absolute left-0 z-[1] h-px w-3 -translate-x-full bg-border",
+                    draftStages ? "top-[49px]" : "top-[21px]",
+                  )}
+                  aria-hidden
+                />
+              ) : null}
+              {renderStage(stage)}
+            </div>
+          ))}
+        </WorkOrderKanbanBoard>
+      </AutomationRowContext.Provider>
     </>
   );
 }
