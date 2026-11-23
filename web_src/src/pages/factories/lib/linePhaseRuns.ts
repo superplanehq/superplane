@@ -416,6 +416,14 @@ function executionStepIndex(execution: FactoriesWorkOrderExecution): number | un
   return execution.stepIndex;
 }
 
+function isValidSavedStageIndex(
+  index: number | null | undefined,
+  stepCount: number,
+  runsExecutionApp: (index: number) => boolean,
+): index is number {
+  return index != null && index >= 0 && index < stepCount && runsExecutionApp(index);
+}
+
 function liveColumnIndexForExecution(
   steps: NonNullable<FactoriesFactoryLine["steps"]>,
   stages: FactoryLineStage[],
@@ -439,13 +447,9 @@ function liveColumnIndexForExecution(
     if (stage?.kind === "STAGE_KIND_CUSTOM" || stageKey.startsWith("custom-")) {
       return undefined;
     }
-    if (
-      stage?.stepIndex != null &&
-      stage.stepIndex >= 0 &&
-      stage.stepIndex < steps.length &&
-      runsExecutionApp(stage.stepIndex)
-    ) {
-      return stage.stepIndex;
+    const savedStageIndex = stage?.stepIndex;
+    if (isValidSavedStageIndex(savedStageIndex, steps.length, runsExecutionApp)) {
+      return savedStageIndex;
     }
   }
 
