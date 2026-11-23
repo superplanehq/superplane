@@ -37,6 +37,7 @@ vi.mock("@/hooks/useCanvasData", () => ({
   useCanvasVersion: () => ({ data: { spec: { nodes: [] } } }),
 }));
 vi.mock("@/hooks/useCanvasWebsocket", () => ({ useCanvasRuntimeWebsocket: hooks.runtime }));
+vi.mock("@/hooks/useSecrets", () => ({ useSecrets: () => ({ data: [] }) }));
 // Agent model controls have separate coverage; retain the real setup form and step selection.
 vi.mock("@/hooks/useSelectableLLMModels", () => ({ useSelectableLLMModels: () => ({}) }));
 vi.mock("./PlanningReviewForm", () => ({ PlanningReviewForm: () => null }));
@@ -469,10 +470,7 @@ steps:
     const onClose = renderModal("?customAutomation=custom-1", "custom-1", "backlog", true);
     const user = userEvent.setup();
     await user.click(await screen.findByRole("button", { name: "Edit YAML" }));
-    const draft = savedYaml.replace(
-      "    bash: echo original\n",
-      "    bash: echo original\n    secrets: [missing-secret]\n",
-    );
+    const draft = savedYaml.replace("echo original", "echo original\n    secrets: [missing-secret]");
     fireEvent.change(screen.getByLabelText("Automation YAML"), { target: { value: draft } });
     await user.click(screen.getByRole("button", { name: "Save" }));
     expect(await screen.findByRole("alert")).toHaveTextContent(

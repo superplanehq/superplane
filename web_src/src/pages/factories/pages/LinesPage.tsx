@@ -237,6 +237,7 @@ import {
 import { replaceLineStepParallelism } from "../lib/factoryLineFormShared";
 import {
   hasLineStageChanges,
+  lineStageNameError,
   insertStageBeforeDone,
   isDraftLineBoardStage,
   lineStageChanges,
@@ -1168,7 +1169,10 @@ function LineDetail({
 }) {
   const steps = line.steps ?? [];
   const fullBoard = useMemo(() => buildLinePhaseBoard(line, workOrders ?? [], apps), [line, workOrders, apps]);
-  const verifyOrders = useMemo(() => collectLineVerifyOrders(fullBoard, workOrders ?? []), [fullBoard, workOrders]);
+  const verifyOrders = useMemo(
+    () => collectLineVerifyOrders(fullBoard, workOrders ?? [], line),
+    [fullBoard, workOrders, line],
+  );
   const hasVerifyStage = useMemo(
     () => orderedLineBoardStages(line).some((stage) => stage.kind === "STAGE_KIND_VERIFY"),
     [line],
@@ -1724,6 +1728,7 @@ function PhaseBoard({
   const [discardStagesOpen, setDiscardStagesOpen] = useState(false);
   const [stageSaveError, setStageSaveError] = useState("");
   const [savingStages, setSavingStages] = useState(false);
+  const stageSaveInFlight = useRef(false);
   const stageElements = useRef(new Map<string, HTMLDivElement>());
   const updateLine = useUpdateFactoryLine(organizationId, factoryId);
   const lineId = line.id;
@@ -1777,6 +1782,12 @@ function PhaseBoard({
 
   const phaseNames = useMemo(() => new Map(columns.map((column) => [column.stepIndex, column.stepName])), [columns]);
   const orderedStages = useMemo(() => orderedLineBoardStages(line, phaseNames), [line, phaseNames]);
+  const verifyOrderIds = useMemo(() => {
+    if (!orderedStages.some((stage) => stage.kind === "STAGE_KIND_VERIFY")) {
+      return new Set<string>();
+    }
+    return new Set(verifyOrders.flatMap((order) => (order.id ? [order.id] : [])));
+  }, [orderedStages, verifyOrders]);
   const stageNamesVersion = useMemo(
     () => JSON.stringify(orderedStages.map((stage) => [stage.id, stage.name])),
     [orderedStages],
@@ -1813,6 +1824,8 @@ function PhaseBoard({
   const moves = editingStages && stageDraft?.lineId === lineId ? (stageDraft?.moves ?? {}) : {};
   const pendingMoves = Object.values(moves);
   const stagesChanged = pendingMoves.length > 0 || (stageChanges ? hasLineStageChanges(stageChanges) : false);
+  const stageSaveBusy = savingStages || updateLine.isPending;
+  const canRenameCustomStages = canManageStages && !stageSaveBusy;
   const setDraftStages = (stages: LineBoardStage[]) =>
     setStageDraft({
       lineId,
@@ -1821,6 +1834,25 @@ function PhaseBoard({
         Object.entries(moves).filter(([, move]) => stages.some((stage) => stage.key === move.destinationKey)),
       ),
     });
+  const renameCustomStage = async (stage: LineBoardStage, name: string) => {
+    if (!canManageStages || !lineId || stageSaveInFlight.current || updateLine.isPending) return;
+    if (name === stage.name || lineStageNameError(name, baseStages, stage.id)) return;
+    const stages = baseStages.map((entry) => (entry.id === stage.id ? { ...entry, name } : entry));
+    if (editingStages) {
+      setDraftStages(stages);
+      return;
+    }
+    stageSaveInFlight.current = true;
+    setSavingStages(true);
+    try {
+      await updateLine.mutateAsync({ lineId, stageConfiguration: { stages } });
+    } catch (error) {
+      showErrorToast(`${getApiErrorMessage(error, "SuperPlane could not rename the stage.")} Try again.`);
+    } finally {
+      stageSaveInFlight.current = false;
+      setSavingStages(false);
+    }
+  };
   const exitStageEditing = () => {
     setStageDraft(null);
     setDraggingCard(null);
@@ -1830,7 +1862,8 @@ function PhaseBoard({
     onExitStageEditing();
   };
   const saveStages = async () => {
-    if (!lineId || !draftStages) return;
+    if (!lineId || !draftStages || stageSaveInFlight.current || updateLine.isPending) return;
+    stageSaveInFlight.current = true;
     setSavingStages(true);
     setStageSaveError("");
     try {
@@ -1850,6 +1883,7 @@ function PhaseBoard({
     } catch (error) {
       setStageSaveError(getApiErrorMessage(error, "SuperPlane could not save the stages."));
     } finally {
+      stageSaveInFlight.current = false;
       setSavingStages(false);
     }
   };
@@ -2102,6 +2136,11 @@ function PhaseBoard({
       return (
         <WorkOrderBoardLane
           title={stage.name}
+          canRename={canRenameCustomStages}
+          renameBusy={stageSaveBusy}
+          onRename={(name) => void renameCustomStage(stage, name)}
+          validateName={(name) => lineStageNameError(name, baseStages, stage.id)}
+          titleTestId={`lines-column-title-${stage.key}`}
           count={0}
           emptyDescription="New stage. It is created when you save."
           subheader={columnAutomationRowsSubheader({
@@ -2112,7 +2151,7 @@ function PhaseBoard({
             testId: `lines-draft-${stage.key}-rows`,
           })}
           className="border-dashed border-muted-foreground/40"
-          testId={`lines-draft-stage-${stage.name}`}
+          testId={`lines-draft-stage-${stage.key}`}
         />
       );
     }
@@ -2123,7 +2162,17 @@ function PhaseBoard({
       return (
         <CustomStageColumn
           stage={stage}
-          runs={lineId ? collectCustomStageRuns(lineId, stage.key, workOrders) : []}
+          canRename={canRenameCustomStages}
+          renameBusy={stageSaveBusy}
+          onRename={(name) => void renameCustomStage(stage, name)}
+          validateName={(name) => lineStageNameError(name, baseStages, stage.id)}
+          runs={
+            lineId
+              ? collectCustomStageRuns(lineId, stage.key, workOrders).filter(
+                  (run) => !verifyOrderIds.has(run.workOrderId),
+                )
+              : []
+          }
           cardsPending={cardsPending}
           workOrderCardContext={workOrderCardContext}
           onOpenWorkOrder={onOpenWorkOrder}
@@ -2323,6 +2372,10 @@ function PhaseBoard({
 
 function CustomStageColumn({
   stage,
+  canRename,
+  renameBusy,
+  onRename,
+  validateName,
   runs,
   cardsPending,
   workOrderCardContext,
@@ -2338,6 +2391,10 @@ function CustomStageColumn({
   onAddAutomation,
 }: {
   stage: LineBoardStage;
+  canRename: boolean;
+  renameBusy: boolean;
+  onRename: (name: string) => void;
+  validateName: (name: string) => string;
   runs: LinePhaseRunCard[];
   cardsPending: boolean;
   workOrderCardContext: WorkOrderCardContext;
@@ -2357,6 +2414,11 @@ function CustomStageColumn({
   return (
     <WorkOrderBoardLane
       title={stage.name}
+      canRename={canRename}
+      renameBusy={renameBusy}
+      onRename={onRename}
+      validateName={validateName}
+      titleTestId={`lines-column-title-${stage.key}`}
       count={runs.length}
       emptyDescription="No tasks in this stage."
       keepChildrenWhenEmpty={cardsPending}

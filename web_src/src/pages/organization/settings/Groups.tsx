@@ -1,3 +1,4 @@
+import type { GroupsGroup } from "@/api-client";
 import { Timestamp } from "@/components/Timestamp";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router";
@@ -31,6 +32,21 @@ import {
 
 interface GroupsProps {
   organizationId: string;
+}
+
+function getGroupSortValue(group: GroupsGroup, key: string | null): string | number {
+  switch (key) {
+    case "name":
+      return (group.metadata?.name || "").toLowerCase();
+    case "role":
+      return (group.spec?.role || "").toLowerCase();
+    case "created":
+      return group.metadata?.createdAt ? new Date(group.metadata.createdAt).getTime() : 0;
+    case "members":
+      return group.status?.membersCount || 0;
+    default:
+      return 0;
+  }
 }
 
 export function Groups({ organizationId }: GroupsProps) {
@@ -121,29 +137,8 @@ export function Groups({ organizationId }: GroupsProps) {
     if (!sortConfig.key) return source;
 
     return [...source].sort((a, b) => {
-      let aValue: string | number;
-      let bValue: string | number;
-
-      switch (sortConfig.key) {
-        case "name":
-          aValue = (a.metadata?.name || "").toLowerCase();
-          bValue = (b.metadata?.name || "").toLowerCase();
-          break;
-        case "role":
-          aValue = (a.spec?.role || "").toLowerCase();
-          bValue = (b.spec?.role || "").toLowerCase();
-          break;
-        case "created":
-          aValue = a.metadata?.createdAt ? new Date(a.metadata.createdAt).getTime() : 0;
-          bValue = b.metadata?.createdAt ? new Date(b.metadata.createdAt).getTime() : 0;
-          break;
-        case "members":
-          aValue = a.status?.membersCount || 0;
-          bValue = b.status?.membersCount || 0;
-          break;
-        default:
-          return 0;
-      }
+      const aValue = getGroupSortValue(a, sortConfig.key);
+      const bValue = getGroupSortValue(b, sortConfig.key);
 
       if (aValue < bValue) {
         return sortConfig.direction === "asc" ? -1 : 1;

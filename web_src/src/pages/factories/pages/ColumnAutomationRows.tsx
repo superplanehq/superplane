@@ -146,34 +146,7 @@ function ColumnAutomationRow({
       data-testid={`${testId}-row-${automation.id}`}
       onClick={onRowAction ? () => onRowAction(automation, "settings") : undefined}
     >
-      {board.move && (
-        <Button
-          type="button"
-          draggable
-          variant="ghost"
-          size="icon-xs"
-          className="size-4 shrink-0 cursor-grab"
-          aria-label={`Move ${automation.name}`}
-          title="Drag to another stage, or use the left and right arrow keys."
-          data-automation-handle={automation.id}
-          onClick={(event) => event.stopPropagation()}
-          onDragStart={(event) => {
-            event.stopPropagation();
-            event.dataTransfer.effectAllowed = "move";
-            event.dataTransfer.setData("application/x-superplane-automation", automation.id);
-            board.move?.start(automation);
-          }}
-          onDragEnd={() => board.move?.end()}
-          onKeyDown={(event) => {
-            if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
-              event.preventDefault();
-              board.move?.keyboard(automation, event.key === "ArrowLeft" ? -1 : 1);
-            }
-          }}
-        >
-          <GripVertical aria-hidden />
-        </Button>
-      )}
+      <AutomationMoveHandle automation={automation} />
       {onRowAction ? (
         <Button
           variant="ghost"
@@ -229,5 +202,39 @@ function ColumnAutomationRow({
         </Button>
       ) : null}
     </div>
+  );
+}
+
+function AutomationMoveHandle({ automation }: { automation: ColumnAutomation }) {
+  const { move } = useContext(AutomationRowContext);
+  if (!move) return null;
+
+  return (
+    <Button
+      type="button"
+      draggable
+      variant="ghost"
+      size="icon-xs"
+      className="size-4 shrink-0 cursor-grab"
+      aria-label={`Move ${automation.name}`}
+      title="Drag to another stage, or use the left and right arrow keys."
+      data-automation-handle={automation.id}
+      onClick={(event) => event.stopPropagation()}
+      onDragStart={(event) => {
+        event.stopPropagation();
+        event.dataTransfer.effectAllowed = "move";
+        event.dataTransfer.setData("application/x-superplane-automation", automation.id);
+        move.start(automation);
+      }}
+      onDragEnd={() => move.end()}
+      onKeyDown={(event) => {
+        if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+          event.preventDefault();
+          move.keyboard(automation, event.key === "ArrowLeft" ? -1 : 1);
+        }
+      }}
+    >
+      <GripVertical aria-hidden />
+    </Button>
   );
 }

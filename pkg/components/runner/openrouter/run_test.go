@@ -797,8 +797,9 @@ func TestFormatOpenCodeJsonLinesEmitsToolRecords(t *testing.T) {
 }
 
 func TestFormatOpenCodeJsonLinesRedactsSecretsAndSummarizesImages(t *testing.T) {
-	token := "github-token-for-openrouter-redaction"
-	t.Setenv("GITHUB_TOKEN", token)
+	token := "z7!"
+	t.Setenv("FIGMA_ACCESS", token)
+	t.Setenv("SUPERPLANE_SECRET_ENV_NAMES", `["FIGMA_ACCESS"]`)
 	image := strings.Repeat("c", 2048)
 	imageResult := fmt.Sprintf(`{"content":[{"type":"image","data":%q,"mimeType":"image/png"}]}`, image)
 	output := runOpenCodeFormatter(t, []string{
@@ -815,12 +816,12 @@ func TestFormatOpenCodeJsonLinesRedactsSecretsAndSummarizesImages(t *testing.T) 
 }
 
 func TestRunPromptRedactsSecretsFromStderrAndResult(t *testing.T) {
-	token := "github-token-from-openrouter-process"
+	token := "z7!"
 	result := runOpenRouterPrompt(t, promptHarness{
-		env: map[string]string{"GITHUB_TOKEN": token},
+		env: map[string]string{"FIGMA_ACCESS": token, "SUPERPLANE_SECRET_ENV_NAMES": `["FIGMA_ACCESS"]`},
 		spawns: []spawnScript{{
 			ExitCode: 0,
-			Stderr:   "Bearer " + token,
+			Stderr:   "credential " + token,
 			Stdout: []string{
 				fmt.Sprintf(`{"type":"text","sessionID":"ses_1","part":{"type":"text","text":%q}}`, token),
 				`{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","tokens":{"input":1,"output":1}}}`,
@@ -830,7 +831,7 @@ func TestRunPromptRedactsSecretsFromStderrAndResult(t *testing.T) {
 
 	assert.NotContains(t, result.output, token)
 	assert.NotContains(t, result.stderr, token)
-	assert.Contains(t, result.stderr, "Bearer [REDACTED]")
+	assert.Contains(t, result.stderr, "credential [REDACTED]")
 	assert.NotContains(t, fmt.Sprint(resultPayload(t, result.resultFile)), token)
 }
 
