@@ -166,6 +166,15 @@ func Test__FactoryWorkOrder__RetryLineStep__KeepsCustomStageSiblingsRunning(t *t
 	require.NoError(t, err)
 	assert.Equal(t, models.FactoryWorkOrderExecutionStatusFinished, settledLater.Status)
 	assert.Equal(t, models.CanvasRunResultCancelled, settledLater.Result)
+
+	require.NoError(t, dispatch.EnterStage(db, "phase-0"))
+	var moved []*models.FactoryLineStepResult
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		_, moved, err = order.RetryLineStep(tx, line, 1)
+		return err
+	}))
+	require.Len(t, moved, 2, "entering a custom stage starts every automation")
+	assert.Equal(t, []int{0, 1}, []int{moved[0].Execution.StepIndex, moved[1].Execution.StepIndex})
 }
 
 func Test__FactoryLine__DispatchStage__QueuesCustomStageAboveLimit(t *testing.T) {

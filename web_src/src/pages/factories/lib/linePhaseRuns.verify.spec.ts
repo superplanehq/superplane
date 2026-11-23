@@ -73,6 +73,29 @@ describe("collectLineVerifyOrders", () => {
     ).toEqual(["wo-wait"]);
   });
 
+  it("uses the dispatch current stage when an empty Verify stage owns the task", () => {
+    const waiting = order("wo-current-verify", "Waiting review", [
+      {
+        id: "e-first",
+        line: { id: "line-1", name: "poc" },
+        step: "plan",
+        stepIndex: 0,
+        stageKey: "phase-0",
+        state: "STATE_FINISHED",
+        result: "RESULT_PASSED",
+        createdAt: "2026-08-11T12:00:00.000Z",
+      },
+    ]);
+    waiting.lineDispatches![0]!.currentStageKey = "verify";
+    waiting.lineDispatches![0]!.state = "STATE_FINISHED";
+
+    const board = buildLinePhaseBoard(LINE, [waiting], APPS);
+    const verify = collectLineVerifyOrders(board, [waiting], LINE);
+
+    expect(verify.map((entry) => entry.id)).toEqual(["wo-current-verify"]);
+    expect(board.flatMap((column) => column.runs)).toEqual([]);
+  });
+
   it("keeps a failed last stage on the stage column", () => {
     const failed = order("wo-failed", "Failed implement", [
       {
