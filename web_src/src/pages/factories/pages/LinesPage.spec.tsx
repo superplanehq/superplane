@@ -834,6 +834,151 @@ describe("LinesPage board stages", () => {
     await resetLinesBoardMocks();
   });
 
+  const customStageFactory = (name = "QA"): FactoriesFactory => ({
+    ...REFUND_FACTORY,
+    lines: (REFUND_FACTORY.lines ?? []).map((line) =>
+      line.id === REFUND_LINE_PLAN_ID
+        ? {
+            ...line,
+            columnColors: { "custom-qa": "blue" },
+            stages: [
+              { id: "backlog", key: "backlog", name: "Backlog", kind: "STAGE_KIND_BACKLOG" },
+              { id: "phase-0", key: "phase-0", name: "Implement", kind: "STAGE_KIND_PHASE", stepIndex: 0 },
+              { id: "custom", key: "custom-qa", name, kind: "STAGE_KIND_CUSTOM" },
+              { id: "verify", key: "verify", name: "Verify", kind: "STAGE_KIND_VERIFY" },
+              { id: "done", key: "done", name: "Done", kind: "STAGE_KIND_DONE" },
+            ],
+          }
+        : line,
+    ),
+  });
+  const renameCustomStage = (name: string, titleId = "lines-column-title-custom-qa") => {
+    fireEvent.click(screen.getByTestId(titleId));
+    const input = screen.getByTestId(`${titleId}-input`);
+    fireEvent.change(input, { target: { value: name } });
+    fireEvent.keyDown(input, { key: "Enter" });
+  };
+  const editStages = async () => {
+    const user = userEvent.setup();
+    await user.click(screen.getByTestId("lines-board-view-menu"));
+    await user.click(screen.getByRole("menuitem", { name: "Edit stages" }));
+  };
+
+  it("saves only the custom name and uses the refreshed line after remount", async () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_STAGES);
+    const factory = customStageFactory();
+    const savedFactory = customStageFactory("Quality review");
+    updateFactoryLineMutateAsync.mockResolvedValueOnce(
+      savedFactory.lines?.find((line) => line.id === REFUND_LINE_PLAN_ID),
+    );
+    const view = renderLinesBoard(undefined, vi.fn(), factory);
+    renameCustomStage("  Quality review  ");
+    await waitFor(() => expect(updateFactoryLineMutateAsync).toHaveBeenCalledTimes(1));
+    expect(updateFactoryLineMutateAsync.mock.calls[0][0]).toEqual({
+      lineId: REFUND_LINE_PLAN_ID,
+      stageConfiguration: { stages: savedFactory.lines?.find((line) => line.id === REFUND_LINE_PLAN_ID)?.stages },
+    });
+    view.rerender(<LinesBoardSpecHarness factory={savedFactory} />);
+    expect(screen.getByTestId("lines-column-title-custom-qa")).toHaveTextContent("Quality review");
+    view.unmount();
+    renderLinesBoard(undefined, vi.fn(), savedFactory);
+    expect(screen.getByTestId("lines-column-title-custom-qa")).toHaveTextContent("Quality review");
+  });
+
+  it("keeps renames in the draft, clears reverted changes, and discards without saving", async () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_STAGES);
+    const user = userEvent.setup();
+    renderLinesBoard(undefined, vi.fn(), customStageFactory());
+    await editStages();
+    renameCustomStage("Quality review");
+    expect(screen.getByRole("button", { name: "Save changes" })).toBeEnabled();
+    renameCustomStage("QA");
+    expect(screen.queryByRole("button", { name: "Save changes" })).not.toBeInTheDocument();
+    renameCustomStage("Quality review");
+    fireEvent.click(screen.getByTestId("lines-column-title-custom-qa"));
+    fireEvent.keyDown(screen.getByTestId("lines-column-title-custom-qa-input"), { key: "Escape" });
+    expect(screen.queryByTestId("discard-line-stages-dialog")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Discard" }));
+    await user.click(
+      within(screen.getByTestId("discard-line-stages-dialog")).getByRole("button", { name: "Discard changes" }),
+    );
+    expect(screen.getByTestId("lines-column-title-custom-qa")).toHaveTextContent("QA");
+    expect(updateFactoryLineMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it("includes a rename-only draft in the save summary and persists it", async () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_STAGES);
+    const user = userEvent.setup();
+    const savedFactory = customStageFactory("Quality review");
+    updateFactoryLineMutateAsync.mockResolvedValueOnce(
+      savedFactory.lines?.find((line) => line.id === REFUND_LINE_PLAN_ID),
+    );
+    const view = renderLinesBoard(undefined, vi.fn(), customStageFactory());
+    await editStages();
+    renameCustomStage("Quality review");
+    expect(updateFactoryLineMutateAsync).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+    const dialog = screen.getByTestId("save-line-stages-dialog");
+    expect(within(dialog).getByTestId("save-line-stages-summary")).toHaveTextContent("QA → Quality review");
+    await user.click(within(dialog).getByRole("button", { name: "Save changes" }));
+    await waitFor(() => expect(screen.queryByTestId("line-stage-edit-toolbar")).not.toBeInTheDocument());
+    expect(updateFactoryLineMutateAsync.mock.calls[0][0].stageConfiguration.stages).toEqual(
+      savedFactory.lines?.find((line) => line.id === REFUND_LINE_PLAN_ID)?.stages,
+    );
+    view.rerender(<LinesBoardSpecHarness factory={savedFactory} />);
+    expect(screen.getByTestId("lines-column-title-custom-qa")).toHaveTextContent("Quality review");
+  });
+
+  it.each(["   ", "x".repeat(65), "vErIfY"])("rejects an invalid custom stage name: %s", (name) => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_STAGES);
+    renderLinesBoard(undefined, vi.fn(), customStageFactory());
+    renameCustomStage(name);
+    expect(screen.getByRole("alert")).toBeInTheDocument();
+    expect(updateFactoryLineMutateAsync).not.toHaveBeenCalled();
+    fireEvent.keyDown(screen.getByTestId("lines-column-title-custom-qa-input"), { key: "Escape" });
+    expect(screen.getByTestId("lines-column-title-custom-qa")).toHaveTextContent("QA");
+  });
+
+  it.each(["feature", "permission"])("disables custom title editing without %s", (gate) => {
+    if (gate === "permission") {
+      enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_STAGES);
+      permissions.canUpdateFactories = false;
+    }
+    renderLinesBoard(undefined, vi.fn(), customStageFactory());
+    const title = screen.getByTestId("lines-column-title-custom-qa");
+    fireEvent.click(title);
+    fireEvent.keyDown(title, { key: "Enter" });
+    expect(screen.queryByTestId("lines-column-title-custom-qa-input")).not.toBeInTheDocument();
+    expect(title).not.toHaveAttribute("tabindex");
+  });
+
+  it("prevents overlapping renames and retains the saved name on failure", async () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_STAGES);
+    const { showErrorToast } = await import("@/lib/toast");
+    vi.mocked(showErrorToast).mockClear();
+    let rejectSave!: (error: Error) => void;
+    updateFactoryLineMutateAsync.mockImplementationOnce(
+      () =>
+        new Promise((_, reject) => {
+          rejectSave = reject;
+        }),
+    );
+    renderLinesBoard(undefined, vi.fn(), customStageFactory());
+    const title = screen.getByTestId("lines-column-title-custom-qa");
+    fireEvent.keyDown(title, { key: "Enter" });
+    const input = screen.getByTestId("lines-column-title-custom-qa-input");
+    fireEvent.change(input, { target: { value: "QA" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(updateFactoryLineMutateAsync).not.toHaveBeenCalled();
+    renameCustomStage("Quality review");
+    fireEvent.click(title);
+    expect(screen.queryByTestId("lines-column-title-custom-qa-input")).not.toBeInTheDocument();
+    await act(async () => rejectSave(new Error("Save failed")));
+    expect(title).toHaveTextContent("QA");
+    expect(showErrorToast).toHaveBeenCalledWith("Save failed Try again.");
+    expect(updateFactoryLineMutateAsync).toHaveBeenCalledTimes(1);
+  });
+
   it("gates stage editing and renders saved custom stages", async () => {
     const user = userEvent.setup();
     const factory = {
@@ -901,10 +1046,14 @@ describe("LinesPage board stages", () => {
     await user.click(screen.getByRole("menuitem", { name: "Edit stages" }));
     await user.click(screen.getByRole("button", { name: "Add stage" }));
     const addDialog = screen.getByTestId("add-line-stage-dialog");
-    await user.type(within(addDialog).getByRole("textbox", { name: "Name" }), "Deploy to prod");
+    await user.type(within(addDialog).getByRole("textbox", { name: "Name" }), "Deploy");
     await user.click(within(addDialog).getByRole("button", { name: "Add stage" }));
 
-    expect(screen.getByTestId("lines-draft-stage-Deploy to prod")).toBeInTheDocument();
+    const draftLane = screen.getByRole("region", { name: "Deploy" });
+    const draftTitle = within(draftLane).getByTestId(/^lines-column-title-new-/);
+    const draftTitleId = draftTitle.getAttribute("data-testid")!;
+    renameCustomStage("Deploy to prod", draftTitleId);
+    expect(draftLane).toHaveAccessibleName("Deploy to prod");
     expect(updateFactoryLineMutateAsync).not.toHaveBeenCalled();
     await user.click(screen.getByRole("button", { name: "Save changes" }));
     const saveDialog = screen.getByTestId("save-line-stages-dialog");

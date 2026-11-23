@@ -91,6 +91,7 @@ export function removeLineBoardStage(stages: LineBoardStage[], stageId: string):
 export type LineStageChanges = {
   added: LineBoardStage[];
   removed: LineBoardStage[];
+  renamed: { previous: LineBoardStage; stage: LineBoardStage }[];
   reordered: boolean;
 };
 
@@ -102,12 +103,26 @@ export function lineStageChanges(saved: LineBoardStage[], draft: LineBoardStage[
   return {
     added: draft.filter(isDraftLineBoardStage),
     removed: saved.filter((stage) => !draftIds.has(stage.id)),
+    renamed: draft.flatMap((stage) => {
+      const previous = saved.find((entry) => entry.id === stage.id);
+      return previous && previous.name !== stage.name ? [{ previous, stage }] : [];
+    }),
     reordered: keptSavedOrder.join() !== keptDraftOrder.join(),
   };
 }
 
 export function hasLineStageChanges(changes: LineStageChanges): boolean {
-  return changes.added.length > 0 || changes.removed.length > 0 || changes.reordered;
+  return changes.added.length > 0 || changes.removed.length > 0 || changes.renamed.length > 0 || changes.reordered;
+}
+
+export function lineStageNameError(name: string, stages: LineBoardStage[], stageId?: string): string {
+  const trimmedName = name.trim();
+  if (!trimmedName) return "Enter a stage name.";
+  if ([...trimmedName].length > 64) return "Stage names cannot exceed 64 characters.";
+  if (stages.some((stage) => stage.id !== stageId && stage.name.toLowerCase() === trimmedName.toLowerCase())) {
+    return "Stage names must be unique.";
+  }
+  return "";
 }
 
 /** New stages go out without an id, so the server assigns their id and key. */
