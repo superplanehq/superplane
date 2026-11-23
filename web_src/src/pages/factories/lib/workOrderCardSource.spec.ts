@@ -53,6 +53,19 @@ describe("workOrderCardSource", () => {
     ).toBeUndefined();
   });
 
+  it("names the automation that created the task", () => {
+    expect(
+      workOrderCardSource({
+        ...baseOrder,
+        createdBy: { automation: { appId: "canvas-eslint", appName: "ESLint AutoFix" } },
+      }),
+    ).toEqual({
+      name: "ESLint AutoFix",
+      iconSrc: superplaneMark,
+      iconAlt: "SuperPlane",
+    });
+  });
+
   it("returns an intake source for a GitHub origin", () => {
     expect(
       workOrderCardSource({

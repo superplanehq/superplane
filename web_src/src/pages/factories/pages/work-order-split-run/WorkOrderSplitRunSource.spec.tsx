@@ -1,10 +1,29 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "bun:test";
+import { MemoryRouter, Route, Routes } from "react-router";
 
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
 
 import type { SplitRunSource } from "./splitRunSource";
 import { WorkOrderSplitRunSource } from "./WorkOrderSplitRunSource";
+
+const AUTOMATION_SOURCE: SplitRunSource = {
+  kind: "automation",
+  name: "ESLint AutoFix",
+  iconSrc: "/superplane.svg",
+  iconAlt: "SuperPlane",
+  run: { appId: "canvas-eslint", runId: "run-eslint-1" },
+};
+
+function renderInFactory(source: SplitRunSource) {
+  return render(
+    <MemoryRouter initialEntries={["/org-1/workspaces/sp/tasks/1"]}>
+      <Routes>
+        <Route path="/:organizationId/workspaces/:factoryKey/*" element={<WorkOrderSplitRunSource source={source} />} />
+      </Routes>
+    </MemoryRouter>,
+  );
+}
 
 const GITHUB_SOURCE: SplitRunSource = {
   kind: "intake",
@@ -84,5 +103,26 @@ describe("WorkOrderSplitRunSource", () => {
     render(<WorkOrderSplitRunSource source={SENTRY_SOURCE} />);
 
     expect(screen.getByRole("img", { name: "Sentry" })).toHaveClass("dark:brightness-0", "dark:invert");
+  });
+
+  it("names an automation source with its name and the SuperPlane mark", () => {
+    render(<WorkOrderSplitRunSource source={AUTOMATION_SOURCE} />);
+
+    expect(screen.getByText("ESLint AutoFix")).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "SuperPlane" })).toBeInTheDocument();
+  });
+
+  it("links the source to the run that created the task", () => {
+    renderInFactory(AUTOMATION_SOURCE);
+
+    const link = screen.getByRole("link", { name: "View run" });
+    expect(link.getAttribute("href")).toContain("canvas-eslint");
+    expect(link.getAttribute("href")).toContain("run-eslint-1");
+  });
+
+  it("omits the run link when the task has no source run", () => {
+    renderInFactory({ ...AUTOMATION_SOURCE, run: undefined });
+
+    expect(screen.queryByRole("link", { name: "View run" })).not.toBeInTheDocument();
   });
 });
