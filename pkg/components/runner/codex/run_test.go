@@ -1148,8 +1148,9 @@ func TestFormatCodexJsonLinesEmitsToolRecords(t *testing.T) {
 }
 
 func TestFormatCodexJsonLinesRedactsSecretsAndSummarizesImages(t *testing.T) {
-	token := "github-token-for-codex-redaction"
-	t.Setenv("GITHUB_TOKEN", token)
+	token := "z7!"
+	t.Setenv("FIGMA_ACCESS", token)
+	t.Setenv("SUPERPLANE_SECRET_ENV_NAMES", `["FIGMA_ACCESS"]`)
 	image := strings.Repeat("b", 2048)
 	imageResult := fmt.Sprintf(`{"content":[{"type":"image","data":%q,"mimeType":"image/png"}]}`, image)
 	output := runCodexFormatter(t, []string{
