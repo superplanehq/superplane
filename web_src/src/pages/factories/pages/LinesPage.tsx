@@ -1166,10 +1166,7 @@ function LineDetail({
 }) {
   const steps = line.steps ?? [];
   const fullBoard = useMemo(() => buildLinePhaseBoard(line, workOrders ?? [], apps), [line, workOrders, apps]);
-  const verifyOrders = useMemo(
-    () => collectLineVerifyOrders(fullBoard, workOrders ?? [], line),
-    [fullBoard, workOrders, line],
-  );
+  const verifyOrders = useMemo(() => collectLineVerifyOrders(workOrders ?? [], line), [workOrders, line]);
   const hasVerifyStage = useMemo(
     () => orderedLineBoardStages(line).some((stage) => stage.kind === "STAGE_KIND_VERIFY"),
     [line],

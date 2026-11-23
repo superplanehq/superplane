@@ -1,12 +1,30 @@
 package tasks
 
 import (
+	"bytes"
+	"encoding/json"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
+
+func TestTaskDescribeReportsLatestTraversalReadiness(t *testing.T) {
+	var task openapi_client.FactoriesWorkOrder
+	require.NoError(t, json.Unmarshal([]byte(`{"state":"STATE_OPEN","lineDispatches":[
+		{"id":"old","line":{"id":"line-old","name":"Old"},"reviewReady":true},
+		{"id":"current","line":{"id":"line-current","name":"Ship"},"reviewReady":false}
+	]}`), &task))
+	var output bytes.Buffer
+	require.NoError(t, renderTaskDescribeText(&output, task, nil, nil, false, 0, memberEmailLookup{}))
+	assert.Regexp(t, `State\s+Open`, output.String())
+	assert.Regexp(t, `Line\s+Ship \(line-current\)`, output.String())
+	assert.Regexp(t, `Traversal\s+current`, output.String())
+	assert.Regexp(t, `Review Ready\s+false`, output.String())
+	assert.NotContains(t, output.String(), "line-old")
+}
 
 func TestFormatTaskState(t *testing.T) {
 	cases := []struct {

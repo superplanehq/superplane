@@ -194,14 +194,16 @@ func TestSerializeWorkOrder_LineDispatchesReplaceFlatExecutions(t *testing.T) {
 	dispatches := []models.FactoryWorkOrderLineDispatchRecord{
 		{
 			FactoryWorkOrderLineDispatch: models.FactoryWorkOrderLineDispatch{
-				ID:       dispatchID,
-				LineID:   lineID,
-				LineName: "ship",
+				ID:          dispatchID,
+				LineID:      lineID,
+				LineName:    "ship",
+				ReviewReady: true,
 				Steps: datatypes.NewJSONSlice([]models.FactoryLineStep{
 					{Type: models.FactoryLineStepTypeRunApp},
 					{Type: models.FactoryLineStepTypeRunApp},
 				}),
-				State: models.FactoryWorkOrderLineDispatchStateActive,
+				State:  models.FactoryWorkOrderLineDispatchStateFinished,
+				Result: models.CanvasRunResultPassed,
 			},
 			Executions: []models.FactoryWorkOrderExecutionRecord{
 				{
@@ -236,7 +238,8 @@ func TestSerializeWorkOrder_LineDispatchesReplaceFlatExecutions(t *testing.T) {
 	assert.Equal(t, dispatchID.String(), dispatch.Id)
 	assert.Equal(t, lineID.String(), dispatch.Line.Id)
 	assert.Equal(t, "ship", dispatch.Line.Name)
-	assert.Equal(t, pb.WorkOrderLineDispatch_STATE_ACTIVE, dispatch.State)
+	assert.True(t, dispatch.GetReviewReady())
+	assert.Equal(t, pb.WorkOrderLineDispatch_STATE_FINISHED, dispatch.State)
 	require.Len(t, dispatch.Steps, 2)
 	assert.Equal(t, "step-one-app", dispatch.Steps[0].Name)
 	assert.Equal(t, "", dispatch.Steps[1].Name)

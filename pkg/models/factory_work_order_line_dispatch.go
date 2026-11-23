@@ -47,6 +47,8 @@ type FactoryWorkOrderLineDispatch struct {
 	Stages         datatypes.JSONSlice[FactoryLineStage]
 	State          string
 	Result         string
+	// ReviewReady records a successful traversal, independent of board layout.
+	ReviewReady bool
 	// Model is the optional Start override for this traversal. Empty means
 	// Auto: each runner keeps the model stored on the live canvas.
 	Model string
@@ -225,8 +227,10 @@ func (l *FactoryLine) RecordPassedStageWithoutRun(
 		LineID:         l.ID,
 		LineName:       l.Name,
 		Steps:          l.Steps,
+		Stages:         l.Stages,
 		State:          FactoryWorkOrderLineDispatchStateFinished,
 		Result:         CanvasRunResultPassed,
+		ReviewReady:    true,
 		CreatedAt:      now,
 		UpdatedAt:      now,
 		FinishedAt:     &now,
@@ -512,17 +516,21 @@ func (l *FactoryWorkOrderLineDispatch) Reactivate(tx *gorm.DB) error {
 	now := time.Now()
 	l.State = FactoryWorkOrderLineDispatchStateActive
 	l.Result = ""
+	l.ReviewReady = false
 	l.FinishedAt = nil
 	l.UpdatedAt = now
 
 	return tx.Model(l).Updates(map[string]any{
-		"state":       l.State,
-		"result":      l.Result,
-		"finished_at": nil,
-		"updated_at":  l.UpdatedAt,
+		"state":        l.State,
+		"result":       l.Result,
+		"review_ready": false,
+		"finished_at":  nil,
+		"updated_at":   l.UpdatedAt,
 	}).Error
 }
 
+// Finish records the traversal outcome. Callers pass a successful result only
+// after the saved final executable stage passes and no open work remains.
 func (l *FactoryWorkOrderLineDispatch) Finish(tx *gorm.DB, result string) error {
 	if l.State == FactoryWorkOrderLineDispatchStateFinished {
 		return nil
@@ -531,14 +539,16 @@ func (l *FactoryWorkOrderLineDispatch) Finish(tx *gorm.DB, result string) error 
 	now := time.Now()
 	l.State = FactoryWorkOrderLineDispatchStateFinished
 	l.Result = result
+	l.ReviewReady = result == CanvasRunResultPassed
 	l.UpdatedAt = now
 	l.FinishedAt = &now
 
 	return tx.Model(l).Updates(map[string]any{
-		"state":       l.State,
-		"result":      l.Result,
-		"updated_at":  l.UpdatedAt,
-		"finished_at": l.FinishedAt,
+		"state":        l.State,
+		"result":       l.Result,
+		"review_ready": l.ReviewReady,
+		"updated_at":   l.UpdatedAt,
+		"finished_at":  l.FinishedAt,
 	}).Error
 }
 
@@ -1015,8 +1025,7 @@ func ListWorkOrderLineDispatchesByWorkOrderIDs(
 }
 
 // WorkOrderIsWaitingAfterPassedStage reports the backend invariant used by the
-// Verify board: an open task whose latest line traversal has no active step and
-// whose furthest step passed.
+// Verify board: an open task whose latest traversal is ready for review.
 func WorkOrderIsWaitingAfterPassedStage(tx *gorm.DB, workOrderID uuid.UUID) (bool, error) {
 	var order FactoryWorkOrder
 	if err := tx.Where("id = ?", workOrderID).First(&order).Error; err != nil {
@@ -1026,45 +1035,25 @@ func WorkOrderIsWaitingAfterPassedStage(tx *gorm.DB, workOrderID uuid.UUID) (boo
 }
 
 func (o *FactoryWorkOrder) IsWaitingAfterPassedStage(tx *gorm.DB) (bool, error) {
-	if o == nil || o.State != FactoryWorkOrderStateOpen {
+	if o == nil || o.State != FactoryWorkOrderStateOpen || o.Result == FactoryWorkOrderResultArchived {
 		return false, nil
 	}
-	grouped, err := ListWorkOrderLineDispatchesByWorkOrderIDs(tx, []uuid.UUID{o.ID})
+	var dispatch FactoryWorkOrderLineDispatch
+	err := tx.Where("work_order_id = ?", o.ID).
+		Order("created_at DESC").Order("id DESC").First(&dispatch).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return false, nil
+	}
 	if err != nil {
 		return false, err
 	}
-	dispatches := grouped[o.ID]
-	if len(dispatches) == 0 {
-		return false, nil
-	}
-	current := dispatches[len(dispatches)-1]
-	if current.QueueItem != nil {
-		return false, nil
-	}
-	executions := current.Executions
-	if len(executions) == 0 {
-		return false, nil
-	}
-	furthest := executions[0].FactoryWorkOrderExecution
-	for i := range executions {
-		execution := executions[i].FactoryWorkOrderExecution
-		if execution.Status == FactoryWorkOrderExecutionStatusPending ||
-			execution.Status == FactoryWorkOrderExecutionStatusRunning {
-			return false, nil
-		}
-		if execution.StepIndex > furthest.StepIndex ||
-			(execution.StepIndex == furthest.StepIndex && execution.UpdatedAt.After(furthest.UpdatedAt)) {
-			furthest = execution
-		}
-	}
-	return furthest.Status == FactoryWorkOrderExecutionStatusFinished &&
-		furthest.Result == CanvasRunResultPassed, nil
+	return dispatch.ReviewReady, nil
 }
 
 // WorkOrderBoardColumn is the board column that currently shows this task.
 // An archived task is not on the board.
 func WorkOrderBoardColumn(tx *gorm.DB, order *FactoryWorkOrder) (string, error) {
-	if order == nil {
+	if order == nil || order.Result == FactoryWorkOrderResultArchived {
 		return "", nil
 	}
 	switch order.State {

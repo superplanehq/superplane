@@ -6,6 +6,7 @@ import {
   buildLinePhaseBoard,
   collectLineBacklogOrders,
   collectLineDoneOrders,
+  collectCustomStageRuns,
   collectLineVerifyOrders,
   resolveColumnGlyph,
   visibleLineStageColumns,
@@ -62,7 +63,8 @@ export function buildMobileBoardColumns(
   totalCounts?: MobileBoardColumnTotalCounts,
 ): MobileBoardColumn[] {
   const fullBoard = buildLinePhaseBoard(line, workOrders, apps);
-  const verifyOrders = collectLineVerifyOrders(fullBoard, workOrders, line);
+  const verifyOrders = collectLineVerifyOrders(workOrders, line);
+  const verifyIds = new Set(verifyOrders.map((order) => order.id));
   const hasVerifyStage = orderedLineBoardStages(line).some((stage) => stage.kind === "STAGE_KIND_VERIFY");
   const stageColumns = visibleLineStageColumns(fullBoard, verifyOrders, hasVerifyStage);
   const backlogOrders = collectLineBacklogOrders(workOrders);
@@ -112,7 +114,9 @@ export function buildMobileBoardColumns(
         {
           key: stage.key as ColumnKey,
           title: stage.name,
-          cards: [],
+          cards: collectCustomStageRuns(line.id ?? "", stage.key, workOrders)
+            .filter((run) => !hasVerifyStage || !verifyIds.has(run.workOrderId))
+            .map((run) => ({ key: run.workOrderId, order: run.order })),
           paging: "open" as const,
           emptyDescription: "No tasks in this stage.",
         },
