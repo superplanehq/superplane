@@ -1,4 +1,4 @@
-import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
+import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 
 import type { SsoConnection, SsoPutConnectionRequest } from "@/api-client/types.gen";
 
@@ -28,6 +28,7 @@ export type SsoForm = {
 export function useSsoSettingsState(model: SsoSettingsModel, actions: SsoSettingsActions) {
   const connection = model.connection;
   const [form, setForm] = useState(() => initialForm(connection));
+  const previousConnection = useRef(connection);
   const [confirm, setConfirm] = useState<ConfirmRequest | null>(null);
   const [requiredConfirm, setRequiredConfirm] = useState(false);
   const [sessionError, setSessionError] = useState<string | null>(null);
@@ -55,6 +56,11 @@ export function useSsoSettingsState(model: SsoSettingsModel, actions: SsoSetting
     setSessionError(null);
     saveCard(actions, connection, form, "policy", seconds);
   };
+  useEffect(() => {
+    const previous = previousConnection.current;
+    previousConnection.current = connection;
+    setForm((current) => refreshForm(current, previous, connection));
+  }, [connection]);
   useEffect(() => {
     if (!model.secretEpoch) {
       return;
@@ -124,6 +130,27 @@ function claimFields(connection?: SsoConnection | null) {
     nameClaim: connection?.nameClaim ?? "",
     loadedPreset: connection?.preset || "PRESET_OKTA",
   };
+}
+
+function refreshForm(current: SsoForm, previous?: SsoConnection | null, connection?: SsoConnection | null): SsoForm {
+  if (previous?.id !== connection?.id) {
+    return initialForm(connection);
+  }
+  const base = initialForm(previous);
+  const saved = initialForm(connection);
+  let next = { ...current, ...claimFields(connection) };
+  const fields = { ...textFields(connection), ...flagFields(connection) };
+  for (const key of Object.keys(fields) as (keyof typeof fields)[]) {
+    // Compare durations by value so an unchanged "15m" also follows a refresh.
+    const unchanged =
+      key === "sessionHours"
+        ? sessionAgeSeconds(current[key]) === sessionAgeSeconds(base[key])
+        : current[key] === base[key];
+    if (unchanged) {
+      next = { ...next, [key]: saved[key] };
+    }
+  }
+  return next;
 }
 
 function accessState(model: SsoSettingsModel) {

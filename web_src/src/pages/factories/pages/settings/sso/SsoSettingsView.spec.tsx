@@ -56,6 +56,63 @@ function renderSettings(model: SsoSettingsModel, actions: Partial<SsoSettingsAct
 }
 
 describe("SsoSettingsView", () => {
+  it("refreshes unchanged fields while preserving unsaved edits on the same card", async () => {
+    const user = userEvent.setup();
+    const actions = noopActions();
+    const model: SsoSettingsModel = { licensed: true, domains: [], tokens: [], connection: draftConnection };
+    const view = (current: SsoSettingsModel) => (
+      <TooltipProvider>
+        <SsoSettingsView model={current} actions={actions} />
+      </TooltipProvider>
+    );
+    const { rerender } = render(view(model));
+    await user.click(screen.getByRole("switch", { name: "Sign out from the identity provider" }));
+    await user.clear(screen.getByLabelText("Display name"));
+    await user.type(screen.getByLabelText("Display name"), "Company Okta");
+    const refreshed = {
+      ...model,
+      connection: {
+        ...draftConnection,
+        displayName: "Updated Okta",
+        issuer: "https://updated.okta.com",
+        jitEnabled: false,
+        allowOwnerBypass: false,
+        enforcement: "ENFORCEMENT_REQUIRED" as const,
+        maxSessionAgeSeconds: 1800,
+      },
+    };
+    rerender(view(refreshed));
+    expect(screen.getByRole("switch", { name: "Owner bypass" })).not.toBeChecked();
+    expect(screen.getByRole("switch", { name: "Create members on first sign-in" })).not.toBeChecked();
+    expect(screen.getByRole("radio", { name: /Required/ })).toBeChecked();
+    expect(screen.getByLabelText("Issuer URL")).toHaveValue("https://updated.okta.com");
+    expect(screen.getByLabelText("Display name")).toHaveValue("Company Okta");
+    await user.click(screen.getByTestId("sso-policy-save"));
+    expect(actions.onSave).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        allowOwnerBypass: false,
+        enforcement: "ENFORCEMENT_REQUIRED",
+        maxSessionAgeSeconds: 1800,
+        idpLogoutEnabled: true,
+      }),
+    );
+    await user.click(screen.getByTestId("sso-identity-save"));
+    expect(actions.onSave).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        displayName: "Company Okta",
+        issuer: "https://updated.okta.com",
+      }),
+    );
+    rerender(
+      view({
+        ...refreshed,
+        connection: { ...refreshed.connection, displayName: "Company Okta", idpLogoutEnabled: true },
+      }),
+    );
+    expect(screen.getByTestId("sso-identity-save")).toBeDisabled();
+    expect(screen.getByTestId("sso-policy-save")).toBeDisabled();
+  });
+
   it("shows the locked state when the license is absent and no connection exists", () => {
     renderSettings({ licensed: false, domains: [], tokens: [] });
     expect(screen.getByTestId("sso-locked")).toHaveTextContent("Single Sign-On needs a SuperPlane Enterprise license.");
