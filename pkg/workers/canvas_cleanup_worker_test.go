@@ -548,3 +548,49 @@ func TestCanvasCleanupBoundsPublicationWakeups(t *testing.T) {
 		require.EqualValues(t, 3, record.Revision, "another deletion must wake each publication again")
 	}
 }
+
+// Cleanup can retain a deleted canvas snapshot after retirement restores it.
+func TestCanvasCleanupPreservesRestoredCanvasHistory(t *testing.T) {
+	for _, phase := range []string{"runs", "remaining resources"} {
+		t.Run(phase, func(t *testing.T) {
+			r := support.Setup(t)
+			defer r.Close()
+			db := database.DB(t.Context())
+			canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{
+				{NodeID: "node-1", Type: models.NodeTypeComponent, Ref: datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}})},
+			}, nil)
+			var event *models.CanvasEvent
+			if phase == "runs" {
+				event = support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
+				support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", event.ID, event.ID)
+			} else {
+				require.NoError(t, db.Create(&models.CanvasNodeRequest{
+					ID: uuid.New(), WorkflowID: canvas.ID, NodeID: "node-1",
+					Type: models.NodeRequestTypeInvokeAction, State: models.NodeExecutionRequestStatePending,
+					Spec: datatypes.NewJSONType(models.NodeExecutionRequestSpec{InvokeAction: &models.InvokeAction{ActionName: "test", Parameters: map[string]any{}}}),
+				}).Error)
+			}
+			require.NoError(t, db.Model(canvas).Update("deleted_at", time.Now().AddDate(0, 0, -31)).Error)
+			stale, err := models.FindUnscopedCanvas(canvas.ID)
+			require.NoError(t, err)
+			require.True(t, stale.DeletedAt.Valid)
+			require.NoError(t, db.Unscoped().Model(canvas).Update("deleted_at", nil).Error)
+
+			worker := NewCanvasCleanupWorker()
+			if phase == "runs" {
+				deleted, err := worker.cleanCanvasRuns(db, *stale)
+				require.NoError(t, err)
+				require.Zero(t, deleted)
+				_, err = models.FindCanvasRunInTransaction(db, canvas.ID, event.RunID)
+				require.NoError(t, err)
+				support.VerifyCanvasEventsCount(t, canvas.ID, 1)
+				support.VerifyNodeExecutionsCount(t, canvas.ID, 1)
+			} else {
+				complete, err := worker.cleanRemainingResources(*stale)
+				require.NoError(t, err)
+				require.False(t, complete)
+				support.VerifyNodeRequestCount(t, canvas.ID, 1)
+			}
+		})
+	}
+}

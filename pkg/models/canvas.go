@@ -193,6 +193,16 @@ func (c *Canvas) SoftDeleteInTransaction(tx *gorm.DB) error {
 	return tx.Model(c).Updates(map[string]any{"name": newName, "deleted_at": now}).Error
 }
 
+// Restore retains canvas history by clearing soft deletion. The caller must hold
+// the canvas lock so cleanup cannot delete resources during restoration.
+func (c *Canvas) Restore(tx *gorm.DB) error {
+	if err := tx.Unscoped().Model(c).Update("deleted_at", nil).Error; err != nil {
+		return err
+	}
+	c.DeletedAt = gorm.DeletedAt{}
+	return nil
+}
+
 func FindCanvas(orgID, id uuid.UUID) (*Canvas, error) {
 	return FindCanvasInTransaction(database.Conn(), orgID, id)
 }

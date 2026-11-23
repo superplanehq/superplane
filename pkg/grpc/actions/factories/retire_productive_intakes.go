@@ -52,10 +52,9 @@ func RetireProductiveIntakes(ctx context.Context, deps IntakeDependencies) error
 				// Old DeleteFactoryIntake requests soft-deleted the canvas. Retain its
 				// remaining history and prevent CanvasCleanupWorker from removing runs.
 				if canvas.DeletedAt.Valid {
-					if err := tx.Unscoped().Model(canvas).Update("deleted_at", nil).Error; err != nil {
+					if err := canvas.Restore(tx); err != nil {
 						return err
 					}
-					canvas.DeletedAt = gorm.DeletedAt{}
 				}
 
 				cancellations, err = cancelProductiveIntakeRuns(tx, canvas.ID)
@@ -72,7 +71,7 @@ func RetireProductiveIntakes(ctx context.Context, deps IntakeDependencies) error
 					if _, err := models.DeleteCanvasNodeWithResult(tx, node); err != nil {
 						return err
 					}
-					if err := tx.Unscoped().Model(&node).Update("webhook_id", nil).Error; err != nil {
+					if err := node.DetachWebhook(tx); err != nil {
 						return err
 					}
 				}
