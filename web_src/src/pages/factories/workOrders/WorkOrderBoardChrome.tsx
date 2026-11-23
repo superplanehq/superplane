@@ -86,6 +86,8 @@ interface WorkOrderBoardLaneProps {
   /** When set, a click on the title opens an inline rename field. */
   onRename?: (name: string) => void;
   canRename?: boolean;
+  renameBusy?: boolean;
+  validateName?: (name: string) => string;
   titleTestId?: string;
   /** Accessible name, when it must read differently from the title. */
   label?: string;
@@ -134,6 +136,8 @@ export function WorkOrderBoardLane({
   banner,
   onRename,
   canRename = false,
+  renameBusy,
+  validateName,
   titleTestId,
   label,
   className,
@@ -170,6 +174,8 @@ export function WorkOrderBoardLane({
                 value={title}
                 onSave={onRename}
                 canEdit={canRename}
+                busy={renameBusy}
+                validate={validateName}
                 testId={titleTestId ?? `${testId ?? "lane"}-title`}
                 ariaLabel={`${title} column name`}
                 inputClassName="text-[15px] font-semibold leading-[22.5px] tracking-[-0.01em]"

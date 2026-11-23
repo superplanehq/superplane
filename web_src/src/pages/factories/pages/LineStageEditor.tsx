@@ -167,6 +167,11 @@ export function SaveLineStagesDialog({
             {changes.removed.map((stage) => (
               <li key={stage.id}>Delete: {stage.name}</li>
             ))}
+            {changes.renamed.map(({ previous, stage }) => (
+              <li key={stage.id}>
+                Rename: {previous.name} → {stage.name}
+              </li>
+            ))}
             {changes.reordered ? <li>Stage order changes</li> : null}
           </ul>
         ) : null}
