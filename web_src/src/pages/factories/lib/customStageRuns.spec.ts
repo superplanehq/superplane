@@ -170,6 +170,39 @@ describe("collectCustomStageRuns", () => {
     expect(collectCustomStageRuns("line-1", "custom-qa", [task])).toHaveLength(1);
   });
 
+  it("places a waiting task in an empty current stage", () => {
+    const task: FactoriesWorkOrder = {
+      id: "wo-empty",
+      state: "STATE_OPEN",
+      lineDispatches: [
+        {
+          line: { id: "line-1" },
+          state: "STATE_FINISHED",
+          result: "RESULT_PASSED",
+          currentStageKey: "custom-empty",
+          stepExecutions: [
+            {
+              id: "phase-passed",
+              stepIndex: 0,
+              stageKey: "phase-0",
+              state: "STATE_FINISHED",
+              result: "RESULT_PASSED",
+              run: { appId: "app-implement" },
+            },
+          ],
+        },
+      ],
+    };
+    const board = buildLinePhaseBoard(
+      { id: "line-1", steps: [{ app: { app: "app-implement" } }] },
+      [task],
+      [{ id: "app-implement", name: "Implement" }],
+    );
+
+    expect(board[0]?.runs).toHaveLength(0);
+    expect(collectCustomStageRuns("line-1", "custom-empty", [task])).toHaveLength(1);
+  });
+
   it("places a repeated app by its saved phase key, not the shifted step index", () => {
     const task: FactoriesWorkOrder = {
       id: "wo-repeated",

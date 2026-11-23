@@ -129,9 +129,11 @@ export function collectCustomStageRuns(
     if (!order.id || order.state === "STATE_CLOSED" || order.state === "STATE_DRAFT") continue;
     const dispatches = (order.lineDispatches ?? []).filter((dispatch) => dispatch.line?.id === lineId);
     if (dispatches.length === 0) continue;
-    const executions = dispatchStepRows(pickMostRecentDispatch(dispatches));
+    const dispatch = pickMostRecentDispatch(dispatches);
+    const executions = dispatchStepRows(dispatch);
     const current = pickCurrentLineExecution(executions);
-    if (!current || current.stageKey !== stageKey) continue;
+    const currentStageKey = dispatch.currentStageKey?.trim();
+    if (!current || (currentStageKey ? currentStageKey !== stageKey : current.stageKey !== stageKey)) continue;
     const stageExecutions = executions.filter((execution) => execution.stageKey === stageKey);
     const failed = stageExecutions.filter(
       (execution) =>
@@ -222,6 +224,15 @@ export function collectLineVerifyOrders(
   line?: FactoriesFactoryLine,
 ): FactoriesWorkOrder[] {
   const verifyById = new Map<string, FactoriesWorkOrder>();
+  if (line?.id) {
+    for (const order of sourceOrders) {
+      if (!order.id || order.state !== "STATE_OPEN" || getWorkOrderDisplayStatus(order) !== "waiting") continue;
+      const dispatches = (order.lineDispatches ?? []).filter((dispatch) => dispatch.line?.id === line.id);
+      if (dispatches.length > 0 && pickMostRecentDispatch(dispatches).currentStageKey === "verify") {
+        verifyById.set(order.id, order);
+      }
+    }
+  }
   for (const run of lastWorkStageRuns(board, sourceOrders, line)) {
     if (!run.order.id || !isWaitingAfterPassedStage(run)) {
       continue;
@@ -513,7 +524,11 @@ function appendCurrentRunForOrder(
     return;
   }
 
-  const currentExecution = pickCurrentLineExecution(lineExecutions);
+  const currentStageKey = currentDispatch.currentStageKey?.trim();
+  const currentExecutions = currentStageKey
+    ? lineExecutions.filter((execution) => execution.stageKey === currentStageKey)
+    : lineExecutions;
+  const currentExecution = pickCurrentLineExecution(currentExecutions);
   const stepIndex = currentExecution ? liveColumnIndexForExecution(steps, stages, currentExecution) : undefined;
   if (!currentExecution || stepIndex == null) {
     return;
