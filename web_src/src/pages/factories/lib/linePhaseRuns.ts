@@ -127,9 +127,8 @@ export function collectCustomStageRuns(
   const runs: LinePhaseRunCard[] = [];
   for (const order of workOrders) {
     if (!order.id || order.state === "STATE_CLOSED" || order.state === "STATE_DRAFT") continue;
-    const dispatches = (order.lineDispatches ?? []).filter((dispatch) => dispatch.line?.id === lineId);
-    if (dispatches.length === 0) continue;
-    const dispatch = pickMostRecentDispatch(dispatches);
+    const dispatch = latestLineDispatch(order, lineId);
+    if (!dispatch) continue;
     const executions = dispatchStepRows(dispatch);
     const current = pickCurrentLineExecution(executions) ?? stoppedBeforeFirstRun(dispatch, stageKey);
     const currentStageKey = dispatch.currentStageKey?.trim();
@@ -163,9 +162,7 @@ function stoppedBeforeFirstRun(
 
 /** Dispatches from before stage tracking have no current stage. */
 function latestDispatchHasCurrentStage(order: FactoriesWorkOrder, lineId: string | undefined): boolean {
-  if (!lineId) return false;
-  const dispatches = (order.lineDispatches ?? []).filter((dispatch) => dispatch.line?.id === lineId);
-  return dispatches.length > 0 && Boolean(pickMostRecentDispatch(dispatches).currentStageKey?.trim());
+  return Boolean(lineId && latestLineDispatch(order, lineId)?.currentStageKey?.trim());
 }
 
 /**
@@ -243,10 +240,7 @@ export function collectLineVerifyOrders(
   if (line?.id) {
     for (const order of sourceOrders) {
       if (!order.id || order.state !== "STATE_OPEN" || getWorkOrderDisplayStatus(order) !== "waiting") continue;
-      const dispatches = (order.lineDispatches ?? []).filter((dispatch) => dispatch.line?.id === line.id);
-      if (dispatches.length > 0 && pickMostRecentDispatch(dispatches).currentStageKey === "verify") {
-        verifyById.set(order.id, order);
-      }
+      if (latestLineDispatch(order, line.id)?.currentStageKey === "verify") verifyById.set(order.id, order);
     }
   }
   for (const run of lastWorkStageRuns(board, sourceOrders, line)) {
@@ -525,11 +519,10 @@ function appendCurrentRunForOrder(
   // A line can have more than one dispatch (traversal) for this order; the
   // board is a compact status summary, so it shows the most recent one —
   // the full history of every dispatch lives in WorkOrderExecutionsList.
-  const dispatchesForLine = (order.lineDispatches ?? []).filter((dispatch) => dispatch.line?.id === lineId);
-  if (dispatchesForLine.length === 0) {
+  const currentDispatch = latestLineDispatch(order, lineId);
+  if (!currentDispatch) {
     return;
   }
-  const currentDispatch = pickMostRecentDispatch(dispatchesForLine);
 
   const lineExecutions = dispatchStepRows(currentDispatch);
   if (lineExecutions.length === 0) {
@@ -558,6 +551,11 @@ function appendCurrentRunForOrder(
     return;
   }
   runsByStep.set(stepIndex, [card]);
+}
+
+function latestLineDispatch(order: FactoriesWorkOrder, lineId: string): FactoriesWorkOrderLineDispatch | undefined {
+  const dispatches = (order.lineDispatches ?? []).filter((dispatch) => dispatch.line?.id === lineId);
+  return dispatches.length > 0 ? pickMostRecentDispatch(dispatches) : undefined;
 }
 
 function pickMostRecentDispatch(dispatches: FactoriesWorkOrderLineDispatch[]): FactoriesWorkOrderLineDispatch {
