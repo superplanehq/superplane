@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"encoding/json"
 	"fmt"
 	"slices"
 	"strconv"
@@ -21,6 +22,8 @@ const (
 	// OpenRouter wait/retry uses this so a 60s rate-limit pause cannot outlive
 	// the runner task timeout.
 	EnvExecutionTimeoutSeconds = "SUPERPLANE_EXECUTION_TIMEOUT_SECONDS"
+	// EnvSecretNames carries names only, never resolved values or prompt content.
+	EnvSecretNames = "SUPERPLANE_SECRET_ENV_NAMES"
 )
 
 // Runner tasks execute with a terminal attached, so commands like `git log`
@@ -182,6 +185,7 @@ func ResolveEnvironment(
 	seen := make(map[string]struct{})
 	usages := make([]string, 0)
 	setups := make([]IntegrationSetup, 0)
+	secretNames := make([]string, 0)
 
 	for _, entry := range environmentFrom {
 		switch strings.TrimSpace(entry.Source) {
@@ -224,6 +228,11 @@ func ResolveEnvironment(
 			if err := appendImportedEnvironmentVariables(&resolved, seen, keys); err != nil {
 				return ResolvedEnvironment{}, err
 			}
+			for name := range keys {
+				if name = strings.TrimSpace(name); name != "" {
+					secretNames = append(secretNames, name)
+				}
+			}
 
 		default:
 			return ResolvedEnvironment{}, fmt.Errorf("invalid environmentFrom source: %s", entry.Source)
@@ -233,6 +242,11 @@ func ResolveEnvironment(
 	explicit, err := resolveExplicitEnvironment(secrets, environment)
 	if err != nil {
 		return ResolvedEnvironment{}, err
+	}
+	for _, variable := range environment {
+		if strings.TrimSpace(variable.ValueSource) == EnvironmentValueSourceSecret {
+			secretNames = append(secretNames, strings.TrimSpace(variable.Name))
+		}
 	}
 
 	for _, variable := range explicit {
@@ -250,6 +264,11 @@ func ResolveEnvironment(
 		resolved = append(resolved, variable)
 	}
 
+	if len(secretNames) > 0 {
+		slices.Sort(secretNames)
+		names, _ := json.Marshal(slices.Compact(secretNames))
+		resolved = upsertEnvironment(resolved, EnvSecretNames, string(names))
+	}
 	return ResolvedEnvironment{
 		Variables: prependPagerDefaults(resolved),
 		Usage:     strings.Join(usages, "\n\n"),
@@ -288,6 +307,9 @@ func appendImportedEnvironmentVariables(
 
 		if !environmentVariableNameRegex.MatchString(name) {
 			return fmt.Errorf("invalid environment variable name: %s", name)
+		}
+		if name == EnvSecretNames {
+			return fmt.Errorf("reserved environment variable name: %s", name)
 		}
 
 		if _, ok := seen[name]; ok {
@@ -352,6 +374,9 @@ func resolveExplicitEnvironment(secrets core.SecretsContext, environment []Envir
 	resolved := make([]TaskEnvironmentVariable, 0, len(environment))
 	for _, variable := range environment {
 		name := strings.TrimSpace(variable.Name)
+		if name == EnvSecretNames {
+			return nil, fmt.Errorf("reserved environment variable name: %s", name)
+		}
 
 		switch strings.TrimSpace(variable.ValueSource) {
 		case EnvironmentValueSourceLiteral:
