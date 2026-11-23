@@ -162,6 +162,38 @@ func Test__FactoryLine__DispatchStage__EmptyFirstStageUsesAutoAdvance(t *testing
 	}
 }
 
+func Test__FactoryLine__DispatchStage__StopsInEmptyVerifyBeforeFirstRun(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	order, err := factory.CreateWorkOrder(db, "Order", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	_, err = order.UpdateStatus(db, models.FactoryWorkOrderStatusUpdate{ToState: models.FactoryWorkOrderStateOpen})
+	require.NoError(t, err)
+	app, entry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "Implement", "start")
+	line, err := factory.CreateLine(db, "ship", []models.FactoryLineStep{{
+		Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entry,
+	}})
+	require.NoError(t, err)
+	stages := line.StagesValue()
+	// Backlog, Verify, phase-0, Done.
+	stages = []models.FactoryLineStage{stages[0], stages[2], stages[1], stages[3]}
+	require.NoError(t, line.UpdateConfiguration(db, nil, nil, nil, stages))
+
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		_, _, dispatchErr := line.DispatchStage(tx, order)
+		return dispatchErr
+	}))
+
+	inVerify, err := order.IsWaitingAfterPassedStage(db)
+	require.NoError(t, err)
+	assert.True(t, inVerify)
+	column, err := models.WorkOrderBoardColumn(db, order)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasColumnKeyVerify, column)
+}
+
 func Test__FactoryWorkOrder__RetryLineStep__KeepsCustomStageSiblingsRunning(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())

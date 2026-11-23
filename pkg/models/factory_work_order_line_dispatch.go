@@ -195,25 +195,6 @@ func (l *FactoryLine) DispatchStageFromWithModel(
 	return dispatch, results, nil
 }
 
-// initialStageKey is the stage a dispatch enters first. A start from the
-// beginning enters the first stage after Backlog, so an empty stage before
-// the first automation can still stop the task.
-func initialStageKey(stages []FactoryLineStage, steps []FactoryLineStep, startIndex int) string {
-	key := steps[startIndex].StageKey
-	if startIndex != 0 || key == "" {
-		return key
-	}
-	for _, stage := range stages {
-		if stage.Key == key || stage.Kind == FactoryLineStageDone {
-			return key
-		}
-		if stage.Kind != FactoryLineStageBacklog {
-			return stage.Key
-		}
-	}
-	return key
-}
-
 func (l *FactoryWorkOrderLineDispatch) startInitialStage(
 	tx *gorm.DB,
 	order *FactoryWorkOrder,
@@ -1166,7 +1147,9 @@ func (o *FactoryWorkOrder) IsWaitingAfterPassedStage(tx *gorm.DB) (bool, error) 
 	}
 	executions := current.Executions
 	if len(executions) == 0 {
-		return false, nil
+		return current.CurrentStageKey == CanvasColumnKeyVerify &&
+			current.State == FactoryWorkOrderLineDispatchStateFinished &&
+			current.Result == CanvasRunResultPassed, nil
 	}
 	furthest := executions[0].FactoryWorkOrderExecution
 	for i := range executions {
@@ -1253,4 +1236,23 @@ func (l *FactoryWorkOrderLineDispatch) rejectStepAdmission(tx *gorm.DB, order *F
 		return nil, err
 	}
 	return &FactoryLineStepResult{Execution: execution}, nil
+}
+
+// initialStageKey is the stage a dispatch enters first. A start from the
+// beginning enters the first stage after Backlog, so an empty stage before
+// the first automation can still stop the task.
+func initialStageKey(stages []FactoryLineStage, steps []FactoryLineStep, startIndex int) string {
+	key := steps[startIndex].StageKey
+	if startIndex != 0 || key == "" {
+		return key
+	}
+	for _, stage := range stages {
+		if stage.Key == key || stage.Kind == FactoryLineStageDone {
+			return key
+		}
+		if stage.Kind != FactoryLineStageBacklog {
+			return stage.Key
+		}
+	}
+	return key
 }
