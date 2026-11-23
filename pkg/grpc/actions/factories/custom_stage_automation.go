@@ -3,12 +3,12 @@ package factories
 import (
 	"errors"
 	"maps"
+	"slices"
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/pkg/yaml"
 	"gorm.io/gorm"
 )
@@ -50,7 +50,11 @@ func buildCustomStageAutomationCanvas(tx *gorm.DB, factory *models.Factory, name
 	doc.Spec.Nodes = append(doc.Spec.Nodes, yaml.Node{
 		ID: "on-run", Name: "On Run", Type: yaml.NodeTypeTrigger, Component: "onRun", Configuration: map[string]any{}, Metadata: metadata,
 	}, customAutomationRunnerNode("stage-run", "Run stage automation", settings,
-		customAutomationRunnerConfiguration(tx, factory, settings, customAutomationCheckoutEnvironment(factory, pb.FactoryCustomAutomation_START_MODE_SCHEDULED, githubHostForFactory(tx, factory), false)), 80))
+		customAutomationRunnerConfiguration(tx, factory, settings, []any{
+			checkoutEnvironmentVar("REPO", "{{ order().repository }}"),
+			checkoutEnvironmentVar("REPO_URL", "{{ order().repository_url }}"),
+			checkoutEnvironmentVar("BASE", "{{ order().default_branch }}"),
+		}), 80))
 	doc.Spec.Edges = append(doc.Spec.Edges, yaml.Edge{SourceID: "on-run", TargetID: "stage-run", Channel: "default"})
 	return doc, nil
 }
@@ -99,8 +103,8 @@ func editLegacyCustomStageGraph(version *models.CanvasVersion, settings *customA
 		}
 		delete(node.Configuration, "llmProvider")
 		settings.Agent.applyLLMProvider(node.Configuration)
-		node.Configuration["steps"] = customAutomationStepConfiguration(settings.Steps)
 		addCustomStageStepSecrets(node.Configuration, settings.Steps)
+		node.Configuration["steps"] = customAutomationStepConfiguration(settings.Steps)
 		node.Configuration["executionTimeoutSeconds"] = settings.ExecutionTimeoutSeconds
 		if settings.model() != "" {
 			node.Configuration["model"] = settings.model()
@@ -109,9 +113,13 @@ func editLegacyCustomStageGraph(version *models.CanvasVersion, settings *customA
 		}
 		if settings.SkipSetupCommands != nil {
 			node.Configuration["skipSetupCommands"] = *settings.SkipSetupCommands
+		} else {
+			delete(node.Configuration, "skipSetupCommands")
 		}
 		if settings.SkipRepositoryCheckout != nil {
 			node.Configuration["skipRepositoryCheckout"] = *settings.SkipRepositoryCheckout
+		} else {
+			delete(node.Configuration, "skipRepositoryCheckout")
 		}
 	}
 	return nodes, edges
@@ -145,6 +153,24 @@ func addCustomStageStepSecrets(configuration map[string]any, steps []runner.Agen
 
 func mergeCustomStageSecrets(configuration map[string]any, requested []any) {
 	sources, _ := configuration["environmentFrom"].([]any)
+	previousSteps, _ := configuration["steps"].([]any)
+	var previousSecrets []string
+	for _, value := range previousSteps {
+		step, _ := value.(map[string]any)
+		secrets, _ := step["secrets"].([]any)
+		for _, value := range secrets {
+			if name, ok := value.(string); ok {
+				previousSecrets = append(previousSecrets, name)
+			}
+		}
+	}
+	// Step-owned references are replaced. Canvas-owned sources stay intact.
+	sources = slices.DeleteFunc(slices.Clone(sources), func(source any) bool {
+		entry, _ := source.(map[string]any)
+		secret, _ := entry["secret"].(map[string]any)
+		name, _ := secret["secret"].(string)
+		return entry["source"] == runner.EnvironmentFromSourceSecret && slices.Contains(previousSecrets, name)
+	})
 	for _, source := range requested {
 		entry, _ := source.(map[string]any)
 		secret, _ := entry["secret"].(map[string]any)
@@ -167,6 +193,8 @@ func mergeCustomStageSecrets(configuration map[string]any, requested []any) {
 	}
 	if len(sources) > 0 {
 		configuration["environmentFrom"] = sources
+	} else {
+		delete(configuration, "environmentFrom")
 	}
 }
 
@@ -198,6 +226,14 @@ func preserveCustomStageGate(version *models.CanvasVersion, doc *yaml.Canvas) {
 			configuration := maps.Clone(agent.Configuration)
 			requested, _ := node.Configuration["environmentFrom"].([]any)
 			mergeCustomStageSecrets(configuration, requested)
+			// Refresh gate checkout fields without removing other canvas variables.
+			environment, _ := configuration["environment"].([]any)
+			environment = slices.DeleteFunc(slices.Clone(environment), func(value any) bool {
+				entry, _ := value.(map[string]any)
+				return entry["name"] == "REPO" || entry["name"] == "REPO_URL" || entry["name"] == "BASE"
+			})
+			checkout, _ := node.Configuration["environment"].([]any)
+			configuration["environment"] = append(environment, checkout...)
 			for _, key := range []string{"steps", "executionTimeoutSeconds", "model", "credentials", "skipSetupCommands", "skipRepositoryCheckout", "llmProvider"} {
 				if value, ok := node.Configuration[key]; ok {
 					configuration[key] = value

@@ -704,6 +704,22 @@ func Test__RunFinalizer__WaitsForEveryCustomStageAutomation(t *testing.T) {
 			require.Len(t, pending, 1)
 			require.Equal(t, int64(3), runCount, "a stage departure starts its leave run once")
 			assert.Equal(t, implement.ID, pending[0].workflowID)
+			finalizer.startAutomaticCustomAutomationsForRun(customRuns[0].Run.ID)
+			require.NoError(t, db.Model(&models.CanvasRun{}).Where("workflow_id = ?", created.GetCustomAutomation().GetAutomation().GetId()).Count(&runCount).Error)
+			require.Equal(t, int64(3), runCount, "sibling callbacks share the same departure")
+			var retried *models.FactoryLineStepResult
+			gateIndex := customRuns[0].Execution.StepIndex
+			if customRuns[0].Run.WorkflowID.String() != created.GetCustomAutomation().GetAutomation().GetId() {
+				gateIndex = customRuns[1].Execution.StepIndex
+			}
+			require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+				retried, _, err = order.RetryLineStep(tx, line, gateIndex)
+				return err
+			}))
+			finish(retried, models.CanvasRunResultPassed)
+			finalizer.startAutomaticCustomAutomationsForRun(customRuns[1].Run.ID)
+			require.NoError(t, db.Model(&models.CanvasRun{}).Where("workflow_id = ?", created.GetCustomAutomation().GetAutomation().GetId()).Count(&runCount).Error)
+			require.Equal(t, int64(5), runCount, "a retried stage starts one new gate run and one new leave run")
 		})
 	}
 }

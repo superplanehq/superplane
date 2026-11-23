@@ -511,7 +511,20 @@ func (w *RunFinalizer) startAutomaticCustomAutomationsForRun(runID uuid.UUID) {
 		if err == nil && execution.StepIndex >= 0 && execution.StepIndex < len(dispatch.Steps) {
 			leftColumn := dispatch.Steps[execution.StepIndex].StageKey
 			if strings.HasPrefix(leftColumn, "custom-") && column != leftColumn {
-				if err := factoryactions.StartColumnLeaveCustomAutomations(db, factory, order, leftColumn, dispatch.ID.String()); err != nil {
+				result, err := dispatch.StageResult(db, execution.StepIndex)
+				if err != nil {
+					w.logger.WithError(err).Warn("custom automation: failed to read the stage result")
+					return
+				}
+				if result != models.CanvasRunResultPassed {
+					return
+				}
+				attemptID, err := dispatch.StageAttemptID(db, execution.StepIndex)
+				if err != nil {
+					w.logger.WithError(err).Warn("custom automation: failed to read the stage attempt")
+					return
+				}
+				if err := factoryactions.StartColumnLeaveCustomAutomations(db, factory, order, leftColumn, attemptID.String()); err != nil {
 					w.logger.WithError(err).Warn("custom automation: failed to start stage leave automation")
 				}
 			}

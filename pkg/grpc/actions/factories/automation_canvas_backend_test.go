@@ -9,12 +9,14 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/automations"
 	"github.com/superplanehq/superplane/pkg/automationspec"
+	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
+	"github.com/superplanehq/superplane/pkg/workers/contexts"
 	"github.com/superplanehq/superplane/test/support"
 	"github.com/superplanehq/superplane/test/support/impl"
 	"gorm.io/datatypes"
@@ -190,16 +192,88 @@ func TestCanvasAutomationCustomStageRoundTripAndAdmission(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, version.Edges, preserved.Edges)
 	require.Len(t, preserved.Nodes, 2, "an unrelated edit adds no event triggers")
+	for _, name := range []string{"retired-secret", "kept-secret", "canvas-secret"} {
+		_, err := models.CreateSecret(name, "local", r.User.String(), models.DomainTypeOrganization, r.Organization.ID, []byte("{}"))
+		require.NoError(t, err)
+	}
+	for _, id := range []uuid.UUID{created.ID, legacyCanvas.ID} {
+		t.Run(id.String(), func(t *testing.T) {
+			bashSource := strings.Replace(source, "prompt: Check the changes.", "bash: make lint", 1)
+			if id == legacyCanvas.ID {
+				bashSource = strings.Replace(bashSource, "name: QA check", "name: Existing QA", 1)
+				bashSource = strings.Replace(bashSource, "  - use: manual\n  - use: task_leaves_stage\n", "", 1)
+			}
+			withSettings := strings.Replace(bashSource, "runs_on_task: true", "runs_on_task: true\nskip_setup_commands: true\nskip_repository_checkout: true", 1)
+			withSettings = strings.Replace(withSettings, "bash: make lint", "bash: make lint\n    secrets: [retired-secret, kept-secret]", 1)
+			_, err := service.Update(ctx, r.Organization.ID, id, r.User, withSettings)
+			require.NoError(t, err)
+			version, err := models.FindLiveCanvasVersionInTransaction(db, id)
+			require.NoError(t, err)
+			for i := range version.Nodes {
+				node := &version.Nodes[i]
+				if node.ID == "stage-run" || node.ID == "existing-agent" {
+					node.Configuration["environmentFrom"] = append(node.Configuration["environmentFrom"].([]any), map[string]any{"source": runner.EnvironmentFromSourceSecret, "secret": map[string]any{"secret": "canvas-secret"}})
+				}
+			}
+			require.NoError(t, db.Save(version).Error)
+			withoutSettings := strings.Replace(bashSource, "bash: make lint", "bash: make lint\n    secrets: [kept-secret]", 1)
+			_, err = service.Update(ctx, r.Organization.ID, id, r.User, withoutSettings)
+			require.NoError(t, err)
+			version, err = models.FindLiveCanvasVersionInTransaction(db, id)
+			require.NoError(t, err)
+			for _, node := range version.Nodes {
+				if !isFactoryAgentHarness(node.ComponentName()) {
+					continue
+				}
+				require.NotContains(t, node.Configuration, "skipSetupCommands")
+				require.NotContains(t, node.Configuration, "skipRepositoryCheckout")
+				var secrets []string
+				for _, source := range node.Configuration["environmentFrom"].([]any) {
+					entry := source.(map[string]any)
+					if entry["source"] == runner.EnvironmentFromSourceSecret {
+						secrets = append(secrets, entry["secret"].(map[string]any)["secret"].(string))
+					}
+				}
+				require.NotContains(t, secrets, "retired-secret")
+				require.Contains(t, secrets, "kept-secret")
+				if node.ID == "stage-run" || node.ID == "existing-agent" {
+					require.Contains(t, secrets, "canvas-secret")
+				}
+			}
+		})
+	}
 	require.NoError(t, legacyCanvas.SetColumnKey(db, ""))
 	order, err := factory.CreateWorkOrder(db, "Check QA", "", &r.User, nil, nil)
 	require.NoError(t, err)
 	require.NoError(t, order.TransitionOnDispatch(db, &r.User))
+	repository, branch := "acme/task-repository", "task-changes"
+	require.NoError(t, db.Model(order).Updates(map[string]any{"repository": repository, "default_branch": branch}).Error)
 	var runs []*models.FactoryLineStepResult
 	_, runs, err = line.DispatchStage(db, order)
 	require.NoError(t, err)
 	require.Len(t, runs, 1)
 	require.Equal(t, "on-run", runs[0].Run.NodeID)
 	require.Equal(t, order.ID.String(), runs[0].Run.Input.Data().(map[string]any)["work_order"].(map[string]any)["id"])
+	version, err = models.FindLiveCanvasVersionInTransaction(db, created.ID)
+	require.NoError(t, err)
+	root := support.EmitCanvasEventForNodeWithData(t, created.ID, runs[0].Run.NodeID, "default", nil, runs[0].Run.Input.Data().(map[string]any))
+	require.NoError(t, db.Model(root).Update("run_id", runs[0].Run.ID).Error)
+	builder := contexts.NewNodeConfigurationBuilder(db, created.ID).WithRootEvent(&root.ID)
+	for _, node := range version.Nodes {
+		if node.ID != "stage-run" {
+			continue
+		}
+		configuration, err := builder.Build(node.Configuration)
+		require.NoError(t, err)
+		environment := map[string]string{}
+		for _, value := range configuration["environment"].([]any) {
+			entry := value.(map[string]any)
+			environment[entry["name"].(string)] = entry["value"].(string)
+		}
+		require.Equal(t, repository, environment["REPO"])
+		require.Equal(t, "https://github.com/"+repository+".git", environment["REPO_URL"])
+		require.Equal(t, branch, environment["BASE"])
+	}
 }
 
 func TestCanvasAutomationLegacyImportProtectsGraphBehavior(t *testing.T) {
