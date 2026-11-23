@@ -201,26 +201,17 @@ function AgentStepMarker({
     { resumeOnBottom: true },
   );
   const row = (
-    <Marker className={cn("group/step min-w-0 py-1", running && "bg-muted")}>
-      <MarkerIcon className="text-muted-foreground">
-        {expandable ? (
-          <ChevronRight className={cn("size-3.5 transition-transform", open && "rotate-90")} aria-hidden />
-        ) : step.type === "node" ? (
-          <NodeIcon iconSlug={step.iconSlug} />
-        ) : (
-          <ToolKindIcon type={step.type} />
-        )}
-      </MarkerIcon>
-      <MarkerContent className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden text-[13px] leading-5 text-foreground">
-        <span className="max-w-[50%] shrink-0 truncate">{step.title}</span>
-        {step.type === "node" ? <NodeIcon iconSlug={step.iconSlug} /> : <ToolKindIcon type={step.type} />}
-        <StepStatusBadge status={step.status} />
-        {reason ? (
-          <span className="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground">{reason}</span>
-        ) : null}
-        <StepDuration duration={step.duration} />
-      </MarkerContent>
-    </Marker>
+    <AgentStepMarkerRow
+      expandable={expandable}
+      open={open}
+      running={running}
+      reason={reason}
+      title={step.title}
+      type={step.type}
+      iconSlug={step.iconSlug}
+      status={step.status}
+      duration={step.duration}
+    />
   );
   if (!expandable) {
     return row;
@@ -251,6 +242,46 @@ function AgentStepMarker({
         />
       </CollapsibleContent>
     </Collapsible>
+  );
+}
+
+function AgentStepMarkerRow({
+  expandable,
+  open,
+  running,
+  reason,
+  title,
+  type,
+  iconSlug,
+  status,
+  duration,
+}: Pick<AgentStep, "title" | "type" | "iconSlug" | "status" | "duration"> & {
+  expandable: boolean;
+  open: boolean;
+  running: boolean;
+  reason: string;
+}) {
+  return (
+    <Marker className={cn("group/step min-w-0 py-1", running && "bg-muted")}>
+      <MarkerIcon className="text-muted-foreground">
+        {expandable ? (
+          <ChevronRight className={cn("size-3.5 transition-transform", open && "rotate-90")} aria-hidden />
+        ) : type === "node" ? (
+          <NodeIcon iconSlug={iconSlug} />
+        ) : (
+          <ToolKindIcon type={type} />
+        )}
+      </MarkerIcon>
+      <MarkerContent className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden text-[13px] leading-5 text-foreground">
+        <span className="max-w-[50%] shrink-0 truncate">{title}</span>
+        {type === "node" ? <NodeIcon iconSlug={iconSlug} /> : <ToolKindIcon type={type} />}
+        <StepStatusBadge status={status} />
+        {reason ? (
+          <span className="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground">{reason}</span>
+        ) : null}
+        <StepDuration duration={duration} />
+      </MarkerContent>
+    </Marker>
   );
 }
 
