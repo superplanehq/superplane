@@ -136,6 +136,36 @@ func TestMaybeRefreshAccountSession(t *testing.T) {
 		assert.Greater(t, int64(exp)-time.Now().Unix(), int64(23*time.Hour.Seconds()))
 	})
 
+	t.Run("keeps the sso claim when the session refreshes", func(t *testing.T) {
+		ResetAccountSessionTTLForTests()
+		t.Cleanup(ResetAccountSessionTTLForTests)
+
+		issuedAt := time.Now().Add(-2 * time.Minute)
+		ssoClaim := "11111111-1111-4111-8111-111111111111:" + fmt.Sprintf("%d", issuedAt.Unix())
+		token := jwtLib.NewWithClaims(jwtLib.SigningMethodHS256, jwtLib.MapClaims{
+			"sub":             r.Account.ID.String(),
+			"iat":             issuedAt.Unix(),
+			"nbf":             issuedAt.Unix(),
+			"exp":             issuedAt.Add(20 * time.Hour).Unix(),
+			sessionStartClaim: fmt.Sprintf("%d", issuedAt.Unix()),
+			SSOSessionClaim:   ssoClaim,
+		})
+		signed, err := token.SignedString([]byte(signer.Secret))
+		require.NoError(t, err)
+
+		req := httptest.NewRequest(http.MethodGet, "/account", nil)
+		req.AddCookie(&http.Cookie{Name: "account_token", Value: signed})
+		res := httptest.NewRecorder()
+		MaybeRefreshAccountSession(res, req, signer, r.Account)
+
+		cookies := res.Result().Cookies()
+		require.Len(t, cookies, 1)
+		claims, err := signer.ValidateAndGetClaims(cookies[0].Value)
+		require.NoError(t, err)
+		assert.Equal(t, ssoClaim, claims[SSOSessionClaim])
+		assert.Equal(t, fmt.Sprintf("%d", issuedAt.Unix()), claims[sessionStartClaim])
+	})
+
 	t.Run("rejects tokens without ses claim", func(t *testing.T) {
 		token, err := signer.Generate(r.Account.ID.String(), time.Hour)
 		require.NoError(t, err)

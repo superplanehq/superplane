@@ -91,6 +91,8 @@ The registry covers every field encrypted through `crypto.Encryptor`:
 | `email_settings` | `smtp_password` |
 | `bitbucket_forge_installations` | `system_token` |
 | `sentry_app_install_grants` | `access_token`, `refresh_token` |
+| `sso_connections` | `client_secret` |
+| `sso_identities` | `id_token` |
 
 The registry includes sensitive values stored inside JSON configuration. Some tables
 have more than one encrypted value per row. Each value needs its own migration
