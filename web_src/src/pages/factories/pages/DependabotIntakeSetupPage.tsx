@@ -63,10 +63,18 @@ function resolveDependabotIntakeSetupModel(
     dialog: {
       organizationId,
       factoryId,
-      repository: factory?.onboarding?.backlogRepository?.trim() ?? "",
-      setupReady: Boolean(
-        factory?.onboarding?.vcsIntegrationId?.trim() && factory?.onboarding?.backlogRepository?.trim(),
-      ),
+      ...resolveDependabotConnectionFields(factory),
     },
   };
+}
+
+function resolveDependabotConnectionFields(factory: ResolvedFactoriesLayout["factory"]): {
+  repository: string;
+  setupReady: boolean;
+} {
+  const onboarding = factory?.onboarding;
+  const repository = onboarding?.backlogRepository?.trim() ?? "";
+  const vcsIntegrationId = onboarding?.vcsIntegrationId?.trim();
+
+  return { repository, setupReady: Boolean(vcsIntegrationId && repository) };
 }
