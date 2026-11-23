@@ -270,36 +270,39 @@ it.each([
   expect(installFactory).not.toHaveBeenCalled();
 });
 
-it("ignores stale subscriptions on hosted onboarding even when BYOK is allowed", async () => {
-  const fixture = factoriesFixtureWithSetupAnswers(SETUP_ANSWERS.issues, {
-    organizationWorkspaceUsage: HOSTED_DEFAULT_USAGE_REPORT,
-  });
-  fixture.organizationBilling = { billingEnabled: false, productFeatures: { byo_key: true } };
-  fixture.factories = fixture.factories.map((factory) =>
-    factory.id === PRIMARY_FACTORY_ID
-      ? { ...factory, onboarding: { ...factory.onboarding, codexSubscription: true } }
-      : factory,
-  );
-  localStorage.setItem(`superplane:onboarding-model-source:${PRIMARY_FACTORY_ID}`, "subscription");
-  render(
-    <FactoriesHarness
-      mode="app"
-      billingEnabled={false}
-      experimentalFeatures={[FEATURE_ORGANIZATION_BYOK]}
-      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/setup?step=agent`}
-      factoriesFixture={fixture}
-      orgIntegrations={CONNECTED_SETUP_INTEGRATIONS}
-      pageOverrides={{ onboarding: OnboardingPage }}
-    />,
-  );
-  expect(await screen.findByTestId("first-run-model-source", {}, { timeout: 8000 })).toBeInTheDocument();
-  expect(screen.queryByRole("button", { name: /Codex subscription/ })).not.toBeInTheDocument();
-  expect(screen.queryByRole("button", { name: "Connect Codex" })).not.toBeInTheDocument();
-  await userEvent.setup().click(screen.getByTestId("first-run-finish-setup"));
-  await waitFor(async () => {
-    const saved = await factoriesDescribeFactory({ path: { id: PRIMARY_FACTORY_ID } });
-    expect(saved.data?.factory?.onboarding?.completedAt).toBeTruthy();
-    expect(saved.data?.factory?.onboarding?.codexSubscription).toBe(false);
-    expect(saved.data?.factory?.onboarding?.agentHarness).toBe("AGENT_HARNESS_SUPERPLANE");
-  });
-});
+it.each(["subscription", null])(
+  "ignores stale subscriptions on hosted onboarding with browser choice %j",
+  async (choice) => {
+    const fixture = factoriesFixtureWithSetupAnswers(SETUP_ANSWERS.issues, {
+      organizationWorkspaceUsage: HOSTED_DEFAULT_USAGE_REPORT,
+    });
+    fixture.organizationBilling = { billingEnabled: false, productFeatures: { byo_key: true } };
+    fixture.factories = fixture.factories.map((factory) =>
+      factory.id === PRIMARY_FACTORY_ID
+        ? { ...factory, onboarding: { ...factory.onboarding, codexSubscription: true } }
+        : factory,
+    );
+    if (choice) localStorage.setItem(`superplane:onboarding-model-source:${PRIMARY_FACTORY_ID}`, choice);
+    render(
+      <FactoriesHarness
+        mode="app"
+        billingEnabled={false}
+        experimentalFeatures={[FEATURE_ORGANIZATION_BYOK]}
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/setup?step=agent`}
+        factoriesFixture={fixture}
+        orgIntegrations={CONNECTED_SETUP_INTEGRATIONS}
+        pageOverrides={{ onboarding: OnboardingPage }}
+      />,
+    );
+    expect(await screen.findByTestId("first-run-model-source", {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Codex subscription/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Connect Codex" })).not.toBeInTheDocument();
+    await userEvent.setup().click(screen.getByTestId("first-run-finish-setup"));
+    await waitFor(async () => {
+      const saved = await factoriesDescribeFactory({ path: { id: PRIMARY_FACTORY_ID } });
+      expect(saved.data?.factory?.onboarding?.completedAt).toBeTruthy();
+      expect(saved.data?.factory?.onboarding?.codexSubscription).toBe(false);
+      expect(saved.data?.factory?.onboarding?.agentHarness).toBe("AGENT_HARNESS_SUPERPLANE");
+    });
+  },
+);
