@@ -12,7 +12,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
@@ -122,13 +121,7 @@ func resolveRunnerScope(
 	scope.Scopes = ScopesForFlow(scope.Flow)
 	if scope.Flow == RunnerFlowTask {
 		scope.Scopes = append(scope.Scopes, TaskCapabilityScopes(environment)...)
-		multiRepo, err := models.HasExperimentalFeature(orgID, features.FeatureFactoryMultiRepoTasks)
-		if err != nil {
-			return nil, nil, err
-		}
-		if multiRepo {
-			scope.Scopes = append(scope.Scopes, MultiRepoTaskScopes...)
-		}
+		scope.Scopes = append(scope.Scopes, ScopePullRequestsRead, ScopePullRequestsWrite)
 	}
 	if err := validateRunnerTokenScope(db, scope); err != nil {
 		return nil, nil, err
@@ -199,15 +192,30 @@ func findOpenTask(db *gorm.DB, scope *RunnerScope) (*models.FactoryWorkOrder, er
 		return nil, err
 	}
 	if order.Result == models.FactoryWorkOrderResultArchived {
+		if leaveCustomAutomationRun(db, scope) {
+			return order, nil
+		}
 		return nil, fmt.Errorf("task is archived")
 	}
 	if order.State != models.FactoryWorkOrderStateClosed {
 		return order, nil
 	}
-	if doneCustomAutomationCanvas(db, scope) {
+	if doneCustomAutomationCanvas(db, scope) || leaveCustomAutomationRun(db, scope) {
 		return order, nil
 	}
 	return nil, fmt.Errorf("task is closed or archived")
+}
+
+func leaveCustomAutomationRun(db *gorm.DB, scope *RunnerScope) bool {
+	matches, err := models.CanvasHasFactoryAppTemplate(db, scope.CanvasID, models.FactoryAppTemplateCustomAutomationID)
+	if err != nil || !matches {
+		return false
+	}
+	event, err := models.FindRootEventForRun(db, scope.CanvasRunID)
+	if err != nil || event.DedupKey == nil {
+		return false
+	}
+	return strings.Contains(*event.DedupKey, "|leave|")
 }
 
 func doneCustomAutomationCanvas(db *gorm.DB, scope *RunnerScope) bool {

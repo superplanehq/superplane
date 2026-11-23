@@ -10,6 +10,17 @@ async function selectViewOption(user: ReturnType<typeof userEvent.setup>, parent
 }
 
 describe("LineBoardViewMenu", () => {
+  it("opens stage editing from board settings", async () => {
+    const user = userEvent.setup();
+    const onEditStages = vi.fn();
+    render(<LineBoardViewMenu colorView="dim" onColorViewChange={vi.fn()} onEditStages={onEditStages} />);
+
+    await user.click(screen.getByTestId("lines-board-view-menu"));
+    await user.click(screen.getByRole("menuitem", { name: "Edit stages" }));
+
+    expect(onEditStages).toHaveBeenCalledTimes(1);
+  });
+
   it("opens View options and reports the selected automation layout", async () => {
     const user = userEvent.setup();
     const onViewChange = vi.fn();

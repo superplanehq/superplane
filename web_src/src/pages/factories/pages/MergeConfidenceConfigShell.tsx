@@ -283,6 +283,7 @@ function MergeConfidenceConfigBody(props: ReturnType<typeof configBodyProps>) {
       canvasId,
     },
     publishing,
+    graph?.specNodes,
   );
   const implementAgent = implementSettingsNode(props);
   if (implementAgent && implementSettings.draft) {

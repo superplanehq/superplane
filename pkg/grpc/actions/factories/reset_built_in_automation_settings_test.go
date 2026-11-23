@@ -35,9 +35,10 @@ func TestResetBuiltInAutomationPreservesImplementationSettings(t *testing.T) {
 		max          int
 		instructions string
 		canvas       *models.Canvas
+		draft        bool
 	}{
-		{provider: models.ProviderGitHub, max: 7, instructions: "Avoid new dependencies. Include API examples in pull requests."},
-		{provider: models.ProviderBitbucket, max: 9, instructions: "Document {{ example }} in the pull request."},
+		{provider: models.ProviderGitHub, max: 7, instructions: "Avoid new dependencies. Include API examples in pull requests.", draft: true},
+		{provider: models.ProviderBitbucket, max: 9, instructions: "Document {{ example }} in the pull request.", draft: true},
 		{provider: models.ProviderGitHub, max: 3, instructions: ""},
 	}
 	for i := range cases {
@@ -55,7 +56,7 @@ func TestResetBuiltInAutomationPreservesImplementationSettings(t *testing.T) {
 			agent.Configuration["disabledAgentResourceTools"] = map[string]any{"github-resource": []any{"delete_issue"}}
 			agent.Configuration["enabledAgentResourceTools"] = map[string]any{"github-resource": []any{"get_issue"}}
 			implementationStep(t, agent, "Implementation")["prompt"] = "Retired implementation prompt"
-			setResetTestDraftPullRequests(t, doc, true)
+			setResetTestDraftPullRequests(t, doc, tc.draft)
 		})
 	}
 	require.NoError(t, resetTestOrganization(t, r))
@@ -75,15 +76,15 @@ func TestResetBuiltInAutomationPreservesImplementationSettings(t *testing.T) {
 			require.NotNil(t, agent.Concurrency)
 			assert.Equal(t, tc.max, agent.Concurrency.EffectiveMax())
 			assert.Equal(t, "team", agent.Concurrency.Key)
-			assert.True(t, resetTestDraftPullRequests(t, version.Nodes))
+			assert.Equal(t, tc.draft, resetTestDraftPullRequests(t, version.Nodes))
 			assert.NotContains(t, liveCanvasJSON(t, tc.canvas), "retired implementation prompt")
 		})
 	}
 }
 
 // setResetTestDraftPullRequests sets the "Create draft pull requests" setting.
-// Bitbucket holds it on the pull request node. GitHub holds it in the agent
-// environment.
+// Legacy templates hold it on the pull request node. Current templates hold
+// it in the agent environment.
 func setResetTestDraftPullRequests(t *testing.T, doc *yaml.Canvas, draft bool) {
 	t.Helper()
 	for i := range doc.Spec.Nodes {
@@ -112,13 +113,10 @@ func resetTestDraftPullRequests(t *testing.T, nodes []models.Node) bool {
 func resetTestTemplate(t *testing.T, r *support.ResourceRegistry, factory *models.Factory, templateID, provider string, configure func(*yaml.Canvas)) *models.Canvas {
 	t.Helper()
 	canvas := support.CreateFactoryCanvas(t, r, factory.ID, templateID)
-	multiRepo, err := factory.MultiRepoTasksEnabled(database.DB(t.Context()))
-	require.NoError(t, err)
 	result, err := materializeFactoryTemplate(templateID, provider, factoryTemplateInput{
 		appID: canvas.ID.String(), appName: canvas.Name,
 		installParams: map[string]string{"appRepository": "acme/app", "defaultBranch": "main"},
 		agent:         &factoryTemplateAgent{component: models.SuperPlaneRunnerComponent, credentialSource: "hosted"},
-		multiRepo:     multiRepo,
 	})
 	require.NoError(t, err)
 	doc, err := yaml.CanvasFromYAML([]byte(result.canvasYAML))
@@ -173,7 +171,7 @@ func TestResetReviewRequestPreservesFallbackAndAgentSettings(t *testing.T) {
 		t.Run("fallback="+fallback, func(t *testing.T) {
 			instructions := ""
 			if fallback != "" {
-				instructions = "Prefer the security owner. Keep {{ example }} literal."
+				instructions = "Publish a detailed explanation of each reviewer. Keep {{ example }} literal."
 			}
 			r, factory := resetTestFactory(t)
 			integration, err := models.CreateIntegration(uuid.New(), r.Organization.ID, "github", "workspace-github", nil)
@@ -200,11 +198,12 @@ func TestResetReviewRequestPreservesFallbackAndAgentSettings(t *testing.T) {
 				agent.Configuration["reviewFindingsComment"] = fallback != ""
 				agent.Configuration["reviewFindingsBodyActivationGeneration"] = 4
 				agent.Configuration["reviewFindingsCommentActivationGeneration"] = 3
-				agent.Configuration["additionalInstructions"] = "Prefer the security owner. Keep {{ example }} literal."
+				agent.Configuration["additionalInstructions"] = "Publish a detailed explanation of each reviewer. Keep {{ example }} literal."
 				agent.Configuration["model"] = models.FormatHostedLLMModelKey(models.UsageProviderOpenRouter, "anthropic/claude-sonnet-4-6")
 				agent.Configuration["thinkingLevel"] = "low"
 				agent.Configuration["executionTimeoutSeconds"] = 0
 				agent.Configuration["steps"] = []any{map[string]any{"type": "prompt", "prompt": "Retired selection policy"}}
+				findYAMLNode(t, doc, "request-reviewers").Configuration["managed"] = false
 			})
 			if instructions == "" {
 				findYAMLNode(t, installedCanvas, reviewRequestAgentNodeID).Configuration["additionalInstructions"] = ""
@@ -219,12 +218,24 @@ func TestResetReviewRequestPreservesFallbackAndAgentSettings(t *testing.T) {
 				require.NotNil(t, node.IntegrationID, "%s must keep its GitHub connection after reset", id)
 				require.Equal(t, integration.ID.String(), *node.IntegrationID)
 			}
+			for _, id := range []string{"request-reviewers", "withdraw-reviewers"} {
+				node := findIntakeNode(version.Nodes, id)
+				require.NotNil(t, node)
+				require.Equal(t, true, node.Configuration["managed"], "reset installs managed reconciliation")
+				require.NotNil(t, node.IntegrationID)
+				require.Equal(t, integration.ID.String(), *node.IntegrationID)
+			}
 			agent := findIntakeNode(version.Nodes, reviewRequestAgentNodeID)
 			require.NotNil(t, agent)
 			steps := agent.Configuration["steps"].([]any)
 			prompt := steps[1].(map[string]any)["prompt"].(string)
 			// The managed policy must replace an installed prompt during reset.
 			require.Contains(t, prompt, "Select a contributor to this pull request only when no eligible non-contributor is available.")
+			require.Contains(t, prompt, "publicationSummary")
+			require.Contains(t, prompt, "publicationReason")
+			if instructions != "" {
+				require.NotContains(t, prompt, instructions, "saved user instructions stay separate from the managed prompt")
+			}
 			require.Equal(t, fallback, agent.Configuration["fallbackReviewer"])
 			require.Equal(t, fallback != "", agent.Configuration["publishPRCheck"])
 			require.EqualValues(t, 7, agent.Configuration["prCheckActivationGeneration"])
@@ -235,7 +246,14 @@ func TestResetReviewRequestPreservesFallbackAndAgentSettings(t *testing.T) {
 			require.Equal(t, fallback != "", agent.Configuration["publishReviewFindings"])
 			require.Equal(t, false, agent.Configuration["reviewFindingsBody"])
 			require.Equal(t, fallback != "", agent.Configuration["reviewFindingsComment"])
+			mandatory := findIntakeNode(version.Nodes, "withdrawal-comment")
+			require.NotNil(t, mandatory)
+			require.Equal(t, true, mandatory.Configuration["enabled"], "mandatory explanations do not use optional findings settings")
+			require.NotNil(t, mandatory.IntegrationID)
+			require.Equal(t, integration.ID.String(), *mandatory.IntegrationID)
 			body, comment := findIntakeNode(version.Nodes, reviewFindingsBodyNodeID), findIntakeNode(version.Nodes, reviewFindingsCommentNode)
+			require.Contains(t, body.Configuration["body"], "publicationSummary")
+			require.Equal(t, body.Configuration["body"], comment.Configuration["body"])
 			require.Equal(t, false, body.Configuration["enabled"])
 			require.EqualValues(t, 4, body.Configuration["activationGeneration"])
 			require.Equal(t, fallback != "", comment.Configuration["enabled"])
@@ -252,6 +270,42 @@ func TestResetReviewRequestPreservesFallbackAndAgentSettings(t *testing.T) {
 			require.Equal(t, source.ID.String(), trigger.Configuration["app"])
 			require.Equal(t, false, trigger.Configuration["enabled"])
 			require.NotContains(t, liveCanvasJSON(t, canvas), "retired selection policy")
+		})
+	}
+}
+
+func TestInstallationResetReviewRequestSetupCommands(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		saved    any
+		expected bool
+	}{
+		{name: "legacy installation", expected: true},
+		{name: "skip setup", saved: true, expected: true},
+		{name: "run setup", saved: false, expected: false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r, factory := resetTestFactory(t)
+			require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryReviewRequest))
+			source := resetTestTemplate(t, r, factory, "risk-score", models.ProviderGitHub, func(*yaml.Canvas) {})
+			canvas := resetTestTemplate(t, r, factory, reviewRequestTemplateID, models.ProviderGitHub, func(doc *yaml.Canvas) {
+				findYAMLNode(t, doc, reviewRequestTriggerNodeID).Configuration["app"] = source.ID.String()
+				config := findYAMLNode(t, doc, reviewRequestAgentNodeID).Configuration
+				delete(config, "skipSetupCommands")
+				config["skipRepositoryCheckout"] = true
+				if tc.saved != nil {
+					config["skipSetupCommands"] = tc.saved
+				}
+			})
+			ctx := authentication.SetUserIdInMetadata(t.Context(), r.User.String())
+			result, err := resetBuiltInAutomationForOrganizations(ctx, []models.Organization{*r.Organization}, reviewRequestTemplateID, testIntakeDependencies(r))
+			require.NoError(t, err)
+			require.Empty(t, result.Failed)
+			require.Equal(t, 1, result.Reset)
+			agent := findIntakeNode(resetTestLiveVersion(t, canvas).Nodes, reviewRequestAgentNodeID)
+			require.NotNil(t, agent)
+			require.Equal(t, tc.expected, agent.Configuration["skipSetupCommands"])
+			require.Equal(t, true, agent.Configuration["skipRepositoryCheckout"])
 		})
 	}
 }
@@ -294,7 +348,7 @@ func TestResetBuiltInVerificationSettings(t *testing.T) {
 							return node.Component == "filter" || node.Component == "broadcastMessage"
 						})
 						doc.Spec.Edges = slices.DeleteFunc(doc.Spec.Edges, func(edge yaml.Edge) bool {
-							return edge.SourceID == "publish-merge-confidence" || edge.SourceID == "complete-merge-confidence"
+							return edge.SourceID == "publish-merge-confidence" || edge.SourceID == "comment-merge-confidence" || edge.SourceID == "complete-merge-confidence"
 						})
 					}
 					trigger := findYAMLNode(t, doc, template.entrypointNodeID)
@@ -343,7 +397,7 @@ func TestResetBuiltInVerificationSettings(t *testing.T) {
 						broadcast := findIntakeNode(version.Nodes, "broadcast-merge-confidence")
 						require.NotNil(t, broadcast)
 						assert.Equal(t, "broadcastMessage", broadcast.ComponentName())
-						assert.Contains(t, version.Edges, models.Edge{SourceID: publication.ID, TargetID: gate.ID, Channel: "default"})
+						assert.Contains(t, version.Edges, models.Edge{SourceID: "comment-merge-confidence", TargetID: gate.ID, Channel: "default"})
 						assert.Contains(t, version.Edges, models.Edge{SourceID: gate.ID, TargetID: broadcast.ID, Channel: "default"})
 					}
 				}
@@ -689,6 +743,9 @@ func TestResetPRFeedbackPreservesEachRunnerAndGeneralSettings(t *testing.T) {
 								step := item.(map[string]any)
 								if step["type"] == "prompt" {
 									step["prompt"] = "Do not set git user.email, and do not add Co-authored-by or Signed-off-by trailers."
+									if source == models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion {
+										step["prompt"] = "Post one pull request comment after you address all feedback.\nSummarize the changes in this comment."
+									}
 								}
 							}
 							if source == models.FactoryPRFeedbackHandlerSourcePullRequestChecks {
@@ -762,6 +819,9 @@ func TestResetPRFeedbackPreservesEachRunnerAndGeneralSettings(t *testing.T) {
 							if step["type"] == "prompt" {
 								assert.Contains(t, step["prompt"], "Do not remove or override the automatic sign-off.")
 								assert.Contains(t, step["prompt"], "Do not bypass the Git wrapper, repository hooks, or push verification.")
+								if source == models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion {
+									assert.Contains(t, step["prompt"], prFeedbackCompletionInstructions)
+								}
 							}
 						}
 						assert.True(t, hasGitUser)
@@ -893,7 +953,7 @@ func TestResetUsesTemplateDefaultsForMissingSettings(t *testing.T) {
 		agent := findYAMLNode(t, doc, implementationAgentNodeID)
 		delete(agent.Configuration, "executionTimeoutSeconds")
 		agent.Concurrency = nil
-		delete(findYAMLNode(t, doc, "create-pr").Configuration, "draft")
+		delete(factoryEnvironmentEntry(agent.Configuration, factoryDraftPullRequestsEnv), "value")
 	})
 	require.NoError(t, resetTestOrganization(t, r))
 	version := resetTestLiveVersion(t, canvas)
@@ -905,29 +965,74 @@ func TestResetUsesTemplateDefaultsForMissingSettings(t *testing.T) {
 	assert.False(t, resetTestDraftPullRequests(t, version.Nodes))
 }
 
-func TestResetFollowsMultiRepoTasksForTheImplementationTemplate(t *testing.T) {
+func TestResetMigratesLegacyImplementationTemplates(t *testing.T) {
+	// Only the saved settings and retired pull request node matter to reset.
+	const legacyImplementation = `apiVersion: v1
+kind: Canvas
+metadata:
+  name: Implement
+spec:
+  edges:
+    - sourceId: onrun-implement
+      targetId: implementation-agent-no-issue
+      channel: default
+    - sourceId: implementation-agent-no-issue
+      targetId: create-pr
+      channel: passed
+  nodes:
+    - id: onrun-implement
+      name: Start Implementation
+      type: TYPE_TRIGGER
+      component: onRun
+      configuration: {}
+    - id: implementation-agent-no-issue
+      name: Implement From Task Description
+      type: TYPE_ACTION
+      component: runnerSuperPlane
+      configuration:
+        model: claude-opus-5-5
+        machineType: e1-large-amd64
+        steps:
+          - name: Implementation
+            type: prompt
+            prompt: Retired implementation prompt
+    - id: create-pr
+      name: Create Pull Request
+      type: TYPE_ACTION
+      component: github.createPullRequest
+      configuration:
+        repository: "{{ task().repository }}"
+        base: "{{ task().default_branch }}"
+        head: task-branch
+        title: Implement task
+        draft: true
+`
 	for _, provider := range []string{models.ProviderGitHub, models.ProviderBitbucket} {
 		t.Run(provider, func(t *testing.T) {
 			r, factory := resetTestFactory(t)
-			canvas := resetTestTemplate(t, r, factory, "line-implementation", provider, func(doc *yaml.Canvas) {
-				setResetTestDraftPullRequests(t, doc, true)
-			})
+			canvas := support.CreateFactoryCanvas(t, r, factory.ID, "Implement")
+			doc, err := yaml.CanvasFromYAML([]byte(legacyImplementation))
+			require.NoError(t, err)
+			findYAMLNode(t, doc, "onrun-implement").Metadata = models.FactoryAppTemplateMetadataFor(lineImplementationTemplateID, 1, provider)
+			findYAMLNode(t, doc, "create-pr").Component = provider + ".createPullRequest"
+			agent := findYAMLNode(t, doc, implementationAgentNodeID)
+			rewriteFactoryAgent(agent, &factoryTemplateAgent{component: models.SuperPlaneRunnerComponent, credentialSource: "hosted"})
+			agent.Configuration["additionalInstructions"] = "Keep public APIs compatible."
+			agent.Configuration["thinkingLevel"] = "low"
+			setResetTestDraftPullRequests(t, doc, true)
+			resetTestPublishCanvas(t, r, canvas, doc)
 			hasPullRequestNode := func(nodes []models.Node) bool {
 				return slices.ContainsFunc(nodes, func(node models.Node) bool { return isFactoryPullRequestComponent(node.ComponentName()) })
 			}
 
-			require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryMultiRepoTasks))
 			require.NoError(t, resetTestOrganization(t, r))
 			current := resetTestLiveVersion(t, canvas)
 			assert.False(t, hasPullRequestNode(current.Nodes), "multi-repo agents open their own pull requests")
 			assert.True(t, resetTestDraftPullRequests(t, current.Nodes))
-
-			require.NoError(t, models.DisableExperimentalFeature(r.Organization.ID, features.FeatureFactoryMultiRepoTasks))
-			require.NoError(t, resetTestOrganization(t, r))
-			current = resetTestLiveVersion(t, canvas)
-			assert.True(t, hasPullRequestNode(current.Nodes))
-			assert.Nil(t, factoryEnvironmentEntry(findIntakeNode(current.Nodes, implementationAgentNodeID).Configuration, factoryDraftPullRequestsEnv))
-			assert.True(t, resetTestDraftPullRequests(t, current.Nodes))
+			publishedAgent := findIntakeNode(current.Nodes, implementationAgentNodeID)
+			assert.Equal(t, "Keep public APIs compatible.", publishedAgent.Configuration["additionalInstructions"])
+			assert.Equal(t, "low", publishedAgent.Configuration["thinkingLevel"])
+			assert.NotContains(t, liveCanvasJSON(t, canvas), "Retired implementation prompt")
 		})
 	}
 }
@@ -1051,6 +1156,14 @@ func TestInstallationResetPreservesMergeConfidencePublishing(t *testing.T) {
 	for _, canvas := range saved {
 		version := resetTestLiveVersion(t, canvas)
 		assert.Equal(t, false, findIntakeNode(version.Nodes, "publish-merge-confidence").Configuration["enabled"])
+		source := "publish-merge-confidence"
+		if findIntakeNode(version.Nodes, "comment-merge-confidence") != nil {
+			source = "comment-merge-confidence"
+		}
+		assert.Contains(t, version.Edges, models.Edge{SourceID: source, TargetID: "complete-merge-confidence", Channel: "default"})
+		assert.Contains(t, version.Edges, models.Edge{SourceID: "complete-merge-confidence", TargetID: "broadcast-merge-confidence", Channel: "default"})
+		assert.Equal(t, "filter", findIntakeNode(version.Nodes, "complete-merge-confidence").ComponentName())
+		assert.Equal(t, "broadcastMessage", findIntakeNode(version.Nodes, "broadcast-merge-confidence").ComponentName())
 		factory, err := models.FindFactory(db, canvas.OrganizationID, *canvas.FactoryID)
 		require.NoError(t, err)
 		// The user-facing restore-defaults path supplies no saved settings.
@@ -1059,5 +1172,92 @@ func TestInstallationResetPreservesMergeConfidencePublishing(t *testing.T) {
 		doc, err := yaml.CanvasFromYAML([]byte(restored.canvasYAML))
 		require.NoError(t, err)
 		assert.Equal(t, true, findYAMLNode(t, doc, "publish-merge-confidence").Configuration["enabled"])
+	}
+}
+
+func TestInstallationResetMergeConfidenceSetupCommands(t *testing.T) {
+	for _, provider := range []string{models.ProviderGitHub, models.ProviderBitbucket} {
+		t.Run(provider, func(t *testing.T) {
+			for _, tc := range []struct {
+				name     string
+				saved    any
+				expected bool
+			}{
+				{name: "legacy installation", expected: true},
+				{name: "skip setup", saved: true, expected: true},
+				{name: "run setup", saved: false, expected: false},
+			} {
+				t.Run(tc.name, func(t *testing.T) {
+					r, factory := resetTestFactory(t)
+					canvas := resetTestTemplate(t, r, factory, "risk-score", provider, func(doc *yaml.Canvas) {
+						config := findYAMLNode(t, doc, "assess-risk").Configuration
+						delete(config, "skipSetupCommands")
+						if tc.saved != nil {
+							config["skipSetupCommands"] = tc.saved
+						}
+					})
+					version := resetTestLiveVersion(t, canvas)
+					agent := findIntakeNode(version.Nodes, "assess-risk")
+					require.NotNil(t, agent)
+					saved, present := agent.Configuration["skipSetupCommands"]
+					require.Equal(t, tc.saved != nil, present)
+					require.Equal(t, tc.saved, saved)
+
+					ctx := authentication.SetUserIdInMetadata(t.Context(), r.User.String())
+					result, err := resetBuiltInAutomationForOrganizations(ctx, []models.Organization{*r.Organization}, "risk-score", testIntakeDependencies(r))
+					require.NoError(t, err)
+					require.Empty(t, result.Failed)
+					require.Equal(t, 1, result.Reset)
+					version = resetTestLiveVersion(t, canvas)
+					agent = findIntakeNode(version.Nodes, "assess-risk")
+					require.NotNil(t, agent)
+					require.Equal(t, tc.expected, agent.Configuration["skipSetupCommands"])
+
+					if tc.saved != false {
+						return
+					}
+					// The user-facing restore-defaults path supplies no saved settings.
+					restored, err := materializeNonIntakeFactoryAppDefaults(database.DB(t.Context()), factory, canvas, version, nil)
+					require.NoError(t, err)
+					doc, err := yaml.CanvasFromYAML([]byte(restored.canvasYAML))
+					require.NoError(t, err)
+					require.Equal(t, true, findYAMLNode(t, doc, "assess-risk").Configuration["skipSetupCommands"])
+				})
+			}
+		})
+	}
+}
+
+func TestResetMergeConfidencePreservesPublicationDestinations(t *testing.T) {
+	for name, settings := range map[string]reviewFindingsSettings{"off": {}, "off with comment": {comment: true}, "comment": {publish: true, comment: true}} {
+		t.Run(name, func(t *testing.T) {
+			r, factory := resetTestFactory(t)
+			canvas := resetTestTemplate(t, r, factory, "risk-score", models.ProviderGitHub, func(doc *yaml.Canvas) {
+				config := findYAMLNode(t, doc, "assess-risk").Configuration
+				config["publishPRCheck"] = settings.publish
+				config["publishResults"], config["resultsBody"], config["resultsComment"] = settings.publish, false, settings.comment
+				config["resultsBodyActivationGeneration"], config["resultsCommentActivationGeneration"] = 3, 4
+			})
+			// Seed an already enabled check, as saved before permission validation existed.
+			saved := resetTestLiveVersion(t, canvas)
+			start := findIntakeNode(saved.Nodes, "start-assessment-check")
+			start.Configuration["enabled"] = settings.publish
+			db := database.DB(t.Context())
+			require.NoError(t, db.Model(saved).Update("nodes", datatypes.NewJSONSlice(saved.Nodes)).Error)
+			require.NoError(t, db.Model(&models.CanvasNode{}).Where("workflow_id = ? AND node_id = ?", canvas.ID, start.ID).Update("configuration", datatypes.NewJSONType(start.Configuration)).Error)
+			_, err := ResetOrganizationBuiltInAutomations(context.Background(), r.Organization.ID, testIntakeDependencies(r))
+			require.NoError(t, err)
+			version := resetTestLiveVersion(t, canvas)
+			agent := findIntakeNode(version.Nodes, "assess-risk").Configuration
+			assert.Equal(t, settings.publish, agent["publishPRCheck"])
+			assert.Equal(t, settings.publish, agent["publishResults"])
+			assert.Equal(t, false, agent["resultsBody"])
+			assert.Equal(t, settings.comment, agent["resultsComment"])
+			assert.Equal(t, settings.publish, findIntakeNode(version.Nodes, "start-assessment-check").Configuration["enabled"])
+			assert.Equal(t, false, findIntakeNode(version.Nodes, "publish-merge-confidence").Configuration["enabled"])
+			comment := findIntakeNode(version.Nodes, "comment-merge-confidence").Configuration
+			assert.Equal(t, settings.publish && settings.comment, comment["enabled"])
+			assert.EqualValues(t, 4, comment["activationGeneration"])
+		})
 	}
 }

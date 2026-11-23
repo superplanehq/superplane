@@ -44,17 +44,7 @@ export const createDropletMapper: ComponentBaseMapper = {
     const droplet = outputs?.default?.[0]?.data as DropletPayload | undefined;
     if (!droplet) return details;
 
-    const ip = droplet.networks?.v4?.find((n) => n.type === "public")?.ip_address;
-
-    details["Droplet ID"] = droplet.id?.toString() || "-";
-    details["Name"] = droplet.name || "-";
-    details["Region"] = droplet.region?.name || droplet.region?.slug || "-";
-    details["Size"] = droplet.size_slug || "-";
-    details["OS"] = droplet.image?.name || droplet.image?.slug || "-";
-
-    if (ip) {
-      details["IP Address"] = ip;
-    }
+    Object.assign(details, dropletDetails(droplet));
 
     return details;
   },
@@ -64,6 +54,25 @@ export const createDropletMapper: ComponentBaseMapper = {
     return renderTimeAgo(new Date(context.execution.createdAt));
   },
 };
+
+function dropletDetails(droplet: DropletPayload): Record<string, string> {
+  const region = droplet.region ?? {};
+  const image = droplet.image ?? {};
+  const details: Record<string, string> = {
+    "Droplet ID": droplet.id?.toString() || "-",
+    Name: droplet.name || "-",
+    Region: region.name || region.slug || "-",
+    Size: droplet.size_slug || "-",
+    OS: image.name || image.slug || "-",
+  };
+
+  const ip = droplet.networks?.v4?.find((n) => n.type === "public")?.ip_address;
+  if (ip) {
+    details["IP Address"] = ip;
+  }
+
+  return details;
+}
 
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];

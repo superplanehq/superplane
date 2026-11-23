@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { logoDarkInvertClass } from "@/lib/logoDarkMode";
 import { cn } from "@/lib/utils";
@@ -11,6 +12,8 @@ interface AddColumnAutomationPickerProps {
   onSelect: (entry: ColumnAutomationCatalogEntry) => void;
   catalog: ColumnAutomationCatalogEntry[];
   takenIds?: readonly string[];
+  unavailableReasons?: Readonly<Record<string, string>>;
+  title?: string;
 }
 
 export function AddColumnAutomationPicker({
@@ -19,6 +22,8 @@ export function AddColumnAutomationPicker({
   onSelect,
   catalog,
   takenIds = [],
+  unavailableReasons = {},
+  title = COLUMN_AUTOMATIONS_COPY.pickerTitle,
 }: AddColumnAutomationPickerProps) {
   return (
     <Dialog
@@ -29,44 +34,40 @@ export function AddColumnAutomationPicker({
         }
       }}
     >
-      <DialogContent className="gap-0 p-0 sm:max-w-lg" showCloseButton data-testid="add-column-automation-picker">
+      <DialogContent className="gap-0 p-0 sm:max-w-2xl" showCloseButton data-testid="add-column-automation-picker">
         <DialogHeader className="border-b border-border px-4 py-3 text-left">
-          <DialogTitle className="text-[15px] font-semibold tracking-[-0.01em]">
-            {COLUMN_AUTOMATIONS_COPY.pickerTitle}
-          </DialogTitle>
+          <DialogTitle className="text-[15px] font-semibold tracking-[-0.01em]">{title}</DialogTitle>
           <DialogDescription className="workspace-body-text text-muted-foreground">
             {COLUMN_AUTOMATIONS_COPY.pickerDescription}
           </DialogDescription>
         </DialogHeader>
 
-        <ul className="grid grid-cols-2 gap-2 p-3" data-testid="add-column-automation-templates">
+        <ul
+          className="grid max-h-[70vh] grid-cols-1 gap-2 overflow-y-auto p-3 sm:grid-cols-3"
+          data-testid="add-column-automation-templates"
+        >
           {catalog.map((entry) => {
             const taken = takenIds.includes(entry.id);
+            const unavailableReason = unavailableReasons[entry.id];
+            const disabled = taken || Boolean(unavailableReason);
             return (
               <li key={entry.id}>
-                <button
+                <Button
                   type="button"
-                  disabled={taken}
-                  onClick={() => {
-                    if (taken) {
-                      return;
-                    }
-                    onSelect(entry);
-                  }}
+                  variant="ghost"
+                  disabled={disabled}
+                  onClick={() => onSelect(entry)}
                   data-testid={`add-column-automation-template-${entry.id}`}
-                  className={cn(
-                    "flex h-full min-h-24 w-full flex-col items-start gap-1 rounded-lg border border-border bg-card px-3 py-2.5 text-left shadow-sm transition-colors",
-                    taken ? "cursor-not-allowed opacity-60" : "hover:border-foreground/20 hover:bg-accent/40",
-                  )}
+                  className="h-full min-h-24 w-full flex-col items-start justify-start gap-1 whitespace-normal rounded-lg border border-border bg-card px-3 py-2.5 text-left font-normal shadow-sm hover:border-foreground/20 hover:bg-accent/40 disabled:opacity-60 dark:text-foreground dark:hover:bg-accent/40"
                 >
                   <CatalogGlyph entry={entry} />
                   <span className="text-[13px] font-medium tracking-[-0.01em] leading-5 text-foreground">
                     {entry.name}
                   </span>
                   <span className="workspace-body-text text-muted-foreground">
-                    {taken ? COLUMN_AUTOMATIONS_COPY.sourceTaken : entry.description}
+                    {taken ? COLUMN_AUTOMATIONS_COPY.sourceTaken : (unavailableReason ?? entry.description)}
                   </span>
-                </button>
+                </Button>
               </li>
             );
           })}

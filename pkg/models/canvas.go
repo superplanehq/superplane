@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -154,7 +155,11 @@ func (c *Canvas) SoftDelete() error {
 }
 
 func ValidCanvasColumnKey(key string) bool {
-	return key == CanvasColumnKeyBacklog || key == CanvasColumnKeyImplement || key == CanvasColumnKeyVerify || key == CanvasColumnKeyDone
+	if key == CanvasColumnKeyBacklog || key == CanvasColumnKeyImplement || key == CanvasColumnKeyVerify || key == CanvasColumnKeyDone {
+		return true
+	}
+	_, err := uuid.Parse(strings.TrimPrefix(key, "custom-"))
+	return strings.HasPrefix(key, "custom-") && err == nil
 }
 
 // SetColumnKey attaches this factory canvas to a board column. An empty key
@@ -222,6 +227,13 @@ func FindCanvasInTransaction(tx *gorm.DB, orgID, id uuid.UUID) (*Canvas, error) 
 	}
 
 	return &canvas, nil
+}
+
+func FindFactoryCanvasesByIDs(tx *gorm.DB, organizationID, factoryID uuid.UUID, ids []uuid.UUID) ([]Canvas, error) {
+	var canvases []Canvas
+	err := tx.Where("organization_id = ? AND factory_id = ? AND id IN ?", organizationID, factoryID, ids).
+		Find(&canvases).Error
+	return canvases, err
 }
 
 func CheckCanvasExistence(tx *gorm.DB, orgID, id uuid.UUID) (bool, error) {

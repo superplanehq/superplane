@@ -79,11 +79,15 @@ interface WorkOrderBoardLaneProps {
   actions?: ReactNode;
   /** Part of the header, under the title row. For example the automation rows. */
   subheader?: ReactNode;
+  /** Disclosure regions include their spacing so it collapses with the content. */
+  subheaderOwnSpacing?: boolean;
   /** Pinned between the header and the card list, and kept while the lane is empty. */
   banner?: ReactNode;
   /** When set, a click on the title opens an inline rename field. */
   onRename?: (name: string) => void;
   canRename?: boolean;
+  renameBusy?: boolean;
+  validateName?: (name: string) => string;
   titleTestId?: string;
   /** Accessible name, when it must read differently from the title. */
   label?: string;
@@ -128,9 +132,12 @@ export function WorkOrderBoardLane({
   surfaceClassName,
   actions,
   subheader,
+  subheaderOwnSpacing,
   banner,
   onRename,
   canRename = false,
+  renameBusy,
+  validateName,
   titleTestId,
   label,
   className,
@@ -167,6 +174,8 @@ export function WorkOrderBoardLane({
                 value={title}
                 onSave={onRename}
                 canEdit={canRename}
+                busy={renameBusy}
+                validate={validateName}
                 testId={titleTestId ?? `${testId ?? "lane"}-title`}
                 ariaLabel={`${title} column name`}
                 inputClassName="text-[15px] font-semibold leading-[22.5px] tracking-[-0.01em]"
@@ -177,7 +186,7 @@ export function WorkOrderBoardLane({
           </h2>
           {actions}
         </div>
-        {subheader ? <div className="px-3 pb-2.5">{subheader}</div> : null}
+        <LaneSubheader ownSpacing={subheaderOwnSpacing}>{subheader}</LaneSubheader>
       </header>
 
       <div className={cn("flex min-h-0 flex-1 flex-col", groupedHeader && "p-2")}>
@@ -194,4 +203,11 @@ export function WorkOrderBoardLane({
       </div>
     </section>
   );
+}
+
+function LaneSubheader({ children, ownSpacing }: { children?: ReactNode; ownSpacing?: boolean }) {
+  if (!children) {
+    return null;
+  }
+  return <div className={ownSpacing ? undefined : "px-3 pb-2.5"}>{children}</div>;
 }

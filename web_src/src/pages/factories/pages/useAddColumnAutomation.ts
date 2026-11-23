@@ -13,6 +13,7 @@ import { useNavigate } from "react-router";
 import {
   catalogForColumn,
   onlyCustomCatalogRemains,
+  pickerCatalogForColumn,
   takenCatalogIds,
   type ColumnAutomation,
   type ColumnAutomationCatalogEntry,
@@ -39,6 +40,7 @@ export function useAddColumnAutomation(args: {
   automationsFor: (key: ColumnKey) => ColumnAutomation[];
 }) {
   const [column, setColumn] = useState<ColumnKey | null>(null);
+  const [columnTitle, setColumnTitle] = useState("");
   const [naming, setNaming] = useState(false);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -49,30 +51,41 @@ export function useAddColumnAutomation(args: {
   const allowReviewRequest = experimentalFeatures.has(FEATURE_FACTORY_REVIEW_REQUEST);
   const catalogOptions = { allowCustom, allowReviewRequest, vcsProvider: args.vcsProvider };
 
-  const catalog = column ? catalogForColumn(column, catalogOptions) : [];
-  const takenIds = column ? takenCatalogIds(args.automationsFor(column), catalog) : [];
+  const pickerCatalog = column
+    ? pickerCatalogForColumn(column, catalogOptions)
+    : { catalog: [], unavailableReasons: {} };
+  const catalog = pickerCatalog.catalog;
+  const takenIds = column
+    ? takenCatalogIds(
+        ["backlog", "phase-0", "verify", "done", column].flatMap((key) => args.automationsFor(key as ColumnKey)),
+        catalog,
+      )
+    : [];
 
   const closePicker = () => {
     setColumn(null);
+    setColumnTitle("");
     setNaming(false);
   };
 
-  const openPicker = (key: ColumnKey) => {
+  const openPicker = (key: ColumnKey, title = "") => {
     const nextCatalog = catalogForColumn(key, catalogOptions);
     const nextTaken = takenCatalogIds(args.automationsFor(key), nextCatalog);
     const setupColumn = customAutomationSetupColumn(key);
-    if (setupColumn !== null && onlyCustomCatalogRemains(nextCatalog, nextTaken) && args.lineId) {
+    const customStage = key.startsWith("custom-");
+    if (!customStage && setupColumn !== null && onlyCustomCatalogRemains(nextCatalog, nextTaken) && args.lineId) {
       navigate(
         factoryCustomAutomationSetupPath(args.organizationId, args.factoryKey, args.lineId, undefined, setupColumn),
       );
       return;
     }
     setColumn(key);
-    setNaming(onlyCustomCatalogRemains(nextCatalog, nextTaken));
+    setColumnTitle(title);
+    setNaming(!customStage && onlyCustomCatalogRemains(nextCatalog, nextTaken));
   };
 
   const onSelect = async (entry: ColumnAutomationCatalogEntry) => {
-    if (!column) {
+    if (!column || pickerCatalog.unavailableReasons[entry.id]) {
       return;
     }
     if (entry.kind === "pr-discussion" || entry.kind === "pr-checks" || entry.kind === "custom-verification") {
@@ -123,12 +136,14 @@ export function useAddColumnAutomation(args: {
   return {
     allowCustom,
     pickerColumn: column,
+    pickerTitle: columnTitle ? `Add an automation for ${columnTitle}` : undefined,
     pickerOpen: column !== null && !naming,
     naming,
     openPicker,
     closePicker,
     catalog,
     takenIds,
+    unavailableReasons: pickerCatalog.unavailableReasons,
     onSelect,
     createNamed,
     isPending: createAutomation.isPending || isInstalling,
@@ -278,7 +293,10 @@ async function createCustomAutomation(input: {
 }) {
   const automation = await input.mutateAsync({
     name: input.name,
-    columnKey: input.column === "verify" || input.column === "done" ? input.column : undefined,
+    columnKey:
+      input.column === "verify" || input.column === "done" || input.column.startsWith("custom-")
+        ? input.column
+        : undefined,
   });
   input.close();
   if (!automation.id) {

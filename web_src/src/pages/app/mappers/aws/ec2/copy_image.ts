@@ -70,21 +70,7 @@ export const copyImageMapper: ComponentBaseMapper = {
       };
     }
 
-    return {
-      "Source Image ID": stringOrDash(configuration?.sourceImageId),
-      "Image ID": stringOrDash(output.image?.imageId),
-      Name: stringOrDash(output.image?.name),
-      Description: stringOrDash(output.image?.description),
-      State: stringOrDash(output.image?.state),
-      "Creation Date": stringOrDash(output.image?.creationDate),
-      Architecture: stringOrDash(output.image?.architecture),
-      "Image Type": stringOrDash(output.image?.imageType),
-      "Root Device Type": stringOrDash(output.image?.rootDeviceType),
-      "Root Device Name": stringOrDash(output.image?.rootDeviceName),
-      "Virtualization Type": stringOrDash(output.image?.virtualizationType),
-      Hypervisor: stringOrDash(output.image?.hypervisor),
-      "Owner ID": stringOrDash(output.image?.ownerId),
-    };
+    return copyImageDetails(configuration, output);
   },
 
   subtitle(context: SubtitleContext): string | React.ReactNode {
@@ -95,6 +81,24 @@ export const copyImageMapper: ComponentBaseMapper = {
     return renderTimeAgo(new Date(context.execution.createdAt));
   },
 };
+
+function copyImageDetails(configuration: Configuration | undefined, output: Output): Record<string, string> {
+  return {
+    "Source Image ID": stringOrDash(configuration?.sourceImageId),
+    "Image ID": stringOrDash(output.image?.imageId),
+    Name: stringOrDash(output.image?.name),
+    Description: stringOrDash(output.image?.description),
+    State: stringOrDash(output.image?.state),
+    "Creation Date": stringOrDash(output.image?.creationDate),
+    Architecture: stringOrDash(output.image?.architecture),
+    "Image Type": stringOrDash(output.image?.imageType),
+    "Root Device Type": stringOrDash(output.image?.rootDeviceType),
+    "Root Device Name": stringOrDash(output.image?.rootDeviceName),
+    "Virtualization Type": stringOrDash(output.image?.virtualizationType),
+    Hypervisor: stringOrDash(output.image?.hypervisor),
+    "Owner ID": stringOrDash(output.image?.ownerId),
+  };
+}
 
 function copyImageMetadata(configuration?: Configuration): MetadataItem[] {
   const items: MetadataItem[] = [];

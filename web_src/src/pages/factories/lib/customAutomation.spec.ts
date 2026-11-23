@@ -3,6 +3,8 @@ import { describe, expect, it } from "bun:test";
 import { buildColumnAutomations, columnAutomationOpenPath } from "./columnAutomations";
 import {
   customAutomationDraft,
+  customAutomationTriggersForRun,
+  newCustomAutomationTrigger,
   customAutomationModeCopy,
   customAutomationSettings,
   customAutomationSchedule,
@@ -32,6 +34,9 @@ describe("custom automation settings", () => {
     expect(saved.startMode).toBe("START_MODE_SCHEDULED");
     expect(customAutomationSettings("manual", draft).steps).toEqual(saved.steps);
     expect(customAutomationSettings("automatic", draft).steps).toEqual(saved.steps);
+    expect(customAutomationSettings("leave", draft).startMode).toBe("START_MODE_ON_LEAVE");
+    expect(customAutomationMode("START_MODE_ON_LEAVE")).toBe("leave");
+    expect(customAutomationModeCopy("leave", "verify").trigger).toBe("When a task leaves Verify");
     expect(
       customAutomationSchedule({
         settings: { startMode: "START_MODE_SCHEDULED", schedule: { cronExpression: "0 9 * * *" } },
@@ -65,6 +70,8 @@ describe("custom automation settings", () => {
       startMode: "START_MODE_AUTOMATIC",
       icon: "sparkles",
       executionTimeoutSeconds: 3600,
+      skipSetupCommands: false,
+      skipRepositoryCheckout: false,
       agent: {
         component: "runnerClaudeCode",
         model: "claude-sonnet",
@@ -115,13 +122,18 @@ describe("custom automation settings", () => {
       model: "",
     });
 
-    draft.components[0]!.configuration.credentialSource = "hosted";
+    draft.components[0]!.configuration.credentials = { source: "hosted" };
     expect(customAutomationSettings("automatic", draft).agent?.credentialSource).toBeUndefined();
   });
 
   it("fills an empty create draft from the workspace agent", () => {
     const draft = customAutomationDraft({
-      settings: { agent: workspaceAgentFromOnboarding({ agentHarness: "AGENT_HARNESS_CLAUDE_CODE" }) },
+      settings: {
+        agent: workspaceAgentFromOnboarding(
+          { agentHarness: "AGENT_HARNESS_CLAUDE_CODE", agentIntegrationId: "claude" },
+          [{ metadata: { id: "claude", name: "team", integrationName: "claude" }, status: { state: "ready" } }],
+        ),
+      },
     });
 
     expect(draft.components[0]?.component).toBe("runnerClaudeCode");
@@ -199,6 +211,24 @@ describe("custom automation settings", () => {
     expect(automation?.canRunNow).toBe(true);
   });
 
+  it("lets a person start a Backlog automation that runs with no task", () => {
+    const [automation] = buildColumnAutomations("backlog", {
+      columnTitle: "Backlog",
+      apps: [
+        {
+          id: "column-run",
+          name: "Column run",
+          columnKey: "backlog",
+          templateId: "custom-verification",
+          customAutomationMode: "manual",
+          customAutomationRunsOnTask: false,
+        },
+      ],
+    });
+
+    expect(automation?.canRunNow).toBe(true);
+  });
+
   it("opens an existing managed row in the focused editor", () => {
     const automation = buildColumnAutomations("verify", {
       columnTitle: "Verify",
@@ -226,5 +256,18 @@ describe("custom automation settings", () => {
     expect(customAutomationIdFromSearch("?customAutomation=review-1")).toBe("review-1");
     expect(customAutomationIdFromSearch("?customVerification=review-1")).toBe("review-1");
     expect(customAutomationIdFromSearch("")).toBeUndefined();
+  });
+});
+
+describe("trigger run context", () => {
+  it.each([
+    [undefined, ["manual", "automatic", "leave", "scheduled"]],
+    [true, ["manual", "automatic", "leave"]],
+    [false, ["manual", "scheduled"]],
+  ] as const)("filters triggers for runsOnTask=%s", (runsOnTask, expected) => {
+    const triggers = (["manual", "automatic", "leave", "scheduled"] as const).map((mode) =>
+      newCustomAutomationTrigger(mode),
+    );
+    expect(customAutomationTriggersForRun(triggers, runsOnTask).map(({ mode }) => mode)).toEqual([...expected]);
   });
 });

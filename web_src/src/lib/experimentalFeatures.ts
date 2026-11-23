@@ -21,17 +21,21 @@ export const FEATURE_WORKSPACE_SKILLS = "workspace_skills";
 /** Organization experimental feature: organization Models (BYOK) settings page. */
 export const FEATURE_ORGANIZATION_BYOK = "organization_byok";
 
+/** Organization experimental feature: hosted Model status settings page. */
+export const FEATURE_MODEL_STATUS = "model_status";
+
 /** Organization experimental feature: custom model provider on the BYOK settings page. Requires organization BYOK. */
 export const FEATURE_ORGANIZATION_BYOK_CUSTOM_PROVIDER = "organization_byok_custom_provider";
 
 /** Organization experimental feature: custom automations on Backlog, Implement, Verify, and Done. */
 export const FEATURE_FACTORY_CUSTOM_AUTOMATIONS = "factory_custom_automations";
+export const FEATURE_AUTOMATIONS_AS_CODE = "automations-as-code";
+
+/** Organization experimental feature: custom stages on factory line boards. */
+export const FEATURE_FACTORY_CUSTOM_STAGES = "factory_custom_stages";
 
 /** Organization experimental feature: Mergeable chip on task cards and Merge button on pull request review. */
 export const FEATURE_FACTORY_PULL_REQUEST_MERGE = "factory_pull_request_merge";
-
-/** Organization experimental feature: agents change every Read & Write workspace repository and open one pull request per repository. */
-export const FEATURE_FACTORY_MULTI_REPO_TASKS = "factory_multi_repo_tasks";
 
 /** Organization experimental feature: public workspace MCP server for Cursor and other MCP clients. */
 export const FEATURE_SUPERPLANE_MCP_SERVER = "superplane_mcp_server";

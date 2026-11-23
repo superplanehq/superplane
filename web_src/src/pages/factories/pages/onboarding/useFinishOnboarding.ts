@@ -1,3 +1,4 @@
+import { hasHostedDefaultModel } from "@/lib/hostedLLMModels";
 import { onboardingBillingError } from "./onboardingBilling";
 import { useOrganizationBilling } from "@/hooks/useOrganizationBilling";
 import { useBYOKAccess } from "@/hooks/useBYOKAccess";
@@ -210,7 +211,7 @@ export async function provisionWorkspace(args: {
     backlogRepository: args.backlogRepository,
     issuesSource: apiIssuesSource(args.issuesChoice),
     agentHarness: args.agentPlan.harness,
-    codexSubscription: false,
+    codexSubscription: args.agentPlan.credentialsSource === "subscription",
   });
   const updated = await args.updateOnboarding({ defaultBranch });
   const provisionBranch = branchFromOnboardingUpdate(updated) || defaultBranch;
@@ -319,6 +320,13 @@ async function verifyOnboardingPlan(
   savedPlan: OnboardingAgentPlan | undefined,
 ) {
   try {
+    if (savedPlan?.credentialsSource === "subscription") {
+      const hosted = await usage.refetch();
+      if (hosted.error || !hosted.data || hasHostedDefaultModel(hosted.data)) {
+        throw new Error("SuperPlane could not verify subscription access. Try again.");
+      }
+      return { plan: savedPlan, bypassAnalysis: false };
+    }
     const byokAllowed = await access.verify();
     if (byokAllowed) return { plan: savedPlan, bypassAnalysis: false };
     const hosted = await usage.refetch();

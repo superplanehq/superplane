@@ -1,6 +1,7 @@
 import type { FactoriesFactoryLine, FactoriesWorkOrder } from "@/api-client";
 
 import type { ColumnKey } from "../lib/columnAutomations";
+import { orderedLineBoardStages } from "../lib/lineBoardStages";
 import {
   buildLinePhaseBoard,
   collectLineBacklogOrders,
@@ -61,12 +62,13 @@ export function buildMobileBoardColumns(
   totalCounts?: MobileBoardColumnTotalCounts,
 ): MobileBoardColumn[] {
   const fullBoard = buildLinePhaseBoard(line, workOrders, apps);
-  const verifyOrders = collectLineVerifyOrders(fullBoard, workOrders);
-  const stageColumns = visibleLineStageColumns(fullBoard, verifyOrders);
+  const verifyOrders = collectLineVerifyOrders(fullBoard, workOrders, line);
+  const hasVerifyStage = orderedLineBoardStages(line).some((stage) => stage.kind === "STAGE_KIND_VERIFY");
+  const stageColumns = visibleLineStageColumns(fullBoard, verifyOrders, hasVerifyStage);
   const backlogOrders = collectLineBacklogOrders(workOrders);
   const doneCards = cardsForOrders(collectLineDoneOrders(workOrders, line, fullBoard));
 
-  return [
+  const systemColumns: MobileBoardColumn[] = [
     {
       key: "backlog",
       title: "Backlog",
@@ -101,6 +103,24 @@ export function buildMobileBoardColumns(
       totalCount: doneColumnTotalCount(totalCounts?.done, doneCards),
     },
   ];
+  const byKey = new Map(systemColumns.map((column) => [column.key, column]));
+  const phaseNames = new Map(stageColumns.map((column) => [column.stepIndex, column.stepName]));
+
+  return orderedLineBoardStages(line, phaseNames).flatMap((stage) => {
+    if (stage.kind === "STAGE_KIND_CUSTOM") {
+      return [
+        {
+          key: stage.key as ColumnKey,
+          title: stage.name,
+          cards: [],
+          paging: "open" as const,
+          emptyDescription: "No tasks in this stage.",
+        },
+      ];
+    }
+    const column = byKey.get(stage.key as ColumnKey);
+    return column ? [{ ...column, title: stage.name }] : [];
+  });
 }
 
 /** Index of the column currently snapped into view, from the carousel scroll offset. */

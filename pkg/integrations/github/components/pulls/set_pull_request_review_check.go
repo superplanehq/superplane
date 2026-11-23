@@ -41,17 +41,42 @@ type reviewCheckConfiguration struct {
 	ResultURL                  string             `json:"resultUrl,omitempty" mapstructure:"resultUrl"`
 }
 
+type observedReviewRequest struct {
+	Reviewer ReviewerIdentity `json:"reviewer"`
+	ReviewID int64            `json:"reviewId"`
+}
+
+type reviewRequestActivity struct {
+	RequestedAt time.Time        `json:"requestedAt,omitempty"`
+	Reviewer    ReviewerIdentity `json:"reviewer"`
+	SHA         string           `json:"sha"`
+	Action      string           `json:"action"`
+	At          time.Time        `json:"at"`
+}
+
+type verifiedReviewActivity struct {
+	ID       int64            `json:"id"`
+	Reviewer ReviewerIdentity `json:"reviewer"`
+	SHA      string           `json:"sha"`
+	State    string           `json:"state"`
+}
+
 type reviewCheckState struct {
-	Configuration reviewCheckConfiguration `json:"configuration"`
-	SHA           string                   `json:"sha"`
-	State         string                   `json:"state"`
-	Description   string                   `json:"description"`
-	Delivered     string                   `json:"delivered,omitempty"`
-	Delivery      *reviewCheckDelivery     `json:"delivery,omitempty"`
-	Error         string                   `json:"error,omitempty"`
-	SetupFailures int                      `json:"setupFailures,omitempty"`
-	CheckRun      *pullRequestCheckRun     `json:"checkRun,omitempty"`
-	Retired       []retiredCommitCheck     `json:"retired,omitempty"`
+	ReviewActivity  []verifiedReviewActivity `json:"reviewActivity,omitempty"`
+	Requests        []observedReviewRequest  `json:"requests,omitempty"`
+	RequestActivity []reviewRequestActivity  `json:"requestActivity,omitempty"`
+	ObservedAt      time.Time                `json:"observedAt,omitempty"`
+	RemovedRequests []observedReviewRequest  `json:"removedRequests,omitempty"`
+	Configuration   reviewCheckConfiguration `json:"configuration"`
+	SHA             string                   `json:"sha"`
+	State           string                   `json:"state"`
+	Description     string                   `json:"description"`
+	Delivered       string                   `json:"delivered,omitempty"`
+	Delivery        *reviewCheckDelivery     `json:"delivery,omitempty"`
+	Error           string                   `json:"error,omitempty"`
+	SetupFailures   int                      `json:"setupFailures,omitempty"`
+	CheckRun        *pullRequestCheckRun     `json:"checkRun,omitempty"`
+	Retired         []retiredCommitCheck     `json:"retired,omitempty"`
 }
 
 type pullRequestCheckRun struct {
@@ -95,7 +120,9 @@ An optional Activation Node ID binds participation to that check node in the adm
 
 Source Run ID and Attempt Root Event ID default to trusted current execution records. Cross-canvas sources require broadcast provenance. Persisted creation times and IDs determine order. Older attempts cannot replace newer state, including on the same commit. Disabled activations remain fenced. Activation Generation is a positive saved version. After disabling, use a greater activation generation to enable the check again.
 
-All required reviewers must approve the assessed current commit. Comments do not change approval. Requested changes fail the check. Dismissed replacement reviews cannot revive older approvals. New heads stay pending for a new decision. Closed pull requests stop polling; reopening resumes monitoring.
+One effective approval from a human other than the PR author passes the check. The approver must have repository write, maintain, or admin access and approve the current assessed commit. Any eligible human can approve, including someone outside the suggested selection. Other pending requests or another person's requested changes do not override that approval. GitHub branch rules can require more approvals.
+
+Follow all current human assignments, including manual replacements. Removing the last human request without approval fails the check. A comment-only submission keeps review pending. An empty request list never proves approval. Later changes requests or dismissals revoke that person's approval. Comments do not revoke approval. Dismissed replacement reviews cannot revive older approvals. New heads stay pending for a new decision. Closed pull requests stop polling; reopening resumes monitoring.
 
 Provider failures publish error and retry. Delivery is durable and at least once. A crash after a GitHub write can repeat the same status. This component does not change branch rules or start agents.`
 }
@@ -204,8 +231,10 @@ func executePullRequestCheck(ctx core.ExecutionContext, config reviewCheckConfig
 		return err
 	}
 	config.SourceRunID, config.AttemptRootEventID = order.SourceRunID.String(), order.AttemptRootEventID.String()
+	var requests []observedReviewRequest
 	if config.Phase == "required_reviewers" {
-		if err := validateRecordedReviewers(ctx.Publications, config); err != nil {
+		requests, err = validateRecordedReviewers(ctx.Publications, config)
+		if err != nil {
 			return err
 		}
 	}
@@ -287,7 +316,7 @@ func executePullRequestCheck(ctx core.ExecutionContext, config reviewCheckConfig
 				retired = append(retired, check)
 			}
 		}
-		record.Payload, err = json.Marshal(reviewCheckState{Configuration: config, Delivery: previous.Delivery, Retired: retired, CheckRun: checkRun})
+		record.Payload, err = json.Marshal(reviewCheckState{Configuration: config, Requests: requests, ReviewActivity: previous.ReviewActivity, RequestActivity: previous.RequestActivity, Delivery: previous.Delivery, Retired: retired, CheckRun: checkRun})
 		if err != nil {
 			return err
 		}
@@ -513,17 +542,17 @@ func emitReviewCheck(execution core.ExecutionStateContext, status string, record
 	return execution.Emit("default", payloadType, []any{out})
 }
 
-func validateRecordedReviewers(publications core.PublicationContext, config reviewCheckConfiguration) error {
+func validateRecordedReviewers(publications core.PublicationContext, config reviewCheckConfiguration) ([]observedReviewRequest, error) {
 	execution, err := publications.ExecutionOutput(uuid.MustParse(config.ReviewerRequestExecutionID))
 	if err != nil {
-		return fmt.Errorf("read recorded reviewer requests: %w", err)
+		return nil, fmt.Errorf("read recorded reviewer requests: %w", err)
 	}
 	if execution.Component != "github.ensurePullRequestReviewers" {
-		return fmt.Errorf("reviewer outcome must come from Ensure Pull Request Reviewers")
+		return nil, fmt.Errorf("reviewer outcome must come from Ensure Pull Request Reviewers")
 	}
 	var ensured ensureReviewersConfiguration
 	if err := mapstructure.Decode(execution.Configuration, &ensured); err != nil {
-		return err
+		return nil, err
 	}
 	if !strings.Contains(ensured.Repository, "/") {
 		owner, _, _ := strings.Cut(config.Repository, "/")
@@ -532,31 +561,31 @@ func validateRecordedReviewers(publications core.PublicationContext, config revi
 	number, _ := parsePullNumber(config.PullNumber)
 	ensuredNumber, err := parsePullNumber(ensured.PullNumber)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if !strings.EqualFold(ensured.Repository, config.Repository) || ensuredNumber != number {
-		return fmt.Errorf("reviewer outcome belongs to another pull request")
+		return nil, fmt.Errorf("reviewer outcome belongs to another pull request")
 	}
 	var envelope struct {
 		Type string
 		Data ensureReviewersOutcome
 	}
 	if err := mapstructure.Decode(execution.Output, &envelope); err != nil {
-		return err
+		return nil, err
 	}
 	if envelope.Type != "github.pullRequestReviewersEnsured" || !slices.Contains([]string{"requested", "already_covered"}, envelope.Data.Status) || envelope.Data.HeadSHA != config.AssessedSHA {
-		return fmt.Errorf("reviewer outcome does not cover the assessed commit")
+		return nil, fmt.Errorf("reviewer outcome does not cover the assessed commit")
 	}
 	covered := append(slices.Clone(envelope.Data.Requested), envelope.Data.AlreadyCovered...)
 	if len(covered) != len(config.Reviewers) {
-		return fmt.Errorf("reviewers differ from the recorded outcome")
+		return nil, fmt.Errorf("reviewers differ from the recorded outcome")
 	}
 	for _, reviewer := range config.Reviewers {
 		if !slices.ContainsFunc(covered, func(other ReviewerIdentity) bool {
 			return reviewer.ID == other.ID && strings.EqualFold(reviewer.Login, other.Login)
 		}) {
-			return fmt.Errorf("reviewer is missing from the recorded outcome: %s", reviewer.Login)
+			return nil, fmt.Errorf("reviewer is missing from the recorded outcome: %s", reviewer.Login)
 		}
 	}
-	return nil
+	return envelope.Data.Requests, nil
 }

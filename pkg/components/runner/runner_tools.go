@@ -106,10 +106,6 @@ func TaskCapabilityScopes(environment []TaskEnvironmentVariable) []RunnerToolSco
 	return []RunnerToolScope{}
 }
 
-// MultiRepoTaskScopes lets a task run open pull requests in the workspace
-// repositories. Organizations with multi-repo tasks get it.
-var MultiRepoTaskScopes = []RunnerToolScope{ScopePullRequestsRead, ScopePullRequestsWrite}
-
 // AllowedRunnerTools returns the tool names that the scopes allow, in catalog
 // order.
 func AllowedRunnerTools(scopes []RunnerToolScope) []string {

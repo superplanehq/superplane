@@ -77,7 +77,21 @@ func (a *bodySectionActionAttempt) publish(ctx context.Context, db *gorm.DB, dep
 	defer cancel()
 	db = db.WithContext(ctx)
 	if !a.enabled() {
+		if !a.isComment() && a.integrationConfiguration.SectionKey == "merge-confidence" {
+			return a.verifyUnpublishedAssessment(ctx, db, deps)
+		}
 		return prbody.Skipped("Publication is disabled for this run."), nil
+	}
+	if a.sectionConfiguration().SectionKey == "merge-confidence" {
+		live, err := models.FindLiveCanvasVersionInTransaction(db, a.source.WorkflowID)
+		if err != nil {
+			return bodySectionPublicationOutcome{}, err
+		}
+		for _, node := range live.Nodes {
+			if node.ID == a.execution.NodeID && node.ComponentName() == a.component && node.Configuration["enabled"] == false {
+				return a.verifyUnpublishedAssessment(ctx, db, deps)
+			}
+		}
 	}
 	if a.ordered() && a.state.Publication == nil {
 		return bodySectionPublicationOutcome{}, permanentPublicationError{fmt.Errorf("the publication was not accepted when the step started")}
@@ -104,6 +118,79 @@ func (a *bodySectionActionAttempt) publish(ctx context.Context, db *gorm.DB, dep
 	return a.publishIntegrationBodySection(ctx, db, client)
 }
 
+// An intentionally unpublished assessment still needs a current, open PR before
+// completion. This read never claims a destination or changes existing content.
+func (a *bodySectionActionAttempt) verifyUnpublishedAssessment(ctx context.Context, db *gorm.DB, deps IntakeDependencies) (bodySectionPublicationOutcome, error) {
+	version, err := models.FindCanvasVersionInTransaction(db, a.source.WorkflowID, a.source.VersionID)
+	if err != nil {
+		return bodySectionPublicationOutcome{}, err
+	}
+	if models.FactoryAppTemplateID(version.Nodes) != "risk-score" {
+		return prbody.Skipped("Publication is disabled for this run."), nil
+	}
+	canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(db, a.source.WorkflowID)
+	if err != nil {
+		return bodySectionPublicationOutcome{}, err
+	}
+	if canvas.FactoryID == nil {
+		return prbody.Skipped("Publication is disabled for this run."), nil
+	}
+	workspace, err := models.FindFactory(db, canvas.OrganizationID, *canvas.FactoryID)
+	if err != nil {
+		return bodySectionPublicationOutcome{}, err
+	}
+	config := a.sectionConfiguration()
+	number, err := config.Number()
+	if err != nil {
+		return bodySectionPublicationOutcome{}, err
+	}
+	provider, _, _ := strings.Cut(a.component, ".")
+	pr, err := workspace.FindPullRequest(db, models.FactoryPullRequestLookup{Provider: provider, Repository: config.Repository, Number: number})
+	if err != nil {
+		return bodySectionPublicationOutcome{}, err
+	}
+	publication := sectionPublication{run: a.source, configuration: factorycomponent.UpdatePullRequestBodySectionConfiguration{SectionKey: "merge-confidence"}}
+	eligible := func() (bool, error) {
+		active, err := a.stillActive(db)
+		if err != nil || !active {
+			return false, err
+		}
+		return publication.currentAssessment(db, pr)
+	}
+	active, err := eligible()
+	if err != nil || !active {
+		return prbody.Skipped("Assessment is canceled or superseded."), err
+	}
+	integration, http, err := a.integrationConnection(db, deps)
+	if err != nil {
+		return a.publicationError(err)
+	}
+	client, err := a.bodySectionClient(integration, http)
+	if err != nil {
+		return a.publicationError(err)
+	}
+	latest, err := client.Read(ctx, config.Repository, number)
+	if err != nil {
+		return a.publicationError(err)
+	}
+	if !latest.Open || latest.HeadSHA != config.ExpectedHeadSHA || config.ExpectedHeadSHA == "" {
+		return prbody.Skipped("Pull request is closed or its expected commit changed."), nil
+	}
+	active, err = eligible()
+	if err != nil || !active {
+		return prbody.Skipped("Assessment is canceled or superseded."), err
+	}
+	return bodySectionPublicationOutcome{Status: "disabled", Reason: "Results publication is disabled for this destination."}, nil
+}
+
+func (a *bodySectionActionAttempt) sectionConfiguration() prbody.Configuration {
+	if a.isComment() {
+		comment := a.commentConfiguration
+		return prbody.Configuration{Repository: comment.Repository, PullNumber: comment.PullNumber, SectionKey: comment.CommentKey, Body: comment.Body, ExpectedHeadSHA: comment.ExpectedHeadSHA}
+	}
+	return a.integrationConfiguration
+}
+
 func (a *bodySectionActionAttempt) publishIntegrationBodySection(ctx context.Context, db *gorm.DB, client prbody.Client) (bodySectionPublicationOutcome, error) {
 	config := a.integrationConfiguration
 	eligible := func() (bool, error) { return a.integrationPublicationEligible(db) }
@@ -114,7 +201,7 @@ func (a *bodySectionActionAttempt) publishIntegrationBodySection(ctx context.Con
 	if !config.IsEnabled() || !active {
 		return prbody.Skipped("Publication is disabled, cancelled, or superseded."), nil
 	}
-	if githubClient, ok := client.(*pulls.BodySectionClient); ok && config.SectionKey == "merge-confidence" {
+	if githubClient, ok := client.(*pulls.BodySectionClient); ok {
 		config.Body = a.enrichReviewedCommit(ctx, db, githubClient, config)
 	}
 	publications := a.publications(db)
@@ -133,8 +220,18 @@ func (a *bodySectionActionAttempt) publishComment(ctx context.Context, db *gorm.
 	if err != nil {
 		return a.publicationError(err)
 	}
+	config := a.commentConfiguration
+	if config.CommentKey == reviewRequestTemplateID {
+		bodyClient, err := pulls.NewBodySectionClient(integration, http)
+		if err != nil {
+			return a.publicationError(err)
+		}
+		if githubClient, ok := bodyClient.(*pulls.BodySectionClient); ok {
+			config.Body = a.enrichReviewedCommit(ctx, db, githubClient, a.sectionConfiguration())
+		}
+	}
 	boundary := pulls.NewOrderedCommentBoundary(a.publications(db), *a.state.Publication)
-	outcome, err := pulls.PublishComment(ctx, client, a.commentConfiguration, a.commentConfiguration.Marker(a.execution.WorkflowID), eligible, boundary)
+	outcome, err := pulls.PublishComment(ctx, client, config, config.Marker(a.execution.WorkflowID), eligible, boundary)
 	if outcome.CommentID > 0 {
 		a.state.CommentID = outcome.CommentID
 	}
@@ -164,7 +261,17 @@ func (a *bodySectionActionAttempt) publicationError(err error) (bodySectionPubli
 
 func (a *bodySectionActionAttempt) enrichReviewedCommit(ctx context.Context, db *gorm.DB, client *pulls.BodySectionClient, config prbody.Configuration) string {
 	version, err := models.FindCanvasVersionInTransaction(db, a.source.WorkflowID, a.source.VersionID)
-	if err != nil || models.FactoryAppTemplateID(version.Nodes) != "risk-score" {
+	if err != nil {
+		return config.Body
+	}
+	templateID := models.FactoryAppTemplateID(version.Nodes)
+	var label string
+	switch {
+	case templateID == "risk-score" && config.SectionKey == "merge-confidence":
+		label = "Reviewed commit: "
+	case templateID == reviewRequestTemplateID && config.SectionKey == reviewRequestTemplateID:
+		label = "Assessed commit: "
+	default:
 		return config.Body
 	}
 	canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(db, a.source.WorkflowID)
@@ -176,10 +283,16 @@ func (a *bodySectionActionAttempt) enrichReviewedCommit(ctx context.Context, db 
 		return config.Body
 	}
 	sha := mergeconfidence.ReviewedCommit(root)
+	if templateID == reviewRequestTemplateID {
+		source, _ := models.RootEventSourcePayload(root.Data.Data()).(map[string]any)
+		payload, _ := source["payload"].(map[string]any)
+		sha, _ = payload["reviewedCommit"].(string)
+		sha = strings.TrimSpace(sha)
+	}
 	if sha == "" {
 		return config.Body
 	}
-	line := "Reviewed commit: " + sha
+	line := label + sha
 	lines := strings.Split(config.Body, "\n")
 	index := -1
 	for i, candidate := range lines {
@@ -203,7 +316,7 @@ func (a *bodySectionActionAttempt) enrichReviewedCommit(ctx context.Context, db 
 		return config.Body
 	}
 	commitURL := client.CommitURL(config.Repository, sha)
-	lines[index] = fmt.Sprintf("Reviewed commit: [%s](%s)", exprruntime.MarkdownText(title), commitURL)
+	lines[index] = fmt.Sprintf("%s[%s](%s)", label, exprruntime.MarkdownText(title), commitURL)
 	return strings.Join(lines, "\n")
 }
 
@@ -267,9 +380,15 @@ func (a *bodySectionActionAttempt) integrationPublicationEligible(db *gorm.DB) (
 		return false, err
 	}
 	if a.ordered() {
-		return a.orderedPublicationEligible(db)
+		eligible, err := a.orderedPublicationEligible(db)
+		if err != nil || !eligible {
+			return false, err
+		}
 	}
-	config := a.integrationConfiguration
+	config := a.sectionConfiguration()
+	if a.ordered() && config.SectionKey != "merge-confidence" {
+		return true, nil
+	}
 	publication := sectionPublication{run: a.source, nodeID: a.execution.NodeID, configuration: factorycomponent.UpdatePullRequestBodySectionConfiguration{SectionKey: config.SectionKey}}
 	canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(db, a.source.WorkflowID)
 	if err != nil {
@@ -278,9 +397,11 @@ func (a *bodySectionActionAttempt) integrationPublicationEligible(db *gorm.DB) (
 	if canvas.FactoryID == nil {
 		return true, nil
 	}
-	enabled, err := publication.nodesEnabled(db)
-	if err != nil || !enabled {
-		return false, err
+	if !a.ordered() {
+		enabled, err := publication.nodesEnabled(db)
+		if err != nil || !enabled {
+			return false, err
+		}
 	}
 	workspace, err := models.FindFactory(db, canvas.OrganizationID, *canvas.FactoryID)
 	if err != nil {
@@ -298,7 +419,7 @@ func (a *bodySectionActionAttempt) integrationPublicationEligible(db *gorm.DB) (
 	if err != nil {
 		return false, err
 	}
-	return publication.eligible(db, pr)
+	return publication.currentAssessment(db, pr)
 }
 
 func (a *bodySectionActionAttempt) orderedPublicationEligible(db *gorm.DB) (bool, error) {

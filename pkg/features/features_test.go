@@ -7,6 +7,15 @@ import (
 )
 
 func Test__Get(t *testing.T) {
+	t.Run("model status is visible and unreleased", func(t *testing.T) {
+		f, ok := Get("model_status")
+		assert.True(t, ok)
+		assert.Equal(t, FeatureModelStatus, f.ID)
+		assert.Equal(t, "Model status", f.Label)
+		assert.Nil(t, f.Released)
+		assert.False(t, f.Hidden)
+	})
+
 	t.Run("known id returns feature and true", func(t *testing.T) {
 		f, ok := Get(FeatureFactories)
 		assert.True(t, ok)
@@ -176,6 +185,7 @@ func Test__Exists(t *testing.T) {
 	assert.True(t, Exists(FeatureOrganizationBYOK))
 	assert.True(t, Exists(FeatureOrganizationBYOKCustomProvider))
 	assert.True(t, Exists(FeatureFactoryCustomAutomations))
+	assert.True(t, Exists(FeatureFactoryCustomStages))
 	assert.False(t, Exists("workspace_agent"))
 	assert.True(t, Exists(FeatureWorkspaceSkills))
 	assert.True(t, Exists(FeatureFactoryPullRequestMerge))

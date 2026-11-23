@@ -16,7 +16,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/integrations/datadog"
 	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
@@ -696,19 +695,6 @@ func (c *FactoryContext) githubClientForCanvas() *githubcommon.Client {
 	return nil
 }
 
-// waitsForAllPullRequests keeps a task open until its last pull request is
-// done. Only organizations with multi-repo tasks open more than one.
-func (c *FactoryContext) waitsForAllPullRequests(params core.UpdateWorkOrderStatusParams) (bool, error) {
-	if params.State != models.FactoryWorkOrderStateClosed || !params.WhenAllPullRequestsDone {
-		return false, nil
-	}
-	organization, err := models.FindOrganizationByIDInTransaction(c.tx, c.canvas.OrganizationID.String())
-	if err != nil {
-		return false, err
-	}
-	return organization.HasExperimentalFeature(features.FeatureFactoryMultiRepoTasks), nil
-}
-
 func (c *FactoryContext) UpdateWorkOrderStatus(params core.UpdateWorkOrderStatusParams) (*core.WorkOrder, bool, error) {
 	order, err := c.resolveWorkOrder(params.OrderID)
 	if err != nil {
@@ -722,11 +708,7 @@ func (c *FactoryContext) UpdateWorkOrderStatus(params core.UpdateWorkOrderStatus
 	if params.State == models.FactoryWorkOrderStateClosed && result == models.FactoryWorkOrderResultRejected {
 		result = models.FactoryWorkOrderResultManualRejected
 	}
-	waitForPullRequests, err := c.waitsForAllPullRequests(params)
-	if err != nil {
-		return nil, false, err
-	}
-	if waitForPullRequests {
+	if params.State == models.FactoryWorkOrderStateClosed && params.WhenAllPullRequestsDone {
 		pullRequestResult, done, err := order.PullRequestCloseOutcome(c.tx)
 		if err != nil {
 			return nil, false, err
@@ -736,6 +718,7 @@ func (c *FactoryContext) UpdateWorkOrderStatus(params core.UpdateWorkOrderStatus
 		}
 		result = pullRequestResult
 	}
+	leftColumn, leftErr := models.WorkOrderBoardColumn(c.tx, order)
 	changed, err := order.UpdateStatus(c.tx, models.FactoryWorkOrderStatusUpdate{
 		ToState:         params.State,
 		Result:          result,
@@ -755,6 +738,7 @@ func (c *FactoryContext) UpdateWorkOrderStatus(params core.UpdateWorkOrderStatus
 	if !changed {
 		return workOrderToCore(order), false, nil
 	}
+	c.emitColumnLeave(order, leftColumn, leftErr)
 	if order.State == models.FactoryWorkOrderStateClosed {
 		factoryModel, findErr := models.FindFactory(c.tx, order.OrganizationID, order.FactoryID)
 		if findErr != nil {
@@ -782,6 +766,39 @@ func (c *FactoryContext) UpdateWorkOrderStatus(params core.UpdateWorkOrderStatus
 	})
 	c.captureAutomationClose(order)
 	return workOrderToCore(order), true, nil
+}
+
+func (c *FactoryContext) emitColumnLeave(order *models.FactoryWorkOrder, leftColumn string, leftErr error) {
+	if leftErr != nil {
+		log.WithError(leftErr).Warnf("failed to read the column for task %s", order.ID)
+		return
+	}
+	if leftColumn == "" {
+		return
+	}
+	next, err := models.WorkOrderBoardColumn(c.tx, order)
+	if err != nil || next == leftColumn {
+		if err != nil {
+			log.WithError(err).Warnf("failed to read the column for task %s", order.ID)
+		}
+		return
+	}
+	factoryModel, err := models.FindFactory(c.tx, order.OrganizationID, order.FactoryID)
+	if err != nil {
+		log.WithError(err).Warnf("failed to load factory for leave automation on task %s", order.ID)
+		return
+	}
+	events, err := EmitColumnLeaveCustomAutomations(
+		c.tx, factoryModel, order, leftColumn,
+		ColumnLeaveDedupKey(order.ID, leftColumn, order.UpdatedAt.UTC().Format(time.RFC3339Nano)),
+	)
+	if err != nil {
+		log.WithError(err).Warnf("failed to start %s leave automation for task %s", leftColumn, order.ID)
+		return
+	}
+	if c.onNewEvents != nil {
+		c.onNewEvents(events)
+	}
 }
 
 func (c *FactoryContext) captureAutomationClose(order *models.FactoryWorkOrder) {
@@ -1211,6 +1228,9 @@ func (c *FactoryContext) pullRequestMatch(pullRequest *models.FactoryPullRequest
 	order, err := factoryModel.FindWorkOrder(c.tx, pullRequest.WorkOrderID)
 	if err != nil {
 		return nil, err
+	}
+	if order.IsArchived() {
+		return nil, core.ErrPullRequestNotFound
 	}
 	workOrder := workOrderToCore(order)
 	workOrder.Key = factoryModel.WorkOrderKey(order.Number)

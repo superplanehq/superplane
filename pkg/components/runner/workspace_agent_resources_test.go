@@ -780,16 +780,7 @@ func TestAttachWorkspaceAgentResourcesBlocksPushToReadOnlyBitbucketRepositories(
 		return entries
 	}
 
-	t.Run("keeps push without multi-repo tasks", func(t *testing.T) {
-		entries := contextEntries(t)
-		assert.True(t, entries["acme/web"].ReadOnly)
-		assert.False(t, entries["acme/web"].PushBlocked)
-		assert.False(t, entries["acme/docs"].PushBlocked)
-	})
-
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryMultiRepoTasks))
-
-	t.Run("blocks push only for read-only repositories with multi-repo tasks", func(t *testing.T) {
+	t.Run("blocks push only for read-only repositories", func(t *testing.T) {
 		entries := contextEntries(t)
 		assert.False(t, entries["acme/web"].ReadOnly)
 		assert.False(t, entries["acme/web"].PushBlocked)
@@ -831,6 +822,73 @@ func TestAttachWorkspaceAgentResourcesSkipsSetupCommandsWhenConfigured(t *testin
 	assert.NotContains(t, paths, runner.WorkspaceSetupConfigPath)
 	assert.NotContains(t, paths["prompts/implement.txt"], "npm ci")
 	assert.Contains(t, paths["prompts/implement.txt"], "superplanehq/suss")
+
+	work := []runner.TaskCommand{
+		{Name: "Prepare agent", Kind: runner.LiveLogKindSetup, Command: "prepare-agent"},
+		{Name: "Explicit Bash", Kind: runner.LiveLogKindBash, Command: "make docs"},
+		{Name: "Implement", Kind: runner.LiveLogKindPrompt, Command: "run-agent"},
+	}
+	bash := "make docs"
+	commands := runner.ApplyFactoryCheckout(files, work, []runner.AgentStep{
+		{Name: "Explicit Bash", Type: runner.AgentStepBash, Command: &bash},
+	}, false)
+	require.Len(t, commands, 4)
+	assert.Equal(t, work[0], commands[0])
+	assert.Equal(t, "Checkout", commands[1].Name)
+	assert.Equal(t, work[1:], commands[2:])
+	for _, command := range commands {
+		assert.NotContains(t, command.Command, "npm ci")
+	}
+	for _, file := range files {
+		if file.Path == "prompts/implement.txt" {
+			assert.NotContains(t, file.Content, "npm ci")
+		}
+	}
+}
+
+func TestAttachWorkspaceAgentResourcesSkipsSetupCommandsForOtherRepository(t *testing.T) {
+	r := setupWorkspaceAgentResources(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	primary := "acme/app"
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{AppRepository: &primary}))
+	canvas := support.CreateFactoryCanvas(t, r, factory.ID, "Line app")
+	_, err = factory.CreateAgentResource(db, models.FactoryAgentResourceKindSetup, "setup", true, models.FactoryAgentResourceConfig{
+		Commands: []string{"npm ci"},
+	})
+	require.NoError(t, err)
+
+	attach := func(t *testing.T, environment []runner.TaskEnvironmentVariable) map[string]string {
+		t.Helper()
+		_, files := runner.AttachWorkspaceAgentResources(core.ExecutionContext{
+			OrganizationID: r.Organization.ID.String(),
+			WorkflowID:     canvas.ID.String(),
+		}, environment, []runner.TaskFile{
+			{Path: "prompts/review.txt", Content: "Review the pull request.\n", Mode: "0644"},
+		})
+		paths := map[string]string{}
+		for _, file := range files {
+			paths[file.Path] = file.Content
+		}
+		return paths
+	}
+
+	t.Run("skips setup for a pull request in another repository", func(t *testing.T) {
+		paths := attach(t, []runner.TaskEnvironmentVariable{{Name: "REPO", Value: "acme/docs"}})
+		assert.NotContains(t, paths, runner.WorkspaceSetupConfigPath)
+		assert.NotContains(t, paths["prompts/review.txt"], "npm ci")
+	})
+
+	t.Run("skips setup when only the clone URL names another repository", func(t *testing.T) {
+		paths := attach(t, []runner.TaskEnvironmentVariable{{Name: "REPO_URL", Value: "https://github.com/acme/docs.git"}})
+		assert.NotContains(t, paths, runner.WorkspaceSetupConfigPath)
+	})
+
+	t.Run("keeps setup for the primary repository in any case", func(t *testing.T) {
+		paths := attach(t, []runner.TaskEnvironmentVariable{{Name: "REPO", Value: "ACME/App"}})
+		assert.Contains(t, paths, runner.WorkspaceSetupConfigPath)
+	})
 }
 
 func TestAttachWorkspaceAgentResourcesAttachesSetupAndContextWithoutAgentFlag(t *testing.T) {

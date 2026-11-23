@@ -7,6 +7,7 @@ type ClickToRenameProps = {
   onSave: (next: string) => void;
   canEdit: boolean;
   busy?: boolean;
+  validate?: (name: string) => string;
   testId: string;
   ariaLabel: string;
   className?: string;
@@ -25,6 +26,7 @@ export function ClickToRename({
   onSave,
   canEdit,
   busy = false,
+  validate,
   testId,
   ariaLabel,
   className,
@@ -32,6 +34,7 @@ export function ClickToRename({
 }: ClickToRenameProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
+  const [error, setError] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const skipBlurCommitRef = useRef(false);
 
@@ -59,6 +62,7 @@ export function ClickToRename({
     event?.preventDefault();
     skipBlurCommitRef.current = false;
     setDraft(value);
+    setError("");
     setEditing(true);
   };
 
@@ -69,7 +73,14 @@ export function ClickToRename({
   };
 
   const commitDraft = () => {
+    if (!canEdit || busy) return;
     const next = draft.trim();
+    const validationError = validate?.(next) ?? "";
+    setError(validationError);
+    if (validationError) {
+      inputRef.current?.focus();
+      return;
+    }
     if (!next) {
       inputRef.current?.focus();
       return;
@@ -135,6 +146,8 @@ export function ClickToRename({
           }}
           onKeyDown={handleKeyDown}
           disabled={busy}
+          aria-invalid={Boolean(error)}
+          aria-describedby={error ? `${testId}-error` : undefined}
           aria-label={ariaLabel}
           data-testid={`${testId}-input`}
           className={cn(
@@ -142,6 +155,15 @@ export function ClickToRename({
             inputClassName,
           )}
         />
+      ) : null}
+      {editing && error ? (
+        <span
+          id={`${testId}-error`}
+          role="alert"
+          className="absolute top-full left-0 z-20 rounded bg-background p-1 text-xs text-destructive shadow-sm"
+        >
+          {error}
+        </span>
       ) : null}
     </span>
   );

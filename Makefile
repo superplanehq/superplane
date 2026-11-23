@@ -737,9 +737,9 @@ image.prepare:
 	  test "$$(go env GOOS)/$$(go env GOARCH)" = "$(IMAGE_PLATFORM)" || { \
 	    echo "Build container must match IMAGE_PLATFORM=$(IMAGE_PLATFORM)" >&2; exit 1; \
 	  }; \
-	  go build -o "$(IMAGE_BUILD_DIR)/app/build/superplane" cmd/server/main.go; \
+	  CGO_ENABLED=0 go build -o "$(IMAGE_BUILD_DIR)/app/build/superplane" cmd/server/main.go; \
 	  mkdir -p "$(IMAGE_BUILD_DIR)/usr/bin"; \
-	  cp /usr/bin/createdb /usr/bin/migrate "$(IMAGE_BUILD_DIR)/usr/bin/"'
+	  cp /usr/bin/migrate "$(IMAGE_BUILD_DIR)/usr/bin/"'
 	$(COMPOSE) exec -T app bash -lc 'cd web_src && NODE_OPTIONS=--max-old-space-size=4096 npx tsc -b'
 
 image.package:

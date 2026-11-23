@@ -234,7 +234,7 @@ function MergeMethodMenu({
           type="button"
           variant="outline"
           size={compact ? "sm" : "lg"}
-          className={compact ? "px-2" : "h-11 px-2.5"}
+          className={compact ? "!rounded-l-none px-2" : "!rounded-l-none h-11 px-2.5"}
           disabled={disabled}
           aria-label={PULL_REQUEST_REVIEW_COPY.mergeMethod}
           data-testid="split-run-merge-method"

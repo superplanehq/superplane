@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { ArrowDown, ArrowUp, MessageSquareText, Plus, Terminal, Trash2, Zap } from "lucide-react";
-import type { ReactNode } from "react";
+import { GripVertical, MessageSquareText, Plus, Terminal, Trash2, Zap } from "lucide-react";
+import type { MouseEvent, MutableRefObject, ReactNode } from "react";
 
 import {
   customAutomationColumnLabel,
@@ -13,22 +13,28 @@ import type { PlanningReviewStep, PlanningReviewStepKind } from "./planningRevie
 
 export function AutomationFlow({
   columnKey = "verify",
+  asCode = false,
   triggers,
+  runsOnTask,
   steps,
   selectedStep,
   onSelectTrigger,
   onSelectStep,
-  onMoveStep,
+  onStartDrag,
+  rowRefs,
   onRemoveStep,
   onAddStep,
 }: {
   columnKey?: CustomAutomationColumn;
+  asCode?: boolean;
   triggers: CustomAutomationTrigger[];
+  runsOnTask: boolean;
   steps: PlanningReviewStep[];
   selectedStep: number | null;
   onSelectTrigger: () => void;
   onSelectStep: (index: number) => void;
-  onMoveStep: (index: number, offset: -1 | 1) => void;
+  onStartDrag: (event: MouseEvent, index: number) => void;
+  rowRefs: MutableRefObject<Array<HTMLDivElement | null>>;
   onRemoveStep: (index: number) => void;
   onAddStep: () => void;
 }) {
@@ -39,19 +45,28 @@ export function AutomationFlow({
         <FlowCard selected={selectedStep === null} onClick={onSelectTrigger}>
           <FlowBadge kind="trigger" />
           <p className="mt-3 text-sm font-semibold text-foreground">{sidebarTriggerTitle(triggers, columnKey)}</p>
-          <p className="mt-1 text-xs text-muted-foreground">{sidebarTriggerDescription(triggers, columnKey)}</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {sidebarTriggerDescription(triggers, columnKey, runsOnTask)}
+          </p>
         </FlowCard>
         {steps.map((step, index) => (
-          <div className="flex w-full flex-col items-center" key={index}>
+          <div
+            className="flex w-full flex-col items-center"
+            key={index}
+            data-testid="custom-automation-step-row"
+            ref={(element) => {
+              rowRefs.current[index] = element;
+            }}
+          >
             <FlowConnector />
             <FlowCard
               selected={selectedStep === index}
               onClick={() => onSelectStep(index)}
               actions={
                 <StepCardActions
-                  position={index}
+                  label={step.name || `Step ${index + 1}`}
                   stepCount={steps.length}
-                  onMove={(offset) => onMoveStep(index, offset)}
+                  onStartDrag={(event) => onStartDrag(event, index)}
                   onRemove={() => onRemoveStep(index)}
                 />
               }
@@ -59,7 +74,11 @@ export function AutomationFlow({
               <FlowBadge kind={step.type} />
               <p className="mt-3 truncate text-sm font-semibold text-foreground">{step.name || `Step ${index + 1}`}</p>
               <p className="mt-1 truncate text-xs text-muted-foreground">
-                {step.type === "prompt" ? mergeCheckPromptBody(step.prompt) : step.command || "No commands yet."}
+                {step.type === "prompt"
+                  ? asCode
+                    ? step.prompt
+                    : mergeCheckPromptBody(step.prompt)
+                  : step.command || "No commands yet."}
               </p>
             </FlowCard>
           </div>
@@ -108,6 +127,7 @@ function FlowCard({
       <button
         type="button"
         onClick={onClick}
+        aria-pressed={selected}
         className={cn(
           "w-full rounded-xl border bg-card px-4 py-4 text-left shadow-sm transition-colors hover:border-foreground/30",
           selected ? "border-primary ring-2 ring-primary/15" : "border-border",
@@ -125,40 +145,31 @@ function FlowCard({
 }
 
 function StepCardActions({
-  position,
+  label,
   stepCount,
-  onMove,
+  onStartDrag,
   onRemove,
 }: {
-  position: number;
+  label: string;
   stepCount: number;
-  onMove: (offset: -1 | 1) => void;
+  onStartDrag: (event: MouseEvent) => void;
   onRemove: () => void;
 }) {
   return (
     <>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon-xs"
-        className="size-6 text-muted-foreground/60 hover:bg-muted hover:text-foreground"
-        aria-label="Move step up"
-        disabled={position === 0}
-        onClick={() => onMove(-1)}
-      >
-        <ArrowUp className="size-3.5" aria-hidden />
-      </Button>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon-xs"
-        className="size-6 text-muted-foreground/60 hover:bg-muted hover:text-foreground"
-        aria-label="Move step down"
-        disabled={position === stepCount - 1}
-        onClick={() => onMove(1)}
-      >
-        <ArrowDown className="size-3.5" aria-hidden />
-      </Button>
+      {stepCount > 1 ? (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-xs"
+          className="size-6 cursor-grab text-muted-foreground/60 hover:bg-muted hover:text-foreground active:cursor-grabbing"
+          aria-label={`Reorder ${label}`}
+          onMouseDown={onStartDrag}
+          onClick={(event) => event.stopPropagation()}
+        >
+          <GripVertical className="size-3.5" aria-hidden />
+        </Button>
+      ) : null}
       <Button
         type="button"
         variant="ghost"
@@ -181,13 +192,17 @@ function sidebarTriggerTitle(triggers: CustomAutomationTrigger[], columnKey: Cus
   return triggerTitle(trigger.mode, columnKey);
 }
 
-function sidebarTriggerDescription(triggers: CustomAutomationTrigger[], columnKey: CustomAutomationColumn): string {
+function sidebarTriggerDescription(
+  triggers: CustomAutomationTrigger[],
+  columnKey: CustomAutomationColumn,
+  runsOnTask: boolean,
+): string {
   const trigger = triggers[0];
   if (!trigger) {
     return "Add a trigger.";
   }
   if (triggers.length === 1) {
-    return triggerDescription(trigger.mode, columnKey);
+    return triggerDescription(trigger.mode, columnKey, runsOnTask);
   }
   const titles = triggers.map((item) => triggerTitle(item.mode, columnKey));
   const titlesRepeat = new Set(titles).size !== titles.length;
@@ -202,6 +217,7 @@ function sidebarTriggerDescription(triggers: CustomAutomationTrigger[], columnKe
 
 function triggerTitle(mode: CustomAutomationTrigger["mode"], columnKey: CustomAutomationColumn): string {
   if (mode === "scheduled") return "Schedule";
+  if (mode === "leave") return `When a task leaves ${customAutomationColumnLabel(columnKey)}`;
   if (mode === "automatic") {
     return columnKey === "verify"
       ? "Every pull request commit"
@@ -210,16 +226,23 @@ function triggerTitle(mode: CustomAutomationTrigger["mode"], columnKey: CustomAu
   return "Manual";
 }
 
-function triggerDescription(mode: CustomAutomationTrigger["mode"], columnKey: CustomAutomationColumn): string {
+function triggerDescription(
+  mode: CustomAutomationTrigger["mode"],
+  columnKey: CustomAutomationColumn,
+  runsOnTask: boolean,
+): string {
   if (mode === "scheduled") {
     return columnKey === "backlog" ? "Run automation on a schedule." : "Runs on the repository default branch.";
+  }
+  if (mode === "leave") {
+    return `Runs when a task leaves ${customAutomationColumnLabel(columnKey)}.`;
   }
   if (mode === "automatic") {
     return columnKey === "verify"
       ? "Runs for every new pull request commit."
       : `Runs when a task enters ${customAutomationColumnLabel(columnKey)}.`;
   }
-  return "Runs when you start it from a task.";
+  return runsOnTask ? "Runs when you start it from a task." : "Runs when you start it from the column.";
 }
 
 function FlowConnector() {

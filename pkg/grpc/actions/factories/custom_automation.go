@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -27,8 +28,10 @@ const (
 	customAutomationDefaultName      = "Custom automation"
 	customAutomationTriggerID        = "on-pull-request"
 	customAutomationTaskTriggerID    = "on-task"
+	customAutomationColumnStartID    = "column-start"
 	customAutomationRunnerID         = "verify"
 	customAutomationScheduleRunnerID = "schedule-run"
+	customAutomationLeaveRunnerID    = "leave-run"
 	customAutomationVersion          = 1
 	backlogTaskRunnerName            = "Run automation"
 )
@@ -80,7 +83,7 @@ func CreateFactoryCustomAutomation(
 	if !customAutomationColumnAllowed(column) {
 		return nil, factoryErrorToStatus(invalidArgument("column must be backlog, implement, verify, or done"), "failed to create custom automation")
 	}
-	settings, err := parseCustomAutomationSettings(db, factory, req.GetSettings())
+	settings, err := customAutomationSettingsForSave(db, factory, req.GetSettings(), versionOwnerID(ctx))
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create custom automation")
 	}
@@ -170,9 +173,10 @@ func UpdateFactoryCustomAutomation(
 	organizationID string,
 	req *pb.UpdateFactoryCustomAutomationRequest,
 ) (*pb.UpdateFactoryCustomAutomationResponse, error) {
+	const errorMessage = "failed to update custom automation"
 	orgID, err := parseOrganizationID(organizationID)
 	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to update custom automation")
+		return nil, factoryErrorToStatus(err, errorMessage)
 	}
 	userID, ok := authentication.GetUserIdFromMetadata(ctx)
 	if !ok {
@@ -180,69 +184,104 @@ func UpdateFactoryCustomAutomation(
 	}
 	ownerID, err := uuid.Parse(userID)
 	if err != nil {
-		return nil, factoryErrorToStatus(invalidArgument("invalid user id"), "failed to update custom automation")
+		return nil, factoryErrorToStatus(invalidArgument("invalid user id"), errorMessage)
+	}
+	name := strings.TrimSpace(req.GetName())
+	if name == "" {
+		return nil, factoryErrorToStatus(invalidArgument("name is required"), errorMessage)
 	}
 
 	db := database.DB(ctx)
 	factory, err := findFactory(db, orgID, req.GetFactoryId())
 	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to update custom automation")
+		return nil, factoryErrorToStatus(err, errorMessage)
 	}
-	canvas, err := findCustomAutomationCanvas(db, factory, req.GetAutomationId())
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to update custom automation")
-	}
-	settings, err := parseCustomAutomationSettings(db, factory, req.GetSettings())
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to update custom automation")
-	}
-	name := strings.TrimSpace(req.GetName())
-	if name == "" {
-		return nil, factoryErrorToStatus(invalidArgument("name is required"), "failed to update custom automation")
-	}
-	if canvas.ColumnKey != nil {
-		settings.ColumnKey = *canvas.ColumnKey
-	}
-	doc, err := buildCustomAutomationCanvas(db, factory, name, settings)
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to update custom automation")
-	}
-	if err := preserveCustomAutomationNodeIdentities(db, canvas, doc); err != nil {
-		return nil, factoryErrorToStatus(err, "failed to update custom automation")
-	}
-	nodes, edges, err := doc.ParseInTransaction(deps.Registry, orgID.String(), db)
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to build custom automation")
-	}
-
+	var canvas *models.Canvas
+	var automation *pb.FactoryCustomAutomation
 	err = db.Transaction(func(tx *gorm.DB) error {
+		factory, err := models.LockAutomationFactory(tx, orgID, factory.ID)
+		if err != nil {
+			return err
+		}
+		current, err := findCustomAutomationCanvas(tx, factory, req.GetAutomationId())
+		if err != nil {
+			return err
+		}
+		canvas, err = models.LockCanvasForUpdate(tx, orgID, current.ID)
+		if err != nil {
+			return err
+		}
+		live, err := models.FindLiveCanvasVersionByCanvasInTransaction(tx, canvas)
+		if err != nil {
+			return err
+		}
+		if expected := req.GetExpectedLiveVersionId(); expected != "" && expected != live.ID.String() {
+			return grpcerrors.FailedPrecondition(nil, "The automation changed. Reopen it before you save.")
+		}
+		if models.FactoryAppTemplateID(live.Nodes) != models.FactoryAppTemplateCustomAutomationID {
+			return invalidArgument("automation is not a custom automation")
+		}
+		authored, err := findLegacyAutomationSource(tx, canvas)
+		if err != nil {
+			return err
+		}
+		settings, err := customAutomationSettingsForSave(tx, factory, req.GetSettings(), ownerID)
+		if err != nil {
+			return err
+		}
+		if canvas.ColumnKey != nil {
+			settings.ColumnKey = *canvas.ColumnKey
+		}
+		if settings.SkipSetupCommands == nil || settings.SkipRepositoryCheckout == nil {
+			previous, err := serializeCustomAutomationVersion(factory, canvas, live)
+			if err != nil {
+				return err
+			}
+			if settings.SkipSetupCommands == nil {
+				settings.SkipSetupCommands = previous.GetSettings().SkipSetupCommands
+			}
+			if settings.SkipRepositoryCheckout == nil {
+				settings.SkipRepositoryCheckout = previous.GetSettings().SkipRepositoryCheckout
+			}
+		}
+		doc, err := buildCustomAutomationCanvas(tx, factory, name, settings)
+		if err != nil {
+			return err
+		}
+		if err := preserveCustomAutomationIdentities(live, doc); err != nil {
+			return err
+		}
+		nodes, edges, err := doc.ParseInTransaction(deps.Registry, orgID.String(), tx)
+		if err != nil {
+			return err
+		}
+
 		if err := canvases.PublishGeneratedCanvasNodes(
-			ctx,
-			tx,
-			canvas,
-			ownerID,
-			"Update custom automation",
-			nodes,
-			edges,
-			intakePublisherOptions(deps, orgID),
+			ctx, tx, canvas, ownerID, "Update custom automation", nodes, edges, intakePublisherOptions(deps, orgID),
 		); err != nil {
 			return err
 		}
-		return canvases.UpdateCanvasInTransaction(tx, canvas, &name, nil)
+		if err := canvases.UpdateCanvasInTransaction(tx, canvas, &name, nil); err != nil {
+			return err
+		}
+		canvas, err = models.FindCanvasInTransaction(tx, orgID, canvas.ID)
+		if err != nil {
+			return err
+		}
+		version, err := models.FindLiveCanvasVersionByCanvasInTransaction(tx, canvas)
+		if err != nil {
+			return err
+		}
+		if err := refreshLegacyAutomationSource(tx, factory, canvas, version, authored); err != nil {
+			return err
+		}
+		automation, err = serializeCustomAutomationVersion(factory, canvas, version)
+		return err
 	})
 	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to update custom automation")
+		return nil, factoryErrorToStatus(err, errorMessage)
 	}
 	canvases.PublishCanvasUpdated(canvas)
-
-	canvas, err = models.FindCanvasInTransaction(db, orgID, canvas.ID)
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to update custom automation")
-	}
-	automation, err := serializeCustomAutomation(db, factory, canvas)
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to update custom automation")
-	}
 	return &pb.UpdateFactoryCustomAutomationResponse{CustomAutomation: automation}, nil
 }
 
@@ -261,6 +300,45 @@ type customAutomationSettings struct {
 	ExecutionTimeoutSeconds int
 	Schedule                *pb.FactoryCustomAutomation_Schedule
 	Triggers                []customAutomationTrigger
+	RunsOnTask              *bool
+	SkipSetupCommands       *bool
+	SkipRepositoryCheckout  *bool
+}
+
+func (settings *customAutomationSettings) runsWithoutTask() bool {
+	return settings != nil && settings.RunsOnTask != nil && !*settings.RunsOnTask
+}
+
+// A custom automation can select a model for its workspace agent.
+func (settings *customAutomationSettings) model() string {
+	if settings.Agent != nil && settings.Agent.Model != "" {
+		return settings.Agent.Model
+	}
+	return settings.Agent.model()
+}
+
+func customAutomationSettingsForSave(
+	tx *gorm.DB,
+	factory *models.Factory,
+	input *pb.FactoryCustomAutomation_Settings,
+	callerID uuid.UUID,
+) (*customAutomationSettings, error) {
+	settings, err := parseCustomAutomationSettings(tx, factory, input)
+	if err != nil {
+		return nil, err
+	}
+	agent := settings.Agent
+	if strings.TrimSpace(input.GetAgent().GetModel()) == "" || (agent.Component != models.SuperPlaneRunnerComponent && !agent.subscription()) {
+		return settings, nil
+	}
+	allowed, err := validateCustomAutomationModel(tx, factory, agent, callerID)
+	if err != nil {
+		return nil, err
+	}
+	if !allowed {
+		return nil, invalidArgument("Select a model available for this agent in the factory.")
+	}
+	return settings, nil
 }
 
 func parseCustomAutomationSettings(
@@ -273,6 +351,9 @@ func parseCustomAutomationSettings(
 	}
 	triggers, startMode, scheduleSettings, err := parseCustomAutomationTriggers(input)
 	if err != nil {
+		return nil, err
+	}
+	if err := validateCustomAutomationRunContext(input.RunsOnTask, triggers); err != nil {
 		return nil, err
 	}
 
@@ -319,7 +400,26 @@ func parseCustomAutomationSettings(
 		Steps:                   steps,
 		Icon:                    strings.TrimSpace(input.GetIcon()),
 		ExecutionTimeoutSeconds: timeout,
+		RunsOnTask:              input.RunsOnTask,
+		SkipSetupCommands:       input.SkipSetupCommands,
+		SkipRepositoryCheckout:  input.SkipRepositoryCheckout,
 	}, nil
+}
+
+func validateCustomAutomationRunContext(runsOnTask *bool, triggers []customAutomationTrigger) error {
+	if runsOnTask == nil {
+		return nil
+	}
+	for _, trigger := range triggers {
+		if *runsOnTask && trigger.Mode == pb.FactoryCustomAutomation_START_MODE_SCHEDULED {
+			return invalidArgument("A schedule runs with no task.")
+		}
+		if !*runsOnTask && (trigger.Mode == pb.FactoryCustomAutomation_START_MODE_AUTOMATIC ||
+			trigger.Mode == pb.FactoryCustomAutomation_START_MODE_ON_LEAVE) {
+			return invalidArgument("This trigger runs on a task.")
+		}
+	}
+	return nil
 }
 
 func parseCustomAutomationTriggers(
@@ -328,8 +428,9 @@ func parseCustomAutomationTriggers(
 	if len(input.GetTriggers()) == 0 {
 		if input.GetStartMode() != pb.FactoryCustomAutomation_START_MODE_MANUAL &&
 			input.GetStartMode() != pb.FactoryCustomAutomation_START_MODE_AUTOMATIC &&
-			input.GetStartMode() != pb.FactoryCustomAutomation_START_MODE_SCHEDULED {
-			return nil, 0, nil, invalidArgument("Choose Manual, Automatic, or Schedule.")
+			input.GetStartMode() != pb.FactoryCustomAutomation_START_MODE_SCHEDULED &&
+			input.GetStartMode() != pb.FactoryCustomAutomation_START_MODE_ON_LEAVE {
+			return nil, 0, nil, invalidArgument("Choose Manual, Automatic, Schedule, or When a task leaves the column.")
 		}
 		var schedule *pb.FactoryCustomAutomation_Schedule
 		if input.GetStartMode() == pb.FactoryCustomAutomation_START_MODE_SCHEDULED {
@@ -347,9 +448,11 @@ func parseCustomAutomationTriggers(
 	triggers := make([]customAutomationTrigger, 0, len(input.GetTriggers()))
 	manualCount := 0
 	automaticCount := 0
+	leaveCount := 0
 	var onlySchedule *pb.FactoryCustomAutomation_Schedule
 	scheduledCount := 0
 	hasAutomatic := false
+	hasLeave := false
 	hasManual := false
 	for index, trigger := range input.GetTriggers() {
 		mode := trigger.GetStartMode()
@@ -361,6 +464,9 @@ func parseCustomAutomationTriggers(
 		case pb.FactoryCustomAutomation_START_MODE_AUTOMATIC:
 			automaticCount++
 			hasAutomatic = true
+		case pb.FactoryCustomAutomation_START_MODE_ON_LEAVE:
+			leaveCount++
+			hasLeave = true
 		case pb.FactoryCustomAutomation_START_MODE_SCHEDULED:
 			parsed, err := parseCustomAutomationSchedule(trigger.GetSchedule())
 			if err != nil {
@@ -370,16 +476,18 @@ func parseCustomAutomationTriggers(
 			scheduledCount++
 			onlySchedule = parsed
 		default:
-			return nil, 0, nil, invalidArgument("Choose Manual, Automatic, or Schedule.")
+			return nil, 0, nil, invalidArgument("Choose Manual, Automatic, Schedule, or When a task leaves the column.")
 		}
 		triggers = append(triggers, customAutomationTrigger{Index: index, Mode: mode, Schedule: schedule})
 	}
-	if manualCount > 1 || automaticCount > 1 {
+	if manualCount > 1 || automaticCount > 1 || leaveCount > 1 {
 		return nil, 0, nil, invalidArgument("Choose each event trigger once.")
 	}
 	startMode := pb.FactoryCustomAutomation_START_MODE_MANUAL
 	if hasAutomatic {
 		startMode = pb.FactoryCustomAutomation_START_MODE_AUTOMATIC
+	} else if hasLeave {
+		startMode = pb.FactoryCustomAutomation_START_MODE_ON_LEAVE
 	} else if scheduledCount > 0 {
 		startMode = pb.FactoryCustomAutomation_START_MODE_SCHEDULED
 	} else if !hasManual {
@@ -436,6 +544,20 @@ func customAutomationAgent(tx *gorm.DB, factory *models.Factory, input *pb.Facto
 	if agent.Component == models.SuperPlaneRunnerComponent {
 		return agent, nil
 	}
+	if source == runner.CredentialsSourceIntegration && agent.Component == "runnerOpenRouter" {
+		integration, err := models.FindIntegrationByName(tx, factory.OrganizationID, integrationName)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, invalidArgument("Select an available agent integration.")
+		}
+		if err != nil {
+			return nil, err
+		}
+		installed := intakeAgentFromIntegration(integration)
+		if installed == nil || installed.Component != agent.Component {
+			return nil, invalidArgument("Select an integration that supports this agent.")
+		}
+		agent.LLMProvider = installed.LLMProvider
+	}
 	if source != "" {
 		agent.Credentials = map[string]any{"source": source}
 		if integrationName != "" {
@@ -470,10 +592,7 @@ func buildCustomAutomationCanvas(
 		return nil, invalidArgument("workspace VCS integration is required")
 	}
 	provider := config.EffectiveVCSProvider()
-	workspaceScope, err := customAutomationListensOnWorkspace(tx, factory)
-	if err != nil {
-		return nil, err
-	}
+	workspaceScope := customAutomationListensOnWorkspace(factory)
 	if workspaceScope {
 		repository = models.WorkspaceRepositoriesExpression
 	}
@@ -488,6 +607,9 @@ func buildCustomAutomationCanvas(
 	)
 	template := metadata[models.FactoryAppTemplateMetadataKey].(map[string]any)
 	template["startMode"] = mode
+	if settings.RunsOnTask != nil {
+		template["runsOnTask"] = *settings.RunsOnTask
+	}
 	if settings.Icon != "" {
 		template["icon"] = settings.Icon
 	}
@@ -552,11 +674,29 @@ func buildCustomAutomationCanvas(
 			},
 		},
 	}
+	if settings.runsWithoutTask() && settings.StartMode == pb.FactoryCustomAutomation_START_MODE_MANUAL {
+		trigger := &doc.Spec.Nodes[0]
+		trigger.ID = customAutomationColumnStartID
+		trigger.Name = "Manual"
+		trigger.Component = "start"
+		trigger.Configuration = columnStartConfiguration()
+		trigger.Integration = nil
+		doc.Spec.Edges[0].SourceID = trigger.ID
+		doc.Spec.Nodes[1].Name = "Run automation"
+		doc.Metadata.Description = "Run prompt and Bash steps with no task."
+		runnerConfiguration["environment"] = customAutomationCheckoutEnvironment(
+			factory, pb.FactoryCustomAutomation_START_MODE_SCHEDULED, githubHostForFactory(tx, factory), false,
+		)
+		if settings.ColumnKey == models.CanvasColumnKeyBacklog {
+			attachBacklogScheduleTask(doc, customAutomationRunnerID, provider, settings.Icon, runnerConfiguration)
+		}
+		return doc, nil
+	}
 	if settings.ColumnKey == models.CanvasColumnKeyBacklog && settings.StartMode == pb.FactoryCustomAutomation_START_MODE_SCHEDULED {
 		attachBacklogScheduleTask(doc, customAutomationRunnerID, provider, settings.Icon, runnerConfiguration)
 		return doc, nil
 	}
-	if customAutomationUsesTaskTrigger(settings.ColumnKey) && settings.StartMode != pb.FactoryCustomAutomation_START_MODE_SCHEDULED {
+	if customAutomationListensForTask(settings.ColumnKey, settings.StartMode) {
 		trigger := &doc.Spec.Nodes[0]
 		trigger.ID = customAutomationTaskTriggerID
 		trigger.Name = "On Task"
@@ -566,6 +706,9 @@ func buildCustomAutomationCanvas(
 		doc.Spec.Edges[0].SourceID = trigger.ID
 		doc.Spec.Nodes[1].Name = "Run automation"
 		doc.Metadata.Description = taskColumnRunDescription(settings.ColumnKey)
+		if settings.StartMode == pb.FactoryCustomAutomation_START_MODE_ON_LEAVE {
+			doc.Metadata.Description = "Run prompt and Bash steps when a task leaves this column."
+		}
 		runnerConfiguration["environment"] = taskColumnCheckoutEnvironment()
 	}
 	return doc, nil
@@ -584,6 +727,13 @@ func customAutomationUsesTaskTrigger(column string) bool {
 	return column == models.CanvasColumnKeyBacklog || column == models.CanvasColumnKeyImplement || column == models.CanvasColumnKeyDone
 }
 
+func customAutomationListensForTask(column string, mode pb.FactoryCustomAutomation_StartMode) bool {
+	if mode == pb.FactoryCustomAutomation_START_MODE_SCHEDULED {
+		return false
+	}
+	return customAutomationUsesTaskTrigger(column) || mode == pb.FactoryCustomAutomation_START_MODE_ON_LEAVE
+}
+
 func taskColumnRunDescription(column string) string {
 	switch column {
 	case models.CanvasColumnKeyImplement:
@@ -597,9 +747,9 @@ func taskColumnRunDescription(column string) string {
 
 func taskColumnCheckoutEnvironment() []any {
 	return []any{
-		checkoutEnvironmentVar("REPO", "{{ $['on-task'].data.workOrder.repository }}"),
-		checkoutEnvironmentVar("REPO_URL", "{{ $['on-task'].data.workOrder.repository_url }}"),
-		checkoutEnvironmentVar("BASE", "{{ $['on-task'].data.workOrder.default_branch }}"),
+		checkoutEnvironmentVar("REPO", "{{ $['On Task'].data.workOrder.repository }}"),
+		checkoutEnvironmentVar("REPO_URL", "{{ $['On Task'].data.workOrder.repository_url }}"),
+		checkoutEnvironmentVar("BASE", "{{ $['On Task'].data.workOrder.default_branch }}"),
 	}
 }
 
@@ -617,13 +767,26 @@ func buildMultiTriggerCustomAutomationCanvas(
 	var taskKinds []string
 	var taskIndexes []any
 	var schedules []customAutomationTrigger
+	var columnManual []customAutomationTrigger
+	var verifyLeaves []customAutomationTrigger
 	for _, trigger := range settings.Triggers {
 		switch trigger.Mode {
 		case pb.FactoryCustomAutomation_START_MODE_MANUAL:
+			if settings.runsWithoutTask() {
+				columnManual = append(columnManual, trigger)
+				continue
+			}
 			taskKinds = append(taskKinds, "manual")
 			taskIndexes = append(taskIndexes, trigger.Index)
 		case pb.FactoryCustomAutomation_START_MODE_AUTOMATIC:
 			taskKinds = append(taskKinds, "automatic")
+			taskIndexes = append(taskIndexes, trigger.Index)
+		case pb.FactoryCustomAutomation_START_MODE_ON_LEAVE:
+			if settings.ColumnKey == models.CanvasColumnKeyVerify {
+				verifyLeaves = append(verifyLeaves, trigger)
+				continue
+			}
+			taskKinds = append(taskKinds, "leave")
 			taskIndexes = append(taskIndexes, trigger.Index)
 		default:
 			schedules = append(schedules, trigger)
@@ -678,9 +841,11 @@ func buildMultiTriggerCustomAutomationCanvas(
 			Component:     taskComponent,
 			Configuration: taskConfiguration,
 			Integration:   taskIntegration,
-			Metadata: customAutomationNodeMetadata(provider, settings.Icon, func(template map[string]any) {
+			Metadata: customAutomationNodeMetadata(provider, settings.Icon, settings.RunsOnTask, func(template map[string]any) {
 				if hasAutomatic {
 					template["startMode"] = "automatic"
+				} else if !hasManual && slices.Contains(taskKinds, "leave") {
+					template["startMode"] = "leave"
 				} else {
 					template["startMode"] = "manual"
 				}
@@ -715,13 +880,28 @@ func buildMultiTriggerCustomAutomationCanvas(
 					"type": "cron", "cronExpression": schedule.Schedule.GetCronExpression(),
 					"timezone": strconv.FormatFloat(schedule.Schedule.GetUtcOffset(), 'f', -1, 64),
 				},
-				Metadata: customAutomationNodeMetadata(provider, settings.Icon, func(template map[string]any) {
+				Metadata: customAutomationNodeMetadata(provider, settings.Icon, settings.RunsOnTask, func(template map[string]any) {
 					template["startMode"] = "scheduled"
 					template["triggerIndex"] = schedule.Index
 				}),
 				Position: yaml.Position{X: 120, Y: 240 + (offset+1)*180},
 			})
 			edges = append(edges, yaml.Edge{SourceID: triggerID, TargetID: scheduleRunnerID, Channel: "default"})
+		}
+		for _, manual := range columnManual {
+			nodes = append(nodes, yaml.Node{
+				ID:            customAutomationColumnStartID,
+				Name:          "Manual",
+				Type:          yaml.NodeTypeTrigger,
+				Component:     "start",
+				Configuration: columnStartConfiguration(),
+				Metadata: customAutomationNodeMetadata(provider, settings.Icon, settings.RunsOnTask, func(template map[string]any) {
+					template["startMode"] = "manual"
+					template["triggerIndex"] = manual.Index
+				}),
+				Position: yaml.Position{X: 120, Y: 80},
+			})
+			edges = append(edges, yaml.Edge{SourceID: customAutomationColumnStartID, TargetID: scheduleRunnerID, Channel: "default"})
 		}
 		if !shareRunner {
 			scheduleConfiguration := customAutomationRunnerConfiguration(
@@ -739,6 +919,33 @@ func buildMultiTriggerCustomAutomationCanvas(
 			}
 			nodes = append(nodes, customAutomationRunnerNode(scheduleRunnerID, runnerName, settings, scheduleConfiguration, 480))
 		}
+	}
+	if len(verifyLeaves) > 0 {
+		leaveIndexes := make([]any, 0, len(verifyLeaves))
+		for _, leave := range verifyLeaves {
+			leaveIndexes = append(leaveIndexes, leave.Index)
+		}
+		nodes = append(nodes, yaml.Node{
+			ID:            customAutomationTaskTriggerID,
+			Name:          "On Task",
+			Type:          yaml.NodeTypeTrigger,
+			Component:     factorycomponent.OnWorkOrderTriggerName,
+			Configuration: map[string]any{},
+			Metadata: customAutomationNodeMetadata(provider, settings.Icon, settings.RunsOnTask, func(template map[string]any) {
+				template["startMode"] = "leave"
+				template["triggerKinds"] = stringsToAny([]string{"leave"})
+				template["triggerIndexes"] = leaveIndexes
+			}),
+			Position: yaml.Position{X: 120, Y: 600},
+		})
+		edges = append(edges, yaml.Edge{SourceID: customAutomationTaskTriggerID, TargetID: customAutomationLeaveRunnerID, Channel: "default"})
+		nodes = append(nodes, customAutomationRunnerNode(
+			customAutomationLeaveRunnerID,
+			"Run automation",
+			settings,
+			customAutomationRunnerConfiguration(tx, factory, settings, taskColumnCheckoutEnvironment()),
+			600,
+		))
 	}
 
 	description := "Run ordered prompt and Bash automation steps."
@@ -817,14 +1024,20 @@ func customAutomationRunnerConfiguration(
 	if credentials := settings.Agent.credentials(); credentials != nil && settings.Agent.component() != models.SuperPlaneRunnerComponent {
 		configuration["credentials"] = credentials
 	}
-	if model := settings.Agent.model(); model != "" {
+	if model := settings.model(); model != "" {
 		configuration["model"] = model
 	}
 	settings.Agent.applyLLMProvider(configuration)
+	if settings.SkipSetupCommands != nil {
+		configuration[runner.SkipSetupCommandsField] = *settings.SkipSetupCommands
+	}
+	if settings.SkipRepositoryCheckout != nil {
+		configuration[runner.SkipRepositoryCheckoutField] = *settings.SkipRepositoryCheckout
+	}
 	return configuration
 }
 
-func customAutomationNodeMetadata(provider, icon string, apply func(map[string]any)) map[string]any {
+func customAutomationNodeMetadata(provider, icon string, runsOnTask *bool, apply func(map[string]any)) map[string]any {
 	metadata := models.FactoryAppTemplateMetadataFor(
 		models.FactoryAppTemplateCustomAutomationID,
 		customAutomationVersion,
@@ -835,7 +1048,18 @@ func customAutomationNodeMetadata(provider, icon string, apply func(map[string]a
 		template["icon"] = icon
 	}
 	apply(template)
+	if runsOnTask != nil {
+		template["runsOnTask"] = *runsOnTask
+	}
 	return metadata
+}
+
+func columnStartConfiguration() map[string]any {
+	return map[string]any{
+		"templates": []any{
+			map[string]any{"name": "Run", "payload": map[string]any{}},
+		},
+	}
 }
 
 func stringsToAny(values []string) []any {
@@ -858,7 +1082,7 @@ func attachBacklogScheduleTask(doc *yaml.Canvas, runnerID, provider, icon string
 		return
 	}
 	runner.Name = backlogTaskRunnerName
-	runner.Metadata = customAutomationNodeMetadata(provider, icon, func(template map[string]any) {
+	runner.Metadata = customAutomationNodeMetadata(provider, icon, nil, func(template map[string]any) {
 		template["startMode"] = "scheduled"
 	})
 	max := 1
@@ -915,16 +1139,13 @@ func stripBacklogTaskInstructions(prompt string) string {
 }
 
 // customAutomationListensOnWorkspace reports whether a pull request
-// automation listens on every workspace repository. A Bitbucket workspace
-// does so only with multi-repo tasks.
-func customAutomationListensOnWorkspace(tx *gorm.DB, factory *models.Factory) (bool, error) {
+// automation listens on every workspace repository.
+func customAutomationListensOnWorkspace(factory *models.Factory) bool {
 	switch factory.OnboardingConfigValue().EffectiveVCSProvider() {
-	case models.ProviderGitHub:
-		return true, nil
-	case models.ProviderBitbucket:
-		return factory.MultiRepoTasksEnabled(tx)
+	case models.ProviderGitHub, models.ProviderBitbucket:
+		return true
 	}
-	return false, nil
+	return false
 }
 
 // customAutomationCheckoutEnvironment checks out the pull request that
@@ -1030,11 +1251,7 @@ func findCustomAutomationCanvas(tx *gorm.DB, factory *models.Factory, rawID stri
 	return canvas, nil
 }
 
-func preserveCustomAutomationNodeIdentities(tx *gorm.DB, canvas *models.Canvas, doc *yaml.Canvas) error {
-	version, err := models.FindLiveCanvasVersionByCanvasInTransaction(tx, canvas)
-	if err != nil {
-		return err
-	}
+func preserveCustomAutomationIdentities(version *models.CanvasVersion, doc *yaml.Canvas) error {
 	for i := range version.Nodes {
 		if version.Nodes[i].Type == models.NodeTypeTrigger {
 			preserveCustomAutomationPRTriggerIdentity(&version.Nodes[i], doc)
@@ -1239,6 +1456,31 @@ func serializeCustomAutomation(
 	if err != nil {
 		return nil, err
 	}
+	return serializeCustomAutomationVersion(factory, canvas, version)
+}
+
+func serializeCustomAutomationVersion(
+	factory *models.Factory,
+	canvas *models.Canvas,
+	version *models.CanvasVersion,
+) (*pb.FactoryCustomAutomation, error) {
+	automation, err := readCustomAutomationVersion(factory, canvas, version)
+	if err != nil {
+		return nil, err
+	}
+	for _, step := range automation.Settings.Steps {
+		if step.Type == pb.FactoryCustomAutomation_Step_TYPE_PROMPT {
+			step.Prompt = strings.TrimSpace(stripBacklogTaskInstructions(step.Prompt))
+		}
+	}
+	return automation, nil
+}
+
+func readCustomAutomationVersion(
+	factory *models.Factory,
+	canvas *models.Canvas,
+	version *models.CanvasVersion,
+) (*pb.FactoryCustomAutomation, error) {
 	triggers, err := decodeCustomAutomationTriggers(version.Nodes)
 	if err != nil {
 		return nil, err
@@ -1252,6 +1494,7 @@ func serializeCustomAutomation(
 	if err != nil {
 		return nil, err
 	}
+	runsOnTask := customAutomationRunsOnTaskMetadata(version.Nodes)
 	icon := ""
 	for i := range version.Nodes {
 		if version.Nodes[i].Type != models.NodeTypeTrigger {
@@ -1271,6 +1514,13 @@ func serializeCustomAutomation(
 		Steps:                   steps,
 		Icon:                    icon,
 		ExecutionTimeoutSeconds: int32(configInt(agent.Configuration, "executionTimeoutSeconds")),
+		RunsOnTask:              runsOnTask,
+	}
+	if skipSetup, ok := agent.Configuration[runner.SkipSetupCommandsField].(bool); ok {
+		settings.SkipSetupCommands = &skipSetup
+	}
+	if skipCheckout, ok := agent.Configuration[runner.SkipRepositoryCheckoutField].(bool); ok {
+		settings.SkipRepositoryCheckout = &skipCheckout
 	}
 	if len(triggers) == 1 {
 		settings.StartMode = triggers[0].mode
@@ -1286,9 +1536,14 @@ func serializeCustomAutomation(
 			switch trigger.mode {
 			case pb.FactoryCustomAutomation_START_MODE_AUTOMATIC:
 				settings.StartMode = pb.FactoryCustomAutomation_START_MODE_AUTOMATIC
+			case pb.FactoryCustomAutomation_START_MODE_ON_LEAVE:
+				if settings.StartMode != pb.FactoryCustomAutomation_START_MODE_AUTOMATIC {
+					settings.StartMode = pb.FactoryCustomAutomation_START_MODE_ON_LEAVE
+				}
 			case pb.FactoryCustomAutomation_START_MODE_SCHEDULED:
 				scheduled++
-				if settings.StartMode != pb.FactoryCustomAutomation_START_MODE_AUTOMATIC {
+				if settings.StartMode != pb.FactoryCustomAutomation_START_MODE_AUTOMATIC &&
+					settings.StartMode != pb.FactoryCustomAutomation_START_MODE_ON_LEAVE {
 					settings.StartMode = pb.FactoryCustomAutomation_START_MODE_SCHEDULED
 				}
 				if scheduled == 1 {
@@ -1315,6 +1570,21 @@ func serializeCustomAutomation(
 	}, nil
 }
 
+func customAutomationRunsOnTaskMetadata(nodes []models.Node) *bool {
+	for i := range nodes {
+		if nodes[i].Type != models.NodeTypeTrigger {
+			continue
+		}
+		template, _ := nodes[i].Metadata[models.FactoryAppTemplateMetadataKey].(map[string]any)
+		value, ok := template["runsOnTask"].(bool)
+		if !ok {
+			continue
+		}
+		return &value
+	}
+	return nil
+}
+
 func customAutomationProtoSteps(raw any) ([]*pb.FactoryCustomAutomation_Step, error) {
 	var steps []runner.AgentStep
 	if err := mapstructure.Decode(raw, &steps); err != nil {
@@ -1335,12 +1605,21 @@ func customAutomationProtoSteps(raw any) ([]*pb.FactoryCustomAutomation_Step, er
 		} else {
 			value.Type = pb.FactoryCustomAutomation_Step_TYPE_PROMPT
 			if step.Prompt != nil {
-				value.Prompt = strings.TrimSpace(stripBacklogTaskInstructions(*step.Prompt))
+				value.Prompt = *step.Prompt
 			}
 		}
 		result = append(result, value)
 	}
 	return result, nil
+}
+
+func stripCustomAutomationBacklogPrompt(steps []*pb.FactoryCustomAutomation_Step) {
+	for i := len(steps) - 1; i >= 0; i-- {
+		if steps[i].Type == pb.FactoryCustomAutomation_Step_TYPE_PROMPT {
+			steps[i].Prompt = stripBacklogTaskInstructions(steps[i].Prompt)
+			return
+		}
+	}
 }
 
 func configInt(configuration map[string]any, key string) int {
@@ -1359,21 +1638,27 @@ func configInt(configuration map[string]any, key string) int {
 }
 
 func customAutomationStartModeName(mode pb.FactoryCustomAutomation_StartMode) string {
-	if mode == pb.FactoryCustomAutomation_START_MODE_SCHEDULED {
+	switch mode {
+	case pb.FactoryCustomAutomation_START_MODE_SCHEDULED:
 		return "scheduled"
-	}
-	if mode == pb.FactoryCustomAutomation_START_MODE_AUTOMATIC {
+	case pb.FactoryCustomAutomation_START_MODE_AUTOMATIC:
 		return "automatic"
+	case pb.FactoryCustomAutomation_START_MODE_ON_LEAVE:
+		return "leave"
+	default:
+		return "manual"
 	}
-	return "manual"
 }
 
 func customAutomationStartMode(mode string) pb.FactoryCustomAutomation_StartMode {
-	if strings.TrimSpace(mode) == "scheduled" {
+	switch strings.TrimSpace(mode) {
+	case "scheduled":
 		return pb.FactoryCustomAutomation_START_MODE_SCHEDULED
-	}
-	if strings.TrimSpace(mode) == "automatic" {
+	case "automatic":
 		return pb.FactoryCustomAutomation_START_MODE_AUTOMATIC
+	case "leave":
+		return pb.FactoryCustomAutomation_START_MODE_ON_LEAVE
+	default:
+		return pb.FactoryCustomAutomation_START_MODE_MANUAL
 	}
-	return pb.FactoryCustomAutomation_START_MODE_MANUAL
 }

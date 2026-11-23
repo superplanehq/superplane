@@ -29,6 +29,18 @@ export function getDetailsForIncident(incident: Incident | undefined): Record<st
   details.Status = incident?.status || "-";
   details.Severity = incident?.severity || "-";
 
+  Object.assign(details, getTimestampDetailsForIncident(incident));
+
+  if (incident?.url) {
+    details["Incident URL"] = incident.url;
+  }
+
+  return details;
+}
+
+function getTimestampDetailsForIncident(incident: Incident | undefined): Record<string, string> {
+  const details: Record<string, string> = {};
+
   if (incident?.started_at) {
     details["Started At"] = new Date(incident.started_at).toLocaleString();
   }
@@ -43,10 +55,6 @@ export function getDetailsForIncident(incident: Incident | undefined): Record<st
 
   if (incident?.updated_at) {
     details["Updated At"] = new Date(incident.updated_at).toLocaleString();
-  }
-
-  if (incident?.url) {
-    details["Incident URL"] = incident.url;
   }
 
   return details;

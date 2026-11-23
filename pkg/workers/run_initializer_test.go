@@ -185,6 +185,48 @@ func Test__RunInitializer__FinishesFactoryWorkOrderExecutionWhenInitializationFa
 	assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
 }
 
+func Test__RunInitializer__KeepsDispatchActiveWhileStageSiblingRuns(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{
+		{NodeID: "not-a-trigger", Type: models.NodeTypeComponent},
+	}, nil)
+	run := createPendingRun(t, canvas.ID, "not-a-trigger", []core.RunCallback{
+		{When: core.RunCallbackWhenPending, On: core.RunCallbackOnEntry, Hook: "onMessage"},
+	})
+
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	order, err := factory.CreateWorkOrder(database.Conn(), "Ship feature", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	line, err := factory.CreateLine(database.Conn(), "ship", nil)
+	require.NoError(t, err)
+	dispatch := support.CreateFactoryLineDispatch(t, r.Organization.ID, factory.ID, order.ID, line.ID, line.Name, nil)
+
+	now := time.Now()
+	failing := models.FactoryWorkOrderExecution{
+		ID: uuid.New(), OrganizationID: r.Organization.ID, FactoryID: factory.ID, WorkOrderID: order.ID,
+		LineID: line.ID, LineDispatchID: dispatch.ID, StepIndex: 0, StepName: "Lint", RunID: &run.ID,
+		Status: models.FactoryWorkOrderExecutionStatusPending, CreatedAt: now, UpdatedAt: now,
+	}
+	sibling := models.FactoryWorkOrderExecution{
+		ID: uuid.New(), OrganizationID: r.Organization.ID, FactoryID: factory.ID, WorkOrderID: order.ID,
+		LineID: line.ID, LineDispatchID: dispatch.ID, StepIndex: 1, StepName: "Tests",
+		Status: models.FactoryWorkOrderExecutionStatusRunning, CreatedAt: now, UpdatedAt: now,
+	}
+	require.NoError(t, database.Conn().Create(&failing).Error)
+	require.NoError(t, database.Conn().Create(&sibling).Error)
+
+	amqpURL, _ := config.RabbitMQURL()
+	initializer := NewRunInitializer(amqpURL, r.Registry)
+	require.NoError(t, initializer.initializeRun(canvas.ID, run.ID, runInitializerTriggerPending))
+
+	reloadedDispatch, err := models.FindWorkOrderLineDispatch(database.Conn(), dispatch.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.FactoryWorkOrderLineDispatchStateActive, reloadedDispatch.State)
+}
+
 func Test__RunInitializer__RollsUpUsageWhenAlreadyFinished(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()

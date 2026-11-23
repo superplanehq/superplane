@@ -120,24 +120,36 @@ func resetOrganizationBuiltInAutomations(
 	var result BuiltInAutomationReset
 	err := database.DB(ctx).Transaction(func(tx *gorm.DB) error {
 		var resetErr error
-		result, resetErr = resetOrganizationBuiltInAutomationsInTransaction(ctx, tx, organizationID, templateID, nil, deps)
+		result, resetErr = resetOrganizationBuiltInAutomationsInTransaction(ctx, tx, organizationID, templateID, deps)
 		return resetErr
 	})
 	if err != nil {
 		return BuiltInAutomationReset{}, err
 	}
+	if result.Reset > 0 && (templateID == "" || templateID == lineImplementationTemplateID) {
+		refreshOrganizationWorkspaceRepositoryAutomations(ctx, organizationID, deps)
+	}
 	return result, nil
 }
 
+func refreshOrganizationWorkspaceRepositoryAutomations(ctx context.Context, organizationID uuid.UUID, deps IntakeDependencies) {
+	factories, err := models.ListFactories(database.DB(ctx), organizationID)
+	if err != nil {
+		log.WithError(err).Warnf("organization %s: failed to list workspaces for the repository refresh", organizationID)
+		return
+	}
+	for i := range factories {
+		refreshWorkspaceRepositoryAutomations(ctx, deps, &factories[i])
+	}
+}
+
 // resetOrganizationBuiltInAutomationsInTransaction resets the built-in
-// automations of the organization in tx. A nil accept resets every live
-// version that matches templateID.
+// automations of the organization in tx that match templateID.
 func resetOrganizationBuiltInAutomationsInTransaction(
 	ctx context.Context,
 	tx *gorm.DB,
 	organizationID uuid.UUID,
 	templateID string,
-	accept func(*models.CanvasVersion) bool,
 	deps IntakeDependencies,
 ) (BuiltInAutomationReset, error) {
 	factoryList, err := models.ListFactories(tx, organizationID)
@@ -152,7 +164,7 @@ func resetOrganizationBuiltInAutomationsInTransaction(
 			return BuiltInAutomationReset{}, err
 		}
 		for j := range canvasesForFactory {
-			saved, err := resetBuiltInAutomation(ctx, tx, &factoryList[i], &canvasesForFactory[j], templateID, accept, deps)
+			saved, err := resetBuiltInAutomation(ctx, tx, &factoryList[i], &canvasesForFactory[j], templateID, deps)
 			if err != nil {
 				return BuiltInAutomationReset{}, fmt.Errorf("reset %q in factory %q: %w", canvasesForFactory[j].Name, factoryList[i].Name, err)
 			}
@@ -170,15 +182,11 @@ func resetBuiltInAutomation(
 	factory *models.Factory,
 	canvas *models.Canvas,
 	templateID string,
-	accept func(*models.CanvasVersion) bool,
 	deps IntakeDependencies,
 ) (bool, error) {
 	version, err := models.FindLiveCanvasVersionByCanvasInTransaction(tx, canvas)
 	if err != nil {
 		return false, err
-	}
-	if accept != nil && !accept(version) {
-		return false, nil
 	}
 	if templateID != "" {
 		liveTemplateID, ok, classifyErr := liveBuiltInAutomationTemplateID(tx, factory, canvas, version)

@@ -500,6 +500,17 @@ func (w *RunFinalizer) startAutomaticCustomAutomationsForRun(runID uuid.UUID) {
 	if err := factoryactions.StartAutomaticCustomAutomations(context.Background(), w.factoryIntakeDeps(), factory, order); err != nil {
 		w.logger.WithError(err).Warnf("custom automation: failed to start automatic automations for order %s", order.ID)
 	}
+	column, columnErr := models.WorkOrderBoardColumn(db, order)
+	if columnErr != nil {
+		w.logger.WithError(columnErr).Warnf("custom automation: failed to read the column for order %s", order.ID)
+		return
+	}
+	if column != models.CanvasColumnKeyVerify {
+		return
+	}
+	if err := factoryactions.StartColumnLeaveCustomAutomations(db, factory, order, models.CanvasColumnKeyImplement, execution.ID.String()); err != nil {
+		w.logger.WithError(err).Warnf("custom automation: failed to start Implement leave automation for order %s", order.ID)
+	}
 }
 
 func (w *RunFinalizer) maybeFinalizeRun(tx *gorm.DB, runID uuid.UUID, trigger string, eventCollector func([]models.CanvasEvent), executionCollector func([]models.CanvasNodeExecution)) (bool, string, error) {
@@ -660,7 +671,15 @@ func (w *RunFinalizer) executeNextFactoryLineStep(tx *gorm.DB, runID uuid.UUID) 
 	// while slots are free. Failed and cancelled runs free their slot the
 	// same way passed runs do.
 	//
-	admitted, err := models.AdmitQueuedForStep(tx, execution.LineID, execution.StepIndex)
+	dispatchSnapshot, err := models.FindWorkOrderLineDispatch(tx, execution.LineDispatchID)
+	if err != nil {
+		return nil, nil, err
+	}
+	stageKey := ""
+	if execution.StepIndex >= 0 && execution.StepIndex < len(dispatchSnapshot.Steps) {
+		stageKey = dispatchSnapshot.Steps[execution.StepIndex].StageKey
+	}
+	admitted, err := models.AdmitQueuedForStep(tx, execution.LineID, run.WorkflowID, stageKey)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -691,8 +710,15 @@ func (w *RunFinalizer) executeNextFactoryLineStep(tx *gorm.DB, runID uuid.UUID) 
 		return pendingRuns, orderUpdates, nil
 	}
 
-	if run.Result != models.CanvasRunResultPassed {
-		return pendingRuns, orderUpdates, dispatch.Finish(tx, run.Result)
+	stageResult, err := dispatch.StageResult(tx, execution.StepIndex)
+	if err != nil {
+		return nil, nil, err
+	}
+	if stageResult == "" {
+		return pendingRuns, orderUpdates, nil
+	}
+	if stageResult != models.CanvasRunResultPassed {
+		return pendingRuns, orderUpdates, dispatch.Finish(tx, stageResult)
 	}
 
 	factory, err := models.FindFactory(tx, execution.OrganizationID, execution.FactoryID)
@@ -713,7 +739,7 @@ func (w *RunFinalizer) executeNextFactoryLineStep(tx *gorm.DB, runID uuid.UUID) 
 		return pendingRuns, orderUpdates, dispatch.Finish(tx, models.CanvasRunResultCancelled)
 	}
 
-	nextIndex := execution.StepIndex + 1
+	_, nextIndex := dispatch.StageStepRange(execution.StepIndex)
 	if nextIndex >= len(dispatch.Steps) {
 		return pendingRuns, orderUpdates, dispatch.Finish(tx, models.CanvasRunResultPassed)
 	}
@@ -733,23 +759,13 @@ func (w *RunFinalizer) executeNextFactoryLineStep(tx *gorm.DB, runID uuid.UUID) 
 		return pendingRuns, orderUpdates, dispatch.Finish(tx, models.CanvasRunResultCancelled)
 	}
 
-	result, err := dispatch.EnqueueOrStartStep(tx, workOrder, nextIndex)
+	results, err := dispatch.StartStage(tx, workOrder, nextIndex)
 	if err != nil {
 		return nil, nil, err
 	}
-
-	if result.Run != nil {
-		pendingRuns = append(pendingRuns, factoryLinePendingRun{
-			workflowID: result.Run.WorkflowID,
-			runID:      result.Run.ID,
-		})
-	}
-	if result.Run == nil && result.Execution != nil {
-		orderUpdates = append(orderUpdates, factoryWorkOrderUpdate{
-			factoryID: result.Execution.FactoryID,
-			orderID:   result.Execution.WorkOrderID,
-		})
-	}
+	startedRuns, startedOrderUpdates := factoryAdmissionOutcomes(results)
+	pendingRuns = append(pendingRuns, startedRuns...)
+	orderUpdates = append(orderUpdates, startedOrderUpdates...)
 
 	return pendingRuns, orderUpdates, nil
 }

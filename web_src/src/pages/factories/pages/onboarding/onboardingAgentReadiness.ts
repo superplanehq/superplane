@@ -19,7 +19,7 @@ export type OnboardingAgentHarness = "AGENT_HARNESS_CLAUDE_CODE" | "AGENT_HARNES
 export type OnboardingAgentPlan = {
   providerId?: AgentProviderId;
   component: "runnerClaudeCode" | "runnerCodex" | "runnerOpenRouter" | "runnerSuperPlane";
-  credentialsSource: "integration" | "hosted";
+  credentialsSource: "integration" | "hosted" | "subscription";
   integrationName?: AgentProviderId;
   harness: OnboardingAgentHarness;
   model: string;
@@ -116,7 +116,18 @@ export function resolveOnboardingAgent(args: {
   defaultHostedModel?: string;
   /** Require a connected provider key instead of falling back to hosted models. */
   preferOwnKey?: boolean;
+  subscription?: { ready: boolean };
 }): OnboardingAgentPlan | undefined {
+  if (args.subscription) {
+    if (!args.subscription.ready) return undefined;
+    return {
+      component: "runnerCodex",
+      credentialsSource: "subscription",
+      harness: "AGENT_HARNESS_CODEX",
+      model: "",
+      planningModel: "",
+    };
+  }
   if (args.preferOwnKey) {
     return connectedProviderPlan(args);
   }
@@ -164,7 +175,7 @@ export function isHostedAgentReady(plan: OnboardingAgentPlan | undefined): boole
   return plan?.component === "runnerSuperPlane";
 }
 
-export type OnboardingAgentCredentialChoice = "own-key" | "hosted";
+export type OnboardingAgentCredentialChoice = "own-key" | "hosted" | "subscription";
 
 /**
  * A model source choice must be made before setup finishes. Own-key setup
@@ -176,8 +187,10 @@ export function agentFinishReady(args: {
   providerConnected: boolean;
   agentReady: boolean;
   hostedAgentReady: boolean;
+  subscriptionReady?: boolean;
 }): boolean {
   if (args.modelSourceChoice && !args.credentialChoice) return false;
+  if (args.credentialChoice === "subscription") return args.subscriptionReady === true;
   if (args.credentialChoice === "own-key") return args.providerConnected;
   return args.agentReady || args.hostedAgentReady;
 }

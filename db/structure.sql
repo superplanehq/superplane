@@ -243,6 +243,23 @@ CREATE TABLE public.application_encryption_migrations (
 
 
 --
+-- Name: automations_as_code; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.automations_as_code (
+    id uuid NOT NULL,
+    organization_id uuid NOT NULL,
+    factory_id uuid NOT NULL,
+    name text NOT NULL,
+    source text NOT NULL,
+    revision bigint NOT NULL,
+    artifact_id text NOT NULL,
+    artifact_revision text NOT NULL,
+    CONSTRAINT automations_as_code_revision_check CHECK ((revision > 0))
+);
+
+
+--
 -- Name: billing_plans; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -599,7 +616,8 @@ CREATE TABLE public.factory_lines (
     steps jsonb DEFAULT '[]'::jsonb NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    column_colors jsonb DEFAULT '{}'::jsonb NOT NULL
+    column_colors jsonb DEFAULT '{}'::jsonb NOT NULL,
+    stages jsonb DEFAULT '[]'::jsonb NOT NULL
 );
 
 
@@ -785,6 +803,7 @@ CREATE TABLE public.factory_pull_requests (
     merge_blocked_message text DEFAULT ''::text NOT NULL,
     mergeable_head_sha text DEFAULT ''::text NOT NULL,
     mergeable_allowed_methods text DEFAULT ''::text NOT NULL,
+    draft_state_updated_at timestamp with time zone,
     CONSTRAINT factory_pull_requests_number_positive CHECK ((number > 0)),
     CONSTRAINT factory_pull_requests_state_valid CHECK ((state = ANY (ARRAY['open'::text, 'draft'::text, 'closed'::text, 'merged'::text])))
 );
@@ -975,7 +994,8 @@ CREATE TABLE public.factory_work_order_line_dispatches (
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     finished_at timestamp with time zone,
     model text DEFAULT ''::text NOT NULL,
-    thinking_level text DEFAULT ''::text NOT NULL
+    thinking_level text DEFAULT ''::text NOT NULL,
+    stages jsonb DEFAULT '[]'::jsonb NOT NULL
 );
 
 
@@ -992,7 +1012,9 @@ CREATE TABLE public.factory_work_order_queue_items (
     line_dispatch_id uuid NOT NULL,
     step_index integer NOT NULL,
     step_name text NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    app_id uuid NOT NULL,
+    stage_key text DEFAULT ''::text NOT NULL
 );
 
 
@@ -2587,6 +2609,22 @@ ALTER TABLE ONLY public.application_encryption_migrations
 
 
 --
+-- Name: automations_as_code automations_as_code_organization_id_artifact_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.automations_as_code
+    ADD CONSTRAINT automations_as_code_organization_id_artifact_id_key UNIQUE (organization_id, artifact_id);
+
+
+--
+-- Name: automations_as_code automations_as_code_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.automations_as_code
+    ADD CONSTRAINT automations_as_code_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: billing_plans billing_plans_key_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2947,11 +2985,11 @@ ALTER TABLE ONLY public.factory_work_order_line_dispatches
 
 
 --
--- Name: factory_work_order_queue_items factory_work_order_queue_items_line_dispatch_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: factory_work_order_queue_items factory_work_order_queue_items_line_dispatch_step_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.factory_work_order_queue_items
-    ADD CONSTRAINT factory_work_order_queue_items_line_dispatch_id_key UNIQUE (line_dispatch_id);
+    ADD CONSTRAINT factory_work_order_queue_items_line_dispatch_step_key UNIQUE (line_dispatch_id, step_index);
 
 
 --
@@ -3729,6 +3767,13 @@ CREATE UNIQUE INDEX application_encryption_migrations_unfinished ON public.appli
 
 
 --
+-- Name: automations_as_code_factory_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX automations_as_code_factory_id_idx ON public.automations_as_code USING btree (factory_id);
+
+
+--
 -- Name: bitbucket_forge_installations_workspace_uuid_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4373,10 +4418,10 @@ CREATE INDEX idx_factory_work_order_queue_items_order ON public.factory_work_ord
 
 
 --
--- Name: idx_factory_work_order_queue_items_step; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_factory_work_order_queue_items_stage; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_factory_work_order_queue_items_step ON public.factory_work_order_queue_items USING btree (line_id, step_index, created_at);
+CREATE INDEX idx_factory_work_order_queue_items_stage ON public.factory_work_order_queue_items USING btree (line_id, app_id, stage_key, created_at);
 
 
 --
@@ -5377,6 +5422,22 @@ ALTER TABLE ONLY public.app_messages
 
 ALTER TABLE ONLY public.application_encryption_migrations
     ADD CONSTRAINT application_encryption_migrations_target_key_id_fkey FOREIGN KEY (target_key_id) REFERENCES public.application_encryption_keys(id);
+
+
+--
+-- Name: automations_as_code automations_as_code_factory_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.automations_as_code
+    ADD CONSTRAINT automations_as_code_factory_id_fkey FOREIGN KEY (factory_id) REFERENCES public.factories(id) ON DELETE CASCADE;
+
+
+--
+-- Name: automations_as_code automations_as_code_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.automations_as_code
+    ADD CONSTRAINT automations_as_code_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
 
 
 --
@@ -6723,7 +6784,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261113000615	f
+20261120182307	f
 \.
 
 

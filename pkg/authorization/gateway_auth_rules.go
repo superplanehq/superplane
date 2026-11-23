@@ -6,8 +6,39 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 )
 
+const (
+	AutomationsPath        = "/api/v2/automations"
+	AutomationPath         = AutomationsPath + "/{id}"
+	ValidateAutomationPath = AutomationsPath + ":validate"
+)
+
 func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 	return map[HTTPRoute]AuthorizationRule{
+		{Method: "GET", Pattern: AutomationsPath}: {
+			Resource: "factories", Action: "read", DomainType: models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories},
+		},
+		{Method: "GET", Pattern: AutomationPath}: {
+			Resource: "factories", Action: "read", DomainType: models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories},
+		},
+		{Method: "POST", Pattern: ValidateAutomationPath}: {
+			Resource: "factories", Action: "update", DomainType: models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories},
+		},
+		{Method: "POST", Pattern: AutomationsPath}: {
+			Resource: "factories", Action: "update", DomainType: models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories},
+		},
+		{Method: "PUT", Pattern: AutomationPath}: {
+			Resource: "factories", Action: "update", DomainType: models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories},
+		},
+		{Method: "DELETE", Pattern: AutomationPath}: {
+			Resource: "factories", Action: "update", DomainType: models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories},
+		},
+
 		{Method: "GET", Pattern: "/api/v1/organizations/{id}/fleets/{fleet_id}/tasks"}:               {Resource: "org", Action: "read", DomainType: models.DomainTypeOrganization},
 		{Method: "GET", Pattern: "/api/v1/organizations/{id}/fleets"}:                                {Resource: "org", Action: "read", DomainType: models.DomainTypeOrganization},
 		{Method: "POST", Pattern: "/api/v1/organizations/{id}/fleets"}:                               {Resource: "org", Action: "update", DomainType: models.DomainTypeOrganization},
@@ -220,9 +251,10 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 		// Model status is installation-wide. Organization settings shows
 		// it, so the caller must be able to read the organization.
 		{Method: "GET", Pattern: "/api/v1/me/model-status"}: {
-			Resource:   "org",
-			Action:     "read",
-			DomainType: models.DomainTypeOrganization,
+			Resource:                     "org",
+			Action:                       "read",
+			DomainType:                   models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureModelStatus},
 		},
 		// Self-scoped: members read their own notification settings.
 		// Note: /api/v1/me, /api/v1/me/token, /api/v1/me/tokens*,

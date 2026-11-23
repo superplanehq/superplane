@@ -9,10 +9,9 @@ import { useOrgUserLookup } from "@/hooks/useOrgUserLookup";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useWorkOrderCardActions } from "@/hooks/useWorkOrderCardActions";
 import { cn } from "@/lib/utils";
-import { THINKING_LEVEL_MEDIUM } from "@/lib/thinkingLevel";
 import { MarkdownContent } from "@/pages/app/Markdown";
 import { ArrowLeft } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { type ReactNode } from "react";
 import { useLocation, useNavigate, useParams } from "react-router";
 
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
@@ -32,7 +31,7 @@ import { ANALYSIS_PLANNING_COPY } from "../pages/work-order-split-run/useAnalysi
 import { PlanningFailureAlert } from "../pages/work-order-split-run/PlanningFailureAlert";
 import type { IntentAnalysisChat } from "../pages/work-order-split-run/intentAnalysisChat";
 import { WorkOrderSplitRunOverview } from "../pages/work-order-split-run/WorkOrderSplitRunOverview";
-import { DRAFT_START_MODEL_AUTO } from "../pages/work-order-split-run/draftStartModel";
+import { useDraftStartDefaults, useDraftStartSelection } from "@/hooks/useDraftStartDefaults";
 import { factoryPlanningEnabled } from "../pages/planningSettingsModel";
 import {
   columnAppsFromFactoryApps,
@@ -175,6 +174,7 @@ function useMobileTaskModel(
     artifacts,
     lineId,
     lineName,
+    lineStages: factory?.lines?.find((line) => line.id === lineId)?.stages,
     demoArtifacts: false,
     prFeedbackRuns,
     analysisRuns,
@@ -336,18 +336,14 @@ function LoadedMobileTask({
 }
 
 /**
- * Start choice for a draft. The model resets when the start line changes so
- * Start never sends a model from another line.
+ * Task overrides reset when the start line changes so Start cannot carry
+ * another line's choices.
  */
 function useMobileDraftStart(model: MobileTaskModel, startLineKey: string) {
   const { organizationId, factoryId } = useFactoriesLayout();
-  const [draftLineKey, setDraftLineKey] = useState(startLineKey);
-  const [draftModel, setDraftModel] = useState(DRAFT_START_MODEL_AUTO);
-  const [draftThinking, setDraftThinking] = useState(THINKING_LEVEL_MEDIUM);
-  if (draftLineKey !== startLineKey) {
-    setDraftLineKey(startLineKey);
-    setDraftModel(DRAFT_START_MODEL_AUTO);
-  }
+  const { selection, onChange } = useDraftStartSelection(`${factoryId}:${model.orderId}:${startLineKey}`);
+  const { model: draftModel, thinkingLevel: draftThinking } = selection;
+  const defaults = useDraftStartDefaults(organizationId, factoryId, model.lineName);
   const { fixture } = model;
   const onStart = draftStartAction(
     fixture.footer.kind,
@@ -363,11 +359,9 @@ function useMobileDraftStart(model: MobileTaskModel, startLineKey: string) {
       orderId={fixture.assigneeIds?.length ? model.orderId : undefined}
       model={draftModel}
       thinkingLevel={draftThinking}
+      defaults={defaults}
       disabled={!model.canUpdate || model.startBusy}
-      onChange={({ model: nextModel, thinkingLevel }) => {
-        setDraftModel(nextModel);
-        setDraftThinking(thinkingLevel);
-      }}
+      onChange={onChange}
     />
   ) : undefined;
   return { onStart, modelSelect };

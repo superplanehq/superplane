@@ -94,6 +94,7 @@ describe("isColumnKey", () => {
     expect(isColumnKey("done")).toBe(true);
     expect(isColumnKey("phase-0")).toBe(true);
     expect(isColumnKey("phase-12")).toBe(true);
+    expect(isColumnKey("custom-stage-id")).toBe(true);
     expect(isColumnKey("phase")).toBe(false);
     expect(isColumnKey("inbox")).toBe(false);
     expect(isColumnKey(null)).toBe(false);

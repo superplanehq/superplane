@@ -2,13 +2,138 @@ package runner
 
 import (
 	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
+
+func TestPromptToolReceivesSelectedSecretWithoutPromptInterpolation(t *testing.T) {
+	const token = "z7!"
+	secrets := &contexts.SecretsContext{SecretKeys: map[string]map[string][]byte{
+		"figma-api-key": {"FIGMA_API_KEY": []byte(token), "FIGMA_ACCESS": []byte(token)},
+	}}
+	resolved, err := ResolveEnvironment(secrets, []EnvironmentFromEntry{{Source: EnvironmentFromSourceSecret, Secret: configuration.SecretRef{Secret: "figma-api-key"}}}, nil)
+	require.NoError(t, err)
+	values := environmentValues(resolved.Variables)
+	assert.JSONEq(t, `["FIGMA_ACCESS","FIGMA_API_KEY"]`, values[EnvSecretNames])
+	prompt := "Read designs with FIGMA_API_KEY."
+	commands, files := BuildAgentTask(AgentTaskInput{
+		Steps:         []AgentStep{{Name: "Design", Type: AgentStepPrompt, Prompt: &prompt, Secrets: []string{"figma-api-key"}}},
+		RunScriptName: "agent.js",
+		// The fixture launches the same child process boundary used by agent tools.
+		RunScript: `const {spawnSync} = require("child_process");
+const tool = spawnSync(process.execPath, ["-e", 'process.exit(process.env.FIGMA_API_KEY === "z7!" ? 0 : 1)'], {env: process.env});
+process.exit(tool.status);`,
+		PromptCommand: func(name, model string) string { return `node "$SUPERPLANE_TASK_DIR/agent.js"` },
+	})
+	task := t.TempDir()
+	for _, file := range files {
+		assert.NotContains(t, file.Content, values[EnvSecretNames])
+		if file.Path != "agent.js" {
+			assert.NotContains(t, file.Content, token)
+		}
+		target := filepath.Join(task, file.Path)
+		require.NoError(t, os.MkdirAll(filepath.Dir(target), 0o755))
+		require.NoError(t, os.WriteFile(target, []byte(file.Content), 0o644))
+	}
+	command := commands[len(commands)-1]
+	assert.NotContains(t, command.Command, token)
+	cmd := exec.Command("bash", "-c", command.Command)
+	cmd.Dir = task
+	cmd.Env = append(os.Environ(), "SUPERPLANE_TASK_DIR="+task, "SUPERPLANE_RESULT_FILE="+filepath.Join(task, "result.json"))
+	for _, variable := range resolved.Variables {
+		cmd.Env = append(cmd.Env, variable.Name+"="+variable.Value)
+	}
+	output, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(output))
+}
+
+func TestAgentStepsValidateSecretsForBothTypes(t *testing.T) {
+	for _, kind := range []string{AgentStepPrompt, AgentStepBash} {
+		for _, test := range []struct {
+			secrets []string
+			failure string
+		}{
+			{[]string{"figma-api-key"}, ""},
+			{[]string{" "}, "secrets[0] is required"},
+			{[]string{"figma-api-key", " figma-api-key "}, "duplicate secret"},
+		} {
+			err := ValidateAgentSteps([]AgentStep{{Name: "Design", Type: kind, Prompt: strPtr("Read designs"), Command: strPtr("true"), Secrets: test.secrets}})
+			if test.failure == "" {
+				require.NoError(t, err)
+				continue
+			}
+			require.ErrorContains(t, err, test.failure)
+		}
+	}
+}
+
+func TestSelectedSecretResolutionFailsWithoutDisclosingValues(t *testing.T) {
+	const token = "z7!"
+	secrets := &contexts.SecretsContext{SecretKeys: map[string]map[string][]byte{
+		"invalid":  {"BAD-NAME": []byte(token)},
+		"reserved": {EnvSecretNames: []byte(token)},
+		"first":    {"FIGMA_ACCESS": []byte(token)},
+		"second":   {"FIGMA_ACCESS": []byte(token)},
+	}}
+	for _, test := range []struct {
+		names   []string
+		failure string
+	}{
+		{[]string{"missing"}, "secret keys not found"},
+		{[]string{"invalid"}, "invalid environment variable name"},
+		{[]string{"reserved"}, "reserved environment variable name"},
+		{[]string{"first", "second"}, "duplicate environment variable name"},
+	} {
+		var sources []EnvironmentFromEntry
+		for _, name := range test.names {
+			sources = append(sources, EnvironmentFromEntry{Source: EnvironmentFromSourceSecret, Secret: configuration.SecretRef{Secret: name}})
+		}
+		resolved, err := ResolveEnvironment(secrets, sources, nil)
+		require.ErrorContains(t, err, test.failure)
+		assert.NotContains(t, err.Error(), token)
+		assert.Empty(t, resolved.Variables)
+	}
+	_, err := ResolveEnvironment(nil, nil, []EnvironmentVariable{{Name: EnvSecretNames, ValueSource: EnvironmentValueSourceLiteral, Value: strPtr("[]")}})
+	require.ErrorContains(t, err, "reserved environment variable name")
+}
+
+func TestResolveExecutionEnvironmentUsesSavedReviewFallback(t *testing.T) {
+	for _, cached := range []bool{false, true} {
+		for _, fallback := range []string{"fallback-user", ""} {
+			t.Run(fmt.Sprintf("cached=%t/fallback=%s", cached, fallback), func(t *testing.T) {
+				const name = "SUPERPLANE_REVIEW_REQUEST_FALLBACK"
+				environment := []EnvironmentVariable{{Name: name, ValueSource: EnvironmentValueSourceLiteral, Value: strPtr("old-value")}}
+				prepared := ResolvedEnvironment{Variables: []TaskEnvironmentVariable{{Name: name, Value: "old-value"}}, Usage: "Keep usage"}
+				ctx := core.ExecutionContext{Configuration: map[string]any{"fallbackReviewer": fallback}}
+				if cached {
+					ctx.ResolvedEnvironment = &prepared
+				}
+				resolved, err := ResolveExecutionEnvironment(ctx, nil, environment)
+				require.NoError(t, err)
+				require.Equal(t, fallback, environmentValues(resolved.Variables)[name])
+				count := 0
+				for _, variable := range resolved.Variables {
+					if variable.Name == name {
+						count++
+					}
+				}
+				require.Equal(t, 1, count, "runner tasks reject duplicate environment names")
+				require.Equal(t, "old-value", prepared.Variables[0].Value)
+				if cached {
+					require.Equal(t, prepared.Usage, resolved.Usage)
+				}
+			})
+		}
+	}
+}
 
 func Test__ValidateEnvironmentFrom(t *testing.T) {
 	t.Parallel()

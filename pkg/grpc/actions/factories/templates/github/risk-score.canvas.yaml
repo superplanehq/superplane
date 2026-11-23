@@ -19,9 +19,12 @@ spec:
       targetId: publish-merge-confidence
     - channel: default
       sourceId: publish-merge-confidence
+      targetId: comment-merge-confidence
+    - channel: default
+      sourceId: comment-merge-confidence
       targetId: complete-merge-confidence
     - channel: default
-      sourceId: publish-merge-confidence
+      sourceId: comment-merge-confidence
       targetId: finish-assessment-check
     - channel: default
       sourceId: complete-merge-confidence
@@ -52,7 +55,10 @@ spec:
         repository: '{{ root().data.repository.full_name }}'
         pullNumber: '{{ root().data.pull_request.number }}'
         assessedSha: '{{ root().data.pull_request.head.sha }}'
+        activationNodeId: start-assessment-check
         context: superplane/merge-confidence
+        enabled: false
+        activationGeneration: 1
         state: pending
         reason: Merge confidence assessment is running.
         resultUrl: '{{ run().url }}'
@@ -67,8 +73,10 @@ spec:
       concurrency:
         max: 5
       configuration:
+        publishPRCheck: false
         executionTimeoutSeconds: 1800
         includeVisualEvidence: false
+        skipSetupCommands: true
         machineType: e1-large-amd64
         model: sonnet
         credentials:
@@ -328,8 +336,39 @@ spec:
              + "Reviewed commit: " + markdownText(report.reviewedCommit) + "\n\n[View task](<" + markdownLink(report.taskUrl) + ">)" }}
         expectedHeadSha: '{{ $["Assess Merge Confidence"].data.mergeConfidence.reviewedCommit }}'
         enabled: true
+        ordered: true
+        activationGeneration: 1
       position:
         x: 1200
+        "y": 80
+      isCollapsed: true
+    - id: comment-merge-confidence
+      name: Comment Merge Confidence
+      type: TYPE_ACTION
+      component: github.publishPullRequestComment
+      configuration:
+        repository: '{{ root().data.repository.full_name }}'
+        pullNumber: '{{ root().data.pull_request.number }}'
+        commentKey: merge-confidence
+        body: |-
+          ## SuperPlane merge confidence
+
+          {{ let report = $["Assess Merge Confidence"].data.mergeConfidence;
+             let indicators = {positive: "✅", neutral: "➖", caution: "⚠️", critical: "❌"};
+             (!report.complete ? "➖ **Incomplete**\n\n" : "")
+             + (len(report.checks) == 0
+               ? "No checks are enabled.\n\n"
+               : "| Check | Status | Summary |\n| --- | :---: | --- |\n"
+                 + join(map(report.checks, { "| " + markdownText(#.label) + " | " +
+                     (#.missing ? "➖ | No result was reported." : (indicators[#.level] ?? "➖") + " | " + markdownText(#.summary))
+                     + " |\n" }), "")
+                 + "\n")
+             + "Reviewed commit: " + markdownText(report.reviewedCommit) + "\n\n[View task](<" + markdownLink(report.taskUrl) + ">)" }}
+        expectedHeadSha: '{{ $["Assess Merge Confidence"].data.mergeConfidence.reviewedCommit }}'
+        enabled: false
+        activationGeneration: 1
+      position:
+        x: 1520
         "y": 80
       isCollapsed: true
     - id: finish-assessment-check
@@ -340,12 +379,13 @@ spec:
         repository: '{{ root().data.repository.full_name }}'
         pullNumber: '{{ root().data.pull_request.number }}'
         assessedSha: '{{ root().data.pull_request.head.sha }}'
+        activationNodeId: start-assessment-check
         context: superplane/merge-confidence
-        state: '{{ $["Assess Merge Confidence"].data.mergeConfidence.complete == true && previous().data.status in ["published", "unchanged"] ? "success" : "failure" }}'
-        reason: '{{ $["Assess Merge Confidence"].data.mergeConfidence.complete == true && previous().data.status in ["published", "unchanged"] ? "Merge confidence assessment completed. Scores are advisory." : "Merge confidence assessment or report publication did not complete." }}'
+        state: '{{ $["Assess Merge Confidence"].data.mergeConfidence.complete == true && $["Publish Merge Confidence"].data.status in ["published", "unchanged", "disabled"] && ($["Comment Merge Confidence"].data.status in ["published", "unchanged", "disabled"] || ($["Comment Merge Confidence"].data.status == "skipped" && $["Comment Merge Confidence"].config.enabled == false)) ? "success" : "failure" }}'
+        reason: '{{ $["Assess Merge Confidence"].data.mergeConfidence.complete == true && $["Publish Merge Confidence"].data.status in ["published", "unchanged", "disabled"] && ($["Comment Merge Confidence"].data.status in ["published", "unchanged", "disabled"] || ($["Comment Merge Confidence"].data.status == "skipped" && $["Comment Merge Confidence"].config.enabled == false)) ? "Merge confidence assessment completed. Scores are advisory." : "Merge confidence assessment or report publication did not complete." }}'
         resultUrl: '{{ run().url }}'
       position:
-        x: 1520
+        x: 1840
         "y": 400
       isCollapsed: true
     - id: complete-merge-confidence
@@ -353,9 +393,9 @@ spec:
       type: TYPE_ACTION
       component: filter
       configuration:
-        expression: '$["Assess Merge Confidence"].data.mergeConfidence.complete == true && previous().data.status in ["published", "unchanged"]'
+        expression: '$["Assess Merge Confidence"].data.mergeConfidence.complete == true && $["Publish Merge Confidence"].data.status in ["published", "unchanged", "disabled"] && ($["Comment Merge Confidence"].data.status in ["published", "unchanged", "disabled"] || ($["Comment Merge Confidence"].data.status == "skipped" && $["Comment Merge Confidence"].config.enabled == false))'
       position:
-        x: 1520
+        x: 1840
         "y": 80
       isCollapsed: true
     - id: broadcast-merge-confidence
@@ -372,6 +412,6 @@ spec:
           reviewedCommit: '{{ $["Assess Merge Confidence"].data.mergeConfidence.reviewedCommit }}'
           mergeConfidence: '{{ $["Assess Merge Confidence"].data.mergeConfidence }}'
       position:
-        x: 1840
+        x: 2160
         "y": 80
       isCollapsed: true

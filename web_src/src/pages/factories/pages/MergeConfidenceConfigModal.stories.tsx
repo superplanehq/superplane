@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { http, HttpResponse } from "msw";
 import { QueryClient } from "@tanstack/react-query";
 
 import { prepareData } from "@/pages/app/workflowPageHelpers";
@@ -39,6 +40,7 @@ function confidenceGraph(): IntakeAutomationGraph {
     nodes,
     edges,
     factoryId: "factory-1",
+    organizationId: "org-1",
     specNodes: [
       {
         id: "on-pr-risk",
@@ -68,6 +70,25 @@ function confidenceGraph(): IntakeAutomationGraph {
         },
         concurrency: { max: 5, key: "{{ $.data.pull_request.number }}" },
       },
+      {
+        id: "publish-merge-confidence",
+        name: "Publish Merge Confidence",
+        component: "github.updatePullRequestBodySection",
+        configuration: { sectionKey: "merge-confidence", enabled: true, activationGeneration: 1 },
+      },
+      {
+        id: "comment-merge-confidence",
+        name: "Comment Merge Confidence",
+        component: "github.publishPullRequestComment",
+        configuration: { commentKey: "merge-confidence", enabled: false, activationGeneration: 1 },
+      },
+      {
+        id: "start-assessment-check",
+        name: "Start Assessment Check",
+        component: "github.setPullRequestCheckRun",
+        integration: { id: "github-1" },
+        configuration: { enabled: false, activationNodeId: "start-assessment-check", activationGeneration: 1 },
+      },
     ],
   };
 }
@@ -75,7 +96,16 @@ function confidenceGraph(): IntakeAutomationGraph {
 const meta = {
   title: "Factories/Components/MergeConfidenceConfigModal",
   component: MergeConfidenceConfigModal,
-  parameters: { layout: "fullscreen" },
+  parameters: {
+    layout: "fullscreen",
+    msw: {
+      handlers: [
+        http.get("*/api/v1/organizations/org-1/integrations/github-1/resources", () =>
+          HttpResponse.json({ resources: [{ id: "granted", name: "Checks write" }] }),
+        ),
+      ],
+    },
+  },
   args: {
     title: "Merge confidence",
     graph: confidenceGraph(),
@@ -104,6 +134,25 @@ export const SaveError: Story = {
   args: {
     onSaveNode: () => {
       throw new Error("Save failed");
+    },
+  },
+};
+
+export const GitHubPermissionApprovalRequired: Story = {
+  parameters: {
+    msw: {
+      handlers: [
+        http.get("*/api/v1/organizations/org-1/integrations/github-1/resources", () =>
+          HttpResponse.json({
+            resources: [
+              {
+                id: "missing",
+                name: "Accept the new GitHub App permissions in GitHub installation settings, then try again.",
+              },
+            ],
+          }),
+        ),
+      ],
     },
   },
 };

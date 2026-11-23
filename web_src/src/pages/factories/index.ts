@@ -16,7 +16,6 @@ export {
   FactorySettingsNotificationsPage,
   FactorySettingsProfilePage,
   FactorySettingsSoonPage,
-  FactorySettingsRepositoryPage,
   FactorySettingsUsagePage,
   FactorySettingsAgentPage,
   FactorySettingsConnectPage,

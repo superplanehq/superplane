@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -283,6 +284,10 @@ func retainDeliveredCheckRun(latest, delivered *reviewCheckState) {
 
 func evaluateReviewCheck(client *common.Client, store core.PublicationStore, record *core.OrderedPublication, state *reviewCheckState) (bool, error) {
 	config := state.Configuration
+	if record.Disabled && config.CheckRun && len(state.Retired) == 0 {
+		state.SHA, state.State, state.Description = config.AssessedSHA, "success", config.Reason
+		return false, nil
+	}
 	if config.State != "" && len(state.Retired) > 0 {
 		retired := state.Retired[0]
 		state.SHA, state.State, state.Description = retired.SHA, "error", "A newer attempt superseded this check."
@@ -357,16 +362,35 @@ func evaluateReviewCheck(client *common.Client, store core.PublicationStore, rec
 		if err != nil {
 			return monitor, err
 		}
-		state.State, state.Description = "success", "All required reviewers approved the current commit"
-		for _, reviewer := range config.Reviewers {
+		users, err := client.ListHumanReviewers(readCtx, config.Repository)
+		if err != nil {
+			return monitor, err
+		}
+		if pr.GetUser().GetLogin() == "" {
+			return monitor, fmt.Errorf("pull request author is missing")
+		}
+		approved, changesRequested := false, false
+		for _, user := range users {
+			if user.GetID() == pr.GetUser().GetID() || strings.EqualFold(user.GetLogin(), pr.GetUser().GetLogin()) {
+				continue
+			}
+			reviewer := ReviewerIdentity{ID: user.GetID(), Login: user.GetLogin()}
 			latest := latestReviewerDecision(reviews, reviewer)
-			if latest != nil && latest.GetState() == "CHANGES_REQUESTED" {
-				state.State, state.Description = "failure", "A required reviewer requested changes"
+			if latest == nil {
+				continue
+			}
+			permission, _, err := client.GetRepositoryPermissionLevel(readCtx, config.Repository, reviewer.Login)
+			if err != nil {
+				return monitor, fmt.Errorf("read reviewer permission: %w", err)
+			}
+			if !slices.Contains([]string{"write", "maintain", "admin"}, permission.GetPermission()) {
+				continue
+			}
+			if hasCurrentApproval(reviews, reviewer, config.AssessedSHA) && state.corroborateReviews(reviews, reviewer.ID) == nil {
+				approved = true
 				break
 			}
-			if !hasCurrentApproval(reviews, reviewer, config.AssessedSHA) {
-				state.State, state.Description = "pending", "Waiting for all required approvals"
-			}
+			changesRequested = changesRequested || latest.GetState() == "CHANGES_REQUESTED"
 		}
 		// Review pagination can overlap a push. Recheck before persisting success.
 		pr, _, err = client.GetPullRequest(readCtx, config.Repository, number)
@@ -380,11 +404,109 @@ func evaluateReviewCheck(client *common.Client, store core.PublicationStore, rec
 		state.SHA = pr.GetHead().GetSHA()
 		if state.SHA != config.AssessedSHA {
 			state.State, state.Description = "pending", "Waiting for a decision on the current commit"
+			return monitor, nil
 		}
+		if !approved {
+			if err := state.corroborateReviews(reviews, 0); err != nil {
+				return monitor, err
+			}
+		}
+		state.observeRequests(pr, users, reviews)
+		state.State, state.Description = "pending", "Waiting for one qualifying human approval"
+		switch {
+		case approved:
+			state.State, state.Description = "success", "A qualifying human approved the current commit"
+		case changesRequested:
+			state.State, state.Description = "failure", "A human reviewer requested changes"
+		case len(state.Requests) == 0 && len(state.RemovedRequests) > 0:
+			state.State, state.Description = "failure", "The last human review request was removed without approval"
+		}
+
+		state.Description += ". " + config.Reason
 	default:
 		return monitor, fmt.Errorf("invalid persisted review check phase")
 	}
 	return monitor, nil
+}
+
+// Verified activity fences provider propagation delays. The paginated provider
+// history still supplies the effective decision; webhook order cannot undo dismissal.
+func (s *reviewCheckState) corroborateReviews(reviews []*github.PullRequestReview, reviewerID int64) error {
+	for _, activity := range s.ReviewActivity {
+		if activity.SHA != s.Configuration.AssessedSHA || (reviewerID != 0 && activity.Reviewer.ID != reviewerID) {
+			continue
+		}
+		index := slices.IndexFunc(reviews, func(review *github.PullRequestReview) bool {
+			return review.GetID() == activity.ID && review.GetUser().GetID() == activity.Reviewer.ID && review.GetCommitID() == activity.SHA
+		})
+		if index < 0 || (reviews[index].GetState() != activity.State && reviews[index].GetState() != "DISMISSED") {
+			return fmt.Errorf("GitHub review history has not confirmed verified review activity %d", activity.ID)
+		}
+	}
+	return nil
+}
+
+// Keep request history with the review watermark from the same fresh provider
+// read. A new submission can clear a request without releasing required review.
+func (s *reviewCheckState) observeRequests(pr *github.PullRequest, users []*github.User, reviews []*github.PullRequestReview) {
+	current := []observedReviewRequest{}
+	for _, user := range pr.RequestedReviewers {
+		if user.GetID() <= 0 || strings.EqualFold(user.GetLogin(), pr.GetUser().GetLogin()) {
+			continue
+		}
+		human := strings.EqualFold(user.GetType(), "User") || slices.ContainsFunc(users, func(candidate *github.User) bool { return candidate.GetID() == user.GetID() })
+		if !human {
+			continue
+		}
+		reviewer := ReviewerIdentity{ID: user.GetID(), Login: user.GetLogin()}
+		current = append(current, observedReviewRequest{Reviewer: reviewer, ReviewID: reviewerSubmittedReviewID(reviews, reviewer)})
+	}
+	for _, previous := range s.Requests {
+		if slices.ContainsFunc(current, func(request observedReviewRequest) bool { return request.Reviewer.ID == previous.Reviewer.ID }) {
+			continue
+		}
+		if reviewerSubmittedReviewID(reviews, previous.Reviewer) == previous.ReviewID {
+			s.recordRemovedRequest(previous)
+		}
+	}
+	for _, activity := range s.RequestActivity {
+		if activity.SHA != s.Configuration.AssessedSHA || activity.Action != "review_request_removed" || activity.At.Before(s.ObservedAt.Truncate(time.Second)) {
+			continue
+		}
+		if slices.ContainsFunc(current, func(request observedReviewRequest) bool { return request.Reviewer.ID == activity.Reviewer.ID }) {
+			continue
+		}
+		// A delayed removal notification must not hide a newer submission.
+		lastSubmission := time.Time{}
+		for _, review := range reviews {
+			if review.GetUser().GetID() == activity.Reviewer.ID && review.GetState() != "PENDING" && review.GetSubmittedAt().After(lastSubmission) {
+				lastSubmission = review.GetSubmittedAt().Time
+			}
+		}
+		// GitHub can emit removal after the submission timestamp. Only a
+		// subsequent assignment proves that this removal was manual.
+		if !lastSubmission.IsZero() && !lastSubmission.Before(activity.RequestedAt) {
+			continue
+		}
+		if lastSubmission.Before(activity.At) {
+			s.recordRemovedRequest(observedReviewRequest{Reviewer: activity.Reviewer, ReviewID: reviewerSubmittedReviewID(reviews, activity.Reviewer)})
+		}
+	}
+	s.RemovedRequests = slices.DeleteFunc(s.RemovedRequests, func(removed observedReviewRequest) bool {
+		latest := reviewerSubmittedReviewID(reviews, removed.Reviewer)
+		return latest != 0 && latest != removed.ReviewID
+	})
+	if len(current) > 0 {
+		s.RemovedRequests = nil
+	}
+	s.Requests, s.ObservedAt = current, time.Now().UTC()
+}
+
+func (s *reviewCheckState) recordRemovedRequest(request observedReviewRequest) {
+	if slices.ContainsFunc(s.RemovedRequests, func(removed observedReviewRequest) bool { return removed.Reviewer.ID == request.Reviewer.ID }) {
+		return
+	}
+	s.RemovedRequests = append(s.RemovedRequests, request)
 }
 
 func permanentCheckError(err error) bool {
@@ -448,17 +570,24 @@ func reviewCheckStore(integration core.IntegrationContext) (core.PublicationStor
 }
 
 // WakeReviewChecks is called only after signature verification by the app or node
-// webhook handler. It schedules refresh; it never interprets review payload states.
+// webhook handler. Provider reads remain authoritative for review decisions.
 func WakeReviewChecks(integration core.IntegrationContext, eventType string, payload []byte) error {
 	if eventType != "pull_request" && eventType != "pull_request_review" {
 		return nil
 	}
 	var event struct {
-		Repository struct {
+		Review            *github.PullRequestReview `json:"review"`
+		Action            string                    `json:"action"`
+		RequestedReviewer *github.User              `json:"requested_reviewer"`
+		Repository        struct {
 			FullName string `json:"full_name"`
 		} `json:"repository"`
 		PullRequest struct {
 			Number int `json:"number"`
+			Head   struct {
+				SHA string `json:"sha"`
+			} `json:"head"`
+			UpdatedAt time.Time `json:"updated_at"`
 		} `json:"pull_request"`
 	}
 	if err := json.Unmarshal(payload, &event); err != nil {
@@ -467,6 +596,7 @@ func WakeReviewChecks(integration core.IntegrationContext, eventType string, pay
 	if event.Repository.FullName == "" || event.PullRequest.Number <= 0 {
 		return nil
 	}
+	reviewState := strings.ToUpper(event.Review.GetState())
 	store, err := reviewCheckStore(integration)
 	if err != nil {
 		return err
@@ -480,6 +610,52 @@ func WakeReviewChecks(integration core.IntegrationContext, eventType string, pay
 		if err := store.Update(record.Key, func(current *core.OrderedPublication) error {
 			if current.Disabled {
 				return core.ErrPublicationUnchanged
+			}
+			if eventType == "pull_request_review" && event.Review.GetID() > 0 && event.Review.GetUser().GetID() > 0 && event.Review.GetCommitID() != "" && slices.Contains([]string{"APPROVED", "CHANGES_REQUESTED", "COMMENTED", "DISMISSED"}, reviewState) {
+				state, err := decodeReviewCheckState(current.Payload)
+				if err != nil {
+					return err
+				}
+				activity := verifiedReviewActivity{ID: event.Review.GetID(), Reviewer: ReviewerIdentity{ID: event.Review.GetUser().GetID(), Login: event.Review.GetUser().GetLogin()}, SHA: event.Review.GetCommitID(), State: reviewState}
+				index := slices.IndexFunc(state.ReviewActivity, func(previous verifiedReviewActivity) bool { return previous.ID == activity.ID })
+				if index < 0 {
+					state.ReviewActivity = append(state.ReviewActivity, activity)
+				} else if activity.State == "DISMISSED" {
+					state.ReviewActivity[index] = activity
+				}
+				current.Payload, err = json.Marshal(state)
+				if err != nil {
+					return err
+				}
+			}
+			if eventType == "pull_request" && slices.Contains([]string{"review_requested", "review_request_removed"}, event.Action) && event.RequestedReviewer.GetID() > 0 && !event.PullRequest.UpdatedAt.IsZero() {
+				state, err := decodeReviewCheckState(current.Payload)
+				if err != nil {
+					return err
+				}
+				activity := reviewRequestActivity{Reviewer: ReviewerIdentity{ID: event.RequestedReviewer.GetID(), Login: event.RequestedReviewer.GetLogin()}, SHA: event.PullRequest.Head.SHA, Action: event.Action, At: event.PullRequest.UpdatedAt}
+				index := slices.IndexFunc(state.RequestActivity, func(previous reviewRequestActivity) bool {
+					return previous.Reviewer.ID == activity.Reviewer.ID && previous.SHA == activity.SHA
+				})
+				if activity.Action == "review_requested" {
+					activity.RequestedAt = activity.At
+				}
+				if index < 0 {
+					state.RequestActivity = append(state.RequestActivity, activity)
+				} else {
+					previous := &state.RequestActivity[index]
+					if activity.RequestedAt.After(previous.RequestedAt) {
+						previous.RequestedAt = activity.RequestedAt
+					}
+					if activity.At.After(previous.At) {
+						activity.RequestedAt = previous.RequestedAt
+						*previous = activity
+					}
+				}
+				current.Payload, err = json.Marshal(state)
+				if err != nil {
+					return err
+				}
 			}
 			current.WakeAt = reviewCheckWake(time.Second)
 			return nil

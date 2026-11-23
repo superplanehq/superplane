@@ -41,6 +41,13 @@ func TestMergeConfidenceCanvasAssessmentStatus(t *testing.T) {
 	} {
 		t.Run(scenario.name, func(t *testing.T) {
 			f := newPublicationFixture(t)
+			f.publishVersion(t, func(version *models.CanvasVersion) {
+				findIntakeNode(version.Nodes, "publish").Name = "Publish Merge Confidence"
+				version.Nodes = append(version.Nodes, models.Node{ID: "comment", Name: "Comment Merge Confidence", Type: models.NodeTypeComponent, Ref: models.NodeRef{Component: &models.ComponentRef{Name: "github.publishPullRequestComment"}}})
+			})
+			require.NoError(t, f.db.Model(&models.CanvasNode{}).Where("workflow_id = ? AND node_id = ?", f.canvas.ID, "publish").Update("name", "Publish Merge Confidence").Error)
+			require.NoError(t, f.db.Create(&models.CanvasNode{WorkflowID: f.canvas.ID, NodeID: "comment", Name: "Comment Merge Confidence", Type: models.NodeTypeComponent, Ref: datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "github.publishPullRequestComment"}})}).Error)
+			f.startRun(t)
 			root, err := f.run.RootEvent(f.db)
 			require.NoError(t, err)
 			require.NoError(t, f.db.Model(root).Update("data", models.NewJSONValue(map[string]any{"data": map[string]any{
@@ -60,6 +67,8 @@ func TestMergeConfidenceCanvasAssessmentStatus(t *testing.T) {
 				}
 				configuration, err := builder.Build(findYAMLNode(t, doc, id).Configuration)
 				require.NoError(t, err)
+				delete(configuration, "activationNodeId")
+				configuration["enabled"] = true
 				return configuration
 			}
 			installation, err := models.CreateIntegration(uuid.New(), f.canvas.OrganizationID, "github", "github", nil)
@@ -113,7 +122,13 @@ func TestMergeConfidenceCanvasAssessmentStatus(t *testing.T) {
 			require.Len(t, events, 1)
 			incoming, err := models.FindCanvasEventInTransaction(f.db, events[0].ID)
 			require.NoError(t, err)
-			finish := build("finish-assessment-check", execution, incoming)
+			comment := support.CreateNextNodeExecution(t, f.canvas.ID, "comment", root.ID, incoming.ID, &execution.ID)
+			comment.Configuration = datatypes.NewJSONType(map[string]any{"enabled": false})
+			require.NoError(t, f.db.Save(comment).Error)
+			require.NoError(t, workercontexts.NewExecutionStateContext(f.db, comment, nil).Emit("default", "github.pullRequestCommentPublished", []any{map[string]any{"status": "skipped"}}))
+			var commented models.CanvasEvent
+			require.NoError(t, f.db.Where("execution_id = ?", comment.ID).First(&commented).Error)
+			finish := build("finish-assessment-check", comment, &commented)
 			require.Equal(t, scenario.expected, finish["state"])
 			require.Equal(t, start["context"], finish["context"])
 			require.Equal(t, start["assessedSha"], finish["assessedSha"])

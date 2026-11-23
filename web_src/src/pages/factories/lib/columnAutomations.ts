@@ -29,13 +29,18 @@ import {
   factoryPRFeedbackPath,
 } from "./factoryPagePaths";
 import { factoryCustomAutomationSetupPath } from "./customAutomationPaths";
+import { phaseIndexFromColumnKey, type ColumnKey } from "./columnKeys";
 import { isActiveWorkOrderExecution } from "./workOrderExecutions";
 import { findBacklogAutomationApp, findClosureAutomationApp, type LinePhaseColumn } from "./linePhaseRuns";
 
-export { catalogForColumn, onlyCustomCatalogRemains, takenCatalogIds } from "./columnAutomationCatalog";
+export {
+  catalogForColumn,
+  onlyCustomCatalogRemains,
+  pickerCatalogForColumn,
+  takenCatalogIds,
+} from "./columnAutomationCatalog";
 export { COLUMN_AUTOMATIONS_COPY } from "./columnAutomationsCopy";
-
-export type ColumnKey = "backlog" | `phase-${number}` | "verify" | "done";
+export { isColumnKey, phaseIndexFromColumnKey, type ColumnKey } from "./columnKeys";
 
 export type ColumnAutomationKind =
   | "intake"
@@ -65,7 +70,7 @@ export type ColumnAutomation = {
   runningCount: number;
   catalogId: string;
   canvasId?: string;
-  /** Backlog schedule job. A person can start it before a task exists. */
+  /** Backlog run with no task. A person can start it from the column. */
   canRunNow?: boolean;
   activity?: ColumnAutomationActivity;
 };
@@ -92,23 +97,6 @@ export type ColumnAutomationsInput = {
   planningEnabled?: boolean;
   vcsProvider?: string;
 };
-
-const PHASE_KEY_PATTERN = /^phase-(\d+)$/;
-
-export function isColumnKey(value: string | null | undefined): value is ColumnKey {
-  if (!value) {
-    return false;
-  }
-  return value === "backlog" || value === "verify" || value === "done" || PHASE_KEY_PATTERN.test(value);
-}
-
-export function phaseIndexFromColumnKey(key: ColumnKey): number | undefined {
-  const match = PHASE_KEY_PATTERN.exec(key);
-  if (!match) {
-    return undefined;
-  }
-  return Number.parseInt(match[1] ?? "", 10);
-}
 
 export function columnTitleForKey(key: ColumnKey, columns: LinePhaseColumn[] = []): string {
   if (key === "backlog") {
@@ -143,6 +131,9 @@ export function columnAutomationsNeedRepair(automations: ColumnAutomation[]): bo
 
 export function buildColumnAutomations(key: ColumnKey, input: ColumnAutomationsInput): ColumnAutomation[] {
   const workOrders = input.workOrders ?? [];
+  if (key.startsWith("custom-")) {
+    return customColumnAutomations(input.apps ?? [], key, workOrders, new Set(), runningCountForApp);
+  }
   const automations = automationsForColumn(key, input, workOrders);
   return automations.map((automation) => attachAutomationActivity(automation, workOrders));
 }
