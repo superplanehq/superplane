@@ -11,6 +11,7 @@ export type ColumnAutomationApp = {
   id?: string;
   name?: string;
   columnKey?: string;
+  displayColumnKey?: string;
   templateId?: string;
   customAutomationMode?: CustomAutomationMode;
   customAutomationIcon?: string;

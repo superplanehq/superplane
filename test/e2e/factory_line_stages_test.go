@@ -24,6 +24,7 @@ func TestFactoryLineCustomStages(t *testing.T) {
 	s.moveStage()
 	s.assertStageOrder("backlog", "custom", "phase", "verify", "done")
 	s.reloadAndAssertStageVisible()
+	s.moveAgentAndReload()
 	s.removeStage()
 	s.assertStageOrder("backlog", "phase", "verify", "done")
 	s.reloadAndAssertStageHidden()
@@ -36,6 +37,19 @@ func (s *factoryLineStagesSteps) moveStage() {
 	target := page.GetByTestId("lines-stage-shell-phase-0")
 	require.NoError(s.t, handle.DragTo(target))
 	s.saveStageChanges()
+}
+
+func (s *factoryLineStagesSteps) moveAgentAndReload() {
+	page := s.session.Page()
+	s.enterStageEditing()
+	handle := pw.LocatorGetByRoleOptions{Name: "Move " + s.line.Stages[1].Name, Exact: pw.Bool(true)}
+	target := page.GetByTestId("lines-stage-shell-" + s.stageKey)
+	require.NoError(s.t, page.GetByTestId("lines-stage-shell-phase-0").GetByRole("button", handle).DragTo(target))
+	s.saveStageChanges()
+	s.reloadAndAssertStageVisible()
+	s.enterStageEditing()
+	require.NoError(s.t, target.GetByRole("button", handle).WaitFor())
+	require.NoError(s.t, page.GetByTestId("line-stage-edit-toolbar").GetByRole("button", pw.LocatorGetByRoleOptions{Name: "Done", Exact: pw.Bool(true)}).Click())
 }
 
 func (s *factoryLineStagesSteps) enterStageEditing() {

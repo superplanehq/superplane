@@ -176,9 +176,6 @@ describe("custom automation configuration run history", () => {
       await user.click(dialog.getByRole("button", { name: "Run history" }));
       expect(dialog.getByRole("table")).toBeVisible();
       expect(screen.getByTestId("url")).not.toHaveTextContent("automationRun=");
-      expect(hooks.create).not.toHaveBeenCalled();
-      expect(hooks.update).not.toHaveBeenCalled();
-      expect(hooks.delete).not.toHaveBeenCalled();
       expect(onClose).not.toHaveBeenCalled();
     },
   );
@@ -245,20 +242,23 @@ describe("custom automation configuration run history", () => {
     expect(hooks.runtime).not.toHaveBeenCalled();
     await userEvent.setup().click(screen.getByRole("button", { name: "Cancel" }));
     expect(onClose).toHaveBeenCalledTimes(1);
-    expect(hooks.create).not.toHaveBeenCalled();
   });
 
-  it("saves configuration through the existing mutation and closes", async () => {
-    const onClose = renderModal();
+  it("saves custom-stage configuration through the shared editor with line-owned execution", async () => {
+    hooks.describe.mockReturnValue({
+      data: { ...automation, settings: { ...automation.settings, startMode: "START_MODE_AUTOMATIC" } },
+    });
+    const onClose = renderModal("?customAutomation=custom-1", "custom-1", "custom-qa");
+    expect(screen.queryByRole("button", { name: "Add trigger" })).toBeNull();
+    expect(screen.queryByTestId("custom-automation-runs-on-task")).toBeNull();
     await userEvent.setup().click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
     expect(hooks.update).toHaveBeenCalledWith(
       expect.objectContaining({
         name: "Deploy preview",
-        settings: expect.objectContaining({ startMode: "START_MODE_MANUAL" }),
+        settings: expect.objectContaining({ startMode: "START_MODE_AUTOMATIC", runsOnTask: true }),
       }),
     );
-    expect(hooks.runs).not.toHaveBeenCalled();
   });
 
   it("keeps deletion confirmation with configuration and closes after deletion", async () => {

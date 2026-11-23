@@ -59,7 +59,7 @@ func canvasUsesTaskCustomAutomationLink(canvas *Canvas) bool {
 	case CanvasColumnKeyBacklog, CanvasColumnKeyImplement, CanvasColumnKeyDone:
 		return true
 	default:
-		return strings.HasPrefix(*canvas.ColumnKey, "custom-")
+		return false
 	}
 }
 

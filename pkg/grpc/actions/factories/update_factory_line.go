@@ -11,7 +11,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func UpdateFactoryLine(ctx context.Context, organizationID string, req *pb.UpdateFactoryLineRequest) (*pb.UpdateFactoryLineResponse, error) {
+func UpdateFactoryLine(ctx context.Context, deps IntakeDependencies, organizationID string, req *pb.UpdateFactoryLineRequest) (*pb.UpdateFactoryLineResponse, error) {
 	orgID, err := parseOrganizationID(organizationID)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update factory line")
@@ -30,6 +30,12 @@ func UpdateFactoryLine(ctx context.Context, organizationID string, req *pb.Updat
 
 	var line *models.FactoryLine
 	err = db.Transaction(func(tx *gorm.DB) error {
+		if req.StageConfiguration != nil {
+			factory, err = models.LockAutomationFactory(tx, orgID, factory.ID)
+			if err != nil {
+				return err
+			}
+		}
 		line, err = factory.FindLineForUpdate(tx, lineID)
 		if err != nil {
 			return err
@@ -88,6 +94,10 @@ func UpdateFactoryLine(ctx context.Context, organizationID string, req *pb.Updat
 				columnColors = line.ColumnColorsValue()
 			}
 			columnColors = remapNewFactoryLineStageColors(req.GetStageConfiguration().GetStages(), stages, columnColors)
+			backend := CanvasAutomationBackend{Deps: deps}
+			if err := backend.moveAutomationCards(ctx, tx, factory, line, stages, req.StageConfiguration); err != nil {
+				return err
+			}
 			if err := line.DetachRemovedCustomStageAutomations(tx, stages); err != nil {
 				return err
 			}

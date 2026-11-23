@@ -156,7 +156,12 @@ func (b CanvasAutomationBackend) compile(
 	if err != nil {
 		return nil, nil, err
 	}
-	if live != nil && legacyCustomStageGraph(&models.Canvas{ColumnKey: &placement.Stage}, live) && len(source.Triggers) == 1 && source.Triggers[0].Use == automationspec.TaskEntersStage && !settings.runsWithoutTask() {
+	if strings.HasPrefix(placement.Stage, "custom-") {
+		if err := validateCustomStageTriggers(settings); err != nil {
+			return nil, nil, source.Diagnostic("triggers", grpcerrors.StatusMessage(err))
+		}
+	}
+	if live != nil && legacyCustomStageGraph(&models.Canvas{ColumnKey: &placement.Stage}, live) {
 		nodes, edges := editLegacyCustomStageGraph(live, settings)
 		return nodes, edges, nil
 	}

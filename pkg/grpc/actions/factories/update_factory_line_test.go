@@ -16,6 +16,7 @@ import (
 
 func Test__UpdateFactoryLine__ColumnColors(t *testing.T) {
 	r := support.Setup(t)
+	deps := testIntakeDependencies(r)
 	db := database.DB(t.Context())
 
 	newFactoryAndLine := func(t *testing.T) (*models.Factory, *models.FactoryLine) {
@@ -30,7 +31,7 @@ func Test__UpdateFactoryLine__ColumnColors(t *testing.T) {
 	t.Run("sets a color", func(t *testing.T) {
 		factory, line := newFactoryAndLine(t)
 
-		response, err := UpdateFactoryLine(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
+		response, err := UpdateFactoryLine(context.Background(), deps, r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
 			FactoryId:    factory.ID.String(),
 			LineId:       line.ID.String(),
 			ColumnColors: map[string]string{"backlog": "lime"},
@@ -46,7 +47,7 @@ func Test__UpdateFactoryLine__ColumnColors(t *testing.T) {
 	t.Run("colors-only update does not require name or steps", func(t *testing.T) {
 		factory, line := newFactoryAndLine(t)
 
-		_, err := UpdateFactoryLine(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
+		_, err := UpdateFactoryLine(context.Background(), deps, r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
 			FactoryId:    factory.ID.String(),
 			LineId:       line.ID.String(),
 			ColumnColors: map[string]string{"verify": "teal"},
@@ -57,14 +58,14 @@ func Test__UpdateFactoryLine__ColumnColors(t *testing.T) {
 	t.Run("clearing a color replaces the stored map", func(t *testing.T) {
 		factory, line := newFactoryAndLine(t)
 
-		_, err := UpdateFactoryLine(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
+		_, err := UpdateFactoryLine(context.Background(), deps, r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
 			FactoryId:    factory.ID.String(),
 			LineId:       line.ID.String(),
 			ColumnColors: map[string]string{"backlog": "lime", "verify": "teal"},
 		})
 		require.NoError(t, err)
 
-		response, err := UpdateFactoryLine(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
+		response, err := UpdateFactoryLine(context.Background(), deps, r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
 			FactoryId:    factory.ID.String(),
 			LineId:       line.ID.String(),
 			ColumnColors: map[string]string{"verify": "teal"},
@@ -76,14 +77,14 @@ func Test__UpdateFactoryLine__ColumnColors(t *testing.T) {
 	t.Run("empty map clears all colors", func(t *testing.T) {
 		factory, line := newFactoryAndLine(t)
 
-		_, err := UpdateFactoryLine(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
+		_, err := UpdateFactoryLine(context.Background(), deps, r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
 			FactoryId:    factory.ID.String(),
 			LineId:       line.ID.String(),
 			ColumnColors: map[string]string{"backlog": "lime"},
 		})
 		require.NoError(t, err)
 
-		response, err := UpdateFactoryLine(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
+		response, err := UpdateFactoryLine(context.Background(), deps, r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
 			FactoryId:    factory.ID.String(),
 			LineId:       line.ID.String(),
 			ColumnColors: map[string]string{},
@@ -99,7 +100,7 @@ func Test__UpdateFactoryLine__ColumnColors(t *testing.T) {
 	t.Run("unknown color id -> error", func(t *testing.T) {
 		factory, line := newFactoryAndLine(t)
 
-		_, err := UpdateFactoryLine(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
+		_, err := UpdateFactoryLine(context.Background(), deps, r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
 			FactoryId:    factory.ID.String(),
 			LineId:       line.ID.String(),
 			ColumnColors: map[string]string{"backlog": "not-a-color"},
@@ -112,7 +113,7 @@ func Test__UpdateFactoryLine__ColumnColors(t *testing.T) {
 	t.Run("no fields provided -> error", func(t *testing.T) {
 		factory, line := newFactoryAndLine(t)
 
-		_, err := UpdateFactoryLine(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
+		_, err := UpdateFactoryLine(context.Background(), deps, r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
 			FactoryId: factory.ID.String(),
 			LineId:    line.ID.String(),
 		})

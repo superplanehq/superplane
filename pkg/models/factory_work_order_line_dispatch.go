@@ -1015,8 +1015,8 @@ func ListWorkOrderLineDispatchesByWorkOrderIDs(
 }
 
 // WorkOrderIsWaitingAfterPassedStage reports the backend invariant used by the
-// Verify board: an open task whose current traversal has no active step and
-// whose latest stage attempt passed.
+// Verify board: an open task whose latest line traversal has no active step and
+// whose furthest step passed.
 func WorkOrderIsWaitingAfterPassedStage(tx *gorm.DB, workOrderID uuid.UUID) (bool, error) {
 	var order FactoryWorkOrder
 	if err := tx.Where("id = ?", workOrderID).First(&order).Error; err != nil {
@@ -1029,8 +1029,36 @@ func (o *FactoryWorkOrder) IsWaitingAfterPassedStage(tx *gorm.DB) (bool, error) 
 	if o == nil || o.State != FactoryWorkOrderStateOpen {
 		return false, nil
 	}
-	column, err := WorkOrderBoardColumn(tx, o)
-	return column == CanvasColumnKeyVerify, err
+	grouped, err := ListWorkOrderLineDispatchesByWorkOrderIDs(tx, []uuid.UUID{o.ID})
+	if err != nil {
+		return false, err
+	}
+	dispatches := grouped[o.ID]
+	if len(dispatches) == 0 {
+		return false, nil
+	}
+	current := dispatches[len(dispatches)-1]
+	if current.QueueItem != nil {
+		return false, nil
+	}
+	executions := current.Executions
+	if len(executions) == 0 {
+		return false, nil
+	}
+	furthest := executions[0].FactoryWorkOrderExecution
+	for i := range executions {
+		execution := executions[i].FactoryWorkOrderExecution
+		if execution.Status == FactoryWorkOrderExecutionStatusPending ||
+			execution.Status == FactoryWorkOrderExecutionStatusRunning {
+			return false, nil
+		}
+		if execution.StepIndex > furthest.StepIndex ||
+			(execution.StepIndex == furthest.StepIndex && execution.UpdatedAt.After(furthest.UpdatedAt)) {
+			furthest = execution
+		}
+	}
+	return furthest.Status == FactoryWorkOrderExecutionStatusFinished &&
+		furthest.Result == CanvasRunResultPassed, nil
 }
 
 // WorkOrderBoardColumn is the board column that currently shows this task.
@@ -1048,72 +1076,17 @@ func WorkOrderBoardColumn(tx *gorm.DB, order *FactoryWorkOrder) (string, error) 
 		}
 		return CanvasColumnKeyDone, nil
 	case FactoryWorkOrderStateOpen:
-		grouped, err := ListWorkOrderLineDispatchesByWorkOrderIDs(tx, []uuid.UUID{order.ID})
+		inVerify, err := order.IsWaitingAfterPassedStage(tx)
 		if err != nil {
 			return "", err
 		}
-		records := grouped[order.ID]
-		if len(records) == 0 {
-			return CanvasColumnKeyImplement, nil
-		}
-		current := records[len(records)-1]
-		for _, record := range records {
-			if record.State == FactoryWorkOrderLineDispatchStateActive {
-				current = record
-				break
-			}
-			if record.UpdatedAt.After(current.UpdatedAt) {
-				current = record
-			}
-		}
-		if current.QueueItem != nil {
-			return boardColumnForStage(current.QueueItem.StageKey), nil
-		}
-		for _, execution := range current.Executions {
-			if execution.Status == FactoryWorkOrderExecutionStatusPending || execution.Status == FactoryWorkOrderExecutionStatusRunning {
-				return current.boardColumnForStep(execution.StepIndex), nil
-			}
-		}
-		if len(current.Executions) == 0 {
-			return CanvasColumnKeyImplement, nil
-		}
-		// Executions are ordered by admission time. A retry can move backwards.
-		latest := current.Executions[len(current.Executions)-1]
-		result, err := current.StageResult(tx, latest.StepIndex)
-		if err != nil {
-			return "", err
-		}
-		if result == CanvasRunResultPassed {
+		if inVerify {
 			return CanvasColumnKeyVerify, nil
 		}
-		return current.boardColumnForStep(latest.StepIndex), nil
+		return CanvasColumnKeyImplement, nil
 	default:
 		return "", nil
 	}
-}
-
-func (l *FactoryWorkOrderLineDispatch) boardColumnForStep(stepIndex int) string {
-	if stepIndex < 0 || stepIndex >= len(l.Steps) {
-		return CanvasColumnKeyImplement
-	}
-	return boardColumnForStage(l.Steps[stepIndex].StageKey)
-}
-
-func boardColumnForStage(stage string) string {
-	if strings.HasPrefix(stage, "custom-") {
-		return stage
-	}
-	return CanvasColumnKeyImplement
-}
-
-// StageAttemptID is shared by sibling completions and changes on each retry.
-func (l *FactoryWorkOrderLineDispatch) StageAttemptID(tx *gorm.DB, stepIndex int) (uuid.UUID, error) {
-	start, end := l.StageStepRange(stepIndex)
-	var latest FactoryWorkOrderExecution
-	err := tx.Select("id").
-		Where("line_dispatch_id = ? AND step_index >= ? AND step_index < ?", l.ID, start, end).
-		Order("created_at DESC").Order("id DESC").First(&latest).Error
-	return latest.ID, err
 }
 
 // rejectStepAdmission records a failed attempt without a run for confirmed

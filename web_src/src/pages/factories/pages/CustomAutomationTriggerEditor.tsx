@@ -90,7 +90,7 @@ export function TriggerEditor({
       <section className="flex flex-col gap-4">
         <div className="flex flex-col gap-1.5">
           <h3 className="text-base font-semibold text-foreground">Triggers</h3>
-          <TriggerContext runsOnTask={runsOnTask} onRunsOnTaskChange={onRunsOnTaskChange} />
+          <TriggerContext columnKey={columnKey} runsOnTask={runsOnTask} onRunsOnTaskChange={onRunsOnTaskChange} />
         </div>
         {visibleTriggers.map((trigger) => (
           <TriggerCard
@@ -110,26 +110,28 @@ export function TriggerEditor({
             onScheduleChange={(schedule) => updateTrigger(trigger.id, { ...trigger, schedule })}
           />
         ))}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button type="button" variant="outline" size="sm" className="w-fit gap-1.5">
-              <Plus className="size-3.5" aria-hidden />
-              Add trigger
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="min-w-72">
-            {triggerModes.map((mode) => (
-              <DropdownMenuItem
-                key={mode}
-                className="py-2.5"
-                disabled={mode !== "scheduled" && triggers.some((trigger) => trigger.mode === mode)}
-                onSelect={() => addTrigger(mode)}
-              >
-                <TriggerOption mode={mode} columnKey={columnKey} runsOnTask={runsOnTask !== false} />
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {!columnKey.startsWith("custom-") && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button type="button" variant="outline" size="sm" className="w-fit gap-1.5">
+                <Plus className="size-3.5" aria-hidden />
+                Add trigger
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="min-w-72">
+              {triggerModes.map((mode) => (
+                <DropdownMenuItem
+                  key={mode}
+                  className="py-2.5"
+                  disabled={mode !== "scheduled" && triggers.some((trigger) => trigger.mode === mode)}
+                  onSelect={() => addTrigger(mode)}
+                >
+                  <TriggerOption mode={mode} columnKey={columnKey} runsOnTask={runsOnTask !== false} />
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </section>
       <section className="flex flex-col gap-8">
         <h3 className="text-base font-semibold text-foreground">Agent</h3>
@@ -226,12 +228,19 @@ function TriggerCard({
 
 /** Chooses which triggers this automation can run. The choice is saved. */
 function TriggerContext({
+  columnKey,
   runsOnTask,
   onRunsOnTaskChange,
 }: {
+  columnKey: CustomAutomationColumn;
   runsOnTask?: boolean;
   onRunsOnTaskChange: (runsOnTask: boolean) => void;
 }) {
+  if (columnKey.startsWith("custom-")) {
+    return (
+      <p className="text-xs text-muted-foreground">The line starts this automation when a task enters the stage.</p>
+    );
+  }
   return (
     <div className="flex items-center gap-2" data-testid="custom-automation-runs-on-task">
       <span className="text-xs text-muted-foreground">Runs</span>

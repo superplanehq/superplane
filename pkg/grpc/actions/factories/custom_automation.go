@@ -271,7 +271,7 @@ func UpdateFactoryCustomAutomation(
 		if err != nil {
 			return err
 		}
-		if legacyCustomStageGraph(canvas, live) && len(settings.Triggers) == 1 && settings.StartMode == pb.FactoryCustomAutomation_START_MODE_AUTOMATIC && !settings.runsWithoutTask() {
+		if legacyCustomStageGraph(canvas, live) {
 			nodes, edges = editLegacyCustomStageGraph(live, settings)
 		}
 
@@ -746,7 +746,7 @@ func customAutomationColumnAllowed(column string) bool {
 }
 
 func customAutomationUsesTaskTrigger(column string) bool {
-	return column == models.CanvasColumnKeyBacklog || column == models.CanvasColumnKeyImplement || column == models.CanvasColumnKeyDone || strings.HasPrefix(column, "custom-")
+	return column == models.CanvasColumnKeyBacklog || column == models.CanvasColumnKeyImplement || column == models.CanvasColumnKeyDone
 }
 
 func customAutomationListensForTask(column string, mode pb.FactoryCustomAutomation_StartMode) bool {
@@ -1274,7 +1274,6 @@ func findCustomAutomationCanvas(tx *gorm.DB, factory *models.Factory, rawID stri
 }
 
 func preserveCustomAutomationIdentities(version *models.CanvasVersion, doc *yaml.Canvas) error {
-	preserveCustomStageGate(version, doc)
 	for i := range version.Nodes {
 		if version.Nodes[i].Type == models.NodeTypeTrigger {
 			preserveCustomAutomationPRTriggerIdentity(&version.Nodes[i], doc)
@@ -1384,9 +1383,6 @@ func decodeCustomAutomationTriggers(nodes []models.Node) ([]decodedCustomAutomat
 			continue
 		}
 		template, _ := node.Metadata[models.FactoryAppTemplateMetadataKey].(map[string]any)
-		if template["stageGate"] == true {
-			continue
-		}
 		mode, _ := template["startMode"].(string)
 		if node.ComponentName() == "onRun" {
 			mode = "automatic"

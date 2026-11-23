@@ -9,6 +9,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
+	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/pkg/yaml"
 	"gorm.io/gorm"
 )
@@ -38,25 +39,37 @@ func validateCustomStageAutomation(tx *gorm.DB, factory *models.Factory, column 
 	return invalidArgument("Select a custom stage in this factory.")
 }
 
-// The line owns gate admission. Event-trigger runs never own that gate.
+// The line owns stage admission. Editing must not add event subscriptions.
 func buildCustomStageAutomationCanvas(tx *gorm.DB, factory *models.Factory, name string, settings *customAutomationSettings, provider string) (*yaml.Canvas, error) {
-	phase := *settings
-	phase.ColumnKey = models.CanvasColumnKeyImplement
-	doc, err := buildCustomAutomationCanvas(tx, factory, name, &phase)
-	if err != nil {
+	if err := validateCustomStageTriggers(settings); err != nil {
 		return nil, err
 	}
-	metadata := customAutomationNodeMetadata(provider, settings.Icon, settings.RunsOnTask, func(template map[string]any) { template["stageGate"] = true })
-	doc.Spec.Nodes = append(doc.Spec.Nodes, yaml.Node{
+	doc := &yaml.Canvas{
+		APIVersion: yaml.APIVersion,
+		Kind:       yaml.KindCanvas,
+		Metadata:   &yaml.CanvasMetadata{Name: name, Description: "Run ordered prompt and Bash automation steps."},
+		Spec:       &yaml.CanvasSpec{},
+	}
+	metadata := customAutomationNodeMetadata(provider, settings.Icon, settings.RunsOnTask, func(template map[string]any) {
+		template["startMode"] = "automatic"
+	})
+	doc.Spec.Nodes = []yaml.Node{{
 		ID: "on-run", Name: "On Run", Type: yaml.NodeTypeTrigger, Component: "onRun", Configuration: map[string]any{}, Metadata: metadata,
 	}, customAutomationRunnerNode("stage-run", "Run stage automation", settings,
 		customAutomationRunnerConfiguration(tx, factory, settings, []any{
 			checkoutEnvironmentVar("REPO", "{{ order().repository }}"),
 			checkoutEnvironmentVar("REPO_URL", "{{ order().repository_url }}"),
 			checkoutEnvironmentVar("BASE", "{{ order().default_branch }}"),
-		}), 80))
-	doc.Spec.Edges = append(doc.Spec.Edges, yaml.Edge{SourceID: "on-run", TargetID: "stage-run", Channel: "default"})
+		}), 80)}
+	doc.Spec.Edges = []yaml.Edge{{SourceID: "on-run", TargetID: "stage-run", Channel: "default"}}
 	return doc, nil
+}
+
+func validateCustomStageTriggers(settings *customAutomationSettings) error {
+	if len(settings.Triggers) != 1 || settings.StartMode != pb.FactoryCustomAutomation_START_MODE_AUTOMATIC || settings.runsWithoutTask() {
+		return invalidArgument("Custom stage automations run on a task when it enters the stage. Keep one task_enters_stage trigger.")
+	}
+	return nil
 }
 
 func legacyCustomStageGraph(canvas *models.Canvas, version *models.CanvasVersion) bool {
@@ -195,73 +208,5 @@ func mergeCustomStageSecrets(configuration map[string]any, requested []any) {
 		configuration["environmentFrom"] = sources
 	} else {
 		delete(configuration, "environmentFrom")
-	}
-}
-
-func preserveCustomStageGate(version *models.CanvasVersion, doc *yaml.Canvas) {
-	var gate *models.Node
-	for i := range version.Nodes {
-		if version.Nodes[i].ComponentName() == "onRun" {
-			gate = &version.Nodes[i]
-			break
-		}
-	}
-	if gate == nil {
-		return
-	}
-	var agent *models.Node
-	for _, edge := range version.Edges {
-		if edge.SourceID != gate.ID {
-			continue
-		}
-		for i := range version.Nodes {
-			if version.Nodes[i].ID == edge.TargetID && isFactoryAgentHarness(version.Nodes[i].ComponentName()) {
-				agent = &version.Nodes[i]
-			}
-		}
-	}
-	for i := range doc.Spec.Nodes {
-		node := &doc.Spec.Nodes[i]
-		if node.ID == "stage-run" && agent != nil {
-			configuration := maps.Clone(agent.Configuration)
-			requested, _ := node.Configuration["environmentFrom"].([]any)
-			mergeCustomStageSecrets(configuration, requested)
-			// Refresh gate checkout fields without removing other canvas variables.
-			environment, _ := configuration["environment"].([]any)
-			environment = slices.DeleteFunc(slices.Clone(environment), func(value any) bool {
-				entry, _ := value.(map[string]any)
-				return entry["name"] == "REPO" || entry["name"] == "REPO_URL" || entry["name"] == "BASE"
-			})
-			checkout, _ := node.Configuration["environment"].([]any)
-			configuration["environment"] = append(environment, checkout...)
-			for _, key := range []string{"steps", "executionTimeoutSeconds", "model", "credentials", "skipSetupCommands", "skipRepositoryCheckout", "llmProvider"} {
-				if value, ok := node.Configuration[key]; ok {
-					configuration[key] = value
-				} else {
-					delete(configuration, key)
-				}
-			}
-			node.Configuration = configuration
-			node.ID = customStageAgentID(agent.ID, agent.ComponentName(), node.Component)
-			if agent.Concurrency != nil {
-				node.Concurrency = &yaml.ConcurrencySpec{Max: agent.Concurrency.Max, Key: agent.Concurrency.Key}
-			}
-			for j := range doc.Spec.Edges {
-				if doc.Spec.Edges[j].TargetID == "stage-run" {
-					doc.Spec.Edges[j].TargetID = node.ID
-				}
-			}
-			continue
-		}
-		if node.ID != "on-run" {
-			continue
-		}
-		node.ID = gate.ID
-		node.Configuration = gate.Configuration
-		for j := range doc.Spec.Edges {
-			if doc.Spec.Edges[j].SourceID == "on-run" {
-				doc.Spec.Edges[j].SourceID = gate.ID
-			}
-		}
 	}
 }

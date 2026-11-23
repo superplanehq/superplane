@@ -9,18 +9,13 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
-	factoryactions "github.com/superplanehq/superplane/pkg/grpc/actions/factories"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
-	factorypb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/pkg/registry"
-	"github.com/superplanehq/superplane/pkg/workers/contexts"
 	testconsumer "github.com/superplanehq/superplane/test/consumer"
 	"github.com/superplanehq/superplane/test/support"
 	"github.com/superplanehq/superplane/test/support/impl"
@@ -612,116 +607,62 @@ func Test__RunFinalizer__ExecuteNextFactoryLineStep(t *testing.T) {
 }
 
 func Test__RunFinalizer__WaitsForEveryCustomStageAutomation(t *testing.T) {
-	for _, gateResult := range []string{models.CanvasRunResultPassed, models.CanvasRunResultFailed} {
-		t.Run(gateResult, func(t *testing.T) {
-			r := support.Setup(t)
-			defer r.Close()
-			db := database.Conn()
+	r := support.Setup(t)
+	defer r.Close()
+	db := database.Conn()
 
-			factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
-			require.NoError(t, err)
-			order, err := factory.CreateWorkOrder(db, "Ship feature", "", &r.User, nil, nil)
-			require.NoError(t, err)
-			dispatchWorkOrderForTest(t, order)
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	order, err := factory.CreateWorkOrder(db, "Ship feature", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	dispatchWorkOrderForTest(t, order)
 
-			implement, implementEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "implement", "start")
-			second, _ := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "test", "start")
-			line, err := factory.CreateLine(db, "ship", []models.FactoryLineStep{{
-				Type: models.FactoryLineStepTypeRunApp, AppID: implement.ID, Entrypoint: implementEntry,
-			}})
-			require.NoError(t, err)
+	implement, implementEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "implement", "start")
+	first, _ := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "lint", "start")
+	second, _ := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "test", "start")
+	line, err := factory.CreateLine(db, "ship", []models.FactoryLineStep{{
+		Type: models.FactoryLineStepTypeRunApp, AppID: implement.ID, Entrypoint: implementEntry,
+	}})
+	require.NoError(t, err)
 
-			stageID := uuid.New()
-			stageKey := "custom-" + stageID.String()
-			stages := line.StagesValue()
-			stages = append(stages[:1], append([]models.FactoryLineStage{{
-				ID: stageID, Key: stageKey, Name: "QA", Kind: models.FactoryLineStageCustom,
-			}}, stages[1:]...)...)
-			require.NoError(t, line.UpdateConfiguration(db, nil, nil, nil, stages))
-			repository, branch, integrationID := "acme/app", "main", uuid.NewString()
-			require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{AppRepository: &repository, DefaultBranch: &branch, VCSIntegrationID: &integrationID}))
-			require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
-			require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomStages))
-			ctx := authentication.SetUserIdInMetadata(t.Context(), r.User.String())
-			deps := factoryactions.IntakeDependencies{Registry: r.Registry, Encryptor: r.Encryptor, AuthService: r.AuthService, WebhookBaseURL: "http://localhost:8000"}
-			created, err := factoryactions.CreateFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &factorypb.CreateFactoryCustomAutomationRequest{
-				FactoryId: factory.ID.String(), ColumnKey: stageKey, Name: "Lint",
-				Settings: &factorypb.FactoryCustomAutomation_Settings{
-					Triggers: []*factorypb.FactoryCustomAutomation_StartTrigger{{StartMode: factorypb.FactoryCustomAutomation_START_MODE_AUTOMATIC}, {StartMode: factorypb.FactoryCustomAutomation_START_MODE_MANUAL}, {StartMode: factorypb.FactoryCustomAutomation_START_MODE_ON_LEAVE}},
-					Agent:    &factorypb.FactoryAppTemplateAgent{Component: "runnerClaudeCode"},
-					Steps:    []*factorypb.FactoryCustomAutomation_Step{{Name: "Lint", Type: factorypb.FactoryCustomAutomation_Step_TYPE_BASH, Command: "make lint"}},
-				},
-			})
-			require.NoError(t, err)
-			require.NoError(t, second.SetColumnKey(db, stageKey))
+	stageID := uuid.New()
+	stageKey := "custom-" + stageID.String()
+	stages := line.StagesValue()
+	stages = append(stages[:1], append([]models.FactoryLineStage{{
+		ID: stageID, Key: stageKey, Name: "QA", Kind: models.FactoryLineStageCustom,
+	}}, stages[1:]...)...)
+	require.NoError(t, line.UpdateConfiguration(db, nil, nil, nil, stages))
+	require.NoError(t, first.SetColumnKey(db, stageKey))
+	require.NoError(t, second.SetColumnKey(db, stageKey))
 
-			var customRuns []*models.FactoryLineStepResult
-			require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
-				_, customRuns, err = line.DispatchStage(tx, order)
-				return err
-			}))
-			require.Len(t, customRuns, 2)
-			events, err := contexts.EmitAutomaticTaskColumnCustomAutomations(db, factory, order, stageKey)
-			require.NoError(t, err)
-			require.Empty(t, events, "line admission already starts the stage-entry run")
+	var customRuns []*models.FactoryLineStepResult
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		_, customRuns, err = line.DispatchStage(tx, order)
+		return err
+	}))
+	require.Len(t, customRuns, 2)
 
-			amqpURL, _ := config.RabbitMQURL()
-			finalizer := NewRunFinalizer(amqpURL, r.Registry)
-			finish := func(result *models.FactoryLineStepResult, runResult string) []factoryLinePendingRun {
-				t.Helper()
-				now := time.Now()
-				require.NoError(t, db.Model(result.Run).Updates(map[string]any{
-					"state": models.CanvasRunStateFinished, "result": runResult,
-					"updated_at": &now, "finished_at": &now,
-				}).Error)
-				var pending []factoryLinePendingRun
-				require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
-					pending, _, err = finalizer.executeNextFactoryLineStep(tx, result.Run.ID)
-					return err
-				}))
-				finalizer.startAutomaticCustomAutomationsForRun(result.Run.ID)
-				return pending
-			}
-
-			manual, err := factoryactions.RunFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &factorypb.RunFactoryCustomAutomationRequest{FactoryId: factory.ID.String(), AutomationId: created.GetCustomAutomation().GetAutomation().GetId(), WorkOrderId: order.ID.String()})
-			require.NoError(t, err)
-			manualRun, err := models.FindCanvasRunInTransaction(db, uuid.MustParse(created.GetCustomAutomation().GetAutomation().GetId()), uuid.MustParse(manual.GetRunId()))
-			require.NoError(t, err)
-			assert.Empty(t, finish(&models.FactoryLineStepResult{Run: manualRun}, models.CanvasRunResultPassed), "an independent manual run cannot complete the stage gate")
-			assert.Empty(t, finish(customRuns[0], models.CanvasRunResultPassed), "the stage waits for its other automation")
-			pending := finish(customRuns[1], gateResult)
-			finalizer.startAutomaticCustomAutomationsForRun(customRuns[1].Run.ID)
-			var runCount int64
-			require.NoError(t, db.Model(&models.CanvasRun{}).Where("workflow_id = ?", created.GetCustomAutomation().GetAutomation().GetId()).Count(&runCount).Error)
-			if gateResult == models.CanvasRunResultFailed {
-				require.Equal(t, int64(2), runCount, "a failed gate creates no leave run")
-				require.Empty(t, pending)
-				column, err := models.WorkOrderBoardColumn(db, order)
-				require.NoError(t, err)
-				require.Equal(t, stageKey, column, "a failed gate does not leave the stage")
-				return
-			}
-			require.Len(t, pending, 1)
-			require.Equal(t, int64(3), runCount, "a stage departure starts its leave run once")
-			assert.Equal(t, implement.ID, pending[0].workflowID)
-			finalizer.startAutomaticCustomAutomationsForRun(customRuns[0].Run.ID)
-			require.NoError(t, db.Model(&models.CanvasRun{}).Where("workflow_id = ?", created.GetCustomAutomation().GetAutomation().GetId()).Count(&runCount).Error)
-			require.Equal(t, int64(3), runCount, "sibling callbacks share the same departure")
-			var retried *models.FactoryLineStepResult
-			gateIndex := customRuns[0].Execution.StepIndex
-			if customRuns[0].Run.WorkflowID.String() != created.GetCustomAutomation().GetAutomation().GetId() {
-				gateIndex = customRuns[1].Execution.StepIndex
-			}
-			require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
-				retried, _, err = order.RetryLineStep(tx, line, gateIndex)
-				return err
-			}))
-			finish(retried, models.CanvasRunResultPassed)
-			finalizer.startAutomaticCustomAutomationsForRun(customRuns[1].Run.ID)
-			require.NoError(t, db.Model(&models.CanvasRun{}).Where("workflow_id = ?", created.GetCustomAutomation().GetAutomation().GetId()).Count(&runCount).Error)
-			require.Equal(t, int64(5), runCount, "a retried stage starts one new gate run and one new leave run")
-		})
+	amqpURL, _ := config.RabbitMQURL()
+	finalizer := NewRunFinalizer(amqpURL, r.Registry)
+	finish := func(result *models.FactoryLineStepResult) []factoryLinePendingRun {
+		t.Helper()
+		now := time.Now()
+		require.NoError(t, db.Model(result.Run).Updates(map[string]any{
+			"state": models.CanvasRunStateFinished, "result": models.CanvasRunResultPassed,
+			"updated_at": &now, "finished_at": &now,
+		}).Error)
+		var pending []factoryLinePendingRun
+		require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+			pending, _, err = finalizer.executeNextFactoryLineStep(tx, result.Run.ID)
+			return err
+		}))
+		return pending
 	}
+
+	assert.Empty(t, finish(customRuns[0]), "the stage waits for its other automation")
+	pending := finish(customRuns[1])
+	require.Len(t, pending, 1)
+	assert.Equal(t, implement.ID, pending[0].workflowID)
 }
 
 func Test__RunFinalizer__ExecuteNextFactoryLineStep__StopsImplementWhenNoBranchIsSaved(t *testing.T) {

@@ -129,7 +129,7 @@ func TestCanvasAutomationCustomStageRoundTripAndAdmission(t *testing.T) {
 	require.NoError(t, line.UpdateConfiguration(db, nil, nil, nil, stages))
 	service := automations.Service{Backend: CanvasAutomationBackend{Deps: onboardingDeps(r)}}
 	ctx := onboardingContext(r)
-	source := "apiVersion: v2\nkind: Automation\nname: QA check\nruns_on_task: true\ntriggers:\n  - use: task_enters_stage\n  - use: manual\n  - use: task_leaves_stage\nsteps:\n  - name: Inspect\n    prompt: Check the changes.\n"
+	source := "apiVersion: v2\nkind: Automation\nname: QA check\nruns_on_task: true\ntriggers:\n  - use: task_enters_stage\nsteps:\n  - name: Inspect\n    prompt: Check the changes.\n"
 	placement := automations.Placement{OrganizationID: r.Organization.ID, FactoryID: factory.ID, Stage: stageKey}
 	invalid := placement
 	invalid.Stage = "custom-" + uuid.NewString()
@@ -153,15 +153,15 @@ func TestCanvasAutomationCustomStageRoundTripAndAdmission(t *testing.T) {
 	_, err = service.Validate(ctx, placement, strings.Replace(source, "task_enters_stage", "pull_request_updated", 1))
 	require.ErrorContains(t, err, "requires Verify")
 	scheduledSource := "apiVersion: v2\nkind: Automation\nname: Scheduled QA\nruns_on_task: false\ntriggers:\n  - use: schedule\n    config:\n      cron: '0 9 * * *'\nsteps:\n  - name: Inspect\n    prompt: Check the changes.\n"
-	scheduled, err := service.Create(ctx, placement, r.User, scheduledSource)
-	require.NoError(t, err)
-	scheduledRead, err := service.Read(ctx, r.Organization.ID, scheduled.ID)
-	require.NoError(t, err)
-	require.Equal(t, scheduledSource, scheduledRead.YAML)
-	scheduledCanvas, err := models.FindCanvasInTransaction(db, r.Organization.ID, scheduled.ID)
-	require.NoError(t, err)
-	// Keep this independent schedule out of this test's stage admission.
-	require.NoError(t, scheduledCanvas.SetColumnKey(db, ""))
+	for _, unsupported := range []string{
+		scheduledSource,
+		strings.Replace(source, "task_enters_stage", "manual", 1),
+		strings.Replace(source, "task_enters_stage", "task_leaves_stage", 1),
+		strings.Replace(source, "  - use: task_enters_stage", "  - use: task_enters_stage\n  - use: manual", 1),
+	} {
+		_, err := service.Create(ctx, placement, r.User, unsupported)
+		require.ErrorContains(t, err, "Keep one task_enters_stage trigger")
+	}
 	legacyCanvas, _ := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "Existing QA", "existing-start")
 	require.NoError(t, legacyCanvas.SetColumnKey(db, stageKey))
 	version, err := models.FindLiveCanvasVersionInTransaction(db, legacyCanvas.ID)
@@ -201,7 +201,6 @@ func TestCanvasAutomationCustomStageRoundTripAndAdmission(t *testing.T) {
 			bashSource := strings.Replace(source, "prompt: Check the changes.", "bash: make lint", 1)
 			if id == legacyCanvas.ID {
 				bashSource = strings.Replace(bashSource, "name: QA check", "name: Existing QA", 1)
-				bashSource = strings.Replace(bashSource, "  - use: manual\n  - use: task_leaves_stage\n", "", 1)
 			}
 			withSettings := strings.Replace(bashSource, "runs_on_task: true", "runs_on_task: true\nskip_setup_commands: true\nskip_repository_checkout: true", 1)
 			withSettings = strings.Replace(withSettings, "bash: make lint", "bash: make lint\n    secrets: [retired-secret, kept-secret]", 1)
@@ -395,7 +394,22 @@ func TestCanvasAutomationLegacyImportProtectsGraphBehavior(t *testing.T) {
 			require.Equal(t, int64(2), reopened.Revision)
 			require.Equal(t, tc.use, doc.Triggers[0].Use)
 			require.Len(t, doc.Triggers, len(triggers))
-
+			if tc.name == "leave" {
+				require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomStages))
+				line, err := factory.CreateLine(db, "Move test", nil)
+				require.NoError(t, err)
+				_, err = UpdateFactoryLine(ctx, deps, r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
+					FactoryId: factory.ID.String(), LineId: line.ID.String(), StageConfiguration: &pb.FactoryLine_StageConfiguration{
+						Stages: factoryLineStageRequests(line.StagesValue()), AutomationMoves: []*pb.FactoryLine_AutomationMove{{Type: "canvas", AutomationId: id.String(), SourceKey: "backlog", DestinationKey: "done"}},
+					},
+				})
+				require.NoError(t, err)
+				moved, err := service.Read(ctx, r.Organization.ID, id)
+				require.NoError(t, err)
+				require.Equal(t, reopened.YAML, moved.YAML)
+				require.Equal(t, reopened.Revision+1, moved.Revision)
+				require.Equal(t, "done", moved.Stage)
+			}
 		})
 	}
 }
