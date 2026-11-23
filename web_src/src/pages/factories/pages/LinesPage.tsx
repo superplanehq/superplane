@@ -40,7 +40,12 @@ import { getApiErrorMessage } from "@/lib/errors";
 import { WORKSPACE_LOADING_COPY } from "@/lib/workspaceLoadingCopy";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
-import { FEATURE_FACTORY_CUSTOM_STAGES, FEATURE_FACTORY_PULL_REQUEST_MERGE } from "@/lib/experimentalFeatures";
+import {
+  FEATURE_AUTOMATIONS_AS_CODE,
+  FEATURE_FACTORY_CUSTOM_AUTOMATIONS,
+  FEATURE_FACTORY_CUSTOM_STAGES,
+  FEATURE_FACTORY_PULL_REQUEST_MERGE,
+} from "@/lib/experimentalFeatures";
 import { useAutoLoadMoreOnScroll } from "@/hooks/useAutoLoadMoreOnScroll";
 import { Clock, Plus } from "lucide-react";
 import {
@@ -795,7 +800,12 @@ export function LinesPage() {
       ) : null}
       {customAutomationAutomationId !== undefined && canUpdate && selectedLine.id ? (
         <CustomAutomationSetupModal
+          key={customAutomationAutomationId ?? "new"}
           lineId={selectedLine.id}
+          yamlEnabled={
+            hasExperimentalFeature(FEATURE_FACTORY_CUSTOM_AUTOMATIONS) &&
+            hasExperimentalFeature(FEATURE_AUTOMATIONS_AS_CODE)
+          }
           automationId={customAutomationAutomationId ?? undefined}
           columnKey={customAutomationColumn(new URLSearchParams(search).get("automationColumn"))}
           onClose={() => navigate(factoryHomePath(organizationId, routeSegment, selectedLine.id))}

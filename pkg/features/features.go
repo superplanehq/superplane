@@ -51,6 +51,8 @@ const FeatureOrganizationBYOKCustomProvider = "organization_byok_custom_provider
 // Implement, Verify, and Done until the flow is generally available.
 const FeatureFactoryCustomAutomations = "factory_custom_automations"
 
+const FeatureAutomationsAsCode = "automations-as-code"
+
 // FeatureFactoryCustomStages gates line-level custom board stages.
 const FeatureFactoryCustomStages = "factory_custom_stages"
 
@@ -105,6 +107,7 @@ var registry = []Feature{
 	{ID: FeatureModelStatus, Label: "Model status", Description: "Show the hosted Model status page in organization settings"},
 	{ID: FeatureOrganizationBYOKCustomProvider, Label: "Organization BYOK Custom Provider", Description: "Add a custom model provider with a URL, token, and API type"},
 	{ID: FeatureFactoryCustomAutomations, Label: "Custom Automations", Description: "Add custom automations to board columns"},
+	{ID: FeatureAutomationsAsCode, Label: "Automations as code", Description: "Edit custom automations in YAML or through the API"},
 	{ID: FeatureFactoryCustomStages, Label: "Factory custom stages", Description: "Add custom stages to factory line boards"},
 	{ID: FeatureWorkspaceSkills, Label: "Workspace Skills", Description: "Add skills for workspace agents"},
 	{ID: FeatureFactoryPullRequestMerge, Label: "Pull Request Merge", Description: "Show the Mergeable chip on task cards and the Merge button on pull request review"},

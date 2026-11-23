@@ -243,6 +243,23 @@ CREATE TABLE public.application_encryption_migrations (
 
 
 --
+-- Name: automations_as_code; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.automations_as_code (
+    id uuid NOT NULL,
+    organization_id uuid NOT NULL,
+    factory_id uuid NOT NULL,
+    name text NOT NULL,
+    source text NOT NULL,
+    revision bigint NOT NULL,
+    artifact_id text NOT NULL,
+    artifact_revision text NOT NULL,
+    CONSTRAINT automations_as_code_revision_check CHECK ((revision > 0))
+);
+
+
+--
 -- Name: billing_plans; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -2606,6 +2623,22 @@ ALTER TABLE ONLY public.application_encryption_migrations
 
 
 --
+-- Name: automations_as_code automations_as_code_organization_id_artifact_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.automations_as_code
+    ADD CONSTRAINT automations_as_code_organization_id_artifact_id_key UNIQUE (organization_id, artifact_id);
+
+
+--
+-- Name: automations_as_code automations_as_code_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.automations_as_code
+    ADD CONSTRAINT automations_as_code_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: billing_plans billing_plans_key_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3753,6 +3786,13 @@ CREATE UNIQUE INDEX application_encryption_keys_one_active ON public.application
 --
 
 CREATE UNIQUE INDEX application_encryption_migrations_unfinished ON public.application_encryption_migrations USING btree ((1)) WHERE (state = ANY (ARRAY['pending'::text, 'running'::text, 'auditing'::text]));
+
+
+--
+-- Name: automations_as_code_factory_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX automations_as_code_factory_id_idx ON public.automations_as_code USING btree (factory_id);
 
 
 --
@@ -5404,6 +5444,22 @@ ALTER TABLE ONLY public.app_messages
 
 ALTER TABLE ONLY public.application_encryption_migrations
     ADD CONSTRAINT application_encryption_migrations_target_key_id_fkey FOREIGN KEY (target_key_id) REFERENCES public.application_encryption_keys(id);
+
+
+--
+-- Name: automations_as_code automations_as_code_factory_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.automations_as_code
+    ADD CONSTRAINT automations_as_code_factory_id_fkey FOREIGN KEY (factory_id) REFERENCES public.factories(id) ON DELETE CASCADE;
+
+
+--
+-- Name: automations_as_code automations_as_code_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.automations_as_code
+    ADD CONSTRAINT automations_as_code_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
 
 
 --
