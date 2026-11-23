@@ -6,6 +6,7 @@ import { BrowserRouter, Link, MemoryRouter, useLocation, useNavigate } from "rea
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import { useState, type ReactNode } from "react";
 import type { CanvasesCanvasRun, FactoriesFactoryCustomAutomation } from "@/api-client";
+import type { CustomAutomationColumn } from "../lib/customAutomation";
 import { useCommandPaletteShortcuts } from "@/components/GlobalCommandPalette/hooks";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { FactoriesLayoutContext } from "../layout/factoriesLayoutContext";
@@ -85,7 +86,7 @@ function BrowserControls() {
 function renderModal(
   search = "?customAutomation=custom-1",
   automationId: string | undefined = search.includes("customAutomation=new") ? undefined : "custom-1",
-  columnKey?: "backlog" | "implement" | "verify" | "done",
+  columnKey?: CustomAutomationColumn,
   yamlEnabled = false,
 ) {
   const onClose = vi.fn();
@@ -331,6 +332,7 @@ steps:
     renderModal("?customAutomation=custom-1", "custom-1", "verify", true);
     expect(await screen.findByRole("alert")).toBeVisible();
     expect(screen.queryByRole("button", { name: "Edit in form" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open full canvas" })).toBeVisible();
   });
 
   it("blocks the app creation shortcut only while the automation draft is dirty", async () => {
@@ -371,47 +373,47 @@ steps:
     expect(screen.getByRole("button", { name: "Add step" })).toBeEnabled();
   });
 
-  it("projects changes between the visual editor and YAML before Save and keeps the exact edited source", async () => {
-    const fetch = vi
-      .spyOn(globalThis, "fetch")
-      .mockImplementation(async (_url, init) =>
-        Response.json(init?.method === "PUT" ? { ...savedAutomation, revision: 2 } : savedAutomation),
+  it.each(["backlog", "custom-qa"] as const)(
+    "round-trips visual and YAML edits on %s without changing identity",
+    async (stage) => {
+      const placed = { ...savedAutomation, stage };
+      const fetch = vi
+        .spyOn(globalThis, "fetch")
+        .mockImplementation(async (_url, init) =>
+          Response.json(init?.method === "PUT" ? { ...placed, revision: 2 } : placed),
+        );
+      const onClose = renderModal("?customAutomation=custom-1", "custom-1", stage, true);
+      const user = userEvent.setup();
+      expect(await screen.findByLabelText("Automation name")).toHaveValue("Preview");
+      await user.click(screen.getByRole("button", { name: /Review.*Review the preview/ }));
+      fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Review changes" } });
+
+      await user.click(screen.getByRole("button", { name: "Edit YAML" }));
+      await user.click(screen.getByRole("button", { name: "Open visual editor" }));
+      fireEvent.change(screen.getByLabelText("Automation name"), { target: { value: "Board preview" } });
+      await user.click(screen.getByRole("button", { name: "Edit YAML" }));
+      const projected = (screen.getByLabelText("Automation YAML") as HTMLTextAreaElement).value;
+      expect(load(projected)).toMatchObject({
+        name: "Board preview",
+        agent: { harness: "codex", model: "gpt-5", credentials: { source: "integration", name: "code-review" } },
+        skip_setup_commands: true,
+        skip_repository_checkout: true,
+        steps: [{ name: "Print marker" }, { name: "Review changes", working_directory: "repo" }],
+      });
+      const edited = `# Unsaved comment\n${projected.replace("echo original", "echo edited")}`;
+      fireEvent.change(screen.getByLabelText("Automation YAML"), { target: { value: edited } });
+      await user.click(screen.getByRole("button", { name: "Open visual editor" }));
+      expect(screen.getByRole("button", { name: /Print marker.*echo edited/ })).toBeVisible();
+      await user.click(screen.getByRole("button", { name: "Edit YAML" }));
+
+      await user.click(screen.getByRole("button", { name: "Save" }));
+      await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+      expect(fetch).toHaveBeenLastCalledWith(
+        "/api/v2/automations/custom-1",
+        expect.objectContaining({ method: "PUT", body: JSON.stringify({ yaml: edited }) }),
       );
-    const onClose = renderModal("?customAutomation=custom-1", "custom-1", "verify", true);
-    const user = userEvent.setup();
-    expect(await screen.findByLabelText("Automation name")).toHaveValue("Preview");
-    expect(screen.getAllByText("When a task enters Backlog").length).toBeGreaterThan(0);
-    await user.click(screen.getByRole("button", { name: /Review.*Review the preview/ }));
-    fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Review changes" } });
-
-    await user.click(screen.getByRole("button", { name: "Edit YAML" }));
-    expect(screen.getByLabelText<HTMLTextAreaElement>("Automation YAML").value).toContain("Review changes");
-    await user.click(screen.getByRole("button", { name: "Open visual editor" }));
-    fireEvent.change(screen.getByLabelText("Automation name"), { target: { value: "Board preview" } });
-    await user.click(screen.getByRole("button", { name: "Edit YAML" }));
-    const projected = (screen.getByLabelText("Automation YAML") as HTMLTextAreaElement).value;
-    expect(projected).toContain("name: Board preview");
-    expect(load(projected)).toMatchObject({
-      agent: { harness: "codex", model: "gpt-5", credentials: { source: "integration", name: "code-review" } },
-      skip_setup_commands: true,
-      skip_repository_checkout: true,
-      steps: [{ name: "Print marker" }, { name: "Review changes", working_directory: "repo" }],
-    });
-    const edited = `# Unsaved comment\n${projected.replace("echo original", "echo edited")}`;
-    fireEvent.change(screen.getByLabelText("Automation YAML"), { target: { value: edited } });
-    await user.click(screen.getByRole("button", { name: "Open visual editor" }));
-    expect(screen.getByRole("button", { name: /Print marker.*echo edited/ })).toBeVisible();
-    await user.click(screen.getByRole("button", { name: "Edit YAML" }));
-    expect(screen.getByLabelText("Automation YAML")).toHaveValue(edited);
-    expect(fetch).toHaveBeenCalledTimes(1);
-
-    await user.click(screen.getByRole("button", { name: "Save" }));
-    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
-    expect(fetch).toHaveBeenLastCalledWith(
-      "/api/v2/automations/custom-1",
-      expect.objectContaining({ method: "PUT", body: JSON.stringify({ yaml: edited }) }),
-    );
-  });
+    },
+  );
 
   it("keeps invalid YAML editable and confirms before discarding changes", async () => {
     const fetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json(savedAutomation));

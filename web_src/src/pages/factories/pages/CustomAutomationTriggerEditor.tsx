@@ -19,6 +19,7 @@ import {
 import { CustomAutomationScheduleFields } from "./CustomAutomationScheduleFields";
 import { PlanningReviewForm } from "./PlanningReviewForm";
 import type { PlanningReviewDraft } from "./planningReviewMockup";
+import { useCustomAutomationStageLabel } from "./useCustomAutomationStageLabel";
 
 type TriggerEditorProps = {
   showModel?: boolean;
@@ -173,6 +174,7 @@ function TriggerCard({
   onScheduleChange: (schedule: CustomAutomationTrigger["schedule"]) => void;
 }) {
   const configurable = trigger.mode === "scheduled";
+  const stageLabel = useCustomAutomationStageLabel(columnKey);
   return (
     <div className="rounded-lg border border-border bg-background">
       <div className="flex items-center gap-1 pr-2">
@@ -201,7 +203,7 @@ function TriggerCard({
             variant="ghost"
             size="icon-sm"
             className="text-muted-foreground hover:text-destructive"
-            aria-label={removeTriggerLabel(triggers, trigger, columnKey)}
+            aria-label={removeTriggerLabel(triggers, trigger, columnKey, stageLabel)}
             onClick={onRemove}
           >
             <Trash2 className="size-4" aria-hidden />
@@ -301,8 +303,9 @@ function removeTriggerLabel(
   triggers: CustomAutomationTrigger[],
   trigger: CustomAutomationTrigger,
   columnKey: CustomAutomationColumn,
+  stageLabel?: string,
 ): string {
-  const title = triggerTitle(trigger.mode, columnKey);
+  const title = triggerTitle(trigger.mode, columnKey, stageLabel);
   const sameType = triggers.filter((item) => item.mode === trigger.mode);
   if (sameType.length < 2) {
     return `Remove ${title}`;
@@ -310,13 +313,15 @@ function removeTriggerLabel(
   return `Remove ${title} ${sameType.findIndex((item) => item.id === trigger.id) + 1}`;
 }
 
-function triggerTitle(mode: CustomAutomationMode, columnKey: CustomAutomationColumn): string {
+function triggerTitle(
+  mode: CustomAutomationMode,
+  columnKey: CustomAutomationColumn,
+  stageLabel = customAutomationColumnLabel(columnKey),
+): string {
   if (mode === "scheduled") return "Schedule";
-  if (mode === "leave") return `When a task leaves ${customAutomationColumnLabel(columnKey)}`;
+  if (mode === "leave") return `When a task leaves ${stageLabel}`;
   if (mode === "automatic") {
-    return columnKey === "verify"
-      ? "Every pull request commit"
-      : `When a task enters ${customAutomationColumnLabel(columnKey)}`;
+    return columnKey === "verify" ? "Every pull request commit" : `When a task enters ${stageLabel}`;
   }
   return "Manual";
 }
@@ -331,6 +336,7 @@ function TriggerOption({
   runsOnTask: boolean;
 }) {
   const automatic = mode === "automatic" || mode === "leave";
+  const stageLabel = useCustomAutomationStageLabel(columnKey);
   const Icon =
     mode === "scheduled" ? AlarmClock : mode === "leave" ? LogOut : automatic ? GitCommitHorizontal : MousePointerClick;
   return (
@@ -346,18 +352,18 @@ function TriggerOption({
         <Icon className="size-4" aria-hidden />
       </span>
       <span className="flex min-w-0 flex-col">
-        <span className="text-sm font-medium text-foreground">{triggerTitle(mode, columnKey)}</span>
+        <span className="text-sm font-medium text-foreground">{triggerTitle(mode, columnKey, stageLabel)}</span>
         <span className="text-xs font-normal text-muted-foreground">
           {mode === "scheduled"
             ? columnKey === "backlog"
               ? "Run automation on a schedule."
               : "Runs on the repository default branch."
             : mode === "leave"
-              ? `Runs when a task leaves ${customAutomationColumnLabel(columnKey)}.`
+              ? `Runs when a task leaves ${stageLabel}.`
               : automatic
                 ? columnKey === "verify"
                   ? "Runs after each new commit."
-                  : `Runs when a task enters ${customAutomationColumnLabel(columnKey)}.`
+                  : `Runs when a task enters ${stageLabel}.`
                 : runsOnTask
                   ? "A person starts each run from a task."
                   : "A person starts each run from the column."}

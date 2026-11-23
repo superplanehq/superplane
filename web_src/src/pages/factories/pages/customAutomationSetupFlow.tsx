@@ -3,13 +3,10 @@ import { cn } from "@/lib/utils";
 import { GripVertical, MessageSquareText, Plus, Terminal, Trash2, Zap } from "lucide-react";
 import type { MouseEvent, MutableRefObject, ReactNode } from "react";
 
-import {
-  customAutomationColumnLabel,
-  type CustomAutomationColumn,
-  type CustomAutomationTrigger,
-} from "../lib/customAutomation";
+import { type CustomAutomationColumn, type CustomAutomationTrigger } from "../lib/customAutomation";
 import { mergeCheckPromptBody } from "./mergeConfidenceSteps";
 import type { PlanningReviewStep, PlanningReviewStepKind } from "./planningReviewMockup";
+import { useCustomAutomationStageLabel } from "./useCustomAutomationStageLabel";
 
 export function AutomationFlow({
   columnKey = "verify",
@@ -38,15 +35,18 @@ export function AutomationFlow({
   onRemoveStep: (index: number) => void;
   onAddStep: () => void;
 }) {
+  const stageLabel = useCustomAutomationStageLabel(columnKey);
   return (
     <aside className="relative min-h-0 w-[42%] shrink-0 overflow-y-auto border-r border-border bg-muted/20">
       <div className="absolute inset-0 bg-[radial-gradient(circle,var(--border)_1px,transparent_1px)] [background-size:18px_18px] opacity-50" />
       <div className="relative mx-auto flex w-full max-w-lg flex-col items-center px-8 py-10">
         <FlowCard selected={selectedStep === null} onClick={onSelectTrigger}>
           <FlowBadge kind="trigger" />
-          <p className="mt-3 text-sm font-semibold text-foreground">{sidebarTriggerTitle(triggers, columnKey)}</p>
+          <p className="mt-3 text-sm font-semibold text-foreground">
+            {sidebarTriggerTitle(triggers, columnKey, stageLabel)}
+          </p>
           <p className="mt-1 text-xs text-muted-foreground">
-            {sidebarTriggerDescription(triggers, columnKey, runsOnTask)}
+            {sidebarTriggerDescription(triggers, columnKey, runsOnTask, stageLabel)}
           </p>
         </FlowCard>
         {steps.map((step, index) => (
@@ -184,27 +184,32 @@ function StepCardActions({
   );
 }
 
-function sidebarTriggerTitle(triggers: CustomAutomationTrigger[], columnKey: CustomAutomationColumn): string {
+function sidebarTriggerTitle(
+  triggers: CustomAutomationTrigger[],
+  columnKey: CustomAutomationColumn,
+  stageLabel: string,
+): string {
   const trigger = triggers[0];
   if (!trigger || triggers.length > 1) {
     return "Triggers";
   }
-  return triggerTitle(trigger.mode, columnKey);
+  return triggerTitle(trigger.mode, columnKey, stageLabel);
 }
 
 function sidebarTriggerDescription(
   triggers: CustomAutomationTrigger[],
   columnKey: CustomAutomationColumn,
   runsOnTask: boolean,
+  stageLabel: string,
 ): string {
   const trigger = triggers[0];
   if (!trigger) {
     return "Add a trigger.";
   }
   if (triggers.length === 1) {
-    return triggerDescription(trigger.mode, columnKey, runsOnTask);
+    return triggerDescription(trigger.mode, columnKey, runsOnTask, stageLabel);
   }
-  const titles = triggers.map((item) => triggerTitle(item.mode, columnKey));
+  const titles = triggers.map((item) => triggerTitle(item.mode, columnKey, stageLabel));
   const titlesRepeat = new Set(titles).size !== titles.length;
   return triggers
     .map((item, index) =>
@@ -215,13 +220,15 @@ function sidebarTriggerDescription(
     .join(", ");
 }
 
-function triggerTitle(mode: CustomAutomationTrigger["mode"], columnKey: CustomAutomationColumn): string {
+function triggerTitle(
+  mode: CustomAutomationTrigger["mode"],
+  columnKey: CustomAutomationColumn,
+  stageLabel: string,
+): string {
   if (mode === "scheduled") return "Schedule";
-  if (mode === "leave") return `When a task leaves ${customAutomationColumnLabel(columnKey)}`;
+  if (mode === "leave") return `When a task leaves ${stageLabel}`;
   if (mode === "automatic") {
-    return columnKey === "verify"
-      ? "Every pull request commit"
-      : `When a task enters ${customAutomationColumnLabel(columnKey)}`;
+    return columnKey === "verify" ? "Every pull request commit" : `When a task enters ${stageLabel}`;
   }
   return "Manual";
 }
@@ -230,17 +237,18 @@ function triggerDescription(
   mode: CustomAutomationTrigger["mode"],
   columnKey: CustomAutomationColumn,
   runsOnTask: boolean,
+  stageLabel: string,
 ): string {
   if (mode === "scheduled") {
     return columnKey === "backlog" ? "Run automation on a schedule." : "Runs on the repository default branch.";
   }
   if (mode === "leave") {
-    return `Runs when a task leaves ${customAutomationColumnLabel(columnKey)}.`;
+    return `Runs when a task leaves ${stageLabel}.`;
   }
   if (mode === "automatic") {
     return columnKey === "verify"
       ? "Runs for every new pull request commit."
-      : `Runs when a task enters ${customAutomationColumnLabel(columnKey)}.`;
+      : `Runs when a task enters ${stageLabel}.`;
   }
   return runsOnTask ? "Runs when you start it from a task." : "Runs when you start it from the column.";
 }

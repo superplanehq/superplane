@@ -49,6 +49,7 @@ export function customColumnAutomations(
         runningCount: runningCountForApp(id, workOrders),
         catalogId: columnKey === "backlog" ? "scheduled-intake" : CUSTOM_CATALOG_ID,
         canvasId: id,
+        columnKey,
       },
     ];
   });

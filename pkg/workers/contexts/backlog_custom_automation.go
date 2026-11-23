@@ -2,6 +2,7 @@ package contexts
 
 import (
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -231,7 +232,7 @@ func columnLeaveAllowed(column string) bool {
 	case models.CanvasColumnKeyBacklog, models.CanvasColumnKeyImplement, models.CanvasColumnKeyVerify, models.CanvasColumnKeyDone:
 		return true
 	default:
-		return false
+		return strings.HasPrefix(column, "custom-")
 	}
 }
 
@@ -290,6 +291,9 @@ func taskColumnAutomation(canvas *models.Canvas, factoryModel *models.Factory, o
 	case models.CanvasColumnKeyDone:
 		return models.CanvasColumnKeyDone, "The task is not in Done.", true
 	default:
+		if strings.HasPrefix(*canvas.ColumnKey, "custom-") {
+			return *canvas.ColumnKey, "The task is not in this stage.", true
+		}
 		return "", "", false
 	}
 }
@@ -304,6 +308,15 @@ func taskColumnDedupKey(tx *gorm.DB, order *models.FactoryWorkOrder, column stri
 		}
 		return order.ID.String() + "|" + order.UpdatedAt.UTC().Format(time.RFC3339Nano), nil
 	default:
+		if strings.HasPrefix(column, "custom-") {
+			current, err := models.WorkOrderBoardColumn(tx, order)
+			if err != nil {
+				return "", err
+			}
+			if current == column {
+				return order.ID.String() + "|" + column, nil
+			}
+		}
 		return "", errors.New("task is not in this column")
 	}
 }

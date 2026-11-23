@@ -3,6 +3,7 @@ package workers
 import (
 	"context"
 	"errors"
+	"strings"
 	"sync"
 	"time"
 
@@ -504,6 +505,17 @@ func (w *RunFinalizer) startAutomaticCustomAutomationsForRun(runID uuid.UUID) {
 	if columnErr != nil {
 		w.logger.WithError(columnErr).Warnf("custom automation: failed to read the column for order %s", order.ID)
 		return
+	}
+	{
+		dispatch, err := models.FindWorkOrderLineDispatch(db, execution.LineDispatchID)
+		if err == nil && execution.StepIndex >= 0 && execution.StepIndex < len(dispatch.Steps) {
+			leftColumn := dispatch.Steps[execution.StepIndex].StageKey
+			if strings.HasPrefix(leftColumn, "custom-") && column != leftColumn {
+				if err := factoryactions.StartColumnLeaveCustomAutomations(db, factory, order, leftColumn, dispatch.ID.String()); err != nil {
+					w.logger.WithError(err).Warn("custom automation: failed to start stage leave automation")
+				}
+			}
+		}
 	}
 	if column != models.CanvasColumnKeyVerify {
 		return
