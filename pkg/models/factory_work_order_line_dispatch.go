@@ -195,34 +195,6 @@ func (l *FactoryLine) DispatchStageFromWithModel(
 	return dispatch, results, nil
 }
 
-func (l *FactoryWorkOrderLineDispatch) startInitialStage(
-	tx *gorm.DB,
-	order *FactoryWorkOrder,
-	fallbackStepIndex int,
-) ([]*FactoryLineStepResult, error) {
-	stage, ok := l.StageByKey(l.CurrentStageKey)
-	if !ok {
-		return l.StartStage(tx, order, fallbackStepIndex)
-	}
-
-	for {
-		if stepIndex, found := l.FirstStepIndexForStage(stage.Key); found {
-			return l.StartStage(tx, order, stepIndex)
-		}
-		if !stage.AutoAdvanceEnabled() {
-			return nil, l.Finish(tx, CanvasRunResultPassed)
-		}
-		next, found := l.NextStageAfter(stage.Key)
-		if !found || next.Kind == FactoryLineStageDone {
-			return nil, l.Finish(tx, CanvasRunResultPassed)
-		}
-		if err := l.EnterStage(tx, next.Key); err != nil {
-			return nil, err
-		}
-		stage = next
-	}
-}
-
 func (l *FactoryWorkOrderLineDispatch) StartStage(
 	tx *gorm.DB,
 	order *FactoryWorkOrder,
@@ -1236,6 +1208,34 @@ func (l *FactoryWorkOrderLineDispatch) rejectStepAdmission(tx *gorm.DB, order *F
 		return nil, err
 	}
 	return &FactoryLineStepResult{Execution: execution}, nil
+}
+
+func (l *FactoryWorkOrderLineDispatch) startInitialStage(
+	tx *gorm.DB,
+	order *FactoryWorkOrder,
+	fallbackStepIndex int,
+) ([]*FactoryLineStepResult, error) {
+	stage, ok := l.StageByKey(l.CurrentStageKey)
+	if !ok {
+		return l.StartStage(tx, order, fallbackStepIndex)
+	}
+
+	for {
+		if stepIndex, found := l.FirstStepIndexForStage(stage.Key); found {
+			return l.StartStage(tx, order, stepIndex)
+		}
+		if !stage.AutoAdvanceEnabled() {
+			return nil, l.Finish(tx, CanvasRunResultPassed)
+		}
+		next, found := l.NextStageAfter(stage.Key)
+		if !found || next.Kind == FactoryLineStageDone {
+			return nil, l.Finish(tx, CanvasRunResultPassed)
+		}
+		if err := l.EnterStage(tx, next.Key); err != nil {
+			return nil, err
+		}
+		stage = next
+	}
 }
 
 // initialStageKey is the stage a dispatch enters first. A start from the
