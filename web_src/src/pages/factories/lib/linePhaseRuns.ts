@@ -127,11 +127,12 @@ export function collectCustomStageRuns(
   const runs: LinePhaseRunCard[] = [];
   for (const order of workOrders) {
     if (!order.id || order.state === "STATE_CLOSED" || order.state === "STATE_DRAFT") continue;
-    const dispatches = (order.lineDispatches ?? []).filter((dispatch) => dispatch.line?.id === lineId);
-    if (dispatches.length === 0) continue;
-    const executions = dispatchStepRows(pickMostRecentDispatch(dispatches));
-    const current = pickCurrentLineExecution(executions);
-    if (!current || current.stageKey !== stageKey) continue;
+    const dispatch = latestLineDispatch(order, lineId);
+    if (!dispatch) continue;
+    const executions = dispatchStepRows(dispatch);
+    const current = pickCurrentLineExecution(executions) ?? stoppedBeforeFirstRun(dispatch, stageKey);
+    const currentStageKey = dispatch.currentStageKey?.trim();
+    if (!current || (currentStageKey ? currentStageKey !== stageKey : current.stageKey !== stageKey)) continue;
     const stageExecutions = executions.filter((execution) => execution.stageKey === stageKey);
     const failed = stageExecutions.filter(
       (execution) =>
@@ -148,6 +149,20 @@ export function collectCustomStageRuns(
     });
   }
   return runs.sort(compareRunsNewestFirst);
+}
+
+/** A task can stop in an empty stage before its first run. It still needs a card there. */
+function stoppedBeforeFirstRun(
+  dispatch: FactoriesWorkOrderLineDispatch,
+  stageKey: string,
+): WorkOrderStepRow | undefined {
+  if (dispatch.currentStageKey?.trim() !== stageKey) return undefined;
+  return { stageKey, state: "STATE_FINISHED", result: "RESULT_PASSED", createdAt: dispatch.createdAt };
+}
+
+/** Dispatches from before stage tracking have no current stage. */
+function latestDispatchHasCurrentStage(order: FactoriesWorkOrder, lineId: string | undefined): boolean {
+  return Boolean(lineId && latestLineDispatch(order, lineId)?.currentStageKey?.trim());
 }
 
 /**
@@ -222,8 +237,14 @@ export function collectLineVerifyOrders(
   line?: FactoriesFactoryLine,
 ): FactoriesWorkOrder[] {
   const verifyById = new Map<string, FactoriesWorkOrder>();
+  if (line?.id) {
+    for (const order of sourceOrders) {
+      if (!order.id || order.state !== "STATE_OPEN" || getWorkOrderDisplayStatus(order) !== "waiting") continue;
+      if (latestLineDispatch(order, line.id)?.currentStageKey === "verify") verifyById.set(order.id, order);
+    }
+  }
   for (const run of lastWorkStageRuns(board, sourceOrders, line)) {
-    if (!run.order.id || !isWaitingAfterPassedStage(run)) {
+    if (!run.order.id || !isWaitingAfterPassedStage(run) || latestDispatchHasCurrentStage(run.order, line?.id)) {
       continue;
     }
     verifyById.set(run.order.id, run.order);
@@ -502,18 +523,21 @@ function appendCurrentRunForOrder(
   // A line can have more than one dispatch (traversal) for this order; the
   // board is a compact status summary, so it shows the most recent one —
   // the full history of every dispatch lives in WorkOrderExecutionsList.
-  const dispatchesForLine = (order.lineDispatches ?? []).filter((dispatch) => dispatch.line?.id === lineId);
-  if (dispatchesForLine.length === 0) {
+  const currentDispatch = latestLineDispatch(order, lineId);
+  if (!currentDispatch) {
     return;
   }
-  const currentDispatch = pickMostRecentDispatch(dispatchesForLine);
 
   const lineExecutions = dispatchStepRows(currentDispatch);
   if (lineExecutions.length === 0) {
     return;
   }
 
-  const currentExecution = pickCurrentLineExecution(lineExecutions);
+  const currentStageKey = currentDispatch.currentStageKey?.trim();
+  const currentExecutions = currentStageKey
+    ? lineExecutions.filter((execution) => execution.stageKey === currentStageKey)
+    : lineExecutions;
+  const currentExecution = pickCurrentLineExecution(currentExecutions);
   const stepIndex = currentExecution ? liveColumnIndexForExecution(steps, stages, currentExecution) : undefined;
   if (!currentExecution || stepIndex == null) {
     return;
@@ -531,6 +555,11 @@ function appendCurrentRunForOrder(
     return;
   }
   runsByStep.set(stepIndex, [card]);
+}
+
+function latestLineDispatch(order: FactoriesWorkOrder, lineId: string): FactoriesWorkOrderLineDispatch | undefined {
+  const dispatches = (order.lineDispatches ?? []).filter((dispatch) => dispatch.line?.id === lineId);
+  return dispatches.length > 0 ? pickMostRecentDispatch(dispatches) : undefined;
 }
 
 function pickMostRecentDispatch(dispatches: FactoriesWorkOrderLineDispatch[]): FactoriesWorkOrderLineDispatch {
