@@ -59,4 +59,19 @@ describe("hasFactoryAppDefaults", () => {
   it("rejects custom canvases", () => {
     expect(hasFactoryAppDefaults(canvasWith([{ id: "custom" }]))).toBe(false);
   });
+
+  it.each([
+    [{ id: "trigger", component: "onWorkOrder" }],
+    [{ id: "onrun-implement" }],
+    [{ id: "trigger" }, { id: "create-work-order" }],
+  ])("rejects explicit custom metadata despite defaults indicators %j", (...nodes) => {
+    expect(
+      hasFactoryAppDefaults(
+        canvasWith([
+          { id: "custom-entrypoint", metadata: { factoryTemplate: { id: "custom-verification", version: 1 } } },
+          ...nodes,
+        ]),
+      ),
+    ).toBe(false);
+  });
 });

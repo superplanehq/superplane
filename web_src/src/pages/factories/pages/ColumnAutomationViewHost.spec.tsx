@@ -1,9 +1,12 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 import { ThemeProvider } from "@/contexts/ThemeProvider";
+import type * as ApiClientModule from "@/api-client";
+import { parseCanvasYamlForImport } from "@/pages/app/lib/workflow-spec-files";
 import type * as CanvasDataModule from "@/hooks/useCanvasData";
 import type * as ComponentDataModule from "@/hooks/useComponentData";
 import type * as IntegrationsModule from "@/hooks/useIntegrations";
@@ -11,6 +14,17 @@ import { unmockedSrc } from "@/test/unmockedModule";
 import { TooltipProvider } from "@/ui/tooltip";
 
 import { ColumnAutomationViewHost } from "./ColumnAutomationViewPopup";
+
+const materializeDefaults = vi.fn();
+
+vi.mock("@/api-client", () => ({
+  ...unmockedSrc<typeof ApiClientModule>("api-client"),
+  factoriesMaterializeFactoryAutomationDefaults: materializeDefaults,
+}));
+
+vi.mock("@/contexts/usePermissions", () => ({
+  usePermissions: () => ({ canAct: () => true, isLoading: false }),
+}));
 
 const { useCanvas, useTriggers, useComponents, useInfiniteCanvasRuns, updateCanvasVersion, commitCanvasStaging } =
   vi.hoisted(() => ({
@@ -231,5 +245,63 @@ describe("ColumnAutomationViewHost", () => {
     renderHost();
 
     expectRunsOnly();
+  });
+
+  it("edits and saves a custom automation agent without requesting bundled defaults", async () => {
+    const user = userEvent.setup();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    materializeDefaults.mockReset();
+    materializeDefaults.mockRejectedValue(new Error("factory app has no bundled defaults"));
+    useCanvas.mockReturnValue({
+      data: {
+        metadata: { id: "app-pr-closure", name: "Custom automation", liveVersionId: "version-1" },
+        spec: {
+          nodes: [
+            {
+              id: "on-task",
+              type: "TYPE_TRIGGER",
+              component: "onWorkOrder",
+              metadata: { factoryTemplate: { id: "custom-verification", version: 1 } },
+            },
+            {
+              id: "verify",
+              name: "Custom agent",
+              type: "TYPE_ACTION",
+              component: "runnerSuperPlane",
+              configuration: { steps: [{ name: "Verify task", type: "prompt", prompt: "Custom prompt" }] },
+            },
+          ],
+          edges: [{ sourceId: "on-task", targetId: "verify", channel: "default" }],
+        },
+      },
+      isPending: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    try {
+      renderHost();
+      await user.click(screen.getByRole("tab", { name: "Agent" }));
+      await act(async () => {
+        await Promise.resolve();
+      });
+      expect(materializeDefaults).not.toHaveBeenCalled();
+      expect(warn).not.toHaveBeenCalled();
+      expect(screen.queryByTestId("planning-review-restore-default-prompt")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("planning-review-restore-default-prompt-error")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("planning-review-restore-default-prompt-retry")).not.toBeInTheDocument();
+
+      await user.click(screen.getByTestId("planning-review-step-toggle-0"));
+      const prompt = screen.getByTestId("planning-review-step-body-0");
+      await user.clear(prompt);
+      await user.type(prompt, "Updated custom prompt");
+      await user.click(screen.getByRole("button", { name: "Save Agent" }));
+      await waitFor(() => expect(commitCanvasStaging).toHaveBeenCalledWith("Update agent"));
+      const parsed = parseCanvasYamlForImport(updateCanvasVersion.mock.calls[0][0].canvasYaml);
+      expect(parsed.ok && parsed.spec.nodes?.find((node) => node.id === "verify")?.configuration?.steps).toEqual([
+        expect.objectContaining({ prompt: "Updated custom prompt" }),
+      ]);
+    } finally {
+      warn.mockRestore();
+    }
   });
 });
