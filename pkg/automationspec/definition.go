@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"reflect"
 	"slices"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -165,7 +166,9 @@ func ValidateStage(document *Document, stage Stage) error {
 	switch stage {
 	case Backlog, Implement, Verify, Done:
 	default:
-		return document.Diagnostic("$", "Select Backlog, Implement, Verify, or Done.")
+		if !strings.HasPrefix(string(stage), "custom-") || len(stage) <= len("custom-") {
+			return document.Diagnostic("$", "Select a stage in this factory.")
+		}
 	}
 	for index, trigger := range document.Triggers {
 		triggerPath := itemPath("triggers", index) + ".use"

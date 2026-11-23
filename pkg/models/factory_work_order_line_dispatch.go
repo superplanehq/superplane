@@ -1076,6 +1076,43 @@ func WorkOrderBoardColumn(tx *gorm.DB, order *FactoryWorkOrder) (string, error) 
 		}
 		return CanvasColumnKeyDone, nil
 	case FactoryWorkOrderStateOpen:
+		grouped, err := ListWorkOrderLineDispatchesByWorkOrderIDs(tx, []uuid.UUID{order.ID})
+		if err != nil {
+			return "", err
+		}
+		records := grouped[order.ID]
+		if len(records) > 0 {
+			current := records[len(records)-1]
+			if current.QueueItem != nil && strings.HasPrefix(current.QueueItem.StageKey, "custom-") {
+				return current.QueueItem.StageKey, nil
+			}
+			for _, execution := range current.Executions {
+				if execution.Status != FactoryWorkOrderExecutionStatusPending && execution.Status != FactoryWorkOrderExecutionStatusRunning {
+					continue
+				}
+				if execution.StepIndex >= 0 && execution.StepIndex < len(current.Steps) {
+					stage := current.Steps[execution.StepIndex].StageKey
+					if strings.HasPrefix(stage, "custom-") {
+						return stage, nil
+					}
+				}
+			}
+			furthest := -1
+			for _, execution := range current.Executions {
+				if execution.StepIndex > furthest {
+					furthest = execution.StepIndex
+				}
+			}
+			if furthest >= 0 && furthest < len(current.Steps) && strings.HasPrefix(current.Steps[furthest].StageKey, "custom-") {
+				result, err := current.StageResult(tx, furthest)
+				if err != nil {
+					return "", err
+				}
+				if result != CanvasRunResultPassed {
+					return current.Steps[furthest].StageKey, nil
+				}
+			}
+		}
 		inVerify, err := order.IsWaitingAfterPassedStage(tx)
 		if err != nil {
 			return "", err

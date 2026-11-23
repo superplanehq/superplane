@@ -34,10 +34,10 @@ beforeEach(() => {
 });
 
 describe("add custom stage automation", () => {
-  it("opens the picker with the stage name", () => {
+  it("opens shared configuration with the custom stage and return line", () => {
     const { result } = renderHook(
-      () =>
-        useAddColumnAutomation({
+      () => ({
+        automation: useAddColumnAutomation({
           organizationId: "org",
           factoryId: "factory",
           factoryKey: "workspace",
@@ -48,6 +48,8 @@ describe("add custom stage automation", () => {
           githubIntegrationId: "vcs-integration",
           automationsFor: () => [],
         }),
+        location: useLocation(),
+      }),
       {
         wrapper: ({ children }: { children: ReactNode }) => (
           <QueryClientProvider client={new QueryClient()}>
@@ -57,21 +59,10 @@ describe("add custom stage automation", () => {
       },
     );
 
-    act(() => result.current.openPicker("custom-stage-id", "Deploy to prod"));
-
-    expect(result.current.pickerOpen).toBe(true);
-    expect(result.current.pickerTitle).toBe("Add an automation for Deploy to prod");
-    expect(result.current.catalog.map((entry) => entry.id)).toEqual([
-      "custom",
-      "analysis",
-      "agent-step",
-      "discussion",
-      "checks",
-      "risk-score",
-      "visual-evidence",
-      "pr-closure",
-    ]);
-    expect(result.current.unavailableReasons.checks).toBe("Available in Verify.");
+    act(() => result.current.automation.openPicker("custom-stage-id", "Deploy to prod"));
+    expect(result.current.location.pathname).toBe("/org/workspaces/workspace/lines/line");
+    expect(result.current.location.search).toBe("?customAutomation=new&automationColumn=custom-stage-id");
+    expect(result.current.automation.pickerOpen).toBe(false);
   });
 });
 
