@@ -93,27 +93,32 @@ function renderEditor(
     organizationId?: string;
     factoryId?: string;
     automationId?: string;
+    defaultsAvailable?: boolean;
   } = {},
 ) {
-  return render(
-    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const editor = (options: typeof props) => (
+    <QueryClientProvider client={client}>
       <MemoryRouter>
         <ThemeProvider>
           <TooltipProvider>
             <PlanningReviewEditor
-              initialDraft={props.initialDraft ?? refineDraft("Custom prompt")}
-              onSave={props.onSave}
-              organizationId={props.organizationId ?? "org-1"}
-              factoryId={props.factoryId ?? "factory-1"}
-              automationId={props.automationId ?? "canvas-1"}
+              initialDraft={options.initialDraft ?? refineDraft("Custom prompt")}
+              onSave={options.onSave}
+              organizationId={options.organizationId ?? "org-1"}
+              factoryId={options.factoryId ?? "factory-1"}
+              automationId={options.automationId ?? "canvas-1"}
+              defaultsAvailable={options.defaultsAvailable ?? true}
               showAutomationNote={false}
               showCancel={false}
             />
           </TooltipProvider>
         </ThemeProvider>
       </MemoryRouter>
-    </QueryClientProvider>,
+    </QueryClientProvider>
   );
+  const view = render(editor(props));
+  return { ...view, rerenderEditor: (options: typeof props) => view.rerender(editor(options)) };
 }
 
 function defaultSteps(prompt: string): PlanningReviewStep[] {
@@ -147,6 +152,29 @@ describe("PlanningReviewEditor restore default prompt", () => {
 
     expect(screen.queryByTestId("planning-review-restore-default-prompt")).not.toBeInTheDocument();
     expect(loadDefault).not.toHaveBeenCalled();
+  });
+
+  it("invalidates defaults and cancels pending results when the automation changes", async () => {
+    const pending = deferredSteps();
+    loadDefault
+      .mockResolvedValue(defaultSteps(DEFAULT_PROMPT))
+      .mockResolvedValueOnce(defaultSteps(DEFAULT_PROMPT))
+      .mockImplementationOnce(() => pending.promise);
+    const { rerenderEditor } = renderEditor();
+    expect(await screen.findByTestId("planning-review-restore-default-prompt")).toBeInTheDocument();
+
+    rerenderEditor({ automationId: "canvas-2" });
+    expect(screen.queryByTestId("planning-review-restore-default-prompt")).not.toBeInTheDocument();
+    await waitFor(() => expect(loadDefault).toHaveBeenCalledTimes(2));
+    rerenderEditor({ automationId: "custom-canvas", defaultsAvailable: false });
+    await act(async () => {
+      pending.resolve(defaultSteps(DEFAULT_PROMPT));
+    });
+    expect(screen.queryByTestId("planning-review-restore-default-prompt")).not.toBeInTheDocument();
+
+    rerenderEditor({ automationId: "canvas-2" });
+    expect(screen.queryByTestId("planning-review-restore-default-prompt")).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId("planning-review-restore-default-prompt")).toBeInTheDocument());
   });
 
   it("does not load the default prompt when the member cannot edit the workspace", async () => {

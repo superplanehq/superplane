@@ -262,6 +262,7 @@ function ColumnAutomationViewBody({
         factoryId={agent.factoryId}
         factoryKey={agent.factoryKey}
         automationId={agent.automationId}
+        defaultsAvailable={agent.defaultsAvailable}
         isLoading={agent.isLoading}
         showAutomationNote={false}
         showCancel={false}
@@ -393,6 +394,7 @@ function columnAutomationAgentSlot(
   return {
     ...scope,
     draft: agent.draft ?? undefined,
+    defaultsAvailable: agent.defaultsAvailable,
     isLoading: agent.isLoading || !agent.draft,
     onSave: agent.save,
   };

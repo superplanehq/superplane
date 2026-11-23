@@ -13,6 +13,7 @@ import { dematerializeCanvasSpec } from "@/pages/app/lib/workflow-spec-files";
 import { CANVAS_YAML_PATH } from "@/pages/app/lib/workflow-spec-paths";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { hasFactoryAppDefaults } from "../lib/factoryAppTemplate";
 
 import {
   findAgentNodes,
@@ -145,6 +146,7 @@ export function useColumnCanvasAgentEditor(
   return {
     agentNode,
     agentNodeIds,
+    defaultsAvailable: hasFactoryAppDefaults(canvas),
     isLoading: enabled && canvasQuery.isPending,
     draft,
     editorOpen,

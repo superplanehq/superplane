@@ -242,6 +242,7 @@ function PRFeedbackSettingsLoaded({
               factoryId,
               factoryKey,
               automationId: canvasId,
+              defaultsAvailable: agent.defaultsAvailable,
               onSave: agent.save,
             }
           : undefined

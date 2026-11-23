@@ -120,6 +120,7 @@ function SourceIntakeSettings({
               factoryId,
               factoryKey,
               automationId: intake.appId,
+              defaultsAvailable: agent.defaultsAvailable,
               onSave: agent.save,
             }
           : undefined

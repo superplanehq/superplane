@@ -1,5 +1,6 @@
 import type { CanvasesCanvas } from "@/api-client";
 import { DEFAULT_FACTORY_ID, listFactoryDefinitions, type FactoryDefinition } from "@/pages/home/factories";
+import { CUSTOM_AUTOMATION_TEMPLATE_ID } from "./customAutomation";
 
 /**
  * Legacy installations do not have explicit template metadata. Match their
@@ -23,6 +24,16 @@ export function resolveFactoryAppTemplate(canvas: CanvasesCanvas | null | undefi
  */
 export function hasFactoryAppDefaults(canvas: CanvasesCanvas | null | undefined): boolean {
   const nodes = canvas?.spec?.nodes ?? [];
+  // Explicit custom metadata overrides entrypoint IDs inherited from built-in apps.
+  if (
+    nodes.some((node) => {
+      const template = node.metadata?.factoryTemplate;
+      return (
+        template && typeof template === "object" && "id" in template && template.id === CUSTOM_AUTOMATION_TEMPLATE_ID
+      );
+    })
+  )
+    return false;
   if (resolveFactoryAppTemplate(canvas)) return true;
   if (nodes.some((node) => node.component === "onWorkOrder")) return true;
 
