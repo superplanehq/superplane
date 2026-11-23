@@ -7,6 +7,7 @@ import type {
 } from "@/api-client";
 import { automationNameForLineStep, lineStepParallelism } from "./factoryLineFormShared";
 import { factoryAppPath, factoryAppRunPath, factoryHomePath, factoryLineDetailPath } from "./factoryPagePaths";
+import { orderedLineBoardStages } from "./lineBoardStages";
 import { getWorkOrderDisplayStatus } from "./workOrderProgress";
 import { dispatchStepRows, isActiveWorkOrderExecution, type WorkOrderStepRow } from "./workOrderExecutions";
 import { resolvePhaseRunStatus } from "./linePhaseRunStatus";
@@ -218,14 +219,10 @@ export function collectLineDoneOrders(
 export function collectLineVerifyOrders(
   board: LinePhaseColumn[],
   sourceOrders: FactoriesWorkOrder[],
+  line?: FactoriesFactoryLine,
 ): FactoriesWorkOrder[] {
-  const lastStage = lineStageColumns(board).at(-1);
-  if (!lastStage) {
-    return [];
-  }
-
   const verifyById = new Map<string, FactoriesWorkOrder>();
-  for (const run of lastStage.runs) {
+  for (const run of lastWorkStageRuns(board, sourceOrders, line)) {
     if (!run.order.id || !isWaitingAfterPassedStage(run)) {
       continue;
     }
@@ -233,6 +230,29 @@ export function collectLineVerifyOrders(
   }
 
   return ordersInSourceListOrder(sourceOrders, verifyById);
+}
+
+/**
+ * Runs on the last step column and on custom stages after the last step.
+ * A custom stage without an automation has no runs, so its tasks finish on the step before it.
+ */
+function lastWorkStageRuns(
+  board: LinePhaseColumn[],
+  sourceOrders: FactoriesWorkOrder[],
+  line: FactoriesFactoryLine | undefined,
+): LinePhaseRunCard[] {
+  const lastStepRuns = lineStageColumns(board).at(-1)?.runs ?? [];
+  const lineId = line?.id;
+  if (!line || !lineId) {
+    return lastStepRuns;
+  }
+  const stages = orderedLineBoardStages(line);
+  const lastPhaseIndex = stages.map((stage) => stage.kind).lastIndexOf("STAGE_KIND_PHASE");
+  const trailingCustomRuns = stages
+    .slice(lastPhaseIndex + 1)
+    .filter((stage) => stage.kind === "STAGE_KIND_CUSTOM")
+    .flatMap((stage) => collectCustomStageRuns(lineId, stage.key, sourceOrders));
+  return [...lastStepRuns, ...trailingCustomRuns];
 }
 
 /**

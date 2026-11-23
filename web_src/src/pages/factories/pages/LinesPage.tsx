@@ -1165,7 +1165,10 @@ function LineDetail({
 }) {
   const steps = line.steps ?? [];
   const fullBoard = useMemo(() => buildLinePhaseBoard(line, workOrders ?? [], apps), [line, workOrders, apps]);
-  const verifyOrders = useMemo(() => collectLineVerifyOrders(fullBoard, workOrders ?? []), [fullBoard, workOrders]);
+  const verifyOrders = useMemo(
+    () => collectLineVerifyOrders(fullBoard, workOrders ?? [], line),
+    [fullBoard, workOrders, line],
+  );
   const hasVerifyStage = useMemo(
     () => orderedLineBoardStages(line).some((stage) => stage.kind === "STAGE_KIND_VERIFY"),
     [line],
@@ -1755,6 +1758,12 @@ function PhaseBoard({
 
   const phaseNames = useMemo(() => new Map(columns.map((column) => [column.stepIndex, column.stepName])), [columns]);
   const orderedStages = useMemo(() => orderedLineBoardStages(line, phaseNames), [line, phaseNames]);
+  const verifyOrderIds = useMemo(() => {
+    if (!orderedStages.some((stage) => stage.kind === "STAGE_KIND_VERIFY")) {
+      return new Set<string>();
+    }
+    return new Set(verifyOrders.flatMap((order) => (order.id ? [order.id] : [])));
+  }, [orderedStages, verifyOrders]);
   const stageNamesVersion = useMemo(
     () => JSON.stringify(orderedStages.map((stage) => [stage.id, stage.name])),
     [orderedStages],
@@ -2043,7 +2052,13 @@ function PhaseBoard({
       return (
         <CustomStageColumn
           stage={stage}
-          runs={lineId ? collectCustomStageRuns(lineId, stage.key, workOrders) : []}
+          runs={
+            lineId
+              ? collectCustomStageRuns(lineId, stage.key, workOrders).filter(
+                  (run) => !verifyOrderIds.has(run.workOrderId),
+                )
+              : []
+          }
           cardsPending={cardsPending}
           workOrderCardContext={workOrderCardContext}
           onOpenWorkOrder={onOpenWorkOrder}
