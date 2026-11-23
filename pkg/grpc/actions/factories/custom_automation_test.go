@@ -51,7 +51,7 @@ func TestCustomAutomationScheduleRoundTripAndTransitions(t *testing.T) {
 				ExecutionTimeoutSeconds: 7200,
 				Steps: []*pb.FactoryCustomAutomation_Step{
 					{Name: "Test", Type: pb.FactoryCustomAutomation_Step_TYPE_BASH, Command: "make test", WorkingDirectory: "repo", Secrets: []string{"deploy-credentials"}},
-					{Name: "Review", Type: pb.FactoryCustomAutomation_Step_TYPE_PROMPT, Prompt: "Review the repository.", WorkingDirectory: "repo"},
+					{Name: "Review", Type: pb.FactoryCustomAutomation_Step_TYPE_PROMPT, Prompt: "Review the repository.", WorkingDirectory: "repo", Secrets: []string{"figma-api-key", "deploy-credentials"}},
 				},
 			}
 			created, err := CreateFactoryCustomAutomation(ctx, deps, orgID, &pb.CreateFactoryCustomAutomationRequest{FactoryId: factory.ID.String(), Name: "Scheduled review", Settings: settings})
@@ -70,6 +70,15 @@ func TestCustomAutomationScheduleRoundTripAndTransitions(t *testing.T) {
 			node, err := models.FindCanvasNode(db, canvasID, customAutomationRunnerID)
 			require.NoError(t, err)
 			env := environmentVars(t, node.Configuration.Data()["environment"])
+			sources := node.Configuration.Data()["environmentFrom"].([]any)
+			var imported []string
+			for _, source := range sources {
+				entry := source.(map[string]any)
+				if entry["source"] == runner.EnvironmentFromSourceSecret {
+					imported = append(imported, entry["secret"].(map[string]any)["secret"].(string))
+				}
+			}
+			assert.ElementsMatch(t, []string{"deploy-credentials", "figma-api-key"}, imported)
 			assert.Equal(t, runner.WorkspaceContextRepoURL(provider, "acme/app", ""), env["REPO_URL"])
 			assert.Equal(t, "main", env["BASE"])
 			assert.NotContains(t, env, "PR_NUMBER")
