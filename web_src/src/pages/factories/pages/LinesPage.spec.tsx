@@ -862,6 +862,7 @@ describe("LinesPage board stages", () => {
           lineDispatches: [
             {
               id: "dispatch-docs",
+              reviewReady: true,
               line: lineRef,
               state: "STATE_FINISHED",
               result: "RESULT_PASSED",

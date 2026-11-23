@@ -115,6 +115,14 @@ func renderTaskDescribeText(
 	writeAlignedField(writer, "Key", task.GetKey())
 	writeAlignedField(writer, "Title", task.GetTitle())
 	writeAlignedField(writer, "State", formatTaskState(task.GetState()))
+	dispatches := task.GetLineDispatches()
+	if len(dispatches) > 0 {
+		latest := dispatches[len(dispatches)-1]
+		line := latest.GetLine()
+		writeAlignedField(writer, "Line", fmt.Sprintf("%s (%s)", line.GetName(), line.GetId()))
+		writeAlignedField(writer, "Traversal", latest.GetId())
+		writeAlignedField(writer, "Review Ready", fmt.Sprintf("%t", latest.GetReviewReady()))
+	}
 	writeAlignedField(writer, "Result", formatTaskResult(task.GetResult()))
 	writeAlignedField(writer, "Created", formatRelativeTime(task.GetCreatedAt()))
 	writeAlignedField(writer, "Updated", formatRelativeTime(task.GetUpdatedAt()))

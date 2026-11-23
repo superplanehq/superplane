@@ -688,11 +688,13 @@ func Test__FactoryWorkOrderLineDispatch__Finish(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, models.FactoryWorkOrderLineDispatchStateFinished, reloaded.State)
 	assert.Equal(t, models.CanvasRunResultFailed, reloaded.Result)
+	assert.False(t, reloaded.ReviewReady)
 
 	// Finishing an already-finished dispatch is a no-op, not an error, and
 	// doesn't clobber the recorded result.
 	require.NoError(t, dispatch.Finish(db, models.CanvasRunResultPassed))
 	assert.Equal(t, models.CanvasRunResultFailed, dispatch.Result)
+	assert.False(t, dispatch.ReviewReady)
 }
 
 func Test__FactoryWorkOrder__FindActiveLineDispatch(t *testing.T) {
@@ -717,9 +719,16 @@ func Test__FactoryWorkOrder__FindActiveLineDispatch(t *testing.T) {
 	assert.Equal(t, dispatch.ID, active.ID)
 
 	require.NoError(t, dispatch.Finish(db, models.CanvasRunResultPassed))
+	reloaded, err := models.FindWorkOrderLineDispatch(db, dispatch.ID)
+	require.NoError(t, err)
+	assert.True(t, reloaded.ReviewReady)
 
 	_, err = order.FindActiveLineDispatch(db)
 	assert.ErrorIs(t, err, gorm.ErrRecordNotFound, "finished dispatches don't count as active")
+	require.NoError(t, dispatch.Reactivate(db))
+	reloaded, err = models.FindWorkOrderLineDispatch(db, dispatch.ID)
+	require.NoError(t, err)
+	assert.False(t, reloaded.ReviewReady)
 }
 
 func Test__FactoryWorkOrder__RetryLineStep__ReusesDispatchWithEarlierSteps(t *testing.T) {
