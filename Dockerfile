@@ -2,6 +2,7 @@ ARG UBUNTU_VERSION=22.04
 ARG GO_VERSION=1.27.3
 ARG PLAYWRIGHT_GO_VERSION=v0.6201.1
 ARG RUNNER_IMAGE="ubuntu:${UBUNTU_VERSION}"
+ARG APPLICATION_IMAGE="alpine:3.24.4@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf"
 ARG ARTIFACTS_STAGE=builder
 
 # Optional CI module caches. `make image.build` replaces these with
@@ -105,7 +106,7 @@ RUN --mount=from=ci-go-mod,target=/mnt/ci-go-mod \
     if [ -n "$(ls -A /mnt/ci-go-build 2>/dev/null)" ]; then \
       cp -a /mnt/ci-go-build/. "${GOCACHE}/"; \
     fi && \
-    rm -rf build && go build -o build/superplane cmd/server/main.go
+    rm -rf build && CGO_ENABLED=0 go build -o build/superplane cmd/server/main.go
 
 WORKDIR /app/web_src
 RUN if [ "$FRONTEND_PREBUILT" = "1" ]; then \
@@ -192,7 +193,7 @@ COPY usr /usr
 
 FROM ${ARTIFACTS_STAGE} AS artifacts
 
-FROM ${RUNNER_IMAGE} AS runner
+FROM ${APPLICATION_IMAGE} AS runner
 
 ARG SUPERPLANE_VERSION=dev
 ARG SOURCE_REVISION=unknown
@@ -207,10 +208,8 @@ LABEL org.opencontainers.image.title="superplane" \
   org.opencontainers.image.version="${SUPERPLANE_VERSION}" \
   org.opencontainers.image.revision="${SOURCE_REVISION}"
 
-# postgresql-client needs to be installed here too,
-# otherwise the createdb command won't work.
-COPY scripts/docker/install-postgresql-client.sh install-postgresql-client.sh
-RUN bash install-postgresql-client.sh
+# Use native client tools; Ubuntu executables depend on glibc.
+RUN apk add --no-cache bash ca-certificates postgresql17-client=17.12-r0
 
 # We don't need Docker health checks, since these containers
 # are intended to run in Kubernetes pods, which have probes.
@@ -220,7 +219,6 @@ WORKDIR /app
 RUN chown nobody /app
 
 # Copy every artifact needed to run the application from previous stages
-COPY --from=artifacts --chown=nobody:root /usr/bin/createdb /usr/bin/createdb
 COPY --from=artifacts --chown=nobody:root /usr/bin/migrate /usr/bin/migrate
 COPY --from=artifacts --chown=nobody:root /app/build/superplane /app/build/superplane
 COPY --from=artifacts --chown=nobody:root /app/docker-entrypoint.sh /app/docker-entrypoint.sh
