@@ -7,6 +7,7 @@ import type {
 } from "@/api-client";
 import { automationNameForLineStep, lineStepParallelism } from "./factoryLineFormShared";
 import { factoryAppPath, factoryAppRunPath, factoryHomePath, factoryLineDetailPath } from "./factoryPagePaths";
+import { orderedLineBoardStages } from "./lineBoardStages";
 import { getWorkOrderDisplayStatus } from "./workOrderProgress";
 import { dispatchStepRows, isActiveWorkOrderExecution, type WorkOrderStepRow } from "./workOrderExecutions";
 import { resolvePhaseRunStatus } from "./linePhaseRunStatus";
@@ -218,14 +219,10 @@ export function collectLineDoneOrders(
 export function collectLineVerifyOrders(
   board: LinePhaseColumn[],
   sourceOrders: FactoriesWorkOrder[],
+  line?: FactoriesFactoryLine,
 ): FactoriesWorkOrder[] {
-  const lastStage = lineStageColumns(board).at(-1);
-  if (!lastStage) {
-    return [];
-  }
-
   const verifyById = new Map<string, FactoriesWorkOrder>();
-  for (const run of lastStage.runs) {
+  for (const run of lastWorkStageRuns(board, sourceOrders, line)) {
     if (!run.order.id || !isWaitingAfterPassedStage(run)) {
       continue;
     }
@@ -233,6 +230,23 @@ export function collectLineVerifyOrders(
   }
 
   return ordersInSourceListOrder(sourceOrders, verifyById);
+}
+
+/** Runs on the last step or custom stage before Verify. The phase board has no custom stage columns. */
+function lastWorkStageRuns(
+  board: LinePhaseColumn[],
+  sourceOrders: FactoriesWorkOrder[],
+  line: FactoriesFactoryLine | undefined,
+): LinePhaseRunCard[] {
+  const lastWorkStage = line
+    ? orderedLineBoardStages(line)
+        .filter((stage) => stage.kind === "STAGE_KIND_PHASE" || stage.kind === "STAGE_KIND_CUSTOM")
+        .at(-1)
+    : undefined;
+  if (line?.id && lastWorkStage?.kind === "STAGE_KIND_CUSTOM") {
+    return collectCustomStageRuns(line.id, lastWorkStage.key, sourceOrders);
+  }
+  return lineStageColumns(board).at(-1)?.runs ?? [];
 }
 
 /**
