@@ -5,7 +5,7 @@ import datadogIcon from "@/assets/icons/integrations/datadog.svg";
 import dependabotIcon from "@/assets/icons/integrations/dependabot.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import linearIcon from "@/assets/icons/integrations/linear.svg";
-import productiveIcon from "@/assets/icons/integrations/productive.svg";
+import jiraIcon from "@/assets/icons/integrations/jira.svg";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
 
 import { ComponentStoryShell } from "../__fixtures__/ComponentStoryShell";
@@ -20,12 +20,12 @@ const GITHUB_SOURCE: BacklogIntakeSource = {
   tabLabel: "GitHub",
 };
 
-const PRODUCTIVE_SOURCE: BacklogIntakeSource = {
-  intakeId: "intake-productive",
-  name: "Productive tasks",
-  iconSrc: productiveIcon,
-  iconAlt: "Productive",
-  tabLabel: "Productive",
+const JIRA_SOURCE: BacklogIntakeSource = {
+  intakeId: "intake-jira",
+  name: "Jira issues",
+  iconSrc: jiraIcon,
+  iconAlt: "Jira",
+  tabLabel: "Jira",
 };
 
 const LINEAR_SOURCE: BacklogIntakeSource = {
@@ -121,10 +121,10 @@ const GITHUB_ITEMS: BacklogIntakeItem[] = [
   },
 ];
 
-const PRODUCTIVE_ITEMS: BacklogIntakeItem[] = [
+const JIRA_ITEMS: BacklogIntakeItem[] = [
   {
     id: "pr-1",
-    intakeId: "intake-productive",
+    intakeId: "intake-jira",
     key: "T-41",
     title: "Sync billing status",
     body: "",
@@ -175,9 +175,7 @@ export const OneSource: Story = {
 
 export const TwoSources: Story = {
   name: "Two sources",
-  render: () => (
-    <CreateMenuStory sources={[GITHUB_SOURCE, PRODUCTIVE_SOURCE]} catalog={[...GITHUB_ITEMS, ...PRODUCTIVE_ITEMS]} />
-  ),
+  render: () => <CreateMenuStory sources={[GITHUB_SOURCE, JIRA_SOURCE]} catalog={[...GITHUB_ITEMS, ...JIRA_ITEMS]} />,
 };
 
 export const FourSources: Story = {

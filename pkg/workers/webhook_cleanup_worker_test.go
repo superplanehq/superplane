@@ -2,6 +2,7 @@ package workers
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -114,4 +115,38 @@ func assertWebhookHardDeleted(t *testing.T, webhookID uuid.UUID) {
 		First(&webhook).
 		Error
 	require.ErrorIs(t, err, gorm.ErrRecordNotFound)
+}
+
+func TestWebhookCleanupWorkerRetriesProductiveCleanup(t *testing.T) {
+	for _, metadata := range []map[string]any{
+		{"ids": []any{"created", "updated"}},
+		{"id": "legacy"},
+	} {
+		t.Run(fmt.Sprint(metadata), func(t *testing.T) {
+			r := support.Setup(t)
+			defer r.Close()
+			calls := 0
+			worker, webhookID := setupWebhookCleanupWorker(t, r, func(ctx core.WebhookHandlerContext) error {
+				calls++
+				if calls == 1 {
+					return errors.New("remote deletion failed")
+				}
+				return nil
+			})
+			db := database.DB(t.Context())
+			integrationID := integrationIDForWebhook(t, webhookID)
+			require.NoError(t, db.Model(&models.Integration{}).Where("id = ?", integrationID).Update("app_name", "productive").Error)
+			r.Registry.WebhookHandlers["productive"] = r.Registry.WebhookHandlers["dummy"]
+			require.NoError(t, db.Unscoped().Model(&models.Webhook{}).Where("id = ?", webhookID).Update("metadata", datatypes.NewJSONType(any(metadata))).Error)
+			logger := logrus.NewEntry(logrus.New())
+			require.Error(t, worker.LockAndProcessWebhook(logger, models.Webhook{ID: webhookID}))
+			var retained models.Webhook
+			require.NoError(t, db.Unscoped().First(&retained, "id = ?", webhookID).Error)
+			require.True(t, retained.DeletedAt.Valid)
+			require.Equal(t, metadata, retained.Metadata.Data())
+			require.NoError(t, worker.LockAndProcessWebhook(logger, retained))
+			assertWebhookHardDeleted(t, webhookID)
+			require.Equal(t, 2, calls)
+		})
+	}
 }

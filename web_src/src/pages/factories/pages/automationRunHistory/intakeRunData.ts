@@ -4,7 +4,7 @@ import type { IntakeRunOutcome } from "@/ui/AutomationRunHistory/intakeRunOutcom
 import type { LineIntakeSourceId } from "../lineIntakeModel";
 import { intakeRunSource, record, text } from "./intakeRunSource";
 
-export type RunHistoryIntakeSource = LineIntakeSourceId | "scheduled-intake";
+export type RunHistoryIntakeSource = LineIntakeSourceId | "productive-tasks" | "scheduled-intake";
 
 const summaries: Record<IntakeRunOutcome, string> = {
   created: "SuperPlane created a task from this source event.",

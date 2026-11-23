@@ -568,6 +568,20 @@ CREATE TABLE public.factory_codex_leases (
 
 
 --
+-- Name: factory_intake_retirements; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.factory_intake_retirements (
+    canvas_id uuid NOT NULL,
+    intake_id uuid NOT NULL,
+    organization_id uuid NOT NULL,
+    factory_id uuid NOT NULL,
+    inventory jsonb DEFAULT '[]'::jsonb NOT NULL,
+    retired_at timestamp with time zone NOT NULL
+);
+
+
+--
 -- Name: factory_intakes; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -2765,6 +2779,14 @@ ALTER TABLE ONLY public.factory_codex_leases
 
 ALTER TABLE ONLY public.factory_codex_leases
     ADD CONSTRAINT factory_codex_leases_task_key UNIQUE (connection_id, task_id);
+
+
+--
+-- Name: factory_intake_retirements factory_intake_retirements_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_intake_retirements
+    ADD CONSTRAINT factory_intake_retirements_pkey PRIMARY KEY (canvas_id);
 
 
 --
@@ -5497,6 +5519,30 @@ ALTER TABLE ONLY public.factory_codex_leases
 
 
 --
+-- Name: factory_intake_retirements factory_intake_retirements_canvas_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_intake_retirements
+    ADD CONSTRAINT factory_intake_retirements_canvas_id_fkey FOREIGN KEY (canvas_id) REFERENCES public.workflows(id) ON DELETE CASCADE;
+
+
+--
+-- Name: factory_intake_retirements factory_intake_retirements_factory_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_intake_retirements
+    ADD CONSTRAINT factory_intake_retirements_factory_id_fkey FOREIGN KEY (factory_id) REFERENCES public.factories(id) ON DELETE CASCADE;
+
+
+--
+-- Name: factory_intake_retirements factory_intake_retirements_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_intake_retirements
+    ADD CONSTRAINT factory_intake_retirements_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
 -- Name: factory_intakes factory_intakes_canvas_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -6728,7 +6774,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261120161421	f
+20261123090507	f
 \.
 
 

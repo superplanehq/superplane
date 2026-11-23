@@ -15,7 +15,6 @@ const (
 	FactoryIntakeSourceGitHubIssues       = "github-issues"
 	FactoryIntakeSourceSentryExceptions   = "sentry-exceptions"
 	FactoryIntakeSourcePagerDutyIncidents = "pagerduty-incidents"
-	FactoryIntakeSourceProductiveTasks    = "productive-tasks"
 	FactoryIntakeSourceJiraIssues         = "jira-issues"
 	FactoryIntakeSourceDependabotAlerts   = "dependabot-alerts"
 	FactoryIntakeSourceDatadog            = "datadog"
@@ -41,7 +40,6 @@ var factoryIntakeSources = []string{
 	FactoryIntakeSourceGitHubIssues,
 	FactoryIntakeSourceSentryExceptions,
 	FactoryIntakeSourcePagerDutyIncidents,
-	FactoryIntakeSourceProductiveTasks,
 	FactoryIntakeSourceJiraIssues,
 	FactoryIntakeSourceDependabotAlerts,
 	FactoryIntakeSourceDatadog,
@@ -208,6 +206,7 @@ func FindFactoryIntakeByCanvasID(tx *gorm.DB, canvasID uuid.UUID) (*FactoryIntak
 func (f *Factory) ListIntakes(tx *gorm.DB) ([]FactoryIntake, error) {
 	var intakes []FactoryIntake
 	err := liveCanvasIntakes(tx).
+		Where("factory_intakes.source <> ?", RetiredProductiveIntakeSource).
 		Where("factory_intakes.organization_id = ? AND factory_intakes.factory_id = ?", f.OrganizationID, f.ID).
 		Order("factory_intakes.created_at ASC").
 		Order("factory_intakes.id ASC").

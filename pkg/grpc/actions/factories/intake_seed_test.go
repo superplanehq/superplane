@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -20,7 +19,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/integrations/datadog"
 	"github.com/superplanehq/superplane/pkg/integrations/jira"
-	"github.com/superplanehq/superplane/pkg/integrations/productive"
 	"github.com/superplanehq/superplane/pkg/integrations/sentry"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
@@ -308,82 +306,6 @@ func jiraEventIssueKey(t *testing.T, event map[string]any) string {
 	require.True(t, ok)
 
 	return key
-}
-
-func Test__ProductiveSeedAsksForThreeNewestTasks(t *testing.T) {
-	httpContext := &contexts.HTTPContext{Responses: []*http.Response{
-		{
-			StatusCode: http.StatusOK,
-			Body:       io.NopCloser(strings.NewReader(`{"data":[]}`)),
-		},
-	}}
-	client, err := productive.NewClient(httpContext, &contexts.IntegrationContext{
-		Configuration: map[string]any{
-			"apiToken":       "token-1",
-			"organizationId": "org-1",
-		},
-	})
-	require.NoError(t, err)
-
-	documents, err := newestProductiveSeedDocuments(client, "42", false, []string{"list-a", "list-b"})
-	require.NoError(t, err)
-	assert.Empty(t, documents)
-
-	require.Len(t, httpContext.Requests, 1)
-	query := httpContext.Requests[0].URL.Query()
-	assert.Equal(t, "42", query.Get("filter[project_id]"))
-	assert.Equal(t, "3", query.Get("page[size]"))
-	assert.Equal(t, "list-a,list-b", query.Get("filter[task_list_id]"))
-}
-
-func Test__ProductiveTaskEvents(t *testing.T) {
-	t.Run("the newest task ends up on top of the intake", func(t *testing.T) {
-		events := productiveTaskEvents(productiveTaskPage([]string{"Newest task", "Older task"}), "")
-		require.Len(t, events, 2)
-
-		// Events are emitted oldest first, so the newest task ends up on top
-		// of the intake list.
-		assert.Equal(t, "Older task", taskEventTitle(t, events[0]))
-		assert.Equal(t, "Newest task", taskEventTitle(t, events[1]))
-	})
-
-	t.Run("an event carries what the graph reads", func(t *testing.T) {
-		document := map[string]any{
-			"id":   "91",
-			"type": "tasks",
-			"attributes": map[string]any{
-				"title":       "Fix payment retries",
-				"description": "Retries fail silently after the third attempt.",
-			},
-		}
-
-		events := productiveTaskEvents([]map[string]any{document}, "12345")
-		require.Len(t, events, 1)
-
-		// The graph reads root().data.data.attributes, and a created task is
-		// what the intake filters on.
-		assert.Equal(t, map[string]any{"event": "task.created"}, events[0]["meta"])
-		assert.Equal(t, document, events[0]["data"])
-		assert.Equal(t, "https://app.productive.io/12345/tasks/91", events[0]["url"])
-	})
-}
-
-// productiveTaskPage builds a page as the API returns it, so the titles are
-// given newest first.
-func productiveTaskPage(titles []string) []map[string]any {
-	documents := make([]map[string]any, 0, len(titles))
-	for i, title := range titles {
-		documents = append(documents, map[string]any{
-			"id":   strconv.Itoa(len(titles) - i),
-			"type": "tasks",
-			"attributes": map[string]any{
-				"title":       title,
-				"description": fmt.Sprintf("Description of %s", title),
-			},
-		})
-	}
-
-	return documents
 }
 
 func taskEventTitle(t *testing.T, event map[string]any) string {

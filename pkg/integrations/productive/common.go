@@ -55,11 +55,6 @@ const (
 	EventNewTask     = 1
 	EventUpdatedTask = 24
 
-	// TaskTypeRegular is a normal Productive.io task. TaskTypeMilestone is
-	// a key task.
-	TaskTypeRegular   = 1
-	TaskTypeMilestone = 3
-
 	// EventHeader is a custom header SuperPlane asks Productive.io to send.
 	// Productive.io does not send it on real deliveries, so the signature
 	// token is what tells a created task from an updated task.

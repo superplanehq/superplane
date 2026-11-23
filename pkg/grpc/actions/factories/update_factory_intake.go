@@ -45,6 +45,10 @@ func UpdateFactoryIntake(
 		return nil, factoryErrorToStatus(err, "failed to update factory intake")
 	}
 
+	if intake.Source == models.RetiredProductiveIntakeSource {
+		return nil, factoryErrorToStatus(models.ErrFactoryIntakeRetired, "Productive intake is retired")
+	}
+
 	canvas, err := models.FindCanvasInTransaction(db, orgID, intake.CanvasID)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update factory intake")
@@ -113,7 +117,6 @@ func intakeSourceSupportsPause(source string) bool {
 	return source == models.FactoryIntakeSourceGitHubIssues ||
 		source == models.FactoryIntakeSourceSentryExceptions ||
 		source == models.FactoryIntakeSourceJiraIssues ||
-		source == models.FactoryIntakeSourceProductiveTasks ||
 		source == models.FactoryIntakeSourceDependabotAlerts ||
 		source == models.FactoryIntakeSourceLinearIssues
 }
@@ -407,9 +410,6 @@ func applyIntakeSettingsToGraph(
 			case models.FactoryIntakeSourceSentryExceptions:
 				configuration["actions"] = intakeSentryActionsFor(updated)
 				applySentryProjectConfiguration(configuration, updated.SentryProjectIDs)
-				nodes[i].Configuration = configuration
-			case models.FactoryIntakeSourceProductiveTasks:
-				configuration["actions"] = intakeProductiveTriggerActions(updated)
 				nodes[i].Configuration = configuration
 			case models.FactoryIntakeSourceJiraIssues:
 				configuration["events"] = intakeTriggerEventsFor(updated)

@@ -54,6 +54,9 @@ func (d IntakeDependencies) itemSource(
 	tx *gorm.DB,
 	intake *models.FactoryIntake,
 ) (intakeItemSource, error) {
+	if intake.Source == models.RetiredProductiveIntakeSource {
+		return nil, models.ErrFactoryIntakeRetired
+	}
 	if d.NewItemSource != nil {
 		return d.NewItemSource(ctx, tx, intake)
 	}
@@ -117,8 +120,6 @@ func CreateFactoryIntake(
 		settings = defaultJiraIntakeSettings()
 	case models.FactoryIntakeSourceSentryExceptions:
 		settings = defaultSentryIntakeSettings()
-	case models.FactoryIntakeSourceProductiveTasks:
-		settings = defaultProductiveIntakeSettings()
 	case models.FactoryIntakeSourceDependabotAlerts:
 		settings = defaultDependabotIntakeSettings()
 	case models.FactoryIntakeSourceDatadog:

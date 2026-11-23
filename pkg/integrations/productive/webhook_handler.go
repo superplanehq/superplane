@@ -176,7 +176,7 @@ func eventTargetURL(webhookURL, eventName string) string {
 func (h *ProductiveWebhookHandler) deleteRemoteWebhooks(client *Client, ids []string) error {
 	var first error
 	for _, id := range ids {
-		if err := client.DeleteWebhook(id); err != nil && first == nil {
+		if err := client.DeleteWebhook(id); err != nil && !IsNotFoundError(err) && first == nil {
 			first = fmt.Errorf("error deleting webhook: %v", err)
 		}
 	}

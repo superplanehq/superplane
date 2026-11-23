@@ -141,3 +141,16 @@ func posixQuote(value string) string {
 	}
 	return out.String()
 }
+
+func parseProductiveTaskURL(rawURL string) (organizationID string, taskID string, ok bool) {
+	parsed, err := url.Parse(strings.TrimSpace(rawURL))
+	if err != nil || !strings.EqualFold(parsed.Hostname(), "app.productive.io") {
+		return "", "", false
+	}
+
+	parts := strings.Split(strings.Trim(parsed.Path, "/"), "/")
+	if len(parts) != 3 || parts[0] == "" || parts[1] != "tasks" || parts[2] == "" {
+		return "", "", false
+	}
+	return parts[0], parts[2], true
+}

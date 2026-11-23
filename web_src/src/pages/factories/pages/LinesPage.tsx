@@ -191,7 +191,6 @@ import {
   factoryGitHubIntakeSetupPath,
   factoryJiraIntakeSetupPath,
   factoryLinearIntakeSetupPath,
-  factoryProductiveIntakeSetupPath,
   factoryPRFeedbackPath,
   factoryPRFeedbackSetupPath,
   factorySentryIntakeSetupPath,
@@ -643,12 +642,6 @@ export function LinesPage() {
     if (template.id === "dependabot-alerts") {
       if (selectedLine.id) {
         navigate(factoryDependabotIntakeSetupPath(organizationId, routeSegment, selectedLine.id));
-      }
-      return;
-    }
-    if (template.id === "productive-tasks") {
-      if (selectedLine.id) {
-        navigate(factoryProductiveIntakeSetupPath(organizationId, routeSegment, selectedLine.id));
       }
       return;
     }

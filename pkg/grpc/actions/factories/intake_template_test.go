@@ -97,7 +97,6 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 			models.FactoryIntakeSourceGitHubIssues:       "github.onIssue",
 			models.FactoryIntakeSourceSentryExceptions:   "sentry.onIssue",
 			models.FactoryIntakeSourcePagerDutyIncidents: "pagerduty.onIncident",
-			models.FactoryIntakeSourceProductiveTasks:    "productive.onTask",
 			models.FactoryIntakeSourceJiraIssues:         "jira.onIssue",
 			models.FactoryIntakeSourceDependabotAlerts:   "github.onDependabotAlert",
 			models.FactoryIntakeSourceDatadog:            "datadog.onErrorTrackingAlert",
@@ -305,33 +304,6 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 			{Channel: "default", SourceID: intakeTriggerNodeID, TargetID: intakeCreateNodeID},
 		}, canvas.Spec.Edges)
 		assert.Nil(t, findSpecNodeOrNil(canvas, intakeFilterNodeID))
-	})
-
-	t.Run("Productive.io filters key tasks by default", func(t *testing.T) {
-		canvas, err := buildIntakeCanvas(intakeCanvasRequest{Source: models.FactoryIntakeSourceProductiveTasks})
-		require.NoError(t, err)
-		assert.Equal(t, []yaml.Edge{
-			{Channel: "default", SourceID: intakeTriggerNodeID, TargetID: intakeFilterNodeID},
-			{Channel: "true", SourceID: intakeFilterNodeID, TargetID: intakeCreateNodeID},
-		}, canvas.Spec.Edges)
-		filter := findSpecNode(t, canvas, intakeFilterNodeID)
-		assert.Equal(t, intakeProductiveExcludeKeyTasksCondition, filter.Configuration["expression"])
-		trigger := findSpecNode(t, canvas, intakeTriggerNodeID)
-		assert.Equal(t, []any{"created"}, trigger.Configuration["actions"])
-	})
-
-	t.Run("a Productive.io task list filter also listens for updates", func(t *testing.T) {
-		canvas, err := buildIntakeCanvas(intakeCanvasRequest{
-			Source: models.FactoryIntakeSourceProductiveTasks,
-			Settings: intakeSettings{
-				ExcludeKeyTasks: true,
-				TaskListIDs:     []string{"list-bugs"},
-			},
-		})
-		require.NoError(t, err)
-
-		trigger := findSpecNode(t, canvas, intakeTriggerNodeID)
-		assert.Equal(t, []any{"created", "updated"}, trigger.Configuration["actions"])
 	})
 
 	t.Run("every action node works on a whole batch at once", func(t *testing.T) {
