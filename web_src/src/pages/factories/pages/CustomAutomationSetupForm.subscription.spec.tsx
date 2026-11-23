@@ -69,6 +69,7 @@ vi.mock("@/hooks/useSelectableLLMModels", () => ({
   }),
 }));
 vi.mock("@/hooks/useOrganizationWorkspaceUsage", () => ({ useOrganizationWorkspaceUsage: () => ({}) }));
+vi.mock("@/hooks/useIntegrations", () => ({ useConnectedIntegrations: () => ({}) }));
 vi.mock("@/hooks/useCanvasData", () => ({ useCanvas: () => ({ data: undefined, isPending: false }) }));
 vi.mock("@/hooks/useExperimentalFeature", () => ({ useExperimentalFeature: () => ({ has: () => false }) }));
 vi.mock("@/hooks/useFactoryAgentResources", () => ({ useFactoryAgentResources: () => ({}) }));

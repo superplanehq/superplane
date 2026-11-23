@@ -3,6 +3,8 @@ import { describe, expect, it } from "bun:test";
 import { buildColumnAutomations, columnAutomationOpenPath } from "./columnAutomations";
 import {
   customAutomationDraft,
+  customAutomationTriggersForRun,
+  newCustomAutomationTrigger,
   customAutomationModeCopy,
   customAutomationSettings,
   customAutomationSchedule,
@@ -120,13 +122,18 @@ describe("custom automation settings", () => {
       model: "",
     });
 
-    draft.components[0]!.configuration.credentialSource = "hosted";
+    draft.components[0]!.configuration.credentials = { source: "hosted" };
     expect(customAutomationSettings("automatic", draft).agent?.credentialSource).toBeUndefined();
   });
 
   it("fills an empty create draft from the workspace agent", () => {
     const draft = customAutomationDraft({
-      settings: { agent: workspaceAgentFromOnboarding({ agentHarness: "AGENT_HARNESS_CLAUDE_CODE" }) },
+      settings: {
+        agent: workspaceAgentFromOnboarding(
+          { agentHarness: "AGENT_HARNESS_CLAUDE_CODE", agentIntegrationId: "claude" },
+          [{ metadata: { id: "claude", name: "team", integrationName: "claude" }, status: { state: "ready" } }],
+        ),
+      },
     });
 
     expect(draft.components[0]?.component).toBe("runnerClaudeCode");
@@ -249,5 +256,18 @@ describe("custom automation settings", () => {
     expect(customAutomationIdFromSearch("?customAutomation=review-1")).toBe("review-1");
     expect(customAutomationIdFromSearch("?customVerification=review-1")).toBe("review-1");
     expect(customAutomationIdFromSearch("")).toBeUndefined();
+  });
+});
+
+describe("trigger run context", () => {
+  it.each([
+    [undefined, ["manual", "automatic", "leave", "scheduled"]],
+    [true, ["manual", "automatic", "leave"]],
+    [false, ["manual", "scheduled"]],
+  ] as const)("filters triggers for runsOnTask=%s", (runsOnTask, expected) => {
+    const triggers = (["manual", "automatic", "leave", "scheduled"] as const).map((mode) =>
+      newCustomAutomationTrigger(mode),
+    );
+    expect(customAutomationTriggersForRun(triggers, runsOnTask).map(({ mode }) => mode)).toEqual([...expected]);
   });
 });
