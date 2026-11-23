@@ -232,21 +232,27 @@ export function collectLineVerifyOrders(
   return ordersInSourceListOrder(sourceOrders, verifyById);
 }
 
-/** Runs on the last step or custom stage before Verify. The phase board has no custom stage columns. */
+/**
+ * Runs on the last step column and on custom stages after the last step.
+ * A custom stage without an automation has no runs, so its tasks finish on the step before it.
+ */
 function lastWorkStageRuns(
   board: LinePhaseColumn[],
   sourceOrders: FactoriesWorkOrder[],
   line: FactoriesFactoryLine | undefined,
 ): LinePhaseRunCard[] {
-  const lastWorkStage = line
-    ? orderedLineBoardStages(line)
-        .filter((stage) => stage.kind === "STAGE_KIND_PHASE" || stage.kind === "STAGE_KIND_CUSTOM")
-        .at(-1)
-    : undefined;
-  if (line?.id && lastWorkStage?.kind === "STAGE_KIND_CUSTOM") {
-    return collectCustomStageRuns(line.id, lastWorkStage.key, sourceOrders);
+  const lastStepRuns = lineStageColumns(board).at(-1)?.runs ?? [];
+  const lineId = line?.id;
+  if (!line || !lineId) {
+    return lastStepRuns;
   }
-  return lineStageColumns(board).at(-1)?.runs ?? [];
+  const stages = orderedLineBoardStages(line);
+  const lastPhaseIndex = stages.map((stage) => stage.kind).lastIndexOf("STAGE_KIND_PHASE");
+  const trailingCustomRuns = stages
+    .slice(lastPhaseIndex + 1)
+    .filter((stage) => stage.kind === "STAGE_KIND_CUSTOM")
+    .flatMap((stage) => collectCustomStageRuns(lineId, stage.key, sourceOrders));
+  return [...lastStepRuns, ...trailingCustomRuns];
 }
 
 /**

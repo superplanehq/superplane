@@ -163,6 +163,27 @@ describe("collectLineVerifyOrders", () => {
       expect(verify.map((entry) => entry.id)).toEqual(["wo-docs-passed"]);
     });
 
+    it("moves a waiting order to Verify when the custom stage has no automation", () => {
+      const waiting = order("wo-plan-passed", "wo-plan-passed", [
+        {
+          id: "wo-plan-passed-plan",
+          line: { id: "line-1", name: "poc" },
+          step: "plan",
+          stepIndex: 0,
+          stageKey: "phase-0",
+          state: "STATE_FINISHED",
+          result: "RESULT_PASSED",
+          createdAt: "2026-08-11T12:00:00.000Z",
+        },
+      ]);
+      const line = { ...CUSTOM_LAST_LINE, steps: [{ app: { app: "app-plan" } }] };
+      const board = buildLinePhaseBoard(line, [waiting], APPS);
+
+      const verify = collectLineVerifyOrders(board, [waiting], line);
+
+      expect(verify.map((entry) => entry.id)).toEqual(["wo-plan-passed"]);
+    });
+
     it("keeps a running custom stage off Verify", () => {
       const running = orderWithCustomStage("wo-docs-running", { state: "STATE_STARTED" });
       const board = buildLinePhaseBoard(CUSTOM_LAST_LINE, [running], APPS);
