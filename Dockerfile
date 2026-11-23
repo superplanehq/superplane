@@ -209,7 +209,7 @@ LABEL org.opencontainers.image.title="superplane" \
   org.opencontainers.image.revision="${SOURCE_REVISION}"
 
 # Use native client tools; Ubuntu executables depend on glibc.
-RUN apk add --no-cache bash ca-certificates postgresql17-client=17.12-r0
+RUN apk add --no-cache bash ca-certificates curl postgresql17-client=17.12-r0
 
 # We don't need Docker health checks, since these containers
 # are intended to run in Kubernetes pods, which have probes.
