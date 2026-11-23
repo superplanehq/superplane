@@ -181,7 +181,7 @@ func (l *FactoryLine) DispatchStageFromWithModel(
 		State:           FactoryWorkOrderLineDispatchStateActive,
 		Model:           strings.TrimSpace(model),
 		ThinkingLevel:   strings.TrimSpace(thinkingLevel),
-		CurrentStageKey: steps[startIndex].StageKey,
+		CurrentStageKey: initialStageKey(stages, steps, startIndex),
 		CreatedAt:       now,
 		UpdatedAt:       now,
 	}
@@ -193,6 +193,25 @@ func (l *FactoryLine) DispatchStageFromWithModel(
 		return nil, nil, err
 	}
 	return dispatch, results, nil
+}
+
+// initialStageKey is the stage a dispatch enters first. A start from the
+// beginning enters the first stage after Backlog, so an empty stage before
+// the first automation can still stop the task.
+func initialStageKey(stages []FactoryLineStage, steps []FactoryLineStep, startIndex int) string {
+	key := steps[startIndex].StageKey
+	if startIndex != 0 || key == "" {
+		return key
+	}
+	for _, stage := range stages {
+		if stage.Key == key || stage.Kind == FactoryLineStageDone {
+			return key
+		}
+		if stage.Kind != FactoryLineStageBacklog {
+			return stage.Key
+		}
+	}
+	return key
 }
 
 func (l *FactoryWorkOrderLineDispatch) startInitialStage(

@@ -130,6 +130,27 @@ describe("collectCustomStageRuns", () => {
     expect(collectCustomStageRuns("line-1", "custom-empty", [task])).toHaveLength(1);
   });
 
+  it("places a task that stops in an empty stage before its first run", () => {
+    const task: FactoriesWorkOrder = {
+      id: "wo-stopped",
+      state: "STATE_OPEN",
+      lineDispatches: [
+        {
+          line: { id: "line-1" },
+          state: "STATE_FINISHED",
+          result: "RESULT_PASSED",
+          currentStageKey: "custom-empty",
+          stepExecutions: [],
+        },
+      ],
+    };
+
+    expect(collectCustomStageRuns("line-1", "custom-empty", [task]).map((run) => run.workOrderId)).toEqual([
+      "wo-stopped",
+    ]);
+    expect(collectCustomStageRuns("line-1", "custom-other", [task])).toEqual([]);
+  });
+
   it("places a repeated app by its saved phase key, not the shifted step index", () => {
     const task: FactoriesWorkOrder = {
       id: "wo-repeated",

@@ -1,6 +1,7 @@
 -- Stages saved before auto-advance existed have no auto_advance key.
 -- Verify and the last work stage before Done stay stopped, so tasks do not
--- move into Done automatically. Every other stage advances.
+-- move into Done automatically. Every other stage advances. Finished
+-- dispatches are included because a retry reopens their snapshot.
 
 UPDATE factory_lines AS line
 SET stages = backfilled.stages
@@ -63,7 +64,6 @@ FROM (
       lead(element.stage->>'kind') OVER (PARTITION BY d.id ORDER BY element.position) AS next_kind
     FROM factory_work_order_line_dispatches AS d,
       jsonb_array_elements(d.stages) WITH ORDINALITY AS element(stage, position)
-    WHERE d.state <> 'finished'
   ) AS stage_rows
   GROUP BY stage_rows.id
 ) AS backfilled

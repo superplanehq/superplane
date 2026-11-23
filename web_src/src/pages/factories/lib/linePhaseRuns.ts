@@ -131,7 +131,7 @@ export function collectCustomStageRuns(
     if (dispatches.length === 0) continue;
     const dispatch = pickMostRecentDispatch(dispatches);
     const executions = dispatchStepRows(dispatch);
-    const current = pickCurrentLineExecution(executions);
+    const current = pickCurrentLineExecution(executions) ?? stoppedBeforeFirstRun(dispatch, stageKey);
     const currentStageKey = dispatch.currentStageKey?.trim();
     if (!current || (currentStageKey ? currentStageKey !== stageKey : current.stageKey !== stageKey)) continue;
     const stageExecutions = executions.filter((execution) => execution.stageKey === stageKey);
@@ -150,6 +150,22 @@ export function collectCustomStageRuns(
     });
   }
   return runs.sort(compareRunsNewestFirst);
+}
+
+/** A task can stop in an empty stage before its first run. It still needs a card there. */
+function stoppedBeforeFirstRun(
+  dispatch: FactoriesWorkOrderLineDispatch,
+  stageKey: string,
+): WorkOrderStepRow | undefined {
+  if (dispatch.currentStageKey?.trim() !== stageKey) return undefined;
+  return { stageKey, state: "STATE_FINISHED", result: "RESULT_PASSED", createdAt: dispatch.createdAt };
+}
+
+/** Dispatches from before stage tracking have no current stage. */
+function latestDispatchHasCurrentStage(order: FactoriesWorkOrder, lineId: string | undefined): boolean {
+  if (!lineId) return false;
+  const dispatches = (order.lineDispatches ?? []).filter((dispatch) => dispatch.line?.id === lineId);
+  return dispatches.length > 0 && Boolean(pickMostRecentDispatch(dispatches).currentStageKey?.trim());
 }
 
 /**
@@ -234,7 +250,7 @@ export function collectLineVerifyOrders(
     }
   }
   for (const run of lastWorkStageRuns(board, sourceOrders, line)) {
-    if (!run.order.id || !isWaitingAfterPassedStage(run)) {
+    if (!run.order.id || !isWaitingAfterPassedStage(run) || latestDispatchHasCurrentStage(run.order, line?.id)) {
       continue;
     }
     verifyById.set(run.order.id, run.order);

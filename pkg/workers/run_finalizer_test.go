@@ -956,8 +956,8 @@ func Test__RunFinalizer__AutoAdvanceIntoDoneClosesTask(t *testing.T) {
 		{
 			name: "stage before Done enabled",
 			configure: func(stages []models.FactoryLineStage) []models.FactoryLineStage {
-				// Move Verify before the phase: Backlog, Verify, phase-0, Done.
-				return []models.FactoryLineStage{stages[0], stages[2], stages[1], stages[3]}
+				// Remove Verify: Backlog, phase-0, Done.
+				return []models.FactoryLineStage{stages[0], stages[1], stages[3]}
 			},
 			wantClosed: true,
 			wantStage:  models.CanvasColumnKeyDone,
@@ -967,7 +967,7 @@ func Test__RunFinalizer__AutoAdvanceIntoDoneClosesTask(t *testing.T) {
 			configure: func(stages []models.FactoryLineStage) []models.FactoryLineStage {
 				disabled := false
 				stages[1].AutoAdvance = &disabled
-				return []models.FactoryLineStage{stages[0], stages[2], stages[1], stages[3]}
+				return []models.FactoryLineStage{stages[0], stages[1], stages[3]}
 			},
 			wantClosed: false,
 			wantStage:  "phase-0",
