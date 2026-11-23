@@ -2532,6 +2532,11 @@ describe("LinesPage board editing", () => {
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     expect(within(header).queryByTestId("work-order-list-create-button")).not.toBeInTheDocument();
+    const editLine = within(header).getByTestId("lines-edit-line");
+    expect(
+      within(header).getByTestId("lines-board-view-menu").compareDocumentPosition(editLine) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
 
     await user.click(within(header).getByTestId("work-orders-filter-trigger"));
     expect(screen.getByTestId("work-orders-filter-statuses")).toBeInTheDocument();
@@ -2539,6 +2544,18 @@ describe("LinesPage board editing", () => {
     expect(screen.queryByTestId("work-orders-filter-lineIds")).not.toBeInTheDocument();
     expect(screen.getByTestId("work-orders-filter-sourceIds")).toBeInTheDocument();
     expect(screen.getByTestId("work-orders-filter-assigneeIds")).toBeInTheDocument();
+  });
+
+  it("opens the line editor from the header", async () => {
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    await user.click(screen.getByRole("link", { name: "Edit line" }));
+
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}/edit`,
+    );
+    expect(screen.getByText("Edit line")).toBeInTheDocument();
   });
 
   it("filters Rejected on the board without opening a dialog", async () => {
