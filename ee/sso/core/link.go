@@ -109,6 +109,10 @@ func (p *Pipeline) bindExistingIdentity(tx *gorm.DB, conn *models.SSOConnection,
 	if !locked.Active {
 		return nil, nil, Fail(CodeAccessDenied)
 	}
+	// A SCIM profile change does not transfer ownership of the linked account.
+	if assignSubject && utils.NormalizeEmail(account.Email) != utils.NormalizeEmail(external.Email) {
+		return nil, nil, Fail(CodeAccountConflict)
+	}
 	locked.Email = utils.NormalizeEmail(external.Email)
 	locked.Name = external.Name
 	if assignSubject {

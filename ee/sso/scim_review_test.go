@@ -10,12 +10,48 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/stretchr/testify/require"
 	billingmodels "github.com/superplanehq/superplane/ee/billing/models"
+	"github.com/superplanehq/superplane/ee/sso/core"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/licensing"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 )
+
+func TestSignInRejectsAPendingSCIMIdentityWithAnotherAccountsEmail(t *testing.T) {
+	f := newFlow(t)
+	f.verifyExample()
+	conn := f.put(connectionInput(true))
+	created, err := f.service.CreateSCIMToken(f.ctx(), f.r.Organization.ID, f.r.Account.ID, "Okta")
+	require.NoError(t, err)
+	response := f.scim(http.MethodPost, conn, created.Secret, "/Users", `{"userName":"alice@example.com","active":true,"emails":[{"value":"alice@example.com","primary":true}]}`)
+	require.Equal(t, http.StatusCreated, response.Code, response.Body.String())
+	userID := jsonString(t, response.Body.String(), "id")
+	alice, err := models.FindAccountByEmail("alice@example.com")
+	require.NoError(t, err)
+	_, err = models.CreateAccount("Bob", "bob@example.com")
+	require.NoError(t, err)
+
+	response = f.scim(http.MethodPatch, conn, created.Secret, "/Users/"+userID, `{"Operations":[{"op":"replace","path":"emails","value":[{"value":"bob@example.com","primary":true}]}]}`)
+	require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+	result, err := f.service.pipeline().SignIn(f.ctx(), conn, core.ExternalIdentity{
+		Subject: "bob-subject", Email: "bob@example.com", Name: "Bob",
+	}, "/", nil)
+	require.Equal(t, core.CodeAccountConflict, core.CodeOf(err))
+	require.Empty(t, result.AccountID)
+	identity, err := models.FindSSOIdentityByID(database.Conn(), conn.ID, uuid.MustParse(userID))
+	require.NoError(t, err)
+	require.Nil(t, identity.Subject)
+	require.Equal(t, alice.ID, identity.AccountID)
+
+	response = f.scim(http.MethodPatch, conn, created.Secret, "/Users/"+userID, `{"Operations":[{"op":"replace","path":"emails","value":[{"value":"alice@example.com","primary":true}]}]}`)
+	require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+	result, err = f.service.pipeline().SignIn(f.ctx(), conn, core.ExternalIdentity{
+		Subject: "alice-subject", Email: "ALICE@example.com", Name: "Alice",
+	}, "/", nil)
+	require.NoError(t, err)
+	require.Equal(t, alice.ID.String(), result.AccountID)
+}
 
 func TestSCIMAdoptsAJITIdentity(t *testing.T) {
 	f := newFlow(t)
