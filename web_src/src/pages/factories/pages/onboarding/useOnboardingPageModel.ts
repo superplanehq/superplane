@@ -31,7 +31,11 @@ import {
   useDefaultBranchGate,
   type OnboardingRepositorySelection,
 } from "./selectOnboardingRepository";
-import { isHostedAgentReady, type OnboardingAgentPlan } from "./onboardingAgentReadiness";
+import {
+  isHostedAgentReady,
+  type OnboardingAgentCredentialChoice,
+  type OnboardingAgentPlan,
+} from "./onboardingAgentReadiness";
 import { useOnboardingConnectionDialogs } from "./useOnboardingConnectionDialogs";
 import { useOnboardingIntegrationSelections } from "./useOnboardingIntegrationSelections";
 import type { IntegrationId, IssuesChoiceId, WizardStepId } from "./onboardingFixtures";
@@ -83,6 +87,16 @@ function initialSetupState(onboarding: FactoriesFactory["onboarding"]): InitialO
     issuesRepo: onboarding?.backlogRepository || appRepository,
     issuesChoice: localIssuesSource(onboarding?.issuesSource),
   };
+}
+
+function resolveOnboardingCredentialChoice(
+  savedCredentialChoice: OnboardingAgentCredentialChoice | null,
+  onboarding: FactoriesFactory["onboarding"],
+  noHostedDefault: boolean,
+): OnboardingAgentCredentialChoice | null {
+  const savedSource = savedCredentialChoice ?? (onboarding?.codexSubscription ? "subscription" : null);
+  // A stored subscription choice cannot enable subscription setup on hosted installations.
+  return savedSource === "subscription" && !noHostedDefault ? null : savedSource;
 }
 
 function useRestoreIntegrationReadiness(setup: OnboardingSetupApi, selections: IntegrationSelections) {
@@ -386,9 +400,11 @@ export function useOnboardingPageModel(args: {
   const customProvider = bringYourOwnKey.customProviderAllowed;
   const [savedCredentialChoice, setAgentCredentialChoice] = useOnboardingModelSource(args.factoryId);
   const onboarding = args.factory?.onboarding;
-  const savedSource = savedCredentialChoice ?? (onboarding?.codexSubscription ? "subscription" : null);
-  // A stored subscription choice cannot enable subscription setup on hosted installations.
-  const agentCredentialChoice = savedSource === "subscription" && !bringYourOwnKey.noHostedDefault ? null : savedSource;
+  const agentCredentialChoice = resolveOnboardingCredentialChoice(
+    savedCredentialChoice,
+    onboarding,
+    bringYourOwnKey.noHostedDefault,
+  );
   const integrations = useOnboardingIntegrationSelections(args.organizationId, onboarding);
   const { connectedIntegrations, existingIntegrationNames } = useTrimmedIntegrationNames(args.organizationId);
   const { agent, subscriptionReady, selectModel, onSelectionsChange } = useOnboardingAgentPageState({
