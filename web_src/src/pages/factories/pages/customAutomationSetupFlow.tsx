@@ -13,6 +13,7 @@ import type { PlanningReviewStep, PlanningReviewStepKind } from "./planningRevie
 
 export function AutomationFlow({
   columnKey = "verify",
+  asCode = false,
   triggers,
   runsOnTask,
   steps,
@@ -25,6 +26,7 @@ export function AutomationFlow({
   onAddStep,
 }: {
   columnKey?: CustomAutomationColumn;
+  asCode?: boolean;
   triggers: CustomAutomationTrigger[];
   runsOnTask: boolean;
   steps: PlanningReviewStep[];
@@ -72,7 +74,11 @@ export function AutomationFlow({
               <FlowBadge kind={step.type} />
               <p className="mt-3 truncate text-sm font-semibold text-foreground">{step.name || `Step ${index + 1}`}</p>
               <p className="mt-1 truncate text-xs text-muted-foreground">
-                {step.type === "prompt" ? mergeCheckPromptBody(step.prompt) : step.command || "No commands yet."}
+                {step.type === "prompt"
+                  ? asCode
+                    ? step.prompt
+                    : mergeCheckPromptBody(step.prompt)
+                  : step.command || "No commands yet."}
               </p>
             </FlowCard>
           </div>

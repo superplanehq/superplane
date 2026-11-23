@@ -8,9 +8,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/automations"
 	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -442,6 +444,54 @@ func TestReconcileFactoryRepositoryRewritesGitHubEnterpriseCheckoutURLs(t *testi
 		assert.Equal(t, nextURL, checkoutEnvironmentValue(t, version.Nodes[0], "REPO_URL"))
 		assert.NotContains(t, checkoutEnvironmentValue(t, version.Nodes[0], "REPO_URL"), "github.com")
 	}
+}
+
+func TestReconcileFactoryRepositoryPreservesIndependentCanvasEdit(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory := seedHandOffFactory(t, r, db)
+	vcsID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSIntegrationID: &vcsID}))
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureAutomationsAsCode))
+	support.AssignOpenSystemTrial(t, r.Organization.ID)
+	upsertHostedOnboardingProvider(t, db)
+	ctx, deps := onboardingContext(r), onboardingDeps(r)
+	service := automations.Service{Backend: CanvasAutomationBackend{Deps: deps}}
+	const source = `apiVersion: v2
+kind: Automation
+name: Inspect repository
+runs_on_task: false
+triggers: [{use: manual}]
+steps: [{name: Inspect, bash: pwd}]
+`
+	created, err := service.Create(ctx, automations.Placement{OrganizationID: r.Organization.ID, FactoryID: factory.ID, Stage: models.CanvasColumnKeyDone}, r.User, source)
+	require.NoError(t, err)
+
+	moveRepository := func(repository string) {
+		t.Helper()
+		previous := factory.OnboardingConfigValue()
+		require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+			if err := factory.UpdateOnboarding(tx, models.FactoryOnboardingPatch{AppRepository: &repository}); err != nil {
+				return err
+			}
+			return reconcileFactoryRepository(ctx, tx, deps, factory, r.User, vcsID, vcsID, previous.AppRepository, previous.BacklogRepository, previous.DefaultBranch, repository, false)
+		}))
+	}
+	moveRepository("acme/second")
+	_, err = service.Update(ctx, r.Organization.ID, created.ID, r.User, source)
+	require.NoError(t, err)
+
+	edit, err := models.CreateCommitVersionWithSpecInTransaction(db, created.ID, r.User, "Edit timeout", nil, nil)
+	require.NoError(t, err)
+	selectCustomAutomationAgent(edit.Nodes).Configuration["executionTimeoutSeconds"] = 900
+	require.NoError(t, models.PromoteToLiveInTransaction(db, edit, edit.Nodes, edit.Edges))
+	moveRepository("acme/third")
+	live, err := models.FindLiveCanvasVersionInTransaction(db, created.ID)
+	require.NoError(t, err)
+	require.Equal(t, "acme/third", checkoutEnvironmentValue(t, *selectCustomAutomationAgent(live.Nodes), "REPO"))
+	_, err = service.Update(ctx, r.Organization.ID, created.ID, r.User, source)
+	require.ErrorContains(t, err, "automation changed")
 }
 
 func checkoutTargetNodes(repoURL, branch string) []models.Node {

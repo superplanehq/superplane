@@ -8,6 +8,7 @@ import { AlarmClock, ChevronDown, GitCommitHorizontal, LogOut, MousePointerClick
 import { useState } from "react";
 
 import {
+  AUTOMATION_ICONS,
   customAutomationColumnLabel,
   customAutomationTriggersForRun,
   newCustomAutomationTrigger,
@@ -20,11 +21,12 @@ import { PlanningReviewForm } from "./PlanningReviewForm";
 import type { PlanningReviewDraft } from "./planningReviewMockup";
 
 type TriggerEditorProps = {
+  showModel?: boolean;
   columnKey: CustomAutomationColumn;
   name: string;
   icon: string;
   triggers: CustomAutomationTrigger[];
-  runsOnTask: boolean;
+  runsOnTask?: boolean;
   onTriggersChange: (triggers: CustomAutomationTrigger[]) => void;
   onRunsOnTaskChange: (runsOnTask: boolean) => void;
   draft: PlanningReviewDraft;
@@ -38,6 +40,7 @@ type TriggerEditorProps = {
 
 export function TriggerEditor({
   columnKey,
+  showModel = true,
   name,
   icon,
   triggers,
@@ -54,6 +57,9 @@ export function TriggerEditor({
 }: TriggerEditorProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const visibleTriggers = customAutomationTriggersForRun(triggers, runsOnTask);
+  const triggerModes: CustomAutomationMode[] = ["manual"];
+  if (runsOnTask !== false) triggerModes.push("automatic", "leave");
+  if (runsOnTask !== true) triggerModes.push("scheduled");
   const updateTrigger = (id: string, next: CustomAutomationTrigger) => {
     onTriggersChange(triggers.map((trigger) => (trigger.id === id ? next : trigger)));
   };
@@ -89,7 +95,7 @@ export function TriggerEditor({
           <TriggerCard
             key={trigger.id}
             columnKey={columnKey}
-            runsOnTask={runsOnTask}
+            runsOnTask={runsOnTask !== false}
             trigger={trigger}
             triggers={triggers}
             expanded={expandedId === trigger.id}
@@ -111,18 +117,16 @@ export function TriggerEditor({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="min-w-72">
-            {(runsOnTask ? (["manual", "automatic", "leave"] as const) : (["manual", "scheduled"] as const)).map(
-              (mode) => (
-                <DropdownMenuItem
-                  key={mode}
-                  className="py-2.5"
-                  disabled={mode !== "scheduled" && triggers.some((trigger) => trigger.mode === mode)}
-                  onSelect={() => addTrigger(mode)}
-                >
-                  <TriggerOption mode={mode} columnKey={columnKey} runsOnTask={runsOnTask} />
-                </DropdownMenuItem>
-              ),
-            )}
+            {triggerModes.map((mode) => (
+              <DropdownMenuItem
+                key={mode}
+                className="py-2.5"
+                disabled={mode !== "scheduled" && triggers.some((trigger) => trigger.mode === mode)}
+                onSelect={() => addTrigger(mode)}
+              >
+                <TriggerOption mode={mode} columnKey={columnKey} runsOnTask={runsOnTask !== false} />
+              </DropdownMenuItem>
+            ))}
           </DropdownMenuContent>
         </DropdownMenu>
       </section>
@@ -140,6 +144,8 @@ export function TriggerEditor({
           showResources={false}
           showSteps={false}
           modelOnly
+          applyModelDefault={false}
+          showModel={showModel}
           modelDescription="The model used for this automation."
         />
       </section>
@@ -221,7 +227,7 @@ function TriggerContext({
   runsOnTask,
   onRunsOnTaskChange,
 }: {
-  runsOnTask: boolean;
+  runsOnTask?: boolean;
   onRunsOnTaskChange: (runsOnTask: boolean) => void;
 }) {
   return (
@@ -230,7 +236,7 @@ function TriggerContext({
       <SegmentedNav
         ariaLabel="Runs"
         size="xs"
-        value={runsOnTask ? "task" : "none"}
+        value={runsOnTask === undefined ? "" : runsOnTask ? "task" : "none"}
         onValueChange={(value) => onRunsOnTaskChange(value === "task")}
         options={[
           { value: "task", label: "on a task" },
@@ -240,57 +246,6 @@ function TriggerContext({
     </div>
   );
 }
-
-const AUTOMATION_ICONS = [
-  "sparkles",
-  "shield-check",
-  "search",
-  "bug",
-  "file-code",
-  "code",
-  "terminal",
-  "eye",
-  "gauge",
-  "git-pull-request",
-  "cpu",
-  "circle-check",
-  "activity",
-  "alarm-clock",
-  "archive",
-  "bell",
-  "bolt",
-  "book",
-  "box",
-  "boxes",
-  "braces",
-  "calendar",
-  "camera",
-  "chart-line",
-  "check",
-  "clock",
-  "cloud",
-  "cog",
-  "component",
-  "container",
-  "database",
-  "factory",
-  "file-json",
-  "file-text",
-  "fingerprint",
-  "flag",
-  "folder",
-  "git-branch",
-  "git-commit",
-  "git-merge",
-  "globe",
-  "key",
-  "layers",
-  "lock",
-  "message-square",
-  "network",
-  "package",
-  "rocket",
-] as const;
 
 function AutomationIconPicker({ icon, onChange }: { icon: string; onChange: (icon: string) => void }) {
   const [open, setOpen] = useState(false);
