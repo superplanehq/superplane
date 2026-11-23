@@ -26,8 +26,15 @@ case "$1" in
     cp "$IMAGE_BUILD_DIR/app/pkg/web/assets/dist/index.html" "$RESULTS/$IMAGE_TAG/index.html"
     touch "$RESULTS/packaged-$IMAGE_TAG"
     ;;
+  image.scan)
+    test -f "$RESULTS/packaged-$IMAGE_TAG"
+    if [ "${FAIL_SCAN_TAG:-}" = "$IMAGE_TAG" ]; then exit 1; fi
+    touch "$RESULTS/scanned-$IMAGE_TAG"
+    ;;
   image.auth|image.push)
     test -f "$RESULTS/upload-complete"
+    test -f "$RESULTS/scanned-test-sha"
+    test -f "$RESULTS/scanned-test-sha-selfhosted"
     echo "$1" >> "$RESULTS/published"
     ;;
   *) echo "Unexpected make target: $1" >&2; exit 1 ;;
@@ -105,4 +112,20 @@ bash "$fixture/repo/scripts/build-image"
 test "$(cat "$RESULTS/test-sha/index.html")" = same-origin
 test ! -e "$RESULTS/published"
 test ! -e "$RESULTS/upload-start"
+test -f "$RESULTS/scanned-test-sha"
+
+unset FAIL_UPLOAD
+for ref_type in branch pull-request; do
+  export SEMAPHORE_GIT_REF_TYPE="$ref_type"
+  for tag in test-sha test-sha-selfhosted; do
+    if [ "$ref_type" = pull-request ] && [ "$tag" = test-sha-selfhosted ]; then continue; fi
+    export RESULTS="$fixture/scan-failure-$ref_type-$tag" FAIL_SCAN_TAG="$tag"
+    mkdir -p "$RESULTS"
+    if bash "$fixture/repo/scripts/build-image"; then
+      echo "Failed scan for $tag must fail the image job" >&2
+      exit 1
+    fi
+    test ! -e "$RESULTS/published"
+  done
+done
 echo 'CI image publication tests passed.'
