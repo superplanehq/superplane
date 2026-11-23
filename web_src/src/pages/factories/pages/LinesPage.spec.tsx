@@ -1902,6 +1902,47 @@ describe("LinesPage stage editing", () => {
     expect(screen.queryByRole("button", { name: "Reorder Done" })).not.toBeInTheDocument();
   });
 
+  it("moves an agent without reordering stages and saves only the confirmed placement", async () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_STAGES);
+    const user = userEvent.setup();
+    renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, ICON_VIEW);
+    await enterStageEditing(user);
+    const order = stageShellOrder();
+    const source = within(screen.getByTestId("lines-stage-shell-phase-0"));
+    const target = screen.getByTestId("lines-stage-shell-backlog");
+    const handle = source.getByRole("button", { name: /^Move / });
+    const label = handle.getAttribute("aria-label")!;
+    const dataTransfer = { effectAllowed: "none", setData: vi.fn() };
+    fireEvent.dragStart(handle, { dataTransfer });
+    fireEvent.dragEnter(target);
+    fireEvent.dragEnd(handle);
+    expect(screen.queryByRole("button", { name: "Save changes" })).not.toBeInTheDocument();
+    fireEvent.dragStart(handle, { dataTransfer });
+    fireEvent.dragOver(target);
+    fireEvent.drop(target);
+    expect(stageShellOrder()).toEqual(order);
+    expect(source.queryByRole("button", { name: label })).not.toBeInTheDocument();
+    fireEvent.keyDown(within(target).getByRole("button", { name: label }), { key: "ArrowRight" });
+    expect(screen.queryByRole("button", { name: "Save changes" })).not.toBeInTheDocument();
+    fireEvent.keyDown(source.getByRole("button", { name: label }), { key: "ArrowLeft" });
+    await user.click(screen.getByRole("button", { name: "Discard" }));
+    await user.click(screen.getByRole("button", { name: "Discard changes" }));
+    await enterStageEditing(user);
+    fireEvent.keyDown(source.getByRole("button", { name: label }), { key: "ArrowLeft" });
+    expect(updateFactoryLineMutateAsync).not.toHaveBeenCalled();
+    updateFactoryLineMutateAsync.mockResolvedValueOnce({});
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+    await user.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Save changes" }));
+    expect(updateFactoryLineMutateAsync.mock.calls[0][0].stageConfiguration.automationMoves).toEqual([
+      expect.objectContaining({
+        type: "agent-step",
+        executionKey: "phase-0",
+        sourceKey: "phase-0",
+        destinationKey: "backlog",
+      }),
+    ]);
+  });
+
   it("offers Save only after a change and exits with Done when nothing changed", async () => {
     enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_STAGES);
     const user = userEvent.setup();

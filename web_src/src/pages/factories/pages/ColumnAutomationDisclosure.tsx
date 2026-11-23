@@ -1,5 +1,6 @@
 import { ChevronDown } from "lucide-react";
-import type { ReactNode } from "react";
+import { useContext, type ReactNode } from "react";
+import { AutomationRowContext } from "./AutomationRowContext";
 
 import { Button } from "@/components/ui/button";
 import type { ColumnAutomationDisclosureState } from "@/hooks/useColumnAutomationCollapsePreference";
@@ -14,6 +15,7 @@ export function ColumnAutomationToggle({
   disclosure: ColumnAutomationDisclosureState;
 }) {
   const label = `${disclosure.open ? "Collapse" : "Expand"} automations for ${title}`;
+  if (useContext(AutomationRowContext).move) return null;
   return (
     <Button
       variant="ghost"
@@ -43,6 +45,7 @@ export function ColumnAutomationDisclosure({
   disclosure: ColumnAutomationDisclosureState;
   children: ReactNode;
 }) {
+  if (useContext(AutomationRowContext).move) return <div className="px-3 pb-2.5">{children}</div>;
   return (
     <Collapsible
       open={disclosure.open}

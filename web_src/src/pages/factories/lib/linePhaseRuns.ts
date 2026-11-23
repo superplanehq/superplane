@@ -313,13 +313,16 @@ export function findBacklogAutomationApp(
 
 /** Factory-level PR Closure automation. It is not a line step. */
 export function findClosureAutomationApp(
-  apps: Array<{ id?: string; name?: string; columnKey?: string }>,
+  apps: Array<{ id?: string; name?: string; columnKey?: string; templateId?: string }>,
 ): { id: string; name: string } | undefined {
   const match = apps.find(
     (app) =>
       Boolean(app.id) &&
       !app.columnKey?.trim() &&
-      (app.name === "PR Closure" || app.id === "app-refund-done" || (app.id ?? "").includes("pr-closure")),
+      (app.templateId === "pr-closure" ||
+        app.name === "PR Closure" ||
+        app.id === "app-refund-done" ||
+        (app.id ?? "").includes("pr-closure")),
   );
   if (!match?.id) {
     return undefined;
