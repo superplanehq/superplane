@@ -834,6 +834,69 @@ describe("LinesPage board stages", () => {
     await resetLinesBoardMocks();
   });
 
+  it("moves a task that passed a custom last stage to Verify", () => {
+    const factory = {
+      ...REFUND_FACTORY,
+      lines: (REFUND_FACTORY.lines ?? []).map((line) =>
+        line.id === REFUND_LINE_PLAN_ID
+          ? {
+              ...line,
+              stages: [
+                { id: "backlog", key: "backlog", name: "Backlog", kind: "STAGE_KIND_BACKLOG" as const },
+                { id: "phase-0", key: "phase-0", name: "Implement", kind: "STAGE_KIND_PHASE" as const, stepIndex: 0 },
+                { id: "docs", key: "custom-docs", name: "Update docs", kind: "STAGE_KIND_CUSTOM" as const },
+                { id: "verify", key: "verify", name: "Verify", kind: "STAGE_KIND_VERIFY" as const },
+                { id: "done", key: "done", name: "Done", kind: "STAGE_KIND_DONE" as const },
+              ],
+            }
+          : line,
+      ),
+    };
+    const lineRef = { id: REFUND_LINE_PLAN_ID, name: "plan-and-implement" };
+    useFactoryWorkOrders.mockReturnValue({
+      data: [
+        {
+          id: "wo-docs-passed",
+          title: "Docs stage passed",
+          state: "STATE_OPEN",
+          lineDispatches: [
+            {
+              id: "dispatch-docs",
+              line: lineRef,
+              state: "STATE_FINISHED",
+              result: "RESULT_PASSED",
+              stepExecutions: [
+                {
+                  id: "exec-implement",
+                  step: "Implement",
+                  stepIndex: 0,
+                  stageKey: "phase-0",
+                  state: "STATE_FINISHED",
+                  result: "RESULT_PASSED",
+                  createdAt: "2026-08-11T12:00:00.000Z",
+                },
+                {
+                  id: "exec-docs",
+                  step: "Update Docs",
+                  stepIndex: 1,
+                  stageKey: "custom-docs",
+                  state: "STATE_FINISHED",
+                  result: "RESULT_PASSED",
+                  createdAt: "2026-08-11T12:10:00.000Z",
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+
+    renderLinesBoard(undefined, vi.fn(), factory);
+
+    expect(screen.getByTestId("lines-verify-column")).toHaveTextContent("Docs stage passed");
+    expect(screen.getByTestId("lines-custom-stage-custom-docs")).not.toHaveTextContent("Docs stage passed");
+  });
+
   const customStageFactory = (name = "QA"): FactoriesFactory => ({
     ...REFUND_FACTORY,
     lines: (REFUND_FACTORY.lines ?? []).map((line) =>
