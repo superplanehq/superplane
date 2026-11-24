@@ -22,8 +22,8 @@ func validateCustomStageAutomation(tx *gorm.DB, factory *models.Factory, column 
 	if err != nil {
 		return err
 	}
-	if !organization.HasExperimentalFeature(features.FeatureFactoryCustomStages) {
-		return errFactoryCustomStagesDisabled
+	if !organization.HasExperimentalFeature(features.FeatureFactoryCustomAutomations) {
+		return errCustomAutomationsDisabled
 	}
 	lines, err := factory.ListLines(tx)
 	if err != nil {

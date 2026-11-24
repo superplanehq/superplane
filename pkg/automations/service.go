@@ -242,8 +242,8 @@ func checkAutomationReferences(tx *gorm.DB, placement Placement, doc *automation
 		if err != nil {
 			return err
 		}
-		if !organization.HasExperimentalFeature(features.FeatureFactoryCustomStages) {
-			return grpcerrors.FailedPrecondition(nil, "Enable custom stages for this organization.")
+		if !organization.HasExperimentalFeature(features.FeatureFactoryCustomAutomations) {
+			return grpcerrors.FailedPrecondition(nil, "Enable custom automations and stages for this organization.")
 		}
 	}
 	if err := automationspec.ValidateStage(doc, automationspec.Stage(placement.Stage)); err != nil {

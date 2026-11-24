@@ -83,8 +83,8 @@ func UpdateFactoryLine(ctx context.Context, deps IntakeDependencies, organizatio
 			if findErr != nil {
 				return findErr
 			}
-			if !organization.HasExperimentalFeature(features.FeatureFactoryCustomStages) {
-				return errFactoryCustomStagesDisabled
+			if !organization.HasExperimentalFeature(features.FeatureFactoryCustomAutomations) {
+				return errCustomAutomationsDisabled
 			}
 			stages, err = parseFactoryLineStages(line, req.GetStageConfiguration().GetStages())
 			if err != nil {
