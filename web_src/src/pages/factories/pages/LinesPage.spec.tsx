@@ -1016,6 +1016,33 @@ describe("LinesPage board stages", () => {
     expect(screen.getByTestId("lines-column-title-custom-qa")).toHaveTextContent("Quality review");
   });
 
+  it("explains automation deletion before saving and cancels or discards without saving", async () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_STAGES);
+    const user = userEvent.setup();
+    useFactoryAutomations.mockReturnValue({ data: [{ id: "app-qa", name: "Check QA", columnKey: "custom-qa" }] });
+    renderLinesBoard(undefined, vi.fn(), customStageFactory());
+    await editStages();
+    await user.click(screen.getByRole("button", { name: "Delete QA" }));
+    expect(updateFactoryLineMutateAsync).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+    const dialog = screen.getByTestId("save-line-stages-dialog");
+    expect(dialog).toHaveTextContent(
+      "Saving a custom-stage deletion also deletes automations that execute in that stage.",
+    );
+    expect(dialog).toHaveTextContent("Automations that only appear there stay in the workspace.");
+    expect(dialog).toHaveTextContent("Removing a system stage keeps its automations.");
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    expect(updateFactoryLineMutateAsync).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Discard" }));
+    await user.click(
+      within(screen.getByTestId("discard-line-stages-dialog")).getByRole("button", { name: "Discard changes" }),
+    );
+    expect(screen.getByTestId("lines-custom-stage-custom-qa-automation-rows-row-custom-app-qa")).toHaveTextContent(
+      "Check QA",
+    );
+    expect(updateFactoryLineMutateAsync).not.toHaveBeenCalled();
+  });
+
   it("keeps renames in the draft, clears reverted changes, and discards without saving", async () => {
     enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_STAGES);
     const user = userEvent.setup();
