@@ -221,28 +221,25 @@ func Test__IsReleased(t *testing.T) {
 	})
 
 	t.Run("registered id with nil Released is not released", func(t *testing.T) {
-		original := registry
-		t.Cleanup(func() { registry = original })
-
-		registry = []Feature{{ID: "preview", Label: "Preview", Description: "Preview feature"}}
+		t.Cleanup(WithRegistryForTest([]Feature{{ID: "preview", Label: "Preview", Description: "Preview feature"}}))
 		assert.False(t, IsReleased("preview"))
 	})
 
 	t.Run("registered id with Released=&true is released", func(t *testing.T) {
-		original := registry
-		t.Cleanup(func() { registry = original })
-
 		v := true
-		registry = []Feature{{ID: "graduated", Label: "Graduated", Released: &v}}
+		t.Cleanup(WithRegistryForTest([]Feature{{ID: "graduated", Label: "Graduated", Released: &v}}))
 		assert.True(t, IsReleased("graduated"))
 	})
 
 	t.Run("registered id with Released=&false is not released", func(t *testing.T) {
-		original := registry
-		t.Cleanup(func() { registry = original })
-
 		v := false
-		registry = []Feature{{ID: "explicit-false", Label: "X", Released: &v}}
+		t.Cleanup(WithRegistryForTest([]Feature{{ID: "explicit-false", Label: "X", Released: &v}}))
 		assert.False(t, IsReleased("explicit-false"))
 	})
+}
+
+func Test__IsHidden(t *testing.T) {
+	assert.True(t, IsHidden(FeatureGitHubEnterpriseServer))
+	assert.False(t, IsHidden(FeatureFactories))
+	assert.False(t, IsHidden("github_enterprise"))
 }
