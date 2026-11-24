@@ -81,7 +81,7 @@ func CreateFactoryCustomAutomation(
 		column = models.CanvasColumnKeyVerify
 	}
 	if !customAutomationColumnAllowed(column) {
-		return nil, factoryErrorToStatus(invalidArgument("column must be backlog, implement, verify, or done"), "failed to create custom automation")
+		return nil, factoryErrorToStatus(invalidArgument("Select a stage in this factory."), "failed to create custom automation")
 	}
 	if err := validateCustomStageAutomation(db, factory, column); err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create custom automation")
@@ -737,12 +737,7 @@ func buildCustomAutomationCanvas(
 }
 
 func customAutomationColumnAllowed(column string) bool {
-	switch column {
-	case models.CanvasColumnKeyBacklog, models.CanvasColumnKeyImplement, models.CanvasColumnKeyVerify, models.CanvasColumnKeyDone:
-		return true
-	default:
-		return strings.HasPrefix(column, "custom-") && models.ValidCanvasColumnKey(column)
-	}
+	return models.ValidCanvasColumnKey(column)
 }
 
 func customAutomationUsesTaskTrigger(column string) bool {
