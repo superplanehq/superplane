@@ -1,11 +1,14 @@
-import { ExternalLink } from "lucide-react";
+import { ArrowRight, ExternalLink } from "lucide-react";
+import { useParams } from "react-router";
 
+import { Link } from "@/components/Link/link";
 import { logoDarkInvertClass } from "@/lib/logoDarkMode";
 import { safeExternalUrl } from "@/lib/safeExternalUrl";
 import { cn } from "@/lib/utils";
 
 import { OrgUserReference } from "../../OrgUserReference";
-import { isMonochromeSourceLogo, type SplitRunSource } from "./splitRunSource";
+import { getWorkOrderRunHref } from "../../lib/workOrderExecutions";
+import { isMonochromeSourceLogo, type SplitRunRunRef, type SplitRunSource } from "./splitRunSource";
 
 export function WorkOrderSplitRunSource({ source, compact = false }: { source: SplitRunSource; compact?: boolean }) {
   if (compact) {
@@ -16,8 +19,8 @@ export function WorkOrderSplitRunSource({ source, compact = false }: { source: S
       >
         {source.kind === "intake" ? (
           <CompactIntakeSource source={source} />
-        ) : source.kind === "mcp" ? (
-          <CompactMcpSource source={source} />
+        ) : source.kind === "mcp" || source.kind === "automation" ? (
+          <CompactNamedSource source={source} />
         ) : (
           <CompactManualSource source={source} />
         )}
@@ -29,8 +32,8 @@ export function WorkOrderSplitRunSource({ source, compact = false }: { source: S
     <div className="mt-2 flex flex-col gap-1.5 text-[13px] tracking-[-0.01em]" data-testid="split-run-source">
       {source.kind === "intake" ? (
         <IntakeSource source={source} />
-      ) : source.kind === "mcp" ? (
-        <McpSource source={source} />
+      ) : source.kind === "mcp" || source.kind === "automation" ? (
+        <NamedSource source={source} />
       ) : (
         <ManualSource source={source} />
       )}
@@ -96,7 +99,7 @@ function IntakeSourceLogo({
   source,
   className,
 }: {
-  source: Extract<SplitRunSource, { kind: "intake" | "mcp" }>;
+  source: Extract<SplitRunSource, { kind: "intake" | "mcp" | "automation" }>;
   className: string;
 }) {
   return (
@@ -112,20 +115,55 @@ function IntakeSourceLogo({
   );
 }
 
-function McpSource({ source }: { source: Extract<SplitRunSource, { kind: "mcp" }> }) {
+/** Client and automation sources show a name and a logo. */
+type NamedSplitRunSource = Extract<SplitRunSource, { kind: "mcp" | "automation" }>;
+
+function NamedSource({ source }: { source: NamedSplitRunSource }) {
   return (
     <p className="flex min-w-0 items-center gap-1.5 text-foreground">
       <IntakeSourceLogo source={source} className="dark:brightness-0 dark:invert" />
-      <span className="truncate">{source.name}</span>
+      <SourceRunName name={source.name} run={source.run} />
     </p>
   );
 }
 
-function CompactMcpSource({ source }: { source: Extract<SplitRunSource, { kind: "mcp" }> }) {
+/**
+ * Names the automation that created the task, then links to that run.
+ * Needs the org and factory route params.
+ */
+function SourceRunName({ name, run }: { name: string; run?: SplitRunRunRef }) {
+  const href = useSourceRunHref(run);
+  return (
+    <>
+      <span className="truncate">{name}</span>
+      {href ? (
+        <Link
+          href={href}
+          className="inline-flex shrink-0 items-center gap-1 font-medium text-foreground hover:text-muted-foreground"
+          data-testid="split-run-source-run"
+        >
+          {/* Decoration does not paint on a flex container's own text, so the underline sits on the span. */}
+          <span className="underline underline-offset-2">View run</span>
+          <ArrowRight className="size-3 shrink-0" aria-hidden />
+        </Link>
+      ) : null}
+    </>
+  );
+}
+
+function useSourceRunHref(run?: SplitRunRunRef): string | undefined {
+  const { organizationId, factoryKey } = useParams();
+  if (!run || !organizationId || !factoryKey) {
+    return undefined;
+  }
+  return getWorkOrderRunHref(organizationId, factoryKey, run.appId, run.runId) || undefined;
+}
+
+function CompactNamedSource({ source }: { source: NamedSplitRunSource }) {
   return (
     <>
       <IntakeSourceLogo source={source} className="dark:brightness-0 dark:invert" />
-      <span className="truncate">{source.name}</span>
+      <SourceRunName name={source.name} run={source.run} />
     </>
   );
 }
