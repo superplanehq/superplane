@@ -33,6 +33,8 @@ export function customAutomationColumnAutomation(
   const hasSchedule =
     listed.some((trigger) => trigger.mode === "scheduled") || app.customAutomationMode === "scheduled";
   const primary = primaryCustomAutomationMode(app.customAutomationMode, listed);
+  // Only a request to the webhook starts a webhook-only automation.
+  const webhookOnly = primary === "webhook" && !listed.some((trigger) => trigger.mode === "manual");
   const copy = customAutomationModeCopy(primary, columnKey);
   const trigger = customAutomationTriggerSummary(app, listed, columnKey, copy.trigger);
   return {
@@ -50,7 +52,10 @@ export function customAutomationColumnAutomation(
     catalogId: CUSTOM_AUTOMATION_CATALOG_ID,
     canvasId: id,
     columnKey: columnKey.startsWith("custom-") ? columnKey : undefined,
-    canRunNow: columnKey === "backlog" && (hasSchedule || app.customAutomationRunsOnTask === false) ? true : undefined,
+    canRunNow:
+      columnKey === "backlog" && (hasSchedule || (app.customAutomationRunsOnTask === false && !webhookOnly))
+        ? true
+        : undefined,
   };
 }
 
@@ -77,6 +82,9 @@ function primaryCustomAutomationMode(
   }
   if (listed.some((trigger) => trigger.mode === "scheduled")) {
     return "scheduled";
+  }
+  if (listed.some((trigger) => trigger.mode === "webhook")) {
+    return "webhook";
   }
   return saved ?? "manual";
 }

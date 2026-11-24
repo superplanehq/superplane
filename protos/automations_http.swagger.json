@@ -191,11 +191,12 @@
           "type": "array", "items": {
             "type": "object", "required": ["use"],
             "properties": {
-              "use": { "type": "string", "enum": ["manual", "task_enters_stage", "task_leaves_stage", "pull_request_updated", "schedule"] },
+              "use": { "type": "string", "enum": ["manual", "task_enters_stage", "task_leaves_stage", "pull_request_updated", "schedule", "webhook"] },
               "id": { "type": "string" },
               "config": {
-                "type": "object", "required": ["cron", "utc_offset"],
-                "properties": { "cron": { "type": "string" }, "utc_offset": { "type": "number" } }
+                "type": "object",
+                "description": "A schedule uses cron and utc_offset. A webhook uses webhook_id.",
+                "properties": { "cron": { "type": "string" }, "utc_offset": { "type": "number" }, "webhook_id": { "type": "string" } }
               }
             }
           }

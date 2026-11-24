@@ -181,3 +181,10 @@ type NodeWebhookContext interface {
 	ResetSecret() ([]byte, []byte, error)
 	GetBaseURL() string
 }
+
+// WebhookBinder attaches a node to a webhook that a user manages in the
+// workspace settings, instead of creating a new webhook for the node.
+// It returns the webhook URL.
+type WebhookBinder interface {
+	Bind(webhookID string) (string, error)
+}
