@@ -10,6 +10,7 @@ import type { ComposerCreditVerdict } from "./splitRunFooter";
 
 export type IntentAnalysisChat = {
   organizationId: string;
+  mode?: "automation";
   requestCreatedAt?: string;
   factoryId?: string;
   view: CreateWithAgentView;

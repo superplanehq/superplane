@@ -142,12 +142,28 @@ func PlanningSessionContinuationFile(ctx core.ExecutionContext) *TaskFile {
 	}
 	db := database.DB(context.Background())
 	session, err := models.FindPlanningSessionByRun(db, ctx.RunID)
-	if err != nil || !session.IsAnalysisSession() {
+	if err != nil {
 		return nil
 	}
-	text, err := models.AnalysisContinuationText(db, session)
+	var text string
+	switch session.Kind {
+	case models.PlanningSessionKindCustomAutomation:
+		text, err = models.CustomAutomationContinuationText(db, session)
+	case models.PlanningSessionKindWorkOrderAnalysis:
+		text, err = models.AnalysisContinuationText(db, session)
+	}
 	if err != nil || strings.TrimSpace(text) == "" {
 		return nil
 	}
 	return &TaskFile{Path: "analysis_continuation.md", Content: text, Mode: "0644"}
+}
+
+// PrepareCustomChatStep keeps setup prompts out of the conversation and saves
+// the authored prompt for fresh follow-up turns.
+func PrepareCustomChatStep(step AgentStep, file TaskFile, command TaskCommand) (TaskCommand, []TaskFile) {
+	if !step.ContinueInChat {
+		return command, nil
+	}
+	command.Command = "export SUPERPLANE_CUSTOM_CHAT_ACTIVE=true\n" + command.Command
+	return command, []TaskFile{{Path: "custom_chat_prompt.md", Content: file.Content, Mode: "0644"}}
 }

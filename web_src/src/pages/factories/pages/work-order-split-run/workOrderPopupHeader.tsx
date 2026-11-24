@@ -94,14 +94,16 @@ export function AnalysisPopupHeader({
       expanded={fullPage}
       onToggleExpanded={toggleFullPage}
       actions={
-        <PopupHeaderActions
-          copyUrl={popupWorkOrderUrl(organizationId, factoryKey, orderNumber, lineId)}
-          onArchive={showsArchive(fixture.footer) ? onArchive : undefined}
-          archiveBusy={footerBusy}
-          taskActions={reviewActions}
-        />
+        <>
+          {views}
+          <PopupHeaderActions
+            copyUrl={popupWorkOrderUrl(organizationId, factoryKey, orderNumber, lineId)}
+            onArchive={showsArchive(fixture.footer) ? onArchive : undefined}
+            archiveBusy={footerBusy}
+            taskActions={reviewActions}
+          />
+        </>
       }
-      accessory={views}
     >
       {planningSpend ? (
         <PlanningHeaderSpendCollector

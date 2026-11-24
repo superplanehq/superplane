@@ -41,7 +41,16 @@ func FindPlanningSessionByWorkOrder(ctx context.Context, organizationID string, 
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to find planning session")
 	}
-	session, err := models.FindPlanningSessionByDraftWorkOrder(db, orgID, factoryID, workOrderID)
+	var session *models.FactoryPlanningSession
+	if req.GetRunId() != "" {
+		runID, parseErr := uuid.Parse(req.GetRunId())
+		if parseErr != nil {
+			return nil, factoryErrorToStatus(invalidArgument("invalid run id"), "failed to find chat session")
+		}
+		session, err = models.FindCustomAutomationSession(db, orgID, factoryID, workOrderID, runID)
+	} else {
+		session, err = models.FindPlanningSessionByDraftWorkOrder(db, orgID, factoryID, workOrderID)
+	}
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to find planning session")
 	}
@@ -112,8 +121,8 @@ func sendPlanningSessionMessage(
 	if err != nil {
 		return nil, err
 	}
-	if err := requireAnalysisPlanningSession(session); err != nil {
-		return nil, factoryErrorToStatus(err, "failed to send planning session message")
+	if !session.IsAnalysisSession() && !session.IsCustomAutomationSession() {
+		return nil, factoryErrorToStatus(models.ErrFactoryPlanningSessionInvalid, "failed to send chat message")
 	}
 	db := database.DB(ctx)
 	if err := billing.AssertOrganizationPaymentMethod(db, session.OrganizationID); err != nil {
@@ -132,6 +141,32 @@ func sendPlanningSessionMessage(
 	firstRefinement := false
 	var newEvents []models.CanvasEvent
 	if err := db.Transaction(func(tx *gorm.DB) error {
+		if session.IsCustomAutomationSession() {
+			if err := session.LockForUpdate(tx); err != nil {
+				return err
+			}
+			restart := session.NeedsAnalysisRestart(tx)
+			if restart {
+				if err := session.Reopen(tx); err != nil {
+					return err
+				}
+			}
+			if err := session.SendUserMessage(tx, req.GetText(), userID); err != nil {
+				return err
+			}
+			if !restart {
+				return nil
+			}
+			event, err := models.RestartCustomAutomationSession(tx, session)
+			if err != nil {
+				return err
+			}
+			if err := session.MarkUserMessagesDelivered(tx); err != nil {
+				return err
+			}
+			newEvents = append(newEvents, *event)
+			return nil
+		}
 		draft, err := lockAnalysisSessionAndDraft(tx, session)
 		if err != nil {
 			return err
@@ -543,6 +578,8 @@ func serializePlanningSessionActivity(activity models.PlanningSessionActivity) *
 
 func planningSessionKindToProto(kind string) pb.PlanningSessionKind {
 	switch kind {
+	case models.PlanningSessionKindCustomAutomation:
+		return pb.PlanningSessionKind_PLANNING_SESSION_KIND_CUSTOM_AUTOMATION
 	case models.PlanningSessionKindTaskCreation:
 		return pb.PlanningSessionKind_PLANNING_SESSION_KIND_TASK_CREATION
 	case models.PlanningSessionKindWorkOrderAnalysis:
@@ -588,7 +625,7 @@ func planningSessionRuntimes(tx *gorm.DB, sessions []*models.FactoryPlanningSess
 		}
 		for i := range executions {
 			execution := executions[i]
-			if isPlanningSessionAgentNode(execution.NodeID) {
+			if isPlanningSessionAgentNode(execution.NodeID) || execution.NodeID == customAutomationRunnerID || execution.NodeID == customAutomationLeaveRunnerID {
 				executionByRun[execution.RunID] = execution.ID
 			}
 		}

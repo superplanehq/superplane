@@ -19,7 +19,8 @@ const UNSAFE_CONTROL_PATTERN = /[\u0000-\u0008\u000B\u000C\u000E-\u001A\u001C-\u
 
 function analysisActivityEnabled(env) {
   return (
-    String((env && env.SUPERPLANE_PLANNING_SESSION_KIND) || "") === "work_order_analysis" &&
+    (String((env && env.SUPERPLANE_PLANNING_SESSION_KIND) || "") === "work_order_analysis" ||
+      (env?.SUPERPLANE_PLANNING_SESSION_KIND === "custom_automation" && env?.SUPERPLANE_CUSTOM_CHAT_ACTIVE === "true")) &&
     Boolean(String((env && env.SUPERPLANE_PLANNING_SESSION_ID) || "").trim())
   );
 }

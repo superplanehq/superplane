@@ -538,3 +538,25 @@ func TestMintAgentStepFileRefsRewritesDescriptionAndSpec(t *testing.T) {
 	assert.Contains(t, *dispatched[0].Prompt, signed)
 	assert.NotContains(t, *dispatched[0].Prompt, "sp-file://")
 }
+
+func TestBuildAgentTaskStartsChatOnlyOnSelectedPrompt(t *testing.T) {
+	commands, files := BuildAgentTask(AgentTaskInput{
+		PrepareName: "Prepare", RunScriptName: "run.js",
+		Steps: []AgentStep{
+			{Name: "Inspect", Type: AgentStepPrompt, Prompt: strPtr("Inspect deployment")},
+			{Name: "Discuss", Type: AgentStepPrompt, Prompt: strPtr("Discuss deployment health"), ContinueInChat: true},
+		},
+		PromptCommand: func(_, _ string) string { return `printf '%s' "${SUPERPLANE_CUSTOM_CHAT_ACTIVE:-}"` },
+	})
+	taskDir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(taskDir, "llm_usage.js"), []byte(""), 0600))
+	for i, expected := range []string{"", "true"} {
+		cmd := exec.Command("bash", "-c", commands[i+1].Command)
+		cmd.Dir = taskDir
+		cmd.Env = append(os.Environ(), "SUPERPLANE_TASK_DIR="+taskDir, "SUPERPLANE_CUSTOM_CHAT_ACTIVE=")
+		output, err := cmd.CombinedOutput()
+		require.NoError(t, err, string(output))
+		assert.Equal(t, expected, string(output))
+	}
+	assert.Contains(t, requireBrokerFile(t, files, "custom_chat_prompt.md").Content, "Discuss deployment health")
+}

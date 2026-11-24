@@ -13,7 +13,9 @@ import { planningHeaderSpendActive } from "./planningHeaderSpend";
 import { DraftStartModelSelect } from "./DraftStartModelSelect";
 import type { DraftStartSelection } from "./draftStartModel";
 import { useDraftStartDefaults, useDraftStartSelection, type DraftStartDefaults } from "@/hooks/useDraftStartDefaults";
+import { useAutomationChatSessions } from "./useAutomationChatSessions";
 import { SplitRunPopupTabs } from "./SplitRunPopupTabs";
+import { AutomationChatFooter } from "./AutomationChatFooter";
 import { SplitRunReview } from "./SplitRunReview";
 import { draftStripAnalysis } from "./draftStripAnalysis";
 import { classicSplitRunFooter, isTaskResultFooter, SPLIT_RUN_ANALYZING_NOTE } from "./splitRunFooter";
@@ -107,6 +109,8 @@ function WorkOrderSplitRunPopupContent(props: WorkOrderSplitRunPopupProps) {
     isDraft: fixture.footer.kind === "draft",
   });
 
+  const automationChats = useAutomationChatSessions(organizationId, factoryId, orderId, fixture.phases);
+
   if (mode === "loading") {
     return <LoadingWorkOrderPopup title={fixture.title} titlePrefix={titlePrefix} fixed={fixed} onClose={onClose} />;
   }
@@ -114,6 +118,7 @@ function WorkOrderSplitRunPopupContent(props: WorkOrderSplitRunPopupProps) {
     <AnalysisWorkOrderPopup
       {...props}
       titlePrefix={titlePrefix}
+      automationChats={automationChats}
       analysis={analysis}
       popupData={popupData}
       planningFailure={planningFailure}
@@ -149,7 +154,9 @@ function AnalysisWorkOrderPopup({
   popupData,
   titlePrefix,
   planningFailure,
+  automationChats,
 }: WorkOrderSplitRunPopupProps & {
+  automationChats: ReturnType<typeof useAutomationChatSessions>;
   analysis: ReturnType<typeof useAnalysisPlanningSession>;
   popupData: ReturnType<typeof useSplitRunPopupData>;
   titlePrefix?: string;
@@ -164,7 +171,11 @@ function AnalysisWorkOrderPopup({
   const { model: draftModel, thinkingLevel: draftThinking } = selection;
   const defaults = useDraftStartDefaults(organizationId, factoryId, fixture.lineName, lineId);
   const factory = useFactory(organizationId ?? "", factoryId ?? "").data;
-  const { sourceOnly, viewFixture: originalViewFixture } = analysisPopupView(fixture, factory);
+  const { sourceOnly, viewFixture: originalViewFixture } = analysisPopupView(
+    fixture,
+    factory,
+    Boolean(automationChats.selected),
+  );
   const footer = useWorkOrderStartFooter(originalViewFixture.footer, organizationId, factoryId, fixture.lineName);
   const viewFixture = { ...originalViewFixture, footer };
   const startAllowed = canDispatch && !footer.actions.some((action) => action.kind === "start" && action.disabled);
@@ -172,12 +183,14 @@ function AnalysisWorkOrderPopup({
     fixture.footer.kind,
     startAllowed ? onDispatch : undefined,
     draftModel,
-    factoryPlanningEnabled(factory) ? draftThinking : undefined,
+    factoryPlanningEnabled(factory) || automationChats.selected ? draftThinking : undefined,
   );
   const showPullRequestReview = isPullRequestReviewFooter(fixture.footer);
   const showSidebarNote = showPullRequestReview || isTaskResultFooter(fixture.footer);
-  const unified = refinePopupShowsAutomations({ footerKind: viewFixture.footer.kind, sourceOnly });
+  const unified =
+    !automationChats.selected && refinePopupShowsAutomations({ footerKind: viewFixture.footer.kind, sourceOnly });
   const draftChrome = analysisDraftChrome({
+    automationChat: Boolean(automationChats.selected),
     factory,
     organizationId,
     factoryId,
@@ -228,6 +241,10 @@ function AnalysisWorkOrderPopup({
     >
       <LiveHeaderSpendProvider>
         <SplitRunPopupTabs
+          automationChats={automationChats}
+          chatFooter={
+            <AutomationChatFooter review={analysisPopupReview(reviewArgs)} modelSelect={draftChrome.chatModelSelect} />
+          }
           fixture={viewFixture}
           edits={edits}
           popupData={popupData}
@@ -405,6 +422,7 @@ function analysisPopupReview(args: {
 }
 
 type AnalysisDraftChromeArgs = {
+  automationChat: boolean;
   factory?: FactoriesFactory;
   organizationId?: string;
   factoryId?: string;
@@ -423,8 +441,8 @@ type AnalysisDraftChromeArgs = {
 };
 
 function analysisDraftChrome(args: AnalysisDraftChromeArgs) {
-  if (!factoryPlanningEnabled(args.factory)) {
-    return { footerModelSelect: undefined, stripAnalysis: undefined };
+  if (!factoryPlanningEnabled(args.factory) && !args.automationChat) {
+    return { footerModelSelect: undefined, chatModelSelect: undefined, stripAnalysis: undefined };
   }
   const modelSelects = draftModelSelects({
     organizationId: args.organizationId,
@@ -439,6 +457,7 @@ function analysisDraftChrome(args: AnalysisDraftChromeArgs) {
   });
   return {
     footerModelSelect: modelSelects.footer,
+    chatModelSelect: modelSelects.strip,
     stripAnalysis: draftStripAnalysis(args, modelSelects.strip),
   };
 }
@@ -466,8 +485,12 @@ function analysisPopupClassName(fullPage: boolean, unified: boolean, sourceOnly:
 /**
  * The refine strip only shows for a draft.
  */
-function analysisPopupView(fixture: WorkOrderSplitRunPopupProps["fixture"], factory: FactoriesFactory | undefined) {
-  const sourceOnly = fixture.footer.kind === "draft" && !factoryPlanningEnabled(factory);
+function analysisPopupView(
+  fixture: WorkOrderSplitRunPopupProps["fixture"],
+  factory: FactoriesFactory | undefined,
+  automationChat = false,
+) {
+  const sourceOnly = !automationChat && fixture.footer.kind === "draft" && !factoryPlanningEnabled(factory);
   return {
     sourceOnly,
     viewFixture: sourceOnly ? { ...fixture, footer: classicSplitRunFooter(fixture.footer) } : fixture,

@@ -28,7 +28,7 @@ func (PlanningSessionMessage) TableName() string {
 }
 
 func sessionWaitText(tx *gorm.DB, session *FactoryPlanningSession, text string, refined bool) string {
-	return planningWaitTextForKind(text, refined, session.Draft(), session.IsAnalysisSession())
+	return planningWaitTextForKind(text, refined, session.Draft(), session.IsAnalysisSession() || session.IsCustomAutomationSession())
 }
 
 func (s *FactoryPlanningSession) usesAnalysisFollowUp(_ *gorm.DB) bool {

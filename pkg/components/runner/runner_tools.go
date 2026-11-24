@@ -25,6 +25,7 @@ const (
 	ScopeArtifactsRead     RunnerToolScope = "artifacts:read"
 	ScopeArtifactsWrite    RunnerToolScope = "artifacts:write"
 	ScopePlanWrite         RunnerToolScope = "plan:write"
+	ScopeSurveyWrite       RunnerToolScope = "survey:write"
 	ScopeEvidenceWrite     RunnerToolScope = "evidence:write"
 	ScopeMergeChecksWrite  RunnerToolScope = "merge_checks:write"
 	ScopePullRequestsRead  RunnerToolScope = "pull_requests:read"
@@ -53,6 +54,7 @@ var runnerTools = []RunnerTool{
 	{Name: "add_artifact", Scope: ScopeArtifactsWrite},
 	{Name: "remove_artifact", Scope: ScopeArtifactsWrite},
 	{Name: "propose_plan", Scope: ScopePlanWrite},
+	{Name: "survey", Scope: ScopeSurveyWrite},
 	{Name: "report_visual_evidence_unavailable", Scope: ScopeEvidenceWrite},
 	{Name: "report_merge_check", Scope: ScopeMergeChecksWrite},
 	{Name: "open_pull_request", Scope: ScopePullRequestsWrite},

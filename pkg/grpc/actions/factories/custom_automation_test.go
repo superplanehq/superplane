@@ -1528,3 +1528,46 @@ func TestColumnLeaveAutomationStartsWhenTheTaskLeavesBacklog(t *testing.T) {
 	require.NoError(t, db.Where("workflow_id = ?", canvasID).Find(&events).Error)
 	require.Len(t, events, 2)
 }
+
+func TestCustomAutomationRejectsInvalidChatSteps(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory := seedHandOffFactory(t, r, db)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
+	onTask, withoutTask := true, false
+	for _, tc := range []struct {
+		name       string
+		runsOnTask *bool
+		mode       pb.FactoryCustomAutomation_StartMode
+		steps      []*pb.FactoryCustomAutomation_Step
+	}{
+		{"not final", &onTask, pb.FactoryCustomAutomation_START_MODE_MANUAL, []*pb.FactoryCustomAutomation_Step{
+			{Name: "Discuss", Type: pb.FactoryCustomAutomation_Step_TYPE_CHAT, Prompt: "Discuss."},
+			{Name: "Check", Type: pb.FactoryCustomAutomation_Step_TYPE_BASH, Command: "pwd"},
+		}},
+		{"without task", &withoutTask, pb.FactoryCustomAutomation_START_MODE_MANUAL, []*pb.FactoryCustomAutomation_Step{
+			{Name: "Discuss", Type: pb.FactoryCustomAutomation_Step_TYPE_CHAT, Prompt: "Discuss."},
+		}},
+		{"scheduled", nil, pb.FactoryCustomAutomation_START_MODE_SCHEDULED, []*pb.FactoryCustomAutomation_Step{
+			{Name: "Discuss", Type: pb.FactoryCustomAutomation_Step_TYPE_CHAT, Prompt: "Discuss."},
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			settings := &pb.FactoryCustomAutomation_Settings{
+				StartMode: tc.mode, RunsOnTask: tc.runsOnTask, Steps: tc.steps,
+				Agent: &pb.FactoryAppTemplateAgent{Component: "runnerClaudeCode"},
+			}
+			if tc.mode == pb.FactoryCustomAutomation_START_MODE_SCHEDULED {
+				settings.Schedule = &pb.FactoryCustomAutomation_Schedule{CronExpression: "0 9 * * *"}
+			}
+			_, err := CreateFactoryCustomAutomation(onboardingContext(r), onboardingDeps(r), r.Organization.ID.String(), &pb.CreateFactoryCustomAutomationRequest{
+				FactoryId: factory.ID.String(), ColumnKey: models.CanvasColumnKeyImplement, Settings: settings,
+			})
+			require.Error(t, err)
+			code, message, ok := grpcerrors.HandlerStatus(err)
+			require.True(t, ok)
+			require.Equal(t, codes.InvalidArgument, code)
+			require.Contains(t, strings.ToLower(message), "chat")
+		})
+	}
+}

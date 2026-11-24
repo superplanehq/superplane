@@ -17,6 +17,11 @@ import { refinePopupShowsAutomations } from "./splitRunPopupModel";
 import type { SplitRunFooterActions } from "./useSplitRunFooterActions";
 import type { useSplitRunPopupData } from "./useSplitRunPopupData";
 import type { useSplitRunWorkOrderEdits } from "./useSplitRunWorkOrderEdits";
+import { AutomationRunChat } from "./AutomationRunChat";
+import { ButtonGroup } from "@/components/ui/button-group";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { ListTree, MessageSquare } from "lucide-react";
+import type { useAutomationChatSessions } from "./useAutomationChatSessions";
 import { WorkOrderSplitRunOverview } from "./WorkOrderSplitRunOverview";
 
 type SplitRunPopupTabsProps = {
@@ -34,6 +39,7 @@ type SplitRunPopupTabsProps = {
   backlogCustomRunsStatus?: { isError: boolean; isFetching: boolean; retry: () => void };
   footerActions: SplitRunFooterActions;
   resultFooter?: ReactNode;
+  chatFooter?: ReactNode;
   sidebarNote?: ReactNode;
   analysis?: IntentAnalysisChat;
   sourceOnly?: boolean;
@@ -41,6 +47,7 @@ type SplitRunPopupTabsProps = {
   /** Decision note and actions for the console summary panel. */
   panelReview?: ReactNode;
   header: (views: ReactNode) => ReactNode;
+  automationChats: ReturnType<typeof useAutomationChatSessions>;
 };
 
 function SplitRunPopupOverview({
@@ -111,7 +118,91 @@ function SplitRunPopupOverview({
  * summary panel carries status, owner, spend, outputs, and the decision
  * actions. A draft with Planning on keeps the refinement view instead.
  */
-export function SplitRunPopupTabs({
+export function SplitRunPopupTabs(props: SplitRunPopupTabsProps) {
+  const { automationChats: chats, organizationId, factoryId, orderId } = props;
+  const navigation = <AutomationChatNavigation chats={chats} />;
+  if (!chats.selected || !organizationId || !factoryId || !orderId) {
+    return <SplitRunPopupContent {...props} header={() => props.header(navigation)} />;
+  }
+  return (
+    <AutomationChatTaskView
+      {...props}
+      organizationId={organizationId}
+      factoryId={factoryId}
+      orderId={orderId}
+      phase={chats.selected}
+      navigation={navigation}
+    />
+  );
+}
+
+function AutomationChatTaskView({
+  phase,
+  navigation,
+  ...props
+}: SplitRunPopupTabsProps & {
+  organizationId: string;
+  factoryId: string;
+  orderId: string;
+  phase: NonNullable<SplitRunPopupTabsProps["automationChats"]["selected"]>;
+  navigation: ReactNode;
+}) {
+  const order = useWorkOrder(props.organizationId, props.factoryId, props.orderId);
+  return (
+    <>
+      {props.header(navigation)}
+      <AutomationRunChat
+        key={phase.runId}
+        organizationId={props.organizationId}
+        factoryId={props.factoryId}
+        workOrderId={props.orderId}
+        phase={phase}
+        canUpdate={props.canUpdate}
+        description={props.edits.description}
+        files={order.data?.files}
+        source={props.fixture.source}
+      />
+      {props.chatFooter}
+    </>
+  );
+}
+
+function AutomationChatNavigation({ chats }: { chats: SplitRunPopupTabsProps["automationChats"] }) {
+  if (!chats.chats.length) return null;
+  const views = [
+    ...chats.chats.map((phase, index) => ({
+      value: phase.runId!,
+      label: chats.chats.length === 1 ? "Chat" : `${phase.componentName} · ${chats.chats.length - index}`,
+      icon: MessageSquare,
+    })),
+    { value: "activity", label: "Timeline", icon: ListTree },
+  ];
+  return (
+    <ButtonGroup aria-label="Task view">
+      {views.map(({ value, label, icon: Icon }) => (
+        <Tooltip key={value}>
+          <TooltipTrigger asChild>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              aria-label={label}
+              aria-pressed={chats.choice === value}
+              className="aria-pressed:bg-accent aria-pressed:text-accent-foreground"
+              onClick={() => chats.setChoice(value)}
+            >
+              <Icon className="size-4" aria-hidden />
+              {label}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">{label}</TooltipContent>
+        </Tooltip>
+      ))}
+    </ButtonGroup>
+  );
+}
+
+function SplitRunPopupContent({
   fixture,
   edits,
   popupData,

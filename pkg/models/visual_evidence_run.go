@@ -21,6 +21,13 @@ func MaybeLinkVisualEvidenceRun(tx *gorm.DB, canvas *Canvas, event *CanvasEvent,
 // MaybeLinkCustomAutomationRun stores task authority for a custom automation.
 // Task events use a task link. Verify pull-request events use pull-request activity.
 func MaybeLinkCustomAutomationRun(tx *gorm.DB, canvas *Canvas, event *CanvasEvent, run *CanvasRun) error {
+	if err := linkCustomAutomationRun(tx, canvas, event, run); err != nil {
+		return err
+	}
+	return MaybeAttachCustomAutomationSession(tx, canvas, event, run)
+}
+
+func linkCustomAutomationRun(tx *gorm.DB, canvas *Canvas, event *CanvasEvent, run *CanvasRun) error {
 	title := customAutomationRunTitle
 	if canvas != nil {
 		if name := strings.TrimSpace(canvas.Name); name != "" {

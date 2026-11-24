@@ -12,7 +12,7 @@ export function AnalysisPlanControls({
   chipsWorking: boolean;
   position: "conversation" | "composer";
 }) {
-  if (position !== "conversation") {
+  if (analysis.mode === "automation" || position !== "conversation") {
     return null;
   }
   if (!shouldShowPlanningReview(analysis)) {

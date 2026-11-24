@@ -22,6 +22,7 @@ var nonSlugChars = regexp.MustCompile(`[^a-z0-9]+`)
 
 // AgentStep is one ordered bash or prompt action for a fleet-runner agent node.
 type AgentStep struct {
+	ContinueInChat   bool     `mapstructure:"continueInChat,omitempty"`
 	Name             string   `mapstructure:"name"`
 	Type             string   `mapstructure:"type"`
 	Prompt           *string  `mapstructure:"prompt,omitempty"`
@@ -43,6 +44,9 @@ func ValidateAgentSteps(steps []AgentStep) error {
 	}
 
 	for i, step := range steps {
+		if step.ContinueInChat && (i != len(steps)-1 || NormalizeAgentStepType(step.Type) != AgentStepPrompt) {
+			return fmt.Errorf("steps[%d].continueInChat requires the final prompt step", i)
+		}
 		if strings.TrimSpace(step.Name) == "" {
 			return fmt.Errorf("steps[%d].name is required", i)
 		}

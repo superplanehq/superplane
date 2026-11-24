@@ -1,6 +1,9 @@
+import type { PlanningReviewStep } from "../pages/planningReviewMockup";
+import type { AutomationDefinition } from "./customAutomationDefinition";
 import { describe, expect, it } from "bun:test";
 import {
   automationDefinitionCanvas,
+  automationDefinitionSteps,
   automationDefinitionTriggers,
   automationDefinitionYaml,
   parseAutomationForCanvas,
@@ -64,6 +67,40 @@ describe("leave trigger conversion", () => {
     expect(automationDefinitionTriggers(visual.triggers, stage)).toEqual(definition.triggers);
     expect(() =>
       parseAutomationForCanvas(automationDefinitionYaml({ ...definition, runs_on_task: false }), stage),
+    ).toThrow();
+  });
+});
+
+describe("chat continuation", () => {
+  it("preserves the final Chat step through the visual editor", () => {
+    const definition = newAutomationDefinition("done");
+    definition.steps = [{ name: "Discuss", chat: "Discuss the result." }];
+    const parsed = parseAutomationForCanvas(automationDefinitionYaml(definition), "done");
+    const visual = automationDefinitionCanvas(parsed);
+    expect(
+      automationDefinitionSteps(visual.draft.components[0].configuration.steps as PlanningReviewStep[])[0].chat,
+    ).toBe("Discuss the result.");
+  });
+
+  it.each([
+    { runs_on_task: false },
+    { triggers: [{ use: "schedule", config: { cron: "0 * * * *" } }] },
+    { steps: [{ name: "Discuss", bash: "echo hello", chat: "Hello" }] },
+    {
+      steps: [
+        { name: "Discuss", chat: "Hello" },
+        { name: "Finish", bash: "true" },
+      ],
+    },
+  ])("rejects chat without a task or outside the final prompt", (patch) => {
+    const definition = {
+      ...newAutomationDefinition("backlog"),
+      triggers: [{ use: "manual" }],
+      steps: [{ name: "Discuss", chat: "Hello" }],
+      ...patch,
+    };
+    expect(() =>
+      parseAutomationForCanvas(automationDefinitionYaml(definition as AutomationDefinition), "backlog"),
     ).toThrow();
   });
 });

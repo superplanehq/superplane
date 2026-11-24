@@ -389,9 +389,10 @@ func parseCustomAutomationSettings(
 			Name:             strings.TrimSpace(step.GetName()),
 			WorkingDirectory: strings.TrimSpace(step.GetWorkingDirectory()),
 			Secrets:          step.GetSecrets(),
+			ContinueInChat:   step.GetType() == pb.FactoryCustomAutomation_Step_TYPE_CHAT,
 		}
 		switch step.GetType() {
-		case pb.FactoryCustomAutomation_Step_TYPE_PROMPT:
+		case pb.FactoryCustomAutomation_Step_TYPE_PROMPT, pb.FactoryCustomAutomation_Step_TYPE_CHAT:
 			parsed.Type = runner.AgentStepPrompt
 			value := step.GetPrompt()
 			parsed.Prompt = &value
@@ -400,9 +401,12 @@ func parseCustomAutomationSettings(
 			value := step.GetCommand()
 			parsed.Command = &value
 		default:
-			return nil, invalidArgument("step type must be prompt or bash")
+			return nil, invalidArgument("step type must be prompt, chat, or bash")
 		}
 		steps = append(steps, parsed)
+	}
+	if err := validateCustomAutomationChat(steps, input.RunsOnTask, triggers); err != nil {
+		return nil, err
 	}
 	if err := runner.ValidateAgentSteps(steps); err != nil {
 		return nil, invalidArgument(err.Error())
@@ -423,6 +427,23 @@ func parseCustomAutomationSettings(
 		SkipSetupCommands:       input.SkipSetupCommands,
 		SkipRepositoryCheckout:  input.SkipRepositoryCheckout,
 	}, nil
+}
+
+func validateCustomAutomationChat(steps []runner.AgentStep, runsOnTask *bool, triggers []customAutomationTrigger) error {
+	for _, step := range steps {
+		if !step.ContinueInChat {
+			continue
+		}
+		if runsOnTask != nil && !*runsOnTask {
+			return invalidArgument("Chat requires an automation that runs on a task.")
+		}
+		for _, trigger := range triggers {
+			if trigger.Mode == pb.FactoryCustomAutomation_START_MODE_SCHEDULED {
+				return invalidArgument("Chat is not available for scheduled automations.")
+			}
+		}
+	}
+	return nil
 }
 
 func validateCustomAutomationRunContext(runsOnTask *bool, triggers []customAutomationTrigger) error {
@@ -1212,6 +1233,9 @@ func customAutomationStepConfiguration(steps []runner.AgentStep) []any {
 			"type":             step.Type,
 			"workingDirectory": step.WorkingDirectory,
 		}
+		if step.ContinueInChat {
+			value["continueInChat"] = true
+		}
 		if step.Prompt != nil {
 			value["prompt"] = *step.Prompt
 		}
@@ -1489,7 +1513,7 @@ func serializeCustomAutomationVersion(
 		return nil, err
 	}
 	for _, step := range automation.Settings.Steps {
-		if step.Type == pb.FactoryCustomAutomation_Step_TYPE_PROMPT {
+		if step.Type == pb.FactoryCustomAutomation_Step_TYPE_PROMPT || step.Type == pb.FactoryCustomAutomation_Step_TYPE_CHAT {
 			step.Prompt = strings.TrimSpace(stripBacklogTaskInstructions(step.Prompt))
 		}
 	}
@@ -1624,6 +1648,9 @@ func customAutomationProtoSteps(raw any) ([]*pb.FactoryCustomAutomation_Step, er
 			}
 		} else {
 			value.Type = pb.FactoryCustomAutomation_Step_TYPE_PROMPT
+			if step.ContinueInChat {
+				value.Type = pb.FactoryCustomAutomation_Step_TYPE_CHAT
+			}
 			if step.Prompt != nil {
 				value.Prompt = *step.Prompt
 			}
@@ -1635,7 +1662,7 @@ func customAutomationProtoSteps(raw any) ([]*pb.FactoryCustomAutomation_Step, er
 
 func stripCustomAutomationBacklogPrompt(steps []*pb.FactoryCustomAutomation_Step) {
 	for i := len(steps) - 1; i >= 0; i-- {
-		if steps[i].Type == pb.FactoryCustomAutomation_Step_TYPE_PROMPT {
+		if steps[i].Type == pb.FactoryCustomAutomation_Step_TYPE_PROMPT || steps[i].Type == pb.FactoryCustomAutomation_Step_TYPE_CHAT {
 			steps[i].Prompt = stripBacklogTaskInstructions(steps[i].Prompt)
 			return
 		}

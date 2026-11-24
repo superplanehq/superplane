@@ -22,7 +22,7 @@ func AttachRunnerEnv(ctx core.ExecutionContext, environment []TaskEnvironmentVar
 	for _, name := range ctx.RunnerEnvironmentRemove {
 		environment = withoutEnvironmentName(environment, name)
 	}
-	if ctx.RunnerEnvironment != nil && !HasPlanningSessionToken(environment) {
+	if ctx.RunnerEnvironment != nil && !HasAnalysisSessionToken(environment) {
 		names := make([]string, 0, len(ctx.RunnerEnvironment))
 		for name := range ctx.RunnerEnvironment {
 			names = append(names, name)
@@ -99,7 +99,7 @@ func resolveRunnerScope(
 	}
 
 	switch {
-	case HasPlanningSessionToken(environment):
+	case HasAnalysisSessionToken(environment):
 		err = resolvePlanningRunnerScope(db, scope)
 	case prepared != nil:
 		if prepared.OrganizationID != scope.OrganizationID || prepared.CanvasID != scope.CanvasID || prepared.CanvasRunID != scope.CanvasRunID || prepared.NodeExecutionID != scope.NodeExecutionID || prepared.NodeID != scope.NodeID {
@@ -120,6 +120,10 @@ func resolveRunnerScope(
 	}
 	scope.Scopes = ScopesForFlow(scope.Flow)
 	if scope.Flow == RunnerFlowTask {
+		session, sessionErr := models.FindPlanningSessionByRun(db, scope.CanvasRunID)
+		if sessionErr == nil && session.IsCustomAutomationSession() && session.OrganizationID == scope.OrganizationID && session.FactoryID == scope.FactoryID && session.DraftWorkOrderID != nil && *session.DraftWorkOrderID == scope.WorkOrderID {
+			scope.Scopes = append(scope.Scopes, ScopeSurveyWrite)
+		}
 		scope.Scopes = append(scope.Scopes, TaskCapabilityScopes(environment)...)
 		scope.Scopes = append(scope.Scopes, ScopePullRequestsRead, ScopePullRequestsWrite)
 	}

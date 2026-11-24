@@ -308,6 +308,10 @@ func TestCanvasAutomationLegacyImportProtectsGraphBehavior(t *testing.T) {
 			runsOnTask := tc.runsOnTask
 			skip := true
 			const prompt = "  Inspect the task.\n"
+			stepType := pb.FactoryCustomAutomation_Step_TYPE_PROMPT
+			if tc.runsOnTask {
+				stepType = pb.FactoryCustomAutomation_Step_TYPE_CHAT
+			}
 			created, err := CreateFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &pb.CreateFactoryCustomAutomationRequest{
 				FactoryId: factory.ID.String(), ColumnKey: tc.stage, Name: "Inspect task",
 				Settings: &pb.FactoryCustomAutomation_Settings{
@@ -318,7 +322,7 @@ func TestCanvasAutomationLegacyImportProtectsGraphBehavior(t *testing.T) {
 					SkipSetupCommands:      &skip,
 					Agent:                  &pb.FactoryAppTemplateAgent{Component: models.SuperPlaneRunnerComponent, Model: "hosted::anthropic::sonnet"},
 					Steps: []*pb.FactoryCustomAutomation_Step{
-						{Name: "Inspect", Type: pb.FactoryCustomAutomation_Step_TYPE_PROMPT, Prompt: prompt, WorkingDirectory: "/tmp"},
+						{Name: "Inspect", Type: stepType, Prompt: prompt, WorkingDirectory: "/tmp"},
 					},
 				},
 			})
@@ -334,6 +338,7 @@ func TestCanvasAutomationLegacyImportProtectsGraphBehavior(t *testing.T) {
 			require.Equal(t, &automationspec.Agent{Model: "sonnet"}, doc.Agent)
 			require.NotNil(t, doc.RunsOnTask)
 			require.Equal(t, tc.runsOnTask, *doc.RunsOnTask)
+			require.Equal(t, tc.runsOnTask, doc.Steps[0].Chat != "")
 			require.Equal(t, tc.use, doc.Triggers[0].Use)
 			require.Len(t, doc.Triggers, len(triggers))
 			require.Equal(t, strings.TrimSpace(prompt), created.GetCustomAutomation().GetSettings().Steps[0].Prompt)
@@ -341,7 +346,11 @@ func TestCanvasAutomationLegacyImportProtectsGraphBehavior(t *testing.T) {
 			if tc.stage == models.CanvasColumnKeyBacklog && !tc.runsOnTask {
 				wantPrompt = strings.TrimSpace(prompt)
 			}
-			require.Equal(t, wantPrompt, doc.Steps[0].Prompt)
+			if tc.runsOnTask {
+				require.Equal(t, wantPrompt, doc.Steps[0].Chat)
+			} else {
+				require.Equal(t, wantPrompt, doc.Steps[0].Prompt)
+			}
 			require.Equal(t, "/tmp", doc.Steps[0].WorkingDirectory)
 			require.Equal(t, &skip, doc.SkipSetupCommands)
 			require.Equal(t, &skip, doc.SkipRepositoryCheckout)
@@ -385,12 +394,17 @@ func TestCanvasAutomationLegacyImportProtectsGraphBehavior(t *testing.T) {
 			doc, err = automationspec.Parse(reopened.YAML)
 			require.NoError(t, err)
 			require.Equal(t, "Inspect latest task", reopened.Name)
+			require.Equal(t, tc.runsOnTask, doc.Steps[0].Chat != "")
 			require.Equal(t, strings.TrimSpace(newPrompt), updated.GetCustomAutomation().GetSettings().Steps[0].Prompt)
 			wantPrompt = newPrompt
 			if tc.stage == models.CanvasColumnKeyBacklog && !tc.runsOnTask {
 				wantPrompt = strings.TrimSpace(newPrompt)
 			}
-			require.Equal(t, wantPrompt, doc.Steps[0].Prompt)
+			if tc.runsOnTask {
+				require.Equal(t, wantPrompt, doc.Steps[0].Chat)
+			} else {
+				require.Equal(t, wantPrompt, doc.Steps[0].Prompt)
+			}
 			require.Equal(t, int64(2), reopened.Revision)
 			require.Equal(t, tc.use, doc.Triggers[0].Use)
 			require.Len(t, doc.Triggers, len(triggers))

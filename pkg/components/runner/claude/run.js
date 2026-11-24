@@ -86,7 +86,7 @@ function withoutEmbeddedAnalysisProtocol(prompt) {
 }
 
 function applyAnalysisContinuation(taskDir, promptCount, prompt) {
-  if (!planningAnalysisEnabled()) {
+  if (!planningAnalysisEnabled() && !customChatEnabled()) {
     return prompt;
   }
   const mod = loadAnalysisProtocolModule();
@@ -116,6 +116,14 @@ function globalAllowedTools(env = process.env) {
 
 function envFlag(env, name) {
   return Boolean(String((env && env[name]) || "").trim());
+}
+
+function customChatEnabled(env = process.env) {
+  return env.SUPERPLANE_PLANNING_SESSION_KIND === "custom_automation" && env.SUPERPLANE_CUSTOM_CHAT_ACTIVE === "true";
+}
+
+function chatSessionEnabled(env = process.env) {
+  return (planningAnalysisEnabled(env) || customChatEnabled(env)) && envFlag(env, "SUPERPLANE_PLANNING_SESSION_ID");
 }
 
 function planningAnalysisEnabled(env = process.env) {
@@ -279,7 +287,7 @@ function writeSessionID(taskDir, sessionID) {
 }
 
 function claudeContinuationArgs(promptCount, sessionID, env = process.env) {
-  if (planningAnalysisEnabled(env) && envFlag(env, "SUPERPLANE_ANALYSIS_REWIND")) {
+  if ((planningAnalysisEnabled(env) || customChatEnabled(env)) && envFlag(env, "SUPERPLANE_ANALYSIS_REWIND")) {
     return [];
   }
   if (Number(promptCount) < 1) {
@@ -438,7 +446,7 @@ async function runPrompt(promptFile, model, thinking) {
   fs.writeFileSync(resultFile, `${resultJSON}\n`);
   accumulateLLMUsage(resultJSON, model);
   fs.writeFileSync(promptCountPath, `${promptCount + 1}\n`);
-  if (planningMCPEnabled()) {
+  if (chatSessionEnabled()) {
     const result = JSON.parse(resultJSON);
     await require(path.join(sp, "agent_message.js")).recordAgentMessage(
       result.result,

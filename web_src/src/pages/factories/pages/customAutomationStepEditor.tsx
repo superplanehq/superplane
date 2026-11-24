@@ -25,6 +25,7 @@ export function StepEditor({
   onRemove,
   organizationId,
   asCode = false,
+  runsOnTask = true,
 }: {
   step: PlanningReviewStep;
   position: number;
@@ -34,6 +35,7 @@ export function StepEditor({
   onRemove: () => void;
   organizationId: string;
   asCode?: boolean;
+  runsOnTask?: boolean;
 }) {
   const prompt = asCode ? (step.prompt ?? "") : mergeCheckPromptBody(step.prompt);
   const value = step.type === "prompt" ? prompt : (step.command ?? "");
@@ -42,7 +44,7 @@ export function StepEditor({
       <StepEditorToolbar
         position={position}
         stepCount={stepCount}
-        type={step.type}
+        type={step.continueInChat ? "chat" : step.type}
         onMove={onMove}
         onRemove={onRemove}
       />
@@ -61,16 +63,17 @@ export function StepEditor({
       </ImplementSettingRow>
       <ImplementSettingRow
         label="Type"
-        description="Choose an agent prompt or shell commands."
+        description="Choose Bash, Prompt, or Chat. Chat continues the final step with the agent on a task."
         htmlFor="custom-automation-step-kind"
       >
         <Select
-          value={step.type}
+          value={step.continueInChat ? "chat" : step.type}
           onValueChange={(value) =>
             onChange({
               ...step,
-              type: value === "prompt" ? "prompt" : "bash",
-              ...(value === "prompt"
+              type: value === "bash" ? "bash" : "prompt",
+              continueInChat: value === "chat",
+              ...(value !== "bash"
                 ? { prompt: step.prompt ?? step.command ?? "" }
                 : { command: step.command ?? step.prompt ?? "" }),
             })
@@ -82,6 +85,9 @@ export function StepEditor({
           <SelectContent>
             <SelectItem value="prompt">Prompt</SelectItem>
             <SelectItem value="bash">Bash</SelectItem>
+            <SelectItem value="chat" disabled={!runsOnTask || position !== stepCount - 1}>
+              Chat
+            </SelectItem>
           </SelectContent>
         </Select>
       </ImplementSettingRow>
@@ -124,7 +130,7 @@ function StepEditorToolbar({
 }: {
   position: number;
   stepCount: number;
-  type: PlanningReviewStep["type"];
+  type: PlanningReviewStep["type"] | "chat";
   onMove: (offset: -1 | 1) => void;
   onRemove: () => void;
 }) {

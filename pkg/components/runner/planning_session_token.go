@@ -107,10 +107,12 @@ func AttachPlanningSessionEnv(ctx core.ExecutionContext, environment []TaskEnvir
 		}
 		return environment
 	}
-	if !session.IsAnalysisSession() {
+	if !session.IsAnalysisSession() && session.Kind != models.PlanningSessionKindCustomAutomation {
 		return environment
 	}
-	markAnalysisSession(ctx.ExecutionState)
+	if session.IsAnalysisSession() {
+		markAnalysisSession(ctx.ExecutionState)
+	}
 
 	baseURL := RunnerSuperplaneBaseURL(ctx.BaseURL)
 	if baseURL == "" {
@@ -148,6 +150,11 @@ func AttachPlanningSessionEnv(ctx core.ExecutionContext, environment []TaskEnvir
 	}
 	if ctx.Logger != nil {
 		ctx.Logger.WithField("planning_session_id", session.ID).Info("attached planning session token")
+	}
+	if session.Kind == models.PlanningSessionKindCustomAutomation {
+		return append(append(environment, planningSessionEnvVars(baseURL, token)...),
+			TaskEnvironmentVariable{Name: EnvSuperplanePlanningID, Value: session.ID.String()},
+			TaskEnvironmentVariable{Name: EnvSuperplanePlanningSessionKind, Value: session.Kind})
 	}
 	// Fail closed. The server rejects score tools the factory has off, so a
 	// lookup failure must not advertise tools the agent cannot use.
@@ -274,4 +281,16 @@ func isLoopbackBaseURL(raw string) bool {
 	}
 	host := strings.ToLower(parsed.Hostname())
 	return host == "localhost" || host == "127.0.0.1" || host == "::1"
+}
+
+func HasAnalysisSessionToken(environment []TaskEnvironmentVariable) bool {
+	if !HasPlanningSessionToken(environment) {
+		return false
+	}
+	for _, variable := range environment {
+		if variable.Name == EnvSuperplanePlanningSessionKind {
+			return variable.Value == models.PlanningSessionKindWorkOrderAnalysis
+		}
+	}
+	return true
 }

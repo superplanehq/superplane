@@ -361,6 +361,7 @@ function stepFromApi(step: FactoriesFactoryCustomAutomationStep): PlanningReview
     command: step.command,
     workingDirectory: step.workingDirectory,
     secrets: step.secrets,
+    continueInChat: step.type === "TYPE_CHAT",
   };
 }
 
@@ -402,7 +403,7 @@ function triggerToApi(trigger: CustomAutomationTrigger): FactoryCustomAutomation
 function stepToApi(step: PlanningReviewStep): FactoriesFactoryCustomAutomationStep {
   return {
     name: step.name,
-    type: step.type === "bash" ? "TYPE_BASH" : "TYPE_PROMPT",
+    type: step.type === "bash" ? "TYPE_BASH" : step.continueInChat ? "TYPE_CHAT" : "TYPE_PROMPT",
     prompt: step.type === "prompt" ? (step.prompt ?? "") : undefined,
     command: step.type === "bash" ? (step.command ?? "") : undefined,
     workingDirectory: step.workingDirectory,

@@ -160,6 +160,8 @@ func importAutomationCanvas(tx *gorm.DB, factory *models.Factory, canvas *models
 		}
 		if step.GetType() == pb.FactoryCustomAutomation_Step_TYPE_BASH {
 			item.Bash = step.GetCommand()
+		} else if step.GetType() == pb.FactoryCustomAutomation_Step_TYPE_CHAT {
+			item.Chat = step.GetPrompt()
 		} else {
 			item.Prompt = step.GetPrompt()
 		}

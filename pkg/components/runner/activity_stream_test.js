@@ -320,3 +320,17 @@ test("preserves every supported terminal tool status", () => {
   assert.equal(stream.snapshot().items[1].exit_code, 7);
   assert.equal(stream.snapshot().items[1].signal, "SIGTERM");
 });
+
+
+test("custom automation streams activity only for its chat step", () => {
+  for (const active of ["", "true"]) {
+    const records = [];
+    const stream = createActivityStream({
+      provider: "codex", activityId: "custom-1", writeRecord: record => records.push(record),
+      env: { SUPERPLANE_PLANNING_SESSION_KIND: "custom_automation", SUPERPLANE_PLANNING_SESSION_ID: "session-1", SUPERPLANE_CUSTOM_CHAT_ACTIVE: active },
+    });
+    stream.start();
+    stream.end("passed");
+    assert.equal(records.length > 0, active === "true");
+  }
+});

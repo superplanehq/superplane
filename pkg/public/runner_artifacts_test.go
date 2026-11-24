@@ -547,16 +547,25 @@ func TestRunnerPublishLinkFromCustomAutomation(t *testing.T) {
 	assert.True(t, runContext.PublishLinks)
 	assertRunnerOwnerAccess(t, server, core.ExecutionContext{ID: nodeExecution.ID, RunID: run.ID, WorkflowID: canvas.ID.String(), OrganizationID: r.Organization.ID.String(), NodeID: nodeID, BaseURL: "http://files.test"}, nil, order.ID)
 
-	environment := runneraction.AttachArtifactUploadEnv(core.ExecutionContext{
-		ID:         nodeExecution.ID,
-		RunID:      run.ID,
-		WorkflowID: canvas.ID.String(),
-		NodeID:     nodeID,
-		BaseURL:    "http://files.test",
-	}, nil, 60, false)
-	require.True(t, runneraction.HasArtifactUploadToken(environment))
-	assert.True(t, runneraction.HasPublishLinks(environment))
-	assert.False(t, runneraction.HasVisualEvidence(environment))
+	var environment []runneraction.TaskEnvironmentVariable
+	for _, kind := range []string{"", models.PlanningSessionKindCustomAutomation} {
+		t.Run("session="+kind, func(t *testing.T) {
+			var sessionEnvironment []runneraction.TaskEnvironmentVariable
+			if kind != "" {
+				sessionEnvironment = []runneraction.TaskEnvironmentVariable{
+					{Name: runneraction.EnvSuperplanePlanningID, Value: uuid.NewString()},
+					{Name: runneraction.EnvSuperplanePlanningSessionKind, Value: kind},
+				}
+			}
+			environment = runneraction.AttachArtifactUploadEnv(core.ExecutionContext{
+				ID: nodeExecution.ID, RunID: run.ID, WorkflowID: canvas.ID.String(),
+				NodeID: nodeID, BaseURL: "http://files.test",
+			}, sessionEnvironment, 60, false)
+			require.True(t, runneraction.HasArtifactUploadToken(environment))
+			assert.True(t, runneraction.HasPublishLinks(environment))
+			assert.False(t, runneraction.HasVisualEvidence(environment))
+		})
+	}
 	var token string
 	for _, variable := range environment {
 		if variable.Name == runneraction.EnvSuperplaneArtifactToken {

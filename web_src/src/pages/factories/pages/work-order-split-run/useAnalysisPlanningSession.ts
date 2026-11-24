@@ -17,8 +17,14 @@ import {
 } from "../planningSessionView";
 import { usePlanningSessionLiveRun } from "../usePlanningSessionLiveRun";
 
-export function workOrderPlanningSessionQueryKey(organizationId: string, factoryId: string, workOrderId: string) {
-  return factoryQueryKeys.planningSession(organizationId, factoryId, workOrderId);
+export function workOrderPlanningSessionQueryKey(
+  organizationId: string,
+  factoryId: string,
+  workOrderId: string,
+  runId?: string,
+) {
+  const key = factoryQueryKeys.planningSession(organizationId, factoryId, workOrderId);
+  return runId ? [...key, "automation-run", runId] : key;
 }
 
 export const ANALYSIS_PLANNING_COPY = {
@@ -38,6 +44,7 @@ type AnalysisPlanningSessionArgs = {
   organizationId?: string;
   factoryId?: string;
   workOrderId?: string;
+  runId?: string;
   enabled: boolean;
   canUpdate: boolean;
   /** Poll a missing session only when a refinement run can still start. */
@@ -79,13 +86,14 @@ function usePlanningSessionLookup(
     organizationId: string;
     factoryId: string;
     workOrderId: string;
+    runId?: string;
     poll: boolean;
   },
 ) {
-  const { organizationId, factoryId, workOrderId, enabled, poll } = args;
+  const { organizationId, factoryId, workOrderId, runId, enabled, poll } = args;
   return useQuery<PlanningSessionPayload | null>({
-    queryKey: workOrderPlanningSessionQueryKey(organizationId, factoryId, workOrderId),
-    queryFn: () => findPlanningSessionByWorkOrder(organizationId, factoryId, workOrderId),
+    queryKey: workOrderPlanningSessionQueryKey(organizationId, factoryId, workOrderId, runId),
+    queryFn: () => findPlanningSessionByWorkOrder(organizationId, factoryId, workOrderId, runId),
     enabled: enabled && Boolean(organizationId && factoryId && workOrderId),
     structuralSharing: (previous, next) =>
       mergePlanningSessionHistory(
@@ -182,6 +190,7 @@ export function useAnalysisPlanningSession(args: AnalysisPlanningSessionArgs) {
     organizationId = "",
     factoryId = "",
     workOrderId = "",
+    runId,
     enabled,
     canUpdate,
     refinementCanStart = false,
@@ -192,11 +201,12 @@ export function useAnalysisPlanningSession(args: AnalysisPlanningSessionArgs) {
   const queryClient = useQueryClient();
   const [composer, setComposer] = useState("");
   const [composerError, setComposerError] = useState("");
-  const queryKey = workOrderPlanningSessionQueryKey(organizationId, factoryId, workOrderId);
+  const queryKey = workOrderPlanningSessionQueryKey(organizationId, factoryId, workOrderId, runId);
   const query = usePlanningSessionLookup({
     organizationId,
     factoryId,
     workOrderId,
+    runId,
     enabled,
     poll: planningSessionNeedsPolling(
       queryClient.getQueryData<PlanningSessionPayload | null>(queryKey),
@@ -265,18 +275,7 @@ export function useAnalysisPlanningSession(args: AnalysisPlanningSessionArgs) {
       return false;
     }
   };
-  const onUploadFiles = async (files: FileList | File[]) => {
-    if (!uploadFiles) {
-      return [];
-    }
-    const uploaded = await uploadFiles(files);
-    if (uploaded.length > 0) {
-      await queryClient.invalidateQueries({
-        queryKey: factoryQueryKeys.workOrderDetail(organizationId, factoryId, workOrderId),
-      });
-    }
-    return uploaded;
-  };
+  const onUploadFiles = (files: FileList | File[]) => uploadAnalysisFiles(args, queryClient, files);
 
   return {
     organizationId,
@@ -300,4 +299,23 @@ export function useAnalysisPlanningSession(args: AnalysisPlanningSessionArgs) {
       submit(text, answerSurvey.mutate);
     },
   };
+}
+
+async function uploadAnalysisFiles(
+  args: AnalysisPlanningSessionArgs,
+  queryClient: QueryClient,
+  files: FileList | File[],
+) {
+  if (!args.uploadFiles) return [];
+  const uploaded = await args.uploadFiles(files);
+  if (uploaded.length > 0) {
+    await queryClient.invalidateQueries({
+      queryKey: factoryQueryKeys.workOrderDetail(
+        args.organizationId ?? "",
+        args.factoryId ?? "",
+        args.workOrderId ?? "",
+      ),
+    });
+  }
+  return uploaded;
 }

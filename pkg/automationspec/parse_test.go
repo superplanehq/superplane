@@ -167,3 +167,42 @@ func TestValidateStagePointsAtTheTriggerType(t *testing.T) {
 		})
 	}
 }
+
+func TestParseChatRequiresFinalTaskStep(t *testing.T) {
+	prompt := "steps:\n  - name: Discuss\n    chat: Discuss the task.\n"
+	for _, tc := range []struct {
+		name, source string
+		valid        bool
+	}{
+		{"task prompt", definitionHeader + manualTrigger + prompt, true},
+		{"earlier prompt", definitionHeader + manualTrigger + prompt + "  - name: Finish\n    bash: echo done\n", false},
+		{"two step actions", definitionHeader + manualTrigger + prompt + "    bash: echo done\n", false},
+		{"prompt and chat", definitionHeader + manualTrigger + prompt + "    prompt: Discuss\n", false},
+		{"without task", definitionHeader + "runs_on_task: false\n" + manualTrigger + prompt, false},
+		{"schedule", definitionHeader + "triggers:\n  - use: schedule\n    config: {cron: '0 9 * * *'}\n" + prompt, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			doc, err := automationspec.Parse(tc.source)
+			if !tc.valid {
+				if err == nil {
+					t.Fatal("expected chat configuration to be rejected")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			encoded, err := automationspec.Encode(doc.Definition)
+			if err != nil {
+				t.Fatal(err)
+			}
+			reopened, err := automationspec.Parse(encoded)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if reopened.Steps[0].Chat != "Discuss the task." {
+				t.Fatal("chat setting was lost")
+			}
+		})
+	}
+}

@@ -304,13 +304,16 @@ func automationCanvasSettings(stage string, source *automationspec.Document, age
 		if err := runner.ValidateStepWorkingDirectory(directory); err != nil {
 			return nil, source.Diagnostic(fmt.Sprintf("steps[%d].working_directory", index), "The working directory "+err.Error()+".")
 		}
-		translated := runner.AgentStep{Name: strings.TrimSpace(step.Name), Secrets: step.Secrets, WorkingDirectory: directory}
+		translated := runner.AgentStep{Name: strings.TrimSpace(step.Name), Secrets: step.Secrets, WorkingDirectory: directory, ContinueInChat: step.Chat != ""}
 		if step.Bash != "" {
 			translated.Type = runner.AgentStepBash
 			translated.Command = &step.Bash
 		} else {
 			translated.Type = runner.AgentStepPrompt
 			translated.Prompt = &step.Prompt
+			if step.Chat != "" {
+				translated.Prompt = &step.Chat
+			}
 		}
 		steps = append(steps, translated)
 	}

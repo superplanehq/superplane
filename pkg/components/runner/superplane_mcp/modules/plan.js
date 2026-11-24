@@ -121,5 +121,16 @@ const PROPOSE_PLAN = {
 };
 
 module.exports = {
-  tools: [PROPOSE_PLAN],
+  tools: [PROPOSE_PLAN, {
+    definition: {
+      name: "survey",
+      description: "Ask the user questions with selectable options and an optional recommendation. The user can also write an answer. After posting, finish your response and wait for the next user message.",
+      inputSchema: PROPOSE_PLAN.definition.inputSchema.properties.survey,
+    },
+    handler: async (input, client) => {
+      const questions = surveyQuestions(input);
+      if (!questions.length) throw new Error("A survey needs a question.");
+      return client.request("POST", "/api/v1/runner/task/surveys", { questions });
+    },
+  }],
 };
