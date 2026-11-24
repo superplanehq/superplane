@@ -195,22 +195,23 @@ function parseAgent(value: unknown): AutomationAgent {
   }
   if (entry.credentials === undefined) return { harness, model };
   if (harness === "superplane") problem("agent.credentials", "SuperPlane uses workspace credentials.");
-  const credentials = mapping(entry.credentials, "agent.credentials", ["source", "name"]);
+  const credentials = parseAgentCredentials(entry.credentials, harness);
+  return { harness, model, credentials };
+}
+
+function parseAgentCredentials(value: unknown, harness: AutomationHarness): AutomationCredentials {
+  const credentials = mapping(value, "agent.credentials", ["source", "name"]);
   if (credentials.source === "integration") {
-    return {
-      harness,
-      model,
-      credentials: { source: "integration", name: singleLine(credentials.name, "agent.credentials.name") },
-    };
+    return { source: "integration", name: singleLine(credentials.name, "agent.credentials.name") };
   }
   if (credentials.source === "subscription") {
     if (harness !== "codex") problem("agent.credentials.source", "A ChatGPT subscription requires Codex.");
     if (credentials.name !== undefined) problem("agent.credentials.name", "Remove the subscription name.");
-    return { harness, model, credentials: { source: "subscription" } };
+    return { source: "subscription" };
   }
   if (credentials.source === "hosted") {
     if (credentials.name !== undefined) problem("agent.credentials.name", "Remove the hosted connection name.");
-    return { harness, model, credentials: { source: "hosted" } };
+    return { source: "hosted" };
   }
   return problem("agent.credentials.source", "Use integration, hosted, or subscription.");
 }
