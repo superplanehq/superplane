@@ -132,14 +132,14 @@ func DeleteFactoryWebhook(
 		if err != nil {
 			return err
 		}
-		counts, err := models.CountActiveWebhookNodes(tx, []uuid.UUID{webhook.ID})
+		deleted, err := webhook.DeleteUnlessListening(tx)
 		if err != nil {
 			return err
 		}
-		if counts[webhook.ID] > 0 {
+		if !deleted {
 			return errFactoryWebhookInUse
 		}
-		return tx.Delete(webhook).Error
+		return nil
 	})
 	if err != nil {
 		return nil, factoryWebhookErrorToStatus(err, "failed to delete webhook")

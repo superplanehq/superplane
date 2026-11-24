@@ -10,6 +10,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/encryption"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type NodeWebhookContext struct {
@@ -109,7 +110,8 @@ func (c *NodeWebhookContext) Bind(webhookID string) (string, error) {
 	if canvas.FactoryID == nil {
 		return "", fmt.Errorf("only workspace apps can use workspace webhooks")
 	}
-	webhook, err := models.FindFactoryWebhook(c.tx, canvas.OrganizationID, *canvas.FactoryID, id)
+	// The share lock keeps the webhook from being deleted until this publish commits.
+	webhook, err := models.FindFactoryWebhook(c.tx.Clauses(clause.Locking{Strength: "SHARE"}), canvas.OrganizationID, *canvas.FactoryID, id)
 	if err != nil {
 		return "", err
 	}

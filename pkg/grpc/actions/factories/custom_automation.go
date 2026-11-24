@@ -1230,14 +1230,13 @@ func celString(value string) string {
 
 func appendWebhookPayloadInstructions(runnerConfiguration map[string]any) {
 	steps, _ := runnerConfiguration["steps"].([]any)
-	for i := len(steps) - 1; i >= 0; i-- {
-		step, _ := steps[i].(map[string]any)
+	for _, item := range steps {
+		step, _ := item.(map[string]any)
 		if step["type"] != runner.AgentStepPrompt && step["type"] != "prompt" {
 			continue
 		}
 		prompt, _ := step["prompt"].(string)
 		step["prompt"] = prompt + webhookPayloadInstructions
-		return
 	}
 }
 

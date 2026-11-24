@@ -1,5 +1,6 @@
 import { Link } from "react-router";
 
+import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useFactoryWebhooks } from "@/hooks/useFactoryWebhooks";
@@ -32,6 +33,22 @@ export function CustomAutomationWebhookFields({
 
   if (webhooks.isLoading) {
     return <p className="text-xs text-muted-foreground">Loading webhooks...</p>;
+  }
+  if (webhooks.isError) {
+    return (
+      <p className="text-xs text-muted-foreground" role="alert">
+        SuperPlane could not load the webhooks.{" "}
+        <Button
+          type="button"
+          variant="link"
+          size="sm"
+          className="h-auto p-0 text-xs"
+          onClick={() => void webhooks.refetch()}
+        >
+          Try again
+        </Button>
+      </p>
+    );
   }
   if (options.length === 0 && !selected) {
     return (

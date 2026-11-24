@@ -108,7 +108,8 @@ func TestBacklogWebhookAutomationCreatesTasksFromThePayload(t *testing.T) {
 		Agent:                   &pb.FactoryAppTemplateAgent{Component: "runnerClaudeCode", Model: "claude-sonnet-4-6"},
 		ExecutionTimeoutSeconds: 3600,
 		Steps: []*pb.FactoryCustomAutomation_Step{
-			{Name: "Triage", Type: pb.FactoryCustomAutomation_Step_TYPE_PROMPT, Prompt: prompt},
+			{Name: "Triage", Type: pb.FactoryCustomAutomation_Step_TYPE_PROMPT, Prompt: "Read the Jira issue."},
+			{Name: "Create", Type: pb.FactoryCustomAutomation_Step_TYPE_PROMPT, Prompt: prompt},
 		},
 	}
 	automation, err := CreateFactoryCustomAutomation(ctx, deps, orgID, &pb.CreateFactoryCustomAutomationRequest{
@@ -129,19 +130,21 @@ func TestBacklogWebhookAutomationCreatesTasksFromThePayload(t *testing.T) {
 	template := runnerNode.Metadata.Data()[models.FactoryAppTemplateMetadataKey].(map[string]any)
 	assert.Equal(t, "scheduled", template["startMode"], "the runner token needs the create_task scope")
 
-	resolve := func(payload map[string]any) string {
+	resolve := func(payload map[string]any, step int) string {
 		configuration, err := contexts.NewNodeConfigurationBuilder(db, canvasID).WithRootPayload(payload).Build(runnerNode.Configuration.Data())
 		require.NoError(t, err)
-		return configuration["steps"].([]any)[0].(map[string]any)["prompt"].(string)
+		return configuration["steps"].([]any)[step].(map[string]any)["prompt"].(string)
 	}
-	fromWebhook := resolve(map[string]any{"type": "webhook", "data": map[string]any{
+	webhookPayload := map[string]any{"type": "webhook", "data": map[string]any{
 		"body": map[string]any{"issue": map[string]any{"key": "ENG-42", "summary": "{{ secrets }}"}},
-	}})
+	}}
+	assert.Contains(t, resolve(webhookPayload, 0), `"key": "ENG-42"`, "every prompt gets the request body")
+	fromWebhook := resolve(webhookPayload, 1)
 	assert.Contains(t, fromWebhook, prompt)
 	assert.Contains(t, fromWebhook, "create_task")
 	assert.Contains(t, fromWebhook, `"key": "ENG-42"`)
 	assert.Contains(t, fromWebhook, `"summary": "{{ secrets }}"`, "payload text must not run as an expression")
-	assert.NotContains(t, resolve(map[string]any{"type": "manual.run", "data": map[string]any{}}), "webhook started this run")
+	assert.NotContains(t, resolve(map[string]any{"type": "manual.run", "data": map[string]any{}}, 1), "webhook started this run")
 
 	listed, err := ListFactoryWebhooks(ctx, deps, orgID, &pb.ListFactoryWebhooksRequest{FactoryId: factory.ID.String()})
 	require.NoError(t, err)
@@ -155,8 +158,9 @@ func TestBacklogWebhookAutomationCreatesTasksFromThePayload(t *testing.T) {
 	require.NoError(t, err)
 	runnerNode, err = models.FindCanvasNode(db, canvasID, customAutomationRunnerID)
 	require.NoError(t, err)
-	published := runnerNode.Configuration.Data()["steps"].([]any)[0].(map[string]any)["prompt"].(string)
-	assert.Equal(t, 1, strings.Count(published, "webhook started this run"))
+	for _, step := range runnerNode.Configuration.Data()["steps"].([]any) {
+		assert.Equal(t, 1, strings.Count(step.(map[string]any)["prompt"].(string), "webhook started this run"))
+	}
 
 	for name, change := range map[string]func(*pb.FactoryCustomAutomation_Settings){
 		"unknown webhook": func(s *pb.FactoryCustomAutomation_Settings) { s.Triggers[0].WebhookId = uuid.NewString() },

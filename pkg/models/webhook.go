@@ -320,6 +320,23 @@ func (w *Webhook) ReplaceSecret(tx *gorm.DB, encrypted []byte) error {
 	}).Error
 }
 
+// DeleteUnlessListening soft-deletes a workspace webhook when no live node listens on it.
+// The row lock conflicts with the share lock that a binding node takes, so a
+// concurrent publish cannot attach a node to a deleted webhook.
+func (w *Webhook) DeleteUnlessListening(tx *gorm.DB) (bool, error) {
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", w.ID).First(w).Error; err != nil {
+		return false, err
+	}
+	counts, err := CountActiveWebhookNodes(tx, []uuid.UUID{w.ID})
+	if err != nil {
+		return false, err
+	}
+	if counts[w.ID] > 0 {
+		return false, nil
+	}
+	return true, tx.Delete(w).Error
+}
+
 func ListFactoryWebhooks(tx *gorm.DB, organizationID, factoryID uuid.UUID) ([]Webhook, error) {
 	var webhooks []Webhook
 	err := tx.
