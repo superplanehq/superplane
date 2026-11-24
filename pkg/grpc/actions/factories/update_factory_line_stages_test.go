@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/automations"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
@@ -16,6 +17,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
+	"gorm.io/datatypes"
 )
 
 func TestUpdateFactoryLineStages(t *testing.T) {
@@ -158,10 +160,10 @@ func TestUpdateFactoryLineStages(t *testing.T) {
 		config.Stages = []*pb.FactoryLine_Stage{result.Line.Stages[0], result.Line.Stages[1], result.Line.Stages[3]}
 		move.SourceKey, move.DestinationKey = card.DisplayColumnKey, "backlog"
 		_, err = UpdateFactoryLine(t.Context(), deps, r.Organization.ID.String(), req)
-		require.NoError(t, err)
+		require.ErrorContains(t, err, "Backlog")
 		card, err = models.FindCanvasInTransaction(db, r.Organization.ID, canvas.ID)
 		require.NoError(t, err)
-		assert.Equal(t, "backlog", card.DisplayColumnKey)
+		assert.Equal(t, result.Line.Stages[2].Key, card.DisplayColumnKey)
 		assert.Equal(t, "verify", *card.ColumnKey)
 	})
 
@@ -186,12 +188,21 @@ func TestUpdateFactoryLineStages(t *testing.T) {
 		})
 		require.NoError(t, err)
 		id := created.CustomAutomation.Automation.Id
+		before, err := models.FindCanvasInTransaction(db, r.Organization.ID, uuid.MustParse(id))
+		require.NoError(t, err)
 		move := &pb.FactoryLine_AutomationMove{Type: "canvas", AutomationId: id, SourceKey: "backlog", DestinationKey: "new-qa"}
 		stages := factoryLineStageRequests(line.StagesValue())
 		stages = append(stages[:2], &pb.FactoryLine_Stage{Key: "new-qa", Name: "QA"}, stages[2])
 		req := &pb.UpdateFactoryLineRequest{FactoryId: factory.ID.String(), LineId: line.ID.String(), StageConfiguration: &pb.FactoryLine_StageConfiguration{Stages: stages, AutomationMoves: []*pb.FactoryLine_AutomationMove{move}}}
-		_, err = UpdateFactoryLine(ctx, deps, r.Organization.ID.String(), req)
-		require.ErrorContains(t, err, "Keep one task_enters_stage trigger")
+		placed, err := UpdateFactoryLine(ctx, deps, r.Organization.ID.String(), req)
+		require.NoError(t, err)
+		card, err := models.FindCanvasInTransaction(db, r.Organization.ID, uuid.MustParse(id))
+		require.NoError(t, err)
+		require.Equal(t, "backlog", *card.ColumnKey)
+		require.Equal(t, before.LiveVersionID, card.LiveVersionID)
+		require.Equal(t, placed.Line.Stages[2].Key, card.DisplayColumnKey)
+		req.StageConfiguration.Stages = placed.Line.Stages
+		move.SourceKey = card.DisplayColumnKey
 		move.DestinationKey = "verify"
 		_, err = UpdateFactoryLine(ctx, deps, r.Organization.ID.String(), req)
 		require.NoError(t, err)
@@ -210,6 +221,74 @@ func TestUpdateFactoryLineStages(t *testing.T) {
 		runs, err = models.ListCanvasRuns(db, uuid.MustParse(id), 10, nil, models.CanvasRunFilters{})
 		require.NoError(t, err)
 		require.Len(t, runs, 1)
+	})
+
+	t.Run("saves incompatible task placements without changing execution", func(t *testing.T) {
+		factory := seedHandOffFactory(t, r, db)
+		vcs := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
+		agent := createReadyOnboardingIntegration(t, r.Organization.ID, "claude")
+		require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSIntegrationID: &vcs, AgentIntegrationID: &agent}))
+		require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
+		_, err := models.UpsertOrganizationBYOKModelAllowlist(db, r.Organization.ID, models.UsageProviderAnthropic, datatypes.JSONSlice[string]{"claude-opus-5-5"})
+		require.NoError(t, err)
+		require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
+		app, entrypoint := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "Implement", "start")
+		step := models.FactoryLineStep{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entrypoint}
+		line, err := factory.CreateLine(db, "Review", []models.FactoryLineStep{step, step})
+		require.NoError(t, err)
+		stage := models.FactoryLineStage{ID: uuid.New(), Key: "custom-qa", Name: "QA", Kind: models.FactoryLineStageCustom}
+		stages := line.StagesValue()
+		stages[2].Name = "Check"
+		stages = append(stages[:1], append([]models.FactoryLineStage{stage}, stages[1:]...)...)
+		require.NoError(t, line.UpdateConfiguration(db, nil, nil, nil, stages))
+		ctx, deps := onboardingContext(r), onboardingDeps(r)
+		service := automations.Service{Backend: CanvasAutomationBackend{Deps: deps}}
+		require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureAutomationsAsCode))
+		for _, origin := range []string{stage.Key, "implement"} {
+			created, err := service.Create(ctx, automations.Placement{OrganizationID: r.Organization.ID, FactoryID: factory.ID, Stage: origin}, r.User, "apiVersion: v2\nkind: Automation\nname: Inspect "+origin+"\ntriggers:\n  - use: task_enters_stage\nsteps:\n  - name: Inspect\n    bash: pwd\n")
+			require.NoError(t, err)
+			id := created.ID
+			before, err := models.FindCanvasInTransaction(db, r.Organization.ID, id)
+			require.NoError(t, err)
+			source := origin
+			if source == "implement" {
+				source = "phase-0"
+			}
+			for _, destination := range []string{"verify", "phase-1"} {
+				move := &pb.FactoryLine_AutomationMove{Type: "canvas", AutomationId: id.String(), ExecutionKey: origin, SourceKey: source, DestinationKey: destination}
+				if origin == "implement" {
+					move.ExecutionKey = "phase-0"
+				}
+				req := &pb.UpdateFactoryLineRequest{FactoryId: factory.ID.String(), LineId: line.ID.String(), StageConfiguration: &pb.FactoryLine_StageConfiguration{Stages: factoryLineStageRequests(stages), AutomationMoves: []*pb.FactoryLine_AutomationMove{move}}}
+				_, err := UpdateFactoryLine(ctx, deps, r.Organization.ID.String(), req)
+				require.NoError(t, err)
+				card, err := models.FindCanvasInTransaction(db, r.Organization.ID, id)
+				require.NoError(t, err)
+				require.Equal(t, destination, card.DisplayColumnKey)
+				require.Equal(t, origin, *card.ColumnKey)
+				require.Equal(t, before.LiveVersionID, card.LiveVersionID)
+				sourceAfter, err := service.Read(ctx, r.Organization.ID, id)
+				require.NoError(t, err)
+				require.Equal(t, created.Revision, sourceAfter.Revision)
+				require.Equal(t, created.YAML, sourceAfter.YAML)
+				runs, err := models.ListCanvasRuns(db, id, 10, nil, models.CanvasRunFilters{})
+				require.NoError(t, err)
+				require.Empty(t, runs)
+				if origin == stage.Key {
+					req.StageConfiguration.AutomationMoves = nil
+					req.StageConfiguration.Stages = factoryLineStageRequests(append([]models.FactoryLineStage{stages[0]}, stages[2:]...))
+					_, err = UpdateFactoryLine(ctx, deps, r.Organization.ID.String(), req)
+					require.ErrorContains(t, err, "Keep the execution stage")
+				}
+				source = destination
+			}
+		}
+		move := &pb.FactoryLine_AutomationMove{Type: "agent-step", AutomationId: app.ID.String(), ExecutionKey: "phase-0", SourceKey: "phase-0", DestinationKey: "backlog"}
+		_, err = UpdateFactoryLine(ctx, deps, r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{FactoryId: factory.ID.String(), LineId: line.ID.String(), StageConfiguration: &pb.FactoryLine_StageConfiguration{Stages: factoryLineStageRequests(stages), AutomationMoves: []*pb.FactoryLine_AutomationMove{move}}})
+		require.ErrorContains(t, err, "Backlog")
+		runs, err := models.ListCanvasRuns(db, app.ID, 10, nil, models.CanvasRunFilters{})
+		require.NoError(t, err)
+		require.Empty(t, runs)
 	})
 
 	t.Run("removes optional system stages", func(t *testing.T) {
