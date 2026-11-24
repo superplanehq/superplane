@@ -98,6 +98,10 @@ export function useCustomAutomationSetupPage(args: {
       setSaveError("Enter a cron expression and choose a timezone.");
       return false;
     }
+    if (activeTriggers.some((trigger) => trigger.mode === "webhook" && !trigger.webhookId)) {
+      setSaveError("Select a webhook for each webhook trigger.");
+      return false;
+    }
     if (validationError) {
       setSaveError(validationError);
       return;

@@ -34,9 +34,9 @@ type Definition struct {
 }
 
 type Trigger struct {
-	ID     string     `yaml:"id,omitempty" json:"id,omitempty"`
-	Use    TriggerUse `yaml:"use" json:"use"`
-	Config *Schedule  `yaml:"config,omitempty" json:"config,omitempty"`
+	ID     string         `yaml:"id,omitempty" json:"id,omitempty"`
+	Use    TriggerUse     `yaml:"use" json:"use"`
+	Config *TriggerConfig `yaml:"config,omitempty" json:"config,omitempty"`
 }
 
 type TriggerUse string
@@ -47,11 +47,15 @@ const (
 	TaskLeavesStage    TriggerUse = "task_leaves_stage"
 	PullRequestUpdated TriggerUse = "pull_request_updated"
 	Scheduled          TriggerUse = "schedule"
+	Webhook            TriggerUse = "webhook"
 )
 
-type Schedule struct {
-	Cron      string  `yaml:"cron" json:"cron"`
+// TriggerConfig holds the schedule fields or the webhook ID. The schema
+// allows only the fields for the trigger type.
+type TriggerConfig struct {
+	Cron      string  `yaml:"cron,omitempty" json:"cron,omitempty"`
 	UTCOffset float64 `yaml:"utc_offset,omitempty" json:"utc_offset"`
+	WebhookID string  `yaml:"webhook_id,omitempty" json:"webhook_id,omitempty"`
 }
 
 type Step struct {

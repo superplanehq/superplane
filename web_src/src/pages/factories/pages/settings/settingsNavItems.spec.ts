@@ -54,6 +54,7 @@ describe("FACTORY_SETTINGS_NAV_GROUPS", () => {
       "General",
       "Models",
       "MCP Server",
+      "Webhooks",
       "Usage",
       "General",
       "Members",
@@ -93,6 +94,7 @@ describe("filterFactorySettingsNavGroups", () => {
       "workspace-general",
       "workspace-models",
       "workspace-superplane-mcp-server",
+      "workspace-webhooks",
       "workspace-usage",
     ]);
   });

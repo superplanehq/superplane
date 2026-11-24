@@ -14,6 +14,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="On Broadcast" href="#on-broadcast" description="Receive broadcast messages from another SuperPlane app" />
   <LinkCard title="On Error" href="#on-error" description="Run a workflow whenever any node in this canvas errors out" />
   <LinkCard title="On Run" href="#on-run" description="Handle runs started from another app" />
+  <LinkCard title="On Workspace Webhook" href="#on-workspace-webhook" description="Start when a workspace webhook receives a request" />
   <LinkCard title="On Task" href="#on-task" description="Start when a task is created in this factory" />
   <LinkCard title="Schedule" href="#schedule" description="Start a new execution chain on a schedule" />
   <LinkCard title="Manual Run" href="#manual-run" description="Start a new execution chain manually" />
@@ -213,6 +214,54 @@ Handle runs started from another app
   },
   "timestamp": "2026-07-19T12:00:00Z",
   "type": "app.invocation"
+}
+```
+
+<a id="on-workspace-webhook"></a>
+
+## On Workspace Webhook
+
+**Trigger key:** `onWebhook`
+
+The On Workspace Webhook trigger starts a workflow when a webhook from the workspace settings receives a request.
+
+Create the webhook in the workspace settings, then select it in a factory automation. More than one automation can use the same webhook.
+
+### Event Data
+
+Each event has type `webhook`. The payload is:
+
+```
+{
+  "body": { "...": "the JSON request body" },
+  "headers": { "Content-Type": ["application/json"] }
+}
+```
+
+SuperPlane masks the authentication header before it stores the event.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "body": {
+      "issue": {
+        "key": "ENG-42",
+        "summary": "Checkout fails for saved cards"
+      }
+    },
+    "headers": {
+      "Authorization": [
+        "Bearer ********"
+      ],
+      "Content-Type": [
+        "application/json"
+      ]
+    }
+  },
+  "timestamp": "2026-01-01T00:00:00Z",
+  "type": "webhook"
 }
 ```
 
