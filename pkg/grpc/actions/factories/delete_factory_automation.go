@@ -27,34 +27,41 @@ func DeleteFactoryAutomation(
 		return nil, factoryErrorToStatus(err, "failed to delete factory automation")
 	}
 
-	db := database.DB(ctx)
-	factory, err := findFactory(db, orgID, req.GetFactoryId())
+	var canvas *models.Canvas
+	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
+		factory, err := findFactory(tx, orgID, req.GetFactoryId())
+		if err != nil {
+			return err
+		}
+		factory, err = models.LockAutomationFactory(tx, orgID, factory.ID)
+		if err != nil {
+			return err
+		}
+		canvas, err = models.FindCanvasInTransaction(tx, orgID, automationID)
+		if err != nil {
+			return err
+		}
+		if canvas.FactoryID == nil || *canvas.FactoryID != factory.ID {
+			return gorm.ErrRecordNotFound
+		}
+		if err := detachFactoryAutomation(tx, factory, canvas); err != nil {
+			return err
+		}
+		return canvases.DeleteCanvasInTransaction(tx, canvas)
+	})
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to delete factory automation")
 	}
-
-	canvas, err := models.FindCanvasInTransaction(db, orgID, automationID)
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to delete factory automation")
-	}
-	if canvas.FactoryID == nil || *canvas.FactoryID != factory.ID {
-		return nil, factoryErrorToStatus(gorm.ErrRecordNotFound, "failed to delete factory automation")
-	}
-
-	if err := rejectReservedFactoryAutomation(db, factory, canvas); err != nil {
-		return nil, factoryErrorToStatus(err, "failed to delete factory automation")
-	}
-
-	if _, err := canvases.DeleteCanvas(ctx, db, canvas); err != nil {
-		return nil, err
-	}
+	canvases.PublishCanvasDeleted(canvas)
 
 	return &pb.DeleteFactoryAutomationResponse{}, nil
 }
 
-func rejectReservedFactoryAutomation(tx *gorm.DB, factory *models.Factory, canvas *models.Canvas) error {
-	if _, err := models.FindFactoryIntakeByCanvasID(tx, canvas.ID); err == nil {
-		return errFactoryAutomationReserved
+func detachFactoryAutomation(tx *gorm.DB, factory *models.Factory, canvas *models.Canvas) error {
+	if intake, err := models.FindFactoryIntakeByCanvasID(tx, canvas.ID); err == nil {
+		if err := intake.Delete(tx); err != nil {
+			return err
+		}
 	} else if !errors.Is(err, models.ErrFactoryIntakeNotFound) {
 		return err
 	}
@@ -64,15 +71,9 @@ func rejectReservedFactoryAutomation(tx *gorm.DB, factory *models.Factory, canva
 		return err
 	}
 	if handler != nil {
-		return errFactoryAutomationReserved
-	}
-
-	liveVersion, err := models.FindLiveCanvasVersionInTransaction(tx, canvas.ID)
-	if err != nil {
-		return err
-	}
-	if models.IsBacklogFactoryApp(liveVersion.Nodes, liveVersion.Edges) {
-		return errFactoryAutomationReserved
+		if err := handler.Delete(tx); err != nil {
+			return err
+		}
 	}
 
 	lines, err := factory.ListLines(tx)
@@ -80,10 +81,12 @@ func rejectReservedFactoryAutomation(tx *gorm.DB, factory *models.Factory, canva
 		return err
 	}
 	for _, line := range lines {
-		for _, step := range line.Steps {
-			if step.AppID == canvas.ID {
-				return errFactoryAutomationReserved
-			}
+		locked, err := factory.FindLineForUpdate(tx, line.ID)
+		if err != nil {
+			return err
+		}
+		if err := locked.DetachAutomation(tx, canvas.ID); err != nil {
+			return err
 		}
 	}
 

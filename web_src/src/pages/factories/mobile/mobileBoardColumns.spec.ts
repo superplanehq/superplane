@@ -25,6 +25,68 @@ const DONE_ORDER: FactoriesWorkOrder = {
 };
 
 describe("buildMobileBoardColumns", () => {
+  it("keeps detached stages and maps compacted steps to their original lanes", () => {
+    const order: FactoriesWorkOrder = {
+      id: "retained-task",
+      state: "STATE_OPEN",
+      lineDispatches: [
+        {
+          id: "dispatch",
+          line: { id: REFUND_LINE_PLAN_ID },
+          stepExecutions: [
+            {
+              id: "execution",
+              stepIndex: 0,
+              stageKey: "phase-1",
+              state: "STATE_STARTED",
+              run: { id: "run", appId: PLAN_LINE.steps![1].app!.app },
+            },
+          ],
+        },
+      ],
+    };
+    const columns = buildMobileBoardColumns(
+      {
+        ...PLAN_LINE,
+        steps: [PLAN_LINE.steps![1]],
+        stages: [
+          { id: "empty", key: "phase-0", name: "Implement", kind: "STAGE_KIND_PHASE" },
+          { id: "retained", key: "phase-1", name: "Release", kind: "STAGE_KIND_PHASE", stepIndex: 0 },
+        ],
+      },
+      [
+        order,
+        {
+          id: "deleted-task",
+          state: "STATE_OPEN",
+          lineDispatches: [
+            {
+              id: "old-dispatch",
+              line: { id: REFUND_LINE_PLAN_ID },
+              currentStageKey: "phase-0",
+              stepExecutions: [
+                {
+                  id: "old-execution",
+                  stepIndex: 0,
+                  stageKey: "phase-0",
+                  state: "STATE_STARTED",
+                  run: { id: "old-run", appId: PLAN_LINE.steps![0].app!.app },
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      REFUND_FACTORY_APPS,
+    );
+    expect(columns.map((column) => [column.key, column.title])).toEqual([
+      ["phase-0", "Implement"],
+      ["phase-1", "Release"],
+    ]);
+    expect(columns[0].cards.map((card) => card.order.id)).toEqual(["deleted-task"]);
+    expect(columns[0].glyph).toBeUndefined();
+    expect(columns[1].cards.map((card) => card.order.id)).toEqual(["retained-task"]);
+  });
   it("lays out Backlog, each line phase, Verify, and Done as one flat swipe order", () => {
     const columns = buildMobileBoardColumns(PLAN_LINE, [BACKLOG_DRAFT, DONE_ORDER], REFUND_FACTORY_APPS);
 

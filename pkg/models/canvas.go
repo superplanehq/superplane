@@ -197,6 +197,19 @@ func (c *Canvas) SoftDeleteInTransaction(tx *gorm.DB) error {
 	return tx.Model(c).Updates(map[string]any{"name": newName, "deleted_at": now}).Error
 }
 
+// Deleted workspace automations keep their saved runs until the workspace or organization is deleted.
+func (c *Canvas) RetainsFactoryHistory(tx *gorm.DB) (bool, error) {
+	if c.FactoryID == nil {
+		return false, nil
+	}
+	var count int64
+	err := tx.Model(&Factory{}).
+		Joins("JOIN organizations ON organizations.id = factories.organization_id").
+		Where("factories.id = ? AND organizations.deleted_at IS NULL", *c.FactoryID).
+		Count(&count).Error
+	return count > 0, err
+}
+
 func FindCanvas(orgID, id uuid.UUID) (*Canvas, error) {
 	return FindCanvasInTransaction(database.Conn(), orgID, id)
 }

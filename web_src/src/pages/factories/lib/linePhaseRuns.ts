@@ -27,6 +27,7 @@ export type LinePhaseRunCard = {
 };
 
 export type LinePhaseColumn = {
+  stageKey?: string;
   stepName: string;
   stepIndex: number;
   /** Factory app id for this runApp step, when present. */
@@ -101,6 +102,9 @@ export function buildLinePhaseBoard(
   }
 
   const columns: LinePhaseColumn[] = steps.map((step, stepIndex) => ({
+    stageKey: orderedLineBoardStages(line).find(
+      (stage) => stage.kind === "STAGE_KIND_PHASE" && stage.stepIndex === stepIndex,
+    )?.key,
     stepName: automationNameForLineStep(step, apps, stepIndex),
     stepIndex,
     appId: step.app?.app?.trim() || undefined,
@@ -468,6 +472,10 @@ function liveColumnIndexForExecution(
     if (stage?.kind === "STAGE_KIND_CUSTOM" || stageKey.startsWith("custom-")) {
       return undefined;
     }
+    // A detached stage still owns its saved executions, even after step indexes compact.
+    if (stage?.kind === "STAGE_KIND_PHASE" && stage.stepIndex == null) {
+      return undefined;
+    }
     const savedStageIndex = stage?.stepIndex;
     if (isValidSavedStageIndex(savedStageIndex, steps.length, runsExecutionApp)) {
       return savedStageIndex;
@@ -494,17 +502,9 @@ function closestAppColumnIndex(
   executionAppId: string,
   stepIndex: number,
 ): number | undefined {
-  const matches: number[] = [];
-  for (let index = 0; index < steps.length; index++) {
-    if (steps[index]?.app?.app?.trim() === executionAppId) {
-      matches.push(index);
-    }
-  }
+  const matches = steps.flatMap((step, index) => (step.app?.app?.trim() === executionAppId ? [index] : []));
   if (matches.length === 0) {
     return undefined;
-  }
-  if (matches.length === 1) {
-    return matches[0];
   }
   return matches.reduce((best, index) => (Math.abs(index - stepIndex) < Math.abs(best - stepIndex) ? index : best));
 }

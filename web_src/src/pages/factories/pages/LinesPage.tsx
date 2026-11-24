@@ -723,13 +723,9 @@ export function LinesPage() {
   };
 
   const viewedAutomation = factoryApps.find((app) => app.id === automationViewCanvasId);
-  const canDeleteViewedCustom =
-    canUpdate &&
-    (viewedAutomation?.columnKey === "backlog" ||
-      viewedAutomation?.columnKey === "verify" ||
-      viewedAutomation?.columnKey === "done");
+  const canDeleteViewedAutomation = canUpdate && Boolean(viewedAutomation?.id);
   const closeAutomationView = () => navigate(factoryHomePath(organizationId, routeSegment, selectedLine.id));
-  const deleteViewedCustomAutomation = async () => {
+  const deleteViewedAutomation = async () => {
     if (!automationViewCanvasId) {
       return;
     }
@@ -804,7 +800,7 @@ export function LinesPage() {
           columnKey={viewedAutomation?.columnKey}
           title={viewedAutomation?.name?.trim() || "Automation"}
           onClose={closeAutomationView}
-          onDelete={canDeleteViewedCustom ? deleteViewedCustomAutomation : undefined}
+          onDelete={canDeleteViewedAutomation ? deleteViewedAutomation : undefined}
           deletePending={deleteAutomation.isPending}
         />
       ) : null}
@@ -1918,7 +1914,7 @@ function PhaseBoard({
     () =>
       displayedStageOrder.filter(
         (stage) =>
-          stage.kind !== "STAGE_KIND_PHASE" || (stage.stepIndex !== undefined && phaseByStep.has(stage.stepIndex)),
+          stage.kind !== "STAGE_KIND_PHASE" || stage.stepIndex === undefined || phaseByStep.has(stage.stepIndex),
       ),
     [displayedStageOrder, phaseByStep],
   );
@@ -2097,15 +2093,51 @@ function PhaseBoard({
       );
     }
 
+    if (stage.kind === "STAGE_KIND_PHASE" && stage.stepIndex === undefined) {
+      const lane = lineBoardColumnLaneProps(columnColors[stage.key] ?? null, colorView);
+      const runs = lineId
+        ? collectCustomStageRuns(lineId, stage.key, workOrders).filter((run) => !verifyOrderIds.has(run.workOrderId))
+        : [];
+      return (
+        <WorkOrderBoardLane
+          title={stageName(stage.key, stage.name)}
+          count={runs.length}
+          keepChildrenWhenEmpty={cardsPending}
+          emptyDescription="No automation in this stage."
+          surfaceClassName={lane.surfaceClassName}
+          className={lane.className}
+          canRename={canRename}
+          onRename={(title) => setColumnTitle(stage.key, title)}
+          titleTestId={`lines-column-title-${stage.key}`}
+          testId={`lines-empty-${stage.key}`}
+          subheader={columnAutomationRowsSubheader({
+            title: stage.name,
+            automations: rowsFor(stage.key),
+            rowCount: automationRowCount(rowsFor(stage.key)),
+            onRowAction: onAutomationRowAction,
+            testId: `lines-${stage.key}-automation-rows`,
+          })}
+        >
+          <LineBoardColumnCardList pending={cardsPending} className={workOrderKanbanLaneScrollClassName}>
+            {runs.map((run) => (
+              <li key={run.executionId}>
+                <PhaseRunCard run={run} workOrderCardContext={workOrderCardContext} onOpenWorkOrder={onOpenWorkOrder} />
+              </li>
+            ))}
+          </LineBoardColumnCardList>
+        </WorkOrderBoardLane>
+      );
+    }
     if (stage.kind === "STAGE_KIND_PHASE" && stage.stepIndex !== undefined) {
       const column = phaseByStep.get(stage.stepIndex);
       if (!column) {
         return null;
       }
-      const columnKey: ColumnKey = `phase-${column.stepIndex}`;
+      const columnKey = stage.key as ColumnKey;
       const automations = rowsFor(stage.key);
       return (
         <PhaseColumn
+          stageKey={stage.key}
           organizationId={organizationId}
           factoryKey={factoryKey}
           lineId={lineId}
@@ -2747,6 +2779,7 @@ const PHASE_LANE_TONE: Record<PhaseGlyphKind, BoardLaneTone> = {
 };
 
 function PhaseColumn({
+  stageKey,
   organizationId,
   factoryKey,
   lineId,
@@ -2770,6 +2803,7 @@ function PhaseColumn({
   paging,
   cardsPending,
 }: {
+  stageKey: string;
   organizationId: string;
   factoryKey: string;
   lineId?: string;
@@ -2795,7 +2829,7 @@ function PhaseColumn({
 }) {
   const disclosure = useColumnAutomationCollapsePreference(automationPreferenceKey, automations?.length ?? 0);
   const { scrollRef, handleScroll } = useFactoryBoardLaneScroll(
-    lineId ? factoryBoardLaneScrollKey(factoryKey, lineId, `step-${column.stepIndex}`) : undefined,
+    lineId ? factoryBoardLaneScrollKey(factoryKey, lineId, stageKey as `phase-${number}`) : undefined,
     !cardsPending,
   );
   const [parallelismOpen, setParallelismOpen] = useState(false);
@@ -2827,8 +2861,8 @@ function PhaseColumn({
         keepChildrenWhenEmpty={cardsPending}
         canRename={canRename}
         onRename={onRename}
-        titleTestId={`lines-column-title-phase-${column.stepIndex}`}
-        testId={`lines-phase-column-${column.stepIndex}`}
+        titleTestId={`lines-column-title-${stageKey}`}
+        testId={`lines-${stageKey.replace("phase-", "phase-column-")}`}
         subheaderOwnSpacing
         subheader={columnAutomationRowsSubheader({
           disclosure,

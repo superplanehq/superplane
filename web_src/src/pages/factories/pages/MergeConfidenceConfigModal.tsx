@@ -1,6 +1,7 @@
 import type { SuperplaneComponentsNode } from "@/api-client";
 import type { RunsSidebarHrefForRun } from "@/components/CanvasToolSidebar/runsSidebarHref";
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { getApiErrorMessage } from "@/lib/errors";
 
 import { DEFAULT_SPLIT_CONFIG_DELETE_COPY, type SplitConfigDeleteCopy } from "./splitConfigDeleteCopy";
 import { MergeConfidenceConfigShell } from "./MergeConfidenceConfigShell";
@@ -60,6 +61,9 @@ export function MergeConfidenceConfigModal({
   const selection = useCanvasNodeSelection(graph, initialNodeId);
   const focus = usePanelFocus(tab, selection.selectedNodeId);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [localDeleteError, setLocalDeleteError] = useState<string>();
   const split = useSplitRunPanePercent({ defaultPercent: 50, minPercent: 28, maxPercent: 72 });
   const selectedNode = nodeForSelection(tab, selection.selectedNodeId, graph);
   const panelNode = visiblePanelNode(tab, selectedNode, selection.selectedNodeId, focus.panelWasOpen, fallbackNode);
@@ -69,10 +73,26 @@ export function MergeConfidenceConfigModal({
       title={title}
       page={page}
       onClose={onClose}
-      onDelete={onDelete}
+      onDelete={
+        onDelete
+          ? async () => {
+              if (deleting || deletePending || saving) return;
+              setDeleting(true);
+              setLocalDeleteError(undefined);
+              try {
+                await onDelete();
+              } catch (error) {
+                setLocalDeleteError(getApiErrorMessage(error, "Could not delete automation. Try again."));
+              } finally {
+                setDeleting(false);
+              }
+            }
+          : undefined
+      }
       deleteCopy={deleteCopy}
-      deletePending={deletePending}
-      deleteError={deleteError}
+      deletePending={deletePending || deleting}
+      savePending={saving}
+      deleteError={deleteError || localDeleteError}
       confirmDelete={confirmDelete}
       onConfirmDelete={() => setConfirmDelete(true)}
       onConfirmDeleteChange={setConfirmDelete}
@@ -90,7 +110,15 @@ export function MergeConfidenceConfigModal({
       isResizing={split.isResizing}
       onResizeStart={split.startResize}
       onClosePanel={selectedNode ? () => selection.setSelectedNodeId(null) : undefined}
-      onSaveNode={onSaveNode}
+      onSaveNode={async (update) => {
+        if (deleting || deletePending) throw new Error("Automation deletion is in progress.");
+        setSaving(true);
+        try {
+          await onSaveNode(update);
+        } finally {
+          setSaving(false);
+        }
+      }}
       graph={graph}
       loading={loading}
       error={error}

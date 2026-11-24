@@ -1015,7 +1015,7 @@ describe("LinesPage board stages", () => {
   });
 
   it("explains automation deletion before saving and cancels or discards without saving", async () => {
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_STAGES);
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
     const user = userEvent.setup();
     useFactoryAutomations.mockReturnValue({ data: [{ id: "app-qa", name: "Check QA", columnKey: "custom-qa" }] });
     renderLinesBoard(undefined, vi.fn(), customStageFactory());
@@ -1885,6 +1885,68 @@ describe("LinesPage board extras", () => {
     await waitFor(() => {
       expect(deleteFactoryAutomationMutateAsync).toHaveBeenCalledWith("app-create-env");
     });
+  });
+
+  it("deletes Implement and displays its detached stage after refresh", async () => {
+    useFactoryWorkOrders.mockReturnValue({
+      data: [
+        {
+          id: "running-task",
+          state: "STATE_OPEN",
+          title: "Keep running task visible",
+          lineDispatches: [
+            {
+              id: "running-dispatch",
+              line: { id: REFUND_LINE_PLAN_ID },
+              currentStageKey: "phase-0",
+              stepExecutions: [
+                {
+                  id: "running-execution",
+                  stepIndex: 0,
+                  stageKey: "phase-0",
+                  state: "STATE_STARTED",
+                  run: { id: "running-run", appId: "app-refund-implementer" },
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+    const appId = "app-refund-implementer";
+    useFactoryAutomations.mockReturnValue({ data: [{ id: appId, name: "Implement", columnKey: "implement" }] });
+    deleteFactoryAutomationMutateAsync.mockResolvedValueOnce(undefined);
+    const path = factoryColumnAutomationViewPath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT, REFUND_LINE_PLAN_ID, appId);
+    const view = renderLinesBoard(path);
+    const user = userEvent.setup();
+    await user.click(screen.getByTestId("column-automation-view-delete"));
+    expect(deleteFactoryAutomationMutateAsync).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Delete automation" }));
+    await waitFor(() => expect(deleteFactoryAutomationMutateAsync).toHaveBeenCalledTimes(1));
+    expect(deleteFactoryAutomationMutateAsync).toHaveBeenCalledWith(appId);
+    useFactoryAutomations.mockReturnValue({ data: [] });
+    const factory = {
+      ...REFUND_FACTORY,
+      lines: REFUND_FACTORY.lines!.map((line) =>
+        line.id === REFUND_LINE_PLAN_ID
+          ? {
+              ...line,
+              steps: line.steps!.slice(1),
+              stages: [
+                { id: "empty", key: "phase-0", name: "Implement", kind: "STAGE_KIND_PHASE" as const },
+                { id: "retained", key: "phase-1", name: "Release", kind: "STAGE_KIND_PHASE" as const, stepIndex: 0 },
+              ],
+            }
+          : line,
+      ),
+    };
+    view.rerender(<LinesBoardSpecHarness factory={factory} />);
+    expect(screen.getByTestId("lines-empty-phase-0")).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("lines-empty-phase-0")).getByTestId("lines-phase-run-running-execution"),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId("lines-column-title-phase-0")).toHaveTextContent("Implement");
+    expect(screen.queryByTestId("implement-settings-save")).not.toBeInTheDocument();
   });
 
   it("lists two intakes on the same source", () => {

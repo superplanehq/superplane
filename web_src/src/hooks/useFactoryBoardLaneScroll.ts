@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
 
 const persistedScrollTops = new Map<string, number>();
 
-export type FactoryBoardLaneId = "backlog" | "verify" | "done" | `step-${number}`;
+export type FactoryBoardLaneId = "backlog" | "verify" | "done" | `step-${number}` | `phase-${number}`;
 
 export function factoryBoardLaneScrollKey(workspaceId: string, lineId: string, lane: FactoryBoardLaneId): string {
   return `${workspaceId}:${lineId}:${lane}`;
