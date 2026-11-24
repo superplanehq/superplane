@@ -3,6 +3,7 @@ package public
 import (
 	"encoding/json"
 	"net/http"
+	"slices"
 	"strings"
 	"testing"
 
@@ -99,6 +100,31 @@ func TestScheduleAutomationCreatesATaskWithoutAnExistingTask(t *testing.T) {
 	assert.Equal(t, "draft", created.State)
 	rec = runnerRequest(t, server, http.MethodPost, token, "/api/v1/runner/task/close", `{}`)
 	assert.Equal(t, http.StatusForbidden, rec.Code)
+}
+
+func TestRunnerCreatedTasksLinkToTheCreatingRun(t *testing.T) {
+	r := support.Setup(t)
+	t.Setenv("JWT_SECRET", "test")
+	ctx, factory, _ := mustTaskLinkedAgentRun(t, r)
+	server := newRunnerArtifactTestServer(t, r, jwt.NewSigner("test"))
+	token := runnerTokenFrom(runner.AttachRunnerEnv(ctx, nil, 60))
+
+	db := database.DB(t.Context())
+	for _, title := range []string{"First follow-up", "Second follow-up"} {
+		rec := runnerRequest(t, server, http.MethodPost, token, "/api/v1/runner/tasks", `{"title":"`+title+`"}`)
+		require.Equal(t, http.StatusCreated, rec.Code, rec.Body.String())
+		created := decodeRunnerTask(t, rec.Body.Bytes())
+
+		order, err := factory.FindWorkOrder(db, uuid.MustParse(created.ID))
+		require.NoError(t, err)
+		require.NotNil(t, order.SourceRunID, "task %q has no source run", title)
+		assert.Equal(t, ctx.RunID, *order.SourceRunID)
+
+		runs, err := order.ListRuns(db)
+		require.NoError(t, err)
+		assert.True(t, slices.ContainsFunc(runs, func(run models.CanvasRun) bool { return run.ID == ctx.RunID }),
+			"task %q does not list its creating run", title)
+	}
 }
 
 func TestRunnerCreatesADraftTaskWithoutAnOwner(t *testing.T) {

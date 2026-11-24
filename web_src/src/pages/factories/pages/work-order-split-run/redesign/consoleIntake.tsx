@@ -27,7 +27,7 @@ import type { ColumnTiming } from "./columnTiming";
 import { ColumnTimingMeta } from "./consoleColumnTiming";
 
 function intakeSourceIcon(source?: SplitRunSource): { src: string; alt: string } {
-  if (source?.kind === "intake" || source?.kind === "mcp") {
+  if (source?.kind === "intake" || source?.kind === "mcp" || source?.kind === "automation") {
     return { src: source.iconSrc, alt: source.iconAlt };
   }
   return { src: superplaneMark, alt: "SuperPlane" };
@@ -168,7 +168,7 @@ function IntakeAddedBy({ source }: { source: SplitRunSource }) {
       className="flex shrink-0 items-center gap-1 text-[11px] font-medium text-muted-foreground"
       data-testid="redesign-console-intake-added-by"
     >
-      {addedBy.kind === "intake" ? <Bot className="size-3" aria-hidden /> : null}
+      {addedBy.kind === "intake" || addedBy.kind === "automation" ? <Bot className="size-3" aria-hidden /> : null}
       <span>{addedByLabel(addedBy)}</span>
     </span>
   );
@@ -181,7 +181,7 @@ function addedByLabel(addedBy: SplitRunAddedBy): string {
   if (addedBy.kind === "imported") {
     return `Imported by ${addedBy.personName}`;
   }
-  if (addedBy.kind === "mcp") {
+  if (addedBy.kind === "mcp" || addedBy.kind === "automation") {
     return addedBy.name;
   }
   return CREATED_MANUALLY;

@@ -134,9 +134,12 @@ func (s *Server) handleRunnerCreateTask(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// The run that calls this tool is the creator. Its link lets the task
+	// show the run that created it.
+	sourceRunID := scope.CanvasRunID
 	var order *models.FactoryWorkOrder
 	err = db.Transaction(func(tx *gorm.DB) error {
-		created, createErr := factoryModel.CreateWorkOrder(tx, title, description, nil, nil, nil)
+		created, createErr := factoryModel.CreateWorkOrder(tx, title, description, nil, nil, &sourceRunID)
 		if createErr != nil {
 			return createErr
 		}
