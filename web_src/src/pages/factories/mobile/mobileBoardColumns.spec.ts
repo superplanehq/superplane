@@ -50,9 +50,9 @@ describe("buildMobileBoardColumns", () => {
         stages: [
           { id: "backlog", key: "backlog", name: "Incoming", kind: "STAGE_KIND_BACKLOG" },
           { id: "phase-0", key: "phase-0", name: "Build", kind: "STAGE_KIND_PHASE", stepIndex: 0 },
-          { id: "custom", key: "custom-qa", name: "QA", kind: "STAGE_KIND_CUSTOM" },
+          { id: "custom", key: "custom-qa", name: "QA", kind: "STAGE_KIND_PHASE" },
           { id: "phase-1", key: "phase-1", name: "Release", kind: "STAGE_KIND_PHASE", stepIndex: 1 },
-          { id: "verify", key: "verify", name: "Check", kind: "STAGE_KIND_VERIFY" },
+          { id: "verify", key: "verify", name: "Check", kind: "STAGE_KIND_PHASE", autoAdvance: false },
           { id: "done", key: "done", name: "Shipped", kind: "STAGE_KIND_DONE" },
         ],
       },
