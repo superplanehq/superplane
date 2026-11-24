@@ -142,6 +142,81 @@ func TestCustomAutomationScheduleRoundTripAndTransitions(t *testing.T) {
 	}
 }
 
+func TestCustomAutomationCustomStageFormRoundTrip(t *testing.T) {
+	for _, test := range []struct {
+		name       string
+		key        string
+		repository string
+		withVCS    bool
+	}{
+		{name: "UUID key with workspace VCS", key: "custom-" + uuid.NewString(), repository: "acme/app", withVCS: true},
+		{name: "named key without workspace VCS", key: "custom-qa", repository: "acme/app"},
+		{name: "without workspace repository or VCS", key: "custom-qa"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			r := support.Setup(t)
+			db := database.DB(t.Context())
+			factory := seedHandOffFactory(t, r, db)
+			for _, feature := range []string{features.FeatureFactoryCustomAutomations, features.FeatureFactoryCustomStages} {
+				require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, feature))
+			}
+			vcsID := ""
+			if test.withVCS {
+				vcsID = createReadyOnboardingIntegration(t, r.Organization.ID, models.ProviderGitHub)
+			}
+			require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{AppRepository: &test.repository, VCSIntegrationID: &vcsID}))
+			line, err := factory.CreateLine(db, "QA", nil)
+			require.NoError(t, err)
+			stageID := uuid.New()
+			stage := models.FactoryLineStage{ID: stageID, Key: test.key, Name: "QA", Kind: models.FactoryLineStageCustom}
+			require.NoError(t, line.UpdateConfiguration(db, nil, nil, nil, append(line.StagesValue(), stage)))
+			settings := &pb.FactoryCustomAutomation_Settings{
+				StartMode:               pb.FactoryCustomAutomation_START_MODE_AUTOMATIC,
+				ExecutionTimeoutSeconds: 3600,
+				Agent:                   &pb.FactoryAppTemplateAgent{Component: "runnerClaudeCode", Model: "claude-sonnet-4-6"},
+				Steps:                   []*pb.FactoryCustomAutomation_Step{{Name: "Inspect", Type: pb.FactoryCustomAutomation_Step_TYPE_PROMPT, Prompt: "Inspect the changes."}},
+			}
+			ctx, deps := onboardingContext(r), onboardingDeps(r)
+			request := &pb.CreateFactoryCustomAutomationRequest{FactoryId: factory.ID.String(), ColumnKey: "custom-" + uuid.NewString(), Name: "QA automation", Settings: settings}
+			for _, invalidKey := range []string{request.ColumnKey, "custom-missing", "custom-", "phase-0"} {
+				request.ColumnKey = invalidKey
+				_, err = CreateFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), request)
+				code, _, ok := grpcerrors.HandlerStatus(err)
+				require.True(t, ok)
+				require.Equal(t, codes.InvalidArgument, code)
+			}
+			request.ColumnKey = stage.Key
+			created, err := CreateFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), request)
+			require.NoError(t, err)
+			id := created.GetCustomAutomation().GetAutomation().GetId()
+			settings.Steps[0].Prompt = "Review the changes."
+			updated, err := UpdateFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &pb.UpdateFactoryCustomAutomationRequest{FactoryId: factory.ID.String(), AutomationId: id, Name: "QA automation", Settings: settings})
+			require.NoError(t, err)
+			require.Equal(t, id, updated.GetCustomAutomation().GetAutomation().GetId())
+			require.Equal(t, stage.Key, updated.GetCustomAutomation().GetAutomation().GetColumnKey())
+			require.True(t, proto.Equal(settings, updated.GetCustomAutomation().GetSettings()))
+			version, err := models.FindLiveCanvasVersionInTransaction(db, uuid.MustParse(id))
+			require.NoError(t, err)
+			gateCount := 0
+			for _, node := range version.Nodes {
+				if node.ComponentName() == "onRun" {
+					gateCount++
+				}
+			}
+			require.Equal(t, 1, gateCount)
+			if !test.withVCS {
+				request.ColumnKey = models.CanvasColumnKeyVerify
+				_, err = CreateFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), request)
+				if test.repository == "" {
+					require.ErrorContains(t, err, "workspace repository is required")
+					return
+				}
+				require.ErrorContains(t, err, "workspace VCS integration is required")
+			}
+		})
+	}
+}
+
 func TestCustomAutomationSkipSetupCommandsPersistence(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())

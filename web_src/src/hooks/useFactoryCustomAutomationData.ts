@@ -10,6 +10,7 @@ import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { factoryAppsKey, factoryQueryKeys } from "./useFactoryData";
+import type { CustomAutomationColumn } from "@/pages/factories/lib/customAutomation";
 
 export const factoryCustomAutomationKey = (organizationId: string, factoryId: string, automationId: string) =>
   ["factories", organizationId, factoryId, "custom-automations", automationId] as const;
@@ -66,7 +67,7 @@ export function useFactoryCustomAutomations(
 
 type CustomAutomationInput = {
   name: string;
-  columnKey?: "backlog" | "implement" | "verify" | "done";
+  columnKey?: CustomAutomationColumn;
   settings: FactoriesFactoryCustomAutomationSettings;
 };
 

@@ -32,7 +32,7 @@ export function useCustomAutomationSetupPage(args: {
   lineId?: string;
   automationId?: string;
   expectedLiveVersionId?: string;
-  columnKey?: "backlog" | "implement" | "verify" | "done";
+  columnKey?: CustomAutomationColumn;
 }) {
   const described = useFactoryCustomAutomation(args.organizationId, args.factoryId, args.automationId);
   const create = useCreateFactoryCustomAutomation(args.organizationId, args.factoryId);

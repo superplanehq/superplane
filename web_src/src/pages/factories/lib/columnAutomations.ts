@@ -22,13 +22,7 @@ import {
   prFeedbackSentence,
 } from "./columnAutomationCatalog";
 import { customColumnAutomations, firstPhaseAutomations, type ColumnAutomationApp } from "./customColumnAutomations";
-import {
-  factoryColumnAutomationViewPath,
-  factoryIntakePath,
-  factoryPlanningPath,
-  factoryPRFeedbackPath,
-} from "./factoryPagePaths";
-import { factoryCustomAutomationSetupPath } from "./customAutomationPaths";
+export { columnAutomationOpenPath } from "./columnAutomationPaths";
 import { phaseIndexFromColumnKey, type ColumnKey } from "./columnKeys";
 import { isActiveWorkOrderExecution } from "./workOrderExecutions";
 import { findBacklogAutomationApp, findClosureAutomationApp, type LinePhaseColumn } from "./linePhaseRuns";
@@ -70,6 +64,7 @@ export type ColumnAutomation = {
   runningCount: number;
   catalogId: string;
   canvasId?: string;
+  columnKey?: string;
   displayColumnKey?: string;
   executionKey?: string;
   taskStageTargets?: string[];
@@ -448,32 +443,6 @@ export function runningCountForApp(appId: string | undefined, workOrders: Factor
     }
   }
   return count;
-}
-
-/**
- * Path for an existing column automation. Opens the popup on the first tab.
- * Task analysis opens Planning settings.
- */
-export function columnAutomationOpenPath(
-  automation: ColumnAutomation,
-  args: { organizationId: string; factoryKey: string; lineId?: string },
-): string | undefined {
-  if (automation.kind === "intake") {
-    return factoryIntakePath(args.organizationId, args.factoryKey, args.lineId, automation.id);
-  }
-  if (automation.kind === "pr-discussion" || automation.kind === "pr-checks") {
-    return factoryPRFeedbackPath(args.organizationId, args.factoryKey, args.lineId, undefined, automation.id);
-  }
-  if (automation.kind === "analysis") {
-    return factoryPlanningPath(args.organizationId, args.factoryKey, args.lineId);
-  }
-  if (automation.kind === "custom-verification" && automation.canvasId && args.lineId) {
-    return factoryCustomAutomationSetupPath(args.organizationId, args.factoryKey, args.lineId, automation.canvasId);
-  }
-  if (!automation.canvasId) {
-    return undefined;
-  }
-  return factoryColumnAutomationViewPath(args.organizationId, args.factoryKey, args.lineId, automation.canvasId);
 }
 
 export type ColumnAutomationViewTab = "general" | "agent" | "automation" | "runs";
