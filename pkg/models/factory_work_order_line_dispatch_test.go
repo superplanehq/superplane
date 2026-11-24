@@ -119,12 +119,14 @@ func Test__FactoryLine__DispatchStage__EmptyFirstStageUsesAutoAdvance(t *testing
 	for _, test := range []struct {
 		name        string
 		autoAdvance bool
+		rerun       bool
 		wantRuns    int
 		wantState   string
 		wantStage   string
 	}{
 		{name: "enabled", autoAdvance: true, wantRuns: 1, wantState: models.FactoryWorkOrderLineDispatchStateActive, wantStage: "phase-0"},
 		{name: "disabled", autoAdvance: false, wantRuns: 0, wantState: models.FactoryWorkOrderLineDispatchStateFinished, wantStage: "custom-qa"},
+		{name: "disabled rerun", autoAdvance: false, rerun: true, wantRuns: 1, wantState: models.FactoryWorkOrderLineDispatchStateActive, wantStage: "phase-0"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			r := support.Setup(t)
@@ -144,6 +146,12 @@ func Test__FactoryLine__DispatchStage__EmptyFirstStageUsesAutoAdvance(t *testing
 			}
 			stages := append([]models.FactoryLineStage{line.StagesValue()[0], qa}, line.StagesValue()[1:]...)
 			require.NoError(t, line.UpdateConfiguration(db, nil, nil, nil, stages))
+			if test.rerun {
+				require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+					_, _, dispatchErr := line.DispatchStage(tx, order)
+					return dispatchErr
+				}))
+			}
 
 			var dispatch *models.FactoryWorkOrderLineDispatch
 			var results []*models.FactoryLineStepResult

@@ -167,6 +167,14 @@ func (l *FactoryLine) DispatchStageFromWithModel(
 			return nil, nil, err
 		}
 	}
+	firstStart := false
+	if startIndex == 0 {
+		dispatched, err := order.HasLineDispatch(tx)
+		if err != nil {
+			return nil, nil, err
+		}
+		firstStart = !dispatched
+	}
 
 	now := time.Now()
 	dispatch := &FactoryWorkOrderLineDispatch{
@@ -181,7 +189,7 @@ func (l *FactoryLine) DispatchStageFromWithModel(
 		State:           FactoryWorkOrderLineDispatchStateActive,
 		Model:           strings.TrimSpace(model),
 		ThinkingLevel:   strings.TrimSpace(thinkingLevel),
-		CurrentStageKey: initialStageKey(stages, steps, startIndex),
+		CurrentStageKey: initialStageKey(stages, steps[startIndex].StageKey, firstStart),
 		CreatedAt:       now,
 		UpdatedAt:       now,
 	}
@@ -1238,12 +1246,11 @@ func (l *FactoryWorkOrderLineDispatch) startInitialStage(
 	}
 }
 
-// initialStageKey is the stage a dispatch enters first. A start from the
-// beginning enters the first stage after Backlog, so an empty stage before
-// the first automation can still stop the task.
-func initialStageKey(stages []FactoryLineStage, steps []FactoryLineStep, startIndex int) string {
-	key := steps[startIndex].StageKey
-	if startIndex != 0 || key == "" {
+// initialStageKey is the stage a dispatch enters first. The first start of a
+// task enters the first stage after Backlog, so an empty stage before the
+// first automation can still stop the task. A rerun enters the step's stage.
+func initialStageKey(stages []FactoryLineStage, key string, firstStart bool) string {
+	if !firstStart || key == "" {
 		return key
 	}
 	for _, stage := range stages {
