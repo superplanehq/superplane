@@ -845,8 +845,8 @@ describe("LinesPage board stages", () => {
               stages: [
                 { id: "backlog", key: "backlog", name: "Backlog", kind: "STAGE_KIND_BACKLOG" as const },
                 { id: "phase-0", key: "phase-0", name: "Implement", kind: "STAGE_KIND_PHASE" as const, stepIndex: 0 },
-                { id: "docs", key: "custom-docs", name: "Update docs", kind: "STAGE_KIND_CUSTOM" as const },
-                { id: "verify", key: "verify", name: "Verify", kind: "STAGE_KIND_VERIFY" as const },
+                { id: "docs", key: "custom-docs", name: "Update docs", kind: "STAGE_KIND_PHASE" as const },
+                { id: "verify", key: "verify", name: "Verify", kind: "STAGE_KIND_PHASE" as const, autoAdvance: false },
                 { id: "done", key: "done", name: "Done", kind: "STAGE_KIND_DONE" as const },
               ],
             }
@@ -908,8 +908,8 @@ describe("LinesPage board stages", () => {
             stages: [
               { id: "backlog", key: "backlog", name: "Backlog", kind: "STAGE_KIND_BACKLOG" },
               { id: "phase-0", key: "phase-0", name: "Implement", kind: "STAGE_KIND_PHASE", stepIndex: 0 },
-              { id: "custom", key: "custom-qa", name, kind: "STAGE_KIND_CUSTOM" },
-              { id: "verify", key: "verify", name: "Verify", kind: "STAGE_KIND_VERIFY" },
+              { id: "custom", key: "custom-qa", name, kind: "STAGE_KIND_PHASE" },
+              { id: "verify", key: "verify", name: "Verify", kind: "STAGE_KIND_PHASE", autoAdvance: false },
               { id: "done", key: "done", name: "Done", kind: "STAGE_KIND_DONE" },
             ],
           }
@@ -1015,7 +1015,7 @@ describe("LinesPage board stages", () => {
   });
 
   it("explains automation deletion before saving and cancels or discards without saving", async () => {
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_STAGES);
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
     const user = userEvent.setup();
     useFactoryAutomations.mockReturnValue({ data: [{ id: "app-qa", name: "Check QA", columnKey: "custom-qa" }] });
     renderLinesBoard(undefined, vi.fn(), customStageFactory());
@@ -1166,7 +1166,7 @@ describe("LinesPage board stages", () => {
                   kind: "STAGE_KIND_PHASE" as const,
                   stepIndex: 0,
                 },
-                { id: "custom", key: "custom-qa", name: "QA", kind: "STAGE_KIND_CUSTOM" as const },
+                { id: "custom", key: "custom-qa", name: "QA", kind: "STAGE_KIND_PHASE" as const },
                 {
                   id: "phase-1",
                   key: "phase-1",
@@ -1181,7 +1181,7 @@ describe("LinesPage board stages", () => {
                   kind: "STAGE_KIND_PHASE" as const,
                   stepIndex: 2,
                 },
-                { id: "verify", key: "verify", name: "Check", kind: "STAGE_KIND_VERIFY" as const },
+                { id: "verify", key: "verify", name: "Check", kind: "STAGE_KIND_PHASE" as const, autoAdvance: false },
                 { id: "done", key: "done", name: "Shipped", kind: "STAGE_KIND_DONE" as const },
               ],
             }
@@ -1206,7 +1206,7 @@ describe("LinesPage board stages", () => {
           id: "custom-deploy",
           key: "custom-deploy",
           name: "Deploy to prod",
-          kind: "STAGE_KIND_CUSTOM" as const,
+          kind: "STAGE_KIND_PHASE" as const,
         },
         ...(selectedLine?.stages?.slice(-1) ?? []),
       ],
@@ -1238,7 +1238,7 @@ describe("LinesPage board stages", () => {
     expect(savedStages.at(-2)).toMatchObject({
       id: "",
       name: "Deploy to prod",
-      kind: "STAGE_KIND_CUSTOM",
+      kind: "STAGE_KIND_PHASE",
       autoAdvance: true,
     });
     expect(screen.queryByTestId("line-stage-edit-toolbar")).not.toBeInTheDocument();
@@ -1282,7 +1282,7 @@ describe("LinesPage board stages", () => {
                   kind: "STAGE_KIND_PHASE" as const,
                   stepIndex: 1,
                 },
-                { id: "verify", key: "verify", name: "Verify", kind: "STAGE_KIND_VERIFY" as const },
+                { id: "verify", key: "verify", name: "Verify", kind: "STAGE_KIND_PHASE" as const, autoAdvance: false },
                 { id: "done", key: "done", name: "Done", kind: "STAGE_KIND_DONE" as const },
               ],
             }
@@ -1331,7 +1331,7 @@ describe("LinesPage board automations", () => {
           stages: [
             { id: "backlog", key: "backlog", name: "Backlog", kind: "STAGE_KIND_BACKLOG" },
             { id: "phase-1", key: "phase-1", name: "Check", kind: "STAGE_KIND_PHASE", stepIndex: 1 },
-            { id: "custom-target", key: "custom-target", name: "QA", kind: "STAGE_KIND_CUSTOM" },
+            { id: "custom-target", key: "custom-target", name: "QA", kind: "STAGE_KIND_PHASE" },
             { id: "done", key: "done", name: "Done", kind: "STAGE_KIND_DONE" },
           ],
         })),
