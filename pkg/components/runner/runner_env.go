@@ -22,7 +22,7 @@ func AttachRunnerEnv(ctx core.ExecutionContext, environment []TaskEnvironmentVar
 	for _, name := range ctx.RunnerEnvironmentRemove {
 		environment = withoutEnvironmentName(environment, name)
 	}
-	if ctx.RunnerEnvironment != nil && !HasPlanningSessionToken(environment) {
+	if ctx.RunnerEnvironment != nil && !HasAnalysisSessionToken(environment) {
 		names := make([]string, 0, len(ctx.RunnerEnvironment))
 		for name := range ctx.RunnerEnvironment {
 			names = append(names, name)
@@ -99,7 +99,7 @@ func resolveRunnerScope(
 	}
 
 	switch {
-	case HasPlanningSessionToken(environment):
+	case HasAnalysisSessionToken(environment):
 		err = resolvePlanningRunnerScope(db, scope)
 	case prepared != nil:
 		if prepared.OrganizationID != scope.OrganizationID || prepared.CanvasID != scope.CanvasID || prepared.CanvasRunID != scope.CanvasRunID || prepared.NodeExecutionID != scope.NodeExecutionID || prepared.NodeID != scope.NodeID {

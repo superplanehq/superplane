@@ -149,6 +149,8 @@ func buildClaudeCodeTask(spec RunClaudeCodeSpec, usage string, setups []runner.I
 	stepCommands := make([]runner.TaskCommand, 0, len(spec.Steps))
 	for i, step := range spec.Steps {
 		file, command := buildClaudeCodeStep(i+1, step, runner.AgentStepForDispatch(spec.Steps, dispatched, i), usage, model, thinking, workdir, attachments, inspectImages)
+		command, chatFiles := runner.PrepareCustomChatStep(step, file, command)
+		files = append(files, chatFiles...)
 		files = append(files, file)
 		stepCommands = append(stepCommands, command)
 	}

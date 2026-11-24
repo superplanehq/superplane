@@ -70,6 +70,9 @@ vi.mock("@/hooks/useFactoryPullRequestMerge", () => ({
 }));
 
 const useLiveLogStreamMock = vi.fn();
+const findAutomationSessionMock = vi.fn<(...args: unknown[]) => Promise<PlanningSessionPayload | null>>(
+  async () => null,
+);
 const findPlanningSessionMock = vi.fn<(...args: unknown[]) => Promise<PlanningSessionPayload | null>>(async () => null);
 
 vi.mock("@/hooks/useExperimentalFeature", () => ({
@@ -89,7 +92,8 @@ vi.mock("@/ui/CanvasPage/RunnerLiveLogDialog/useLiveLogStream", () => ({
 }));
 
 vi.mock("../planningSessionClient", () => ({
-  findPlanningSessionByWorkOrder: (...args: unknown[]) => findPlanningSessionMock(...args),
+  findPlanningSessionByWorkOrder: (...args: unknown[]) =>
+    args[3] ? findAutomationSessionMock(...args) : findPlanningSessionMock(...args),
   sendPlanningSessionMessage: vi.fn(),
   answerPlanningSessionSurvey: vi.fn(),
 }));
@@ -295,6 +299,7 @@ describe("WorkOrderSplitRunPopup", () => {
     refinementModels.current = [];
     useLiveLogStreamMock.mockReset();
     useLiveLogStreamMock.mockReturnValue(idleLiveLogStream(vi.fn()));
+    findAutomationSessionMock.mockReset().mockResolvedValue(null);
     findPlanningSessionMock.mockReset();
     findPlanningSessionMock.mockResolvedValue(null);
     closeMutateAsync.mockReset().mockResolvedValue({});
@@ -305,6 +310,46 @@ describe("WorkOrderSplitRunPopup", () => {
       allowedMethods: ["MERGE_METHOD_SQUASH", "MERGE_METHOD_REBASE"],
       headSha: "abc123",
     };
+  });
+
+  it("continues a custom chat task with Planning off and preserves dispatch permissions", async () => {
+    factoryPlanning.current = { enabled: false, clarity: false, confidence: false };
+    billingProductEnabled.current = false;
+    findAutomationSessionMock.mockResolvedValue({ id: "custom-session", state: "ended", messages: [] });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    client.setQueryData(canvasKeys.detail(FACTORIES_ORGANIZATION_ID, "custom-canvas"), {
+      spec: { nodes: [{ metadata: { factoryTemplate: { id: "custom-verification" } } }] },
+    });
+    const fixture = splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER);
+    fixture.phases.push({
+      id: "backlog-custom-run",
+      appId: "custom-canvas",
+      runId: "custom-run",
+      name: "Chat",
+      componentName: "Chat",
+      status: "passed",
+      duration: "1m",
+      artifacts: [],
+      stream: [],
+      canvasSteps: [],
+    });
+    const onDispatch = vi.fn();
+    const props = {
+      organizationId: FACTORIES_ORGANIZATION_ID,
+      factoryId: PRIMARY_FACTORY_ID,
+      orderId: DRAFT_WORK_ORDER.id,
+      fixture,
+      canDispatch: false,
+      onDispatch,
+    };
+    const { rerenderPopup } = renderPopup(props, client);
+    expect(await screen.findByRole("textbox", { name: "Message the agent" })).toBeVisible();
+    const footer = screen.getByRole("region", { name: "Implementation" });
+    expect(within(footer).getByRole("button", { name: "Continue" })).toBeDisabled();
+    expect(within(footer).getByTestId("split-run-draft-model")).toBeVisible();
+    rerenderPopup({ ...props, canDispatch: true });
+    await userEvent.setup().click(within(footer).getByRole("button", { name: "Continue" }));
+    expect(onDispatch).toHaveBeenCalledTimes(1);
   });
 
   it("shows a failed Backlog run before a planning session exists and clears it for a newer run", async () => {

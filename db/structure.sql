@@ -713,7 +713,8 @@ CREATE TABLE public.factory_planning_sessions (
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     selectable_model_key text DEFAULT ''::text NOT NULL,
     kind text NOT NULL,
-    CONSTRAINT factory_planning_sessions_kind_check CHECK ((kind = ANY (ARRAY['task_creation'::text, 'work_order_analysis'::text]))),
+    origin_run_id uuid,
+    CONSTRAINT factory_planning_sessions_kind_check CHECK ((kind = ANY (ARRAY['task_creation'::text, 'work_order_analysis'::text, 'custom_automation'::text]))),
     CONSTRAINT factory_planning_sessions_task_creation_creator_check CHECK (((kind <> 'task_creation'::text) OR (created_by_user_id IS NOT NULL)))
 );
 
@@ -4146,6 +4147,13 @@ CREATE INDEX idx_factory_planning_sessions_open_heartbeat ON public.factory_plan
 
 
 --
+-- Name: idx_factory_planning_sessions_origin_run; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_factory_planning_sessions_origin_run ON public.factory_planning_sessions USING btree (origin_run_id) WHERE (origin_run_id IS NOT NULL);
+
+
+--
 -- Name: idx_factory_pr_feedback_handlers_canvas_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -6785,7 +6793,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261123125259	f
+20261124114724	f
 \.
 
 

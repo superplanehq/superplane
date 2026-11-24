@@ -27,6 +27,7 @@ type AutomationStep = {
   prompt?: string;
   secrets?: string[];
   working_directory?: string;
+  chat?: string;
 };
 export type AutomationDefinition = {
   apiVersion: "v2";
@@ -111,8 +112,7 @@ export function parseAutomationForCanvas(source: string, stage: CustomAutomation
   ) {
     problem("runs_on_task", "This trigger runs on a task.");
   }
-  const steps = document.steps;
-  if (!Array.isArray(steps)) problem("steps", "Enter a list of steps.");
+  const steps = parseSteps(document.steps, runsOnTask, triggers);
   return {
     apiVersion: "v2",
     kind: "Automation",
@@ -124,7 +124,7 @@ export function parseAutomationForCanvas(source: string, stage: CustomAutomation
     skip_repository_checkout: optionalBoolean(document.skip_repository_checkout, "skip_repository_checkout"),
     agent: document.agent === undefined ? undefined : parseAgent(document.agent),
     triggers,
-    steps: steps.map(parseStep),
+    steps,
   };
 }
 
@@ -134,6 +134,19 @@ function parseTimeout(value: unknown): number | undefined {
     problem("timeout_seconds", "Enter an integer from 1 through 86400.");
   }
   return value;
+}
+
+function parseSteps(value: unknown, runsOnTask: boolean | undefined, triggers: AutomationTrigger[]): AutomationStep[] {
+  if (!Array.isArray(value)) problem("steps", "Enter a list of steps.");
+  const steps = value.map(parseStep);
+  steps.forEach((step, index) => {
+    if (step.chat === undefined) return;
+    if (runsOnTask === false || triggers.some(({ use }) => use === "schedule")) {
+      problem(`steps[${index}].chat`, "Chat requires an automation that runs on a task.");
+    }
+    if (index !== steps.length - 1) problem(`steps[${index}].chat`, "Chat must be the final step.");
+  });
+  return steps;
 }
 
 function parseTrigger(value: unknown, path: string, stage: CustomAutomationColumn): AutomationTrigger {
@@ -219,15 +232,16 @@ function parseAgentCredentials(value: unknown, harness: AutomationHarness): Auto
 
 function parseStep(value: unknown, index: number): AutomationStep {
   const path = `steps[${index}]`;
-  const entry = mapping(value, path, ["name", "bash", "prompt", "secrets", "working_directory"]);
+  const entry = mapping(value, path, ["name", "bash", "prompt", "secrets", "working_directory", "chat"]);
   const name = singleLine(entry.name, `${path}.name`);
   const bash = optionalText(entry.bash, `${path}.bash`);
   const prompt = optionalText(entry.prompt, `${path}.prompt`);
-  if ((bash === undefined) === (prompt === undefined)) {
-    problem(path, "Enter either bash or prompt.");
+  const chat = optionalText(entry.chat, `${path}.chat`);
+  if ([bash, prompt, chat].filter((value) => value !== undefined).length !== 1) {
+    problem(path, "Enter exactly one of bash, prompt, or chat.");
   }
   const working_directory = optionalText(entry.working_directory, `${path}.working_directory`);
-  if (entry.secrets === undefined) return { name, bash, prompt, working_directory };
+  if (entry.secrets === undefined) return { name, bash, prompt, chat, working_directory };
   if (!bash) problem(`${path}.secrets`, "Only Bash steps can reference secrets.");
   if (!Array.isArray(entry.secrets)) problem(`${path}.secrets`, "Enter a list of secret names.");
   const secrets = entry.secrets.map((secret, i) => singleLine(secret, `${path}.secrets[${i}]`));
@@ -288,9 +302,9 @@ export function automationDefinitionCanvas(
         skipRepositoryCheckout: definition.skip_repository_checkout,
         steps: definition.steps.map((step) => ({
           name: step.name,
-          type: step.bash !== undefined ? "TYPE_BASH" : "TYPE_PROMPT",
+          type: step.bash !== undefined ? "TYPE_BASH" : step.chat !== undefined ? "TYPE_CHAT" : "TYPE_PROMPT",
           command: step.bash,
-          prompt: step.prompt,
+          prompt: step.chat ?? step.prompt,
           secrets: step.secrets,
           workingDirectory: step.working_directory,
         })),
@@ -356,7 +370,8 @@ export function automationDefinitionSteps(steps: PlanningReviewStep[]): Automati
   return steps.map((step) => ({
     name: step.name,
     bash: step.type === "bash" ? (step.command ?? "") : undefined,
-    prompt: step.type === "prompt" ? (step.prompt ?? "") : undefined,
+    prompt: step.type === "prompt" && !step.continueInChat ? (step.prompt ?? "") : undefined,
+    chat: step.continueInChat ? (step.prompt ?? "") : undefined,
     secrets: step.type === "bash" ? step.secrets : undefined,
     working_directory: step.workingDirectory,
   }));

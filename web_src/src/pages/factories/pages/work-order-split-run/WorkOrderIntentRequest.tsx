@@ -84,10 +84,14 @@ function analysisRequestChatState(analysis: IntentAnalysisChat) {
   return {
     followKey: analysis.view.executionId || analysis.view.canvasId || "analysis",
     active,
-    showSurvey: hasPendingPlanningQuestions(analysis.view),
-    progressLabel: analysis.canTogglePlan ? undefined : "Creating the first plan…",
+    showSurvey: analysis.mode !== "automation" && hasPendingPlanningQuestions(analysis.view),
+    progressLabel: analysis.mode === "automation" || analysis.canTogglePlan ? undefined : "Creating the first plan…",
     placeholder:
-      !analysis.canSend && stopped ? ANALYSIS_PLANNING_COPY.stopped : ANALYSIS_PLANNING_COPY.composerPlaceholder,
+      analysis.mode === "automation"
+        ? "Message the agent"
+        : !analysis.canSend && stopped
+          ? ANALYSIS_PLANNING_COPY.stopped
+          : ANALYSIS_PLANNING_COPY.composerPlaceholder,
   };
 }
 
@@ -129,9 +133,12 @@ function AnalysisRequestChat({
         >
           <div className={cn(chatColumnClass, chatSolo ? "py-6" : "py-3")} data-testid="split-run-intent-chat-column">
             {analysis.leading}
-            <ChatMessageTimestamp createdAt={analysis.requestCreatedAt} align="end">
-              <RequestMessage description={description} files={files} source={source} asChat />
-            </ChatMessageTimestamp>
+            <InitialChatRequest
+              description={description}
+              files={files}
+              source={source}
+              createdAt={analysis.requestCreatedAt}
+            />
             <WorkOrderIntentTranscript
               messages={analysis.view.messages}
               organizationId={analysis.organizationId}
@@ -141,6 +148,7 @@ function AnalysisRequestChat({
             />
             {state.active || analysis.view.machineStatus === "queued" ? (
               <AnalysisLiveWork
+                automationChat={analysis.mode === "automation"}
                 machineStatus={analysis.view.machineStatus}
                 runnerState={analysis.view.runnerState}
                 blockedByParallelismLimit={analysis.view.blockedByParallelismLimit}
@@ -196,6 +204,20 @@ function AnalysisRequestChat({
         actions={analysis.closedDecision}
       />
     </div>
+  );
+}
+
+function InitialChatRequest({
+  description,
+  files,
+  source,
+  createdAt,
+}: Pick<WorkOrderIntentRequestProps, "description" | "files" | "source"> & { createdAt?: string }) {
+  if (!description && !files?.length) return null;
+  return (
+    <ChatMessageTimestamp createdAt={createdAt} align="end">
+      <RequestMessage description={description} files={files} source={source} asChat />
+    </ChatMessageTimestamp>
   );
 }
 
@@ -262,7 +284,7 @@ function AnalysisComposer({
         onSubmit={handleSubmit}
       >
         <Label htmlFor="split-run-intent-composer" className="sr-only">
-          {ANALYSIS_PLANNING_COPY.composerPlaceholder}
+          {analysis.mode === "automation" ? "Message the agent" : ANALYSIS_PLANNING_COPY.composerPlaceholder}
         </Label>
         <div className="flex flex-col gap-2">
           <AnalysisPlanControls analysis={analysis} chipsWorking={chipsWorking} position="composer" />

@@ -68,6 +68,13 @@ export function CustomAutomationSetupForm(props: CustomAutomationSetupFormProps)
   const [selectedStep, setSelectedStep] = useState<number | null>(null);
   const component = draft.components[0];
   const steps = (component?.configuration.steps as PlanningReviewStep[] | undefined) ?? [];
+  const taskBased =
+    runsOnTask !== false &&
+    !customAutomationTriggersForRun(triggers, runsOnTask).some((trigger) => trigger.mode === "scheduled");
+  const invalidChat = steps.some(
+    (step, index) => step.continueInChat && (!taskBased || step.type !== "prompt" || index !== steps.length - 1),
+  );
+  const chatError = invalidChat ? "Chat requires the final prompt step in an automation that runs on a task." : "";
   const activeStep = selectedStep === null ? undefined : steps[selectedStep];
   const { updateStep, addStep, removeStepAt, moveStepAt, reorderSteps } = useStepList(
     draft,
@@ -111,6 +118,7 @@ export function CustomAutomationSetupForm(props: CustomAutomationSetupFormProps)
           {activeStep ? (
             <StepEditor
               step={activeStep}
+              runsOnTask={taskBased}
               position={selectedStep ?? 0}
               stepCount={steps.length}
               onChange={updateStep}
@@ -141,10 +149,12 @@ export function CustomAutomationSetupForm(props: CustomAutomationSetupFormProps)
         </div>
       </div>
       <CustomAutomationSetupFooter
-        error={error}
+        error={error || chatError}
         saving={saving}
         deleting={deleting}
-        onSave={onSave}
+        onSave={() => {
+          if (!invalidChat) onSave();
+        }}
         onDelete={onDelete}
         onClose={onClose}
       />

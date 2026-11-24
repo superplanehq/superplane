@@ -12,6 +12,7 @@ export interface PlanningReviewStep {
   prompt?: string;
   workingDirectory?: string;
   secrets?: string[];
+  continueInChat?: boolean;
 }
 
 export interface PlanningReviewComponent {

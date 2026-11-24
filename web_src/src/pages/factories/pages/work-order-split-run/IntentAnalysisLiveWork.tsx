@@ -26,6 +26,7 @@ type LiveStatusInput = {
 };
 
 export function AnalysisLiveWork({
+  automationChat = false,
   machineStatus,
   runnerState,
   blockedByParallelismLimit,
@@ -35,6 +36,7 @@ export function AnalysisLiveWork({
   activities,
   progressLabel,
 }: {
+  automationChat?: boolean;
   machineStatus: CreateWithAgentMachineStatus;
   runnerState?: string;
   blockedByParallelismLimit?: boolean;
@@ -48,19 +50,21 @@ export function AnalysisLiveWork({
     return (
       <div
         role="status"
-        aria-label="Queued for planning"
+        aria-label={automationChat ? "Queued" : "Queued for planning"}
         className="mt-3 flex gap-2 rounded-md border border-border bg-muted/50 p-3 text-[13px] leading-5"
       >
         <Clock className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
         <div>
-          <p className="font-medium text-foreground">Queued for planning</p>
+          <p className="font-medium text-foreground">{automationChat ? "Queued" : "Queued for planning"}</p>
           <p className="text-muted-foreground">
             {blockedByParallelismLimit
               ? "Parallelism limit reached."
               : runnerState === "pending"
                 ? "Waiting for scheduling."
                 : "Waiting for a runner."}{" "}
-            Planning starts automatically when a slot is free.
+            {automationChat
+              ? "The agent starts automatically when a slot is free."
+              : "Planning starts automatically when a slot is free."}
           </p>
         </div>
       </div>
@@ -73,7 +77,7 @@ export function AnalysisLiveWork({
       canvasId={canvasId}
       executionId={executionId}
       activities={activities}
-      startingLabel="Starting analysis…"
+      startingLabel={automationChat ? "Starting agent…" : "Starting analysis…"}
       progressLabel={progressLabel}
       className="mt-3"
       testId="split-run-intent-live-work"

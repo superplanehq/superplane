@@ -16,6 +16,7 @@ const (
 	PlanningSessionStateRunning = "running"
 	PlanningSessionStateEnded   = "ended"
 
+	PlanningSessionKindCustomAutomation  = "custom_automation"
 	PlanningSessionKindTaskCreation      = "task_creation"
 	PlanningSessionKindWorkOrderAnalysis = "work_order_analysis"
 
@@ -79,6 +80,7 @@ type FactoryPlanningSession struct {
 	State              string
 	CanvasID           *uuid.UUID
 	CanvasRunID        *uuid.UUID
+	OriginRunID        *uuid.UUID
 	DraftTitle         string
 	DraftDescription   string
 	DraftWorkOrderID   *uuid.UUID
@@ -316,7 +318,7 @@ func (s *FactoryPlanningSession) IsAnalysisSession() bool {
 }
 
 func (s *FactoryPlanningSession) NeedsAnalysisRestart(tx *gorm.DB) bool {
-	if !s.IsAnalysisSession() {
+	if !s.IsAnalysisSession() && !s.IsCustomAutomationSession() {
 		return false
 	}
 	if s.State == PlanningSessionStateEnded {
@@ -483,4 +485,8 @@ func (s *FactoryPlanningSession) saveSurvey(tx *gorm.DB) error {
 		"survey":     s.Survey,
 		"updated_at": s.UpdatedAt,
 	}).Error
+}
+
+func (s *FactoryPlanningSession) IsCustomAutomationSession() bool {
+	return s.Kind == PlanningSessionKindCustomAutomation
 }

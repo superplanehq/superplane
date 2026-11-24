@@ -78,11 +78,16 @@
         "bash": { "$ref": "#/$defs/nonblank" },
         "working_directory": { "$ref": "#/$defs/nonblank" },
         "prompt": { "$ref": "#/$defs/nonblank" },
+        "chat": { "$ref": "#/$defs/nonblank" },
         "secrets": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/nonblank" } }
       },
       "if": { "required": ["bash"] },
-      "then": { "properties": { "prompt": false } },
-      "else": { "required": ["prompt"], "properties": { "secrets": false } }
+      "then": { "properties": { "prompt": false, "chat": false } },
+      "else": {
+        "if": { "required": ["chat"] },
+        "then": { "properties": { "prompt": false, "secrets": false } },
+        "else": { "required": ["prompt"], "properties": { "secrets": false } }
+      }
     },
     "agent": {
       "type": "object",

@@ -1074,3 +1074,51 @@ test("runLoop downloads follow-up images before the prompt", async () => {
   assert.equal(saved.length, 1);
   assert.match(prompts[0], new RegExp(saved[0].replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
 });
+
+
+test("custom chat follow-up retains its prompt and activates conversation recording", async () => {
+  const taskDir = fs.mkdtempSync(path.join(os.tmpdir(), "custom-chat-"));
+  const previousKind = process.env.SUPERPLANE_PLANNING_SESSION_KIND;
+  process.env.SUPERPLANE_PLANNING_SESSION_KIND = "custom_automation";
+  try {
+    const received = path.join(taskDir, "received.json");
+    fs.writeFileSync(path.join(taskDir, "custom_chat_prompt.md"), "Investigate deployment health. Do not plan implementation.");
+    fs.writeFileSync(path.join(taskDir, "run.js"), `
+      const fs = require("node:fs");
+      fs.writeFileSync(${JSON.stringify(received)}, JSON.stringify({
+        prompt: fs.readFileSync(process.argv[2], "utf8"),
+        active: process.env.SUPERPLANE_CUSTOM_CHAT_ACTIVE,
+      }));
+    `);
+    const prompt = writePrompt(taskDir, "Check production next.");
+    assert.equal(await runPromptFile(taskDir, prompt, ""), 0);
+    assert.deepEqual(JSON.parse(fs.readFileSync(received, "utf8")), {
+      prompt: "Investigate deployment health. Do not plan implementation.\n\nCheck production next.\n",
+      active: "true",
+    });
+  } finally {
+    if (previousKind === undefined) delete process.env.SUPERPLANE_PLANNING_SESSION_KIND;
+    else process.env.SUPERPLANE_PLANNING_SESSION_KIND = previousKind;
+    fs.rmSync(taskDir, { recursive: true, force: true });
+  }
+});
+
+test("custom chat resumes with conversation context without planning permissions", () => {
+  const env = {
+    SUPERPLANE_PLANNING_SESSION_KIND: "custom_automation",
+    SUPERPLANE_PLANNING_SESSION_ID: "session-1",
+    SUPERPLANE_CUSTOM_CHAT_ACTIVE: "true",
+    SUPERPLANE_ANALYSIS_REWIND: "yes",
+  };
+  const claude = require("./claude/run.js");
+  const codex = require("./codex/run.js");
+  const openrouter = require("./openrouter/run.js");
+  assert.deepEqual(claude.claudeContinuationArgs(4, "previous", env), []);
+  assert.equal(codex.codexSessionForPrompt(4, "previous", env), "");
+  assert.equal(claude.planningSystemPrompt(env), "");
+  assert.equal(codex.planningSystemPrompt(env), "");
+  assert.equal(openrouter.planningEnabled(env), false);
+  assert.match(claude.allowedClaudeTools(env), /Edit/);
+  assert.doesNotMatch(claude.allowedClaudeTools(env), /propose_plan/);
+  assert.deepEqual(claude.claudeContinuationArgs(4, "previous", { ...env, SUPERPLANE_CUSTOM_CHAT_ACTIVE: "" }), ["--resume", "previous"]);
+});

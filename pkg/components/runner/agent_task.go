@@ -74,6 +74,8 @@ func BuildAgentTask(input AgentTaskInput) (commands []TaskCommand, files []TaskF
 
 	for i, step := range input.Steps {
 		file, command := buildAgentStep(i+1, step, AgentStepForDispatch(input.Steps, input.DispatchedSteps, i), input.WorkingDirectory, input.Usage, input.Model, input.PromptCommand, attachments, input.InspectImages)
+		command, chatFiles := PrepareCustomChatStep(step, file, command)
+		files = append(files, chatFiles...)
 		files = append(files, file)
 		commands = append(commands, command)
 	}

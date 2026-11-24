@@ -71,7 +71,7 @@ export function AutomationFlow({
                 />
               }
             >
-              <FlowBadge kind={step.type} />
+              <FlowBadge kind={step.continueInChat ? "chat" : step.type} />
               <p className="mt-3 truncate text-sm font-semibold text-foreground">{step.name || `Step ${index + 1}`}</p>
               <p className="mt-1 truncate text-xs text-muted-foreground">
                 {step.type === "prompt"
@@ -93,15 +93,16 @@ export function AutomationFlow({
   );
 }
 
-export function FlowBadge({ kind }: { kind: PlanningReviewStepKind | "trigger" }) {
-  const Icon = kind === "trigger" ? Zap : kind === "prompt" ? MessageSquareText : Terminal;
-  const label = kind === "trigger" ? "Trigger" : kind === "prompt" ? "Prompt" : "Bash";
+export function FlowBadge({ kind }: { kind: PlanningReviewStepKind | "trigger" | "chat" }) {
+  const Icon = kind === "trigger" ? Zap : kind === "prompt" || kind === "chat" ? MessageSquareText : Terminal;
+  const label = kind === "trigger" ? "Trigger" : kind === "prompt" ? "Prompt" : kind === "chat" ? "Chat" : "Bash";
   return (
     <span
       className={cn(
         "inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-medium",
         kind === "trigger" && "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400",
-        kind === "prompt" && "border-violet-500/30 bg-violet-500/10 text-violet-700 dark:text-violet-400",
+        (kind === "prompt" || kind === "chat") &&
+          "border-violet-500/30 bg-violet-500/10 text-violet-700 dark:text-violet-400",
         kind === "bash" && "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
       )}
     >

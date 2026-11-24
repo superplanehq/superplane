@@ -21,6 +21,9 @@ func (FactoryPlanningSessionWorkOrder) TableName() string {
 }
 
 func (s *FactoryPlanningSession) applyRefineNote(tx *gorm.DB, text string) (bool, error) {
+	if s.IsCustomAutomationSession() {
+		return false, nil
+	}
 	key := planningRefineKey(text)
 	if key == "" {
 		return false, nil

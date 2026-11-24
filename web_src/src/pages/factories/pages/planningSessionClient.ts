@@ -33,12 +33,14 @@ export async function findPlanningSessionByWorkOrder(
   organizationId: string,
   factoryId: string,
   workOrderId: string,
+  runId?: string,
 ): Promise<PlanningSessionPayload | null> {
   const headers = withOrganizationHeader({
     organizationId,
     headers: { Accept: "application/json" },
   }).headers as Record<string, string>;
-  const response = await fetch(`/api/v1/factories/${factoryId}/work-orders/${workOrderId}/planning-session`, {
+  const query = runId ? `?run_id=${encodeURIComponent(runId)}` : "";
+  const response = await fetch(`/api/v1/factories/${factoryId}/work-orders/${workOrderId}/planning-session${query}`, {
     method: "GET",
     headers,
     credentials: "include",

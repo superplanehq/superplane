@@ -546,7 +546,11 @@ function writePrompt(taskDir, text) {
       throw err;
     }
   }
-  const prompt = instructions.trim() ? `${text}\n\n${instructions}` : text;
+  let originalPrompt = "";
+  if (process.env.SUPERPLANE_PLANNING_SESSION_KIND === "custom_automation") {
+    originalPrompt = fs.readFileSync(path.join(taskDir, "custom_chat_prompt.md"), "utf8");
+  }
+  const prompt = [originalPrompt, text, instructions].filter(part => part.trim()).join("\n\n");
   fs.writeFileSync(file, `${prompt}\n`);
   return file;
 }
@@ -558,7 +562,7 @@ function runPromptFile(taskDir, promptFile, model, extraArgs = []) {
       [path.join(taskDir, "run.js"), promptFile, model || "", ...extraArgs],
       {
         stdio: "inherit",
-        env: { ...process.env, SUPERPLANE_ANALYSIS_REWIND: "yes" },
+        env: { ...process.env, SUPERPLANE_ANALYSIS_REWIND: "yes", SUPERPLANE_CUSTOM_CHAT_ACTIVE: "true" },
       },
     );
     child.on("error", reject);

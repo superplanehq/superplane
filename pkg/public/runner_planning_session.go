@@ -82,7 +82,7 @@ func (s *Server) handleRunnerPlanningActivity(w http.ResponseWriter, r *http.Req
 		http.Error(w, "Invalid activity status", http.StatusBadRequest)
 		return
 	}
-	session, err := s.loadAnalysisPlanningSessionForRunner(r, scope)
+	session, err := s.loadChatSessionForRunner(r, scope)
 	if err != nil {
 		writeRunnerPlanningError(w, r, session, err)
 		return
@@ -159,6 +159,17 @@ func (s *Server) loadPlanningSessionForRunner(r *http.Request, scope *runneracti
 	return session, nil
 }
 
+func (s *Server) loadChatSessionForRunner(r *http.Request, scope *runneraction.PlanningSessionScope) (*models.FactoryPlanningSession, error) {
+	session, err := s.loadPlanningSessionForRunner(r, scope)
+	if err != nil {
+		return nil, err
+	}
+	if !session.IsAnalysisSession() && !session.IsCustomAutomationSession() {
+		return nil, models.ErrFactoryPlanningSessionInvalid
+	}
+	return session, nil
+}
+
 func (s *Server) loadAnalysisPlanningSessionForRunner(r *http.Request, scope *runneraction.PlanningSessionScope) (*models.FactoryPlanningSession, error) {
 	session, err := s.loadPlanningSessionForRunner(r, scope)
 	if err != nil {
@@ -185,7 +196,7 @@ func (s *Server) handleRunnerPlanningWait(w http.ResponseWriter, r *http.Request
 			writeJSON(w, http.StatusOK, map[string]any{"status": "pending"})
 			return
 		}
-		session, err := s.loadAnalysisPlanningSessionForRunner(r, scope)
+		session, err := s.loadChatSessionForRunner(r, scope)
 		if err != nil {
 			writePlanningWaitError(w, r, session, err)
 			return
@@ -411,7 +422,7 @@ func (s *Server) handleRunnerPlanningAgentMessage(w http.ResponseWriter, r *http
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
-	session, err := s.loadAnalysisPlanningSessionForRunner(r, scope)
+	session, err := s.loadChatSessionForRunner(r, scope)
 	if err != nil {
 		writeRunnerPlanningError(w, r, session, err)
 		return
@@ -460,7 +471,7 @@ func beginPlanningWaitAndNotify(db *gorm.DB, session *models.FactoryPlanningSess
 }
 
 func maybeAutoStartPlannedWorkOrder(db *gorm.DB, session *models.FactoryPlanningSession) {
-	if session == nil || session.DraftWorkOrderID == nil {
+	if session == nil || !session.IsAnalysisSession() || session.DraftWorkOrderID == nil {
 		return
 	}
 	factoryModel, err := models.FindFactory(db, session.OrganizationID, session.FactoryID)
@@ -550,10 +561,16 @@ func planningWaitMessageBody(
 		"work_order_id":  result.WorkOrderID,
 		"work_order_key": result.WorkOrderKey,
 	}
-	if session == nil || !session.IsAnalysisSession() {
+	if session == nil {
 		return body, nil
 	}
-	continuation, err := models.AnalysisContinuationText(database.DB(ctx), session)
+	var continuation string
+	var err error
+	if session.IsCustomAutomationSession() {
+		continuation, err = models.CustomAutomationContinuationText(database.DB(ctx), session)
+	} else if session.IsAnalysisSession() {
+		continuation, err = models.AnalysisContinuationText(database.DB(ctx), session)
+	}
 	if err != nil {
 		return nil, err
 	}

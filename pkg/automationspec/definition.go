@@ -55,6 +55,7 @@ type Schedule struct {
 }
 
 type Step struct {
+	Chat             string   `yaml:"chat,omitempty" json:"chat,omitempty"`
 	Name             string   `yaml:"name" json:"name"`
 	WorkingDirectory string   `yaml:"working_directory,omitempty" json:"working_directory,omitempty"`
 	Bash             string   `yaml:"bash,omitempty" json:"bash,omitempty"`

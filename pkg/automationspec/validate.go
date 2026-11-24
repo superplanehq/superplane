@@ -28,5 +28,22 @@ func (d *Document) validateSemantics() error {
 		}
 	}
 
+	for index, step := range d.Steps {
+		if step.Chat == "" {
+			continue
+		}
+		path := itemPath("steps", index) + ".chat"
+		if index != len(d.Steps)-1 {
+			return d.Diagnostic(path, "The Chat step must be the final step.")
+		}
+		if d.RunsOnTask != nil && !*d.RunsOnTask {
+			return d.Diagnostic(path, "Chat requires an automation that runs on a task.")
+		}
+		for _, trigger := range d.Triggers {
+			if trigger.Use == Scheduled {
+				return d.Diagnostic(path, "Chat is not available for scheduled automations.")
+			}
+		}
+	}
 	return nil
 }

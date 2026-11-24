@@ -405,7 +405,7 @@ func HasPublishLinks(environment []TaskEnvironmentVariable) bool {
 
 func AttachArtifactUploadEnv(ctx core.ExecutionContext, environment []TaskEnvironmentVariable, timeoutSeconds int, enabled bool) []TaskEnvironmentVariable {
 	environment = removeArtifactCapabilityEnv(environment)
-	if HasPlanningSessionToken(environment) || ctx.RunID == uuid.Nil || ctx.ID == uuid.Nil {
+	if HasAnalysisSessionToken(environment) || ctx.RunID == uuid.Nil || ctx.ID == uuid.Nil {
 		return environment
 	}
 	// A run id without a canvas is not a custom automation. Skip the lookup so

@@ -110,6 +110,10 @@ func (b *NodeConfigurationBuilder) Build(configuration map[string]any) (map[stri
 		return nil, err
 	}
 
+	resolved, err = b.applyCustomChatContinuation(resolved)
+	if err != nil {
+		return nil, err
+	}
 	if b.nodeID == "refine-task" {
 		resolved, err = b.applyRefinementModel(resolved)
 	} else {
@@ -2664,4 +2668,38 @@ func (b *NodeConfigurationBuilder) nodeAcceptsDispatchModel(
 		return models.RunnerAcceptsModel(b.tx, workflow.OrganizationID, workflow.FactoryID, node.ComponentName(), resolved, model, ownerID)
 	}
 	return models.RunnerAcceptsModel(b.tx, workflow.OrganizationID, workflow.FactoryID, node.ComponentName(), resolved, model)
+}
+
+// A restarted conversation must not repeat setup or earlier automation steps.
+func (b *NodeConfigurationBuilder) applyCustomChatContinuation(resolved map[string]any) (map[string]any, error) {
+	steps, ok := resolved["steps"].([]any)
+	if !ok || len(steps) == 0 {
+		return resolved, nil
+	}
+	step, _ := steps[len(steps)-1].(map[string]any)
+	if step["continueInChat"] != true || step["type"] != "prompt" {
+		return resolved, nil
+	}
+	if b.tx == nil || b.rootEventID == nil {
+		return resolved, nil
+	}
+	run, err := models.FindCanvasRunByRootEventInTransaction(b.tx, *b.rootEventID)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return resolved, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	session, err := models.FindPlanningSessionByRun(b.tx, run.ID)
+	if errors.Is(err, models.ErrFactoryPlanningSessionNotFound) {
+		return resolved, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if !session.IsCustomAutomationSession() || session.OriginRunID == nil || *session.OriginRunID == run.ID {
+		return resolved, nil
+	}
+	resolved["steps"] = steps[len(steps)-1:]
+	return resolved, nil
 }
