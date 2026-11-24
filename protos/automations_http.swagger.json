@@ -135,7 +135,7 @@
         "type": "object", "additionalProperties": false, "required": ["factory_id", "stage", "yaml"],
         "properties": {
           "factory_id": { "type": "string", "format": "uuid" },
-          "stage": { "type": "string", "enum": ["backlog", "implement", "verify", "done"] },
+          "stage": { "type": "string", "pattern": "^(backlog|implement|verify|done|custom-.+)$", "description": "A built-in board stage or the key of a custom stage in this factory." },
           "yaml": {
             "type": "string",
             "example": "apiVersion: v2\nkind: Automation\nname: Inspect task\ntriggers: [{use: manual}]\nsteps: [{name: Inspect, bash: pwd}]\n"
@@ -150,7 +150,7 @@
       "properties": {
         "id": { "type": "string", "format": "uuid" },
         "factory_id": { "type": "string", "format": "uuid" },
-        "stage": { "type": "string", "enum": ["backlog", "implement", "verify", "done"] },
+        "stage": { "type": "string", "pattern": "^(backlog|implement|verify|done|custom-.+)$", "description": "A built-in board stage or the key of a custom stage in this factory." },
         "name": { "type": "string" }
       }
     },

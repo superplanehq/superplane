@@ -55,6 +55,7 @@ export function customAutomationColumnAutomation(
     runningCount: runningCountForApp(id, workOrders),
     catalogId: CUSTOM_AUTOMATION_CATALOG_ID,
     canvasId: id,
+    columnKey: columnKey.startsWith("custom-") ? columnKey : undefined,
     canRunNow: columnKey === "backlog" && (hasSchedule || app.customAutomationRunsOnTask === false) ? true : undefined,
   };
 }
