@@ -240,11 +240,7 @@ describe("MergeConfidenceConfigModal", () => {
     expect(screen.queryByTestId("merge-confidence-settings")).not.toBeInTheDocument();
     expect(screen.queryByTestId("merge-confidence-config-footer")).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Edit automation" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Search commands and components" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Fit all components in view" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Errors" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Warnings" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "More actions" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Delete automation" })).toBeInTheDocument();
   });
 
   it("selects the requested step when the canvas loads", () => {
@@ -481,18 +477,30 @@ describe("MergeConfidenceConfigModal", () => {
     expect(screen.getByTestId("merge-confidence-config-canvas")).toHaveAttribute("data-selected-run-id", OLDER_RUN_ID);
   });
 
-  it("asks to confirm before it deletes the automation", async () => {
+  it("confirms deletion, blocks concurrent requests, and retains failed confirmation", async () => {
+    let rejectDelete!: (error: Error) => void;
+    const onDelete = vi.fn(
+      () =>
+        new Promise<void>((_, reject) => {
+          rejectDelete = reject;
+        }),
+    );
+    renderModal(onDelete, vi.fn(), implementConfigGraph([]));
     const user = userEvent.setup();
-    const onDelete = vi.fn();
-    renderModal(onDelete);
-
-    await user.click(screen.getByRole("button", { name: "More actions" }));
-    await user.click(screen.getByRole("menuitem", { name: "Delete automation" }));
-
+    await user.click(screen.getByTestId("column-automation-view-delete"));
+    await user.click(screen.getByRole("button", { name: "Keep automation" }));
+    expect(onDelete).not.toHaveBeenCalled();
+    await user.click(screen.getByTestId("column-automation-view-delete"));
+    await user.click(screen.getByTestId("merge-confidence-config-delete-confirm"));
+    expect(screen.getByTestId("merge-confidence-config-delete-confirm")).toBeDisabled();
+    expect(screen.getByTestId("implement-settings-save")).toBeDisabled();
+    rejectDelete(new Error("Service unavailable. Try again."));
+    await waitFor(() =>
+      expect(screen.getByTestId("merge-confidence-config-delete-error")).toHaveTextContent(
+        "Service unavailable. Try again.",
+      ),
+    );
     expect(screen.getByRole("alertdialog", { name: "Delete automation" })).toBeInTheDocument();
-    expect(screen.getByText("Delete this automation? This cannot be undone.")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Delete automation" }));
-
     expect(onDelete).toHaveBeenCalledTimes(1);
   });
 

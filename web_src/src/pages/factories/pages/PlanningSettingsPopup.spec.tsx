@@ -50,6 +50,8 @@ function renderPopup(
     lines?: PlanningAutoStartLine[];
     onRetry?: () => void;
     initialPath?: string;
+    onDelete?: () => Promise<void> | void;
+    deletePending?: boolean;
   } = {},
 ) {
   const agentSlot = options.agent ? defaultAgentSlot(options.agent === true ? {} : options.agent) : undefined;
@@ -67,6 +69,8 @@ function renderPopup(
               onClose={onClose}
               onRetryAutomation={options.onRetry}
               fixed={false}
+              onDelete={options.onDelete}
+              deletePending={options.deletePending}
               agent={agentSlot}
             />
           </TooltipProvider>
@@ -79,6 +83,25 @@ function renderPopup(
 }
 
 describe("PlanningSettingsPopup", () => {
+  it("confirms deletion independently of settings and keeps failed deletion open", async () => {
+    const onDelete = vi.fn().mockRejectedValue(new Error("Service unavailable. Try again."));
+    const view = renderPopup(vi.fn(), DEFAULT_PLANNING_SETTINGS, { onDelete });
+    const user = userEvent.setup();
+    await user.click(screen.getByTestId("column-automation-view-delete"));
+    await user.click(screen.getByRole("button", { name: "Keep automation" }));
+    expect(onDelete).not.toHaveBeenCalled();
+    await user.click(screen.getByTestId("column-automation-view-delete"));
+    await user.click(screen.getByTestId("column-automation-view-delete-confirm"));
+    await waitFor(() => expect(screen.getByText("Service unavailable. Try again.")).toBeInTheDocument());
+    expect(onDelete).toHaveBeenCalledTimes(1);
+    expect(view.onClose).not.toHaveBeenCalled();
+  });
+
+  it("blocks save and another deletion while deletion is pending", () => {
+    renderPopup(vi.fn(), DEFAULT_PLANNING_SETTINGS, { onDelete: vi.fn(), deletePending: true });
+    expect(screen.getByTestId("column-automation-view-delete")).toBeDisabled();
+    expect(screen.getByTestId("planning-settings-save")).toBeDisabled();
+  });
   beforeEach(() => {
     vi.mocked(useExperimentalFeature).mockReturnValue({
       has: () => false,

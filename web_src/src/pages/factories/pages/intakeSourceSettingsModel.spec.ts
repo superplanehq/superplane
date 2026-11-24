@@ -10,7 +10,6 @@ import {
   intakeSettingsContentKey,
   intakeSettingsFromApi,
   intakeSettingsToApi,
-  intakeSupportsDelete,
   jiraCompletionSettingsToApi,
   normalizeIntakeSourceSettings,
   toggleIntakeLabel,
@@ -299,15 +298,5 @@ describe("intakeSourceSettingsModel", () => {
 
     expect(settings.datadogService).toBe("checkout");
     expect(intakeSettingsToApi(settings)).not.toHaveProperty("datadogService");
-  });
-
-  it("offers delete for GitHub, Sentry, Jira, Productive.io, and Datadog intakes", () => {
-    expect(intakeSupportsDelete("github-issues")).toBe(true);
-    expect(intakeSupportsDelete("dependabot-alerts")).toBe(true);
-    expect(intakeSupportsDelete("sentry-exceptions")).toBe(true);
-    expect(intakeSupportsDelete("jira-issues")).toBe(true);
-    expect(intakeSupportsDelete("productive-tasks")).toBe(true);
-    expect(intakeSupportsDelete("datadog")).toBe(true);
-    expect(intakeSupportsDelete("pagerduty-incidents")).toBe(false);
   });
 });

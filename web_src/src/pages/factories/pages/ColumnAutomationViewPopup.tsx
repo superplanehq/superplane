@@ -12,6 +12,7 @@ import { Link } from "@/components/Link/link";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Pencil } from "lucide-react";
 import { useState, type ReactNode } from "react";
+import { ColumnAutomationViewFooter } from "./ColumnAutomationViewFooter";
 
 import { ColumnAutomationFooterSlotProvider } from "./columnAutomationFooterSlot";
 
@@ -83,10 +84,11 @@ export function ColumnAutomationViewPopup({
   const { tab, setTab } = history;
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [footerSlot, setFooterSlot] = useState<HTMLDivElement | null>(null);
+  const [savePending, setSavePending] = useState(false);
   const footerSlotValue = onDelete ? (confirmDelete ? null : footerSlot) : undefined;
 
   return (
-    <ColumnAutomationFooterSlotProvider slot={footerSlotValue}>
+    <ColumnAutomationFooterSlotProvider slot={footerSlotValue} onSavingChange={setSavePending}>
       <PopupShell testId="column-automation-view" canvas fixed onDismiss={onClose}>
         <PopupHeader
           title={title}
@@ -140,6 +142,7 @@ export function ColumnAutomationViewPopup({
           <ColumnAutomationViewFooter
             confirmDelete={confirmDelete}
             deletePending={deletePending}
+            savePending={savePending}
             onDelete={onDelete}
             onConfirmDelete={setConfirmDelete}
             onActionsSlot={setFooterSlot}
@@ -147,63 +150,6 @@ export function ColumnAutomationViewPopup({
         ) : null}
       </PopupShell>
     </ColumnAutomationFooterSlotProvider>
-  );
-}
-
-function ColumnAutomationViewFooter({
-  confirmDelete,
-  deletePending,
-  onDelete,
-  onConfirmDelete,
-  onActionsSlot,
-}: {
-  confirmDelete: boolean;
-  deletePending: boolean;
-  onDelete: () => Promise<void> | void;
-  onConfirmDelete: (next: boolean) => void;
-  onActionsSlot: (slot: HTMLDivElement | null) => void;
-}) {
-  return (
-    <footer
-      className="flex shrink-0 items-center justify-between gap-3 border-t border-border px-5 py-3"
-      data-testid="column-automation-view-footer"
-    >
-      {confirmDelete ? (
-        <>
-          <p className="workspace-body-text text-destructive" role="alert">
-            {COLUMN_AUTOMATIONS_COPY.confirmDelete}
-          </p>
-          <div className="flex items-center gap-2">
-            <Button type="button" variant="outline" size="sm" onClick={() => onConfirmDelete(false)}>
-              {COLUMN_AUTOMATIONS_COPY.keepLabel}
-            </Button>
-            <Button
-              type="button"
-              variant="destructive"
-              size="sm"
-              disabled={deletePending}
-              onClick={() => void onDelete()}
-              data-testid="column-automation-view-delete-confirm"
-            >
-              {deletePending ? COLUMN_AUTOMATIONS_COPY.deletingLabel : COLUMN_AUTOMATIONS_COPY.deleteLabel}
-            </Button>
-          </div>
-        </>
-      ) : (
-        <>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => onConfirmDelete(true)}
-            data-testid="column-automation-view-delete"
-          >
-            {COLUMN_AUTOMATIONS_COPY.deleteLabel}
-          </Button>
-          <div ref={onActionsSlot} className="flex items-center gap-3" />
-        </>
-      )}
-    </footer>
   );
 }
 

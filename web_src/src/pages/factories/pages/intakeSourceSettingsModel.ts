@@ -178,18 +178,6 @@ export const INTAKE_SETTINGS_COPY = {
   deleteError: "SuperPlane could not delete the intake. Try again.",
 } as const;
 
-export function intakeSupportsDelete(sourceId: LineIntakeSourceId): boolean {
-  return (
-    sourceId === "github-issues" ||
-    sourceId === "dependabot-alerts" ||
-    sourceId === "sentry-exceptions" ||
-    sourceId === "jira-issues" ||
-    sourceId === "productive-tasks" ||
-    sourceId === "datadog" ||
-    sourceId === "linear-issues"
-  );
-}
-
 export function toggleIntakeLabel(labels: string[], label: string): string[] {
   return labels.includes(label) ? labels.filter((entry) => entry !== label) : [...labels, label];
 }
