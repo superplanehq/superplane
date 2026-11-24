@@ -601,7 +601,7 @@ func buildCustomAutomationCanvas(
 	name string,
 	settings *customAutomationSettings,
 ) (*yaml.Canvas, error) {
-	if customAutomationUsesOnRun(settings.ColumnKey) {
+	if customAutomationUsesDispatch(settings.ColumnKey) {
 		return buildDispatchCustomAutomationCanvas(tx, factory, name, settings)
 	}
 	config := factory.OnboardingConfigValue()
@@ -743,13 +743,13 @@ func customAutomationColumnAllowed(column string) bool {
 	return models.ValidCanvasColumnKey(column)
 }
 
-func customAutomationUsesOnRun(column string) bool {
-	return strings.HasPrefix(column, "phase-") || strings.HasPrefix(column, "custom-")
+func customAutomationUsesDispatch(column string) bool {
+	return strings.HasPrefix(column, "phase-")
 }
 
 func buildDispatchCustomAutomationCanvas(tx *gorm.DB, factory *models.Factory, name string, settings *customAutomationSettings) (*yaml.Canvas, error) {
 	if len(settings.Triggers) != 1 || settings.Triggers[0].Mode != pb.FactoryCustomAutomation_START_MODE_MANUAL || settings.runsWithoutTask() {
-		return nil, invalidArgument("A phase or custom stage requires one manual trigger and runs on a task.")
+		return nil, invalidArgument("A phase requires one manual trigger and runs on a task.")
 	}
 	metadata := customAutomationNodeMetadata(factory.OnboardingConfigValue().EffectiveVCSProvider(), settings.Icon, settings.RunsOnTask,
 		func(template map[string]any) { template["startMode"] = "manual" })

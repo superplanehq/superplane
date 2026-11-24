@@ -497,7 +497,7 @@ func validateFactoryConfigurationManifest(ctx context.Context, tx *gorm.DB, deps
 		return configurationDiagnostic("stages", "Done must remain last."), nil
 	}
 	if factoryConfigurationStagesChanged(target, manifest) {
-		enabled, err := models.OrganizationHasExperimentalFeatures(tx, target.factory.OrganizationID, features.FeatureFactoryCustomStages)
+		enabled, err := models.OrganizationHasExperimentalFeatures(tx, target.factory.OrganizationID, features.FeatureFactoryCustomAutomations)
 		if err != nil {
 			return nil, err
 		}

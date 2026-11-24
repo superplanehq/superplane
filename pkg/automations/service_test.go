@@ -163,6 +163,37 @@ func TestServiceValidatesSecretsInOneOrganizationScopedQuery(t *testing.T) {
 	require.Zero(t, queries)
 }
 
+func TestServiceCustomStageRequiresUnifiedFlagAndFactoryAsCode(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, "Custom stage", "", "")
+	require.NoError(t, err)
+	line, err := factory.CreateLine(db, "Main", nil)
+	require.NoError(t, err)
+	stageID := uuid.New()
+	stage := models.FactoryLineStage{ID: stageID, Key: "custom-" + stageID.String(), Name: "QA", Kind: models.FactoryLineStageCustom}
+	stages := line.StagesValue()
+	stages = append(stages[:1], append([]models.FactoryLineStage{stage}, stages[1:]...)...)
+	require.NoError(t, line.UpdateConfiguration(db, nil, nil, nil, stages))
+	service := automations.Service{Backend: backendWithoutCanvases{}}
+	placement := automations.Placement{OrganizationID: r.Organization.ID, FactoryID: factory.ID, Stage: stage.Key}
+	source := strings.Replace(automationSource, "use: manual", "use: task_enters_stage", 1)
+
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
+	_, err = service.Validate(t.Context(), placement, source)
+	require.ErrorContains(t, err, "Factory as code")
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryAsCode))
+	_, err = service.Validate(t.Context(), placement, source)
+	require.NoError(t, err)
+	placement.Stage = "custom-missing"
+	_, err = service.Validate(t.Context(), placement, source)
+	require.ErrorContains(t, err, "Select a custom stage")
+	placement.Stage = stage.Key
+	require.NoError(t, models.DisableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
+	_, err = service.Validate(t.Context(), placement, source)
+	require.ErrorContains(t, err, "Custom Automations")
+}
+
 var errCannotPublish = errors.New("backend could not publish")
 
 type backendWithoutCanvases struct{}

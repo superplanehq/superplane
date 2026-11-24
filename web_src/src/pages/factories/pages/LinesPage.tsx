@@ -43,7 +43,6 @@ import { cn } from "@/lib/utils";
 import {
   FEATURE_FACTORY_AS_CODE,
   FEATURE_FACTORY_CUSTOM_AUTOMATIONS,
-  FEATURE_FACTORY_CUSTOM_STAGES,
   FEATURE_FACTORY_PULL_REQUEST_MERGE,
 } from "@/lib/experimentalFeatures";
 import { useAutoLoadMoreOnScroll } from "@/hooks/useAutoLoadMoreOnScroll";
@@ -432,7 +431,7 @@ export function LinesPage() {
   const showAddIntakeControl = useFactoryPreviewFlag("addIntakeControl");
   const { has: hasExperimentalFeature } = useExperimentalFeature(organizationId);
   const showPullRequestMerge = hasExperimentalFeature(FEATURE_FACTORY_PULL_REQUEST_MERGE);
-  const customStagesEnabled = hasExperimentalFeature(FEATURE_FACTORY_CUSTOM_STAGES);
+  const customStagesEnabled = hasExperimentalFeature(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
   const takenIntakeSourceIds = useMemo(
     (): string[] => configuredIntakes.map((intake) => intake.source.id),
     [configuredIntakes],

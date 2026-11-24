@@ -31,11 +31,8 @@ func TestFactoryConfigurationCustomDispatchRoundTrip(t *testing.T) {
 			upsertHostedOnboardingProvider(t, db)
 			ctx, deps := onboardingContext(r), onboardingDeps(r)
 			feature := features.FeatureFactoryCustomAutomations
-			if strings.HasPrefix(placement, "custom-") {
-				feature = features.FeatureFactoryCustomStages
-			}
 			require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, feature))
-			const source = `apiVersion: v2
+			source := `apiVersion: v2
 kind: Automation
 name: Inspect task
 triggers:
@@ -44,6 +41,13 @@ steps:
   - name: Inspect
     prompt: Inspect the task.
 `
+			if strings.HasPrefix(placement, "custom-") {
+				line, err := factory.CreateLine(db, "QA", nil)
+				require.NoError(t, err)
+				stage := models.FactoryLineStage{ID: uuid.New(), Key: placement, Name: "QA", Kind: models.FactoryLineStageCustom}
+				require.NoError(t, line.UpdateConfiguration(db, nil, nil, nil, append(line.StagesValue(), stage)))
+				source = strings.Replace(source, "use: manual", "use: task_enters_stage", 1)
+			}
 			document, err := automationspec.Parse(source)
 			require.NoError(t, err)
 			nodes, edges, err := (CanvasAutomationBackend{Deps: deps}).compile(db, automations.Placement{
@@ -100,12 +104,14 @@ steps:
 			require.NoError(t, err)
 			require.Equal(t, live.ID.String(), stored.ArtifactRevision)
 			_, err = validateFactoryConfigurationCustom(ctx, db, deps, factory, canvas, live, placement,
-				strings.Replace(edited, "use: manual", "use: task_enters_stage", 1))
-			require.ErrorContains(t, err, "manual")
+				strings.Replace(edited, "use: "+string(document.Triggers[0].Use), "use: task_leaves_stage", 1))
+			require.Error(t, err)
 			_, err = validateFactoryConfigurationCustom(ctx, db, deps, factory, canvas, live, placement,
 				strings.Replace(edited, "prompt: Review the task.", "bash: echo ready\n    secrets: [missing-secret]", 1))
 			require.ErrorContains(t, err, "steps[0].secrets[0]")
-			selectCustomAutomationAgent(live.Nodes).Configuration["unsupportedSetting"] = true
+			extra := *selectCustomAutomationAgent(live.Nodes)
+			extra.ID = "unsupported-agent"
+			live.Nodes = append(live.Nodes, extra)
 			_, err = exportFactoryConfigurationCustom(db, factory, canvas, live, placement)
 			require.ErrorContains(t, err, canvas.Name)
 		})
@@ -116,9 +122,7 @@ func TestFactoryConfigurationCustomBundleCoversEveryPlacement(t *testing.T) {
 	f := newConfigurationFixture(t)
 	db := database.DB(t.Context())
 	deps := testIntakeDependencies(f.r)
-	for _, feature := range []string{features.FeatureFactoryCustomAutomations, features.FeatureFactoryCustomStages} {
-		require.NoError(t, models.EnableExperimentalFeature(f.r.Organization.ID, feature))
-	}
+	require.NoError(t, models.EnableExperimentalFeature(f.r.Organization.ID, features.FeatureFactoryCustomAutomations))
 	vcsID := createReadyOnboardingIntegration(t, f.r.Organization.ID, models.ProviderGitHub)
 	repository, branch := "acme/app", "main"
 	require.NoError(t, f.factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
@@ -130,10 +134,16 @@ func TestFactoryConfigurationCustomBundleCoversEveryPlacement(t *testing.T) {
 		Triggers: []core.Trigger{impl.NewDummyIntegrationTrigger(impl.DummyIntegrationTriggerOptions{Name: prFeedbackTriggerComponent(models.ProviderGitHub)})},
 	})
 	customStage := models.FactoryLineStage{ID: uuid.New(), Key: "custom-" + uuid.NewString(), Name: "Security", Kind: models.FactoryLineStageCustom}
+	stages := f.line.StagesValue()
+	stages = append(stages[:3], append([]models.FactoryLineStage{customStage}, stages[3:]...)...)
+	require.NoError(t, f.line.UpdateConfiguration(db, nil, nil, nil, stages))
 	placements := []string{"backlog", "implement", "verify", "done", "phase-1", customStage.Key}
 	canvasesByPlacement := make(map[string]*models.Canvas, len(placements))
 	for _, placement := range placements {
 		source := "apiVersion: v2\nkind: Automation\nname: Inspect " + placement + "\nruns_on_task: true\ntriggers:\n  - use: manual\nsteps:\n  - name: Inspect\n    prompt: Inspect the task.\n"
+		if placement == customStage.Key {
+			source = strings.Replace(source, "use: manual", "use: task_enters_stage", 1)
+		}
 		document, err := automationspec.Parse(source)
 		require.NoError(t, err)
 		nodes, edges, err := (CanvasAutomationBackend{Deps: deps}).compile(db, automations.Placement{
@@ -154,9 +164,6 @@ func TestFactoryConfigurationCustomBundleCoversEveryPlacement(t *testing.T) {
 	steps := append([]models.FactoryLineStep{}, f.line.Steps...)
 	steps = append(steps, models.FactoryLineStep{Type: models.FactoryLineStepTypeRunApp, AppID: canvasesByPlacement["phase-1"].ID, Entrypoint: "on-run"})
 	require.NoError(t, f.line.Update(db, nil, steps, nil))
-	stages := f.line.StagesValue()
-	stages = append(stages[:3], append([]models.FactoryLineStage{customStage}, stages[3:]...)...)
-	require.NoError(t, f.line.UpdateConfiguration(db, nil, nil, nil, stages))
 	exported, err := ExportFactoryConfiguration(f.ctx, f.r.Organization.ID.String(), &pb.ExportFactoryConfigurationRequest{
 		FactoryId: f.factory.ID.String(), LineId: f.line.ID.String(),
 	})

@@ -203,7 +203,7 @@ func (b CanvasAutomationBackend) compile(
 }
 
 func validateAutomationCanvasPlacement(source *automationspec.Document, stage string) error {
-	if customAutomationUsesOnRun(stage) {
+	if customAutomationUsesDispatch(stage) {
 		return automationspec.ValidateDispatch(source)
 	}
 	return automationspec.ValidateStage(source, automationspec.Stage(stage))

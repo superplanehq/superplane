@@ -178,10 +178,10 @@ func encodeYAML(value any) (string, error) {
 // ValidateDispatch checks an automation bound to a line's execution plan.
 func ValidateDispatch(document *Document) error {
 	if len(document.Triggers) != 1 || document.Triggers[0].Use != Manual {
-		return document.Diagnostic("triggers", "A phase or custom stage requires exactly one manual trigger.")
+		return document.Diagnostic("triggers", "A phase requires exactly one manual trigger.")
 	}
 	if document.RunsOnTask != nil && !*document.RunsOnTask {
-		return document.Diagnostic("runs_on_task", "A phase or custom stage runs on a task.")
+		return document.Diagnostic("runs_on_task", "A phase runs on a task.")
 	}
 	return nil
 }

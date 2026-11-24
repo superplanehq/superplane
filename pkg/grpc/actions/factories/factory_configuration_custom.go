@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/automations"
@@ -55,8 +54,20 @@ func validateFactoryConfigurationCustom(ctx context.Context, tx *gorm.DB, deps I
 			return nil, err
 		}
 	}
-	if err := requireFactoryConfigurationCustomFeature(tx, factory, canvas, version, placement, document); err != nil {
+	changed, err := factoryConfigurationCustomChanged(tx, factory, canvas, version, placement, document)
+	if err != nil {
 		return nil, err
+	}
+	if !changed {
+		return document, nil
+	}
+	feature := features.FeatureFactoryCustomAutomations
+	enabled, err := models.OrganizationHasExperimentalFeatures(tx, factory.OrganizationID, feature)
+	if err != nil {
+		return nil, err
+	}
+	if !enabled {
+		return nil, document.Diagnostic("$", fmt.Sprintf("Enable %s before changing this automation.", feature))
 	}
 	if err := validateFactoryConfigurationCustomSecrets(tx, factory.OrganizationID, document); err != nil {
 		return nil, err
@@ -70,33 +81,20 @@ func validateFactoryConfigurationCustom(ctx context.Context, tx *gorm.DB, deps I
 	return document, nil
 }
 
-func requireFactoryConfigurationCustomFeature(tx *gorm.DB, factory *models.Factory, canvas *models.Canvas, version *models.CanvasVersion, placement string, desired *automationspec.Document) error {
-	if canvas != nil {
-		source, err := exportFactoryConfigurationCustom(tx, factory, canvas, version, placement)
-		if err != nil {
-			return err
-		}
-		current, err := automationspec.Parse(source)
-		if err != nil {
-			return err
-		}
-		current.Definition.Name = desired.Name
-		if equalCanvasJSON(current.Definition, desired.Definition) {
-			return nil
-		}
+func factoryConfigurationCustomChanged(tx *gorm.DB, factory *models.Factory, canvas *models.Canvas, version *models.CanvasVersion, placement string, desired *automationspec.Document) (bool, error) {
+	if canvas == nil {
+		return true, nil
 	}
-	feature := features.FeatureFactoryCustomAutomations
-	if strings.HasPrefix(placement, "custom-") {
-		feature = features.FeatureFactoryCustomStages
-	}
-	enabled, err := models.OrganizationHasExperimentalFeatures(tx, factory.OrganizationID, feature)
+	source, err := exportFactoryConfigurationCustom(tx, factory, canvas, version, placement)
 	if err != nil {
-		return err
+		return false, err
 	}
-	if !enabled {
-		return desired.Diagnostic("$", fmt.Sprintf("Enable %s before changing this automation.", feature))
+	current, err := automationspec.Parse(source)
+	if err != nil {
+		return false, err
 	}
-	return nil
+	current.Definition.Name = desired.Name
+	return !equalCanvasJSON(current.Definition, desired.Definition), nil
 }
 
 func configurationAutomationSourceID(factoryID uuid.UUID, placement, id string) uuid.UUID {

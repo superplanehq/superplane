@@ -142,8 +142,6 @@ function ColumnAutomationRow({
   const board = useContext(AutomationRowContext);
   const drag = useAutomationRowDrag(automation);
   const run = board.onRun ?? onRun;
-  const needsRepair = automation.health === "needs-repair";
-  const headline = columnAutomationHeadline(automation);
   const className = cn(
     ROW_CLASSNAME,
     "text-foreground",
@@ -151,21 +149,7 @@ function ColumnAutomationRow({
     onRowAction && ROW_HOVER_CLASSNAME,
     board.move && "cursor-grab active:cursor-grabbing",
   );
-  const details = (
-    <>
-      <span className={cn(ICON_SLOT_CLASSNAME, "pointer-events-none")}>
-        <ColumnAutomationGlyph automation={automation} className="size-3.5" />
-      </span>
-      <span className="min-w-0 flex-1 truncate">{headline}</span>
-      {needsRepair ? (
-        <span
-          className="size-1.5 shrink-0 rounded-full bg-amber-500"
-          title={COLUMN_AUTOMATIONS_COPY.needsRepairLabel}
-          data-testid={`${testId}-needs-repair-${automation.id}`}
-        />
-      ) : null}
-    </>
-  );
+  const details = <AutomationRowDetails automation={automation} testId={testId} />;
   const showRun = Boolean(run && automation.canRunNow);
   const runningId = board.runningAutomationId ?? runningAutomationId;
   const starting = Boolean(runningId && runningId === automation.canvasId);
@@ -237,6 +221,24 @@ function ColumnAutomationRow({
         </Button>
       ) : null}
     </div>
+  );
+}
+
+function AutomationRowDetails({ automation, testId }: { automation: ColumnAutomation; testId: string }) {
+  return (
+    <>
+      <span className={cn(ICON_SLOT_CLASSNAME, "pointer-events-none")}>
+        <ColumnAutomationGlyph automation={automation} className="size-3.5" />
+      </span>
+      <span className="min-w-0 flex-1 truncate">{columnAutomationHeadline(automation)}</span>
+      {automation.health === "needs-repair" ? (
+        <span
+          className="size-1.5 shrink-0 rounded-full bg-amber-500"
+          title={COLUMN_AUTOMATIONS_COPY.needsRepairLabel}
+          data-testid={`${testId}-needs-repair-${automation.id}`}
+        />
+      ) : null}
+    </>
   );
 }
 

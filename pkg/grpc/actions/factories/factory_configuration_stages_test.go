@@ -19,7 +19,7 @@ import (
 func TestFactoryConfigurationIncludesEveryStageAndPhase(t *testing.T) {
 	f := newConfigurationFixture(t)
 	db := database.DB(t.Context())
-	require.NoError(t, models.EnableExperimentalFeature(f.r.Organization.ID, features.FeatureFactoryCustomStages))
+	require.NoError(t, models.EnableExperimentalFeature(f.r.Organization.ID, features.FeatureFactoryCustomAutomations))
 	second := resetTestTemplate(t, f.r, f.factory, "line-implementation", models.ProviderGitHub, func(*yaml.Canvas) {})
 	steps := append([]models.FactoryLineStep{}, f.line.Steps...)
 	steps = append(steps, models.FactoryLineStep{Type: models.FactoryLineStepTypeRunApp, AppID: second.ID, Entrypoint: "onrun-implement"})
