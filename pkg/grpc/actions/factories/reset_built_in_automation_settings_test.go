@@ -59,7 +59,18 @@ func TestResetBuiltInAutomationPreservesImplementationSettings(t *testing.T) {
 			setResetTestDraftPullRequests(t, doc, tc.draft)
 		})
 	}
+	deletedFactory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	deleted := resetTestTemplate(t, r, deletedFactory, "line-implementation", models.ProviderGitHub, func(*yaml.Canvas) {})
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	_, err = DeleteFactoryAutomation(ctx, r.Organization.ID.String(), &pb.DeleteFactoryAutomationRequest{
+		FactoryId: deletedFactory.ID.String(), AutomationId: deleted.ID.String(),
+	})
+	require.NoError(t, err)
 	require.NoError(t, resetTestOrganization(t, r))
+	apps, err := deletedFactory.ListCanvases(db)
+	require.NoError(t, err)
+	assert.Empty(t, apps)
 	for _, tc := range cases {
 		t.Run(tc.provider, func(t *testing.T) {
 			version := resetTestLiveVersion(t, tc.canvas)

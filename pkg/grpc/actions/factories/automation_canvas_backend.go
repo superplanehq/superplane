@@ -126,7 +126,7 @@ func (b CanvasAutomationBackend) Remove(_ context.Context, tx *gorm.DB, placemen
 	if err != nil {
 		return nil, err
 	}
-	if err := rejectReservedFactoryAutomation(tx, factory, canvas); err != nil {
+	if err := detachFactoryAutomation(tx, factory, canvas); err != nil {
 		return nil, factoryErrorToStatus(err, "failed to delete factory automation")
 	}
 	if err := canvas.SoftDeleteInTransaction(tx); err != nil {

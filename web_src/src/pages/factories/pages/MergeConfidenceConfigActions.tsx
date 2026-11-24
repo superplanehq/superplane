@@ -77,7 +77,7 @@ export function MergeConfidenceDeleteDialog({
           ) : null}
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>{copy.keepLabel}</AlertDialogCancel>
+          <AlertDialogCancel disabled={pending}>{copy.keepLabel}</AlertDialogCancel>
           <AlertDialogAction
             className="bg-destructive text-white hover:bg-destructive/90"
             disabled={pending}

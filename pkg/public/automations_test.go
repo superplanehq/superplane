@@ -239,11 +239,17 @@ steps:
 		Type: models.FactoryLineStepTypeRunApp, AppID: first.ID, Entrypoint: live.Edges[0].SourceID,
 	}})
 	require.NoError(t, err)
-	call(http.MethodDelete, path, nil, http.StatusBadRequest)
-	call(http.MethodGet, path, nil, http.StatusOK)
-	require.NoError(t, line.Update(db, nil, []models.FactoryLineStep{}, nil))
+	stages := line.StagesValue()
 	call(http.MethodDelete, path, nil, http.StatusNoContent)
 	call(http.MethodGet, path, nil, http.StatusNotFound)
+	listed = call(http.MethodGet, collection+"?factory_id="+factory.ID.String(), nil, http.StatusOK)
+	require.NoError(t, json.Unmarshal(listed.Body.Bytes(), &list))
+	require.Empty(t, list.Automations)
+	line, err = factory.FindLine(db, line.ID)
+	require.NoError(t, err)
+	require.Empty(t, line.Steps)
+	stages[1].StepIndex = nil
+	require.Equal(t, stages, line.StagesValue())
 
 	t.Run("validate a model from the authenticated member's subscription", func(t *testing.T) {
 		connection, err := models.CreateCodexConnection(db, orgID, resources.User, time.Now())

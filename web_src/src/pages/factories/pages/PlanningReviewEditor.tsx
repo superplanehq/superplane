@@ -12,6 +12,7 @@ import {
 } from "@/ui/alertDialog";
 import { Workflow } from "lucide-react";
 import { useState } from "react";
+import { ColumnAutomationFooterAction } from "./columnAutomationFooterSlot";
 
 import { RESTORE_DEFAULT_PROMPT_COPY } from "../lib/defaultAgentPrompt";
 import { PlanningReviewForm } from "./PlanningReviewForm";
@@ -132,7 +133,7 @@ export function PlanningReviewEditor({
           />
         </PopupBody>
       )}
-      <footer className="flex shrink-0 items-center gap-4 border-t border-border px-6 py-4">
+      <ColumnAutomationFooterAction saving={isSaving || restore.isRestoring}>
         {showAutomationNote ? <AutomationNote href={automationHref} /> : <span className="min-w-0 flex-1" />}
         {showCancel ? (
           <Button type="button" variant="outline" className="shrink-0" onClick={onCancel} disabled={isSaving}>
@@ -148,7 +149,7 @@ export function PlanningReviewEditor({
         >
           {isSaving ? "Saving…" : "Save Agent"}
         </Button>
-      </footer>
+      </ColumnAutomationFooterAction>
       <RestoreDefaultPromptDialog
         open={restore.confirmOpen}
         onOpenChange={restore.setConfirmOpen}

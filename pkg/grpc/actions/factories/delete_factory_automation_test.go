@@ -63,7 +63,7 @@ func Test__DeleteFactoryAutomation(t *testing.T) {
 		assert.Error(t, err)
 	})
 
-	t.Run("rejects an intake canvas", func(t *testing.T) {
+	t.Run("deletes an intake and its registration", func(t *testing.T) {
 		factory := newFactory(t)
 		response, err := CreateFactoryIntake(ctx, deps, orgID, &pb.CreateFactoryIntakeRequest{
 			FactoryId: factory.ID.String(),
@@ -75,13 +75,12 @@ func Test__DeleteFactoryAutomation(t *testing.T) {
 			FactoryId:    factory.ID.String(),
 			AutomationId: response.GetIntake().GetCanvasId(),
 		})
-		code, message, ok := grpcerrors.HandlerStatus(err)
-		assert.True(t, ok)
-		assert.Equal(t, codes.FailedPrecondition, code)
-		assert.Equal(t, "This canvas belongs to a factory intake, line, backlog, or PR feedback handler.", message)
+		require.NoError(t, err)
+		_, err = models.FindFactoryIntakeByCanvasID(database.DB(t.Context()), uuid.MustParse(response.GetIntake().GetCanvasId()))
+		assert.ErrorIs(t, err, models.ErrFactoryIntakeNotFound)
 	})
 
-	t.Run("rejects a backlog canvas", func(t *testing.T) {
+	t.Run("deletes a backlog canvas", func(t *testing.T) {
 		factory := newFactory(t)
 		_, err := CreateFactoryIntake(ctx, deps, orgID, &pb.CreateFactoryIntakeRequest{
 			FactoryId: factory.ID.String(),
@@ -94,15 +93,15 @@ func Test__DeleteFactoryAutomation(t *testing.T) {
 			FactoryId:    factory.ID.String(),
 			AutomationId: backlog.ID.String(),
 		})
-		code, _, ok := grpcerrors.HandlerStatus(err)
-		assert.True(t, ok)
-		assert.Equal(t, codes.FailedPrecondition, code)
+		require.NoError(t, err)
+		_, err = models.FindCanvasInTransaction(database.DB(t.Context()), r.Organization.ID, backlog.ID)
+		assert.Error(t, err)
 	})
 
-	t.Run("rejects a line step canvas", func(t *testing.T) {
+	t.Run("deletes the final step and preserves its stage", func(t *testing.T) {
 		factory := newFactory(t)
 		automation := createAutomation(t, factory)
-		_, err := factory.CreateLine(database.DB(t.Context()), "ship", []models.FactoryLineStep{
+		line, err := factory.CreateLine(database.DB(t.Context()), "ship", []models.FactoryLineStep{
 			{
 				Type:       models.FactoryLineStepTypeRunApp,
 				AppID:      uuid.MustParse(automation.GetId()),
@@ -110,17 +109,25 @@ func Test__DeleteFactoryAutomation(t *testing.T) {
 			},
 		})
 		require.NoError(t, err)
+		stages := line.StagesValue()
+		colors := line.ColumnColorsValue()
 
 		_, err = DeleteFactoryAutomation(ctx, orgID, &pb.DeleteFactoryAutomationRequest{
 			FactoryId:    factory.ID.String(),
 			AutomationId: automation.GetId(),
 		})
-		code, _, ok := grpcerrors.HandlerStatus(err)
-		assert.True(t, ok)
-		assert.Equal(t, codes.FailedPrecondition, code)
+		require.NoError(t, err)
+		line, err = factory.FindLine(database.DB(t.Context()), line.ID)
+		require.NoError(t, err)
+		assert.Empty(t, line.Steps)
+		stages[1].StepIndex = nil
+		assert.Equal(t, stages, line.StagesValue())
+		assert.Equal(t, colors, line.ColumnColorsValue())
+		_, err = line.ExecutionPlan(database.DB(t.Context()))
+		assert.ErrorIs(t, err, models.ErrFactoryLineHasNoSteps)
 	})
 
-	t.Run("rejects a PR feedback canvas", func(t *testing.T) {
+	t.Run("deletes a PR feedback canvas and its registration", func(t *testing.T) {
 		factory := newFactory(t)
 		appRepo := "acme/app"
 		require.NoError(t, factory.UpdateOnboarding(database.DB(t.Context()), models.FactoryOnboardingPatch{
@@ -135,8 +142,64 @@ func Test__DeleteFactoryAutomation(t *testing.T) {
 			FactoryId:    factory.ID.String(),
 			AutomationId: response.GetHandler().GetCanvasId(),
 		})
-		code, _, ok := grpcerrors.HandlerStatus(err)
-		assert.True(t, ok)
-		assert.Equal(t, codes.FailedPrecondition, code)
+		require.NoError(t, err)
+		handler, err := models.FindPRFeedbackHandlerByCanvasID(database.DB(t.Context()), uuid.MustParse(response.GetHandler().GetCanvasId()))
+		require.NoError(t, err)
+		assert.Nil(t, handler)
+	})
+
+	t.Run("remaps shared steps without changing stages on a later settings save", func(t *testing.T) {
+		factory := newFactory(t)
+		deleted := uuid.MustParse(createAutomation(t, factory).GetId())
+		retained := uuid.MustParse(createAutomation(t, factory).GetId())
+		db := database.DB(t.Context())
+		var lines []*models.FactoryLine
+		for _, name := range []string{"first", "second"} {
+			line, err := factory.CreateLine(db, name, []models.FactoryLineStep{
+				{Type: models.FactoryLineStepTypeRunApp, AppID: deleted, Entrypoint: "start"},
+				{Type: models.FactoryLineStepTypeRunApp, AppID: retained, Entrypoint: "start"},
+				{Type: models.FactoryLineStepTypeRunApp, AppID: deleted, Entrypoint: "start"},
+			})
+			require.NoError(t, err)
+			lines = append(lines, line)
+		}
+		_, err := DeleteFactoryAutomation(ctx, orgID, &pb.DeleteFactoryAutomationRequest{FactoryId: factory.ID.String(), AutomationId: deleted.String()})
+		require.NoError(t, err)
+		for _, original := range lines {
+			line, err := factory.FindLine(db, original.ID)
+			require.NoError(t, err)
+			require.Len(t, line.Steps, 1)
+			assert.Equal(t, retained, line.Steps[0].AppID)
+			expected := original.StagesValue()
+			expected[1].StepIndex, expected[3].StepIndex = nil, nil
+			index := 0
+			expected[2].StepIndex = &index
+			assert.Equal(t, expected, line.StagesValue())
+			max := 3
+			steps := []models.FactoryLineStep(line.Steps)
+			steps[0].MaxParallelism = &max
+			require.NoError(t, line.Update(db, nil, steps, nil))
+			assert.Equal(t, expected, line.StagesValue())
+			plan, err := line.ExecutionPlan(db)
+			require.NoError(t, err)
+			require.Len(t, plan, 1)
+			assert.Equal(t, "phase-1", plan[0].StageKey)
+			assert.Equal(t, retained, plan[0].AppID)
+			assert.Equal(t, 3, plan[0].EffectiveMaxParallelism())
+		}
+	})
+
+	t.Run("rejects another workspace or organization", func(t *testing.T) {
+		factory := newFactory(t)
+		automation := createAutomation(t, factory)
+		other := newFactory(t)
+		for _, request := range []struct{ org, factory string }{{orgID, other.ID.String()}, {uuid.NewString(), factory.ID.String()}} {
+			_, err := DeleteFactoryAutomation(ctx, request.org, &pb.DeleteFactoryAutomationRequest{FactoryId: request.factory, AutomationId: automation.GetId()})
+			code, _, ok := grpcerrors.HandlerStatus(err)
+			assert.True(t, ok)
+			assert.Equal(t, codes.NotFound, code)
+		}
+		_, err := models.FindCanvasInTransaction(database.DB(t.Context()), r.Organization.ID, uuid.MustParse(automation.GetId()))
+		require.NoError(t, err)
 	})
 }

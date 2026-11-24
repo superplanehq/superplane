@@ -1,5 +1,11 @@
 import { Button } from "@/components/ui/button";
-import { useFactory, useFactoryAutomations, useUpdateFactory } from "@/hooks/useFactoryData";
+import {
+  useFactory,
+  useFactoryAutomations,
+  useUpdateFactory,
+  useDeleteFactoryAutomation,
+} from "@/hooks/useFactoryData";
+import { usePermissions } from "@/contexts/usePermissions";
 import { getApiErrorMessage } from "@/lib/errors";
 import { useState } from "react";
 
@@ -113,6 +119,8 @@ function PlanningSettingsLoaded({
     preferredAgentNodeId: REFINE_TASK_NODE_ID,
   });
   const updateFactory = useUpdateFactory(organizationId, factoryId);
+  const deleteAutomation = useDeleteFactoryAutomation(organizationId, factoryId);
+  const { canAct } = usePermissions();
 
   return (
     <PlanningSettingsPopup
@@ -130,6 +138,15 @@ function PlanningSettingsLoaded({
         void automation.refetch();
       }}
       savePending={updateFactory.isPending}
+      deletePending={deleteAutomation.isPending}
+      onDelete={
+        canvasId && canAct("factories", "update")
+          ? async () => {
+              await deleteAutomation.mutateAsync(canvasId);
+              onClose();
+            }
+          : undefined
+      }
       saveError={saveError}
       onSave={async (next) => {
         setSaveError(undefined);

@@ -15,7 +15,6 @@ import { useState } from "react";
 
 import {
   INTAKE_SETTINGS_COPY,
-  intakeSupportsDelete,
   linearIntakeScopeMissing,
   normalizeIntakeSourceSettings,
   type IntakeSourceSettings,
@@ -66,7 +65,7 @@ export function IntakeSourceSettingsFooter({
     );
   }
 
-  const deleteControls = intakeSupportsDelete(sourceId);
+  const deleteControls = Boolean(onDelete);
   const linearScopeMissing = sourceId === "linear-issues" && linearIntakeScopeMissing(draft);
   const sentryProjectsMissing = sourceId === "sentry-exceptions" && draft.sentryProjectIds.length === 0;
   const scopeMissing = linearScopeMissing || sentryProjectsMissing;
@@ -82,7 +81,7 @@ export function IntakeSourceSettingsFooter({
               variant="ghost"
               size="sm"
               className="hover:bg-destructive/10 hover:text-destructive dark:hover:bg-destructive/10 dark:hover:text-destructive"
-              disabled={deletePending}
+              disabled={deletePending || savePending}
               onClick={() => setDeleteOpen(true)}
               data-testid="intake-source-settings-delete"
             >

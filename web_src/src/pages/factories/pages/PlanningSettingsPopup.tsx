@@ -1,4 +1,7 @@
 import { FactoryAutomationSettingsTabs } from "./FactoryAutomationSettingsTabs";
+import { useState, type ComponentProps } from "react";
+import { ColumnAutomationFooterSlotProvider } from "./columnAutomationFooterSlot";
+import { ColumnAutomationViewFooter } from "./ColumnAutomationViewFooter";
 
 import { type PlanningReviewAgentSlot } from "./PlanningReviewEditor";
 import { FactoryAutomationHistory } from "./FactoryAutomationHistory";
@@ -34,6 +37,8 @@ interface PlanningSettingsPopupProps {
   onClose: () => void;
   fixed?: boolean;
   initialTab?: PlanningSettingsTab;
+  onDelete?: () => Promise<void> | void;
+  deletePending?: boolean;
 }
 
 export function PlanningSettingsPopup({
@@ -54,7 +59,11 @@ export function PlanningSettingsPopup({
   onClose,
   fixed = true,
   initialTab = "general",
+  onDelete,
+  deletePending = false,
 }: PlanningSettingsPopupProps) {
+  const [footerSlot, setFooterSlot] = useState<HTMLDivElement | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const editor = usePlanningSettingsDraft({ settings, agent, savePending, onSave, onClose });
   const history = useFactoryAutomationNavigation({
     organizationId,
@@ -66,63 +75,93 @@ export function PlanningSettingsPopup({
     hasAgent: false,
   });
   const { tab, setTab } = history;
+  const busy = editor.busy || deletePending;
 
   return (
-    <PopupShell testId="planning-settings" canvas fixed={fixed} onDismiss={onClose}>
-      <PopupHeader
-        title={title}
-        onClose={onClose}
-        actions={
-          tab === "general" ? (
-            <PlanningSettingsMenu
-              enabled={editor.draft.enabled}
-              disabled={editor.busy}
-              onEnabledChange={(enabled) => void editor.setPlanningEnabled(enabled)}
-            />
-          ) : undefined
-        }
-      >
-        <FactoryAutomationSettingsTabs
-          tab={tab}
-          onTabChange={setTab}
-          hasAgent={false}
-          generalLabel="Configuration"
-          historyEnabled={history.enabled}
-          label={PLANNING_SETTINGS_COPY.tabsLabel}
-          testId="planning-settings"
+    <ColumnAutomationFooterSlotProvider slot={planningFooterSlot(onDelete, confirmDelete, footerSlot)}>
+      <PopupShell testId="planning-settings" canvas fixed={fixed} onDismiss={onClose}>
+        <PopupHeader
+          title={title}
+          onClose={onClose}
+          actions={
+            tab === "general" ? (
+              <PlanningSettingsMenu
+                enabled={editor.draft.enabled}
+                disabled={busy}
+                onEnabledChange={(enabled) => void editor.setPlanningEnabled(enabled)}
+              />
+            ) : undefined
+          }
+        >
+          <FactoryAutomationSettingsTabs
+            tab={tab}
+            onTabChange={setTab}
+            hasAgent={false}
+            generalLabel="Configuration"
+            historyEnabled={history.enabled}
+            label={PLANNING_SETTINGS_COPY.tabsLabel}
+            testId="planning-settings"
+          />
+        </PopupHeader>
+        {tab === "runs" ? (
+          <FactoryAutomationHistory
+            organizationId={history.organizationId}
+            factoryId={history.factoryId}
+            canvasId={canvasId}
+            selectedRunId={history.selectedRunId}
+            onSelectRun={history.setSelectedRunId}
+            loading={automationLoading}
+            error={automationError}
+            onRetry={onRetryAutomation}
+          />
+        ) : (
+          <PlanningSettingsConfiguration
+            draft={editor.draft}
+            lines={lines}
+            agent={agent}
+            agentDraft={editor.agentDraft}
+            onAgentChange={editor.setEditedAgent}
+            onUpdate={editor.update}
+            onRetry={onRetryAutomation}
+            saving={busy}
+          />
+        )}
+        {tab === "general" ? (
+          <PlanningSettingsFooter
+            error={editor.saveError || saveError}
+            saving={editor.busy}
+            disabled={editor.saveDisabled || deletePending}
+            onSave={() => void editor.save()}
+          />
+        ) : null}
+        <PlanningDeletionFooter
+          onDelete={onDelete}
+          confirmDelete={confirmDelete}
+          deletePending={deletePending}
+          savePending={editor.busy}
+          onConfirmDelete={setConfirmDelete}
+          onActionsSlot={setFooterSlot}
         />
-      </PopupHeader>
-      {tab === "runs" ? (
-        <FactoryAutomationHistory
-          organizationId={history.organizationId}
-          factoryId={history.factoryId}
-          canvasId={canvasId}
-          selectedRunId={history.selectedRunId}
-          onSelectRun={history.setSelectedRunId}
-          loading={automationLoading}
-          error={automationError}
-          onRetry={onRetryAutomation}
-        />
-      ) : (
-        <PlanningSettingsConfiguration
-          draft={editor.draft}
-          lines={lines}
-          agent={agent}
-          agentDraft={editor.agentDraft}
-          onAgentChange={editor.setEditedAgent}
-          onUpdate={editor.update}
-          onRetry={onRetryAutomation}
-          saving={editor.busy}
-        />
-      )}
-      {tab === "general" ? (
-        <PlanningSettingsFooter
-          error={editor.saveError || saveError}
-          saving={editor.busy}
-          disabled={editor.saveDisabled}
-          onSave={() => void editor.save()}
-        />
-      ) : null}
-    </PopupShell>
+      </PopupShell>
+    </ColumnAutomationFooterSlotProvider>
   );
+}
+
+function planningFooterSlot(
+  onDelete: PlanningSettingsPopupProps["onDelete"],
+  confirmDelete: boolean,
+  slot: HTMLDivElement | null,
+) {
+  if (!onDelete) return undefined;
+  return confirmDelete ? null : slot;
+}
+
+function PlanningDeletionFooter({
+  onDelete,
+  ...props
+}: Omit<ComponentProps<typeof ColumnAutomationViewFooter>, "onDelete"> & {
+  onDelete: PlanningSettingsPopupProps["onDelete"];
+}) {
+  if (!onDelete) return null;
+  return <ColumnAutomationViewFooter {...props} onDelete={onDelete} />;
 }
