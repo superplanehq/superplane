@@ -82,6 +82,7 @@ function analysisRequestChatState(analysis: IntentAnalysisChat) {
   const stopped = analysis.view.machineStatus === "failed" || analysis.view.machineStatus === "passed";
   const active = analysis.view.machineStatus === "starting" || analysis.view.machineStatus === "running";
   return {
+    chatSoloMarker: analysis.mode === "automation" ? "" : undefined,
     followKey: analysis.view.executionId || analysis.view.canvasId || "analysis",
     active,
     showSurvey: hasPendingPlanningQuestions(analysis.view),
@@ -126,7 +127,7 @@ function AnalysisRequestChat({
     <div
       className="flex min-h-0 flex-1 flex-col"
       data-testid="split-run-intent-chat"
-      data-refine-chat-solo={analysis.mode === "automation" ? "" : undefined}
+      data-refine-chat-solo={state.chatSoloMarker}
     >
       <div className="relative min-h-0 flex-1">
         <div
