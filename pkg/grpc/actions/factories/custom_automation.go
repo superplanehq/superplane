@@ -1739,11 +1739,17 @@ func customAutomationProtoSteps(raw any) ([]*pb.FactoryCustomAutomation_Step, er
 }
 
 func stripCustomAutomationBacklogPrompt(steps []*pb.FactoryCustomAutomation_Step) {
+	last := true
 	for i := len(steps) - 1; i >= 0; i-- {
-		if steps[i].Type == pb.FactoryCustomAutomation_Step_TYPE_PROMPT {
-			steps[i].Prompt = stripBacklogTaskInstructions(steps[i].Prompt)
-			return
+		if steps[i].Type != pb.FactoryCustomAutomation_Step_TYPE_PROMPT {
+			continue
 		}
+		if last {
+			steps[i].Prompt = stripBacklogTaskInstructions(steps[i].Prompt)
+			last = false
+			continue
+		}
+		steps[i].Prompt = strings.TrimSuffix(steps[i].Prompt, webhookPayloadInstructions)
 	}
 }
 

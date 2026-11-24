@@ -146,6 +146,15 @@ func TestBacklogWebhookAutomationCreatesTasksFromThePayload(t *testing.T) {
 	assert.Contains(t, fromWebhook, `"summary": "{{ secrets }}"`, "payload text must not run as an expression")
 	assert.NotContains(t, resolve(map[string]any{"type": "manual.run", "data": map[string]any{}}, 1), "webhook started this run")
 
+	canvas, err := models.FindCanvasWithoutOrgScope(canvasID)
+	require.NoError(t, err)
+	_, version, err := canvasLegacyAutomation(db, canvas)
+	require.NoError(t, err)
+	source, err := importAutomationCanvas(db, factory, canvas, version)
+	require.NoError(t, err, "the YAML source keeps each prompt as written")
+	assert.Contains(t, source, "webhook_id: "+webhookID)
+	assert.NotContains(t, source, "webhook started this run")
+
 	listed, err := ListFactoryWebhooks(ctx, deps, orgID, &pb.ListFactoryWebhooksRequest{FactoryId: factory.ID.String()})
 	require.NoError(t, err)
 	assert.Equal(t, int32(1), listed.GetWebhooks()[0].GetAutomationCount())
