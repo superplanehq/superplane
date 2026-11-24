@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"strings"
 	"testing"
 
 	pw "github.com/mxschmitt/playwright-go"
@@ -20,13 +21,13 @@ func TestFactoryLineCustomStages(t *testing.T) {
 	s.givenALine()
 	s.openLine()
 	s.addStage("QA")
-	s.assertStageOrder("backlog", "phase", "verify", "custom", "done")
+	s.assertStageOrder("backlog", "phase", "phase", "phase", "done")
 	s.moveStage()
 	s.assertStageOrder("backlog", "custom", "phase", "verify", "done")
 	s.reloadAndAssertStageVisible()
 	s.moveAgentAndReload()
 	s.removeStage()
-	s.assertStageOrder("backlog", "phase", "verify", "done")
+	s.assertStageOrder("backlog", "phase", "phase", "done")
 	s.reloadAndAssertStageHidden()
 }
 
@@ -121,7 +122,7 @@ func (s *factoryLineStagesSteps) addStage(name string) {
 	reloaded, err := s.factory.FindLine(database.DB(s.t.Context()), s.line.ID)
 	require.NoError(s.t, err)
 	for _, stage := range reloaded.StagesValue() {
-		if stage.Kind == models.FactoryLineStageCustom {
+		if strings.HasPrefix(stage.Key, "custom-") {
 			s.stageKey = stage.Key
 			break
 		}

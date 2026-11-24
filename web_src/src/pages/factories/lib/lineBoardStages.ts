@@ -8,7 +8,7 @@ export type LineBoardStage = FactoryLineStage & {
 };
 
 export function stageAutoAdvances(stage: Pick<FactoryLineStage, "kind" | "autoAdvance">): boolean {
-  return stage.autoAdvance ?? stage.kind !== "STAGE_KIND_VERIFY";
+  return stage.autoAdvance ?? true;
 }
 
 export function orderedLineBoardStages(
@@ -46,13 +46,13 @@ export function orderedLineBoardStages(
   return [
     { id: "backlog", key: "backlog", name: "Backlog", kind: "STAGE_KIND_BACKLOG", autoAdvance: true },
     ...phases,
-    { id: "verify", key: "verify", name: "Verify", kind: "STAGE_KIND_VERIFY", autoAdvance: false },
+    { id: "verify", key: "verify", name: "Verify", kind: "STAGE_KIND_PHASE", autoAdvance: false },
     { id: "done", key: "done", name: "Done", kind: "STAGE_KIND_DONE", autoAdvance: true },
   ];
 }
 
 export function isCustomLineBoardStage(stage: FactoryLineStage): boolean {
-  return stage.kind === "STAGE_KIND_CUSTOM";
+  return stage.key?.startsWith("custom-") ?? false;
 }
 
 export function reorderLineBoardStages(stages: LineBoardStage[], stageId: string, targetId: string): LineBoardStage[] {
@@ -93,7 +93,7 @@ export function insertStageBeforeDone(stages: LineBoardStage[], name: string): L
     id: key,
     key,
     name: name.trim(),
-    kind: "STAGE_KIND_CUSTOM",
+    kind: "STAGE_KIND_PHASE",
     autoAdvance: true,
   };
   const doneIndex = stages.findIndex((entry) => entry.kind === "STAGE_KIND_DONE");

@@ -39,8 +39,8 @@ func TestUpdateFactoryLineStages(t *testing.T) {
 		factory, line := newLine(t)
 		stages := factoryLineStageRequests(line.StagesValue())
 		stages = append(stages[:1], append([]*pb.FactoryLine_Stage{
-			{Key: "new-security", Name: " Security review ", Kind: pb.FactoryLine_STAGE_KIND_CUSTOM},
-			{Key: "new-release", Name: "Release", Kind: pb.FactoryLine_STAGE_KIND_CUSTOM},
+			{Key: "new-security", Name: " Security review ", Kind: pb.FactoryLine_STAGE_KIND_PHASE},
+			{Key: "new-release", Name: "Release", Kind: pb.FactoryLine_STAGE_KIND_PHASE},
 		}, stages[1:]...)...)
 
 		created, err := UpdateFactoryLine(context.Background(), deps, r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
@@ -55,6 +55,9 @@ func TestUpdateFactoryLineStages(t *testing.T) {
 		})
 		require.NoError(t, err)
 		require.Len(t, created.Line.Stages, 5)
+		for _, stage := range created.Line.Stages[1:4] {
+			assert.Equal(t, pb.FactoryLine_STAGE_KIND_PHASE, stage.Kind)
+		}
 		security := created.Line.Stages[1]
 		release := created.Line.Stages[2]
 		assert.Equal(t, "Security review", security.Name)
@@ -105,7 +108,7 @@ func TestUpdateFactoryLineStages(t *testing.T) {
 		stages := factoryLineStageRequests(line.StagesValue())
 		autoAdvance := false
 		stages = append(stages[:1], append([]*pb.FactoryLine_Stage{{
-			Key: "new-qa", Name: "QA", Kind: pb.FactoryLine_STAGE_KIND_CUSTOM, AutoAdvance: &autoAdvance,
+			Key: "new-qa", Name: "QA", Kind: pb.FactoryLine_STAGE_KIND_PHASE, AutoAdvance: &autoAdvance,
 		}}, stages[1:]...)...)
 
 		created, err := UpdateFactoryLine(t.Context(), deps, r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
@@ -280,8 +283,8 @@ func TestUpdateFactoryLineStages(t *testing.T) {
 		factory, line := newLine(t)
 		stages := factoryLineStageRequests(line.StagesValue())
 		stages = append(stages[:1], append([]*pb.FactoryLine_Stage{
-			{Name: "Security", Kind: pb.FactoryLine_STAGE_KIND_CUSTOM},
-			{Name: "Release", Kind: pb.FactoryLine_STAGE_KIND_CUSTOM},
+			{Name: "Security", Kind: pb.FactoryLine_STAGE_KIND_PHASE},
+			{Name: "Release", Kind: pb.FactoryLine_STAGE_KIND_PHASE},
 		}, stages[1:]...)...)
 		created, err := UpdateFactoryLine(context.Background(), deps, r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
 			FactoryId:          factory.ID.String(),
@@ -355,7 +358,7 @@ func TestUpdateFactoryLineStages(t *testing.T) {
 	t.Run("rolls back stage removal when an attached canvas is a line step", func(t *testing.T) {
 		factory, line := newLine(t)
 		stages := factoryLineStageRequests(line.StagesValue())
-		stages = append(stages[:1], append([]*pb.FactoryLine_Stage{{Name: "Security", Kind: pb.FactoryLine_STAGE_KIND_CUSTOM}}, stages[1:]...)...)
+		stages = append(stages[:1], append([]*pb.FactoryLine_Stage{{Name: "Security", Kind: pb.FactoryLine_STAGE_KIND_PHASE}}, stages[1:]...)...)
 		created, err := UpdateFactoryLine(t.Context(), deps, r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
 			FactoryId: factory.ID.String(), LineId: line.ID.String(),
 			StageConfiguration: &pb.FactoryLine_StageConfiguration{Stages: stages},
@@ -396,7 +399,7 @@ func TestUpdateFactoryLineStages(t *testing.T) {
 		stageID := uuid.New()
 		stages := line.StagesValue()
 		stages = append(stages[:1], append([]models.FactoryLineStage{{
-			ID: stageID, Key: "custom-" + stageID.String(), Name: "QA", Kind: models.FactoryLineStageCustom,
+			ID: stageID, Key: "custom-" + stageID.String(), Name: "QA", Kind: models.FactoryLineStagePhase,
 		}}, stages[1:]...)...)
 		require.NoError(t, line.UpdateConfiguration(db, nil, nil, nil, stages))
 		canvas := support.CreateFactoryCanvas(t, r, factory.ID, "QA checks")
@@ -455,7 +458,7 @@ func TestUpdateFactoryLineStages(t *testing.T) {
 				ID:   id,
 				Key:  "custom-" + id.String(),
 				Name: fmt.Sprintf("Review %d", index+1),
-				Kind: models.FactoryLineStageCustom,
+				Kind: models.FactoryLineStagePhase,
 			}
 		}
 		stages := line.StagesValue()
