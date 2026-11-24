@@ -18,7 +18,6 @@ import {
 } from "../../../lib/mergeConfidenceScore";
 import { isPlanningReviewMetric } from "../../../lib/planningReviewScore";
 import { workOrderCardPullRequestShowsMergeable } from "../../../lib/workOrderCardPullRequest";
-import { SourceRunLink } from "../WorkOrderSplitRunSource";
 import { splitRunDecisionTone } from "../splitRunFooter";
 import { attentionToneClassName } from "../splitRunNoteActionStyle";
 import { toArtifactDataRecord } from "../../../lib/workOrderArtifact";
@@ -165,7 +164,6 @@ export function ConsoleSummaryPanel({
                 />
               </SummaryRow>
               <StartSummaryRow fixture={fixture} />
-              <SourceRunSummaryRow source={source} />
               {panel.duration ? <SummaryRow label="Duration">{panel.duration}</SummaryRow> : null}
               <SummaryRow label="Spend">
                 <OwnerSpendValue
@@ -201,18 +199,6 @@ function PanelPullRequests({
         <PanelPullRequest key={pullRequest.id ?? pullRequest.url ?? index} pullRequest={pullRequest} {...row} />
       ))}
     </FramePanel>
-  );
-}
-
-/** Links back to the run that created the task. Hidden when no run created it. */
-function SourceRunSummaryRow({ source }: { source?: SplitRunSource }) {
-  if (!source?.run) {
-    return null;
-  }
-  return (
-    <SummaryRow label="Source run">
-      <SourceRunLink run={source.run} />
-    </SummaryRow>
   );
 }
 

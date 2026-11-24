@@ -15,11 +15,14 @@ const AUTOMATION_SOURCE: SplitRunSource = {
   run: { appId: "canvas-eslint", runId: "run-eslint-1" },
 };
 
-function renderInFactory(source: SplitRunSource) {
+function renderInFactory(source: SplitRunSource, compact = false) {
   return render(
     <MemoryRouter initialEntries={["/org-1/workspaces/sp/tasks/1"]}>
       <Routes>
-        <Route path="/:organizationId/workspaces/:factoryKey/*" element={<WorkOrderSplitRunSource source={source} />} />
+        <Route
+          path="/:organizationId/workspaces/:factoryKey/*"
+          element={<WorkOrderSplitRunSource compact={compact} source={source} />}
+        />
       </Routes>
     </MemoryRouter>,
   );
@@ -112,17 +115,20 @@ describe("WorkOrderSplitRunSource", () => {
     expect(screen.getByRole("img", { name: "SuperPlane" })).toBeInTheDocument();
   });
 
-  it("links the source to the run that created the task", () => {
-    renderInFactory(AUTOMATION_SOURCE);
+  for (const compact of [false, true]) {
+    it(`links the automation name to the run that created the task (compact: ${compact})`, () => {
+      renderInFactory(AUTOMATION_SOURCE, compact);
 
-    const link = screen.getByRole("link", { name: "View run" });
-    expect(link.getAttribute("href")).toContain("canvas-eslint");
-    expect(link.getAttribute("href")).toContain("run-eslint-1");
-  });
+      const link = screen.getByRole("link", { name: /ESLint AutoFix/ });
+      expect(link.getAttribute("href")).toContain("canvas-eslint");
+      expect(link.getAttribute("href")).toContain("run-eslint-1");
+    });
 
-  it("omits the run link when the task has no source run", () => {
-    renderInFactory({ ...AUTOMATION_SOURCE, run: undefined });
+    it(`leaves the automation name unlinked when the task has no source run (compact: ${compact})`, () => {
+      renderInFactory({ ...AUTOMATION_SOURCE, run: undefined }, compact);
 
-    expect(screen.queryByRole("link", { name: "View run" })).not.toBeInTheDocument();
-  });
+      expect(screen.getByText("ESLint AutoFix")).toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: /ESLint AutoFix/ })).not.toBeInTheDocument();
+    });
+  }
 });

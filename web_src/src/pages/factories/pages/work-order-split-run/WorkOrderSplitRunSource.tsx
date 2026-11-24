@@ -37,7 +37,6 @@ export function WorkOrderSplitRunSource({ source, compact = false }: { source: S
       ) : (
         <ManualSource source={source} />
       )}
-      <SourceRunLink run={source.run} />
     </div>
   );
 }
@@ -123,38 +122,45 @@ function NamedSource({ source }: { source: NamedSplitRunSource }) {
   return (
     <p className="flex min-w-0 items-center gap-1.5 text-foreground">
       <IntakeSourceLogo source={source} className="dark:brightness-0 dark:invert" />
-      <span className="truncate">{source.name}</span>
+      <SourceRunName name={source.name} run={source.run} />
     </p>
   );
 }
 
-/** Links to the run that created this task. Needs the org and factory route params. */
-export function SourceRunLink({ run }: { run?: SplitRunRunRef }) {
-  const { organizationId, factoryKey } = useParams();
-  if (!run || !organizationId || !factoryKey) {
-    return null;
-  }
-  const href = getWorkOrderRunHref(organizationId, factoryKey, run.appId, run.runId);
+/**
+ * Names the automation that created the task. Links to that run, as a
+ * GitHub intake links to its issue. Needs the org and factory route params.
+ */
+function SourceRunName({ name, run }: { name: string; run?: SplitRunRunRef }) {
+  const href = useSourceRunHref(run);
   if (!href) {
-    return null;
+    return <span className="truncate">{name}</span>;
   }
   return (
     <Link
       href={href}
-      className="inline-flex items-center gap-1 text-[13px] font-medium text-foreground hover:underline"
+      className="inline-flex min-w-0 items-center gap-1.5 font-medium text-foreground hover:underline"
       data-testid="split-run-source-run"
     >
-      View run
+      <span className="truncate">{name}</span>
       <ArrowRight className="size-3 shrink-0 text-muted-foreground" aria-hidden />
     </Link>
   );
+}
+
+function useSourceRunHref(run?: SplitRunRunRef): string | undefined {
+  const { organizationId, factoryKey } = useParams();
+  if (!run || !organizationId || !factoryKey) {
+    return undefined;
+  }
+  return getWorkOrderRunHref(organizationId, factoryKey, run.appId, run.runId) || undefined;
 }
 
 function CompactNamedSource({ source }: { source: NamedSplitRunSource }) {
   return (
     <>
       <IntakeSourceLogo source={source} className="dark:brightness-0 dark:invert" />
-      <span className="truncate">{source.name}</span>
+      <SourceRunName name={source.name} run={source.run} />
     </>
   );
 }
