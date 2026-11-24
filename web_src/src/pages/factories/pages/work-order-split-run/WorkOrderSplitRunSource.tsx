@@ -129,7 +129,7 @@ function NamedSource({ source }: { source: NamedSplitRunSource }) {
 }
 
 /** Links to the run that created this task. Needs the org and factory route params. */
-function SourceRunLink({ run }: { run?: SplitRunRunRef }) {
+export function SourceRunLink({ run }: { run?: SplitRunRunRef }) {
   const { organizationId, factoryKey } = useParams();
   if (!run || !organizationId || !factoryKey) {
     return null;
