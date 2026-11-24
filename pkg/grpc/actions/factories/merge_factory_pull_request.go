@@ -158,7 +158,7 @@ func MergeFactoryPullRequest(
 	}
 
 	if closeOutcome != nil && closeOutcome.closed {
-		publishWorkOrderClosed(
+		PublishWorkOrderClosed(
 			db,
 			factory.OrganizationID,
 			factory,

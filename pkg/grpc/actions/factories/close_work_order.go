@@ -68,7 +68,7 @@ func CloseWorkOrder(ctx context.Context, organizationID string, req *pb.CloseWor
 		return nil, factoryErrorToStatus(err, "failed to close work order")
 	}
 
-	publishWorkOrderClosed(db, orgID, factory, order, &closedBy, fromState, result, wasClosed, leftColumn)
+	PublishWorkOrderClosed(db, orgID, factory, order, &closedBy, fromState, result, wasClosed, leftColumn)
 	if !wasClosed {
 		if eventName, properties, ok := factoryCloseEvent(result); ok {
 			captureFactoryProductEvent(
@@ -99,7 +99,7 @@ func CloseWorkOrder(ctx context.Context, organizationID string, req *pb.CloseWor
 	}, nil
 }
 
-func publishWorkOrderClosed(
+func PublishWorkOrderClosed(
 	db *gorm.DB,
 	orgID uuid.UUID,
 	factory *models.Factory,

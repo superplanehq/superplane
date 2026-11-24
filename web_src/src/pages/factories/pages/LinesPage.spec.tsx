@@ -8,6 +8,7 @@ import type {
   FactoriesWorkOrder,
   FactoriesWorkOrderSummary,
   FactoryAutomation,
+  FactoryLineStage,
   CanvasesListRunsResponse,
 } from "@/api-client";
 import type * as canvasData from "@/hooks/useCanvasData";
@@ -965,6 +966,35 @@ describe("LinesPage board stages", () => {
     await user.click(screen.getByRole("menuitem", { name: "Edit stages" }));
   };
 
+  it("edits and saves stage auto-advance settings", async () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_STAGES);
+    const user = userEvent.setup();
+    const factory = customStageFactory();
+    const selectedLine = factory.lines?.find((line) => line.id === REFUND_LINE_PLAN_ID);
+    updateFactoryLineMutateAsync.mockResolvedValueOnce({
+      ...selectedLine,
+      stages: selectedLine?.stages?.map((stage) =>
+        stage.key === "custom-qa" ? { ...stage, autoAdvance: false } : stage,
+      ),
+    });
+    renderLinesBoard(undefined, vi.fn(), factory);
+
+    await editStages();
+    expect(screen.getByRole("switch", { name: "Auto-advance Implement" })).toBeChecked();
+    expect(screen.getByRole("switch", { name: "Auto-advance QA" })).toBeChecked();
+    expect(screen.getByRole("switch", { name: "Auto-advance Verify" })).not.toBeChecked();
+    expect(screen.queryByRole("switch", { name: "Auto-advance Backlog" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("switch", { name: "Auto-advance Done" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("switch", { name: "Auto-advance QA" }));
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+    const dialog = screen.getByTestId("save-line-stages-dialog");
+    expect(within(dialog).getByTestId("save-line-stages-summary")).toHaveTextContent("Disable auto-advance: QA");
+    await user.click(within(dialog).getByRole("button", { name: "Save changes" }));
+
+    const savedStages = updateFactoryLineMutateAsync.mock.calls[0][0].stageConfiguration.stages;
+    expect(savedStages.find((stage: FactoryLineStage) => stage.key === "custom-qa")?.autoAdvance).toBe(false);
+  });
+
   it("saves only the custom name and uses the refreshed line after remount", async () => {
     enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_STAGES);
     const factory = customStageFactory();
@@ -1165,6 +1195,7 @@ describe("LinesPage board stages", () => {
     await user.click(within(addDialog).getByRole("button", { name: "Add stage" }));
 
     const draftLane = screen.getByRole("region", { name: "Deploy" });
+    expect(screen.getByRole("switch", { name: "Auto-advance Deploy" })).toBeChecked();
     const draftTitle = within(draftLane).getByTestId(/^lines-column-title-new-/);
     const draftTitleId = draftTitle.getAttribute("data-testid")!;
     renameCustomStage("Deploy to prod", draftTitleId);
@@ -1177,7 +1208,12 @@ describe("LinesPage board stages", () => {
 
     expect(await screen.findByRole("heading", { name: "Add an automation for Deploy to prod" })).toBeInTheDocument();
     const savedStages = updateFactoryLineMutateAsync.mock.calls[0][0].stageConfiguration.stages;
-    expect(savedStages.at(-2)).toMatchObject({ id: "", name: "Deploy to prod", kind: "STAGE_KIND_CUSTOM" });
+    expect(savedStages.at(-2)).toMatchObject({
+      id: "",
+      name: "Deploy to prod",
+      kind: "STAGE_KIND_CUSTOM",
+      autoAdvance: true,
+    });
     expect(screen.queryByTestId("line-stage-edit-toolbar")).not.toBeInTheDocument();
     expect(screen.getByTestId("add-column-automation-template-custom")).toBeInTheDocument();
   });

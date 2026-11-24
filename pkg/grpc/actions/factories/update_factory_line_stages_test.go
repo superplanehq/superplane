@@ -58,6 +58,9 @@ func TestUpdateFactoryLineStages(t *testing.T) {
 		assert.Equal(t, "Security review", security.Name)
 		assert.NotEmpty(t, security.Id)
 		assert.Contains(t, security.Key, "custom-")
+		assert.True(t, security.GetAutoAdvance())
+		assert.True(t, release.GetAutoAdvance())
+		assert.False(t, created.Line.Stages[3].GetAutoAdvance())
 		assert.Equal(t, "purple", created.Line.ColumnColors[security.Key])
 
 		reordered := []*pb.FactoryLine_Stage{
@@ -93,6 +96,36 @@ func TestUpdateFactoryLineStages(t *testing.T) {
 		reloaded, err := factory.FindLine(db, line.ID)
 		require.NoError(t, err)
 		assert.Equal(t, []string{"Backlog", "Release", "Verify", "Done"}, modelStageNames(reloaded.StagesValue()))
+	})
+
+	t.Run("persists auto advance and preserves it when omitted", func(t *testing.T) {
+		factory, line := newLine(t)
+		stages := factoryLineStageRequests(line.StagesValue())
+		autoAdvance := false
+		stages = append(stages[:1], append([]*pb.FactoryLine_Stage{{
+			Key: "new-qa", Name: "QA", Kind: pb.FactoryLine_STAGE_KIND_CUSTOM, AutoAdvance: &autoAdvance,
+		}}, stages[1:]...)...)
+
+		created, err := UpdateFactoryLine(t.Context(), deps, r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
+			FactoryId: factory.ID.String(), LineId: line.ID.String(),
+			StageConfiguration: &pb.FactoryLine_StageConfiguration{Stages: stages},
+		})
+		require.NoError(t, err)
+		qa := created.Line.Stages[1]
+		assert.False(t, qa.GetAutoAdvance())
+
+		reloaded, err := factory.FindLine(db, line.ID)
+		require.NoError(t, err)
+		withoutSetting := factoryLineStageRequests(reloaded.StagesValue())
+		withoutSetting[1].AutoAdvance = nil
+		_, err = UpdateFactoryLine(t.Context(), deps, r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
+			FactoryId: factory.ID.String(), LineId: line.ID.String(),
+			StageConfiguration: &pb.FactoryLine_StageConfiguration{Stages: withoutSetting},
+		})
+		require.NoError(t, err)
+		reloaded, err = factory.FindLine(db, line.ID)
+		require.NoError(t, err)
+		assert.False(t, reloaded.StagesValue()[1].AutoAdvanceEnabled())
 	})
 
 	t.Run("moves a workspace card to a new stage atomically", func(t *testing.T) {

@@ -481,6 +481,8 @@ func serializeFactoryLineStages(stages []models.FactoryLineStage) []*pb.FactoryL
 			Kind:            serializeFactoryLineStageKind(stage.Kind),
 			AgentDisplayKey: stage.AgentDisplayKey,
 		}
+		autoAdvance := stage.AutoAdvanceEnabled()
+		result[index].AutoAdvance = &autoAdvance
 		if stage.StepIndex != nil {
 			stepIndex := int32(*stage.StepIndex)
 			result[index].StepIndex = &stepIndex
@@ -810,14 +812,15 @@ func serializeWorkOrderLineDispatch(
 			Id:   dispatch.LineID.String(),
 			Name: dispatch.LineName,
 		},
-		Steps:          serializeExecutionSteps(dispatch.Steps, dispatch.Executions),
-		Stages:         serializeFactoryLineStages(dispatch.StagesValue()),
-		State:          serializeLineDispatchState(dispatch.State),
-		Result:         serializeLineDispatchResult(dispatch.Result),
-		CreatedAt:      timestamppb.New(dispatch.CreatedAt),
-		StepExecutions: serializeWorkOrderExecutions(dispatch.Executions, dispatch.Steps, modelsByExecution),
-		Model:          dispatch.Model,
-		ThinkingLevel:  dispatch.ThinkingLevel,
+		Steps:           serializeExecutionSteps(dispatch.Steps, dispatch.Executions),
+		Stages:          serializeFactoryLineStages(dispatch.StagesValue()),
+		State:           serializeLineDispatchState(dispatch.State),
+		Result:          serializeLineDispatchResult(dispatch.Result),
+		CreatedAt:       timestamppb.New(dispatch.CreatedAt),
+		StepExecutions:  serializeWorkOrderExecutions(dispatch.Executions, dispatch.Steps, modelsByExecution),
+		Model:           dispatch.Model,
+		ThinkingLevel:   dispatch.ThinkingLevel,
+		CurrentStageKey: dispatch.CurrentStageKey,
 	}
 	if dispatch.FinishedAt != nil {
 		item.FinishedAt = timestamppb.New(*dispatch.FinishedAt)
