@@ -123,7 +123,11 @@ function AnalysisRequestChat({
   const transcriptFiles = mergeAnalysisTranscriptFiles(files, images.transcriptFiles);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col" data-testid="split-run-intent-chat">
+    <div
+      className="flex min-h-0 flex-1 flex-col"
+      data-testid="split-run-intent-chat"
+      data-refine-chat-solo={analysis.mode === "automation" ? "" : undefined}
+    >
       <div className="relative min-h-0 flex-1">
         <div
           ref={follow.scrollRef}
