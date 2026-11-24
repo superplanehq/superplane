@@ -33,13 +33,12 @@ export function customAutomationColumnAutomation(
   const hasSchedule =
     listed.some((trigger) => trigger.mode === "scheduled") || app.customAutomationMode === "scheduled";
   const primary = primaryCustomAutomationMode(app.customAutomationMode, listed);
-  const taskStageTargets = customAutomationTaskStageTargets(hasSchedule, primary, columnKey);
   const copy = customAutomationModeCopy(primary, columnKey);
   const trigger = customAutomationTriggerSummary(app, listed, columnKey, copy.trigger);
   return {
     id: `custom-automation-${id}`,
     kind: "custom-verification",
-    taskStageTargets,
+    taskStageTargets: customAutomationTaskStageTargets(primary, columnKey, hasSchedule),
     name: app.name?.trim() || "Custom automation",
     trigger,
     action: copy.action,
@@ -56,9 +55,9 @@ export function customAutomationColumnAutomation(
 }
 
 function customAutomationTaskStageTargets(
-  hasSchedule: boolean,
   mode: CustomAutomationMode,
   columnKey: CustomAutomationColumn,
+  hasSchedule: boolean,
 ): string[] | undefined {
   if (hasSchedule) return undefined;
   if (mode === "leave") return ["backlog", "phase-0", "verify", "done"];
