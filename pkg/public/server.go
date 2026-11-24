@@ -2079,10 +2079,21 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if webhook.IsManaged() {
+		if code, err := s.authenticateFactoryWebhook(r.Context(), webhook, r.Header, body); err != nil {
+			http.Error(w, err.Error(), code)
+			return
+		}
+	}
+
 	nodes, err := models.FindActiveWebhookNodes(webhookID)
 	if err != nil {
 		track.complete(r.Context(), http.StatusNotFound, 0)
 		http.Error(w, "webhook not found", http.StatusNotFound)
+		return
+	}
+	if webhook.IsManaged() && len(nodes) == 0 {
+		w.WriteHeader(http.StatusAccepted)
 		return
 	}
 

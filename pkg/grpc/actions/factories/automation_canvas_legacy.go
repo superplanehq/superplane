@@ -144,7 +144,7 @@ func importAutomationCanvas(tx *gorm.DB, factory *models.Factory, canvas *models
 		return "", unrepresentableAutomationCanvas()
 	}
 	hasSchedule := slices.ContainsFunc(definition.Triggers, func(trigger automationspec.Trigger) bool {
-		return trigger.Use == automationspec.Scheduled
+		return trigger.Use == automationspec.Scheduled || trigger.Use == automationspec.Webhook
 	})
 	if *canvas.ColumnKey == models.CanvasColumnKeyBacklog && ((settings.RunsOnTask != nil && !*settings.RunsOnTask) || hasSchedule) {
 		stripCustomAutomationBacklogPrompt(settings.Steps)
@@ -247,7 +247,12 @@ func legacyAutomationTriggers(stage string, nodes []models.Node) ([]automationsp
 		case pb.FactoryCustomAutomation_START_MODE_SCHEDULED:
 			result = append(result, automationspec.Trigger{
 				Use:    automationspec.Scheduled,
-				Config: &automationspec.Schedule{Cron: trigger.schedule.GetCronExpression(), UTCOffset: trigger.schedule.GetUtcOffset()},
+				Config: &automationspec.TriggerConfig{Cron: trigger.schedule.GetCronExpression(), UTCOffset: trigger.schedule.GetUtcOffset()},
+			})
+		case pb.FactoryCustomAutomation_START_MODE_WEBHOOK:
+			result = append(result, automationspec.Trigger{
+				Use:    automationspec.Webhook,
+				Config: &automationspec.TriggerConfig{WebhookID: trigger.webhookID},
 			})
 		}
 	}
