@@ -582,6 +582,9 @@ func buildCustomAutomationCanvas(
 	name string,
 	settings *customAutomationSettings,
 ) (*yaml.Canvas, error) {
+	if customAutomationUsesOnRun(settings.ColumnKey) {
+		return buildDispatchCustomAutomationCanvas(tx, factory, name, settings)
+	}
 	config := factory.OnboardingConfigValue()
 	repository := strings.TrimSpace(config.AppRepository)
 	integrationID := strings.TrimSpace(config.VCSIntegrationID)
@@ -721,6 +724,34 @@ func customAutomationColumnAllowed(column string) bool {
 	default:
 		return false
 	}
+}
+
+func customAutomationUsesOnRun(column string) bool {
+	return strings.HasPrefix(column, "phase-") || strings.HasPrefix(column, "custom-")
+}
+
+func buildDispatchCustomAutomationCanvas(tx *gorm.DB, factory *models.Factory, name string, settings *customAutomationSettings) (*yaml.Canvas, error) {
+	if len(settings.Triggers) != 1 || settings.Triggers[0].Mode != pb.FactoryCustomAutomation_START_MODE_MANUAL || settings.runsWithoutTask() {
+		return nil, invalidArgument("A phase or custom stage requires one manual trigger and runs on a task.")
+	}
+	metadata := customAutomationNodeMetadata(factory.OnboardingConfigValue().EffectiveVCSProvider(), settings.Icon, settings.RunsOnTask,
+		func(template map[string]any) { template["startMode"] = "manual" })
+	environment := []any{
+		checkoutEnvironmentVar("REPO", "{{ task().repository }}"),
+		checkoutEnvironmentVar("REPO_URL", "{{ task().repository_url }}"),
+		checkoutEnvironmentVar("BASE", "{{ task().default_branch }}"),
+	}
+	return &yaml.Canvas{
+		APIVersion: yaml.APIVersion, Kind: yaml.KindCanvas,
+		Metadata: &yaml.CanvasMetadata{Name: name, Description: "Run prompt and Bash steps for a task."},
+		Spec: &yaml.CanvasSpec{
+			Nodes: []yaml.Node{
+				{ID: "on-run", Name: "On Run", Type: yaml.NodeTypeTrigger, Component: "onRun", Configuration: map[string]any{}, Metadata: metadata},
+				customAutomationRunnerNode(customAutomationRunnerID, "Run automation", settings, customAutomationRunnerConfiguration(tx, factory, settings, environment), 240),
+			},
+			Edges: []yaml.Edge{{SourceID: "on-run", TargetID: customAutomationRunnerID, Channel: "default"}},
+		},
+	}, nil
 }
 
 func customAutomationUsesTaskTrigger(column string) bool {
@@ -1254,6 +1285,7 @@ func findCustomAutomationCanvas(tx *gorm.DB, factory *models.Factory, rawID stri
 func preserveCustomAutomationIdentities(version *models.CanvasVersion, doc *yaml.Canvas) error {
 	for i := range version.Nodes {
 		if version.Nodes[i].Type == models.NodeTypeTrigger {
+			preserveCustomAutomationOnRunIdentity(&version.Nodes[i], doc)
 			preserveCustomAutomationPRTriggerIdentity(&version.Nodes[i], doc)
 		}
 	}
@@ -1290,6 +1322,26 @@ func preserveCustomAutomationIdentities(version *models.CanvasVersion, doc *yaml
 		return nil
 	}
 	return errors.New("custom automation agent is missing")
+}
+
+func preserveCustomAutomationOnRunIdentity(previous *models.Node, doc *yaml.Canvas) {
+	if previous.ComponentName() != "onRun" {
+		return
+	}
+	for i := range doc.Spec.Nodes {
+		trigger := &doc.Spec.Nodes[i]
+		if trigger.Component != "onRun" {
+			continue
+		}
+		generatedID := trigger.ID
+		trigger.ID = previous.ID
+		for j := range doc.Spec.Edges {
+			if doc.Spec.Edges[j].SourceID == generatedID {
+				doc.Spec.Edges[j].SourceID = previous.ID
+			}
+		}
+		return
+	}
 }
 
 func customAutomationAgentForRunner(nodes []models.Node, runnerID string) *models.Node {

@@ -7,6 +7,13 @@ import (
 )
 
 func Test__Get(t *testing.T) {
+	t.Run("factory as code is available and disabled by default", func(t *testing.T) {
+		f, ok := Get("factory_as_code")
+		assert.True(t, ok)
+		assert.False(t, f.Hidden)
+		assert.False(t, IsReleased(f.ID))
+	})
+
 	t.Run("model status is visible and unreleased", func(t *testing.T) {
 		f, ok := Get("model_status")
 		assert.True(t, ok)

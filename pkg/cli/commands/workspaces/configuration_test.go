@@ -1,0 +1,411 @@
+package workspaces
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/cli/core"
+	"github.com/superplanehq/superplane/pkg/openapi_client"
+	clitest "github.com/superplanehq/superplane/test/support/cli"
+)
+
+const configurationManifest = `apiVersion: v2
+kind: Factory
+name: Example workspace
+stages:
+  - key: implementation
+    name: Implement
+    kind: phase
+    run: implement
+    automations:
+      - id: implement
+        uses: "@superplane/implement"
+        with:
+          additional_instructions: Follow AGENTS.md.
+`
+
+func configurationCLI(t *testing.T, handler http.HandlerFunc) (*cobra.Command, *bytes.Buffer) {
+	t.Helper()
+	server := httptest.NewServer(handler)
+	t.Cleanup(server.Close)
+	ctx, stdout := clitest.NewCommandContext(t, server, "text")
+	root := NewCommand(core.BindOptions{
+		NewAPIClient: func() *openapi_client.APIClient { return ctx.API },
+		NewConfigContext: func() core.ConfigContext {
+			return &clitest.FakeConfig{ActiveWorkspace: "active-workspace"}
+		},
+	})
+	root.SetOut(stdout)
+	root.SetErr(stdout)
+	root.SetIn(strings.NewReader(""))
+	root.SilenceErrors = true
+	root.SilenceUsage = true
+	return root, stdout
+}
+
+func writeConfigurationInput(t *testing.T) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "factory.yaml")
+	require.NoError(t, os.WriteFile(path, []byte(configurationManifest), 0600))
+	return path
+}
+
+func exportPayload(content string) map[string]any {
+	return map[string]any{
+		"coverage": "All stages and automations",
+		"bundle": map[string]any{
+			"manifestPath": ".superplane/factory.yaml",
+			"files":        []map[string]any{{"path": ".superplane/factory.yaml", "content": content}},
+		},
+	}
+}
+
+func TestConfigurationCommandsRequireExplicitWorkspace(t *testing.T) {
+	for _, operation := range []string{"export", "plan", "apply"} {
+		t.Run(operation, func(t *testing.T) {
+			root, _ := configurationCLI(t, func(w http.ResponseWriter, r *http.Request) { t.Errorf("unexpected API call: %s", r.URL) })
+			args := []string{operation}
+			if operation == "export" {
+				args = append(args, "--output-dir", t.TempDir())
+			} else {
+				args = append(args, "-f", writeConfigurationInput(t))
+			}
+			root.SetArgs(args)
+			require.ErrorContains(t, root.Execute(), "workspace")
+		})
+	}
+}
+
+func TestExportConfigurationProtectsLocalFiles(t *testing.T) {
+	outputDir := t.TempDir()
+	unrelated := filepath.Join(outputDir, "README.md")
+	require.NoError(t, os.WriteFile(unrelated, []byte("Keep this file."), 0600))
+	content := configurationManifest
+	root, stdout := configurationCLI(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodGet, r.Method)
+		assert.Equal(t, "/api/v1/factories/example/configuration", r.URL.Path)
+		assert.Empty(t, r.URL.Query().Get("lineId"))
+		w.Header().Set("Content-Type", "application/json")
+		require.NoError(t, json.NewEncoder(w).Encode(exportPayload(content)))
+	})
+	args := []string{"export", "--workspace", "example", "--output-dir", outputDir}
+	root.SetArgs(args)
+	require.NoError(t, root.Execute())
+	require.Contains(t, stdout.String(), "All stages and automations")
+	manifest := filepath.Join(outputDir, ".superplane", "factory.yaml")
+	actual, err := os.ReadFile(manifest)
+	require.NoError(t, err)
+	assert.Equal(t, configurationManifest, string(actual))
+
+	content = strings.ReplaceAll(configurationManifest, "Follow AGENTS.md.", "Use the UI changes.")
+	root.SetArgs(args)
+	require.ErrorContains(t, root.Execute(), "--overwrite")
+	actual, err = os.ReadFile(manifest)
+	require.NoError(t, err)
+	assert.Equal(t, configurationManifest, string(actual))
+
+	root.SetArgs(append(args, "--overwrite"))
+	require.NoError(t, root.Execute())
+	actual, err = os.ReadFile(manifest)
+	require.NoError(t, err)
+	assert.Equal(t, content, string(actual))
+	actual, err = os.ReadFile(unrelated)
+	require.NoError(t, err)
+	assert.Equal(t, "Keep this file.", string(actual))
+}
+
+func TestExportConfigurationRejectsInvalidResponsesBeforeOverwrite(t *testing.T) {
+	for _, scenario := range []string{"missing bundle", "missing coverage", "unsafe manifest", "unsafe file", "extra file", "missing content", "invalid YAML", "missing stages", "unknown field", "YAML alias"} {
+		t.Run(scenario, func(t *testing.T) {
+			outputDir := t.TempDir()
+			require.NoError(t, os.Mkdir(filepath.Join(outputDir, ".superplane"), 0755))
+			manifest := filepath.Join(outputDir, ".superplane", "factory.yaml")
+			require.NoError(t, os.WriteFile(manifest, []byte("existing content"), 0600))
+			payload := exportPayload(configurationManifest)
+			bundle := payload["bundle"].(map[string]any)
+			files := bundle["files"].([]map[string]any)
+			switch scenario {
+			case "missing bundle":
+				delete(payload, "bundle")
+			case "missing coverage":
+				delete(payload, "coverage")
+			case "unsafe manifest":
+				bundle["manifestPath"] = "../factory.yaml"
+			case "unsafe file":
+				files[0]["path"] = "/tmp/factory.yaml"
+			case "extra file":
+				bundle["files"] = append(files, map[string]any{"path": "README.md", "content": "overwrite"})
+			case "missing content":
+				delete(files[0], "content")
+			case "invalid YAML":
+				files[0]["content"] = "apiVersion: ["
+			case "missing stages":
+				files[0]["content"] = "apiVersion: v2\nkind: Factory\nname: Example workspace\n"
+			case "unknown field":
+				files[0]["content"] = configurationManifest + "unsupported: true\n"
+			case "YAML alias":
+				aliased := strings.ReplaceAll(configurationManifest, "name: Example workspace", "name: &workspace Example workspace")
+				files[0]["content"] = strings.ReplaceAll(aliased, "name: Implement", "name: *workspace")
+			}
+			root, _ := configurationCLI(t, func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				require.NoError(t, json.NewEncoder(w).Encode(payload))
+			})
+			root.SetArgs([]string{"export", "--workspace", "example", "--output-dir", outputDir, "--overwrite"})
+			require.Error(t, root.Execute())
+			actual, err := os.ReadFile(manifest)
+			require.NoError(t, err)
+			assert.Equal(t, "existing content", string(actual))
+		})
+	}
+}
+
+func TestExportConfigurationRejectsSymlinks(t *testing.T) {
+	for _, location := range []string{"output", "directory", "manifest"} {
+		t.Run(location, func(t *testing.T) {
+			outputDir := filepath.Join(t.TempDir(), "output")
+			targetDir := t.TempDir()
+			target := filepath.Join(targetDir, "factory.yaml")
+			require.NoError(t, os.WriteFile(target, []byte("Keep this file."), 0600))
+			switch location {
+			case "output":
+				require.NoError(t, os.Symlink(targetDir, outputDir))
+			case "directory":
+				require.NoError(t, os.MkdirAll(outputDir, 0755))
+				require.NoError(t, os.Symlink(targetDir, filepath.Join(outputDir, ".superplane")))
+			case "manifest":
+				require.NoError(t, os.MkdirAll(filepath.Join(outputDir, ".superplane"), 0755))
+				require.NoError(t, os.Symlink(target, filepath.Join(outputDir, ".superplane", "factory.yaml")))
+			}
+			root, _ := configurationCLI(t, func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				require.NoError(t, json.NewEncoder(w).Encode(exportPayload(configurationManifest)))
+			})
+			root.SetArgs([]string{"export", "--workspace", "example", "--output-dir", outputDir, "--overwrite"})
+			require.Error(t, root.Execute())
+			actual, err := os.ReadFile(target)
+			require.NoError(t, err)
+			assert.Equal(t, "Keep this file.", string(actual))
+		})
+	}
+}
+
+func TestApplyConfigurationSubmitsCapturedPlanInput(t *testing.T) {
+	path := writeConfigurationInput(t)
+	var requests []string
+	var planned map[string]any
+	root, stdout := configurationCLI(t, func(w http.ResponseWriter, r *http.Request) {
+		requests = append(requests, r.URL.Path)
+		assert.Equal(t, http.MethodPost, r.Method)
+		w.Header().Set("Content-Type", "application/json")
+		var body map[string]any
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		assert.NotContains(t, body, "lineId")
+		switch r.URL.Path {
+		case "/api/v1/factories/example/configuration:plan":
+			planned = body
+			require.NoError(t, os.WriteFile(path, []byte("changed after preview"), 0600))
+			_, _ = fmt.Fprint(w, `{"coverage":"All stages and automations","baseStateToken":"preview-token","changes":[{"resource":"implementation/implement","fieldPath":"with.additional_instructions","previousValue":"old","requestedValue":"Follow AGENTS.md."}]}`)
+		case "/api/v1/factories/example/configuration:apply":
+			assert.Equal(t, "preview-token", body["baseStateToken"])
+			assert.Equal(t, planned["bundle"], body["bundle"])
+			bundle := body["bundle"].(map[string]any)
+			files := bundle["files"].([]any)
+			assert.Equal(t, configurationManifest, files[0].(map[string]any)["content"])
+			_, _ = fmt.Fprint(w, `{"coverage":"All stages and automations","changed":true}`)
+		default:
+			t.Errorf("unexpected API call: %s", r.URL)
+			http.NotFound(w, r)
+		}
+	})
+	root.SetArgs([]string{"apply", "--workspace", "example", "-f", path, "--yes"})
+	require.NoError(t, root.Execute())
+	assert.Len(t, requests, 2)
+	assert.Contains(t, stdout.String(), "old")
+	assert.Contains(t, stdout.String(), "Follow AGENTS.md.")
+}
+
+func TestConfigurationRoundTripsCustomFilesAcrossStages(t *testing.T) {
+	manifest := configurationManifest + `  - key: custom-review
+    name: Review changes
+    kind: custom
+    automations:
+      - id: review
+        name: Review changes
+        uses: automations/review.yaml
+  - key: verify
+    name: Verify
+    kind: verify
+    automations: []
+  - key: done
+    name: Done
+    kind: done
+    automations: []
+`
+	source := "apiVersion: v2\nkind: Automation\nname: Review changes\ntriggers:\n  - use: manual\nsteps:\n  - name: Review\n    prompt: Review the changes.\n"
+	output := t.TempDir()
+	var planned map[string]any
+	root, _ := configurationCLI(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.Method == http.MethodGet {
+			payload := exportPayload(manifest)
+			bundle := payload["bundle"].(map[string]any)
+			bundle["files"] = append(bundle["files"].([]map[string]any), map[string]any{"path": ".superplane/automations/review.yaml", "content": source})
+			require.NoError(t, json.NewEncoder(w).Encode(payload))
+			return
+		}
+		var body map[string]any
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		if strings.HasSuffix(r.URL.Path, ":plan") {
+			planned = body["bundle"].(map[string]any)
+			files := planned["files"].([]any)
+			require.Len(t, files, 2)
+			assert.Equal(t, ".superplane/automations/review.yaml", files[1].(map[string]any)["path"])
+			assert.Equal(t, source, files[1].(map[string]any)["content"])
+			require.NoError(t, os.WriteFile(filepath.Join(output, ".superplane", "automations", "review.yaml"), []byte("changed after preview"), 0600))
+			_, _ = fmt.Fprint(w, `{"coverage":"All stages and automations","baseStateToken":"preview-token","changes":[{"resource":"custom-review/review","fieldPath":"steps","previousValue":"old","requestedValue":"new"}]}`)
+			return
+		}
+		assert.Equal(t, planned, body["bundle"])
+		_, _ = fmt.Fprint(w, `{"coverage":"All stages and automations","changed":true}`)
+	})
+	root.SetArgs([]string{"export", "--workspace", "example", "--output-dir", output})
+	require.NoError(t, root.Execute())
+	actual, err := os.ReadFile(filepath.Join(output, ".superplane", "automations", "review.yaml"))
+	require.NoError(t, err)
+	require.Equal(t, source, string(actual))
+	root.SetArgs([]string{"apply", "--workspace", "example", "-f", filepath.Join(output, ".superplane", "factory.yaml"), "--yes"})
+	require.NoError(t, root.Execute())
+}
+
+func TestConfigurationRejectsUnsafeCustomFiles(t *testing.T) {
+	for _, scenario := range []string{"traversal", "absolute", "backslash", "symlink", "missing", "stdin"} {
+		t.Run(scenario, func(t *testing.T) {
+			directory := t.TempDir()
+			reference := "automations/custom.yaml"
+			switch scenario {
+			case "traversal":
+				reference = "../custom.yaml"
+			case "absolute":
+				reference = "/tmp/custom.yaml"
+			case "backslash":
+				reference = "..\\custom.yaml"
+			case "symlink":
+				require.NoError(t, os.Symlink(t.TempDir(), filepath.Join(directory, "automations")))
+			}
+			manifest := strings.Replace(configurationManifest, "\"@superplane/implement\"", "'"+reference+"'", 1)
+			input := filepath.Join(directory, "factory.yaml")
+			require.NoError(t, os.WriteFile(input, []byte(manifest), 0600))
+			root, _ := configurationCLI(t, func(w http.ResponseWriter, r *http.Request) { t.Errorf("unsafe input reached API: %s", r.URL) })
+			if scenario == "stdin" {
+				input = "-"
+				root.SetIn(strings.NewReader(manifest))
+			}
+			root.SetArgs([]string{"plan", "--workspace", "example", "-f", input})
+			require.Error(t, root.Execute())
+		})
+	}
+}
+
+func TestExportConfigurationChecksEveryFileBeforeReplacement(t *testing.T) {
+	manifest := strings.Replace(configurationManifest, "\"@superplane/implement\"", "automations/custom.yaml", 1)
+	for _, scenario := range []string{"unsafe path", "missing referenced file", "duplicate path", "symlink", "existing custom file"} {
+		t.Run(scenario, func(t *testing.T) {
+			output := t.TempDir()
+			directory := filepath.Join(output, ".superplane")
+			require.NoError(t, os.MkdirAll(filepath.Join(directory, "automations"), 0755))
+			manifestPath := filepath.Join(directory, "factory.yaml")
+			payload := exportPayload(manifest)
+			bundle := payload["bundle"].(map[string]any)
+			files := bundle["files"].([]map[string]any)
+			custom := map[string]any{"path": ".superplane/automations/custom.yaml", "content": "apiVersion: v2\nkind: Automation\n"}
+			args := []string{"export", "--workspace", "example", "--output-dir", output, "--overwrite"}
+			if scenario != "existing custom file" {
+				require.NoError(t, os.WriteFile(manifestPath, []byte("keep manifest"), 0600))
+			}
+			switch scenario {
+			case "unsafe path":
+				custom["path"] = "../custom.yaml"
+			case "duplicate path":
+				files = append(files, custom)
+			case "symlink":
+				require.NoError(t, os.Remove(filepath.Join(directory, "automations")))
+				require.NoError(t, os.Symlink(t.TempDir(), filepath.Join(directory, "automations")))
+			case "existing custom file":
+				require.NoError(t, os.WriteFile(filepath.Join(directory, "automations", "custom.yaml"), []byte("keep custom"), 0600))
+				args = args[:len(args)-1]
+			}
+			if scenario != "missing referenced file" {
+				files = append(files, custom)
+			}
+			bundle["files"] = files
+			root, _ := configurationCLI(t, func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				require.NoError(t, json.NewEncoder(w).Encode(payload))
+			})
+			root.SetArgs(args)
+			require.Error(t, root.Execute())
+			if scenario == "existing custom file" {
+				_, err := os.Stat(manifestPath)
+				require.ErrorIs(t, err, os.ErrNotExist)
+				return
+			}
+			actual, err := os.ReadFile(manifestPath)
+			require.NoError(t, err)
+			require.Equal(t, "keep manifest", string(actual))
+		})
+	}
+}
+
+func TestConfigurationPlanAndApplyStopBeforePublishing(t *testing.T) {
+	for _, scenario := range []string{"plan", "unchanged", "diagnostics", "confirmation unavailable", "missing token"} {
+		t.Run(scenario, func(t *testing.T) {
+			var calls int
+			root, stdout := configurationCLI(t, func(w http.ResponseWriter, r *http.Request) {
+				calls++
+				assert.Equal(t, "/api/v1/factories/example/configuration:plan", r.URL.Path)
+				w.Header().Set("Content-Type", "application/json")
+				response := map[string]any{"coverage": "All stages and automations", "baseStateToken": "token"}
+				if scenario != "unchanged" {
+					response["changes"] = []map[string]string{{"resource": "implementation/implement", "fieldPath": "with.additional_instructions", "previousValue": "old", "requestedValue": "new"}}
+				}
+				if scenario == "diagnostics" {
+					response["diagnostics"] = []map[string]string{{"path": ".superplane/factory.yaml", "field": "stages", "message": "Unsupported stage."}}
+				}
+				if scenario == "missing token" {
+					delete(response, "baseStateToken")
+				}
+				require.NoError(t, json.NewEncoder(w).Encode(response))
+			})
+			operation := "apply"
+			if scenario == "plan" {
+				operation = "plan"
+			}
+			root.SetArgs([]string{operation, "--workspace", "example", "-f", writeConfigurationInput(t)})
+			err := root.Execute()
+			switch scenario {
+			case "plan", "unchanged":
+				require.NoError(t, err)
+			case "diagnostics":
+				require.Error(t, err)
+				assert.Contains(t, stdout.String(), ".superplane/factory.yaml")
+				assert.Contains(t, stdout.String(), "stages")
+			case "confirmation unavailable":
+				require.ErrorContains(t, err, "--yes")
+			case "missing token":
+				require.ErrorContains(t, err, "token")
+			}
+			assert.Equal(t, 1, calls)
+		})
+	}
+}

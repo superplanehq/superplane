@@ -30,6 +30,9 @@ func UpdateFactoryLine(ctx context.Context, organizationID string, req *pb.Updat
 
 	var line *models.FactoryLine
 	err = db.Transaction(func(tx *gorm.DB) error {
+		if err := factory.LockForUpdate(tx); err != nil {
+			return err
+		}
 		line, err = factory.FindLineForUpdate(tx, lineID)
 		if err != nil {
 			return err
