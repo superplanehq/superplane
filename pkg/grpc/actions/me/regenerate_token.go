@@ -21,6 +21,10 @@ func RegenerateToken(ctx context.Context) (*pb.RegenerateTokenResponse, error) {
 		return nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
 	}
 
+	if _, scoped := authentication.GetScopedTokenScopesFromMetadata(ctx); scoped {
+		return nil, grpcerrors.PermissionDenied(nil, "scoped credentials cannot issue personal tokens")
+	}
+
 	user, err := models.FindActiveUserByID(orgID, userID)
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to load user")
