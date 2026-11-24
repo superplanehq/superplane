@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/automations"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
@@ -18,13 +19,14 @@ import (
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
 	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
 func TestUpdateFactoryLineStages(t *testing.T) {
 	r := support.Setup(t)
 	deps := testIntakeDependencies(r)
 	db := database.DB(t.Context())
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomStages))
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
 
 	newLine := func(t *testing.T) (*models.Factory, *models.FactoryLine) {
 		t.Helper()
@@ -353,10 +355,13 @@ func TestUpdateFactoryLineStages(t *testing.T) {
 		})
 	})
 
-	t.Run("detaches automations when their stage is removed", func(t *testing.T) {
+	t.Run("releases automation names when their execution stage is removed", func(t *testing.T) {
 		factory, line := newLine(t)
 		stages := factoryLineStageRequests(line.StagesValue())
-		stages = append(stages[:1], append([]*pb.FactoryLine_Stage{{Name: "Security", Kind: pb.FactoryLine_STAGE_KIND_CUSTOM}}, stages[1:]...)...)
+		stages = append(stages[:1], append([]*pb.FactoryLine_Stage{
+			{Name: "Security", Kind: pb.FactoryLine_STAGE_KIND_CUSTOM},
+			{Name: "Release", Kind: pb.FactoryLine_STAGE_KIND_CUSTOM},
+		}, stages[1:]...)...)
 		created, err := UpdateFactoryLine(context.Background(), deps, r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
 			FactoryId:          factory.ID.String(),
 			LineId:             line.ID.String(),
@@ -365,24 +370,118 @@ func TestUpdateFactoryLineStages(t *testing.T) {
 		require.NoError(t, err)
 
 		canvas := support.CreateFactoryCanvas(t, r, factory.ID, "security")
-		require.NoError(t, db.Model(canvas).Update("column_key", created.Line.Stages[1].Key).Error)
+		originalName := canvas.Name
+		removedKey, retainedKey := created.Line.Stages[1].Key, created.Line.Stages[2].Key
+		require.NoError(t, canvas.SetColumnKey(db, removedKey))
+		source := &models.AutomationSource{
+			ID: uuid.New(), OrganizationID: r.Organization.ID, FactoryID: factory.ID,
+			Name: originalName, Source: "definition", Revision: 1, ArtifactID: canvas.ID.String(),
+			ArtifactRevision: canvas.LiveVersionID.String(),
+		}
+		require.NoError(t, source.Save(db))
+		displayOnly := support.CreateFactoryCanvas(t, r, factory.ID, "display-only")
+		require.NoError(t, displayOnly.SetColumnKey(db, "verify"))
+		require.NoError(t, displayOnly.SetDisplayColumn(db, removedKey))
+		moved := support.CreateFactoryCanvas(t, r, factory.ID, "moved")
+		require.NoError(t, moved.SetColumnKey(db, removedKey))
+		other, _ := newLine(t)
+		foreign := support.CreateFactoryCanvas(t, r, other.ID, "foreign")
+		require.NoError(t, foreign.SetColumnKey(db, removedKey))
+		require.NoError(t, foreign.SetDisplayColumn(db, removedKey))
 		withoutCustom := append([]*pb.FactoryLine_Stage{created.Line.Stages[0]}, created.Line.Stages[2:]...)
 		_, err = UpdateFactoryLine(context.Background(), deps, r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
-			FactoryId:          factory.ID.String(),
-			LineId:             line.ID.String(),
-			StageConfiguration: &pb.FactoryLine_StageConfiguration{Stages: withoutCustom},
+			FactoryId: factory.ID.String(),
+			LineId:    line.ID.String(),
+			StageConfiguration: &pb.FactoryLine_StageConfiguration{
+				Stages: withoutCustom,
+				AutomationMoves: []*pb.FactoryLine_AutomationMove{{
+					Type: "canvas", AutomationId: moved.ID.String(), SourceKey: removedKey, DestinationKey: retainedKey,
+				}},
+			},
 		})
 		require.NoError(t, err)
-		reloaded, err := models.FindCanvasInTransaction(db, r.Organization.ID, canvas.ID)
+		require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
+		replacement, err := CreateFactoryAutomation(
+			authentication.SetUserIdInMetadata(t.Context(), r.User.String()), deps, r.Organization.ID.String(),
+			&pb.CreateFactoryAutomationRequest{FactoryId: factory.ID.String(), Name: originalName},
+		)
 		require.NoError(t, err)
-		assert.Nil(t, reloaded.ColumnKey)
+		require.Equal(t, originalName, replacement.Automation.Name)
+		_, err = models.FindCanvasInTransaction(db, r.Organization.ID, canvas.ID)
+		require.ErrorIs(t, err, gorm.ErrRecordNotFound)
+		var deleted models.Canvas
+		require.NoError(t, db.Unscoped().First(&deleted, canvas.ID).Error)
+		assert.True(t, deleted.DeletedAt.Valid)
+		assert.NotEqual(t, originalName, deleted.Name)
+		_, err = models.FindAutomationSourceByArtifact(db, r.Organization.ID, canvas.ID.String())
+		require.ErrorIs(t, err, gorm.ErrRecordNotFound)
+		found, err := models.FindCanvasByName(db, r.Organization.ID, &factory.ID, originalName)
+		require.NoError(t, err)
+		assert.Equal(t, replacement.Automation.Id, found.ID.String())
+		for _, fixture := range []struct {
+			canvas  *models.Canvas
+			key     string
+			display string
+		}{{displayOnly, "verify", ""}, {moved, retainedKey, ""}, {foreign, removedKey, removedKey}} {
+			reloaded, err := models.FindCanvasInTransaction(db, r.Organization.ID, fixture.canvas.ID)
+			require.NoError(t, err)
+			assert.Equal(t, fixture.key, *reloaded.ColumnKey)
+			assert.Equal(t, fixture.display, reloaded.DisplayColumnKey)
+		}
 	})
 
-	t.Run("requires the custom stages feature", func(t *testing.T) {
+	t.Run("rolls back stage removal when an attached canvas is a line step", func(t *testing.T) {
 		factory, line := newLine(t)
-		require.NoError(t, models.DisableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomStages))
+		stages := factoryLineStageRequests(line.StagesValue())
+		stages = append(stages[:1], append([]*pb.FactoryLine_Stage{{Name: "Security", Kind: pb.FactoryLine_STAGE_KIND_CUSTOM}}, stages[1:]...)...)
+		created, err := UpdateFactoryLine(t.Context(), deps, r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
+			FactoryId: factory.ID.String(), LineId: line.ID.String(),
+			StageConfiguration: &pb.FactoryLine_StageConfiguration{Stages: stages},
+		})
+		require.NoError(t, err)
+		deletable := support.CreateFactoryCanvas(t, r, factory.ID, "deletable")
+		protected, entrypoint := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "protected", "start")
+		_, err = factory.CreateLine(db, "other", []models.FactoryLineStep{{
+			Type: models.FactoryLineStepTypeRunApp, AppID: protected.ID, Entrypoint: entrypoint,
+		}})
+		require.NoError(t, err)
+		for _, canvas := range []*models.Canvas{deletable, protected} {
+			require.NoError(t, canvas.SetColumnKey(db, created.Line.Stages[1].Key))
+		}
+		_, err = UpdateFactoryLine(t.Context(), deps, r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
+			FactoryId: factory.ID.String(), LineId: line.ID.String(),
+			StageConfiguration: &pb.FactoryLine_StageConfiguration{
+				Stages: append([]*pb.FactoryLine_Stage{created.Line.Stages[0]}, created.Line.Stages[2:]...),
+			},
+		})
+		require.Error(t, err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
+		require.True(t, ok)
+		assert.Equal(t, codes.FailedPrecondition, code)
+		reloaded, err := factory.FindLine(db, line.ID)
+		require.NoError(t, err)
+		assert.Equal(t, stageNames(created.Line.Stages), modelStageNames(reloaded.StagesValue()))
+		for _, canvas := range []*models.Canvas{deletable, protected} {
+			active, err := models.FindCanvasInTransaction(db, r.Organization.ID, canvas.ID)
+			require.NoError(t, err)
+			assert.Equal(t, canvas.Name, active.Name)
+			assert.Equal(t, created.Line.Stages[1].Key, *active.ColumnKey)
+		}
+	})
+
+	t.Run("requires the unified feature and preserves saved records", func(t *testing.T) {
+		factory, line := newLine(t)
+		stageID := uuid.New()
+		stages := line.StagesValue()
+		stages = append(stages[:1], append([]models.FactoryLineStage{{
+			ID: stageID, Key: "custom-" + stageID.String(), Name: "QA", Kind: models.FactoryLineStageCustom,
+		}}, stages[1:]...)...)
+		require.NoError(t, line.UpdateConfiguration(db, nil, nil, nil, stages))
+		canvas := support.CreateFactoryCanvas(t, r, factory.ID, "QA checks")
+		require.NoError(t, canvas.SetColumnKey(db, stages[1].Key))
+		require.NoError(t, models.DisableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
 		t.Cleanup(func() {
-			require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomStages))
+			require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
 		})
 
 		_, err := UpdateFactoryLine(context.Background(), deps, r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
@@ -393,6 +492,13 @@ func TestUpdateFactoryLineStages(t *testing.T) {
 		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.FailedPrecondition, code)
+		reloaded, err := factory.FindLine(db, line.ID)
+		require.NoError(t, err)
+		assert.Equal(t, stages, reloaded.StagesValue())
+		savedCanvas, err := models.FindCanvasInTransaction(db, r.Organization.ID, canvas.ID)
+		require.NoError(t, err)
+		require.NotNil(t, savedCanvas.ColumnKey)
+		assert.Equal(t, stages[1].Key, *savedCanvas.ColumnKey)
 	})
 
 	t.Run("rejects replacing steps and stages together", func(t *testing.T) {

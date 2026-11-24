@@ -21,12 +21,7 @@ export function columnAutomationOpenPath(
   if (automation.kind === "analysis") {
     return factoryPlanningPath(args.organizationId, args.factoryKey, args.lineId);
   }
-  const customStageEditor =
-    automation.kind === "custom" && automation.columnKey?.startsWith("custom-") && args.customEditingEnabled;
-  const customSetupEditor =
-    automation.kind === "custom-verification" &&
-    (!automation.columnKey?.startsWith("custom-") || args.customEditingEnabled);
-  if ((customSetupEditor || customStageEditor) && automation.canvasId && args.lineId) {
+  if (usesCustomSetupEditor(automation, args.customEditingEnabled) && automation.canvasId && args.lineId) {
     return factoryCustomAutomationSetupPath(
       args.organizationId,
       args.factoryKey,
@@ -37,4 +32,12 @@ export function columnAutomationOpenPath(
   }
   if (!automation.canvasId) return undefined;
   return factoryColumnAutomationViewPath(args.organizationId, args.factoryKey, args.lineId, automation.canvasId);
+}
+
+function usesCustomSetupEditor(automation: ColumnAutomation, customEditingEnabled = false): boolean {
+  const customStage = automation.columnKey?.startsWith("custom-");
+  if (customStage) {
+    return customEditingEnabled && (automation.kind === "custom" || automation.kind === "custom-verification");
+  }
+  return automation.kind === "custom-verification";
 }

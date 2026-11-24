@@ -16,7 +16,6 @@ const copy = FIRST_RUN_COPY.host;
 export function FirstRunHostScreen({
   selectedHost,
   githubEnterpriseSelected = false,
-  showGitHubEnterprise = false,
   githubEnterpriseLicensed = false,
   chrome,
   sphere,
@@ -24,16 +23,13 @@ export function FirstRunHostScreen({
 }: {
   selectedHost: VcsHostId | null;
   githubEnterpriseSelected?: boolean;
-  showGitHubEnterprise?: boolean;
   githubEnterpriseLicensed?: boolean;
   chrome?: FirstRunChrome;
   sphere?: FirstRunSphereProps;
   onChooseHost: (host: FirstRunHostChoice) => void;
 }) {
   const options: FirstRunHostOption[] = [...VCS_OPTIONS];
-  if (showGitHubEnterprise) {
-    options.splice(1, 0, GITHUB_ENTERPRISE_VCS_OPTION);
-  }
+  options.splice(1, 0, GITHUB_ENTERPRISE_VCS_OPTION);
 
   return (
     <FirstRunShell testId="first-run-host" chrome={chrome} sphere={sphere} visual="preview">
