@@ -419,7 +419,7 @@ function WebhookSecretDialog({ reveal, onClose }: { reveal: Reveal | null; onClo
           <DialogDescription>Copy the secret now. You cannot see it again.</DialogDescription>
         </DialogHeader>
         {reveal ? (
-          <div className="space-y-3">
+          <div className="min-w-0 space-y-3">
             <CopyField label="Webhook URL" value={webhook?.url ?? ""} testId="factory-webhook-secret-url" />
             <CopyField label="Secret" value={reveal.secret} testId="factory-webhook-secret" />
             <div>
