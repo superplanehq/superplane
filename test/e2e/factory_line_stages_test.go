@@ -115,7 +115,7 @@ func (s *factoryLineStagesSteps) addStage(name string) {
 	require.NoError(s.t, dialog.GetByRole("button", pw.LocatorGetByRoleOptions{Name: "Add stage", Exact: pw.Bool(true)}).Click())
 	require.NoError(s.t, dialog.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateHidden}))
 	s.saveStageChanges()
-	automationDialog := page.GetByRole("dialog", pw.PageGetByRoleOptions{Name: "Add an automation for " + name, Exact: pw.Bool(true)})
+	automationDialog := page.GetByTestId("custom-automation-setup-modal")
 	require.NoError(s.t, automationDialog.GetByRole("button", pw.LocatorGetByRoleOptions{Name: "Close", Exact: pw.Bool(true)}).Click())
 
 	reloaded, err := s.factory.FindLine(database.DB(s.t.Context()), s.line.ID)
