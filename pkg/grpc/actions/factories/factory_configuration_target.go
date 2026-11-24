@@ -255,9 +255,24 @@ func inspectFactoryConfigurationTarget(tx *gorm.DB, factory *models.Factory, lin
 		}
 		stage.automations = append(stage.automations, automation)
 	}
+	customPaths := map[uuid.UUID]string{}
+	usedPaths := map[string]bool{}
 	for _, stage := range target.stages {
 		counts := map[string]int{}
 		for _, automation := range stage.automations {
+			if automation.templateID == "" {
+				reference, exists := customPaths[automation.canvas.ID]
+				if !exists {
+					base := "automations/" + models.Slugify(automation.canvas.Name)
+					reference = base + ".yaml"
+					for suffix := 2; usedPaths[reference]; suffix++ {
+						reference = base + "-" + strconv.Itoa(suffix) + ".yaml"
+					}
+					customPaths[automation.canvas.ID] = reference
+					usedPaths[reference] = true
+				}
+				automation.uses = reference
+			}
 			counts[configurationAutomationKey(automation)]++
 		}
 		for i, automation := range stage.automations {
@@ -296,7 +311,6 @@ func inspectConfigurationAutomation(tx *gorm.DB, factory *models.Factory, canvas
 		automation.settings, err = exportFactoryConfigurationBuiltIn(version, template)
 	} else {
 		automation.source, err = exportFactoryConfigurationCustom(tx, factory, canvas, version, placement)
-		automation.uses = "automations/" + configurationCanvasKey(canvas.ID) + ".yaml"
 	}
 	if err != nil {
 		return nil, unsupportedConfigurationTarget(fmt.Sprintf("Cannot export automation %q: %v", canvas.Name, err))
@@ -320,7 +334,8 @@ func configurationCanvasKey(canvasID uuid.UUID) string {
 
 func configurationAutomationKey(automation *factoryConfigurationAutomationTarget) string {
 	if automation.templateID == "" {
-		return strings.TrimSuffix(strings.TrimPrefix(automation.uses, "automations/"), ".yaml")
+		// Keep manifest identity stable when the display name and filename change.
+		return configurationCanvasKey(automation.canvas.ID)
 	}
 	return strings.ReplaceAll(strings.TrimPrefix(automation.uses, "@superplane/"), "/", "-")
 }

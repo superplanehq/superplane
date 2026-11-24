@@ -210,3 +210,24 @@ func TestFactoryConfigurationCustomBundleCoversEveryPlacement(t *testing.T) {
 		require.Nil(t, document.Agent)
 	}
 }
+
+func TestFactoryConfigurationExportDisambiguatesCustomFilenames(t *testing.T) {
+	f := newConfigurationLifecycleFixture(t)
+	bundle := f.export(t)
+	addConfigurationLifecycleAutomation(t, bundle, "first", "Inspect Task")
+	addConfigurationLifecycleAutomation(t, bundle, "second", "Inspect Task!")
+	plan := f.plan(t, bundle)
+	require.Empty(t, plan.Diagnostics)
+	_, err := f.apply(bundle, plan.BaseStateToken)
+	require.NoError(t, err)
+
+	exported, err := ExportFactoryConfiguration(f.ctx, f.r.Organization.ID.String(), &pb.ExportFactoryConfigurationRequest{FactoryId: f.factory.Key})
+	require.NoError(t, err)
+	bundle = exported.Bundle
+	require.Len(t, bundle.Files, 3)
+	require.Equal(t, ".superplane/automations/inspect-task-2.yaml", bundle.Files[1].Path)
+	require.Equal(t, ".superplane/automations/inspect-task.yaml", bundle.Files[2].Path)
+	plan = f.plan(t, bundle)
+	require.Empty(t, plan.Diagnostics)
+	require.Empty(t, plan.Changes)
+}
