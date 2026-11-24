@@ -1,5 +1,5 @@
 import { ArrowRight, ExternalLink } from "lucide-react";
-import { useParams } from "react-router";
+import { useParams, useSearchParams } from "react-router";
 
 import { Link } from "@/components/Link/link";
 import { logoDarkInvertClass } from "@/lib/logoDarkMode";
@@ -7,7 +7,8 @@ import { safeExternalUrl } from "@/lib/safeExternalUrl";
 import { cn } from "@/lib/utils";
 
 import { OrgUserReference } from "../../OrgUserReference";
-import { getWorkOrderRunHref } from "../../lib/workOrderExecutions";
+import { useOptionalFactoriesLayout } from "../../layout/factoriesLayoutContext";
+import { factoryCustomAutomationRunPath } from "../../lib/customAutomationPaths";
 import { isMonochromeSourceLogo, type SplitRunRunRef, type SplitRunSource } from "./splitRunSource";
 
 export function WorkOrderSplitRunSource({ source, compact = false }: { source: SplitRunSource; compact?: boolean }) {
@@ -151,12 +152,20 @@ function SourceRunName({ name, run }: { name: string; run?: SplitRunRunRef }) {
   );
 }
 
+/** Pick the line that opens the run. Prefer the line named in the URL, else the first factory line. */
+function sourceRunLineId(queryLineId: string | null, lines: Array<{ id?: string }> | undefined): string | undefined {
+  return queryLineId || lines?.find((line) => line.id)?.id;
+}
+
 function useSourceRunHref(run?: SplitRunRunRef): string | undefined {
   const { organizationId, factoryKey } = useParams();
-  if (!run || !organizationId || !factoryKey) {
+  const layout = useOptionalFactoriesLayout();
+  const [searchParams] = useSearchParams();
+  const lineId = sourceRunLineId(searchParams.get("lineId"), layout?.factory?.lines);
+  if (!run || !organizationId || !factoryKey || !lineId) {
     return undefined;
   }
-  return getWorkOrderRunHref(organizationId, factoryKey, run.appId, run.runId) || undefined;
+  return factoryCustomAutomationRunPath(organizationId, factoryKey, lineId, run.appId, run.runId);
 }
 
 function CompactNamedSource({ source }: { source: NamedSplitRunSource }) {

@@ -17,7 +17,7 @@ const AUTOMATION_SOURCE: SplitRunSource = {
 
 function renderInFactory(source: SplitRunSource, compact = false) {
   return render(
-    <MemoryRouter initialEntries={["/org-1/workspaces/sp/tasks/1"]}>
+    <MemoryRouter initialEntries={["/org-1/workspaces/sp/tasks/1?lineId=line-1"]}>
       <Routes>
         <Route
           path="/:organizationId/workspaces/:factoryKey/*"
@@ -109,7 +109,7 @@ describe("WorkOrderSplitRunSource", () => {
   });
 
   it("names an automation source with its name and the SuperPlane mark", () => {
-    render(<WorkOrderSplitRunSource source={AUTOMATION_SOURCE} />);
+    renderInFactory(AUTOMATION_SOURCE);
 
     expect(screen.getByText("ESLint AutoFix")).toBeInTheDocument();
     expect(screen.getByRole("img", { name: "SuperPlane" })).toBeInTheDocument();
@@ -120,8 +120,9 @@ describe("WorkOrderSplitRunSource", () => {
       renderInFactory(AUTOMATION_SOURCE, compact);
 
       const link = screen.getByRole("link", { name: "View run" });
-      expect(link.getAttribute("href")).toContain("canvas-eslint");
-      expect(link.getAttribute("href")).toContain("run-eslint-1");
+      expect(link.getAttribute("href")).toBe(
+        "/org-1/workspaces/sp/lines/line-1?customAutomation=canvas-eslint&automationColumn=backlog&automationTab=runs&automationRun=run-eslint-1",
+      );
     });
 
     it(`shows no run link when the task has no source run (compact: ${compact})`, () => {
