@@ -224,6 +224,30 @@ describe("custom automation settings", () => {
     expect(automation?.canRunNow).toBe(true);
   });
 
+  it.each([
+    ["backlog", "leave", false, ["backlog", "phase-0", "verify", "done"]],
+    ["verify", "leave", false, ["backlog", "phase-0", "verify", "done"]],
+    ["backlog", "automatic", false, ["backlog", "phase-0", "done"]],
+    ["verify", "automatic", false, undefined],
+    ["backlog", "manual", false, undefined],
+    ["backlog", "leave", true, undefined],
+    ["backlog", "automatic", true, undefined],
+  ] as const)("selects task stage targets for %s/%s (scheduled=%s)", (column, mode, scheduled, targets) => {
+    const [automation] = buildColumnAutomations(column, {
+      columnTitle: column,
+      apps: [
+        {
+          id: "review",
+          columnKey: column,
+          templateId: "custom-verification",
+          customAutomationMode: mode,
+          customAutomationTriggers: scheduled ? [{ mode: "scheduled" }, { mode }] : undefined,
+        },
+      ],
+    });
+    expect(automation?.taskStageTargets).toEqual(targets);
+  });
+
   it("lets a person start a Backlog automation that runs with no task", () => {
     const [automation] = buildColumnAutomations("backlog", {
       columnTitle: "Backlog",
