@@ -226,6 +226,7 @@ function triggerTitle(
   stageLabel: string,
 ): string {
   if (mode === "scheduled") return "Schedule";
+  if (mode === "webhook") return "Webhook";
   if (mode === "leave") return `When a task leaves ${stageLabel}`;
   if (mode === "automatic") {
     return columnKey === "verify" ? "Every pull request commit" : `When a task enters ${stageLabel}`;
@@ -242,6 +243,7 @@ function triggerDescription(
   if (mode === "scheduled") {
     return columnKey === "backlog" ? "Run automation on a schedule." : "Runs on the repository default branch.";
   }
+  if (mode === "webhook") return "Runs when a webhook receives a request.";
   if (mode === "leave") {
     return `Runs when a task leaves ${stageLabel}.`;
   }

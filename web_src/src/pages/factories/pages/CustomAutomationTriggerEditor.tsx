@@ -4,7 +4,16 @@ import { Label } from "@/components/ui/label";
 import { cn, resolveIcon } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { SegmentedNav } from "@/ui/SegmentedNav";
-import { AlarmClock, ChevronDown, GitCommitHorizontal, LogOut, MousePointerClick, Plus, Trash2 } from "lucide-react";
+import {
+  AlarmClock,
+  ChevronDown,
+  GitCommitHorizontal,
+  LogOut,
+  MousePointerClick,
+  Plus,
+  Trash2,
+  Webhook,
+} from "lucide-react";
 import { useState } from "react";
 
 import {
@@ -17,6 +26,7 @@ import {
   type CustomAutomationTrigger,
 } from "../lib/customAutomation";
 import { CustomAutomationScheduleFields } from "./CustomAutomationScheduleFields";
+import { CustomAutomationWebhookFields } from "./CustomAutomationWebhookFields";
 import { PlanningReviewForm } from "./PlanningReviewForm";
 import type { PlanningReviewDraft } from "./planningReviewMockup";
 import { useCustomAutomationStageLabel } from "./useCustomAutomationStageLabel";
@@ -58,16 +68,14 @@ export function TriggerEditor({
 }: TriggerEditorProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const visibleTriggers = customAutomationTriggersForRun(triggers, runsOnTask);
-  const triggerModes: CustomAutomationMode[] = ["manual"];
-  if (runsOnTask !== false) triggerModes.push("automatic", "leave");
-  if (runsOnTask !== true) triggerModes.push("scheduled");
+  const triggerModes = availableTriggerModes(columnKey, runsOnTask);
   const updateTrigger = (id: string, next: CustomAutomationTrigger) => {
     onTriggersChange(triggers.map((trigger) => (trigger.id === id ? next : trigger)));
   };
   const addTrigger = (mode: CustomAutomationMode) => {
     const trigger = newCustomAutomationTrigger(mode);
     onTriggersChange([...triggers, trigger]);
-    setExpandedId(mode === "scheduled" ? trigger.id : null);
+    setExpandedId(repeatableTriggerMode(mode) ? trigger.id : null);
   };
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-10 px-8 py-10">
@@ -108,6 +116,10 @@ export function TriggerEditor({
               onTriggersChange(triggers.filter((item) => item.id !== trigger.id));
             }}
             onScheduleChange={(schedule) => updateTrigger(trigger.id, { ...trigger, schedule })}
+            onWebhookChange={(webhookId) => updateTrigger(trigger.id, { ...trigger, webhookId })}
+            organizationId={organizationId}
+            factoryId={factoryId}
+            factoryKey={factoryKey}
           />
         ))}
         {!columnKey.startsWith("custom-") && (
@@ -123,7 +135,7 @@ export function TriggerEditor({
                 <DropdownMenuItem
                   key={mode}
                   className="py-2.5"
-                  disabled={mode !== "scheduled" && triggers.some((trigger) => trigger.mode === mode)}
+                  disabled={!repeatableTriggerMode(mode) && triggers.some((trigger) => trigger.mode === mode)}
                   onSelect={() => addTrigger(mode)}
                 >
                   <TriggerOption mode={mode} columnKey={columnKey} runsOnTask={runsOnTask !== false} />
@@ -165,6 +177,10 @@ function TriggerCard({
   onToggle,
   onRemove,
   onScheduleChange,
+  onWebhookChange,
+  organizationId,
+  factoryId,
+  factoryKey,
 }: {
   columnKey: CustomAutomationColumn;
   runsOnTask: boolean;
@@ -174,8 +190,12 @@ function TriggerCard({
   onToggle: () => void;
   onRemove: () => void;
   onScheduleChange: (schedule: CustomAutomationTrigger["schedule"]) => void;
+  onWebhookChange: (webhookId: string) => void;
+  organizationId: string;
+  factoryId: string;
+  factoryKey: string;
 }) {
-  const configurable = trigger.mode === "scheduled";
+  const configurable = repeatableTriggerMode(trigger.mode);
   const stageLabel = useCustomAutomationStageLabel(columnKey);
   return (
     <div className="rounded-lg border border-border bg-background">
@@ -214,12 +234,26 @@ function TriggerCard({
       </div>
       {configurable && expanded ? (
         <div className="border-t border-border px-4 py-4">
-          <CustomAutomationScheduleFields
-            embedded
-            idPrefix={trigger.id}
-            schedule={trigger.schedule}
-            onChange={onScheduleChange}
-          />
+          {trigger.mode === "webhook" ? (
+            <CustomAutomationWebhookFields
+              idPrefix={trigger.id}
+              organizationId={organizationId}
+              factoryId={factoryId}
+              factoryKey={factoryKey}
+              webhookId={trigger.webhookId}
+              usedWebhookIds={triggers
+                .filter((item) => item.id !== trigger.id && item.mode === "webhook" && item.webhookId)
+                .map((item) => item.webhookId!)}
+              onChange={onWebhookChange}
+            />
+          ) : (
+            <CustomAutomationScheduleFields
+              embedded
+              idPrefix={trigger.id}
+              schedule={trigger.schedule}
+              onChange={onScheduleChange}
+            />
+          )}
         </div>
       ) : null}
     </div>
@@ -308,6 +342,19 @@ function AutomationIconPicker({ icon, onChange }: { icon: string; onChange: (ico
   );
 }
 
+function availableTriggerModes(columnKey: CustomAutomationColumn, runsOnTask?: boolean): CustomAutomationMode[] {
+  const modes: CustomAutomationMode[] = ["manual"];
+  if (runsOnTask !== false) modes.push("automatic", "leave");
+  if (runsOnTask !== true) modes.push("scheduled");
+  if (runsOnTask !== true && columnKey === "backlog") modes.push("webhook");
+  return modes;
+}
+
+/** Schedules and webhooks can repeat with different settings. Event triggers cannot. */
+function repeatableTriggerMode(mode: CustomAutomationMode): boolean {
+  return mode === "scheduled" || mode === "webhook";
+}
+
 function removeTriggerLabel(
   triggers: CustomAutomationTrigger[],
   trigger: CustomAutomationTrigger,
@@ -328,6 +375,7 @@ function triggerTitle(
   stageLabel = customAutomationColumnLabel(columnKey),
 ): string {
   if (mode === "scheduled") return "Schedule";
+  if (mode === "webhook") return "Webhook";
   if (mode === "leave") return `When a task leaves ${stageLabel}`;
   if (mode === "automatic") {
     return columnKey === "verify" ? "Every pull request commit" : `When a task enters ${stageLabel}`;
@@ -347,7 +395,15 @@ function TriggerOption({
   const automatic = mode === "automatic" || mode === "leave";
   const stageLabel = useCustomAutomationStageLabel(columnKey);
   const Icon =
-    mode === "scheduled" ? AlarmClock : mode === "leave" ? LogOut : automatic ? GitCommitHorizontal : MousePointerClick;
+    mode === "scheduled"
+      ? AlarmClock
+      : mode === "webhook"
+        ? Webhook
+        : mode === "leave"
+          ? LogOut
+          : automatic
+            ? GitCommitHorizontal
+            : MousePointerClick;
   return (
     <span className="flex min-w-0 items-center gap-3 text-left">
       <span
@@ -363,19 +419,21 @@ function TriggerOption({
       <span className="flex min-w-0 flex-col">
         <span className="text-sm font-medium text-foreground">{triggerTitle(mode, columnKey, stageLabel)}</span>
         <span className="text-xs font-normal text-muted-foreground">
-          {mode === "scheduled"
-            ? columnKey === "backlog"
-              ? "Run automation on a schedule."
-              : "Runs on the repository default branch."
-            : mode === "leave"
-              ? `Runs when a task leaves ${stageLabel}.`
-              : automatic
-                ? columnKey === "verify"
-                  ? "Runs after each new commit."
-                  : `Runs when a task enters ${stageLabel}.`
-                : runsOnTask
-                  ? "A person starts each run from a task."
-                  : "A person starts each run from the column."}
+          {mode === "webhook"
+            ? "Runs when a webhook receives a request."
+            : mode === "scheduled"
+              ? columnKey === "backlog"
+                ? "Run automation on a schedule."
+                : "Runs on the repository default branch."
+              : mode === "leave"
+                ? `Runs when a task leaves ${stageLabel}.`
+                : automatic
+                  ? columnKey === "verify"
+                    ? "Runs after each new commit."
+                    : `Runs when a task enters ${stageLabel}.`
+                  : runsOnTask
+                    ? "A person starts each run from a task."
+                    : "A person starts each run from the column."}
         </span>
       </span>
     </span>
