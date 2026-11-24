@@ -27,7 +27,7 @@ export function CustomAutomationWebhookFields({
 }) {
   const webhooks = useFactoryWebhooks(organizationId, factoryId);
   const settingsPath = factorySettingsSectionPath(organizationId, factoryKey, "workspace", "webhooks");
-  const options = (webhooks.data ?? []).filter((webhook) => !usedWebhookIds.includes(webhook.id ?? ""));
+  const options = (webhooks.data ?? []).filter((webhook) => webhook.id && !usedWebhookIds.includes(webhook.id));
   const selected = webhooks.data?.find((webhook) => webhook.id === webhookId);
 
   if (webhooks.isLoading) {
@@ -53,7 +53,7 @@ export function CustomAutomationWebhookFields({
         <SelectContent>
           {[...(selected ? [selected] : []), ...options.filter((webhook) => webhook.id !== selected?.id)].map(
             (webhook) => (
-              <SelectItem key={webhook.id} value={webhook.id ?? ""}>
+              <SelectItem key={webhook.id} value={webhook.id!}>
                 {webhook.name}
               </SelectItem>
             ),

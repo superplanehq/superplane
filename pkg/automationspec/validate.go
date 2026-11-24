@@ -21,8 +21,12 @@ func (d *Document) validateSemantics() error {
 			ids[trigger.ID] = true
 		}
 		if trigger.Use == Webhook {
-			id, err := uuid.Parse(trigger.Config.WebhookID)
-			if err != nil {
+			var id uuid.UUID
+			var err error
+			if trigger.Config != nil {
+				id, err = uuid.Parse(trigger.Config.WebhookID)
+			}
+			if trigger.Config == nil || err != nil {
 				return d.Diagnostic(triggerPath+".config.webhook_id", "Enter the ID of a webhook from the workspace settings.")
 			}
 			if webhooks[id.String()] {

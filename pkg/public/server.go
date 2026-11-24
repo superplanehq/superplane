@@ -2081,6 +2081,7 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 
 	if webhook.IsManaged() {
 		if code, err := s.authenticateFactoryWebhook(r.Context(), webhook, r.Header, body); err != nil {
+			track.complete(r.Context(), code, 0)
 			http.Error(w, err.Error(), code)
 			return
 		}
@@ -2093,6 +2094,7 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if webhook.IsManaged() && len(nodes) == 0 {
+		track.complete(r.Context(), http.StatusAccepted, 0)
 		w.WriteHeader(http.StatusAccepted)
 		return
 	}

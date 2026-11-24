@@ -465,7 +465,11 @@ func validateCustomAutomationWebhooks(tx *gorm.DB, factory *models.Factory, trig
 		if trigger.Mode != pb.FactoryCustomAutomation_START_MODE_WEBHOOK {
 			continue
 		}
-		_, err := models.FindFactoryWebhook(tx, factory.OrganizationID, factory.ID, uuid.MustParse(trigger.WebhookID))
+		webhookID, err := uuid.Parse(trigger.WebhookID)
+		if err != nil {
+			return invalidArgument("Select a webhook from this workspace.")
+		}
+		_, err = models.FindFactoryWebhook(tx, factory.OrganizationID, factory.ID, webhookID)
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return invalidArgument("Select a webhook from this workspace.")
 		}

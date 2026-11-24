@@ -62,7 +62,9 @@ export function useFactoryWebhookMutations(organizationId: string, factoryId: st
       const response = await factoriesRegenerateFactoryWebhookSecret(
         withOrganizationHeader({ organizationId, path: { factoryId, webhookId }, body: {} }),
       );
-      return response.data?.secret ?? "";
+      const secret = response.data?.secret;
+      if (!secret) throw new Error("SuperPlane could not regenerate the webhook secret.");
+      return secret;
     },
   });
 
