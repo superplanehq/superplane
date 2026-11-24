@@ -246,8 +246,12 @@ dev.setup.no.cache:
 
 dev.server:
 	@test -n "$$($(COMPOSE) ps --status running -q app 2>/dev/null)" || { echo "Run \`make dev.up\` first (app container is not running)." >&2; exit 1; }
-	$(COMPOSE) exec -d app bash /app/docker-entrypoint.dev.sh
-	@bash ./scripts/wait-for-app
+	$(COMPOSE) exec -d app bash -c 'mkdir -p /app/tmp && exec bash /app/docker-entrypoint.dev.sh > /app/tmp/dev-server.log 2>&1'
+	@bash ./scripts/wait-for-app || { \
+	  echo "Startup failed. Recent output from tmp/dev-server.log:" >&2; \
+	  $(COMPOSE) exec -T app tail -n 80 /app/tmp/dev-server.log >&2; \
+	  exit 1; \
+	}
 ifeq ($(strip $(CI)),)
 	@$(MAKE) dev.runners
 endif

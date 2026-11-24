@@ -41,7 +41,7 @@ import { WORKSPACE_LOADING_COPY } from "@/lib/workspaceLoadingCopy";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import {
-  FEATURE_AUTOMATIONS_AS_CODE,
+  FEATURE_FACTORY_AS_CODE,
   FEATURE_FACTORY_CUSTOM_AUTOMATIONS,
   FEATURE_FACTORY_CUSTOM_STAGES,
   FEATURE_FACTORY_PULL_REQUEST_MERGE,
@@ -811,7 +811,7 @@ export function LinesPage() {
           lineId={selectedLine.id}
           yamlEnabled={
             hasExperimentalFeature(FEATURE_FACTORY_CUSTOM_AUTOMATIONS) &&
-            hasExperimentalFeature(FEATURE_AUTOMATIONS_AS_CODE)
+            hasExperimentalFeature(FEATURE_FACTORY_AS_CODE)
           }
           automationId={customAutomationAutomationId ?? undefined}
           columnKey={customAutomationColumn(new URLSearchParams(search).get("automationColumn"))}

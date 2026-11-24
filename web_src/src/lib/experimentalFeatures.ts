@@ -29,7 +29,7 @@ export const FEATURE_ORGANIZATION_BYOK_CUSTOM_PROVIDER = "organization_byok_cust
 
 /** Organization experimental feature: custom automations on Backlog, Implement, Verify, and Done. */
 export const FEATURE_FACTORY_CUSTOM_AUTOMATIONS = "factory_custom_automations";
-export const FEATURE_AUTOMATIONS_AS_CODE = "automations-as-code";
+export const FEATURE_FACTORY_AS_CODE = "factory-as-code";
 
 /** Organization experimental feature: custom stages on factory line boards. */
 export const FEATURE_FACTORY_CUSTOM_STAGES = "factory_custom_stages";

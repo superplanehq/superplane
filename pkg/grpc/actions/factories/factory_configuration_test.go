@@ -70,7 +70,7 @@ func (f configurationFixture) export(t *testing.T) *pb.FactoryConfigurationBundl
 	})
 	require.NoError(t, err)
 	require.Equal(t, factoryConfigurationCoverage, response.Coverage)
-	require.Equal(t, ".superplane/factory.yaml", response.Bundle.ManifestPath)
+	require.Equal(t, ".superplane/main.yml", response.Bundle.ManifestPath)
 	require.Len(t, response.Bundle.Files, 1)
 	require.Contains(t, response.Bundle.Files[0].Content, "name: Build changes")
 	require.NotContains(t, response.Bundle.Files[0].Content, f.canvas.ID.String())
@@ -212,11 +212,11 @@ func TestFactoryConfigurationRejectsUnsupportedManifestWithoutWrites(t *testing.
 	}{
 		{"missing bundle", func(*pb.FactoryConfigurationBundle) *pb.FactoryConfigurationBundle { return nil }, "manifest_path"},
 		{"unsafe manifest path", func(bundle *pb.FactoryConfigurationBundle) *pb.FactoryConfigurationBundle {
-			bundle.ManifestPath = "../factory.yaml"
+			bundle.ManifestPath = "../main.yml"
 			return bundle
 		}, "manifest_path"},
 		{"unexpected file path", func(bundle *pb.FactoryConfigurationBundle) *pb.FactoryConfigurationBundle {
-			bundle.Files[0].Path = "/tmp/factory.yaml"
+			bundle.Files[0].Path = "/tmp/main.yml"
 			return bundle
 		}, "files"},
 		{"extra file", func(bundle *pb.FactoryConfigurationBundle) *pb.FactoryConfigurationBundle {
@@ -232,7 +232,7 @@ func TestFactoryConfigurationRejectsUnsupportedManifestWithoutWrites(t *testing.
 			bundle := tc.change(proto.Clone(exported).(*pb.FactoryConfigurationBundle))
 			plan := f.plan(t, bundle)
 			require.NotEmpty(t, plan.Diagnostics)
-			require.Equal(t, ".superplane/factory.yaml", plan.Diagnostics[0].Path)
+			require.Equal(t, ".superplane/main.yml", plan.Diagnostics[0].Path)
 			require.Equal(t, tc.field, plan.Diagnostics[0].Field)
 			require.Empty(t, plan.BaseStateToken)
 			_, err := f.apply(bundle, "invalid")

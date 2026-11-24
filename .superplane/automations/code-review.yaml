@@ -1,0 +1,21 @@
+apiVersion: v2
+kind: Automation
+name: Code review
+icon: eye
+timeout_seconds: 3600
+runs_on_task: false
+skip_repository_checkout: false
+skip_setup_commands: false
+triggers:
+  - use: manual
+steps:
+  - name: Review code
+    prompt: |-
+      Review the checked-out repository for correctness, security, and reliability problems. Follow the repository's AGENTS.md instructions.
+      Verify each finding against the source code. Prioritize concrete bugs with clear user or system impact.
+      Check existing SuperPlane tasks and skip findings that already have a task.
+      Create at most 5 tasks in the SuperPlane Backlog per run, one task per distinct finding.
+      Select the highest-impact findings. Create fewer tasks when fewer findings qualify, including zero when no findings qualify.
+      Prefix each task title with [CODE REVIEW].
+      Include affected file paths, evidence, reproduction steps when available, expected behavior, and acceptance criteria in each task.
+      Do not change source code or create pull requests. Report the findings and created tasks when the review completes.

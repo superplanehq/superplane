@@ -24,7 +24,7 @@ import (
 )
 
 const (
-	factoryConfigurationManifestPath = ".superplane/factory.yaml"
+	factoryConfigurationManifestPath = ".superplane/main.yml"
 	factoryConfigurationCoverage     = "All stages and automations"
 )
 
@@ -59,7 +59,7 @@ func configurationDiagnostic(field, message string) *pb.FactoryConfigurationDiag
 
 func parseFactoryConfigurationBundle(bundle *pb.FactoryConfigurationBundle) (*factoryConfigurationManifest, *pb.FactoryConfigurationDiagnostic) {
 	if bundle.GetManifestPath() != factoryConfigurationManifestPath {
-		return nil, configurationDiagnostic("manifest_path", "The manifest path must be .superplane/factory.yaml.")
+		return nil, configurationDiagnostic("manifest_path", "The manifest path must be .superplane/main.yml.")
 	}
 	files := map[string]string{}
 	for _, file := range bundle.GetFiles() {
@@ -74,7 +74,7 @@ func parseFactoryConfigurationBundle(bundle *pb.FactoryConfigurationBundle) (*fa
 	}
 	content, exists := files[factoryConfigurationManifestPath]
 	if !exists {
-		return nil, configurationDiagnostic("files", "The bundle must contain .superplane/factory.yaml.")
+		return nil, configurationDiagnostic("files", "The bundle must contain .superplane/main.yml.")
 	}
 	decoder := yaml.NewDecoder(strings.NewReader(content))
 	var document yaml.Node
@@ -154,7 +154,7 @@ func parseFactoryConfigurationBundle(bundle *pb.FactoryConfigurationBundle) (*fa
 				continue
 			}
 			reference := automation.Uses
-			if !fs.ValidPath(reference) || strings.ContainsAny(reference, "\\:") || reference == "factory.yaml" || (path.Ext(reference) != ".yaml" && path.Ext(reference) != ".yml") {
+			if !fs.ValidPath(reference) || strings.ContainsAny(reference, "\\:") || reference == "main.yml" || (path.Ext(reference) != ".yaml" && path.Ext(reference) != ".yml") {
 				return nil, configurationDiagnostic(fmt.Sprintf("stages[%d].automations[%d].uses", i, j), "Use a relative YAML path inside the manifest directory.")
 			}
 			filePath := path.Join(path.Dir(factoryConfigurationManifestPath), reference)

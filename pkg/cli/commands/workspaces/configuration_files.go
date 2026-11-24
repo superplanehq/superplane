@@ -109,7 +109,7 @@ func configurationYAMLHasAlias(node *yaml.Node) bool {
 }
 
 func configurationReferenceAllowed(reference string) bool {
-	return fs.ValidPath(reference) && reference != "factory.yaml" &&
+	return fs.ValidPath(reference) && reference != "main.yml" &&
 		!strings.ContainsAny(reference, "\\:") &&
 		(path.Ext(reference) == ".yaml" || path.Ext(reference) == ".yml")
 }

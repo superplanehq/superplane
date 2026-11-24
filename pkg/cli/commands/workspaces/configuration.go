@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	configurationManifestPath = ".superplane/factory.yaml"
+	configurationManifestPath = ".superplane/main.yml"
 	configurationCoverage     = "All stages and automations"
 )
 
@@ -41,8 +41,7 @@ type configurationInput struct {
 
 func (c *configurationInput) bind(cmd *cobra.Command) {
 	c.configurationTarget.bind(cmd)
-	cmd.Flags().StringVarP(&c.file, "file", "f", "", "Factory manifest file (required; - for stdin)")
-	_ = cmd.MarkFlagRequired("file")
+	cmd.Flags().StringVarP(&c.file, "file", "f", configurationManifestPath, "Factory manifest file (- for stdin)")
 }
 
 func (c configurationInput) readBundle(ctx core.CommandContext) (openapi_client.FactoriesFactoryConfigurationBundle, error) {

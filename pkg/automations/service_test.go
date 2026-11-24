@@ -36,7 +36,7 @@ func TestServiceKeepsSourceAndBackendRevisionTogether(t *testing.T) {
 	factory, err := models.CreateFactory(db, orgID, "Automation test", "", "AAC")
 	require.NoError(t, err)
 	require.NoError(t, models.EnableExperimentalFeature(orgID, features.FeatureFactoryCustomAutomations))
-	require.NoError(t, models.EnableExperimentalFeature(orgID, features.FeatureAutomationsAsCode))
+	require.NoError(t, models.EnableExperimentalFeature(orgID, features.FeatureFactoryAsCode))
 
 	service := automations.Service{Backend: backendWithoutCanvases{}}
 	placement := automations.Placement{OrganizationID: orgID, FactoryID: factory.ID, Stage: string(automationspec.Backlog)}
@@ -126,7 +126,7 @@ func TestServiceValidatesSecretsInOneOrganizationScopedQuery(t *testing.T) {
 	factory, err := models.CreateFactory(db, r.Organization.ID, "Secrets", "", "SEC")
 	require.NoError(t, err)
 	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureAutomationsAsCode))
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryAsCode))
 	for _, name := range []string{"FIRST", "SECOND"} {
 		_, err := models.CreateSecret(name, "local", r.User.String(), models.DomainTypeOrganization, r.Organization.ID, []byte("{}"))
 		require.NoError(t, err)
