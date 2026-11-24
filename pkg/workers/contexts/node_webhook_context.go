@@ -96,6 +96,28 @@ func (c *NodeWebhookContext) Setup() (string, error) {
 	return webhookCallbackURL(c.GetBaseURL(), webhook.ID.String()), nil
 }
 
+// Bind attaches the node to a webhook that the workspace of the node owns.
+func (c *NodeWebhookContext) Bind(webhookID string) (string, error) {
+	id, err := uuid.Parse(webhookID)
+	if err != nil {
+		return "", fmt.Errorf("invalid webhook id")
+	}
+	canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(c.tx, c.node.WorkflowID)
+	if err != nil {
+		return "", err
+	}
+	if canvas.FactoryID == nil {
+		return "", fmt.Errorf("only workspace apps can use workspace webhooks")
+	}
+	webhook, err := models.FindFactoryWebhook(c.tx, canvas.OrganizationID, *canvas.FactoryID, id)
+	if err != nil {
+		return "", err
+	}
+
+	c.node.WebhookID = &webhook.ID
+	return webhookCallbackURL(c.GetBaseURL(), webhook.ID.String()), nil
+}
+
 func (c *NodeWebhookContext) findOrCreateWebhook() (*models.Webhook, error) {
 	//
 	// If webhook already exists, just return it
