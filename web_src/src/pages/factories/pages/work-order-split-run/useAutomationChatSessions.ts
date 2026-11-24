@@ -1,8 +1,10 @@
 import { useQueries } from "@tanstack/react-query";
-import { useState } from "react";
+import { createContext, useState } from "react";
 import { findPlanningSessionByWorkOrder } from "../planningSessionClient";
 import type { SplitRunPhase } from "./splitRunMocks";
 import { workOrderPlanningSessionQueryKey } from "./useAnalysisPlanningSession";
+
+export const AutomationChatContext = createContext<ReturnType<typeof useAutomationChatSessions> | null>(null);
 
 /** Runs can share a conversation after an idle restart. Show each session once. */
 export function useAutomationChatSessions(

@@ -1,3 +1,4 @@
+import { AutomationTimelineChat } from "../AutomationChatNavigation";
 import { Frame, FrameHeader, FramePanel } from "@/components/reui/frame";
 import { cn } from "@/lib/utils";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/ui/collapsible";
@@ -237,6 +238,7 @@ function ConsoleCardHeader({
         <StepOutputCounts stage={automation.latest} phase={shownPhase} runs={automation.runs} />
       )}
       <span className="ml-auto flex shrink-0 items-center gap-2">
+        <AutomationTimelineChat phaseIds={automation.runs.map((run) => run.id)} />
         {runAction}
         {timer ? <span className={cn(META_TEXT_CLASSNAME, "px-1.5")}>{timer}</span> : null}
         <ChevronRight

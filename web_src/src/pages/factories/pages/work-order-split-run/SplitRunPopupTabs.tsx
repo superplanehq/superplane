@@ -17,11 +17,9 @@ import { refinePopupShowsAutomations } from "./splitRunPopupModel";
 import type { SplitRunFooterActions } from "./useSplitRunFooterActions";
 import type { useSplitRunPopupData } from "./useSplitRunPopupData";
 import type { useSplitRunWorkOrderEdits } from "./useSplitRunWorkOrderEdits";
+import { AutomationChatNavigation } from "./AutomationChatNavigation";
 import { AutomationRunChat } from "./AutomationRunChat";
-import { ButtonGroup } from "@/components/ui/button-group";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { ListTree, MessageSquare } from "lucide-react";
-import type { useAutomationChatSessions } from "./useAutomationChatSessions";
+import { AutomationChatContext, type useAutomationChatSessions } from "./useAutomationChatSessions";
 import { WorkOrderSplitRunOverview } from "./WorkOrderSplitRunOverview";
 
 type SplitRunPopupTabsProps = {
@@ -119,10 +117,24 @@ function SplitRunPopupOverview({
  * actions. A draft with Planning on keeps the refinement view instead.
  */
 export function SplitRunPopupTabs(props: SplitRunPopupTabsProps) {
+  return (
+    <AutomationChatContext.Provider value={props.automationChats}>
+      <TaskView {...props} />
+    </AutomationChatContext.Provider>
+  );
+}
+
+function TaskView(props: SplitRunPopupTabsProps) {
   const { automationChats: chats, organizationId, factoryId, orderId } = props;
-  const navigation = <AutomationChatNavigation chats={chats} />;
+  const navigation = <AutomationChatNavigation />;
   if (!chats.selected || !organizationId || !factoryId || !orderId) {
-    return <SplitRunPopupContent {...props} header={() => props.header(navigation)} />;
+    return (
+      <SplitRunPopupContent
+        {...props}
+        sourceOnly={props.sourceOnly || chats.chats.length > 0}
+        header={() => props.header(navigation)}
+      />
+    );
   }
   return (
     <AutomationChatTaskView
@@ -164,41 +176,6 @@ function AutomationChatTaskView({
       />
       {props.chatFooter}
     </>
-  );
-}
-
-function AutomationChatNavigation({ chats }: { chats: SplitRunPopupTabsProps["automationChats"] }) {
-  if (!chats.chats.length) return null;
-  const views = [
-    ...chats.chats.map((phase, index) => ({
-      value: phase.runId!,
-      label: chats.chats.length === 1 ? "Chat" : `${phase.componentName} · ${chats.chats.length - index}`,
-      icon: MessageSquare,
-    })),
-    { value: "activity", label: "Timeline", icon: ListTree },
-  ];
-  return (
-    <ButtonGroup aria-label="Task view">
-      {views.map(({ value, label, icon: Icon }) => (
-        <Tooltip key={value}>
-          <TooltipTrigger asChild>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              aria-label={label}
-              aria-pressed={chats.choice === value}
-              className="aria-pressed:bg-accent aria-pressed:text-accent-foreground"
-              onClick={() => chats.setChoice(value)}
-            >
-              <Icon className="size-4" aria-hidden />
-              {label}
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="bottom">{label}</TooltipContent>
-        </Tooltip>
-      ))}
-    </ButtonGroup>
   );
 }
 
