@@ -455,6 +455,10 @@ func (w *RunFinalizer) finalizeRun(workflowID, runID uuid.UUID, trigger string) 
 	publishPlanningBoardStatusForRun(w.logger, runID)
 
 	for _, update := range factoryOrderUpdates {
+		if update.closed {
+			w.publishAutoAdvancedClose(update)
+			continue
+		}
 		if err := messages.PublishFactoryWorkOrderUpdated(
 			update.factoryID.String(),
 			update.orderID.String(),
@@ -476,6 +480,33 @@ func (w *RunFinalizer) finalizeRun(workflowID, runID uuid.UUID, trigger string) 
 
 	w.startAutomaticCustomAutomationsForRun(runID)
 	return nil
+}
+
+func (w *RunFinalizer) publishAutoAdvancedClose(update factoryWorkOrderUpdate) {
+	db := database.Conn()
+	logger := w.logger.WithField("work_order_id", update.orderID)
+	order, err := models.FindUnscopedWorkOrder(db, update.orderID)
+	if err != nil {
+		logger.WithError(err).Warn("failed to load the task closed by auto-advance")
+		return
+	}
+	factory, err := models.FindFactory(db, order.OrganizationID, update.factoryID)
+	if err != nil {
+		logger.WithError(err).Warn("failed to load the factory for the task closed by auto-advance")
+		return
+	}
+	factoryactions.PublishWorkOrderClosed(
+		db,
+		order.OrganizationID,
+		factory,
+		order,
+		nil,
+		models.FactoryWorkOrderStateOpen,
+		models.FactoryWorkOrderResultCompleted,
+		false,
+		update.leftColumn,
+	)
+	messages.PublishWorkOrderRunCancellations(db, order)
 }
 
 func (w *RunFinalizer) startAutomaticCustomAutomationsForRun(runID uuid.UUID) {
@@ -604,6 +635,9 @@ func publishPlanningBoardStatusForRun(logger *log.Entry, runID uuid.UUID) {
 type factoryWorkOrderUpdate struct {
 	factoryID uuid.UUID
 	orderID   uuid.UUID
+	// closed marks a task that auto-advanced into Done from leftColumn.
+	closed     bool
+	leftColumn string
 }
 
 type factoryPullRequestMergeabilityRefresh struct {
@@ -695,6 +729,16 @@ func (w *RunFinalizer) executeNextFactoryLineStep(tx *gorm.DB, runID uuid.UUID) 
 	if err != nil {
 		return nil, nil, err
 	}
+	executionStageKey := dispatch.StepStageKey(execution.StepIndex)
+	currentStage, usesStagePolicy := dispatch.StageByKey(executionStageKey)
+	if dispatch.CurrentStageKey != "" && dispatch.CurrentStageKey != executionStageKey {
+		return pendingRuns, orderUpdates, nil
+	}
+	if dispatch.CurrentStageKey == "" && usesStagePolicy {
+		if err := dispatch.EnterStage(tx, executionStageKey); err != nil {
+			return nil, nil, err
+		}
+	}
 
 	//
 	// A rerun can start a step on this traversal while the run of an
@@ -738,6 +782,19 @@ func (w *RunFinalizer) executeNextFactoryLineStep(tx *gorm.DB, runID uuid.UUID) 
 	if !workOrder.IsOpen() {
 		return pendingRuns, orderUpdates, dispatch.Finish(tx, models.CanvasRunResultCancelled)
 	}
+	if usesStagePolicy {
+		results, closed, err := w.advancePassedFactoryStage(tx, dispatch, factory, workOrder, currentStage, runID)
+		if err != nil {
+			return nil, nil, err
+		}
+		startedRuns, startedOrderUpdates := factoryAdmissionOutcomes(results)
+		pendingRuns = append(pendingRuns, startedRuns...)
+		orderUpdates = append(orderUpdates, startedOrderUpdates...)
+		if closed != nil {
+			orderUpdates = append(orderUpdates, *closed)
+		}
+		return pendingRuns, orderUpdates, nil
+	}
 
 	_, nextIndex := dispatch.StageStepRange(execution.StepIndex)
 	if nextIndex >= len(dispatch.Steps) {
@@ -768,6 +825,90 @@ func (w *RunFinalizer) executeNextFactoryLineStep(tx *gorm.DB, runID uuid.UUID) 
 	orderUpdates = append(orderUpdates, startedOrderUpdates...)
 
 	return pendingRuns, orderUpdates, nil
+}
+
+func (w *RunFinalizer) advancePassedFactoryStage(
+	tx *gorm.DB,
+	dispatch *models.FactoryWorkOrderLineDispatch,
+	factory *models.Factory,
+	workOrder *models.FactoryWorkOrder,
+	current models.FactoryLineStage,
+	runID uuid.UUID,
+) ([]*models.FactoryLineStepResult, *factoryWorkOrderUpdate, error) {
+	for {
+		if !current.AutoAdvanceEnabled() {
+			return nil, nil, dispatch.Finish(tx, models.CanvasRunResultPassed)
+		}
+
+		next, found := dispatch.NextStageAfter(current.Key)
+		if !found {
+			return nil, nil, dispatch.Finish(tx, models.CanvasRunResultPassed)
+		}
+		if next.Kind == models.FactoryLineStageDone {
+			closed, err := closeFactoryTaskIntoDone(tx, dispatch, workOrder, next.Key, runID)
+			return nil, closed, err
+		}
+		if err := dispatch.EnterStage(tx, next.Key); err != nil {
+			return nil, nil, err
+		}
+
+		nextIndex, hasAutomations := dispatch.FirstStepIndexForStage(next.Key)
+		if !hasAutomations {
+			current = next
+			continue
+		}
+
+		blocked, err := factoryactions.ImplementStepBlockedByMissingBranch(tx, factory, workOrder, dispatch.Steps[nextIndex].AppID)
+		if err != nil {
+			return nil, nil, err
+		}
+		if blocked {
+			if err := factoryactions.NoteMissingImplementBranch(tx, workOrder); err != nil {
+				return nil, nil, err
+			}
+			w.logger.WithField("work_order_id", workOrder.ID).Info("stopped the line before Implement because no default branch is saved")
+			return nil, nil, dispatch.Finish(tx, models.CanvasRunResultCancelled)
+		}
+
+		results, err := dispatch.StartStage(tx, workOrder, nextIndex)
+		return results, nil, err
+	}
+}
+
+// closeFactoryTaskIntoDone completes the task when its last stage auto-advances.
+// The returned update carries the closed side effects the caller publishes after commit.
+func closeFactoryTaskIntoDone(
+	tx *gorm.DB,
+	dispatch *models.FactoryWorkOrderLineDispatch,
+	workOrder *models.FactoryWorkOrder,
+	doneStageKey string,
+	runID uuid.UUID,
+) (*factoryWorkOrderUpdate, error) {
+	leftColumn, err := models.WorkOrderBoardColumn(tx, workOrder)
+	if err != nil {
+		return nil, err
+	}
+	if err := dispatch.EnterStage(tx, doneStageKey); err != nil {
+		return nil, err
+	}
+	if err := dispatch.Finish(tx, models.CanvasRunResultPassed); err != nil {
+		return nil, err
+	}
+	changed, err := workOrder.UpdateStatus(tx, models.FactoryWorkOrderStatusUpdate{
+		ToState:  models.FactoryWorkOrderStateClosed,
+		Result:   models.FactoryWorkOrderResultCompleted,
+		Run:      &factoryevents.RunRef{ID: runID},
+		SkipSame: true,
+	})
+	if err != nil || !changed {
+		return nil, err
+	}
+	return &factoryWorkOrderUpdate{
+		factoryID:  workOrder.FactoryID,
+		orderID:    workOrder.ID,
+		closed:     true,
+		leftColumn: leftColumn,
+	}, nil
 }
 
 func finalizePullRequestActivityForRun(tx *gorm.DB, runID uuid.UUID) (*factoryWorkOrderUpdate, *factoryPullRequestMergeabilityRefresh, error) {
