@@ -157,9 +157,7 @@ func TestCustomAutomationCustomStageFormRoundTrip(t *testing.T) {
 			r := support.Setup(t)
 			db := database.DB(t.Context())
 			factory := seedHandOffFactory(t, r, db)
-			for _, feature := range []string{features.FeatureFactoryCustomAutomations, features.FeatureFactoryCustomStages} {
-				require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, feature))
-			}
+			require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
 			vcsID := ""
 			if test.withVCS {
 				vcsID = createReadyOnboardingIntegration(t, r.Organization.ID, models.ProviderGitHub)

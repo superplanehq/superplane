@@ -18,7 +18,6 @@ import { resetFactoryBoardLaneScrollPositions } from "@/hooks/useFactoryBoardLan
 import {
   FEATURE_FACTORY_CUSTOM_AUTOMATIONS,
   FEATURE_AUTOMATIONS_AS_CODE,
-  FEATURE_FACTORY_CUSTOM_STAGES,
   FEATURE_FACTORY_DATADOG_INTAKE,
   FEATURE_FACTORY_PRODUCTIVE_INTAKE,
   FEATURE_FACTORY_SCHEDULED_INTAKE,
@@ -926,7 +925,6 @@ describe("LinesPage board stages", () => {
   it.each([false, true])(
     "opens custom-stage automation configuration from a saved board row (YAML: %s)",
     async (yamlEnabled) => {
-      enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_STAGES);
       enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
       const fetch = yamlEnabled
         ? vi.spyOn(globalThis, "fetch").mockImplementation(async () =>
@@ -967,7 +965,7 @@ describe("LinesPage board stages", () => {
   };
 
   it("edits and saves stage auto-advance settings", async () => {
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_STAGES);
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
     const user = userEvent.setup();
     const factory = customStageFactory();
     const selectedLine = factory.lines?.find((line) => line.id === REFUND_LINE_PLAN_ID);
@@ -996,7 +994,7 @@ describe("LinesPage board stages", () => {
   });
 
   it("saves only the custom name and uses the refreshed line after remount", async () => {
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_STAGES);
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
     const factory = customStageFactory();
     const savedFactory = customStageFactory("Quality review");
     updateFactoryLineMutateAsync.mockResolvedValueOnce(
@@ -1017,7 +1015,7 @@ describe("LinesPage board stages", () => {
   });
 
   it("keeps renames in the draft, clears reverted changes, and discards without saving", async () => {
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_STAGES);
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
     const user = userEvent.setup();
     renderLinesBoard(undefined, vi.fn(), customStageFactory());
     await editStages();
@@ -1038,7 +1036,7 @@ describe("LinesPage board stages", () => {
   });
 
   it.each([false, true])("saves a custom stage rename with pending card move: %s", async (moveCard) => {
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_STAGES);
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
     const user = userEvent.setup();
     const savedFactory = customStageFactory("Quality review");
     updateFactoryLineMutateAsync.mockResolvedValueOnce(
@@ -1075,7 +1073,7 @@ describe("LinesPage board stages", () => {
   });
 
   it.each(["   ", "x".repeat(65), "vErIfY"])("rejects an invalid custom stage name: %s", (name) => {
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_STAGES);
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
     renderLinesBoard(undefined, vi.fn(), customStageFactory());
     renameCustomStage(name);
     expect(screen.getByRole("alert")).toBeInTheDocument();
@@ -1086,7 +1084,7 @@ describe("LinesPage board stages", () => {
 
   it.each(["feature", "permission"])("disables custom title editing without %s", (gate) => {
     if (gate === "permission") {
-      enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_STAGES);
+      enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
       permissions.canUpdateFactories = false;
     }
     renderLinesBoard(undefined, vi.fn(), customStageFactory());
@@ -1098,7 +1096,7 @@ describe("LinesPage board stages", () => {
   });
 
   it("prevents overlapping renames and retains the saved name on failure", async () => {
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_STAGES);
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
     const { showErrorToast } = await import("@/lib/toast");
     vi.mocked(showErrorToast).mockClear();
     let rejectSave!: (error: Error) => void;
@@ -1171,7 +1169,7 @@ describe("LinesPage board stages", () => {
     expect(screen.queryByRole("menuitem", { name: "Edit stages" })).not.toBeInTheDocument();
     disabled.unmount();
 
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_STAGES);
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
     const selectedLine = factory.lines?.find((line) => line.id === REFUND_LINE_PLAN_ID);
     updateFactoryLineMutateAsync.mockResolvedValueOnce({
       ...selectedLine,
@@ -1206,7 +1204,9 @@ describe("LinesPage board stages", () => {
     expect(within(saveDialog).getByTestId("save-line-stages-summary")).toHaveTextContent("Deploy to prod");
     await user.click(within(saveDialog).getByRole("button", { name: "Save changes" }));
 
-    expect(await screen.findByRole("heading", { name: "Add an automation for Deploy to prod" })).toBeInTheDocument();
+    expect(await screen.findByTestId("custom-automation-setup-modal")).toBeInTheDocument();
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent("customAutomation=new");
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent("automationColumn=custom-deploy");
     const savedStages = updateFactoryLineMutateAsync.mock.calls[0][0].stageConfiguration.stages;
     expect(savedStages.at(-2)).toMatchObject({
       id: "",
@@ -1215,11 +1215,10 @@ describe("LinesPage board stages", () => {
       autoAdvance: true,
     });
     expect(screen.queryByTestId("line-stage-edit-toolbar")).not.toBeInTheDocument();
-    expect(screen.getByTestId("add-column-automation-template-custom")).toBeInTheDocument();
   });
 
   it("hides stage mutations without factory update permission", async () => {
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_STAGES);
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
     permissions.canUpdateFactories = false;
     const user = userEvent.setup();
     renderLinesBoard();
@@ -2229,7 +2228,7 @@ describe("LinesPage stage editing", () => {
   };
 
   it("shows reorder handles only while editing stages", async () => {
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_STAGES);
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
     const user = userEvent.setup();
     renderLinesBoard();
 
@@ -2242,7 +2241,7 @@ describe("LinesPage stage editing", () => {
   });
 
   it("moves an agent without reordering stages and saves only the confirmed placement", async () => {
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_STAGES);
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
     const user = userEvent.setup();
     renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, ICON_VIEW);
     await enterStageEditing(user);
@@ -2286,7 +2285,7 @@ describe("LinesPage stage editing", () => {
   });
 
   it("offers Save only after a change and exits with Done when nothing changed", async () => {
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_STAGES);
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
     const user = userEvent.setup();
     renderLinesBoard();
     await enterStageEditing(user);
@@ -2302,7 +2301,7 @@ describe("LinesPage stage editing", () => {
   });
 
   it("saves the reordered draft once after confirmation", async () => {
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_STAGES);
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
     updateFactoryLineMutateAsync.mockResolvedValueOnce({});
     const user = userEvent.setup();
     renderLinesBoard();
@@ -2330,7 +2329,7 @@ describe("LinesPage stage editing", () => {
   });
 
   it("restores the saved order when changes are discarded", async () => {
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_STAGES);
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
     const user = userEvent.setup();
     renderLinesBoard();
     await enterStageEditing(user);
@@ -2351,7 +2350,7 @@ describe("LinesPage stage editing", () => {
   });
 
   it("leaves a deleted draft stage out of the save", async () => {
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_STAGES);
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
     updateFactoryLineMutateAsync.mockResolvedValueOnce({});
     const user = userEvent.setup();
     renderLinesBoard();
@@ -2370,7 +2369,7 @@ describe("LinesPage stage editing", () => {
   });
 
   it("deletes a stage from the column menu only in the draft", async () => {
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_STAGES);
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
     const user = userEvent.setup();
     renderLinesBoard();
 
@@ -2388,7 +2387,7 @@ describe("LinesPage stage editing", () => {
   });
 
   it("keeps a drag move in the draft when the target emits repeated drag events", async () => {
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_STAGES);
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
     const user = userEvent.setup();
     renderLinesBoard();
     await enterStageEditing(user);

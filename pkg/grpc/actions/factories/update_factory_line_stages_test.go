@@ -22,7 +22,7 @@ func TestUpdateFactoryLineStages(t *testing.T) {
 	r := support.Setup(t)
 	deps := testIntakeDependencies(r)
 	db := database.DB(t.Context())
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomStages))
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
 
 	newLine := func(t *testing.T) (*models.Factory, *models.FactoryLine) {
 		t.Helper()
@@ -299,11 +299,19 @@ func TestUpdateFactoryLineStages(t *testing.T) {
 		assert.Nil(t, reloaded.ColumnKey)
 	})
 
-	t.Run("requires the custom stages feature", func(t *testing.T) {
+	t.Run("requires the unified feature and preserves saved records", func(t *testing.T) {
 		factory, line := newLine(t)
-		require.NoError(t, models.DisableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomStages))
+		stageID := uuid.New()
+		stages := line.StagesValue()
+		stages = append(stages[:1], append([]models.FactoryLineStage{{
+			ID: stageID, Key: "custom-" + stageID.String(), Name: "QA", Kind: models.FactoryLineStageCustom,
+		}}, stages[1:]...)...)
+		require.NoError(t, line.UpdateConfiguration(db, nil, nil, nil, stages))
+		canvas := support.CreateFactoryCanvas(t, r, factory.ID, "QA checks")
+		require.NoError(t, canvas.SetColumnKey(db, stages[1].Key))
+		require.NoError(t, models.DisableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
 		t.Cleanup(func() {
-			require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomStages))
+			require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
 		})
 
 		_, err := UpdateFactoryLine(context.Background(), deps, r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
@@ -314,6 +322,13 @@ func TestUpdateFactoryLineStages(t *testing.T) {
 		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.FailedPrecondition, code)
+		reloaded, err := factory.FindLine(db, line.ID)
+		require.NoError(t, err)
+		assert.Equal(t, stages, reloaded.StagesValue())
+		savedCanvas, err := models.FindCanvasInTransaction(db, r.Organization.ID, canvas.ID)
+		require.NoError(t, err)
+		require.NotNil(t, savedCanvas.ColumnKey)
+		assert.Equal(t, stages[1].Key, *savedCanvas.ColumnKey)
 	})
 
 	t.Run("rejects replacing steps and stages together", func(t *testing.T) {
