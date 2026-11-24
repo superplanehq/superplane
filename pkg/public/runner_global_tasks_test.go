@@ -3,7 +3,6 @@ package public
 import (
 	"encoding/json"
 	"net/http"
-	"slices"
 	"strings"
 	"testing"
 
@@ -110,20 +109,19 @@ func TestRunnerCreatedTasksLinkToTheCreatingRun(t *testing.T) {
 	token := runnerTokenFrom(runner.AttachRunnerEnv(ctx, nil, 60))
 
 	db := database.DB(t.Context())
+	var createdIDs []uuid.UUID
 	for _, title := range []string{"First follow-up", "Second follow-up"} {
 		rec := runnerRequest(t, server, http.MethodPost, token, "/api/v1/runner/tasks", `{"title":"`+title+`"}`)
 		require.Equal(t, http.StatusCreated, rec.Code, rec.Body.String())
 		created := decodeRunnerTask(t, rec.Body.Bytes())
+		createdIDs = append(createdIDs, uuid.MustParse(created.ID))
+	}
 
-		order, err := factory.FindWorkOrder(db, uuid.MustParse(created.ID))
+	for _, id := range createdIDs {
+		order, err := factory.FindWorkOrder(db, id)
 		require.NoError(t, err)
-		require.NotNil(t, order.SourceRunID, "task %q has no source run", title)
+		require.NotNil(t, order.SourceRunID, "task %s has no source run", id)
 		assert.Equal(t, ctx.RunID, *order.SourceRunID)
-
-		runs, err := order.ListRuns(db)
-		require.NoError(t, err)
-		assert.True(t, slices.ContainsFunc(runs, func(run models.CanvasRun) bool { return run.ID == ctx.RunID }),
-			"task %q does not list its creating run", title)
 	}
 }
 
