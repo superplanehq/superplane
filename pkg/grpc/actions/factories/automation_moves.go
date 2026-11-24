@@ -229,7 +229,7 @@ func (b CanvasAutomationBackend) moveCustomExecution(ctx context.Context, tx *go
 	hasTask := false
 	for _, trigger := range triggers {
 		switch trigger.Use {
-		case automationspec.Scheduled, automationspec.PullRequestUpdated:
+		case automationspec.Scheduled, automationspec.Webhook, automationspec.PullRequestUpdated:
 			return false, nil
 		case automationspec.TaskEntersStage, automationspec.TaskLeavesStage:
 			hasTask = true

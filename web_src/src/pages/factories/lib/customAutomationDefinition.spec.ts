@@ -5,7 +5,9 @@ import {
   automationDefinitionYaml,
   parseAutomationForCanvas,
   newAutomationDefinition,
+  type AutomationDefinition,
 } from "./customAutomationDefinition";
+import type { CustomAutomationColumn } from "./customAutomation";
 
 describe("automation YAML validation", () => {
   it.each([undefined, 1, 86400])("preserves an optional timeout of %s", (timeout) => {
@@ -65,5 +67,33 @@ describe("leave trigger conversion", () => {
     expect(() =>
       parseAutomationForCanvas(automationDefinitionYaml({ ...definition, runs_on_task: false }), stage),
     ).toThrow();
+  });
+});
+
+describe("webhook trigger conversion", () => {
+  const webhookDefinition = (): AutomationDefinition => ({
+    ...newAutomationDefinition("backlog"),
+    triggers: [{ id: "intake", use: "webhook", config: { webhook_id: "webhook-1" } }],
+  });
+
+  it("preserves a Backlog webhook trigger and runs it with no task", () => {
+    const definition = webhookDefinition();
+    const visual = automationDefinitionCanvas(
+      parseAutomationForCanvas(automationDefinitionYaml(definition), "backlog"),
+    );
+
+    expect(visual.runsOnTask).toBe(false);
+    expect(visual.triggers[0]).toEqual(expect.objectContaining({ mode: "webhook", webhookId: "webhook-1" }));
+    expect(automationDefinitionTriggers(visual.triggers, "backlog")).toEqual(definition.triggers);
+  });
+
+  const duplicate = webhookDefinition();
+  duplicate.triggers.push({ id: "again", use: "webhook", config: { webhook_id: "webhook-1" } });
+  it.each<[CustomAutomationColumn, AutomationDefinition, string]>([
+    ["implement", webhookDefinition(), "triggers[0].use"],
+    ["backlog", { ...webhookDefinition(), runs_on_task: true }, "runs_on_task"],
+    ["backlog", duplicate, "triggers[1].config.webhook_id"],
+  ])("rejects an invalid webhook trigger in %s", (stage, definition, path) => {
+    expect(() => parseAutomationForCanvas(automationDefinitionYaml(definition), stage)).toThrow(path);
   });
 });

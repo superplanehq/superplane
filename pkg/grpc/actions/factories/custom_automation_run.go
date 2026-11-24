@@ -9,6 +9,7 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
+	factorycomponent "github.com/superplanehq/superplane/pkg/components/factory"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
@@ -247,7 +248,7 @@ func emitColumnCustomAutomation(db *gorm.DB, canvas *models.Canvas, triggerID st
 
 func taskCustomAutomationTriggerID(version *models.CanvasVersion) string {
 	for _, node := range version.Nodes {
-		if node.Type == models.NodeTypeTrigger && node.ComponentName() != "schedule" {
+		if node.Type == models.NodeTypeTrigger && node.ComponentName() != "schedule" && node.ComponentName() != factorycomponent.OnWebhookTriggerName {
 			return node.ID
 		}
 	}
@@ -539,6 +540,12 @@ func customAutomationCanvasModeFromVersion(version *models.CanvasVersion) (pb.Fa
 		}
 		if triggerMetadataHasMode(template, "manual") {
 			found = pb.FactoryCustomAutomation_START_MODE_MANUAL
+			continue
+		}
+		if triggerMetadataHasMode(template, "webhook") {
+			if found == pb.FactoryCustomAutomation_START_MODE_UNSPECIFIED {
+				found = pb.FactoryCustomAutomation_START_MODE_WEBHOOK
+			}
 			continue
 		}
 		if found != pb.FactoryCustomAutomation_START_MODE_MANUAL && found != pb.FactoryCustomAutomation_START_MODE_ON_LEAVE {
