@@ -27,9 +27,8 @@ func newConfigurationExportCommand(options core.BindOptions) *cobra.Command {
 		Use: "export", Short: "Export all stages and automations", Args: cobra.NoArgs,
 	}
 	command.bind(cmd)
-	cmd.Flags().StringVar(&command.outputDir, "output-dir", "", "destination directory (required)")
+	cmd.Flags().StringVar(&command.outputDir, "output-dir", ".", "destination directory for the .superplane folder")
 	cmd.Flags().BoolVar(&command.overwrite, "overwrite", false, "replace existing exported configuration files")
-	_ = cmd.MarkFlagRequired("output-dir")
 	core.Bind(cmd, command, options)
 	return cmd
 }

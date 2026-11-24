@@ -86,6 +86,20 @@ func TestConfigurationCommandsRequireExplicitWorkspace(t *testing.T) {
 	}
 }
 
+func TestExportConfigurationDefaultsToCurrentDirectory(t *testing.T) {
+	directory := t.TempDir()
+	t.Chdir(directory)
+	root, _ := configurationCLI(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		require.NoError(t, json.NewEncoder(w).Encode(exportPayload(configurationManifest)))
+	})
+	root.SetArgs([]string{"export", "--workspace", "example"})
+	require.NoError(t, root.Execute())
+	actual, err := os.ReadFile(filepath.Join(directory, ".superplane", "main.yml"))
+	require.NoError(t, err)
+	assert.Equal(t, configurationManifest, string(actual))
+}
+
 func TestExportConfigurationProtectsLocalFiles(t *testing.T) {
 	outputDir := t.TempDir()
 	unrelated := filepath.Join(outputDir, "README.md")
