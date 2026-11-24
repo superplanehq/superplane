@@ -24,6 +24,10 @@ func CreateToken(ctx context.Context, req *pb.CreateTokenRequest) (*pb.CreateTok
 		return nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
 	}
 
+	if _, scoped := authentication.GetScopedTokenScopesFromMetadata(ctx); scoped {
+		return nil, grpcerrors.PermissionDenied(nil, "scoped credentials cannot issue personal tokens")
+	}
+
 	name := strings.TrimSpace(req.GetName())
 	if name == "" {
 		return nil, grpcerrors.InvalidArgument(nil, "name is required")
