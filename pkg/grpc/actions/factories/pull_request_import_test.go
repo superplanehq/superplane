@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"crypto/hmac"
 	"crypto/sha256"
@@ -143,6 +144,7 @@ type importSearchGitHub struct {
 	*fakeFactoryGitHub
 	t            *testing.T
 	query        string
+	searchCalls  int
 	pullRequests []*github.PullRequest
 }
 
@@ -156,6 +158,8 @@ func (f *importSearchGitHub) ListPullRequests(_ context.Context, repository stri
 	return []*github.PullRequest{f.pullRequest, openHandOffPullRequest("other/app", 43, "branch")}, nil, nil
 }
 func (f *importSearchGitHub) SearchIssues(_ context.Context, query string, opts *github.SearchOptions) (*github.IssuesSearchResult, *github.Response, error) {
+	f.searchCalls++
+	assert.LessOrEqual(f.t, utf8.RuneCountInString(query), 256, "GitHub rejects longer decoded searches")
 	assert.Equal(f.t, f.query, query)
 	assert.Equal(f.t, 50, opts.PerPage)
 	return &github.IssuesSearchResult{Issues: []*github.Issue{
@@ -182,7 +186,7 @@ func TestSearchFactoryPullRequestImportItemsGitHub(t *testing.T) {
 			original := newFactoryGitHubAPI
 			newFactoryGitHubAPI = func(*gorm.DB, IntakeDependencies, *models.Factory) (factoryGitHubAPI, error) { return fake, nil }
 			t.Cleanup(func() { newFactoryGitHubAPI = original })
-			for _, query := range []string{"", "42", "#42", pr.GetHTMLURL(), `fix " repo:other/app`} {
+			for _, query := range []string{"", "42", "#42", pr.GetHTMLURL(), pr.GetHTMLURL() + strings.Repeat("a", 256), `fix " repo:other/app`} {
 				t.Run(query, func(t *testing.T) {
 					limit := int32(0)
 					if strings.HasPrefix(query, "fix") {
@@ -192,6 +196,42 @@ func TestSearchFactoryPullRequestImportItemsGitHub(t *testing.T) {
 					require.NoError(t, err)
 					require.Len(t, result.Items, 1)
 					assert.True(t, result.Items[0].Draft)
+					assert.Equal(t, pr.GetHTMLURL(), result.Items[0].Url)
+				})
+			}
+			const prefix = `repo:acme/app is:pr is:open in:title "`
+			// The literal qualifiers and closing quote consume the title budget.
+			budget := 256 - len(prefix) - 1
+			for _, scenario := range []struct {
+				name, query, escaped string
+				invalid              bool
+			}{
+				{"ASCII at bound", strings.Repeat("a", budget), strings.Repeat("a", budget), false},
+				{"ASCII beyond bound", strings.Repeat("a", budget+1), "", true},
+				{"Unicode at bound", strings.Repeat("é", budget), strings.Repeat("é", budget), false},
+				{"Unicode beyond bound", strings.Repeat("é", budget+1), "", true},
+				{"quote at bound", strings.Repeat("a", budget-2) + `"`, strings.Repeat("a", budget-2) + `\"`, false},
+				{"quote beyond bound", strings.Repeat("a", budget-1) + `"`, "", true},
+				{"backslash at bound", strings.Repeat("a", budget-2) + `\`, strings.Repeat("a", budget-2) + `\\`, false},
+				{"backslash beyond bound", strings.Repeat("a", budget-1) + `\`, "", true},
+				{"Portuguese incident", "Uma coisa que acho meio estranha nessa história da factory é que a maior parte do meu trabalho agora é encontrar alguém pra revisar o PR e passar a tarefa pra frente.  Eu criei a tarefa, mas só descrevi o que precisava ser feito. Quem implementou tudo foi a IA kkk", "", true},
+			} {
+				t.Run(scenario.name, func(t *testing.T) {
+					fake.t = t
+					fake.query = prefix + scenario.escaped + `"`
+					calls := fake.searchCalls
+					result, err := SearchFactoryPullRequestImportItems(t.Context(), IntakeDependencies{}, r.Organization.ID.String(), &pb.SearchFactoryPullRequestImportItemsRequest{FactoryId: factory.ID.String(), Query: "  " + scenario.query + "  ", Limit: 100})
+					if scenario.invalid {
+						assert.Equal(t, calls, fake.searchCalls, "invalid searches must not reach GitHub")
+						code, message, ok := grpcerrors.HandlerStatus(err)
+						require.True(t, ok)
+						assert.Equal(t, codes.InvalidArgument, code)
+						assert.Contains(t, message, "Shorten the search or enter a pull request URL.")
+						return
+					}
+					require.NoError(t, err)
+					assert.Equal(t, calls+1, fake.searchCalls)
+					require.Len(t, result.Items, 1)
 					assert.Equal(t, pr.GetHTMLURL(), result.Items[0].Url)
 				})
 			}

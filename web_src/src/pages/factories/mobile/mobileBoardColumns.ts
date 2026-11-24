@@ -62,7 +62,7 @@ export function buildMobileBoardColumns(
   totalCounts?: MobileBoardColumnTotalCounts,
 ): MobileBoardColumn[] {
   const fullBoard = buildLinePhaseBoard(line, workOrders, apps);
-  const verifyOrders = collectLineVerifyOrders(fullBoard, workOrders);
+  const verifyOrders = collectLineVerifyOrders(fullBoard, workOrders, line);
   const hasVerifyStage = orderedLineBoardStages(line).some((stage) => stage.kind === "STAGE_KIND_VERIFY");
   const stageColumns = visibleLineStageColumns(fullBoard, verifyOrders, hasVerifyStage);
   const backlogOrders = collectLineBacklogOrders(workOrders);

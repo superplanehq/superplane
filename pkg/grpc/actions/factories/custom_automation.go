@@ -81,7 +81,10 @@ func CreateFactoryCustomAutomation(
 		column = models.CanvasColumnKeyVerify
 	}
 	if !customAutomationColumnAllowed(column) {
-		return nil, factoryErrorToStatus(invalidArgument("column must be backlog, implement, verify, or done"), "failed to create custom automation")
+		return nil, factoryErrorToStatus(invalidArgument("Select a stage in this factory."), "failed to create custom automation")
+	}
+	if err := validateCustomStageAutomation(db, factory, column); err != nil {
+		return nil, factoryErrorToStatus(err, "failed to create custom automation")
 	}
 	settings, err := customAutomationSettingsForSave(db, factory, req.GetSettings(), versionOwnerID(ctx))
 	if err != nil {
@@ -160,6 +163,13 @@ func DescribeFactoryCustomAutomation(
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to describe custom automation")
 	}
+	version, err := models.FindLiveCanvasVersionByCanvasInTransaction(db, canvas)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to describe custom automation")
+	}
+	if err := checkCustomStageFormGraph(db, factory, canvas, version); err != nil {
+		return nil, err
+	}
 	automation, err := serializeCustomAutomation(db, factory, canvas)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to describe custom automation")
@@ -218,8 +228,11 @@ func UpdateFactoryCustomAutomation(
 		if expected := req.GetExpectedLiveVersionId(); expected != "" && expected != live.ID.String() {
 			return grpcerrors.FailedPrecondition(nil, "The automation changed. Reopen it before you save.")
 		}
-		if models.FactoryAppTemplateID(live.Nodes) != models.FactoryAppTemplateCustomAutomationID {
+		if models.FactoryAppTemplateID(live.Nodes) != models.FactoryAppTemplateCustomAutomationID && !legacyCustomStageGraph(canvas, live) {
 			return invalidArgument("automation is not a custom automation")
+		}
+		if err := checkCustomStageFormGraph(tx, factory, canvas, live); err != nil {
+			return err
 		}
 		authored, err := findLegacyAutomationSource(tx, canvas)
 		if err != nil {
@@ -231,6 +244,9 @@ func UpdateFactoryCustomAutomation(
 		}
 		if canvas.ColumnKey != nil {
 			settings.ColumnKey = *canvas.ColumnKey
+		}
+		if err := validateCustomStageAutomation(tx, factory, settings.ColumnKey); err != nil {
+			return err
 		}
 		if settings.SkipSetupCommands == nil || settings.SkipRepositoryCheckout == nil {
 			previous, err := serializeCustomAutomationVersion(factory, canvas, live)
@@ -254,6 +270,9 @@ func UpdateFactoryCustomAutomation(
 		nodes, edges, err := doc.ParseInTransaction(deps.Registry, orgID.String(), tx)
 		if err != nil {
 			return err
+		}
+		if legacyCustomStageGraph(canvas, live) {
+			nodes, edges = editLegacyCustomStageGraph(live, settings)
 		}
 
 		if err := canvases.PublishGeneratedCanvasNodes(
@@ -586,6 +605,10 @@ func buildCustomAutomationCanvas(
 		return buildDispatchCustomAutomationCanvas(tx, factory, name, settings)
 	}
 	config := factory.OnboardingConfigValue()
+	provider := config.EffectiveVCSProvider()
+	if strings.HasPrefix(settings.ColumnKey, "custom-") {
+		return buildCustomStageAutomationCanvas(tx, factory, name, settings, provider)
+	}
 	repository := strings.TrimSpace(config.AppRepository)
 	integrationID := strings.TrimSpace(config.VCSIntegrationID)
 	if repository == "" {
@@ -594,7 +617,6 @@ func buildCustomAutomationCanvas(
 	if integrationID == "" {
 		return nil, invalidArgument("workspace VCS integration is required")
 	}
-	provider := config.EffectiveVCSProvider()
 	workspaceScope := customAutomationListensOnWorkspace(factory)
 	if workspaceScope {
 		repository = models.WorkspaceRepositoriesExpression
@@ -718,12 +740,7 @@ func buildCustomAutomationCanvas(
 }
 
 func customAutomationColumnAllowed(column string) bool {
-	switch column {
-	case models.CanvasColumnKeyBacklog, models.CanvasColumnKeyImplement, models.CanvasColumnKeyVerify, models.CanvasColumnKeyDone:
-		return true
-	default:
-		return false
-	}
+	return models.ValidCanvasColumnKey(column)
 }
 
 func customAutomationUsesOnRun(column string) bool {
@@ -1276,7 +1293,7 @@ func findCustomAutomationCanvas(tx *gorm.DB, factory *models.Factory, rawID stri
 	if err != nil {
 		return nil, err
 	}
-	if models.FactoryAppTemplateID(version.Nodes) != models.FactoryAppTemplateCustomAutomationID {
+	if models.FactoryAppTemplateID(version.Nodes) != models.FactoryAppTemplateCustomAutomationID && !legacyCustomStageGraph(canvas, version) {
 		return nil, invalidArgument("automation is not a custom automation")
 	}
 	return canvas, nil
@@ -1414,6 +1431,9 @@ func decodeCustomAutomationTriggers(nodes []models.Node) ([]decodedCustomAutomat
 		}
 		template, _ := node.Metadata[models.FactoryAppTemplateMetadataKey].(map[string]any)
 		mode, _ := template["startMode"].(string)
+		if node.ComponentName() == "onRun" {
+			mode = "automatic"
+		}
 		if node.ComponentName() == "schedule" || mode == "scheduled" {
 			offset, err := strconv.ParseFloat(configString(node.Configuration, "timezone"), 64)
 			if err != nil {
@@ -1538,7 +1558,7 @@ func readCustomAutomationVersion(
 		return nil, err
 	}
 	agent := selectCustomAutomationAgent(version.Nodes)
-	if len(triggers) == 0 || agent == nil || models.FactoryAppTemplateID(version.Nodes) != models.FactoryAppTemplateCustomAutomationID {
+	if len(triggers) == 0 || agent == nil || (models.FactoryAppTemplateID(version.Nodes) != models.FactoryAppTemplateCustomAutomationID && !legacyCustomStageGraph(canvas, version)) {
 		return nil, errors.New("custom automation graph is incomplete")
 	}
 

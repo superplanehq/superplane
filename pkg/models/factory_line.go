@@ -60,11 +60,20 @@ func (e *FactoryLineStageAutomationError) Error() string {
 }
 
 type FactoryLineStage struct {
-	ID        uuid.UUID `json:"id"`
-	Key       string    `json:"key"`
-	Name      string    `json:"name"`
-	Kind      string    `json:"kind"`
-	StepIndex *int      `json:"step_index,omitempty"`
+	ID              uuid.UUID `json:"id"`
+	Key             string    `json:"key"`
+	Name            string    `json:"name"`
+	Kind            string    `json:"kind"`
+	StepIndex       *int      `json:"step_index,omitempty"`
+	AgentDisplayKey string    `json:"agent_display_key,omitempty"`
+	AutoAdvance     *bool     `json:"auto_advance,omitempty"`
+}
+
+func (s FactoryLineStage) AutoAdvanceEnabled() bool {
+	if s.AutoAdvance != nil {
+		return *s.AutoAdvance
+	}
+	return s.Kind != FactoryLineStageVerify
 }
 
 func (s *FactoryLineStep) EffectiveMaxParallelism() int {
@@ -434,6 +443,9 @@ func (l *FactoryLine) ReconcileStages(tx *gorm.DB, steps []FactoryLineStep) ([]F
 			if _, ok := nextByKey[stage.Key]; !ok || stage.Kind == FactoryLineStageBacklog || stage.Kind == FactoryLineStageDone {
 				continue
 			}
+			if _, existed := existingByKey[stage.Key]; existed {
+				continue
+			}
 			result = append(result, stage)
 			delete(nextByKey, stage.Key)
 		}
@@ -447,10 +459,14 @@ func (l *FactoryLine) ReconcileStages(tx *gorm.DB, steps []FactoryLineStep) ([]F
 		if !ok {
 			continue
 		}
-		if stage.Kind == FactoryLineStageDone {
+		// New phases go before Verify so a task stops in Verify after its work stages.
+		if stage.Kind == FactoryLineStageVerify || stage.Kind == FactoryLineStageDone {
 			appendNewStages()
 		}
 		stage.StepIndex = next.StepIndex
+		if stage.StepIndex != nil && *stage.StepIndex < len(l.Steps) && l.Steps[*stage.StepIndex].AppID != steps[*stage.StepIndex].AppID {
+			stage.AgentDisplayKey = ""
+		}
 		result = append(result, stage)
 		delete(nextByKey, stage.Key)
 	}
@@ -493,6 +509,9 @@ func (l *FactoryLine) DetachRemovedCustomStageAutomations(tx *gorm.DB, next []Fa
 	}
 	if len(removedKeys) == 0 {
 		return nil
+	}
+	if err := tx.Model(&Canvas{}).Where("factory_id = ? AND display_column_key IN ?", l.FactoryID, removedKeys).Update("display_column_key", "").Error; err != nil {
+		return err
 	}
 	return tx.Model(&Canvas{}).
 		Where("factory_id = ? AND column_key IN ?", l.FactoryID, removedKeys).
@@ -560,5 +579,13 @@ func factoryLineStepNames(tx *gorm.DB, steps []FactoryLineStep) (map[uuid.UUID]s
 }
 
 func newFactoryLineStage(kind, key, name string, stepIndex *int) FactoryLineStage {
-	return FactoryLineStage{ID: uuid.New(), Key: key, Name: name, Kind: kind, StepIndex: stepIndex}
+	autoAdvance := kind != FactoryLineStageVerify
+	return FactoryLineStage{
+		ID:          uuid.New(),
+		Key:         key,
+		Name:        name,
+		Kind:        kind,
+		StepIndex:   stepIndex,
+		AutoAdvance: &autoAdvance,
+	}
 }

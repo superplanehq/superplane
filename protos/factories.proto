@@ -1323,6 +1323,8 @@ message Factory {
     // predates template metadata. Empty for a custom automation.
     // The id does not change when the canvas name changes.
     string template_id = 7;
+    // Optional board placement. Does not change execution membership.
+    string display_column_key = 8;
   }
 
   string id = 1;
@@ -1373,10 +1375,26 @@ message FactoryLine {
     string name = 3;
     StageKind kind = 4;
     optional int32 step_index = 5;
+    // Display override for the agent occurrence at this stage.
+    string agent_display_key = 6;
+    // Whether a task moves to the next stage after all synchronous
+    // automations pass. Unset uses the stage-kind default.
+    optional bool auto_advance = 7;
+  }
+
+  message AutomationMove {
+    string automation_id = 1;
+    // canvas, intake, feedback, or agent-step.
+    string type = 2;
+    string source_key = 3;
+    string destination_key = 4;
+    // Identifies the original phase for an agent-step occurrence.
+    string execution_key = 5;
   }
 
   message StageConfiguration {
     repeated Stage stages = 1;
+    repeated AutomationMove automation_moves = 2;
   }
 
   message Step {
@@ -2449,6 +2467,9 @@ message WorkOrderLineDispatch {
   // Ordered stage snapshot used by task history. It stays stable when the
   // line is edited after this dispatch starts.
   repeated FactoryLine.Stage stages = 12;
+  // Stage that currently owns the task, or the terminal stage where this
+  // dispatch stopped. Empty on historical dispatches created before this field.
+  string current_stage_key = 13;
 }
 
 // WorkOrderQueueItem is a line dispatch waiting for admission into a step

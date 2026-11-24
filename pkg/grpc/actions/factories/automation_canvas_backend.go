@@ -148,6 +148,9 @@ func (b CanvasAutomationBackend) compile(
 	if err := checkAutomationRepository(tx, factory, source); err != nil {
 		return nil, nil, err
 	}
+	if err := validateCustomStageAutomation(tx, factory, placement.Stage); err != nil {
+		return nil, nil, err
+	}
 	agent, err := resolveAutomationAgent(tx, factory, source, live, callerID)
 	if err != nil {
 		return nil, nil, err
@@ -155,6 +158,15 @@ func (b CanvasAutomationBackend) compile(
 	settings, err := automationCanvasSettings(placement.Stage, source, agent)
 	if err != nil {
 		return nil, nil, err
+	}
+	if strings.HasPrefix(placement.Stage, "custom-") {
+		if err := validateCustomStageTriggers(settings); err != nil {
+			return nil, nil, source.Diagnostic("triggers", grpcerrors.StatusMessage(err))
+		}
+	}
+	if live != nil && legacyCustomStageGraph(&models.Canvas{ColumnKey: &placement.Stage}, live) {
+		nodes, edges := editLegacyCustomStageGraph(live, settings)
+		return nodes, edges, nil
 	}
 	graph, err := buildCustomAutomationCanvas(tx, factory, strings.TrimSpace(source.Name), settings)
 	if err != nil {

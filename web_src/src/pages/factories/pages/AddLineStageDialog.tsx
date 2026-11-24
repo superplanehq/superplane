@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useState } from "react";
 
-import type { LineBoardStage } from "../lib/lineBoardStages";
+import { lineStageNameError, type LineBoardStage } from "../lib/lineBoardStages";
 
 /** Names a draft stage. The stage is created when the stage edits are saved. */
 export function AddLineStageDialog({
@@ -27,7 +27,7 @@ export function AddLineStageDialog({
 }) {
   const [name, setName] = useState("");
   const trimmedName = name.trim();
-  const duplicate = stages.some((stage) => stage.name.toLocaleLowerCase() === trimmedName.toLocaleLowerCase());
+  const nameError = lineStageNameError(name, stages);
 
   const close = () => {
     setName("");
@@ -35,7 +35,7 @@ export function AddLineStageDialog({
   };
 
   const add = () => {
-    if (!trimmedName || duplicate) {
+    if (nameError) {
       return;
     }
     setName("");
@@ -64,13 +64,13 @@ export function AddLineStageDialog({
             autoFocus
             onChange={(event) => setName(event.target.value)}
           />
-          {duplicate ? <p className="text-sm text-destructive">Stage names must be unique.</p> : null}
+          {trimmedName && nameError ? <p className="text-sm text-destructive">{nameError}</p> : null}
         </form>
         <DialogFooter>
           <Button type="button" variant="outline" onClick={close}>
             Cancel
           </Button>
-          <Button type="button" onClick={add} disabled={!trimmedName || duplicate}>
+          <Button type="button" onClick={add} disabled={Boolean(nameError)}>
             Add stage
           </Button>
         </DialogFooter>

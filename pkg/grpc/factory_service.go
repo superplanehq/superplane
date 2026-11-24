@@ -133,7 +133,7 @@ func (s *FactoryService) CreateFactoryLine(ctx context.Context, req *pb.CreateFa
 
 func (s *FactoryService) UpdateFactoryLine(ctx context.Context, req *pb.UpdateFactoryLineRequest) (*pb.UpdateFactoryLineResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return actions.UpdateFactoryLine(ctx, organizationID, req)
+	return actions.UpdateFactoryLine(ctx, s.intakeDeps, organizationID, req)
 }
 
 func (s *FactoryService) ListFactoryAutomations(ctx context.Context, req *pb.ListFactoryAutomationsRequest) (*pb.ListFactoryAutomationsResponse, error) {

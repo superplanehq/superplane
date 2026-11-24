@@ -522,8 +522,7 @@ it("keeps a renamed scheduled intake visible and opens its saved automation", ()
     apps: [{ id: "scheduled-app", name: "Review documentation", columnKey: "backlog" }],
   });
   expect(rows).toHaveLength(1);
-  expect(rows[0].name).toBe("Review documentation");
-  expect(rows[0].trigger).toBe("On schedule");
+  expect(rows[0]).toMatchObject({ name: "Review documentation", trigger: "On schedule" });
   expect(columnAutomationOpenPath(rows[0], { organizationId: "org", factoryKey: "workspace" })).toBe(
     factoryColumnAutomationViewPath("org", "workspace", undefined, "scheduled-app"),
   );
@@ -538,12 +537,15 @@ it("keeps a renamed Review request visible without discovery and avoids a duplic
         name: "Request engineering review",
         templateId: "review-request",
         columnKey: "verify",
+        displayColumnKey: "done",
       },
     ],
   });
   expect(rows).toHaveLength(1);
   expect(rows[0]).toMatchObject({
     kind: "review-request",
+    displayColumnKey: "done",
+    executionKey: "verify",
     canvasId: "review-request-app",
     name: "Request engineering review",
   });

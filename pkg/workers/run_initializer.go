@@ -393,6 +393,9 @@ func (w *RunInitializer) finishFactoryWorkOrderExecutionForRun(tx *gorm.DB, runI
 	if err != nil {
 		return nil, err
 	}
+	if current := dispatch.CurrentStageKey; current != "" && current != dispatch.StepStageKey(execution.StepIndex) {
+		return admitted, nil
+	}
 	openWork, err := dispatch.HasOpenWork(tx)
 	if err != nil {
 		return nil, err

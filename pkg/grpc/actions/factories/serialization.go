@@ -199,9 +199,10 @@ func serializeFactoryAutomations(canvases []models.Canvas) []*pb.Factory_Automat
 
 func serializeFactoryAutomation(canvas models.Canvas) *pb.Factory_Automation {
 	automation := &pb.Factory_Automation{
-		Id:          canvas.ID.String(),
-		Name:        canvas.Name,
-		Description: canvas.Description,
+		Id:               canvas.ID.String(),
+		Name:             canvas.Name,
+		Description:      canvas.Description,
+		DisplayColumnKey: canvas.DisplayColumnKey,
 	}
 	if canvas.ColumnKey != nil {
 		automation.ColumnKey = *canvas.ColumnKey
@@ -474,11 +475,14 @@ func serializeFactoryLineStages(stages []models.FactoryLineStage) []*pb.FactoryL
 	result := make([]*pb.FactoryLine_Stage, len(stages))
 	for index, stage := range stages {
 		result[index] = &pb.FactoryLine_Stage{
-			Id:   stage.ID.String(),
-			Key:  stage.Key,
-			Name: stage.Name,
-			Kind: serializeFactoryLineStageKind(stage.Kind),
+			Id:              stage.ID.String(),
+			Key:             stage.Key,
+			Name:            stage.Name,
+			Kind:            serializeFactoryLineStageKind(stage.Kind),
+			AgentDisplayKey: stage.AgentDisplayKey,
 		}
+		autoAdvance := stage.AutoAdvanceEnabled()
+		result[index].AutoAdvance = &autoAdvance
 		if stage.StepIndex != nil {
 			stepIndex := int32(*stage.StepIndex)
 			result[index].StepIndex = &stepIndex
@@ -808,14 +812,15 @@ func serializeWorkOrderLineDispatch(
 			Id:   dispatch.LineID.String(),
 			Name: dispatch.LineName,
 		},
-		Steps:          serializeExecutionSteps(dispatch.Steps, dispatch.Executions),
-		Stages:         serializeFactoryLineStages(dispatch.StagesValue()),
-		State:          serializeLineDispatchState(dispatch.State),
-		Result:         serializeLineDispatchResult(dispatch.Result),
-		CreatedAt:      timestamppb.New(dispatch.CreatedAt),
-		StepExecutions: serializeWorkOrderExecutions(dispatch.Executions, dispatch.Steps, modelsByExecution),
-		Model:          dispatch.Model,
-		ThinkingLevel:  dispatch.ThinkingLevel,
+		Steps:           serializeExecutionSteps(dispatch.Steps, dispatch.Executions),
+		Stages:          serializeFactoryLineStages(dispatch.StagesValue()),
+		State:           serializeLineDispatchState(dispatch.State),
+		Result:          serializeLineDispatchResult(dispatch.Result),
+		CreatedAt:       timestamppb.New(dispatch.CreatedAt),
+		StepExecutions:  serializeWorkOrderExecutions(dispatch.Executions, dispatch.Steps, modelsByExecution),
+		Model:           dispatch.Model,
+		ThinkingLevel:   dispatch.ThinkingLevel,
+		CurrentStageKey: dispatch.CurrentStageKey,
 	}
 	if dispatch.FinishedAt != nil {
 		item.FinishedAt = timestamppb.New(*dispatch.FinishedAt)

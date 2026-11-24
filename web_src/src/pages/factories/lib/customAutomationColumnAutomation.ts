@@ -33,11 +33,13 @@ export function customAutomationColumnAutomation(
   const hasSchedule =
     listed.some((trigger) => trigger.mode === "scheduled") || app.customAutomationMode === "scheduled";
   const primary = primaryCustomAutomationMode(app.customAutomationMode, listed);
+  const taskStageTargets = customAutomationTaskStageTargets(hasSchedule, primary, columnKey);
   const copy = customAutomationModeCopy(primary, columnKey);
   const trigger = customAutomationTriggerSummary(app, listed, columnKey, copy.trigger);
   return {
     id: `custom-automation-${id}`,
     kind: "custom-verification",
+    taskStageTargets,
     name: app.name?.trim() || "Custom automation",
     trigger,
     action: copy.action,
@@ -48,8 +50,20 @@ export function customAutomationColumnAutomation(
     runningCount: runningCountForApp(id, workOrders),
     catalogId: CUSTOM_AUTOMATION_CATALOG_ID,
     canvasId: id,
+    columnKey: columnKey.startsWith("custom-") ? columnKey : undefined,
     canRunNow: columnKey === "backlog" && (hasSchedule || app.customAutomationRunsOnTask === false) ? true : undefined,
   };
+}
+
+function customAutomationTaskStageTargets(
+  hasSchedule: boolean,
+  mode: CustomAutomationMode,
+  columnKey: CustomAutomationColumn,
+): string[] | undefined {
+  if (hasSchedule) return undefined;
+  if (mode === "leave") return ["backlog", "phase-0", "verify", "done"];
+  if (mode === "automatic" && columnKey !== "verify") return ["backlog", "phase-0", "done"];
+  return undefined;
 }
 
 function primaryCustomAutomationMode(

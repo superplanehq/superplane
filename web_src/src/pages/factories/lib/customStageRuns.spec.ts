@@ -1,9 +1,82 @@
 import { describe, expect, it } from "bun:test";
-import type { FactoriesWorkOrder } from "@/api-client";
+import type { FactoriesWorkOrder, FactoriesWorkOrderExecution, FactoryLineStage } from "@/api-client";
 
 import { buildLinePhaseBoard, collectCustomStageRuns } from "./linePhaseRuns";
 
+function taskWithExecution(execution: FactoriesWorkOrderExecution): FactoriesWorkOrder {
+  return {
+    id: "wo-stage",
+    state: "STATE_OPEN",
+    lineDispatches: [{ line: { id: "line-1" }, stepExecutions: [{ state: "STATE_STARTED", ...execution }] }],
+  };
+}
+
 describe("collectCustomStageRuns", () => {
+  it.each([undefined, -1, 2])("uses the snapshot when the saved stage index is %s", (stepIndex) => {
+    const task = taskWithExecution({ stepIndex: 1, stageKey: "phase-saved" });
+    const board = buildLinePhaseBoard(
+      {
+        id: "line-1",
+        steps: [{ app: { app: "app-plan" } }, { app: { app: "app-build" } }],
+        stages: [{ key: "phase-saved", stepIndex }],
+      },
+      [task],
+    );
+
+    expect(board.map((column) => column.runs.length)).toEqual([0, 1]);
+  });
+
+  it.each([undefined, "   "])("accepts saved index zero with execution app ID %s", (appId) => {
+    const task = taskWithExecution({ stepIndex: 1, stageKey: "phase-zero", run: { appId } });
+    const board = buildLinePhaseBoard(
+      {
+        id: "line-1",
+        steps: [{ app: { app: "app-plan" } }, { app: { app: "app-build" } }],
+        stages: [{ key: "phase-zero", stepIndex: 0 }],
+      },
+      [task],
+    );
+
+    expect(board.map((column) => column.runs.length)).toEqual([1, 0]);
+  });
+
+  it.each<FactoryLineStage>([
+    { key: "qa", kind: "STAGE_KIND_CUSTOM", stepIndex: 0 },
+    { key: "custom-qa", kind: "STAGE_KIND_PHASE", stepIndex: 0 },
+  ])("excludes custom stage $key even when the snapshot matches", (stage) => {
+    const task = taskWithExecution({ stepIndex: 0, stageKey: stage.key, run: { appId: "app-plan" } });
+    const board = buildLinePhaseBoard({ id: "line-1", steps: [{ app: { app: "app-plan" } }], stages: [stage] }, [task]);
+
+    expect(board.flatMap((column) => column.runs)).toEqual([]);
+  });
+
+  it.each([
+    { snapshotIndex: 3, expectedRuns: [0, 0, 1, 0, 0] },
+    { snapshotIndex: 5, expectedRuns: [0, 0, 0, 0, 1] },
+  ])("selects the closest repeated app from snapshot $snapshotIndex", ({ snapshotIndex, expectedRuns }) => {
+    const task = taskWithExecution({ stepIndex: snapshotIndex, stageKey: "phase-stale", run: { appId: "app-plan" } });
+    const board = buildLinePhaseBoard(
+      {
+        id: "line-1",
+        steps: ["app-plan", "app-build", "app-plan", "app-build", "app-plan"].map((app) => ({ app: { app } })),
+        stages: [{ key: "phase-stale", stepIndex: 1 }],
+      },
+      [task],
+    );
+
+    expect(board.map((column) => column.runs.length)).toEqual(expectedRuns);
+  });
+
+  it("uses the snapshot when the saved stage is missing", () => {
+    const task = taskWithExecution({ stepIndex: 1, stageKey: "phase-missing", run: { appId: "app-build" } });
+    const board = buildLinePhaseBoard(
+      { id: "line-1", steps: [{ app: { app: "app-plan" } }, { app: { app: "app-build" } }] },
+      [task],
+    );
+
+    expect(board.map((column) => column.runs.length)).toEqual([0, 1]);
+  });
+
   it("places a task in its current custom stage", () => {
     const task: FactoriesWorkOrder = {
       id: "wo-custom",
@@ -95,6 +168,60 @@ describe("collectCustomStageRuns", () => {
 
     expect(board[0]?.runs).toHaveLength(0);
     expect(collectCustomStageRuns("line-1", "custom-qa", [task])).toHaveLength(1);
+  });
+
+  it("places a waiting task in an empty current stage", () => {
+    const task: FactoriesWorkOrder = {
+      id: "wo-empty",
+      state: "STATE_OPEN",
+      lineDispatches: [
+        {
+          line: { id: "line-1" },
+          state: "STATE_FINISHED",
+          result: "RESULT_PASSED",
+          currentStageKey: "custom-empty",
+          stepExecutions: [
+            {
+              id: "phase-passed",
+              stepIndex: 0,
+              stageKey: "phase-0",
+              state: "STATE_FINISHED",
+              result: "RESULT_PASSED",
+              run: { appId: "app-implement" },
+            },
+          ],
+        },
+      ],
+    };
+    const board = buildLinePhaseBoard(
+      { id: "line-1", steps: [{ app: { app: "app-implement" } }] },
+      [task],
+      [{ id: "app-implement", name: "Implement" }],
+    );
+
+    expect(board[0]?.runs).toHaveLength(0);
+    expect(collectCustomStageRuns("line-1", "custom-empty", [task])).toHaveLength(1);
+  });
+
+  it("places a task that stops in an empty stage before its first run", () => {
+    const task: FactoriesWorkOrder = {
+      id: "wo-stopped",
+      state: "STATE_OPEN",
+      lineDispatches: [
+        {
+          line: { id: "line-1" },
+          state: "STATE_FINISHED",
+          result: "RESULT_PASSED",
+          currentStageKey: "custom-empty",
+          stepExecutions: [],
+        },
+      ],
+    };
+
+    expect(collectCustomStageRuns("line-1", "custom-empty", [task]).map((run) => run.workOrderId)).toEqual([
+      "wo-stopped",
+    ]);
+    expect(collectCustomStageRuns("line-1", "custom-other", [task])).toEqual([]);
   });
 
   it("places a repeated app by its saved phase key, not the shifted step index", () => {
