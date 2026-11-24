@@ -741,6 +741,18 @@ func attachUsageEventsToWorkOrder(tx *gorm.DB, factoryID, workOrderID, sourceRun
 	if err != nil || len(runIDs) == 0 {
 		return err
 	}
+	orders, err := ListWorkOrdersBySourceRunIDs(tx, factoryID, []uuid.UUID{sourceRunID})
+	if err != nil {
+		return err
+	}
+	if _, unique := orders[sourceRunID]; !unique {
+		// A second task makes earlier source-run usage shared too.
+		sourceOrders := tx.Model(&FactoryWorkOrder{}).Select("id").
+			Where("factory_id = ? AND source_run_id = ?", factoryID, sourceRunID)
+		return tx.Model(&WorkspaceUsageEvent{}).
+			Where("factory_id = ? AND canvas_run_id IN ? AND work_order_id IN (?) AND work_order_execution_id IS NULL", factoryID, runIDs, sourceOrders).
+			Update("work_order_id", nil).Error
+	}
 	return tx.Model(&WorkspaceUsageEvent{}).
 		Where("factory_id = ? AND canvas_run_id IN ? AND work_order_id IS NULL AND work_order_execution_id IS NULL", factoryID, runIDs).
 		Update("work_order_id", workOrderID).Error

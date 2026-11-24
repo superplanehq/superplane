@@ -246,7 +246,7 @@ func FindUnscopedWorkOrder(db *gorm.DB, id uuid.UUID) (*FactoryWorkOrder, error)
 }
 
 // ListWorkOrdersBySourceRunIDs returns the work order each run created, keyed
-// by run id. A run creates at most one work order.
+// by run id. Runs that created multiple work orders are omitted.
 func ListWorkOrdersBySourceRunIDs(tx *gorm.DB, factoryID uuid.UUID, runIDs []uuid.UUID) (map[uuid.UUID]FactoryWorkOrder, error) {
 	ordersByRunID := make(map[uuid.UUID]FactoryWorkOrder, len(runIDs))
 	if len(runIDs) == 0 {
@@ -254,9 +254,14 @@ func ListWorkOrdersBySourceRunIDs(tx *gorm.DB, factoryID uuid.UUID, runIDs []uui
 	}
 
 	var orders []FactoryWorkOrder
+	uniqueSourceRuns := tx.Model(&FactoryWorkOrder{}).
+		Select("source_run_id").
+		Where("factory_id = ? AND source_run_id IN ?", factoryID, runIDs).
+		Group("source_run_id").
+		Having("COUNT(*) = 1")
 	err := tx.
 		Where("factory_id = ?", factoryID).
-		Where("source_run_id IN ?", runIDs).
+		Where("source_run_id IN (?)", uniqueSourceRuns).
 		Find(&orders).
 		Error
 	if err != nil {
@@ -298,6 +303,18 @@ func ResolveFactoryWorkOrderCreatorAutomations(
 	if err := tx.Where("id IN ?", runIDs).Find(&runs).Error; err != nil {
 		return nil, err
 	}
+	versionIDs := make([]uuid.UUID, 0, len(runs))
+	for _, run := range runs {
+		versionIDs = append(versionIDs, run.VersionID)
+	}
+	var versions []CanvasVersion
+	if err := tx.Select("id", "nodes").Where("id IN ?", versionIDs).Find(&versions).Error; err != nil {
+		return nil, err
+	}
+	templateIDs := make(map[uuid.UUID]string, len(versions))
+	for _, version := range versions {
+		templateIDs[version.ID] = FactoryAppTemplateID(version.Nodes)
+	}
 
 	canvasIDs, nodeKeys := collectCreatorAutomationKeys(runs)
 	canvasesByID, err := loadCreatorAutomationCanvases(tx, canvasIDs)
@@ -313,8 +330,9 @@ func ResolveFactoryWorkOrderCreatorAutomations(
 	for i := range runs {
 		run := &runs[i]
 		ref := &factory.AutomationRef{
-			AppID:  run.WorkflowID,
-			NodeID: run.NodeID,
+			AppID:      run.WorkflowID,
+			NodeID:     run.NodeID,
+			TemplateID: templateIDs[run.VersionID],
 		}
 		ref.AppName = canvasesByID[run.WorkflowID]
 		ref.NodeName = nodesByKey[creatorAutomationNodeKey{CanvasID: run.WorkflowID, NodeID: run.NodeID}]

@@ -33,15 +33,25 @@ const SLACK_ORIGIN = {
 } as const;
 
 export const INGEST_CREATED_BY = {
-  automation: { appId: "app-refund-backlog", appName: "Ingest", nodeName: "On Issue Label" },
+  automation: {
+    appId: "app-refund-backlog",
+    appName: "Ingest",
+    nodeName: "On Issue Label",
+    templateId: "intake:github-issues",
+  },
 } as const;
 
 export const SENTRY_CREATED_BY = {
-  automation: { appId: "app-refund-sentry", appName: "Sentry", nodeName: "On Issue" },
+  automation: {
+    appId: "app-refund-sentry",
+    appName: "Sentry",
+    nodeName: "On Issue",
+    templateId: "intake:sentry-exceptions",
+  },
 } as const;
 
 export const SLACK_CREATED_BY = {
-  automation: { appId: "app-refund-slack", appName: "Slack", nodeName: "On Mention" },
+  automation: { appId: "app-refund-slack", appName: "Slack", nodeName: "On Mention", templateId: "intake:slack" },
 } as const;
 
 export const OPEN_WORK_ORDER: FactoriesWorkOrder = {

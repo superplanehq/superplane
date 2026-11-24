@@ -117,6 +117,7 @@ func findWorkOrderIDForFactoryRun(tx *gorm.DB, runID, factoryID uuid.UUID) (*uui
 		}
 	}
 
+	// Shared source runs have no task link, so their costs stay at workspace scope.
 	orders, err := ListWorkOrdersBySourceRunIDs(tx, factoryID, runIDs)
 	if err != nil {
 		return nil, err
