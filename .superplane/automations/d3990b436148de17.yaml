@@ -1,8 +1,0 @@
-apiVersion: v2
-kind: Automation
-name: Custom automation asdf
-triggers:
-  - use: task_enters_stage
-steps:
-  - name: New step
-    bash: asd
