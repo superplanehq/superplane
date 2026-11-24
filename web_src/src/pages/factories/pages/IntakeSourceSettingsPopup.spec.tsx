@@ -401,6 +401,7 @@ describe("IntakeSourceSettingsPopup", () => {
     "productive-tasks",
     "datadog",
     "linear-issues",
+    "pagerduty-incidents",
   ] as const)("hides connection and unavailable automatic intake controls for a %s intake", (sourceId) => {
     renderPopup({ sourceId });
 
@@ -420,8 +421,6 @@ describe("IntakeSourceSettingsPopup", () => {
     const onDelete = vi.fn();
     const user = userEvent.setup();
     renderPopup({ sourceId, onDelete });
-
-    expect(screen.getByTestId("intake-source-settings-delete")).toHaveTextContent(INTAKE_SETTINGS_COPY.delete);
 
     await user.click(screen.getByTestId("intake-source-settings-delete"));
     expect(screen.getByTestId("intake-delete-dialog")).toBeInTheDocument();

@@ -27,6 +27,7 @@ export type LinePhaseRunCard = {
 };
 
 export type LinePhaseColumn = {
+  stageKey?: string;
   stepName: string;
   stepIndex: number;
   /** Factory app id for this runApp step, when present. */
@@ -101,6 +102,9 @@ export function buildLinePhaseBoard(
   }
 
   const columns: LinePhaseColumn[] = steps.map((step, stepIndex) => ({
+    stageKey: orderedLineBoardStages(line).find(
+      (stage) => stage.kind === "STAGE_KIND_PHASE" && stage.stepIndex === stepIndex,
+    )?.key,
     stepName: automationNameForLineStep(step, apps, stepIndex),
     stepIndex,
     appId: step.app?.app?.trim() || undefined,

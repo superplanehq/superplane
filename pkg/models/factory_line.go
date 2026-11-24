@@ -331,8 +331,8 @@ func ListFactoryLinesByFactoryIDs(tx *gorm.DB, organizationID uuid.UUID, factory
 }
 
 // Update persists the given fields. A nil name, steps, or columnColors
-// means "do not change" that field; an empty (non-nil) steps slice is not
-// valid (callers must not pass one), while an empty (non-nil) columnColors
+// means "do not change" that field; an empty (non-nil) steps slice clears
+// execution automations, while an empty (non-nil) columnColors
 // map is a valid "clear all colors" request.
 func (l *FactoryLine) Update(tx *gorm.DB, name *string, steps []FactoryLineStep, columnColors map[string]string) error {
 	return l.update(tx, name, steps, columnColors, nil)
@@ -418,6 +418,35 @@ func (l *FactoryLine) ReconcileStages(tx *gorm.DB, steps []FactoryLineStep) ([]F
 	if len(existingStages) == 0 {
 		return systemStages, nil
 	}
+	// Stage keys identify board lanes, not compacted execution indices.
+	usedKeys := make(map[string]bool, len(existingStages))
+	for _, stage := range existingStages {
+		usedKeys[stage.Key] = true
+	}
+	for i := range systemStages {
+		next := &systemStages[i]
+		if next.Kind != FactoryLineStagePhase || next.StepIndex == nil {
+			continue
+		}
+		index := *next.StepIndex
+		matched := false
+		for _, stage := range existingStages {
+			if stage.Kind != FactoryLineStagePhase || stage.StepIndex == nil || *stage.StepIndex >= len(l.Steps) {
+				continue
+			}
+			if *stage.StepIndex == index {
+				next.Key = stage.Key
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			for suffix := index; usedKeys[next.Key]; suffix++ {
+				next.Key = "phase-" + strconv.Itoa(suffix+1)
+			}
+		}
+		usedKeys[next.Key] = true
+	}
 	existingByKey := make(map[string]FactoryLineStage, len(existingStages))
 	for _, stage := range existingStages {
 		if stage.Kind != FactoryLineStageCustom {
@@ -440,7 +469,7 @@ func (l *FactoryLine) ReconcileStages(tx *gorm.DB, steps []FactoryLineStep) ([]F
 		}
 	}
 	for _, stage := range existingStages {
-		if stage.Kind == FactoryLineStageCustom {
+		if stage.Kind == FactoryLineStageCustom || (stage.Kind == FactoryLineStagePhase && stage.StepIndex == nil) {
 			result = append(result, stage)
 			continue
 		}
@@ -460,6 +489,40 @@ func (l *FactoryLine) ReconcileStages(tx *gorm.DB, steps []FactoryLineStep) ([]F
 	}
 	appendNewStages()
 	return result, nil
+}
+
+// DetachAutomation keeps board stages while removing every execution reference.
+func (l *FactoryLine) DetachAutomation(tx *gorm.DB, automationID uuid.UUID) error {
+	steps := make([]FactoryLineStep, 0, len(l.Steps))
+	indices := make(map[int]int, len(l.Steps))
+	for index, step := range l.Steps {
+		if step.AppID == automationID {
+			continue
+		}
+		indices[index] = len(steps)
+		steps = append(steps, step)
+	}
+	if len(steps) == len(l.Steps) {
+		return nil
+	}
+	stages, err := l.executionStages(tx)
+	if err != nil {
+		return err
+	}
+	for i := range stages {
+		stage := &stages[i]
+		if stage.StepIndex == nil {
+			continue
+		}
+		index, retained := indices[*stage.StepIndex]
+		if !retained {
+			stage.StepIndex = nil
+			stage.AgentDisplayKey = ""
+			continue
+		}
+		stage.StepIndex = &index
+	}
+	return l.UpdateConfiguration(tx, nil, steps, nil, stages)
 }
 
 func retainConfiguredOptionalStages(
