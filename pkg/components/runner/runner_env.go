@@ -120,6 +120,10 @@ func resolveRunnerScope(
 	}
 	scope.Scopes = ScopesForFlow(scope.Flow)
 	if scope.Flow == RunnerFlowTask {
+		session, sessionErr := models.FindPlanningSessionByRun(db, scope.CanvasRunID)
+		if sessionErr == nil && session.IsCustomAutomationSession() && session.OrganizationID == scope.OrganizationID && session.FactoryID == scope.FactoryID && session.DraftWorkOrderID != nil && *session.DraftWorkOrderID == scope.WorkOrderID {
+			scope.Scopes = append(scope.Scopes, ScopeSurveyWrite)
+		}
 		scope.Scopes = append(scope.Scopes, TaskCapabilityScopes(environment)...)
 		scope.Scopes = append(scope.Scopes, ScopePullRequestsRead, ScopePullRequestsWrite)
 	}

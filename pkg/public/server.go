@@ -477,6 +477,7 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 	s.Router.HandleFunc("/api/v1/runner/task/suggest-owners", s.handleRunnerGlobalSuggestOwners).Methods(http.MethodPost)
 	s.Router.HandleFunc("/api/v1/runner/task/owner", s.handleRunnerGlobalAssignOwner).Methods(http.MethodPut)
 	s.Router.HandleFunc("/api/v1/runner/task/plan", s.handleRunnerGlobalPlanUpdate).Methods(http.MethodPut)
+	s.Router.HandleFunc("/api/v1/runner/task/surveys", s.handleRunnerGlobalSurvey).Methods(http.MethodPost)
 	s.Router.HandleFunc("/api/v1/runner/task/merge-checks", s.handleRunnerGlobalMergeCheck).Methods(http.MethodPost)
 	s.Router.HandleFunc("/api/v1/runner/task/artifacts", s.handleRunnerGlobalArtifactUpload).Methods(http.MethodPost)
 	s.Router.HandleFunc("/api/v1/runner/task/links", s.handleRunnerGlobalArtifactLink).Methods(http.MethodPost)

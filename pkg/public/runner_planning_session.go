@@ -392,12 +392,16 @@ func (s *Server) handleRunnerPlanningSurvey(w http.ResponseWriter, r *http.Reque
 	if !ok {
 		return
 	}
+	s.runnerPlanningSurvey(w, r, scope)
+}
+
+func (s *Server) runnerPlanningSurvey(w http.ResponseWriter, r *http.Request, scope *runneraction.PlanningSessionScope) {
 	var req planningSurveyRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
-	session, err := s.loadAnalysisPlanningSessionForRunner(r, scope)
+	session, err := s.loadChatSessionForRunner(r, scope)
 	if err != nil {
 		writeRunnerPlanningError(w, r, session, err)
 		return

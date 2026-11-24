@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	runneraction "github.com/superplanehq/superplane/pkg/components/runner"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
 )
@@ -115,4 +116,20 @@ func loadRunnerFlowArtifactContext(db *gorm.DB, scope *runneraction.RunnerScope,
 
 func writeRunnerFlowMismatch(w http.ResponseWriter) {
 	http.Error(w, "This run cannot use this tool", http.StatusForbidden)
+}
+
+// Surveys use the run's custom conversation, never its task planning session.
+func (s *Server) handleRunnerGlobalSurvey(w http.ResponseWriter, r *http.Request) {
+	scope, ok := s.authenticateRunner(w, r, runneraction.ScopeSurveyWrite)
+	if !ok {
+		return
+	}
+	session, err := models.FindPlanningSessionByRun(database.DB(r.Context()), scope.CanvasRunID)
+	if err != nil || !session.IsCustomAutomationSession() || session.OrganizationID != scope.OrganizationID || session.FactoryID != scope.FactoryID || session.DraftWorkOrderID == nil || *session.DraftWorkOrderID != scope.WorkOrderID {
+		writeRunnerFlowMismatch(w)
+		return
+	}
+	s.runnerPlanningSurvey(w, r, &runneraction.PlanningSessionScope{
+		OrganizationID: scope.OrganizationID, FactoryID: scope.FactoryID, SessionID: session.ID, CanvasRunID: scope.CanvasRunID,
+	})
 }

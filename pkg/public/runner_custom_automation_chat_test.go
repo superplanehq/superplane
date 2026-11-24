@@ -11,7 +11,9 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	runner "github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 )
@@ -95,4 +97,42 @@ func TestRunnerCustomAutomationChatTransportDoesNotApplyPlanning(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, artifacts, 1)
 	require.Contains(t, string(artifacts[0].Data), "Existing plan")
+}
+
+func TestRunnerCustomAutomationSurvey(t *testing.T) {
+	r := support.Setup(t)
+	t.Setenv("JWT_SECRET", "test")
+	db := database.DB(t.Context())
+	server := newRunnerArtifactTestServer(t, r, jwt.NewSigner("test"))
+	ctx, factory, order := mustTaskLinkedAgentRun(t, r)
+	ordinaryToken := runnerTokenFrom(runner.AttachRunnerEnv(ctx, nil, 60))
+	canvasID := uuid.MustParse(ctx.WorkflowID)
+	session := &models.FactoryPlanningSession{
+		ID: uuid.New(), OrganizationID: r.Organization.ID, FactoryID: factory.ID,
+		Kind: models.PlanningSessionKindCustomAutomation, State: models.PlanningSessionStateRunning,
+		CanvasID: &canvasID, CanvasRunID: &ctx.RunID, OriginRunID: &ctx.RunID,
+		DraftWorkOrderID: &order.ID, HeartbeatAt: time.Now(),
+	}
+	require.NoError(t, db.Create(session).Error)
+	token := runnerTokenFrom(runner.AttachRunnerEnv(ctx, nil, 60))
+	mcp := startGlobalMCP(t, server, token, runner.GlobalMCPFiles())
+	require.Contains(t, mcp.toolNames(), "survey")
+	require.NotContains(t, mcp.toolNames(), "propose_plan")
+	result := mcp.call("survey", map[string]any{"questions": []map[string]any{{"prompt": "Which approach?", "options": []string{"Small patch", "Refactor"}, "recommended_option": "Small patch"}}})
+	require.Equal(t, "shown", result["status"])
+	stored, err := models.FindPlanningSession(db, r.Organization.ID, factory.ID, session.ID)
+	require.NoError(t, err)
+	require.Len(t, stored.CurrentSurvey().Questions, 1)
+	require.Equal(t, "Small patch", stored.CurrentSurvey().Questions[0].RecommendedOption)
+	require.NoError(t, stored.SendUserMessage(db, "Which approach?\nSmall patch", uuid.Nil))
+	require.Empty(t, stored.CurrentSurvey().Questions)
+	require.NoError(t, stored.BeginWait(db))
+	wait, err := stored.ConsumeWait(db)
+	require.NoError(t, err)
+	require.Contains(t, wait.Text, "Small patch")
+	checks, err := order.ListChecks(db)
+	require.NoError(t, err)
+	require.Empty(t, checks)
+	denied := runnerRequest(t, server, http.MethodPost, ordinaryToken, "/api/v1/runner/task/surveys", `{"questions":[{"prompt":"Question","options":["Answer"]}]}`)
+	require.Equal(t, http.StatusForbidden, denied.Code)
 }

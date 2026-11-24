@@ -84,7 +84,7 @@ function analysisRequestChatState(analysis: IntentAnalysisChat) {
   return {
     followKey: analysis.view.executionId || analysis.view.canvasId || "analysis",
     active,
-    showSurvey: analysis.mode !== "automation" && hasPendingPlanningQuestions(analysis.view),
+    showSurvey: hasPendingPlanningQuestions(analysis.view),
     progressLabel: analysis.mode === "automation" || analysis.canTogglePlan ? undefined : "Creating the first plan…",
     placeholder:
       analysis.mode === "automation"
