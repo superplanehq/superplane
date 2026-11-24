@@ -54,14 +54,36 @@ describe("buildMobileBoardColumns", () => {
           { id: "retained", key: "phase-1", name: "Release", kind: "STAGE_KIND_PHASE", stepIndex: 0 },
         ],
       },
-      [order],
+      [
+        order,
+        {
+          id: "deleted-task",
+          state: "STATE_OPEN",
+          lineDispatches: [
+            {
+              id: "old-dispatch",
+              line: { id: REFUND_LINE_PLAN_ID },
+              currentStageKey: "phase-0",
+              stepExecutions: [
+                {
+                  id: "old-execution",
+                  stepIndex: 0,
+                  stageKey: "phase-0",
+                  state: "STATE_STARTED",
+                  run: { id: "old-run", appId: PLAN_LINE.steps![0].app!.app },
+                },
+              ],
+            },
+          ],
+        },
+      ],
       REFUND_FACTORY_APPS,
     );
     expect(columns.map((column) => [column.key, column.title])).toEqual([
       ["phase-0", "Implement"],
       ["phase-1", "Release"],
     ]);
-    expect(columns[0].cards).toEqual([]);
+    expect(columns[0].cards.map((card) => card.order.id)).toEqual(["deleted-task"]);
     expect(columns[0].glyph).toBeUndefined();
     expect(columns[1].cards.map((card) => card.order.id)).toEqual(["retained-task"]);
   });

@@ -2,6 +2,8 @@ package factories
 
 import (
 	"context"
+	"errors"
+	"slices"
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/database"
@@ -135,4 +137,38 @@ func UpdateFactoryLine(ctx context.Context, deps IntakeDependencies, organizatio
 	return &pb.UpdateFactoryLineResponse{
 		Line: serializeFactoryLine(line),
 	}, nil
+}
+
+// Removing a custom stage must not implicitly delete shared or built-in automations.
+// Users can delete those automations explicitly through DeleteFactoryAutomation.
+func rejectReservedFactoryAutomation(tx *gorm.DB, factory *models.Factory, canvas *models.Canvas) error {
+	if _, err := models.FindFactoryIntakeByCanvasID(tx, canvas.ID); err == nil {
+		return errFactoryAutomationReserved
+	} else if !errors.Is(err, models.ErrFactoryIntakeNotFound) {
+		return err
+	}
+	handler, err := models.FindPRFeedbackHandlerByCanvasID(tx, canvas.ID)
+	if err != nil {
+		return err
+	}
+	if handler != nil {
+		return errFactoryAutomationReserved
+	}
+	liveVersion, err := models.FindLiveCanvasVersionInTransaction(tx, canvas.ID)
+	if err != nil {
+		return err
+	}
+	if models.IsBacklogFactoryApp(liveVersion.Nodes, liveVersion.Edges) {
+		return errFactoryAutomationReserved
+	}
+	lines, err := factory.ListLines(tx)
+	if err != nil {
+		return err
+	}
+	for _, line := range lines {
+		if slices.ContainsFunc(line.Steps, func(step models.FactoryLineStep) bool { return step.AppID == canvas.ID }) {
+			return errFactoryAutomationReserved
+		}
+	}
+	return nil
 }

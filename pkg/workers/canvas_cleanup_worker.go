@@ -95,6 +95,13 @@ func (w *CanvasCleanupWorker) LockAndProcessCanvas(canvas models.Canvas) error {
 	if deletedResourceWithinGracePeriod(canvas.DeletedAt.Time, time.Now()) {
 		return nil
 	}
+	retainHistory, err := canvas.RetainsFactoryHistory(database.Conn())
+	if err != nil {
+		return fmt.Errorf("check deleted automation history retention: %w", err)
+	}
+	if retainHistory {
+		return nil
+	}
 
 	w.logger.Infof("Processing deleted canvas %s", canvas.ID)
 

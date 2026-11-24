@@ -115,6 +115,36 @@ func Test__HandOffWorkOrder__ImplementStartsCustomStageWhenDoneFollows(t *testin
 	assert.Equal(t, pb.WorkOrderExecution_STATE_PENDING, result.Order.GetLineDispatches()[0].GetStepExecutions()[0].GetState())
 }
 
+func TestHandOffImplementAfterDeletingEarlierAutomation(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+	factory := seedHandOffFactory(t, r, db)
+	plan, planEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "Plan", "plan")
+	implement, implementEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "Implement", "implement")
+	line, err := factory.CreateLine(db, "ship", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: plan.ID, Entrypoint: planEntry},
+		{Type: models.FactoryLineStepTypeRunApp, AppID: implement.ID, Entrypoint: implementEntry},
+	})
+	require.NoError(t, err)
+	_, err = DeleteFactoryAutomation(ctx, r.Organization.ID.String(), &pb.DeleteFactoryAutomationRequest{
+		FactoryId: factory.ID.String(), AutomationId: plan.ID.String(),
+	})
+	require.NoError(t, err)
+	result, err := HandOffWorkOrder(ctx, IntakeDependencies{}, r.Organization.ID.String(), HandOffWorkOrderRequest{
+		FactoryID: factory.ID.String(), Title: "Ship", Plan: "Implement the saved plan", Column: HandOffColumnImplement,
+	})
+	require.NoError(t, err)
+	require.Len(t, result.Order.GetLineDispatches(), 1)
+	dispatch := result.Order.GetLineDispatches()[0]
+	assert.Equal(t, line.ID.String(), dispatch.GetLine().GetId())
+	require.Len(t, dispatch.GetStepExecutions(), 1)
+	execution := dispatch.GetStepExecutions()[0]
+	assert.EqualValues(t, 0, execution.GetStepIndex())
+	assert.Equal(t, "phase-1", execution.GetStageKey())
+	assert.Equal(t, implement.ID.String(), execution.GetRun().GetAppId())
+}
+
 func TestHandOffStartsBacklogLeaveAutomation(t *testing.T) {
 	for _, scenario := range []struct {
 		name   string

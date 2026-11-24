@@ -7,6 +7,7 @@ import {
   collectLineBacklogOrders,
   collectLineDoneOrders,
   collectLineVerifyOrders,
+  collectCustomStageRuns,
   resolveColumnGlyph,
   visibleLineStageColumns,
   type PhaseGlyphKind,
@@ -111,7 +112,16 @@ export function buildMobileBoardColumns(
       const column = stage.stepIndex === undefined ? undefined : byKey.get(`phase-${stage.stepIndex}`);
       return [
         {
-          ...(column ?? { cards: [], paging: "open" as const, emptyDescription: "No automation in this stage." }),
+          ...(column ?? {
+            cards: line.id
+              ? collectCustomStageRuns(line.id, stage.key, workOrders).map((run) => ({
+                  key: run.executionId,
+                  order: run.order,
+                }))
+              : [],
+            paging: "open" as const,
+            emptyDescription: "No automation in this stage.",
+          }),
           key: stage.key as ColumnKey,
           title: stage.name,
         },

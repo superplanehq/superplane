@@ -1015,7 +1015,7 @@ describe("LinesPage board stages", () => {
   });
 
   it("explains automation deletion before saving and cancels or discards without saving", async () => {
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_STAGES);
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
     const user = userEvent.setup();
     useFactoryAutomations.mockReturnValue({ data: [{ id: "app-qa", name: "Check QA", columnKey: "custom-qa" }] });
     renderLinesBoard(undefined, vi.fn(), customStageFactory());
@@ -1888,6 +1888,31 @@ describe("LinesPage board extras", () => {
   });
 
   it("deletes Implement and displays its detached stage after refresh", async () => {
+    useFactoryWorkOrders.mockReturnValue({
+      data: [
+        {
+          id: "running-task",
+          state: "STATE_OPEN",
+          title: "Keep running task visible",
+          lineDispatches: [
+            {
+              id: "running-dispatch",
+              line: { id: REFUND_LINE_PLAN_ID },
+              currentStageKey: "phase-0",
+              stepExecutions: [
+                {
+                  id: "running-execution",
+                  stepIndex: 0,
+                  stageKey: "phase-0",
+                  state: "STATE_STARTED",
+                  run: { id: "running-run", appId: "app-refund-implementer" },
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
     const appId = "app-refund-implementer";
     useFactoryAutomations.mockReturnValue({ data: [{ id: appId, name: "Implement", columnKey: "implement" }] });
     deleteFactoryAutomationMutateAsync.mockResolvedValueOnce(undefined);
@@ -1917,6 +1942,9 @@ describe("LinesPage board extras", () => {
     };
     view.rerender(<LinesBoardSpecHarness factory={factory} />);
     expect(screen.getByTestId("lines-empty-phase-0")).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("lines-empty-phase-0")).getByTestId("lines-phase-run-running-execution"),
+    ).toBeInTheDocument();
     expect(screen.getByTestId("lines-column-title-phase-0")).toHaveTextContent("Implement");
     expect(screen.queryByTestId("implement-settings-save")).not.toBeInTheDocument();
   });

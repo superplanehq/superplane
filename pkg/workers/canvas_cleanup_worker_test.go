@@ -16,6 +16,29 @@ import (
 	"gorm.io/gorm"
 )
 
+func TestCanvasCleanupPreservesAutomationHistoryUntilWorkspaceDeletion(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	canvas, _ := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "Implement", "start")
+	support.EmitCanvasEventForNode(t, canvas.ID, "start", "default", nil)
+	run, err := models.CreateCanvasRunInTransaction(db, canvas.ID, "start", models.CanvasRunStateFinished, models.CanvasRunResultPassed)
+	require.NoError(t, err)
+	require.NoError(t, canvas.SoftDeleteInTransaction(db))
+	require.NoError(t, db.Unscoped().Model(canvas).Update("deleted_at", time.Now().AddDate(0, 0, -31)).Error)
+	deleted, err := models.FindUnscopedCanvas(canvas.ID)
+	require.NoError(t, err)
+	worker := NewCanvasCleanupWorker()
+	require.NoError(t, worker.LockAndProcessCanvas(*deleted))
+	var saved models.CanvasRun
+	require.NoError(t, db.Where("id = ?", run.ID).First(&saved).Error)
+	support.VerifyCanvasEventsCount(t, canvas.ID, 1)
+	require.NoError(t, factory.SoftDelete(db))
+	require.NoError(t, worker.LockAndProcessCanvas(*deleted))
+	assert.ErrorIs(t, db.Where("id = ?", run.ID).First(&models.CanvasRun{}).Error, gorm.ErrRecordNotFound)
+}
+
 func Test__CanvasCleanupWorker_ProcessesDeletedWorkflow(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()

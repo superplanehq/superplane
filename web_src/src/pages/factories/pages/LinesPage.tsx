@@ -2095,10 +2095,14 @@ function PhaseBoard({
 
     if (stage.kind === "STAGE_KIND_PHASE" && stage.stepIndex === undefined) {
       const lane = lineBoardColumnLaneProps(columnColors[stage.key] ?? null, colorView);
+      const runs = lineId
+        ? collectCustomStageRuns(lineId, stage.key, workOrders).filter((run) => !verifyOrderIds.has(run.workOrderId))
+        : [];
       return (
         <WorkOrderBoardLane
           title={stageName(stage.key, stage.name)}
-          count={0}
+          count={runs.length}
+          keepChildrenWhenEmpty={cardsPending}
           emptyDescription="No automation in this stage."
           surfaceClassName={lane.surfaceClassName}
           className={lane.className}
@@ -2113,7 +2117,15 @@ function PhaseBoard({
             onRowAction: onAutomationRowAction,
             testId: `lines-${stage.key}-automation-rows`,
           })}
-        />
+        >
+          <LineBoardColumnCardList pending={cardsPending} className={workOrderKanbanLaneScrollClassName}>
+            {runs.map((run) => (
+              <li key={run.executionId}>
+                <PhaseRunCard run={run} workOrderCardContext={workOrderCardContext} onOpenWorkOrder={onOpenWorkOrder} />
+              </li>
+            ))}
+          </LineBoardColumnCardList>
+        </WorkOrderBoardLane>
       );
     }
     if (stage.kind === "STAGE_KIND_PHASE" && stage.stepIndex !== undefined) {
