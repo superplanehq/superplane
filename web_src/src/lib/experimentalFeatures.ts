@@ -27,12 +27,9 @@ export const FEATURE_MODEL_STATUS = "model_status";
 /** Organization experimental feature: custom model provider on the BYOK settings page. Requires organization BYOK. */
 export const FEATURE_ORGANIZATION_BYOK_CUSTOM_PROVIDER = "organization_byok_custom_provider";
 
-/** Organization experimental feature: custom automations on Backlog, Implement, Verify, and Done. */
+/** Organization experimental feature: custom automations and custom stages on factory line boards. */
 export const FEATURE_FACTORY_CUSTOM_AUTOMATIONS = "factory_custom_automations";
 export const FEATURE_AUTOMATIONS_AS_CODE = "automations-as-code";
-
-/** Organization experimental feature: custom stages on factory line boards. */
-export const FEATURE_FACTORY_CUSTOM_STAGES = "factory_custom_stages";
 
 /** Organization experimental feature: Mergeable chip on task cards and Merge button on pull request review. */
 export const FEATURE_FACTORY_PULL_REQUEST_MERGE = "factory_pull_request_merge";

@@ -56,11 +56,7 @@ func Test__CreateFactoryAutomation(t *testing.T) {
 
 	t.Run("attaches an automation to a custom stage", func(t *testing.T) {
 		db := database.DB(t.Context())
-		require.NoError(t, models.DisableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
-		t.Cleanup(func() {
-			require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
-		})
-		require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomStages))
+		require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
 		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 		require.NoError(t, err)
 		support.CompleteFactoryOnboarding(t, factory)
@@ -90,6 +86,19 @@ func Test__CreateFactoryAutomation(t *testing.T) {
 		assert.Equal(t, models.NodeTypeTrigger, specs[canvasID].Nodes[0].Type)
 		require.NotNil(t, specs[canvasID].Nodes[0].Ref.Trigger)
 		assert.Equal(t, "onRun", specs[canvasID].Nodes[0].Ref.Trigger.Name)
+
+		_, err = CreateFactoryAutomation(onboardingContext(r), onboardingDeps(r), r.Organization.ID.String(),
+			&pb.CreateFactoryAutomationRequest{FactoryId: factory.ID.String(), Name: "Verify checks", ColumnKey: models.CanvasColumnKeyVerify})
+		require.NoError(t, err)
+
+		require.NoError(t, models.DisableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
+		for _, column := range []string{stageKey, models.CanvasColumnKeyVerify} {
+			_, err = CreateFactoryAutomation(onboardingContext(r), onboardingDeps(r), r.Organization.ID.String(),
+				&pb.CreateFactoryAutomationRequest{FactoryId: factory.ID.String(), Name: "Disabled", ColumnKey: column})
+			code, _, ok := grpcerrors.HandlerStatus(err)
+			require.True(t, ok)
+			assert.Equal(t, codes.FailedPrecondition, code)
+		}
 	})
 
 }

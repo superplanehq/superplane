@@ -115,7 +115,7 @@ func TestCanvasAutomationCustomStageRoundTripAndAdmission(t *testing.T) {
 	factory := seedHandOffFactory(t, r, db)
 	vcsID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
 	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSIntegrationID: &vcsID}))
-	for _, feature := range []string{features.FeatureFactoryCustomAutomations, features.FeatureAutomationsAsCode, features.FeatureFactoryCustomStages} {
+	for _, feature := range []string{features.FeatureFactoryCustomAutomations, features.FeatureAutomationsAsCode} {
 		require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, feature))
 	}
 	support.AssignOpenSystemTrial(t, r.Organization.ID)
@@ -395,7 +395,6 @@ func TestCanvasAutomationLegacyImportProtectsGraphBehavior(t *testing.T) {
 			require.Equal(t, tc.use, doc.Triggers[0].Use)
 			require.Len(t, doc.Triggers, len(triggers))
 			if tc.name == "leave" {
-				require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomStages))
 				line, err := factory.CreateLine(db, "Move test", nil)
 				require.NoError(t, err)
 				_, err = UpdateFactoryLine(ctx, deps, r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
