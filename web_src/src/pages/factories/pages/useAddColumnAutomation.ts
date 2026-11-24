@@ -26,6 +26,7 @@ import {
   prFeedbackSetupKindFromSourceId,
 } from "../lib/factoryPagePaths";
 import { factoryCustomAutomationSetupPath } from "../lib/customAutomationPaths";
+import type { CustomAutomationColumn } from "../lib/customAutomation";
 
 export function useAddColumnAutomation(args: {
   organizationId: string;
@@ -73,7 +74,7 @@ export function useAddColumnAutomation(args: {
     const nextTaken = takenCatalogIds(args.automationsFor(key), nextCatalog);
     const setupColumn = customAutomationSetupColumn(key);
     const customStage = key.startsWith("custom-");
-    if (!customStage && setupColumn !== null && onlyCustomCatalogRemains(nextCatalog, nextTaken) && args.lineId) {
+    if (allowCustom && setupColumn !== null && onlyCustomCatalogRemains(nextCatalog, nextTaken) && args.lineId) {
       navigate(
         factoryCustomAutomationSetupPath(args.organizationId, args.factoryKey, args.lineId, undefined, setupColumn),
       );
@@ -88,7 +89,12 @@ export function useAddColumnAutomation(args: {
     if (!column || pickerCatalog.unavailableReasons[entry.id]) {
       return;
     }
-    if (entry.kind === "pr-discussion" || entry.kind === "pr-checks" || entry.kind === "custom-verification") {
+    if (
+      entry.kind === "pr-discussion" ||
+      entry.kind === "pr-checks" ||
+      entry.kind === "custom-verification" ||
+      (entry.kind === "custom" && column.startsWith("custom-") && allowCustom)
+    ) {
       openFocusedVerifySetup(entry, column, args, navigate, closePicker);
       return;
     }
@@ -113,10 +119,7 @@ export function useAddColumnAutomation(args: {
       }
       return;
     }
-    if (entry.kind !== "custom") {
-      return;
-    }
-    setNaming(true);
+    if (entry.kind === "custom") setNaming(true);
   };
 
   const createNamed = async (name: string) => {
@@ -168,7 +171,8 @@ function githubVerifyTemplate(
   };
 }
 
-function customAutomationSetupColumn(key: ColumnKey): "implement" | "verify" | "done" | undefined | null {
+function customAutomationSetupColumn(key: ColumnKey): CustomAutomationColumn | undefined | null {
+  if (key.startsWith("custom-")) return key as CustomAutomationColumn;
   if (key === "verify") return undefined;
   if (key === "done") return "done";
   if (key === "phase-0") return "implement";
@@ -199,7 +203,7 @@ function focusedVerifySetupPath(
   if (!args.lineId) {
     return undefined;
   }
-  if (entry.kind === "custom-verification") {
+  if (entry.kind === "custom-verification" || entry.kind === "custom") {
     const setupColumn = customAutomationSetupColumn(column);
     return factoryCustomAutomationSetupPath(
       args.organizationId,
