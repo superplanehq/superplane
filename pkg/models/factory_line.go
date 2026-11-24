@@ -496,7 +496,28 @@ func retainConfiguredOptionalStages(
 	return result
 }
 
-func (l *FactoryLine) DetachRemovedCustomStageAutomations(tx *gorm.DB, next []FactoryLineStage) error {
+func (l *FactoryLine) ListRemovedCustomStageAutomations(tx *gorm.DB, next []FactoryLineStage) ([]Canvas, error) {
+	keys := l.removedCustomStageKeys(next)
+	if len(keys) == 0 {
+		return nil, nil
+	}
+	var canvases []Canvas
+	err := tx.Where("organization_id = ? AND factory_id = ? AND column_key IN ?", l.OrganizationID, l.FactoryID, keys).
+		Order("created_at, id").Find(&canvases).Error
+	return canvases, err
+}
+
+func (l *FactoryLine) ClearRemovedCustomStageDisplayColumns(tx *gorm.DB, next []FactoryLineStage) error {
+	keys := l.removedCustomStageKeys(next)
+	if len(keys) == 0 {
+		return nil
+	}
+	return tx.Model(&Canvas{}).
+		Where("organization_id = ? AND factory_id = ? AND display_column_key IN ?", l.OrganizationID, l.FactoryID, keys).
+		Update("display_column_key", "").Error
+}
+
+func (l *FactoryLine) removedCustomStageKeys(next []FactoryLineStage) []string {
 	retained := make(map[uuid.UUID]bool, len(next))
 	for _, stage := range next {
 		retained[stage.ID] = true
@@ -507,16 +528,7 @@ func (l *FactoryLine) DetachRemovedCustomStageAutomations(tx *gorm.DB, next []Fa
 			removedKeys = append(removedKeys, stage.Key)
 		}
 	}
-	if len(removedKeys) == 0 {
-		return nil
-	}
-	if err := tx.Model(&Canvas{}).Where("factory_id = ? AND display_column_key IN ?", l.FactoryID, removedKeys).Update("display_column_key", "").Error; err != nil {
-		return err
-	}
-	return tx.Model(&Canvas{}).
-		Where("factory_id = ? AND column_key IN ?", l.FactoryID, removedKeys).
-		Update("column_key", nil).
-		Error
+	return removedKeys
 }
 
 func (f *Factory) findLine(tx *gorm.DB, lineID uuid.UUID) (*FactoryLine, error) {

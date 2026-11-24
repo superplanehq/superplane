@@ -16,20 +16,7 @@ func DeleteCanvas(ctx context.Context, db *gorm.DB, canvas *models.Canvas) (*pb.
 	// Perform soft delete on the canvas with name suffix
 	// The cleanup worker will handle the actual deletion of nodes and related data
 	err := db.Transaction(func(tx *gorm.DB) error {
-		if canvas.FactoryID != nil {
-			if _, err := models.LockAutomationFactory(tx, canvas.OrganizationID, *canvas.FactoryID); err != nil {
-				return err
-			}
-			source, err := models.FindAutomationSourceByArtifact(tx, canvas.OrganizationID, canvas.ID.String())
-			if err == nil {
-				if err := source.Delete(tx); err != nil {
-					return err
-				}
-			} else if !errors.Is(err, gorm.ErrRecordNotFound) {
-				return err
-			}
-		}
-		return canvas.SoftDeleteInTransaction(tx)
+		return DeleteCanvasInTransaction(tx, canvas)
 	})
 	if err != nil {
 		log.Errorf("failed to delete canvas %s: %v", canvas.ID.String(), err)
@@ -38,6 +25,24 @@ func DeleteCanvas(ctx context.Context, db *gorm.DB, canvas *models.Canvas) (*pb.
 
 	PublishCanvasDeleted(canvas)
 	return &pb.DeleteCanvasResponse{}, nil
+}
+
+// DeleteCanvasInTransaction leaves deletion notifications to the caller after commit.
+func DeleteCanvasInTransaction(tx *gorm.DB, canvas *models.Canvas) error {
+	if canvas.FactoryID != nil {
+		if _, err := models.LockAutomationFactory(tx, canvas.OrganizationID, *canvas.FactoryID); err != nil {
+			return err
+		}
+		source, err := models.FindAutomationSourceByArtifact(tx, canvas.OrganizationID, canvas.ID.String())
+		if err == nil {
+			if err := source.Delete(tx); err != nil {
+				return err
+			}
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+	}
+	return canvas.SoftDeleteInTransaction(tx)
 }
 
 func PublishCanvasDeleted(canvas *models.Canvas) {
