@@ -1310,6 +1310,7 @@ function LineDetail({
         organizationId,
         factoryKey,
         lineId: line.id,
+        customEditingEnabled: canUpdate && addAutomation.allowCustom,
       });
       if (href) {
         navigate(href);

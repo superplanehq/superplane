@@ -99,8 +99,11 @@ describe("custom automation settings", () => {
     });
   });
 
-  it("saves the draft agent and run duration", () => {
-    const draft = customAutomationDraft();
+  it.each([undefined, {}])("saves the draft agent and run duration without settings (%j)", (automation) => {
+    const draft = customAutomationDraft(automation);
+    expect(draft.components[0]?.configuration.steps).toEqual([
+      { name: "Hello world", type: "bash", command: 'echo "hello world"', workingDirectory: "repo" },
+    ]);
     draft.components[0]!.component = "runnerClaudeCode";
     draft.components[0]!.configuration.model = "claude-opus";
     draft.components[0]!.configuration.executionTimeoutSeconds = 7200;
@@ -111,6 +114,13 @@ describe("custom automation settings", () => {
     expect(settings.executionTimeoutSeconds).toBe(7200);
     expect(settings.steps?.map((step) => step.type)).toEqual(["TYPE_BASH"]);
   });
+
+  it.each([{ settings: {} }, { settings: { steps: [] } }])(
+    "keeps draft steps empty for existing settings (%j)",
+    (automation) => {
+      expect(customAutomationDraft(automation).components[0]?.configuration.steps).toEqual([]);
+    },
+  );
 
   it("does not send credentials for the SuperPlane agent", () => {
     const draft = customAutomationDraft({
@@ -212,6 +222,30 @@ describe("custom automation settings", () => {
 
     expect(automation?.trigger).toBe("On schedule: 0 9 * * *, When a task enters Backlog");
     expect(automation?.canRunNow).toBe(true);
+  });
+
+  it.each([
+    ["backlog", "leave", false, ["backlog", "phase-0", "verify", "done"]],
+    ["verify", "leave", false, ["backlog", "phase-0", "verify", "done"]],
+    ["backlog", "automatic", false, ["backlog", "phase-0", "done"]],
+    ["verify", "automatic", false, undefined],
+    ["backlog", "manual", false, undefined],
+    ["backlog", "leave", true, undefined],
+    ["backlog", "automatic", true, undefined],
+  ] as const)("selects task stage targets for %s/%s (scheduled=%s)", (column, mode, scheduled, targets) => {
+    const [automation] = buildColumnAutomations(column, {
+      columnTitle: column,
+      apps: [
+        {
+          id: "review",
+          columnKey: column,
+          templateId: "custom-verification",
+          customAutomationMode: mode,
+          customAutomationTriggers: scheduled ? [{ mode: "scheduled" }, { mode }] : undefined,
+        },
+      ],
+    });
+    expect(automation?.taskStageTargets).toEqual(targets);
   });
 
   it("lets a person start a Backlog automation that runs with no task", () => {

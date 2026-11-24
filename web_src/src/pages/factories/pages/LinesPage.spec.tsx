@@ -17,6 +17,7 @@ import type * as integrationsData from "@/hooks/useIntegrations";
 import { resetFactoryBoardLaneScrollPositions } from "@/hooks/useFactoryBoardLaneScroll";
 import {
   FEATURE_FACTORY_CUSTOM_AUTOMATIONS,
+  FEATURE_AUTOMATIONS_AS_CODE,
   FEATURE_FACTORY_CUSTOM_STAGES,
   FEATURE_FACTORY_DATADOG_INTAKE,
   FEATURE_FACTORY_PRODUCTIVE_INTAKE,
@@ -922,6 +923,43 @@ describe("LinesPage board stages", () => {
     fireEvent.change(input, { target: { value: name } });
     fireEvent.keyDown(input, { key: "Enter" });
   };
+  it.each([false, true])(
+    "opens custom-stage automation configuration from a saved board row (YAML: %s)",
+    async (yamlEnabled) => {
+      enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_STAGES);
+      enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
+      const fetch = yamlEnabled
+        ? vi.spyOn(globalThis, "fetch").mockImplementation(async () =>
+            Response.json({
+              id: "app-qa",
+              factory_id: PRIMARY_FACTORY_ID,
+              stage: "custom-qa",
+              name: "Check QA",
+              revision: 1,
+              yaml: "apiVersion: v2\nkind: Automation\nname: Check QA\ntriggers:\n  - use: task_enters_stage\nsteps:\n  - name: Inspect\n    bash: make lint\n",
+            }),
+          )
+        : undefined;
+      if (yamlEnabled) enabledExperimentalFeatures.add(FEATURE_AUTOMATIONS_AS_CODE);
+      useFactoryAutomations.mockReturnValue({ data: [{ id: "app-qa", name: "Check QA", columnKey: "custom-qa" }] });
+      renderLinesBoard(undefined, vi.fn(), customStageFactory());
+      await userEvent
+        .setup()
+        .click(screen.getByTestId("lines-custom-stage-custom-qa-automation-rows-row-custom-app-qa"));
+      expect(await screen.findByTestId("custom-automation-setup-modal")).toBeInTheDocument();
+      expect(screen.getByTestId("lines-test-location")).toHaveTextContent("customAutomation=app-qa");
+      expect(screen.getByTestId("lines-test-location")).toHaveTextContent("automationColumn=custom-qa");
+      expect(updateCanvasVersionMutateAsync).not.toHaveBeenCalled();
+      if (yamlEnabled) {
+        await userEvent.setup().click(await screen.findByRole("button", { name: "Edit YAML" }));
+        expect((screen.getByLabelText("Automation YAML") as HTMLTextAreaElement).value).toContain("task_enters_stage");
+        await userEvent.setup().click(screen.getByRole("button", { name: "Cancel" }));
+        expect(screen.queryByTestId("custom-automation-setup-modal")).not.toBeInTheDocument();
+        expect(fetch?.mock.calls.every(([, init]) => !init?.method)).toBe(true);
+        fetch?.mockRestore();
+      }
+    },
+  );
   const editStages = async () => {
     const user = userEvent.setup();
     await user.click(screen.getByTestId("lines-board-view-menu"));
@@ -2213,17 +2251,20 @@ describe("LinesPage stage editing", () => {
     const target = screen.getByTestId("lines-stage-shell-backlog");
     const handle = source.getByRole("button", { name: /^Move / });
     const label = handle.getAttribute("aria-label")!;
+    const content = source.getByRole("button", { name: /^Open automation:/ });
     const dataTransfer = { effectAllowed: "none", setData: vi.fn() };
-    fireEvent.dragStart(handle, { dataTransfer });
+    fireEvent.dragStart(content, { dataTransfer });
     fireEvent.dragEnter(target);
-    fireEvent.dragEnd(handle);
+    fireEvent.dragEnd(content);
     expect(screen.queryByRole("button", { name: "Save changes" })).not.toBeInTheDocument();
-    fireEvent.dragStart(handle, { dataTransfer });
+    fireEvent.dragStart(content, { dataTransfer });
     fireEvent.dragOver(target);
     fireEvent.drop(target);
     expect(stageShellOrder()).toEqual(order);
     expect(source.queryByRole("button", { name: label })).not.toBeInTheDocument();
+    expect(within(target).getByRole("button", { name: label })).toBeInTheDocument();
     fireEvent.keyDown(within(target).getByRole("button", { name: label }), { key: "ArrowRight" });
+    expect(source.getByRole("button", { name: label })).toHaveFocus();
     expect(screen.queryByRole("button", { name: "Save changes" })).not.toBeInTheDocument();
     fireEvent.keyDown(source.getByRole("button", { name: label }), { key: "ArrowLeft" });
     await user.click(screen.getByRole("button", { name: "Discard" }));

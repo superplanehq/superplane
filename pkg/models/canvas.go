@@ -159,8 +159,7 @@ func ValidCanvasColumnKey(key string) bool {
 	if key == CanvasColumnKeyBacklog || key == CanvasColumnKeyImplement || key == CanvasColumnKeyVerify || key == CanvasColumnKeyDone {
 		return true
 	}
-	_, err := uuid.Parse(strings.TrimPrefix(key, "custom-"))
-	return strings.HasPrefix(key, "custom-") && err == nil
+	return strings.HasPrefix(key, "custom-") && len(key) > len("custom-")
 }
 
 // SetColumnKey attaches this factory canvas to a board column. An empty key

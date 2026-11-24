@@ -64,6 +64,7 @@ package_image() {
   rm -rf "$context/app/pkg/web/assets/dist"
   cp -R "${build_dir}/${variant}" "$context/app/pkg/web/assets/dist"
   make image.package IMAGE_TAG="$image_tag" IMAGE_BUILD_DIR="$context"
+  make image.scan IMAGE_TAG="$image_tag"
 }
 
 publish_main_images() {

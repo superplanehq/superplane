@@ -1,5 +1,5 @@
 import { GripVertical, Loader2, Play, Plus, Settings2 } from "lucide-react";
-import { useContext } from "react";
+import { useContext, useRef, type HTMLAttributes } from "react";
 import { AutomationRowContext } from "./AutomationRowContext";
 
 import { Button } from "@/components/ui/button";
@@ -93,6 +93,36 @@ function EmptyAutomationRow({ title, onAdd, testId }: { title: string; onAdd?: (
   );
 }
 
+function useAutomationRowDrag(automation: ColumnAutomation): HTMLAttributes<HTMLDivElement> {
+  const { move } = useContext(AutomationRowContext);
+  const dragFromAction = useRef(false);
+  const dragging = useRef(false);
+  return {
+    draggable: Boolean(move),
+    onMouseDownCapture: (event) => {
+      // Include the Run wrapper because disabled buttons pass pointer events through.
+      dragFromAction.current = Boolean((event.target as Element).closest("[data-automation-action]"));
+    },
+    onDragStart: (event) => {
+      event.stopPropagation();
+      if (!move || dragFromAction.current) {
+        event.preventDefault();
+        return;
+      }
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("application/x-superplane-automation", automation.id);
+      dragging.current = true;
+      move.start(automation);
+    },
+    onDragEnd: (event) => {
+      event.stopPropagation();
+      if (!dragging.current) return;
+      dragging.current = false;
+      move?.end();
+    },
+  };
+}
+
 function ColumnAutomationRow({
   automation,
   onRowAction,
@@ -110,6 +140,7 @@ function ColumnAutomationRow({
 }) {
   const disabled = automation.health === "disabled";
   const board = useContext(AutomationRowContext);
+  const drag = useAutomationRowDrag(automation);
   const run = board.onRun ?? onRun;
   const needsRepair = automation.health === "needs-repair";
   const headline = columnAutomationHeadline(automation);
@@ -118,10 +149,11 @@ function ColumnAutomationRow({
     "text-foreground",
     disabled && "line-through opacity-60",
     onRowAction && ROW_HOVER_CLASSNAME,
+    board.move && "cursor-grab active:cursor-grabbing",
   );
   const details = (
     <>
-      <span className={ICON_SLOT_CLASSNAME}>
+      <span className={cn(ICON_SLOT_CLASSNAME, "pointer-events-none")}>
         <ColumnAutomationGlyph automation={automation} className="size-3.5" />
       </span>
       <span className="min-w-0 flex-1 truncate">{headline}</span>
@@ -144,6 +176,7 @@ function ColumnAutomationRow({
       title={`${automation.name}: ${automation.trigger} → ${automation.action}`}
       className={className}
       data-testid={`${testId}-row-${automation.id}`}
+      {...drag}
       onClick={onRowAction ? () => onRowAction(automation, "settings") : undefined}
     >
       <AutomationMoveHandle automation={automation} />
@@ -153,6 +186,7 @@ function ColumnAutomationRow({
           size="xs"
           type="button"
           aria-label={`${COLUMN_AUTOMATIONS_COPY.rowMenu}: ${automation.name}`}
+          style={board.move ? { cursor: "inherit" } : undefined}
           className="h-auto min-w-0 flex-1 justify-start gap-1.5 rounded-none p-0 text-left text-[12px] font-normal hover:bg-transparent dark:hover:bg-transparent"
         >
           {details}
@@ -162,7 +196,7 @@ function ColumnAutomationRow({
       )}
       {showRun ? (
         // Disabled buttons ignore pointer events, so stop clicks on their enclosing area.
-        <span className="flex shrink-0" onClick={(event) => event.stopPropagation()}>
+        <span data-automation-action className="flex shrink-0" onClick={(event) => event.stopPropagation()}>
           <Button
             variant="ghost"
             size="icon-xs"
@@ -192,6 +226,7 @@ function ColumnAutomationRow({
           type="button"
           tabIndex={-1}
           aria-hidden
+          data-automation-action
           onClick={(event) => {
             event.stopPropagation();
             onRowAction(automation, "settings");
@@ -212,21 +247,14 @@ function AutomationMoveHandle({ automation }: { automation: ColumnAutomation }) 
   return (
     <Button
       type="button"
-      draggable
       variant="ghost"
       size="icon-xs"
-      className="size-4 shrink-0 cursor-grab"
+      className="size-4 shrink-0"
+      style={{ cursor: "inherit" }}
       aria-label={`Move ${automation.name}`}
       title="Drag to another stage, or use the left and right arrow keys."
       data-automation-handle={automation.id}
       onClick={(event) => event.stopPropagation()}
-      onDragStart={(event) => {
-        event.stopPropagation();
-        event.dataTransfer.effectAllowed = "move";
-        event.dataTransfer.setData("application/x-superplane-automation", automation.id);
-        move.start(automation);
-      }}
-      onDragEnd={() => move.end()}
       onKeyDown={(event) => {
         if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
           event.preventDefault();

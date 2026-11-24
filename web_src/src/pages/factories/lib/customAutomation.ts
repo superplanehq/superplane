@@ -20,16 +20,23 @@ const CUSTOM_AUTOMATION_START_MODES: Record<CustomAutomationMode, FactoryCustomA
   leave: "START_MODE_ON_LEAVE",
 };
 export type CustomAutomationSchedule = { cronExpression: string; utcOffset: number };
-export type CustomAutomationColumn = "backlog" | "implement" | "verify" | "done";
+export type CustomAutomationColumn = "backlog" | "implement" | "verify" | "done" | `custom-${string}`;
 
 export function customAutomationColumn(value: string | null | undefined): CustomAutomationColumn {
-  if (value === "backlog" || value === "implement" || value === "done" || value === "verify") {
-    return value;
+  if (
+    value === "backlog" ||
+    value === "implement" ||
+    value === "done" ||
+    value === "verify" ||
+    value?.startsWith("custom-")
+  ) {
+    return value as CustomAutomationColumn;
   }
   return "verify";
 }
 
 export function customAutomationColumnLabel(column: CustomAutomationColumn): string {
+  if (column.startsWith("custom-")) return "this stage";
   switch (column) {
     case "backlog":
       return "Backlog";
@@ -264,16 +271,7 @@ export function customAutomationDraft(
 ): PlanningReviewDraft {
   const settings = automation?.settings;
   const agent = settings?.agent;
-  const steps = settings
-    ? (settings.steps ?? []).map(stepFromApi)
-    : [
-        {
-          name: "Hello world",
-          type: "bash" as const,
-          command: 'echo "hello world"',
-          workingDirectory: "repo",
-        },
-      ];
+  const steps = customAutomationDraftSteps(settings);
   return {
     title: automation?.automation?.name?.trim() || "Custom automation",
     components: [
@@ -333,6 +331,22 @@ export function customAutomationSettings(
       : undefined,
     steps: steps.map(stepToApi),
   };
+}
+
+function customAutomationDraftSteps(
+  settings: FactoriesFactoryCustomAutomationSettings | undefined,
+): PlanningReviewStep[] {
+  if (settings) {
+    return (settings.steps ?? []).map(stepFromApi);
+  }
+  return [
+    {
+      name: "Hello world",
+      type: "bash",
+      command: 'echo "hello world"',
+      workingDirectory: "repo",
+    },
+  ];
 }
 
 function customAutomationTimeout(value: unknown): number {

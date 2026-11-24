@@ -191,7 +191,7 @@ func TestUpdateFactoryLineStages(t *testing.T) {
 		stages = append(stages[:2], &pb.FactoryLine_Stage{Key: "new-qa", Name: "QA"}, stages[2])
 		req := &pb.UpdateFactoryLineRequest{FactoryId: factory.ID.String(), LineId: line.ID.String(), StageConfiguration: &pb.FactoryLine_StageConfiguration{Stages: stages, AutomationMoves: []*pb.FactoryLine_AutomationMove{move}}}
 		_, err = UpdateFactoryLine(ctx, deps, r.Organization.ID.String(), req)
-		require.ErrorContains(t, err, "Select Backlog, Implement, Verify, or Done")
+		require.ErrorContains(t, err, "Keep one task_enters_stage trigger")
 		move.DestinationKey = "verify"
 		_, err = UpdateFactoryLine(ctx, deps, r.Organization.ID.String(), req)
 		require.NoError(t, err)
