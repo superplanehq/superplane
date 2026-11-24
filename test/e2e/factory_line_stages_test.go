@@ -30,6 +30,38 @@ func TestFactoryLineCustomStages(t *testing.T) {
 	s.reloadAndAssertStageHidden()
 }
 
+func TestFactoryLineCustomAutomationMove(t *testing.T) {
+	s := &factoryLineStagesSteps{t: t}
+	s.start()
+	s.givenALine()
+	s.openLine()
+	s.addStage("QA")
+	s.moveCustomAutomationAndReload()
+}
+
+func (s *factoryLineStagesSteps) moveCustomAutomationAndReload() {
+	db := database.DB(s.t.Context())
+	user, err := models.FindMaybeDeletedUserByEmail(s.session.OrgID.String(), s.session.Account.Email)
+	require.NoError(s.t, err)
+	resources := &support.ResourceRegistry{User: user.ID, Organization: &models.Organization{ID: s.session.OrgID}}
+	app, _ := support.CreateFactoryAppWithOnRunTrigger(s.t, resources, s.factory.ID, "Check QA", "start")
+	require.NoError(s.t, app.SetColumnKey(db, s.stageKey))
+	s.reloadAndAssertStageVisible()
+	s.enterStageEditing()
+	page := s.session.Page()
+	handle := pw.LocatorGetByRoleOptions{Name: "Move " + app.Name, Exact: pw.Bool(true)}
+	require.NoError(s.t, page.GetByTestId("lines-stage-shell-"+s.stageKey).GetByRole("button", handle).DragTo(page.GetByTestId("lines-stage-shell-verify")))
+	s.saveStageChanges()
+	s.reloadAndAssertStageVisible()
+	s.enterStageEditing()
+	require.NoError(s.t, page.GetByTestId("lines-stage-shell-verify").GetByRole("button", handle).WaitFor())
+	reloaded, err := models.FindCanvasInTransaction(db, s.session.OrgID, app.ID)
+	require.NoError(s.t, err)
+	require.Equal(s.t, "verify", reloaded.DisplayColumnKey)
+	require.Equal(s.t, s.stageKey, *reloaded.ColumnKey)
+	require.Equal(s.t, app.LiveVersionID, reloaded.LiveVersionID)
+}
+
 func (s *factoryLineStagesSteps) moveStage() {
 	page := s.session.Page()
 	s.enterStageEditing()
