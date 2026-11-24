@@ -26,6 +26,7 @@ export function cardMove(
 }
 
 export function supportsCard(stage: LineBoardStage, card: ColumnAutomation) {
+  if (card.kind !== "intake") return stage.kind !== "STAGE_KIND_BACKLOG";
   if (card.executionKey?.startsWith("custom-")) return stage.key.startsWith("custom-") || stage.key.startsWith("new-");
   return !card.taskStageTargets || card.taskStageTargets.includes(stage.key);
 }

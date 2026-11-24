@@ -43,6 +43,9 @@ func (b CanvasAutomationBackend) moveAutomationCards(ctx context.Context, tx *go
 		if target == nil || move.DestinationKey == "" || !saved[move.SourceKey] {
 			return invalidArgument("Select a stage on this line.")
 		}
+		if target.Key == "backlog" && move.Type != "intake" {
+			return invalidArgument("Select a stage other than Backlog for this automation.")
+		}
 		if move.Type == "agent-step" {
 			stage := destinations[move.ExecutionKey]
 			if stage == nil || stage.StepIndex == nil || *stage.StepIndex < 0 || *stage.StepIndex >= len(line.Steps) || line.Steps[*stage.StepIndex].AppID != id {
@@ -82,8 +85,15 @@ func (b CanvasAutomationBackend) moveAutomationCards(ctx context.Context, tx *go
 			stages[i].AgentDisplayKey = ""
 		}
 	}
-	if saved["verify"] && destinations["verify"] == nil {
-		// Removing Verify must not orphan a workspace card displayed elsewhere.
+	hasRemovedStages := false
+	for key := range saved {
+		if destinations[key] == nil {
+			hasRemovedStages = true
+			break
+		}
+	}
+	if hasRemovedStages {
+		// Removing an execution stage must not orphan a card displayed elsewhere.
 		apps, err := factory.ListCanvases(tx)
 		if err != nil {
 			return err
@@ -97,8 +107,21 @@ func (b CanvasAutomationBackend) moveAutomationCards(ctx context.Context, tx *go
 			feedback[handler.CanvasID] = true
 		}
 		for _, app := range apps {
-			if app.DisplayColumnKey != "" && ((app.ColumnKey != nil && *app.ColumnKey == "verify") || feedback[app.ID]) {
-				return invalidArgument("Keep Verify for the moved automation.")
+			if app.DisplayColumnKey == "" {
+				continue
+			}
+			origin := ""
+			if app.ColumnKey != nil {
+				origin = *app.ColumnKey
+				if origin == "implement" {
+					origin = "phase-0"
+				}
+			}
+			if feedback[app.ID] {
+				origin = "verify"
+			}
+			if saved[origin] && destinations[origin] == nil {
+				return invalidArgument("Keep the execution stage for the moved automation.")
 			}
 		}
 	}
@@ -185,7 +208,7 @@ func (b CanvasAutomationBackend) moveCustomExecution(ctx context.Context, tx *go
 	}
 	if strings.HasPrefix(*canvas.ColumnKey, "custom-") {
 		if !strings.HasPrefix(target, "custom-") {
-			return false, invalidArgument("Select a custom stage for this task automation.")
+			return false, nil
 		}
 		return true, canvas.SetColumnKey(tx, target)
 	}
@@ -217,6 +240,10 @@ func (b CanvasAutomationBackend) moveCustomExecution(ctx context.Context, tx *go
 	}
 	if target == "phase-0" {
 		target = "implement"
+	}
+	// Placement can differ from execution when the destination uses another trigger contract.
+	if !compatibleTaskAutomationDestination(triggers, target) {
+		return false, nil
 	}
 	authored, err := findLegacyAutomationSource(tx, canvas)
 	if err != nil {
@@ -251,6 +278,25 @@ func (b CanvasAutomationBackend) moveCustomExecution(ctx context.Context, tx *go
 		return true, authored.Save(tx)
 	}
 	return true, nil
+}
+
+func compatibleTaskAutomationDestination(triggers []automationspec.Trigger, target string) bool {
+	if strings.HasPrefix(target, "custom-") {
+		return len(triggers) == 1 && triggers[0].Use == automationspec.TaskEntersStage
+	}
+	switch target {
+	case "implement", "done":
+		return true
+	case "verify":
+		for _, trigger := range triggers {
+			if trigger.Use == automationspec.TaskEntersStage {
+				return false
+			}
+		}
+		return true
+	default:
+		return false
+	}
 }
 
 func (b CanvasAutomationBackend) compileMovedAutomation(tx *gorm.DB, factory *models.Factory, canvas *models.Canvas, live *models.CanvasVersion, authored *models.AutomationSource, triggers []automationspec.Trigger, target string, actor uuid.UUID) ([]models.Node, []models.Edge, error) {

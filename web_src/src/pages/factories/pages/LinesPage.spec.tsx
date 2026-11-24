@@ -964,6 +964,46 @@ describe("LinesPage board stages", () => {
     await user.click(screen.getByRole("menuitem", { name: "Edit stages" }));
   };
 
+  it.each(["drag", "keyboard"])("moves a custom card to Verify with %s and discards placement", async (interaction) => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
+    useFactoryAutomations.mockReturnValue({ data: [{ id: "app-qa", name: "Check QA", columnKey: "custom-qa" }] });
+    const user = userEvent.setup();
+    renderLinesBoard(undefined, vi.fn(), customStageFactory());
+    await editStages();
+    const handle = within(screen.getByTestId("lines-stage-shell-custom-qa")).getByRole("button", {
+      name: "Move Check QA",
+    });
+    if (interaction === "drag") {
+      fireEvent.dragStart(handle, { dataTransfer: new DataTransfer() });
+      fireEvent.drop(screen.getByTestId("lines-stage-shell-verify"));
+      fireEvent.dragEnd(handle);
+    } else {
+      fireEvent.keyDown(handle, { key: "ArrowRight" });
+    }
+    const moved = within(screen.getByTestId("lines-stage-shell-verify")).getByRole("button", { name: "Move Check QA" });
+    if (interaction === "keyboard") expect(moved).toHaveFocus();
+    await user.click(screen.getByRole("button", { name: "Discard" }));
+    await user.click(
+      within(screen.getByTestId("discard-line-stages-dialog")).getByRole("button", { name: "Discard changes" }),
+    );
+    expect(within(screen.getByTestId("lines-stage-shell-custom-qa")).getByText("Check QA")).toBeInTheDocument();
+    expect(updateFactoryLineMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it("rejects agent drops and keyboard moves into Backlog", async () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
+    renderLinesBoard(undefined, vi.fn(), customStageFactory());
+    await editStages();
+    const source = within(screen.getByTestId("lines-stage-shell-phase-0"));
+    const handle = source.getByRole("button", { name: /^Move / });
+    fireEvent.keyDown(handle, { key: "ArrowLeft" });
+    fireEvent.dragStart(handle, { dataTransfer: new DataTransfer() });
+    fireEvent.drop(screen.getByTestId("lines-stage-shell-backlog"));
+    fireEvent.dragEnd(handle);
+    expect(source.getByRole("button", { name: /^Move / })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Save changes" })).not.toBeInTheDocument();
+  });
+
   it("edits and saves stage auto-advance settings", async () => {
     enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
     const user = userEvent.setup();
@@ -1073,7 +1113,7 @@ describe("LinesPage board stages", () => {
     await editStages();
     if (moveCard) {
       const source = within(screen.getByTestId("lines-stage-shell-phase-0"));
-      fireEvent.keyDown(source.getByRole("button", { name: /^Move / }), { key: "ArrowLeft" });
+      fireEvent.keyDown(source.getByRole("button", { name: /^Move / }), { key: "ArrowRight" });
     }
     renameCustomStage("Quality review");
     expect(updateFactoryLineMutateAsync).not.toHaveBeenCalled();
@@ -1091,7 +1131,7 @@ describe("LinesPage board stages", () => {
           type: "agent-step",
           executionKey: "phase-0",
           sourceKey: "phase-0",
-          destinationKey: "backlog",
+          destinationKey: "custom-qa",
         }),
       ]);
     }
@@ -2274,7 +2314,7 @@ describe("LinesPage stage editing", () => {
     await enterStageEditing(user);
     const order = stageShellOrder();
     const source = within(screen.getByTestId("lines-stage-shell-phase-0"));
-    const target = screen.getByTestId("lines-stage-shell-backlog");
+    const target = screen.getByTestId("lines-stage-shell-phase-1");
     const handle = source.getByRole("button", { name: /^Move / });
     const label = handle.getAttribute("aria-label")!;
     const content = source.getByRole("button", { name: /^Open automation:/ });
@@ -2289,14 +2329,14 @@ describe("LinesPage stage editing", () => {
     expect(stageShellOrder()).toEqual(order);
     expect(source.queryByRole("button", { name: label })).not.toBeInTheDocument();
     expect(within(target).getByRole("button", { name: label })).toBeInTheDocument();
-    fireEvent.keyDown(within(target).getByRole("button", { name: label }), { key: "ArrowRight" });
+    fireEvent.keyDown(within(target).getByRole("button", { name: label }), { key: "ArrowLeft" });
     expect(source.getByRole("button", { name: label })).toHaveFocus();
     expect(screen.queryByRole("button", { name: "Save changes" })).not.toBeInTheDocument();
-    fireEvent.keyDown(source.getByRole("button", { name: label }), { key: "ArrowLeft" });
+    fireEvent.keyDown(source.getByRole("button", { name: label }), { key: "ArrowRight" });
     await user.click(screen.getByRole("button", { name: "Discard" }));
     await user.click(screen.getByRole("button", { name: "Discard changes" }));
     await enterStageEditing(user);
-    fireEvent.keyDown(source.getByRole("button", { name: label }), { key: "ArrowLeft" });
+    fireEvent.keyDown(source.getByRole("button", { name: label }), { key: "ArrowRight" });
     expect(updateFactoryLineMutateAsync).not.toHaveBeenCalled();
     updateFactoryLineMutateAsync.mockResolvedValueOnce({});
     await user.click(screen.getByRole("button", { name: "Save changes" }));
@@ -2306,7 +2346,7 @@ describe("LinesPage stage editing", () => {
         type: "agent-step",
         executionKey: "phase-0",
         sourceKey: "phase-0",
-        destinationKey: "backlog",
+        destinationKey: "phase-1",
       }),
     ]);
   });
