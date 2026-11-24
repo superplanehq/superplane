@@ -79,59 +79,35 @@ function getNodeIconDarkTextClass(color: string, shade: 300 | 400): string | und
   return NODE_ICON_DARK_TEXT_CLASS[`${color}-${shade}`];
 }
 
+const COLOR_TEXT_CLASS = new Map<string, string>([
+  ["slate", "text-slate-600 dark:text-slate-400"],
+  ["gray", "text-gray-500 dark:text-gray-400"],
+  ["zinc", "text-gray-500 dark:text-gray-400"],
+  ["neutral", "text-neutral-600 dark:text-neutral-400"],
+  ["stone", "text-stone-600 dark:text-stone-400"],
+  ["red", "text-red-600 dark:text-red-400"],
+  ["orange", "text-orange-600 dark:text-orange-400"],
+  ["amber", "text-amber-600 dark:text-amber-400"],
+  ["yellow", "text-yellow-600 dark:text-yellow-400"],
+  ["lime", "text-lime-600 dark:text-lime-400"],
+  ["green", "text-green-600 dark:text-green-400"],
+  ["emerald", "text-emerald-600 dark:text-emerald-400"],
+  ["teal", "text-teal-600 dark:text-teal-400"],
+  ["cyan", "text-cyan-600 dark:text-cyan-400"],
+  ["sky", "text-sky-600 dark:text-sky-400"],
+  ["blue", "text-blue-600 dark:text-blue-400"],
+  ["indigo", "text-indigo-600 dark:text-indigo-400"],
+  ["violet", "text-violet-600 dark:text-violet-400"],
+  ["purple", "text-purple-600 dark:text-purple-400"],
+  ["fuchsia", "text-fuchsia-600 dark:text-fuchsia-400"],
+  ["pink", "text-pink-600 dark:text-pink-400"],
+  ["rose", "text-rose-600 dark:text-rose-400"],
+  ["white", "text-white dark:text-white"],
+  ["black", "text-gray-900 dark:text-gray-300"],
+]);
+
 export const getColorClass = (color?: string): string => {
-  switch (color) {
-    case "slate":
-      return "text-slate-600 dark:text-slate-400";
-    case "gray":
-      return "text-gray-500 dark:text-gray-400";
-    case "zinc":
-      return "text-gray-500 dark:text-gray-400";
-    case "neutral":
-      return "text-neutral-600 dark:text-neutral-400";
-    case "stone":
-      return "text-stone-600 dark:text-stone-400";
-    case "red":
-      return "text-red-600 dark:text-red-400";
-    case "orange":
-      return "text-orange-600 dark:text-orange-400";
-    case "amber":
-      return "text-amber-600 dark:text-amber-400";
-    case "yellow":
-      return "text-yellow-600 dark:text-yellow-400";
-    case "lime":
-      return "text-lime-600 dark:text-lime-400";
-    case "green":
-      return "text-green-600 dark:text-green-400";
-    case "emerald":
-      return "text-emerald-600 dark:text-emerald-400";
-    case "teal":
-      return "text-teal-600 dark:text-teal-400";
-    case "cyan":
-      return "text-cyan-600 dark:text-cyan-400";
-    case "sky":
-      return "text-sky-600 dark:text-sky-400";
-    case "blue":
-      return "text-blue-600 dark:text-blue-400";
-    case "indigo":
-      return "text-indigo-600 dark:text-indigo-400";
-    case "violet":
-      return "text-violet-600 dark:text-violet-400";
-    case "purple":
-      return "text-purple-600 dark:text-purple-400";
-    case "fuchsia":
-      return "text-fuchsia-600 dark:text-fuchsia-400";
-    case "pink":
-      return "text-pink-600 dark:text-pink-400";
-    case "rose":
-      return "text-rose-600 dark:text-rose-400";
-    case "white":
-      return "text-white dark:text-white";
-    case "black":
-      return "text-gray-900 dark:text-gray-300";
-    default:
-      return "text-gray-500 dark:text-gray-400";
-  }
+  return COLOR_TEXT_CLASS.get(color ?? "") ?? "text-gray-500 dark:text-gray-400";
 };
 
 /** Ensures canvas node header icons remain visible in dark mode. */
@@ -159,57 +135,33 @@ export function resolveNodeIconColorClass(iconColor?: string): string {
   return `${trimmed} dark:text-gray-300`;
 }
 
+const COLOR_BACKGROUND_CLASS = new Map<string, string>([
+  ["slate", "bg-slate-100"],
+  ["gray", "bg-gray-100"],
+  ["zinc", "bg-gray-100"],
+  ["neutral", "bg-neutral-100"],
+  ["stone", "bg-stone-100"],
+  ["red", "bg-red-100"],
+  ["orange", "bg-orange-100"],
+  ["amber", "bg-amber-100"],
+  ["yellow", "bg-yellow-100"],
+  ["lime", "bg-lime-100"],
+  ["green", "bg-green-100"],
+  ["emerald", "bg-emerald-100"],
+  ["teal", "bg-teal-100"],
+  ["cyan", "bg-cyan-100"],
+  ["sky", "bg-sky-100"],
+  ["blue", "bg-blue-100"],
+  ["indigo", "bg-indigo-100"],
+  ["violet", "bg-violet-100"],
+  ["purple", "bg-purple-100"],
+  ["fuchsia", "bg-fuchsia-100"],
+  ["pink", "bg-pink-100"],
+  ["rose", "bg-rose-100"],
+  ["white", "bg-white"],
+  ["black", "bg-black"],
+]);
+
 export const getBackgroundColorClass = (color?: string): string => {
-  switch (color) {
-    case "slate":
-      return "bg-slate-100";
-    case "gray":
-      return "bg-gray-100";
-    case "zinc":
-      return "bg-gray-100";
-    case "neutral":
-      return "bg-neutral-100";
-    case "stone":
-      return "bg-stone-100";
-    case "red":
-      return "bg-red-100";
-    case "orange":
-      return "bg-orange-100";
-    case "amber":
-      return "bg-amber-100";
-    case "yellow":
-      return "bg-yellow-100";
-    case "lime":
-      return "bg-lime-100";
-    case "green":
-      return "bg-green-100";
-    case "emerald":
-      return "bg-emerald-100";
-    case "teal":
-      return "bg-teal-100";
-    case "cyan":
-      return "bg-cyan-100";
-    case "sky":
-      return "bg-sky-100";
-    case "blue":
-      return "bg-blue-100";
-    case "indigo":
-      return "bg-indigo-100";
-    case "violet":
-      return "bg-violet-100";
-    case "purple":
-      return "bg-purple-100";
-    case "fuchsia":
-      return "bg-fuchsia-100";
-    case "pink":
-      return "bg-pink-100";
-    case "rose":
-      return "bg-rose-100";
-    case "white":
-      return "bg-white";
-    case "black":
-      return "bg-black";
-    default:
-      return "bg-gray-100";
-  }
+  return COLOR_BACKGROUND_CLASS.get(color ?? "") ?? "bg-gray-100";
 };
