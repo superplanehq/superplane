@@ -264,16 +264,7 @@ export function customAutomationDraft(
 ): PlanningReviewDraft {
   const settings = automation?.settings;
   const agent = settings?.agent;
-  const steps = settings
-    ? (settings.steps ?? []).map(stepFromApi)
-    : [
-        {
-          name: "Hello world",
-          type: "bash" as const,
-          command: 'echo "hello world"',
-          workingDirectory: "repo",
-        },
-      ];
+  const steps = customAutomationDraftSteps(settings);
   return {
     title: automation?.automation?.name?.trim() || "Custom automation",
     components: [
@@ -333,6 +324,22 @@ export function customAutomationSettings(
       : undefined,
     steps: steps.map(stepToApi),
   };
+}
+
+function customAutomationDraftSteps(
+  settings: FactoriesFactoryCustomAutomationSettings | undefined,
+): PlanningReviewStep[] {
+  if (settings) {
+    return (settings.steps ?? []).map(stepFromApi);
+  }
+  return [
+    {
+      name: "Hello world",
+      type: "bash",
+      command: 'echo "hello world"',
+      workingDirectory: "repo",
+    },
+  ];
 }
 
 function customAutomationTimeout(value: unknown): number {
