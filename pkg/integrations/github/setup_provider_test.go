@@ -23,29 +23,19 @@ import (
 func Test__GitHub__SetupProvider__FirstStep(t *testing.T) {
 	g := &SetupProvider{}
 
-	t.Run("hides the GitHub Enterprise host in Community", func(t *testing.T) {
-		step := g.FirstStep(core.SetupStepContext{})
-		assert.Equal(t, SetupStepSelectOwner, step.Name)
-		names := make([]string, 0, len(step.Inputs))
-		for _, field := range step.Inputs {
-			names = append(names, field.Name)
-		}
-		assert.NotContains(t, names, common.PropertyGitHubLocation)
-		assert.NotContains(t, names, common.PropertyHost)
-		assert.Contains(t, names, common.PropertyOwnerType)
-	})
-
-	t.Run("hides the GitHub Enterprise host when the license is missing", func(t *testing.T) {
+	t.Run("shows the GitHub Enterprise license requirement when the license is missing", func(t *testing.T) {
 		t.Cleanup(withGitHubEnterpriseForTest(communityGitHubEnterprise()))
 		step := g.FirstStep(core.SetupStepContext{
 			OrganizationID: "11111111-1111-1111-1111-111111111111",
 		})
-		names := make([]string, 0, len(step.Inputs))
-		for _, field := range step.Inputs {
-			names = append(names, field.Name)
-		}
-		assert.NotContains(t, names, common.PropertyGitHubLocation)
-		assert.NotContains(t, names, common.PropertyHost)
+		require.Equal(t, common.PropertyGitHubLocation, step.Inputs[0].Name)
+		assert.Equal(t, common.GitHubLocationDotCom, step.Inputs[0].Default)
+		options := step.Inputs[0].TypeOptions.Select.Options
+		require.Len(t, options, 2)
+		assert.Equal(t, common.GitHubLocationEnterpriseCloud, options[1].Value)
+		assert.False(t, options[0].Disabled)
+		assert.True(t, options[1].Disabled)
+		assert.Equal(t, "This option needs a SuperPlane Enterprise license.", options[1].Description)
 	})
 
 	t.Run("shows the GitHub Enterprise host for a licensed connection without an experimental flag", func(t *testing.T) {
@@ -57,6 +47,7 @@ func Test__GitHub__SetupProvider__FirstStep(t *testing.T) {
 		assert.Equal(t, common.PropertyGitHubLocation, step.Inputs[0].Name)
 		assert.Equal(t, common.GitHubLocationDotCom, step.Inputs[0].Default)
 		assert.Equal(t, common.PropertyHost, step.Inputs[1].Name)
+		assert.False(t, step.Inputs[0].TypeOptions.Select.Options[1].Disabled)
 	})
 
 	t.Run("keeps GitHub Enterprise host fields when the integration already uses a GHE host", func(t *testing.T) {
