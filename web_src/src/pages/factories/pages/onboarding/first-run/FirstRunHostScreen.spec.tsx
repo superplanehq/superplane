@@ -26,16 +26,8 @@ function expectColoredMark(image: HTMLImageElement) {
 }
 
 describe("FirstRunHostScreen", () => {
-  it("hides GitHub Enterprise Cloud when the org flag is off", () => {
+  it("enables GitHub Enterprise Cloud when licensed", () => {
     render(<FirstRunHostScreen selectedHost={null} githubEnterpriseLicensed onChooseHost={vi.fn()} />);
-
-    expect(screen.queryByTestId("first-run-host-github-enterprise")).not.toBeInTheDocument();
-  });
-
-  it("enables GitHub Enterprise Cloud when the flag and the license are on", () => {
-    render(
-      <FirstRunHostScreen selectedHost={null} showGitHubEnterprise githubEnterpriseLicensed onChooseHost={vi.fn()} />,
-    );
 
     const option = screen.getByTestId("first-run-host-github-enterprise");
     expect(option).toHaveTextContent("GitHub Enterprise Cloud");
@@ -43,8 +35,8 @@ describe("FirstRunHostScreen", () => {
     expect(within(option).getByRole("button")).toBeEnabled();
   });
 
-  it("shows GitHub Enterprise Cloud disabled with an Enterprise badge when the flag is on and the license is missing", () => {
-    render(<FirstRunHostScreen selectedHost={null} showGitHubEnterprise onChooseHost={vi.fn()} />);
+  it("shows GitHub Enterprise Cloud disabled with an Enterprise badge when unlicensed", () => {
+    render(<FirstRunHostScreen selectedHost={null} onChooseHost={vi.fn()} />);
 
     const option = screen.getByTestId("first-run-host-github-enterprise");
     expect(option).toHaveTextContent("GitHub Enterprise Cloud");
