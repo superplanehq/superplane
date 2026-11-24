@@ -1,9 +1,10 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "bun:test";
 
 import type { ColumnAutomation } from "../lib/columnAutomations";
 import { ColumnAutomationRows } from "./ColumnAutomationRows";
+import { AutomationRowContext } from "./AutomationRowContext";
 
 const GITHUB_INTAKE: ColumnAutomation = {
   id: "intake-github",
@@ -27,6 +28,48 @@ const ANALYSIS: ColumnAutomation = {
 };
 
 describe("ColumnAutomationRows", () => {
+  it("does not start an automation drag outside stage editing", () => {
+    render(<ColumnAutomationRows title="Backlog" automations={[GITHUB_INTAKE]} rowCount={1} testId="rows" />);
+
+    const dataTransfer = { setData: vi.fn() };
+    expect(fireEvent.dragStart(screen.getByRole("listitem"), { dataTransfer })).toBe(false);
+    expect(dataTransfer.setData).not.toHaveBeenCalled();
+  });
+
+  it.each(["run", "pending-run", "settings"])("does not start a card drag from %s", (action) => {
+    const move = { start: vi.fn(), end: vi.fn(), keyboard: vi.fn() };
+    const automation = { ...GITHUB_INTAKE, canRunNow: true };
+    render(
+      <AutomationRowContext.Provider value={{ move }}>
+        <ColumnAutomationRows
+          title="Backlog"
+          automations={[automation]}
+          rowCount={1}
+          testId="rows"
+          onRowAction={vi.fn()}
+          onRun={vi.fn()}
+          runPending={action === "pending-run"}
+        />
+      </AutomationRowContext.Provider>,
+    );
+
+    const run = screen.getByRole("button", { name: "Run GitHub issues" });
+    const origin =
+      action === "settings"
+        ? screen.getByTestId("rows-settings-intake-github")
+        : action === "pending-run"
+          ? run.parentElement!
+          : run;
+    fireEvent.mouseDown(origin);
+    const row = screen.getByRole("listitem");
+    const dataTransfer = { setData: vi.fn() };
+    expect(fireEvent.dragStart(row, { dataTransfer })).toBe(false);
+    fireEvent.dragEnd(row);
+    expect(move.start).not.toHaveBeenCalled();
+    expect(move.end).not.toHaveBeenCalled();
+    expect(dataTransfer.setData).not.toHaveBeenCalled();
+  });
+
   it("lists one sentence per automation", () => {
     render(<ColumnAutomationRows title="Backlog" automations={[GITHUB_INTAKE, ANALYSIS]} rowCount={2} testId="rows" />);
 
