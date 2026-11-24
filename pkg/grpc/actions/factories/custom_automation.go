@@ -602,6 +602,10 @@ func buildCustomAutomationCanvas(
 	settings *customAutomationSettings,
 ) (*yaml.Canvas, error) {
 	config := factory.OnboardingConfigValue()
+	provider := config.EffectiveVCSProvider()
+	if strings.HasPrefix(settings.ColumnKey, "custom-") {
+		return buildCustomStageAutomationCanvas(tx, factory, name, settings, provider)
+	}
 	repository := strings.TrimSpace(config.AppRepository)
 	integrationID := strings.TrimSpace(config.VCSIntegrationID)
 	if repository == "" {
@@ -610,13 +614,9 @@ func buildCustomAutomationCanvas(
 	if integrationID == "" {
 		return nil, invalidArgument("workspace VCS integration is required")
 	}
-	provider := config.EffectiveVCSProvider()
 	workspaceScope := customAutomationListensOnWorkspace(factory)
 	if workspaceScope {
 		repository = models.WorkspaceRepositoriesExpression
-	}
-	if strings.HasPrefix(settings.ColumnKey, "custom-") {
-		return buildCustomStageAutomationCanvas(tx, factory, name, settings, provider)
 	}
 	if len(settings.Triggers) > 1 {
 		return buildMultiTriggerCustomAutomationCanvas(tx, factory, name, settings, repository, integrationID, provider, workspaceScope)

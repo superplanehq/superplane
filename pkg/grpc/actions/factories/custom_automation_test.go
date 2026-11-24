@@ -143,20 +143,32 @@ func TestCustomAutomationScheduleRoundTripAndTransitions(t *testing.T) {
 }
 
 func TestCustomAutomationCustomStageFormRoundTrip(t *testing.T) {
-	for _, key := range []string{"custom-" + uuid.NewString(), "custom-qa"} {
-		t.Run(key, func(t *testing.T) {
+	for _, test := range []struct {
+		name       string
+		key        string
+		repository string
+		withVCS    bool
+	}{
+		{name: "UUID key with workspace VCS", key: "custom-" + uuid.NewString(), repository: "acme/app", withVCS: true},
+		{name: "named key without workspace VCS", key: "custom-qa", repository: "acme/app"},
+		{name: "without workspace repository or VCS", key: "custom-qa"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
 			r := support.Setup(t)
 			db := database.DB(t.Context())
 			factory := seedHandOffFactory(t, r, db)
 			for _, feature := range []string{features.FeatureFactoryCustomAutomations, features.FeatureFactoryCustomStages} {
 				require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, feature))
 			}
-			vcsID := createReadyOnboardingIntegration(t, r.Organization.ID, models.ProviderGitHub)
-			require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSIntegrationID: &vcsID}))
+			vcsID := ""
+			if test.withVCS {
+				vcsID = createReadyOnboardingIntegration(t, r.Organization.ID, models.ProviderGitHub)
+			}
+			require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{AppRepository: &test.repository, VCSIntegrationID: &vcsID}))
 			line, err := factory.CreateLine(db, "QA", nil)
 			require.NoError(t, err)
 			stageID := uuid.New()
-			stage := models.FactoryLineStage{ID: stageID, Key: key, Name: "QA", Kind: models.FactoryLineStageCustom}
+			stage := models.FactoryLineStage{ID: stageID, Key: test.key, Name: "QA", Kind: models.FactoryLineStageCustom}
 			require.NoError(t, line.UpdateConfiguration(db, nil, nil, nil, append(line.StagesValue(), stage)))
 			settings := &pb.FactoryCustomAutomation_Settings{
 				StartMode:               pb.FactoryCustomAutomation_START_MODE_AUTOMATIC,
@@ -192,6 +204,15 @@ func TestCustomAutomationCustomStageFormRoundTrip(t *testing.T) {
 				}
 			}
 			require.Equal(t, 1, gateCount)
+			if !test.withVCS {
+				request.ColumnKey = models.CanvasColumnKeyVerify
+				_, err = CreateFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), request)
+				if test.repository == "" {
+					require.ErrorContains(t, err, "workspace repository is required")
+					return
+				}
+				require.ErrorContains(t, err, "workspace VCS integration is required")
+			}
 		})
 	}
 }
