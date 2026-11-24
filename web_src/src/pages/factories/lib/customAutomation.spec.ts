@@ -99,8 +99,11 @@ describe("custom automation settings", () => {
     });
   });
 
-  it("saves the draft agent and run duration", () => {
-    const draft = customAutomationDraft();
+  it.each([undefined, {}])("saves the draft agent and run duration without settings (%j)", (automation) => {
+    const draft = customAutomationDraft(automation);
+    expect(draft.components[0]?.configuration.steps).toEqual([
+      { name: "Hello world", type: "bash", command: 'echo "hello world"', workingDirectory: "repo" },
+    ]);
     draft.components[0]!.component = "runnerClaudeCode";
     draft.components[0]!.configuration.model = "claude-opus";
     draft.components[0]!.configuration.executionTimeoutSeconds = 7200;
@@ -111,6 +114,13 @@ describe("custom automation settings", () => {
     expect(settings.executionTimeoutSeconds).toBe(7200);
     expect(settings.steps?.map((step) => step.type)).toEqual(["TYPE_BASH"]);
   });
+
+  it.each([{ settings: {} }, { settings: { steps: [] } }])(
+    "keeps draft steps empty for existing settings (%j)",
+    (automation) => {
+      expect(customAutomationDraft(automation).components[0]?.configuration.steps).toEqual([]);
+    },
+  );
 
   it("does not send credentials for the SuperPlane agent", () => {
     const draft = customAutomationDraft({
