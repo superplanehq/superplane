@@ -16,7 +16,7 @@ func DeleteCanvas(ctx context.Context, db *gorm.DB, canvas *models.Canvas) (*pb.
 	// Perform soft delete on the canvas with name suffix
 	// The cleanup worker will handle the actual deletion of nodes and related data
 	err := db.Transaction(func(tx *gorm.DB) error {
-		return SoftDeleteCanvas(tx, canvas)
+		return DeleteCanvasInTransaction(tx, canvas)
 	})
 	if err != nil {
 		log.Errorf("failed to delete canvas %s: %v", canvas.ID.String(), err)
@@ -27,9 +27,8 @@ func DeleteCanvas(ctx context.Context, db *gorm.DB, canvas *models.Canvas) (*pb.
 	return &pb.DeleteCanvasResponse{}, nil
 }
 
-// SoftDeleteCanvas removes the automation source in the caller's transaction.
-// The caller publishes the deletion only after commit.
-func SoftDeleteCanvas(tx *gorm.DB, canvas *models.Canvas) error {
+// DeleteCanvasInTransaction leaves deletion notifications to the caller after commit.
+func DeleteCanvasInTransaction(tx *gorm.DB, canvas *models.Canvas) error {
 	if canvas.FactoryID != nil {
 		if _, err := models.LockAutomationFactory(tx, canvas.OrganizationID, *canvas.FactoryID); err != nil {
 			return err

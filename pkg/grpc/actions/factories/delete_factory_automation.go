@@ -47,7 +47,7 @@ func DeleteFactoryAutomation(
 		if err := detachFactoryAutomation(tx, factory, canvas); err != nil {
 			return err
 		}
-		return canvases.SoftDeleteCanvas(tx, canvas)
+		return canvases.DeleteCanvasInTransaction(tx, canvas)
 	})
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to delete factory automation")

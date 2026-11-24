@@ -141,6 +141,7 @@ func selectTypeOptionsToProto(opts *configuration.SelectTypeOptions) *configpb.S
 			Label:       opt.Label,
 			Value:       opt.Value,
 			Description: opt.Description,
+			Disabled:    opt.Disabled,
 		}
 	}
 	return pbOpts
@@ -487,6 +488,7 @@ func protoToSelectTypeOptions(pbOpts *configpb.SelectTypeOptions) *configuration
 			Label:       pbOpt.Label,
 			Value:       pbOpt.Value,
 			Description: pbOpt.Description,
+			Disabled:    pbOpt.Disabled,
 		}
 	}
 	return opts

@@ -31,17 +31,6 @@ func withLicensedGitHubEnterprise(t *testing.T) {
 	t.Cleanup(withGitHubEnterpriseForTest(licensedGitHubEnterprise()))
 }
 
-func enableGitHubEnterpriseFlag(t *testing.T) {
-	t.Helper()
-	t.Cleanup(withGitHubEnterpriseFlagForTest(func(uuid.UUID) bool { return true }))
-}
-
-func withGitHubEnterpriseCloudAllowed(t *testing.T) {
-	t.Helper()
-	withLicensedGitHubEnterprise(t)
-	enableGitHubEnterpriseFlag(t)
-}
-
 func TestGitHubEnterpriseHostRequiresTheOrganizationGrant(t *testing.T) {
 	orgID := uuid.New()
 	granted := uuid.New()
@@ -53,7 +42,6 @@ func TestGitHubEnterpriseHostRequiresTheOrganizationGrant(t *testing.T) {
 			licensing.FeatureGitHubEnterprise,
 		),
 	)))
-	enableGitHubEnterpriseFlag(t)
 
 	_, err := WizardCreateConfiguration(orgID, map[string]any{"host": "acme.ghe.com"}, nil)
 	require.Error(t, err)

@@ -995,7 +995,8 @@ CREATE TABLE public.factory_work_order_line_dispatches (
     finished_at timestamp with time zone,
     model text DEFAULT ''::text NOT NULL,
     thinking_level text DEFAULT ''::text NOT NULL,
-    stages jsonb DEFAULT '[]'::jsonb NOT NULL
+    stages jsonb DEFAULT '[]'::jsonb NOT NULL,
+    current_stage_key text DEFAULT ''::text NOT NULL
 );
 
 
@@ -6785,7 +6786,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261123125259	f
+20261124164250	f
 \.
 
 

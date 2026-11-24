@@ -1,6 +1,9 @@
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -15,6 +18,7 @@ import { Check, GripHorizontal, Lock, Plus, Trash2 } from "lucide-react";
 import type { DragEvent, KeyboardEvent } from "react";
 
 import type { LineBoardStage, LineStageChanges } from "../lib/lineBoardStages";
+import { stageAutoAdvances } from "../lib/lineBoardStages";
 
 export function LineStageEditToolbar({
   hasChanges,
@@ -90,24 +94,65 @@ export function LineStageEditStrip({
   onDragEnd,
   onKeyDown,
   onDelete,
+  onAutoAdvanceChange,
 }: {
   stage: LineBoardStage;
   onDragStart: (event: DragEvent<HTMLButtonElement>) => void;
   onDragEnd: () => void;
   onKeyDown: (event: KeyboardEvent<HTMLButtonElement>) => void;
   onDelete?: () => void;
+  onAutoAdvanceChange: (enabled: boolean) => void;
 }) {
   if (stage.kind === "STAGE_KIND_BACKLOG" || stage.kind === "STAGE_KIND_DONE") {
     return (
-      <div className="flex h-7 shrink-0 items-center justify-center gap-1 text-xs text-muted-foreground">
-        <Lock className="size-3" aria-hidden />
-        Fixed
+      <div className="flex h-12 shrink-0 items-start justify-center">
+        <div className="flex h-7 items-center gap-1 text-xs text-muted-foreground">
+          <Lock className="size-3" aria-hidden />
+          Fixed
+        </div>
       </div>
     );
   }
+  const autoAdvanceId = `lines-stage-auto-advance-${stage.key}`;
   return (
-    <div className="flex h-7 shrink-0 items-center justify-between gap-1 px-1">
-      <span className="size-6" aria-hidden />
+    <div className="flex h-12 shrink-0 flex-col px-1">
+      <div className="flex h-7 items-center justify-between gap-1">
+        <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+          <Switch
+            id={autoAdvanceId}
+            checked={stageAutoAdvances(stage)}
+            onCheckedChange={onAutoAdvanceChange}
+            aria-label={`Auto-advance ${stage.name}`}
+            className="scale-75"
+          />
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Label htmlFor={autoAdvanceId} className="cursor-help text-[10px] font-normal text-muted-foreground">
+                Auto-advance
+              </Label>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="max-w-56">
+              When all automations in this stage pass, move the task to the next stage.
+            </TooltipContent>
+          </Tooltip>
+        </div>
+        {onDelete ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            aria-label={`Delete ${stage.name}`}
+            title="Delete stage"
+            data-testid={`lines-stage-delete-${stage.key}`}
+            className="size-6 rounded-sm text-muted-foreground hover:text-destructive"
+            onClick={onDelete}
+          >
+            <Trash2 className="size-3.5" aria-hidden />
+          </Button>
+        ) : (
+          <span className="size-6" aria-hidden />
+        )}
+      </div>
       <Button
         type="button"
         draggable
@@ -116,29 +161,13 @@ export function LineStageEditStrip({
         aria-label={`Reorder ${stage.name}`}
         title="Drag to reorder stage"
         data-testid={`lines-stage-reorder-${stage.key}`}
-        className="h-6 w-16 cursor-grab touch-none rounded-sm text-muted-foreground hover:text-foreground active:cursor-grabbing"
+        className="mx-auto h-5 w-16 cursor-grab touch-none rounded-sm text-muted-foreground hover:text-foreground active:cursor-grabbing"
         onDragStart={onDragStart}
         onDragEnd={onDragEnd}
         onKeyDown={onKeyDown}
       >
         <GripHorizontal className="size-4" aria-hidden />
       </Button>
-      {onDelete ? (
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          aria-label={`Delete ${stage.name}`}
-          title="Delete stage"
-          data-testid={`lines-stage-delete-${stage.key}`}
-          className="size-6 rounded-sm text-muted-foreground hover:text-destructive"
-          onClick={onDelete}
-        >
-          <Trash2 className="size-3.5" aria-hidden />
-        </Button>
-      ) : (
-        <span className="size-6" aria-hidden />
-      )}
     </div>
   );
 }
@@ -164,8 +193,9 @@ export function SaveLineStagesDialog({
         <AlertDialogHeader>
           <AlertDialogTitle>Save stage changes?</AlertDialogTitle>
           <AlertDialogDescription>
-            This changes the board for everyone who uses this line. Deleted stages keep their automations in the
-            workspace.
+            This changes the board for everyone who uses this line. Saving a custom-stage deletion also deletes
+            automations that execute in that stage. Automations that only appear there stay in the workspace. Removing a
+            system stage keeps its automations.
           </AlertDialogDescription>
         </AlertDialogHeader>
         {changes ? (
@@ -179,6 +209,11 @@ export function SaveLineStagesDialog({
             {changes.renamed.map(({ previous, stage }) => (
               <li key={stage.id}>
                 Rename: {previous.name} → {stage.name}
+              </li>
+            ))}
+            {changes.autoAdvanceChanged.map(({ stage }) => (
+              <li key={`${stage.id}-auto-advance`}>
+                {stageAutoAdvances(stage) ? "Enable" : "Disable"} auto-advance: {stage.name}
               </li>
             ))}
             {changes.reordered ? <li>Stage order changes</li> : null}

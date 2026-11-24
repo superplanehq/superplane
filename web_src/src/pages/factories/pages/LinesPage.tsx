@@ -43,7 +43,6 @@ import { cn } from "@/lib/utils";
 import {
   FEATURE_AUTOMATIONS_AS_CODE,
   FEATURE_FACTORY_CUSTOM_AUTOMATIONS,
-  FEATURE_FACTORY_CUSTOM_STAGES,
   FEATURE_FACTORY_PULL_REQUEST_MERGE,
 } from "@/lib/experimentalFeatures";
 import { useAutoLoadMoreOnScroll } from "@/hooks/useAutoLoadMoreOnScroll";
@@ -432,7 +431,7 @@ export function LinesPage() {
   const showAddIntakeControl = useFactoryPreviewFlag("addIntakeControl");
   const { has: hasExperimentalFeature } = useExperimentalFeature(organizationId);
   const showPullRequestMerge = hasExperimentalFeature(FEATURE_FACTORY_PULL_REQUEST_MERGE);
-  const customStagesEnabled = hasExperimentalFeature(FEATURE_FACTORY_CUSTOM_STAGES);
+  const customStagesEnabled = hasExperimentalFeature(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
   const takenIntakeSourceIds = useMemo(
     (): string[] => configuredIntakes.map((intake) => intake.source.id),
     [configuredIntakes],
@@ -2360,13 +2359,18 @@ function PhaseBoard({
                   onDragEnd={finishStageDrag}
                   onKeyDown={(event) => moveStageWithKeyboard(event, stage)}
                   onDelete={() => requestDeleteStage(stage)}
+                  onAutoAdvanceChange={(autoAdvance) =>
+                    setDraftStages(
+                      baseStages.map((entry) => (entry.id === stage.id ? { ...entry, autoAdvance } : entry)),
+                    )
+                  }
                 />
               ) : null}
               {stage.kind === "STAGE_KIND_PHASE" ? (
                 <span
                   className={cn(
                     "absolute left-full z-[1] h-px w-3 bg-border",
-                    draftStages ? "top-[49px]" : "top-[21px]",
+                    draftStages ? "top-[69px]" : "top-[21px]",
                   )}
                   aria-hidden
                 />
@@ -2377,7 +2381,7 @@ function PhaseBoard({
                 <span
                   className={cn(
                     "absolute left-0 z-[1] h-px w-3 -translate-x-full bg-border",
-                    draftStages ? "top-[49px]" : "top-[21px]",
+                    draftStages ? "top-[69px]" : "top-[21px]",
                   )}
                   aria-hidden
                 />

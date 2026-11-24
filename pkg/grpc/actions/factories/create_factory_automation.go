@@ -51,11 +51,7 @@ func CreateFactoryAutomation(
 		return nil, factoryErrorToStatus(invalidArgument("column key is invalid"), "failed to create factory automation")
 	}
 	customStageColumn := strings.HasPrefix(columnKey, "custom-")
-	if templateID == "" && customStageColumn {
-		if !organization.HasExperimentalFeature(features.FeatureFactoryCustomStages) {
-			return nil, factoryErrorToStatus(errFactoryCustomStagesDisabled, "failed to create factory automation")
-		}
-	} else if templateID == "" && !organization.HasExperimentalFeature(features.FeatureFactoryCustomAutomations) {
+	if templateID == "" && !organization.HasExperimentalFeature(features.FeatureFactoryCustomAutomations) {
 		return nil, factoryErrorToStatus(errCustomAutomationsDisabled, "failed to create factory automation")
 	}
 	factory, err := findFactory(db, orgID, req.GetFactoryId())
