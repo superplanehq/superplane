@@ -161,13 +161,10 @@ func Test__Get(t *testing.T) {
 		assert.Equal(t, Feature{}, feature)
 	})
 
-	t.Run("known id returns GitHub Enterprise Cloud feature", func(t *testing.T) {
-		f, ok := Get(FeatureGitHubEnterprise)
-		assert.True(t, ok)
-		assert.Equal(t, FeatureGitHubEnterprise, f.ID)
-		assert.Equal(t, "GitHub Enterprise Cloud", f.Label)
-		assert.Equal(t, "Connect GitHub Enterprise Cloud (ghe.com) with a private GitHub App", f.Description)
-		assert.False(t, f.Hidden)
+	t.Run("retired GitHub Enterprise Cloud flag is absent", func(t *testing.T) {
+		feature, ok := Get("github_enterprise")
+		assert.False(t, ok)
+		assert.Equal(t, Feature{}, feature)
 	})
 
 	t.Run("retired ChatGPT subscription flag is absent", func(t *testing.T) {
@@ -202,8 +199,7 @@ func Test__Exists(t *testing.T) {
 	assert.False(t, Exists("factory_jira_intake"))
 	assert.False(t, Exists("factory_linear_intake"))
 	assert.False(t, Exists("factory_bitbucket"))
-	assert.True(t, Exists(FeatureGitHubEnterprise))
-	assert.False(t, IsHidden(FeatureGitHubEnterprise))
+	assert.False(t, Exists("github_enterprise"))
 	assert.False(t, Exists("codex_subscriptions"))
 	assert.False(t, Exists("does-not-exist"))
 	assert.False(t, Exists(""))

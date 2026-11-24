@@ -77,11 +77,6 @@ const FeatureFactoryPullRequestMerge = "factory_pull_request_merge"
 // still applies.
 const FeatureSuperPlaneMCPServer = "superplane_mcp_server"
 
-// FeatureGitHubEnterprise is the org rollout gate for GitHub Enterprise Cloud
-// (ghe.com). Connecting a host other than github.com also requires the
-// github_enterprise license.
-const FeatureGitHubEnterprise = "github_enterprise"
-
 // FeatureGitHubEnterpriseServer is registered and hidden. GitHub Enterprise
 // Server setup answers that the server is not available yet. Connecting a
 // GitHub Enterprise Server host also requires the github_enterprise license.
@@ -100,7 +95,6 @@ func released() *bool {
 
 var registry = []Feature{
 	{ID: FeatureFactoryPullRequestImport, Label: "Pull request import", Description: "Import open pull requests into Verify"},
-	{ID: FeatureGitHubEnterprise, Label: "GitHub Enterprise Cloud", Description: "Connect GitHub Enterprise Cloud (ghe.com) with a private GitHub App"},
 	{ID: FeatureGitHubEnterpriseServer, Label: "GitHub Enterprise Server", Description: "Connect GitHub Enterprise Server. This option is not available yet", Hidden: true},
 	{ID: FeatureOrganizationRunners, Label: "Organization runners", Description: "Manage self-hosted fleets and runners for an organization"},
 	{ID: FeatureFactories, Label: "Factories", Description: "Software factories for work orders and production workflows"},

@@ -233,7 +233,7 @@ func (g *SetupProvider) OnSecretUpdate(ctx core.SecretUpdateContext) (*core.Setu
 func (g *SetupProvider) FirstStep(ctx core.SetupStepContext) core.SetupStep {
 	host := hostFromSetupConfiguration(ctx)
 	orgID, _ := uuid.Parse(ctx.OrganizationID)
-	enterprise := (githubEnterpriseEnabledForOrg(setupDB(ctx.HTTP), ctx.OrganizationID) && gitHubEnterpriseLicensed(context.Background(), orgID)) || !host.IsDotCom()
+	enterprise := gitHubEnterpriseLicensed(context.Background(), orgID) || !host.IsDotCom()
 	ownerDefault := common.OwnerTypeUser
 	locationDefault := common.GitHubLocationDotCom
 	if !host.IsDotCom() {
