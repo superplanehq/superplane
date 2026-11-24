@@ -116,19 +116,19 @@ describe("WorkOrderSplitRunSource", () => {
   });
 
   for (const compact of [false, true]) {
-    it(`links the automation name to the run that created the task (compact: ${compact})`, () => {
+    it(`links the task to the run that created it (compact: ${compact})`, () => {
       renderInFactory(AUTOMATION_SOURCE, compact);
 
-      const link = screen.getByRole("link", { name: /ESLint AutoFix/ });
+      const link = screen.getByRole("link", { name: "View run" });
       expect(link.getAttribute("href")).toContain("canvas-eslint");
       expect(link.getAttribute("href")).toContain("run-eslint-1");
     });
 
-    it(`leaves the automation name unlinked when the task has no source run (compact: ${compact})`, () => {
+    it(`shows no run link when the task has no source run (compact: ${compact})`, () => {
       renderInFactory({ ...AUTOMATION_SOURCE, run: undefined }, compact);
 
       expect(screen.getByText("ESLint AutoFix")).toBeInTheDocument();
-      expect(screen.queryByRole("link", { name: /ESLint AutoFix/ })).not.toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: "View run" })).not.toBeInTheDocument();
     });
   }
 });

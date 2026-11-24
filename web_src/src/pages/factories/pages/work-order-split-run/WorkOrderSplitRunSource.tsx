@@ -128,23 +128,26 @@ function NamedSource({ source }: { source: NamedSplitRunSource }) {
 }
 
 /**
- * Names the automation that created the task. Links to that run, as a
- * GitHub intake links to its issue. Needs the org and factory route params.
+ * Names the automation that created the task, then links to that run.
+ * Needs the org and factory route params.
  */
 function SourceRunName({ name, run }: { name: string; run?: SplitRunRunRef }) {
   const href = useSourceRunHref(run);
-  if (!href) {
-    return <span className="truncate">{name}</span>;
-  }
   return (
-    <Link
-      href={href}
-      className="inline-flex min-w-0 items-center gap-1.5 font-medium text-foreground hover:underline"
-      data-testid="split-run-source-run"
-    >
+    <>
       <span className="truncate">{name}</span>
-      <ArrowRight className="size-3 shrink-0 text-muted-foreground" aria-hidden />
-    </Link>
+      {href ? (
+        <Link
+          href={href}
+          className="inline-flex shrink-0 items-center gap-1 font-medium text-foreground hover:text-muted-foreground"
+          data-testid="split-run-source-run"
+        >
+          {/* Decoration does not paint on a flex container's own text, so the underline sits on the span. */}
+          <span className="underline underline-offset-2">View run</span>
+          <ArrowRight className="size-3 shrink-0" aria-hidden />
+        </Link>
+      ) : null}
+    </>
   );
 }
 
