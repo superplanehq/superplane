@@ -1,11 +1,13 @@
 import { Link } from "react-router";
 
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useFactoryWebhooks } from "@/hooks/useFactoryWebhooks";
 import { CopyButton } from "@/ui/CopyButton";
 
+import type { CustomAutomationTaskMatch } from "../lib/customAutomation";
 import { factorySettingsSectionPath } from "../lib/factoryPagePaths";
 
 export function CustomAutomationWebhookFields({
@@ -91,6 +93,52 @@ export function CustomAutomationWebhookFields({
           Manage webhooks
         </Link>
       </p>
+    </div>
+  );
+}
+
+export function TaskMatchFields({
+  idPrefix,
+  taskMatch,
+  onChange,
+}: {
+  idPrefix: string;
+  taskMatch: CustomAutomationTaskMatch;
+  onChange: (taskMatch: CustomAutomationTaskMatch) => void;
+}) {
+  return (
+    <div className="mt-4 grid gap-4 border-t border-border pt-4">
+      <div className="grid gap-2">
+        <Label htmlFor={`${idPrefix}-task-match-kind`}>Find task by</Label>
+        <Select
+          value={taskMatch.kind}
+          onValueChange={(kind: CustomAutomationTaskMatch["kind"]) => onChange({ ...taskMatch, kind })}
+        >
+          <SelectTrigger id={`${idPrefix}-task-match-kind`}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="task">Task</SelectItem>
+            <SelectItem value="pull_request">Pull request</SelectItem>
+            <SelectItem value="commit">Commit</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="grid gap-2">
+        <Label htmlFor={`${idPrefix}-task-match-path`}>Field path</Label>
+        <Input
+          id={`${idPrefix}-task-match-path`}
+          value={taskMatch.fieldPath}
+          placeholder={
+            taskMatch.kind === "task"
+              ? "task.key"
+              : taskMatch.kind === "pull_request"
+                ? "pull_request.url"
+                : "commit.sha"
+          }
+          onChange={(event) => onChange({ ...taskMatch, fieldPath: event.target.value })}
+        />
+      </div>
     </div>
   );
 }
