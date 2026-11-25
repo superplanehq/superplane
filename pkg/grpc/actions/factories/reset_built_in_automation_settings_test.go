@@ -445,6 +445,10 @@ func TestResetScheduledIntakeKeepsScheduleAndUserPrompt(t *testing.T) {
 	for _, provider := range []string{models.ProviderGitHub, models.ProviderBitbucket} {
 		t.Run(provider, func(t *testing.T) {
 			r, factory := resetTestFactory(t)
+			prompt := "Find accessibility defects."
+			if provider == models.ProviderBitbucket {
+				prompt = ""
+			}
 			repository := "acme/app"
 			require.NoError(t, factory.UpdateOnboarding(database.DB(t.Context()), models.FactoryOnboardingPatch{AppRepository: &repository, VCSProvider: &provider}))
 			canvas := resetTestTemplate(t, r, factory, scheduledIntakeTemplateID, provider, func(doc *yaml.Canvas) {
@@ -453,7 +457,7 @@ func TestResetScheduledIntakeKeepsScheduleAndUserPrompt(t *testing.T) {
 				findYAMLNode(t, doc, "create-task").Configuration["defaultOwnerId"] = r.User.String()
 				agent := findYAMLNode(t, doc, "scheduled-agent")
 				agent.Configuration["executionTimeoutSeconds"] = 600
-				implementationStep(t, agent, "Propose a task")["prompt"] = "Find accessibility defects." + scheduledIntakeOutputInstructions
+				implementationStep(t, agent, "Propose a task")["prompt"] = prompt + scheduledIntakeOutputInstructions
 			})
 			require.NoError(t, canvas.SetDisplayColumn(database.DB(t.Context()), "done"))
 			require.NoError(t, resetTestOrganization(t, r))
@@ -474,7 +478,7 @@ func TestResetScheduledIntakeKeepsScheduleAndUserPrompt(t *testing.T) {
 			agent := findIntakeNode(version.Nodes, "scheduled-agent")
 			assert.EqualValues(t, 600, agent.Configuration["executionTimeoutSeconds"])
 			steps := agent.Configuration["steps"].([]any)
-			assert.Equal(t, "Find accessibility defects."+scheduledIntakeOutputInstructions, steps[1].(map[string]any)["prompt"])
+			assert.Equal(t, prompt+scheduledIntakeOutputInstructions, steps[1].(map[string]any)["prompt"])
 		})
 	}
 }

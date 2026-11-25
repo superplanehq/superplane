@@ -51,6 +51,10 @@ const (
 // canvas by hand. Filter fields are stored in, and read back from, the filter
 // expression: the graph is what the workers run, so nothing is kept twice.
 type intakeSettings struct {
+	configured          bool
+	listeningConfigured bool
+
+	Paused            bool
 	DefaultOwnerID    string
 	ConfidencePct     int
 	Labels            []string
@@ -115,6 +119,7 @@ func dependabotIntakeActions() []any {
 
 func defaultIntakeSettings() intakeSettings {
 	return intakeSettings{
+		configured:      true,
 		ConfidencePct:   DefaultIntakeConfidencePct,
 		Labels:          []string{},
 		LabelFilterMode: intakeLabelFilterInclude,
@@ -187,6 +192,7 @@ func intakeSourceHasFilterNode(source string) bool {
 }
 
 func (s intakeSettings) normalized() intakeSettings {
+	s.configured = true
 	s.ConfidencePct = clampIntakeConfidence(s.ConfidencePct)
 
 	if s.LabelFilterMode != intakeLabelFilterExclude {
@@ -458,6 +464,9 @@ func intakeProductiveTaskListCondition(ids []string) string {
 // and they also limit a re-opened issue. With no labels, a new issue starts
 // a task and label events do not.
 func deriveGitHubIssueListening(settings intakeSettings) intakeSettings {
+	if settings.listeningConfigured {
+		return settings
+	}
 	settings.NewIssues = true
 	settings.SuperplaneLabelAdded = len(settings.Labels) > 0 && settings.LabelFilterMode == intakeLabelFilterInclude
 	return settings
@@ -649,6 +658,11 @@ func intakeSettingsFromGraph(source string, graph intakeGraph, spec models.LiveC
 
 	trigger := findIntakeNode(spec.Nodes, graph.TriggerNodeID)
 	if trigger != nil {
+		settings.listeningConfigured = metadataBool(trigger.Metadata["intakeExplicitIssueEvents"], false)
+		if value, present := trigger.Metadata["intakeConfidencePct"]; present {
+			encoded, _ := json.Marshal(value)
+			_ = json.Unmarshal(encoded, &settings.ConfidencePct)
+		}
 		switch source {
 		case models.FactoryIntakeSourceJiraIssues:
 			events := configurationStrings(trigger.Configuration["events"])
@@ -844,6 +858,9 @@ func parseIntakeSettings(current intakeSettings, requested *pb.FactoryIntake_Set
 	if intakeSettingsOnlyDefaultOwner(requested) {
 		return updated
 	}
+	// The editor derives issue events from its label controls. YAML records
+	// explicit event choices separately from this existing editor behavior.
+	updated.listeningConfigured = false
 	updated.ConfidencePct = int(requested.GetConfidencePct())
 	updated.Labels = requested.GetLabels()
 

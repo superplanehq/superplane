@@ -396,6 +396,10 @@ func applyIntakeSettingsToGraph(
 	for i := range nodes {
 		switch nodes[i].ID {
 		case graph.TriggerNodeID:
+			if source == models.FactoryIntakeSourceGitHubIssues && !updated.listeningConfigured {
+				nodes[i].Metadata = maps.Clone(nodes[i].Metadata)
+				delete(nodes[i].Metadata, "intakeExplicitIssueEvents")
+			}
 			configuration := maps.Clone(nodes[i].Configuration)
 			if configuration == nil {
 				configuration = map[string]any{}

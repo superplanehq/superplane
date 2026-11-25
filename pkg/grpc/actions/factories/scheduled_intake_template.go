@@ -72,6 +72,9 @@ func scheduledIntakeCanvas(db *gorm.DB, factory *models.Factory, name string, pa
 		integrations: map[string]factoryTemplateIntegration{provider: {name: resolveVCSInstallationName(db, factory)}},
 		agent:        factoryTemplateAgentFromIntake(agent),
 	}
+	if _, present := params["prompt"]; !present {
+		delete(input.installParams, "prompt")
+	}
 	result, err := materializeFactoryTemplate(scheduledIntakeTemplateID, provider, input)
 	if err != nil {
 		return nil, err
@@ -89,8 +92,8 @@ func configureScheduledIntake(canvas *yaml.Canvas, provider string, params map[s
 		return invalidArgument("repository is required for scheduled intake")
 	}
 	repoURL := scheduledIntakeRepoURL(provider, repository, params["githubHost"])
-	prompt := strings.TrimSpace(params["prompt"])
-	if prompt == "" {
+	prompt, specified := params["prompt"]
+	if !specified {
 		prompt = scheduledIntakeDefaultPrompt
 	}
 	for i := range canvas.Spec.Nodes {

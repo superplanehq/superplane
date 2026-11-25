@@ -119,7 +119,7 @@ func TestFactoryConfigurationOmitsDefaultsAndRestoresOmittedOverrides(t *testing
 	require.NotContains(t, bundle.Files[0].Content, "execution_timeout_seconds:")
 	require.NotContains(t, bundle.Files[0].Content, "skip_setup_commands:")
 
-	for _, field := range []string{"agents", "additional_instructions"} {
+	for _, field := range []string{"additional_instructions", "agents"} {
 		var manifest factoryConfigurationManifest
 		require.NoError(t, goyaml.Unmarshal([]byte(bundle.Files[0].Content), &manifest))
 		for i := range manifest.Stages {
@@ -129,8 +129,14 @@ func TestFactoryConfigurationOmitsDefaultsAndRestoresOmittedOverrides(t *testing
 					require.Empty(t, automation.With)
 				}
 				if automation.Uses == "@superplane/implement" {
-					require.Equal(t, "Original instructions", automation.With["additional_instructions"])
-					delete(automation.With, field)
+					if field == "additional_instructions" {
+						agents := automation.With["agents"].(map[string]any)
+						agent := agents[implementationAgentNodeID].(map[string]any)
+						require.Equal(t, "Original instructions", agent[field])
+						delete(agent, field)
+					} else {
+						delete(automation.With, field)
+					}
 				}
 			}
 		}
