@@ -98,11 +98,10 @@ func TestRefreshBacklog(t *testing.T) {
 		return &pb.RefreshBacklogRequest{FactoryId: factory.ID.String()}
 	}
 
-	t.Run("archives unavailable items from every readable intake source", func(t *testing.T) {
+	t.Run("refreshes supported items and preserves historical Productive tasks", func(t *testing.T) {
 		recorder := useAnalytics(t)
 		factory := newFactory(t)
 		createIntake(t, factory, models.FactoryIntakeSourceGitHubIssues)
-		createIntake(t, factory, models.FactoryIntakeSourceProductiveTasks)
 		githubOrder := createDraft(t, factory, "Closed issue", "https://github.com/acme/payments/issues/12")
 		productiveOrder := createDraft(t, factory, "Closed task", "https://app.productive.io/123/tasks/91")
 		openOrder := createDraft(t, factory, "Open issue", "https://github.com/acme/payments/issues/13")
@@ -113,11 +112,6 @@ func TestRefreshBacklog(t *testing.T) {
 				urlPrefix: "https://github.com/acme/payments/issues/",
 				available: map[string]bool{"12": false, "13": true},
 			},
-			models.FactoryIntakeSourceProductiveTasks: &stubIntakeItemAvailabilitySource{
-				scope:     "productive:123:project",
-				urlPrefix: "https://app.productive.io/123/tasks/",
-				available: map[string]bool{"91": false},
-			},
 		}
 		response, err := RefreshBacklog(ctx, IntakeDependencies{
 			NewItemSource: func(_ context.Context, _ *gorm.DB, intake *models.FactoryIntake) (intakeItemSource, error) {
@@ -125,21 +119,24 @@ func TestRefreshBacklog(t *testing.T) {
 			},
 		}, orgID, request(factory))
 		require.NoError(t, err)
-		assert.Equal(t, int32(2), response.GetArchivedCount())
+		assert.Equal(t, int32(1), response.GetArchivedCount())
 		assert.Zero(t, response.GetFailedItemCount())
 		assert.Zero(t, response.GetFailedSourceCount())
 
-		for _, order := range []*models.FactoryWorkOrder{githubOrder, productiveOrder} {
+		for _, order := range []*models.FactoryWorkOrder{githubOrder} {
 			reloaded, err := factory.FindWorkOrder(database.DB(t.Context()), order.ID)
 			require.NoError(t, err)
 			assert.Equal(t, models.FactoryWorkOrderStateClosed, reloaded.State)
 			assert.Equal(t, models.FactoryWorkOrderResultArchived, reloaded.Result)
 		}
+		retained, err := factory.FindWorkOrder(database.DB(t.Context()), productiveOrder.ID)
+		require.NoError(t, err)
+		assert.Equal(t, models.FactoryWorkOrderStateDraft, retained.State)
 		reloaded, err := factory.FindWorkOrder(database.DB(t.Context()), openOrder.ID)
 		require.NoError(t, err)
 		assert.Equal(t, models.FactoryWorkOrderStateDraft, reloaded.State)
 		events := recorder.snapshot()
-		require.Len(t, events, 2)
+		require.Len(t, events, 1)
 		for _, event := range events {
 			assert.Equal(t, "factory_task_archived", string(event.Name))
 			assert.Equal(t, "backlog_refresh", event.Properties["archive_source"])
@@ -153,7 +150,7 @@ func TestRefreshBacklog(t *testing.T) {
 		}, orgID, request(factory))
 		require.NoError(t, err)
 		assert.Zero(t, response.GetArchivedCount())
-		require.Len(t, recorder.snapshot(), 2)
+		require.Len(t, recorder.snapshot(), 1)
 	})
 
 	t.Run("counts each failed item lookup once", func(t *testing.T) {
@@ -181,34 +178,10 @@ func TestRefreshBacklog(t *testing.T) {
 		assert.Empty(t, recorder.snapshot())
 	})
 
-	t.Run("keeps an open Productive task after it moves to another project", func(t *testing.T) {
-		factory := newFactory(t)
-		createIntake(t, factory, models.FactoryIntakeSourceProductiveTasks)
-		order := createDraft(t, factory, "Moved task", "https://app.productive.io/123/tasks/91")
-		source := &stubIntakeItemAvailabilitySource{
-			scope:     "productive:123:original-project",
-			urlPrefix: "https://app.productive.io/123/tasks/",
-			available: map[string]bool{"91": true},
-		}
-
-		response, err := RefreshBacklog(ctx, IntakeDependencies{
-			NewItemSource: func(context.Context, *gorm.DB, *models.FactoryIntake) (intakeItemSource, error) {
-				return source, nil
-			},
-		}, orgID, request(factory))
-		require.NoError(t, err)
-		assert.Zero(t, response.GetArchivedCount())
-		assert.Zero(t, response.GetFailedItemCount())
-
-		reloaded, err := factory.FindWorkOrder(database.DB(t.Context()), order.ID)
-		require.NoError(t, err)
-		assert.Equal(t, models.FactoryWorkOrderStateDraft, reloaded.State)
-	})
-
 	t.Run("reports a failed source while another source refreshes", func(t *testing.T) {
 		factory := newFactory(t)
 		createIntake(t, factory, models.FactoryIntakeSourceGitHubIssues)
-		createIntake(t, factory, models.FactoryIntakeSourceProductiveTasks)
+		createIntake(t, factory, models.FactoryIntakeSourceJiraIssues)
 		source := &stubIntakeItemAvailabilitySource{
 			scope:     "github:acme/payments",
 			urlPrefix: "https://github.com/acme/payments/issues/",
@@ -217,7 +190,7 @@ func TestRefreshBacklog(t *testing.T) {
 
 		response, err := RefreshBacklog(ctx, IntakeDependencies{
 			NewItemSource: func(_ context.Context, _ *gorm.DB, intake *models.FactoryIntake) (intakeItemSource, error) {
-				if intake.Source == models.FactoryIntakeSourceProductiveTasks {
+				if intake.Source == models.FactoryIntakeSourceJiraIssues {
 					return nil, errors.New("not connected")
 				}
 				return source, nil

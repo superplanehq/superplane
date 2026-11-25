@@ -505,7 +505,6 @@ func TestResetIntakePreservesGeneralSettings(t *testing.T) {
 		{source: models.FactoryIntakeSourceSentryExceptions},
 		{source: models.FactoryIntakeSourceSentryExceptions, paused: true},
 		{source: models.FactoryIntakeSourceDependabotAlerts},
-		{source: models.FactoryIntakeSourceProductiveTasks},
 		{source: models.FactoryIntakeSourceDatadog},
 		{source: models.FactoryIntakeSourceLinearIssues},
 		{source: models.FactoryIntakeSourcePagerDutyIncidents},
@@ -546,9 +545,6 @@ func TestResetIntakePreservesGeneralSettings(t *testing.T) {
 				settings.SentryProjectIDs = []string{"payments", "checkout"}
 			case models.FactoryIntakeSourceDependabotAlerts:
 				settings.DependabotSeverities = []string{"high"}
-			case models.FactoryIntakeSourceProductiveTasks:
-				settings.ExcludeKeyTasks = false
-				settings.TaskListIDs = []string{"42"}
 			case models.FactoryIntakeSourceDatadog:
 				settings.DatadogTriggeredAlerts, settings.DatadogRetriggeredAlerts = false, true
 				settings.DatadogEnvironments = []string{"production"}

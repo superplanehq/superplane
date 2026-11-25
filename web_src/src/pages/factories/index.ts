@@ -54,7 +54,6 @@ export {
   GitHubIntakeSetupPage,
   JiraIntakeSetupPage,
   LinearIntakeSetupPage,
-  ProductiveIntakeSetupPage,
   PlanningSetupPage,
   RiskScoreSetupPage,
   SentryIntakeSetupPage,
