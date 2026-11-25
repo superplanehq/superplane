@@ -9,11 +9,7 @@ export function useCustomAutomationEditorAgent(
   automationId: string | undefined,
   saved: FactoriesFactoryAppTemplateAgent | undefined,
 ) {
-  const needsConnections = automationId
-    ? saved?.component === "runnerOpenRouter" && saved.credentialSource === "integration"
-    : !!onboarding &&
-      !onboarding.codexSubscription &&
-      (!!onboarding.agentIntegrationId || onboarding.agentHarness !== "AGENT_HARNESS_SUPERPLANE");
+  const needsConnections = editorAgentNeedsConnections(onboarding, automationId, saved);
   const { data: connections, isError } = useConnectedIntegrations(organizationId, { enabled: needsConnections });
   const agent = useMemo(
     () => (automationId ? saved : workspaceAgentFromOnboarding(onboarding, connections)),
@@ -28,4 +24,19 @@ export function useCustomAutomationEditorAgent(
     customProvider: connection?.metadata?.integrationName === "customLlm",
     ready: !!agent?.component && (!needsConnections || (!!connections && !isError)) && (!needsProvider || !!connection),
   };
+}
+
+function editorAgentNeedsConnections(
+  onboarding: FactoriesFactoryOnboarding | undefined,
+  automationId: string | undefined,
+  saved: FactoriesFactoryAppTemplateAgent | undefined,
+): boolean {
+  if (automationId) {
+    return saved?.component === "runnerOpenRouter" && saved.credentialSource === "integration";
+  }
+  return (
+    !!onboarding &&
+    !onboarding.codexSubscription &&
+    (!!onboarding.agentIntegrationId || onboarding.agentHarness !== "AGENT_HARNESS_SUPERPLANE")
+  );
 }
