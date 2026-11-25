@@ -52,4 +52,44 @@ describe("AccountsList", () => {
       expect(lastQuery().get("offset")).toBe("0");
     });
   });
+
+  it("returns to the first page after demoting the last admin on the second page", async () => {
+    const admins = Array.from({ length: 51 }, (_, index) => ({
+      id: `admin-${index}`,
+      name: `Admin ${index}`,
+      email: `admin-${index}@example.com`,
+      installation_admin: true,
+      blocked: false,
+    }));
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(String(input), "http://localhost");
+      if (init?.method === "POST" && url.pathname === "/admin/api/accounts/admin-50/demote") {
+        admins.pop();
+        return Response.json({});
+      }
+      const offset = Number(url.searchParams.get("offset"));
+      return Response.json({ items: admins.slice(offset, offset + 50), total: admins.length });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(
+      <MemoryRouter>
+        <AccountsList />
+      </MemoryRouter>,
+    );
+    await screen.findByText("Admin 0");
+    fireEvent.click(screen.getByRole("checkbox", { name: "Installation admins only" }));
+    await waitFor(() => {
+      const url = new URL(String(fetchMock.mock.calls.at(-1)?.[0]), "http://localhost");
+      expect(url.searchParams.get("installation_admin")).toBe("true");
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    await screen.findByText("Admin 50");
+    fireEvent.click(screen.getByRole("button", { name: "Demote" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Remove Admin Access" }));
+
+    await screen.findByText("50 accounts");
+    expect(await screen.findByText("Admin 0")).toBeInTheDocument();
+    expect(screen.queryByText("Admin 50")).not.toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "Installation admins only" })).toBeChecked();
+  });
 });

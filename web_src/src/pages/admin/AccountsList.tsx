@@ -146,6 +146,19 @@ function AccountsListContent({
   );
 }
 
+function InstallationAdminFilter({ checked, onChange }: { checked: boolean; onChange: (checked: boolean) => void }) {
+  return (
+    <div className="flex items-center gap-2">
+      <Checkbox
+        id="installation-admins-only"
+        checked={checked}
+        onChange={(event: React.ChangeEvent<HTMLInputElement>) => onChange(event.target.checked)}
+      />
+      <Label htmlFor="installation-admins-only">Installation admins only</Label>
+    </div>
+  );
+}
+
 const AccountsList: React.FC = () => {
   const { account: currentAccount } = useAccount();
   const [accounts, setAccounts] = useState<AdminAccount[]>([]);
@@ -195,7 +208,10 @@ const AccountsList: React.FC = () => {
   const onToggle = async (acc: AdminAccount) => {
     setConfirmTarget(null);
     setToggling(acc.id);
-    await toggleAdmin(acc, () => fetchAccounts(search, offset, sortBy, sortDirection));
+    await toggleAdmin(acc, () => {
+      setOffset(0);
+      fetchAccounts(search, 0, sortBy, sortDirection);
+    });
     setToggling(null);
   };
 
@@ -241,16 +257,7 @@ const AccountsList: React.FC = () => {
         search={search}
         onSearchChange={setSearch}
         placeholder="Search by name or email..."
-        filters={
-          <div className="flex items-center gap-2">
-            <Checkbox
-              id="installation-admins-only"
-              checked={installationAdminsOnly}
-              onChange={(event: React.ChangeEvent<HTMLInputElement>) => setInstallationAdminsOnly(event.target.checked)}
-            />
-            <Label htmlFor="installation-admins-only">Installation admins only</Label>
-          </div>
-        }
+        filters={<InstallationAdminFilter checked={installationAdminsOnly} onChange={setInstallationAdminsOnly} />}
       />
       <AccountsListContent
         loading={loading}
