@@ -45,7 +45,11 @@ func MaybeAttachCustomAutomationSession(tx *gorm.DB, canvas *Canvas, event *Canv
 		return err
 	}
 	payload, _ := objectMap(RootEventSourcePayload(event.Data.Data()))
-	task, _ := objectMap(payload["workOrder"])
+	task, ok := objectMap(payload["workOrder"])
+	if !ok {
+		// Line dispatches use the onRun input contract.
+		task, _ = objectMap(payload["work_order"])
+	}
 	raw, _ := task["id"].(string)
 	taskID, _ := uuid.Parse(raw)
 	factory, err := FindFactory(tx, canvas.OrganizationID, *canvas.FactoryID)
