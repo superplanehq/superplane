@@ -5,10 +5,15 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/pkg/yaml"
+	"github.com/superplanehq/superplane/test/support"
+	"google.golang.org/grpc/codes"
 	goyaml "gopkg.in/yaml.v3"
+	"gorm.io/datatypes"
 )
 
 func TestFactoryConfigurationRejectsInvalidBuiltInModelWithoutWrites(t *testing.T) {
@@ -41,6 +46,92 @@ func TestFactoryConfigurationRejectsInvalidBuiltInModelWithoutWrites(t *testing.
 	_, err = f.apply(bundle, "invalid")
 	require.Error(t, err)
 	require.Equal(t, before, configurationResourceCounts(t))
+}
+
+func TestFactoryConfigurationBuiltInBYOKModelPolicy(t *testing.T) {
+	for _, provider := range []string{models.UsageProviderOpenRouter, models.UsageProviderCustom} {
+		t.Run(provider, func(t *testing.T) {
+			r, factory := resetTestFactory(t)
+			db := database.DB(t.Context())
+			require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryAsCode))
+			support.CompleteFactoryOnboarding(t, factory)
+			for _, feature := range []string{features.FeatureOrganizationBYOK, features.FeatureOrganizationBYOKCustomProvider} {
+				require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, feature))
+			}
+			app := "openrouter"
+			if provider == models.UsageProviderCustom {
+				app = models.CustomLLMAppName
+			}
+			integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, app)
+			vcsID := createReadyOnboardingIntegration(t, r.Organization.ID, models.ProviderGitHub)
+			require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSIntegrationID: &vcsID, AgentIntegrationID: &integrationID}))
+			canvas := resetTestTemplate(t, r, factory, "line-implementation", models.ProviderGitHub, func(doc *yaml.Canvas) {
+				for i := range doc.Spec.Nodes {
+					agent := &doc.Spec.Nodes[i]
+					if !isFactoryAgentHarness(agent.Component) {
+						continue
+					}
+					agent.Component = "runnerOpenRouter"
+					agent.Configuration["credentials"] = map[string]any{"source": "integration", "integration": map[string]any{"name": integrationName(t, r.Organization.ID, integrationID)}}
+					agent.Configuration["llmProvider"] = provider
+					agent.Configuration["model"] = "allowed-model"
+				}
+			})
+			line, err := factory.CreateLine(db, "Delivery", []models.FactoryLineStep{{Type: models.FactoryLineStepTypeRunApp, AppID: canvas.ID, Entrypoint: "onrun-implement"}})
+			require.NoError(t, err)
+			f := configurationFixture{r: r, factory: factory, canvas: canvas, line: line, ctx: onboardingContext(r)}
+			configureConfigurationCatalogIntegration(t, f, vcsID, models.ProviderGitHub)
+			_, err = models.UpsertOrganizationBYOKModelAllowlist(db, r.Organization.ID, provider, datatypes.JSONSlice[string]{"allowed-model", "other-model"})
+			require.NoError(t, err)
+			exported, err := ExportFactoryConfiguration(f.ctx, r.Organization.ID.String(), &pb.ExportFactoryConfigurationRequest{FactoryId: factory.ID.String(), LineId: line.ID.String()})
+			require.NoError(t, err)
+			bundle := exported.Bundle
+			var manifest factoryConfigurationManifest
+			require.NoError(t, goyaml.Unmarshal([]byte(bundle.Files[0].Content), &manifest))
+			var settings map[string]any
+			for i := range manifest.Stages {
+				for j := range manifest.Stages[i].Automations {
+					automation := &manifest.Stages[i].Automations[j]
+					if automation.Uses == "@superplane/implement" {
+						settings = map[string]any{}
+						automation.With = map[string]any{"agents": map[string]any{implementationAgentNodeID: settings}}
+					}
+				}
+			}
+			require.NotNil(t, settings)
+			before := configurationResourceCounts(t)
+			for _, model := range []string{"unavailable-model", "other-model"} {
+				settings["model"] = model
+				content, err := goyaml.Marshal(manifest)
+				require.NoError(t, err)
+				bundle.Files[0].Content = string(content)
+				plan := f.plan(t, bundle)
+				if model == "unavailable-model" {
+					require.NotEmpty(t, plan.Diagnostics)
+					require.Contains(t, plan.Diagnostics[0].Field, "agents."+implementationAgentNodeID+".model")
+					require.Empty(t, plan.BaseStateToken)
+					_, err = f.apply(bundle, "invalid")
+					require.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
+					require.Equal(t, before, configurationResourceCounts(t))
+					continue
+				}
+				require.Empty(t, plan.Diagnostics)
+				require.NotEmpty(t, plan.BaseStateToken)
+				// Apply must recheck workspace policy after a successful plan.
+				_, err = models.UpsertFactoryLLMModelAllowlist(db, r.Organization.ID, factory.ID, provider, models.UsageFundingSourceBYOK, datatypes.JSONSlice[string]{"allowed-model"})
+				require.NoError(t, err)
+				_, err = f.apply(bundle, plan.BaseStateToken)
+				require.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
+				require.Equal(t, before, configurationResourceCounts(t))
+				_, err = models.UpsertFactoryLLMModelAllowlist(db, r.Organization.ID, factory.ID, provider, models.UsageFundingSourceBYOK, datatypes.JSONSlice[string]{"allowed-model", "other-model"})
+				require.NoError(t, err)
+				applied, err := f.apply(bundle, plan.BaseStateToken)
+				require.NoError(t, err)
+				require.True(t, applied.Changed)
+				require.Equal(t, model, findIntakeNode(resetTestLiveVersion(t, f.canvas).Nodes, implementationAgentNodeID).Configuration["model"])
+			}
+		})
+	}
 }
 
 func TestFactoryConfigurationBuiltInSettingsSurviveReset(t *testing.T) {

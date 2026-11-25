@@ -150,7 +150,7 @@ func prepareFactoryConfigurationBuiltIn(ctx context.Context, tx *gorm.DB, deps I
 	if current != nil {
 		prepared.Nodes, prepared.Edges = alignConfigurationIntakeTrigger(current.version, prepared.IntakeSource, prepared.Nodes, prepared.Edges)
 	}
-	if err := validateFactoryConfigurationBuiltInNodes(deps, prepared.Nodes); err != nil {
+	if err := validateFactoryConfigurationBuiltInNodes(tx, deps, target.factory, prepared.Nodes); err != nil {
 		return nil, prefixConfigurationPreparationSettings(err)
 	}
 	// Retain installed managed graphs for public agent changes. Legacy graphs
