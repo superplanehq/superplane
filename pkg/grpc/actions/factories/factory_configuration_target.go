@@ -13,6 +13,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/yaml"
 	"gorm.io/gorm"
 )
 
@@ -30,15 +31,17 @@ type factoryConfigurationStageTarget struct {
 }
 
 type factoryConfigurationAutomationTarget struct {
-	canvas     *models.Canvas
-	version    *models.CanvasVersion
-	templateID string
-	placement  string
-	id         string
-	uses       string
-	settings   map[string]any
-	source     string
-	sourceID   uuid.UUID
+	canvas          *models.Canvas
+	version         *models.CanvasVersion
+	templateID      string
+	placement       string
+	id              string
+	uses            string
+	settings        map[string]any
+	defaults        *models.CanvasVersion
+	defaultSettings map[string]any
+	source          string
+	sourceID        uuid.UUID
 }
 
 func requireFactoryAsCode(tx *gorm.DB, orgID uuid.UUID) error {
@@ -308,6 +311,32 @@ func inspectConfigurationAutomation(tx *gorm.DB, factory *models.Factory, canvas
 			return nil, unsupportedConfigurationTarget(fmt.Sprintf("Automation %q uses an unsupported built-in template %q.", canvas.Name, template))
 		}
 		automation.templateID, automation.uses = template, alias
+		defaults, defaultErr := materializeLiveAutomationDefaults(tx, factory, canvas, version, nil)
+		if defaultErr != nil {
+			return nil, defaultErr
+		}
+		document, defaultErr := yaml.CanvasFromYAML([]byte(defaults.canvasYAML))
+		if defaultErr != nil {
+			return nil, defaultErr
+		}
+		// Reset preserves installed models; YAML defaults use the workspace model.
+		agent := resolveIntakeAgent(tx, factory)
+		for i := range document.Spec.Nodes {
+			node := &document.Spec.Nodes[i]
+			if agent == nil || !isFactoryAgentHarness(node.Component) {
+				continue
+			}
+			if model := agent.model(); model != "" {
+				node.Configuration["model"] = model
+				continue
+			}
+			delete(node.Configuration, "model")
+		}
+		automation.defaults = &models.CanvasVersion{Nodes: document.Nodes()}
+		automation.defaultSettings, err = exportFactoryConfigurationBuiltIn(automation.defaults, template)
+		if err != nil {
+			return nil, err
+		}
 		automation.settings, err = exportFactoryConfigurationBuiltIn(version, template)
 	} else {
 		automation.source, err = exportFactoryConfigurationCustom(tx, factory, canvas, version, placement)

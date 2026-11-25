@@ -179,7 +179,6 @@ func TestFactoryConfigurationRejectsUnsupportedManifestWithoutWrites(t *testing.
 	for _, tc := range []struct{ name, from, to, field string }{
 		{"invalid YAML", "apiVersion: v2", "apiVersion: [", "$"},
 		{"unknown field", "kind: Factory", "kind: Factory\nunknown: true", "unknown"},
-		{"missing instructions", "additional_instructions: Original instructions", "", "stages[1].automations[0].with.additional_instructions"},
 		{"null instructions", "additional_instructions: Original instructions", "additional_instructions: null", "stages[1].automations[0].with.additional_instructions"},
 		{"boolean instructions", "additional_instructions: Original instructions", "additional_instructions: true", "stages[1].automations[0].with.additional_instructions"},
 		{"numeric instructions", "additional_instructions: Original instructions", "additional_instructions: 123", "stages[1].automations[0].with.additional_instructions"},

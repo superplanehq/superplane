@@ -261,10 +261,10 @@ func exportFactoryConfigurationManifest(target *factoryConfigurationTarget) fact
 	for _, stage := range target.stages {
 		entry := factoryConfigurationStage{Key: stage.key, Name: stage.stage.Name, Kind: stage.stage.Kind, Run: stage.run, Automations: []factoryConfigurationAutomation{}}
 		if stage.stage.StepIndex != nil {
-			entry.MaxParallelism = target.line.Steps[*stage.stage.StepIndex].MaxParallelism
+			entry.MaxParallelism = configurationMaxParallelism(target.line.Steps[*stage.stage.StepIndex].MaxParallelism)
 		}
 		for _, automation := range stage.automations {
-			entry.Automations = append(entry.Automations, factoryConfigurationAutomation{ID: automation.id, Name: automation.canvas.Name, Uses: automation.uses, With: automation.settings})
+			entry.Automations = append(entry.Automations, factoryConfigurationAutomation{ID: automation.id, Name: automation.canvas.Name, Uses: automation.uses, With: factoryConfigurationOverrides(automation.settings, automation.defaultSettings)})
 			if automation.templateID == "" {
 				filePath := path.Join(path.Dir(factoryConfigurationManifestPath), automation.uses)
 				manifest.Sources[filePath] = automation.source
@@ -320,6 +320,7 @@ func validateFactoryConfigurationManifest(ctx context.Context, tx *gorm.DB, deps
 		if stage.Kind != models.FactoryLineStagePhase && stage.MaxParallelism != nil {
 			return configurationDiagnostic(stagePath+".max_parallelism", "Only phases support max_parallelism."), nil
 		}
+		stage.MaxParallelism = configurationMaxParallelism(stage.MaxParallelism)
 		ids, automationNames, retained := map[string]bool{}, map[string]bool{}, map[string]bool{}
 		retainedByStage[stage.Key] = retained
 		for j := range stage.Automations {
@@ -398,7 +399,7 @@ func validateFactoryConfigurationManifest(ctx context.Context, tx *gorm.DB, deps
 				}
 			}
 			if current != nil && current.templateID != "" {
-				nodes, edges, err := copyFactoryConfigurationBuiltIn(current.version, current.templateID, automation.With)
+				nodes, edges, err := copyFactoryConfigurationBuiltIn(current.version, current.defaults, current.templateID, automation.With)
 				if err != nil {
 					var setting *factoryConfigurationSettingError
 					if errors.As(err, &setting) {

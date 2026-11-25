@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/pkg/yaml"
@@ -102,4 +103,58 @@ func TestFactoryConfigurationBuiltInSettingsSurviveReset(t *testing.T) {
 	require.EqualValues(t, 0, agent.Configuration["executionTimeoutSeconds"])
 	require.Equal(t, false, agent.Configuration["skipSetupCommands"])
 	require.Equal(t, true, agent.Configuration["skipRepositoryCheckout"])
+}
+
+func TestFactoryConfigurationOmitsDefaultsAndRestoresOmittedOverrides(t *testing.T) {
+	f := newConfigurationFixture(t)
+	parallelism := models.DefaultFactoryLineStepMaxParallelism
+	f.line.Steps[0].MaxParallelism = &parallelism
+	require.NoError(t, f.line.Update(database.DB(t.Context()), nil, f.line.Steps, nil))
+	resetTestTemplate(t, f.r, f.factory, "risk-score", models.ProviderGitHub, func(*yaml.Canvas) {})
+	bundle := f.export(t)
+	initialPlan := f.plan(t, bundle)
+	require.Empty(t, initialPlan.Diagnostics)
+	require.Empty(t, initialPlan.Changes)
+	require.NotContains(t, bundle.Files[0].Content, "max_parallelism:")
+	require.NotContains(t, bundle.Files[0].Content, "execution_timeout_seconds:")
+	require.NotContains(t, bundle.Files[0].Content, "skip_setup_commands:")
+
+	for _, field := range []string{"agents", "additional_instructions"} {
+		var manifest factoryConfigurationManifest
+		require.NoError(t, goyaml.Unmarshal([]byte(bundle.Files[0].Content), &manifest))
+		for i := range manifest.Stages {
+			for j := range manifest.Stages[i].Automations {
+				automation := &manifest.Stages[i].Automations[j]
+				if automation.Uses == "@superplane/merge-confidence" {
+					require.Empty(t, automation.With)
+				}
+				if automation.Uses == "@superplane/implement" {
+					require.Equal(t, "Original instructions", automation.With["additional_instructions"])
+					delete(automation.With, field)
+				}
+			}
+		}
+		content, err := goyaml.Marshal(manifest)
+		require.NoError(t, err)
+		bundle.Files[0].Content = string(content)
+		plan := f.plan(t, bundle)
+		require.Empty(t, plan.Diagnostics)
+		require.NotEmpty(t, plan.Changes, "Removing %s must restore its defaults", field)
+		result, err := f.apply(bundle, plan.BaseStateToken)
+		require.NoError(t, err)
+		require.True(t, result.Changed)
+		bundle = f.export(t)
+	}
+	agent := findIntakeNode(resetTestLiveVersion(t, f.canvas).Nodes, implementationAgentNodeID)
+	require.Empty(t, agent.Configuration["additionalInstructions"])
+	require.Empty(t, agent.Configuration["thinkingLevel"])
+	require.EqualValues(t, 3600, agent.Configuration["executionTimeoutSeconds"])
+	bundle = f.export(t)
+	require.NotContains(t, bundle.Files[0].Content, "with:")
+	plan := f.plan(t, bundle)
+	require.Empty(t, plan.Diagnostics)
+	require.Empty(t, plan.Changes)
+	result, err := f.apply(bundle, plan.BaseStateToken)
+	require.NoError(t, err)
+	require.False(t, result.Changed)
 }

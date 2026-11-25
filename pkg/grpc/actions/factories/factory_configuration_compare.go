@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/automationspec"
+	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 )
 
@@ -100,7 +101,7 @@ func compareFactoryConfiguration(target *factoryConfigurationTarget, manifest *f
 			changes = append(changes, configurationChange("stages."+stage.Key, stagePath+".name", live.stage.Name, stage.Name))
 		}
 		if live.stage.StepIndex != nil {
-			previous := target.line.Steps[*live.stage.StepIndex].MaxParallelism
+			previous := configurationMaxParallelism(target.line.Steps[*live.stage.StepIndex].MaxParallelism)
 			if !equalCanvasJSON(previous, stage.MaxParallelism) {
 				changes = append(changes, configurationChange("stages."+stage.Key, stagePath+".max_parallelism", previous, stage.MaxParallelism))
 			}
@@ -146,9 +147,14 @@ func compareFactoryConfiguration(target *factoryConfigurationTarget, manifest *f
 }
 
 func configurationSettingChanges(resource, field string, previous, requested map[string]any) []*pb.FactoryConfigurationChange {
-	keys := make([]string, 0, len(requested))
-	for key := range requested {
+	keys := make([]string, 0, len(previous)+len(requested))
+	for key := range previous {
 		keys = append(keys, key)
+	}
+	for key := range requested {
+		if _, present := previous[key]; !present {
+			keys = append(keys, key)
+		}
 	}
 	slices.Sort(keys)
 	var changes []*pb.FactoryConfigurationChange
@@ -178,4 +184,11 @@ func configurationChangeValue(value any) string {
 	}
 	encoded, _ := json.Marshal(value)
 	return string(encoded)
+}
+
+func configurationMaxParallelism(value *int) *int {
+	if value == nil || *value == models.DefaultFactoryLineStepMaxParallelism {
+		return nil
+	}
+	return value
 }

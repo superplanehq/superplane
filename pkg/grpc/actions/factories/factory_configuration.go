@@ -183,7 +183,7 @@ func ApplyFactoryConfiguration(ctx context.Context, deps IntakeDependencies, org
 					continue
 				}
 				if current.templateID != "" {
-					nodes, edges, err := copyFactoryConfigurationBuiltIn(current.version, current.templateID, automation.With)
+					nodes, edges, err := copyFactoryConfigurationBuiltIn(current.version, current.defaults, current.templateID, automation.With)
 					if err != nil {
 						return err
 					}

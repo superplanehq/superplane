@@ -97,7 +97,7 @@ func exportFactoryConfigurationBuiltIn(version *models.CanvasVersion, templateID
 	return settings, nil
 }
 
-func copyFactoryConfigurationBuiltIn(version *models.CanvasVersion, templateID string, settings map[string]any) ([]models.Node, []models.Edge, error) {
+func copyFactoryConfigurationBuiltIn(version, defaults *models.CanvasVersion, templateID string, settings map[string]any) ([]models.Node, []models.Edge, error) {
 	if _, ok := factoryConfigurationBuiltInAlias(templateID); !ok {
 		return nil, nil, fmt.Errorf("unknown built-in automation %q", templateID)
 	}
@@ -109,6 +109,38 @@ func copyFactoryConfigurationBuiltIn(version *models.CanvasVersion, templateID s
 	if err := json.Unmarshal(encoded, &snapshot); err != nil {
 		return nil, nil, fmt.Errorf("copy automation: %w", err)
 	}
+	// Omitted public settings restore defaults without replacing the installed graph.
+	for i := range snapshot.Nodes {
+		node := &snapshot.Nodes[i]
+		if !isFactoryAgentHarness(node.ComponentName()) {
+			continue
+		}
+		baseline := findIntakeNode(defaults.Nodes, node.ID)
+		if baseline == nil {
+			return nil, nil, fmt.Errorf("agent %q has no factory defaults", node.ID)
+		}
+		for field, key := range factoryConfigurationAgentFields {
+			value, present := baseline.Configuration[key]
+			if !present {
+				value = factoryConfigurationAgentZero(field)
+			}
+			current, exists := node.Configuration[key]
+			if !exists {
+				current = factoryConfigurationAgentZero(field)
+			}
+			if equalCanvasJSON(current, value) {
+				continue
+			}
+			if present {
+				if node.Configuration == nil {
+					node.Configuration = map[string]any{}
+				}
+				node.Configuration[key] = value
+			} else {
+				delete(node.Configuration, key)
+			}
+		}
+	}
 	for field := range settings {
 		if field == "agents" || (field == "additional_instructions" && templateID == lineImplementationTemplateID) {
 			continue
@@ -118,7 +150,7 @@ func copyFactoryConfigurationBuiltIn(version *models.CanvasVersion, templateID s
 	if templateID == lineImplementationTemplateID {
 		instructions, present := settings["additional_instructions"]
 		if !present {
-			return nil, nil, &factoryConfigurationSettingError{Field: "additional_instructions", Message: "This field is required for Implement."}
+			instructions = ""
 		}
 		agent := findIntakeNode(snapshot.Nodes, implementationAgentNodeID)
 		if agent == nil || !isFactoryAgentHarness(agent.ComponentName()) {
@@ -235,4 +267,38 @@ func validFactoryConfigurationTimeout(value any) bool {
 		return false
 	}
 	return seconds >= 0 && seconds <= runner.MaxExecutionTimeoutSecondsRequest && math.Trunc(seconds) == seconds
+}
+
+func factoryConfigurationAgentZero(field string) any {
+	switch field {
+	case "skip_setup_commands", "skip_repository_checkout":
+		return false
+	case "execution_timeout_seconds":
+		return 0
+	default:
+		return ""
+	}
+}
+
+func factoryConfigurationOverrides(settings, defaults map[string]any) map[string]any {
+	overrides := map[string]any{}
+	for field, value := range settings {
+		baselineValue, present := defaults[field]
+		if _, agentField := factoryConfigurationAgentFields[field]; agentField && !present {
+			baselineValue = factoryConfigurationAgentZero(field)
+		}
+		if equalCanvasJSON(value, baselineValue) {
+			continue
+		}
+		if fields, ok := value.(map[string]any); ok {
+			baseline, _ := defaults[field].(map[string]any)
+			nested := factoryConfigurationOverrides(fields, baseline)
+			if len(nested) > 0 {
+				overrides[field] = nested
+			}
+			continue
+		}
+		overrides[field] = value
+	}
+	return overrides
 }
