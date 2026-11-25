@@ -490,6 +490,31 @@ func (s *FactoryService) RevokeFactoryMCPClient(ctx context.Context, req *pb.Rev
 	return actions.RevokeFactoryMCPClient(ctx, organizationID, req)
 }
 
+func (s *FactoryService) ListFactoryWebhooks(ctx context.Context, req *pb.ListFactoryWebhooksRequest) (*pb.ListFactoryWebhooksResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.ListFactoryWebhooks(ctx, s.intakeDeps, organizationID, req)
+}
+
+func (s *FactoryService) CreateFactoryWebhook(ctx context.Context, req *pb.CreateFactoryWebhookRequest) (*pb.CreateFactoryWebhookResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.CreateFactoryWebhook(ctx, s.intakeDeps, organizationID, req)
+}
+
+func (s *FactoryService) UpdateFactoryWebhook(ctx context.Context, req *pb.UpdateFactoryWebhookRequest) (*pb.UpdateFactoryWebhookResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.UpdateFactoryWebhook(ctx, s.intakeDeps, organizationID, req)
+}
+
+func (s *FactoryService) DeleteFactoryWebhook(ctx context.Context, req *pb.DeleteFactoryWebhookRequest) (*pb.DeleteFactoryWebhookResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.DeleteFactoryWebhook(ctx, organizationID, req)
+}
+
+func (s *FactoryService) RegenerateFactoryWebhookSecret(ctx context.Context, req *pb.RegenerateFactoryWebhookSecretRequest) (*pb.RegenerateFactoryWebhookSecretResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.RegenerateFactoryWebhookSecret(ctx, s.intakeDeps, organizationID, req)
+}
+
 func (s *FactoryService) ListFactoryOwnerEligibility(ctx context.Context, req *pb.ListFactoryOwnerEligibilityRequest) (*pb.ListFactoryOwnerEligibilityResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.ListFactoryOwnerEligibility(ctx, organizationID, req)

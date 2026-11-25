@@ -69,6 +69,10 @@ type WorkOrderParams struct {
 	DefaultOwnerID string
 	Title          string
 	Description    string
+	// OriginURL links the task to its source item. It wins over a link read
+	// from the trigger payload, and a task with the same link is not created
+	// again.
+	OriginURL string
 }
 
 // FindWorkOrderParams configures FactoryContext.FindWorkOrder. By selects

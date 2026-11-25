@@ -165,6 +165,12 @@ func (b CanvasAutomationBackend) compile(
 	if err != nil {
 		return nil, nil, err
 	}
+	if err := validateCustomAutomationWebhooks(tx, factory, settings.Triggers); err != nil {
+		return nil, nil, source.Diagnostic("triggers", grpcerrors.StatusMessage(err))
+	}
+	if settings.hasWebhookTrigger() && placement.Stage != models.CanvasColumnKeyBacklog {
+		return nil, nil, source.Diagnostic("triggers", "Webhook triggers are available in Backlog only.")
+	}
 	if strings.HasPrefix(placement.Stage, "custom-") {
 		if err := validateCustomStageTriggers(settings); err != nil {
 			return nil, nil, source.Diagnostic("triggers", grpcerrors.StatusMessage(err))
@@ -310,6 +316,9 @@ func automationCanvasSettings(stage string, source *automationspec.Document, age
 			start.Schedule = &pb.FactoryCustomAutomation_Schedule{
 				CronExpression: trigger.Config.Cron, UtcOffset: trigger.Config.UTCOffset,
 			}
+		case automationspec.Webhook:
+			start.StartMode = pb.FactoryCustomAutomation_START_MODE_WEBHOOK
+			start.WebhookId = trigger.Config.WebhookID
 		}
 		input.Triggers = append(input.Triggers, start)
 	}
