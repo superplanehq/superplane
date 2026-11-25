@@ -159,6 +159,105 @@ func (o *FactoryWorkOrder) SubscriptionOwnershipBlockedForStart(tx *gorm.DB) (bo
 	return o.subscriptionOwnershipBlocked(tx, ignored)
 }
 
+// DefaultSubscriptionAssignees applies only to implicit assignments. Explicit
+// assignments go through ReplaceAssignees and are rejected without mutation.
+func (f *Factory) DefaultSubscriptionAssignees(tx *gorm.DB, userID *uuid.UUID) ([]uuid.UUID, error) {
+	if userID == nil {
+		return nil, nil
+	}
+	if !f.OnboardingConfigValue().CodexSubscription {
+		return []uuid.UUID{*userID}, nil
+	}
+	eligible, err := SubscriptionOwnerEligible(tx.Clauses(clause.Locking{Strength: "SHARE"}).Session(&gorm.Session{}), f.OrganizationID, f.ID, *userID)
+	if err != nil || !eligible {
+		return nil, err
+	}
+	return []uuid.UUID{*userID}, nil
+}
+
+// FindSubscriptionWorkOrderForRun uses persisted associations and ancestors.
+// Event payloads and agent-supplied task IDs are never authority for routing.
+func FindSubscriptionWorkOrderForRun(tx *gorm.DB, orgID, factoryID, runID uuid.UUID) (*FactoryWorkOrder, error) {
+	orders, err := subscriptionWorkOrdersForRun(tx, orgID, factoryID, runID)
+	if err != nil {
+		return nil, err
+	}
+	if len(orders) != 1 {
+		return nil, ErrSubscriptionTaskAssociation
+	}
+	return &orders[0], nil
+}
+
+// RequireSubscriptionRunOwner prefers task and intake owners, then uses the
+// workspace default for automations without a task. Ambiguous task links
+// never fall back to a default.
+func RequireSubscriptionRunOwner(tx *gorm.DB, orgID, factoryID, runID uuid.UUID) (uuid.UUID, error) {
+	return requireSubscriptionRunOwner(tx, orgID, factoryID, runID, uuid.Nil)
+}
+
+// ResolveSubscriptionCatalogOwner never substitutes another member's catalog.
+func (f *Factory) ResolveSubscriptionCatalogOwner(tx *gorm.DB, callerID uuid.UUID, taskRef string) (uuid.UUID, error) {
+	if _, err := ActiveCodexMember(tx, f.OrganizationID, callerID); err != nil {
+		return uuid.Nil, err
+	}
+	if taskRef == "" {
+		return callerID, nil
+	}
+	order, err := f.FindWorkOrderByRef(tx, taskRef)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	owners, err := order.ListAssignees(tx)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	if len(owners) != 1 {
+		return uuid.Nil, nil
+	}
+	eligible, err := SubscriptionOwnerEligible(tx, f.OrganizationID, f.ID, owners[0].UserID)
+	if err != nil || !eligible {
+		return uuid.Nil, err
+	}
+	return owners[0].UserID, nil
+}
+
+// ValidateSubscriptionCanvasModels validates effective choices before admission.
+// Historical dispatch snapshots remain unchanged when a catalog changes.
+func (o *FactoryWorkOrder) ValidateSubscriptionCanvasModels(tx *gorm.DB, canvasID uuid.UUID, override string) error {
+	subscription, err := o.UsesCodexSubscription(tx)
+	if err != nil || !subscription {
+		return err
+	}
+	ownerID, err := o.RequireSubscriptionOwner(tx, true)
+	if err != nil {
+		return err
+	}
+	version, err := FindLiveCanvasVersionInTransaction(tx, canvasID)
+	if err != nil {
+		return err
+	}
+	for _, node := range version.Nodes {
+		credentials, _ := node.Configuration["credentials"].(map[string]any)
+		if node.ComponentName() != "runnerCodex" || credentials["source"] != "subscription" {
+			continue
+		}
+		model := strings.TrimSpace(override)
+		if model == "" {
+			model, _ = node.Configuration["model"].(string)
+			model = strings.TrimSpace(model)
+		}
+		// Expressions resolve later. Dispatch checks the resolved value.
+		if strings.Contains(model, "{{") {
+			continue
+		}
+		_, err := ResolveFactoryCodexSubscriptionModel(tx, o.OrganizationID, o.FactoryID, ownerID, model)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (o *FactoryWorkOrder) subscriptionOwnershipBlocked(tx *gorm.DB, ignoredRuns map[uuid.UUID]bool) (bool, error) {
 	var queued int64
 	if err := tx.Model(&FactoryWorkOrderQueueItem{}).Where("work_order_id = ?", o.ID).Count(&queued).Error; err != nil {
@@ -199,42 +298,6 @@ func (o *FactoryWorkOrder) subscriptionOwnershipBlocked(tx *gorm.DB, ignoredRuns
 		Where("e.run_id IN ?", ids).
 		Where("t.state IN ? OR (r.id IS NOT NULL AND r.provider_deleted_at IS NULL AND (t.cancel_requested_at IS NOT NULL OR t.state = ?))", []string{RunnerTaskStatePending, RunnerTaskStateQueued, RunnerTaskStateReserved, RunnerTaskStateRunning}, RunnerTaskStateLost).Count(&active).Error
 	return active > 0, err
-}
-
-// DefaultSubscriptionAssignees applies only to implicit assignments. Explicit
-// assignments go through ReplaceAssignees and are rejected without mutation.
-func (f *Factory) DefaultSubscriptionAssignees(tx *gorm.DB, userID *uuid.UUID) ([]uuid.UUID, error) {
-	if userID == nil {
-		return nil, nil
-	}
-	if !f.OnboardingConfigValue().CodexSubscription {
-		return []uuid.UUID{*userID}, nil
-	}
-	eligible, err := SubscriptionOwnerEligible(tx.Clauses(clause.Locking{Strength: "SHARE"}).Session(&gorm.Session{}), f.OrganizationID, f.ID, *userID)
-	if err != nil || !eligible {
-		return nil, err
-	}
-	return []uuid.UUID{*userID}, nil
-}
-
-// FindSubscriptionWorkOrderForRun uses persisted associations and ancestors.
-// Event payloads and agent-supplied task IDs are never authority for routing.
-func FindSubscriptionWorkOrderForRun(tx *gorm.DB, orgID, factoryID, runID uuid.UUID) (*FactoryWorkOrder, error) {
-	orders, err := subscriptionWorkOrdersForRun(tx, orgID, factoryID, runID)
-	if err != nil {
-		return nil, err
-	}
-	if len(orders) != 1 {
-		return nil, ErrSubscriptionTaskAssociation
-	}
-	return &orders[0], nil
-}
-
-// RequireSubscriptionRunOwner prefers task and intake owners, then uses the
-// workspace default for automations without a task. Ambiguous task links
-// never fall back to a default.
-func RequireSubscriptionRunOwner(tx *gorm.DB, orgID, factoryID, runID uuid.UUID) (uuid.UUID, error) {
-	return requireSubscriptionRunOwner(tx, orgID, factoryID, runID, uuid.Nil)
 }
 
 func requireSubscriptionRunOwner(tx *gorm.DB, orgID, factoryID, runID, leaseOwnerID uuid.UUID) (uuid.UUID, error) {
@@ -321,69 +384,6 @@ func subscriptionWorkOrdersForRun(tx *gorm.DB, orgID, factoryID, runID uuid.UUID
 		}
 	}
 	return orders, nil
-}
-
-// ResolveSubscriptionCatalogOwner never substitutes another member's catalog.
-func (f *Factory) ResolveSubscriptionCatalogOwner(tx *gorm.DB, callerID uuid.UUID, taskRef string) (uuid.UUID, error) {
-	if _, err := ActiveCodexMember(tx, f.OrganizationID, callerID); err != nil {
-		return uuid.Nil, err
-	}
-	if taskRef == "" {
-		return callerID, nil
-	}
-	order, err := f.FindWorkOrderByRef(tx, taskRef)
-	if err != nil {
-		return uuid.Nil, err
-	}
-	owners, err := order.ListAssignees(tx)
-	if err != nil {
-		return uuid.Nil, err
-	}
-	if len(owners) != 1 {
-		return uuid.Nil, nil
-	}
-	eligible, err := SubscriptionOwnerEligible(tx, f.OrganizationID, f.ID, owners[0].UserID)
-	if err != nil || !eligible {
-		return uuid.Nil, err
-	}
-	return owners[0].UserID, nil
-}
-
-// ValidateSubscriptionCanvasModels validates effective choices before admission.
-// Historical dispatch snapshots remain unchanged when a catalog changes.
-func (o *FactoryWorkOrder) ValidateSubscriptionCanvasModels(tx *gorm.DB, canvasID uuid.UUID, override string) error {
-	subscription, err := o.UsesCodexSubscription(tx)
-	if err != nil || !subscription {
-		return err
-	}
-	ownerID, err := o.RequireSubscriptionOwner(tx, true)
-	if err != nil {
-		return err
-	}
-	version, err := FindLiveCanvasVersionInTransaction(tx, canvasID)
-	if err != nil {
-		return err
-	}
-	for _, node := range version.Nodes {
-		credentials, _ := node.Configuration["credentials"].(map[string]any)
-		if node.ComponentName() != "runnerCodex" || credentials["source"] != "subscription" {
-			continue
-		}
-		model := strings.TrimSpace(override)
-		if model == "" {
-			model, _ = node.Configuration["model"].(string)
-			model = strings.TrimSpace(model)
-		}
-		// Expressions resolve later. Dispatch checks the resolved value.
-		if strings.Contains(model, "{{") {
-			continue
-		}
-		_, err := ResolveFactoryCodexSubscriptionModel(tx, o.OrganizationID, o.FactoryID, ownerID, model)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 func (o *FactoryWorkOrder) validateSubscriptionAssignment(tx *gorm.DB, ids []uuid.UUID) error {
