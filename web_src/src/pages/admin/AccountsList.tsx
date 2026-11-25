@@ -1,4 +1,6 @@
 import { Text } from "@/components/Text/text";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { useAccount } from "@/contexts/useAccount";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
@@ -144,12 +146,26 @@ function AccountsListContent({
   );
 }
 
+function InstallationAdminFilter({ checked, onChange }: { checked: boolean; onChange: (checked: boolean) => void }) {
+  return (
+    <div className="flex items-center gap-2">
+      <Checkbox
+        id="installation-admins-only"
+        checked={checked}
+        onChange={(event: React.ChangeEvent<HTMLInputElement>) => onChange(event.target.checked)}
+      />
+      <Label htmlFor="installation-admins-only">Installation admins only</Label>
+    </div>
+  );
+}
+
 const AccountsList: React.FC = () => {
   const { account: currentAccount } = useAccount();
   const [accounts, setAccounts] = useState<AdminAccount[]>([]);
   const [total, setTotal] = useState(0);
   const [offset, setOffset] = useState(0);
   const [search, setSearch] = useState("");
+  const [installationAdminsOnly, setInstallationAdminsOnly] = useState(false);
   const [loading, setLoading] = useState(true);
   const [toggling, setToggling] = useState<string | null>(null);
   const [confirmTarget, setConfirmTarget] = useState<AdminAccount | null>(null);
@@ -157,25 +173,29 @@ const AccountsList: React.FC = () => {
   const [sortBy, setSortBy] = useState<SortField>("created_at");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
 
-  const fetchAccounts = useCallback(async (s: string, o: number, sort: SortField, direction: SortDirection) => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(o) });
-      if (s) params.set("search", s);
-      params.set("sort_by", sort);
-      params.set("sort_direction", direction);
-      const res = await fetch(`/admin/api/accounts?${params}`, { credentials: "include" });
-      if (res.ok) {
-        const d = await res.json();
-        setAccounts(d.items);
-        setTotal(d.total);
+  const fetchAccounts = useCallback(
+    async (s: string, o: number, sort: SortField, direction: SortDirection) => {
+      setLoading(true);
+      try {
+        const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(o) });
+        if (s) params.set("search", s);
+        if (installationAdminsOnly) params.set("installation_admin", "true");
+        params.set("sort_by", sort);
+        params.set("sort_direction", direction);
+        const res = await fetch(`/admin/api/accounts?${params}`, { credentials: "include" });
+        if (res.ok) {
+          const d = await res.json();
+          setAccounts(d.items);
+          setTotal(d.total);
+        }
+      } catch {
+        showErrorToast("Failed to load accounts");
+      } finally {
+        setLoading(false);
       }
-    } catch {
-      showErrorToast("Failed to load accounts");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    },
+    [installationAdminsOnly],
+  );
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -188,7 +208,10 @@ const AccountsList: React.FC = () => {
   const onToggle = async (acc: AdminAccount) => {
     setConfirmTarget(null);
     setToggling(acc.id);
-    await toggleAdmin(acc, () => fetchAccounts(search, offset, sortBy, sortDirection));
+    await toggleAdmin(acc, () => {
+      setOffset(0);
+      fetchAccounts(search, 0, sortBy, sortDirection);
+    });
     setToggling(null);
   };
 
@@ -234,6 +257,7 @@ const AccountsList: React.FC = () => {
         search={search}
         onSearchChange={setSearch}
         placeholder="Search by name or email..."
+        filters={<InstallationAdminFilter checked={installationAdminsOnly} onChange={setInstallationAdminsOnly} />}
       />
       <AccountsListContent
         loading={loading}
