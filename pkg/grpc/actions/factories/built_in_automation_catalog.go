@@ -33,6 +33,7 @@ var builtInAutomations = []BuiltInAutomation{
 	{ID: intakeTemplateID(models.FactoryIntakeSourceProductiveTasks), Name: "Productive tasks"},
 	{ID: intakeTemplateID(models.FactoryIntakeSourceDatadog), Name: "Datadog errors"},
 	{ID: intakeTemplateID(models.FactoryIntakeSourceLinearIssues), Name: "Linear issues"},
+	{ID: intakeTemplateID(models.FactoryIntakeSourceWebhook), Name: "Webhook"},
 }
 
 func intakeTemplateID(source string) string {

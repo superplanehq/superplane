@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	factorycomponent "github.com/superplanehq/superplane/pkg/components/factory"
 	httpcomponent "github.com/superplanehq/superplane/pkg/components/http"
 	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/integrations/sentry"
@@ -195,6 +196,15 @@ var intakeSpecsBySource = map[string]intakeSpec{
 		createTitle:       `{{ root().data.data.identifier }}: {{ root().data.data.title }}`,
 		createDescription: `{{ root().data.data.description }}`,
 	},
+	// The task fields come from the intake settings. See
+	// webhookIntakeCreateConfiguration.
+	models.FactoryIntakeSourceWebhook: {
+		name:                 "Webhook",
+		description:          "Create a task when a workspace webhook receives a request.",
+		triggerComponent:     factorycomponent.OnWebhookTriggerName,
+		triggerName:          "On Workspace Webhook",
+		triggerConfiguration: map[string]any{},
+	},
 }
 
 // Both API errors and transport failures leave the original issue available.
@@ -337,17 +347,21 @@ func buildIntakeCanvas(request intakeCanvasRequest) (*yaml.Canvas, error) {
 		)
 	}
 
+	createConfiguration := map[string]any{
+		"title":       spec.createTitle,
+		"description": spec.createDescription,
+	}
+	if request.Source == models.FactoryIntakeSourceWebhook {
+		createConfiguration = webhookIntakeCreateConfiguration(intakeSettingsOrDefault(request.Source, request.Settings))
+	}
 	nodes = append(nodes, yaml.Node{
-		ID:        intakeCreateNodeID,
-		Name:      intakeCreateNodeName,
-		Type:      yaml.NodeTypeAction,
-		Component: intakeCreateComponent,
-		Configuration: map[string]any{
-			"title":       spec.createTitle,
-			"description": spec.createDescription,
-		},
-		Concurrency: intakeConcurrency(),
-		Position:    yaml.Position{X: 160, Y: createY},
+		ID:            intakeCreateNodeID,
+		Name:          intakeCreateNodeName,
+		Type:          yaml.NodeTypeAction,
+		Component:     intakeCreateComponent,
+		Configuration: createConfiguration,
+		Concurrency:   intakeConcurrency(),
+		Position:      yaml.Position{X: 160, Y: createY},
 	})
 
 	if intakeSourceSupportsDefaultOwner(request.Source) {
@@ -615,6 +629,9 @@ func intakeSettingsOrDefault(source string, settings intakeSettings) intakeSetti
 	}
 	if source == models.FactoryIntakeSourceLinearIssues {
 		return defaultLinearIntakeSettings()
+	}
+	if source == models.FactoryIntakeSourceWebhook {
+		return defaultWebhookIntakeSettings()
 	}
 	return defaultIntakeSettings()
 }

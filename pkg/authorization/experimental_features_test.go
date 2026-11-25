@@ -217,7 +217,7 @@ func TestTeamBillingMutationsRequireBillingPermission(t *testing.T) {
 	}
 }
 
-func TestFactoryConfigurationRoutesRequireFeatureAndPermission(t *testing.T) {
+func TestFactoryAsCodeRoutesRequireFeatureAndPermission(t *testing.T) {
 	t.Cleanup(clearOrgExperimentalFeatureCacheForTest)
 	t.Cleanup(clearOrganizationPermissionCacheForTest)
 	org, err := models.CreateOrganization("configuration-auth-"+uuid.NewString()[:8], "")
@@ -232,6 +232,11 @@ func TestFactoryConfigurationRoutesRequireFeatureAndPermission(t *testing.T) {
 		{"GET", "/api/v1/factories/{factory_id}/configuration", "read"},
 		{"POST", "/api/v1/factories/{factory_id}/configuration:plan", "update"},
 		{"POST", "/api/v1/factories/{factory_id}/configuration:apply", "update"},
+		{"GET", "/api/v1/factories/{factory_id}/webhooks", "read"},
+		{"POST", "/api/v1/factories/{factory_id}/webhooks", "update"},
+		{"PATCH", "/api/v1/factories/{factory_id}/webhooks/{webhook_id}", "update"},
+		{"DELETE", "/api/v1/factories/{factory_id}/webhooks/{webhook_id}", "update"},
+		{"POST", "/api/v1/factories/{factory_id}/webhooks/{webhook_id}/secret", "update"},
 	}
 	for _, route := range routes {
 		t.Run(route.path+" disabled", func(t *testing.T) {

@@ -83,6 +83,7 @@ import { AddPRFeedbackPicker } from "./AddPRFeedbackPicker";
 import { useAddColumnAutomation } from "./useAddColumnAutomation";
 import { IntakeWebhookFailureNotice } from "./IntakeWebhookFailureNotice";
 import { useIntakeWebhookRetry } from "./useIntakeWebhookRetry";
+import { WebhookIntakeSetupDialog } from "./WebhookIntakeSetupDialog";
 import { NextStepsPanel, WorkspaceNextStepsHeaderBadge } from "./NextStepsPanel";
 import { useWorkspaceNextStepDeferral } from "./workspaceNextStepDeferral";
 import {
@@ -433,6 +434,7 @@ export function LinesPage() {
   );
   const [addIntakeOpen, setAddIntakeOpen] = useState(false);
   const [scheduledIntakeOpen, setScheduledIntakeOpen] = useState(false);
+  const [webhookIntakeOpen, setWebhookIntakeOpen] = useState(false);
   const [ownerIntakeTemplate, setOwnerIntakeTemplate] = useState<AddIntakeTemplate>();
   const [addPRFeedbackOpen, setAddPRFeedbackOpen] = useState(false);
   const [stageEditingLineId, setStageEditingLineId] = useState<string | null>(null);
@@ -672,6 +674,10 @@ export function LinesPage() {
       }
       return;
     }
+    if (template.id === "webhook") {
+      setWebhookIntakeOpen(true);
+      return;
+    }
     if (!isLineIntakeSourceId(template.id)) {
       showErrorToast("This intake template is not available yet.");
       return;
@@ -772,6 +778,15 @@ export function LinesPage() {
             setScheduledIntakeOpen(false);
             navigate(factoryColumnAutomationViewPath(organizationId, routeSegment, selectedLine.id, canvasId));
           }}
+        />
+      ) : null}
+      {webhookIntakeOpen ? (
+        <WebhookIntakeSetupDialog
+          organizationId={organizationId}
+          factoryId={factoryId}
+          factoryKey={routeSegment}
+          onClose={() => setWebhookIntakeOpen(false)}
+          onCreated={() => setWebhookIntakeOpen(false)}
         />
       ) : null}
       <AddIntakePicker

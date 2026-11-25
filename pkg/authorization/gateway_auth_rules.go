@@ -127,6 +127,36 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			DomainType:                   models.DomainTypeOrganization,
 			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureSuperPlaneMCPServer},
 		},
+		{Method: "GET", Pattern: "/api/v1/factories/{factory_id}/webhooks"}: {
+			Resource:                     "factories",
+			Action:                       "read",
+			DomainType:                   models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureFactoryAsCode},
+		},
+		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/webhooks"}: {
+			Resource:                     "factories",
+			Action:                       "update",
+			DomainType:                   models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureFactoryAsCode},
+		},
+		{Method: "PATCH", Pattern: "/api/v1/factories/{factory_id}/webhooks/{webhook_id}"}: {
+			Resource:                     "factories",
+			Action:                       "update",
+			DomainType:                   models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureFactoryAsCode},
+		},
+		{Method: "DELETE", Pattern: "/api/v1/factories/{factory_id}/webhooks/{webhook_id}"}: {
+			Resource:                     "factories",
+			Action:                       "update",
+			DomainType:                   models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureFactoryAsCode},
+		},
+		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/webhooks/{webhook_id}/secret"}: {
+			Resource:                     "factories",
+			Action:                       "update",
+			DomainType:                   models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureFactoryAsCode},
+		},
 		{Method: "DELETE", Pattern: "/api/v1/groups/{group_name}"}: {
 			Resource:   "groups",
 			Action:     "delete",

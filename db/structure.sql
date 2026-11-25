@@ -2228,7 +2228,10 @@ CREATE TABLE public.webhooks (
     deleted_at timestamp without time zone,
     retry_count integer DEFAULT 0 NOT NULL,
     max_retries integer DEFAULT 3 NOT NULL,
-    app_installation_id uuid
+    app_installation_id uuid,
+    organization_id uuid,
+    factory_id uuid,
+    name text
 );
 
 
@@ -4660,6 +4663,20 @@ CREATE INDEX idx_webhooks_deleted_at ON public.webhooks USING btree (deleted_at)
 
 
 --
+-- Name: idx_webhooks_factory_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_webhooks_factory_id ON public.webhooks USING btree (factory_id);
+
+
+--
+-- Name: idx_webhooks_factory_name; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_webhooks_factory_name ON public.webhooks USING btree (factory_id, name) WHERE ((factory_id IS NOT NULL) AND (deleted_at IS NULL));
+
+
+--
 -- Name: idx_workflow_events_dedup_key; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -6558,6 +6575,22 @@ ALTER TABLE ONLY public.vcs_provider_repository_sync_jobs
 
 ALTER TABLE ONLY public.webhooks
     ADD CONSTRAINT webhooks_app_installation_id_fkey FOREIGN KEY (app_installation_id) REFERENCES public.app_installations(id);
+
+
+--
+-- Name: webhooks webhooks_factory_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.webhooks
+    ADD CONSTRAINT webhooks_factory_id_fkey FOREIGN KEY (factory_id) REFERENCES public.factories(id) ON DELETE CASCADE;
+
+
+--
+-- Name: webhooks webhooks_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.webhooks
+    ADD CONSTRAINT webhooks_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
 
 
 --

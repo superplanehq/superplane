@@ -93,8 +93,12 @@ func configurationCatalogBundle(t *testing.T, f configurationFixture, automation
 	return bundle
 }
 
-func TestFactoryConfigurationInstallsEveryCatalogEntry(t *testing.T) {
+func TestFactoryConfigurationInstallsSupportedCatalogEntries(t *testing.T) {
 	for _, entry := range builtInAutomations {
+		// Workspace webhook bindings are not supported by YAML restoration yet.
+		if entry.ID == intakeTemplateID(models.FactoryIntakeSourceWebhook) {
+			continue
+		}
 		for _, provider := range []string{models.ProviderGitHub, models.ProviderBitbucket} {
 			if provider == models.ProviderBitbucket && !configurationCatalogSupportsBitbucket(entry.ID) {
 				continue
@@ -382,6 +386,10 @@ func TestFactoryConfigurationDiagnosesProviderSelectionsWithoutWrites(t *testing
 		{name: "Linear empty projects without team", templateID: intakeTemplateID(models.FactoryIntakeSourceLinearIssues), field: "with.intake.linear_project_ids", mutate: func(_ *testing.T, _ configurationFixture, automation *factoryConfigurationAutomation) {
 			automation.Binding.TeamID = ""
 			automation.With = map[string]any{"intake": map[string]any{"linear_project_ids": []any{}}}
+		}},
+		{name: "unsupported webhook intake", field: "uses", mutate: func(_ *testing.T, _ configurationFixture, automation *factoryConfigurationAutomation) {
+			automation.Uses = "@superplane/intake/webhook"
+			automation.Binding = nil
 		}},
 		{name: "missing provider", field: "binding.integration_id", mutate: func(_ *testing.T, _ configurationFixture, automation *factoryConfigurationAutomation) {
 			automation.Binding = nil

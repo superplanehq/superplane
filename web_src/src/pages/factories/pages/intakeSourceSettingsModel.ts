@@ -66,6 +66,12 @@ export interface IntakeSourceSettings {
   linearIncludeIssuesWithoutProject: boolean;
   /** Linear labels that still create a task. Empty means every label. */
   linearLabels: string[];
+  /** Workspace webhook the trigger listens on. Saved as the intake resource, not in settings. */
+  webhookId: string;
+  /** Request body fields that fill the task. Webhook intakes only. */
+  webhookTitlePath: string;
+  webhookDescriptionPath: string;
+  webhookLinkPath: string;
 }
 
 export const DEFAULT_GITHUB_INTAKE_SETTINGS: IntakeSourceSettings = {
@@ -98,6 +104,10 @@ export const DEFAULT_GITHUB_INTAKE_SETTINGS: IntakeSourceSettings = {
   linearProjectIds: [],
   linearIncludeIssuesWithoutProject: true,
   linearLabels: [],
+  webhookId: "",
+  webhookTitlePath: "title",
+  webhookDescriptionPath: "description",
+  webhookLinkPath: "url",
 };
 
 export const SENTRY_INTAKE_LEVELS = ["fatal", "error", "warning", "info", "debug"] as const;
@@ -186,7 +196,8 @@ export function intakeSupportsDelete(sourceId: LineIntakeSourceId): boolean {
     sourceId === "jira-issues" ||
     sourceId === "productive-tasks" ||
     sourceId === "datadog" ||
-    sourceId === "linear-issues"
+    sourceId === "linear-issues" ||
+    sourceId === "webhook"
   );
 }
 
@@ -264,6 +275,10 @@ export function normalizeIntakeSourceSettings(
     linearProjectIds,
     linearLabels,
     sentryProjectIds,
+    webhookId: draft.webhookId.trim(),
+    webhookTitlePath: draft.webhookTitlePath.trim(),
+    webhookDescriptionPath: draft.webhookDescriptionPath.trim(),
+    webhookLinkPath: draft.webhookLinkPath.trim(),
   };
 }
 
@@ -399,6 +414,10 @@ export function intakeSettingsFromApi(
     datadogService: "",
     ...linearScopeFromApi(settings),
     ...productiveFiltersFromApi(settings),
+    webhookId: "",
+    webhookTitlePath: settings?.webhookTitlePath ?? DEFAULT_GITHUB_INTAKE_SETTINGS.webhookTitlePath,
+    webhookDescriptionPath: settings?.webhookDescriptionPath ?? DEFAULT_GITHUB_INTAKE_SETTINGS.webhookDescriptionPath,
+    webhookLinkPath: settings?.webhookLinkPath ?? DEFAULT_GITHUB_INTAKE_SETTINGS.webhookLinkPath,
   };
 }
 
@@ -475,6 +494,13 @@ export function intakeSettingsToApi(
     linearProjectIds: normalizeLinearValues(settings.linearProjectIds),
     linearIncludeIssuesWithoutProject: settings.linearIncludeIssuesWithoutProject,
     linearLabels: normalizeLinearValues(settings.linearLabels),
+    ...(sourceId === "webhook"
+      ? {
+          webhookTitlePath: settings.webhookTitlePath.trim(),
+          webhookDescriptionPath: settings.webhookDescriptionPath.trim(),
+          webhookLinkPath: settings.webhookLinkPath.trim(),
+        }
+      : {}),
   };
 }
 
