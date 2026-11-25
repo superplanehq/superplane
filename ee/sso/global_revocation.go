@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
+	ssooidc "github.com/superplanehq/superplane/ee/sso/oidc"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -26,27 +27,27 @@ func (s *Service) globalTokenRevocation(w http.ResponseWriter, r *http.Request) 
 	}
 	conn, status, reason := s.globalRevocationConnection(r)
 	if status != 0 {
-		s.finishGlobalRevocation(w, r, conn, status, reason, false)
+		s.finishGlobalRevocation(w, r, conn, status, reason, "", false)
 		return
 	}
 	raw, ok := bearerJWT(r.Header.Get("Authorization"))
 	if !ok {
-		s.finishGlobalRevocation(w, r, conn, http.StatusUnauthorized, "auth", false)
+		s.finishGlobalRevocation(w, r, conn, http.StatusUnauthorized, "auth", "", false)
 		return
 	}
 	audience := s.BaseURL + "/auth/sso/" + conn.ID.String() + "/global-token-revocation"
 	jti, expiresAt, err := s.adapter.VerifyGlobalRevocation(r.Context(), conn, raw, audience)
 	if err != nil {
-		s.finishGlobalRevocation(w, r, conn, http.StatusUnauthorized, "auth", false)
+		s.finishGlobalRevocation(w, r, conn, http.StatusUnauthorized, "auth", revocationDetail(err), false)
 		return
 	}
 	identities, status, reason := globalRevocationIdentities(w, r, conn)
 	if status != 0 {
-		s.finishGlobalRevocation(w, r, conn, status, reason, false)
+		s.finishGlobalRevocation(w, r, conn, status, reason, "", false)
 		return
 	}
 	if len(identities) == 0 {
-		s.finishGlobalRevocation(w, r, conn, http.StatusNotFound, "", false)
+		s.finishGlobalRevocation(w, r, conn, http.StatusNotFound, "", "", false)
 		return
 	}
 	now := s.now()
@@ -66,14 +67,22 @@ func (s *Service) globalTokenRevocation(w http.ResponseWriter, r *http.Request) 
 		return nil
 	})
 	if errors.Is(err, errGlobalReplay) {
-		s.finishGlobalRevocation(w, r, conn, http.StatusUnauthorized, "replay", false)
+		s.finishGlobalRevocation(w, r, conn, http.StatusUnauthorized, "replay", "", false)
 		return
 	}
 	if err != nil {
-		s.finishGlobalRevocation(w, r, conn, http.StatusUnprocessableEntity, "", false)
+		s.finishGlobalRevocation(w, r, conn, http.StatusUnprocessableEntity, "", "", false)
 		return
 	}
-	s.finishGlobalRevocation(w, r, conn, http.StatusNoContent, "", true)
+	s.finishGlobalRevocation(w, r, conn, http.StatusNoContent, "", "", true)
+}
+
+func revocationDetail(err error) string {
+	var failure *ssooidc.RevocationError
+	if errors.As(err, &failure) {
+		return failure.Detail
+	}
+	return ""
 }
 
 func (s *Service) globalRevocationConnection(r *http.Request) (*models.SSOConnection, int, string) {
@@ -147,7 +156,7 @@ func identitiesByEmail(r *http.Request, conn *models.SSOConnection, email string
 	return identities, 0, ""
 }
 
-func (s *Service) finishGlobalRevocation(w http.ResponseWriter, r *http.Request, conn *models.SSOConnection, status int, reason string, found bool) {
+func (s *Service) finishGlobalRevocation(w http.ResponseWriter, r *http.Request, conn *models.SSOConnection, status int, reason, detail string, found bool) {
 	outcome := "failure"
 	switch status {
 	case http.StatusNoContent:
@@ -162,6 +171,9 @@ func (s *Service) finishGlobalRevocation(w http.ResponseWriter, r *http.Request,
 	}
 	if reason != "" {
 		fields["sso_failure_reason"] = reason
+	}
+	if detail != "" {
+		fields["sso_failure_detail"] = detail
 	}
 	if id := mux.Vars(r)["connectionID"]; id != "" {
 		if _, err := uuid.Parse(id); err == nil {

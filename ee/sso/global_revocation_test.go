@@ -31,18 +31,28 @@ func TestGlobalTokenRevocationRejectsAnInvalidToken(t *testing.T) {
 	expired := globalClaims(fake.issuer, audience, "client-1")
 	expired["exp"] = time.Now().Add(-3 * time.Minute).Unix()
 	expired["iat"] = time.Now().Add(-4 * time.Minute).Unix()
+	notYetValid := globalClaims(fake.issuer, audience, "client-1")
+	notYetValid["iat"] = time.Now().Add(3 * time.Minute).Unix()
+	notYetValid["nbf"] = time.Now().Add(3 * time.Minute).Unix()
+	notYetValid["exp"] = time.Now().Add(10 * time.Minute).Unix()
+	missingJTI := globalClaims(fake.issuer, audience, "client-1")
+	delete(missingJTI, "jti")
 
 	cases := []struct {
-		name  string
-		token string
-		raw   string
+		name   string
+		token  string
+		raw    string
+		detail string
 	}{
-		{name: "wrong audience", token: signGlobalRevocation(t, fake.key, globalClaims(fake.issuer, "https://evil.example/logout", "client-1"), globalRevocationType)},
-		{name: "wrong issuer", token: signGlobalRevocation(t, fake.key, globalClaims("https://evil.example", audience, "client-1"), globalRevocationType)},
-		{name: "expired", token: signGlobalRevocation(t, fake.key, expired, globalRevocationType)},
-		{name: "bad signature", token: signGlobalRevocation(t, otherKey, globalClaims(fake.issuer, audience, "client-1"), globalRevocationType)},
+		{name: "wrong audience", detail: "audience", token: signGlobalRevocation(t, fake.key, globalClaims(fake.issuer, "https://evil.example/logout", "client-1"), globalRevocationType)},
+		{name: "wrong issuer", detail: "issuer", token: signGlobalRevocation(t, fake.key, globalClaims("https://evil.example", audience, "client-1"), globalRevocationType)},
+		{name: "expired", detail: "expired", token: signGlobalRevocation(t, fake.key, expired, globalRevocationType)},
+		{name: "not yet valid", detail: "not_yet_valid", token: signGlobalRevocation(t, fake.key, notYetValid, globalRevocationType)},
+		{name: "bad signature", detail: "signature", token: signGlobalRevocation(t, otherKey, globalClaims(fake.issuer, audience, "client-1"), globalRevocationType)},
+		{name: "refused type", detail: "type", token: signGlobalRevocation(t, fake.key, globalClaims(fake.issuer, audience, "client-1"), "logout+jwt")},
+		{name: "missing jti", detail: "jti_missing", token: signGlobalRevocation(t, fake.key, missingJTI, globalRevocationType)},
 		{name: "missing header", raw: ""},
-		{name: "subject is not the client", token: signGlobalRevocation(t, fake.key, globalClaims(fake.issuer, audience, "other-client"), globalRevocationType)},
+		{name: "subject is not the client", detail: "subject", token: signGlobalRevocation(t, fake.key, globalClaims(fake.issuer, audience, "other-client"), globalRevocationType)},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -54,8 +64,29 @@ func TestGlobalTokenRevocationRejectsAnInvalidToken(t *testing.T) {
 			require.Equal(t, http.StatusUnauthorized, recorder.Code)
 			require.Empty(t, recorder.Body.String())
 			require.Equal(t, "auth", fields["sso_failure_reason"])
+			if tc.detail == "" {
+				_, logged := fields["sso_failure_detail"]
+				require.False(t, logged)
+			} else {
+				require.Equal(t, tc.detail, fields["sso_failure_detail"])
+			}
 			requireNotRevoked(t, conn, fake.subject)
 		})
+	}
+}
+
+func TestGlobalTokenRevocationAcceptsCommonTokenTypes(t *testing.T) {
+	f, fake, conn := signedInOIDCConnection(t)
+	audience := revocationAudience(f, conn)
+	body := issSubBody(t, fake.issuer+"/", fake.subject)
+	for _, typ := range []string{"JWT", ""} {
+		token := signGlobalRevocation(t, fake.key, globalClaims(fake.issuer, audience, "client-1"), typ)
+		recorder, fields := postGlobalRevocation(t, f, conn.ID, "Bearer "+token, body)
+		require.Equal(t, http.StatusNoContent, recorder.Code)
+		require.Empty(t, recorder.Body.String())
+		require.Equal(t, "success", fields["outcome"])
+		_, logged := fields["sso_failure_detail"]
+		require.False(t, logged)
 	}
 }
 
@@ -189,7 +220,11 @@ func signGlobalRevocation(t *testing.T, key *rsa.PrivateKey, claims jwtLib.MapCl
 	t.Helper()
 	token := jwtLib.NewWithClaims(jwtLib.SigningMethodRS256, claims)
 	token.Header["kid"] = "test"
-	token.Header["typ"] = typ
+	if typ == "" {
+		delete(token.Header, "typ")
+	} else {
+		token.Header["typ"] = typ
+	}
 	signed, err := token.SignedString(key)
 	require.NoError(t, err)
 	return signed

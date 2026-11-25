@@ -17,6 +17,20 @@ const (
 	globalRevocationSkew = 2 * time.Minute
 )
 
+// RevocationError is one failed check of a Universal Logout JWT.
+// Detail is the check that failed. It is never a token or claim value.
+type RevocationError struct {
+	Detail string
+}
+
+func (e *RevocationError) Error() string {
+	return "revocation token is not valid"
+}
+
+func revocationError(detail string) error {
+	return &RevocationError{Detail: detail}
+}
+
 // VerifyGlobalRevocation checks an Okta Universal Logout JWT.
 // audience is the revocation endpoint URL. The token subject must be the
 // connection client ID. The returned expiry is the token exp claim.
@@ -37,38 +51,62 @@ func (a *Adapter) VerifyGlobalRevocation(ctx context.Context, conn *models.SSOCo
 		SkipExpiryCheck: true,
 	}).Verify(a.clientContext(ctx), raw)
 	if err != nil {
-		return "", time.Time{}, err
+		return "", time.Time{}, revocationError(verificationDetail(err))
 	}
 	tokenType, err := signedJWTType(raw)
-	if err != nil || tokenType != globalRevocationType {
-		return "", time.Time{}, fmt.Errorf("revocation token type is not valid")
+	if err != nil {
+		return "", time.Time{}, revocationError("signature")
+	}
+	if !acceptedRevocationType(tokenType) {
+		return "", time.Time{}, revocationError("type")
 	}
 	if len(idToken.Audience) != 1 || idToken.Audience[0] != audience {
-		return "", time.Time{}, fmt.Errorf("revocation token audience is not valid")
+		return "", time.Time{}, revocationError("audience")
 	}
 	if idToken.Subject != cfg.ClientID {
-		return "", time.Time{}, fmt.Errorf("revocation token subject is not valid")
+		return "", time.Time{}, revocationError("subject")
 	}
 	now := a.now()
 	if idToken.IssuedAt.IsZero() || idToken.IssuedAt.After(now.Add(globalRevocationSkew)) {
-		return "", time.Time{}, fmt.Errorf("revocation token is not valid yet")
+		return "", time.Time{}, revocationError("not_yet_valid")
 	}
 	if idToken.Expiry.IsZero() || idToken.Expiry.Before(now.Add(-globalRevocationSkew)) {
-		return "", time.Time{}, fmt.Errorf("revocation token is expired")
+		return "", time.Time{}, revocationError("expired")
 	}
 	claims := map[string]any{}
 	if err := idToken.Claims(&claims); err != nil {
-		return "", time.Time{}, err
+		return "", time.Time{}, revocationError("signature")
 	}
 	if notBefore, ok := claimTime(claims, "nbf"); ok && notBefore.After(now.Add(globalRevocationSkew)) {
-		return "", time.Time{}, fmt.Errorf("revocation token is not valid yet")
+		return "", time.Time{}, revocationError("not_yet_valid")
 	}
 	jti, _ := claims["jti"].(string)
 	jti = strings.TrimSpace(jti)
 	if jti == "" {
-		return "", time.Time{}, fmt.Errorf("revocation token id is missing")
+		return "", time.Time{}, revocationError("jti_missing")
 	}
 	return jti, idToken.Expiry, nil
+}
+
+func verificationDetail(err error) string {
+	text := err.Error()
+	switch {
+	case strings.Contains(text, "issued by a different provider"):
+		return "issuer"
+	case strings.Contains(text, "expected audience"):
+		return "audience"
+	default:
+		return "signature"
+	}
+}
+
+func acceptedRevocationType(tokenType string) bool {
+	switch strings.ToLower(strings.TrimSpace(tokenType)) {
+	case "", "jwt", globalRevocationType:
+		return true
+	default:
+		return false
+	}
 }
 
 func signedJWTType(raw string) (string, error) {
