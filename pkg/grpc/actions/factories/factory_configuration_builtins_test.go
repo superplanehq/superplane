@@ -63,6 +63,8 @@ func TestFactoryConfigurationBuiltInBYOKModelPolicy(t *testing.T) {
 				app = models.CustomLLMAppName
 			}
 			integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, app)
+			vcsID := createReadyOnboardingIntegration(t, r.Organization.ID, models.ProviderGitHub)
+			require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSIntegrationID: &vcsID, AgentIntegrationID: &integrationID}))
 			canvas := resetTestTemplate(t, r, factory, "line-implementation", models.ProviderGitHub, func(doc *yaml.Canvas) {
 				for i := range doc.Spec.Nodes {
 					agent := &doc.Spec.Nodes[i]
@@ -78,6 +80,7 @@ func TestFactoryConfigurationBuiltInBYOKModelPolicy(t *testing.T) {
 			line, err := factory.CreateLine(db, "Delivery", []models.FactoryLineStep{{Type: models.FactoryLineStepTypeRunApp, AppID: canvas.ID, Entrypoint: "onrun-implement"}})
 			require.NoError(t, err)
 			f := configurationFixture{r: r, factory: factory, canvas: canvas, line: line, ctx: onboardingContext(r)}
+			configureConfigurationCatalogIntegration(t, f, vcsID, models.ProviderGitHub)
 			_, err = models.UpsertOrganizationBYOKModelAllowlist(db, r.Organization.ID, provider, datatypes.JSONSlice[string]{"allowed-model", "other-model"})
 			require.NoError(t, err)
 			exported, err := ExportFactoryConfiguration(f.ctx, r.Organization.ID.String(), &pb.ExportFactoryConfigurationRequest{FactoryId: factory.ID.String(), LineId: line.ID.String()})
@@ -207,7 +210,7 @@ func TestFactoryConfigurationOmitsDefaultsAndRestoresOmittedOverrides(t *testing
 	require.NotContains(t, bundle.Files[0].Content, "execution_timeout_seconds:")
 	require.NotContains(t, bundle.Files[0].Content, "skip_setup_commands:")
 
-	for _, field := range []string{"agents", "additional_instructions"} {
+	for _, field := range []string{"additional_instructions", "agents"} {
 		var manifest factoryConfigurationManifest
 		require.NoError(t, goyaml.Unmarshal([]byte(bundle.Files[0].Content), &manifest))
 		for i := range manifest.Stages {
@@ -217,8 +220,14 @@ func TestFactoryConfigurationOmitsDefaultsAndRestoresOmittedOverrides(t *testing
 					require.Empty(t, automation.With)
 				}
 				if automation.Uses == "@superplane/implement" {
-					require.Equal(t, "Original instructions", automation.With["additional_instructions"])
-					delete(automation.With, field)
+					if field == "additional_instructions" {
+						agents := automation.With["agents"].(map[string]any)
+						agent := agents[implementationAgentNodeID].(map[string]any)
+						require.Equal(t, "Original instructions", agent[field])
+						delete(agent, field)
+					} else {
+						delete(automation.With, field)
+					}
 				}
 			}
 		}

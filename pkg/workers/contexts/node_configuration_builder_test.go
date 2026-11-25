@@ -483,6 +483,46 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 		assert.Equal(t, currentDefaultBranch, payload["default_branch"])
 	})
 
+	t.Run("uses the automation repository binding for checkout", func(t *testing.T) {
+		db := database.DB(t.Context())
+		require.NoError(t, db.Model(order).Updates(map[string]any{"repository": "acme/order", "default_branch": "task-branch"}).Error)
+		defer func() {
+			require.NoError(t, db.Model(order).Updates(map[string]any{"repository": "acme/previous-service", "default_branch": nil}).Error)
+		}()
+		line, err := factoryModel.CreateLine(db, "Pinned implementation", nil)
+		require.NoError(t, err)
+		for _, tc := range []struct {
+			provider string
+			host     string
+			url      string
+		}{
+			{models.ProviderGitHub, "", "https://github.com/acme/pinned.git"},
+			{models.ProviderGitHub, "github.acme.com", "https://github.acme.com/acme/pinned.git"},
+			{models.ProviderBitbucket, "", "https://bitbucket.org/acme/pinned.git"},
+		} {
+			t.Run(tc.url, func(t *testing.T) {
+				integration := models.NewIntegration(uuid.New(), r.Organization.ID, tc.provider, support.RandomName("pinned"), map[string]any{"host": tc.host})
+				require.NoError(t, db.Create(integration).Error)
+				binding := models.FactoryConfigurationAutomation{
+					OrganizationID: r.Organization.ID, FactoryID: factoryModel.ID, LineID: line.ID,
+					StageKey: "implementation", ManifestID: "implement", CanvasID: canvas.ID,
+					Binding: datatypes.JSONMap{"integration_id": integration.ID.String(), "resource_id": "acme/pinned"},
+				}
+				require.NoError(t, binding.Save(db))
+				defer func() { require.NoError(t, db.Delete(&binding).Error) }()
+				built, err := builder.Build(map[string]any{
+					"repository": "{{ task().repository }}",
+					"url":        "{{ task().repository_url }}",
+					"branch":     "{{ task().default_branch }}",
+				})
+				require.NoError(t, err)
+				require.Equal(t, "acme/pinned", built["repository"])
+				require.Equal(t, tc.url, built["url"])
+				require.Empty(t, built["branch"], "a different repository must use its own default branch")
+			})
+		}
+	})
+
 	t.Run("field access and templates", func(t *testing.T) {
 		id, err := builder.ResolveExpression(`order().id`)
 		require.NoError(t, err)
