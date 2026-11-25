@@ -66,8 +66,8 @@ func configurationManifestReferences(content string) ([]string, error) {
 				return nil, fmt.Errorf("invalid Factory manifest: only phase stages can contain run or max_parallelism")
 			}
 		case "phase":
-			if stage.Run == "" || (stage.MaxParallelism != nil && *stage.MaxParallelism < 1) {
-				return nil, fmt.Errorf("invalid Factory manifest: phases require run and positive max_parallelism when supplied")
+			if stage.MaxParallelism != nil && *stage.MaxParallelism < 1 {
+				return nil, fmt.Errorf("invalid Factory manifest: phases require positive max_parallelism when supplied")
 			}
 		default:
 			return nil, fmt.Errorf("invalid Factory manifest: unsupported stage kind %q", stage.Kind)

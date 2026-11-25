@@ -139,7 +139,7 @@ func TestExportConfigurationProtectsLocalFiles(t *testing.T) {
 }
 
 func TestExportConfigurationRejectsInvalidResponsesBeforeOverwrite(t *testing.T) {
-	for _, scenario := range []string{"missing bundle", "missing coverage", "unsafe manifest", "unsafe file", "extra file", "missing content", "invalid YAML", "missing stages", "unknown field", "YAML alias"} {
+	for _, scenario := range []string{"missing bundle", "missing coverage", "unsafe manifest", "unsafe file", "extra file", "missing content", "invalid YAML", "missing stages", "unknown field", "YAML alias", "invalid parallelism", "unknown runner"} {
 		t.Run(scenario, func(t *testing.T) {
 			outputDir := t.TempDir()
 			require.NoError(t, os.Mkdir(filepath.Join(outputDir, ".superplane"), 0755))
@@ -167,6 +167,10 @@ func TestExportConfigurationRejectsInvalidResponsesBeforeOverwrite(t *testing.T)
 				files[0]["content"] = "apiVersion: v2\nkind: Factory\nname: Example workspace\n"
 			case "unknown field":
 				files[0]["content"] = configurationManifest + "unsupported: true\n"
+			case "invalid parallelism":
+				files[0]["content"] = strings.Replace(configurationManifest, "    run: implement", "    max_parallelism: 0", 1)
+			case "unknown runner":
+				files[0]["content"] = strings.Replace(configurationManifest, "    run: implement", "    run: missing", 1)
 			case "YAML alias":
 				aliased := strings.ReplaceAll(configurationManifest, "name: Example workspace", "name: &workspace Example workspace")
 				files[0]["content"] = strings.ReplaceAll(aliased, "name: Implement", "name: *workspace")
@@ -252,14 +256,14 @@ func TestApplyConfigurationSubmitsCapturedPlanInput(t *testing.T) {
 func TestConfigurationRoundTripsCustomFilesAcrossStages(t *testing.T) {
 	manifest := configurationManifest + `  - key: custom-review
     name: Review changes
-    kind: custom
+    kind: phase
     automations:
       - id: review
         name: Review changes
         uses: automations/review.yaml
   - key: verify
     name: Verify
-    kind: verify
+    kind: phase
     automations: []
   - key: done
     name: Done
