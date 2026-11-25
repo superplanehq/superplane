@@ -245,7 +245,7 @@ func TestUpdateFactoryLineStages(t *testing.T) {
 		require.NoError(t, line.UpdateConfiguration(db, nil, nil, nil, stages))
 		ctx, deps := onboardingContext(r), onboardingDeps(r)
 		service := automations.Service{Backend: CanvasAutomationBackend{Deps: deps}}
-		require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureAutomationsAsCode))
+		require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryAsCode))
 		for _, origin := range []string{stage.Key, "implement"} {
 			created, err := service.Create(ctx, automations.Placement{OrganizationID: r.Organization.ID, FactoryID: factory.ID, Stage: origin}, r.User, "apiVersion: v2\nkind: Automation\nname: Inspect "+origin+"\ntriggers:\n  - use: task_enters_stage\nsteps:\n  - name: Inspect\n    bash: pwd\n")
 			require.NoError(t, err)

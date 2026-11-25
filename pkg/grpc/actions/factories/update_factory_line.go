@@ -31,11 +31,9 @@ func UpdateFactoryLine(ctx context.Context, deps IntakeDependencies, organizatio
 	var line *models.FactoryLine
 	var deletedCanvases []models.Canvas
 	err = db.Transaction(func(tx *gorm.DB) error {
-		if req.StageConfiguration != nil {
-			factory, err = models.LockAutomationFactory(tx, orgID, factory.ID)
-			if err != nil {
-				return err
-			}
+		factory, err = models.LockAutomationFactory(tx, orgID, factory.ID)
+		if err != nil {
+			return err
 		}
 		line, err = factory.FindLineForUpdate(tx, lineID)
 		if err != nil {

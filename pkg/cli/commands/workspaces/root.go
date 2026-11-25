@@ -59,6 +59,9 @@ to pick from a list. Non-interactive with no args prints the active workspace id
 	root.AddCommand(listCmd)
 	root.AddCommand(describeCmd)
 	root.AddCommand(activeCmd)
+	root.AddCommand(newConfigurationExportCommand(options))
+	root.AddCommand(newConfigurationPlanCommand(options))
+	root.AddCommand(newConfigurationApplyCommand(options))
 
 	return root
 }
