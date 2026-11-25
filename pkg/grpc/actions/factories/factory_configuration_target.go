@@ -38,6 +38,18 @@ type factoryConfigurationAutomationMetadata struct {
 	handler *models.FactoryPRFeedbackHandler
 }
 
+// Rendering uses workspace-owned attachments. Removal also checks the raw
+// canvas attachments, including an inconsistent owner, before it deletes them.
+func (m factoryConfigurationAutomationMetadata) forFactory(factory *models.Factory) factoryConfigurationAutomationMetadata {
+	if m.intake != nil && (m.intake.OrganizationID != factory.OrganizationID || m.intake.FactoryID != factory.ID) {
+		m.intake = nil
+	}
+	if m.handler != nil && (m.handler.OrganizationID != factory.OrganizationID || m.handler.FactoryID != factory.ID) {
+		m.handler = nil
+	}
+	return m
+}
+
 func (m factoryConfigurationAutomationMetadata) materializeDefaults(tx *gorm.DB, factory *models.Factory, canvas *models.Canvas, version *models.CanvasVersion) (*materializedFactoryTemplate, error) {
 	if m.intake != nil {
 		return materializeIntakeDefaults(tx, canvas, version, m.intake, nil)
@@ -49,6 +61,7 @@ func (m factoryConfigurationAutomationMetadata) materializeDefaults(tx *gorm.DB,
 }
 
 type factoryConfigurationAutomationTarget struct {
+	metadata        factoryConfigurationAutomationMetadata
 	canvas          *models.Canvas
 	version         *models.CanvasVersion
 	templateID      string
@@ -190,15 +203,21 @@ func inspectFactoryConfigurationTarget(tx *gorm.DB, factory *models.Factory, lin
 	}
 	placements := map[uuid.UUID]string{}
 	metadata := map[uuid.UUID]factoryConfigurationAutomationMetadata{}
-	intakes, err := factory.ListIntakes(tx)
+	canvasIDs := make([]uuid.UUID, 0, len(canvases))
+	for _, canvas := range canvases {
+		canvasIDs = append(canvasIDs, canvas.ID)
+	}
+	intakes, err := models.FindFactoryIntakesByCanvasIDs(tx, canvasIDs)
 	if err != nil {
 		return nil, err
 	}
 	for _, intake := range intakes {
 		metadata[intake.CanvasID] = factoryConfigurationAutomationMetadata{intake: &intake}
-		placements[intake.CanvasID] = models.CanvasColumnKeyBacklog
+		if intake.OrganizationID == factory.OrganizationID && intake.FactoryID == factory.ID {
+			placements[intake.CanvasID] = models.CanvasColumnKeyBacklog
+		}
 	}
-	handlers, err := factory.ListPRFeedbackHandlers(tx)
+	handlers, err := models.FindFactoryPRFeedbackHandlersByCanvasIDs(tx, canvasIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -206,7 +225,9 @@ func inspectFactoryConfigurationTarget(tx *gorm.DB, factory *models.Factory, lin
 		entry := metadata[handler.CanvasID]
 		entry.handler = &handler
 		metadata[handler.CanvasID] = entry
-		placements[handler.CanvasID] = models.CanvasColumnKeyVerify
+		if handler.OrganizationID == factory.OrganizationID && handler.FactoryID == factory.ID {
+			placements[handler.CanvasID] = models.CanvasColumnKeyVerify
+		}
 	}
 	slices.SortFunc(canvases, func(a, b models.Canvas) int {
 		if name := strings.Compare(a.Name, b.Name); name != 0 {
@@ -281,7 +302,7 @@ func inspectFactoryConfigurationTarget(tx *gorm.DB, factory *models.Factory, lin
 			if version == nil {
 				return nil, gorm.ErrRecordNotFound
 			}
-			entry := metadata[canvas.ID]
+			entry := metadata[canvas.ID].forFactory(factory)
 			template, builtIn := builtInAutomationTemplateID(version, entry.intake, entry.handler)
 			if builtIn {
 				switch template {
@@ -356,7 +377,8 @@ func inspectConfigurationAutomation(tx *gorm.DB, factory *models.Factory, canvas
 	if version == nil {
 		return nil, gorm.ErrRecordNotFound
 	}
-	automation := &factoryConfigurationAutomationTarget{canvas: canvas, version: version, placement: placement}
+	automation := &factoryConfigurationAutomationTarget{canvas: canvas, version: version, placement: placement, metadata: metadata}
+	metadata = metadata.forFactory(factory)
 	template, builtIn := builtInAutomationTemplateID(version, metadata.intake, metadata.handler)
 	var err error
 	if builtIn {
@@ -396,7 +418,15 @@ func inspectConfigurationAutomation(tx *gorm.DB, factory *models.Factory, canvas
 		automation.source, err = renderFactoryConfigurationCustom(tx, factory, canvas, version, placement, metadata.source)
 	}
 	if err != nil {
-		return nil, unsupportedConfigurationTarget(fmt.Sprintf("Cannot export automation %q: %v", canvas.Name, err))
+		message := err.Error()
+		if !builtIn {
+			_, safeMessage, ok := grpcerrors.HandlerStatus(err)
+			if !ok {
+				return nil, err
+			}
+			message = safeMessage
+		}
+		return nil, unsupportedConfigurationTarget(fmt.Sprintf("Cannot export automation %q: %s", canvas.Name, message))
 	}
 	if !builtIn && metadata.source != nil && metadata.source.FactoryID == factory.ID {
 		automation.sourceID = metadata.source.ID

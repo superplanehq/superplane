@@ -17,6 +17,7 @@ import (
 	"github.com/superplanehq/superplane/test/support"
 	"github.com/superplanehq/superplane/test/support/impl"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/protobuf/proto"
 	"gopkg.in/yaml.v3"
 	"gorm.io/gorm"
 )
@@ -284,6 +285,68 @@ func TestFactoryConfigurationRemovesIntakeAndFeedbackAttachments(t *testing.T) {
 	for _, canvas := range []*models.Canvas{intakeCanvas, feedbackCanvas} {
 		_, err = models.FindCanvasInTransaction(db, f.r.Organization.ID, canvas.ID)
 		require.ErrorIs(t, err, gorm.ErrRecordNotFound)
+	}
+}
+
+func TestFactoryConfigurationRejectsRemovingForeignAttachments(t *testing.T) {
+	for _, attachment := range []string{"intake", "feedback handler"} {
+		t.Run(attachment, func(t *testing.T) {
+			f := newConfigurationLifecycleFixture(t)
+			db := database.DB(t.Context())
+			omitted := f.export(t)
+			bundle := proto.Clone(omitted).(*pb.FactoryConfigurationBundle)
+			addConfigurationLifecycleAutomation(t, bundle, "audit", "Audit")
+			planned := f.plan(t, bundle)
+			require.Empty(t, planned.Diagnostics)
+			_, err := f.apply(bundle, planned.BaseStateToken)
+			require.NoError(t, err)
+			canvas, err := models.FindCanvasByName(db, f.r.Organization.ID, &f.factory.ID, "Audit")
+			require.NoError(t, err)
+			source, err := models.FindAutomationSourceByArtifact(db, f.r.Organization.ID, canvas.ID.String())
+			require.NoError(t, err)
+			planned = f.plan(t, omitted)
+			require.Empty(t, planned.Diagnostics, "the optional automation must be removable before an inconsistent attachment exists")
+			require.Len(t, planned.Changes, 1)
+
+			otherOrganization := support.CreateOrganization(t, f.r, f.r.User)
+			otherFactory, err := models.CreateFactory(db, otherOrganization.ID, support.RandomName("factory"), "", "")
+			require.NoError(t, err)
+			var savedAttachment any
+			if attachment == "intake" {
+				_, err = otherFactory.CreateIntake(db, canvas.ID, models.FactoryIntakeSourceGitHubIssues)
+				require.NoError(t, err)
+				savedAttachment, err = models.FindFactoryIntakeByCanvasID(db, canvas.ID)
+			} else {
+				_, err = otherFactory.CreatePRFeedbackHandler(db, canvas.ID,
+					models.FactoryPRFeedbackHandlerSubjectGitHubPullRequest, models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion)
+				require.NoError(t, err)
+				savedAttachment, err = models.FindPRFeedbackHandlerByCanvasID(db, canvas.ID)
+			}
+			require.NoError(t, err)
+			before := configurationResourceCounts(t)
+			blocked := f.plan(t, omitted)
+			require.Len(t, blocked.Diagnostics, 1)
+			require.Contains(t, blocked.Diagnostics[0].Message, "Cannot remove automation")
+			require.Empty(t, blocked.BaseStateToken)
+			_, err = f.apply(omitted, planned.BaseStateToken)
+			require.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
+			require.Equal(t, before, configurationResourceCounts(t))
+			retained, err := models.FindCanvasInTransaction(db, f.r.Organization.ID, canvas.ID)
+			require.NoError(t, err)
+			require.Equal(t, canvas, retained)
+			retainedSource, err := models.FindAutomationSourceByArtifact(db, f.r.Organization.ID, canvas.ID.String())
+			require.NoError(t, err)
+			require.Equal(t, source, retainedSource)
+			if attachment == "intake" {
+				retained, err := models.FindFactoryIntakeByCanvasID(db, canvas.ID)
+				require.NoError(t, err)
+				require.Equal(t, savedAttachment, retained)
+			} else {
+				retained, err := models.FindPRFeedbackHandlerByCanvasID(db, canvas.ID)
+				require.NoError(t, err)
+				require.Equal(t, savedAttachment, retained)
+			}
+		})
 	}
 }
 
