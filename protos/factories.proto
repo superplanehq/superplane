@@ -1387,9 +1387,7 @@ message FactoryLine {
     STAGE_KIND_UNSPECIFIED = 0;
     STAGE_KIND_BACKLOG = 1;
     STAGE_KIND_PHASE = 2;
-    STAGE_KIND_CUSTOM = 3;
-    STAGE_KIND_VERIFY = 4;
-    STAGE_KIND_DONE = 5;
+    STAGE_KIND_DONE = 3;
   }
 
   message Stage {
@@ -1401,7 +1399,7 @@ message FactoryLine {
     // Display override for the agent occurrence at this stage.
     string agent_display_key = 6;
     // Whether a task moves to the next stage after all synchronous
-    // automations pass. Unset uses the stage-kind default.
+    // automations pass. Unset defaults to true. Verify starts with false.
     optional bool auto_advance = 7;
   }
 

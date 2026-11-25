@@ -18,16 +18,18 @@ func TestAssessmentReportData(t *testing.T) {
 		wantLevel  string
 		incomplete bool
 	}{
-		{name: "invert risk and drift and take weakest", passed: true, enabled: []string{"risk", "performance", "security", "drift", "reversibility"}, scores: map[string]float64{"risk": 2, "performance": 5, "security": 4, "drift": 4, "reversibility": 5}, levels: map[string]string{"risk": "positive", "performance": "positive", "security": "positive", "drift": "critical", "reversibility": "positive"}, want: 2, wantLevel: "critical"},
+		{name: "invert risk and drift and take weakest", passed: true, enabled: []string{"drift", "performance", "security", "risk", "reversibility"}, scores: map[string]float64{"risk": 2, "performance": 5, "security": 4, "drift": 4, "reversibility": 5}, levels: map[string]string{"risk": "positive", "performance": "positive", "security": "positive", "drift": "critical", "reversibility": "positive"}, want: 2, wantLevel: "critical"},
 		{name: "disabled checks and custom score", passed: true, enabled: []string{"performance", "custom"}, scores: map[string]float64{"performance": 4, "custom": 1, "risk": 5}, levels: map[string]string{"performance": "positive", "custom": "critical", "risk": "critical"}, want: 4, wantLevel: "positive"},
 		{name: "unclassified check", passed: true, enabled: []string{"security"}, scores: map[string]float64{"security": 4}, want: 4, wantLevel: "neutral"},
 		{name: "low blast radius", passed: true, enabled: []string{"risk"}, scores: map[string]float64{"risk": 1}, want: 5},
 		{name: "high blast radius", passed: true, enabled: []string{"risk"}, scores: map[string]float64{"risk": 5}, want: 1},
+		{name: "high correctness", passed: true, enabled: []string{"correctness"}, scores: map[string]float64{"correctness": 5}, want: 5},
+		{name: "low correctness", passed: true, enabled: []string{"correctness"}, scores: map[string]float64{"correctness": 1}, want: 1},
 		{name: "low drift", passed: true, enabled: []string{"drift"}, scores: map[string]float64{"drift": 1}, want: 5},
 		{name: "high drift", passed: true, enabled: []string{"drift"}, scores: map[string]float64{"drift": 5}, want: 1},
 		{name: "custom only", passed: true, enabled: []string{"custom"}, scores: map[string]float64{"custom": 2}},
 		{name: "all disabled", passed: true},
-		{name: "missing result", passed: true, enabled: []string{"risk", "security"}, scores: map[string]float64{"risk": 1}, incomplete: true},
+		{name: "missing result", passed: true, enabled: []string{"security", "risk"}, scores: map[string]float64{"risk": 1}, incomplete: true},
 		{name: "failed with all results", enabled: []string{"risk"}, scores: map[string]float64{"risk": 1}, incomplete: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

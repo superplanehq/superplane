@@ -232,11 +232,11 @@ spec:
               If no security practice applies, report the check with 5.
               Say that no security practice in this repository applies.
               Do not skip the check.
-          - name: Drift from Specification
+          - name: Correctness
             type: prompt
             workingDirectory: repo
             prompt: |-
-              Merge check: drift.
+              Merge check: correctness.
               The repository is checked out at the pull request head.
               The pull request diff is in /tmp/pr.diff. Review that file.
               It is the difference between the base branch and the head.
@@ -255,21 +255,24 @@ spec:
 
               Report this check with the report_merge_check tool.
               Call the tool once.
-              check is drift.
+              check is correctness.
               score is an integer from 1 to 5.
               summary is one sentence.
               Do not write a file.
 
-              score is an integer from 1 to 5. A higher score means the change moved farther from the original task.
+              score is an integer from 1 to 5. A lower score means a more serious problem with correctness or task fit.
               Compare the diff with the task title and the task description.
-              1 means the change does what the task asks.
-              2 means the change does the task and also makes a small extra change.
-              3 means the change does the task and also adds work that raises risk past the task.
-              4 means the change does most of the task and also does something the task did not ask for.
-              5 means the change does something different from the task, or raises risk far past the task.
-              If the task title and the task description are empty, use 1.
+              Review the changed code, callers, and relevant tests for plausible failures. Check whether the code or tests address each plausible failure.
+              The pull request description and passing checks alone do not establish correctness.
+              Match the review to the risk. Style preferences and unsupported speculation do not affect the score.
+              Use 4 or 5 only when the implementation appears correct and no material concern remains.
+              5 means the change does what the task asks.
+              4 means the change does the task and also makes a small extra change in behavior. Use 4 only if the diff shows that behavior and it does not conflict with the task.
+              3 means a specific, plausible failure remains unresolved.
+              1 or 2 means the evidence shows a defect or a material conflict with the task. Use 1 if it prevents the main outcome.
+              If the task title and the task description are empty, assess correctness with the available evidence.
               summary is one sentence.
-              Say what the task asked for and what the change did.
+              Name the specific behavior that works, could fail, or fails.
               Do not repeat the score. Do not write a second sentence.
           - name: Reversibility
             type: prompt

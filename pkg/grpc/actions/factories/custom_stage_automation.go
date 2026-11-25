@@ -31,7 +31,7 @@ func validateCustomStageAutomation(tx *gorm.DB, factory *models.Factory, column 
 	}
 	for _, line := range lines {
 		for _, stage := range line.StagesValue() {
-			if stage.Key == column && stage.Kind == models.FactoryLineStageCustom {
+			if stage.Key == column && stage.Kind == models.FactoryLineStagePhase {
 				return nil
 			}
 		}

@@ -359,11 +359,11 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 		},
 		{Method: "GET", Pattern: "/api/v1/factories/{factory_id}/pull-request-imports/candidates"}: {
 			Resource: "work_orders", Action: "read", DomainType: models.DomainTypeOrganization,
-			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureFactoryPullRequestImport},
+			RequiredExperimentalFeatures: []string{features.FeatureFactories},
 		},
 		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/pull-request-imports"}: {
 			Resource: "work_orders", Action: "create", RequiredActions: []string{"update"}, DomainType: models.DomainTypeOrganization,
-			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureFactoryPullRequestImport},
+			RequiredExperimentalFeatures: []string{features.FeatureFactories},
 		},
 
 		{Method: "GET", Pattern: "/api/v1/factories/{factory_id}/intakes/{intake_id}/items"}: {

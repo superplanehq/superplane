@@ -38,7 +38,7 @@ export const RISK_SCORE_SETUP_COPY = {
     risk: { score: "2", status: "Low risk" },
     performance: { score: "5", status: "Follows practices" },
     security: { score: "4", status: "Follows practices" },
-    drift: { score: "1", status: "On task" },
+    drift: { score: "5", status: "Pass" },
     reversibility: { score: "5", status: "Easy to undo" },
   },
 } as const;

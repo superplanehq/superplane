@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -128,13 +129,93 @@ func TestScheduleAutomationCreatesATaskWithoutAnExistingTask(t *testing.T) {
 	token := runnerTokenFrom(runner.AttachRunnerEnv(ctx, nil, 60))
 	require.NotEmpty(t, token)
 	assert.Equal(t, []string{"list_tasks", "create_task"}, listRunnerTools(t, server, token))
-	rec := runnerRequest(t, server, http.MethodPost, token, "/api/v1/runner/tasks", `{"title":"Fix the lint","description":"Clean the reported errors."}`)
-	require.Equal(t, http.StatusCreated, rec.Code, rec.Body.String())
-	created := decodeRunnerTask(t, rec.Body.Bytes())
-	assert.Equal(t, "Fix the lint", created.Title)
-	assert.Equal(t, "draft", created.State)
-	rec = runnerRequest(t, server, http.MethodPost, token, "/api/v1/runner/task/close", `{}`)
+	connection, err := models.CreateCodexConnection(db, r.Organization.ID, r.User, time.Now())
+	require.NoError(t, err)
+	require.NoError(t, db.Model(connection).Updates(map[string]any{
+		"credential_version": 1, "bundle_ciphertext": []byte("test-bundle"),
+	}).Error)
+
+	for _, tc := range []struct {
+		name         string
+		subscription bool
+		owner        string
+		disconnected bool
+		wantStatus   int
+	}{
+		{name: "subscription default owner", subscription: true, owner: r.User.String(), wantStatus: http.StatusCreated},
+		{name: "API key workspace", wantStatus: http.StatusCreated},
+		{name: "missing subscription default", subscription: true, wantStatus: http.StatusBadRequest},
+		{name: "invalid subscription default", subscription: true, owner: "invalid", wantStatus: http.StatusBadRequest},
+		{name: "disconnected subscription default", subscription: true, owner: r.User.String(), disconnected: true, wantStatus: http.StatusBadRequest},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
+				CodexSubscription: &tc.subscription, CodexDefaultOwnerID: &tc.owner,
+			}))
+			status := models.CodexConnectionStatusReady
+			if tc.disconnected {
+				status = models.CodexConnectionStatusDisconnected
+			}
+			require.NoError(t, db.Model(connection).Update("status", status).Error)
+			var task *models.RunnerTask
+			if tc.subscription && tc.wantStatus == http.StatusCreated {
+				runnerTask := createSessionRunnerTask(t, r)
+				task = &runnerTask
+				require.NoError(t, db.Model(task).Update("state", models.RunnerTaskStateRunning).Error)
+				require.NoError(t, models.CreateNodeExecutionKVInTransaction(db, canvas.ID, "agent", execution.ID, "task_id", task.ID.String()))
+				_, err := models.ReserveFactoryCodexConnection(db, r.Organization.ID, factory.ID, run.ID, task.ID, time.Now(), r.Encryptor)
+				require.NoError(t, err)
+				require.NoError(t, task.RequireSubscriptionLeaseContinuation(db))
+			}
+			body, err := json.Marshal(map[string]string{"title": tc.name})
+			require.NoError(t, err)
+			rec := runnerRequest(t, server, http.MethodPost, token, "/api/v1/runner/tasks", string(body))
+			require.Equal(t, tc.wantStatus, rec.Code, rec.Body.String())
+			if tc.wantStatus != http.StatusCreated {
+				var count int64
+				require.NoError(t, db.Model(&models.FactoryWorkOrder{}).Where("factory_id = ? AND title = ?", factory.ID, tc.name).Count(&count).Error)
+				assert.Zero(t, count, "invalid defaults must not create an ownerless task")
+				return
+			}
+			created := decodeRunnerTask(t, rec.Body.Bytes())
+			assert.Equal(t, "draft", created.State)
+			order, err := factory.FindWorkOrder(db, uuid.MustParse(created.ID))
+			require.NoError(t, err)
+			assert.Nil(t, order.CreatedByID)
+			if tc.subscription {
+				require.NoError(t, task.RequireSubscriptionLeaseContinuation(db), "creating a task must preserve credential refresh")
+				assert.Equal(t, []uuid.UUID{r.User}, order.AssigneeIDs())
+				return
+			}
+			assert.Empty(t, order.AssigneeIDs())
+		})
+	}
+	rec := runnerRequest(t, server, http.MethodPost, token, "/api/v1/runner/task/close", `{}`)
 	assert.Equal(t, http.StatusForbidden, rec.Code)
+}
+
+func TestRunnerCreatedTasksLinkToTheCreatingRun(t *testing.T) {
+	r := support.Setup(t)
+	t.Setenv("JWT_SECRET", "test")
+	ctx, factory, _ := mustTaskLinkedAgentRun(t, r)
+	server := newRunnerArtifactTestServer(t, r, jwt.NewSigner("test"))
+	token := runnerTokenFrom(runner.AttachRunnerEnv(ctx, nil, 60))
+
+	db := database.DB(t.Context())
+	var createdIDs []uuid.UUID
+	for _, title := range []string{"First follow-up", "Second follow-up"} {
+		rec := runnerRequest(t, server, http.MethodPost, token, "/api/v1/runner/tasks", `{"title":"`+title+`"}`)
+		require.Equal(t, http.StatusCreated, rec.Code, rec.Body.String())
+		created := decodeRunnerTask(t, rec.Body.Bytes())
+		createdIDs = append(createdIDs, uuid.MustParse(created.ID))
+	}
+
+	for _, id := range createdIDs {
+		order, err := factory.FindWorkOrder(db, id)
+		require.NoError(t, err)
+		require.NotNil(t, order.SourceRunID, "task %s has no source run", id)
+		assert.Equal(t, ctx.RunID, *order.SourceRunID)
+	}
 }
 
 func TestRunnerCreatesADraftTaskWithoutAnOwner(t *testing.T) {

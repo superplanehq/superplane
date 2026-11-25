@@ -2,6 +2,7 @@ package models_test
 
 import (
 	"fmt"
+	"os"
 	"testing"
 	"time"
 
@@ -78,7 +79,7 @@ func Test__FactoryLine__Dispatch__StartsCustomStageBeforeLineStep(t *testing.T) 
 
 	stageID := uuid.New()
 	customStage := models.FactoryLineStage{
-		ID: stageID, Key: "custom-" + stageID.String(), Name: "QA", Kind: models.FactoryLineStageCustom,
+		ID: stageID, Key: "custom-" + stageID.String(), Name: "QA", Kind: models.FactoryLineStagePhase,
 	}
 	stages := append([]models.FactoryLineStage{line.StagesValue()[0], customStage}, line.StagesValue()[1:]...)
 	stages[2].AgentDisplayKey = customStage.Key
@@ -141,7 +142,7 @@ func Test__FactoryLine__DispatchStage__EmptyFirstStageUsesAutoAdvance(t *testing
 			}})
 			require.NoError(t, err)
 			qa := models.FactoryLineStage{
-				ID: uuid.New(), Key: "custom-qa", Name: "QA", Kind: models.FactoryLineStageCustom,
+				ID: uuid.New(), Key: "custom-qa", Name: "QA", Kind: models.FactoryLineStagePhase,
 				AutoAdvance: &test.autoAdvance,
 			}
 			stages := append([]models.FactoryLineStage{line.StagesValue()[0], qa}, line.StagesValue()[1:]...)
@@ -215,7 +216,7 @@ func Test__FactoryWorkOrder__RetryLineStep__KeepsCustomStageSiblingsRunning(t *t
 	}})
 	require.NoError(t, err)
 	stageID := uuid.New()
-	stage := models.FactoryLineStage{ID: stageID, Key: "custom-" + stageID.String(), Name: "QA", Kind: models.FactoryLineStageCustom}
+	stage := models.FactoryLineStage{ID: stageID, Key: "custom-" + stageID.String(), Name: "QA", Kind: models.FactoryLineStagePhase}
 	stages := append([]models.FactoryLineStage{line.StagesValue()[0], stage}, line.StagesValue()[1:]...)
 	require.NoError(t, line.UpdateConfiguration(db, nil, nil, nil, stages))
 	first, _ := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "Lint", "start")
@@ -275,7 +276,7 @@ func Test__FactoryLine__DispatchStage__QueuesCustomStageAboveLimit(t *testing.T)
 	}})
 	require.NoError(t, err)
 	stageID := uuid.New()
-	stage := models.FactoryLineStage{ID: stageID, Key: "custom-" + stageID.String(), Name: "QA", Kind: models.FactoryLineStageCustom}
+	stage := models.FactoryLineStage{ID: stageID, Key: "custom-" + stageID.String(), Name: "QA", Kind: models.FactoryLineStagePhase}
 	stages := append([]models.FactoryLineStage{line.StagesValue()[0], stage}, line.StagesValue()[1:]...)
 	require.NoError(t, line.UpdateConfiguration(db, nil, nil, nil, stages))
 	lint, _ := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "Lint", "start")
@@ -318,7 +319,7 @@ func Test__FactoryWorkOrder__RetryLineStep__QueuesCustomStageRetryAtLimit(t *tes
 	}})
 	require.NoError(t, err)
 	stageID := uuid.New()
-	stage := models.FactoryLineStage{ID: stageID, Key: "custom-" + stageID.String(), Name: "QA", Kind: models.FactoryLineStageCustom}
+	stage := models.FactoryLineStage{ID: stageID, Key: "custom-" + stageID.String(), Name: "QA", Kind: models.FactoryLineStagePhase}
 	stages := append([]models.FactoryLineStage{line.StagesValue()[0], stage}, line.StagesValue()[1:]...)
 	require.NoError(t, line.UpdateConfiguration(db, nil, nil, nil, stages))
 	lint, _ := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "Lint", "start")
@@ -852,6 +853,15 @@ func Test__FactoryWorkOrder__RetryLineStep__ReusesDispatchWithEarlierSteps(t *te
 		}
 		return full.Finish(tx, models.CanvasRunResultFailed)
 	}))
+
+	// A finished legacy snapshot must remain usable when a retry reopens it.
+	require.NoError(t, db.Exec(`UPDATE factory_work_order_line_dispatches
+		SET stages = jsonb_set(stages, '{3,kind}', '"verify"'),
+		    steps = jsonb_set(steps, '{1,stage_kind}', '"custom"')
+		WHERE id = ?`, full.ID).Error)
+	migration, err := os.ReadFile("../../db/migrations/20261124182440_unify-factory-stage-kinds.up.sql")
+	require.NoError(t, err)
+	require.NoError(t, db.Exec(string(migration)).Error)
 
 	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
 		_, _, dispatchErr := line.DispatchFrom(tx, order, 1)

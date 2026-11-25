@@ -152,6 +152,20 @@ describe("custom automation settings", () => {
     expect(customAutomationSettings("manual", draft).agent?.component).toBe("runnerClaudeCode");
   });
 
+  it("uses provider priority when the saved agent integration is unavailable", () => {
+    const connections = [
+      { metadata: { id: "openai", name: "Codex", integrationName: "openai" }, status: { state: "ready" } },
+      { metadata: { id: "claude", name: "Claude", integrationName: "claude" }, status: { state: "ready" } },
+    ];
+    const onboarding = { agentHarness: "AGENT_HARNESS_CLAUDE_CODE" as const, agentIntegrationId: "removed" };
+    expect(workspaceAgentFromOnboarding(onboarding, connections)).toEqual({
+      component: "runnerClaudeCode",
+      credentialSource: "integration",
+      credentialIntegrationName: "Claude",
+    });
+    expect(workspaceAgentFromOnboarding(onboarding, [])).toEqual({ component: "runnerSuperPlane" });
+  });
+
   it("uses concise mode copy for board rows", () => {
     expect(customAutomationModeCopy("manual").trigger).toBe("Manual start on a Verify task");
     expect(customAutomationModeCopy("automatic").action).toBe("Run automation automatically");

@@ -222,7 +222,7 @@ describe("LineBoardOrderCard", () => {
     });
 
     const chip = screen.getByRole("img", {
-      name: "Merge confidence. Blast radius: Passed. Drift from Specification: Passed",
+      name: "Merge confidence. Correctness: Passed. Blast radius: Passed",
     });
     expect(chip).toHaveTextContent("Confidence");
     expect(chip).not.toHaveTextContent(/\d/);
@@ -242,7 +242,7 @@ describe("LineBoardOrderCard", () => {
     });
 
     expect(
-      screen.getByRole("img", { name: "Merge confidence. Blast radius: Needs review. Performance: Passed" }),
+      screen.getByRole("img", { name: "Merge confidence. Performance: Passed. Blast radius: Needs review" }),
     ).not.toHaveTextContent("Merge");
   });
 

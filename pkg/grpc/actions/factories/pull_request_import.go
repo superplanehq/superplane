@@ -8,7 +8,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/productanalytics"
@@ -140,13 +139,6 @@ func pullRequestImportFactory(db *gorm.DB, organizationID, factoryID string) (*m
 	orgID, err := parseOrganizationID(organizationID)
 	if err != nil {
 		return nil, err
-	}
-	org, err := models.FindOrganizationByIDInTransaction(db, orgID.String())
-	if err != nil {
-		return nil, err
-	}
-	if !org.HasExperimentalFeature(features.FeatureFactoryPullRequestImport) {
-		return nil, grpcerrors.PermissionDenied(nil, "Pull request import is not enabled.")
 	}
 	factory, err := findFactory(db, orgID, factoryID)
 	if err != nil {
