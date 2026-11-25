@@ -6,6 +6,7 @@ import linearIcon from "@/assets/icons/integrations/linear.svg";
 import notionIcon from "@/assets/icons/integrations/notion.svg";
 import productiveIcon from "@/assets/icons/integrations/productive.svg";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
+import webhookIcon from "@/assets/icons/webhook.svg";
 import {
   FEATURE_FACTORY_CUSTOM_AUTOMATIONS,
   FEATURE_FACTORY_DATADOG_INTAKE,
@@ -95,6 +96,13 @@ export const ADD_INTAKE_TEMPLATES: AddIntakeTemplate[] = [
     name: "Linear issues",
     description: "Create a task when a Linear issue is created in the selected team.",
     iconSrc: linearIcon,
+  },
+  {
+    id: "webhook",
+    name: "Webhook",
+    description: "Creates tasks from requests that other tools send.",
+    iconSrc: webhookIcon,
+    featureId: FEATURE_FACTORY_CUSTOM_AUTOMATIONS,
   },
   {
     id: "notion",

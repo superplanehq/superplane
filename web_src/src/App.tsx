@@ -75,6 +75,7 @@ import {
   JiraIntakeSetupPage,
   LinearIntakeSetupPage,
   ProductiveIntakeSetupPage,
+  WebhookIntakeSetupPage,
   PlanningSetupPage,
   RiskScoreSetupPage,
   CustomAutomationSetupPage,
@@ -217,6 +218,7 @@ function organizationScopedRouteTree() {
               <Route path=":lineId/setup/jira" element={<JiraIntakeSetupPage />} />
               <Route path=":lineId/setup/linear" element={<LinearIntakeSetupPage />} />
               <Route path=":lineId/setup/productive" element={<ProductiveIntakeSetupPage />} />
+              <Route path=":lineId/setup/webhook" element={<WebhookIntakeSetupPage />} />
             </Route>
             <Route path="automations">
               <Route index element={<AutomationsPage />} />

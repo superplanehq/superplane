@@ -21,6 +21,7 @@ export { GitHubIntakeSetupPage } from "./GitHubIntakeSetupPage";
 export { JiraIntakeSetupPage } from "./JiraIntakeSetupPage";
 export { LinearIntakeSetupPage } from "./LinearIntakeSetupPage";
 export { ProductiveIntakeSetupPage } from "./ProductiveIntakeSetupPage";
+export { WebhookIntakeSetupPage } from "./WebhookIntakeSetupPage";
 export { PlanningSetupPage } from "./PlanningSetupPage";
 export { RiskScoreSetupPage } from "./RiskScoreSetupPage";
 export { SentryIntakeSetupPage } from "./SentryIntakeSetupPage";
