@@ -14,6 +14,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/pkg/yaml"
+	"google.golang.org/protobuf/proto"
 	"gorm.io/gorm"
 )
 
@@ -89,6 +90,9 @@ func prepareFactoryConfigurationBuiltIn(ctx context.Context, tx *gorm.DB, deps I
 
 	if err := validateFactoryConfigurationBuiltInSettingSections(templateID, automation.With); err != nil {
 		return nil, prefixConfigurationPreparationSettings(err)
+	}
+	if templateID == intakeTemplateID(models.FactoryIntakeSourceWebhook) && automation.current != nil {
+		return prepareInstalledConfigurationWebhookIntake(tx, deps, target.factory, automation)
 	}
 	if factoryVCSProviderOrDefault(target.factory) == models.ProviderBitbucket && templateID == "risk-score" {
 		section, err := configurationSettingsSection(automation.With, "template")
@@ -216,6 +220,57 @@ func prepareFactoryConfigurationBuiltIn(ctx context.Context, tx *gorm.DB, deps I
 		public["runner_integration_ids"] = ids
 	}
 	prepared.State = state
+	return prepared, nil
+}
+
+// Workspace webhooks have no integration. Keep their installed trigger and
+// field paths while applying the settings supported by workspace YAML.
+func prepareInstalledConfigurationWebhookIntake(tx *gorm.DB, deps IntakeDependencies, factory *models.Factory, automation factoryConfigurationAutomation) (*preparedFactoryConfigurationBuiltIn, error) {
+	current := automation.current
+	if !equalCanvasJSON(current.exportedBinding, automation.Binding) {
+		return nil, configurationPreparationError("binding", "Keep the existing workspace webhook binding.")
+	}
+	section, err := configurationSettingsSection(automation.With, "intake")
+	if err != nil {
+		return nil, err
+	}
+	source := models.FactoryIntakeSourceWebhook
+	settings, err := parseFactoryConfigurationIntakeSettings(source, section)
+	if err != nil {
+		return nil, prefixConfigurationPreparationSettings(err)
+	}
+	if factory.OnboardingConfigValue().CodexSubscription {
+		if _, present := section["default_owner_id"]; !present {
+			settings.DefaultOwnerID = factory.OnboardingConfigValue().CodexDefaultOwnerID
+		}
+	}
+	if err := validateConfigurationIntakeOwner(tx, factory, source, settings.DefaultOwnerID); err != nil {
+		return nil, configurationPreparationError("with.intake.default_owner_id", err.Error())
+	}
+	nodes, edges, err := copyFactoryConfigurationBuiltIn(current.version, current.defaults, current.templateID, automation.With)
+	if err != nil {
+		return nil, prefixConfigurationPreparationSettings(err)
+	}
+	spec := models.LiveCanvasSpec{Nodes: nodes, Edges: edges}
+	nodes, edges, err = applyIntakeSettingsToGraph(source, resolveIntakeGraph(source, spec), spec, &pb.FactoryIntake_Settings{
+		ConfidencePct: int32(settings.ConfidencePct), DefaultOwnerId: proto.String(settings.DefaultOwnerID),
+	}, nodes, edges)
+	if err != nil {
+		return nil, configurationPreparationError("with.intake", err.Error())
+	}
+	if err := validateFactoryConfigurationBuiltInNodes(tx, deps, factory, nodes); err != nil {
+		return nil, prefixConfigurationPreparationSettings(err)
+	}
+	public, err := exportFactoryConfigurationBuiltIn(&models.CanvasVersion{Nodes: nodes, Edges: edges}, current.templateID)
+	if err != nil {
+		return nil, err
+	}
+	prepared := &preparedFactoryConfigurationBuiltIn{
+		TemplateID: current.templateID, Nodes: nodes, Edges: edges, Defaults: current.defaults,
+		Settings: public, Binding: current.binding, ExplicitBinding: automation.Binding,
+		IntakeSource: source, Description: current.canvas.Description,
+	}
+	configurationPreparedRecordSettings(prepared, automation.With, prepared.Settings)
 	return prepared, nil
 }
 

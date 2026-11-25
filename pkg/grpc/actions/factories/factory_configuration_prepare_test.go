@@ -21,6 +21,7 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
 	"github.com/superplanehq/superplane/test/support"
+	"google.golang.org/protobuf/proto"
 	goyaml "gopkg.in/yaml.v3"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
@@ -178,6 +179,76 @@ func TestFactoryConfigurationInstallsSupportedCatalogEntries(t *testing.T) {
 			})
 		}
 	}
+}
+
+func TestFactoryConfigurationPreservesInstalledWebhookIntake(t *testing.T) {
+	f := newConfigurationFixture(t)
+	require.NoError(t, models.EnableExperimentalFeature(f.r.Organization.ID, features.FeatureFactoryWebhookIntake))
+	deps := testIntakeDependencies(f.r)
+	webhook, err := CreateFactoryWebhook(f.ctx, deps, f.r.Organization.ID.String(), &pb.CreateFactoryWebhookRequest{
+		FactoryId: f.factory.ID.String(), Name: "Tracker", Authentication: pb.FactoryWebhook_AUTHENTICATION_BEARER,
+	})
+	require.NoError(t, err)
+	created, err := CreateFactoryIntake(f.ctx, deps, f.r.Organization.ID.String(), &pb.CreateFactoryIntakeRequest{
+		FactoryId: f.factory.ID.String(), Source: pb.FactoryIntake_SOURCE_WEBHOOK, ResourceId: webhook.Webhook.Id,
+	})
+	require.NoError(t, err)
+	_, err = UpdateFactoryIntake(f.ctx, deps, f.r.Organization.ID.String(), &pb.UpdateFactoryIntakeRequest{
+		FactoryId: f.factory.ID.String(), IntakeId: created.Intake.Id,
+		Settings: &pb.FactoryIntake_Settings{WebhookTitlePath: proto.String("issue.summary")},
+	})
+	require.NoError(t, err)
+	canvas, err := models.FindCanvasInTransaction(database.DB(t.Context()), f.r.Organization.ID, uuid.MustParse(created.Intake.CanvasId))
+	require.NoError(t, err)
+	before := resetTestLiveVersion(t, canvas)
+	bundle := f.export(t)
+	plan := f.plan(t, bundle)
+	require.Empty(t, plan.Diagnostics)
+	require.Empty(t, plan.Changes)
+	result, err := f.apply(bundle, plan.BaseStateToken)
+	require.NoError(t, err)
+	require.False(t, result.Changed)
+
+	bundle.Files[0].Content = strings.ReplaceAll(bundle.Files[0].Content, "Original instructions", "Updated instructions")
+	plan = f.plan(t, bundle)
+	require.Empty(t, plan.Diagnostics)
+	require.Len(t, plan.Changes, 1)
+	result, err = f.apply(bundle, plan.BaseStateToken)
+	require.NoError(t, err)
+	require.True(t, result.Changed)
+	require.Equal(t, before.ID, resetTestLiveVersion(t, canvas).ID, "an unrelated update must preserve the intake revision")
+
+	var manifest factoryConfigurationManifest
+	require.NoError(t, goyaml.Unmarshal([]byte(bundle.Files[0].Content), &manifest))
+	for i := range manifest.Stages {
+		for j := range manifest.Stages[i].Automations {
+			automation := &manifest.Stages[i].Automations[j]
+			if automation.Uses == "@superplane/intake/webhook" {
+				automation.With["intake"] = map[string]any{"confidence_pct": 23}
+			}
+		}
+	}
+	content, err := goyaml.Marshal(manifest)
+	require.NoError(t, err)
+	bundle.Files[0].Content = string(content)
+	plan = f.plan(t, bundle)
+	require.Empty(t, plan.Diagnostics)
+	_, err = f.apply(bundle, plan.BaseStateToken)
+	require.NoError(t, err)
+	live := resetTestLiveVersion(t, canvas)
+	spec := models.LiveCanvasSpec{Nodes: live.Nodes, Edges: live.Edges}
+	graph := resolveIntakeGraph(models.FactoryIntakeSourceWebhook, spec)
+	require.Equal(t, webhook.Webhook.Id, graph.TriggerResourceID(spec))
+	require.Equal(t, 23, intakeSettingsFromGraph(models.FactoryIntakeSourceWebhook, graph, spec).ConfidencePct)
+	require.Equal(t, "issue.summary", intakeSettingsFromGraph(models.FactoryIntakeSourceWebhook, graph, spec).WebhookTitlePath)
+	plan = f.plan(t, f.export(t))
+	require.Empty(t, plan.Diagnostics)
+	require.Empty(t, plan.Changes)
+	bundle = f.export(t)
+	bundle.Files[0].Content = strings.ReplaceAll(bundle.Files[0].Content, webhook.Webhook.Id, uuid.NewString())
+	plan = f.plan(t, bundle)
+	require.Len(t, plan.Diagnostics, 1)
+	require.Contains(t, plan.Diagnostics[0].Field, ".binding")
 }
 
 func configurationAssertCatalogBindingChange(t *testing.T, f configurationFixture, canvas *models.Canvas, automation factoryConfigurationAutomation, bundle *pb.FactoryConfigurationBundle, templateID string) {

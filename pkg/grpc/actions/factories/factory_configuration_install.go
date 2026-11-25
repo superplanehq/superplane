@@ -216,6 +216,11 @@ func factoryConfigurationBindingChanged(current *factoryConfigurationAutomationT
 	if desired.prepared == nil {
 		return false
 	}
+	// Existing workspace webhook bindings are fixed, so exporting their selected
+	// webhook does not introduce a new binding intent.
+	if current.templateID == intakeTemplateID(models.FactoryIntakeSourceWebhook) {
+		return current.binding != desired.prepared.Binding
+	}
 	return current.binding != desired.prepared.Binding || !equalCanvasJSON(current.explicitBinding, desired.Binding)
 }
 
