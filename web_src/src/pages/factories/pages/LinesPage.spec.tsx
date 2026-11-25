@@ -1942,6 +1942,22 @@ describe("LinesPage board extras", () => {
     expect(screen.getByTestId("line-intake-source-intake-triage")).toHaveTextContent("Listening to Triage issues");
   });
 
+  it("opens webhook intake setup in a modal on the board", async () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
+    const user = userEvent.setup();
+    renderLinesBoard();
+    const location = screen.getByTestId("lines-test-location").textContent;
+
+    await user.click(screen.getByTestId("lines-backlog-menu"));
+    await user.click(screen.getByTestId("lines-backlog-menu-add-intake"));
+    await user.click(screen.getByTestId("add-intake-template-webhook"));
+
+    expect(screen.getByTestId("webhook-intake-setup")).toBeInTheDocument();
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(location ?? "");
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByTestId("webhook-intake-setup")).not.toBeInTheDocument();
+  });
+
   it("opens GitHub intake setup from the picker", async () => {
     const user = userEvent.setup();
     renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, { addIntakeControl: true, columnAutomations: false });
