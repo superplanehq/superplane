@@ -626,29 +626,33 @@ func (c actionPermissionChecker) CheckOrganizationPermission(_ context.Context, 
 func TestPullRequestImportAuthorization(t *testing.T) {
 	org, err := models.CreateOrganization("pr-import-"+uuid.NewString(), "")
 	require.NoError(t, err)
+	// Disabled cache entries fall back to the stored feature setting.
+	require.NoError(t, models.DisableExperimentalFeature(org.ID, features.FeatureFactories))
 	orgID := org.ID.String()
 	t.Cleanup(clearOrganizationPermissionCacheForTest)
 	t.Cleanup(clearOrgExperimentalFeatureCacheForTest)
 	for _, scenario := range []struct {
-		name, method, path string
-		permissions        actionPermissionChecker
-		scopes             []string
-		enabled, allowed   bool
+		name, method, path        string
+		permissions               actionPermissionChecker
+		scopes                    []string
+		factoriesEnabled, allowed bool
 	}{
-		{"search needs task read", "GET", "/candidates", actionPermissionChecker{"work_orders:read": true}, nil, true, true},
+		{"search allows task read without import flag", "GET", "/candidates", actionPermissionChecker{"work_orders:read": true}, nil, true, true},
 		{"search denies create only", "GET", "/candidates", actionPermissionChecker{"work_orders:create": true}, nil, true, false},
-		{"import needs create and update", "POST", "", actionPermissionChecker{"work_orders:create": true, "work_orders:update": true}, nil, true, true},
+		{"import allows create and update without import flag", "POST", "", actionPermissionChecker{"work_orders:create": true, "work_orders:update": true}, nil, true, true},
 		{"import denies create only", "POST", "", actionPermissionChecker{"work_orders:create": true}, nil, true, false},
 		{"import denies update only", "POST", "", actionPermissionChecker{"work_orders:update": true}, nil, true, false},
+		{"scoped search token needs read", "GET", "/candidates", actionPermissionChecker{"work_orders:read": true}, []string{"work_orders:create"}, true, false},
+		{"scoped search token allows read", "GET", "/candidates", actionPermissionChecker{"work_orders:read": true}, []string{"work_orders:read"}, true, true},
+		{"scoped token needs create", "POST", "", actionPermissionChecker{"work_orders:create": true, "work_orders:update": true}, []string{"work_orders:update"}, true, false},
 		{"scoped token needs update", "POST", "", actionPermissionChecker{"work_orders:create": true, "work_orders:update": true}, []string{"work_orders:create"}, true, false},
 		{"scoped token allows both", "POST", "", actionPermissionChecker{"work_orders:create": true, "work_orders:update": true}, []string{"work_orders:create", "work_orders:update"}, true, true},
-		{"flag off denies search", "GET", "/candidates", actionPermissionChecker{"work_orders:read": true}, nil, false, false},
-		{"flag off denies import", "POST", "", actionPermissionChecker{"work_orders:create": true, "work_orders:update": true}, nil, false, false},
+		{"factories off denies search", "GET", "/candidates", actionPermissionChecker{"work_orders:read": true}, nil, false, false},
+		{"factories off denies import", "POST", "", actionPermissionChecker{"work_orders:create": true, "work_orders:update": true}, nil, false, false},
 	} {
 		t.Run(scenario.name, func(t *testing.T) {
 			clearOrganizationPermissionCacheForTest()
-			SetOrgExperimentalFeatureCache(uuid.MustParse(orgID), features.FeatureFactories, true)
-			SetOrgExperimentalFeatureCache(uuid.MustParse(orgID), features.FeatureFactoryPullRequestImport, scenario.enabled)
+			SetOrgExperimentalFeatureCache(uuid.MustParse(orgID), features.FeatureFactories, scenario.factoriesEnabled)
 			headers := map[string]string{"x-user-id": "22222222-2222-4222-8222-222222222222", "x-organization-id": orgID}
 			if scenario.scopes != nil {
 				headers["x-token-scopes"] = marshalScopes(t, scenario.scopes)

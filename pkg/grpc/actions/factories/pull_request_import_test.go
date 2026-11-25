@@ -20,7 +20,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/integrations/bitbucket"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -44,7 +43,6 @@ func TestImportFactoryPullRequest(t *testing.T) {
 	factory := seedHandOffFactory(t, r, db)
 	require.NoError(t, factory.UpdatePlanning(db, models.FactoryPlanning{Enabled: true, Clarity: true, Confidence: true}))
 	backlog := createOnWorkOrderCanvas(t, r, factory.ID)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryPullRequestImport))
 	app, entry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "implement", "start")
 	line, err := factory.CreateLine(db, "ship", []models.FactoryLineStep{{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entry}})
 	require.NoError(t, err)
@@ -178,7 +176,6 @@ func TestSearchFactoryPullRequestImportItemsGitHub(t *testing.T) {
 			require.NoError(t, err)
 			vcsID := integration.ID.String()
 			require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSIntegrationID: &vcsID}))
-			require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryPullRequestImport))
 			pr := openHandOffPullRequest("acme/app", 42, "branch")
 			pr.HTMLURL = github.Ptr("https://" + host + "/ACME/App/pull/42?diff=split#files")
 			pr.Draft = github.Ptr(true)
@@ -235,6 +232,18 @@ func TestSearchFactoryPullRequestImportItemsGitHub(t *testing.T) {
 					assert.Equal(t, pr.GetHTMLURL(), result.Items[0].Url)
 				})
 			}
+			t.Run("import without experimental flag", func(t *testing.T) {
+				app, entry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "implement", "start")
+				line, err := factory.CreateLine(db, "ship", []models.FactoryLineStep{{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entry}})
+				require.NoError(t, err)
+				ctx := authentication.SetUserIdInMetadata(t.Context(), r.User.String())
+				result, err := ImportFactoryPullRequest(ctx, IntakeDependencies{}, r.Organization.ID.String(), &pb.ImportFactoryPullRequestRequest{
+					FactoryId: factory.ID.String(), LineId: line.ID.String(), PullRequestUrl: pr.GetHTMLURL(),
+				})
+				require.NoError(t, err)
+				assert.True(t, result.Created)
+				assert.Equal(t, pr.GetTitle(), result.Order.GetTitle())
+			})
 			for _, rawURL := range []string{"https://" + host + "/other/app/pull/42", "https://other.ghe.com/acme/app/pull/42"} {
 				t.Run("reject "+rawURL, func(t *testing.T) {
 					_, err := SearchFactoryPullRequestImportItems(t.Context(), IntakeDependencies{}, r.Organization.ID.String(), &pb.SearchFactoryPullRequestImportItemsRequest{FactoryId: factory.ID.String(), Query: rawURL})
@@ -251,7 +260,6 @@ func TestSearchFactoryPullRequestImportItemsBatchesExistingTasks(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 	factory := seedHandOffFactory(t, r, db)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryPullRequestImport))
 	orders := make([]*models.FactoryWorkOrder, 5)
 	prs := make([]*github.PullRequest, len(orders))
 	for i := range orders {
@@ -324,7 +332,6 @@ func TestImportFactoryPullRequestConcurrent(t *testing.T) {
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 	db := database.DB(ctx)
 	factory := seedHandOffFactory(t, r, db)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryPullRequestImport))
 	app, entry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "implement", "start")
 	line, err := factory.CreateLine(db, "ship", []models.FactoryLineStep{{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entry}})
 	require.NoError(t, err)
@@ -380,7 +387,7 @@ func (f *concurrentImportGitHub) GetPullRequest(ctx context.Context, repository 
 	return f.fakeFactoryGitHub.GetPullRequest(ctx, repository, number)
 }
 
-func TestPullRequestImportRequiresFlagAndConnections(t *testing.T) {
+func TestPullRequestImportRequiresConnections(t *testing.T) {
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 	db := database.DB(ctx)
@@ -388,13 +395,7 @@ func TestPullRequestImportRequiresFlagAndConnections(t *testing.T) {
 	search := &pb.SearchFactoryPullRequestImportItemsRequest{FactoryId: factory.ID.String()}
 	request := &pb.ImportFactoryPullRequestRequest{FactoryId: factory.ID.String(), LineId: uuid.NewString(), PullRequestUrl: "https://github.com/acme/app/pull/42"}
 	_, err := SearchFactoryPullRequestImportItems(ctx, IntakeDependencies{}, r.Organization.ID.String(), search)
-	require.Error(t, err)
-	code, _, ok := grpcerrors.HandlerStatus(err)
-	require.True(t, ok)
-	assert.Equal(t, codes.PermissionDenied, code)
-	_, err = ImportFactoryPullRequest(ctx, IntakeDependencies{}, r.Organization.ID.String(), request)
-	require.Error(t, err)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryPullRequestImport))
+	require.ErrorIs(t, err, errFactoryGitHubNotConnected)
 	_, err = ImportFactoryPullRequest(ctx, IntakeDependencies{}, r.Organization.ID.String(), request)
 	require.ErrorIs(t, err, errFactoryGitHubNotConnected)
 	useGitHub(t, openHandOffPullRequest("acme/app", 42, "branch"))
@@ -413,7 +414,6 @@ func TestPullRequestImportBitbucket(t *testing.T) {
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 	db := database.DB(ctx)
 	factory := seedBitbucketHandOffFactory(t, r, db)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryPullRequestImport))
 	app, entry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "implement", "start")
 	line, err := factory.CreateLine(db, "ship", []models.FactoryLineStep{{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entry}})
 	require.NoError(t, err)
@@ -457,7 +457,6 @@ func TestBitbucketImportStartsMergeConfidence(t *testing.T) {
 			ctx := authentication.SetUserIdInMetadata(t.Context(), r.User.String())
 			db := database.DB(ctx)
 			factory := seedBitbucketHandOffFactory(t, r, db)
-			require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryPullRequestImport))
 			app, entry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "implement", "start")
 			line, err := factory.CreateLine(db, "ship", []models.FactoryLineStep{{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entry}})
 			require.NoError(t, err)
