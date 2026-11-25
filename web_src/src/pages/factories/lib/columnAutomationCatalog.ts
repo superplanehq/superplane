@@ -79,7 +79,7 @@ export const RISK_SCORE_ENTRY: ColumnAutomationCatalogEntry = {
   id: RISK_SCORE_CATALOG_ID,
   kind: "risk-score",
   name: "Merge confidence",
-  description: "Score risk, performance, security, and drift on a pull request.",
+  description: "Review a pull request for correctness, performance, security, blast radius, and reversibility.",
   trigger: "On pull request opened or updated",
   action: "Score merge confidence",
   iconSrc: "",

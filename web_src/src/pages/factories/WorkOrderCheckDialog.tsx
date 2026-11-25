@@ -121,22 +121,23 @@ function CheckVerdictIcon({ check }: { check: WorkOrderCheckPresentation }) {
 
 /** Trend versus the previous report, spelled out in text. */
 function CheckTrendLine({ check }: { check: WorkOrderCheckPresentation }) {
-  if (check.previousScore === undefined || check.previousScore === check.score) {
+  const { score, previousScore } = formatCheckScore(check);
+  if (previousScore === undefined || previousScore === score) {
     return null;
   }
 
   if (check.format === "boolean") {
     return (
       <p className="mt-2 text-[12px] text-muted-foreground">
-        Was {booleanCheckVerdict(check.previousScore)} on the previous run.
+        Was {booleanCheckVerdict(previousScore)} on the previous run.
       </p>
     );
   }
 
-  const direction = check.score > check.previousScore ? "Up" : "Down";
+  const direction = score > previousScore ? "Up" : "Down";
   return (
     <p className="mt-2 text-[12px] text-muted-foreground">
-      {direction} from <span className="tabular-nums">{check.previousScore}</span> on the previous run.
+      {direction} from <span className="tabular-nums">{previousScore}</span> on the previous run.
     </p>
   );
 }
