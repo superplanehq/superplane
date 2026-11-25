@@ -1,4 +1,5 @@
 import type { FactoriesWorkOrderEvent, FactoriesWorkOrderResult } from "@/api-client";
+import { workOrderCheckDisplayName } from "./workOrderChecks";
 import { formatWorkOrderResult } from "./workOrderPresentation";
 import { isPullRequestArtifactType, pullRequestFromEventPayload } from "./workOrderPullRequest";
 import {
@@ -62,6 +63,7 @@ interface EventPullRequestPayload {
 }
 
 interface EventCheckPayload {
+  key?: string;
   name?: string;
   score?: number;
   maxScore?: number;
@@ -481,6 +483,7 @@ function appendCheckReportedEvent(state: TimelineBuildState, index: number, payl
   }
 
   const automationActor = toAutomationActor(payload.automation);
+  const name = workOrderCheckDisplayName(check);
   // Same wording rule as CheckReportedEventBody: a re-report with an
   // unchanged score still reads as "reported".
   const isRescore = check.previousScore !== undefined && check.previousScore !== check.score;
@@ -492,13 +495,14 @@ function appendCheckReportedEvent(state: TimelineBuildState, index: number, payl
     sourceRunId: payload.run?.id,
     sourceAppId: automationActor?.appId ?? payload.app?.id,
     check: {
-      name: check.name,
+      key: check.key,
+      name,
       score: check.score,
       maxScore: check.maxScore,
       format: check.format,
       previousScore: check.previousScore,
     },
-    title: isRescore ? `re-scored ${check.name}` : `reported ${check.name}`,
+    title: isRescore ? `re-scored ${name}` : `reported ${name}`,
   });
 }
 
