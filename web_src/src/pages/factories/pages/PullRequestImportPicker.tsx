@@ -3,10 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { usePermissions } from "@/contexts/usePermissions";
-import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useImportFactoryPullRequest, useSearchFactoryPullRequestImports } from "@/hooks/useFactoryPullRequestImports";
 import { useAutoLoadMoreOnScroll } from "@/hooks/useAutoLoadMoreOnScroll";
-import { FEATURE_FACTORY_PULL_REQUEST_IMPORT } from "@/lib/experimentalFeatures";
 import { getApiErrorMessage } from "@/lib/errors";
 import { factoryVCSProvider } from "@/pages/home/factories";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
@@ -25,10 +23,8 @@ type PullRequestImportPickerProps = {
 };
 
 export function PullRequestImportPicker(props: PullRequestImportPickerProps) {
-  const { has } = useExperimentalFeature(props.organizationId);
   const { canAct } = usePermissions();
-  if (!has(FEATURE_FACTORY_PULL_REQUEST_IMPORT) || !canAct("work_orders", "create") || !canAct("work_orders", "update"))
-    return null;
+  if (!canAct("work_orders", "create") || !canAct("work_orders", "update")) return null;
   return <ConnectedPullRequestImportPicker {...props} />;
 }
 

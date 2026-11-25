@@ -16,15 +16,19 @@ import (
 )
 
 func exportFactoryConfigurationCustom(tx *gorm.DB, factory *models.Factory, canvas *models.Canvas, version *models.CanvasVersion, placement string) (string, error) {
+	authored, err := findLegacyAutomationSource(tx, canvas)
+	if err != nil {
+		return "", err
+	}
+	return renderFactoryConfigurationCustom(tx, factory, canvas, version, placement, authored)
+}
+
+func renderFactoryConfigurationCustom(tx *gorm.DB, factory *models.Factory, canvas *models.Canvas, version *models.CanvasVersion, placement string, authored *models.AutomationSource) (string, error) {
 	placed := *canvas
 	placed.ColumnKey = &placement
 	source, err := importAutomationCanvas(tx, factory, &placed, version)
 	if err != nil {
 		return "", fmt.Errorf("automation %q: %w", canvas.Name, err)
-	}
-	authored, err := findLegacyAutomationSource(tx, canvas)
-	if err != nil {
-		return "", err
 	}
 	if authored == nil || authored.FactoryID != factory.ID || authored.ArtifactRevision != version.ID.String() {
 		return source, nil

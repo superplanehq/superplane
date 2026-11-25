@@ -21,7 +21,7 @@ stage order, phase settings, and runner validation.
 
 Include every existing stage exactly once. YAML cannot add or remove stages.
 Backlog must remain first, and Done must remain last. Keep existing `run`
-bindings. Only phases support `max_parallelism`. Existing permissions for
+bindings. Only stages with a runner binding support `max_parallelism`. Existing permissions for
 stage names and order still apply.
 
 Export followed by plan produces no changes when the workspace has not changed.

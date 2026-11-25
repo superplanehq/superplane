@@ -191,7 +191,7 @@ func TestNodeRequestExecutorPreparesMergeConfidenceOnlyOnTerminalPoll(t *testing
 			assert.Equal(t, pr.ID.String(), report.PullRequestID)
 			assert.Equal(t, "reviewed-head", report.ReviewedCommit)
 			assert.Equal(t, outcome == "succeeded", report.Complete)
-			assert.Equal(t, []mergeconfidence.ReportCheck{
+			assert.ElementsMatch(t, []mergeconfidence.ReportCheck{
 				{ID: "risk", Label: "Blast radius", Score: 2, MaxScore: 5, Summary: "Limited blast radius.", Level: factoryevents.CheckLevelPositive},
 				{ID: "security", Label: "Security", Score: 4, MaxScore: 5, Summary: "Final security result.", Level: factoryevents.CheckLevelPositive},
 			}, report.Checks)

@@ -12,8 +12,8 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// Only the server validates live stage kinds, built-in aliases, and settings. The CLI validates
-// the bundle structure before reading references or replacing local files.
+// The server validates live stage kinds, built-in aliases, and settings.
+// The CLI validates bundle structure before reading references or replacing local files.
 func configurationManifestReferences(content string) ([]string, error) {
 	var manifest struct {
 		APIVersion string `yaml:"apiVersion"`

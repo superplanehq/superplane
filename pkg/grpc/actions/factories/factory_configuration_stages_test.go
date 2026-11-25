@@ -26,7 +26,7 @@ func TestFactoryConfigurationIncludesEveryStageAndPhase(t *testing.T) {
 	require.NoError(t, f.line.Update(db, nil, steps, nil))
 	stages := f.line.StagesValue()
 	customID := uuid.New()
-	custom := models.FactoryLineStage{ID: customID, Key: "custom-" + customID.String(), Name: "Security", Kind: models.FactoryLineStageCustom}
+	custom := models.FactoryLineStage{ID: customID, Key: "custom-" + customID.String(), Name: "Security", Kind: models.FactoryLineStagePhase}
 	byKey := map[string]models.FactoryLineStage{}
 	for _, stage := range stages {
 		byKey[stage.Key] = stage
@@ -47,6 +47,8 @@ func TestFactoryConfigurationIncludesEveryStageAndPhase(t *testing.T) {
 		require.NotContains(t, stage.(map[string]any), "kind")
 	}
 	require.Empty(t, manifest.Stages[2].Automations)
+	require.Empty(t, manifest.Stages[2].Run)
+	require.Empty(t, manifest.Stages[4].Run)
 	require.Len(t, manifest.Stages[5].Automations, 1)
 	require.Equal(t, "@superplane/pr-closure", manifest.Stages[5].Automations[0].Uses)
 	plan := f.plan(t, bundle)
@@ -73,7 +75,7 @@ func TestFactoryConfigurationIncludesEveryStageAndPhase(t *testing.T) {
 	reloaded, err := f.factory.FindLine(db, f.line.ID)
 	require.NoError(t, err)
 	require.Equal(t, custom.ID, reloaded.Stages[3].ID)
-	require.Equal(t, models.FactoryLineStageCustom, reloaded.Stages[3].Kind)
+	require.Equal(t, models.FactoryLineStagePhase, reloaded.Stages[3].Kind)
 	require.Equal(t, "Phase", reloaded.Stages[3].Name)
 	require.Equal(t, 3, reloaded.Steps[1].EffectiveMaxParallelism())
 	require.Equal(t, before, configurationResourceCounts(t), "stage edits must not publish automation revisions")

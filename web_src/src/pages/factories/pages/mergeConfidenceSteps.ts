@@ -11,7 +11,7 @@ const CHECK_SECTIONS: ReadonlyArray<{ id: MergeConfidenceCheck; label: string; m
     marker: "Performance. Use this section only when performance is enabled.",
   },
   { id: "security", label: "Security", marker: "Security. Use this section only when security is enabled." },
-  { id: "drift", label: "Drift from Specification", marker: "Drift. Use this section only when drift is enabled." },
+  { id: "drift", label: "Correctness", marker: "Drift. Use this section only when drift is enabled." },
   {
     id: "reversibility",
     label: "Reversibility",

@@ -138,7 +138,7 @@ func TestExportConfigurationProtectsLocalFiles(t *testing.T) {
 }
 
 func TestExportConfigurationRejectsInvalidResponsesBeforeOverwrite(t *testing.T) {
-	for _, scenario := range []string{"missing bundle", "missing coverage", "unsafe manifest", "unsafe file", "extra file", "missing content", "invalid YAML", "missing stages", "unknown field", "stage kind", "zero concurrency", "YAML alias"} {
+	for _, scenario := range []string{"missing bundle", "missing coverage", "unsafe manifest", "unsafe file", "extra file", "missing content", "invalid YAML", "missing stages", "unknown field", "stage kind", "zero concurrency", "unknown runner", "YAML alias"} {
 		t.Run(scenario, func(t *testing.T) {
 			outputDir := t.TempDir()
 			require.NoError(t, os.Mkdir(filepath.Join(outputDir, ".superplane"), 0755))
@@ -170,6 +170,8 @@ func TestExportConfigurationRejectsInvalidResponsesBeforeOverwrite(t *testing.T)
 				files[0]["content"] = strings.Replace(configurationManifest, "name: Implement", "name: Implement\n    kind: phase", 1)
 			case "zero concurrency":
 				files[0]["content"] = strings.Replace(configurationManifest, "run: implement", "run: implement\n    max_parallelism: 0", 1)
+			case "unknown runner":
+				files[0]["content"] = strings.Replace(configurationManifest, "    run: implement", "    run: missing", 1)
 			case "YAML alias":
 				aliased := strings.ReplaceAll(configurationManifest, "name: Example workspace", "name: &workspace Example workspace")
 				files[0]["content"] = strings.ReplaceAll(aliased, "name: Implement", "name: *workspace")

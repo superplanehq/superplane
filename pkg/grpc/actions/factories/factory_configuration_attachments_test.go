@@ -15,7 +15,7 @@ func TestFactoryConfigurationPreservesSharedStageAttachments(t *testing.T) {
 	f := newConfigurationFixture(t)
 	db := database.DB(t.Context())
 	id := uuid.New()
-	shared := models.FactoryLineStage{ID: id, Key: "custom-" + id.String(), Name: "Recheck", Kind: models.FactoryLineStageCustom}
+	shared := models.FactoryLineStage{ID: id, Key: "custom-" + id.String(), Name: "Recheck", Kind: models.FactoryLineStagePhase}
 	stages := f.line.StagesValue()
 	done := stages[len(stages)-1]
 	stages = append(stages[:len(stages)-1], shared, done)

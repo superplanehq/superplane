@@ -254,7 +254,7 @@ func TestMaterializeRiskScoreTemplate(t *testing.T) {
 	assert.Contains(t, prompt, "Authorization changes = 4 (high).")
 	assert.Contains(t, prompt, "report_merge_check")
 	assert.Contains(t, prompt, "check is risk.")
-	for _, name := range []string{"Blast radius", "Performance", "Security", "Drift from Specification", "Reversibility"} {
+	for _, name := range []string{"Correctness", "Performance", "Security", "Blast radius", "Reversibility"} {
 		implementationStep(t, agent, name)
 	}
 	assert.NotContains(t, result.canvasYAML, "Checkout Pull Request")

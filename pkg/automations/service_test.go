@@ -171,7 +171,7 @@ func TestServiceCustomStageRequiresUnifiedFlagAndFactoryAsCode(t *testing.T) {
 	line, err := factory.CreateLine(db, "Main", nil)
 	require.NoError(t, err)
 	stageID := uuid.New()
-	stage := models.FactoryLineStage{ID: stageID, Key: "custom-" + stageID.String(), Name: "QA", Kind: models.FactoryLineStageCustom}
+	stage := models.FactoryLineStage{ID: stageID, Key: "custom-" + stageID.String(), Name: "QA", Kind: models.FactoryLineStagePhase}
 	stages := line.StagesValue()
 	stages = append(stages[:1], append([]models.FactoryLineStage{stage}, stages[1:]...)...)
 	require.NoError(t, line.UpdateConfiguration(db, nil, nil, nil, stages))

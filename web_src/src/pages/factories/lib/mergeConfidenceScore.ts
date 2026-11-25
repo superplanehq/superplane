@@ -6,17 +6,22 @@ import { workOrderCheckStatus, type WorkOrderCheckLevel, type WorkOrderCheckPres
 
 /** Check keys written by the merge confidence automation. */
 export const MERGE_CONFIDENCE_METRIC_KEYS = [
-  "risk-review",
+  "correctness-review",
+  "drift-review",
   "performance-review",
   "security-review",
-  "drift-review",
+  "risk-review",
   "reversibility-review",
 ] as const;
 
 const LOWER_IS_BETTER_KEYS = new Set<string>(["risk-review", "drift-review"]);
 
-/** Performance, security, and reversibility improve as the score rises. Other checks, including custom ones, improve as the score falls. */
-const HIGHER_IS_BETTER_KEYS = new Set<string>(["performance-review", "security-review", "reversibility-review"]);
+const HIGHER_IS_BETTER_KEYS = new Set<string>([
+  "correctness-review",
+  "performance-review",
+  "security-review",
+  "reversibility-review",
+]);
 
 export type MergeConfidenceCardCheck = {
   key?: string;
@@ -133,7 +138,7 @@ export function mergeConfidenceHeadline(
 function weakestPerKey(metrics: MergeConfidenceCardCheck[]): MergeConfidenceCardCheck[] {
   const byKey = new Map<string, MergeConfidenceCardCheck>();
   for (const metric of metrics) {
-    const key = metric.key ?? metric.name ?? "";
+    const key = metric.key === "drift-review" ? "correctness-review" : (metric.key ?? metric.name ?? "");
     const current = byKey.get(key);
     if (!current || confidenceRatio(metric) < confidenceRatio(current)) {
       byKey.set(key, metric);

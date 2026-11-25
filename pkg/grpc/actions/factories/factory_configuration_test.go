@@ -55,7 +55,7 @@ func newConfigurationFixture(t *testing.T) configurationFixture {
 	phaseName := "Build changes"
 	stages := line.StagesValue()
 	for i := range stages {
-		if stages[i].Kind == models.FactoryLineStagePhase {
+		if stages[i].StepIndex != nil {
 			stages[i].Name = phaseName
 		}
 	}
@@ -187,6 +187,7 @@ func TestFactoryConfigurationRejectsUnsupportedManifestWithoutWrites(t *testing.
 		{"numeric instructions", "additional_instructions: Original instructions", "additional_instructions: 123", "stages[1].automations[0].with.additional_instructions"},
 		{"YAML anchor", "additional_instructions: Original instructions", "additional_instructions: &instructions Original instructions", "stages[1].automations[0].with.additional_instructions"},
 		{"unsupported alias", "@superplane/implement", "@superplane/planning", "stages[1].automations[0].uses"},
+		{"concurrency without runner", "name: Verify", "name: Verify\n    max_parallelism: 2", "stages[2].max_parallelism"},
 		{"zero concurrency", "run: implement", "run: implement\n    max_parallelism: 0", "stages[1].max_parallelism"},
 		{"concurrency outside API range", "run: implement", "run: implement\n    max_parallelism: 2147483648", "stages[1].max_parallelism"},
 		{"stage editing disabled", "name: Build changes", "name: Other phase", "stages"},
@@ -312,7 +313,7 @@ func TestFactoryConfigurationGuardsDoNotWrite(t *testing.T) {
 				require.NoError(t, err)
 				stages := line.StagesValue()
 				for i := range stages {
-					if stages[i].Kind == models.FactoryLineStagePhase {
+					if stages[i].StepIndex != nil {
 						stages[i].Name = "Build changes"
 					}
 				}

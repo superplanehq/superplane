@@ -27,7 +27,7 @@ export function workOrderCardSource(order: FactoriesWorkOrder): WorkOrderCardSou
       ...(creatorName ? { creatorName } : {}),
     };
   }
-  if (source.kind === "mcp") {
+  if (source.kind === "mcp" || source.kind === "automation") {
     return {
       name: source.name,
       iconSrc: source.iconSrc,
