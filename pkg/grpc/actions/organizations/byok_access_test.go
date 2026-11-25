@@ -5,6 +5,7 @@ import (
 	"errors"
 	billingorganizations "github.com/superplanehq/superplane/ee/billing/organizations"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -41,6 +42,7 @@ func TestBYOKAccess(t *testing.T) {
 	_, err = billingmodels.SetAdminOrganizationPlan(db, r.Organization.ID, plan.Key, nil)
 	require.NoError(t, err)
 	for _, provider := range []string{models.UsageProviderAnthropic, models.UsageProviderOpenAI, models.UsageProviderOpenRouter, models.UsageProviderCustom} {
+		require.NoError(t, models.UpsertLLMModelCapabilities(db, provider, "https://provider.example/v1", []models.LLMModelCapability{{Model: "test-model", ThinkingLevels: datatypes.JSONSlice[string]{"high"}, RefreshedAt: time.Now()}}))
 		_, err := models.UpsertOrganizationBYOKModelAllowlist(db, r.Organization.ID, provider, datatypes.JSONSlice[string]{"test-model"})
 		require.NoError(t, err)
 	}
