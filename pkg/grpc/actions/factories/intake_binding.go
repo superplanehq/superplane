@@ -136,7 +136,7 @@ func resolveJiraIntakeBinding(
 		return nil, invalidArgument("Jira integration is invalid")
 	}
 
-	integration, err := models.FindIntegrationInTransaction(tx, factory.OrganizationID, id)
+	integration, err := factoryAutomationIntegrationByID(tx, factory.OrganizationID, id)
 	if err != nil {
 		return nil, invalidArgument("Jira integration was not found")
 	}
@@ -177,7 +177,7 @@ func resolveProductiveIntakeBinding(
 		return nil, invalidArgument("Productive integration is invalid")
 	}
 
-	integration, err := models.FindIntegrationInTransaction(tx, factory.OrganizationID, id)
+	integration, err := factoryAutomationIntegrationByID(tx, factory.OrganizationID, id)
 	if err != nil {
 		return nil, invalidArgument("Productive integration was not found")
 	}
@@ -218,7 +218,7 @@ func resolveDatadogIntakeBinding(
 		return nil, invalidArgument("Datadog integration is invalid")
 	}
 
-	integration, err := models.FindIntegrationInTransaction(tx, factory.OrganizationID, id)
+	integration, err := factoryAutomationIntegrationByID(tx, factory.OrganizationID, id)
 	if err != nil {
 		return nil, invalidArgument("Datadog integration was not found")
 	}
@@ -265,7 +265,7 @@ func resolveLinearIntakeBinding(
 		return nil, invalidArgument("Linear integration is invalid")
 	}
 
-	integration, err := models.FindIntegrationInTransaction(tx, factory.OrganizationID, id)
+	integration, err := factoryAutomationIntegrationByID(tx, factory.OrganizationID, id)
 	if err != nil {
 		return nil, invalidArgument("Linear integration was not found")
 	}
@@ -317,7 +317,7 @@ func resolveSentryIntakeBinding(
 		return nil, invalidArgument("Sentry integration is invalid")
 	}
 
-	integration, err := models.FindIntegrationInTransaction(tx, factory.OrganizationID, id)
+	integration, err := factoryAutomationIntegrationByID(tx, factory.OrganizationID, id)
 	if err != nil {
 		return nil, invalidArgument("Sentry integration was not found")
 	}
@@ -350,7 +350,7 @@ func findIntakeGitHubIntegration(tx *gorm.DB, factory *models.Factory, integrati
 		return nil
 	}
 
-	integration, err := models.FindIntegrationInTransaction(tx, factory.OrganizationID, id)
+	integration, err := factoryAutomationIntegrationByID(tx, factory.OrganizationID, id)
 	if err != nil {
 		log.Warnf("factory %s: intake left unbound, integration %s not found: %v", factory.ID, id, err)
 		return nil
