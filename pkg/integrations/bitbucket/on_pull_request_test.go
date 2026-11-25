@@ -469,6 +469,10 @@ func (f *recordingBitbucketFactory) FindWorkOrder(core.FindWorkOrderParams) (*co
 	return nil, nil
 }
 
+func (f *recordingBitbucketFactory) FindWorkOrdersForWebhook(string, string, string) ([]map[string]any, error) {
+	return nil, nil
+}
+
 func (f *recordingBitbucketFactory) UpdateWorkOrderStatus(core.UpdateWorkOrderStatusParams) (*core.WorkOrder, bool, error) {
 	return nil, false, nil
 }

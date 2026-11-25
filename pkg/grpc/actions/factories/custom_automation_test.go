@@ -1511,3 +1511,82 @@ func TestColumnLeaveAutomationStartsWhenTheTaskLeavesBacklog(t *testing.T) {
 	require.NoError(t, db.Where("workflow_id = ?", canvasID).Find(&events).Error)
 	require.Len(t, events, 2)
 }
+
+func TestTaskWebhookTriggerRoundTrip(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory := seedHandOffFactory(t, r, db)
+	integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, models.ProviderGitHub)
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSIntegrationID: &integrationID}))
+	ctx, deps, orgID := onboardingContext(r), onboardingDeps(r), r.Organization.ID.String()
+	webhook, err := CreateFactoryWebhook(ctx, deps, orgID, &pb.CreateFactoryWebhookRequest{
+		FactoryId: factory.ID.String(), Name: "Deploy", Authentication: pb.FactoryWebhook_AUTHENTICATION_BEARER,
+	})
+	require.NoError(t, err)
+	runsOnTask := true
+	match := &pb.FactoryCustomAutomation_StartTrigger_TaskMatch{
+		Kind: pb.FactoryCustomAutomation_StartTrigger_TaskMatch_KIND_PULL_REQUEST, FieldPath: "pull_request.url",
+	}
+	settings := &pb.FactoryCustomAutomation_Settings{
+		StartMode:               pb.FactoryCustomAutomation_START_MODE_WEBHOOK,
+		RunsOnTask:              &runsOnTask,
+		ExecutionTimeoutSeconds: prFeedbackTimeoutSeconds,
+		Agent:                   &pb.FactoryAppTemplateAgent{Component: "runnerClaudeCode", Model: "claude-sonnet-4-6"},
+		Steps:                   []*pb.FactoryCustomAutomation_Step{{Name: "Inspect", Type: pb.FactoryCustomAutomation_Step_TYPE_PROMPT, Prompt: "Inspect the task."}},
+		Triggers: []*pb.FactoryCustomAutomation_StartTrigger{{
+			StartMode: pb.FactoryCustomAutomation_START_MODE_WEBHOOK, WebhookId: webhook.GetWebhook().GetId(), TaskMatch: match,
+		}},
+	}
+	request := &pb.CreateFactoryCustomAutomationRequest{
+		FactoryId: factory.ID.String(), Name: "Deploy task", ColumnKey: models.CanvasColumnKeyImplement, Settings: settings,
+	}
+	_, err = CreateFactoryCustomAutomation(ctx, deps, orgID, request)
+	require.ErrorContains(t, err, "not enabled")
+
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryTaskWebhookTriggers))
+	settings.Triggers[0].TaskMatch = nil
+	_, err = CreateFactoryCustomAutomation(ctx, deps, orgID, request)
+	require.ErrorContains(t, err, "finds a task")
+	settings.Triggers[0].TaskMatch = &pb.FactoryCustomAutomation_StartTrigger_TaskMatch{
+		Kind: pb.FactoryCustomAutomation_StartTrigger_TaskMatch_KIND_TASK, FieldPath: "task key",
+	}
+	_, err = CreateFactoryCustomAutomation(ctx, deps, orgID, request)
+	require.ErrorContains(t, err, "field path")
+	settings.Triggers[0].TaskMatch = match
+	noTask := false
+	settings.RunsOnTask = &noTask
+	_, err = CreateFactoryCustomAutomation(ctx, deps, orgID, request)
+	require.ErrorContains(t, err, "must run on a task")
+	settings.RunsOnTask = &runsOnTask
+
+	created, err := CreateFactoryCustomAutomation(ctx, deps, orgID, request)
+	require.NoError(t, err)
+	id := created.GetCustomAutomation().GetAutomation().GetId()
+	described, err := DescribeFactoryCustomAutomation(ctx, orgID, &pb.DescribeFactoryCustomAutomationRequest{FactoryId: factory.ID.String(), AutomationId: id})
+	require.NoError(t, err)
+	require.True(t, proto.Equal(settings, described.GetCustomAutomation().GetSettings()))
+	node, err := models.FindCanvasNode(db, uuid.MustParse(id), "webhook-"+webhook.GetWebhook().GetId())
+	require.NoError(t, err)
+	assert.Equal(t, map[string]any{"kind": "pull_request", "fieldPath": "pull_request.url"}, node.Configuration.Data()["taskMatch"])
+
+	_, err = ResetOrganizationBuiltInAutomations(ctx, r.Organization.ID, deps)
+	require.NoError(t, err)
+	described, err = DescribeFactoryCustomAutomation(ctx, orgID, &pb.DescribeFactoryCustomAutomationRequest{FactoryId: factory.ID.String(), AutomationId: id})
+	require.NoError(t, err)
+	require.True(t, proto.Equal(settings, described.GetCustomAutomation().GetSettings()))
+
+	line, err := factory.CreateLine(db, "QA", nil)
+	require.NoError(t, err)
+	stage := models.FactoryLineStage{ID: uuid.New(), Key: "custom-qa", Name: "QA", Kind: models.FactoryLineStagePhase}
+	require.NoError(t, line.UpdateConfiguration(db, nil, nil, nil, append(line.StagesValue(), stage)))
+	settings.Triggers = []*pb.FactoryCustomAutomation_StartTrigger{
+		{StartMode: pb.FactoryCustomAutomation_START_MODE_AUTOMATIC},
+		{StartMode: pb.FactoryCustomAutomation_START_MODE_WEBHOOK, WebhookId: webhook.GetWebhook().GetId(), TaskMatch: match},
+	}
+	request.ColumnKey = stage.Key
+	request.Name = "QA webhook"
+	created, err = CreateFactoryCustomAutomation(ctx, deps, orgID, request)
+	require.NoError(t, err)
+	_, err = models.FindCanvasNode(db, uuid.MustParse(created.GetCustomAutomation().GetAutomation().GetId()), "webhook-"+webhook.GetWebhook().GetId())
+	require.NoError(t, err)
+}
