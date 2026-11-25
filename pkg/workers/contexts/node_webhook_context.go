@@ -10,6 +10,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/encryption"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type NodeWebhookContext struct {
@@ -90,6 +91,29 @@ func (c *NodeWebhookContext) Setup() (string, error) {
 	webhook, err := c.findOrCreateWebhook()
 	if err != nil {
 		return "", fmt.Errorf("failed to find or create webhook: %w", err)
+	}
+
+	c.node.WebhookID = &webhook.ID
+	return webhookCallbackURL(c.GetBaseURL(), webhook.ID.String()), nil
+}
+
+// Bind attaches the node to a webhook that the workspace of the node owns.
+func (c *NodeWebhookContext) Bind(webhookID string) (string, error) {
+	id, err := uuid.Parse(webhookID)
+	if err != nil {
+		return "", fmt.Errorf("invalid webhook id")
+	}
+	canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(c.tx, c.node.WorkflowID)
+	if err != nil {
+		return "", err
+	}
+	if canvas.FactoryID == nil {
+		return "", fmt.Errorf("only workspace apps can use workspace webhooks")
+	}
+	// The share lock keeps the webhook from being deleted until this publish commits.
+	webhook, err := models.FindFactoryWebhook(c.tx.Clauses(clause.Locking{Strength: "SHARE"}), canvas.OrganizationID, *canvas.FactoryID, id)
+	if err != nil {
+		return "", err
 	}
 
 	c.node.WebhookID = &webhook.ID
