@@ -32,7 +32,7 @@ import { FactoryDeleteDialog } from "../../FactoryDeleteDialog";
 import { FactorySettingsCard, FactorySettingsPageFrame } from "./FactorySettingsCard";
 import { useFactorySettingsLayout } from "./factorySettingsLayoutContext";
 
-type Authentication = Exclude<FactoryWebhookAuthentication, "AUTHENTICATION_UNSPECIFIED">;
+export type Authentication = Exclude<FactoryWebhookAuthentication, "AUTHENTICATION_UNSPECIFIED">;
 
 const AUTHENTICATION_OPTIONS: { value: Authentication; label: string; mode: string }[] = [
   { value: "AUTHENTICATION_BEARER", label: "Bearer token", mode: "bearer" },
@@ -48,7 +48,7 @@ const DEFAULT_HEADER: Partial<Record<Authentication, string>> = {
 const NO_UPDATE_PERMISSION = "You need permission to update this workspace.";
 
 type Editor = { webhook?: FactoriesFactoryWebhook };
-type Reveal = { webhook: FactoriesFactoryWebhook; secret: string };
+export type Reveal = { webhook: FactoriesFactoryWebhook; secret: string };
 
 export function FactorySettingsWebhooksPage() {
   const { organizationId, factoryId, factory } = useFactorySettingsLayout();
@@ -371,7 +371,7 @@ function WebhookEditorForm({
   );
 }
 
-function WebhookAuthenticationField({
+export function WebhookAuthenticationField({
   value,
   onChange,
 }: {
@@ -402,7 +402,7 @@ function WebhookAuthenticationField({
   );
 }
 
-function WebhookSecretDialog({ reveal, onClose }: { reveal: Reveal | null; onClose: () => void }) {
+export function WebhookSecretDialog({ reveal, onClose }: { reveal: Reveal | null; onClose: () => void }) {
   const webhook = reveal?.webhook;
   const mode = AUTHENTICATION_OPTIONS.find((option) => option.value === webhook?.authentication)?.mode ?? "bearer";
   const example = generateWebhookCode(mode, {
