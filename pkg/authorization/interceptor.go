@@ -26,6 +26,8 @@ type AuthorizationRule struct {
 	// Prefer Action for new checks, and scope legacy actions to the smallest route set possible.
 	LegacyActions                []string
 	RequiredExperimentalFeatures []string
+	// RequiredAnyExperimentalFeatures requires at least one feature in addition to all required features.
+	RequiredAnyExperimentalFeatures []string
 	// RequiredLicenseFeatures lists Enterprise features that the installation
 	// license must grant. Use it only for operations that create or expand
 	// Enterprise access, never for operations that remove access.
