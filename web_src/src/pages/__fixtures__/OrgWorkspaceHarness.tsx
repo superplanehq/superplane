@@ -28,6 +28,7 @@ import {
   LinearIntakeSetupPage,
   ProductiveIntakeSetupPage,
   RiskScoreSetupPage,
+  WebhookIntakeSetupPage,
   SentryIntakeSetupPage,
   FactoriesIndexPage,
   FactoryAppCanvasPage,
@@ -314,6 +315,7 @@ function OrgWorkspaceRoutes({ pageOverrides }: { pageOverrides?: OrgWorkspacePag
                 <Route path=":lineId/setup/jira" element={<JiraIntakeSetupPage />} />
                 <Route path=":lineId/setup/linear" element={<LinearIntakeSetupPage />} />
                 <Route path=":lineId/setup/productive" element={<ProductiveIntakeSetupPage />} />
+                <Route path=":lineId/setup/webhook" element={<WebhookIntakeSetupPage />} />
                 {/* Storybook design preview: factory WorkOrderCanvas node chrome */}
                 <Route path=":lineId/phases/:phaseId/configure" element={<ConfigureAutomationPage />} />
               </Route>

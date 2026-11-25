@@ -80,6 +80,9 @@ func resolveIntakeBinding(
 	if source == models.FactoryIntakeSourceLinearIssues {
 		return resolveLinearIntakeBinding(tx, factory, integrationID, resourceID, linearTeamID)
 	}
+	if source == models.FactoryIntakeSourceWebhook {
+		return resolveWebhookIntakeBinding(tx, factory, resourceID)
+	}
 	if source != models.FactoryIntakeSourceGitHubIssues && source != models.FactoryIntakeSourceDependabotAlerts {
 		return nil, nil
 	}

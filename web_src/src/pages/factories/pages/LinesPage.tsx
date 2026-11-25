@@ -192,6 +192,7 @@ import {
   factoryAppRunPath,
   factoryColumnAutomationViewPath,
   factoryDatadogIntakeSetupPath,
+  factoryWebhookIntakeSetupPath,
   factoryDependabotIntakeSetupPath,
   factoryHomePath,
   factoryIntakePath,
@@ -675,6 +676,12 @@ export function LinesPage() {
     if (template.id === "linear-issues") {
       if (selectedLine.id) {
         navigate(factoryLinearIntakeSetupPath(organizationId, routeSegment, selectedLine.id));
+      }
+      return;
+    }
+    if (template.id === "webhook") {
+      if (selectedLine.id) {
+        navigate(factoryWebhookIntakeSetupPath(organizationId, routeSegment, selectedLine.id));
       }
       return;
     }

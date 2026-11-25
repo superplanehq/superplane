@@ -13,6 +13,7 @@ import linearIcon from "@/assets/icons/integrations/linear.svg";
 import pagerdutyIcon from "@/assets/icons/integrations/pagerduty.svg";
 import productiveIcon from "@/assets/icons/integrations/productive.svg";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
+import webhookIcon from "@/assets/icons/webhook.svg";
 import { getUserInitials } from "@/lib/orgUserDisplay";
 import type { FactoryNodeStatus } from "@/ui/factoryNodeChrome/types";
 
@@ -60,7 +61,8 @@ export type LineIntakeSourceId =
   | "pagerduty-incidents"
   | "productive-tasks"
   | "datadog"
-  | "linear-issues";
+  | "linear-issues"
+  | "webhook";
 
 export type LineIntakeListenKind = "webhook" | "poll";
 
@@ -253,6 +255,26 @@ export const LINE_INTAKE_SOURCES: LineIntakeSource[] = [
       label: "Create a task in Backlog",
     },
   },
+  {
+    id: "webhook",
+    name: "Webhook",
+    description: "Creates tasks from requests that other tools send.",
+    iconSrc: webhookIcon,
+    iconAlt: "Webhook",
+    tabLabel: "Webhook",
+    listen: {
+      kind: "webhook",
+      label: "On webhook request",
+    },
+    evaluate: {
+      label: "Create a task",
+      rule: "Each webhook request becomes a task in Backlog. SuperPlane scores it there.",
+    },
+    accept: {
+      destination: "backlog",
+      label: "Create a task in Backlog",
+    },
+  },
 ];
 
 export function lineIntakeSourceById(id: string): LineIntakeSource | undefined {
@@ -312,6 +334,7 @@ const LINE_INTAKE_SOURCE_ID_BY_API_SOURCE: Record<string, LineIntakeSourceId> = 
   SOURCE_PRODUCTIVE_TASKS: "productive-tasks",
   SOURCE_DATADOG: "datadog",
   SOURCE_LINEAR_ISSUES: "linear-issues",
+  SOURCE_WEBHOOK: "webhook",
 };
 
 const API_SOURCE_BY_LINE_INTAKE_SOURCE_ID: Record<LineIntakeSourceId, FactoriesFactoryIntakeSource> = {
@@ -323,6 +346,7 @@ const API_SOURCE_BY_LINE_INTAKE_SOURCE_ID: Record<LineIntakeSourceId, FactoriesF
   "productive-tasks": "SOURCE_PRODUCTIVE_TASKS",
   datadog: "SOURCE_DATADOG",
   "linear-issues": "SOURCE_LINEAR_ISSUES",
+  webhook: "SOURCE_WEBHOOK",
 };
 
 export function apiIntakeSource(sourceId: LineIntakeSourceId): FactoriesFactoryIntakeSource {
@@ -368,6 +392,7 @@ export function intakeSourcesFromFactoryIntakes(intakes: FactoriesFactoryIntake[
         settings: {
           ...settings,
           datadogService: textFields.datadogService,
+          webhookId: source.id === "webhook" ? textFields.datadogService : "",
         },
         source: { ...source, name },
         health: intake.health,

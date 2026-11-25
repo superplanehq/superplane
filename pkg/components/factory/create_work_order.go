@@ -21,6 +21,7 @@ type CreateWorkOrderConfiguration struct {
 	DefaultOwnerID string `json:"defaultOwnerId" mapstructure:"defaultOwnerId"`
 	Title          string `json:"title" mapstructure:"title"`
 	Description    string `json:"description" mapstructure:"description"`
+	OriginURL      string `json:"originUrl" mapstructure:"originUrl"`
 }
 
 func (c *CreateWorkOrder) Name() string {
@@ -87,6 +88,13 @@ func (c *CreateWorkOrder) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeString,
 			Required:    false,
 		},
+		{
+			Name:        "originUrl",
+			Label:       "Source link",
+			Description: "Link to the item that the task comes from. A task with the same link is not created again.",
+			Type:        configuration.FieldTypeString,
+			Required:    false,
+		},
 	}
 }
 
@@ -100,6 +108,7 @@ func (c *CreateWorkOrder) Execute(ctx core.ExecutionContext) error {
 		DefaultOwnerID: config.DefaultOwnerID,
 		Title:          config.Title,
 		Description:    config.Description,
+		OriginURL:      config.OriginURL,
 	})
 	if err != nil {
 		return err
