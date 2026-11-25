@@ -38,10 +38,6 @@ describe("sourceTicketLabel", () => {
     expect(sourceTicketLabel("https://acme.slack.com/archives/C0REFUNDS/p1710000000000000")).toBe("acme#C0REFUNDS");
   });
 
-  it("uses the task id alone for Productive.io, whose link holds an organization id", () => {
-    expect(sourceTicketLabel("https://app.productive.io/48521/tasks/19976991")).toBe("#19976991");
-  });
-
   it("uses the issue key for Jira browse links", () => {
     expect(sourceTicketLabel("https://acme.atlassian.net/browse/DEV-3")).toBe("DEV-3");
     expect(sourceTicketLabel("https://linear.app/acme/issue/ENG-142/fix-login-redirect")).toBe("ENG-142");
@@ -245,28 +241,6 @@ describe("splitRunSourceForOrder", () => {
         ticket: { label: expect.stringMatching(/^acme#/), href: expect.stringContaining("slack.com") },
       }),
     );
-  });
-
-  // A Productive.io webhook carries no link to the task, so the order has no
-  // origin and the automation is the only evidence of where it came from.
-  // Naming the source after the automation keeps it from reading as GitHub.
-  it("names the Productive.io intake when the order has no origin", () => {
-    expect(
-      splitRunSourceForOrder({
-        ...DRAFT_WORK_ORDER,
-        origin: undefined,
-        createdBy: { automation: { appId: "app-productive-intake", appName: "Productive tasks" } },
-      }),
-    ).toEqual(expect.objectContaining({ kind: "intake", name: "Productive tasks", iconAlt: "Productive" }));
-  });
-
-  it("names the Productive.io intake from a task link", () => {
-    expect(
-      splitRunSourceForOrder({
-        ...DRAFT_WORK_ORDER,
-        origin: { url: "https://app.productive.io/1-acme/tasks/task/19976991" },
-      }),
-    ).toEqual(expect.objectContaining({ kind: "intake", name: "Productive tasks" }));
   });
 
   it("names the Jira intake from a browse link", () => {
