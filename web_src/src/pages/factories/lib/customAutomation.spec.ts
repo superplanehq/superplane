@@ -1,5 +1,7 @@
 import { describe, expect, it } from "bun:test";
 
+import type { FactoriesFactoryOnboarding, OrganizationsIntegration } from "@/api-client";
+
 import { buildColumnAutomations, columnAutomationOpenPath } from "./columnAutomations";
 import {
   customAutomationDraft,
@@ -293,6 +295,91 @@ describe("custom automation settings", () => {
     expect(customAutomationIdFromSearch("?customAutomation=review-1")).toBe("review-1");
     expect(customAutomationIdFromSearch("?customVerification=review-1")).toBe("review-1");
     expect(customAutomationIdFromSearch("")).toBeUndefined();
+  });
+});
+
+describe("workspace agent selection", () => {
+  const connections: OrganizationsIntegration[] = [
+    { metadata: { id: "custom", name: "custom-team", integrationName: "customLlm" }, status: { state: "ready" } },
+    { metadata: { id: "router", name: "router-team", integrationName: "openrouter" }, status: { state: "ready" } },
+    { metadata: { id: "openai", name: "openai-team", integrationName: "openai" }, status: { state: "ready" } },
+    { metadata: { id: "claude", name: "claude-team", integrationName: "claude" }, status: { state: "ready" } },
+    { metadata: { id: "claude-2", name: "other-claude", integrationName: "claude" }, status: { state: "ready" } },
+  ];
+
+  it.each([
+    [[], "runnerClaudeCode", "claude-team"],
+    [["claude"], "runnerCodex", "openai-team"],
+    [["claude", "openai"], "runnerOpenRouter", "router-team"],
+    [["claude", "openai", "openrouter"], "runnerOpenRouter", "custom-team"],
+  ] as const)("uses provider priority after excluding %j", (excluded, component, integrationName) => {
+    const available = connections.filter(
+      ({ metadata }) => !excluded.some((provider) => provider === metadata?.integrationName),
+    );
+
+    expect(workspaceAgentFromOnboarding({}, available)).toEqual({
+      component,
+      credentialSource: "integration",
+      credentialIntegrationName: integrationName,
+    });
+  });
+
+  it.each([
+    ["custom", "runnerOpenRouter", "custom-team"],
+    ["unready", "runnerClaudeCode", "claude-team"],
+    ["unsupported", "runnerClaudeCode", "claude-team"],
+    ["missing", "runnerClaudeCode", "claude-team"],
+  ])("prefers an eligible explicit selection (%s)", (agentIntegrationId, component, integrationName) => {
+    expect(
+      workspaceAgentFromOnboarding({ agentIntegrationId }, [
+        ...connections,
+        { metadata: { id: "unready", name: "unready-team", integrationName: "openai" }, status: { state: "error" } },
+        { metadata: { id: "unsupported", name: "github-team", integrationName: "github" }, status: { state: "ready" } },
+      ]),
+    ).toEqual({ component, credentialSource: "integration", credentialIntegrationName: integrationName });
+  });
+
+  const boundaryCases: Array<{
+    name: string;
+    onboarding?: FactoriesFactoryOnboarding;
+    connections?: OrganizationsIntegration[];
+    expected?: { component: string; credentialSource?: string };
+  }> = [
+    {
+      name: "subscription wins before connections load",
+      onboarding: { codexSubscription: true, agentHarness: "AGENT_HARNESS_SUPERPLANE", agentIntegrationId: "custom" },
+      expected: { component: "runnerCodex", credentialSource: "subscription" },
+    },
+    { name: "missing onboarding", connections },
+    { name: "required connections have not loaded", onboarding: { agentIntegrationId: "claude" } },
+    {
+      name: "hosted needs no connections without an explicit selection",
+      onboarding: { agentHarness: "AGENT_HARNESS_SUPERPLANE" },
+      expected: { component: "runnerSuperPlane" },
+    },
+    {
+      name: "hosted waits for connections with an explicit selection",
+      onboarding: { agentHarness: "AGENT_HARNESS_SUPERPLANE", agentIntegrationId: "custom" },
+    },
+    {
+      name: "hosted skips provider fallback when the explicit selection is missing",
+      onboarding: { agentHarness: "AGENT_HARNESS_SUPERPLANE", agentIntegrationId: "missing" },
+      connections,
+      expected: { component: "runnerSuperPlane" },
+    },
+    {
+      name: "loaded connections have no eligible match",
+      onboarding: {},
+      connections: [
+        { metadata: { integrationName: "claude" }, status: { state: "error" } },
+        { metadata: { integrationName: "github" }, status: { state: "ready" } },
+      ],
+      expected: { component: "runnerSuperPlane" },
+    },
+  ];
+
+  it.each(boundaryCases)("preserves the boundary result: $name", ({ onboarding, connections, expected }) => {
+    expect(workspaceAgentFromOnboarding(onboarding, connections)).toEqual(expected);
   });
 });
 

@@ -254,15 +254,20 @@ export function workspaceAgentFromOnboarding(
   );
   let selected = ready.find(({ metadata }) => metadata?.id === onboarding.agentIntegrationId);
   if (!selected && onboarding.agentHarness !== "AGENT_HARNESS_SUPERPLANE") {
-    // Use the same integration priority as existing custom automations in older workspaces.
-    for (const provider of integrationAgentComponents.keys()) {
-      selected = ready.find(({ metadata }) => metadata?.integrationName === provider);
-      if (selected) break;
-    }
+    selected = fallbackAgentIntegration(ready);
   }
   const component = integrationAgentComponents.get(selected?.metadata?.integrationName ?? "");
   if (!component) return hosted;
   return { component, credentialSource: "integration", credentialIntegrationName: selected?.metadata?.name };
+}
+
+function fallbackAgentIntegration(ready: OrganizationsIntegration[]): OrganizationsIntegration | undefined {
+  // Use the same integration priority as existing custom automations in older workspaces.
+  for (const provider of integrationAgentComponents.keys()) {
+    const selected = ready.find(({ metadata }) => metadata?.integrationName === provider);
+    if (selected) return selected;
+  }
+  return undefined;
 }
 
 export function customAutomationDraft(
