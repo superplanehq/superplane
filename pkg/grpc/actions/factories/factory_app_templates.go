@@ -1128,6 +1128,16 @@ func materializeNonIntakeFactoryAppDefaults(
 	if handler != nil && handler.FactoryID == factory.ID {
 		return materializePRFeedbackDefaults(tx, factory, canvas, version, handler, savedSettings)
 	}
+	return materializeFactoryAppGraphDefaults(tx, factory, canvas, version, savedSettings)
+}
+
+func materializeFactoryAppGraphDefaults(
+	tx *gorm.DB,
+	factory *models.Factory,
+	canvas *models.Canvas,
+	version *models.CanvasVersion,
+	savedSettings *factoryAutomationSettings,
+) (*materializedFactoryTemplate, error) {
 	// A custom automation can start from a task. That trigger is not the
 	// built-in Backlog app, so reset must leave the canvas unchanged.
 	if models.FactoryAppTemplateID(version.Nodes) == models.FactoryAppTemplateCustomAutomationID {
