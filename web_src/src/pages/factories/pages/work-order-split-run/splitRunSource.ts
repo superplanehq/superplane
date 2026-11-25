@@ -316,10 +316,6 @@ function intakeKindForAutomation(automation: FactoriesAutomationRef): SplitRunIn
   return key === "intake" ? "github-issues" : undefined;
 }
 
-function intakeKindFromLabel(label: string): SplitRunIntakeKind {
-  return INTAKE_KIND_HINTS.find((hint) => hint.pattern.test(label))?.kind ?? "github-issues";
-}
-
 function intakeSourceFromKind(intakeKind: SplitRunIntakeKind): SplitRunIntakeSource {
   return {
     kind: "intake",
