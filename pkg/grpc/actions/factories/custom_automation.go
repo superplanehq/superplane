@@ -15,7 +15,6 @@ import (
 	factorycomponent "github.com/superplanehq/superplane/pkg/components/factory"
 	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -64,13 +63,6 @@ func CreateFactoryCustomAutomation(
 	}
 
 	db := database.DB(ctx)
-	organization, err := models.FindOrganizationByIDInTransaction(db, orgID.String())
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to create custom automation")
-	}
-	if !organization.HasExperimentalFeature(features.FeatureFactoryCustomAutomations) {
-		return nil, factoryErrorToStatus(errCustomAutomationsDisabled, "failed to create custom automation")
-	}
 	factory, err := findFactory(db, orgID, req.GetFactoryId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create custom automation")

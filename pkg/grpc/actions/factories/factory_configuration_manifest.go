@@ -16,7 +16,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/automationspec"
-	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"gopkg.in/yaml.v3"
@@ -493,14 +492,6 @@ func validateFactoryConfigurationManifest(ctx context.Context, tx *gorm.DB, deps
 	if byKey[manifest.Stages[len(manifest.Stages)-1].Key].stage.Kind != models.FactoryLineStageDone {
 		return configurationDiagnostic("stages", "Done must remain last."), nil
 	}
-	if factoryConfigurationStagesChanged(target, manifest) {
-		enabled, err := models.OrganizationHasExperimentalFeatures(tx, target.factory.OrganizationID, features.FeatureFactoryCustomAutomations)
-		if err != nil {
-			return nil, err
-		}
-		if !enabled {
-			return configurationDiagnostic("stages", "Enable custom stages before changing stage names or order."), nil
-		}
-	}
+
 	return nil, nil
 }

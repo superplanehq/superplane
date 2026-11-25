@@ -7,7 +7,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -19,7 +18,6 @@ import (
 func TestFactoryConfigurationIncludesEveryStageAndPhase(t *testing.T) {
 	f := newConfigurationFixture(t)
 	db := database.DB(t.Context())
-	require.NoError(t, models.EnableExperimentalFeature(f.r.Organization.ID, features.FeatureFactoryCustomAutomations))
 	second := resetTestTemplate(t, f.r, f.factory, "line-implementation", models.ProviderGitHub, func(*yaml.Canvas) {})
 	steps := append([]models.FactoryLineStep{}, f.line.Steps...)
 	steps = append(steps, models.FactoryLineStep{Type: models.FactoryLineStepTypeRunApp, AppID: second.ID, Entrypoint: "onrun-implement"})

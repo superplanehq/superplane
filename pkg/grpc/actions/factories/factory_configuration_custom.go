@@ -65,7 +65,7 @@ func validateFactoryConfigurationCustom(ctx context.Context, tx *gorm.DB, deps I
 	if !changed {
 		return document, nil
 	}
-	feature := features.FeatureFactoryCustomAutomations
+	feature := features.FeatureFactoryAsCode
 	enabled, err := models.OrganizationHasExperimentalFeatures(tx, factory.OrganizationID, feature)
 	if err != nil {
 		return nil, err

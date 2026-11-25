@@ -35,7 +35,6 @@ func TestServiceKeepsSourceAndBackendRevisionTogether(t *testing.T) {
 	db := database.DB(ctx)
 	factory, err := models.CreateFactory(db, orgID, "Automation test", "", "AAC")
 	require.NoError(t, err)
-	require.NoError(t, models.EnableExperimentalFeature(orgID, features.FeatureFactoryCustomAutomations))
 	require.NoError(t, models.EnableExperimentalFeature(orgID, features.FeatureFactoryAsCode))
 
 	service := automations.Service{Backend: backendWithoutCanvases{}}
@@ -125,7 +124,6 @@ func TestServiceValidatesSecretsInOneOrganizationScopedQuery(t *testing.T) {
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, "Secrets", "", "SEC")
 	require.NoError(t, err)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
 	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryAsCode))
 	for _, name := range []string{"FIRST", "SECOND"} {
 		_, err := models.CreateSecret(name, "local", r.User.String(), models.DomainTypeOrganization, r.Organization.ID, []byte("{}"))
@@ -163,7 +161,7 @@ func TestServiceValidatesSecretsInOneOrganizationScopedQuery(t *testing.T) {
 	require.Zero(t, queries)
 }
 
-func TestServiceCustomStageRequiresUnifiedFlagAndFactoryAsCode(t *testing.T) {
+func TestServiceCustomStageRequiresFactoryAsCode(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, "Custom stage", "", "")
@@ -179,7 +177,6 @@ func TestServiceCustomStageRequiresUnifiedFlagAndFactoryAsCode(t *testing.T) {
 	placement := automations.Placement{OrganizationID: r.Organization.ID, FactoryID: factory.ID, Stage: stage.Key}
 	source := strings.Replace(automationSource, "use: manual", "use: task_enters_stage", 1)
 
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
 	_, err = service.Validate(t.Context(), placement, source)
 	require.ErrorContains(t, err, "Factory as code")
 	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryAsCode))
@@ -188,10 +185,6 @@ func TestServiceCustomStageRequiresUnifiedFlagAndFactoryAsCode(t *testing.T) {
 	placement.Stage = "custom-missing"
 	_, err = service.Validate(t.Context(), placement, source)
 	require.ErrorContains(t, err, "Select a custom stage")
-	placement.Stage = stage.Key
-	require.NoError(t, models.DisableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
-	_, err = service.Validate(t.Context(), placement, source)
-	require.ErrorContains(t, err, "Custom Automations")
 }
 
 var errCannotPublish = errors.New("backend could not publish")

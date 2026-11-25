@@ -238,13 +238,6 @@ func checkAutomationReferences(tx *gorm.DB, placement Placement, doc *automation
 		if !found {
 			return doc.Diagnostic("$", "Select a custom stage in this factory.")
 		}
-		organization, err := models.FindOrganizationByIDInTransaction(tx, placement.OrganizationID.String())
-		if err != nil {
-			return err
-		}
-		if !organization.HasExperimentalFeature(features.FeatureFactoryCustomAutomations) {
-			return grpcerrors.FailedPrecondition(nil, "Enable custom automations and stages for this organization.")
-		}
 	}
 	if err := automationspec.ValidateStage(doc, automationspec.Stage(placement.Stage)); err != nil {
 		return err
@@ -338,9 +331,8 @@ func requireFeatures(tx *gorm.DB, organizationID uuid.UUID) error {
 	if err != nil {
 		return err
 	}
-	if !organization.HasExperimentalFeature(features.FeatureFactoryCustomAutomations) ||
-		!organization.HasExperimentalFeature(features.FeatureFactoryAsCode) {
-		return grpcerrors.NotFound(gorm.ErrRecordNotFound, "Enable Custom Automations and Factory as code for this organization.")
+	if !organization.HasExperimentalFeature(features.FeatureFactoryAsCode) {
+		return grpcerrors.NotFound(gorm.ErrRecordNotFound, "Enable Factory as code for this organization.")
 	}
 	return nil
 }

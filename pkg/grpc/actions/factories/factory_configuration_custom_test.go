@@ -30,7 +30,7 @@ func TestFactoryConfigurationCustomDispatchRoundTrip(t *testing.T) {
 			support.AssignOpenSystemTrial(t, r.Organization.ID)
 			upsertHostedOnboardingProvider(t, db)
 			ctx, deps := onboardingContext(r), onboardingDeps(r)
-			feature := features.FeatureFactoryCustomAutomations
+			feature := features.FeatureFactoryAsCode
 			require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, feature))
 			source := `apiVersion: v2
 kind: Automation
@@ -122,7 +122,6 @@ func TestFactoryConfigurationCustomBundleCoversEveryPlacement(t *testing.T) {
 	f := newConfigurationFixture(t)
 	db := database.DB(t.Context())
 	deps := testIntakeDependencies(f.r)
-	require.NoError(t, models.EnableExperimentalFeature(f.r.Organization.ID, features.FeatureFactoryCustomAutomations))
 	vcsID := createReadyOnboardingIntegration(t, f.r.Organization.ID, models.ProviderGitHub)
 	repository, branch := "acme/app", "main"
 	require.NoError(t, f.factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{

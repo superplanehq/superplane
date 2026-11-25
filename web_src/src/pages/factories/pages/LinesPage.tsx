@@ -40,11 +40,7 @@ import { getApiErrorMessage } from "@/lib/errors";
 import { WORKSPACE_LOADING_COPY } from "@/lib/workspaceLoadingCopy";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
-import {
-  FEATURE_FACTORY_AS_CODE,
-  FEATURE_FACTORY_CUSTOM_AUTOMATIONS,
-  FEATURE_FACTORY_PULL_REQUEST_MERGE,
-} from "@/lib/experimentalFeatures";
+import { FEATURE_FACTORY_AS_CODE, FEATURE_FACTORY_PULL_REQUEST_MERGE } from "@/lib/experimentalFeatures";
 import { useAutoLoadMoreOnScroll } from "@/hooks/useAutoLoadMoreOnScroll";
 import { Clock, Plus } from "lucide-react";
 import {
@@ -431,7 +427,6 @@ export function LinesPage() {
   const showAddIntakeControl = useFactoryPreviewFlag("addIntakeControl");
   const { has: hasExperimentalFeature } = useExperimentalFeature(organizationId);
   const showPullRequestMerge = hasExperimentalFeature(FEATURE_FACTORY_PULL_REQUEST_MERGE);
-  const customStagesEnabled = hasExperimentalFeature(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
   const takenIntakeSourceIds = useMemo(
     (): string[] => configuredIntakes.map((intake) => intake.source.id),
     [configuredIntakes],
@@ -507,8 +502,7 @@ export function LinesPage() {
     () => (selectedLineId ? (lines.find((line) => line.id === selectedLineId) ?? null) : null),
     [lines, selectedLineId],
   );
-  const stageEditing =
-    customStagesEnabled && canUpdate && Boolean(selectedLine?.id) && stageEditingLineId === selectedLine?.id;
+  const stageEditing = canUpdate && Boolean(selectedLine?.id) && stageEditingLineId === selectedLine?.id;
   const peekOrder = resolvePeekWorkOrder(
     permalink,
     routeOrderNumber,
@@ -812,10 +806,7 @@ export function LinesPage() {
         <CustomAutomationSetupModal
           key={customAutomationAutomationId ?? "new"}
           lineId={selectedLine.id}
-          yamlEnabled={
-            hasExperimentalFeature(FEATURE_FACTORY_CUSTOM_AUTOMATIONS) &&
-            hasExperimentalFeature(FEATURE_FACTORY_AS_CODE)
-          }
+          yamlEnabled={hasExperimentalFeature(FEATURE_FACTORY_AS_CODE)}
           automationId={customAutomationAutomationId ?? undefined}
           columnKey={customAutomationColumn(new URLSearchParams(search).get("automationColumn"))}
           onClose={() => navigate(factoryHomePath(organizationId, routeSegment, selectedLine.id))}
@@ -865,7 +856,7 @@ export function LinesPage() {
             colorView={columnColorView}
             onColorViewChange={setColumnColorView}
             onEditStages={
-              customStagesEnabled && canUpdate && !stageEditing && selectedLine.id
+              canUpdate && !stageEditing && selectedLine.id
                 ? () => setStageEditingLineId(selectedLine.id ?? null)
                 : undefined
             }
@@ -914,7 +905,7 @@ export function LinesPage() {
             cardsPending={Boolean(isPlaceholderData)}
             canCreateWorkOrder={canCreateWorkOrder || permissionsLoading}
             canUpdate={canUpdate}
-            canManageStages={customStagesEnabled && canUpdate}
+            canManageStages={canUpdate}
             stageEditing={stageEditing}
             onExitStageEditing={() => setStageEditingLineId(null)}
             onCreateWorkOrder={openCreateWorkOrder}
@@ -1297,8 +1288,7 @@ function LineDetail({
     vcsProvider,
     automationsFor: (key) => automationsFor(key, columnTitleForKey(key, board)),
   });
-  const canAddColumnAutomation = showColumnAutomations && canUpdate && addAutomation.allowCustom;
-  const canAddVerifyAutomation = showColumnAutomations && canUpdate;
+  const canAddColumnAutomation = showColumnAutomations && canUpdate;
 
   const handleRowAction = (automation: ColumnAutomation, action: ColumnAutomationRowAction) => {
     if (action === "settings") {
@@ -1306,7 +1296,7 @@ function LineDetail({
         organizationId,
         factoryKey,
         lineId: line.id,
-        customEditingEnabled: canUpdate && addAutomation.allowCustom,
+        customEditingEnabled: canUpdate,
       });
       if (href) {
         navigate(href);
@@ -1372,7 +1362,7 @@ function LineDetail({
           automationsFor={automationsFor}
           workspaceAutomationKeys={workspaceAutomationKeys}
           onAutomationRowAction={handleRowAction}
-          onAddVerifyAutomation={canAddVerifyAutomation ? () => addAutomation.openPicker("verify") : undefined}
+          onAddVerifyAutomation={canAddColumnAutomation ? () => addAutomation.openPicker("verify") : undefined}
           onAddImplementAutomation={canAddColumnAutomation ? () => addAutomation.openPicker("phase-0") : undefined}
           onAddDoneAutomation={canAddColumnAutomation ? () => addAutomation.openPicker("done") : undefined}
           onAddStageAutomation={

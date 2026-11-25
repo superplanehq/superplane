@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -26,7 +25,6 @@ func newConfigurationLifecycleFixture(t *testing.T) configurationFixture {
 	t.Helper()
 	f := newConfigurationFixture(t)
 	db := database.DB(t.Context())
-	require.NoError(t, models.EnableExperimentalFeature(f.r.Organization.ID, features.FeatureFactoryCustomAutomations))
 	vcsID := createReadyOnboardingIntegration(t, f.r.Organization.ID, models.ProviderGitHub)
 	repository, branch := "acme/app", "main"
 	require.NoError(t, f.factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{

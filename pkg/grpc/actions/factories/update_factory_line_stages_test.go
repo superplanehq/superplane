@@ -26,7 +26,6 @@ func TestUpdateFactoryLineStages(t *testing.T) {
 	r := support.Setup(t)
 	deps := testIntakeDependencies(r)
 	db := database.DB(t.Context())
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
 
 	newLine := func(t *testing.T) (*models.Factory, *models.FactoryLine) {
 		t.Helper()
@@ -178,7 +177,6 @@ func TestUpdateFactoryLineStages(t *testing.T) {
 		upsertHostedOnboardingProvider(t, db)
 		vcs := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
 		require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSIntegrationID: &vcs}))
-		require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
 		line, err := factory.CreateLine(db, "Review", nil)
 		require.NoError(t, err)
 		ctx, deps := onboardingContext(r), onboardingDeps(r)
@@ -236,7 +234,6 @@ func TestUpdateFactoryLineStages(t *testing.T) {
 		require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
 		_, err := models.UpsertOrganizationBYOKModelAllowlist(db, r.Organization.ID, models.UsageProviderAnthropic, datatypes.JSONSlice[string]{"claude-opus-5-5"})
 		require.NoError(t, err)
-		require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
 		app, entrypoint := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "Implement", "start")
 		step := models.FactoryLineStep{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entrypoint}
 		line, err := factory.CreateLine(db, "Review", []models.FactoryLineStep{step, step})
@@ -403,7 +400,6 @@ func TestUpdateFactoryLineStages(t *testing.T) {
 			},
 		})
 		require.NoError(t, err)
-		require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
 		replacement, err := CreateFactoryAutomation(
 			authentication.SetUserIdInMetadata(t.Context(), r.User.String()), deps, r.Organization.ID.String(),
 			&pb.CreateFactoryAutomationRequest{FactoryId: factory.ID.String(), Name: originalName},
@@ -472,29 +468,24 @@ func TestUpdateFactoryLineStages(t *testing.T) {
 		}
 	})
 
-	t.Run("requires the unified feature and preserves saved records", func(t *testing.T) {
+	t.Run("updates stages without opt-in and preserves saved records", func(t *testing.T) {
 		factory, line := newLine(t)
 		stageID := uuid.New()
+		autoAdvance := true
 		stages := line.StagesValue()
 		stages = append(stages[:1], append([]models.FactoryLineStage{{
-			ID: stageID, Key: "custom-" + stageID.String(), Name: "QA", Kind: models.FactoryLineStagePhase,
+			ID: stageID, Key: "custom-" + stageID.String(), Name: "QA", Kind: models.FactoryLineStagePhase, AutoAdvance: &autoAdvance,
 		}}, stages[1:]...)...)
 		require.NoError(t, line.UpdateConfiguration(db, nil, nil, nil, stages))
 		canvas := support.CreateFactoryCanvas(t, r, factory.ID, "QA checks")
 		require.NoError(t, canvas.SetColumnKey(db, stages[1].Key))
-		require.NoError(t, models.DisableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
-		t.Cleanup(func() {
-			require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
-		})
 
 		_, err := UpdateFactoryLine(context.Background(), deps, r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
 			FactoryId:          factory.ID.String(),
 			LineId:             line.ID.String(),
 			StageConfiguration: &pb.FactoryLine_StageConfiguration{Stages: factoryLineStageRequests(line.StagesValue())},
 		})
-		code, _, ok := grpcerrors.HandlerStatus(err)
-		assert.True(t, ok)
-		assert.Equal(t, codes.FailedPrecondition, code)
+		require.NoError(t, err)
 		reloaded, err := factory.FindLine(db, line.ID)
 		require.NoError(t, err)
 		assert.Equal(t, stages, reloaded.StagesValue())

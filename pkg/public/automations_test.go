@@ -22,7 +22,7 @@ import (
 	"gorm.io/datatypes"
 )
 
-func TestAutomationAPIUsesFactoryPermissionsAndBothFlags(t *testing.T) {
+func TestAutomationAPIUsesFactoryPermissionsAndFactoryAsCode(t *testing.T) {
 	resources := support.Setup(t)
 	server, token := automationAPITestServer(t, resources)
 	orgID := resources.Organization.ID
@@ -39,14 +39,10 @@ func TestAutomationAPIUsesFactoryPermissionsAndBothFlags(t *testing.T) {
 	require.Equal(t, http.StatusUnauthorized, execRequest(server, requestParams{method: http.MethodGet, path: endpoint}).Code)
 
 	require.NoError(t, models.EnableExperimentalFeature(orgID, features.FeatureFactories))
-	require.NoError(t, models.EnableExperimentalFeature(orgID, features.FeatureFactoryCustomAutomations))
 	require.Equal(t, http.StatusNotFound, list(factory.ID))
 	require.NoError(t, models.EnableExperimentalFeature(orgID, features.FeatureFactoryAsCode))
 	require.Equal(t, http.StatusOK, list(factory.ID))
 	require.Equal(t, http.StatusNotFound, list(uuid.New()))
-	require.NoError(t, models.DisableExperimentalFeature(orgID, features.FeatureFactoryCustomAutomations))
-	require.Equal(t, http.StatusNotFound, list(factory.ID))
-	require.NoError(t, models.EnableExperimentalFeature(orgID, features.FeatureFactoryCustomAutomations))
 
 	input, err := json.Marshal(automationWriteRequest{
 		FactoryID: factory.ID.String(),
@@ -99,7 +95,7 @@ func TestAutomationAPIPublishesInTheSelectedStage(t *testing.T) {
 	db := database.DB(t.Context())
 	orgID := resources.Organization.ID
 	for _, feature := range []string{
-		features.FeatureFactories, features.FeatureFactoryCustomAutomations,
+		features.FeatureFactories,
 		features.FeatureFactoryAsCode,
 	} {
 		require.NoError(t, models.EnableExperimentalFeature(orgID, feature))
