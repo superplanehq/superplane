@@ -90,6 +90,12 @@ func TestWebhookIntakeCreatesTasksFromRequests(t *testing.T) {
 	webhookID := newWebhook("Tracker")
 
 	_, err := CreateFactoryIntake(ctx, deps, orgID, &pb.CreateFactoryIntakeRequest{
+		FactoryId: factory.ID.String(), Source: pb.FactoryIntake_SOURCE_WEBHOOK, ResourceId: webhookID,
+	})
+	requireStatusCode(t, err, codes.FailedPrecondition)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryWebhookIntake))
+
+	_, err = CreateFactoryIntake(ctx, deps, orgID, &pb.CreateFactoryIntakeRequest{
 		FactoryId: factory.ID.String(), Source: pb.FactoryIntake_SOURCE_WEBHOOK, ResourceId: uuid.NewString(),
 	})
 	requireStatusCode(t, err, codes.InvalidArgument)
