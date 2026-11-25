@@ -230,10 +230,14 @@ func FindSubscriptionWorkOrderForRun(tx *gorm.DB, orgID, factoryID, runID uuid.U
 	return &orders[0], nil
 }
 
-// RequireSubscriptionRunOwner admits either an associated task or the trusted
-// scheduled proposal that runs before its task exists. Ambiguous task links
-// never fall back to an intake default.
+// RequireSubscriptionRunOwner prefers task and intake owners, then uses the
+// workspace default for automations without a task. Ambiguous task links
+// never fall back to a default.
 func RequireSubscriptionRunOwner(tx *gorm.DB, orgID, factoryID, runID uuid.UUID) (uuid.UUID, error) {
+	return requireSubscriptionRunOwner(tx, orgID, factoryID, runID, uuid.Nil)
+}
+
+func requireSubscriptionRunOwner(tx *gorm.DB, orgID, factoryID, runID, leaseOwnerID uuid.UUID) (uuid.UUID, error) {
 	orders, err := subscriptionWorkOrdersForRun(tx, orgID, factoryID, runID)
 	if err != nil {
 		return uuid.Nil, err
@@ -246,7 +250,7 @@ func RequireSubscriptionRunOwner(tx *gorm.DB, orgID, factoryID, runID uuid.UUID)
 	}
 	ownerID, err := FindSubscriptionIntakeOwnerForRun(tx, orgID, factoryID, runID)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return uuid.Nil, ErrSubscriptionTaskAssociation
+		ownerID, err = subscriptionAutomationOwnerForRun(tx, orgID, factoryID, runID, leaseOwnerID)
 	}
 	if err != nil {
 		return uuid.Nil, err
@@ -256,6 +260,39 @@ func RequireSubscriptionRunOwner(tx *gorm.DB, orgID, factoryID, runID uuid.UUID)
 		return uuid.Nil, err
 	}
 	if !connected {
+		return uuid.Nil, ErrSubscriptionOwnerInvalid
+	}
+	return ownerID, nil
+}
+
+func subscriptionAutomationOwnerForRun(tx *gorm.DB, orgID, factoryID, runID, leaseOwnerID uuid.UUID) (uuid.UUID, error) {
+	// Intake lookup also returns not found for missing data. Verify the run's
+	// scope and version before authorizing an unrelated automation.
+	var run CanvasRun
+	err := tx.Joins("JOIN workflows w ON w.id = workflow_runs.workflow_id AND w.deleted_at IS NULL").
+		Joins("JOIN workflow_versions v ON v.id = workflow_runs.version_id AND v.workflow_id = w.id").
+		Where("workflow_runs.id = ? AND w.organization_id = ? AND w.factory_id = ?", runID, orgID, factoryID).
+		First(&run).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return uuid.Nil, ErrSubscriptionTaskAssociation
+	}
+	if err != nil {
+		return uuid.Nil, err
+	}
+	// A lease keeps the owner selected at reservation when the default changes.
+	if leaseOwnerID != uuid.Nil {
+		return leaseOwnerID, nil
+	}
+	factory, err := FindFactory(tx, orgID, factoryID)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	owner := strings.TrimSpace(factory.OnboardingConfigValue().CodexDefaultOwnerID)
+	if owner == "" {
+		return uuid.Nil, ErrSubscriptionTaskAssociation
+	}
+	ownerID, err := uuid.Parse(owner)
+	if err != nil || ownerID == uuid.Nil {
 		return uuid.Nil, ErrSubscriptionOwnerInvalid
 	}
 	return ownerID, nil

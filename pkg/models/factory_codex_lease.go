@@ -236,7 +236,7 @@ func (t *RunnerTask) requireSubscriptionLease(tx *gorm.DB, admission bool) error
 	if err != nil {
 		return err
 	}
-	ownerID, err := RequireSubscriptionRunOwner(tx, connection.OrganizationID, *lease.FactoryID, execution.RunID)
+	ownerID, err := requireSubscriptionRunOwner(tx, connection.OrganizationID, *lease.FactoryID, execution.RunID, connection.OwnerUserID)
 	if err != nil {
 		return err
 	}

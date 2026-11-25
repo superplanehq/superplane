@@ -321,7 +321,8 @@ func TestSubscriptionReservationUsesStoredTaskAssociations(t *testing.T) {
 	f, err := models.FindFactory(db, connection.OrganizationID, support.CodexWorkspaceID(t, db, connection.OrganizationID))
 	require.NoError(t, err)
 	subscription := true
-	require.NoError(t, f.UpdateOnboarding(db, models.FactoryOnboardingPatch{CodexSubscription: &subscription}))
+	defaultOwner := uuid.NewString()
+	require.NoError(t, f.UpdateOnboarding(db, models.FactoryOnboardingPatch{CodexSubscription: &subscription, CodexDefaultOwnerID: &defaultOwner}))
 	order, err := f.CreateWorkOrder(db, "Route every task activity", "", &connection.OwnerUserID, []uuid.UUID{connection.OwnerUserID}, nil)
 	require.NoError(t, err)
 	canvas, _ := support.CreateCanvas(t, f.OrganizationID, connection.OwnerUserID, []models.CanvasNode{{NodeID: "trigger", Type: models.NodeTypeTrigger, Metadata: datatypes.NewJSONType(models.FactoryAppTemplateMetadata("risk-score", 1))}}, nil)
@@ -363,7 +364,7 @@ func TestSubscriptionReservationUsesStoredTaskAssociations(t *testing.T) {
 	untrusted := newRun()
 	require.NoError(t, db.Model(untrusted).Update("input", models.NewJSONValue(map[string]any{"work_order": map[string]any{"id": order.ID.String()}})).Error)
 	_, err = models.ReserveFactoryCodexConnection(db, f.OrganizationID, f.ID, untrusted.ID, uuid.New(), time.Now(), crypto.NewNoOpEncryptor())
-	require.ErrorIs(t, err, models.ErrSubscriptionTaskAssociation)
+	require.ErrorIs(t, err, models.ErrSubscriptionOwnerInvalid)
 	other, err := f.CreateWorkOrder(db, "Conflicting task", "", &connection.OwnerUserID, []uuid.UUID{connection.OwnerUserID}, nil)
 	require.NoError(t, err)
 	require.NoError(t, db.Create(&models.FactoryPlanningSession{ID: uuid.New(), OrganizationID: f.OrganizationID, FactoryID: f.ID, CreatedByUserID: &connection.OwnerUserID, Kind: models.PlanningSessionKindWorkOrderAnalysis, State: models.PlanningSessionStateRunning, CanvasID: &canvas.ID, CanvasRunID: &child.ID, DraftWorkOrderID: &other.ID}).Error)
