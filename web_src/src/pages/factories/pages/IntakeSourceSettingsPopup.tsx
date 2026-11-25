@@ -19,6 +19,7 @@ import { GitHubIntakeFilterFields } from "./GitHubIntakeFilterFields";
 import { JiraIntakeFilterFields } from "./JiraIntakeFilterFields";
 import { ProductiveIntakeFilterFields } from "./ProductiveIntakeFilterFields";
 import { SentryIntakeFilterFields } from "./SentryIntakeFilterFields";
+import { WebhookIntakeFilterFields } from "./WebhookIntakeFilterFields";
 import { PlanningReviewEditor, type PlanningReviewAgentSlot } from "./PlanningReviewEditor";
 import { PopupShell } from "./work-order-popup-redesign/popupShared";
 import type { LineIntakeSourceId } from "./lineIntakeModel";
@@ -463,6 +464,13 @@ function IntakeFilterFields({
         integrationId={integrationId}
         filterChoices={linearFilterChoices}
         onFilterChoicesChange={onLinearFilterChoicesChange}
+      />
+      <WebhookIntakeFilterFields
+        sourceId={sourceId}
+        settings={draft}
+        onSettingsChange={onDraftChange}
+        organizationId={organizationId}
+        disabled={!canEdit}
       />
     </>
   );

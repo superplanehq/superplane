@@ -77,6 +77,11 @@ func CreateFactoryIntake(
 	}
 
 	db := database.DB(ctx)
+	if source == models.FactoryIntakeSourceWebhook {
+		if err := requireWebhookIntake(db, orgID); err != nil {
+			return nil, err
+		}
+	}
 	factory, err := findFactory(db, orgID, req.GetFactoryId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create factory intake")
@@ -125,11 +130,18 @@ func CreateFactoryIntake(
 		settings = defaultDatadogIntakeSettings()
 	case models.FactoryIntakeSourceLinearIssues:
 		settings = defaultLinearIntakeSettings()
+	case models.FactoryIntakeSourceWebhook:
+		settings = defaultWebhookIntakeSettings()
 	}
 
 	settings = parseIntakeSettings(settings, req.GetSettings())
 	if req.GetSettings() != nil && req.GetSettings().GetConfidencePct() == 0 {
 		settings.ConfidencePct = DefaultIntakeConfidencePct
+	}
+	if source == models.FactoryIntakeSourceWebhook {
+		if err := validateWebhookIntakeSettings(settings); err != nil {
+			return nil, factoryErrorToStatus(err, "failed to create factory intake")
+		}
 	}
 	if source == models.FactoryIntakeSourceLinearIssues && len(settings.LinearProjectIDs) == 0 {
 		settings.LinearProjectIDs = linearProjectIDsFromResource(req.GetResourceId())
@@ -187,7 +199,8 @@ func CreateFactoryIntake(
 	// can distinguish an empty source from an import that did not run.
 	var seedResult intakeSeedResult
 	var seedErr error
-	if req.GetSkipInitialImport() {
+	// A webhook has no earlier requests to import.
+	if req.GetSkipInitialImport() || source == models.FactoryIntakeSourceWebhook {
 		seedResult = intakeSeedResult{skipped: true}
 	} else {
 		seedResult, seedErr = seedIntake(ctx, deps, db, canvasID, source, binding)

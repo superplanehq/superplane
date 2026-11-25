@@ -12,12 +12,13 @@ import type { PlanningReviewDraft, PlanningReviewStep } from "../pages/planningR
 
 export const CUSTOM_AUTOMATION_TEMPLATE_ID = "custom-verification";
 
-export type CustomAutomationMode = "manual" | "automatic" | "scheduled" | "leave";
+export type CustomAutomationMode = "manual" | "automatic" | "scheduled" | "leave" | "webhook";
 const CUSTOM_AUTOMATION_START_MODES: Record<CustomAutomationMode, FactoryCustomAutomationStartMode> = {
   manual: "START_MODE_MANUAL",
   automatic: "START_MODE_AUTOMATIC",
   scheduled: "START_MODE_SCHEDULED",
   leave: "START_MODE_ON_LEAVE",
+  webhook: "START_MODE_WEBHOOK",
 };
 export type CustomAutomationSchedule = { cronExpression: string; utcOffset: number };
 export type CustomAutomationColumn = "backlog" | "implement" | "verify" | "done" | `custom-${string}`;
@@ -53,13 +54,15 @@ export type CustomAutomationTrigger = {
   publicId?: string;
   mode: CustomAutomationMode;
   schedule: CustomAutomationSchedule;
+  webhookId?: string;
 };
 
 export function newCustomAutomationTrigger(
   mode: CustomAutomationMode = "manual",
   schedule: CustomAutomationSchedule = customAutomationSchedule(),
+  webhookId?: string,
 ): CustomAutomationTrigger {
-  return { id: crypto.randomUUID(), mode, schedule };
+  return { id: crypto.randomUUID(), mode, schedule, ...(webhookId ? { webhookId } : {}) };
 }
 
 export function customAutomationTriggers(automation?: FactoriesFactoryCustomAutomation): CustomAutomationTrigger[] {
@@ -74,6 +77,7 @@ export function customAutomationTriggers(automation?: FactoriesFactoryCustomAuto
               utcOffset: trigger.schedule?.utcOffset ?? 0,
             }
           : customAutomationSchedule(),
+        trigger.webhookId,
       ),
     );
   }
@@ -105,7 +109,7 @@ export function customAutomationRunsOnTask(
   if (triggers.some((trigger) => trigger.mode === "automatic" || trigger.mode === "leave")) {
     return true;
   }
-  if (triggers.some((trigger) => trigger.mode === "scheduled")) {
+  if (triggers.some((trigger) => runsWithoutTask(trigger.mode))) {
     return false;
   }
   return true;
@@ -117,9 +121,13 @@ export function customAutomationTriggersForRun(
 ): CustomAutomationTrigger[] {
   if (runsOnTask === undefined) return triggers;
   return triggers.filter((trigger) => {
-    if (runsOnTask) return trigger.mode !== "scheduled";
+    if (runsOnTask) return !runsWithoutTask(trigger.mode);
     return trigger.mode !== "automatic" && trigger.mode !== "leave";
   });
+}
+
+function runsWithoutTask(mode: CustomAutomationMode): boolean {
+  return mode === "scheduled" || mode === "webhook";
 }
 
 export function customAutomationSchedule(automation?: FactoriesFactoryCustomAutomation): CustomAutomationSchedule {
@@ -195,6 +203,7 @@ export const DEFAULT_CUSTOM_AUTOMATION_TIMEOUT_SECONDS = 3600;
 export function customAutomationMode(value: FactoryCustomAutomationStartMode | undefined): CustomAutomationMode {
   if (value === "START_MODE_SCHEDULED") return "scheduled";
   if (value === "START_MODE_ON_LEAVE") return "leave";
+  if (value === "START_MODE_WEBHOOK") return "webhook";
   return value === "START_MODE_AUTOMATIC" ? "automatic" : "manual";
 }
 
@@ -210,6 +219,9 @@ export function customAutomationModeCopy(
       trigger: "On schedule",
       action: columnKey === "backlog" ? "Creates a task" : "Run automation on the repository default branch",
     };
+  }
+  if (mode === "webhook") {
+    return { trigger: "When a webhook receives a request", action: "Creates a task" };
   }
   if (mode === "leave") {
     return {
@@ -384,10 +396,13 @@ export function customAutomationSettingsForTriggers(
       ? "leave"
       : scheduled.length > 0
         ? "scheduled"
-        : "manual";
+        : current.some((trigger) => trigger.mode === "webhook")
+          ? "webhook"
+          : "manual";
   const settings = customAutomationSettings(primary, draft, icon, scheduled[0]?.schedule);
+  // A webhook trigger carries its webhook ID, so it always uses the trigger list.
   const chosen =
-    current.length === 1
+    current.length === 1 && current[0]!.mode !== "webhook"
       ? customAutomationSettings(current[0]!.mode, draft, icon, current[0]!.schedule)
       : {
           ...settings,
@@ -401,6 +416,7 @@ function triggerToApi(trigger: CustomAutomationTrigger): FactoryCustomAutomation
   return {
     startMode: CUSTOM_AUTOMATION_START_MODES[trigger.mode],
     schedule: trigger.mode === "scheduled" ? trigger.schedule : undefined,
+    ...(trigger.mode === "webhook" ? { webhookId: trigger.webhookId ?? "" } : {}),
   };
 }
 

@@ -2,7 +2,11 @@ import { Navigate, Route } from "react-router";
 
 import { RequireAnyPermission, RequirePermission } from "@/components/PermissionGate";
 import { RequireExperimentalFeature } from "@/components/RequireExperimentalFeature";
-import { FEATURE_MODEL_STATUS, FEATURE_SUPERPLANE_MCP_SERVER } from "@/lib/experimentalFeatures";
+import {
+  FEATURE_MODEL_STATUS,
+  FEATURE_SUPERPLANE_MCP_SERVER,
+  WORKSPACE_WEBHOOK_FEATURES,
+} from "@/lib/experimentalFeatures";
 import {
   FactorySettingsAccountNotificationsPage,
   FactorySettingsAccountProfilePage,
@@ -46,6 +50,7 @@ import { BillingProductSettingsRoute } from "@/pages/factories/pages/settings/Bi
 import { LegacyAgentResourcesRedirect } from "@/pages/factories/pages/settings/LegacyAgentResourcesRedirect";
 import { FactorySettingsIndexRoute } from "@/pages/factories/pages/settings/MobileSettingsIndexPage";
 import { FactorySettingsAccountCodexUsagePage } from "./FactorySettingsAccountCodexUsagePage";
+import { FactorySettingsWebhooksPage } from "./FactorySettingsWebhooksPage";
 import { LegacyRepositorySettingsRoute } from "./LegacyRepositorySettingsRoute";
 
 export const factorySettingsSectionRoutes = [
@@ -150,6 +155,17 @@ export const factorySettingsSectionRoutes = [
       <RequirePermission resource="factories" action="update">
         <RequireExperimentalFeature featureId={FEATURE_SUPERPLANE_MCP_SERVER}>
           <FactorySettingsConnectPage />
+        </RequireExperimentalFeature>
+      </RequirePermission>
+    }
+  />,
+  <Route
+    key="factory-settings-workspace-webhooks"
+    path="workspace/webhooks"
+    element={
+      <RequirePermission resource="factories" action="read">
+        <RequireExperimentalFeature anyOf={WORKSPACE_WEBHOOK_FEATURES}>
+          <FactorySettingsWebhooksPage />
         </RequireExperimentalFeature>
       </RequirePermission>
     }

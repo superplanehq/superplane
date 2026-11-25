@@ -2,7 +2,11 @@ import { usePermissions } from "@/contexts/usePermissions";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useBillingProductEnabled } from "@/hooks/useBillingProductEnabled";
 import { useOrganizationFleetAccess } from "@/hooks/useOrganizationFleetManagement";
-import { FEATURE_MODEL_STATUS, FEATURE_SUPERPLANE_MCP_SERVER } from "@/lib/experimentalFeatures";
+import {
+  FEATURE_MODEL_STATUS,
+  FEATURE_SUPERPLANE_MCP_SERVER,
+  WORKSPACE_WEBHOOK_FEATURES,
+} from "@/lib/experimentalFeatures";
 
 import {
   type FactorySettingsNavGroup,
@@ -29,6 +33,9 @@ function visibleFactorySettingsNavGroups(
   }
   if (!hasExperimentalFeature(FEATURE_MODEL_STATUS)) {
     hiddenNavItemIds.add("organization-model-status");
+  }
+  if (!WORKSPACE_WEBHOOK_FEATURES.some(hasExperimentalFeature)) {
+    hiddenNavItemIds.add("workspace-webhooks");
   }
   if (hiddenNavItemIds.size === 0) {
     return groups;

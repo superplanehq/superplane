@@ -20,7 +20,8 @@ type AutomationAgent = {
 };
 type AutomationTrigger =
   | { id?: string; use: "manual" | "task_enters_stage" | "task_leaves_stage" | "pull_request_updated" }
-  | { id?: string; use: "schedule"; config: { cron: string; utc_offset?: number } };
+  | { id?: string; use: "schedule"; config: { cron: string; utc_offset?: number } }
+  | { id?: string; use: "webhook"; config: { webhook_id: string } };
 type AutomationStep = {
   name: string;
   bash?: string;
@@ -103,6 +104,9 @@ export function parseAutomationForCanvas(source: string, stage: CustomAutomation
   if (runsOnTask === true && triggers.some(({ use }) => use === "schedule")) {
     problem("runs_on_task", "A schedule runs with no task.");
   }
+  if (runsOnTask === true && triggers.some(({ use }) => use === "webhook")) {
+    problem("runs_on_task", "A webhook runs with no task.");
+  }
   if (
     runsOnTask === false &&
     triggers.some(
@@ -140,21 +144,10 @@ function parseTrigger(value: unknown, path: string, stage: CustomAutomationColum
   const trigger = mapping(value, path, ["id", "use", "config"]);
   const id = optionalText(trigger.id, `${path}.id`);
   switch (trigger.use) {
-    case "schedule": {
-      const config = mapping(trigger.config, `${path}.config`, ["cron", "utc_offset"]);
-      const cron = singleLine(config.cron, `${path}.config.cron`);
-      if (![5, 6].includes(cron.trim().split(/\s+/).length)) {
-        problem(`${path}.config.cron`, "Enter a cron expression with five or six fields.");
-      }
-      const offset = config.utc_offset;
-      if (
-        offset !== undefined &&
-        (typeof offset !== "number" || !Number.isFinite(offset) || offset < -12 || offset > 14)
-      ) {
-        problem(`${path}.config.utc_offset`, "Enter a UTC offset from -12 through 14.");
-      }
-      return { id, use: "schedule", config: { cron, utc_offset: offset } };
-    }
+    case "schedule":
+      return parseScheduleTrigger(trigger.config, id, path);
+    case "webhook":
+      return parseWebhookTrigger(trigger.config, id, path, stage);
     case "pull_request_updated":
       if (stage !== "verify") problem(`${path}.use`, "This trigger requires Verify.");
       break;
@@ -167,16 +160,45 @@ function parseTrigger(value: unknown, path: string, stage: CustomAutomationColum
     default:
       problem(`${path}.use`, "Choose a supported trigger.");
   }
-  if (trigger.config !== undefined) problem(`${path}.config`, "Only schedule accepts a configuration.");
+  if (trigger.config !== undefined) problem(`${path}.config`, "Only schedule and webhook accept a configuration.");
   return { id, use: trigger.use };
+}
+
+function parseScheduleTrigger(value: unknown, id: string | undefined, path: string): AutomationTrigger {
+  const config = mapping(value, `${path}.config`, ["cron", "utc_offset"]);
+  const cron = singleLine(config.cron, `${path}.config.cron`);
+  if (![5, 6].includes(cron.trim().split(/\s+/).length)) {
+    problem(`${path}.config.cron`, "Enter a cron expression with five or six fields.");
+  }
+  const offset = config.utc_offset;
+  if (offset !== undefined && (typeof offset !== "number" || !Number.isFinite(offset) || offset < -12 || offset > 14)) {
+    problem(`${path}.config.utc_offset`, "Enter a UTC offset from -12 through 14.");
+  }
+  return { id, use: "schedule", config: { cron, utc_offset: offset } };
+}
+
+function parseWebhookTrigger(
+  value: unknown,
+  id: string | undefined,
+  path: string,
+  stage: CustomAutomationColumn,
+): AutomationTrigger {
+  if (stage !== "backlog") problem(`${path}.use`, "Webhook triggers are available in Backlog only.");
+  const config = mapping(value, `${path}.config`, ["webhook_id"]);
+  return { id, use: "webhook", config: { webhook_id: singleLine(config.webhook_id, `${path}.config.webhook_id`) } };
 }
 
 function validateTriggerIdentities(triggers: AutomationTrigger[]) {
   const ids = new Set<string>();
   const events = new Set<string>();
-  triggers.forEach(({ id, use }, index) => {
+  const webhooks = new Set<string>();
+  triggers.forEach((trigger, index) => {
+    const { id, use } = trigger;
     const path = `triggers[${index}]`;
-    if (use !== "schedule") {
+    if (trigger.use === "webhook") {
+      if (webhooks.has(trigger.config.webhook_id)) problem(`${path}.config.webhook_id`, "Use each webhook once.");
+      webhooks.add(trigger.config.webhook_id);
+    } else if (use !== "schedule") {
       if (events.has(use)) problem(`${path}.use`, "Use this trigger once.");
       events.add(use);
     }
@@ -309,8 +331,9 @@ export function automationDefinitionCanvas(
 
 function automationDefinitionRunContext(definition: AutomationDefinition): boolean | undefined {
   if (definition.runs_on_task !== undefined) return definition.runs_on_task;
-  if (definition.triggers.every(({ use }) => use !== "schedule")) return true;
-  if (definition.triggers.every(({ use }) => use === "schedule")) return false;
+  const withNoTask = ({ use }: AutomationTrigger) => use === "schedule" || use === "webhook";
+  if (!definition.triggers.some(withNoTask)) return true;
+  if (definition.triggers.every(withNoTask)) return false;
   // Keep both task and schedule triggers when the YAML already combines them.
   return undefined;
 }
@@ -322,15 +345,18 @@ function canvasTrigger(trigger: AutomationTrigger, index: number): CustomAutomat
     mode:
       trigger.use === "schedule"
         ? "scheduled"
-        : trigger.use === "manual"
-          ? "manual"
-          : trigger.use === "task_leaves_stage"
-            ? "leave"
-            : "automatic",
+        : trigger.use === "webhook"
+          ? "webhook"
+          : trigger.use === "manual"
+            ? "manual"
+            : trigger.use === "task_leaves_stage"
+              ? "leave"
+              : "automatic",
     schedule:
       trigger.use === "schedule"
         ? { cronExpression: trigger.config.cron, utcOffset: trigger.config.utc_offset ?? 0 }
         : customAutomationSchedule(),
+    ...(trigger.use === "webhook" ? { webhookId: trigger.config.webhook_id } : {}),
   };
 }
 
@@ -338,7 +364,8 @@ export function automationDefinitionTriggers(
   triggers: CustomAutomationTrigger[],
   stage: CustomAutomationColumn,
 ): AutomationTrigger[] {
-  return triggers.map(({ publicId, mode, schedule }) => {
+  return triggers.map(({ publicId, mode, schedule, webhookId }) => {
+    if (mode === "webhook") return { id: publicId, use: "webhook", config: { webhook_id: webhookId ?? "" } };
     if (mode === "scheduled") {
       return {
         id: publicId,

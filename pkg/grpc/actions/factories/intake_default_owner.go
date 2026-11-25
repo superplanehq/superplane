@@ -22,6 +22,7 @@ var intakeSourcesWithDefaultOwner = []string{
 	models.FactoryIntakeSourceProductiveTasks,
 	models.FactoryIntakeSourceDatadog,
 	models.FactoryIntakeSourceLinearIssues,
+	models.FactoryIntakeSourceWebhook,
 }
 
 func intakeSourceSupportsDefaultOwner(source string) bool {
