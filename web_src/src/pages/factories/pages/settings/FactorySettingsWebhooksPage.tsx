@@ -27,12 +27,13 @@ import {
   generateWebhookCode,
 } from "@/lib/webhookRequestExample";
 import { CopyButton } from "@/ui/CopyButton";
+import { HighlightedCode } from "@/ui/HighlightedCode";
 
 import { FactoryDeleteDialog } from "../../FactoryDeleteDialog";
 import { FactorySettingsCard, FactorySettingsPageFrame } from "./FactorySettingsCard";
 import { useFactorySettingsLayout } from "./factorySettingsLayoutContext";
 
-type Authentication = Exclude<FactoryWebhookAuthentication, "AUTHENTICATION_UNSPECIFIED">;
+export type Authentication = Exclude<FactoryWebhookAuthentication, "AUTHENTICATION_UNSPECIFIED">;
 
 const AUTHENTICATION_OPTIONS: { value: Authentication; label: string; mode: string }[] = [
   { value: "AUTHENTICATION_BEARER", label: "Bearer token", mode: "bearer" },
@@ -48,7 +49,7 @@ const DEFAULT_HEADER: Partial<Record<Authentication, string>> = {
 const NO_UPDATE_PERMISSION = "You need permission to update this workspace.";
 
 type Editor = { webhook?: FactoriesFactoryWebhook };
-type Reveal = { webhook: FactoriesFactoryWebhook; secret: string };
+export type Reveal = { webhook: FactoriesFactoryWebhook; secret: string };
 
 export function FactorySettingsWebhooksPage() {
   const { organizationId, factoryId, factory } = useFactorySettingsLayout();
@@ -371,17 +372,19 @@ function WebhookEditorForm({
   );
 }
 
-function WebhookAuthenticationField({
+export function WebhookAuthenticationField({
   value,
   onChange,
+  disabled,
 }: {
   value: Authentication;
   onChange: (value: Authentication) => void;
+  disabled?: boolean;
 }) {
   return (
     <div className="space-y-2">
       <Label htmlFor="factory-webhook-authentication">Authentication</Label>
-      <Select value={value} onValueChange={(next) => onChange(next as Authentication)}>
+      <Select value={value} onValueChange={(next) => onChange(next as Authentication)} disabled={disabled}>
         <SelectTrigger
           id="factory-webhook-authentication"
           className="w-full"
@@ -402,7 +405,16 @@ function WebhookAuthenticationField({
   );
 }
 
-function WebhookSecretDialog({ reveal, onClose }: { reveal: Reveal | null; onClose: () => void }) {
+export function WebhookSecretDialog({
+  reveal,
+  payload,
+  onClose,
+}: {
+  reveal: Reveal | null;
+  /** JSON body for the example request. */
+  payload?: string;
+  onClose: () => void;
+}) {
   const webhook = reveal?.webhook;
   const mode = AUTHENTICATION_OPTIONS.find((option) => option.value === webhook?.authentication)?.mode ?? "bearer";
   const example = generateWebhookCode(mode, {
@@ -410,6 +422,7 @@ function WebhookSecretDialog({ reveal, onClose }: { reveal: Reveal | null; onClo
     headerName: webhook?.headerName || DEFAULT_WEBHOOK_HEADER_TOKEN_NAME,
     signatureHeaderName: webhook?.headerName || DEFAULT_WEBHOOK_SIGNATURE_HEADER,
     secret: reveal?.secret,
+    payload,
   });
   return (
     <Dialog open={Boolean(reveal)} onOpenChange={(open) => !open && onClose()}>
@@ -434,9 +447,12 @@ function WebhookSecretDialog({ reveal, onClose }: { reveal: Reveal | null; onClo
                     copiedAriaLabel="Example request copied"
                   />
                 </div>
-                <pre className="overflow-x-auto px-4 py-3 pr-12 text-[12px] leading-relaxed text-foreground">
-                  {example.code}
-                </pre>
+                <HighlightedCode
+                  code={example.code}
+                  language="shell"
+                  className="px-4 py-3 pr-12"
+                  testId="factory-webhook-secret-example"
+                />
               </div>
             </div>
           </div>

@@ -178,6 +178,7 @@ function useIntakeSettingsActions({
         intakeId: intake.intakeId,
         settings: intakeSettingsToApi(normalized, intake.source.id),
         ...datadogServiceRebind(intake, next),
+        ...webhookRebind(intake, next),
         ...linearProjectRebind(intake, next),
         ...sentryProjectRebind(intake, next),
       });
@@ -221,6 +222,17 @@ function datadogServiceRebind(
     return {};
   }
   return { integrationId: intake.integrationId, resourceId: service };
+}
+
+function webhookRebind(intake: ConfiguredLineIntakeSource, next: IntakeSourceSettings): { resourceId?: string } {
+  if (intake.source.id !== "webhook") {
+    return {};
+  }
+  const webhookId = next.webhookId.trim();
+  if (!webhookId || webhookId === (intake.resourceId?.trim() ?? "")) {
+    return {};
+  }
+  return { resourceId: webhookId };
 }
 
 function linearProjectRebind(

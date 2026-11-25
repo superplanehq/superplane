@@ -20,6 +20,7 @@ const (
 	FactoryIntakeSourceDependabotAlerts   = "dependabot-alerts"
 	FactoryIntakeSourceDatadog            = "datadog"
 	FactoryIntakeSourceLinearIssues       = "linear-issues"
+	FactoryIntakeSourceWebhook            = "webhook"
 
 	FactoryIntakeInitialImportStatusUnspecified = "unspecified"
 	FactoryIntakeInitialImportStatusPending     = "pending"
@@ -46,6 +47,7 @@ var factoryIntakeSources = []string{
 	FactoryIntakeSourceDependabotAlerts,
 	FactoryIntakeSourceDatadog,
 	FactoryIntakeSourceLinearIssues,
+	FactoryIntakeSourceWebhook,
 }
 
 // FactoryIntake declares that a factory canvas listens to an external source,
