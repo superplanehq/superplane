@@ -3,6 +3,7 @@ package mergeconfidence
 
 import (
 	"math"
+	"slices"
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/models/factory"
@@ -39,10 +40,36 @@ type ReportCheck struct {
 	Missing  bool    `json:"missing"`
 }
 
+// reportCheckOrder sorts the built-in checks for display and keeps custom checks in their saved slots.
+func reportCheckOrder(enabled []string) []string {
+	builtIns := []string{"correctness", "drift", "performance", "security", "risk", "reversibility"}
+	ordered := slices.Clone(enabled)
+	slot := 0
+	for _, id := range builtIns {
+		if !slices.Contains(enabled, id) {
+			continue
+		}
+		for !slices.Contains(builtIns, enabled[slot]) {
+			slot++
+		}
+		ordered[slot] = id
+		slot++
+	}
+	return ordered
+}
+
 // ReportData includes only checks selected in the saved run configuration.
 func (a Assessment) ReportData() ReportData {
 	report := ReportData{Complete: a.Passed, Checks: []ReportCheck{}, ReviewedCommit: a.ReviewedCommit, TaskURL: a.TaskURL}
-	for _, id := range a.Enabled {
+	// A saved run can contain both versions. ChecksForRun keeps the last report.
+	if slices.Contains(a.Enabled, "drift") && slices.Contains(a.Enabled, "correctness") {
+		superseded := "drift"
+		if _, ok := a.Checks["drift-review"]; ok {
+			superseded = "correctness"
+		}
+		a.Enabled = slices.DeleteFunc(slices.Clone(a.Enabled), func(id string) bool { return id == superseded })
+	}
+	for _, id := range reportCheckOrder(a.Enabled) {
 		label := a.Labels[id]
 		if label == "" {
 			label = checkLabel(id)
@@ -76,7 +103,7 @@ func (a Assessment) overallRating() (float64, string, bool) {
 	}
 	for _, id := range a.Enabled {
 		switch id {
-		case "risk", "performance", "security", "drift", "reversibility":
+		case "risk", "performance", "security", "correctness", "drift", "reversibility":
 		default:
 			continue
 		}
@@ -113,8 +140,8 @@ func checkLabel(id string) string {
 		return "Performance"
 	case "security":
 		return "Security"
-	case "drift":
-		return "Drift from Specification"
+	case "correctness", "drift":
+		return "Correctness"
 	case "reversibility":
 		return "Reversibility"
 	default:

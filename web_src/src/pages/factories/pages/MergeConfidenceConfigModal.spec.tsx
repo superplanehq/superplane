@@ -125,7 +125,7 @@ describe("MergeConfidenceConfigModal", () => {
       const view = renderModal(vi.fn(), vi.fn(), graph);
       expect(screen.getByRole("tab", { name: "Configuration" })).toHaveAttribute("aria-selected", "true");
       expect(screen.queryByTestId("merge-confidence-config-canvas")).not.toBeInTheDocument();
-      for (const label of ["Blast radius", "Performance", "Security", "Drift from Specification", "Reversibility"]) {
+      for (const label of ["Correctness", "Performance", "Security", "Blast radius", "Reversibility"]) {
         expect(screen.getByRole("switch", { name: label })).toBeChecked();
       }
       expect(screen.getByRole("group", { name: "Default model" })).toBeInTheDocument();

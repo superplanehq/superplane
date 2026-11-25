@@ -176,16 +176,17 @@ func includeLegacyStageKey(query *gorm.DB, expression, stageKey string) *gorm.DB
 func admissionStep(liveLine *FactoryLine, dispatch *FactoryWorkOrderLineDispatch, stepIndex int) *FactoryLineStep {
 	snapshotSteps := []FactoryLineStep(dispatch.Steps)
 	snapshot := &snapshotSteps[stepIndex]
-	if snapshot.StageKind == FactoryLineStageCustom {
-		return snapshot
-	}
 	liveSteps := []FactoryLineStep(liveLine.Steps)
 	if snapshot.StageKey != "" {
 		for _, stage := range liveLine.StagesValue() {
-			if stage.Key == snapshot.StageKey && stage.StepIndex != nil && *stage.StepIndex < len(liveSteps) {
-				return &liveSteps[*stage.StepIndex]
+			if stage.Key == snapshot.StageKey {
+				if stage.StepIndex != nil && *stage.StepIndex >= 0 && *stage.StepIndex < len(liveSteps) {
+					return &liveSteps[*stage.StepIndex]
+				}
+				return snapshot
 			}
 		}
+		return snapshot
 	}
 	if stepIndex < len(liveSteps) && liveSteps[stepIndex].AppID == snapshot.AppID {
 		return &liveSteps[stepIndex]

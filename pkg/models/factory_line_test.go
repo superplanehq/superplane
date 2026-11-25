@@ -46,7 +46,7 @@ func Test__FactoryLine__Stages__DefaultAndRoundTrip(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, line.StagesValue(), 4)
-	assert.Equal(t, []string{"backlog", "phase", "verify", "done"}, []string{
+	assert.Equal(t, []string{"backlog", "phase", "phase", "done"}, []string{
 		line.StagesValue()[0].Kind,
 		line.StagesValue()[1].Kind,
 		line.StagesValue()[2].Kind,
@@ -64,8 +64,7 @@ func Test__FactoryLine__Stages__DefaultAndRoundTrip(t *testing.T) {
 	reloaded, err := factory.FindLine(db, line.ID)
 	require.NoError(t, err)
 	assert.Equal(t, line.StagesValue(), reloaded.StagesValue())
-	assert.True(t, (models.FactoryLineStage{Kind: models.FactoryLineStageCustom}).AutoAdvanceEnabled())
-	assert.False(t, (models.FactoryLineStage{Kind: models.FactoryLineStageVerify}).AutoAdvanceEnabled())
+	assert.True(t, (models.FactoryLineStage{Kind: models.FactoryLineStagePhase, Key: "verify"}).AutoAdvanceEnabled())
 }
 
 func Test__FactoryLine__Update__ReconcilesPhasesAndKeepsCustomStages(t *testing.T) {
@@ -84,7 +83,7 @@ func Test__FactoryLine__Update__ReconcilesPhasesAndKeepsCustomStages(t *testing.
 	require.NoError(t, err)
 	autoAdvance := false
 	custom := models.FactoryLineStage{
-		ID: uuid.New(), Key: "custom-qa", Name: "QA", Kind: models.FactoryLineStageCustom, AutoAdvance: &autoAdvance,
+		ID: uuid.New(), Key: "custom-qa", Name: "QA", Kind: models.FactoryLineStagePhase, AutoAdvance: &autoAdvance,
 	}
 	stages := append([]models.FactoryLineStage{}, line.StagesValue()[:2]...)
 	stages = append(stages, custom)
@@ -115,7 +114,7 @@ func Test__FactoryLine__Update__InsertsNewPhaseBeforeVerify(t *testing.T) {
 	app, entry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "Implement", "start-one")
 	line, err := factory.CreateLine(db, "ship", nil)
 	require.NoError(t, err)
-	custom := models.FactoryLineStage{ID: uuid.New(), Key: "custom-qa", Name: "QA", Kind: models.FactoryLineStageCustom}
+	custom := models.FactoryLineStage{ID: uuid.New(), Key: "custom-qa", Name: "QA", Kind: models.FactoryLineStagePhase}
 	stages := line.StagesValue()
 	stages = append(stages[:len(stages)-1], custom, stages[len(stages)-1])
 	require.NoError(t, line.UpdateConfiguration(db, nil, nil, nil, stages))

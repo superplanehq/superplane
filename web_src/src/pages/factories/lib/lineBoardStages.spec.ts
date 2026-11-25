@@ -14,8 +14,8 @@ import {
 const SAVED: LineBoardStage[] = [
   { id: "backlog", key: "backlog", name: "Backlog", kind: "STAGE_KIND_BACKLOG" },
   { id: "phase-0", key: "phase-0", name: "Implement", kind: "STAGE_KIND_PHASE", stepIndex: 0 },
-  { id: "qa", key: "custom-qa", name: "QA", kind: "STAGE_KIND_CUSTOM" },
-  { id: "verify", key: "verify", name: "Verify", kind: "STAGE_KIND_VERIFY" },
+  { id: "qa", key: "custom-qa", name: "QA", kind: "STAGE_KIND_PHASE" },
+  { id: "verify", key: "verify", name: "Verify", kind: "STAGE_KIND_PHASE", autoAdvance: false },
   { id: "done", key: "done", name: "Done", kind: "STAGE_KIND_DONE" },
 ];
 
@@ -25,7 +25,7 @@ describe("line stage drafts", () => {
 
     expect(draft.map((stage) => stage.name)).toEqual(["Backlog", "Implement", "QA", "Verify", "Deploy", "Done"]);
     const saved = stagesForSave(draft);
-    expect(saved[4]).toMatchObject({ id: "", name: "Deploy", kind: "STAGE_KIND_CUSTOM" });
+    expect(saved[4]).toMatchObject({ id: "", name: "Deploy", kind: "STAGE_KIND_PHASE" });
     expect(saved[4]?.autoAdvance).toBe(true);
     expect(saved[4]?.key).toMatch(/^new-/);
     expect(saved[2]).toMatchObject({ id: "qa", key: "custom-qa" });

@@ -6,9 +6,9 @@ export const MERGE_CONFIDENCE_CHECK_COPY: ReadonlyArray<{
   helper: string;
 }> = [
   {
-    id: "risk",
-    label: "Blast radius",
-    helper: "Score how risky the change is. A higher score means more risk.",
+    id: "drift",
+    label: "Correctness",
+    helper: "Check whether the implementation delivers the intended outcome and what could cause it to fail.",
   },
   {
     id: "performance",
@@ -21,9 +21,9 @@ export const MERGE_CONFIDENCE_CHECK_COPY: ReadonlyArray<{
     helper: "Check the change against the security practices in this application.",
   },
   {
-    id: "drift",
-    label: "Drift from Specification",
-    helper: "Check how far the change moved from the original task.",
+    id: "risk",
+    label: "Blast radius",
+    helper: "Score how risky the change is. A higher score means more risk.",
   },
   {
     id: "reversibility",
