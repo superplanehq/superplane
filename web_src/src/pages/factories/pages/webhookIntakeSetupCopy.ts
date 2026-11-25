@@ -1,0 +1,36 @@
+export const WEBHOOK_INTAKE_SETUP_COPY = {
+  title: "Webhook intake",
+  description: "Other tools send requests to a webhook. Each request becomes a task in Backlog.",
+  stepWebhook: "Step 1 of 2",
+  stepFields: "Step 2 of 2",
+  webhookSection: "Webhook",
+  fieldsTitle: "Map task fields",
+  fieldsHelper: "Enter the JSON body field for each task field. Use dots for nested fields, for example issue.title.",
+  modeNew: "New webhook",
+  modeNewHelper: "SuperPlane shows the URL and the secret after setup.",
+  modeExisting: "Existing webhook",
+  modeExistingHelper: "Use a webhook from workspace settings.",
+  nameLabel: "Name",
+  defaultName: "Webhook intake",
+  existingHelper: "Each request to this webhook becomes a task.",
+  cancel: "Cancel",
+  back: "Back",
+  continue: "Continue",
+  create: "Create intake",
+  creating: "Creating…",
+  webhookCreateError: "SuperPlane could not create the webhook.",
+  wizardCreateError: "SuperPlane could not create the webhook intake.",
+} as const;
+
+export const WEBHOOK_INTAKE_FIELDS_COPY = {
+  titleLabel: "Title",
+  titleHelper: 'A request without this field gets the title "Webhook request".',
+  descriptionLabel: "Description",
+  descriptionHelper: "Leave empty to create tasks without a description.",
+  linkLabel: "Link",
+  linkHelper:
+    "SuperPlane skips a request when a task with the same link exists. Leave empty to create a task for each request.",
+  exampleLabel: "Example request body",
+  titleRequired: "Enter the title field.",
+  pathInvalid: "Use names with letters, digits, - or _, separated by dots.",
+} as const;

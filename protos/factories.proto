@@ -1667,6 +1667,7 @@ message FactoryIntake {
     SOURCE_DEPENDABOT_ALERTS = 6;
     SOURCE_DATADOG = 7;
     SOURCE_LINEAR_ISSUES = 8;
+    SOURCE_WEBHOOK = 9;
   }
 
   enum InitialImportStatus {
@@ -1778,6 +1779,16 @@ message FactoryIntake {
     // linear_project_ids is not empty. Omitted means true.
     // Linear issue intakes only.
     optional bool linear_include_issues_without_project = 26;
+    // Dot path in the JSON request body for the task title. Omitted updates
+    // preserve the path. Webhook intakes only.
+    optional string webhook_title_path = 27;
+    // Dot path in the JSON request body for the task description.
+    // Webhook intakes only.
+    optional string webhook_description_path = 28;
+    // Dot path in the JSON request body for the link to the source item.
+    // A request whose link matches a task creates no task. Empty turns off
+    // the link. Webhook intakes only.
+    optional string webhook_link_path = 29;
   }
 
   string id = 1;

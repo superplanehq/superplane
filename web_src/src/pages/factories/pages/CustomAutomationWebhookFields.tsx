@@ -16,6 +16,7 @@ export function CustomAutomationWebhookFields({
   webhookId,
   usedWebhookIds,
   onChange,
+  helper = "The agent gets the JSON request body and can create a task.",
 }: {
   idPrefix: string;
   organizationId: string;
@@ -25,6 +26,7 @@ export function CustomAutomationWebhookFields({
   /** Webhooks that other triggers of this automation already use. */
   usedWebhookIds: string[];
   onChange: (webhookId: string) => void;
+  helper?: string;
 }) {
   const webhooks = useFactoryWebhooks(organizationId, factoryId);
   const settingsPath = factorySettingsSectionPath(organizationId, factoryKey, "workspace", "webhooks");
@@ -84,7 +86,7 @@ export function CustomAutomationWebhookFields({
         </div>
       ) : null}
       <p className="text-xs text-muted-foreground">
-        The agent gets the JSON request body and can create a task.{" "}
+        {helper}{" "}
         <Link to={settingsPath} className="font-medium text-foreground underline underline-offset-2">
           Manage webhooks
         </Link>
