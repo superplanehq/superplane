@@ -3,6 +3,7 @@ package public
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -15,6 +16,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/blob"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -72,6 +74,28 @@ func (s *Server) handleFileContentUpload(w http.ResponseWriter, r *http.Request)
 	if !allowed {
 		http.Error(w, "Unauthorized", http.StatusForbidden)
 		return
+	}
+
+	var credentialScopes [][]string
+	if claims, ok := middleware.GetScopedTokenClaimsFromContext(r.Context()); ok {
+		credentialScopes = append(credentialScopes, claims.Scopes)
+	}
+	if user.HasAPIKeyCanvasScope() {
+		credentialScopes = append(credentialScopes, apiKeyCanvasScopes(user.APIKeyCanvasIDs))
+	}
+	// Each authenticated restriction must allow the upload, even when both apply.
+	rule := authorization.AuthorizationRule{Resource: resource, Action: action}
+	for _, scopes := range credentialScopes {
+		encoded, err := json.Marshal(scopes)
+		if err != nil {
+			log.Errorf("Failed to encode file upload credential scopes: %v", err)
+			http.Error(w, "Failed to encode credential scopes", http.StatusInternalServerError)
+			return
+		}
+		if !authorization.HasRequiredScopedTokenPermissionForScopes(string(encoded), nil, rule) {
+			http.Error(w, "Unauthorized", http.StatusForbidden)
+			return
+		}
 	}
 
 	if r.ContentLength > file.MaxBytes() {
