@@ -611,11 +611,13 @@ func TestResetIntakePreservesGeneralSettings(t *testing.T) {
 			if source == models.FactoryIntakeSourceGitHubIssues || source == models.FactoryIntakeSourceSentryExceptions {
 				paused = &tc.paused
 			}
+			settings.ConfidencePct = 23
 			updated, err := UpdateFactoryIntake(ctx, IntakeDependencies{Registry: r.Registry, Encryptor: r.Encryptor, AuthService: r.AuthService, WebhookBaseURL: "http://localhost:8000"}, r.Organization.ID.String(), &pb.UpdateFactoryIntakeRequest{
 				FactoryId: factory.ID.String(), IntakeId: intake.ID.String(), Settings: serializeIntakeSettings(source, settings), Paused: paused,
 			})
 			require.NoError(t, err)
 			assert.Equal(t, tc.paused, updated.Intake.GetPaused())
+			assert.EqualValues(t, 23, updated.Intake.Settings.GetConfidencePct())
 			if source == models.FactoryIntakeSourceSentryExceptions {
 				version := resetTestLiveVersion(t, canvas)
 				assert.Nil(t, findIntakeNode(version.Nodes, intakeSentryEventHasStackNodeID), "settings updates preserve saved workflows")

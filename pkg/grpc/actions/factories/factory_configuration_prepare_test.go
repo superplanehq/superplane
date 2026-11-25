@@ -560,7 +560,10 @@ func configureConfigurationCatalogIntegration(t *testing.T, f configurationFixtu
 		for _, trigger := range implementation.Triggers() {
 			integration.Capabilities = append(integration.Capabilities, models.CapabilityState{Name: trigger.Name(), State: core.IntegrationCapabilityStateEnabled})
 		}
-		metadata["repositories"] = []any{map[string]any{"id": 101, "name": "acme/app"}, map[string]any{"id": 102, "name": "acme/backlog"}}
+		metadata["repositories"] = []githubcommon.Repository{
+			{ID: 101, Name: "app", URL: "https://github.com/acme/app"},
+			{ID: 102, Name: "backlog", URL: "https://github.com/acme/backlog"},
+		}
 		secret(githubcommon.SecretPAT)
 	case models.ProviderBitbucket:
 		configuration["authType"] = bitbucket.AuthTypeWorkspaceAccessToken

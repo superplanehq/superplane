@@ -790,6 +790,15 @@ func validateConfigurationResourceSelections(integration *models.Integration, ke
 	if err := json.Unmarshal(encoded, &resources); err != nil {
 		return configurationPreparationError(field, "The integration resource list is invalid. Sync the integration and plan again.")
 	}
+	if integration.AppName == models.ProviderGitHub && key == "repositories" {
+		host := githubcommon.HostFromModel(integration)
+		for _, resource := range resources {
+			rawURL, _ := resource["url"].(string)
+			if owner, repository, ok := host.ParseRepoURL(rawURL); ok {
+				resource["full_name"] = owner + "/" + repository
+			}
+		}
+	}
 	for _, selected := range selections {
 		found := slices.ContainsFunc(resources, func(resource map[string]any) bool {
 			for _, name := range []string{"id", "key", "name", "slug", "full_name", "fullName", "uuid"} {
