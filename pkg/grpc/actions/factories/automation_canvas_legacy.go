@@ -241,6 +241,9 @@ func legacyAutomationTriggers(stage string, nodes []models.Node) ([]automationsp
 			if stage == models.CanvasColumnKeyVerify {
 				use = automationspec.PullRequestUpdated
 			}
+			if customAutomationUsesDispatch(stage) {
+				use = automationspec.Manual
+			}
 			result = append(result, automationspec.Trigger{Use: use})
 		case pb.FactoryCustomAutomation_START_MODE_ON_LEAVE:
 			result = append(result, automationspec.Trigger{Use: automationspec.TaskLeavesStage})
