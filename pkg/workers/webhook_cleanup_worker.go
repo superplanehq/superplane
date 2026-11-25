@@ -124,8 +124,7 @@ func (w *WebhookCleanupWorker) processAppInstallationWebhook(tx *gorm.DB, logger
 		return err
 	}
 
-	// Productive was removed, so its remote cleanup handler cannot run again.
-	if instance.AppName == "productive" {
+	if _, err := w.registry.GetIntegration(instance.AppName); err != nil {
 		return webhook.HardDelete(tx)
 	}
 

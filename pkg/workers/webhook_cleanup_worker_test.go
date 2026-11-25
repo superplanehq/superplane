@@ -36,19 +36,58 @@ func Test__WebhookCleanupWorker_DeletesWebhookWhenProviderCleanupFails(t *testin
 	assert.Equal(t, 1, cleanupCalls)
 }
 
-func Test__WebhookCleanupWorker_DeletesRetiredProductiveWebhook(t *testing.T) {
+func Test__WebhookCleanupWorker_DeletesUnregisteredWebhookWithoutProviderCleanup(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	worker, webhookID := setupWebhookCleanupWorker(t, r, nil)
-	integrationID := integrationIDForWebhook(t, webhookID)
-	require.NoError(t, database.Conn().Model(&models.Integration{}).
-		Where("id = ?", integrationID).
-		Update("app_name", "productive").Error)
+	cleanupCalls := 0
+	worker, webhookID := setupWebhookCleanupWorker(t, r, func(ctx core.WebhookHandlerContext) error {
+		cleanupCalls++
+		return nil
+	})
+	delete(r.Registry.Integrations, "dummy")
 
 	require.NoError(t, worker.LockAndProcessWebhook(logrus.NewEntry(logrus.New()), models.Webhook{ID: webhookID}))
 
 	assertWebhookHardDeleted(t, webhookID)
+	assert.Zero(t, cleanupCalls)
+}
+
+func Test__WebhookCleanupWorker_PreservesWebhookWithMissingRegisteredHandler(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	worker, webhookID := setupWebhookCleanupWorker(t, r, nil)
+	delete(r.Registry.WebhookHandlers, "dummy")
+	var before models.Webhook
+	require.NoError(t, database.Conn().Unscoped().First(&before, webhookID).Error)
+
+	require.Error(t, worker.LockAndProcessWebhook(logrus.NewEntry(logrus.New()), before))
+
+	var after models.Webhook
+	require.NoError(t, database.Conn().Unscoped().First(&after, webhookID).Error)
+	assert.Equal(t, before, after)
+}
+
+func Test__WebhookCleanupWorker_PreservesActiveUnregisteredWebhook(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	worker, webhookID := setupWebhookCleanupWorker(t, r, nil)
+	delete(r.Registry.Integrations, "dummy")
+	var stale models.Webhook
+	require.NoError(t, database.Conn().Unscoped().First(&stale, webhookID).Error)
+	require.NoError(t, database.Conn().Unscoped().Model(&models.Webhook{}).
+		Where("id = ?", webhookID).
+		Update("deleted_at", nil).Error)
+	var before models.Webhook
+	require.NoError(t, database.Conn().First(&before, webhookID).Error)
+
+	require.NoError(t, worker.LockAndProcessWebhook(logrus.NewEntry(logrus.New()), stale))
+
+	var after models.Webhook
+	require.NoError(t, database.Conn().First(&after, webhookID).Error)
+	assert.Equal(t, before, after)
 }
 
 func Test__WebhookCleanupWorker_PersistsIntegrationMetadataClearedByCleanup(t *testing.T) {

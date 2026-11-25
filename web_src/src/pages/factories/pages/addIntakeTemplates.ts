@@ -5,10 +5,7 @@ import jiraIcon from "@/assets/icons/integrations/jira.svg";
 import linearIcon from "@/assets/icons/integrations/linear.svg";
 import notionIcon from "@/assets/icons/integrations/notion.svg";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
-import {
-  FEATURE_FACTORY_DATADOG_INTAKE,
-  FEATURE_FACTORY_SCHEDULED_INTAKE,
-} from "@/lib/experimentalFeatures";
+import { FEATURE_FACTORY_DATADOG_INTAKE, FEATURE_FACTORY_SCHEDULED_INTAKE } from "@/lib/experimentalFeatures";
 
 export interface AddIntakeTemplate {
   id: string;
