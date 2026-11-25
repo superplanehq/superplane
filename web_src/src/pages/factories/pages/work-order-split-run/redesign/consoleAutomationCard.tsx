@@ -1,9 +1,10 @@
+import { AutomationChatContext } from "../useAutomationChatSessions";
 import { AutomationTimelineChat } from "../AutomationChatNavigation";
 import { Frame, FrameHeader, FramePanel } from "@/components/reui/frame";
 import { cn } from "@/lib/utils";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/ui/collapsible";
 import { ChevronRight } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useContext, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { type SplitRunPhase, type SplitRunPhaseStatus } from "../splitRunMocks";
 import type { ManualCustomAutomation } from "../../../lib/customAutomation";
@@ -66,30 +67,13 @@ export function ConsoleAutomationCard({
   const shownStatus: ConsoleDisplayStatus = stopping.active && latest.status === "running" ? "cancelled" : headerStatus;
   const phaseStatus = shownPhaseStatus(shownStatus);
   const shownPhase = phase && phaseStatus !== phase.status ? { ...phase, status: phaseStatus } : phase;
-  const live = isLiveAutomationStatus(shownStatus);
+  const chats = useContext(AutomationChatContext);
+  const hasChat = chats?.chats.some((chat) => automation.runs.some((run) => run.id === chat.id));
+  const live = isLiveAutomationStatus(shownStatus) && !hasChat;
   const ticking =
     headerStatus === "running" && [...timing.values()].some((entry) => entry.workStartedAt && !entry.workEndedAt);
   const now = useTickingNow(ticking);
-  const [open, setOpen] = useState(live || expandIdle);
-  const closedByUser = useRef(false);
-  useEffect(() => {
-    if (live) {
-      setOpen(true);
-      return;
-    }
-    if (closedByUser.current) {
-      setOpen(false);
-      return;
-    }
-    if (expandIdle) {
-      return;
-    }
-    setOpen(false);
-  }, [expandIdle, live]);
-  const handleOpenChange = (next: boolean) => {
-    closedByUser.current = !next;
-    setOpen(next);
-  };
+  const { open, handleOpenChange } = useCardDisclosure(live, expandIdle, Boolean(hasChat));
   const stopPhase = phaseForStop(phases, automation.runs, queuedIds) ?? shownPhase;
   const stopRun = cardStopRun({
     canStopRun,
@@ -385,4 +369,32 @@ function mixedQueueSummary(runs: ConsoleAutomation["runs"], queuedIds: ReadonlyS
   const queued = active.filter((run) => queuedIds.has(run.id)).length;
   const running = active.length - queued;
   return running > 0 && queued > 0 ? `${running} running · ${queued} queued` : "";
+}
+
+function useCardDisclosure(live: boolean, expandIdle: boolean, hasChat: boolean) {
+  const [open, setOpen] = useState((live || expandIdle) && !hasChat);
+  const closedByUser = useRef(false);
+  useEffect(() => {
+    if (hasChat) {
+      setOpen(false);
+      return;
+    }
+    if (live) {
+      setOpen(true);
+      return;
+    }
+    if (closedByUser.current) {
+      setOpen(false);
+      return;
+    }
+    if (expandIdle) {
+      return;
+    }
+    setOpen(false);
+  }, [expandIdle, live, hasChat]);
+  const handleOpenChange = (next: boolean) => {
+    closedByUser.current = !next;
+    setOpen(next);
+  };
+  return { open, handleOpenChange };
 }

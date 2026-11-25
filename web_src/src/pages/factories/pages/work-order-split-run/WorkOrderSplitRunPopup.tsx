@@ -109,7 +109,8 @@ function WorkOrderSplitRunPopupContent(props: WorkOrderSplitRunPopupProps) {
     isDraft: fixture.footer.kind === "draft",
   });
 
-  const automationChats = useAutomationChatSessions(organizationId, factoryId, orderId, fixture.phases);
+  const { session } = analysis;
+  const automationChats = useAutomationChatSessions(organizationId, factoryId, orderId, fixture.phases, session);
 
   if (mode === "loading") {
     return <LoadingWorkOrderPopup title={fixture.title} titlePrefix={titlePrefix} fixed={fixed} onClose={onClose} />;

@@ -352,6 +352,58 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(onDispatch).toHaveBeenCalledTimes(1);
   });
 
+  it("switches between Planning, custom chat, and a collapsed timeline", async () => {
+    factoryPlanning.current = { enabled: true, clarity: true, confidence: true };
+    findPlanningSessionMock.mockResolvedValue({
+      id: "planning-session",
+      canvasRunId: "planning-run",
+      state: "ended",
+      messages: [{ id: "planning-message", role: "agent", text: "Planning conversation" }],
+    });
+    findAutomationSessionMock.mockImplementation(async (_org, _factory, _order, runId) =>
+      runId === "custom-run"
+        ? {
+            id: "custom-session",
+            state: "ended",
+            messages: [{ id: "custom-message", role: "agent", text: "Custom conversation" }],
+          }
+        : null,
+    );
+    const fixture = splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER);
+    fixture.phases.push(
+      ...["planning", "custom"].map((kind) => ({
+        id: kind === "planning" ? "backlog-analysis-planning-run" : "backlog-custom-run",
+        appId: `${kind}-canvas`,
+        runId: `${kind}-run`,
+        name: kind,
+        componentName: kind === "planning" ? "Planning" : "Strategy",
+        status: "running" as const,
+        duration: "1m",
+        artifacts: [],
+        stream: [],
+        canvasSteps: [],
+      })),
+    );
+    renderPopup({
+      organizationId: FACTORIES_ORGANIZATION_ID,
+      factoryId: PRIMARY_FACTORY_ID,
+      orderId: DRAFT_WORK_ORDER.id,
+      fixture,
+    });
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Chat (2)" }));
+    await user.click(screen.getByRole("menuitemradio", { name: "Planning" }));
+    expect(await screen.findByText("Planning conversation")).toBeVisible();
+    expect(screen.queryByText("Custom conversation")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Timeline" }));
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Toggle Strategy details" })).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("Planning conversation")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Chat with Strategy" }));
+    expect(await screen.findByText("Custom conversation")).toBeVisible();
+    expect(screen.queryByText("Planning conversation")).not.toBeInTheDocument();
+  });
+
   it("shows a failed Backlog run before a planning session exists and clears it for a newer run", async () => {
     const failed: BacklogAnalysisRun = {
       canvasId: "backlog-canvas",

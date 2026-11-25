@@ -131,7 +131,7 @@ function TaskView(props: SplitRunPopupTabsProps) {
     return (
       <SplitRunPopupContent
         {...props}
-        sourceOnly={props.sourceOnly || chats.chats.length > 0}
+        sourceOnly={chats.choice === "planning" ? false : props.sourceOnly || chats.chats.length > 0}
         header={() => props.header(navigation)}
       />
     );
@@ -200,6 +200,7 @@ function SplitRunPopupContent({
   sessionLookupError,
   panelReview,
   header,
+  automationChats,
 }: SplitRunPopupTabsProps) {
   const liveWorkOrder = useWorkOrder(organizationId ?? "", factoryId ?? "", orderId ?? "");
   const files = liveWorkOrder.isSuccess ? liveWorkOrder.data?.files : undefined;
@@ -233,6 +234,7 @@ function SplitRunPopupContent({
             analysis={analysis}
             sourceOnly={sourceOnly}
             automationRuns={
+              automationChats.choice !== "planning" &&
               consoleFixture.phases.some((phase) => phase.id.startsWith("backlog-custom-")) ? (
                 <BacklogCustomRunCards
                   fixture={consoleFixture}
