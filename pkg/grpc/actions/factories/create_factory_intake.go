@@ -122,8 +122,6 @@ func CreateFactoryIntake(
 		settings = defaultJiraIntakeSettings()
 	case models.FactoryIntakeSourceSentryExceptions:
 		settings = defaultSentryIntakeSettings()
-	case models.FactoryIntakeSourceProductiveTasks:
-		settings = defaultProductiveIntakeSettings()
 	case models.FactoryIntakeSourceDependabotAlerts:
 		settings = defaultDependabotIntakeSettings()
 	case models.FactoryIntakeSourceDatadog:

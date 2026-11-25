@@ -110,6 +110,7 @@ func TestAdminBuiltInAutomationCatalog(t *testing.T) {
 			assert.Empty(t, automation.LastResetBy)
 			assert.True(t, automation.LastResetAt.IsZero())
 		}
+		assert.NotContains(t, names, "intake:productive-tasks")
 		assert.Equal(t, "GitHub issues", names["intake:github-issues"])
 		assert.Equal(t, "Pull request discussion", names["pr-feedback:discussion"])
 		assert.Equal(t, "Pull request checks", names["pr-feedback:checks"])
@@ -124,6 +125,14 @@ func TestAdminBuiltInAutomationCatalog(t *testing.T) {
 		})
 		assert.Equal(t, http.StatusBadRequest, response.Code)
 		assert.Contains(t, response.Body.String(), "This automation is not built in.")
+	})
+
+	t.Run("admin cannot reset retired Productive intakes", func(t *testing.T) {
+		response := execRequest(server, requestParams{
+			method: "POST", path: "/admin/api/built-in-automations/reset",
+			body: []byte(`{"id":"intake:productive-tasks"}`), authCookie: token,
+		})
+		require.Equal(t, http.StatusBadRequest, response.Code)
 	})
 
 	t.Run("admin reset records who reset the automation and when", func(t *testing.T) {

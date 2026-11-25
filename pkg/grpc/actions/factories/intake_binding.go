@@ -13,7 +13,6 @@ import (
 
 const intakeGitHubAppName = "github"
 const intakeJiraAppName = "jira"
-const intakeProductiveAppName = "productive"
 const intakeSentryAppName = "sentry"
 const intakeDatadogAppName = "datadog"
 const intakeLinearAppName = "linear"
@@ -65,9 +64,6 @@ func resolveIntakeBinding(
 	resourceID string,
 	linearTeamID string,
 ) (*intakeBinding, error) {
-	if source == models.FactoryIntakeSourceProductiveTasks {
-		return resolveProductiveIntakeBinding(tx, factory, integrationID, resourceID)
-	}
 	if source == models.FactoryIntakeSourceSentryExceptions {
 		return resolveSentryIntakeBinding(tx, factory, integrationID, resourceID)
 	}
@@ -153,47 +149,6 @@ func resolveJiraIntakeBinding(
 			Name: integration.InstallationName,
 		},
 		Configuration: map[string]any{"project": projectKey},
-		Installation:  integration,
-	}, nil
-}
-
-func resolveProductiveIntakeBinding(
-	tx *gorm.DB,
-	factory *models.Factory,
-	integrationID string,
-	projectID string,
-) (*intakeBinding, error) {
-	integrationID = strings.TrimSpace(integrationID)
-	projectID = strings.TrimSpace(projectID)
-	if integrationID == "" && projectID == "" {
-		return nil, nil
-	}
-	if integrationID == "" || projectID == "" {
-		return nil, invalidArgument("Productive integration and project are required")
-	}
-
-	id, err := uuid.Parse(integrationID)
-	if err != nil {
-		return nil, invalidArgument("Productive integration is invalid")
-	}
-
-	integration, err := models.FindIntegrationInTransaction(tx, factory.OrganizationID, id)
-	if err != nil {
-		return nil, invalidArgument("Productive integration was not found")
-	}
-	if integration.AppName != intakeProductiveAppName {
-		return nil, invalidArgument("selected integration is not Productive")
-	}
-	if integration.State != models.IntegrationStateReady {
-		return nil, invalidArgument("Productive integration is not ready")
-	}
-
-	return &intakeBinding{
-		Integration: &yaml.IntegrationRef{
-			ID:   integration.ID.String(),
-			Name: integration.InstallationName,
-		},
-		Configuration: map[string]any{"project": projectID},
 		Installation:  integration,
 	}, nil
 }

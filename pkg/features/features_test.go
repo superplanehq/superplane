@@ -22,12 +22,9 @@ func Test__Get(t *testing.T) {
 		assert.Equal(t, FeatureFactories, f.ID)
 	})
 
-	t.Run("known id returns factory productive intake feature", func(t *testing.T) {
-		f, ok := Get(FeatureFactoryProductiveIntake)
-		assert.True(t, ok)
-		assert.Equal(t, FeatureFactoryProductiveIntake, f.ID)
-		assert.Equal(t, "Factory Productive Intake", f.Label)
-		assert.Equal(t, "Add Productive intake from the Backlog column menu", f.Description)
+	t.Run("retired Productive intake flag is absent", func(t *testing.T) {
+		_, ok := Get("factory_productive_intake")
+		assert.False(t, ok)
 	})
 
 	t.Run("known id returns factory datadog intake feature", func(t *testing.T) {
@@ -168,7 +165,7 @@ func Test__Get(t *testing.T) {
 func Test__Exists(t *testing.T) {
 	assert.True(t, Exists(FeatureFactories))
 	assert.True(t, Exists(FeatureFactories))
-	assert.True(t, Exists(FeatureFactoryProductiveIntake))
+	assert.False(t, Exists("factory_productive_intake"))
 	assert.True(t, Exists(FeatureFactoryDatadogIntake))
 	assert.True(t, Exists(FeatureOrganizationBYOK))
 	assert.True(t, Exists(FeatureOrganizationBYOKCustomProvider))

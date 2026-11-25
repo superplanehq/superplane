@@ -32,7 +32,7 @@ describe("AddIntakePicker", () => {
     await user.click(card);
     expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ id: "custom-verification" }));
   });
-  it("offers GitHub, Jira, Sentry, Productive.io, Datadog, and coming-soon Notion sources", () => {
+  it("offers GitHub, Jira, Sentry, Datadog, and coming-soon Notion sources", () => {
     renderPicker();
 
     const picker = screen.getByTestId("add-intake-picker");
@@ -43,7 +43,7 @@ describe("AddIntakePicker", () => {
     expect(within(picker).getByTestId("add-intake-template-github-issues")).toBeInTheDocument();
     expect(within(picker).getByTestId("add-intake-template-jira-issues")).toBeInTheDocument();
     expect(within(picker).getByTestId("add-intake-template-sentry-exceptions")).toBeInTheDocument();
-    expect(within(picker).getByTestId("add-intake-template-productive-tasks")).toBeInTheDocument();
+    expect(within(picker).queryByRole("button", { name: /Productive/ })).not.toBeInTheDocument();
     expect(within(picker).getByTestId("add-intake-template-datadog")).toBeInTheDocument();
     expect(within(picker).getByTestId("add-intake-template-notion")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
     expect(within(picker).queryByTestId("add-intake-template-pagerduty-incidents")).not.toBeInTheDocument();
