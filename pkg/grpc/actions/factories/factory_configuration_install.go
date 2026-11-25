@@ -59,16 +59,16 @@ func configurationBindingOverrides(binding, defaults factoryConfigurationBinding
 	return &result
 }
 
-func supplementFactoryConfigurationRecordSettings(tx *gorm.DB, automation *factoryConfigurationAutomationTarget) {
-	if automation.metadata.intake != nil {
+func supplementFactoryConfigurationRecordSettings(tx *gorm.DB, automation *factoryConfigurationAutomationTarget, metadata factoryConfigurationAutomationMetadata) {
+	if metadata.intake != nil {
 		settings, _ := automation.settings["intake"].(map[string]any)
-		settings["paused"] = automation.metadata.intake.Paused()
+		settings["paused"] = metadata.intake.Paused()
 		defaults, _ := automation.defaultSettings["intake"].(map[string]any)
 		defaults["paused"] = false
 	}
-	if automation.metadata.handler != nil && automation.templateID == prFeedbackChecksTemplateID {
+	if metadata.handler != nil && automation.templateID == prFeedbackChecksTemplateID {
 		settings, _ := automation.settings["pr_feedback"].(map[string]any)
-		settings["maximum_attempts"] = prFeedbackResetMaximumAttempts(automation.metadata.handler)
+		settings["maximum_attempts"] = prFeedbackResetMaximumAttempts(metadata.handler)
 		defaults, _ := automation.defaultSettings["pr_feedback"].(map[string]any)
 		defaults["maximum_attempts"] = prFeedbackDefaultMaximumAttempts
 		spec := models.LiveCanvasSpec{Nodes: automation.version.Nodes, Edges: automation.version.Edges}
@@ -385,15 +385,16 @@ func publishFactoryConfigurationBuiltIn(ctx context.Context, tx *gorm.DB, deps I
 			}
 		}
 	}
-	if current != nil && current.metadata.intake != nil && current.metadata.intake.Paused() != prepared.Paused {
-		if err := current.metadata.intake.SetPaused(tx, prepared.Paused); err != nil {
+	metadata := factoryConfigurationAutomationMetadata{}
+	if current != nil {
+		metadata = current.metadata.forFactory(target.factory)
+	}
+	if metadata.intake != nil && metadata.intake.Paused() != prepared.Paused {
+		if err := metadata.intake.SetPaused(tx, prepared.Paused); err != nil {
 			return nil, err
 		}
 	}
-	handler := (*models.FactoryPRFeedbackHandler)(nil)
-	if current != nil {
-		handler = current.metadata.handler
-	}
+	handler := metadata.handler
 	if current == nil && prepared.PRFeedbackSource != "" {
 		handler, err = target.factory.CreatePRFeedbackHandler(tx, canvas.ID, models.FactoryPRFeedbackHandlerSubjectGitHubPullRequest, prepared.PRFeedbackSource)
 		if err != nil {

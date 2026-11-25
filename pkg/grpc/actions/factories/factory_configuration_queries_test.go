@@ -18,6 +18,7 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/pkg/yaml"
 	"google.golang.org/protobuf/proto"
+	yamlv3 "gopkg.in/yaml.v3"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -30,7 +31,7 @@ type configurationQueryCountKey struct{}
 
 func countConfigurationQueries(ctx context.Context, run func(context.Context)) configurationQueryCounts {
 	counts := configurationQueryCounters{}
-	for _, category := range []string{"sources", "versions", "metadata", "ownership", "integrations", "policy", "secrets"} {
+	for _, category := range []string{"sources", "versions", "metadata", "ownership", "integrations", "policy", "secrets", "locks"} {
 		counts[category] = &atomic.Int64{}
 	}
 	run(context.WithValue(ctx, configurationQueryCountKey{}, counts))
@@ -47,6 +48,10 @@ func TestFactoryConfigurationBatchesSharedReads(t *testing.T) {
 	require.NoError(t, db.Callback().Query().After("gorm:query").Register(callback, func(tx *gorm.DB) {
 		counts, ok := tx.Statement.Context.Value(configurationQueryCountKey{}).(configurationQueryCounters)
 		if !ok {
+			return
+		}
+		if _, locking := tx.Statement.Clauses["FOR"]; locking {
+			counts["locks"].Add(1)
 			return
 		}
 		switch tx.Statement.Table {
@@ -223,6 +228,9 @@ func TestFactoryConfigurationBatchesSharedReads(t *testing.T) {
 						require.Positive(t, expected["secrets"])
 					}
 					for category, count := range expected {
+						if category == "locks" {
+							continue
+						}
 						assert.Equal(t, count, many[operation][category], "%s reads must not grow with unchanged automations", category)
 					}
 				})
@@ -257,6 +265,82 @@ func TestFactoryConfigurationBatchesSharedReads(t *testing.T) {
 					require.NotNil(t, agent)
 					assert.Equal(t, expectedModel, configString(agent.Configuration, "model"), "one document's override must not affect the next document")
 				}
+			}
+			measureOmissions := func(omitted int) map[string]configurationQueryCounts {
+				t.Helper()
+				saved := export(f.ctx)
+				desired := proto.Clone(saved).(*pb.FactoryConfigurationBundle)
+				var manifest factoryConfigurationManifest
+				require.NoError(t, yamlv3.Unmarshal([]byte(desired.Files[0].Content), &manifest))
+				removed := map[string]*models.Canvas{}
+				for i := range manifest.Stages {
+					retained := manifest.Stages[i].Automations[:0]
+					for _, automation := range manifest.Stages[i].Automations {
+						if strings.HasPrefix(automation.Uses, "@superplane/") || len(removed) == omitted {
+							retained = append(retained, automation)
+							continue
+						}
+						canvas, err := models.FindCanvasByName(db, f.r.Organization.ID, &f.factory.ID, automation.Name)
+						require.NoError(t, err)
+						removed[configurationAutomationPath(automation.Uses)] = canvas
+					}
+					manifest.Stages[i].Automations = retained
+				}
+				require.Len(t, removed, omitted)
+				content, err := yamlv3.Marshal(manifest)
+				require.NoError(t, err)
+				desired.Files[0].Content = string(content)
+				retainedFiles := desired.Files[:1]
+				for _, file := range desired.Files[1:] {
+					if removed[file.Path] == nil {
+						retainedFiles = append(retainedFiles, file)
+					}
+				}
+				desired.Files = retainedFiles
+				before := configurationResourceCounts(t)
+				runnerRevisions := configurationRevisionCount(t, f.canvas)
+				counts := map[string]configurationQueryCounts{}
+				var planned *pb.PlanFactoryConfigurationResponse
+				counts["omitted plan"] = countConfigurationQueries(f.ctx, func(ctx context.Context) {
+					planned = plan(ctx, desired)
+					require.Len(t, planned.Changes, omitted)
+				})
+				require.Equal(t, before, configurationResourceCounts(t), "planning omissions must not delete automations")
+				counts["omitted apply"] = countConfigurationQueries(f.ctx, func(ctx context.Context) {
+					result, err := ApplyFactoryConfiguration(ctx, testIntakeDependencies(f.r), f.r.Organization.ID.String(), &pb.ApplyFactoryConfigurationRequest{
+						FactoryId: f.factory.ID.String(), LineId: f.line.ID.String(), Bundle: desired, BaseStateToken: planned.BaseStateToken,
+					})
+					require.NoError(t, err)
+					require.True(t, result.Changed)
+				})
+				for _, canvas := range removed {
+					_, err := models.FindCanvasInTransaction(db, f.r.Organization.ID, canvas.ID)
+					require.ErrorIs(t, err, gorm.ErrRecordNotFound)
+					_, err = models.FindAutomationSourceByArtifact(db, f.r.Organization.ID, canvas.ID.String())
+					require.ErrorIs(t, err, gorm.ErrRecordNotFound)
+				}
+				require.Equal(t, before["automations_as_code"]-int64(omitted), configurationResourceCounts(t)["automations_as_code"])
+				require.Equal(t, runnerRevisions, configurationRevisionCount(t, f.canvas), "removing optional automations must retain the phase runner")
+				restored := plan(f.ctx, saved)
+				_, err = f.apply(saved, restored.BaseStateToken)
+				require.NoError(t, err)
+				return counts
+			}
+			singleOmission := measureOmissions(1)
+			manyOmissions := measureOmissions(5)
+			for operation, expected := range singleOmission {
+				t.Run(operation, func(t *testing.T) {
+					t.Logf("one omission: %v; five omissions: %v", expected, manyOmissions[operation])
+					for _, category := range []string{"sources", "versions", "metadata"} {
+						require.Positive(t, expected[category], "%s reads must be observed", category)
+					}
+					for category, count := range expected {
+						if category == "locks" {
+							continue
+						}
+						assert.Equal(t, count, manyOmissions[operation][category], "%s shared reads must not grow with omitted automations", category)
+					}
+				})
 			}
 		})
 	}

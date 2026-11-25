@@ -509,7 +509,7 @@ func validateFactoryConfigurationManifest(ctx context.Context, tx *gorm.DB, deps
 				continue
 			}
 			checkedRemovals[identity] = true
-			if err := validateFactoryConfigurationAutomationRemoval(tx, target, current); err != nil {
+			if err := validateFactoryConfigurationAutomationRemoval(target, current); err != nil {
 				return configurationDiagnostic(field, fmt.Sprintf("Cannot remove automation %q: %s", current.canvas.Name, err)), nil
 			}
 		}
