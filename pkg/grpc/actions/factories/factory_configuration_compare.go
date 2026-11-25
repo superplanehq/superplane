@@ -24,20 +24,33 @@ func configurationStagesByKey(target *factoryConfigurationTarget) map[string]*fa
 	return stages
 }
 
-func configurationAutomationByIdentity(stage *factoryConfigurationStageTarget, desired factoryConfigurationAutomation) *factoryConfigurationAutomationTarget {
+func configurationAutomationByStableIdentity(stage *factoryConfigurationStageTarget, id string) *factoryConfigurationAutomationTarget {
 	for _, current := range stage.automations {
-		if current.id == desired.ID {
+		if current.id == id {
 			return current
 		}
-		if current.templateID != "" && desired.ID == configurationAutomationKey(current)+"-"+configurationCanvasKey(current.canvas.ID) {
+		if current.templateID != "" && id == configurationAutomationKey(current)+"-"+configurationCanvasKey(current.canvas.ID) {
 			return current
 		}
-		if current.canvas.FactoryID != nil && current.sourceID == configurationAutomationSourceID(*current.canvas.FactoryID, configurationStagePlacement(stage), desired.ID) {
+		if current.canvas.FactoryID != nil && current.sourceID == configurationAutomationSourceID(*current.canvas.FactoryID, configurationStagePlacement(stage), id) {
 			return current
 		}
 	}
+	return nil
+}
+
+func configurationAutomationByIdentity(stage *factoryConfigurationStageTarget, desired factoryConfigurationAutomation, automations []factoryConfigurationAutomation) *factoryConfigurationAutomationTarget {
+	if current := configurationAutomationByStableIdentity(stage, desired.ID); current != nil {
+		return current
+	}
 	// Older manifests and new custom entries can use different IDs from export.
 	for _, current := range stage.automations {
+		// A filename or name must not take another entry's stable identity.
+		if slices.ContainsFunc(automations, func(automation factoryConfigurationAutomation) bool {
+			return configurationAutomationByStableIdentity(stage, automation.ID) == current
+		}) {
+			continue
+		}
 		if current.templateID == "" && current.uses == desired.Uses {
 			return current
 		}
@@ -108,7 +121,7 @@ func compareFactoryConfiguration(target *factoryConfigurationTarget, manifest *f
 		}
 		retained := map[string]bool{}
 		for j, automation := range stage.Automations {
-			current := configurationAutomationByIdentity(live, automation)
+			current := configurationAutomationByIdentity(live, automation, stage.Automations)
 			resource := "stages." + stage.Key + ".automations." + automation.ID
 			if current == nil {
 				changes = append(changes, configurationChange(resource, fmt.Sprintf("%s.automations[%d]", stagePath, j), nil, automation))

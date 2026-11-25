@@ -145,7 +145,7 @@ func ApplyFactoryConfiguration(ctx context.Context, deps IntakeDependencies, org
 			live := byKey[stage.Key]
 			for _, current := range live.automations {
 				retained := slices.ContainsFunc(stage.Automations, func(automation factoryConfigurationAutomation) bool {
-					return configurationAutomationByIdentity(live, automation) == current
+					return configurationAutomationByIdentity(live, automation, stage.Automations) == current
 				})
 				if retained || seen[current.canvas.ID] {
 					continue
@@ -161,7 +161,7 @@ func ApplyFactoryConfiguration(ctx context.Context, deps IntakeDependencies, org
 		for _, stage := range manifest.Stages {
 			live := byKey[stage.Key]
 			for _, automation := range stage.Automations {
-				current := configurationAutomationByIdentity(live, automation)
+				current := configurationAutomationByIdentity(live, automation, stage.Automations)
 				if current == nil {
 					source := manifest.Sources[configurationAutomationPath(automation.Uses)]
 					notify, err := createFactoryConfigurationCustom(ctx, tx, deps, target.factory, configurationStagePlacement(live), automation.ID, source, actor)

@@ -329,3 +329,43 @@ func TestFactoryConfigurationRollsBackAutomationMembershipChanges(t *testing.T) 
 		})
 	}
 }
+
+func TestFactoryConfigurationRestoresDeletedAutomationWithReusedFilename(t *testing.T) {
+	f := newConfigurationLifecycleFixture(t)
+	db := database.DB(t.Context())
+	bundle := f.export(t)
+	addConfigurationLifecycleAutomation(t, bundle, "inspect-first", "Inspect Task")
+	addConfigurationLifecycleAutomation(t, bundle, "inspect-second", "Inspect Task!")
+	plan := f.plan(t, bundle)
+	require.Empty(t, plan.Diagnostics)
+	_, err := f.apply(bundle, plan.BaseStateToken)
+	require.NoError(t, err)
+	first, err := models.FindCanvasByName(db, f.r.Organization.ID, &f.factory.ID, "Inspect Task")
+	require.NoError(t, err)
+	survivor, err := models.FindCanvasByName(db, f.r.Organization.ID, &f.factory.ID, "Inspect Task!")
+	require.NoError(t, err)
+	survivorVersion := survivor.LiveVersionID
+	exported, err := ExportFactoryConfiguration(f.ctx, f.r.Organization.ID.String(), &pb.ExportFactoryConfigurationRequest{FactoryId: f.factory.ID.String()})
+	require.NoError(t, err)
+	saved := exported.Bundle
+	_, err = DeleteFactoryAutomation(f.ctx, f.r.Organization.ID.String(), &pb.DeleteFactoryAutomationRequest{
+		FactoryId: f.factory.ID.String(), AutomationId: first.ID.String(),
+	})
+	require.NoError(t, err)
+	plan = f.plan(t, saved)
+	require.Empty(t, plan.Diagnostics)
+	require.Len(t, plan.Changes, 1)
+	result, err := f.apply(saved, plan.BaseStateToken)
+	require.NoError(t, err)
+	require.True(t, result.Changed)
+	restored, err := models.FindCanvasByName(db, f.r.Organization.ID, &f.factory.ID, "Inspect Task")
+	require.NoError(t, err)
+	require.NotEqual(t, first.ID, restored.ID)
+	current, err := models.FindCanvasInTransaction(db, f.r.Organization.ID, survivor.ID)
+	require.NoError(t, err)
+	require.Equal(t, "Inspect Task!", current.Name)
+	require.Equal(t, survivorVersion, current.LiveVersionID)
+	plan = f.plan(t, saved)
+	require.Empty(t, plan.Diagnostics)
+	require.Empty(t, plan.Changes)
+}

@@ -334,7 +334,7 @@ func validateFactoryConfigurationManifest(ctx context.Context, tx *gorm.DB, deps
 				return configurationDiagnostic(automationPath+".name", "Use each automation name once per stage without surrounding spaces."), nil
 			}
 			automationNames[automation.Name] = true
-			current := configurationAutomationByIdentity(live, *automation)
+			current := configurationAutomationByIdentity(live, *automation, stage.Automations)
 			identity := "new:" + stage.Key + "." + automation.ID
 			if current != nil {
 				identity = current.canvas.ID.String()

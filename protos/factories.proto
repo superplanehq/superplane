@@ -34,7 +34,7 @@ service Factories {
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Export all stages and automations";
-      description: "Returns a partial Factory configuration for one existing Implement automation. Accepts a workspace key or UUID.";
+      description: "Exports all stages and their automations for the selected workspace line. Applying this configuration deletes omitted automations except required phase runners. Accepts a workspace key or UUID.";
       tags: "Factory";
     };
   }
@@ -46,7 +46,7 @@ service Factories {
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Plan stage and automation configuration";
-      description: "Validates a partial Factory configuration and compares it with the selected live automation without writes.";
+      description: "Validates all stages and automations for the selected workspace line and compares them with live state without writes. The plan includes deletion of omitted automations except required phase runners.";
       tags: "Factory";
     };
   }
@@ -58,7 +58,7 @@ service Factories {
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Apply stage and automation configuration";
-      description: "Applies the captured partial configuration if its base-state token still matches the selected live automation.";
+      description: "Applies all stages and automations for the selected workspace line if its base-state token still matches live state. Deletes omitted automations except required phase runners.";
       tags: "Factory";
     };
   }
