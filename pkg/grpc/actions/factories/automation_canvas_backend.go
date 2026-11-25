@@ -138,6 +138,9 @@ func (b CanvasAutomationBackend) Remove(_ context.Context, tx *gorm.DB, placemen
 func (b CanvasAutomationBackend) compile(
 	tx *gorm.DB, placement automations.Placement, source *automationspec.Document, live *models.CanvasVersion, callerID uuid.UUID,
 ) ([]models.Node, []models.Edge, error) {
+	if err := validateAutomationCanvasPlacement(source, placement.Stage); err != nil {
+		return nil, nil, err
+	}
 	factory, err := models.FindFactory(tx, placement.OrganizationID, placement.FactoryID)
 	if err != nil {
 		return nil, nil, err
@@ -197,6 +200,13 @@ func (b CanvasAutomationBackend) compile(
 		}
 	}
 	return nodes, edges, nil
+}
+
+func validateAutomationCanvasPlacement(source *automationspec.Document, stage string) error {
+	if customAutomationUsesDispatch(stage) {
+		return automationspec.ValidateDispatch(source)
+	}
+	return automationspec.ValidateStage(source, automationspec.Stage(stage))
 }
 
 func lockCustomAutomationArtifact(
