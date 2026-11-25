@@ -31,6 +31,15 @@ func (o *FactoryWorkOrder) RecordRefinementRun(tx *gorm.DB, runID uuid.UUID) err
 	}).Error
 }
 
+func FindWorkOrderByRefinementRunID(tx *gorm.DB, runID uuid.UUID) (*FactoryWorkOrder, error) {
+	var order FactoryWorkOrder
+	err := tx.Model(&FactoryWorkOrder{}).
+		Joins("JOIN factory_work_order_refinement_runs ON factory_work_order_refinement_runs.work_order_id = factory_work_orders.id").
+		Where("factory_work_order_refinement_runs.run_id = ?", runID).
+		First(&order).Error
+	return &order, err
+}
+
 // LatestBacklogRefinementRun also finds runs rejected before a planning session
 // or durable task-run link exists.
 func (o *FactoryWorkOrder) LatestBacklogRefinementRun(tx *gorm.DB, canvasIDs []uuid.UUID) (*CanvasRun, error) {

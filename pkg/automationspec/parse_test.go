@@ -73,7 +73,7 @@ steps:
 
 func TestParseKeepsWebhookTriggers(t *testing.T) {
 	id := "1f0c3c55-4a8f-4a8e-9a43-2a7d8f6b6f10"
-	document, err := automationspec.Parse(definitionHeader + "triggers:\n  - use: webhook\n    config:\n      webhook_id: " + id + "\n" + bashStep)
+	document, err := automationspec.Parse(definitionHeader + "triggers:\n  - use: webhook\n    config:\n      webhook_id: " + id + "\n      task_match:\n        kind: pull_request\n        field_path: issue.pull_request.url\n" + bashStep)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -81,7 +81,7 @@ func TestParseKeepsWebhookTriggers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(normalized, "webhook_id: "+id) || strings.Contains(normalized, "cron") {
+	if !strings.Contains(normalized, "webhook_id: "+id) || !strings.Contains(normalized, "field_path: issue.pull_request.url") || strings.Contains(normalized, "cron") {
 		t.Fatalf("unexpected webhook trigger: %s", normalized)
 	}
 	if _, err := automationspec.Parse(normalized); err != nil {
