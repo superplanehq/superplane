@@ -25,7 +25,6 @@ name: Example workspace
 stages:
   - key: implementation
     name: Implement
-    kind: phase
     run: implement
     automations:
       - id: implement
@@ -139,7 +138,7 @@ func TestExportConfigurationProtectsLocalFiles(t *testing.T) {
 }
 
 func TestExportConfigurationRejectsInvalidResponsesBeforeOverwrite(t *testing.T) {
-	for _, scenario := range []string{"missing bundle", "missing coverage", "unsafe manifest", "unsafe file", "extra file", "missing content", "invalid YAML", "missing stages", "unknown field", "YAML alias"} {
+	for _, scenario := range []string{"missing bundle", "missing coverage", "unsafe manifest", "unsafe file", "extra file", "missing content", "invalid YAML", "missing stages", "unknown field", "stage kind", "zero concurrency", "YAML alias"} {
 		t.Run(scenario, func(t *testing.T) {
 			outputDir := t.TempDir()
 			require.NoError(t, os.Mkdir(filepath.Join(outputDir, ".superplane"), 0755))
@@ -167,6 +166,10 @@ func TestExportConfigurationRejectsInvalidResponsesBeforeOverwrite(t *testing.T)
 				files[0]["content"] = "apiVersion: v2\nkind: Factory\nname: Example workspace\n"
 			case "unknown field":
 				files[0]["content"] = configurationManifest + "unsupported: true\n"
+			case "stage kind":
+				files[0]["content"] = strings.Replace(configurationManifest, "name: Implement", "name: Implement\n    kind: phase", 1)
+			case "zero concurrency":
+				files[0]["content"] = strings.Replace(configurationManifest, "run: implement", "run: implement\n    max_parallelism: 0", 1)
 			case "YAML alias":
 				aliased := strings.ReplaceAll(configurationManifest, "name: Example workspace", "name: &workspace Example workspace")
 				files[0]["content"] = strings.ReplaceAll(aliased, "name: Implement", "name: *workspace")
@@ -252,18 +255,15 @@ func TestApplyConfigurationSubmitsCapturedPlanInput(t *testing.T) {
 func TestConfigurationRoundTripsCustomFilesAcrossStages(t *testing.T) {
 	manifest := configurationManifest + `  - key: custom-review
     name: Review changes
-    kind: custom
     automations:
       - id: review
         name: Review changes
         uses: automations/review.yaml
   - key: verify
     name: Verify
-    kind: verify
     automations: []
   - key: done
     name: Done
-    kind: done
     automations: []
 `
 	source := "apiVersion: v2\nkind: Automation\nname: Review changes\ntriggers:\n  - use: manual\nsteps:\n  - name: Review\n    prompt: Review the changes.\n"

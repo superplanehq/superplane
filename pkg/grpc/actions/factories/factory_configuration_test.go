@@ -177,6 +177,9 @@ func TestFactoryConfigurationRejectsUnsupportedManifestWithoutWrites(t *testing.
 	exported := f.export(t)
 	count := configurationRevisionCount(t, f.canvas)
 	for _, tc := range []struct{ name, from, to, field string }{
+		{"unsupported stage kind", "name: Build changes", "name: Build changes\n    kind: phase", "stages[1].kind"},
+		{"nonphase concurrency", "key: verify", "key: verify\n    max_parallelism: 2", "stages[2].max_parallelism"},
+		{"changed runner", "run: implement", "run: other", "stages[1].run"},
 		{"invalid YAML", "apiVersion: v2", "apiVersion: [", "$"},
 		{"unknown field", "kind: Factory", "kind: Factory\nunknown: true", "unknown"},
 		{"null instructions", "additional_instructions: Original instructions", "additional_instructions: null", "stages[1].automations[0].with.additional_instructions"},

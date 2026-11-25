@@ -12,7 +12,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// Only the server validates built-in aliases and settings. The CLI validates
+// Only the server validates live stage kinds, built-in aliases, and settings. The CLI validates
 // the bundle structure before reading references or replacing local files.
 func configurationManifestReferences(content string) ([]string, error) {
 	var manifest struct {
@@ -22,7 +22,6 @@ func configurationManifestReferences(content string) ([]string, error) {
 		Stages     []struct {
 			Key            string `yaml:"key"`
 			Name           string `yaml:"name"`
-			Kind           string `yaml:"kind"`
 			Run            string `yaml:"run"`
 			MaxParallelism *int   `yaml:"max_parallelism"`
 			Automations    []struct {
@@ -60,17 +59,8 @@ func configurationManifestReferences(content string) ([]string, error) {
 			return nil, fmt.Errorf("invalid Factory manifest: stages require unique keys, names, and an automations list")
 		}
 		seenStages[stage.Key] = true
-		switch stage.Kind {
-		case "backlog", "custom", "verify", "done":
-			if stage.Run != "" || stage.MaxParallelism != nil {
-				return nil, fmt.Errorf("invalid Factory manifest: only phase stages can contain run or max_parallelism")
-			}
-		case "phase":
-			if stage.Run == "" || (stage.MaxParallelism != nil && *stage.MaxParallelism < 1) {
-				return nil, fmt.Errorf("invalid Factory manifest: phases require run and positive max_parallelism when supplied")
-			}
-		default:
-			return nil, fmt.Errorf("invalid Factory manifest: unsupported stage kind %q", stage.Kind)
+		if stage.MaxParallelism != nil && *stage.MaxParallelism < 1 {
+			return nil, fmt.Errorf("invalid Factory manifest: max_parallelism must be positive")
 		}
 		seenAutomations := map[string]bool{}
 		for _, automation := range stage.Automations {

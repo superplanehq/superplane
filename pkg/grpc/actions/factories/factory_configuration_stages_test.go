@@ -39,10 +39,13 @@ func TestFactoryConfigurationIncludesEveryStageAndPhase(t *testing.T) {
 	var manifest factoryConfigurationManifest
 	require.NoError(t, yamlv3.Unmarshal([]byte(bundle.Files[0].Content), &manifest))
 	require.Len(t, manifest.Stages, 6)
-	require.Equal(t, []string{"backlog", "phase", "custom", "phase", "verify", "done"}, []string{
-		manifest.Stages[0].Kind, manifest.Stages[1].Kind, manifest.Stages[2].Kind,
-		manifest.Stages[3].Kind, manifest.Stages[4].Kind, manifest.Stages[5].Kind,
-	})
+	// Stage kinds are live state, not exported configuration.
+	var document map[string]any
+	require.NoError(t, yamlv3.Unmarshal([]byte(bundle.Files[0].Content), &document))
+	require.Equal(t, "Factory", document["kind"])
+	for _, stage := range document["stages"].([]any) {
+		require.NotContains(t, stage.(map[string]any), "kind")
+	}
 	require.Empty(t, manifest.Stages[2].Automations)
 	require.Len(t, manifest.Stages[5].Automations, 1)
 	require.Equal(t, "@superplane/pr-closure", manifest.Stages[5].Automations[0].Uses)
@@ -54,7 +57,7 @@ func TestFactoryConfigurationIncludesEveryStageAndPhase(t *testing.T) {
 	require.False(t, result.Changed)
 	require.Equal(t, before, configurationResourceCounts(t))
 
-	manifest.Stages[2].Name = "Security review"
+	manifest.Stages[2].Name = "Phase"
 	manifest.Stages[2], manifest.Stages[3] = manifest.Stages[3], manifest.Stages[2]
 	maxParallelism := 3
 	manifest.Stages[2].MaxParallelism = &maxParallelism
@@ -70,7 +73,8 @@ func TestFactoryConfigurationIncludesEveryStageAndPhase(t *testing.T) {
 	reloaded, err := f.factory.FindLine(db, f.line.ID)
 	require.NoError(t, err)
 	require.Equal(t, custom.ID, reloaded.Stages[3].ID)
-	require.Equal(t, "Security review", reloaded.Stages[3].Name)
+	require.Equal(t, models.FactoryLineStageCustom, reloaded.Stages[3].Kind)
+	require.Equal(t, "Phase", reloaded.Stages[3].Name)
 	require.Equal(t, 3, reloaded.Steps[1].EffectiveMaxParallelism())
 	require.Equal(t, before, configurationResourceCounts(t), "stage edits must not publish automation revisions")
 	require.Equal(t, *closure.LiveVersionID, resetTestLiveVersion(t, closure).ID)
@@ -94,4 +98,47 @@ func TestFactoryConfigurationTracksEveryAutomationRevision(t *testing.T) {
 	require.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
 	require.Equal(t, before, configurationResourceCounts(t))
 	require.Equal(t, "Original instructions", findIntakeNode(resetTestLiveVersion(t, f.canvas).Nodes, implementationAgentNodeID).Configuration["additionalInstructions"])
+}
+
+func TestFactoryConfigurationPreservesStageRestrictionsWithoutKinds(t *testing.T) {
+	f := newConfigurationFixture(t)
+	for _, tc := range []struct {
+		name   string
+		change func(*factoryConfigurationManifest)
+		field  string
+	}{
+		{"added stage", func(m *factoryConfigurationManifest) {
+			m.Stages = append(m.Stages, factoryConfigurationStage{Key: "new", Name: "New"})
+		}, "stages"},
+		{"removed stage", func(m *factoryConfigurationManifest) {
+			m.Stages = m.Stages[1:]
+		}, "stages"},
+		{"unknown key", func(m *factoryConfigurationManifest) {
+			m.Stages[1].Key = "unknown"
+		}, "stages[1].key"},
+		{"duplicate key", func(m *factoryConfigurationManifest) {
+			m.Stages[1].Key = m.Stages[0].Key
+		}, "stages[1].key"},
+		{"backlog moved", func(m *factoryConfigurationManifest) {
+			m.Stages[0], m.Stages[1] = m.Stages[1], m.Stages[0]
+		}, "stages[0]"},
+		{"done moved", func(m *factoryConfigurationManifest) {
+			last := len(m.Stages) - 1
+			m.Stages[last], m.Stages[last-1] = m.Stages[last-1], m.Stages[last]
+		}, "stages"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			bundle := f.export(t)
+			var manifest factoryConfigurationManifest
+			require.NoError(t, yamlv3.Unmarshal([]byte(bundle.Files[0].Content), &manifest))
+			tc.change(&manifest)
+			encoded, err := yamlv3.Marshal(manifest)
+			require.NoError(t, err)
+			bundle.Files[0].Content = string(encoded)
+			plan := f.plan(t, bundle)
+			require.Len(t, plan.Diagnostics, 1)
+			require.Equal(t, tc.field, plan.Diagnostics[0].Field)
+			require.Empty(t, plan.BaseStateToken)
+		})
+	}
 }

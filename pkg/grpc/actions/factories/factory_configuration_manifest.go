@@ -40,7 +40,6 @@ type factoryConfigurationManifest struct {
 type factoryConfigurationStage struct {
 	Key            string                           `yaml:"key"`
 	Name           string                           `yaml:"name"`
-	Kind           string                           `yaml:"kind"`
 	Run            string                           `yaml:"run,omitempty"`
 	MaxParallelism *int                             `yaml:"max_parallelism,omitempty"`
 	Automations    []factoryConfigurationAutomation `yaml:"automations"`
@@ -105,11 +104,11 @@ func parseFactoryConfigurationBundle(bundle *pb.FactoryConfigurationBundle) (*fa
 	}
 	for i, stage := range root["stages"].Content {
 		stagePath := fmt.Sprintf("stages[%d]", i)
-		fields, diagnostic := configurationFields(stage, stagePath, []string{"key", "name", "kind", "run", "max_parallelism", "automations"}, []string{"key", "name", "kind", "automations"})
+		fields, diagnostic := configurationFields(stage, stagePath, []string{"key", "name", "run", "max_parallelism", "automations"}, []string{"key", "name", "automations"})
 		if diagnostic != nil {
 			return nil, diagnostic
 		}
-		for _, field := range []string{"key", "name", "kind", "run"} {
+		for _, field := range []string{"key", "name", "run"} {
 			if fields[field] != nil {
 				if diagnostic := configurationStringNode(fields[field], configurationField(stagePath, field)); diagnostic != nil {
 					return nil, diagnostic
@@ -259,7 +258,7 @@ func configurationSourceDiagnostic(filePath string, err error) *pb.FactoryConfig
 func exportFactoryConfigurationManifest(target *factoryConfigurationTarget) factoryConfigurationManifest {
 	manifest := factoryConfigurationManifest{APIVersion: "v2", Kind: "Factory", Name: target.factory.Name, Stages: []factoryConfigurationStage{}, Sources: map[string]string{}, Definitions: map[string]automationspec.Definition{}}
 	for _, stage := range target.stages {
-		entry := factoryConfigurationStage{Key: stage.key, Name: stage.stage.Name, Kind: stage.stage.Kind, Run: stage.run, Automations: []factoryConfigurationAutomation{}}
+		entry := factoryConfigurationStage{Key: stage.key, Name: stage.stage.Name, Run: stage.run, Automations: []factoryConfigurationAutomation{}}
 		if stage.stage.StepIndex != nil {
 			entry.MaxParallelism = configurationMaxParallelism(target.line.Steps[*stage.stage.StepIndex].MaxParallelism)
 		}
@@ -311,13 +310,10 @@ func validateFactoryConfigurationManifest(ctx context.Context, tx *gorm.DB, deps
 			return configurationDiagnostic(stagePath+".name", "Use a unique stage name of 1 through 64 characters without surrounding spaces."), nil
 		}
 		names[strings.ToLower(stage.Name)] = true
-		if stage.Kind != live.stage.Kind {
-			return configurationDiagnostic(stagePath+".kind", "The existing stage kind cannot change."), nil
-		}
 		if stage.Run != live.run {
 			return configurationDiagnostic(stagePath+".run", "Keep the existing phase runner binding."), nil
 		}
-		if stage.Kind != models.FactoryLineStagePhase && stage.MaxParallelism != nil {
+		if live.stage.Kind != models.FactoryLineStagePhase && stage.MaxParallelism != nil {
 			return configurationDiagnostic(stagePath+".max_parallelism", "Only phases support max_parallelism."), nil
 		}
 		stage.MaxParallelism = configurationMaxParallelism(stage.MaxParallelism)
@@ -491,10 +487,10 @@ func validateFactoryConfigurationManifest(ctx context.Context, tx *gorm.DB, deps
 			}
 		}
 	}
-	if manifest.Stages[0].Kind != models.FactoryLineStageBacklog {
+	if byKey[manifest.Stages[0].Key].stage.Kind != models.FactoryLineStageBacklog {
 		return configurationDiagnostic("stages[0]", "Backlog must remain first."), nil
 	}
-	if manifest.Stages[len(manifest.Stages)-1].Kind != models.FactoryLineStageDone {
+	if byKey[manifest.Stages[len(manifest.Stages)-1].Key].stage.Kind != models.FactoryLineStageDone {
 		return configurationDiagnostic("stages", "Done must remain last."), nil
 	}
 	if factoryConfigurationStagesChanged(target, manifest) {
