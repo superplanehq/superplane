@@ -142,8 +142,8 @@ func TestScheduleAutomationCreatesATaskWithoutAnExistingTask(t *testing.T) {
 		disconnected bool
 		wantStatus   int
 	}{
-		{name: "API key workspace", wantStatus: http.StatusCreated},
 		{name: "subscription default owner", subscription: true, owner: r.User.String(), wantStatus: http.StatusCreated},
+		{name: "API key workspace", wantStatus: http.StatusCreated},
 		{name: "missing subscription default", subscription: true, wantStatus: http.StatusBadRequest},
 		{name: "invalid subscription default", subscription: true, owner: "invalid", wantStatus: http.StatusBadRequest},
 		{name: "disconnected subscription default", subscription: true, owner: r.User.String(), disconnected: true, wantStatus: http.StatusBadRequest},
@@ -157,6 +157,16 @@ func TestScheduleAutomationCreatesATaskWithoutAnExistingTask(t *testing.T) {
 				status = models.CodexConnectionStatusDisconnected
 			}
 			require.NoError(t, db.Model(connection).Update("status", status).Error)
+			var task *models.RunnerTask
+			if tc.subscription && tc.wantStatus == http.StatusCreated {
+				runnerTask := createSessionRunnerTask(t, r)
+				task = &runnerTask
+				require.NoError(t, db.Model(task).Update("state", models.RunnerTaskStateRunning).Error)
+				require.NoError(t, models.CreateNodeExecutionKVInTransaction(db, canvas.ID, "agent", execution.ID, "task_id", task.ID.String()))
+				_, err := models.ReserveFactoryCodexConnection(db, r.Organization.ID, factory.ID, run.ID, task.ID, time.Now(), r.Encryptor)
+				require.NoError(t, err)
+				require.NoError(t, task.RequireSubscriptionLeaseContinuation(db))
+			}
 			body, err := json.Marshal(map[string]string{"title": tc.name})
 			require.NoError(t, err)
 			rec := runnerRequest(t, server, http.MethodPost, token, "/api/v1/runner/tasks", string(body))
@@ -173,6 +183,7 @@ func TestScheduleAutomationCreatesATaskWithoutAnExistingTask(t *testing.T) {
 			require.NoError(t, err)
 			assert.Nil(t, order.CreatedByID)
 			if tc.subscription {
+				require.NoError(t, task.RequireSubscriptionLeaseContinuation(db), "creating a task must preserve credential refresh")
 				assert.Equal(t, []uuid.UUID{r.User}, order.AssigneeIDs())
 				return
 			}
