@@ -126,6 +126,7 @@ func TestAnonymousFactoryOrderRoutesStayUnauthorized(t *testing.T) {
 		"/app/templates",
 		r.AuthService,
 		false,
+		nil,
 	)
 	require.NoError(t, err)
 	registerTestGRPCGateway(t, server, r.AuthService, r.Registry, r.Encryptor, support.NewOIDCProvider())

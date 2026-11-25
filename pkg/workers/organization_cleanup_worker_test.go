@@ -4,11 +4,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
+	"gorm.io/datatypes"
 )
 
 func Test__CanvasCleanupWorker_GracePeriod(t *testing.T) {
@@ -115,5 +117,65 @@ func Test__OrganizationCleanupWorker_GracePeriod(t *testing.T) {
 		require.NoError(t, database.Conn().Unscoped().Model(&models.User{}).Where("organization_id = ?", r2.Organization.ID).Count(&userCount).Error)
 		assert.Equal(t, int64(0), userCount)
 
+	})
+
+	t.Run("cleans up an organization that has SSO identities", func(t *testing.T) {
+		r3 := support.Setup(t)
+		defer r3.Close()
+
+		canvasWorker := NewCanvasCleanupWorker()
+		worker := NewOrganizationCleanupWorker()
+		canvas, _ := support.CreateCanvas(t, r3.Organization.ID, r3.User, []models.CanvasNode{}, []models.Edge{})
+		now := time.Now()
+		connection := &models.SSOConnection{
+			ID:                   uuid.New(),
+			OrganizationID:       r3.Organization.ID,
+			Protocol:             models.SSOProtocolOIDC,
+			Preset:               models.SSOPresetOkta,
+			DisplayName:          "Okta",
+			Status:               models.SSOStatusActive,
+			Enforcement:          models.SSOEnforcementOptional,
+			AllowOwnerBypass:     true,
+			JITEnabled:           true,
+			DefaultRole:          models.RoleOrgOperator,
+			MaxSessionAgeSeconds: models.SSODefaultSessionAge,
+			Config:               datatypes.JSON(`{}`),
+			CreatedAt:            now,
+			UpdatedAt:            now,
+		}
+		require.NoError(t, database.Conn().Create(connection).Error)
+		require.NoError(t, database.Conn().Create(&models.OrganizationDomain{
+			OrganizationID: r3.Organization.ID, Domain: "cleanup.example", VerificationToken: "token",
+			CreatedAt: now, UpdatedAt: now,
+		}).Error)
+		require.NoError(t, database.Conn().Create(&models.SCIMToken{
+			ConnectionID: connection.ID, TokenHash: uuid.NewString(), Description: "Okta", CreatedAt: now,
+		}).Error)
+		subject := "subject-1"
+		userID := r3.User
+		require.NoError(t, database.Conn().Create(&models.SSOIdentity{
+			ConnectionID: connection.ID, OrganizationID: r3.Organization.ID, AccountID: r3.Account.ID,
+			UserID: &userID, Subject: &subject, Email: "ada@example.com", Active: true,
+			ProvisionedBy: models.SSOProvisionedByJIT, CreatedAt: now, UpdatedAt: now,
+		}).Error)
+
+		require.NoError(t, models.SoftDeleteOrganization(r3.Organization.ID.String()))
+		require.NoError(t, database.Conn().Unscoped().Model(&models.Organization{}).Where("id = ?", r3.Organization.ID).Update("deleted_at", time.Now().AddDate(0, 0, -31)).Error)
+		deletedCanvases, err := models.ListDeletedCanvases(database.Conn())
+		require.NoError(t, err)
+		require.Len(t, deletedCanvases, 1)
+		require.NoError(t, canvasWorker.LockAndProcessCanvas(deletedCanvases[0]))
+		deletedOrganizations, err := models.ListDeletedOrganizations()
+		require.NoError(t, err)
+		require.Len(t, deletedOrganizations, 1)
+		require.NoError(t, worker.LockAndProcessOrganization(deletedOrganizations[0]))
+
+		var organizationCount int64
+		require.NoError(t, database.Conn().Unscoped().Model(&models.Organization{}).Where("id = ?", r3.Organization.ID).Count(&organizationCount).Error)
+		assert.Equal(t, int64(0), organizationCount)
+
+		var canvasCount int64
+		require.NoError(t, database.Conn().Unscoped().Model(&models.Canvas{}).Where("id = ?", canvas.ID).Count(&canvasCount).Error)
+		assert.Equal(t, int64(0), canvasCount)
 	})
 }

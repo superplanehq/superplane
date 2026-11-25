@@ -17,6 +17,10 @@ const (
 	// FeatureAuditLogs is a defined Enterprise entitlement without a product
 	// implementation yet.
 	FeatureAuditLogs Feature = "audit_logs"
+
+	// FeatureSSO grants organization Single Sign-On and SCIM provisioning.
+	// The key is permanent.
+	FeatureSSO Feature = "sso"
 )
 
 // DevelopmentKeyID is the signing key of the ephemeral development license.
@@ -29,6 +33,7 @@ var recognizedFeatures = []Feature{
 	FeatureCustomRoles,
 	FeatureGitHubEnterprise,
 	FeatureGroups,
+	FeatureSSO,
 }
 
 // RecognizedFeatures returns every Enterprise feature that this SuperPlane

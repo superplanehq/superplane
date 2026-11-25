@@ -612,7 +612,9 @@ MODULES := \
 	admin/fleets, \
 	admin/keys, \
 	admin/organizations, \
-	admin/enterprise_features
+	admin/enterprise_features, \
+	admin/sso, \
+	sso
 REST_API_MODULES := \
 	authorization, \
 	organizations, \
@@ -633,7 +635,9 @@ REST_API_MODULES := \
 	admin/fleets, \
 	admin/keys, \
 	admin/organizations, \
-	admin/enterprise_features
+	admin/enterprise_features, \
+	admin/sso, \
+	sso
 
 pb.gen: dev.test.is.running
 	$(MAKE) pb.gen.go
@@ -720,6 +724,7 @@ image.build:
 	  --build-arg BASE_URL=$(BASE_URL) \
 	  --build-arg VITE_ASSET_BASE_URL=$(VITE_ASSET_BASE_URL) \
 	  --build-arg FRONTEND_PREBUILT=$(FRONTEND_PREBUILT) \
+	  --build-arg GO_BUILD_TAGS=$(GO_BUILD_TAGS) \
 	  --progress plain -t $(IMAGE):$(IMAGE_TAG) .
 
 # CI builds in the app container so Go can use its mounted caches directly.

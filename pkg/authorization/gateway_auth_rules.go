@@ -1223,5 +1223,70 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			Action:     "update",
 			DomainType: models.DomainTypeOrganization,
 		},
+		{Method: "GET", Pattern: "/api/v1/sso/connection"}: {
+			Resource:   "sso",
+			Action:     "read",
+			DomainType: models.DomainTypeOrganization,
+		},
+		{Method: "PUT", Pattern: "/api/v1/sso/connection"}: {
+			Resource:                "sso",
+			Action:                  "update",
+			DomainType:              models.DomainTypeOrganization,
+			RequiredLicenseFeatures: []licensing.Feature{licensing.FeatureSSO},
+		},
+		{Method: "POST", Pattern: "/api/v1/sso/connection/activate"}: {
+			Resource:                "sso",
+			Action:                  "update",
+			DomainType:              models.DomainTypeOrganization,
+			RequiredLicenseFeatures: []licensing.Feature{licensing.FeatureSSO},
+		},
+		{Method: "POST", Pattern: "/api/v1/sso/connection/disable"}: {
+			Resource:   "sso",
+			Action:     "update",
+			DomainType: models.DomainTypeOrganization,
+		},
+		{Method: "DELETE", Pattern: "/api/v1/sso/connection"}: {
+			Resource:   "sso",
+			Action:     "update",
+			DomainType: models.DomainTypeOrganization,
+		},
+		{Method: "GET", Pattern: "/api/v1/sso/domains"}: {
+			Resource:   "sso",
+			Action:     "read",
+			DomainType: models.DomainTypeOrganization,
+		},
+		{Method: "POST", Pattern: "/api/v1/sso/domains"}: {
+			Resource:                "sso",
+			Action:                  "update",
+			DomainType:              models.DomainTypeOrganization,
+			RequiredLicenseFeatures: []licensing.Feature{licensing.FeatureSSO},
+		},
+		{Method: "POST", Pattern: "/api/v1/sso/domains/{id}/verify"}: {
+			Resource:                "sso",
+			Action:                  "update",
+			DomainType:              models.DomainTypeOrganization,
+			RequiredLicenseFeatures: []licensing.Feature{licensing.FeatureSSO},
+		},
+		{Method: "DELETE", Pattern: "/api/v1/sso/domains/{id}"}: {
+			Resource:   "sso",
+			Action:     "update",
+			DomainType: models.DomainTypeOrganization,
+		},
+		{Method: "GET", Pattern: "/api/v1/sso/scim-tokens"}: {
+			Resource:   "sso",
+			Action:     "read",
+			DomainType: models.DomainTypeOrganization,
+		},
+		{Method: "POST", Pattern: "/api/v1/sso/scim-tokens"}: {
+			Resource:                "sso",
+			Action:                  "update",
+			DomainType:              models.DomainTypeOrganization,
+			RequiredLicenseFeatures: []licensing.Feature{licensing.FeatureSSO},
+		},
+		{Method: "DELETE", Pattern: "/api/v1/sso/scim-tokens/{id}"}: {
+			Resource:   "sso",
+			Action:     "update",
+			DomainType: models.DomainTypeOrganization,
+		},
 	}
 }
