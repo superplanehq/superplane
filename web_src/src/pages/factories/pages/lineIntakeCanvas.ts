@@ -73,6 +73,13 @@ const INTAKE_CANVAS_BY_SOURCE: Record<LineIntakeSourceId, IntakeCanvasSpec> = {
     createDescription: "{{ root().data.data.description }}",
     title: "Linear issue intake",
   },
+  webhook: {
+    triggerComponent: "onWebhook",
+    triggerName: "On Workspace Webhook",
+    createTitle: '{{ root().data.body?.["title"] }}',
+    createDescription: '{{ root().data.body?.["description"] }}',
+    title: "Webhook intake",
+  },
 };
 
 export function intakeCanvasForSource(source: LineIntakeSource): SplitRunCanvasModel {

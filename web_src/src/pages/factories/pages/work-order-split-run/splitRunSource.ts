@@ -11,6 +11,7 @@ import pagerdutyIcon from "@/assets/icons/integrations/pagerduty.svg";
 import productiveIcon from "@/assets/icons/integrations/productive.svg";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
 import slackIcon from "@/assets/icons/integrations/slack.svg";
+import webhookIcon from "@/assets/icons/webhook.svg";
 import superplaneMark from "@/assets/superplane-mark.svg";
 import { isGitHubWebHostname } from "@/lib/githubHost";
 import {
@@ -36,6 +37,7 @@ export type SplitRunIntakeKind =
   | "productive-tasks"
   | "datadog"
   | "linear-issues"
+  | "webhook"
   | "slack";
 
 export type SplitRunAddedBy =
@@ -112,6 +114,7 @@ export const INTAKE_PRESENTATION: Record<SplitRunIntakeKind, { name: string; ico
   "productive-tasks": { name: "Productive tasks", iconSrc: productiveIcon, iconAlt: "Productive" },
   datadog: { name: "Datadog errors", iconSrc: datadogIcon, iconAlt: "Datadog" },
   "linear-issues": { name: "Linear", iconSrc: linearIcon, iconAlt: "Linear" },
+  webhook: { name: "Webhook", iconSrc: webhookIcon, iconAlt: "Webhook" },
   slack: { name: "Slack", iconSrc: slackIcon, iconAlt: "Slack" },
 };
 
@@ -128,6 +131,7 @@ const INTAKE_KIND_HINTS: Array<{ pattern: RegExp; kind: SplitRunIntakeKind }> = 
   { pattern: /pagerduty/i, kind: "pagerduty-incidents" },
   { pattern: /datadog|ddog-gov\.com/i, kind: "datadog" },
   { pattern: /linear/i, kind: "linear-issues" },
+  { pattern: /webhook/i, kind: "webhook" },
 ];
 
 export function sourceTicketLabel(url: string): string {
@@ -186,10 +190,12 @@ function creatorRunForOrder(order: FactoriesWorkOrder): SplitRunRunRef | undefin
 
 function splitRunSourceWithoutRun(order: FactoriesWorkOrder, resolveUser?: OrgUserDisplayLookup): SplitRunSourceKind {
   const originHref = order.origin?.url?.trim();
+  const automation = order.createdBy?.automation;
   if (originHref) {
+    // A link on a host that names no source shows the automation that made the task.
     const source = intakeSourceFromHref(
       originHref,
-      intakeKindFromHref(originHref),
+      knownIntakeKindFromHref(originHref) ?? (automation ? intakeKindForAutomation(automation) : "github-issues"),
       order.origin?.label?.trim() || sourceTicketLabel(originHref),
     );
     return { ...source, addedBy: addedByForIntakeOrder(order, source.name) };
@@ -201,7 +207,6 @@ function splitRunSourceWithoutRun(order: FactoriesWorkOrder, resolveUser?: OrgUs
     return { ...source, addedBy: addedByForIntakeOrder(order, source.name) };
   }
 
-  const automation = order.createdBy?.automation;
   if (automation) {
     return sourceForAutomation(automation);
   }
@@ -311,10 +316,6 @@ function intakeKindForAutomation(automation: FactoriesAutomationRef): SplitRunIn
   return key === "intake" ? "github-issues" : undefined;
 }
 
-function intakeKindFromLabel(label: string): SplitRunIntakeKind {
-  return INTAKE_KIND_HINTS.find((hint) => hint.pattern.test(label))?.kind ?? "github-issues";
-}
-
 function intakeSourceFromKind(intakeKind: SplitRunIntakeKind): SplitRunIntakeSource {
   return {
     kind: "intake",
@@ -323,6 +324,10 @@ function intakeSourceFromKind(intakeKind: SplitRunIntakeKind): SplitRunIntakeSou
 }
 
 function intakeKindFromHref(href: string): SplitRunIntakeKind {
+  return knownIntakeKindFromHref(href) ?? "github-issues";
+}
+
+function knownIntakeKindFromHref(href: string): SplitRunIntakeKind | undefined {
   const parsed = parseUrl(href);
   const host = parsed?.hostname ?? "";
   if (host === "bitbucket.org") {
@@ -343,7 +348,11 @@ function intakeKindFromHref(href: string): SplitRunIntakeKind {
   if (isGitHubDependabotAlertHref(parsed)) {
     return "dependabot-alerts";
   }
-  return intakeKindFromLabel(host);
+  const hinted = INTAKE_KIND_HINTS.find((hint) => hint.pattern.test(host))?.kind;
+  if (hinted) {
+    return hinted;
+  }
+  return isGitHubWebHostname(host) ? "github-issues" : undefined;
 }
 
 function isGitHubDependabotAlertHref(parsed: URL | undefined): boolean {
