@@ -105,6 +105,10 @@ func (w *Webhook) HasExceededRetries() bool {
 	return w.RetryCount >= w.MaxRetries
 }
 
+func (w *Webhook) HardDelete(tx *gorm.DB) error {
+	return tx.Unscoped().Delete(w).Error
+}
+
 // UpdateConfiguration stores a new configuration and leaves the state unchanged.
 func (w *Webhook) UpdateConfiguration(tx *gorm.DB, configuration any) error {
 	if w == nil || w.ID == uuid.Nil {

@@ -115,13 +115,18 @@ func (w *WebhookCleanupWorker) processWebhook(tx *gorm.DB, logger *log.Entry, we
 		return w.processAppInstallationWebhook(tx, logger, webhook)
 	}
 
-	return tx.Unscoped().Delete(webhook).Error
+	return webhook.HardDelete(tx)
 }
 
 func (w *WebhookCleanupWorker) processAppInstallationWebhook(tx *gorm.DB, logger *log.Entry, webhook *models.Webhook) error {
 	instance, err := models.FindMaybeDeletedIntegrationInTransaction(tx, *webhook.AppInstallationID)
 	if err != nil {
 		return err
+	}
+
+	// Productive was removed, so its remote cleanup handler cannot run again.
+	if instance.AppName == "productive" {
+		return webhook.HardDelete(tx)
 	}
 
 	handler, err := w.registry.GetWebhookHandler(instance.AppName)
@@ -150,5 +155,5 @@ func (w *WebhookCleanupWorker) processAppInstallationWebhook(tx *gorm.DB, logger
 		return persistErr
 	}
 
-	return tx.Unscoped().Delete(webhook).Error
+	return webhook.HardDelete(tx)
 }
