@@ -1,0 +1,228 @@
+syntax = "proto3";
+
+package Superplane.SSO;
+
+import "google/api/annotations.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+import "protoc-gen-openapiv2/options/annotations.proto";
+
+option go_package = "github.com/superplanehq/superplane/pkg/protos/sso";
+
+option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
+  info: {
+    title: "SuperPlane Single Sign-On API";
+    version: "1.0";
+    description: "Organization Single Sign-On settings";
+  };
+  schemes: HTTPS;
+  schemes: HTTP;
+  consumes: "application/json";
+  produces: "application/json";
+};
+
+service SSO {
+  rpc GetConnection(google.protobuf.Empty) returns (GetConnectionResponse) {
+    option (google.api.http) = {get: "/api/v1/sso/connection"};
+  }
+
+  rpc PutConnection(PutConnectionRequest) returns (ConnectionResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/sso/connection"
+      body: "*"
+    };
+  }
+
+  rpc ActivateConnection(google.protobuf.Empty) returns (ConnectionResponse) {
+    option (google.api.http) = {post: "/api/v1/sso/connection/activate"};
+  }
+
+  rpc DisableConnection(google.protobuf.Empty) returns (ConnectionResponse) {
+    option (google.api.http) = {post: "/api/v1/sso/connection/disable"};
+  }
+
+  rpc DeleteConnection(google.protobuf.Empty) returns (google.protobuf.Empty) {
+    option (google.api.http) = {delete: "/api/v1/sso/connection"};
+  }
+
+  rpc ListDomains(google.protobuf.Empty) returns (ListDomainsResponse) {
+    option (google.api.http) = {get: "/api/v1/sso/domains"};
+  }
+
+  rpc CreateDomain(CreateDomainRequest) returns (DomainResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/sso/domains"
+      body: "*"
+    };
+  }
+
+  rpc VerifyDomain(VerifyDomainRequest) returns (DomainResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/sso/domains/{id}/verify"
+      body: "*"
+    };
+  }
+
+  rpc DeleteDomain(DeleteDomainRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {delete: "/api/v1/sso/domains/{id}"};
+  }
+
+  rpc ListSCIMTokens(google.protobuf.Empty) returns (ListSCIMTokensResponse) {
+    option (google.api.http) = {get: "/api/v1/sso/scim-tokens"};
+  }
+
+  rpc CreateSCIMToken(CreateSCIMTokenRequest) returns (CreateSCIMTokenResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/sso/scim-tokens"
+      body: "*"
+    };
+  }
+
+  rpc RevokeSCIMToken(RevokeSCIMTokenRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {delete: "/api/v1/sso/scim-tokens/{id}"};
+  }
+}
+
+enum Protocol {
+  PROTOCOL_UNSPECIFIED = 0;
+  PROTOCOL_OIDC = 1;
+}
+
+enum Preset {
+  PRESET_UNSPECIFIED = 0;
+  PRESET_GENERIC = 1;
+  PRESET_OKTA = 2;
+  PRESET_ENTRA = 3;
+}
+
+enum Status {
+  STATUS_UNSPECIFIED = 0;
+  STATUS_DRAFT = 1;
+  STATUS_ACTIVE = 2;
+  STATUS_DISABLED = 3;
+}
+
+enum Enforcement {
+  ENFORCEMENT_UNSPECIFIED = 0;
+  ENFORCEMENT_OPTIONAL = 1;
+  ENFORCEMENT_REQUIRED = 2;
+}
+
+message TestResult {
+  bool ok = 1;
+  string error = 2;
+  string subject = 3;
+  string email = 4;
+  string name = 5;
+}
+
+message Connection {
+  string id = 1;
+  string organization_id = 2;
+  Protocol protocol = 3;
+  Preset preset = 4;
+  string display_name = 5;
+  Status status = 6;
+  Enforcement enforcement = 7;
+  bool allow_owner_bypass = 8;
+  bool jit_enabled = 9;
+  string default_role = 10;
+  int32 max_session_age_seconds = 11;
+  bool idp_logout_enabled = 12;
+  string issuer = 13;
+  string client_id = 14;
+  repeated string scopes = 15;
+  string subject_claim = 16;
+  string email_claim = 17;
+  string name_claim = 18;
+  bool client_secret_set = 19;
+  google.protobuf.Timestamp last_tested_at = 20;
+  TestResult last_test = 21;
+  string redirect_uri = 22;
+  string initiate_login_uri = 23;
+  string post_logout_redirect_uri = 24;
+  string back_channel_logout_uri = 25;
+  string scim_base_url = 26;
+  string global_token_revocation_uri = 27;
+}
+
+message GetConnectionResponse {
+  bool exists = 1;
+  Connection connection = 2;
+}
+
+message ConnectionResponse {
+  Connection connection = 1;
+}
+
+message PutConnectionRequest {
+  Preset preset = 1;
+  string display_name = 2;
+  string issuer = 3;
+  string client_id = 4;
+  string client_secret = 5;
+  repeated string scopes = 6;
+  string subject_claim = 7;
+  string email_claim = 8;
+  string name_claim = 9;
+  bool jit_enabled = 10;
+  string default_role = 11;
+  Enforcement enforcement = 12;
+  bool allow_owner_bypass = 13;
+  int32 max_session_age_seconds = 14;
+  bool idp_logout_enabled = 15;
+}
+
+message Domain {
+  string id = 1;
+  string domain = 2;
+  string verification_token = 3;
+  string txt_name = 4;
+  string txt_value = 5;
+  google.protobuf.Timestamp verified_at = 6;
+  string verification_method = 7;
+}
+
+message ListDomainsResponse {
+  repeated Domain domains = 1;
+}
+
+message DomainResponse {
+  Domain domain = 1;
+}
+
+message CreateDomainRequest {
+  string domain = 1;
+}
+
+message VerifyDomainRequest {
+  string id = 1;
+}
+
+message DeleteDomainRequest {
+  string id = 1;
+}
+
+message SCIMToken {
+  string id = 1;
+  string description = 2;
+  google.protobuf.Timestamp created_at = 3;
+  google.protobuf.Timestamp last_used_at = 4;
+}
+
+message ListSCIMTokensResponse {
+  repeated SCIMToken tokens = 1;
+}
+
+message CreateSCIMTokenRequest {
+  string description = 1;
+}
+
+message CreateSCIMTokenResponse {
+  SCIMToken token = 1;
+  string secret = 2;
+}
+
+message RevokeSCIMTokenRequest {
+  string id = 1;
+}

@@ -12,6 +12,7 @@ import { useOrganization } from "../../../hooks/useOrganizationData";
 import { useAccount } from "../../../contexts/useAccount";
 import { useParams } from "react-router";
 import { Members } from "./Members";
+import { SsoSettingsScreen } from "@/pages/factories/pages/settings/sso/FactorySettingsSsoPage";
 import { Integrations } from "./Integrations";
 import { Secrets } from "./Secrets";
 import { SecretDetail } from "./SecretDetail";
@@ -126,6 +127,7 @@ export function OrganizationSettings() {
     "profile",
     "general",
     "members",
+    "sso",
     "groups",
     "roles",
     "integrations",
@@ -186,6 +188,13 @@ export function OrganizationSettings() {
       href: `/${organizationId}/settings/members`,
       Icon: UserIcon,
       permission: { resource: "members", action: "read" },
+    },
+    {
+      id: "sso",
+      label: "Single Sign-On",
+      href: `/${organizationId}/settings/sso`,
+      Icon: Shield,
+      permission: { resource: "sso", action: "read" },
     },
     {
       id: "api-keys",
@@ -269,6 +278,10 @@ export function OrganizationSettings() {
     members: {
       title: "Members",
       description: "Invite people and manage who has access to this organization.",
+    },
+    sso: {
+      title: "Single Sign-On",
+      description: "Connect one identity provider for this organization.",
     },
     groups: {
       title: "Groups",
@@ -474,6 +487,14 @@ export function OrganizationSettings() {
               element={
                 <RequirePermission resource="members" action="read">
                   <Members organizationId={organizationId || ""} />
+                </RequirePermission>
+              }
+            />
+            <Route
+              path="sso"
+              element={
+                <RequirePermission resource="sso" action="read">
+                  <SsoSettingsScreen organizationId={organizationId || ""} />
                 </RequirePermission>
               }
             />
