@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -16,6 +17,11 @@ import (
 
 const OnWebhookTriggerName = "onWebhook"
 const OnWebhookPayloadType = "webhook"
+
+// taskWebhookRetryWindow groups header-less retries of one body. A later
+// request in the next window can start again. Senders that set a delivery
+// id do not use this window.
+const taskWebhookRetryWindow = 15 * time.Minute
 
 func init() {
 	registry.RegisterTrigger(OnWebhookTriggerName, &OnWebhook{})
@@ -131,15 +137,12 @@ func (t *OnWebhook) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.We
 	if err != nil {
 		return http.StatusInternalServerError, nil, fmt.Errorf("error finding tasks: %v", err)
 	}
-	deliveryKey := fmt.Sprintf("%x", sha256.Sum256(ctx.Body))
+	deliveryKey := taskWebhookDeliveryKey(ctx.Headers, ctx.Body, time.Now())
 	events, ok := ctx.Events.(core.DeduplicatedEventContext)
 	if !ok {
 		return http.StatusInternalServerError, nil, fmt.Errorf("task webhook deduplication is not available")
 	}
-	for index, order := range orders {
-		if index == 25 {
-			break
-		}
+	for _, order := range orders {
 		orderID, _ := order["id"].(string)
 		payload["workOrder"] = order
 		if err := events.EmitDeduplicated(OnWebhookPayloadType, payload, deliveryKey+"|"+orderID); err != nil {
@@ -147,6 +150,16 @@ func (t *OnWebhook) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.We
 		}
 	}
 	return http.StatusOK, nil, nil
+}
+
+func taskWebhookDeliveryKey(headers http.Header, body []byte, now time.Time) string {
+	for _, name := range []string{"X-GitHub-Delivery", "Webhook-Id", "Idempotency-Key"} {
+		if id := strings.TrimSpace(headers.Get(name)); id != "" {
+			return id
+		}
+	}
+	window := now.UTC().Truncate(taskWebhookRetryWindow).Unix()
+	return fmt.Sprintf("%x|%d", sha256.Sum256(body), window)
 }
 
 func nestedWebhookString(body any, fieldPath string) string {

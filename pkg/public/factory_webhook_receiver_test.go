@@ -159,6 +159,39 @@ func Test__HandleWebhook_TaskMatchRunsOncePerMatchedTask(t *testing.T) {
 	require.Equal(t, http.StatusOK, post(body))
 	assert.ElementsMatch(t, []string{draft.ID.String(), secondDraft.ID.String()}, workOrderIDs(commitCanvas))
 
+	postDelivery := func(deliveryID string) int {
+		return execRequest(server, requestParams{
+			method: "POST", path: "/webhooks/" + webhookID.String(), body: []byte(body), authToken: secret,
+			headers: map[string]string{"Webhook-Id": deliveryID},
+		}).Code
+	}
+	require.Equal(t, http.StatusOK, postDelivery("delivery-1"))
+	require.Equal(t, http.StatusOK, postDelivery("delivery-1"))
+	firstDelivery := append([]string{draft.ID.String(), secondDraft.ID.String()}, draft.ID.String(), secondDraft.ID.String())
+	assert.ElementsMatch(t, firstDelivery, workOrderIDs(commitCanvas))
+	require.Equal(t, http.StatusOK, postDelivery("delivery-2"))
+	secondDelivery := append(firstDelivery, draft.ID.String(), secondDraft.ID.String())
+	assert.ElementsMatch(t, secondDelivery, workOrderIDs(commitCanvas))
+
+	extra := make([]string, 0, 24)
+	for number := 0; number < 24; number++ {
+		order, err := factory.CreateWorkOrder(db, fmt.Sprintf("Draft %d", number), "", &r.User, nil, nil)
+		require.NoError(t, err)
+		pullRequest, err := order.CreatePullRequest(db, models.FactoryPullRequestParams{
+			URL: fmt.Sprintf("https://github.com/acme/app/pull/%d", 100+number),
+		})
+		require.NoError(t, err)
+		require.NoError(t, pullRequest.SetMergeability(db, models.FactoryPullRequestMergeabilitySnapshot{HeadSHA: sha, Mergeable: true}))
+		extra = append(extra, order.ID.String())
+	}
+	require.Equal(t, http.StatusOK, postDelivery("delivery-3"))
+	allOrders := append(append([]string{}, draft.ID.String(), secondDraft.ID.String()), extra...)
+	got := workOrderIDs(commitCanvas)
+	for _, id := range allOrders {
+		assert.Contains(t, got, id)
+	}
+	assert.Equal(t, len(secondDelivery)+len(allOrders), len(got))
+
 	require.Equal(t, http.StatusOK, post(`{"task":{"number":`+fmt.Sprint(draft.Number)+`}}`))
 	assert.Equal(t, []string{draft.ID.String()}, workOrderIDs(taskCanvas))
 	require.Equal(t, http.StatusOK, post(`{"task":{"number":`+fmt.Sprint(open.Number)+`}}`))
