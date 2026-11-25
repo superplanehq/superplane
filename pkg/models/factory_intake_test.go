@@ -80,6 +80,7 @@ func Test__FactoryIntake(t *testing.T) {
 			models.FactoryIntakeSourceDependabotAlerts,
 			models.FactoryIntakeSourceDatadog,
 			models.FactoryIntakeSourceLinearIssues,
+			models.FactoryIntakeSourceWebhook,
 		} {
 			assert.True(t, models.ValidFactoryIntakeSource(source))
 

@@ -331,6 +331,8 @@ func serializeFactoryIntakeSource(source string) pb.FactoryIntake_Source {
 		return pb.FactoryIntake_SOURCE_DATADOG
 	case models.FactoryIntakeSourceLinearIssues:
 		return pb.FactoryIntake_SOURCE_LINEAR_ISSUES
+	case models.FactoryIntakeSourceWebhook:
+		return pb.FactoryIntake_SOURCE_WEBHOOK
 	default:
 		return pb.FactoryIntake_SOURCE_UNSPECIFIED
 	}
@@ -352,6 +354,8 @@ func parseFactoryIntakeSource(source pb.FactoryIntake_Source) (string, error) {
 		return models.FactoryIntakeSourceDatadog, nil
 	case pb.FactoryIntake_SOURCE_LINEAR_ISSUES:
 		return models.FactoryIntakeSourceLinearIssues, nil
+	case pb.FactoryIntake_SOURCE_WEBHOOK:
+		return models.FactoryIntakeSourceWebhook, nil
 	default:
 		return "", invalidArgument("intake source is required")
 	}

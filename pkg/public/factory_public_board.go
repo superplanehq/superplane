@@ -972,6 +972,8 @@ func intakeSourceName(source string) string {
 		return "Dependabot alerts"
 	case models.FactoryIntakeSourceDatadog:
 		return "Datadog errors"
+	case models.FactoryIntakeSourceWebhook:
+		return "Webhook"
 	default:
 		return ""
 	}

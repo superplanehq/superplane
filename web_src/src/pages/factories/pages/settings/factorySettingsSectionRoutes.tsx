@@ -46,6 +46,7 @@ import { BillingProductSettingsRoute } from "@/pages/factories/pages/settings/Bi
 import { LegacyAgentResourcesRedirect } from "@/pages/factories/pages/settings/LegacyAgentResourcesRedirect";
 import { FactorySettingsIndexRoute } from "@/pages/factories/pages/settings/MobileSettingsIndexPage";
 import { FactorySettingsAccountCodexUsagePage } from "./FactorySettingsAccountCodexUsagePage";
+import { FactorySettingsWebhooksPage } from "./FactorySettingsWebhooksPage";
 import { LegacyRepositorySettingsRoute } from "./LegacyRepositorySettingsRoute";
 
 export const factorySettingsSectionRoutes = [
@@ -151,6 +152,15 @@ export const factorySettingsSectionRoutes = [
         <RequireExperimentalFeature featureId={FEATURE_SUPERPLANE_MCP_SERVER}>
           <FactorySettingsConnectPage />
         </RequireExperimentalFeature>
+      </RequirePermission>
+    }
+  />,
+  <Route
+    key="factory-settings-workspace-webhooks"
+    path="workspace/webhooks"
+    element={
+      <RequirePermission resource="factories" action="read">
+        <FactorySettingsWebhooksPage />
       </RequirePermission>
     }
   />,

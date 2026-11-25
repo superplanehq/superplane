@@ -72,6 +72,9 @@ func (g intakeGraph) TriggerResourceID(spec models.LiveCanvasSpec) string {
 	if projects := configurationStrings(trigger.Configuration["projects"]); len(projects) > 0 {
 		return strings.Join(projects, ",")
 	}
+	if webhook, ok := trigger.Configuration["webhook"].(string); ok {
+		return strings.TrimSpace(webhook)
+	}
 
 	return ""
 }
@@ -87,6 +90,9 @@ func intakeHealth(
 		return pb.FactoryIntake_HEALTH_GRAPH_BROKEN
 	}
 
+	if intake.Source == models.FactoryIntakeSourceWebhook && graph.TriggerResourceID(spec) == "" {
+		return pb.FactoryIntake_HEALTH_MISSING_INTEGRATION
+	}
 	integrationID := graph.TriggerIntegrationID(spec)
 	if integrationID == "" && intakeSourceAllowsRebind(intake.Source) {
 		return pb.FactoryIntake_HEALTH_MISSING_INTEGRATION

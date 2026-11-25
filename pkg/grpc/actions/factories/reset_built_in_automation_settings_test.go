@@ -517,6 +517,7 @@ func TestResetIntakePreservesGeneralSettings(t *testing.T) {
 		{source: models.FactoryIntakeSourceDatadog},
 		{source: models.FactoryIntakeSourceLinearIssues},
 		{source: models.FactoryIntakeSourcePagerDutyIncidents},
+		{source: models.FactoryIntakeSourceWebhook},
 	}
 	for _, tc := range cases {
 		source := tc.source
@@ -562,6 +563,10 @@ func TestResetIntakePreservesGeneralSettings(t *testing.T) {
 				settings.LinearProjectIDs = []string{"project-one"}
 				settings.LinearIncludeNoProject = false
 				settings.LinearLabels = []string{"bug"}
+			case models.FactoryIntakeSourceWebhook:
+				settings.WebhookTitlePath = "issue.summary"
+				settings.WebhookDescriptionPath = ""
+				settings.WebhookLinkPath = "issue.links.html"
 			}
 			binding := &intakeBinding{Configuration: map[string]any{"repository": "acme/app", "project": "APP"}}
 			var sentryIntegrationID string

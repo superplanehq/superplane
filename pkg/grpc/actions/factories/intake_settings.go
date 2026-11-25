@@ -98,6 +98,11 @@ type intakeSettings struct {
 	// Label names that still create a task. Empty means every label.
 	// Linear issue intakes only.
 	LinearLabels []string
+	// Dot-separated request body fields that fill the task. Webhook intakes
+	// only. An empty description or link path leaves that field empty.
+	WebhookTitlePath       string
+	WebhookDescriptionPath string
+	WebhookLinkPath        string
 }
 
 var intakeSentryKnownLevels = []string{"fatal", "error", "warning", "info", "debug"}
@@ -198,6 +203,9 @@ func (s intakeSettings) normalized() intakeSettings {
 	s.LinearTeamID = strings.TrimSpace(s.LinearTeamID)
 	s.LinearProjectIDs = normalizeLinearValues(s.LinearProjectIDs)
 	s.LinearLabels = normalizeLinearValues(s.LinearLabels)
+	s.WebhookTitlePath = strings.TrimSpace(s.WebhookTitlePath)
+	s.WebhookDescriptionPath = strings.TrimSpace(s.WebhookDescriptionPath)
+	s.WebhookLinkPath = strings.TrimSpace(s.WebhookLinkPath)
 
 	return s
 }
@@ -549,12 +557,16 @@ func intakeSettingsFromGraph(source string, graph intakeGraph, spec models.LiveC
 		settings = defaultDatadogIntakeSettings()
 	case models.FactoryIntakeSourceLinearIssues:
 		settings = defaultLinearIntakeSettings()
+	case models.FactoryIntakeSourceWebhook:
+		settings = defaultWebhookIntakeSettings()
 	}
 	settings.ConfidencePct = graph.ConfidencePct
-	if intakeSourceSupportsDefaultOwner(source) {
-		if create := findIntakeNode(spec.Nodes, graph.CreateNodeID); create != nil {
-			settings.DefaultOwnerID, _ = create.Configuration["defaultOwnerId"].(string)
-		}
+	create := findIntakeNode(spec.Nodes, graph.CreateNodeID)
+	if intakeSourceSupportsDefaultOwner(source) && create != nil {
+		settings.DefaultOwnerID, _ = create.Configuration["defaultOwnerId"].(string)
+	}
+	if source == models.FactoryIntakeSourceWebhook {
+		return webhookIntakeSettingsFromCreateNode(create, settings).normalized()
 	}
 
 	trigger := findIntakeNode(spec.Nodes, graph.TriggerNodeID)
@@ -719,6 +731,11 @@ func serializeIntakeSettings(source string, settings intakeSettings) *pb.Factory
 		serialized.LinearIncludeIssuesWithoutProject = proto.Bool(settings.LinearIncludeNoProject)
 		serialized.LinearLabels = settings.LinearLabels
 	}
+	if source == models.FactoryIntakeSourceWebhook {
+		serialized.WebhookTitlePath = proto.String(settings.WebhookTitlePath)
+		serialized.WebhookDescriptionPath = proto.String(settings.WebhookDescriptionPath)
+		serialized.WebhookLinkPath = proto.String(settings.WebhookLinkPath)
+	}
 	return serialized
 }
 
@@ -791,6 +808,15 @@ func parseIntakeSettings(current intakeSettings, requested *pb.FactoryIntake_Set
 		updated.LinearIncludeNoProject = requested.GetLinearIncludeIssuesWithoutProject()
 	}
 	updated.LinearLabels = requested.GetLinearLabels()
+	if requested.WebhookTitlePath != nil {
+		updated.WebhookTitlePath = requested.GetWebhookTitlePath()
+	}
+	if requested.WebhookDescriptionPath != nil {
+		updated.WebhookDescriptionPath = requested.GetWebhookDescriptionPath()
+	}
+	if requested.WebhookLinkPath != nil {
+		updated.WebhookLinkPath = requested.GetWebhookLinkPath()
+	}
 
 	return updated.normalized()
 }

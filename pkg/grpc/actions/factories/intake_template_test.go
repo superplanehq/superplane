@@ -101,6 +101,7 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 			models.FactoryIntakeSourceDependabotAlerts:   "github.onDependabotAlert",
 			models.FactoryIntakeSourceDatadog:            "datadog.onErrorTrackingAlert",
 			models.FactoryIntakeSourceLinearIssues:       "linear.onIssue",
+			models.FactoryIntakeSourceWebhook:            "onWebhook",
 		} {
 			canvas, err := buildIntakeCanvas(intakeCanvasRequest{Source: source})
 			require.NoError(t, err)

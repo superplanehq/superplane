@@ -952,6 +952,64 @@ service Factories {
     };
   }
 
+  rpc ListFactoryWebhooks(ListFactoryWebhooksRequest) returns (ListFactoryWebhooksResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/webhooks"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List workspace webhooks";
+      description: "Returns the webhooks that automations in this workspace can use as triggers.";
+      tags: "Factory";
+    };
+  }
+
+  rpc CreateFactoryWebhook(CreateFactoryWebhookRequest) returns (CreateFactoryWebhookResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/webhooks"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create a workspace webhook";
+      description: "Creates a webhook and returns its secret. The secret is not returned again.";
+      tags: "Factory";
+    };
+  }
+
+  rpc UpdateFactoryWebhook(UpdateFactoryWebhookRequest) returns (UpdateFactoryWebhookResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/factories/{factory_id}/webhooks/{webhook_id}"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update a workspace webhook";
+      description: "Updates the name and authentication of a webhook. The secret does not change.";
+      tags: "Factory";
+    };
+  }
+
+  rpc DeleteFactoryWebhook(DeleteFactoryWebhookRequest) returns (DeleteFactoryWebhookResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/factories/{factory_id}/webhooks/{webhook_id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Delete a workspace webhook";
+      description: "Deletes a webhook that no automation uses.";
+      tags: "Factory";
+    };
+  }
+
+  rpc RegenerateFactoryWebhookSecret(RegenerateFactoryWebhookSecretRequest) returns (RegenerateFactoryWebhookSecretResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/webhooks/{webhook_id}/secret"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Regenerate a workspace webhook secret";
+      description: "Replaces the webhook secret and returns the new one. The old secret stops working.";
+      tags: "Factory";
+    };
+  }
+
   rpc DescribePlanningSession(DescribePlanningSessionRequest) returns (DescribePlanningSessionResponse) {
     option (google.api.http) = {
       get: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}"
@@ -1447,6 +1505,7 @@ message FactoryCustomAutomation {
     START_MODE_AUTOMATIC = 2;
     START_MODE_SCHEDULED = 3;
     START_MODE_ON_LEAVE = 4;
+    START_MODE_WEBHOOK = 5;
   }
 
   message Step {
@@ -1472,6 +1531,8 @@ message FactoryCustomAutomation {
   message StartTrigger {
     StartMode start_mode = 1;
     Schedule schedule = 2;
+    // ID of a workspace webhook. Set only for START_MODE_WEBHOOK.
+    string webhook_id = 3;
   }
 
   message Settings {
@@ -1605,6 +1666,7 @@ message FactoryIntake {
     SOURCE_DEPENDABOT_ALERTS = 6;
     SOURCE_DATADOG = 7;
     SOURCE_LINEAR_ISSUES = 8;
+    SOURCE_WEBHOOK = 9;
   }
 
   enum InitialImportStatus {
@@ -1710,6 +1772,16 @@ message FactoryIntake {
     // linear_project_ids is not empty. Omitted means true.
     // Linear issue intakes only.
     optional bool linear_include_issues_without_project = 24;
+    // Dot path in the JSON request body for the task title. Omitted updates
+    // preserve the path. Webhook intakes only.
+    optional string webhook_title_path = 25;
+    // Dot path in the JSON request body for the task description.
+    // Webhook intakes only.
+    optional string webhook_description_path = 26;
+    // Dot path in the JSON request body for the link to the source item.
+    // A request whose link matches a task creates no task. Empty turns off
+    // the link. Webhook intakes only.
+    optional string webhook_link_path = 27;
   }
 
   string id = 1;
@@ -3601,6 +3673,71 @@ message RevokeFactoryMCPClientRequest {
 }
 
 message RevokeFactoryMCPClientResponse {}
+
+message FactoryWebhook {
+  enum Authentication {
+    AUTHENTICATION_UNSPECIFIED = 0;
+    AUTHENTICATION_BEARER = 1;
+    AUTHENTICATION_SIGNATURE = 2;
+    AUTHENTICATION_HEADER_TOKEN = 3;
+  }
+
+  string id = 1;
+  string name = 2;
+  string url = 3;
+  Authentication authentication = 4;
+  string header_name = 5;
+  int32 automation_count = 6;
+  google.protobuf.Timestamp created_at = 7;
+}
+
+message ListFactoryWebhooksRequest {
+  string factory_id = 1;
+}
+
+message ListFactoryWebhooksResponse {
+  repeated FactoryWebhook webhooks = 1;
+}
+
+message CreateFactoryWebhookRequest {
+  string factory_id = 1;
+  string name = 2;
+  FactoryWebhook.Authentication authentication = 3;
+  string header_name = 4;
+}
+
+message CreateFactoryWebhookResponse {
+  FactoryWebhook webhook = 1;
+  string secret = 2;
+}
+
+message UpdateFactoryWebhookRequest {
+  string factory_id = 1;
+  string webhook_id = 2;
+  string name = 3;
+  FactoryWebhook.Authentication authentication = 4;
+  string header_name = 5;
+}
+
+message UpdateFactoryWebhookResponse {
+  FactoryWebhook webhook = 1;
+}
+
+message DeleteFactoryWebhookRequest {
+  string factory_id = 1;
+  string webhook_id = 2;
+}
+
+message DeleteFactoryWebhookResponse {}
+
+message RegenerateFactoryWebhookSecretRequest {
+  string factory_id = 1;
+  string webhook_id = 2;
+}
+
+message RegenerateFactoryWebhookSecretResponse {
+  string secret = 1;
+}
 
 message PendingHandOff {
   string line_id = 1;

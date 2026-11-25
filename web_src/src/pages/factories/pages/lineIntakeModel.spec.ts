@@ -25,6 +25,7 @@ describe("lineIntakeModel", () => {
       "pagerduty-incidents",
       "datadog",
       "linear-issues",
+      "webhook",
     ]);
 
     const github = lineIntakeSourceById("github-issues");

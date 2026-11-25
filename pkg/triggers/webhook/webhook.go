@@ -1,6 +1,7 @@
 package webhook
 
 import (
+	"crypto/subtle"
 	"fmt"
 	"net/http"
 	"strings"
@@ -256,46 +257,8 @@ func (w *Webhook) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webh
 		return http.StatusInternalServerError, nil, fmt.Errorf("error authenticating request")
 	}
 
-	switch config.Authentication {
-	case "signature":
-		headerName := config.SignatureHeaderName()
-		signature := ctx.Headers.Get(headerName)
-		if signature == "" {
-			return http.StatusForbidden, nil, fmt.Errorf("missing signature header")
-		}
-
-		signature = strings.TrimPrefix(signature, "sha256=")
-		if signature == "" {
-			return http.StatusForbidden, nil, fmt.Errorf("invalid signature format")
-		}
-
-		if err := crypto.VerifySignature(secret, ctx.Body, signature); err != nil {
-			return http.StatusForbidden, nil, fmt.Errorf("invalid signature")
-		}
-	case "bearer":
-		authHeader := ctx.Headers.Get("Authorization")
-		if authHeader == "" {
-			return http.StatusUnauthorized, nil, fmt.Errorf("missing Authorization header")
-		}
-
-		expectedToken := "Bearer " + string(secret)
-		if authHeader != expectedToken {
-			return http.StatusUnauthorized, nil, fmt.Errorf("invalid Bearer token")
-		}
-
-		ctx.Headers.Set("Authorization", "Bearer ********")
-	case "header_token":
-		headerName := config.HeaderTokenName()
-		headerToken := ctx.Headers.Get(headerName)
-		if headerToken == "" {
-			return http.StatusUnauthorized, nil, fmt.Errorf("missing %s header", headerName)
-		}
-
-		if headerToken != string(secret) {
-			return http.StatusUnauthorized, nil, fmt.Errorf("invalid header token")
-		}
-
-		ctx.Headers.Set(headerName, "********")
+	if code, err := Authenticate(config, secret, ctx.Headers, ctx.Body); err != nil {
+		return code, nil, err
 	}
 
 	var parsedData any
@@ -319,6 +282,57 @@ func (w *Webhook) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webh
 
 func (w *Webhook) Cleanup(ctx core.TriggerContext) error {
 	return nil
+}
+
+// Authenticate checks a request against the configured authentication mode.
+// It masks the token header in place so emitted events do not carry the secret.
+// The "none" mode accepts every request.
+func Authenticate(config Configuration, secret []byte, headers http.Header, body []byte) (int, error) {
+	switch config.Authentication {
+	case "signature":
+		signature := headers.Get(config.SignatureHeaderName())
+		if signature == "" {
+			return http.StatusForbidden, fmt.Errorf("missing signature header")
+		}
+
+		signature = strings.TrimPrefix(signature, "sha256=")
+		if signature == "" {
+			return http.StatusForbidden, fmt.Errorf("invalid signature format")
+		}
+
+		if err := crypto.VerifySignature(secret, body, signature); err != nil {
+			return http.StatusForbidden, fmt.Errorf("invalid signature")
+		}
+	case "bearer":
+		authHeader := headers.Get("Authorization")
+		if authHeader == "" {
+			return http.StatusUnauthorized, fmt.Errorf("missing Authorization header")
+		}
+
+		if !tokensEqual(authHeader, "Bearer "+string(secret)) {
+			return http.StatusUnauthorized, fmt.Errorf("invalid Bearer token")
+		}
+
+		headers.Set("Authorization", "Bearer ********")
+	case "header_token":
+		headerName := config.HeaderTokenName()
+		headerToken := headers.Get(headerName)
+		if headerToken == "" {
+			return http.StatusUnauthorized, fmt.Errorf("missing %s header", headerName)
+		}
+
+		if !tokensEqual(headerToken, string(secret)) {
+			return http.StatusUnauthorized, fmt.Errorf("invalid header token")
+		}
+
+		headers.Set(headerName, "********")
+	}
+
+	return http.StatusOK, nil
+}
+
+func tokensEqual(got, want string) bool {
+	return subtle.ConstantTimeCompare([]byte(got), []byte(want)) == 1
 }
 
 func (c Configuration) HeaderTokenName() string {

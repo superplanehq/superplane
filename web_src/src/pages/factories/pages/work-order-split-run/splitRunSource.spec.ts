@@ -208,6 +208,22 @@ describe("splitRunSourceForOrder", () => {
     );
   });
 
+  it("names the webhook intake for a link on a host that names no source", () => {
+    expect(
+      splitRunSourceForOrder({
+        ...DRAFT_WORK_ORDER,
+        origin: { url: "https://tracker.example.com/items/42" },
+        createdBy: { automation: { appId: "intake-webhook", appName: "Webhook" } },
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        kind: "intake",
+        name: "Webhook",
+        ticket: { label: "tracker#42", href: "https://tracker.example.com/items/42" },
+      }),
+    );
+  });
+
   it("maps automation-created orders without origin to the intake source", () => {
     const sentry = splitRunSourceForOrder({ ...OPEN_WORK_ORDER_SECONDARY, origin: undefined });
     expect(sentry).toEqual(expect.objectContaining({ kind: "intake", name: "Sentry exceptions" }));

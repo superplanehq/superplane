@@ -19,6 +19,7 @@ import {
   FEATURE_AUTOMATIONS_AS_CODE,
   FEATURE_FACTORY_DATADOG_INTAKE,
   FEATURE_FACTORY_SCHEDULED_INTAKE,
+  FEATURE_FACTORY_WEBHOOK_INTAKE,
   FEATURE_WORKSPACE_SKILLS,
 } from "@/lib/experimentalFeatures";
 import { unmockedSrc } from "@/test/unmockedModule";
@@ -1902,6 +1903,33 @@ describe("LinesPage board extras", () => {
       "Listening to GitHub issues",
     );
     expect(screen.getByTestId("line-intake-source-intake-triage")).toHaveTextContent("Listening to Triage issues");
+  });
+
+  it("hides webhook intake when the organization feature is off", async () => {
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    await user.click(screen.getByTestId("lines-backlog-menu"));
+    await user.click(screen.getByTestId("lines-backlog-menu-add-intake"));
+
+    expect(screen.getByTestId("add-intake-template-github-issues")).toBeInTheDocument();
+    expect(screen.queryByTestId("add-intake-template-webhook")).not.toBeInTheDocument();
+  });
+
+  it("opens webhook intake setup in a modal on the board", async () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_WEBHOOK_INTAKE);
+    const user = userEvent.setup();
+    renderLinesBoard();
+    const location = screen.getByTestId("lines-test-location").textContent;
+
+    await user.click(screen.getByTestId("lines-backlog-menu"));
+    await user.click(screen.getByTestId("lines-backlog-menu-add-intake"));
+    await user.click(screen.getByTestId("add-intake-template-webhook"));
+
+    expect(screen.getByTestId("webhook-intake-setup")).toBeInTheDocument();
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(location ?? "");
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByTestId("webhook-intake-setup")).not.toBeInTheDocument();
   });
 
   it("opens GitHub intake setup from the picker", async () => {

@@ -33,6 +33,11 @@ export function intakeRunSource(
     }
     case "datadog":
       return datadogSource(payload);
+    case "webhook": {
+      // Reads the default field paths. A custom path shows the generic title.
+      const body = record(payload.body);
+      return source("Webhook", text(body.title) || "Webhook request", body.url);
+    }
     case "scheduled-intake":
       return { reference: "Schedule", title: "Scheduled review" };
   }

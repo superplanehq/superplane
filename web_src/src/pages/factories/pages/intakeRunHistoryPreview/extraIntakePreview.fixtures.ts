@@ -29,6 +29,12 @@ const SOURCES: Record<ExtraSource, { prefix: string; offset: number; url: string
     url: "https://app.datadoghq.com/error-tracking/issue/",
     event: "Error alert triggered",
   },
+  webhook: {
+    prefix: "Webhook",
+    offset: 0,
+    url: "https://tracker.example.com/items/",
+    event: "Webhook request",
+  },
 };
 const INCIDENT_TITLES = [
   "API error rate is above the alert threshold",
@@ -119,6 +125,11 @@ function extraPayload(sourceId: ExtraSource, source: SourceItem, index: number):
           issue_url: source.url,
           alert_transition: "Triggered",
         },
+      };
+    case "webhook":
+      return {
+        type: "webhook",
+        data: { body: { title: source.title, url: source.url }, headers: {} },
       };
   }
 }

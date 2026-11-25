@@ -898,6 +898,9 @@ func materializeIntakeDefaults(
 			if node.ID == intakeFilterNodeID {
 				node.Configuration["expression"] = intakeFilterExpressionFor(intake.Source, settings)
 			}
+			if node.ID == intakeCreateNodeID && intake.Source == models.FactoryIntakeSourceWebhook {
+				maps.Copy(node.Configuration, webhookIntakeCreateConfiguration(settings))
+			}
 			if node.ID == intakeTriggerNodeID {
 				if intake.Source == models.FactoryIntakeSourceGitHubIssues {
 					node.Configuration["actions"] = intakeTriggerActionsFor(settings)

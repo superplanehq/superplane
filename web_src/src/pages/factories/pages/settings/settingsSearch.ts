@@ -107,6 +107,14 @@ export const FACTORY_SETTINGS_SEARCH_ENTRIES: FactorySettingsSearchResult[] = [
     "ide",
     "connect client",
   ]),
+  entry("workspace", "webhooks", "Webhooks", undefined, [
+    "webhook url",
+    "secret",
+    "signature",
+    "bearer token",
+    "jira",
+    "intake",
+  ]),
 
   // Workspace · Models
   entry("workspace", "models", "Models", undefined, [
