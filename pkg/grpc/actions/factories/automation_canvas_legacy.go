@@ -193,7 +193,7 @@ func importAutomationCanvas(tx *gorm.DB, factory *models.Factory, canvas *models
 		return "", unrepresentableAutomationCanvas()
 	}
 	if credentials := definition.Agent.Credentials; credentials != nil && credentials.Source == automationspec.Integration {
-		connection, err := models.FindIntegrationByName(tx, factory.OrganizationID, credentials.Name)
+		connection, err := factoryAutomationIntegrationByName(tx, factory.OrganizationID, credentials.Name)
 		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 			return "", err
 		}
@@ -240,6 +240,9 @@ func legacyAutomationTriggers(stage string, nodes []models.Node) ([]automationsp
 			use := automationspec.TaskEntersStage
 			if stage == models.CanvasColumnKeyVerify {
 				use = automationspec.PullRequestUpdated
+			}
+			if customAutomationUsesDispatch(stage) {
+				use = automationspec.Manual
 			}
 			result = append(result, automationspec.Trigger{Use: use})
 		case pb.FactoryCustomAutomation_START_MODE_ON_LEAVE:

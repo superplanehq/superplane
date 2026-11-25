@@ -104,6 +104,18 @@ func (a *intakeAgent) subscription() bool {
 }
 
 func resolveIntakeAgent(tx *gorm.DB, factory *models.Factory) *intakeAgent {
+	reads := factoryAutomationReads(tx, factory)
+	if reads == nil {
+		return resolveIntakeAgentUncached(tx, factory)
+	}
+	if !reads.agentResolved {
+		reads.agent = resolveIntakeAgentUncached(tx, factory)
+		reads.agentResolved = true
+	}
+	return cloneFactoryAutomationAgent(reads.agent)
+}
+
+func resolveIntakeAgentUncached(tx *gorm.DB, factory *models.Factory) *intakeAgent {
 	config := factory.OnboardingConfigValue()
 	if config.CodexSubscription {
 		return &intakeAgent{
@@ -138,7 +150,7 @@ func intakeAgentFromSetup(tx *gorm.DB, factory *models.Factory, integrationID st
 		return nil
 	}
 
-	integration, err := models.FindIntegrationInTransaction(tx, factory.OrganizationID, id)
+	integration, err := factoryAutomationIntegrationByID(tx, factory.OrganizationID, id)
 	if err != nil {
 		log.Warnf("factory %s: intake ignores the setup agent, integration %s not found: %v", factory.ID, id, err)
 		return nil
@@ -152,11 +164,32 @@ func intakeAgentFromSetup(tx *gorm.DB, factory *models.Factory, integrationID st
 	if err != nil {
 		return agent
 	}
-	app, err := models.FindCanvasInTransaction(tx, factory.OrganizationID, appID)
+	var app *models.Canvas
+	if reads := factoryAutomationReads(tx, factory); reads != nil {
+		for i := range reads.canvases {
+			if reads.canvases[i].ID == appID {
+				app = &reads.canvases[i]
+				break
+			}
+		}
+		if app == nil {
+			return agent
+		}
+	} else {
+		app, err = models.FindCanvasInTransaction(tx, factory.OrganizationID, appID)
+	}
 	if err != nil || app.FactoryID == nil || *app.FactoryID != factory.ID || app.LiveVersionID == nil {
 		return agent
 	}
-	version, err := models.FindLiveCanvasVersionInTransaction(tx, appID)
+	var version *models.CanvasVersion
+	if reads := factoryAutomationReads(tx, factory); reads != nil {
+		version = reads.versions[appID]
+		if version == nil {
+			return agent
+		}
+	} else {
+		version, err = models.FindLiveCanvasVersionInTransaction(tx, appID)
+	}
 	if err != nil {
 		log.WithError(err).Warnf("factory %s: intake cannot read the provisioned agent model", factory.ID)
 		return agent
@@ -175,7 +208,7 @@ func intakeAgentFromSetup(tx *gorm.DB, factory *models.Factory, integrationID st
 
 // intakeAgentFromInstallations takes the first ready agent installation.
 func intakeAgentFromInstallations(tx *gorm.DB, factory *models.Factory) *intakeAgent {
-	integrations, err := models.ListIntegrations(tx, factory.OrganizationID)
+	integrations, err := factoryAutomationIntegrations(tx, factory.OrganizationID)
 	if err != nil {
 		log.Warnf("factory %s: intake cannot read the installations of the organization: %v", factory.ID, err)
 		return nil
@@ -198,6 +231,18 @@ func intakeAgentFromInstallations(tx *gorm.DB, factory *models.Factory) *intakeA
 // intakeAgentFromHostedProvider uses Run SuperPlane Agent when no integration
 // is available and the instance has a SuperPlane agent model.
 func intakeAgentFromHostedProvider(tx *gorm.DB, factory *models.Factory) *intakeAgent {
+	reads := factoryAutomationReads(tx, factory)
+	if reads == nil {
+		return intakeAgentFromHostedProviderUncached(tx, factory)
+	}
+	if !reads.hostedAgentResolved {
+		reads.hostedAgent = intakeAgentFromHostedProviderUncached(tx, factory)
+		reads.hostedAgentResolved = true
+	}
+	return cloneFactoryAutomationAgent(reads.hostedAgent)
+}
+
+func intakeAgentFromHostedProviderUncached(tx *gorm.DB, factory *models.Factory) *intakeAgent {
 	defaultModel, err := models.GetInstallationDefaultHostedLLMModel(tx)
 	if err != nil {
 		log.Warnf("factory %s: intake cannot read the SuperPlane agent model: %v", factory.ID, err)
@@ -227,6 +272,18 @@ func factoryVCSProviderOrDefault(factory *models.Factory) string {
 // resolveVCSInstallationName returns the integration name that runner steps
 // read repository credentials from.
 func resolveVCSInstallationName(tx *gorm.DB, factory *models.Factory) string {
+	reads := factoryAutomationReads(tx, factory)
+	if reads == nil {
+		return resolveVCSInstallationNameUncached(tx, factory)
+	}
+	if !reads.vcsResolved {
+		reads.vcsName = resolveVCSInstallationNameUncached(tx, factory)
+		reads.vcsResolved = true
+	}
+	return reads.vcsName
+}
+
+func resolveVCSInstallationNameUncached(tx *gorm.DB, factory *models.Factory) string {
 	if tx == nil || factory == nil {
 		return intakeGitHubAppName
 	}
@@ -242,7 +299,7 @@ func resolveVCSInstallationName(tx *gorm.DB, factory *models.Factory) string {
 		return intakeGitHubAppName
 	}
 
-	integrations, err := models.ListIntegrations(tx, factory.OrganizationID)
+	integrations, err := factoryAutomationIntegrations(tx, factory.OrganizationID)
 	if err != nil {
 		log.Warnf("factory %s: backlog cannot read GitHub installations: %v", factory.ID, err)
 		return intakeGitHubAppName
@@ -282,7 +339,7 @@ func bitbucketInstallationNameFromVCS(tx *gorm.DB, factory *models.Factory) stri
 	if err != nil {
 		return models.ProviderBitbucket
 	}
-	integration, err := models.FindIntegrationInTransaction(tx, factory.OrganizationID, id)
+	integration, err := factoryAutomationIntegrationByID(tx, factory.OrganizationID, id)
 	if err != nil || integration.AppName != models.ProviderBitbucket {
 		return models.ProviderBitbucket
 	}
@@ -346,17 +403,32 @@ func customModelFromFactory(tx *gorm.DB, factory *models.Factory) string {
 	if tx == nil || factory == nil {
 		return ""
 	}
-	canvases, err := factory.ListCanvases(tx)
-	if err != nil {
-		return ""
+	var canvases []models.Canvas
+	if reads := factoryAutomationReads(tx, factory); reads != nil {
+		canvases = reads.canvases
+	} else {
+		var err error
+		canvases, err = factory.ListCanvases(tx)
+		if err != nil {
+			return ""
+		}
 	}
 	for i := range canvases {
 		if canvases[i].LiveVersionID == nil {
 			continue
 		}
-		version, err := models.FindLiveCanvasVersionInTransaction(tx, canvases[i].ID)
-		if err != nil {
-			continue
+		var version *models.CanvasVersion
+		if reads := factoryAutomationReads(tx, factory); reads != nil {
+			version = reads.versions[canvases[i].ID]
+			if version == nil {
+				continue
+			}
+		} else {
+			var err error
+			version, err = models.FindLiveCanvasVersionInTransaction(tx, canvases[i].ID)
+			if err != nil {
+				continue
+			}
 		}
 		for _, node := range version.Nodes {
 			if node.ComponentName() != "runnerOpenRouter" {
