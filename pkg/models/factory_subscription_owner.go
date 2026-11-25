@@ -159,48 +159,6 @@ func (o *FactoryWorkOrder) SubscriptionOwnershipBlockedForStart(tx *gorm.DB) (bo
 	return o.subscriptionOwnershipBlocked(tx, ignored)
 }
 
-func (o *FactoryWorkOrder) subscriptionOwnershipBlocked(tx *gorm.DB, ignoredRuns map[uuid.UUID]bool) (bool, error) {
-	var queued int64
-	if err := tx.Model(&FactoryWorkOrderQueueItem{}).Where("work_order_id = ?", o.ID).Count(&queued).Error; err != nil {
-		return false, err
-	}
-	if queued > 0 {
-		return true, nil
-	}
-	var executions int64
-	if err := tx.Model(&FactoryWorkOrderExecution{}).Where("work_order_id = ? AND status IN ?", o.ID, []string{FactoryWorkOrderExecutionStatusPending, FactoryWorkOrderExecutionStatusRunning}).Count(&executions).Error; err != nil {
-		return false, err
-	}
-	if executions > 0 {
-		return true, nil
-	}
-	runs, err := o.ListRuns(tx)
-	if err != nil {
-		return false, err
-	}
-	for _, run := range runs {
-		if !ignoredRuns[run.ID] && run.State != CanvasRunStateFinished {
-			return true, nil
-		}
-	}
-	ids := make([]uuid.UUID, 0, len(runs))
-	for _, run := range runs {
-		if !ignoredRuns[run.ID] {
-			ids = append(ids, run.ID)
-		}
-	}
-	if len(ids) == 0 {
-		return false, nil
-	}
-	var active int64
-	err = tx.Table("runner_tasks t").Joins("JOIN workflow_node_execution_kvs kv ON kv.key = 'task_id' AND kv.value = t.id::text").
-		Joins("JOIN workflow_node_executions e ON e.id = kv.execution_id AND e.workflow_id = kv.workflow_id AND e.node_id = kv.node_id").
-		Joins("LEFT JOIN runners r ON r.id = t.runner_id").
-		Where("e.run_id IN ?", ids).
-		Where("t.state IN ? OR (r.id IS NOT NULL AND r.provider_deleted_at IS NULL AND (t.cancel_requested_at IS NOT NULL OR t.state = ?))", []string{RunnerTaskStatePending, RunnerTaskStateQueued, RunnerTaskStateReserved, RunnerTaskStateRunning}, RunnerTaskStateLost).Count(&active).Error
-	return active > 0, err
-}
-
 // DefaultSubscriptionAssignees applies only to implicit assignments. Explicit
 // assignments go through ReplaceAssignees and are rejected without mutation.
 func (f *Factory) DefaultSubscriptionAssignees(tx *gorm.DB, userID *uuid.UUID) ([]uuid.UUID, error) {
@@ -230,60 +188,11 @@ func FindSubscriptionWorkOrderForRun(tx *gorm.DB, orgID, factoryID, runID uuid.U
 	return &orders[0], nil
 }
 
-// RequireSubscriptionRunOwner admits either an associated task or the trusted
-// scheduled proposal that runs before its task exists. Ambiguous task links
-// never fall back to an intake default.
+// RequireSubscriptionRunOwner prefers task and intake owners, then uses the
+// workspace default for automations without a task. Ambiguous task links
+// never fall back to a default.
 func RequireSubscriptionRunOwner(tx *gorm.DB, orgID, factoryID, runID uuid.UUID) (uuid.UUID, error) {
-	orders, err := subscriptionWorkOrdersForRun(tx, orgID, factoryID, runID)
-	if err != nil {
-		return uuid.Nil, err
-	}
-	if len(orders) > 1 {
-		return uuid.Nil, ErrSubscriptionTaskAssociation
-	}
-	if len(orders) == 1 {
-		return orders[0].RequireSubscriptionOwner(tx, true)
-	}
-	ownerID, err := FindSubscriptionIntakeOwnerForRun(tx, orgID, factoryID, runID)
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return uuid.Nil, ErrSubscriptionTaskAssociation
-	}
-	if err != nil {
-		return uuid.Nil, err
-	}
-	connected, err := SubscriptionOwnerEligible(tx, orgID, factoryID, ownerID)
-	if err != nil {
-		return uuid.Nil, err
-	}
-	if !connected {
-		return uuid.Nil, ErrSubscriptionOwnerInvalid
-	}
-	return ownerID, nil
-}
-
-func subscriptionWorkOrdersForRun(tx *gorm.DB, orgID, factoryID, runID uuid.UUID) ([]FactoryWorkOrder, error) {
-	var orders []FactoryWorkOrder
-	// History excludes shared creator runs, but admission must see every
-	// creator link so an ambiguous run cannot fall back to an intake owner.
-	err := tx.Raw(factoryTaskRunAssociationsCTE+`
- , source_ancestors AS (
-  SELECT id, parent_run_id FROM scoped_runs WHERE id = ?
-  UNION
-  SELECT r.id, r.parent_run_id FROM scoped_runs r
-  JOIN source_ancestors a ON r.id = a.parent_run_id
- )
- SELECT DISTINCT o.* FROM factory_work_orders o
- WHERE o.id IN (SELECT work_order_id FROM associated_task_runs WHERE id = ?)
-    OR o.source_run_id IN (SELECT id FROM source_ancestors)`, orgID, factoryID, runID, runID).Scan(&orders).Error
-	if err != nil {
-		return nil, err
-	}
-	for _, order := range orders {
-		if order.OrganizationID != orgID || order.FactoryID != factoryID {
-			return nil, ErrSubscriptionTaskAssociation
-		}
-	}
-	return orders, nil
+	return requireSubscriptionRunOwner(tx, orgID, factoryID, runID, uuid.Nil)
 }
 
 // ResolveSubscriptionCatalogOwner never substitutes another member's catalog.
@@ -347,6 +256,134 @@ func (o *FactoryWorkOrder) ValidateSubscriptionCanvasModels(tx *gorm.DB, canvasI
 		}
 	}
 	return nil
+}
+
+func (o *FactoryWorkOrder) subscriptionOwnershipBlocked(tx *gorm.DB, ignoredRuns map[uuid.UUID]bool) (bool, error) {
+	var queued int64
+	if err := tx.Model(&FactoryWorkOrderQueueItem{}).Where("work_order_id = ?", o.ID).Count(&queued).Error; err != nil {
+		return false, err
+	}
+	if queued > 0 {
+		return true, nil
+	}
+	var executions int64
+	if err := tx.Model(&FactoryWorkOrderExecution{}).Where("work_order_id = ? AND status IN ?", o.ID, []string{FactoryWorkOrderExecutionStatusPending, FactoryWorkOrderExecutionStatusRunning}).Count(&executions).Error; err != nil {
+		return false, err
+	}
+	if executions > 0 {
+		return true, nil
+	}
+	runs, err := o.ListRuns(tx)
+	if err != nil {
+		return false, err
+	}
+	for _, run := range runs {
+		if !ignoredRuns[run.ID] && run.State != CanvasRunStateFinished {
+			return true, nil
+		}
+	}
+	ids := make([]uuid.UUID, 0, len(runs))
+	for _, run := range runs {
+		if !ignoredRuns[run.ID] {
+			ids = append(ids, run.ID)
+		}
+	}
+	if len(ids) == 0 {
+		return false, nil
+	}
+	var active int64
+	err = tx.Table("runner_tasks t").Joins("JOIN workflow_node_execution_kvs kv ON kv.key = 'task_id' AND kv.value = t.id::text").
+		Joins("JOIN workflow_node_executions e ON e.id = kv.execution_id AND e.workflow_id = kv.workflow_id AND e.node_id = kv.node_id").
+		Joins("LEFT JOIN runners r ON r.id = t.runner_id").
+		Where("e.run_id IN ?", ids).
+		Where("t.state IN ? OR (r.id IS NOT NULL AND r.provider_deleted_at IS NULL AND (t.cancel_requested_at IS NOT NULL OR t.state = ?))", []string{RunnerTaskStatePending, RunnerTaskStateQueued, RunnerTaskStateReserved, RunnerTaskStateRunning}, RunnerTaskStateLost).Count(&active).Error
+	return active > 0, err
+}
+
+func requireSubscriptionRunOwner(tx *gorm.DB, orgID, factoryID, runID, leaseOwnerID uuid.UUID) (uuid.UUID, error) {
+	orders, err := subscriptionWorkOrdersForRun(tx, orgID, factoryID, runID)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	if len(orders) > 1 {
+		return uuid.Nil, ErrSubscriptionTaskAssociation
+	}
+	if len(orders) == 1 {
+		return orders[0].RequireSubscriptionOwner(tx, true)
+	}
+	ownerID, err := FindSubscriptionIntakeOwnerForRun(tx, orgID, factoryID, runID)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		ownerID, err = subscriptionAutomationOwnerForRun(tx, orgID, factoryID, runID, leaseOwnerID)
+	}
+	if err != nil {
+		return uuid.Nil, err
+	}
+	connected, err := SubscriptionOwnerEligible(tx, orgID, factoryID, ownerID)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	if !connected {
+		return uuid.Nil, ErrSubscriptionOwnerInvalid
+	}
+	return ownerID, nil
+}
+
+func subscriptionAutomationOwnerForRun(tx *gorm.DB, orgID, factoryID, runID, leaseOwnerID uuid.UUID) (uuid.UUID, error) {
+	// Intake lookup also returns not found for missing data. Verify the run's
+	// scope and version before authorizing an unrelated automation.
+	var run CanvasRun
+	err := tx.Joins("JOIN workflows w ON w.id = workflow_runs.workflow_id AND w.deleted_at IS NULL").
+		Joins("JOIN workflow_versions v ON v.id = workflow_runs.version_id AND v.workflow_id = w.id").
+		Where("workflow_runs.id = ? AND w.organization_id = ? AND w.factory_id = ?", runID, orgID, factoryID).
+		First(&run).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return uuid.Nil, ErrSubscriptionTaskAssociation
+	}
+	if err != nil {
+		return uuid.Nil, err
+	}
+	// A lease keeps the owner selected at reservation when the default changes.
+	if leaseOwnerID != uuid.Nil {
+		return leaseOwnerID, nil
+	}
+	factory, err := FindFactory(tx, orgID, factoryID)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	owner := strings.TrimSpace(factory.OnboardingConfigValue().CodexDefaultOwnerID)
+	if owner == "" {
+		return uuid.Nil, ErrSubscriptionTaskAssociation
+	}
+	ownerID, err := uuid.Parse(owner)
+	if err != nil || ownerID == uuid.Nil {
+		return uuid.Nil, ErrSubscriptionOwnerInvalid
+	}
+	return ownerID, nil
+}
+
+func subscriptionWorkOrdersForRun(tx *gorm.DB, orgID, factoryID, runID uuid.UUID) ([]FactoryWorkOrder, error) {
+	var orders []FactoryWorkOrder
+	// History excludes shared creator runs, but admission must see every
+	// creator link so an ambiguous run cannot fall back to an intake owner.
+	err := tx.Raw(factoryTaskRunAssociationsCTE+`
+ , source_ancestors AS (
+  SELECT id, parent_run_id FROM scoped_runs WHERE id = ?
+  UNION
+  SELECT r.id, r.parent_run_id FROM scoped_runs r
+  JOIN source_ancestors a ON r.id = a.parent_run_id
+ )
+ SELECT DISTINCT o.* FROM factory_work_orders o
+ WHERE o.id IN (SELECT work_order_id FROM associated_task_runs WHERE id = ?)
+    OR o.source_run_id IN (SELECT id FROM source_ancestors)`, orgID, factoryID, runID, runID).Scan(&orders).Error
+	if err != nil {
+		return nil, err
+	}
+	for _, order := range orders {
+		if order.OrganizationID != orgID || order.FactoryID != factoryID {
+			return nil, ErrSubscriptionTaskAssociation
+		}
+	}
+	return orders, nil
 }
 
 func (o *FactoryWorkOrder) validateSubscriptionAssignment(tx *gorm.DB, ids []uuid.UUID) error {
