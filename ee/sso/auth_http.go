@@ -31,6 +31,7 @@ func (s *Service) AuthHandler() http.Handler {
 	router.HandleFunc("/auth/sso/discover", s.discover).Methods(http.MethodPost)
 	router.HandleFunc("/auth/sso/organizations/{slug}/start", s.organizationStart).Methods(http.MethodGet)
 	router.HandleFunc("/auth/sso/{connectionID}/backchannel-logout", s.backchannelLogout).Methods(http.MethodPost)
+	router.HandleFunc("/auth/sso/{connectionID}/global-token-revocation", s.globalTokenRevocation).Methods(http.MethodPost)
 	router.HandleFunc("/auth/sso/{connectionID}/callback", s.callback).Methods(http.MethodGet)
 	router.HandleFunc("/auth/sso/{connectionID}/start", s.start).Methods(http.MethodGet)
 	return router

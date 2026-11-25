@@ -70,6 +70,16 @@ func FindActiveSCIMTokenByHash(tx *gorm.DB, tokenHash string) (*SCIMToken, error
 	return &token, nil
 }
 
+// FindSCIMTokenByHash returns the token for a hash, including a revoked token.
+func FindSCIMTokenByHash(tx *gorm.DB, tokenHash string) (*SCIMToken, error) {
+	var token SCIMToken
+	err := tx.Where("token_hash = ?", tokenHash).First(&token).Error
+	if err != nil {
+		return nil, err
+	}
+	return &token, nil
+}
+
 func FindActiveSCIMToken(tx *gorm.DB, connectionID, id uuid.UUID) (*SCIMToken, error) {
 	var token SCIMToken
 	err := tx.Where("connection_id = ? AND id = ? AND revoked_at IS NULL", connectionID, id).First(&token).Error

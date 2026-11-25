@@ -27,6 +27,7 @@ const urls = {
   initiateLoginUri: "https://app.example.com/auth/sso/conn/start",
   postLogoutRedirectUri: "https://app.example.com/login",
   backChannelLogoutUri: "https://app.example.com/auth/sso/conn/backchannel-logout",
+  globalTokenRevocationUri: "https://app.example.com/auth/sso/conn/global-token-revocation",
   scimBaseUrl: "https://app.example.com/scim/v2/conn",
 };
 

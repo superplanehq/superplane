@@ -2,6 +2,7 @@ package scim
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"strconv"
@@ -15,6 +16,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
+	"gorm.io/gorm"
 )
 
 const (
@@ -59,19 +61,31 @@ func (h *Handler) now() time.Time {
 }
 
 func (h *Handler) authenticate(w http.ResponseWriter, r *http.Request) (*models.SSOConnection, bool) {
-	connectionID, err := uuid.Parse(mux.Vars(r)["connectionID"])
+	connectionID, connectionErr := uuid.Parse(mux.Vars(r)["connectionID"])
+	token, reason := authorizationToken(r.Header.Get("Authorization"))
+	if reason != "" {
+		rejectSCIMToken(w, r, reason)
+		return nil, false
+	}
+	if connectionErr != nil {
+		rejectSCIMToken(w, r, "unknown_token")
+		return nil, false
+	}
+	stored, err := models.FindSCIMTokenByHash(database.DB(r.Context()), crypto.HashToken(token))
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		rejectSCIMToken(w, r, "unknown_token")
+		return nil, false
+	}
 	if err != nil {
-		writeError(w, r, http.StatusUnauthorized, "", "The SCIM token is not valid.")
+		rejectSCIMToken(w, r, "unknown_token")
 		return nil, false
 	}
-	token := bearerToken(r.Header.Get("Authorization"))
-	if token == "" {
-		writeError(w, r, http.StatusUnauthorized, "", "The SCIM token is not valid.")
+	if stored.ConnectionID != connectionID {
+		rejectSCIMToken(w, r, "connection_mismatch")
 		return nil, false
 	}
-	stored, err := models.FindActiveSCIMTokenByHash(database.DB(r.Context()), crypto.HashToken(token))
-	if err != nil || stored.ConnectionID != connectionID {
-		writeError(w, r, http.StatusUnauthorized, "", "The SCIM token is not valid.")
+	if stored.RevokedAt != nil {
+		rejectSCIMToken(w, r, "revoked")
 		return nil, false
 	}
 	conn, err := models.FindSSOConnectionByID(database.DB(r.Context()), connectionID)
@@ -174,12 +188,41 @@ func (h *Handler) user(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func bearerToken(header string) string {
-	const prefix = "Bearer "
-	if len(header) < len(prefix) || !strings.EqualFold(header[:len(prefix)], prefix) {
-		return ""
+func authorizationToken(header string) (string, string) {
+	header = strings.TrimSpace(header)
+	if header == "" {
+		return "", "missing"
 	}
-	return strings.TrimSpace(header[len(prefix):])
+	scheme, token, ok := strings.Cut(header, " ")
+	if !ok {
+		return header, ""
+	}
+	if !strings.EqualFold(scheme, "Bearer") {
+		return "", "scheme"
+	}
+	token = strings.TrimSpace(token)
+	if token == "" || strings.Contains(token, " ") {
+		return "", "missing"
+	}
+	return token, ""
+}
+
+func rejectSCIMToken(w http.ResponseWriter, r *http.Request, reason string) {
+	fields := map[string]any{
+		"action":            scimAction(r),
+		"object":            "sso_identity",
+		"outcome":           "failure",
+		"scim_auth_failure": reason,
+	}
+	if id := mux.Vars(r)["connectionID"]; id != "" {
+		fields["sso_connection_id"] = id
+	}
+	logging.AddRequestLogFields(r.Context(), fields)
+	writeJSON(w, http.StatusUnauthorized, map[string]any{
+		"schemas": []string{schemaError},
+		"status":  strconv.Itoa(http.StatusUnauthorized),
+		"detail":  "The SCIM token is not valid.",
+	})
 }
 
 func writeJSON(w http.ResponseWriter, status int, body any) {

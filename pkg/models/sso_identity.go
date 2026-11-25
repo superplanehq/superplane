@@ -133,6 +133,14 @@ func FindSSOIdentityByIDPSubject(tx *gorm.DB, connectionID uuid.UUID, subject st
 	return &identity, nil
 }
 
+// ListSSOIdentitiesByEmail returns every identity on the connection with this email.
+func ListSSOIdentitiesByEmail(tx *gorm.DB, connectionID uuid.UUID, email string) ([]SSOIdentity, error) {
+	var identities []SSOIdentity
+	err := tx.Where("connection_id = ? AND lower(email) = ?", connectionID, utils.NormalizeEmail(email)).
+		Find(&identities).Error
+	return identities, err
+}
+
 // ListSSOIdentities returns one page of identities for a connection.
 // filterAttr is "userName" or "externalId". An empty filter lists every identity.
 func ListSSOIdentities(tx *gorm.DB, connectionID uuid.UUID, filterAttr, filterValue string, offset, limit int) ([]SSOIdentity, int64, error) {

@@ -296,6 +296,7 @@ func TestDraftConnectionShowsURLsBeforeTheProviderValues(t *testing.T) {
 	require.Equal(t, "https://app.example.com/auth/sso/"+id+"/start", view.InitiateLoginURI)
 	require.Equal(t, "https://app.example.com/login", view.PostLogoutRedirectURI)
 	require.Equal(t, "https://app.example.com/auth/sso/"+id+"/backchannel-logout", view.BackChannelLogoutURI)
+	require.Equal(t, "https://app.example.com/auth/sso/"+id+"/global-token-revocation", view.GlobalTokenRevocationURI)
 
 	conn, err := models.FindSSOConnectionByOrganization(database.Conn(), f.r.Organization.ID)
 	require.NoError(t, err)

@@ -297,10 +297,15 @@ function ProviderUrls({ connection, preset }: { connection?: SsoConnection | nul
         value={connection?.postLogoutRedirectUri ?? ""}
         helper={okta ? "In Okta: Sign-out redirect URIs." : undefined}
       />
+      {okta ? null : <CopyField label="Back-channel logout URI" value={connection?.backChannelLogoutUri ?? ""} />}
       <CopyField
-        label="Back-channel logout URI"
-        value={connection?.backChannelLogoutUri ?? ""}
-        helper={okta ? "In Okta: Logout, back-channel logout URI. Turn on the session ID (sid)." : undefined}
+        label="Global token revocation URL"
+        value={connection?.globalTokenRevocationUri ?? ""}
+        helper={
+          okta
+            ? "In Okta: Logout, API based logout setup, Endpoint URL. Select Signed JWT and Issuer and Subject Identifier."
+            : undefined
+        }
       />
     </div>
   );

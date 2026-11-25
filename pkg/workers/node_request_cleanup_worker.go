@@ -30,8 +30,9 @@ var deleteExpiredHostedModelCallOutcomesBatch = models.DeleteExpiredHostedModelC
 
 // NodeRequestCleanupWorker deletes old rows that otherwise grow without bound.
 // It removes completed workflow node requests, expired webhook receipts,
-// expired organization invitation sends, hosted model call samples, and
-// SSO provider sessions that can no longer end access.
+// expired organization invitation sends, hosted model call samples,
+// SSO provider sessions that can no longer end access, and expired
+// Global Token Revocation token ids.
 type NodeRequestCleanupWorker struct {
 	logger              *log.Entry
 	retentionDays       int
@@ -75,6 +76,7 @@ func (w *NodeRequestCleanupWorker) tick(ctx context.Context) {
 	w.deleteExpiredLinearWebhookReceipts()
 	w.deleteExpiredOrganizationInvitationSends()
 	w.deleteUnusedSSOIdentitySessions()
+	w.deleteExpiredSSOLogoutReplays()
 
 	startedAt := time.Now()
 	olderThan := startedAt.AddDate(0, 0, -w.retentionDays)
@@ -210,6 +212,18 @@ func (w *NodeRequestCleanupWorker) deleteUnusedSSOIdentitySessions() {
 		"deleted":    deleted,
 		"older_than": cutoff.Format(time.RFC3339),
 	}).Info("Deleted unused SSO identity sessions")
+}
+
+func (w *NodeRequestCleanupWorker) deleteExpiredSSOLogoutReplays() {
+	deleted, err := models.DeleteExpiredSSOLogoutReplays(database.Conn(), time.Now())
+	if err != nil {
+		w.logger.Errorf("Error cleaning SSO logout replays: %v", err)
+		return
+	}
+	if deleted == 0 {
+		return
+	}
+	w.logger.WithField("deleted", deleted).Info("Deleted expired SSO logout replays")
 }
 
 func (w *NodeRequestCleanupWorker) deleteExpiredOrganizationInvitationSends() {

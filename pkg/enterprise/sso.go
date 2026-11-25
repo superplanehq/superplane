@@ -56,33 +56,34 @@ type SSO interface {
 // SSOConnection is the organization view of one identity-provider connection.
 // It never includes the client secret.
 type SSOConnection struct {
-	Exists                bool
-	ID                    uuid.UUID
-	OrganizationID        uuid.UUID
-	Protocol              string
-	Preset                string
-	DisplayName           string
-	Status                string
-	Enforcement           string
-	AllowOwnerBypass      bool
-	JITEnabled            bool
-	DefaultRole           string
-	MaxSessionAgeSeconds  int32
-	IDPLogoutEnabled      bool
-	Issuer                string
-	ClientID              string
-	Scopes                []string
-	SubjectClaim          string
-	EmailClaim            string
-	NameClaim             string
-	ClientSecretSet       bool
-	LastTestedAt          *time.Time
-	LastTest              *SSOTestResult
-	RedirectURI           string
-	InitiateLoginURI      string
-	PostLogoutRedirectURI string
-	BackChannelLogoutURI  string
-	SCIMBaseURL           string
+	Exists                   bool
+	ID                       uuid.UUID
+	OrganizationID           uuid.UUID
+	Protocol                 string
+	Preset                   string
+	DisplayName              string
+	Status                   string
+	Enforcement              string
+	AllowOwnerBypass         bool
+	JITEnabled               bool
+	DefaultRole              string
+	MaxSessionAgeSeconds     int32
+	IDPLogoutEnabled         bool
+	Issuer                   string
+	ClientID                 string
+	Scopes                   []string
+	SubjectClaim             string
+	EmailClaim               string
+	NameClaim                string
+	ClientSecretSet          bool
+	LastTestedAt             *time.Time
+	LastTest                 *SSOTestResult
+	RedirectURI              string
+	InitiateLoginURI         string
+	PostLogoutRedirectURI    string
+	BackChannelLogoutURI     string
+	SCIMBaseURL              string
+	GlobalTokenRevocationURI string
 }
 
 // SSOConnectionInput is a full replacement of the editable connection fields.

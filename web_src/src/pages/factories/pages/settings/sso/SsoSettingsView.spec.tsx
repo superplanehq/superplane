@@ -334,6 +334,42 @@ describe("SsoSettingsView", () => {
     expect(screen.getByText(/Last test failed on/)).toHaveTextContent("The issuer did not respond.");
   });
 
+  it("shows the Okta global token revocation URL without back-channel logout", () => {
+    renderSettings({
+      licensed: true,
+      domains: [],
+      tokens: [],
+      connection: {
+        ...draftConnection,
+        globalTokenRevocationUri: "https://app.example.com/auth/sso/conn/global-token-revocation",
+      },
+    });
+    expect(screen.getByText("Global token revocation URL")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "In Okta: Logout, API based logout setup, Endpoint URL. Select Signed JWT and Issuer and Subject Identifier.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Back-channel logout URI")).not.toBeInTheDocument();
+  });
+
+  it("keeps back-channel logout for other identity providers", () => {
+    renderSettings({
+      licensed: true,
+      domains: [],
+      tokens: [],
+      connection: {
+        ...draftConnection,
+        preset: "PRESET_GENERIC",
+        backChannelLogoutUri: "https://app.example.com/auth/sso/conn/backchannel-logout",
+        globalTokenRevocationUri: "https://app.example.com/auth/sso/conn/global-token-revocation",
+      },
+    });
+    expect(screen.getByText("Back-channel logout URI")).toBeInTheDocument();
+    expect(screen.getByText("Global token revocation URL")).toBeInTheDocument();
+    expect(screen.queryByText(/API based logout setup/)).not.toBeInTheDocument();
+  });
+
   it("disables changes when the user cannot update SSO", () => {
     renderSettings({
       licensed: true,

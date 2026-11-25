@@ -143,6 +143,7 @@ message Connection {
   string post_logout_redirect_uri = 24;
   string back_channel_logout_uri = 25;
   string scim_base_url = 26;
+  string global_token_revocation_uri = 27;
 }
 
 message GetConnectionResponse {

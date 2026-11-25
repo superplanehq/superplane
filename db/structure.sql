@@ -2014,6 +2014,17 @@ CREATE TABLE public.sso_identity_sessions (
 
 
 --
+-- Name: sso_logout_replays; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.sso_logout_replays (
+    connection_id uuid NOT NULL,
+    jti text NOT NULL,
+    expires_at timestamp with time zone NOT NULL
+);
+
+
+--
 -- Name: usage_price_book_rates; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -3616,6 +3627,14 @@ ALTER TABLE ONLY public.sso_identities
 
 ALTER TABLE ONLY public.sso_identity_sessions
     ADD CONSTRAINT sso_identity_sessions_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: sso_logout_replays sso_logout_replays_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.sso_logout_replays
+    ADD CONSTRAINT sso_logout_replays_pkey PRIMARY KEY (connection_id, jti);
 
 
 --
@@ -5427,6 +5446,13 @@ CREATE INDEX sso_identity_sessions_identity ON public.sso_identity_sessions USIN
 
 
 --
+-- Name: sso_logout_replays_expires_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX sso_logout_replays_expires_at ON public.sso_logout_replays USING btree (expires_at);
+
+
+--
 -- Name: unique_api_key_in_organization; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -6686,6 +6712,14 @@ ALTER TABLE ONLY public.sso_identity_sessions
 
 
 --
+-- Name: sso_logout_replays sso_logout_replays_connection_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.sso_logout_replays
+    ADD CONSTRAINT sso_logout_replays_connection_id_fkey FOREIGN KEY (connection_id) REFERENCES public.sso_connections(id) ON DELETE CASCADE;
+
+
+--
 -- Name: usage_price_book_rates usage_price_book_rates_version_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -7141,7 +7175,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261124182440	f
+20261125171808	f
 \.
 
 
