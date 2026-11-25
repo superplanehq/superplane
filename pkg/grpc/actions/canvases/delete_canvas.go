@@ -2,6 +2,7 @@ package canvases
 
 import (
 	"context"
+	"errors"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
@@ -14,15 +15,38 @@ import (
 func DeleteCanvas(ctx context.Context, db *gorm.DB, canvas *models.Canvas) (*pb.DeleteCanvasResponse, error) {
 	// Perform soft delete on the canvas with name suffix
 	// The cleanup worker will handle the actual deletion of nodes and related data
-	err := canvas.SoftDeleteInTransaction(db)
+	err := db.Transaction(func(tx *gorm.DB) error {
+		return DeleteCanvasInTransaction(tx, canvas)
+	})
 	if err != nil {
 		log.Errorf("failed to delete canvas %s: %v", canvas.ID.String(), err)
 		return nil, grpcerrors.Internal(err, "failed to delete canvas")
 	}
 
+	PublishCanvasDeleted(canvas)
+	return &pb.DeleteCanvasResponse{}, nil
+}
+
+// DeleteCanvasInTransaction leaves deletion notifications to the caller after commit.
+func DeleteCanvasInTransaction(tx *gorm.DB, canvas *models.Canvas) error {
+	if canvas.FactoryID != nil {
+		if _, err := models.LockAutomationFactory(tx, canvas.OrganizationID, *canvas.FactoryID); err != nil {
+			return err
+		}
+		source, err := models.FindAutomationSourceByArtifact(tx, canvas.OrganizationID, canvas.ID.String())
+		if err == nil {
+			if err := source.Delete(tx); err != nil {
+				return err
+			}
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+	}
+	return canvas.SoftDeleteInTransaction(tx)
+}
+
+func PublishCanvasDeleted(canvas *models.Canvas) {
 	if err := messages.NewCanvasDeletedMessage(canvas.ID.String(), canvas.OrganizationID.String()).PublishDeleted(); err != nil {
 		log.Errorf("failed to publish canvas deleted RabbitMQ message: %v", err)
 	}
-
-	return &pb.DeleteCanvasResponse{}, nil
 }

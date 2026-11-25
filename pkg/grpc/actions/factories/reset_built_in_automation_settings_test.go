@@ -372,7 +372,12 @@ func TestResetBuiltInVerificationSettings(t *testing.T) {
 							risk["name"] = "Risk approval"
 							risk["prompt"] = strings.ReplaceAll(risk["prompt"].(string), defaultRiskScoreRules, "Escalation = 5 (critical).") + "\nRetired system instruction"
 							custom := map[string]any{"name": "Release policy", "type": "prompt", "prompt": "Merge check: custom-1.\nCheck the release policy."}
-							node.Configuration["steps"] = []any{risk, custom}
+							drift := map[string]any{"name": "Drift from Specification", "type": "prompt", "prompt": "Merge check: drift.\nRetired system instruction"}
+							steps := []any{risk, drift}
+							if provider == models.ProviderBitbucket {
+								steps = append(steps, map[string]any{"name": "Correctness", "type": "prompt", "prompt": "Merge check: correctness."})
+							}
+							node.Configuration["steps"] = append(steps, custom)
 						}
 					}
 				})
@@ -419,12 +424,16 @@ func TestResetBuiltInVerificationSettings(t *testing.T) {
 					assert.EqualValues(t, 2400, node.Configuration["executionTimeoutSeconds"])
 					if templateID == "risk-score" {
 						steps := node.Configuration["steps"].([]any)
-						require.Len(t, steps, 2)
+						require.Len(t, steps, 3)
 						assert.Equal(t, "Risk approval", steps[0].(map[string]any)["name"])
 						prompt := steps[0].(map[string]any)["prompt"].(string)
 						assert.Contains(t, prompt, "Escalation = 5 (critical).")
 						assert.NotContains(t, prompt, "Retired system instruction")
-						assert.Equal(t, "Merge check: custom-1.\nCheck the release policy.", steps[1].(map[string]any)["prompt"])
+						correctness := steps[1].(map[string]any)
+						assert.Equal(t, "Correctness", correctness["name"])
+						assert.Equal(t, "correctness", mergeconfidence.MergeCheckID(correctness["prompt"].(string)))
+						assert.NotContains(t, correctness["prompt"], "Retired system instruction")
+						assert.Equal(t, "Merge check: custom-1.\nCheck the release policy.", steps[2].(map[string]any)["prompt"])
 					}
 				}
 			})
@@ -446,7 +455,11 @@ func TestResetScheduledIntakeKeepsScheduleAndUserPrompt(t *testing.T) {
 				agent.Configuration["executionTimeoutSeconds"] = 600
 				implementationStep(t, agent, "Propose a task")["prompt"] = "Find accessibility defects." + scheduledIntakeOutputInstructions
 			})
+			require.NoError(t, canvas.SetDisplayColumn(database.DB(t.Context()), "done"))
 			require.NoError(t, resetTestOrganization(t, r))
+			reloaded, err := models.FindCanvasInTransaction(database.DB(t.Context()), r.Organization.ID, canvas.ID)
+			require.NoError(t, err)
+			assert.Equal(t, "done", reloaded.DisplayColumnKey)
 			version := resetTestLiveVersion(t, canvas)
 			assert.Equal(t, r.User.String(), findIntakeNode(version.Nodes, "create-task").Configuration["defaultOwnerId"])
 			restored, err := materializeNonIntakeFactoryAppDefaults(database.DB(t.Context()), factory, canvas, version, nil)

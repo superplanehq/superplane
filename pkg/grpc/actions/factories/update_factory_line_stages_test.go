@@ -8,19 +8,24 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/automations"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
+	"github.com/superplanehq/superplane/pkg/workers/contexts"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
+	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
 func TestUpdateFactoryLineStages(t *testing.T) {
 	r := support.Setup(t)
+	deps := testIntakeDependencies(r)
 	db := database.DB(t.Context())
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomStages))
 
 	newLine := func(t *testing.T) (*models.Factory, *models.FactoryLine) {
 		t.Helper()
@@ -35,11 +40,11 @@ func TestUpdateFactoryLineStages(t *testing.T) {
 		factory, line := newLine(t)
 		stages := factoryLineStageRequests(line.StagesValue())
 		stages = append(stages[:1], append([]*pb.FactoryLine_Stage{
-			{Key: "new-security", Name: " Security review ", Kind: pb.FactoryLine_STAGE_KIND_CUSTOM},
-			{Key: "new-release", Name: "Release", Kind: pb.FactoryLine_STAGE_KIND_CUSTOM},
+			{Key: "new-security", Name: " Security review ", Kind: pb.FactoryLine_STAGE_KIND_PHASE},
+			{Key: "new-release", Name: "Release", Kind: pb.FactoryLine_STAGE_KIND_PHASE},
 		}, stages[1:]...)...)
 
-		created, err := UpdateFactoryLine(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
+		created, err := UpdateFactoryLine(context.Background(), deps, r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
 			FactoryId: factory.ID.String(),
 			LineId:    line.ID.String(),
 			ColumnColors: map[string]string{
@@ -51,11 +56,17 @@ func TestUpdateFactoryLineStages(t *testing.T) {
 		})
 		require.NoError(t, err)
 		require.Len(t, created.Line.Stages, 5)
+		for _, stage := range created.Line.Stages[1:4] {
+			assert.Equal(t, pb.FactoryLine_STAGE_KIND_PHASE, stage.Kind)
+		}
 		security := created.Line.Stages[1]
 		release := created.Line.Stages[2]
 		assert.Equal(t, "Security review", security.Name)
 		assert.NotEmpty(t, security.Id)
 		assert.Contains(t, security.Key, "custom-")
+		assert.True(t, security.GetAutoAdvance())
+		assert.True(t, release.GetAutoAdvance())
+		assert.False(t, created.Line.Stages[3].GetAutoAdvance())
 		assert.Equal(t, "purple", created.Line.ColumnColors[security.Key])
 
 		reordered := []*pb.FactoryLine_Stage{
@@ -65,7 +76,7 @@ func TestUpdateFactoryLineStages(t *testing.T) {
 			created.Line.Stages[3],
 			created.Line.Stages[4],
 		}
-		updated, err := UpdateFactoryLine(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
+		updated, err := UpdateFactoryLine(context.Background(), deps, r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
 			FactoryId: factory.ID.String(),
 			LineId:    line.ID.String(),
 			ColumnColors: map[string]string{
@@ -79,7 +90,7 @@ func TestUpdateFactoryLineStages(t *testing.T) {
 
 		withoutSecurity := append([]*pb.FactoryLine_Stage{}, updated.Line.Stages[:2]...)
 		withoutSecurity = append(withoutSecurity, updated.Line.Stages[3:]...)
-		removed, err := UpdateFactoryLine(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
+		removed, err := UpdateFactoryLine(context.Background(), deps, r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
 			FactoryId:          factory.ID.String(),
 			LineId:             line.ID.String(),
 			StageConfiguration: &pb.FactoryLine_StageConfiguration{Stages: withoutSecurity},
@@ -93,6 +104,195 @@ func TestUpdateFactoryLineStages(t *testing.T) {
 		assert.Equal(t, []string{"Backlog", "Release", "Verify", "Done"}, modelStageNames(reloaded.StagesValue()))
 	})
 
+	t.Run("persists auto advance and preserves it when omitted", func(t *testing.T) {
+		factory, line := newLine(t)
+		stages := factoryLineStageRequests(line.StagesValue())
+		autoAdvance := false
+		stages = append(stages[:1], append([]*pb.FactoryLine_Stage{{
+			Key: "new-qa", Name: "QA", Kind: pb.FactoryLine_STAGE_KIND_PHASE, AutoAdvance: &autoAdvance,
+		}}, stages[1:]...)...)
+
+		created, err := UpdateFactoryLine(t.Context(), deps, r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
+			FactoryId: factory.ID.String(), LineId: line.ID.String(),
+			StageConfiguration: &pb.FactoryLine_StageConfiguration{Stages: stages},
+		})
+		require.NoError(t, err)
+		qa := created.Line.Stages[1]
+		assert.False(t, qa.GetAutoAdvance())
+
+		reloaded, err := factory.FindLine(db, line.ID)
+		require.NoError(t, err)
+		withoutSetting := factoryLineStageRequests(reloaded.StagesValue())
+		withoutSetting[1].AutoAdvance = nil
+		_, err = UpdateFactoryLine(t.Context(), deps, r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
+			FactoryId: factory.ID.String(), LineId: line.ID.String(),
+			StageConfiguration: &pb.FactoryLine_StageConfiguration{Stages: withoutSetting},
+		})
+		require.NoError(t, err)
+		reloaded, err = factory.FindLine(db, line.ID)
+		require.NoError(t, err)
+		assert.False(t, reloaded.StagesValue()[1].AutoAdvanceEnabled())
+	})
+
+	t.Run("moves a workspace card to a new stage atomically", func(t *testing.T) {
+		factory, line := newLine(t)
+		canvas := support.CreateFactoryCanvas(t, r, factory.ID, "Review")
+		require.NoError(t, canvas.SetColumnKey(db, "verify"))
+		stages := factoryLineStageRequests(line.StagesValue())
+		stages = append(stages[:2], &pb.FactoryLine_Stage{Key: "new-qa", Name: "QA"}, stages[2])
+		move := &pb.FactoryLine_AutomationMove{Type: "canvas", AutomationId: canvas.ID.String(), SourceKey: "verify", DestinationKey: "new-qa"}
+		config := &pb.FactoryLine_StageConfiguration{Stages: stages, AutomationMoves: []*pb.FactoryLine_AutomationMove{move, move}}
+		req := &pb.UpdateFactoryLineRequest{FactoryId: factory.ID.String(), LineId: line.ID.String(), StageConfiguration: config}
+		_, err := UpdateFactoryLine(t.Context(), deps, r.Organization.ID.String(), req)
+		require.Error(t, err)
+		other, _ := newLine(t)
+		foreign := support.CreateFactoryCanvas(t, r, other.ID, "Other")
+		require.NoError(t, foreign.SetColumnKey(db, "verify"))
+		config.AutomationMoves[1] = &pb.FactoryLine_AutomationMove{Type: "canvas", AutomationId: foreign.ID.String(), SourceKey: "verify", DestinationKey: "new-qa"}
+		_, err = UpdateFactoryLine(t.Context(), deps, r.Organization.ID.String(), req)
+		require.Error(t, err)
+		reloaded, err := factory.FindLine(db, line.ID)
+		require.NoError(t, err)
+		require.Len(t, reloaded.Stages, 3)
+		config.AutomationMoves = config.AutomationMoves[:1]
+		result, err := UpdateFactoryLine(t.Context(), deps, r.Organization.ID.String(), req)
+		require.NoError(t, err)
+		card, err := models.FindCanvasInTransaction(db, r.Organization.ID, canvas.ID)
+		require.NoError(t, err)
+		assert.Equal(t, result.Line.Stages[2].Key, card.DisplayColumnKey)
+		assert.Equal(t, "verify", *card.ColumnKey)
+		config.Stages = []*pb.FactoryLine_Stage{result.Line.Stages[0], result.Line.Stages[1], result.Line.Stages[3]}
+		move.SourceKey, move.DestinationKey = card.DisplayColumnKey, "backlog"
+		_, err = UpdateFactoryLine(t.Context(), deps, r.Organization.ID.String(), req)
+		require.ErrorContains(t, err, "Backlog")
+		card, err = models.FindCanvasInTransaction(db, r.Organization.ID, canvas.ID)
+		require.NoError(t, err)
+		assert.Equal(t, result.Line.Stages[2].Key, card.DisplayColumnKey)
+		assert.Equal(t, "verify", *card.ColumnKey)
+	})
+
+	t.Run("moves a task departure trigger without starting a run", func(t *testing.T) {
+		factory := seedHandOffFactory(t, r, db)
+		support.AssignOpenSystemTrial(t, r.Organization.ID)
+		upsertHostedOnboardingProvider(t, db)
+		vcs := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
+		require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSIntegrationID: &vcs}))
+		line, err := factory.CreateLine(db, "Review", nil)
+		require.NoError(t, err)
+		ctx, deps := onboardingContext(r), onboardingDeps(r)
+		onTask := true
+		created, err := CreateFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &pb.CreateFactoryCustomAutomationRequest{
+			FactoryId: factory.ID.String(), Name: "Check departure", ColumnKey: "backlog",
+			Settings: &pb.FactoryCustomAutomation_Settings{
+				StartMode: pb.FactoryCustomAutomation_START_MODE_ON_LEAVE, RunsOnTask: &onTask,
+				Agent: &pb.FactoryAppTemplateAgent{Component: models.SuperPlaneRunnerComponent, Model: "hosted::anthropic::sonnet"},
+				Steps: []*pb.FactoryCustomAutomation_Step{{Name: "Inspect", Type: pb.FactoryCustomAutomation_Step_TYPE_BASH, Command: "pwd"}},
+			},
+		})
+		require.NoError(t, err)
+		id := created.CustomAutomation.Automation.Id
+		before, err := models.FindCanvasInTransaction(db, r.Organization.ID, uuid.MustParse(id))
+		require.NoError(t, err)
+		move := &pb.FactoryLine_AutomationMove{Type: "canvas", AutomationId: id, SourceKey: "backlog", DestinationKey: "new-qa"}
+		stages := factoryLineStageRequests(line.StagesValue())
+		stages = append(stages[:2], &pb.FactoryLine_Stage{Key: "new-qa", Name: "QA"}, stages[2])
+		req := &pb.UpdateFactoryLineRequest{FactoryId: factory.ID.String(), LineId: line.ID.String(), StageConfiguration: &pb.FactoryLine_StageConfiguration{Stages: stages, AutomationMoves: []*pb.FactoryLine_AutomationMove{move}}}
+		placed, err := UpdateFactoryLine(ctx, deps, r.Organization.ID.String(), req)
+		require.NoError(t, err)
+		card, err := models.FindCanvasInTransaction(db, r.Organization.ID, uuid.MustParse(id))
+		require.NoError(t, err)
+		require.Equal(t, "backlog", *card.ColumnKey)
+		require.Equal(t, before.LiveVersionID, card.LiveVersionID)
+		require.Equal(t, placed.Line.Stages[2].Key, card.DisplayColumnKey)
+		req.StageConfiguration.Stages = placed.Line.Stages
+		move.SourceKey = card.DisplayColumnKey
+		move.DestinationKey = "verify"
+		_, err = UpdateFactoryLine(ctx, deps, r.Organization.ID.String(), req)
+		require.NoError(t, err)
+		runs, err := models.ListCanvasRuns(db, uuid.MustParse(id), 10, nil, models.CanvasRunFilters{})
+		require.NoError(t, err)
+		require.Empty(t, runs)
+		order, err := factory.CreateWorkOrder(db, "Inspect", "", &r.User, nil, nil)
+		require.NoError(t, err)
+		for _, stage := range []string{"backlog", "verify", "verify"} {
+			events, err := contexts.EmitColumnLeaveCustomAutomations(db, factory, order, stage, "departure")
+			require.NoError(t, err)
+			if stage == "backlog" {
+				require.Empty(t, events)
+			}
+		}
+		runs, err = models.ListCanvasRuns(db, uuid.MustParse(id), 10, nil, models.CanvasRunFilters{})
+		require.NoError(t, err)
+		require.Len(t, runs, 1)
+	})
+
+	t.Run("saves incompatible task placements without changing execution", func(t *testing.T) {
+		factory := seedHandOffFactory(t, r, db)
+		vcs := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
+		agent := createReadyOnboardingIntegration(t, r.Organization.ID, "claude")
+		require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSIntegrationID: &vcs, AgentIntegrationID: &agent}))
+		require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
+		_, err := models.UpsertOrganizationBYOKModelAllowlist(db, r.Organization.ID, models.UsageProviderAnthropic, datatypes.JSONSlice[string]{"claude-opus-5-5"})
+		require.NoError(t, err)
+		app, entrypoint := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "Implement", "start")
+		step := models.FactoryLineStep{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entrypoint}
+		line, err := factory.CreateLine(db, "Review", []models.FactoryLineStep{step, step})
+		require.NoError(t, err)
+		stage := models.FactoryLineStage{ID: uuid.New(), Key: "custom-qa", Name: "QA", Kind: models.FactoryLineStagePhase}
+		stages := line.StagesValue()
+		stages[2].Name = "Check"
+		stages = append(stages[:1], append([]models.FactoryLineStage{stage}, stages[1:]...)...)
+		require.NoError(t, line.UpdateConfiguration(db, nil, nil, nil, stages))
+		ctx, deps := onboardingContext(r), onboardingDeps(r)
+		service := automations.Service{Backend: CanvasAutomationBackend{Deps: deps}}
+		require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureAutomationsAsCode))
+		for _, origin := range []string{stage.Key, "implement"} {
+			created, err := service.Create(ctx, automations.Placement{OrganizationID: r.Organization.ID, FactoryID: factory.ID, Stage: origin}, r.User, "apiVersion: v2\nkind: Automation\nname: Inspect "+origin+"\ntriggers:\n  - use: task_enters_stage\nsteps:\n  - name: Inspect\n    bash: pwd\n")
+			require.NoError(t, err)
+			id := created.ID
+			before, err := models.FindCanvasInTransaction(db, r.Organization.ID, id)
+			require.NoError(t, err)
+			source := origin
+			if source == "implement" {
+				source = "phase-0"
+			}
+			for _, destination := range []string{"verify", "phase-1"} {
+				move := &pb.FactoryLine_AutomationMove{Type: "canvas", AutomationId: id.String(), ExecutionKey: origin, SourceKey: source, DestinationKey: destination}
+				if origin == "implement" {
+					move.ExecutionKey = "phase-0"
+				}
+				req := &pb.UpdateFactoryLineRequest{FactoryId: factory.ID.String(), LineId: line.ID.String(), StageConfiguration: &pb.FactoryLine_StageConfiguration{Stages: factoryLineStageRequests(stages), AutomationMoves: []*pb.FactoryLine_AutomationMove{move}}}
+				_, err := UpdateFactoryLine(ctx, deps, r.Organization.ID.String(), req)
+				require.NoError(t, err)
+				card, err := models.FindCanvasInTransaction(db, r.Organization.ID, id)
+				require.NoError(t, err)
+				require.Equal(t, destination, card.DisplayColumnKey)
+				require.Equal(t, origin, *card.ColumnKey)
+				require.Equal(t, before.LiveVersionID, card.LiveVersionID)
+				sourceAfter, err := service.Read(ctx, r.Organization.ID, id)
+				require.NoError(t, err)
+				require.Equal(t, created.Revision, sourceAfter.Revision)
+				require.Equal(t, created.YAML, sourceAfter.YAML)
+				runs, err := models.ListCanvasRuns(db, id, 10, nil, models.CanvasRunFilters{})
+				require.NoError(t, err)
+				require.Empty(t, runs)
+				if origin == stage.Key {
+					req.StageConfiguration.AutomationMoves = nil
+					req.StageConfiguration.Stages = factoryLineStageRequests(append([]models.FactoryLineStage{stages[0]}, stages[2:]...))
+					_, err = UpdateFactoryLine(ctx, deps, r.Organization.ID.String(), req)
+					require.ErrorContains(t, err, "Keep the execution stage")
+				}
+				source = destination
+			}
+		}
+		move := &pb.FactoryLine_AutomationMove{Type: "agent-step", AutomationId: app.ID.String(), ExecutionKey: "phase-0", SourceKey: "phase-0", DestinationKey: "backlog"}
+		_, err = UpdateFactoryLine(ctx, deps, r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{FactoryId: factory.ID.String(), LineId: line.ID.String(), StageConfiguration: &pb.FactoryLine_StageConfiguration{Stages: factoryLineStageRequests(stages), AutomationMoves: []*pb.FactoryLine_AutomationMove{move}}})
+		require.ErrorContains(t, err, "Backlog")
+		runs, err := models.ListCanvasRuns(db, app.ID, 10, nil, models.CanvasRunFilters{})
+		require.NoError(t, err)
+		require.Empty(t, runs)
+	})
+
 	t.Run("removes optional system stages", func(t *testing.T) {
 		factory, line := newLine(t)
 		canvas := support.CreateFactoryCanvas(t, r, factory.ID, "verify")
@@ -100,7 +300,7 @@ func TestUpdateFactoryLineStages(t *testing.T) {
 		stages := factoryLineStageRequests(line.StagesValue())
 		stages = append(stages[:1], stages[2:]...)
 
-		updated, err := UpdateFactoryLine(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
+		updated, err := UpdateFactoryLine(context.Background(), deps, r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
 			FactoryId:          factory.ID.String(),
 			LineId:             line.ID.String(),
 			StageConfiguration: &pb.FactoryLine_StageConfiguration{Stages: stages},
@@ -118,7 +318,7 @@ func TestUpdateFactoryLineStages(t *testing.T) {
 		stages := factoryLineStageRequests(line.StagesValue())
 
 		for _, invalid := range [][]*pb.FactoryLine_Stage{stages[1:], stages[:len(stages)-1]} {
-			_, err := UpdateFactoryLine(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
+			_, err := UpdateFactoryLine(context.Background(), deps, r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
 				FactoryId:          factory.ID.String(),
 				LineId:             line.ID.String(),
 				StageConfiguration: &pb.FactoryLine_StageConfiguration{Stages: invalid},
@@ -140,7 +340,7 @@ func TestUpdateFactoryLineStages(t *testing.T) {
 		stages := factoryLineStageRequests(line.StagesValue())
 		reordered := []*pb.FactoryLine_Stage{stages[0], stages[2], stages[1], stages[3]}
 
-		updated, err := UpdateFactoryLine(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
+		updated, err := UpdateFactoryLine(context.Background(), deps, r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
 			FactoryId:          factory.ID.String(),
 			LineId:             line.ID.String(),
 			StageConfiguration: &pb.FactoryLine_StageConfiguration{Stages: reordered},
@@ -155,11 +355,14 @@ func TestUpdateFactoryLineStages(t *testing.T) {
 		})
 	})
 
-	t.Run("detaches automations when their stage is removed", func(t *testing.T) {
+	t.Run("releases automation names when their execution stage is removed", func(t *testing.T) {
 		factory, line := newLine(t)
 		stages := factoryLineStageRequests(line.StagesValue())
-		stages = append(stages[:1], append([]*pb.FactoryLine_Stage{{Name: "Security", Kind: pb.FactoryLine_STAGE_KIND_CUSTOM}}, stages[1:]...)...)
-		created, err := UpdateFactoryLine(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
+		stages = append(stages[:1], append([]*pb.FactoryLine_Stage{
+			{Name: "Security", Kind: pb.FactoryLine_STAGE_KIND_PHASE},
+			{Name: "Release", Kind: pb.FactoryLine_STAGE_KIND_PHASE},
+		}, stages[1:]...)...)
+		created, err := UpdateFactoryLine(context.Background(), deps, r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
 			FactoryId:          factory.ID.String(),
 			LineId:             line.ID.String(),
 			StageConfiguration: &pb.FactoryLine_StageConfiguration{Stages: stages},
@@ -167,39 +370,134 @@ func TestUpdateFactoryLineStages(t *testing.T) {
 		require.NoError(t, err)
 
 		canvas := support.CreateFactoryCanvas(t, r, factory.ID, "security")
-		require.NoError(t, db.Model(canvas).Update("column_key", created.Line.Stages[1].Key).Error)
+		originalName := canvas.Name
+		removedKey, retainedKey := created.Line.Stages[1].Key, created.Line.Stages[2].Key
+		require.NoError(t, canvas.SetColumnKey(db, removedKey))
+		source := &models.AutomationSource{
+			ID: uuid.New(), OrganizationID: r.Organization.ID, FactoryID: factory.ID,
+			Name: originalName, Source: "definition", Revision: 1, ArtifactID: canvas.ID.String(),
+			ArtifactRevision: canvas.LiveVersionID.String(),
+		}
+		require.NoError(t, source.Save(db))
+		displayOnly := support.CreateFactoryCanvas(t, r, factory.ID, "display-only")
+		require.NoError(t, displayOnly.SetColumnKey(db, "verify"))
+		require.NoError(t, displayOnly.SetDisplayColumn(db, removedKey))
+		moved := support.CreateFactoryCanvas(t, r, factory.ID, "moved")
+		require.NoError(t, moved.SetColumnKey(db, removedKey))
+		other, _ := newLine(t)
+		foreign := support.CreateFactoryCanvas(t, r, other.ID, "foreign")
+		require.NoError(t, foreign.SetColumnKey(db, removedKey))
+		require.NoError(t, foreign.SetDisplayColumn(db, removedKey))
 		withoutCustom := append([]*pb.FactoryLine_Stage{created.Line.Stages[0]}, created.Line.Stages[2:]...)
-		_, err = UpdateFactoryLine(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
-			FactoryId:          factory.ID.String(),
-			LineId:             line.ID.String(),
-			StageConfiguration: &pb.FactoryLine_StageConfiguration{Stages: withoutCustom},
+		_, err = UpdateFactoryLine(context.Background(), deps, r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
+			FactoryId: factory.ID.String(),
+			LineId:    line.ID.String(),
+			StageConfiguration: &pb.FactoryLine_StageConfiguration{
+				Stages: withoutCustom,
+				AutomationMoves: []*pb.FactoryLine_AutomationMove{{
+					Type: "canvas", AutomationId: moved.ID.String(), SourceKey: removedKey, DestinationKey: retainedKey,
+				}},
+			},
 		})
 		require.NoError(t, err)
-		reloaded, err := models.FindCanvasInTransaction(db, r.Organization.ID, canvas.ID)
+		replacement, err := CreateFactoryAutomation(
+			authentication.SetUserIdInMetadata(t.Context(), r.User.String()), deps, r.Organization.ID.String(),
+			&pb.CreateFactoryAutomationRequest{FactoryId: factory.ID.String(), Name: originalName},
+		)
 		require.NoError(t, err)
-		assert.Nil(t, reloaded.ColumnKey)
+		require.Equal(t, originalName, replacement.Automation.Name)
+		_, err = models.FindCanvasInTransaction(db, r.Organization.ID, canvas.ID)
+		require.ErrorIs(t, err, gorm.ErrRecordNotFound)
+		var deleted models.Canvas
+		require.NoError(t, db.Unscoped().First(&deleted, canvas.ID).Error)
+		assert.True(t, deleted.DeletedAt.Valid)
+		assert.NotEqual(t, originalName, deleted.Name)
+		_, err = models.FindAutomationSourceByArtifact(db, r.Organization.ID, canvas.ID.String())
+		require.ErrorIs(t, err, gorm.ErrRecordNotFound)
+		found, err := models.FindCanvasByName(db, r.Organization.ID, &factory.ID, originalName)
+		require.NoError(t, err)
+		assert.Equal(t, replacement.Automation.Id, found.ID.String())
+		for _, fixture := range []struct {
+			canvas  *models.Canvas
+			key     string
+			display string
+		}{{displayOnly, "verify", ""}, {moved, retainedKey, ""}, {foreign, removedKey, removedKey}} {
+			reloaded, err := models.FindCanvasInTransaction(db, r.Organization.ID, fixture.canvas.ID)
+			require.NoError(t, err)
+			assert.Equal(t, fixture.key, *reloaded.ColumnKey)
+			assert.Equal(t, fixture.display, reloaded.DisplayColumnKey)
+		}
 	})
 
-	t.Run("requires the custom stages feature", func(t *testing.T) {
+	t.Run("rolls back stage removal when an attached canvas is a line step", func(t *testing.T) {
 		factory, line := newLine(t)
-		require.NoError(t, models.DisableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomStages))
-		t.Cleanup(func() {
-			require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomStages))
+		stages := factoryLineStageRequests(line.StagesValue())
+		stages = append(stages[:1], append([]*pb.FactoryLine_Stage{{Name: "Security", Kind: pb.FactoryLine_STAGE_KIND_PHASE}}, stages[1:]...)...)
+		created, err := UpdateFactoryLine(t.Context(), deps, r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
+			FactoryId: factory.ID.String(), LineId: line.ID.String(),
+			StageConfiguration: &pb.FactoryLine_StageConfiguration{Stages: stages},
 		})
+		require.NoError(t, err)
+		deletable := support.CreateFactoryCanvas(t, r, factory.ID, "deletable")
+		protected, entrypoint := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "protected", "start")
+		_, err = factory.CreateLine(db, "other", []models.FactoryLineStep{{
+			Type: models.FactoryLineStepTypeRunApp, AppID: protected.ID, Entrypoint: entrypoint,
+		}})
+		require.NoError(t, err)
+		for _, canvas := range []*models.Canvas{deletable, protected} {
+			require.NoError(t, canvas.SetColumnKey(db, created.Line.Stages[1].Key))
+		}
+		_, err = UpdateFactoryLine(t.Context(), deps, r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
+			FactoryId: factory.ID.String(), LineId: line.ID.String(),
+			StageConfiguration: &pb.FactoryLine_StageConfiguration{
+				Stages: append([]*pb.FactoryLine_Stage{created.Line.Stages[0]}, created.Line.Stages[2:]...),
+			},
+		})
+		require.Error(t, err)
+		code, _, ok := grpcerrors.HandlerStatus(err)
+		require.True(t, ok)
+		assert.Equal(t, codes.FailedPrecondition, code)
+		reloaded, err := factory.FindLine(db, line.ID)
+		require.NoError(t, err)
+		assert.Equal(t, stageNames(created.Line.Stages), modelStageNames(reloaded.StagesValue()))
+		for _, canvas := range []*models.Canvas{deletable, protected} {
+			active, err := models.FindCanvasInTransaction(db, r.Organization.ID, canvas.ID)
+			require.NoError(t, err)
+			assert.Equal(t, canvas.Name, active.Name)
+			assert.Equal(t, created.Line.Stages[1].Key, *active.ColumnKey)
+		}
+	})
 
-		_, err := UpdateFactoryLine(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
+	t.Run("updates stages without opt-in and preserves saved records", func(t *testing.T) {
+		factory, line := newLine(t)
+		stageID := uuid.New()
+		autoAdvance := true
+		stages := line.StagesValue()
+		stages = append(stages[:1], append([]models.FactoryLineStage{{
+			ID: stageID, Key: "custom-" + stageID.String(), Name: "QA", Kind: models.FactoryLineStagePhase, AutoAdvance: &autoAdvance,
+		}}, stages[1:]...)...)
+		require.NoError(t, line.UpdateConfiguration(db, nil, nil, nil, stages))
+		canvas := support.CreateFactoryCanvas(t, r, factory.ID, "QA checks")
+		require.NoError(t, canvas.SetColumnKey(db, stages[1].Key))
+
+		_, err := UpdateFactoryLine(context.Background(), deps, r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
 			FactoryId:          factory.ID.String(),
 			LineId:             line.ID.String(),
 			StageConfiguration: &pb.FactoryLine_StageConfiguration{Stages: factoryLineStageRequests(line.StagesValue())},
 		})
-		code, _, ok := grpcerrors.HandlerStatus(err)
-		assert.True(t, ok)
-		assert.Equal(t, codes.FailedPrecondition, code)
+		require.NoError(t, err)
+		reloaded, err := factory.FindLine(db, line.ID)
+		require.NoError(t, err)
+		assert.Equal(t, stages, reloaded.StagesValue())
+		savedCanvas, err := models.FindCanvasInTransaction(db, r.Organization.ID, canvas.ID)
+		require.NoError(t, err)
+		require.NotNil(t, savedCanvas.ColumnKey)
+		assert.Equal(t, stages[1].Key, *savedCanvas.ColumnKey)
 	})
 
 	t.Run("rejects replacing steps and stages together", func(t *testing.T) {
 		factory, line := newLine(t)
-		_, err := UpdateFactoryLine(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
+		_, err := UpdateFactoryLine(context.Background(), deps, r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
 			FactoryId:          factory.ID.String(),
 			LineId:             line.ID.String(),
 			Steps:              []*pb.FactoryLine_Step{{}},
@@ -229,7 +527,7 @@ func TestUpdateFactoryLineStages(t *testing.T) {
 				ID:   id,
 				Key:  "custom-" + id.String(),
 				Name: fmt.Sprintf("Review %d", index+1),
-				Kind: models.FactoryLineStageCustom,
+				Kind: models.FactoryLineStagePhase,
 			}
 		}
 		stages := line.StagesValue()
@@ -240,7 +538,7 @@ func TestUpdateFactoryLineStages(t *testing.T) {
 			Type: models.FactoryLineStepTypeRunApp,
 			App:  &pb.FactoryLine_AppStep{App: app.ID.String(), Entrypoint: entrypoint},
 		}
-		_, err = UpdateFactoryLine(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
+		_, err = UpdateFactoryLine(context.Background(), deps, r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
 			FactoryId: factory.ID.String(),
 			LineId:    line.ID.String(),
 			Steps:     []*pb.FactoryLine_Step{stepRequest, stepRequest},

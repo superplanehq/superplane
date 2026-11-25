@@ -52,14 +52,43 @@ type FactoryWorkOrderLineDispatch struct {
 	Model string
 	// ThinkingLevel is the optional Start thinking override. Empty means
 	// Auto: each runner keeps the thinking level stored on the live canvas.
-	ThinkingLevel string
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
-	FinishedAt    *time.Time
+	ThinkingLevel   string
+	CurrentStageKey string
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+	FinishedAt      *time.Time
 }
 
 func (l *FactoryWorkOrderLineDispatch) StagesValue() []FactoryLineStage {
 	return []FactoryLineStage(l.Stages)
+}
+
+func (l *FactoryWorkOrderLineDispatch) StageByKey(key string) (FactoryLineStage, bool) {
+	for _, stage := range l.StagesValue() {
+		if stage.Key == key {
+			return stage, true
+		}
+	}
+	return FactoryLineStage{}, false
+}
+
+func (l *FactoryWorkOrderLineDispatch) NextStageAfter(key string) (FactoryLineStage, bool) {
+	stages := l.StagesValue()
+	for index, stage := range stages {
+		if stage.Key == key && index+1 < len(stages) {
+			return stages[index+1], true
+		}
+	}
+	return FactoryLineStage{}, false
+}
+
+func (l *FactoryWorkOrderLineDispatch) FirstStepIndexForStage(key string) (int, bool) {
+	for index, step := range []FactoryLineStep(l.Steps) {
+		if step.StageKey == key {
+			return index, true
+		}
+	}
+	return 0, false
 }
 
 // FactoryLineStartOptions records the choices made for one Start action.
@@ -102,6 +131,9 @@ func (l *FactoryLine) DispatchFromWithModel(tx *gorm.DB, order *FactoryWorkOrder
 	if err != nil {
 		return nil, nil, err
 	}
+	if len(results) == 0 {
+		return dispatch, nil, nil
+	}
 	return dispatch, results[0], nil
 }
 
@@ -135,27 +167,36 @@ func (l *FactoryLine) DispatchStageFromWithModel(
 			return nil, nil, err
 		}
 	}
+	firstStart := false
+	if startIndex == 0 {
+		dispatched, err := order.HasLineDispatch(tx)
+		if err != nil {
+			return nil, nil, err
+		}
+		firstStart = !dispatched
+	}
 
 	now := time.Now()
 	dispatch := &FactoryWorkOrderLineDispatch{
-		ID:             uuid.New(),
-		OrganizationID: l.OrganizationID,
-		FactoryID:      l.FactoryID,
-		WorkOrderID:    order.ID,
-		LineID:         l.ID,
-		LineName:       l.Name,
-		Steps:          datatypes.JSONSlice[FactoryLineStep](steps),
-		Stages:         datatypes.JSONSlice[FactoryLineStage](stages),
-		State:          FactoryWorkOrderLineDispatchStateActive,
-		Model:          strings.TrimSpace(model),
-		ThinkingLevel:  strings.TrimSpace(thinkingLevel),
-		CreatedAt:      now,
-		UpdatedAt:      now,
+		ID:              uuid.New(),
+		OrganizationID:  l.OrganizationID,
+		FactoryID:       l.FactoryID,
+		WorkOrderID:     order.ID,
+		LineID:          l.ID,
+		LineName:        l.Name,
+		Steps:           datatypes.JSONSlice[FactoryLineStep](steps),
+		Stages:          datatypes.JSONSlice[FactoryLineStage](stages),
+		State:           FactoryWorkOrderLineDispatchStateActive,
+		Model:           strings.TrimSpace(model),
+		ThinkingLevel:   strings.TrimSpace(thinkingLevel),
+		CurrentStageKey: initialStageKey(stages, steps[startIndex].StageKey, firstStart),
+		CreatedAt:       now,
+		UpdatedAt:       now,
 	}
 	if err := tx.Clauses(clause.Returning{}).Create(dispatch).Error; err != nil {
 		return nil, nil, err
 	}
-	results, err := dispatch.StartStage(tx, order, startIndex)
+	results, err := dispatch.startInitialStage(tx, order, startIndex)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -172,7 +213,7 @@ func (l *FactoryWorkOrderLineDispatch) StartStage(
 		return nil, ErrFactoryLineStepOutOfRange
 	}
 	stageKey := steps[stepIndex].StageKey
-	if stageKey == "" || steps[stepIndex].StageKind != FactoryLineStageCustom {
+	if stageKey == "" {
 		result, err := l.EnqueueOrStartStep(tx, order, stepIndex)
 		if err != nil {
 			return nil, err
@@ -218,18 +259,20 @@ func (l *FactoryLine) RecordPassedStageWithoutRun(
 
 	now := time.Now()
 	dispatch := &FactoryWorkOrderLineDispatch{
-		ID:             uuid.New(),
-		OrganizationID: l.OrganizationID,
-		FactoryID:      l.FactoryID,
-		WorkOrderID:    order.ID,
-		LineID:         l.ID,
-		LineName:       l.Name,
-		Steps:          l.Steps,
-		State:          FactoryWorkOrderLineDispatchStateFinished,
-		Result:         CanvasRunResultPassed,
-		CreatedAt:      now,
-		UpdatedAt:      now,
-		FinishedAt:     &now,
+		ID:              uuid.New(),
+		OrganizationID:  l.OrganizationID,
+		FactoryID:       l.FactoryID,
+		WorkOrderID:     order.ID,
+		LineID:          l.ID,
+		LineName:        l.Name,
+		Steps:           l.Steps,
+		Stages:          l.Stages,
+		State:           FactoryWorkOrderLineDispatchStateFinished,
+		Result:          CanvasRunResultPassed,
+		CurrentStageKey: CanvasColumnKeyVerify,
+		CreatedAt:       now,
+		UpdatedAt:       now,
+		FinishedAt:      &now,
 	}
 	if len(startOptions) > 0 {
 		dispatch.Model = strings.TrimSpace(startOptions[0].Model)
@@ -523,6 +566,20 @@ func (l *FactoryWorkOrderLineDispatch) Reactivate(tx *gorm.DB) error {
 	}).Error
 }
 
+func (l *FactoryWorkOrderLineDispatch) EnterStage(tx *gorm.DB, stageKey string) error {
+	if l.CurrentStageKey == stageKey {
+		return nil
+	}
+
+	now := time.Now()
+	l.CurrentStageKey = stageKey
+	l.UpdatedAt = now
+	return tx.Model(l).Updates(map[string]any{
+		"current_stage_key": stageKey,
+		"updated_at":        now,
+	}).Error
+}
+
 func (l *FactoryWorkOrderLineDispatch) Finish(tx *gorm.DB, result string) error {
 	if l.State == FactoryWorkOrderLineDispatchStateFinished {
 		return nil
@@ -629,7 +686,19 @@ func (o *FactoryWorkOrder) RetryLineStep(tx *gorm.DB, line *FactoryLine, stepInd
 	if stepIndex >= len(target.Steps) {
 		return nil, nil, ErrFactoryLineStepOutOfRange
 	}
-	for _, step := range target.Steps[stepIndex:] {
+	stageKey := target.Steps[stepIndex].StageKey
+	stageStart, stageEnd := target.StageStepRange(stepIndex)
+	canvasStage := slices.ContainsFunc(target.StagesValue(), func(stage FactoryLineStage) bool {
+		return stage.Key == stageKey && stage.Kind == FactoryLineStagePhase && stage.StepIndex == nil
+	})
+	// Old snapshots can have execution keys without stage metadata.
+	parallelStage := canvasStage || stageEnd-stageStart > 1 || (len(target.Stages) == 0 && strings.HasPrefix(stageKey, "custom-"))
+	enteringStage := target.CurrentStageKey != "" && target.CurrentStageKey != stageKey
+	startIndex := stepIndex
+	if parallelStage && enteringStage {
+		startIndex, _ = target.StageStepRange(stepIndex)
+	}
+	for _, step := range target.Steps[startIndex:] {
 		if err := o.ValidateSubscriptionCanvasModels(tx, step.AppID, options.Model); err != nil {
 			return nil, nil, err
 		}
@@ -647,14 +716,13 @@ func (o *FactoryWorkOrder) RetryLineStep(tx *gorm.DB, line *FactoryLine, stepInd
 		return nil, nil, err
 	}
 
-	customStage := target.Steps[stepIndex].StageKind == FactoryLineStageCustom
 	// Release before reactivate, so every path takes the line admission
 	// lock before the dispatch row and the two cannot deadlock.
 	var released []*FactoryLineStepResult
-	if customStage {
+	if parallelStage && !enteringStage {
 		released, err = target.releaseOpenWorkForCustomRetry(tx, stepIndex)
 	} else {
-		released, err = target.releaseOpenWorkFrom(tx, stepIndex)
+		released, err = target.releaseOpenWorkFrom(tx, startIndex)
 	}
 	if err != nil {
 		return nil, nil, err
@@ -663,6 +731,16 @@ func (o *FactoryWorkOrder) RetryLineStep(tx *gorm.DB, line *FactoryLine, stepInd
 
 	if err := target.Reactivate(tx); err != nil {
 		return nil, nil, err
+	}
+	if err := target.EnterStage(tx, stageKey); err != nil {
+		return nil, nil, err
+	}
+	if parallelStage && enteringStage {
+		results, startErr := target.StartStage(tx, o, startIndex)
+		if startErr != nil {
+			return nil, nil, startErr
+		}
+		return results[0], append(started, lineStepExecutionResults(results...)...), nil
 	}
 
 	result, err := target.EnqueueOrStartStep(tx, o, stepIndex)
@@ -950,6 +1028,14 @@ func (l *FactoryWorkOrderLineDispatch) StageResult(tx *gorm.DB, stepIndex int) (
 	return CanvasRunResultPassed, nil
 }
 
+func (l *FactoryWorkOrderLineDispatch) StepStageKey(stepIndex int) string {
+	steps := []FactoryLineStep(l.Steps)
+	if stepIndex < 0 || stepIndex >= len(steps) {
+		return ""
+	}
+	return steps[stepIndex].StageKey
+}
+
 // FactoryWorkOrderLineDispatchRecord is a line dispatch with its child step
 // executions — and, when the dispatch is waiting for step admission, its
 // queue item — preloaded, as used by the serialization layer.
@@ -1038,12 +1124,17 @@ func (o *FactoryWorkOrder) IsWaitingAfterPassedStage(tx *gorm.DB) (bool, error) 
 		return false, nil
 	}
 	current := dispatches[len(dispatches)-1]
+	if current.CurrentStageKey != "" && current.CurrentStageKey != CanvasColumnKeyVerify {
+		return false, nil
+	}
 	if current.QueueItem != nil {
 		return false, nil
 	}
 	executions := current.Executions
 	if len(executions) == 0 {
-		return false, nil
+		return current.CurrentStageKey == CanvasColumnKeyVerify &&
+			current.State == FactoryWorkOrderLineDispatchStateFinished &&
+			current.Result == CanvasRunResultPassed, nil
 	}
 	furthest := executions[0].FactoryWorkOrderExecution
 	for i := range executions {
@@ -1130,4 +1221,50 @@ func (l *FactoryWorkOrderLineDispatch) rejectStepAdmission(tx *gorm.DB, order *F
 		return nil, err
 	}
 	return &FactoryLineStepResult{Execution: execution}, nil
+}
+
+func (l *FactoryWorkOrderLineDispatch) startInitialStage(
+	tx *gorm.DB,
+	order *FactoryWorkOrder,
+	fallbackStepIndex int,
+) ([]*FactoryLineStepResult, error) {
+	stage, ok := l.StageByKey(l.CurrentStageKey)
+	if !ok {
+		return l.StartStage(tx, order, fallbackStepIndex)
+	}
+
+	for {
+		if stepIndex, found := l.FirstStepIndexForStage(stage.Key); found {
+			return l.StartStage(tx, order, stepIndex)
+		}
+		if !stage.AutoAdvanceEnabled() {
+			return nil, l.Finish(tx, CanvasRunResultPassed)
+		}
+		next, found := l.NextStageAfter(stage.Key)
+		if !found || next.Kind == FactoryLineStageDone {
+			return nil, l.Finish(tx, CanvasRunResultPassed)
+		}
+		if err := l.EnterStage(tx, next.Key); err != nil {
+			return nil, err
+		}
+		stage = next
+	}
+}
+
+// initialStageKey is the stage a dispatch enters first. The first start of a
+// task enters the first stage after Backlog, so an empty stage before the
+// first automation can still stop the task. A rerun enters the step's stage.
+func initialStageKey(stages []FactoryLineStage, key string, firstStart bool) string {
+	if !firstStart || key == "" {
+		return key
+	}
+	for _, stage := range stages {
+		if stage.Key == key || stage.Kind == FactoryLineStageDone {
+			return key
+		}
+		if stage.Kind != FactoryLineStageBacklog {
+			return stage.Key
+		}
+	}
+	return key
 }

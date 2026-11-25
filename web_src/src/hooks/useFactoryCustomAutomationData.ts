@@ -10,6 +10,7 @@ import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { factoryAppsKey, factoryQueryKeys } from "./useFactoryData";
+import type { CustomAutomationColumn } from "@/pages/factories/lib/customAutomation";
 
 export const factoryCustomAutomationKey = (organizationId: string, factoryId: string, automationId: string) =>
   ["factories", organizationId, factoryId, "custom-automations", automationId] as const;
@@ -40,6 +41,7 @@ export function useFactoryCustomAutomation(
     queryKey: factoryCustomAutomationKey(organizationId, factoryId, automationId ?? ""),
     queryFn: () => fetchFactoryCustomAutomation(organizationId, factoryId, automationId ?? ""),
     enabled: Boolean(organizationId && factoryId && automationId),
+    refetchOnMount: "always",
   });
 }
 
@@ -65,7 +67,7 @@ export function useFactoryCustomAutomations(
 
 type CustomAutomationInput = {
   name: string;
-  columnKey?: "backlog" | "implement" | "verify" | "done";
+  columnKey?: CustomAutomationColumn;
   settings: FactoriesFactoryCustomAutomationSettings;
 };
 
@@ -94,7 +96,7 @@ export function useCreateFactoryCustomAutomation(organizationId: string, factory
 export function useUpdateFactoryCustomAutomation(organizationId: string, factoryId: string, automationId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (input: CustomAutomationInput) => {
+    mutationFn: async (input: CustomAutomationInput & { expectedLiveVersionId?: string }) => {
       const response = await factoriesUpdateFactoryCustomAutomation(
         withOrganizationHeader({
           organizationId,

@@ -22,12 +22,7 @@ describe("AddColumnAutomationPicker", () => {
 
   it("offers the catalog for the column", () => {
     render(
-      <AddColumnAutomationPicker
-        open
-        onClose={vi.fn()}
-        onSelect={vi.fn()}
-        catalog={catalogForColumn("verify", { allowCustom: true })}
-      />,
+      <AddColumnAutomationPicker open onClose={vi.fn()} onSelect={vi.fn()} catalog={catalogForColumn("verify")} />,
     );
 
     expect(screen.getByRole("heading", { name: "Add automation" })).toBeInTheDocument();
@@ -37,7 +32,7 @@ describe("AddColumnAutomationPicker", () => {
     expect(screen.getByTestId("add-column-automation-template-checks")).toHaveTextContent("Pull request checks");
     expect(screen.getByTestId("add-column-automation-template-risk-score")).toHaveTextContent("Merge confidence");
     expect(screen.getByTestId("add-column-automation-template-risk-score")).toHaveTextContent(
-      "Score risk, performance, security, and drift on a pull request.",
+      "Review a pull request for correctness, performance, security, blast radius, and reversibility.",
     );
     expect(screen.getByTestId("add-column-automation-template-visual-evidence")).toHaveTextContent("Visual Evidence");
     expect(screen.getByTestId("add-column-automation-template-visual-evidence")).toHaveTextContent(

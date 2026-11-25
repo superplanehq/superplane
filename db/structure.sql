@@ -243,6 +243,23 @@ CREATE TABLE public.application_encryption_migrations (
 
 
 --
+-- Name: automations_as_code; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.automations_as_code (
+    id uuid NOT NULL,
+    organization_id uuid NOT NULL,
+    factory_id uuid NOT NULL,
+    name text NOT NULL,
+    source text NOT NULL,
+    revision bigint NOT NULL,
+    artifact_id text NOT NULL,
+    artifact_revision text NOT NULL,
+    CONSTRAINT automations_as_code_revision_check CHECK ((revision > 0))
+);
+
+
+--
 -- Name: billing_plans; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -978,7 +995,8 @@ CREATE TABLE public.factory_work_order_line_dispatches (
     finished_at timestamp with time zone,
     model text DEFAULT ''::text NOT NULL,
     thinking_level text DEFAULT ''::text NOT NULL,
-    stages jsonb DEFAULT '[]'::jsonb NOT NULL
+    stages jsonb DEFAULT '[]'::jsonb NOT NULL,
+    current_stage_key text DEFAULT ''::text NOT NULL
 );
 
 
@@ -2509,7 +2527,8 @@ CREATE TABLE public.workflows (
     live_version_id uuid NOT NULL,
     description text DEFAULT ''::text NOT NULL,
     factory_id uuid,
-    column_key text
+    column_key text,
+    display_column_key text DEFAULT ''::text NOT NULL
 );
 
 
@@ -2701,6 +2720,22 @@ ALTER TABLE ONLY public.application_encryption_keys
 
 ALTER TABLE ONLY public.application_encryption_migrations
     ADD CONSTRAINT application_encryption_migrations_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: automations_as_code automations_as_code_organization_id_artifact_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.automations_as_code
+    ADD CONSTRAINT automations_as_code_organization_id_artifact_id_key UNIQUE (organization_id, artifact_id);
+
+
+--
+-- Name: automations_as_code automations_as_code_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.automations_as_code
+    ADD CONSTRAINT automations_as_code_pkey PRIMARY KEY (id);
 
 
 --
@@ -3891,6 +3926,13 @@ CREATE UNIQUE INDEX application_encryption_keys_one_active ON public.application
 --
 
 CREATE UNIQUE INDEX application_encryption_migrations_unfinished ON public.application_encryption_migrations USING btree ((1)) WHERE (state = ANY (ARRAY['pending'::text, 'running'::text, 'auditing'::text]));
+
+
+--
+-- Name: automations_as_code_factory_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX automations_as_code_factory_id_idx ON public.automations_as_code USING btree (factory_id);
 
 
 --
@@ -5636,6 +5678,22 @@ ALTER TABLE ONLY public.application_encryption_migrations
 
 
 --
+-- Name: automations_as_code automations_as_code_factory_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.automations_as_code
+    ADD CONSTRAINT automations_as_code_factory_id_fkey FOREIGN KEY (factory_id) REFERENCES public.factories(id) ON DELETE CASCADE;
+
+
+--
+-- Name: automations_as_code automations_as_code_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.automations_as_code
+    ADD CONSTRAINT automations_as_code_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
 -- Name: built_in_automation_resets built_in_automation_resets_account_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -7083,7 +7141,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261120222601	f
+20261124182440	f
 \.
 
 

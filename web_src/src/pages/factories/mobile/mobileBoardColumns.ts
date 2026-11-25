@@ -62,8 +62,8 @@ export function buildMobileBoardColumns(
   totalCounts?: MobileBoardColumnTotalCounts,
 ): MobileBoardColumn[] {
   const fullBoard = buildLinePhaseBoard(line, workOrders, apps);
-  const verifyOrders = collectLineVerifyOrders(fullBoard, workOrders);
-  const hasVerifyStage = orderedLineBoardStages(line).some((stage) => stage.kind === "STAGE_KIND_VERIFY");
+  const verifyOrders = collectLineVerifyOrders(fullBoard, workOrders, line);
+  const hasVerifyStage = orderedLineBoardStages(line).some((stage) => stage.key === "verify");
   const stageColumns = visibleLineStageColumns(fullBoard, verifyOrders, hasVerifyStage);
   const backlogOrders = collectLineBacklogOrders(workOrders);
   const doneCards = cardsForOrders(collectLineDoneOrders(workOrders, line, fullBoard));
@@ -107,7 +107,7 @@ export function buildMobileBoardColumns(
   const phaseNames = new Map(stageColumns.map((column) => [column.stepIndex, column.stepName]));
 
   return orderedLineBoardStages(line, phaseNames).flatMap((stage) => {
-    if (stage.kind === "STAGE_KIND_CUSTOM") {
+    if (stage.kind === "STAGE_KIND_PHASE" && stage.stepIndex === undefined && stage.key !== "verify") {
       return [
         {
           key: stage.key as ColumnKey,

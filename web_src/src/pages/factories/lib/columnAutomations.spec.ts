@@ -357,34 +357,18 @@ describe("catalogForColumn", () => {
     expect(catalog.map((entry) => entry.id)).toEqual([...LINE_INTAKE_SOURCES.map((source) => source.id), "analysis"]);
   });
 
-  it("offers discussion, status-check, merge confidence, and visual evidence in the verify catalog", () => {
+  it("offers custom automation in Verify by default", () => {
     expect(catalogForColumn("verify").map((entry) => entry.id)).toEqual([
       "discussion",
       "checks",
       "risk-score",
       "visual-evidence",
-    ]);
-  });
-
-  it("offers a custom canvas in the verify catalog when the feature is on", () => {
-    expect(catalogForColumn("verify", { allowCustom: true }).map((entry) => entry.id)).toEqual([
-      "discussion",
-      "checks",
-      "risk-score",
-      "visual-evidence",
       "custom-verification",
     ]);
   });
 
-  it("offers pull request closure in the done catalog", () => {
-    expect(catalogForColumn("done").map((entry) => entry.id)).toEqual(["pr-closure"]);
-  });
-
-  it("offers a custom automation in the done catalog when the feature is on", () => {
-    expect(catalogForColumn("done", { allowCustom: true }).map((entry) => entry.id)).toEqual([
-      "pr-closure",
-      "custom-verification",
-    ]);
+  it("offers custom automation in Done by default", () => {
+    expect(catalogForColumn("done").map((entry) => entry.id)).toEqual(["pr-closure", "custom-verification"]);
   });
 
   it("keeps phase catalog entries available after one agent exists", () => {
@@ -395,33 +379,29 @@ describe("catalogForColumn", () => {
     });
 
     expect(takenCatalogIds(automations, catalog)).toEqual([]);
-    expect(catalog.map((entry) => entry.id)).toEqual(["agent-step"]);
+    expect(catalog.map((entry) => entry.id)).toEqual(["custom-verification"]);
   });
 });
 
 describe("onlyCustomCatalogRemains", () => {
   it("is true when every unique Verify type is taken", () => {
-    const catalog = catalogForColumn("verify", { allowCustom: true });
+    const catalog = catalogForColumn("verify");
     expect(onlyCustomCatalogRemains(catalog, ["discussion", "checks", "risk-score", "visual-evidence"])).toBe(true);
   });
 
   it("is false when risk score is still available", () => {
-    const catalog = catalogForColumn("verify", { allowCustom: true });
+    const catalog = catalogForColumn("verify");
     expect(onlyCustomCatalogRemains(catalog, ["discussion", "checks"])).toBe(false);
   });
 
-  it("is false when custom automations are off", () => {
-    expect(onlyCustomCatalogRemains(catalogForColumn("verify"), ["discussion", "checks"])).toBe(false);
-  });
-
   it("is false when another unique Verify type is still available", () => {
-    const catalog = catalogForColumn("verify", { allowCustom: true });
+    const catalog = catalogForColumn("verify");
     expect(onlyCustomCatalogRemains(catalog, ["discussion"])).toBe(false);
     expect(onlyCustomCatalogRemains(catalog, [])).toBe(false);
   });
 
   it("is true when Done already has pull request closure", () => {
-    expect(onlyCustomCatalogRemains(catalogForColumn("done", { allowCustom: true }), ["pr-closure"])).toBe(true);
+    expect(onlyCustomCatalogRemains(catalogForColumn("done"), ["pr-closure"])).toBe(true);
   });
 });
 
@@ -522,8 +502,7 @@ it("keeps a renamed scheduled intake visible and opens its saved automation", ()
     apps: [{ id: "scheduled-app", name: "Review documentation", columnKey: "backlog" }],
   });
   expect(rows).toHaveLength(1);
-  expect(rows[0].name).toBe("Review documentation");
-  expect(rows[0].trigger).toBe("On schedule");
+  expect(rows[0]).toMatchObject({ name: "Review documentation", trigger: "On schedule" });
   expect(columnAutomationOpenPath(rows[0], { organizationId: "org", factoryKey: "workspace" })).toBe(
     factoryColumnAutomationViewPath("org", "workspace", undefined, "scheduled-app"),
   );
@@ -538,12 +517,15 @@ it("keeps a renamed Review request visible without discovery and avoids a duplic
         name: "Request engineering review",
         templateId: "review-request",
         columnKey: "verify",
+        displayColumnKey: "done",
       },
     ],
   });
   expect(rows).toHaveLength(1);
   expect(rows[0]).toMatchObject({
     kind: "review-request",
+    displayColumnKey: "done",
+    executionKey: "verify",
     canvasId: "review-request-app",
     name: "Request engineering review",
   });

@@ -55,15 +55,6 @@ func Test__Get(t *testing.T) {
 		assert.Nil(t, f.Released)
 	})
 
-	t.Run("known id returns custom automations feature", func(t *testing.T) {
-		f, ok := Get(FeatureFactoryCustomAutomations)
-		assert.True(t, ok)
-		assert.Equal(t, FeatureFactoryCustomAutomations, f.ID)
-		assert.Equal(t, "Custom Automations", f.Label)
-		assert.Equal(t, "Add custom automations to board columns", f.Description)
-		assert.Nil(t, f.Released)
-	})
-
 	t.Run("retired workspace agent flag is absent", func(t *testing.T) {
 		feature, ok := Get("workspace_agent")
 		assert.False(t, ok)
@@ -161,13 +152,10 @@ func Test__Get(t *testing.T) {
 		assert.Equal(t, Feature{}, feature)
 	})
 
-	t.Run("known id returns GitHub Enterprise Cloud feature", func(t *testing.T) {
-		f, ok := Get(FeatureGitHubEnterprise)
-		assert.True(t, ok)
-		assert.Equal(t, FeatureGitHubEnterprise, f.ID)
-		assert.Equal(t, "GitHub Enterprise Cloud", f.Label)
-		assert.Equal(t, "Connect GitHub Enterprise Cloud (ghe.com) with a private GitHub App", f.Description)
-		assert.False(t, f.Hidden)
+	t.Run("retired GitHub Enterprise Cloud flag is absent", func(t *testing.T) {
+		feature, ok := Get("github_enterprise")
+		assert.False(t, ok)
+		assert.Equal(t, Feature{}, feature)
 	})
 
 	t.Run("retired ChatGPT subscription flag is absent", func(t *testing.T) {
@@ -184,8 +172,8 @@ func Test__Exists(t *testing.T) {
 	assert.True(t, Exists(FeatureFactoryDatadogIntake))
 	assert.True(t, Exists(FeatureOrganizationBYOK))
 	assert.True(t, Exists(FeatureOrganizationBYOKCustomProvider))
-	assert.True(t, Exists(FeatureFactoryCustomAutomations))
-	assert.True(t, Exists(FeatureFactoryCustomStages))
+	assert.False(t, Exists("factory_custom_stages"))
+	assert.False(t, Exists("factory_custom_automations"))
 	assert.False(t, Exists("workspace_agent"))
 	assert.True(t, Exists(FeatureWorkspaceSkills))
 	assert.True(t, Exists(FeatureFactoryPullRequestMerge))
@@ -202,8 +190,7 @@ func Test__Exists(t *testing.T) {
 	assert.False(t, Exists("factory_jira_intake"))
 	assert.False(t, Exists("factory_linear_intake"))
 	assert.False(t, Exists("factory_bitbucket"))
-	assert.True(t, Exists(FeatureGitHubEnterprise))
-	assert.False(t, IsHidden(FeatureGitHubEnterprise))
+	assert.False(t, Exists("github_enterprise"))
 	assert.False(t, Exists("codex_subscriptions"))
 	assert.False(t, Exists("does-not-exist"))
 	assert.False(t, Exists(""))
@@ -225,28 +212,25 @@ func Test__IsReleased(t *testing.T) {
 	})
 
 	t.Run("registered id with nil Released is not released", func(t *testing.T) {
-		original := registry
-		t.Cleanup(func() { registry = original })
-
-		registry = []Feature{{ID: "preview", Label: "Preview", Description: "Preview feature"}}
+		t.Cleanup(WithRegistryForTest([]Feature{{ID: "preview", Label: "Preview", Description: "Preview feature"}}))
 		assert.False(t, IsReleased("preview"))
 	})
 
 	t.Run("registered id with Released=&true is released", func(t *testing.T) {
-		original := registry
-		t.Cleanup(func() { registry = original })
-
 		v := true
-		registry = []Feature{{ID: "graduated", Label: "Graduated", Released: &v}}
+		t.Cleanup(WithRegistryForTest([]Feature{{ID: "graduated", Label: "Graduated", Released: &v}}))
 		assert.True(t, IsReleased("graduated"))
 	})
 
 	t.Run("registered id with Released=&false is not released", func(t *testing.T) {
-		original := registry
-		t.Cleanup(func() { registry = original })
-
 		v := false
-		registry = []Feature{{ID: "explicit-false", Label: "X", Released: &v}}
+		t.Cleanup(WithRegistryForTest([]Feature{{ID: "explicit-false", Label: "X", Released: &v}}))
 		assert.False(t, IsReleased("explicit-false"))
 	})
+}
+
+func Test__IsHidden(t *testing.T) {
+	assert.True(t, IsHidden(FeatureGitHubEnterpriseServer))
+	assert.False(t, IsHidden(FeatureFactories))
+	assert.False(t, IsHidden("github_enterprise"))
 }

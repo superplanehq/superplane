@@ -40,11 +40,15 @@ export type SplitRunIntakeKind =
 
 export type SplitRunAddedBy =
   | { kind: "intake"; name: string }
+  | { kind: "automation"; name: string }
   | { kind: "manual" }
   | { kind: "imported"; personName: string }
   | { kind: "mcp"; name: string };
 
-export type SplitRunSource =
+/** The run that created the task, with the automation that owns it. */
+export type SplitRunRunRef = { appId: string; runId: string };
+
+type SplitRunSourceKind =
   | {
       kind: "intake";
       name: string;
@@ -60,11 +64,20 @@ export type SplitRunSource =
       iconAlt: string;
     }
   | {
+      kind: "automation";
+      name: string;
+      iconSrc: string;
+      iconAlt: string;
+      addedBy?: SplitRunAddedBy;
+    }
+  | {
       kind: "manual";
       person: OrgUserDisplay;
       detail: typeof CREATED_MANUALLY;
       addedBy?: SplitRunAddedBy;
     };
+
+export type SplitRunSource = SplitRunSourceKind & { run?: SplitRunRunRef };
 
 export function addedByForSource(source: SplitRunSource): SplitRunAddedBy {
   if (source.kind === "mcp") {
@@ -156,6 +169,22 @@ export function splitRunIntakeSource(href: string, intakeKind?: SplitRunIntakeKi
 }
 
 export function splitRunSourceForOrder(order: FactoriesWorkOrder, resolveUser?: OrgUserDisplayLookup): SplitRunSource {
+  const source = splitRunSourceWithoutRun(order, resolveUser);
+  const run = creatorRunForOrder(order);
+  return run ? { ...source, run } : source;
+}
+
+/** Links the task to the run that created it. Needs the run and its automation. */
+function creatorRunForOrder(order: FactoriesWorkOrder): SplitRunRunRef | undefined {
+  const runId = order.sourceRunId?.trim();
+  const appId = order.createdBy?.automation?.appId?.trim();
+  if (!runId || !appId) {
+    return undefined;
+  }
+  return { appId, runId };
+}
+
+function splitRunSourceWithoutRun(order: FactoriesWorkOrder, resolveUser?: OrgUserDisplayLookup): SplitRunSourceKind {
   const originHref = order.origin?.url?.trim();
   if (originHref) {
     const source = intakeSourceFromHref(
@@ -174,8 +203,7 @@ export function splitRunSourceForOrder(order: FactoriesWorkOrder, resolveUser?: 
 
   const automation = order.createdBy?.automation;
   if (automation) {
-    const source = intakeSourceFromKind(intakeKindForAutomation(automation));
-    return { ...source, addedBy: { kind: "intake", name: source.name } };
+    return sourceForAutomation(automation);
   }
 
   const mcpName = order.mcpClient?.name?.trim();
@@ -245,7 +273,29 @@ function intakeSourceFromHref(
   };
 }
 
-function intakeKindForAutomation(automation: FactoriesAutomationRef): SplitRunIntakeKind {
+const AUTOMATION_FALLBACK_NAME = "Automation";
+
+/**
+ * Automations that are not intakes name themselves. Only ingest-style
+ * automations without a known ticket type keep the GitHub issues default.
+ */
+function sourceForAutomation(automation: FactoriesAutomationRef): SplitRunSourceKind {
+  const intakeKind = intakeKindForAutomation(automation);
+  if (intakeKind) {
+    const source = intakeSourceFromKind(intakeKind);
+    return { ...source, addedBy: { kind: "intake", name: source.name } };
+  }
+  const name = automation.appName?.trim() || AUTOMATION_FALLBACK_NAME;
+  return {
+    kind: "automation",
+    name,
+    iconSrc: superplaneMark,
+    iconAlt: "SuperPlane",
+    addedBy: { kind: "automation", name },
+  };
+}
+
+function intakeKindForAutomation(automation: FactoriesAutomationRef): SplitRunIntakeKind | undefined {
   const key = canvasKeyForAutomation({ id: automation.appId, name: automation.appName });
   if (key === "sentry") {
     return "sentry-exceptions";
@@ -253,7 +303,12 @@ function intakeKindForAutomation(automation: FactoriesAutomationRef): SplitRunIn
   if (key === "slack") {
     return "slack";
   }
-  return intakeKindFromLabel(`${automation.appId ?? ""} ${automation.appName ?? ""}`);
+  const label = `${automation.appId ?? ""} ${automation.appName ?? ""}`;
+  const hinted = INTAKE_KIND_HINTS.find((hint) => hint.pattern.test(label))?.kind;
+  if (hinted) {
+    return hinted;
+  }
+  return key === "intake" ? "github-issues" : undefined;
 }
 
 function intakeKindFromLabel(label: string): SplitRunIntakeKind {

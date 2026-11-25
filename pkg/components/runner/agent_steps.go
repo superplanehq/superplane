@@ -46,48 +46,49 @@ func ValidateAgentSteps(steps []AgentStep) error {
 		if strings.TrimSpace(step.Name) == "" {
 			return fmt.Errorf("steps[%d].name is required", i)
 		}
-		if err := validateStepWorkingDirectory(i, step.WorkingDirectory); err != nil {
-			return err
+		if err := ValidateStepWorkingDirectory(step.WorkingDirectory); err != nil {
+			return fmt.Errorf("steps[%d].workingDirectory %w", i, err)
 		}
 		switch NormalizeAgentStepType(step.Type) {
 		case AgentStepBash:
 			if step.Command == nil || strings.TrimSpace(*step.Command) == "" {
 				return fmt.Errorf("steps[%d].command is required for bash steps", i)
 			}
-			seenSecrets := make(map[string]struct{}, len(step.Secrets))
-			for j, secret := range step.Secrets {
-				name := strings.TrimSpace(secret)
-				if name == "" {
-					return fmt.Errorf("steps[%d].secrets[%d] is required", i, j)
-				}
-				if _, ok := seenSecrets[name]; ok {
-					return fmt.Errorf("steps[%d] has duplicate secret: %s", i, name)
-				}
-				seenSecrets[name] = struct{}{}
-			}
 		case AgentStepPrompt:
 			if step.Prompt == nil || strings.TrimSpace(*step.Prompt) == "" {
 				return fmt.Errorf("steps[%d].prompt is required for prompt steps", i)
 			}
 		}
+		seenSecrets := make(map[string]struct{}, len(step.Secrets))
+		for j, secret := range step.Secrets {
+			name := strings.TrimSpace(secret)
+			if name == "" {
+				return fmt.Errorf("steps[%d].secrets[%d] is required", i, j)
+			}
+			if _, ok := seenSecrets[name]; ok {
+				return fmt.Errorf("steps[%d] has duplicate secret: %s", i, name)
+			}
+			seenSecrets[name] = struct{}{}
+		}
 	}
 	return nil
 }
 
-func validateStepWorkingDirectory(index int, dir string) error {
+// ValidateStepWorkingDirectory checks the working directory accepted by runner steps.
+func ValidateStepWorkingDirectory(dir string) error {
 	dir = strings.TrimSpace(dir)
 	if dir == "" {
 		return nil
 	}
 	if strings.ContainsAny(dir, "\n\r") {
-		return fmt.Errorf("steps[%d].workingDirectory must be a single path", index)
+		return fmt.Errorf("must be a single path")
 	}
 	if filepath.IsAbs(dir) {
 		return nil
 	}
 	cleaned := filepath.ToSlash(filepath.Clean(dir))
 	if cleaned == ".." || strings.HasPrefix(cleaned, "../") {
-		return fmt.Errorf("steps[%d].workingDirectory must not contain parent path segments", index)
+		return fmt.Errorf("must not contain parent path segments")
 	}
 	return nil
 }

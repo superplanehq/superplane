@@ -31,8 +31,17 @@ function normalizeTerminalText(value) {
 }
 
 function secretValues(env) {
+  let selectedNames = [];
+  try {
+    selectedNames = JSON.parse(env?.SUPERPLANE_SECRET_ENV_NAMES || "[]");
+  } catch (_error) {
+    // Keep credential-pattern masking when registration metadata is malformed.
+  }
+  const selected = new Set(Array.isArray(selectedNames) ? selectedNames : []);
   return Object.entries(env || {})
-    .filter(([name, value]) => SECRET_NAME_PATTERN.test(name) && String(value || "").length >= 8)
+    .filter(([name, value]) =>
+      String(value || "").length > 0 &&
+      (selected.has(name) || (SECRET_NAME_PATTERN.test(name) && String(value).length >= 8)))
     .map(([, value]) => String(value))
     .sort((left, right) => right.length - left.length);
 }
@@ -56,8 +65,8 @@ function createTextRedactor(env) {
 
 function redactText(value, secrets, redactSubscription) {
   let text = normalizeTerminalText(value);
-  for (const secret of secrets) {
-    text = text.replace(new RegExp(escapeRegExp(secret), "g"), "[REDACTED]");
+  if (secrets.length > 0) {
+    text = text.replace(new RegExp(secrets.map(escapeRegExp).join("|"), "g"), "[REDACTED]");
   }
   text = redactSubscription(text);
   text = text

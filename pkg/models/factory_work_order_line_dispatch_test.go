@@ -2,6 +2,7 @@ package models_test
 
 import (
 	"fmt"
+	"os"
 	"testing"
 	"time"
 
@@ -78,9 +79,13 @@ func Test__FactoryLine__Dispatch__StartsCustomStageBeforeLineStep(t *testing.T) 
 
 	stageID := uuid.New()
 	customStage := models.FactoryLineStage{
-		ID: stageID, Key: "custom-" + stageID.String(), Name: "QA", Kind: models.FactoryLineStageCustom,
+		ID: stageID, Key: "custom-" + stageID.String(), Name: "QA", Kind: models.FactoryLineStagePhase,
 	}
 	stages := append([]models.FactoryLineStage{line.StagesValue()[0], customStage}, line.StagesValue()[1:]...)
+	stages[2].AgentDisplayKey = customStage.Key
+	eventCanvas := support.CreateFactoryCanvas(t, r, factory.ID, "PR checks")
+	require.NoError(t, eventCanvas.SetColumnKey(db, "verify"))
+	require.NoError(t, eventCanvas.SetDisplayColumn(db, customStage.Key))
 	require.NoError(t, line.UpdateConfiguration(db, nil, nil, nil, stages))
 	first, firstEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "Lint", "lint")
 	second, secondEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "Test", "test")
@@ -111,6 +116,93 @@ func Test__FactoryLine__Dispatch__StartsCustomStageBeforeLineStep(t *testing.T) 
 	assert.Equal(t, []int{0, 1}, []int{results[0].Execution.StepIndex, results[1].Execution.StepIndex})
 }
 
+func Test__FactoryLine__DispatchStage__EmptyFirstStageUsesAutoAdvance(t *testing.T) {
+	for _, test := range []struct {
+		name        string
+		autoAdvance bool
+		rerun       bool
+		wantRuns    int
+		wantState   string
+		wantStage   string
+	}{
+		{name: "enabled", autoAdvance: true, wantRuns: 1, wantState: models.FactoryWorkOrderLineDispatchStateActive, wantStage: "phase-0"},
+		{name: "disabled", autoAdvance: false, wantRuns: 0, wantState: models.FactoryWorkOrderLineDispatchStateFinished, wantStage: "custom-qa"},
+		{name: "disabled rerun", autoAdvance: false, rerun: true, wantRuns: 1, wantState: models.FactoryWorkOrderLineDispatchStateActive, wantStage: "phase-0"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			r := support.Setup(t)
+			db := database.DB(t.Context())
+			factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+			require.NoError(t, err)
+			order, err := factory.CreateWorkOrder(db, "Order", "", &r.User, nil, nil)
+			require.NoError(t, err)
+			app, entry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "Implement", "start")
+			line, err := factory.CreateLine(db, "ship", []models.FactoryLineStep{{
+				Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entry,
+			}})
+			require.NoError(t, err)
+			qa := models.FactoryLineStage{
+				ID: uuid.New(), Key: "custom-qa", Name: "QA", Kind: models.FactoryLineStagePhase,
+				AutoAdvance: &test.autoAdvance,
+			}
+			stages := append([]models.FactoryLineStage{line.StagesValue()[0], qa}, line.StagesValue()[1:]...)
+			require.NoError(t, line.UpdateConfiguration(db, nil, nil, nil, stages))
+			if test.rerun {
+				require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+					_, _, dispatchErr := line.DispatchStage(tx, order)
+					return dispatchErr
+				}))
+			}
+
+			var dispatch *models.FactoryWorkOrderLineDispatch
+			var results []*models.FactoryLineStepResult
+			require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+				var dispatchErr error
+				dispatch, results, dispatchErr = line.DispatchStage(tx, order)
+				return dispatchErr
+			}))
+
+			assert.Len(t, results, test.wantRuns)
+			reloaded, err := models.FindWorkOrderLineDispatch(db, dispatch.ID)
+			require.NoError(t, err)
+			assert.Equal(t, test.wantState, reloaded.State)
+			assert.Equal(t, test.wantStage, reloaded.CurrentStageKey)
+		})
+	}
+}
+
+func Test__FactoryLine__DispatchStage__StopsInEmptyVerifyBeforeFirstRun(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	order, err := factory.CreateWorkOrder(db, "Order", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	_, err = order.UpdateStatus(db, models.FactoryWorkOrderStatusUpdate{ToState: models.FactoryWorkOrderStateOpen})
+	require.NoError(t, err)
+	app, entry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "Implement", "start")
+	line, err := factory.CreateLine(db, "ship", []models.FactoryLineStep{{
+		Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entry,
+	}})
+	require.NoError(t, err)
+	stages := line.StagesValue()
+	// Backlog, Verify, phase-0, Done.
+	stages = []models.FactoryLineStage{stages[0], stages[2], stages[1], stages[3]}
+	require.NoError(t, line.UpdateConfiguration(db, nil, nil, nil, stages))
+
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		_, _, dispatchErr := line.DispatchStage(tx, order)
+		return dispatchErr
+	}))
+
+	inVerify, err := order.IsWaitingAfterPassedStage(db)
+	require.NoError(t, err)
+	assert.True(t, inVerify)
+	column, err := models.WorkOrderBoardColumn(db, order)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasColumnKeyVerify, column)
+}
+
 func Test__FactoryWorkOrder__RetryLineStep__KeepsCustomStageSiblingsRunning(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
@@ -124,7 +216,7 @@ func Test__FactoryWorkOrder__RetryLineStep__KeepsCustomStageSiblingsRunning(t *t
 	}})
 	require.NoError(t, err)
 	stageID := uuid.New()
-	stage := models.FactoryLineStage{ID: stageID, Key: "custom-" + stageID.String(), Name: "QA", Kind: models.FactoryLineStageCustom}
+	stage := models.FactoryLineStage{ID: stageID, Key: "custom-" + stageID.String(), Name: "QA", Kind: models.FactoryLineStagePhase}
 	stages := append([]models.FactoryLineStage{line.StagesValue()[0], stage}, line.StagesValue()[1:]...)
 	require.NoError(t, line.UpdateConfiguration(db, nil, nil, nil, stages))
 	first, _ := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "Lint", "start")
@@ -162,6 +254,15 @@ func Test__FactoryWorkOrder__RetryLineStep__KeepsCustomStageSiblingsRunning(t *t
 	require.NoError(t, err)
 	assert.Equal(t, models.FactoryWorkOrderExecutionStatusFinished, settledLater.Status)
 	assert.Equal(t, models.CanvasRunResultCancelled, settledLater.Result)
+
+	require.NoError(t, dispatch.EnterStage(db, "phase-0"))
+	var moved []*models.FactoryLineStepResult
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		_, moved, err = order.RetryLineStep(tx, line, 1)
+		return err
+	}))
+	require.Len(t, moved, 2, "entering a custom stage starts every automation")
+	assert.Equal(t, []int{0, 1}, []int{moved[0].Execution.StepIndex, moved[1].Execution.StepIndex})
 }
 
 func Test__FactoryLine__DispatchStage__QueuesCustomStageAboveLimit(t *testing.T) {
@@ -175,7 +276,7 @@ func Test__FactoryLine__DispatchStage__QueuesCustomStageAboveLimit(t *testing.T)
 	}})
 	require.NoError(t, err)
 	stageID := uuid.New()
-	stage := models.FactoryLineStage{ID: stageID, Key: "custom-" + stageID.String(), Name: "QA", Kind: models.FactoryLineStageCustom}
+	stage := models.FactoryLineStage{ID: stageID, Key: "custom-" + stageID.String(), Name: "QA", Kind: models.FactoryLineStagePhase}
 	stages := append([]models.FactoryLineStage{line.StagesValue()[0], stage}, line.StagesValue()[1:]...)
 	require.NoError(t, line.UpdateConfiguration(db, nil, nil, nil, stages))
 	lint, _ := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "Lint", "start")
@@ -218,7 +319,7 @@ func Test__FactoryWorkOrder__RetryLineStep__QueuesCustomStageRetryAtLimit(t *tes
 	}})
 	require.NoError(t, err)
 	stageID := uuid.New()
-	stage := models.FactoryLineStage{ID: stageID, Key: "custom-" + stageID.String(), Name: "QA", Kind: models.FactoryLineStageCustom}
+	stage := models.FactoryLineStage{ID: stageID, Key: "custom-" + stageID.String(), Name: "QA", Kind: models.FactoryLineStagePhase}
 	stages := append([]models.FactoryLineStage{line.StagesValue()[0], stage}, line.StagesValue()[1:]...)
 	require.NoError(t, line.UpdateConfiguration(db, nil, nil, nil, stages))
 	lint, _ := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "Lint", "start")
@@ -752,6 +853,15 @@ func Test__FactoryWorkOrder__RetryLineStep__ReusesDispatchWithEarlierSteps(t *te
 		}
 		return full.Finish(tx, models.CanvasRunResultFailed)
 	}))
+
+	// A finished legacy snapshot must remain usable when a retry reopens it.
+	require.NoError(t, db.Exec(`UPDATE factory_work_order_line_dispatches
+		SET stages = jsonb_set(stages, '{3,kind}', '"verify"'),
+		    steps = jsonb_set(steps, '{1,stage_kind}', '"custom"')
+		WHERE id = ?`, full.ID).Error)
+	migration, err := os.ReadFile("../../db/migrations/20261124182440_unify-factory-stage-kinds.up.sql")
+	require.NoError(t, err)
+	require.NoError(t, db.Exec(string(migration)).Error)
 
 	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
 		_, _, dispatchErr := line.DispatchFrom(tx, order, 1)

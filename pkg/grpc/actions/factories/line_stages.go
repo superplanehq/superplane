@@ -71,15 +71,20 @@ func parseFactoryLineStage(
 		if len(stage.GetKey()) > factoryLineColumnColorKeyMaxLength {
 			return models.FactoryLineStage{}, invalidArgument("temporary stage key is invalid")
 		}
-		if (stage.GetKey() != "" && !strings.HasPrefix(stage.GetKey(), "new-")) || (stage.GetKind() != pb.FactoryLine_STAGE_KIND_UNSPECIFIED && stage.GetKind() != pb.FactoryLine_STAGE_KIND_CUSTOM) || stage.StepIndex != nil {
-			return models.FactoryLineStage{}, invalidArgument("new stages must be custom stages without an id or step index")
+		if (stage.GetKey() != "" && !strings.HasPrefix(stage.GetKey(), "new-")) || (stage.GetKind() != pb.FactoryLine_STAGE_KIND_UNSPECIFIED && stage.GetKind() != pb.FactoryLine_STAGE_KIND_PHASE) || stage.StepIndex != nil {
+			return models.FactoryLineStage{}, invalidArgument("new stages must be phases without an id or step index")
 		}
 		id := uuid.New()
+		autoAdvance := true
+		if stage.AutoAdvance != nil {
+			autoAdvance = stage.GetAutoAdvance()
+		}
 		return models.FactoryLineStage{
-			ID:   id,
-			Key:  "custom-" + id.String(),
-			Name: name,
-			Kind: models.FactoryLineStageCustom,
+			ID:          id,
+			Key:         "custom-" + id.String(),
+			Name:        name,
+			Kind:        models.FactoryLineStagePhase,
+			AutoAdvance: &autoAdvance,
 		}, nil
 	}
 
@@ -95,6 +100,10 @@ func parseFactoryLineStage(
 		return models.FactoryLineStage{}, invalidArgument("stage id, key, kind, and step index cannot change")
 	}
 	existing.Name = name
+	if stage.AutoAdvance != nil {
+		autoAdvance := stage.GetAutoAdvance()
+		existing.AutoAdvance = &autoAdvance
+	}
 	return existing, nil
 }
 
@@ -125,10 +134,6 @@ func factoryLineStageKind(kind pb.FactoryLine_StageKind) string {
 		return models.FactoryLineStageBacklog
 	case pb.FactoryLine_STAGE_KIND_PHASE:
 		return models.FactoryLineStagePhase
-	case pb.FactoryLine_STAGE_KIND_CUSTOM:
-		return models.FactoryLineStageCustom
-	case pb.FactoryLine_STAGE_KIND_VERIFY:
-		return models.FactoryLineStageVerify
 	case pb.FactoryLine_STAGE_KIND_DONE:
 		return models.FactoryLineStageDone
 	default:

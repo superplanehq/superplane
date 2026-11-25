@@ -8,6 +8,7 @@ import { AlarmClock, ChevronDown, GitCommitHorizontal, LogOut, MousePointerClick
 import { useState } from "react";
 
 import {
+  AUTOMATION_ICONS,
   customAutomationColumnLabel,
   customAutomationTriggersForRun,
   newCustomAutomationTrigger,
@@ -18,13 +19,15 @@ import {
 import { CustomAutomationScheduleFields } from "./CustomAutomationScheduleFields";
 import { PlanningReviewForm } from "./PlanningReviewForm";
 import type { PlanningReviewDraft } from "./planningReviewMockup";
+import { useCustomAutomationStageLabel } from "./useCustomAutomationStageLabel";
 
 type TriggerEditorProps = {
+  showModel?: boolean;
   columnKey: CustomAutomationColumn;
   name: string;
   icon: string;
   triggers: CustomAutomationTrigger[];
-  runsOnTask: boolean;
+  runsOnTask?: boolean;
   onTriggersChange: (triggers: CustomAutomationTrigger[]) => void;
   onRunsOnTaskChange: (runsOnTask: boolean) => void;
   draft: PlanningReviewDraft;
@@ -38,6 +41,7 @@ type TriggerEditorProps = {
 
 export function TriggerEditor({
   columnKey,
+  showModel = true,
   name,
   icon,
   triggers,
@@ -54,6 +58,9 @@ export function TriggerEditor({
 }: TriggerEditorProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const visibleTriggers = customAutomationTriggersForRun(triggers, runsOnTask);
+  const triggerModes: CustomAutomationMode[] = ["manual"];
+  if (runsOnTask !== false) triggerModes.push("automatic", "leave");
+  if (runsOnTask !== true) triggerModes.push("scheduled");
   const updateTrigger = (id: string, next: CustomAutomationTrigger) => {
     onTriggersChange(triggers.map((trigger) => (trigger.id === id ? next : trigger)));
   };
@@ -83,13 +90,13 @@ export function TriggerEditor({
       <section className="flex flex-col gap-4">
         <div className="flex flex-col gap-1.5">
           <h3 className="text-base font-semibold text-foreground">Triggers</h3>
-          <TriggerContext runsOnTask={runsOnTask} onRunsOnTaskChange={onRunsOnTaskChange} />
+          <TriggerContext columnKey={columnKey} runsOnTask={runsOnTask} onRunsOnTaskChange={onRunsOnTaskChange} />
         </div>
         {visibleTriggers.map((trigger) => (
           <TriggerCard
             key={trigger.id}
             columnKey={columnKey}
-            runsOnTask={runsOnTask}
+            runsOnTask={runsOnTask !== false}
             trigger={trigger}
             triggers={triggers}
             expanded={expandedId === trigger.id}
@@ -103,28 +110,28 @@ export function TriggerEditor({
             onScheduleChange={(schedule) => updateTrigger(trigger.id, { ...trigger, schedule })}
           />
         ))}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button type="button" variant="outline" size="sm" className="w-fit gap-1.5">
-              <Plus className="size-3.5" aria-hidden />
-              Add trigger
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="min-w-72">
-            {(runsOnTask ? (["manual", "automatic", "leave"] as const) : (["manual", "scheduled"] as const)).map(
-              (mode) => (
+        {!columnKey.startsWith("custom-") && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button type="button" variant="outline" size="sm" className="w-fit gap-1.5">
+                <Plus className="size-3.5" aria-hidden />
+                Add trigger
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="min-w-72">
+              {triggerModes.map((mode) => (
                 <DropdownMenuItem
                   key={mode}
                   className="py-2.5"
                   disabled={mode !== "scheduled" && triggers.some((trigger) => trigger.mode === mode)}
                   onSelect={() => addTrigger(mode)}
                 >
-                  <TriggerOption mode={mode} columnKey={columnKey} runsOnTask={runsOnTask} />
+                  <TriggerOption mode={mode} columnKey={columnKey} runsOnTask={runsOnTask !== false} />
                 </DropdownMenuItem>
-              ),
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </section>
       <section className="flex flex-col gap-8">
         <h3 className="text-base font-semibold text-foreground">Agent</h3>
@@ -140,6 +147,8 @@ export function TriggerEditor({
           showResources={false}
           showSteps={false}
           modelOnly
+          applyModelDefault={false}
+          showModel={showModel}
           modelDescription="The model used for this automation."
         />
       </section>
@@ -167,6 +176,7 @@ function TriggerCard({
   onScheduleChange: (schedule: CustomAutomationTrigger["schedule"]) => void;
 }) {
   const configurable = trigger.mode === "scheduled";
+  const stageLabel = useCustomAutomationStageLabel(columnKey);
   return (
     <div className="rounded-lg border border-border bg-background">
       <div className="flex items-center gap-1 pr-2">
@@ -195,7 +205,7 @@ function TriggerCard({
             variant="ghost"
             size="icon-sm"
             className="text-muted-foreground hover:text-destructive"
-            aria-label={removeTriggerLabel(triggers, trigger, columnKey)}
+            aria-label={removeTriggerLabel(triggers, trigger, columnKey, stageLabel)}
             onClick={onRemove}
           >
             <Trash2 className="size-4" aria-hidden />
@@ -218,19 +228,26 @@ function TriggerCard({
 
 /** Chooses which triggers this automation can run. The choice is saved. */
 function TriggerContext({
+  columnKey,
   runsOnTask,
   onRunsOnTaskChange,
 }: {
-  runsOnTask: boolean;
+  columnKey: CustomAutomationColumn;
+  runsOnTask?: boolean;
   onRunsOnTaskChange: (runsOnTask: boolean) => void;
 }) {
+  if (columnKey.startsWith("custom-")) {
+    return (
+      <p className="text-xs text-muted-foreground">The line starts this automation when a task enters the stage.</p>
+    );
+  }
   return (
     <div className="flex items-center gap-2" data-testid="custom-automation-runs-on-task">
       <span className="text-xs text-muted-foreground">Runs</span>
       <SegmentedNav
         ariaLabel="Runs"
         size="xs"
-        value={runsOnTask ? "task" : "none"}
+        value={runsOnTask === undefined ? "" : runsOnTask ? "task" : "none"}
         onValueChange={(value) => onRunsOnTaskChange(value === "task")}
         options={[
           { value: "task", label: "on a task" },
@@ -240,57 +257,6 @@ function TriggerContext({
     </div>
   );
 }
-
-const AUTOMATION_ICONS = [
-  "sparkles",
-  "shield-check",
-  "search",
-  "bug",
-  "file-code",
-  "code",
-  "terminal",
-  "eye",
-  "gauge",
-  "git-pull-request",
-  "cpu",
-  "circle-check",
-  "activity",
-  "alarm-clock",
-  "archive",
-  "bell",
-  "bolt",
-  "book",
-  "box",
-  "boxes",
-  "braces",
-  "calendar",
-  "camera",
-  "chart-line",
-  "check",
-  "clock",
-  "cloud",
-  "cog",
-  "component",
-  "container",
-  "database",
-  "factory",
-  "file-json",
-  "file-text",
-  "fingerprint",
-  "flag",
-  "folder",
-  "git-branch",
-  "git-commit",
-  "git-merge",
-  "globe",
-  "key",
-  "layers",
-  "lock",
-  "message-square",
-  "network",
-  "package",
-  "rocket",
-] as const;
 
 function AutomationIconPicker({ icon, onChange }: { icon: string; onChange: (icon: string) => void }) {
   const [open, setOpen] = useState(false);
@@ -346,8 +312,9 @@ function removeTriggerLabel(
   triggers: CustomAutomationTrigger[],
   trigger: CustomAutomationTrigger,
   columnKey: CustomAutomationColumn,
+  stageLabel?: string,
 ): string {
-  const title = triggerTitle(trigger.mode, columnKey);
+  const title = triggerTitle(trigger.mode, columnKey, stageLabel);
   const sameType = triggers.filter((item) => item.mode === trigger.mode);
   if (sameType.length < 2) {
     return `Remove ${title}`;
@@ -355,13 +322,15 @@ function removeTriggerLabel(
   return `Remove ${title} ${sameType.findIndex((item) => item.id === trigger.id) + 1}`;
 }
 
-function triggerTitle(mode: CustomAutomationMode, columnKey: CustomAutomationColumn): string {
+function triggerTitle(
+  mode: CustomAutomationMode,
+  columnKey: CustomAutomationColumn,
+  stageLabel = customAutomationColumnLabel(columnKey),
+): string {
   if (mode === "scheduled") return "Schedule";
-  if (mode === "leave") return `When a task leaves ${customAutomationColumnLabel(columnKey)}`;
+  if (mode === "leave") return `When a task leaves ${stageLabel}`;
   if (mode === "automatic") {
-    return columnKey === "verify"
-      ? "Every pull request commit"
-      : `When a task enters ${customAutomationColumnLabel(columnKey)}`;
+    return columnKey === "verify" ? "Every pull request commit" : `When a task enters ${stageLabel}`;
   }
   return "Manual";
 }
@@ -376,6 +345,7 @@ function TriggerOption({
   runsOnTask: boolean;
 }) {
   const automatic = mode === "automatic" || mode === "leave";
+  const stageLabel = useCustomAutomationStageLabel(columnKey);
   const Icon =
     mode === "scheduled" ? AlarmClock : mode === "leave" ? LogOut : automatic ? GitCommitHorizontal : MousePointerClick;
   return (
@@ -391,18 +361,18 @@ function TriggerOption({
         <Icon className="size-4" aria-hidden />
       </span>
       <span className="flex min-w-0 flex-col">
-        <span className="text-sm font-medium text-foreground">{triggerTitle(mode, columnKey)}</span>
+        <span className="text-sm font-medium text-foreground">{triggerTitle(mode, columnKey, stageLabel)}</span>
         <span className="text-xs font-normal text-muted-foreground">
           {mode === "scheduled"
             ? columnKey === "backlog"
               ? "Run automation on a schedule."
               : "Runs on the repository default branch."
             : mode === "leave"
-              ? `Runs when a task leaves ${customAutomationColumnLabel(columnKey)}.`
+              ? `Runs when a task leaves ${stageLabel}.`
               : automatic
                 ? columnKey === "verify"
                   ? "Runs after each new commit."
-                  : `Runs when a task enters ${customAutomationColumnLabel(columnKey)}.`
+                  : `Runs when a task enters ${stageLabel}.`
                 : runsOnTask
                   ? "A person starts each run from a task."
                   : "A person starts each run from the column."}

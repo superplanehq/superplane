@@ -20,9 +20,11 @@ func TestScheduledSubscriptionReservationUsesPersistedVersionBeforeTaskExists(t 
 	factory, err := models.FindFactory(db, connection.OrganizationID, support.CodexWorkspaceID(t, db, connection.OrganizationID))
 	require.NoError(t, err)
 	enabled := true
-	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{CodexSubscription: &enabled}))
+	defaultOwner := uuid.NewString()
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{CodexSubscription: &enabled, CodexDefaultOwnerID: &defaultOwner}))
 	canvas, _ := support.CreateCanvas(t, connection.OrganizationID, connection.OwnerUserID, scheduledSubscriptionNodes(connection.OwnerUserID), nil)
 	require.NoError(t, db.Model(canvas).Updates(map[string]any{"factory_id": factory.ID, "column_key": models.CanvasColumnKeyBacklog}).Error)
+	require.NoError(t, canvas.SetDisplayColumn(db, "verify"))
 	run, err := models.CreateCanvasRunInTransaction(db, canvas.ID, "schedule", models.CanvasRunStateStarted, "")
 	require.NoError(t, err)
 	// A newer live default and untrusted event input must not redirect this run.

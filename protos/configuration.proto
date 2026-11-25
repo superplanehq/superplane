@@ -134,6 +134,7 @@ message SelectOption {
   string label = 1;
   string value = 2;
   string description = 3;
+  bool disabled = 4;
 }
 
 message VisibilityCondition {

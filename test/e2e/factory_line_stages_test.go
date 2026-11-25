@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"strings"
 	"testing"
 
 	pw "github.com/mxschmitt/playwright-go"
@@ -20,13 +21,46 @@ func TestFactoryLineCustomStages(t *testing.T) {
 	s.givenALine()
 	s.openLine()
 	s.addStage("QA")
-	s.assertStageOrder("backlog", "phase", "verify", "custom", "done")
+	s.assertStageOrder("backlog", "phase-0", "verify", s.stageKey, "done")
 	s.moveStage()
-	s.assertStageOrder("backlog", "custom", "phase", "verify", "done")
+	s.assertStageOrder("backlog", s.stageKey, "phase-0", "verify", "done")
 	s.reloadAndAssertStageVisible()
+	s.moveAgentAndReload()
 	s.removeStage()
-	s.assertStageOrder("backlog", "phase", "verify", "done")
+	s.assertStageOrder("backlog", "phase-0", "verify", "done")
 	s.reloadAndAssertStageHidden()
+}
+
+func TestFactoryLineCustomAutomationMove(t *testing.T) {
+	s := &factoryLineStagesSteps{t: t}
+	s.start()
+	s.givenALine()
+	s.openLine()
+	s.addStage("QA")
+	s.moveCustomAutomationAndReload()
+}
+
+func (s *factoryLineStagesSteps) moveCustomAutomationAndReload() {
+	db := database.DB(s.t.Context())
+	user, err := models.FindMaybeDeletedUserByEmail(s.session.OrgID.String(), s.session.Account.Email)
+	require.NoError(s.t, err)
+	resources := &support.ResourceRegistry{User: user.ID, Organization: &models.Organization{ID: s.session.OrgID}}
+	app, _ := support.CreateFactoryAppWithOnRunTrigger(s.t, resources, s.factory.ID, "Check QA", "start")
+	require.NoError(s.t, app.SetColumnKey(db, s.stageKey))
+	s.reloadAndAssertStageVisible()
+	s.enterStageEditing()
+	page := s.session.Page()
+	handle := pw.LocatorGetByRoleOptions{Name: "Move " + app.Name, Exact: pw.Bool(true)}
+	require.NoError(s.t, page.GetByTestId("lines-stage-shell-"+s.stageKey).GetByRole("button", handle).DragTo(page.GetByTestId("lines-stage-shell-verify")))
+	s.saveStageChanges()
+	s.reloadAndAssertStageVisible()
+	s.enterStageEditing()
+	require.NoError(s.t, page.GetByTestId("lines-stage-shell-verify").GetByRole("button", handle).WaitFor())
+	reloaded, err := models.FindCanvasInTransaction(db, s.session.OrgID, app.ID)
+	require.NoError(s.t, err)
+	require.Equal(s.t, "verify", reloaded.DisplayColumnKey)
+	require.Equal(s.t, s.stageKey, *reloaded.ColumnKey)
+	require.Equal(s.t, app.LiveVersionID, reloaded.LiveVersionID)
 }
 
 func (s *factoryLineStagesSteps) moveStage() {
@@ -36,6 +70,19 @@ func (s *factoryLineStagesSteps) moveStage() {
 	target := page.GetByTestId("lines-stage-shell-phase-0")
 	require.NoError(s.t, handle.DragTo(target))
 	s.saveStageChanges()
+}
+
+func (s *factoryLineStagesSteps) moveAgentAndReload() {
+	page := s.session.Page()
+	s.enterStageEditing()
+	handle := pw.LocatorGetByRoleOptions{Name: "Move " + s.line.Stages[1].Name, Exact: pw.Bool(true)}
+	target := page.GetByTestId("lines-stage-shell-" + s.stageKey)
+	require.NoError(s.t, page.GetByTestId("lines-stage-shell-phase-0").GetByRole("button", handle).DragTo(target))
+	s.saveStageChanges()
+	s.reloadAndAssertStageVisible()
+	s.enterStageEditing()
+	require.NoError(s.t, target.GetByRole("button", handle).WaitFor())
+	require.NoError(s.t, page.GetByTestId("line-stage-edit-toolbar").GetByRole("button", pw.LocatorGetByRoleOptions{Name: "Done", Exact: pw.Bool(true)}).Click())
 }
 
 func (s *factoryLineStagesSteps) enterStageEditing() {
@@ -67,7 +114,6 @@ func (s *factoryLineStagesSteps) start() {
 	s.session.Start()
 	s.session.Login()
 	require.NoError(s.t, models.EnableExperimentalFeature(s.session.OrgID, features.FeatureFactories))
-	require.NoError(s.t, models.EnableExperimentalFeature(s.session.OrgID, features.FeatureFactoryCustomStages))
 }
 
 func (s *factoryLineStagesSteps) givenALine() {
@@ -101,13 +147,13 @@ func (s *factoryLineStagesSteps) addStage(name string) {
 	require.NoError(s.t, dialog.GetByRole("button", pw.LocatorGetByRoleOptions{Name: "Add stage", Exact: pw.Bool(true)}).Click())
 	require.NoError(s.t, dialog.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateHidden}))
 	s.saveStageChanges()
-	automationDialog := page.GetByRole("dialog", pw.PageGetByRoleOptions{Name: "Add an automation for " + name, Exact: pw.Bool(true)})
+	automationDialog := page.GetByTestId("custom-automation-setup-modal")
 	require.NoError(s.t, automationDialog.GetByRole("button", pw.LocatorGetByRoleOptions{Name: "Close", Exact: pw.Bool(true)}).Click())
 
 	reloaded, err := s.factory.FindLine(database.DB(s.t.Context()), s.line.ID)
 	require.NoError(s.t, err)
 	for _, stage := range reloaded.StagesValue() {
-		if stage.Kind == models.FactoryLineStageCustom {
+		if strings.HasPrefix(stage.Key, "custom-") {
 			s.stageKey = stage.Key
 			break
 		}
@@ -115,14 +161,14 @@ func (s *factoryLineStagesSteps) addStage(name string) {
 	require.NotEmpty(s.t, s.stageKey)
 }
 
-func (s *factoryLineStagesSteps) assertStageOrder(kinds ...string) {
+func (s *factoryLineStagesSteps) assertStageOrder(keys ...string) {
 	reloaded, err := s.factory.FindLine(database.DB(s.t.Context()), s.line.ID)
 	require.NoError(s.t, err)
 	actual := make([]string, len(reloaded.StagesValue()))
 	for index, stage := range reloaded.StagesValue() {
-		actual[index] = stage.Kind
+		actual[index] = stage.Key
 	}
-	assert.Equal(s.t, kinds, actual)
+	assert.Equal(s.t, keys, actual)
 }
 
 func (s *factoryLineStagesSteps) reloadAndAssertStageVisible() {

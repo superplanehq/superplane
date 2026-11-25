@@ -15,7 +15,6 @@ import (
 	factorycomponent "github.com/superplanehq/superplane/pkg/components/factory"
 	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -64,13 +63,6 @@ func CreateFactoryCustomAutomation(
 	}
 
 	db := database.DB(ctx)
-	organization, err := models.FindOrganizationByIDInTransaction(db, orgID.String())
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to create custom automation")
-	}
-	if !organization.HasExperimentalFeature(features.FeatureFactoryCustomAutomations) {
-		return nil, factoryErrorToStatus(errCustomAutomationsDisabled, "failed to create custom automation")
-	}
 	factory, err := findFactory(db, orgID, req.GetFactoryId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create custom automation")
@@ -81,9 +73,12 @@ func CreateFactoryCustomAutomation(
 		column = models.CanvasColumnKeyVerify
 	}
 	if !customAutomationColumnAllowed(column) {
-		return nil, factoryErrorToStatus(invalidArgument("column must be backlog, implement, verify, or done"), "failed to create custom automation")
+		return nil, factoryErrorToStatus(invalidArgument("Select a stage in this factory."), "failed to create custom automation")
 	}
-	settings, err := parseCustomAutomationSettings(db, factory, req.GetSettings())
+	if err := validateCustomStageAutomation(db, factory, column); err != nil {
+		return nil, factoryErrorToStatus(err, "failed to create custom automation")
+	}
+	settings, err := customAutomationSettingsForSave(db, factory, req.GetSettings(), versionOwnerID(ctx))
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create custom automation")
 	}
@@ -160,6 +155,13 @@ func DescribeFactoryCustomAutomation(
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to describe custom automation")
 	}
+	version, err := models.FindLiveCanvasVersionByCanvasInTransaction(db, canvas)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to describe custom automation")
+	}
+	if err := checkCustomStageFormGraph(db, factory, canvas, version); err != nil {
+		return nil, err
+	}
 	automation, err := serializeCustomAutomation(db, factory, canvas)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to describe custom automation")
@@ -173,9 +175,10 @@ func UpdateFactoryCustomAutomation(
 	organizationID string,
 	req *pb.UpdateFactoryCustomAutomationRequest,
 ) (*pb.UpdateFactoryCustomAutomationResponse, error) {
+	const errorMessage = "failed to update custom automation"
 	orgID, err := parseOrganizationID(organizationID)
 	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to update custom automation")
+		return nil, factoryErrorToStatus(err, errorMessage)
 	}
 	userID, ok := authentication.GetUserIdFromMetadata(ctx)
 	if !ok {
@@ -183,81 +186,113 @@ func UpdateFactoryCustomAutomation(
 	}
 	ownerID, err := uuid.Parse(userID)
 	if err != nil {
-		return nil, factoryErrorToStatus(invalidArgument("invalid user id"), "failed to update custom automation")
+		return nil, factoryErrorToStatus(invalidArgument("invalid user id"), errorMessage)
+	}
+	name := strings.TrimSpace(req.GetName())
+	if name == "" {
+		return nil, factoryErrorToStatus(invalidArgument("name is required"), errorMessage)
 	}
 
 	db := database.DB(ctx)
 	factory, err := findFactory(db, orgID, req.GetFactoryId())
 	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to update custom automation")
+		return nil, factoryErrorToStatus(err, errorMessage)
 	}
-	canvas, err := findCustomAutomationCanvas(db, factory, req.GetAutomationId())
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to update custom automation")
-	}
-	settings, err := parseCustomAutomationSettings(db, factory, req.GetSettings())
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to update custom automation")
-	}
-	name := strings.TrimSpace(req.GetName())
-	if name == "" {
-		return nil, factoryErrorToStatus(invalidArgument("name is required"), "failed to update custom automation")
-	}
-	if canvas.ColumnKey != nil {
-		settings.ColumnKey = *canvas.ColumnKey
-	}
-	if settings.SkipSetupCommands == nil || settings.SkipRepositoryCheckout == nil {
-		current, err := serializeCustomAutomation(db, factory, canvas)
-		if err != nil {
-			return nil, factoryErrorToStatus(err, "failed to read custom automation settings")
-		}
-		if settings.SkipSetupCommands == nil {
-			settings.SkipSetupCommands = current.GetSettings().SkipSetupCommands
-		}
-		if settings.SkipRepositoryCheckout == nil {
-			settings.SkipRepositoryCheckout = current.GetSettings().SkipRepositoryCheckout
-		}
-	}
-	doc, err := buildCustomAutomationCanvas(db, factory, name, settings)
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to update custom automation")
-	}
-	if err := preserveCustomAutomationNodeIdentities(db, canvas, doc); err != nil {
-		return nil, factoryErrorToStatus(err, "failed to update custom automation")
-	}
-	nodes, edges, err := doc.ParseInTransaction(deps.Registry, orgID.String(), db)
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to build custom automation")
-	}
-
+	var canvas *models.Canvas
+	var automation *pb.FactoryCustomAutomation
 	err = db.Transaction(func(tx *gorm.DB) error {
+		factory, err := models.LockAutomationFactory(tx, orgID, factory.ID)
+		if err != nil {
+			return err
+		}
+		current, err := findCustomAutomationCanvas(tx, factory, req.GetAutomationId())
+		if err != nil {
+			return err
+		}
+		canvas, err = models.LockCanvasForUpdate(tx, orgID, current.ID)
+		if err != nil {
+			return err
+		}
+		live, err := models.FindLiveCanvasVersionByCanvasInTransaction(tx, canvas)
+		if err != nil {
+			return err
+		}
+		if expected := req.GetExpectedLiveVersionId(); expected != "" && expected != live.ID.String() {
+			return grpcerrors.FailedPrecondition(nil, "The automation changed. Reopen it before you save.")
+		}
+		if models.FactoryAppTemplateID(live.Nodes) != models.FactoryAppTemplateCustomAutomationID && !legacyCustomStageGraph(canvas, live) {
+			return invalidArgument("automation is not a custom automation")
+		}
+		if err := checkCustomStageFormGraph(tx, factory, canvas, live); err != nil {
+			return err
+		}
+		authored, err := findLegacyAutomationSource(tx, canvas)
+		if err != nil {
+			return err
+		}
+		settings, err := customAutomationSettingsForSave(tx, factory, req.GetSettings(), ownerID)
+		if err != nil {
+			return err
+		}
+		if canvas.ColumnKey != nil {
+			settings.ColumnKey = *canvas.ColumnKey
+		}
+		if err := validateCustomStageAutomation(tx, factory, settings.ColumnKey); err != nil {
+			return err
+		}
+		if settings.SkipSetupCommands == nil || settings.SkipRepositoryCheckout == nil {
+			previous, err := serializeCustomAutomationVersion(factory, canvas, live)
+			if err != nil {
+				return err
+			}
+			if settings.SkipSetupCommands == nil {
+				settings.SkipSetupCommands = previous.GetSettings().SkipSetupCommands
+			}
+			if settings.SkipRepositoryCheckout == nil {
+				settings.SkipRepositoryCheckout = previous.GetSettings().SkipRepositoryCheckout
+			}
+		}
+		doc, err := buildCustomAutomationCanvas(tx, factory, name, settings)
+		if err != nil {
+			return err
+		}
+		if err := preserveCustomAutomationIdentities(live, doc); err != nil {
+			return err
+		}
+		nodes, edges, err := doc.ParseInTransaction(deps.Registry, orgID.String(), tx)
+		if err != nil {
+			return err
+		}
+		if legacyCustomStageGraph(canvas, live) {
+			nodes, edges = editLegacyCustomStageGraph(live, settings)
+		}
+
 		if err := canvases.PublishGeneratedCanvasNodes(
-			ctx,
-			tx,
-			canvas,
-			ownerID,
-			"Update custom automation",
-			nodes,
-			edges,
-			intakePublisherOptions(deps, orgID),
+			ctx, tx, canvas, ownerID, "Update custom automation", nodes, edges, intakePublisherOptions(deps, orgID),
 		); err != nil {
 			return err
 		}
-		return canvases.UpdateCanvasInTransaction(tx, canvas, &name, nil)
+		if err := canvases.UpdateCanvasInTransaction(tx, canvas, &name, nil); err != nil {
+			return err
+		}
+		canvas, err = models.FindCanvasInTransaction(tx, orgID, canvas.ID)
+		if err != nil {
+			return err
+		}
+		version, err := models.FindLiveCanvasVersionByCanvasInTransaction(tx, canvas)
+		if err != nil {
+			return err
+		}
+		if err := refreshLegacyAutomationSource(tx, factory, canvas, version, authored); err != nil {
+			return err
+		}
+		automation, err = serializeCustomAutomationVersion(factory, canvas, version)
+		return err
 	})
 	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to update custom automation")
+		return nil, factoryErrorToStatus(err, errorMessage)
 	}
 	canvases.PublishCanvasUpdated(canvas)
-
-	canvas, err = models.FindCanvasInTransaction(db, orgID, canvas.ID)
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to update custom automation")
-	}
-	automation, err := serializeCustomAutomation(db, factory, canvas)
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to update custom automation")
-	}
 	return &pb.UpdateFactoryCustomAutomationResponse{CustomAutomation: automation}, nil
 }
 
@@ -283,6 +318,38 @@ type customAutomationSettings struct {
 
 func (settings *customAutomationSettings) runsWithoutTask() bool {
 	return settings != nil && settings.RunsOnTask != nil && !*settings.RunsOnTask
+}
+
+// A custom automation can select a model for its workspace agent.
+func (settings *customAutomationSettings) model() string {
+	if settings.Agent != nil && settings.Agent.Model != "" {
+		return settings.Agent.Model
+	}
+	return settings.Agent.model()
+}
+
+func customAutomationSettingsForSave(
+	tx *gorm.DB,
+	factory *models.Factory,
+	input *pb.FactoryCustomAutomation_Settings,
+	callerID uuid.UUID,
+) (*customAutomationSettings, error) {
+	settings, err := parseCustomAutomationSettings(tx, factory, input)
+	if err != nil {
+		return nil, err
+	}
+	agent := settings.Agent
+	if strings.TrimSpace(input.GetAgent().GetModel()) == "" || (agent.Component != models.SuperPlaneRunnerComponent && !agent.subscription()) {
+		return settings, nil
+	}
+	allowed, err := validateCustomAutomationModel(tx, factory, agent, callerID)
+	if err != nil {
+		return nil, err
+	}
+	if !allowed {
+		return nil, invalidArgument("Select a model available for this agent in the factory.")
+	}
+	return settings, nil
 }
 
 func parseCustomAutomationSettings(
@@ -488,6 +555,20 @@ func customAutomationAgent(tx *gorm.DB, factory *models.Factory, input *pb.Facto
 	if agent.Component == models.SuperPlaneRunnerComponent {
 		return agent, nil
 	}
+	if source == runner.CredentialsSourceIntegration && agent.Component == "runnerOpenRouter" {
+		integration, err := models.FindIntegrationByName(tx, factory.OrganizationID, integrationName)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, invalidArgument("Select an available agent integration.")
+		}
+		if err != nil {
+			return nil, err
+		}
+		installed := intakeAgentFromIntegration(integration)
+		if installed == nil || installed.Component != agent.Component {
+			return nil, invalidArgument("Select an integration that supports this agent.")
+		}
+		agent.LLMProvider = installed.LLMProvider
+	}
 	if source != "" {
 		agent.Credentials = map[string]any{"source": source}
 		if integrationName != "" {
@@ -513,6 +594,10 @@ func buildCustomAutomationCanvas(
 	settings *customAutomationSettings,
 ) (*yaml.Canvas, error) {
 	config := factory.OnboardingConfigValue()
+	provider := config.EffectiveVCSProvider()
+	if strings.HasPrefix(settings.ColumnKey, "custom-") {
+		return buildCustomStageAutomationCanvas(tx, factory, name, settings, provider)
+	}
 	repository := strings.TrimSpace(config.AppRepository)
 	integrationID := strings.TrimSpace(config.VCSIntegrationID)
 	if repository == "" {
@@ -521,7 +606,6 @@ func buildCustomAutomationCanvas(
 	if integrationID == "" {
 		return nil, invalidArgument("workspace VCS integration is required")
 	}
-	provider := config.EffectiveVCSProvider()
 	workspaceScope := customAutomationListensOnWorkspace(factory)
 	if workspaceScope {
 		repository = models.WorkspaceRepositoriesExpression
@@ -645,12 +729,7 @@ func buildCustomAutomationCanvas(
 }
 
 func customAutomationColumnAllowed(column string) bool {
-	switch column {
-	case models.CanvasColumnKeyBacklog, models.CanvasColumnKeyImplement, models.CanvasColumnKeyVerify, models.CanvasColumnKeyDone:
-		return true
-	default:
-		return false
-	}
+	return models.ValidCanvasColumnKey(column)
 }
 
 func customAutomationUsesTaskTrigger(column string) bool {
@@ -954,11 +1033,7 @@ func customAutomationRunnerConfiguration(
 	if credentials := settings.Agent.credentials(); credentials != nil && settings.Agent.component() != models.SuperPlaneRunnerComponent {
 		configuration["credentials"] = credentials
 	}
-	model := settings.Agent.model()
-	if settings.Agent.subscription() {
-		model = settings.Agent.Model
-	}
-	if model != "" {
+	if model := settings.model(); model != "" {
 		configuration["model"] = model
 	}
 	settings.Agent.applyLLMProvider(configuration)
@@ -1179,17 +1254,13 @@ func findCustomAutomationCanvas(tx *gorm.DB, factory *models.Factory, rawID stri
 	if err != nil {
 		return nil, err
 	}
-	if models.FactoryAppTemplateID(version.Nodes) != models.FactoryAppTemplateCustomAutomationID {
+	if models.FactoryAppTemplateID(version.Nodes) != models.FactoryAppTemplateCustomAutomationID && !legacyCustomStageGraph(canvas, version) {
 		return nil, invalidArgument("automation is not a custom automation")
 	}
 	return canvas, nil
 }
 
-func preserveCustomAutomationNodeIdentities(tx *gorm.DB, canvas *models.Canvas, doc *yaml.Canvas) error {
-	version, err := models.FindLiveCanvasVersionByCanvasInTransaction(tx, canvas)
-	if err != nil {
-		return err
-	}
+func preserveCustomAutomationIdentities(version *models.CanvasVersion, doc *yaml.Canvas) error {
 	for i := range version.Nodes {
 		if version.Nodes[i].Type == models.NodeTypeTrigger {
 			preserveCustomAutomationPRTriggerIdentity(&version.Nodes[i], doc)
@@ -1300,6 +1371,9 @@ func decodeCustomAutomationTriggers(nodes []models.Node) ([]decodedCustomAutomat
 		}
 		template, _ := node.Metadata[models.FactoryAppTemplateMetadataKey].(map[string]any)
 		mode, _ := template["startMode"].(string)
+		if node.ComponentName() == "onRun" {
+			mode = "automatic"
+		}
 		if node.ComponentName() == "schedule" || mode == "scheduled" {
 			offset, err := strconv.ParseFloat(configString(node.Configuration, "timezone"), 64)
 			if err != nil {
@@ -1394,12 +1468,37 @@ func serializeCustomAutomation(
 	if err != nil {
 		return nil, err
 	}
+	return serializeCustomAutomationVersion(factory, canvas, version)
+}
+
+func serializeCustomAutomationVersion(
+	factory *models.Factory,
+	canvas *models.Canvas,
+	version *models.CanvasVersion,
+) (*pb.FactoryCustomAutomation, error) {
+	automation, err := readCustomAutomationVersion(factory, canvas, version)
+	if err != nil {
+		return nil, err
+	}
+	for _, step := range automation.Settings.Steps {
+		if step.Type == pb.FactoryCustomAutomation_Step_TYPE_PROMPT {
+			step.Prompt = strings.TrimSpace(stripBacklogTaskInstructions(step.Prompt))
+		}
+	}
+	return automation, nil
+}
+
+func readCustomAutomationVersion(
+	factory *models.Factory,
+	canvas *models.Canvas,
+	version *models.CanvasVersion,
+) (*pb.FactoryCustomAutomation, error) {
 	triggers, err := decodeCustomAutomationTriggers(version.Nodes)
 	if err != nil {
 		return nil, err
 	}
 	agent := selectCustomAutomationAgent(version.Nodes)
-	if len(triggers) == 0 || agent == nil || models.FactoryAppTemplateID(version.Nodes) != models.FactoryAppTemplateCustomAutomationID {
+	if len(triggers) == 0 || agent == nil || (models.FactoryAppTemplateID(version.Nodes) != models.FactoryAppTemplateCustomAutomationID && !legacyCustomStageGraph(canvas, version)) {
 		return nil, errors.New("custom automation graph is incomplete")
 	}
 
@@ -1407,6 +1506,7 @@ func serializeCustomAutomation(
 	if err != nil {
 		return nil, err
 	}
+	runsOnTask := customAutomationRunsOnTaskMetadata(version.Nodes)
 	icon := ""
 	for i := range version.Nodes {
 		if version.Nodes[i].Type != models.NodeTypeTrigger {
@@ -1426,7 +1526,7 @@ func serializeCustomAutomation(
 		Steps:                   steps,
 		Icon:                    icon,
 		ExecutionTimeoutSeconds: int32(configInt(agent.Configuration, "executionTimeoutSeconds")),
-		RunsOnTask:              customAutomationRunsOnTaskMetadata(version.Nodes),
+		RunsOnTask:              runsOnTask,
 	}
 	if skipSetup, ok := agent.Configuration[runner.SkipSetupCommandsField].(bool); ok {
 		settings.SkipSetupCommands = &skipSetup
@@ -1517,12 +1617,21 @@ func customAutomationProtoSteps(raw any) ([]*pb.FactoryCustomAutomation_Step, er
 		} else {
 			value.Type = pb.FactoryCustomAutomation_Step_TYPE_PROMPT
 			if step.Prompt != nil {
-				value.Prompt = strings.TrimSpace(stripBacklogTaskInstructions(*step.Prompt))
+				value.Prompt = *step.Prompt
 			}
 		}
 		result = append(result, value)
 	}
 	return result, nil
+}
+
+func stripCustomAutomationBacklogPrompt(steps []*pb.FactoryCustomAutomation_Step) {
+	for i := len(steps) - 1; i >= 0; i-- {
+		if steps[i].Type == pb.FactoryCustomAutomation_Step_TYPE_PROMPT {
+			steps[i].Prompt = stripBacklogTaskInstructions(steps[i].Prompt)
+			return
+		}
+	}
 }
 
 func configInt(configuration map[string]any, key string) int {

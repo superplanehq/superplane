@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { factoryVCSProvider } from "@/pages/home/factories";
 import { factoryAppsKey, useCreateFactoryAutomation } from "@/hooks/useFactoryData";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
-import { FEATURE_FACTORY_CUSTOM_AUTOMATIONS, FEATURE_FACTORY_REVIEW_REQUEST } from "@/lib/experimentalFeatures";
+import { FEATURE_FACTORY_REVIEW_REQUEST } from "@/lib/experimentalFeatures";
 import { showErrorToast } from "@/lib/toast";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { useInstallFactory } from "@/pages/home/useInstallFactory";
@@ -26,6 +26,7 @@ import {
   prFeedbackSetupKindFromSourceId,
 } from "../lib/factoryPagePaths";
 import { factoryCustomAutomationSetupPath } from "../lib/customAutomationPaths";
+import type { CustomAutomationColumn } from "../lib/customAutomation";
 
 export function useAddColumnAutomation(args: {
   organizationId: string;
@@ -47,9 +48,8 @@ export function useAddColumnAutomation(args: {
   const createAutomation = useCreateFactoryAutomation(args.organizationId, args.factoryId);
   const { installFactory, isInstalling } = useInstallFactory({ organizationId: args.organizationId });
   const experimentalFeatures = useExperimentalFeature(args.organizationId);
-  const allowCustom = experimentalFeatures.has(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
   const allowReviewRequest = experimentalFeatures.has(FEATURE_FACTORY_REVIEW_REQUEST);
-  const catalogOptions = { allowCustom, allowReviewRequest, vcsProvider: args.vcsProvider };
+  const catalogOptions = { allowReviewRequest, vcsProvider: args.vcsProvider };
 
   const pickerCatalog = column
     ? pickerCatalogForColumn(column, catalogOptions)
@@ -73,7 +73,7 @@ export function useAddColumnAutomation(args: {
     const nextTaken = takenCatalogIds(args.automationsFor(key), nextCatalog);
     const setupColumn = customAutomationSetupColumn(key);
     const customStage = key.startsWith("custom-");
-    if (!customStage && setupColumn !== null && onlyCustomCatalogRemains(nextCatalog, nextTaken) && args.lineId) {
+    if (setupColumn !== null && onlyCustomCatalogRemains(nextCatalog, nextTaken) && args.lineId) {
       navigate(
         factoryCustomAutomationSetupPath(args.organizationId, args.factoryKey, args.lineId, undefined, setupColumn),
       );
@@ -88,7 +88,12 @@ export function useAddColumnAutomation(args: {
     if (!column || pickerCatalog.unavailableReasons[entry.id]) {
       return;
     }
-    if (entry.kind === "pr-discussion" || entry.kind === "pr-checks" || entry.kind === "custom-verification") {
+    if (
+      entry.kind === "pr-discussion" ||
+      entry.kind === "pr-checks" ||
+      entry.kind === "custom-verification" ||
+      (entry.kind === "custom" && column.startsWith("custom-"))
+    ) {
       openFocusedVerifySetup(entry, column, args, navigate, closePicker);
       return;
     }
@@ -113,10 +118,7 @@ export function useAddColumnAutomation(args: {
       }
       return;
     }
-    if (entry.kind !== "custom") {
-      return;
-    }
-    setNaming(true);
+    if (entry.kind === "custom") setNaming(true);
   };
 
   const createNamed = async (name: string) => {
@@ -134,7 +136,6 @@ export function useAddColumnAutomation(args: {
   };
 
   return {
-    allowCustom,
     pickerColumn: column,
     pickerTitle: columnTitle ? `Add an automation for ${columnTitle}` : undefined,
     pickerOpen: column !== null && !naming,
@@ -168,7 +169,8 @@ function githubVerifyTemplate(
   };
 }
 
-function customAutomationSetupColumn(key: ColumnKey): "implement" | "verify" | "done" | undefined | null {
+function customAutomationSetupColumn(key: ColumnKey): CustomAutomationColumn | undefined | null {
+  if (key.startsWith("custom-")) return key as CustomAutomationColumn;
   if (key === "verify") return undefined;
   if (key === "done") return "done";
   if (key === "phase-0") return "implement";
@@ -199,7 +201,7 @@ function focusedVerifySetupPath(
   if (!args.lineId) {
     return undefined;
   }
-  if (entry.kind === "custom-verification") {
+  if (entry.kind === "custom-verification" || entry.kind === "custom") {
     const setupColumn = customAutomationSetupColumn(column);
     return factoryCustomAutomationSetupPath(
       args.organizationId,

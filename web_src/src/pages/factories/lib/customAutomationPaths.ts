@@ -1,4 +1,5 @@
 import { factoryLineDetailPath } from "./factoryPagePaths";
+import type { CustomAutomationColumn } from "./customAutomation";
 
 const CUSTOM_AUTOMATION_PARAM = "customAutomation";
 const LEGACY_CUSTOM_AUTOMATION_PARAM = "customVerification";
@@ -9,7 +10,7 @@ export function factoryCustomAutomationSetupPath(
   factoryKey: string,
   lineId: string,
   automationId?: string,
-  columnKey?: "backlog" | "implement" | "verify" | "done",
+  columnKey?: CustomAutomationColumn,
 ) {
   const params = new URLSearchParams({
     [CUSTOM_AUTOMATION_PARAM]: automationId?.trim() || NEW_CUSTOM_AUTOMATION,

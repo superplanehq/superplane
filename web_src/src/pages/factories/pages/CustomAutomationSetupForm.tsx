@@ -19,7 +19,7 @@ type CustomAutomationSetupFormProps = {
   name: string;
   icon: string;
   triggers: CustomAutomationTrigger[];
-  runsOnTask: boolean;
+  runsOnTask?: boolean;
   columnKey?: CustomAutomationColumn;
   draft: PlanningReviewDraft;
   organizationId: string;
@@ -28,6 +28,8 @@ type CustomAutomationSetupFormProps = {
   saving: boolean;
   deleting: boolean;
   error: string;
+  asCode?: boolean;
+  showModel?: boolean;
   onNameChange: (name: string) => void;
   onIconChange: (icon: string) => void;
   onTriggersChange: (triggers: CustomAutomationTrigger[]) => void;
@@ -52,6 +54,8 @@ export function CustomAutomationSetupForm(props: CustomAutomationSetupFormProps)
     saving,
     deleting,
     error,
+    asCode,
+    showModel,
     onNameChange,
     onIconChange,
     onTriggersChange,
@@ -62,7 +66,6 @@ export function CustomAutomationSetupForm(props: CustomAutomationSetupFormProps)
     onClose,
   } = props;
   const [selectedStep, setSelectedStep] = useState<number | null>(null);
-  const [confirmDelete, setConfirmDelete] = useState(false);
   const component = draft.components[0];
   const steps = (component?.configuration.steps as PlanningReviewStep[] | undefined) ?? [];
   const activeStep = selectedStep === null ? undefined : steps[selectedStep];
@@ -89,11 +92,12 @@ export function CustomAutomationSetupForm(props: CustomAutomationSetupFormProps)
 
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid="custom-automation-setup">
-      <div className="flex min-h-0 flex-1">
+      <div className="flex min-h-0 flex-1" inert={saving || deleting}>
         <AutomationFlow
           columnKey={columnKey}
+          asCode={asCode}
           triggers={customAutomationTriggersForRun(triggers, runsOnTask)}
-          runsOnTask={runsOnTask}
+          runsOnTask={runsOnTask !== false}
           steps={renderedSteps}
           selectedStep={previewSelection}
           rowRefs={rowRefs}
@@ -113,10 +117,12 @@ export function CustomAutomationSetupForm(props: CustomAutomationSetupFormProps)
               onMove={(offset) => selectedStep !== null && moveStepAt(selectedStep, offset)}
               onRemove={() => selectedStep !== null && removeStepAt(selectedStep)}
               organizationId={organizationId}
+              asCode={asCode}
             />
           ) : (
             <TriggerEditor
               columnKey={columnKey}
+              showModel={showModel}
               name={name}
               icon={icon}
               triggers={triggers}
@@ -134,12 +140,10 @@ export function CustomAutomationSetupForm(props: CustomAutomationSetupFormProps)
           )}
         </div>
       </div>
-      <SetupFormFooter
+      <CustomAutomationSetupFooter
         error={error}
         saving={saving}
         deleting={deleting}
-        confirmDelete={confirmDelete}
-        onConfirmDeleteChange={setConfirmDelete}
         onSave={onSave}
         onDelete={onDelete}
         onClose={onClose}
@@ -196,12 +200,10 @@ function useStepList(
   };
 }
 
-function SetupFormFooter({
+export function CustomAutomationSetupFooter({
   error,
   saving,
   deleting,
-  confirmDelete,
-  onConfirmDeleteChange,
   onSave,
   onDelete,
   onClose,
@@ -209,12 +211,11 @@ function SetupFormFooter({
   error: string;
   saving: boolean;
   deleting: boolean;
-  confirmDelete: boolean;
-  onConfirmDeleteChange: (value: boolean) => void;
   onSave: () => void;
   onDelete?: () => void;
   onClose: () => void;
 }) {
+  const [confirmDelete, setConfirmDelete] = useState(false);
   return (
     <footer className="flex shrink-0 flex-col gap-3 border-t border-border bg-popover px-6 py-4">
       {error ? (
@@ -223,7 +224,7 @@ function SetupFormFooter({
           role="alert"
         >
           <CircleAlert className="size-4 shrink-0" aria-hidden />
-          <p>{error}</p>
+          <p className="whitespace-pre-line">{error}</p>
         </div>
       ) : null}
       <div className="flex w-full items-center justify-between gap-3">
@@ -237,7 +238,7 @@ function SetupFormFooter({
                   variant="outline"
                   size="sm"
                   disabled={deleting}
-                  onClick={() => onConfirmDeleteChange(false)}
+                  onClick={() => setConfirmDelete(false)}
                 >
                   Keep
                 </Button>
@@ -253,13 +254,7 @@ function SetupFormFooter({
                 </LoadingButton>
               </div>
             ) : (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                disabled={saving}
-                onClick={() => onConfirmDeleteChange(true)}
-              >
+              <Button type="button" variant="ghost" size="sm" disabled={saving} onClick={() => setConfirmDelete(true)}>
                 Delete
               </Button>
             )

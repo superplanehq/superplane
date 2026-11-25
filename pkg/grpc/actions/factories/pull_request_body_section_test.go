@@ -16,6 +16,7 @@ import (
 	factorycomponent "github.com/superplanehq/superplane/pkg/components/factory"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/factories/mergeconfidence"
 	"github.com/superplanehq/superplane/pkg/factories/vcs"
 	"github.com/superplanehq/superplane/pkg/integrations/bitbucket"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
@@ -198,6 +199,53 @@ func TestAssessmentCompletionEmitsStructuredMergeConfidence(t *testing.T) {
 	}
 }
 
+func TestPullRequestUsesLatestCorrectnessAcrossScales(t *testing.T) {
+	f := newPublicationFixture(t)
+	automation := &factoryevents.AutomationRef{AppID: f.canvas.ID, NodeID: "agent"}
+	report := func(id string, score float64) {
+		t.Helper()
+		_, err := factorycomponent.ReportMergeConfidenceCheck(f.db, f.order, f.run.ID, automation, f.pr.Repository, id, score, "Reviewed the requested behavior.", []string{id}, nil)
+		require.NoError(t, err)
+	}
+	current := func(key string, score float64, level string) {
+		t.Helper()
+		checks, err := f.order.ListChecks(f.db)
+		require.NoError(t, err)
+		require.Len(t, checks, 1)
+		assert.Equal(t, key, checks[0].Key)
+		assert.Equal(t, score, checks[0].Score)
+		assert.Equal(t, level, checks[0].Level)
+		require.NotNil(t, checks[0].PreviousScore)
+		assert.Equal(t, 6-score, *checks[0].PreviousScore)
+	}
+
+	oldRun := f.run.ID
+	report("drift", 5)
+	f.startRun(t)
+	report("correctness", 5)
+	current("correctness-review", 5, factoryevents.CheckLevelPositive)
+
+	history, err := f.order.ChecksForRun(f.db, oldRun)
+	require.NoError(t, err)
+	assert.Equal(t, 5.0, history["drift-review"].Score)
+	assert.Equal(t, factoryevents.CheckLevelCritical, history["drift-review"].Level)
+
+	// An installation that still uses the old prompt can report again.
+	f.startRun(t)
+	report("drift", 5)
+	current("drift-review", 5, factoryevents.CheckLevelCritical)
+
+	// Even if both steps run in one assessment, the PR report counts only the latest.
+	report("correctness", 5)
+	runChecks, err := f.order.ChecksForRun(f.db, f.run.ID)
+	require.NoError(t, err)
+	result := (mergeconfidence.Assessment{Passed: true, Enabled: []string{"drift", "correctness"}, Checks: runChecks}).ReportData()
+	require.Len(t, result.Checks, 1)
+	require.NotNil(t, result.OverallScore)
+	assert.Equal(t, 5.0, *result.OverallScore)
+	assert.Equal(t, factoryevents.CheckLevelPositive, result.OverallLevel)
+}
+
 func TestMergeConfidenceTemplateReportFormat(t *testing.T) {
 	for _, provider := range []string{models.ProviderGitHub, models.ProviderBitbucket} {
 		for _, scenario := range []string{"complete", "caution", "mixed", "custom only", "all disabled", "unsafe text"} {
@@ -208,6 +256,7 @@ func TestMergeConfidenceTemplateReportFormat(t *testing.T) {
 				}
 				f := newPublicationFixture(t)
 				f.pr.Provider = provider
+				const defect = "On retry, saveOrder inserts a second order because it ignores the existing order ID."
 				mixedChecks := []struct {
 					id, label string
 					score     float64
@@ -247,7 +296,11 @@ func TestMergeConfidenceTemplateReportFormat(t *testing.T) {
 					require.NoError(t, err)
 				} else if scenario == "mixed" {
 					for _, check := range mixedChecks {
-						_, err := factorycomponent.ReportMergeConfidenceCheck(f.db, f.order, f.run.ID, &factoryevents.AutomationRef{AppID: f.canvas.ID, NodeID: "agent"}, "acme/app", check.id, check.score, "Reported result.", []string{check.id}, nil)
+						summary := "Reported result."
+						if check.id == "drift" {
+							summary = defect
+						}
+						_, err := factorycomponent.ReportMergeConfidenceCheck(f.db, f.order, f.run.ID, &factoryevents.AutomationRef{AppID: f.canvas.ID, NodeID: "agent"}, "acme/app", check.id, check.score, summary, []string{check.id}, nil)
 						require.NoError(t, err)
 					}
 				} else if scenario == "caution" {
@@ -266,15 +319,18 @@ func TestMergeConfidenceTemplateReportFormat(t *testing.T) {
 				case "caution":
 					assert.Contains(t, body, "| Security | ⚠️ |")
 				case "mixed":
+					remaining := body
 					for _, row := range []string{
-						"| Blast radius | ✅ |",
+						"| Correctness | ❌ | " + defect + " |",
 						"| Performance | ⚠️ |",
 						"| Security | ✅ |",
-						"| Drift from Specification | ❌ |",
+						"| Blast radius | ✅ |",
 						"| Reversibility | ❌ |",
 						"| Custom | ✅ |",
 					} {
-						assert.Contains(t, body, row)
+						var found bool
+						_, remaining, found = strings.Cut(remaining, row)
+						require.True(t, found, "expected report row in order: %s", row)
 					}
 				case "custom only":
 					assert.Equal(t, "## SuperPlane merge confidence\n\n| Check | Status | Summary |\n| --- | :---: | --- |\n| Custom | ➖ | Custom result. |\n\n"+suffix, body)

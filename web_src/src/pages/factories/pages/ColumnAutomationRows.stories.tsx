@@ -10,6 +10,8 @@ import { withFactoriesTheme } from "../__fixtures__/factoriesStoryTheme";
 import type { ColumnAutomation } from "../lib/columnAutomations";
 import { WorkOrderBoardLane, WorkOrderKanbanBoard } from "../workOrders/WorkOrderBoardChrome";
 import { ColumnAutomationRows } from "./ColumnAutomationRows";
+import { AutomationRowContext } from "./AutomationRowContext";
+import { Button } from "@/components/ui/button";
 import { useColumnAutomationCollapsePreference } from "@/hooks/useColumnAutomationCollapsePreference";
 import { ColumnAutomationToggle } from "./ColumnAutomationDisclosure";
 import { columnAutomationRowsSubheader } from "./columnAutomationRowsSubheader";
@@ -127,6 +129,67 @@ export const EmptyWithAdd: Story = {
       <Lane title="Review" automations={[]} onAdd={() => undefined} cards={[]} />
     </div>
   ),
+};
+
+export const EditStages: Story = {
+  render: function EditStagesStory() {
+    const [editing, setEditing] = useState(true);
+    const [destination, setDestination] = useState("Backlog");
+    const [dragging, setDragging] = useState(false);
+    const [pending, setPending] = useState(false);
+    const [status, setStatus] = useState("");
+    const automation = { ...GITHUB_INTAKE, canRunNow: true };
+    return (
+      <div className="space-y-4">
+        <Button onClick={() => setEditing(!editing)}>{editing ? "Done" : "Edit stages"}</Button>
+        <AutomationRowContext.Provider
+          value={{
+            move: editing
+              ? {
+                  start: () => setDragging(true),
+                  end: () => setDragging(false),
+                  keyboard: () => setDestination(destination === "Backlog" ? "Review" : "Backlog"),
+                }
+              : undefined,
+          }}
+        >
+          <div className="flex gap-6">
+            {["Backlog", "Review"].map((title) => (
+              <section
+                key={title}
+                aria-label={title}
+                className="w-80 min-h-32 rounded-lg bg-muted p-4"
+                onDragOver={(event) => {
+                  if (dragging) event.preventDefault();
+                }}
+                onDrop={(event) => {
+                  if (!dragging) return;
+                  event.preventDefault();
+                  setDestination(title);
+                  setDragging(false);
+                }}
+              >
+                <h2 className="mb-4">{title}</h2>
+                <ColumnAutomationRows
+                  title={title}
+                  automations={destination === title ? [automation] : []}
+                  rowCount={1}
+                  testId={`${title.toLowerCase()}-edit-rows`}
+                  onRowAction={() => setStatus("Automation settings opened.")}
+                  onRun={() => {
+                    setPending(true);
+                    setStatus("Automation run requested.");
+                  }}
+                  runPending={pending}
+                />
+              </section>
+            ))}
+          </div>
+        </AutomationRowContext.Provider>
+        <p role="status">{dragging ? "Drag started." : status}</p>
+      </div>
+    );
+  },
 };
 
 export const ScheduleControls: Story = {

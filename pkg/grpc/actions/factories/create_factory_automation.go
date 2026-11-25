@@ -6,7 +6,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
@@ -51,13 +50,6 @@ func CreateFactoryAutomation(
 		return nil, factoryErrorToStatus(invalidArgument("column key is invalid"), "failed to create factory automation")
 	}
 	customStageColumn := strings.HasPrefix(columnKey, "custom-")
-	if templateID == "" && customStageColumn {
-		if !organization.HasExperimentalFeature(features.FeatureFactoryCustomStages) {
-			return nil, factoryErrorToStatus(errFactoryCustomStagesDisabled, "failed to create factory automation")
-		}
-	} else if templateID == "" && !organization.HasExperimentalFeature(features.FeatureFactoryCustomAutomations) {
-		return nil, factoryErrorToStatus(errCustomAutomationsDisabled, "failed to create factory automation")
-	}
 	factory, err := findFactory(db, orgID, req.GetFactoryId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create factory automation")
@@ -71,7 +63,7 @@ func CreateFactoryAutomation(
 		found := false
 		for _, line := range lines {
 			for _, stage := range line.StagesValue() {
-				if stage.Key == columnKey && stage.Kind == models.FactoryLineStageCustom {
+				if stage.Key == columnKey && stage.Kind == models.FactoryLineStagePhase {
 					found = true
 					break
 				}

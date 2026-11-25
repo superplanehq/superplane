@@ -282,8 +282,8 @@ func TestAssemblePublicBoardUsesSavedStageOrder(t *testing.T) {
 		Name: "implement",
 		Stages: datatypes.JSONSlice[models.FactoryLineStage]{
 			{ID: uuid.New(), Key: "backlog", Name: "Incoming", Kind: models.FactoryLineStageBacklog},
-			{ID: uuid.New(), Key: "custom-qa", Name: "QA", Kind: models.FactoryLineStageCustom},
-			{ID: uuid.New(), Key: "verify", Name: "Check", Kind: models.FactoryLineStageVerify},
+			{ID: uuid.New(), Key: "custom-qa", Name: "QA", Kind: models.FactoryLineStagePhase},
+			{ID: uuid.New(), Key: "verify", Name: "Check", Kind: models.FactoryLineStagePhase},
 			{ID: uuid.New(), Key: "done", Name: "Shipped", Kind: models.FactoryLineStageDone},
 		},
 		ColumnColors: datatypes.NewJSONType(map[string]string{"custom-qa": "purple"}),

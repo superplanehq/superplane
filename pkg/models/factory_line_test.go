@@ -46,7 +46,7 @@ func Test__FactoryLine__Stages__DefaultAndRoundTrip(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, line.StagesValue(), 4)
-	assert.Equal(t, []string{"backlog", "phase", "verify", "done"}, []string{
+	assert.Equal(t, []string{"backlog", "phase", "phase", "done"}, []string{
 		line.StagesValue()[0].Kind,
 		line.StagesValue()[1].Kind,
 		line.StagesValue()[2].Kind,
@@ -54,10 +54,17 @@ func Test__FactoryLine__Stages__DefaultAndRoundTrip(t *testing.T) {
 	})
 	assert.Contains(t, line.StagesValue()[1].Name, "Implement")
 	assert.Equal(t, 0, *line.StagesValue()[1].StepIndex)
+	assert.Equal(t, []bool{true, true, false, true}, []bool{
+		line.StagesValue()[0].AutoAdvanceEnabled(),
+		line.StagesValue()[1].AutoAdvanceEnabled(),
+		line.StagesValue()[2].AutoAdvanceEnabled(),
+		line.StagesValue()[3].AutoAdvanceEnabled(),
+	})
 
 	reloaded, err := factory.FindLine(db, line.ID)
 	require.NoError(t, err)
 	assert.Equal(t, line.StagesValue(), reloaded.StagesValue())
+	assert.True(t, (models.FactoryLineStage{Kind: models.FactoryLineStagePhase, Key: "verify"}).AutoAdvanceEnabled())
 }
 
 func Test__FactoryLine__Update__ReconcilesPhasesAndKeepsCustomStages(t *testing.T) {
@@ -74,7 +81,10 @@ func Test__FactoryLine__Update__ReconcilesPhasesAndKeepsCustomStages(t *testing.
 	}
 	line, err := factory.CreateLine(db, "ship", steps)
 	require.NoError(t, err)
-	custom := models.FactoryLineStage{ID: uuid.New(), Key: "custom-qa", Name: "QA", Kind: models.FactoryLineStageCustom}
+	autoAdvance := false
+	custom := models.FactoryLineStage{
+		ID: uuid.New(), Key: "custom-qa", Name: "QA", Kind: models.FactoryLineStagePhase, AutoAdvance: &autoAdvance,
+	}
 	stages := append([]models.FactoryLineStage{}, line.StagesValue()[:2]...)
 	stages = append(stages, custom)
 	stages = append(stages, line.StagesValue()[2:]...)
@@ -91,7 +101,33 @@ func Test__FactoryLine__Update__ReconcilesPhasesAndKeepsCustomStages(t *testing.
 		line.StagesValue()[4].Key,
 	})
 	assert.Equal(t, custom.ID, line.StagesValue()[2].ID)
+	assert.False(t, line.StagesValue()[2].AutoAdvanceEnabled())
 	assert.Equal(t, map[string]string{"custom-qa": "teal"}, line.ColumnColorsValue())
+}
+
+func Test__FactoryLine__Update__InsertsNewPhaseBeforeVerify(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	app, entry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "Implement", "start-one")
+	line, err := factory.CreateLine(db, "ship", nil)
+	require.NoError(t, err)
+	custom := models.FactoryLineStage{ID: uuid.New(), Key: "custom-qa", Name: "QA", Kind: models.FactoryLineStagePhase}
+	stages := line.StagesValue()
+	stages = append(stages[:len(stages)-1], custom, stages[len(stages)-1])
+	require.NoError(t, line.UpdateConfiguration(db, nil, nil, nil, stages))
+
+	require.NoError(t, line.Update(db, nil, []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entry},
+	}, nil))
+
+	keys := make([]string, 0, len(line.StagesValue()))
+	for _, stage := range line.StagesValue() {
+		keys = append(keys, stage.Key)
+	}
+	assert.Equal(t, []string{"backlog", "phase-0", "verify", "custom-qa", "done"}, keys)
 }
 
 func Test__FactoryLine__Update__KeepsOptionalStagesRemoved(t *testing.T) {

@@ -15,7 +15,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/integrations/bitbucket"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -131,7 +130,6 @@ func TestHandOffStartsBacklogLeaveAutomation(t *testing.T) {
 			ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 			db := database.DB(t.Context())
 			factoryModel := seedHandOffFactory(t, r, db)
-			require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
 			integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
 			require.NoError(t, factoryModel.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSIntegrationID: &integrationID}))
 			if scenario.resume {
@@ -202,7 +200,6 @@ func Test__HandOffWorkOrder__ImplementStartsAutomaticCustomAutomation(t *testing
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 	db := database.DB(t.Context())
 	factoryModel := seedHandOffFactory(t, r, db)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
 	integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
 	require.NoError(t, factoryModel.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSIntegrationID: &integrationID}))
 	customApp, customEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "custom", "start-custom")
@@ -1125,7 +1122,7 @@ func TestExecutionPlanIndexForLineStepAccountsForCustomStages(t *testing.T) {
 	}})
 	require.NoError(t, err)
 	stageID := uuid.New()
-	stage := models.FactoryLineStage{ID: stageID, Key: "custom-" + stageID.String(), Name: "QA", Kind: models.FactoryLineStageCustom}
+	stage := models.FactoryLineStage{ID: stageID, Key: "custom-" + stageID.String(), Name: "QA", Kind: models.FactoryLineStagePhase}
 	stages := append([]models.FactoryLineStage{line.StagesValue()[0], stage}, line.StagesValue()[1:]...)
 	require.NoError(t, line.UpdateConfiguration(db, nil, nil, nil, stages))
 	custom, _ := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "QA", "start")
