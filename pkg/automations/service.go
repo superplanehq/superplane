@@ -232,7 +232,7 @@ func checkAutomationReferences(tx *gorm.DB, placement Placement, doc *automation
 		}
 		found := slices.ContainsFunc(lines, func(line models.FactoryLine) bool {
 			return slices.ContainsFunc(line.StagesValue(), func(stage models.FactoryLineStage) bool {
-				return stage.Key == placement.Stage && stage.Kind == models.FactoryLineStageCustom
+				return stage.Key == placement.Stage && stage.Kind == models.FactoryLineStagePhase
 			})
 		})
 		if !found {

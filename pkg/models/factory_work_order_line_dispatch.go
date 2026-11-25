@@ -213,7 +213,7 @@ func (l *FactoryWorkOrderLineDispatch) StartStage(
 		return nil, ErrFactoryLineStepOutOfRange
 	}
 	stageKey := steps[stepIndex].StageKey
-	if stageKey == "" || steps[stepIndex].StageKind != FactoryLineStageCustom {
+	if stageKey == "" {
 		result, err := l.EnqueueOrStartStep(tx, order, stepIndex)
 		if err != nil {
 			return nil, err
@@ -687,10 +687,15 @@ func (o *FactoryWorkOrder) RetryLineStep(tx *gorm.DB, line *FactoryLine, stepInd
 		return nil, nil, ErrFactoryLineStepOutOfRange
 	}
 	stageKey := target.Steps[stepIndex].StageKey
-	customStage := target.Steps[stepIndex].StageKind == FactoryLineStageCustom
+	stageStart, stageEnd := target.StageStepRange(stepIndex)
+	canvasStage := slices.ContainsFunc(target.StagesValue(), func(stage FactoryLineStage) bool {
+		return stage.Key == stageKey && stage.Kind == FactoryLineStagePhase && stage.StepIndex == nil
+	})
+	// Old snapshots can have execution keys without stage metadata.
+	parallelStage := canvasStage || stageEnd-stageStart > 1 || (len(target.Stages) == 0 && strings.HasPrefix(stageKey, "custom-"))
 	enteringStage := target.CurrentStageKey != "" && target.CurrentStageKey != stageKey
 	startIndex := stepIndex
-	if customStage && enteringStage {
+	if parallelStage && enteringStage {
 		startIndex, _ = target.StageStepRange(stepIndex)
 	}
 	for _, step := range target.Steps[startIndex:] {
@@ -714,7 +719,7 @@ func (o *FactoryWorkOrder) RetryLineStep(tx *gorm.DB, line *FactoryLine, stepInd
 	// Release before reactivate, so every path takes the line admission
 	// lock before the dispatch row and the two cannot deadlock.
 	var released []*FactoryLineStepResult
-	if customStage && !enteringStage {
+	if parallelStage && !enteringStage {
 		released, err = target.releaseOpenWorkForCustomRetry(tx, stepIndex)
 	} else {
 		released, err = target.releaseOpenWorkFrom(tx, startIndex)
@@ -730,7 +735,7 @@ func (o *FactoryWorkOrder) RetryLineStep(tx *gorm.DB, line *FactoryLine, stepInd
 	if err := target.EnterStage(tx, stageKey); err != nil {
 		return nil, nil, err
 	}
-	if customStage && enteringStage {
+	if parallelStage && enteringStage {
 		results, startErr := target.StartStage(tx, o, startIndex)
 		if startErr != nil {
 			return nil, nil, startErr

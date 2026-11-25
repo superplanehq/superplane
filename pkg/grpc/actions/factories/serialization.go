@@ -497,10 +497,6 @@ func serializeFactoryLineStageKind(kind string) pb.FactoryLine_StageKind {
 		return pb.FactoryLine_STAGE_KIND_BACKLOG
 	case models.FactoryLineStagePhase:
 		return pb.FactoryLine_STAGE_KIND_PHASE
-	case models.FactoryLineStageCustom:
-		return pb.FactoryLine_STAGE_KIND_CUSTOM
-	case models.FactoryLineStageVerify:
-		return pb.FactoryLine_STAGE_KIND_VERIFY
 	case models.FactoryLineStageDone:
 		return pb.FactoryLine_STAGE_KIND_DONE
 	default:

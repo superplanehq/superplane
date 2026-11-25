@@ -268,10 +268,10 @@ function lastWorkStageRuns(
     return lastStepRuns;
   }
   const stages = orderedLineBoardStages(line);
-  const lastPhaseIndex = stages.map((stage) => stage.kind).lastIndexOf("STAGE_KIND_PHASE");
+  const lastPhaseIndex = stages.map((stage) => stage.stepIndex !== undefined).lastIndexOf(true);
   const trailingCustomRuns = stages
     .slice(lastPhaseIndex + 1)
-    .filter((stage) => stage.kind === "STAGE_KIND_CUSTOM")
+    .filter((stage) => stage.kind === "STAGE_KIND_PHASE" && stage.stepIndex === undefined && stage.key !== "verify")
     .flatMap((stage) => collectCustomStageRuns(lineId, stage.key, sourceOrders));
   return [...lastStepRuns, ...trailingCustomRuns];
 }
@@ -465,7 +465,7 @@ function liveColumnIndexForExecution(
   const stageKey = execution.stageKey?.trim();
   if (stageKey) {
     const stage = stages.find((candidate) => candidate.key === stageKey);
-    if (stage?.kind === "STAGE_KIND_CUSTOM" || stageKey.startsWith("custom-")) {
+    if ((stage?.kind === "STAGE_KIND_PHASE" && stage.stepIndex == null) || stageKey.startsWith("custom-")) {
       return undefined;
     }
     const savedStageIndex = stage?.stepIndex;

@@ -169,8 +169,8 @@ describe("collectLineVerifyOrders", () => {
       stages: [
         { id: "backlog", key: "backlog", name: "Backlog", kind: "STAGE_KIND_BACKLOG" },
         { id: "phase-0", key: "phase-0", name: "Plan", kind: "STAGE_KIND_PHASE", stepIndex: 0 },
-        { id: "docs", key: CUSTOM_KEY, name: "Update docs", kind: "STAGE_KIND_CUSTOM" },
-        { id: "verify", key: "verify", name: "Verify", kind: "STAGE_KIND_VERIFY" },
+        { id: "docs", key: CUSTOM_KEY, name: "Update docs", kind: "STAGE_KIND_PHASE" },
+        { id: "verify", key: "verify", name: "Verify", kind: "STAGE_KIND_PHASE", autoAdvance: false },
         { id: "done", key: "done", name: "Done", kind: "STAGE_KIND_DONE" },
       ],
     };

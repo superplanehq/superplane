@@ -125,7 +125,7 @@ func TestCanvasAutomationCustomStageRoundTripAndAdmission(t *testing.T) {
 	stageID := uuid.New()
 	stageKey := "custom-" + stageID.String()
 	stages := line.StagesValue()
-	stages = append(stages[:1], append([]models.FactoryLineStage{{ID: stageID, Key: stageKey, Name: "QA", Kind: models.FactoryLineStageCustom}}, stages[1:]...)...)
+	stages = append(stages[:1], append([]models.FactoryLineStage{{ID: stageID, Key: stageKey, Name: "QA", Kind: models.FactoryLineStagePhase}}, stages[1:]...)...)
 	require.NoError(t, line.UpdateConfiguration(db, nil, nil, nil, stages))
 	service := automations.Service{Backend: CanvasAutomationBackend{Deps: onboardingDeps(r)}}
 	ctx := onboardingContext(r)

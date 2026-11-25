@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"strings"
 	"testing"
 
 	pw "github.com/mxschmitt/playwright-go"
@@ -20,13 +21,13 @@ func TestFactoryLineCustomStages(t *testing.T) {
 	s.givenALine()
 	s.openLine()
 	s.addStage("QA")
-	s.assertStageOrder("backlog", "phase", "verify", "custom", "done")
+	s.assertStageOrder("backlog", "phase-0", "verify", s.stageKey, "done")
 	s.moveStage()
-	s.assertStageOrder("backlog", "custom", "phase", "verify", "done")
+	s.assertStageOrder("backlog", s.stageKey, "phase-0", "verify", "done")
 	s.reloadAndAssertStageVisible()
 	s.moveAgentAndReload()
 	s.removeStage()
-	s.assertStageOrder("backlog", "phase", "verify", "done")
+	s.assertStageOrder("backlog", "phase-0", "verify", "done")
 	s.reloadAndAssertStageHidden()
 }
 
@@ -153,7 +154,7 @@ func (s *factoryLineStagesSteps) addStage(name string) {
 	reloaded, err := s.factory.FindLine(database.DB(s.t.Context()), s.line.ID)
 	require.NoError(s.t, err)
 	for _, stage := range reloaded.StagesValue() {
-		if stage.Kind == models.FactoryLineStageCustom {
+		if strings.HasPrefix(stage.Key, "custom-") {
 			s.stageKey = stage.Key
 			break
 		}
@@ -161,14 +162,14 @@ func (s *factoryLineStagesSteps) addStage(name string) {
 	require.NotEmpty(s.t, s.stageKey)
 }
 
-func (s *factoryLineStagesSteps) assertStageOrder(kinds ...string) {
+func (s *factoryLineStagesSteps) assertStageOrder(keys ...string) {
 	reloaded, err := s.factory.FindLine(database.DB(s.t.Context()), s.line.ID)
 	require.NoError(s.t, err)
 	actual := make([]string, len(reloaded.StagesValue()))
 	for index, stage := range reloaded.StagesValue() {
-		actual[index] = stage.Kind
+		actual[index] = stage.Key
 	}
-	assert.Equal(s.t, kinds, actual)
+	assert.Equal(s.t, keys, actual)
 }
 
 func (s *factoryLineStagesSteps) reloadAndAssertStageVisible() {
