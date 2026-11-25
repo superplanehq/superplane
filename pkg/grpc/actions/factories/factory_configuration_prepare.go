@@ -47,20 +47,21 @@ type configurationIntegrationState struct {
 }
 
 type configurationBuiltInState struct {
-	Binding            factoryConfigurationBinding
-	Integration        configurationIntegrationState
-	Agent              *configurationIntegrationState
-	AgentHarness       string
-	AgentModel         string
-	DefaultOwner       string
-	Repository         string
-	Backlog            string
-	Branch             string
-	GitProvider        string
-	Subscription       bool
-	HostedModel        models.DefaultHostedLLMModel
-	HostedProviders    []configurationHostedProviderState
-	RunnerIntegrations []configurationIntegrationState
+	Binding               factoryConfigurationBinding
+	Integration           configurationIntegrationState
+	Agent                 *configurationIntegrationState
+	AgentHarness          string
+	AgentModel            string
+	DefaultOwner          string
+	Repository            string
+	WorkspaceRepositories []string
+	Backlog               string
+	Branch                string
+	GitProvider           string
+	Subscription          bool
+	HostedModel           models.DefaultHostedLLMModel
+	HostedProviders       []configurationHostedProviderState
+	RunnerIntegrations    []configurationIntegrationState
 }
 
 func configurationBuiltInTemplateID(alias string) (string, bool) {
@@ -145,6 +146,9 @@ func prepareFactoryConfigurationBuiltIn(ctx context.Context, tx *gorm.DB, deps I
 		if err != nil {
 			return nil, prefixConfigurationPreparationSettings(err)
 		}
+	}
+	if current != nil {
+		prepared.Nodes, prepared.Edges = alignConfigurationIntakeTrigger(current.version, prepared.IntakeSource, prepared.Nodes, prepared.Edges)
 	}
 	if err := validateFactoryConfigurationBuiltInNodes(deps, prepared.Nodes); err != nil {
 		return nil, prefixConfigurationPreparationSettings(err)
@@ -617,6 +621,13 @@ func buildConfigurationFactoryTemplate(tx *gorm.DB, factory *models.Factory, nam
 func configurationPreparedState(tx *gorm.DB, factory *models.Factory, binding factoryConfigurationBinding, integration *models.Integration, agent *intakeAgent, nodes []models.Node) (configurationBuiltInState, error) {
 	config := factory.OnboardingConfigValue()
 	state := configurationBuiltInState{Binding: binding, Integration: configurationIntegrationSnapshot(integration), DefaultOwner: config.CodexDefaultOwnerID, Repository: config.AppRepository, Backlog: config.BacklogRepository, Branch: config.DefaultBranch, GitProvider: config.EffectiveVCSProvider(), Subscription: config.CodexSubscription}
+	repositories, err := factoryAutomationPolicy(tx, factory, "configuration-workspace-repositories", nil, func() ([]string, error) {
+		return factory.WorkspaceRepositories(tx)
+	})
+	if err != nil {
+		return state, err
+	}
+	state.WorkspaceRepositories = repositories
 	if agent == nil {
 		return state, nil
 	}
@@ -677,14 +688,14 @@ func configurationIntegrationSnapshot(integration *models.Integration) configura
 	configuration := maps.Clone(integration.Configuration.Data())
 	state.Host, _ = configuration["host"].(string)
 	state.Configuration = map[string]any{}
-	for _, key := range []string{"host", "baseUrl", "region", "organizationId", "subdomain"} {
+	for _, key := range []string{"host", "baseUrl", "baseURL", "apiType", "site", "authType", "region", "organization", "organizationId", "subdomain"} {
 		if value, present := configuration[key]; present {
 			state.Configuration[key] = value
 		}
 	}
 	state.Resources = map[string]any{}
 	metadata := integration.Metadata.Data()
-	for _, key := range []string{"repositories", "repository", "workspace", "authType", "forgeInstallationId", "owner", "projects", "teams", "services", "organization", "organizationId", "installationId", "installationUUID", "hostedApp", "appSlug", "cloudId", "siteUrl", "issueWebhookScopesRequested", "oauthScopes"} {
+	for _, key := range []string{"repositories", "repository", "workspace", "authType", "forgeInstallationId", "owner", "githubApp", "projects", "teams", "services", "organization", "organizationId", "installationId", "installationUUID", "hostedApp", "appSlug", "cloudId", "siteUrl", "issueWebhookScopesRequested", "oauthScopes"} {
 		if value, present := metadata[key]; present {
 			state.Resources[key] = configurationResourceSnapshot(value)
 		}

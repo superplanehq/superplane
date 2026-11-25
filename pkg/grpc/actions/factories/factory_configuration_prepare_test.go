@@ -57,6 +57,9 @@ func configurationCatalogEntry(t *testing.T, f configurationFixture, templateID 
 	if templateID == prFeedbackChecksTemplateID {
 		automation.With = map[string]any{"pr_feedback": map[string]any{"check_names": []any{"CI"}}}
 	}
+	if templateID == scheduledIntakeTemplateID {
+		automation.With = map[string]any{"template": map[string]any{"prompt": ""}}
+	}
 	return automation
 }
 
@@ -165,9 +168,113 @@ func TestFactoryConfigurationInstallsEveryCatalogEntry(t *testing.T) {
 					require.Empty(t, plan.Diagnostics)
 					require.Empty(t, plan.Changes)
 				}
+				if entry.ID == intakeTemplateID(models.FactoryIntakeSourceDatadog) || entry.ID == intakeTemplateID(models.FactoryIntakeSourcePagerDutyIncidents) {
+					configurationAssertCatalogBindingChange(t, f, canvas, automation, bundle, entry.ID)
+				}
 			})
 		}
 	}
+}
+
+func configurationAssertCatalogBindingChange(t *testing.T, f configurationFixture, canvas *models.Canvas, automation factoryConfigurationAutomation, bundle *pb.FactoryConfigurationBundle, templateID string) {
+	t.Helper()
+	db := database.DB(t.Context())
+	source := strings.TrimPrefix(templateID, "intake:")
+	intake, err := models.FindFactoryIntakeByCanvasID(db, canvas.ID)
+	require.NoError(t, err)
+	live := resetTestLiveVersion(t, canvas)
+	graph := resolveIntakeGraph(source, models.LiveCanvasSpec{Nodes: live.Nodes, Edges: live.Edges})
+	previous, err := models.FindCanvasNode(db, canvas.ID, graph.TriggerNodeID)
+	require.NoError(t, err)
+	binding := *automation.Binding
+	if source == models.FactoryIntakeSourceDatadog {
+		// A completed reconcile stores these values for post-commit retirement.
+		metadata := previous.Metadata.Data()
+		metadata["monitorId"], metadata["monitorService"] = "123", "project"
+		require.NoError(t, db.Model(previous).Update("metadata", datatypes.NewJSONType(metadata)).Error)
+		binding.IntegrationID = createReadyOnboardingIntegration(t, f.r.Organization.ID, "datadog")
+		configureConfigurationCatalogIntegration(t, f, binding.IntegrationID, "datadog")
+	} else {
+		binding.ResourceID = "second"
+	}
+	configurationUpdateCatalogAutomation(t, bundle, automation.ID, func(candidate *factoryConfigurationAutomation) {
+		candidate.Binding = &binding
+	})
+	resources := configurationResourceCounts(t)
+	plan := f.plan(t, bundle)
+	require.Empty(t, plan.Diagnostics)
+	require.NotEmpty(t, plan.Changes)
+	require.Equal(t, resources, configurationResourceCounts(t), "planning a rebind must retain the active resources")
+	_, err = f.apply(bundle, plan.BaseStateToken)
+	require.NoError(t, err)
+	updatedIntake, err := models.FindFactoryIntakeByCanvasID(db, canvas.ID)
+	require.NoError(t, err)
+	require.Equal(t, intake.ID, updatedIntake.ID, "rebinding must retain the intake and canvas")
+	live = resetTestLiveVersion(t, canvas)
+	graph = resolveIntakeGraph(source, models.LiveCanvasSpec{Nodes: live.Nodes, Edges: live.Edges})
+	require.True(t, graph.Healthy(live.Edges))
+	require.NotEqual(t, previous.NodeID, graph.TriggerNodeID, "rebinding must retire provider runtime state")
+	retired, err := models.FindUnscopedCanvasNode(db, canvas.ID, previous.NodeID)
+	require.NoError(t, err)
+	require.True(t, retired.DeletedAt.Valid)
+	require.Equal(t, previous.AppInstallationID, retired.AppInstallationID)
+	current, err := models.FindCanvasNode(db, canvas.ID, graph.TriggerNodeID)
+	require.NoError(t, err)
+	require.Equal(t, uuid.MustParse(binding.IntegrationID), *current.AppInstallationID)
+	if source == models.FactoryIntakeSourceDatadog {
+		require.Equal(t, "123", retired.Metadata.Data()["monitorId"], "cleanup needs the old monitor with its old integration")
+		require.Empty(t, current.Metadata.Data()["monitorId"])
+		var count int64
+		require.NoError(t, db.Model(&models.IntegrationSubscription{}).Where("workflow_id = ? AND node_id = ?", canvas.ID, retired.NodeID).Count(&count).Error)
+		require.Zero(t, count, "the retired connection must stop delivering alerts")
+	} else {
+		require.Equal(t, "second", current.Configuration.Data()["service"])
+		require.Equal(t, "second", current.Metadata.Data()["service"].(map[string]any)["id"])
+		require.NotEqual(t, previous.WebhookID, current.WebhookID)
+		var hook models.Webhook
+		require.NoError(t, db.Unscoped().First(&hook, "id = ?", previous.WebhookID).Error)
+		require.True(t, hook.DeletedAt.Valid, "an unused previous-service webhook must retire")
+	}
+	configurationAssertCatalogSupportingRecords(t, f, canvas, templateID)
+	// A later settings rebuild must keep the active trigger and its resources.
+	configurationUpdateCatalogAutomation(t, bundle, automation.ID, func(candidate *factoryConfigurationAutomation) {
+		candidate.With = map[string]any{"intake": map[string]any{"confidence_pct": 17}}
+	})
+	plan = f.plan(t, bundle)
+	require.Empty(t, plan.Diagnostics)
+	_, err = f.apply(bundle, plan.BaseStateToken)
+	require.NoError(t, err)
+	live = resetTestLiveVersion(t, canvas)
+	graph = resolveIntakeGraph(source, models.LiveCanvasSpec{Nodes: live.Nodes, Edges: live.Edges})
+	require.Equal(t, current.NodeID, graph.TriggerNodeID, "settings changes must not restore a retired trigger")
+	configurationAssertCatalogSupportingRecords(t, f, canvas, templateID)
+	plan = f.plan(t, bundle)
+	require.Empty(t, plan.Diagnostics)
+	require.Empty(t, plan.Changes)
+	revision := configurationRevisionCount(t, canvas)
+	writes := configurationCountApplyWrites(t, func() {
+		result, err := f.apply(bundle, plan.BaseStateToken)
+		require.NoError(t, err)
+		require.False(t, result.Changed)
+	})
+	require.Zero(t, writes)
+	require.Equal(t, revision, configurationRevisionCount(t, canvas))
+}
+
+func configurationUpdateCatalogAutomation(t *testing.T, bundle *pb.FactoryConfigurationBundle, id string, update func(*factoryConfigurationAutomation)) {
+	t.Helper()
+	var manifest factoryConfigurationManifest
+	require.NoError(t, goyaml.Unmarshal([]byte(bundle.Files[0].Content), &manifest))
+	for i := range manifest.Stages {
+		for j := range manifest.Stages[i].Automations {
+			if manifest.Stages[i].Automations[j].ID == id {
+				update(&manifest.Stages[i].Automations[j])
+			}
+		}
+	}
+	content, err := goyaml.Marshal(manifest)
+	require.NoError(t, err)
+	bundle.Files[0].Content = string(content)
 }
 
 func configurationCatalogSupportsBitbucket(templateID string) bool {
@@ -411,8 +518,8 @@ func (client *configurationCatalogHTTP) Do(request *http.Request) (*http.Respons
 		body = `{"values":[{"uuid":"{app}","slug":"app","name":"app","full_name":"acme/app"},{"uuid":"{backlog}","slug":"backlog","name":"backlog","full_name":"acme/backlog"}]}`
 	case request.URL.Host == "api.atlassian.com" && strings.HasSuffix(request.URL.Path, "/rest/api/3/project"):
 		body = `[{"id":"1","key":"project","name":"Project"}]`
-	case request.URL.Host == "api.pagerduty.com" && request.URL.Path == "/services/project":
-		body = `{"service":{"id":"project","name":"API"}}`
+	case request.URL.Host == "api.pagerduty.com" && (request.URL.Path == "/services/project" || request.URL.Path == "/services/second"):
+		body = fmt.Sprintf(`{"service":{"id":%q,"name":"API"}}`, strings.TrimPrefix(request.URL.Path, "/services/"))
 	case request.URL.Host == "api.productive.io" && strings.HasSuffix(request.URL.Path, "/projects/project"):
 		body = `{"data":{"id":"project","type":"projects","attributes":{"name":"Project"}}}`
 	default:
@@ -468,7 +575,7 @@ func configureConfigurationCatalogIntegration(t *testing.T, f configurationFixtu
 	case "pagerduty":
 		configuration["authType"] = "apiToken"
 		sensitive("apiToken")
-		metadata["services"] = []any{map[string]any{"id": "project", "name": "API"}}
+		metadata["services"] = []any{map[string]any{"id": "project", "name": "API"}, map[string]any{"id": "second", "name": "Worker"}}
 	case "productive":
 		configuration["organizationId"] = "1"
 		sensitive("apiToken")

@@ -319,6 +319,10 @@ func publishFactoryConfigurationBuiltIn(ctx context.Context, tx *gorm.DB, deps I
 	if err != nil {
 		return nil, err
 	}
+	nodes, edges, err = replaceConfigurationIntakeTriggerForBinding(tx, current, prepared, nodes, edges)
+	if err != nil {
+		return nil, err
+	}
 	replacements := map[string]string{factoryCanvasIDPlaceholder: canvasID.String()}
 	for key, value := range references {
 		replacements[key] = value

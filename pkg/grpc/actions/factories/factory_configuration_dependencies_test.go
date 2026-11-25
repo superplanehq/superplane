@@ -1,8 +1,10 @@
 package factories
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -177,16 +179,40 @@ func TestFactoryConfigurationResolvesDependenciesAcrossDeletionAndOverlappingIDs
 }
 
 func TestFactoryConfigurationRejectsStalePreparationInputs(t *testing.T) {
-	for _, input := range []string{"integration", "resources", "workspace defaults"} {
+	for _, input := range []string{"integration", "resources", "workspace defaults", "workspace repositories", "Datadog site", "PagerDuty authentication"} {
 		t.Run(input, func(t *testing.T) {
 			f := configurationCatalogFixture(t)
-			automation := configurationCatalogEntry(t, f, intakeTemplateID(models.FactoryIntakeSourceGitHubIssues))
-			bundle := configurationCatalogBundle(t, f, automation, intakeTemplateID(models.FactoryIntakeSourceGitHubIssues))
+			templateID := intakeTemplateID(models.FactoryIntakeSourceGitHubIssues)
+			switch input {
+			case "workspace repositories":
+				templateID = "risk-score"
+			case "Datadog site":
+				templateID = intakeTemplateID(models.FactoryIntakeSourceDatadog)
+			case "PagerDuty authentication":
+				templateID = intakeTemplateID(models.FactoryIntakeSourcePagerDutyIncidents)
+			}
+			automation := configurationCatalogEntry(t, f, templateID)
+			bundle := configurationCatalogBundle(t, f, automation, templateID)
 			plan := f.plan(t, bundle)
 			require.Empty(t, plan.Diagnostics)
 			require.NotEmpty(t, plan.BaseStateToken)
 			db := database.DB(t.Context())
-			if input == "workspace defaults" {
+			if input == "Datadog site" || input == "PagerDuty authentication" {
+				integration, err := models.FindIntegrationInTransaction(db, f.r.Organization.ID, uuid.MustParse(automation.Binding.IntegrationID))
+				require.NoError(t, err)
+				configuration := integration.Configuration.Data()
+				if input == "Datadog site" {
+					configuration["site"] = "datadoghq.eu"
+				} else {
+					configuration["authType"] = "appOAuth"
+				}
+				require.NoError(t, db.Model(integration).Update("configuration", datatypes.NewJSONType(configuration)).Error)
+			} else if input == "workspace repositories" {
+				_, err := f.factory.CreateAgentResource(db, models.FactoryAgentResourceKindContextRepo, "", true, models.FactoryAgentResourceConfig{
+					Repository: "acme/context", VCSProvider: models.ProviderGitHub, Access: models.FactoryContextRepoAccessWrite,
+				})
+				require.NoError(t, err)
+			} else if input == "workspace defaults" {
 				branch := "next-main"
 				require.NoError(t, f.factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{DefaultBranch: &branch}))
 			} else {
@@ -217,6 +243,32 @@ func TestFactoryConfigurationRejectsStalePreparationInputs(t *testing.T) {
 			require.Equal(t, before, configurationResourceCounts(t))
 		})
 	}
+}
+
+func TestFactoryConfigurationIgnoresCredentialRotationAndSyncTimestamps(t *testing.T) {
+	f := configurationCatalogFixture(t)
+	templateID := intakeTemplateID(models.FactoryIntakeSourceDatadog)
+	automation := configurationCatalogEntry(t, f, templateID)
+	bundle := configurationCatalogBundle(t, f, automation, templateID)
+	plan := f.plan(t, bundle)
+	require.Empty(t, plan.Diagnostics)
+	require.NotEmpty(t, plan.BaseStateToken)
+	db := database.DB(t.Context())
+	integration, err := models.FindIntegrationInTransaction(db, f.r.Organization.ID, uuid.MustParse(automation.Binding.IntegrationID))
+	require.NoError(t, err)
+	credential, err := f.r.Encryptor.Encrypt(t.Context(), []byte("rotated-api-key"), []byte(integration.ID.String()))
+	require.NoError(t, err)
+	configuration := integration.Configuration.Data()
+	configuration["apiKey"] = base64.StdEncoding.EncodeToString(credential)
+	metadata := integration.Metadata.Data()
+	metadata["refreshedAt"] = time.Now().Format(time.RFC3339Nano)
+	require.NoError(t, db.Model(integration).Updates(map[string]any{
+		"configuration": datatypes.NewJSONType(configuration),
+		"metadata":      datatypes.NewJSONType(metadata),
+	}).Error)
+	fresh := f.plan(t, bundle)
+	require.Empty(t, fresh.Diagnostics)
+	require.Equal(t, plan.BaseStateToken, fresh.BaseStateToken)
 }
 
 func editConfigurationManifest(t *testing.T, bundle *pb.FactoryConfigurationBundle, edit func(*factoryConfigurationManifest)) {

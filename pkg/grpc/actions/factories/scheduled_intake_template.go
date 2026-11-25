@@ -1,6 +1,7 @@
 package factories
 
 import (
+	"encoding/json"
 	"math"
 	"strconv"
 	"strings"
@@ -14,6 +15,7 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/pkg/triggers/schedule"
 	"github.com/superplanehq/superplane/pkg/yaml"
+	goyaml "gopkg.in/yaml.v3"
 	"gorm.io/gorm"
 )
 
@@ -224,4 +226,29 @@ func scheduledIntakePromptFromSteps(raw any) string {
 		return strings.TrimSuffix(strings.TrimRight(prompt, "\r\n"), scheduledIntakeOutputInstructions)
 	}
 	return ""
+}
+
+// Quote leading newlines because yaml.v3 emits an invalid nested block scalar
+// for an empty proposal prompt followed by the managed output instructions.
+func marshalScheduledIntakeCanvas(canvas *yaml.Canvas) ([]byte, error) {
+	encoded, err := json.Marshal(canvas)
+	if err != nil {
+		return nil, err
+	}
+	var document goyaml.Node
+	if err := goyaml.Unmarshal(encoded, &document); err != nil {
+		return nil, err
+	}
+	var quote func(*goyaml.Node)
+	quote = func(node *goyaml.Node) {
+		node.Style = 0
+		if node.Kind == goyaml.ScalarNode && node.Tag == "!!str" && strings.HasPrefix(node.Value, "\n") {
+			node.Style = goyaml.DoubleQuotedStyle
+		}
+		for _, child := range node.Content {
+			quote(child)
+		}
+	}
+	quote(&document)
+	return goyaml.Marshal(&document)
 }

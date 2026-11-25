@@ -308,7 +308,12 @@ func materializeFactoryTemplate(templateID, provider string, input factoryTempla
 	}
 	markFactoryTemplate(canvas, template)
 
-	canvasYAML, err := goyaml.Marshal(canvas)
+	var canvasYAML []byte
+	if template.id == scheduledIntakeTemplateID {
+		canvasYAML, err = marshalScheduledIntakeCanvas(canvas)
+	} else {
+		canvasYAML, err = goyaml.Marshal(canvas)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("encode factory app template: %w", err)
 	}
@@ -927,6 +932,25 @@ func materializeIntakeDefaults(
 	}
 
 	stampFactoryTemplateMetadata(defaults, intakeTriggerNodeID, "intake:"+intake.Source)
+	if graph.TriggerNodeID != intakeTriggerNodeID {
+		ownedBinding, err := factoryConfigurationSavedBinding(tx, canvas)
+		if err != nil {
+			return nil, err
+		}
+		if ownedBinding != nil {
+			// YAML rebinding retires trigger resources. Reset keeps the current
+			// identity so it does not retire those resources again.
+			nodes, edges := alignConfigurationIntakeTrigger(version, intake.Source, defaults.Nodes(), defaults.Edges())
+			encoded, err := yaml.VersionToCanvasYAML(defaults.Metadata.Name, defaults.Metadata.Description, &models.CanvasVersion{Nodes: nodes, Edges: edges})
+			if err != nil {
+				return nil, err
+			}
+			defaults, err = yaml.CanvasFromYAML([]byte(encoded))
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
 
 	defaults.Metadata.ID = canvas.ID.String()
 	encoded, err := goyaml.Marshal(defaults)

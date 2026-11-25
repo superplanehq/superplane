@@ -110,7 +110,12 @@ func materializeFactoryConfigurationBoundTemplate(tx *gorm.DB, canvas *models.Ca
 			rewriteFactoryIntegrationNames(node.Configuration, rewrites)
 		}
 	}
-	encoded, err := goyaml.Marshal(document)
+	var encoded []byte
+	if template.id == scheduledIntakeTemplateID {
+		encoded, err = marshalScheduledIntakeCanvas(document)
+	} else {
+		encoded, err = goyaml.Marshal(document)
+	}
 	if err != nil {
 		return nil, err
 	}

@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
+	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/pkg/yaml"
 	"gorm.io/datatypes"
 )
@@ -145,6 +146,55 @@ func TestFactoryConfigurationScheduleReportsTheInvalidField(t *testing.T) {
 			var setting *factoryConfigurationSettingError
 			require.ErrorAs(t, err, &setting)
 			require.Equal(t, "template."+tc.field, setting.Field)
+		})
+	}
+}
+
+func TestFactoryConfigurationResetKeepsReboundIntakeTrigger(t *testing.T) {
+	for _, source := range []string{models.FactoryIntakeSourceDatadog, models.FactoryIntakeSourcePagerDutyIncidents} {
+		t.Run(source, func(t *testing.T) {
+			f := configurationCatalogFixture(t)
+			templateID := intakeTemplateID(source)
+			automation := configurationCatalogEntry(t, f, templateID)
+			bundle := configurationCatalogBundle(t, f, automation, templateID)
+			plan := f.plan(t, bundle)
+			require.Empty(t, plan.Diagnostics)
+			_, err := f.apply(bundle, plan.BaseStateToken)
+			require.NoError(t, err)
+			canvas, err := models.FindCanvasByName(database.DB(t.Context()), f.factory.OrganizationID, &f.factory.ID, automation.Name)
+			require.NoError(t, err)
+			binding := *automation.Binding
+			if source == models.FactoryIntakeSourceDatadog {
+				binding.IntegrationID = createReadyOnboardingIntegration(t, f.r.Organization.ID, "datadog")
+				configureConfigurationCatalogIntegration(t, f, binding.IntegrationID, "datadog")
+			} else {
+				binding.ResourceID = "second"
+			}
+			configurationUpdateCatalogAutomation(t, bundle, automation.ID, func(candidate *factoryConfigurationAutomation) { candidate.Binding = &binding })
+			plan = f.plan(t, bundle)
+			require.Empty(t, plan.Diagnostics)
+			_, err = f.apply(bundle, plan.BaseStateToken)
+			require.NoError(t, err)
+			live := resetTestLiveVersion(t, canvas)
+			graph := resolveIntakeGraph(source, models.LiveCanvasSpec{Nodes: live.Nodes, Edges: live.Edges})
+			require.NotEqual(t, intakeTriggerNodeID, graph.TriggerNodeID, "the fixture must exercise a rebound trigger")
+			before, err := models.FindCanvasNode(database.DB(t.Context()), canvas.ID, graph.TriggerNodeID)
+			require.NoError(t, err)
+			restored, err := MaterializeFactoryAutomationDefaults(f.ctx, f.r.Organization.ID.String(), &pb.MaterializeFactoryAutomationDefaultsRequest{FactoryId: f.factory.ID.String(), AutomationId: canvas.ID.String()})
+			require.NoError(t, err)
+			document, err := yaml.CanvasFromYAML([]byte(restored.CanvasYaml))
+			require.NoError(t, err)
+			restoredGraph := resolveIntakeGraph(source, models.LiveCanvasSpec{Nodes: document.Nodes(), Edges: document.Edges()})
+			require.Equal(t, graph.TriggerNodeID, restoredGraph.TriggerNodeID, "restore defaults must keep the active provider resources")
+			require.NoError(t, resetTestOrganization(t, f.r))
+			live = resetTestLiveVersion(t, canvas)
+			resetGraph := resolveIntakeGraph(source, models.LiveCanvasSpec{Nodes: live.Nodes, Edges: live.Edges})
+			require.Equal(t, graph.TriggerNodeID, resetGraph.TriggerNodeID, "admin reset must keep the active trigger")
+			require.True(t, resetGraph.Healthy(live.Edges))
+			after, err := models.FindCanvasNode(database.DB(t.Context()), canvas.ID, resetGraph.TriggerNodeID)
+			require.NoError(t, err)
+			require.Equal(t, before.WebhookID, after.WebhookID)
+			require.Equal(t, before.AppInstallationID, after.AppInstallationID)
 		})
 	}
 }

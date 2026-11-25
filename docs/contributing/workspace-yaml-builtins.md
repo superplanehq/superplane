@@ -127,6 +127,8 @@ for filter selections. Names and IDs are strings.
 
 All provider intakes accept `with.intake.confidence_pct` from 0 through 100 and
 `with.intake.default_owner_id`. The owner must belong to the workspace organization.
+GitHub, Sentry, Jira, Productive, Dependabot, and Linear intakes also accept
+`with.intake.paused`, which defaults to `false`.
 Each intake also accepts these provider settings:
 
 | Intake | Additional `with.intake` fields |
