@@ -384,14 +384,15 @@ describe("WorkOrderSplitRunPopup", () => {
         canvasSteps: [],
       })),
     );
-    renderPopup({
+    const props = {
       organizationId: FACTORIES_ORGANIZATION_ID,
       factoryId: PRIMARY_FACTORY_ID,
       orderId: DRAFT_WORK_ORDER.id,
       fixture,
-    });
+    };
+    const popup = renderPopup(props);
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "Chat (2)" }));
+    await user.click(await screen.findByRole("button", { name: /\(2 active chats\)/ }));
     await user.click(screen.getByRole("menuitemradio", { name: "Planning" }));
     expect(await screen.findByText("Planning conversation")).toBeVisible();
     expect(screen.queryByText("Custom conversation")).not.toBeInTheDocument();
@@ -402,6 +403,9 @@ describe("WorkOrderSplitRunPopup", () => {
     await user.click(screen.getByRole("button", { name: "Chat with Strategy" }));
     expect(await screen.findByText("Custom conversation")).toBeVisible();
     expect(screen.queryByText("Planning conversation")).not.toBeInTheDocument();
+    popup.rerenderPopup({ ...props, fixture: { ...fixture, footer: { ...fixture.footer, kind: "done" } } });
+    expect(screen.queryByRole("group", { name: "Task view" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
   });
 
   it("shows a failed Backlog run before a planning session exists and clears it for a newer run", async () => {

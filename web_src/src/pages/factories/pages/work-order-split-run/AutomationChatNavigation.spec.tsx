@@ -24,7 +24,9 @@ function TaskChats() {
   const selected = chats.find((chat) => chat.runId === choice);
   return (
     <TooltipProvider>
-      <AutomationChatContext.Provider value={{ chats, choice: choice ?? "activity", selected, setChoice }}>
+      <AutomationChatContext.Provider
+        value={{ chats, hasHistory: true, choice: choice ?? "activity", selected, setChoice }}
+      >
         <AutomationChatNavigation />
         {selected ? (
           <p>{selected.componentName} conversation</p>
@@ -43,10 +45,11 @@ function TaskChats() {
 it("shows the chat count and switches between named automation conversations", async () => {
   const user = userEvent.setup();
   render(<TaskChats />);
-  await user.click(screen.getByRole("button", { name: "Chat (2)" }));
+  await user.click(screen.getByRole("button", { name: "Strategy (2 active chats)" }));
   expect(screen.getByRole("menuitemradio", { name: "Strategy" })).toHaveAttribute("aria-checked", "true");
   await user.click(screen.getByRole("menuitemradio", { name: "Review" }));
   expect(screen.getByText("Review conversation")).toBeVisible();
+  expect(screen.getByRole("button", { name: "Review (2 active chats)" })).toBeVisible();
 });
 
 it("opens the matching conversation from a timeline chat button", async () => {

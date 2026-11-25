@@ -110,7 +110,7 @@ function WorkOrderSplitRunPopupContent(props: WorkOrderSplitRunPopupProps) {
   });
 
   const { session } = analysis;
-  const automationChats = useAutomationChatSessions(organizationId, factoryId, orderId, fixture.phases, session);
+  const automationChats = useAutomationChatSessions(organizationId, factoryId, orderId, fixture, session);
 
   if (mode === "loading") {
     return <LoadingWorkOrderPopup title={fixture.title} titlePrefix={titlePrefix} fixed={fixed} onClose={onClose} />;

@@ -4,7 +4,7 @@ import { expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
 import { findPlanningSessionByWorkOrder, sendPlanningSessionMessage } from "../planningSessionClient";
 import { useAutomationChatSessions } from "./useAutomationChatSessions";
-import type { SplitRunPhase } from "./splitRunMocks";
+import { SPLIT_RUN_RUNNING, type SplitRunPhase, type SplitRunFixture } from "./splitRunMocks";
 import { useAnalysisPlanningSession } from "./useAnalysisPlanningSession";
 
 vi.mock("../planningSessionClient", () => ({
@@ -74,20 +74,25 @@ it("opens the latest chat by default, deduplicates restarts, and keeps Activity 
     name: "Custom",
     componentName: "Custom",
     status: "passed",
+    columnKey: "backlog",
     duration: "1m",
     artifacts: [],
     stream: [],
     canvasSteps: [],
   });
-  const { result, unmount } = renderHook(
-    () =>
-      useAutomationChatSessions("org", "factory", "task", [
-        phase("older", "2026-11-24T10:00:00Z"),
-        phase("original", "2026-11-24T11:00:00Z"),
-        phase("restart", "2026-11-24T12:00:00Z"),
-        phase("plain", "2026-11-24T13:00:00Z"),
-      ]),
-    { wrapper },
+  const { result, unmount, rerender } = renderHook(
+    ({ kind }: { kind: SplitRunFixture["footer"]["kind"] }) =>
+      useAutomationChatSessions("org", "factory", "task", {
+        ...SPLIT_RUN_RUNNING,
+        footer: { ...SPLIT_RUN_RUNNING.footer, kind },
+        phases: [
+          phase("older", "2026-11-24T10:00:00Z"),
+          phase("original", "2026-11-24T11:00:00Z"),
+          phase("restart", "2026-11-24T12:00:00Z"),
+          phase("plain", "2026-11-24T13:00:00Z"),
+        ],
+      }),
+    { wrapper, initialProps: { kind: "draft" } },
   );
   await waitFor(() => expect(result.current.selected?.runId).toBe("restart"));
   expect(result.current.chats.map((chat) => chat.runId)).toEqual(["restart", "older"]);
@@ -95,5 +100,9 @@ it("opens the latest chat by default, deduplicates restarts, and keeps Activity 
   expect(result.current.selected).toBeUndefined();
   act(() => result.current.setChoice("older"));
   expect(result.current.selected?.runId).toBe("older");
+  rerender({ kind: "running" });
+  expect(result.current.chats).toHaveLength(0);
+  expect(result.current.choice).toBe("activity");
+  expect(result.current.hasHistory).toBe(true);
   unmount();
 });

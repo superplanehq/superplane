@@ -1,5 +1,6 @@
 import { useContext } from "react";
 import { ChevronDown, ListTree, MessageSquare } from "lucide-react";
+import { Badge } from "@/components/reui/badge";
 import { Button } from "@/components/ui/button";
 import { ButtonGroup } from "@/components/ui/button-group";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -18,7 +19,7 @@ export function AutomationChatNavigation() {
   if (!chats?.chats.length) return null;
   return (
     <ButtonGroup aria-label="Task view">
-      <ChatPicker phases={chats.chats} selected={chats.choice} onSelect={chats.setChoice} />
+      <ChatPicker phases={chats.chats} selected={chats.choice} onSelect={chats.setChoice} navigation />
       <Button
         type="button"
         variant="outline"
@@ -50,30 +51,42 @@ function ChatPicker({
   phases,
   selected,
   onSelect,
+  navigation = false,
 }: {
+  navigation?: boolean;
   phases: SplitRunPhase[];
   selected: string;
   onSelect: (runId: string) => void;
 }) {
   const multiple = phases.length > 1;
   const active = phases.find((phase) => phase.runId === selected);
+  const label = navigation ? (active?.componentName ?? "Chat") : "Chat";
   const button = (
     <Button
       type="button"
       variant="outline"
       size="sm"
-      aria-label={multiple ? `Chat (${phases.length})` : `Chat with ${phases[0].componentName}`}
+      aria-label={
+        navigation
+          ? `${label} (${phases.length} active ${phases.length === 1 ? "chat" : "chats"})`
+          : `Chat with ${phases[0].componentName}`
+      }
       aria-pressed={Boolean(active)}
-      className="aria-pressed:bg-accent aria-pressed:text-accent-foreground"
+      className="relative gap-2 aria-pressed:bg-accent aria-pressed:text-accent-foreground"
       onClick={multiple ? undefined : () => onSelect(phases[0].runId!)}
     >
       <MessageSquare className="size-4" aria-hidden />
-      Chat
-      {multiple ? (
-        <>
-          <span className="tabular-nums">{phases.length}</span>
-          <ChevronDown className="size-3" aria-hidden />
-        </>
+      {label}
+      {multiple ? <ChevronDown className="size-3" aria-hidden /> : null}
+      {navigation ? (
+        <Badge
+          variant="destructive"
+          size="sm"
+          className="absolute -top-1.5 -right-2 z-10 rounded-full px-1"
+          aria-hidden
+        >
+          {phases.length}
+        </Badge>
       ) : null}
     </Button>
   );

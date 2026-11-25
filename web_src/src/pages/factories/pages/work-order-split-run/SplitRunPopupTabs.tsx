@@ -131,7 +131,7 @@ function TaskView(props: SplitRunPopupTabsProps) {
     return (
       <SplitRunPopupContent
         {...props}
-        sourceOnly={chats.choice === "planning" ? false : props.sourceOnly || chats.chats.length > 0}
+        sourceOnly={chats.choice === "planning" ? false : props.sourceOnly || chats.hasHistory}
         header={() => props.header(navigation)}
       />
     );
