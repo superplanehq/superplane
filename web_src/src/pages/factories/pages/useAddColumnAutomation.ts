@@ -12,6 +12,7 @@ import { useNavigate } from "react-router";
 
 import {
   catalogForColumn,
+  isCustomStageColumn,
   onlyCustomCatalogRemains,
   pickerCatalogForColumn,
   takenCatalogIds,
@@ -70,11 +71,15 @@ export function useAddColumnAutomation(args: {
   };
 
   const openPicker = (key: ColumnKey, title = "") => {
-    const nextCatalog = catalogForColumn(key, catalogOptions);
-    const nextTaken = takenCatalogIds(args.automationsFor(key), nextCatalog);
+    // A custom stage always opens the shared setup editor, even before the
+    // feature flag lookup reports custom automations as enabled.
+    if (isCustomStageColumn(key) && args.lineId) {
+      navigate(factoryCustomAutomationSetupPath(args.organizationId, args.factoryKey, args.lineId, undefined, key));
+      return;
+    }
+    const customRemains = onlyCustomRemains(key, catalogOptions, args.automationsFor(key));
     const setupColumn = customAutomationSetupColumn(key);
-    const customStage = key.startsWith("custom-");
-    if (allowCustom && setupColumn !== null && onlyCustomCatalogRemains(nextCatalog, nextTaken) && args.lineId) {
+    if (allowCustom && setupColumn !== null && customRemains && args.lineId) {
       navigate(
         factoryCustomAutomationSetupPath(args.organizationId, args.factoryKey, args.lineId, undefined, setupColumn),
       );
@@ -82,7 +87,7 @@ export function useAddColumnAutomation(args: {
     }
     setColumn(key);
     setColumnTitle(title);
-    setNaming(!customStage && onlyCustomCatalogRemains(nextCatalog, nextTaken));
+    setNaming(!isCustomStageColumn(key) && customRemains);
   };
 
   const onSelect = async (entry: ColumnAutomationCatalogEntry) => {
@@ -93,7 +98,7 @@ export function useAddColumnAutomation(args: {
       entry.kind === "pr-discussion" ||
       entry.kind === "pr-checks" ||
       entry.kind === "custom-verification" ||
-      (entry.kind === "custom" && column.startsWith("custom-") && allowCustom)
+      (entry.kind === "custom" && isCustomStageColumn(column))
     ) {
       openFocusedVerifySetup(entry, column, args, navigate, closePicker);
       return;
@@ -171,8 +176,17 @@ function githubVerifyTemplate(
   };
 }
 
+function onlyCustomRemains(
+  key: ColumnKey,
+  catalogOptions: { allowCustom?: boolean; allowReviewRequest?: boolean; vcsProvider?: string },
+  automations: ColumnAutomation[],
+): boolean {
+  const catalog = catalogForColumn(key, catalogOptions);
+  return onlyCustomCatalogRemains(catalog, takenCatalogIds(automations, catalog));
+}
+
 function customAutomationSetupColumn(key: ColumnKey): CustomAutomationColumn | undefined | null {
-  if (key.startsWith("custom-")) return key as CustomAutomationColumn;
+  if (isCustomStageColumn(key)) return key;
   if (key === "verify") return undefined;
   if (key === "done") return "done";
   if (key === "phase-0") return "implement";

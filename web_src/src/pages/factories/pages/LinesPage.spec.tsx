@@ -958,6 +958,25 @@ describe("LinesPage board stages", () => {
       }
     },
   );
+  it("opens custom-stage automation configuration before the feature list loads", async () => {
+    useFactoryAutomations.mockReturnValue({ data: [{ id: "app-qa", name: "Check QA", columnKey: "custom-qa" }] });
+    renderLinesBoard(undefined, vi.fn(), customStageFactory());
+    await userEvent.setup().click(screen.getByTestId("lines-custom-stage-custom-qa-automation-rows-row-custom-app-qa"));
+    expect(await screen.findByTestId("custom-automation-setup-modal")).toBeInTheDocument();
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent("customAutomation=app-qa");
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent("automationColumn=custom-qa");
+  });
+  it("opens shared setup from the stage menu before the feature list loads", async () => {
+    const user = userEvent.setup();
+    renderLinesBoard(undefined, vi.fn(), customStageFactory());
+    await user.click(screen.getByTestId("lines-custom-stage-menu-custom-qa"));
+    await user.click(screen.getByTestId("lines-custom-stage-menu-custom-qa-add-automation"));
+    expect(await screen.findByTestId("custom-automation-setup-modal")).toBeInTheDocument();
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent("customAutomation=new");
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent("automationColumn=custom-qa");
+    expect(screen.queryByTestId("add-column-automation-picker")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("factory-app-name-input")).not.toBeInTheDocument();
+  });
   const editStages = async () => {
     const user = userEvent.setup();
     await user.click(screen.getByTestId("lines-board-view-menu"));
@@ -1272,6 +1291,7 @@ describe("LinesPage board stages", () => {
     await user.click(within(saveDialog).getByRole("button", { name: "Save changes" }));
 
     expect(await screen.findByTestId("custom-automation-setup-modal")).toBeInTheDocument();
+    expect(screen.queryByTestId("factory-app-name-input")).not.toBeInTheDocument();
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent("customAutomation=new");
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent("automationColumn=custom-deploy");
     const savedStages = updateFactoryLineMutateAsync.mock.calls[0][0].stageConfiguration.stages;
