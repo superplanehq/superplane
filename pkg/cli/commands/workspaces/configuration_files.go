@@ -25,9 +25,14 @@ func configurationManifestReferences(content string) ([]string, error) {
 			Run            string `yaml:"run"`
 			MaxParallelism *int   `yaml:"max_parallelism"`
 			Automations    []struct {
-				ID   string         `yaml:"id"`
-				Name string         `yaml:"name"`
-				Uses string         `yaml:"uses"`
+				ID      string `yaml:"id"`
+				Name    string `yaml:"name"`
+				Uses    string `yaml:"uses"`
+				Binding *struct {
+					IntegrationID string `yaml:"integration_id"`
+					ResourceID    string `yaml:"resource_id"`
+					TeamID        string `yaml:"team_id"`
+				} `yaml:"binding"`
 				With map[string]any `yaml:"with"`
 			} `yaml:"automations"`
 		} `yaml:"stages"`

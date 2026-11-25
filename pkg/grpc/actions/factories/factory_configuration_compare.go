@@ -106,7 +106,7 @@ func factoryConfigurationAutomationChanged(current *factoryConfigurationAutomati
 
 func factoryConfigurationAutomationContentChanged(current *factoryConfigurationAutomationTarget, desired factoryConfigurationAutomation, manifest *factoryConfigurationManifest) bool {
 	if current.templateID != "" {
-		return !equalCanvasJSON(current.settings, desired.With)
+		return !equalCanvasJSON(current.settings, desired.With) || factoryConfigurationBindingChanged(current, desired) || factoryConfigurationReviewSourceChanged(current, desired)
 	}
 	previous, err := automationspec.Parse(current.source)
 	if err != nil {
@@ -163,6 +163,14 @@ func compareFactoryConfiguration(target *factoryConfigurationTarget, manifest *f
 				continue
 			}
 			if current.templateID != "" {
+				if factoryConfigurationBindingChanged(current, automation) {
+					changes = append(changes, configurationChange(resource, fmt.Sprintf("%s.automations[%d].binding", stagePath, j), current.exportedBinding, automation.Binding))
+				}
+				if factoryConfigurationReviewSourceChanged(current, automation) {
+					previous := findIntakeNode(current.version.Nodes, reviewRequestTriggerNodeID)
+					requested := findIntakeNode(automation.prepared.Nodes, reviewRequestTriggerNodeID)
+					changes = append(changes, configurationChange(resource, fmt.Sprintf("%s.automations[%d].with.template.merge_confidence", stagePath, j), previous.Configuration["app"], requested.Configuration["app"]))
+				}
 				changes = append(changes, configurationSettingChanges(resource, fmt.Sprintf("%s.automations[%d].with", stagePath, j), current.settings, automation.With)...)
 				continue
 			}

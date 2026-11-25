@@ -814,11 +814,29 @@ func TestMaterializePRClosureClosesGitHubOriginAfterMerge(t *testing.T) {
 
 	hasGitHubOrigin := findYAMLNode(t, canvas, "has-github-issue-origin")
 	assert.Equal(t, "if", hasGitHubOrigin.Component)
-	assert.Equal(
-		t,
-		`root().data.workOrder.origin != nil && root().data.workOrder.origin.label != "" && len(split(root().data.workOrder.origin.url, "/issues/")) == 2 && (contains(root().data.workOrder.origin.url, "://github.com/") || contains(root().data.workOrder.origin.url, "://www.github.com/") || contains(root().data.workOrder.origin.url, ".ghe.com/")) && split(split(root().data.workOrder.origin.url, "://")[1], "/")[0] == split(split(root().data.pull_request.html_url, "://")[1], "/")[0]`,
-		hasGitHubOrigin.Configuration["expression"],
-	)
+	for _, tc := range []struct {
+		name, originURL, pullURL, label string
+		matches                         bool
+	}{
+		{name: "GitHub", originURL: "https://github.com/acme/api/issues/12", pullURL: "https://github.com/acme/api/pull/34", label: "acme/api#12", matches: true},
+		{name: "GitHub Enterprise", originURL: "https://acme.ghe.com/acme/api/issues/12", pullURL: "https://acme.ghe.com/acme/api/pull/34", label: "acme/api#12", matches: true},
+		{name: "different hosts", originURL: "https://github.com/acme/api/issues/12", pullURL: "https://acme.ghe.com/acme/api/pull/34", label: "acme/api#12"},
+		{name: "other provider", originURL: "https://gitlab.com/acme/api/issues/12", pullURL: "https://gitlab.com/acme/api/pull/34", label: "acme/api#12"},
+		{name: "missing origin", pullURL: "https://github.com/acme/api/pull/34"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var origin any
+			if tc.originURL != "" {
+				origin = map[string]any{"url": tc.originURL, "label": tc.label}
+			}
+			environment := map[string]any{"root": func() map[string]any {
+				return map[string]any{"data": map[string]any{"workOrder": map[string]any{"origin": origin}, "pull_request": map[string]any{"html_url": tc.pullURL}}}
+			}}
+			result, err := expr.Eval(hasGitHubOrigin.Configuration["expression"].(string), environment)
+			require.NoError(t, err)
+			require.Equal(t, tc.matches, result)
+		})
+	}
 
 	comment := findYAMLNode(t, canvas, "comment-source-issue")
 	assert.Equal(t, "github.createIssueComment", comment.Component)
