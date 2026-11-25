@@ -99,5 +99,17 @@ func checkRequiredExperimentalFeatures(ctx context.Context, orgID string, rule A
 		}
 	}
 
-	return nil
+	if len(rule.RequiredAnyExperimentalFeatures) == 0 {
+		return nil
+	}
+	for _, featureID := range rule.RequiredAnyExperimentalFeatures {
+		enabled, err := orgHasExperimentalFeature(orgUUID, featureID)
+		if err != nil {
+			return status.Error(codes.NotFound, "organization not found")
+		}
+		if enabled {
+			return nil
+		}
+	}
+	return status.Error(codes.PermissionDenied, "required experimental feature is not enabled")
 }

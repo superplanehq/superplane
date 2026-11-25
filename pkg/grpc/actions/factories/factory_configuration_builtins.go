@@ -237,10 +237,27 @@ func validateFactoryConfigurationBuiltInNodes(tx *gorm.DB, deps IntakeDependenci
 		if node.Configuration["llmProvider"] == models.UsageProviderCustom {
 			config["llmProvider"] = models.UsageProviderCustom
 		}
-		_, err := factoryAutomationPolicy(tx, factory, "byok-runner-model", []any{node.ComponentName(), config}, func() (string, error) {
-			return models.ResolveBYOKRunnerModel(tx, factory.OrganizationID, &factory.ID, node.ComponentName(), config)
+		policy := "byok-runner-model"
+		if node.ComponentName() == models.SuperPlaneRunnerComponent {
+			policy = "hosted-runner-model"
+			config["hostedProvider"] = node.Configuration["hostedProvider"]
+		}
+		_, err := factoryAutomationPolicy(tx, factory, policy, []any{node.ComponentName(), config}, func() (string, error) {
+			if node.ComponentName() != models.SuperPlaneRunnerComponent {
+				return models.ResolveBYOKRunnerModel(tx, factory.OrganizationID, &factory.ID, node.ComponentName(), config)
+			}
+			model := strings.TrimSpace(configString(config, "model"))
+			if model == "" {
+				_, err := models.ResolveRunnableHostedLLMModel(tx, factory.OrganizationID, &factory.ID)
+				return "", err
+			}
+			allowed, err := models.RunnerAcceptsModel(tx, factory.OrganizationID, &factory.ID, node.ComponentName(), config, model)
+			if err == nil && !allowed {
+				return "", models.ErrSelectableLLMModelNotAllowed
+			}
+			return model, err
 		})
-		if errors.Is(err, models.ErrSelectableLLMModelNotAllowed) {
+		if errors.Is(err, models.ErrSelectableLLMModelNotAllowed) || errors.Is(err, models.ErrSuperPlaneRunnerNoModel) || errors.Is(err, models.ErrSuperPlaneRunnerModelNotAllowed) {
 			return &factoryConfigurationSettingError{Field: "agents." + node.ID + ".model", Message: "Select an available model for the configured agent."}
 		}
 		if err != nil {
