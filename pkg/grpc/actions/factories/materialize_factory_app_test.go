@@ -261,7 +261,7 @@ func Test__MaterializeFactoryAutomationDefaults(t *testing.T) {
 		materialized, err := yaml.CanvasFromYAML([]byte(response.GetCanvasYaml()))
 		require.NoError(t, err)
 		agent := findYAMLNode(t, materialized, "assess-risk")
-		for _, name := range []string{"Blast radius", "Performance", "Security", "Drift from Specification", "Reversibility"} {
+		for _, name := range []string{"Correctness", "Performance", "Security", "Blast radius", "Reversibility"} {
 			implementationStep(t, agent, name)
 		}
 		assert.Contains(t, agentPrompt(t, agent), "Additive database changes = 3 (medium).")
