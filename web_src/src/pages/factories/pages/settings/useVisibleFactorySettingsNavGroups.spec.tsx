@@ -7,6 +7,7 @@ import { useVisibleFactorySettingsNavGroups } from "./useVisibleFactorySettingsN
 import { buildFactorySettingsSearchIndex, searchFactorySettings } from "./settingsSearch";
 
 let modelStatusEnabled = false;
+let webhookFeatures: string[] = [];
 
 vi.mock("@/api-client", () => ({ meListCodexUsage: vi.fn() }));
 vi.mock("@/contexts/usePermissions", () => ({
@@ -14,7 +15,13 @@ vi.mock("@/contexts/usePermissions", () => ({
 }));
 vi.mock("@/hooks/useExperimentalFeature", () => ({
   useExperimentalFeature: () => ({
-    has: (id: string) => id !== "model_status" || modelStatusEnabled,
+    has: (id: string) => {
+      if (id === "model_status") return modelStatusEnabled;
+      if (["factory-as-code", "factory_webhook_intake", "factory_custom_automations"].includes(id)) {
+        return webhookFeatures.includes(id);
+      }
+      return true;
+    },
     isLoading: false,
   }),
 }));
@@ -72,6 +79,23 @@ describe("Model status discovery", () => {
       );
       view.unmount();
       modelStatusEnabled = false;
+    });
+  }
+});
+
+describe("Workspace webhook discovery", () => {
+  for (const features of [[], ["factory_custom_automations"], ["factory-as-code"], ["factory_webhook_intake"]]) {
+    it(`gates webhook navigation with ${features.join(", ") || "no features"}`, () => {
+      webhookFeatures = features;
+      const view = render(
+        <QueryClientProvider client={new QueryClient()}>
+          <SettingsNavigation />
+        </QueryClientProvider>,
+      );
+      const enabled = features.includes("factory-as-code") || features.includes("factory_webhook_intake");
+      expect(screen.queryByRole("link", { name: "Webhooks" }) !== null).toBe(enabled);
+      view.unmount();
+      webhookFeatures = [];
     });
   }
 });

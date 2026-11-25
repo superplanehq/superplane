@@ -6,9 +6,13 @@ import (
 	"testing"
 
 	ghodssyaml "github.com/ghodss/yaml"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/integrations/github"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/registry"
 	"gorm.io/datatypes"
 )
 
@@ -234,4 +238,41 @@ spec:
 
 	node := resource.Spec.Nodes[0].Model()
 	assert.Equal(t, models.SuperPlaneRunnerComponent, node.ComponentName())
+}
+
+func TestCanvasParseLoadedIntegrationsRetainsAdmission(t *testing.T) {
+	organizationID := uuid.New()
+	integrationID := uuid.New()
+	component := "github.createIssue"
+	components := &registry.Registry{Integrations: map[string]core.Integration{"github": &github.GitHub{}}}
+	for _, test := range []struct {
+		name           string
+		organizationID uuid.UUID
+		capability     core.IntegrationCapabilityState
+		diagnostic     string
+	}{
+		{name: "enabled capability", organizationID: organizationID, capability: core.IntegrationCapabilityStateEnabled},
+		{name: "another organization", organizationID: uuid.New(), capability: core.IntegrationCapabilityStateEnabled, diagnostic: "does not belong to this organization"},
+		{name: "disabled capability", organizationID: organizationID, capability: core.IntegrationCapabilityStateDisabled, diagnostic: "is not enabled"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			integration := models.NewIntegration(integrationID, test.organizationID, "github", "repository", nil)
+			integration.State = models.IntegrationStateReady
+			integration.Capabilities = datatypes.NewJSONSlice([]models.CapabilityState{{Name: component, State: test.capability}})
+			canvas := &Canvas{Spec: &CanvasSpec{Nodes: []Node{{
+				ID: "issue", Name: "Create issue", Type: NodeTypeAction, Component: component,
+				Integration:   &IntegrationRef{ID: integrationID.String()},
+				Configuration: map[string]any{"repository": "team/project", "title": "Review changes"},
+			}}}}
+			nodes, _, err := canvas.ParseInTransactionWithIntegrations(components, organizationID.String(), nil, map[uuid.UUID]*models.Integration{integrationID: integration})
+			require.NoError(t, err)
+			require.Len(t, nodes, 1)
+			if test.diagnostic == "" {
+				require.Nil(t, nodes[0].ErrorMessage)
+				return
+			}
+			require.NotNil(t, nodes[0].ErrorMessage)
+			require.Contains(t, *nodes[0].ErrorMessage, test.diagnostic)
+		})
+	}
 }

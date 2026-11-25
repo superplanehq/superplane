@@ -41,6 +41,21 @@ func (s *FactoryService) ListFactories(ctx context.Context, req *pb.ListFactorie
 	return actions.ListFactories(ctx, organizationID)
 }
 
+func (s *FactoryService) ExportFactoryConfiguration(ctx context.Context, req *pb.ExportFactoryConfigurationRequest) (*pb.ExportFactoryConfigurationResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.ExportFactoryConfiguration(ctx, organizationID, req)
+}
+
+func (s *FactoryService) PlanFactoryConfiguration(ctx context.Context, req *pb.PlanFactoryConfigurationRequest) (*pb.PlanFactoryConfigurationResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.PlanFactoryConfiguration(ctx, s.intakeDeps, organizationID, req)
+}
+
+func (s *FactoryService) ApplyFactoryConfiguration(ctx context.Context, req *pb.ApplyFactoryConfigurationRequest) (*pb.ApplyFactoryConfigurationResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.ApplyFactoryConfiguration(ctx, s.intakeDeps, organizationID, req)
+}
+
 func (s *FactoryService) CreateFactory(ctx context.Context, req *pb.CreateFactoryRequest) (*pb.CreateFactoryResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.CreateFactory(ctx, organizationID, req)
