@@ -492,6 +492,5 @@ func validateFactoryConfigurationManifest(ctx context.Context, tx *gorm.DB, deps
 	if byKey[manifest.Stages[len(manifest.Stages)-1].Key].stage.Kind != models.FactoryLineStageDone {
 		return configurationDiagnostic("stages", "Done must remain last."), nil
 	}
-
 	return nil, nil
 }

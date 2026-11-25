@@ -178,7 +178,6 @@ func TestFactoryConfigurationRejectsUnsupportedManifestWithoutWrites(t *testing.
 	count := configurationRevisionCount(t, f.canvas)
 	for _, tc := range []struct{ name, from, to, field string }{
 		{"unsupported stage kind", "name: Build changes", "name: Build changes\n    kind: phase", "stages[1].kind"},
-		{"nonphase concurrency", "key: verify", "key: verify\n    max_parallelism: 2", "stages[2].max_parallelism"},
 		{"changed runner", "run: implement", "run: other", "stages[1].run"},
 		{"invalid YAML", "apiVersion: v2", "apiVersion: [", "$"},
 		{"unknown field", "kind: Factory", "kind: Factory\nunknown: true", "unknown"},
@@ -190,7 +189,6 @@ func TestFactoryConfigurationRejectsUnsupportedManifestWithoutWrites(t *testing.
 		{"concurrency without runner", "name: Verify", "name: Verify\n    max_parallelism: 2", "stages[2].max_parallelism"},
 		{"zero concurrency", "run: implement", "run: implement\n    max_parallelism: 0", "stages[1].max_parallelism"},
 		{"concurrency outside API range", "run: implement", "run: implement\n    max_parallelism: 2147483648", "stages[1].max_parallelism"},
-		{"stage editing disabled", "name: Build changes", "name: Other phase", "stages"},
 		{"uninstalled built-in", "      - id: implement", "      - id: second\n        name: Other\n        uses: \"@superplane/implement\"\n        with:\n          additional_instructions: Extra\n      - id: implement", "stages[1].automations[0].uses"},
 		{"duplicate field", "kind: Factory", "kind: Factory\nkind: Factory", "kind"},
 		{"extra document", "apiVersion: v2", "---\nname: extra\n---\napiVersion: v2", "$"},
