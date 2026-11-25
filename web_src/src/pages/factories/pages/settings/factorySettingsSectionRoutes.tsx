@@ -2,7 +2,7 @@ import { Navigate, Route } from "react-router";
 
 import { RequireAnyPermission, RequirePermission } from "@/components/PermissionGate";
 import { RequireExperimentalFeature } from "@/components/RequireExperimentalFeature";
-import { FEATURE_SUPERPLANE_MCP_SERVER } from "@/lib/experimentalFeatures";
+import { FEATURE_MODEL_STATUS, FEATURE_SUPERPLANE_MCP_SERVER } from "@/lib/experimentalFeatures";
 import {
   FactorySettingsAccountNotificationsPage,
   FactorySettingsAccountProfilePage,
@@ -235,7 +235,9 @@ export const factorySettingsSectionRoutes = [
     path="organization/model-status"
     element={
       <RequirePermission resource="org" action="read">
-        <FactoryOrganizationModelStatusPage />
+        <RequireExperimentalFeature featureId={FEATURE_MODEL_STATUS}>
+          <FactoryOrganizationModelStatusPage />
+        </RequireExperimentalFeature>
       </RequirePermission>
     }
   />,

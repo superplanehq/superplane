@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { MoreHorizontal, Plus } from "lucide-react";
 import { useState } from "react";
-import { expect, userEvent, within } from "storybook/test";
+import { expect, userEvent, within, waitFor } from "storybook/test";
 
 import githubIcon from "@/assets/icons/integrations/github.svg";
 
@@ -10,6 +10,11 @@ import { withFactoriesTheme } from "../__fixtures__/factoriesStoryTheme";
 import type { ColumnAutomation } from "../lib/columnAutomations";
 import { WorkOrderBoardLane, WorkOrderKanbanBoard } from "../workOrders/WorkOrderBoardChrome";
 import { ColumnAutomationRows } from "./ColumnAutomationRows";
+import { AutomationRowContext } from "./AutomationRowContext";
+import { Button } from "@/components/ui/button";
+import { useColumnAutomationCollapsePreference } from "@/hooks/useColumnAutomationCollapsePreference";
+import { ColumnAutomationToggle } from "./ColumnAutomationDisclosure";
+import { columnAutomationRowsSubheader } from "./columnAutomationRowsSubheader";
 import { lineBoardColumnLaneClassName } from "./lineBoardColumnColors";
 
 const GITHUB_INTAKE: ColumnAutomation = {
@@ -85,6 +90,14 @@ export const SettingsRows: Story = {
   name: "Settings rows",
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
+    const verify = within(canvas.getByRole("region", { name: "Verify" }));
+    for (const title of ["Backlog", "Implement", "Verify"]) {
+      const lane = within(canvas.getByRole("region", { name: title }));
+      const expand = lane.queryByRole("button", { name: `Expand automations for ${title}` });
+      if (expand) await userEvent.click(expand);
+      await waitFor(() => expect(lane.getByRole("list", { name: `${title} automations` })).toBeVisible());
+    }
+    await Promise.all(canvasElement.getAnimations({ subtree: true }).map((animation) => animation.finished));
     const labelOffsets: number[] = [];
     const cardTops: number[] = [];
     for (const title of ["Backlog", "Implement", "Verify", "Review"]) {
@@ -101,7 +114,10 @@ export const SettingsRows: Story = {
       cardTops.push(lane.getAllByRole("listitem").at(-1)!.getBoundingClientRect().top);
     }
     expect(Math.max(...labelOffsets) - Math.min(...labelOffsets)).toBeLessThanOrEqual(1);
-    expect(Math.max(...cardTops) - Math.min(...cardTops)).toBeLessThanOrEqual(1);
+    expect(cardTops[2]).toBeGreaterThan(cardTops[0]);
+    await userEvent.click(verify.getByRole("button", { name: "Collapse automations for Verify" }));
+    await expect(verify.queryByRole("list", { name: "Verify automations" })).not.toBeInTheDocument();
+    await expect(canvas.getByRole("list", { name: "Backlog automations" })).toBeVisible();
   },
   render: () => <Board />,
 };
@@ -113,6 +129,67 @@ export const EmptyWithAdd: Story = {
       <Lane title="Review" automations={[]} onAdd={() => undefined} cards={[]} />
     </div>
   ),
+};
+
+export const EditStages: Story = {
+  render: function EditStagesStory() {
+    const [editing, setEditing] = useState(true);
+    const [destination, setDestination] = useState("Backlog");
+    const [dragging, setDragging] = useState(false);
+    const [pending, setPending] = useState(false);
+    const [status, setStatus] = useState("");
+    const automation = { ...GITHUB_INTAKE, canRunNow: true };
+    return (
+      <div className="space-y-4">
+        <Button onClick={() => setEditing(!editing)}>{editing ? "Done" : "Edit stages"}</Button>
+        <AutomationRowContext.Provider
+          value={{
+            move: editing
+              ? {
+                  start: () => setDragging(true),
+                  end: () => setDragging(false),
+                  keyboard: () => setDestination(destination === "Backlog" ? "Review" : "Backlog"),
+                }
+              : undefined,
+          }}
+        >
+          <div className="flex gap-6">
+            {["Backlog", "Review"].map((title) => (
+              <section
+                key={title}
+                aria-label={title}
+                className="w-80 min-h-32 rounded-lg bg-muted p-4"
+                onDragOver={(event) => {
+                  if (dragging) event.preventDefault();
+                }}
+                onDrop={(event) => {
+                  if (!dragging) return;
+                  event.preventDefault();
+                  setDestination(title);
+                  setDragging(false);
+                }}
+              >
+                <h2 className="mb-4">{title}</h2>
+                <ColumnAutomationRows
+                  title={title}
+                  automations={destination === title ? [automation] : []}
+                  rowCount={1}
+                  testId={`${title.toLowerCase()}-edit-rows`}
+                  onRowAction={() => setStatus("Automation settings opened.")}
+                  onRun={() => {
+                    setPending(true);
+                    setStatus("Automation run requested.");
+                  }}
+                  runPending={pending}
+                />
+              </section>
+            ))}
+          </div>
+        </AutomationRowContext.Provider>
+        <p role="status">{dragging ? "Drag started." : status}</p>
+      </div>
+    );
+  },
 };
 
 export const ScheduleControls: Story = {
@@ -225,6 +302,10 @@ function Lane({
   onAdd?: () => void;
   cards: Array<{ title: string; meta: string }>;
 }) {
+  const disclosure = useColumnAutomationCollapsePreference(
+    JSON.stringify(["storybook", "automation-rows", "board", title.toLowerCase()]),
+    automations.length,
+  );
   return (
     <WorkOrderBoardLane
       title={title}
@@ -235,6 +316,7 @@ function Lane({
       className={colorId ? undefined : "bg-muted"}
       actions={
         <div className="flex shrink-0 items-center gap-0.5">
+          {automations.length ? <ColumnAutomationToggle title={title} disclosure={disclosure} /> : null}
           {showAdd ? (
             <span className="flex size-6 items-center justify-center rounded-md text-muted-foreground">
               <Plus className="size-3.5" aria-hidden />
@@ -245,17 +327,17 @@ function Lane({
           </span>
         </div>
       }
-      subheader={
-        <ColumnAutomationRows
-          title={title}
-          automations={automations}
-          rowCount={3}
-          onRowAction={(automation, action) => console.log("Automation action", automation.id, action)}
-          onRun={(automation) => console.log("Run automation", automation.id)}
-          onAdd={onAdd}
-          testId={`${title.toLowerCase()}-rows`}
-        />
-      }
+      subheaderOwnSpacing
+      subheader={columnAutomationRowsSubheader({
+        title,
+        automations,
+        disclosure,
+        rowCount: Math.max(1, automations.length),
+        onRowAction: (automation, action) => console.log("Automation action", automation.id, action),
+        onRun: (automation) => console.log("Run automation", automation.id),
+        onAdd,
+        testId: `${title.toLowerCase()}-rows`,
+      })}
       testId={`${title.toLowerCase()}-lane`}
     >
       <ul className="flex flex-col gap-2 p-0.5">

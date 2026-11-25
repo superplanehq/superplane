@@ -1,7 +1,5 @@
-import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useIntegrationResources } from "@/hooks/useIntegrations";
 import { useOrganization } from "@/hooks/useOrganizationData";
-import { FEATURE_FLAG_GITHUB_ENTERPRISE } from "@/lib/experimentalFeatures";
 import { FEATURE_GITHUB_ENTERPRISE, hasOrganizationEnterpriseFeature } from "@/lib/license";
 
 import { RepositoryBranchPromptLoader } from "../RepositoryBranchPromptLoader";
@@ -138,7 +136,6 @@ function FirstRunVcsChoices({
   branchPrompt,
 }: FirstRunVcsScreenProps & { branchPrompt?: RepositoryBranchPrompt }) {
   const { data: organization } = useOrganization(organizationId);
-  const showGitHubEnterprise = useExperimentalFeature(organizationId).has(FEATURE_FLAG_GITHUB_ENTERPRISE);
   const githubEnterpriseLicensed = hasOrganizationEnterpriseFeature(organization, FEATURE_GITHUB_ENTERPRISE);
   const setup = model.setup;
   if (screen === "host") {
@@ -146,7 +143,6 @@ function FirstRunVcsChoices({
       <FirstRunHostScreen
         selectedHost={flow.vcsHost}
         githubEnterpriseSelected={flow.githubEnterprise}
-        showGitHubEnterprise={showGitHubEnterprise}
         githubEnterpriseLicensed={githubEnterpriseLicensed}
         chrome={chrome}
         sphere={sphereFor("host", setup.selectedRepo)}

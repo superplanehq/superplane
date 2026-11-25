@@ -248,6 +248,18 @@ describe("console column placement", () => {
     expect(ids.implement).toContain("implement-0");
   });
 
+  it("keeps Implement activity in the first saved phase stage", () => {
+    const fixture = splitRunFixtureForWorkOrder(LINE_BOARD_VERIFY_ENUM_ORDER);
+    const columns = stagesByConsoleColumn(stagesFromFixture(fixture), undefined, [
+      "backlog",
+      "phase-0",
+      "verify",
+      "done",
+    ]);
+
+    expect(columns["phase-0"].map((stage) => stage.id)).toContain("implement-0");
+  });
+
   it("puts a Done line step in Done", () => {
     const ids = columnStageIds(splitRunFixtureForWorkOrder(LINE_BOARD_DONE_RECEIPTS_ORDER));
 

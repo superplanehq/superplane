@@ -311,7 +311,7 @@ describe("ColumnAutomationViewHost", () => {
     renderHost();
     expect(screen.getByRole("tab", { name: "Configuration" })).toBeInTheDocument();
     expect(screen.getByRole("switch", { name: "Security" })).toBeChecked();
-    expect(screen.getAllByRole("switch")).toHaveLength(5);
+    expect(screen.getByRole("switch", { name: "Skip setup commands" })).not.toBeChecked();
     expect(screen.queryByTestId("merge-confidence-config-canvas")).not.toBeInTheDocument();
   });
 

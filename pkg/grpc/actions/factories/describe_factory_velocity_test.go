@@ -12,7 +12,6 @@ import (
 	billingmodels "github.com/superplanehq/superplane/ee/billing/models"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/test/support"
@@ -1010,7 +1009,6 @@ func TestDescribeFactoryVelocity_CountsTasksApartFromPullRequests(t *testing.T) 
 	assert.Equal(t, int32(2), resp.Totals.TasksClosed, "the merged order counts once, however many pull requests it opened")
 	assert.Equal(t, int32(1), resp.Totals.TasksWaste)
 
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryMultiRepoTasks))
 	primary := "example/repo"
 	require.NoError(t, factoryModel.UpdateOnboarding(db, models.FactoryOnboardingPatch{AppRepository: &primary}))
 	_, err = factoryModel.CreateAgentResource(db, models.FactoryAgentResourceKindContextRepo, "", true, models.FactoryAgentResourceConfig{Repository: "example/other", Access: models.FactoryContextRepoAccessWrite})

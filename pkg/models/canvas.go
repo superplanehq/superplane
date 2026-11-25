@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -38,11 +39,12 @@ type Canvas struct {
 	Description    string
 	// ColumnKey is the line-board column this factory event automation is
 	// shown on. Empty when the canvas is not attached to Verify or Done.
-	ColumnKey *string
-	CreatedBy *uuid.UUID
-	CreatedAt *time.Time
-	UpdatedAt *time.Time
-	DeletedAt gorm.DeletedAt `gorm:"index"`
+	ColumnKey        *string
+	DisplayColumnKey string
+	CreatedBy        *uuid.UUID
+	CreatedAt        *time.Time
+	UpdatedAt        *time.Time
+	DeletedAt        gorm.DeletedAt `gorm:"index"`
 }
 
 func (c *Canvas) TableName() string {
@@ -154,7 +156,10 @@ func (c *Canvas) SoftDelete() error {
 }
 
 func ValidCanvasColumnKey(key string) bool {
-	return key == CanvasColumnKeyBacklog || key == CanvasColumnKeyImplement || key == CanvasColumnKeyVerify || key == CanvasColumnKeyDone
+	if key == CanvasColumnKeyBacklog || key == CanvasColumnKeyImplement || key == CanvasColumnKeyVerify || key == CanvasColumnKeyDone {
+		return true
+	}
+	return strings.HasPrefix(key, "custom-") && len(key) > len("custom-")
 }
 
 // SetColumnKey attaches this factory canvas to a board column. An empty key
@@ -178,6 +183,10 @@ func (c *Canvas) SetColumnKey(tx *gorm.DB, key string) error {
 	c.ColumnKey = stored
 	c.UpdatedAt = &now
 	return nil
+}
+
+func (c *Canvas) SetDisplayColumn(tx *gorm.DB, key string) error {
+	return tx.Model(c).Update("display_column_key", key).Error
 }
 
 func (c *Canvas) SoftDeleteInTransaction(tx *gorm.DB) error {
@@ -222,6 +231,13 @@ func FindCanvasInTransaction(tx *gorm.DB, orgID, id uuid.UUID) (*Canvas, error) 
 	}
 
 	return &canvas, nil
+}
+
+func FindFactoryCanvasesByIDs(tx *gorm.DB, organizationID, factoryID uuid.UUID, ids []uuid.UUID) ([]Canvas, error) {
+	var canvases []Canvas
+	err := tx.Where("organization_id = ? AND factory_id = ? AND id IN ?", organizationID, factoryID, ids).
+		Find(&canvases).Error
+	return canvases, err
 }
 
 func CheckCanvasExistence(tx *gorm.DB, orgID, id uuid.UUID) (bool, error) {

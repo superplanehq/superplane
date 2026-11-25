@@ -1,5 +1,4 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { FEATURE_FACTORY_MULTI_REPO_TASKS } from "@/lib/experimentalFeatures";
 
 import { FactoriesHarness } from "../__fixtures__/FactoriesHarness";
 import {
@@ -66,7 +65,6 @@ export const MultiRepository: Story = {
   render: () => (
     <FactoriesHarness
       pathSuffix={velocityPath}
-      experimentalFeatures={[FEATURE_FACTORY_MULTI_REPO_TASKS]}
       factoriesFixture={{
         ...factoriesFixtureWithSetupAnswers(velocityWorkspaceSetup),
         velocityByFactoryId: {

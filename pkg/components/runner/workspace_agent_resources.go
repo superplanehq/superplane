@@ -16,7 +16,6 @@ import (
 	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/mcp"
 	"github.com/superplanehq/superplane/pkg/models"
-	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -133,7 +132,7 @@ func AttachWorkspaceAgentResources(
 			skills = nil
 		}
 	}
-	setupCommands, contextRepos, multiRepo, err := loadWorkspaceSetupAndContext(db, factory)
+	setupCommands, contextRepos, err := loadWorkspaceSetupAndContext(db, factory)
 	if err != nil {
 		logger.WithError(err).Warn("skip workspace setup and context: list failed")
 		setupCommands = nil
@@ -155,32 +154,21 @@ func AttachWorkspaceAgentResources(
 	environment, files, mcpNames = attachWorkspaceMCPServers(ctx, db, mcpServers, disabledTools, enabledTools, environment, files)
 	files = appendWorkspaceSkillFiles(skills, files)
 	files = appendWorkspaceSetupFiles(setupCommands, files)
-	files = appendWorkspaceContextFiles(db, factory, contextRepos, multiRepo, files)
+	files = appendWorkspaceContextFiles(db, factory, contextRepos, files)
 	files = appendWorkspaceAgentResourcesHint(files, mcpNames, setupCommands, contextRepos)
 	return environment, files
 }
 
-func loadWorkspaceSetupAndContext(db *gorm.DB, factory *models.Factory) ([]string, []models.FactoryAgentResource, bool, error) {
+func loadWorkspaceSetupAndContext(db *gorm.DB, factory *models.Factory) ([]string, []models.FactoryAgentResource, error) {
 	commands, err := factory.ListEnabledSetupCommands(db)
 	if err != nil {
-		return nil, nil, false, err
+		return nil, nil, err
 	}
 	repos, err := factory.ListEnabledContextRepos(db)
 	if err != nil {
-		return nil, nil, false, err
+		return nil, nil, err
 	}
-	multiRepo, err := factory.MultiRepoTasksEnabled(db)
-	if err != nil {
-		return nil, nil, false, err
-	}
-	if !multiRepo {
-		for i := range repos {
-			config := repos[i].Config.Data()
-			config.Access = models.FactoryContextRepoAccessRead
-			repos[i].Config = datatypes.NewJSONType(config)
-		}
-	}
-	return commands, repos, multiRepo, nil
+	return commands, repos, nil
 }
 
 func rejectDisabledSetupCommands(db *gorm.DB, factory *models.Factory, commands []string, disabled map[string]struct{}) []string {
@@ -317,7 +305,7 @@ func WorkspaceContextRepoDirectory(repository string) string {
 	return "context/" + repository
 }
 
-func appendWorkspaceContextFiles(db *gorm.DB, factory *models.Factory, resources []models.FactoryAgentResource, multiRepo bool, files []TaskFile) []TaskFile {
+func appendWorkspaceContextFiles(db *gorm.DB, factory *models.Factory, resources []models.FactoryAgentResource, files []TaskFile) []TaskFile {
 	if len(resources) == 0 {
 		return files
 	}
@@ -352,7 +340,7 @@ func appendWorkspaceContextFiles(db *gorm.DB, factory *models.Factory, resources
 			Directory:   WorkspaceContextRepoDirectory(repository),
 			Branch:      strings.TrimSpace(config.Ref),
 			ReadOnly:    readOnly,
-			PushBlocked: multiRepo && readOnly && strings.EqualFold(provider, models.ProviderBitbucket),
+			PushBlocked: readOnly && strings.EqualFold(provider, models.ProviderBitbucket),
 		})
 	}
 	if len(repos) == 0 {
@@ -838,11 +826,11 @@ const (
 // already clones keeps that step and does not get a second checkout.
 // Prompt hints stay on the saved-clone instructions unless this inserts
 // the command, because only then have setup and context checkout run.
-func ApplyFactoryCheckout(files []TaskFile, commands []TaskCommand, steps []AgentStep) []TaskCommand {
+func ApplyFactoryCheckout(files []TaskFile, commands []TaskCommand, steps []AgentStep, skipCheckout bool) []TaskCommand {
 	if !taskShipsCheckout(files) {
 		return commands
 	}
-	return InsertFactoryCheckoutCommand(commands, steps, files)
+	return InsertFactoryCheckoutCommand(commands, steps, files, skipCheckout)
 }
 
 // InsertFactoryCheckoutCommand inserts checkout before the first canvas
@@ -850,12 +838,17 @@ func ApplyFactoryCheckout(files []TaskFile, commands []TaskCommand, steps []Agen
 // regular commands so the task log shows them apart. Steps that already
 // run git clone, or the checkout helper, are left unchanged so saved
 // automations keep their own clone and run setup themselves.
-func InsertFactoryCheckoutCommand(commands []TaskCommand, steps []AgentStep, files []TaskFile) []TaskCommand {
+func InsertFactoryCheckoutCommand(commands []TaskCommand, steps []AgentStep, files []TaskFile, skipCheckout bool) []TaskCommand {
 	if stepsAlreadyCheckout(steps) {
 		return commands
 	}
-	markCheckoutHintsComplete(files)
-	inserted := factoryCheckoutCommands(files)
+	inserted := factoryCheckoutCommands(files, skipCheckout)
+	if len(inserted) == 0 {
+		return commands
+	}
+	if !skipCheckout {
+		markCheckoutHintsComplete(files)
+	}
 	for i, command := range commands {
 		if command.Kind == LiveLogKindSetup {
 			continue
@@ -868,13 +861,16 @@ func InsertFactoryCheckoutCommand(commands []TaskCommand, steps []AgentStep, fil
 	return append(commands, inserted...)
 }
 
-func factoryCheckoutCommands(files []TaskFile) []TaskCommand {
-	commands := []TaskCommand{{
-		Name:    "Checkout",
-		Command: WrapAgentStepCommand("checkout"),
-		Kind:    LiveLogKindBash,
-		Preview: LiveLogText("Checkout"),
-	}}
+func factoryCheckoutCommands(files []TaskFile, skipCheckout bool) []TaskCommand {
+	commands := make([]TaskCommand, 0, 2)
+	if !skipCheckout {
+		commands = append(commands, TaskCommand{
+			Name:    "Checkout",
+			Command: WrapAgentStepCommand("checkout"),
+			Kind:    LiveLogKindBash,
+			Preview: LiveLogText("Checkout"),
+		})
+	}
 	setup := setupCommandsFromFiles(files)
 	if len(setup) == 0 {
 		return commands

@@ -36,6 +36,7 @@ import type {
   FactoriesWorkOrderResult,
   FactoriesWorkOrderState,
   FactoryAutomation,
+  FactoryLineStageConfiguration,
   FactoriesFactoryLineStep,
   OrganizationsDescribeOrganizationBillingResponse,
 } from "@/api-client";
@@ -1090,6 +1091,7 @@ export function useUpdateFactoryLine(organizationId: string, factoryId: string) 
       name?: string;
       steps?: FactoriesFactoryLineStep[];
       columnColors?: Record<string, string>;
+      stageConfiguration?: FactoryLineStageConfiguration;
     }) => {
       const response = await factoriesUpdateFactoryLine(
         withOrganizationHeader({
@@ -1099,6 +1101,7 @@ export function useUpdateFactoryLine(organizationId: string, factoryId: string) 
             name: input.name,
             steps: input.steps,
             columnColors: input.columnColors,
+            stageConfiguration: input.stageConfiguration,
           },
         }),
       );
@@ -1107,7 +1110,13 @@ export function useUpdateFactoryLine(organizationId: string, factoryId: string) 
       }
       return response.data.line;
     },
-    onSuccess: (line) => {
+    onSuccess: (line, input) => {
+      if (input.stageConfiguration?.automationMoves?.length) {
+        void queryClient.invalidateQueries({ queryKey: factoryAppsKey(organizationId, factoryId) });
+        void queryClient.invalidateQueries({
+          queryKey: ["factories", organizationId, factoryId, "custom-automations"],
+        });
+      }
       queryClient.setQueryData<FactoriesFactory>(factoryDetailKey(organizationId, factoryId), (current) => {
         if (!current?.lines) {
           return current;

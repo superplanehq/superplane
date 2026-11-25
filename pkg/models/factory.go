@@ -1261,6 +1261,8 @@ func (f *Factory) ListWorkOrderSummaries(tx *gorm.DB, filters ListFactoryWorkOrd
 			"factory_work_orders.number",
 			"factory_work_orders.title",
 			"factory_work_orders.state",
+			"factory_work_orders.origin_url",
+			"factory_work_orders.origin_label",
 		).
 		Order("factory_work_orders.updated_at DESC").
 		Order("factory_work_orders.id DESC").

@@ -1288,6 +1288,8 @@ message Factory {
     // predates template metadata. Empty for a custom automation.
     // The id does not change when the canvas name changes.
     string template_id = 7;
+    // Optional board placement. Does not change execution membership.
+    string display_column_key = 8;
   }
 
   string id = 1;
@@ -1323,6 +1325,43 @@ message FactoryPlanning {
 }
 
 message FactoryLine {
+  enum StageKind {
+    STAGE_KIND_UNSPECIFIED = 0;
+    STAGE_KIND_BACKLOG = 1;
+    STAGE_KIND_PHASE = 2;
+    STAGE_KIND_CUSTOM = 3;
+    STAGE_KIND_VERIFY = 4;
+    STAGE_KIND_DONE = 5;
+  }
+
+  message Stage {
+    string id = 1;
+    string key = 2;
+    string name = 3;
+    StageKind kind = 4;
+    optional int32 step_index = 5;
+    // Display override for the agent occurrence at this stage.
+    string agent_display_key = 6;
+    // Whether a task moves to the next stage after all synchronous
+    // automations pass. Unset uses the stage-kind default.
+    optional bool auto_advance = 7;
+  }
+
+  message AutomationMove {
+    string automation_id = 1;
+    // canvas, intake, feedback, or agent-step.
+    string type = 2;
+    string source_key = 3;
+    string destination_key = 4;
+    // Identifies the original phase for an agent-step occurrence.
+    string execution_key = 5;
+  }
+
+  message StageConfiguration {
+    repeated Stage stages = 1;
+    repeated AutomationMove automation_moves = 2;
+  }
+
   message Step {
     string type = 1;
     optional AppStep app = 2;
@@ -1348,6 +1387,7 @@ message FactoryLine {
   // index>", "verify", "done"). Value is a color id. Missing keys use the
   // default color.
   map<string, string> column_colors = 7;
+  repeated Stage stages = 8;
 }
 
 message CreateFactoryLineRequest {
@@ -1368,6 +1408,8 @@ message UpdateFactoryLineRequest {
   // Full replacement of the board column colors. Absent means "do not
   // change"; present (including an empty map) replaces the stored map.
   map<string, string> column_colors = 5;
+  // Full ordered stage configuration. Absent means "do not change".
+  optional FactoryLine.StageConfiguration stage_configuration = 6;
 }
 
 message UpdateFactoryLineResponse {
@@ -1406,6 +1448,7 @@ message FactoryCustomAutomation {
     START_MODE_MANUAL = 1;
     START_MODE_AUTOMATIC = 2;
     START_MODE_SCHEDULED = 3;
+    START_MODE_ON_LEAVE = 4;
   }
 
   message Step {
@@ -1441,6 +1484,10 @@ message FactoryCustomAutomation {
     int32 execution_timeout_seconds = 5;
     Schedule schedule = 6;
     repeated StartTrigger triggers = 7;
+    // Absent on automations saved before this choice. True runs on a task.
+    optional bool runs_on_task = 8;
+    optional bool skip_setup_commands = 9;
+    optional bool skip_repository_checkout = 10;
   }
 
   Factory.Automation automation = 1;
@@ -1473,6 +1520,8 @@ message UpdateFactoryCustomAutomationRequest {
   string automation_id = 2;
   string name = 3;
   FactoryCustomAutomation.Settings settings = 4;
+  // Use the version verified for editing when opening the fallback form.
+  string expected_live_version_id = 5;
 }
 
 message UpdateFactoryCustomAutomationResponse {
@@ -2380,6 +2429,12 @@ message WorkOrderLineDispatch {
   // Thinking chosen at Start. Empty means Auto: each runner keeps the
   // thinking level stored on the live automation canvas.
   string thinking_level = 11;
+  // Ordered stage snapshot used by task history. It stays stable when the
+  // line is edited after this dispatch starts.
+  repeated FactoryLine.Stage stages = 12;
+  // Stage that currently owns the task, or the terminal stage where this
+  // dispatch stopped. Empty on historical dispatches created before this field.
+  string current_stage_key = 13;
 }
 
 // WorkOrderQueueItem is a line dispatch waiting for admission into a step
@@ -2399,6 +2454,7 @@ message WorkOrderQueueItem {
   // snapshot. Lets the UI place the queued work order on the correct
   // board column even after a line edit moved the step.
   string app_id = 6;
+  string stage_key = 7;
 }
 
 message WorkOrderExecution {
@@ -2447,11 +2503,13 @@ message WorkOrderExecution {
   // hosted credit failures: no_hosted_credit,
   // hosted_subscription_required, payment_past_due, or workspace_budget_empty.
   string failure_reason = 14;
+  string stage_key = 15;
 }
 
 message WorkOrderExecutionStep {
   string name = 1;
   int32 step_index = 2;
+  string stage_key = 3;
 }
 
 message DescribeWorkOrderRequest {

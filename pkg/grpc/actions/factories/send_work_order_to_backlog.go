@@ -68,6 +68,7 @@ func SendWorkOrderToBacklog(
 	}
 
 	fromState := resolvedOrder.State
+	var leftColumn string
 	var backlogEvents []models.CanvasEvent
 	err = db.Transaction(func(tx *gorm.DB) error {
 		factory, err := models.FindFactory(tx, orgID, factoryID)
@@ -89,6 +90,10 @@ func SendWorkOrderToBacklog(
 		if order.State != models.FactoryWorkOrderStateClosed {
 			return errWorkOrderNotClosedForBacklog
 		}
+		leftColumn, err = models.WorkOrderBoardColumn(tx, order)
+		if err != nil {
+			return err
+		}
 		if req.GetClearArtifacts() {
 			if _, err := order.DeleteArtifacts(tx, &actor); err != nil {
 				return err
@@ -107,6 +112,11 @@ func SendWorkOrderToBacklog(
 		return nil, factoryErrorToStatus(err, "failed to send work order to backlog")
 	}
 	contexts.PublishWorkOrderCreatedEvents(orgID, backlogEvents)
+	if leftColumn != "" {
+		if err := StartColumnLeaveCustomAutomations(db, resolvedFactory, resolvedOrder, leftColumn, ""); err != nil {
+			log.WithError(err).Warnf("Failed to start %s leave automation for order %s", leftColumn, orderID)
+		}
+	}
 
 	factory, err := models.FindFactory(db, orgID, factoryID)
 	if err != nil {

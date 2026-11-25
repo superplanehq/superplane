@@ -191,7 +191,7 @@ func withAllPullRequestsClose(nodes []models.Node, changed bool) ([]models.Node,
 		if !slices.Contains(prClosureCloseNodeIDs, nodes[i].ID) || nodes[i].ComponentName() != "updateWorkOrderStatus" {
 			continue
 		}
-		if enabled, _ := nodes[i].Configuration[allPullRequestsDoneField].(bool); enabled {
+		if _, configured := nodes[i].Configuration[allPullRequestsDoneField]; configured {
 			continue
 		}
 		configuration := maps.Clone(nodes[i].Configuration)

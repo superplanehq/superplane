@@ -32,6 +32,24 @@ function addDetail(details: Record<string, string>, key: string, value: string |
   }
 }
 
+function resolveAgentDetails(
+  metadata: LaunchAgentMetadata | undefined,
+  data: LaunchAgentPayloadData | undefined,
+): Record<string, string> {
+  const agent = metadata?.agent ?? {};
+  const target = metadata?.target ?? {};
+  const payloadData = data ?? {};
+  const details: Record<string, string> = {};
+
+  addDetail(details, "Cloud Agent", agent.url);
+  addDetail(details, "Pull Request", target.prUrl ?? payloadData.prUrl);
+  addDetail(details, "Branch", target.branchName ?? payloadData.branchName);
+  addDetail(details, "Status", payloadData.status ?? agent.status);
+  addDetail(details, "Summary", payloadData.summary ?? agent.summary);
+
+  return details;
+}
+
 export const launchAgentMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
@@ -54,24 +72,11 @@ export const launchAgentMapper: ComponentBaseMapper = {
   },
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
-    const details: Record<string, string> = {};
     const metadata = context.execution.metadata as LaunchAgentMetadata | undefined;
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
     const payload = outputs?.default?.[0];
     const data = payload?.data as LaunchAgentPayloadData | undefined;
-
-    // Cloud Agent link (from metadata; API may set agent.url)
-    addDetail(details, "Cloud Agent", metadata?.agent?.url);
-
-    // PR link (if created)
-    addDetail(details, "Pull Request", metadata?.target?.prUrl ?? data?.prUrl);
-
-    // Branch name
-    addDetail(details, "Branch", metadata?.target?.branchName ?? data?.branchName);
-
-    // Status and summary for context
-    addDetail(details, "Status", data?.status ?? metadata?.agent?.status);
-    addDetail(details, "Summary", data?.summary ?? metadata?.agent?.summary);
+    const details = resolveAgentDetails(metadata, data);
 
     if (payload?.timestamp) {
       details["Emitted At"] = new Date(payload.timestamp).toLocaleString();

@@ -1,10 +1,13 @@
 import type { FactoriesWorkOrder } from "@/api-client";
-import { useRef, useState } from "react";
-import { useNavigate } from "react-router";
+import { useBacklogScheduleRun } from "@/hooks/useBacklogScheduleRun";
+import {
+  useColumnAutomationCollapsePreference,
+  type ColumnAutomationDisclosureState,
+} from "@/hooks/useColumnAutomationCollapsePreference";
+import { ColumnAutomationToggle } from "./ColumnAutomationDisclosure";
 import { useAutoLoadMoreOnScroll } from "@/hooks/useAutoLoadMoreOnScroll";
 import { usePermissions } from "@/contexts/usePermissions";
 import { factoryBoardLaneScrollKey, useFactoryBoardLaneScroll } from "@/hooks/useFactoryBoardLaneScroll";
-import { useRunFactoryCustomAutomation } from "@/hooks/useFactoryCustomAutomationData";
 import { type RefreshBacklogResult, useFactoryIntakes, useRefreshBacklog } from "@/hooks/useFactoryIntakeData";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast, showInfoToast, showSuccessToast } from "@/lib/toast";
@@ -26,7 +29,6 @@ import { isFirstRunOnboardingFactory, type ConfiguredLineIntakeSource } from "./
 import { BacklogOnboardingCard } from "./onboarding/first-run/BacklogOnboardingCard";
 import { useBacklogCreateMenu } from "./useBacklogCreateMenu";
 import { BACKLOG_REFRESH_COPY, backlogRefreshToast, canRefreshBacklog } from "./backlogRefresh";
-import { factoryCustomAutomationRunPath } from "../lib/customAutomationPaths";
 
 export type BacklogColumnProps = {
   organizationId: string;
@@ -59,7 +61,7 @@ export type BacklogColumnProps = {
   onAddIntake?: () => void;
   /** Column automations for the header icons. Hidden when unset. */
   automations?: ColumnAutomation[];
-  /** Rows the automation subheader reserves. Shared across the board. Hidden when unset. */
+  /** Rows the automation subheader reserves. Hidden when unset. */
   automationRowCount?: number;
   onAutomationRowAction?: (automation: ColumnAutomation, action: ColumnAutomationRowAction) => void;
   paging?: {
@@ -110,6 +112,10 @@ export function BacklogColumn({
   cardsPending = false,
 }: BacklogColumnProps) {
   const lane = lineBoardColumnLaneProps(colorId, colorView, { mutedFallback: true });
+  const disclosure = useColumnAutomationCollapsePreference(
+    JSON.stringify([organizationId, factoryId, lineId, "backlog"]),
+    automations?.length ?? 0,
+  );
   const atCapacity = size != null && orders.length >= size;
   const canAdd = canCreateWorkOrder && !atCapacity;
   const createMenu = useBacklogCreateMenu(organizationId, factoryId, onOpenWorkOrder);
@@ -118,6 +124,7 @@ export function BacklogColumn({
   const scheduleRun = useBacklogScheduleRun(organizationId, factoryId, factoryKey, lineId);
   const intakesQuery = useFactoryIntakes(organizationId, factoryId);
   const refreshBacklog = useRefreshBacklog(organizationId, factoryId);
+  const onRefreshBacklog = () => void runBacklogRefresh(refreshBacklog.mutateAsync);
   const createPopover = backlogCreatePopoverProps({
     canAdd,
     atCapacity,
@@ -146,22 +153,19 @@ export function BacklogColumn({
             createPopover={createPopover}
             automations={automations}
             automationRowCount={automationRowCount}
+            disclosure={disclosure}
             onAutomationRowAction={onAutomationRowAction}
             onOpenSettings={onOpenSettings}
             onAddIntake={onAddIntake}
-            onRefreshBacklog={
-              canRefreshBacklog(intakesQuery.data, canUpdateWorkOrders)
-                ? () => {
-                    void runBacklogRefresh(refreshBacklog.mutateAsync);
-                  }
-                : undefined
-            }
+            onRefreshBacklog={canRefreshBacklog(intakesQuery.data, canUpdateWorkOrders) ? onRefreshBacklog : undefined}
             refreshBacklogPending={refreshBacklog.isPending}
             colorId={colorId}
             onColorChange={onColorChange}
           />
         }
+        subheaderOwnSpacing
         subheader={columnAutomationRowsSubheader({
+          disclosure,
           title,
           automations,
           rowCount: automationRowCount,
@@ -198,46 +202,12 @@ export function BacklogColumn({
   );
 }
 
-function useBacklogScheduleRun(organizationId: string, factoryId: string, factoryKey: string, lineId?: string) {
-  const navigate = useNavigate();
-  const runAutomation = useRunFactoryCustomAutomation(organizationId, factoryId);
-  const [runningAutomationId, setRunningAutomationId] = useState<string | null>(null);
-  const runningAutomationIdRef = useRef<string | null>(null);
-  const onRun = async (automation: ColumnAutomation) => {
-    if (!automation.canvasId || !lineId || runningAutomationIdRef.current) {
-      return;
-    }
-    runningAutomationIdRef.current = automation.canvasId;
-    setRunningAutomationId(automation.canvasId);
-    try {
-      const started = await runAutomation.mutateAsync({
-        automationId: automation.canvasId,
-        workOrderId: "",
-      });
-      if (started.runId) {
-        navigate(
-          factoryCustomAutomationRunPath(organizationId, factoryKey, lineId, automation.canvasId, started.runId),
-        );
-      }
-    } catch (error: unknown) {
-      showErrorToast(getApiErrorMessage(error, "SuperPlane could not start the automation."));
-    } finally {
-      runningAutomationIdRef.current = null;
-      setRunningAutomationId(null);
-    }
-  };
-  return {
-    onRun,
-    runPending: runningAutomationId !== null,
-    runningAutomationId: runningAutomationId ?? undefined,
-  };
-}
-
 function BacklogColumnHeaderActions({
   title,
   createPopover,
   automations,
   automationRowCount,
+  disclosure,
   onAutomationRowAction,
   onOpenSettings,
   onAddIntake,
@@ -257,11 +227,15 @@ function BacklogColumnHeaderActions({
   | "onColorChange"
 > & {
   createPopover: BacklogCreatePopoverProps;
+  disclosure: ColumnAutomationDisclosureState;
   onRefreshBacklog?: () => void;
   refreshBacklogPending?: boolean;
 }) {
   return (
     <div className="flex shrink-0 items-center gap-0.5">
+      {automationRowCount && automations?.length ? (
+        <ColumnAutomationToggle title={title} disclosure={disclosure} />
+      ) : null}
       {automationRowCount ? null : (
         <ColumnAutomationsHeaderSlot
           title={title}

@@ -45,13 +45,18 @@ const FeatureFactoryReviewRequest = "factory_review_request"
 // until the BYOK UX is ready for general use.
 const FeatureOrganizationBYOK = "organization_byok"
 
+// FeatureModelStatus gates the hosted Model status page in organization settings.
+const FeatureModelStatus = "model_status"
+
 // FeatureOrganizationBYOKCustomProvider gates a custom model provider on the
 // organization Models page. It requires FeatureOrganizationBYOK as well.
 const FeatureOrganizationBYOKCustomProvider = "organization_byok_custom_provider"
 
-// FeatureFactoryCustomAutomations gates custom automations on Backlog,
-// Implement, Verify, and Done until the flow is generally available.
+// FeatureFactoryCustomAutomations gates custom automations and line-level
+// custom board stages until the flow is generally available.
 const FeatureFactoryCustomAutomations = "factory_custom_automations"
+
+const FeatureAutomationsAsCode = "automations-as-code"
 
 // FeatureWorkspaceSkills gates workspace skill settings, skill APIs, and skill attach.
 const FeatureWorkspaceSkills = "workspace_skills"
@@ -64,23 +69,10 @@ const FeatureFactoryPullRequestImport = "factory_pull_request_import"
 // available.
 const FeatureFactoryPullRequestMerge = "factory_pull_request_merge"
 
-// FeatureFactoryMultiRepoTasks lets agents change every Read & Write
-// workspace repository and open one pull request per repository. Without
-// it, context repositories stay read-only and the Implement app opens the
-// pull request from the canvas. The admin toggle republishes the Implement
-// apps of the organization. Releasing the flag does not: run the
-// installation-wide reset of "line-implementation" after the release.
-const FeatureFactoryMultiRepoTasks = "factory_multi_repo_tasks"
-
 // FeatureSuperPlaneMCPServer is released. Every organization can authorize
 // Cursor and other MCP clients against one workspace. The factories flag
 // still applies.
 const FeatureSuperPlaneMCPServer = "superplane_mcp_server"
-
-// FeatureGitHubEnterprise is the org rollout gate for GitHub Enterprise Cloud
-// (ghe.com). Connecting a host other than github.com also requires the
-// github_enterprise license.
-const FeatureGitHubEnterprise = "github_enterprise"
 
 // FeatureGitHubEnterpriseServer is registered and hidden. GitHub Enterprise
 // Server setup answers that the server is not available yet. Connecting a
@@ -100,7 +92,6 @@ func released() *bool {
 
 var registry = []Feature{
 	{ID: FeatureFactoryPullRequestImport, Label: "Pull request import", Description: "Import open pull requests into Verify"},
-	{ID: FeatureGitHubEnterprise, Label: "GitHub Enterprise Cloud", Description: "Connect GitHub Enterprise Cloud (ghe.com) with a private GitHub App"},
 	{ID: FeatureGitHubEnterpriseServer, Label: "GitHub Enterprise Server", Description: "Connect GitHub Enterprise Server. This option is not available yet", Hidden: true},
 	{ID: FeatureOrganizationRunners, Label: "Organization runners", Description: "Manage self-hosted fleets and runners for an organization"},
 	{ID: FeatureFactories, Label: "Factories", Description: "Software factories for work orders and production workflows"},
@@ -110,13 +101,14 @@ var registry = []Feature{
 	{ID: FeatureFactoryReviewRequest, Label: "Review request", Description: "Request human reviews after Merge confidence completes"},
 	{ID: FeatureFactoryDatadogIntake, Label: "Factory Datadog Intake", Description: "Add Datadog intake from the Backlog column menu"},
 	{ID: FeatureOrganizationBYOK, Label: "Organization BYOK", Description: "Show the organization Models settings page"},
+	{ID: FeatureModelStatus, Label: "Model status", Description: "Show the hosted Model status page in organization settings"},
 	{ID: FeatureOrganizationBYOKCustomProvider, Label: "Organization BYOK Custom Provider", Description: "Add a custom model provider with a URL, token, and API type"},
-	{ID: FeatureFactoryCustomAutomations, Label: "Custom Automations", Description: "Add custom automations to board columns"},
+	{ID: FeatureFactoryCustomAutomations, Label: "Custom automations and stages", Description: "Add custom automations to board columns and manage custom stages on factory line boards"},
+	{ID: FeatureAutomationsAsCode, Label: "Automations as code", Description: "Edit custom automations in YAML or through the API"},
 	{ID: FeatureWorkspaceSkills, Label: "Workspace Skills", Description: "Add skills for workspace agents"},
 	{ID: FeatureFactoryPullRequestMerge, Label: "Pull Request Merge", Description: "Show the Mergeable chip on task cards and the Merge button on pull request review"},
 	{ID: FeatureSuperPlaneMCPServer, Label: "MCP Server", Description: "Allow Cursor and other MCP clients to connect to workspaces in this organization", Released: released()},
 	{ID: FeatureFactoryStepActions, Label: "Step actions", Description: "Show agent action reasons on the step card"},
-	{ID: FeatureFactoryMultiRepoTasks, Label: "Multi-repo tasks", Description: "Let agents change every Read & Write workspace repository and open one pull request per repository"},
 }
 
 func All() []Feature {

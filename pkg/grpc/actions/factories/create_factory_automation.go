@@ -38,8 +38,6 @@ func CreateFactoryAutomation(
 		if err := requireScheduledIntake(organization); err != nil {
 			return nil, err
 		}
-	} else if !organization.HasExperimentalFeature(features.FeatureFactoryCustomAutomations) {
-		return nil, factoryErrorToStatus(errCustomAutomationsDisabled, "failed to create factory automation")
 	}
 
 	columnKey := strings.TrimSpace(req.GetColumnKey())
@@ -50,14 +48,35 @@ func CreateFactoryAutomation(
 		return nil, factoryErrorToStatus(invalidArgument("Use the scheduled intake template for Backlog automations."), "failed to create factory automation")
 	}
 	if columnKey != "" && !models.ValidCanvasColumnKey(columnKey) {
-		return nil, factoryErrorToStatus(invalidArgument("column key must be backlog, implement, verify, or done"), "failed to create factory automation")
+		return nil, factoryErrorToStatus(invalidArgument("column key is invalid"), "failed to create factory automation")
 	}
-
+	customStageColumn := strings.HasPrefix(columnKey, "custom-")
+	if templateID == "" && !organization.HasExperimentalFeature(features.FeatureFactoryCustomAutomations) {
+		return nil, factoryErrorToStatus(errCustomAutomationsDisabled, "failed to create factory automation")
+	}
 	factory, err := findFactory(db, orgID, req.GetFactoryId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create factory automation")
 	}
 	factoryID := factory.ID
+	if customStageColumn {
+		lines, listErr := factory.ListLines(db)
+		if listErr != nil {
+			return nil, factoryErrorToStatus(listErr, "failed to create factory automation")
+		}
+		found := false
+		for _, line := range lines {
+			for _, stage := range line.StagesValue() {
+				if stage.Key == columnKey && stage.Kind == models.FactoryLineStageCustom {
+					found = true
+					break
+				}
+			}
+		}
+		if !found {
+			return nil, factoryErrorToStatus(invalidArgument("column key is invalid"), "failed to create factory automation")
+		}
+	}
 
 	name := strings.TrimSpace(req.GetName())
 	if name == "" {
@@ -74,6 +93,17 @@ func CreateFactoryAutomation(
 	var nodes []models.Node
 	var edges []models.Edge
 	description := ""
+	if customStageColumn {
+		nodes = []models.Node{{
+			ID:            "on-run",
+			Name:          "On Run",
+			Type:          models.NodeTypeTrigger,
+			Ref:           models.NodeRef{Trigger: &models.TriggerRef{Name: "onRun"}},
+			Configuration: map[string]any{},
+			Metadata:      map[string]any{},
+			Position:      models.Position{X: 0, Y: 0},
+		}}
+	}
 	if templateID == scheduledIntakeTemplateID {
 		doc, buildErr := scheduledIntakeCanvas(db, factory, name, req.GetInstallParams())
 		if buildErr != nil {

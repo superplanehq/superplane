@@ -47,12 +47,18 @@ type runnerRemoveArtifactRequest struct {
 }
 
 type runnerTaskView struct {
-	ID     string `json:"id"`
-	Key    string `json:"key"`
-	Title  string `json:"title"`
-	State  string `json:"state"`
-	Result string `json:"result,omitempty"`
-	URL    string `json:"url"`
+	ID     string            `json:"id"`
+	Key    string            `json:"key"`
+	Title  string            `json:"title"`
+	State  string            `json:"state"`
+	Result string            `json:"result,omitempty"`
+	URL    string            `json:"url"`
+	Origin *runnerTaskOrigin `json:"origin,omitempty"`
+}
+
+type runnerTaskOrigin struct {
+	URL   string `json:"url"`
+	Label string `json:"label,omitempty"`
 }
 
 func (s *Server) handleRunnerListTasks(w http.ResponseWriter, r *http.Request) {
@@ -91,13 +97,7 @@ func (s *Server) handleRunnerListTasks(w http.ResponseWriter, r *http.Request) {
 
 	tasks := make([]runnerTaskView, 0, len(orders))
 	for i := range orders {
-		tasks = append(tasks, runnerTaskView{
-			ID:    orders[i].ID.String(),
-			Key:   factoryModel.WorkOrderKey(orders[i].Number),
-			Title: orders[i].Title,
-			State: orders[i].State,
-			URL:   runnerTaskURL(s.BaseURL, factoryModel, orders[i].Number),
-		})
+		tasks = append(tasks, runnerTaskViewFrom(s.BaseURL, factoryModel, &orders[i]))
 	}
 	_ = writeJSON(w, http.StatusOK, map[string]any{"tasks": tasks})
 }
@@ -171,6 +171,7 @@ func (s *Server) handleRunnerCloseTask(w http.ResponseWriter, r *http.Request) {
 
 	db := database.DB(r.Context())
 	fromState := target.order.State
+	leftColumn, leftErr := models.WorkOrderBoardColumn(db, target.order)
 	// Pass this run so close does not cancel the agent that called the tool.
 	changed, err := target.order.UpdateStatus(db, models.FactoryWorkOrderStatusUpdate{
 		ToState:  models.FactoryWorkOrderStateClosed,
@@ -189,6 +190,18 @@ func (s *Server) handleRunnerCloseTask(w http.ResponseWriter, r *http.Request) {
 	}
 	order := target.order
 
+	if leftErr != nil {
+		log.WithError(leftErr).Warnf("Failed to read the column for order %s", order.ID)
+	} else if leftColumn != "" {
+		next, nextErr := models.WorkOrderBoardColumn(db, order)
+		if nextErr != nil {
+			log.WithError(nextErr).Warnf("Failed to read the column for order %s", order.ID)
+		} else if leftColumn != next {
+			if err := factoryactions.StartColumnLeaveCustomAutomations(db, target.factory, order, leftColumn, ""); err != nil {
+				log.WithError(err).Warnf("Failed to start %s leave automation for order %s", leftColumn, order.ID)
+			}
+		}
+	}
 	if err := factoryactions.StartAutomaticTaskColumnCustomAutomations(db, target.factory, order, models.CanvasColumnKeyDone); err != nil {
 		log.WithError(err).Warnf("Failed to start Done custom automation for order %s", order.ID)
 	}
@@ -258,7 +271,7 @@ func runnerTaskViewFrom(baseURL string, factoryModel *models.Factory, order *mod
 	if result == models.FactoryWorkOrderResultManualRejected {
 		result = models.FactoryWorkOrderResultRejected
 	}
-	return runnerTaskView{
+	view := runnerTaskView{
 		ID:     order.ID.String(),
 		Key:    factoryModel.WorkOrderKey(order.Number),
 		Title:  order.Title,
@@ -266,6 +279,10 @@ func runnerTaskViewFrom(baseURL string, factoryModel *models.Factory, order *mod
 		Result: result,
 		URL:    runnerTaskURL(baseURL, factoryModel, order.Number),
 	}
+	if origin := order.Origin(); origin != nil {
+		view.Origin = &runnerTaskOrigin{URL: origin.URL, Label: origin.Label}
+	}
+	return view
 }
 
 func runnerTaskURL(baseURL string, factoryModel *models.Factory, number int64) string {

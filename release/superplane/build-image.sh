@@ -55,5 +55,19 @@ docker buildx build \
 
 bash "${SCRIPT_DIR}/verify-oci-archive.sh" \
   "${OUTPUT}" "${VERSION}" "${SOURCE_SHA}" "${ARCHITECTURE}"
+
+# Scan a Docker-format copy without changing the prepared OCI archive or provenance.
+mkdir -p tmp
+scan_directory="$(mktemp -d tmp/release-image-scan.XXXXXX)"
+trap 'rm -rf "${scan_directory}"' EXIT
+archive_directory="$(cd "$(dirname "${OUTPUT}")" && pwd)"
+docker run --rm \
+  --volume "${archive_directory}:/input:ro" \
+  --volume "${PWD}/${scan_directory}:/output" \
+  quay.io/skopeo/stable:v1.22.3-immutable@sha256:c0ee1f4edca5c01cb8d5611124f92f3cc47196ecab68aee5d0f90834e00574d5 \
+  --override-os linux --override-arch "${ARCHITECTURE}" copy \
+  "oci-archive:/input/$(basename "${OUTPUT}")" docker-archive:/output/image.tar
+make image.scan.archive IMAGE_ARCHIVE="${scan_directory}/image.tar"
+
 sha256sum "${OUTPUT}" | awk '{print $1}' >"${OUTPUT}.sha256"
 tar -xOf "${OUTPUT}" index.json >"${OUTPUT}.descriptor.json"

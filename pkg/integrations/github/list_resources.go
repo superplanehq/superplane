@@ -17,6 +17,15 @@ import (
 
 func (g *GitHub) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	switch resourceType {
+	case "check_run_permission":
+		if err := common.VerifyCheckRunPermissions(context.Background(), ctx.Integration, ctx.HTTP); err != nil {
+			if errors.Is(err, common.ErrCheckRunPermissions) || errors.Is(err, common.ErrCheckRunAppRequired) {
+				return []core.IntegrationResource{{Type: resourceType, ID: "missing", Name: err.Error()}}, nil
+			}
+			return nil, err
+		}
+		return []core.IntegrationResource{{Type: resourceType, ID: "granted", Name: "Checks write"}}, nil
+
 	case "repository":
 		metadata := common.Metadata{}
 		if decodeErr := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); decodeErr != nil {

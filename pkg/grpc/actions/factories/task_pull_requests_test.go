@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	bitbucketintegration "github.com/superplanehq/superplane/pkg/integrations/bitbucket"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
@@ -75,7 +74,6 @@ func (f *fakeTaskPullRequestGitHub) EditPullRequest(_ context.Context, repositor
 
 func TestOpenTaskPullRequest(t *testing.T) {
 	r := support.Setup(t)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryMultiRepoTasks))
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
@@ -123,12 +121,14 @@ func TestOpenTaskPullRequest(t *testing.T) {
 	})
 
 	t.Run("updates the same pull request when the branch is opened again", func(t *testing.T) {
-		pullRequest, err := open(TaskPullRequestInput{Repository: "acme/api", Head: "feature", Title: "Change the API again"})
+		pullRequest, err := open(TaskPullRequestInput{Repository: "acme/api", Head: "feature", Title: "Change the API again", Draft: true})
 		require.NoError(t, err)
 
 		assert.Len(t, fake.created, 1)
 		require.Len(t, fake.edited, 1)
 		assert.Equal(t, "Change the API again", pullRequest.Title)
+		assert.Nil(t, fake.edited[0].Draft, "editing a pull request must not change its GitHub draft status")
+		assert.Equal(t, models.FactoryPullRequestStateOpen, pullRequest.State)
 		tracked, err := ListTaskPullRequests(db, order)
 		require.NoError(t, err)
 		assert.Len(t, tracked, 1)
@@ -294,7 +294,6 @@ func installTaskPullRequestBitbucket(t *testing.T, api taskPullRequestBitbucketA
 
 func TestOpenTaskPullRequestInBitbucket(t *testing.T) {
 	r := support.Setup(t)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryMultiRepoTasks))
 	db := database.DB(t.Context())
 	factory, order := bitbucketTaskPullRequestWorkspace(t, r)
 	fake := &fakeTaskPullRequestBitbucket{mainBranch: "trunk", open: map[string][]map[string]any{}}
@@ -388,18 +387,19 @@ func TestOpenTaskPullRequestInBitbucket(t *testing.T) {
 	})
 }
 
-func TestOpenTaskPullRequestInBitbucketWithoutMultiRepoTasks(t *testing.T) {
+func TestOpenTaskPullRequestInBitbucketByDefault(t *testing.T) {
 	r := support.Setup(t)
 	factory, order := bitbucketTaskPullRequestWorkspace(t, r)
 	fake := &fakeTaskPullRequestBitbucket{mainBranch: "trunk", open: map[string][]map[string]any{}}
 	installTaskPullRequestBitbucket(t, fake)
 
-	_, err := OpenTaskPullRequest(context.Background(), IntakeDependencies{}, "http://app.test", factory, order, TaskPullRequestInput{
+	pullRequest, err := OpenTaskPullRequest(context.Background(), IntakeDependencies{}, "http://app.test", factory, order, TaskPullRequestInput{
 		Repository: "acme/web", Head: "feature", Title: "Change the web app",
 	})
 
-	require.ErrorIs(t, err, models.ErrFactoryPullRequestRepositoryNotInWorkspace)
-	assert.Zero(t, fake.calls)
+	require.NoError(t, err)
+	assert.Equal(t, "acme/web", pullRequest.Repository)
+	assert.Positive(t, fake.calls)
 }
 
 // stalledTaskPullRequestGitHub never answers the pull request lookup.

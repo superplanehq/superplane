@@ -1,0 +1,275 @@
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { LoadingButton } from "@/components/ui/loading-button";
+import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/ui/alertDialog";
+import { Check, GripHorizontal, Lock, Plus, Trash2 } from "lucide-react";
+import type { DragEvent, KeyboardEvent } from "react";
+
+import type { LineBoardStage, LineStageChanges } from "../lib/lineBoardStages";
+import { stageAutoAdvances } from "../lib/lineBoardStages";
+
+export function LineStageEditToolbar({
+  hasChanges,
+  canMoveCards = false,
+  saving,
+  onAddStage,
+  onDiscard,
+  onSave,
+}: {
+  hasChanges: boolean;
+  canMoveCards?: boolean;
+  saving: boolean;
+  onAddStage: () => void;
+  onDiscard: () => void;
+  onSave: () => void;
+}) {
+  return (
+    <div
+      role="toolbar"
+      aria-label="Edit stages"
+      data-testid="line-stage-edit-toolbar"
+      className="mb-3 flex shrink-0 flex-wrap items-center gap-3"
+    >
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <p className="text-[13px] font-medium text-foreground">Editing stages</p>
+          {hasChanges ? (
+            <span
+              className="inline-flex items-center gap-1.5 text-xs text-muted-foreground"
+              data-testid="line-stage-edit-unsaved"
+            >
+              <span className="size-1.5 rounded-full bg-amber-500" aria-hidden />
+              Unsaved changes
+            </span>
+          ) : null}
+        </div>
+        <p className="text-xs text-muted-foreground">
+          {canMoveCards
+            ? "Drag stages to reorder them or move automation cards between stages."
+            : "Drag stages to reorder."}{" "}
+          Backlog and Done stay in place.
+        </p>
+      </div>
+      <div className="flex items-center gap-2">
+        <Button type="button" variant="ghost" size="sm" onClick={onAddStage} disabled={saving}>
+          <Plus className="size-3.5" aria-hidden />
+          Add stage
+        </Button>
+        <Separator orientation="vertical" className="data-[orientation=vertical]:h-5" />
+        {hasChanges ? (
+          <>
+            <Button type="button" variant="ghost" size="sm" onClick={onDiscard} disabled={saving}>
+              Discard
+            </Button>
+            <LoadingButton type="button" size="sm" onClick={onSave} loading={saving} loadingText="Saving...">
+              <Check className="size-3.5" aria-hidden />
+              Save changes
+            </LoadingButton>
+          </>
+        ) : (
+          <Button type="button" variant="outline" size="sm" onClick={onDiscard}>
+            Done
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export function LineStageEditStrip({
+  stage,
+  onDragStart,
+  onDragEnd,
+  onKeyDown,
+  onDelete,
+  onAutoAdvanceChange,
+}: {
+  stage: LineBoardStage;
+  onDragStart: (event: DragEvent<HTMLButtonElement>) => void;
+  onDragEnd: () => void;
+  onKeyDown: (event: KeyboardEvent<HTMLButtonElement>) => void;
+  onDelete?: () => void;
+  onAutoAdvanceChange: (enabled: boolean) => void;
+}) {
+  if (stage.kind === "STAGE_KIND_BACKLOG" || stage.kind === "STAGE_KIND_DONE") {
+    return (
+      <div className="flex h-12 shrink-0 items-start justify-center">
+        <div className="flex h-7 items-center gap-1 text-xs text-muted-foreground">
+          <Lock className="size-3" aria-hidden />
+          Fixed
+        </div>
+      </div>
+    );
+  }
+  const autoAdvanceId = `lines-stage-auto-advance-${stage.key}`;
+  return (
+    <div className="flex h-12 shrink-0 flex-col px-1">
+      <div className="flex h-7 items-center justify-between gap-1">
+        <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+          <Switch
+            id={autoAdvanceId}
+            checked={stageAutoAdvances(stage)}
+            onCheckedChange={onAutoAdvanceChange}
+            aria-label={`Auto-advance ${stage.name}`}
+            className="scale-75"
+          />
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Label htmlFor={autoAdvanceId} className="cursor-help text-[10px] font-normal text-muted-foreground">
+                Auto-advance
+              </Label>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="max-w-56">
+              When all automations in this stage pass, move the task to the next stage.
+            </TooltipContent>
+          </Tooltip>
+        </div>
+        {onDelete ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            aria-label={`Delete ${stage.name}`}
+            title="Delete stage"
+            data-testid={`lines-stage-delete-${stage.key}`}
+            className="size-6 rounded-sm text-muted-foreground hover:text-destructive"
+            onClick={onDelete}
+          >
+            <Trash2 className="size-3.5" aria-hidden />
+          </Button>
+        ) : (
+          <span className="size-6" aria-hidden />
+        )}
+      </div>
+      <Button
+        type="button"
+        draggable
+        variant="ghost"
+        size="icon"
+        aria-label={`Reorder ${stage.name}`}
+        title="Drag to reorder stage"
+        data-testid={`lines-stage-reorder-${stage.key}`}
+        className="mx-auto h-5 w-16 cursor-grab touch-none rounded-sm text-muted-foreground hover:text-foreground active:cursor-grabbing"
+        onDragStart={onDragStart}
+        onDragEnd={onDragEnd}
+        onKeyDown={onKeyDown}
+      >
+        <GripHorizontal className="size-4" aria-hidden />
+      </Button>
+    </div>
+  );
+}
+
+export function SaveLineStagesDialog({
+  moves = [],
+  changes,
+  saving,
+  error,
+  onCancel,
+  onConfirm,
+}: {
+  changes: LineStageChanges | null;
+  moves?: Array<{ type: string }>;
+  saving: boolean;
+  error: string;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <AlertDialog open={Boolean(changes)} onOpenChange={(open) => !open && !saving && onCancel()}>
+      <AlertDialogContent data-testid="save-line-stages-dialog">
+        <AlertDialogHeader>
+          <AlertDialogTitle>Save stage changes?</AlertDialogTitle>
+          <AlertDialogDescription>
+            This changes the board for everyone who uses this line. Saving a custom-stage deletion also deletes
+            automations that execute in that stage. Automations that only appear there stay in the workspace. Removing a
+            system stage keeps its automations.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        {changes ? (
+          <ul className="space-y-1 text-sm text-foreground" data-testid="save-line-stages-summary">
+            {changes.added.map((stage) => (
+              <li key={stage.id}>Add: {stage.name}</li>
+            ))}
+            {changes.removed.map((stage) => (
+              <li key={stage.id}>Delete: {stage.name}</li>
+            ))}
+            {changes.renamed.map(({ previous, stage }) => (
+              <li key={stage.id}>
+                Rename: {previous.name} → {stage.name}
+              </li>
+            ))}
+            {changes.autoAdvanceChanged.map(({ stage }) => (
+              <li key={`${stage.id}-auto-advance`}>
+                {stageAutoAdvances(stage) ? "Enable" : "Disable"} auto-advance: {stage.name}
+              </li>
+            ))}
+            {changes.reordered ? <li>Stage order changes</li> : null}
+            {moves.length > 0 && (
+              <li>
+                Move {moves.length} automation {moves.length === 1 ? "card" : "cards"}.
+              </li>
+            )}
+            {moves.some((move) => move.type !== "agent-step") && (
+              <li>Workspace automation moves apply to all lines that have the destination stage.</li>
+            )}
+          </ul>
+        ) : null}
+        {error ? (
+          <p role="alert" className="text-sm text-destructive">
+            {error}
+          </p>
+        ) : null}
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={saving}>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            disabled={saving}
+            onClick={(event) => {
+              event.preventDefault();
+              onConfirm();
+            }}
+          >
+            Save changes
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
+export function DiscardLineStagesDialog({
+  open,
+  onKeepEditing,
+  onDiscard,
+}: {
+  open: boolean;
+  onKeepEditing: () => void;
+  onDiscard: () => void;
+}) {
+  return (
+    <AlertDialog open={open} onOpenChange={(next) => !next && onKeepEditing()}>
+      <AlertDialogContent data-testid="discard-line-stages-dialog">
+        <AlertDialogHeader>
+          <AlertDialogTitle>Discard changes?</AlertDialogTitle>
+          <AlertDialogDescription>Your stage changes are not saved.</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Keep editing</AlertDialogCancel>
+          <AlertDialogAction onClick={onDiscard}>Discard changes</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}

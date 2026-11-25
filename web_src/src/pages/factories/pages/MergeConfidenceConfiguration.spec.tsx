@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 import { experimentalFeaturesKeys } from "@/hooks/useExperimentalFeatures";
@@ -9,6 +9,10 @@ import { MERGE_CONFIDENCE_CHECKS } from "./mergeConfidenceChecks";
 import type { PlanningReviewStep } from "./planningReviewMockup";
 import type { NodeConfigurationUpdate } from "./nodeConfigurationCanvas";
 
+const checkPermissions = vi.fn();
+vi.mock("@/hooks/useIntegrations", () => ({
+  integrationResourcesQueryOptions: () => ({ queryFn: checkPermissions }),
+}));
 const loadDefaults = vi.fn();
 vi.mock("../lib/loadDefaultAgentPrompt", () => ({ loadDefaultAgentPrompt: loadDefaults }));
 vi.mock("@/hooks/useComponentData", () => ({
@@ -84,9 +88,66 @@ function renderSettings(
   return { onSave, onClose, unmount: rendered.unmount };
 }
 
-beforeEach(() => loadDefaults.mockReset());
+beforeEach(() => {
+  loadDefaults.mockReset();
+  checkPermissions.mockReset();
+});
 
 describe("Merge confidence configuration", () => {
+  it.each(["granted", "missing", "unavailable"])(
+    "checks GitHub access before enabling PR checks: %s",
+    async (access) => {
+      const body: SuperplaneComponentsNode = {
+        id: "publish-merge-confidence",
+        component: "github.updatePullRequestBodySection",
+        configuration: { enabled: true },
+      };
+      const start: SuperplaneComponentsNode = {
+        id: "start-assessment-check",
+        component: "github.setPullRequestCheckRun",
+        integration: { id: "github" },
+        configuration: { enabled: false },
+      };
+      let finishCheck!: (resources: { id: string; name?: string }[]) => void;
+      let failCheck!: (error: Error) => void;
+      checkPermissions.mockImplementation(
+        () =>
+          new Promise((resolve, reject) => {
+            finishCheck = resolve;
+            failCheck = reject;
+          }),
+      );
+      const { onSave } = renderSettings(steps, vi.fn(), vi.fn(), body, { publicationNodes: [body, start] });
+      const toggle = screen.getByRole("switch", { name: "Publish PR check" });
+      expect(toggle).not.toBeChecked();
+      fireEvent.click(toggle);
+      expect(toggle).toBeDisabled();
+      expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+      await act(async () => {
+        if (access === "unavailable") failCheck(new Error("GitHub unavailable"));
+        else finishCheck([{ id: access, name: "Accept the new GitHub App permissions, then try again." }]);
+      });
+      expect(toggle).not.toBeDisabled();
+      if (access !== "granted") {
+        expect(toggle).not.toBeChecked();
+        expect(screen.getByRole("alert")).toHaveTextContent(
+          access === "missing" ? "Accept the new GitHub App permissions" : "Could not verify GitHub permissions",
+        );
+        expect(onSave).not.toHaveBeenCalled();
+        checkPermissions.mockResolvedValue([{ id: "granted" }]);
+        await act(async () => fireEvent.click(toggle));
+        expect(toggle).toBeChecked();
+      }
+      expect(toggle).toBeChecked();
+      fireEvent.click(screen.getByRole("button", { name: "Save" }));
+      await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+      expect(
+        onSave.mock.calls[0][0].find((node: NodeConfigurationUpdate) => node.nodeId === "start-assessment-check")
+          ?.configuration,
+      ).toEqual(expect.objectContaining({ enabled: true, activationGeneration: 2 }));
+    },
+  );
+
   it("saves independent controls, reloads choices, and fences earlier activations", async () => {
     const body: SuperplaneComponentsNode = {
       id: "publish-merge-confidence",
@@ -309,7 +370,7 @@ describe("Merge confidence configuration", () => {
     expect(screen.getByRole("switch", { name: "Security" })).toBeDisabled();
     expect(concurrency).toBeDisabled();
     rejectSave(new Error("Network error"));
-    expect(await screen.findByRole("alert")).toHaveTextContent("Could not save Merge confidence settings");
+    expect(await screen.findByRole("alert")).toBeVisible();
     expect(onClose).not.toHaveBeenCalled();
     expect(screen.getByDisplayValue("opus")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Save" }));

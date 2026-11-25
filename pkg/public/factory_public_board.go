@@ -366,6 +366,31 @@ func assemblePublicBoard(
 			Cards:       []publicCard{},
 		},
 	)
+	if len(line.Stages) > 0 {
+		columnsByKey := make(map[string]publicColumn, len(columns))
+		for _, column := range columns {
+			columnsByKey[column.Key] = column
+		}
+		ordered := make([]publicColumn, 0, len(line.Stages))
+		for _, stage := range line.StagesValue() {
+			if stage.Kind == models.FactoryLineStageCustom {
+				ordered = append(ordered, publicColumn{
+					Key:   stage.Key,
+					Title: stage.Name,
+					Color: line.ColumnColorsValue()[stage.Key],
+					Cards: []publicCard{},
+				})
+				continue
+			}
+			column, ok := columnsByKey[stage.Key]
+			if !ok {
+				continue
+			}
+			column.Title = stage.Name
+			ordered = append(ordered, column)
+		}
+		columns = ordered
+	}
 
 	byKey := map[string]*publicColumn{}
 	for i := range columns {

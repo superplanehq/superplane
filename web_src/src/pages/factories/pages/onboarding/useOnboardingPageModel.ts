@@ -16,15 +16,13 @@ import { resolveRepositoryDefaultBranch, useConnectedIntegrations } from "@/hook
 import { useUpdateOrganization } from "@/hooks/useOrganizationData";
 import { githubHostFromIntegration } from "@/lib/githubHost";
 import { useBYOKAccess } from "@/hooks/useBYOKAccess";
-import { showErrorToast } from "@/lib/toast";
 import type { IntegrationSelections } from "@/pages/home/InstallIntegrationsSection";
-import { selectReadyIntegrationInstance, useIntegrationConnectDialog } from "@/pages/home/useIntegrationConnectDialog";
+import { useIntegrationConnectDialog } from "@/pages/home/useIntegrationConnectDialog";
 import { useInstallFactory } from "@/pages/home/useInstallFactory";
-import { createElement, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router";
 
 import { factorySetupPath } from "../../lib/factoryPagePaths";
-import { OnboardingConnectDialogs } from "./CustomProviderConnectDialog";
 import {
   runSave,
   saveBitbucketForgeRepository,
@@ -33,7 +31,8 @@ import {
   useDefaultBranchGate,
   type OnboardingRepositorySelection,
 } from "./selectOnboardingRepository";
-import { AGENT_PROVIDER_IDS, isHostedAgentReady, type OnboardingAgentPlan } from "./onboardingAgentReadiness";
+import { isHostedAgentReady, type OnboardingAgentPlan } from "./onboardingAgentReadiness";
+import { useOnboardingConnectionDialogs } from "./useOnboardingConnectionDialogs";
 import { useOnboardingIntegrationSelections } from "./useOnboardingIntegrationSelections";
 import type { IntegrationId, IssuesChoiceId, WizardStepId } from "./onboardingFixtures";
 import { useOnboardingModelSource } from "./onboardingModelSource";
@@ -141,6 +140,7 @@ function useSectionSaves(args: {
     return runSave(args.setSaving, () =>
       args.updateOnboarding({
         agentHarness: plan.harness,
+        codexSubscription: plan.credentialsSource === "subscription",
         agentIntegrationId: plan.credentialsSource === "integration" ? integration?.id : "",
       }),
     );
@@ -384,21 +384,24 @@ export function useOnboardingPageModel(args: {
   const { canAct } = usePermissions();
   const bringYourOwnKey = useBYOKAccess(args.organizationId);
   const customProvider = bringYourOwnKey.customProviderAllowed;
-  const [agentCredentialChoice, setAgentCredentialChoice] = useOnboardingModelSource(args.factoryId);
+  const [savedCredentialChoice, setAgentCredentialChoice] = useOnboardingModelSource(args.factoryId);
   const onboarding = args.factory?.onboarding;
+  const savedSource = savedCredentialChoice ?? (onboarding?.codexSubscription ? "subscription" : null);
+  // A stored subscription choice cannot enable subscription setup on hosted installations.
+  const agentCredentialChoice = savedSource === "subscription" && !bringYourOwnKey.noHostedDefault ? null : savedSource;
   const integrations = useOnboardingIntegrationSelections(args.organizationId, onboarding);
   const { connectedIntegrations, existingIntegrationNames } = useTrimmedIntegrationNames(args.organizationId);
-  const { agent, selectModel, onSelectionsChange } = useOnboardingAgentPageState({
+  const { agent, subscriptionReady, selectModel, onSelectionsChange } = useOnboardingAgentPageState({
     organizationId: args.organizationId,
     factoryId: args.factoryId,
     connected: integrations.connected,
     customProvider,
     agentCredentialChoice,
+    subscriptionOffered: bringYourOwnKey.noHostedDefault,
     setSelections: integrations.setSelections,
     connectedIntegrations,
     agentIntegrationId: onboarding?.agentIntegrationId,
   });
-  const [customProviderDialogOpen, setCustomProviderDialogOpen] = useState(false);
   const setup = useOnboardingSetupState(
     args.factory?.name ?? "",
     onboardingSetupOptions(args.factoryId, onboarding, integrations.connected, agent.remainingCreditCents),
@@ -440,18 +443,14 @@ export function useOnboardingPageModel(args: {
     agent,
   });
 
-  const requestConnect = (id: IntegrationId) => {
-    if (providerConnectionDenied(id, bringYourOwnKey)) return false;
-    if (id !== "customLlm" || !customProvider) return connect.requestConnect(id);
-    const existing = selectReadyIntegrationInstance(connectedIntegrations, integrations.selections, "customLlm");
-    if (existing) {
-      integrations.setSelections(existing);
-      // True means the browser left this page. A saved connection stays here.
-      return false;
-    }
-    setCustomProviderDialogOpen(true);
-    return false;
-  };
+  const dialogs = useOnboardingConnectionDialogs({
+    ...args,
+    bringYourOwnKey,
+    connect,
+    integrations,
+    connectedIntegrations,
+    existingIntegrationNames,
+  });
 
   return {
     setup,
@@ -461,24 +460,22 @@ export function useOnboardingPageModel(args: {
     bringYourOwnKey: bringYourOwnKey.allowed,
     bringYourOwnKeyLoading: !bringYourOwnKey.ready,
     customProvider,
+    subscription: {
+      offered: bringYourOwnKey.noHostedDefault,
+      ready: subscriptionReady,
+      connect: dialogs.connectSubscription,
+    },
     agentCredentialChoice,
     setAgentCredentialChoice,
     agentLoading: agent.hostedModelsLoading,
+    agentProviderId: agent.plan?.providerId,
     agentModelPicker: agent.modelPicker ? { ...agent.modelPicker, onChange: selectModel } : undefined,
     openSection,
     setOpenSection,
-    requestConnect,
+    requestConnect: dialogs.requestConnect,
     ...wiredVcsFields(wired, connectedIntegrations),
     ...branchGate.model,
-    integrationDialogs: createElement(OnboardingConnectDialogs, {
-      connectDialogs: connect.dialogs,
-      customProviderOpen: customProviderDialogOpen,
-      organizationId: args.organizationId,
-      existingNames: existingIntegrationNames,
-      selections: integrations.selections,
-      onSelectionsChange: integrations.setSelections,
-      onCloseCustomProvider: () => setCustomProviderDialogOpen(false),
-    }),
+    integrationDialogs: dialogs.integrationDialogs,
     canConfigureWorkspace: canConfigureWorkspace(canAct),
     saving: saving || wired.installer.isInstalling || wired.createIntake.isPending,
     ...wired.saves,
@@ -489,11 +486,4 @@ export function useOnboardingPageModel(args: {
     ...wired.jira,
     ...wired.linear,
   };
-}
-
-function providerConnectionDenied(id: IntegrationId, access: ReturnType<typeof useBYOKAccess>) {
-  const providerDenied = AGENT_PROVIDER_IDS.some((provider) => provider === id) && !access.allowed;
-  if (!providerDenied && (id !== "customLlm" || access.customProviderAllowed)) return false;
-  showErrorToast("Your organization does not have access to provider credentials. Contact your administrator.");
-  return true;
 }

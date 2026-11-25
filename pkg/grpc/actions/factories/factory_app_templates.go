@@ -42,12 +42,10 @@ type factoryTemplateKey struct {
 }
 
 type factoryAppTemplate struct {
-	id               string
-	provider         string
-	entrypointNodeID string
-	canvasFile       string
-	// multiRepoCanvasFile replaces canvasFile for organizations with multi-repo tasks.
-	multiRepoCanvasFile   string
+	id                    string
+	provider              string
+	entrypointNodeID      string
+	canvasFile            string
 	consoleFile           string
 	componentIntegrations map[string]string
 	// columnKey attaches the canvas to Verify or Done when the template is installed.
@@ -82,28 +80,16 @@ var factoryAppTemplates = map[factoryTemplateKey]factoryAppTemplate{
 		},
 	}),
 	{id: "line-implementation", provider: models.ProviderGitHub}: githubFactoryTemplate(factoryAppTemplate{
-		id:                  "line-implementation",
-		entrypointNodeID:    "onrun-implement",
-		canvasFile:          "templates/github/line-implementation.canvas.yaml",
-		multiRepoCanvasFile: "templates/github/line-implementation-multi-repo.canvas.yaml",
-		consoleFile:         "templates/github/line-app.console.yaml",
-		componentIntegrations: map[string]string{
-			"github.createPullRequest": "github",
-			"github.findPullRequest":   "github",
-			"github.updatePullRequest": "github",
-		},
+		id:               "line-implementation",
+		entrypointNodeID: "onrun-implement",
+		canvasFile:       "templates/github/line-implementation-multi-repo.canvas.yaml",
+		consoleFile:      "templates/github/line-app.console.yaml",
 	}),
 	{id: "line-implementation", provider: models.ProviderBitbucket}: bitbucketFactoryTemplate(factoryAppTemplate{
-		id:                  "line-implementation",
-		entrypointNodeID:    "onrun-implement",
-		canvasFile:          "templates/bitbucket/line-implementation.canvas.yaml",
-		multiRepoCanvasFile: "templates/bitbucket/line-implementation-multi-repo.canvas.yaml",
-		consoleFile:         "templates/bitbucket/line-app.console.yaml",
-		componentIntegrations: map[string]string{
-			"bitbucket.createPullRequest": "bitbucket",
-			"bitbucket.findPullRequest":   "bitbucket",
-			"bitbucket.updatePullRequest": "bitbucket",
-		},
+		id:               "line-implementation",
+		entrypointNodeID: "onrun-implement",
+		canvasFile:       "templates/bitbucket/line-implementation-multi-repo.canvas.yaml",
+		consoleFile:      "templates/bitbucket/line-app.console.yaml",
 	}),
 	{id: "pr-closure", provider: models.ProviderGitHub}: githubFactoryTemplate(factoryAppTemplate{
 		id:               "pr-closure",
@@ -191,7 +177,6 @@ type factoryTemplateInput struct {
 	agentSettings         map[string]*factoryAgentSettings
 	triggerSettings       *factoryTriggerSettings
 	draftPullRequests     *bool
-	multiRepo             bool
 	mergeCheckSteps       any
 	bodySectionSettings   map[string]map[string]any
 }
@@ -264,11 +249,7 @@ func materializeFactoryTemplate(templateID, provider string, input factoryTempla
 		return nil, invalidArgument("unknown factory app template")
 	}
 
-	canvasFile := template.canvasFile
-	if input.multiRepo && template.multiRepoCanvasFile != "" {
-		canvasFile = template.multiRepoCanvasFile
-	}
-	raw, err := factoryTemplateFiles.ReadFile(canvasFile)
+	raw, err := factoryTemplateFiles.ReadFile(template.canvasFile)
 	if err != nil {
 		return nil, fmt.Errorf("read factory app template: %w", err)
 	}
@@ -1158,10 +1139,6 @@ func materializeNonIntakeFactoryAppDefaults(
 		return nil, invalidArgument("factory app has no bundled defaults")
 	}
 	input := deriveFactoryTemplateInput(tx, factory, canvas, version, resolved, savedSettings)
-	input.multiRepo, err = factory.MultiRepoTasksEnabled(tx)
-	if err != nil {
-		return nil, err
-	}
 	// Reset uses the provider saved on the app. A later workspace host change
 	// must not select a template the app was not installed with.
 	return materializeFactoryTemplate(resolved.id, resolved.provider, input)

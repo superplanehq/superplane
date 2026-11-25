@@ -26,7 +26,8 @@ type OwnerStepProps = {
   onSubmit: (event: React.FormEvent) => void;
 };
 
-const fieldLabelClass = "mb-2 block text-left text-[13px] font-medium";
+const fieldLabelClass = "mb-2 block text-left text-[13px] font-medium text-foreground dark:text-foreground";
+const ownerFormClass = "mt-8 space-y-4 text-left [&_input[type=password][data-slot=input]]:placeholder:text-[#b8b6af]!";
 
 function InstallReportChoice({ checked, onChange }: { checked: boolean; onChange: (value: boolean) => void }) {
   return (
@@ -68,7 +69,7 @@ export const OwnerStep: React.FC<OwnerStepProps> = ({
     <FirstRunHeading headline="Create the owner account" size="display">
       <p className="text-[15px] leading-6 text-muted-foreground">This account administers the installation.</p>
     </FirstRunHeading>
-    <form onSubmit={onSubmit} className="mt-8 space-y-4 text-left">
+    <form onSubmit={onSubmit} className={ownerFormClass}>
       <ErrorBanner message={error} />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
@@ -137,7 +138,7 @@ export const OwnerStep: React.FC<OwnerStepProps> = ({
         {fieldErrors.password ? (
           <p className="mt-1 text-xs text-red-600 dark:text-red-400">{fieldErrors.password}</p>
         ) : (
-          <p className="mt-1 text-xs text-muted-foreground">8+ characters, at least 1 number and 1 capital letter</p>
+          <p className="mt-1 text-xs text-[#b8b6af]">8+ characters, at least 1 number and 1 capital letter</p>
         )}
       </div>
       <div>

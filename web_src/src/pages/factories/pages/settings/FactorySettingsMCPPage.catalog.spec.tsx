@@ -203,6 +203,7 @@ describe("FactorySettingsMCPPage catalog", () => {
     expect(screen.queryByTestId("agent-resource-url")).not.toBeInTheDocument();
     expect(screen.queryByTestId("agent-resource-auth")).not.toBeInTheDocument();
     expect(screen.queryByTestId("mcp-catalog-setup-token")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("mcp-catalog-setup-site")).not.toBeInTheDocument();
     expect(screen.getByTestId("mcp-catalog-setup-icon")).toBeInTheDocument();
     expect(screen.getByTestId("mcp-catalog-setup-instruction")).toHaveTextContent("Sign in with Linear.");
     expect(screen.getByTestId("mcp-catalog-setup-sign-in")).toHaveTextContent("Sign in");
@@ -226,10 +227,13 @@ describe("FactorySettingsMCPPage catalog", () => {
 
     expect(await screen.findByTestId("mcp-catalog-setup-dialog")).toBeInTheDocument();
     expect(screen.getByTestId("mcp-catalog-setup-instruction")).toHaveTextContent("Sign in with Datadog.");
-    expect(screen.getByTestId("mcp-catalog-setup-site")).toHaveTextContent("US1 (datadoghq.com)");
+    expect(screen.getByRole("combobox", { name: AGENT_RESOURCES_COPY.datadogSiteLabel })).toHaveTextContent(
+      "US1 (datadoghq.com)",
+    );
     expect(screen.getByText("Choose the site from your Datadog URL.")).toBeInTheDocument();
 
     await user.click(screen.getByTestId("mcp-catalog-setup-site"));
+    expect(screen.getAllByRole("option")).toHaveLength(7);
     await user.click(screen.getByRole("option", { name: "EU (datadoghq.eu)" }));
     await user.click(screen.getByTestId("mcp-catalog-setup-sign-in"));
 
@@ -238,6 +242,8 @@ describe("FactorySettingsMCPPage catalog", () => {
     });
     expect(screen.getByTestId("agent-resources-connections-list")).toHaveTextContent("Datadog");
     expect(screen.getByTestId("agent-resources-connections-list")).toHaveTextContent("Not connected");
+    await user.click(screen.getByTestId("agent-resource-edit-resource-1"));
+    expect(await screen.findByTestId("mcp-connection-settings")).toHaveTextContent("https://mcp.datadoghq.eu/v1/mcp");
   }, 10000);
 
   it("opens a saved Datadog server on its site", async () => {
@@ -262,6 +268,12 @@ describe("FactorySettingsMCPPage catalog", () => {
     await user.click(await screen.findByTestId(`agent-resource-edit-${datadogResource.id}`, {}, { timeout: 8000 }));
     expect(await screen.findByTestId("mcp-connection-settings", {}, { timeout: 8000 })).toBeInTheDocument();
     expect(screen.getByText("https://mcp.us5.datadoghq.com/v1/mcp")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: AGENT_RESOURCES_COPY.edit }));
+    expect(await screen.findByTestId("mcp-catalog-setup-site")).toHaveTextContent("US5 (us5.datadoghq.com)");
+    await user.click(screen.getByTestId("mcp-catalog-setup-site"));
+    await user.click(screen.getByRole("option", { name: "EU (datadoghq.eu)" }));
+    await user.click(screen.getByRole("button", { name: AGENT_RESOURCES_COPY.cancel }));
+    expect(screen.queryByTestId("mcp-catalog-setup-dialog")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: AGENT_RESOURCES_COPY.edit }));
     expect(await screen.findByTestId("mcp-catalog-setup-site")).toHaveTextContent("US5 (us5.datadoghq.com)");
   }, 10000);

@@ -1630,9 +1630,14 @@ func TestAdminListOrgExperimentalFeatures(t *testing.T) {
 		for _, f := range body.Features {
 			id, _ := f["id"].(string)
 			ids = append(ids, id)
+			if id == features.FeatureModelStatus {
+				assert.Equal(t, false, f["released"])
+			}
 		}
 		assert.Contains(t, ids, features.FeatureFactories)
-		assert.Contains(t, ids, features.FeatureGitHubEnterprise)
+		assert.Contains(t, ids, features.FeatureModelStatus)
+		assert.NotContains(t, body.Enabled, features.FeatureModelStatus)
+		assert.NotContains(t, ids, "github_enterprise")
 		assert.NotContains(t, ids, features.FeatureGitHubEnterpriseServer)
 	})
 
@@ -1669,29 +1674,34 @@ func TestAdminEnableOrgExperimentalFeature(t *testing.T) {
 
 	t.Cleanup(func() {
 		_ = models.DisableExperimentalFeature(r.Organization.ID, features.FeatureFactories)
+		_ = models.DisableExperimentalFeature(r.Organization.ID, features.FeatureModelStatus)
 	})
 
-	t.Run("enables a known feature", func(t *testing.T) {
-		response := execRequest(server, requestParams{
-			method:     "POST",
-			path:       "/admin/api/organizations/" + r.Organization.ID.String() + "/experimental-features/" + features.FeatureFactories,
-			authCookie: token,
+	for _, featureID := range []string{features.FeatureFactories, features.FeatureModelStatus} {
+		t.Run("enables "+featureID, func(t *testing.T) {
+			response := execRequest(server, requestParams{
+				method:     "POST",
+				path:       "/admin/api/organizations/" + r.Organization.ID.String() + "/experimental-features/" + featureID,
+				authCookie: token,
+			})
+			assert.Equal(t, http.StatusOK, response.Code)
+
+			reloaded, err := models.FindOrganizationByID(r.Organization.ID.String())
+			require.NoError(t, err)
+			assert.Contains(t, []string(reloaded.EnabledExperimentalFeatures), featureID)
 		})
-		assert.Equal(t, http.StatusOK, response.Code)
+	}
 
-		reloaded, err := models.FindOrganizationByID(r.Organization.ID.String())
-		require.NoError(t, err)
-		assert.Contains(t, []string(reloaded.EnabledExperimentalFeatures), features.FeatureFactories)
-	})
-
-	t.Run("rejects unknown feature ids", func(t *testing.T) {
-		response := execRequest(server, requestParams{
-			method:     "POST",
-			path:       "/admin/api/organizations/" + r.Organization.ID.String() + "/experimental-features/does-not-exist",
-			authCookie: token,
+	for _, featureID := range []string{"does-not-exist", "github_enterprise"} {
+		t.Run("rejects unknown feature "+featureID, func(t *testing.T) {
+			response := execRequest(server, requestParams{
+				method:     "POST",
+				path:       "/admin/api/organizations/" + r.Organization.ID.String() + "/experimental-features/" + featureID,
+				authCookie: token,
+			})
+			assert.Equal(t, http.StatusBadRequest, response.Code)
 		})
-		assert.Equal(t, http.StatusBadRequest, response.Code)
-	})
+	}
 
 	t.Run("rejects hidden GitHub Enterprise Server", func(t *testing.T) {
 		response := execRequest(server, requestParams{
@@ -1737,10 +1747,19 @@ func TestAdminDisableOrgExperimentalFeature(t *testing.T) {
 	t.Run("is idempotent for ids not currently enabled", func(t *testing.T) {
 		response := execRequest(server, requestParams{
 			method:     "DELETE",
-			path:       "/admin/api/organizations/" + r.Organization.ID.String() + "/experimental-features/does-not-exist",
+			path:       "/admin/api/organizations/" + r.Organization.ID.String() + "/experimental-features/" + features.FeatureFactories,
 			authCookie: token,
 		})
 		assert.Equal(t, http.StatusOK, response.Code)
+	})
+
+	t.Run("rejects unknown feature ids", func(t *testing.T) {
+		response := execRequest(server, requestParams{
+			method:     "DELETE",
+			path:       "/admin/api/organizations/" + r.Organization.ID.String() + "/experimental-features/does-not-exist",
+			authCookie: token,
+		})
+		assert.Equal(t, http.StatusBadRequest, response.Code)
 	})
 
 	t.Run("returns 404 for non-existent org", func(t *testing.T) {
@@ -1753,25 +1772,13 @@ func TestAdminDisableOrgExperimentalFeature(t *testing.T) {
 	})
 }
 
-func TestAdminToggleMultiRepoTasksReportsRepublishedAutomations(t *testing.T) {
+func TestAdminRejectsRetiredMultiRepoToggle(t *testing.T) {
 	server, r, token := setupAdminTestServer(t)
-	path := "/admin/api/organizations/" + r.Organization.ID.String() + "/experimental-features/" + features.FeatureFactoryMultiRepoTasks
+	path := "/admin/api/organizations/" + r.Organization.ID.String() + "/experimental-features/factory_multi_repo_tasks"
 
 	for _, method := range []string{"POST", "DELETE"} {
 		response := execRequest(server, requestParams{method: method, path: path, authCookie: token})
-		require.Equal(t, http.StatusOK, response.Code)
-
-		var body struct {
-			Status string `json:"status"`
-			Reset  *int   `json:"reset"`
-		}
-		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body))
-		require.NotNil(t, body.Reset)
-		assert.Zero(t, *body.Reset, "the organization has no Implement automation")
-
-		reloaded, err := models.FindOrganizationByID(r.Organization.ID.String())
-		require.NoError(t, err)
-		assert.Equal(t, method == "POST", slices.Contains(reloaded.EnabledExperimentalFeatures, features.FeatureFactoryMultiRepoTasks))
+		require.Equal(t, http.StatusBadRequest, response.Code)
 	}
 }
 

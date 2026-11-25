@@ -79,17 +79,7 @@ export function WorkspacePageHeader(props: WorkspacePageHeaderProps) {
         )}
       >
         <div className={cn("min-w-0", actionsAlign === "start" ? "shrink-0" : "flex-1")}>
-          {isEntity && props.backHref && props.backLabel ? (
-            <BackLink href={props.backHref} label={props.backLabel} testId={props.backTestId} />
-          ) : null}
-          {isEntity && props.kicker ? (
-            <p
-              className="mt-2 text-[12px] font-medium uppercase tracking-[0.06em] text-muted-foreground tabular-nums"
-              data-testid="workspace-page-header-kicker"
-            >
-              {props.kicker}
-            </p>
-          ) : null}
+          {isEntity ? <WorkspaceEntityHeaderDetails {...props} /> : null}
           <div className={cn("flex min-w-0 flex-col gap-1", isEntity && "mt-1")}>
             {props.aboveTitle ? <div data-testid="workspace-page-header-above-title">{props.aboveTitle}</div> : null}
             <div className="flex min-w-0 flex-wrap items-center gap-3">
@@ -115,6 +105,27 @@ export function WorkspacePageHeader(props: WorkspacePageHeaderProps) {
       </div>
       {props.belowRow}
     </header>
+  );
+}
+
+function WorkspaceEntityHeaderDetails({
+  backHref,
+  backLabel,
+  backTestId,
+  kicker,
+}: Pick<WorkspaceEntityHeaderProps, "backHref" | "backLabel" | "backTestId" | "kicker">) {
+  return (
+    <>
+      {backHref && backLabel ? <BackLink href={backHref} label={backLabel} testId={backTestId} /> : null}
+      {kicker ? (
+        <p
+          className="mt-2 text-[12px] font-medium uppercase tracking-[0.06em] text-muted-foreground tabular-nums"
+          data-testid="workspace-page-header-kicker"
+        >
+          {kicker}
+        </p>
+      ) : null}
+    </>
   );
 }
 

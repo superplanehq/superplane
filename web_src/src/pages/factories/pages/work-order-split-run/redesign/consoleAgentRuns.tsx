@@ -1,6 +1,4 @@
 import { useEventExecutions } from "@/hooks/useCanvasData";
-import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
-import { FEATURE_FACTORY_MULTI_REPO_TASKS } from "@/lib/experimentalFeatures";
 import { safeExternalUrl } from "@/lib/safeExternalUrl";
 import { cn } from "@/lib/utils";
 import { MarkdownContent } from "@/pages/app/Markdown";
@@ -49,7 +47,6 @@ export function AgentRunsPage({
   /** Only this run reports into the card usage chart. */
   usagePhaseId?: string;
 }) {
-  const multiRepo = useExperimentalFeature(organizationId).has(FEATURE_FACTORY_MULTI_REPO_TASKS);
   const single = runs.length === 1 ? runs[0] : undefined;
   if (single) {
     return (
@@ -64,7 +61,7 @@ export function AgentRunsPage({
       />
     );
   }
-  const showsRepository = multiRepo && runsSpanRepositories(runs);
+  const showsRepository = runsSpanRepositories(runs);
   return (
     <div className="flex flex-col divide-y divide-border">
       {runs.map((run, index) => (

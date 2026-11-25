@@ -116,6 +116,31 @@ test("redacts credentials from activity text", () => {
   assert.match(output, /\[REDACTED\]/);
 });
 
+test("protects explicitly selected secrets regardless of name or length", () => {
+  const env = {
+    ...analysisEnvironment(),
+    SUPERPLANE_SECRET_ENV_NAMES: JSON.stringify(["FIGMA_ACCESS", "DESIGN", "EMPTY"]),
+    FIGMA_ACCESS: "z7!",
+    DESIGN: "z7!long",
+    EMPTY: "",
+    OTHER: "ordinary",
+  };
+  assert.equal(redactSensitiveText("z7!long z7! ordinary", env), "[REDACTED] [REDACTED] ordinary");
+  assert.deepEqual(sanitizeLogValue({ result: "z7!", stderr: "z7!long" }, env), {
+    result: "[REDACTED]", stderr: "[REDACTED]",
+  });
+  const records = [];
+  const stream = createActivityStream({ env, writeRecord: (record) => records.push(record) });
+  stream.startTool({ id: "tool", input: "z7!long" });
+  stream.appendToolOutput("tool", "z7!", "stdout");
+  stream.appendToolOutput("tool", "z7!long", "stderr");
+  stream.end("passed");
+  for (const value of [records, stream.snapshot()]) {
+    assert.equal(JSON.stringify(value).includes("z7!"), false);
+    assert.match(JSON.stringify(value), /\[REDACTED\]/);
+  }
+});
+
 test("redacts the planning session runner token from activity text", () => {
   const token = "runner-token-value-for-redaction-test";
   const output = redactSensitiveText(`SUPERPLANE_RUN_TOKEN=${token}\n${token}`, {

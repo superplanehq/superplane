@@ -10,7 +10,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/ui/dropdownMenu";
-import { Check, Settings } from "lucide-react";
+import { Check, Columns3, Settings } from "lucide-react";
 
 import type { ColumnAutomationView } from "../lib/columnAutomationViewPreference";
 import { COLUMN_AUTOMATIONS_COPY } from "../lib/columnAutomations";
@@ -40,11 +40,13 @@ export function LineBoardViewMenu({
   onViewChange,
   colorView,
   onColorViewChange,
+  onEditStages,
 }: {
   view?: ColumnAutomationView;
   onViewChange?: (view: ColumnAutomationView) => void;
   colorView: LineBoardColumnColorView;
   onColorViewChange: (view: LineBoardColumnColorView) => void;
+  onEditStages?: () => void;
 }) {
   const showAutomationView = Boolean(view && onViewChange);
 
@@ -64,6 +66,16 @@ export function LineBoardViewMenu({
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-52">
         <DropdownMenuLabel className={MENU_LABEL_CLASSNAME}>{COLUMN_AUTOMATIONS_COPY.viewOptions}</DropdownMenuLabel>
+        {onEditStages ? (
+          <DropdownMenuItem
+            className={MENU_ITEM_CLASSNAME}
+            onSelect={onEditStages}
+            data-testid="lines-board-edit-stages"
+          >
+            <Columns3 className="size-3.5" aria-hidden />
+            Edit stages
+          </DropdownMenuItem>
+        ) : null}
         {showAutomationView && view && onViewChange ? (
           <ViewOptionSub
             label={COLUMN_AUTOMATIONS_COPY.viewAutomations}

@@ -36,12 +36,8 @@ export const onPRCommentTriggerRenderer: TriggerRenderer = {
 
     return {
       "Received At": context.event?.createdAt ? new Date(context.event.createdAt).toLocaleString() : "-",
-      Author: eventData?.comment?.user?.login || "-",
-      "Comment Body": eventData?.comment?.body || "-",
-      "Comment URL": eventData?.comment?.html_url || "-",
-      "PR Number": eventData?.issue?.number?.toString() || "-",
-      "PR Title": eventData?.issue?.title || "-",
-      "PR URL": eventData?.issue?.pull_request?.html_url || eventData?.issue?.pull_request?.url || "-",
+      ...prCommentFields(eventData?.comment),
+      ...prFields(eventData?.issue),
     };
   },
 
@@ -62,6 +58,22 @@ export const onPRCommentTriggerRenderer: TriggerRenderer = {
     return props;
   },
 };
+
+function prCommentFields(comment: Comment | undefined): Record<string, string> {
+  return {
+    Author: comment?.user?.login || "-",
+    "Comment Body": comment?.body || "-",
+    "Comment URL": comment?.html_url || "-",
+  };
+}
+
+function prFields(issue: Issue | undefined): Record<string, string> {
+  return {
+    "PR Number": issue?.number?.toString() || "-",
+    "PR Title": issue?.title || "-",
+    "PR URL": issue?.pull_request?.html_url || issue?.pull_request?.url || "-",
+  };
+}
 
 function prCommentMetadata(node: TriggerRendererContext["node"]): MetadataItem[] {
   const metadata = node.metadata as unknown as BaseNodeMetadata;
