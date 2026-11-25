@@ -384,6 +384,9 @@ func exportFactoryConfigurationPublicSettings(version *models.CanvasVersion, tem
 			// Defaults were implicit on older graphs.
 			if _, ok := section["publish_results"]; !ok {
 				section["publish_results"] = true
+				if publication := findIntakeNode(version.Nodes, "publish-merge-confidence"); publication != nil {
+					section["publish_results"] = publication.Configuration["enabled"] != false
+				}
 			}
 			if _, ok := section["results_body"]; !ok {
 				section["results_body"] = true

@@ -198,3 +198,25 @@ func TestFactoryConfigurationResetKeepsReboundIntakeTrigger(t *testing.T) {
 		})
 	}
 }
+
+func TestFactoryConfigurationRestoresLegacyPublicationSetting(t *testing.T) {
+	f := newConfigurationFixture(t)
+	canvas := resetTestTemplate(t, f.r, f.factory, "risk-score", models.ProviderGitHub, func(doc *yaml.Canvas) {
+		delete(findYAMLNode(t, doc, "assess-risk").Configuration, "publishResults")
+		findYAMLNode(t, doc, "publish-merge-confidence").Configuration["enabled"] = false
+	})
+	bundle := f.export(t)
+	_, err := DeleteFactoryAutomation(f.ctx, f.r.Organization.ID.String(), &pb.DeleteFactoryAutomationRequest{
+		FactoryId: f.factory.ID.String(), AutomationId: canvas.ID.String(),
+	})
+	require.NoError(t, err)
+	plan := f.plan(t, bundle)
+	require.Empty(t, plan.Diagnostics)
+	_, err = f.apply(bundle, plan.BaseStateToken)
+	require.NoError(t, err)
+	restored, err := models.FindCanvasByName(database.DB(t.Context()), f.r.Organization.ID, &f.factory.ID, canvas.Name)
+	require.NoError(t, err)
+	require.NoError(t, resetTestOrganization(t, f.r))
+	live := resetTestLiveVersion(t, restored)
+	require.Equal(t, false, findIntakeNode(live.Nodes, "publish-merge-confidence").Configuration["enabled"])
+}

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mitchellh/mapstructure"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -22,7 +23,7 @@ const (
 
 func Test__OnErrorTrackingAlert__Setup__DefersMonitorProvisioning(t *testing.T) {
 	httpContext := &contexts.HTTPContext{}
-	metadata := &contexts.MetadataContext{}
+	metadata := &contexts.MetadataContext{Metadata: map[string]any{"intakeConfidencePct": 37, "factoryTemplate": map[string]any{"id": "intake:datadog", "version": 1}}}
 	integration := datadogIntegration()
 	requests := &contexts.RequestContext{}
 	err := (&OnErrorTrackingAlert{}).Setup(core.TriggerContext{
@@ -36,8 +37,12 @@ func Test__OnErrorTrackingAlert__Setup__DefersMonitorProvisioning(t *testing.T) 
 	require.NoError(t, err)
 	assert.Empty(t, httpContext.Requests)
 	require.Len(t, integration.Subscriptions, 1)
-	saved := metadata.Metadata.(OnErrorTrackingAlertMetadata)
+	saved := savedErrorTrackingAlertMetadata(t, metadata)
 	assert.NotEmpty(t, saved.SubscriptionID)
+	fields := map[string]any{}
+	require.NoError(t, mapstructure.Decode(metadata.Get(), &fields))
+	assert.Equal(t, 37, fields["intakeConfidencePct"])
+	assert.Equal(t, map[string]any{"id": "intake:datadog", "version": 1}, fields["factoryTemplate"])
 	assert.Empty(t, saved.MonitorID)
 	assert.Equal(t, reconcileIntakeMonitorAction, requests.Action)
 }
@@ -49,7 +54,7 @@ func Test__OnErrorTrackingAlert__ProvisionMonitor__CreatesMonitor(t *testing.T) 
 			jsonResponse(http.StatusOK, monitorJSON(42, "SuperPlane checkout", checkoutMonitorQuery, intakeMonitorMessage, 0, false)),
 		},
 	}
-	metadata := &contexts.MetadataContext{}
+	metadata := &contexts.MetadataContext{Metadata: map[string]any{"intakeConfidencePct": 37, "factoryTemplate": map[string]any{"id": "intake:datadog", "version": 1}}}
 	integration := datadogIntegration()
 
 	err := setupAndProvisionIntakeMonitor(core.TriggerContext{
@@ -61,10 +66,14 @@ func Test__OnErrorTrackingAlert__ProvisionMonitor__CreatesMonitor(t *testing.T) 
 
 	require.NoError(t, err)
 	require.Len(t, integration.Subscriptions, 1)
-	saved := metadata.Metadata.(OnErrorTrackingAlertMetadata)
+	saved := savedErrorTrackingAlertMetadata(t, metadata)
 	assert.Equal(t, "42", saved.MonitorID)
 	assert.Equal(t, "checkout", saved.MonitorService)
 	assert.NotEmpty(t, saved.SubscriptionID)
+	fields := map[string]any{}
+	require.NoError(t, mapstructure.Decode(metadata.Get(), &fields))
+	assert.Equal(t, 37, fields["intakeConfidencePct"])
+	assert.Equal(t, map[string]any{"id": "intake:datadog", "version": 1}, fields["factoryTemplate"])
 
 	post := monitorRequest(t, httpContext, http.MethodPost)
 	assert.Equal(t, "https://api.datadoghq.eu/api/v1/monitor", post.URL.String())
@@ -110,7 +119,7 @@ func Test__OnErrorTrackingAlert__ProvisionMonitor__SkipsWriteWhenMonitorMatches(
 	assert.Empty(t, requestsWithMethod(httpContext, http.MethodPost))
 	assert.Empty(t, requestsWithMethod(httpContext, http.MethodDelete))
 
-	saved := metadata.Metadata.(OnErrorTrackingAlertMetadata)
+	saved := savedErrorTrackingAlertMetadata(t, metadata)
 	assert.Equal(t, "42", saved.MonitorID)
 	assert.Equal(t, "checkout", saved.MonitorService)
 }
@@ -145,7 +154,7 @@ func Test__OnErrorTrackingAlert__ProvisionMonitor__ServiceChangeDeletesUnusedMon
 	assert.Equal(t, billingMonitorQuery, readMonitorBody(t, post).Query)
 	deleted := monitorRequest(t, httpContext, http.MethodDelete)
 	assert.Equal(t, "https://api.datadoghq.eu/api/v1/monitor/7", deleted.URL.String())
-	saved := metadata.Metadata.(OnErrorTrackingAlertMetadata)
+	saved := savedErrorTrackingAlertMetadata(t, metadata)
 	assert.Equal(t, "8", saved.MonitorID)
 	assert.Equal(t, "billing", saved.MonitorService)
 }
@@ -177,7 +186,7 @@ func Test__OnErrorTrackingAlert__ProvisionMonitor__ServiceChangeKeepsSharedMonit
 
 	require.NoError(t, err)
 	assert.Empty(t, requestsWithMethod(httpContext, http.MethodDelete))
-	saved := metadata.Metadata.(OnErrorTrackingAlertMetadata)
+	saved := savedErrorTrackingAlertMetadata(t, metadata)
 	assert.Equal(t, "8", saved.MonitorID)
 	assert.Equal(t, "billing", saved.MonitorService)
 }
@@ -204,7 +213,7 @@ func Test__OnErrorTrackingAlert__ProvisionMonitor__LeavesCustomWebhookMonitor(t 
 	assert.Empty(t, requestsWithMethod(httpContext, http.MethodDelete))
 	post := monitorRequest(t, httpContext, http.MethodPost)
 	assert.Equal(t, "https://api.datadoghq.eu/api/v1/monitor", post.URL.String())
-	saved := metadata.Metadata.(OnErrorTrackingAlertMetadata)
+	saved := savedErrorTrackingAlertMetadata(t, metadata)
 	assert.Equal(t, "42", saved.MonitorID)
 	assert.Equal(t, "checkout", saved.MonitorService)
 }
@@ -229,7 +238,7 @@ func Test__OnErrorTrackingAlert__ProvisionMonitor__LeavesAnotherConnectionsMonit
 	})
 
 	require.NoError(t, err)
-	saved := metadata.Metadata.(OnErrorTrackingAlertMetadata)
+	saved := savedErrorTrackingAlertMetadata(t, metadata)
 	assert.Equal(t, "42", saved.MonitorID)
 	assert.Empty(t, requestsWithMethod(httpContext, http.MethodDelete))
 	post := monitorRequest(t, httpContext, http.MethodPost)
@@ -253,7 +262,7 @@ func Test__OnErrorTrackingAlert__ProvisionMonitor__RetriesAfterPermissionFailure
 	})
 
 	require.ErrorContains(t, err, "monitors_write")
-	saved := metadata.Metadata.(OnErrorTrackingAlertMetadata)
+	saved := savedErrorTrackingAlertMetadata(t, metadata)
 	assert.Empty(t, saved.MonitorID)
 	assert.NotEmpty(t, saved.SubscriptionID)
 
@@ -269,7 +278,7 @@ func Test__OnErrorTrackingAlert__ProvisionMonitor__RetriesAfterPermissionFailure
 		Metadata:      metadata,
 	})
 	require.NoError(t, err)
-	retried := metadata.Metadata.(OnErrorTrackingAlertMetadata)
+	retried := savedErrorTrackingAlertMetadata(t, metadata)
 	assert.Equal(t, saved.SubscriptionID, retried.SubscriptionID)
 	assert.Equal(t, "42", retried.MonitorID)
 	assert.Equal(t, "checkout", retried.MonitorService)
@@ -589,4 +598,11 @@ func setupAndProvisionIntakeMonitor(ctx core.TriggerContext) error {
 		Integration:   ctx.Integration,
 	})
 	return err
+}
+
+func savedErrorTrackingAlertMetadata(t *testing.T, metadata *contexts.MetadataContext) OnErrorTrackingAlertMetadata {
+	t.Helper()
+	var saved OnErrorTrackingAlertMetadata
+	require.NoError(t, mapstructure.Decode(metadata.Get(), &saved))
+	return saved
 }

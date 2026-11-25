@@ -158,7 +158,7 @@ func (t *OnErrorTrackingAlert) Setup(ctx core.TriggerContext) error {
 		metadata.SubscriptionID = subscriptionID.String()
 	}
 
-	if err := ctx.Metadata.Set(metadata); err != nil {
+	if err := setErrorTrackingAlertMetadata(ctx.Metadata, metadata); err != nil {
 		return err
 	}
 
@@ -192,7 +192,18 @@ func (t *OnErrorTrackingAlert) HandleHook(ctx core.TriggerHookContext) (map[stri
 	}, &metadata, config.Service); err != nil {
 		return nil, err
 	}
-	return nil, ctx.Metadata.Set(metadata)
+	return nil, setErrorTrackingAlertMetadata(ctx.Metadata, metadata)
+}
+
+func setErrorTrackingAlertMetadata(writer core.MetadataWriter, metadata OnErrorTrackingAlertMetadata) error {
+	values := map[string]any{}
+	if err := mapstructure.Decode(writer.Get(), &values); err != nil {
+		return fmt.Errorf("failed to decode metadata: %w", err)
+	}
+	values["subscriptionId"] = metadata.SubscriptionID
+	values["monitorId"] = metadata.MonitorID
+	values["monitorService"] = metadata.MonitorService
+	return writer.Set(values)
 }
 
 func (t *OnErrorTrackingAlert) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
