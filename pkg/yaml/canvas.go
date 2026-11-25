@@ -363,14 +363,19 @@ func ModelTypeToYamlType(t string) string {
 }
 
 func (c *Canvas) Parse(registry *registry.Registry, orgID string) ([]models.Node, []models.Edge, error) {
-	return c.parse(registry, orgID, nil)
+	return c.parse(registry, orgID, nil, nil)
 }
 
 func (c *Canvas) ParseInTransaction(registry *registry.Registry, orgID string, tx *gorm.DB) ([]models.Node, []models.Edge, error) {
-	return c.parse(registry, orgID, tx)
+	return c.parse(registry, orgID, tx, nil)
 }
 
-func (c *Canvas) parse(registry *registry.Registry, orgID string, tx *gorm.DB) ([]models.Node, []models.Edge, error) {
+// ParseInTransactionWithIntegrations retains admission checks while sharing loaded integrations.
+func (c *Canvas) ParseInTransactionWithIntegrations(registry *registry.Registry, orgID string, tx *gorm.DB, integrations map[uuid.UUID]*models.Integration) ([]models.Node, []models.Edge, error) {
+	return c.parse(registry, orgID, tx, integrations)
+}
+
+func (c *Canvas) parse(registry *registry.Registry, orgID string, tx *gorm.DB, integrations map[uuid.UUID]*models.Integration) ([]models.Node, []models.Edge, error) {
 
 	//
 	// Allow empty canvases
@@ -413,7 +418,7 @@ func (c *Canvas) parse(registry *registry.Registry, orgID string, tx *gorm.DB) (
 
 		nodeIDs[node.ID] = true
 		nodeTypeByID[node.ID] = node.Type
-		if err := c.validateNodeRef(registry, orgID, node, tx); err != nil {
+		if err := c.validateNodeRef(registry, orgID, node, tx, integrations); err != nil {
 			nodeValidationErrors[node.ID] = err.Error()
 		}
 	}
@@ -545,7 +550,7 @@ func validateNodeConcurrency(node Node) error {
 	return nil
 }
 
-func (c *Canvas) validateNodeRef(registry *registry.Registry, organizationID string, node Node, tx *gorm.DB) error {
+func (c *Canvas) validateNodeRef(registry *registry.Registry, organizationID string, node Node, tx *gorm.DB, integrations map[uuid.UUID]*models.Integration) error {
 	if node.Component == "" {
 		return fmt.Errorf("component name is required")
 	}
@@ -561,7 +566,7 @@ func (c *Canvas) validateNodeRef(registry *registry.Registry, organizationID str
 	}
 
 	if len(parts) > 1 {
-		err := c.validateIntegration(organizationID, node.Integration, node.Component, tx)
+		err := c.validateIntegration(organizationID, node.Integration, node.Component, tx, integrations)
 		if err != nil {
 			return err
 		}
@@ -570,7 +575,7 @@ func (c *Canvas) validateNodeRef(registry *registry.Registry, organizationID str
 	return configuration.ValidateConfiguration(configurable.Configuration(), node.Configuration)
 }
 
-func (c *Canvas) validateIntegration(organizationID string, ref *IntegrationRef, component string, tx *gorm.DB) error {
+func (c *Canvas) validateIntegration(organizationID string, ref *IntegrationRef, component string, tx *gorm.DB, integrations map[uuid.UUID]*models.Integration) error {
 	if ref == nil || ref.ID == "" {
 		return fmt.Errorf("integration is required")
 	}
@@ -586,7 +591,12 @@ func (c *Canvas) validateIntegration(organizationID string, ref *IntegrationRef,
 	}
 
 	var integration *models.Integration
-	if tx != nil {
+	if integrations != nil {
+		integration = integrations[integrationID]
+		if integration == nil || integration.ID != integrationID || integration.OrganizationID != orgID {
+			err = gorm.ErrRecordNotFound
+		}
+	} else if tx != nil {
 		integration, err = models.FindIntegrationInTransaction(tx, orgID, integrationID)
 	} else {
 		integration, err = models.FindIntegration(orgID, integrationID)

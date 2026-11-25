@@ -182,7 +182,7 @@ func factoryForWebhooks(db *gorm.DB, organizationID, factoryRef string) (uuid.UU
 		return uuid.Nil, nil, err
 	}
 	if !workspaceWebhooksEnabled(organization) {
-		return uuid.Nil, nil, errCustomAutomationsDisabled
+		return uuid.Nil, nil, grpcerrors.FailedPrecondition(nil, "Webhooks are not enabled for this organization.")
 	}
 	factory, err := findFactory(db, orgID, factoryRef)
 	if err != nil {
@@ -193,7 +193,7 @@ func factoryForWebhooks(db *gorm.DB, organizationID, factoryRef string) (uuid.UU
 
 // Custom automation triggers and webhook intakes both listen on workspace webhooks.
 func workspaceWebhooksEnabled(organization *models.Organization) bool {
-	return organization.HasExperimentalFeature(features.FeatureFactoryCustomAutomations) ||
+	return organization.HasExperimentalFeature(features.FeatureFactoryAsCode) ||
 		organization.HasExperimentalFeature(features.FeatureFactoryWebhookIntake)
 }
 

@@ -27,7 +27,7 @@ export const FEATURE_MODEL_STATUS = "model_status";
 /** Organization experimental feature: custom model provider on the BYOK settings page. Requires organization BYOK. */
 export const FEATURE_ORGANIZATION_BYOK_CUSTOM_PROVIDER = "organization_byok_custom_provider";
 
-export const FEATURE_AUTOMATIONS_AS_CODE = "automations-as-code";
+export const FEATURE_FACTORY_AS_CODE = "factory-as-code";
 
 /** Organization experimental feature: Mergeable chip on task cards and Merge button on pull request review. */
 export const FEATURE_FACTORY_PULL_REQUEST_MERGE = "factory_pull_request_merge";
@@ -42,7 +42,7 @@ export const FEATURE_FACTORY_SCHEDULED_INTAKE = "factory_scheduled_intake";
 export const FEATURE_FACTORY_WEBHOOK_INTAKE = "factory_webhook_intake";
 
 /** Custom automation triggers and webhook intakes both use workspace webhooks. */
-export const WORKSPACE_WEBHOOK_FEATURES = [FEATURE_FACTORY_CUSTOM_AUTOMATIONS, FEATURE_FACTORY_WEBHOOK_INTAKE];
+export const WORKSPACE_WEBHOOK_FEATURES = [FEATURE_FACTORY_AS_CODE, FEATURE_FACTORY_WEBHOOK_INTAKE];
 
 /** Organization experimental feature: Actions timeline on a step card. Off until the organization enables it. */
 export const FEATURE_FACTORY_STEP_ACTIONS = "factory_step_actions";
