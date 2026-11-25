@@ -40,7 +40,7 @@ import { getApiErrorMessage } from "@/lib/errors";
 import { WORKSPACE_LOADING_COPY } from "@/lib/workspaceLoadingCopy";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
-import { FEATURE_AUTOMATIONS_AS_CODE, FEATURE_FACTORY_PULL_REQUEST_MERGE } from "@/lib/experimentalFeatures";
+import { FEATURE_FACTORY_AS_CODE, FEATURE_FACTORY_PULL_REQUEST_MERGE } from "@/lib/experimentalFeatures";
 import { useAutoLoadMoreOnScroll } from "@/hooks/useAutoLoadMoreOnScroll";
 import { Clock, Plus } from "lucide-react";
 import {
@@ -83,6 +83,7 @@ import { AddPRFeedbackPicker } from "./AddPRFeedbackPicker";
 import { useAddColumnAutomation } from "./useAddColumnAutomation";
 import { IntakeWebhookFailureNotice } from "./IntakeWebhookFailureNotice";
 import { useIntakeWebhookRetry } from "./useIntakeWebhookRetry";
+import { WebhookIntakeSetupDialog } from "./WebhookIntakeSetupDialog";
 import { NextStepsPanel, WorkspaceNextStepsHeaderBadge } from "./NextStepsPanel";
 import { useWorkspaceNextStepDeferral } from "./workspaceNextStepDeferral";
 import {
@@ -433,6 +434,7 @@ export function LinesPage() {
   );
   const [addIntakeOpen, setAddIntakeOpen] = useState(false);
   const [scheduledIntakeOpen, setScheduledIntakeOpen] = useState(false);
+  const [webhookIntakeOpen, setWebhookIntakeOpen] = useState(false);
   const [ownerIntakeTemplate, setOwnerIntakeTemplate] = useState<AddIntakeTemplate>();
   const [addPRFeedbackOpen, setAddPRFeedbackOpen] = useState(false);
   const [stageEditingLineId, setStageEditingLineId] = useState<string | null>(null);
@@ -672,6 +674,10 @@ export function LinesPage() {
       }
       return;
     }
+    if (template.id === "webhook") {
+      setWebhookIntakeOpen(true);
+      return;
+    }
     if (!isLineIntakeSourceId(template.id)) {
       showErrorToast("This intake template is not available yet.");
       return;
@@ -774,6 +780,15 @@ export function LinesPage() {
           }}
         />
       ) : null}
+      {webhookIntakeOpen ? (
+        <WebhookIntakeSetupDialog
+          organizationId={organizationId}
+          factoryId={factoryId}
+          factoryKey={routeSegment}
+          onClose={() => setWebhookIntakeOpen(false)}
+          onCreated={() => setWebhookIntakeOpen(false)}
+        />
+      ) : null}
       <AddIntakePicker
         open={addIntakeOpen}
         onClose={() => setAddIntakeOpen(false)}
@@ -806,7 +821,7 @@ export function LinesPage() {
         <CustomAutomationSetupModal
           key={customAutomationAutomationId ?? "new"}
           lineId={selectedLine.id}
-          yamlEnabled={hasExperimentalFeature(FEATURE_AUTOMATIONS_AS_CODE)}
+          yamlEnabled={hasExperimentalFeature(FEATURE_FACTORY_AS_CODE)}
           automationId={customAutomationAutomationId ?? undefined}
           columnKey={customAutomationColumn(new URLSearchParams(search).get("automationColumn"))}
           onClose={() => navigate(factoryHomePath(organizationId, routeSegment, selectedLine.id))}

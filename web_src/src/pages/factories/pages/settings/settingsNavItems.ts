@@ -14,6 +14,7 @@ import {
   Server,
   Settings,
   Users,
+  Webhook,
 } from "lucide-react";
 
 import type { FactorySettingsScope } from "../../lib/factoryPagePaths";
@@ -38,7 +39,8 @@ export type FactorySettingsSection =
   | "fleets"
   | "integrations"
   | "api-keys"
-  | "secrets";
+  | "secrets"
+  | "webhooks";
 
 export interface FactorySettingsNavItem {
   id: string;
@@ -202,6 +204,15 @@ export const FACTORY_SETTINGS_NAV_GROUPS: FactorySettingsNavGroup[] = [
           "inbound",
           "connect client",
         ],
+      },
+      {
+        id: "workspace-webhooks",
+        label: "Webhooks",
+        Icon: Webhook,
+        scope: "workspace",
+        section: "webhooks",
+        permission: { resource: "factories", action: "read" },
+        keywords: ["webhook url", "secret", "signature", "bearer token", "jira", "intake", "trigger"],
       },
       {
         id: "workspace-usage",

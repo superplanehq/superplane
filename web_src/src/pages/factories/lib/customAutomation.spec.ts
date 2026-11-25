@@ -7,7 +7,9 @@ import {
   newCustomAutomationTrigger,
   customAutomationModeCopy,
   customAutomationSettings,
+  customAutomationSettingsForTriggers,
   customAutomationSchedule,
+  customAutomationTriggers,
   customAutomationMode,
   workspaceAgentFromOnboarding,
 } from "./customAutomation";
@@ -238,6 +240,25 @@ describe("custom automation settings", () => {
     expect(automation?.canRunNow).toBe(true);
   });
 
+  it("does not offer Run for an automation that only a webhook starts", () => {
+    const [automation] = buildColumnAutomations("backlog", {
+      columnTitle: "Backlog",
+      apps: [
+        {
+          id: "webhook-intake",
+          name: "Webhook intake",
+          columnKey: "backlog",
+          templateId: "custom-verification",
+          customAutomationMode: "webhook",
+          customAutomationRunsOnTask: false,
+        },
+      ],
+    });
+
+    expect(automation?.trigger).toBe("When a webhook receives a request");
+    expect(automation?.canRunNow).toBeUndefined();
+  });
+
   it.each([
     ["backlog", "leave", false, ["backlog", "phase-0", "verify", "done"]],
     ["verify", "leave", false, ["backlog", "phase-0", "verify", "done"]],
@@ -312,13 +333,29 @@ describe("custom automation settings", () => {
 
 describe("trigger run context", () => {
   it.each([
-    [undefined, ["manual", "automatic", "leave", "scheduled"]],
+    [undefined, ["manual", "automatic", "leave", "scheduled", "webhook"]],
     [true, ["manual", "automatic", "leave"]],
-    [false, ["manual", "scheduled"]],
+    [false, ["manual", "scheduled", "webhook"]],
   ] as const)("filters triggers for runsOnTask=%s", (runsOnTask, expected) => {
-    const triggers = (["manual", "automatic", "leave", "scheduled"] as const).map((mode) =>
+    const triggers = (["manual", "automatic", "leave", "scheduled", "webhook"] as const).map((mode) =>
       newCustomAutomationTrigger(mode),
     );
     expect(customAutomationTriggersForRun(triggers, runsOnTask).map(({ mode }) => mode)).toEqual([...expected]);
+  });
+});
+
+describe("webhook triggers", () => {
+  it("saves a single webhook trigger with its webhook and reads it back", () => {
+    const trigger = newCustomAutomationTrigger("webhook", customAutomationSchedule(), "webhook-1");
+    const settings = customAutomationSettingsForTriggers([trigger], customAutomationDraft({}), "webhook", false);
+
+    expect(settings.startMode).toBe("START_MODE_WEBHOOK");
+    expect(settings.runsOnTask).toBe(false);
+    expect(settings.triggers).toEqual([
+      expect.objectContaining({ startMode: "START_MODE_WEBHOOK", webhookId: "webhook-1" }),
+    ]);
+    expect(customAutomationTriggers({ settings })).toEqual([
+      expect.objectContaining({ mode: "webhook", webhookId: "webhook-1" }),
+    ]);
   });
 });

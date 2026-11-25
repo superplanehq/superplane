@@ -2,6 +2,7 @@ package authorization
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -214,5 +215,75 @@ func TestTeamBillingMutationsRequireBillingPermission(t *testing.T) {
 				})
 			}
 		})
+	}
+}
+
+func TestFactoryAsCodeRoutesRequireFeatureAndPermission(t *testing.T) {
+	t.Cleanup(clearOrgExperimentalFeatureCacheForTest)
+	t.Cleanup(clearOrganizationPermissionCacheForTest)
+	org, err := models.CreateOrganization("configuration-auth-"+uuid.NewString()[:8], "")
+	require.NoError(t, err)
+	require.NoError(t, models.EnableExperimentalFeature(org.ID, features.FeatureFactories))
+
+	routes := []struct {
+		method string
+		path   string
+		action string
+	}{
+		{"GET", "/api/v1/factories/{factory_id}/configuration", "read"},
+		{"POST", "/api/v1/factories/{factory_id}/configuration:plan", "update"},
+		{"POST", "/api/v1/factories/{factory_id}/configuration:apply", "update"},
+		{"GET", "/api/v1/factories/{factory_id}/webhooks", "read"},
+		{"POST", "/api/v1/factories/{factory_id}/webhooks", "update"},
+		{"PATCH", "/api/v1/factories/{factory_id}/webhooks/{webhook_id}", "update"},
+		{"DELETE", "/api/v1/factories/{factory_id}/webhooks/{webhook_id}", "update"},
+		{"POST", "/api/v1/factories/{factory_id}/webhooks/{webhook_id}/secret", "update"},
+	}
+	for _, route := range routes {
+		t.Run(route.path+" disabled", func(t *testing.T) {
+			request := httptestRequest(t, map[string]string{"x-user-id": uuid.NewString(), "x-organization-id": org.ID.String()})
+			_, err := NewGatewayAuthorizer(allowingPermissionChecker{}).AuthorizeHTTP(t.Context(), request,
+				HTTPRoute{Method: route.method, Pattern: route.path}, nil)
+			require.Equal(t, codes.PermissionDenied, status.Code(err))
+		})
+	}
+
+	for _, feature := range []string{features.FeatureFactoryAsCode, features.FeatureFactoryWebhookIntake} {
+		clearOrgExperimentalFeatureCacheForTest()
+		require.NoError(t, models.DisableExperimentalFeature(org.ID, features.FeatureFactoryAsCode))
+		require.NoError(t, models.EnableExperimentalFeature(org.ID, feature))
+		for _, route := range routes {
+			if feature == features.FeatureFactoryWebhookIntake && !strings.Contains(route.path, "/webhooks") {
+				request := httptestRequest(t, map[string]string{"x-user-id": uuid.NewString(), "x-organization-id": org.ID.String()})
+				_, err := NewGatewayAuthorizer(allowingPermissionChecker{}).AuthorizeHTTP(t.Context(), request,
+					HTTPRoute{Method: route.method, Pattern: route.path}, nil)
+				require.Equal(t, codes.PermissionDenied, status.Code(err))
+				continue
+			}
+			t.Run(feature+route.path+" enabled", func(t *testing.T) {
+				permission := "factories:" + route.action
+				for _, scenario := range []struct {
+					name        string
+					permissions actionPermissionChecker
+					scopes      []string
+					want        codes.Code
+				}{
+					{"matching permission", actionPermissionChecker{permission: true}, []string{permission}, codes.OK},
+					{"missing permission", actionPermissionChecker{}, []string{permission}, codes.NotFound},
+					{"missing token scope", actionPermissionChecker{permission: true}, []string{"work_orders:read"}, codes.NotFound},
+				} {
+					t.Run(scenario.name, func(t *testing.T) {
+						request := httptestRequest(t, map[string]string{
+							"x-user-id":         uuid.NewString(),
+							"x-organization-id": org.ID.String(),
+							"x-token-scopes":    marshalScopes(t, scenario.scopes),
+						})
+						_, err := NewGatewayAuthorizer(scenario.permissions).AuthorizeHTTP(t.Context(), request,
+							HTTPRoute{Method: route.method, Pattern: route.path}, nil)
+						require.Equal(t, scenario.want, status.Code(err))
+					})
+				}
+			})
+		}
 	}
 }

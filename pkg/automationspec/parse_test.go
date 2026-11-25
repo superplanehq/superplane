@@ -71,6 +71,24 @@ steps:
 	}
 }
 
+func TestParseKeepsWebhookTriggers(t *testing.T) {
+	id := "1f0c3c55-4a8f-4a8e-9a43-2a7d8f6b6f10"
+	document, err := automationspec.Parse(definitionHeader + "triggers:\n  - use: webhook\n    config:\n      webhook_id: " + id + "\n" + bashStep)
+	if err != nil {
+		t.Fatal(err)
+	}
+	normalized, err := automationspec.Encode(document.Definition)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(normalized, "webhook_id: "+id) || strings.Contains(normalized, "cron") {
+		t.Fatalf("unexpected webhook trigger: %s", normalized)
+	}
+	if _, err := automationspec.Parse(normalized); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestParseAcceptsIntegralTimeout(t *testing.T) {
 	document, err := automationspec.Parse(definitionHeader + "timeout_seconds: 900.0\n" + manualTrigger + bashStep)
 	if err != nil {
@@ -114,6 +132,8 @@ func TestParseRejectsInvalidDefinitionAtItsSource(t *testing.T) {
 		{"missing integration name", definitionHeader + manualTrigger + bashStep + "agent: {harness: codex, credentials: {source: integration}}\n", "agent.credentials.name", 9, 38},
 		{"hosted credentials override", definitionHeader + manualTrigger + bashStep + "agent: {harness: superplane, credentials: {source: hosted}}\n", "agent.credentials", 9, 43},
 		{"extra document", definitionHeader + manualTrigger + bashStep + "---\nname: extra\n", "$", 9, 1},
+		{"webhook without ID", definitionHeader + "triggers:\n  - use: webhook\n    config: {cron: \"0 9 * * *\"}\n" + bashStep, "triggers[0].config.webhook_id", 6, 13},
+		{"invalid webhook ID", definitionHeader + "triggers:\n  - use: webhook\n    config: {webhook_id: jira}\n" + bashStep, "triggers[0].config.webhook_id", 6, 26},
 	}
 	for _, test := range cases {
 		t.Run(test.name, func(t *testing.T) {

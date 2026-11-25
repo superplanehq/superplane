@@ -20,6 +20,7 @@ const (
 	FactoryIntakeSourceDependabotAlerts   = "dependabot-alerts"
 	FactoryIntakeSourceDatadog            = "datadog"
 	FactoryIntakeSourceLinearIssues       = "linear-issues"
+	FactoryIntakeSourceWebhook            = "webhook"
 
 	FactoryIntakeInitialImportStatusUnspecified = "unspecified"
 	FactoryIntakeInitialImportStatusPending     = "pending"
@@ -46,6 +47,7 @@ var factoryIntakeSources = []string{
 	FactoryIntakeSourceDependabotAlerts,
 	FactoryIntakeSourceDatadog,
 	FactoryIntakeSourceLinearIssues,
+	FactoryIntakeSourceWebhook,
 }
 
 // FactoryIntake declares that a factory canvas listens to an external source,
@@ -237,6 +239,16 @@ func ListFactoryIntakesBySourceAfterID(tx *gorm.DB, source string, after uuid.UU
 // this before the canvas row goes away.
 func DeleteFactoryIntakesByCanvas(tx *gorm.DB, canvasID uuid.UUID) error {
 	return tx.Where("canvas_id = ?", canvasID).Delete(&FactoryIntake{}).Error
+}
+
+// FindFactoryIntakesByCanvasIDs reads attachments for loaded canvases so callers can check ownership.
+func FindFactoryIntakesByCanvasIDs(tx *gorm.DB, canvasIDs []uuid.UUID) ([]FactoryIntake, error) {
+	if len(canvasIDs) == 0 {
+		return nil, nil
+	}
+	var intakes []FactoryIntake
+	err := tx.Where("canvas_id IN ?", canvasIDs).Find(&intakes).Error
+	return intakes, err
 }
 
 // liveCanvasIntakes scopes intakes to canvases that still exist. A soft-deleted

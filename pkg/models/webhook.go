@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/superplanehq/superplane/pkg/database"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
@@ -21,6 +22,12 @@ const (
 	WebhookStateFailed       = "failed"
 )
 
+const (
+	WebhookAuthenticationBearer      = "bearer"
+	WebhookAuthenticationSignature   = "signature"
+	WebhookAuthenticationHeaderToken = "header_token"
+)
+
 type Webhook struct {
 	ID                uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
 	State             string
@@ -28,11 +35,66 @@ type Webhook struct {
 	Configuration     datatypes.JSONType[any]
 	Metadata          datatypes.JSONType[any]
 	AppInstallationID *uuid.UUID
+	OrganizationID    *uuid.UUID
+	FactoryID         *uuid.UUID
+	Name              *string
 	RetryCount        int `gorm:"default:0"`
 	MaxRetries        int `gorm:"default:3"`
 	CreatedAt         *time.Time
 	UpdatedAt         *time.Time
 	DeletedAt         gorm.DeletedAt `gorm:"index"`
+}
+
+// WebhookAuthenticationConfig is the configuration of a webhook that a user
+// manages in workspace settings.
+type WebhookAuthenticationConfig struct {
+	Authentication string `json:"authentication" mapstructure:"authentication"`
+	HeaderName     string `json:"headerName,omitempty" mapstructure:"headerName"`
+}
+
+var ErrWebhookNameAlreadyExists = errors.New("webhook name already exists")
+
+const webhookFactoryNameConstraint = "idx_webhooks_factory_name"
+
+// NewFactoryWebhook builds a webhook that a user manages in workspace settings.
+// The secret must already be encrypted with the webhook ID as associated data.
+func NewFactoryWebhook(id, organizationID, factoryID uuid.UUID, name string, config WebhookAuthenticationConfig, encryptedSecret []byte) Webhook {
+	now := time.Now()
+	return Webhook{
+		ID:             id,
+		State:          WebhookStateReady,
+		Secret:         encryptedSecret,
+		Configuration:  datatypes.NewJSONType[any](config),
+		Metadata:       datatypes.NewJSONType[any](map[string]any{}),
+		OrganizationID: &organizationID,
+		FactoryID:      &factoryID,
+		Name:           &name,
+		CreatedAt:      &now,
+		UpdatedAt:      &now,
+	}
+}
+
+// IsManaged reports whether a user manages this webhook in workspace settings.
+// A managed webhook outlives the automations that use it.
+func (w *Webhook) IsManaged() bool {
+	return w.FactoryID != nil
+}
+
+func (w *Webhook) DisplayName() string {
+	if w.Name == nil {
+		return ""
+	}
+	return *w.Name
+}
+
+func (w *Webhook) AuthenticationConfig() WebhookAuthenticationConfig {
+	var config WebhookAuthenticationConfig
+	raw, err := json.Marshal(w.Configuration.Data())
+	if err != nil {
+		return config
+	}
+	_ = json.Unmarshal(raw, &config)
+	return config
 }
 
 type WebhookResource struct {
@@ -221,6 +283,9 @@ func SoftDeleteWebhookIfUnreferenced(tx *gorm.DB, webhookID uuid.UUID) error {
 		}
 		return err
 	}
+	if webhook.IsManaged() {
+		return nil
+	}
 
 	nodes, err := FindActiveWebhookNodesInTransaction(tx, webhookID)
 	if err != nil {
@@ -231,6 +296,92 @@ func SoftDeleteWebhookIfUnreferenced(tx *gorm.DB, webhookID uuid.UUID) error {
 	}
 
 	return tx.Delete(webhook).Error
+}
+
+func (w *Webhook) Create(tx *gorm.DB) error {
+	return mapWebhookNameError(tx.Create(w).Error)
+}
+
+func (w *Webhook) UpdateSettings(tx *gorm.DB, name string, config WebhookAuthenticationConfig) error {
+	w.Name = &name
+	w.Configuration = datatypes.NewJSONType[any](config)
+	return mapWebhookNameError(tx.Model(w).Updates(map[string]any{
+		"name":          name,
+		"configuration": w.Configuration,
+		"updated_at":    time.Now(),
+	}).Error)
+}
+
+func (w *Webhook) ReplaceSecret(tx *gorm.DB, encrypted []byte) error {
+	w.Secret = encrypted
+	return tx.Model(w).Updates(map[string]any{
+		"secret":     encrypted,
+		"updated_at": time.Now(),
+	}).Error
+}
+
+// DeleteUnlessListening soft-deletes a workspace webhook when no live node listens on it.
+// The row lock conflicts with the share lock that a binding node takes, so a
+// concurrent publish cannot attach a node to a deleted webhook.
+func (w *Webhook) DeleteUnlessListening(tx *gorm.DB) (bool, error) {
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", w.ID).First(w).Error; err != nil {
+		return false, err
+	}
+	counts, err := CountActiveWebhookNodes(tx, []uuid.UUID{w.ID})
+	if err != nil {
+		return false, err
+	}
+	if counts[w.ID] > 0 {
+		return false, nil
+	}
+	return true, tx.Delete(w).Error
+}
+
+func ListFactoryWebhooks(tx *gorm.DB, organizationID, factoryID uuid.UUID) ([]Webhook, error) {
+	var webhooks []Webhook
+	err := tx.
+		Where("organization_id = ? AND factory_id = ?", organizationID, factoryID).
+		Order("name ASC").
+		Find(&webhooks).
+		Error
+	return webhooks, err
+}
+
+func FindFactoryWebhook(tx *gorm.DB, organizationID, factoryID, id uuid.UUID) (*Webhook, error) {
+	var webhook Webhook
+	err := tx.
+		Where("organization_id = ? AND factory_id = ? AND id = ?", organizationID, factoryID, id).
+		First(&webhook).
+		Error
+	if err != nil {
+		return nil, err
+	}
+	return &webhook, nil
+}
+
+// CountActiveWebhookNodes returns, per webhook, how many live nodes listen on it.
+func CountActiveWebhookNodes(tx *gorm.DB, webhookIDs []uuid.UUID) (map[uuid.UUID]int, error) {
+	counts := make(map[uuid.UUID]int, len(webhookIDs))
+	if len(webhookIDs) == 0 {
+		return counts, nil
+	}
+	var rows []struct {
+		WebhookID uuid.UUID
+		Count     int
+	}
+	query := tx.
+		Table("workflow_nodes").
+		Select("workflow_nodes.webhook_id AS webhook_id, COUNT(*) AS count").
+		Where("workflow_nodes.webhook_id IN ?", webhookIDs).
+		Where("workflow_nodes.deleted_at IS NULL").
+		Group("workflow_nodes.webhook_id")
+	if err := withActiveCanvas(query, "workflow_nodes.workflow_id").Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		counts[row.WebhookID] = row.Count
+	}
+	return counts, nil
 }
 
 func ListBitbucketForgeWebhooks(tx *gorm.DB, installationID, repositoryUUID string) ([]Webhook, error) {
@@ -330,4 +481,12 @@ func ResetStuckProvisioningWebhooks() (int64, error) {
 		})
 
 	return result.RowsAffected, result.Error
+}
+
+func mapWebhookNameError(err error) error {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.ConstraintName == webhookFactoryNameConstraint {
+		return ErrWebhookNameAlreadyExists
+	}
+	return err
 }

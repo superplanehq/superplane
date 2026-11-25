@@ -49,14 +49,30 @@
           "$ref": "#/$defs/nonblank",
           "description": "Use a unique ID within the automation."
         },
-        "use": { "enum": ["manual", "task_enters_stage", "task_leaves_stage", "pull_request_updated", "schedule"] },
+        "use": { "enum": ["manual", "task_enters_stage", "task_leaves_stage", "pull_request_updated", "schedule", "webhook"] },
         "config": true
       },
       "if": { "$ref": "#/$defs/isSchedule" },
       "then": { "required": ["config"], "properties": { "config": { "$ref": "#/$defs/schedule" } } },
-      "else": { "properties": { "config": false } }
+      "else": {
+        "if": { "$ref": "#/$defs/isWebhook" },
+        "then": { "required": ["config"], "properties": { "config": { "$ref": "#/$defs/webhook" } } },
+        "else": { "properties": { "config": false } }
+      }
     },
     "isSchedule": { "type": "object", "properties": { "use": { "const": "schedule" } }, "required": ["use"] },
+    "isWebhook": { "type": "object", "properties": { "use": { "const": "webhook" } }, "required": ["use"] },
+    "webhook": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["webhook_id"],
+      "properties": {
+        "webhook_id": {
+          "$ref": "#/$defs/nonblank",
+          "description": "Use the ID of a webhook from the workspace settings."
+        }
+      }
+    },
     "schedule": {
       "type": "object",
       "additionalProperties": false,

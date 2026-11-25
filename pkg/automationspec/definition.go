@@ -34,9 +34,9 @@ type Definition struct {
 }
 
 type Trigger struct {
-	ID     string     `yaml:"id,omitempty" json:"id,omitempty"`
-	Use    TriggerUse `yaml:"use" json:"use"`
-	Config *Schedule  `yaml:"config,omitempty" json:"config,omitempty"`
+	ID     string         `yaml:"id,omitempty" json:"id,omitempty"`
+	Use    TriggerUse     `yaml:"use" json:"use"`
+	Config *TriggerConfig `yaml:"config,omitempty" json:"config,omitempty"`
 }
 
 type TriggerUse string
@@ -47,11 +47,15 @@ const (
 	TaskLeavesStage    TriggerUse = "task_leaves_stage"
 	PullRequestUpdated TriggerUse = "pull_request_updated"
 	Scheduled          TriggerUse = "schedule"
+	Webhook            TriggerUse = "webhook"
 )
 
-type Schedule struct {
-	Cron      string  `yaml:"cron" json:"cron"`
+// TriggerConfig holds the schedule fields or the webhook ID. The schema
+// allows only the fields for the trigger type.
+type TriggerConfig struct {
+	Cron      string  `yaml:"cron,omitempty" json:"cron,omitempty"`
 	UTCOffset float64 `yaml:"utc_offset,omitempty" json:"utc_offset"`
+	WebhookID string  `yaml:"webhook_id,omitempty" json:"webhook_id,omitempty"`
 }
 
 type Step struct {
@@ -110,6 +114,19 @@ func Encode(definition Definition) (string, error) {
 	return encodeYAML(definition)
 }
 
+// ReplaceName updates the display name while preserving the authored definition.
+func ReplaceName(source, name string) (string, error) {
+	document, err := Parse(source)
+	if err != nil {
+		return "", err
+	}
+	if document.Name == name {
+		return source, nil
+	}
+	mappingProperty(document.root, "name").value.Value = name
+	return encodeYAML(document.root)
+}
+
 // ReplaceExplicitAgent updates a stored override after the factory switches providers.
 // A definition that inherits its agent keeps its exact authored source.
 func ReplaceExplicitAgent(source string, agent *Agent) (string, error) {
@@ -160,6 +177,17 @@ func encodeYAML(value any) (string, error) {
 		return "", fmt.Errorf("close automation definition: %w", err)
 	}
 	return source.String(), nil
+}
+
+// ValidateDispatch checks an automation bound to a line's execution plan.
+func ValidateDispatch(document *Document) error {
+	if len(document.Triggers) != 1 || document.Triggers[0].Use != Manual {
+		return document.Diagnostic("triggers", "A phase requires exactly one manual trigger.")
+	}
+	if document.RunsOnTask != nil && !*document.RunsOnTask {
+		return document.Diagnostic("runs_on_task", "A phase runs on a task.")
+	}
+	return nil
 }
 
 func ValidateStage(document *Document, stage Stage) error {

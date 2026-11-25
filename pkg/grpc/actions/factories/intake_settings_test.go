@@ -1332,7 +1332,7 @@ func Test__applyIntakeSettingsToGraph_Datadog(t *testing.T) {
 
 func TestIntakeDefaultOwnerGraphUpdates(t *testing.T) {
 	owner := "3ea1cf96-c943-4891-8e90-172519547bee"
-	for _, source := range []string{models.FactoryIntakeSourceGitHubIssues, models.FactoryIntakeSourceSentryExceptions, models.FactoryIntakeSourceJiraIssues, models.FactoryIntakeSourceDependabotAlerts, models.FactoryIntakeSourcePagerDutyIncidents, models.FactoryIntakeSourceProductiveTasks, models.FactoryIntakeSourceDatadog, models.FactoryIntakeSourceLinearIssues} {
+	for _, source := range []string{models.FactoryIntakeSourceGitHubIssues, models.FactoryIntakeSourceSentryExceptions, models.FactoryIntakeSourceJiraIssues, models.FactoryIntakeSourceDependabotAlerts, models.FactoryIntakeSourcePagerDutyIncidents, models.FactoryIntakeSourceProductiveTasks, models.FactoryIntakeSourceDatadog, models.FactoryIntakeSourceLinearIssues, models.FactoryIntakeSourceWebhook} {
 		t.Run(source, func(t *testing.T) {
 			nodes := []models.Node{{ID: "custom-create", Configuration: map[string]any{"title": "keep", "defaultOwnerId": owner}}}
 			graph := intakeGraph{CreateNodeID: "custom-create"}

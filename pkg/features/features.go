@@ -37,6 +37,10 @@ const FeatureFactoryDatadogIntake = "factory_datadog_intake"
 
 const FeatureFactoryScheduledIntake = "factory_scheduled_intake"
 
+// FeatureFactoryWebhookIntake gates new webhook intakes. Existing webhook
+// intakes continue to create tasks when the organization disables it.
+const FeatureFactoryWebhookIntake = "factory_webhook_intake"
+
 // FeatureFactoryReviewRequest gates new reviewer-request automations. Existing
 // automations continue to run when the organization disables discovery.
 const FeatureFactoryReviewRequest = "factory_review_request"
@@ -52,7 +56,8 @@ const FeatureModelStatus = "model_status"
 // organization Models page. It requires FeatureOrganizationBYOK as well.
 const FeatureOrganizationBYOKCustomProvider = "organization_byok_custom_provider"
 
-const FeatureAutomationsAsCode = "automations-as-code"
+// FeatureFactoryAsCode gates YAML custom automations and workspace configuration.
+const FeatureFactoryAsCode = "factory-as-code"
 
 // FeatureWorkspaceSkills gates workspace skill settings, skill APIs, and skill attach.
 const FeatureWorkspaceSkills = "workspace_skills"
@@ -92,10 +97,11 @@ var registry = []Feature{
 	{ID: FeatureFactoryScheduledIntake, Label: "Scheduled Intake", Description: "Propose backlog tasks on a schedule"},
 	{ID: FeatureFactoryReviewRequest, Label: "Review request", Description: "Request human reviews after Merge confidence completes"},
 	{ID: FeatureFactoryDatadogIntake, Label: "Factory Datadog Intake", Description: "Add Datadog intake from the Backlog column menu"},
+	{ID: FeatureFactoryWebhookIntake, Label: "Factory Webhook Intake", Description: "Add webhook intake from the Backlog column menu"},
 	{ID: FeatureOrganizationBYOK, Label: "Organization BYOK", Description: "Show the organization Models settings page"},
 	{ID: FeatureModelStatus, Label: "Model status", Description: "Show the hosted Model status page in organization settings"},
 	{ID: FeatureOrganizationBYOKCustomProvider, Label: "Organization BYOK Custom Provider", Description: "Add a custom model provider with a URL, token, and API type"},
-	{ID: FeatureAutomationsAsCode, Label: "Automations as code", Description: "Edit custom automations in YAML or through the API"},
+	{ID: FeatureFactoryAsCode, Label: "Factory as code", Description: "Export, plan, and apply stage and automation configuration from YAML"},
 	{ID: FeatureWorkspaceSkills, Label: "Workspace Skills", Description: "Add skills for workspace agents"},
 	{ID: FeatureFactoryPullRequestMerge, Label: "Pull Request Merge", Description: "Show the Mergeable chip on task cards and the Merge button on pull request review"},
 	{ID: FeatureSuperPlaneMCPServer, Label: "MCP Server", Description: "Allow Cursor and other MCP clients to connect to workspaces in this organization", Released: released()},
