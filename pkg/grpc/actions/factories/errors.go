@@ -11,7 +11,6 @@ import (
 	ghcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 	ghdependabot "github.com/superplanehq/superplane/pkg/integrations/github/dependabot"
 	"github.com/superplanehq/superplane/pkg/integrations/jira"
-	"github.com/superplanehq/superplane/pkg/integrations/productive"
 	"github.com/superplanehq/superplane/pkg/integrations/sentry"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
@@ -360,7 +359,7 @@ func liveIntakeSourceStatus(err error) (int, bool) {
 	if status, ok := sentry.StatusCode(err); ok {
 		return status, true
 	}
-	return productive.StatusCode(err)
+	return 0, false
 }
 
 func invalidArgument(message string) error {

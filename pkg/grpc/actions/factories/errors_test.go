@@ -13,7 +13,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations/datadog"
 	ghdependabot "github.com/superplanehq/superplane/pkg/integrations/github/dependabot"
 	"github.com/superplanehq/superplane/pkg/integrations/jira"
-	"github.com/superplanehq/superplane/pkg/integrations/productive"
 	"github.com/superplanehq/superplane/pkg/integrations/sentry"
 	"github.com/superplanehq/superplane/pkg/models"
 	"google.golang.org/grpc/codes"
@@ -207,7 +206,6 @@ func liveIntakeClientErrors() []liveIntakeClientError {
 		{name: "GitHub", statusError: githubAPIError},
 		{name: "Jira", statusError: func(status int) error { return &jira.APIError{StatusCode: status} }},
 		{name: "Sentry", statusError: sentry.StatusError},
-		{name: "Productive", statusError: productive.StatusError},
 	}
 }
 

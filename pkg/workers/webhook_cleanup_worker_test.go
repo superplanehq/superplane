@@ -36,6 +36,21 @@ func Test__WebhookCleanupWorker_DeletesWebhookWhenProviderCleanupFails(t *testin
 	assert.Equal(t, 1, cleanupCalls)
 }
 
+func Test__WebhookCleanupWorker_DeletesRetiredProductiveWebhook(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	worker, webhookID := setupWebhookCleanupWorker(t, r, nil)
+	integrationID := integrationIDForWebhook(t, webhookID)
+	require.NoError(t, database.Conn().Model(&models.Integration{}).
+		Where("id = ?", integrationID).
+		Update("app_name", "productive").Error)
+
+	require.NoError(t, worker.LockAndProcessWebhook(logrus.NewEntry(logrus.New()), models.Webhook{ID: webhookID}))
+
+	assertWebhookHardDeleted(t, webhookID)
+}
+
 func Test__WebhookCleanupWorker_PersistsIntegrationMetadataClearedByCleanup(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()

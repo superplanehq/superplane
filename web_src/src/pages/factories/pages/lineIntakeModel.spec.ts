@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { FEATURE_FACTORY_DATADOG_INTAKE, FEATURE_FACTORY_PRODUCTIVE_INTAKE } from "@/lib/experimentalFeatures";
+import { FEATURE_FACTORY_DATADOG_INTAKE } from "@/lib/experimentalFeatures";
 
 import {
   ADD_INTAKE_TEMPLATES,
@@ -16,14 +16,13 @@ import {
 } from "./lineIntakeModel";
 
 describe("lineIntakeModel", () => {
-  it("defines GitHub, Jira, Sentry, PagerDuty, Productive.io, and Datadog as automations that feed Backlog", () => {
+  it("defines GitHub, Jira, Sentry, PagerDuty, and Datadog as automations that feed Backlog", () => {
     expect(LINE_INTAKE_SOURCES.map((source) => source.id)).toEqual([
       "github-issues",
       "dependabot-alerts",
       "jira-issues",
       "sentry-exceptions",
       "pagerduty-incidents",
-      "productive-tasks",
       "datadog",
       "linear-issues",
     ]);
@@ -343,7 +342,7 @@ describe("lineIntakeModel", () => {
     expect(canvas?.nodes.map((node) => node.component)).toEqual(["github.onIssue", "createWorkOrder"]);
   });
 
-  it("builds Sentry, PagerDuty, and Productive.io canvases from catalogue triggers", () => {
+  it("builds Sentry and PagerDuty canvases from catalogue triggers", () => {
     const sentry = intakeAutomationFixture(lineIntakeSourceById("sentry-exceptions")!);
     expect(sentry.phases[0]?.canvas?.nodes.map((node) => node.component)).toEqual([
       "sentry.onIssue",
@@ -372,12 +371,6 @@ describe("lineIntakeModel", () => {
       "pagerduty.onIncident",
       "createWorkOrder",
     ]);
-
-    const productive = intakeAutomationFixture(lineIntakeSourceById("productive-tasks")!);
-    expect(productive.phases[0]?.canvas?.nodes.map((node) => node.component)).toEqual([
-      "productive.onTask",
-      "createWorkOrder",
-    ]);
   });
 
   it("hides Dependabot alerts for GitHub Enterprise Server", () => {
@@ -393,21 +386,21 @@ describe("lineIntakeModel", () => {
     expect(templates.find((template) => template.id === "dependabot-alerts")?.soon).toBeFalsy();
     expect(templates.find((template) => template.id === "jira-issues")?.soon).toBeFalsy();
     expect(templates.find((template) => template.id === "sentry-exceptions")?.soon).toBeFalsy();
-    expect(templates.find((template) => template.id === "productive-tasks")?.soon).toBe(true);
+    expect(templates.find((template) => template.id === "productive-tasks")).toBeUndefined();
     expect(templates.find((template) => template.id === "datadog")?.soon).toBe(true);
     expect(templates.find((template) => template.id === "linear-issues")?.soon).toBeFalsy();
     expect(templates.find((template) => template.id === "notion")?.soon).toBe(true);
   });
 
-  it("keeps Productive.io and Datadog live when their organization features are on", () => {
+  it("keeps Datadog live and excludes Productive when all organization features are on", () => {
     const templates = addIntakeTemplatesForOrg((featureId) =>
-      [FEATURE_FACTORY_DATADOG_INTAKE, FEATURE_FACTORY_PRODUCTIVE_INTAKE].includes(featureId),
+      [FEATURE_FACTORY_DATADOG_INTAKE, "factory_productive_intake"].includes(featureId),
     );
 
     expect(templates.find((template) => template.id === "dependabot-alerts")?.soon).toBeFalsy();
     expect(templates.find((template) => template.id === "jira-issues")?.soon).toBeFalsy();
     expect(templates.find((template) => template.id === "sentry-exceptions")?.soon).toBeFalsy();
-    expect(templates.find((template) => template.id === "productive-tasks")?.soon).toBeFalsy();
+    expect(templates.find((template) => template.id === "productive-tasks")).toBeUndefined();
     expect(templates.find((template) => template.id === "datadog")?.soon).toBeFalsy();
     expect(templates.find((template) => template.id === "linear-issues")?.soon).toBeFalsy();
   });
@@ -420,7 +413,6 @@ describe("lineIntakeModel", () => {
       expect(apiIntakeSource(template.id)).toBeDefined();
     }
 
-    expect(apiIntakeSource("productive-tasks")).toBe("SOURCE_PRODUCTIVE_TASKS");
     expect(apiIntakeSource("dependabot-alerts")).toBe("SOURCE_DEPENDABOT_ALERTS");
     expect(apiIntakeSource("linear-issues")).toBe("SOURCE_LINEAR_ISSUES");
   });

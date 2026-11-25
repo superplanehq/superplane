@@ -5,7 +5,7 @@ import { BACKLOG_REFRESH_COPY, backlogRefreshToast, canRefreshBacklog, hasRefres
 describe("hasRefreshableIntake", () => {
   it("accepts intake sources that support item lookup", () => {
     expect(hasRefreshableIntake([{ source: "SOURCE_GITHUB_ISSUES" }])).toBe(true);
-    expect(hasRefreshableIntake([{ source: "SOURCE_PRODUCTIVE_TASKS" }])).toBe(true);
+    expect(hasRefreshableIntake([{ source: "SOURCE_JIRA_ISSUES" }])).toBe(true);
   });
 
   it("rejects intake sources that cannot look up items", () => {
