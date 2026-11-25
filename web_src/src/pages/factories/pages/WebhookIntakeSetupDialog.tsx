@@ -18,6 +18,7 @@ import { IntakeSetupDefaultOwner } from "./IntakeDefaultOwnerField";
 import { WebhookAuthenticationField, WebhookSecretDialog } from "./settings/FactorySettingsWebhooksPage";
 import { useWebhookIntakeSetup, type WebhookIntakeMode, type WebhookIntakeSetupModel } from "./useWebhookIntakeSetup";
 import { WebhookIntakeFieldPathInputs } from "./WebhookIntakeFieldPathInputs";
+import { webhookIntakeExampleBody } from "./webhookIntakeFieldPaths";
 import { WEBHOOK_INTAKE_SETUP_COPY } from "./webhookIntakeSetupCopy";
 
 interface WebhookIntakeSetupDialogProps {
@@ -34,7 +35,13 @@ export function WebhookIntakeSetupDialog(props: WebhookIntakeSetupDialogProps) {
   const fieldsStep = step === "fields";
 
   if (setup.reveal) {
-    return <WebhookSecretDialog reveal={setup.reveal} onClose={props.onCreated} />;
+    return (
+      <WebhookSecretDialog
+        reveal={setup.reveal}
+        payload={webhookIntakeExampleBody(setup.paths)}
+        onClose={props.onCreated}
+      />
+    );
   }
 
   const submit = () => {

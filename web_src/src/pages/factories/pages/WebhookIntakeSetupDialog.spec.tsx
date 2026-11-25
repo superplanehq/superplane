@@ -69,6 +69,7 @@ describe("WebhookIntakeSetupDialog", () => {
     await user.click(screen.getByTestId("webhook-intake-setup-finish"));
 
     expect(await screen.findByTestId("factory-webhook-secret")).toHaveTextContent("secret-value");
+    expect(screen.getByTestId("factory-webhook-secret-example").textContent).toContain('"issue": {\n    "title"');
     expect(mocks.createIntake).toHaveBeenCalledWith({
       source: "SOURCE_WEBHOOK",
       resourceId: "webhook-new",

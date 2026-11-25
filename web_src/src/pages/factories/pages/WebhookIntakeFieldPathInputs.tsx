@@ -1,5 +1,6 @@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { HighlightedCode } from "@/ui/HighlightedCode";
 import { ChevronRight } from "lucide-react";
 
 import {
@@ -70,12 +71,12 @@ export function WebhookIntakeFieldPathInputs({
           <ChevronRight className="size-3.5 transition-transform group-open:rotate-90" aria-hidden />
           {WEBHOOK_INTAKE_FIELDS_COPY.exampleLabel}
         </summary>
-        <pre
-          className="overflow-x-auto border-t border-border bg-muted/40 px-3 py-2 text-[12px] leading-relaxed text-foreground"
-          data-testid={`${idPrefix}-example-body`}
-        >
-          {webhookIntakeExampleBody(paths)}
-        </pre>
+        <HighlightedCode
+          code={webhookIntakeExampleBody(paths)}
+          language="json"
+          className="border-t border-border bg-muted/40 px-3 py-2"
+          testId={`${idPrefix}-example-body`}
+        />
       </details>
     </div>
   );
