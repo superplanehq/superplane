@@ -114,7 +114,6 @@ func (s *factoryLineStagesSteps) start() {
 	s.session.Start()
 	s.session.Login()
 	require.NoError(s.t, models.EnableExperimentalFeature(s.session.OrgID, features.FeatureFactories))
-	require.NoError(s.t, models.EnableExperimentalFeature(s.session.OrgID, features.FeatureFactoryCustomAutomations))
 }
 
 func (s *factoryLineStagesSteps) givenALine() {
