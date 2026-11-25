@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
@@ -81,13 +80,6 @@ func UpdateFactoryLine(ctx context.Context, deps IntakeDependencies, organizatio
 		}
 
 		if req.StageConfiguration != nil {
-			organization, findErr := models.FindOrganizationByIDInTransaction(tx, orgID.String())
-			if findErr != nil {
-				return findErr
-			}
-			if !organization.HasExperimentalFeature(features.FeatureFactoryCustomAutomations) {
-				return errCustomAutomationsDisabled
-			}
 			stages, err = parseFactoryLineStages(line, req.GetStageConfiguration().GetStages())
 			if err != nil {
 				return err

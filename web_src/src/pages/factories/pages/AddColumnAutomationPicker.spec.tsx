@@ -22,12 +22,7 @@ describe("AddColumnAutomationPicker", () => {
 
   it("offers the catalog for the column", () => {
     render(
-      <AddColumnAutomationPicker
-        open
-        onClose={vi.fn()}
-        onSelect={vi.fn()}
-        catalog={catalogForColumn("verify", { allowCustom: true })}
-      />,
+      <AddColumnAutomationPicker open onClose={vi.fn()} onSelect={vi.fn()} catalog={catalogForColumn("verify")} />,
     );
 
     expect(screen.getByRole("heading", { name: "Add automation" })).toBeInTheDocument();

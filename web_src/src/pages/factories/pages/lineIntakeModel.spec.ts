@@ -389,6 +389,7 @@ describe("lineIntakeModel", () => {
   it("keeps Jira and Linear live when other flagged intake sources are off", () => {
     const templates = addIntakeTemplatesForOrg(() => false);
 
+    expect(templates.find((template) => template.id === "custom-verification")?.soon).toBeFalsy();
     expect(templates.find((template) => template.id === "github-issues")?.soon).toBeFalsy();
     expect(templates.find((template) => template.id === "dependabot-alerts")?.soon).toBeFalsy();
     expect(templates.find((template) => template.id === "jira-issues")?.soon).toBeFalsy();

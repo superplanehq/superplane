@@ -14,7 +14,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	factoryactions "github.com/superplanehq/superplane/pkg/grpc/actions/factories"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
@@ -107,7 +106,6 @@ func Test__NodeRequestExecutor_CustomScheduleLifecycle(t *testing.T) {
 	}))
 	repository, branch, integrationID := "acme/app", "main", integration.ID.String()
 	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{AppRepository: &repository, DefaultBranch: &branch, VCSIntegrationID: &integrationID}))
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
 	support.AssignOpenSystemTrial(t, r.Organization.ID)
 	claudeIntegration, err := models.CreateIntegration(uuid.New(), r.Organization.ID, "claude", support.RandomName("claude"), map[string]any{
 		"apiKey": base64.StdEncoding.EncodeToString([]byte("test-claude-key")),

@@ -37,7 +37,6 @@ func TestCustomAutomationScheduleRoundTripAndTransitions(t *testing.T) {
 			r := support.Setup(t)
 			db := database.DB(t.Context())
 			factory := seedHandOffFactory(t, r, db)
-			require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
 			integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, provider)
 			require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSProvider: &provider, VCSIntegrationID: &integrationID}))
 			r.Registry.Integrations[provider] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{
@@ -157,7 +156,6 @@ func TestCustomAutomationCustomStageFormRoundTrip(t *testing.T) {
 			r := support.Setup(t)
 			db := database.DB(t.Context())
 			factory := seedHandOffFactory(t, r, db)
-			require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
 			vcsID := ""
 			if test.withVCS {
 				vcsID = createReadyOnboardingIntegration(t, r.Organization.ID, models.ProviderGitHub)
@@ -219,7 +217,6 @@ func TestCustomAutomationSkipSetupCommandsPersistence(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 	factory := seedHandOffFactory(t, r, db)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
 	integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
 	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSIntegrationID: &integrationID}))
 	ctx, deps, orgID := onboardingContext(r), onboardingDeps(r), r.Organization.ID.String()
@@ -306,7 +303,7 @@ func TestCustomAutomationExplicitIntegrationPreservesProvider(t *testing.T) {
 		t.Run(test.app, func(t *testing.T) {
 			r := support.Setup(t)
 			support.AssignOpenSystemTrial(t, r.Organization.ID)
-			for _, feature := range []string{features.FeatureFactoryCustomAutomations, features.FeatureOrganizationBYOK, features.FeatureOrganizationBYOKCustomProvider} {
+			for _, feature := range []string{features.FeatureOrganizationBYOK, features.FeatureOrganizationBYOKCustomProvider} {
 				require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, feature))
 			}
 			db := database.DB(t.Context())
@@ -363,7 +360,6 @@ func TestBacklogCustomAutomationLifecycle(t *testing.T) {
 	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
 	db := database.DB(t.Context())
 	factory := seedHandOffFactory(t, r, db)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
 	integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
 	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSIntegrationID: &integrationID}))
 	ctx, deps := onboardingContext(r), onboardingDeps(r)
@@ -557,7 +553,6 @@ func TestBacklogScheduledCustomAutomationCreatesATask(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 	factory := seedHandOffFactory(t, r, db)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
 	integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
 	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSIntegrationID: &integrationID}))
 	ctx, deps := onboardingContext(r), onboardingDeps(r)
@@ -641,7 +636,6 @@ func TestCustomAutomationMultipleTriggers(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 	factory := seedHandOffFactory(t, r, db)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
 	integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
 	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSIntegrationID: &integrationID}))
 	ctx, deps := onboardingContext(r), onboardingDeps(r)
@@ -822,7 +816,6 @@ func TestVerifyCustomAutomationRunsOncePerWorkspaceRepositoryPullRequest(t *test
 	db := database.DB(t.Context())
 	ctx, deps := onboardingContext(r), onboardingDeps(r)
 	factory := seedHandOffFactory(t, r, db)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
 	integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
 	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSIntegrationID: &integrationID}))
 	_, err := factory.CreateAgentResource(db, models.FactoryAgentResourceKindContextRepo, "", true, models.FactoryAgentResourceConfig{
@@ -1027,7 +1020,6 @@ func TestCustomAutomationPreservesSubscriptionAgentOnUpdate(t *testing.T) {
 			r := support.Setup(t)
 			db := database.DB(t.Context())
 			factory := seedHandOffFactory(t, r, db)
-			require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
 			integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
 			subscription := true
 			harness := models.FactoryOnboardingAgentHarnessCodex
@@ -1118,7 +1110,6 @@ func TestCustomAutomationUsesTheWorkspaceAgentWhenTheHarnessDiffers(t *testing.T
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 	factory := seedHandOffFactory(t, r, db)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
 	vcsID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
 	customID := createReadyOnboardingIntegration(t, r.Organization.ID, models.CustomLLMAppName)
 	claudeID := createReadyOnboardingIntegration(t, r.Organization.ID, "claude")
@@ -1159,7 +1150,6 @@ func TestCustomAutomationSuperPlaneAgentOmitsCredentials(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 	factory := seedHandOffFactory(t, r, db)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
 	integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
 	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
 		VCSIntegrationID: &integrationID,
@@ -1253,7 +1243,6 @@ func TestCustomAutomationKeepsAUserStepNamedWriteTaskResult(t *testing.T) {
 			r := support.Setup(t)
 			db := database.DB(t.Context())
 			factory := seedHandOffFactory(t, r, db)
-			require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
 			integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
 			require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSIntegrationID: &integrationID}))
 			ctx, deps, orgID := onboardingContext(r), onboardingDeps(r), r.Organization.ID.String()
@@ -1329,7 +1318,6 @@ func TestImplementAndDoneCustomAutomationsStartFromTheTask(t *testing.T) {
 			r := support.Setup(t)
 			db := database.DB(t.Context())
 			factory := seedHandOffFactory(t, r, db)
-			require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
 			integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
 			require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSIntegrationID: &integrationID}))
 			ctx, deps := onboardingContext(r), onboardingDeps(r)
@@ -1367,7 +1355,6 @@ func TestCustomAutomationWithoutTaskStartsFromTheColumn(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 	factory := seedHandOffFactory(t, r, db)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
 	integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
 	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSIntegrationID: &integrationID}))
 	ctx, deps := onboardingContext(r), onboardingDeps(r)
@@ -1435,7 +1422,6 @@ func TestColumnLeaveAutomationListensForTheTaskOnEveryColumn(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 	factory := seedHandOffFactory(t, r, db)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
 	integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
 	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSIntegrationID: &integrationID}))
 	ctx, deps := onboardingContext(r), onboardingDeps(r)
@@ -1471,7 +1457,6 @@ func TestColumnLeaveAutomationStartsWhenTheTaskLeavesBacklog(t *testing.T) {
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 	db := database.DB(t.Context())
 	factory := seedHandOffFactory(t, r, db)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
 	integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
 	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSIntegrationID: &integrationID}))
 	app, entry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "ship-step", "start-ship")
