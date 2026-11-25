@@ -185,6 +185,10 @@ func inspectFactoryConfigurationTarget(tx *gorm.DB, factory *models.Factory, lin
 	for i := range canvases {
 		byCanvas[canvases[i].ID] = &canvases[i]
 	}
+	versions, err := models.FindLiveCanvasVersions(tx, canvases)
+	if err != nil {
+		return nil, err
+	}
 	for _, stage := range target.stages {
 		if stage.stage.Kind != models.FactoryLineStagePhase {
 			continue
@@ -198,7 +202,7 @@ func inspectFactoryConfigurationTarget(tx *gorm.DB, factory *models.Factory, lin
 		if step.Type != models.FactoryLineStepTypeRunApp || canvas == nil {
 			return nil, unsupportedConfigurationTarget("A phase must have a workspace automation runner.")
 		}
-		automation, err := inspectConfigurationAutomation(tx, factory, canvas, "phase-"+strconv.Itoa(*index))
+		automation, err := inspectConfigurationAutomation(tx, factory, canvas, versions[canvas.ID], "phase-"+strconv.Itoa(*index))
 		if err != nil {
 			return nil, err
 		}
@@ -218,9 +222,9 @@ func inspectFactoryConfigurationTarget(tx *gorm.DB, factory *models.Factory, lin
 			placement = "phase-0"
 		}
 		if placement == "" && canvas.LiveVersionID != nil {
-			version, err := models.FindLiveCanvasVersionByCanvasInTransaction(tx, canvas)
-			if err != nil {
-				return nil, err
+			version := versions[canvas.ID]
+			if version == nil {
+				return nil, gorm.ErrRecordNotFound
 			}
 			template, builtIn, err := liveBuiltInAutomationTemplateID(tx, factory, canvas, version)
 			if err != nil {
@@ -252,7 +256,7 @@ func inspectFactoryConfigurationTarget(tx *gorm.DB, factory *models.Factory, lin
 		if placement == "phase-0" {
 			compilerPlacement = "implement"
 		}
-		automation, err := inspectConfigurationAutomation(tx, factory, canvas, compilerPlacement)
+		automation, err := inspectConfigurationAutomation(tx, factory, canvas, versions[canvas.ID], compilerPlacement)
 		if err != nil {
 			return nil, err
 		}
@@ -292,13 +296,12 @@ func inspectFactoryConfigurationTarget(tx *gorm.DB, factory *models.Factory, lin
 	return target, nil
 }
 
-func inspectConfigurationAutomation(tx *gorm.DB, factory *models.Factory, canvas *models.Canvas, placement string) (*factoryConfigurationAutomationTarget, error) {
+func inspectConfigurationAutomation(tx *gorm.DB, factory *models.Factory, canvas *models.Canvas, version *models.CanvasVersion, placement string) (*factoryConfigurationAutomationTarget, error) {
 	if canvas.LiveVersionID == nil {
 		return nil, unsupportedConfigurationTarget(fmt.Sprintf("Automation %q must be published before export.", canvas.Name))
 	}
-	version, err := models.FindLiveCanvasVersionByCanvasInTransaction(tx, canvas)
-	if err != nil {
-		return nil, err
+	if version == nil {
+		return nil, gorm.ErrRecordNotFound
 	}
 	automation := &factoryConfigurationAutomationTarget{canvas: canvas, version: version, placement: placement}
 	template, builtIn, err := liveBuiltInAutomationTemplateID(tx, factory, canvas, version)
