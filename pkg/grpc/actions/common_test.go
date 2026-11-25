@@ -21,6 +21,25 @@ import (
 var _ = registryimports.Loaded
 
 func TestConfigurationFieldToProto(t *testing.T) {
+	t.Run("preserves disabled select options through the API", func(t *testing.T) {
+		field := configuration.Field{
+			Name: "githubLocation",
+			Type: configuration.FieldTypeSelect,
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: []configuration.FieldOption{
+						{Label: "GitHub Enterprise Cloud", Value: "enterprise-cloud", Disabled: true},
+					},
+				},
+			},
+		}
+
+		serialized := ConfigurationFieldToProto(field)
+		require.True(t, serialized.TypeOptions.Select.Options[0].Disabled)
+		parsed := ProtoToConfigurationField(serialized)
+		assert.True(t, parsed.TypeOptions.Select.Options[0].Disabled)
+	})
+
 	t.Run("roundtrip string default value does not introduce extra quotes", func(t *testing.T) {
 		original := "https://example.com/webhook"
 

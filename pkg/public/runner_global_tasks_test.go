@@ -2,6 +2,7 @@ package public
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 	"testing"
@@ -56,6 +57,41 @@ func TestRunnerListsTasksByState(t *testing.T) {
 	rec = runnerRequest(t, server, http.MethodGet, token, "/api/v1/runner/tasks?limit=100000", "")
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 	assert.NotContains(t, rec.Body.String(), "Stop the retry loop.")
+}
+
+func TestRunnerListsSavedTaskOrigins(t *testing.T) {
+	r := support.Setup(t)
+	t.Setenv("JWT_SECRET", "test")
+	ctx, factory, manual := mustTaskLinkedAgentRun(t, r)
+	server := newRunnerArtifactTestServer(t, r, jwt.NewSigner("test"))
+	token := runnerTokenFrom(runner.AttachRunnerEnv(ctx, nil, 60))
+	require.NotEmpty(t, token)
+
+	issueURL := "https://github.com/acme/widgets/issues/9876"
+	issueLabel := "GitHub issue #9876"
+	linked, err := factory.CreateWorkOrderWithOrigin(database.DB(t.Context()), "Imported issue", "", nil, nil, nil,
+		models.WorkOrderOrigin{URL: issueURL, Label: issueLabel})
+	require.NoError(t, err)
+	require.NotEqual(t, int64(9876), linked.Number)
+
+	rec := runnerRequest(t, server, http.MethodGet, token, "/api/v1/runner/tasks", "")
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	var body struct {
+		Tasks []map[string]any `json:"tasks"`
+	}
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	require.Len(t, body.Tasks, 2)
+	for _, task := range body.Tasks {
+		switch task["id"] {
+		case linked.ID.String():
+			assert.Equal(t, map[string]any{"url": issueURL, "label": issueLabel}, task["origin"])
+			assert.Equal(t, fmt.Sprintf("%s/%s/workspaces/%s/task/%d", server.BaseURL, factory.OrganizationID, factory.RouteSegment(), linked.Number), task["url"])
+		case manual.ID.String():
+			assert.NotContains(t, task, "origin")
+		default:
+			t.Fatalf("unexpected task: %v", task["id"])
+		}
+	}
 }
 
 func TestScheduleAutomationCreatesATaskWithoutAnExistingTask(t *testing.T) {

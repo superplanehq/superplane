@@ -128,6 +128,14 @@ export function parseAutomationForCanvas(source: string, stage: CustomAutomation
   };
 }
 
+function parseTimeout(value: unknown): number | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 1 || value > 86400) {
+    problem("timeout_seconds", "Enter an integer from 1 through 86400.");
+  }
+  return value;
+}
+
 function parseTrigger(value: unknown, path: string, stage: CustomAutomationColumn): AutomationTrigger {
   const trigger = mapping(value, path, ["id", "use", "config"]);
   const id = optionalText(trigger.id, `${path}.id`);
@@ -179,14 +187,6 @@ function validateTriggerIdentities(triggers: AutomationTrigger[]) {
   });
 }
 
-function parseTimeout(value: unknown): number | undefined {
-  if (value === undefined) return undefined;
-  if (typeof value !== "number" || !Number.isInteger(value) || value < 1 || value > 86400) {
-    problem("timeout_seconds", "Enter an integer from 1 through 86400.");
-  }
-  return value;
-}
-
 function parseAgent(value: unknown): AutomationAgent {
   const entry = mapping(value, "agent", ["harness", "model", "credentials"]);
   const harness = entry.harness;
@@ -197,16 +197,13 @@ function parseAgent(value: unknown): AutomationAgent {
   }
   if (entry.credentials === undefined) return { harness, model };
   if (harness === "superplane") problem("agent.credentials", "SuperPlane uses workspace credentials.");
-  return { harness, model, credentials: parseCredentials(entry.credentials, harness) };
+  return { harness, model, credentials: parseAgentCredentials(entry.credentials, harness) };
 }
 
-function parseCredentials(value: unknown, harness: AutomationHarness): AutomationCredentials {
+function parseAgentCredentials(value: unknown, harness: AutomationHarness): AutomationCredentials {
   const credentials = mapping(value, "agent.credentials", ["source", "name"]);
   if (credentials.source === "integration") {
-    return {
-      source: "integration",
-      name: singleLine(credentials.name, "agent.credentials.name"),
-    };
+    return { source: "integration", name: singleLine(credentials.name, "agent.credentials.name") };
   }
   if (credentials.source === "subscription") {
     if (harness !== "codex") problem("agent.credentials.source", "A ChatGPT subscription requires Codex.");

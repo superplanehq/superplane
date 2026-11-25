@@ -11,6 +11,7 @@ export type ColumnAutomationApp = {
   id?: string;
   name?: string;
   columnKey?: string;
+  displayColumnKey?: string;
   templateId?: string;
   customAutomationMode?: CustomAutomationMode;
   customAutomationIcon?: string;
@@ -49,6 +50,7 @@ export function customColumnAutomations(
         runningCount: runningCountForApp(id, workOrders),
         catalogId: columnKey === "backlog" ? "scheduled-intake" : CUSTOM_CATALOG_ID,
         canvasId: id,
+        columnKey,
       },
     ];
   });

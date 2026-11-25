@@ -42,7 +42,7 @@ func (b CanvasAutomationBackend) ListLegacy(_ context.Context, tx *gorm.DB, plac
 	}
 	result := make([]automations.LegacyAutomation, 0)
 	for _, canvas := range canvases {
-		if spec, ok := specs[canvas.ID]; ok && models.FactoryAppTemplateID(spec.Nodes) == models.FactoryAppTemplateCustomAutomationID {
+		if spec, ok := specs[canvas.ID]; ok && (models.FactoryAppTemplateID(spec.Nodes) == models.FactoryAppTemplateCustomAutomationID || legacyCustomStageGraph(&canvas, &models.CanvasVersion{Nodes: spec.Nodes, Edges: spec.Edges})) {
 			result = append(result, legacyCanvasMetadata(&canvas))
 		}
 	}
@@ -112,7 +112,7 @@ func canvasLegacyAutomation(tx *gorm.DB, canvas *models.Canvas) (automations.Leg
 	if err != nil {
 		return automations.LegacyAutomation{}, nil, err
 	}
-	if models.FactoryAppTemplateID(version.Nodes) != models.FactoryAppTemplateCustomAutomationID {
+	if models.FactoryAppTemplateID(version.Nodes) != models.FactoryAppTemplateCustomAutomationID && !legacyCustomStageGraph(canvas, version) {
 		return automations.LegacyAutomation{}, nil, gorm.ErrRecordNotFound
 	}
 	return legacyCanvasMetadata(canvas), version, nil
@@ -172,6 +172,10 @@ func importAutomationCanvas(tx *gorm.DB, factory *models.Factory, canvas *models
 	document, err := automationspec.Parse(source)
 	if err != nil {
 		return "", unrepresentableAutomationCanvas()
+	}
+	if legacyCustomStageGraph(canvas, version) {
+		// This graph has no event subscription. Keep its dispatch-owned start.
+		return source, nil
 	}
 
 	// Rebuild the supported graph and compare all execution settings and edges.

@@ -221,6 +221,31 @@ func (s Service) save(ctx context.Context, actor, id uuid.UUID, placement Placem
 }
 
 func checkAutomationReferences(tx *gorm.DB, placement Placement, doc *automationspec.Document) error {
+	if strings.HasPrefix(placement.Stage, "custom-") {
+		factory, err := models.FindFactory(tx, placement.OrganizationID, placement.FactoryID)
+		if err != nil {
+			return factoryError(err)
+		}
+		lines, err := factory.ListLines(tx)
+		if err != nil {
+			return err
+		}
+		found := slices.ContainsFunc(lines, func(line models.FactoryLine) bool {
+			return slices.ContainsFunc(line.StagesValue(), func(stage models.FactoryLineStage) bool {
+				return stage.Key == placement.Stage && stage.Kind == models.FactoryLineStageCustom
+			})
+		})
+		if !found {
+			return doc.Diagnostic("$", "Select a custom stage in this factory.")
+		}
+		organization, err := models.FindOrganizationByIDInTransaction(tx, placement.OrganizationID.String())
+		if err != nil {
+			return err
+		}
+		if !organization.HasExperimentalFeature(features.FeatureFactoryCustomAutomations) {
+			return grpcerrors.FailedPrecondition(nil, "Enable custom automations and stages for this organization.")
+		}
+	}
 	if err := automationspec.ValidateStage(doc, automationspec.Stage(placement.Stage)); err != nil {
 		return err
 	}

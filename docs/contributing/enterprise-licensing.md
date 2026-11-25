@@ -94,16 +94,13 @@ The Enterprise features are:
 | `groups`            | Create or update a group. Add a user to a group.                                                                             |
 | `github_enterprise` | Create or configure a GitHub integration with a host other than github.com. Create or install a private GitHub App on that host. |
 
-GitHub Enterprise Cloud also needs the organization experimental feature
-`github_enterprise` during rollout. An installation administrator turns that
-feature on for each organization. github.com connections do not use the license
-or the experimental feature.
+GitHub Enterprise Cloud requires only the license and an organization grant.
+github.com connections do not require this entitlement.
 
 When a license expires, SuperPlane removes all organization grants. Existing custom roles and groups continue to work,
 and administrators can still remove them. Existing GitHub Enterprise
 integrations continue to run: webhooks, API calls, and repository lists
-keep working, and administrators can still view and delete them. Turning the
-experimental feature off only stops new connections.
+keep working, and administrators can still view and delete them.
 
 ## Feature registry
 

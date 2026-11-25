@@ -8,6 +8,7 @@ import type {
   FactoriesWorkOrder,
   FactoriesWorkOrderSummary,
   FactoryAutomation,
+  FactoryLineStage,
   CanvasesListRunsResponse,
 } from "@/api-client";
 import type * as canvasData from "@/hooks/useCanvasData";
@@ -16,7 +17,7 @@ import type * as integrationsData from "@/hooks/useIntegrations";
 import { resetFactoryBoardLaneScrollPositions } from "@/hooks/useFactoryBoardLaneScroll";
 import {
   FEATURE_FACTORY_CUSTOM_AUTOMATIONS,
-  FEATURE_FACTORY_CUSTOM_STAGES,
+  FEATURE_AUTOMATIONS_AS_CODE,
   FEATURE_FACTORY_DATADOG_INTAKE,
   FEATURE_FACTORY_PRODUCTIVE_INTAKE,
   FEATURE_FACTORY_SCHEDULED_INTAKE,
@@ -834,6 +835,69 @@ describe("LinesPage board stages", () => {
     await resetLinesBoardMocks();
   });
 
+  it("moves a task that passed a custom last stage to Verify", () => {
+    const factory = {
+      ...REFUND_FACTORY,
+      lines: (REFUND_FACTORY.lines ?? []).map((line) =>
+        line.id === REFUND_LINE_PLAN_ID
+          ? {
+              ...line,
+              stages: [
+                { id: "backlog", key: "backlog", name: "Backlog", kind: "STAGE_KIND_BACKLOG" as const },
+                { id: "phase-0", key: "phase-0", name: "Implement", kind: "STAGE_KIND_PHASE" as const, stepIndex: 0 },
+                { id: "docs", key: "custom-docs", name: "Update docs", kind: "STAGE_KIND_CUSTOM" as const },
+                { id: "verify", key: "verify", name: "Verify", kind: "STAGE_KIND_VERIFY" as const },
+                { id: "done", key: "done", name: "Done", kind: "STAGE_KIND_DONE" as const },
+              ],
+            }
+          : line,
+      ),
+    };
+    const lineRef = { id: REFUND_LINE_PLAN_ID, name: "plan-and-implement" };
+    useFactoryWorkOrders.mockReturnValue({
+      data: [
+        {
+          id: "wo-docs-passed",
+          title: "Docs stage passed",
+          state: "STATE_OPEN",
+          lineDispatches: [
+            {
+              id: "dispatch-docs",
+              line: lineRef,
+              state: "STATE_FINISHED",
+              result: "RESULT_PASSED",
+              stepExecutions: [
+                {
+                  id: "exec-implement",
+                  step: "Implement",
+                  stepIndex: 0,
+                  stageKey: "phase-0",
+                  state: "STATE_FINISHED",
+                  result: "RESULT_PASSED",
+                  createdAt: "2026-08-11T12:00:00.000Z",
+                },
+                {
+                  id: "exec-docs",
+                  step: "Update Docs",
+                  stepIndex: 1,
+                  stageKey: "custom-docs",
+                  state: "STATE_FINISHED",
+                  result: "RESULT_PASSED",
+                  createdAt: "2026-08-11T12:10:00.000Z",
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+
+    renderLinesBoard(undefined, vi.fn(), factory);
+
+    expect(screen.getByTestId("lines-verify-column")).toHaveTextContent("Docs stage passed");
+    expect(screen.getByTestId("lines-custom-stage-custom-docs")).not.toHaveTextContent("Docs stage passed");
+  });
+
   const customStageFactory = (name = "QA"): FactoriesFactory => ({
     ...REFUND_FACTORY,
     lines: (REFUND_FACTORY.lines ?? []).map((line) =>
@@ -858,14 +922,119 @@ describe("LinesPage board stages", () => {
     fireEvent.change(input, { target: { value: name } });
     fireEvent.keyDown(input, { key: "Enter" });
   };
+  it.each([false, true])(
+    "opens custom-stage automation configuration from a saved board row (YAML: %s)",
+    async (yamlEnabled) => {
+      enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
+      const fetch = yamlEnabled
+        ? vi.spyOn(globalThis, "fetch").mockImplementation(async () =>
+            Response.json({
+              id: "app-qa",
+              factory_id: PRIMARY_FACTORY_ID,
+              stage: "custom-qa",
+              name: "Check QA",
+              revision: 1,
+              yaml: "apiVersion: v2\nkind: Automation\nname: Check QA\ntriggers:\n  - use: task_enters_stage\nsteps:\n  - name: Inspect\n    bash: make lint\n",
+            }),
+          )
+        : undefined;
+      if (yamlEnabled) enabledExperimentalFeatures.add(FEATURE_AUTOMATIONS_AS_CODE);
+      useFactoryAutomations.mockReturnValue({ data: [{ id: "app-qa", name: "Check QA", columnKey: "custom-qa" }] });
+      renderLinesBoard(undefined, vi.fn(), customStageFactory());
+      await userEvent
+        .setup()
+        .click(screen.getByTestId("lines-custom-stage-custom-qa-automation-rows-row-custom-app-qa"));
+      expect(await screen.findByTestId("custom-automation-setup-modal")).toBeInTheDocument();
+      expect(screen.getByTestId("lines-test-location")).toHaveTextContent("customAutomation=app-qa");
+      expect(screen.getByTestId("lines-test-location")).toHaveTextContent("automationColumn=custom-qa");
+      expect(updateCanvasVersionMutateAsync).not.toHaveBeenCalled();
+      if (yamlEnabled) {
+        await userEvent.setup().click(await screen.findByRole("button", { name: "Edit YAML" }));
+        expect((screen.getByLabelText("Automation YAML") as HTMLTextAreaElement).value).toContain("task_enters_stage");
+        await userEvent.setup().click(screen.getByRole("button", { name: "Cancel" }));
+        expect(screen.queryByTestId("custom-automation-setup-modal")).not.toBeInTheDocument();
+        expect(fetch?.mock.calls.every(([, init]) => !init?.method)).toBe(true);
+        fetch?.mockRestore();
+      }
+    },
+  );
   const editStages = async () => {
     const user = userEvent.setup();
     await user.click(screen.getByTestId("lines-board-view-menu"));
     await user.click(screen.getByRole("menuitem", { name: "Edit stages" }));
   };
 
+  it.each(["drag", "keyboard"])("moves a custom card to Verify with %s and discards placement", async (interaction) => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
+    useFactoryAutomations.mockReturnValue({ data: [{ id: "app-qa", name: "Check QA", columnKey: "custom-qa" }] });
+    const user = userEvent.setup();
+    renderLinesBoard(undefined, vi.fn(), customStageFactory());
+    await editStages();
+    const handle = within(screen.getByTestId("lines-stage-shell-custom-qa")).getByRole("button", {
+      name: "Move Check QA",
+    });
+    if (interaction === "drag") {
+      fireEvent.dragStart(handle, { dataTransfer: new DataTransfer() });
+      fireEvent.drop(screen.getByTestId("lines-stage-shell-verify"));
+      fireEvent.dragEnd(handle);
+    } else {
+      fireEvent.keyDown(handle, { key: "ArrowRight" });
+    }
+    const moved = within(screen.getByTestId("lines-stage-shell-verify")).getByRole("button", { name: "Move Check QA" });
+    if (interaction === "keyboard") expect(moved).toHaveFocus();
+    await user.click(screen.getByRole("button", { name: "Discard" }));
+    await user.click(
+      within(screen.getByTestId("discard-line-stages-dialog")).getByRole("button", { name: "Discard changes" }),
+    );
+    expect(within(screen.getByTestId("lines-stage-shell-custom-qa")).getByText("Check QA")).toBeInTheDocument();
+    expect(updateFactoryLineMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it("rejects agent drops and keyboard moves into Backlog", async () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
+    renderLinesBoard(undefined, vi.fn(), customStageFactory());
+    await editStages();
+    const source = within(screen.getByTestId("lines-stage-shell-phase-0"));
+    const handle = source.getByRole("button", { name: /^Move / });
+    fireEvent.keyDown(handle, { key: "ArrowLeft" });
+    fireEvent.dragStart(handle, { dataTransfer: new DataTransfer() });
+    fireEvent.drop(screen.getByTestId("lines-stage-shell-backlog"));
+    fireEvent.dragEnd(handle);
+    expect(source.getByRole("button", { name: /^Move / })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Save changes" })).not.toBeInTheDocument();
+  });
+
+  it("edits and saves stage auto-advance settings", async () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
+    const user = userEvent.setup();
+    const factory = customStageFactory();
+    const selectedLine = factory.lines?.find((line) => line.id === REFUND_LINE_PLAN_ID);
+    updateFactoryLineMutateAsync.mockResolvedValueOnce({
+      ...selectedLine,
+      stages: selectedLine?.stages?.map((stage) =>
+        stage.key === "custom-qa" ? { ...stage, autoAdvance: false } : stage,
+      ),
+    });
+    renderLinesBoard(undefined, vi.fn(), factory);
+
+    await editStages();
+    expect(screen.getByRole("switch", { name: "Auto-advance Implement" })).toBeChecked();
+    expect(screen.getByRole("switch", { name: "Auto-advance QA" })).toBeChecked();
+    expect(screen.getByRole("switch", { name: "Auto-advance Verify" })).not.toBeChecked();
+    expect(screen.queryByRole("switch", { name: "Auto-advance Backlog" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("switch", { name: "Auto-advance Done" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("switch", { name: "Auto-advance QA" }));
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+    const dialog = screen.getByTestId("save-line-stages-dialog");
+    expect(within(dialog).getByTestId("save-line-stages-summary")).toHaveTextContent("Disable auto-advance: QA");
+    await user.click(within(dialog).getByRole("button", { name: "Save changes" }));
+
+    const savedStages = updateFactoryLineMutateAsync.mock.calls[0][0].stageConfiguration.stages;
+    expect(savedStages.find((stage: FactoryLineStage) => stage.key === "custom-qa")?.autoAdvance).toBe(false);
+  });
+
   it("saves only the custom name and uses the refreshed line after remount", async () => {
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_STAGES);
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
     const factory = customStageFactory();
     const savedFactory = customStageFactory("Quality review");
     updateFactoryLineMutateAsync.mockResolvedValueOnce(
@@ -885,8 +1054,35 @@ describe("LinesPage board stages", () => {
     expect(screen.getByTestId("lines-column-title-custom-qa")).toHaveTextContent("Quality review");
   });
 
+  it("explains automation deletion before saving and cancels or discards without saving", async () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
+    const user = userEvent.setup();
+    useFactoryAutomations.mockReturnValue({ data: [{ id: "app-qa", name: "Check QA", columnKey: "custom-qa" }] });
+    renderLinesBoard(undefined, vi.fn(), customStageFactory());
+    await editStages();
+    await user.click(screen.getByRole("button", { name: "Delete QA" }));
+    expect(updateFactoryLineMutateAsync).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+    const dialog = screen.getByTestId("save-line-stages-dialog");
+    expect(dialog).toHaveTextContent(
+      "Saving a custom-stage deletion also deletes automations that execute in that stage.",
+    );
+    expect(dialog).toHaveTextContent("Automations that only appear there stay in the workspace.");
+    expect(dialog).toHaveTextContent("Removing a system stage keeps its automations.");
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    expect(updateFactoryLineMutateAsync).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Discard" }));
+    await user.click(
+      within(screen.getByTestId("discard-line-stages-dialog")).getByRole("button", { name: "Discard changes" }),
+    );
+    expect(screen.getByTestId("lines-custom-stage-custom-qa-automation-rows-row-custom-app-qa")).toHaveTextContent(
+      "Check QA",
+    );
+    expect(updateFactoryLineMutateAsync).not.toHaveBeenCalled();
+  });
+
   it("keeps renames in the draft, clears reverted changes, and discards without saving", async () => {
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_STAGES);
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
     const user = userEvent.setup();
     renderLinesBoard(undefined, vi.fn(), customStageFactory());
     await editStages();
@@ -906,8 +1102,8 @@ describe("LinesPage board stages", () => {
     expect(updateFactoryLineMutateAsync).not.toHaveBeenCalled();
   });
 
-  it("includes a rename-only draft in the save summary and persists it", async () => {
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_STAGES);
+  it.each([false, true])("saves a custom stage rename with pending card move: %s", async (moveCard) => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
     const user = userEvent.setup();
     const savedFactory = customStageFactory("Quality review");
     updateFactoryLineMutateAsync.mockResolvedValueOnce(
@@ -915,6 +1111,10 @@ describe("LinesPage board stages", () => {
     );
     const view = renderLinesBoard(undefined, vi.fn(), customStageFactory());
     await editStages();
+    if (moveCard) {
+      const source = within(screen.getByTestId("lines-stage-shell-phase-0"));
+      fireEvent.keyDown(source.getByRole("button", { name: /^Move / }), { key: "ArrowRight" });
+    }
     renameCustomStage("Quality review");
     expect(updateFactoryLineMutateAsync).not.toHaveBeenCalled();
     await user.click(screen.getByRole("button", { name: "Save changes" }));
@@ -925,12 +1125,22 @@ describe("LinesPage board stages", () => {
     expect(updateFactoryLineMutateAsync.mock.calls[0][0].stageConfiguration.stages).toEqual(
       savedFactory.lines?.find((line) => line.id === REFUND_LINE_PLAN_ID)?.stages,
     );
+    if (moveCard) {
+      expect(updateFactoryLineMutateAsync.mock.calls[0][0].stageConfiguration.automationMoves).toEqual([
+        expect.objectContaining({
+          type: "agent-step",
+          executionKey: "phase-0",
+          sourceKey: "phase-0",
+          destinationKey: "custom-qa",
+        }),
+      ]);
+    }
     view.rerender(<LinesBoardSpecHarness factory={savedFactory} />);
     expect(screen.getByTestId("lines-column-title-custom-qa")).toHaveTextContent("Quality review");
   });
 
   it.each(["   ", "x".repeat(65), "vErIfY"])("rejects an invalid custom stage name: %s", (name) => {
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_STAGES);
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
     renderLinesBoard(undefined, vi.fn(), customStageFactory());
     renameCustomStage(name);
     expect(screen.getByRole("alert")).toBeInTheDocument();
@@ -941,7 +1151,7 @@ describe("LinesPage board stages", () => {
 
   it.each(["feature", "permission"])("disables custom title editing without %s", (gate) => {
     if (gate === "permission") {
-      enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_STAGES);
+      enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
       permissions.canUpdateFactories = false;
     }
     renderLinesBoard(undefined, vi.fn(), customStageFactory());
@@ -953,7 +1163,7 @@ describe("LinesPage board stages", () => {
   });
 
   it("prevents overlapping renames and retains the saved name on failure", async () => {
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_STAGES);
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
     const { showErrorToast } = await import("@/lib/toast");
     vi.mocked(showErrorToast).mockClear();
     let rejectSave!: (error: Error) => void;
@@ -1026,7 +1236,7 @@ describe("LinesPage board stages", () => {
     expect(screen.queryByRole("menuitem", { name: "Edit stages" })).not.toBeInTheDocument();
     disabled.unmount();
 
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_STAGES);
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
     const selectedLine = factory.lines?.find((line) => line.id === REFUND_LINE_PLAN_ID);
     updateFactoryLineMutateAsync.mockResolvedValueOnce({
       ...selectedLine,
@@ -1050,6 +1260,7 @@ describe("LinesPage board stages", () => {
     await user.click(within(addDialog).getByRole("button", { name: "Add stage" }));
 
     const draftLane = screen.getByRole("region", { name: "Deploy" });
+    expect(screen.getByRole("switch", { name: "Auto-advance Deploy" })).toBeChecked();
     const draftTitle = within(draftLane).getByTestId(/^lines-column-title-new-/);
     const draftTitleId = draftTitle.getAttribute("data-testid")!;
     renameCustomStage("Deploy to prod", draftTitleId);
@@ -1060,15 +1271,21 @@ describe("LinesPage board stages", () => {
     expect(within(saveDialog).getByTestId("save-line-stages-summary")).toHaveTextContent("Deploy to prod");
     await user.click(within(saveDialog).getByRole("button", { name: "Save changes" }));
 
-    expect(await screen.findByRole("heading", { name: "Add an automation for Deploy to prod" })).toBeInTheDocument();
+    expect(await screen.findByTestId("custom-automation-setup-modal")).toBeInTheDocument();
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent("customAutomation=new");
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent("automationColumn=custom-deploy");
     const savedStages = updateFactoryLineMutateAsync.mock.calls[0][0].stageConfiguration.stages;
-    expect(savedStages.at(-2)).toMatchObject({ id: "", name: "Deploy to prod", kind: "STAGE_KIND_CUSTOM" });
+    expect(savedStages.at(-2)).toMatchObject({
+      id: "",
+      name: "Deploy to prod",
+      kind: "STAGE_KIND_CUSTOM",
+      autoAdvance: true,
+    });
     expect(screen.queryByTestId("line-stage-edit-toolbar")).not.toBeInTheDocument();
-    expect(screen.getByTestId("add-column-automation-template-custom")).toBeInTheDocument();
   });
 
   it("hides stage mutations without factory update permission", async () => {
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_STAGES);
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
     permissions.canUpdateFactories = false;
     const user = userEvent.setup();
     renderLinesBoard();
@@ -1132,6 +1349,45 @@ describe("LinesPage board automations", () => {
   beforeEach(async () => {
     await resetLinesBoardMocks();
   });
+
+  it.each([
+    { columnKey: "verify", templateId: "risk-score", cardId: "risk-score-moved-app", sourceKey: "verify" },
+    { columnKey: "implement", cardId: "custom-moved-app", sourceKey: "phase-0" },
+    { columnKey: "custom-source", cardId: "custom-moved-app", sourceKey: "custom-source" },
+  ])(
+    "shows a moved $columnKey workspace card on a line without its source stage",
+    ({ columnKey, templateId, cardId, sourceKey }) => {
+      const destinationKey = columnKey === "custom-source" ? "custom-target" : "backlog";
+      useFactoryAutomations.mockReturnValue({
+        data: [
+          { id: "moved-app", name: "Moved automation", columnKey, templateId, displayColumnKey: destinationKey },
+          { id: "unmoved-app", name: "Unmoved automation", columnKey, templateId },
+        ],
+      });
+      const factory: FactoriesFactory = {
+        ...REFUND_FACTORY,
+        lines: (REFUND_FACTORY.lines ?? []).map((line) => ({
+          ...line,
+          stages: [
+            { id: "backlog", key: "backlog", name: "Backlog", kind: "STAGE_KIND_BACKLOG" },
+            { id: "phase-1", key: "phase-1", name: "Check", kind: "STAGE_KIND_PHASE", stepIndex: 1 },
+            { id: "custom-target", key: "custom-target", name: "QA", kind: "STAGE_KIND_CUSTOM" },
+            { id: "done", key: "done", name: "Done", kind: "STAGE_KIND_DONE" },
+          ],
+        })),
+      };
+      renderLinesBoard(undefined, vi.fn(), factory);
+
+      expect(screen.queryByTestId(`lines-stage-shell-${sourceKey}`)).not.toBeInTheDocument();
+      const destinationTestId = destinationKey === "backlog" ? "lines-backlog" : `lines-custom-stage-${destinationKey}`;
+      expect(
+        within(screen.getByTestId(`lines-stage-shell-${destinationKey}`)).getByTestId(
+          `${destinationTestId}-automation-rows-row-${cardId}`,
+        ),
+      ).toBeInTheDocument();
+      expect(screen.queryByText("Unmoved automation")).not.toBeInTheDocument();
+    },
+  );
 
   it("puts backlog automations before the create plus and column menu", () => {
     useFactoryIntakes.mockReturnValue({ data: [GITHUB_ISSUES_INTAKE] });
@@ -2039,7 +2295,7 @@ describe("LinesPage stage editing", () => {
   };
 
   it("shows reorder handles only while editing stages", async () => {
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_STAGES);
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
     const user = userEvent.setup();
     renderLinesBoard();
 
@@ -2051,8 +2307,52 @@ describe("LinesPage stage editing", () => {
     expect(screen.queryByRole("button", { name: "Reorder Done" })).not.toBeInTheDocument();
   });
 
+  it("moves an agent without reordering stages and saves only the confirmed placement", async () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
+    const user = userEvent.setup();
+    renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, ICON_VIEW);
+    await enterStageEditing(user);
+    const order = stageShellOrder();
+    const source = within(screen.getByTestId("lines-stage-shell-phase-0"));
+    const target = screen.getByTestId("lines-stage-shell-phase-1");
+    const handle = source.getByRole("button", { name: /^Move / });
+    const label = handle.getAttribute("aria-label")!;
+    const content = source.getByRole("button", { name: /^Open automation:/ });
+    const dataTransfer = { effectAllowed: "none", setData: vi.fn() };
+    fireEvent.dragStart(content, { dataTransfer });
+    fireEvent.dragEnter(target);
+    fireEvent.dragEnd(content);
+    expect(screen.queryByRole("button", { name: "Save changes" })).not.toBeInTheDocument();
+    fireEvent.dragStart(content, { dataTransfer });
+    fireEvent.dragOver(target);
+    fireEvent.drop(target);
+    expect(stageShellOrder()).toEqual(order);
+    expect(source.queryByRole("button", { name: label })).not.toBeInTheDocument();
+    expect(within(target).getByRole("button", { name: label })).toBeInTheDocument();
+    fireEvent.keyDown(within(target).getByRole("button", { name: label }), { key: "ArrowLeft" });
+    expect(source.getByRole("button", { name: label })).toHaveFocus();
+    expect(screen.queryByRole("button", { name: "Save changes" })).not.toBeInTheDocument();
+    fireEvent.keyDown(source.getByRole("button", { name: label }), { key: "ArrowRight" });
+    await user.click(screen.getByRole("button", { name: "Discard" }));
+    await user.click(screen.getByRole("button", { name: "Discard changes" }));
+    await enterStageEditing(user);
+    fireEvent.keyDown(source.getByRole("button", { name: label }), { key: "ArrowRight" });
+    expect(updateFactoryLineMutateAsync).not.toHaveBeenCalled();
+    updateFactoryLineMutateAsync.mockResolvedValueOnce({});
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+    await user.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Save changes" }));
+    expect(updateFactoryLineMutateAsync.mock.calls[0][0].stageConfiguration.automationMoves).toEqual([
+      expect.objectContaining({
+        type: "agent-step",
+        executionKey: "phase-0",
+        sourceKey: "phase-0",
+        destinationKey: "phase-1",
+      }),
+    ]);
+  });
+
   it("offers Save only after a change and exits with Done when nothing changed", async () => {
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_STAGES);
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
     const user = userEvent.setup();
     renderLinesBoard();
     await enterStageEditing(user);
@@ -2068,7 +2368,7 @@ describe("LinesPage stage editing", () => {
   });
 
   it("saves the reordered draft once after confirmation", async () => {
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_STAGES);
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
     updateFactoryLineMutateAsync.mockResolvedValueOnce({});
     const user = userEvent.setup();
     renderLinesBoard();
@@ -2096,7 +2396,7 @@ describe("LinesPage stage editing", () => {
   });
 
   it("restores the saved order when changes are discarded", async () => {
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_STAGES);
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
     const user = userEvent.setup();
     renderLinesBoard();
     await enterStageEditing(user);
@@ -2117,7 +2417,7 @@ describe("LinesPage stage editing", () => {
   });
 
   it("leaves a deleted draft stage out of the save", async () => {
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_STAGES);
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
     updateFactoryLineMutateAsync.mockResolvedValueOnce({});
     const user = userEvent.setup();
     renderLinesBoard();
@@ -2136,7 +2436,7 @@ describe("LinesPage stage editing", () => {
   });
 
   it("deletes a stage from the column menu only in the draft", async () => {
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_STAGES);
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
     const user = userEvent.setup();
     renderLinesBoard();
 
@@ -2154,7 +2454,7 @@ describe("LinesPage stage editing", () => {
   });
 
   it("keeps a drag move in the draft when the target emits repeated drag events", async () => {
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_STAGES);
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
     const user = userEvent.setup();
     renderLinesBoard();
     await enterStageEditing(user);

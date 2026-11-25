@@ -38,6 +38,7 @@ export function customAutomationColumnAutomation(
   return {
     id: `custom-automation-${id}`,
     kind: "custom-verification",
+    taskStageTargets: customAutomationTaskStageTargets(primary, columnKey, hasSchedule),
     name: app.name?.trim() || "Custom automation",
     trigger,
     action: copy.action,
@@ -48,8 +49,20 @@ export function customAutomationColumnAutomation(
     runningCount: runningCountForApp(id, workOrders),
     catalogId: CUSTOM_AUTOMATION_CATALOG_ID,
     canvasId: id,
+    columnKey: columnKey.startsWith("custom-") ? columnKey : undefined,
     canRunNow: columnKey === "backlog" && (hasSchedule || app.customAutomationRunsOnTask === false) ? true : undefined,
   };
+}
+
+function customAutomationTaskStageTargets(
+  mode: CustomAutomationMode,
+  columnKey: CustomAutomationColumn,
+  hasSchedule: boolean,
+): string[] | undefined {
+  if (hasSchedule) return undefined;
+  if (mode === "leave") return ["backlog", "phase-0", "verify", "done"];
+  if (mode === "automatic" && columnKey !== "verify") return ["backlog", "phase-0", "done"];
+  return undefined;
 }
 
 function primaryCustomAutomationMode(
