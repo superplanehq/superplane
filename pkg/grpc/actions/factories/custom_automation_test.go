@@ -166,7 +166,7 @@ func TestCustomAutomationCustomStageFormRoundTrip(t *testing.T) {
 			line, err := factory.CreateLine(db, "QA", nil)
 			require.NoError(t, err)
 			stageID := uuid.New()
-			stage := models.FactoryLineStage{ID: stageID, Key: test.key, Name: "QA", Kind: models.FactoryLineStageCustom}
+			stage := models.FactoryLineStage{ID: stageID, Key: test.key, Name: "QA", Kind: models.FactoryLineStagePhase}
 			require.NoError(t, line.UpdateConfiguration(db, nil, nil, nil, append(line.StagesValue(), stage)))
 			settings := &pb.FactoryCustomAutomation_Settings{
 				StartMode:               pb.FactoryCustomAutomation_START_MODE_AUTOMATIC,

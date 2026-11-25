@@ -7,7 +7,7 @@ import { AddLineStageDialog } from "./AddLineStageDialog";
 
 const STAGES: LineBoardStage[] = [
   { id: "backlog", key: "backlog", name: "Backlog", kind: "STAGE_KIND_BACKLOG" },
-  { id: "verify", key: "verify", name: "Verify", kind: "STAGE_KIND_VERIFY" },
+  { id: "verify", key: "verify", name: "Verify", kind: "STAGE_KIND_PHASE", autoAdvance: false },
   { id: "done", key: "done", name: "Done", kind: "STAGE_KIND_DONE" },
 ];
 

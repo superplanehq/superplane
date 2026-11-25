@@ -1165,10 +1165,7 @@ function LineDetail({
     () => collectLineVerifyOrders(fullBoard, workOrders ?? [], line),
     [fullBoard, workOrders, line],
   );
-  const hasVerifyStage = useMemo(
-    () => orderedLineBoardStages(line).some((stage) => stage.kind === "STAGE_KIND_VERIFY"),
-    [line],
-  );
+  const hasVerifyStage = useMemo(() => orderedLineBoardStages(line).some((stage) => stage.key === "verify"), [line]);
   const board = useMemo(
     () => visibleLineStageColumns(fullBoard, verifyOrders, hasVerifyStage),
     [fullBoard, hasVerifyStage, verifyOrders],
@@ -1776,7 +1773,7 @@ function PhaseBoard({
   const phaseNames = useMemo(() => new Map(columns.map((column) => [column.stepIndex, column.stepName])), [columns]);
   const orderedStages = useMemo(() => orderedLineBoardStages(line, phaseNames), [line, phaseNames]);
   const verifyOrderIds = useMemo(() => {
-    if (!orderedStages.some((stage) => stage.kind === "STAGE_KIND_VERIFY")) {
+    if (!orderedStages.some((stage) => stage.key === "verify")) {
       return new Set<string>();
     }
     return new Set(verifyOrders.flatMap((order) => (order.id ? [order.id] : [])));
@@ -1869,7 +1866,7 @@ function PhaseBoard({
       });
       const savedIds = new Set(orderedStages.map((stage) => stage.id));
       const created = orderedLineBoardStages(updated).find(
-        (stage) => stage.kind === "STAGE_KIND_CUSTOM" && !savedIds.has(stage.id),
+        (stage) => stage.key.startsWith("custom-") && !savedIds.has(stage.id),
       );
       exitStageEditing();
       onStagesSaved(pendingMoves.length ? undefined : created);
@@ -1908,11 +1905,7 @@ function PhaseBoard({
   }, [editingStages, stageDialogOpen, stagesChanged, onExitStageEditing]);
   const displayedStageOrder = stagePreview ?? baseStages;
   const visibleStages = useMemo(
-    () =>
-      displayedStageOrder.filter(
-        (stage) =>
-          stage.kind !== "STAGE_KIND_PHASE" || (stage.stepIndex !== undefined && phaseByStep.has(stage.stepIndex)),
-      ),
+    () => displayedStageOrder.filter((stage) => stage.stepIndex === undefined || phaseByStep.has(stage.stepIndex)),
     [displayedStageOrder, phaseByStep],
   );
   const reorderStagePreview = (stageId: string, targetId: string) => {
@@ -2125,7 +2118,7 @@ function PhaseBoard({
       );
     }
 
-    if (stage.kind === "STAGE_KIND_CUSTOM" && isDraftLineBoardStage(stage)) {
+    if (isDraftLineBoardStage(stage)) {
       return (
         <WorkOrderBoardLane
           title={stage.name}
@@ -2149,7 +2142,7 @@ function PhaseBoard({
       );
     }
 
-    if (stage.kind === "STAGE_KIND_CUSTOM") {
+    if (stage.kind === "STAGE_KIND_PHASE" && stage.stepIndex === undefined && stage.key !== "verify") {
       const columnKey = isColumnKey(stage.key) ? stage.key : undefined;
       const automations = rowsFor(stage.key);
       return (
@@ -2182,7 +2175,7 @@ function PhaseBoard({
       );
     }
 
-    if (stage.kind === "STAGE_KIND_VERIFY") {
+    if (stage.key === "verify") {
       return (
         <VerifyColumn
           importPicker={
@@ -2339,7 +2332,7 @@ function PhaseBoard({
                   }
                 />
               ) : null}
-              {stage.kind === "STAGE_KIND_PHASE" ? (
+              {stage.stepIndex !== undefined ? (
                 <span
                   className={cn(
                     "absolute left-full z-[1] h-px w-3 bg-border",
@@ -2348,8 +2341,7 @@ function PhaseBoard({
                   aria-hidden
                 />
               ) : null}
-              {stage.kind === "STAGE_KIND_CUSTOM" ||
-              stage.kind === "STAGE_KIND_VERIFY" ||
+              {(stage.kind === "STAGE_KIND_PHASE" && stage.stepIndex === undefined) ||
               stage.kind === "STAGE_KIND_DONE" ? (
                 <span
                   className={cn(
