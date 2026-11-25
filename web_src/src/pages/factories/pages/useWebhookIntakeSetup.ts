@@ -87,6 +87,7 @@ export function useWebhookIntakeSetup(organizationId: string, factoryId: string)
     reveal,
     error,
     pending,
+    webhookReady,
     canFinish,
     finish,
   };

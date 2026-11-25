@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { Webhook } from "lucide-react";
-import type { ReactNode } from "react";
+import { useState } from "react";
 
 import { CustomAutomationWebhookFields } from "./CustomAutomationWebhookFields";
 import { IntakeSetupDefaultOwner } from "./IntakeDefaultOwnerField";
@@ -30,12 +30,18 @@ interface WebhookIntakeSetupDialogProps {
 
 export function WebhookIntakeSetupDialog(props: WebhookIntakeSetupDialogProps) {
   const setup = useWebhookIntakeSetup(props.organizationId, props.factoryId);
+  const [step, setStep] = useState<"webhook" | "fields">("webhook");
+  const fieldsStep = step === "fields";
 
   if (setup.reveal) {
     return <WebhookSecretDialog reveal={setup.reveal} onClose={props.onCreated} />;
   }
 
   const submit = () => {
+    if (!fieldsStep) {
+      if (setup.webhookReady) setStep("fields");
+      return;
+    }
     if (!setup.canFinish) return;
     void setup.finish().then((result) => {
       if (result === "created") props.onCreated();
@@ -55,11 +61,16 @@ export function WebhookIntakeSetupDialog(props: WebhookIntakeSetupDialogProps) {
         data-testid="webhook-intake-setup"
       >
         <DialogHeader>
+          <p className="text-xs text-muted-foreground" data-testid="webhook-intake-setup-step">
+            {fieldsStep ? WEBHOOK_INTAKE_SETUP_COPY.stepFields : WEBHOOK_INTAKE_SETUP_COPY.stepWebhook}
+          </p>
           <DialogTitle className="flex items-center gap-2">
             <Webhook className="size-4" aria-hidden />
-            {WEBHOOK_INTAKE_SETUP_COPY.title}
+            {fieldsStep ? WEBHOOK_INTAKE_SETUP_COPY.fieldsTitle : WEBHOOK_INTAKE_SETUP_COPY.title}
           </DialogTitle>
-          <DialogDescription>{WEBHOOK_INTAKE_SETUP_COPY.description}</DialogDescription>
+          <DialogDescription>
+            {fieldsStep ? WEBHOOK_INTAKE_SETUP_COPY.fieldsHelper : WEBHOOK_INTAKE_SETUP_COPY.description}
+          </DialogDescription>
         </DialogHeader>
         <form
           className="min-w-0 space-y-6"
@@ -69,18 +80,19 @@ export function WebhookIntakeSetupDialog(props: WebhookIntakeSetupDialogProps) {
           }}
         >
           <fieldset disabled={setup.pending} className="min-w-0 space-y-6">
-            <Section title={WEBHOOK_INTAKE_SETUP_COPY.webhookSection}>
+            {fieldsStep ? (
+              <>
+                <WebhookIntakeFieldPathInputs
+                  idPrefix="webhook-intake-setup"
+                  paths={setup.paths}
+                  disabled={setup.pending}
+                  onChange={setup.setPaths}
+                />
+                <IntakeSetupDefaultOwner owner={setup.owner} disabled={setup.pending} />
+              </>
+            ) : (
               <WebhookSourceFields setup={setup} {...props} />
-            </Section>
-            <Section title={WEBHOOK_INTAKE_SETUP_COPY.fieldsSection} helper={WEBHOOK_INTAKE_SETUP_COPY.fieldsHelper}>
-              <WebhookIntakeFieldPathInputs
-                idPrefix="webhook-intake-setup"
-                paths={setup.paths}
-                disabled={setup.pending}
-                onChange={setup.setPaths}
-              />
-            </Section>
-            <IntakeSetupDefaultOwner owner={setup.owner} disabled={setup.pending} />
+            )}
           </fieldset>
           {setup.error ? (
             <p role="alert" className="text-sm text-destructive">
@@ -88,28 +100,27 @@ export function WebhookIntakeSetupDialog(props: WebhookIntakeSetupDialogProps) {
             </p>
           ) : null}
           <DialogFooter>
-            <Button type="button" variant="outline" disabled={setup.pending} onClick={props.onClose}>
-              {WEBHOOK_INTAKE_SETUP_COPY.cancel}
+            <Button
+              type="button"
+              variant="outline"
+              disabled={setup.pending}
+              onClick={fieldsStep ? () => setStep("webhook") : props.onClose}
+            >
+              {fieldsStep ? WEBHOOK_INTAKE_SETUP_COPY.back : WEBHOOK_INTAKE_SETUP_COPY.cancel}
             </Button>
-            <Button type="submit" disabled={!setup.canFinish} data-testid="webhook-intake-setup-finish">
-              {setup.pending ? WEBHOOK_INTAKE_SETUP_COPY.creating : WEBHOOK_INTAKE_SETUP_COPY.create}
-            </Button>
+            {fieldsStep ? (
+              <Button type="submit" disabled={!setup.canFinish} data-testid="webhook-intake-setup-finish">
+                {setup.pending ? WEBHOOK_INTAKE_SETUP_COPY.creating : WEBHOOK_INTAKE_SETUP_COPY.create}
+              </Button>
+            ) : (
+              <Button type="submit" disabled={!setup.webhookReady} data-testid="webhook-intake-setup-continue">
+                {WEBHOOK_INTAKE_SETUP_COPY.continue}
+              </Button>
+            )}
           </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
-  );
-}
-
-function Section({ title, helper, children }: { title: string; helper?: string; children: ReactNode }) {
-  return (
-    <section className="space-y-3">
-      <div className="space-y-1">
-        <h3 className="text-[11px] font-medium uppercase tracking-[0.04em] text-muted-foreground">{title}</h3>
-        {helper ? <p className="text-xs text-muted-foreground">{helper}</p> : null}
-      </div>
-      {children}
-    </section>
   );
 }
 

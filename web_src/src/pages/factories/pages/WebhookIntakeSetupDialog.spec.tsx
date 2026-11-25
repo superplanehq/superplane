@@ -63,6 +63,7 @@ describe("WebhookIntakeSetupDialog", () => {
     const user = userEvent.setup();
     const onCreated = renderDialog();
 
+    await user.click(screen.getByTestId("webhook-intake-setup-continue"));
     await user.clear(screen.getByTestId("webhook-intake-setup-title-path"));
     await user.type(screen.getByTestId("webhook-intake-setup-title-path"), "issue.title");
     await user.click(screen.getByTestId("webhook-intake-setup-finish"));
@@ -84,10 +85,13 @@ describe("WebhookIntakeSetupDialog", () => {
     renderDialog();
     mocks.createIntake.mockRejectedValueOnce(new Error("boom"));
 
+    await user.click(screen.getByTestId("webhook-intake-setup-continue"));
     await user.click(screen.getByTestId("webhook-intake-setup-finish"));
     expect(await screen.findByRole("alert")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Back" }));
     expect(screen.getByTestId("factory-webhook-authentication")).toBeDisabled();
     expect(screen.getByTestId("webhook-intake-mode-existing")).toBeDisabled();
+    await user.click(screen.getByTestId("webhook-intake-setup-continue"));
     await user.click(screen.getByTestId("webhook-intake-setup-finish"));
 
     await screen.findByTestId("factory-webhook-secret");
@@ -99,9 +103,10 @@ describe("WebhookIntakeSetupDialog", () => {
     const onCreated = renderDialog();
 
     await user.click(screen.getByTestId("webhook-intake-mode-existing"));
-    expect(screen.getByTestId("webhook-intake-setup-finish")).toBeDisabled();
+    expect(screen.getByTestId("webhook-intake-setup-continue")).toBeDisabled();
     await user.click(screen.getByTestId("custom-automation-webhook-select"));
     await user.click(await screen.findByRole("option", { name: "Tracker bridge" }));
+    await user.click(screen.getByTestId("webhook-intake-setup-continue"));
     await user.click(screen.getByTestId("webhook-intake-setup-finish"));
 
     await waitFor(() => expect(onCreated).toHaveBeenCalled());
@@ -114,6 +119,7 @@ describe("WebhookIntakeSetupDialog", () => {
     const user = userEvent.setup();
     renderDialog();
 
+    await user.click(screen.getByTestId("webhook-intake-setup-continue"));
     await user.clear(screen.getByTestId("webhook-intake-setup-title-path"));
 
     expect(screen.getByTestId("webhook-intake-setup-finish")).toBeDisabled();
