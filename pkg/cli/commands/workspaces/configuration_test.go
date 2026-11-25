@@ -138,7 +138,7 @@ func TestExportConfigurationProtectsLocalFiles(t *testing.T) {
 }
 
 func TestExportConfigurationRejectsInvalidResponsesBeforeOverwrite(t *testing.T) {
-	for _, scenario := range []string{"missing bundle", "missing coverage", "unsafe manifest", "unsafe file", "extra file", "missing content", "invalid YAML", "missing stages", "unknown field", "stage kind", "zero concurrency", "unknown runner", "YAML alias"} {
+	for _, scenario := range []string{"missing bundle", "missing coverage", "unsafe manifest", "unsafe file", "extra file", "missing content", "invalid YAML", "missing stages", "unknown field", "unknown binding", "stage kind", "zero concurrency", "unknown runner", "YAML alias"} {
 		t.Run(scenario, func(t *testing.T) {
 			outputDir := t.TempDir()
 			require.NoError(t, os.Mkdir(filepath.Join(outputDir, ".superplane"), 0755))
@@ -166,6 +166,8 @@ func TestExportConfigurationRejectsInvalidResponsesBeforeOverwrite(t *testing.T)
 				files[0]["content"] = "apiVersion: v2\nkind: Factory\nname: Example workspace\n"
 			case "unknown field":
 				files[0]["content"] = configurationManifest + "unsupported: true\n"
+			case "unknown binding":
+				files[0]["content"] = strings.Replace(configurationManifest, "        with:", "        binding:\n          credentials: secret\n        with:", 1)
 			case "stage kind":
 				files[0]["content"] = strings.Replace(configurationManifest, "name: Implement", "name: Implement\n    kind: phase", 1)
 			case "zero concurrency":
@@ -255,7 +257,19 @@ func TestApplyConfigurationSubmitsCapturedPlanInput(t *testing.T) {
 }
 
 func TestConfigurationRoundTripsCustomFilesAcrossStages(t *testing.T) {
-	manifest := configurationManifest + `  - key: custom-review
+	manifest := strings.Replace(configurationManifest, `        with:
+          additional_instructions: Follow AGENTS.md.
+`, `        binding:
+          integration_id: repository-connection
+          resource_id: repository-resource
+        with:
+          agents:
+            implementation-agent-no-issue:
+              execution_timeout_seconds: 0
+              skip_setup_commands: false
+          template:
+            draft_pull_requests: false
+`, 1) + `  - key: custom-review
     name: Review changes
     automations:
       - id: review
@@ -263,7 +277,47 @@ func TestConfigurationRoundTripsCustomFilesAcrossStages(t *testing.T) {
         uses: automations/review.yaml
   - key: verify
     name: Verify
-    automations: []
+    automations:
+      - id: confidence
+        name: Merge confidence
+        uses: "@superplane/merge-confidence"
+        with:
+          template:
+            enabled_checks: []
+            publish_results: false
+      - id: review
+        name: Review request
+        uses: "@superplane/review-request"
+        with:
+          template:
+            merge_confidence:
+              stage: verify
+              automation: confidence
+            fallback_reviewer: ""
+      - id: discussion
+        name: Pull request discussion
+        uses: "@superplane/pr-discussion"
+        with:
+          pr_feedback:
+            mention: ""
+            allowed_bots: []
+  - key: backlog
+    name: Backlog
+    automations:
+      - id: issues
+        name: GitHub issues
+        uses: "@superplane/intake/github-issues"
+        with:
+          intake:
+            confidence_pct: 0
+            labels: []
+            new_issues: false
+      - id: linear
+        name: Linear issues
+        uses: "@superplane/intake/linear-issues"
+        binding:
+          integration_id: linear-connection
+          team_id: engineering
   - key: done
     name: Done
     automations: []
@@ -286,6 +340,7 @@ func TestConfigurationRoundTripsCustomFilesAcrossStages(t *testing.T) {
 			planned = body["bundle"].(map[string]any)
 			files := planned["files"].([]any)
 			require.Len(t, files, 2)
+			assert.Equal(t, manifest, files[0].(map[string]any)["content"])
 			assert.Equal(t, ".superplane/automations/review.yaml", files[1].(map[string]any)["path"])
 			assert.Equal(t, source, files[1].(map[string]any)["content"])
 			require.NoError(t, os.WriteFile(filepath.Join(output, ".superplane", "automations", "review.yaml"), []byte("changed after preview"), 0600))
