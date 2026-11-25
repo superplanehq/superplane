@@ -17,7 +17,7 @@ import type * as integrationsData from "@/hooks/useIntegrations";
 import { resetFactoryBoardLaneScrollPositions } from "@/hooks/useFactoryBoardLaneScroll";
 import {
   FEATURE_FACTORY_CUSTOM_AUTOMATIONS,
-  FEATURE_AUTOMATIONS_AS_CODE,
+  FEATURE_FACTORY_AS_CODE,
   FEATURE_FACTORY_DATADOG_INTAKE,
   FEATURE_FACTORY_PRODUCTIVE_INTAKE,
   FEATURE_FACTORY_SCHEDULED_INTAKE,
@@ -938,7 +938,7 @@ describe("LinesPage board stages", () => {
             }),
           )
         : undefined;
-      if (yamlEnabled) enabledExperimentalFeatures.add(FEATURE_AUTOMATIONS_AS_CODE);
+      if (yamlEnabled) enabledExperimentalFeatures.add(FEATURE_FACTORY_AS_CODE);
       useFactoryAutomations.mockReturnValue({ data: [{ id: "app-qa", name: "Check QA", columnKey: "custom-qa" }] });
       renderLinesBoard(undefined, vi.fn(), customStageFactory());
       await userEvent
