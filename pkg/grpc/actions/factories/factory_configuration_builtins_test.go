@@ -48,38 +48,63 @@ func TestFactoryConfigurationRejectsInvalidBuiltInModelWithoutWrites(t *testing.
 	require.Equal(t, before, configurationResourceCounts(t))
 }
 
-func TestFactoryConfigurationBuiltInBYOKModelPolicy(t *testing.T) {
-	for _, provider := range []string{models.UsageProviderOpenRouter, models.UsageProviderCustom} {
+func TestFactoryConfigurationBuiltInModelPolicy(t *testing.T) {
+	for _, provider := range []string{models.UsageProviderOpenRouter, models.UsageProviderCustom, models.UsageProviderAnthropic} {
 		t.Run(provider, func(t *testing.T) {
 			r, factory := resetTestFactory(t)
 			db := database.DB(t.Context())
 			require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryAsCode))
 			support.CompleteFactoryOnboarding(t, factory)
-			for _, feature := range []string{features.FeatureOrganizationBYOK, features.FeatureOrganizationBYOKCustomProvider} {
-				require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, feature))
+			funding := models.UsageFundingSourceBYOK
+			component := "runnerOpenRouter"
+			modelKey := func(model string) string { return model }
+			var credentials map[string]any
+			if provider == models.UsageProviderAnthropic {
+				funding = models.UsageFundingSourceHosted
+				component = models.SuperPlaneRunnerComponent
+				modelKey = func(model string) string {
+					if model == "" {
+						return ""
+					}
+					return "hosted::anthropic::" + model
+				}
+				upsertHostedOnboardingProvider(t, db)
+				_, err := models.UpsertHostedLLMProvider(db, models.HostedLLMProvider{
+					Provider: provider, Enabled: true, APIKey: []byte("test-hosted-key"),
+					AllowedModels: datatypes.JSONSlice[string]{"sonnet", "allowed-model", "other-model"},
+				})
+				require.NoError(t, err)
+			} else {
+				for _, feature := range []string{features.FeatureOrganizationBYOK, features.FeatureOrganizationBYOKCustomProvider} {
+					require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, feature))
+				}
+				app := "openrouter"
+				if provider == models.UsageProviderCustom {
+					app = models.CustomLLMAppName
+				}
+				integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, app)
+				credentials = map[string]any{"source": "integration", "integration": map[string]any{"name": integrationName(t, r.Organization.ID, integrationID)}}
+				_, err := models.UpsertOrganizationBYOKModelAllowlist(db, r.Organization.ID, provider, datatypes.JSONSlice[string]{"allowed-model", "other-model"})
+				require.NoError(t, err)
 			}
-			app := "openrouter"
-			if provider == models.UsageProviderCustom {
-				app = models.CustomLLMAppName
-			}
-			integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, app)
 			canvas := resetTestTemplate(t, r, factory, "line-implementation", models.ProviderGitHub, func(doc *yaml.Canvas) {
 				for i := range doc.Spec.Nodes {
 					agent := &doc.Spec.Nodes[i]
 					if !isFactoryAgentHarness(agent.Component) {
 						continue
 					}
-					agent.Component = "runnerOpenRouter"
-					agent.Configuration["credentials"] = map[string]any{"source": "integration", "integration": map[string]any{"name": integrationName(t, r.Organization.ID, integrationID)}}
+					agent.Component = component
+					delete(agent.Configuration, "credentials")
+					if credentials != nil {
+						agent.Configuration["credentials"] = credentials
+					}
 					agent.Configuration["llmProvider"] = provider
-					agent.Configuration["model"] = "allowed-model"
+					agent.Configuration["model"] = modelKey("allowed-model")
 				}
 			})
 			line, err := factory.CreateLine(db, "Delivery", []models.FactoryLineStep{{Type: models.FactoryLineStepTypeRunApp, AppID: canvas.ID, Entrypoint: "onrun-implement"}})
 			require.NoError(t, err)
 			f := configurationFixture{r: r, factory: factory, canvas: canvas, line: line, ctx: onboardingContext(r)}
-			_, err = models.UpsertOrganizationBYOKModelAllowlist(db, r.Organization.ID, provider, datatypes.JSONSlice[string]{"allowed-model", "other-model"})
-			require.NoError(t, err)
 			exported, err := ExportFactoryConfiguration(f.ctx, r.Organization.ID.String(), &pb.ExportFactoryConfigurationRequest{FactoryId: factory.ID.String(), LineId: line.ID.String()})
 			require.NoError(t, err)
 			bundle := exported.Bundle
@@ -96,9 +121,13 @@ func TestFactoryConfigurationBuiltInBYOKModelPolicy(t *testing.T) {
 				}
 			}
 			require.NotNil(t, settings)
-			before := configurationResourceCounts(t)
-			for _, model := range []string{"unavailable-model", "other-model"} {
-				settings["model"] = model
+			modelsToCheck := []string{"unavailable-model", "other-model"}
+			if funding == models.UsageFundingSourceHosted {
+				modelsToCheck = append(modelsToCheck, "")
+			}
+			for _, model := range modelsToCheck {
+				before := configurationResourceCounts(t)
+				settings["model"] = modelKey(model)
 				content, err := goyaml.Marshal(manifest)
 				require.NoError(t, err)
 				bundle.Files[0].Content = string(content)
@@ -115,17 +144,22 @@ func TestFactoryConfigurationBuiltInBYOKModelPolicy(t *testing.T) {
 				require.Empty(t, plan.Diagnostics)
 				require.NotEmpty(t, plan.BaseStateToken)
 				// Apply must recheck workspace policy after a successful plan.
-				_, err = models.UpsertFactoryLLMModelAllowlist(db, r.Organization.ID, factory.ID, provider, models.UsageFundingSourceBYOK, datatypes.JSONSlice[string]{"allowed-model"})
+				permitted := datatypes.JSONSlice[string]{"allowed-model"}
+				if model == "" {
+					permitted = nil
+				}
+				inherit := false
+				_, err = models.UpsertFactoryLLMModelAllowlist(db, r.Organization.ID, factory.ID, provider, funding, permitted, &inherit)
 				require.NoError(t, err)
 				_, err = f.apply(bundle, plan.BaseStateToken)
 				require.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
 				require.Equal(t, before, configurationResourceCounts(t))
-				_, err = models.UpsertFactoryLLMModelAllowlist(db, r.Organization.ID, factory.ID, provider, models.UsageFundingSourceBYOK, datatypes.JSONSlice[string]{"allowed-model", "other-model"})
+				_, err = models.UpsertFactoryLLMModelAllowlist(db, r.Organization.ID, factory.ID, provider, funding, datatypes.JSONSlice[string]{"allowed-model", "other-model"})
 				require.NoError(t, err)
 				applied, err := f.apply(bundle, plan.BaseStateToken)
 				require.NoError(t, err)
 				require.True(t, applied.Changed)
-				require.Equal(t, model, findIntakeNode(resetTestLiveVersion(t, f.canvas).Nodes, implementationAgentNodeID).Configuration["model"])
+				require.Equal(t, modelKey(model), findIntakeNode(resetTestLiveVersion(t, f.canvas).Nodes, implementationAgentNodeID).Configuration["model"])
 			}
 		})
 	}

@@ -33,6 +33,7 @@ type configurationFixture struct {
 func newConfigurationFixture(t *testing.T) configurationFixture {
 	t.Helper()
 	r, factory := resetTestFactory(t)
+	upsertHostedOnboardingProvider(t, database.DB(t.Context()))
 	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryAsCode))
 	support.CompleteFactoryOnboarding(t, factory)
 	canvas := resetTestTemplate(t, r, factory, "line-implementation", models.ProviderGitHub, func(doc *yaml.Canvas) {
