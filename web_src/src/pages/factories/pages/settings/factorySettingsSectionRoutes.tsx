@@ -3,9 +3,9 @@ import { Navigate, Route } from "react-router";
 import { RequireAnyPermission, RequirePermission } from "@/components/PermissionGate";
 import { RequireExperimentalFeature } from "@/components/RequireExperimentalFeature";
 import {
-  FEATURE_FACTORY_CUSTOM_AUTOMATIONS,
   FEATURE_MODEL_STATUS,
   FEATURE_SUPERPLANE_MCP_SERVER,
+  WORKSPACE_WEBHOOK_FEATURES,
 } from "@/lib/experimentalFeatures";
 import {
   FactorySettingsAccountNotificationsPage,
@@ -164,7 +164,7 @@ export const factorySettingsSectionRoutes = [
     path="workspace/webhooks"
     element={
       <RequirePermission resource="factories" action="read">
-        <RequireExperimentalFeature featureId={FEATURE_FACTORY_CUSTOM_AUTOMATIONS}>
+        <RequireExperimentalFeature anyOf={WORKSPACE_WEBHOOK_FEATURES}>
           <FactorySettingsWebhooksPage />
         </RequireExperimentalFeature>
       </RequirePermission>

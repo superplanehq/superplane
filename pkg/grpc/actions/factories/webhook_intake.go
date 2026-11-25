@@ -157,7 +157,12 @@ func applyWebhookIntakeSettingsToGraph(graph intakeGraph, settings intakeSetting
 
 // webhookIntakeRunTitle matches the task title the create node renders for a
 // text field. Every request is a run, so a missing field uses the fallback.
-func webhookIntakeRunTitle(titlePath string, event models.CanvasEvent) string {
+// A run that created a task shows the task title. The title path can change
+// after the run, so only runs without a task read the request again.
+func webhookIntakeRunTitle(titlePath string, event models.CanvasEvent, order *models.FactoryWorkOrder) string {
+	if order != nil && order.Title != "" {
+		return order.Title
+	}
 	payload, ok := models.RootEventSourcePayload(event.Data.Data()).(map[string]any)
 	if !ok {
 		return ""

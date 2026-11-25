@@ -70,16 +70,22 @@ func TestWebhookIntakeRunTitleReadsTheTitlePath(t *testing.T) {
 			"data": map[string]any{"body": body},
 		})}
 	}
-	assert.Equal(t, "Checkout fails", webhookIntakeRunTitle("issue.summary", event(map[string]any{"issue": map[string]any{"summary": "Checkout fails"}})))
-	assert.Equal(t, webhookIntakeTitleFallback, webhookIntakeRunTitle("issue.summary", event(map[string]any{})))
+	assert.Equal(t, "Checkout fails", webhookIntakeRunTitle("issue.summary", event(map[string]any{"issue": map[string]any{"summary": "Checkout fails"}}), nil))
+	assert.Equal(t, webhookIntakeTitleFallback, webhookIntakeRunTitle("issue.summary", event(map[string]any{}), nil))
+	assert.Equal(t, "Checkout fails", webhookIntakeRunTitle("ticket.name", event(map[string]any{"issue": map[string]any{"summary": "Checkout fails"}}), &models.FactoryWorkOrder{Title: "Checkout fails"}), "a changed title path keeps the task title")
 }
 
 func TestWebhookIntakeCreatesTasksFromRequests(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 	factory := seedHandOffFactory(t, r, db)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
 	ctx, deps, orgID := onboardingContext(r), onboardingDeps(r), r.Organization.ID.String()
+	_, err := CreateFactoryIntake(ctx, deps, orgID, &pb.CreateFactoryIntakeRequest{
+		FactoryId: factory.ID.String(), Source: pb.FactoryIntake_SOURCE_WEBHOOK, ResourceId: uuid.NewString(),
+	})
+	requireStatusCode(t, err, codes.FailedPrecondition)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryWebhookIntake))
+
 	newWebhook := func(name string) string {
 		created, err := CreateFactoryWebhook(ctx, deps, orgID, &pb.CreateFactoryWebhookRequest{
 			FactoryId: factory.ID.String(), Name: name, Authentication: pb.FactoryWebhook_AUTHENTICATION_BEARER,
@@ -88,12 +94,6 @@ func TestWebhookIntakeCreatesTasksFromRequests(t *testing.T) {
 		return created.GetWebhook().GetId()
 	}
 	webhookID := newWebhook("Tracker")
-
-	_, err := CreateFactoryIntake(ctx, deps, orgID, &pb.CreateFactoryIntakeRequest{
-		FactoryId: factory.ID.String(), Source: pb.FactoryIntake_SOURCE_WEBHOOK, ResourceId: webhookID,
-	})
-	requireStatusCode(t, err, codes.FailedPrecondition)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryWebhookIntake))
 
 	_, err = CreateFactoryIntake(ctx, deps, orgID, &pb.CreateFactoryIntakeRequest{
 		FactoryId: factory.ID.String(), Source: pb.FactoryIntake_SOURCE_WEBHOOK, ResourceId: uuid.NewString(),

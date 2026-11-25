@@ -157,16 +157,17 @@ function WebhookSourceFields({
         {MODES.map((mode) => {
           const selected = setup.mode === mode.id;
           return (
-            <button
+            <Button
               key={mode.id}
               type="button"
+              variant="ghost"
               role="radio"
               aria-checked={selected}
               disabled={locked && !selected}
               onClick={() => setup.setMode(mode.id)}
               data-testid={`webhook-intake-mode-${mode.id}`}
               className={cn(
-                "flex items-start gap-2.5 rounded-lg border px-3 py-2.5 text-left transition-colors disabled:opacity-50",
+                "h-auto items-start justify-start gap-2.5 whitespace-normal rounded-lg border px-3 py-2.5 text-left font-normal",
                 selected ? "border-foreground bg-accent/40" : "border-border hover:bg-accent/30",
               )}
             >
@@ -183,7 +184,7 @@ function WebhookSourceFields({
                 <span className="block text-[13px] font-medium">{mode.label}</span>
                 <span className="block text-xs text-muted-foreground">{mode.helper}</span>
               </span>
-            </button>
+            </Button>
           );
         })}
       </div>
