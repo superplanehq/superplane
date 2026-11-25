@@ -14,8 +14,6 @@ stop_watchers() {
   local i
   for i in 1 2 3; do
     pkill -9 -x air 2>/dev/null || true
-    # Force-stopping Air can leave its server child holding the API port.
-    pkill -9 -f '^(/app/|\./)?tmp/superplane$' 2>/dev/null || true
     pkill -9 -f 'node_modules/.bin/vite' 2>/dev/null || true
     sleep 1
   done

@@ -218,8 +218,6 @@ services:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 3s
       timeout: 3s
-      # Initializing a new data volume can exceed the normal retry window.
-      start_period: 60s
       retries: 5
 
   pgweb:
