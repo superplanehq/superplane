@@ -339,8 +339,8 @@ func requireFeatures(tx *gorm.DB, organizationID uuid.UUID) error {
 		return err
 	}
 	if !organization.HasExperimentalFeature(features.FeatureFactoryCustomAutomations) ||
-		!organization.HasExperimentalFeature(features.FeatureAutomationsAsCode) {
-		return grpcerrors.NotFound(gorm.ErrRecordNotFound, "Enable Custom Automations and Automations as code for this organization.")
+		!organization.HasExperimentalFeature(features.FeatureFactoryAsCode) {
+		return grpcerrors.NotFound(gorm.ErrRecordNotFound, "Enable Custom Automations and Factory as code for this organization.")
 	}
 	return nil
 }
