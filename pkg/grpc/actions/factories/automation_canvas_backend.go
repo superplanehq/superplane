@@ -138,9 +138,18 @@ func (b CanvasAutomationBackend) Remove(_ context.Context, tx *gorm.DB, placemen
 func (b CanvasAutomationBackend) compile(
 	tx *gorm.DB, placement automations.Placement, source *automationspec.Document, live *models.CanvasVersion, callerID uuid.UUID,
 ) ([]models.Node, []models.Edge, error) {
-	factory, err := models.FindFactory(tx, placement.OrganizationID, placement.FactoryID)
-	if err != nil {
+	if err := validateAutomationCanvasPlacement(source, placement.Stage); err != nil {
 		return nil, nil, err
+	}
+	var factory *models.Factory
+	var err error
+	if reads := factoryAutomationReadsForOrganization(tx, placement.OrganizationID); reads != nil && reads.factory.ID == placement.FactoryID {
+		factory = reads.factory
+	} else {
+		factory, err = models.FindFactory(tx, placement.OrganizationID, placement.FactoryID)
+		if err != nil {
+			return nil, nil, err
+		}
 	}
 	if err := checkAutomationRepository(tx, factory, source); err != nil {
 		return nil, nil, err
@@ -174,7 +183,13 @@ func (b CanvasAutomationBackend) compile(
 			return nil, nil, err
 		}
 	}
-	nodes, edges, err := graph.ParseInTransaction(b.Deps.Registry, placement.OrganizationID.String(), tx)
+	var nodes []models.Node
+	var edges []models.Edge
+	if reads := factoryAutomationReads(tx, factory); reads != nil {
+		nodes, edges, err = graph.ParseInTransactionWithIntegrations(b.Deps.Registry, placement.OrganizationID.String(), tx, reads.integrationsByID)
+	} else {
+		nodes, edges, err = graph.ParseInTransaction(b.Deps.Registry, placement.OrganizationID.String(), tx)
+	}
 	if err != nil {
 		return nil, nil, source.Diagnostic("$", "SuperPlane cannot build this automation. Check the triggers and steps.")
 	}
@@ -197,6 +212,13 @@ func (b CanvasAutomationBackend) compile(
 		}
 	}
 	return nodes, edges, nil
+}
+
+func validateAutomationCanvasPlacement(source *automationspec.Document, stage string) error {
+	if customAutomationUsesDispatch(stage) {
+		return automationspec.ValidateDispatch(source)
+	}
+	return automationspec.ValidateStage(source, automationspec.Stage(stage))
 }
 
 func lockCustomAutomationArtifact(
@@ -236,7 +258,7 @@ func checkAutomationRepository(tx *gorm.DB, factory *models.Factory, source *aut
 	if err != nil {
 		return source.Diagnostic("triggers", "Connect the factory repository before you save the automation.")
 	}
-	integration, err := models.FindIntegrationInTransaction(tx, factory.OrganizationID, id)
+	integration, err := factoryAutomationIntegrationByID(tx, factory.OrganizationID, id)
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return err
 	}

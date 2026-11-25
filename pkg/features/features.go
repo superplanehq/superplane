@@ -52,7 +52,8 @@ const FeatureModelStatus = "model_status"
 // organization Models page. It requires FeatureOrganizationBYOK as well.
 const FeatureOrganizationBYOKCustomProvider = "organization_byok_custom_provider"
 
-const FeatureAutomationsAsCode = "automations-as-code"
+// FeatureFactoryAsCode gates YAML custom automations and workspace configuration.
+const FeatureFactoryAsCode = "factory-as-code"
 
 // FeatureWorkspaceSkills gates workspace skill settings, skill APIs, and skill attach.
 const FeatureWorkspaceSkills = "workspace_skills"
@@ -95,7 +96,7 @@ var registry = []Feature{
 	{ID: FeatureOrganizationBYOK, Label: "Organization BYOK", Description: "Show the organization Models settings page"},
 	{ID: FeatureModelStatus, Label: "Model status", Description: "Show the hosted Model status page in organization settings"},
 	{ID: FeatureOrganizationBYOKCustomProvider, Label: "Organization BYOK Custom Provider", Description: "Add a custom model provider with a URL, token, and API type"},
-	{ID: FeatureAutomationsAsCode, Label: "Automations as code", Description: "Edit custom automations in YAML or through the API"},
+	{ID: FeatureFactoryAsCode, Label: "Factory as code", Description: "Export, plan, and apply stage and automation configuration from YAML"},
 	{ID: FeatureWorkspaceSkills, Label: "Workspace Skills", Description: "Add skills for workspace agents"},
 	{ID: FeatureFactoryPullRequestMerge, Label: "Pull Request Merge", Description: "Show the Mergeable chip on task cards and the Merge button on pull request review"},
 	{ID: FeatureSuperPlaneMCPServer, Label: "MCP Server", Description: "Allow Cursor and other MCP clients to connect to workspaces in this organization", Released: released()},
