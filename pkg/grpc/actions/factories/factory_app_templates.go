@@ -308,7 +308,12 @@ func materializeFactoryTemplate(templateID, provider string, input factoryTempla
 	}
 	markFactoryTemplate(canvas, template)
 
-	canvasYAML, err := goyaml.Marshal(canvas)
+	var canvasYAML []byte
+	if template.id == scheduledIntakeTemplateID {
+		canvasYAML, err = marshalScheduledIntakeCanvas(canvas)
+	} else {
+		canvasYAML, err = goyaml.Marshal(canvas)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("encode factory app template: %w", err)
 	}
@@ -369,10 +374,10 @@ func normalizeFactoryInstallParams(params map[string]string) map[string]string {
 	if normalized == nil {
 		normalized = map[string]string{}
 	}
-	if strings.TrimSpace(normalized["riskRules"]) == "" {
+	if _, present := normalized["riskRules"]; !present {
 		normalized["riskRules"] = defaultRiskScoreRules
 	}
-	if strings.TrimSpace(normalized["enabledChecks"]) == "" {
+	if _, present := normalized["enabledChecks"]; !present {
 		normalized["enabledChecks"] = defaultMergeConfidenceChecks
 	}
 	repository := strings.TrimSpace(normalized["repository"])
@@ -397,6 +402,9 @@ func substituteFactoryInstallParams(content string, params map[string]string) st
 		value, ok := params[parts[1]]
 		if !ok {
 			return match
+		}
+		if parts[1] == "riskRules" {
+			value = strings.ReplaceAll(value, "\n", "\n              ")
 		}
 		return value
 	})
@@ -632,6 +640,11 @@ func deriveFactoryTemplateInput(
 		input.triggerSettings = settings.triggers[template.entrypointNodeID]
 		input.draftPullRequests = settings.draftPullRequests
 		if template.id == "risk-score" {
+			if agent := settings.agents["assess-risk"]; agent != nil {
+				if rules, ok := agent.configuration["mergeConfidenceRiskRules"].(string); ok {
+					input.installParams["riskRules"] = rules
+				}
+			}
 			input.mergeCheckSteps = settings.agentSteps["assess-risk"]
 			input.bodySectionSettings = settings.bodySections
 		}
@@ -922,6 +935,25 @@ func materializeIntakeDefaults(
 	}
 
 	stampFactoryTemplateMetadata(defaults, intakeTriggerNodeID, "intake:"+intake.Source)
+	if graph.TriggerNodeID != intakeTriggerNodeID {
+		ownedBinding, err := factoryConfigurationSavedBinding(tx, canvas)
+		if err != nil {
+			return nil, err
+		}
+		if ownedBinding != nil {
+			// YAML rebinding retires trigger resources. Reset keeps the current
+			// identity so it does not retire those resources again.
+			nodes, edges := alignConfigurationIntakeTrigger(version, intake.Source, defaults.Nodes(), defaults.Edges())
+			encoded, err := yaml.VersionToCanvasYAML(defaults.Metadata.Name, defaults.Metadata.Description, &models.CanvasVersion{Nodes: nodes, Edges: edges})
+			if err != nil {
+				return nil, err
+			}
+			defaults, err = yaml.CanvasFromYAML([]byte(encoded))
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
 
 	defaults.Metadata.ID = canvas.ID.String()
 	encoded, err := goyaml.Marshal(defaults)
@@ -1046,6 +1078,9 @@ func materializePRFeedbackDefaults(
 		TriggerSettings:        prFeedbackTriggerSettingsFromGraph(graph, savedSettings),
 	}
 
+	if err := preserveFactoryConfigurationPRFeedbackBinding(tx, canvas, &request); err != nil {
+		return nil, err
+	}
 	templateID := prFeedbackDiscussionTemplateID
 	triggerID := prFeedbackCommentTriggerNodeID
 	defaults := buildDiscussionPRFeedbackCanvas(request)
@@ -1154,7 +1189,11 @@ func materializeFactoryAppGraphDefaults(
 		return nil, invalidArgument("factory app has no bundled defaults")
 	}
 	input := deriveFactoryTemplateInput(tx, factory, canvas, version, resolved, savedSettings)
+	binding, err := factoryConfigurationSavedBinding(tx, canvas)
+	if err != nil {
+		return nil, err
+	}
 	// Reset uses the provider saved on the app. A later workspace host change
 	// must not select a template the app was not installed with.
-	return materializeFactoryTemplate(resolved.id, resolved.provider, input)
+	return materializeFactoryConfigurationBoundTemplate(tx, canvas, resolved, input, binding)
 }
