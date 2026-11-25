@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { factoryVCSProvider } from "@/pages/home/factories";
 import { factoryAppsKey, useCreateFactoryAutomation } from "@/hooks/useFactoryData";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
-import { FEATURE_FACTORY_CUSTOM_AUTOMATIONS, FEATURE_FACTORY_REVIEW_REQUEST } from "@/lib/experimentalFeatures";
+import { FEATURE_FACTORY_REVIEW_REQUEST } from "@/lib/experimentalFeatures";
 import { showErrorToast } from "@/lib/toast";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { useInstallFactory } from "@/pages/home/useInstallFactory";
@@ -48,9 +48,8 @@ export function useAddColumnAutomation(args: {
   const createAutomation = useCreateFactoryAutomation(args.organizationId, args.factoryId);
   const { installFactory, isInstalling } = useInstallFactory({ organizationId: args.organizationId });
   const experimentalFeatures = useExperimentalFeature(args.organizationId);
-  const allowCustom = experimentalFeatures.has(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
   const allowReviewRequest = experimentalFeatures.has(FEATURE_FACTORY_REVIEW_REQUEST);
-  const catalogOptions = { allowCustom, allowReviewRequest, vcsProvider: args.vcsProvider };
+  const catalogOptions = { allowReviewRequest, vcsProvider: args.vcsProvider };
 
   const pickerCatalog = column
     ? pickerCatalogForColumn(column, catalogOptions)
@@ -74,7 +73,7 @@ export function useAddColumnAutomation(args: {
     const nextTaken = takenCatalogIds(args.automationsFor(key), nextCatalog);
     const setupColumn = customAutomationSetupColumn(key);
     const customStage = key.startsWith("custom-");
-    if (allowCustom && setupColumn !== null && onlyCustomCatalogRemains(nextCatalog, nextTaken) && args.lineId) {
+    if (setupColumn !== null && onlyCustomCatalogRemains(nextCatalog, nextTaken) && args.lineId) {
       navigate(
         factoryCustomAutomationSetupPath(args.organizationId, args.factoryKey, args.lineId, undefined, setupColumn),
       );
@@ -93,7 +92,7 @@ export function useAddColumnAutomation(args: {
       entry.kind === "pr-discussion" ||
       entry.kind === "pr-checks" ||
       entry.kind === "custom-verification" ||
-      (entry.kind === "custom" && column.startsWith("custom-") && allowCustom)
+      (entry.kind === "custom" && column.startsWith("custom-"))
     ) {
       openFocusedVerifySetup(entry, column, args, navigate, closePicker);
       return;
@@ -137,7 +136,6 @@ export function useAddColumnAutomation(args: {
   };
 
   return {
-    allowCustom,
     pickerColumn: column,
     pickerTitle: columnTitle ? `Add an automation for ${columnTitle}` : undefined,
     pickerOpen: column !== null && !naming,

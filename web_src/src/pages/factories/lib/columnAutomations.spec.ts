@@ -357,34 +357,18 @@ describe("catalogForColumn", () => {
     expect(catalog.map((entry) => entry.id)).toEqual([...LINE_INTAKE_SOURCES.map((source) => source.id), "analysis"]);
   });
 
-  it("offers discussion, status-check, merge confidence, and visual evidence in the verify catalog", () => {
+  it("offers custom automation in Verify by default", () => {
     expect(catalogForColumn("verify").map((entry) => entry.id)).toEqual([
       "discussion",
       "checks",
       "risk-score",
       "visual-evidence",
-    ]);
-  });
-
-  it("offers a custom canvas in the verify catalog when the feature is on", () => {
-    expect(catalogForColumn("verify", { allowCustom: true }).map((entry) => entry.id)).toEqual([
-      "discussion",
-      "checks",
-      "risk-score",
-      "visual-evidence",
       "custom-verification",
     ]);
   });
 
-  it("offers pull request closure in the done catalog", () => {
-    expect(catalogForColumn("done").map((entry) => entry.id)).toEqual(["pr-closure"]);
-  });
-
-  it("offers a custom automation in the done catalog when the feature is on", () => {
-    expect(catalogForColumn("done", { allowCustom: true }).map((entry) => entry.id)).toEqual([
-      "pr-closure",
-      "custom-verification",
-    ]);
+  it("offers custom automation in Done by default", () => {
+    expect(catalogForColumn("done").map((entry) => entry.id)).toEqual(["pr-closure", "custom-verification"]);
   });
 
   it("keeps phase catalog entries available after one agent exists", () => {
@@ -395,33 +379,29 @@ describe("catalogForColumn", () => {
     });
 
     expect(takenCatalogIds(automations, catalog)).toEqual([]);
-    expect(catalog.map((entry) => entry.id)).toEqual(["agent-step"]);
+    expect(catalog.map((entry) => entry.id)).toEqual(["custom-verification"]);
   });
 });
 
 describe("onlyCustomCatalogRemains", () => {
   it("is true when every unique Verify type is taken", () => {
-    const catalog = catalogForColumn("verify", { allowCustom: true });
+    const catalog = catalogForColumn("verify");
     expect(onlyCustomCatalogRemains(catalog, ["discussion", "checks", "risk-score", "visual-evidence"])).toBe(true);
   });
 
   it("is false when risk score is still available", () => {
-    const catalog = catalogForColumn("verify", { allowCustom: true });
+    const catalog = catalogForColumn("verify");
     expect(onlyCustomCatalogRemains(catalog, ["discussion", "checks"])).toBe(false);
   });
 
-  it("is false when custom automations are off", () => {
-    expect(onlyCustomCatalogRemains(catalogForColumn("verify"), ["discussion", "checks"])).toBe(false);
-  });
-
   it("is false when another unique Verify type is still available", () => {
-    const catalog = catalogForColumn("verify", { allowCustom: true });
+    const catalog = catalogForColumn("verify");
     expect(onlyCustomCatalogRemains(catalog, ["discussion"])).toBe(false);
     expect(onlyCustomCatalogRemains(catalog, [])).toBe(false);
   });
 
   it("is true when Done already has pull request closure", () => {
-    expect(onlyCustomCatalogRemains(catalogForColumn("done", { allowCustom: true }), ["pr-closure"])).toBe(true);
+    expect(onlyCustomCatalogRemains(catalogForColumn("done"), ["pr-closure"])).toBe(true);
   });
 });
 

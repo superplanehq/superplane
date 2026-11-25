@@ -125,9 +125,8 @@ export const PR_CLOSURE_ENTRY: ColumnAutomationCatalogEntry = {
 
 export function catalogForColumn(
   key: ColumnKey,
-  options?: { allowCustom?: boolean; allowReviewRequest?: boolean; vcsProvider?: string },
+  options?: { allowReviewRequest?: boolean; vcsProvider?: string },
 ): ColumnAutomationCatalogEntry[] {
-  const allowCustom = options?.allowCustom === true;
   if (key.startsWith("custom-")) {
     return [CUSTOM_ENTRY];
   }
@@ -166,7 +165,7 @@ export function catalogForColumn(
       RISK_SCORE_ENTRY,
       ...(reviewRequestAvailable(options) ? [REVIEW_REQUEST_ENTRY] : []),
       ...(options?.vcsProvider === "bitbucket" ? [] : [VISUAL_EVIDENCE_ENTRY]),
-      ...(allowCustom ? [CUSTOM_AUTOMATION_ENTRY] : []),
+      CUSTOM_AUTOMATION_ENTRY,
     ];
   }
   if (key === "done") {
@@ -174,19 +173,19 @@ export function catalogForColumn(
       options?.vcsProvider === "bitbucket"
         ? { ...PR_CLOSURE_ENTRY, iconSrc: bitbucketIcon, iconAlt: "Bitbucket" }
         : PR_CLOSURE_ENTRY;
-    return allowCustom ? [closureEntry, CUSTOM_AUTOMATION_ENTRY] : [closureEntry];
+    return [closureEntry, CUSTOM_AUTOMATION_ENTRY];
   }
-  return phaseCatalog(key, allowCustom);
+  return phaseCatalog(key);
 }
 
 export function pickerCatalogForColumn(
   key: ColumnKey,
-  options?: { allowCustom?: boolean; allowReviewRequest?: boolean; vcsProvider?: string },
+  options?: { allowReviewRequest?: boolean; vcsProvider?: string },
 ): { catalog: ColumnAutomationCatalogEntry[]; unavailableReasons: Record<string, string> } {
   const available = catalogForColumn(key, options);
   const groups = [
     { label: "Backlog", catalog: [ANALYSIS_ENTRY] },
-    { label: "an app stage", catalog: phaseCatalog("phase-1", options?.allowCustom === true) },
+    { label: "an app stage", catalog: phaseCatalog("phase-1") },
     { label: "Verify", catalog: catalogForColumn("verify", options) },
     { label: "Done", catalog: catalogForColumn("done", options) },
   ];
@@ -212,11 +211,11 @@ export function pickerCatalogForColumn(
   return { catalog, unavailableReasons };
 }
 
-function phaseCatalog(key: ColumnKey, allowCustom: boolean): ColumnAutomationCatalogEntry[] {
+function phaseCatalog(key: ColumnKey): ColumnAutomationCatalogEntry[] {
   if (key === "phase-0") {
-    return allowCustom ? [CUSTOM_AUTOMATION_ENTRY] : [AGENT_STEP_ENTRY];
+    return [CUSTOM_AUTOMATION_ENTRY];
   }
-  return allowCustom ? [AGENT_STEP_ENTRY, CUSTOM_ENTRY] : [AGENT_STEP_ENTRY];
+  return [AGENT_STEP_ENTRY, CUSTOM_ENTRY];
 }
 
 function reviewRequestAvailable(options: { allowReviewRequest?: boolean; vcsProvider?: string } | undefined) {

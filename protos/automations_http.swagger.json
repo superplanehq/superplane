@@ -241,7 +241,7 @@
       "description": "The authenticated account or session cannot perform this operation. The authentication middleware returns plain text."
     },
     "AutomationV2NotFound": {
-      "description": "The resource is unavailable, the account lacks the required factory permission, or the organization has not enabled Factories, Custom Automations and Automations as code. An unavailable session organization returns plain text.",
+      "description": "The resource is unavailable, the account lacks the required factory permission, or the organization has not enabled Factories and Automations as code. An unavailable session organization returns plain text.",
       "schema": { "$ref": "#/definitions/AutomationV2Error" }
     },
     "AutomationV2BodyLimit": {
