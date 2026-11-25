@@ -27,7 +27,7 @@ func TestFactoryWebhookLifecycle(t *testing.T) {
 
 	_, err := ListFactoryWebhooks(ctx, deps, orgID, &pb.ListFactoryWebhooksRequest{FactoryId: factory.ID.String()})
 	requireStatusCode(t, err, codes.FailedPrecondition)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryAsCode))
 
 	created, err := CreateFactoryWebhook(ctx, deps, orgID, &pb.CreateFactoryWebhookRequest{
 		FactoryId: factory.ID.String(), Name: " Jira ", Authentication: pb.FactoryWebhook_AUTHENTICATION_SIGNATURE,
@@ -87,7 +87,7 @@ func TestBacklogWebhookAutomationCreatesTasksFromThePayload(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 	factory := seedHandOffFactory(t, r, db)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryAsCode))
 	integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
 	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSIntegrationID: &integrationID}))
 	ctx, deps, orgID := onboardingContext(r), onboardingDeps(r), r.Organization.ID.String()
