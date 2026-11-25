@@ -484,8 +484,12 @@ func (c *FactoryContext) createFactoryWorkOrder(
 	params core.WorkOrderParams,
 	sourceRunID uuid.UUID,
 ) (*models.FactoryWorkOrder, error) {
+	origin := c.originFromSourceRun(sourceRunID)
+	if params.OriginURL != "" {
+		origin = &models.WorkOrderOrigin{URL: params.OriginURL, Label: models.OriginLabelFromURL(params.OriginURL)}
+	}
 	if factoryModel.OnboardingConfigValue().CodexSubscription {
-		order, err := factoryModel.CreateIntakeWorkOrder(c.tx, params.Title, params.Description, sourceRunID, c.originFromSourceRun(sourceRunID))
+		order, err := factoryModel.CreateIntakeWorkOrder(c.tx, params.Title, params.Description, sourceRunID, origin)
 		if !errors.Is(err, models.ErrSubscriptionOwnerRequired) {
 			return order, err
 		}
@@ -511,10 +515,6 @@ func (c *FactoryContext) createFactoryWorkOrder(
 				return nil, err
 			}
 		}
-	}
-	origin := c.originFromSourceRun(sourceRunID)
-	if params.OriginURL != "" {
-		origin = &models.WorkOrderOrigin{URL: params.OriginURL, Label: models.OriginLabelFromURL(params.OriginURL)}
 	}
 	if origin != nil {
 		return factoryModel.CreateWorkOrderWithOrigin(

@@ -374,14 +374,16 @@ function WebhookEditorForm({
 export function WebhookAuthenticationField({
   value,
   onChange,
+  disabled,
 }: {
   value: Authentication;
   onChange: (value: Authentication) => void;
+  disabled?: boolean;
 }) {
   return (
     <div className="space-y-2">
       <Label htmlFor="factory-webhook-authentication">Authentication</Label>
-      <Select value={value} onValueChange={(next) => onChange(next as Authentication)}>
+      <Select value={value} onValueChange={(next) => onChange(next as Authentication)} disabled={disabled}>
         <SelectTrigger
           id="factory-webhook-authentication"
           className="w-full"

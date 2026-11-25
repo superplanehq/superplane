@@ -88,6 +88,9 @@ describe("WebhookIntakeSetupDialog", () => {
     await user.click(screen.getByTestId("webhook-intake-setup-continue"));
     await user.click(screen.getByTestId("webhook-intake-setup-finish"));
     expect(await screen.findByRole("alert")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Back" }));
+    expect(screen.getByTestId("factory-webhook-authentication")).toBeDisabled();
+    await user.click(screen.getByTestId("webhook-intake-setup-continue"));
     await user.click(screen.getByTestId("webhook-intake-setup-finish"));
 
     await screen.findByTestId("factory-webhook-secret");

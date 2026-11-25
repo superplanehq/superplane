@@ -29,6 +29,12 @@ describe("webhookIntakeExampleBody", () => {
     expect(Object.keys(body.issue)).toEqual(["title", "body", "url"]);
   });
 
+  it("keeps a __proto__ segment inside the example body", () => {
+    const body = JSON.parse(webhookIntakeExampleBody({ title: "__proto__.title", description: "", link: "" }));
+    expect(Object.keys(body)).toEqual(["__proto__"]);
+    expect(({} as Record<string, unknown>).title).toBeUndefined();
+  });
+
   it("uses top-level keys for the default paths", () => {
     expect(Object.keys(JSON.parse(webhookIntakeExampleBody(DEFAULT_WEBHOOK_INTAKE_FIELD_PATHS)))).toEqual([
       "title",

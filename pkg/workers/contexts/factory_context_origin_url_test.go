@@ -2,6 +2,7 @@ package contexts
 
 import (
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -10,6 +11,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
+	"gorm.io/datatypes"
 )
 
 func TestFactoryContext_CreateWorkOrder_ConfiguredOriginURL(t *testing.T) {
@@ -56,6 +58,38 @@ func TestFactoryContext_CreateWorkOrder_ConfiguredOriginURL(t *testing.T) {
 		orders, err := factory.ListWorkOrders(database.Conn(), models.ListFactoryWorkOrdersFilters{Limit: 10})
 		require.NoError(t, err)
 		assert.Len(t, orders, 1)
+	})
+
+	t.Run("a subscription workspace keeps the configured link", func(t *testing.T) {
+		db := database.Conn()
+		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		subscription := true
+		require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{CodexSubscription: &subscription}))
+		connection, err := models.CreateCodexConnection(db, r.Organization.ID, r.User, time.Now())
+		require.NoError(t, err)
+		require.NoError(t, db.Model(connection).Updates(map[string]any{"credential_version": 1, "bundle_ciphertext": []byte("bundle")}).Error)
+		canvas, execution, run := setupFactoryAppExecutionWithPayload(t, r, factory.ID, map[string]any{"type": "webhook", "data": map[string]any{}})
+		version, err := models.FindCanvasVersionInTransaction(db, canvas.ID, run.VersionID)
+		require.NoError(t, err)
+		version.Nodes = datatypes.JSONSlice[models.Node]{{
+			ID: "create-work-order", Type: models.NodeTypeComponent,
+			Ref:           models.NodeRef{Component: &models.ComponentRef{Name: "createWorkOrder"}},
+			Configuration: map[string]any{"defaultOwnerId": r.User.String()},
+		}}
+		require.NoError(t, models.SaveCanvasVersionInTransaction(db, version))
+		_, err = factory.CreateIntake(db, canvas.ID, models.FactoryIntakeSourceWebhook)
+		require.NoError(t, err)
+		link := "https://tracker.example.com/items/7"
+
+		created, inserted, err := NewFactoryContext(db, canvas, execution).
+			CreateWorkOrder(core.WorkOrderParams{Title: "Checkout fails", OriginURL: link, DefaultOwnerID: r.User.String()})
+		require.NoError(t, err)
+		require.True(t, inserted)
+		persisted, err := factory.FindWorkOrder(db, uuid.MustParse(created.ID))
+		require.NoError(t, err)
+		require.NotNil(t, persisted.Origin())
+		assert.Equal(t, link, persisted.Origin().URL)
 	})
 
 	t.Run("a webhook intake without a link does not take one from the request", func(t *testing.T) {

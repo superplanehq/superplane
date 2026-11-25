@@ -120,7 +120,11 @@ function WebhookStep({
               data-testid="webhook-intake-name"
             />
           </div>
-          <WebhookAuthenticationField value={setup.authentication} onChange={setup.setAuthentication} />
+          <WebhookAuthenticationField
+            value={setup.authentication}
+            onChange={setup.setAuthentication}
+            disabled={Boolean(setup.createdWebhook)}
+          />
           <p className="text-xs text-muted-foreground">{WEBHOOK_INTAKE_SETUP_COPY.newWebhookHelper}</p>
         </div>
       ) : (

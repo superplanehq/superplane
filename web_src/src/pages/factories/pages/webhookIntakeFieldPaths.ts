@@ -41,7 +41,8 @@ export function webhookIntakeFieldPathErrors(paths: WebhookIntakeFieldPaths): We
 
 /** A request body that fills every mapped field, so the user can check the paths. */
 export function webhookIntakeExampleBody(paths: WebhookIntakeFieldPaths): string {
-  const body: Record<string, unknown> = {};
+  // Objects without a prototype, so a segment such as __proto__ stays an own key.
+  const body: Record<string, unknown> = Object.create(null);
   for (const field of ["title", "description", "link"] as const) {
     const path = paths[field].trim();
     if (!path || !FIELD_PATH.test(path)) continue;
@@ -49,7 +50,7 @@ export function webhookIntakeExampleBody(paths: WebhookIntakeFieldPaths): string
     let parent = body;
     for (const segment of segments.slice(0, -1)) {
       const child = parent[segment];
-      parent[segment] = child && typeof child === "object" ? child : {};
+      parent[segment] = child && typeof child === "object" ? child : Object.create(null);
       parent = parent[segment] as Record<string, unknown>;
     }
     parent[segments[segments.length - 1]] = EXAMPLE_VALUES[field];
