@@ -65,9 +65,6 @@ const FeatureAutomationsAsCode = "automations-as-code"
 // FeatureWorkspaceSkills gates workspace skill settings, skill APIs, and skill attach.
 const FeatureWorkspaceSkills = "workspace_skills"
 
-// FeatureFactoryPullRequestImport gates manual PR import into Verify.
-const FeatureFactoryPullRequestImport = "factory_pull_request_import"
-
 // FeatureFactoryPullRequestMerge gates the Mergeable chip on task cards and
 // the Merge button on pull request review until the feature is generally
 // available.
@@ -95,7 +92,6 @@ func released() *bool {
 }
 
 var registry = []Feature{
-	{ID: FeatureFactoryPullRequestImport, Label: "Pull request import", Description: "Import open pull requests into Verify"},
 	{ID: FeatureGitHubEnterpriseServer, Label: "GitHub Enterprise Server", Description: "Connect GitHub Enterprise Server. This option is not available yet", Hidden: true},
 	{ID: FeatureOrganizationRunners, Label: "Organization runners", Description: "Manage self-hosted fleets and runners for an organization"},
 	{ID: FeatureFactories, Label: "Factories", Description: "Software factories for work orders and production workflows"},

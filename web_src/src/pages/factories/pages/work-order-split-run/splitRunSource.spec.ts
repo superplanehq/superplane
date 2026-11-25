@@ -512,7 +512,7 @@ describe("splitRunSourceForOrder", () => {
           expect(source.ticket.href, order.id).toMatch(/^https?:/);
           expect(source.ticket.label, order.id).toBeTruthy();
         }
-      } else if (source.kind === "mcp") {
+      } else if (source.kind === "mcp" || source.kind === "automation") {
         expect(source.name, order.id).toBeTruthy();
       } else {
         expect(source.person.name, order.id).toBeTruthy();

@@ -71,8 +71,8 @@ func parseFactoryLineStage(
 		if len(stage.GetKey()) > factoryLineColumnColorKeyMaxLength {
 			return models.FactoryLineStage{}, invalidArgument("temporary stage key is invalid")
 		}
-		if (stage.GetKey() != "" && !strings.HasPrefix(stage.GetKey(), "new-")) || (stage.GetKind() != pb.FactoryLine_STAGE_KIND_UNSPECIFIED && stage.GetKind() != pb.FactoryLine_STAGE_KIND_CUSTOM) || stage.StepIndex != nil {
-			return models.FactoryLineStage{}, invalidArgument("new stages must be custom stages without an id or step index")
+		if (stage.GetKey() != "" && !strings.HasPrefix(stage.GetKey(), "new-")) || (stage.GetKind() != pb.FactoryLine_STAGE_KIND_UNSPECIFIED && stage.GetKind() != pb.FactoryLine_STAGE_KIND_PHASE) || stage.StepIndex != nil {
+			return models.FactoryLineStage{}, invalidArgument("new stages must be phases without an id or step index")
 		}
 		id := uuid.New()
 		autoAdvance := true
@@ -83,7 +83,7 @@ func parseFactoryLineStage(
 			ID:          id,
 			Key:         "custom-" + id.String(),
 			Name:        name,
-			Kind:        models.FactoryLineStageCustom,
+			Kind:        models.FactoryLineStagePhase,
 			AutoAdvance: &autoAdvance,
 		}, nil
 	}
@@ -134,10 +134,6 @@ func factoryLineStageKind(kind pb.FactoryLine_StageKind) string {
 		return models.FactoryLineStageBacklog
 	case pb.FactoryLine_STAGE_KIND_PHASE:
 		return models.FactoryLineStagePhase
-	case pb.FactoryLine_STAGE_KIND_CUSTOM:
-		return models.FactoryLineStageCustom
-	case pb.FactoryLine_STAGE_KIND_VERIFY:
-		return models.FactoryLineStageVerify
 	case pb.FactoryLine_STAGE_KIND_DONE:
 		return models.FactoryLineStageDone
 	default:

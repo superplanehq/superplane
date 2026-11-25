@@ -1,10 +1,32 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "bun:test";
+import { MemoryRouter, Route, Routes } from "react-router";
 
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
 
 import type { SplitRunSource } from "./splitRunSource";
 import { WorkOrderSplitRunSource } from "./WorkOrderSplitRunSource";
+
+const AUTOMATION_SOURCE: SplitRunSource = {
+  kind: "automation",
+  name: "ESLint AutoFix",
+  iconSrc: "/superplane.svg",
+  iconAlt: "SuperPlane",
+  run: { appId: "canvas-eslint", runId: "run-eslint-1" },
+};
+
+function renderInFactory(source: SplitRunSource, compact = false) {
+  return render(
+    <MemoryRouter initialEntries={["/org-1/workspaces/sp/tasks/1?lineId=line-1"]}>
+      <Routes>
+        <Route
+          path="/:organizationId/workspaces/:factoryKey/*"
+          element={<WorkOrderSplitRunSource compact={compact} source={source} />}
+        />
+      </Routes>
+    </MemoryRouter>,
+  );
+}
 
 const GITHUB_SOURCE: SplitRunSource = {
   kind: "intake",
@@ -85,4 +107,29 @@ describe("WorkOrderSplitRunSource", () => {
 
     expect(screen.getByRole("img", { name: "Sentry" })).toHaveClass("dark:brightness-0", "dark:invert");
   });
+
+  it("names an automation source with its name and the SuperPlane mark", () => {
+    renderInFactory(AUTOMATION_SOURCE);
+
+    expect(screen.getByText("ESLint AutoFix")).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "SuperPlane" })).toBeInTheDocument();
+  });
+
+  for (const compact of [false, true]) {
+    it(`links the task to the run that created it (compact: ${compact})`, () => {
+      renderInFactory(AUTOMATION_SOURCE, compact);
+
+      const link = screen.getByRole("link", { name: "View run" });
+      expect(link.getAttribute("href")).toBe(
+        "/org-1/workspaces/sp/lines/line-1?customAutomation=canvas-eslint&automationColumn=backlog&automationTab=runs&automationRun=run-eslint-1",
+      );
+    });
+
+    it(`shows no run link when the task has no source run (compact: ${compact})`, () => {
+      renderInFactory({ ...AUTOMATION_SOURCE, run: undefined }, compact);
+
+      expect(screen.getByText("ESLint AutoFix")).toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: "View run" })).not.toBeInTheDocument();
+    });
+  }
 });

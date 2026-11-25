@@ -98,7 +98,7 @@ describe("fixtureForSplitRunPage", () => {
     const fixture = fixtureForSplitRunPage(DRAFT_WORK_ORDER, [], null, {
       lineStages: [
         { key: "backlog", name: "Backlog", kind: "STAGE_KIND_BACKLOG" },
-        { key: "custom-qa", name: "QA", kind: "STAGE_KIND_CUSTOM" },
+        { key: "custom-qa", name: "QA", kind: "STAGE_KIND_PHASE" },
         { key: "phase-0", name: "Implement", kind: "STAGE_KIND_PHASE", stepIndex: 0 },
         { key: "done", name: "Done", kind: "STAGE_KIND_DONE" },
       ],
@@ -119,7 +119,7 @@ describe("fixtureForSplitRunPage", () => {
             createdAt: "2026-08-26T10:00:00Z",
             stages: [
               { key: "backlog", name: "Backlog", kind: "STAGE_KIND_BACKLOG" },
-              { key: "custom-qa", name: "QA", kind: "STAGE_KIND_CUSTOM" },
+              { key: "custom-qa", name: "QA", kind: "STAGE_KIND_PHASE" },
               { key: "phase-0", name: "Implement", kind: "STAGE_KIND_PHASE", stepIndex: 0 },
               { key: "done", name: "Done", kind: "STAGE_KIND_DONE" },
             ],

@@ -66,7 +66,7 @@ func Test__CreateFactoryAutomation(t *testing.T) {
 		stageKey := "custom-" + stageID.String()
 		stages := line.StagesValue()
 		stages = append(stages[:len(stages)-1], models.FactoryLineStage{
-			ID: stageID, Key: stageKey, Name: "QA", Kind: models.FactoryLineStageCustom,
+			ID: stageID, Key: stageKey, Name: "QA", Kind: models.FactoryLineStagePhase,
 		}, stages[len(stages)-1])
 		require.NoError(t, line.UpdateConfiguration(db, nil, nil, nil, stages))
 

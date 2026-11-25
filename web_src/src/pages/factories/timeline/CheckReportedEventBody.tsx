@@ -36,10 +36,10 @@ export function CheckReportedEventBody({
   const runHref = getWorkOrderRunHref(organizationId, factoryKey, event.sourceAppId, event.sourceRunId, {
     orderNumber,
   });
-  const { value: scoreLabel, scale } = formatCheckScore(check);
+  const { value: scoreLabel, scale, previousScore } = formatCheckScore(check);
   const isBoolean = check.format === "boolean";
   const previousScoreLabel =
-    isBoolean && check.previousScore !== undefined ? booleanCheckVerdict(check.previousScore) : check.previousScore;
+    isBoolean && previousScore !== undefined ? booleanCheckVerdict(previousScore) : previousScore;
   const isRescore = check.previousScore !== undefined && check.previousScore !== check.score;
 
   return (

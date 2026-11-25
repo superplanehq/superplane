@@ -373,7 +373,7 @@ func assemblePublicBoard(
 		}
 		ordered := make([]publicColumn, 0, len(line.Stages))
 		for _, stage := range line.StagesValue() {
-			if stage.Kind == models.FactoryLineStageCustom {
+			if stage.Kind == models.FactoryLineStagePhase && stage.StepIndex == nil && stage.Key != "verify" {
 				ordered = append(ordered, publicColumn{
 					Key:   stage.Key,
 					Title: stage.Name,

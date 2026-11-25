@@ -4,12 +4,15 @@ import (
 	"encoding/json"
 	"os"
 	"testing"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
+	"gorm.io/datatypes"
 )
 
 func TestFactoryLineStagesMigrationBackfillsExistingLines(t *testing.T) {
@@ -55,4 +58,69 @@ func TestFactoryLineStagesMigrationBackfillsExistingLines(t *testing.T) {
 	})
 	assert.Contains(t, stages[1].Name, "Implement")
 	assert.Equal(t, 0, *stages[1].StepIndex)
+}
+
+func TestFactoryStageKindsMigrationPreservesLineAndRetrySnapshots(t *testing.T) {
+	r := support.Setup(t)
+	tx := database.DB(t.Context()).Begin()
+	require.NoError(t, tx.Error)
+	defer tx.Rollback()
+	factory, err := models.CreateFactory(tx, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	line, err := factory.CreateLine(tx, "ship", nil)
+	require.NoError(t, err)
+	legacyStages := `[
+		{"id":"backlog-id","key":"backlog","name":"Backlog","kind":"backlog"},
+		{"id":"qa-id","key":"custom-qa","name":"QA","kind":"custom","auto_advance":false,"extra":"keep"},
+		{"id":"verify-id","key":"verify","name":"Check","kind":"verify"},
+		{"id":"review-id","key":"custom-review","name":"Review","kind":"verify","auto_advance":true},
+		{"id":"done-id","key":"done","name":"Done","kind":"done"}
+	]`
+	expectedStages := `[
+		{"id":"backlog-id","key":"backlog","name":"Backlog","kind":"backlog"},
+		{"id":"qa-id","key":"custom-qa","name":"QA","kind":"phase","auto_advance":false,"extra":"keep"},
+		{"id":"verify-id","key":"verify","name":"Check","kind":"phase","auto_advance":false},
+		{"id":"review-id","key":"custom-review","name":"Review","kind":"phase","auto_advance":true},
+		{"id":"done-id","key":"done","name":"Done","kind":"done"}
+	]`
+	legacySteps := `[{"stage_kind":"custom","stage_key":"custom-qa","extra":1},{"stage_kind":"verify","stage_key":"verify"},{"type":"runApp"}]`
+	expectedSteps := `[{"stage_kind":"phase","stage_key":"custom-qa","extra":1},{"stage_kind":"phase","stage_key":"verify"},{"type":"runApp"}]`
+	require.NoError(t, tx.Exec("UPDATE factory_lines SET stages = ?::jsonb, steps = ?::jsonb WHERE id = ?", legacyStages, legacySteps, line.ID).Error)
+	ids := []uuid.UUID{}
+	for _, state := range []string{models.FactoryWorkOrderLineDispatchStateActive, models.FactoryWorkOrderLineDispatchStateFinished} {
+		order, err := factory.CreateWorkOrder(tx, state, "", &r.User, nil, nil)
+		require.NoError(t, err)
+		now := time.Now()
+		dispatch := models.FactoryWorkOrderLineDispatch{
+			ID: uuid.New(), OrganizationID: r.Organization.ID, FactoryID: factory.ID,
+			WorkOrderID: order.ID, LineID: line.ID, LineName: line.Name, State: state,
+			Steps: datatypes.JSONSlice[models.FactoryLineStep]{}, Stages: datatypes.JSONSlice[models.FactoryLineStage]{},
+			CreatedAt: now, UpdatedAt: now,
+		}
+		require.NoError(t, tx.Create(&dispatch).Error)
+		require.NoError(t, tx.Exec("UPDATE factory_work_order_line_dispatches SET stages = ?::jsonb, steps = ?::jsonb WHERE id = ?", legacyStages, legacySteps, dispatch.ID).Error)
+		ids = append(ids, dispatch.ID)
+	}
+	empty, err := factory.CreateLine(tx, "empty", nil)
+	require.NoError(t, err)
+	require.NoError(t, tx.Exec("UPDATE factory_lines SET stages = '[]'::jsonb, steps = '[]'::jsonb WHERE id = ?", empty.ID).Error)
+	_, err = factory.CreateLine(tx, "null steps", nil)
+	require.NoError(t, err)
+	migration, err := os.ReadFile("../../db/migrations/20261124182440_unify-factory-stage-kinds.up.sql")
+	require.NoError(t, err)
+	for range 2 {
+		require.NoError(t, tx.Exec(string(migration)).Error)
+		var row struct{ Stages, Steps string }
+		require.NoError(t, tx.Raw("SELECT stages, steps FROM factory_lines WHERE id = ?", line.ID).Scan(&row).Error)
+		assert.JSONEq(t, expectedStages, row.Stages)
+		assert.JSONEq(t, expectedSteps, row.Steps)
+		for _, id := range ids {
+			require.NoError(t, tx.Raw("SELECT stages, steps FROM factory_work_order_line_dispatches WHERE id = ?", id).Scan(&row).Error)
+			assert.JSONEq(t, expectedStages, row.Stages)
+			assert.JSONEq(t, expectedSteps, row.Steps)
+		}
+		require.NoError(t, tx.Raw("SELECT stages, steps FROM factory_lines WHERE id = ?", empty.ID).Scan(&row).Error)
+		assert.JSONEq(t, `[]`, row.Stages)
+		assert.JSONEq(t, `[]`, row.Steps)
+	}
 }

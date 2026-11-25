@@ -10,6 +10,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	runneraction "github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -134,9 +135,25 @@ func (s *Server) handleRunnerCreateTask(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// The run that calls this tool is the creator. Its link lets the task
+	// show the run that created it.
+	sourceRunID := scope.CanvasRunID
 	var order *models.FactoryWorkOrder
 	err = db.Transaction(func(tx *gorm.DB) error {
-		created, createErr := factoryModel.CreateWorkOrder(tx, title, description, nil, nil, nil)
+		var assignees []uuid.UUID
+		config := factoryModel.OnboardingConfigValue()
+		if config.CodexSubscription {
+			owner := strings.TrimSpace(config.CodexDefaultOwnerID)
+			if owner == "" {
+				return models.ErrSubscriptionOwnerRequired
+			}
+			ownerID, err := uuid.Parse(owner)
+			if err != nil || ownerID == uuid.Nil {
+				return models.ErrSubscriptionOwnerInvalid
+			}
+			assignees = []uuid.UUID{ownerID}
+		}
+		created, createErr := factoryModel.CreateWorkOrder(tx, title, description, nil, assignees, &sourceRunID)
 		if createErr != nil {
 			return createErr
 		}
@@ -370,6 +387,8 @@ func writeRunnerTaskError(w http.ResponseWriter, err error) {
 	case errors.Is(err, models.ErrFactoryWorkOrderArtifactNotFound):
 		http.Error(w, "Artifact not found", http.StatusNotFound)
 	case errors.Is(err, models.ErrFactoryWorkOrderArtifactInvalid), errors.Is(err, models.ErrFactoryWorkOrderTitleRequired):
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	case errors.Is(err, models.ErrSubscriptionOwnerRequired), errors.Is(err, models.ErrSubscriptionOwnerInvalid):
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	case errors.Is(err, models.ErrFactoryWorkOrderInvalidState):
 		http.Error(w, err.Error(), http.StatusConflict)

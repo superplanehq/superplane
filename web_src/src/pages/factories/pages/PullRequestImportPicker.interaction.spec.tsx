@@ -5,7 +5,6 @@ import { PullRequestImportPicker } from "./PullRequestImportPicker";
 import { CodexActionCancelled } from "../codex/codexActionContext";
 
 let archivedTask = false;
-let enabled = true;
 let canCreate = true;
 let canUpdate = true;
 const prepareOpen = vi.fn(async () => true);
@@ -35,7 +34,7 @@ const searchPRs = vi.fn(
     refetch,
   }),
 );
-vi.mock("@/hooks/useExperimentalFeature", () => ({ useExperimentalFeature: () => ({ has: () => enabled }) }));
+vi.mock("@/hooks/useExperimentalFeature", () => ({ useExperimentalFeature: () => ({ has: () => false }) }));
 vi.mock("@/contexts/usePermissions", () => ({
   usePermissions: () => ({
     canAct: (_resource: string, action: string) => (action === "create" ? canCreate : canUpdate),
@@ -49,7 +48,7 @@ vi.mock("@/hooks/useFactoryPullRequestImports", () => ({
 
 beforeEach(() => {
   archivedTask = false;
-  enabled = canCreate = canUpdate = true;
+  canCreate = canUpdate = true;
   prepareOpen.mockReset();
   prepareOpen.mockResolvedValue(true);
   importPR.mockReset();
@@ -70,13 +69,9 @@ function picker(mobile = false, onOpenTask = vi.fn()) {
 }
 
 describe("Pull request picker integration", () => {
-  it("hides the importer when the flag is off or a required permission is missing", () => {
-    enabled = false;
-    const view = render(picker());
-    expect(screen.queryByRole("button", { name: "Import pull request" })).toBeNull();
-    enabled = true;
+  it("hides the importer when a required permission is missing", () => {
     canCreate = false;
-    view.rerender(picker());
+    const view = render(picker());
     expect(screen.queryByRole("button", { name: "Import pull request" })).toBeNull();
     canCreate = true;
     canUpdate = false;
@@ -85,7 +80,7 @@ describe("Pull request picker integration", () => {
   });
 
   for (const mobile of [false, true]) {
-    it(`imports into the selected line and opens the task on ${mobile ? "mobile" : "desktop"}`, async () => {
+    it(`imports without the flag into the selected line on ${mobile ? "mobile" : "desktop"}`, async () => {
       const onOpenTask = vi.fn();
       render(picker(mobile, onOpenTask));
       fireEvent.click(screen.getByRole("button", { name: "Import pull request" }));

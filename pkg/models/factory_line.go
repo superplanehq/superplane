@@ -18,8 +18,6 @@ const (
 	FactoryLineStepTypeRunApp = "runApp"
 	FactoryLineStageBacklog   = "backlog"
 	FactoryLineStagePhase     = "phase"
-	FactoryLineStageCustom    = "custom"
-	FactoryLineStageVerify    = "verify"
 	FactoryLineStageDone      = "done"
 
 	// DefaultFactoryLineStepMaxParallelism is the number of in-flight runs
@@ -73,7 +71,7 @@ func (s FactoryLineStage) AutoAdvanceEnabled() bool {
 	if s.AutoAdvance != nil {
 		return *s.AutoAdvance
 	}
-	return s.Kind != FactoryLineStageVerify
+	return true
 }
 
 func (s *FactoryLineStep) EffectiveMaxParallelism() int {
@@ -140,9 +138,11 @@ func (l *FactoryLine) ExecutionPlan(tx *gorm.DB) ([]FactoryLineStep, error) {
 	}
 	steps := make([]FactoryLineStep, 0, len(l.Steps)+len(canvases))
 	for _, stage := range stages {
-		switch stage.Kind {
-		case FactoryLineStagePhase:
-			if stage.StepIndex == nil || *stage.StepIndex < 0 || *stage.StepIndex >= len(l.Steps) {
+		if stage.Kind != FactoryLineStagePhase {
+			continue
+		}
+		if stage.StepIndex != nil {
+			if *stage.StepIndex < 0 || *stage.StepIndex >= len(l.Steps) {
 				continue
 			}
 			step := l.Steps[*stage.StepIndex]
@@ -150,7 +150,8 @@ func (l *FactoryLine) ExecutionPlan(tx *gorm.DB) ([]FactoryLineStep, error) {
 			step.StageName = stage.Name
 			step.StageKind = stage.Kind
 			steps = append(steps, step)
-		case FactoryLineStageCustom:
+		}
+		if stage.StepIndex == nil {
 			for _, canvas := range canvasesByStage[stage.Key] {
 				entrypoint, err := customStageEntrypoint(canvas, specs[canvas.ID])
 				if err != nil {
@@ -428,9 +429,7 @@ func (l *FactoryLine) ReconcileStages(tx *gorm.DB, steps []FactoryLineStep) ([]F
 	}
 	existingByKey := make(map[string]FactoryLineStage, len(existingStages))
 	for _, stage := range existingStages {
-		if stage.Kind != FactoryLineStageCustom {
-			existingByKey[stage.Key] = stage
-		}
+		existingByKey[stage.Key] = stage
 	}
 	systemStages = retainConfiguredOptionalStages(systemStages, existingByKey, len(l.Steps))
 	nextByKey := make(map[string]FactoryLineStage, len(systemStages))
@@ -451,7 +450,7 @@ func (l *FactoryLine) ReconcileStages(tx *gorm.DB, steps []FactoryLineStep) ([]F
 		}
 	}
 	for _, stage := range existingStages {
-		if stage.Kind == FactoryLineStageCustom {
+		if stage.Kind == FactoryLineStagePhase && stage.StepIndex == nil && stage.Key != "verify" {
 			result = append(result, stage)
 			continue
 		}
@@ -460,7 +459,7 @@ func (l *FactoryLine) ReconcileStages(tx *gorm.DB, steps []FactoryLineStep) ([]F
 			continue
 		}
 		// New phases go before Verify so a task stops in Verify after its work stages.
-		if stage.Kind == FactoryLineStageVerify || stage.Kind == FactoryLineStageDone {
+		if stage.Key == "verify" || stage.Kind == FactoryLineStageDone {
 			appendNewStages()
 		}
 		stage.StepIndex = next.StepIndex
@@ -524,7 +523,7 @@ func (l *FactoryLine) removedCustomStageKeys(next []FactoryLineStage) []string {
 	}
 	removedKeys := make([]string, 0, len(l.Stages))
 	for _, stage := range l.StagesValue() {
-		if stage.Kind == FactoryLineStageCustom && !retained[stage.ID] {
+		if strings.HasPrefix(stage.Key, "custom-") && !retained[stage.ID] {
 			removedKeys = append(removedKeys, stage.Key)
 		}
 	}
@@ -564,7 +563,7 @@ func defaultFactoryLineStages(tx *gorm.DB, steps []FactoryLineStep) ([]FactoryLi
 		stages = append(stages, newFactoryLineStage(FactoryLineStagePhase, "phase-"+strconv.Itoa(index), name, &stepIndex))
 	}
 	stages = append(stages,
-		newFactoryLineStage(FactoryLineStageVerify, "verify", "Verify", nil),
+		newFactoryLineStage(FactoryLineStagePhase, "verify", "Verify", nil),
 		newFactoryLineStage(FactoryLineStageDone, "done", "Done", nil),
 	)
 	return stages, nil
@@ -591,7 +590,7 @@ func factoryLineStepNames(tx *gorm.DB, steps []FactoryLineStep) (map[uuid.UUID]s
 }
 
 func newFactoryLineStage(kind, key, name string, stepIndex *int) FactoryLineStage {
-	autoAdvance := kind != FactoryLineStageVerify
+	autoAdvance := key != "verify"
 	return FactoryLineStage{
 		ID:          uuid.New(),
 		Key:         key,
