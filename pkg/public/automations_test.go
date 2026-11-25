@@ -41,7 +41,7 @@ func TestAutomationAPIUsesFactoryPermissionsAndBothFlags(t *testing.T) {
 	require.NoError(t, models.EnableExperimentalFeature(orgID, features.FeatureFactories))
 	require.NoError(t, models.EnableExperimentalFeature(orgID, features.FeatureFactoryCustomAutomations))
 	require.Equal(t, http.StatusNotFound, list(factory.ID))
-	require.NoError(t, models.EnableExperimentalFeature(orgID, features.FeatureAutomationsAsCode))
+	require.NoError(t, models.EnableExperimentalFeature(orgID, features.FeatureFactoryAsCode))
 	require.Equal(t, http.StatusOK, list(factory.ID))
 	require.Equal(t, http.StatusNotFound, list(uuid.New()))
 	require.NoError(t, models.DisableExperimentalFeature(orgID, features.FeatureFactoryCustomAutomations))
@@ -100,7 +100,7 @@ func TestAutomationAPIPublishesInTheSelectedStage(t *testing.T) {
 	orgID := resources.Organization.ID
 	for _, feature := range []string{
 		features.FeatureFactories, features.FeatureFactoryCustomAutomations,
-		features.FeatureAutomationsAsCode,
+		features.FeatureFactoryAsCode,
 	} {
 		require.NoError(t, models.EnableExperimentalFeature(orgID, feature))
 	}

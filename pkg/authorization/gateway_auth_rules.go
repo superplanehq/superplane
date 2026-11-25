@@ -14,6 +14,18 @@ const (
 
 func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 	return map[HTTPRoute]AuthorizationRule{
+		{Method: "GET", Pattern: "/api/v1/factories/{factory_id}/configuration"}: {
+			Resource: "factories", Action: "read", DomainType: models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureFactoryAsCode},
+		},
+		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/configuration:plan"}: {
+			Resource: "factories", Action: "update", DomainType: models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureFactoryAsCode},
+		},
+		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/configuration:apply"}: {
+			Resource: "factories", Action: "update", DomainType: models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureFactoryAsCode},
+		},
 		{Method: "GET", Pattern: AutomationsPath}: {
 			Resource: "factories", Action: "read", DomainType: models.DomainTypeOrganization,
 			RequiredExperimentalFeatures: []string{features.FeatureFactories},
