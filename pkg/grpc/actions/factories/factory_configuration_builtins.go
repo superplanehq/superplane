@@ -10,6 +10,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/yaml"
+	"gorm.io/gorm"
 )
 
 type factoryConfigurationSettingError struct {
@@ -229,7 +230,7 @@ func validateFactoryConfigurationAgentField(node *models.Node, field string, val
 	return nil
 }
 
-func validateFactoryConfigurationBuiltInNodes(deps IntakeDependencies, nodes []models.Node) error {
+func validateFactoryConfigurationBuiltInNodes(tx *gorm.DB, deps IntakeDependencies, factory *models.Factory, nodes []models.Node) error {
 	for _, node := range nodes {
 		if !isFactoryAgentHarness(node.ComponentName()) {
 			continue
@@ -239,6 +240,19 @@ func validateFactoryConfigurationBuiltInNodes(deps IntakeDependencies, nodes []m
 			Component: node.ComponentName(), Configuration: node.Configuration,
 		}, deps.Registry); err != nil {
 			return &factoryConfigurationSettingError{Field: "agents." + node.ID, Message: err.Error()}
+		}
+		config := map[string]any{"credentials": node.Configuration["credentials"], "model": node.Configuration["model"]}
+		if node.Configuration["llmProvider"] == models.UsageProviderCustom {
+			config["llmProvider"] = models.UsageProviderCustom
+		}
+		_, err := factoryAutomationPolicy(tx, factory, "byok-runner-model", []any{node.ComponentName(), config}, func() (string, error) {
+			return models.ResolveBYOKRunnerModel(tx, factory.OrganizationID, &factory.ID, node.ComponentName(), config)
+		})
+		if errors.Is(err, models.ErrSelectableLLMModelNotAllowed) {
+			return &factoryConfigurationSettingError{Field: "agents." + node.ID + ".model", Message: "Select an available model for the configured agent."}
+		}
+		if err != nil {
+			return err
 		}
 	}
 	return nil

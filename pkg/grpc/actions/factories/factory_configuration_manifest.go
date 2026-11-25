@@ -410,7 +410,7 @@ func validateFactoryConfigurationManifest(ctx context.Context, tx *gorm.DB, deps
 					return nil, err
 				}
 				if !equalCanvasJSON(current.settings, automation.With) {
-					if err := validateFactoryConfigurationBuiltInNodes(deps, nodes); err != nil {
+					if err := validateFactoryConfigurationBuiltInNodes(tx, deps, target.factory, nodes); err != nil {
 						var setting *factoryConfigurationSettingError
 						if errors.As(err, &setting) {
 							return configurationDiagnostic(automationPath+".with."+setting.Field, setting.Message), nil
