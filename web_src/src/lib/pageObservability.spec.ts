@@ -74,6 +74,48 @@ describe("resolvePageObservability", () => {
       pageKey: "settingsNotifications",
       attributes: { organization_id: "org-1" },
     });
+    for (const [section, pageKey] of [
+      ["members", "settingsMembers"],
+      ["create-group", "settingsCreateGroup"],
+      ["roles", "settingsRoles"],
+      ["profile", "settingsProfile"],
+      ["billing", "settingsUsage"],
+      ["general/ignored/trailing", "settingsGeneral"],
+      ["unknown", "settingsUnknown"],
+      ["toString", "settingsUnknown"],
+      ["groups", "settingsGroups"],
+      ["groups/admins", "settingsGroups"],
+      ["groups/admins/unknown", "settingsGroups"],
+      ["create-role", "settingsCreateRole"],
+      ["integrations", "settingsIntegrations"],
+      ["secrets", "settingsSecrets"],
+      ["api-keys", "settingsAPIKeys"],
+    ]) {
+      expect(resolvePageObservability(`/org-1/settings/${section}`)).toEqual({
+        pageKey,
+        attributes: { organization_id: "org-1" },
+      });
+    }
+    expect(resolvePageObservability("/org-1/settings")).toEqual({
+      pageKey: "settingsGeneral",
+      attributes: { organization_id: "org-1" },
+    });
+    expect(resolvePageObservability("/org-1/settings/create-role/operator")).toEqual({
+      pageKey: "settingsCreateRole",
+      attributes: { organization_id: "org-1", role_name: "operator" },
+    });
+    expect(resolvePageObservability("/org-1/settings/integrations/int-9")).toEqual({
+      pageKey: "settingsIntegrationDetail",
+      attributes: { organization_id: "org-1", integration_id: "int-9" },
+    });
+    expect(resolvePageObservability("/org-1/settings/secrets/secret-1")).toEqual({
+      pageKey: "settingsSecretDetail",
+      attributes: { organization_id: "org-1", secret_id: "secret-1" },
+    });
+    expect(resolvePageObservability("/org-1/settings/api-keys/key-1")).toEqual({
+      pageKey: "settingsAPIKeyDetail",
+      attributes: { organization_id: "org-1", api_key_id: "key-1" },
+    });
   });
 
   it("maps factories organization settings routes", () => {

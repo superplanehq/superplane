@@ -33,6 +33,7 @@ import { CustomAutomationSourceEditor } from "./CustomAutomationSourceEditor";
 import { useCustomAutomationSourceDraft } from "@/hooks/useCustomAutomationSourceDraft";
 import { useAutomationRunNavigation } from "./useAutomationRunNavigation";
 import { useCustomAutomationSetupPage } from "./useCustomAutomationSetupPage";
+import { factoryColumnAutomationViewPath } from "../lib/factoryPagePaths";
 
 type CustomAutomationSetupModalProps = {
   lineId: string;
@@ -93,6 +94,11 @@ function LegacyAutomationModal({
           error={failure}
           onClose={onClose}
           onRetry={() => void model.described.refetch()}
+          canvasHref={
+            automationId
+              ? factoryColumnAutomationViewPath(organizationId, routeSegment, lineId, automationId)
+              : undefined
+          }
         />
       ) : (
         <CustomAutomationSetupForm
@@ -126,7 +132,7 @@ function LegacyAutomationModal({
 function AutomationSourceModal(props: CustomAutomationSetupModalProps) {
   const { automationId, columnKey = "verify", onClose } = props;
   const [formVersion, setFormVersion] = useState<string>();
-  const { organizationId, factoryId } = useFactoriesLayout();
+  const { organizationId, factoryId, routeSegment } = useFactoriesLayout();
   const source = useCustomAutomationSource(organizationId, factoryId, automationId);
   if (formVersion) return <LegacyAutomationModal {...props} expectedLiveVersionId={formVersion} />;
   const safeFormVersion = source.error instanceof AutomationSourceError ? source.error.formVersion : undefined;
@@ -140,6 +146,7 @@ function AutomationSourceModal(props: CustomAutomationSetupModalProps) {
           onClose={onClose}
           onRetry={() => void source.refetch()}
           onEditInForm={safeFormVersion ? () => setFormVersion(safeFormVersion) : undefined}
+          canvasHref={factoryColumnAutomationViewPath(organizationId, routeSegment, props.lineId, automationId)}
         />
       </AutomationDialog>
     );
@@ -327,12 +334,14 @@ function AutomationLoadState({
   onClose,
   onRetry,
   onEditInForm,
+  canvasHref,
 }: {
   loading: boolean;
   error: unknown;
   onClose: () => void;
   onRetry: () => void;
   onEditInForm?: () => void;
+  canvasHref?: string;
 }) {
   if (loading) {
     return (
@@ -355,6 +364,11 @@ function AutomationLoadState({
           {onEditInForm ? (
             <Button type="button" variant="outline" onClick={onEditInForm}>
               Edit in form
+            </Button>
+          ) : null}
+          {canvasHref ? (
+            <Button type="button" variant="outline" asChild>
+              <a href={canvasHref}>Open full canvas</a>
             </Button>
           ) : null}
           <Button type="button" onClick={onRetry}>

@@ -6,12 +6,13 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"gorm.io/gorm"
 )
 
-func UpdateFactoryLine(ctx context.Context, organizationID string, req *pb.UpdateFactoryLineRequest) (*pb.UpdateFactoryLineResponse, error) {
+func UpdateFactoryLine(ctx context.Context, deps IntakeDependencies, organizationID string, req *pb.UpdateFactoryLineRequest) (*pb.UpdateFactoryLineResponse, error) {
 	orgID, err := parseOrganizationID(organizationID)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update factory line")
@@ -29,7 +30,14 @@ func UpdateFactoryLine(ctx context.Context, organizationID string, req *pb.Updat
 	}
 
 	var line *models.FactoryLine
+	var deletedCanvases []models.Canvas
 	err = db.Transaction(func(tx *gorm.DB) error {
+		if req.StageConfiguration != nil {
+			factory, err = models.LockAutomationFactory(tx, orgID, factory.ID)
+			if err != nil {
+				return err
+			}
+		}
 		line, err = factory.FindLineForUpdate(tx, lineID)
 		if err != nil {
 			return err
@@ -77,8 +85,8 @@ func UpdateFactoryLine(ctx context.Context, organizationID string, req *pb.Updat
 			if findErr != nil {
 				return findErr
 			}
-			if !organization.HasExperimentalFeature(features.FeatureFactoryCustomStages) {
-				return errFactoryCustomStagesDisabled
+			if !organization.HasExperimentalFeature(features.FeatureFactoryCustomAutomations) {
+				return errCustomAutomationsDisabled
 			}
 			stages, err = parseFactoryLineStages(line, req.GetStageConfiguration().GetStages())
 			if err != nil {
@@ -88,7 +96,24 @@ func UpdateFactoryLine(ctx context.Context, organizationID string, req *pb.Updat
 				columnColors = line.ColumnColorsValue()
 			}
 			columnColors = remapNewFactoryLineStageColors(req.GetStageConfiguration().GetStages(), stages, columnColors)
-			if err := line.DetachRemovedCustomStageAutomations(tx, stages); err != nil {
+			backend := CanvasAutomationBackend{Deps: deps}
+			if err := backend.moveAutomationCards(ctx, tx, factory, line, stages, req.StageConfiguration); err != nil {
+				return err
+			}
+			deletedCanvases, err = line.ListRemovedCustomStageAutomations(tx, stages)
+			if err != nil {
+				return err
+			}
+			for i := range deletedCanvases {
+				canvas := &deletedCanvases[i]
+				if err := rejectReservedFactoryAutomation(tx, factory, canvas); err != nil {
+					return err
+				}
+				if err := canvases.DeleteCanvasInTransaction(tx, canvas); err != nil {
+					return err
+				}
+			}
+			if err := line.ClearRemovedCustomStageDisplayColumns(tx, stages); err != nil {
 				return err
 			}
 		}
@@ -101,6 +126,10 @@ func UpdateFactoryLine(ctx context.Context, organizationID string, req *pb.Updat
 	})
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update factory line")
+	}
+
+	for i := range deletedCanvases {
+		canvases.PublishCanvasDeleted(&deletedCanvases[i])
 	}
 
 	return &pb.UpdateFactoryLineResponse{

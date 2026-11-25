@@ -36,13 +36,12 @@ compose_exec() {
 
 prepare_artifacts() {
   make image.prepare IMAGE_BUILD_DIR="$context"
-  mkdir -p "$context/app/db" "$context/app/api" "$context/app/ee" "$context/scripts/docker"
+  mkdir -p "$context/app/db" "$context/app/api" "$context/app/ee"
   cp LICENSE NOTICE docker-entrypoint.sh "$context/app/"
   cp ee/LICENSE "$context/app/ee/"
   cp -R db/migrations db/data_migrations "$context/app/db/"
   cp -R api/swagger "$context/app/api/"
   cp -R rbac templates "$context/app/"
-  cp scripts/docker/install-postgresql-client.sh "$context/scripts/docker/"
 }
 
 build_frontend() {
@@ -65,6 +64,7 @@ package_image() {
   rm -rf "$context/app/pkg/web/assets/dist"
   cp -R "${build_dir}/${variant}" "$context/app/pkg/web/assets/dist"
   make image.package IMAGE_TAG="$image_tag" IMAGE_BUILD_DIR="$context"
+  make image.scan IMAGE_TAG="$image_tag"
 }
 
 publish_main_images() {

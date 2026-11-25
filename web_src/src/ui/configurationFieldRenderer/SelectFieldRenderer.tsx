@@ -32,8 +32,16 @@ export const SelectFieldRenderer: React.FC<FieldRendererProps> = ({ field, value
       </SelectTrigger>
       <SelectContent position="popper" className="max-h-60">
         {selectOptions.map((opt) => (
-          <SelectItem key={opt.value} value={opt.value ?? ""} title={opt.description || undefined}>
+          <SelectItem
+            key={opt.value}
+            value={opt.value ?? ""}
+            disabled={opt.disabled}
+            title={opt.description || undefined}
+          >
             {opt.label}
+            {opt.disabled && opt.description && (
+              <span className="block text-xs text-muted-foreground">{opt.description}</span>
+            )}
           </SelectItem>
         ))}
       </SelectContent>

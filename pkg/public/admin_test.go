@@ -1638,7 +1638,7 @@ func TestAdminListOrgExperimentalFeatures(t *testing.T) {
 		assert.Contains(t, ids, features.FeatureModelStatus)
 		assert.NotContains(t, ids, "factory_productive_intake")
 		assert.NotContains(t, body.Enabled, features.FeatureModelStatus)
-		assert.Contains(t, ids, features.FeatureGitHubEnterprise)
+		assert.NotContains(t, ids, "github_enterprise")
 		assert.NotContains(t, ids, features.FeatureGitHubEnterpriseServer)
 	})
 
@@ -1693,14 +1693,16 @@ func TestAdminEnableOrgExperimentalFeature(t *testing.T) {
 		})
 	}
 
-	t.Run("rejects unknown feature ids", func(t *testing.T) {
-		response := execRequest(server, requestParams{
-			method:     "POST",
-			path:       "/admin/api/organizations/" + r.Organization.ID.String() + "/experimental-features/does-not-exist",
-			authCookie: token,
+	for _, featureID := range []string{"does-not-exist", "github_enterprise"} {
+		t.Run("rejects unknown feature "+featureID, func(t *testing.T) {
+			response := execRequest(server, requestParams{
+				method:     "POST",
+				path:       "/admin/api/organizations/" + r.Organization.ID.String() + "/experimental-features/" + featureID,
+				authCookie: token,
+			})
+			assert.Equal(t, http.StatusBadRequest, response.Code)
 		})
-		assert.Equal(t, http.StatusBadRequest, response.Code)
-	})
+	}
 
 	t.Run("rejects hidden GitHub Enterprise Server", func(t *testing.T) {
 		response := execRequest(server, requestParams{

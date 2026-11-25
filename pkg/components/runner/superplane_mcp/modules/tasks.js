@@ -143,7 +143,7 @@ const LIST_TASKS = {
   definition: {
     name: "list_tasks",
     description:
-      "List tasks in this workspace. Returns at most 100 tasks, newest update first. Pass state to keep draft, open, or closed tasks. Repeat state to combine them. Archived tasks stay hidden. There is no offset. Each task includes id, key, title, state, and url.",
+      "List tasks in this workspace. Returns at most 100 tasks, newest update first. Pass state to keep draft, open, or closed tasks. Repeat state to combine them. Archived tasks stay hidden. There is no offset. Each task includes id, key, title, state, and url. url is the SuperPlane task link. If a task has a saved external issue link, origin contains its url and label. Use origin.url to identify the issue before commenting with your existing GitHub access. Tasks without a saved origin omit origin. Do not infer issue numbers from task numbers.",
     inputSchema: {
       type: "object",
       properties: {

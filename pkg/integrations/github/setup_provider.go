@@ -233,7 +233,15 @@ func (g *SetupProvider) OnSecretUpdate(ctx core.SecretUpdateContext) (*core.Setu
 func (g *SetupProvider) FirstStep(ctx core.SetupStepContext) core.SetupStep {
 	host := hostFromSetupConfiguration(ctx)
 	orgID, _ := uuid.Parse(ctx.OrganizationID)
-	enterprise := (githubEnterpriseEnabledForOrg(setupDB(ctx.HTTP), ctx.OrganizationID) && gitHubEnterpriseLicensed(context.Background(), orgID)) || !host.IsDotCom()
+	enterpriseLicensed := gitHubEnterpriseLicensed(context.Background(), orgID)
+	enterpriseOption := configuration.FieldOption{
+		Label:    "GitHub Enterprise Cloud",
+		Value:    common.GitHubLocationEnterpriseCloud,
+		Disabled: !enterpriseLicensed,
+	}
+	if !enterpriseLicensed {
+		enterpriseOption.Description = "This option needs a SuperPlane Enterprise license."
+	}
 	ownerDefault := common.OwnerTypeUser
 	locationDefault := common.GitHubLocationDotCom
 	if !host.IsDotCom() {
@@ -246,41 +254,35 @@ func (g *SetupProvider) FirstStep(ctx core.SetupStepContext) core.SetupStep {
 		hostDefault = host.WebHostname()
 	}
 
-	inputs := []configuration.Field{}
-	if enterprise {
-		inputs = append(inputs,
-			configuration.Field{
-				Name:     common.PropertyGitHubLocation,
-				Label:    "Where is your GitHub?",
-				Type:     configuration.FieldTypeSelect,
-				Required: true,
-				Default:  locationDefault,
-				TypeOptions: &configuration.TypeOptions{
-					Select: &configuration.SelectTypeOptions{
-						Options: []configuration.FieldOption{
-							{Label: "GitHub.com", Value: common.GitHubLocationDotCom},
-							{Label: "GitHub Enterprise Cloud", Value: common.GitHubLocationEnterpriseCloud},
-						},
+	inputs := []configuration.Field{
+		{
+			Name:     common.PropertyGitHubLocation,
+			Label:    "Where is your GitHub?",
+			Type:     configuration.FieldTypeSelect,
+			Required: true,
+			Default:  locationDefault,
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: []configuration.FieldOption{
+						{Label: "GitHub.com", Value: common.GitHubLocationDotCom},
+						enterpriseOption,
 					},
 				},
 			},
-			configuration.Field{
-				Name:        common.PropertyHost,
-				Label:       "GitHub host",
-				Type:        configuration.FieldTypeString,
-				Required:    true,
-				Default:     hostDefault,
-				Placeholder: "acme.ghe.com",
-				Description: "Enter the GitHub Enterprise Cloud hostname. If the tenant uses an IP allow list, allow SuperPlane egress addresses.",
-				VisibilityConditions: []configuration.VisibilityCondition{
-					{Field: common.PropertyGitHubLocation, Values: []string{common.GitHubLocationEnterpriseCloud}},
-				},
+		},
+		{
+			Name:        common.PropertyHost,
+			Label:       "GitHub host",
+			Type:        configuration.FieldTypeString,
+			Required:    true,
+			Default:     hostDefault,
+			Placeholder: "acme.ghe.com",
+			Description: "Enter the GitHub Enterprise Cloud hostname. If the tenant uses an IP allow list, allow SuperPlane egress addresses.",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: common.PropertyGitHubLocation, Values: []string{common.GitHubLocationEnterpriseCloud}},
 			},
-		)
-	}
-
-	inputs = append(inputs,
-		configuration.Field{
+		},
+		{
 			Name:     common.PropertyOwnerType,
 			Label:    "Owner Type",
 			Type:     configuration.FieldTypeSelect,
@@ -295,14 +297,14 @@ func (g *SetupProvider) FirstStep(ctx core.SetupStepContext) core.SetupStep {
 				},
 			},
 		},
-		configuration.Field{
+		{
 			Name:        common.PropertyOwner,
 			Label:       "User account / organization name",
 			Type:        configuration.FieldTypeString,
 			Required:    true,
 			Placeholder: "e.g. superplanehq",
 		},
-	)
+	}
 
 	return core.SetupStep{
 		Type:   core.SetupStepTypeInputs,

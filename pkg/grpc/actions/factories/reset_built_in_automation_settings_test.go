@@ -446,7 +446,11 @@ func TestResetScheduledIntakeKeepsScheduleAndUserPrompt(t *testing.T) {
 				agent.Configuration["executionTimeoutSeconds"] = 600
 				implementationStep(t, agent, "Propose a task")["prompt"] = "Find accessibility defects." + scheduledIntakeOutputInstructions
 			})
+			require.NoError(t, canvas.SetDisplayColumn(database.DB(t.Context()), "done"))
 			require.NoError(t, resetTestOrganization(t, r))
+			reloaded, err := models.FindCanvasInTransaction(database.DB(t.Context()), r.Organization.ID, canvas.ID)
+			require.NoError(t, err)
+			assert.Equal(t, "done", reloaded.DisplayColumnKey)
 			version := resetTestLiveVersion(t, canvas)
 			assert.Equal(t, r.User.String(), findIntakeNode(version.Nodes, "create-task").Configuration["defaultOwnerId"])
 			restored, err := materializeNonIntakeFactoryAppDefaults(database.DB(t.Context()), factory, canvas, version, nil)

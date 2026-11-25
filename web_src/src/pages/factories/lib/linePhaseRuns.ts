@@ -7,6 +7,7 @@ import type {
 } from "@/api-client";
 import { automationNameForLineStep, lineStepParallelism } from "./factoryLineFormShared";
 import { factoryAppPath, factoryAppRunPath, factoryHomePath, factoryLineDetailPath } from "./factoryPagePaths";
+import { orderedLineBoardStages } from "./lineBoardStages";
 import { getWorkOrderDisplayStatus } from "./workOrderProgress";
 import { dispatchStepRows, isActiveWorkOrderExecution, type WorkOrderStepRow } from "./workOrderExecutions";
 import { resolvePhaseRunStatus } from "./linePhaseRunStatus";
@@ -126,11 +127,12 @@ export function collectCustomStageRuns(
   const runs: LinePhaseRunCard[] = [];
   for (const order of workOrders) {
     if (!order.id || order.state === "STATE_CLOSED" || order.state === "STATE_DRAFT") continue;
-    const dispatches = (order.lineDispatches ?? []).filter((dispatch) => dispatch.line?.id === lineId);
-    if (dispatches.length === 0) continue;
-    const executions = dispatchStepRows(pickMostRecentDispatch(dispatches));
-    const current = pickCurrentLineExecution(executions);
-    if (!current || current.stageKey !== stageKey) continue;
+    const dispatch = latestLineDispatch(order, lineId);
+    if (!dispatch) continue;
+    const executions = dispatchStepRows(dispatch);
+    const current = pickCurrentLineExecution(executions) ?? stoppedBeforeFirstRun(dispatch, stageKey);
+    const currentStageKey = dispatch.currentStageKey?.trim();
+    if (!current || (currentStageKey ? currentStageKey !== stageKey : current.stageKey !== stageKey)) continue;
     const stageExecutions = executions.filter((execution) => execution.stageKey === stageKey);
     const failed = stageExecutions.filter(
       (execution) =>
@@ -147,6 +149,20 @@ export function collectCustomStageRuns(
     });
   }
   return runs.sort(compareRunsNewestFirst);
+}
+
+/** A task can stop in an empty stage before its first run. It still needs a card there. */
+function stoppedBeforeFirstRun(
+  dispatch: FactoriesWorkOrderLineDispatch,
+  stageKey: string,
+): WorkOrderStepRow | undefined {
+  if (dispatch.currentStageKey?.trim() !== stageKey) return undefined;
+  return { stageKey, state: "STATE_FINISHED", result: "RESULT_PASSED", createdAt: dispatch.createdAt };
+}
+
+/** Dispatches from before stage tracking have no current stage. */
+function latestDispatchHasCurrentStage(order: FactoriesWorkOrder, lineId: string | undefined): boolean {
+  return Boolean(lineId && latestLineDispatch(order, lineId)?.currentStageKey?.trim());
 }
 
 /**
@@ -218,21 +234,46 @@ export function collectLineDoneOrders(
 export function collectLineVerifyOrders(
   board: LinePhaseColumn[],
   sourceOrders: FactoriesWorkOrder[],
+  line?: FactoriesFactoryLine,
 ): FactoriesWorkOrder[] {
-  const lastStage = lineStageColumns(board).at(-1);
-  if (!lastStage) {
-    return [];
-  }
-
   const verifyById = new Map<string, FactoriesWorkOrder>();
-  for (const run of lastStage.runs) {
-    if (!run.order.id || !isWaitingAfterPassedStage(run)) {
+  if (line?.id) {
+    for (const order of sourceOrders) {
+      if (!order.id || order.state !== "STATE_OPEN" || getWorkOrderDisplayStatus(order) !== "waiting") continue;
+      if (latestLineDispatch(order, line.id)?.currentStageKey === "verify") verifyById.set(order.id, order);
+    }
+  }
+  for (const run of lastWorkStageRuns(board, sourceOrders, line)) {
+    if (!run.order.id || !isWaitingAfterPassedStage(run) || latestDispatchHasCurrentStage(run.order, line?.id)) {
       continue;
     }
     verifyById.set(run.order.id, run.order);
   }
 
   return ordersInSourceListOrder(sourceOrders, verifyById);
+}
+
+/**
+ * Runs on the last step column and on custom stages after the last step.
+ * A custom stage without an automation has no runs, so its tasks finish on the step before it.
+ */
+function lastWorkStageRuns(
+  board: LinePhaseColumn[],
+  sourceOrders: FactoriesWorkOrder[],
+  line: FactoriesFactoryLine | undefined,
+): LinePhaseRunCard[] {
+  const lastStepRuns = lineStageColumns(board).at(-1)?.runs ?? [];
+  const lineId = line?.id;
+  if (!line || !lineId) {
+    return lastStepRuns;
+  }
+  const stages = orderedLineBoardStages(line);
+  const lastPhaseIndex = stages.map((stage) => stage.kind).lastIndexOf("STAGE_KIND_PHASE");
+  const trailingCustomRuns = stages
+    .slice(lastPhaseIndex + 1)
+    .filter((stage) => stage.kind === "STAGE_KIND_CUSTOM")
+    .flatMap((stage) => collectCustomStageRuns(lineId, stage.key, sourceOrders));
+  return [...lastStepRuns, ...trailingCustomRuns];
 }
 
 /**
@@ -313,13 +354,16 @@ export function findBacklogAutomationApp(
 
 /** Factory-level PR Closure automation. It is not a line step. */
 export function findClosureAutomationApp(
-  apps: Array<{ id?: string; name?: string; columnKey?: string }>,
+  apps: Array<{ id?: string; name?: string; columnKey?: string; templateId?: string }>,
 ): { id: string; name: string } | undefined {
   const match = apps.find(
     (app) =>
       Boolean(app.id) &&
       !app.columnKey?.trim() &&
-      (app.name === "PR Closure" || app.id === "app-refund-done" || (app.id ?? "").includes("pr-closure")),
+      (app.templateId === "pr-closure" ||
+        app.name === "PR Closure" ||
+        app.id === "app-refund-done" ||
+        (app.id ?? "").includes("pr-closure")),
   );
   if (!match?.id) {
     return undefined;
@@ -393,6 +437,14 @@ function executionStepIndex(execution: FactoriesWorkOrderExecution): number | un
   return execution.stepIndex;
 }
 
+function isValidSavedStageIndex(
+  index: number | null | undefined,
+  stepCount: number,
+  runsExecutionApp: (index: number) => boolean,
+): index is number {
+  return index != null && index >= 0 && index < stepCount && runsExecutionApp(index);
+}
+
 function liveColumnIndexForExecution(
   steps: NonNullable<FactoriesFactoryLine["steps"]>,
   stages: FactoryLineStage[],
@@ -416,13 +468,9 @@ function liveColumnIndexForExecution(
     if (stage?.kind === "STAGE_KIND_CUSTOM" || stageKey.startsWith("custom-")) {
       return undefined;
     }
-    if (
-      stage?.stepIndex != null &&
-      stage.stepIndex >= 0 &&
-      stage.stepIndex < steps.length &&
-      runsExecutionApp(stage.stepIndex)
-    ) {
-      return stage.stepIndex;
+    const savedStageIndex = stage?.stepIndex;
+    if (isValidSavedStageIndex(savedStageIndex, steps.length, runsExecutionApp)) {
+      return savedStageIndex;
     }
   }
 
@@ -475,18 +523,21 @@ function appendCurrentRunForOrder(
   // A line can have more than one dispatch (traversal) for this order; the
   // board is a compact status summary, so it shows the most recent one —
   // the full history of every dispatch lives in WorkOrderExecutionsList.
-  const dispatchesForLine = (order.lineDispatches ?? []).filter((dispatch) => dispatch.line?.id === lineId);
-  if (dispatchesForLine.length === 0) {
+  const currentDispatch = latestLineDispatch(order, lineId);
+  if (!currentDispatch) {
     return;
   }
-  const currentDispatch = pickMostRecentDispatch(dispatchesForLine);
 
   const lineExecutions = dispatchStepRows(currentDispatch);
   if (lineExecutions.length === 0) {
     return;
   }
 
-  const currentExecution = pickCurrentLineExecution(lineExecutions);
+  const currentStageKey = currentDispatch.currentStageKey?.trim();
+  const currentExecutions = currentStageKey
+    ? lineExecutions.filter((execution) => execution.stageKey === currentStageKey)
+    : lineExecutions;
+  const currentExecution = pickCurrentLineExecution(currentExecutions);
   const stepIndex = currentExecution ? liveColumnIndexForExecution(steps, stages, currentExecution) : undefined;
   if (!currentExecution || stepIndex == null) {
     return;
@@ -504,6 +555,11 @@ function appendCurrentRunForOrder(
     return;
   }
   runsByStep.set(stepIndex, [card]);
+}
+
+function latestLineDispatch(order: FactoriesWorkOrder, lineId: string): FactoriesWorkOrderLineDispatch | undefined {
+  const dispatches = (order.lineDispatches ?? []).filter((dispatch) => dispatch.line?.id === lineId);
+  return dispatches.length > 0 ? pickMostRecentDispatch(dispatches) : undefined;
 }
 
 function pickMostRecentDispatch(dispatches: FactoriesWorkOrderLineDispatch[]): FactoriesWorkOrderLineDispatch {
