@@ -48,18 +48,6 @@ func TestParseGitHubIssueURL(t *testing.T) {
 	assert.False(t, ok)
 }
 
-func TestParseProductiveTaskURL(t *testing.T) {
-	organizationID, taskID, ok := parseProductiveTaskURL("https://app.productive.io/12345/tasks/91")
-	assert.True(t, ok)
-	assert.Equal(t, "12345", organizationID)
-	assert.Equal(t, "91", taskID)
-
-	_, _, ok = parseProductiveTaskURL("https://app.productive.io/12345/projects/91")
-	assert.False(t, ok)
-	_, _, ok = parseProductiveTaskURL("https://example.com/12345/tasks/91")
-	assert.False(t, ok)
-}
-
 type stubIntakeItemSource struct {
 	items []IntakeItem
 	err   error

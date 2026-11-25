@@ -68,14 +68,6 @@ func workOrderOriginMatch(raw string) (*models.WorkOrderOriginMatch, error) {
 		return originRegexpMatch(pattern), nil
 	}
 
-	if organizationID, taskID, ok := parseProductiveTaskURL(raw); ok {
-		pattern := fmt.Sprintf(
-			`^https?://app\.productive\.io/%s/tasks/%s/?([?#].*)?$`,
-			posixQuote(organizationID), posixQuote(taskID),
-		)
-		return originRegexpMatch(pattern), nil
-	}
-
 	normalized, ok := normalizeOriginURL(parsed)
 	if !ok {
 		return nil, errAbsoluteOriginURL
@@ -140,17 +132,4 @@ func posixQuote(value string) string {
 		out.WriteRune(r)
 	}
 	return out.String()
-}
-
-func parseProductiveTaskURL(rawURL string) (organizationID string, taskID string, ok bool) {
-	parsed, err := url.Parse(strings.TrimSpace(rawURL))
-	if err != nil || !strings.EqualFold(parsed.Hostname(), "app.productive.io") {
-		return "", "", false
-	}
-
-	parts := strings.Split(strings.Trim(parsed.Path, "/"), "/")
-	if len(parts) != 3 || parts[0] == "" || parts[1] != "tasks" || parts[2] == "" {
-		return "", "", false
-	}
-	return parts[0], parts[2], true
 }
