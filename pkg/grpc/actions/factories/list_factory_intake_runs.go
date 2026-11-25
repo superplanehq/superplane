@@ -103,9 +103,15 @@ func serializeIntakeRuns(
 		return nil, err
 	}
 
+	runTitle := func(event models.CanvasEvent) string { return intakeRunTitle(intake.Source, event) }
+	if intake.Source == models.FactoryIntakeSourceWebhook {
+		titlePath := liveIntakeSettings(db, intake.Source, intake.CanvasID, defaultWebhookIntakeSettings()).WebhookTitlePath
+		runTitle = func(event models.CanvasEvent) string { return webhookIntakeRunTitle(titlePath, event) }
+	}
+
 	serialized := make([]*pb.FactoryIntakeRun, 0, len(runs))
 	for _, run := range runs {
-		title := intakeRunTitle(intake.Source, context.rootEvents[run.ID])
+		title := runTitle(context.rootEvents[run.ID])
 		if title == "" {
 			continue
 		}
