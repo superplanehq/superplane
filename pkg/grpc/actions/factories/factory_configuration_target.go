@@ -210,11 +210,11 @@ func inspectFactoryConfigurationTarget(tx *gorm.DB, factory *models.Factory, lin
 		return nil, err
 	}
 	for _, stage := range target.stages {
-		if stage.stage.Kind != models.FactoryLineStagePhase {
+		if stage.stage.Kind != models.FactoryLineStagePhase || stage.stage.StepIndex == nil {
 			continue
 		}
 		index := stage.stage.StepIndex
-		if index == nil || *index < 0 || *index >= len(line.Steps) {
+		if *index < 0 || *index >= len(line.Steps) {
 			return nil, unsupportedConfigurationTarget("A phase has an invalid runner binding.")
 		}
 		step := line.Steps[*index]
@@ -306,7 +306,7 @@ func inspectFactoryConfigurationTarget(tx *gorm.DB, factory *models.Factory, lin
 				id += "-" + configurationCanvasKey(automation.canvas.ID)
 			}
 			automation.id = id
-			if i == 0 && stage.stage.Kind == models.FactoryLineStagePhase {
+			if i == 0 && stage.stage.StepIndex != nil {
 				stage.run = id
 			}
 		}

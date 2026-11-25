@@ -9,7 +9,7 @@ import (
 )
 
 func TestMergeConfidenceCheckParams(t *testing.T) {
-	enabled := []string{"risk", "performance", "security", "drift", "reversibility"}
+	enabled := []string{"risk", "performance", "security", "correctness", "drift", "reversibility"}
 	cases := []struct {
 		check string
 		score float64
@@ -23,7 +23,9 @@ func TestMergeConfidenceCheckParams(t *testing.T) {
 		{check: "performance", score: 5, key: "performance-review", name: "Performance", level: checkfactory.CheckLevelPositive},
 		{check: "performance", score: 2, key: "performance-review", name: "Performance", level: checkfactory.CheckLevelCritical},
 		{check: "security", score: 3, key: "security-review", name: "Security", level: checkfactory.CheckLevelCaution},
-		{check: "drift", score: 4, key: "drift-review", name: "Drift from Specification", level: checkfactory.CheckLevelCritical},
+		{check: "correctness", score: 5, key: "correctness-review", name: "Correctness", level: checkfactory.CheckLevelPositive},
+		{check: "correctness", score: 1, key: "correctness-review", name: "Correctness", level: checkfactory.CheckLevelCritical},
+		{check: "drift", score: 4, key: "drift-review", name: "Correctness", level: checkfactory.CheckLevelCritical},
 		{check: "reversibility", score: 5, key: "reversibility-review", name: "Reversibility", level: checkfactory.CheckLevelPositive},
 	}
 

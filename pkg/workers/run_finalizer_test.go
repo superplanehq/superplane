@@ -630,7 +630,7 @@ func Test__RunFinalizer__WaitsForEveryCustomStageAutomation(t *testing.T) {
 	stageKey := "custom-" + stageID.String()
 	stages := line.StagesValue()
 	stages = append(stages[:1], append([]models.FactoryLineStage{{
-		ID: stageID, Key: stageKey, Name: "QA", Kind: models.FactoryLineStageCustom,
+		ID: stageID, Key: stageKey, Name: "QA", Kind: models.FactoryLineStagePhase,
 	}}, stages[1:]...)...)
 	require.NoError(t, line.UpdateConfiguration(db, nil, nil, nil, stages))
 	require.NoError(t, first.SetColumnKey(db, stageKey))
@@ -707,7 +707,7 @@ func testCustomStageStops(t *testing.T, autoAdvance bool, firstResult string) {
 	stageKey := "custom-" + stageID.String()
 	stages := line.StagesValue()
 	stage := models.FactoryLineStage{
-		ID: stageID, Key: stageKey, Name: "QA", Kind: models.FactoryLineStageCustom, AutoAdvance: &autoAdvance,
+		ID: stageID, Key: stageKey, Name: "QA", Kind: models.FactoryLineStagePhase, AutoAdvance: &autoAdvance,
 	}
 	stages = append(stages[:1], append([]models.FactoryLineStage{stage}, stages[1:]...)...)
 	require.NoError(t, line.UpdateConfiguration(db, nil, nil, nil, stages))
@@ -775,7 +775,7 @@ func Test__RunFinalizer__EmptyStageUsesAutoAdvanceSetting(t *testing.T) {
 			require.NoError(t, err)
 			stages := line.StagesValue()
 			empty := models.FactoryLineStage{
-				ID: uuid.New(), Key: "custom-empty", Name: "Empty", Kind: models.FactoryLineStageCustom,
+				ID: uuid.New(), Key: "custom-empty", Name: "Empty", Kind: models.FactoryLineStagePhase,
 				AutoAdvance: &test.autoAdvance,
 			}
 			stages = append(stages[:2], append([]models.FactoryLineStage{empty}, stages[2:]...)...)

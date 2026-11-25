@@ -44,7 +44,7 @@ steps:
 			if strings.HasPrefix(placement, "custom-") {
 				line, err := factory.CreateLine(db, "QA", nil)
 				require.NoError(t, err)
-				stage := models.FactoryLineStage{ID: uuid.New(), Key: placement, Name: "QA", Kind: models.FactoryLineStageCustom}
+				stage := models.FactoryLineStage{ID: uuid.New(), Key: placement, Name: "QA", Kind: models.FactoryLineStagePhase}
 				require.NoError(t, line.UpdateConfiguration(db, nil, nil, nil, append(line.StagesValue(), stage)))
 				source = strings.Replace(source, "use: manual", "use: task_enters_stage", 1)
 			}
@@ -133,7 +133,7 @@ func TestFactoryConfigurationCustomBundleCoversEveryPlacement(t *testing.T) {
 	f.r.Registry.Integrations[models.ProviderGitHub] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{
 		Triggers: []core.Trigger{impl.NewDummyIntegrationTrigger(impl.DummyIntegrationTriggerOptions{Name: prFeedbackTriggerComponent(models.ProviderGitHub)})},
 	})
-	customStage := models.FactoryLineStage{ID: uuid.New(), Key: "custom-" + uuid.NewString(), Name: "Security", Kind: models.FactoryLineStageCustom}
+	customStage := models.FactoryLineStage{ID: uuid.New(), Key: "custom-" + uuid.NewString(), Name: "Security", Kind: models.FactoryLineStagePhase}
 	stages := f.line.StagesValue()
 	stages = append(stages[:3], append([]models.FactoryLineStage{customStage}, stages[3:]...)...)
 	require.NoError(t, f.line.UpdateConfiguration(db, nil, nil, nil, stages))

@@ -20,7 +20,14 @@ const EVENTS = [
   }),
   event("order.check.reported", "2026-01-01T00:00:00Z", {
     run: { id: "run-1" },
-    check: { name: "Risk score", score: 3, maxScore: 5, format: "fraction", summary: "Low risk overall." },
+    check: {
+      key: "drift-review",
+      name: "Drift from Specification",
+      score: 1,
+      maxScore: 5,
+      format: "fraction",
+      summary: "The requested behavior works.",
+    },
   }),
   event("order.assignees.updated", "2026-01-04T00:00:00Z", {
     run: { id: "run-1" },
@@ -36,11 +43,15 @@ describe("stepActionRows", () => {
     );
 
     expect(rows.map((row) => row.title)).toEqual([
-      "Reported Risk score 3/5",
+      "Reported Correctness 5/5",
       "Assigned Ada as owner",
       "Assigned Bea as owner",
     ]);
-    expect(rows.map((row) => row.detail)).toEqual(["Low risk overall.", "Changed pkg/payments.", undefined]);
+    expect(rows.map((row) => row.detail)).toEqual([
+      "The requested behavior works.",
+      "Changed pkg/payments.",
+      undefined,
+    ]);
     expect(rows.some((row) => row.detail === "Other run.")).toBe(false);
   });
 });

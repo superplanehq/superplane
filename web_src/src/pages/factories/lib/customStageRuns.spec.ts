@@ -41,7 +41,7 @@ describe("collectCustomStageRuns", () => {
   });
 
   it.each<FactoryLineStage>([
-    { key: "qa", kind: "STAGE_KIND_CUSTOM", stepIndex: 0 },
+    { key: "qa", kind: "STAGE_KIND_PHASE" },
     { key: "custom-qa", kind: "STAGE_KIND_PHASE", stepIndex: 0 },
   ])("excludes custom stage $key even when the snapshot matches", (stage) => {
     const task = taskWithExecution({ stepIndex: 0, stageKey: stage.key, run: { appId: "app-plan" } });
@@ -248,7 +248,7 @@ describe("collectCustomStageRuns", () => {
         id: "line-1",
         steps: [{ app: { app: "app-repeated" } }, { app: { app: "app-repeated" } }],
         stages: [
-          { key: "custom-qa", kind: "STAGE_KIND_CUSTOM" },
+          { key: "custom-qa", kind: "STAGE_KIND_PHASE" },
           { key: "phase-0", kind: "STAGE_KIND_PHASE", stepIndex: 0 },
           { key: "phase-1", kind: "STAGE_KIND_PHASE", stepIndex: 1 },
         ],

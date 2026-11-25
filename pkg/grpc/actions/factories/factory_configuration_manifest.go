@@ -317,8 +317,8 @@ func validateFactoryConfigurationManifest(ctx context.Context, tx *gorm.DB, deps
 		if stage.Run != live.run {
 			return configurationDiagnostic(stagePath+".run", "Keep the existing phase runner binding."), nil
 		}
-		if stage.Kind != models.FactoryLineStagePhase && stage.MaxParallelism != nil {
-			return configurationDiagnostic(stagePath+".max_parallelism", "Only phases support max_parallelism."), nil
+		if live.stage.StepIndex == nil && stage.MaxParallelism != nil {
+			return configurationDiagnostic(stagePath+".max_parallelism", "Only stages with a runner binding support max_parallelism."), nil
 		}
 		stage.MaxParallelism = configurationMaxParallelism(stage.MaxParallelism)
 		ids, automationNames, retained := map[string]bool{}, map[string]bool{}, map[string]bool{}

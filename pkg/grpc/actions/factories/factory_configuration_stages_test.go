@@ -26,7 +26,7 @@ func TestFactoryConfigurationIncludesEveryStageAndPhase(t *testing.T) {
 	require.NoError(t, f.line.Update(db, nil, steps, nil))
 	stages := f.line.StagesValue()
 	customID := uuid.New()
-	custom := models.FactoryLineStage{ID: customID, Key: "custom-" + customID.String(), Name: "Security", Kind: models.FactoryLineStageCustom}
+	custom := models.FactoryLineStage{ID: customID, Key: "custom-" + customID.String(), Name: "Security", Kind: models.FactoryLineStagePhase}
 	byKey := map[string]models.FactoryLineStage{}
 	for _, stage := range stages {
 		byKey[stage.Key] = stage
@@ -39,11 +39,13 @@ func TestFactoryConfigurationIncludesEveryStageAndPhase(t *testing.T) {
 	var manifest factoryConfigurationManifest
 	require.NoError(t, yamlv3.Unmarshal([]byte(bundle.Files[0].Content), &manifest))
 	require.Len(t, manifest.Stages, 6)
-	require.Equal(t, []string{"backlog", "phase", "custom", "phase", "verify", "done"}, []string{
+	require.Equal(t, []string{"backlog", "phase", "phase", "phase", "phase", "done"}, []string{
 		manifest.Stages[0].Kind, manifest.Stages[1].Kind, manifest.Stages[2].Kind,
 		manifest.Stages[3].Kind, manifest.Stages[4].Kind, manifest.Stages[5].Kind,
 	})
 	require.Empty(t, manifest.Stages[2].Automations)
+	require.Empty(t, manifest.Stages[2].Run)
+	require.Empty(t, manifest.Stages[4].Run)
 	require.Len(t, manifest.Stages[5].Automations, 1)
 	require.Equal(t, "@superplane/pr-closure", manifest.Stages[5].Automations[0].Uses)
 	plan := f.plan(t, bundle)

@@ -1125,7 +1125,7 @@ func TestExecutionPlanIndexForLineStepAccountsForCustomStages(t *testing.T) {
 	}})
 	require.NoError(t, err)
 	stageID := uuid.New()
-	stage := models.FactoryLineStage{ID: stageID, Key: "custom-" + stageID.String(), Name: "QA", Kind: models.FactoryLineStageCustom}
+	stage := models.FactoryLineStage{ID: stageID, Key: "custom-" + stageID.String(), Name: "QA", Kind: models.FactoryLineStagePhase}
 	stages := append([]models.FactoryLineStage{line.StagesValue()[0], stage}, line.StagesValue()[1:]...)
 	require.NoError(t, line.UpdateConfiguration(db, nil, nil, nil, stages))
 	custom, _ := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "QA", "start")

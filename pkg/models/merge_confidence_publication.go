@@ -34,6 +34,9 @@ func (o *FactoryWorkOrder) ChecksForRun(tx *gorm.DB, runID uuid.UUID) (map[strin
 			return nil, err
 		}
 		if report.Check != nil && report.Run != nil && report.Run.ID == runID {
+			if other := otherCorrectnessKey(report.Check.Key); other != "" {
+				delete(checks, other)
+			}
 			checks[report.Check.Key] = *report.Check
 		}
 	}

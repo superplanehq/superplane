@@ -67,7 +67,7 @@ func CreateFactoryAutomation(
 		found := false
 		for _, line := range lines {
 			for _, stage := range line.StagesValue() {
-				if stage.Key == columnKey && stage.Kind == models.FactoryLineStageCustom {
+				if stage.Key == columnKey && stage.Kind == models.FactoryLineStagePhase {
 					found = true
 					break
 				}
