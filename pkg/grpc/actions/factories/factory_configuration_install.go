@@ -75,7 +75,7 @@ func supplementFactoryConfigurationRecordSettings(tx *gorm.DB, automation *facto
 		feedback := prFeedbackSettingsFromGraph(resolvePRFeedbackGraph(spec), spec)
 		ids := make([]string, 0, len(feedback.RunnerIntegrationNames))
 		for _, name := range feedback.RunnerIntegrationNames {
-			installation, err := models.FindIntegrationByName(tx, automation.canvas.OrganizationID, name)
+			installation, err := factoryAutomationIntegrationByName(tx, automation.canvas.OrganizationID, name)
 			if err == nil {
 				ids = append(ids, installation.ID.String())
 			}
@@ -132,14 +132,13 @@ func exportFactoryConfigurationDependencies(target *factoryConfigurationTarget) 
 func resolveFactoryConfigurationDependencies(manifest *factoryConfigurationManifest, target *factoryConfigurationTarget) *pb.FactoryConfigurationDiagnostic {
 	type candidate struct{ stage, id, canvas string }
 	candidates := map[string]candidate{}
-	byKey := configurationStagesByKey(target)
 	for _, stage := range manifest.Stages {
 		for _, automation := range stage.Automations {
 			if automation.prepared == nil || automation.prepared.TemplateID != "risk-score" {
 				continue
 			}
 			canvas := configurationManifestReference(stage.Key, automation.ID)
-			if current := configurationAutomationByIdentity(byKey[stage.Key], automation, stage.Automations); current != nil {
+			if current := automation.current; current != nil {
 				canvas = current.canvas.ID.String()
 			}
 			candidates[stage.Key+"/"+automation.ID] = candidate{stage.Key, automation.ID, canvas}

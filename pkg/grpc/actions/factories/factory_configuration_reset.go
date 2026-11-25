@@ -45,7 +45,7 @@ func preserveFactoryConfigurationPRFeedbackBinding(tx *gorm.DB, canvas *models.C
 	if err != nil {
 		return err
 	}
-	integration, err := models.FindIntegrationInTransaction(tx, canvas.OrganizationID, id)
+	integration, err := factoryAutomationIntegrationByID(tx, canvas.OrganizationID, id)
 	if err != nil {
 		return err
 	}
@@ -71,10 +71,11 @@ func materializeFactoryConfigurationBoundTemplate(tx *gorm.DB, canvas *models.Ca
 		if err != nil {
 			return nil, err
 		}
-		integration, err = models.FindIntegrationInTransaction(tx, canvas.OrganizationID, id)
+		integration, err = factoryAutomationIntegrationByID(tx, canvas.OrganizationID, id)
 		if err != nil {
 			return nil, err
 		}
+		input.installParams["githubHost"] = githubHostForVCSIntegration(tx, canvas.OrganizationID, raw)
 		replacement := factoryTemplateIntegration{id: raw, name: integration.InstallationName}
 		rewrites[template.provider] = replacement
 		if previous, exists := input.integrations[template.provider]; exists && previous.name != "" {

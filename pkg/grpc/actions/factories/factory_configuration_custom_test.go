@@ -81,16 +81,18 @@ steps:
 			require.NotEmpty(t, entrypoint)
 			exported, err := exportFactoryConfigurationCustom(db, factory, canvas, live, placement)
 			require.NoError(t, err)
+			target := &factoryConfigurationTarget{factory: factory}
+			current := &factoryConfigurationAutomationTarget{canvas: canvas, version: live, placement: placement, source: exported}
 			edited := strings.Replace(exported, "Inspect the task.", "Review the task.", 1)
 			require.NotEqual(t, exported, edited)
 			require.NoError(t, models.DisableExperimentalFeature(r.Organization.ID, feature))
-			_, err = validateFactoryConfigurationCustom(ctx, db, deps, factory, canvas, live, placement, exported)
+			_, err = validateFactoryConfigurationCustom(ctx, db, deps, target, current, placement, exported)
 			require.NoError(t, err, "an unchanged export remains valid when its creation feature is disabled")
-			_, err = validateFactoryConfigurationCustom(ctx, db, deps, factory, canvas, live, placement, edited)
+			_, err = validateFactoryConfigurationCustom(ctx, db, deps, target, current, placement, edited)
 			require.ErrorContains(t, err, feature)
 			require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, feature))
 			require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
-				_, err := applyFactoryConfigurationCustom(ctx, tx, deps, factory, canvas, live, placement, edited, r.User)
+				_, err := applyFactoryConfigurationCustom(ctx, tx, deps, target, current, edited, r.User)
 				return err
 			}))
 			live, err = models.FindLiveCanvasVersionInTransaction(db, id)
@@ -99,14 +101,15 @@ steps:
 			require.Equal(t, "onRun", findIntakeNode(live.Nodes, entrypoint).ComponentName())
 			reexported, err := exportFactoryConfigurationCustom(db, factory, canvas, live, placement)
 			require.NoError(t, err)
+			current = &factoryConfigurationAutomationTarget{canvas: canvas, version: live, placement: placement, source: reexported}
 			require.Contains(t, reexported, "Review the task.")
 			stored, err := models.FindAutomationSourceByArtifact(db, factory.OrganizationID, id.String())
 			require.NoError(t, err)
 			require.Equal(t, live.ID.String(), stored.ArtifactRevision)
-			_, err = validateFactoryConfigurationCustom(ctx, db, deps, factory, canvas, live, placement,
+			_, err = validateFactoryConfigurationCustom(ctx, db, deps, target, current, placement,
 				strings.Replace(edited, "use: "+string(document.Triggers[0].Use), "use: task_leaves_stage", 1))
 			require.Error(t, err)
-			_, err = validateFactoryConfigurationCustom(ctx, db, deps, factory, canvas, live, placement,
+			_, err = validateFactoryConfigurationCustom(ctx, db, deps, target, current, placement,
 				strings.Replace(edited, "prompt: Review the task.", "bash: echo ready\n    secrets: [missing-secret]", 1))
 			require.ErrorContains(t, err, "steps[0].secrets[0]")
 			extra := *selectCustomAutomationAgent(live.Nodes)
@@ -236,4 +239,12 @@ func TestFactoryConfigurationExportDisambiguatesCustomFilenames(t *testing.T) {
 	plan = f.plan(t, bundle)
 	require.Empty(t, plan.Diagnostics)
 	require.Empty(t, plan.Changes)
+}
+
+func exportFactoryConfigurationCustom(tx *gorm.DB, factory *models.Factory, canvas *models.Canvas, version *models.CanvasVersion, placement string) (string, error) {
+	authored, err := findLegacyAutomationSource(tx, canvas)
+	if err != nil {
+		return "", err
+	}
+	return renderFactoryConfigurationCustom(tx, factory, canvas, version, placement, authored)
 }

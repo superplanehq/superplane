@@ -138,7 +138,7 @@ func prepareFactoryConfigurationBuiltIn(ctx context.Context, tx *gorm.DB, deps I
 		return nil, err
 	}
 	configurationPreparedRecordSettings(prepared, automation.With, generated)
-	current := configurationAutomationByIdentity(stage, automation, []factoryConfigurationAutomation{automation})
+	current := automation.current
 	keepInstalled := current != nil && current.binding == binding && equalCanvasJSON(current.explicitBinding, automation.Binding) && configurationPublicSectionsEqual(current.settings, generated)
 	if keepInstalled {
 		prepared.Nodes, prepared.Edges, err = copyFactoryConfigurationBuiltIn(current.version, current.defaults, templateID, automation.With)
@@ -161,7 +161,11 @@ func prepareFactoryConfigurationBuiltIn(ctx context.Context, tx *gorm.DB, deps I
 		if err != nil {
 			return nil, err
 		}
-		prepared.Nodes, prepared.Edges, err = document.ParseInTransaction(deps.Registry, target.factory.OrganizationID.String(), tx)
+		if reads := factoryAutomationReads(tx, target.factory); reads != nil {
+			prepared.Nodes, prepared.Edges, err = document.ParseInTransactionWithIntegrations(deps.Registry, target.factory.OrganizationID.String(), tx, reads.integrationsByID)
+		} else {
+			prepared.Nodes, prepared.Edges, err = document.ParseInTransaction(deps.Registry, target.factory.OrganizationID.String(), tx)
+		}
 		if err != nil {
 			return nil, configurationPreparationError("with", err.Error())
 		}
@@ -195,7 +199,7 @@ func prepareFactoryConfigurationBuiltIn(ctx context.Context, tx *gorm.DB, deps I
 		ids := make([]string, 0, len(feedback.RunnerIntegrationIDs))
 		for _, raw := range feedback.RunnerIntegrationIDs {
 			id, _ := uuid.Parse(raw)
-			installation, err := models.FindIntegrationInTransaction(tx, target.factory.OrganizationID, id)
+			installation, err := factoryAutomationIntegrationByID(tx, target.factory.OrganizationID, id)
 			if err != nil {
 				return nil, configurationPreparationError("with.pr_feedback.runner_integration_ids", "Runner integrations must belong to this organization.")
 			}
@@ -242,7 +246,9 @@ func validateConfigurationBuiltInFeature(tx *gorm.DB, factory *models.Factory, t
 	if templateID != scheduledIntakeTemplateID && templateID != reviewRequestTemplateID {
 		return nil
 	}
-	organization, err := models.FindOrganizationByIDInTransaction(tx, factory.OrganizationID.String())
+	organization, err := factoryAutomationPolicy(tx, factory, "configuration-organization", nil, func() (*models.Organization, error) {
+		return models.FindOrganizationByIDInTransaction(tx, factory.OrganizationID.String())
+	})
 	if err != nil {
 		return err
 	}
@@ -313,7 +319,7 @@ func resolveConfigurationBuiltInBinding(tx *gorm.DB, factory *models.Factory, te
 	if err != nil {
 		return binding, nil, configurationPreparationError("binding.integration_id", "Use an existing integration ID.")
 	}
-	integration, err := models.FindIntegrationInTransaction(tx, factory.OrganizationID, integrationID)
+	integration, err := factoryAutomationIntegrationByID(tx, factory.OrganizationID, integrationID)
 	if err != nil {
 		return binding, nil, configurationPreparationError("binding.integration_id", "The integration must belong to this organization.")
 	}
@@ -449,7 +455,7 @@ func buildConfigurationBuiltInGraph(tx *gorm.DB, factory *models.Factory, name, 
 				intakeSettings.DefaultOwnerID = factory.OnboardingConfigValue().CodexDefaultOwnerID
 			}
 		}
-		if err := validateIntakeDefaultOwner(tx, factory, source, "", &pb.FactoryIntake_Settings{DefaultOwnerId: &intakeSettings.DefaultOwnerID}); prepared != nil && err != nil {
+		if err := validateConfigurationIntakeOwner(tx, factory, source, intakeSettings.DefaultOwnerID); prepared != nil && err != nil {
 			return nil, configurationPreparationError("with.intake.default_owner_id", err.Error())
 		}
 		resolved := configurationIntakeBinding(binding, integration, source)
@@ -525,13 +531,25 @@ func buildConfigurationPRFeedback(tx *gorm.DB, factory *models.Factory, name, te
 	// Defaults can be exported before a check list is selected. Preparation of
 	// the requested graph still requires the provider's public settings.
 	if prepared != nil {
-		if err := validatePRFeedbackSettingsForSource(tx, factory.OrganizationID, source, feedback, nil); err != nil {
+		_, err := factoryAutomationPolicy(tx, factory, "configuration-pr-feedback-settings", []any{source, feedback}, func() (bool, error) {
+			err := validatePRFeedbackSettingsForSource(tx, factory.OrganizationID, source, feedback, nil)
+			return err == nil, err
+		})
+		if err != nil {
 			return nil, configurationPreparationError("with.pr_feedback.check_names", err.Error())
 		}
 	}
-	if err := resolveRunnerIntegrationNames(tx, factory.OrganizationID, &feedback); err != nil {
+	names, err := factoryAutomationPolicy(tx, factory, "configuration-pr-feedback-runner-names", []any{feedback.RunnerIntegrationIDs}, func() ([]string, error) {
+		resolved := feedback
+		if err := resolveRunnerIntegrationNames(tx, factory.OrganizationID, &resolved); err != nil {
+			return nil, err
+		}
+		return resolved.RunnerIntegrationNames, nil
+	})
+	if err != nil {
 		return nil, configurationPreparationError("with.pr_feedback.runner_integration_ids", err.Error())
 	}
+	feedback.RunnerIntegrationNames = names
 	request := prFeedbackBuildRequest{Name: name, Repository: feedback.Repository, Mention: feedback.Mention, IgnoreBots: feedback.IgnoreBots, AddressAllBots: feedback.AddressAllBots, AllowedBots: feedback.AllowedBots, CheckNames: feedback.CheckNames, MaximumAttempts: feedback.MaximumAttempts, RunnerIntegrationNames: feedback.RunnerIntegrationNames, Binding: configurationIntakeBinding(binding, integration, models.FactoryIntakeSourceGitHubIssues), Agent: agent, VCSProvider: factoryVCSProviderOrDefault(factory)}
 	document := buildDiscussionPRFeedbackCanvas(request)
 	trigger := prFeedbackCommentTriggerNodeID
@@ -573,7 +591,7 @@ func buildConfigurationFactoryTemplate(tx *gorm.DB, factory *models.Factory, nam
 	}
 	if templateID == scheduledIntakeTemplateID {
 		owner := input.installParams["defaultOwnerId"]
-		if err := validateIntakeDefaultOwner(tx, factory, models.FactoryIntakeSourceGitHubIssues, "", &pb.FactoryIntake_Settings{DefaultOwnerId: &owner}); err != nil {
+		if err := validateConfigurationIntakeOwner(tx, factory, models.FactoryIntakeSourceGitHubIssues, owner); err != nil {
 			return nil, configurationPreparationError("with.template.default_owner_id", err.Error())
 		}
 	}
@@ -604,7 +622,9 @@ func configurationPreparedState(tx *gorm.DB, factory *models.Factory, binding fa
 	}
 	state.AgentHarness, state.AgentModel = agent.component(), agent.model()
 	if agent.Component == models.SuperPlaneRunnerComponent {
-		model, err := models.GetInstallationDefaultHostedLLMModel(tx)
+		model, err := factoryAutomationPolicy(tx, factory, "configuration-default-hosted-model", nil, func() (models.DefaultHostedLLMModel, error) {
+			return models.GetInstallationDefaultHostedLLMModel(tx)
+		})
 		if err != nil {
 			return state, err
 		}
@@ -623,7 +643,9 @@ func configurationPreparedState(tx *gorm.DB, factory *models.Factory, binding fa
 			}
 		}
 		for provider := range providers {
-			row, err := models.FindHostedLLMProvider(tx, provider)
+			row, err := factoryAutomationPolicy(tx, factory, "configuration-hosted-provider", []any{provider}, func() (*models.HostedLLMProvider, error) {
+				return models.FindHostedLLMProvider(tx, provider)
+			})
 			if errors.Is(err, models.ErrHostedLLMProviderNotFound) {
 				continue
 			}
@@ -641,7 +663,7 @@ func configurationPreparedState(tx *gorm.DB, factory *models.Factory, binding fa
 	if name == "" {
 		return state, nil
 	}
-	installation, err := models.FindIntegrationByName(tx, factory.OrganizationID, name)
+	installation, err := factoryAutomationIntegrationByName(tx, factory.OrganizationID, name)
 	if err != nil {
 		return state, err
 	}
@@ -704,7 +726,7 @@ func buildFreshFactoryConfigurationBuiltInDefaults(tx *gorm.DB, factory *models.
 	integration := &models.Integration{AppName: provider, InstallationName: provider}
 	if id, err := uuid.Parse(defaults.IntegrationID); err == nil {
 		integration.ID = id
-		if existing, err := models.FindIntegrationInTransaction(tx, factory.OrganizationID, id); err == nil {
+		if existing, err := factoryAutomationIntegrationByID(tx, factory.OrganizationID, id); err == nil {
 			integration = existing
 		}
 	}
@@ -870,4 +892,12 @@ func configurationPublicSectionsEqual(current, requested map[string]any) bool {
 		}
 	}
 	return true
+}
+
+func validateConfigurationIntakeOwner(tx *gorm.DB, factory *models.Factory, source, owner string) error {
+	_, err := factoryAutomationPolicy(tx, factory, "configuration-intake-owner", []any{source, owner, factory.OnboardingConfigValue().CodexSubscription}, func() (bool, error) {
+		err := validateIntakeDefaultOwner(tx, factory, source, "", &pb.FactoryIntake_Settings{DefaultOwnerId: &owner})
+		return err == nil, err
+	})
+	return err
 }

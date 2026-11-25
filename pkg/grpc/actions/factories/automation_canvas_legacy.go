@@ -193,7 +193,7 @@ func importAutomationCanvas(tx *gorm.DB, factory *models.Factory, canvas *models
 		return "", unrepresentableAutomationCanvas()
 	}
 	if credentials := definition.Agent.Credentials; credentials != nil && credentials.Source == automationspec.Integration {
-		connection, err := models.FindIntegrationByName(tx, factory.OrganizationID, credentials.Name)
+		connection, err := factoryAutomationIntegrationByName(tx, factory.OrganizationID, credentials.Name)
 		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 			return "", err
 		}

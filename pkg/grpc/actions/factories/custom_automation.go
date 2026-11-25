@@ -556,7 +556,7 @@ func customAutomationAgent(tx *gorm.DB, factory *models.Factory, input *pb.Facto
 		return agent, nil
 	}
 	if source == runner.CredentialsSourceIntegration && agent.Component == "runnerOpenRouter" {
-		integration, err := models.FindIntegrationByName(tx, factory.OrganizationID, integrationName)
+		integration, err := factoryAutomationIntegrationByName(tx, factory.OrganizationID, integrationName)
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, invalidArgument("Select an available agent integration.")
 		}

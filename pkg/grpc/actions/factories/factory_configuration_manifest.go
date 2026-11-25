@@ -37,6 +37,7 @@ type factoryConfigurationManifest struct {
 }
 
 type factoryConfigurationStage struct {
+	retained       map[uuid.UUID]bool               `yaml:"-" json:"-"`
 	Key            string                           `yaml:"key"`
 	Name           string                           `yaml:"name"`
 	Run            string                           `yaml:"run,omitempty"`
@@ -45,11 +46,12 @@ type factoryConfigurationStage struct {
 }
 
 type factoryConfigurationAutomation struct {
-	ID                string                       `yaml:"id"`
-	Name              string                       `yaml:"name"`
-	Uses              string                       `yaml:"uses"`
-	Binding           *factoryConfigurationBinding `yaml:"binding,omitempty"`
-	With              map[string]any               `yaml:"with,omitempty"`
+	current           *factoryConfigurationAutomationTarget `yaml:"-" json:"-"`
+	ID                string                                `yaml:"id"`
+	Name              string                                `yaml:"name"`
+	Uses              string                                `yaml:"uses"`
+	Binding           *factoryConfigurationBinding          `yaml:"binding,omitempty"`
+	With              map[string]any                        `yaml:"with,omitempty"`
 	prepared          *preparedFactoryConfigurationBuiltIn
 	dependency        any
 	dependencyPresent bool
@@ -315,6 +317,12 @@ func validateFactoryConfigurationManifest(ctx context.Context, tx *gorm.DB, deps
 	if len(manifest.Stages) != len(target.stages) {
 		return configurationDiagnostic("stages", "Include every existing stage. This POC does not add or remove stages."), nil
 	}
+	resolveFactoryConfigurationIdentities(target, manifest)
+	validation, err := loadFactoryConfigurationValidationInputs(tx, target, manifest)
+	if err != nil {
+		return nil, err
+	}
+	target.validation = validation
 	byKey := map[string]*factoryConfigurationStageTarget{}
 	for _, stage := range target.stages {
 		byKey[stage.key] = stage
@@ -358,7 +366,7 @@ func validateFactoryConfigurationManifest(ctx context.Context, tx *gorm.DB, deps
 				return configurationDiagnostic(automationPath+".name", "Use each automation name once per stage without surrounding spaces."), nil
 			}
 			automationNames[automation.Name] = true
-			current := configurationAutomationByIdentity(live, *automation, stage.Automations)
+			current := automation.current
 			if current != nil && current.owned && current.id != automation.ID {
 				return configurationDiagnostic(automationPath+".id", "Keep the installed manifest ID when you rename this automation."), nil
 			}
@@ -383,22 +391,15 @@ func validateFactoryConfigurationManifest(ctx context.Context, tx *gorm.DB, deps
 				}
 				if !strings.HasPrefix(automation.Uses, "@superplane/") {
 					sourceID := configurationAutomationSourceID(target.factory.ID, configurationStagePlacement(live), automation.ID)
-					authored, err := models.FindAutomationSource(tx, target.factory.OrganizationID, sourceID)
-					if err == nil {
+					authored := validation.sources[sourceID]
+					if authored != nil {
 						canvasID, err := uuid.Parse(authored.ArtifactID)
 						if err != nil {
 							return nil, err
 						}
-						inUse, err := models.CheckCanvasExistence(tx, target.factory.OrganizationID, canvasID)
-						if err != nil {
-							return nil, err
-						}
-						if inUse || authored.FactoryID != target.factory.ID {
+						if validation.existingArtifacts[canvasID] || authored.FactoryID != target.factory.ID {
 							return configurationDiagnostic(automationPath+".id", "Use an automation ID that is not already assigned in this workspace."), nil
 						}
-					}
-					if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-						return nil, err
 					}
 				}
 				if newNames[automation.Name] {
@@ -412,12 +413,12 @@ func validateFactoryConfigurationManifest(ctx context.Context, tx *gorm.DB, deps
 				}
 				retained[identity] = true
 				if automation.Name != current.canvas.Name {
-					existing, err := models.FindCanvasByName(tx, target.factory.OrganizationID, &target.factory.ID, automation.Name)
-					if err == nil && existing.ID != current.canvas.ID {
-						return configurationDiagnostic(automationPath+".name", "Use a unique automation name in this workspace."), nil
-					}
-					if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+					existing, err := target.findCanvasByName(tx, automation.Name)
+					if err != nil {
 						return nil, err
+					}
+					if existing != nil && existing.ID != current.canvas.ID {
+						return configurationDiagnostic(automationPath+".name", "Use a unique automation name in this workspace."), nil
 					}
 				}
 				if (current.templateID != "" || strings.HasPrefix(automation.Uses, "@superplane/")) && automation.Uses != current.uses {
@@ -456,13 +457,11 @@ func validateFactoryConfigurationManifest(ctx context.Context, tx *gorm.DB, deps
 					return configurationSourceDiagnostic(filePath, err), nil
 				}
 				manifest.Sources[filePath] = source
-				var canvas *models.Canvas
-				var version *models.CanvasVersion
 				placement := configurationStagePlacement(live)
 				if current != nil {
-					canvas, version, placement = current.canvas, current.version, current.placement
+					placement = current.placement
 				}
-				document, err := validateFactoryConfigurationCustom(ctx, tx, deps, target.factory, canvas, version, placement, manifest.Sources[filePath])
+				document, err := validateFactoryConfigurationCustom(ctx, tx, deps, target, current, placement, manifest.Sources[filePath])
 				if err != nil {
 					var diagnostic *automationspec.Diagnostic
 					if errors.As(err, &diagnostic) {

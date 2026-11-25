@@ -68,6 +68,7 @@ func PlanFactoryConfiguration(ctx context.Context, deps IntakeDependencies, orga
 		if err != nil {
 			return err
 		}
+		tx = withFactoryAutomationReadInputs(tx, target.reads)
 		manifest, diagnostic := parseFactoryConfigurationBundle(req.GetBundle())
 		if diagnostic == nil {
 			diagnostic, err = validateFactoryConfigurationManifest(ctx, tx, deps, manifest, target)
@@ -115,6 +116,7 @@ func ApplyFactoryConfiguration(ctx context.Context, deps IntakeDependencies, org
 		if !allowed {
 			return grpcerrors.PermissionDenied(nil, "Factory update permission is required.")
 		}
+		tx = withFactoryAutomationReadInputs(tx, target.reads)
 		manifest, diagnostic := parseFactoryConfigurationBundle(req.GetBundle())
 		if diagnostic == nil {
 			diagnostic, err = validateFactoryConfigurationManifest(ctx, tx, deps, manifest, target)
@@ -144,9 +146,7 @@ func ApplyFactoryConfiguration(ctx context.Context, deps IntakeDependencies, org
 		for _, stage := range manifest.Stages {
 			live := byKey[stage.Key]
 			for _, current := range live.automations {
-				retained := slices.ContainsFunc(stage.Automations, func(automation factoryConfigurationAutomation) bool {
-					return configurationAutomationByIdentity(live, automation, stage.Automations) == current
-				})
+				retained := stage.retained[current.canvas.ID]
 				if retained || seen[current.canvas.ID] {
 					continue
 				}
@@ -165,7 +165,7 @@ func ApplyFactoryConfiguration(ctx context.Context, deps IntakeDependencies, org
 				if automation.prepared == nil {
 					continue
 				}
-				current := configurationAutomationByIdentity(live, automation, stage.Automations)
+				current := automation.current
 				id := uuid.New()
 				if current != nil {
 					id = current.canvas.ID
@@ -200,7 +200,7 @@ func ApplyFactoryConfiguration(ctx context.Context, deps IntakeDependencies, org
 		for _, stage := range manifest.Stages {
 			live := byKey[stage.Key]
 			for _, automation := range stage.Automations {
-				current := configurationAutomationByIdentity(live, automation, stage.Automations)
+				current := automation.current
 				if automation.prepared != nil {
 					if current != nil && (seen[current.canvas.ID] || !factoryConfigurationAutomationChanged(current, automation, manifest)) {
 						continue
@@ -239,7 +239,7 @@ func ApplyFactoryConfiguration(ctx context.Context, deps IntakeDependencies, org
 				}
 				if current == nil {
 					source := manifest.Sources[configurationAutomationPath(automation.Uses)]
-					notify, err := createFactoryConfigurationCustom(ctx, tx, deps, target.factory, configurationStagePlacement(live), automation.ID, source, actor)
+					notify, err := createFactoryConfigurationCustom(ctx, tx, deps, target, configurationStagePlacement(live), automation.ID, source, actor)
 					if err != nil {
 						return err
 					}
@@ -259,7 +259,7 @@ func ApplyFactoryConfiguration(ctx context.Context, deps IntakeDependencies, org
 				}
 
 				source := manifest.Sources[configurationAutomationPath(automation.Uses)]
-				notify, err := applyFactoryConfigurationCustom(ctx, tx, deps, target.factory, current.canvas, current.version, current.placement, source, actor)
+				notify, err := applyFactoryConfigurationCustom(ctx, tx, deps, target, current, source, actor)
 				if err != nil {
 					return err
 				}
