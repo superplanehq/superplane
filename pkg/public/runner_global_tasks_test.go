@@ -137,6 +137,30 @@ func TestScheduleAutomationCreatesATaskWithoutAnExistingTask(t *testing.T) {
 	assert.Equal(t, http.StatusForbidden, rec.Code)
 }
 
+func TestRunnerCreatedTasksLinkToTheCreatingRun(t *testing.T) {
+	r := support.Setup(t)
+	t.Setenv("JWT_SECRET", "test")
+	ctx, factory, _ := mustTaskLinkedAgentRun(t, r)
+	server := newRunnerArtifactTestServer(t, r, jwt.NewSigner("test"))
+	token := runnerTokenFrom(runner.AttachRunnerEnv(ctx, nil, 60))
+
+	db := database.DB(t.Context())
+	var createdIDs []uuid.UUID
+	for _, title := range []string{"First follow-up", "Second follow-up"} {
+		rec := runnerRequest(t, server, http.MethodPost, token, "/api/v1/runner/tasks", `{"title":"`+title+`"}`)
+		require.Equal(t, http.StatusCreated, rec.Code, rec.Body.String())
+		created := decodeRunnerTask(t, rec.Body.Bytes())
+		createdIDs = append(createdIDs, uuid.MustParse(created.ID))
+	}
+
+	for _, id := range createdIDs {
+		order, err := factory.FindWorkOrder(db, id)
+		require.NoError(t, err)
+		require.NotNil(t, order.SourceRunID, "task %s has no source run", id)
+		assert.Equal(t, ctx.RunID, *order.SourceRunID)
+	}
+}
+
 func TestRunnerCreatesADraftTaskWithoutAnOwner(t *testing.T) {
 	r := support.Setup(t)
 	t.Setenv("JWT_SECRET", "test")
