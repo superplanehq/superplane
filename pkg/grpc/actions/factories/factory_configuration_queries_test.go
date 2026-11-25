@@ -2,6 +2,7 @@ package factories
 
 import (
 	"context"
+	"slices"
 	"sync/atomic"
 	"testing"
 
@@ -13,13 +14,13 @@ import (
 	"gorm.io/gorm"
 )
 
-func TestFactoryConfigurationExportBatchesLiveVersions(t *testing.T) {
+func TestFactoryConfigurationExportBatchesMetadataAndLiveVersions(t *testing.T) {
 	f := newConfigurationFixture(t)
 	db := database.DB(t.Context())
 	type queryCountKey struct{}
 	const callback = "test:configuration_version_queries"
 	require.NoError(t, db.Callback().Query().After("gorm:query").Register(callback, func(tx *gorm.DB) {
-		if count, ok := tx.Statement.Context.Value(queryCountKey{}).(*atomic.Int64); ok && tx.Statement.Table == "workflow_versions" {
+		if count, ok := tx.Statement.Context.Value(queryCountKey{}).(*atomic.Int64); ok && slices.Contains([]string{"workflow_versions", "factory_intakes", "factory_pr_feedback_handlers"}, tx.Statement.Table) {
 			count.Add(1)
 		}
 	}))
@@ -41,5 +42,5 @@ func TestFactoryConfigurationExportBatchesLiveVersions(t *testing.T) {
 		resetTestTemplate(t, f.r, f.factory, "risk-score", models.ProviderGitHub, func(*yaml.Canvas) {})
 	}
 	require.Positive(t, singleQueries)
-	require.Equal(t, singleQueries, export(), "live graph reads must not grow with automation count")
+	require.Equal(t, singleQueries, export(), "live graph and metadata reads must not grow with automation count")
 }

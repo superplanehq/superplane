@@ -30,6 +30,21 @@ type factoryConfigurationStageTarget struct {
 	automations []*factoryConfigurationAutomationTarget
 }
 
+type factoryConfigurationAutomationMetadata struct {
+	intake  *models.FactoryIntake
+	handler *models.FactoryPRFeedbackHandler
+}
+
+func (m factoryConfigurationAutomationMetadata) materializeDefaults(tx *gorm.DB, factory *models.Factory, canvas *models.Canvas, version *models.CanvasVersion) (*materializedFactoryTemplate, error) {
+	if m.intake != nil {
+		return materializeIntakeDefaults(tx, canvas, version, m.intake, nil)
+	}
+	if m.handler != nil {
+		return materializePRFeedbackDefaults(tx, factory, canvas, version, m.handler, nil)
+	}
+	return materializeFactoryAppGraphDefaults(tx, factory, canvas, version, nil)
+}
+
 type factoryConfigurationAutomationTarget struct {
 	canvas          *models.Canvas
 	version         *models.CanvasVersion
@@ -161,11 +176,13 @@ func inspectFactoryConfigurationTarget(tx *gorm.DB, factory *models.Factory, lin
 		byKey[stage.Key] = entry
 	}
 	placements := map[uuid.UUID]string{}
+	metadata := map[uuid.UUID]factoryConfigurationAutomationMetadata{}
 	intakes, err := factory.ListIntakes(tx)
 	if err != nil {
 		return nil, err
 	}
 	for _, intake := range intakes {
+		metadata[intake.CanvasID] = factoryConfigurationAutomationMetadata{intake: &intake}
 		placements[intake.CanvasID] = models.CanvasColumnKeyBacklog
 	}
 	handlers, err := factory.ListPRFeedbackHandlers(tx)
@@ -173,6 +190,9 @@ func inspectFactoryConfigurationTarget(tx *gorm.DB, factory *models.Factory, lin
 		return nil, err
 	}
 	for _, handler := range handlers {
+		entry := metadata[handler.CanvasID]
+		entry.handler = &handler
+		metadata[handler.CanvasID] = entry
 		placements[handler.CanvasID] = models.CanvasColumnKeyVerify
 	}
 	slices.SortFunc(canvases, func(a, b models.Canvas) int {
@@ -202,7 +222,7 @@ func inspectFactoryConfigurationTarget(tx *gorm.DB, factory *models.Factory, lin
 		if step.Type != models.FactoryLineStepTypeRunApp || canvas == nil {
 			return nil, unsupportedConfigurationTarget("A phase must have a workspace automation runner.")
 		}
-		automation, err := inspectConfigurationAutomation(tx, factory, canvas, versions[canvas.ID], "phase-"+strconv.Itoa(*index))
+		automation, err := inspectConfigurationAutomation(tx, factory, canvas, versions[canvas.ID], metadata[canvas.ID], "phase-"+strconv.Itoa(*index))
 		if err != nil {
 			return nil, err
 		}
@@ -226,10 +246,8 @@ func inspectFactoryConfigurationTarget(tx *gorm.DB, factory *models.Factory, lin
 			if version == nil {
 				return nil, gorm.ErrRecordNotFound
 			}
-			template, builtIn, err := liveBuiltInAutomationTemplateID(tx, factory, canvas, version)
-			if err != nil {
-				return nil, err
-			}
+			entry := metadata[canvas.ID]
+			template, builtIn := builtInAutomationTemplateID(version, entry.intake, entry.handler)
 			if builtIn {
 				switch template {
 				case models.FactoryAppTemplateBacklogID, scheduledIntakeTemplateID, "issue-intake":
@@ -256,7 +274,7 @@ func inspectFactoryConfigurationTarget(tx *gorm.DB, factory *models.Factory, lin
 		if placement == "phase-0" {
 			compilerPlacement = "implement"
 		}
-		automation, err := inspectConfigurationAutomation(tx, factory, canvas, versions[canvas.ID], compilerPlacement)
+		automation, err := inspectConfigurationAutomation(tx, factory, canvas, versions[canvas.ID], metadata[canvas.ID], compilerPlacement)
 		if err != nil {
 			return nil, err
 		}
@@ -296,7 +314,7 @@ func inspectFactoryConfigurationTarget(tx *gorm.DB, factory *models.Factory, lin
 	return target, nil
 }
 
-func inspectConfigurationAutomation(tx *gorm.DB, factory *models.Factory, canvas *models.Canvas, version *models.CanvasVersion, placement string) (*factoryConfigurationAutomationTarget, error) {
+func inspectConfigurationAutomation(tx *gorm.DB, factory *models.Factory, canvas *models.Canvas, version *models.CanvasVersion, metadata factoryConfigurationAutomationMetadata, placement string) (*factoryConfigurationAutomationTarget, error) {
 	if canvas.LiveVersionID == nil {
 		return nil, unsupportedConfigurationTarget(fmt.Sprintf("Automation %q must be published before export.", canvas.Name))
 	}
@@ -304,17 +322,15 @@ func inspectConfigurationAutomation(tx *gorm.DB, factory *models.Factory, canvas
 		return nil, gorm.ErrRecordNotFound
 	}
 	automation := &factoryConfigurationAutomationTarget{canvas: canvas, version: version, placement: placement}
-	template, builtIn, err := liveBuiltInAutomationTemplateID(tx, factory, canvas, version)
-	if err != nil {
-		return nil, err
-	}
+	template, builtIn := builtInAutomationTemplateID(version, metadata.intake, metadata.handler)
+	var err error
 	if builtIn {
 		alias, ok := factoryConfigurationBuiltInAlias(template)
 		if !ok {
 			return nil, unsupportedConfigurationTarget(fmt.Sprintf("Automation %q uses an unsupported built-in template %q.", canvas.Name, template))
 		}
 		automation.templateID, automation.uses = template, alias
-		defaults, defaultErr := materializeLiveAutomationDefaults(tx, factory, canvas, version, nil)
+		defaults, defaultErr := metadata.materializeDefaults(tx, factory, canvas, version)
 		if defaultErr != nil {
 			return nil, defaultErr
 		}
