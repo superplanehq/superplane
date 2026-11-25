@@ -1961,3 +1961,50 @@ func TestAdminDeleteAccount(t *testing.T) {
 		assert.Empty(t, events[0].Properties["deleted_organization_ids"])
 	})
 }
+
+func TestAdminListInstallationAdmins(t *testing.T) {
+	server, _, token := setupAdminTestServer(t)
+	first, err := models.CreateAccount("Filter Admin A", "filter-a@example.com")
+	require.NoError(t, err)
+	second, err := models.CreateAccount("Filter Admin B", "filter-b@example.com")
+	require.NoError(t, err)
+	_, err = models.CreateAccount("Filter Admin Regular", "filter-regular@example.com")
+	require.NoError(t, err)
+	require.NoError(t, models.PromoteToInstallationAdmin(first.ID.String()))
+	require.NoError(t, models.PromoteToInstallationAdmin(second.ID.String()))
+
+	for _, test := range []struct {
+		name  string
+		query string
+		total int64
+		ids   []string
+	}{
+		{"all accounts", "search=Filter%20Admin", 3, []string{first.ID.String(), second.ID.String()}},
+		{"admins only", "search=Filter%20Admin&installation_admin=true", 2, []string{first.ID.String(), second.ID.String()}},
+		{"filtered pagination", "search=Filter%20Admin&installation_admin=true&limit=1&offset=1", 2, []string{second.ID.String()}},
+		{"email search", "search=filter-b%40example.com&installation_admin=true", 1, []string{second.ID.String()}},
+		{"no matches", "search=filter-regular%40example.com&installation_admin=true", 0, nil},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			response := execRequest(server, requestParams{method: "GET", path: "/admin/api/accounts?sort_by=name&sort_direction=asc&" + test.query, authCookie: token})
+			require.Equal(t, http.StatusOK, response.Code)
+			var page struct {
+				Items []struct {
+					ID                string `json:"id"`
+					InstallationAdmin bool   `json:"installation_admin"`
+				} `json:"items"`
+				Total int64 `json:"total"`
+			}
+			require.NoError(t, json.Unmarshal(response.Body.Bytes(), &page))
+			require.Equal(t, test.total, page.Total)
+			if test.name == "all accounts" {
+				return
+			}
+			require.Len(t, page.Items, len(test.ids))
+			for i, item := range page.Items {
+				assert.Equal(t, test.ids[i], item.ID)
+				assert.True(t, item.InstallationAdmin)
+			}
+		})
+	}
+}

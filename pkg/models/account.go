@@ -141,8 +141,12 @@ func CreateAccountInTransaction(tx *gorm.DB, name, email string) (*Account, erro
 	return account, nil
 }
 
-func ListAccounts(search string, limit, offset int, sortBy, sortDirection string) ([]Account, int64, error) {
-	query := database.Conn().Model(&Account{})
+func ListAccounts(tx *gorm.DB, search string, limit, offset int, sortBy, sortDirection string, installationAdminsOnly bool) ([]Account, int64, error) {
+	query := tx.Model(&Account{})
+
+	if installationAdminsOnly {
+		query = query.Where("installation_admin = ?", true)
+	}
 
 	if search != "" {
 		query = query.Where("name ILIKE ? OR email ILIKE ?", "%"+search+"%", "%"+search+"%")

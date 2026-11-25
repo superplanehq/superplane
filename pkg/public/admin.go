@@ -379,7 +379,7 @@ func (s *Server) adminListAccounts(w http.ResponseWriter, r *http.Request) {
 	search, limit, offset := parsePagination(r)
 	sortBy, sortDirection := parseSorting(r)
 
-	accounts, total, err := models.ListAccounts(search, limit, offset, sortBy, sortDirection)
+	accounts, total, err := models.ListAccounts(database.DB(r.Context()), search, limit, offset, sortBy, sortDirection, r.URL.Query().Get("installation_admin") == "true")
 	if err != nil {
 		log.Errorf("admin: failed to list accounts: %v", err)
 		http.Error(w, "Failed to list accounts", http.StatusInternalServerError)
