@@ -17,7 +17,7 @@ func validateCustomStageAutomation(tx *gorm.DB, factory *models.Factory, column 
 	if !strings.HasPrefix(column, "custom-") {
 		return nil
 	}
-	lines, err := factory.ListLines(tx)
+	lines, err := factoryAutomationLines(tx, factory)
 	if err != nil {
 		return err
 	}

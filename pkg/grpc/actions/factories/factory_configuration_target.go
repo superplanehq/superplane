@@ -18,9 +18,11 @@ import (
 )
 
 type factoryConfigurationTarget struct {
-	factory *models.Factory
-	line    *models.FactoryLine
-	stages  []*factoryConfigurationStageTarget
+	reads      *factoryAutomationReadInputs
+	validation *factoryConfigurationValidationInputs
+	factory    *models.Factory
+	line       *models.FactoryLine
+	stages     []*factoryConfigurationStageTarget
 }
 
 type factoryConfigurationStageTarget struct {
@@ -79,19 +81,29 @@ func loadFactoryConfigurationTarget(tx *gorm.DB, orgID uuid.UUID, factoryRef, li
 	if err != nil {
 		return nil, err
 	}
-	lineID, err := resolveConfigurationLineID(tx, factory, lineRef)
+	lines, err := factory.ListLines(tx)
 	if err != nil {
 		return nil, err
 	}
-	line, err := factory.FindLine(tx, lineID)
+	lineID, err := resolveConfigurationLineID(factory, lines, lineRef)
 	if err != nil {
 		return nil, err
+	}
+	var line *models.FactoryLine
+	for i := range lines {
+		if lines[i].ID == lineID {
+			line = &lines[i]
+			break
+		}
+	}
+	if line == nil {
+		return nil, gorm.ErrRecordNotFound
 	}
 	canvases, err := factory.ListCanvases(tx)
 	if err != nil {
 		return nil, err
 	}
-	return inspectFactoryConfigurationTarget(tx, factory, line, canvases)
+	return inspectFactoryConfigurationTarget(tx, factory, line, canvases, lines)
 }
 
 func lockFactoryConfigurationTarget(tx *gorm.DB, orgID uuid.UUID, factoryRef, lineRef string) (*factoryConfigurationTarget, error) {
@@ -104,7 +116,11 @@ func lockFactoryConfigurationTarget(tx *gorm.DB, orgID uuid.UUID, factoryRef, li
 	if err := factory.LockForUpdate(tx); err != nil {
 		return nil, err
 	}
-	lineID, err := resolveConfigurationLineID(tx, factory, lineRef)
+	lines, err := factory.ListLines(tx)
+	if err != nil {
+		return nil, err
+	}
+	lineID, err := resolveConfigurationLineID(factory, lines, lineRef)
 	if err != nil {
 		return nil, err
 	}
@@ -127,16 +143,12 @@ func lockFactoryConfigurationTarget(tx *gorm.DB, orgID uuid.UUID, factoryRef, li
 	if err := requireFactoryAsCode(tx, orgID); err != nil {
 		return nil, err
 	}
-	return inspectFactoryConfigurationTarget(tx, factory, line, canvases)
+	return inspectFactoryConfigurationTarget(tx, factory, line, canvases, lines)
 }
 
-func resolveConfigurationLineID(tx *gorm.DB, factory *models.Factory, ref string) (uuid.UUID, error) {
+func resolveConfigurationLineID(factory *models.Factory, lines []models.FactoryLine, ref string) (uuid.UUID, error) {
 	if strings.TrimSpace(ref) != "" {
 		return parseLineID(ref)
-	}
-	lines, err := factory.ListLines(tx)
-	if err != nil {
-		return uuid.Nil, err
 	}
 	provisioned := factory.OnboardingConfigValue().ProvisionedLineID
 	for _, line := range lines {
@@ -150,7 +162,7 @@ func resolveConfigurationLineID(tx *gorm.DB, factory *models.Factory, ref string
 	return lines[0].ID, nil
 }
 
-func inspectFactoryConfigurationTarget(tx *gorm.DB, factory *models.Factory, line *models.FactoryLine, canvases []models.Canvas) (*factoryConfigurationTarget, error) {
+func inspectFactoryConfigurationTarget(tx *gorm.DB, factory *models.Factory, line *models.FactoryLine, canvases []models.Canvas, lines []models.FactoryLine) (*factoryConfigurationTarget, error) {
 	if !factory.IsOnboardingComplete() {
 		return nil, unsupportedConfigurationTarget("Select an onboarded workspace.")
 	}
@@ -226,6 +238,12 @@ func inspectFactoryConfigurationTarget(tx *gorm.DB, factory *models.Factory, lin
 	if err != nil {
 		return nil, err
 	}
+	reads, err := newFactoryAutomationReadInputs(tx, factory, canvases, versions, lines)
+	if err != nil {
+		return nil, err
+	}
+	target.reads = reads
+	tx = withFactoryAutomationReadInputs(tx, reads)
 	for _, stage := range target.stages {
 		if stage.stage.Kind != models.FactoryLineStagePhase || stage.stage.StepIndex == nil {
 			continue

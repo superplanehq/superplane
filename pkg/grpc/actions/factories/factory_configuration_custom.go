@@ -2,7 +2,6 @@ package factories
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/google/uuid"
@@ -14,14 +13,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
 )
-
-func exportFactoryConfigurationCustom(tx *gorm.DB, factory *models.Factory, canvas *models.Canvas, version *models.CanvasVersion, placement string) (string, error) {
-	authored, err := findLegacyAutomationSource(tx, canvas)
-	if err != nil {
-		return "", err
-	}
-	return renderFactoryConfigurationCustom(tx, factory, canvas, version, placement, authored)
-}
 
 func renderFactoryConfigurationCustom(tx *gorm.DB, factory *models.Factory, canvas *models.Canvas, version *models.CanvasVersion, placement string, authored *models.AutomationSource) (string, error) {
 	placed := *canvas
@@ -41,7 +32,7 @@ func renderFactoryConfigurationCustom(tx *gorm.DB, factory *models.Factory, canv
 	return authored.Source, nil
 }
 
-func validateFactoryConfigurationCustom(ctx context.Context, tx *gorm.DB, deps IntakeDependencies, factory *models.Factory, canvas *models.Canvas, version *models.CanvasVersion, placement, source string) (*automationspec.Document, error) {
+func validateFactoryConfigurationCustom(ctx context.Context, tx *gorm.DB, deps IntakeDependencies, target *factoryConfigurationTarget, current *factoryConfigurationAutomationTarget, placement, source string) (*automationspec.Document, error) {
 	document, err := automationspec.Parse(source)
 	if err != nil {
 		return nil, err
@@ -49,32 +40,41 @@ func validateFactoryConfigurationCustom(ctx context.Context, tx *gorm.DB, deps I
 	if err := validateAutomationCanvasPlacement(document, placement); err != nil {
 		return nil, err
 	}
-	if canvas == nil {
-		_, err := models.FindCanvasByName(tx, factory.OrganizationID, &factory.ID, document.Name)
-		if err == nil {
-			return nil, document.Diagnostic("name", "Use a unique automation name in this workspace.")
-		}
-		if !errors.Is(err, gorm.ErrRecordNotFound) {
+	factory := target.factory
+	if current == nil {
+		existing, err := target.findCanvasByName(tx, document.Name)
+		if err != nil {
 			return nil, err
 		}
+		if existing != nil {
+			return nil, document.Diagnostic("name", "Use a unique automation name in this workspace.")
+		}
 	}
-	changed, err := factoryConfigurationCustomChanged(tx, factory, canvas, version, placement, document)
+	changed, err := factoryConfigurationCustomChanged(current, document)
 	if err != nil {
 		return nil, err
 	}
 	if !changed {
 		return document, nil
 	}
-	feature := features.FeatureFactoryAsCode
-	enabled, err := models.OrganizationHasExperimentalFeatures(tx, factory.OrganizationID, feature)
-	if err != nil {
+	// Configuration requests check feature access before loading their read inputs.
+	if factoryAutomationReads(tx, factory) == nil {
+		feature := features.FeatureFactoryAsCode
+		enabled, err := models.OrganizationHasExperimentalFeatures(tx, factory.OrganizationID, feature)
+		if err != nil {
+			return nil, err
+		}
+		if !enabled {
+			return nil, document.Diagnostic("$", fmt.Sprintf("Enable %s before changing this automation.", feature))
+		}
+	}
+
+	if err := target.validateCustomSecrets(tx, document); err != nil {
 		return nil, err
 	}
-	if !enabled {
-		return nil, document.Diagnostic("$", fmt.Sprintf("Enable %s before changing this automation.", feature))
-	}
-	if err := validateFactoryConfigurationCustomSecrets(tx, factory.OrganizationID, document); err != nil {
-		return nil, err
+	var version *models.CanvasVersion
+	if current != nil {
+		version = current.version
 	}
 	_, _, err = (CanvasAutomationBackend{Deps: deps}).compile(tx, automations.Placement{
 		OrganizationID: factory.OrganizationID, FactoryID: factory.ID, Stage: placement,
@@ -85,31 +85,28 @@ func validateFactoryConfigurationCustom(ctx context.Context, tx *gorm.DB, deps I
 	return document, nil
 }
 
-func factoryConfigurationCustomChanged(tx *gorm.DB, factory *models.Factory, canvas *models.Canvas, version *models.CanvasVersion, placement string, desired *automationspec.Document) (bool, error) {
-	if canvas == nil {
+func factoryConfigurationCustomChanged(current *factoryConfigurationAutomationTarget, desired *automationspec.Document) (bool, error) {
+	if current == nil {
 		return true, nil
 	}
-	source, err := exportFactoryConfigurationCustom(tx, factory, canvas, version, placement)
+	previous, err := automationspec.Parse(current.source)
 	if err != nil {
 		return false, err
 	}
-	current, err := automationspec.Parse(source)
-	if err != nil {
-		return false, err
-	}
-	current.Definition.Name = desired.Name
-	return !equalCanvasJSON(current.Definition, desired.Definition), nil
+	previous.Definition.Name = desired.Name
+	return !equalCanvasJSON(previous.Definition, desired.Definition), nil
 }
 
 func configurationAutomationSourceID(factoryID uuid.UUID, placement, id string) uuid.UUID {
 	return uuid.NewSHA1(factoryID, []byte("factory-configuration\x00"+placement+"\x00"+id))
 }
 
-func createFactoryConfigurationCustom(ctx context.Context, tx *gorm.DB, deps IntakeDependencies, factory *models.Factory, placement, manifestID, source string, actor uuid.UUID) (func(), error) {
-	document, err := validateFactoryConfigurationCustom(ctx, tx, deps, factory, nil, nil, placement, source)
+func createFactoryConfigurationCustom(ctx context.Context, tx *gorm.DB, deps IntakeDependencies, target *factoryConfigurationTarget, placement, manifestID, source string, actor uuid.UUID) (func(), error) {
+	document, err := validateFactoryConfigurationCustom(ctx, tx, deps, target, nil, placement, source)
 	if err != nil {
 		return nil, err
 	}
+	factory := target.factory
 	id := uuid.New()
 	artifact, notify, err := (CanvasAutomationBackend{Deps: deps}).Apply(ctx, tx, automations.Placement{
 		OrganizationID: factory.OrganizationID, FactoryID: factory.ID, Stage: placement,
@@ -158,6 +155,10 @@ func validateFactoryConfigurationCustomSecrets(tx *gorm.DB, organizationID uuid.
 	for _, name := range existing {
 		found[name] = true
 	}
+	return checkFactoryConfigurationCustomSecrets(document, found)
+}
+
+func checkFactoryConfigurationCustomSecrets(document *automationspec.Document, found map[string]bool) error {
 	for i, step := range document.Steps {
 		for j, name := range step.Secrets {
 			if !found[name] {
@@ -168,15 +169,17 @@ func validateFactoryConfigurationCustomSecrets(tx *gorm.DB, organizationID uuid.
 	return nil
 }
 
-func applyFactoryConfigurationCustom(ctx context.Context, tx *gorm.DB, deps IntakeDependencies, factory *models.Factory, canvas *models.Canvas, version *models.CanvasVersion, placement, source string, actor uuid.UUID) (func(), error) {
-	current, err := models.LockCanvasForUpdate(tx, factory.OrganizationID, canvas.ID)
+func applyFactoryConfigurationCustom(ctx context.Context, tx *gorm.DB, deps IntakeDependencies, target *factoryConfigurationTarget, previous *factoryConfigurationAutomationTarget, source string, actor uuid.UUID) (func(), error) {
+	factory := target.factory
+	version, placement := previous.version, previous.placement
+	current, err := models.LockCanvasForUpdate(tx, factory.OrganizationID, previous.canvas.ID)
 	if err != nil {
 		return nil, err
 	}
 	if current.FactoryID == nil || *current.FactoryID != factory.ID || current.LiveVersionID == nil || *current.LiveVersionID != version.ID {
 		return nil, grpcerrors.FailedPrecondition(nil, "The automation changed. Run plan again before apply.")
 	}
-	document, err := validateFactoryConfigurationCustom(ctx, tx, deps, factory, current, version, placement, source)
+	document, err := validateFactoryConfigurationCustom(ctx, tx, deps, target, previous, placement, source)
 	if err != nil {
 		return nil, err
 	}

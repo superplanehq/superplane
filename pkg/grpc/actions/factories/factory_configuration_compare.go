@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/automationspec"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
@@ -39,16 +40,39 @@ func configurationAutomationByStableIdentity(stage *factoryConfigurationStageTar
 	return nil
 }
 
-func configurationAutomationByIdentity(stage *factoryConfigurationStageTarget, desired factoryConfigurationAutomation, automations []factoryConfigurationAutomation) *factoryConfigurationAutomationTarget {
-	if current := configurationAutomationByStableIdentity(stage, desired.ID); current != nil {
-		return current
+func resolveFactoryConfigurationIdentities(target *factoryConfigurationTarget, manifest *factoryConfigurationManifest) {
+	byKey := configurationStagesByKey(target)
+	for i := range manifest.Stages {
+		stage := &manifest.Stages[i]
+		stage.retained = map[uuid.UUID]bool{}
+		live := byKey[stage.Key]
+		if live == nil {
+			continue
+		}
+		claimed := map[*factoryConfigurationAutomationTarget]bool{}
+		for j := range stage.Automations {
+			automation := &stage.Automations[j]
+			automation.current = configurationAutomationByStableIdentity(live, automation.ID)
+			if automation.current != nil {
+				claimed[automation.current] = true
+			}
+		}
+		for j := range stage.Automations {
+			automation := &stage.Automations[j]
+			if automation.current == nil {
+				automation.current = configurationAutomationFallback(live, *automation, claimed)
+			}
+			if automation.current != nil {
+				stage.retained[automation.current.canvas.ID] = true
+			}
+		}
 	}
-	// Older manifests and new custom entries can use different IDs from export.
+}
+
+func configurationAutomationFallback(stage *factoryConfigurationStageTarget, desired factoryConfigurationAutomation, claimed map[*factoryConfigurationAutomationTarget]bool) *factoryConfigurationAutomationTarget {
+	// Keep the historical filename/name priority in live automation order.
 	for _, current := range stage.automations {
-		// A filename or name must not take another entry's stable identity.
-		if slices.ContainsFunc(automations, func(automation factoryConfigurationAutomation) bool {
-			return configurationAutomationByStableIdentity(stage, automation.ID) == current
-		}) {
+		if claimed[current] {
 			continue
 		}
 		if current.templateID == "" && current.uses == desired.Uses {
@@ -121,7 +145,7 @@ func compareFactoryConfiguration(target *factoryConfigurationTarget, manifest *f
 		}
 		retained := map[string]bool{}
 		for j, automation := range stage.Automations {
-			current := configurationAutomationByIdentity(live, automation, stage.Automations)
+			current := automation.current
 			resource := "stages." + stage.Key + ".automations." + automation.ID
 			if current == nil {
 				changes = append(changes, configurationChange(resource, fmt.Sprintf("%s.automations[%d]", stagePath, j), nil, automation))

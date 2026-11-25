@@ -283,7 +283,7 @@ func TestFactoryConfigurationRejectsStalePlanAndRollsBackPublication(t *testing.
 }
 
 func TestFactoryConfigurationGuardsDoNotWrite(t *testing.T) {
-	for _, guard := range []string{"disabled", "permission revoked", "missing binding", "unsupported binding", "changed binding", "different line", "changed desired input", "wrong organization"} {
+	for _, guard := range []string{"disabled", "permission revoked", "missing binding", "unsupported binding", "changed binding", "different line", "changed desired input"} {
 		t.Run(guard, func(t *testing.T) {
 			f := newConfigurationFixture(t)
 			bundle := f.export(t)
@@ -319,8 +319,6 @@ func TestFactoryConfigurationGuardsDoNotWrite(t *testing.T) {
 				f.line = line
 			case "changed desired input":
 				bundle.Files[0].Content = strings.ReplaceAll(bundle.Files[0].Content, "New instructions", "Other instructions")
-			case "wrong organization":
-				f.r.Organization.ID = uuid.New()
 			}
 			if guard == "changed binding" || guard == "different line" {
 				fresh := f.plan(t, bundle)
@@ -370,4 +368,32 @@ func TestFactoryConfigurationResolvesWorkspaceWithoutLineID(t *testing.T) {
 	_, err = ApplyFactoryConfiguration(f.ctx, testIntakeDependencies(f.r), f.r.Organization.ID.String(), &pb.ApplyFactoryConfigurationRequest{FactoryId: f.factory.Key, Bundle: exported.Bundle, BaseStateToken: plan.BaseStateToken})
 	require.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
 	require.Equal(t, count, configurationRevisionCount(t, f.canvas))
+}
+
+func TestFactoryConfigurationRejectsAnotherEnabledOrganizationWithoutWrites(t *testing.T) {
+	f := newConfigurationFixture(t)
+	original := f.export(t)
+	desired := proto.Clone(original).(*pb.FactoryConfigurationBundle)
+	desired.Files[0].Content = strings.ReplaceAll(desired.Files[0].Content, "Original instructions", "Cross-organization instructions")
+	plan := f.plan(t, desired)
+	require.Empty(t, plan.Diagnostics)
+	other := support.CreateOrganization(t, f.r, f.r.User)
+	for _, feature := range []string{features.FeatureFactories, features.FeatureFactoryAsCode} {
+		require.NoError(t, models.EnableExperimentalFeature(other.ID, feature))
+	}
+	before := configurationResourceCounts(t)
+	_, err := ExportFactoryConfiguration(f.ctx, other.ID.String(), &pb.ExportFactoryConfigurationRequest{
+		FactoryId: f.factory.ID.String(), LineId: f.line.ID.String(),
+	})
+	require.Equal(t, codes.NotFound, grpcerrors.Code(err))
+	_, err = PlanFactoryConfiguration(f.ctx, testIntakeDependencies(f.r), other.ID.String(), &pb.PlanFactoryConfigurationRequest{
+		FactoryId: f.factory.ID.String(), LineId: f.line.ID.String(), Bundle: desired,
+	})
+	require.Equal(t, codes.NotFound, grpcerrors.Code(err))
+	_, err = ApplyFactoryConfiguration(f.ctx, testIntakeDependencies(f.r), other.ID.String(), &pb.ApplyFactoryConfigurationRequest{
+		FactoryId: f.factory.ID.String(), LineId: f.line.ID.String(), Bundle: desired, BaseStateToken: plan.BaseStateToken,
+	})
+	require.Equal(t, codes.NotFound, grpcerrors.Code(err))
+	require.Equal(t, before, configurationResourceCounts(t))
+	require.True(t, proto.Equal(original, f.export(t)), "a foreign organization must not change the source workspace")
 }

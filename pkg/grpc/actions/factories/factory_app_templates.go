@@ -669,7 +669,7 @@ func deriveFactoryTemplateInput(
 		if integrationType != "" && node.IntegrationID != nil {
 			integrationID, err := uuid.Parse(*node.IntegrationID)
 			if err == nil {
-				integration, findErr := models.FindIntegrationInTransaction(tx, canvas.OrganizationID, integrationID)
+				integration, findErr := factoryAutomationIntegrationByID(tx, canvas.OrganizationID, integrationID)
 				if findErr == nil {
 					input.integrations[integrationType] = factoryTemplateIntegration{
 						id:   integration.ID.String(),
@@ -679,7 +679,7 @@ func deriveFactoryTemplateInput(
 			}
 		}
 		for _, name := range factoryIntegrationNames(node.Configuration) {
-			integration, err := models.FindIntegrationByName(tx, canvas.OrganizationID, name)
+			integration, err := factoryAutomationIntegrationByName(tx, canvas.OrganizationID, name)
 			if err != nil {
 				continue
 			}
@@ -858,7 +858,7 @@ func materializeIntakeDefaults(
 	if trigger.IntegrationID != nil {
 		integrationID, parseErr := uuid.Parse(*trigger.IntegrationID)
 		if parseErr == nil {
-			integration, findErr := models.FindIntegrationInTransaction(tx, canvas.OrganizationID, integrationID)
+			integration, findErr := factoryAutomationIntegrationByID(tx, canvas.OrganizationID, integrationID)
 			if findErr == nil {
 				binding.Integration = &yaml.IntegrationRef{ID: integration.ID.String(), Name: integration.InstallationName}
 			}

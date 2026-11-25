@@ -84,3 +84,12 @@ func IsAutomationManagedArtifact(tx *gorm.DB, organizationID uuid.UUID, artifact
 	}
 	return err == nil, err
 }
+
+func FindAutomationSourcesByIDs(tx *gorm.DB, organizationID uuid.UUID, ids []uuid.UUID) ([]AutomationSource, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	var sources []AutomationSource
+	err := tx.Where("organization_id = ? AND id IN ?", organizationID, ids).Find(&sources).Error
+	return sources, err
+}
