@@ -105,6 +105,10 @@ func (w *Webhook) HasExceededRetries() bool {
 	return w.RetryCount >= w.MaxRetries
 }
 
+func (w *Webhook) HardDelete(tx *gorm.DB) error {
+	return tx.Unscoped().Delete(w).Error
+}
+
 // UpdateConfiguration stores a new configuration and leaves the state unchanged.
 func (w *Webhook) UpdateConfiguration(tx *gorm.DB, configuration any) error {
 	if w == nil || w.ID == uuid.Nil {
@@ -252,9 +256,9 @@ func ListBitbucketForgeWebhooks(tx *gorm.DB, installationID, repositoryUUID stri
 	return webhooks, err
 }
 
-func ListPendingWebhooks() ([]Webhook, error) {
+func ListPendingWebhooks(tx *gorm.DB, integrationNames []string) ([]Webhook, error) {
 	var webhooks []Webhook
-	err := database.Conn().
+	err := withRegisteredWebhookIntegration(tx, integrationNames).
 		Where("state = ?", WebhookStatePending).
 		Find(&webhooks).
 		Error
@@ -280,10 +284,10 @@ func ListDeletedWebhooks() ([]Webhook, error) {
 	return webhooks, nil
 }
 
-func LockWebhook(tx *gorm.DB, ID uuid.UUID) (*Webhook, error) {
+func LockWebhook(tx *gorm.DB, ID uuid.UUID, integrationNames []string) (*Webhook, error) {
 	var webhook Webhook
 
-	err := tx.Unscoped().
+	err := withRegisteredWebhookIntegration(tx, integrationNames).
 		Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
 		Where("id = ?", ID).
 		Where("state = ?", WebhookStatePending).
@@ -320,8 +324,8 @@ func LockDeletedWebhook(tx *gorm.DB, ID uuid.UUID) (*Webhook, error) {
 // ResetStuckProvisioningWebhooks resets webhooks that have been stuck in
 // "provisioning" state back to "pending". This handles the edge case where
 // the process crashes during the external API call (Phase 2).
-func ResetStuckProvisioningWebhooks() (int64, error) {
-	result := database.Conn().
+func ResetStuckProvisioningWebhooks(tx *gorm.DB, integrationNames []string) (int64, error) {
+	result := withRegisteredWebhookIntegration(tx, integrationNames).
 		Model(&Webhook{}).
 		Where("state = ?", WebhookStateProvisioning).
 		Updates(map[string]any{
@@ -330,4 +334,8 @@ func ResetStuckProvisioningWebhooks() (int64, error) {
 		})
 
 	return result.RowsAffected, result.Error
+}
+
+func withRegisteredWebhookIntegration(tx *gorm.DB, integrationNames []string) *gorm.DB {
+	return tx.Where("app_installation_id IS NULL OR app_installation_id IN (?)", registeredIntegrationIDs(tx, integrationNames))
 }

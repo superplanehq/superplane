@@ -48,7 +48,7 @@ Closest finished intakes:
 
 - The integration and trigger already exist: Dependabot alerts (`#7833`).
 - The source needs its own connection and setup wizard: Jira issues
-  (`#7534`), Sentry exceptions (`#7484`), Productive tasks (`#7030`).
+  (`#7534`), Sentry exceptions (`#7484`).
 
 Read that closest intake before you edit. Match its files. Do not invent a
 second way to register a source.
@@ -168,7 +168,6 @@ own objects, then let the human cut the list:
 - GitHub issues: labels, assignment, author access, which events
 - Jira issues: new or updated, labels, assignment
 - Sentry exceptions: which events, issue level
-- Productive tasks: task list, skip key tasks
 - Dependabot alerts: severity
 
 Empty selection means every value, unless the human says otherwise. The same
@@ -271,21 +270,21 @@ app asks for a personal token.
 ### 3. Setup choices
 
 - Which integration installation does the trigger use?
-- Which resource does it listen on? GitHub uses `repository`. Jira, Sentry,
-  and Productive use `project`. Linear uses `team` on `linear.onIssue`.
+- Which resource does it listen on? GitHub uses `repository`. Jira and Sentry
+  use `project`. Linear uses `team` on `linear.onIssue`.
   Record the configuration key. `TriggerResourceID` in
   `pkg/grpc/actions/factories/intake_graph.go` reads `repository` and
   `project` only. A new key must be added there or settings lose the
   resource.
 - Filters for this source are required. Collect them in **Settings filters**.
-- Can the user reconnect a missing integration from settings? Jira, Sentry,
-  and Productive can. GitHub uses the workspace repository from onboarding.
+- Can the user reconnect a missing integration from settings? Jira and Sentry
+  can. GitHub uses the workspace repository from onboarding.
 
 ### 4. Import existing items
 
 The setup wizard includes **Import existing items**. Reuse
 `IntakeSkipInitialImportField`. Do not add a second control. GitHub, Jira,
-Sentry, and Productive use this field. Do not copy Dependabot, which skips
+and Sentry use this field. Do not copy Dependabot, which skips
 the import and asks the user to pick packages.
 
 - The checkbox is on by default. Create then imports items.
@@ -294,9 +293,7 @@ the import and asks the user to pick packages.
 - The import is the 10 newest items that match the intake filters. Use a
   source cap of 10 in `pkg/grpc/actions/factories/intake_seed.go`. GitHub
   issues still use 30. Do not change that cap.
-- The helper states the number. Productive says "SuperPlane adds the 10
-  newest open tasks from this project." Name this source's open state the
-  same way.
+- The helper states the number and names the source's open state.
 - The label stays **Import existing items**. That string is shared.
 
 Search and import of one item by id stays available after create, through
@@ -326,16 +323,16 @@ either unless the human says yes.
 - When the task completes, does SuperPlane change the source item? Jira can
   move the issue to a status column. That landed after the first intake
   commit. It is not part of the first slice unless requested.
-- Copy attachments or images onto the task? Jira and Productive did this in
-  later commits. Skip it on the first slice unless requested.
+- Copy attachments or images onto the task? Jira does this.
+  Skip it on the first slice unless requested.
 - Webhook health. Report a webhook that is pending or failed when the source
-  can look connected and still receive nothing. Jira and Productive do this
+  can look connected and still receive nothing. Jira does this
   in `intake_graph.go`.
 
 ### 7. Release
 
 - Ship the Add intake entry behind an organization feature flag. That is the
-  pattern for Sentry, Jira, Productive, and Dependabot. GitHub issues has no
+  pattern for Sentry, Jira, and Dependabot. GitHub issues has no
   flag. Default for a new source: flag on, entry shows **Coming soon** until
   the flag is enabled.
 - Picker name, description, and icon.
@@ -370,8 +367,8 @@ analysis node. Scoring happens on the Backlog canvas.
 - `pkg/grpc/actions/factories/serialization.go`: `serializeFactoryIntakeSource`
   and `parseFactoryIntakeSource`.
 - `pkg/grpc/actions/factories/factory_velocity_report.go`: label and series
-  order, when this source should appear on the velocity report. Jira and
-  Productive are absent there today. Ask before you add a band.
+  order, when this source should appear on the velocity report. Jira is
+  absent there today. Ask before you add a band.
 
 ### Build the canvas
 

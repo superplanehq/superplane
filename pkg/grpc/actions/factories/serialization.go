@@ -323,8 +323,6 @@ func serializeFactoryIntakeSource(source string) pb.FactoryIntake_Source {
 		return pb.FactoryIntake_SOURCE_SENTRY_EXCEPTIONS
 	case models.FactoryIntakeSourcePagerDutyIncidents:
 		return pb.FactoryIntake_SOURCE_PAGERDUTY_INCIDENTS
-	case models.FactoryIntakeSourceProductiveTasks:
-		return pb.FactoryIntake_SOURCE_PRODUCTIVE_TASKS
 	case models.FactoryIntakeSourceJiraIssues:
 		return pb.FactoryIntake_SOURCE_JIRA_ISSUES
 	case models.FactoryIntakeSourceDependabotAlerts:
@@ -346,8 +344,6 @@ func parseFactoryIntakeSource(source pb.FactoryIntake_Source) (string, error) {
 		return models.FactoryIntakeSourceSentryExceptions, nil
 	case pb.FactoryIntake_SOURCE_PAGERDUTY_INCIDENTS:
 		return models.FactoryIntakeSourcePagerDutyIncidents, nil
-	case pb.FactoryIntake_SOURCE_PRODUCTIVE_TASKS:
-		return models.FactoryIntakeSourceProductiveTasks, nil
 	case pb.FactoryIntake_SOURCE_JIRA_ISSUES:
 		return models.FactoryIntakeSourceJiraIssues, nil
 	case pb.FactoryIntake_SOURCE_DEPENDABOT_ALERTS:
