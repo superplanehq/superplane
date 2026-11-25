@@ -1,12 +1,20 @@
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import { Check } from "lucide-react";
+import { Webhook } from "lucide-react";
+import type { ReactNode } from "react";
 
 import { CustomAutomationWebhookFields } from "./CustomAutomationWebhookFields";
 import { IntakeSetupDefaultOwner } from "./IntakeDefaultOwnerField";
-import { IntakeSetupWizard } from "./IntakeSetupWizard";
 import { WebhookAuthenticationField, WebhookSecretDialog } from "./settings/FactorySettingsWebhooksPage";
 import { useWebhookIntakeSetup, type WebhookIntakeMode, type WebhookIntakeSetupModel } from "./useWebhookIntakeSetup";
 import { WebhookIntakeFieldPathInputs } from "./WebhookIntakeFieldPathInputs";
@@ -22,100 +30,154 @@ interface WebhookIntakeSetupDialogProps {
 
 export function WebhookIntakeSetupDialog(props: WebhookIntakeSetupDialogProps) {
   const setup = useWebhookIntakeSetup(props.organizationId, props.factoryId);
-  const webhookStep = setup.step === "connection";
+
+  if (setup.reveal) {
+    return <WebhookSecretDialog reveal={setup.reveal} onClose={props.onCreated} />;
+  }
+
+  const submit = () => {
+    if (!setup.canFinish) return;
+    void setup.finish().then((result) => {
+      if (result === "created") props.onCreated();
+    });
+  };
 
   return (
-    <>
-      <IntakeSetupWizard
-        testId="webhook-intake-setup"
-        integrationName="webhook"
-        step={setup.step}
-        title={webhookStep ? WEBHOOK_INTAKE_SETUP_COPY.wizardStepWebhook : WEBHOOK_INTAKE_SETUP_COPY.wizardStepFields}
-        helper={
-          webhookStep
-            ? WEBHOOK_INTAKE_SETUP_COPY.wizardStepWebhookHelper
-            : WEBHOOK_INTAKE_SETUP_COPY.wizardStepFieldsHelper
-        }
-        resourceStepLabel="Map request fields"
-        resourceStepCaption="Awaiting field mapping"
-        footer={<SetupFooter setup={setup} onCreated={props.onCreated} />}
-        onBack={() => {
-          if (setup.step === "project") {
-            setup.setStep("connection");
-            return;
-          }
-          props.onClose();
-        }}
+    <Dialog
+      open
+      onOpenChange={(open) => {
+        if (!open && !setup.pending) props.onClose();
+      }}
+    >
+      <DialogContent
+        className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-xl"
+        showCloseButton={!setup.pending}
+        data-testid="webhook-intake-setup"
       >
-        <div>
-          {webhookStep ? (
-            <WebhookStep setup={setup} {...props} />
-          ) : (
-            <WebhookIntakeFieldPathInputs
-              idPrefix="webhook-intake-setup"
-              paths={setup.paths}
-              disabled={setup.pending}
-              onChange={setup.setPaths}
-            />
-          )}
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Webhook className="size-4" aria-hidden />
+            {WEBHOOK_INTAKE_SETUP_COPY.title}
+          </DialogTitle>
+          <DialogDescription>{WEBHOOK_INTAKE_SETUP_COPY.description}</DialogDescription>
+        </DialogHeader>
+        <form
+          className="min-w-0 space-y-6"
+          onSubmit={(event) => {
+            event.preventDefault();
+            submit();
+          }}
+        >
+          <fieldset disabled={setup.pending} className="min-w-0 space-y-6">
+            <Section title={WEBHOOK_INTAKE_SETUP_COPY.webhookSection}>
+              <WebhookSourceFields setup={setup} {...props} />
+            </Section>
+            <Section title={WEBHOOK_INTAKE_SETUP_COPY.fieldsSection} helper={WEBHOOK_INTAKE_SETUP_COPY.fieldsHelper}>
+              <WebhookIntakeFieldPathInputs
+                idPrefix="webhook-intake-setup"
+                paths={setup.paths}
+                disabled={setup.pending}
+                onChange={setup.setPaths}
+              />
+            </Section>
+            <IntakeSetupDefaultOwner owner={setup.owner} disabled={setup.pending} />
+          </fieldset>
           {setup.error ? (
-            <p className="workspace-body-text mt-4 text-destructive" role="alert">
+            <p role="alert" className="text-sm text-destructive">
               {setup.error}
             </p>
           ) : null}
-        </div>
-        {webhookStep ? null : <IntakeSetupDefaultOwner owner={setup.owner} disabled={setup.pending} />}
-      </IntakeSetupWizard>
-      <WebhookSecretDialog reveal={setup.reveal} onClose={props.onCreated} />
-    </>
+          <DialogFooter>
+            <Button type="button" variant="outline" disabled={setup.pending} onClick={props.onClose}>
+              {WEBHOOK_INTAKE_SETUP_COPY.cancel}
+            </Button>
+            <Button type="submit" disabled={!setup.canFinish} data-testid="webhook-intake-setup-finish">
+              {setup.pending ? WEBHOOK_INTAKE_SETUP_COPY.creating : WEBHOOK_INTAKE_SETUP_COPY.create}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 
-const MODES: Array<{ id: WebhookIntakeMode; label: string }> = [
-  { id: "new", label: WEBHOOK_INTAKE_SETUP_COPY.modeNew },
-  { id: "existing", label: WEBHOOK_INTAKE_SETUP_COPY.modeExisting },
+function Section({ title, helper, children }: { title: string; helper?: string; children: ReactNode }) {
+  return (
+    <section className="space-y-3">
+      <div className="space-y-1">
+        <h3 className="text-[11px] font-medium uppercase tracking-[0.04em] text-muted-foreground">{title}</h3>
+        {helper ? <p className="text-xs text-muted-foreground">{helper}</p> : null}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+const MODES: Array<{ id: WebhookIntakeMode; label: string; helper: string }> = [
+  { id: "new", label: WEBHOOK_INTAKE_SETUP_COPY.modeNew, helper: WEBHOOK_INTAKE_SETUP_COPY.modeNewHelper },
+  {
+    id: "existing",
+    label: WEBHOOK_INTAKE_SETUP_COPY.modeExisting,
+    helper: WEBHOOK_INTAKE_SETUP_COPY.modeExistingHelper,
+  },
 ];
 
-function WebhookStep({
+function WebhookSourceFields({
   setup,
   organizationId,
   factoryId,
   factoryKey,
 }: { setup: WebhookIntakeSetupModel } & WebhookIntakeSetupDialogProps) {
+  const locked = Boolean(setup.createdWebhook);
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Webhook">
+      <div
+        className="grid gap-2 sm:grid-cols-2"
+        role="radiogroup"
+        aria-label={WEBHOOK_INTAKE_SETUP_COPY.webhookSection}
+      >
         {MODES.map((mode) => {
           const selected = setup.mode === mode.id;
           return (
-            <Button
+            <button
               key={mode.id}
               type="button"
-              variant="ghost"
               role="radio"
               aria-checked={selected}
+              disabled={locked && !selected}
               onClick={() => setup.setMode(mode.id)}
               data-testid={`webhook-intake-mode-${mode.id}`}
               className={cn(
-                "h-auto justify-between rounded-lg border px-3 py-3 text-left text-[13px] font-medium",
+                "flex items-start gap-2.5 rounded-lg border px-3 py-2.5 text-left transition-colors disabled:opacity-50",
                 selected ? "border-foreground bg-accent/40" : "border-border hover:bg-accent/30",
               )}
             >
-              <span className="min-w-0 flex-1 truncate">{mode.label}</span>
-              {selected ? <Check className="size-4 shrink-0" aria-hidden /> : null}
-            </Button>
+              <span
+                className={cn(
+                  "mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full border",
+                  selected ? "border-foreground" : "border-muted-foreground/50",
+                )}
+                aria-hidden
+              >
+                {selected ? <span className="size-2 rounded-full bg-foreground" /> : null}
+              </span>
+              <span className="min-w-0">
+                <span className="block text-[13px] font-medium">{mode.label}</span>
+                <span className="block text-xs text-muted-foreground">{mode.helper}</span>
+              </span>
+            </button>
           );
         })}
       </div>
       {setup.mode === "new" ? (
-        <div className="space-y-4">
+        <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="webhook-intake-name">{WEBHOOK_INTAKE_SETUP_COPY.nameLabel}</Label>
             <Input
               id="webhook-intake-name"
               value={setup.name}
               maxLength={100}
-              disabled={Boolean(setup.createdWebhook)}
+              disabled={locked}
               onChange={(event) => setup.setName(event.target.value)}
               data-testid="webhook-intake-name"
             />
@@ -123,9 +185,8 @@ function WebhookStep({
           <WebhookAuthenticationField
             value={setup.authentication}
             onChange={setup.setAuthentication}
-            disabled={Boolean(setup.createdWebhook)}
+            disabled={locked}
           />
-          <p className="text-xs text-muted-foreground">{WEBHOOK_INTAKE_SETUP_COPY.newWebhookHelper}</p>
         </div>
       ) : (
         <CustomAutomationWebhookFields
@@ -140,37 +201,5 @@ function WebhookStep({
         />
       )}
     </div>
-  );
-}
-
-function SetupFooter({ setup, onCreated }: { setup: WebhookIntakeSetupModel; onCreated: () => void }) {
-  if (setup.step === "connection") {
-    return (
-      <Button
-        type="button"
-        className="w-full"
-        disabled={!setup.canContinue}
-        onClick={() => setup.setStep("project")}
-        data-testid="webhook-intake-setup-continue"
-      >
-        {WEBHOOK_INTAKE_SETUP_COPY.wizardContinue}
-      </Button>
-    );
-  }
-
-  return (
-    <Button
-      type="button"
-      className="w-full"
-      disabled={!setup.canFinish}
-      onClick={() => {
-        void setup.finish().then((result) => {
-          if (result === "created") onCreated();
-        });
-      }}
-      data-testid="webhook-intake-setup-finish"
-    >
-      {setup.pending ? WEBHOOK_INTAKE_SETUP_COPY.wizardFinishing : WEBHOOK_INTAKE_SETUP_COPY.wizardFinish}
-    </Button>
   );
 }

@@ -382,11 +382,6 @@ export function factoryDatadogIntakeSetupPath(organizationId: string, factoryKey
   return `${factoryLineDetailPath(organizationId, factoryKey, lineId)}/setup/datadog`;
 }
 
-/** Dedicated setup page for webhook intake. */
-export function factoryWebhookIntakeSetupPath(organizationId: string, factoryKey: string, lineId: string) {
-  return `${factoryLineDetailPath(organizationId, factoryKey, lineId)}/setup/webhook`;
-}
-
 /** Connection created in this Linear OAuth round trip. The Linear callback appends it. */
 export const LINEAR_INTAKE_INTEGRATION_SEARCH_PARAM = "linearIntegrationId";
 

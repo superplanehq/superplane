@@ -4,7 +4,6 @@ import { useFactoryWebhookMutations } from "@/hooks/useFactoryWebhooks";
 import { getApiErrorMessage } from "@/lib/errors";
 import { useState } from "react";
 
-import type { IntakeSetupStep } from "./IntakeSetupWizard";
 import type { Authentication, Reveal } from "./settings/FactorySettingsWebhooksPage";
 import {
   DEFAULT_WEBHOOK_INTAKE_FIELD_PATHS,
@@ -19,7 +18,6 @@ export type WebhookIntakeMode = "new" | "existing";
 export type WebhookIntakeFinish = "created" | "reveal" | "failed";
 
 export function useWebhookIntakeSetup(organizationId: string, factoryId: string) {
-  const [step, setStep] = useState<IntakeSetupStep>("connection");
   const [mode, setMode] = useState<WebhookIntakeMode>("new");
   const [name, setName] = useState<string>(WEBHOOK_INTAKE_SETUP_COPY.defaultName);
   const [authentication, setAuthentication] = useState<Authentication>("AUTHENTICATION_BEARER");
@@ -34,8 +32,9 @@ export function useWebhookIntakeSetup(organizationId: string, factoryId: string)
   const createIntake = useCreateFactoryIntake(organizationId, factoryId);
   const owner = useIntakeOwnerDraft(organizationId, factoryId);
   const pending = createWebhook.isPending || createIntake.isPending;
-  const canContinue = mode === "new" ? name.trim() !== "" : webhookId !== "";
-  const canFinish = Object.keys(webhookIntakeFieldPathErrors(paths)).length === 0 && !pending;
+  const webhookReady = mode === "new" ? name.trim() !== "" : webhookId !== "";
+  const pathsValid = Object.keys(webhookIntakeFieldPathErrors(paths)).length === 0;
+  const canFinish = webhookReady && pathsValid && (!owner.required || owner.value !== "") && !pending;
 
   const ensureWebhook = async (): Promise<Reveal | string> => {
     if (mode === "existing") return webhookId;
@@ -74,8 +73,6 @@ export function useWebhookIntakeSetup(organizationId: string, factoryId: string)
 
   return {
     owner,
-    step,
-    setStep,
     mode,
     setMode,
     name,
@@ -90,7 +87,6 @@ export function useWebhookIntakeSetup(organizationId: string, factoryId: string)
     reveal,
     error,
     pending,
-    canContinue,
     canFinish,
     finish,
   };

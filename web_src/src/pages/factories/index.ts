@@ -58,5 +58,4 @@ export {
   PlanningSetupPage,
   RiskScoreSetupPage,
   SentryIntakeSetupPage,
-  WebhookIntakeSetupPage,
 } from "./pages";
