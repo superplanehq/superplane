@@ -2,6 +2,7 @@ package factories
 
 import (
 	"context"
+	"fmt"
 	"slices"
 	"sync/atomic"
 	"testing"
@@ -14,13 +15,13 @@ import (
 	"gorm.io/gorm"
 )
 
-func TestFactoryConfigurationExportBatchesMetadataAndLiveVersions(t *testing.T) {
-	f := newConfigurationFixture(t)
+func TestFactoryConfigurationExportBatchesMetadataLiveVersionsAndSources(t *testing.T) {
+	f := newConfigurationLifecycleFixture(t)
 	db := database.DB(t.Context())
 	type queryCountKey struct{}
 	const callback = "test:configuration_version_queries"
 	require.NoError(t, db.Callback().Query().After("gorm:query").Register(callback, func(tx *gorm.DB) {
-		if count, ok := tx.Statement.Context.Value(queryCountKey{}).(*atomic.Int64); ok && slices.Contains([]string{"workflow_versions", "factory_intakes", "factory_pr_feedback_handlers"}, tx.Statement.Table) {
+		if count, ok := tx.Statement.Context.Value(queryCountKey{}).(*atomic.Int64); ok && slices.Contains([]string{"workflow_versions", "factory_intakes", "factory_pr_feedback_handlers", "automations_as_code"}, tx.Statement.Table) {
 			count.Add(1)
 		}
 	}))
@@ -37,10 +38,28 @@ func TestFactoryConfigurationExportBatchesMetadataAndLiveVersions(t *testing.T) 
 		require.NotEmpty(t, response.Bundle.Files)
 		return count.Load()
 	}
+	bundle := f.export(t)
+	addConfigurationLifecycleAutomation(t, bundle, "audit", "Audit")
+	plan := f.plan(t, bundle)
+	require.Empty(t, plan.Diagnostics)
+	_, err := f.apply(bundle, plan.BaseStateToken)
+	require.NoError(t, err)
 	singleQueries := export()
 	for range 4 {
 		resetTestTemplate(t, f.r, f.factory, "risk-score", models.ProviderGitHub, func(*yaml.Canvas) {})
 	}
+	response, err := ExportFactoryConfiguration(f.ctx, f.r.Organization.ID.String(), &pb.ExportFactoryConfigurationRequest{
+		FactoryId: f.factory.ID.String(), LineId: f.line.ID.String(),
+	})
+	require.NoError(t, err)
+	bundle = response.Bundle
+	for i := range 4 {
+		addConfigurationLifecycleAutomation(t, bundle, fmt.Sprintf("audit-%d", i), fmt.Sprintf("Audit %d", i))
+	}
+	plan = f.plan(t, bundle)
+	require.Empty(t, plan.Diagnostics)
+	_, err = f.apply(bundle, plan.BaseStateToken)
+	require.NoError(t, err)
 	require.Positive(t, singleQueries)
-	require.Equal(t, singleQueries, export(), "live graph and metadata reads must not grow with automation count")
+	require.Equal(t, singleQueries, export(), "live graph, metadata, and source reads must not grow with automation count")
 }

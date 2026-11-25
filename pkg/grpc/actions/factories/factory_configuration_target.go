@@ -31,6 +31,7 @@ type factoryConfigurationStageTarget struct {
 }
 
 type factoryConfigurationAutomationMetadata struct {
+	source  *models.AutomationSource
 	intake  *models.FactoryIntake
 	handler *models.FactoryPRFeedbackHandler
 }
@@ -202,8 +203,24 @@ func inspectFactoryConfigurationTarget(tx *gorm.DB, factory *models.Factory, lin
 		return strings.Compare(a.ID.String(), b.ID.String())
 	})
 	byCanvas := make(map[uuid.UUID]*models.Canvas, len(canvases))
+	artifactIDs := make([]string, 0, len(canvases))
 	for i := range canvases {
 		byCanvas[canvases[i].ID] = &canvases[i]
+		artifactIDs = append(artifactIDs, canvases[i].ID.String())
+	}
+	sources, err := models.FindAutomationSourcesByArtifacts(tx, factory.OrganizationID, artifactIDs)
+	if err != nil {
+		return nil, err
+	}
+	for i := range sources {
+		source := &sources[i]
+		canvasID, err := uuid.Parse(source.ArtifactID)
+		if err != nil {
+			return nil, err
+		}
+		entry := metadata[canvasID]
+		entry.source = source
+		metadata[canvasID] = entry
 	}
 	versions, err := models.FindLiveCanvasVersions(tx, canvases)
 	if err != nil {
@@ -358,20 +375,15 @@ func inspectConfigurationAutomation(tx *gorm.DB, factory *models.Factory, canvas
 		}
 		automation.settings, err = exportFactoryConfigurationBuiltIn(version, template)
 	} else {
-		automation.source, err = exportFactoryConfigurationCustom(tx, factory, canvas, version, placement)
+		automation.source, err = renderFactoryConfigurationCustom(tx, factory, canvas, version, placement, metadata.source)
 	}
 	if err != nil {
 		return nil, unsupportedConfigurationTarget(fmt.Sprintf("Cannot export automation %q: %v", canvas.Name, err))
 	}
-	if !builtIn {
-		authored, err := findLegacyAutomationSource(tx, canvas)
-		if err != nil {
-			return nil, err
-		}
-		if authored != nil && authored.FactoryID == factory.ID {
-			automation.sourceID = authored.ID
-		}
+	if !builtIn && metadata.source != nil && metadata.source.FactoryID == factory.ID {
+		automation.sourceID = metadata.source.ID
 	}
+
 	return automation, nil
 }
 
