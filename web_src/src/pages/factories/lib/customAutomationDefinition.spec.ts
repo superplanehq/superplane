@@ -125,6 +125,27 @@ describe("webhook trigger conversion", () => {
     expect(automationDefinitionTriggers(visual.triggers, "backlog")).toEqual(definition.triggers);
   });
 
+  it("keeps a task webhook on an Implement automation", () => {
+    const definition: AutomationDefinition = {
+      ...newAutomationDefinition("implement"),
+      runs_on_task: true,
+      triggers: [
+        {
+          id: "deploy",
+          use: "webhook",
+          config: { webhook_id: "webhook-1", task_match: { kind: "pull_request", field_path: "pull_request.url" } },
+        },
+      ],
+    };
+    const visual = automationDefinitionCanvas(
+      parseAutomationForCanvas(automationDefinitionYaml(definition), "implement"),
+    );
+
+    expect(visual.runsOnTask).toBe(true);
+    expect(visual.triggers[0]?.taskMatch).toEqual({ kind: "pull_request", fieldPath: "pull_request.url" });
+    expect(automationDefinitionTriggers(visual.triggers, "implement")).toEqual(definition.triggers);
+  });
+
   const duplicate = webhookDefinition();
   duplicate.triggers.push({ id: "again", use: "webhook", config: { webhook_id: "webhook-1" } });
   it.each<[CustomAutomationColumn, AutomationDefinition, string]>([

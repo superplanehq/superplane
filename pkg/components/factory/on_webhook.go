@@ -1,6 +1,8 @@
 package factory
 
 import (
+	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -25,7 +27,13 @@ func init() {
 type OnWebhook struct{}
 
 type OnWebhookConfiguration struct {
-	Webhook string `json:"webhook" mapstructure:"webhook"`
+	Webhook   string              `json:"webhook" mapstructure:"webhook"`
+	TaskMatch *OnWebhookTaskMatch `json:"taskMatch" mapstructure:"taskMatch"`
+}
+
+type OnWebhookTaskMatch struct {
+	Kind      string `json:"kind" mapstructure:"kind"`
+	FieldPath string `json:"fieldPath" mapstructure:"fieldPath"`
 }
 
 func (t *OnWebhook) Name() string {
@@ -101,15 +109,74 @@ func (t *OnWebhook) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.We
 		return http.StatusBadRequest, nil, fmt.Errorf("error parsing request body: %v", err)
 	}
 
-	err := ctx.Events.Emit(OnWebhookPayloadType, map[string]any{
+	var config OnWebhookConfiguration
+	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
+		return http.StatusInternalServerError, nil, fmt.Errorf("failed to decode configuration: %w", err)
+	}
+	payload := map[string]any{
 		"body":    body,
 		"headers": ctx.Headers,
-	})
-	if err != nil {
-		return http.StatusInternalServerError, nil, fmt.Errorf("error emitting event: %v", err)
 	}
-
+	if config.TaskMatch == nil {
+		if err := ctx.Events.Emit(OnWebhookPayloadType, payload); err != nil {
+			return http.StatusInternalServerError, nil, fmt.Errorf("error emitting event: %v", err)
+		}
+		return http.StatusOK, nil, nil
+	}
+	value := nestedWebhookString(body, config.TaskMatch.FieldPath)
+	if value == "" {
+		return http.StatusOK, nil, nil
+	}
+	orders, err := ctx.Factory.FindWorkOrdersForWebhook(config.TaskMatch.Kind, value, "")
+	if err != nil {
+		return http.StatusInternalServerError, nil, fmt.Errorf("error finding tasks: %v", err)
+	}
+	deliveryKey := fmt.Sprintf("%x", sha256.Sum256(ctx.Body))
+	events, ok := ctx.Events.(core.DeduplicatedEventContext)
+	if !ok {
+		return http.StatusInternalServerError, nil, fmt.Errorf("task webhook deduplication is not available")
+	}
+	for index, order := range orders {
+		if index == 25 {
+			break
+		}
+		orderID, _ := order["id"].(string)
+		payload["workOrder"] = order
+		if err := events.EmitDeduplicated(OnWebhookPayloadType, payload, deliveryKey+"|"+orderID); err != nil {
+			return http.StatusInternalServerError, nil, fmt.Errorf("error emitting event: %v", err)
+		}
+	}
 	return http.StatusOK, nil, nil
+}
+
+func nestedWebhookString(body any, fieldPath string) string {
+	current, ok := body.(map[string]any)
+	if !ok {
+		return ""
+	}
+	segments := strings.Split(strings.TrimSpace(fieldPath), ".")
+	for index, segment := range segments {
+		value, found := current[segment]
+		if !found {
+			return ""
+		}
+		if index == len(segments)-1 {
+			switch typed := value.(type) {
+			case string:
+				return strings.TrimSpace(typed)
+			case json.Number:
+				if _, err := typed.Int64(); err == nil {
+					return typed.String()
+				}
+			}
+			return ""
+		}
+		current, ok = value.(map[string]any)
+		if !ok {
+			return ""
+		}
+	}
+	return ""
 }
 
 func (t *OnWebhook) Setup(ctx core.TriggerContext) error {
