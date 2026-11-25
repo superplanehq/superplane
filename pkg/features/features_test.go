@@ -52,15 +52,6 @@ func Test__Get(t *testing.T) {
 		assert.Nil(t, f.Released)
 	})
 
-	t.Run("known id returns custom automations feature", func(t *testing.T) {
-		f, ok := Get(FeatureFactoryCustomAutomations)
-		assert.True(t, ok)
-		assert.Equal(t, FeatureFactoryCustomAutomations, f.ID)
-		assert.Equal(t, "Custom automations and stages", f.Label)
-		assert.Equal(t, "Add custom automations to board columns and manage custom stages on factory line boards", f.Description)
-		assert.Nil(t, f.Released)
-	})
-
 	t.Run("retired workspace agent flag is absent", func(t *testing.T) {
 		feature, ok := Get("workspace_agent")
 		assert.False(t, ok)
@@ -178,9 +169,8 @@ func Test__Exists(t *testing.T) {
 	assert.True(t, Exists(FeatureFactoryDatadogIntake))
 	assert.True(t, Exists(FeatureOrganizationBYOK))
 	assert.True(t, Exists(FeatureOrganizationBYOKCustomProvider))
-	assert.True(t, Exists(FeatureFactoryCustomAutomations))
 	assert.False(t, Exists("factory_custom_stages"))
-	assert.False(t, IsReleased(FeatureFactoryCustomAutomations))
+	assert.False(t, Exists("factory_custom_automations"))
 	assert.False(t, Exists("workspace_agent"))
 	assert.True(t, Exists(FeatureWorkspaceSkills))
 	assert.True(t, Exists(FeatureFactoryPullRequestMerge))

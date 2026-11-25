@@ -6,7 +6,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
@@ -51,9 +50,6 @@ func CreateFactoryAutomation(
 		return nil, factoryErrorToStatus(invalidArgument("column key is invalid"), "failed to create factory automation")
 	}
 	customStageColumn := strings.HasPrefix(columnKey, "custom-")
-	if templateID == "" && !organization.HasExperimentalFeature(features.FeatureFactoryCustomAutomations) {
-		return nil, factoryErrorToStatus(errCustomAutomationsDisabled, "failed to create factory automation")
-	}
 	factory, err := findFactory(db, orgID, req.GetFactoryId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create factory automation")

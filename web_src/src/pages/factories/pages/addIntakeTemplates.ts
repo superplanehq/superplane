@@ -6,7 +6,6 @@ import linearIcon from "@/assets/icons/integrations/linear.svg";
 import notionIcon from "@/assets/icons/integrations/notion.svg";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
 import {
-  FEATURE_FACTORY_CUSTOM_AUTOMATIONS,
   FEATURE_FACTORY_DATADOG_INTAKE,
   FEATURE_FACTORY_SCHEDULED_INTAKE,
 } from "@/lib/experimentalFeatures";
@@ -41,7 +40,6 @@ export const ADD_INTAKE_TEMPLATES: AddIntakeTemplate[] = [
     iconName: "sparkles",
     name: "Build your own",
     description: "Run prompt and Bash steps, or create tasks on a schedule.",
-    featureId: FEATURE_FACTORY_CUSTOM_AUTOMATIONS,
   },
   {
     id: "scheduled-intake",

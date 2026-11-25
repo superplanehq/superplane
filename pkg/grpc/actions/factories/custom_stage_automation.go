@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/components/runner"
-	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/pkg/yaml"
@@ -17,13 +16,6 @@ import (
 func validateCustomStageAutomation(tx *gorm.DB, factory *models.Factory, column string) error {
 	if !strings.HasPrefix(column, "custom-") {
 		return nil
-	}
-	organization, err := models.FindOrganizationByIDInTransaction(tx, factory.OrganizationID.String())
-	if err != nil {
-		return err
-	}
-	if !organization.HasExperimentalFeature(features.FeatureFactoryCustomAutomations) {
-		return errCustomAutomationsDisabled
 	}
 	lines, err := factory.ListLines(tx)
 	if err != nil {

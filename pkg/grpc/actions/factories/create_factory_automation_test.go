@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
@@ -19,21 +18,7 @@ import (
 func Test__CreateFactoryAutomation(t *testing.T) {
 	r := support.Setup(t)
 
-	t.Run("feature off -> error", func(t *testing.T) {
-		_, err := CreateFactoryAutomation(context.Background(), IntakeDependencies{}, r.Organization.ID.String(), &pb.CreateFactoryAutomationRequest{
-			FactoryId: "00000000-0000-0000-0000-000000000001",
-			Name:      "Preview environment",
-			ColumnKey: models.CanvasColumnKeyVerify,
-		})
-		code, message, ok := grpcerrors.HandlerStatus(err)
-		assert.True(t, ok)
-		assert.Equal(t, codes.FailedPrecondition, code)
-		assert.Equal(t, "Custom automations are not enabled for this organization.", message)
-	})
-
-	t.Run("feature on continues past the flag", func(t *testing.T) {
-		require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
-
+	t.Run("rejects an invalid column without opt-in", func(t *testing.T) {
 		_, err := CreateFactoryAutomation(context.Background(), IntakeDependencies{}, r.Organization.ID.String(), &pb.CreateFactoryAutomationRequest{
 			FactoryId: "00000000-0000-0000-0000-000000000001",
 			Name:      "Preview environment",
@@ -44,7 +29,6 @@ func Test__CreateFactoryAutomation(t *testing.T) {
 		assert.Equal(t, codes.InvalidArgument, code)
 	})
 	t.Run("custom automation cannot bypass the scheduled intake gate", func(t *testing.T) {
-		require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
 		_, err := CreateFactoryAutomation(context.Background(), IntakeDependencies{}, r.Organization.ID.String(), &pb.CreateFactoryAutomationRequest{
 			FactoryId: "00000000-0000-0000-0000-000000000001", ColumnKey: models.CanvasColumnKeyBacklog,
 		})
@@ -56,7 +40,6 @@ func Test__CreateFactoryAutomation(t *testing.T) {
 
 	t.Run("attaches an automation to a custom stage", func(t *testing.T) {
 		db := database.DB(t.Context())
-		require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
 		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 		require.NoError(t, err)
 		support.CompleteFactoryOnboarding(t, factory)
@@ -90,15 +73,5 @@ func Test__CreateFactoryAutomation(t *testing.T) {
 		_, err = CreateFactoryAutomation(onboardingContext(r), onboardingDeps(r), r.Organization.ID.String(),
 			&pb.CreateFactoryAutomationRequest{FactoryId: factory.ID.String(), Name: "Verify checks", ColumnKey: models.CanvasColumnKeyVerify})
 		require.NoError(t, err)
-
-		require.NoError(t, models.DisableExperimentalFeature(r.Organization.ID, features.FeatureFactoryCustomAutomations))
-		for _, column := range []string{stageKey, models.CanvasColumnKeyVerify} {
-			_, err = CreateFactoryAutomation(onboardingContext(r), onboardingDeps(r), r.Organization.ID.String(),
-				&pb.CreateFactoryAutomationRequest{FactoryId: factory.ID.String(), Name: "Disabled", ColumnKey: column})
-			code, _, ok := grpcerrors.HandlerStatus(err)
-			require.True(t, ok)
-			assert.Equal(t, codes.FailedPrecondition, code)
-		}
 	})
-
 }
