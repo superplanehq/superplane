@@ -5,7 +5,9 @@ import (
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
+	"gorm.io/gorm"
 )
 
 func CreateFactoryLine(ctx context.Context, organizationID string, req *pb.CreateFactoryLineRequest) (*pb.CreateFactoryLineResponse, error) {
@@ -24,14 +26,19 @@ func CreateFactoryLine(ctx context.Context, organizationID string, req *pb.Creat
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create factory line")
 	}
-	factoryID := factory.ID
 
-	steps, err := parseLineSteps(db, orgID, factoryID, req.GetSteps())
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to create factory line")
-	}
-
-	line, err := factory.CreateLine(db, name, steps)
+	var line *models.FactoryLine
+	err = db.Transaction(func(tx *gorm.DB) error {
+		if err := factory.LockForUpdate(tx); err != nil {
+			return err
+		}
+		steps, err := parseLineSteps(tx, orgID, factory.ID, req.GetSteps())
+		if err != nil {
+			return err
+		}
+		line, err = factory.CreateLine(tx, name, steps)
+		return err
+	})
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create factory line")
 	}
