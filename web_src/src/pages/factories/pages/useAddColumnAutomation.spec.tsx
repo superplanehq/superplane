@@ -8,6 +8,7 @@ import { catalogEntryToAutomation, catalogForColumn } from "../lib/columnAutomat
 import { useAddColumnAutomation } from "./useAddColumnAutomation";
 
 const reviewRequestFeature = { enabled: false };
+const customAutomationsFeature = { enabled: true };
 const installFactory = vi.fn();
 const describeIntegration = vi.fn();
 vi.mock("@/api-client", () => ({
@@ -19,7 +20,11 @@ vi.mock("@/hooks/useFactoryData", () => ({
 }));
 vi.mock("@/hooks/useExperimentalFeature", () => ({
   useExperimentalFeature: () => ({
-    has: (feature: string) => feature !== "factory_review_request" || reviewRequestFeature.enabled,
+    has: (feature: string) => {
+      if (feature === "factory_review_request") return reviewRequestFeature.enabled;
+      if (feature === "factory_custom_automations") return customAutomationsFeature.enabled;
+      return true;
+    },
   }),
 }));
 vi.mock("@/pages/home/useInstallFactory", () => ({
@@ -28,20 +33,21 @@ vi.mock("@/pages/home/useInstallFactory", () => ({
 
 beforeEach(() => {
   reviewRequestFeature.enabled = false;
+  customAutomationsFeature.enabled = true;
   installFactory.mockReset();
   installFactory.mockResolvedValue({ canvasId: "closure-app" });
   describeIntegration.mockResolvedValue({ data: { integration: { metadata: { name: "workspace-vcs" } } } });
 });
 
 describe("add custom stage automation", () => {
-  it("opens shared configuration with the custom stage and return line", () => {
-    const { result } = renderHook(
+  const renderAddAutomation = (lineId?: string) =>
+    renderHook(
       () => ({
         automation: useAddColumnAutomation({
           organizationId: "org",
           factoryId: "factory",
           factoryKey: "workspace",
-          lineId: "line",
+          lineId,
           appRepository: "acme/app",
           backlogRepository: "acme/app",
           defaultBranch: "main",
@@ -59,9 +65,35 @@ describe("add custom stage automation", () => {
       },
     );
 
+  it("opens shared configuration with the custom stage and return line", () => {
+    const { result } = renderAddAutomation("line");
+
     act(() => result.current.automation.openPicker("custom-stage-id", "Deploy to prod"));
     expect(result.current.location.pathname).toBe("/org/workspaces/workspace/lines/line");
     expect(result.current.location.search).toBe("?customAutomation=new&automationColumn=custom-stage-id");
+    expect(result.current.automation.pickerOpen).toBe(false);
+  });
+
+  it("opens shared configuration before the feature list reports custom automations", () => {
+    customAutomationsFeature.enabled = false;
+    const { result } = renderAddAutomation("line");
+
+    act(() => result.current.automation.openPicker("custom-stage-id", "Deploy to prod"));
+    expect(result.current.location.pathname).toBe("/org/workspaces/workspace/lines/line");
+    expect(result.current.location.search).toBe("?customAutomation=new&automationColumn=custom-stage-id");
+    expect(result.current.automation.pickerOpen).toBe(false);
+    expect(result.current.automation.naming).toBe(false);
+  });
+
+  it("never opens the name dialog for Build your own on a custom stage", async () => {
+    customAutomationsFeature.enabled = false;
+    const { result } = renderAddAutomation(undefined);
+
+    act(() => result.current.automation.openPicker("custom-stage-id", "Deploy to prod"));
+    const entry = result.current.automation.catalog.find((item) => item.kind === "custom")!;
+    await act(async () => result.current.automation.onSelect(entry));
+
+    expect(result.current.automation.naming).toBe(false);
     expect(result.current.automation.pickerOpen).toBe(false);
   });
 });

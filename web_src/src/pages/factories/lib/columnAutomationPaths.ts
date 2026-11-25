@@ -1,4 +1,5 @@
 import type { ColumnAutomation } from "./columnAutomations";
+import { isCustomStageColumn } from "./columnKeys";
 import { customAutomationColumn } from "./customAutomation";
 import { factoryCustomAutomationSetupPath } from "./customAutomationPaths";
 import {
@@ -35,8 +36,7 @@ export function columnAutomationOpenPath(
 }
 
 function usesCustomSetupEditor(automation: ColumnAutomation, customEditingEnabled = false): boolean {
-  const customStage = automation.columnKey?.startsWith("custom-");
-  if (customStage) {
+  if (isCustomStageColumn(automation.columnKey)) {
     return customEditingEnabled && (automation.kind === "custom" || automation.kind === "custom-verification");
   }
   return automation.kind === "custom-verification";

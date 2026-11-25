@@ -13,6 +13,13 @@ export function isColumnKey(value: string | null | undefined): value is ColumnKe
   );
 }
 
+// Custom stages exist only on boards where the custom automations feature is
+// on, so flows for these columns must not depend on the feature flag lookup,
+// which reports the feature as off while it loads.
+export function isCustomStageColumn(value: string | null | undefined): value is `custom-${string}` {
+  return Boolean(value?.startsWith("custom-"));
+}
+
 export function phaseIndexFromColumnKey(key: ColumnKey): number | undefined {
   const match = PHASE_KEY_PATTERN.exec(key);
   return match ? Number.parseInt(match[1] ?? "", 10) : undefined;

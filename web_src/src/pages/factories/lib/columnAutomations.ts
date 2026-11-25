@@ -34,7 +34,7 @@ export {
   takenCatalogIds,
 } from "./columnAutomationCatalog";
 export { COLUMN_AUTOMATIONS_COPY } from "./columnAutomationsCopy";
-export { isColumnKey, phaseIndexFromColumnKey, type ColumnKey } from "./columnKeys";
+export { isColumnKey, isCustomStageColumn, phaseIndexFromColumnKey, type ColumnKey } from "./columnKeys";
 
 export type ColumnAutomationKind =
   | "intake"

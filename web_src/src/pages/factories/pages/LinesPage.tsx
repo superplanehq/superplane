@@ -1305,11 +1305,13 @@ function LineDetail({
 
   const handleRowAction = (automation: ColumnAutomation, action: ColumnAutomationRowAction) => {
     if (action === "settings") {
+      // Custom-stage settings must not wait for the feature flag lookup; the
+      // stage itself proves the feature is on. See isCustomStageColumn.
       const href = columnAutomationOpenPath(automation, {
         organizationId,
         factoryKey,
         lineId: line.id,
-        customEditingEnabled: canUpdate && addAutomation.allowCustom,
+        customEditingEnabled: canUpdate,
       });
       if (href) {
         navigate(href);
