@@ -141,7 +141,6 @@ The built-in catalog contains these aliases:
 | Jira issues | `@superplane/intake/jira-issues` |
 | Sentry exceptions | `@superplane/intake/sentry-exceptions` |
 | PagerDuty incidents | `@superplane/intake/pagerduty-incidents` |
-| Productive tasks | `@superplane/intake/productive-tasks` |
 | Datadog errors | `@superplane/intake/datadog` |
 | Linear issues | `@superplane/intake/linear-issues` |
 
@@ -188,7 +187,6 @@ experimental feature gates still apply.
 | GitHub issues, Dependabot alerts, Issue label intake | Defaults to the workspace GitHub connection and Backlog repository |
 | Jira issues | `integration_name` or `integration_id`, and `resource_id` with the project key |
 | Sentry exceptions | `integration_name` or `integration_id`, and `resource_id` with comma-separated project slugs |
-| Productive tasks | `integration_name` or `integration_id`, and `resource_id` with the project ID |
 | Datadog errors | `integration_name` or `integration_id`, and `resource_id` with the service name |
 | PagerDuty incidents | `integration_name` or `integration_id`, and `resource_id` with the service ID |
 | Linear issues | `integration_name` or `integration_id`, and `team_id`; legacy project selection can use comma-separated IDs in `resource_id` |
@@ -225,7 +223,7 @@ for filter selections. Names and IDs are strings.
 
 All provider intakes accept `with.intake.confidence_pct` from 0 through 100 and
 `with.intake.default_owner_id`. The owner must belong to the workspace organization.
-GitHub, Sentry, Jira, Productive, Dependabot, and Linear intakes also accept
+GitHub, Sentry, Jira, Dependabot, and Linear intakes also accept
 `with.intake.paused`, which defaults to `false`.
 Each intake also accepts these provider settings:
 
@@ -234,7 +232,6 @@ Each intake also accepts these provider settings:
 | GitHub issues | `labels`, `label_filter_mode`, `assignment`, `new_issues`, `reopened_issues`, `authors_with_access`, `superplane_label_added` |
 | Jira issues | `labels`, `label_filter_mode`, `assignment`, `new_issues`, `reopened_issues`, `jira_move_on_complete`, `jira_completion_column` |
 | Sentry exceptions | `sentry_new_issues`, `sentry_regressed_issues`, `sentry_assigned_issues`, `sentry_levels`, `sentry_project_ids` |
-| Productive tasks | `exclude_key_tasks`, `task_list_ids` |
 | Dependabot alerts | `dependabot_severities` |
 | Datadog errors | `datadog_triggered_alerts`, `datadog_retriggered_alerts`, `datadog_environments` |
 | Linear issues | `linear_project_ids`, `linear_include_issues_without_project`, `linear_labels` |

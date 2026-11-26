@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -47,6 +48,9 @@ func TestFactoryConfigurationAppliesHostedRepositoryGrantsAtomically(t *testing.
 		{RepositoryID: 201, FullName: "acme/new-app", DefaultBranch: "main"},
 		{RepositoryID: 202, FullName: "acme/new-backlog", DefaultBranch: "main"},
 		{RepositoryID: 203, FullName: "acme/new-intake", DefaultBranch: "main"},
+		{RepositoryID: 204, FullName: "acme/new-docs", DefaultBranch: "main"},
+		{RepositoryID: 205, FullName: "acme/new-tools", DefaultBranch: "main"},
+		{RepositoryID: 206, FullName: "acme/new-disabled", DefaultBranch: "main"},
 	}
 	require.NoError(t, models.ReplaceVCSProviderRepositories(db, models.ProviderGitHub, installationID, repositories))
 	for _, repository := range repositories {
@@ -76,10 +80,16 @@ func TestFactoryConfigurationAppliesHostedRepositoryGrantsAtomically(t *testing.
 	bundle := f.export(t)
 	var manifest factoryConfigurationManifest
 	require.NoError(t, goyaml.Unmarshal([]byte(bundle.Files[0].Content), &manifest))
+	disabled := false
 	manifest.Repositories = &factoryConfigurationRepositories{
 		Binding:           factoryConfigurationBinding{IntegrationName: hosted.InstallationName},
 		Primary:           factoryConfigurationRepository{Repository: "acme/new-app", Ref: "main"},
 		BacklogRepository: "acme/new-backlog",
+		Additional: []factoryConfigurationContextRepository{
+			{Repository: "acme/new-docs", Access: "read"},
+			{Repository: "acme/new-tools", Access: "write"},
+			{Repository: "acme/new-disabled", Access: "read", Enabled: &disabled},
+		},
 	}
 	for index := range manifest.Stages {
 		if manifest.Stages[index].Key == "backlog" {
@@ -122,12 +132,14 @@ func TestFactoryConfigurationAppliesHostedRepositoryGrantsAtomically(t *testing.
 	require.True(t, applied.Changed)
 	granted, err = models.ListVCSProviderBindingRepositories(db, hosted.ID)
 	require.NoError(t, err)
-	require.Len(t, granted, 3)
-	grantedIDs := []int64{granted[0].RepositoryID, granted[1].RepositoryID, granted[2].RepositoryID}
-	require.ElementsMatch(t, []int64{201, 202, 203}, grantedIDs)
+	grantedIDs := make([]int64, 0, len(granted))
+	for _, grant := range granted {
+		grantedIDs = append(grantedIDs, grant.RepositoryID)
+	}
+	require.ElementsMatch(t, []int64{201, 202, 203, 204, 205, 206}, grantedIDs)
 	require.NotEmpty(t, client.tokenGrants, "real trigger setup must obtain a hosted installation token")
 	for _, selected := range client.tokenGrants {
-		require.ElementsMatch(t, []int64{201, 202, 203}, selected)
+		require.ElementsMatch(t, []int64{201, 202, 203, 204, 205, 206}, selected)
 	}
 	intakes, err := reloaded.ListIntakes(db)
 	require.NoError(t, err)
@@ -140,6 +152,16 @@ func TestFactoryConfigurationAppliesHostedRepositoryGrantsAtomically(t *testing.
 	for _, node := range live.Nodes {
 		require.Nil(t, node.ErrorMessage, node.ID)
 	}
+
+	// Organization keys must be able to reuse repositories added by a personal token.
+	organizationKey, err := models.CreateAPIKey(db, f.factory.OrganizationID, "YAML round trip", nil, f.r.User, nil, nil)
+	require.NoError(t, err)
+	require.NoError(t, f.r.AuthService.AssignRole(organizationKey.ID.String(), models.RoleOrgAdmin, f.factory.OrganizationID.String(), models.DomainTypeOrganization))
+	organizationCaller := f
+	organizationCaller.ctx = authentication.SetUserIdInMetadata(f.ctx, organizationKey.ID.String())
+	roundTrip := organizationCaller.plan(t, organizationCaller.export(t))
+	require.Empty(t, roundTrip.Diagnostics)
+	require.Empty(t, roundTrip.Changes)
 
 	// A pinned intake must retain access when the workspace changes connections.
 	bundle = f.export(t)

@@ -40,12 +40,13 @@ type factoryConfigurationContextRepository struct {
 }
 
 type preparedFactoryConfigurationRepositories struct {
-	Desired        factoryConfigurationRepositories
-	Integration    configurationIntegrationState
-	Configuration  models.FactoryOnboardingConfig
-	patch          models.FactoryOnboardingPatch
-	factory        *models.Factory
-	previousBranch string
+	Desired             factoryConfigurationRepositories
+	Integration         configurationIntegrationState
+	Configuration       models.FactoryOnboardingConfig
+	GitHubRepositoryIDs []int64
+	patch               models.FactoryOnboardingPatch
+	factory             *models.Factory
+	previousBranch      string
 }
 
 func validateConfigurationBindingYAML(node *yaml.Node, field string, allowed []string) (map[string]*yaml.Node, *pb.FactoryConfigurationDiagnostic) {
@@ -293,6 +294,7 @@ func prepareFactoryConfigurationRepositories(ctx context.Context, tx *gorm.DB, d
 	desiredFactory.OnboardingConfig = datatypes.NewJSONType(merged)
 	seen := map[string]bool{}
 	enabledCount := 0
+	var githubRepositoryIDs []int64
 	for i, entry := range selection.Additional {
 		field := fmt.Sprintf("repositories.additional[%d]", i)
 		config := entry.config(integration.AppName)
@@ -309,6 +311,16 @@ func prepareFactoryConfigurationRepositories(ctx context.Context, tx *gorm.DB, d
 		if entry.enabled() {
 			enabledCount++
 		}
+		if config.VCSProvider == models.ProviderGitHub && integration.AppName == models.ProviderGitHub {
+			repositoryID, _, err := authorizeConfigurationPrimaryRepository(ctx, tx, &desiredFactory, integration, config.Repository)
+			if err != nil {
+				return configurationRepositoryAccessDiagnostic(err, field+".repository")
+			}
+			if repositoryID != 0 {
+				githubRepositoryIDs = append(githubRepositoryIDs, repositoryID)
+			}
+			continue
+		}
 		if err := authorizeContextRepository(ctx, tx, deps, target.factory.OrganizationID.String(), &desiredFactory, config); err != nil {
 			return configurationRepositoryAccessDiagnostic(err, field+".repository")
 		}
@@ -317,7 +329,7 @@ func prepareFactoryConfigurationRepositories(ctx context.Context, tx *gorm.DB, d
 		return configurationDiagnostic("repositories.additional", models.ErrFactoryAgentResourceContextRepoCapReached.Error()), nil
 	}
 	selection = normalizeConfigurationRepositories(selection, integration.AppName)
-	target.repositoryUpdate = &preparedFactoryConfigurationRepositories{Desired: selection, Integration: configurationIntegrationSnapshot(integration), Configuration: merged, patch: patch, factory: &desiredFactory}
+	target.repositoryUpdate = &preparedFactoryConfigurationRepositories{Desired: selection, Integration: configurationIntegrationSnapshot(integration), Configuration: merged, GitHubRepositoryIDs: githubRepositoryIDs, patch: patch, factory: &desiredFactory}
 	return nil, nil
 }
 
@@ -469,6 +481,12 @@ func applyFactoryConfigurationRepositories(tx *gorm.DB, target *factoryConfigura
 			continue
 		}
 		if _, err := target.factory.CreateAgentResource(tx, models.FactoryAgentResourceKindContextRepo, "", enabled, config); err != nil {
+			return err
+		}
+	}
+	// Sync retains existing grants for saved additional repositories.
+	for _, repositoryID := range target.repositoryUpdate.GitHubRepositoryIDs {
+		if err := models.GrantVCSProviderBindingRepository(tx, uuid.MustParse(desired.Binding.IntegrationID), models.ProviderGitHub, repositoryID); err != nil {
 			return err
 		}
 	}
