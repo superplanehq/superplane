@@ -166,11 +166,6 @@ describe("Intake run evidence", () => {
       key: "project#12",
     },
     {
-      sourceId: "productive-tasks",
-      data: { data: { id: "563", attributes: { title: "Checkout error" } } },
-      key: "#563",
-    },
-    {
       sourceId: "pagerduty-incidents",
       data: {
         incident: { id: "PN12", title: "Checkout error", html_url: "https://example.pagerduty.com/incidents/PN12" },

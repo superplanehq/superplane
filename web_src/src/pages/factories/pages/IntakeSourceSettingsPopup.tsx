@@ -17,7 +17,6 @@ import { LinearIntakeFilterFields } from "./LinearIntakeFilterFields";
 import { IntakeSourceDefaultOwner } from "./IntakeDefaultOwnerField";
 import { GitHubIntakeFilterFields } from "./GitHubIntakeFilterFields";
 import { JiraIntakeFilterFields } from "./JiraIntakeFilterFields";
-import { ProductiveIntakeFilterFields } from "./ProductiveIntakeFilterFields";
 import { SentryIntakeFilterFields } from "./SentryIntakeFilterFields";
 import { WebhookIntakeFilterFields } from "./WebhookIntakeFilterFields";
 import { PlanningReviewEditor, type PlanningReviewAgentSlot } from "./PlanningReviewEditor";
@@ -440,14 +439,6 @@ function IntakeFilterFields({
         integrationId={integrationId}
       />
       <DependabotIntakeFilterFields sourceId={sourceId} settings={draft} onSettingsChange={onDraftChange} />
-      <ProductiveIntakeFilterFields
-        sourceId={sourceId}
-        settings={draft}
-        onSettingsChange={onDraftChange}
-        organizationId={organizationId}
-        integrationId={integrationId}
-        projectId={resourceId}
-      />
       <DatadogIntakeFilterFields
         sourceId={sourceId}
         settings={draft}

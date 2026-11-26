@@ -79,6 +79,10 @@ func (w *IntegrationCleanupWorker) LockAndProcessIntegration(integration models.
 }
 
 func (w *IntegrationCleanupWorker) processIntegration(tx *gorm.DB, integration *models.Integration) error {
+	if !integration.DeletedAt.Valid {
+		return nil
+	}
+
 	webhooks, err := models.ListUnscopedIntegrationWebhooks(tx, integration.ID)
 	if err != nil {
 		return err
@@ -92,7 +96,7 @@ func (w *IntegrationCleanupWorker) processIntegration(tx *gorm.DB, integration *
 	w.log("Cleaning up app installation %s", integration.ID)
 	impl, err := w.registry.GetIntegration(integration.AppName)
 	if err != nil {
-		return err
+		return integration.HardDelete(tx)
 	}
 
 	err = impl.Cleanup(core.IntegrationCleanupContext{
@@ -109,7 +113,7 @@ func (w *IntegrationCleanupWorker) processIntegration(tx *gorm.DB, integration *
 	}
 
 	w.log("Cleanup completed for integration %s - deleting", integration.ID)
-	return tx.Unscoped().Delete(integration).Error
+	return integration.HardDelete(tx)
 }
 
 func (w *IntegrationCleanupWorker) log(format string, v ...any) {

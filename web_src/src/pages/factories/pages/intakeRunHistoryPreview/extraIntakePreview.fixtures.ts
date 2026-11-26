@@ -23,12 +23,6 @@ const SOURCES: Record<ExtraSource, { prefix: string; offset: number; url: string
     url: "https://example.pagerduty.com/incidents/",
     event: "Incident triggered",
   },
-  "productive-tasks": {
-    prefix: "#",
-    offset: 563,
-    url: "https://app.productive.io/1-example/tasks/",
-    event: "Task created",
-  },
   datadog: {
     prefix: "ERR-",
     offset: 4820,
@@ -67,7 +61,7 @@ export function extraIntakePreview(sourceId: ExtraSource, index: number, title: 
         : sourceId === "datadog"
           ? ERROR_TITLES[index % ERROR_TITLES.length]
           : title,
-    url: `${spec.url}${sourceId === "datadog" ? datadogIssueId(index) : sourceId === "productive-tasks" ? spec.offset + index : reference}`,
+    url: `${spec.url}${sourceId === "datadog" ? datadogIssueId(index) : reference}`,
   };
   return { source, event: spec.event, payload: extraPayload(sourceId, source, index) };
 }
@@ -116,19 +110,6 @@ function extraPayload(sourceId: ExtraSource, source: SourceItem, index: number):
             urgency: "high",
             status: "triggered",
             service: { summary: "Production API" },
-          },
-        },
-      };
-    case "productive-tasks":
-      return {
-        type: "productive.task",
-        data: {
-          event: "task.created",
-          data: {
-            id: String(563 + index),
-            type: "tasks",
-            attributes: { title: source.title, description: "Keep the existing behavior for other projects." },
-            relationships: { task_list: { data: { id: "platform", type: "task_lists" } } },
           },
         },
       };

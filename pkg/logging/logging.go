@@ -2,7 +2,6 @@ package logging
 
 import (
 	"context"
-	"strings"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
@@ -13,10 +12,6 @@ const (
 	// ComponentBillingSeats is the Cloud Logging component for seat-based
 	// billing. Filter: jsonPayload.component="billing.seats"
 	ComponentBillingSeats = "billing.seats"
-	// ComponentWebhookProductive is the Cloud Logging component for a
-	// Productive task webhook failure. Filter:
-	// jsonPayload.component="webhook.productive"
-	ComponentWebhookProductive = "webhook.productive"
 	// ComponentWebhookSentry is the Cloud Logging component for a hosted
 	// Sentry webhook. Filter: jsonPayload.component="webhook.sentry"
 	ComponentWebhookSentry = "webhook.sentry"
@@ -33,11 +28,6 @@ const (
 	SeatsOverCapacityMessage = "billing.seats_over_capacity"
 	// SeatsOverCapacityResolvedMessage is the stable key that ends that alert.
 	SeatsOverCapacityResolvedMessage = "billing.seats_over_capacity_resolved"
-
-	productiveWebhookFailureMessage = "error handling webhook"
-	webhookTypeUnknown              = "unknown"
-	productiveTaskCreated           = "task.created"
-	productiveTaskUpdated           = "task.updated"
 )
 
 // WebhookNodeFields are the canvas and webhook ids added to a node logger
@@ -70,13 +60,6 @@ func newCloudLoggingLineLogger() *log.Logger {
 	return logger
 }
 
-func newProductiveWebhookLogger() *log.Logger {
-	return newJSONLineLogger()
-}
-
-// productiveWebhookLogger writes one JSON object per Productive webhook failure.
-var productiveWebhookLogger = newProductiveWebhookLogger()
-
 // sentryWebhookLogger writes one JSON object per hosted Sentry webhook log.
 // message and severity are the Cloud Logging summary fields. The other fields
 // stay in the JSON payload.
@@ -93,11 +76,6 @@ func SentryWebhookLogger() *log.Logger {
 // DatadogWebhookLogger returns the JSON logger used for Datadog webhooks.
 func DatadogWebhookLogger() *log.Logger {
 	return datadogWebhookLogger
-}
-
-// ProductiveWebhookLogger returns the JSON logger used for Productive webhook failures.
-func ProductiveWebhookLogger() *log.Logger {
-	return productiveWebhookLogger
 }
 
 func ForFactory(factory models.Factory) *log.Entry {
@@ -233,36 +211,6 @@ func WithWebhookNode(logger *log.Entry, fields WebhookNodeFields) *log.Entry {
 	return logger.WithFields(logFields)
 }
 
-// ProductiveWebhookType returns task.created or task.updated.
-// Any other delivery is unknown.
-func ProductiveWebhookType(event string) string {
-	switch strings.TrimSpace(event) {
-	case productiveTaskCreated, productiveTaskUpdated:
-		return strings.TrimSpace(event)
-	default:
-		return webhookTypeUnknown
-	}
-}
-
-func productiveWebhookFields(event string) log.Fields {
-	return log.Fields{
-		"component":   ComponentWebhookProductive,
-		"webhookType": ProductiveWebhookType(event),
-	}
-}
-
-// LogProductiveWebhookFailure writes one JSON failure line for a Productive
-// task webhook. component and webhookType stay set when fields repeat them.
-func LogProductiveWebhookFailure(event string, fields log.Fields, err error) {
-	productiveWebhookEntry(event, fields, err).Error(productiveWebhookFailureMessage)
-}
-
-// LogProductiveWebhookWarning writes one JSON warning line for a Productive
-// task webhook that succeeded with less data than expected.
-func LogProductiveWebhookWarning(event string, message string, fields log.Fields, err error) {
-	productiveWebhookEntry(event, fields, err).Warn(message)
-}
-
 // LogSentryWebhookInfo writes one JSON info line for a hosted Sentry webhook.
 func LogSentryWebhookInfo(message string, fields log.Fields) {
 	sentryWebhookEntry(fields, nil).Info(message)
@@ -349,19 +297,6 @@ func datadogWebhookEntry(fields log.Fields, err error) *log.Entry {
 		"type":        WebhookLogType,
 		"integration": DatadogIntegration,
 	})
-	if err != nil {
-		entry = entry.WithError(err)
-	}
-	return entry
-}
-
-func productiveWebhookEntry(event string, fields log.Fields, err error) *log.Entry {
-	productiveWebhookLogger.SetLevel(log.StandardLogger().GetLevel())
-	entry := log.NewEntry(productiveWebhookLogger)
-	if len(fields) > 0 {
-		entry = entry.WithFields(fields)
-	}
-	entry = entry.WithFields(productiveWebhookFields(event))
 	if err != nil {
 		entry = entry.WithError(err)
 	}
