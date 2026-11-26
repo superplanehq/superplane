@@ -152,12 +152,11 @@ func TestCanvasAutomationCustomStageRoundTripAndAdmission(t *testing.T) {
 	scheduledSource := "apiVersion: v2\nkind: Automation\nname: Scheduled QA\nruns_on_task: false\ntriggers:\n  - use: schedule\n    config:\n      cron: '0 9 * * *'\nsteps:\n  - name: Inspect\n    prompt: Check the changes.\n"
 	for _, unsupported := range []string{
 		scheduledSource,
-		strings.Replace(source, "task_enters_stage", "manual", 1),
 		strings.Replace(source, "task_enters_stage", "task_leaves_stage", 1),
 		strings.Replace(source, "  - use: task_enters_stage", "  - use: task_enters_stage\n  - use: manual", 1),
 	} {
 		_, err := service.Create(ctx, placement, r.User, unsupported)
-		require.ErrorContains(t, err, "Keep one task_enters_stage trigger")
+		require.ErrorContains(t, err, "Keep one task_enters_stage or manual trigger")
 	}
 	legacyCanvas, _ := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "Existing QA", "existing-start")
 	require.NoError(t, legacyCanvas.SetColumnKey(db, stageKey))
@@ -189,6 +188,18 @@ func TestCanvasAutomationCustomStageRoundTripAndAdmission(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, version.Edges, preserved.Edges)
 	require.Len(t, preserved.Nodes, 2, "an unrelated edit adds no event triggers")
+	for _, id := range []uuid.UUID{created.ID, legacyCanvas.ID} {
+		original, err := service.Read(ctx, r.Organization.ID, id)
+		require.NoError(t, err)
+		manual := strings.Replace(original.YAML, "task_enters_stage", "manual", 1)
+		_, err = service.Update(ctx, r.Organization.ID, id, r.User, manual)
+		require.NoError(t, err)
+		read, err := service.Read(ctx, r.Organization.ID, id)
+		require.NoError(t, err)
+		require.Equal(t, manual, read.YAML)
+		_, err = service.Update(ctx, r.Organization.ID, id, r.User, original.YAML)
+		require.NoError(t, err)
+	}
 	for _, name := range []string{"retired-secret", "kept-secret", "canvas-secret"} {
 		_, err := models.CreateSecret(name, "local", r.User.String(), models.DomainTypeOrganization, r.Organization.ID, []byte("{}"))
 		require.NoError(t, err)
@@ -270,6 +281,29 @@ func TestCanvasAutomationCustomStageRoundTripAndAdmission(t *testing.T) {
 		require.Equal(t, "https://github.com/"+repository+".git", environment["REPO_URL"])
 		require.Equal(t, branch, environment["BASE"])
 	}
+	current, err := service.Read(ctx, r.Organization.ID, created.ID)
+	require.NoError(t, err)
+	_, err = service.Update(ctx, r.Organization.ID, created.ID, r.User, strings.Replace(current.YAML, "task_enters_stage", "manual", 1))
+	require.NoError(t, err)
+	started, err := RunFactoryCustomAutomation(ctx, onboardingDeps(r), r.Organization.ID.String(), &pb.RunFactoryCustomAutomationRequest{FactoryId: factory.ID.String(), AutomationId: created.ID.String(), WorkOrderId: order.ID.String()})
+	require.NoError(t, err)
+	run, err := models.FindCanvasRunInTransaction(db, created.ID, uuid.MustParse(started.RunId))
+	require.NoError(t, err)
+	require.Equal(t, runs[0].Run.Input.Data(), run.Input.Data())
+	require.Equal(t, "on-run", run.NodeID)
+	var link models.FactoryWorkOrderRefinementRun
+	require.NoError(t, db.Where("run_id = ?", run.ID).First(&link).Error)
+	require.Equal(t, order.ID, link.WorkOrderID)
+	canvas, err := models.FindCanvasInTransaction(db, r.Organization.ID, created.ID)
+	require.NoError(t, err)
+	labels, err := models.ResolveCanvasRunTasks(db, canvas, []models.CanvasRun{*run})
+	require.NoError(t, err)
+	require.Equal(t, order.ID, labels[run.ID].ID)
+	dispatch, err := order.FindActiveLineDispatch(db)
+	require.NoError(t, err)
+	require.NoError(t, dispatch.EnterStage(db, "verify"))
+	_, err = RunFactoryCustomAutomation(ctx, onboardingDeps(r), r.Organization.ID.String(), &pb.RunFactoryCustomAutomationRequest{FactoryId: factory.ID.String(), AutomationId: created.ID.String(), WorkOrderId: order.ID.String()})
+	require.ErrorContains(t, err, "not in this stage")
 }
 
 func TestCanvasAutomationLegacyImportProtectsGraphBehavior(t *testing.T) {

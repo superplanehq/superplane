@@ -245,6 +245,7 @@ export interface SplitRunFixture {
   usageByMachineType?: WorkOrderUsageByMachineType[];
   lineName: string;
   currentStepIndex: number;
+  currentStageKey?: string;
   lineStatus: SplitRunPhaseStatus;
   /** Verify eligibility remains independent of the review strip. */
   canRunVerifyCustomAutomation?: boolean;
@@ -549,6 +550,7 @@ function mappedWorkOrderFixture(order: FactoriesWorkOrder, options?: SplitRunFix
       visibleDispatchForLine(order, options?.lineId)?.line?.name ||
       SPLIT_RUN_RUNNING.lineName,
     currentStepIndex: current?.stepIndex ?? 0,
+    currentStageKey: order.state === "STATE_OPEN" ? latestDispatchForLine(order)?.currentStageKey : undefined,
     lineStatus: lineStatusForDisplay(displayStatus),
     canRunVerifyCustomAutomation:
       displayStatus === "waiting" &&
@@ -836,7 +838,7 @@ function phasesForOrder(
   const knownPhases = [
     ...sourcePhasesForOrder(order, executions.length > 0, demoArtifacts),
     ...phasesForAnalysisRuns(analysisRuns, apiChecks, artifacts),
-    ...phasesForBacklogCustomRuns(options, columnApps),
+    ...phasesForBacklogCustomRuns(options, columnApps, peers),
     ...prior.map((execution) => ({
       ...executionToPhase(order, execution, apiChecks, demoArtifacts, peers),
       historyRun: true,
@@ -931,8 +933,10 @@ const ANALYSIS_PHASE_ID_PREFIX = "backlog-analysis-";
 function phasesForBacklogCustomRuns(
   options: SplitRunFixtureOptions | undefined,
   apps: SplitRunColumnApp[],
+  executions: FactoriesWorkOrderExecution[],
 ): SplitRunPhase[] {
   return [...(options?.backlogCustomRuns ?? [])]
+    .filter((entry) => !executions.some((execution) => execution.run?.id === entry.run.id))
     .sort((left, right) => Date.parse(left.run.createdAt ?? "") - Date.parse(right.run.createdAt ?? ""))
     .flatMap(({ canvasId, run }) => {
       const app = apps.find((entry) => entry.id === canvasId);
@@ -944,9 +948,9 @@ function phasesForBacklogCustomRuns(
       return [
         {
           id: `backlog-custom-${run.id}`,
-          name: "Backlog",
+          name: app.columnKey?.startsWith("custom-") ? "Custom stage" : "Backlog",
           componentName,
-          columnKey: "backlog" as const,
+          columnKey: app.columnKey ?? "backlog",
           status,
           duration,
           durationRunning: status === "running",

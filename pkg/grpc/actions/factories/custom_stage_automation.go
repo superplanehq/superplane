@@ -43,7 +43,7 @@ func buildCustomStageAutomationCanvas(tx *gorm.DB, factory *models.Factory, name
 		Spec:       &yaml.CanvasSpec{},
 	}
 	metadata := customAutomationNodeMetadata(provider, settings.Icon, settings.RunsOnTask, func(template map[string]any) {
-		template["startMode"] = "automatic"
+		template["startMode"] = customStageStartMode(settings)
 	})
 	doc.Spec.Nodes = []yaml.Node{{
 		ID: "on-run", Name: "On Run", Type: yaml.NodeTypeTrigger, Component: "onRun", Configuration: map[string]any{}, Metadata: metadata,
@@ -58,10 +58,17 @@ func buildCustomStageAutomationCanvas(tx *gorm.DB, factory *models.Factory, name
 }
 
 func validateCustomStageTriggers(settings *customAutomationSettings) error {
-	if len(settings.Triggers) != 1 || settings.StartMode != pb.FactoryCustomAutomation_START_MODE_AUTOMATIC || settings.runsWithoutTask() {
-		return invalidArgument("Custom stage automations run on a task when it enters the stage. Keep one task_enters_stage trigger.")
+	if len(settings.Triggers) != 1 || (settings.StartMode != pb.FactoryCustomAutomation_START_MODE_AUTOMATIC && settings.StartMode != pb.FactoryCustomAutomation_START_MODE_MANUAL) || settings.runsWithoutTask() {
+		return invalidArgument("Custom stage automations run on a task. Keep one task_enters_stage or manual trigger.")
 	}
 	return nil
+}
+
+func customStageStartMode(settings *customAutomationSettings) string {
+	if settings.StartMode == pb.FactoryCustomAutomation_START_MODE_MANUAL {
+		return "manual"
+	}
+	return "automatic"
 }
 
 func legacyCustomStageGraph(canvas *models.Canvas, version *models.CanvasVersion) bool {
@@ -86,6 +93,22 @@ func editLegacyCustomStageGraph(version *models.CanvasVersion, settings *customA
 	edges := append([]models.Edge(nil), version.Edges...)
 	for i := range nodes {
 		node := &nodes[i]
+		if node.ComponentName() == "onRun" {
+			node.Metadata = maps.Clone(node.Metadata)
+			if node.Metadata == nil {
+				node.Metadata = map[string]any{}
+			}
+			template, _ := node.Metadata[models.FactoryAppTemplateMetadataKey].(map[string]any)
+			template = maps.Clone(template)
+			if template == nil {
+				template = map[string]any{"id": models.FactoryAppTemplateCustomAutomationID}
+			}
+			template["startMode"] = customStageStartMode(settings)
+			if settings.RunsOnTask != nil {
+				template["runsOnTask"] = *settings.RunsOnTask
+			}
+			node.Metadata[models.FactoryAppTemplateMetadataKey] = template
+		}
 		if !isFactoryAgentHarness(node.ComponentName()) {
 			continue
 		}
