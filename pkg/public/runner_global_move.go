@@ -14,6 +14,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
+	"github.com/superplanehq/superplane/pkg/workers/contexts"
 	"gorm.io/gorm"
 )
 
@@ -39,12 +40,21 @@ func (s *Server) handleRunnerMoveTask(w http.ResponseWriter, r *http.Request) {
 	}
 	db := database.DB(r.Context())
 	fromState := target.order.State
+	var leftColumn string
+	var backlogEvents []models.CanvasEvent
 	var result *models.FactoryTaskMoveResult
 	err := db.Transaction(func(tx *gorm.DB) error {
 		var err error
+		leftColumn, err = models.WorkOrderBoardColumn(tx, target.order)
+		if err != nil {
+			return err
+		}
 		result, err = target.order.MoveFromRun(tx, target.canvasRunID, column, request.Next != nil)
 		if err != nil {
 			return err
+		}
+		if result.Changed && target.order.State == models.FactoryWorkOrderStateDraft {
+			backlogEvents = contexts.EmitBacklogCustomAutomations(tx, target.factory, target.order)
 		}
 		if !result.Changed || !target.order.IsOpen() {
 			return nil
@@ -86,6 +96,7 @@ func (s *Server) handleRunnerMoveTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if result.Changed {
+		contexts.PublishWorkOrderCreatedEvents(target.factory.OrganizationID, backlogEvents)
 		for _, stop := range result.Cancellations {
 			if stop == nil || stop.Run == nil {
 				continue
@@ -109,7 +120,7 @@ func (s *Server) handleRunnerMoveTask(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		}
-		left := result.FromColumn
+		left := leftColumn
 		for _, entered := range result.EnteredColumns {
 			if err := factoryactions.StartColumnLeaveCustomAutomations(db, target.factory, target.order, left, target.canvasRunID.String()); err != nil {
 				log.WithError(err).Warn("Failed to start stage leave automation")

@@ -151,6 +151,50 @@ func TestRunnerMoveTaskQueuesDestinationAtCapacity(t *testing.T) {
 	assert.Equal(t, 2, queued[0].StepIndex)
 }
 
+func TestRunnerMoveTaskStartsLeaveAndDestinationAutomations(t *testing.T) {
+	for _, destination := range []string{"done", "backlog"} {
+		t.Run(destination, func(t *testing.T) {
+			server, token, order, dispatch, ctx := moveTaskFixture(t)
+			db := database.DB(t.Context())
+			// Normal lines use phase keys, while custom automations use board columns.
+			dispatch.Steps[0].StageKey = "phase-0"
+			dispatch.Steps[1].StageKey = "phase-0"
+			dispatch.Stages[1].Key = "phase-0"
+			require.NoError(t, db.Save(dispatch).Error)
+			require.NoError(t, dispatch.EnterStage(db, "phase-0"))
+			callerCanvas, err := models.FindCanvasInTransaction(db, order.OrganizationID, uuid.MustParse(ctx.WorkflowID))
+			require.NoError(t, err)
+			require.NotNil(t, callerCanvas.CreatedBy)
+			var automations []*models.Canvas
+			for _, automation := range []struct{ column, mode string }{
+				{models.CanvasColumnKeyImplement, "leave"},
+				{destination, "automatic"},
+			} {
+				canvas, _ := support.CreateCanvas(t, order.OrganizationID, *callerCanvas.CreatedBy, []models.CanvasNode{{
+					NodeID: "on-task", Type: models.NodeTypeTrigger,
+					Ref: datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "onWorkOrder"}}),
+					Metadata: datatypes.NewJSONType(map[string]any{
+						models.FactoryAppTemplateMetadataKey: map[string]any{
+							"id": models.FactoryAppTemplateCustomAutomationID, "startMode": automation.mode,
+						},
+					}),
+				}}, nil)
+				require.NoError(t, db.Model(canvas).Updates(map[string]any{"factory_id": order.FactoryID, "column_key": automation.column}).Error)
+				automations = append(automations, canvas)
+			}
+			rec := runnerRequest(t, server, http.MethodPost, token, "/api/v1/runner/task/move", `{"column":"`+destination+`"}`)
+			require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+			for _, canvas := range automations {
+				var events []models.CanvasEvent
+				require.NoError(t, db.Where("workflow_id = ?", canvas.ID).Find(&events).Error)
+				require.Len(t, events, 1, "move must start the configured automation")
+				payload := models.RootEventSourcePayload(events[0].Data.Data()).(map[string]any)
+				assert.Equal(t, order.ID.String(), payload["workOrder"].(map[string]any)["id"])
+			}
+		})
+	}
+}
+
 func TestRunnerMoveTaskConcurrentRequestsDoNotAdvanceTwice(t *testing.T) {
 	server, token, order, dispatch, _ := moveTaskFixture(t)
 	start := make(chan struct{})
