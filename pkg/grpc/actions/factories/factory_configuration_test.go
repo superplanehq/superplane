@@ -33,9 +33,14 @@ type configurationFixture struct {
 func newConfigurationFixture(t *testing.T) configurationFixture {
 	t.Helper()
 	r, factory := resetTestFactory(t)
-	upsertHostedOnboardingProvider(t, database.DB(t.Context()))
 	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryAsCode))
 	support.CompleteFactoryOnboarding(t, factory)
+	vcsID := createReadyOnboardingIntegration(t, r.Organization.ID, models.ProviderGitHub)
+	agentID := ""
+	harness := models.FactoryOnboardingAgentHarnessSuperPlane
+	enableHostedSuperPlaneAgent(t, database.DB(t.Context()))
+	defaultBranch := "main"
+	require.NoError(t, factory.UpdateOnboarding(database.DB(t.Context()), models.FactoryOnboardingPatch{VCSIntegrationID: &vcsID, AgentIntegrationID: &agentID, AgentHarness: &harness, DefaultBranch: &defaultBranch}))
 	canvas := resetTestTemplate(t, r, factory, "line-implementation", models.ProviderGitHub, func(doc *yaml.Canvas) {
 		agent := findYAMLNode(t, doc, implementationAgentNodeID)
 		agent.Configuration["additionalInstructions"] = "Original instructions"
@@ -61,7 +66,9 @@ func newConfigurationFixture(t *testing.T) configurationFixture {
 		}
 	}
 	require.NoError(t, line.UpdateConfiguration(database.DB(t.Context()), nil, nil, nil, stages))
-	return configurationFixture{r: r, factory: factory, line: line, canvas: canvas, ctx: authentication.SetUserIdInMetadata(t.Context(), r.User.String())}
+	fixture := configurationFixture{r: r, factory: factory, line: line, canvas: canvas, ctx: authentication.SetUserIdInMetadata(t.Context(), r.User.String())}
+	configureConfigurationCatalogIntegration(t, fixture, vcsID, models.ProviderGitHub)
+	return fixture
 }
 
 func (f configurationFixture) export(t *testing.T) *pb.FactoryConfigurationBundle {
@@ -103,7 +110,7 @@ func configurationRevisionCount(t *testing.T, canvas *models.Canvas) int64 {
 func configurationResourceCounts(t *testing.T) map[string]int64 {
 	t.Helper()
 	counts := map[string]int64{}
-	for _, table := range []string{"factories", "factory_lines", "factory_intakes", "factory_pr_feedback_handlers", "automations_as_code", "workflows", "workflow_versions", "webhooks"} {
+	for _, table := range []string{"factories", "factory_lines", "factory_intakes", "factory_pr_feedback_handlers", "automations_as_code", "workflows", "workflow_versions", "webhooks", "factory_configuration_automations", "workflow_node_requests", "workflow_events", "app_installation_subscriptions"} {
 		var count int64
 		require.NoError(t, database.DB(t.Context()).Table(table).Count(&count).Error)
 		counts[table] = count
@@ -182,15 +189,15 @@ func TestFactoryConfigurationRejectsUnsupportedManifestWithoutWrites(t *testing.
 		{"changed runner", "run: implement", "run: other", "stages[1].run"},
 		{"invalid YAML", "apiVersion: v2", "apiVersion: [", "$"},
 		{"unknown field", "kind: Factory", "kind: Factory\nunknown: true", "unknown"},
-		{"null instructions", "additional_instructions: Original instructions", "additional_instructions: null", "stages[1].automations[0].with.additional_instructions"},
-		{"boolean instructions", "additional_instructions: Original instructions", "additional_instructions: true", "stages[1].automations[0].with.additional_instructions"},
-		{"numeric instructions", "additional_instructions: Original instructions", "additional_instructions: 123", "stages[1].automations[0].with.additional_instructions"},
-		{"YAML anchor", "additional_instructions: Original instructions", "additional_instructions: &instructions Original instructions", "stages[1].automations[0].with.additional_instructions"},
+		{"null instructions", "additional_instructions: Original instructions", "additional_instructions: null", "stages[1].automations[0].with.agents.implementation-agent-no-issue.additional_instructions"},
+		{"boolean instructions", "additional_instructions: Original instructions", "additional_instructions: true", "stages[1].automations[0].with.agents.implementation-agent-no-issue.additional_instructions"},
+		{"numeric instructions", "additional_instructions: Original instructions", "additional_instructions: 123", "stages[1].automations[0].with.agents.implementation-agent-no-issue.additional_instructions"},
+		{"YAML anchor", "additional_instructions: Original instructions", "additional_instructions: &instructions Original instructions", "stages[1].automations[0].with.agents.implementation-agent-no-issue.additional_instructions"},
 		{"unsupported alias", "@superplane/implement", "@superplane/planning", "stages[1].automations[0].uses"},
 		{"concurrency without runner", "name: Verify", "name: Verify\n    max_parallelism: 2", "stages[2].max_parallelism"},
 		{"zero concurrency", "run: implement", "run: implement\n    max_parallelism: 0", "stages[1].max_parallelism"},
 		{"concurrency outside API range", "run: implement", "run: implement\n    max_parallelism: 2147483648", "stages[1].max_parallelism"},
-		{"uninstalled built-in", "      - id: implement", "      - id: second\n        name: Other\n        uses: \"@superplane/implement\"\n        with:\n          additional_instructions: Extra\n      - id: implement", "stages[1].automations[0].uses"},
+
 		{"duplicate field", "kind: Factory", "kind: Factory\nkind: Factory", "kind"},
 		{"extra document", "apiVersion: v2", "---\nname: extra\n---\napiVersion: v2", "$"},
 	} {

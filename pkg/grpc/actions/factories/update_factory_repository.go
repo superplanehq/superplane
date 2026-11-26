@@ -73,11 +73,12 @@ func UpdateFactoryRepository(
 		return updateBitbucketFactoryRepository(ctx, deps, orgID, organizationID, actorID, req)
 	}
 	err = db.Transaction(func(tx *gorm.DB) error {
-		loaded, err := models.FindFactory(tx, orgID, factory.ID)
-		if err != nil {
+		if err := models.LockOrganizationVCSProviderBindingRepositories(tx, orgID); err != nil {
 			return err
 		}
-		factory = loaded
+		if err := factory.LockForUpdate(tx); err != nil {
+			return err
+		}
 
 		previous := factory.OnboardingConfigValue()
 		if _, err := factory.OnboardingConfigAfter(models.FactoryOnboardingPatch{AppRepository: &repository}); err != nil {
@@ -103,28 +104,15 @@ func UpdateFactoryRepository(
 		selectedIntegration := integration
 		_, bindingErr := models.FindVCSProviderIntegrationBinding(tx, integration.ID)
 		if bindingErr == nil {
-			catalogRepository, findErr := findGitHubCatalogRepositoryByName(ctx, tx, organizationID, repository)
-			if errors.Is(findErr, gorm.ErrRecordNotFound) {
-				return grpcerrors.PermissionDenied(findErr, "VCS repository is not accessible")
+			selectionIntegrationID := uuid.Nil
+			if !repositoryChanged {
+				selectionIntegrationID = integration.ID
 			}
+			catalogRepository, findErr := findGitHubCatalogRepositoryByName(ctx, tx, organizationID, repository, selectionIntegrationID)
 			if findErr != nil {
 				return findErr
 			}
-			installation, findErr := models.FindVCSProviderInstallation(
-				tx,
-				models.ProviderGitHub,
-				catalogRepository.InstallationID,
-			)
-			if findErr != nil {
-				return findErr
-			}
-			selectedIntegration, findErr = models.FindOrCreateVCSProviderBinding(
-				tx,
-				orgID,
-				models.ProviderGitHub,
-				catalogRepository.InstallationID,
-				installation.AccountLogin,
-			)
+			selectedIntegration, findErr = gitHubRepositoryIntegration(tx, orgID, catalogRepository)
 			if findErr != nil {
 				return findErr
 			}
@@ -174,6 +162,10 @@ func UpdateFactoryRepository(
 			patch.AppRepositoryID = &selectedRepositoryID
 			patch.BacklogRepository = &selectedRepository
 			patch.BacklogRepositoryID = &selectedRepositoryID
+		}
+		patch, err = authorizeFactoryRepositoryPatch(ctx, tx, deps, factory, patch)
+		if err != nil {
+			return err
 		}
 		if err := factory.UpdateOnboarding(tx, patch); err != nil {
 			return err
@@ -294,6 +286,10 @@ func reconcileFactoryRepository(
 	}
 	config := factory.OnboardingConfigValue()
 	nextBranch := strings.TrimSpace(config.DefaultBranch)
+	backlogRepository := config.BacklogRepository
+	if backlogRepository == "" {
+		backlogRepository = repository
+	}
 	previousGitHubHost := githubHostForVCSIntegration(tx, factory.OrganizationID, previousVCSIntegrationID)
 	nextGitHubHost := githubHostForVCSIntegration(tx, factory.OrganizationID, vcsIntegrationID)
 	if retargetTasks {
@@ -329,10 +325,10 @@ func reconcileFactoryRepository(
 		previousIntegrationName, integrationName = previousIntegration.InstallationName, integration.InstallationName
 	}
 
-	intakeCanvasIDs := make(map[uuid.UUID]struct{}, len(intakes))
+	intakeSourcesByCanvas := make(map[uuid.UUID]string, len(intakes))
 	for _, intake := range intakes {
-		if intake.Source == models.FactoryIntakeSourceGitHubIssues {
-			intakeCanvasIDs[intake.CanvasID] = struct{}{}
+		if intake.Source == models.FactoryIntakeSourceGitHubIssues || intake.Source == models.FactoryIntakeSourceDependabotAlerts {
+			intakeSourcesByCanvas[intake.CanvasID] = intake.Source
 		}
 	}
 	handlerCanvasIDs := make(map[uuid.UUID]struct{}, len(handlers))
@@ -342,6 +338,17 @@ func reconcileFactoryRepository(
 
 	for i := range canvasesForFactory {
 		canvas := &canvasesForFactory[i]
+		binding, err := factoryConfigurationSavedBinding(tx, canvas)
+		if err != nil {
+			return err
+		}
+		_, pinnedRepository := binding["resource_id"]
+		_, pinnedIntegration := binding["integration_id"]
+		previousApp, previousBacklog := previousAppRepository, previousBacklogRepository
+		if pinnedRepository {
+			// Explicit automation repositories do not follow workspace defaults.
+			previousApp, previousBacklog = "", ""
+		}
 		liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(tx, canvas)
 		if err != nil {
 			return err
@@ -359,23 +366,23 @@ func reconcileFactoryRepository(
 			case "line-implementation":
 				managedRunnerNodeIDs[implementationAgentNodeID] = true
 				changed = replaceNodeConfigurationValues(nodes, []configurationReplacement{
-					{from: previousAppRepository, to: orderRepositoryExpression},
+					{from: previousApp, to: orderRepositoryExpression},
 					{from: previousDefaultBranch, to: orderDefaultBranchExpression},
 					{from: legacyAppRepositoryExpression, to: orderRepositoryExpression},
 					{from: legacyDefaultBranchExpression, to: orderDefaultBranchExpression},
 				}) || changed
 			case "pr-closure":
-				changed = replaceNodeConfigurationValues(nodes, []configurationReplacement{{from: previousAppRepository, to: repository}}) || changed
+				changed = replaceNodeConfigurationValues(nodes, []configurationReplacement{{from: previousApp, to: repository}}) || changed
 			case "issue-intake":
-				changed = replaceNodeConfigurationValues(nodes, []configurationReplacement{{from: previousBacklogRepository, to: repository}}) || changed
+				changed = replaceNodeConfigurationValues(nodes, []configurationReplacement{{from: previousBacklog, to: backlogRepository}}) || changed
 			case "risk-score":
 				managedRunnerNodeIDs["assess-risk"] = true
-				changed = replaceNodeConfigurationValues(nodes, []configurationReplacement{{from: previousAppRepository, to: repository}}) || changed
+				changed = replaceNodeConfigurationValues(nodes, []configurationReplacement{{from: previousApp, to: repository}}) || changed
 			case "visual-evidence":
 				managedRunnerNodeIDs["capture-visual-evidence"] = true
-				changed = replaceNodeConfigurationValues(nodes, []configurationReplacement{{from: previousAppRepository, to: repository}}) || changed
+				changed = replaceNodeConfigurationValues(nodes, []configurationReplacement{{from: previousApp, to: repository}}) || changed
 			case scheduledIntakeTemplateID:
-				changed = replaceWorkspaceCheckoutTarget(nodes, config.EffectiveVCSProvider(), previousAppRepository, repository, previousDefaultBranch, nextBranch, previousGitHubHost, nextGitHubHost) || changed
+				changed = replaceWorkspaceCheckoutTarget(nodes, config.EffectiveVCSProvider(), previousApp, repository, previousDefaultBranch, nextBranch, previousGitHubHost, nextGitHubHost) || changed
 			}
 			if template.id == "line-implementation" {
 				changed = replaceLegacyCheckoutBaseToken(nodes, managedRunnerNodeIDs) || changed
@@ -383,9 +390,9 @@ func reconcileFactoryRepository(
 		}
 		isCustomAutomation := models.FactoryAppTemplateID(nodes) == models.FactoryAppTemplateCustomAutomationID
 		if isCustomAutomation {
-			changed = replaceWorkspaceCheckoutTarget(nodes, config.EffectiveVCSProvider(), previousAppRepository, repository, previousDefaultBranch, nextBranch, previousGitHubHost, nextGitHubHost) || changed
+			changed = replaceWorkspaceCheckoutTarget(nodes, config.EffectiveVCSProvider(), previousApp, repository, previousDefaultBranch, nextBranch, previousGitHubHost, nextGitHubHost) || changed
 		}
-		if isCustomAutomation && slices.ContainsFunc(nodes, func(node models.Node) bool {
+		if isCustomAutomation && !pinnedRepository && slices.ContainsFunc(nodes, func(node models.Node) bool {
 			return node.ComponentName() == "schedule" || node.ComponentName() == factorycomponent.OnWebhookTriggerName
 		}) {
 			for i := range nodes {
@@ -396,16 +403,16 @@ func reconcileFactoryRepository(
 				changed = refreshCustomAutomationCheckout(&nodes[i], factory, nextGitHubHost) || changed
 			}
 		}
-		if _, ok := intakeCanvasIDs[canvas.ID]; ok {
-			graph := resolveIntakeGraph(models.FactoryIntakeSourceGitHubIssues, models.LiveCanvasSpec{
+		if source, ok := intakeSourcesByCanvas[canvas.ID]; ok {
+			graph := resolveIntakeGraph(source, models.LiveCanvasSpec{
 				Nodes: nodes,
 				Edges: liveVersion.Edges,
 			})
 			managedVCSNodeIDs[graph.TriggerNodeID] = true
 			managedVCSNodeIDs[graph.AuthorPermissionNodeID] = true
 			managedRunnerNodeIDs[graph.AnalysisNodeID] = true
-			changed = replaceTriggerRepository(nodes, "github.onIssue", previousBacklogRepository, repository) || changed
-			changed = replaceTriggerRepository(nodes, "github.onDependabotAlert", previousBacklogRepository, repository) || changed
+			changed = replaceTriggerRepository(nodes, "github.onIssue", previousBacklog, backlogRepository) || changed
+			changed = replaceTriggerRepository(nodes, "github.onDependabotAlert", previousBacklog, backlogRepository) || changed
 		}
 		if _, ok := handlerCanvasIDs[canvas.ID]; ok {
 			spec := models.LiveCanvasSpec{
@@ -419,18 +426,20 @@ func reconcileFactoryRepository(
 			} else {
 				maps.Copy(managedRunnerNodeIDs, graph.discussionRunnerNodeIDs(spec))
 			}
-			changed = replaceGitHubTriggerRepository(nodes, previousAppRepository, repository) || changed
+			changed = replaceGitHubTriggerRepository(nodes, previousApp, repository) || changed
 		}
-		changed = replaceVCSNodeIntegration(
-			nodes,
-			managedVCSNodeIDs,
-			previousVCSIntegrationID,
-			vcsIntegrationID,
-			previousAppRepository,
-			previousBacklogRepository,
-			repository,
-		) || changed
-		changed = replaceRunnerVCSIntegration(nodes, managedRunnerNodeIDs, previousIntegrationName, integrationName) || changed
+		if !pinnedIntegration {
+			changed = replaceVCSNodeIntegration(
+				nodes,
+				managedVCSNodeIDs,
+				previousVCSIntegrationID,
+				vcsIntegrationID,
+				previousAppRepository,
+				previousBacklogRepository,
+				repository,
+			) || changed
+			changed = replaceRunnerVCSIntegration(nodes, managedRunnerNodeIDs, previousIntegrationName, integrationName) || changed
+		}
 		if !changed {
 			continue
 		}

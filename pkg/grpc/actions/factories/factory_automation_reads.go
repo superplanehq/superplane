@@ -3,6 +3,7 @@ package factories
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"maps"
 
 	"github.com/google/uuid"
@@ -13,21 +14,22 @@ import (
 // These inputs live for one configuration operation and one transaction only.
 // Publication and row locking still read through their existing model paths.
 type factoryAutomationReadInputs struct {
-	connection          gorm.ConnPool
-	factory             *models.Factory
-	canvases            []models.Canvas
-	versions            map[uuid.UUID]*models.CanvasVersion
-	lines               []models.FactoryLine
-	integrations        []models.Integration
-	integrationsByID    map[uuid.UUID]*models.Integration
-	integrationsByName  map[string]*models.Integration
-	agent               *intakeAgent
-	agentResolved       bool
-	hostedAgent         *intakeAgent
-	hostedAgentResolved bool
-	vcsName             string
-	vcsResolved         bool
-	policies            map[string]any
+	connection            gorm.ConnPool
+	factory               *models.Factory
+	canvases              []models.Canvas
+	versions              map[uuid.UUID]*models.CanvasVersion
+	lines                 []models.FactoryLine
+	integrations          []models.Integration
+	integrationsByID      map[uuid.UUID]*models.Integration
+	integrationsByName    map[string]*models.Integration
+	agent                 *intakeAgent
+	agentResolved         bool
+	hostedAgent           *intakeAgent
+	hostedAgentResolved   bool
+	vcsName               string
+	vcsResolved           bool
+	policies              map[string]any
+	workspaceRepositories []string
 }
 
 type factoryAutomationReadInputsKey struct{}
@@ -149,4 +151,18 @@ func factoryAutomationPolicy[T any](tx *gorm.DB, factory *models.Factory, operat
 		reads.policies[key] = result
 	}
 	return result, err
+}
+
+func factoryAutomationVCSBinding(tx *gorm.DB, factory *models.Factory, integrationID uuid.UUID) (*models.VCSProviderIntegrationBinding, error) {
+	binding, err := factoryAutomationPolicy(tx, factory, "vcs-binding", []any{integrationID}, func() (*models.VCSProviderIntegrationBinding, error) {
+		binding, err := models.FindVCSProviderIntegrationBinding(tx, integrationID)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return binding, err
+	})
+	if err == nil && binding == nil {
+		return nil, gorm.ErrRecordNotFound
+	}
+	return binding, err
 }
