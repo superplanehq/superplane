@@ -14,24 +14,13 @@ type ClickToRenameProps = {
   inputClassName?: string;
 };
 
-/**
- * Click (or Enter/Space) opens an input. Enter or blur saves a non-empty
- * name. Escape restores the previous value.
- *
- * The label keeps the layout size. The field paints around that label so
- * opening edit does not shift the header or the columns.
- */
-export function ClickToRename({
+function useClickToRename({
   value,
   onSave,
   canEdit,
-  busy = false,
+  busy,
   validate,
-  testId,
-  ariaLabel,
-  className,
-  inputClassName,
-}: ClickToRenameProps) {
+}: Pick<ClickToRenameProps, "value" | "onSave" | "canEdit" | "busy" | "validate">) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
   const [error, setError] = useState("");
@@ -104,6 +93,43 @@ export function ClickToRename({
     }
   };
 
+  const handleBlur = () => {
+    if (skipBlurCommitRef.current) {
+      skipBlurCommitRef.current = false;
+      return;
+    }
+    commitDraft();
+  };
+
+  return { editing, draft, error, inputRef, setDraft, startEditing, handleKeyDown, handleBlur };
+}
+
+/**
+ * Click (or Enter/Space) opens an input. Enter or blur saves a non-empty
+ * name. Escape restores the previous value.
+ *
+ * The label keeps the layout size. The field paints around that label so
+ * opening edit does not shift the header or the columns.
+ */
+export function ClickToRename({
+  value,
+  onSave,
+  canEdit,
+  busy = false,
+  validate,
+  testId,
+  ariaLabel,
+  className,
+  inputClassName,
+}: ClickToRenameProps) {
+  const { editing, draft, error, inputRef, setDraft, startEditing, handleKeyDown, handleBlur } = useClickToRename({
+    value,
+    onSave,
+    canEdit,
+    busy,
+    validate,
+  });
+
   return (
     <span className={cn("relative inline-flex max-w-full min-w-0 items-center overflow-visible", className)}>
       <span
@@ -137,13 +163,7 @@ export function ClickToRename({
           ref={inputRef}
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
-          onBlur={() => {
-            if (skipBlurCommitRef.current) {
-              skipBlurCommitRef.current = false;
-              return;
-            }
-            commitDraft();
-          }}
+          onBlur={handleBlur}
           onKeyDown={handleKeyDown}
           disabled={busy}
           aria-invalid={Boolean(error)}

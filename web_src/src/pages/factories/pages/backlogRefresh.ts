@@ -4,7 +4,6 @@ import type { RefreshBacklogResult } from "@/hooks/useFactoryIntakeData";
 const REFRESHABLE_INTAKE_SOURCES: ReadonlySet<FactoriesFactoryIntake["source"]> = new Set([
   "SOURCE_GITHUB_ISSUES",
   "SOURCE_JIRA_ISSUES",
-  "SOURCE_PRODUCTIVE_TASKS",
 ]);
 
 export const BACKLOG_REFRESH_COPY = {

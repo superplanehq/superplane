@@ -8,7 +8,6 @@ import githubIcon from "@/assets/icons/integrations/github.svg";
 import jiraIcon from "@/assets/icons/integrations/jira.svg";
 import linearIcon from "@/assets/icons/integrations/linear.svg";
 import pagerdutyIcon from "@/assets/icons/integrations/pagerduty.svg";
-import productiveIcon from "@/assets/icons/integrations/productive.svg";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
 import slackIcon from "@/assets/icons/integrations/slack.svg";
 import webhookIcon from "@/assets/icons/webhook.svg";
@@ -34,7 +33,6 @@ export type SplitRunIntakeKind =
   | "jira-issues"
   | "sentry-exceptions"
   | "pagerduty-incidents"
-  | "productive-tasks"
   | "datadog"
   | "linear-issues"
   | "webhook"
@@ -111,7 +109,6 @@ export const INTAKE_PRESENTATION: Record<SplitRunIntakeKind, { name: string; ico
   "jira-issues": { name: "Jira issues", iconSrc: jiraIcon, iconAlt: "Jira" },
   "sentry-exceptions": { name: "Sentry exceptions", iconSrc: sentryIcon, iconAlt: "Sentry" },
   "pagerduty-incidents": { name: "PagerDuty incidents", iconSrc: pagerdutyIcon, iconAlt: "PagerDuty" },
-  "productive-tasks": { name: "Productive tasks", iconSrc: productiveIcon, iconAlt: "Productive" },
   datadog: { name: "Datadog errors", iconSrc: datadogIcon, iconAlt: "Datadog" },
   "linear-issues": { name: "Linear", iconSrc: linearIcon, iconAlt: "Linear" },
   webhook: { name: "Webhook", iconSrc: webhookIcon, iconAlt: "Webhook" },
@@ -127,7 +124,6 @@ const INTAKE_KIND_HINTS: Array<{ pattern: RegExp; kind: SplitRunIntakeKind }> = 
   { pattern: /dependabot/i, kind: "dependabot-alerts" },
   { pattern: /bitbucket/i, kind: "bitbucket-prs" },
   { pattern: /jira/i, kind: "jira-issues" },
-  { pattern: /productive/i, kind: "productive-tasks" },
   { pattern: /pagerduty/i, kind: "pagerduty-incidents" },
   { pattern: /datadog|ddog-gov\.com/i, kind: "datadog" },
   { pattern: /linear/i, kind: "linear-issues" },
@@ -156,11 +152,6 @@ export function sourceTicketLabel(url: string): string {
     return linear;
   }
   const id = hostTicketId(parsed);
-  // Productive.io links carry the organization id where other hosts carry a
-  // name. A number says nothing to a reader, so the task id stands alone.
-  if (parsed.hostname.endsWith("productive.io")) {
-    return id ? `#${id}` : parsed.hostname;
-  }
   const org = parsed.hostname.split(".")[0] ?? parsed.hostname;
   if (id) {
     return `${org}#${id}`;
