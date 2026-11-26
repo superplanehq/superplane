@@ -18,6 +18,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/githubapp"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
+	"gorm.io/gorm"
 )
 
 const (
@@ -46,22 +47,34 @@ type HostedAppBinding struct {
 	RepositoryIDs []int64
 }
 
+// IntegrationDB keeps hosted repository grants and provisioning reads in the
+// transaction that owns the integration operation.
+func IntegrationDB(ctx core.IntegrationContext) *gorm.DB {
+	if holder, ok := ctx.(interface{ DB() *gorm.DB }); ok {
+		if db := holder.DB(); db != nil {
+			return db
+		}
+	}
+	return database.Conn()
+}
+
 func ResolveHostedAppBinding(ctx core.IntegrationContext) (*HostedAppBinding, error) {
-	binding, err := models.FindVCSProviderIntegrationBinding(database.Conn(), ctx.ID())
+	tx := IntegrationDB(ctx)
+	binding, err := models.FindVCSProviderIntegrationBinding(tx, ctx.ID())
 	if err != nil {
 		return nil, fmt.Errorf("failed to find global GitHub App binding: %w", err)
 	}
 	if binding.Provider != models.ProviderGitHub {
 		return nil, fmt.Errorf("hosted GitHub integration has provider %q", binding.Provider)
 	}
-	installation, err := models.FindVCSProviderInstallation(database.Conn(), binding.Provider, binding.InstallationID)
+	installation, err := models.FindVCSProviderInstallation(tx, binding.Provider, binding.InstallationID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find global GitHub App installation: %w", err)
 	}
 	if installation.SuspendedAt != nil {
 		return nil, fmt.Errorf("global GitHub App installation is suspended")
 	}
-	repositories, err := models.ListVCSProviderBindingRepositories(database.Conn(), ctx.ID())
+	repositories, err := models.ListVCSProviderBindingRepositories(tx, ctx.ID())
 	if err != nil {
 		return nil, fmt.Errorf("failed to list repositories granted to the GitHub App binding: %w", err)
 	}
@@ -69,7 +82,7 @@ func ResolveHostedAppBinding(ctx core.IntegrationContext) (*HostedAppBinding, er
 	for _, repository := range repositories {
 		repositoryIDs = append(repositoryIDs, repository.RepositoryID)
 	}
-	contextRepositoryIDs, err := bindingContextRepositoryIDs(binding)
+	contextRepositoryIDs, err := bindingContextRepositoryIDs(tx, binding)
 	if err != nil {
 		return nil, err
 	}
@@ -98,8 +111,8 @@ func ResolveHostedAppBinding(ctx core.IntegrationContext) (*HostedAppBinding, er
 // context repositories, and names that the catalog learns after the last
 // grant sync. A name missing from the catalog schedules an installation
 // refresh, so a later run can include it.
-func bindingContextRepositoryIDs(binding *models.VCSProviderIntegrationBinding) ([]int64, error) {
-	repositoryIDs, missing, err := models.MatchBindingContextRepositoryIDs(database.Conn(), binding.IntegrationID, binding.InstallationID)
+func bindingContextRepositoryIDs(tx *gorm.DB, binding *models.VCSProviderIntegrationBinding) ([]int64, error) {
+	repositoryIDs, missing, err := models.MatchBindingContextRepositoryIDs(tx, binding.IntegrationID, binding.InstallationID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to match context repositories: %w", err)
 	}
@@ -107,7 +120,7 @@ func bindingContextRepositoryIDs(binding *models.VCSProviderIntegrationBinding) 
 		return repositoryIDs, nil
 	}
 	if err := models.EnqueueVCSProviderInstallationReconciliation(
-		database.Conn(),
+		tx,
 		models.ProviderGitHub,
 		binding.InstallationID,
 		binding.OrganizationID,

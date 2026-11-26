@@ -379,8 +379,11 @@ func applyIntakeSettingsToGraph(
 		updated = deriveGitHubIssueListening(updated)
 	}
 	if source == models.FactoryIntakeSourceWebhook {
-		nodes, err := applyWebhookIntakeSettingsToGraph(graph, updated, nodes)
-		return nodes, edges, err
+		var err error
+		nodes, err = applyWebhookIntakeSettingsToGraph(graph, updated, nodes)
+		if err != nil {
+			return nil, nil, err
+		}
 	}
 	if source == models.FactoryIntakeSourceLinearIssues && !linearIntakeHasScope(updated) {
 		return nil, nil, invalidArgument("a Linear team is required")
@@ -406,6 +409,14 @@ func applyIntakeSettingsToGraph(
 	for i := range nodes {
 		switch nodes[i].ID {
 		case graph.TriggerNodeID:
+			nodes[i].Metadata = maps.Clone(nodes[i].Metadata)
+			if nodes[i].Metadata == nil {
+				nodes[i].Metadata = map[string]any{}
+			}
+			nodes[i].Metadata["intakeConfidencePct"] = updated.ConfidencePct
+			if source == models.FactoryIntakeSourceGitHubIssues && !updated.listeningConfigured {
+				delete(nodes[i].Metadata, "intakeExplicitIssueEvents")
+			}
 			configuration := maps.Clone(nodes[i].Configuration)
 			if configuration == nil {
 				configuration = map[string]any{}
