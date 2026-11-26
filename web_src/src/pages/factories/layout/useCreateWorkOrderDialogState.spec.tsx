@@ -3,13 +3,7 @@ import { type ReactNode } from "react";
 import { MemoryRouter, useLocation, useNavigate } from "react-router";
 import { describe, expect, it } from "bun:test";
 
-import {
-  createWorkOrderPath,
-  factoryLineDetailPath,
-  linesPath,
-  workOrderDetailPath,
-  workOrdersPath,
-} from "../lib/factoryPagePaths";
+import { createWorkOrderPath, factoryHomePath, workOrderDetailPath, workOrdersPath } from "../lib/factoryPagePaths";
 import { useCreateWorkOrderDialogState } from "./useCreateWorkOrderDialogState";
 
 const ORGANIZATION_ID = "org-1";
@@ -68,9 +62,9 @@ describe("useCreateWorkOrderDialogState", () => {
     expect(result.current.locationState).toEqual({ peekOrder: order });
   });
 
-  it("keeps the current line when create finishes from a board", () => {
+  it("stays on the workspace board when create finishes from the board", () => {
     const { result } = renderHook(() => useDialogState(true, "line-plan-and-implement"), {
-      wrapper: wrapper(factoryLineDetailPath(ORGANIZATION_ID, FACTORY_KEY, "line-hotfix")),
+      wrapper: wrapper(factoryHomePath(ORGANIZATION_ID, FACTORY_KEY)),
     });
 
     act(() => {
@@ -78,7 +72,7 @@ describe("useCreateWorkOrderDialogState", () => {
     });
 
     expect(result.current.createWorkOrderOpen).toBe(false);
-    expect(result.current.href).toBe(factoryLineDetailPath(ORGANIZATION_ID, FACTORY_KEY, "line-hotfix"));
+    expect(result.current.href).toBe(factoryHomePath(ORGANIZATION_ID, FACTORY_KEY));
   });
 
   it("does not open from New Task when create is not allowed", () => {
@@ -105,7 +99,7 @@ describe("useCreateWorkOrderDialogState", () => {
     expect(result.current.createWorkOrderOpen).toBe(true);
 
     act(() => {
-      result.current.navigate(linesPath(ORGANIZATION_ID, FACTORY_KEY));
+      result.current.navigate(factoryHomePath(ORGANIZATION_ID, FACTORY_KEY));
     });
 
     expect(result.current.createWorkOrderOpen).toBe(false);

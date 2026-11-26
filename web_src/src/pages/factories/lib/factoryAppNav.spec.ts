@@ -26,7 +26,7 @@ describe("resolveFactoryAppBackNav", () => {
   it("returns line detail when lineId present", () => {
     expect(resolveFactoryAppBackNav("org", "fac", { from: "lines", lineId: "line-1", lineName: "poc" })).toEqual({
       label: "Back",
-      href: "/org/workspaces/fac/lines/line-1",
+      href: "/org/workspaces/fac",
     });
   });
 

@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
@@ -38,11 +39,13 @@ vi.mock("./MobileBottomBar", () => ({
 
 function renderLayout() {
   return render(
-    <MemoryRouter initialEntries={[`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/velocity`]}>
-      <Routes>
-        <Route path="/:organizationId/workspaces/:factoryKey/*" element={<MobileFactoriesLayout />} />
-      </Routes>
-    </MemoryRouter>,
+    <QueryClientProvider client={new QueryClient()}>
+      <MemoryRouter initialEntries={[`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/velocity`]}>
+        <Routes>
+          <Route path="/:organizationId/workspaces/:factoryKey/*" element={<MobileFactoriesLayout />} />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
 }
 

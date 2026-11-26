@@ -5,7 +5,7 @@ export { CreateWorkOrderComposeRedirect } from "./CreateWorkOrderComposeRedirect
 export { FactoryAppCanvasPage } from "./FactoryAppCanvasPage";
 export { FactoryAutomationRunPage } from "./FactoryAutomationRunPage";
 export { FactoryAppSplitRunPage } from "./work-order-split-run/FactoryAppSplitRunPage";
-export { FactoryHomeRedirect } from "./FactoryHomeRedirect";
+export { FactoryBoardIndex } from "./FactoryBoardIndex";
 export { FactoryLineEditPage } from "./FactoryLineEditPage";
 export { LinesPage } from "./LinesPage";
 export { MissionsPage } from "./MissionsPage";

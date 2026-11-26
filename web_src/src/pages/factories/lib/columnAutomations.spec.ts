@@ -21,7 +21,7 @@ import {
   factoryPRFeedbackPath,
 } from "./factoryPagePaths";
 import { LINE_INTAKE_SOURCES } from "../pages/lineIntakeModel";
-import type { LinePhaseColumn } from "./linePhaseRuns";
+import { buildLinePhaseBoard, type LinePhaseColumn } from "./linePhaseRuns";
 
 const GITHUB_INTAKE: FactoriesFactoryIntake = {
   id: "intake-github",
@@ -130,6 +130,20 @@ describe("columnAutomationsEmptyCopy", () => {
 });
 
 describe("buildColumnAutomations", () => {
+  it("keeps the retained phase runner visible after step indexes change", () => {
+    const columns = buildLinePhaseBoard(
+      {
+        id: "line-1",
+        steps: [{ type: "runApp", app: { app: "retained-runner", entrypoint: "start" } }],
+        stages: [{ id: "retained-stage", key: "phase-1", name: "Review", kind: "STAGE_KIND_PHASE", stepIndex: 0 }],
+      },
+      [],
+      [{ id: "retained-runner", name: "Review" }],
+    );
+    const automations = buildColumnAutomations("phase-1", { columnTitle: "Review", columns });
+    expect(automations.map((automation) => automation.canvasId)).toEqual(["retained-runner"]);
+    expect(buildColumnAutomations("phase-0", { columnTitle: "Deleted", columns })).toEqual([]);
+  });
   it("builds backlog intakes and the analysis automation", () => {
     const automations = buildColumnAutomations("backlog", {
       columnTitle: "Backlog",
@@ -426,7 +440,7 @@ describe("columnAutomationOpenPath", () => {
         },
         nav,
       ),
-    ).toBe(factoryColumnAutomationViewPath("org-1", "RF", "line-plan", "app-refund-implementer"));
+    ).toBe(factoryColumnAutomationViewPath("org-1", "RF", "app-refund-implementer"));
   });
 
   const analysisAutomation = {
@@ -446,7 +460,7 @@ describe("columnAutomationOpenPath", () => {
   it("opens Planning settings for Task analysis", () => {
     const href = columnAutomationOpenPath(analysisAutomation, nav);
 
-    expect(href).toBe(factoryPlanningPath("org-1", "RF", "line-plan"));
+    expect(href).toBe(factoryPlanningPath("org-1", "RF"));
     expect(href).not.toContain("/apps/");
     expect(href).not.toContain("configure=1");
     expect(href).not.toContain("/setup/planning");
@@ -470,7 +484,7 @@ describe("columnAutomationOpenPath", () => {
         },
         nav,
       ),
-    ).toBe(factoryIntakePath("org-1", "RF", "line-plan", "intake-github"));
+    ).toBe(factoryIntakePath("org-1", "RF", "intake-github"));
   });
 
   it("opens the PR feedback settings popup on the first tab", () => {
@@ -491,7 +505,7 @@ describe("columnAutomationOpenPath", () => {
         },
         nav,
       ),
-    ).toBe(factoryPRFeedbackPath("org-1", "RF", "line-plan", undefined, "handler-checks"));
+    ).toBe(factoryPRFeedbackPath("org-1", "RF", undefined, "handler-checks"));
   });
 });
 
@@ -504,7 +518,7 @@ it("keeps a renamed scheduled intake visible and opens its saved automation", ()
   expect(rows).toHaveLength(1);
   expect(rows[0]).toMatchObject({ name: "Review documentation", trigger: "On schedule" });
   expect(columnAutomationOpenPath(rows[0], { organizationId: "org", factoryKey: "workspace" })).toBe(
-    factoryColumnAutomationViewPath("org", "workspace", undefined, "scheduled-app"),
+    factoryColumnAutomationViewPath("org", "workspace", "scheduled-app"),
   );
 });
 
@@ -530,7 +544,7 @@ it("keeps a renamed Review request visible without discovery and avoids a duplic
     name: "Request engineering review",
   });
   expect(columnAutomationOpenPath(rows[0], { organizationId: "org", factoryKey: "workspace" })).toBe(
-    factoryColumnAutomationViewPath("org", "workspace", undefined, "review-request-app"),
+    factoryColumnAutomationViewPath("org", "workspace", "review-request-app"),
   );
   expect(catalogForColumn("verify").some((entry) => entry.id === "review-request")).toBe(false);
 });

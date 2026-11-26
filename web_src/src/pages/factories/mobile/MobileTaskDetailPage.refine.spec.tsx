@@ -195,7 +195,7 @@ function renderTask(
               <TestLineSwitch />
               <Routes>
                 <Route path="/org-1/workspaces/:factoryKey/task/:orderNumber" element={<MobileTaskDetailPage />} />
-                <Route path="/org-1/workspaces/:factoryKey/lines/:lineId" element={<LocationProbe />} />
+                <Route path="/org-1/workspaces/:factoryKey" element={<LocationProbe />} />
               </Routes>
             </FactoriesLayoutContext.Provider>
           </MemoryRouter>

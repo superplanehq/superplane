@@ -479,6 +479,17 @@ service Organizations {
     };
   }
 
+  rpc RetryIntegrationWebhook(RetryIntegrationWebhookRequest) returns (RetryIntegrationWebhookResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/organizations/{id}/integrations/{integration_id}/webhooks/{webhook_id}/retry"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Retry failed webhook setup";
+      tags: "Organization";
+    };
+  }
+
   rpc CreateIntegration(CreateIntegrationRequest) returns (CreateIntegrationResponse) {
     option (google.api.http) = {
       post: "/api/v1/organizations/{id}/integrations"
@@ -1322,6 +1333,30 @@ message DescribeIntegrationResponse {
   Integration integration = 1;
 }
 
+message RetryIntegrationWebhookRequest {
+  string id = 1;
+  string integration_id = 2;
+  string webhook_id = 3;
+}
+
+message RetryIntegrationWebhookResponse {}
+
+message IntegrationWebhookFailure {
+  string id = 1;
+  string state = 2;
+  repeated string repositories = 3;
+  repeated string events = 4;
+  string message = 5;
+  string limit_event = 6;
+}
+
+message IntegrationWebhookSetup {
+  string id = 1;
+  string state = 2;
+  repeated string repositories = 3;
+  repeated string events = 4;
+}
+
 message ListIntegrationResourcesRequest {
   string id = 1;
   string integration_id = 2;
@@ -1450,6 +1485,9 @@ message Integration {
     repeated Property properties = 8;
     repeated Secret secrets = 9;
     bool legacy_setup = 10;
+    repeated IntegrationWebhookFailure webhook_failures = 11;
+    // Returned when describing a GitHub integration.
+    repeated IntegrationWebhookSetup webhook_setups = 12;
   }
 
   message SetupState {

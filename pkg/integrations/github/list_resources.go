@@ -17,6 +17,9 @@ import (
 
 func (g *GitHub) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	switch resourceType {
+	case "repository_webhook":
+		return g.listRepositoryWebhookResources(ctx)
+
 	case "check_run_permission":
 		if err := common.VerifyCheckRunPermissions(context.Background(), ctx.Integration, ctx.HTTP); err != nil {
 			if errors.Is(err, common.ErrCheckRunPermissions) || errors.Is(err, common.ErrCheckRunAppRequired) {

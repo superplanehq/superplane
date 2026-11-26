@@ -107,7 +107,10 @@ export function columnTitleForKey(key: ColumnKey, columns: LinePhaseColumn[] = [
     return "Done";
   }
   const stepIndex = phaseIndexFromColumnKey(key);
-  return columns.find((column) => column.stepIndex === stepIndex)?.stepName ?? `Phase ${(stepIndex ?? 0) + 1}`;
+  return (
+    columns.find((column) => (column.stageKey ? column.stageKey === key : column.stepIndex === stepIndex))?.stepName ??
+    `Phase ${(stepIndex ?? 0) + 1}`
+  );
 }
 
 export function columnAutomationsEmptyCopy(columnTitle: string, key: ColumnKey): string {
@@ -404,7 +407,7 @@ function agentStepAutomation(
   workOrders: FactoriesWorkOrder[],
 ): ColumnAutomation[] {
   const stepIndex = phaseIndexFromColumnKey(key);
-  const column = columns.find((entry) => entry.stepIndex === stepIndex);
+  const column = columns.find((entry) => (entry.stageKey ? entry.stageKey === key : entry.stepIndex === stepIndex));
   const appId = column?.appId?.trim();
   if (!appId) {
     return [];

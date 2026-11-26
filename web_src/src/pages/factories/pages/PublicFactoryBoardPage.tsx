@@ -137,7 +137,6 @@ export function PublicFactoryBoardPage({
     <PublicBoardView
       organizationId={organizationId}
       factoryKey={factoryKey}
-      lineId={lineId}
       account={signedIn ? { name: accountName, avatarUrl: accountAvatarUrl } : null}
       board={board}
       columns={columns}
@@ -223,7 +222,6 @@ function usePublicBoardSocket(
 function PublicBoardView({
   organizationId,
   factoryKey,
-  lineId,
   account,
   board,
   columns,
@@ -236,7 +234,6 @@ function PublicBoardView({
 }: {
   organizationId: string;
   factoryKey: string;
-  lineId: string;
   account: { name?: string; avatarUrl?: string | null } | null;
   board: PublicBoard;
   columns: PublicBoardColumn[];
@@ -255,7 +252,6 @@ function PublicBoardView({
       <PublicFactoriesSidebar
         organizationId={organizationId}
         factoryKey={factoryKey}
-        lineId={lineId}
         workspaceName={board.workspaceName}
         account={account}
       />
