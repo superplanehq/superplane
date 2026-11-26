@@ -239,34 +239,61 @@ func TestCustomStageWebhookRunsWithoutTask(t *testing.T) {
 	require.NoError(t, err)
 	webhookID := webhook.GetWebhook().GetId()
 
-	service := automations.Service{Backend: CanvasAutomationBackend{Deps: onboardingDeps(r)}}
-	placement := automations.Placement{OrganizationID: r.Organization.ID, FactoryID: factory.ID, Stage: stageKey}
-	taskOnly := "apiVersion: v2\nkind: Automation\nname: QA check\ntriggers:\n  - use: task_enters_stage\nsteps:\n  - name: Inspect\n    prompt: Check the changes.\n"
-	created, err := service.Create(ctx, placement, r.User, taskOnly)
-	require.NoError(t, err)
-	canvas, err := models.FindCanvasWithoutOrgScope(created.ID)
-	require.NoError(t, err)
-	version, err := models.FindLiveCanvasVersionInTransaction(db, created.ID)
-	require.NoError(t, err)
-	saved := checkoutEnvironmentVar("KEEP", "1")
-	for i := range version.Nodes {
-		if version.Nodes[i].ID == customStageRunnerID {
-			version.Nodes[i].Configuration["environment"] = append(version.Nodes[i].Configuration["environment"].([]any), saved)
-		}
+	workspaceAgent := resolveIntakeAgent(db, factory)
+	require.NotNil(t, workspaceAgent)
+	runsOnTask := true
+	settings := &pb.FactoryCustomAutomation_Settings{
+		StartMode:               pb.FactoryCustomAutomation_START_MODE_AUTOMATIC,
+		RunsOnTask:              &runsOnTask,
+		ExecutionTimeoutSeconds: 3600,
+		Agent:                   &pb.FactoryAppTemplateAgent{Component: workspaceAgent.Component, Model: workspaceAgent.Model},
+		Steps:                   []*pb.FactoryCustomAutomation_Step{{Name: "Inspect", Type: pb.FactoryCustomAutomation_Step_TYPE_PROMPT, Prompt: "Check the changes."}},
 	}
-	require.NoError(t, canvases.PublishGeneratedCanvasNodes(ctx, db, canvas, r.User, "Add a value", version.Nodes, version.Edges, intakePublisherOptions(onboardingDeps(r), r.Organization.ID)))
-	published, err := models.FindLiveCanvasVersionInTransaction(db, created.ID)
+	created, err := CreateFactoryCustomAutomation(ctx, onboardingDeps(r), r.Organization.ID.String(), &pb.CreateFactoryCustomAutomationRequest{
+		FactoryId: factory.ID.String(), ColumnKey: stageKey, Name: "QA check", Settings: settings,
+	})
 	require.NoError(t, err)
-	require.NoError(t, models.RefreshAutomationArtifactRevision(db, r.Organization.ID, created.ID.String(), version.ID.String(), published.ID.String()))
+	canvasID := uuid.MustParse(created.GetCustomAutomation().GetAutomation().GetId())
+	saved := checkoutEnvironmentVar("KEEP", "1")
+	keepOn := func(runnerID string) {
+		canvas, err := models.FindCanvasWithoutOrgScope(canvasID)
+		require.NoError(t, err)
+		version, err := models.FindLiveCanvasVersionInTransaction(db, canvasID)
+		require.NoError(t, err)
+		for i := range version.Nodes {
+			if version.Nodes[i].ID == runnerID {
+				version.Nodes[i].Configuration["environment"] = append(version.Nodes[i].Configuration["environment"].([]any), saved)
+			}
+		}
+		require.NoError(t, canvases.PublishGeneratedCanvasNodes(ctx, db, canvas, r.User, "Add a value", version.Nodes, version.Edges, intakePublisherOptions(onboardingDeps(r), r.Organization.ID)))
+		published, err := models.FindLiveCanvasVersionInTransaction(db, canvasID)
+		require.NoError(t, err)
+		require.NoError(t, models.RefreshAutomationArtifactRevision(db, r.Organization.ID, canvasID.String(), version.ID.String(), published.ID.String()))
+	}
+	keepOn(customStageRunnerID)
 
-	source := strings.Replace(taskOnly, "  - use: task_enters_stage\n", "  - use: task_enters_stage\n  - use: webhook\n    config:\n      webhook_id: "+webhookID+"\n", 1)
-	_, err = service.Update(ctx, r.Organization.ID, created.ID, r.User, source)
+	settings.RunsOnTask = nil
+	settings.Triggers = []*pb.FactoryCustomAutomation_StartTrigger{
+		{StartMode: pb.FactoryCustomAutomation_START_MODE_AUTOMATIC},
+		{StartMode: pb.FactoryCustomAutomation_START_MODE_WEBHOOK, WebhookId: webhookID},
+	}
+	updated, err := UpdateFactoryCustomAutomation(ctx, onboardingDeps(r), r.Organization.ID.String(), &pb.UpdateFactoryCustomAutomationRequest{
+		FactoryId: factory.ID.String(), AutomationId: canvasID.String(), Name: "QA check", Settings: settings,
+	})
 	require.NoError(t, err)
-	read, err := service.Read(ctx, r.Organization.ID, created.ID)
-	require.NoError(t, err)
-	assert.Equal(t, source, read.YAML)
+	assert.Nil(t, updated.GetCustomAutomation().GetSettings().RunsOnTask, "a webhook clears the saved task run context")
+	keepOn(customStageWebhookRunnerID)
 
-	version, err = models.FindLiveCanvasVersionInTransaction(db, created.ID)
+	service := automations.Service{Backend: CanvasAutomationBackend{Deps: onboardingDeps(r)}}
+	read, err := service.Read(ctx, r.Organization.ID, canvasID)
+	require.NoError(t, err)
+	assert.Contains(t, read.YAML, "webhook_id: "+webhookID)
+	assert.NotContains(t, read.YAML, "runs_on_task")
+	source := strings.Replace(read.YAML, "Check the changes.", "Review the changes.", 1)
+	_, err = service.Update(ctx, r.Organization.ID, canvasID, r.User, source)
+	require.NoError(t, err)
+
+	version, err := models.FindLiveCanvasVersionInTransaction(db, canvasID)
 	require.NoError(t, err)
 	assert.Contains(t, version.Edges, models.Edge{SourceID: "webhook-" + webhookID, TargetID: customStageWebhookRunnerID, Channel: "default"})
 	prompts := map[string]string{}
@@ -275,18 +302,17 @@ func TestCustomStageWebhookRunsWithoutTask(t *testing.T) {
 			continue
 		}
 		prompts[node.ID] = node.Configuration["steps"].([]any)[0].(map[string]any)["prompt"].(string)
+		assert.Contains(t, node.Configuration["environment"], saved, "an edit keeps saved values on %s", node.ID)
 		if node.ID == customStageWebhookRunnerID {
 			template := node.Metadata[models.FactoryAppTemplateMetadataKey].(map[string]any)
 			assert.Equal(t, "scheduled", template["startMode"], "the webhook runner needs the task tools")
 		}
-		if node.ID == customStageRunnerID {
-			assert.Contains(t, node.Configuration["environment"], saved, "a webhook must not reset the task runner")
-		}
 	}
-	assert.Contains(t, prompts[customStageWebhookRunnerID], "webhook started this run")
+	assert.Equal(t, 1, strings.Count(prompts[customStageWebhookRunnerID], "webhook started this run"))
+	assert.Contains(t, prompts[customStageWebhookRunnerID], "Review the changes.")
 	assert.NotContains(t, prompts[customStageRunnerID], "webhook started this run")
 
-	_, err = service.Update(ctx, r.Organization.ID, created.ID, r.User, strings.Replace(source, "  - use: task_enters_stage\n", "", 1))
+	_, err = service.Update(ctx, r.Organization.ID, canvasID, r.User, strings.Replace(source, "  - use: task_enters_stage\n", "", 1))
 	require.ErrorContains(t, err, "Keep one task_enters_stage trigger")
 }
 
