@@ -34,7 +34,7 @@ beforeEach(() => {
 });
 
 describe("add custom stage automation", () => {
-  it("opens shared configuration with the custom stage and return line", () => {
+  it("opens shared configuration with the custom stage on the workspace board", () => {
     const { result } = renderHook(
       () => ({
         automation: useAddColumnAutomation({
@@ -60,7 +60,7 @@ describe("add custom stage automation", () => {
     );
 
     act(() => result.current.automation.openPicker("custom-stage-id", "Deploy to prod"));
-    expect(result.current.location.pathname).toBe("/org/workspaces/workspace/lines/line");
+    expect(result.current.location.pathname).toBe("/org/workspaces/workspace");
     expect(result.current.location.search).toBe("?customAutomation=new&automationColumn=custom-stage-id");
     expect(result.current.automation.pickerOpen).toBe(false);
   });
@@ -71,7 +71,7 @@ describe("add pull request closure", () => {
     it(`installs with ${provider} and stays on the board`, async () => {
       const client = new QueryClient();
       const invalidate = vi.spyOn(client, "invalidateQueries");
-      const boardPath = "/org/workspaces/workspace/lines/line";
+      const boardPath = "/org/workspaces/workspace";
       const { result } = renderHook(
         () => ({
           automation: useAddColumnAutomation({
@@ -120,7 +120,7 @@ describe("add visual evidence", () => {
   it("installs the GitHub canvas and stays on the board", async () => {
     const client = new QueryClient();
     const invalidate = vi.spyOn(client, "invalidateQueries");
-    const boardPath = "/org/workspaces/workspace/lines/line";
+    const boardPath = "/org/workspaces/workspace";
     const { result } = renderHook(
       () => ({
         automation: useAddColumnAutomation({
@@ -227,7 +227,7 @@ describe("add custom automation", () => {
       {
         wrapper: ({ children }: { children: ReactNode }) => (
           <QueryClientProvider client={new QueryClient()}>
-            <MemoryRouter initialEntries={["/org/workspaces/workspace/lines/line"]}>{children}</MemoryRouter>
+            <MemoryRouter initialEntries={["/org/workspaces/workspace"]}>{children}</MemoryRouter>
           </QueryClientProvider>
         ),
       },
@@ -237,7 +237,7 @@ describe("add custom automation", () => {
     const entry = result.current.automation.catalog.find((item) => item.kind === "custom-verification")!;
     await act(async () => result.current.automation.onSelect(entry));
 
-    expect(result.current.location.pathname).toBe("/org/workspaces/workspace/lines/line");
+    expect(result.current.location.pathname).toBe("/org/workspaces/workspace");
     expect(result.current.location.search).toBe("?customAutomation=new");
     expect(result.current.automation.naming).toBe(false);
   });
@@ -263,7 +263,7 @@ describe("add custom automation", () => {
       {
         wrapper: ({ children }: { children: ReactNode }) => (
           <QueryClientProvider client={new QueryClient()}>
-            <MemoryRouter initialEntries={["/org/workspaces/workspace/lines/line"]}>{children}</MemoryRouter>
+            <MemoryRouter initialEntries={["/org/workspaces/workspace"]}>{children}</MemoryRouter>
           </QueryClientProvider>
         ),
       },
@@ -271,7 +271,7 @@ describe("add custom automation", () => {
 
     act(() => result.current.automation.openPicker("verify"));
 
-    expect(result.current.location.pathname).toBe("/org/workspaces/workspace/lines/line");
+    expect(result.current.location.pathname).toBe("/org/workspaces/workspace");
     expect(result.current.location.search).toBe("?customAutomation=new");
     expect(result.current.automation.naming).toBe(false);
   });

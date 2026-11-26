@@ -38,19 +38,17 @@ vi.mock("@monaco-editor/react", () => {
 import {
   ACME_ONBOARDING_FACTORY,
   ACME_ONBOARDING_FACTORY_ROUTE_SEGMENT,
-  ACME_ONBOARDING_LINE_ID,
   DRAFT_WORK_ORDER,
   GITHUB_ISSUES_INTAKE,
   GITHUB_ISSUES_INTAKE_ID,
   PRIMARY_FACTORY_ROUTE_SEGMENT,
   REFUND_FACTORY,
-  REFUND_LINE_PLAN_ID,
 } from "../__fixtures__/factoryPageResponses";
 import { LinesBoardSpecHarness } from "./linesPageSpecRender";
 import { REVIEW_CANDIDATE_WORK_ORDERS } from "./onboarding/first-run/reviewCandidates";
 
 function renderLinesBoard(
-  path = `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}`,
+  path = `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}`,
   openCreateWorkOrder = vi.fn(),
   factory: FactoriesFactory = REFUND_FACTORY,
 ) {
@@ -283,10 +281,7 @@ describe("LinesPage backlog create", () => {
     Element.prototype.scrollIntoView = vi.fn();
     const openCreateWorkOrder = vi.fn();
     const user = userEvent.setup();
-    renderLinesBoard(
-      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}`,
-      openCreateWorkOrder,
-    );
+    renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}`, openCreateWorkOrder);
 
     const backlog = screen.getByTestId("lines-backlog-column");
     expect(within(backlog).queryByRole("button", { name: "Add task" })).not.toBeInTheDocument();
@@ -355,7 +350,7 @@ describe("LinesPage backlog create", () => {
   it("does not refine a backlog draft from the task popup", async () => {
     useFactoryWorkOrders.mockReturnValue({ data: [DRAFT_WORK_ORDER] });
     const user = userEvent.setup();
-    renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}`, vi.fn(), {
+    renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}`, vi.fn(), {
       ...REFUND_FACTORY,
       onboarding: { ...REFUND_FACTORY.onboarding, appRepository: "acme/payments" },
     });
@@ -413,11 +408,7 @@ describe("LinesPage backlog create", () => {
   });
 
   it("shows a backlog onboarding card on Acme when the backlog is empty", () => {
-    renderLinesBoard(
-      `/org-1/workspaces/${ACME_ONBOARDING_FACTORY_ROUTE_SEGMENT}/lines/${ACME_ONBOARDING_LINE_ID}`,
-      vi.fn(),
-      ACME_ONBOARDING_FACTORY,
-    );
+    renderLinesBoard(`/org-1/workspaces/${ACME_ONBOARDING_FACTORY_ROUTE_SEGMENT}`, vi.fn(), ACME_ONBOARDING_FACTORY);
 
     expect(screen.getByTestId("backlog-onboarding-card")).toBeInTheDocument();
     expect(screen.queryByTestId("lines-backlog-create-ghost")).not.toBeInTheDocument();

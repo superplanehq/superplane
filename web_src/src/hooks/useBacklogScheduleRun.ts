@@ -18,9 +18,7 @@ export function useBacklogScheduleRun(organizationId: string, factoryId: string,
     try {
       const started = await runAutomation.mutateAsync({ automationId: automation.canvasId, workOrderId: "" });
       if (started.runId)
-        navigate(
-          factoryCustomAutomationRunPath(organizationId, factoryKey, lineId, automation.canvasId, started.runId),
-        );
+        navigate(factoryCustomAutomationRunPath(organizationId, factoryKey, automation.canvasId, started.runId));
     } catch (error) {
       showErrorToast(getApiErrorMessage(error, "SuperPlane could not start the automation."));
     } finally {

@@ -39,7 +39,6 @@ function renderCard(
           entry={buildWorkOrderListEntry(order, factory)}
           organizationId="org-1"
           factoryKey="RF"
-          factoryLines={[{ id: "line-a", name: "hotfix" }]}
           canDispatch
           canAssign
           dispatchingOrderIds={new Set()}

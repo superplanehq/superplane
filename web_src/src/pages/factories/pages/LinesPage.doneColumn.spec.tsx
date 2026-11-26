@@ -149,9 +149,7 @@ function renderBoard(factory: FactoriesFactory = REFUND_FACTORY) {
     <QueryClientProvider client={new QueryClient()}>
       <ThemeProvider>
         <TooltipProvider>
-          <MemoryRouter
-            initialEntries={[`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}`]}
-          >
+          <MemoryRouter initialEntries={[`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}`]}>
             <FactoriesLayoutContext.Provider
               value={{
                 organizationId: "org-1",
@@ -164,7 +162,7 @@ function renderBoard(factory: FactoriesFactory = REFUND_FACTORY) {
               }}
             >
               <Routes>
-                <Route path="/org-1/workspaces/:factoryKey/lines/:lineId" element={<LinesPage />} />
+                <Route path="/org-1/workspaces/:factoryKey" element={<LinesPage />} />
               </Routes>
             </FactoriesLayoutContext.Provider>
           </MemoryRouter>
@@ -376,9 +374,7 @@ describe("LinesPage Done column", () => {
       <QueryClientProvider client={new QueryClient()}>
         <ThemeProvider>
           <TooltipProvider>
-            <MemoryRouter
-              initialEntries={[`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}`]}
-            >
+            <MemoryRouter initialEntries={[`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}`]}>
               <FactoriesLayoutContext.Provider
                 value={{
                   organizationId: "org-1",
@@ -391,7 +387,7 @@ describe("LinesPage Done column", () => {
                 }}
               >
                 <Routes>
-                  <Route path="/org-1/workspaces/:factoryKey/lines/:lineId" element={<LinesPage />} />
+                  <Route path="/org-1/workspaces/:factoryKey" element={<LinesPage />} />
                   <Route path="/org-1/workspaces/:factoryKey/task/:orderNumber" element={<LinesPage />} />
                 </Routes>
                 <OpenTaskRouteButton href={taskHref} state={{ lineId: REFUND_LINE_PLAN_ID }} />

@@ -81,6 +81,20 @@ describe("repairActionLabel", () => {
 });
 
 describe("findBrokenIntegrations", () => {
+  it("surfaces a failed review webhook even when the GitHub connection is ready", () => {
+    const integration = instance({ state: "ready" });
+    integration.status!.webhookFailures = [
+      { id: "review-hook", state: "failed", message: "GitHub webhook limit reached." },
+    ];
+    expect(findBrokenIntegrations([integration])).toEqual([
+      expect.objectContaining({
+        id: "integration-1",
+        reason: "webhook",
+        actionLabel: "Fix webhooks",
+      }),
+    ]);
+  });
+
   it("returns nothing when every integration is ready", () => {
     expect(findBrokenIntegrations([instance({ state: "ready" })])).toEqual([]);
   });

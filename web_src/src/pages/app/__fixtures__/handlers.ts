@@ -242,6 +242,12 @@ function canvasDetailResponse(fixture: CanvasAppFixture) {
   return { canvas: { ...canvas, metadata: { ...metadata, liveVersionId } } };
 }
 
+function integrationsResponse(fixture: CanvasAppFixture) {
+  const payload =
+    fixture.integrations && typeof fixture.integrations === "object" ? fixture.integrations : { integrations: [] };
+  return { githubAppConfigured: true, ...payload };
+}
+
 const re = (pattern: string): RegExp => new RegExp(`^${pattern}$`);
 
 const CANVAS = "/api/v1/canvases/[^/]+";
@@ -262,13 +268,7 @@ function buildRoutes(fixture: CanvasAppFixture): Route[] {
     { pattern: re("/api/v1/widgets"), resolve: () => ({ json: fixture.widgets ?? { widgets: [] } }) },
     {
       pattern: re("/api/v1/integrations"),
-      resolve: () => {
-        const payload =
-          fixture.integrations && typeof fixture.integrations === "object"
-            ? fixture.integrations
-            : { integrations: [] };
-        return { json: { githubAppConfigured: true, ...payload } };
-      },
+      resolve: () => ({ json: integrationsResponse(fixture) }),
     },
     { pattern: re("/api/v1/api-keys"), resolve: () => ({ json: { apiKeys: [] } }) },
 

@@ -110,20 +110,15 @@ export function finishOnboardingError(args: {
   return null;
 }
 
-export type OnboardingDestination = { organizationId: string; factoryKey: string; lineId: string };
+export type OnboardingDestination = { organizationId: string; factoryKey: string };
 
 /** The line board, where the new GitHub intake sits at the foot of Backlog. */
 export function afterOnboardingPath(args: OnboardingDestination) {
-  return factoryHomePath(args.organizationId, args.factoryKey, args.lineId);
+  return factoryHomePath(args.organizationId, args.factoryKey);
 }
 
-function navigateAfterFinish(
-  navigate: ReturnType<typeof useNavigate>,
-  organizationId: string,
-  factoryKey: string,
-  lineId: string,
-) {
-  navigate(afterOnboardingPath({ organizationId, factoryKey, lineId }), { replace: true });
+function navigateAfterFinish(navigate: ReturnType<typeof useNavigate>, organizationId: string, factoryKey: string) {
+  navigate(afterOnboardingPath({ organizationId, factoryKey }), { replace: true });
 }
 
 export async function afterWorkspaceProvisioned(args: {
@@ -155,12 +150,12 @@ export async function afterWorkspaceProvisioned(args: {
   }
   args.invalidateAccountOrganizations();
   markWorkspaceGettingStarted(organizationId, args.factoryId);
-  const destination = { organizationId, factoryKey: args.factoryKey, lineId: args.lineId };
+  const destination = { organizationId, factoryKey: args.factoryKey };
   if (args.onProvisioned && !args.skipInitialImport && !args.bypassAnalysis) {
     args.onProvisioned(destination);
     return;
   }
-  navigateAfterFinish(args.navigate, organizationId, args.factoryKey, args.lineId);
+  navigateAfterFinish(args.navigate, organizationId, args.factoryKey);
 }
 
 export async function provisionWorkspace(args: {

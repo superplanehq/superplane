@@ -5,7 +5,6 @@ import { useWorkOrderCardActions } from "@/hooks/useWorkOrderCardActions";
 import { cn } from "@/lib/utils";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { WorkspacePageHeader } from "../layout/WorkspacePageHeader";
-import { useBrokenIntegrationsBanner } from "../lib/useBrokenIntegrationsBanner";
 import { useHostedCreditChrome } from "../lib/useHostedCreditEmptyBanner";
 import { useWorkOrderListState } from "../lib/useWorkOrderListState";
 import { WorkOrdersLoadedView } from "../workOrders/WorkOrdersLoadedView";
@@ -42,7 +41,6 @@ export function WorkOrdersPage() {
   const canDispatch = canAct("work_orders", "update");
   const canAssign = canAct("work_orders", "update");
   const { headerKicker: hostedCreditHeaderKicker } = useHostedCreditChrome(organizationId, routeSegment);
-  const brokenIntegrationsBanner = useBrokenIntegrationsBanner(organizationId, routeSegment);
 
   const isOrdersLoading = workOrdersLoading || (workOrdersFetching && workOrders.length === 0);
 
@@ -84,7 +82,6 @@ export function WorkOrdersPage() {
       canAssign={canAssign}
       permissionsLoading={permissionsLoading}
       hostedCreditHeaderKicker={hostedCreditHeaderKicker}
-      brokenIntegrationsBanner={brokenIntegrationsBanner}
       {...cardActions}
     />
   );

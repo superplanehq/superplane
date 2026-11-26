@@ -22,7 +22,6 @@ import {
   type CustomAutomationColumn,
   type CustomAutomationTrigger,
 } from "../lib/customAutomation";
-import { factoryHomePath, factoryLineDetailPath, firstFactoryLineId } from "../lib/factoryPagePaths";
 import type { PlanningReviewDraft, PlanningReviewStep } from "./planningReviewMockup";
 
 export function useCustomAutomationSetupPage(args: {
@@ -30,7 +29,6 @@ export function useCustomAutomationSetupPage(args: {
   factoryId: string;
   factoryKey: string;
   factory?: FactoriesFactory;
-  lineId?: string;
   automationId?: string;
   expectedLiveVersionId?: string;
   columnKey?: CustomAutomationColumn;
@@ -80,9 +78,6 @@ export function useCustomAutomationSetupPage(args: {
     setDraft(customAutomationDraft(automation));
   }, [automation]);
 
-  const boardHref = factoryHomePath(args.organizationId, args.factoryKey, firstFactoryLineId(args.factory));
-  const line = args.factory?.lines?.find((entry) => entry.id === args.lineId);
-  const returnHref = line?.id ? factoryLineDetailPath(args.organizationId, args.factoryKey, line.id) : boardHref;
   const validationError = useMemo(() => validateDraft(name, draft), [draft, name]);
   const runContext = customAutomationRunContext(columnKey, triggers, runsOnTask);
 
@@ -128,9 +123,6 @@ export function useCustomAutomationSetupPage(args: {
 
   return {
     columnKey,
-    boardHref,
-    returnHref,
-    lineExists: Boolean(line),
     described,
     showModel: ready,
     name,
