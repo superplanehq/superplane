@@ -11,6 +11,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	bitbucketintegration "github.com/superplanehq/superplane/pkg/integrations/bitbucket"
 	githubintegration "github.com/superplanehq/superplane/pkg/integrations/github"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
@@ -339,6 +340,9 @@ func verifiedOnboardingDefaultBranch(
 		saved = strings.TrimSpace(current.DefaultBranch)
 	}
 	check := onboardingBranchVerification(ctx, deps, db, orgID, organizationID, merged, requested)
+	if _, _, ok := grpcerrors.HandlerStatus(check.verifyErr); ok {
+		return patch, check.verifyErr
+	}
 	chosen, keepSaved, err := chooseVerifiedDefaultBranch(requested, saved, check)
 	if err != nil {
 		return patch, err
@@ -384,7 +388,10 @@ func onboardingProviderDefaultBranch(
 		}
 		return strings.TrimSpace(branch)
 	}
-	installationID, repositoryID := githubInstallationForRepository(ctx, db, organizationID, integration, repository)
+	installationID, repositoryID, err := githubInstallationForRepository(ctx, db, organizationID, integration, repository)
+	if err != nil {
+		return ""
+	}
 	branch, lookupErr := gitHubRepositoryDefaultBranch(ctx, deps, integration, repository, installationID, repositoryID)
 	if lookupErr != nil {
 		return ""
@@ -424,7 +431,10 @@ func githubOnboardingBranchVerification(
 	if err != nil {
 		return onboardingBranchCheck{verifyErr: err}
 	}
-	installationID, repositoryID := githubInstallationForRepository(ctx, db, organizationID, integration, repository)
+	installationID, repositoryID, err := githubInstallationForRepository(ctx, db, organizationID, integration, repository)
+	if err != nil {
+		return onboardingBranchCheck{verifyErr: factoryErrorToStatus(err, "failed to authorize repository")}
+	}
 	names, err := gitHubBranchNames(ctx, deps, integration, repository, installationID, repositoryID)
 	if err != nil {
 		return onboardingBranchCheck{verifyErr: err}
@@ -490,18 +500,20 @@ func githubInstallationForRepository(
 	organizationID string,
 	integration *models.Integration,
 	repository string,
-) (int64, int64) {
+) (int64, int64, error) {
 	if integration == nil {
-		return 0, 0
+		return 0, 0, nil
 	}
-	if _, err := models.FindVCSProviderIntegrationBinding(db, integration.ID); err != nil {
-		return 0, 0
+	if _, err := models.FindVCSProviderIntegrationBinding(db, integration.ID); errors.Is(err, gorm.ErrRecordNotFound) {
+		return 0, 0, nil
+	} else if err != nil {
+		return 0, 0, err
 	}
-	catalog, err := findGitHubCatalogRepositoryByName(ctx, db, organizationID, repository)
-	if err != nil || catalog == nil {
-		return 0, 0
+	catalog, err := findGitHubCatalogRepositoryByName(ctx, db, organizationID, repository, integration.ID)
+	if err != nil {
+		return 0, 0, err
 	}
-	return catalog.InstallationID, catalog.RepositoryID
+	return catalog.InstallationID, catalog.RepositoryID, nil
 }
 
 func bitbucketOnboardingBranchVerification(

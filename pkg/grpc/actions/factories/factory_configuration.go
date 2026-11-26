@@ -63,7 +63,8 @@ func PlanFactoryConfiguration(ctx context.Context, deps IntakeDependencies, orga
 		return nil, factoryErrorToStatus(err, "Failed to plan stage configuration.")
 	}
 	response := &pb.PlanFactoryConfigurationResponse{Coverage: factoryConfigurationCoverage}
-	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
+	ctx, providerChecks := newRepositoryProviderChecks(ctx)
+	err = providerChecks.prepare(database.DB(ctx), func(tx *gorm.DB) error {
 		target, err := loadFactoryConfigurationTarget(tx, orgID, req.GetFactoryId(), req.GetLineId())
 		if err != nil {
 			return err
@@ -96,9 +97,35 @@ func ApplyFactoryConfiguration(ctx context.Context, deps IntakeDependencies, org
 		return nil, factoryErrorToStatus(err, "Failed to apply stage configuration.")
 	}
 	response := &pb.ApplyFactoryConfigurationResponse{Coverage: factoryConfigurationCoverage}
+	ctx, providerChecks := newRepositoryProviderChecks(ctx)
+	err = providerChecks.prepare(database.DB(ctx), func(tx *gorm.DB) error {
+		target, err := loadFactoryConfigurationTarget(tx, orgID, req.GetFactoryId(), req.GetLineId())
+		if err != nil {
+			return err
+		}
+		tx = withFactoryAutomationReadInputs(tx, target.reads)
+		manifest, diagnostic := parseFactoryConfigurationBundle(req.GetBundle())
+		if diagnostic == nil {
+			diagnostic, err = validateFactoryConfigurationManifest(ctx, tx, deps, manifest, target)
+			if err != nil {
+				return err
+			}
+		}
+		if diagnostic != nil {
+			return grpcerrors.InvalidArgument(nil, fmt.Sprintf("%s: %s: %s", diagnostic.Path, diagnostic.Field, diagnostic.Message))
+		}
+		return nil
+	}, &sql.TxOptions{ReadOnly: true, Isolation: sql.LevelRepeatableRead})
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "Failed to apply stage configuration.")
+	}
+	providerChecks.frozen = true
 	var notifications []func()
 	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := requireFactoryAsCode(tx, orgID); err != nil {
+			return err
+		}
+		if err := models.LockOrganizationVCSProviderBindingRepositories(tx, orgID); err != nil {
 			return err
 		}
 		target, err := lockFactoryConfigurationTarget(tx, orgID, req.GetFactoryId(), req.GetLineId())
@@ -138,6 +165,27 @@ func ApplyFactoryConfiguration(ctx context.Context, deps IntakeDependencies, org
 		if len(response.Changes) == 0 {
 			return nil
 		}
+		repositoriesChanged := configurationRepositoriesChanged(target)
+		previousRepositories := target.factory.OnboardingConfigValue()
+		if err := applyFactoryConfigurationRepositories(tx, target); err != nil {
+			return err
+		}
+		if repositoriesChanged {
+			// Publication must see the repository records saved in this transaction.
+			tx = withFactoryAutomationReadInputs(tx, nil)
+		}
+		// Setup must see authorized automation grants before publication.
+		for _, stage := range manifest.Stages {
+			for _, automation := range stage.Automations {
+				prepared := automation.prepared
+				if prepared == nil || prepared.GitHubRepositoryID == 0 {
+					continue
+				}
+				if err := models.GrantVCSProviderBindingRepository(tx, uuid.MustParse(prepared.Binding.IntegrationID), models.ProviderGitHub, prepared.GitHubRepositoryID); err != nil {
+					return err
+				}
+			}
+		}
 		if err := applyFactoryConfigurationStages(tx, target, manifest); err != nil {
 			return err
 		}
@@ -158,10 +206,85 @@ func ApplyFactoryConfiguration(ctx context.Context, deps IntakeDependencies, org
 				notifications = append(notifications, notify)
 			}
 		}
+		references := map[string]string{}
+		for _, stage := range manifest.Stages {
+			live := byKey[stage.Key]
+			for _, automation := range stage.Automations {
+				if automation.prepared == nil {
+					continue
+				}
+				current := automation.current
+				id := uuid.New()
+				if current != nil {
+					id = current.canvas.ID
+					if configurationNeedsStableIdentity(stage, automation, current) {
+						if err := saveFactoryConfigurationOwnership(tx, target, live, automation, id); err != nil {
+							return err
+						}
+					}
+				} else {
+					_, err := canvases.CreateCanvasWithIDInTransaction(ctx, tx, id, deps.Registry, deps.Encryptor, deps.AuthService, deps.WebhookBaseURL, orgID, automation.Name, automation.prepared.Description, &target.factory.ID, nil, nil)
+					if err != nil {
+						return err
+					}
+					canvas, err := models.FindCanvasInTransaction(tx, orgID, id)
+					if err != nil {
+						return err
+					}
+					if err := canvas.SetColumnKey(tx, configurationStagePlacement(live)); err != nil {
+						return err
+					}
+				}
+				references[configurationManifestReference(stage.Key, automation.ID)] = id.String()
+			}
+		}
+		type pendingReview struct {
+			stage      *factoryConfigurationStageTarget
+			automation factoryConfigurationAutomation
+			current    *factoryConfigurationAutomationTarget
+			id         uuid.UUID
+		}
+		var reviews []pendingReview
 		for _, stage := range manifest.Stages {
 			live := byKey[stage.Key]
 			for _, automation := range stage.Automations {
 				current := automation.current
+				if automation.prepared != nil {
+					if current != nil && (seen[current.canvas.ID] || !factoryConfigurationAutomationChanged(current, automation, manifest)) {
+						continue
+					}
+					id, err := uuid.Parse(references[configurationManifestReference(stage.Key, automation.ID)])
+					if err != nil {
+						return err
+					}
+					if current != nil {
+						seen[current.canvas.ID] = true
+					}
+					if current != nil && equalCanvasJSON(current.settings, automation.With) && current.binding == automation.prepared.Binding && !factoryConfigurationReviewSourceChanged(current, automation) && (!factoryConfigurationBindingChanged(current, automation) || !configurationHasVCSListener(current)) {
+						if current.canvas.Name != automation.Name {
+							if err := renameFactoryConfigurationAutomation(tx, target.factory, current, automation, manifest); err != nil {
+								return err
+							}
+						}
+						if configurationShouldSaveOwnership(current, automation) {
+							if err := saveFactoryConfigurationOwnership(tx, target, live, automation, current.canvas.ID); err != nil {
+								return err
+							}
+						}
+						notifications = append(notifications, func() { canvases.PublishCanvasUpdated(current.canvas) })
+						continue
+					}
+					if automation.prepared.TemplateID == reviewRequestTemplateID {
+						reviews = append(reviews, pendingReview{live, automation, current, id})
+						continue
+					}
+					notify, err := publishFactoryConfigurationBuiltIn(ctx, tx, deps, target, live, automation, current, id, actor, references)
+					if err != nil {
+						return err
+					}
+					notifications = append(notifications, notify)
+					continue
+				}
 				if current == nil {
 					source := manifest.Sources[configurationAutomationPath(automation.Uses)]
 					notify, err := createFactoryConfigurationCustom(ctx, tx, deps, target, configurationStagePlacement(live), automation.ID, source, actor)
@@ -182,20 +305,7 @@ func ApplyFactoryConfiguration(ctx context.Context, deps IntakeDependencies, org
 					notifications = append(notifications, func() { canvases.PublishCanvasUpdated(current.canvas) })
 					continue
 				}
-				if current.templateID != "" {
-					nodes, edges, err := copyFactoryConfigurationBuiltIn(current.version, current.defaults, current.templateID, automation.With)
-					if err != nil {
-						return err
-					}
-					if err := canvases.PublishGeneratedCanvasNodes(ctx, tx, current.canvas, actor, "Update stage automation settings", nodes, edges, intakePublisherOptions(deps, orgID)); err != nil {
-						return err
-					}
-					if err := canvases.UpdateCanvasInTransaction(tx, current.canvas, &automation.Name, nil); err != nil {
-						return err
-					}
-					notifications = append(notifications, func() { canvases.PublishCanvasUpdated(current.canvas) })
-					continue
-				}
+
 				source := manifest.Sources[configurationAutomationPath(automation.Uses)]
 				notify, err := applyFactoryConfigurationCustom(ctx, tx, deps, target, current, source, actor)
 				if err != nil {
@@ -203,6 +313,23 @@ func ApplyFactoryConfiguration(ctx context.Context, deps IntakeDependencies, org
 				}
 				notifications = append(notifications, notify)
 			}
+		}
+		for _, review := range reviews {
+			notify, err := publishFactoryConfigurationBuiltIn(ctx, tx, deps, target, review.stage, review.automation, review.current, review.id, actor, references)
+			if err != nil {
+				return err
+			}
+			notifications = append(notifications, notify)
+		}
+		if repositoriesChanged {
+			notifies, err := reconcileFactoryConfigurationRepositories(ctx, tx, deps, target, previousRepositories, actor)
+			if err != nil {
+				return err
+			}
+			notifications = append(notifications, notifies...)
+		}
+		if err := syncFactoryConfigurationRepositoryBindings(tx, target, manifest, previousRepositories); err != nil {
+			return err
 		}
 		response.Changed = true
 		return nil
