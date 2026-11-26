@@ -6,7 +6,7 @@ import type {
   FactoryLineStage,
 } from "@/api-client";
 import { automationNameForLineStep, lineStepParallelism } from "./factoryLineFormShared";
-import { factoryAppPath, factoryAppRunPath, factoryHomePath, factoryLineDetailPath } from "./factoryPagePaths";
+import { factoryAppPath, factoryAppRunPath, factoryHomePath } from "./factoryPagePaths";
 import { orderedLineBoardStages } from "./lineBoardStages";
 import { getWorkOrderDisplayStatus } from "./workOrderProgress";
 import { dispatchStepRows, isActiveWorkOrderExecution, type WorkOrderStepRow } from "./workOrderExecutions";
@@ -76,9 +76,6 @@ export function linePhaseRunHref(
   }
   if (appId) {
     return factoryAppPath(organizationId, factoryKey, appId, { from: "lines", lineId });
-  }
-  if (lineId) {
-    return factoryLineDetailPath(organizationId, factoryKey, lineId);
   }
   return factoryHomePath(organizationId, factoryKey);
 }

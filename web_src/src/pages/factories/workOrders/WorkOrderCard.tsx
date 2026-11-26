@@ -1,4 +1,4 @@
-import type { FactoriesFactoryLine, FactoriesFactoryPullRequest } from "@/api-client";
+import type { FactoriesFactoryPullRequest } from "@/api-client";
 import { formatRelative } from "@/lib/datetime";
 import { cn } from "@/lib/utils";
 import { Bot, Clock } from "lucide-react";
@@ -41,7 +41,6 @@ export interface WorkOrderCardContext extends WorkOrderRowCallbacks {
   organizationId: string;
   factoryId?: string;
   factoryKey: string;
-  factoryLines: FactoriesFactoryLine[];
   /** When set, Start on a draft sends the task to this line. */
   preferredLineName?: string;
   canDispatch: boolean;
@@ -130,7 +129,6 @@ export function WorkOrderCard({
   entry,
   organizationId,
   factoryKey,
-  factoryLines,
   addressingFeedbackOrderIds = EMPTY_ADDRESSING_FEEDBACK_IDS,
   addressingFeedbackLabels = EMPTY_ADDRESSING_FEEDBACK_LABELS,
   waitingOnChecksOrderIds = EMPTY_WAITING_ON_CHECKS_IDS,
@@ -158,7 +156,7 @@ export function WorkOrderCard({
 }: WorkOrderCardProps) {
   const meta = getWorkOrderDisplayStatusMeta(entry.displayStatus);
   const destination = interactive
-    ? (href ?? workOrderOpenPath(organizationId, factoryKey, entry.order.number, factoryLines[0]?.id))
+    ? (href ?? workOrderOpenPath(organizationId, factoryKey, entry.order.number))
     : "";
   const updatedAt = entry.updatedAtMs > 0 ? new Date(entry.updatedAtMs) : null;
   const isDraft = entry.displayStatus === "draft";

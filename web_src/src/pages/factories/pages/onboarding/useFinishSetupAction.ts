@@ -47,7 +47,7 @@ export function useFinishSetupAction(args: {
     if (!lineId) {
       return;
     }
-    navigate(afterOnboardingPath({ organizationId: args.organizationId, factoryKey: args.factoryKey, lineId }), {
+    navigate(afterOnboardingPath({ organizationId: args.organizationId, factoryKey: args.factoryKey }), {
       replace: true,
     });
   };

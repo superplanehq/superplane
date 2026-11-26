@@ -4,7 +4,6 @@ import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 import {
   ACME_ONBOARDING_FACTORY,
-  ACME_ONBOARDING_LINE_ID,
   EMPTY_FACTORY,
   FACTORIES_ORGANIZATION_ID,
 } from "./__fixtures__/factoryPageResponses";
@@ -62,7 +61,7 @@ describe("FactoriesIndexPage", () => {
     renderIndex();
 
     expect(screen.getByTestId("location-path")).toHaveTextContent(
-      factoryHomePath(FACTORIES_ORGANIZATION_ID, factoryRouteSegment(ACME_ONBOARDING_FACTORY), ACME_ONBOARDING_LINE_ID),
+      factoryHomePath(FACTORIES_ORGANIZATION_ID, factoryRouteSegment(ACME_ONBOARDING_FACTORY)),
     );
   });
 
@@ -80,7 +79,7 @@ describe("FactoriesIndexPage", () => {
     renderIndex();
 
     expect(screen.getByTestId("location-path")).toHaveTextContent(
-      factoryHomePath(FACTORIES_ORGANIZATION_ID, factoryRouteSegment(ACME_ONBOARDING_FACTORY), ACME_ONBOARDING_LINE_ID),
+      factoryHomePath(FACTORIES_ORGANIZATION_ID, factoryRouteSegment(ACME_ONBOARDING_FACTORY)),
     );
   });
 

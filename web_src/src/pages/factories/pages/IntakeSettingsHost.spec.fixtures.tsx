@@ -323,7 +323,7 @@ export function renderHost(
 ) {
   return render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <MemoryRouter initialEntries={[props.path ?? "/org-1/workspaces/rf/lines/line-plan"]}>
+      <MemoryRouter initialEntries={[props.path ?? "/org-1/workspaces/rf"]}>
         <ThemeProvider>
           <TooltipProvider>
             <FactoriesLayoutContext.Provider

@@ -36,7 +36,6 @@ import { useCustomAutomationSetupPage } from "./useCustomAutomationSetupPage";
 import { factoryColumnAutomationViewPath } from "../lib/factoryPagePaths";
 
 type CustomAutomationSetupModalProps = {
-  lineId: string;
   automationId?: string;
   columnKey?: CustomAutomationColumn;
   yamlEnabled?: boolean;
@@ -48,7 +47,6 @@ export function CustomAutomationSetupModal(props: CustomAutomationSetupModalProp
 }
 
 function LegacyAutomationModal({
-  lineId,
   automationId,
   columnKey,
   onClose,
@@ -60,7 +58,6 @@ function LegacyAutomationModal({
     factoryId,
     factoryKey: routeSegment,
     factory: factory ?? undefined,
-    lineId,
     automationId,
     expectedLiveVersionId,
     columnKey,
@@ -96,7 +93,7 @@ function LegacyAutomationModal({
           onRetry={() => void model.described.refetch()}
           canvasHref={
             automationId
-              ? factoryColumnAutomationViewPath(organizationId, routeSegment, lineId, automationId)
+              ? factoryColumnAutomationViewPath(organizationId, routeSegment, automationId)
               : undefined
           }
         />
@@ -146,7 +143,7 @@ function AutomationSourceModal(props: CustomAutomationSetupModalProps) {
           onClose={onClose}
           onRetry={() => void source.refetch()}
           onEditInForm={safeFormVersion ? () => setFormVersion(safeFormVersion) : undefined}
-          canvasHref={factoryColumnAutomationViewPath(organizationId, routeSegment, props.lineId, automationId)}
+          canvasHref={factoryColumnAutomationViewPath(organizationId, routeSegment, automationId)}
         />
       </AutomationDialog>
     );

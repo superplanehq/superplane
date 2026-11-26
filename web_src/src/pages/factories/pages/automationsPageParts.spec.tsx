@@ -160,7 +160,6 @@ describe("AutomationDetail tabs", () => {
   const workOrderCardContext: WorkOrderCardContext = {
     organizationId: "org-1",
     factoryKey: "SP",
-    factoryLines: [],
     canDispatch: false,
     canAssign: false,
     dispatchingOrderIds: new Set<string>(),

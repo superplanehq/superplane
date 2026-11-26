@@ -1,11 +1,10 @@
 import { usePermissions } from "@/contexts/usePermissions";
 import { usePageTitle } from "@/hooks/usePageTitle";
-import { Navigate, useNavigate, useParams, useSearchParams } from "react-router";
+import { Navigate, useNavigate, useSearchParams } from "react-router";
 
 import { useFactoriesLayout, type ResolvedFactoriesLayout } from "../layout/factoriesLayoutContext";
 import {
   factoryHomePath,
-  factoryLineDetailPath,
   firstFactoryLineId,
   jiraIntakeIntegrationIdFromSearch,
 } from "../lib/factoryPagePaths";
@@ -15,7 +14,7 @@ import { JIRA_INTAKE_SETUP_COPY } from "./jiraIntakeSetupCopy";
 export function JiraIntakeSetupPage() {
   const layout = useFactoriesLayout();
   const { canAct } = usePermissions();
-  const { lineId } = useParams<{ lineId?: string }>();
+  const lineId = firstFactoryLineId(layout.factory);
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const model = resolveJiraIntakeSetupModel(layout, canAct("factories", "update"), lineId);
@@ -52,9 +51,9 @@ function resolveJiraIntakeSetupModel(
   const { organizationId, factoryId, routeSegment, factory } = layout;
   const workspaceName = factory?.name ?? "Workspace";
   const lines = factory?.lines ?? [];
-  const boardHref = factoryHomePath(organizationId, routeSegment, firstFactoryLineId(factory));
+  const boardHref = factoryHomePath(organizationId, routeSegment);
   const line = lines.find((entry) => entry.id === lineId);
-  const returnHref = line?.id ? factoryLineDetailPath(organizationId, routeSegment, line.id) : boardHref;
+  const returnHref = boardHref;
   const titleParts = [JIRA_INTAKE_SETUP_COPY.pageTitle, workspaceName];
 
   if (!canUpdate || !lineId || (factory && !line)) {

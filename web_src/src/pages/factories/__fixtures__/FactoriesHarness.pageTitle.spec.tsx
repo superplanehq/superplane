@@ -83,7 +83,7 @@ describe("client-side navigation updates document.title", () => {
   it("updates the tab title on the line board home", async () => {
     render(
       <FactoriesHarness
-        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/line-plan-and-implement`}
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}`}
         factoriesFixture={defaultFactoriesFixture}
         pageOverrides={pageOverrides}
       />,

@@ -18,14 +18,13 @@ import { useWorkOrderCardActions } from "@/hooks/useWorkOrderCardActions";
 import { FEATURE_FACTORY_PULL_REQUEST_MERGE } from "@/lib/experimentalFeatures";
 import { getOrgUserDisplayFromUser } from "@/lib/orgUserDisplay";
 import { useMemo } from "react";
-import { Navigate, useLocation, useNavigate, useParams } from "react-router";
+import { Navigate, useLocation, useNavigate } from "react-router";
 
 import { backlogAnalysisCreditLabels } from "../lib/backlogAnalysis";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { useLineBoardColumnColorViewPreference } from "../lib/lineBoardColumnColorViewPreference";
 import {
-  factoryHomePath,
-  factoryLineDetailPath,
+  factoryOverviewPath,
   intakeIdFromSearch,
   isIntakeSearchOpen,
   isPRFeedbackSearchOpen,
@@ -86,16 +85,16 @@ function boardQueryOptions(
 /** Phone line board: one column in view, swipe sideways to change column. */
 export function MobileBoardPage() {
   const { organizationId, factoryId, routeSegment, factory } = useFactoriesLayout();
-  const { lineId: routeLineId } = useParams<{ lineId?: string }>();
   const navigate = useNavigate();
   const { canAct, currentUserId } = usePermissions();
   const lines = useMemo(() => factory?.lines ?? [], [factory?.lines]);
-  const selectedLine = lines.find((line) => line.id === routeLineId) ?? null;
+  const workspaceLineId = firstFactoryLineId(factory);
+  const selectedLine = lines.find((line) => line.id === workspaceLineId) ?? null;
 
   usePageTitle([factory?.name?.trim() || "Workspace"]);
 
   if (!selectedLine?.id) {
-    return <Navigate to={factoryHomePath(organizationId, routeSegment, firstFactoryLineId(factory))} replace />;
+    return <Navigate to={factoryOverviewPath(organizationId, routeSegment)} replace />;
   }
 
   return (
@@ -247,7 +246,6 @@ function useMobileBoardModel({
       organizationId,
       factoryId,
       factoryKey: routeSegment,
-      factoryLines: factory?.lines ?? [],
       preferredLineName: line.name,
       canDispatch: canUpdateWorkOrders,
       canAssign: canUpdateWorkOrders,
@@ -271,7 +269,6 @@ function MobileLineBoard(props: {
   onOpenWorkOrder: (order: FactoriesWorkOrderSummary, columnKey?: string) => void;
 }) {
   const { organizationId, factoryId, routeSegment, line, lineId, onOpenWorkOrder } = props;
-  const navigate = useNavigate();
   const { factory } = useFactoriesLayout();
   const { canAct } = usePermissions();
   const model = useMobileBoardModel(props);
@@ -316,10 +313,9 @@ function MobileLineBoard(props: {
             showPullRequestMerge={model.showPullRequestMerge}
             lines={lines}
             lineId={lineId}
-            onSelectLine={(nextLineId) => {
-              if (nextLineId !== lineId) {
-                navigate(factoryLineDetailPath(organizationId, routeSegment, nextLineId));
-              }
+            onSelectLine={() => {
+              // The switcher renders only for several lines. Routes no longer
+              // select a line, so a selection keeps the workspace board.
             }}
           />
           <MobileColumnCarousel
