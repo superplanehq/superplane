@@ -52,13 +52,6 @@ const INTAKE_CANVAS_BY_SOURCE: Record<LineIntakeSourceId, IntakeCanvasSpec> = {
     createDescription: "{{ root().data.incident.html_url }}",
     title: "PagerDuty incident intake",
   },
-  "productive-tasks": {
-    triggerComponent: "productive.onTask",
-    triggerName: "On Task",
-    createTitle: "{{ root().data.data.attributes.title }}",
-    createDescription: "{{ root().data.data.attributes.description }}",
-    title: "Productive task intake",
-  },
   datadog: {
     triggerComponent: "datadog.onErrorTrackingAlert",
     triggerName: "On Error Tracking Alert",

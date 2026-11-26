@@ -40,7 +40,7 @@ import { getApiErrorMessage } from "@/lib/errors";
 import { WORKSPACE_LOADING_COPY } from "@/lib/workspaceLoadingCopy";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
-import { FEATURE_AUTOMATIONS_AS_CODE, FEATURE_FACTORY_PULL_REQUEST_MERGE } from "@/lib/experimentalFeatures";
+import { FEATURE_FACTORY_AS_CODE, FEATURE_FACTORY_PULL_REQUEST_MERGE } from "@/lib/experimentalFeatures";
 import { useAutoLoadMoreOnScroll } from "@/hooks/useAutoLoadMoreOnScroll";
 import { Clock, Plus } from "lucide-react";
 import {
@@ -195,7 +195,6 @@ import {
   factoryGitHubIntakeSetupPath,
   factoryJiraIntakeSetupPath,
   factoryLinearIntakeSetupPath,
-  factoryProductiveIntakeSetupPath,
   factoryPRFeedbackPath,
   factoryPRFeedbackSetupPath,
   factorySentryIntakeSetupPath,
@@ -650,12 +649,6 @@ export function LinesPage() {
       }
       return;
     }
-    if (template.id === "productive-tasks") {
-      if (selectedLine.id) {
-        navigate(factoryProductiveIntakeSetupPath(organizationId, routeSegment, selectedLine.id));
-      }
-      return;
-    }
     if (template.id === "jira-issues") {
       if (selectedLine.id) {
         navigate(factoryJiraIntakeSetupPath(organizationId, routeSegment, selectedLine.id));
@@ -821,7 +814,7 @@ export function LinesPage() {
         <CustomAutomationSetupModal
           key={customAutomationAutomationId ?? "new"}
           lineId={selectedLine.id}
-          yamlEnabled={hasExperimentalFeature(FEATURE_AUTOMATIONS_AS_CODE)}
+          yamlEnabled={hasExperimentalFeature(FEATURE_FACTORY_AS_CODE)}
           automationId={customAutomationAutomationId ?? undefined}
           columnKey={customAutomationColumn(new URLSearchParams(search).get("automationColumn"))}
           onClose={() => navigate(factoryHomePath(organizationId, routeSegment, selectedLine.id))}

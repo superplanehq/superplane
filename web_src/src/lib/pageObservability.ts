@@ -12,18 +12,15 @@ export function resolvePageObservability(pathname: string): PageObservabilityCon
     return { pageKey: "rootOrganizationRedirect", attributes: {} };
   }
 
-  const [first, second, third, fourth] = segments;
+  const [first, second] = segments;
+  const topLevelPageKey = new Map<string, string>([
+    ["login", "login"],
+    ["onboarding", "organizationOnboarding"],
+    ["setup", "ownerSetup"],
+  ]).get(first);
 
-  if (first === "login") {
-    return { pageKey: "login", attributes: {} };
-  }
-
-  if (first === "onboarding") {
-    return { pageKey: "organizationOnboarding", attributes: {} };
-  }
-
-  if (first === "setup") {
-    return { pageKey: "ownerSetup", attributes: {} };
+  if (topLevelPageKey) {
+    return { pageKey: topLevelPageKey, attributes: {} };
   }
 
   if (first === "github" && second === "approved") {
@@ -39,79 +36,75 @@ export function resolvePageObservability(pathname: string): PageObservabilityCon
   }
 
   if (first === "admin") {
-    if (second === "accounts") {
-      return { pageKey: "adminAccounts", attributes: {} };
-    }
-
-    if (second === "settings") {
-      return { pageKey: "adminSettings", attributes: {} };
-    }
-
-    if (second === "price-books") {
-      return { pageKey: "adminPriceBooks", attributes: {} };
-    }
-
-    if (second === "runner-tasks") {
-      return { pageKey: "adminRunnerTasks", attributes: {} };
-    }
-
-    if (second === "organizations" && third) {
-      return { pageKey: "adminOrganizationDetail", attributes: { organization_id: third } };
-    }
-
-    return { pageKey: "adminOrganizations", attributes: {} };
+    return resolveAdminPageObservability(segments.slice(1));
   }
-
-  const organizationId = first;
-  const organizationAttributes = { organization_id: organizationId };
 
   if (segments.length === 1) {
-    return { pageKey: "organizationHomePage", attributes: organizationAttributes };
+    return { pageKey: "organizationHomePage", attributes: { organization_id: first } };
   }
 
-  if (second === "apps") {
-    if (third === "new") {
-      return { pageKey: "newApp", attributes: organizationAttributes };
-    }
+  switch (second) {
+    case "apps":
+    case "canvases":
+      return resolveCanvasPageObservability(first, segments.slice(1));
+    case "settings":
+      return resolveSettingsPageObservability(first, segments.slice(2));
+    case "organization":
+      return resolveOrganizationSettingsPageObservability(first, segments.slice(2));
+    default:
+      return null;
+  }
+}
 
-    if (third && fourth === "settings") {
-      return {
-        pageKey: "canvasSettings",
-        attributes: { ...organizationAttributes, canvas_id: third },
-      };
-    }
+function resolveAdminPageObservability(segments: string[]): PageObservabilityContext {
+  const [section, organizationId] = segments;
 
-    if (third) {
-      return {
-        pageKey: "canvas",
-        attributes: { ...organizationAttributes, canvas_id: third },
-      };
-    }
+  if (section === "accounts") {
+    return { pageKey: "adminAccounts", attributes: {} };
   }
 
-  if (second === "canvases" && third) {
-    if (fourth === "settings") {
-      return {
-        pageKey: "canvasSettings",
-        attributes: { ...organizationAttributes, canvas_id: third },
-      };
-    }
+  if (section === "settings") {
+    return { pageKey: "adminSettings", attributes: {} };
+  }
 
+  if (section === "price-books") {
+    return { pageKey: "adminPriceBooks", attributes: {} };
+  }
+
+  if (section === "runner-tasks") {
+    return { pageKey: "adminRunnerTasks", attributes: {} };
+  }
+
+  if (section === "organizations" && organizationId) {
+    return { pageKey: "adminOrganizationDetail", attributes: { organization_id: organizationId } };
+  }
+
+  return { pageKey: "adminOrganizations", attributes: {} };
+}
+
+function resolveCanvasPageObservability(organizationId: string, segments: string[]): PageObservabilityContext | null {
+  const [section, canvasId, canvasSection] = segments;
+  const organizationAttributes = { organization_id: organizationId };
+
+  if (!canvasId) {
+    return null;
+  }
+
+  if (section === "apps" && canvasId === "new") {
+    return { pageKey: "newApp", attributes: organizationAttributes };
+  }
+
+  if (canvasSection === "settings") {
     return {
-      pageKey: "canvas",
-      attributes: { ...organizationAttributes, canvas_id: third },
+      pageKey: "canvasSettings",
+      attributes: { ...organizationAttributes, canvas_id: canvasId },
     };
   }
 
-  if (second === "settings") {
-    return resolveSettingsPageObservability(organizationId, segments.slice(2));
-  }
-
-  if (second === "organization") {
-    return resolveOrganizationSettingsPageObservability(organizationId, segments.slice(2));
-  }
-
-  return null;
+  return {
+    pageKey: "canvas",
+    attributes: { ...organizationAttributes, canvas_id: canvasId },
+  };
 }
 
 const settingsPageKeys = new Map<string, string>([

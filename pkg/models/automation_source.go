@@ -44,6 +44,16 @@ func FindAutomationSourceByArtifact(tx *gorm.DB, organizationID uuid.UUID, artif
 	return &source, err
 }
 
+// FindAutomationSourcesByArtifacts loads authored definitions for a set of artifacts.
+func FindAutomationSourcesByArtifacts(tx *gorm.DB, organizationID uuid.UUID, artifactIDs []string) ([]AutomationSource, error) {
+	if len(artifactIDs) == 0 {
+		return nil, nil
+	}
+	var sources []AutomationSource
+	err := tx.Where("organization_id = ? AND artifact_id IN ?", organizationID, artifactIDs).Find(&sources).Error
+	return sources, err
+}
+
 // ListAutomationSources loads only the fields needed to build automation summaries.
 func ListAutomationSources(tx *gorm.DB, organizationID, factoryID uuid.UUID) ([]AutomationSource, error) {
 	var sources []AutomationSource
@@ -73,4 +83,13 @@ func IsAutomationManagedArtifact(tx *gorm.DB, organizationID uuid.UUID, artifact
 		return false, nil
 	}
 	return err == nil, err
+}
+
+func FindAutomationSourcesByIDs(tx *gorm.DB, organizationID uuid.UUID, ids []uuid.UUID) ([]AutomationSource, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	var sources []AutomationSource
+	err := tx.Where("organization_id = ? AND id IN ?", organizationID, ids).Find(&sources).Error
+	return sources, err
 }

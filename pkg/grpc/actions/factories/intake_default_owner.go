@@ -19,7 +19,6 @@ var intakeSourcesWithDefaultOwner = []string{
 	models.FactoryIntakeSourceJiraIssues,
 	models.FactoryIntakeSourceDependabotAlerts,
 	models.FactoryIntakeSourcePagerDutyIncidents,
-	models.FactoryIntakeSourceProductiveTasks,
 	models.FactoryIntakeSourceDatadog,
 	models.FactoryIntakeSourceLinearIssues,
 	models.FactoryIntakeSourceWebhook,
