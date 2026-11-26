@@ -193,6 +193,7 @@ export function currentPlanningRunFailure(
 }
 
 export function analyzedWorkOrderId(run: CanvasesCanvasRun): string | undefined {
+  if (run.task?.id) return run.task.id;
   const envelope = asRecord(run.rootEvent?.data);
   const payload = asRecord(envelope?.data) ?? envelope;
   const id = asRecord(payload?.workOrder)?.id;
