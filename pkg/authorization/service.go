@@ -179,34 +179,21 @@ func (a *AuthService) checkPermission(ctx context.Context, userID, domainID, dom
 }
 
 func (a *AuthService) CreateGroup(domainID string, domainType string, groupName string, role string, displayName string, description string) error {
-	domain := prefixDomain(domainType, domainID)
-	prefixedRole := prefixRoleName(role)
-
-	if !a.roleExistsInDomain(role, domain) {
-		return fmt.Errorf("invalid role %s for domain type %s", role, domainType)
-	}
-
-	prefixedGroupName := prefixGroupName(groupName)
-
-	tx := database.Conn().Begin()
-	err := models.UpsertGroupMetadataInTransaction(tx, groupName, domainType, domainID, displayName, description)
-	if err != nil {
-		tx.Rollback()
-		return fmt.Errorf("failed to create group metadata: %w", err)
-	}
-
-	ruleAdded, err := a.enforcer.AddGroupingPolicy(prefixedGroupName, prefixedRole, domain)
-	if err != nil {
-		tx.Rollback()
-		return fmt.Errorf("failed to create group: %w", err)
-	}
-
-	if !ruleAdded {
-		tx.Rollback()
-		return fmt.Errorf("group %s already exists with role %s in %s %s", groupName, role, domainType, domainID)
-	}
-
-	return tx.Commit().Error
+	return a.withCreateEnforcer("group", domainType, domainID, groupName, func(tx *gorm.DB, enforcer casbin.IEnforcer) error {
+		exists, err := a.roleExistsWithEnforcer(enforcer, role, domainType, domainID)
+		if err != nil {
+			return err
+		}
+		if !exists {
+			return fmt.Errorf("invalid role %s for domain type %s", role, domainType)
+		}
+		metadata := models.GroupMetadata{GroupName: groupName, DomainType: domainType, DomainID: domainID, DisplayName: displayName, Description: description}
+		if err := metadata.CreateInTransaction(tx); err != nil {
+			return fmt.Errorf("failed to create group metadata: %w", err)
+		}
+		_, err = enforcer.AddGroupingPolicy(prefixGroupName(groupName), prefixRoleName(role), prefixDomain(domainType, domainID))
+		return err
+	})
 }
 
 func (a *AuthService) DeleteGroup(domainID string, domainType string, groupName string) error {
@@ -220,8 +207,7 @@ func (a *AuthService) DeleteGroup(domainID string, domainType string, groupName 
 		return fmt.Errorf("failed to delete group metadata: %w", err)
 	}
 
-	db := a.enforcer.GetAdapter().(*gormadapter.Adapter)
-	err = db.Transaction(a.enforcer, func(enforcerTx casbin.IEnforcer) error {
+	err = a.writePolicies(tx, domainType, domainID, func(enforcerTx casbin.IEnforcer) error {
 		_, err := enforcerTx.RemoveFilteredGroupingPolicy(0, prefixedGroupName, "", domain)
 		if err != nil {
 			return fmt.Errorf("failed to remove group role assignments: %w", err)
@@ -250,7 +236,7 @@ func (a *AuthService) UpdateGroup(domainID string, domainType string, groupName 
 
 	domain := prefixDomain(domainType, domainID)
 
-	if !a.roleExistsInDomain(newRole, domain) {
+	if _, err := a.GetRoleDefinition(context.Background(), newRole, domainType, domainID); err != nil {
 		return fmt.Errorf("invalid role %s for domain type %s", newRole, domainType)
 	}
 
@@ -282,8 +268,7 @@ func (a *AuthService) UpdateGroup(domainID string, domainType string, groupName 
 	}
 
 	prefixedOldRole := prefixRoleName(currentRole)
-	db := a.enforcer.GetAdapter().(*gormadapter.Adapter)
-	err = db.Transaction(a.enforcer, func(enforcerTx casbin.IEnforcer) error {
+	err = a.writePolicies(tx, domainType, domainID, func(enforcerTx casbin.IEnforcer) error {
 		ruleRemoved, err := enforcerTx.RemoveGroupingPolicy(prefixedGroupName, prefixedOldRole, domain)
 		if err != nil {
 			return fmt.Errorf("failed to remove old group role: %w", err)
@@ -358,13 +343,17 @@ func (a *AuthService) RemoveUserFromGroup(domainID string, domainType string, us
 // removal, changes these rows without updating that cache.
 func (a *AuthService) withWriteEnforcer(domainType, domainID string, fn func(casbin.IEnforcer) error) error {
 	return database.Conn().Transaction(func(tx *gorm.DB) error {
-		enforcer, err := a.newFilteredEnforcer(tx, policyFiltersForDomain(domainType, domainID))
-		if err != nil {
-			return err
-		}
-		enforcer.EnableAutoSave(true)
-		return fn(enforcer)
+		return a.writePolicies(tx, domainType, domainID, fn)
 	})
+}
+
+func (a *AuthService) writePolicies(tx *gorm.DB, domainType, domainID string, fn func(casbin.IEnforcer) error) error {
+	enforcer, err := a.newFilteredEnforcer(tx, policyFiltersForDomain(domainType, domainID))
+	if err != nil {
+		return err
+	}
+	enforcer.EnableAutoSave(true)
+	return fn(enforcer)
 }
 
 func (a *AuthService) GetGroupUsers(ctx context.Context, domainID string, domainType string, group string) ([]string, error) {
@@ -917,32 +906,22 @@ func (a *AuthService) GetRoleHierarchy(ctx context.Context, roleName string, dom
 }
 
 func (a *AuthService) CreateCustomRole(domainID string, roleDefinition *RoleDefinition) error {
-	if a.IsDefaultRole(roleDefinition.Name, roleDefinition.DomainType) {
-		return fmt.Errorf("cannot create custom role with default role name: %s", roleDefinition.Name)
-	}
-
 	domain := prefixDomain(roleDefinition.DomainType, domainID)
 	prefixedRoleName := prefixRoleName(roleDefinition.Name)
-
-	if roleDefinition.InheritsFrom != nil {
-		if !a.IsDefaultRole(roleDefinition.InheritsFrom.Name, roleDefinition.DomainType) {
-			prefixedInheritedRole := prefixRoleName(roleDefinition.InheritsFrom.Name)
-			policies, _ := a.enforcer.GetFilteredPolicy(0, prefixedInheritedRole, domain)
-			if len(policies) == 0 {
+	return a.withCreateEnforcer("role", roleDefinition.DomainType, domainID, roleDefinition.Name, func(tx *gorm.DB, enforcerTx casbin.IEnforcer) error {
+		if roleDefinition.InheritsFrom != nil {
+			exists, err := a.roleExistsWithEnforcer(enforcerTx, roleDefinition.InheritsFrom.Name, roleDefinition.DomainType, domainID)
+			if err != nil {
+				return err
+			}
+			if !exists {
 				return fmt.Errorf("inherited role not found: %s", roleDefinition.InheritsFrom.Name)
 			}
 		}
-	}
-
-	tx := database.Conn().Begin()
-	err := models.UpsertRoleMetadataInTransaction(tx, roleDefinition.Name, roleDefinition.DomainType, domainID, roleDefinition.DisplayName, roleDefinition.Description)
-	if err != nil {
-		tx.Rollback()
-		return fmt.Errorf("failed to upsert role metadata for role %s: %w", roleDefinition.Name, err)
-	}
-
-	db := a.enforcer.GetAdapter().(*gormadapter.Adapter)
-	err = db.Transaction(a.enforcer, func(enforcerTx casbin.IEnforcer) error {
+		metadata := models.RoleMetadata{RoleName: roleDefinition.Name, DomainType: roleDefinition.DomainType, DomainID: domainID, DisplayName: roleDefinition.DisplayName, Description: roleDefinition.Description}
+		if err := metadata.CreateInTransaction(tx); err != nil {
+			return fmt.Errorf("failed to create role metadata: %w", err)
+		}
 		for _, permission := range roleDefinition.Permissions {
 			_, err := enforcerTx.AddPolicy(prefixedRoleName, domain, permission.Resource, permission.Action)
 			if err != nil {
@@ -960,13 +939,6 @@ func (a *AuthService) CreateCustomRole(domainID string, roleDefinition *RoleDefi
 
 		return nil
 	})
-
-	if err != nil {
-		tx.Rollback()
-		return fmt.Errorf("failed to create custom role: %w", err)
-	}
-
-	return tx.Commit().Error
 }
 
 func (a *AuthService) UpdateCustomRole(domainID string, roleDefinition *RoleDefinition) error {
@@ -977,16 +949,13 @@ func (a *AuthService) UpdateCustomRole(domainID string, roleDefinition *RoleDefi
 	domain := prefixDomain(roleDefinition.DomainType, domainID)
 	prefixedRoleName := prefixRoleName(roleDefinition.Name)
 
-	existingPolicies, _ := a.enforcer.GetFilteredPolicy(0, prefixedRoleName, domain)
-	if len(existingPolicies) == 0 {
-		return fmt.Errorf("role %s not found in domain %s", roleDefinition.Name, domain)
+	if _, err := a.GetRoleDefinition(context.Background(), roleDefinition.Name, roleDefinition.DomainType, domainID); err != nil {
+		return err
 	}
 
 	if roleDefinition.InheritsFrom != nil {
 		if !a.IsDefaultRole(roleDefinition.InheritsFrom.Name, roleDefinition.DomainType) {
-			prefixedInheritedRole := prefixRoleName(roleDefinition.InheritsFrom.Name)
-			policies, _ := a.enforcer.GetFilteredPolicy(0, prefixedInheritedRole, domain)
-			if len(policies) == 0 {
+			if _, err := a.GetRoleDefinition(context.Background(), roleDefinition.InheritsFrom.Name, roleDefinition.DomainType, domainID); err != nil {
 				return fmt.Errorf("inherited role not found: %s", roleDefinition.InheritsFrom.Name)
 			}
 		}
@@ -999,8 +968,7 @@ func (a *AuthService) UpdateCustomRole(domainID string, roleDefinition *RoleDefi
 		return fmt.Errorf("failed to upsert role metadata for role %s: %w", roleDefinition.Name, err)
 	}
 
-	db := a.enforcer.GetAdapter().(*gormadapter.Adapter)
-	err = db.Transaction(a.enforcer, func(enforcerTx casbin.IEnforcer) error {
+	err = a.writePolicies(tx, roleDefinition.DomainType, domainID, func(enforcerTx casbin.IEnforcer) error {
 		_, err = enforcerTx.RemoveFilteredPolicy(0, prefixedRoleName, domain)
 		if err != nil {
 			return fmt.Errorf("failed to remove existing policies for role %s: %w", roleDefinition.Name, err)
@@ -1045,9 +1013,8 @@ func (a *AuthService) DeleteCustomRole(domainID string, domainType string, roleN
 	domain := prefixDomain(domainType, domainID)
 	prefixedRoleName := prefixRoleName(roleName)
 
-	existingPolicies, _ := a.enforcer.GetFilteredPolicy(0, prefixedRoleName, domain)
-	if len(existingPolicies) == 0 {
-		return fmt.Errorf("role %s not found in domain %s", roleName, domain)
+	if _, err := a.GetRoleDefinition(context.Background(), roleName, domainType, domainID); err != nil {
+		return err
 	}
 
 	tx := database.Conn().Begin()
@@ -1057,8 +1024,7 @@ func (a *AuthService) DeleteCustomRole(domainID string, domainType string, roleN
 		return fmt.Errorf("failed to delete role metadata for role %s: %w", roleName, err)
 	}
 
-	db := a.enforcer.GetAdapter().(*gormadapter.Adapter)
-	err = db.Transaction(a.enforcer, func(enforcerTx casbin.IEnforcer) error {
+	err = a.writePolicies(tx, domainType, domainID, func(enforcerTx casbin.IEnforcer) error {
 		_, err = enforcerTx.RemoveFilteredPolicy(0, prefixedRoleName, domain)
 		if err != nil {
 			return fmt.Errorf("failed to remove existing policies for role %s: %w", roleName, err)
@@ -1142,34 +1108,6 @@ func (a *AuthService) loadDefaultPoliciesOn(enforcer casbin.IEnforcer) error {
 	}
 
 	return nil
-}
-
-func (a *AuthService) roleExistsInDomain(roleName, domain string) bool {
-	prefixedRoleName := prefixRoleName(roleName)
-
-	// Check if role has any policies in this domain
-	policies, err := a.enforcer.GetFilteredPolicy(0, prefixedRoleName, domain)
-	if err == nil && len(policies) > 0 {
-		return true
-	}
-
-	// Check if role exists in grouping policies (inheritance)
-	leftRoles, err := a.enforcer.GetFilteredGroupingPolicy(0, prefixedRoleName, "", domain)
-	if err == nil && len(leftRoles) > 0 {
-		return true
-	}
-
-	rightRoles, err := a.enforcer.GetFilteredGroupingPolicy(1, prefixedRoleName, domain)
-	if err == nil && len(rightRoles) > 0 {
-		return true
-	}
-
-	// Check if it's a default role (always exists)
-	if a.IsDefaultRole(roleName, a.getDomainTypeFromDomain(domain)) {
-		return true
-	}
-
-	return false
 }
 
 func (a *AuthService) getRolePermissions(enforcer casbin.IEnforcer, roleName, domain, domainType string) []*Permission {

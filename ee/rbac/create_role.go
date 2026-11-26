@@ -2,6 +2,7 @@ package rbac
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	log "github.com/sirupsen/logrus"
@@ -77,6 +78,9 @@ func createRole(ctx context.Context, domainType string, domainID string, role *p
 	}
 
 	err := authService.CreateCustomRole(domainID, roleDefinition)
+	if errors.Is(err, authorization.ErrResourceAlreadyExists) {
+		return nil, grpcerrors.AlreadyExists(err, "role already exists")
+	}
 	if err != nil {
 		log.Errorf("failed to create role %s: %v", role.Metadata.Name, err)
 		return nil, grpcerrors.Internal(err, "failed to create role")

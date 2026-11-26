@@ -7,10 +7,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/auth"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
 	pb "github.com/superplanehq/superplane/pkg/protos/roles"
 	"github.com/superplanehq/superplane/test/support"
+	"google.golang.org/grpc/codes"
 )
 
 func Test_CreateRole(t *testing.T) {
@@ -137,7 +139,7 @@ func Test_CreateRole(t *testing.T) {
 
 		_, err := createRole(ctx, models.DomainTypeOrganization, orgID, role, r.AuthService)
 		assert.Error(t, err)
-		assert.Equal(t, "failed to create role", err.Error())
+		assert.Equal(t, codes.AlreadyExists, grpcerrors.Code(err))
 	})
 
 	t.Run("invalid request - nonexistent inherited role", func(t *testing.T) {

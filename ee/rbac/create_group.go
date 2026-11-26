@@ -2,6 +2,7 @@ package rbac
 
 import (
 	"context"
+	"errors"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authorization"
@@ -43,6 +44,9 @@ func createGroup(ctx context.Context, domainType, domainID string, group *pb.Gro
 	}
 
 	err := authService.CreateGroup(domainID, domainType, group.Metadata.Name, group.Spec.Role, displayName, description)
+	if errors.Is(err, authorization.ErrResourceAlreadyExists) {
+		return nil, grpcerrors.AlreadyExists(err, "group already exists")
+	}
 	if err != nil {
 		log.Errorf("failed to create group %s with role %s in domain %s: %v", group.Metadata.Name, group.Spec.Role, domainID, err)
 		return nil, grpcerrors.Internal(err, "failed to create group")
