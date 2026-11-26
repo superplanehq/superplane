@@ -1,3 +1,4 @@
+import type { OrganizationsIntegration } from "@/api-client";
 import {
   STORYBOOK_ME_USER_AVATAR_URL,
   STORYBOOK_ME_USER_EMAIL,
@@ -6,6 +7,7 @@ import {
 import { storybookAccountProviders } from "./storybookAccountState";
 import { defaultHomePageFixture, type HomePageFixture } from "./homePageResponses";
 import { storybookHostedLlmModels, storybookSelectableLlmModels } from "./hostedLlmModels";
+import { matchIntegrationDetailFixture } from "./integrationDetailFixture";
 
 export type { HomePageFixture };
 
@@ -422,7 +424,12 @@ function storybookIntegrationDefinition(
 
 export type StorybookOrgIntegration = {
   metadata: { id: string; name: string; integrationName: string };
-  status: { state: "ready" | "pending" | "error"; stateDescription?: string; metadata?: Record<string, unknown> };
+  status: {
+    state: "ready" | "pending" | "error";
+    stateDescription?: string;
+    metadata?: Record<string, unknown>;
+    webhookFailures?: NonNullable<OrganizationsIntegration["status"]>["webhookFailures"];
+  };
   spec?: { configuration?: Record<string, unknown> };
 };
 
@@ -472,18 +479,6 @@ async function createStorybookOrgIntegration(
   return { json: { integration: created } };
 }
 
-function matchOrgIntegrationDetail(
-  url: URL,
-  method: string,
-  orgIntegrations: StorybookOrgIntegration[],
-): FixtureResult {
-  const integrationDetailMatch = /^\/api\/v1\/organizations\/([^/]+)\/integrations\/([^/]+)$/.exec(url.pathname);
-  if (!integrationDetailMatch || method !== "GET") return null;
-  const integration = orgIntegrations.find((item) => item.metadata.id === integrationDetailMatch[2]);
-  if (!integration) return { json: {} };
-  return { json: { integration } };
-}
-
 /** Factory setup mocks for Storybook / vitest (connect + repository picker). */
 export async function matchFactorySetupFixture(
   url: URL,
@@ -504,7 +499,7 @@ export async function matchFactorySetupFixture(
     return createStorybookOrgIntegration(input, init, orgIntegrations);
   }
 
-  const detailResolved = matchOrgIntegrationDetail(url, method, orgIntegrations);
+  const detailResolved = matchIntegrationDetailFixture(url, method, orgIntegrations);
   if (detailResolved) return detailResolved;
 
   const resourcesMatch = /^\/api\/v1\/organizations\/([^/]+)\/integrations\/([^/]+)\/resources$/.exec(url.pathname);

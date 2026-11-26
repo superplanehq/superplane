@@ -118,26 +118,7 @@ func intakeHealth(
 			return health
 		}
 	}
-	if intake.Source == models.FactoryIntakeSourceGitHubIssues {
-		if health, _ := githubIntakeWebhookFailure(tx, intake.CanvasID, graph.TriggerNodeID); health != pb.FactoryIntake_HEALTH_OK {
-			return health
-		}
-	}
-
 	return pb.FactoryIntake_HEALTH_OK
-}
-
-// githubIntakeWebhookFailure reports a GitHub webhook that stopped retrying.
-// A pending webhook stays healthy here: registration is still in progress.
-// A failed webhook is the case the factory must show, because new issues
-// never arrive and waiting does not repair it.
-func githubIntakeWebhookFailure(tx *gorm.DB, canvasID uuid.UUID, triggerNodeID string) (pb.FactoryIntake_Health, string) {
-	webhook := intakeTriggerWebhook(tx, canvasID, triggerNodeID)
-	if webhook == nil || webhook.State != models.WebhookStateFailed {
-		return pb.FactoryIntake_HEALTH_OK, ""
-	}
-
-	return pb.FactoryIntake_HEALTH_WEBHOOK_FAILED, githubWebhookFailureMessage(webhookSetupError(webhook.Metadata.Data()))
 }
 
 func intakeTriggerWebhook(tx *gorm.DB, canvasID uuid.UUID, triggerNodeID string) *models.Webhook {
@@ -156,15 +137,6 @@ func intakeTriggerWebhook(tx *gorm.DB, canvasID uuid.UUID, triggerNodeID string)
 	}
 
 	return webhook
-}
-
-func webhookSetupError(metadata any) string {
-	asMap, ok := metadata.(map[string]any)
-	if !ok || asMap == nil {
-		return ""
-	}
-	reason, _ := asMap["setupError"].(string)
-	return strings.TrimSpace(reason)
 }
 
 func githubWebhookFailureMessage(setupError string) string {

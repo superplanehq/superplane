@@ -22,6 +22,7 @@ import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { DeleteModal } from "../CapabilityBasedIntegrationDetails/DeleteModal";
 import { Header } from "../CapabilityBasedIntegrationDetails/Header";
 import { UsageTab } from "../CapabilityBasedIntegrationDetails/UsageTab";
+import { IntegrationWebhookFailures } from "../IntegrationWebhookFailures";
 import { getActiveTabClass, groupNodeRefsByCanvas } from "../CapabilityBasedIntegrationDetails/lib";
 import {
   configurationSubmitPayload,
@@ -149,6 +150,7 @@ export function LegacyIntegrationDetails({ organizationId, integration }: Legacy
       />
 
       <div className="space-y-6">
+        <IntegrationWebhookFailures organizationId={organizationId} integration={integration} />
         {integration.status?.state === "error" && integration.status.stateDescription ? (
           <Alert className="border-destructive/40 bg-destructive/10 text-destructive [&>svg+div]:translate-y-0 [&>svg]:top-[14px] [&>svg]:text-destructive">
             <CircleX className="size-4" />
