@@ -37,10 +37,10 @@ func (*GitHub) listRepositoryWebhookResources(ctx core.ListResourcesContext) ([]
 			if event != "" && !slices.Contains(hook.Events, event) && !slices.Contains(hook.Events, "*") {
 				continue
 			}
-			// Hook URLs can contain credentials. Only show the host and path.
+			// Hook URL paths can also contain credentials. Only show the host.
 			destination := "Unknown destination"
 			if parsed, err := url.Parse(hook.GetConfig().GetURL()); err == nil && parsed.Host != "" {
-				destination = parsed.Host + parsed.EscapedPath()
+				destination = parsed.Host
 			}
 			id := strconv.FormatInt(hook.GetID(), 10)
 			resources = append(resources, core.IntegrationResource{

@@ -19,7 +19,7 @@ import (
 func TestListRepositoryWebhooksForLimitRecovery(t *testing.T) {
 	first := mocks.GitHubResponse(http.StatusOK, `[
 		{"id":11,"events":["issues"],"config":{"url":"https://other.example/issues"}},
-		{"id":12,"events":["pull_request"],"config":{"url":"https://user:password@old.example/hook?token=secret"}}
+		{"id":12,"events":["pull_request"],"config":{"url":"https://user:password@old.example/hooks/path-token?token=secret#fragment-token"}}
 	]`)
 	first.Header.Set("Link", `<https://api.github.com/repos/acme/api/hooks?page=2>; rel="next"`)
 	httpCtx := &contexts.HTTPContext{Responses: []*http.Response{first, mocks.GitHubResponse(http.StatusOK, `[
@@ -32,7 +32,10 @@ func TestListRepositoryWebhooksForLimitRecovery(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, resources, 2, "include every page and only hooks that use the limited event")
 	require.Equal(t, "12", resources[0].ID)
-	require.Contains(t, resources[0].Name, "old.example/hook")
+	require.Contains(t, resources[0].Name, "old.example")
+	require.NotContains(t, resources[0].Name, "/hooks/")
+	require.NotContains(t, resources[0].Name, "path-token")
+	require.NotContains(t, resources[0].Name, "fragment-token")
 	require.NotContains(t, resources[0].Name, "secret")
 	require.NotContains(t, resources[0].Name, "password")
 	require.Equal(t, "https://github.com/acme/api/settings/hooks/12", resources[0].URL)
