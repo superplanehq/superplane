@@ -966,8 +966,6 @@ func intakeSourceName(source string) string {
 		return "Sentry exceptions"
 	case models.FactoryIntakeSourcePagerDutyIncidents:
 		return "PagerDuty incidents"
-	case models.FactoryIntakeSourceProductiveTasks:
-		return "Productive tasks"
 	case models.FactoryIntakeSourceJiraIssues:
 		return "Jira issues"
 	case models.FactoryIntakeSourceDependabotAlerts:
@@ -988,7 +986,6 @@ const (
 	publicIconSentry     = "sentry"
 	publicIconJira       = "jira"
 	publicIconPagerDuty  = "pagerduty"
-	publicIconProductive = "productive"
 	publicIconDatadog    = "datadog"
 )
 
@@ -1011,8 +1008,6 @@ func intakeIcon(source string) string {
 		return publicIconJira
 	case models.FactoryIntakeSourcePagerDutyIncidents:
 		return publicIconPagerDuty
-	case models.FactoryIntakeSourceProductiveTasks:
-		return publicIconProductive
 	case models.FactoryIntakeSourceDatadog:
 		return publicIconDatadog
 	default:

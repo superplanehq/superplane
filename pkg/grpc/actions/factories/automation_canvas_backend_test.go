@@ -28,7 +28,7 @@ func TestCanvasAutomationScheduleEditMatchesForm(t *testing.T) {
 	factory := seedHandOffFactory(t, r, db)
 	vcsID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
 	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSIntegrationID: &vcsID}))
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureAutomationsAsCode))
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryAsCode))
 	support.AssignOpenSystemTrial(t, r.Organization.ID)
 	upsertHostedOnboardingProvider(t, db)
 
@@ -114,7 +114,7 @@ func TestCanvasAutomationCustomStageRoundTripAndAdmission(t *testing.T) {
 	factory := seedHandOffFactory(t, r, db)
 	vcsID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
 	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSIntegrationID: &vcsID}))
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureAutomationsAsCode))
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryAsCode))
 	support.AssignOpenSystemTrial(t, r.Organization.ID)
 	upsertHostedOnboardingProvider(t, db)
 	line, err := factory.CreateLine(db, "QA line", nil)
@@ -292,7 +292,7 @@ func TestCanvasAutomationLegacyImportProtectsGraphBehavior(t *testing.T) {
 			factory := seedHandOffFactory(t, r, db)
 			vcsID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
 			require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSIntegrationID: &vcsID}))
-			require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureAutomationsAsCode))
+			require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryAsCode))
 			support.AssignOpenSystemTrial(t, r.Organization.ID)
 			upsertHostedOnboardingProvider(t, db)
 			r.Registry.Integrations[models.ProviderGitHub] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{
@@ -364,7 +364,7 @@ func TestCanvasAutomationLegacyImportProtectsGraphBehavior(t *testing.T) {
 				require.NotEmpty(t, started.GetRunId())
 			}
 
-			require.NoError(t, models.DisableExperimentalFeature(r.Organization.ID, features.FeatureAutomationsAsCode))
+			require.NoError(t, models.DisableExperimentalFeature(r.Organization.ID, features.FeatureFactoryAsCode))
 			settings := created.GetCustomAutomation().GetSettings()
 			skipWorkspaceSetup := false
 			settings.SkipSetupCommands = &skipWorkspaceSetup
@@ -375,7 +375,7 @@ func TestCanvasAutomationLegacyImportProtectsGraphBehavior(t *testing.T) {
 				FactoryId: factory.ID.String(), AutomationId: id.String(), Name: "Inspect latest task", Settings: settings,
 			})
 			require.NoError(t, err)
-			require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureAutomationsAsCode))
+			require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryAsCode))
 			reopened, err := service.Read(ctx, r.Organization.ID, id)
 			require.NoError(t, err)
 			doc, err = automationspec.Parse(reopened.YAML)
@@ -415,7 +415,7 @@ func TestAutomationFormFallbackRequiresVerifiedGraph(t *testing.T) {
 	factory := seedHandOffFactory(t, r, db)
 	vcsID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
 	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSIntegrationID: &vcsID}))
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureAutomationsAsCode))
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryAsCode))
 	ctx, deps := onboardingContext(r), onboardingDeps(r)
 	onTask := true
 	settings := &pb.FactoryCustomAutomation_Settings{
@@ -463,7 +463,7 @@ func TestCanvasAutomationFollowsFactoryModelSource(t *testing.T) {
 	vcsID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
 	agentID := createReadyOnboardingIntegration(t, r.Organization.ID, "claude")
 	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSIntegrationID: &vcsID, AgentIntegrationID: &agentID}))
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureAutomationsAsCode))
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryAsCode))
 	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
 	support.AssignOpenSystemTrial(t, r.Organization.ID)
 	_, err := models.UpsertOrganizationBYOKModelAllowlist(db, r.Organization.ID, models.UsageProviderAnthropic, datatypes.JSONSlice[string]{"claude-opus-5-5"})
@@ -556,7 +556,7 @@ func TestCanvasAutomationImportsSwitchedSubscription(t *testing.T) {
 	factory := seedHandOffFactory(t, r, db)
 	vcsID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
 	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSIntegrationID: &vcsID}))
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureAutomationsAsCode))
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryAsCode))
 	connection, err := models.CreateCodexConnection(db, r.Organization.ID, r.User, time.Now())
 	require.NoError(t, err)
 	require.NoError(t, db.Model(connection).Updates(map[string]any{
@@ -622,7 +622,7 @@ func TestCanvasAutomationResolvesAllowedDefaultModel(t *testing.T) {
 	vcsID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
 	agentID := createReadyOnboardingIntegration(t, r.Organization.ID, "openai")
 	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSIntegrationID: &vcsID, AgentIntegrationID: &agentID}))
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureAutomationsAsCode))
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryAsCode))
 	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureOrganizationBYOK))
 	support.AssignOpenSystemTrial(t, r.Organization.ID)
 	_, err := models.UpsertOrganizationBYOKModelAllowlist(db, r.Organization.ID, models.UsageProviderOpenAI, datatypes.JSONSlice[string]{"gpt-5-mini", "gpt-5-nano"})

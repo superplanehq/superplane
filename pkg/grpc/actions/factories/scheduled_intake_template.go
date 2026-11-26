@@ -138,7 +138,7 @@ func githubHostForVCSIntegration(db *gorm.DB, organizationID uuid.UUID, integrat
 	if err != nil {
 		return ""
 	}
-	integration, err := models.FindIntegrationInTransaction(db, organizationID, parsed)
+	integration, err := factoryAutomationIntegrationByID(db, organizationID, parsed)
 	if err != nil {
 		return ""
 	}

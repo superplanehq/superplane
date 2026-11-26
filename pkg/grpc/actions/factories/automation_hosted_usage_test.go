@@ -29,7 +29,7 @@ func TestCanvasAutomationHostedModelUsage(t *testing.T) {
 	factory := seedHandOffFactory(t, r, db)
 	vcsID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
 	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSIntegrationID: &vcsID}))
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureAutomationsAsCode))
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryAsCode))
 	support.AssignOpenSystemTrial(t, r.Organization.ID)
 	upsertHostedOnboardingProvider(t, db)
 	const model = "anthropic/claude-sonnet-4-6"

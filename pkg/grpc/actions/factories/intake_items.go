@@ -20,7 +20,6 @@ import (
 	ghdependabot "github.com/superplanehq/superplane/pkg/integrations/github/dependabot"
 	"github.com/superplanehq/superplane/pkg/integrations/jira"
 	"github.com/superplanehq/superplane/pkg/integrations/linear"
-	"github.com/superplanehq/superplane/pkg/integrations/productive"
 	"github.com/superplanehq/superplane/pkg/integrations/sentry"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
@@ -60,7 +59,6 @@ func init() {
 	registerIntakeItemSource("github.onIssue", newGitHubIntakeItemSource)
 	registerIntakeItemSource("github.onDependabotAlert", newDependabotIntakeItemSource)
 	registerIntakeItemSource("jira.onIssue", newJiraIntakeItemSource)
-	registerIntakeItemSource("productive.onTask", newProductiveIntakeItemSource)
 	registerIntakeItemSource("sentry.onIssue", newSentryIntakeItemSource)
 	registerIntakeItemSource("datadog.onErrorTrackingAlert", newDatadogIntakeItemSource)
 	registerIntakeItemSource("linear.onIssue", newLinearIntakeItemSource)
@@ -79,16 +77,6 @@ type jiraIntakeItemSource struct {
 	siteURL            string
 	projectProbe       sync.Once
 	projectReadableErr error
-}
-
-type productiveIntakeItemSource struct {
-	productive            *productive.Client
-	projectID             string
-	organizationID        string
-	taskListIDs           []string
-	excludeKeyTasks       bool
-	projectProbe          sync.Once
-	projectReadabilityErr error
 }
 
 type sentryIntakeItemSource struct {
@@ -135,11 +123,6 @@ func newLiveIntakeItemSource(
 	source, err := builder(ctx, deps, tx, trigger, integration)
 	if err != nil {
 		return nil, err
-	}
-	if productiveSource, ok := source.(*productiveIntakeItemSource); ok {
-		settings := productiveIntakeSettings(tx, intake.CanvasID)
-		productiveSource.excludeKeyTasks = settings.ExcludeKeyTasks
-		productiveSource.taskListIDs = settings.TaskListIDs
 	}
 	if dependabotSource, ok := source.(*dependabotIntakeItemSource); ok {
 		settings := liveIntakeSettings(tx, models.FactoryIntakeSourceDependabotAlerts, intake.CanvasID, defaultDependabotIntakeSettings())
@@ -368,32 +351,6 @@ func parseJiraIssueURL(rawURL, siteURL string) (string, bool) {
 	}
 
 	return issueKey, true
-}
-
-func newProductiveIntakeItemSource(
-	_ context.Context,
-	deps IntakeDependencies,
-	tx *gorm.DB,
-	trigger *models.Node,
-	integration *models.Integration,
-) (intakeItemSource, error) {
-	projectID, _ := trigger.Configuration["project"].(string)
-	projectID = strings.TrimSpace(projectID)
-	if projectID == "" {
-		return nil, errIntakeNotConnected
-	}
-
-	client, err := newIntakeProductiveClient(deps, tx, integration)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %s", errIntakeNotConnected, err)
-	}
-
-	return &productiveIntakeItemSource{
-		productive:      client,
-		projectID:       projectID,
-		organizationID:  client.OrganizationID,
-		excludeKeyTasks: true,
-	}, nil
 }
 
 func newSentryIntakeItemSource(
@@ -687,95 +644,6 @@ func (s *gitHubIntakeItemSource) Get(ctx context.Context, id string) (*IntakeIte
 	return &item, nil
 }
 
-func (s *productiveIntakeItemSource) Search(ctx context.Context, query string, limit int) ([]IntakeItem, error) {
-	tasks, err := s.productive.ListTasks(s.projectID, query, limit, s.excludeKeyTasks, s.taskListIDs)
-	if err != nil {
-		return nil, err
-	}
-
-	items := make([]IntakeItem, 0, len(tasks))
-	for _, task := range tasks {
-		items = append(items, productiveTaskItem(task, s.organizationID))
-	}
-	return items, nil
-}
-
-func (s *productiveIntakeItemSource) TaskFiles(ctx context.Context, taskID, description string) ([]productive.TaskFile, error) {
-	return s.productive.TaskFiles(ctx, taskID, description)
-}
-
-func (s *productiveIntakeItemSource) Get(_ context.Context, id string) (*IntakeItem, error) {
-	task, err := s.productive.GetTask(strings.TrimSpace(id))
-	if err != nil {
-		return nil, err
-	}
-	if task.ProjectID != "" && task.ProjectID != s.projectID {
-		return nil, errIntakeItemNotFound
-	}
-	if !s.acceptsTask(*task) {
-		return nil, errIntakeItemNotFound
-	}
-
-	item := productiveTaskItem(*task, s.organizationID)
-	return &item, nil
-}
-
-func (s *productiveIntakeItemSource) AvailabilityScope() string {
-	return "productive:" + s.organizationID + ":" + s.projectID
-}
-
-func (s *productiveIntakeItemSource) ItemIDFromOriginURL(rawURL string) (string, bool) {
-	organizationID, taskID, ok := parseProductiveTaskURL(rawURL)
-	if !ok || organizationID != s.organizationID {
-		return "", false
-	}
-	return taskID, true
-}
-
-func (s *productiveIntakeItemSource) IsItemAvailable(_ context.Context, id string) (bool, error) {
-	task, err := s.productive.GetTask(strings.TrimSpace(id))
-	if productive.IsNotFoundError(err) {
-		s.projectProbe.Do(func() {
-			_, s.projectReadabilityErr = s.productive.GetProject(s.projectID)
-		})
-		if s.projectReadabilityErr != nil {
-			return false, s.projectReadabilityErr
-		}
-		return false, nil
-	}
-	if err != nil {
-		return false, err
-	}
-	if !s.acceptsTask(*task) {
-		return false, nil
-	}
-	return !task.Closed, nil
-}
-
-func (s *productiveIntakeItemSource) acceptsTask(task productive.Task) bool {
-	if s.excludeKeyTasks && task.IsKeyTask() {
-		return false
-	}
-	if len(s.taskListIDs) == 0 {
-		return true
-	}
-	return slices.Contains(s.taskListIDs, task.TaskListID)
-}
-
-func productiveTaskItem(task productive.Task, organizationID string) IntakeItem {
-	key := task.Number
-	if key != "" {
-		key = "#" + key
-	}
-	return IntakeItem{
-		ID:    task.ID,
-		Key:   key,
-		Title: task.Title,
-		Body:  task.Description,
-		URL:   fmt.Sprintf("https://app.productive.io/%s/tasks/%s", organizationID, task.ID),
-	}
-}
-
 func (s *sentryIntakeItemSource) Search(_ context.Context, query string, limit int) ([]IntakeItem, error) {
 	projects := s.projectSlugs()
 	if len(projects) == 0 {
@@ -1027,19 +895,6 @@ func parseGitHubIssueURL(rawURL string) (host common.Host, repository string, nu
 		return common.Host{}, "", 0, false
 	}
 	return host, parts[0] + "/" + parts[1], number, true
-}
-
-func parseProductiveTaskURL(rawURL string) (organizationID string, taskID string, ok bool) {
-	parsed, err := url.Parse(strings.TrimSpace(rawURL))
-	if err != nil || !strings.EqualFold(parsed.Hostname(), "app.productive.io") {
-		return "", "", false
-	}
-
-	parts := strings.Split(strings.Trim(parsed.Path, "/"), "/")
-	if len(parts) != 3 || parts[0] == "" || parts[1] != "tasks" || parts[2] == "" {
-		return "", "", false
-	}
-	return parts[0], parts[2], true
 }
 
 const (

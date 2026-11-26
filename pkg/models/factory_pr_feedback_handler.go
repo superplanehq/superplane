@@ -203,6 +203,16 @@ func DeleteFactoryPRFeedbackHandlersByCanvas(tx *gorm.DB, canvasID uuid.UUID) er
 	return tx.Where("canvas_id = ?", canvasID).Delete(&FactoryPRFeedbackHandler{}).Error
 }
 
+// FindFactoryPRFeedbackHandlersByCanvasIDs reads attachments for loaded canvases so callers can check ownership.
+func FindFactoryPRFeedbackHandlersByCanvasIDs(tx *gorm.DB, canvasIDs []uuid.UUID) ([]FactoryPRFeedbackHandler, error) {
+	if len(canvasIDs) == 0 {
+		return nil, nil
+	}
+	var handlers []FactoryPRFeedbackHandler
+	err := tx.Where("canvas_id IN ?", canvasIDs).Find(&handlers).Error
+	return handlers, err
+}
+
 func liveCanvasPRFeedbackHandlers(tx *gorm.DB) *gorm.DB {
 	return tx.
 		Joins("JOIN workflows ON workflows.id = factory_pr_feedback_handlers.canvas_id AND workflows.deleted_at IS NULL").
