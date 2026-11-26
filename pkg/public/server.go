@@ -466,6 +466,7 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 	s.Router.HandleFunc("/api/v1/runner/tools", s.handleRunnerTools).Methods(http.MethodGet)
 	s.Router.HandleFunc("/api/v1/runner/tasks", s.handleRunnerListTasks).Methods(http.MethodGet)
 	s.Router.HandleFunc("/api/v1/runner/tasks", s.handleRunnerCreateTask).Methods(http.MethodPost)
+	s.Router.HandleFunc("/api/v1/runner/task/get", s.handleRunnerGetTask).Methods(http.MethodGet)
 	s.Router.HandleFunc("/api/v1/runner/task/close", s.handleRunnerCloseTask).Methods(http.MethodPost)
 	s.Router.HandleFunc("/api/v1/runner/task/move", s.handleRunnerMoveTask).Methods(http.MethodPost)
 	s.Router.HandleFunc("/api/v1/runner/members", s.handleRunnerListMembers).Methods(http.MethodGet)
@@ -660,8 +661,7 @@ func (s *Server) RegisterOpenAPIHandler() {
 	log.Infof("Raw API JSON available at %s", swaggerFilesPath+"/superplane.swagger.json")
 }
 
-// RegisterWebSocketRoutes registers canvas, factory, and
-// user-notification WebSocket endpoints.
+// RegisterWebSocketRoutes registers the live update endpoints.
 func (s *Server) RegisterWebSocketRoutes() {
 	log.Info("Registering websocket routes")
 
@@ -690,6 +690,11 @@ func (s *Server) RegisterWebSocketRoutes() {
 		"/ws/users/notifications",
 		middleware.OrganizationAuthMiddleware(s.jwt).
 			Middleware(http.HandlerFunc(s.handleUserNotificationsWebSocket)),
+	)
+	s.Router.Handle(
+		"/ws/integrations/webhook-setup",
+		middleware.OrganizationAuthMiddleware(s.jwt).
+			Middleware(http.HandlerFunc(s.handleWebhookSetupWebSocket)),
 	)
 }
 

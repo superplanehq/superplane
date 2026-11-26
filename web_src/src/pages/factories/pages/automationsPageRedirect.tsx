@@ -1,6 +1,6 @@
 import { Navigate } from "react-router";
 import { WorkspacePageHeader } from "../layout/WorkspacePageHeader";
-import { automationsPath, factoryLineDetailPath } from "../lib/factoryPagePaths";
+import { automationsPath, factoryHomePath } from "../lib/factoryPagePaths";
 import { factorySectionBodyClassName, factorySectionHeaderClassName } from "./factoryPageLayoutStyles";
 
 type AutomationsLegacyRedirectProps = {
@@ -28,7 +28,7 @@ export function AutomationsLegacyRedirect({
     );
   }
   if (legacyLineId) {
-    return <Navigate to={factoryLineDetailPath(organizationId, factoryKey, legacyLineId)} replace />;
+    return <Navigate to={factoryHomePath(organizationId, factoryKey)} replace />;
   }
   return <Navigate to={automationsPath(organizationId, factoryKey)} replace />;
 }

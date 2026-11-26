@@ -7,6 +7,7 @@ import type { useCustomAutomationSourceDraft } from "@/hooks/useCustomAutomation
 import { useSelectableLLMModels } from "@/hooks/useSelectableLLMModels";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import {
+  customAutomationRunContext,
   customAutomationTriggersForRun,
   newCustomAutomationTrigger,
   type CustomAutomationColumn,
@@ -90,9 +91,10 @@ export function CustomAutomationSourceEditor({
   const visual = automationDefinitionCanvas(definition, agent, customProvider, hosted);
   const triggers = formTriggers ?? visual.triggers;
 
-  const editTriggers = (next: CustomAutomationTrigger[], runsOnTask?: boolean) => {
+  const editTriggers = (next: CustomAutomationTrigger[], selected?: boolean) => {
     // Keep hidden triggers in the form draft when switching between task and column runs.
     setFormTriggers(next);
+    const runsOnTask = customAutomationRunContext(stage, next, selected);
     const active = customAutomationTriggersForRun(next, runsOnTask);
     model.editCanvas({
       runs_on_task: runsOnTask,

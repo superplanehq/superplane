@@ -5,16 +5,22 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 
 import { clearBacklogAnalysisPending, pendingBacklogAnalysisIds } from "@/pages/factories/lib/backlogAnalysis";
 
-const { factoriesCreateWorkOrder, factoriesSelectFactoryVcsProviderRepository, organizationsListIntegrations } =
-  vi.hoisted(() => ({
-    factoriesCreateWorkOrder: vi.fn(),
-    factoriesSelectFactoryVcsProviderRepository: vi.fn(),
-    organizationsListIntegrations: vi.fn(),
-  }));
+const {
+  factoriesCreateWorkOrder,
+  factoriesSelectFactoryVcsProviderRepository,
+  factoriesUpdateFactoryLine,
+  organizationsListIntegrations,
+} = vi.hoisted(() => ({
+  factoriesCreateWorkOrder: vi.fn(),
+  factoriesSelectFactoryVcsProviderRepository: vi.fn(),
+  factoriesUpdateFactoryLine: vi.fn(),
+  organizationsListIntegrations: vi.fn(),
+}));
 
 vi.mock("@/api-client", () => ({
   factoriesCreateWorkOrder,
   factoriesSelectFactoryVcsProviderRepository,
+  factoriesUpdateFactoryLine,
   organizationsListIntegrations,
 }));
 
@@ -23,6 +29,7 @@ import {
   mergeFactoryBoardWorkOrders,
   useCreateWorkOrder,
   useSelectFactoryVcsProviderRepository,
+  useUpdateFactoryLine,
 } from "./useFactoryData";
 import { useConnectedIntegrations } from "./useIntegrations";
 import { organizationBillingQueryKey } from "./useOrganizationBilling";
@@ -32,6 +39,27 @@ function createWrapper(queryClient: QueryClient) {
     return createElement(QueryClientProvider, { client: queryClient }, children);
   };
 }
+
+describe("useUpdateFactoryLine", () => {
+  it("refreshes automation, feedback, and line data after a saved deletion without moves", async () => {
+    const queryClient = new QueryClient();
+    const keys = [
+      factoryQueryKeys.apps("org-1", "factory-1"),
+      ["factories", "org-1", "factory-1", "custom-automations"],
+      ["factories", "org-1", "factory-1", "pr-feedback-handlers"],
+      factoryQueryKeys.detail("org-1", "factory-1"),
+    ];
+    for (const key of keys) queryClient.setQueryData(key, { stale: true });
+    factoriesUpdateFactoryLine.mockResolvedValue({ data: { line: { id: "line-1", stages: [] } } });
+    const { result } = renderHook(() => useUpdateFactoryLine("org-1", "factory-1"), {
+      wrapper: createWrapper(queryClient),
+    });
+    await act(async () => {
+      await result.current.mutateAsync({ lineId: "line-1", stageConfiguration: { stages: [] } });
+    });
+    for (const key of keys) expect(queryClient.getQueryState(key)?.isInvalidated).toBe(true);
+  });
+});
 
 describe("useSelectFactoryVcsProviderRepository", () => {
   it("refreshes connections created by repository selection before the save completes", async () => {

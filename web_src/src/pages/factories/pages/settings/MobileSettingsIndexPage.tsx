@@ -6,7 +6,7 @@ import { ArrowLeft, ChevronRight, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router";
 
-import { factoryHomePath, factorySettingsSectionPath, firstFactoryLineId } from "../../lib/factoryPagePaths";
+import { factoryHomePath, factorySettingsSectionPath } from "../../lib/factoryPagePaths";
 import { MOBILE_SETTINGS_COPY } from "../../mobile/mobileCopy";
 import { factoryCardClassName } from "../factoryPageLayoutStyles";
 import { LegacyFactorySettingsIndexRedirect } from "./FactorySettingsRedirects";
@@ -57,7 +57,7 @@ function MobileSettingsIndexPage() {
       <header className="sticky top-0 z-10 shrink-0 border-b border-border bg-background pt-[env(safe-area-inset-top)]">
         <div className="flex h-12 items-center px-1">
           <Link
-            to={factoryHomePath(organizationId, factoryKey, firstFactoryLineId(factory))}
+            to={factoryHomePath(organizationId, factoryKey)}
             aria-label={MOBILE_SETTINGS_COPY.backToWorkspace}
             className="flex size-10 shrink-0 items-center justify-center rounded-md text-foreground hover:bg-accent"
             data-testid="factory-settings-mobile-index-back"

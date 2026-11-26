@@ -231,6 +231,9 @@ function CatalogInstanceRow({
       <Plug className={`size-4 shrink-0 ${instancePlugClass(state, styles)}`} />
       <span className={instanceStatusLabelClass(appearance, state, styles)}>{integrationStatusLabel(state)}</span>
       <p className={styles.instanceName}>{integration.metadata?.name}</p>
+      {integration.status?.webhookFailures?.length ? (
+        <span className="text-sm text-amber-700 dark:text-amber-300">Webhook setup needs attention</span>
+      ) : null}
       <GitHubHostBadge integration={integration} />
       <div className="ml-auto flex items-center gap-2">
         <GitHubAppInstallationLink integration={integration} />

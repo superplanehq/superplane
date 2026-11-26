@@ -302,6 +302,35 @@ func TestAssemblePublicBoardUsesSavedStageOrder(t *testing.T) {
 	assert.Empty(t, board.Columns[1].Cards)
 }
 
+func TestPublicBoardKeepsRetainedPhaseCardsAfterStepCompaction(t *testing.T) {
+	appID, lineID, orderID := uuid.New(), uuid.New(), uuid.New()
+	index := 0
+	line := &models.FactoryLine{ID: lineID, Steps: []models.FactoryLineStep{{AppID: appID}},
+		Stages: []models.FactoryLineStage{
+			{Key: "backlog", Kind: models.FactoryLineStageBacklog},
+			{Key: "phase-1", Name: "Implement", Kind: models.FactoryLineStagePhase, StepIndex: &index},
+			{Key: "done", Kind: models.FactoryLineStageDone},
+		}}
+	for _, queued := range []bool{false, true} {
+		dispatch := models.FactoryWorkOrderLineDispatchRecord{
+			FactoryWorkOrderLineDispatch: models.FactoryWorkOrderLineDispatch{LineID: lineID, CurrentStageKey: "phase-1"},
+			Executions:                   []models.FactoryWorkOrderExecutionRecord{{FactoryWorkOrderExecution: models.FactoryWorkOrderExecution{StepIndex: 1, Status: models.FactoryWorkOrderExecutionStatusRunning}}},
+		}
+		if queued {
+			dispatch.Executions = nil
+			dispatch.QueueItem = &models.FactoryWorkOrderQueueItemRecord{FactoryWorkOrderQueueItem: models.FactoryWorkOrderQueueItem{StepIndex: 1, StageKey: "phase-1"}}
+		}
+		board := assemblePublicBoard(&models.Factory{}, line,
+			[]models.FactoryWorkOrder{{ID: orderID, Title: "Retained task", State: models.FactoryWorkOrderStateOpen}},
+			map[uuid.UUID][]models.FactoryWorkOrderLineDispatchRecord{orderID: {dispatch}}, nil, nil, nil,
+			[]models.Canvas{{ID: appID, Name: "Implement"}}, nil, nil)
+		require.Len(t, board.Columns, 3)
+		assert.Equal(t, "phase-1", board.Columns[1].Key)
+		require.Len(t, board.Columns[1].Cards, 1)
+		assert.Equal(t, "Retained task", board.Columns[1].Cards[0].Title)
+	}
+}
+
 func TestPublicBoardDependabotIntakeUsesDependabotIcon(t *testing.T) {
 	factory := &models.Factory{Name: "Instabot", Key: "NEWWO"}
 	line := &models.FactoryLine{Name: "implement"}

@@ -167,7 +167,7 @@ function closureCanvas(component: "github.onPullRequest" | "bitbucket.onPullRequ
 function renderHost() {
   return render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <MemoryRouter initialEntries={["/org-1/workspaces/rf/lines/line-plan"]}>
+      <MemoryRouter initialEntries={["/org-1/workspaces/rf"]}>
         <ThemeProvider>
           <TooltipProvider>
             <ColumnAutomationViewHost

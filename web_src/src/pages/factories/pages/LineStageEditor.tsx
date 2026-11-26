@@ -193,9 +193,9 @@ export function SaveLineStagesDialog({
         <AlertDialogHeader>
           <AlertDialogTitle>Save stage changes?</AlertDialogTitle>
           <AlertDialogDescription>
-            This changes the board for everyone who uses this line. Saving a custom-stage deletion also deletes
-            automations that execute in that stage. Automations that only appear there stay in the workspace. Removing a
-            system stage keeps its automations.
+            This changes the board for everyone who uses this line. Saving a stage deletion deletes its execution
+            automations and requests cancellation of unfinished runs. Automations that execute in a retained stage stay
+            in the workspace.
           </AlertDialogDescription>
         </AlertDialogHeader>
         {changes ? (

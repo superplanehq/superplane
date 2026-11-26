@@ -1845,6 +1845,8 @@ message FactoryIntake {
   Health health = 16;
   // Why the intake cannot receive items. Empty when health is HEALTH_OK.
   string health_message = 17;
+  // Registration state of the webhook linked to a GitHub intake trigger.
+  string webhook_setup_state = 18;
 }
 
 message FactoryIntakeRun {

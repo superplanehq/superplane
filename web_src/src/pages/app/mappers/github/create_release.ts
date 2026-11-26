@@ -24,6 +24,28 @@ interface ReleaseOutput {
   };
 }
 
+function getOptionalReleaseDetails(release: ReleaseOutput): Record<string, string> {
+  const details: Record<string, string> = {};
+
+  if (release.name) {
+    details["Release Name"] = release.name;
+  }
+
+  if (release.draft !== undefined) {
+    details["Draft"] = release.draft ? "Yes" : "No";
+  }
+
+  if (release.prerelease !== undefined) {
+    details["Prerelease"] = release.prerelease ? "Yes" : "No";
+  }
+
+  if (release.published_at) {
+    details["Published At"] = new Date(release.published_at).toLocaleString();
+  }
+
+  return details;
+}
+
 export const createReleaseMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     return baseProps(context.nodes, context.node, context.componentDefinition, context.lastExecutions);
@@ -38,31 +60,17 @@ export const createReleaseMapper: ComponentBaseMapper = {
     const details: Record<string, string> = {};
 
     if (outputs && outputs.default && outputs.default.length > 0) {
-      const release = outputs.default[0].data as ReleaseOutput;
+      const release = (outputs.default[0].data ?? {}) as ReleaseOutput;
       Object.assign(details, {
-        "Created At": release?.created_at ? new Date(release.created_at).toLocaleString() : "-",
-        "Created By": release?.author?.login || "-",
+        "Created At": release.created_at ? new Date(release.created_at).toLocaleString() : "-",
+        "Created By": release.author?.login || "-",
       });
 
-      details["Release URL"] = release?.html_url || "";
-      details["Release ID"] = release?.id?.toString() || "";
-      details["Tag Name"] = release?.tag_name || "";
+      details["Release URL"] = release.html_url || "";
+      details["Release ID"] = release.id?.toString() || "";
+      details["Tag Name"] = release.tag_name || "";
 
-      if (release?.name) {
-        details["Release Name"] = release.name;
-      }
-
-      if (release?.draft !== undefined) {
-        details["Draft"] = release.draft ? "Yes" : "No";
-      }
-
-      if (release?.prerelease !== undefined) {
-        details["Prerelease"] = release.prerelease ? "Yes" : "No";
-      }
-
-      if (release?.published_at) {
-        details["Published At"] = new Date(release.published_at).toLocaleString();
-      }
+      Object.assign(details, getOptionalReleaseDetails(release));
     }
 
     return details;
