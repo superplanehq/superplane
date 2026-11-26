@@ -152,12 +152,10 @@ func TestCanvasAutomationCustomStageRoundTripAndAdmission(t *testing.T) {
 	scheduledSource := "apiVersion: v2\nkind: Automation\nname: Scheduled QA\nruns_on_task: false\ntriggers:\n  - use: schedule\n    config:\n      cron: '0 9 * * *'\nsteps:\n  - name: Inspect\n    prompt: Check the changes.\n"
 	for _, unsupported := range []string{
 		scheduledSource,
-		strings.Replace(source, "task_enters_stage", "manual", 1),
 		strings.Replace(source, "task_enters_stage", "task_leaves_stage", 1),
-		strings.Replace(source, "  - use: task_enters_stage", "  - use: task_enters_stage\n  - use: manual", 1),
 	} {
 		_, err := service.Create(ctx, placement, r.User, unsupported)
-		require.ErrorContains(t, err, "Keep one task_enters_stage trigger")
+		require.ErrorContains(t, err, "Custom stage automations")
 	}
 	legacyCanvas, _ := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "Existing QA", "existing-start")
 	require.NoError(t, legacyCanvas.SetColumnKey(db, stageKey))
@@ -270,6 +268,90 @@ func TestCanvasAutomationCustomStageRoundTripAndAdmission(t *testing.T) {
 		require.Equal(t, "https://github.com/"+repository+".git", environment["REPO_URL"])
 		require.Equal(t, branch, environment["BASE"])
 	}
+	manualSource := strings.Replace(source, "task_enters_stage", "manual", 1)
+	for _, id := range []uuid.UUID{created.ID, legacyCanvas.ID} {
+		manualDefinition := manualSource
+		if id == legacyCanvas.ID {
+			manualDefinition = strings.Replace(manualSource, "name: QA check", "name: Existing QA", 1)
+			require.NoError(t, legacyCanvas.SetColumnKey(db, stageKey))
+		}
+		before, err := models.FindLiveCanvasVersionInTransaction(db, id)
+		require.NoError(t, err)
+		_, err = service.Update(ctx, r.Organization.ID, id, r.User, manualDefinition)
+		require.NoError(t, err)
+		read, err := service.Read(ctx, r.Organization.ID, id)
+		require.NoError(t, err)
+		require.Contains(t, read.YAML, "use: manual")
+		require.NotContains(t, read.YAML, "task_enters_stage")
+		after, err := models.FindLiveCanvasVersionInTransaction(db, id)
+		require.NoError(t, err)
+		require.Equal(t, before.Edges, after.Edges)
+	}
+	require.NoError(t, legacyCanvas.SetColumnKey(db, ""))
+	manualOrder, err := factory.CreateWorkOrder(db, "Manual QA", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	require.NoError(t, manualOrder.TransitionOnDispatch(db, &r.User))
+	dispatch, waiting, err := line.DispatchStage(db, manualOrder)
+	require.NoError(t, err)
+	require.Empty(t, waiting)
+	require.Equal(t, "manual", dispatch.Steps[0].StartMode)
+	snapshot := serializeExecutionSteps(dispatch.Steps, nil)
+	require.Equal(t, created.ID.String(), snapshot[0].GetAppId())
+	require.True(t, snapshot[0].GetManualStart())
+	response, err := RunFactoryCustomAutomation(ctx, onboardingDeps(r), r.Organization.ID.String(), &pb.RunFactoryCustomAutomationRequest{FactoryId: factory.ID.String(), AutomationId: created.ID.String(), WorkOrderId: manualOrder.ID.String()})
+	require.NoError(t, err)
+	require.NotEmpty(t, response.RunId)
+	execution, err := models.FindWorkOrderExecutionByRunID(db, uuid.MustParse(response.RunId))
+	require.NoError(t, err)
+	require.Equal(t, dispatch.ID, execution.LineDispatchID)
+	_, err = RunFactoryCustomAutomation(ctx, onboardingDeps(r), r.Organization.ID.String(), &pb.RunFactoryCustomAutomationRequest{FactoryId: factory.ID.String(), AutomationId: created.ID.String(), WorkOrderId: manualOrder.ID.String()})
+	require.ErrorContains(t, err, "already started")
+	_, err = RunFactoryCustomAutomation(ctx, onboardingDeps(r), r.Organization.ID.String(), &pb.RunFactoryCustomAutomationRequest{FactoryId: factory.ID.String(), AutomationId: created.ID.String(), WorkOrderId: order.ID.String()})
+	require.ErrorContains(t, err, "does not use manual start")
+	_, err = service.Update(ctx, r.Organization.ID, created.ID, r.User, source)
+	require.NoError(t, err)
+	captured, err := models.FindWorkOrderLineDispatch(db, dispatch.ID)
+	require.NoError(t, err)
+	require.Equal(t, "manual", captured.Steps[0].StartMode)
+	plan, err := line.ExecutionPlan(db)
+	require.NoError(t, err)
+	require.Equal(t, "automatic", plan[0].StartMode)
+	mixedSource := strings.Replace(source, "  - use: task_enters_stage", "  - use: task_enters_stage\n  - use: manual", 1)
+	_, err = service.Update(ctx, r.Organization.ID, created.ID, r.User, mixedSource)
+	require.NoError(t, err)
+	plan, err = line.ExecutionPlan(db)
+	require.NoError(t, err)
+	require.Equal(t, "automatic", plan[0].StartMode)
+	require.True(t, plan[0].ManualStart)
+	mixedOrder, err := factory.CreateWorkOrder(db, "Both triggers", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	require.NoError(t, mixedOrder.TransitionOnDispatch(db, &r.User))
+	_, automaticRuns, err := line.DispatchStage(db, mixedOrder)
+	require.NoError(t, err)
+	require.Len(t, automaticRuns, 1)
+	_, err = RunFactoryCustomAutomation(ctx, onboardingDeps(r), r.Organization.ID.String(), &pb.RunFactoryCustomAutomationRequest{FactoryId: factory.ID.String(), AutomationId: created.ID.String(), WorkOrderId: mixedOrder.ID.String()})
+	require.ErrorContains(t, err, "already started")
+	require.NoError(t, dispatch.EnterStage(db, "phase-0"))
+	_, err = RunFactoryCustomAutomation(ctx, onboardingDeps(r), r.Organization.ID.String(), &pb.RunFactoryCustomAutomationRequest{FactoryId: factory.ID.String(), AutomationId: created.ID.String(), WorkOrderId: manualOrder.ID.String()})
+	require.ErrorContains(t, err, "not in this custom stage")
+	_, err = service.Update(ctx, r.Organization.ID, created.ID, r.User, manualSource)
+	require.NoError(t, err)
+	queuedOrder, err := factory.CreateWorkOrder(db, "Queued manual QA", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	require.NoError(t, queuedOrder.TransitionOnDispatch(db, &r.User))
+	queuedDispatch, waiting, err := line.DispatchStage(db, queuedOrder)
+	require.NoError(t, err)
+	require.Empty(t, waiting)
+	limit := 1
+	queuedDispatch.Steps[0].MaxParallelism = &limit
+	require.NoError(t, db.Save(queuedDispatch).Error)
+	queuedResponse, err := RunFactoryCustomAutomation(ctx, onboardingDeps(r), r.Organization.ID.String(), &pb.RunFactoryCustomAutomationRequest{FactoryId: factory.ID.String(), AutomationId: created.ID.String(), WorkOrderId: queuedOrder.ID.String()})
+	require.NoError(t, err)
+	require.Empty(t, queuedResponse.RunId)
+	require.NotEmpty(t, queuedResponse.QueueItemId)
+	queueItems, err := models.ListFactoryWorkOrderQueueItemsByLineDispatchIDs(db, []uuid.UUID{queuedDispatch.ID})
+	require.NoError(t, err)
+	require.Equal(t, queueItems[queuedDispatch.ID].ID.String(), queuedResponse.QueueItemId)
 }
 
 func TestCanvasAutomationLegacyImportProtectsGraphBehavior(t *testing.T) {

@@ -1,14 +1,10 @@
 import { load } from "js-yaml";
-import { useCustomAutomationSourceDraft } from "@/hooks/useCustomAutomationSourceDraft";
-import { CustomAutomationSourceEditor } from "./CustomAutomationSourceEditor";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, it, vi } from "bun:test";
 import type { FactoriesFactoryCustomAutomation, FactoriesFactoryOnboarding } from "@/api-client";
 import type { SelectableLLMSourceID } from "@/lib/selectableLLMModels";
-import { ThemeProvider } from "@/contexts/ThemeProvider";
-import { CustomAutomationSetupForm } from "./CustomAutomationSetupForm";
-import { useCustomAutomationSetupPage } from "./useCustomAutomationSetupPage";
+import { Editor, SourceEditor } from "./customAutomationEditorTestSupport";
 
 const saveAutomation = vi.fn();
 let sharedHostedId = false;
@@ -64,40 +60,6 @@ vi.mock("@/hooks/useSecrets", () => ({ useSecrets: () => ({ data: [] }) }));
 vi.mock("@/contexts/usePermissions", () => ({ usePermissions: () => ({ canAct: () => false }) }));
 vi.mock("@monaco-editor/react", () => ({ Editor: () => null }));
 
-function Editor({ columnKey, onClose = () => {} }: { columnKey?: "backlog" | "verify"; onClose?: () => void }) {
-  const model = useCustomAutomationSetupPage({
-    organizationId: "org",
-    factoryId: "factory",
-    factoryKey: "workspace",
-    automationId: "automation",
-  });
-  return (
-    <ThemeProvider>
-      <CustomAutomationSetupForm
-        name={model.name}
-        icon={model.icon}
-        triggers={model.triggers}
-        runsOnTask={model.runsOnTask}
-        columnKey={columnKey}
-        draft={model.draft}
-        organizationId="org"
-        factoryId="factory"
-        factoryKey="workspace"
-        saving={model.saving}
-        deleting={false}
-        error={model.saveError}
-        onNameChange={model.setName}
-        onIconChange={model.setIcon}
-        onTriggersChange={model.setTriggers}
-        onRunsOnTaskChange={(runsOnTask) => model.setRunsOnTask(runsOnTask ?? true)}
-        onDraftChange={model.setDraft}
-        onSave={() => void model.save()}
-        onClose={onClose}
-      />
-    </ThemeProvider>
-  );
-}
-
 vi.mock("@/hooks/useIntegrations", () => ({ useConnectedIntegrations: () => ({}) }));
 let onboarding: FactoriesFactoryOnboarding | undefined;
 vi.mock("../layout/factoriesLayoutContext", () => ({
@@ -108,30 +70,6 @@ vi.mock("../layout/factoriesLayoutContext", () => ({
     factory: { onboarding },
   }),
 }));
-
-function SourceEditor({
-  source,
-  save,
-  automationId,
-}: {
-  source: string;
-  save: (definition: unknown) => void;
-  automationId?: string;
-}) {
-  const draft = useCustomAutomationSourceDraft(source, "backlog");
-  return (
-    <CustomAutomationSourceEditor
-      model={draft}
-      automationId={automationId}
-      stage="backlog"
-      saving={false}
-      deleting={false}
-      error=""
-      onSave={() => save(load(draft.source))}
-      onClose={() => {}}
-    />
-  );
-}
 
 it.each([
   { source: "hosted", initialModel: "", model: "anthropic/claude-test", label: "openrouter/anthropic/claude-test" },
@@ -482,6 +420,60 @@ it("previews Runs on a task above the trigger list without saving the switch", a
   await user.click(screen.getByRole("button", { name: "Save" }));
   await waitFor(() => expect(saveAutomation).toHaveBeenCalled());
   expect(saveAutomation.mock.calls.at(-1)![0].settings.runsOnTask).toBe(false);
+});
+
+it("replaces custom-stage entry with Manual and reopens the saved trigger", async () => {
+  const previous = automation;
+  automation = {
+    automation: { id: "automation", name: "Update Docs", columnKey: "custom-qa" },
+    settings: { ...previous.settings, startMode: "START_MODE_AUTOMATIC", triggers: undefined, runsOnTask: true },
+  };
+  saveAutomation.mockClear();
+  saveAutomation.mockResolvedValue({});
+  const user = userEvent.setup();
+  try {
+    const view = render(<Editor columnKey="custom-qa" />);
+    await user.click(screen.getByRole("button", { name: "Add trigger" }));
+    expect(screen.getAllByRole("menuitem")).toHaveLength(2);
+    await user.click(screen.getByRole("menuitem", { name: /Manual/ }));
+    await user.click(screen.getByRole("button", { name: /Remove When a task enters/ }));
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(saveAutomation).toHaveBeenCalledTimes(1));
+    const saved = saveAutomation.mock.calls[0]![0];
+    expect(saved.settings.startMode).toBe("START_MODE_MANUAL");
+    expect(saved.settings.runsOnTask).toBe(true);
+    expect(saved.settings.steps).toEqual(automation.settings!.steps);
+    expect(saved.settings.agent).toMatchObject(automation.settings!.agent!);
+    view.unmount();
+    automation = { automation: automation.automation, settings: saved.settings };
+    render(<Editor columnKey="custom-qa" />);
+    expect(screen.getByRole("button", { name: /^Trigger Manual/ })).toBeInTheDocument();
+    expect(screen.queryByText(/When a task enters/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Remove Manual" })).not.toBeInTheDocument();
+  } finally {
+    automation = previous;
+  }
+});
+
+it("saves custom-stage Manual through the source-backed visual editor", async () => {
+  const source = `apiVersion: v2
+kind: Automation
+name: Update Docs
+runs_on_task: true
+triggers: [{use: task_enters_stage}]
+steps: [{name: Review, prompt: Review the changes.}]
+`;
+  const save = vi.fn();
+  const user = userEvent.setup();
+  const view = render(<SourceEditor source={source} stage="custom-qa" save={save} />);
+  await user.click(screen.getByRole("button", { name: "Add trigger" }));
+  await user.click(screen.getByRole("menuitem", { name: /Manual/ }));
+  await user.click(screen.getByRole("button", { name: /Remove When a task enters/ }));
+  await user.click(screen.getByRole("button", { name: "Save" }));
+  expect(save).toHaveBeenCalledWith(expect.objectContaining({ triggers: [{ use: "manual" }], runs_on_task: true }));
+  view.unmount();
+  render(<SourceEditor source={source.replace("task_enters_stage", "manual")} stage="custom-qa" save={save} />);
+  expect(screen.getByRole("button", { name: /^Trigger Manual/ })).toBeInTheDocument();
 });
 
 it("offers Schedule for a Backlog automation", async () => {
