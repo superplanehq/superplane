@@ -481,8 +481,6 @@ func configurationIntakeProvider(source string) string {
 		return intakeSentryAppName
 	case models.FactoryIntakeSourcePagerDutyIncidents:
 		return "pagerduty"
-	case models.FactoryIntakeSourceProductiveTasks:
-		return intakeProductiveAppName
 	case models.FactoryIntakeSourceDatadog:
 		return intakeDatadogAppName
 	case models.FactoryIntakeSourceLinearIssues:
@@ -497,7 +495,7 @@ func configurationIntakeBinding(binding factoryConfigurationBinding, integration
 	switch source {
 	case models.FactoryIntakeSourceGitHubIssues, models.FactoryIntakeSourceDependabotAlerts:
 		configuration["repository"] = binding.ResourceID
-	case models.FactoryIntakeSourceJiraIssues, models.FactoryIntakeSourceProductiveTasks:
+	case models.FactoryIntakeSourceJiraIssues:
 		configuration["project"] = binding.ResourceID
 	case models.FactoryIntakeSourcePagerDutyIncidents, models.FactoryIntakeSourceDatadog:
 		configuration["service"] = binding.ResourceID

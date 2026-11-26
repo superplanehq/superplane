@@ -77,8 +77,6 @@ func factoryConfigurationIntakeFields(source string) map[string]string {
 		}
 	case models.FactoryIntakeSourceSentryExceptions:
 		maps.Copy(fields, map[string]string{"sentry_new_issues": "SentryNewIssues", "sentry_regressed_issues": "SentryRegressedIssues", "sentry_assigned_issues": "SentryAssignedIssues", "sentry_levels": "SentryLevels", "sentry_project_ids": "SentryProjectIDs"})
-	case models.FactoryIntakeSourceProductiveTasks:
-		maps.Copy(fields, map[string]string{"exclude_key_tasks": "ExcludeKeyTasks", "task_list_ids": "TaskListIDs"})
 	case models.FactoryIntakeSourceDependabotAlerts:
 		fields["dependabot_severities"] = "DependabotSeverities"
 	case models.FactoryIntakeSourceDatadog:

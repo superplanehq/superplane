@@ -140,15 +140,6 @@ var intakeSpecsBySource = map[string]intakeSpec{
 		createTitle:       "{{ root().data.incident.title }}",
 		createDescription: "{{ root().data.incident.html_url }}",
 	},
-	models.FactoryIntakeSourceProductiveTasks: {
-		name:                 "Productive tasks",
-		description:          "Create a work order when a Productive task is created.",
-		triggerComponent:     "productive.onTask",
-		triggerName:          "On Task",
-		triggerConfiguration: map[string]any{"actions": intakeProductiveTriggerActions(defaultProductiveIntakeSettings())},
-		createTitle:          "{{ root().data.data.attributes.title }}",
-		createDescription:    "{{ root().data.data.attributes.description }}",
-	},
 	models.FactoryIntakeSourceJiraIssues: {
 		name:             "Jira issues",
 		description:      "Create a work order when a Jira issue is created or updated.",
@@ -571,8 +562,6 @@ func intakeTriggerConfiguration(spec intakeSpec, request intakeCanvasRequest) ma
 	}
 	settings := intakeSettingsOrDefault(request.Source, request.Settings)
 	switch request.Source {
-	case models.FactoryIntakeSourceProductiveTasks:
-		configuration["actions"] = intakeProductiveTriggerActions(request.Settings)
 	case models.FactoryIntakeSourceJiraIssues:
 		configuration["events"] = intakeTriggerEventsFor(settings)
 	case models.FactoryIntakeSourceSentryExceptions:
@@ -617,9 +606,6 @@ func intakeSettingsOrDefault(source string, settings intakeSettings) intakeSetti
 	}
 	if source == models.FactoryIntakeSourceSentryExceptions {
 		return defaultSentryIntakeSettings()
-	}
-	if source == models.FactoryIntakeSourceProductiveTasks {
-		return defaultProductiveIntakeSettings()
 	}
 	if source == models.FactoryIntakeSourceDependabotAlerts {
 		return defaultDependabotIntakeSettings()

@@ -30,7 +30,6 @@ var builtInAutomations = []BuiltInAutomation{
 	{ID: intakeTemplateID(models.FactoryIntakeSourceJiraIssues), Name: "Jira issues"},
 	{ID: intakeTemplateID(models.FactoryIntakeSourceSentryExceptions), Name: "Sentry exceptions"},
 	{ID: intakeTemplateID(models.FactoryIntakeSourcePagerDutyIncidents), Name: "PagerDuty incidents"},
-	{ID: intakeTemplateID(models.FactoryIntakeSourceProductiveTasks), Name: "Productive tasks"},
 	{ID: intakeTemplateID(models.FactoryIntakeSourceDatadog), Name: "Datadog errors"},
 	{ID: intakeTemplateID(models.FactoryIntakeSourceLinearIssues), Name: "Linear issues"},
 	{ID: intakeTemplateID(models.FactoryIntakeSourceWebhook), Name: "Webhook"},

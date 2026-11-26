@@ -15,7 +15,6 @@ import {
   factoryIntakePath,
   factoryGitHubIntakeSetupPath,
   factoryJiraIntakeSetupPath,
-  factoryProductiveIntakeSetupPath,
   factoryPlanningPath,
   factoryPRFeedbackPath,
   factoryPRFeedbackSetupPath,
@@ -247,14 +246,6 @@ describe("factoryDependabotIntakeSetupPath", () => {
   it("opens the Dependabot intake setup page on the line board", () => {
     expect(factoryDependabotIntakeSetupPath("org-1", "SP", "line-plan")).toBe(
       "/org-1/workspaces/sp/lines/line-plan/setup/dependabot",
-    );
-  });
-});
-
-describe("factoryProductiveIntakeSetupPath", () => {
-  it("opens the Productive.io intake setup page on the line board", () => {
-    expect(factoryProductiveIntakeSetupPath("org-1", "SP", "line-plan")).toBe(
-      "/org-1/workspaces/sp/lines/line-plan/setup/productive",
     );
   });
 });

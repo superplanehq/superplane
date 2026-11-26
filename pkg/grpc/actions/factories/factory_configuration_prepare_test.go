@@ -600,8 +600,6 @@ func (client *configurationCatalogHTTP) Do(request *http.Request) (*http.Respons
 		body = `[{"id":"1","key":"project","name":"Project"}]`
 	case request.URL.Host == "api.pagerduty.com" && (request.URL.Path == "/services/project" || request.URL.Path == "/services/second"):
 		body = fmt.Sprintf(`{"service":{"id":%q,"name":"API"}}`, strings.TrimPrefix(request.URL.Path, "/services/"))
-	case request.URL.Host == "api.productive.io" && strings.HasSuffix(request.URL.Path, "/projects/project"):
-		body = `{"data":{"id":"project","type":"projects","attributes":{"name":"Project"}}}`
 	default:
 		return nil, fmt.Errorf("unexpected provider read during configuration: %s", request.URL)
 	}
@@ -659,9 +657,6 @@ func configureConfigurationCatalogIntegration(t *testing.T, f configurationFixtu
 		configuration["authType"] = "apiToken"
 		sensitive("apiToken")
 		metadata["services"] = []any{map[string]any{"id": "project", "name": "API"}, map[string]any{"id": "second", "name": "Worker"}}
-	case "productive":
-		configuration["organizationId"] = "1"
-		sensitive("apiToken")
 	case "sentry":
 		metadata["organization"] = map[string]any{"id": "1", "slug": "acme", "name": "Acme"}
 		metadata["projects"] = []any{map[string]any{"id": "1", "slug": "project"}, map[string]any{"id": "2", "slug": "second"}}

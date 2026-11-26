@@ -854,6 +854,10 @@ func materializeIntakeDefaults(
 	intake *models.FactoryIntake,
 	savedSettings *factoryAutomationSettings,
 ) (*materializedFactoryTemplate, error) {
+	if _, ok := intakeSpecsBySource[intake.Source]; !ok {
+		return nil, invalidArgument("factory app has no bundled defaults")
+	}
+
 	spec := models.LiveCanvasSpec{Nodes: version.Nodes, Edges: version.Edges}
 	graph := resolveIntakeGraph(intake.Source, spec)
 	if graph.TriggerNodeID == "" {
