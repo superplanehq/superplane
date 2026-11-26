@@ -21,7 +21,7 @@ async function loadRecentRuns(
       withOrganizationHeader({
         organizationId,
         path: { canvasId },
-        query: { limit: 200, ...(before ? { before } : {}) },
+        query: { limit: 200, includeTask: true, ...(before ? { before } : {}) },
         signal,
         throwOnError: true,
       }),
@@ -56,6 +56,7 @@ async function refreshHistory(
         withOrganizationHeader({
           organizationId,
           path: { canvasId, runId: entry.run.id! },
+          query: { includeTask: true },
           signal,
           throwOnError: true,
         }),
@@ -79,7 +80,12 @@ export function useBacklogCustomRuns(
   const queryClient = useQueryClient();
   const queries = useQueries({
     queries: apps
-      .filter((app) => app.id && app.columnKey === "backlog" && app.templateId === CUSTOM_AUTOMATION_TEMPLATE_ID)
+      .filter(
+        (app) =>
+          app.id &&
+          (app.columnKey === "backlog" || app.columnKey?.startsWith("custom-")) &&
+          app.templateId === CUSTOM_AUTOMATION_TEMPLATE_ID,
+      )
       .map((app) => ({
         queryKey: ["backlog-custom-runs", organizationId, app.id, workOrderId],
         queryFn: ({ signal }: { signal: AbortSignal }) =>

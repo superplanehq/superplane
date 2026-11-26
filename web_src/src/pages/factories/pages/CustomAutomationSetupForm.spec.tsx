@@ -6,9 +6,7 @@ import userEvent from "@testing-library/user-event";
 import { expect, it, vi } from "bun:test";
 import type { FactoriesFactoryCustomAutomation, FactoriesFactoryOnboarding } from "@/api-client";
 import type { SelectableLLMSourceID } from "@/lib/selectableLLMModels";
-import { ThemeProvider } from "@/contexts/ThemeProvider";
-import { CustomAutomationSetupForm } from "./CustomAutomationSetupForm";
-import { useCustomAutomationSetupPage } from "./useCustomAutomationSetupPage";
+import { Editor } from "./CustomAutomationSetupForm.testSupport";
 
 const saveAutomation = vi.fn();
 let sharedHostedId = false;
@@ -64,40 +62,6 @@ vi.mock("@/hooks/useSecrets", () => ({ useSecrets: () => ({ data: [] }) }));
 vi.mock("@/contexts/usePermissions", () => ({ usePermissions: () => ({ canAct: () => false }) }));
 vi.mock("@monaco-editor/react", () => ({ Editor: () => null }));
 
-function Editor({ columnKey, onClose = () => {} }: { columnKey?: "backlog" | "verify"; onClose?: () => void }) {
-  const model = useCustomAutomationSetupPage({
-    organizationId: "org",
-    factoryId: "factory",
-    factoryKey: "workspace",
-    automationId: "automation",
-  });
-  return (
-    <ThemeProvider>
-      <CustomAutomationSetupForm
-        name={model.name}
-        icon={model.icon}
-        triggers={model.triggers}
-        runsOnTask={model.runsOnTask}
-        columnKey={columnKey}
-        draft={model.draft}
-        organizationId="org"
-        factoryId="factory"
-        factoryKey="workspace"
-        saving={model.saving}
-        deleting={false}
-        error={model.saveError}
-        onNameChange={model.setName}
-        onIconChange={model.setIcon}
-        onTriggersChange={model.setTriggers}
-        onRunsOnTaskChange={(runsOnTask) => model.setRunsOnTask(runsOnTask ?? true)}
-        onDraftChange={model.setDraft}
-        onSave={() => void model.save()}
-        onClose={onClose}
-      />
-    </ThemeProvider>
-  );
-}
-
 vi.mock("@/hooks/useIntegrations", () => ({ useConnectedIntegrations: () => ({}) }));
 let onboarding: FactoriesFactoryOnboarding | undefined;
 vi.mock("../layout/factoriesLayoutContext", () => ({
@@ -113,17 +77,19 @@ function SourceEditor({
   source,
   save,
   automationId,
+  stage = "backlog",
 }: {
   source: string;
   save: (definition: unknown) => void;
   automationId?: string;
+  stage?: "backlog" | `custom-${string}`;
 }) {
-  const draft = useCustomAutomationSourceDraft(source, "backlog");
+  const draft = useCustomAutomationSourceDraft(source, stage);
   return (
     <CustomAutomationSourceEditor
       model={draft}
       automationId={automationId}
-      stage="backlog"
+      stage={stage}
       saving={false}
       deleting={false}
       error=""
@@ -132,6 +98,49 @@ function SourceEditor({
     />
   );
 }
+
+it("replaces the custom-column trigger in both editors", async () => {
+  const previous = automation;
+  automation = {
+    ...previous,
+    automation: { ...previous.automation, columnKey: "custom-qa" },
+    settings: { ...previous.settings, startMode: "START_MODE_AUTOMATIC" },
+  };
+  const user = userEvent.setup();
+  try {
+    const legacy = render(<Editor columnKey="custom-qa" />);
+    await user.click(screen.getByRole("tab", { name: "Manual" }));
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    expect(saveAutomation).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        settings: expect.objectContaining({ startMode: "START_MODE_MANUAL", runsOnTask: true }),
+      }),
+    );
+    await user.click(screen.getByRole("tab", { name: "Automatic stage entry" }));
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    expect(saveAutomation).toHaveBeenLastCalledWith(
+      expect.objectContaining({ settings: expect.objectContaining({ startMode: "START_MODE_AUTOMATIC" }) }),
+    );
+    legacy.unmount();
+    const source =
+      "apiVersion: v2\nkind: Automation\nname: QA\nruns_on_task: true\ntriggers: [{use: task_enters_stage}]\nsteps: [{name: Inspect, prompt: Inspect the changes.}]\n";
+    const save = vi.fn();
+    const visual = render(<SourceEditor source={source} stage="custom-qa" save={save} />);
+    await user.click(screen.getByRole("tab", { name: "Manual" }));
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    const manual = { ...(load(source) as object), triggers: [{ use: "manual" }] };
+    expect(save).toHaveBeenLastCalledWith(manual);
+    visual.unmount();
+    render(<SourceEditor source={source.replace("task_enters_stage", "manual")} stage="custom-qa" save={save} />);
+    expect(screen.getByRole("tab", { name: "Manual" })).toHaveAttribute("aria-selected", "true");
+    await user.click(screen.getByRole("tab", { name: "Automatic stage entry" }));
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    expect(save).toHaveBeenLastCalledWith(load(source));
+  } finally {
+    automation = previous;
+    saveAutomation.mockReset();
+  }
+});
 
 it.each([
   { source: "hosted", initialModel: "", model: "anthropic/claude-test", label: "openrouter/anthropic/claude-test" },

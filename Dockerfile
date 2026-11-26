@@ -59,7 +59,13 @@ RUN export GOMODCACHE=/tmp/go-mod GOCACHE=/tmp/go-build && \
 WORKDIR /app
 
 RUN mkdir -p "${PLAYWRIGHT_BROWSERS_PATH}"
-RUN playwright install chromium-headless-shell --with-deps
+# Retry temporary package mirror failures; Playwright refreshes apt indexes on each attempt.
+RUN attempt=1; \
+  until playwright install chromium-headless-shell --with-deps; do \
+    if [ "$attempt" -ge 5 ]; then exit 1; fi; \
+    attempt=$((attempt + 1)); \
+    sleep 5; \
+  done
 RUN rm -rf /opt/install /opt/install-scripts /tmp/*
 
 COPY scripts/docker/install-bun.sh /tmp/install-bun.sh
