@@ -121,11 +121,11 @@ it("saves a webhook next to the line trigger on a custom stage", async () => {
   saveAutomation.mockClear();
   saveAutomation.mockResolvedValueOnce({});
   render(<Editor columnKey="custom-qa" />);
+  expect(screen.queryByRole("button", { name: /Remove When a task enters/ })).not.toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "Add trigger" }));
-  expect(screen.getAllByRole("menuitem")).toHaveLength(1);
+  expect(screen.getAllByRole("menuitem")).toHaveLength(2);
   await user.click(screen.getByRole("menuitem", { name: /Webhook/ }));
   await selectWebhook(user);
-  expect(screen.queryByRole("button", { name: /Remove When a task enters/ })).not.toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "Save" }));
   await waitFor(() => expect(saveAutomation).toHaveBeenCalled());
   const saved = saveAutomation.mock.calls.at(-1)![0];
@@ -133,5 +133,25 @@ it("saves a webhook next to the line trigger on a custom stage", async () => {
     { startMode: "START_MODE_AUTOMATIC" },
     { startMode: "START_MODE_WEBHOOK", webhookId: "webhook-1" },
   ]);
+  expect(saved.settings.runsOnTask).toBeUndefined();
+});
+
+it("saves a custom stage automation that only a webhook starts", async () => {
+  const user = userEvent.setup();
+  current = {
+    automation: { ...automation.automation, columnKey: "custom-qa" },
+    settings: { ...automation.settings, startMode: "START_MODE_AUTOMATIC" },
+  };
+  saveAutomation.mockClear();
+  saveAutomation.mockResolvedValueOnce({});
+  render(<Editor columnKey="custom-qa" />);
+  await user.click(screen.getByRole("button", { name: "Add trigger" }));
+  await user.click(screen.getByRole("menuitem", { name: /Webhook/ }));
+  await selectWebhook(user);
+  await user.click(screen.getByRole("button", { name: /Remove When a task enters/ }));
+  await user.click(screen.getByRole("button", { name: "Save" }));
+  await waitFor(() => expect(saveAutomation).toHaveBeenCalled());
+  const saved = saveAutomation.mock.calls.at(-1)![0];
+  expect(saved.settings.triggers).toEqual([{ startMode: "START_MODE_WEBHOOK", webhookId: "webhook-1" }]);
   expect(saved.settings.runsOnTask).toBeUndefined();
 });

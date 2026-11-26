@@ -47,6 +47,11 @@ When this run already has a task, or when there is no task to create, do not cal
 // The payload is inserted once. Expressions inside the payload do not run.
 const webhookPayloadInstructions = `
 
+{{ root().data?.body != nil ? "A webhook started this run. This run has no task. To find a task from the request, run superplane task get with --task, --pull-request, --number, or --commit. To move a task that waits in this stage, run superplane task move --task with --next or --column. The JSON request body is:\n\n" + toJSON(root().data.body) : "" }}`
+
+// Saved prompts can still end with the earlier payload text.
+const legacyWebhookPayloadInstructions = `
+
 {{ root().data?.body != nil ? "A webhook started this run. The JSON request body is:\n\n" + toJSON(root().data.body) : "" }}`
 
 // Older canvases told the agent to write /tmp/proposal.json. Strip that text
@@ -330,8 +335,12 @@ func (settings *customAutomationSettings) runsWithoutTask() bool {
 }
 
 func (settings *customAutomationSettings) hasWebhookTrigger() bool {
+	return settings.hasTrigger(pb.FactoryCustomAutomation_START_MODE_WEBHOOK)
+}
+
+func (settings *customAutomationSettings) hasTrigger(mode pb.FactoryCustomAutomation_StartMode) bool {
 	return slices.ContainsFunc(settings.Triggers, func(trigger customAutomationTrigger) bool {
-		return trigger.Mode == pb.FactoryCustomAutomation_START_MODE_WEBHOOK
+		return trigger.Mode == mode
 	})
 }
 
@@ -1280,7 +1289,7 @@ func appendWebhookPayloadInstructions(runnerConfiguration map[string]any) {
 }
 
 func stripBacklogTaskInstructions(prompt string) string {
-	for _, suffix := range []string{webhookPayloadInstructions, backlogTaskOutputInstructions, backlogTaskProposalInstructions} {
+	for _, suffix := range []string{webhookPayloadInstructions, legacyWebhookPayloadInstructions, backlogTaskOutputInstructions, backlogTaskProposalInstructions} {
 		prompt = strings.TrimSuffix(prompt, suffix)
 	}
 	return prompt
@@ -1594,7 +1603,7 @@ func selectCustomAutomationAgent(nodes []models.Node) *models.Node {
 			return node
 		}
 	}
-	return nil
+	return savedCustomStageWebhookRunner(nodes)
 }
 
 func metadataStrings(template map[string]any, key string) []string {
@@ -1812,7 +1821,7 @@ func stripCustomAutomationBacklogPrompt(steps []*pb.FactoryCustomAutomation_Step
 			last = false
 			continue
 		}
-		steps[i].Prompt = strings.TrimSuffix(steps[i].Prompt, webhookPayloadInstructions)
+		steps[i].Prompt = strings.TrimSuffix(strings.TrimSuffix(steps[i].Prompt, webhookPayloadInstructions), legacyWebhookPayloadInstructions)
 	}
 }
 

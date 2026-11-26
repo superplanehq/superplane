@@ -174,7 +174,7 @@ func (b CanvasAutomationBackend) compile(
 		}
 	}
 	legacy := live != nil && legacyCustomStageGraph(&models.Canvas{ColumnKey: &placement.Stage}, live)
-	if legacy && !settings.hasWebhookTrigger() {
+	if legacy && !settings.hasWebhookTrigger() && len(customStageCore(live).Nodes) > 0 {
 		nodes, edges := editLegacyCustomStageGraph(customStageCore(live), settings)
 		return nodes, edges, nil
 	}

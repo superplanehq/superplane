@@ -43,18 +43,20 @@ func buildCustomStageAutomationCanvas(tx *gorm.DB, factory *models.Factory, name
 		Metadata:   &yaml.CanvasMetadata{Name: name, Description: "Run ordered prompt and Bash automation steps."},
 		Spec:       &yaml.CanvasSpec{},
 	}
-	metadata := customAutomationNodeMetadata(provider, settings.Icon, settings.RunsOnTask, func(template map[string]any) {
-		template["startMode"] = "automatic"
-	})
-	doc.Spec.Nodes = []yaml.Node{{
-		ID: "on-run", Name: "On Run", Type: yaml.NodeTypeTrigger, Component: "onRun", Configuration: map[string]any{}, Metadata: metadata,
-	}, customAutomationRunnerNode(customStageRunnerID, "Run stage automation", settings,
-		customAutomationRunnerConfiguration(tx, factory, settings, []any{
-			checkoutEnvironmentVar("REPO", "{{ order().repository }}"),
-			checkoutEnvironmentVar("REPO_URL", "{{ order().repository_url }}"),
-			checkoutEnvironmentVar("BASE", "{{ order().default_branch }}"),
-		}), 80)}
-	doc.Spec.Edges = []yaml.Edge{{SourceID: "on-run", TargetID: customStageRunnerID, Channel: "default"}}
+	if settings.hasTrigger(pb.FactoryCustomAutomation_START_MODE_AUTOMATIC) {
+		metadata := customAutomationNodeMetadata(provider, settings.Icon, settings.RunsOnTask, func(template map[string]any) {
+			template["startMode"] = "automatic"
+		})
+		doc.Spec.Nodes = []yaml.Node{{
+			ID: "on-run", Name: "On Run", Type: yaml.NodeTypeTrigger, Component: "onRun", Configuration: map[string]any{}, Metadata: metadata,
+		}, customAutomationRunnerNode(customStageRunnerID, "Run stage automation", settings,
+			customAutomationRunnerConfiguration(tx, factory, settings, []any{
+				checkoutEnvironmentVar("REPO", "{{ order().repository }}"),
+				checkoutEnvironmentVar("REPO_URL", "{{ order().repository_url }}"),
+				checkoutEnvironmentVar("BASE", "{{ order().default_branch }}"),
+			}), 80)}
+		doc.Spec.Edges = []yaml.Edge{{SourceID: "on-run", TargetID: customStageRunnerID, Channel: "default"}}
+	}
 	if !settings.hasWebhookTrigger() {
 		return doc, nil
 	}
@@ -75,7 +77,10 @@ func buildCustomStageAutomationCanvas(tx *gorm.DB, factory *models.Factory, name
 		doc.Spec.Nodes = append(doc.Spec.Nodes, node)
 		doc.Spec.Edges = append(doc.Spec.Edges, yaml.Edge{SourceID: node.ID, TargetID: customStageWebhookRunnerID, Channel: "default"})
 	}
-	doc.Metadata.Description = "Run prompt and Bash steps when a task enters the stage or a webhook receives a request."
+	doc.Metadata.Description = "Run prompt and Bash steps when a webhook receives a request."
+	if settings.hasTrigger(pb.FactoryCustomAutomation_START_MODE_AUTOMATIC) {
+		doc.Metadata.Description = "Run prompt and Bash steps when a task enters the stage or a webhook receives a request."
+	}
 	return doc, nil
 }
 
@@ -87,20 +92,28 @@ func validateCustomStageTriggers(settings *customAutomationSettings) error {
 			automatic++
 		case pb.FactoryCustomAutomation_START_MODE_WEBHOOK:
 		default:
-			automatic = -1
+			automatic = 2
 		}
 	}
-	if automatic != 1 || settings.runsWithoutTask() {
-		return invalidArgument("Custom stage automations run on a task when it enters the stage. Keep one task_enters_stage trigger. You can also add webhook triggers.")
+	if automatic > 1 || len(settings.Triggers) == 0 || settings.runsWithoutTask() {
+		return invalidArgument("Custom stage automations start when a task enters the stage or when a webhook receives a request. Use one task_enters_stage trigger, webhook triggers, or both.")
 	}
 	return nil
 }
 
 // The line owns the task trigger and its runner. Webhook triggers and their
-// runner are generated, so they do not change the line-owned graph.
+// runner are generated, so they do not change the line-owned graph. A
+// webhook-only graph has no line-owned part.
 func legacyCustomStageGraph(canvas *models.Canvas, version *models.CanvasVersion) bool {
-	version = customStageCore(version)
-	if canvas.ColumnKey == nil || !strings.HasPrefix(*canvas.ColumnKey, "custom-") || len(version.Nodes) != 2 || len(version.Edges) != 1 {
+	core := customStageCore(version)
+	if canvas.ColumnKey == nil || !strings.HasPrefix(*canvas.ColumnKey, "custom-") {
+		return false
+	}
+	if len(core.Nodes) == 0 && len(core.Edges) == 0 {
+		return savedCustomStageWebhookRunner(version.Nodes) != nil
+	}
+	version = core
+	if len(version.Nodes) != 2 || len(version.Edges) != 1 {
 		return false
 	}
 	var trigger, agent *models.Node
@@ -175,7 +188,17 @@ func editCustomStageRunner(node *models.Node, baseID string, settings *customAut
 
 // Saved runner settings stay. The build supplies only new webhook nodes.
 func editCustomStageGraph(live *models.CanvasVersion, settings *customAutomationSettings, built []models.Node, builtEdges []models.Edge) ([]models.Node, []models.Edge) {
-	nodes, edges := editLegacyCustomStageGraph(customStageCore(live), settings)
+	var nodes []models.Node
+	var edges []models.Edge
+	if settings.hasTrigger(pb.FactoryCustomAutomation_START_MODE_AUTOMATIC) {
+		core := customStageCore(live)
+		if len(core.Nodes) == 0 {
+			core = customStageCore(&models.CanvasVersion{Nodes: built, Edges: builtEdges})
+		} else {
+			core.Nodes, core.Edges = editLegacyCustomStageGraph(core, settings)
+		}
+		nodes, edges = core.Nodes, core.Edges
+	}
 	for i := range nodes {
 		if nodes[i].ComponentName() == "onRun" {
 			setCustomStageRunContext(&nodes[i], settings.RunsOnTask)
