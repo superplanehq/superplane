@@ -390,6 +390,9 @@ func startCustomStageAutomation(db *gorm.DB, factory *models.Factory, canvas *mo
 	if result != nil && result.Run != nil {
 		response.RunId = result.Run.ID.String()
 	}
+	if result != nil && result.QueueItem != nil {
+		response.QueueItemId = result.QueueItem.ID.String()
+	}
 	return response, nil
 }
 

@@ -334,6 +334,24 @@ func TestCanvasAutomationCustomStageRoundTripAndAdmission(t *testing.T) {
 	require.NoError(t, dispatch.EnterStage(db, "phase-0"))
 	_, err = RunFactoryCustomAutomation(ctx, onboardingDeps(r), r.Organization.ID.String(), &pb.RunFactoryCustomAutomationRequest{FactoryId: factory.ID.String(), AutomationId: created.ID.String(), WorkOrderId: manualOrder.ID.String()})
 	require.ErrorContains(t, err, "not in this custom stage")
+	_, err = service.Update(ctx, r.Organization.ID, created.ID, r.User, manualSource)
+	require.NoError(t, err)
+	queuedOrder, err := factory.CreateWorkOrder(db, "Queued manual QA", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	require.NoError(t, queuedOrder.TransitionOnDispatch(db, &r.User))
+	queuedDispatch, waiting, err := line.DispatchStage(db, queuedOrder)
+	require.NoError(t, err)
+	require.Empty(t, waiting)
+	limit := 1
+	queuedDispatch.Steps[0].MaxParallelism = &limit
+	require.NoError(t, db.Save(queuedDispatch).Error)
+	queuedResponse, err := RunFactoryCustomAutomation(ctx, onboardingDeps(r), r.Organization.ID.String(), &pb.RunFactoryCustomAutomationRequest{FactoryId: factory.ID.String(), AutomationId: created.ID.String(), WorkOrderId: queuedOrder.ID.String()})
+	require.NoError(t, err)
+	require.Empty(t, queuedResponse.RunId)
+	require.NotEmpty(t, queuedResponse.QueueItemId)
+	queueItems, err := models.ListFactoryWorkOrderQueueItemsByLineDispatchIDs(db, []uuid.UUID{queuedDispatch.ID})
+	require.NoError(t, err)
+	require.Equal(t, queueItems[queuedDispatch.ID].ID.String(), queuedResponse.QueueItemId)
 }
 
 func TestCanvasAutomationLegacyImportProtectsGraphBehavior(t *testing.T) {

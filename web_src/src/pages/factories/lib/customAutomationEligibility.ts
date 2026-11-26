@@ -19,7 +19,7 @@ export function eligibleColumnAutomations(
         return false;
       const latest = [...fixture.phases]
         .reverse()
-        .find((phase) => phase.appId === automation.id && phase.columnKey === savedColumn);
+        .find((phase) => !phase.historyRun && phase.appId === automation.id && phase.columnKey === savedColumn);
       return !latest || latest.status === "failed" || latest.status === "cancelled";
     }
     if (savedColumn === "backlog") return fixture.footer.kind === "draft";

@@ -32,9 +32,9 @@ export function CustomAutomationRunAction({
     setStatus(null);
     setLastAutomationId(automation.id);
     try {
-      await run.mutateAsync({ automationId: automation.id, workOrderId });
+      const result = await run.mutateAsync({ automationId: automation.id, workOrderId });
       if (placement === "board") {
-        setStatus({ type: "success", message: `${automation.name} started.` });
+        setStatus({ type: "success", message: `${automation.name} ${result.queueItemId ? "queued" : "started"}.` });
       }
     } catch (error) {
       setStatus({

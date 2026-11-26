@@ -1631,6 +1631,7 @@ message RunFactoryCustomAutomationRequest {
 message RunFactoryCustomAutomationResponse {
   string run_id = 1;
   string event_id = 2;
+  string queue_item_id = 3;
 }
 
 message PreviewFactoryScheduleRequest {
