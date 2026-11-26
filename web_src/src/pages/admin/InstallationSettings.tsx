@@ -134,29 +134,35 @@ const toSMTPFormState = (data: InstallationSettingsResponse): SMTPFormState => (
   useTLS: data.smtp_enabled ? data.smtp_use_tls : true,
 });
 
+const hasSMTPChanges = (settings: InstallationSettingsResponse | null, form: SMTPFormState): boolean => {
+  if (settings === null) {
+    return false;
+  }
+
+  return (
+    form.enabled !== settings.smtp_enabled ||
+    form.host.trim() !== settings.smtp_host ||
+    normalizeSMTPPort(form.port) !== settings.smtp_port ||
+    form.username.trim() !== settings.smtp_username ||
+    form.fromName.trim() !== settings.smtp_from_name ||
+    form.fromEmail.trim() !== settings.smtp_from_email ||
+    ((form.enabled || settings.smtp_enabled) && form.useTLS !== settings.smtp_use_tls) ||
+    form.password !== ""
+  );
+};
+
 const getDerivedState = (
   settings: InstallationSettingsResponse | null,
   allowPrivateNetworkAccess: boolean,
   signupsEnabled: boolean,
   form: SMTPFormState,
 ): DerivedState => {
-  const hasSMTPSettings = settings?.smtp_enabled ?? false;
-
   return {
     blockedHosts: settings?.effective_blocked_http_hosts ?? [],
     privateRanges: settings?.effective_private_ip_ranges ?? [],
     hasNetworkChanges: settings != null && allowPrivateNetworkAccess !== settings.allow_private_network_access,
     hasSignupChanges: settings != null && signupsEnabled !== settings.signups_enabled,
-    hasSMTPChanges:
-      settings != null &&
-      (form.enabled !== settings.smtp_enabled ||
-        form.host.trim() !== settings.smtp_host ||
-        normalizeSMTPPort(form.port) !== settings.smtp_port ||
-        form.username.trim() !== settings.smtp_username ||
-        form.fromName.trim() !== settings.smtp_from_name ||
-        form.fromEmail.trim() !== settings.smtp_from_email ||
-        ((form.enabled || hasSMTPSettings) && form.useTLS !== settings.smtp_use_tls) ||
-        form.password !== ""),
+    hasSMTPChanges: hasSMTPChanges(settings, form),
   };
 };
 

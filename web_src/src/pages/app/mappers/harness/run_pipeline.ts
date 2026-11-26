@@ -34,7 +34,13 @@ type RunPipelineSource = {
 };
 
 type RunPipelinePayload = RunPipelineSource & {
-  data?: RunPipelineSource;
+  data?: unknown;
+};
+
+type RunPipelineOutputs = {
+  success?: OutputPayload[];
+  failed?: OutputPayload[];
+  default?: OutputPayload[];
 };
 
 export const RUN_PIPELINE_STATE_MAP: EventStateMap = {
@@ -122,33 +128,9 @@ export const runPipelineMapper: ComponentBaseMapper = {
   },
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, unknown> {
     const details: Record<string, unknown> = {};
-    const outputs = context.execution.outputs as
-      | { success?: OutputPayload[]; failed?: OutputPayload[]; default?: OutputPayload[] }
-      | undefined;
+    const sourceData = runPipelineDetailSource(context.execution);
 
-    const payload =
-      (outputs?.success?.[0]?.data as RunPipelinePayload | undefined) ||
-      (outputs?.failed?.[0]?.data as RunPipelinePayload | undefined) ||
-      (outputs?.default?.[0]?.data as RunPipelinePayload | undefined);
-
-    const payloadData =
-      payload && typeof payload === "object" && payload.data && typeof payload.data === "object"
-        ? payload.data
-        : payload;
-
-    const metadataFallback =
-      (!payloadData || typeof payloadData !== "object") && context.execution.metadata
-        ? (context.execution.metadata as RunPipelineSource)
-        : undefined;
-
-    const sourceData =
-      payloadData && typeof payloadData === "object"
-        ? payloadData
-        : metadataFallback && typeof metadataFallback === "object"
-          ? metadataFallback
-          : undefined;
-
-    if (!sourceData || typeof sourceData !== "object") {
+    if (!sourceData) {
       return details;
     }
 
@@ -166,6 +148,37 @@ export const runPipelineMapper: ComponentBaseMapper = {
     return details;
   },
 };
+
+function runPipelinePayloadFromOutputs(outputs: RunPipelineOutputs | undefined): unknown {
+  return outputs?.success?.[0]?.data || outputs?.failed?.[0]?.data || outputs?.default?.[0]?.data;
+}
+
+function runPipelineSourceFromPayload(payload: unknown): RunPipelineSource | undefined {
+  if (!payload || typeof payload !== "object") {
+    return undefined;
+  }
+
+  const source = payload as RunPipelinePayload;
+  if (source.data && typeof source.data === "object") {
+    return source.data as RunPipelineSource;
+  }
+
+  return source;
+}
+
+function runPipelineDetailSource(execution: ExecutionInfo): RunPipelineSource | undefined {
+  const outputs = execution.outputs as RunPipelineOutputs | undefined;
+  const source = runPipelineSourceFromPayload(runPipelinePayloadFromOutputs(outputs));
+  if (source) {
+    return source;
+  }
+
+  if (!execution.metadata || typeof execution.metadata !== "object") {
+    return undefined;
+  }
+
+  return execution.metadata as RunPipelineSource;
+}
 
 function runPipelineMetadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];

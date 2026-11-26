@@ -467,6 +467,7 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 	s.Router.HandleFunc("/api/v1/runner/tasks", s.handleRunnerListTasks).Methods(http.MethodGet)
 	s.Router.HandleFunc("/api/v1/runner/tasks", s.handleRunnerCreateTask).Methods(http.MethodPost)
 	s.Router.HandleFunc("/api/v1/runner/task/close", s.handleRunnerCloseTask).Methods(http.MethodPost)
+	s.Router.HandleFunc("/api/v1/runner/task/move", s.handleRunnerMoveTask).Methods(http.MethodPost)
 	s.Router.HandleFunc("/api/v1/runner/members", s.handleRunnerListMembers).Methods(http.MethodGet)
 	s.Router.HandleFunc("/api/v1/runner/checks", s.handleRunnerListChecks).Methods(http.MethodGet)
 	s.Router.HandleFunc("/api/v1/runner/task/checks", s.handleRunnerAddChecks).Methods(http.MethodPost)
@@ -802,11 +803,6 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	//
 	publicRoute.
 		HandleFunc(s.BasePath+"/webhooks/{webhookID}", s.HandleWebhook).
-		Methods("POST")
-	// The extra segment names the event. Productive.io does not send an
-	// event header, and a shared signature token does not name it either.
-	publicRoute.
-		HandleFunc(s.BasePath+"/webhooks/{webhookID}/{event}", s.HandleWebhook).
 		Methods("POST")
 
 	//
@@ -1838,76 +1834,6 @@ func (s *Server) Close() {
 	}
 }
 
-// webhookDeliveryQuery returns the query the trigger should read.
-// The event can be a path segment or a query value. A proxy can drop
-// the query and still forward the path. Use the path when the query
-// does not name the event. Read the last path segment even when Gorilla
-// mux vars are missing, because some proxies forward the path without
-// matching the extra route.
-func webhookDeliveryQuery(r *http.Request) url.Values {
-	query := r.URL.Query()
-	if strings.TrimSpace(query.Get("event")) != "" {
-		return query
-	}
-
-	event := strings.TrimSpace(mux.Vars(r)["event"])
-	if event == "" {
-		event = eventNameFromPath(r.URL.Path)
-	}
-	if event == "" && r.RequestURI != "" {
-		parsed, err := url.ParseRequestURI(r.RequestURI)
-		if err == nil {
-			if value := strings.TrimSpace(parsed.Query().Get("event")); value != "" {
-				return parsed.Query()
-			}
-			event = eventNameFromPath(parsed.Path)
-		}
-	}
-	if event == "" {
-		return query
-	}
-
-	cloned := make(url.Values, len(query)+1)
-	for key, values := range query {
-		cloned[key] = append([]string(nil), values...)
-	}
-	cloned.Set("event", event)
-	return cloned
-}
-
-// eventNameFromPath returns the segment after a webhook UUID.
-// `/webhooks/{id}/task.created` yields `task.created`. A path that
-// ends on the webhook id has no event.
-func eventNameFromPath(rawPath string) string {
-	parts := strings.Split(strings.Trim(rawPath, "/"), "/")
-	if len(parts) < 2 {
-		return ""
-	}
-
-	last := strings.TrimSpace(parts[len(parts)-1])
-	webhookID := strings.TrimSpace(parts[len(parts)-2])
-	if last == "" {
-		return ""
-	}
-	if _, err := uuid.Parse(webhookID); err != nil {
-		return ""
-	}
-	if _, err := uuid.Parse(last); err == nil {
-		return ""
-	}
-	return last
-}
-
-const productiveOnTaskTrigger = "productive.onTask"
-
-func isProductiveOnTaskNode(node models.CanvasNode) bool {
-	if node.Type != models.NodeTypeTrigger {
-		return false
-	}
-	trigger := node.Ref.Data().Trigger
-	return trigger != nil && trigger.Name == productiveOnTaskTrigger
-}
-
 func webhookNodeLogger(node models.CanvasNode, integration *models.Integration) *log.Entry {
 	logger := logging.ForNode(node)
 	organizationID := ""
@@ -1960,15 +1886,11 @@ func uuidTag(id uuid.UUID) string {
 
 func (s *Server) replyWebhookError(w http.ResponseWriter, r *http.Request, webhook *models.Webhook, node models.CanvasNode, code int, err error, organizationID string) {
 	message := fmt.Sprintf("error handling webhook: %v", err)
-	if isProductiveOnTaskNode(node) {
-		organizationID = organizationIDForWebhookError(r, node, organizationID)
-		s.logWebhookError(r, webhook, node, code, err, organizationID)
-		storeWebhookServerError(r, webhook, node, code, err, organizationID)
-		http.Error(w, message, code)
-		return
-	}
-
-	s.logWebhookError(r, webhook, node, code, err, "")
+	log.WithFields(log.Fields{
+		"webhook_id": webhook.ID.String(),
+		"path":       r.URL.Path,
+		"status":     code,
+	}).Errorf("error handling webhook: %v", err)
 	http.Error(w, message, code)
 	if code < http.StatusInternalServerError {
 		return
@@ -1999,32 +1921,6 @@ func integrationOrganizationID(integration *models.Integration) string {
 		return ""
 	}
 	return integration.OrganizationID.String()
-}
-
-func (s *Server) logWebhookError(r *http.Request, webhook *models.Webhook, node models.CanvasNode, code int, err error, organizationID string) {
-	if !isProductiveOnTaskNode(node) {
-		log.WithFields(log.Fields{
-			"webhook_id": webhook.ID.String(),
-			"path":       r.URL.Path,
-			"status":     code,
-		}).Errorf("error handling webhook: %v", err)
-		return
-	}
-
-	fields := log.Fields{
-		"workflow_id":   node.WorkflowID.String(),
-		"node_id":       node.NodeID,
-		"webhook_id":    webhook.ID.String(),
-		"webhook_state": webhook.State,
-		"status":        code,
-	}
-	if organizationID != "" {
-		fields["organization_id"] = organizationID
-	}
-	if node.AppInstallationID != nil {
-		fields["app_installation_id"] = node.AppInstallationID.String()
-	}
-	logging.LogProductiveWebhookFailure(webhookDeliveryQuery(r).Get("event"), fields, err)
 }
 
 func organizationIDForWebhookNode(tx *gorm.DB, node models.CanvasNode) string {
@@ -2135,7 +2031,7 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 	var firstResponse *core.WebhookResponseBody
 
 	for _, node := range nodes {
-		code, response, organizationID, err := s.executeWebhookNode(requestCtx, body, r.Header, webhookDeliveryQuery(r), node, onNewEvents, recordExecution)
+		code, response, organizationID, err := s.executeWebhookNode(requestCtx, body, r.Header, r.URL.Query(), node, onNewEvents, recordExecution)
 		if err != nil {
 			track.complete(requestCtx, code, len(nodes))
 			s.replyWebhookError(w, r, webhook, node, code, err, organizationID)
