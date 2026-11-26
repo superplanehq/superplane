@@ -1,6 +1,7 @@
 package factories
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -313,7 +314,28 @@ func TestCustomStageWebhookRunsWithoutTask(t *testing.T) {
 	assert.NotContains(t, prompts[customStageRunnerID], "webhook started this run")
 
 	_, err = service.Update(ctx, r.Organization.ID, canvasID, r.User, strings.Replace(source, "  - use: task_enters_stage\n", "", 1))
-	require.ErrorContains(t, err, "Keep one task_enters_stage trigger")
+	require.NoError(t, err)
+	version, err = models.FindLiveCanvasVersionInTransaction(db, canvasID)
+	require.NoError(t, err)
+	components := []string{}
+	for _, node := range version.Nodes {
+		components = append(components, node.ComponentName())
+		if node.ID == customStageWebhookRunnerID {
+			assert.Contains(t, node.Configuration["environment"], saved, "removing the task trigger keeps the webhook runner")
+		}
+	}
+	assert.NotContains(t, components, "onRun")
+	_, err = line.ExecutionPlan(db)
+	require.ErrorIs(t, err, models.ErrFactoryLineHasNoSteps, "a webhook-only stage automation adds no step")
+	read, err = service.Read(ctx, r.Organization.ID, canvasID)
+	require.NoError(t, err)
+	assert.NotContains(t, read.YAML, "task_enters_stage")
+
+	_, err = service.Update(ctx, r.Organization.ID, canvasID, r.User, source)
+	require.NoError(t, err)
+	steps, err := line.ExecutionPlan(db)
+	require.NoError(t, err)
+	assert.True(t, slices.ContainsFunc(steps, func(step models.FactoryLineStep) bool { return step.AppID == canvasID }))
 }
 
 func requireStatusCode(t *testing.T, err error, expected codes.Code) {

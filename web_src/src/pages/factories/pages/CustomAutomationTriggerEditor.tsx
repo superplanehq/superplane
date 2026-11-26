@@ -98,7 +98,12 @@ export function TriggerEditor({
       <section className="flex flex-col gap-4">
         <div className="flex flex-col gap-1.5">
           <h3 className="text-base font-semibold text-foreground">Triggers</h3>
-          <TriggerContext columnKey={columnKey} runsOnTask={runsOnTask} onRunsOnTaskChange={onRunsOnTaskChange} />
+          <TriggerContext
+            columnKey={columnKey}
+            triggers={triggers}
+            runsOnTask={runsOnTask}
+            onRunsOnTaskChange={onRunsOnTaskChange}
+          />
         </div>
         {visibleTriggers.map((trigger) => (
           <TriggerCard
@@ -217,7 +222,7 @@ function TriggerCard({
             <TriggerOption mode={trigger.mode} columnKey={columnKey} runsOnTask={runsOnTask} />
           </div>
         )}
-        {triggers.length > 1 && !lineStartsTrigger(columnKey, trigger.mode) ? (
+        {triggers.length > 1 ? (
           <Button
             type="button"
             variant="ghost"
@@ -266,17 +271,21 @@ function TriggerCard({
 /** Chooses which triggers this automation can run. The choice is saved. */
 function TriggerContext({
   columnKey,
+  triggers,
   runsOnTask,
   onRunsOnTaskChange,
 }: {
   columnKey: CustomAutomationColumn;
+  triggers: CustomAutomationTrigger[];
   runsOnTask?: boolean;
   onRunsOnTaskChange: (runsOnTask: boolean) => void;
 }) {
   if (columnKey.startsWith("custom-")) {
     return (
       <p className="text-xs text-muted-foreground">
-        The line starts this automation when a task enters the stage. A webhook can also start it with no task.
+        {triggers.some((trigger) => trigger.mode === "automatic")
+          ? "The line starts this automation when a task enters the stage. A webhook can also start it with no task."
+          : "A webhook starts this automation with no task. Tasks wait in this stage only when auto advance is off. A webhook run can move them."}
       </p>
     );
   }
@@ -347,18 +356,13 @@ function AutomationIconPicker({ icon, onChange }: { icon: string; onChange: (ico
   );
 }
 
-/** A custom stage can add webhooks next to its line trigger. Other stages offer every trigger for the run context. */
+/** A custom stage starts on its line trigger, webhooks, or both. Other stages offer every trigger for the run context. */
 function availableTriggerModes(columnKey: CustomAutomationColumn, runsOnTask?: boolean): CustomAutomationMode[] {
-  if (columnKey.startsWith("custom-")) return ["webhook"];
+  if (columnKey.startsWith("custom-")) return ["automatic", "webhook"];
   const modes: CustomAutomationMode[] = ["manual"];
   if (runsOnTask !== false) modes.push("automatic", "leave");
   if (runsOnTask !== true) modes.push("scheduled", "webhook");
   return modes;
-}
-
-/** The line starts a custom stage automation when a task enters the stage. Keep that trigger. */
-function lineStartsTrigger(columnKey: CustomAutomationColumn, mode: CustomAutomationMode): boolean {
-  return columnKey.startsWith("custom-") && mode === "automatic";
 }
 
 /** Schedules and webhooks can repeat with different settings. Event triggers cannot. */

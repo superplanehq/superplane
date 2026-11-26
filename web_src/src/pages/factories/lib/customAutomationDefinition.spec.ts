@@ -142,6 +142,13 @@ describe("webhook trigger conversion", () => {
     expect(automationDefinitionTriggers(visual.triggers, stage)).toEqual(definition.triggers);
   });
 
+  it("accepts a custom stage automation that only a webhook starts", () => {
+    const stage: CustomAutomationColumn = "custom-qa";
+    const definition = webhookDefinition();
+    const visual = automationDefinitionCanvas(parseAutomationForCanvas(automationDefinitionYaml(definition), stage));
+    expect(automationDefinitionTriggers(visual.triggers, stage)).toEqual(definition.triggers);
+  });
+
   const duplicate = webhookDefinition();
   duplicate.triggers.push({ id: "again", use: "webhook", config: { webhook_id: "webhook-1" } });
   it.each<[CustomAutomationColumn, AutomationDefinition, string]>([

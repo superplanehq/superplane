@@ -44,6 +44,7 @@ var runnerTools = []RunnerTool{
 	{Name: "assign_task_owner", Scope: ScopeOwnerWrite},
 	{Name: "suggest_task_owner", Scope: ScopeOwnerRead},
 	{Name: "list_tasks", Scope: ScopeTasksRead},
+	{Name: "get_task", Scope: ScopeTasksRead},
 	{Name: "create_task", Scope: ScopeTasksCreate},
 	{Name: "close_task", Scope: ScopeTasksClose},
 	{Name: "list_checks", Scope: ScopeChecksRead},
@@ -81,8 +82,9 @@ var runnerFlowScopes = map[RunnerFlow][]RunnerToolScope{
 	RunnerFlowPlanning:        withScopes(ScopePlanWrite),
 	RunnerFlowTask:            withScopes(ScopeTasksMove),
 	RunnerFlowMergeConfidence: withScopes(ScopeMergeChecksWrite, ScopeTasksMove),
-	// A schedule run has no task yet. It can list and create tasks.
-	RunnerFlowSchedule: {ScopeTasksRead, ScopeTasksCreate},
+	// A schedule run has no task. It can find and create tasks, and move
+	// tasks that wait in its own stage.
+	RunnerFlowSchedule: {ScopeTasksRead, ScopeTasksCreate, ScopeTasksMove},
 }
 
 func withScopes(extra ...RunnerToolScope) []RunnerToolScope {
