@@ -389,6 +389,88 @@ func TestUpdateFactoryLineStages(t *testing.T) {
 		assert.Equal(t, models.CanvasRunResultPassed, completed.Result)
 	})
 
+	t.Run("keeps a runner used by a retained phase", func(t *testing.T) {
+		factory, _ := newLine(t)
+		app, entrypoint := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "Repeated", "start")
+		require.NoError(t, app.SetColumnKey(db, "implement"))
+		step := models.FactoryLineStep{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entrypoint}
+		line, err := factory.CreateLine(db, "repeated", []models.FactoryLineStep{step, step})
+		require.NoError(t, err)
+		run, err := models.CreateCanvasRunInTransaction(db, app.ID, entrypoint, models.CanvasRunStateStarted, "")
+		require.NoError(t, err)
+		stages := factoryLineStageRequests(line.StagesValue())
+		_, err = UpdateFactoryLine(t.Context(), deps, r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
+			FactoryId: factory.ID.String(), LineId: line.ID.String(),
+			StageConfiguration: &pb.FactoryLine_StageConfiguration{Stages: append(stages[:1], stages[2:]...)},
+		})
+		require.NoError(t, err)
+		_, err = models.FindCanvasInTransaction(db, r.Organization.ID, app.ID)
+		require.NoError(t, err)
+		reloaded, err := factory.FindLine(db, line.ID)
+		require.NoError(t, err)
+		require.Len(t, reloaded.Steps, 1)
+		assert.Equal(t, app.ID, reloaded.Steps[0].AppID)
+		assert.Equal(t, "phase-1", reloaded.Stages[1].Key)
+		assert.Equal(t, 0, *reloaded.Stages[1].StepIndex)
+		run, err = models.FindCanvasRunInTransaction(db, app.ID, run.ID)
+		require.NoError(t, err)
+		assert.Equal(t, models.CanvasRunStateStarted, run.State)
+	})
+
+	t.Run("cancels waiting dispatches atomically when their runner is deleted", func(t *testing.T) {
+		factory, _ := newLine(t)
+		app, entrypoint := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "Queued", "start")
+		one := 1
+		line, err := factory.CreateLine(db, "queued", []models.FactoryLineStep{{
+			Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entrypoint, MaxParallelism: &one,
+		}})
+		require.NoError(t, err)
+		var waiting *models.FactoryWorkOrderLineDispatch
+		for index := range 2 {
+			order, err := factory.CreateWorkOrder(db, fmt.Sprintf("Order %d", index), "", &r.User, nil, nil)
+			require.NoError(t, err)
+			require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+				var result *models.FactoryLineStepResult
+				waiting, result, err = line.Dispatch(tx, order)
+				if err == nil && index == 1 {
+					require.NotNil(t, result.QueueItem)
+				}
+				return err
+			}))
+		}
+		stages := factoryLineStageRequests(line.StagesValue())
+		req := &pb.UpdateFactoryLineRequest{FactoryId: factory.ID.String(), LineId: line.ID.String(),
+			StageConfiguration: &pb.FactoryLine_StageConfiguration{Stages: append(stages[:1], stages[2:]...)}}
+		const callback = "test:fail_queued_stage_cleanup"
+		t.Cleanup(func() { db.Callback().Update().Remove(callback) })
+		require.NoError(t, db.Callback().Update().Before("gorm:update").Register(callback, func(tx *gorm.DB) {
+			if tx.Statement.Table == "factory_lines" {
+				tx.AddError(errors.New("save failed"))
+			}
+		}))
+		_, err = UpdateFactoryLine(t.Context(), deps, r.Organization.ID.String(), req)
+		require.Error(t, err)
+		require.NoError(t, db.Callback().Update().Remove(callback))
+		queued, err := models.ListFactoryWorkOrderQueueItemsByLineDispatchIDs(db, []uuid.UUID{waiting.ID})
+		require.NoError(t, err)
+		require.Len(t, queued, 1)
+		unchanged, err := models.FindWorkOrderLineDispatch(db, waiting.ID)
+		require.NoError(t, err)
+		assert.True(t, unchanged.IsActive())
+		_, err = UpdateFactoryLine(t.Context(), deps, r.Organization.ID.String(), req)
+		require.NoError(t, err)
+		queued, err = models.ListFactoryWorkOrderQueueItemsByLineDispatchIDs(db, []uuid.UUID{waiting.ID})
+		require.NoError(t, err)
+		assert.Empty(t, queued)
+		waiting, err = models.FindWorkOrderLineDispatch(db, waiting.ID)
+		require.NoError(t, err)
+		assert.False(t, waiting.IsActive())
+		assert.Equal(t, models.CanvasRunResultCancelled, waiting.Result)
+		admitted, err := models.AdmitQueuedForStep(db, line.ID, app.ID, "phase-0")
+		require.NoError(t, err)
+		assert.Empty(t, admitted)
+	})
+
 	t.Run("keeps Backlog and Done fixed", func(t *testing.T) {
 		factory, line := newLine(t)
 		stages := factoryLineStageRequests(line.StagesValue())

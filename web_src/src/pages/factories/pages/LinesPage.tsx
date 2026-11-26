@@ -2100,7 +2100,7 @@ function PhaseBoard({
       if (!column) {
         return null;
       }
-      const columnKey: ColumnKey = `phase-${column.stepIndex}`;
+      const columnKey = stage.key as ColumnKey;
       const automations = rowsFor(stage.key);
       return (
         <PhaseColumn

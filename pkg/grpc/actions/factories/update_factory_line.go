@@ -98,6 +98,11 @@ func UpdateFactoryLine(ctx context.Context, deps IntakeDependencies, organizatio
 			if err != nil {
 				return err
 			}
+			// Lock all factory lines before deleting canvases or queued dispatches.
+			steps, err = line.RemoveDeletedAutomationBindings(tx, stages, deletedCanvases)
+			if err != nil {
+				return err
+			}
 			for i := range deletedCanvases {
 				canvas := &deletedCanvases[i]
 				locked, err := models.LockCanvasForUpdate(tx, orgID, canvas.ID)
@@ -127,6 +132,9 @@ func UpdateFactoryLine(ctx context.Context, deps IntakeDependencies, organizatio
 					return err
 				}
 				cancellations = append(cancellations, requested...)
+				if err := canvas.CancelQueuedFactoryDispatches(tx); err != nil {
+					return err
+				}
 				if err := models.DeleteFactoryPRFeedbackHandlersByCanvas(tx, canvas.ID); err != nil {
 					return err
 				}
@@ -135,10 +143,6 @@ func UpdateFactoryLine(ctx context.Context, deps IntakeDependencies, organizatio
 				}
 			}
 			if err := line.ClearRemovedStageDisplayColumns(tx, stages); err != nil {
-				return err
-			}
-			steps, err = line.RemoveDeletedAutomationBindings(tx, stages, deletedCanvases)
-			if err != nil {
 				return err
 			}
 		}

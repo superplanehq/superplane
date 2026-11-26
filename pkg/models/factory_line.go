@@ -3,6 +3,7 @@ package models
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -582,7 +583,7 @@ func (l *FactoryLine) ListRemovedStageAutomations(tx *gorm.DB, next []FactoryLin
 				key = "verify"
 			}
 		}
-		if bound[canvas.ID] || (removed[key] && !retainedRunners[canvas.ID]) {
+		if !retainedRunners[canvas.ID] && (bound[canvas.ID] || removed[key]) {
 			selected = append(selected, canvas)
 		}
 	}
@@ -613,14 +614,21 @@ func (l *FactoryLine) removedStageKeys(next []FactoryLineStage) []string {
 	return removedKeys
 }
 
-// Remove only deleted runner bindings; legacy lines keep their stage identities.
+// Remove deleted phase bindings and deleted canvases; keep retained stage identities.
 func (l *FactoryLine) RemoveDeletedAutomationBindings(tx *gorm.DB, next []FactoryLineStage, deleted []Canvas) ([]FactoryLineStep, error) {
-	if len(deleted) == 0 {
-		return nil, nil
-	}
 	ids := map[uuid.UUID]bool{}
 	for _, canvas := range deleted {
 		ids[canvas.ID] = true
+	}
+	removedIndexes := map[int]bool{}
+	removedKeys := l.removedStageKeys(next)
+	for _, stage := range l.StagesValue() {
+		if stage.StepIndex != nil && slices.Contains(removedKeys, stage.Key) {
+			removedIndexes[*stage.StepIndex] = true
+		}
+	}
+	if len(deleted) == 0 && len(removedIndexes) == 0 {
+		return nil, nil
 	}
 	factory := &Factory{ID: l.FactoryID, OrganizationID: l.OrganizationID}
 	lines, err := factory.ListLines(tx.Clauses(clause.Locking{Strength: "UPDATE"}))
@@ -633,7 +641,7 @@ func (l *FactoryLine) RemoveDeletedAutomationBindings(tx *gorm.DB, next []Factor
 		steps := make([]FactoryLineStep, 0, len(line.Steps))
 		indexes := map[int]int{}
 		for index, step := range line.Steps {
-			if ids[step.AppID] {
+			if ids[step.AppID] || (line.ID == l.ID && removedIndexes[index]) {
 				continue
 			}
 			indexes[index] = len(steps)
