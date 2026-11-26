@@ -56,6 +56,7 @@ async function refreshHistory(
         withOrganizationHeader({
           organizationId,
           path: { canvasId, runId: entry.run.id! },
+          query: { includeTask: true },
           signal,
           throwOnError: true,
         }),
