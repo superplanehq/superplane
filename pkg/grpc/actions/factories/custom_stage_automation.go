@@ -124,9 +124,8 @@ func editLegacyCustomStageGraph(version *models.CanvasVersion, settings *customA
 		if !isFactoryAgentHarness(node.ComponentName()) {
 			continue
 		}
-		node.Configuration = maps.Clone(node.Configuration)
 		previousID := node.ID
-		node.ID = customStageAgentID(node.ID, node.ComponentName(), settings.Agent.component())
+		editCustomStageRunner(node, customStageRunnerID, settings)
 		if node.ID != previousID {
 			// A provider change retires the old runner identity.
 			for j := range edges {
@@ -135,61 +134,113 @@ func editLegacyCustomStageGraph(version *models.CanvasVersion, settings *customA
 				}
 			}
 		}
-		node.Ref = models.NodeRef{Component: &models.ComponentRef{Name: settings.Agent.component()}}
-		if credentials := settings.Agent.credentials(); credentials != nil && settings.Agent.component() != models.SuperPlaneRunnerComponent {
-			node.Configuration["credentials"] = credentials
-		} else {
-			delete(node.Configuration, "credentials")
-		}
-		delete(node.Configuration, "llmProvider")
-		settings.Agent.applyLLMProvider(node.Configuration)
-		addCustomStageStepSecrets(node.Configuration, settings.Steps)
-		node.Configuration["steps"] = customAutomationStepConfiguration(settings.Steps)
-		node.Configuration["executionTimeoutSeconds"] = settings.ExecutionTimeoutSeconds
-		if settings.model() != "" {
-			node.Configuration["model"] = settings.model()
-		} else {
-			delete(node.Configuration, "model")
-		}
-		if settings.SkipSetupCommands != nil {
-			node.Configuration["skipSetupCommands"] = *settings.SkipSetupCommands
-		} else {
-			delete(node.Configuration, "skipSetupCommands")
-		}
-		if settings.SkipRepositoryCheckout != nil {
-			node.Configuration["skipRepositoryCheckout"] = *settings.SkipRepositoryCheckout
-		} else {
-			delete(node.Configuration, "skipRepositoryCheckout")
-		}
 	}
 	return nodes, edges
 }
 
-// Saved task runner settings stay. Only the webhook part comes from the build.
+// Only form-owned fields change. Canvas-owned values, such as extra
+// environment entries and secret sources, stay.
+func editCustomStageRunner(node *models.Node, baseID string, settings *customAutomationSettings) {
+	node.Configuration = maps.Clone(node.Configuration)
+	if node.ComponentName() != settings.Agent.component() {
+		node.ID = baseID + "-" + strings.ToLower(strings.ReplaceAll(settings.Agent.component(), ".", "-"))
+	}
+	node.Ref = models.NodeRef{Component: &models.ComponentRef{Name: settings.Agent.component()}}
+	if credentials := settings.Agent.credentials(); credentials != nil && settings.Agent.component() != models.SuperPlaneRunnerComponent {
+		node.Configuration["credentials"] = credentials
+	} else {
+		delete(node.Configuration, "credentials")
+	}
+	delete(node.Configuration, "llmProvider")
+	settings.Agent.applyLLMProvider(node.Configuration)
+	addCustomStageStepSecrets(node.Configuration, settings.Steps)
+	node.Configuration["steps"] = customAutomationStepConfiguration(settings.Steps)
+	node.Configuration["executionTimeoutSeconds"] = settings.ExecutionTimeoutSeconds
+	if settings.model() != "" {
+		node.Configuration["model"] = settings.model()
+	} else {
+		delete(node.Configuration, "model")
+	}
+	if settings.SkipSetupCommands != nil {
+		node.Configuration["skipSetupCommands"] = *settings.SkipSetupCommands
+	} else {
+		delete(node.Configuration, "skipSetupCommands")
+	}
+	if settings.SkipRepositoryCheckout != nil {
+		node.Configuration["skipRepositoryCheckout"] = *settings.SkipRepositoryCheckout
+	} else {
+		delete(node.Configuration, "skipRepositoryCheckout")
+	}
+}
+
+// Saved runner settings stay. The build supplies only new webhook nodes.
 func editCustomStageGraph(live *models.CanvasVersion, settings *customAutomationSettings, built []models.Node, builtEdges []models.Edge) ([]models.Node, []models.Edge) {
 	nodes, edges := editLegacyCustomStageGraph(customStageCore(live), settings)
-	for _, node := range built {
-		if customStageWebhookPart(node) {
-			nodes = append(nodes, node)
+	for i := range nodes {
+		if nodes[i].ComponentName() == "onRun" {
+			setCustomStageRunContext(&nodes[i], settings.RunsOnTask)
 		}
+	}
+	runnerID := customStageWebhookRunnerID
+	for _, node := range built {
+		if !customStageWebhookPart(node) {
+			continue
+		}
+		if saved := savedCustomStageWebhookRunner(live.Nodes); saved != nil && isFactoryAgentHarness(node.ComponentName()) {
+			node = *saved
+			editCustomStageRunner(&node, customStageWebhookRunnerID, settings)
+			appendWebhookPayloadInstructions(node.Configuration)
+		}
+		if isFactoryAgentHarness(node.ComponentName()) {
+			runnerID = node.ID
+		}
+		nodes = append(nodes, node)
 	}
 	for _, edge := range builtEdges {
 		if edge.TargetID == customStageWebhookRunnerID {
+			edge.TargetID = runnerID
 			edges = append(edges, edge)
 		}
 	}
 	return nodes, edges
 }
 
-func customStageCore(version *models.CanvasVersion) *models.CanvasVersion {
-	core := &models.CanvasVersion{}
-	for _, node := range version.Nodes {
-		if !customStageWebhookPart(node) {
-			core.Nodes = append(core.Nodes, node)
+// A webhook runs with no task, so the line trigger must not keep runsOnTask: true.
+func setCustomStageRunContext(node *models.Node, runsOnTask *bool) {
+	template, ok := node.Metadata[models.FactoryAppTemplateMetadataKey].(map[string]any)
+	if !ok {
+		return
+	}
+	template = maps.Clone(template)
+	delete(template, "runsOnTask")
+	if runsOnTask != nil {
+		template["runsOnTask"] = *runsOnTask
+	}
+	node.Metadata = maps.Clone(node.Metadata)
+	node.Metadata[models.FactoryAppTemplateMetadataKey] = template
+}
+
+func savedCustomStageWebhookRunner(nodes []models.Node) *models.Node {
+	for i := range nodes {
+		if customStageWebhookPart(nodes[i]) && isFactoryAgentHarness(nodes[i].ComponentName()) {
+			return &nodes[i]
 		}
 	}
+	return nil
+}
+
+func customStageCore(version *models.CanvasVersion) *models.CanvasVersion {
+	core := &models.CanvasVersion{}
+	webhookParts := map[string]bool{}
+	for _, node := range version.Nodes {
+		if customStageWebhookPart(node) {
+			webhookParts[node.ID] = true
+			continue
+		}
+		core.Nodes = append(core.Nodes, node)
+	}
 	for _, edge := range version.Edges {
-		if edge.TargetID != customStageWebhookRunnerID {
+		if !webhookParts[edge.SourceID] && !webhookParts[edge.TargetID] {
 			core.Edges = append(core.Edges, edge)
 		}
 	}
@@ -197,14 +248,8 @@ func customStageCore(version *models.CanvasVersion) *models.CanvasVersion {
 }
 
 func customStageWebhookPart(node models.Node) bool {
-	return node.ID == customStageWebhookRunnerID || node.ComponentName() == factorycomponent.OnWebhookTriggerName
-}
-
-func customStageAgentID(id, previousComponent, component string) string {
-	if previousComponent == component {
-		return id
-	}
-	return customStageRunnerID + "-" + strings.ToLower(strings.ReplaceAll(component, ".", "-"))
+	return node.ID == customStageWebhookRunnerID || strings.HasPrefix(node.ID, customStageWebhookRunnerID+"-") ||
+		node.ComponentName() == factorycomponent.OnWebhookTriggerName
 }
 
 func checkCustomStageFormGraph(tx *gorm.DB, factory *models.Factory, canvas *models.Canvas, version *models.CanvasVersion) error {
