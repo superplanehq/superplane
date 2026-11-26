@@ -18,7 +18,7 @@ import type { ManualCustomAutomation } from "../../../lib/customAutomation";
 import { CustomAutomationRunAction } from "../../CustomAutomationRunAction";
 
 import { type SplitRunFixture, type SplitRunPhase } from "../splitRunMocks";
-import { isClosedWorkOrderDisplayStatus } from "../splitRunFooter";
+import { eligibleColumnAutomations } from "../../../lib/customAutomationEligibility";
 import type { SplitRunSource } from "../splitRunSource";
 import { ConsoleSummaryPanel } from "./ConsoleSummaryPanel";
 import { timingsForConsoleColumns, type ColumnTiming } from "./columnTiming";
@@ -430,27 +430,6 @@ function ColumnTimelineItem({
       </TimelineContent>
     </TimelineItem>
   );
-}
-
-function eligibleColumnAutomations(
-  automations: readonly ManualCustomAutomation[],
-  columnId: ConsoleColumnId,
-  fixture: SplitRunFixture,
-) {
-  return automations.filter((automation) => {
-    const savedColumn = automation.columnKey ?? "verify";
-    if (savedColumn !== columnId) return false;
-    if (savedColumn === "backlog") return fixture.footer.kind === "draft";
-    if (savedColumn === "implement") {
-      return (
-        fixture.currentStepIndex === 0 &&
-        !fixture.canRunVerifyCustomAutomation &&
-        (fixture.lineStatus === "running" || fixture.lineStatus === "waiting")
-      );
-    }
-    if (savedColumn === "done") return isClosedWorkOrderDisplayStatus(fixture.footer.status);
-    return Boolean(fixture.canRunVerifyCustomAutomation);
-  });
 }
 
 /** Empty Backlog after Intake is not skipped; the creation stage already ran. */

@@ -127,7 +127,7 @@ export function useRunFactoryCustomAutomation(organizationId: string, factoryId:
           body: { workOrderId },
         }),
       );
-      if (!response.data?.runId) {
+      if (!response.data?.runId && !response.data?.queueItemId) {
         throw new Error("SuperPlane could not start the automation.");
       }
       return response.data;
