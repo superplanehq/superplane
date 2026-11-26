@@ -27,6 +27,7 @@ export type LinePhaseRunCard = {
 };
 
 export type LinePhaseColumn = {
+  stageKey?: string;
   stepName: string;
   stepIndex: number;
   /** Factory app id for this runApp step, when present. */
@@ -101,6 +102,7 @@ export function buildLinePhaseBoard(
   }
 
   const columns: LinePhaseColumn[] = steps.map((step, stepIndex) => ({
+    stageKey: line.stages?.find((stage) => stage.stepIndex === stepIndex)?.key,
     stepName: automationNameForLineStep(step, apps, stepIndex),
     stepIndex,
     appId: step.app?.app?.trim() || undefined,
@@ -303,10 +305,7 @@ function ordersInSourceListOrder(
 }
 
 function isWaitingAfterPassedStage(run: LinePhaseRunCard): boolean {
-  if (run.order.state === "STATE_CLOSED") {
-    return false;
-  }
-  if (getWorkOrderDisplayStatus(run.order) !== "waiting") {
+  if (run.order.state === "STATE_CLOSED" || getWorkOrderDisplayStatus(run.order) !== "waiting") {
     return false;
   }
   return run.execution.state === "STATE_FINISHED" && run.execution.result === "RESULT_PASSED";

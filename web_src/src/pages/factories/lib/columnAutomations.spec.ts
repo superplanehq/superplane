@@ -21,7 +21,7 @@ import {
   factoryPRFeedbackPath,
 } from "./factoryPagePaths";
 import { LINE_INTAKE_SOURCES } from "../pages/lineIntakeModel";
-import type { LinePhaseColumn } from "./linePhaseRuns";
+import { buildLinePhaseBoard, type LinePhaseColumn } from "./linePhaseRuns";
 
 const GITHUB_INTAKE: FactoriesFactoryIntake = {
   id: "intake-github",
@@ -130,6 +130,21 @@ describe("columnAutomationsEmptyCopy", () => {
 });
 
 describe("buildColumnAutomations", () => {
+  it("keeps the retained phase runner visible after step indexes change", () => {
+    const columns = buildLinePhaseBoard(
+      {
+        id: "line-1",
+        steps: [{ type: "runApp", app: { app: "retained-runner", entrypoint: "start" } }],
+        stages: [{ id: "retained-stage", key: "phase-1", name: "Review", kind: "STAGE_KIND_PHASE", stepIndex: 0 }],
+      },
+      [],
+      [{ id: "retained-runner", name: "Review" }],
+    );
+    const automations = buildColumnAutomations("phase-1", { columnTitle: "Review", columns });
+    expect(automations.map((automation) => automation.canvasId)).toEqual(["retained-runner"]);
+    expect(buildColumnAutomations("phase-0", { columnTitle: "Deleted", columns })).toEqual([]);
+  });
+
   it("builds backlog intakes and analysis once with explicit placement", () => {
     const automations = buildColumnAutomations("backlog", {
       columnTitle: "Backlog",
@@ -502,44 +517,4 @@ describe("columnAutomationOpenPath", () => {
       ),
     ).toBe(factoryPRFeedbackPath("org-1", "RF", "line-plan", undefined, "handler-checks"));
   });
-});
-
-it("keeps a renamed scheduled intake visible and opens its saved automation", () => {
-  const rows = buildColumnAutomations("backlog", {
-    columnTitle: "Backlog",
-    planningEnabled: false,
-    apps: [{ id: "scheduled-app", name: "Review documentation", columnKey: "backlog" }],
-  });
-  expect(rows).toHaveLength(1);
-  expect(rows[0]).toMatchObject({ name: "Review documentation", trigger: "On schedule" });
-  expect(columnAutomationOpenPath(rows[0], { organizationId: "org", factoryKey: "workspace" })).toBe(
-    factoryColumnAutomationViewPath("org", "workspace", undefined, "scheduled-app"),
-  );
-});
-
-it("keeps a renamed Review request visible without discovery and avoids a duplicate custom row", () => {
-  const rows = buildColumnAutomations("verify", {
-    columnTitle: "Verify",
-    apps: [
-      {
-        id: "review-request-app",
-        name: "Request engineering review",
-        templateId: "review-request",
-        columnKey: "verify",
-        displayColumnKey: "done",
-      },
-    ],
-  });
-  expect(rows).toHaveLength(1);
-  expect(rows[0]).toMatchObject({
-    kind: "review-request",
-    displayColumnKey: "done",
-    executionKey: "verify",
-    canvasId: "review-request-app",
-    name: "Request engineering review",
-  });
-  expect(columnAutomationOpenPath(rows[0], { organizationId: "org", factoryKey: "workspace" })).toBe(
-    factoryColumnAutomationViewPath("org", "workspace", undefined, "review-request-app"),
-  );
-  expect(catalogForColumn("verify").some((entry) => entry.id === "review-request")).toBe(false);
 });

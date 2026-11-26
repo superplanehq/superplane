@@ -31,7 +31,6 @@ const env = {
   SUPERPLANE_RUNNER_TOKEN: "token",
 };
 
-const placeholders = [["task", "move", "--column", "done"]];
 
 test("superplane task artifact add-link attaches the url and label", async () => {
   const requests = [];
@@ -283,8 +282,8 @@ test("superplane task artifact add is not a command", () => {
   assert.doesNotMatch(result.stderr, /task artifact add --url/);
 });
 
-test("other task commands are recognized and do no work", async () => {
-  for (const argv of placeholders) {
+test("task move rejects missing and contradictory destinations before a request", async () => {
+  for (const argv of [["task", "move"], ["task", "move", "--next", "--column", "done"], ["task", "move", "--column"]]) {
     let stderr = "";
     const code = await main(
       argv,
@@ -295,10 +294,23 @@ test("other task commands are recognized and do no work", async () => {
       { write() {} },
       { write: (chunk) => { stderr += chunk; } },
     );
-    const flagAt = argv.findIndex((arg) => arg.startsWith("--"));
-    const command = argv.slice(0, flagAt === -1 ? argv.length : flagAt).join(" ");
     assert.equal(code, 1, argv.join(" "));
-    assert.match(stderr, new RegExp(`superplane ${command} is not available yet`));
+    assert.match(stderr, /column|next/);
+  }
+});
+
+test("task move sends both modes through the runner API and prints the result", async () => {
+  for (const [flags, body] of [[["--column", "custom-review"], {column: "custom-review"}], [["--next"], {next: true}]]) {
+    let stdout = "";
+    const result = {id: "task-1", from_column: "implement", column: "custom-review", state: "open"};
+    const code = await main(["task", "move", ...flags], env, async (url, options) => {
+      assert.equal(url, "https://app.example/api/v1/runner/task/move");
+      assert.equal(options.method, "POST");
+      assert.deepEqual(JSON.parse(options.body), body);
+      return {ok: true, status: 200, text: async () => JSON.stringify(result)};
+    }, {write: chunk => {stdout += chunk;}}, {write() {}});
+    assert.equal(code, 0);
+    assert.deepEqual(JSON.parse(stdout), result);
   }
 });
 
@@ -557,18 +569,15 @@ test("superplane task check list uses SUPERPLANE_TASK_ID when --task is omitted"
   assert.match(stderr, /usage: superplane task check list \[--task TASK\]/);
 });
 
-test("a placeholder with a missing flag does not claim to run", async () => {
+test("task move reports an API error with a nonzero exit code", async () => {
   let stderr = "";
   const code = await main(
-    ["task", "move"],
+    ["task", "move", "--next"],
     env,
-    async () => {
-      throw new Error("fetch must not run");
-    },
+    async () => ({ok: false, status: 409, text: async () => "Calling run has no current task stage"}),
     { write() {} },
     { write: (chunk) => { stderr += chunk; } },
   );
   assert.equal(code, 1);
-  assert.match(stderr, /usage: superplane task move --column COLUMN/);
-  assert.doesNotMatch(stderr, /not available yet/);
+  assert.match(stderr, /Calling run has no current task stage/);
 });

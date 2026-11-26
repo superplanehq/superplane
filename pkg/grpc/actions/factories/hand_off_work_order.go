@@ -699,6 +699,15 @@ func executionPlanIndexForLineStep(tx *gorm.DB, line *models.FactoryLine, lineSt
 		return 0, err
 	}
 	stageKey := fmt.Sprintf("phase-%d", lineStepIndex)
+	if len(line.Stages) > 0 {
+		stageKey = ""
+		for _, stage := range line.StagesValue() {
+			if stage.StepIndex != nil && *stage.StepIndex == lineStepIndex {
+				stageKey = stage.Key
+				break
+			}
+		}
+	}
 	for index, step := range steps {
 		if step.StageKey == stageKey && step.AppID == line.Steps[lineStepIndex].AppID {
 			return index, nil
