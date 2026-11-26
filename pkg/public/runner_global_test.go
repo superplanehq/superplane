@@ -25,7 +25,7 @@ func TestRunnerToolsFollowTheTokenScopes(t *testing.T) {
 	token := runnerTokenFrom(runner.AttachRunnerEnv(ctx, nil, 60))
 	require.NotEmpty(t, token)
 
-	assert.Equal(t, globalRunnerToolsWith("open_pull_request", "list_pull_requests"), listRunnerTools(t, server, token))
+	assert.Equal(t, globalRunnerToolsWith("open_pull_request", "list_pull_requests", "move_task"), listRunnerTools(t, server, token))
 
 	scope, err := runner.ParseRunnerToken(jwt.NewSigner("test"), token)
 	require.NoError(t, err)

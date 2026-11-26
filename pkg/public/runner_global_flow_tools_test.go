@@ -176,7 +176,7 @@ func TestRunnerGlobalMergeCheck(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, models.CanvasNodeExecutionStateStarted, active.State)
 
-	assert.ElementsMatch(t, globalRunnerToolsWith("report_merge_check"), listRunnerTools(t, server, token))
+	assert.ElementsMatch(t, globalRunnerToolsWith("report_merge_check", "move_task"), listRunnerTools(t, server, token))
 
 	rec := runnerRequest(t, server, http.MethodPost, token, "/api/v1/runner/task/merge-checks", `{"check":"risk","score":4,"summary":"Risk is not enabled."}`)
 	assert.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
@@ -240,7 +240,7 @@ func TestRunnerGlobalArtifactUpload(t *testing.T) {
 	require.True(t, runner.HasVisualEvidence(env))
 	token := runnerTokenFrom(runner.AttachRunnerEnv(ctx, env, 60))
 	require.NotEmpty(t, token)
-	assert.ElementsMatch(t, globalRunnerToolsWith("report_visual_evidence_unavailable", "open_pull_request", "list_pull_requests"), listRunnerTools(t, server, token))
+	assert.ElementsMatch(t, globalRunnerToolsWith("report_visual_evidence_unavailable", "open_pull_request", "list_pull_requests", "move_task"), listRunnerTools(t, server, token))
 
 	png := append([]byte("\x89PNG\r\n\x1a\n"), bytes.Repeat([]byte{0}, 16)...)
 	rec := postRunnerArtifactFile(t, server, token, png)
@@ -280,7 +280,7 @@ func TestRunnerGlobalArtifactLink(t *testing.T) {
 		{Name: runner.EnvSuperplanePublishLinks, Value: "yes"},
 	}, 60))
 	require.NotEmpty(t, token)
-	assert.ElementsMatch(t, globalRunnerToolsWith("open_pull_request", "list_pull_requests"), listRunnerTools(t, server, token))
+	assert.ElementsMatch(t, globalRunnerToolsWith("open_pull_request", "list_pull_requests", "move_task"), listRunnerTools(t, server, token))
 
 	body := `{"url":"https://staging.example.com/pr-42","title":"Staging","key":"staging"}`
 	rec := runnerRequest(t, server, http.MethodPost, token, "/api/v1/runner/task/links", body)
