@@ -31,6 +31,8 @@ const (
 	customAutomationRunnerID         = "verify"
 	customAutomationScheduleRunnerID = "schedule-run"
 	customAutomationLeaveRunnerID    = "leave-run"
+	customStageRunnerID              = "stage-run"
+	customStageWebhookRunnerID       = "webhook-run"
 	customAutomationVersion          = 1
 	backlogTaskRunnerName            = "Run automation"
 )
@@ -270,7 +272,7 @@ func UpdateFactoryCustomAutomation(
 			return err
 		}
 		if legacyCustomStageGraph(canvas, live) {
-			nodes, edges = editLegacyCustomStageGraph(live, settings)
+			nodes, edges = editCustomStageGraph(live, settings, nodes, edges)
 		}
 
 		if err := canvases.PublishGeneratedCanvasNodes(
@@ -651,9 +653,6 @@ func buildCustomAutomationCanvas(
 	}
 	config := factory.OnboardingConfigValue()
 	provider := config.EffectiveVCSProvider()
-	if settings.hasWebhookTrigger() && settings.ColumnKey != models.CanvasColumnKeyBacklog {
-		return nil, invalidArgument("Webhook triggers are available in Backlog only.")
-	}
 	if strings.HasPrefix(settings.ColumnKey, "custom-") {
 		return buildCustomStageAutomationCanvas(tx, factory, name, settings, provider)
 	}
@@ -989,20 +988,9 @@ func buildMultiTriggerCustomAutomationCanvas(
 			edges = append(edges, yaml.Edge{SourceID: triggerID, TargetID: scheduleRunnerID, Channel: "default"})
 		}
 		for offset, webhook := range webhooks {
-			triggerID := "webhook-" + webhook.WebhookID
-			nodes = append(nodes, yaml.Node{
-				ID:            triggerID,
-				Name:          "Webhook",
-				Type:          yaml.NodeTypeTrigger,
-				Component:     factorycomponent.OnWebhookTriggerName,
-				Configuration: map[string]any{"webhook": webhook.WebhookID},
-				Metadata: customAutomationNodeMetadata(provider, settings.Icon, settings.RunsOnTask, func(template map[string]any) {
-					template["startMode"] = "webhook"
-					template["triggerIndex"] = webhook.Index
-				}),
-				Position: yaml.Position{X: 120, Y: 240 + (len(schedules)+offset+1)*180},
-			})
-			edges = append(edges, yaml.Edge{SourceID: triggerID, TargetID: scheduleRunnerID, Channel: "default"})
+			node := customAutomationWebhookNode(provider, settings, webhook, 240+(len(schedules)+offset+1)*180)
+			nodes = append(nodes, node)
+			edges = append(edges, yaml.Edge{SourceID: node.ID, TargetID: scheduleRunnerID, Channel: "default"})
 		}
 		for _, manual := range columnManual {
 			nodes = append(nodes, yaml.Node{
@@ -1084,15 +1072,22 @@ func buildMultiTriggerCustomAutomationCanvas(
 		Metadata:   &yaml.CanvasMetadata{Name: name, Description: description},
 		Spec:       &yaml.CanvasSpec{Nodes: nodes, Edges: edges},
 	}
-	if backlog && noTask {
+	if noTask {
 		for i := range doc.Spec.Nodes {
 			if doc.Spec.Nodes[i].ID != scheduleRunnerID {
 				continue
 			}
-			attachBacklogScheduleTask(doc, scheduleRunnerID, provider, settings.Icon, doc.Spec.Nodes[i].Configuration)
+			if backlog {
+				attachBacklogScheduleTask(doc, scheduleRunnerID, provider, settings.Icon, doc.Spec.Nodes[i].Configuration)
+			} else {
+				markNoTaskRunner(&doc.Spec.Nodes[i], provider, settings.Icon)
+			}
 			if len(webhooks) > 0 {
 				appendWebhookPayloadInstructions(doc.Spec.Nodes[i].Configuration)
-				doc.Metadata.Description = "Run prompt and Bash steps when a webhook receives a request. The agent creates a task."
+				doc.Metadata.Description = "Run prompt and Bash steps when a webhook receives a request."
+				if backlog {
+					doc.Metadata.Description += " The agent creates a task."
+				}
 			}
 			break
 		}
@@ -1174,6 +1169,21 @@ func customAutomationNodeMetadata(provider, icon string, runsOnTask *bool, apply
 	return metadata
 }
 
+func customAutomationWebhookNode(provider string, settings *customAutomationSettings, webhook customAutomationTrigger, y int) yaml.Node {
+	return yaml.Node{
+		ID:            "webhook-" + webhook.WebhookID,
+		Name:          "Webhook",
+		Type:          yaml.NodeTypeTrigger,
+		Component:     factorycomponent.OnWebhookTriggerName,
+		Configuration: map[string]any{"webhook": webhook.WebhookID},
+		Metadata: customAutomationNodeMetadata(provider, settings.Icon, settings.RunsOnTask, func(template map[string]any) {
+			template["startMode"] = "webhook"
+			template["triggerIndex"] = webhook.Index
+		}),
+		Position: yaml.Position{X: 120, Y: y},
+	}
+}
+
 func columnStartConfiguration() map[string]any {
 	return map[string]any{
 		"templates": []any{
@@ -1202,15 +1212,21 @@ func attachBacklogScheduleTask(doc *yaml.Canvas, runnerID, provider, icon string
 		return
 	}
 	runner.Name = backlogTaskRunnerName
-	runner.Metadata = customAutomationNodeMetadata(provider, icon, nil, func(template map[string]any) {
-		template["startMode"] = "scheduled"
-	})
+	markNoTaskRunner(runner, provider, icon)
 	max := 1
 	runner.Concurrency = &yaml.ConcurrencySpec{Max: &max}
 	runnerConfiguration["steps"] = backlogTaskSteps(runnerConfiguration["steps"])
 	if !customAutomationDocHasNode(doc, customAutomationTaskTriggerID) {
 		doc.Metadata.Description = "Run prompt and Bash steps on a schedule. The agent creates a task."
 	}
+}
+
+// The runner token gives the schedule flow (list and create tasks) only to
+// runners marked as scheduled.
+func markNoTaskRunner(runner *yaml.Node, provider, icon string) {
+	runner.Metadata = customAutomationNodeMetadata(provider, icon, nil, func(template map[string]any) {
+		template["startMode"] = "scheduled"
+	})
 }
 
 func backlogTaskSteps(raw any) []any {
@@ -1569,9 +1585,12 @@ func selectCustomAutomationAgent(nodes []models.Node) *models.Node {
 	if agent := customAutomationAgentForRunner(nodes, customAutomationRunnerID); agent != nil {
 		return agent
 	}
+	if agent := customAutomationAgentForRunner(nodes, customStageRunnerID); agent != nil {
+		return agent
+	}
 	for i := range nodes {
 		node := &nodes[i]
-		if isFactoryAgentHarness(node.ComponentName()) {
+		if isFactoryAgentHarness(node.ComponentName()) && !customStageWebhookPart(*node) {
 			return node
 		}
 	}
