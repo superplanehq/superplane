@@ -272,6 +272,13 @@ describe("custom automation configuration run history", () => {
   });
 });
 
+function mockAutomationSourceFetch(onAutomation: (method: string) => Response) {
+  return vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+    if (!String(input).includes("/api/v2/automations")) return Response.json({});
+    return onAutomation(init?.method ?? "GET");
+  });
+}
+
 describe("custom automation YAML draft", () => {
   const savedYaml = `# Saved from HTTP
 apiVersion: v2
@@ -416,7 +423,7 @@ steps:
   );
 
   it("keeps invalid YAML editable and confirms before discarding changes", async () => {
-    const fetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json(savedAutomation));
+    const fetch = mockAutomationSourceFetch(() => Response.json(savedAutomation));
     const onClose = renderModal("?customAutomation=custom-1", "custom-1", "backlog", true);
     const user = userEvent.setup();
     await user.click(await screen.findByRole("button", { name: "Edit YAML" }));
@@ -434,7 +441,7 @@ steps:
     expect(onClose).not.toHaveBeenCalled();
     await user.click(confirmation.getByRole("button", { name: "Discard changes" }));
     expect(onClose).toHaveBeenCalledTimes(1);
-    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(fetch.mock.calls.some(([, init]) => init?.method === "PUT")).toBe(false);
   });
 
   it("saves the column run setting from the visual editor in the YAML definition", async () => {
@@ -456,19 +463,23 @@ steps:
   });
 
   it("retains a rejected draft and shows the server diagnostic", async () => {
-    const fetch = vi
-      .spyOn(globalThis, "fetch")
-      .mockResolvedValueOnce(Response.json(savedAutomation))
-      .mockResolvedValueOnce(
-        Response.json(
-          {
-            diagnostics: [
-              { path: "steps[0].secrets[0]", line: 10, column: 15, message: "Create this secret in the organization." },
-            ],
-          },
-          { status: 400 },
-        ),
-      );
+    const fetch = mockAutomationSourceFetch((method) =>
+      method === "PUT"
+        ? Response.json(
+            {
+              diagnostics: [
+                {
+                  path: "steps[0].secrets[0]",
+                  line: 10,
+                  column: 15,
+                  message: "Create this secret in the organization.",
+                },
+              ],
+            },
+            { status: 400 },
+          )
+        : Response.json(savedAutomation),
+    );
     const onClose = renderModal("?customAutomation=custom-1", "custom-1", "backlog", true);
     const user = userEvent.setup();
     await user.click(await screen.findByRole("button", { name: "Edit YAML" }));
@@ -480,7 +491,7 @@ steps:
     );
     expect(screen.getByLabelText("Automation YAML")).toHaveValue(draft);
     expect(onClose).not.toHaveBeenCalled();
-    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(fetch.mock.calls.filter(([, init]) => init?.method === "PUT")).toHaveLength(1);
   });
 
   it("closes cleanly after visiting YAML and Runs without edits", async () => {
