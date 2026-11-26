@@ -1248,13 +1248,6 @@ func (b *NodeConfigurationBuilder) workOrderForRun(run *models.CanvasRun) (*mode
 	if !errors.Is(err, models.ErrFactoryWorkOrderExecutionNotFound) {
 		return nil, fmt.Errorf("order() could not resolve the work order execution: %w", err)
 	}
-	order, err := models.FindWorkOrderByRefinementRunID(b.tx, run.ID)
-	if err == nil {
-		return order, nil
-	}
-	if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, fmt.Errorf("order() could not resolve the task run: %w", err)
-	}
 	return b.workOrderFromPullRequestLink(run.ID)
 }
 

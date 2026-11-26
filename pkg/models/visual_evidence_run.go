@@ -37,14 +37,10 @@ func customAutomationUsesTaskLink(canvas *Canvas, event *CanvasEvent) bool {
 	if canvasUsesTaskCustomAutomationLink(canvas) {
 		return true
 	}
-	if canvas == nil || canvas.ColumnKey == nil || event == nil {
+	if canvas == nil || canvas.ColumnKey == nil || *canvas.ColumnKey != CanvasColumnKeyVerify || event == nil {
 		return false
 	}
-	column := *canvas.ColumnKey
-	if column != CanvasColumnKeyVerify && !strings.HasPrefix(column, "custom-") {
-		return false
-	}
-	if column == CanvasColumnKeyVerify && visualEvidencePullRequestID(event.Data.Data()) != uuid.Nil {
+	if visualEvidencePullRequestID(event.Data.Data()) != uuid.Nil {
 		return false
 	}
 	payload, ok := objectMap(RootEventSourcePayload(event.Data.Data()))

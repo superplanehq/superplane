@@ -584,24 +584,6 @@ func (f *Factory) FindPullRequest(tx *gorm.DB, filter FactoryPullRequestLookup) 
 	return &pullRequest, nil
 }
 
-// ListPullRequestsByCommitSHA finds pull requests in this factory that observed
-// the commit or currently use it for mergeability checks.
-func (f *Factory) ListPullRequestsByCommitSHA(tx *gorm.DB, sha string) ([]FactoryPullRequest, error) {
-	sha = strings.TrimSpace(sha)
-	if sha == "" {
-		return nil, nil
-	}
-	var pullRequests []FactoryPullRequest
-	err := tx.Model(&FactoryPullRequest{}).
-		Select("DISTINCT factory_pull_requests.*").
-		Joins("LEFT JOIN factory_pull_request_revisions ON factory_pull_request_revisions.pull_request_id = factory_pull_requests.id").
-		Where("factory_pull_requests.organization_id = ? AND factory_pull_requests.factory_id = ?", f.OrganizationID, f.ID).
-		Where("factory_pull_request_revisions.sha = ? OR factory_pull_requests.mergeable_head_sha = ?", sha, sha).
-		Order("factory_pull_requests.created_at ASC, factory_pull_requests.id ASC").
-		Find(&pullRequests).Error
-	return pullRequests, err
-}
-
 func (f *Factory) ListPullRequests(tx *gorm.DB, filter FactoryPullRequestFilter) ([]FactoryPullRequest, error) {
 	query := tx.Model(&FactoryPullRequest{}).
 		Select("factory_pull_requests.*").

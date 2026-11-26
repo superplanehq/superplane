@@ -3,7 +3,6 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { expect, it, vi } from "bun:test";
 import type { FactoriesFactoryCustomAutomation } from "@/api-client";
-import { FEATURE_FACTORY_TASK_WEBHOOK_TRIGGERS } from "@/lib/experimentalFeatures";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { CustomAutomationSetupForm } from "./CustomAutomationSetupForm";
 import { useCustomAutomationSetupPage } from "./useCustomAutomationSetupPage";
@@ -29,10 +28,7 @@ vi.mock("@/hooks/useFactoryCustomAutomationData", () => ({
 vi.mock("@/hooks/useComponentData", () => ({ useComponent: () => ({}) }));
 vi.mock("@monaco-editor/react", () => ({ Editor: () => null }));
 vi.mock("@/hooks/useByokRunnerModelDefault", () => ({ useByokRunnerModelDefault: () => undefined }));
-const enabledFeatures = new Set<string>();
-vi.mock("@/hooks/useExperimentalFeature", () => ({
-  useExperimentalFeature: () => ({ has: (feature: string) => enabledFeatures.has(feature) }),
-}));
+vi.mock("@/hooks/useExperimentalFeature", () => ({ useExperimentalFeature: () => ({ has: () => false }) }));
 vi.mock("@/hooks/useFactoryAgentResources", () => ({ useFactoryAgentResources: () => ({}) }));
 vi.mock("@/hooks/useIntegrations", () => ({ useConnectedIntegrations: () => ({}) }));
 vi.mock("@/contexts/usePermissions", () => ({ usePermissions: () => ({ canAct: () => false }) }));
@@ -43,7 +39,7 @@ vi.mock("@/hooks/useFactoryWebhooks", () => ({
   }),
 }));
 
-function Editor({ columnKey = "backlog" }: { columnKey?: "backlog" | "implement" }) {
+function Editor() {
   const model = useCustomAutomationSetupPage({
     organizationId: "org",
     factoryId: "factory",
@@ -58,7 +54,7 @@ function Editor({ columnKey = "backlog" }: { columnKey?: "backlog" | "implement"
           icon={model.icon}
           triggers={model.triggers}
           runsOnTask={model.runsOnTask}
-          columnKey={columnKey}
+          columnKey="backlog"
           draft={model.draft}
           organizationId="org"
           factoryId="factory"
@@ -97,7 +93,6 @@ it("saves a Backlog webhook trigger with the selected webhook", async () => {
   await user.click(screen.getByRole("combobox", { name: "Webhook" }));
   await user.click(screen.getByRole("option", { name: "Jira issues" }));
   expect(screen.getByText("https://superplane.test/api/v1/webhooks/webhook-1")).toBeInTheDocument();
-  expect(screen.getByRole("link", { name: "Manage webhooks" })).toHaveAttribute("target", "_blank");
   await user.click(screen.getByRole("button", { name: "Save" }));
   await waitFor(() => expect(saveAutomation).toHaveBeenCalled());
   const saved = saveAutomation.mock.calls.at(-1)![0];
@@ -106,36 +101,4 @@ it("saves a Backlog webhook trigger with the selected webhook", async () => {
     { startMode: "START_MODE_WEBHOOK", webhookId: "webhook-1" },
   ]);
   expect(saved.settings.runsOnTask).toBe(false);
-});
-
-it("shows a task webhook on Implement when the flag is on", async () => {
-  const user = userEvent.setup();
-  enabledFeatures.add(FEATURE_FACTORY_TASK_WEBHOOK_TRIGGERS);
-  saveAutomation.mockClear();
-  saveAutomation.mockResolvedValueOnce({});
-  render(<Editor columnKey="implement" />);
-  await user.click(screen.getByRole("button", { name: "Add trigger" }));
-  await user.click(screen.getByRole("menuitem", { name: /Webhook/ }));
-  expect(screen.getByText("Runs for each matched task.")).toBeInTheDocument();
-  expect(screen.getByRole("combobox", { name: "Find task by" })).toBeInTheDocument();
-  expect(screen.getByLabelText("JSON body field")).toHaveValue("task");
-  expect(screen.getByText(/for example issue\.key/)).toBeInTheDocument();
-  expect(screen.getByTestId(/task-match-example$/)).toHaveTextContent('"task": "SP-42"');
-
-  await user.click(screen.getByRole("combobox", { name: "Webhook" }));
-  await user.click(screen.getByRole("option", { name: "Jira issues" }));
-  await user.click(screen.getByRole("button", { name: "Save" }));
-  await waitFor(() => expect(saveAutomation).toHaveBeenCalled());
-  const saved = saveAutomation.mock.calls.at(-1)![0];
-  expect(saved.settings.runsOnTask).toBe(true);
-  expect(saved.settings.triggers).toEqual(
-    expect.arrayContaining([
-      expect.objectContaining({
-        startMode: "START_MODE_WEBHOOK",
-        webhookId: "webhook-1",
-        taskMatch: { kind: "KIND_TASK", fieldPath: "task" },
-      }),
-    ]),
-  );
-  enabledFeatures.delete(FEATURE_FACTORY_TASK_WEBHOOK_TRIGGERS);
 });

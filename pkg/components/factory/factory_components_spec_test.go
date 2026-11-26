@@ -94,10 +94,6 @@ func (f *fakeFactoryContext) FindWorkOrder(params core.FindWorkOrderParams) (*co
 	return f.findOrder, f.findErr
 }
 
-func (f *fakeFactoryContext) FindWorkOrdersForWebhook(string, string, string) ([]map[string]any, error) {
-	return nil, nil
-}
-
 func (f *fakeFactoryContext) UpdateWorkOrderStatus(params core.UpdateWorkOrderStatusParams) (*core.WorkOrder, bool, error) {
 	f.statusCalls++
 	f.lastStatusParams = params
