@@ -48,7 +48,7 @@ export function SearchField({ inputRef, open, value, onOpen, onChange, onClose }
         value={value}
         onChange={(event) => onChange(event.target.value)}
         onKeyDown={handleKeyDown}
-        placeholder="Search…"
+        placeholder="Explore…"
         aria-label="Search tasks"
         className="!h-8 w-[200px] pl-8 pr-8 text-[13px] shadow-none"
         data-testid="work-orders-search-input"
