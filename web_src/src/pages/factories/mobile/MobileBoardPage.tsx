@@ -31,6 +31,9 @@ import {
   isPlanningSearchOpen,
   columnAutomationViewCanvasIdFromSearch,
   firstFactoryLineId,
+  factoryHomePath,
+  WORK_ORDER_LINE_SEARCH_PARAM,
+  workOrderBoardLineIdFromSearch,
   workOrderDetailPath,
 } from "../lib/factoryPagePaths";
 import { boardDoneResultsForStatuses, uniqueWorkOrdersById } from "../lib/workOrderListPagination";
@@ -49,7 +52,7 @@ import {
   buildWorkOrderListEntries,
   type WorkOrderScope,
 } from "../lib/workOrderListModel";
-import { canonicalWorkOrderNumber } from "../lib/workOrderNumberResolution";
+import { canonicalWorkOrderNumber, displayedBoardLineId } from "../lib/workOrderNumberResolution";
 import { pullRequestsFromWorkOrders } from "../lib/workOrderPullRequest";
 import { LineBoardWorkOrderCard } from "../pages/LineBoardOrderCard";
 import { lineBoardColumnLaneProps, normalizeColumnColors } from "../pages/lineBoardColumnColors";
@@ -87,8 +90,13 @@ export function MobileBoardPage() {
   const { organizationId, factoryId, routeSegment, factory } = useFactoriesLayout();
   const navigate = useNavigate();
   const { canAct, currentUserId } = usePermissions();
+  const { search } = useLocation();
   const lines = useMemo(() => factory?.lines ?? [], [factory?.lines]);
-  const workspaceLineId = firstFactoryLineId(factory);
+  const workspaceLineId = displayedBoardLineId({
+    queryLineId: workOrderBoardLineIdFromSearch(search),
+    lines,
+    fallbackLineId: firstFactoryLineId(factory),
+  });
   const selectedLine = lines.find((line) => line.id === workspaceLineId) ?? null;
 
   usePageTitle([factory?.name?.trim() || "Workspace"]);
@@ -283,6 +291,7 @@ function MobileLineBoard(props: {
   const canCreateWorkOrder = canAct("work_orders", "create");
   const lines = factory?.lines ?? [];
   const { search } = useLocation();
+  const navigate = useNavigate();
   const settingsOpen =
     (isIntakeSearchOpen(search) &&
       configuredIntakes.some((intake) => intake.intakeId === intakeIdFromSearch(search))) ||
@@ -313,9 +322,10 @@ function MobileLineBoard(props: {
             showPullRequestMerge={model.showPullRequestMerge}
             lines={lines}
             lineId={lineId}
-            onSelectLine={() => {
-              // The switcher renders only for several lines. Routes no longer
-              // select a line, so a selection keeps the workspace board.
+            onSelectLine={(nextLineId) => {
+              const params = new URLSearchParams(search);
+              params.set(WORK_ORDER_LINE_SEARCH_PARAM, nextLineId);
+              navigate({ pathname: factoryHomePath(organizationId, routeSegment), search: params.toString() });
             }}
           />
           <MobileColumnCarousel

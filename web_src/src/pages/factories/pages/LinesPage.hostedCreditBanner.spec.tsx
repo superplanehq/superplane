@@ -4,10 +4,7 @@ import { beforeAll, describe, expect, it } from "bun:test";
 import { client } from "@/api-client/client.gen";
 
 import { FactoriesHarness } from "../__fixtures__/FactoriesHarness";
-import {
-  defaultFactoriesFixture,
-  PRIMARY_FACTORY_KEY,
-} from "../__fixtures__/factoryPageResponses";
+import { defaultFactoriesFixture, PRIMARY_FACTORY_KEY } from "../__fixtures__/factoryPageResponses";
 import {
   BUSINESS_ORGANIZATION_BILLING,
   LAPSED_ORGANIZATION_BILLING,

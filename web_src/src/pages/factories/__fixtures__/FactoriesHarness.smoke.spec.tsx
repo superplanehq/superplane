@@ -378,10 +378,7 @@ describe("FactoriesHarness Acme onboarding", () => {
   it("opens Acme onboarding from the switcher with an empty line board", async () => {
     const user = userEvent.setup();
     render(
-      <FactoriesHarness
-        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}`}
-        factoriesFixture={defaultFactoriesFixture}
-      />,
+      <FactoriesHarness pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}`} factoriesFixture={defaultFactoriesFixture} />,
     );
 
     await user.click(await screen.findByTestId("factories-workspace-switch", {}, { timeout: 8000 }));

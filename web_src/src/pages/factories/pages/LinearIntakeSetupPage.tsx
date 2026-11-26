@@ -3,11 +3,7 @@ import { usePageTitle } from "@/hooks/usePageTitle";
 import { Navigate, useNavigate, useSearchParams } from "react-router";
 
 import { useFactoriesLayout, type ResolvedFactoriesLayout } from "../layout/factoriesLayoutContext";
-import {
-  factoryHomePath,
-  firstFactoryLineId,
-  linearIntakeIntegrationIdFromSearch,
-} from "../lib/factoryPagePaths";
+import { factoryHomePath, firstFactoryLineId, linearIntakeIntegrationIdFromSearch } from "../lib/factoryPagePaths";
 import { LinearIntakeSetupDialog } from "./LinearIntakeSetupDialog";
 import { LINEAR_INTAKE_SETUP_COPY } from "./linearIntakeSetupCopy";
 

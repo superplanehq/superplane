@@ -578,8 +578,7 @@ export function LinesPage() {
     : {
         sources: configuredIntakes,
         showAddIntake: showAddIntakeControl,
-        onOpenSettings: (intake) =>
-          navigate(factoryIntakePath(organizationId, routeSegment, intake.intakeId)),
+        onOpenSettings: (intake) => navigate(factoryIntakePath(organizationId, routeSegment, intake.intakeId)),
         onAddIntake: () => setAddIntakeOpen(true),
       };
 
@@ -598,8 +597,7 @@ export function LinesPage() {
         needsRepairLabel: "Needs repair",
         settingsLabel: "Open PR feedback settings",
         testId: `lines-verify-listener-${handler.id}`,
-        onOpenSettings: () =>
-          navigate(factoryPRFeedbackPath(organizationId, routeSegment, undefined, handler.id)),
+        onOpenSettings: () => navigate(factoryPRFeedbackPath(organizationId, routeSegment, undefined, handler.id)),
       },
     ];
   });

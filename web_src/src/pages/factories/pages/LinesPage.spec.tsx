@@ -58,6 +58,7 @@ import {
   PRIMARY_FACTORY_ID,
   PRIMARY_FACTORY_ROUTE_SEGMENT,
   REFUND_FACTORY,
+  REFUND_LINE_HOTFIX_ID,
   REFUND_LINE_PLAN_ID,
 } from "../__fixtures__/factoryPageResponses";
 import { BOARD_IMPLEMENT_NOTIFY_ORDER } from "../__fixtures__/lineMetricsBoardOrders";
@@ -590,11 +591,7 @@ describe("LinesPage board", () => {
       open: idleBoardPage(),
       done: idleBoardPage(),
     });
-    view.rerender(
-      <LinesBoardSpecHarness
-        path={`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}`}
-      />,
-    );
+    view.rerender(<LinesBoardSpecHarness path={`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}`} />);
 
     expect(screen.queryByRole("status", { name: "Loading tasks" })).not.toBeInTheDocument();
     expect(screen.getByTestId("lines-backlog-column-scroll")).toHaveAttribute("data-reveal");
@@ -1301,7 +1298,7 @@ describe("LinesPage board stages", () => {
           : line,
       ),
     });
-    const path = `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}`;
+    const path = `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}`;
     const view = renderLinesBoard(path, vi.fn(), factoryWithStageName("Implement"));
 
     await user.click(screen.getByTestId("lines-column-title-phase-0"));
@@ -1399,11 +1396,7 @@ describe("LinesPage board automations", () => {
     expect(screen.queryByTestId("column-automations-popup")).not.toBeInTheDocument();
     const location = screen.getByTestId("lines-test-location");
     expect(location).toHaveTextContent(
-      factoryColumnAutomationViewPath(
-        "org-1",
-        PRIMARY_FACTORY_ROUTE_SEGMENT,
-        "app-refund-implementer",
-      ),
+      factoryColumnAutomationViewPath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT, "app-refund-implementer"),
     );
     expect(location).not.toHaveTextContent("/apps/");
     expect(location).not.toHaveTextContent("configure=1");
@@ -1446,11 +1439,7 @@ describe("LinesPage board automations", () => {
   it("opens Planning settings from the Task analysis row before setup is confirmed", async () => {
     useFactoryAutomations.mockReturnValue({ data: [{ id: "app-refund-backlog", name: "Ingest" }] });
     const user = userEvent.setup();
-    renderLinesBoard(
-      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}`,
-      vi.fn(),
-      PLANNING_OPEN_FACTORY,
-    );
+    renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}`, vi.fn(), PLANNING_OPEN_FACTORY);
 
     await user.click(screen.getByTestId("lines-backlog-automation-rows-row-analysis-app-refund-backlog"));
 
@@ -1502,12 +1491,7 @@ describe("LinesPage board automations", () => {
     await user.click(screen.getByTestId("lines-verify-automation-rows-row-handler-discussion"));
     expect(screen.queryByTestId("column-automations-popup")).not.toBeInTheDocument();
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      factoryPRFeedbackPath(
-        "org-1",
-        PRIMARY_FACTORY_ROUTE_SEGMENT,
-        undefined,
-        "handler-discussion",
-      ),
+      factoryPRFeedbackPath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT, undefined, "handler-discussion"),
     );
 
     unmount();
@@ -1855,11 +1839,7 @@ describe("LinesPage board extras", () => {
 
     await waitFor(() => {
       expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-        factoryColumnAutomationViewPath(
-          "org-1",
-          PRIMARY_FACTORY_ROUTE_SEGMENT,
-          "canvas-scheduled",
-        ),
+        factoryColumnAutomationViewPath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT, "canvas-scheduled"),
       );
     });
     expect(screen.getByTestId("column-automation-view")).toBeInTheDocument();
@@ -2613,18 +2593,12 @@ describe("LinesPage board editing", () => {
     updateFactoryLineMutateAsync.mockImplementation(async (input) => {
       updateLineIsPending.value = true;
       view.rerender(
-        <LinesBoardSpecHarness
-          path={`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}`}
-          factory={REFUND_FACTORY}
-        />,
+        <LinesBoardSpecHarness path={`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}`} factory={REFUND_FACTORY} />,
       );
       await Promise.resolve();
       updateLineIsPending.value = false;
       view.rerender(
-        <LinesBoardSpecHarness
-          path={`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}`}
-          factory={REFUND_FACTORY}
-        />,
+        <LinesBoardSpecHarness path={`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}`} factory={REFUND_FACTORY} />,
       );
       return {
         id: REFUND_LINE_PLAN_ID,
@@ -3046,11 +3020,7 @@ describe("LinesPage Implement phase window", () => {
       const at = new Date(Date.now() + index * 1000).toISOString();
       orders[index] = dispatchDraftToImplement(drafts[index], at);
       useFactoryWorkOrders.mockReturnValue({ data: [...orders] });
-      view.rerender(
-        <LinesBoardSpecHarness
-          path={`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}`}
-        />,
-      );
+      view.rerender(<LinesBoardSpecHarness path={`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}`} />);
 
       await waitFor(() => {
         expect(implementPhaseCards()).toHaveLength(index + 1);
@@ -3149,11 +3119,7 @@ describe("LinesPage Implement phase window", () => {
       open: idleBoardPage(),
       done: idleBoardPage(),
     });
-    view.rerender(
-      <LinesBoardSpecHarness
-        path={`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}`}
-      />,
-    );
+    view.rerender(<LinesBoardSpecHarness path={`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}`} />);
 
     const pending = screen.getByTestId("lines-phase-column-scroll-0");
     pending.scrollTop = 40;
@@ -3167,11 +3133,7 @@ describe("LinesPage Implement phase window", () => {
       open: idleBoardPage(),
       done: idleBoardPage(),
     });
-    view.rerender(
-      <LinesBoardSpecHarness
-        path={`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}`}
-      />,
-    );
+    view.rerender(<LinesBoardSpecHarness path={`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}`} />);
 
     expect(screen.getByTestId("lines-phase-column-scroll-0").scrollTop).toBe(1760);
   });
@@ -3184,7 +3146,7 @@ describe("LinesPage Implement phase window", () => {
     render(
       <LinesBoardSpecHarness
         path={`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}`}
-        navigateTo={`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}`}
+        navigateTo={`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}?lineId=${REFUND_LINE_HOTFIX_ID}`}
       />,
     );
 
@@ -3196,7 +3158,7 @@ describe("LinesPage Implement phase window", () => {
     await user.click(screen.getByTestId("lines-test-navigate"));
 
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}`,
+      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}?lineId=${REFUND_LINE_HOTFIX_ID}`,
     );
     expect(screen.getByTestId("lines-backlog-column-scroll").scrollTop).toBe(0);
 

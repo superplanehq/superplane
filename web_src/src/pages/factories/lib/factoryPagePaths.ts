@@ -103,12 +103,7 @@ export const INTAKE_ID_SEARCH_PARAM = "intakeId";
 /** Opens intake settings on a tab: general, agent, runs, or automation. */
 export const INTAKE_SETTINGS_SEARCH_PARAM = "settings";
 
-export function factoryIntakePath(
-  organizationId: string,
-  factoryKey: string,
-  intakeId?: string,
-  settingsTab?: string,
-) {
+export function factoryIntakePath(organizationId: string, factoryKey: string, intakeId?: string, settingsTab?: string) {
   const path = `${factoryHomePath(organizationId, factoryKey)}?${INTAKE_SEARCH_PARAM}=1`;
   const intakeQuery = intakeId ? `&${INTAKE_ID_SEARCH_PARAM}=${encodeURIComponent(intakeId)}` : "";
   const settingsQuery = settingsTab ? `&${INTAKE_SETTINGS_SEARCH_PARAM}=${encodeURIComponent(settingsTab)}` : "";

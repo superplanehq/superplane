@@ -113,9 +113,7 @@ describe("WorkspaceSwitcher", () => {
 
   it("opens the other workspace on its line board without intake query", async () => {
     const user = userEvent.setup();
-    renderSwitcher(
-      `/${FACTORIES_ORGANIZATION_ID}/workspaces/${factoryRouteSegment(REFUND_FACTORY)}?intake=1`,
-    );
+    renderSwitcher(`/${FACTORIES_ORGANIZATION_ID}/workspaces/${factoryRouteSegment(REFUND_FACTORY)}?intake=1`);
 
     await user.click(screen.getByTestId("factories-workspace-switch"));
     await user.click(screen.getByTestId(`factories-workspace-option-${ACME_ONBOARDING_FACTORY.id}`));

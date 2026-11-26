@@ -55,6 +55,7 @@ import { agentSectionRoute } from "@/pages/factories/pages/settings/agentSection
 import { factorySettingsSectionRoutes } from "@/pages/factories/pages/settings/factorySettingsSectionRoutes";
 import { MissionDetailPage } from "@/pages/factories/pages/missions/MissionDetailPage";
 import { ConfigureAutomationPage } from "@/pages/factories/pages/ConfigureAutomationPage";
+import { FactoryLineAccessGate } from "@/pages/factories/pages/FactoryLineAccessGate";
 import { OnboardingGate } from "@/pages/factories/pages/onboarding/OnboardingGate";
 import { OrganizationSettingsWorkspaceUsagePage } from "@/pages/factories/pages/organizationSettings/OrganizationSettingsWorkspaceUsagePage";
 import { HomePage } from "@/pages/home";
@@ -262,6 +263,7 @@ function OrgWorkspaceRoutes({ pageOverrides }: { pageOverrides?: OrgWorkspacePag
         <Route path="workspaces">
           <Route index element={factoryRoute(<FactoriesIndexPage />)} />
           <Route path="new" element={factoryRoute(<NewWorkspacePage />)} />
+          <Route path=":factoryKey/lines/:lineId" element={<FactoryLineAccessGate />} />
           <Route path=":factoryKey" element={factoryRoute(<FactoryWorkspaceLayoutSwitch />)}>
             <Route element={<OptionalOnboardingGate enabled={onboardingEnabled} />}>
               <Route index element={<FactoryBoardIndex />} />

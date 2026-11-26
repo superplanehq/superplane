@@ -281,10 +281,7 @@ describe("LinesPage backlog create", () => {
     Element.prototype.scrollIntoView = vi.fn();
     const openCreateWorkOrder = vi.fn();
     const user = userEvent.setup();
-    renderLinesBoard(
-      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}`,
-      openCreateWorkOrder,
-    );
+    renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}`, openCreateWorkOrder);
 
     const backlog = screen.getByTestId("lines-backlog-column");
     expect(within(backlog).queryByRole("button", { name: "Add task" })).not.toBeInTheDocument();
@@ -411,11 +408,7 @@ describe("LinesPage backlog create", () => {
   });
 
   it("shows a backlog onboarding card on Acme when the backlog is empty", () => {
-    renderLinesBoard(
-      `/org-1/workspaces/${ACME_ONBOARDING_FACTORY_ROUTE_SEGMENT}`,
-      vi.fn(),
-      ACME_ONBOARDING_FACTORY,
-    );
+    renderLinesBoard(`/org-1/workspaces/${ACME_ONBOARDING_FACTORY_ROUTE_SEGMENT}`, vi.fn(), ACME_ONBOARDING_FACTORY);
 
     expect(screen.getByTestId("backlog-onboarding-card")).toBeInTheDocument();
     expect(screen.queryByTestId("lines-backlog-create-ghost")).not.toBeInTheDocument();

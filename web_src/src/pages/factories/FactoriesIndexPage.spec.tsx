@@ -2,11 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
-import {
-  ACME_ONBOARDING_FACTORY,
-  EMPTY_FACTORY,
-  FACTORIES_ORGANIZATION_ID,
-} from "./__fixtures__/factoryPageResponses";
+import { ACME_ONBOARDING_FACTORY, EMPTY_FACTORY, FACTORIES_ORGANIZATION_ID } from "./__fixtures__/factoryPageResponses";
 import { FactoriesIndexPage } from "./FactoriesIndexPage";
 import { factoryHomePath, factoryRouteSegment, newFactoryPath } from "./lib/factoryPagePaths";
 

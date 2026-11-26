@@ -34,7 +34,7 @@ beforeEach(() => {
 });
 
 describe("add custom stage automation", () => {
-  it("opens shared configuration with the custom stage and return line", () => {
+  it("opens shared configuration with the custom stage on the workspace board", () => {
     const { result } = renderHook(
       () => ({
         automation: useAddColumnAutomation({
@@ -60,7 +60,7 @@ describe("add custom stage automation", () => {
     );
 
     act(() => result.current.automation.openPicker("custom-stage-id", "Deploy to prod"));
-    expect(result.current.location.pathname).toBe("/org/workspaces/workspace/lines/line");
+    expect(result.current.location.pathname).toBe("/org/workspaces/workspace");
     expect(result.current.location.search).toBe("?customAutomation=new&automationColumn=custom-stage-id");
     expect(result.current.automation.pickerOpen).toBe(false);
   });

@@ -446,7 +446,7 @@ describe("columnAutomationOpenPath", () => {
   it("opens Planning settings for Task analysis", () => {
     const href = columnAutomationOpenPath(analysisAutomation, nav);
 
-    expect(href).toBe(factoryPlanningPath("org-1", "RF", "line-plan"));
+    expect(href).toBe(factoryPlanningPath("org-1", "RF"));
     expect(href).not.toContain("/apps/");
     expect(href).not.toContain("configure=1");
     expect(href).not.toContain("/setup/planning");
@@ -470,7 +470,7 @@ describe("columnAutomationOpenPath", () => {
         },
         nav,
       ),
-    ).toBe(factoryIntakePath("org-1", "RF", "line-plan", "intake-github"));
+    ).toBe(factoryIntakePath("org-1", "RF", "intake-github"));
   });
 
   it("opens the PR feedback settings popup on the first tab", () => {

@@ -3,12 +3,7 @@ import { Gauge, LayoutGrid, MoreHorizontal } from "lucide-react";
 import type { ReactNode } from "react";
 import { Link, useLocation } from "react-router";
 
-import {
-  factoryHomePath,
-  factorySettingsPath,
-  factoryMorePath,
-  factoryVelocityPath,
-} from "../lib/factoryPagePaths";
+import { factoryHomePath, factorySettingsPath, factoryMorePath, factoryVelocityPath } from "../lib/factoryPagePaths";
 import { isBoardPath } from "../layout/factoriesRail";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { MOBILE_BOTTOM_BAR_COPY } from "./mobileCopy";

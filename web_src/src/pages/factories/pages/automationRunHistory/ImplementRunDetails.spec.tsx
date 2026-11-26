@@ -126,7 +126,7 @@ describe("Implement run details hydration", () => {
       await waitFor(() =>
         expect(screen.getByRole("link", { name: "Task SP-42" })).toHaveAttribute(
           "href",
-          "/org/workspaces/sp-abcd/task/42?lineId=line-one",
+          "/org/workspaces/sp-abcd/task/42",
         ),
       );
       expect(screen.queryByText("Outcome unavailable")).not.toBeInTheDocument();

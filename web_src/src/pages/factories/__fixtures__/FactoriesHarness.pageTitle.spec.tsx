@@ -5,7 +5,7 @@ import { beforeAll, describe, expect, it } from "bun:test";
 import { client } from "@/api-client/client.gen";
 
 import { WorkOrdersPage } from "../pages/WorkOrdersPage";
-import { PRIMARY_FACTORY_KEY, defaultFactoriesFixture } from "./factoryPageResponses";
+import { PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID, defaultFactoriesFixture } from "./factoryPageResponses";
 import { FactoriesHarness } from "./FactoriesHarness";
 
 // The harness swaps in a Storybook-only Missions rail variant of the Work
@@ -93,10 +93,10 @@ describe("client-side navigation updates document.title", () => {
     expect(document.title).toBe("Semaphore · SuperPlane");
   }, 15000);
 
-  it("sends /lines to the line board", async () => {
+  it("opens a legacy line board URL", async () => {
     render(
       <FactoriesHarness
-        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines`}
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`}
         factoriesFixture={defaultFactoriesFixture}
         pageOverrides={pageOverrides}
       />,

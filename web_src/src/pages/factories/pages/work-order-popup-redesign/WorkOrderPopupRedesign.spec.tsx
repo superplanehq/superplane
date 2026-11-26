@@ -373,9 +373,7 @@ describe("Line board job popup", () => {
       },
     };
 
-    render(
-      <FactoriesHarness pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}`} factoriesFixture={fixture} />,
-    );
+    render(<FactoriesHarness pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}`} factoriesFixture={fixture} />);
 
     const card = await screen.findByTestId("work-order-card-wo-review-pay-842", {}, { timeout: 8000 });
     expect(within(card).queryByRole("button", { name: "Start" })).not.toBeInTheDocument();

@@ -3,11 +3,7 @@ import { usePageTitle } from "@/hooks/usePageTitle";
 import { Navigate, useNavigate, useSearchParams } from "react-router";
 
 import { useFactoriesLayout, type ResolvedFactoriesLayout } from "../layout/factoriesLayoutContext";
-import {
-  factoryHomePath,
-  firstFactoryLineId,
-  jiraIntakeIntegrationIdFromSearch,
-} from "../lib/factoryPagePaths";
+import { factoryHomePath, firstFactoryLineId, jiraIntakeIntegrationIdFromSearch } from "../lib/factoryPagePaths";
 import { JiraIntakeSetupDialog } from "./JiraIntakeSetupDialog";
 import { JIRA_INTAKE_SETUP_COPY } from "./jiraIntakeSetupCopy";
 

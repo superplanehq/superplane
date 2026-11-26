@@ -278,9 +278,7 @@ describe("MobileTaskDetailPage back link", () => {
     await user.click(screen.getByTestId("mobile-task-back"));
 
     const location = screen.getByTestId("mobile-task-location");
-    expect(location).toHaveTextContent(
-      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}`,
-    );
+    expect(location).toHaveTextContent(`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}`);
     expect(location).not.toHaveTextContent("column=");
   });
 

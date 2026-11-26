@@ -84,9 +84,7 @@ describe("MobileBoardHeader", () => {
     await user.type(search, "engineering");
     expect(within(sheet).queryByText("Current workspace")).not.toBeInTheDocument();
     await user.click(within(sheet).getByRole("button", { name: "Engineering" }));
-    expect(screen.getByTestId("location")).toHaveTextContent(
-      `/org-1/workspaces/eng-abcd1234`,
-    );
+    expect(screen.getByTestId("location")).toHaveTextContent(`/org-1/workspaces/eng-abcd1234`);
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 

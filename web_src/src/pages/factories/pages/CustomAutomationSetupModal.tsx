@@ -92,9 +92,7 @@ function LegacyAutomationModal({
           onClose={onClose}
           onRetry={() => void model.described.refetch()}
           canvasHref={
-            automationId
-              ? factoryColumnAutomationViewPath(organizationId, routeSegment, automationId)
-              : undefined
+            automationId ? factoryColumnAutomationViewPath(organizationId, routeSegment, automationId) : undefined
           }
         />
       ) : (

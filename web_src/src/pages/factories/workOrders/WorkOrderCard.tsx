@@ -155,9 +155,7 @@ export function WorkOrderCard({
   onAssigneesSave,
 }: WorkOrderCardProps) {
   const meta = getWorkOrderDisplayStatusMeta(entry.displayStatus);
-  const destination = interactive
-    ? (href ?? workOrderOpenPath(organizationId, factoryKey, entry.order.number))
-    : "";
+  const destination = interactive ? (href ?? workOrderOpenPath(organizationId, factoryKey, entry.order.number)) : "";
   const updatedAt = entry.updatedAtMs > 0 ? new Date(entry.updatedAtMs) : null;
   const isDraft = entry.displayStatus === "draft";
   const planningSession = entry.order.planningSession;

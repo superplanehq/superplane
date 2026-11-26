@@ -94,8 +94,7 @@ function FactoryLineRow({
   organizationId: string;
   factoryKey: string;
 }) {
-  const href =
-    row.lineId && row.lineId !== "unknown" ? factoryHomePath(organizationId, factoryKey) : undefined;
+  const href = row.lineId && row.lineId !== "unknown" ? factoryHomePath(organizationId, factoryKey) : undefined;
   const inner = (
     <>
       <Sparkles className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />

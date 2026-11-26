@@ -149,9 +149,7 @@ function renderBoard(factory: FactoriesFactory = REFUND_FACTORY) {
     <QueryClientProvider client={new QueryClient()}>
       <ThemeProvider>
         <TooltipProvider>
-          <MemoryRouter
-            initialEntries={[`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}`]}
-          >
+          <MemoryRouter initialEntries={[`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}`]}>
             <FactoriesLayoutContext.Provider
               value={{
                 organizationId: "org-1",
@@ -376,9 +374,7 @@ describe("LinesPage Done column", () => {
       <QueryClientProvider client={new QueryClient()}>
         <ThemeProvider>
           <TooltipProvider>
-            <MemoryRouter
-              initialEntries={[`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}`]}
-            >
+            <MemoryRouter initialEntries={[`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}`]}>
               <FactoriesLayoutContext.Provider
                 value={{
                   organizationId: "org-1",

@@ -36,10 +36,7 @@ describe("FactoriesSidebarNav", () => {
     expect(screen.queryByTestId("factories-sidebar-create-work-order")).not.toBeInTheDocument();
     expect(screen.queryByTestId("factories-nav-intake")).not.toBeInTheDocument();
     expect(screen.queryByTestId("factories-nav-pr-feedback")).not.toBeInTheDocument();
-    expect(screen.getByTestId("factories-nav-board")).toHaveAttribute(
-      "href",
-      factoryHomePath(org, key),
-    );
+    expect(screen.getByTestId("factories-nav-board")).toHaveAttribute("href", factoryHomePath(org, key));
     expect(screen.getByTestId("factories-nav-board").querySelector(".lucide-house")).toBeInTheDocument();
     expect(screen.getByTestId("factories-nav-velocity").querySelector(".lucide-chart-line")).toBeInTheDocument();
     expect(screen.queryByTestId("factories-nav-agent")).not.toBeInTheDocument();

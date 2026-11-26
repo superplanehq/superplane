@@ -270,11 +270,7 @@ function MobileBoardOptions() {
           onRetry={retry}
         />
       </div>
-      <MobileBoardOptionColumnSections
-        columns={columns}
-        organizationId={organizationId}
-        factoryKey={routeSegment}
-      />
+      <MobileBoardOptionColumnSections columns={columns} organizationId={organizationId} factoryKey={routeSegment} />
     </section>
   );
 }

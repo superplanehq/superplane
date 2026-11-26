@@ -12,11 +12,7 @@ import { Settings, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { Link, useParams } from "react-router";
 import { FactoryDeleteDialog } from "../../FactoryDeleteDialog";
-import {
-  factoryHomePath,
-  factoryRouteSegment,
-  factorySettingsWorkspaceGeneralPath,
-} from "../../lib/factoryPagePaths";
+import { factoryHomePath, factoryRouteSegment, factorySettingsWorkspaceGeneralPath } from "../../lib/factoryPagePaths";
 import { clearLastVisitedFactory } from "../../lib/lastVisitedFactory";
 import { FactorySettingsCard, FactorySettingsPageFrame } from "../settings/FactorySettingsCard";
 

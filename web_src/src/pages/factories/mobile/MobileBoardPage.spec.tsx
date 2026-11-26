@@ -355,7 +355,7 @@ describe("MobileBoardPage", () => {
     await user.click(await screen.findByTestId(`mobile-board-line-${REFUND_LINE_HOTFIX_ID}`));
 
     expect(screen.getByTestId("mobile-test-location")).toHaveTextContent(
-      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}`,
+      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}?lineId=${REFUND_LINE_HOTFIX_ID}`,
     );
     expect(screen.getByTestId("mobile-board-line-switcher")).toHaveTextContent("Hotfix");
   });

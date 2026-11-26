@@ -3,12 +3,7 @@ import { type ReactNode } from "react";
 import { MemoryRouter, useLocation, useNavigate } from "react-router";
 import { describe, expect, it } from "bun:test";
 
-import {
-  createWorkOrderPath,
-  factoryHomePath,
-  workOrderDetailPath,
-  workOrdersPath,
-} from "../lib/factoryPagePaths";
+import { createWorkOrderPath, factoryHomePath, workOrderDetailPath, workOrdersPath } from "../lib/factoryPagePaths";
 import { useCreateWorkOrderDialogState } from "./useCreateWorkOrderDialogState";
 
 const ORGANIZATION_ID = "org-1";
