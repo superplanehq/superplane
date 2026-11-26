@@ -125,10 +125,26 @@ describe("webhook trigger conversion", () => {
     expect(automationDefinitionTriggers(visual.triggers, "backlog")).toEqual(definition.triggers);
   });
 
+  it.each<CustomAutomationColumn>(["implement", "verify", "done"])("accepts a webhook trigger in %s", (stage) => {
+    const visual = automationDefinitionCanvas(
+      parseAutomationForCanvas(automationDefinitionYaml(webhookDefinition()), stage),
+    );
+    expect(visual.runsOnTask).toBe(false);
+    expect(visual.triggers[0]?.mode).toBe("webhook");
+  });
+
+  it("keeps the task trigger next to a webhook on a custom stage", () => {
+    const stage: CustomAutomationColumn = "custom-qa";
+    const definition = webhookDefinition();
+    definition.triggers.unshift({ id: "enter", use: "task_enters_stage" });
+    const visual = automationDefinitionCanvas(parseAutomationForCanvas(automationDefinitionYaml(definition), stage));
+    expect(visual.runsOnTask).toBeUndefined();
+    expect(automationDefinitionTriggers(visual.triggers, stage)).toEqual(definition.triggers);
+  });
+
   const duplicate = webhookDefinition();
   duplicate.triggers.push({ id: "again", use: "webhook", config: { webhook_id: "webhook-1" } });
   it.each<[CustomAutomationColumn, AutomationDefinition, string]>([
-    ["implement", webhookDefinition(), "triggers[0].use"],
     ["backlog", { ...webhookDefinition(), runs_on_task: true }, "runs_on_task"],
     ["backlog", duplicate, "triggers[1].config.webhook_id"],
   ])("rejects an invalid webhook trigger in %s", (stage, definition, path) => {

@@ -122,28 +122,26 @@ export function TriggerEditor({
             factoryKey={factoryKey}
           />
         ))}
-        {!columnKey.startsWith("custom-") && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button type="button" variant="outline" size="sm" className="w-fit gap-1.5">
-                <Plus className="size-3.5" aria-hidden />
-                Add trigger
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="min-w-72">
-              {triggerModes.map((mode) => (
-                <DropdownMenuItem
-                  key={mode}
-                  className="py-2.5"
-                  disabled={!repeatableTriggerMode(mode) && triggers.some((trigger) => trigger.mode === mode)}
-                  onSelect={() => addTrigger(mode)}
-                >
-                  <TriggerOption mode={mode} columnKey={columnKey} runsOnTask={runsOnTask !== false} />
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button type="button" variant="outline" size="sm" className="w-fit gap-1.5">
+              <Plus className="size-3.5" aria-hidden />
+              Add trigger
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="min-w-72">
+            {triggerModes.map((mode) => (
+              <DropdownMenuItem
+                key={mode}
+                className="py-2.5"
+                disabled={!repeatableTriggerMode(mode) && triggers.some((trigger) => trigger.mode === mode)}
+                onSelect={() => addTrigger(mode)}
+              >
+                <TriggerOption mode={mode} columnKey={columnKey} runsOnTask={runsOnTask !== false} />
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </section>
       <section className="flex flex-col gap-8">
         <h3 className="text-base font-semibold text-foreground">Agent</h3>
@@ -219,7 +217,7 @@ function TriggerCard({
             <TriggerOption mode={trigger.mode} columnKey={columnKey} runsOnTask={runsOnTask} />
           </div>
         )}
-        {triggers.length > 1 ? (
+        {triggers.length > 1 && !lineStartsTrigger(columnKey, trigger.mode) ? (
           <Button
             type="button"
             variant="ghost"
@@ -240,6 +238,11 @@ function TriggerCard({
               organizationId={organizationId}
               factoryId={factoryId}
               factoryKey={factoryKey}
+              helper={
+                columnKey === "backlog"
+                  ? "The agent gets the JSON request body and can create a task."
+                  : "The agent gets the JSON request body. The run has no task."
+              }
               webhookId={trigger.webhookId}
               usedWebhookIds={triggers
                 .filter((item) => item.id !== trigger.id && item.mode === "webhook" && item.webhookId)
@@ -272,7 +275,9 @@ function TriggerContext({
 }) {
   if (columnKey.startsWith("custom-")) {
     return (
-      <p className="text-xs text-muted-foreground">The line starts this automation when a task enters the stage.</p>
+      <p className="text-xs text-muted-foreground">
+        The line starts this automation when a task enters the stage. A webhook can also start it with no task.
+      </p>
     );
   }
   return (
@@ -342,12 +347,18 @@ function AutomationIconPicker({ icon, onChange }: { icon: string; onChange: (ico
   );
 }
 
+/** A custom stage can add webhooks next to its line trigger. Other stages offer every trigger for the run context. */
 function availableTriggerModes(columnKey: CustomAutomationColumn, runsOnTask?: boolean): CustomAutomationMode[] {
+  if (columnKey.startsWith("custom-")) return ["webhook"];
   const modes: CustomAutomationMode[] = ["manual"];
   if (runsOnTask !== false) modes.push("automatic", "leave");
-  if (runsOnTask !== true) modes.push("scheduled");
-  if (runsOnTask !== true && columnKey === "backlog") modes.push("webhook");
+  if (runsOnTask !== true) modes.push("scheduled", "webhook");
   return modes;
+}
+
+/** The line starts a custom stage automation when a task enters the stage. Keep that trigger. */
+function lineStartsTrigger(columnKey: CustomAutomationColumn, mode: CustomAutomationMode): boolean {
+  return columnKey.startsWith("custom-") && mode === "automatic";
 }
 
 /** Schedules and webhooks can repeat with different settings. Event triggers cannot. */
