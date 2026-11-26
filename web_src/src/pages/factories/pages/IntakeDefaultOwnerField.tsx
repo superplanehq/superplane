@@ -1,5 +1,6 @@
 import { useId, useState, type Dispatch, type SetStateAction } from "react";
 import { useFactoryOwnerEligibility } from "@/hooks/useFactoryOwnerEligibility";
+import type { FactoriesFactoryOwnerEligibility } from "@/api-client";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useOptionalFactoriesLayout } from "../layout/factoriesLayoutContext";
 import type { IntakeOwnerDraft } from "./useIntakeOwnerDraft";
@@ -159,6 +160,53 @@ function ConnectedOwnerSelect({
             ))}
         </SelectContent>
       </Select>
+      <ConnectedOwnerFeedback
+        eligibility={eligibility}
+        members={members}
+        hasConnectedMembers={hasConnectedMembers}
+        selected={selected}
+        value={value}
+        currentUserId={currentUserId}
+        organizationId={organizationId}
+        factoryId={factoryId}
+        disabled={disabled}
+        onConnectCodex={onConnectCodex}
+        onConnected={async () => {
+          // Setup refreshes eligibility before invoking this continuation.
+          if (currentUserId) onChange(currentUserId);
+        }}
+      />
+    </>
+  );
+}
+
+function ConnectedOwnerFeedback({
+  eligibility,
+  members,
+  hasConnectedMembers,
+  selected,
+  value,
+  currentUserId,
+  organizationId,
+  factoryId,
+  disabled,
+  onConnectCodex,
+  onConnected,
+}: {
+  eligibility: Pick<ReturnType<typeof useFactoryOwnerEligibility>, "isPending" | "isError" | "refetch">;
+  members: FactoriesFactoryOwnerEligibility[];
+  hasConnectedMembers: boolean;
+  selected?: FactoriesFactoryOwnerEligibility;
+  value: string;
+  currentUserId?: string;
+  organizationId: string;
+  factoryId: string;
+  disabled: boolean;
+  onConnectCodex?: () => void;
+  onConnected: () => Promise<void>;
+}) {
+  return (
+    <>
       {!eligibility.isPending && !eligibility.isError && !hasConnectedMembers ? (
         <p className="text-sm text-muted-foreground">No members have ChatGPT connected.</p>
       ) : null}
@@ -181,10 +229,7 @@ function ConnectedOwnerSelect({
           factoryId={factoryId}
           disabled={disabled}
           onConnectCodex={onConnectCodex}
-          onConnected={async () => {
-            // Setup refreshes eligibility before invoking this continuation.
-            if (currentUserId) onChange(currentUserId);
-          }}
+          onConnected={onConnected}
         />
       ) : null}
     </>
