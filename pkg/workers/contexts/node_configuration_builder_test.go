@@ -16,6 +16,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models/factory"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
 func Test_NodeConfigurationBuilder_EvaluatesMultilineExpression(t *testing.T) {
@@ -483,6 +484,24 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 		assert.Equal(t, currentDefaultBranch, payload["default_branch"])
 	})
 
+	t.Run("loads repository bindings only for repository expressions", func(t *testing.T) {
+		for _, table := range []string{`"workflows"`, `"factory_configuration_automations"`} {
+			t.Run(table, func(t *testing.T) {
+				db := database.Conn().Session(&gorm.Session{NewDB: true, Context: t.Context()})
+				lookupErr := fmt.Errorf("unexpected repository lookup: %s", table)
+				db.Statement.ConnPool = failingQueryPool{ConnPool: db.Statement.ConnPool, needle: table, fail: lookupErr}
+				lazyBuilder := NewNodeConfigurationBuilder(db, canvas.ID).WithRootEvent(&nodeExecution.RootEventID)
+				for _, expression := range []string{`order().id`, `task()["id"]`, `order().title + task().id`} {
+					result, err := lazyBuilder.ResolveExpression(expression)
+					require.NoError(t, err)
+					require.NotEmpty(t, result)
+				}
+				_, err := lazyBuilder.ResolveExpression(`order().repository_url`)
+				require.ErrorIs(t, err, lookupErr)
+			})
+		}
+	})
+
 	t.Run("uses the automation repository binding for checkout", func(t *testing.T) {
 		db := database.DB(t.Context())
 		require.NoError(t, db.Model(order).Updates(map[string]any{"repository": "acme/order", "default_branch": "task-branch"}).Error)
@@ -519,6 +538,18 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 				require.Equal(t, "acme/pinned", built["repository"])
 				require.Equal(t, tc.url, built["url"])
 				require.Empty(t, built["branch"], "a different repository must use its own default branch")
+				for _, expression := range []string{
+					`order()["repository_url"]`,
+					`let field = "repository_url"; task()[field]`,
+					`let current = order(); current.repository_url`,
+				} {
+					result, err := builder.ResolveExpression(expression)
+					require.NoError(t, err)
+					require.Equal(t, tc.url, result)
+				}
+				result, err := builder.ResolveExpression(`order()`)
+				require.NoError(t, err)
+				require.Equal(t, tc.url, result.(map[string]any)["repository_url"])
 			})
 		}
 	})

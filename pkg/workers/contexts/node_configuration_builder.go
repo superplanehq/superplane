@@ -1115,28 +1115,34 @@ func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, 
 	}
 	serverURL := githubServerURL(b.tx, owningFactory.OrganizationID, config)
 	repositoryURL := models.VCSRepositoryCloneURL(provider, repository, serverURL)
-	canvas, err := models.FindCanvasInTransaction(b.tx, order.OrganizationID, b.workflowID)
+	usesRepository, err := expressionvalidation.ExpressionUsesOrderRepository(expression)
 	if err != nil {
-		return nil, fmt.Errorf("order() could not resolve the current app: %w", err)
+		return nil, fmt.Errorf("order() could not inspect expression: %w", err)
 	}
-	binding, integration, err := NewFactoryContext(b.tx, canvas, nil).configuredRepositoryBinding()
-	if err != nil {
-		return nil, fmt.Errorf("order() could not resolve the repository binding: %w", err)
-	}
-	if binding != nil {
-		if pinned, _ := binding.Binding["resource_id"].(string); pinned != "" {
-			repository = pinned
+	if usesRepository {
+		canvas, err := models.FindCanvasInTransaction(b.tx, order.OrganizationID, b.workflowID)
+		if err != nil {
+			return nil, fmt.Errorf("order() could not resolve the current app: %w", err)
 		}
-		if integration != nil {
-			provider = integration.AppName
-			if provider == models.ProviderGitHub {
-				serverURL = githubcommon.HostFromModel(integration).WebURL()
+		binding, integration, err := NewFactoryContext(b.tx, canvas, nil).configuredRepositoryBinding()
+		if err != nil {
+			return nil, fmt.Errorf("order() could not resolve the repository binding: %w", err)
+		}
+		if binding != nil {
+			if pinned, _ := binding.Binding["resource_id"].(string); pinned != "" {
+				repository = pinned
+			}
+			if integration != nil {
+				provider = integration.AppName
+				if provider == models.ProviderGitHub {
+					serverURL = githubcommon.HostFromModel(integration).WebURL()
+				}
 			}
 		}
-	}
-	if boundURL := models.VCSRepositoryCloneURL(provider, repository, serverURL); boundURL != repositoryURL {
-		// Let checkout discover the pinned repository's default branch.
-		repositoryURL, defaultBranch = boundURL, ""
+		if boundURL := models.VCSRepositoryCloneURL(provider, repository, serverURL); boundURL != repositoryURL {
+			// Let checkout discover the pinned repository's default branch.
+			repositoryURL, defaultBranch = boundURL, ""
+		}
 	}
 	payload := map[string]any{
 		"id":             order.ID.String(),
