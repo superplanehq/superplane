@@ -112,7 +112,7 @@ describe("useCreateFactoryIntake", () => {
       wrapper: createWrapper(queryClient),
     });
 
-    await result.current.mutateAsync({ source: "SOURCE_PRODUCTIVE_TASKS" });
+    await result.current.mutateAsync({ source: "SOURCE_JIRA_ISSUES" });
 
     await waitFor(() => {
       expect(invalidate).toHaveBeenCalledWith({

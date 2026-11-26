@@ -372,6 +372,10 @@ func LockIntegration(tx *gorm.DB, ID uuid.UUID) (*Integration, error) {
 	return &integration, nil
 }
 
+func (a *Integration) HardDelete(tx *gorm.DB) error {
+	return tx.Unscoped().Delete(a).Error
+}
+
 func (a *Integration) SoftDelete() error {
 	return a.SoftDeleteInTransaction(database.Conn())
 }
@@ -751,4 +755,8 @@ func ListSentryIntegrationsByInstallationUUID(tx *gorm.DB, installationUUID stri
 		return nil, err
 	}
 	return integrations, nil
+}
+
+func registeredIntegrationIDs(tx *gorm.DB, integrationNames []string) *gorm.DB {
+	return tx.Model(&Integration{}).Select("id").Where("app_name IN ?", integrationNames)
 }
