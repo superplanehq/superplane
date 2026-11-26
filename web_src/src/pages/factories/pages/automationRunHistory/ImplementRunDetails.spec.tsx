@@ -103,10 +103,10 @@ describe("Implement run details hydration", () => {
     try {
       render(
         <QueryClientProvider client={client}>
-          <MemoryRouter initialEntries={["/org/workspaces/sp-abcd/lines/line-one"]}>
+          <MemoryRouter initialEntries={["/org/workspaces/sp-abcd"]}>
             <Routes>
               <Route
-                path="/:organizationId/workspaces/:factoryKey/lines/:lineId"
+                path="/:organizationId/workspaces/:factoryKey"
                 element={
                   <FactoryAutomationRunHistory
                     canvasId="canvas"
@@ -126,7 +126,7 @@ describe("Implement run details hydration", () => {
       await waitFor(() =>
         expect(screen.getByRole("link", { name: "Task SP-42" })).toHaveAttribute(
           "href",
-          "/org/workspaces/sp-abcd/task/42?lineId=line-one",
+          "/org/workspaces/sp-abcd/task/42",
         ),
       );
       expect(screen.queryByText("Outcome unavailable")).not.toBeInTheDocument();

@@ -47,10 +47,10 @@ function renderColumn() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={["/org-1/workspaces/newws/lines/line-1"]}>
+      <MemoryRouter initialEntries={["/org-1/workspaces/newws"]}>
         <Routes>
           <Route
-            path="/org-1/workspaces/newws/lines/:lineId"
+            path="/org-1/workspaces/newws"
             element={
               <>
                 <BacklogColumn

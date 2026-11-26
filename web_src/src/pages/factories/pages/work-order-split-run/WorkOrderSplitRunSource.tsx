@@ -165,7 +165,7 @@ function useSourceRunHref(run?: SplitRunRunRef): string | undefined {
   if (!run || !organizationId || !factoryKey || !lineId) {
     return undefined;
   }
-  return factoryCustomAutomationRunPath(organizationId, factoryKey, lineId, run.appId, run.runId);
+  return factoryCustomAutomationRunPath(organizationId, factoryKey, run.appId, run.runId);
 }
 
 function CompactNamedSource({ source }: { source: NamedSplitRunSource }) {

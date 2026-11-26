@@ -11,7 +11,7 @@ import type { FactoriesFactoryLine, FactoriesWorkOrder } from "@/api-client";
 import { useMemo } from "react";
 import { Navigate, useLocation, useParams } from "react-router";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
-import { factoryHomePath, firstFactoryLineId, workOrderDetailPath } from "../lib/factoryPagePaths";
+import { factoryHomePath, workOrderDetailPath } from "../lib/factoryPagePaths";
 import { flattenWorkOrderEventsPages } from "../lib/workOrderEventsPagination";
 import { canonicalWorkOrderNumber, resolveWorkOrderByNumber } from "../lib/workOrderNumberResolution";
 import { getWorkOrderDetailDerived } from "../lib/workOrderProgress";
@@ -33,7 +33,7 @@ export function WorkOrderDetailPage() {
  */
 export function LegacyWorkOrderDetailRedirect() {
   const { orderId } = useParams<{ orderId: string }>();
-  const { organizationId, factoryId, routeSegment, factory } = useFactoriesLayout();
+  const { organizationId, factoryId, routeSegment } = useFactoriesLayout();
   const location = useLocation();
   const { data: workOrders = [], isLoading } = useFactoryWorkOrders(organizationId, factoryId);
   const resolution = resolveWorkOrderByNumber(workOrders, orderId, isLoading);
@@ -47,7 +47,7 @@ export function LegacyWorkOrderDetailRedirect() {
     // the id-to-number redirect instead of falling back to the first line.
     return <Navigate to={`${workOrderDetailPath(organizationId, routeSegment, number)}${location.search}`} replace />;
   }
-  return <Navigate to={factoryHomePath(organizationId, routeSegment, firstFactoryLineId(factory))} replace />;
+  return <Navigate to={factoryHomePath(organizationId, routeSegment)} replace />;
 }
 
 export function WorkOrderDetailPanel({
@@ -79,7 +79,7 @@ export function WorkOrderDetailPanel({
 
   usePageTitle(workOrderDetailTitle(order, factory), { enabled: chrome === "page" });
 
-  const boardHref = factoryHomePath(organizationId, factoryKey, firstFactoryLineId(factory));
+  const boardHref = factoryHomePath(organizationId, factoryKey);
   const unavailable = shouldRedirectAfterError({ factoryLoading, factoryError, orderLoading, orderError });
   const ready = isWorkOrderDetailReady(factory, order, derived);
 

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 
 import { createWorkOrderPath, factoryHomePath, workOrderDetailPath } from "../lib/factoryPagePaths";
+import { isBoardPath } from "./factoriesRail";
 
 export function useCreateWorkOrderDialogState(
   organizationId: string,
@@ -29,18 +30,17 @@ export function useCreateWorkOrderDialogState(
   const closeCreateWorkOrder = useCallback(() => {
     setCreateWorkOrderOpen(false);
     if (isCreateWorkOrderRoute) {
-      navigate(factoryHomePath(organizationId, factoryKey, firstLineId), { replace: true });
+      navigate(factoryHomePath(organizationId, factoryKey), { replace: true });
     }
-  }, [factoryKey, firstLineId, isCreateWorkOrderRoute, navigate, organizationId]);
+  }, [factoryKey, isCreateWorkOrderRoute, navigate, organizationId]);
 
   const completeCreateWorkOrder = useCallback(
     (orderNumber: string, order?: FactoriesWorkOrder) => {
       setCreateWorkOrderOpen(false);
-      const boardLineId = lineIdFromPathname(location.pathname);
-      if (boardLineId && !isCreateWorkOrderRoute) {
+      if (isBoardPath(location.pathname) && !isCreateWorkOrderRoute) {
         return;
       }
-      navigate(workOrderDetailPath(organizationId, factoryKey, orderNumber, boardLineId ?? firstLineId), {
+      navigate(workOrderDetailPath(organizationId, factoryKey, orderNumber, firstLineId), {
         replace: isCreateWorkOrderRoute,
         state: order?.id ? { peekOrder: order } : undefined,
       });
@@ -54,13 +54,4 @@ export function useCreateWorkOrderDialogState(
     closeCreateWorkOrder,
     completeCreateWorkOrder,
   };
-}
-
-function lineIdFromPathname(pathname: string): string | undefined {
-  const match = /\/lines\/([^/]+)/.exec(pathname);
-  const lineId = match?.[1];
-  if (!lineId || lineId === "new") {
-    return undefined;
-  }
-  return lineId;
 }
