@@ -9,7 +9,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
-	"github.com/superplanehq/superplane/pkg/githubapp"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	bitbucketintegration "github.com/superplanehq/superplane/pkg/integrations/bitbucket"
 	"github.com/superplanehq/superplane/pkg/mcp"
@@ -74,16 +73,21 @@ func CreateFactoryAgentResource(
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create agent resource")
 	}
-	if err := authorizeContextRepository(ctx, db, deps, organizationID, factory, config); err != nil {
-		return nil, factoryErrorToStatus(err, "failed to create agent resource")
-	}
-	resource, err := factory.CreateAgentResource(
-		db,
-		protoKindToModel(req.GetKind()),
-		req.GetName(),
-		req.GetEnabled(),
-		config,
-	)
+	var resource *models.FactoryAgentResource
+	err = db.Transaction(func(tx *gorm.DB) error {
+		if err := models.LockOrganizationVCSProviderBindingRepositories(tx, orgID); err != nil {
+			return err
+		}
+		if err := factory.LockForUpdate(tx); err != nil {
+			return err
+		}
+		if err := authorizeContextRepository(ctx, tx, deps, organizationID, factory, config); err != nil {
+			return err
+		}
+		var err error
+		resource, err = factory.CreateAgentResource(tx, protoKindToModel(req.GetKind()), req.GetName(), req.GetEnabled(), config)
+		return err
+	})
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create agent resource")
 	}
@@ -185,23 +189,33 @@ func UpdateFactoryAgentResource(
 		config = &merged
 	}
 
-	if resource.Kind == models.FactoryAgentResourceKindContextRepo && (config != nil || (enabled != nil && *enabled)) {
-		merged := resource.Config.Data()
-		if config != nil {
-			merged = *config
-		}
-		if err := authorizeContextRepository(ctx, db, deps, organizationID, factory, merged); err != nil {
-			return nil, factoryErrorToStatus(err, "failed to update agent resource")
-		}
-	}
-
 	var revocation *oauthRevocation
 	if config != nil && resource.Config.Data().InvalidatesOAuth(*config) {
 		revocation = captureOAuthRevocation(ctx, deps, db, resource)
 	}
-	if err := resource.Update(db, name, enabled, config); err != nil {
+	err = db.Transaction(func(tx *gorm.DB) error {
+		if err := models.LockOrganizationVCSProviderBindingRepositories(tx, orgID); err != nil {
+			return err
+		}
+		if err := factory.LockForUpdate(tx); err != nil {
+			return err
+		}
+		if resource.Kind == models.FactoryAgentResourceKindContextRepo && (config != nil || (enabled != nil && *enabled)) {
+			merged := resource.Config.Data()
+			if config != nil {
+				merged = *config
+			}
+			if err := authorizeContextRepository(ctx, tx, deps, organizationID, factory, merged); err != nil {
+				return err
+			}
+		}
+
+		return resource.Update(tx, name, enabled, config)
+	})
+	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update agent resource")
 	}
+
 	revocation.run(ctx, deps)
 	if resource.Kind == models.FactoryAgentResourceKindContextRepo {
 		refreshWorkspaceRepositoryAutomations(ctx, deps, factory)
@@ -233,7 +247,7 @@ func authorizeContextRepository(
 		return nil
 	}
 	integrationID := strings.TrimSpace(factory.OnboardingConfigValue().VCSIntegrationID)
-	if integrationID == "" || !githubapp.AccountConnectionRequired(ctx) {
+	if integrationID == "" {
 		return nil
 	}
 	bindingID, err := uuid.Parse(integrationID)
@@ -253,10 +267,7 @@ func authorizeContextRepository(
 		return nil
 	}
 
-	repository, err := findGitHubCatalogRepositoryByName(ctx, db, organizationID, config.Repository)
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return grpcerrors.PermissionDenied(err, "repository is not accessible")
-	}
+	repository, err := findGitHubCatalogRepositoryByName(ctx, db, organizationID, config.Repository, bindingID)
 	if err != nil {
 		return err
 	}

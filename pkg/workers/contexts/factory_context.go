@@ -1305,7 +1305,7 @@ func (c *FactoryContext) VCSProvider() (string, error) {
 	return factory.OnboardingConfigValue().VCSProvider, nil
 }
 
-// GitHubHost returns the hostname of the workspace GitHub integration.
+// GitHubHost returns the hostname of the automation's GitHub integration.
 // Empty means github.com, or that the workspace does not use GitHub.
 func (c *FactoryContext) GitHubHost() (string, error) {
 	if c.canvas == nil || c.canvas.FactoryID == nil {
@@ -1314,6 +1314,17 @@ func (c *FactoryContext) GitHubHost() (string, error) {
 	factory, err := c.currentFactory()
 	if err != nil {
 		return "", err
+	}
+	_, integration, err := c.configuredRepositoryBinding()
+	if err != nil {
+		return "", err
+	}
+	if integration != nil && integration.AppName == models.ProviderGitHub {
+		host := githubcommon.HostFromModel(integration)
+		if host.IsDotCom() {
+			return "", nil
+		}
+		return host.WebHostname(), nil
 	}
 	host, err := githubcommon.HostFromFactoryOnboarding(c.tx, c.canvas.OrganizationID, factory.OnboardingConfigValue())
 	if err != nil {
@@ -1333,7 +1344,45 @@ func (c *FactoryContext) ListRepositories() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
+	binding, _, err := c.configuredRepositoryBinding()
+	if err != nil {
+		return nil, err
+	}
+	if binding != nil {
+		if repository, ok := binding.Binding["resource_id"].(string); ok && repository != "" {
+			return []string{repository}, nil
+		}
+	}
 	return factory.WorkspaceRepositories(c.tx)
+}
+
+func (c *FactoryContext) configuredRepositoryBinding() (*models.FactoryConfigurationAutomation, *models.Integration, error) {
+	binding, err := models.FindFactoryConfigurationAutomationByCanvas(c.tx, c.canvas.ID)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil, nil
+	}
+	if err != nil {
+		return nil, nil, err
+	}
+	if binding.OrganizationID != c.canvas.OrganizationID || c.canvas.FactoryID == nil || binding.FactoryID != *c.canvas.FactoryID {
+		return nil, nil, fmt.Errorf("automation binding does not belong to this workspace")
+	}
+	raw, _ := binding.Binding["integration_id"].(string)
+	if raw == "" {
+		return binding, nil, nil
+	}
+	id, err := uuid.Parse(raw)
+	if err != nil {
+		return nil, nil, err
+	}
+	integration, err := models.FindIntegrationInTransaction(c.tx, c.canvas.OrganizationID, id)
+	if err != nil {
+		return nil, nil, err
+	}
+	if integration.AppName != models.ProviderGitHub && integration.AppName != models.ProviderBitbucket {
+		return nil, nil, nil
+	}
+	return binding, integration, nil
 }
 
 func (c *FactoryContext) AddPullRequest(params core.AddPullRequestParams) (*core.PullRequest, error) {
