@@ -55,9 +55,9 @@ func buildCustomStageAutomationCanvas(tx *gorm.DB, factory *models.Factory, name
 		template["triggerIndex"] = automaticIndex
 	})
 	runnerConfiguration := customAutomationRunnerConfiguration(tx, factory, settings, []any{
-		checkoutEnvironmentVar("REPO", "{{ root().data.workOrder?.repository ?? order().repository }}"),
-		checkoutEnvironmentVar("REPO_URL", "{{ root().data.workOrder?.repository_url ?? order().repository_url }}"),
-		checkoutEnvironmentVar("BASE", "{{ root().data.workOrder?.default_branch ?? order().default_branch }}"),
+		checkoutEnvironmentVar("REPO", "{{ root().data?.workOrder?.repository ?? order().repository }}"),
+		checkoutEnvironmentVar("REPO_URL", "{{ root().data?.workOrder?.repository_url ?? order().repository_url }}"),
+		checkoutEnvironmentVar("BASE", "{{ root().data?.workOrder?.default_branch ?? order().default_branch }}"),
 	})
 	doc.Spec.Nodes = []yaml.Node{{
 		ID: "on-run", Name: "On Run", Type: yaml.NodeTypeTrigger, Component: "onRun", Configuration: map[string]any{}, Metadata: metadata,
