@@ -34,7 +34,7 @@ vi.mock("@/hooks/useFactoryIntakeData", () => ({
 
 function renderDialog(onCreated = vi.fn()) {
   return render(
-    <MemoryRouter initialEntries={["/org-1/workspaces/sp/lines/line-plan/setup/github"]}>
+    <MemoryRouter initialEntries={["/org-1/workspaces/sp/line/setup/github"]}>
       <GitHubIntakeSetupDialog
         organizationId="org-1"
         factoryId="factory-1"
@@ -97,7 +97,7 @@ describe("GitHubIntakeSetupDialog", () => {
     const user = userEvent.setup();
     const onCreated = vi.fn();
     render(
-      <MemoryRouter initialEntries={["/org-1/workspaces/sp/lines/line-plan/setup/github"]}>
+      <MemoryRouter initialEntries={["/org-1/workspaces/sp/line/setup/github"]}>
         <GitHubIntakeSetupDialog
           organizationId="org-1"
           factoryId="factory-1"

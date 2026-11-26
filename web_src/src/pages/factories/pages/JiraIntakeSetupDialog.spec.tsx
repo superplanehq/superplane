@@ -86,7 +86,7 @@ vi.mock("@/ui/IntegrationCreateDialog", () => ({
 
 function renderDialog(onCreated = vi.fn(), selectIntegrationId = "") {
   return render(
-    <MemoryRouter initialEntries={["/org-1/workspaces/sp/lines/line-plan/setup/jira"]}>
+    <MemoryRouter initialEntries={["/org-1/workspaces/sp/line/setup/jira"]}>
       <JiraIntakeSetupDialog
         organizationId="org-1"
         factoryId="factory-1"
@@ -258,7 +258,7 @@ describe("JiraIntakeSetupDialog", () => {
     renderDialog();
 
     await user.click(screen.getByTestId("jira-setup-connect"));
-    expect(screen.getByTestId("setup-return-to")).toHaveTextContent("/org-1/workspaces/sp/lines/line-plan/setup/jira");
+    expect(screen.getByTestId("setup-return-to")).toHaveTextContent("/org-1/workspaces/sp/line/setup/jira");
     await user.click(await screen.findByTestId("finish-connect"));
 
     expect(screen.getByRole("heading", { name: JIRA_INTAKE_SETUP_COPY.wizardStepProject })).toBeInTheDocument();
@@ -277,7 +277,7 @@ describe("JiraIntakeSetupDialog", () => {
       expect(mocks.createIntegration).toHaveBeenCalledWith({
         integrationName: "jira",
         name: "jira",
-        configuration: { setupReturnPath: "/org-1/workspaces/sp/lines/line-plan/setup/jira" },
+        configuration: { setupReturnPath: "/org-1/workspaces/sp/line/setup/jira" },
       });
     });
     expect(mocks.followBrowserAction).toHaveBeenCalledWith({ url: "https://auth.atlassian.com/authorize" });

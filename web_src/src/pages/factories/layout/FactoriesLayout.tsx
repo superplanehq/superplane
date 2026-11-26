@@ -146,12 +146,13 @@ function FactoriesLayoutContent({
   const { data: describedFactory, error: factoryError } = useFactory(organizationId, factoryId);
   const factory = describedFactory ?? factories.find((item) => item.id === factoryId);
   const { slug, routeSegment } = workspaceLayoutKeys(factory, factoryKey);
-  const boardRoute = useMatch("/:organizationId/workspaces/:factoryKey/lines/:lineId");
+  const boardRoute = useMatch("/:organizationId/workspaces/:factoryKey");
+  const legacyBoardRoute = useMatch("/:organizationId/workspaces/:factoryKey/lines/:lineId");
   const taskRoute = useMatch("/:organizationId/workspaces/:factoryKey/task/:orderNumber");
   const brokenIntegrationsBanner = useBrokenIntegrationsBanner(
     organizationId,
     routeSegment,
-    Boolean(boardRoute || taskRoute),
+    Boolean(boardRoute || legacyBoardRoute || taskRoute),
   );
   const { createWorkOrderOpen, openCreateWorkOrder, closeCreateWorkOrder, completeCreateWorkOrder } =
     useCreateWorkOrderDialogState(

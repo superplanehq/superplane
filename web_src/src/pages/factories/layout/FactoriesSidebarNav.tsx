@@ -9,7 +9,6 @@ import { factoriesRailControlClassName, isAgentPath, isBoardPath, isVelocityPath
 interface FactoriesSidebarNavProps {
   organizationId: string;
   factoryKey: string;
-  lineId?: string;
   /** Public board keeps the home icon and hides Agent. */
   showAgent?: boolean;
   /** Public board keeps the home icon and hides Velocity. */
@@ -60,12 +59,11 @@ function RailNavLink({
 export function FactoriesSidebarNav({
   organizationId,
   factoryKey,
-  lineId,
   showAgent = false,
   showVelocity = true,
 }: FactoriesSidebarNavProps) {
   const { pathname } = useLocation();
-  const boardHref = factoryHomePath(organizationId, factoryKey, lineId);
+  const boardHref = factoryHomePath(organizationId, factoryKey);
   const agentHref = factoryAgentPath(organizationId, factoryKey);
   const velocityHref = factoryVelocityPath(organizationId, factoryKey);
 

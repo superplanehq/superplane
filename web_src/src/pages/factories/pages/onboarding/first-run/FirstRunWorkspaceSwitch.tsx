@@ -5,7 +5,7 @@ import { useState, type CSSProperties } from "react";
 import { useNavigate } from "react-router";
 
 import { factoriesRailControlClassName, initialsForName } from "../../../layout/factoriesRail";
-import { factoryHomePath, factoryRouteSegment, firstFactoryLineId } from "../../../lib/factoryPagePaths";
+import { factoryHomePath, factoryRouteSegment } from "../../../lib/factoryPagePaths";
 import { FIRST_RUN_COPY } from "./firstRunCopy";
 import type { FirstRunChrome, FirstRunWorkspaceOption } from "./firstRunTypes";
 
@@ -84,7 +84,7 @@ function FirstRunWorkspaceSwitchMenu({
                   setOpen(false);
                   const nextSegment = factoryRouteSegment(factory);
                   if (isCurrent || !nextSegment) return;
-                  navigate(factoryHomePath(switcher.organizationId, nextSegment, firstFactoryLineId(factory)));
+                  navigate(factoryHomePath(switcher.organizationId, nextSegment));
                 }}
                 data-testid={`first-run-workspace-option-${factory.id}`}
               >
