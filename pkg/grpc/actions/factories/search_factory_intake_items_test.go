@@ -19,7 +19,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations/datadog"
 	"github.com/superplanehq/superplane/pkg/integrations/jira"
 	"github.com/superplanehq/superplane/pkg/integrations/linear"
-	"github.com/superplanehq/superplane/pkg/integrations/productive"
 	"github.com/superplanehq/superplane/pkg/integrations/sentry"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
@@ -29,21 +28,6 @@ import (
 
 	_ "github.com/superplanehq/superplane/pkg/registryimports"
 )
-
-func Test__ProductiveTaskItem(t *testing.T) {
-	item := productiveTaskItem(productive.Task{
-		ID:          "91",
-		Number:      "512",
-		Title:       "Fix payment retries",
-		Description: "Retries fail silently.",
-	}, "12345")
-
-	assert.Equal(t, "91", item.ID)
-	assert.Equal(t, "#512", item.Key)
-	assert.Equal(t, "Fix payment retries", item.Title)
-	assert.Equal(t, "Retries fail silently.", item.Body)
-	assert.Equal(t, "https://app.productive.io/12345/tasks/91", item.URL)
-}
 
 func TestParseGitHubIssueURL(t *testing.T) {
 	host, repository, number, ok := parseGitHubIssueURL("https://github.com/acme/payments/issues/12#issuecomment-1")
@@ -61,18 +45,6 @@ func TestParseGitHubIssueURL(t *testing.T) {
 	_, _, _, ok = parseGitHubIssueURL("https://github.com/acme/payments/pull/12")
 	assert.False(t, ok)
 	_, _, _, ok = parseGitHubIssueURL("https://example.com/acme/payments/issues/12")
-	assert.False(t, ok)
-}
-
-func TestParseProductiveTaskURL(t *testing.T) {
-	organizationID, taskID, ok := parseProductiveTaskURL("https://app.productive.io/12345/tasks/91")
-	assert.True(t, ok)
-	assert.Equal(t, "12345", organizationID)
-	assert.Equal(t, "91", taskID)
-
-	_, _, ok = parseProductiveTaskURL("https://app.productive.io/12345/projects/91")
-	assert.False(t, ok)
-	_, _, ok = parseProductiveTaskURL("https://example.com/12345/tasks/91")
 	assert.False(t, ok)
 }
 

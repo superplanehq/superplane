@@ -20,6 +20,7 @@ const (
 	ScopeTasksRead         RunnerToolScope = "tasks:read"
 	ScopeTasksCreate       RunnerToolScope = "tasks:create"
 	ScopeTasksClose        RunnerToolScope = "tasks:close"
+	ScopeTasksMove         RunnerToolScope = "tasks:move"
 	ScopeChecksRead        RunnerToolScope = "checks:read"
 	ScopeChecksWrite       RunnerToolScope = "checks:write"
 	ScopeArtifactsRead     RunnerToolScope = "artifacts:read"
@@ -57,6 +58,7 @@ var runnerTools = []RunnerTool{
 	{Name: "report_merge_check", Scope: ScopeMergeChecksWrite},
 	{Name: "open_pull_request", Scope: ScopePullRequestsWrite},
 	{Name: "list_pull_requests", Scope: ScopePullRequestsRead},
+	{Name: "move_task", Scope: ScopeTasksMove},
 }
 
 // Every flow receives these tools for now. Narrow the list here later.
@@ -77,8 +79,8 @@ var sharedRunnerScopes = []RunnerToolScope{
 // the run settings, see TaskCapabilityScopes.
 var runnerFlowScopes = map[RunnerFlow][]RunnerToolScope{
 	RunnerFlowPlanning:        withScopes(ScopePlanWrite),
-	RunnerFlowTask:            withScopes(),
-	RunnerFlowMergeConfidence: withScopes(ScopeMergeChecksWrite),
+	RunnerFlowTask:            withScopes(ScopeTasksMove),
+	RunnerFlowMergeConfidence: withScopes(ScopeMergeChecksWrite, ScopeTasksMove),
 	// A schedule run has no task yet. It can list and create tasks.
 	RunnerFlowSchedule: {ScopeTasksRead, ScopeTasksCreate},
 }

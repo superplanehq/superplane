@@ -16,9 +16,8 @@ import * as apiClient from "@/api-client";
 import type * as integrationsData from "@/hooks/useIntegrations";
 import { resetFactoryBoardLaneScrollPositions } from "@/hooks/useFactoryBoardLaneScroll";
 import {
-  FEATURE_AUTOMATIONS_AS_CODE,
+  FEATURE_FACTORY_AS_CODE,
   FEATURE_FACTORY_DATADOG_INTAKE,
-  FEATURE_FACTORY_PRODUCTIVE_INTAKE,
   FEATURE_FACTORY_SCHEDULED_INTAKE,
   FEATURE_FACTORY_WEBHOOK_INTAKE,
   FEATURE_WORKSPACE_SKILLS,
@@ -41,7 +40,6 @@ import {
   factoryJiraIntakeSetupPath,
   factoryLinearIntakeSetupPath,
   factoryPlanningPath,
-  factoryProductiveIntakeSetupPath,
   factoryPRFeedbackPath,
   factoryPRFeedbackSetupPath,
   factoryRiskScoreSetupPath,
@@ -936,7 +934,7 @@ describe("LinesPage board stages", () => {
             }),
           )
         : undefined;
-      if (yamlEnabled) enabledExperimentalFeatures.add(FEATURE_AUTOMATIONS_AS_CODE);
+      if (yamlEnabled) enabledExperimentalFeatures.add(FEATURE_FACTORY_AS_CODE);
       useFactoryAutomations.mockReturnValue({ data: [{ id: "app-qa", name: "Check QA", columnKey: "custom-qa" }] });
       renderLinesBoard(undefined, vi.fn(), customStageFactory());
       await userEvent
@@ -2000,13 +1998,11 @@ describe("LinesPage board extras", () => {
     expect(screen.getByTestId("add-intake-template-sentry-exceptions")).not.toHaveTextContent(
       ADD_INTAKE_COPY.comingSoon,
     );
-    expect(screen.getByTestId("add-intake-template-productive-tasks")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
     expect(screen.getByTestId("add-intake-template-datadog")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
     expect(screen.getByTestId("add-intake-template-linear-issues")).toBeEnabled();
     expect(screen.getByTestId("add-intake-template-linear-issues")).not.toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
     expect(screen.getByTestId("add-intake-template-notion")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
 
-    await user.click(screen.getByTestId("add-intake-template-productive-tasks"));
     await user.click(screen.getByTestId("add-intake-template-datadog"));
 
     expect(screen.queryByTestId("jira-intake-setup")).not.toBeInTheDocument();
@@ -2070,7 +2066,6 @@ describe("LinesPage board extras", () => {
     expect(screen.getByTestId("add-intake-template-linear-issues")).toBeEnabled();
     expect(screen.getByTestId("add-intake-template-notion")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
     expect(screen.queryByTestId("add-intake-template-pagerduty-incidents")).not.toBeInTheDocument();
-    expect(screen.getByTestId("add-intake-template-productive-tasks")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
 
     await user.click(screen.getByTestId("add-intake-template-sentry-exceptions"));
 
@@ -2126,7 +2121,6 @@ describe("LinesPage board extras", () => {
     expect(screen.getByTestId("add-intake-template-github-issues")).toBeInTheDocument();
     expect(screen.getByTestId("add-intake-template-jira-issues")).toBeInTheDocument();
     expect(screen.getByTestId("add-intake-template-sentry-exceptions")).toBeInTheDocument();
-    expect(screen.getByTestId("add-intake-template-productive-tasks")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
 
     await user.click(screen.getByTestId("add-intake-template-jira-issues"));
     expect(screen.getByTestId("jira-intake-setup")).toBeInTheDocument();
@@ -2134,27 +2128,6 @@ describe("LinesPage board extras", () => {
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
       factoryJiraIntakeSetupPath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT, REFUND_LINE_PLAN_ID),
     );
-  });
-
-  it("opens guided Productive.io setup from the overflow menu", async () => {
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_PRODUCTIVE_INTAKE);
-    const user = userEvent.setup();
-    renderLinesBoard();
-
-    await user.click(screen.getByTestId("lines-backlog-menu"));
-    await user.click(screen.getByTestId("lines-backlog-menu-add-intake"));
-
-    const productive = screen.getByTestId("add-intake-template-productive-tasks");
-    expect(productive).toBeEnabled();
-    expect(screen.getByTestId("add-intake-template-jira-issues")).toBeEnabled();
-    expect(screen.getByTestId("add-intake-template-jira-issues")).not.toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
-
-    await user.click(productive);
-
-    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      factoryProductiveIntakeSetupPath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT, REFUND_LINE_PLAN_ID),
-    );
-    expect(createFactoryIntakeMutateAsync).not.toHaveBeenCalled();
   });
 
   it("sends a legacy Jira OAuth return to the setup page", () => {

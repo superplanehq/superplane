@@ -102,15 +102,6 @@ export const SENTRY_INTAKE_CANVAS = {
   },
 };
 
-export const PRODUCTIVE_INTAKE: ConfiguredLineIntakeSource = {
-  intakeId: "intake-productive",
-  appId: "app-productive-intake",
-  healthy: true,
-  paused: false,
-  settings: { ...DEFAULT_GITHUB_INTAKE_SETTINGS, name: "Productive tasks" },
-  source: lineIntakeSourceById("productive-tasks")!,
-};
-
 export const DEPENDABOT_INTAKE: ConfiguredLineIntakeSource = {
   intakeId: "intake-dependabot",
   appId: "app-dependabot-intake",

@@ -42,7 +42,7 @@ func TestGlobalRunnerToolsOverStdio(t *testing.T) {
 	env := runner.AttachRunnerEnv(ctx, nil, 60)
 	mcp := startGlobalMCP(t, server, runnerTokenFrom(env), runner.AppendGlobalMCP(env, nil))
 
-	assert.ElementsMatch(t, globalRunnerToolsWith("open_pull_request", "list_pull_requests"), mcp.toolNames())
+	assert.ElementsMatch(t, globalRunnerToolsWith("open_pull_request", "list_pull_requests", "move_task"), mcp.toolNames())
 
 	members := mcp.call("list_members", map[string]any{})["members"].([]any)
 	assert.Contains(t, fieldValues(members, "user_id"), member.ID.String())
@@ -104,6 +104,17 @@ func TestGlobalRunnerToolsOverStdio(t *testing.T) {
 	reloaded, err := factory.FindWorkOrder(db, order.ID)
 	require.NoError(t, err)
 	assert.Equal(t, models.FactoryWorkOrderStateClosed, reloaded.State)
+}
+
+func TestRunnerMoveTaskOverStdio(t *testing.T) {
+	server, token, order, dispatch, ctx := moveTaskFixture(t)
+	env := runner.AttachRunnerEnv(ctx, nil, 60)
+	mcp := startGlobalMCP(t, server, token, runner.AppendGlobalMCP(env, nil))
+	moved := mcp.call("move_task", map[string]any{"next": true})
+	assert.Equal(t, order.ID.String(), moved["id"])
+	assert.Equal(t, "custom-review", moved["column"])
+	require.NoError(t, database.DB(t.Context()).First(dispatch, "id = ?", dispatch.ID).Error)
+	assert.Equal(t, "custom-review", dispatch.CurrentStageKey)
 }
 
 func fieldValues(items []any, field string) []string {

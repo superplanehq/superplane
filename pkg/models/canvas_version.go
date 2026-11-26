@@ -285,6 +285,29 @@ func FindLiveCanvasVersionInTransaction(tx *gorm.DB, workflowID uuid.UUID) (*Can
 	return FindLiveCanvasVersionByCanvasInTransaction(tx, canvas)
 }
 
+// FindLiveCanvasVersions reads the published versions captured by the loaded canvases.
+func FindLiveCanvasVersions(tx *gorm.DB, canvases []Canvas) (map[uuid.UUID]*CanvasVersion, error) {
+	result := make(map[uuid.UUID]*CanvasVersion, len(canvases))
+	bindings := make([][]any, 0, len(canvases))
+	for _, canvas := range canvases {
+		if canvas.LiveVersionID != nil {
+			bindings = append(bindings, []any{canvas.ID, *canvas.LiveVersionID})
+		}
+	}
+	if len(bindings) == 0 {
+		return result, nil
+	}
+
+	var versions []CanvasVersion
+	if err := tx.Where("(workflow_id, id) IN ?", bindings).Find(&versions).Error; err != nil {
+		return nil, err
+	}
+	for i := range versions {
+		result[versions[i].WorkflowID] = &versions[i]
+	}
+	return result, nil
+}
+
 func FindLiveCanvasVersionByCanvasInTransaction(tx *gorm.DB, canvas *Canvas) (*CanvasVersion, error) {
 	if canvas.LiveVersionID == nil {
 		return nil, gorm.ErrRecordNotFound

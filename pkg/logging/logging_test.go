@@ -3,80 +3,12 @@ package logging
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"testing"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-func TestProductiveWebhookFailure_JSONIncludesComponentAndWebhookType(t *testing.T) {
-	previousOutput := log.StandardLogger().Out
-	previousFormatter := log.StandardLogger().Formatter
-	standardOutput := &bytes.Buffer{}
-	log.StandardLogger().SetOutput(standardOutput)
-	t.Cleanup(func() {
-		log.StandardLogger().SetOutput(previousOutput)
-		log.StandardLogger().SetFormatter(previousFormatter)
-	})
-
-	logger := ProductiveWebhookLogger()
-	previousLoggerOutput := logger.Out
-	logger.SetOutput(standardLogWriter{})
-	t.Cleanup(func() {
-		logger.SetOutput(previousLoggerOutput)
-	})
-
-	LogProductiveWebhookFailure("task.updated", log.Fields{
-		"status": 500,
-	}, errors.New("productive task 123: task update activity unavailable"))
-	LogProductiveWebhookFailure("task.created", nil, errors.New("productive task 91: task list unavailable"))
-	LogProductiveWebhookFailure(" ", nil, errors.New("event missing"))
-
-	payloads := decodeJSONLines(t, standardOutput.String())
-	require.Len(t, payloads, 3)
-
-	assert.Equal(t, ComponentWebhookProductive, payloads[0]["component"])
-	assert.Equal(t, "task.updated", payloads[0]["webhookType"])
-	assert.Equal(t, "error", payloads[0]["level"])
-	assert.Equal(t, "error handling webhook", payloads[0]["msg"])
-	assert.EqualValues(t, 500, payloads[0]["status"])
-	assert.Contains(t, payloads[0]["error"], "task update activity unavailable")
-
-	assert.Equal(t, ComponentWebhookProductive, payloads[1]["component"])
-	assert.Equal(t, "task.created", payloads[1]["webhookType"])
-
-	assert.Equal(t, ComponentWebhookProductive, payloads[2]["component"])
-	assert.Equal(t, "unknown", payloads[2]["webhookType"])
-
-	_, processIsText := log.StandardLogger().Formatter.(*log.TextFormatter)
-	assert.True(t, processIsText)
-	_, webhookIsJSON := logger.Formatter.(*log.JSONFormatter)
-	assert.True(t, webhookIsJSON)
-}
-
-func TestProductiveWebhookWarning_JSONUsesWarningLevel(t *testing.T) {
-	logger := ProductiveWebhookLogger()
-	previous := logger.Out
-	buffer := &bytes.Buffer{}
-	logger.SetOutput(buffer)
-	t.Cleanup(func() {
-		logger.SetOutput(previous)
-	})
-
-	LogProductiveWebhookWarning("task.updated", "task update emitted without task list move", log.Fields{
-		"component": "overridden",
-	}, errors.New("no activity"))
-
-	payloads := decodeJSONLines(t, buffer.String())
-	require.Len(t, payloads, 1)
-	assert.Equal(t, "warning", payloads[0]["level"])
-	assert.Equal(t, "task update emitted without task list move", payloads[0]["msg"])
-	assert.Equal(t, ComponentWebhookProductive, payloads[0]["component"])
-	assert.Equal(t, "task.updated", payloads[0]["webhookType"])
-	assert.Equal(t, "no activity", payloads[0]["error"])
-}
 
 func TestLogSentryWebhookInfo_JSONIncludesComponent(t *testing.T) {
 	logger := SentryWebhookLogger()

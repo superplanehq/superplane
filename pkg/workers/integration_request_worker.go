@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"maps"
+	"slices"
 	"time"
 
 	"golang.org/x/sync/semaphore"
@@ -57,7 +59,7 @@ func (w *IntegrationRequestWorker) Start(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			requests, err := models.ListIntegrationRequests()
+			requests, err := models.ListIntegrationRequests(database.DB(ctx), slices.Collect(maps.Keys(w.registry.Integrations)))
 			if err != nil {
 				w.log("Error finding app installation requests: %v", err)
 			}
@@ -107,7 +109,7 @@ func (w *IntegrationRequestWorker) claimRequest(request models.IntegrationReques
 	var claimed *models.IntegrationRequest
 
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
-		r, err := models.LeaseIntegrationRequest(tx, request.ID, requestLeaseDuration)
+		r, err := models.LeaseIntegrationRequest(tx, request.ID, requestLeaseDuration, slices.Collect(maps.Keys(w.registry.Integrations)))
 		if err != nil {
 			return err
 		}

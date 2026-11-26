@@ -1636,6 +1636,7 @@ func TestAdminListOrgExperimentalFeatures(t *testing.T) {
 		}
 		assert.Contains(t, ids, features.FeatureFactories)
 		assert.Contains(t, ids, features.FeatureModelStatus)
+		assert.NotContains(t, ids, "factory_productive_intake")
 		assert.NotContains(t, body.Enabled, features.FeatureModelStatus)
 		assert.NotContains(t, ids, "github_enterprise")
 		assert.NotContains(t, ids, features.FeatureGitHubEnterpriseServer)

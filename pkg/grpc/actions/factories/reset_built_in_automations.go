@@ -267,20 +267,31 @@ func liveBuiltInAutomationTemplateID(
 	if err != nil {
 		return "", false, err
 	}
-	if handler != nil && handler.FactoryID == factory.ID {
+	if handler != nil && handler.FactoryID != factory.ID {
+		handler = nil
+	}
+	template, builtIn := builtInAutomationTemplateID(version, nil, handler)
+	return template, builtIn, nil
+}
+
+func builtInAutomationTemplateID(version *models.CanvasVersion, intake *models.FactoryIntake, handler *models.FactoryPRFeedbackHandler) (string, bool) {
+	if intake != nil {
+		return intakeTemplateID(intake.Source), true
+	}
+	if handler != nil {
 		if handler.Source == models.FactoryPRFeedbackHandlerSourcePullRequestChecks {
-			return prFeedbackChecksTemplateID, true, nil
+			return prFeedbackChecksTemplateID, true
 		}
-		return prFeedbackDiscussionTemplateID, true, nil
+		return prFeedbackDiscussionTemplateID, true
 	}
 
 	spec := models.LiveCanvasSpec{Nodes: version.Nodes, Edges: version.Edges}
 	if models.IsBacklogFactoryApp(spec.Nodes, spec.Edges) {
-		return models.FactoryAppTemplateBacklogID, true, nil
+		return models.FactoryAppTemplateBacklogID, true
 	}
 	resolved, ok := resolveFactoryTemplate(version.Nodes)
 	if !ok {
-		return "", false, nil
+		return "", false
 	}
-	return resolved.id, true, nil
+	return resolved.id, true
 }

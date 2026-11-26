@@ -3,6 +3,8 @@ package workers
 import (
 	"context"
 	"errors"
+	"maps"
+	"slices"
 	"time"
 
 	"golang.org/x/sync/semaphore"
@@ -44,7 +46,7 @@ func NewWebhookProvisioner(baseURL string, encryptor crypto.Encryptor, registry 
 func (w *WebhookProvisioner) Start(ctx context.Context) {
 	// On startup, reset any webhooks stuck in "provisioning" state
 	// from a previous crash back to "pending" so they get retried.
-	if count, err := models.ResetStuckProvisioningWebhooks(); err != nil {
+	if count, err := models.ResetStuckProvisioningWebhooks(database.DB(ctx), slices.Collect(maps.Keys(w.registry.Integrations))); err != nil {
 		w.logger.Errorf("Error resetting stuck provisioning webhooks: %v", err)
 	} else if count > 0 {
 		w.logger.Infof("Reset %d stuck provisioning webhook(s) back to pending", count)
@@ -60,7 +62,7 @@ func (w *WebhookProvisioner) Start(ctx context.Context) {
 		case <-ticker.C:
 			tickStart := time.Now()
 
-			webhooks, err := models.ListPendingWebhooks()
+			webhooks, err := models.ListPendingWebhooks(database.DB(ctx), slices.Collect(maps.Keys(w.registry.Integrations)))
 			if err != nil {
 				w.logger.Errorf("Error finding workflow nodes ready to be processed: %v", err)
 			}
@@ -122,7 +124,7 @@ func (w *WebhookProvisioner) handleNonIntegrationWebhook(logger *log.Entry, webh
 		)
 	}()
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
-		r, err := models.LockWebhook(tx, webhook.ID)
+		r, err := models.LockWebhook(tx, webhook.ID, slices.Collect(maps.Keys(w.registry.Integrations)))
 		if err != nil {
 			return err
 		}
@@ -225,7 +227,7 @@ func (w *WebhookProvisioner) lockAndMarkProvisioning(webhook models.Webhook) (*m
 	var locked *models.Webhook
 
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
-		r, err := models.LockWebhook(tx, webhook.ID)
+		r, err := models.LockWebhook(tx, webhook.ID, slices.Collect(maps.Keys(w.registry.Integrations)))
 		if err != nil {
 			return err
 		}

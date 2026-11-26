@@ -669,7 +669,7 @@ func deriveFactoryTemplateInput(
 		if integrationType != "" && node.IntegrationID != nil {
 			integrationID, err := uuid.Parse(*node.IntegrationID)
 			if err == nil {
-				integration, findErr := models.FindIntegrationInTransaction(tx, canvas.OrganizationID, integrationID)
+				integration, findErr := factoryAutomationIntegrationByID(tx, canvas.OrganizationID, integrationID)
 				if findErr == nil {
 					input.integrations[integrationType] = factoryTemplateIntegration{
 						id:   integration.ID.String(),
@@ -679,7 +679,7 @@ func deriveFactoryTemplateInput(
 			}
 		}
 		for _, name := range factoryIntegrationNames(node.Configuration) {
-			integration, err := models.FindIntegrationByName(tx, canvas.OrganizationID, name)
+			integration, err := factoryAutomationIntegrationByName(tx, canvas.OrganizationID, name)
 			if err != nil {
 				continue
 			}
@@ -841,6 +841,10 @@ func materializeIntakeDefaults(
 	intake *models.FactoryIntake,
 	savedSettings *factoryAutomationSettings,
 ) (*materializedFactoryTemplate, error) {
+	if _, ok := intakeSpecsBySource[intake.Source]; !ok {
+		return nil, invalidArgument("factory app has no bundled defaults")
+	}
+
 	spec := models.LiveCanvasSpec{Nodes: version.Nodes, Edges: version.Edges}
 	graph := resolveIntakeGraph(intake.Source, spec)
 	if graph.TriggerNodeID == "" {
@@ -858,7 +862,7 @@ func materializeIntakeDefaults(
 	if trigger.IntegrationID != nil {
 		integrationID, parseErr := uuid.Parse(*trigger.IntegrationID)
 		if parseErr == nil {
-			integration, findErr := models.FindIntegrationInTransaction(tx, canvas.OrganizationID, integrationID)
+			integration, findErr := factoryAutomationIntegrationByID(tx, canvas.OrganizationID, integrationID)
 			if findErr == nil {
 				binding.Integration = &yaml.IntegrationRef{ID: integration.ID.String(), Name: integration.InstallationName}
 			}
@@ -1131,6 +1135,16 @@ func materializeNonIntakeFactoryAppDefaults(
 	if handler != nil && handler.FactoryID == factory.ID {
 		return materializePRFeedbackDefaults(tx, factory, canvas, version, handler, savedSettings)
 	}
+	return materializeFactoryAppGraphDefaults(tx, factory, canvas, version, savedSettings)
+}
+
+func materializeFactoryAppGraphDefaults(
+	tx *gorm.DB,
+	factory *models.Factory,
+	canvas *models.Canvas,
+	version *models.CanvasVersion,
+	savedSettings *factoryAutomationSettings,
+) (*materializedFactoryTemplate, error) {
 	// A custom automation can start from a task. That trigger is not the
 	// built-in Backlog app, so reset must leave the canvas unchanged.
 	if models.FactoryAppTemplateID(version.Nodes) == models.FactoryAppTemplateCustomAutomationID {

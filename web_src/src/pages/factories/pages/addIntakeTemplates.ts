@@ -4,12 +4,10 @@ import githubIcon from "@/assets/icons/integrations/github.svg";
 import jiraIcon from "@/assets/icons/integrations/jira.svg";
 import linearIcon from "@/assets/icons/integrations/linear.svg";
 import notionIcon from "@/assets/icons/integrations/notion.svg";
-import productiveIcon from "@/assets/icons/integrations/productive.svg";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
 import webhookIcon from "@/assets/icons/webhook.svg";
 import {
   FEATURE_FACTORY_DATADOG_INTAKE,
-  FEATURE_FACTORY_PRODUCTIVE_INTAKE,
   FEATURE_FACTORY_SCHEDULED_INTAKE,
   FEATURE_FACTORY_WEBHOOK_INTAKE,
 } from "@/lib/experimentalFeatures";
@@ -75,13 +73,6 @@ export const ADD_INTAKE_TEMPLATES: AddIntakeTemplate[] = [
     name: "Sentry exceptions",
     description: "Creates tasks from Sentry exceptions.",
     iconSrc: sentryIcon,
-  },
-  {
-    id: "productive-tasks",
-    name: "Productive tasks",
-    description: "Creates tasks from Productive tasks.",
-    iconSrc: productiveIcon,
-    featureId: FEATURE_FACTORY_PRODUCTIVE_INTAKE,
   },
   {
     id: "datadog",

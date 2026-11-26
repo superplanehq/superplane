@@ -1,13 +1,18 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MemoryRouter, Route, Routes } from "react-router";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 import type { FactoriesFactoryWebhook } from "@/api-client/types.gen";
+import { experimentalFeaturesKeys } from "@/hooks/useExperimentalFeatures";
+import { organizationKeys } from "@/hooks/useOrganizationData";
 import { TooltipProvider } from "@/ui/tooltip";
 
 import { REFUND_FACTORY } from "../../__fixtures__/factoryPageResponses";
 import { FactorySettingsLayoutContext } from "./factorySettingsLayoutContext";
 import { FactorySettingsWebhooksPage } from "./FactorySettingsWebhooksPage";
+import { factorySettingsSectionRoutes } from "./factorySettingsSectionRoutes";
 
 const createMutateAsync = vi.fn();
 let webhooks: FactoriesFactoryWebhook[] = [];
@@ -23,7 +28,7 @@ const JIRA: FactoriesFactoryWebhook = {
 vi.mock("@/hooks/usePageTitle", () => ({ usePageTitle: vi.fn() }));
 vi.mock("@/lib/toast", () => ({ showSuccessToast: vi.fn(), showErrorToast: vi.fn() }));
 vi.mock("@/contexts/usePermissions", () => ({
-  usePermissions: () => ({ canAct: () => true, isLoading: false }),
+  usePermissions: () => ({ canAct: () => true, hasPermission: () => true, isLoading: false }),
 }));
 vi.mock("@/hooks/useFactoryWebhooks", () => {
   const idle = () => ({ mutateAsync: vi.fn(), isPending: false });
@@ -38,15 +43,33 @@ vi.mock("@/hooks/useFactoryWebhooks", () => {
   };
 });
 
-function renderPage() {
-  return render(
+function renderPage(client?: QueryClient) {
+  const page = (
     <TooltipProvider>
       <FactorySettingsLayoutContext.Provider
         value={{ organizationId: "org-1", factoryId: REFUND_FACTORY.id ?? "factory-1", factory: REFUND_FACTORY }}
       >
-        <FactorySettingsWebhooksPage />
+        {client ? (
+          <Routes>
+            <Route path="/:organizationId" element={<div>Organization home</div>} />
+            <Route path="/:organizationId/workspaces/:factoryKey/settings">{factorySettingsSectionRoutes}</Route>
+          </Routes>
+        ) : (
+          <FactorySettingsWebhooksPage />
+        )}
       </FactorySettingsLayoutContext.Provider>
-    </TooltipProvider>,
+    </TooltipProvider>
+  );
+  return render(
+    client ? (
+      <QueryClientProvider client={client}>
+        <MemoryRouter initialEntries={["/org-1/workspaces/workspace-1/settings/workspace/webhooks"]}>
+          {page}
+        </MemoryRouter>
+      </QueryClientProvider>
+    ) : (
+      page
+    ),
   );
 }
 
@@ -55,6 +78,30 @@ describe("FactorySettingsWebhooksPage", () => {
     webhooks = [];
     createMutateAsync.mockReset();
   });
+
+  for (const feature of [null, "factory-as-code", "factory_webhook_intake"]) {
+    it(`gates direct webhook settings visits with ${feature ?? "neither feature"}`, () => {
+      const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
+      client.setQueryData(organizationKeys.details("org-1"), {
+        spec: { enabledExperimentalFeatures: feature ? [feature] : [] },
+      });
+      client.setQueryData(experimentalFeaturesKeys.registry(), {
+        features: [
+          { id: "factory-as-code", released: false },
+          { id: "factory_webhook_intake", released: false },
+        ],
+      });
+      const view = renderPage(client);
+      if (feature) {
+        expect(screen.getByTestId("factory-webhook-create")).toBeEnabled();
+      } else {
+        expect(screen.getByText("Organization home")).toBeInTheDocument();
+        expect(screen.queryByTestId("factory-webhooks")).not.toBeInTheDocument();
+      }
+      view.unmount();
+      client.clear();
+    });
+  }
 
   it("shows the secret once after the webhook is created", async () => {
     const user = userEvent.setup();

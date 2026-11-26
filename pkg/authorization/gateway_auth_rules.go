@@ -14,6 +14,18 @@ const (
 
 func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 	return map[HTTPRoute]AuthorizationRule{
+		{Method: "GET", Pattern: "/api/v1/factories/{factory_id}/configuration"}: {
+			Resource: "factories", Action: "read", DomainType: models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureFactoryAsCode},
+		},
+		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/configuration:plan"}: {
+			Resource: "factories", Action: "update", DomainType: models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureFactoryAsCode},
+		},
+		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/configuration:apply"}: {
+			Resource: "factories", Action: "update", DomainType: models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureFactoryAsCode},
+		},
 		{Method: "GET", Pattern: AutomationsPath}: {
 			Resource: "factories", Action: "read", DomainType: models.DomainTypeOrganization,
 			RequiredExperimentalFeatures: []string{features.FeatureFactories},
@@ -116,34 +128,39 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureSuperPlaneMCPServer},
 		},
 		{Method: "GET", Pattern: "/api/v1/factories/{factory_id}/webhooks"}: {
-			Resource:                     "factories",
-			Action:                       "read",
-			DomainType:                   models.DomainTypeOrganization,
-			RequiredExperimentalFeatures: []string{features.FeatureFactories},
+			Resource:                        "factories",
+			Action:                          "read",
+			DomainType:                      models.DomainTypeOrganization,
+			RequiredExperimentalFeatures:    []string{features.FeatureFactories},
+			RequiredAnyExperimentalFeatures: []string{features.FeatureFactoryAsCode, features.FeatureFactoryWebhookIntake},
 		},
 		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/webhooks"}: {
-			Resource:                     "factories",
-			Action:                       "update",
-			DomainType:                   models.DomainTypeOrganization,
-			RequiredExperimentalFeatures: []string{features.FeatureFactories},
+			Resource:                        "factories",
+			Action:                          "update",
+			DomainType:                      models.DomainTypeOrganization,
+			RequiredExperimentalFeatures:    []string{features.FeatureFactories},
+			RequiredAnyExperimentalFeatures: []string{features.FeatureFactoryAsCode, features.FeatureFactoryWebhookIntake},
 		},
 		{Method: "PATCH", Pattern: "/api/v1/factories/{factory_id}/webhooks/{webhook_id}"}: {
-			Resource:                     "factories",
-			Action:                       "update",
-			DomainType:                   models.DomainTypeOrganization,
-			RequiredExperimentalFeatures: []string{features.FeatureFactories},
+			Resource:                        "factories",
+			Action:                          "update",
+			DomainType:                      models.DomainTypeOrganization,
+			RequiredExperimentalFeatures:    []string{features.FeatureFactories},
+			RequiredAnyExperimentalFeatures: []string{features.FeatureFactoryAsCode, features.FeatureFactoryWebhookIntake},
 		},
 		{Method: "DELETE", Pattern: "/api/v1/factories/{factory_id}/webhooks/{webhook_id}"}: {
-			Resource:                     "factories",
-			Action:                       "update",
-			DomainType:                   models.DomainTypeOrganization,
-			RequiredExperimentalFeatures: []string{features.FeatureFactories},
+			Resource:                        "factories",
+			Action:                          "update",
+			DomainType:                      models.DomainTypeOrganization,
+			RequiredExperimentalFeatures:    []string{features.FeatureFactories},
+			RequiredAnyExperimentalFeatures: []string{features.FeatureFactoryAsCode, features.FeatureFactoryWebhookIntake},
 		},
 		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/webhooks/{webhook_id}/secret"}: {
-			Resource:                     "factories",
-			Action:                       "update",
-			DomainType:                   models.DomainTypeOrganization,
-			RequiredExperimentalFeatures: []string{features.FeatureFactories},
+			Resource:                        "factories",
+			Action:                          "update",
+			DomainType:                      models.DomainTypeOrganization,
+			RequiredExperimentalFeatures:    []string{features.FeatureFactories},
+			RequiredAnyExperimentalFeatures: []string{features.FeatureFactoryAsCode, features.FeatureFactoryWebhookIntake},
 		},
 		{Method: "DELETE", Pattern: "/api/v1/groups/{group_name}"}: {
 			Resource:   "groups",
