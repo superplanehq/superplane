@@ -562,3 +562,12 @@ func (c *Canvas) CountRuns(db *gorm.DB) (int64, error) {
 	}
 	return count, nil
 }
+
+func FindExistingCanvasIDs(tx *gorm.DB, organizationID uuid.UUID, ids []uuid.UUID) ([]uuid.UUID, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	var existing []uuid.UUID
+	err := tx.Model(&Canvas{}).Where("organization_id = ? AND id IN ?", organizationID, ids).Pluck("id", &existing).Error
+	return existing, err
+}

@@ -24,6 +24,12 @@ var automationHarnesses = map[automationspec.Harness]string{
 // validateCustomAutomationModel uses the same catalog as the model picker.
 // A subscription's catalog belongs to the member editing the automation.
 func validateCustomAutomationModel(tx *gorm.DB, factory *models.Factory, agent *intakeAgent, callerID uuid.UUID) (bool, error) {
+	return factoryAutomationPolicy(tx, factory, "runner-accepts-model", []any{agent.Component, agent.Credentials, agent.LLMProvider, agent.Model, callerID}, func() (bool, error) {
+		return validateCustomAutomationModelUncached(tx, factory, agent, callerID)
+	})
+}
+
+func validateCustomAutomationModelUncached(tx *gorm.DB, factory *models.Factory, agent *intakeAgent, callerID uuid.UUID) (bool, error) {
 	config := map[string]any{"credentials": agent.credentials()}
 	agent.applyLLMProvider(config)
 	if agent.subscription() {
@@ -102,7 +108,7 @@ func resolveAutomationAgent(tx *gorm.DB, factory *models.Factory, source *automa
 		}
 	}
 	if credentials := configured.Credentials; credentials != nil && credentials.Source == automationspec.Integration {
-		connection, err := models.FindIntegrationByName(tx, factory.OrganizationID, credentials.Name)
+		connection, err := factoryAutomationIntegrationByName(tx, factory.OrganizationID, credentials.Name)
 		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, err
 		}
@@ -126,7 +132,9 @@ func resolveAutomationAgent(tx *gorm.DB, factory *models.Factory, source *automa
 		return agent, nil // The task owner's subscription supplies the default at run time.
 	}
 	if model == "" && agent.Component == models.SuperPlaneRunnerComponent {
-		_, err := models.ResolveRunnableHostedLLMModel(tx, factory.OrganizationID, &factory.ID)
+		_, err := factoryAutomationPolicy(tx, factory, "runnable-hosted-model", nil, func() (models.DefaultHostedLLMModel, error) {
+			return models.ResolveRunnableHostedLLMModel(tx, factory.OrganizationID, &factory.ID)
+		})
 		if errors.Is(err, models.ErrSuperPlaneRunnerNoModel) || errors.Is(err, models.ErrSuperPlaneRunnerModelNotAllowed) {
 			return nil, source.Diagnostic("agent", "Enable a SuperPlane-hosted model for this workspace.")
 		}
@@ -142,7 +150,9 @@ func resolveAutomationAgent(tx *gorm.DB, factory *models.Factory, source *automa
 		// Let the execution policy select a permitted BYOK default when YAML omits a model.
 		config := map[string]any{"credentials": agent.credentials(), "model": model}
 		agent.applyLLMProvider(config)
-		resolved, err := models.ResolveBYOKRunnerModel(tx, factory.OrganizationID, &factory.ID, agent.Component, config)
+		resolved, err := factoryAutomationPolicy(tx, factory, "byok-runner-model", []any{agent.Component, config}, func() (string, error) {
+			return models.ResolveBYOKRunnerModel(tx, factory.OrganizationID, &factory.ID, agent.Component, config)
+		})
 		if errors.Is(err, models.ErrSelectableLLMModelNotAllowed) {
 			return nil, source.Diagnostic("agent.model", "Select an available model for the configured agent.")
 		}
@@ -215,7 +225,10 @@ func isQualifiedAutomationHostedModel(model string) bool {
 func automationHostedModelProviders(tx *gorm.DB, orgID, factoryID uuid.UUID, modelID string) ([]string, error) {
 	var providers []string
 	for _, provider := range models.KnownHostedLLMProviders() {
-		allowed, err := models.ModelIsSelectable(tx, orgID, &factoryID, provider, models.UsageFundingSourceHosted, modelID)
+		factory := &models.Factory{OrganizationID: orgID, ID: factoryID}
+		allowed, err := factoryAutomationPolicy(tx, factory, "selectable-hosted-model", []any{provider, models.UsageFundingSourceHosted, modelID}, func() (bool, error) {
+			return models.ModelIsSelectable(tx, orgID, &factoryID, provider, models.UsageFundingSourceHosted, modelID)
+		})
 		if err != nil {
 			return nil, err
 		}

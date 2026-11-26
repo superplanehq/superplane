@@ -206,7 +206,7 @@ func findIntakeVCSIntegration(tx *gorm.DB, factory *models.Factory, integrationI
 		return nil
 	}
 
-	integration, err := models.FindIntegrationInTransaction(tx, factory.OrganizationID, id)
+	integration, err := factoryAutomationIntegrationByID(tx, factory.OrganizationID, id)
 	if err != nil {
 		log.Warnf("factory %s: feedback left unbound, integration %s not found: %v", factory.ID, id, err)
 		return nil

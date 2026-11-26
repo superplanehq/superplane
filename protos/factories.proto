@@ -28,6 +28,41 @@ option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
 };
 
 service Factories {
+  rpc ExportFactoryConfiguration(ExportFactoryConfigurationRequest) returns (ExportFactoryConfigurationResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/configuration"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Export all stages and automations";
+      description: "Exports all stages and their automations for the selected workspace line. Applying this configuration deletes omitted automations except required phase runners. Accepts a workspace key or UUID.";
+      tags: "Factory";
+    };
+  }
+
+  rpc PlanFactoryConfiguration(PlanFactoryConfigurationRequest) returns (PlanFactoryConfigurationResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/configuration:plan"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Plan stage and automation configuration";
+      description: "Validates all stages and automations for the selected workspace line and compares them with live state without writes. The plan includes deletion of omitted automations except required phase runners.";
+      tags: "Factory";
+    };
+  }
+
+  rpc ApplyFactoryConfiguration(ApplyFactoryConfigurationRequest) returns (ApplyFactoryConfigurationResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/configuration:apply"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Apply stage and automation configuration";
+      description: "Applies all stages and automations for the selected workspace line if its base-state token still matches live state. Deletes omitted automations except required phase runners.";
+      tags: "Factory";
+    };
+  }
+
   rpc ListFactories(ListFactoriesRequest) returns (ListFactoriesResponse) {
     option (google.api.http) = {
       get: "/api/v1/factories"
@@ -3852,4 +3887,65 @@ message ImportFactoryPullRequestRequest {
 message ImportFactoryPullRequestResponse {
   WorkOrder order = 1;
   bool created = 2;
+}
+
+// This bundle covers all existing stages and their automations. It is not a workspace backup.
+message FactoryConfigurationBundle {
+  string manifest_path = 1;
+  repeated FactoryConfigurationFile files = 2;
+}
+
+message FactoryConfigurationFile {
+  string path = 1;
+  string content = 2;
+}
+
+message FactoryConfigurationChange {
+  string resource = 1;
+  string field_path = 2;
+  string previous_value = 3;
+  string requested_value = 4;
+}
+
+message FactoryConfigurationDiagnostic {
+  string path = 1;
+  string field = 2;
+  string message = 3;
+}
+
+message ExportFactoryConfigurationRequest {
+  string factory_id = 1;
+  string line_id = 2;
+}
+
+message ExportFactoryConfigurationResponse {
+  FactoryConfigurationBundle bundle = 1;
+  string coverage = 2;
+}
+
+message PlanFactoryConfigurationRequest {
+  string factory_id = 1;
+  string line_id = 2;
+  FactoryConfigurationBundle bundle = 3;
+}
+
+message PlanFactoryConfigurationResponse {
+  repeated FactoryConfigurationChange changes = 1;
+  repeated FactoryConfigurationDiagnostic diagnostics = 2;
+  // Opaque token for this live state and normalized desired configuration.
+  string base_state_token = 3;
+  string coverage = 4;
+}
+
+message ApplyFactoryConfigurationRequest {
+  string factory_id = 1;
+  string line_id = 2;
+  FactoryConfigurationBundle bundle = 3;
+  string base_state_token = 4;
+}
+
+message ApplyFactoryConfigurationResponse {
+  bool changed = 1;
+  repeated FactoryConfigurationChange changes = 2;
+  string coverage = 3;
 }
