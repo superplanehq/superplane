@@ -379,7 +379,7 @@ function useMobileBoardOptionColumns({
   return useMemo(() => {
     const keys: ColumnKey[] = [
       "backlog",
-      ...board.map((column): ColumnKey => `phase-${column.stepIndex}`),
+      ...board.map((column): ColumnKey => (column.stageKey ?? `phase-${column.stepIndex}`) as ColumnKey),
       "verify",
       "done",
     ];

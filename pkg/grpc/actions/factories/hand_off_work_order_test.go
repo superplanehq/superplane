@@ -26,63 +26,77 @@ import (
 )
 
 func Test__HandOffWorkOrder__ImplementWritesSpecAndStartsImplementation(t *testing.T) {
-	r := support.Setup(t)
-	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-	db := database.DB(t.Context())
+	for _, compacted := range []bool{false, true} {
+		t.Run("compacted="+strconv.FormatBool(compacted), func(t *testing.T) {
+			r := support.Setup(t)
+			ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+			db := database.DB(t.Context())
 
-	factoryModel := seedHandOffFactory(t, r, db)
-	require.NoError(t, factoryModel.UpdatePlanning(db, models.FactoryPlanning{Enabled: true, Clarity: true, Confidence: true}))
-	backlog := createOnWorkOrderCanvas(t, r, factoryModel.ID)
+			factoryModel := seedHandOffFactory(t, r, db)
+			require.NoError(t, factoryModel.UpdatePlanning(db, models.FactoryPlanning{Enabled: true, Clarity: true, Confidence: true}))
+			backlog := createOnWorkOrderCanvas(t, r, factoryModel.ID)
 
-	planApp, planEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "plan", "start-plan")
-	implApp, implEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "implement", "start-impl")
-	require.NoError(t, implApp.StampFactoryAppTemplate(db, implEntry, "line-implementation", 1))
-	line, err := factoryModel.CreateLine(db, "ship", []models.FactoryLineStep{
-		{Type: models.FactoryLineStepTypeRunApp, AppID: planApp.ID, Entrypoint: planEntry},
-		{Type: models.FactoryLineStepTypeRunApp, AppID: implApp.ID, Entrypoint: implEntry},
-	})
-	require.NoError(t, err)
+			planApp, planEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "plan", "start-plan")
+			implApp, implEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "implement", "start-impl")
+			require.NoError(t, implApp.StampFactoryAppTemplate(db, implEntry, "line-implementation", 1))
+			line, err := factoryModel.CreateLine(db, "ship", []models.FactoryLineStep{
+				{Type: models.FactoryLineStepTypeRunApp, AppID: planApp.ID, Entrypoint: planEntry},
+				{Type: models.FactoryLineStepTypeRunApp, AppID: implApp.ID, Entrypoint: implEntry},
+			})
+			require.NoError(t, err)
 
-	result, err := HandOffWorkOrder(ctx, IntakeDependencies{}, r.Organization.ID.String(), HandOffWorkOrderRequest{
-		FactoryID:     factoryModel.ID.String(),
-		Title:         "Ship refund retries",
-		Description:   "Stop double charges.",
-		Plan:          "# Retry refunds\n\nStop double charges.",
-		Column:        HandOffColumnImplement,
-		MCPClientID:   "superplane-local",
-		MCPClientName: "Cursor",
-	})
-	require.NoError(t, err)
-	require.NotNil(t, result.Order)
-	assert.Equal(t, HandOffColumnImplement, result.Column)
-	assert.Equal(t, pb.WorkOrder_STATE_OPEN, result.Order.GetState())
-	assert.Equal(t, "Cursor", result.Order.GetMcpClient().GetName())
-	assert.Equal(t, "superplane-local", result.Order.GetMcpClient().GetId())
+			// The implementation stage retains its key after the first phase is deleted.
+			wantStepIndex := int32(1)
+			if compacted {
+				stages := line.StagesValue()
+				stages[2].StepIndex = new(int)
+				stages = append(stages[:1], stages[2:]...)
+				require.NoError(t, line.UpdateConfiguration(db, nil, []models.FactoryLineStep{line.Steps[1]}, nil, stages))
+				wantStepIndex = 0
+			}
 
-	order, err := factoryModel.FindWorkOrder(db, uuid.MustParse(result.Order.GetId()))
-	require.NoError(t, err)
-	artifact, err := order.FindArtifactByKey(db, models.PlanningSpecArtifactKey+":"+order.ID.String())
-	require.NoError(t, err)
-	assert.Equal(t, "# Retry refunds\n\nStop double charges.", planningSpecBody(t, artifact))
+			result, err := HandOffWorkOrder(ctx, IntakeDependencies{}, r.Organization.ID.String(), HandOffWorkOrderRequest{
+				FactoryID:     factoryModel.ID.String(),
+				Title:         "Ship refund retries",
+				Description:   "Stop double charges.",
+				Plan:          "# Retry refunds\n\nStop double charges.",
+				Column:        HandOffColumnImplement,
+				MCPClientID:   "superplane-local",
+				MCPClientName: "Cursor",
+			})
+			require.NoError(t, err)
+			require.NotNil(t, result.Order)
+			assert.Equal(t, HandOffColumnImplement, result.Column)
+			assert.Equal(t, pb.WorkOrder_STATE_OPEN, result.Order.GetState())
+			assert.Equal(t, "Cursor", result.Order.GetMcpClient().GetName())
+			assert.Equal(t, "superplane-local", result.Order.GetMcpClient().GetId())
 
-	var backlogEvents []models.CanvasEvent
-	require.NoError(t, db.Where("workflow_id = ?", backlog.ID).Find(&backlogEvents).Error)
-	assert.Empty(t, backlogEvents)
+			order, err := factoryModel.FindWorkOrder(db, uuid.MustParse(result.Order.GetId()))
+			require.NoError(t, err)
+			artifact, err := order.FindArtifactByKey(db, models.PlanningSpecArtifactKey+":"+order.ID.String())
+			require.NoError(t, err)
+			assert.Equal(t, "# Retry refunds\n\nStop double charges.", planningSpecBody(t, artifact))
 
-	require.Len(t, result.Order.GetLineDispatches(), 1)
-	dispatch := result.Order.GetLineDispatches()[0]
-	assert.Equal(t, line.Name, dispatch.GetLine().GetName())
-	require.Len(t, dispatch.GetStepExecutions(), 1)
-	assert.Equal(t, int32(1), dispatch.GetStepExecutions()[0].GetStepIndex())
-	assert.Equal(t, pb.WorkOrderExecution_STATE_PENDING, dispatch.GetStepExecutions()[0].GetState())
-	assert.NotEmpty(t, dispatch.GetStepExecutions()[0].GetRun().GetId())
+			var backlogEvents []models.CanvasEvent
+			require.NoError(t, db.Where("workflow_id = ?", backlog.ID).Find(&backlogEvents).Error)
+			assert.Empty(t, backlogEvents)
 
-	var planRuns int64
-	require.NoError(t, db.Model(&models.CanvasRun{}).Where("workflow_id = ?", planApp.ID).Count(&planRuns).Error)
-	assert.Zero(t, planRuns)
-	var implRuns int64
-	require.NoError(t, db.Model(&models.CanvasRun{}).Where("workflow_id = ?", implApp.ID).Count(&implRuns).Error)
-	assert.EqualValues(t, 1, implRuns)
+			require.Len(t, result.Order.GetLineDispatches(), 1)
+			dispatch := result.Order.GetLineDispatches()[0]
+			assert.Equal(t, line.Name, dispatch.GetLine().GetName())
+			require.Len(t, dispatch.GetStepExecutions(), 1)
+			assert.Equal(t, wantStepIndex, dispatch.GetStepExecutions()[0].GetStepIndex())
+			assert.Equal(t, pb.WorkOrderExecution_STATE_PENDING, dispatch.GetStepExecutions()[0].GetState())
+			assert.NotEmpty(t, dispatch.GetStepExecutions()[0].GetRun().GetId())
+
+			var planRuns int64
+			require.NoError(t, db.Model(&models.CanvasRun{}).Where("workflow_id = ?", planApp.ID).Count(&planRuns).Error)
+			assert.Zero(t, planRuns)
+			var implRuns int64
+			require.NoError(t, db.Model(&models.CanvasRun{}).Where("workflow_id = ?", implApp.ID).Count(&implRuns).Error)
+			assert.EqualValues(t, 1, implRuns)
+		})
+	}
 }
 
 func Test__HandOffWorkOrder__ImplementStartsCustomStageWhenDoneFollows(t *testing.T) {
