@@ -4810,6 +4810,13 @@ CREATE INDEX idx_workflow_node_requests_completed_updated_at ON public.workflow_
 
 
 --
+-- Name: idx_workflow_node_requests_datadog_monitor_lease; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_node_requests_datadog_monitor_lease ON public.workflow_node_requests USING btree (workflow_id, node_id, run_at DESC, id) WHERE (((spec -> 'datadog_monitor'::text) ->> 'lease_until'::text) IS NOT NULL);
+
+
+--
 -- Name: idx_workflow_node_requests_execution_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -6881,7 +6888,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261125223556	f
+20261126193743	f
 \.
 
 

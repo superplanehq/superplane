@@ -217,11 +217,6 @@ func ApplyFactoryConfiguration(ctx context.Context, deps IntakeDependencies, org
 				id := uuid.New()
 				if current != nil {
 					id = current.canvas.ID
-					if configurationNeedsStableIdentity(stage, automation, current) {
-						if err := saveFactoryConfigurationOwnership(tx, target, live, automation, id); err != nil {
-							return err
-						}
-					}
 				} else {
 					_, err := canvases.CreateCanvasWithIDInTransaction(ctx, tx, id, deps.Registry, deps.Encryptor, deps.AuthService, deps.WebhookBaseURL, orgID, automation.Name, automation.prepared.Description, &target.factory.ID, nil, nil)
 					if err != nil {
@@ -235,11 +230,16 @@ func ApplyFactoryConfiguration(ctx context.Context, deps IntakeDependencies, org
 						return err
 					}
 				}
+				// Every binding must be visible before any automation resolves tokens.
+				if configurationShouldSaveOwnership(current, automation) || current != nil && configurationNeedsStableIdentity(stage, automation, current) {
+					if err := saveFactoryConfigurationOwnership(tx, target, live, automation, id); err != nil {
+						return err
+					}
+				}
 				references[configurationManifestReference(stage.Key, automation.ID)] = id.String()
 			}
 		}
 		type pendingReview struct {
-			stage      *factoryConfigurationStageTarget
 			automation factoryConfigurationAutomation
 			current    *factoryConfigurationAutomationTarget
 			id         uuid.UUID
@@ -266,19 +266,14 @@ func ApplyFactoryConfiguration(ctx context.Context, deps IntakeDependencies, org
 								return err
 							}
 						}
-						if configurationShouldSaveOwnership(current, automation) {
-							if err := saveFactoryConfigurationOwnership(tx, target, live, automation, current.canvas.ID); err != nil {
-								return err
-							}
-						}
 						notifications = append(notifications, func() { canvases.PublishCanvasUpdated(current.canvas) })
 						continue
 					}
 					if automation.prepared.TemplateID == reviewRequestTemplateID {
-						reviews = append(reviews, pendingReview{live, automation, current, id})
+						reviews = append(reviews, pendingReview{automation, current, id})
 						continue
 					}
-					notify, err := publishFactoryConfigurationBuiltIn(ctx, tx, deps, target, live, automation, current, id, actor, references)
+					notify, err := publishFactoryConfigurationBuiltIn(ctx, tx, deps, target, automation, current, id, actor, references)
 					if err != nil {
 						return err
 					}
@@ -315,7 +310,7 @@ func ApplyFactoryConfiguration(ctx context.Context, deps IntakeDependencies, org
 			}
 		}
 		for _, review := range reviews {
-			notify, err := publishFactoryConfigurationBuiltIn(ctx, tx, deps, target, review.stage, review.automation, review.current, review.id, actor, references)
+			notify, err := publishFactoryConfigurationBuiltIn(ctx, tx, deps, target, review.automation, review.current, review.id, actor, references)
 			if err != nil {
 				return err
 			}

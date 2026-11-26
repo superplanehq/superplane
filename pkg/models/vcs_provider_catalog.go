@@ -3,6 +3,7 @@ package models
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -1596,6 +1597,39 @@ func ListVCSProviderBindingRepositories(tx *gorm.DB, integrationID uuid.UUID) ([
 		Find(&repositories).
 		Error
 	return repositories, err
+}
+
+// Saved context grants authorize YAML round trips. They permit write tokens
+// only when the repository also has a current write use on this binding.
+func (b *VCSProviderIntegrationBinding) ListWriteTokenRepositories(tx *gorm.DB) ([]VCSProviderRepository, error) {
+	repositories, err := ListVCSProviderBindingRepositories(tx, b.IntegrationID)
+	if err != nil {
+		return nil, err
+	}
+	contextIDs, err := b.retainedContextRepositoryIDs(tx)
+	if err != nil || len(contextIDs) == 0 {
+		return repositories, err
+	}
+	writeIDs, err := b.retainedAutomationRepositoryIDs(tx)
+	if err != nil {
+		return nil, err
+	}
+	var factories []Factory
+	if err := tx.Select("onboarding_config").
+		Where("organization_id = ? AND deleted_at IS NULL", b.OrganizationID).
+		Where("onboarding_config ->> 'vcs_integration_id' = ?", b.IntegrationID.String()).
+		Find(&factories).Error; err != nil {
+		return nil, err
+	}
+	for _, factory := range factories {
+		config := factory.OnboardingConfigValue()
+		writeIDs = append(writeIDs, config.AppRepositoryID, config.BacklogRepositoryID)
+	}
+	// Enabled write context repositories are merged from the current catalog
+	// by the resolver, including repositories without saved grants.
+	return slices.DeleteFunc(repositories, func(repository VCSProviderRepository) bool {
+		return slices.Contains(contextIDs, repository.RepositoryID) && !slices.Contains(writeIDs, repository.RepositoryID)
+	}), nil
 }
 
 // Organization keys can use only current grants on active organization bindings.

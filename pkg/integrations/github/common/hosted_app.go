@@ -74,9 +74,9 @@ func ResolveHostedAppBinding(ctx core.IntegrationContext) (*HostedAppBinding, er
 	if installation.SuspendedAt != nil {
 		return nil, fmt.Errorf("global GitHub App installation is suspended")
 	}
-	repositories, err := models.ListVCSProviderBindingRepositories(tx, ctx.ID())
+	repositories, err := binding.ListWriteTokenRepositories(tx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list repositories granted to the GitHub App binding: %w", err)
+		return nil, fmt.Errorf("failed to list write token repositories for the GitHub App binding: %w", err)
 	}
 	repositoryIDs := make([]int64, 0, len(repositories))
 	for _, repository := range repositories {

@@ -789,6 +789,9 @@ func ListEnabledGitHubContextRepositoryNames(tx *gorm.DB, integrationID uuid.UUI
 			AND factory.organization_id = resource.organization_id
 		JOIN organizations AS organization
 			ON organization.id = factory.organization_id
+		JOIN app_installations AS integration
+			ON integration.id::text = factory.onboarding_config ->> 'vcs_integration_id'
+			AND integration.organization_id = factory.organization_id
 		WHERE factory.deleted_at IS NULL
 			AND factory.onboarding_config ->> 'vcs_integration_id' = ?
 			AND resource.kind = ?

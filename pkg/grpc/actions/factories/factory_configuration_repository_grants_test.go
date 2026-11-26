@@ -86,6 +86,7 @@ func TestFactoryConfigurationAppliesHostedRepositoryGrantsAtomically(t *testing.
 		Primary:           factoryConfigurationRepository{Repository: "acme/new-app", Ref: "main"},
 		BacklogRepository: "acme/new-backlog",
 		Additional: []factoryConfigurationContextRepository{
+			{Repository: "acme/new-intake", Access: "read"},
 			{Repository: "acme/new-docs", Access: "read"},
 			{Repository: "acme/new-tools", Access: "write"},
 			{Repository: "acme/new-disabled", Access: "read", Enabled: &disabled},
@@ -139,7 +140,7 @@ func TestFactoryConfigurationAppliesHostedRepositoryGrantsAtomically(t *testing.
 	require.ElementsMatch(t, []int64{201, 202, 203, 204, 205, 206}, grantedIDs)
 	require.NotEmpty(t, client.tokenGrants, "real trigger setup must obtain a hosted installation token")
 	for _, selected := range client.tokenGrants {
-		require.ElementsMatch(t, []int64{201, 202, 203, 204, 205, 206}, selected)
+		require.ElementsMatch(t, []int64{201, 202, 203, 205}, selected)
 	}
 	intakes, err := reloaded.ListIntakes(db)
 	require.NoError(t, err)

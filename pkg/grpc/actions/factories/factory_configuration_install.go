@@ -318,7 +318,7 @@ func saveFactoryConfigurationOwnership(tx *gorm.DB, target *factoryConfiguration
 	return owner.Save(tx)
 }
 
-func publishFactoryConfigurationBuiltIn(ctx context.Context, tx *gorm.DB, deps IntakeDependencies, target *factoryConfigurationTarget, stage *factoryConfigurationStageTarget, desired factoryConfigurationAutomation, current *factoryConfigurationAutomationTarget, canvasID, actor uuid.UUID, references map[string]string) (func(), error) {
+func publishFactoryConfigurationBuiltIn(ctx context.Context, tx *gorm.DB, deps IntakeDependencies, target *factoryConfigurationTarget, desired factoryConfigurationAutomation, current *factoryConfigurationAutomationTarget, canvasID, actor uuid.UUID, references map[string]string) (func(), error) {
 	prepared := desired.prepared
 	nodes, edges, err := configurationBuiltInGraph(current, desired)
 	if err != nil {
@@ -345,12 +345,6 @@ func publishFactoryConfigurationBuiltIn(ctx context.Context, tx *gorm.DB, deps I
 	}
 	if err != nil {
 		return nil, err
-	}
-	// Setup resolves workspace expressions through the saved binding intent.
-	if configurationShouldSaveOwnership(current, desired) {
-		if err := saveFactoryConfigurationOwnership(tx, target, stage, desired, canvas.ID); err != nil {
-			return nil, err
-		}
 	}
 	if err := canvases.PublishGeneratedCanvasNodes(ctx, tx, canvas, actor, "Apply workspace built-in automation", nodes, edges, intakePublisherOptions(deps, canvas.OrganizationID)); err != nil {
 		return nil, err
