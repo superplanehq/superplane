@@ -63,7 +63,7 @@ vi.mock("@/ui/IntegrationCreateDialog", () => ({
 
 function renderDialog(onCreated = vi.fn()) {
   return render(
-    <MemoryRouter initialEntries={["/org-1/workspaces/sp/lines/line-plan/setup/linear"]}>
+    <MemoryRouter initialEntries={["/org-1/workspaces/sp/line/setup/linear"]}>
       <LinearIntakeSetupDialog organizationId="org-1" factoryId="factory-1" onClose={vi.fn()} onCreated={onCreated} />
     </MemoryRouter>,
   );

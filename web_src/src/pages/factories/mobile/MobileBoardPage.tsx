@@ -18,20 +18,22 @@ import { useWorkOrderCardActions } from "@/hooks/useWorkOrderCardActions";
 import { FEATURE_FACTORY_PULL_REQUEST_MERGE } from "@/lib/experimentalFeatures";
 import { getOrgUserDisplayFromUser } from "@/lib/orgUserDisplay";
 import { useMemo } from "react";
-import { Navigate, useLocation, useNavigate, useParams } from "react-router";
+import { Navigate, useLocation, useNavigate } from "react-router";
 
 import { backlogAnalysisCreditLabels } from "../lib/backlogAnalysis";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { useLineBoardColumnColorViewPreference } from "../lib/lineBoardColumnColorViewPreference";
 import {
-  factoryHomePath,
-  factoryLineDetailPath,
+  factoryOverviewPath,
   intakeIdFromSearch,
   isIntakeSearchOpen,
   isPRFeedbackSearchOpen,
   isPlanningSearchOpen,
   columnAutomationViewCanvasIdFromSearch,
   firstFactoryLineId,
+  factoryHomePath,
+  WORK_ORDER_LINE_SEARCH_PARAM,
+  workOrderBoardLineIdFromSearch,
   workOrderDetailPath,
 } from "../lib/factoryPagePaths";
 import { boardDoneResultsForStatuses, uniqueWorkOrdersById } from "../lib/workOrderListPagination";
@@ -50,7 +52,7 @@ import {
   buildWorkOrderListEntries,
   type WorkOrderScope,
 } from "../lib/workOrderListModel";
-import { canonicalWorkOrderNumber } from "../lib/workOrderNumberResolution";
+import { canonicalWorkOrderNumber, displayedBoardLineId } from "../lib/workOrderNumberResolution";
 import { pullRequestsFromWorkOrders } from "../lib/workOrderPullRequest";
 import { LineBoardWorkOrderCard } from "../pages/LineBoardOrderCard";
 import { lineBoardColumnLaneProps, normalizeColumnColors } from "../pages/lineBoardColumnColors";
@@ -86,16 +88,21 @@ function boardQueryOptions(
 /** Phone line board: one column in view, swipe sideways to change column. */
 export function MobileBoardPage() {
   const { organizationId, factoryId, routeSegment, factory } = useFactoriesLayout();
-  const { lineId: routeLineId } = useParams<{ lineId?: string }>();
   const navigate = useNavigate();
   const { canAct, currentUserId } = usePermissions();
+  const { search } = useLocation();
   const lines = useMemo(() => factory?.lines ?? [], [factory?.lines]);
-  const selectedLine = lines.find((line) => line.id === routeLineId) ?? null;
+  const workspaceLineId = displayedBoardLineId({
+    queryLineId: workOrderBoardLineIdFromSearch(search),
+    lines,
+    fallbackLineId: firstFactoryLineId(factory),
+  });
+  const selectedLine = lines.find((line) => line.id === workspaceLineId) ?? null;
 
   usePageTitle([factory?.name?.trim() || "Workspace"]);
 
   if (!selectedLine?.id) {
-    return <Navigate to={factoryHomePath(organizationId, routeSegment, firstFactoryLineId(factory))} replace />;
+    return <Navigate to={factoryOverviewPath(organizationId, routeSegment)} replace />;
   }
 
   return (
@@ -247,7 +254,6 @@ function useMobileBoardModel({
       organizationId,
       factoryId,
       factoryKey: routeSegment,
-      factoryLines: factory?.lines ?? [],
       preferredLineName: line.name,
       canDispatch: canUpdateWorkOrders,
       canAssign: canUpdateWorkOrders,
@@ -271,7 +277,6 @@ function MobileLineBoard(props: {
   onOpenWorkOrder: (order: FactoriesWorkOrderSummary, columnKey?: string) => void;
 }) {
   const { organizationId, factoryId, routeSegment, line, lineId, onOpenWorkOrder } = props;
-  const navigate = useNavigate();
   const { factory } = useFactoriesLayout();
   const { canAct } = usePermissions();
   const model = useMobileBoardModel(props);
@@ -286,6 +291,7 @@ function MobileLineBoard(props: {
   const canCreateWorkOrder = canAct("work_orders", "create");
   const lines = factory?.lines ?? [];
   const { search } = useLocation();
+  const navigate = useNavigate();
   const settingsOpen =
     (isIntakeSearchOpen(search) &&
       configuredIntakes.some((intake) => intake.intakeId === intakeIdFromSearch(search))) ||
@@ -317,9 +323,9 @@ function MobileLineBoard(props: {
             lines={lines}
             lineId={lineId}
             onSelectLine={(nextLineId) => {
-              if (nextLineId !== lineId) {
-                navigate(factoryLineDetailPath(organizationId, routeSegment, nextLineId));
-              }
+              const params = new URLSearchParams(search);
+              params.set(WORK_ORDER_LINE_SEARCH_PARAM, nextLineId);
+              navigate({ pathname: factoryHomePath(organizationId, routeSegment), search: params.toString() });
             }}
           />
           <MobileColumnCarousel

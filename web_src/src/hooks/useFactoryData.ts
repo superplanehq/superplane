@@ -1111,10 +1111,13 @@ export function useUpdateFactoryLine(organizationId: string, factoryId: string) 
       return response.data.line;
     },
     onSuccess: (line, input) => {
-      if (input.stageConfiguration?.automationMoves?.length) {
+      if (input.stageConfiguration) {
         void queryClient.invalidateQueries({ queryKey: factoryAppsKey(organizationId, factoryId) });
         void queryClient.invalidateQueries({
           queryKey: ["factories", organizationId, factoryId, "custom-automations"],
+        });
+        void queryClient.invalidateQueries({
+          queryKey: ["factories", organizationId, factoryId, "pr-feedback-handlers"],
         });
       }
       queryClient.setQueryData<FactoriesFactory>(factoryDetailKey(organizationId, factoryId), (current) => {

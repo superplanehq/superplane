@@ -9,7 +9,6 @@ import {
   PRIMARY_FACTORY_KEY,
   PRIMARY_FACTORY_ROUTE_SEGMENT,
   REFUND_FACTORY,
-  REFUND_LINE_PLAN_ID,
 } from "../__fixtures__/factoryPageResponses";
 import { factoryRouteSegment } from "../lib/factoryKeyResolution";
 import { FactoriesLayoutContext } from "../layout/factoriesLayoutContext";
@@ -35,7 +34,7 @@ export function LocationProbe({ navigateTo }: { navigateTo?: string } = {}) {
 }
 
 export function LinesBoardSpecHarness({
-  path = `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}`,
+  path = `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}`,
   openCreateWorkOrder = () => {},
   factory = REFUND_FACTORY,
   previewFlags = null,
@@ -65,38 +64,38 @@ export function LinesBoardSpecHarness({
                 }}
               >
                 <Routes>
-                  <Route path="/org-1/workspaces/:factoryKey/lines/:lineId" element={<LinesPage />} />
-                  <Route path="/org-1/workspaces/:factoryKey/lines/:lineId/edit" element={<div>Edit line</div>} />
+                  <Route path="/org-1/workspaces/:factoryKey" element={<LinesPage />} />
+                  <Route path="/org-1/workspaces/:factoryKey/line/edit" element={<div>Edit line</div>} />
                   <Route
-                    path="/org-1/workspaces/:factoryKey/lines/:lineId/setup/comments"
+                    path="/org-1/workspaces/:factoryKey/line/setup/comments"
                     element={<div data-testid="discussion-pr-feedback-setup">Comments setup page</div>}
                   />
                   <Route
-                    path="/org-1/workspaces/:factoryKey/lines/:lineId/setup/checks"
+                    path="/org-1/workspaces/:factoryKey/line/setup/checks"
                     element={<div data-testid="checks-pr-feedback-setup">Checks setup page</div>}
                   />
                   <Route
-                    path="/org-1/workspaces/:factoryKey/lines/:lineId/setup/github"
+                    path="/org-1/workspaces/:factoryKey/line/setup/github"
                     element={<div data-testid="github-intake-setup">GitHub setup page</div>}
                   />
                   <Route
-                    path="/org-1/workspaces/:factoryKey/lines/:lineId/setup/sentry"
+                    path="/org-1/workspaces/:factoryKey/line/setup/sentry"
                     element={<div data-testid="sentry-intake-setup">Sentry setup page</div>}
                   />
                   <Route
-                    path="/org-1/workspaces/:factoryKey/lines/:lineId/setup/datadog"
+                    path="/org-1/workspaces/:factoryKey/line/setup/datadog"
                     element={<div data-testid="datadog-intake-setup">Datadog setup page</div>}
                   />
                   <Route
-                    path="/org-1/workspaces/:factoryKey/lines/:lineId/setup/linear"
+                    path="/org-1/workspaces/:factoryKey/line/setup/linear"
                     element={<div data-testid="linear-intake-setup">Linear setup page</div>}
                   />
                   <Route
-                    path="/org-1/workspaces/:factoryKey/lines/:lineId/setup/dependabot"
+                    path="/org-1/workspaces/:factoryKey/line/setup/dependabot"
                     element={<div data-testid="dependabot-intake-setup">Dependabot setup page</div>}
                   />
                   <Route
-                    path="/org-1/workspaces/:factoryKey/lines/:lineId/setup/jira"
+                    path="/org-1/workspaces/:factoryKey/line/setup/jira"
                     element={<div data-testid="jira-intake-setup">Jira setup page</div>}
                   />
                   <Route path="/org-1/workspaces/:factoryKey/task/:orderNumber" element={<LinesPage />} />

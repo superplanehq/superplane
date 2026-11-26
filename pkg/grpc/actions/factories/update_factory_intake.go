@@ -113,7 +113,6 @@ func intakeSourceSupportsPause(source string) bool {
 	return source == models.FactoryIntakeSourceGitHubIssues ||
 		source == models.FactoryIntakeSourceSentryExceptions ||
 		source == models.FactoryIntakeSourceJiraIssues ||
-		source == models.FactoryIntakeSourceProductiveTasks ||
 		source == models.FactoryIntakeSourceDependabotAlerts ||
 		source == models.FactoryIntakeSourceLinearIssues
 }
@@ -339,8 +338,7 @@ func retryFailedIntakeWebhook(tx *gorm.DB, canvasID uuid.UUID, triggerNodeID str
 		return nil
 	}
 
-	_, err := webhook.Reprovision(tx, webhook.Configuration.Data())
-	return err
+	return webhook.RetrySetup(tx)
 }
 
 func applyIntakeSettingsToGraph(
@@ -418,9 +416,6 @@ func applyIntakeSettingsToGraph(
 			case models.FactoryIntakeSourceSentryExceptions:
 				configuration["actions"] = intakeSentryActionsFor(updated)
 				applySentryProjectConfiguration(configuration, updated.SentryProjectIDs)
-				nodes[i].Configuration = configuration
-			case models.FactoryIntakeSourceProductiveTasks:
-				configuration["actions"] = intakeProductiveTriggerActions(updated)
 				nodes[i].Configuration = configuration
 			case models.FactoryIntakeSourceJiraIssues:
 				configuration["events"] = intakeTriggerEventsFor(updated)

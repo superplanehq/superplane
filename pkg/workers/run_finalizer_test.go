@@ -1173,6 +1173,49 @@ func Test__RunFinalizer__StaleCompletionDoesNotAdvanceChangedStage(t *testing.T)
 	assert.Equal(t, models.FactoryWorkOrderLineDispatchStateActive, reloaded.State)
 }
 
+func Test__RunFinalizer__MovedExecutionCannotAdvanceAfterReturningToSourceStage(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	order, err := factory.CreateWorkOrder(db, "Move task", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	dispatchWorkOrderForTest(t, order)
+	first, entry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "first", "start")
+	second, secondEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "second", "start")
+	line, err := factory.CreateLine(db, "move", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: first.ID, Entrypoint: entry},
+		{Type: models.FactoryLineStepTypeRunApp, AppID: second.ID, Entrypoint: secondEntry},
+	})
+	require.NoError(t, err)
+	dispatch, original, err := line.Dispatch(db, order)
+	require.NoError(t, err)
+	var moved *models.FactoryTaskMoveResult
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		var err error
+		moved, err = order.MoveFromRun(tx, original.Run.ID, "phase-1", false)
+		return err
+	}))
+	require.Len(t, moved.Started, 1)
+	destination := moved.Started[0]
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		_, err := order.MoveFromRun(tx, destination.Run.ID, "phase-0", false)
+		return err
+	}))
+	finishPassedRun(t, original.Run)
+	amqpURL, _ := config.RabbitMQURL()
+	finalizer := NewRunFinalizer(amqpURL, r.Registry)
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		pending, _, err := finalizer.executeNextFactoryLineStep(tx, original.Run.ID)
+		assert.Empty(t, pending)
+		return err
+	}))
+	reloaded, err := models.FindWorkOrderLineDispatch(db, dispatch.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "phase-0", reloaded.CurrentStageKey)
+	assert.Equal(t, models.FactoryWorkOrderLineDispatchStateActive, reloaded.State)
+}
+
 // A rerun can start a step on the traversal while the run of an earlier
 // step is finalized. The finalizer must leave that traversal alone: it
 // must not cancel the live step, and it must not open a second one.

@@ -5,8 +5,8 @@ import { useOrganization } from "@/hooks/useOrganizationData";
 import { useBillingProductEnabled } from "@/hooks/useBillingProductEnabled";
 import { useOrganizationBilling } from "@/hooks/useOrganizationBilling";
 import { useOrganizationWorkspaceUsage } from "@/hooks/useOrganizationWorkspaceUsage";
-import { useNavigate, useParams } from "react-router";
-import { firstFactoryLineId, newFactoryPath } from "../lib/factoryPagePaths";
+import { useNavigate } from "react-router";
+import { newFactoryPath } from "../lib/factoryPagePaths";
 import { organizationPlanLabel } from "../lib/hostedCreditEmpty";
 import { FactoriesSidebarNav } from "./FactoriesSidebarNav";
 import { isWorkspaceAgentNavVisible } from "./factoriesRail";
@@ -32,7 +32,6 @@ export function FactoriesSidebar({ organizationId, factoryKey, factory, factorie
   const { account } = useAccount();
   const { canAct, hasPermission, isLoading: permissionsLoading } = usePermissions();
   const { data: organization } = useOrganization(organizationId);
-  const { lineId: routeLineId } = useParams<{ lineId?: string }>();
   const spend = useOrganizationWorkspaceUsage(organizationId);
   const billing = useOrganizationBilling(organizationId);
   const billingProductEnabled = useBillingProductEnabled();
@@ -61,7 +60,6 @@ export function FactoriesSidebar({ organizationId, factoryKey, factory, factorie
       <FactoriesSidebarNav
         organizationId={organizationId}
         factoryKey={factoryKey}
-        lineId={routeLineId ?? firstFactoryLineId(factory)}
         showAgent={isWorkspaceAgentNavVisible({
           permissionsLoading,
           canUpdateFactories: hasPermission("factories", "update"),
@@ -87,13 +85,11 @@ export function FactoriesSidebar({ organizationId, factoryKey, factory, factorie
 export function PublicFactoriesSidebar({
   organizationId,
   factoryKey,
-  lineId,
   workspaceName,
   account,
 }: {
   organizationId: string;
   factoryKey: string;
-  lineId: string;
   workspaceName: string;
   account: { name?: string; avatarUrl?: string | null } | null;
 }) {
@@ -114,7 +110,6 @@ export function PublicFactoriesSidebar({
       <FactoriesSidebarNav
         organizationId={organizationId}
         factoryKey={factoryKey}
-        lineId={lineId}
         showAgent={false}
         showVelocity={false}
       />

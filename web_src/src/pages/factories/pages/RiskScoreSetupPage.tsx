@@ -1,24 +1,24 @@
 import { usePermissions } from "@/contexts/usePermissions";
 import { useIntegration } from "@/hooks/useIntegrations";
 import { usePageTitle } from "@/hooks/usePageTitle";
-import { Navigate, useNavigate, useParams } from "react-router";
+import { Navigate, useNavigate } from "react-router";
 
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
-import { factoryHomePath, factoryLineDetailPath, firstFactoryLineId } from "../lib/factoryPagePaths";
+import { factoryHomePath, firstFactoryLineId } from "../lib/factoryPagePaths";
 import { RiskScoreSetupDialog } from "./RiskScoreSetupDialog";
 import { RISK_SCORE_SETUP_COPY } from "./riskScoreSetupCopy";
 
 export function RiskScoreSetupPage() {
   const { organizationId, factoryId, routeSegment, factory } = useFactoriesLayout();
   const { canAct } = usePermissions();
-  const { lineId } = useParams<{ lineId?: string }>();
+  const lineId = firstFactoryLineId(factory);
   const navigate = useNavigate();
 
   usePageTitle([RISK_SCORE_SETUP_COPY.pageTitle, factory?.name ?? "Workspace"]);
 
-  const boardHref = factoryHomePath(organizationId, routeSegment, firstFactoryLineId(factory));
+  const boardHref = factoryHomePath(organizationId, routeSegment);
   const line = factory?.lines?.find((entry) => entry.id === lineId);
-  const returnHref = line?.id ? factoryLineDetailPath(organizationId, routeSegment, line.id) : boardHref;
+  const returnHref = boardHref;
   const githubIntegrationId = factory?.onboarding?.vcsIntegrationId?.trim() ?? "";
   const githubIntegration = useIntegration(organizationId, githubIntegrationId);
   const githubInstallationName = githubIntegration.data?.metadata?.name?.trim() ?? "";

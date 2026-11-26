@@ -1,7 +1,6 @@
 package factories
 
 import (
-	"fmt"
 	"slices"
 	"strings"
 
@@ -113,31 +112,7 @@ func intakeHealth(
 			return health
 		}
 	}
-	if intake.Source == models.FactoryIntakeSourceProductiveTasks {
-		if health := productiveIntakeWebhookHealth(tx, intake.CanvasID, graph.TriggerNodeID); health != pb.FactoryIntake_HEALTH_OK {
-			return health
-		}
-	}
-	if intake.Source == models.FactoryIntakeSourceGitHubIssues {
-		if health, _ := githubIntakeWebhookFailure(tx, intake.CanvasID, graph.TriggerNodeID); health != pb.FactoryIntake_HEALTH_OK {
-			return health
-		}
-	}
-
 	return pb.FactoryIntake_HEALTH_OK
-}
-
-// githubIntakeWebhookFailure reports a GitHub webhook that stopped retrying.
-// A pending webhook stays healthy here: registration is still in progress.
-// A failed webhook is the case the factory must show, because new issues
-// never arrive and waiting does not repair it.
-func githubIntakeWebhookFailure(tx *gorm.DB, canvasID uuid.UUID, triggerNodeID string) (pb.FactoryIntake_Health, string) {
-	webhook := intakeTriggerWebhook(tx, canvasID, triggerNodeID)
-	if webhook == nil || webhook.State != models.WebhookStateFailed {
-		return pb.FactoryIntake_HEALTH_OK, ""
-	}
-
-	return pb.FactoryIntake_HEALTH_WEBHOOK_FAILED, githubWebhookFailureMessage(webhookSetupError(webhook.Metadata.Data()))
 }
 
 func intakeTriggerWebhook(tx *gorm.DB, canvasID uuid.UUID, triggerNodeID string) *models.Webhook {
@@ -158,15 +133,6 @@ func intakeTriggerWebhook(tx *gorm.DB, canvasID uuid.UUID, triggerNodeID string)
 	return webhook
 }
 
-func webhookSetupError(metadata any) string {
-	asMap, ok := metadata.(map[string]any)
-	if !ok || asMap == nil {
-		return ""
-	}
-	reason, _ := asMap["setupError"].(string)
-	return strings.TrimSpace(reason)
-}
-
 func githubWebhookFailureMessage(setupError string) string {
 	if strings.Contains(setupError, "cannot have more than 20 hooks") {
 		return "GitHub did not create the webhook. This repository already has 20 webhooks for issues. Remove unused webhooks in the repository settings, then try again."
@@ -177,7 +143,6 @@ func githubWebhookFailureMessage(setupError string) string {
 func intakeSourceAllowsRebind(source string) bool {
 	return source == models.FactoryIntakeSourceJiraIssues ||
 		source == models.FactoryIntakeSourceSentryExceptions ||
-		source == models.FactoryIntakeSourceProductiveTasks ||
 		source == models.FactoryIntakeSourceDatadog ||
 		source == models.FactoryIntakeSourceLinearIssues
 }
@@ -189,10 +154,6 @@ func intakeSourceAllowsRebind(source string) bool {
 // one, because it is out of retries and waiting does not repair it.
 func jiraIntakeWebhookHealth(tx *gorm.DB, canvasID uuid.UUID, triggerNodeID string) pb.FactoryIntake_Health {
 	return intakeWebhookHealth(tx, canvasID, triggerNodeID, jiraWebhookHasRemoteID)
-}
-
-func productiveIntakeWebhookHealth(tx *gorm.DB, canvasID uuid.UUID, triggerNodeID string) pb.FactoryIntake_Health {
-	return intakeWebhookHealth(tx, canvasID, triggerNodeID, productiveWebhookHasRemoteID)
 }
 
 func intakeWebhookHealth(
@@ -233,33 +194,6 @@ func jiraWebhookHasRemoteID(metadata any) bool {
 	}
 	id, present := asMap["webhookId"]
 	return present && id != nil
-}
-
-func productiveWebhookHasRemoteID(metadata any) bool {
-	asMap, ok := metadata.(map[string]any)
-	if !ok || asMap == nil {
-		return false
-	}
-	if webhookRemoteIDsPresent(asMap["ids"]) {
-		return true
-	}
-	id, present := asMap["id"]
-	return present && id != nil && strings.TrimSpace(fmt.Sprint(id)) != ""
-}
-
-func webhookRemoteIDsPresent(value any) bool {
-	switch ids := value.(type) {
-	case []string:
-		return slices.ContainsFunc(ids, func(id string) bool {
-			return strings.TrimSpace(id) != ""
-		})
-	case []any:
-		return slices.ContainsFunc(ids, func(id any) bool {
-			return id != nil && strings.TrimSpace(fmt.Sprint(id)) != ""
-		})
-	default:
-		return false
-	}
 }
 
 // resolveIntakeGraph matches the generated node identifiers first, then falls

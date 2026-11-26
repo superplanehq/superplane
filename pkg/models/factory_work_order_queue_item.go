@@ -33,6 +33,30 @@ func (i *FactoryWorkOrderQueueItem) Delete(tx *gorm.DB) error {
 	return tx.Delete(i).Error
 }
 
+// CancelQueuedFactoryDispatches removes waiting work before canvas deletion.
+// The caller must hold the admission locks for all factory lines.
+func (c *Canvas) CancelQueuedFactoryDispatches(tx *gorm.DB) error {
+	var dispatchIDs []uuid.UUID
+	if err := tx.Model(&FactoryWorkOrderQueueItem{}).
+		Where("organization_id = ? AND app_id = ?", c.OrganizationID, c.ID).
+		Distinct().Order("line_dispatch_id").Pluck("line_dispatch_id", &dispatchIDs).Error; err != nil {
+		return err
+	}
+	for _, id := range dispatchIDs {
+		dispatch, err := LockWorkOrderLineDispatch(tx, id)
+		if err != nil {
+			return err
+		}
+		if err := tx.Where("line_dispatch_id = ?", id).Delete(&FactoryWorkOrderQueueItem{}).Error; err != nil {
+			return err
+		}
+		if err := dispatch.Finish(tx, CanvasRunResultCancelled); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // FactoryWorkOrderQueueItemRecord is a queue item joined with its 1-based
 // position inside the automation's queue, for API serialization.
 type FactoryWorkOrderQueueItemRecord struct {

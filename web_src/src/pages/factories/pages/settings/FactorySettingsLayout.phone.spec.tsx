@@ -6,6 +6,7 @@ import { client } from "@/api-client/client.gen";
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
 import {
   defaultFactoriesFixture,
+  FACTORIES_ORGANIZATION_ID,
   PRIMARY_FACTORY_KEY,
   PRIMARY_FACTORY_ROUTE_SEGMENT,
 } from "../../__fixtures__/factoryPageResponses";
@@ -44,7 +45,7 @@ describe("FactorySettingsLayout at phone width", () => {
     expect(within(index).getByTestId("factory-settings-nav-organization-members")).toHaveTextContent("Members");
     expect(within(index).getByTestId("factory-settings-mobile-index-back")).toHaveAttribute(
       "href",
-      expect.stringContaining(`/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/`),
+      `/${FACTORIES_ORGANIZATION_ID}/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}`,
     );
   }, 10000);
 

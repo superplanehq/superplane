@@ -22,7 +22,6 @@ const cardContext: WorkOrderCardContext = {
   organizationId: "org-1",
   factoryId: "factory-1",
   factoryKey: "RF",
-  factoryLines: [{ id: "line-a", name: "hotfix" }],
   canDispatch: true,
   canAssign: true,
   dispatchingOrderIds: new Set(),

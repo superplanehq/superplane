@@ -44,10 +44,6 @@ export interface IntakeSourceSettings {
   sentryLevels: string[];
   /** Sentry projects that still create a task. At least one is required. */
   sentryProjectIds: string[];
-  /** Skip Productive.io key tasks (milestones). Productive task intakes only. */
-  excludeKeyTasks: boolean;
-  /** Productive.io task list ids that still create a task. Empty means every task list. */
-  taskListIds: string[];
   /** Severities that still create a task. Empty means every severity. */
   dependabotSeverities: string[];
   /** Create a task when Datadog reports a Triggered Error Tracking alert. */
@@ -93,8 +89,6 @@ export const DEFAULT_GITHUB_INTAKE_SETTINGS: IntakeSourceSettings = {
   sentryAssignedIssues: false,
   sentryLevels: [],
   sentryProjectIds: [],
-  excludeKeyTasks: true,
-  taskListIds: [],
   dependabotSeverities: [],
   datadogTriggeredAlerts: true,
   datadogRetriggeredAlerts: false,
@@ -129,12 +123,6 @@ export const DEFAULT_SENTRY_INTAKE_SETTINGS: IntakeSourceSettings = {
   sentryRegressedIssues: false,
   sentryAssignedIssues: false,
   sentryLevels: [],
-};
-
-export const DEFAULT_PRODUCTIVE_INTAKE_SETTINGS: IntakeSourceSettings = {
-  ...DEFAULT_GITHUB_INTAKE_SETTINGS,
-  name: "Productive tasks",
-  excludeKeyTasks: true,
 };
 
 export const DEFAULT_DATADOG_INTAKE_SETTINGS: IntakeSourceSettings = {
@@ -194,7 +182,6 @@ export function intakeSupportsDelete(sourceId: LineIntakeSourceId): boolean {
     sourceId === "dependabot-alerts" ||
     sourceId === "sentry-exceptions" ||
     sourceId === "jira-issues" ||
-    sourceId === "productive-tasks" ||
     sourceId === "datadog" ||
     sourceId === "linear-issues" ||
     sourceId === "webhook"
@@ -218,7 +205,6 @@ export function intakeSettingsContentKey(settings: IntakeSourceSettings): string
   return JSON.stringify({
     ...settings,
     labels: [...settings.labels].sort(),
-    taskListIds: [...settings.taskListIds].sort(),
     datadogEnvironments: [...settings.datadogEnvironments].sort(),
     linearProjectIds: [...settings.linearProjectIds].sort(),
     linearLabels: [...settings.linearLabels].sort(),
@@ -237,7 +223,6 @@ export function normalizeIntakeSourceSettings(
   const dependabotSeverities = normalizeDependabotSeverities(draft.dependabotSeverities);
   const hiddenSentryTriggers =
     sourceId === "sentry-exceptions" ? { sentryRegressedIssues: false, sentryAssignedIssues: false } : {};
-  const taskListIds = normalizeTaskListIds(draft.taskListIds);
   const datadogEnvironments = normalizeDatadogEnvironments(draft.datadogEnvironments);
   const datadogService = draft.datadogService.trim();
   const linearTeamId = draft.linearTeamId.trim();
@@ -268,7 +253,6 @@ export function normalizeIntakeSourceSettings(
     labelFilterMode,
     sentryLevels,
     dependabotSeverities,
-    taskListIds,
     datadogEnvironments,
     datadogService,
     linearTeamId,
@@ -310,18 +294,6 @@ export function toggleDependabotSeverity(severities: string[], severity: string)
   const current = severities.length === 0 ? [...DEPENDABOT_INTAKE_SEVERITIES] : [...severities];
   const next = current.includes(severity) ? current.filter((entry) => entry !== severity) : [...current, severity];
   return normalizeDependabotSeverities(next);
-}
-
-function normalizeTaskListIds(ids: string[]): string[] {
-  const normalized: string[] = [];
-  for (const id of ids) {
-    const next = id.trim();
-    if (next.length === 0 || normalized.includes(next)) {
-      continue;
-    }
-    normalized.push(next);
-  }
-  return normalized;
 }
 
 function normalizeLinearValues(values: string[]): string[] {
@@ -413,7 +385,6 @@ export function intakeSettingsFromApi(
     datadogEnvironments: normalizeDatadogEnvironments(settings?.datadogEnvironments ?? []),
     datadogService: "",
     ...linearScopeFromApi(settings),
-    ...productiveFiltersFromApi(settings),
     webhookId: "",
     webhookTitlePath: settings?.webhookTitlePath ?? DEFAULT_GITHUB_INTAKE_SETTINGS.webhookTitlePath,
     webhookDescriptionPath: settings?.webhookDescriptionPath ?? DEFAULT_GITHUB_INTAKE_SETTINGS.webhookDescriptionPath,
@@ -433,15 +404,6 @@ function linearScopeFromApi(
     linearIncludeIssuesWithoutProject:
       settings?.linearIncludeIssuesWithoutProject ?? DEFAULT_GITHUB_INTAKE_SETTINGS.linearIncludeIssuesWithoutProject,
     linearLabels: normalizeLinearValues(settings?.linearLabels ?? []),
-  };
-}
-
-function productiveFiltersFromApi(
-  settings: FactoriesFactoryIntakeSettings | undefined,
-): Pick<IntakeSourceSettings, "excludeKeyTasks" | "taskListIds"> {
-  return {
-    excludeKeyTasks: settings?.excludeKeyTasks ?? DEFAULT_PRODUCTIVE_INTAKE_SETTINGS.excludeKeyTasks,
-    taskListIds: normalizeTaskListIds(settings?.taskListIds ?? []),
   };
 }
 
@@ -485,8 +447,6 @@ export function intakeSettingsToApi(
     sentryLevels: SENTRY_INTAKE_LEVELS.filter((level) => settings.sentryLevels.includes(level)),
     sentryProjectIds: normalizeLinearValues(settings.sentryProjectIds),
     dependabotSeverities: normalizeDependabotSeverities(settings.dependabotSeverities),
-    excludeKeyTasks: settings.excludeKeyTasks,
-    taskListIds: normalizeTaskListIds(settings.taskListIds),
     datadogTriggeredAlerts: settings.datadogTriggeredAlerts,
     datadogRetriggeredAlerts: settings.datadogRetriggeredAlerts,
     datadogEnvironments: normalizeDatadogEnvironments(settings.datadogEnvironments),

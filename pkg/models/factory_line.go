@@ -3,6 +3,7 @@ package models
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -433,8 +434,34 @@ func (l *FactoryLine) ReconcileStages(tx *gorm.DB, steps []FactoryLineStep) ([]F
 		return systemStages, nil
 	}
 	existingByKey := make(map[string]FactoryLineStage, len(existingStages))
+	usedKeys := make(map[string]bool, len(existingStages))
 	for _, stage := range existingStages {
 		existingByKey[stage.Key] = stage
+		usedKeys[stage.Key] = true
+	}
+	// A deleted phase compacts steps without changing retained stage keys.
+	for i := range systemStages {
+		next := &systemStages[i]
+		if next.StepIndex == nil {
+			continue
+		}
+		matched := false
+		for _, existing := range existingStages {
+			if existing.StepIndex != nil && *existing.StepIndex == *next.StepIndex {
+				next.Key = existing.Key
+				matched = true
+				break
+			}
+		}
+		if !matched && *next.StepIndex >= len(l.Steps) {
+			for index := *next.StepIndex; ; index++ {
+				next.Key = "phase-" + strconv.Itoa(index)
+				if !usedKeys[next.Key] {
+					break
+				}
+			}
+			usedKeys[next.Key] = true
+		}
 	}
 	systemStages = retainConfiguredOptionalStages(systemStages, existingByKey, len(l.Steps))
 	nextByKey := make(map[string]FactoryLineStage, len(systemStages))
@@ -500,25 +527,159 @@ func retainConfiguredOptionalStages(
 	return result
 }
 
-func (l *FactoryLine) ListRemovedCustomStageAutomations(tx *gorm.DB, next []FactoryLineStage) ([]Canvas, error) {
-	keys := l.removedCustomStageKeys(next)
+func (l *FactoryLine) ListRemovedStageAutomations(tx *gorm.DB, next []FactoryLineStage) ([]Canvas, error) {
+	keys := l.removedStageKeys(next)
 	if len(keys) == 0 {
 		return nil, nil
 	}
-	var canvases []Canvas
-	err := tx.Where("organization_id = ? AND factory_id = ? AND column_key IN ?", l.OrganizationID, l.FactoryID, keys).
-		Order("created_at, id").Find(&canvases).Error
-	return canvases, err
+	removed := make(map[string]bool, len(keys))
+	for _, key := range keys {
+		removed[key] = true
+	}
+	bound := map[uuid.UUID]bool{}
+	retainedRunners := map[uuid.UUID]bool{}
+	for _, stage := range l.Stages {
+		if stage.StepIndex == nil || *stage.StepIndex < 0 || *stage.StepIndex >= len(l.Steps) {
+			continue
+		}
+		id := l.Steps[*stage.StepIndex].AppID
+		if removed[stage.Key] {
+			bound[id] = true
+			continue
+		}
+		retainedRunners[id] = true
+	}
+	factory := &Factory{ID: l.FactoryID, OrganizationID: l.OrganizationID}
+	canvases, err := factory.ListCanvases(tx)
+	if err != nil {
+		return nil, err
+	}
+	handlers, err := factory.ListPRFeedbackHandlers(tx)
+	if err != nil {
+		return nil, err
+	}
+	feedback := map[uuid.UUID]bool{}
+	for _, handler := range handlers {
+		feedback[handler.CanvasID] = true
+	}
+	ids := make([]uuid.UUID, 0, len(canvases))
+	for _, canvas := range canvases {
+		ids = append(ids, canvas.ID)
+	}
+	specs, err := FindLiveCanvasSpecsByCanvasIDs(tx, ids)
+	if err != nil {
+		return nil, err
+	}
+	selected := make([]Canvas, 0)
+	for _, canvas := range canvases {
+		key := ""
+		if canvas.ColumnKey != nil {
+			key = *canvas.ColumnKey
+		}
+		if key == CanvasColumnKeyImplement {
+			key = "phase-0"
+		}
+		if feedback[canvas.ID] {
+			key = "verify"
+		}
+		if key == "" {
+			switch FactoryAppTemplateID(specs[canvas.ID].Nodes) {
+			case "risk-score", "visual-evidence", "review-request", "pr-feedback:checks", "pr-feedback:discussion":
+				key = "verify"
+			}
+		}
+		if !retainedRunners[canvas.ID] && (bound[canvas.ID] || removed[key]) {
+			selected = append(selected, canvas)
+		}
+	}
+	return selected, nil
 }
 
-func (l *FactoryLine) ClearRemovedCustomStageDisplayColumns(tx *gorm.DB, next []FactoryLineStage) error {
-	keys := l.removedCustomStageKeys(next)
+func (l *FactoryLine) ClearRemovedStageDisplayColumns(tx *gorm.DB, next []FactoryLineStage) error {
+	keys := l.removedStageKeys(next)
 	if len(keys) == 0 {
 		return nil
 	}
 	return tx.Model(&Canvas{}).
 		Where("organization_id = ? AND factory_id = ? AND display_column_key IN ?", l.OrganizationID, l.FactoryID, keys).
 		Update("display_column_key", "").Error
+}
+
+func (l *FactoryLine) removedStageKeys(next []FactoryLineStage) []string {
+	retained := make(map[uuid.UUID]bool, len(next))
+	for _, stage := range next {
+		retained[stage.ID] = true
+	}
+	removedKeys := make([]string, 0, len(l.Stages))
+	for _, stage := range l.StagesValue() {
+		if !retained[stage.ID] {
+			removedKeys = append(removedKeys, stage.Key)
+		}
+	}
+	return removedKeys
+}
+
+// Remove deleted phase bindings and deleted canvases; keep retained stage identities.
+func (l *FactoryLine) RemoveDeletedAutomationBindings(tx *gorm.DB, next []FactoryLineStage, deleted []Canvas) ([]FactoryLineStep, error) {
+	ids := map[uuid.UUID]bool{}
+	for _, canvas := range deleted {
+		ids[canvas.ID] = true
+	}
+	removedIndexes := map[int]bool{}
+	removedKeys := l.removedStageKeys(next)
+	for _, stage := range l.StagesValue() {
+		if stage.StepIndex != nil && slices.Contains(removedKeys, stage.Key) {
+			removedIndexes[*stage.StepIndex] = true
+		}
+	}
+	if len(deleted) == 0 && len(removedIndexes) == 0 {
+		return nil, nil
+	}
+	factory := &Factory{ID: l.FactoryID, OrganizationID: l.OrganizationID}
+	lines, err := factory.ListLines(tx.Clauses(clause.Locking{Strength: "UPDATE"}))
+	if err != nil {
+		return nil, err
+	}
+	var currentSteps []FactoryLineStep
+	for i := range lines {
+		line := &lines[i]
+		steps := make([]FactoryLineStep, 0, len(line.Steps))
+		indexes := map[int]int{}
+		for index, step := range line.Steps {
+			if ids[step.AppID] || (line.ID == l.ID && removedIndexes[index]) {
+				continue
+			}
+			indexes[index] = len(steps)
+			steps = append(steps, step)
+		}
+		stages := line.StagesValue()
+		if line.ID == l.ID {
+			stages = next
+		}
+		for j := range stages {
+			stage := &stages[j]
+			if stage.StepIndex == nil {
+				continue
+			}
+			index, retained := indexes[*stage.StepIndex]
+			stage.StepIndex = nil
+			if retained {
+				stage.StepIndex = &index
+				continue
+			}
+			stage.AgentDisplayKey = ""
+		}
+		if line.ID == l.ID {
+			currentSteps = steps
+			continue
+		}
+		if len(steps) != len(line.Steps) {
+			if err := line.UpdateConfiguration(tx, nil, steps, nil, stages); err != nil {
+				return nil, err
+			}
+		}
+	}
+	return currentSteps, nil
 }
 
 func customStageStartMode(spec LiveCanvasSpec, entrypoint string) string {
@@ -557,20 +718,6 @@ func customStageAllowsManualStart(spec LiveCanvasSpec, entrypoint string) bool {
 		}
 	}
 	return false
-}
-
-func (l *FactoryLine) removedCustomStageKeys(next []FactoryLineStage) []string {
-	retained := make(map[uuid.UUID]bool, len(next))
-	for _, stage := range next {
-		retained[stage.ID] = true
-	}
-	removedKeys := make([]string, 0, len(l.Stages))
-	for _, stage := range l.StagesValue() {
-		if strings.HasPrefix(stage.Key, "custom-") && !retained[stage.ID] {
-			removedKeys = append(removedKeys, stage.Key)
-		}
-	}
-	return removedKeys
 }
 
 func (f *Factory) findLine(tx *gorm.DB, lineID uuid.UUID) (*FactoryLine, error) {

@@ -65,6 +65,75 @@ export const Populated: Story = {
   },
 };
 
+export const WebhookFailures: Story = {
+  name: "Board — webhook setup failed",
+  render: () => (
+    <FactoriesHarness
+      mode="app"
+      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_FACTORY_LINES[0].id}`}
+      factoriesFixture={boardConfidenceFixture}
+      orgIntegrations={[
+        {
+          metadata: { id: "github-1", name: "GitHub", integrationName: "github" },
+          status: {
+            state: "ready",
+            webhookFailures: [
+              {
+                id: "checks-hook",
+                state: "failed",
+                repositories: ["acme/api"],
+                events: ["check_run", "check_suite", "status", "pull_request"],
+                limitEvent: "pull_request",
+                message: "GitHub allows 20 webhooks for the pull_request event in each repository.",
+              },
+              {
+                id: "pull-request-hook",
+                state: "failed",
+                repositories: ["acme/api"],
+                events: ["pull_request"],
+                limitEvent: "pull_request",
+                message: "GitHub allows 20 webhooks for the pull_request event in each repository.",
+              },
+              {
+                id: "issues-hook",
+                state: "failed",
+                repositories: ["acme/api"],
+                events: ["issues"],
+                limitEvent: "issues",
+                message: "GitHub allows 20 webhooks for the issues event in each repository.",
+              },
+              {
+                id: "review-hook",
+                state: "failed",
+                repositories: ["acme/api"],
+                events: ["pull_request_review"],
+                limitEvent: "pull_request_review",
+                message: "GitHub allows 20 webhooks for the pull_request_review event in each repository.",
+              },
+              {
+                id: "issue-comment-hook",
+                state: "failed",
+                repositories: ["acme/api"],
+                events: ["issue_comment"],
+                limitEvent: "issue_comment",
+                message: "GitHub allows 20 webhooks for the issue_comment event in each repository.",
+              },
+              {
+                id: "review-comment-hook",
+                state: "failed",
+                repositories: ["acme/api"],
+                events: ["pull_request_review_comment"],
+                limitEvent: "pull_request_review_comment",
+                message: "GitHub allows 20 webhooks for the pull_request_review_comment event in each repository.",
+              },
+            ],
+          },
+        },
+      ]}
+    />
+  ),
+};
+
 export const AcmeOnboardingEmpty: Story = {
   name: "Acme onboarding — empty board",
   render: () => (

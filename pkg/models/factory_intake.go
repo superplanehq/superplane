@@ -15,7 +15,6 @@ const (
 	FactoryIntakeSourceGitHubIssues       = "github-issues"
 	FactoryIntakeSourceSentryExceptions   = "sentry-exceptions"
 	FactoryIntakeSourcePagerDutyIncidents = "pagerduty-incidents"
-	FactoryIntakeSourceProductiveTasks    = "productive-tasks"
 	FactoryIntakeSourceJiraIssues         = "jira-issues"
 	FactoryIntakeSourceDependabotAlerts   = "dependabot-alerts"
 	FactoryIntakeSourceDatadog            = "datadog"
@@ -42,7 +41,6 @@ var factoryIntakeSources = []string{
 	FactoryIntakeSourceGitHubIssues,
 	FactoryIntakeSourceSentryExceptions,
 	FactoryIntakeSourcePagerDutyIncidents,
-	FactoryIntakeSourceProductiveTasks,
 	FactoryIntakeSourceJiraIssues,
 	FactoryIntakeSourceDependabotAlerts,
 	FactoryIntakeSourceDatadog,
