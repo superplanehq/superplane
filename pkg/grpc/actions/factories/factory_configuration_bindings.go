@@ -1,8 +1,6 @@
 package factories
 
 import (
-	"strings"
-
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
@@ -72,10 +70,6 @@ func configurationBindingIntentEqual(current *factoryConfigurationAutomationTarg
 		value := *binding
 		if value.IntegrationName != "" {
 			value.IntegrationName, value.IntegrationID = "", current.binding.IntegrationID
-		}
-		if strings.HasPrefix(current.templateID, "intake:") {
-			// Intake exports always include their selected connection.
-			value.IntegrationID = ""
 		}
 		return value
 	}

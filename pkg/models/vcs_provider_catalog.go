@@ -1828,9 +1828,10 @@ func (b *VCSProviderIntegrationBinding) retainedAutomationRepositoryIDs(tx *gorm
 	err := tx.Table("vcs_provider_integration_repositories AS access").
 		Select("DISTINCT access.repository_id").
 		Joins("JOIN vcs_provider_repositories AS repository ON repository.provider = access.provider AND repository.repository_id = access.repository_id AND repository.installation_id = ?", b.InstallationID).
-		Joins("JOIN factory_configuration_automations AS automation ON LOWER(automation.binding ->> 'integration_id') = access.integration_id::text AND LOWER(BTRIM(automation.binding ->> 'resource_id')) = LOWER(repository.full_name)").
+		Joins("JOIN factory_configuration_automations AS automation ON LOWER(BTRIM(automation.binding ->> 'resource_id')) = LOWER(repository.full_name)").
 		Joins("JOIN workflows AS canvas ON canvas.id = automation.canvas_id AND canvas.factory_id = automation.factory_id AND canvas.organization_id = automation.organization_id").
 		Joins("JOIN factories AS factory ON factory.id = automation.factory_id AND factory.organization_id = automation.organization_id").
+		Where("LOWER(COALESCE(NULLIF(automation.binding ->> 'integration_id', ''), factory.onboarding_config ->> 'vcs_integration_id')) = access.integration_id::text").
 		Where("access.integration_id = ? AND access.provider = ? AND automation.organization_id = ?", b.IntegrationID, b.Provider, b.OrganizationID).
 		Where("canvas.deleted_at IS NULL AND factory.deleted_at IS NULL").
 		Pluck("access.repository_id", &repositoryIDs).Error

@@ -89,6 +89,47 @@ func TestFactoryConfigurationResolvesNamedIntakeConnection(t *testing.T) {
 	require.Empty(t, plan.Changes)
 }
 
+func TestFactoryConfigurationRemovesIntakeConnectionPin(t *testing.T) {
+	f := newConfigurationFixture(t)
+	db := database.DB(t.Context())
+	previous := f.factory.OnboardingConfigValue()
+	connection := previous.VCSIntegrationID
+	bundle := f.export(t)
+	editConfigurationManifest(t, bundle, func(manifest *factoryConfigurationManifest) {
+		manifest.Stages[0].Automations = append(manifest.Stages[0].Automations, factoryConfigurationAutomation{
+			ID: "issues", Name: "Unpinned issues", Uses: "@superplane/intake/github-issues",
+			Binding: &factoryConfigurationBinding{IntegrationID: connection},
+		})
+	})
+	applyConfigurationBundle(t, f, bundle)
+	canvas := configurationCanvasByName(t, f, "Unpinned issues")
+	bundle = f.export(t)
+	configurationUpdateCatalogAutomation(t, bundle, "issues", func(automation *factoryConfigurationAutomation) {
+		automation.Binding = nil
+	})
+	plan := f.plan(t, bundle)
+	require.Empty(t, plan.Diagnostics)
+	require.NotEmpty(t, plan.Changes, "removing a saved connection pin must change ownership")
+	result, err := f.apply(bundle, plan.BaseStateToken)
+	require.NoError(t, err)
+	require.True(t, result.Changed)
+	owner, err := models.FindFactoryConfigurationAutomationByCanvas(db, canvas.ID)
+	require.NoError(t, err)
+	require.NotContains(t, owner.Binding, "integration_id")
+	plan = f.plan(t, f.export(t))
+	require.Empty(t, plan.Diagnostics)
+	require.Empty(t, plan.Changes, "exporting the selected connection must not introduce a pin")
+	newConnection := createReadyOnboardingIntegration(t, f.factory.OrganizationID, models.ProviderGitHub)
+	require.NoError(t, f.factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSIntegrationID: &newConnection}))
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		return reconcileFactoryRepository(f.ctx, tx, testIntakeDependencies(f.r), f.factory, f.r.User,
+			connection, newConnection, previous.AppRepository, previous.BacklogRepository, previous.DefaultBranch, previous.AppRepository, false)
+	}))
+	trigger := findIntakeNode(resetTestLiveVersion(t, canvas).Nodes, intakeTriggerNodeID)
+	require.NotNil(t, trigger)
+	require.Equal(t, newConnection, *trigger.IntegrationID, "an unpinned intake must follow the workspace connection")
+}
+
 func TestFactoryConfigurationChangesRepositoriesAndIntakeTogether(t *testing.T) {
 	f := newConfigurationFixture(t)
 	db := database.DB(t.Context())

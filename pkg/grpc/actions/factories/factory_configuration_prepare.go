@@ -21,20 +21,21 @@ import (
 )
 
 type preparedFactoryConfigurationBuiltIn struct {
-	TemplateID       string
-	Nodes            []models.Node
-	Edges            []models.Edge
-	Defaults         *models.CanvasVersion
-	Settings         map[string]any
-	Binding          factoryConfigurationBinding
-	DefaultBinding   factoryConfigurationBinding
-	IntakeSource     string
-	PRFeedbackSource string
-	MaximumAttempts  int
-	Paused           bool
-	Description      string
-	ExplicitBinding  *factoryConfigurationBinding
-	State            any
+	TemplateID         string
+	Nodes              []models.Node
+	Edges              []models.Edge
+	Defaults           *models.CanvasVersion
+	Settings           map[string]any
+	Binding            factoryConfigurationBinding
+	DefaultBinding     factoryConfigurationBinding
+	IntakeSource       string
+	PRFeedbackSource   string
+	MaximumAttempts    int
+	Paused             bool
+	Description        string
+	ExplicitBinding    *factoryConfigurationBinding
+	GitHubRepositoryID int64
+	State              any
 }
 
 type configurationIntegrationState struct {
@@ -130,7 +131,8 @@ func prepareFactoryConfigurationBuiltIn(ctx context.Context, tx *gorm.DB, deps I
 		return nil, err
 	}
 	if integration.AppName == models.ProviderGitHub && binding.ResourceID != "" {
-		if _, _, err := authorizeConfigurationPrimaryRepository(ctx, tx, target.factory, integration, binding.ResourceID); err != nil {
+		prepared.GitHubRepositoryID, _, err = authorizeConfigurationPrimaryRepository(ctx, tx, target.factory, integration, binding.ResourceID)
+		if err != nil {
 			code, message, ok := grpcerrors.HandlerStatus(err)
 			if ok && code == codes.PermissionDenied {
 				return nil, configurationPreparationError("binding.resource_id", message)

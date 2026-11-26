@@ -46,6 +46,7 @@ func TestFactoryConfigurationAppliesHostedRepositoryGrantsAtomically(t *testing.
 	repositories := []models.VCSProviderRepository{
 		{RepositoryID: 201, FullName: "acme/new-app", DefaultBranch: "main"},
 		{RepositoryID: 202, FullName: "acme/new-backlog", DefaultBranch: "main"},
+		{RepositoryID: 203, FullName: "acme/new-intake", DefaultBranch: "main"},
 	}
 	require.NoError(t, models.ReplaceVCSProviderRepositories(db, models.ProviderGitHub, installationID, repositories))
 	for _, repository := range repositories {
@@ -84,6 +85,7 @@ func TestFactoryConfigurationAppliesHostedRepositoryGrantsAtomically(t *testing.
 		if manifest.Stages[index].Key == "backlog" {
 			manifest.Stages[index].Automations = append(manifest.Stages[index].Automations, factoryConfigurationAutomation{
 				ID: "issues", Name: "Hosted issues", Uses: "@superplane/intake/github-issues",
+				Binding: &factoryConfigurationBinding{IntegrationID: hosted.ID.String(), ResourceID: "acme/new-intake"},
 			})
 		}
 	}
@@ -120,12 +122,12 @@ func TestFactoryConfigurationAppliesHostedRepositoryGrantsAtomically(t *testing.
 	require.True(t, applied.Changed)
 	granted, err = models.ListVCSProviderBindingRepositories(db, hosted.ID)
 	require.NoError(t, err)
-	require.Len(t, granted, 2)
-	grantedIDs := []int64{granted[0].RepositoryID, granted[1].RepositoryID}
-	require.ElementsMatch(t, []int64{201, 202}, grantedIDs)
+	require.Len(t, granted, 3)
+	grantedIDs := []int64{granted[0].RepositoryID, granted[1].RepositoryID, granted[2].RepositoryID}
+	require.ElementsMatch(t, []int64{201, 202, 203}, grantedIDs)
 	require.NotEmpty(t, client.tokenGrants, "real trigger setup must obtain a hosted installation token")
 	for _, selected := range client.tokenGrants {
-		require.ElementsMatch(t, []int64{201, 202}, selected)
+		require.ElementsMatch(t, []int64{201, 202, 203}, selected)
 	}
 	intakes, err := reloaded.ListIntakes(db)
 	require.NoError(t, err)
@@ -133,7 +135,7 @@ func TestFactoryConfigurationAppliesHostedRepositoryGrantsAtomically(t *testing.
 	live := resetTestLiveVersion(t, intakes[0].Canvas)
 	trigger := findIntakeNode(live.Nodes, intakeTriggerNodeID)
 	require.NotNil(t, trigger)
-	require.Equal(t, "acme/new-backlog", trigger.Configuration["repository"])
+	require.Equal(t, "acme/new-intake", trigger.Configuration["repository"])
 	require.Equal(t, hosted.ID.String(), *trigger.IntegrationID)
 	for _, node := range live.Nodes {
 		require.Nil(t, node.ErrorMessage, node.ID)
@@ -153,7 +155,7 @@ func TestFactoryConfigurationAppliesHostedRepositoryGrantsAtomically(t *testing.
 		}
 	}
 	require.NotNil(t, issues)
-	issues.Binding = &factoryConfigurationBinding{IntegrationID: hosted.ID.String(), ResourceID: "acme/new-backlog"}
+	issues.Binding = &factoryConfigurationBinding{IntegrationID: hosted.ID.String(), ResourceID: "acme/new-intake"}
 	content, err = goyaml.Marshal(pinned)
 	require.NoError(t, err)
 	bundle.Files[0].Content = string(content)
@@ -177,20 +179,20 @@ func TestFactoryConfigurationAppliesHostedRepositoryGrantsAtomically(t *testing.
 	granted, err = models.ListVCSProviderBindingRepositories(db, hosted.ID)
 	require.NoError(t, err)
 	require.Len(t, granted, 1)
-	require.Equal(t, int64(202), granted[0].RepositoryID)
+	require.Equal(t, int64(203), granted[0].RepositoryID)
 	live = resetTestLiveVersion(t, intakes[0].Canvas)
 	trigger = findIntakeNode(live.Nodes, intakeTriggerNodeID)
 	require.NotNil(t, trigger)
-	require.Equal(t, "acme/new-backlog", trigger.Configuration["repository"])
+	require.Equal(t, "acme/new-intake", trigger.Configuration["repository"])
 	require.Equal(t, hosted.ID.String(), *trigger.IntegrationID)
 	client.tokenGrants = nil
 	githubClient, err := githubcommon.NewClient(contexts.NewIntegrationContext(db, nil, hosted, f.r.Encryptor, f.r.Registry, nil), client)
 	require.NoError(t, err)
-	repository, err := githubClient.FindRepository("acme/new-backlog")
+	repository, err := githubClient.FindRepository("acme/new-intake")
 	require.NoError(t, err)
-	require.Equal(t, "acme/new-backlog", repository.GetFullName())
+	require.Equal(t, "acme/new-intake", repository.GetFullName())
 	require.Len(t, client.tokenGrants, 1)
-	require.Equal(t, []int64{202}, client.tokenGrants[0])
+	require.Equal(t, []int64{203}, client.tokenGrants[0])
 
 	// Removing the pinned intake must remove its remaining hosted grant.
 	plan = f.plan(t, original)

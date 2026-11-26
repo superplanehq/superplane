@@ -179,12 +179,15 @@ func TestVCSProviderBindingSyncRetainsOnlyAuthorizedActiveAutomationRepositories
 		organization uuid.UUID
 		granted      bool
 		deleted      string
+		inherited    bool
 	}{
-		{"active", organization.ID, true, ""},
-		{"ungranted", organization.ID, false, ""},
-		{"deleted-canvas", organization.ID, true, "canvas"},
-		{"deleted-workspace", organization.ID, true, "workspace"},
-		{"foreign-organization", otherOrganization.ID, true, ""},
+		{"active", organization.ID, true, "", false},
+		{"ungranted", organization.ID, false, "", false},
+		{"deleted-canvas", organization.ID, true, "canvas", false},
+		{"deleted-workspace", organization.ID, true, "workspace", false},
+		{"foreign-organization", otherOrganization.ID, true, "", false},
+		{"inherited-active", organization.ID, true, "", true},
+		{"inherited-ungranted", organization.ID, false, "", true},
 	}
 	repositories := make([]VCSProviderRepository, len(entries))
 	for i, entry := range entries {
@@ -215,6 +218,11 @@ func TestVCSProviderBindingSyncRetainsOnlyAuthorizedActiveAutomationRepositories
 			StageKey: "verify", ManifestID: "automation", CanvasID: canvas.ID,
 			Binding: datatypes.JSONMap{"integration_id": integration.ID.String(), "resource_id": repositories[i].FullName},
 		}
+		if entry.inherited {
+			connection := integration.ID.String()
+			require.NoError(t, factory.UpdateOnboarding(db, FactoryOnboardingPatch{VCSIntegrationID: &connection}))
+			delete(owner.Binding, "integration_id")
+		}
 		require.NoError(t, owner.Save(db))
 		if entry.granted {
 			require.NoError(t, GrantVCSProviderBindingRepository(db, integration.ID, ProviderGitHub, repositories[i].RepositoryID))
@@ -230,8 +238,8 @@ func TestVCSProviderBindingSyncRetainsOnlyAuthorizedActiveAutomationRepositories
 	require.NoError(t, SyncVCSProviderBindingRepositories(db, integration.ID, ProviderGitHub))
 	retained, err := ListVCSProviderBindingRepositories(db, integration.ID)
 	require.NoError(t, err)
-	require.Len(t, retained, 1)
-	assert.Equal(t, int64(201), retained[0].RepositoryID, "saved bindings must not create new grants or retain inactive or foreign references")
+	require.Len(t, retained, 2)
+	assert.ElementsMatch(t, []int64{201, 206}, []int64{retained[0].RepositoryID, retained[1].RepositoryID}, "saved bindings must not create new grants or retain inactive or foreign references")
 }
 
 func TestDeleteVCSProviderInstallationsMissingFromSnapshotMarksIntegrations(t *testing.T) {

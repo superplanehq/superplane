@@ -150,6 +150,18 @@ func ApplyFactoryConfiguration(ctx context.Context, deps IntakeDependencies, org
 			// Publication must see the repository records saved in this transaction.
 			tx = withFactoryAutomationReadInputs(tx, nil)
 		}
+		// Setup must see authorized automation grants before publication.
+		for _, stage := range manifest.Stages {
+			for _, automation := range stage.Automations {
+				prepared := automation.prepared
+				if prepared == nil || prepared.GitHubRepositoryID == 0 {
+					continue
+				}
+				if err := models.GrantVCSProviderBindingRepository(tx, uuid.MustParse(prepared.Binding.IntegrationID), models.ProviderGitHub, prepared.GitHubRepositoryID); err != nil {
+					return err
+				}
+			}
+		}
 		if err := applyFactoryConfigurationStages(tx, target, manifest); err != nil {
 			return err
 		}
