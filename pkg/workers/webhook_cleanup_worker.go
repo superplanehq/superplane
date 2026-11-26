@@ -115,13 +115,17 @@ func (w *WebhookCleanupWorker) processWebhook(tx *gorm.DB, logger *log.Entry, we
 		return w.processAppInstallationWebhook(tx, logger, webhook)
 	}
 
-	return tx.Unscoped().Delete(webhook).Error
+	return webhook.HardDelete(tx)
 }
 
 func (w *WebhookCleanupWorker) processAppInstallationWebhook(tx *gorm.DB, logger *log.Entry, webhook *models.Webhook) error {
 	instance, err := models.FindMaybeDeletedIntegrationInTransaction(tx, *webhook.AppInstallationID)
 	if err != nil {
 		return err
+	}
+
+	if _, err := w.registry.GetIntegration(instance.AppName); err != nil {
+		return webhook.HardDelete(tx)
 	}
 
 	handler, err := w.registry.GetWebhookHandler(instance.AppName)
@@ -150,5 +154,5 @@ func (w *WebhookCleanupWorker) processAppInstallationWebhook(tx *gorm.DB, logger
 		return persistErr
 	}
 
-	return tx.Unscoped().Delete(webhook).Error
+	return webhook.HardDelete(tx)
 }

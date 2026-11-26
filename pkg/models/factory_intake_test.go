@@ -76,7 +76,6 @@ func Test__FactoryIntake(t *testing.T) {
 			models.FactoryIntakeSourceGitHubIssues,
 			models.FactoryIntakeSourceSentryExceptions,
 			models.FactoryIntakeSourcePagerDutyIncidents,
-			models.FactoryIntakeSourceProductiveTasks,
 			models.FactoryIntakeSourceJiraIssues,
 			models.FactoryIntakeSourceDependabotAlerts,
 			models.FactoryIntakeSourceDatadog,
