@@ -339,8 +339,7 @@ func retryFailedIntakeWebhook(tx *gorm.DB, canvasID uuid.UUID, triggerNodeID str
 		return nil
 	}
 
-	_, err := webhook.Reprovision(tx, webhook.Configuration.Data())
-	return err
+	return webhook.RetrySetup(tx)
 }
 
 func applyIntakeSettingsToGraph(

@@ -30,7 +30,9 @@ export function IntakeWebhookFailureNotice({
   return (
     <section className="px-3 pb-3" data-testid="intake-webhook-failure">
       <div role="alert" className="rounded-lg border border-amber-300 bg-background px-3.5 py-3 dark:border-amber-700">
-        <h2 className="text-[15px] font-semibold tracking-[-0.02em] text-foreground">New issues do not arrive</h2>
+        <h2 className="text-[15px] font-semibold tracking-[-0.02em] text-foreground">
+          {retrying ? "Retrying webhook setup" : "New issues do not arrive"}
+        </h2>
         <p className="mt-1.5 text-[13px] text-muted-foreground">{message?.trim() || FALLBACK_MESSAGE}</p>
         <div className="mt-3 flex flex-wrap items-center gap-2">
           {webhooksUrl ? (
