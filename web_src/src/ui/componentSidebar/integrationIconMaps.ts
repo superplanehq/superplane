@@ -52,7 +52,6 @@ import perplexityIcon from "@/assets/icons/integrations/perplexity.svg";
 import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg";
 import postmanIcon from "@/assets/icons/integrations/postman.svg";
 import prismaIcon from "@/assets/icons/integrations/prisma.svg";
-import productiveIcon from "@/assets/icons/integrations/productive.svg";
 import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
 import incidentIcon from "@/assets/icons/integrations/incident.svg";
 import slackIcon from "@/assets/icons/integrations/slack.svg";
@@ -117,7 +116,6 @@ export const INTEGRATION_APP_LOGO_MAP: Record<string, string> = {
   pagerduty: pagerDutyIcon,
   postman: postmanIcon,
   prisma: prismaIcon,
-  productive: productiveIcon,
   rootly: rootlyIcon,
   incident: incidentIcon,
   semaphore: SemaphoreLogo,
@@ -180,7 +178,6 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
   pagerduty: pagerDutyIcon,
   postman: postmanIcon,
   prisma: prismaIcon,
-  productive: productiveIcon,
   rootly: rootlyIcon,
   incident: incidentIcon,
   semaphore: SemaphoreLogo,

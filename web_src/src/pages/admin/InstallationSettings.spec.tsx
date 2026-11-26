@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "bun:test";
 import { MemoryRouter } from "react-router";
@@ -66,20 +66,23 @@ const llmSettingsResponse = {
   ],
 };
 
-const mockInstallationSettingsFetch = () => {
+const mockInstallationSettingsFetch = (
+  settings: typeof installationSettingsResponse | null = installationSettingsResponse,
+) => {
   vi.stubGlobal(
     "fetch",
     vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
-      const body = url.includes("/llm-settings")
-        ? llmSettingsResponse
-        : url.includes("/built-in-automations")
-          ? { automations: [{ id: "intake:github-issues", name: "GitHub issues" }] }
-          : installationSettingsResponse;
-      return new Response(JSON.stringify(body), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      });
+      if (url.includes("/llm-settings")) return Response.json(llmSettingsResponse);
+      if (url.includes("/built-in-automations")) {
+        return Response.json({ automations: [{ id: "intake:github-issues", name: "GitHub issues" }] });
+      }
+      if (url === "/admin/api/installation/network-settings") {
+        return settings === null
+          ? new Response("Failed to load installation settings", { status: 500 })
+          : Response.json(settings);
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
     }),
   );
 };
@@ -163,6 +166,120 @@ describe("InstallationSettings", () => {
     expect(screen.getByText("Public signups")).toBeInTheDocument();
     expect(screen.getByTestId("installation-signups-switch")).toBeInTheDocument();
     expect(screen.queryByText("Network policy")).not.toBeInTheDocument();
+  });
+});
+
+describe("SMTP Save state", () => {
+  const savedSMTPSettings = {
+    ...installationSettingsResponse,
+    smtp_enabled: true,
+    smtp_host: "mail.example.com",
+    smtp_port: 587,
+    smtp_username: "mailer",
+    smtp_from_name: "Notifications",
+    smtp_from_email: "notifications@example.com",
+    smtp_password_configured: true,
+  };
+
+  const openEmailSettings = async (settings: typeof installationSettingsResponse | null) => {
+    const user = userEvent.setup();
+    mockInstallationSettingsFetch(settings);
+    renderInstallationSettings();
+    await user.click(await screen.findByRole("tab", { name: "Email" }));
+    return user;
+  };
+
+  it("keeps Save disabled after a failed load and an SMTP toggle", async () => {
+    const user = await openEmailSettings(null);
+    const save = screen.getByTestId("installation-smtp-save");
+    expect(save).toBeDisabled();
+    const toggle = screen.getByTestId("installation-smtp-switch");
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute("aria-checked", "true");
+    expect(save).toBeDisabled();
+  });
+
+  it.each([false, true])("detects and reverts the SMTP toggle with saved enabled=%s", async (enabled) => {
+    const user = await openEmailSettings({ ...savedSMTPSettings, smtp_enabled: enabled });
+    const save = screen.getByTestId("installation-smtp-save");
+    const toggle = screen.getByTestId("installation-smtp-switch");
+    expect(save).toBeDisabled();
+    await user.click(toggle);
+    expect(save).toBeEnabled();
+    await user.click(toggle);
+    expect(save).toBeDisabled();
+  });
+
+  it.each([
+    ["host", "mail.example.com", "other.example.com"],
+    ["username", "mailer", "other-user"],
+    ["from name", "Notifications", "Other sender"],
+    ["from email", "notifications@example.com", "other@example.com"],
+  ])("normalizes whitespace and detects edits to SMTP %s", async (_field, saved, changed) => {
+    await openEmailSettings(savedSMTPSettings);
+    const save = screen.getByTestId("installation-smtp-save");
+    const input = screen.getByDisplayValue(saved);
+    expect(save).toBeDisabled();
+    fireEvent.change(input, { target: { value: `  ${saved}  ` } });
+    expect(save).toBeDisabled();
+    fireEvent.change(input, { target: { value: changed } });
+    expect(save).toBeEnabled();
+    fireEvent.change(input, { target: { value: saved } });
+    expect(save).toBeDisabled();
+  });
+
+  it.each([
+    [587, [" 0587 ", "587.0"]],
+    [0, ["", "   ", "0"]],
+  ] as const)("compares SMTP port numerically with saved port=%s", async (port, equivalents) => {
+    await openEmailSettings({ ...savedSMTPSettings, smtp_port: port });
+    const save = screen.getByTestId("installation-smtp-save");
+    const input = screen.getByPlaceholderText("587");
+    expect(save).toBeDisabled();
+    for (const value of equivalents) {
+      fireEvent.change(input, { target: { value } });
+      expect(save).toBeDisabled();
+    }
+    fireEvent.change(input, { target: { value: "25" } });
+    expect(save).toBeEnabled();
+    fireEvent.change(input, { target: { value: String(port) } });
+    expect(save).toBeDisabled();
+  });
+
+  it.each(["new-password", "   "])("detects and clears a non-empty password %j", async (password) => {
+    await openEmailSettings(savedSMTPSettings);
+    const save = screen.getByTestId("installation-smtp-save");
+    const input = screen.getByTestId("installation-smtp-password");
+    expect(save).toBeDisabled();
+    fireEvent.change(input, { target: { value: password } });
+    expect(save).toBeEnabled();
+    fireEvent.change(input, { target: { value: "" } });
+    expect(save).toBeDisabled();
+  });
+
+  it("detects and reverts a TLS-only edit when SMTP is enabled", async () => {
+    const user = await openEmailSettings(savedSMTPSettings);
+    const save = screen.getByTestId("installation-smtp-save");
+    const tls = screen.getByTestId("installation-smtp-tls-switch");
+    expect(save).toBeDisabled();
+    await user.click(tls);
+    expect(save).toBeEnabled();
+    await user.click(tls);
+    expect(save).toBeDisabled();
+  });
+
+  it.each([false, true])("ignores TLS differences while SMTP is disabled with saved TLS=%s", async (useTLS) => {
+    const user = await openEmailSettings({ ...savedSMTPSettings, smtp_enabled: false, smtp_use_tls: useTLS });
+    const save = screen.getByTestId("installation-smtp-save");
+    const toggle = screen.getByTestId("installation-smtp-switch");
+    expect(save).toBeDisabled();
+    await user.click(toggle);
+    expect(save).toBeEnabled();
+    const tls = screen.getByTestId("installation-smtp-tls-switch");
+    expect(tls).toHaveAttribute("aria-checked", "true");
+    await user.click(tls);
+    await user.click(toggle);
+    expect(save).toBeDisabled();
   });
 });
 

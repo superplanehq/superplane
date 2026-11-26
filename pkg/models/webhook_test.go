@@ -2,6 +2,7 @@ package models_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -10,7 +11,70 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
+
+func Test__WebhookProvisioning__PreservesUnsupportedWebhooks(t *testing.T) {
+	for _, state := range []string{models.WebhookStatePending, models.WebhookStateProvisioning} {
+		t.Run(state, func(t *testing.T) {
+			r := support.Setup(t)
+			defer r.Close()
+
+			var eligibleIDs []uuid.UUID
+			var internalID uuid.UUID
+			var unsupported models.Webhook
+			for _, provider := range []string{"dummy", "productive", ""} {
+				var integrationID *uuid.UUID
+				if provider != "" {
+					integration, err := models.CreateIntegration(uuid.New(), r.Organization.ID, provider, uuid.NewString(), nil)
+					require.NoError(t, err)
+					integrationID = &integration.ID
+				}
+				updatedAt := time.Now().Add(-time.Hour)
+				webhook := models.Webhook{
+					ID: uuid.New(), State: state, Secret: []byte("secret"),
+					AppInstallationID: integrationID, RetryCount: 2, MaxRetries: 3,
+					UpdatedAt:     &updatedAt,
+					Configuration: datatypes.NewJSONType[any](map[string]any{"project": "stored"}),
+					Metadata:      datatypes.NewJSONType[any](map[string]any{"webhookId": "remote-id"}),
+				}
+				require.NoError(t, database.Conn().Create(&webhook).Error)
+				if provider == "productive" {
+					require.NoError(t, database.Conn().First(&unsupported, webhook.ID).Error)
+					continue
+				}
+				eligibleIDs = append(eligibleIDs, webhook.ID)
+				if provider == "" {
+					internalID = webhook.ID
+				}
+			}
+
+			if state == models.WebhookStateProvisioning {
+				count, err := models.ResetStuckProvisioningWebhooks(database.Conn(), []string{"dummy"})
+				require.NoError(t, err)
+				assert.EqualValues(t, 2, count)
+			}
+			listed, err := models.ListPendingWebhooks(database.Conn(), []string{"dummy"})
+			require.NoError(t, err)
+			var listedIDs []uuid.UUID
+			for _, webhook := range listed {
+				listedIDs = append(listedIDs, webhook.ID)
+			}
+			assert.ElementsMatch(t, eligibleIDs, listedIDs)
+			listed, err = models.ListPendingWebhooks(database.Conn(), nil)
+			require.NoError(t, err)
+			require.Len(t, listed, 1)
+			assert.Equal(t, internalID, listed[0].ID)
+			if state == models.WebhookStatePending {
+				_, err := models.LockWebhook(database.Conn(), unsupported.ID, []string{"dummy"})
+				assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
+			}
+			var stored models.Webhook
+			require.NoError(t, database.Conn().First(&stored, unsupported.ID).Error)
+			assert.Equal(t, unsupported, stored)
+		})
+	}
+}
 
 func Test__SoftDeleteWebhookIfUnreferenced(t *testing.T) {
 	t.Run("soft-deletes when no active nodes remain", func(t *testing.T) {

@@ -50,6 +50,20 @@ func TestResetOrganizationBuiltInAutomations(t *testing.T) {
 	custom := support.CreateFactoryCanvas(t, r, factory.ID, "Custom notes")
 	stampCloneCommand(t, custom)
 
+	unsupported := support.CreateFactoryCanvas(t, r, factory.ID, "Unsupported intake")
+	stampCloneCommand(t, unsupported)
+	storedIntake := &models.FactoryIntake{
+		ID:                  uuid.New(),
+		OrganizationID:      r.Organization.ID,
+		FactoryID:           factory.ID,
+		CanvasID:            unsupported.ID,
+		Source:              "removed-source",
+		InitialImportStatus: models.FactoryIntakeInitialImportStatusSkipped,
+	}
+	require.NoError(t, db.Create(storedIntake).Error)
+	require.NoError(t, db.First(storedIntake, "id = ?", storedIntake.ID).Error)
+	storedVersion := resetTestLiveVersion(t, unsupported)
+
 	result, err := ResetOrganizationBuiltInAutomations(ctx, r.Organization.ID, deps)
 	require.NoError(t, err)
 	assert.Equal(t, len(builtIn), result.Reset)
@@ -58,6 +72,10 @@ func TestResetOrganizationBuiltInAutomations(t *testing.T) {
 		assert.NotContains(t, liveCanvasJSON(t, &builtIn[i]), "git clone")
 	}
 	assert.Contains(t, liveCanvasJSON(t, custom), "git clone")
+	assert.Equal(t, storedVersion, resetTestLiveVersion(t, unsupported))
+	var unchangedIntake models.FactoryIntake
+	require.NoError(t, db.First(&unchangedIntake, "id = ?", storedIntake.ID).Error)
+	assert.Equal(t, *storedIntake, unchangedIntake)
 }
 
 func stampCloneCommand(t *testing.T, canvas *models.Canvas) {

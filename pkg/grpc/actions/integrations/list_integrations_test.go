@@ -17,6 +17,7 @@ import (
 	ghub "github.com/superplanehq/superplane/pkg/integrations/github"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
+	_ "github.com/superplanehq/superplane/pkg/registryimports"
 	"github.com/superplanehq/superplane/test/support"
 	"github.com/superplanehq/superplane/test/support/impl"
 	"google.golang.org/grpc/codes"
@@ -394,4 +395,16 @@ func TestListIntegrationsRequiresOrganization(t *testing.T) {
 		require.Nil(t, resp)
 		require.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
 	})
+}
+
+func TestListIntegrationsExcludesProductive(t *testing.T) {
+	reg, err := registry.NewRegistry(nil, registry.HTTPOptions{})
+	require.NoError(t, err)
+
+	response, err := ListIntegrations(contextWithOrganizationID(uuid.New().String()), reg)
+	require.NoError(t, err)
+	require.NotEmpty(t, response.Integrations)
+	for _, integration := range response.Integrations {
+		require.NotEqual(t, "productive", integration.Name)
+	}
 }

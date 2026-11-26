@@ -26,7 +26,6 @@ import {
   GitHubIntakeSetupPage,
   JiraIntakeSetupPage,
   LinearIntakeSetupPage,
-  ProductiveIntakeSetupPage,
   RiskScoreSetupPage,
   SentryIntakeSetupPage,
   FactoriesIndexPage,
@@ -313,7 +312,6 @@ function OrgWorkspaceRoutes({ pageOverrides }: { pageOverrides?: OrgWorkspacePag
                 <Route path=":lineId/setup/dependabot" element={<DependabotIntakeSetupPage />} />
                 <Route path=":lineId/setup/jira" element={<JiraIntakeSetupPage />} />
                 <Route path=":lineId/setup/linear" element={<LinearIntakeSetupPage />} />
-                <Route path=":lineId/setup/productive" element={<ProductiveIntakeSetupPage />} />
                 {/* Storybook design preview: factory WorkOrderCanvas node chrome */}
                 <Route path=":lineId/phases/:phaseId/configure" element={<ConfigureAutomationPage />} />
               </Route>

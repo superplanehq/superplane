@@ -7,7 +7,6 @@ import { afterEach, describe, expect, it, vi } from "bun:test";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import jiraIcon from "@/assets/icons/integrations/jira.svg";
 import pagerdutyIcon from "@/assets/icons/integrations/pagerduty.svg";
-import productiveIcon from "@/assets/icons/integrations/productive.svg";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import type * as CanvasDataModule from "@/hooks/useCanvasData";
@@ -18,7 +17,6 @@ import { TooltipProvider } from "@/ui/tooltip";
 import { IntakeSourceSettingsPopup } from "./IntakeSourceSettingsPopup";
 import {
   DEFAULT_GITHUB_INTAKE_SETTINGS,
-  DEFAULT_PRODUCTIVE_INTAKE_SETTINGS,
   DEFAULT_SENTRY_INTAKE_SETTINGS,
   INTAKE_SETTINGS_COPY,
   type IntakeSettingsTab,
@@ -169,9 +167,7 @@ function renderPopup(
                     ? { ...DEFAULT_GITHUB_INTAKE_SETTINGS, name: "Jira issues" }
                     : props.sourceId === "pagerduty-incidents"
                       ? { ...DEFAULT_GITHUB_INTAKE_SETTINGS, name: "PagerDuty incidents" }
-                      : props.sourceId === "productive-tasks"
-                        ? DEFAULT_PRODUCTIVE_INTAKE_SETTINGS
-                        : DEFAULT_GITHUB_INTAKE_SETTINGS)
+                      : DEFAULT_GITHUB_INTAKE_SETTINGS)
               }
               sourceId={props.sourceId}
               organizationId={props.organizationId}
@@ -270,7 +266,6 @@ describe("IntakeSourceSettingsPopup", () => {
     ["jira-issues", "Jira issues", jiraIcon],
     ["sentry-exceptions", "Sentry exceptions", sentryIcon],
     ["pagerduty-incidents", "PagerDuty incidents", pagerdutyIcon],
-    ["productive-tasks", "Productive tasks", productiveIcon],
   ] as const)("shows the %s picture left of the title", (sourceId, name, iconSrc) => {
     renderPopup({ sourceId });
 
@@ -398,7 +393,6 @@ describe("IntakeSourceSettingsPopup", () => {
     "dependabot-alerts",
     "sentry-exceptions",
     "jira-issues",
-    "productive-tasks",
     "datadog",
     "linear-issues",
   ] as const)("hides connection and unavailable automatic intake controls for a %s intake", (sourceId) => {
@@ -413,7 +407,6 @@ describe("IntakeSourceSettingsPopup", () => {
     "dependabot-alerts",
     "sentry-exceptions",
     "jira-issues",
-    "productive-tasks",
     "datadog",
     "linear-issues",
   ] as const)("deletes a %s intake after confirmation", async (sourceId) => {

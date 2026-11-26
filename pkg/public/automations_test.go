@@ -22,7 +22,7 @@ import (
 	"gorm.io/datatypes"
 )
 
-func TestAutomationAPIUsesFactoryPermissionsAndAutomationsAsCode(t *testing.T) {
+func TestAutomationAPIUsesFactoryPermissionsAndFactoryAsCode(t *testing.T) {
 	resources := support.Setup(t)
 	server, token := automationAPITestServer(t, resources)
 	orgID := resources.Organization.ID
@@ -40,7 +40,7 @@ func TestAutomationAPIUsesFactoryPermissionsAndAutomationsAsCode(t *testing.T) {
 
 	require.NoError(t, models.EnableExperimentalFeature(orgID, features.FeatureFactories))
 	require.Equal(t, http.StatusNotFound, list(factory.ID))
-	require.NoError(t, models.EnableExperimentalFeature(orgID, features.FeatureAutomationsAsCode))
+	require.NoError(t, models.EnableExperimentalFeature(orgID, features.FeatureFactoryAsCode))
 	require.Equal(t, http.StatusOK, list(factory.ID))
 	require.Equal(t, http.StatusNotFound, list(uuid.New()))
 
@@ -96,7 +96,7 @@ func TestAutomationAPIPublishesInTheSelectedStage(t *testing.T) {
 	orgID := resources.Organization.ID
 	for _, feature := range []string{
 		features.FeatureFactories,
-		features.FeatureAutomationsAsCode,
+		features.FeatureFactoryAsCode,
 	} {
 		require.NoError(t, models.EnableExperimentalFeature(orgID, feature))
 	}
