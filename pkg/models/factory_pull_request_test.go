@@ -315,6 +315,39 @@ func Test__FactoryPullRequest(t *testing.T) {
 		assert.Equal(t, pullRequest.ID, matched[0].ID)
 		assert.Equal(t, models.FactoryPullRequestStateMerged, matched[0].State)
 	})
+
+	t.Run("commit lookup stays inside the factory", func(t *testing.T) {
+		factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		other, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		sha := "abc123def456"
+		observed := createOrder(t, factoryModel)
+		cached := createOrder(t, factoryModel)
+		outside := createOrder(t, other)
+		observedPR, err := observed.CreatePullRequest(db, models.FactoryPullRequestParams{URL: "https://github.com/acme/app/pull/11"})
+		require.NoError(t, err)
+		cachedPR, err := cached.CreatePullRequest(db, models.FactoryPullRequestParams{URL: "https://github.com/acme/app/pull/12"})
+		require.NoError(t, err)
+		outsidePR, err := outside.CreatePullRequest(db, models.FactoryPullRequestParams{URL: "https://github.com/acme/app/pull/13"})
+		require.NoError(t, err)
+		_, err = observedPR.ObserveRevision(db, sha)
+		require.NoError(t, err)
+		require.NoError(t, cachedPR.SetMergeability(db, models.FactoryPullRequestMergeabilitySnapshot{HeadSHA: sha, Mergeable: true}))
+		require.NoError(t, outsidePR.SetMergeability(db, models.FactoryPullRequestMergeabilitySnapshot{HeadSHA: sha, Mergeable: true}))
+
+		found, err := factoryModel.ListPullRequestsByCommitSHA(db, sha)
+		require.NoError(t, err)
+		require.Len(t, found, 2)
+		assert.ElementsMatch(t, []uuid.UUID{observedPR.ID, cachedPR.ID}, []uuid.UUID{found[0].ID, found[1].ID})
+		found, err = other.ListPullRequestsByCommitSHA(db, sha)
+		require.NoError(t, err)
+		require.Len(t, found, 1)
+		assert.Equal(t, outsidePR.ID, found[0].ID)
+		found, err = factoryModel.ListPullRequestsByCommitSHA(db, " ")
+		require.NoError(t, err)
+		assert.Empty(t, found)
+	})
 }
 
 func findWorkOrderEventType(t *testing.T, events []models.FactoryWorkOrderEvent, eventType string) models.FactoryWorkOrderEvent {
