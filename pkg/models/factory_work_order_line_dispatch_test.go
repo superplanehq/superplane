@@ -116,6 +116,80 @@ func Test__FactoryLine__Dispatch__StartsCustomStageBeforeLineStep(t *testing.T) 
 	assert.Equal(t, []int{0, 1}, []int{results[0].Execution.StepIndex, results[1].Execution.StepIndex})
 }
 
+func Test__FactoryLine__DispatchStage__ManualWorkWaitsWithoutAdmission(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	line, err := factory.CreateLine(db, "QA", nil)
+	require.NoError(t, err)
+	stage := models.FactoryLineStage{ID: uuid.New(), Key: "custom-qa", Name: "QA", Kind: models.FactoryLineStagePhase}
+	stages := append([]models.FactoryLineStage{line.StagesValue()[0], stage}, line.StagesValue()[1:]...)
+	require.NoError(t, line.UpdateConfiguration(db, nil, nil, nil, stages))
+	app, _ := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "Manual QA", "start")
+	require.NoError(t, app.SetColumnKey(db, stage.Key))
+	version, err := models.FindLiveCanvasVersionInTransaction(db, app.ID)
+	require.NoError(t, err)
+	version.Nodes[0].Metadata = map[string]any{models.FactoryAppTemplateMetadataKey: map[string]any{"startMode": "manual"}}
+	require.NoError(t, db.Save(version).Error)
+	order, err := factory.CreateWorkOrder(db, "Manual work", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	require.NoError(t, order.TransitionOnDispatch(db, &r.User))
+	dispatch, results, err := line.DispatchStage(db, order)
+	require.NoError(t, err)
+	require.Empty(t, results)
+	require.Len(t, dispatch.Steps, 1)
+	require.Equal(t, "manual", dispatch.Steps[0].StartMode)
+	require.Equal(t, stage.Key, dispatch.CurrentStageKey)
+	open, err := dispatch.HasOpenWork(db)
+	require.NoError(t, err)
+	require.False(t, open, "waiting for an explicit start occupies no admission slot")
+	result, err := dispatch.StageResult(db, 0)
+	require.NoError(t, err)
+	require.Empty(t, result, "unstarted work does not pass the stage")
+	var count int64
+	require.NoError(t, db.Model(&models.FactoryWorkOrderQueueItem{}).Where("line_dispatch_id = ?", dispatch.ID).Count(&count).Error)
+	require.Zero(t, count)
+	limit := 1
+	dispatch.Steps[0].MaxParallelism = &limit
+	require.NoError(t, db.Save(dispatch).Error)
+	waiter, err := factory.CreateWorkOrder(db, "Wait for manual slot", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	require.NoError(t, waiter.TransitionOnDispatch(db, &r.User))
+	waitingDispatch, waitingResults, err := line.DispatchStage(db, waiter)
+	require.NoError(t, err)
+	require.Empty(t, waitingResults)
+	waitingDispatch.Steps[0].MaxParallelism = &limit
+	require.NoError(t, db.Save(waitingDispatch).Error)
+	for _, outcome := range []string{models.CanvasRunResultFailed, models.CanvasRunResultCancelled, models.CanvasRunResultPassed} {
+		var started *models.FactoryLineStepResult
+		require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+			started, err = order.StartCustomStageAutomation(tx, app.ID, stage.Key)
+			return err
+		}))
+		require.Equal(t, dispatch.ID, started.Execution.LineDispatchID)
+		if outcome == models.CanvasRunResultFailed {
+			var queued *models.FactoryLineStepResult
+			require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+				queued, err = waiter.StartCustomStageAutomation(tx, app.ID, stage.Key)
+				return err
+			}))
+			require.NotNil(t, queued.QueueItem)
+			require.Nil(t, queued.Run)
+			err = db.Transaction(func(tx *gorm.DB) error {
+				_, err := waiter.StartCustomStageAutomation(tx, app.ID, stage.Key)
+				return err
+			})
+			require.ErrorContains(t, err, "already queued")
+			require.NoError(t, db.Delete(queued.QueueItem).Error)
+		}
+		require.NoError(t, started.Execution.MarkFinished(db, outcome))
+		result, err = dispatch.StageResult(db, 0)
+		require.NoError(t, err)
+		require.Equal(t, outcome, result)
+	}
+}
+
 func Test__FactoryLine__DispatchStage__EmptyFirstStageUsesAutoAdvance(t *testing.T) {
 	for _, test := range []struct {
 		name        string

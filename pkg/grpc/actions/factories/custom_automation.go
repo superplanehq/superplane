@@ -1516,7 +1516,7 @@ func decodeCustomAutomationTriggers(nodes []models.Node) ([]decodedCustomAutomat
 		}
 		template, _ := node.Metadata[models.FactoryAppTemplateMetadataKey].(map[string]any)
 		mode, _ := template["startMode"].(string)
-		if node.ComponentName() == "onRun" {
+		if node.ComponentName() == "onRun" && mode == "" {
 			mode = "automatic"
 		}
 		if node.ComponentName() == factorycomponent.OnWebhookTriggerName {

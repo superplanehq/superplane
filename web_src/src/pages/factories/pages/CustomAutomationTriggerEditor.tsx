@@ -122,7 +122,7 @@ export function TriggerEditor({
             factoryKey={factoryKey}
           />
         ))}
-        {!columnKey.startsWith("custom-") && (
+        {triggerModes.length > 0 && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button type="button" variant="outline" size="sm" className="w-fit gap-1.5">
@@ -272,7 +272,9 @@ function TriggerContext({
 }) {
   if (columnKey.startsWith("custom-")) {
     return (
-      <p className="text-xs text-muted-foreground">The line starts this automation when a task enters the stage.</p>
+      <p className="text-xs text-muted-foreground">
+        This automation runs on a task in this stage. Every required automation must pass before the task advances.
+      </p>
     );
   }
   return (
@@ -343,6 +345,7 @@ function AutomationIconPicker({ icon, onChange }: { icon: string; onChange: (ico
 }
 
 function availableTriggerModes(columnKey: CustomAutomationColumn, runsOnTask?: boolean): CustomAutomationMode[] {
+  if (columnKey.startsWith("custom-")) return ["manual", "automatic"];
   const modes: CustomAutomationMode[] = ["manual"];
   if (runsOnTask !== false) modes.push("automatic", "leave");
   if (runsOnTask !== true) modes.push("scheduled");
