@@ -159,7 +159,7 @@ function triggerSaveError(triggers: CustomAutomationTrigger[], runsOnTask: boole
         trigger.mode === "webhook" && runsOnTask && !validWebhookIntakeFieldPath(trigger.taskMatch?.fieldPath ?? ""),
     )
   ) {
-    return "Enter a valid field path for each task webhook trigger.";
+    return "Enter a valid JSON body field for each task webhook trigger.";
   }
   return "";
 }
