@@ -2,10 +2,13 @@ package factories
 
 import (
 	"context"
+	"errors"
 	"strings"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"gorm.io/gorm"
@@ -30,6 +33,7 @@ func UpdateFactoryLine(ctx context.Context, deps IntakeDependencies, organizatio
 
 	var line *models.FactoryLine
 	var deletedCanvases []models.Canvas
+	var cancellations []*models.RunCancellationResult
 	err = db.Transaction(func(tx *gorm.DB) error {
 		factory, err = models.LockAutomationFactory(tx, orgID, factory.ID)
 		if err != nil {
@@ -90,20 +94,51 @@ func UpdateFactoryLine(ctx context.Context, deps IntakeDependencies, organizatio
 			if err := backend.moveAutomationCards(ctx, tx, factory, line, stages, req.StageConfiguration); err != nil {
 				return err
 			}
-			deletedCanvases, err = line.ListRemovedCustomStageAutomations(tx, stages)
+			deletedCanvases, err = line.ListRemovedStageAutomations(tx, stages)
 			if err != nil {
 				return err
 			}
 			for i := range deletedCanvases {
 				canvas := &deletedCanvases[i]
-				if err := rejectReservedFactoryAutomation(tx, factory, canvas); err != nil {
+				locked, err := models.LockCanvasForUpdate(tx, orgID, canvas.ID)
+				if err != nil {
+					return err
+				}
+				*canvas = *locked
+				if canvas.OrganizationID != factory.OrganizationID || canvas.FactoryID == nil || *canvas.FactoryID != factory.ID {
+					return gorm.ErrRecordNotFound
+				}
+				if _, err := models.FindFactoryIntakeByCanvasID(tx, canvas.ID); err == nil {
+					return errFactoryAutomationReserved
+				} else if !errors.Is(err, models.ErrFactoryIntakeNotFound) {
+					return err
+				}
+				if canvas.LiveVersionID != nil {
+					version, err := models.FindLiveCanvasVersionInTransaction(tx, canvas.ID)
+					if err != nil {
+						return err
+					}
+					if models.IsBacklogFactoryApp(version.Nodes, version.Edges) {
+						return errFactoryAutomationReserved
+					}
+				}
+				requested, err := canvas.RequestUnfinishedRunCancellation(tx, nil)
+				if err != nil {
+					return err
+				}
+				cancellations = append(cancellations, requested...)
+				if err := models.DeleteFactoryPRFeedbackHandlersByCanvas(tx, canvas.ID); err != nil {
 					return err
 				}
 				if err := canvases.DeleteCanvasInTransaction(tx, canvas); err != nil {
 					return err
 				}
 			}
-			if err := line.ClearRemovedCustomStageDisplayColumns(tx, stages); err != nil {
+			if err := line.ClearRemovedStageDisplayColumns(tx, stages); err != nil {
+				return err
+			}
+			steps, err = line.RemoveDeletedAutomationBindings(tx, stages, deletedCanvases)
+			if err != nil {
 				return err
 			}
 		}
@@ -120,6 +155,15 @@ func UpdateFactoryLine(ctx context.Context, deps IntakeDependencies, organizatio
 
 	for i := range deletedCanvases {
 		canvases.PublishCanvasDeleted(&deletedCanvases[i])
+	}
+	for _, cancellation := range cancellations {
+		run := cancellation.Run
+		if cancellation.NewlyCancelling {
+			if err := messages.NewCanvasRunMessage(run.WorkflowID.String(), run.ID.String()).Publish(); err != nil {
+				log.Errorf("failed to publish run cancellation: %v", err)
+			}
+		}
+		messages.PublishRunCancellationDrain(run.WorkflowID, cancellation.Drain)
 	}
 
 	return &pb.UpdateFactoryLineResponse{

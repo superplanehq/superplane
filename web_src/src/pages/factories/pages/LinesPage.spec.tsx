@@ -1058,10 +1058,9 @@ describe("LinesPage board stages", () => {
     await user.click(screen.getByRole("button", { name: "Save changes" }));
     const dialog = screen.getByTestId("save-line-stages-dialog");
     expect(dialog).toHaveTextContent(
-      "Saving a custom-stage deletion also deletes automations that execute in that stage.",
+      "Saving a stage deletion deletes its execution automations and requests cancellation of unfinished runs.",
     );
-    expect(dialog).toHaveTextContent("Automations that only appear there stay in the workspace.");
-    expect(dialog).toHaveTextContent("Removing a system stage keeps its automations.");
+    expect(dialog).toHaveTextContent("Automations that execute in a retained stage stay in the workspace.");
     await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
     expect(updateFactoryLineMutateAsync).not.toHaveBeenCalled();
     await user.click(screen.getByRole("button", { name: "Discard" }));

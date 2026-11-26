@@ -21,7 +21,7 @@ import {
   factoryPRFeedbackPath,
 } from "./factoryPagePaths";
 import { LINE_INTAKE_SOURCES } from "../pages/lineIntakeModel";
-import type { LinePhaseColumn } from "./linePhaseRuns";
+import { buildLinePhaseBoard, type LinePhaseColumn } from "./linePhaseRuns";
 
 const GITHUB_INTAKE: FactoriesFactoryIntake = {
   id: "intake-github",
@@ -130,6 +130,20 @@ describe("columnAutomationsEmptyCopy", () => {
 });
 
 describe("buildColumnAutomations", () => {
+  it("keeps the retained phase runner visible after step indexes change", () => {
+    const columns = buildLinePhaseBoard(
+      {
+        id: "line-1",
+        steps: [{ type: "runApp", app: { app: "retained-runner", entrypoint: "start" } }],
+        stages: [{ id: "retained-stage", key: "phase-1", name: "Review", kind: "STAGE_KIND_PHASE", stepIndex: 0 }],
+      },
+      [],
+      [{ id: "retained-runner", name: "Review" }],
+    );
+    const automations = buildColumnAutomations("phase-1", { columnTitle: "Review", columns });
+    expect(automations.map((automation) => automation.canvasId)).toEqual(["retained-runner"]);
+    expect(buildColumnAutomations("phase-0", { columnTitle: "Deleted", columns })).toEqual([]);
+  });
   it("builds backlog intakes and the analysis automation", () => {
     const automations = buildColumnAutomations("backlog", {
       columnTitle: "Backlog",

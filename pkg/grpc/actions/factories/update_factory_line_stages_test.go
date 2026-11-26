@@ -2,6 +2,7 @@ package factories
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 
@@ -16,6 +17,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
+	"github.com/superplanehq/superplane/pkg/yaml"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
 	"gorm.io/datatypes"
@@ -295,8 +297,12 @@ func TestUpdateFactoryLineStages(t *testing.T) {
 
 	t.Run("removes optional system stages", func(t *testing.T) {
 		factory, line := newLine(t)
-		canvas := support.CreateFactoryCanvas(t, r, factory.ID, "verify")
+		canvas := resetTestTemplate(t, r, factory, "risk-score", models.ProviderGitHub, func(*yaml.Canvas) {})
 		require.NoError(t, canvas.SetColumnKey(db, models.CanvasColumnKeyVerify))
+		review := resetTestTemplate(t, r, factory, reviewRequestTemplateID, models.ProviderGitHub, func(*yaml.Canvas) {})
+		feedback := support.CreateFactoryCanvas(t, r, factory.ID, "feedback")
+		_, err := factory.CreatePRFeedbackHandler(db, feedback.ID, models.FactoryPRFeedbackHandlerSubjectGitHubPullRequest, models.FactoryPRFeedbackHandlerSourcePullRequestChecks)
+		require.NoError(t, err)
 		stages := factoryLineStageRequests(line.StagesValue())
 		stages = append(stages[:1], stages[2:]...)
 
@@ -307,10 +313,80 @@ func TestUpdateFactoryLineStages(t *testing.T) {
 		})
 		require.NoError(t, err)
 		assert.Equal(t, []string{"Backlog", "Done"}, stageNames(updated.Line.Stages))
-		reloaded, err := models.FindCanvasInTransaction(db, r.Organization.ID, canvas.ID)
+		for _, deleted := range []*models.Canvas{canvas, review, feedback} {
+			_, err = models.FindCanvasInTransaction(db, r.Organization.ID, deleted.ID)
+			require.ErrorIs(t, err, gorm.ErrRecordNotFound)
+		}
+		handlers, err := factory.ListPRFeedbackHandlers(db)
 		require.NoError(t, err)
-		require.NotNil(t, reloaded.ColumnKey)
-		assert.Equal(t, models.CanvasColumnKeyVerify, *reloaded.ColumnKey)
+		require.Empty(t, handlers)
+	})
+
+	t.Run("deletes a default phase runner and cancels unfinished work", func(t *testing.T) {
+		factory, _ := newLine(t)
+		app, entrypoint := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "Implement", "start")
+		retained, retainedEntrypoint := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "Retained", "start")
+		line, err := factory.CreateLine(db, "phases", []models.FactoryLineStep{
+			{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entrypoint},
+			{Type: models.FactoryLineStepTypeRunApp, AppID: retained.ID, Entrypoint: retainedEntrypoint},
+		})
+		require.NoError(t, err)
+		run, err := models.CreateCanvasRunInTransaction(db, app.ID, entrypoint, models.CanvasRunStateStarted, "")
+		require.NoError(t, err)
+		finished, err := models.CreateCanvasRunInTransaction(db, app.ID, entrypoint, models.CanvasRunStateFinished, models.CanvasRunResultPassed)
+		require.NoError(t, err)
+		event := support.EmitCanvasEventForNode(t, app.ID, entrypoint, "default", nil)
+		require.NoError(t, db.Model(event).Update("run_id", run.ID).Error)
+		queue := support.CreateQueueItem(t, app.ID, entrypoint, event.ID, event.ID)
+		require.NoError(t, db.Model(queue).Update("run_id", run.ID).Error)
+		execution := support.CreateCanvasNodeExecution(t, app.ID, entrypoint, event.ID, event.ID)
+		require.NoError(t, db.Model(execution).Update("run_id", run.ID).Error)
+		stages := factoryLineStageRequests(line.StagesValue())
+		stages = append(stages[:1], stages[2:]...)
+		_, err = UpdateFactoryLine(t.Context(), deps, r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
+			FactoryId: factory.ID.String(), LineId: line.ID.String(),
+			StageConfiguration: &pb.FactoryLine_StageConfiguration{Stages: stages},
+		})
+		require.NoError(t, err)
+		_, err = models.FindCanvasInTransaction(db, r.Organization.ID, app.ID)
+		require.ErrorIs(t, err, gorm.ErrRecordNotFound)
+		reloaded, err := factory.FindLine(db, line.ID)
+		require.NoError(t, err)
+		require.Len(t, reloaded.Steps, 1)
+		require.Equal(t, retained.ID, reloaded.Steps[0].AppID)
+		require.Equal(t, stages[1].Id, reloaded.Stages[1].ID.String())
+		require.Equal(t, 0, *reloaded.Stages[1].StepIndex)
+		plan, err := reloaded.ExecutionPlan(db)
+		require.NoError(t, err)
+		require.Len(t, plan, 1)
+		require.Equal(t, retained.ID, plan[0].AppID)
+		updated, err := UpdateFactoryLine(t.Context(), deps, r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
+			FactoryId: factory.ID.String(), LineId: line.ID.String(),
+			Steps: serializeFactoryLine(reloaded).Steps,
+		})
+		require.NoError(t, err)
+		require.Equal(t, stages[1].Id, updated.Line.Stages[1].Id)
+		require.Equal(t, stages[1].Key, updated.Line.Stages[1].Key)
+		updated, err = UpdateFactoryLine(t.Context(), deps, r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
+			FactoryId: factory.ID.String(), LineId: line.ID.String(),
+			Steps: []*pb.FactoryLine_Step{updated.Line.Steps[0], updated.Line.Steps[0]},
+		})
+		require.NoError(t, err)
+		require.Equal(t, stages[1].Id, updated.Line.Stages[1].Id)
+		require.NotEqual(t, updated.Line.Stages[1].Key, updated.Line.Stages[2].Key)
+		cancelled, err := models.FindCanvasRunInTransaction(db, app.ID, run.ID)
+		require.NoError(t, err)
+		assert.Equal(t, models.CanvasRunStateCancelling, cancelled.State)
+		open, err := cancelled.FindOpenWork(db)
+		require.NoError(t, err)
+		assert.False(t, open.HasQueueItems)
+		assert.False(t, open.HasPendingEvents)
+		require.NoError(t, db.First(execution, execution.ID).Error)
+		assert.Equal(t, models.CanvasNodeExecutionStateCancelling, execution.State)
+		completed, err := models.FindCanvasRunInTransaction(db, app.ID, finished.ID)
+		require.NoError(t, err)
+		assert.Equal(t, models.CanvasRunStateFinished, completed.State)
+		assert.Equal(t, models.CanvasRunResultPassed, completed.Result)
 	})
 
 	t.Run("keeps Backlog and Done fixed", func(t *testing.T) {
@@ -429,7 +505,7 @@ func TestUpdateFactoryLineStages(t *testing.T) {
 		}
 	})
 
-	t.Run("rolls back stage removal when an attached canvas is a line step", func(t *testing.T) {
+	t.Run("removes legacy shared phase bindings without removing their columns", func(t *testing.T) {
 		factory, line := newLine(t)
 		stages := factoryLineStageRequests(line.StagesValue())
 		stages = append(stages[:1], append([]*pb.FactoryLine_Stage{{Name: "Security", Kind: pb.FactoryLine_STAGE_KIND_PHASE}}, stages[1:]...)...)
@@ -440,31 +516,71 @@ func TestUpdateFactoryLineStages(t *testing.T) {
 		require.NoError(t, err)
 		deletable := support.CreateFactoryCanvas(t, r, factory.ID, "deletable")
 		protected, entrypoint := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "protected", "start")
-		_, err = factory.CreateLine(db, "other", []models.FactoryLineStep{{
-			Type: models.FactoryLineStepTypeRunApp, AppID: protected.ID, Entrypoint: entrypoint,
-		}})
+		retained, retainedEntrypoint := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "retained", "start")
+		other, err := factory.CreateLine(db, "other", []models.FactoryLineStep{
+			{Type: models.FactoryLineStepTypeRunApp, AppID: protected.ID, Entrypoint: entrypoint},
+			{Type: models.FactoryLineStepTypeRunApp, AppID: retained.ID, Entrypoint: retainedEntrypoint},
+		})
 		require.NoError(t, err)
 		for _, canvas := range []*models.Canvas{deletable, protected} {
 			require.NoError(t, canvas.SetColumnKey(db, created.Line.Stages[1].Key))
 		}
-		_, err = UpdateFactoryLine(t.Context(), deps, r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
+		run, err := models.CreateCanvasRunInTransaction(db, protected.ID, entrypoint, models.CanvasRunStateStarted, "")
+		require.NoError(t, err)
+		req := &pb.UpdateFactoryLineRequest{
 			FactoryId: factory.ID.String(), LineId: line.ID.String(),
 			StageConfiguration: &pb.FactoryLine_StageConfiguration{
 				Stages: append([]*pb.FactoryLine_Stage{created.Line.Stages[0]}, created.Line.Stages[2:]...),
 			},
-		})
-		require.Error(t, err)
-		code, _, ok := grpcerrors.HandlerStatus(err)
-		require.True(t, ok)
-		assert.Equal(t, codes.FailedPrecondition, code)
-		reloaded, err := factory.FindLine(db, line.ID)
+		}
+		const callback = "test:fail_stage_binding_cleanup"
+		t.Cleanup(func() { db.Callback().Update().Remove(callback) })
+		require.NoError(t, db.Callback().Update().Before("gorm:update").Register(callback, func(tx *gorm.DB) {
+			if tx.Statement.Table == "factory_lines" {
+				tx.AddError(errors.New("binding cleanup failed"))
+			}
+		}))
+		_, err = UpdateFactoryLine(t.Context(), deps, r.Organization.ID.String(), req)
+		require.ErrorContains(t, err, "failed to update factory line")
+		require.NoError(t, db.Callback().Update().Remove(callback))
+		unchanged, err := factory.FindLine(db, line.ID)
 		require.NoError(t, err)
-		assert.Equal(t, stageNames(created.Line.Stages), modelStageNames(reloaded.StagesValue()))
+		assert.Equal(t, stageNames(created.Line.Stages), modelStageNames(unchanged.StagesValue()))
 		for _, canvas := range []*models.Canvas{deletable, protected} {
 			active, err := models.FindCanvasInTransaction(db, r.Organization.ID, canvas.ID)
 			require.NoError(t, err)
 			assert.Equal(t, canvas.Name, active.Name)
-			assert.Equal(t, created.Line.Stages[1].Key, *active.ColumnKey)
+		}
+		unchangedRun, err := models.FindCanvasRunInTransaction(db, protected.ID, run.ID)
+		require.NoError(t, err)
+		assert.Equal(t, models.CanvasRunStateStarted, unchangedRun.State)
+		unchangedLegacy, err := factory.FindLine(db, other.ID)
+		require.NoError(t, err)
+		assert.Equal(t, other.Steps, unchangedLegacy.Steps)
+		assert.Equal(t, other.Stages, unchangedLegacy.Stages)
+		_, err = UpdateFactoryLine(t.Context(), deps, r.Organization.ID.String(), req)
+		require.NoError(t, err)
+		reloaded, err := factory.FindLine(db, line.ID)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"Backlog", "Verify", "Done"}, modelStageNames(reloaded.StagesValue()))
+		legacy, err := factory.FindLine(db, other.ID)
+		require.NoError(t, err)
+		require.Len(t, legacy.Steps, 1)
+		assert.Equal(t, retained.ID, legacy.Steps[0].AppID)
+		require.Len(t, legacy.Stages, 5)
+		assert.Nil(t, legacy.Stages[1].StepIndex)
+		assert.Equal(t, other.Stages[2].ID, legacy.Stages[2].ID)
+		assert.Equal(t, 0, *legacy.Stages[2].StepIndex)
+		plan, err := legacy.ExecutionPlan(db)
+		require.NoError(t, err)
+		require.Len(t, plan, 1)
+		assert.Equal(t, retained.ID, plan[0].AppID)
+		cancelled, err := models.FindCanvasRunInTransaction(db, protected.ID, run.ID)
+		require.NoError(t, err)
+		assert.Equal(t, models.CanvasRunStateCancelling, cancelled.State)
+		for _, canvas := range []*models.Canvas{deletable, protected} {
+			_, err := models.FindCanvasInTransaction(db, r.Organization.ID, canvas.ID)
+			require.ErrorIs(t, err, gorm.ErrRecordNotFound)
 		}
 	})
 
