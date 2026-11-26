@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	factorycomponent "github.com/superplanehq/superplane/pkg/components/factory"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -53,6 +54,9 @@ func RunFactoryCustomAutomation(
 	if !customAutomationAllowsManualStart(version) {
 		return nil, factoryErrorToStatus(invalidArgument("automation does not use manual start"), "failed to run custom automation")
 	}
+	if canvas.ColumnKey != nil && strings.HasPrefix(*canvas.ColumnKey, "custom-") {
+		return startManualCustomStageAutomation(db, canvas, order)
+	}
 
 	events, err := startCustomAutomation(ctx, db, deps, factory, canvas, order, false)
 	if err != nil {
@@ -70,6 +74,59 @@ func RunFactoryCustomAutomation(
 		RunId:   events[0].RunID.String(),
 		EventId: events[0].ID.String(),
 	}, nil
+}
+
+func startManualCustomStageAutomation(db *gorm.DB, canvas *models.Canvas, order *models.FactoryWorkOrder) (*pb.RunFactoryCustomAutomationResponse, error) {
+	var run *models.CanvasRun
+	err := db.Transaction(func(tx *gorm.DB) error {
+		if err := order.LockForUpdate(tx); err != nil {
+			return err
+		}
+		records, err := models.ListWorkOrderLineDispatchesByWorkOrderIDs(tx, []uuid.UUID{order.ID})
+		if err != nil {
+			return err
+		}
+		dispatches := records[order.ID]
+		if order.State != models.FactoryWorkOrderStateOpen || len(dispatches) == 0 || dispatches[len(dispatches)-1].CurrentStageKey != *canvas.ColumnKey {
+			return grpcFailedPrecondition("The task is not in this stage.")
+		}
+		if err := order.RequireExecutionOwner(tx, true); err != nil {
+			return err
+		}
+		if err := order.ValidateSubscriptionCanvasModels(tx, canvas.ID, ""); err != nil {
+			return err
+		}
+		version, err := models.FindLiveCanvasVersionByCanvasInTransaction(tx, canvas)
+		if err != nil {
+			return err
+		}
+		if !customAutomationAllowsManualStart(version) {
+			return invalidArgument("automation does not use manual start")
+		}
+		entrypoint := taskCustomAutomationTriggerID(version)
+		if entrypoint == "" {
+			return invalidArgument("custom automation trigger is missing")
+		}
+		node, err := models.FindCanvasNode(tx, canvas.ID, entrypoint)
+		if err != nil {
+			return err
+		}
+		if ref := node.Ref.Data(); ref.Trigger == nil || ref.Trigger.Name != "onRun" {
+			return models.ErrFactoryLineStepNotOnRun
+		}
+		run, err = order.CreateTaskCanvasRun(tx, canvas.ID, entrypoint, version.ID)
+		if err != nil {
+			return err
+		}
+		return order.RecordRefinementRun(tx, run.ID)
+	})
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to run custom automation")
+	}
+	if err := messages.NewCanvasRunMessage(canvas.ID.String(), run.ID.String()).PublishPending(); err != nil {
+		log.WithError(err).Warnf("custom automation: failed to publish run %s", run.ID)
+	}
+	return &pb.RunFactoryCustomAutomationResponse{RunId: run.ID.String()}, nil
 }
 
 // StartAutomaticCustomAutomations starts all automatic Verify automations

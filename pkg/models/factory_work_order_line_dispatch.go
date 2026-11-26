@@ -419,31 +419,9 @@ func (l *FactoryWorkOrderLineDispatch) StartStep(tx *gorm.DB, order *FactoryWork
 		return nil, err
 	}
 
-	runInput, err := factoryWorkOrderRunInput(tx, order)
-	if err != nil {
-		return nil, err
-	}
-
 	now := time.Now()
-	run := &CanvasRun{
-		ID:         uuid.New(),
-		WorkflowID: step.AppID,
-		NodeID:     step.Entrypoint,
-		VersionID:  liveVersion.ID,
-		Callbacks: datatypes.JSONSlice[core.RunCallback]{
-			{
-				When: core.RunCallbackWhenPending,
-				On:   core.RunCallbackOnEntry,
-				Hook: "onMessage",
-			},
-		},
-		Input:     NewJSONValue(runInput),
-		State:     CanvasRunStatePending,
-		CreatedAt: &now,
-		UpdatedAt: &now,
-	}
-
-	if err := tx.Create(run).Error; err != nil {
+	run, err := order.CreateTaskCanvasRun(tx, step.AppID, step.Entrypoint, liveVersion.ID)
+	if err != nil {
 		return nil, err
 	}
 
@@ -484,6 +462,30 @@ func (l *FactoryWorkOrderLineDispatch) StartStep(tx *gorm.DB, order *FactoryWork
 		Run:       run,
 		Execution: execution,
 	}, nil
+}
+
+// CreateTaskCanvasRun starts an On Run graph with the same task input as line runs.
+func (o *FactoryWorkOrder) CreateTaskCanvasRun(tx *gorm.DB, canvasID uuid.UUID, entrypoint string, versionID uuid.UUID) (*CanvasRun, error) {
+	input, err := factoryWorkOrderRunInput(tx, o)
+	if err != nil {
+		return nil, err
+	}
+	now := time.Now()
+	run := &CanvasRun{
+		ID:         uuid.New(),
+		WorkflowID: canvasID,
+		NodeID:     entrypoint,
+		VersionID:  versionID,
+		Callbacks:  datatypes.JSONSlice[core.RunCallback]{{When: core.RunCallbackWhenPending, On: core.RunCallbackOnEntry, Hook: "onMessage"}},
+		Input:      NewJSONValue(input),
+		State:      CanvasRunStatePending,
+		CreatedAt:  &now,
+		UpdatedAt:  &now,
+	}
+	if err := tx.Create(run).Error; err != nil {
+		return nil, err
+	}
+	return run, nil
 }
 
 func (l *FactoryWorkOrderLineDispatch) RecordStepExecutionQueued(
