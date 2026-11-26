@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 
+	factorycomponent "github.com/superplanehq/superplane/pkg/components/factory"
 	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
@@ -95,7 +96,10 @@ func validateCustomStageTriggers(settings *customAutomationSettings) error {
 	return nil
 }
 
+// The line owns the task trigger and its runner. Webhook triggers and their
+// runner are generated, so they do not change the line-owned graph.
 func legacyCustomStageGraph(canvas *models.Canvas, version *models.CanvasVersion) bool {
+	version = customStageCore(version)
 	if canvas.ColumnKey == nil || !strings.HasPrefix(*canvas.ColumnKey, "custom-") || len(version.Nodes) != 2 || len(version.Edges) != 1 {
 		return false
 	}
@@ -159,6 +163,41 @@ func editLegacyCustomStageGraph(version *models.CanvasVersion, settings *customA
 		}
 	}
 	return nodes, edges
+}
+
+// Saved task runner settings stay. Only the webhook part comes from the build.
+func editCustomStageGraph(live *models.CanvasVersion, settings *customAutomationSettings, built []models.Node, builtEdges []models.Edge) ([]models.Node, []models.Edge) {
+	nodes, edges := editLegacyCustomStageGraph(customStageCore(live), settings)
+	for _, node := range built {
+		if customStageWebhookPart(node) {
+			nodes = append(nodes, node)
+		}
+	}
+	for _, edge := range builtEdges {
+		if edge.TargetID == customStageWebhookRunnerID {
+			edges = append(edges, edge)
+		}
+	}
+	return nodes, edges
+}
+
+func customStageCore(version *models.CanvasVersion) *models.CanvasVersion {
+	core := &models.CanvasVersion{}
+	for _, node := range version.Nodes {
+		if !customStageWebhookPart(node) {
+			core.Nodes = append(core.Nodes, node)
+		}
+	}
+	for _, edge := range version.Edges {
+		if edge.TargetID != customStageWebhookRunnerID {
+			core.Edges = append(core.Edges, edge)
+		}
+	}
+	return core
+}
+
+func customStageWebhookPart(node models.Node) bool {
+	return node.ID == customStageWebhookRunnerID || node.ComponentName() == factorycomponent.OnWebhookTriggerName
 }
 
 func customStageAgentID(id, previousComponent, component string) string {
