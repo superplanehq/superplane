@@ -150,23 +150,29 @@ function automationsForColumn(
   workOrders: FactoriesWorkOrder[],
 ): ColumnAutomation[] {
   if (key === "backlog") {
+    const intakes = intakeAutomations(input.intakes ?? [], workOrders);
+    const analysis = analysisAutomation(input.apps ?? [], workOrders, input.planningEnabled !== false);
+    const skip = new Set(
+      [...intakes, ...analysis].flatMap((automation) => (automation.canvasId ? [automation.canvasId] : [])),
+    );
     return [
-      ...intakeAutomations(input.intakes ?? [], workOrders),
-      ...customColumnAutomations(input.apps ?? [], "backlog", workOrders, new Set(), runningCountForApp),
-      ...analysisAutomation(input.apps ?? [], workOrders, input.planningEnabled !== false),
+      ...intakes,
+      ...customColumnAutomations(input.apps ?? [], "backlog", workOrders, skip, runningCountForApp),
+      ...analysis,
     ];
   }
   if (key === "verify") {
+    const feedback = prFeedbackAutomations(input.prFeedbackHandlers ?? [], workOrders, input.vcsProvider);
     const riskScore = riskScoreAutomation(input.apps ?? [], workOrders);
     const visualEvidence = visualEvidenceAutomation(input.apps ?? [], workOrders);
     const reviewRequest = reviewRequestAutomation(input.apps ?? [], workOrders);
     const skip = new Set(
-      [...riskScore, ...visualEvidence, ...reviewRequest].flatMap((automation) =>
+      [...feedback, ...riskScore, ...visualEvidence, ...reviewRequest].flatMap((automation) =>
         automation.canvasId ? [automation.canvasId] : [],
       ),
     );
     return [
-      ...prFeedbackAutomations(input.prFeedbackHandlers ?? [], workOrders, input.vcsProvider),
+      ...feedback,
       ...riskScore,
       ...visualEvidence,
       ...reviewRequest,
