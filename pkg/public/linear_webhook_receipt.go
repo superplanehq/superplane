@@ -2,6 +2,7 @@ package public
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 
 	"github.com/google/uuid"
@@ -110,6 +111,23 @@ func (e *linearReceiptEvents) Emit(payloadType string, payload any) error {
 	}
 	err := e.inner.Emit(payloadType, payload)
 	if err != nil {
+		return err
+	}
+	if e.track != nil {
+		e.track.emitted++
+	}
+	return nil
+}
+
+func (e *linearReceiptEvents) EmitDeduplicated(payloadType string, payload any, dedupKey string) error {
+	if payloadMap, ok := payload.(map[string]any); ok && e.track != nil && e.track.id != uuid.Nil {
+		payloadMap[linear.ReceiptField] = e.track.id.String()
+	}
+	inner, ok := e.inner.(core.DeduplicatedEventContext)
+	if !ok {
+		return fmt.Errorf("deduplicated events are not available")
+	}
+	if err := inner.EmitDeduplicated(payloadType, payload, dedupKey); err != nil {
 		return err
 	}
 	if e.track != nil {

@@ -358,4 +358,16 @@ describe("webhook triggers", () => {
       expect.objectContaining({ mode: "webhook", webhookId: "webhook-1" }),
     ]);
   });
+
+  it("keeps a task webhook on the task run and writes the match", () => {
+    const taskMatch = { kind: "commit" as const, fieldPath: "commit.sha" };
+    const trigger = newCustomAutomationTrigger("webhook", customAutomationSchedule(), "webhook-1", taskMatch);
+    expect(customAutomationTriggersForRun([trigger], true)).toEqual([expect.objectContaining({ taskMatch })]);
+    expect(customAutomationTriggersForRun([trigger], false)).toEqual([]);
+
+    const settings = customAutomationSettingsForTriggers([trigger], customAutomationDraft({}), "webhook", true);
+    expect(settings.runsOnTask).toBe(true);
+    expect(settings.triggers?.[0]?.taskMatch).toEqual({ kind: "KIND_COMMIT", fieldPath: "commit.sha" });
+    expect(customAutomationTriggers({ settings })[0]?.taskMatch).toEqual(taskMatch);
+  });
 });

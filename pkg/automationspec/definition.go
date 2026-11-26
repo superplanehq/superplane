@@ -53,9 +53,15 @@ const (
 // TriggerConfig holds the schedule fields or the webhook ID. The schema
 // allows only the fields for the trigger type.
 type TriggerConfig struct {
-	Cron      string  `yaml:"cron,omitempty" json:"cron,omitempty"`
-	UTCOffset float64 `yaml:"utc_offset,omitempty" json:"utc_offset"`
-	WebhookID string  `yaml:"webhook_id,omitempty" json:"webhook_id,omitempty"`
+	Cron      string     `yaml:"cron,omitempty" json:"cron,omitempty"`
+	UTCOffset float64    `yaml:"utc_offset,omitempty" json:"utc_offset"`
+	WebhookID string     `yaml:"webhook_id,omitempty" json:"webhook_id,omitempty"`
+	TaskMatch *TaskMatch `yaml:"task_match,omitempty" json:"task_match,omitempty"`
+}
+
+type TaskMatch struct {
+	Kind      string `yaml:"kind" json:"kind"`
+	FieldPath string `yaml:"field_path" json:"field_path"`
 }
 
 type Step struct {
