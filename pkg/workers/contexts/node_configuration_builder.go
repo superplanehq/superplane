@@ -20,7 +20,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/configuration/expressionvalidation"
 	"github.com/superplanehq/superplane/pkg/exprruntime"
-	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/models/factory"
 	"github.com/superplanehq/superplane/pkg/storedfiles"
@@ -1113,37 +1112,6 @@ func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, 
 	if repositoryFromOrder {
 		provider = orderRepositoryProvider(order)
 	}
-	serverURL := githubServerURL(b.tx, owningFactory.OrganizationID, config)
-	repositoryURL := models.VCSRepositoryCloneURL(provider, repository, serverURL)
-	usesRepository, err := expressionvalidation.ExpressionUsesOrderRepository(expression)
-	if err != nil {
-		return nil, fmt.Errorf("order() could not inspect expression: %w", err)
-	}
-	if usesRepository {
-		canvas, err := models.FindCanvasInTransaction(b.tx, order.OrganizationID, b.workflowID)
-		if err != nil {
-			return nil, fmt.Errorf("order() could not resolve the current app: %w", err)
-		}
-		binding, integration, err := NewFactoryContext(b.tx, canvas, nil).configuredRepositoryBinding()
-		if err != nil {
-			return nil, fmt.Errorf("order() could not resolve the repository binding: %w", err)
-		}
-		if binding != nil {
-			if pinned, _ := binding.Binding["resource_id"].(string); pinned != "" {
-				repository = pinned
-			}
-			if integration != nil {
-				provider = integration.AppName
-				if provider == models.ProviderGitHub {
-					serverURL = githubcommon.HostFromModel(integration).WebURL()
-				}
-			}
-		}
-		if boundURL := models.VCSRepositoryCloneURL(provider, repository, serverURL); boundURL != repositoryURL {
-			// Let checkout discover the pinned repository's default branch.
-			repositoryURL, defaultBranch = boundURL, ""
-		}
-	}
 	payload := map[string]any{
 		"id":             order.ID.String(),
 		"title":          order.Title,
@@ -1152,7 +1120,7 @@ func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, 
 		"state":          order.State,
 		"result":         order.Result,
 		"repository":     repository,
-		"repository_url": repositoryURL,
+		"repository_url": models.VCSRepositoryCloneURL(provider, repository, githubServerURL(b.tx, owningFactory.OrganizationID, config)),
 		"default_branch": defaultBranch,
 		// Keep this compatibility value until stored canvases no longer reference it.
 		"visual_evidence_enabled": false,

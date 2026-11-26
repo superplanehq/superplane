@@ -63,8 +63,7 @@ func PlanFactoryConfiguration(ctx context.Context, deps IntakeDependencies, orga
 		return nil, factoryErrorToStatus(err, "Failed to plan stage configuration.")
 	}
 	response := &pb.PlanFactoryConfigurationResponse{Coverage: factoryConfigurationCoverage}
-	ctx, providerChecks := newRepositoryProviderChecks(ctx)
-	err = providerChecks.prepare(database.DB(ctx), func(tx *gorm.DB) error {
+	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
 		target, err := loadFactoryConfigurationTarget(tx, orgID, req.GetFactoryId(), req.GetLineId())
 		if err != nil {
 			return err
@@ -97,35 +96,9 @@ func ApplyFactoryConfiguration(ctx context.Context, deps IntakeDependencies, org
 		return nil, factoryErrorToStatus(err, "Failed to apply stage configuration.")
 	}
 	response := &pb.ApplyFactoryConfigurationResponse{Coverage: factoryConfigurationCoverage}
-	ctx, providerChecks := newRepositoryProviderChecks(ctx)
-	err = providerChecks.prepare(database.DB(ctx), func(tx *gorm.DB) error {
-		target, err := loadFactoryConfigurationTarget(tx, orgID, req.GetFactoryId(), req.GetLineId())
-		if err != nil {
-			return err
-		}
-		tx = withFactoryAutomationReadInputs(tx, target.reads)
-		manifest, diagnostic := parseFactoryConfigurationBundle(req.GetBundle())
-		if diagnostic == nil {
-			diagnostic, err = validateFactoryConfigurationManifest(ctx, tx, deps, manifest, target)
-			if err != nil {
-				return err
-			}
-		}
-		if diagnostic != nil {
-			return grpcerrors.InvalidArgument(nil, fmt.Sprintf("%s: %s: %s", diagnostic.Path, diagnostic.Field, diagnostic.Message))
-		}
-		return nil
-	}, &sql.TxOptions{ReadOnly: true, Isolation: sql.LevelRepeatableRead})
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "Failed to apply stage configuration.")
-	}
-	providerChecks.frozen = true
 	var notifications []func()
 	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := requireFactoryAsCode(tx, orgID); err != nil {
-			return err
-		}
-		if err := models.LockOrganizationVCSProviderBindingRepositories(tx, orgID); err != nil {
 			return err
 		}
 		target, err := lockFactoryConfigurationTarget(tx, orgID, req.GetFactoryId(), req.GetLineId())
@@ -164,27 +137,6 @@ func ApplyFactoryConfiguration(ctx context.Context, deps IntakeDependencies, org
 		response.Changes = compareFactoryConfiguration(target, manifest)
 		if len(response.Changes) == 0 {
 			return nil
-		}
-		repositoriesChanged := configurationRepositoriesChanged(target)
-		previousRepositories := target.factory.OnboardingConfigValue()
-		if err := applyFactoryConfigurationRepositories(tx, target); err != nil {
-			return err
-		}
-		if repositoriesChanged {
-			// Publication must see the repository records saved in this transaction.
-			tx = withFactoryAutomationReadInputs(tx, nil)
-		}
-		// Setup must see authorized automation grants before publication.
-		for _, stage := range manifest.Stages {
-			for _, automation := range stage.Automations {
-				prepared := automation.prepared
-				if prepared == nil || prepared.GitHubRepositoryID == 0 {
-					continue
-				}
-				if err := models.GrantVCSProviderBindingRepository(tx, uuid.MustParse(prepared.Binding.IntegrationID), models.ProviderGitHub, prepared.GitHubRepositoryID); err != nil {
-					return err
-				}
-			}
 		}
 		if err := applyFactoryConfigurationStages(tx, target, manifest); err != nil {
 			return err
@@ -230,7 +182,7 @@ func ApplyFactoryConfiguration(ctx context.Context, deps IntakeDependencies, org
 						return err
 					}
 				}
-				// Every binding must be visible before any automation resolves tokens.
+				// Save identities before resolving automation dependencies.
 				if configurationShouldSaveOwnership(current, automation) || current != nil && configurationNeedsStableIdentity(stage, automation, current) {
 					if err := saveFactoryConfigurationOwnership(tx, target, live, automation, id); err != nil {
 						return err
@@ -315,16 +267,6 @@ func ApplyFactoryConfiguration(ctx context.Context, deps IntakeDependencies, org
 				return err
 			}
 			notifications = append(notifications, notify)
-		}
-		if repositoriesChanged {
-			notifies, err := reconcileFactoryConfigurationRepositories(ctx, tx, deps, target, previousRepositories, actor)
-			if err != nil {
-				return err
-			}
-			notifications = append(notifications, notifies...)
-		}
-		if err := syncFactoryConfigurationRepositoryBindings(tx, target, manifest, previousRepositories); err != nil {
-			return err
 		}
 		response.Changed = true
 		return nil

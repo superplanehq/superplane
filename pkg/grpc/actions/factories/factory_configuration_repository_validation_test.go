@@ -21,14 +21,14 @@ func TestFactoryConfigurationDiagnosesRepositoryFieldsBeforeWrites(t *testing.T)
 	for _, test := range []struct{ name, section, field string }{
 		{"missing connection", "binding: {}\n  primary: {repository: acme/app, ref: main}", "repositories.binding"},
 		{"missing primary", "binding: {integration_name: github}", "repositories.primary"},
-		{"missing name", "binding: {integration_name: Missing}\n  primary: {repository: acme/app, ref: main}", "repositories.binding.integration_name"},
-		{"unavailable backlog", "binding: {integration_name: github}\n  primary: {repository: acme/app, ref: main}\n  backlog_repository: acme/unavailable", "repositories.backlog_repository"},
+		{"missing name", "binding: {integration_name: Missing}\n  primary: {repository: acme/app, ref: main}", "repositories"},
+		{"unavailable backlog", "binding: {integration_name: github}\n  primary: {repository: acme/app, ref: main}\n  backlog_repository: acme/unavailable", "repositories"},
 		{"both connection references", "binding: {integration_name: github, integration_id: old}\n  primary: {repository: acme/app}", "repositories.binding.integration_name"},
 		{"missing access", "binding: {integration_name: github}\n  primary: {repository: acme/app, ref: main}\n  additional: [{repository: acme/docs}]", "repositories.additional[0].access"},
 		{"invalid access", "binding: {integration_name: github}\n  primary: {repository: acme/app, ref: main}\n  additional: [{repository: acme/docs, access: admin}]", "repositories.additional[0].access"},
 		{"invalid enabled", "binding: {integration_name: github}\n  primary: {repository: acme/app, ref: main}\n  additional: [{repository: acme/docs, access: read, enabled: 'false'}]", "repositories.additional[0].enabled"},
-		{"diagnostic preserves order", "binding: {integration_name: github}\n  primary: {repository: acme/app, ref: main}\n  additional: [{repository: z/docs, access: read}, {repository: invalid, access: read}]", "repositories.additional[1]"},
-		{"duplicate repository", "binding: {integration_name: github}\n  primary: {repository: acme/app, ref: main}\n  additional: [{repository: acme/docs, access: read}, {repository: ACME/DOCS, access: write}]", "repositories.additional[1].repository"},
+		{"diagnostic preserves order", "binding: {integration_name: github}\n  primary: {repository: acme/app, ref: main}\n  additional: [{repository: z/docs, access: read}, {repository: invalid, access: read}]", "repositories"},
+		{"duplicate repository", "binding: {integration_name: github}\n  primary: {repository: acme/app, ref: main}\n  additional: [{repository: acme/docs, access: read}, {repository: ACME/DOCS, access: write}]", "repositories"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			bundle := proto.Clone(original).(*pb.FactoryConfigurationBundle)
@@ -49,22 +49,4 @@ func TestFactoryConfigurationDiagnosesRepositoryFieldsBeforeWrites(t *testing.T)
 			require.Equal(t, before.OnboardingConfig, after.OnboardingConfig)
 		})
 	}
-}
-
-func TestFactoryConfigurationUsesProviderDefaultForOmittedPrimaryRef(t *testing.T) {
-	f := newConfigurationFixture(t)
-	f.ctx = withRepositoryBranchResolver(f.ctx, repositoryBranchResolver{gitHubDefault: func(string) (string, error) { return "trunk", nil }})
-	bundle := f.export(t)
-	editConfigurationManifest(t, bundle, func(manifest *factoryConfigurationManifest) { manifest.Repositories.Primary.Ref = "" })
-	plan := f.plan(t, bundle)
-	require.Empty(t, plan.Diagnostics)
-	require.NotEmpty(t, plan.Changes)
-	_, err := f.apply(bundle, plan.BaseStateToken)
-	require.NoError(t, err)
-	saved, err := models.FindFactory(database.DB(t.Context()), f.r.Organization.ID, f.factory.ID)
-	require.NoError(t, err)
-	require.Equal(t, "trunk", saved.OnboardingConfigValue().DefaultBranch)
-	plan = f.plan(t, bundle)
-	require.Empty(t, plan.Diagnostics)
-	require.Empty(t, plan.Changes)
 }

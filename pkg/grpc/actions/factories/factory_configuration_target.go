@@ -18,15 +18,13 @@ import (
 )
 
 type factoryConfigurationTarget struct {
-	reads             *factoryAutomationReadInputs
-	validation        *factoryConfigurationValidationInputs
-	factory           *models.Factory
-	line              *models.FactoryLine
-	stages            []*factoryConfigurationStageTarget
-	ownership         []models.FactoryConfigurationAutomation
-	repositories      *factoryConfigurationRepositories
-	repositoryRecords []models.FactoryAgentResource
-	repositoryUpdate  *preparedFactoryConfigurationRepositories
+	reads        *factoryAutomationReadInputs
+	validation   *factoryConfigurationValidationInputs
+	factory      *models.Factory
+	line         *models.FactoryLine
+	stages       []*factoryConfigurationStageTarget
+	ownership    []models.FactoryConfigurationAutomation
+	repositories *factoryConfigurationRepositories
 }
 
 type factoryConfigurationStageTarget struct {
@@ -515,16 +513,6 @@ func factoryConfigurationToken(target *factoryConfigurationTarget, manifest *fac
 		}
 	}
 	dependencies := []any{}
-	if manifest.Repositories != nil {
-		// Repository changes reconcile listeners across every line in the workspace.
-		dependencies = append(dependencies, struct {
-			Current   models.FactoryOnboardingConfig
-			Records   []models.FactoryAgentResource
-			Desired   *preparedFactoryConfigurationRepositories
-			Versions  map[uuid.UUID]*models.CanvasVersion
-			Ownership []models.FactoryConfigurationAutomation
-		}{target.factory.OnboardingConfigValue(), target.repositoryRecords, target.repositoryUpdate, target.reads.versions, target.ownership})
-	}
 	for _, stage := range manifest.Stages {
 		for _, automation := range stage.Automations {
 			if automation.prepared != nil {

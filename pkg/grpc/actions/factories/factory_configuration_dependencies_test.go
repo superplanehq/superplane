@@ -13,126 +13,10 @@ import (
 	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
-	"github.com/superplanehq/superplane/pkg/workers/contexts"
 	"google.golang.org/grpc/codes"
 	goyaml "gopkg.in/yaml.v3"
 	"gorm.io/datatypes"
 )
-
-func TestFactoryConfigurationPreservesExplicitDefaultBindingIntent(t *testing.T) {
-	f := configurationCatalogFixture(t)
-	config := f.factory.OnboardingConfigValue()
-	pinned := factoryConfigurationBinding{IntegrationID: config.VCSIntegrationID, ResourceID: config.AppRepository}
-	bundle := f.export(t)
-	editConfigurationManifest(t, bundle, func(manifest *factoryConfigurationManifest) {
-		for i := range manifest.Stages {
-			for j := range manifest.Stages[i].Automations {
-				automation := &manifest.Stages[i].Automations[j]
-				if automation.Uses == "@superplane/implement" {
-					automation.Binding = &pinned
-				}
-			}
-		}
-	})
-	before := configurationRevisionCount(t, f.canvas)
-	plan := f.plan(t, bundle)
-	require.Empty(t, plan.Diagnostics)
-	require.NotEmpty(t, plan.Changes, "an explicit pin changes future reset and repository refresh behavior")
-	result, err := f.apply(bundle, plan.BaseStateToken)
-	require.NoError(t, err)
-	require.True(t, result.Changed)
-	require.Equal(t, before, configurationRevisionCount(t, f.canvas), "binding intent alone does not change the installed graph")
-	exportedPin := &factoryConfigurationBinding{IntegrationName: integrationName(t, f.r.Organization.ID, pinned.IntegrationID), ResourceID: pinned.ResourceID}
-	require.Equal(t, exportedPin, configurationManifestAutomation(t, f.export(t), "implementation", "implement").Binding)
-
-	confidence := configurationCatalogEntry(t, f, "risk-score")
-	confidence.ID, confidence.Name = "confidence", "Pinned confidence"
-	db := database.DB(t.Context())
-	_, err = f.factory.CreateAgentResource(db, models.FactoryAgentResourceKindContextRepo, "", true, models.FactoryAgentResourceConfig{
-		Repository: "acme/context", Access: models.FactoryContextRepoAccessWrite,
-	})
-	require.NoError(t, err)
-	bundle = configurationCatalogBundle(t, f, confidence, "risk-score")
-	applyConfigurationBundle(t, f, bundle)
-	installed := configurationCanvasByName(t, f, confidence.Name)
-	require.ElementsMatch(t, []string{pinned.ResourceID, "acme/context"}, configurationWebhookRepositories(t, installed, riskScoreTriggerNodeID))
-
-	bundle = f.export(t)
-	setConfigurationBinding(t, bundle, "verify", "confidence", &pinned)
-	applyConfigurationBundle(t, f, bundle)
-	require.Equal(t, []string{pinned.ResourceID}, configurationWebhookRepositories(t, installed, riskScoreTriggerNodeID), "pinning a default repository must narrow an existing webhook")
-
-	newRepository := "acme/backlog"
-	require.NoError(t, f.factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{AppRepository: &newRepository}))
-	require.NoError(t, republishWorkspaceRepositoryAutomations(f.ctx, db, testIntakeDependencies(f.r), f.factory))
-	trigger := findIntakeNode(resetTestLiveVersion(t, installed).Nodes, riskScoreTriggerNodeID)
-	require.NotNil(t, trigger)
-	require.Equal(t, pinned.ResourceID, trigger.Configuration["repository"], "repository refresh must keep an explicit pin")
-	boundRepositories, err := contexts.NewFactoryContext(db, f.canvas, nil).ListRepositories()
-	require.NoError(t, err)
-	require.Equal(t, []string{pinned.ResourceID}, boundRepositories, "the phase runner must execute against its pinned repository")
-
-	_, err = ResetOrganizationBuiltInAutomations(f.ctx, f.r.Organization.ID, testIntakeDependencies(f.r))
-	require.NoError(t, err)
-	for _, automation := range []struct{ stage, id string }{{"implementation", "implement"}, {"verify", "confidence"}} {
-		require.Equal(t, exportedPin, configurationManifestAutomation(t, f.export(t), automation.stage, automation.id).Binding)
-	}
-	trigger = findIntakeNode(resetTestLiveVersion(t, installed).Nodes, riskScoreTriggerNodeID)
-	require.Equal(t, pinned.ResourceID, trigger.Configuration["repository"], "admin reset must keep an explicit pin")
-	require.Equal(t, []string{pinned.ResourceID}, configurationWebhookRepositories(t, installed, riskScoreTriggerNodeID))
-
-	bundle = f.export(t)
-	setConfigurationBinding(t, bundle, "verify", "confidence", nil)
-	applyConfigurationBundle(t, f, bundle)
-	require.ElementsMatch(t, []string{newRepository, "acme/context"}, configurationWebhookRepositories(t, installed, riskScoreTriggerNodeID), "removing a pin must set up the webhook with the new workspace scope")
-	plan = f.plan(t, f.export(t))
-	require.Empty(t, plan.Diagnostics)
-	require.Empty(t, plan.Changes)
-}
-
-func TestFactoryConfigurationKeepsSharedRunnerBindingsConsistentAcrossLines(t *testing.T) {
-	f := configurationCatalogFixture(t)
-	db := database.DB(t.Context())
-	defaults := f.factory.OnboardingConfigValue()
-	pinned := &factoryConfigurationBinding{IntegrationID: defaults.VCSIntegrationID, ResourceID: defaults.AppRepository}
-	bundle := f.export(t)
-	setConfigurationBinding(t, bundle, "implementation", "implement", pinned)
-	applyConfigurationBundle(t, f, bundle)
-
-	line, err := f.factory.CreateLine(db, "Alternate delivery", f.line.Steps)
-	require.NoError(t, err)
-	stages := line.StagesValue()
-	for i := range stages {
-		if stages[i].StepIndex != nil {
-			stages[i].Name = "Build changes"
-		}
-	}
-	require.NoError(t, line.UpdateConfiguration(db, nil, nil, nil, stages))
-	other := f
-	other.line = line
-	for _, change := range []struct {
-		writer     configurationFixture
-		binding    *factoryConfigurationBinding
-		repository string
-	}{
-		{other, &factoryConfigurationBinding{IntegrationID: defaults.VCSIntegrationID, ResourceID: "acme/backlog"}, "acme/backlog"},
-		{f, nil, defaults.AppRepository},
-	} {
-		bundle = change.writer.export(t)
-		setConfigurationBinding(t, bundle, "implementation", "implement", change.binding)
-		applyConfigurationBundle(t, change.writer, bundle)
-		for _, reader := range []configurationFixture{f, other} {
-			var exportedBinding *factoryConfigurationBinding
-			if change.binding != nil {
-				exportedBinding = &factoryConfigurationBinding{IntegrationName: integrationName(t, f.r.Organization.ID, change.binding.IntegrationID), ResourceID: change.binding.ResourceID}
-			}
-			require.Equal(t, exportedBinding, configurationManifestAutomation(t, reader.export(t), "implementation", "implement").Binding)
-		}
-		repositories, err := contexts.NewFactoryContext(db, f.canvas, nil).ListRepositories()
-		require.NoError(t, err)
-		require.Equal(t, []string{change.repository}, repositories, "one shared canvas must use the same binding regardless of its ownership row order")
-	}
-}
 
 func TestFactoryConfigurationResolvesDependenciesAcrossDeletionAndOverlappingIDs(t *testing.T) {
 	f := configurationCatalogFixture(t)
@@ -198,6 +82,7 @@ func TestFactoryConfigurationRejectsStalePreparationInputs(t *testing.T) {
 			}
 			automation := configurationCatalogEntry(t, f, templateID)
 			bundle := configurationCatalogBundle(t, f, automation, templateID)
+			editConfigurationManifest(t, bundle, func(m *factoryConfigurationManifest) { m.Repositories = nil })
 			plan := f.plan(t, bundle)
 			require.Empty(t, plan.Diagnostics)
 			require.NotEmpty(t, plan.BaseStateToken)
@@ -285,24 +170,6 @@ func editConfigurationManifest(t *testing.T, bundle *pb.FactoryConfigurationBund
 	encoded, err := goyaml.Marshal(manifest)
 	require.NoError(t, err)
 	bundle.Files[0].Content = string(encoded)
-}
-
-func setConfigurationBinding(t *testing.T, bundle *pb.FactoryConfigurationBundle, stageKey, id string, binding *factoryConfigurationBinding) {
-	t.Helper()
-	editConfigurationManifest(t, bundle, func(manifest *factoryConfigurationManifest) {
-		for i := range manifest.Stages {
-			if manifest.Stages[i].Key != stageKey {
-				continue
-			}
-			for j := range manifest.Stages[i].Automations {
-				if manifest.Stages[i].Automations[j].ID == id {
-					manifest.Stages[i].Automations[j].Binding = binding
-					return
-				}
-			}
-		}
-		t.Fatalf("automation %s/%s is missing", stageKey, id)
-	})
 }
 
 func configurationManifestAutomation(t *testing.T, bundle *pb.FactoryConfigurationBundle, stageKey, id string) factoryConfigurationAutomation {

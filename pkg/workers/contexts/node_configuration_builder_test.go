@@ -16,7 +16,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/models/factory"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
-	"gorm.io/gorm"
 )
 
 func Test_NodeConfigurationBuilder_EvaluatesMultilineExpression(t *testing.T) {
@@ -482,76 +481,6 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 		assert.Equal(t, currentRepository, payload["repository"])
 		assert.Equal(t, "https://github.com/"+currentRepository+".git", payload["repository_url"])
 		assert.Equal(t, currentDefaultBranch, payload["default_branch"])
-	})
-
-	t.Run("loads repository bindings only for repository expressions", func(t *testing.T) {
-		for _, table := range []string{`"workflows"`, `"factory_configuration_automations"`} {
-			t.Run(table, func(t *testing.T) {
-				db := database.Conn().Session(&gorm.Session{NewDB: true, Context: t.Context()})
-				lookupErr := fmt.Errorf("unexpected repository lookup: %s", table)
-				db.Statement.ConnPool = failingQueryPool{ConnPool: db.Statement.ConnPool, needle: table, fail: lookupErr}
-				lazyBuilder := NewNodeConfigurationBuilder(db, canvas.ID).WithRootEvent(&nodeExecution.RootEventID)
-				for _, expression := range []string{`order().id`, `task()["id"]`, `order().title + task().id`} {
-					result, err := lazyBuilder.ResolveExpression(expression)
-					require.NoError(t, err)
-					require.NotEmpty(t, result)
-				}
-				_, err := lazyBuilder.ResolveExpression(`order().repository_url`)
-				require.ErrorIs(t, err, lookupErr)
-			})
-		}
-	})
-
-	t.Run("uses the automation repository binding for checkout", func(t *testing.T) {
-		db := database.DB(t.Context())
-		require.NoError(t, db.Model(order).Updates(map[string]any{"repository": "acme/order", "default_branch": "task-branch"}).Error)
-		defer func() {
-			require.NoError(t, db.Model(order).Updates(map[string]any{"repository": "acme/previous-service", "default_branch": nil}).Error)
-		}()
-		line, err := factoryModel.CreateLine(db, "Pinned implementation", nil)
-		require.NoError(t, err)
-		for _, tc := range []struct {
-			provider string
-			host     string
-			url      string
-		}{
-			{models.ProviderGitHub, "", "https://github.com/acme/pinned.git"},
-			{models.ProviderGitHub, "github.acme.com", "https://github.acme.com/acme/pinned.git"},
-			{models.ProviderBitbucket, "", "https://bitbucket.org/acme/pinned.git"},
-		} {
-			t.Run(tc.url, func(t *testing.T) {
-				integration := models.NewIntegration(uuid.New(), r.Organization.ID, tc.provider, support.RandomName("pinned"), map[string]any{"host": tc.host})
-				require.NoError(t, db.Create(integration).Error)
-				binding := models.FactoryConfigurationAutomation{
-					OrganizationID: r.Organization.ID, FactoryID: factoryModel.ID, LineID: line.ID,
-					StageKey: "implementation", ManifestID: "implement", CanvasID: canvas.ID,
-					Binding: datatypes.JSONMap{"integration_id": integration.ID.String(), "resource_id": "acme/pinned"},
-				}
-				require.NoError(t, binding.Save(db))
-				defer func() { require.NoError(t, db.Delete(&binding).Error) }()
-				built, err := builder.Build(map[string]any{
-					"repository": "{{ task().repository }}",
-					"url":        "{{ task().repository_url }}",
-					"branch":     "{{ task().default_branch }}",
-				})
-				require.NoError(t, err)
-				require.Equal(t, "acme/pinned", built["repository"])
-				require.Equal(t, tc.url, built["url"])
-				require.Empty(t, built["branch"], "a different repository must use its own default branch")
-				for _, expression := range []string{
-					`order()["repository_url"]`,
-					`let field = "repository_url"; task()[field]`,
-					`let current = order(); current.repository_url`,
-				} {
-					result, err := builder.ResolveExpression(expression)
-					require.NoError(t, err)
-					require.Equal(t, tc.url, result)
-				}
-				result, err := builder.ResolveExpression(`order()`)
-				require.NoError(t, err)
-				require.Equal(t, tc.url, result.(map[string]any)["repository_url"])
-			})
-		}
 	})
 
 	t.Run("field access and templates", func(t *testing.T) {

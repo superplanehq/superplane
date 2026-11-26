@@ -640,7 +640,7 @@ func (f *Factory) CreateAgentResource(tx *gorm.DB, kind, name string, enabled bo
 			}
 		}
 		if kind == FactoryAgentResourceKindContextRepo {
-			if err := f.ensureUniqueContextRepo(inner, uuid.Nil, config); err != nil {
+			if err := f.ensureUniqueContextRepo(inner, uuid.Nil, config.Repository); err != nil {
 				return err
 			}
 		}
@@ -789,9 +789,6 @@ func ListEnabledGitHubContextRepositoryNames(tx *gorm.DB, integrationID uuid.UUI
 			AND factory.organization_id = resource.organization_id
 		JOIN organizations AS organization
 			ON organization.id = factory.organization_id
-		JOIN app_installations AS integration
-			ON integration.id::text = factory.onboarding_config ->> 'vcs_integration_id'
-			AND integration.organization_id = factory.organization_id
 		WHERE factory.deleted_at IS NULL
 			AND factory.onboarding_config ->> 'vcs_integration_id' = ?
 			AND resource.kind = ?
@@ -883,7 +880,7 @@ func (r *FactoryAgentResource) Update(tx *gorm.DB, name *string, enabled *bool, 
 				normalized := config.NormalizedContextRepo()
 				config = &normalized
 				factory := &Factory{ID: r.FactoryID, OrganizationID: r.OrganizationID}
-				if err := factory.ensureUniqueContextRepo(inner, r.ID, *config); err != nil {
+				if err := factory.ensureUniqueContextRepo(inner, r.ID, config.Repository); err != nil {
 					return err
 				}
 				// Keep the derived name in sync when the repository changes and the
@@ -1186,8 +1183,8 @@ func (f *Factory) ensureContextRepoCapacity(tx *gorm.DB, exceptID uuid.UUID) err
 	return nil
 }
 
-func (f *Factory) ensureUniqueContextRepo(tx *gorm.DB, exceptID uuid.UUID, config FactoryAgentResourceConfig) error {
-	canonical := CanonicalContextRepo(config.Repository)
+func (f *Factory) ensureUniqueContextRepo(tx *gorm.DB, exceptID uuid.UUID, repository string) error {
+	canonical := CanonicalContextRepo(repository)
 	if canonical == "" {
 		return nil
 	}
@@ -1203,8 +1200,7 @@ func (f *Factory) ensureUniqueContextRepo(tx *gorm.DB, exceptID uuid.UUID, confi
 		if exceptID != uuid.Nil && resource.ID == exceptID {
 			continue
 		}
-		existing := resource.Config.Data()
-		if contextRepoProvider(existing) == contextRepoProvider(config) && CanonicalContextRepo(existing.Repository) == canonical {
+		if CanonicalContextRepo(resource.Config.Data().Repository) == canonical {
 			return ErrFactoryAgentResourceRepositoryTaken
 		}
 	}

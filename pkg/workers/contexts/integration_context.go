@@ -63,10 +63,6 @@ func NewIntegrationContext(
 	return ctx
 }
 
-func (c *IntegrationContext) DB() *gorm.DB {
-	return c.tx
-}
-
 func (c *IntegrationContext) ID() uuid.UUID {
 	return c.integration.ID
 }

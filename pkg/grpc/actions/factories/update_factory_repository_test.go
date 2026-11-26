@@ -463,52 +463,6 @@ func TestReconcileFactoryRepositoryRewritesGitHubEnterpriseCheckoutURLs(t *testi
 	}
 }
 
-func TestReconcileFactoryRepositoryPreservesPinnedCheckoutTargets(t *testing.T) {
-	for _, templateID := range []string{scheduledIntakeTemplateID, models.FactoryAppTemplateCustomAutomationID} {
-		t.Run(templateID, func(t *testing.T) {
-			r := support.Setup(t)
-			db := database.DB(t.Context())
-			integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, models.ProviderGitHub)
-			factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
-			require.NoError(t, err)
-			provider, repository, branch := models.ProviderGitHub, "acme/new", "develop"
-			require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
-				VCSProvider: &provider, VCSIntegrationID: &integrationID,
-				AppRepository: &repository, BacklogRepository: &repository, DefaultBranch: &branch,
-			}))
-			canvas := support.CreateFactoryCanvas(t, r, factory.ID, "Pinned automation")
-			line, err := factory.CreateLine(db, "Delivery", nil)
-			require.NoError(t, err)
-			owner := models.FactoryConfigurationAutomation{
-				OrganizationID: r.Organization.ID, FactoryID: factory.ID, LineID: line.ID,
-				StageKey: "plan", ManifestID: "pinned", CanvasID: canvas.ID,
-				Binding: datatypes.JSONMap{"resource_id": "acme/old"},
-			}
-			require.NoError(t, owner.Save(db))
-			deps := IntakeDependencies{Registry: r.Registry, Encryptor: r.Encryptor, AuthService: r.AuthService, WebhookBaseURL: "http://localhost:8000"}
-			const repoURL = "https://github.com/acme/old.git"
-			require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
-				return canvases.PublishGeneratedCanvasNodes(t.Context(), tx, canvas, r.User, "Install pinned automation", []models.Node{
-					checkoutTemplateNode("scheduled-agent", templateID, "acme/old", repoURL, "main"),
-				}, nil, changesets.CanvasPublisherOptions{
-					Registry: r.Registry, OrgID: r.Organization.ID, Encryptor: r.Encryptor,
-					AuthService: r.AuthService, WebhookBaseURL: deps.WebhookBaseURL,
-				})
-			}))
-			require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
-				return reconcileFactoryRepository(t.Context(), tx, deps, factory, r.User,
-					integrationID, integrationID, "acme/old", "acme/old", "main", repository, true)
-			}))
-			live, err := models.FindLiveCanvasVersionInTransaction(db, canvas.ID)
-			require.NoError(t, err)
-			require.Len(t, live.Nodes, 1)
-			assert.Equal(t, "main", checkoutEnvironmentValue(t, live.Nodes[0], "BASE"))
-			assert.Equal(t, "acme/old", checkoutEnvironmentValue(t, live.Nodes[0], "REPO"))
-			assert.Equal(t, repoURL, checkoutEnvironmentValue(t, live.Nodes[0], "REPO_URL"))
-		})
-	}
-}
-
 func TestReconcileFactoryRepositoryPreservesIndependentCanvasEdit(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())

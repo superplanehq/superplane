@@ -50,45 +50,6 @@ func ExpressionUsesOrderSpec(expression string) (bool, error) {
 	return expressionReferencesOrderProperty(expression, "spec")
 }
 
-// ExpressionUsesOrderRepository reports whether repository fields can be read.
-// Whole payloads, aliases, and dynamic access keep repository values available.
-func ExpressionUsesOrderRepository(expression string) (bool, error) {
-	tree, err := parser.Parse(expression)
-	if err != nil {
-		return false, err
-	}
-	usage := &orderRepositoryUsage{}
-	ast.Walk(&tree.Node, usage)
-	return usage.calls > usage.otherFieldAccesses, nil
-}
-
-type orderRepositoryUsage struct {
-	calls              int
-	otherFieldAccesses int
-}
-
-func (u *orderRepositoryUsage) Visit(node *ast.Node) {
-	if isOrderCall(*node) {
-		u.calls++
-		return
-	}
-	member, ok := (*node).(*ast.MemberNode)
-	if !ok || !isOrderCall(member.Node) {
-		return
-	}
-	property, ok := member.Property.(*ast.StringNode)
-	if !ok {
-		return
-	}
-	switch property.Value {
-	case "repository", "repository_url", "default_branch":
-		return
-	default:
-		// Only direct access to a different field can skip repository lookups.
-		u.otherFieldAccesses++
-	}
-}
-
 // expressionReferencesOrderProperty reports whether the expression accesses
 // order().<property> or task().<property> (dot or bracket), including nested
 // uses such as len(order().<property>) or none(task().<property>, …).

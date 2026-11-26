@@ -12,7 +12,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/productanalytics"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
-	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -107,23 +106,6 @@ func UpdateFactoryOnboarding(
 	}
 
 	err = db.Transaction(func(tx *gorm.DB) error {
-		if onboardingRepositorySelectionRequested(patch) && config.EffectiveVCSProvider() == models.ProviderGitHub {
-			if err := models.LockOrganizationVCSProviderBindingRepositories(tx, orgID); err != nil {
-				return err
-			}
-			if err := factory.LockForUpdate(tx); err != nil {
-				return err
-			}
-			patch, err = authorizeFactoryRepositoryPatch(ctx, tx, deps, factory, patch)
-			if err != nil {
-				return err
-			}
-			config, err = factory.OnboardingConfigAfter(patch)
-			if err != nil {
-				return err
-			}
-		}
-
 		if !wasComplete && config.CodexSubscription {
 			ownerID, err := onboardingSubscriptionOwner(ctx, tx, factory)
 			if err != nil {
@@ -501,61 +483,4 @@ func factoryOnboardingAgentHarnessFromProto(harness pb.FactoryOnboarding_AgentHa
 	default:
 		return "", invalidArgument("invalid agent harness")
 	}
-}
-
-func onboardingRepositorySelectionRequested(patch models.FactoryOnboardingPatch) bool {
-	return patch.VCSIntegrationID != nil || patch.AppRepository != nil || patch.BacklogRepository != nil || patch.DefaultBranch != nil || patch.AppRepositoryID != nil || patch.BacklogRepositoryID != nil
-}
-
-func authorizeFactoryRepositoryPatch(ctx context.Context, tx *gorm.DB, deps IntakeDependencies, factory *models.Factory, patch models.FactoryOnboardingPatch) (models.FactoryOnboardingPatch, error) {
-	config, err := factory.OnboardingConfigAfter(patch)
-	if err != nil {
-		return patch, err
-	}
-	if config.VCSIntegrationID == "" {
-		return patch, nil
-	}
-	integrationID, err := uuid.Parse(config.VCSIntegrationID)
-	if err != nil {
-		return patch, err
-	}
-	if _, err := models.FindVCSProviderIntegrationBinding(tx, integrationID); errors.Is(err, gorm.ErrRecordNotFound) {
-		return patch, nil
-	} else if err != nil {
-		return patch, err
-	}
-	integration, err := findReadyOnboardingIntegration(tx, factory.OrganizationID, config.VCSIntegrationID)
-	if err != nil {
-		return patch, err
-	}
-	primaryID := int64(0)
-	if config.AppRepository != "" {
-		primaryID, _, err = authorizeConfigurationPrimaryRepository(ctx, tx, factory, integration, config.AppRepository)
-		if err != nil {
-			return patch, err
-		}
-	}
-	backlogID := primaryID
-	if config.BacklogRepository != "" && !sameRepository(config.AppRepository, config.BacklogRepository) {
-		backlogID, _, err = authorizeConfigurationPrimaryRepository(ctx, tx, factory, integration, config.BacklogRepository)
-		if err != nil {
-			return patch, err
-		}
-	}
-	if config.VCSIntegrationID != factory.OnboardingConfigValue().VCSIntegrationID {
-		resources, err := factory.ListContextRepos(tx)
-		if err != nil {
-			return patch, err
-		}
-		desired := *factory
-		desired.OnboardingConfig = datatypes.NewJSONType(config)
-		for _, resource := range resources {
-			if err := authorizeContextRepository(ctx, tx, deps, factory.OrganizationID.String(), &desired, resource.Config.Data()); err != nil {
-				return patch, err
-			}
-		}
-	}
-	// Repository IDs must come from the authorized catalog, not request fields.
-	patch.AppRepositoryID, patch.BacklogRepositoryID = &primaryID, &backlogID
-	return patch, nil
 }

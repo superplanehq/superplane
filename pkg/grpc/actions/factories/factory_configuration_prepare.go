@@ -10,32 +10,29 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/pkg/yaml"
-	"google.golang.org/grpc/codes"
 	"google.golang.org/protobuf/proto"
 	"gorm.io/gorm"
 )
 
 type preparedFactoryConfigurationBuiltIn struct {
-	TemplateID         string
-	Nodes              []models.Node
-	Edges              []models.Edge
-	Defaults           *models.CanvasVersion
-	Settings           map[string]any
-	Binding            factoryConfigurationBinding
-	DefaultBinding     factoryConfigurationBinding
-	IntakeSource       string
-	PRFeedbackSource   string
-	MaximumAttempts    int
-	Paused             bool
-	Description        string
-	ExplicitBinding    *factoryConfigurationBinding
-	GitHubRepositoryID int64
-	State              any
+	TemplateID       string
+	Nodes            []models.Node
+	Edges            []models.Edge
+	Defaults         *models.CanvasVersion
+	Settings         map[string]any
+	Binding          factoryConfigurationBinding
+	DefaultBinding   factoryConfigurationBinding
+	IntakeSource     string
+	PRFeedbackSource string
+	MaximumAttempts  int
+	Paused           bool
+	Description      string
+	ExplicitBinding  *factoryConfigurationBinding
+	State            any
 }
 
 type configurationIntegrationState struct {
@@ -130,14 +127,12 @@ func prepareFactoryConfigurationBuiltIn(ctx context.Context, tx *gorm.DB, deps I
 		}
 		return nil, err
 	}
-	if integration.AppName == models.ProviderGitHub && binding.ResourceID != "" {
-		prepared.GitHubRepositoryID, _, err = authorizeConfigurationPrimaryRepository(ctx, tx, target.factory, integration, binding.ResourceID)
-		if err != nil {
-			code, message, ok := grpcerrors.HandlerStatus(err)
-			if ok && code == codes.PermissionDenied {
-				return nil, configurationPreparationError("binding.resource_id", message)
-			}
-			return nil, err
+	// Intakes and PR feedback already accept resource bindings through their APIs.
+	supportsResourceBinding := strings.HasPrefix(templateID, "intake:") || slices.Contains([]string{models.FactoryAppTemplateBacklogID, prFeedbackChecksTemplateID, prFeedbackDiscussionTemplateID}, templateID)
+	if !supportsResourceBinding {
+		defaults := configurationBuiltInDefaultBinding(target.factory, templateID)
+		if !sameRepository(binding.ResourceID, defaults.ResourceID) {
+			return nil, configurationPreparationError("binding.resource_id", "Use the workspace repository. Per-automation repository selection is not supported.")
 		}
 	}
 	prepared.Binding = binding
@@ -457,9 +452,22 @@ func resolveConfigurationBuiltInBinding(tx *gorm.DB, factory *models.Factory, te
 			}
 		}
 	}
-	// Hosted GitHub selections use the catalog and caller authorization, not a stale resource cache.
+	// Restoration uses existing hosted grants without changing token scope.
 	if integration.AppName == models.ProviderGitHub {
 		if _, err := factoryAutomationVCSBinding(tx, factory, integration.ID); err == nil {
+			if binding.ResourceID != "" {
+				repositories, err := factoryAutomationPolicy(tx, factory, "configuration-granted-repositories", []any{integration.ID}, func() ([]models.VCSProviderRepository, error) {
+					return models.ListVCSProviderBindingRepositories(tx, integration.ID)
+				})
+				if err != nil {
+					return binding, nil, err
+				}
+				if !slices.ContainsFunc(repositories, func(repository models.VCSProviderRepository) bool {
+					return sameRepository(repository.FullName, binding.ResourceID)
+				}) {
+					return binding, nil, configurationPreparationError("binding.resource_id", "Use a repository already available to this connection. Change repositories in workspace settings and export again.")
+				}
+			}
 			return binding, integration, nil
 		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return binding, nil, err
@@ -589,9 +597,6 @@ func buildConfigurationBuiltInGraph(tx *gorm.DB, factory *models.Factory, name, 
 	}
 	if slices.Contains([]string{"risk-score", "pr-closure", "visual-evidence"}, templateID) {
 		repository := models.WorkspaceRepositoriesExpression
-		if prepared != nil && prepared.ExplicitBinding != nil && prepared.ExplicitBinding.ResourceID != "" {
-			repository = binding.ResourceID
-		}
 		for i := range document.Spec.Nodes {
 			node := &document.Spec.Nodes[i]
 			if node.Type == yaml.NodeTypeTrigger && strings.HasPrefix(node.Component, factoryVCSProviderOrDefault(factory)+".") {
@@ -649,14 +654,7 @@ func buildConfigurationPRFeedback(tx *gorm.DB, factory *models.Factory, name, te
 		trigger = prFeedbackPullRequestTriggerNodeID
 	}
 	stampFactoryTemplateMetadata(document, trigger, templateID)
-	if prepared != nil && prepared.ExplicitBinding != nil && prepared.ExplicitBinding.ResourceID != "" {
-		for i := range document.Spec.Nodes {
-			node := &document.Spec.Nodes[i]
-			if node.Type == yaml.NodeTypeTrigger && strings.HasPrefix(node.Component, factoryVCSProviderOrDefault(factory)+".") {
-				node.Configuration["repository"] = binding.ResourceID
-			}
-		}
-	}
+
 	if prepared != nil {
 		prepared.PRFeedbackSource = source
 		prepared.MaximumAttempts = feedback.MaximumAttempts
@@ -709,9 +707,6 @@ func configurationPreparedState(tx *gorm.DB, factory *models.Factory, binding fa
 	config := factory.OnboardingConfigValue()
 	state := configurationBuiltInState{Binding: binding, Integration: configurationIntegrationSnapshot(integration), DefaultOwner: config.CodexDefaultOwnerID, Repository: config.AppRepository, Backlog: config.BacklogRepository, Branch: config.DefaultBranch, GitProvider: config.EffectiveVCSProvider(), Subscription: config.CodexSubscription}
 	repositories, err := factoryAutomationPolicy(tx, factory, "configuration-workspace-repositories", nil, func() ([]string, error) {
-		if reads := factoryAutomationReads(tx, factory); reads != nil && reads.workspaceRepositories != nil {
-			return reads.workspaceRepositories, nil
-		}
 		return factory.WorkspaceRepositories(tx)
 	})
 	if err != nil {

@@ -318,11 +318,9 @@ func validateFactoryConfigurationManifest(ctx context.Context, tx *gorm.DB, deps
 	if len(manifest.Stages) != len(target.stages) {
 		return configurationDiagnostic("stages", "Include every existing stage. This POC does not add or remove stages."), nil
 	}
-	if diagnostic, err := prepareFactoryConfigurationRepositories(ctx, tx, deps, target, manifest.Repositories); diagnostic != nil || err != nil {
+	if diagnostic, err := validateFactoryConfigurationRepositories(tx, target, manifest.Repositories); diagnostic != nil || err != nil {
 		return diagnostic, err
 	}
-	liveTarget := target
-	target = configurationPreparationTarget(target)
 	tx = withFactoryAutomationReadInputs(tx, target.reads)
 	resolveFactoryConfigurationIdentities(target, manifest)
 	validation, err := loadFactoryConfigurationValidationInputs(tx, target, manifest)
@@ -330,7 +328,6 @@ func validateFactoryConfigurationManifest(ctx context.Context, tx *gorm.DB, deps
 		return nil, err
 	}
 	target.validation = validation
-	liveTarget.validation = validation
 	byKey := map[string]*factoryConfigurationStageTarget{}
 	for _, stage := range target.stages {
 		byKey[stage.key] = stage

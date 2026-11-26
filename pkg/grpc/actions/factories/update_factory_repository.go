@@ -73,12 +73,11 @@ func UpdateFactoryRepository(
 		return updateBitbucketFactoryRepository(ctx, deps, orgID, organizationID, actorID, req)
 	}
 	err = db.Transaction(func(tx *gorm.DB) error {
-		if err := models.LockOrganizationVCSProviderBindingRepositories(tx, orgID); err != nil {
+		loaded, err := models.FindFactory(tx, orgID, factory.ID)
+		if err != nil {
 			return err
 		}
-		if err := factory.LockForUpdate(tx); err != nil {
-			return err
-		}
+		factory = loaded
 
 		previous := factory.OnboardingConfigValue()
 		if _, err := factory.OnboardingConfigAfter(models.FactoryOnboardingPatch{AppRepository: &repository}); err != nil {
@@ -104,15 +103,28 @@ func UpdateFactoryRepository(
 		selectedIntegration := integration
 		_, bindingErr := models.FindVCSProviderIntegrationBinding(tx, integration.ID)
 		if bindingErr == nil {
-			selectionIntegrationID := uuid.Nil
-			if !repositoryChanged {
-				selectionIntegrationID = integration.ID
+			catalogRepository, findErr := findGitHubCatalogRepositoryByName(ctx, tx, organizationID, repository)
+			if errors.Is(findErr, gorm.ErrRecordNotFound) {
+				return grpcerrors.PermissionDenied(findErr, "VCS repository is not accessible")
 			}
-			catalogRepository, findErr := findGitHubCatalogRepositoryByName(ctx, tx, organizationID, repository, selectionIntegrationID)
 			if findErr != nil {
 				return findErr
 			}
-			selectedIntegration, findErr = gitHubRepositoryIntegration(tx, orgID, catalogRepository)
+			installation, findErr := models.FindVCSProviderInstallation(
+				tx,
+				models.ProviderGitHub,
+				catalogRepository.InstallationID,
+			)
+			if findErr != nil {
+				return findErr
+			}
+			selectedIntegration, findErr = models.FindOrCreateVCSProviderBinding(
+				tx,
+				orgID,
+				models.ProviderGitHub,
+				catalogRepository.InstallationID,
+				installation.AccountLogin,
+			)
 			if findErr != nil {
 				return findErr
 			}
@@ -162,10 +174,6 @@ func UpdateFactoryRepository(
 			patch.AppRepositoryID = &selectedRepositoryID
 			patch.BacklogRepository = &selectedRepository
 			patch.BacklogRepositoryID = &selectedRepositoryID
-		}
-		patch, err = authorizeFactoryRepositoryPatch(ctx, tx, deps, factory, patch)
-		if err != nil {
-			return err
 		}
 		if err := factory.UpdateOnboarding(tx, patch); err != nil {
 			return err
@@ -382,16 +390,14 @@ func reconcileFactoryRepository(
 				managedRunnerNodeIDs["capture-visual-evidence"] = true
 				changed = replaceNodeConfigurationValues(nodes, []configurationReplacement{{from: previousApp, to: repository}}) || changed
 			case scheduledIntakeTemplateID:
-				if !pinnedRepository {
-					changed = replaceWorkspaceCheckoutTarget(nodes, config.EffectiveVCSProvider(), previousApp, repository, previousDefaultBranch, nextBranch, previousGitHubHost, nextGitHubHost) || changed
-				}
+				changed = replaceWorkspaceCheckoutTarget(nodes, config.EffectiveVCSProvider(), previousApp, repository, previousDefaultBranch, nextBranch, previousGitHubHost, nextGitHubHost) || changed
 			}
 			if template.id == "line-implementation" {
 				changed = replaceLegacyCheckoutBaseToken(nodes, managedRunnerNodeIDs) || changed
 			}
 		}
 		isCustomAutomation := models.FactoryAppTemplateID(nodes) == models.FactoryAppTemplateCustomAutomationID
-		if isCustomAutomation && !pinnedRepository {
+		if isCustomAutomation {
 			changed = replaceWorkspaceCheckoutTarget(nodes, config.EffectiveVCSProvider(), previousApp, repository, previousDefaultBranch, nextBranch, previousGitHubHost, nextGitHubHost) || changed
 		}
 		if isCustomAutomation && !pinnedRepository && slices.ContainsFunc(nodes, func(node models.Node) bool {

@@ -2,48 +2,6 @@ package expressionvalidation
 
 import "testing"
 
-func TestExpressionUsesOrderRepository(t *testing.T) {
-	cases := []struct {
-		name string
-		raw  string
-		want bool
-	}{
-		{name: "whole order", raw: `order()`, want: true},
-		{name: "whole task", raw: `task()`, want: true},
-		{name: "repository", raw: `order().repository`, want: true},
-		{name: "repository URL", raw: `task().repository_url`, want: true},
-		{name: "default branch", raw: `order()["default_branch"]`, want: true},
-		{name: "aliased payload", raw: `let payload = task(); payload.repository`, want: true},
-		{name: "dynamic property", raw: `order()[root().field]`, want: true},
-		{name: "unrelated property", raw: `task().id`, want: false},
-		{name: "nested unrelated property", raw: `order().source.repository`, want: false},
-		{name: "multiple unrelated accesses", raw: `order().id + task().title`, want: false},
-		{name: "mixed accesses", raw: `order().id + task().repository`, want: true},
-		{name: "whole payload and unrelated access", raw: `[order().id, task()]`, want: true},
-		{name: "unrelated function", raw: `root().repository`, want: false},
-		{name: "no calls", raw: `"order().repository"`, want: false},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			got, err := ExpressionUsesOrderRepository(tc.raw)
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if got != tc.want {
-				t.Fatalf("got %v, want %v", got, tc.want)
-			}
-		})
-	}
-
-	t.Run("invalid expression", func(t *testing.T) {
-		_, err := ExpressionUsesOrderRepository(`order(`)
-		if err == nil {
-			t.Fatal("expected a parse error")
-		}
-	})
-}
-
 func TestExpressionUsesOrderArtifacts(t *testing.T) {
 	cases := []struct {
 		name string

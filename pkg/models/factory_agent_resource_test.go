@@ -525,17 +525,6 @@ func Test__FactoryAgentResourceContextRepos(t *testing.T) {
 			Repository: "SuperplaneHQ/Suss",
 		})
 		assert.ErrorIs(t, err, models.ErrFactoryAgentResourceRepositoryTaken)
-
-		bitbucket, err := factory.CreateAgentResource(db, models.FactoryAgentResourceKindContextRepo, "", true, models.FactoryAgentResourceConfig{
-			Repository: "SuperplaneHQ/Suss", VCSProvider: models.ProviderBitbucket,
-		})
-		require.NoError(t, err, "repositories with the same name on different providers are distinct")
-		next := bitbucket.Config.Data()
-		next.VCSProvider = models.ProviderGitHub
-		assert.ErrorIs(t, bitbucket.Update(db, nil, nil, &next), models.ErrFactoryAgentResourceRepositoryTaken)
-		saved, err := factory.FindAgentResource(db, bitbucket.ID)
-		require.NoError(t, err)
-		assert.Equal(t, models.ProviderBitbucket, saved.Config.Data().VCSProvider)
 	})
 
 	t.Run("rejects over the context repo cap", func(t *testing.T) {

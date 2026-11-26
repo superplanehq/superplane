@@ -10,6 +10,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
+	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
 	"gorm.io/datatypes"
@@ -160,4 +161,35 @@ func TestFactoryConfigurationUsesIDsForAmbiguousConnectionNames(t *testing.T) {
 	_, err := f.apply(named, "invalid")
 	require.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
 	require.Equal(t, before, configurationResourceCounts(t))
+}
+
+func TestFactoryConfigurationRestoresBitbucketDiscussionBinding(t *testing.T) {
+	f := configurationCatalogFixture(t)
+	db := database.DB(t.Context())
+	provider := models.ProviderBitbucket
+	integrationID := createReadyOnboardingIntegration(t, f.r.Organization.ID, provider)
+	configureConfigurationCatalogIntegration(t, f, integrationID, provider)
+	require.NoError(t, f.factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSProvider: &provider, VCSIntegrationID: &integrationID}))
+	repository := f.factory.OnboardingConfigValue().BacklogRepository
+	created, err := CreateFactoryPRFeedbackHandler(f.ctx, testIntakeDependencies(f.r), f.factory.OrganizationID.String(), &pb.CreateFactoryPRFeedbackHandlerRequest{
+		FactoryId: f.factory.ID.String(), Name: "Saved discussion repository",
+		Settings: &pb.FactoryPRFeedbackHandler_Settings{Subject: &pb.FactoryPRFeedbackHandler_SubjectSettings{Repository: repository}},
+	})
+	require.NoError(t, err)
+	require.Equal(t, repository, created.GetHandler().GetSettings().GetSubject().GetRepository())
+	exported := f.export(t)
+	_, err = DeleteFactoryPRFeedbackHandler(f.ctx, f.factory.OrganizationID.String(), &pb.DeleteFactoryPRFeedbackHandlerRequest{
+		FactoryId: f.factory.ID.String(), HandlerId: created.GetHandler().GetId(),
+	})
+	require.NoError(t, err)
+	applyConfigurationBundle(t, f, exported)
+	canvas := configurationCanvasByName(t, f, "Saved discussion repository")
+	for _, reset := range []bool{false, true} {
+		if reset {
+			require.NoError(t, resetTestOrganization(t, f.r))
+		}
+		live := resetTestLiveVersion(t, canvas)
+		spec := models.LiveCanvasSpec{Nodes: live.Nodes, Edges: live.Edges}
+		require.Equal(t, repository, prFeedbackSettingsFromGraph(resolvePRFeedbackGraph(spec), spec).Repository)
+	}
 }

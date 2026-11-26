@@ -14,22 +14,21 @@ import (
 // These inputs live for one configuration operation and one transaction only.
 // Publication and row locking still read through their existing model paths.
 type factoryAutomationReadInputs struct {
-	connection            gorm.ConnPool
-	factory               *models.Factory
-	canvases              []models.Canvas
-	versions              map[uuid.UUID]*models.CanvasVersion
-	lines                 []models.FactoryLine
-	integrations          []models.Integration
-	integrationsByID      map[uuid.UUID]*models.Integration
-	integrationsByName    map[string]*models.Integration
-	agent                 *intakeAgent
-	agentResolved         bool
-	hostedAgent           *intakeAgent
-	hostedAgentResolved   bool
-	vcsName               string
-	vcsResolved           bool
-	policies              map[string]any
-	workspaceRepositories []string
+	connection          gorm.ConnPool
+	factory             *models.Factory
+	canvases            []models.Canvas
+	versions            map[uuid.UUID]*models.CanvasVersion
+	lines               []models.FactoryLine
+	integrations        []models.Integration
+	integrationsByID    map[uuid.UUID]*models.Integration
+	integrationsByName  map[string]*models.Integration
+	agent               *intakeAgent
+	agentResolved       bool
+	hostedAgent         *intakeAgent
+	hostedAgentResolved bool
+	vcsName             string
+	vcsResolved         bool
+	policies            map[string]any
 }
 
 type factoryAutomationReadInputsKey struct{}

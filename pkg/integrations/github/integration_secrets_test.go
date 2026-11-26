@@ -1,7 +1,6 @@
 package github
 
 import (
-	"encoding/json"
 	"io"
 	"net/http"
 	"testing"
@@ -16,8 +15,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	contexts "github.com/superplanehq/superplane/test/support/contexts"
 	mocks "github.com/superplanehq/superplane/test/support/mocks/github"
-	"gorm.io/datatypes"
-	"gorm.io/gorm"
 )
 
 func TestGitHub__ResolveSecrets__PAT(t *testing.T) {
@@ -123,46 +120,14 @@ func TestGitHub__ResolveSecrets__HostedTokensFollowContextRepositoryAccess(t *te
 		{RepositoryID: 604, FullName: "acme/other"},
 		{RepositoryID: 605, FullName: "acme/bb"},
 		{RepositoryID: 606, FullName: "acme/docs"},
-		{RepositoryID: 607, FullName: "acme/legacy"},
-		{RepositoryID: 608, FullName: "acme/backlog"},
-		{RepositoryID: 609, FullName: "acme/automation"},
 	}))
 
 	factory := createContextRepoWorkspace(t, organization.ID, integration.ID)
-	writeResource, err := factory.CreateAgentResource(database.Conn(), models.FactoryAgentResourceKindContextRepo, "", true, models.FactoryAgentResourceConfig{
+	_, err = factory.CreateAgentResource(database.Conn(), models.FactoryAgentResourceKindContextRepo, "", true, models.FactoryAgentResourceConfig{
 		Repository: "acme/web",
 		Access:     models.FactoryContextRepoAccessWrite,
 	})
 	require.NoError(t, err)
-	backlog, backlogID := "acme/backlog", int64(608)
-	require.NoError(t, factory.UpdateOnboarding(database.Conn(), models.FactoryOnboardingPatch{
-		BacklogRepository: &backlog, BacklogRepositoryID: &backlogID,
-	}))
-	for _, repository := range []string{"acme/api", "acme/backlog", "acme/automation"} {
-		_, err = factory.CreateAgentResource(database.Conn(), models.FactoryAgentResourceKindContextRepo, "", true, models.FactoryAgentResourceConfig{
-			Repository: repository, Access: models.FactoryContextRepoAccessRead,
-		})
-		require.NoError(t, err)
-	}
-	line, err := factory.CreateLine(database.Conn(), "Delivery", nil)
-	require.NoError(t, err)
-	versionID := uuid.New()
-	canvas := &models.Canvas{ID: uuid.New(), OrganizationID: organization.ID, FactoryID: &factory.ID, Name: "Bound automation", LiveVersionID: &versionID}
-	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
-		if err := tx.Create(canvas).Error; err != nil {
-			return err
-		}
-		return tx.Create(&models.CanvasVersion{
-			ID: versionID, WorkflowID: canvas.ID,
-			Nodes: datatypes.NewJSONSlice([]models.Node{}), Edges: datatypes.NewJSONSlice([]models.Edge{}),
-		}).Error
-	}))
-	owner := &models.FactoryConfigurationAutomation{
-		OrganizationID: organization.ID, FactoryID: factory.ID, LineID: line.ID,
-		StageKey: "verify", ManifestID: "bound", CanvasID: canvas.ID,
-		Binding: datatypes.JSONMap{"integration_id": integration.ID.String(), "resource_id": "acme/automation"},
-	}
-	require.NoError(t, owner.Save(database.Conn()))
 	_, err = factory.CreateAgentResource(database.Conn(), models.FactoryAgentResourceKindContextRepo, "", true, models.FactoryAgentResourceConfig{
 		Repository: "acme/docs",
 		Access:     models.FactoryContextRepoAccessRead,
@@ -184,68 +149,27 @@ func TestGitHub__ResolveSecrets__HostedTokensFollowContextRepositoryAccess(t *te
 		Access:     models.FactoryContextRepoAccessWrite,
 	})
 	require.NoError(t, err)
-	// Another organization cannot add token access by naming this integration.
-	foreignFactory := createContextRepoWorkspace(t, other.ID, integration.ID)
-	_, err = foreignFactory.CreateAgentResource(database.Conn(), models.FactoryAgentResourceKindContextRepo, "", true, models.FactoryAgentResourceConfig{
-		Repository: "acme/secret", Access: models.FactoryContextRepoAccessWrite,
-	})
-	require.NoError(t, err)
-	for _, id := range []int64{601, 602, 603, 606, 607, 608, 609} {
-		require.NoError(t, models.GrantVCSProviderBindingRepository(database.Conn(), integration.ID, models.ProviderGitHub, id))
-	}
-	require.NoError(t, models.GrantVCSProviderBindingRepository(database.Conn(), otherIntegration.ID, models.ProviderGitHub, 604))
-	sharedFactory := createContextRepoWorkspace(t, organization.ID, integration.ID)
-	sharedWrite, err := sharedFactory.CreateAgentResource(database.Conn(), models.FactoryAgentResourceKindContextRepo, "", false, models.FactoryAgentResourceConfig{
-		Repository: "acme/docs", Access: models.FactoryContextRepoAccessWrite,
-	})
-	require.NoError(t, err)
+	require.NoError(t, models.SyncVCSProviderBindingRepositories(database.Conn(), integration.ID, models.ProviderGitHub))
 
-	for _, entry := range []struct {
-		name    string
-		access  string
-		enabled bool
-		shared  bool
-		write   []int64
-		read    []int64
-	}{
-		{"saved grants", models.FactoryContextRepoAccessWrite, true, false, []int64{601, 602, 607, 608, 609}, []int64{601, 606, 608, 609}},
-		{"write changed to read", models.FactoryContextRepoAccessRead, true, false, []int64{601, 607, 608, 609}, []int64{601, 602, 606, 608, 609}},
-		{"write disabled", models.FactoryContextRepoAccessWrite, false, false, []int64{601, 607, 608, 609}, []int64{601, 606, 608, 609}},
-		{"write use in another workspace", models.FactoryContextRepoAccessWrite, true, true, []int64{601, 602, 606, 607, 608, 609}, []int64{601, 606, 608, 609}},
-	} {
-		t.Run(entry.name, func(t *testing.T) {
-			resourceConfig := writeResource.Config.Data()
-			resourceConfig.Access = entry.access
-			require.NoError(t, writeResource.Update(database.Conn(), nil, &entry.enabled, &resourceConfig))
-			require.NoError(t, sharedWrite.Update(database.Conn(), nil, &entry.shared, nil))
-			httpCtx := &contexts.HTTPContext{Responses: []*http.Response{
-				mocks.GitHubResponse(http.StatusCreated, `{"token":"ghs_write","expires_at":"2030-01-01T00:00:00Z"}`),
-				mocks.GitHubResponse(http.StatusCreated, `{"token":"ghs_read","expires_at":"2030-01-01T00:00:00Z"}`),
-			}}
-			secrets, err := (&GitHub{}).ResolveSecrets(core.IntegrationSecretContext{
-				HTTP: httpCtx,
-				Integration: &contexts.IntegrationContext{
-					IntegrationID: integration.ID.String(), Metadata: common.Metadata{HostedApp: true},
-				},
-			})
-			require.NoError(t, err)
-			assert.Equal(t, runner.GitHubContextTokenEnv, integrationSecretGitHubContextToken)
-			assert.Equal(t, []byte("ghs_write"), secrets.Values[integrationSecretGitHubToken])
-			assert.Equal(t, []byte("ghs_read"), secrets.Values[integrationSecretGitHubContextToken])
-			require.Len(t, httpCtx.Requests, 2)
-			for index, ids := range [][]int64{entry.write, entry.read} {
-				var selection struct {
-					RepositoryIDs []int64           `json:"repository_ids"`
-					Permissions   map[string]string `json:"permissions"`
-				}
-				require.NoError(t, json.Unmarshal([]byte(readRequestBody(t, httpCtx.Requests[index])), &selection))
-				assert.ElementsMatch(t, ids, selection.RepositoryIDs)
-				if index == 1 {
-					assert.Equal(t, map[string]string{"contents": "read", "metadata": "read"}, selection.Permissions)
-				}
-			}
-		})
-	}
+	httpCtx := &contexts.HTTPContext{Responses: []*http.Response{
+		mocks.GitHubResponse(http.StatusCreated, `{"token":"ghs_write","expires_at":"2030-01-01T00:00:00Z"}`),
+		mocks.GitHubResponse(http.StatusCreated, `{"token":"ghs_read","expires_at":"2030-01-01T00:00:00Z"}`),
+	}}
+	secrets, err := (&GitHub{}).ResolveSecrets(core.IntegrationSecretContext{
+		HTTP: httpCtx,
+		Integration: &contexts.IntegrationContext{
+			IntegrationID: integration.ID.String(),
+			Metadata:      common.Metadata{HostedApp: true},
+		},
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, runner.GitHubContextTokenEnv, integrationSecretGitHubContextToken)
+	assert.Equal(t, []byte("ghs_write"), secrets.Values[integrationSecretGitHubToken])
+	assert.Equal(t, []byte("ghs_read"), secrets.Values[integrationSecretGitHubContextToken])
+	require.Len(t, httpCtx.Requests, 2)
+	assert.JSONEq(t, `{"repository_ids":[601,602]}`, readRequestBody(t, httpCtx.Requests[0]))
+	assert.JSONEq(t, `{"repository_ids":[606],"permissions":{"contents":"read","metadata":"read"}}`, readRequestBody(t, httpCtx.Requests[1]))
 }
 
 func TestGitHub__ResolveSecrets__HostedWriteTokenCoversContextRepositoriesWithoutGrants(t *testing.T) {

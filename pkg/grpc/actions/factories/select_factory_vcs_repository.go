@@ -3,7 +3,6 @@ package factories
 import (
 	"context"
 	"errors"
-	"slices"
 	"strconv"
 	"strings"
 
@@ -49,6 +48,9 @@ func SelectFactoryVCSProviderRepository(
 
 	db := database.DB(ctx)
 	catalog, findErr := findGitHubCatalogRepository(ctx, db, organizationID, req.GetRepositoryId())
+	if errors.Is(findErr, gorm.ErrRecordNotFound) {
+		return nil, grpcerrors.PermissionDenied(findErr, "VCS repository is not accessible")
+	}
 	if findErr != nil {
 		return nil, factoryErrorToStatus(findErr, "failed to select VCS repository")
 	}
@@ -69,14 +71,8 @@ func SelectFactoryVCSProviderRepository(
 
 	var factory *models.Factory
 	err = db.Transaction(func(tx *gorm.DB) error {
-		if err := models.LockOrganizationVCSProviderBindingRepositories(tx, orgID); err != nil {
-			return err
-		}
 		factory, err = findFactory(tx, orgID, req.GetId())
 		if err != nil {
-			return err
-		}
-		if err := factory.LockForUpdate(tx); err != nil {
 			return err
 		}
 		if err := rejectFactoryProviderSwitch(factory, provider); err != nil {
@@ -84,11 +80,24 @@ func SelectFactoryVCSProviderRepository(
 		}
 
 		repository, findErr := findGitHubCatalogRepository(ctx, tx, organizationID, req.GetRepositoryId())
+		if errors.Is(findErr, gorm.ErrRecordNotFound) {
+			return grpcerrors.PermissionDenied(findErr, "VCS repository is not accessible")
+		}
 		if findErr != nil {
 			return findErr
 		}
 
-		integration, bindErr := gitHubRepositoryIntegration(tx, orgID, repository)
+		installation, findErr := models.FindVCSProviderInstallation(tx, provider, repository.InstallationID)
+		if findErr != nil {
+			return findErr
+		}
+		integration, bindErr := models.FindOrCreateVCSProviderBinding(
+			tx,
+			orgID,
+			provider,
+			repository.InstallationID,
+			installation.AccountLogin,
+		)
 		if bindErr != nil {
 			return bindErr
 		}
@@ -101,7 +110,7 @@ func SelectFactoryVCSProviderRepository(
 			backlogRepositoryID = nil
 		}
 		branch := keepSavedDefaultBranch(factory.OnboardingConfigValue(), repository.FullName, liveBranch)
-		patch := models.FactoryOnboardingPatch{
+		if updateErr := factory.UpdateOnboarding(tx, models.FactoryOnboardingPatch{
 			VCSIntegrationID:    &integrationID,
 			VCSProvider:         &provider,
 			AppRepository:       &repository.FullName,
@@ -109,13 +118,8 @@ func SelectFactoryVCSProviderRepository(
 			BacklogRepository:   onboardingBacklogRepository(factory, repository.FullName),
 			BacklogRepositoryID: backlogRepositoryID,
 			DefaultBranch:       &branch,
-		}
-		patch, err = authorizeFactoryRepositoryPatch(ctx, tx, deps, factory, patch)
-		if err != nil {
-			return err
-		}
-		if err := factory.UpdateOnboarding(tx, patch); err != nil {
-			return err
+		}); updateErr != nil {
+			return updateErr
 		}
 		return syncFactoryVCSProviderBindings(tx, provider, previousIntegrationID, integration.ID)
 	})
@@ -134,56 +138,23 @@ func SelectFactoryVCSProviderRepository(
 	return &pb.SelectFactoryVCSProviderRepositoryResponse{Factory: serialized}, nil
 }
 
-const organizationKeyRepositoryDenied = "This repository is not authorized for the selected connection. Use a personal API token with GitHub access to select it first."
-
-func factoryRepositoryCaller(ctx context.Context, tx *gorm.DB, organizationID string) (*models.User, error) {
-	userID, ok := authentication.GetUserIdFromMetadata(ctx)
-	if !ok {
-		return nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
-	}
-	user, err := models.FindActiveUserByIDInTransaction(tx, organizationID, userID)
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, grpcerrors.PermissionDenied(err, "VCS repository is not accessible")
-	}
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to load user")
-	}
-	return user, nil
-}
-
-func gitHubRepositoryAccessError(err error, message string) error {
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return grpcerrors.PermissionDenied(err, message)
-	}
-	return err
-}
-
 func findGitHubCatalogRepository(
 	ctx context.Context,
 	tx *gorm.DB,
 	organizationID string,
 	repositoryID int64,
 ) (*models.AccessibleVCSProviderRepository, error) {
-	user, err := factoryRepositoryCaller(ctx, tx, organizationID)
+	if !githubapp.AccountConnectionRequired(ctx) {
+		if err := requireFactoryOrganizationMember(ctx, tx, organizationID); err != nil {
+			return nil, err
+		}
+		return models.FindInstalledVCSProviderRepository(tx, models.ProviderGitHub, repositoryID)
+	}
+	providerUserID, err := factoryVCSProviderUserID(ctx, tx, organizationID, models.ProviderGitHub)
 	if err != nil {
 		return nil, err
 	}
-	if user.IsAPIKey() {
-		repository, err := models.FindGrantedVCSProviderRepository(tx, user.OrganizationID, uuid.Nil, models.ProviderGitHub, repositoryID)
-		return repository, gitHubRepositoryAccessError(err, organizationKeyRepositoryDenied)
-	}
-	var repository *models.AccessibleVCSProviderRepository
-	if !githubapp.AccountConnectionRequired(ctx) {
-		repository, err = models.FindInstalledVCSProviderRepository(tx, models.ProviderGitHub, repositoryID)
-	} else {
-		var providerUserID int64
-		providerUserID, err = factoryVCSProviderUserID(ctx, tx, organizationID, models.ProviderGitHub)
-		if err != nil {
-			return nil, err
-		}
-		repository, err = models.FindAccessibleVCSProviderRepository(tx, models.ProviderGitHub, providerUserID, repositoryID)
-	}
-	return repository, gitHubRepositoryAccessError(err, "VCS repository is not accessible")
+	return models.FindAccessibleVCSProviderRepository(tx, models.ProviderGitHub, providerUserID, repositoryID)
 }
 
 func findGitHubCatalogRepositoryByName(
@@ -191,43 +162,30 @@ func findGitHubCatalogRepositoryByName(
 	tx *gorm.DB,
 	organizationID string,
 	fullName string,
-	integrationID uuid.UUID,
 ) (*models.AccessibleVCSProviderRepository, error) {
-	user, err := factoryRepositoryCaller(ctx, tx, organizationID)
-	if err != nil {
-		return nil, err
-	}
-	if user.IsAPIKey() {
-		repository, err := models.FindGrantedVCSProviderRepositoryByName(tx, user.OrganizationID, integrationID, models.ProviderGitHub, fullName)
-		return repository, gitHubRepositoryAccessError(err, organizationKeyRepositoryDenied)
-	}
-	var repository *models.AccessibleVCSProviderRepository
 	if !githubapp.AccountConnectionRequired(ctx) {
-		repository, err = models.FindInstalledVCSProviderRepositoryByName(tx, models.ProviderGitHub, fullName)
-	} else {
-		var providerUserID int64
-		providerUserID, err = factoryVCSProviderUserID(ctx, tx, organizationID, models.ProviderGitHub)
-		if err != nil {
+		if err := requireFactoryOrganizationMember(ctx, tx, organizationID); err != nil {
 			return nil, err
 		}
-		repository, err = models.FindAccessibleVCSProviderRepositoryByName(tx, models.ProviderGitHub, providerUserID, fullName)
+		return models.FindInstalledVCSProviderRepositoryByName(tx, models.ProviderGitHub, fullName)
 	}
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, grpcerrors.PermissionDenied(err, "VCS repository is not accessible")
-	}
+	providerUserID, err := factoryVCSProviderUserID(ctx, tx, organizationID, models.ProviderGitHub)
 	if err != nil {
 		return nil, err
 	}
-	if integrationID != uuid.Nil {
-		binding, err := models.FindVCSProviderIntegrationBinding(tx, integrationID)
-		if err != nil {
-			return nil, err
-		}
-		if binding.OrganizationID != user.OrganizationID || binding.Provider != models.ProviderGitHub || binding.InstallationID != repository.InstallationID {
-			return nil, grpcerrors.PermissionDenied(nil, "VCS repository is not accessible")
-		}
+	return models.FindAccessibleVCSProviderRepositoryByName(tx, models.ProviderGitHub, providerUserID, fullName)
+}
+
+func requireFactoryOrganizationMember(ctx context.Context, db *gorm.DB, organizationID string) error {
+	userID, ok := authentication.GetUserIdFromMetadata(ctx)
+	if !ok {
+		return grpcerrors.Unauthenticated(nil, "user not authenticated")
 	}
-	return repository, nil
+	_, err := models.FindActiveUserByIDInTransaction(db, organizationID, userID)
+	if err != nil {
+		return factoryErrorToStatus(err, "failed to load user")
+	}
+	return nil
 }
 
 func factoryVCSProviderUserID(ctx context.Context, db *gorm.DB, organizationID, provider string) (int64, error) {
@@ -262,20 +220,24 @@ func syncFactoryVCSProviderBindings(
 	currentIntegrationID uuid.UUID,
 ) error {
 	integrationIDs := []uuid.UUID{currentIntegrationID}
-	if strings.TrimSpace(previousIntegrationID) != "" && previousIntegrationID != currentIntegrationID.String() {
-		previousID, err := uuid.Parse(previousIntegrationID)
-		if err != nil {
-			return err
-		}
-		integrationIDs = append(integrationIDs, previousID)
+	if strings.TrimSpace(previousIntegrationID) == "" || previousIntegrationID == currentIntegrationID.String() {
+		return models.SyncVCSProviderBindingRepositories(tx, currentIntegrationID, provider)
 	}
-	slices.SortFunc(integrationIDs, func(a, b uuid.UUID) int { return strings.Compare(a.String(), b.String()) })
+
+	previousID, err := uuid.Parse(previousIntegrationID)
+	if err != nil {
+		return err
+	}
+	if _, err := models.FindVCSProviderIntegrationBinding(tx, previousID); errors.Is(err, gorm.ErrRecordNotFound) {
+		return models.SyncVCSProviderBindingRepositories(tx, currentIntegrationID, provider)
+	} else if err != nil {
+		return err
+	}
+	integrationIDs = append(integrationIDs, previousID)
+	if integrationIDs[1].String() < integrationIDs[0].String() {
+		integrationIDs[0], integrationIDs[1] = integrationIDs[1], integrationIDs[0]
+	}
 	for _, integrationID := range integrationIDs {
-		if _, err := models.FindVCSProviderIntegrationBinding(tx, integrationID); errors.Is(err, gorm.ErrRecordNotFound) {
-			continue
-		} else if err != nil {
-			return err
-		}
 		if err := models.SyncVCSProviderBindingRepositories(tx, integrationID, provider); err != nil {
 			return err
 		}
@@ -307,16 +269,4 @@ func onboardingBacklogRepository(factory *models.Factory, repository string) *st
 		return nil
 	}
 	return &repository
-}
-
-// An organization-key lookup supplies the granted connection; only humans can create one.
-func gitHubRepositoryIntegration(tx *gorm.DB, orgID uuid.UUID, repository *models.AccessibleVCSProviderRepository) (*models.Integration, error) {
-	if repository.IntegrationID != uuid.Nil {
-		return models.FindIntegrationInTransaction(tx, orgID, repository.IntegrationID)
-	}
-	installation, err := models.FindVCSProviderInstallation(tx, models.ProviderGitHub, repository.InstallationID)
-	if err != nil {
-		return nil, err
-	}
-	return models.FindOrCreateVCSProviderBinding(tx, orgID, models.ProviderGitHub, repository.InstallationID, installation.AccountLogin)
 }
