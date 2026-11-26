@@ -16,7 +16,7 @@ export function CustomAutomationWebhookFields({
   webhookId,
   usedWebhookIds,
   onChange,
-  helper = "The agent gets the JSON request body and can create a task.",
+  helper = "The agent gets the JSON request body.",
 }: {
   idPrefix: string;
   organizationId: string;
@@ -87,7 +87,12 @@ export function CustomAutomationWebhookFields({
       ) : null}
       <p className="text-xs text-muted-foreground">
         {helper}{" "}
-        <Link to={settingsPath} className="font-medium text-foreground underline underline-offset-2">
+        <Link
+          to={settingsPath}
+          target="_blank"
+          rel="noreferrer"
+          className="font-medium text-foreground underline underline-offset-2"
+        >
           Manage webhooks
         </Link>
       </p>

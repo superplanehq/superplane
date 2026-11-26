@@ -168,15 +168,12 @@ func (b CanvasAutomationBackend) compile(
 	if err := validateCustomAutomationWebhooks(tx, factory, settings.Triggers); err != nil {
 		return nil, nil, source.Diagnostic("triggers", grpcerrors.StatusMessage(err))
 	}
-	if settings.hasWebhookTrigger() && placement.Stage != models.CanvasColumnKeyBacklog {
-		return nil, nil, source.Diagnostic("triggers", "Webhook triggers are available in Backlog only.")
-	}
 	if strings.HasPrefix(placement.Stage, "custom-") {
 		if err := validateCustomStageTriggers(settings); err != nil {
 			return nil, nil, source.Diagnostic("triggers", grpcerrors.StatusMessage(err))
 		}
 	}
-	if live != nil && legacyCustomStageGraph(&models.Canvas{ColumnKey: &placement.Stage}, live) {
+	if live != nil && !settings.hasWebhookTrigger() && legacyCustomStageGraph(&models.Canvas{ColumnKey: &placement.Stage}, live) {
 		nodes, edges := editLegacyCustomStageGraph(live, settings)
 		return nodes, edges, nil
 	}
