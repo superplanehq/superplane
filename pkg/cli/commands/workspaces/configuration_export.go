@@ -24,7 +24,7 @@ type configurationExportCommand struct {
 func newConfigurationExportCommand(options core.BindOptions) *cobra.Command {
 	command := &configurationExportCommand{}
 	cmd := &cobra.Command{
-		Use: "export", Short: "Export all stages and automations", Args: cobra.NoArgs,
+		Use: "export", Short: "Export repositories, stages, and automations", Args: cobra.NoArgs,
 	}
 	command.bind(cmd)
 	cmd.Flags().StringVar(&command.outputDir, "output-dir", ".", "destination directory for the .superplane folder")

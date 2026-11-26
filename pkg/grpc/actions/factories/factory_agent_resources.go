@@ -9,7 +9,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
-	"github.com/superplanehq/superplane/pkg/githubapp"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	bitbucketintegration "github.com/superplanehq/superplane/pkg/integrations/bitbucket"
 	"github.com/superplanehq/superplane/pkg/mcp"
@@ -74,16 +73,40 @@ func CreateFactoryAgentResource(
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create agent resource")
 	}
-	if err := authorizeContextRepository(ctx, db, deps, organizationID, factory, config); err != nil {
-		return nil, factoryErrorToStatus(err, "failed to create agent resource")
+	ctx, providerChecks := newRepositoryProviderChecks(ctx)
+	db = database.DB(ctx)
+	if kind == models.FactoryAgentResourceKindContextRepo {
+		err = providerChecks.prepare(db, func(tx *gorm.DB) error {
+			current, err := findFactory(tx, orgID, req.GetFactoryId())
+			if err != nil {
+				return err
+			}
+			return authorizeContextRepository(ctx, tx, deps, organizationID, current, config)
+		})
+		if err != nil {
+			return nil, factoryErrorToStatus(err, "failed to create agent resource")
+		}
 	}
-	resource, err := factory.CreateAgentResource(
-		db,
-		protoKindToModel(req.GetKind()),
-		req.GetName(),
-		req.GetEnabled(),
-		config,
-	)
+	providerChecks.frozen = true
+	var resource *models.FactoryAgentResource
+	err = db.Transaction(func(tx *gorm.DB) error {
+		if kind == models.FactoryAgentResourceKindContextRepo {
+			if err := models.LockOrganizationVCSProviderBindingRepositories(tx, orgID); err != nil {
+				return err
+			}
+		}
+		if err := factory.LockForUpdate(tx); err != nil {
+			return err
+		}
+		if kind == models.FactoryAgentResourceKindContextRepo {
+			if err := authorizeContextRepository(ctx, tx, deps, organizationID, factory, config); err != nil {
+				return err
+			}
+		}
+		var err error
+		resource, err = factory.CreateAgentResource(tx, protoKindToModel(req.GetKind()), req.GetName(), req.GetEnabled(), config)
+		return err
+	})
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create agent resource")
 	}
@@ -148,22 +171,7 @@ func UpdateFactoryAgentResource(
 			config = &merged
 		}
 	} else if resource.Kind == models.FactoryAgentResourceKindContextRepo {
-		if req.Repository != nil || req.VcsProvider != nil || req.Ref != nil || req.Access != nil {
-			merged := resource.Config.Data()
-			if req.Repository != nil {
-				merged.Repository = req.GetRepository()
-			}
-			if req.VcsProvider != nil {
-				merged.VCSProvider = req.GetVcsProvider()
-			}
-			if req.Ref != nil {
-				merged.Ref = req.GetRef()
-			}
-			if req.Access != nil {
-				merged.Access = req.GetAccess()
-			}
-			config = &merged
-		}
+		config = contextRepositoryUpdateConfig(resource, req)
 	} else if req.Url != nil || req.Auth != nil || len(req.GetHeaders()) > 0 || req.GetReplaceDisabledTools() {
 		merged := resource.Config.Data()
 		if req.Url != nil {
@@ -185,28 +193,95 @@ func UpdateFactoryAgentResource(
 		config = &merged
 	}
 
-	if resource.Kind == models.FactoryAgentResourceKindContextRepo && (config != nil || (enabled != nil && *enabled)) {
-		merged := resource.Config.Data()
-		if config != nil {
-			merged = *config
-		}
-		if err := authorizeContextRepository(ctx, db, deps, organizationID, factory, merged); err != nil {
-			return nil, factoryErrorToStatus(err, "failed to update agent resource")
-		}
-	}
-
 	var revocation *oauthRevocation
 	if config != nil && resource.Config.Data().InvalidatesOAuth(*config) {
 		revocation = captureOAuthRevocation(ctx, deps, db, resource)
 	}
-	if err := resource.Update(db, name, enabled, config); err != nil {
+	ctx, providerChecks := newRepositoryProviderChecks(ctx)
+	db = database.DB(ctx)
+	isContextRepository := resource.Kind == models.FactoryAgentResourceKindContextRepo
+	if isContextRepository {
+		err = providerChecks.prepare(db, func(tx *gorm.DB) error {
+			currentFactory, err := findFactory(tx, orgID, req.GetFactoryId())
+			if err != nil {
+				return err
+			}
+			current, err := currentFactory.FindAgentResource(tx, resourceID)
+			if err != nil {
+				return err
+			}
+			merged := current.Config.Data()
+			if update := contextRepositoryUpdateConfig(current, req); update != nil {
+				merged = *update
+			}
+			if config != nil || (enabled != nil && *enabled) {
+				return authorizeContextRepository(ctx, tx, deps, organizationID, currentFactory, merged)
+			}
+			return nil
+		})
+		if err != nil {
+			return nil, factoryErrorToStatus(err, "failed to update agent resource")
+		}
+	}
+	providerChecks.frozen = true
+	err = db.Transaction(func(tx *gorm.DB) error {
+		if isContextRepository {
+			if err := models.LockOrganizationVCSProviderBindingRepositories(tx, orgID); err != nil {
+				return err
+			}
+		}
+		if err := factory.LockForUpdate(tx); err != nil {
+			return err
+		}
+		if isContextRepository {
+			var err error
+			resource, err = factory.FindAgentResource(tx, resourceID)
+			if err != nil {
+				return err
+			}
+			config = contextRepositoryUpdateConfig(resource, req)
+		}
+		if isContextRepository && (config != nil || (enabled != nil && *enabled)) {
+			merged := resource.Config.Data()
+			if config != nil {
+				merged = *config
+			}
+			if err := authorizeContextRepository(ctx, tx, deps, organizationID, factory, merged); err != nil {
+				return err
+			}
+		}
+
+		return resource.Update(tx, name, enabled, config)
+	})
+	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update agent resource")
 	}
+
 	revocation.run(ctx, deps)
 	if resource.Kind == models.FactoryAgentResourceKindContextRepo {
 		refreshWorkspaceRepositoryAutomations(ctx, deps, factory)
 	}
 	return &pb.UpdateFactoryAgentResourceResponse{Resource: serializeFactoryAgentResource(resource)}, nil
+}
+
+func contextRepositoryUpdateConfig(resource *models.FactoryAgentResource, req *pb.UpdateFactoryAgentResourceRequest) *models.FactoryAgentResourceConfig {
+	if req.Repository == nil && req.VcsProvider == nil && req.Ref == nil && req.Access == nil {
+		return nil
+	}
+	merged := resource.Config.Data()
+	if req.Repository != nil {
+		merged.Repository = req.GetRepository()
+	}
+	if req.VcsProvider != nil {
+		merged.VCSProvider = req.GetVcsProvider()
+	}
+	if req.Ref != nil {
+		merged.Ref = req.GetRef()
+	}
+	if req.Access != nil {
+		merged.Access = req.GetAccess()
+	}
+	return &merged
 }
 
 // authorizeContextRepository rejects a GitHub context repository the caller
@@ -224,7 +299,7 @@ func authorizeContextRepository(
 ) error {
 	provider := strings.ToLower(strings.TrimSpace(config.VCSProvider))
 	if provider == models.ProviderBitbucket {
-		return authorizeBitbucketContextRepository(db, deps, factory, config)
+		return authorizeBitbucketContextRepository(ctx, db, deps, factory, config)
 	}
 	if provider != "" && provider != models.ProviderGitHub {
 		return nil
@@ -233,7 +308,7 @@ func authorizeContextRepository(
 		return nil
 	}
 	integrationID := strings.TrimSpace(factory.OnboardingConfigValue().VCSIntegrationID)
-	if integrationID == "" || !githubapp.AccountConnectionRequired(ctx) {
+	if integrationID == "" {
 		return nil
 	}
 	bindingID, err := uuid.Parse(integrationID)
@@ -253,10 +328,7 @@ func authorizeContextRepository(
 		return nil
 	}
 
-	repository, err := findGitHubCatalogRepositoryByName(ctx, db, organizationID, config.Repository)
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return grpcerrors.PermissionDenied(err, "repository is not accessible")
-	}
+	repository, err := findGitHubCatalogRepositoryByName(ctx, db, organizationID, config.Repository, bindingID)
 	if err != nil {
 		return err
 	}
@@ -271,6 +343,7 @@ func authorizeContextRepository(
 // be limited to some repositories, so agents push with the workspace token.
 // A repository access token reaches only its own repository.
 func authorizeBitbucketContextRepository(
+	ctx context.Context,
 	db *gorm.DB,
 	deps IntakeDependencies,
 	factory *models.Factory,
@@ -282,18 +355,37 @@ func authorizeBitbucketContextRepository(
 	if strings.TrimSpace(factory.OnboardingConfigValue().VCSIntegrationID) == "" {
 		return nil
 	}
-	client, err := newFactoryBitbucketAPI(db, deps, factory)
-	if err != nil {
-		return err
+	var integration *models.Integration
+	if id, err := uuid.Parse(factory.OnboardingConfigValue().VCSIntegrationID); err == nil {
+		integration, err = models.FindIntegrationInTransaction(db, factory.OrganizationID, id)
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
 	}
-	if client.AuthType == bitbucketintegration.AuthTypeRepositoryAccessToken {
-		return grpcerrors.PermissionDenied(nil, "a repository access token cannot change other repositories")
+	if integration != nil && (integration.AppName != models.ProviderBitbucket || integration.State != models.IntegrationStateReady) {
+		return errFactoryBitbucketNotConnected
 	}
-	_, err = client.GetRepository(config.Repository)
-	var apiError *bitbucketintegration.APIError
-	if errors.As(err, &apiError) && (apiError.StatusCode == http.StatusForbidden || apiError.StatusCode == http.StatusNotFound) {
-		return grpcerrors.PermissionDenied(err, "repository is not accessible")
-	}
+	_, err := repositoryProviderCheck(ctx, factory.ID.String()+":context:"+config.VCSProvider+":"+config.Repository, []any{"context-repository", factory.OrganizationID, factory.OnboardingConfigValue(), integration, config.NormalizedContextRepo()}, func() (string, error) {
+		var client *bitbucketintegration.Client
+		var err error
+		if integration != nil {
+			client, err = buildBitbucketClient(database.DB(ctx), deps, integration)
+		} else {
+			client, err = newFactoryBitbucketAPI(database.DB(ctx), deps, factory)
+		}
+		if err != nil {
+			return "", err
+		}
+		if client.AuthType == bitbucketintegration.AuthTypeRepositoryAccessToken {
+			return "", grpcerrors.PermissionDenied(nil, "a repository access token cannot change other repositories")
+		}
+		_, err = client.GetRepository(config.Repository)
+		var apiError *bitbucketintegration.APIError
+		if errors.As(err, &apiError) && (apiError.StatusCode == http.StatusForbidden || apiError.StatusCode == http.StatusNotFound) {
+			return "", grpcerrors.PermissionDenied(err, "repository is not accessible")
+		}
+		return "", err
+	})
 	return err
 }
 
