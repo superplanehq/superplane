@@ -1,0 +1,22 @@
+apiVersion: v2
+kind: Automation
+name: ESLint AutoFix
+agent:
+  harness: superplane
+triggers:
+  - use: manual
+  - use: schedule
+    config:
+      cron: 0 9 * * *
+      utc_offset: 1
+steps:
+  - name: Lookup
+    prompt: |-
+      Look into the web_src/.eslint-budget-baseline.json file and try to identify up to 5 issues that can be fixed the most easily. For each of them open an independent task on SuperPlane.
+
+      Guidelines:
+
+      1/ No more than 5 created tasks
+      2/ Each task should have a clear description what should be fixed
+      3/ Try to minimize the requests as much as possible per task to make it easy to review
+      4/ Prefix the task title with [ESLint]

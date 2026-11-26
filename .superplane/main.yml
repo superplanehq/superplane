@@ -1,0 +1,103 @@
+apiVersion: v2
+kind: Factory
+name: SuperPlane Prod 🚀
+stages:
+  - key: backlog
+    name: Backlog
+    automations:
+      - id: task-analysis
+        name: Backlog
+        uses: '@superplane/task-analysis'
+        with:
+          agents:
+            refine-task:
+              additional_instructions: |-
+                These owner-selection rules override the default assignment rules.
+
+                Only assign an owner when the task has none. Never replace an existing owner.
+
+                Choose one eligible SuperPlane member in this order:
+
+                1. If the task has an explicit originating issue URL, inspect that issue. Prefer its assignee, then its author, if they match a member. Never infer an issue number from the SuperPlane task number.
+
+                2. Identify the affected behavior, files, and lines. Check CODEOWNERS for a matching member.
+
+                3. If CODEOWNERS provides no match, you MUST inspect commit history and blame for the affected lines. Follow file renames. Prefer members who introduced or substantially changed the behavior. Inspect commit messages and associated pull requests to identify human contributors behind bot-authored commits. Match co-authors to members by GitHub identity or email.
+
+                Do not treat formatting, import changes, file moves, or bulk migrations as stronger evidence than substantive contributions. Do not stop at the most recent commit.
+
+                4. If exact-file history provides no suitable member, inspect related files in the same subsystem.
+
+                5. Use the number of open tasks only to choose between similarly suitable candidates, or when all previous steps produce no suitable member. Refresh the counts immediately before using this fallback.
+
+                Before assigning, compare the strongest candidates. Record a concise reason naming the selection step and supporting evidence, such as a commit or pull request. If you use workload alone, explain why CODEOWNERS and commit history provided no suitable member.
+
+                Call assign_task_owner with only_if_unassigned set to true.
+              thinking_level: high
+      - id: add4872d70c011ba
+        name: CloudFlare security audit
+        uses: automations/cloudflare-security-audit.yaml
+      - id: intake-dependabot-alerts
+        name: Dependabot alerts
+        uses: '@superplane/intake/dependabot-alerts'
+      - id: 7bb38e29522ccad5
+        name: E2E Pruner
+        uses: automations/e2e-pruner.yaml
+      - id: 39a5adc9b10d31a7
+        name: ESLint AutoFix
+        uses: automations/eslint-autofix.yaml
+      - id: intake-github-issues
+        name: GitHub issues
+        uses: '@superplane/intake/github-issues'
+      - id: intake-sentry-exceptions
+        name: Sentry exceptions
+        uses: '@superplane/intake/sentry-exceptions'
+  - key: phase-0
+    name: Implement
+    run: implement
+    max_parallelism: 20
+    automations:
+      - id: implement
+        name: Implement
+        uses: '@superplane/implement'
+        with:
+          additional_instructions: |-
+            - Avoid running expensive full unit tests
+            - Any test run that takes more than 1 minute, should be stopped and run a smaller scope
+            - Aim to finish your work under 15 minutes. It is better to finish and open a PR compared to failing on timeout of 30 minutes
+            - use ponytail skill
+            - in this stage, do not update the docs repo, we added a special stage for that
+          agents:
+            implementation-agent-no-issue:
+              thinking_level: high
+              execution_timeout_seconds: 7200
+  - key: custom-a8e9ccb5-95a2-4ff6-b35e-085cdcfd8c5a
+    name: Update docs
+    automations:
+      - id: 0c76b1dd2d0750fa
+        name: Update Docs
+        uses: automations/update-docs.yaml
+  - key: verify
+    name: Verify
+    automations:
+      - id: pr-discussion
+        name: Address PR feedback
+        uses: '@superplane/pr-discussion'
+      - id: c061b683ae9731d6
+        name: Deploy to Preview
+        uses: automations/deploy-to-preview.yaml
+      - id: pr-checks
+        name: Fix pull request checks
+        uses: '@superplane/pr-checks'
+      - id: merge-confidence
+        name: Merge confidence
+        uses: '@superplane/merge-confidence'
+      - id: review-request
+        name: Review request
+        uses: '@superplane/review-request'
+  - key: done
+    name: Done
+    automations:
+      - id: pr-closure
+        name: PR Closure
+        uses: '@superplane/pr-closure'
