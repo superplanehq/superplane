@@ -7,7 +7,6 @@ import { WorkspacePageHeader } from "../../layout/WorkspacePageHeader";
 import { WorkOrdersErrorState, WorkOrdersLoadingState } from "../../workOrders/WorkOrdersEmptyStates";
 import { WorkOrdersLoadedView } from "../../workOrders/WorkOrdersLoadedView";
 import { factoryContentBodyClassName, factorySectionHeaderClassName } from "../factoryPageLayoutStyles";
-import { useBrokenIntegrationsBanner } from "../../lib/useBrokenIntegrationsBanner";
 import { useHostedCreditChrome } from "../../lib/useHostedCreditEmptyBanner";
 import { pullRequestsFromWorkOrders } from "../../lib/workOrderPullRequest";
 import { useWorkOrderListState } from "../../lib/useWorkOrderListState";
@@ -33,7 +32,6 @@ export function MissionsWorkOrdersPage() {
   const canDispatch = canAct("work_orders", "update");
   const canAssign = canAct("work_orders", "update");
   const { headerKicker: hostedCreditHeaderKicker } = useHostedCreditChrome(organizationId, routeSegment);
-  const brokenIntegrationsBanner = useBrokenIntegrationsBanner(organizationId, routeSegment);
   const isOrdersLoading = workOrdersLoading || (workOrdersFetching && workOrders.length === 0);
 
   if (workOrdersError) {
@@ -74,7 +72,6 @@ export function MissionsWorkOrdersPage() {
       canAssign={canAssign}
       permissionsLoading={permissionsLoading}
       hostedCreditHeaderKicker={hostedCreditHeaderKicker}
-      brokenIntegrationsBanner={brokenIntegrationsBanner}
       {...cardActions}
     />
   );
