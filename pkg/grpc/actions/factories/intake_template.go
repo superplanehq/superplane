@@ -2,6 +2,7 @@ package factories
 
 import (
 	"fmt"
+	"maps"
 	"regexp"
 	"slices"
 	"strconv"
@@ -568,8 +569,16 @@ func intakeTriggerConfiguration(spec intakeSpec, request intakeCanvasRequest) ma
 	if request.Source == models.FactoryIntakeSourceGitHubIssues {
 		configuration["actions"] = intakeTriggerActionsFor(deriveGitHubIssueListening(intakeSettingsOrDefault(request.Source, request.Settings)))
 	}
-	if request.Source == models.FactoryIntakeSourceProductiveTasks {
+	settings := intakeSettingsOrDefault(request.Source, request.Settings)
+	switch request.Source {
+	case models.FactoryIntakeSourceProductiveTasks:
 		configuration["actions"] = intakeProductiveTriggerActions(request.Settings)
+	case models.FactoryIntakeSourceJiraIssues:
+		configuration["events"] = intakeTriggerEventsFor(settings)
+	case models.FactoryIntakeSourceSentryExceptions:
+		configuration["actions"] = intakeSentryActionsFor(settings)
+	case models.FactoryIntakeSourceDatadog:
+		configuration["alertTransitions"] = intakeDatadogAlertTransitions(settings)
 	}
 	if request.Source == models.FactoryIntakeSourceLinearIssues {
 		applyLinearTriggerConfiguration(configuration, linearTriggerSettings(request.Settings, configuration))
@@ -588,14 +597,19 @@ func intakeTriggerConfiguration(spec intakeSpec, request intakeCanvasRequest) ma
 }
 
 func intakeTriggerMetadata(source string, settings intakeSettings) map[string]any {
-	if source != models.FactoryIntakeSourceJiraIssues {
-		return nil
+	settings = intakeSettingsOrDefault(source, settings)
+	metadata := map[string]any{"intakeConfidencePct": settings.ConfidencePct}
+	if settings.listeningConfigured {
+		metadata["intakeExplicitIssueEvents"] = true
 	}
-	return jiraCompletionMetadata(intakeSettingsOrDefault(source, settings))
+	if source == models.FactoryIntakeSourceJiraIssues {
+		maps.Copy(metadata, jiraCompletionMetadata(settings))
+	}
+	return metadata
 }
 
 func intakeSettingsOrDefault(source string, settings intakeSettings) intakeSettings {
-	if settings.ConfidencePct != 0 {
+	if settings.configured || settings.ConfidencePct != 0 {
 		return settings
 	}
 	if source == models.FactoryIntakeSourceJiraIssues {

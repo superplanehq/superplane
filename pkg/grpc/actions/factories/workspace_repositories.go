@@ -81,6 +81,14 @@ func republishWorkspaceRepositoryAutomations(ctx context.Context, tx *gorm.DB, d
 		}
 		spec := models.LiveCanvasSpec{Nodes: liveVersion.Nodes, Edges: liveVersion.Edges}
 		nodeIDs := workspaceScopeNodeIDs(spec, provider, handlerCanvasIDs[canvas.ID])
+		binding, err := factoryConfigurationSavedBinding(tx, canvas)
+		if err != nil {
+			return err
+		}
+		if _, pinned := binding["resource_id"]; pinned {
+			// An explicit repository stays pinned when workspace repositories change.
+			nodeIDs = nil
+		}
 		setupNodeIDs := withWorkspaceListenerNodeIDs(nodeIDs, provider, liveVersion.Nodes)
 		if len(setupNodeIDs) == 0 {
 			continue

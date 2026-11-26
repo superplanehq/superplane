@@ -200,8 +200,9 @@ func (VCSProviderIntegrationRepository) TableName() string {
 
 type AccessibleVCSProviderRepository struct {
 	VCSProviderRepository
-	AccountLogin string
-	AccountType  string
+	AccountLogin  string
+	AccountType   string
+	IntegrationID uuid.UUID
 }
 
 func UpsertVCSProviderInstallation(tx *gorm.DB, installation *VCSProviderInstallation) error {
@@ -1597,9 +1598,43 @@ func ListVCSProviderBindingRepositories(tx *gorm.DB, integrationID uuid.UUID) ([
 	return repositories, err
 }
 
-// SyncVCSProviderBindingRepositories limits a binding to repositories selected
-// by its active Factory workspaces. The transaction lock prevents concurrent
-// workspace updates from replacing each other's grants.
+// Organization keys can use only current grants on active organization bindings.
+func FindGrantedVCSProviderRepository(tx *gorm.DB, organizationID, integrationID uuid.UUID, provider string, repositoryID int64) (*AccessibleVCSProviderRepository, error) {
+	var repository AccessibleVCSProviderRepository
+	err := grantedVCSProviderRepositories(tx, organizationID, integrationID, provider).
+		Where("repository.repository_id = ?", repositoryID).First(&repository).Error
+	return &repository, err
+}
+
+func FindGrantedVCSProviderRepositoryByName(tx *gorm.DB, organizationID, integrationID uuid.UUID, provider, fullName string) (*AccessibleVCSProviderRepository, error) {
+	var repository AccessibleVCSProviderRepository
+	err := grantedVCSProviderRepositories(tx, organizationID, integrationID, provider).
+		Where("LOWER(repository.full_name) = LOWER(?)", strings.TrimSpace(fullName)).First(&repository).Error
+	return &repository, err
+}
+
+func LockVCSProviderBindingRepositories(tx *gorm.DB, integrationID uuid.UUID) error {
+	lockKey := fmt.Sprintf("vcs-provider-binding-repositories:%s", integrationID)
+	return tx.Exec("SELECT pg_advisory_xact_lock(hashtext(?))", lockKey).Error
+}
+
+// Lock in synchronization order before checking grants and saving workspace uses.
+func LockOrganizationVCSProviderBindingRepositories(tx *gorm.DB, organizationID uuid.UUID) error {
+	var bindings []VCSProviderIntegrationBinding
+	if err := tx.Where("organization_id = ?", organizationID).Order("integration_id").Find(&bindings).Error; err != nil {
+		return err
+	}
+	for _, binding := range bindings {
+		if err := LockVCSProviderBindingRepositories(tx, binding.IntegrationID); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// SyncVCSProviderBindingRepositories limits a binding to workspace selections
+// and existing grants needed by explicitly bound automations. The transaction
+// lock prevents concurrent workspace updates from replacing each other's grants.
 func SyncVCSProviderBindingRepositories(tx *gorm.DB, integrationID uuid.UUID, provider string) error {
 	provider, err := normalizeVCSProvider(provider)
 	if err != nil {
@@ -1614,8 +1649,7 @@ func SyncVCSProviderBindingRepositories(tx *gorm.DB, integrationID uuid.UUID, pr
 	}
 
 	return tx.Transaction(func(tx *gorm.DB) error {
-		lockKey := fmt.Sprintf("vcs-provider-binding-repositories:%s", integrationID)
-		if err := tx.Exec("SELECT pg_advisory_xact_lock(hashtext(?))", lockKey).Error; err != nil {
+		if err := LockVCSProviderBindingRepositories(tx, integrationID); err != nil {
 			return err
 		}
 
@@ -1638,6 +1672,13 @@ func SyncVCSProviderBindingRepositories(tx *gorm.DB, integrationID uuid.UUID, pr
 			if config.BacklogRepositoryID > 0 {
 				selected[config.BacklogRepositoryID] = struct{}{}
 			}
+		}
+		retained, err := binding.retainedAutomationRepositoryIDs(tx)
+		if err != nil {
+			return err
+		}
+		for _, repositoryID := range retained {
+			selected[repositoryID] = struct{}{}
 		}
 
 		if err := tx.Where("integration_id = ?", integrationID).Delete(&VCSProviderIntegrationRepository{}).Error; err != nil {
@@ -1780,6 +1821,37 @@ func MatchBindingContextRepositoryIDs(tx *gorm.DB, integrationID uuid.UUID, inst
 		return nil, nil, err
 	}
 	return MatchVCSProviderRepositoryIDs(tx, ProviderGitHub, installationID, names)
+}
+
+func (b *VCSProviderIntegrationBinding) retainedAutomationRepositoryIDs(tx *gorm.DB) ([]int64, error) {
+	var repositoryIDs []int64
+	err := tx.Table("vcs_provider_integration_repositories AS access").
+		Select("DISTINCT access.repository_id").
+		Joins("JOIN vcs_provider_repositories AS repository ON repository.provider = access.provider AND repository.repository_id = access.repository_id AND repository.installation_id = ?", b.InstallationID).
+		Joins("JOIN factory_configuration_automations AS automation ON LOWER(BTRIM(automation.binding ->> 'resource_id')) = LOWER(repository.full_name)").
+		Joins("JOIN workflows AS canvas ON canvas.id = automation.canvas_id AND canvas.factory_id = automation.factory_id AND canvas.organization_id = automation.organization_id").
+		Joins("JOIN factories AS factory ON factory.id = automation.factory_id AND factory.organization_id = automation.organization_id").
+		Where("LOWER(COALESCE(NULLIF(automation.binding ->> 'integration_id', ''), factory.onboarding_config ->> 'vcs_integration_id')) = access.integration_id::text").
+		Where("access.integration_id = ? AND access.provider = ? AND automation.organization_id = ?", b.IntegrationID, b.Provider, b.OrganizationID).
+		Where("canvas.deleted_at IS NULL AND factory.deleted_at IS NULL").
+		Pluck("access.repository_id", &repositoryIDs).Error
+	return repositoryIDs, err
+}
+
+func grantedVCSProviderRepositories(tx *gorm.DB, organizationID, integrationID uuid.UUID, provider string) *gorm.DB {
+	query := tx.Table("vcs_provider_repositories AS repository").
+		Select("repository.*, installation.account_login, installation.account_type, binding.integration_id").
+		Joins("JOIN vcs_provider_installations AS installation ON installation.provider = repository.provider AND installation.installation_id = repository.installation_id").
+		Joins("JOIN vcs_provider_integration_bindings AS binding ON binding.provider = repository.provider AND binding.installation_id = repository.installation_id").
+		Joins("JOIN app_installations AS integration ON integration.id = binding.integration_id AND integration.organization_id = binding.organization_id AND integration.app_name = binding.provider").
+		Joins("JOIN vcs_provider_integration_repositories AS access ON access.integration_id = binding.integration_id AND access.provider = repository.provider AND access.repository_id = repository.repository_id").
+		Where("binding.organization_id = ? AND repository.provider = ?", organizationID, provider).
+		Where("integration.state = ? AND integration.deleted_at IS NULL AND installation.suspended_at IS NULL", IntegrationStateReady).
+		Order("binding.integration_id")
+	if integrationID != uuid.Nil {
+		query = query.Where("binding.integration_id = ?", integrationID)
+	}
+	return query
 }
 
 func normalizeVCSProvider(provider string) (string, error) {
