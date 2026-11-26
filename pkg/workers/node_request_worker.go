@@ -46,11 +46,6 @@ func (w *NodeRequestWorker) Start(ctx context.Context) {
 				w.logger.WithError(checksErr).Error("Error finding checks startup requests")
 			}
 			requests = append(requests, checksRequests...)
-			retiredMonitors, cleanupErr := models.ListDueRetiredDatadogMonitorRequests(database.DB(ctx))
-			if cleanupErr != nil {
-				w.logger.WithError(cleanupErr).Error("Error finding retired monitor cleanup requests")
-			}
-			requests = append(requests, retiredMonitors...)
 
 			telemetry.RecordNodeRequestWorkerRequestsCount(context.Background(), len(requests))
 

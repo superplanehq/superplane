@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"slices"
 	"strings"
-	"time"
 
 	"github.com/mitchellh/mapstructure"
 	log "github.com/sirupsen/logrus"
@@ -15,8 +14,6 @@ import (
 )
 
 const ErrorTrackingAlertPayloadType = "datadog.errorTrackingAlert"
-const ReconcileIntakeMonitorAction = "reconcileIntakeMonitor"
-const reconcileIntakeMonitorAction = ReconcileIntakeMonitorAction
 
 type OnErrorTrackingAlert struct{}
 
@@ -133,25 +130,21 @@ func (t *OnErrorTrackingAlert) Configuration() []configuration.Field {
 }
 
 func (t *OnErrorTrackingAlert) Setup(ctx core.TriggerContext) error {
+	metadata := OnErrorTrackingAlertMetadata{}
+	if ctx.Metadata != nil {
+		if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil {
+			return fmt.Errorf("failed to decode metadata: %w", err)
+		}
+	}
+
 	if ctx.Metadata == nil {
 		return fmt.Errorf("trigger metadata is required")
 	}
-	if ctx.Requests == nil {
-		return fmt.Errorf("trigger requests are required")
-	}
-	if ctx.Integration == nil {
-		return fmt.Errorf("integration is required")
-	}
-	config := OnErrorTrackingAlertConfiguration{}
-	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
-		return fmt.Errorf("failed to decode configuration: %w", err)
-	}
-	metadata := OnErrorTrackingAlertMetadata{}
-	if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil {
-		return fmt.Errorf("failed to decode metadata: %w", err)
-	}
 
 	if metadata.SubscriptionID == "" {
+		if ctx.Integration == nil {
+			return fmt.Errorf("integration is required")
+		}
 		subscriptionID, err := ctx.Integration.Subscribe(SubscriptionConfiguration{})
 		if err != nil {
 			return fmt.Errorf("failed to subscribe to datadog alerts: %w", err)
@@ -159,58 +152,32 @@ func (t *OnErrorTrackingAlert) Setup(ctx core.TriggerContext) error {
 		metadata.SubscriptionID = subscriptionID.String()
 	}
 
-	if err := setErrorTrackingAlertMetadata(ctx.Metadata, metadata); err != nil {
+	config := OnErrorTrackingAlertConfiguration{}
+	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
+		return fmt.Errorf("failed to decode configuration: %w", err)
+	}
+
+	if err := reconcileIntakeMonitor(ctx, &metadata, config.Service); err != nil {
 		return err
 	}
 
-	return ctx.Requests.ScheduleActionCall(reconcileIntakeMonitorAction, map[string]any{}, time.Second)
-}
-
-func (t *OnErrorTrackingAlert) Hooks() []core.Hook {
-	return []core.Hook{{Name: reconcileIntakeMonitorAction, Type: core.HookTypeInternal}}
-}
-
-func (t *OnErrorTrackingAlert) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
-	if ctx.HTTP != nil {
-		ctx.HTTP = monitorDeadlineHTTP{HTTPContext: ctx.HTTP, deadline: time.Now().Add(time.Minute)}
-	}
-	if retired, _ := ctx.Parameters["retiredMonitor"].(bool); retired && ctx.Name == reconcileIntakeMonitorAction {
-		return nil, ReleaseRetiredIntakeMonitor(core.TriggerContext{Configuration: ctx.Configuration, HTTP: ctx.HTTP, Metadata: ctx.Metadata, Integration: ctx.Integration})
-	}
-	if ctx.Name != reconcileIntakeMonitorAction {
-		return nil, fmt.Errorf("unknown hook: %s", ctx.Name)
-	}
-	if ctx.Metadata == nil {
-		return nil, fmt.Errorf("trigger metadata is required")
-	}
-	metadata := OnErrorTrackingAlertMetadata{}
-	if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil {
-		return nil, fmt.Errorf("failed to decode metadata: %w", err)
-	}
-	config := OnErrorTrackingAlertConfiguration{}
-	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
-		return nil, fmt.Errorf("failed to decode configuration: %w", err)
-	}
-	if err := reconcileIntakeMonitor(core.TriggerContext{
-		Configuration: ctx.Configuration,
-		HTTP:          ctx.HTTP,
-		Metadata:      ctx.Metadata,
-		Integration:   ctx.Integration,
-	}, &metadata, config.Service); err != nil {
-		return nil, err
-	}
-	return nil, setErrorTrackingAlertMetadata(ctx.Metadata, metadata)
-}
-
-func setErrorTrackingAlertMetadata(writer core.MetadataWriter, metadata OnErrorTrackingAlertMetadata) error {
+	// Preserve the factory template and intake settings stored with the trigger.
 	values := map[string]any{}
-	if err := mapstructure.Decode(writer.Get(), &values); err != nil {
+	if err := mapstructure.Decode(ctx.Metadata.Get(), &values); err != nil {
 		return fmt.Errorf("failed to decode metadata: %w", err)
 	}
 	values["subscriptionId"] = metadata.SubscriptionID
 	values["monitorId"] = metadata.MonitorID
 	values["monitorService"] = metadata.MonitorService
-	return writer.Set(values)
+	return ctx.Metadata.Set(values)
+}
+
+func (t *OnErrorTrackingAlert) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (t *OnErrorTrackingAlert) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
+	return nil, nil
 }
 
 func (t *OnErrorTrackingAlert) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {

@@ -104,13 +104,13 @@ func (c *Client) execRequest(method, requestURL string, body io.Reader) ([]byte,
 
 	res, err := c.http.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("error executing request: %w", err)
+		return nil, fmt.Errorf("error executing request: %v", err)
 	}
 	defer res.Body.Close()
 
 	responseBody, err := io.ReadAll(res.Body)
 	if err != nil {
-		return nil, fmt.Errorf("error reading body: %w", err)
+		return nil, fmt.Errorf("error reading body: %v", err)
 	}
 
 	if res.StatusCode < 200 || res.StatusCode >= 300 {

@@ -297,16 +297,17 @@ SuperPlane infers this dependency only when exactly one valid source exists.
 Apply checks the plan token again before publication. Changes to relevant
 workspace defaults, repository settings, resolved connections, resources, or
 dependencies require a new plan. Apply saves repository records, connection
-grants, graphs, placement, ownership, subscriptions, and provisioning requests
-in one transaction. A synchronous setup error rolls back the full apply.
+grants, graphs, placement, ownership, and subscriptions in one transaction.
+A synchronous setup error rolls back the local changes. Database rollback
+does not undo external provider changes made by existing setup calls.
 
 Repository changes refresh affected listeners across the workspace. Explicit
 automation resource overrides keep their selected repository. Existing tasks
 retain a snapshot of their repository and branch before defaults change.
 
-A successful apply means configuration and provisioning requests were committed.
-External provisioning can finish later. Datadog monitor changes use durable node
-requests and existing worker retries. Notifications follow the transaction commit.
+A successful apply means configuration was published. Datadog intakes use the
+existing synchronous monitor setup. Webhook provisioning follows the existing
+worker path. Notifications follow the transaction commit.
 YAML-created intakes skip historical imports and record their import status as
 `skipped`. Future provider events use the installed trigger configuration.
 
@@ -315,10 +316,9 @@ Automations omitted from the manifest follow the existing removal behavior.
 Shared automations must retain the same configuration in every existing stage,
 or be removed from every stage.
 
-Apply the ownership database migration first. Deploy the updated node-request
-workers before the API so workers can process the new Datadog provisioning hook.
-No new runtime service or configuration key is required. Existing node-request
-and webhook workers process provisioning and cleanup.
+Apply the ownership database migration before deploying the updated API and
+workers. No Datadog database migration, runtime service, or configuration key is
+required. Existing webhook workers continue provisioning and cleanup.
 
 Repository configuration reuses existing records and requires no additional
 database migration or runtime configuration key.

@@ -2,6 +2,7 @@ package factories
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -263,10 +264,7 @@ func configurationAssertCatalogBindingChange(t *testing.T, f configurationFixtur
 	require.NoError(t, err)
 	binding := *automation.Binding
 	if source == models.FactoryIntakeSourceDatadog {
-		// A completed reconcile stores these values for post-commit retirement.
-		metadata := previous.Metadata.Data()
-		metadata["monitorId"], metadata["monitorService"] = "123", "project"
-		require.NoError(t, db.Model(previous).Update("metadata", datatypes.NewJSONType(metadata)).Error)
+		require.NotEmpty(t, previous.Metadata.Data()["monitorId"])
 		binding.IntegrationID = createReadyOnboardingIntegration(t, f.r.Organization.ID, "datadog")
 		configureConfigurationCatalogIntegration(t, f, binding.IntegrationID, "datadog")
 	} else {
@@ -298,7 +296,7 @@ func configurationAssertCatalogBindingChange(t *testing.T, f configurationFixtur
 	require.Equal(t, uuid.MustParse(binding.IntegrationID), *current.AppInstallationID)
 	if source == models.FactoryIntakeSourceDatadog {
 		require.Equal(t, "123", retired.Metadata.Data()["monitorId"], "cleanup needs the old monitor with its old integration")
-		require.Empty(t, current.Metadata.Data()["monitorId"])
+		require.NotEmpty(t, current.Metadata.Data()["monitorId"])
 		var count int64
 		require.NoError(t, db.Model(&models.IntegrationSubscription{}).Where("workflow_id = ? AND node_id = ?", canvas.ID, retired.NodeID).Count(&count).Error)
 		require.Zero(t, count, "the retired connection must stop delivering alerts")
@@ -407,9 +405,8 @@ func configurationAssertCatalogSupportingRecords(t *testing.T, f configurationFi
 			require.NoError(t, db.Where("workflow_id = ? AND node_id = ?", canvas.ID, node.NodeID).First(&subscription).Error)
 			require.Equal(t, *node.AppInstallationID, subscription.InstallationID)
 			if strings.HasPrefix(node.ComponentName(), "datadog.") {
-				request, err := models.FindPendingRequestForNode(db, canvas.ID, node.NodeID)
-				require.NoError(t, err)
-				require.Equal(t, "reconcileIntakeMonitor", request.Spec.Data().InvokeAction.ActionName)
+				require.Equal(t, "123", node.Metadata.Data()["monitorId"])
+				require.Equal(t, node.Configuration.Data()["service"], node.Metadata.Data()["monitorService"])
 			}
 			continue
 		}
@@ -569,7 +566,7 @@ func TestFactoryConfigurationRejectsProviderAndStageRestrictions(t *testing.T) {
 }
 
 // Only the provider HTTP boundary is replaced. The production trigger still
-// creates its real subscriptions, webhook records, and provisioning requests.
+// creates its real subscriptions, webhook records, and monitor metadata.
 type configurationCatalogTrigger struct {
 	core.Trigger
 	http *configurationCatalogHTTP
@@ -582,10 +579,14 @@ func (trigger configurationCatalogTrigger) Setup(ctx core.TriggerContext) error 
 
 type configurationCatalogHTTP struct {
 	requests int
+	monitor  map[string]any
 }
 
 func (client *configurationCatalogHTTP) Do(request *http.Request) (*http.Response, error) {
 	client.requests++
+	if (request.URL.Host == "api.datadoghq.com" || request.URL.Host == "api.datadoghq.eu") && strings.HasPrefix(request.URL.Path, "/api/v1/monitor") {
+		return client.datadogMonitorResponse(request)
+	}
 	if request.Method != http.MethodGet {
 		return nil, fmt.Errorf("unexpected provider write during configuration: %s %s", request.Method, request.URL)
 	}
@@ -604,6 +605,33 @@ func (client *configurationCatalogHTTP) Do(request *http.Request) (*http.Respons
 		return nil, fmt.Errorf("unexpected provider read during configuration: %s", request.URL)
 	}
 	return &http.Response{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": []string{"application/json"}}, Body: io.NopCloser(strings.NewReader(body)), Request: request}, nil
+}
+
+func (client *configurationCatalogHTTP) datadogMonitorResponse(request *http.Request) (*http.Response, error) {
+	var body []byte
+	if request.Method == http.MethodGet && request.URL.Path == "/api/v1/monitor/search" {
+		body = []byte(`{"monitors":[]}`)
+	} else {
+		switch request.Method {
+		case http.MethodPost, http.MethodPut:
+			if err := json.NewDecoder(request.Body).Decode(&client.monitor); err != nil {
+				return nil, err
+			}
+			client.monitor["id"] = 123
+		case http.MethodGet:
+			if request.URL.Path != "/api/v1/monitor/123" || client.monitor == nil {
+				return nil, fmt.Errorf("unexpected monitor lookup: %s", request.URL)
+			}
+		default:
+			return nil, fmt.Errorf("unexpected monitor request: %s %s", request.Method, request.URL)
+		}
+		var err error
+		body, err = json.Marshal(client.monitor)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return &http.Response{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": []string{"application/json"}}, Body: io.NopCloser(strings.NewReader(string(body))), Request: request}, nil
 }
 
 func configureConfigurationCatalogIntegration(t *testing.T, f configurationFixture, integrationID, provider string) {
@@ -668,7 +696,7 @@ func configureConfigurationCatalogIntegration(t *testing.T, f configurationFixtu
 	case "datadog":
 		configuration["site"] = "datadoghq.com"
 		sensitive("apiKey")
-		sensitive("applicationKey")
+		sensitive("appKey")
 	}
 	integration.Configuration = datatypes.NewJSONType(configuration)
 	integration.Metadata = datatypes.NewJSONType(metadata)

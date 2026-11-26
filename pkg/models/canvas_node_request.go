@@ -40,7 +40,6 @@ func (r *CanvasNodeRequest) TableName() string {
 }
 
 type NodeExecutionRequestSpec struct {
-	DatadogMonitor         *DatadogMonitorRequest         `json:"datadog_monitor,omitempty"`
 	PullRequestChecksStart *PullRequestChecksStartRequest `json:"pull_request_checks_start,omitempty"`
 	InvokeAction           *InvokeAction                  `json:"invoke_action,omitempty"`
 	VisualEvidenceCapture  *VisualEvidenceCaptureRequest  `json:"visual_evidence_capture,omitempty"`
