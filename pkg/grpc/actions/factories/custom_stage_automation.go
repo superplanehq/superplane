@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 
+	factorycomponent "github.com/superplanehq/superplane/pkg/components/factory"
 	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
@@ -42,24 +43,75 @@ func buildCustomStageAutomationCanvas(tx *gorm.DB, factory *models.Factory, name
 		Metadata:   &yaml.CanvasMetadata{Name: name, Description: "Run ordered prompt and Bash automation steps."},
 		Spec:       &yaml.CanvasSpec{},
 	}
+	automaticIndex := 0
+	for _, trigger := range settings.Triggers {
+		if trigger.Mode == pb.FactoryCustomAutomation_START_MODE_AUTOMATIC {
+			automaticIndex = trigger.Index
+			break
+		}
+	}
 	metadata := customAutomationNodeMetadata(provider, settings.Icon, settings.RunsOnTask, func(template map[string]any) {
 		template["startMode"] = "automatic"
+		template["triggerIndex"] = automaticIndex
+	})
+	runnerConfiguration := customAutomationRunnerConfiguration(tx, factory, settings, []any{
+		checkoutEnvironmentVar("REPO", "{{ root().data?.workOrder?.repository ?? order().repository }}"),
+		checkoutEnvironmentVar("REPO_URL", "{{ root().data?.workOrder?.repository_url ?? order().repository_url }}"),
+		checkoutEnvironmentVar("BASE", "{{ root().data?.workOrder?.default_branch ?? order().default_branch }}"),
 	})
 	doc.Spec.Nodes = []yaml.Node{{
 		ID: "on-run", Name: "On Run", Type: yaml.NodeTypeTrigger, Component: "onRun", Configuration: map[string]any{}, Metadata: metadata,
-	}, customAutomationRunnerNode("stage-run", "Run stage automation", settings,
-		customAutomationRunnerConfiguration(tx, factory, settings, []any{
-			checkoutEnvironmentVar("REPO", "{{ order().repository }}"),
-			checkoutEnvironmentVar("REPO_URL", "{{ order().repository_url }}"),
-			checkoutEnvironmentVar("BASE", "{{ order().default_branch }}"),
-		}), 80)}
+	}, customAutomationRunnerNode("stage-run", "Run stage automation", settings, runnerConfiguration, 80)}
 	doc.Spec.Edges = []yaml.Edge{{SourceID: "on-run", TargetID: "stage-run", Channel: "default"}}
+	webhookOffset := 0
+	for _, trigger := range settings.Triggers {
+		if trigger.Mode != pb.FactoryCustomAutomation_START_MODE_WEBHOOK {
+			continue
+		}
+		webhookOffset++
+		triggerID := "webhook-" + trigger.WebhookID
+		doc.Spec.Nodes = append(doc.Spec.Nodes, yaml.Node{
+			ID:        triggerID,
+			Name:      "Webhook",
+			Type:      yaml.NodeTypeTrigger,
+			Component: factorycomponent.OnWebhookTriggerName,
+			Configuration: map[string]any{
+				"webhook":   trigger.WebhookID,
+				"taskMatch": customAutomationTaskMatchConfiguration(trigger.TaskMatch),
+			},
+			Metadata: customAutomationNodeMetadata(provider, settings.Icon, settings.RunsOnTask, func(template map[string]any) {
+				template["startMode"] = "webhook"
+				template["triggerIndex"] = trigger.Index
+			}),
+			Position: yaml.Position{X: 0, Y: 80 + webhookOffset*180},
+		})
+		doc.Spec.Edges = append(doc.Spec.Edges, yaml.Edge{SourceID: triggerID, TargetID: "stage-run", Channel: "default"})
+	}
+	if webhookOffset > 0 {
+		appendWebhookPayloadInstructions(runnerConfiguration)
+	}
 	return doc, nil
 }
 
 func validateCustomStageTriggers(settings *customAutomationSettings) error {
-	if len(settings.Triggers) != 1 || settings.StartMode != pb.FactoryCustomAutomation_START_MODE_AUTOMATIC || settings.runsWithoutTask() {
+	if settings.runsWithoutTask() {
 		return invalidArgument("Custom stage automations run on a task when it enters the stage. Keep one task_enters_stage trigger.")
+	}
+	automatic := 0
+	for _, trigger := range settings.Triggers {
+		switch trigger.Mode {
+		case pb.FactoryCustomAutomation_START_MODE_AUTOMATIC:
+			automatic++
+		case pb.FactoryCustomAutomation_START_MODE_WEBHOOK:
+			if trigger.TaskMatch == nil {
+				return invalidArgument("A custom stage webhook must find a task.")
+			}
+		default:
+			return invalidArgument("Custom stage automations run on a task when it enters the stage. Keep one task_enters_stage trigger.")
+		}
+	}
+	if automatic != 1 {
+		return invalidArgument("Custom stage automations must keep one task_enters_stage trigger.")
 	}
 	return nil
 }

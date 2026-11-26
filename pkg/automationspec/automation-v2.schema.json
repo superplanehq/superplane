@@ -70,7 +70,19 @@
         "webhook_id": {
           "$ref": "#/$defs/nonblank",
           "description": "Use the ID of a webhook from the workspace settings."
+        },
+        "task_match": {
+          "$ref": "#/$defs/taskMatch"
         }
+      }
+    },
+    "taskMatch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "field_path"],
+      "properties": {
+        "kind": { "enum": ["task", "pull_request", "commit"] },
+        "field_path": { "$ref": "#/$defs/nonblank" }
       }
     },
     "schedule": {

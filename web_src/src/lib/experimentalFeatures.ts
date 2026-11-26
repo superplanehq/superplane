@@ -41,6 +41,9 @@ export const FEATURE_FACTORY_SCHEDULED_INTAKE = "factory_scheduled_intake";
 /** Organization experimental feature: webhook intake from the Backlog column menu. */
 export const FEATURE_FACTORY_WEBHOOK_INTAKE = "factory_webhook_intake";
 
+/** Organization experimental feature: start task automations from workspace webhooks. */
+export const FEATURE_FACTORY_TASK_WEBHOOK_TRIGGERS = "factory_task_webhook_triggers";
+
 /** Organization experimental feature: Actions timeline on a step card. Off until the organization enables it. */
 export const FEATURE_FACTORY_STEP_ACTIONS = "factory_step_actions";
 

@@ -6,6 +6,7 @@ import type {
   OrganizationsIntegration,
   FactoryCustomAutomationStartTrigger,
   FactoryCustomAutomationStartMode,
+  StartTriggerTaskMatch,
 } from "@/api-client";
 
 import type { PlanningReviewDraft, PlanningReviewStep } from "../pages/planningReviewMockup";
@@ -21,6 +22,10 @@ const CUSTOM_AUTOMATION_START_MODES: Record<CustomAutomationMode, FactoryCustomA
   webhook: "START_MODE_WEBHOOK",
 };
 export type CustomAutomationSchedule = { cronExpression: string; utcOffset: number };
+export type CustomAutomationTaskMatch = {
+  kind: "task" | "pull_request" | "commit";
+  fieldPath: string;
+};
 export type CustomAutomationColumn = "backlog" | "implement" | "verify" | "done" | `custom-${string}`;
 
 export function customAutomationColumn(value: string | null | undefined): CustomAutomationColumn {
@@ -55,14 +60,22 @@ export type CustomAutomationTrigger = {
   mode: CustomAutomationMode;
   schedule: CustomAutomationSchedule;
   webhookId?: string;
+  taskMatch?: CustomAutomationTaskMatch;
 };
 
 export function newCustomAutomationTrigger(
   mode: CustomAutomationMode = "manual",
   schedule: CustomAutomationSchedule = customAutomationSchedule(),
   webhookId?: string,
+  taskMatch?: CustomAutomationTaskMatch,
 ): CustomAutomationTrigger {
-  return { id: crypto.randomUUID(), mode, schedule, ...(webhookId ? { webhookId } : {}) };
+  return {
+    id: crypto.randomUUID(),
+    mode,
+    schedule,
+    ...(webhookId ? { webhookId } : {}),
+    ...(taskMatch ? { taskMatch } : {}),
+  };
 }
 
 export function customAutomationTriggers(automation?: FactoriesFactoryCustomAutomation): CustomAutomationTrigger[] {
@@ -78,6 +91,7 @@ export function customAutomationTriggers(automation?: FactoriesFactoryCustomAuto
             }
           : customAutomationSchedule(),
         trigger.webhookId,
+        taskMatchFromApi(trigger.taskMatch),
       ),
     );
   }
@@ -101,7 +115,7 @@ export function customAutomationAllowsManualStart(settings?: FactoriesFactoryCus
 
 export function customAutomationRunsOnTask(
   saved: boolean | undefined,
-  triggers: Array<{ mode: CustomAutomationMode }>,
+  triggers: Array<Pick<CustomAutomationTrigger, "mode" | "taskMatch">>,
 ): boolean {
   if (saved !== undefined) {
     return saved;
@@ -109,7 +123,7 @@ export function customAutomationRunsOnTask(
   if (triggers.some((trigger) => trigger.mode === "automatic" || trigger.mode === "leave")) {
     return true;
   }
-  if (triggers.some((trigger) => runsWithoutTask(trigger.mode))) {
+  if (triggers.some(runsWithoutTask)) {
     return false;
   }
   return true;
@@ -121,13 +135,13 @@ export function customAutomationTriggersForRun(
 ): CustomAutomationTrigger[] {
   if (runsOnTask === undefined) return triggers;
   return triggers.filter((trigger) => {
-    if (runsOnTask) return !runsWithoutTask(trigger.mode);
-    return trigger.mode !== "automatic" && trigger.mode !== "leave";
+    if (runsOnTask) return !runsWithoutTask(trigger);
+    return trigger.mode === "manual" || runsWithoutTask(trigger);
   });
 }
 
-function runsWithoutTask(mode: CustomAutomationMode): boolean {
-  return mode === "scheduled" || mode === "webhook";
+function runsWithoutTask(trigger: Pick<CustomAutomationTrigger, "mode" | "taskMatch">): boolean {
+  return trigger.mode === "scheduled" || (trigger.mode === "webhook" && !trigger.taskMatch);
 }
 
 export function customAutomationSchedule(automation?: FactoriesFactoryCustomAutomation): CustomAutomationSchedule {
@@ -416,7 +430,30 @@ function triggerToApi(trigger: CustomAutomationTrigger): FactoryCustomAutomation
   return {
     startMode: CUSTOM_AUTOMATION_START_MODES[trigger.mode],
     schedule: trigger.mode === "scheduled" ? trigger.schedule : undefined,
-    ...(trigger.mode === "webhook" ? { webhookId: trigger.webhookId ?? "" } : {}),
+    ...(trigger.mode === "webhook"
+      ? { webhookId: trigger.webhookId ?? "", taskMatch: taskMatchToApi(trigger.taskMatch) }
+      : {}),
+  };
+}
+
+function taskMatchFromApi(taskMatch?: StartTriggerTaskMatch): CustomAutomationTaskMatch | undefined {
+  const kind =
+    taskMatch?.kind === "KIND_TASK"
+      ? "task"
+      : taskMatch?.kind === "KIND_PULL_REQUEST"
+        ? "pull_request"
+        : taskMatch?.kind === "KIND_COMMIT"
+          ? "commit"
+          : undefined;
+  return kind ? { kind, fieldPath: taskMatch?.fieldPath ?? "" } : undefined;
+}
+
+function taskMatchToApi(taskMatch?: CustomAutomationTaskMatch): StartTriggerTaskMatch | undefined {
+  if (!taskMatch) return undefined;
+  return {
+    kind:
+      taskMatch.kind === "task" ? "KIND_TASK" : taskMatch.kind === "pull_request" ? "KIND_PULL_REQUEST" : "KIND_COMMIT",
+    fieldPath: taskMatch.fieldPath,
   };
 }
 
