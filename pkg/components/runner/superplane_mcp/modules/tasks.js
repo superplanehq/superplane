@@ -65,6 +65,40 @@ async function closeTask(input, client) {
   return client.request("POST", "/api/v1/runner/task/close", body);
 }
 
+async function moveTask(input, client) {
+  const column = input && input.column;
+  const next = input && input.next;
+  if (
+    (column !== undefined && (typeof column !== "string" || !column.trim())) ||
+    (next !== undefined && next !== true) ||
+    (column !== undefined) === (next === true)
+  ) {
+    throw new Error("Pass exactly one of column or next: true");
+  }
+  return client.request("POST", "/api/v1/runner/task/move", column !== undefined ? { column: column.trim() } : { next: true });
+}
+
+const MOVE_TASK = {
+  definition: {
+    name: "move_task",
+    description:
+      "Move this run's open task immediately to a stage on its recorded line. Pass exactly one of column or next: true. column is a stable stage key, including custom stages, Backlog, and Done. next follows the recorded stage order. Unfinished source work is replaced. Destination work starts or queues under existing limits. Returns task identity, from_column, column, and state. Current-stage movement is unchanged. Planning runs, tasks without a line, stale runs, and closed or archived tasks cannot move. A missing successor fails.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        column: { type: "string", minLength: 1, description: "Stable stage key on this task's recorded line." },
+        next: { type: "boolean", const: true, description: "Move to the next stage in recorded line order." },
+      },
+      oneOf: [
+        { required: ["column"], not: { required: ["next"] } },
+        { required: ["next"], not: { required: ["column"] } },
+      ],
+      additionalProperties: false,
+    },
+  },
+  handler: moveTask,
+};
+
 function ownerPaths(raw) {
   const values = Array.isArray(raw) ? raw : [];
   return values
@@ -207,5 +241,5 @@ const CLOSE_TASK = {
 };
 
 module.exports = {
-  tools: [ASSIGN_TASK_OWNER, SUGGEST_TASK_OWNER, LIST_TASKS, CREATE_TASK, CLOSE_TASK],
+  tools: [ASSIGN_TASK_OWNER, SUGGEST_TASK_OWNER, LIST_TASKS, CREATE_TASK, CLOSE_TASK, MOVE_TASK],
 };

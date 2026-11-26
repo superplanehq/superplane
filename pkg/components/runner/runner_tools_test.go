@@ -24,8 +24,8 @@ func TestFlowTools(t *testing.T) {
 	}
 	for flow, extra := range map[RunnerFlow][]string{
 		RunnerFlowPlanning:        {"propose_plan"},
-		RunnerFlowTask:            nil,
-		RunnerFlowMergeConfidence: {"report_merge_check"},
+		RunnerFlowTask:            {"move_task"},
+		RunnerFlowMergeConfidence: {"report_merge_check", "move_task"},
 	} {
 		assert.Equal(t, append(append([]string{}, shared...), extra...), AllowedRunnerTools(ScopesForFlow(flow)), flow)
 	}
