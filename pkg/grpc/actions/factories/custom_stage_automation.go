@@ -47,19 +47,50 @@ func buildCustomStageAutomationCanvas(tx *gorm.DB, factory *models.Factory, name
 	})
 	doc.Spec.Nodes = []yaml.Node{{
 		ID: "on-run", Name: "On Run", Type: yaml.NodeTypeTrigger, Component: "onRun", Configuration: map[string]any{}, Metadata: metadata,
-	}, customAutomationRunnerNode("stage-run", "Run stage automation", settings,
+	}, customAutomationRunnerNode(customStageRunnerID, "Run stage automation", settings,
 		customAutomationRunnerConfiguration(tx, factory, settings, []any{
 			checkoutEnvironmentVar("REPO", "{{ order().repository }}"),
 			checkoutEnvironmentVar("REPO_URL", "{{ order().repository_url }}"),
 			checkoutEnvironmentVar("BASE", "{{ order().default_branch }}"),
 		}), 80)}
-	doc.Spec.Edges = []yaml.Edge{{SourceID: "on-run", TargetID: "stage-run", Channel: "default"}}
+	doc.Spec.Edges = []yaml.Edge{{SourceID: "on-run", TargetID: customStageRunnerID, Channel: "default"}}
+	if !settings.hasWebhookTrigger() {
+		return doc, nil
+	}
+	webhookRunner := customAutomationRunnerNode(customStageWebhookRunnerID, "Run webhook", settings,
+		customAutomationRunnerConfiguration(tx, factory, settings,
+			customAutomationCheckoutEnvironment(factory, pb.FactoryCustomAutomation_START_MODE_SCHEDULED, githubHostForFactory(tx, factory), false),
+		), 480)
+	markNoTaskRunner(&webhookRunner, provider, settings.Icon)
+	appendWebhookPayloadInstructions(webhookRunner.Configuration)
+	doc.Spec.Nodes = append(doc.Spec.Nodes, webhookRunner)
+	offset := 0
+	for _, trigger := range settings.Triggers {
+		if trigger.Mode != pb.FactoryCustomAutomation_START_MODE_WEBHOOK {
+			continue
+		}
+		offset++
+		node := customAutomationWebhookNode(provider, settings, trigger, 80+offset*180)
+		doc.Spec.Nodes = append(doc.Spec.Nodes, node)
+		doc.Spec.Edges = append(doc.Spec.Edges, yaml.Edge{SourceID: node.ID, TargetID: customStageWebhookRunnerID, Channel: "default"})
+	}
+	doc.Metadata.Description = "Run prompt and Bash steps when a task enters the stage or a webhook receives a request."
 	return doc, nil
 }
 
 func validateCustomStageTriggers(settings *customAutomationSettings) error {
-	if len(settings.Triggers) != 1 || settings.StartMode != pb.FactoryCustomAutomation_START_MODE_AUTOMATIC || settings.runsWithoutTask() {
-		return invalidArgument("Custom stage automations run on a task when it enters the stage. Keep one task_enters_stage trigger.")
+	automatic := 0
+	for _, trigger := range settings.Triggers {
+		switch trigger.Mode {
+		case pb.FactoryCustomAutomation_START_MODE_AUTOMATIC:
+			automatic++
+		case pb.FactoryCustomAutomation_START_MODE_WEBHOOK:
+		default:
+			automatic = -1
+		}
+	}
+	if automatic != 1 || settings.runsWithoutTask() {
+		return invalidArgument("Custom stage automations run on a task when it enters the stage. Keep one task_enters_stage trigger. You can also add webhook triggers.")
 	}
 	return nil
 }
@@ -134,7 +165,7 @@ func customStageAgentID(id, previousComponent, component string) string {
 	if previousComponent == component {
 		return id
 	}
-	return "stage-run-" + strings.ToLower(strings.ReplaceAll(component, ".", "-"))
+	return customStageRunnerID + "-" + strings.ToLower(strings.ReplaceAll(component, ".", "-"))
 }
 
 func checkCustomStageFormGraph(tx *gorm.DB, factory *models.Factory, canvas *models.Canvas, version *models.CanvasVersion) error {
