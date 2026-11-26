@@ -61,7 +61,7 @@ function renderAt(url: string) {
 
 describe("automation run navigation", () => {
   it("keeps tab and run selection in shareable URLs and restores them with browser navigation", async () => {
-    const base = "/org/workspaces/sp/lines/line?automationView=canvas&keep=1";
+    const base = "/org/workspaces/sp?automationView=canvas&keep=1";
     const view = renderAt(base);
     fireEvent.click(screen.getByTestId("runs"));
     expect(screen.getByTestId("url").textContent).toContain("automationTab=runs");

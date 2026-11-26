@@ -7,7 +7,7 @@ import { client } from "@/api-client/client.gen";
 import { TooltipProvider } from "@/ui/tooltip";
 
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
-import { PRIMARY_FACTORY_KEY, REFUND_FACTORY_LINES } from "../../__fixtures__/factoryPageResponses";
+import { PRIMARY_FACTORY_KEY } from "../../__fixtures__/factoryPageResponses";
 import { lineMetricsFactoriesFixture } from "../../__fixtures__/lineMetricsFactoriesFixture";
 import { SPEC_ARTIFACT_NAME } from "../../lib/intentDocument";
 import { WorkOrderPopupRedesignPlayground } from "./WorkOrderPopupRedesignPlayground";
@@ -109,11 +109,10 @@ describe("Line board job popup", () => {
 
   it("opens the job report from a line-board card", async () => {
     const user = userEvent.setup();
-    const line = REFUND_FACTORY_LINES[0];
 
     render(
       <FactoriesHarness
-        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}`}
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}`}
         factoriesFixture={lineMetricsFactoriesFixture}
       />,
     );
@@ -247,11 +246,10 @@ describe("Line board job popup", () => {
 
   it("opens a manually created backlog card with person source", async () => {
     const user = userEvent.setup();
-    const line = REFUND_FACTORY_LINES[0];
 
     render(
       <FactoriesHarness
-        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}`}
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}`}
         factoriesFixture={lineMetricsFactoriesFixture}
       />,
     );
@@ -270,11 +268,10 @@ describe("Line board job popup", () => {
 
   it("matches popup content to the card state", async () => {
     const user = userEvent.setup();
-    const line = REFUND_FACTORY_LINES[0];
 
     render(
       <FactoriesHarness
-        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}`}
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}`}
         factoriesFixture={lineMetricsFactoriesFixture}
       />,
     );
@@ -361,7 +358,6 @@ describe("Line board job popup", () => {
 
   it("dispatches a draft task to the open line", async () => {
     const user = userEvent.setup();
-    const line = REFUND_FACTORY_LINES[0];
     const orderId = "wo-review-pay-842";
     const fixture = {
       ...lineMetricsFactoriesFixture,
@@ -377,9 +373,7 @@ describe("Line board job popup", () => {
       },
     };
 
-    render(
-      <FactoriesHarness pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}`} factoriesFixture={fixture} />,
-    );
+    render(<FactoriesHarness pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}`} factoriesFixture={fixture} />);
 
     const card = await screen.findByTestId("work-order-card-wo-review-pay-842", {}, { timeout: 8000 });
     expect(within(card).queryByRole("button", { name: "Start" })).not.toBeInTheDocument();

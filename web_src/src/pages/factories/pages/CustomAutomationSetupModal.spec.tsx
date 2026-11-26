@@ -91,11 +91,10 @@ function renderModal(
 ) {
   const onClose = vi.fn();
   render(
-    <MemoryRouter initialEntries={[`/org/workspaces/sp/lines/line${search}`]}>
+    <MemoryRouter initialEntries={[`/org/workspaces/sp${search}`]}>
       <BrowserControls />
       <AutomationModalProviders>
         <CustomAutomationSetupModal
-          lineId="line"
           automationId={automationId}
           columnKey={columnKey}
           yamlEnabled={yamlEnabled}
@@ -249,8 +248,8 @@ describe("custom automation configuration run history", () => {
       data: { ...automation, settings: { ...automation.settings, startMode: "START_MODE_AUTOMATIC" } },
     });
     const onClose = renderModal("?customAutomation=custom-1", "custom-1", "custom-qa");
-    expect(screen.queryByRole("button", { name: "Add trigger" })).toBeNull();
     expect(screen.queryByTestId("custom-automation-runs-on-task")).toBeNull();
+    expect(screen.queryByRole("button", { name: /Remove When a task enters/ })).toBeNull();
     await userEvent.setup().click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
     expect(hooks.update).toHaveBeenCalledWith(
@@ -506,7 +505,7 @@ steps:
     function Board() {
       const { search } = useLocation();
       return search ? (
-        <CustomAutomationSetupModal lineId="line" automationId="custom-1" yamlEnabled onClose={() => {}} />
+        <CustomAutomationSetupModal automationId="custom-1" yamlEnabled onClose={() => {}} />
       ) : (
         <Link to="?customAutomation=custom-1">Open automation</Link>
       );

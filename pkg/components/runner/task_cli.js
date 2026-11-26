@@ -41,6 +41,13 @@ const COMMANDS = [
     tool: "list_tasks",
   },
   {
+    words: ["task", "get"],
+    usage: "superplane task get (--task TASK | --pull-request URL | --number N [--repository OWNER/NAME] | --commit SHA)",
+    flags: ["task", "pull-request", "number", "repository", "commit"],
+    alias: { "pull-request": "pull_request" },
+    tool: "get_task",
+  },
+  {
     words: ["task", "create"],
     usage: "superplane task create --title TITLE [--description TEXT]",
     flags: ["title", "description"],
@@ -171,8 +178,8 @@ const COMMANDS = [
   },
   {
     words: ["task", "move"],
-    usage: "superplane task move (--column COLUMN | --next)",
-    flags: ["column", "next"],
+    usage: "superplane task move [--task TASK] (--column COLUMN | --next)",
+    flags: ["task", "column", "next"],
     boolean: ["next"],
     tool: "move_task",
   },

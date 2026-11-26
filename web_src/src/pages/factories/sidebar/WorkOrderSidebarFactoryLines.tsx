@@ -6,7 +6,7 @@ import { ChevronDown, Plus, Sparkles } from "lucide-react";
 import { Link } from "react-router";
 
 import { DispatchWorkOrderPopover } from "../DispatchWorkOrderPopover";
-import { factoryLineDetailPath } from "../lib/factoryPagePaths";
+import { factoryHomePath } from "../lib/factoryPagePaths";
 import {
   deriveFactoryLineRows,
   FACTORY_LINE_TONE_DOT_CLASS,
@@ -94,8 +94,7 @@ function FactoryLineRow({
   organizationId: string;
   factoryKey: string;
 }) {
-  const href =
-    row.lineId && row.lineId !== "unknown" ? factoryLineDetailPath(organizationId, factoryKey, row.lineId) : undefined;
+  const href = row.lineId && row.lineId !== "unknown" ? factoryHomePath(organizationId, factoryKey) : undefined;
   const inner = (
     <>
       <Sparkles className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />

@@ -1,15 +1,18 @@
 package factories
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/automations"
 	factorycomponent "github.com/superplanehq/superplane/pkg/components/factory"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
@@ -190,10 +193,149 @@ func TestBacklogWebhookAutomationCreatesTasksFromThePayload(t *testing.T) {
 			requireStatusCode(t, err, codes.InvalidArgument)
 		})
 	}
-	_, err = CreateFactoryCustomAutomation(ctx, deps, orgID, &pb.CreateFactoryCustomAutomationRequest{
+
+	implement, err := CreateFactoryCustomAutomation(ctx, deps, orgID, &pb.CreateFactoryCustomAutomationRequest{
 		FactoryId: factory.ID.String(), Name: "Implement webhook", ColumnKey: "implement", Settings: settings,
 	})
-	requireStatusCode(t, err, codes.InvalidArgument)
+	require.NoError(t, err)
+	assert.True(t, proto.Equal(settings, implement.GetCustomAutomation().GetSettings()))
+	implementID := uuid.MustParse(implement.GetCustomAutomation().GetAutomation().GetId())
+	runnerNode, err = models.FindCanvasNode(db, implementID, customAutomationRunnerID)
+	require.NoError(t, err)
+	template = runnerNode.Metadata.Data()[models.FactoryAppTemplateMetadataKey].(map[string]any)
+	assert.Equal(t, "scheduled", template["startMode"], "a no-task runner outside Backlog needs the task tools")
+	configuration, err := contexts.NewNodeConfigurationBuilder(db, implementID).WithRootPayload(webhookPayload).Build(runnerNode.Configuration.Data())
+	require.NoError(t, err)
+	implementPrompt := configuration["steps"].([]any)[1].(map[string]any)["prompt"].(string)
+	assert.Contains(t, implementPrompt, `"key": "ENG-42"`)
+	assert.NotContains(t, implementPrompt, "create_task", "only Backlog tells the agent to create a task")
+	implementCanvas, err := models.FindCanvasWithoutOrgScope(implementID)
+	require.NoError(t, err)
+	_, version, err = canvasLegacyAutomation(db, implementCanvas)
+	require.NoError(t, err)
+	source, err = importAutomationCanvas(db, factory, implementCanvas, version)
+	require.NoError(t, err)
+	assert.NotContains(t, source, "webhook started this run")
+}
+
+func TestCustomStageWebhookRunsWithoutTask(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory := seedHandOffFactory(t, r, db)
+	vcsID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSIntegrationID: &vcsID}))
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryAsCode))
+	support.AssignOpenSystemTrial(t, r.Organization.ID)
+	upsertHostedOnboardingProvider(t, db)
+	line, err := factory.CreateLine(db, "QA line", nil)
+	require.NoError(t, err)
+	stageKey := "custom-" + uuid.NewString()
+	stages := line.StagesValue()
+	stages = append(stages[:1], append([]models.FactoryLineStage{{ID: uuid.New(), Key: stageKey, Name: "QA", Kind: models.FactoryLineStagePhase}}, stages[1:]...)...)
+	require.NoError(t, line.UpdateConfiguration(db, nil, nil, nil, stages))
+	ctx := onboardingContext(r)
+	webhook, err := CreateFactoryWebhook(ctx, onboardingDeps(r), r.Organization.ID.String(), &pb.CreateFactoryWebhookRequest{
+		FactoryId: factory.ID.String(), Name: "Alerts", Authentication: pb.FactoryWebhook_AUTHENTICATION_BEARER,
+	})
+	require.NoError(t, err)
+	webhookID := webhook.GetWebhook().GetId()
+
+	workspaceAgent := resolveIntakeAgent(db, factory)
+	require.NotNil(t, workspaceAgent)
+	runsOnTask := true
+	settings := &pb.FactoryCustomAutomation_Settings{
+		StartMode:               pb.FactoryCustomAutomation_START_MODE_AUTOMATIC,
+		RunsOnTask:              &runsOnTask,
+		ExecutionTimeoutSeconds: 3600,
+		Agent:                   &pb.FactoryAppTemplateAgent{Component: workspaceAgent.Component, Model: workspaceAgent.Model},
+		Steps:                   []*pb.FactoryCustomAutomation_Step{{Name: "Inspect", Type: pb.FactoryCustomAutomation_Step_TYPE_PROMPT, Prompt: "Check the changes."}},
+	}
+	created, err := CreateFactoryCustomAutomation(ctx, onboardingDeps(r), r.Organization.ID.String(), &pb.CreateFactoryCustomAutomationRequest{
+		FactoryId: factory.ID.String(), ColumnKey: stageKey, Name: "QA check", Settings: settings,
+	})
+	require.NoError(t, err)
+	canvasID := uuid.MustParse(created.GetCustomAutomation().GetAutomation().GetId())
+	saved := checkoutEnvironmentVar("KEEP", "1")
+	keepOn := func(runnerID string) {
+		canvas, err := models.FindCanvasWithoutOrgScope(canvasID)
+		require.NoError(t, err)
+		version, err := models.FindLiveCanvasVersionInTransaction(db, canvasID)
+		require.NoError(t, err)
+		for i := range version.Nodes {
+			if version.Nodes[i].ID == runnerID {
+				version.Nodes[i].Configuration["environment"] = append(version.Nodes[i].Configuration["environment"].([]any), saved)
+			}
+		}
+		require.NoError(t, canvases.PublishGeneratedCanvasNodes(ctx, db, canvas, r.User, "Add a value", version.Nodes, version.Edges, intakePublisherOptions(onboardingDeps(r), r.Organization.ID)))
+		published, err := models.FindLiveCanvasVersionInTransaction(db, canvasID)
+		require.NoError(t, err)
+		require.NoError(t, models.RefreshAutomationArtifactRevision(db, r.Organization.ID, canvasID.String(), version.ID.String(), published.ID.String()))
+	}
+	keepOn(customStageRunnerID)
+
+	settings.RunsOnTask = nil
+	settings.Triggers = []*pb.FactoryCustomAutomation_StartTrigger{
+		{StartMode: pb.FactoryCustomAutomation_START_MODE_AUTOMATIC},
+		{StartMode: pb.FactoryCustomAutomation_START_MODE_WEBHOOK, WebhookId: webhookID},
+	}
+	updated, err := UpdateFactoryCustomAutomation(ctx, onboardingDeps(r), r.Organization.ID.String(), &pb.UpdateFactoryCustomAutomationRequest{
+		FactoryId: factory.ID.String(), AutomationId: canvasID.String(), Name: "QA check", Settings: settings,
+	})
+	require.NoError(t, err)
+	assert.Nil(t, updated.GetCustomAutomation().GetSettings().RunsOnTask, "a webhook clears the saved task run context")
+	keepOn(customStageWebhookRunnerID)
+
+	service := automations.Service{Backend: CanvasAutomationBackend{Deps: onboardingDeps(r)}}
+	read, err := service.Read(ctx, r.Organization.ID, canvasID)
+	require.NoError(t, err)
+	assert.Contains(t, read.YAML, "webhook_id: "+webhookID)
+	assert.NotContains(t, read.YAML, "runs_on_task")
+	source := strings.Replace(read.YAML, "Check the changes.", "Review the changes.", 1)
+	_, err = service.Update(ctx, r.Organization.ID, canvasID, r.User, source)
+	require.NoError(t, err)
+
+	version, err := models.FindLiveCanvasVersionInTransaction(db, canvasID)
+	require.NoError(t, err)
+	assert.Contains(t, version.Edges, models.Edge{SourceID: "webhook-" + webhookID, TargetID: customStageWebhookRunnerID, Channel: "default"})
+	prompts := map[string]string{}
+	for _, node := range version.Nodes {
+		if !isFactoryAgentHarness(node.ComponentName()) {
+			continue
+		}
+		prompts[node.ID] = node.Configuration["steps"].([]any)[0].(map[string]any)["prompt"].(string)
+		assert.Contains(t, node.Configuration["environment"], saved, "an edit keeps saved values on %s", node.ID)
+		if node.ID == customStageWebhookRunnerID {
+			template := node.Metadata[models.FactoryAppTemplateMetadataKey].(map[string]any)
+			assert.Equal(t, "scheduled", template["startMode"], "the webhook runner needs the task tools")
+		}
+	}
+	assert.Equal(t, 1, strings.Count(prompts[customStageWebhookRunnerID], "webhook started this run"))
+	assert.Contains(t, prompts[customStageWebhookRunnerID], "Review the changes.")
+	assert.NotContains(t, prompts[customStageRunnerID], "webhook started this run")
+
+	_, err = service.Update(ctx, r.Organization.ID, canvasID, r.User, strings.Replace(source, "  - use: task_enters_stage\n", "", 1))
+	require.NoError(t, err)
+	version, err = models.FindLiveCanvasVersionInTransaction(db, canvasID)
+	require.NoError(t, err)
+	components := []string{}
+	for _, node := range version.Nodes {
+		components = append(components, node.ComponentName())
+		if node.ID == customStageWebhookRunnerID {
+			assert.Contains(t, node.Configuration["environment"], saved, "removing the task trigger keeps the webhook runner")
+		}
+	}
+	assert.NotContains(t, components, "onRun")
+	_, err = line.ExecutionPlan(db)
+	require.ErrorIs(t, err, models.ErrFactoryLineHasNoSteps, "a webhook-only stage automation adds no step")
+	read, err = service.Read(ctx, r.Organization.ID, canvasID)
+	require.NoError(t, err)
+	assert.NotContains(t, read.YAML, "task_enters_stage")
+
+	_, err = service.Update(ctx, r.Organization.ID, canvasID, r.User, source)
+	require.NoError(t, err)
+	steps, err := line.ExecutionPlan(db)
+	require.NoError(t, err)
+	assert.True(t, slices.ContainsFunc(steps, func(step models.FactoryLineStep) bool { return step.AppID == canvasID }))
 }
 
 func requireStatusCode(t *testing.T, err error, expected codes.Code) {

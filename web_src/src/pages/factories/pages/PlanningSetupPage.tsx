@@ -1,5 +1,5 @@
 import { usePermissions } from "@/contexts/usePermissions";
-import { Navigate, useParams } from "react-router";
+import { Navigate } from "react-router";
 
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { factoryHomePath, factoryPlanningPath, firstFactoryLineId } from "../lib/factoryPagePaths";
@@ -20,16 +20,15 @@ function planningSetupRedirectTarget(input: {
 export function PlanningSetupPage() {
   const { canAct } = usePermissions();
   const { organizationId, routeSegment, factory } = useFactoriesLayout();
-  const { lineId } = useParams<{ lineId?: string }>();
-  const line = factory?.lines?.find((entry) => entry.id === lineId);
-  const boardHref = factoryHomePath(organizationId, routeSegment, firstFactoryLineId(factory));
-  const settingsHref = line?.id ? factoryPlanningPath(organizationId, routeSegment, line.id) : boardHref;
+  const lineId = firstFactoryLineId(factory);
+  const boardHref = factoryHomePath(organizationId, routeSegment);
+  const settingsHref = lineId ? factoryPlanningPath(organizationId, routeSegment) : boardHref;
 
   return (
     <Navigate
       to={planningSetupRedirectTarget({
         canUpdate: canAct("factories", "update"),
-        linePresent: Boolean(line?.id),
+        linePresent: Boolean(lineId),
         boardHref,
         settingsHref,
       })}

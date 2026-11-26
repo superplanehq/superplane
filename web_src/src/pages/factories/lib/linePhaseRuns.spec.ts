@@ -6,7 +6,7 @@ import type {
   FactoriesWorkOrderExecution,
   FactoriesWorkOrderLineDispatch,
 } from "@/api-client";
-import { factoryAppPath, factoryAppRunPath, factoryLineDetailPath } from "./factoryPagePaths";
+import { factoryAppPath, factoryAppRunPath, factoryHomePath } from "./factoryPagePaths";
 import { BOARD_IMPLEMENT_NOTIFY_ORDER } from "../__fixtures__/lineMetricsBoardOrders";
 import { REFUND_LINE_PLAN_ID } from "../__fixtures__/factoryPageIds";
 import {
@@ -393,7 +393,7 @@ describe("linePhaseRunHref", () => {
       execution: { id: "e1" },
     });
 
-    expect(href).toBe(factoryLineDetailPath("org-1", "RF", "line-1"));
+    expect(href).toBe(factoryHomePath("org-1", "RF"));
   });
 });
 

@@ -1,3 +1,4 @@
+import { useBrokenIntegrationsBanner } from "../lib/useBrokenIntegrationsBanner";
 import { CodexActionProvider } from "../codex/CodexActionProvider";
 import type { FactoriesFactory } from "@/api-client";
 import { Link } from "@/components/Link/link";
@@ -10,7 +11,7 @@ import { useWorkspaceLoading } from "@/hooks/useWorkspaceLoading";
 import { WORKSPACE_LOADING_COPY } from "@/lib/workspaceLoadingCopy";
 import { AlertTriangle } from "lucide-react";
 import { useEffect, useMemo, type ReactNode } from "react";
-import { Navigate, Outlet, useLocation, useParams } from "react-router";
+import { Navigate, Outlet, useLocation, useMatch, useParams } from "react-router";
 import { CreateWorkOrderDialog } from "../CreateWorkOrderDialog";
 import {
   factoryRouteNeedsCanonicalRedirect,
@@ -145,6 +146,14 @@ function FactoriesLayoutContent({
   const { data: describedFactory, error: factoryError } = useFactory(organizationId, factoryId);
   const factory = describedFactory ?? factories.find((item) => item.id === factoryId);
   const { slug, routeSegment } = workspaceLayoutKeys(factory, factoryKey);
+  const boardRoute = useMatch("/:organizationId/workspaces/:factoryKey");
+  const legacyBoardRoute = useMatch("/:organizationId/workspaces/:factoryKey/lines/:lineId");
+  const taskRoute = useMatch("/:organizationId/workspaces/:factoryKey/task/:orderNumber");
+  const brokenIntegrationsBanner = useBrokenIntegrationsBanner(
+    organizationId,
+    routeSegment,
+    Boolean(boardRoute || legacyBoardRoute || taskRoute),
+  );
   const { createWorkOrderOpen, openCreateWorkOrder, closeCreateWorkOrder, completeCreateWorkOrder } =
     useCreateWorkOrderDialogState(
       organizationId,
@@ -227,9 +236,12 @@ function FactoriesLayoutContent({
               factories={factories}
             />
           )}
-          <main className="relative min-h-0 min-w-0 flex-1 overflow-y-auto bg-background">
-            {children ?? <Outlet />}
-          </main>
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+            {brokenIntegrationsBanner ? <div className="shrink-0 p-4">{brokenIntegrationsBanner}</div> : null}
+            <main className="relative min-h-0 min-w-0 flex-1 overflow-y-auto bg-background">
+              {children ?? <Outlet />}
+            </main>
+          </div>
         </div>
 
         {canCreateWorkOrder ? (

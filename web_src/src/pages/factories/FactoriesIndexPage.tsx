@@ -5,7 +5,7 @@ import { usePageTitle } from "@/hooks/usePageTitle";
 import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
 import { cn } from "@/lib/utils";
 import { Navigate, useParams } from "react-router";
-import { factoryHomePath, factoryRouteSegment, firstFactoryLineId, newFactoryPath } from "./lib/factoryPagePaths";
+import { factoryHomePath, factoryRouteSegment, newFactoryPath } from "./lib/factoryPagePaths";
 import { pickReadyFactory, readLastVisitedFactory } from "./lib/lastVisitedFactory";
 import { useFactoriesThemeClass } from "./lib/useFactoriesThemeClass";
 
@@ -54,7 +54,7 @@ function FactoriesIndexPageContent({ organizationId }: { organizationId: string 
   const targetSegment = factoryRouteSegment(targetFactory);
 
   if (targetSegment) {
-    return <Navigate to={factoryHomePath(organizationId, targetSegment, firstFactoryLineId(targetFactory))} replace />;
+    return <Navigate to={factoryHomePath(organizationId, targetSegment)} replace />;
   }
 
   if (permissionsLoading) {

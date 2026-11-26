@@ -2,10 +2,10 @@ import { BookOpen, ClipboardList, Gauge, Layers, LayoutDashboard, Workflow } fro
 import type { LucideIcon } from "lucide-react";
 import {
   automationsPath,
+  factoryHomePath,
   factoryOverviewPath,
   factoryVelocityPath,
   factoryWikiPath,
-  linesPath,
   workOrdersPath,
 } from "../lib/factoryPagePaths";
 
@@ -35,7 +35,7 @@ export const FACTORIES_NAV_ITEMS: FactoriesNavItem[] = [
     id: "lines",
     label: "Lines",
     Icon: Layers,
-    buildHref: linesPath,
+    buildHref: factoryHomePath,
   },
   {
     id: "automations",

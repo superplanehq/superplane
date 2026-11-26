@@ -69,7 +69,6 @@ function PublicBoardTaskCard({ card, board, index }: { card: PublicBoardCard; bo
       entry={entry}
       organizationId=""
       factoryKey={board.workspaceKey ?? ""}
-      factoryLines={[]}
       canDispatch={false}
       canAssign={false}
       dispatchingOrderIds={IDLE_ORDER_IDS}

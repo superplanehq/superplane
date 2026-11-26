@@ -82,7 +82,9 @@ import { ScheduledIntakeSetupDialog } from "./ScheduledIntakeSetupDialog";
 import { AddPRFeedbackPicker } from "./AddPRFeedbackPicker";
 import { useAddColumnAutomation } from "./useAddColumnAutomation";
 import { IntakeWebhookFailureNotice } from "./IntakeWebhookFailureNotice";
+import { WebhookFailuresNotice } from "./WebhookFailuresNotice";
 import { useIntakeWebhookRetry } from "./useIntakeWebhookRetry";
+import { webhookSetupInProgress } from "@/lib/webhookSetup";
 import { WebhookIntakeSetupDialog } from "./WebhookIntakeSetupDialog";
 import { NextStepsPanel, WorkspaceNextStepsHeaderBadge } from "./NextStepsPanel";
 import { useWorkspaceNextStepDeferral } from "./workspaceNextStepDeferral";
@@ -192,6 +194,7 @@ import {
   factoryDependabotIntakeSetupPath,
   factoryHomePath,
   factoryIntakePath,
+  factoryOverviewPath,
   factoryGitHubIntakeSetupPath,
   factoryJiraIntakeSetupPath,
   factoryLinearIntakeSetupPath,
@@ -359,13 +362,13 @@ function prFeedbackSetupHref(
   if (!lineId) {
     return undefined;
   }
-  return factoryPRFeedbackSetupPath(organizationId, factoryKey, lineId, prFeedbackSetupKindFromSourceId(sourceId));
+  return factoryPRFeedbackSetupPath(organizationId, factoryKey, prFeedbackSetupKindFromSourceId(sourceId));
 }
 
 export function LinesPage() {
   const { organizationId, factoryId, routeSegment, factory, openCreateWorkOrder } = useFactoriesLayout();
   const { canAct, currentUserId, isLoading: permissionsLoading } = usePermissions();
-  const { lineId: routeLineId, orderNumber: routeOrderNumber } = useParams<{ lineId?: string; orderNumber?: string }>();
+  const { orderNumber: routeOrderNumber } = useParams<{ orderNumber?: string }>();
   const { search, state: locationState } = useLocation();
   const boardLineId = workOrderBoardLineIdFromSearch(search);
   const navigate = useNavigate();
@@ -387,7 +390,7 @@ export function LinesPage() {
   const listState = useWorkOrderListState(factoryId);
   const lines = useMemo(() => factory?.lines ?? [], [factory?.lines]);
   const navigationLineId = boardLineIdFromNavigationState(locationState);
-  const lineSources = { routeLineId, queryLineId: boardLineId, navigationLineId, lines };
+  const lineSources = { queryLineId: boardLineId, navigationLineId, lines };
   const knownBoardLineId = displayedBoardLineId(lineSources);
   const taskLineOrderId = !knownBoardLineId && routeOrderNumber ? routeOrderNumber : "";
   const { data: taskForBoardLine, isLoading: taskLineLoading } = useWorkOrder(
@@ -550,13 +553,13 @@ export function LinesPage() {
         </div>
       );
     }
-    return <Navigate to={factoryHomePath(organizationId, routeSegment, firstFactoryLineId(factory))} replace />;
+    return <Navigate to={factoryOverviewPath(organizationId, routeSegment)} replace />;
   }
 
   if (isJiraIntakeSetupSearchOpen(search) && selectedLine.id) {
     return (
       <Navigate
-        to={factoryJiraIntakeSetupPath(organizationId, routeSegment, selectedLine.id, {
+        to={factoryJiraIntakeSetupPath(organizationId, routeSegment, {
           integrationId: jiraIntakeIntegrationIdFromSearch(search) || undefined,
         })}
         replace
@@ -575,8 +578,7 @@ export function LinesPage() {
     : {
         sources: configuredIntakes,
         showAddIntake: showAddIntakeControl,
-        onOpenSettings: (intake) =>
-          navigate(factoryIntakePath(organizationId, routeSegment, selectedLine.id, intake.intakeId)),
+        onOpenSettings: (intake) => navigate(factoryIntakePath(organizationId, routeSegment, intake.intakeId)),
         onAddIntake: () => setAddIntakeOpen(true),
       };
 
@@ -595,8 +597,7 @@ export function LinesPage() {
         needsRepairLabel: "Needs repair",
         settingsLabel: "Open PR feedback settings",
         testId: `lines-verify-listener-${handler.id}`,
-        onOpenSettings: () =>
-          navigate(factoryPRFeedbackPath(organizationId, routeSegment, selectedLine.id, undefined, handler.id)),
+        onOpenSettings: () => navigate(factoryPRFeedbackPath(organizationId, routeSegment, undefined, handler.id)),
       },
     ];
   });
@@ -623,7 +624,7 @@ export function LinesPage() {
     }
     if (template.id === CUSTOM_AUTOMATION_TEMPLATE_ID) {
       if (selectedLine.id) {
-        navigate(factoryCustomAutomationSetupPath(organizationId, routeSegment, selectedLine.id, undefined, "backlog"));
+        navigate(factoryCustomAutomationSetupPath(organizationId, routeSegment, undefined, "backlog"));
       }
       return;
     }
@@ -633,37 +634,37 @@ export function LinesPage() {
     }
     if (template.id === "github-issues") {
       if (selectedLine.id) {
-        navigate(factoryGitHubIntakeSetupPath(organizationId, routeSegment, selectedLine.id));
+        navigate(factoryGitHubIntakeSetupPath(organizationId, routeSegment));
       }
       return;
     }
     if (template.id === "sentry-exceptions") {
       if (selectedLine.id) {
-        navigate(factorySentryIntakeSetupPath(organizationId, routeSegment, selectedLine.id));
+        navigate(factorySentryIntakeSetupPath(organizationId, routeSegment));
       }
       return;
     }
     if (template.id === "dependabot-alerts") {
       if (selectedLine.id) {
-        navigate(factoryDependabotIntakeSetupPath(organizationId, routeSegment, selectedLine.id));
+        navigate(factoryDependabotIntakeSetupPath(organizationId, routeSegment));
       }
       return;
     }
     if (template.id === "jira-issues") {
       if (selectedLine.id) {
-        navigate(factoryJiraIntakeSetupPath(organizationId, routeSegment, selectedLine.id));
+        navigate(factoryJiraIntakeSetupPath(organizationId, routeSegment));
       }
       return;
     }
     if (template.id === "datadog") {
       if (selectedLine.id) {
-        navigate(factoryDatadogIntakeSetupPath(organizationId, routeSegment, selectedLine.id));
+        navigate(factoryDatadogIntakeSetupPath(organizationId, routeSegment));
       }
       return;
     }
     if (template.id === "linear-issues") {
       if (selectedLine.id) {
-        navigate(factoryLinearIntakeSetupPath(organizationId, routeSegment, selectedLine.id));
+        navigate(factoryLinearIntakeSetupPath(organizationId, routeSegment));
       }
       return;
     }
@@ -712,7 +713,7 @@ export function LinesPage() {
 
   const closePeek = () => {
     setPeekHint(null);
-    navigate(factoryHomePath(organizationId, routeSegment, selectedLine.id), { replace: true });
+    navigate(factoryHomePath(organizationId, routeSegment), { replace: true });
   };
 
   const viewedAutomation = factoryApps.find((app) => app.id === automationViewCanvasId);
@@ -721,7 +722,7 @@ export function LinesPage() {
     (viewedAutomation?.columnKey === "backlog" ||
       viewedAutomation?.columnKey === "verify" ||
       viewedAutomation?.columnKey === "done");
-  const closeAutomationView = () => navigate(factoryHomePath(organizationId, routeSegment, selectedLine.id));
+  const closeAutomationView = () => navigate(factoryHomePath(organizationId, routeSegment));
   const deleteViewedCustomAutomation = async () => {
     if (!automationViewCanvasId) {
       return;
@@ -749,7 +750,7 @@ export function LinesPage() {
           repository={factory?.onboarding?.backlogRepository}
           vcsIntegrationId={factory?.onboarding?.vcsIntegrationId}
           initialTab={isIntakeSettingsTab(intakeSettingsTab) ? intakeSettingsTab : "general"}
-          onClose={() => navigate(factoryHomePath(organizationId, routeSegment, selectedLine.id))}
+          onClose={() => navigate(factoryHomePath(organizationId, routeSegment))}
         />
       ) : null}
       {ownerIntakeTemplate && isLineIntakeSourceId(ownerIntakeTemplate.id) ? (
@@ -769,7 +770,7 @@ export function LinesPage() {
           onClose={() => setScheduledIntakeOpen(false)}
           onCreated={(canvasId) => {
             setScheduledIntakeOpen(false);
-            navigate(factoryColumnAutomationViewPath(organizationId, routeSegment, selectedLine.id, canvasId));
+            navigate(factoryColumnAutomationViewPath(organizationId, routeSegment, canvasId));
           }}
         />
       ) : null}
@@ -813,11 +814,10 @@ export function LinesPage() {
       {customAutomationAutomationId !== undefined && canUpdate && selectedLine.id ? (
         <CustomAutomationSetupModal
           key={customAutomationAutomationId ?? "new"}
-          lineId={selectedLine.id}
           yamlEnabled={hasExperimentalFeature(FEATURE_FACTORY_AS_CODE)}
           automationId={customAutomationAutomationId ?? undefined}
           columnKey={customAutomationColumn(new URLSearchParams(search).get("automationColumn"))}
-          onClose={() => navigate(factoryHomePath(organizationId, routeSegment, selectedLine.id))}
+          onClose={() => navigate(factoryHomePath(organizationId, routeSegment))}
         />
       ) : null}
       {planningOpen ? (
@@ -827,7 +827,7 @@ export function LinesPage() {
           factoryKey={routeSegment}
           lineId={selectedLine.id}
           initialTab={isPlanningSettingsTab(planningSettingsTab) ? planningSettingsTab : "general"}
-          onClose={() => navigate(factoryHomePath(organizationId, routeSegment, selectedLine.id))}
+          onClose={() => navigate(factoryHomePath(organizationId, routeSegment))}
         />
       ) : null}
       {prFeedbackOpen ? (
@@ -842,7 +842,7 @@ export function LinesPage() {
           canUpdate={canUpdate}
           handlerId={prFeedbackHandlerId}
           initialTab={isPRFeedbackSettingsTab(prFeedbackSettingsTab) ? prFeedbackSettingsTab : "general"}
-          onClose={() => navigate(factoryHomePath(organizationId, routeSegment, selectedLine.id))}
+          onClose={() => navigate(factoryHomePath(organizationId, routeSegment))}
         />
       ) : null}
       <div className={factoryKanbanPageClassName}>
@@ -870,15 +870,21 @@ export function LinesPage() {
             }
           />
           <SubscriptionIntakeOwnerRecovery />
+          <WebhookFailuresNotice organizationId={organizationId} />
           {configuredIntakes
-            .filter((intake) => intake.source.id === "github-issues" && intake.health === "HEALTH_WEBHOOK_FAILED")
+            .filter(
+              (intake) =>
+                !canAct("integrations", "read") &&
+                intake.source.id === "github-issues" &&
+                intake.health === "HEALTH_WEBHOOK_FAILED",
+            )
             .map((intake) => (
               <IntakeWebhookFailureNotice
                 key={intake.intakeId}
                 message={intake.healthMessage}
                 repository={intake.resourceId}
                 host={githubHost}
-                retrying={intakeWebhookRetry.retrying}
+                retrying={intakeWebhookRetry.retrying || webhookSetupInProgress(intake.webhookSetupState)}
                 onRetry={() => intakeWebhookRetry.retryIntake(intake)}
               />
             ))}
@@ -954,7 +960,6 @@ export function LinesPage() {
               organizationId,
               factoryId,
               factoryKey: routeSegment,
-              factoryLines: lines,
               canDispatch: canUpdateWorkOrders,
               preferredLineName: selectedLine.name,
               canAssign: canUpdateWorkOrders,
@@ -1303,7 +1308,6 @@ function LineDetail({
       const href = columnAutomationOpenPath(automation, {
         organizationId,
         factoryKey,
-        lineId: line.id,
         customEditingEnabled: canUpdate,
       });
       if (href) {
@@ -2093,7 +2097,7 @@ function PhaseBoard({
       if (!column) {
         return null;
       }
-      const columnKey: ColumnKey = `phase-${column.stepIndex}`;
+      const columnKey = stage.key as ColumnKey;
       const automations = rowsFor(stage.key);
       return (
         <PhaseColumn

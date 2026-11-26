@@ -47,7 +47,7 @@ function pathAfterSetup(organizationId: string, factoryKey: string, factory: Fac
   if (!lineId) {
     return factoryOverviewPath(organizationId, factoryKey);
   }
-  return factoryHomePath(organizationId, factoryKey, lineId);
+  return factoryHomePath(organizationId, factoryKey);
 }
 
 /**
