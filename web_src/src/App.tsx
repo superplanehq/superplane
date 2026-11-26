@@ -17,6 +17,7 @@ import { FEATURE_FACTORIES } from "./lib/experimentalFeatures";
 import { usePersistOrganizationLastLocation } from "./hooks/usePersistOrganizationLastLocation";
 import { useIdentifyOrganizationGroup } from "./hooks/useIdentifyOrganizationGroup";
 import { UserNotificationsListener } from "./hooks/useUserNotificationsWebsocket";
+import { WebhookSetupListener } from "./hooks/useWebhookSetupWebsocket";
 import { resolveOrganizationUidRedirect } from "./lib/organizationPath";
 import { isReservedAppPathSegment } from "./lib/reservedAppPaths";
 import { useConsumeIntegrationSetupReturnOnArrival } from "./hooks/useConsumeIntegrationSetupReturnOnArrival";
@@ -51,7 +52,7 @@ import {
   FactoryAppCanvasPage,
   FactoryAutomationRunPage,
   FactoryAppSplitRunPage,
-  FactoryHomeRedirect,
+  FactoryBoardIndex,
   FactoryLineEditPage,
   FactorySettingsLayout,
   LegacyFactoryAppRedirect,
@@ -79,7 +80,7 @@ import {
   CustomAutomationSetupPage,
   SentryIntakeSetupPage,
 } from "./pages/factories";
-import { createFactoryLinePath, editFactoryLinePath } from "./pages/factories/lib/factoryPagePaths";
+import { createFactoryLinePath } from "./pages/factories/lib/factoryPagePaths";
 import { isPublicFactoryLinePath } from "./pages/factories/lib/publicFactoryLinePath";
 import { FactoryLineAccessGate } from "./pages/factories/pages/FactoryLineAccessGate";
 import {
@@ -179,7 +180,7 @@ function organizationScopedRouteTree() {
           element={withAuthPermissionAndFactoriesFeature(FactoryWorkspaceLayoutSwitch, "factories", "read")}
         >
           <Route element={<OnboardingGate />}>
-            <Route index element={<FactoryHomeRedirect />} />
+            <Route index element={<FactoryBoardIndex />} />
             <Route path="setup" element={<OnboardingPage />} />
             <Route path="onboarding" element={<Navigate to="../setup" replace />} />
             <Route path="overview" element={<WorkspaceOverviewPage />} />
@@ -197,29 +198,27 @@ function organizationScopedRouteTree() {
             {/* Back-compat for bookmarks made before `work-order(s)` was renamed to `task(s)`. */}
             <Route path="work-orders/*" element={<LegacyWorkOrdersRedirect />} />
             <Route path="work-order/:orderNumber" element={<LegacyWorkOrderPermalinkRedirect />} />
-            <Route path="lines">
-              <Route index element={<FactoryHomeRedirect />} />
-              <Route path="new" element={<FactoryLineEditPageGate />} />
-              <Route path=":lineId/edit" element={<FactoryLineEditPageGate />} />
-              <Route path=":lineId/setup/comments" element={<DiscussionPRFeedbackSetupPage />} />
-              <Route path=":lineId/setup/checks" element={<ChecksPRFeedbackSetupPage />} />
-              <Route path=":lineId/setup/risk-score" element={<RiskScoreSetupPage />} />
-              <Route path=":lineId/setup/custom-automation" element={<CustomAutomationSetupPage />} />
-              <Route path=":lineId/setup/custom-automation/:automationId" element={<CustomAutomationSetupPage />} />
-              <Route path=":lineId/setup/custom-verification" element={<CustomAutomationSetupPage />} />
-              <Route path=":lineId/setup/custom-verification/:automationId" element={<CustomAutomationSetupPage />} />
-              <Route path=":lineId/setup/planning" element={<PlanningSetupPage />} />
-              <Route path=":lineId/setup/github" element={<GitHubIntakeSetupPage />} />
-              <Route path=":lineId/setup/sentry" element={<SentryIntakeSetupPage />} />
-              <Route path=":lineId/setup/datadog" element={<DatadogIntakeSetupPage />} />
-              <Route path=":lineId/setup/dependabot" element={<DependabotIntakeSetupPage />} />
-              <Route path=":lineId/setup/jira" element={<JiraIntakeSetupPage />} />
-              <Route path=":lineId/setup/linear" element={<LinearIntakeSetupPage />} />
+            <Route path="line">
+              <Route path="new" element={<FactoryLineEditPageGate isCreate />} />
+              <Route path="edit" element={<FactoryLineEditPageGate />} />
+              <Route path="setup/comments" element={<DiscussionPRFeedbackSetupPage />} />
+              <Route path="setup/checks" element={<ChecksPRFeedbackSetupPage />} />
+              <Route path="setup/risk-score" element={<RiskScoreSetupPage />} />
+              <Route path="setup/custom-automation" element={<CustomAutomationSetupPage />} />
+              <Route path="setup/custom-automation/:automationId" element={<CustomAutomationSetupPage />} />
+              <Route path="setup/custom-verification" element={<CustomAutomationSetupPage />} />
+              <Route path="setup/custom-verification/:automationId" element={<CustomAutomationSetupPage />} />
+              <Route path="setup/planning" element={<PlanningSetupPage />} />
+              <Route path="setup/github" element={<GitHubIntakeSetupPage />} />
+              <Route path="setup/sentry" element={<SentryIntakeSetupPage />} />
+              <Route path="setup/datadog" element={<DatadogIntakeSetupPage />} />
+              <Route path="setup/dependabot" element={<DependabotIntakeSetupPage />} />
+              <Route path="setup/jira" element={<JiraIntakeSetupPage />} />
+              <Route path="setup/linear" element={<LinearIntakeSetupPage />} />
             </Route>
             <Route path="automations">
               <Route index element={<AutomationsPage />} />
               <Route path="new" element={<LegacyAutomationsNewLineRedirect />} />
-              <Route path=":lineId/edit" element={<LegacyAutomationsLineEditRedirect />} />
               <Route path=":appId" element={<FactoryCanvasConfigureGate />} />
               <Route path=":appId/runs/:runId?" element={<FactoryAutomationRunPage />} />
               <Route path=":appId/split-run" element={<FactoryAppSplitRunPage />} />
@@ -454,6 +453,7 @@ export function OrganizationScope() {
   return (
     <PermissionsProvider>
       <UserNotificationsListener organizationId={resolvedId} />
+      <WebhookSetupListener organizationId={resolvedId} />
       <Outlet />
     </PermissionsProvider>
   );
@@ -467,10 +467,10 @@ function CreateWorkOrderComposeGate() {
   );
 }
 
-function FactoryLineEditPageGate() {
+function FactoryLineEditPageGate({ isCreate = false }: { isCreate?: boolean }) {
   return (
     <RequirePermission resource="factories" action="update">
-      <FactoryLineEditPage />
+      <FactoryLineEditPage isCreate={isCreate} />
     </RequirePermission>
   );
 }
@@ -507,16 +507,6 @@ function LegacyAutomationsNewLineRedirect() {
   const { organizationId, factoryKey } = useParams<{ organizationId: string; factoryKey: string }>();
   if (!organizationId || !factoryKey) return <Navigate to="/" replace />;
   return <Navigate to={createFactoryLinePath(organizationId, factoryKey)} replace />;
-}
-
-function LegacyAutomationsLineEditRedirect() {
-  const { organizationId, factoryKey, lineId } = useParams<{
-    organizationId: string;
-    factoryKey: string;
-    lineId: string;
-  }>();
-  if (!organizationId || !factoryKey || !lineId) return <Navigate to="/" replace />;
-  return <Navigate to={editFactoryLinePath(organizationId, factoryKey, lineId)} replace />;
 }
 
 function LegacyCanvasRedirect({ settings = false }: { settings?: boolean }) {

@@ -83,9 +83,7 @@ export function PRFeedbackSettingsHost({
     }
     setPickerOpen(false);
     onClose();
-    navigate(
-      factoryPRFeedbackSetupPath(organizationId, factoryKey, lineId, prFeedbackSetupKindFromSourceId(source.id)),
-    );
+    navigate(factoryPRFeedbackSetupPath(organizationId, factoryKey, prFeedbackSetupKindFromSourceId(source.id)));
   };
 
   if (handlersQuery.isPending) {

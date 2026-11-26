@@ -8,7 +8,7 @@ import { ChevronRight, Loader2 } from "lucide-react";
 import { Link } from "react-router";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { WorkspacePageHeader } from "../layout/WorkspacePageHeader";
-import { factoryHomePath, factoryLineDetailPath, firstFactoryLineId, workOrdersPath } from "../lib/factoryPagePaths";
+import { factoryHomePath, workOrdersPath } from "../lib/factoryPagePaths";
 import { getWorkOrderDisplayStatus, getWorkOrderDisplayStatusMeta } from "../lib/workOrderProgress";
 import {
   factoryCardClassName,
@@ -50,7 +50,6 @@ export function OverviewPage() {
           <WorkOrdersOverviewCard
             organizationId={organizationId}
             factoryKey={routeSegment}
-            lineId={firstFactoryLineId(factory)}
             orders={recentOrders}
             isLoading={workOrdersLoading}
             error={workOrdersError}
@@ -65,14 +64,12 @@ export function OverviewPage() {
 function WorkOrdersOverviewCard({
   organizationId,
   factoryKey,
-  lineId,
   orders,
   isLoading,
   error,
 }: {
   organizationId: string;
   factoryKey: string;
-  lineId: string | undefined;
   orders: FactoriesWorkOrder[];
   isLoading: boolean;
   error: Error | null;
@@ -105,7 +102,7 @@ function WorkOrdersOverviewCard({
             {orders.map((order) => {
               const status = getWorkOrderDisplayStatus(order);
               const statusMeta = getWorkOrderDisplayStatusMeta(status);
-              const href = factoryHomePath(organizationId, factoryKey, lineId);
+              const href = factoryHomePath(organizationId, factoryKey);
               const updatedAt = order.updatedAt ?? order.createdAt;
               const timeLabel = updatedAt ? formatTimeAgo(new Date(updatedAt)) : "—";
               return (
@@ -163,7 +160,7 @@ function LinesOverviewCard({
           <p className="text-[12px] text-muted-foreground">Lines and their steps.</p>
         </div>
         <Link
-          to={factoryHomePath(organizationId, factoryKey, firstFactoryLineId({ lines }))}
+          to={factoryHomePath(organizationId, factoryKey)}
           className="text-[12px] font-medium text-muted-foreground hover:text-foreground"
           data-testid="overview-lines-view-all"
         >
@@ -177,7 +174,7 @@ function LinesOverviewCard({
         <ul>
           {lines.map((line) => {
             const stepsCount = line.steps?.length ?? 0;
-            const href = line.id ? factoryLineDetailPath(organizationId, factoryKey, line.id) : "#";
+            const href = line.id ? factoryHomePath(organizationId, factoryKey) : "#";
             return (
               <li key={line.id ?? line.name} className="border-b border-border/60 last:border-b-0">
                 <Link

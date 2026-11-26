@@ -12,7 +12,6 @@ import {
   PRIMARY_FACTORY_ROUTE_SEGMENT,
   REFUND_FACTORY,
   REFUND_LINE_HOTFIX_ID,
-  REFUND_LINE_PLAN_ID,
 } from "../__fixtures__/factoryPageResponses";
 import { FactoriesLayoutContext } from "../layout/factoriesLayoutContext";
 import { factorySettingsPath, factoryVelocityPath } from "../lib/factoryPagePaths";
@@ -74,7 +73,7 @@ describe("MobileBottomBar", () => {
 
   it("keeps the current line when Board is opened again", async () => {
     const user = userEvent.setup();
-    const hotfixBoard = `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_HOTFIX_ID}`;
+    const hotfixBoard = `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}`;
     renderBar(hotfixBoard);
 
     expect(screen.getByTestId("mobile-tab-board")).toHaveAttribute("href", hotfixBoard);
@@ -92,7 +91,7 @@ describe("MobileBottomBar", () => {
 
     expect(screen.getByTestId("mobile-tab-board")).toHaveAttribute(
       "href",
-      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_HOTFIX_ID}`,
+      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}`,
     );
   });
 
@@ -101,7 +100,7 @@ describe("MobileBottomBar", () => {
 
     expect(screen.getByTestId("mobile-tab-board")).toHaveAttribute(
       "href",
-      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}`,
+      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}`,
     );
   });
 
@@ -110,10 +109,7 @@ describe("MobileBottomBar", () => {
     renderBar(`${settingsIndex}/organization/members`);
 
     const settingsTab = screen.getByRole("link", { name: "More" });
-    expect(settingsTab).toHaveAttribute(
-      "href",
-      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/more?lineId=${REFUND_LINE_PLAN_ID}`,
-    );
+    expect(settingsTab).toHaveAttribute("href", `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/more`);
     expect(screen.queryByTestId("factories-sidebar-user-menu-trigger")).not.toBeInTheDocument();
     expect(settingsTab).toHaveAttribute("aria-current", "page");
     expect(screen.getByTestId("mobile-tab-velocity")).not.toHaveAttribute("aria-current");

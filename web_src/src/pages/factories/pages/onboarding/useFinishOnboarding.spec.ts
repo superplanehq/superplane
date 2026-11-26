@@ -343,7 +343,7 @@ describe("afterWorkspaceProvisioned", () => {
       skipInitialImport: true,
     });
     expect(onProvisioned).not.toHaveBeenCalled();
-    expect(navigate).toHaveBeenCalledWith("/org/workspaces/sp/lines/line-1", { replace: true });
+    expect(navigate).toHaveBeenCalledWith("/org/workspaces/sp", { replace: true });
   });
 
   it("renames the organization, refreshes the switcher, then opens the new slug", async () => {
@@ -365,7 +365,7 @@ describe("afterWorkspaceProvisioned", () => {
 
     expect(updateOrganization).toHaveBeenCalledWith({ name: "Acme Org", slug: "acme-org" });
     expect(invalidateAccountOrganizations).toHaveBeenCalledTimes(1);
-    expect(navigate).toHaveBeenCalledWith("/acme-org/workspaces/sp/lines/line-1", { replace: true });
+    expect(navigate).toHaveBeenCalledWith("/acme-org/workspaces/sp", { replace: true });
   });
 
   it("hands the renamed organization to onProvisioned instead of navigating", async () => {
@@ -391,7 +391,6 @@ describe("afterWorkspaceProvisioned", () => {
     expect(onProvisioned).toHaveBeenCalledWith({
       organizationId: "acme-org",
       factoryKey: "SP",
-      lineId: "line-1",
     });
   });
 });
@@ -480,13 +479,12 @@ describe("provisionWorkspace default branch", () => {
 });
 
 describe("afterOnboardingPath", () => {
-  it("opens the board of the provisioned line, where the intake sits in Backlog", () => {
+  it("opens the workspace board, where the intake sits in Backlog", () => {
     expect(
       afterOnboardingPath({
         organizationId: "org-1",
         factoryKey: "SP",
-        lineId: "line-1",
       }),
-    ).toBe("/org-1/workspaces/sp/lines/line-1");
+    ).toBe("/org-1/workspaces/sp");
   });
 });

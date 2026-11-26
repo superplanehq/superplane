@@ -43,7 +43,7 @@ function PhoneBoardHeader() {
   );
 }
 
-function renderHeader(path = `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}`) {
+function renderHeader(path = `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}`) {
   return render(
     <MemoryRouter initialEntries={[path]}>
       <FactoriesLayoutContext.Provider
@@ -84,9 +84,7 @@ describe("MobileBoardHeader", () => {
     await user.type(search, "engineering");
     expect(within(sheet).queryByText("Current workspace")).not.toBeInTheDocument();
     await user.click(within(sheet).getByRole("button", { name: "Engineering" }));
-    expect(screen.getByTestId("location")).toHaveTextContent(
-      `/org-1/workspaces/eng-abcd1234/lines/${REFUND_LINE_PLAN_ID}`,
-    );
+    expect(screen.getByTestId("location")).toHaveTextContent(`/org-1/workspaces/eng-abcd1234`);
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
