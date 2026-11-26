@@ -147,7 +147,7 @@ function parseTrigger(value: unknown, path: string, stage: CustomAutomationColum
     case "schedule":
       return parseScheduleTrigger(trigger.config, id, path);
     case "webhook":
-      return parseWebhookTrigger(trigger.config, id, path, stage);
+      return parseWebhookTrigger(trigger.config, id, path);
     case "pull_request_updated":
       if (stage !== "verify") problem(`${path}.use`, "This trigger requires Verify.");
       break;
@@ -177,13 +177,7 @@ function parseScheduleTrigger(value: unknown, id: string | undefined, path: stri
   return { id, use: "schedule", config: { cron, utc_offset: offset } };
 }
 
-function parseWebhookTrigger(
-  value: unknown,
-  id: string | undefined,
-  path: string,
-  stage: CustomAutomationColumn,
-): AutomationTrigger {
-  if (stage !== "backlog") problem(`${path}.use`, "Webhook triggers are available in Backlog only.");
+function parseWebhookTrigger(value: unknown, id: string | undefined, path: string): AutomationTrigger {
   const config = mapping(value, `${path}.config`, ["webhook_id"]);
   return { id, use: "webhook", config: { webhook_id: singleLine(config.webhook_id, `${path}.config.webhook_id`) } };
 }

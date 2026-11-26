@@ -68,7 +68,7 @@ export function FactorySettingsWebhooksPage() {
   return (
     <FactorySettingsPageFrame
       title="Webhooks"
-      subtitle="Receive requests from other tools. Select a webhook as the trigger of a Backlog automation."
+      subtitle="Receive requests from other tools. Select a webhook as the trigger of an automation."
       actions={
         <PermissionTooltip allowed={canUpdate} message={NO_UPDATE_PERMISSION}>
           <Button
