@@ -97,6 +97,7 @@ it("saves a Backlog webhook trigger with the selected webhook", async () => {
   await user.click(screen.getByRole("combobox", { name: "Webhook" }));
   await user.click(screen.getByRole("option", { name: "Jira issues" }));
   expect(screen.getByText("https://superplane.test/api/v1/webhooks/webhook-1")).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "Manage webhooks" })).toHaveAttribute("target", "_blank");
   await user.click(screen.getByRole("button", { name: "Save" }));
   await waitFor(() => expect(saveAutomation).toHaveBeenCalled());
   const saved = saveAutomation.mock.calls.at(-1)![0];
@@ -117,7 +118,9 @@ it("shows a task webhook on Implement when the flag is on", async () => {
   await user.click(screen.getByRole("menuitem", { name: /Webhook/ }));
   expect(screen.getByText("Runs for each matched task.")).toBeInTheDocument();
   expect(screen.getByRole("combobox", { name: "Find task by" })).toBeInTheDocument();
-  expect(screen.getByLabelText("Field path")).toHaveValue("task");
+  expect(screen.getByLabelText("JSON body field")).toHaveValue("task");
+  expect(screen.getByText(/for example issue\.key/)).toBeInTheDocument();
+  expect(screen.getByTestId(/task-match-example$/)).toHaveTextContent('"task": "SP-42"');
 
   await user.click(screen.getByRole("combobox", { name: "Webhook" }));
   await user.click(screen.getByRole("option", { name: "Jira issues" }));

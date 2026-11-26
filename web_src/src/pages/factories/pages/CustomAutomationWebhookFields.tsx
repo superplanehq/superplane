@@ -6,9 +6,12 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useFactoryWebhooks } from "@/hooks/useFactoryWebhooks";
 import { CopyButton } from "@/ui/CopyButton";
+import { HighlightedCode } from "@/ui/HighlightedCode";
 
 import type { CustomAutomationTaskMatch } from "../lib/customAutomation";
 import { factorySettingsSectionPath } from "../lib/factoryPagePaths";
+import { validWebhookIntakeFieldPath } from "./webhookIntakeFieldPaths";
+import { WEBHOOK_INTAKE_FIELDS_COPY } from "./webhookIntakeSetupCopy";
 
 export function CustomAutomationWebhookFields({
   idPrefix,
@@ -89,7 +92,12 @@ export function CustomAutomationWebhookFields({
       ) : null}
       <p className="text-xs text-muted-foreground">
         {helper}{" "}
-        <Link to={settingsPath} className="font-medium text-foreground underline underline-offset-2">
+        <Link
+          to={settingsPath}
+          target="_blank"
+          rel="noreferrer"
+          className="font-medium text-foreground underline underline-offset-2"
+        >
           Manage webhooks
         </Link>
       </p>
@@ -106,6 +114,7 @@ export function TaskMatchFields({
   taskMatch: CustomAutomationTaskMatch;
   onChange: (taskMatch: CustomAutomationTaskMatch) => void;
 }) {
+  const example = taskMatchExampleBody(taskMatch);
   return (
     <div className="mt-4 grid gap-4 border-t border-border pt-4">
       <div className="grid gap-2">
@@ -125,20 +134,66 @@ export function TaskMatchFields({
         </Select>
       </div>
       <div className="grid gap-2">
-        <Label htmlFor={`${idPrefix}-task-match-path`}>Field path</Label>
+        <Label htmlFor={`${idPrefix}-task-match-path`}>JSON body field</Label>
         <Input
           id={`${idPrefix}-task-match-path`}
           value={taskMatch.fieldPath}
+          aria-describedby={`${idPrefix}-task-match-path-help`}
           placeholder={
             taskMatch.kind === "task"
-              ? "task.key"
+              ? "issue.key"
               : taskMatch.kind === "pull_request"
                 ? "pull_request.url"
                 : "commit.sha"
           }
           onChange={(event) => onChange({ ...taskMatch, fieldPath: event.target.value })}
         />
+        <p id={`${idPrefix}-task-match-path-help`} className="text-xs text-muted-foreground">
+          {taskMatchPathHelper(taskMatch.kind)}
+        </p>
+        {example ? (
+          <div className="grid gap-2">
+            <p className="text-xs text-muted-foreground">{WEBHOOK_INTAKE_FIELDS_COPY.exampleLabel}</p>
+            <HighlightedCode
+              code={example}
+              language="json"
+              className="rounded-md border border-border bg-muted/40 px-3 py-2"
+              testId={`${idPrefix}-task-match-example`}
+            />
+          </div>
+        ) : null}
       </div>
     </div>
   );
+}
+
+function taskMatchPathHelper(kind: CustomAutomationTaskMatch["kind"]): string {
+  if (kind === "pull_request") {
+    return "The value is a pull request URL. Use dots for nested fields, for example pull_request.url.";
+  }
+  if (kind === "commit") {
+    return "The value is a commit SHA. Use dots for nested fields, for example commit.sha.";
+  }
+  return "The value is a task id, number, or key. Use dots for nested fields, for example issue.key.";
+}
+
+function taskMatchExampleBody(taskMatch: CustomAutomationTaskMatch): string {
+  const path = taskMatch.fieldPath.trim();
+  if (!validWebhookIntakeFieldPath(path)) return "";
+  const value =
+    taskMatch.kind === "pull_request"
+      ? "https://github.com/acme/app/pull/40"
+      : taskMatch.kind === "commit"
+        ? "abc123def456"
+        : "SP-42";
+  const body: Record<string, unknown> = Object.create(null);
+  const segments = path.split(".");
+  let parent = body;
+  for (const segment of segments.slice(0, -1)) {
+    const child: Record<string, unknown> = Object.create(null);
+    parent[segment] = child;
+    parent = child;
+  }
+  parent[segments[segments.length - 1]] = value;
+  return JSON.stringify(body, null, 2);
 }
