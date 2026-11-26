@@ -34,7 +34,6 @@ interface WorkOrdersHeaderProps {
   canCreate: boolean;
   permissionsLoading: boolean;
   hostedCreditHeaderKicker?: ReactNode;
-  brokenIntegrationsBanner?: ReactNode;
   showPullRequestMerge?: boolean;
 }
 
@@ -54,7 +53,6 @@ export function WorkOrdersHeader({
   canCreate,
   permissionsLoading,
   hostedCreditHeaderKicker,
-  brokenIntegrationsBanner,
   showPullRequestMerge = false,
 }: WorkOrdersHeaderProps) {
   const searchRef = useWorkOrdersHeaderShortcuts(state);
@@ -111,19 +109,14 @@ export function WorkOrdersHeader({
         </>
       }
       belowRow={
-        brokenIntegrationsBanner || visibleFilterCount > 0 ? (
-          <>
-            {brokenIntegrationsBanner}
-            {visibleFilterCount > 0 ? (
-              <FilterChips
-                state={state}
-                lineOptions={lineOptions}
-                sourceOptions={sourceOptions}
-                assigneeOptions={assigneeOptions}
-                showPullRequestMerge={showPullRequestMerge}
-              />
-            ) : null}
-          </>
+        visibleFilterCount > 0 ? (
+          <FilterChips
+            state={state}
+            lineOptions={lineOptions}
+            sourceOptions={sourceOptions}
+            assigneeOptions={assigneeOptions}
+            showPullRequestMerge={showPullRequestMerge}
+          />
         ) : undefined
       }
     />

@@ -46,7 +46,7 @@ export function MobileBoardSettings({
 }) {
   const navigate = useNavigate();
   const { search } = useLocation();
-  const close = () => navigate(factoryHomePath(organizationId, routeSegment, lineId));
+  const close = () => navigate(factoryHomePath(organizationId, routeSegment));
   const intakeId = intakeIdFromSearch(search);
   const canvasId = columnAutomationViewCanvasIdFromSearch(search);
   const planningTab = planningSettingsTabFromSearch(search);

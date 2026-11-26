@@ -13,7 +13,6 @@ import { buildWorkOrderListEntry } from "../lib/workOrderListModel";
 import { WorkOrderCard } from "./WorkOrderCard";
 
 const factory: FactoriesFactory = { id: "factory-1", name: "Refunds", key: "RF" };
-const factoryLines: FactoriesFactoryLine[] = [{ id: "line-a", name: "hotfix" }];
 
 function waitingOrder(overrides: Partial<FactoriesWorkOrder> = {}): FactoriesWorkOrder {
   return {
@@ -65,7 +64,6 @@ const meta = {
     entry: buildWorkOrderListEntry(waitingOrder(), factory),
     organizationId: "org-1",
     factoryKey: "RF",
-    factoryLines,
     canDispatch: true,
     canAssign: true,
     dispatchingOrderIds: new Set<string>(),

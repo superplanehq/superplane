@@ -78,7 +78,7 @@ export function MobileTaskDetailPage() {
     if (!boardLineId) {
       return;
     }
-    navigate(factoryHomeColumnPath(organizationId, routeSegment, boardLineId, boardColumnKey));
+    navigate(factoryHomeColumnPath(organizationId, routeSegment, boardColumnKey));
   };
 
   usePageTitle([order?.title ?? "Task", factory?.name ?? "Workspace"]);

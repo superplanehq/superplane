@@ -1,3 +1,4 @@
+import { useBrokenIntegrationsBanner } from "../lib/useBrokenIntegrationsBanner";
 import { CodexActionProvider } from "../codex/CodexActionProvider";
 import type { FactoriesFactory } from "@/api-client";
 import { useAccount } from "@/contexts/useAccount";
@@ -101,6 +102,7 @@ function MobileFactoryShell({
   const { data: describedFactory, error: factoryError } = useFactory(organizationId, factoryId);
   const factory = describedFactory ?? factories.find((item) => item.id === factoryId) ?? null;
   const routeSegment = factoryRouteSegment(factory) || factoryKey;
+  const brokenIntegrationsBanner = useBrokenIntegrationsBanner(organizationId, routeSegment);
   const canCreateWorkOrder = canAct("work_orders", "create");
 
   useEffect(() => {
@@ -150,9 +152,12 @@ function MobileFactoryShell({
               <MobileWorkspaceSwitcher />
             </header>
           ) : null}
-          <main className="relative min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-none">
-            {children ?? <Outlet />}
-          </main>
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+            {brokenIntegrationsBanner ? <div className="shrink-0 p-4">{brokenIntegrationsBanner}</div> : null}
+            <main className="relative min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-none">
+              {children ?? <Outlet />}
+            </main>
+          </div>
           <MobileBottomBar />
         </PinnedPhoneShell>
         {canCreateWorkOrder ? (

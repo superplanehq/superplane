@@ -108,7 +108,7 @@ func TestPlanningRunnerTokenOwnsTheDraftTask(t *testing.T) {
 
 // everyGlobalRunnerTool lists the tools that every run receives.
 var everyGlobalRunnerTool = []string{
-	"list_members", "assign_task_owner", "suggest_task_owner", "list_tasks", "create_task", "close_task",
+	"list_members", "assign_task_owner", "suggest_task_owner", "list_tasks", "get_task", "create_task", "close_task",
 	"list_checks", "add_checks", "remove_checks",
 	"list_artifacts", "get_artifact", "add_artifact", "remove_artifact",
 }

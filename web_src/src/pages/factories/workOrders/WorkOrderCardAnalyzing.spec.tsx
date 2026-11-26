@@ -41,7 +41,6 @@ function renderCard(props: {
           entry={buildWorkOrderListEntry(order, factory)}
           organizationId="org-1"
           factoryKey="RF"
-          factoryLines={[{ id: "line-a", name: "hotfix" }]}
           canDispatch
           canAssign
           dispatchingOrderIds={new Set()}
@@ -179,7 +178,6 @@ describe("Confidence score on a backlog card", () => {
             entry={buildWorkOrderListEntry({ ...order, state: "STATE_OPEN" }, factory)}
             organizationId="org-1"
             factoryKey="RF"
-            factoryLines={[{ id: "line-a", name: "hotfix" }]}
             canDispatch
             canAssign
             dispatchingOrderIds={new Set()}

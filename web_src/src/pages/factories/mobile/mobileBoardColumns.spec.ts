@@ -25,6 +25,37 @@ const DONE_ORDER: FactoriesWorkOrder = {
 };
 
 describe("buildMobileBoardColumns", () => {
+  it("keeps a retained phase and its task after step indexes compact", () => {
+    const columns = buildMobileBoardColumns(
+      {
+        ...PLAN_LINE,
+        steps: PLAN_LINE.steps?.slice(1),
+        stages: [
+          { id: "backlog", key: "backlog", name: "Backlog", kind: "STAGE_KIND_BACKLOG" },
+          { id: "retained-phase", key: "phase-1", name: "Implement", kind: "STAGE_KIND_PHASE", stepIndex: 0 },
+          { id: "done", key: "done", name: "Done", kind: "STAGE_KIND_DONE" },
+        ],
+      },
+      [
+        {
+          id: "retained-task",
+          state: "STATE_OPEN",
+          lineDispatches: [
+            {
+              id: "retained-dispatch",
+              line: { id: REFUND_LINE_PLAN_ID },
+              currentStageKey: "phase-1",
+              stepExecutions: [{ id: "retained-execution", stepIndex: 0, stageKey: "phase-1", state: "STATE_STARTED" }],
+            },
+          ],
+        },
+      ],
+      REFUND_FACTORY_APPS,
+    );
+    expect(columns.map((column) => column.key)).toEqual(["backlog", "phase-1", "done"]);
+    expect(columns[1].cards.map((card) => card.order.id)).toEqual(["retained-task"]);
+  });
+
   it("lays out Backlog, each line phase, Verify, and Done as one flat swipe order", () => {
     const columns = buildMobileBoardColumns(PLAN_LINE, [BACKLOG_DRAFT, DONE_ORDER], REFUND_FACTORY_APPS);
 

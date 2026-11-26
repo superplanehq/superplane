@@ -24,8 +24,8 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { FactoryDeleteDialog } from "../../FactoryDeleteDialog";
 import {
-  factoryLineDetailPath,
   factoryListPath,
+  factoryPublicBoardPath,
   factoryRouteSegment,
   factorySettingsGeneralPathAfterKeyChange,
   firstFactoryLineId,
@@ -272,7 +272,7 @@ function publicBoardPath(
   if (!lineId) {
     return undefined;
   }
-  return factoryLineDetailPath(organizationId, factoryRouteSegment(factory), lineId);
+  return factoryPublicBoardPath(organizationId, factoryRouteSegment(factory), lineId);
 }
 
 interface VisibilitySectionProps {
