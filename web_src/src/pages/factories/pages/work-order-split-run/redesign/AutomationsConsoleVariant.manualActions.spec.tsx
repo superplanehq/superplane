@@ -14,6 +14,28 @@ const manualCustomAutomations = [
 ];
 
 describe("AutomationsConsoleVariant manual actions", () => {
+  it.each(["custom-qa", "phase-0"])(
+    "offers unstarted custom work only in its matching stage: %s",
+    (currentStageKey) => {
+      const fixture = splitRunFixtureForWorkOrder(BOARD_IMPLEMENT_NOTIFY_ORDER, { demoArtifacts: false });
+      fixture.currentStageKey = currentStageKey;
+      fixture.manualStageAppIds = ["qa-manual"];
+      fixture.stageColumns = [{ id: "custom-qa", title: "QA" }, ...(fixture.stageColumns ?? [])];
+      renderConsole(fixture, {
+        organizationId: "org-1",
+        factoryId: "factory-1",
+        orderId: BOARD_IMPLEMENT_NOTIFY_ORDER.id,
+        canStopRun: true,
+        manualCustomAutomations: [{ id: "qa-manual", name: "Update Docs", columnKey: "custom-qa" }],
+      });
+      const action = within(screen.getByTestId("redesign-console-column-custom-qa")).queryByRole("button", {
+        name: /Run/,
+      });
+      if (currentStageKey === "custom-qa") expect(action).toBeEnabled();
+      else expect(action).toBeNull();
+    },
+  );
+
   it("offers only Backlog manual actions for a Backlog task", () => {
     renderConsole(splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER, { demoArtifacts: false }), {
       organizationId: "org-1",

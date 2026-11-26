@@ -249,7 +249,7 @@ describe("custom automation configuration run history", () => {
       data: { ...automation, settings: { ...automation.settings, startMode: "START_MODE_AUTOMATIC" } },
     });
     const onClose = renderModal("?customAutomation=custom-1", "custom-1", "custom-qa");
-    expect(screen.queryByRole("button", { name: "Add trigger" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Add trigger" })).toBeEnabled();
     expect(screen.queryByTestId("custom-automation-runs-on-task")).toBeNull();
     await userEvent.setup().click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));

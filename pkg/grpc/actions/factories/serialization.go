@@ -949,9 +949,11 @@ func serializeExecutionSteps(
 			name = steps[i].StageName
 		}
 		result[i] = &pb.WorkOrderExecutionStep{
-			Name:      name,
-			StepIndex: int32(i),
-			StageKey:  steps[i].StageKey,
+			Name:        name,
+			StepIndex:   int32(i),
+			StageKey:    steps[i].StageKey,
+			AppId:       steps[i].AppID.String(),
+			ManualStart: steps[i].ManualStart || steps[i].StartMode == "manual",
 		}
 	}
 	return result
