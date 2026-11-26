@@ -180,44 +180,6 @@ func (l *FactoryLine) ExecutionPlan(tx *gorm.DB) ([]FactoryLineStep, error) {
 	return steps, nil
 }
 
-func customStageStartMode(spec LiveCanvasSpec, entrypoint string) string {
-	for _, node := range spec.Nodes {
-		if node.ID != entrypoint {
-			continue
-		}
-		template, _ := node.Metadata[FactoryAppTemplateMetadataKey].(map[string]any)
-		kinds, _ := template["triggerKinds"].([]any)
-		for _, kind := range kinds {
-			if kind == "automatic" {
-				return "automatic"
-			}
-		}
-		if template["startMode"] == "manual" {
-			return "manual"
-		}
-	}
-	return "automatic"
-}
-
-func customStageAllowsManualStart(spec LiveCanvasSpec, entrypoint string) bool {
-	for _, node := range spec.Nodes {
-		if node.ID != entrypoint {
-			continue
-		}
-		template, _ := node.Metadata[FactoryAppTemplateMetadataKey].(map[string]any)
-		if template["startMode"] == "manual" {
-			return true
-		}
-		kinds, _ := template["triggerKinds"].([]any)
-		for _, kind := range kinds {
-			if kind == "manual" {
-				return true
-			}
-		}
-	}
-	return false
-}
-
 func customStageEntrypoint(canvas Canvas, spec LiveCanvasSpec) (string, error) {
 	if canvas.LiveVersionID == nil {
 		return "", &FactoryLineStageAutomationError{
@@ -557,6 +519,44 @@ func (l *FactoryLine) ClearRemovedCustomStageDisplayColumns(tx *gorm.DB, next []
 	return tx.Model(&Canvas{}).
 		Where("organization_id = ? AND factory_id = ? AND display_column_key IN ?", l.OrganizationID, l.FactoryID, keys).
 		Update("display_column_key", "").Error
+}
+
+func customStageStartMode(spec LiveCanvasSpec, entrypoint string) string {
+	for _, node := range spec.Nodes {
+		if node.ID != entrypoint {
+			continue
+		}
+		template, _ := node.Metadata[FactoryAppTemplateMetadataKey].(map[string]any)
+		kinds, _ := template["triggerKinds"].([]any)
+		for _, kind := range kinds {
+			if kind == "automatic" {
+				return "automatic"
+			}
+		}
+		if template["startMode"] == "manual" {
+			return "manual"
+		}
+	}
+	return "automatic"
+}
+
+func customStageAllowsManualStart(spec LiveCanvasSpec, entrypoint string) bool {
+	for _, node := range spec.Nodes {
+		if node.ID != entrypoint {
+			continue
+		}
+		template, _ := node.Metadata[FactoryAppTemplateMetadataKey].(map[string]any)
+		if template["startMode"] == "manual" {
+			return true
+		}
+		kinds, _ := template["triggerKinds"].([]any)
+		for _, kind := range kinds {
+			if kind == "manual" {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (l *FactoryLine) removedCustomStageKeys(next []FactoryLineStage) []string {
