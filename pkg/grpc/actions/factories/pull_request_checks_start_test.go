@@ -695,9 +695,14 @@ func TestPullRequestChecksStartupAttachmentEntries(t *testing.T) {
 			require.NoError(t, err)
 			useGitHub(t, checksStartupGitHubPullRequest())
 			if entry == "API" {
-				_, err = CreateFactoryPullRequest(t.Context(), IntakeDependencies{}, r.Organization.ID.String(), &pb.CreateFactoryPullRequestRequest{FactoryId: factory.ID.String(), WorkOrderId: order.ID.String(), Url: "https://github.com/acme/app/pull/42"})
+				created, err := CreateFactoryPullRequest(t.Context(), IntakeDependencies{}, r.Organization.ID.String(), &pb.CreateFactoryPullRequestRequest{FactoryId: factory.ID.String(), WorkOrderId: order.ID.String(), Url: "https://github.com/acme/app/pull/42"})
 				require.NoError(t, err)
 				assert.EqualValues(t, 1, countCanvasEvents(t, canvas.ID))
+				// Finish the background refresh before the next fixture truncates its tables.
+				require.Eventually(t, func() bool {
+					stored, err := factory.FindPullRequest(db, models.FactoryPullRequestLookup{ID: uuid.MustParse(created.PullRequest.Id)})
+					return err == nil && stored.MergeableHeadSHA == checksStartupGitHubPullRequest().GetHead().GetSHA()
+				}, 5*time.Second, 10*time.Millisecond)
 				return
 			}
 			var trackedID uuid.UUID
