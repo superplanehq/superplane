@@ -432,10 +432,6 @@ func (f *recordingFactory) FindWorkOrder(core.FindWorkOrderParams) (*core.WorkOr
 	return nil, nil
 }
 
-func (f *recordingFactory) FindWorkOrdersForWebhook(string, string, string) ([]map[string]any, error) {
-	return nil, nil
-}
-
 func (f *recordingFactory) UpdateWorkOrderStatus(core.UpdateWorkOrderStatusParams) (*core.WorkOrder, bool, error) {
 	return nil, false, nil
 }

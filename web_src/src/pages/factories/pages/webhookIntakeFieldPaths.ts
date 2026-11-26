@@ -18,11 +18,6 @@ export const DEFAULT_WEBHOOK_INTAKE_FIELD_PATHS: WebhookIntakeFieldPaths = {
 const FIELD_PATH = /^[A-Za-z0-9_-]+(\.[A-Za-z0-9_-]+)*$/;
 const FIELD_PATH_MAX_LENGTH = 200;
 
-export function validWebhookIntakeFieldPath(path: string): boolean {
-  const value = path.trim();
-  return value.length > 0 && value.length <= FIELD_PATH_MAX_LENGTH && FIELD_PATH.test(value);
-}
-
 const EXAMPLE_VALUES: WebhookIntakeFieldPaths = {
   title: "Checkout fails for saved cards",
   description: "Customers see an error when they pay with a saved card.",
@@ -37,7 +32,7 @@ export function webhookIntakeFieldPathErrors(paths: WebhookIntakeFieldPaths): We
       if (field === "title") errors.title = WEBHOOK_INTAKE_FIELDS_COPY.titleRequired;
       continue;
     }
-    if (!validWebhookIntakeFieldPath(path)) {
+    if (path.length > FIELD_PATH_MAX_LENGTH || !FIELD_PATH.test(path)) {
       errors[field] = WEBHOOK_INTAKE_FIELDS_COPY.pathInvalid;
     }
   }

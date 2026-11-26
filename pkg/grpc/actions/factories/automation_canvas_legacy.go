@@ -201,7 +201,7 @@ func importAutomationCanvas(tx *gorm.DB, factory *models.Factory, canvas *models
 			agent.LLMProvider = models.UsageProviderCustom
 		}
 	}
-	rebuild, err := automationCanvasSettings(tx, factory, *canvas.ColumnKey, document, agent)
+	rebuild, err := automationCanvasSettings(*canvas.ColumnKey, document, agent)
 	if err != nil {
 		return "", unrepresentableAutomationCanvas()
 	}
@@ -250,33 +250,13 @@ func legacyAutomationTriggers(stage string, nodes []models.Node) ([]automationsp
 				Config: &automationspec.TriggerConfig{Cron: trigger.schedule.GetCronExpression(), UTCOffset: trigger.schedule.GetUtcOffset()},
 			})
 		case pb.FactoryCustomAutomation_START_MODE_WEBHOOK:
-			var taskMatch *automationspec.TaskMatch
-			if trigger.taskMatch != nil {
-				taskMatch = &automationspec.TaskMatch{
-					Kind:      automationTaskMatchName(trigger.taskMatch.GetKind()),
-					FieldPath: trigger.taskMatch.GetFieldPath(),
-				}
-			}
 			result = append(result, automationspec.Trigger{
 				Use:    automationspec.Webhook,
-				Config: &automationspec.TriggerConfig{WebhookID: trigger.webhookID, TaskMatch: taskMatch},
+				Config: &automationspec.TriggerConfig{WebhookID: trigger.webhookID},
 			})
 		}
 	}
 	return result, nil
-}
-
-func automationTaskMatchName(kind pb.FactoryCustomAutomation_StartTrigger_TaskMatch_Kind) string {
-	switch kind {
-	case pb.FactoryCustomAutomation_StartTrigger_TaskMatch_KIND_TASK:
-		return "task"
-	case pb.FactoryCustomAutomation_StartTrigger_TaskMatch_KIND_PULL_REQUEST:
-		return "pull_request"
-	case pb.FactoryCustomAutomation_StartTrigger_TaskMatch_KIND_COMMIT:
-		return "commit"
-	default:
-		return ""
-	}
 }
 
 func equalAutomationExecutionGraph(live *models.CanvasVersion, expected *yaml.Canvas) bool {

@@ -179,11 +179,6 @@ func publishWorkOrderCreatedEvents(organizationID uuid.UUID, events []models.Can
 }
 
 func workOrderCreatedPayload(tx *gorm.DB, order *models.FactoryWorkOrder) map[string]any {
-	return WorkOrderCreatedPayload(tx, order)
-}
-
-// WorkOrderCreatedPayload builds the task context used by task-scoped root events.
-func WorkOrderCreatedPayload(tx *gorm.DB, order *models.FactoryWorkOrder) map[string]any {
 	return workOrderCreatedPayloadWithRefinement(tx, order, nil)
 }
 

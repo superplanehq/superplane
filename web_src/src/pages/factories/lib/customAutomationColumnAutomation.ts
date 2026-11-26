@@ -43,8 +43,7 @@ export function customAutomationColumnAutomation(
     taskStageTargets: customAutomationTaskStageTargets(primary, columnKey, hasSchedule),
     name: app.name?.trim() || "Custom automation",
     trigger,
-    action:
-      primary === "webhook" && app.customAutomationRunsOnTask === true ? "Runs for each matched task." : copy.action,
+    action: copy.action,
     iconSrc: "",
     iconAlt: "",
     iconName: app.customAutomationIcon,

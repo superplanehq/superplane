@@ -152,14 +152,14 @@ func (b CanvasAutomationBackend) compile(
 	if err != nil {
 		return nil, nil, err
 	}
-	settings, err := automationCanvasSettings(tx, factory, placement.Stage, source, agent)
+	settings, err := automationCanvasSettings(placement.Stage, source, agent)
 	if err != nil {
 		return nil, nil, err
 	}
 	if err := validateCustomAutomationWebhooks(tx, factory, settings.Triggers); err != nil {
 		return nil, nil, source.Diagnostic("triggers", grpcerrors.StatusMessage(err))
 	}
-	if settings.hasNoTaskWebhookTrigger() && placement.Stage != models.CanvasColumnKeyBacklog {
+	if settings.hasWebhookTrigger() && placement.Stage != models.CanvasColumnKeyBacklog {
 		return nil, nil, source.Diagnostic("triggers", "Webhook triggers are available in Backlog only.")
 	}
 	if strings.HasPrefix(placement.Stage, "custom-") {
@@ -278,13 +278,7 @@ func automationCanvasWriteError(source *automationspec.Document, err error) erro
 	return err
 }
 
-func automationCanvasSettings(
-	tx *gorm.DB,
-	factory *models.Factory,
-	stage string,
-	source *automationspec.Document,
-	agent *intakeAgent,
-) (*customAutomationSettings, error) {
+func automationCanvasSettings(stage string, source *automationspec.Document, agent *intakeAgent) (*customAutomationSettings, error) {
 	input := &pb.FactoryCustomAutomation_Settings{}
 	for _, trigger := range source.Triggers {
 		start := &pb.FactoryCustomAutomation_StartTrigger{}
@@ -303,12 +297,6 @@ func automationCanvasSettings(
 		case automationspec.Webhook:
 			start.StartMode = pb.FactoryCustomAutomation_START_MODE_WEBHOOK
 			start.WebhookId = trigger.Config.WebhookID
-			if trigger.Config.TaskMatch != nil {
-				start.TaskMatch = &pb.FactoryCustomAutomation_StartTrigger_TaskMatch{
-					Kind:      automationTaskMatchKind(trigger.Config.TaskMatch.Kind),
-					FieldPath: trigger.Config.TaskMatch.FieldPath,
-				}
-			}
 		}
 		input.Triggers = append(input.Triggers, start)
 	}
@@ -316,7 +304,7 @@ func automationCanvasSettings(
 	if err != nil {
 		return nil, source.Diagnostic("triggers", "Check the trigger types and schedule settings.")
 	}
-	if err := validateCustomAutomationRunContext(tx, factory, source.RunsOnTask, triggers); err != nil {
+	if err := validateCustomAutomationRunContext(source.RunsOnTask, triggers); err != nil {
 		return nil, source.Diagnostic("runs_on_task", grpcerrors.StatusMessage(err))
 	}
 	steps := make([]runner.AgentStep, 0, len(source.Steps))
@@ -341,17 +329,4 @@ func automationCanvasSettings(
 		RunsOnTask:        source.RunsOnTask,
 		SkipSetupCommands: source.SkipSetupCommands, SkipRepositoryCheckout: source.SkipRepositoryCheckout,
 	}, nil
-}
-
-func automationTaskMatchKind(kind string) pb.FactoryCustomAutomation_StartTrigger_TaskMatch_Kind {
-	switch kind {
-	case "task":
-		return pb.FactoryCustomAutomation_StartTrigger_TaskMatch_KIND_TASK
-	case "pull_request":
-		return pb.FactoryCustomAutomation_StartTrigger_TaskMatch_KIND_PULL_REQUEST
-	case "commit":
-		return pb.FactoryCustomAutomation_StartTrigger_TaskMatch_KIND_COMMIT
-	default:
-		return pb.FactoryCustomAutomation_StartTrigger_TaskMatch_KIND_UNSPECIFIED
-	}
 }

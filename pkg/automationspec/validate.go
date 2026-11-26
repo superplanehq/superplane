@@ -32,15 +32,6 @@ func (d *Document) validateSemantics() error {
 			if webhooks[id.String()] {
 				return d.Diagnostic(triggerPath+".config.webhook_id", "Use each webhook once.")
 			}
-			if trigger.Config.TaskMatch != nil {
-				match := trigger.Config.TaskMatch
-				if match.Kind != "task" && match.Kind != "pull_request" && match.Kind != "commit" {
-					return d.Diagnostic(triggerPath+".config.task_match.kind", "Choose task, pull_request, or commit.")
-				}
-				if strings.TrimSpace(match.FieldPath) == "" {
-					return d.Diagnostic(triggerPath+".config.task_match.field_path", "Enter the request body field path.")
-				}
-			}
 			webhooks[id.String()] = true
 			continue
 		}

@@ -159,7 +159,7 @@ func TestMaybeLinkCustomAutomationRunShowsTheRunOnThePullRequest(t *testing.T) {
 }
 
 func TestMaybeLinkCustomAutomationRunLinksTaskEvents(t *testing.T) {
-	for _, column := range []string{models.CanvasColumnKeyImplement, models.CanvasColumnKeyVerify, models.CanvasColumnKeyDone, "custom-qa"} {
+	for _, column := range []string{models.CanvasColumnKeyImplement, models.CanvasColumnKeyVerify, models.CanvasColumnKeyDone} {
 		t.Run(column, func(t *testing.T) {
 			r := support.Setup(t)
 			db := database.DB(t.Context())
