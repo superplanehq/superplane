@@ -82,7 +82,9 @@ import { ScheduledIntakeSetupDialog } from "./ScheduledIntakeSetupDialog";
 import { AddPRFeedbackPicker } from "./AddPRFeedbackPicker";
 import { useAddColumnAutomation } from "./useAddColumnAutomation";
 import { IntakeWebhookFailureNotice } from "./IntakeWebhookFailureNotice";
+import { WebhookFailuresNotice } from "./WebhookFailuresNotice";
 import { useIntakeWebhookRetry } from "./useIntakeWebhookRetry";
+import { webhookSetupInProgress } from "@/lib/webhookSetup";
 import { WebhookIntakeSetupDialog } from "./WebhookIntakeSetupDialog";
 import { NextStepsPanel, WorkspaceNextStepsHeaderBadge } from "./NextStepsPanel";
 import { useWorkspaceNextStepDeferral } from "./workspaceNextStepDeferral";
@@ -870,15 +872,21 @@ export function LinesPage() {
             }
           />
           <SubscriptionIntakeOwnerRecovery />
+          <WebhookFailuresNotice organizationId={organizationId} />
           {configuredIntakes
-            .filter((intake) => intake.source.id === "github-issues" && intake.health === "HEALTH_WEBHOOK_FAILED")
+            .filter(
+              (intake) =>
+                !canAct("integrations", "read") &&
+                intake.source.id === "github-issues" &&
+                intake.health === "HEALTH_WEBHOOK_FAILED",
+            )
             .map((intake) => (
               <IntakeWebhookFailureNotice
                 key={intake.intakeId}
                 message={intake.healthMessage}
                 repository={intake.resourceId}
                 host={githubHost}
-                retrying={intakeWebhookRetry.retrying}
+                retrying={intakeWebhookRetry.retrying || webhookSetupInProgress(intake.webhookSetupState)}
                 onRetry={() => intakeWebhookRetry.retryIntake(intake)}
               />
             ))}
