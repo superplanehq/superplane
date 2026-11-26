@@ -63,7 +63,8 @@ func PlanFactoryConfiguration(ctx context.Context, deps IntakeDependencies, orga
 		return nil, factoryErrorToStatus(err, "Failed to plan stage configuration.")
 	}
 	response := &pb.PlanFactoryConfigurationResponse{Coverage: factoryConfigurationCoverage}
-	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
+	ctx, providerChecks := newRepositoryProviderChecks(ctx)
+	err = providerChecks.prepare(database.DB(ctx), func(tx *gorm.DB) error {
 		target, err := loadFactoryConfigurationTarget(tx, orgID, req.GetFactoryId(), req.GetLineId())
 		if err != nil {
 			return err
@@ -96,6 +97,29 @@ func ApplyFactoryConfiguration(ctx context.Context, deps IntakeDependencies, org
 		return nil, factoryErrorToStatus(err, "Failed to apply stage configuration.")
 	}
 	response := &pb.ApplyFactoryConfigurationResponse{Coverage: factoryConfigurationCoverage}
+	ctx, providerChecks := newRepositoryProviderChecks(ctx)
+	err = providerChecks.prepare(database.DB(ctx), func(tx *gorm.DB) error {
+		target, err := loadFactoryConfigurationTarget(tx, orgID, req.GetFactoryId(), req.GetLineId())
+		if err != nil {
+			return err
+		}
+		tx = withFactoryAutomationReadInputs(tx, target.reads)
+		manifest, diagnostic := parseFactoryConfigurationBundle(req.GetBundle())
+		if diagnostic == nil {
+			diagnostic, err = validateFactoryConfigurationManifest(ctx, tx, deps, manifest, target)
+			if err != nil {
+				return err
+			}
+		}
+		if diagnostic != nil {
+			return grpcerrors.InvalidArgument(nil, fmt.Sprintf("%s: %s: %s", diagnostic.Path, diagnostic.Field, diagnostic.Message))
+		}
+		return nil
+	}, &sql.TxOptions{ReadOnly: true, Isolation: sql.LevelRepeatableRead})
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "Failed to apply stage configuration.")
+	}
+	providerChecks.frozen = true
 	var notifications []func()
 	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := requireFactoryAsCode(tx, orgID); err != nil {

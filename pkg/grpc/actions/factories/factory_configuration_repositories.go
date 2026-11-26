@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/githubapp"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
@@ -259,10 +260,32 @@ func prepareFactoryConfigurationRepositories(ctx context.Context, tx *gorm.DB, d
 		}
 	}
 	patch := models.FactoryOnboardingPatch{VCSIntegrationID: &selection.Binding.IntegrationID, VCSProvider: &integration.AppName, AppRepository: &selection.Primary.Repository, AppRepositoryID: &primaryID, AppRepositoryExternalID: &externalID, BacklogRepository: &selection.BacklogRepository, BacklogRepositoryID: &backlogID, DefaultBranch: &selection.Primary.Ref}
+	providerInput, err := repositoryProviderIntegration(tx, integration)
+	if err != nil {
+		return nil, err
+	}
 	// Older workspaces already follow the provider default without a saved branch.
 	keepsProviderDefault := previous.DefaultBranch == "" && sameRepository(selection.Primary.Repository, previous.AppRepository) && selection.Binding.IntegrationID == previous.VCSIntegrationID
 	if selection.Primary.Ref == "" && !keepsProviderDefault {
-		selection.Primary.Ref = onboardingProviderDefaultBranch(ctx, deps, tx, target.factory.OrganizationID, target.factory.OrganizationID.String(), target.factory, patch)
+		var installationID, repositoryID int64
+		if integration.AppName == models.ProviderGitHub {
+			installationID, repositoryID, err = githubInstallationForRepository(ctx, tx, target.factory.OrganizationID.String(), integration, selection.Primary.Repository)
+			if err != nil {
+				return configurationRepositoryAccessDiagnostic(err, "repositories.primary.repository")
+			}
+		}
+		selection.Primary.Ref, err = repositoryProviderCheck(ctx, "primary.default", []any{"default-branch", providerInput, target.factory.OnboardingConfigValue(), selection.Primary.Repository, installationID, repositoryID}, func() (string, error) {
+			if integration.AppName == models.ProviderBitbucket {
+				return bitbucketRepositoryDefaultBranch(ctx, database.DB(ctx), deps, integration, selection.Primary.Repository)
+			}
+			return gitHubRepositoryDefaultBranch(ctx, deps, integration, selection.Primary.Repository, installationID, repositoryID)
+		})
+		if err != nil {
+			if deferredRepositoryProviderCheck(err) {
+				return nil, err
+			}
+			selection.Primary.Ref = ""
+		}
 		if selection.Primary.Ref == "" {
 			return configurationDiagnostic("repositories.primary.ref", "The provider default branch is unavailable. Set ref or sync the connection and plan again."), nil
 		}
@@ -273,16 +296,23 @@ func prepareFactoryConfigurationRepositories(ctx context.Context, tx *gorm.DB, d
 	}
 	if requested.Primary.Ref != "" && (selection.Primary.Ref != savedBranch || !sameRepository(selection.Primary.Repository, previous.AppRepository) || selection.Binding.IntegrationID != previous.VCSIntegrationID) {
 		if integration.AppName == models.ProviderBitbucket {
-			err = ensureBitbucketBranch(ctx, tx, deps, integration, selection.Primary.Repository, selection.Primary.Ref)
+			_, err = repositoryProviderCheck(ctx, "primary.branch", []any{"branch", providerInput, selection.Primary}, func() (string, error) {
+				return "", ensureBitbucketBranch(ctx, database.DB(ctx), deps, integration, selection.Primary.Repository, selection.Primary.Ref)
+			})
 		} else {
 			var installationID, repositoryID int64
 			installationID, repositoryID, err = githubInstallationForRepository(ctx, tx, target.factory.OrganizationID.String(), integration, selection.Primary.Repository)
 			if err != nil {
 				return configurationRepositoryAccessDiagnostic(err, "repositories.primary.repository")
 			}
-			err = ensureGitHubBranch(ctx, deps, integration, selection.Primary.Repository, installationID, repositoryID, selection.Primary.Ref)
+			_, err = repositoryProviderCheck(ctx, "primary.branch", []any{"branch", providerInput, selection.Primary, installationID, repositoryID}, func() (string, error) {
+				return "", ensureGitHubBranch(ctx, deps, integration, selection.Primary.Repository, installationID, repositoryID, selection.Primary.Ref)
+			})
 		}
 		if err != nil {
+			if deferredRepositoryProviderCheck(err) {
+				return nil, err
+			}
 			return configurationDiagnostic("repositories.primary.ref", err.Error()), nil
 		}
 	}

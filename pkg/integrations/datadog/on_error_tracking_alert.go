@@ -15,7 +15,8 @@ import (
 )
 
 const ErrorTrackingAlertPayloadType = "datadog.errorTrackingAlert"
-const reconcileIntakeMonitorAction = "reconcileIntakeMonitor"
+const ReconcileIntakeMonitorAction = "reconcileIntakeMonitor"
+const reconcileIntakeMonitorAction = ReconcileIntakeMonitorAction
 
 type OnErrorTrackingAlert struct{}
 
@@ -170,6 +171,12 @@ func (t *OnErrorTrackingAlert) Hooks() []core.Hook {
 }
 
 func (t *OnErrorTrackingAlert) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
+	if ctx.HTTP != nil {
+		ctx.HTTP = monitorDeadlineHTTP{HTTPContext: ctx.HTTP, deadline: time.Now().Add(time.Minute)}
+	}
+	if retired, _ := ctx.Parameters["retiredMonitor"].(bool); retired && ctx.Name == reconcileIntakeMonitorAction {
+		return nil, ReleaseRetiredIntakeMonitor(core.TriggerContext{Configuration: ctx.Configuration, HTTP: ctx.HTTP, Metadata: ctx.Metadata, Integration: ctx.Integration})
+	}
 	if ctx.Name != reconcileIntakeMonitorAction {
 		return nil, fmt.Errorf("unknown hook: %s", ctx.Name)
 	}
