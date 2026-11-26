@@ -538,6 +538,7 @@ func TestFactoryConfigurationRejectsProviderAndStageRestrictions(t *testing.T) {
 			if test.bitbucket {
 				provider := models.ProviderBitbucket
 				integrationID := createReadyOnboardingIntegration(t, f.r.Organization.ID, provider)
+				configureConfigurationCatalogIntegration(t, f, integrationID, provider)
 				require.NoError(t, f.factory.UpdateOnboarding(database.DB(t.Context()), models.FactoryOnboardingPatch{VCSProvider: &provider, VCSIntegrationID: &integrationID}))
 			}
 			automation := configurationCatalogEntry(t, f, test.templateID)

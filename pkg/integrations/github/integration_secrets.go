@@ -13,7 +13,6 @@ import (
 	githubauth "github.com/google/go-github/v84/github"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/core"
-	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/models"
 )
@@ -143,7 +142,8 @@ func resolveContextAccessToken(httpCtx core.HTTPContext, integrationCtx core.Int
 	if err != nil {
 		return "", err
 	}
-	names, err := models.ListEnabledGitHubContextRepositoryNames(database.Conn(), integrationCtx.ID(), models.FactoryContextRepoAccessRead)
+	tx := common.IntegrationDB(integrationCtx)
+	names, err := models.ListEnabledGitHubContextRepositoryNames(tx, integrationCtx.ID(), models.FactoryContextRepoAccessRead)
 	if err != nil {
 		return "", fmt.Errorf("failed to list context repositories: %w", err)
 	}
@@ -151,7 +151,7 @@ func resolveContextAccessToken(httpCtx core.HTTPContext, integrationCtx core.Int
 		return "", nil
 	}
 	repositoryIDs, missing, err := models.MatchVCSProviderRepositoryIDs(
-		database.Conn(),
+		tx,
 		models.ProviderGitHub,
 		hosted.ID,
 		names,
@@ -160,12 +160,12 @@ func resolveContextAccessToken(httpCtx core.HTTPContext, integrationCtx core.Int
 		return "", fmt.Errorf("failed to match context repositories: %w", err)
 	}
 	if len(missing) > 0 {
-		binding, bindErr := models.FindVCSProviderIntegrationBinding(database.Conn(), integrationCtx.ID())
+		binding, bindErr := models.FindVCSProviderIntegrationBinding(tx, integrationCtx.ID())
 		if bindErr != nil {
 			return "", fmt.Errorf("failed to find GitHub App binding: %w", bindErr)
 		}
 		enqueueErr := models.EnqueueVCSProviderInstallationReconciliation(
-			database.Conn(),
+			tx,
 			models.ProviderGitHub,
 			hosted.ID,
 			binding.OrganizationID,

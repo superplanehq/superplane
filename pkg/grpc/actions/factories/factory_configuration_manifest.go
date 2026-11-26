@@ -24,16 +24,17 @@ import (
 
 const (
 	factoryConfigurationManifestPath = ".superplane/main.yml"
-	factoryConfigurationCoverage     = "All stages and automations"
+	factoryConfigurationCoverage     = "Repositories, stages, and automations"
 )
 
 type factoryConfigurationManifest struct {
-	APIVersion  string                               `yaml:"apiVersion"`
-	Kind        string                               `yaml:"kind"`
-	Name        string                               `yaml:"name"`
-	Stages      []factoryConfigurationStage          `yaml:"stages"`
-	Sources     map[string]string                    `yaml:"-" json:"-"`
-	Definitions map[string]automationspec.Definition `yaml:"-" json:"definitions,omitempty"`
+	APIVersion   string                               `yaml:"apiVersion"`
+	Kind         string                               `yaml:"kind"`
+	Name         string                               `yaml:"name"`
+	Repositories *factoryConfigurationRepositories    `yaml:"repositories,omitempty"`
+	Stages       []factoryConfigurationStage          `yaml:"stages"`
+	Sources      map[string]string                    `yaml:"-" json:"-"`
+	Definitions  map[string]automationspec.Definition `yaml:"-" json:"definitions,omitempty"`
 }
 
 type factoryConfigurationStage struct {
@@ -58,9 +59,10 @@ type factoryConfigurationAutomation struct {
 }
 
 type factoryConfigurationBinding struct {
-	IntegrationID string `yaml:"integration_id,omitempty" json:"integration_id,omitempty"`
-	ResourceID    string `yaml:"resource_id,omitempty" json:"resource_id,omitempty"`
-	TeamID        string `yaml:"team_id,omitempty" json:"team_id,omitempty"`
+	IntegrationName string `yaml:"integration_name,omitempty" json:"integration_name,omitempty"`
+	IntegrationID   string `yaml:"integration_id,omitempty" json:"integration_id,omitempty"`
+	ResourceID      string `yaml:"resource_id,omitempty" json:"resource_id,omitempty"`
+	TeamID          string `yaml:"team_id,omitempty" json:"team_id,omitempty"`
 }
 
 func configurationDiagnostic(field, message string) *pb.FactoryConfigurationDiagnostic {
@@ -101,12 +103,17 @@ func parseFactoryConfigurationBundle(bundle *pb.FactoryConfigurationBundle) (*fa
 	if diagnostic := validateConfigurationYAML(document.Content[0], ""); diagnostic != nil {
 		return nil, diagnostic
 	}
-	root, diagnostic := configurationFields(document.Content[0], "", []string{"apiVersion", "kind", "name", "stages"}, []string{"apiVersion", "kind", "name", "stages"})
+	root, diagnostic := configurationFields(document.Content[0], "", []string{"apiVersion", "kind", "name", "repositories", "stages"}, []string{"apiVersion", "kind", "name", "stages"})
 	if diagnostic != nil {
 		return nil, diagnostic
 	}
 	for _, field := range []string{"apiVersion", "kind", "name"} {
 		if diagnostic := configurationStringNode(root[field], field); diagnostic != nil {
+			return nil, diagnostic
+		}
+	}
+	if node := root["repositories"]; node != nil {
+		if diagnostic := validateConfigurationRepositoriesYAML(node); diagnostic != nil {
 			return nil, diagnostic
 		}
 	}
@@ -150,14 +157,8 @@ func parseFactoryConfigurationBundle(bundle *pb.FactoryConfigurationBundle) (*fa
 				return nil, configurationDiagnostic(automationPath+".with", "Use a mapping of supported settings.")
 			}
 			if node := fields["binding"]; node != nil {
-				binding, diagnostic := configurationFields(node, automationPath+".binding", []string{"integration_id", "resource_id", "team_id"}, nil)
-				if diagnostic != nil {
+				if _, diagnostic := validateConfigurationBindingYAML(node, automationPath+".binding", []string{"integration_id", "integration_name", "resource_id", "team_id"}); diagnostic != nil {
 					return nil, diagnostic
-				}
-				for key, value := range binding {
-					if diagnostic := configurationStringNode(value, automationPath+".binding."+key); diagnostic != nil {
-						return nil, diagnostic
-					}
 				}
 			}
 		}
@@ -286,7 +287,7 @@ func configurationSourceDiagnostic(filePath string, err error) *pb.FactoryConfig
 }
 
 func exportFactoryConfigurationManifest(target *factoryConfigurationTarget) factoryConfigurationManifest {
-	manifest := factoryConfigurationManifest{APIVersion: "v2", Kind: "Factory", Name: target.factory.Name, Stages: []factoryConfigurationStage{}, Sources: map[string]string{}, Definitions: map[string]automationspec.Definition{}}
+	manifest := factoryConfigurationManifest{APIVersion: "v2", Kind: "Factory", Name: target.factory.Name, Repositories: target.repositories, Stages: []factoryConfigurationStage{}, Sources: map[string]string{}, Definitions: map[string]automationspec.Definition{}}
 	for _, stage := range target.stages {
 		entry := factoryConfigurationStage{Key: stage.key, Name: stage.stage.Name, Run: stage.run, Automations: []factoryConfigurationAutomation{}}
 		if stage.stage.StepIndex != nil {
@@ -317,12 +318,19 @@ func validateFactoryConfigurationManifest(ctx context.Context, tx *gorm.DB, deps
 	if len(manifest.Stages) != len(target.stages) {
 		return configurationDiagnostic("stages", "Include every existing stage. This POC does not add or remove stages."), nil
 	}
+	if diagnostic, err := prepareFactoryConfigurationRepositories(ctx, tx, deps, target, manifest.Repositories); diagnostic != nil || err != nil {
+		return diagnostic, err
+	}
+	liveTarget := target
+	target = configurationPreparationTarget(target)
+	tx = withFactoryAutomationReadInputs(tx, target.reads)
 	resolveFactoryConfigurationIdentities(target, manifest)
 	validation, err := loadFactoryConfigurationValidationInputs(tx, target, manifest)
 	if err != nil {
 		return nil, err
 	}
 	target.validation = validation
+	liveTarget.validation = validation
 	byKey := map[string]*factoryConfigurationStageTarget{}
 	for _, stage := range target.stages {
 		byKey[stage.key] = stage

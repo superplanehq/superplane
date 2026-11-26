@@ -101,6 +101,9 @@ func ApplyFactoryConfiguration(ctx context.Context, deps IntakeDependencies, org
 		if err := requireFactoryAsCode(tx, orgID); err != nil {
 			return err
 		}
+		if err := models.LockOrganizationVCSProviderBindingRepositories(tx, orgID); err != nil {
+			return err
+		}
 		target, err := lockFactoryConfigurationTarget(tx, orgID, req.GetFactoryId(), req.GetLineId())
 		if err != nil {
 			return err
@@ -137,6 +140,15 @@ func ApplyFactoryConfiguration(ctx context.Context, deps IntakeDependencies, org
 		response.Changes = compareFactoryConfiguration(target, manifest)
 		if len(response.Changes) == 0 {
 			return nil
+		}
+		repositoriesChanged := configurationRepositoriesChanged(target)
+		previousRepositories := target.factory.OnboardingConfigValue()
+		if err := applyFactoryConfigurationRepositories(tx, target); err != nil {
+			return err
+		}
+		if repositoriesChanged {
+			// Publication must see the repository records saved in this transaction.
+			tx = withFactoryAutomationReadInputs(tx, nil)
 		}
 		if err := applyFactoryConfigurationStages(tx, target, manifest); err != nil {
 			return err
@@ -272,6 +284,16 @@ func ApplyFactoryConfiguration(ctx context.Context, deps IntakeDependencies, org
 				return err
 			}
 			notifications = append(notifications, notify)
+		}
+		if repositoriesChanged {
+			notifies, err := reconcileFactoryConfigurationRepositories(ctx, tx, deps, target, previousRepositories, actor)
+			if err != nil {
+				return err
+			}
+			notifications = append(notifications, notifies...)
+		}
+		if err := syncFactoryConfigurationRepositoryBindings(tx, target, manifest, previousRepositories); err != nil {
+			return err
 		}
 		response.Changed = true
 		return nil

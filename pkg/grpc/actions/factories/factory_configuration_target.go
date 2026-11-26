@@ -14,15 +14,19 @@ import (
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type factoryConfigurationTarget struct {
-	reads      *factoryAutomationReadInputs
-	validation *factoryConfigurationValidationInputs
-	factory    *models.Factory
-	line       *models.FactoryLine
-	stages     []*factoryConfigurationStageTarget
-	ownership  []models.FactoryConfigurationAutomation
+	reads             *factoryAutomationReadInputs
+	validation        *factoryConfigurationValidationInputs
+	factory           *models.Factory
+	line              *models.FactoryLine
+	stages            []*factoryConfigurationStageTarget
+	ownership         []models.FactoryConfigurationAutomation
+	repositories      *factoryConfigurationRepositories
+	repositoryRecords []models.FactoryAgentResource
+	repositoryUpdate  *preparedFactoryConfigurationRepositories
 }
 
 type factoryConfigurationStageTarget struct {
@@ -147,6 +151,9 @@ func lockFactoryConfigurationTarget(tx *gorm.DB, orgID uuid.UUID, factoryRef, li
 		}
 		canvases[i] = *canvas
 	}
+	if _, err := factory.ListContextRepos(tx.Clauses(clause.Locking{Strength: "UPDATE"})); err != nil {
+		return nil, err
+	}
 	if err := requireFactoryAsCode(tx, orgID); err != nil {
 		return nil, err
 	}
@@ -263,6 +270,9 @@ func inspectFactoryConfigurationTarget(tx *gorm.DB, factory *models.Factory, lin
 	}
 	target.reads = reads
 	tx = withFactoryAutomationReadInputs(tx, reads)
+	if err := loadFactoryConfigurationRepositories(tx, target); err != nil {
+		return nil, err
+	}
 	for _, stage := range target.stages {
 		if stage.stage.Kind != models.FactoryLineStagePhase || stage.stage.StepIndex == nil {
 			continue
@@ -390,6 +400,15 @@ func inspectFactoryConfigurationTarget(tx *gorm.DB, factory *models.Factory, lin
 				}
 			}
 
+			if strings.HasPrefix(automation.templateID, "intake:") && automation.binding.IntegrationID != "" {
+				binding := factoryConfigurationBinding{}
+				if automation.exportedBinding != nil {
+					binding = *automation.exportedBinding
+				}
+				binding.IntegrationID = automation.binding.IntegrationID
+				automation.exportedBinding = &binding
+			}
+			automation.exportedBinding = portableConfigurationBinding(reads.integrations, automation.exportedBinding)
 			automation.id = id
 			if i == 0 && stage.stage.StepIndex != nil {
 				stage.run = id
@@ -496,6 +515,16 @@ func factoryConfigurationToken(target *factoryConfigurationTarget, manifest *fac
 		}
 	}
 	dependencies := []any{}
+	if manifest.Repositories != nil {
+		// Repository changes reconcile listeners across every line in the workspace.
+		dependencies = append(dependencies, struct {
+			Current   models.FactoryOnboardingConfig
+			Records   []models.FactoryAgentResource
+			Desired   *preparedFactoryConfigurationRepositories
+			Versions  map[uuid.UUID]*models.CanvasVersion
+			Ownership []models.FactoryConfigurationAutomation
+		}{target.factory.OnboardingConfigValue(), target.repositoryRecords, target.repositoryUpdate, target.reads.versions, target.ownership})
+	}
 	for _, stage := range manifest.Stages {
 		for _, automation := range stage.Automations {
 			if automation.prepared != nil {

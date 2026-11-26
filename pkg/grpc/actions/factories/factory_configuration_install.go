@@ -221,7 +221,7 @@ func factoryConfigurationBindingChanged(current *factoryConfigurationAutomationT
 	if current.templateID == intakeTemplateID(models.FactoryIntakeSourceWebhook) {
 		return current.binding != desired.prepared.Binding
 	}
-	return current.binding != desired.prepared.Binding || !equalCanvasJSON(current.explicitBinding, desired.Binding)
+	return current.binding != desired.prepared.Binding || !configurationBindingIntentEqual(current, desired.prepared.ExplicitBinding)
 }
 
 func factoryConfigurationReviewSourceChanged(current *factoryConfigurationAutomationTarget, desired factoryConfigurationAutomation) bool {
@@ -305,8 +305,8 @@ func configurationNeedsStableIdentity(stage factoryConfigurationStage, desired f
 
 func saveFactoryConfigurationOwnership(tx *gorm.DB, target *factoryConfigurationTarget, stage *factoryConfigurationStageTarget, desired factoryConfigurationAutomation, canvasID uuid.UUID) error {
 	binding := datatypes.JSONMap{}
-	if desired.Binding != nil {
-		encoded, err := json.Marshal(desired.Binding)
+	if desired.prepared.ExplicitBinding != nil {
+		encoded, err := json.Marshal(desired.prepared.ExplicitBinding)
 		if err != nil {
 			return err
 		}

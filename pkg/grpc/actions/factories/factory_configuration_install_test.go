@@ -62,7 +62,8 @@ func TestFactoryConfigurationInstallsMissingBuiltIns(t *testing.T) {
 
 	exported := f.export(t)
 	require.Contains(t, exported.Files[0].Content, "id: issues")
-	require.NotContains(t, exported.Files[0].Content, "binding:", "workspace repository bindings stay portable")
+	exportedIntake := configurationManifestAutomation(t, exported, "backlog", "issues")
+	require.Equal(t, &factoryConfigurationBinding{IntegrationName: integrationName(t, f.r.Organization.ID, f.factory.OnboardingConfigValue().VCSIntegrationID)}, exportedIntake.Binding)
 	renamed := proto.Clone(exported).(*pb.FactoryConfigurationBundle)
 	renamed.Files[0].Content = strings.Replace(renamed.Files[0].Content, "Issues from YAML", "Renamed issues", 1)
 	plan = f.plan(t, renamed)

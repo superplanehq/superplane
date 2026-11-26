@@ -10,10 +10,12 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/pkg/yaml"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/protobuf/proto"
 	"gorm.io/gorm"
 )
@@ -76,7 +78,17 @@ func configurationBuiltInTemplateID(alias string) (string, bool) {
 }
 
 // Preparation shares the install builders but never runs Setup or creates records.
-func prepareFactoryConfigurationBuiltIn(ctx context.Context, tx *gorm.DB, deps IntakeDependencies, target *factoryConfigurationTarget, stage *factoryConfigurationStageTarget, automation factoryConfigurationAutomation) (*preparedFactoryConfigurationBuiltIn, error) {
+func prepareFactoryConfigurationBuiltIn(ctx context.Context, tx *gorm.DB, deps IntakeDependencies, target *factoryConfigurationTarget, stage *factoryConfigurationStageTarget, automation factoryConfigurationAutomation) (result *preparedFactoryConfigurationBuiltIn, err error) {
+	namedConnection := automation.Binding != nil && automation.Binding.IntegrationName != ""
+	defer func() {
+		if setting, ok := err.(*factoryConfigurationSettingError); namedConnection && ok && setting.Field == "binding.integration_id" {
+			setting.Field = "binding.integration_name"
+		}
+	}()
+	automation.Binding, err = resolveConfigurationBindingName(tx, target.factory.OrganizationID, automation.Binding)
+	if err != nil {
+		return nil, err
+	}
 	templateID, exists := configurationBuiltInTemplateID(automation.Uses)
 	if !exists {
 		return nil, configurationPreparationError("uses", "This built-in automation is not supported.")
@@ -117,6 +129,15 @@ func prepareFactoryConfigurationBuiltIn(ctx context.Context, tx *gorm.DB, deps I
 		}
 		return nil, err
 	}
+	if integration.AppName == models.ProviderGitHub && binding.ResourceID != "" {
+		if _, _, err := authorizeConfigurationPrimaryRepository(ctx, tx, target.factory, integration, binding.ResourceID); err != nil {
+			code, message, ok := grpcerrors.HandlerStatus(err)
+			if ok && code == codes.PermissionDenied {
+				return nil, configurationPreparationError("binding.resource_id", message)
+			}
+			return nil, err
+		}
+	}
 	prepared.Binding = binding
 	prepared.DefaultBinding = configurationBuiltInDefaultBinding(target.factory, templateID)
 	agent := resolveIntakeAgent(tx, target.factory)
@@ -144,7 +165,7 @@ func prepareFactoryConfigurationBuiltIn(ctx context.Context, tx *gorm.DB, deps I
 	}
 	configurationPreparedRecordSettings(prepared, automation.With, generated)
 	current := automation.current
-	keepInstalled := current != nil && current.binding == binding && equalCanvasJSON(current.explicitBinding, automation.Binding) && configurationPublicSectionsEqual(current.settings, generated)
+	keepInstalled := current != nil && current.binding == binding && configurationBindingIntentEqual(current, automation.Binding) && configurationPublicSectionsEqual(current.settings, generated)
 	if keepInstalled {
 		prepared.Nodes, prepared.Edges, err = copyFactoryConfigurationBuiltIn(current.version, current.defaults, templateID, automation.With)
 		if err != nil {
@@ -379,8 +400,11 @@ func resolveConfigurationBuiltInBinding(tx *gorm.DB, factory *models.Factory, te
 		return binding, nil, configurationPreparationError("binding.integration_id", "Use an existing integration ID.")
 	}
 	integration, err := factoryAutomationIntegrationByID(tx, factory.OrganizationID, integrationID)
-	if err != nil {
+	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return binding, nil, configurationPreparationError("binding.integration_id", "The integration must belong to this organization.")
+	}
+	if err != nil {
+		return binding, nil, err
 	}
 	if integration.AppName != provider {
 		return binding, nil, configurationPreparationError("binding.integration_id", "The integration provider does not match this automation.")
@@ -429,6 +453,14 @@ func resolveConfigurationBuiltInBinding(tx *gorm.DB, factory *models.Factory, te
 			if fullName != "" && fullName != binding.ResourceID {
 				return binding, nil, configurationPreparationError("binding.resource_id", "The repository is not available to this integration.")
 			}
+		}
+	}
+	// Hosted GitHub selections use the catalog and caller authorization, not a stale resource cache.
+	if integration.AppName == models.ProviderGitHub {
+		if _, err := models.FindVCSProviderIntegrationBinding(tx, integration.ID); err == nil {
+			return binding, integration, nil
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return binding, nil, err
 		}
 	}
 	if err := validateConfigurationCachedResource(integration, binding); err != nil {
@@ -677,6 +709,9 @@ func configurationPreparedState(tx *gorm.DB, factory *models.Factory, binding fa
 	config := factory.OnboardingConfigValue()
 	state := configurationBuiltInState{Binding: binding, Integration: configurationIntegrationSnapshot(integration), DefaultOwner: config.CodexDefaultOwnerID, Repository: config.AppRepository, Backlog: config.BacklogRepository, Branch: config.DefaultBranch, GitProvider: config.EffectiveVCSProvider(), Subscription: config.CodexSubscription}
 	repositories, err := factoryAutomationPolicy(tx, factory, "configuration-workspace-repositories", nil, func() ([]string, error) {
+		if reads := factoryAutomationReads(tx, factory); reads != nil && reads.workspaceRepositories != nil {
+			return reads.workspaceRepositories, nil
+		}
 		return factory.WorkspaceRepositories(tx)
 	})
 	if err != nil {

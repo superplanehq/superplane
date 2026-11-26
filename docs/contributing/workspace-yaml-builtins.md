@@ -1,8 +1,22 @@
 # Workspace YAML
 
 The v2 Factory manifest at `.superplane/main.yml` configures an existing
-workspace. Export includes every stage and omits stage `kind` fields. Keep
-the document-level `kind: Factory`.
+workspace. Export includes repositories, stages, and automations. Keep the
+document-level `kind: Factory`. Stage entries do not include `kind` fields.
+
+Select the destination with `--workspace` for export, plan, and apply:
+
+```sh
+superplane workspaces export --workspace engineering
+superplane workspaces plan --workspace engineering
+superplane workspaces apply --workspace engineering
+```
+
+Apply requires an existing workspace. Workspace creation and multiple workspaces
+in one `.superplane` folder are not supported.
+
+The top-level `name` must match the selected workspace. When copying YAML to a
+workspace with a different name, update `name` before you run plan.
 
 For example, an exported stage entry can contain:
 
@@ -25,6 +39,82 @@ bindings. Only stages with a runner binding support `max_parallelism`.
 Existing permissions for stage names and order still apply.
 
 Export followed by plan produces no changes when the workspace has not changed.
+
+## Repositories
+
+Use the optional workspace-level `repositories` section to configure the primary
+repository, additional repositories, and their existing access settings:
+
+```yaml
+repositories:
+  binding:
+    integration_name: "Engineering GitHub"
+  primary:
+    repository: acme/application
+    ref: main
+  backlog_repository: acme/backlog
+  additional:
+    - repository: acme/shared-library
+      ref: main
+      access: write
+      enabled: true
+    - repository: acme/reference-docs
+      access: read
+      enabled: false
+```
+
+When `repositories` is present, include its connection and primary repository.
+The primary repository remains writable. Each additional entry requires
+`repository` and explicit `access: read` or `access: write`. `enabled` defaults
+to `true`. An omitted `ref` uses the provider default branch.
+
+An additional entry can set `provider`; it defaults to the workspace connection
+provider. Existing provider and authentication restrictions still apply.
+Repository access retains the current runtime behavior. YAML does not add
+credential isolation or support a read-only primary repository.
+
+`backlog_repository` defaults to the primary repository. Set it only when Backlog
+uses a different repository. GitHub Issues intake without an explicit
+`binding.resource_id` uses the desired Backlog repository.
+
+`additional` is the complete desired list. An omitted or empty list removes all
+additional repositories. Other agent resources remain unchanged. SuperPlane
+matches existing entries by provider and canonical repository name to retain
+record identity. Export includes disabled entries and explicit access values.
+
+If `repositories` is absent, apply preserves the existing repository settings.
+A workspace without a primary repository keeps its existing export behavior.
+Repository settings apply to the whole workspace, including listeners on other
+workspace lines. Existing tasks keep their saved repository and branch when
+workspace defaults change.
+
+### API credentials and GitHub repository access
+
+Personal API tokens act as their owners. Repository selection requires the
+owner's existing workspace permissions and the same GitHub access as the UI.
+A personal token can select a new accessible repository.
+
+Organization API keys use their existing permissions and scope. They do not
+require a personal GitHub account or use their creator's GitHub access.
+For hosted GitHub connections, a key can select only repositories already
+granted to the selected connection in the same organization.
+A repository in the same installation still requires its own grant.
+Removed repositories and suspended installations are unavailable.
+
+These rules cover primary, Backlog, and additional repositories, including
+branch verification. Repository APIs without a connection selection resolve an
+existing granted connection in the organization. Organization keys cannot create
+connections or extend access to an entire installation.
+
+If an organization key selects an ungranted repository, plan reports:
+
+> This repository is not authorized for the selected connection. Use a personal API token with GitHub access to select it first.
+
+Plan does not create grants. Apply checks current access again before it saves
+changes. Repository grants follow existing workspace and automation uses.
+Switching or removing those uses can remove grants; grants are not a permanent
+repository allowlist. Bitbucket and customer-managed GitHub credentials retain
+their existing authorization rules.
 
 ## Built-in installations
 
@@ -65,20 +155,28 @@ An optional `binding` mapping selects existing connections and resources:
 
 ```yaml
 binding:
-  integration_id: "<integration UUID>"
-  resource_id: "<provider resource ID>"
-  team_id: "<team ID>"
+  integration_name: "Production Sentry"
+  resource_id: "backend"
 ```
+
+Use either `integration_name` or `integration_id`, never both. Names match
+exactly within the destination organization. Export uses a connection name when
+it is unique; otherwise it uses the connection ID. Missing, ambiguous,
+unavailable, or incompatible connections produce diagnostics at the binding field.
 
 Bindings do not create connections or contain credentials. The selected
 integration must belong to the organization, be ready, and support the built-in.
-Resources must belong to that integration. Unsupported binding fields fail plan
-at the corresponding YAML field.
+Resources must belong to that integration. Linear bindings can set `team_id`.
+Unsupported binding fields fail plan at the corresponding YAML field.
 
 Repository automations use the workspace repository and connection by default.
-Exports omit those resolved bindings so a copied manifest uses the destination
-workspace repository. Explicit overrides remain in exported YAML and survive
-admin reset and repository refresh.
+Export always includes the selected intake connection, including a connection
+that came from workspace defaults. Other explicit connection, resource, and team
+bindings remain in exported YAML and survive admin reset and repository refresh.
+Older intake manifests can still inherit workspace connections.
+
+To copy YAML to another configured workspace, create matching connection names
+in its organization. ID bindings must reference destination connections.
 
 Provider intake cannot infer provider-specific selections from the repository.
 Select the provider integration and its required resource or team explicitly
@@ -88,12 +186,12 @@ experimental feature gates still apply.
 | Built-in | Required selections |
 | --- | --- |
 | GitHub issues, Dependabot alerts, Issue label intake | Defaults to the workspace GitHub connection and Backlog repository |
-| Jira issues | `integration_id` and `resource_id` with the project key |
-| Sentry exceptions | `integration_id` and `resource_id` with comma-separated project slugs |
-| Productive tasks | `integration_id` and `resource_id` with the project ID |
-| Datadog errors | `integration_id` and `resource_id` with the service name |
-| PagerDuty incidents | `integration_id` and `resource_id` with the service ID |
-| Linear issues | `integration_id` and `team_id`; legacy project selection can use comma-separated IDs in `resource_id` |
+| Jira issues | `integration_name` or `integration_id`, and `resource_id` with the project key |
+| Sentry exceptions | `integration_name` or `integration_id`, and `resource_id` with comma-separated project slugs |
+| Productive tasks | `integration_name` or `integration_id`, and `resource_id` with the project ID |
+| Datadog errors | `integration_name` or `integration_id`, and `resource_id` with the service name |
+| PagerDuty incidents | `integration_name` or `integration_id`, and `resource_id` with the service ID |
+| Linear issues | `integration_name` or `integration_id`, and `team_id`; legacy project selection can use comma-separated IDs in `resource_id` |
 
 Task analysis uses the workspace agent and connection; it does not accept a
 repository resource override. Other repository templates use the application
@@ -180,9 +278,11 @@ portable reference described below.
 
 ## Plan, apply, and provisioning
 
-Plan resolves and validates the complete desired configuration without writes,
-webhooks, historical imports, or external provisioning. Dependencies can refer
-to retained or newly installed automations, regardless of manifest order.
+Plan prepares repository settings before automations. A combined repository and
+intake change uses the requested connection and repositories throughout the plan.
+Plan validates the complete desired configuration without writes, webhooks,
+historical imports, or external provisioning. Dependencies can refer to retained
+or newly installed automations, regardless of manifest order.
 
 Review request refers to Merge confidence with manifest identities:
 
@@ -198,10 +298,14 @@ The `stage` value is a stage key, and `automation` is its automation ID.
 SuperPlane infers this dependency only when exactly one valid source exists.
 
 Apply checks the plan token again before publication. Changes to relevant
-workspace defaults, selected integrations, resources, or dependencies require
-a new plan. Apply creates the final graphs, placement, ownership, subscriptions,
-and provisioning requests in one transaction. A synchronous setup error rolls
-back the full apply.
+workspace defaults, repository settings, resolved connections, resources, or
+dependencies require a new plan. Apply saves repository records, connection
+grants, graphs, placement, ownership, subscriptions, and provisioning requests
+in one transaction. A synchronous setup error rolls back the full apply.
+
+Repository changes refresh affected listeners across the workspace. Explicit
+automation resource overrides keep their selected repository. Existing tasks
+retain a snapshot of their repository and branch before defaults change.
 
 A successful apply means configuration and provisioning requests were committed.
 External provisioning can finish later. Datadog monitor changes use durable node
@@ -218,3 +322,6 @@ Apply the ownership database migration first. Deploy the updated node-request
 workers before the API so workers can process the new Datadog provisioning hook.
 No new runtime service or configuration key is required. Existing node-request
 and webhook workers process provisioning and cleanup.
+
+Repository configuration reuses existing records and requires no additional
+database migration or runtime configuration key.

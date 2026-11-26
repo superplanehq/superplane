@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -161,6 +162,76 @@ func TestVCSProviderBindingListsOnlyGrantedRepositories(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, repositories, 1)
 	assert.Equal(t, int64(201), repositories[0].RepositoryID)
+}
+
+func TestVCSProviderBindingSyncRetainsOnlyAuthorizedActiveAutomationRepositories(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	db := database.DB(t.Context())
+	organization, err := CreateOrganization("Binding "+uuid.NewString(), "")
+	require.NoError(t, err)
+	otherOrganization, err := CreateOrganization("Other "+uuid.NewString(), "")
+	require.NoError(t, err)
+	require.NoError(t, UpsertVCSProviderInstallation(db, &VCSProviderInstallation{Provider: ProviderGitHub, InstallationID: 101}))
+	integration, err := FindOrCreateVCSProviderBinding(db, organization.ID, ProviderGitHub, 101, "acme")
+	require.NoError(t, err)
+	entries := []struct {
+		name         string
+		organization uuid.UUID
+		granted      bool
+		deleted      string
+	}{
+		{"active", organization.ID, true, ""},
+		{"ungranted", organization.ID, false, ""},
+		{"deleted-canvas", organization.ID, true, "canvas"},
+		{"deleted-workspace", organization.ID, true, "workspace"},
+		{"foreign-organization", otherOrganization.ID, true, ""},
+	}
+	repositories := make([]VCSProviderRepository, len(entries))
+	for i, entry := range entries {
+		repositories[i] = VCSProviderRepository{RepositoryID: int64(201 + i), FullName: "acme/" + entry.name}
+	}
+	require.NoError(t, ReplaceVCSProviderRepositories(db, ProviderGitHub, 101, repositories))
+	for i, entry := range entries {
+		factory, err := CreateFactory(db, entry.organization, entry.name, "", "")
+		require.NoError(t, err)
+		line, err := factory.CreateLine(db, "Delivery", nil)
+		require.NoError(t, err)
+		now, versionID := time.Now(), uuid.New()
+		canvas := &Canvas{
+			ID: uuid.New(), OrganizationID: entry.organization, FactoryID: &factory.ID, Name: entry.name,
+			LiveVersionID: &versionID, CreatedAt: &now, UpdatedAt: &now,
+		}
+		require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+			if err := tx.Create(canvas).Error; err != nil {
+				return err
+			}
+			return tx.Create(&CanvasVersion{
+				ID: versionID, WorkflowID: canvas.ID, CreatedAt: &now, UpdatedAt: &now,
+				Nodes: datatypes.NewJSONSlice([]Node{}), Edges: datatypes.NewJSONSlice([]Edge{}),
+			}).Error
+		}))
+		owner := FactoryConfigurationAutomation{
+			OrganizationID: entry.organization, FactoryID: factory.ID, LineID: line.ID,
+			StageKey: "verify", ManifestID: "automation", CanvasID: canvas.ID,
+			Binding: datatypes.JSONMap{"integration_id": integration.ID.String(), "resource_id": repositories[i].FullName},
+		}
+		require.NoError(t, owner.Save(db))
+		if entry.granted {
+			require.NoError(t, GrantVCSProviderBindingRepository(db, integration.ID, ProviderGitHub, repositories[i].RepositoryID))
+		}
+		if entry.deleted == "canvas" {
+			require.NoError(t, db.Model(canvas).Update("deleted_at", time.Now()).Error)
+		}
+		if entry.deleted == "workspace" {
+			require.NoError(t, db.Model(factory).Update("deleted_at", time.Now()).Error)
+		}
+	}
+
+	require.NoError(t, SyncVCSProviderBindingRepositories(db, integration.ID, ProviderGitHub))
+	retained, err := ListVCSProviderBindingRepositories(db, integration.ID)
+	require.NoError(t, err)
+	require.Len(t, retained, 1)
+	assert.Equal(t, int64(201), retained[0].RepositoryID, "saved bindings must not create new grants or retain inactive or foreign references")
 }
 
 func TestDeleteVCSProviderInstallationsMissingFromSnapshotMarksIntegrations(t *testing.T) {

@@ -119,6 +119,9 @@ func factoryConfigurationAutomationContentChanged(current *factoryConfigurationA
 
 func compareFactoryConfiguration(target *factoryConfigurationTarget, manifest *factoryConfigurationManifest) []*pb.FactoryConfigurationChange {
 	var changes []*pb.FactoryConfigurationChange
+	if configurationRepositoriesChanged(target) {
+		changes = append(changes, configurationChange("repositories", "repositories", target.repositories, manifest.Repositories))
+	}
 	byKey := configurationStagesByKey(target)
 	previousOrder, requestedOrder := []string{}, []string{}
 	for _, stage := range target.stages {

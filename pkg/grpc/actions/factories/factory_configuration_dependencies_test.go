@@ -42,7 +42,8 @@ func TestFactoryConfigurationPreservesExplicitDefaultBindingIntent(t *testing.T)
 	require.NoError(t, err)
 	require.True(t, result.Changed)
 	require.Equal(t, before, configurationRevisionCount(t, f.canvas), "binding intent alone does not change the installed graph")
-	require.Equal(t, &pinned, configurationManifestAutomation(t, f.export(t), "implementation", "implement").Binding)
+	exportedPin := &factoryConfigurationBinding{IntegrationName: integrationName(t, f.r.Organization.ID, pinned.IntegrationID), ResourceID: pinned.ResourceID}
+	require.Equal(t, exportedPin, configurationManifestAutomation(t, f.export(t), "implementation", "implement").Binding)
 
 	confidence := configurationCatalogEntry(t, f, "risk-score")
 	confidence.ID, confidence.Name = "confidence", "Pinned confidence"
@@ -74,7 +75,7 @@ func TestFactoryConfigurationPreservesExplicitDefaultBindingIntent(t *testing.T)
 	_, err = ResetOrganizationBuiltInAutomations(f.ctx, f.r.Organization.ID, testIntakeDependencies(f.r))
 	require.NoError(t, err)
 	for _, automation := range []struct{ stage, id string }{{"implementation", "implement"}, {"verify", "confidence"}} {
-		require.Equal(t, &pinned, configurationManifestAutomation(t, f.export(t), automation.stage, automation.id).Binding)
+		require.Equal(t, exportedPin, configurationManifestAutomation(t, f.export(t), automation.stage, automation.id).Binding)
 	}
 	trigger = findIntakeNode(resetTestLiveVersion(t, installed).Nodes, riskScoreTriggerNodeID)
 	require.Equal(t, pinned.ResourceID, trigger.Configuration["repository"], "admin reset must keep an explicit pin")
@@ -121,7 +122,11 @@ func TestFactoryConfigurationKeepsSharedRunnerBindingsConsistentAcrossLines(t *t
 		setConfigurationBinding(t, bundle, "implementation", "implement", change.binding)
 		applyConfigurationBundle(t, change.writer, bundle)
 		for _, reader := range []configurationFixture{f, other} {
-			require.Equal(t, change.binding, configurationManifestAutomation(t, reader.export(t), "implementation", "implement").Binding)
+			var exportedBinding *factoryConfigurationBinding
+			if change.binding != nil {
+				exportedBinding = &factoryConfigurationBinding{IntegrationName: integrationName(t, f.r.Organization.ID, change.binding.IntegrationID), ResourceID: change.binding.ResourceID}
+			}
+			require.Equal(t, exportedBinding, configurationManifestAutomation(t, reader.export(t), "implementation", "implement").Binding)
 		}
 		repositories, err := contexts.NewFactoryContext(db, f.canvas, nil).ListRepositories()
 		require.NoError(t, err)
@@ -213,6 +218,7 @@ func TestFactoryConfigurationRejectsStalePreparationInputs(t *testing.T) {
 				})
 				require.NoError(t, err)
 			} else if input == "workspace defaults" {
+				f.ctx = withRepositoryBranchResolver(f.ctx, repositoryBranchResolver{gitHubBranches: func(string) ([]string, error) { return []string{"main", "next-main"}, nil }})
 				branch := "next-main"
 				require.NoError(t, f.factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{DefaultBranch: &branch}))
 			} else {
