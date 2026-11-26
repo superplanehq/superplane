@@ -88,12 +88,7 @@ export function useAddColumnAutomation(args: {
     if (!column || pickerCatalog.unavailableReasons[entry.id]) {
       return;
     }
-    if (
-      entry.kind === "pr-discussion" ||
-      entry.kind === "pr-checks" ||
-      entry.kind === "custom-verification" ||
-      (entry.kind === "custom" && column.startsWith("custom-"))
-    ) {
+    if (needsFocusedAutomationSetup(entry, column)) {
       openFocusedVerifySetup(entry, column, args, navigate, closePicker);
       return;
     }
@@ -149,6 +144,15 @@ export function useAddColumnAutomation(args: {
     createNamed,
     isPending: createAutomation.isPending || isInstalling,
   };
+}
+
+function needsFocusedAutomationSetup(entry: ColumnAutomationCatalogEntry, column: ColumnKey): boolean {
+  return (
+    entry.kind === "pr-discussion" ||
+    entry.kind === "pr-checks" ||
+    entry.kind === "custom-verification" ||
+    (entry.kind === "custom" && column.startsWith("custom-"))
+  );
 }
 
 function githubVerifyTemplate(
