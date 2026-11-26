@@ -2231,14 +2231,6 @@ func (l *lazyWebhookFactory) FindWorkOrder(params core.FindWorkOrderParams) (*co
 	return inner.FindWorkOrder(params)
 }
 
-func (l *lazyWebhookFactory) FindWorkOrdersForWebhook(match, value, stage string) ([]map[string]any, error) {
-	inner, err := l.load()
-	if err != nil {
-		return nil, err
-	}
-	return inner.FindWorkOrdersForWebhook(match, value, stage)
-}
-
 func (l *lazyWebhookFactory) UpdateWorkOrderStatus(params core.UpdateWorkOrderStatusParams) (*core.WorkOrder, bool, error) {
 	inner, err := l.load()
 	if err != nil {

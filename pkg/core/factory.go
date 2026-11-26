@@ -30,9 +30,6 @@ type FactoryContext interface {
 	// to a `factory_work_order_executions` row. Returns ErrWorkOrderNotFound
 	// (wrapped) when nothing matches.
 	FindWorkOrder(params FindWorkOrderParams) (*WorkOrder, error)
-	// FindWorkOrdersForWebhook resolves untrusted webhook input inside the
-	// current factory and keeps only tasks in the automation stage.
-	FindWorkOrdersForWebhook(match, value, stage string) ([]map[string]any, error)
 	// UpdateWorkOrderStatus reports whether the row actually transitioned
 	// via the second return value; callers must skip downstream emits
 	// when `changed` is false so a no-op doesn't leak into the timeline.

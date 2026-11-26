@@ -1529,24 +1529,10 @@ message FactoryCustomAutomation {
   }
 
   message StartTrigger {
-    message TaskMatch {
-      enum Kind {
-        KIND_UNSPECIFIED = 0;
-        KIND_TASK = 1;
-        KIND_PULL_REQUEST = 2;
-        KIND_COMMIT = 3;
-      }
-
-      Kind kind = 1;
-      string field_path = 2;
-    }
-
     StartMode start_mode = 1;
     Schedule schedule = 2;
     // ID of a workspace webhook. Set only for START_MODE_WEBHOOK.
     string webhook_id = 3;
-    // Finds the task for a task-scoped webhook trigger.
-    TaskMatch task_match = 4;
   }
 
   message Settings {

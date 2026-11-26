@@ -41,9 +41,6 @@ const FeatureFactoryScheduledIntake = "factory_scheduled_intake"
 // intakes continue to create tasks when the organization disables it.
 const FeatureFactoryWebhookIntake = "factory_webhook_intake"
 
-// FeatureFactoryTaskWebhookTriggers gates webhook triggers that find existing tasks.
-const FeatureFactoryTaskWebhookTriggers = "factory_task_webhook_triggers"
-
 // FeatureFactoryReviewRequest gates new reviewer-request automations. Existing
 // automations continue to run when the organization disables discovery.
 const FeatureFactoryReviewRequest = "factory_review_request"
@@ -100,7 +97,6 @@ var registry = []Feature{
 	{ID: FeatureFactoryReviewRequest, Label: "Review request", Description: "Request human reviews after Merge confidence completes"},
 	{ID: FeatureFactoryDatadogIntake, Label: "Factory Datadog Intake", Description: "Add Datadog intake from the Backlog column menu"},
 	{ID: FeatureFactoryWebhookIntake, Label: "Factory Webhook Intake", Description: "Add webhook intake from the Backlog column menu"},
-	{ID: FeatureFactoryTaskWebhookTriggers, Label: "Factory task webhook triggers", Description: "Run task automations from workspace webhooks"},
 	{ID: FeatureOrganizationBYOK, Label: "Organization BYOK", Description: "Show the organization Models settings page"},
 	{ID: FeatureModelStatus, Label: "Model status", Description: "Show the hosted Model status page in organization settings"},
 	{ID: FeatureOrganizationBYOKCustomProvider, Label: "Organization BYOK Custom Provider", Description: "Add a custom model provider with a URL, token, and API type"},

@@ -23,7 +23,6 @@ import {
 } from "../lib/customAutomation";
 import { factoryHomePath, factoryLineDetailPath, firstFactoryLineId } from "../lib/factoryPagePaths";
 import type { PlanningReviewDraft, PlanningReviewStep } from "./planningReviewMockup";
-import { validWebhookIntakeFieldPath } from "./webhookIntakeFieldPaths";
 
 export function useCustomAutomationSetupPage(args: {
   organizationId: string;
@@ -86,9 +85,21 @@ export function useCustomAutomationSetupPage(args: {
   const validationError = useMemo(() => validateDraft(name, draft), [draft, name]);
 
   const save = async () => {
-    const triggerError = triggerSaveError(triggers, runsOnTask);
-    if (triggerError) {
-      setSaveError(triggerError);
+    const activeTriggers = customAutomationTriggersForRun(triggers, runsOnTask);
+    const invalidSchedule = activeTriggers.some(
+      (trigger) =>
+        trigger.mode === "scheduled" &&
+        (!trigger.schedule.cronExpression.trim() ||
+          !Number.isFinite(trigger.schedule.utcOffset) ||
+          trigger.schedule.utcOffset < -12 ||
+          trigger.schedule.utcOffset > 14),
+    );
+    if (invalidSchedule) {
+      setSaveError("Enter a cron expression and choose a timezone.");
+      return false;
+    }
+    if (activeTriggers.some((trigger) => trigger.mode === "webhook" && !trigger.webhookId)) {
+      setSaveError("Select a webhook for each webhook trigger.");
       return false;
     }
     if (validationError) {
@@ -134,34 +145,6 @@ export function useCustomAutomationSetupPage(args: {
     saving: create.isPending || update.isPending,
     save,
   };
-}
-
-function triggerSaveError(triggers: CustomAutomationTrigger[], runsOnTask: boolean): string {
-  const activeTriggers = customAutomationTriggersForRun(triggers, runsOnTask);
-  if (
-    activeTriggers.some(
-      (trigger) =>
-        trigger.mode === "scheduled" &&
-        (!trigger.schedule.cronExpression.trim() ||
-          !Number.isFinite(trigger.schedule.utcOffset) ||
-          trigger.schedule.utcOffset < -12 ||
-          trigger.schedule.utcOffset > 14),
-    )
-  ) {
-    return "Enter a cron expression and choose a timezone.";
-  }
-  if (activeTriggers.some((trigger) => trigger.mode === "webhook" && !trigger.webhookId)) {
-    return "Select a webhook for each webhook trigger.";
-  }
-  if (
-    activeTriggers.some(
-      (trigger) =>
-        trigger.mode === "webhook" && runsOnTask && !validWebhookIntakeFieldPath(trigger.taskMatch?.fieldPath ?? ""),
-    )
-  ) {
-    return "Enter a valid JSON body field for each task webhook trigger.";
-  }
-  return "";
 }
 
 function withAgent(

@@ -2,7 +2,6 @@ import { CORE_SCHEMA, dump, load, YAMLException } from "js-yaml";
 import type { FactoriesFactoryAppTemplateAgent } from "@/api-client";
 import { hostedModelForPicker, type AutomationHostedModels } from "./customAutomationHostedModels";
 import type { PlanningReviewStep } from "../pages/planningReviewMockup";
-import { validWebhookIntakeFieldPath } from "../pages/webhookIntakeFieldPaths";
 import {
   AUTOMATION_ICONS,
   customAutomationDraft,
@@ -22,14 +21,7 @@ type AutomationAgent = {
 type AutomationTrigger =
   | { id?: string; use: "manual" | "task_enters_stage" | "task_leaves_stage" | "pull_request_updated" }
   | { id?: string; use: "schedule"; config: { cron: string; utc_offset?: number } }
-  | {
-      id?: string;
-      use: "webhook";
-      config: {
-        webhook_id: string;
-        task_match?: { kind: "task" | "pull_request" | "commit"; field_path: string };
-      };
-    };
+  | { id?: string; use: "webhook"; config: { webhook_id: string } };
 type AutomationStep = {
   name: string;
   bash?: string;
@@ -109,7 +101,20 @@ export function parseAutomationForCanvas(source: string, stage: CustomAutomation
   );
   validateTriggerIdentities(triggers);
   const runsOnTask = optionalBoolean(document.runs_on_task, "runs_on_task");
-  validateAutomationRunContext(runsOnTask, triggers);
+  if (runsOnTask === true && triggers.some(({ use }) => use === "schedule")) {
+    problem("runs_on_task", "A schedule runs with no task.");
+  }
+  if (runsOnTask === true && triggers.some(({ use }) => use === "webhook")) {
+    problem("runs_on_task", "A webhook runs with no task.");
+  }
+  if (
+    runsOnTask === false &&
+    triggers.some(
+      ({ use }) => use === "task_enters_stage" || use === "task_leaves_stage" || use === "pull_request_updated",
+    )
+  ) {
+    problem("runs_on_task", "This trigger runs on a task.");
+  }
   const steps = document.steps;
   if (!Array.isArray(steps)) problem("steps", "Enter a list of steps.");
   return {
@@ -125,25 +130,6 @@ export function parseAutomationForCanvas(source: string, stage: CustomAutomation
     triggers,
     steps: steps.map(parseStep),
   };
-}
-
-function validateAutomationRunContext(runsOnTask: boolean | undefined, triggers: AutomationTrigger[]) {
-  const webhookWithoutTask = triggers.some((trigger) => trigger.use === "webhook" && !trigger.config.task_match);
-  const webhookWithTask = triggers.some((trigger) => trigger.use === "webhook" && trigger.config.task_match);
-  if (runsOnTask === true && triggers.some(({ use }) => use === "schedule")) {
-    problem("runs_on_task", "A schedule runs with no task.");
-  }
-  if (runsOnTask === true && webhookWithoutTask) problem("runs_on_task", "Select how the webhook finds a task.");
-  if (runsOnTask !== true && webhookWithTask)
-    problem("runs_on_task", "A webhook with task matching must run on a task.");
-  if (
-    runsOnTask === false &&
-    triggers.some(
-      ({ use }) => use === "task_enters_stage" || use === "task_leaves_stage" || use === "pull_request_updated",
-    )
-  ) {
-    problem("runs_on_task", "This trigger runs on a task.");
-  }
 }
 
 function parseTimeout(value: unknown): number | undefined {
@@ -197,38 +183,9 @@ function parseWebhookTrigger(
   path: string,
   stage: CustomAutomationColumn,
 ): AutomationTrigger {
-  const config = mapping(value, `${path}.config`, ["webhook_id", "task_match"]);
-  const taskMatch = config.task_match === undefined ? undefined : parseTaskMatch(config.task_match, path);
-  if (stage !== "backlog" && !taskMatch)
-    problem(`${path}.use`, "Webhook triggers with no task are available in Backlog only.");
-  return {
-    id,
-    use: "webhook",
-    config: {
-      webhook_id: singleLine(config.webhook_id, `${path}.config.webhook_id`),
-      task_match: taskMatch,
-    },
-  };
-}
-
-function parseTaskMatch(
-  value: unknown,
-  path: string,
-): { kind: "task" | "pull_request" | "commit"; field_path: string } {
-  const match = mapping(value, `${path}.config.task_match`, ["kind", "field_path"]);
-  const kind = match.kind;
-  if (kind !== "task" && kind !== "pull_request" && kind !== "commit") {
-    problem(`${path}.config.task_match.kind`, "Choose task, pull_request, or commit.");
-    throw new Error("Invalid task match kind");
-  }
-  const fieldPath = singleLine(match.field_path, `${path}.config.task_match.field_path`);
-  if (!validWebhookIntakeFieldPath(fieldPath)) {
-    problem(`${path}.config.task_match.field_path`, "Enter a dot-separated field path.");
-  }
-  return {
-    kind,
-    field_path: fieldPath,
-  };
+  if (stage !== "backlog") problem(`${path}.use`, "Webhook triggers are available in Backlog only.");
+  const config = mapping(value, `${path}.config`, ["webhook_id"]);
+  return { id, use: "webhook", config: { webhook_id: singleLine(config.webhook_id, `${path}.config.webhook_id`) } };
 }
 
 function validateTriggerIdentities(triggers: AutomationTrigger[]) {
@@ -374,8 +331,7 @@ export function automationDefinitionCanvas(
 
 function automationDefinitionRunContext(definition: AutomationDefinition): boolean | undefined {
   if (definition.runs_on_task !== undefined) return definition.runs_on_task;
-  const withNoTask = (trigger: AutomationTrigger) =>
-    trigger.use === "schedule" || (trigger.use === "webhook" && !trigger.config.task_match);
+  const withNoTask = ({ use }: AutomationTrigger) => use === "schedule" || use === "webhook";
   if (!definition.triggers.some(withNoTask)) return true;
   if (definition.triggers.every(withNoTask)) return false;
   // Keep both task and schedule triggers when the YAML already combines them.
@@ -400,14 +356,7 @@ function canvasTrigger(trigger: AutomationTrigger, index: number): CustomAutomat
       trigger.use === "schedule"
         ? { cronExpression: trigger.config.cron, utcOffset: trigger.config.utc_offset ?? 0 }
         : customAutomationSchedule(),
-    ...(trigger.use === "webhook"
-      ? {
-          webhookId: trigger.config.webhook_id,
-          taskMatch: trigger.config.task_match
-            ? { kind: trigger.config.task_match.kind, fieldPath: trigger.config.task_match.field_path }
-            : undefined,
-        }
-      : {}),
+    ...(trigger.use === "webhook" ? { webhookId: trigger.config.webhook_id } : {}),
   };
 }
 
@@ -415,17 +364,8 @@ export function automationDefinitionTriggers(
   triggers: CustomAutomationTrigger[],
   stage: CustomAutomationColumn,
 ): AutomationTrigger[] {
-  return triggers.map(({ publicId, mode, schedule, webhookId, taskMatch }) => {
-    if (mode === "webhook") {
-      return {
-        id: publicId,
-        use: "webhook",
-        config: {
-          webhook_id: webhookId ?? "",
-          ...(taskMatch ? { task_match: { kind: taskMatch.kind, field_path: taskMatch.fieldPath } } : {}),
-        },
-      };
-    }
+  return triggers.map(({ publicId, mode, schedule, webhookId }) => {
+    if (mode === "webhook") return { id: publicId, use: "webhook", config: { webhook_id: webhookId ?? "" } };
     if (mode === "scheduled") {
       return {
         id: publicId,

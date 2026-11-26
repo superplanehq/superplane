@@ -133,11 +133,6 @@ type EventContext interface {
 	Emit(payloadType string, payload any) error
 }
 
-type DeduplicatedEventContext interface {
-	EventContext
-	EmitDeduplicated(payloadType string, payload any, dedupKey string) error
-}
-
 type WebhookRequestContext struct {
 	Body          []byte
 	Headers       http.Header
