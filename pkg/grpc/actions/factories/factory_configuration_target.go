@@ -13,16 +13,20 @@ import (
 	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
-	"github.com/superplanehq/superplane/pkg/yaml"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type factoryConfigurationTarget struct {
-	reads      *factoryAutomationReadInputs
-	validation *factoryConfigurationValidationInputs
-	factory    *models.Factory
-	line       *models.FactoryLine
-	stages     []*factoryConfigurationStageTarget
+	reads             *factoryAutomationReadInputs
+	validation        *factoryConfigurationValidationInputs
+	factory           *models.Factory
+	line              *models.FactoryLine
+	stages            []*factoryConfigurationStageTarget
+	ownership         []models.FactoryConfigurationAutomation
+	repositories      *factoryConfigurationRepositories
+	repositoryRecords []models.FactoryAgentResource
+	repositoryUpdate  *preparedFactoryConfigurationRepositories
 }
 
 type factoryConfigurationStageTarget struct {
@@ -50,16 +54,6 @@ func (m factoryConfigurationAutomationMetadata) forFactory(factory *models.Facto
 	return m
 }
 
-func (m factoryConfigurationAutomationMetadata) materializeDefaults(tx *gorm.DB, factory *models.Factory, canvas *models.Canvas, version *models.CanvasVersion) (*materializedFactoryTemplate, error) {
-	if m.intake != nil {
-		return materializeIntakeDefaults(tx, canvas, version, m.intake, nil)
-	}
-	if m.handler != nil {
-		return materializePRFeedbackDefaults(tx, factory, canvas, version, m.handler, nil)
-	}
-	return materializeFactoryAppGraphDefaults(tx, factory, canvas, version, nil)
-}
-
 type factoryConfigurationAutomationTarget struct {
 	metadata        factoryConfigurationAutomationMetadata
 	canvas          *models.Canvas
@@ -73,6 +67,10 @@ type factoryConfigurationAutomationTarget struct {
 	defaultSettings map[string]any
 	source          string
 	sourceID        uuid.UUID
+	binding         factoryConfigurationBinding
+	exportedBinding *factoryConfigurationBinding
+	explicitBinding *factoryConfigurationBinding
+	owned           bool
 }
 
 func requireFactoryAsCode(tx *gorm.DB, orgID uuid.UUID) error {
@@ -153,6 +151,9 @@ func lockFactoryConfigurationTarget(tx *gorm.DB, orgID uuid.UUID, factoryRef, li
 		}
 		canvases[i] = *canvas
 	}
+	if _, err := factory.ListContextRepos(tx.Clauses(clause.Locking{Strength: "UPDATE"})); err != nil {
+		return nil, err
+	}
 	if err := requireFactoryAsCode(tx, orgID); err != nil {
 		return nil, err
 	}
@@ -190,7 +191,11 @@ func inspectFactoryConfigurationTarget(tx *gorm.DB, factory *models.Factory, lin
 	if err := validateFactoryLineSystemStages(stages); err != nil {
 		return nil, err
 	}
-	target := &factoryConfigurationTarget{factory: factory, line: line}
+	owners, err := models.ListFactoryConfigurationAutomations(tx, factory.OrganizationID, factory.ID, uuid.Nil)
+	if err != nil {
+		return nil, err
+	}
+	target := &factoryConfigurationTarget{factory: factory, line: line, ownership: owners}
 	byKey := make(map[string]*factoryConfigurationStageTarget, len(stages))
 	for _, stage := range stages {
 		key := stage.Key
@@ -265,6 +270,9 @@ func inspectFactoryConfigurationTarget(tx *gorm.DB, factory *models.Factory, lin
 	}
 	target.reads = reads
 	tx = withFactoryAutomationReadInputs(tx, reads)
+	if err := loadFactoryConfigurationRepositories(tx, target); err != nil {
+		return nil, err
+	}
 	for _, stage := range target.stages {
 		if stage.stage.Kind != models.FactoryLineStagePhase || stage.stage.StepIndex == nil {
 			continue
@@ -361,11 +369,54 @@ func inspectFactoryConfigurationTarget(tx *gorm.DB, factory *models.Factory, lin
 			if automation.templateID != "" && counts[id] > 1 {
 				id += "-" + configurationCanvasKey(automation.canvas.ID)
 			}
+			for _, owner := range target.ownership {
+				if owner.CanvasID != automation.canvas.ID {
+					continue
+				}
+				if len(owner.Binding) > 0 {
+					binding := &factoryConfigurationBinding{}
+					encoded, err := json.Marshal(owner.Binding)
+					if err != nil {
+						return nil, err
+					}
+					if err := json.Unmarshal(encoded, binding); err != nil {
+						return nil, err
+					}
+					automation.explicitBinding = binding
+					automation.exportedBinding = mergeConfigurationBindingIntent(automation.exportedBinding, binding)
+					if binding.IntegrationID != "" {
+						automation.binding.IntegrationID = binding.IntegrationID
+					}
+					if binding.ResourceID != "" {
+						automation.binding.ResourceID = binding.ResourceID
+					}
+					if binding.TeamID != "" {
+						automation.binding.TeamID = binding.TeamID
+					}
+				}
+				if owner.LineID == line.ID && owner.StageKey == stage.key {
+					id = owner.ManifestID
+					automation.owned = true
+				}
+			}
+
+			if strings.HasPrefix(automation.templateID, "intake:") && automation.binding.IntegrationID != "" {
+				binding := factoryConfigurationBinding{}
+				if automation.exportedBinding != nil {
+					binding = *automation.exportedBinding
+				}
+				binding.IntegrationID = automation.binding.IntegrationID
+				automation.exportedBinding = &binding
+			}
+			automation.exportedBinding = portableConfigurationBinding(reads.integrations, automation.exportedBinding)
 			automation.id = id
 			if i == 0 && stage.stage.StepIndex != nil {
 				stage.run = id
 			}
 		}
+	}
+	if err := exportFactoryConfigurationDependencies(target); err != nil {
+		return nil, err
 	}
 	return target, nil
 }
@@ -387,33 +438,31 @@ func inspectConfigurationAutomation(tx *gorm.DB, factory *models.Factory, canvas
 			return nil, unsupportedConfigurationTarget(fmt.Sprintf("Automation %q uses an unsupported built-in template %q.", canvas.Name, template))
 		}
 		automation.templateID, automation.uses = template, alias
-		defaults, defaultErr := metadata.materializeDefaults(tx, factory, canvas, version)
-		if defaultErr != nil {
-			return nil, defaultErr
+		automation.binding = configurationBuiltInDefaultBinding(factory, template)
+		selected := factoryConfigurationBindingFromGraph(version, template)
+		if selected.IntegrationID != "" {
+			automation.binding.IntegrationID = selected.IntegrationID
 		}
-		document, defaultErr := yaml.CanvasFromYAML([]byte(defaults.canvasYAML))
-		if defaultErr != nil {
-			return nil, defaultErr
+		if selected.ResourceID != "" {
+			automation.binding.ResourceID = selected.ResourceID
 		}
-		// Reset preserves installed models; YAML defaults use the workspace model.
-		agent := resolveIntakeAgent(tx, factory)
-		for i := range document.Spec.Nodes {
-			node := &document.Spec.Nodes[i]
-			if agent == nil || !isFactoryAgentHarness(node.Component) {
-				continue
-			}
-			if model := agent.model(); model != "" {
-				node.Configuration["model"] = model
-				continue
-			}
-			delete(node.Configuration, "model")
+		if selected.TeamID != "" {
+			automation.binding.TeamID = selected.TeamID
 		}
-		automation.defaults = &models.CanvasVersion{Nodes: document.Nodes()}
+		automation.exportedBinding = configurationBindingOverrides(automation.binding, configurationBuiltInDefaultBinding(factory, template))
+		automation.defaults, err = buildFreshFactoryConfigurationBuiltInDefaults(tx, factory, template, automation.binding)
+		if err != nil {
+			return nil, err
+		}
+
 		automation.defaultSettings, err = exportFactoryConfigurationBuiltIn(automation.defaults, template)
 		if err != nil {
 			return nil, err
 		}
 		automation.settings, err = exportFactoryConfigurationBuiltIn(version, template)
+		if err == nil {
+			supplementFactoryConfigurationRecordSettings(tx, automation, metadata)
+		}
 	} else {
 		automation.source, err = renderFactoryConfigurationCustom(tx, factory, canvas, version, placement, metadata.source)
 	}
@@ -457,11 +506,43 @@ func factoryConfigurationToken(target *factoryConfigurationTarget, manifest *fac
 		Canvas    uuid.UUID
 		Version   uuid.UUID
 		Placement string
+		Defaults  map[string]any
 	}
 	revisions := []revision{}
 	for _, stage := range target.stages {
 		for _, automation := range stage.automations {
-			revisions = append(revisions, revision{automation.canvas.ID, automation.version.ID, automation.placement})
+			revisions = append(revisions, revision{automation.canvas.ID, automation.version.ID, automation.placement, automation.defaultSettings})
+		}
+	}
+	dependencies := []any{}
+	if manifest.Repositories != nil {
+		// Repository changes reconcile listeners across every line in the workspace.
+		dependencies = append(dependencies, struct {
+			Current   models.FactoryOnboardingConfig
+			Records   []models.FactoryAgentResource
+			Desired   *preparedFactoryConfigurationRepositories
+			Versions  map[uuid.UUID]*models.CanvasVersion
+			Ownership []models.FactoryConfigurationAutomation
+		}{target.factory.OnboardingConfigValue(), target.repositoryRecords, target.repositoryUpdate, target.reads.versions, target.ownership})
+	}
+	for _, stage := range manifest.Stages {
+		for _, automation := range stage.Automations {
+			if automation.prepared != nil {
+				console := ""
+				if template, exists := lookupFactoryAppTemplate(automation.prepared.TemplateID, factoryVCSProviderOrDefault(target.factory)); exists {
+					var err error
+					console, err = materializeFactoryConsole(template, factoryCanvasIDPlaceholder, automation.Name)
+					if err != nil {
+						return "", err
+					}
+				}
+				dependencies = append(dependencies, struct {
+					State   any
+					Nodes   []models.Node
+					Edges   []models.Edge
+					Console string
+				}{automation.prepared.State, configurationTokenNodes(automation.prepared.Nodes), automation.prepared.Edges, console})
+			}
 		}
 	}
 	state := struct {
@@ -473,7 +554,8 @@ func factoryConfigurationToken(target *factoryConfigurationTarget, manifest *fac
 		Live         factoryConfigurationManifest
 		Revisions    []revision
 		Desired      *factoryConfigurationManifest
-	}{target.factory.OrganizationID, target.factory.ID, target.line.ID, target.line.Steps, target.line.Stages, exportFactoryConfigurationManifest(target), revisions, manifest}
+		Dependencies []any
+	}{target.factory.OrganizationID, target.factory.ID, target.line.ID, target.line.Steps, target.line.Stages, exportFactoryConfigurationManifest(target), revisions, manifest, dependencies}
 	encoded, err := json.Marshal(state)
 	if err != nil {
 		return "", fmt.Errorf("encode configuration base state: %w", err)
