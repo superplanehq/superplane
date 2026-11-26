@@ -273,21 +273,18 @@ describe("custom automation configuration run history", () => {
 });
 
 function mockAutomationSourceFetch(onAutomation: (method: string) => Response) {
-  return vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
-    if (!String(input).includes("/api/v2/automations")) return Response.json({});
-    return onAutomation(init?.method ?? "GET");
-  });
+  return vi
+    .spyOn(globalThis, "fetch")
+    .mockImplementation(async (input, init) =>
+      String(input).includes("/api/v2/automations") ? onAutomation(init?.method ?? "GET") : Response.json({}),
+    );
 }
 
 describe("custom automation YAML draft", () => {
-  const savedYaml = `# Saved from HTTP
-apiVersion: v2
+  const savedYaml = `apiVersion: v2
 kind: Automation
 name: Preview
-agent:
-  harness: codex
-  model: gpt-5
-  credentials: {source: integration, name: code-review}
+agent: {harness: codex, model: gpt-5, credentials: {source: integration, name: code-review}}
 skip_setup_commands: true
 skip_repository_checkout: true
 triggers:
@@ -463,23 +460,15 @@ steps:
   });
 
   it("retains a rejected draft and shows the server diagnostic", async () => {
-    const fetch = mockAutomationSourceFetch((method) =>
-      method === "PUT"
-        ? Response.json(
-            {
-              diagnostics: [
-                {
-                  path: "steps[0].secrets[0]",
-                  line: 10,
-                  column: 15,
-                  message: "Create this secret in the organization.",
-                },
-              ],
-            },
-            { status: 400 },
-          )
-        : Response.json(savedAutomation),
+    const rejected = Response.json(
+      {
+        diagnostics: [
+          { path: "steps[0].secrets[0]", line: 10, column: 15, message: "Create this secret in the organization." },
+        ],
+      },
+      { status: 400 },
     );
+    const fetch = mockAutomationSourceFetch((method) => (method === "PUT" ? rejected : Response.json(savedAutomation)));
     const onClose = renderModal("?customAutomation=custom-1", "custom-1", "backlog", true);
     const user = userEvent.setup();
     await user.click(await screen.findByRole("button", { name: "Edit YAML" }));
