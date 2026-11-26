@@ -18,6 +18,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/test/support"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -27,10 +28,12 @@ func TestReconcileFactoryRepositoryPublishesManagedRunnerCredentials(t *testing.
 		provider             string
 		runnerID             string
 		repositoryExpression string
+		pinnedBinding        bool
 	}{
-		{"line-implementation", models.ProviderBitbucket, implementationAgentNodeID, orderRepositoryExpression},
-		{"risk-score", models.ProviderGitHub, "assess-risk", "new-workspace/api"},
-		{"visual-evidence", models.ProviderGitHub, "capture-visual-evidence", "new-workspace/api"},
+		{"line-implementation", models.ProviderBitbucket, implementationAgentNodeID, orderRepositoryExpression, false},
+		{"risk-score", models.ProviderGitHub, "assess-risk", "new-workspace/api", false},
+		{"visual-evidence", models.ProviderGitHub, "capture-visual-evidence", "new-workspace/api", false},
+		{"risk-score", models.ProviderGitHub, "assess-risk", "old-workspace/api", true},
 	} {
 		t.Run(testCase.templateID, func(t *testing.T) {
 			r := support.Setup(t)
@@ -49,6 +52,16 @@ func TestReconcileFactoryRepositoryPublishesManagedRunnerCredentials(t *testing.
 				AppRepository: &repository, BacklogRepository: &repository, DefaultBranch: &branch,
 			}))
 			canvas := support.CreateFactoryCanvas(t, r, factory.ID, "Implement")
+			if testCase.pinnedBinding {
+				line, err := factory.CreateLine(db, "Delivery", nil)
+				require.NoError(t, err)
+				owner := models.FactoryConfigurationAutomation{
+					OrganizationID: r.Organization.ID, FactoryID: factory.ID, LineID: line.ID,
+					StageKey: "verify", ManifestID: "risk", CanvasID: canvas.ID,
+					Binding: datatypes.JSONMap{"resource_id": "old-workspace/api", "integration_id": previousID},
+				}
+				require.NoError(t, owner.Save(db))
+			}
 			nodes := []models.Node{
 				{
 					ID: "find-pr", Name: "Find Pull Request", Type: models.NodeTypeComponent,
@@ -104,10 +117,14 @@ func TestReconcileFactoryRepositoryPublishesManagedRunnerCredentials(t *testing.
 			require.NotNil(t, findPR)
 			require.NotNil(t, managedRunner)
 			require.NotNil(t, custom)
-			assert.Equal(t, selectedID, *findPR.IntegrationID)
+			expectedIntegrationID, expectedIntegrationName := selectedID, selectedName
+			if testCase.pinnedBinding {
+				expectedIntegrationID, expectedIntegrationName = previousID, previousName
+			}
+			assert.Equal(t, expectedIntegrationID, *findPR.IntegrationID)
 			assert.Equal(t, testCase.repositoryExpression, findPR.Configuration["repository"])
 			assert.Equal(t, []any{
-				map[string]any{"source": "integration", "integration": map[string]any{"name": selectedName}},
+				map[string]any{"source": "integration", "integration": map[string]any{"name": expectedIntegrationName}},
 				map[string]any{"source": "integration", "integration": map[string]any{"name": unrelatedName}},
 			}, managedRunner.Configuration["environmentFrom"])
 			assert.Equal(t, "echo "+previousName, managedRunner.Configuration["script"])

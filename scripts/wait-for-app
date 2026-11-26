@@ -10,7 +10,8 @@ fi
 
 PORT="${PUBLIC_API_PORT:-8000}"
 HOST="${WAIT_FOR_APP_HOST:-localhost}"
-TIMEOUT_SECONDS="${WAIT_FOR_APP_TIMEOUT_SECONDS:-60}"
+# The first Go build after an image update can take several minutes.
+TIMEOUT_SECONDS="${WAIT_FOR_APP_TIMEOUT_SECONDS:-300}"
 INTERVAL_SECONDS="${WAIT_FOR_APP_INTERVAL_SECONDS:-2}"
 
 url="http://${HOST}:${PORT}/health"

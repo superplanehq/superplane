@@ -15,7 +15,7 @@ import (
 
 const (
 	configurationManifestPath = ".superplane/main.yml"
-	configurationCoverage     = "All stages and automations"
+	configurationCoverage     = "Repositories, stages, and automations"
 )
 
 type configurationTarget struct {
@@ -105,7 +105,7 @@ type configurationPlanCommand struct {
 func newConfigurationPlanCommand(options core.BindOptions) *cobra.Command {
 	command := &configurationPlanCommand{}
 	cmd := &cobra.Command{
-		Use: "plan", Short: "Plan stage and automation changes", Args: cobra.NoArgs,
+		Use: "plan", Short: "Plan repository, stage, and automation changes", Args: cobra.NoArgs,
 	}
 	command.bind(cmd)
 	core.Bind(cmd, command, options)
@@ -178,7 +178,7 @@ type configurationApplyCommand struct {
 func newConfigurationApplyCommand(options core.BindOptions) *cobra.Command {
 	command := &configurationApplyCommand{}
 	cmd := &cobra.Command{
-		Use: "apply", Short: "Apply stage and automation changes", Args: cobra.NoArgs,
+		Use: "apply", Short: "Apply repository, stage, and automation changes", Args: cobra.NoArgs,
 	}
 	command.bind(cmd)
 	cmd.Flags().BoolVar(&command.yes, "yes", false, "apply the displayed plan without confirmation")
@@ -229,7 +229,7 @@ func (c *configurationApplyCommand) Execute(ctx core.CommandContext) error {
 	}
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
 		if response.GetChanged() {
-			_, err := fmt.Fprintln(stdout, "Applied stage and automation configuration.")
+			_, err := fmt.Fprintln(stdout, "Applied repository, stage, and automation configuration.")
 			return err
 		}
 		_, err := fmt.Fprintln(stdout, "No changes.")
