@@ -2,14 +2,17 @@ package datadog
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -23,6 +26,31 @@ const (
 	monitorPageSize               = 100
 	MonitorsWriteForbiddenMessage = "Datadog refused the request. The application key needs monitors_write."
 )
+
+// All calls in one reconciliation share a single deadline, including searches.
+type monitorDeadlineHTTP struct {
+	core.HTTPContext
+	deadline time.Time
+}
+
+func (h monitorDeadlineHTTP) Do(request *http.Request) (*http.Response, error) {
+	ctx, cancel := context.WithDeadline(request.Context(), h.deadline)
+	// Keep the deadline active while the response body is read.
+	response, err := h.HTTPContext.Do(request.WithContext(ctx))
+	if err != nil {
+		cancel()
+		return nil, err
+	}
+	response.Body = &monitorResponseBody{ReadCloser: response.Body, cancel: cancel}
+	return response, nil
+}
+
+type monitorResponseBody struct {
+	io.ReadCloser
+	cancel context.CancelFunc
+}
+
+func (b *monitorResponseBody) Close() error { defer b.cancel(); return b.ReadCloser.Close() }
 
 type Monitor struct {
 	ID      int64          `json:"id,omitempty"`
@@ -297,6 +325,22 @@ func ReleaseRetiredIntakeMonitor(ctx core.TriggerContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
+	// An interrupted create may have reached Datadog before its ID was saved.
+	if metadata.MonitorID == "" && strings.TrimSpace(config.Service) != "" && ctx.HTTP != nil && ctx.Integration != nil {
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return err
+		}
+		monitor, err := findIntakeMonitor(client, strings.TrimSpace(config.Service), ctx.Integration.ID().String())
+		if err != nil {
+			return monitorPermissionError(err)
+		}
+		if monitor == nil {
+			return nil
+		}
+		metadata.MonitorID = strconv.FormatInt(monitor.ID, 10)
+		metadata.MonitorService = strings.TrimSpace(config.Service)
+	}
 	return monitorPermissionError(releaseOwnedMonitor(ctx, &metadata, config.Service, false))
 }
 

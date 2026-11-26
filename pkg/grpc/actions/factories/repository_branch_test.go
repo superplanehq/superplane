@@ -114,13 +114,14 @@ func TestGitHubInstallationForRepositorySkipsCatalogWithoutBinding(t *testing.T)
 	require.NoError(t, err)
 	assert.Equal(t, models.ProviderGitHub, integration.AppName)
 
-	installationID, repositoryID := githubInstallationForRepository(
+	installationID, repositoryID, err := githubInstallationForRepository(
 		t.Context(),
 		db,
 		r.Organization.ID.String(),
 		integration,
 		"acme/app",
 	)
+	require.NoError(t, err)
 	assert.Equal(t, int64(0), installationID)
 	assert.Equal(t, int64(0), repositoryID)
 }

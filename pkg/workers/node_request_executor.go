@@ -16,6 +16,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	factoryactions "github.com/superplanehq/superplane/pkg/grpc/actions/factories"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+	"github.com/superplanehq/superplane/pkg/integrations/datadog"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/productanalytics"
@@ -53,19 +54,31 @@ func (e *NodeRequestExecutor) factoryIntakeDeps() factoryactions.IntakeDependenc
 // RunNow processes a request synchronously, even when its scheduled time is in the future.
 // It shares the worker lock, so an in-flight or completed request is skipped.
 func (e *NodeRequestExecutor) RunNow(request models.CanvasNodeRequest) error {
-	return e.execute(request, models.LockNodeRequestNow)
+	return e.execute(request, models.LockNodeRequestNow, true)
 }
 
 // Execute processes a pending request when its scheduled time has arrived.
 func (e *NodeRequestExecutor) Execute(request models.CanvasNodeRequest) error {
-	return e.execute(request, models.LockNodeRequest)
+	return e.execute(request, models.LockNodeRequest, false)
 }
 
 func (e *NodeRequestExecutor) execute(
 	request models.CanvasNodeRequest,
 	lockRequest func(*gorm.DB, uuid.UUID) (*models.CanvasNodeRequest, error),
+	runNow bool,
 ) error {
+	stored, err := models.FindCanvasNodeRequest(database.DB(context.Background()), request.ID)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	request = *stored
 	defer e.publishExecution(request)
+	if hook := request.Spec.Data().InvokeAction; hook != nil && hook.ActionName == datadog.ReconcileIntakeMonitorAction {
+		return e.processDatadogMonitorRequest(request.ID, runNow)
+	}
 	if request.Type == models.NodeRequestTypeInvokeAction && request.Spec.Data().InvokeAction != nil &&
 		factoryactions.IsPublicationHook(request.Spec.Data().InvokeAction.ActionName) {
 		events, err := factoryactions.ProcessBodySectionPublicationRequest(context.Background(), e.factoryIntakeDeps(), request.ID, lockRequest)
@@ -142,7 +155,7 @@ func (e *NodeRequestExecutor) execute(
 
 	runCancellations := &RunCancellationNotifier{}
 
-	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+	err = database.Conn().Transaction(func(tx *gorm.DB) error {
 		r, err := lockRequest(tx, request.ID)
 		if err == nil {
 			return e.processRequest(logger, tx, r, onNewEvents, runCancellations, onFactoryWorkOrderUpdated, onGitHubPullRequestRecorded, onFileBindCleanup, onProductAnalytics)

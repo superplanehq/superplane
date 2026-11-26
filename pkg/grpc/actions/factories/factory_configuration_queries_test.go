@@ -3,6 +3,7 @@ package factories
 import (
 	"context"
 	"fmt"
+	"maps"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -31,7 +32,7 @@ type configurationQueryCountKey struct{}
 
 func countConfigurationQueries(ctx context.Context, run func(context.Context)) configurationQueryCounts {
 	counts := configurationQueryCounters{}
-	for _, category := range []string{"sources", "versions", "metadata", "integrations", "policy", "secrets", "locks"} {
+	for _, category := range []string{"sources", "versions", "metadata", "ownership", "integrations", "policy", "secrets", "locks"} {
 		counts[category] = &atomic.Int64{}
 	}
 	run(context.WithValue(ctx, configurationQueryCountKey{}, counts))
@@ -61,6 +62,8 @@ func TestFactoryConfigurationBatchesSharedReads(t *testing.T) {
 			counts["versions"].Add(1)
 		case "factory_intakes", "factory_pr_feedback_handlers", "factory_lines":
 			counts["metadata"].Add(1)
+		case "factory_configuration_automations":
+			counts["ownership"].Add(1)
 		case "app_installations":
 			counts["integrations"].Add(1)
 		case "hosted_llm_providers", "installation_llm_settings", "organization_byok_model_allowlists", "organization_hosted_model_allowlists", "factory_llm_model_allowlists", "factory_codex_connections":
@@ -191,6 +194,20 @@ func TestFactoryConfigurationBatchesSharedReads(t *testing.T) {
 						})
 					}
 				}
+				desired := export(f.ctx)
+				editConfigurationManifest(t, desired, func(manifest *factoryConfigurationManifest) {
+					for i := range manifest.Stages {
+						if manifest.Stages[i].Key == "backlog" {
+							manifest.Stages[i].Automations = append(manifest.Stages[i].Automations, factoryConfigurationAutomation{
+								ID: "planned-analysis", Name: "Planned analysis", Uses: "@superplane/task-analysis",
+							})
+						}
+					}
+				})
+				counts["one built-in addition plan"] = countConfigurationQueries(f.ctx, func(ctx context.Context) {
+					planned := plan(ctx, desired)
+					require.Len(t, planned.Changes, 1)
+				})
 				return counts
 			}
 			single := measure()
@@ -204,7 +221,7 @@ func TestFactoryConfigurationBatchesSharedReads(t *testing.T) {
 			for operation, expected := range single {
 				t.Run(operation, func(t *testing.T) {
 					t.Logf("one custom automation: %v; five custom automations: %v", expected, many[operation])
-					for _, category := range []string{"sources", "versions", "metadata", "integrations"} {
+					for _, category := range []string{"sources", "versions", "metadata", "ownership", "integrations"} {
 						require.Positive(t, expected[category], "%s reads must be observed", category)
 					}
 					if operation == "changed plan" {
@@ -326,6 +343,51 @@ func TestFactoryConfigurationBatchesSharedReads(t *testing.T) {
 					}
 				})
 			}
+		})
+	}
+}
+
+func TestFactoryConfigurationSharesRepositoryAuthorizationReads(t *testing.T) {
+	for _, hosted := range []bool{false, true} {
+		t.Run(fmt.Sprintf("hosted=%t", hosted), func(t *testing.T) {
+			var f configurationFixture
+			if hosted {
+				f = organizationKeyConfigurationFixture(t)
+			} else {
+				f = newConfigurationFixture(t)
+			}
+			db := database.DB(t.Context())
+			queries := map[string]int{}
+			const callback = "test:configuration_repository_queries"
+			require.NoError(t, db.Callback().Query().After("gorm:query").Register(callback, func(tx *gorm.DB) {
+				switch tx.Statement.Table {
+				case "vcs_provider_integration_bindings", "users", "vcs_provider_repositories", "repository":
+					queries[tx.Statement.Table]++
+				}
+			}))
+			t.Cleanup(func() { require.NoError(t, db.Callback().Query().Remove(callback)) })
+			measure := func() map[string]int {
+				bundle := f.export(t)
+				clear(queries)
+				planned := f.plan(t, bundle)
+				require.Empty(t, planned.Diagnostics)
+				require.Empty(t, planned.Changes)
+				counts := maps.Clone(queries)
+				clear(queries)
+				result, err := f.apply(bundle, planned.BaseStateToken)
+				require.NoError(t, err)
+				require.False(t, result.Changed)
+				for table, count := range queries {
+					counts["apply:"+table] = count
+				}
+				return counts
+			}
+			single := measure()
+			require.Positive(t, single["vcs_provider_integration_bindings"])
+			for range 4 {
+				resetTestTemplate(t, f.r, f.factory, "risk-score", models.ProviderGitHub, func(*yaml.Canvas) {})
+			}
+			require.Equal(t, single, measure(), "shared repository reads must not grow with unchanged built-ins")
 		})
 	}
 }

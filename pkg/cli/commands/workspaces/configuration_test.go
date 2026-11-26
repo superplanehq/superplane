@@ -61,7 +61,7 @@ func writeConfigurationInput(t *testing.T) string {
 
 func exportPayload(content string) map[string]any {
 	return map[string]any{
-		"coverage": "All stages and automations",
+		"coverage": "Repositories, stages, and automations",
 		"bundle": map[string]any{
 			"manifestPath": ".superplane/main.yml",
 			"files":        []map[string]any{{"path": ".superplane/main.yml", "content": content}},
@@ -114,7 +114,7 @@ func TestExportConfigurationProtectsLocalFiles(t *testing.T) {
 	args := []string{"export", "--workspace", "example", "--output-dir", outputDir}
 	root.SetArgs(args)
 	require.NoError(t, root.Execute())
-	require.Contains(t, stdout.String(), "All stages and automations")
+	require.Contains(t, stdout.String(), "Repositories, stages, and automations")
 	manifest := filepath.Join(outputDir, ".superplane", "main.yml")
 	actual, err := os.ReadFile(manifest)
 	require.NoError(t, err)
@@ -138,7 +138,7 @@ func TestExportConfigurationProtectsLocalFiles(t *testing.T) {
 }
 
 func TestExportConfigurationRejectsInvalidResponsesBeforeOverwrite(t *testing.T) {
-	for _, scenario := range []string{"missing bundle", "missing coverage", "unsafe manifest", "unsafe file", "extra file", "missing content", "invalid YAML", "missing stages", "unknown field", "stage kind", "zero concurrency", "unknown runner", "YAML alias"} {
+	for _, scenario := range []string{"missing bundle", "missing coverage", "unsafe manifest", "unsafe file", "extra file", "missing content", "invalid YAML", "missing stages", "unknown field", "unknown binding", "conflicting binding", "missing repository connection", "missing primary repository", "missing repository access", "invalid repository access", "invalid repository enabled", "unknown repository field", "stage kind", "zero concurrency", "unknown runner", "YAML alias"} {
 		t.Run(scenario, func(t *testing.T) {
 			outputDir := t.TempDir()
 			require.NoError(t, os.Mkdir(filepath.Join(outputDir, ".superplane"), 0755))
@@ -166,6 +166,25 @@ func TestExportConfigurationRejectsInvalidResponsesBeforeOverwrite(t *testing.T)
 				files[0]["content"] = "apiVersion: v2\nkind: Factory\nname: Example workspace\n"
 			case "unknown field":
 				files[0]["content"] = configurationManifest + "unsupported: true\n"
+			case "unknown binding":
+				files[0]["content"] = strings.Replace(configurationManifest, "        with:", "        binding:\n          credentials: secret\n        with:", 1)
+			case "conflicting binding":
+				files[0]["content"] = strings.Replace(configurationManifest, "        with:", "        binding:\n          integration_name: GitHub\n          integration_id: github-id\n        with:", 1)
+			case "missing repository connection":
+				files[0]["content"] = configurationManifest + "repositories:\n  primary:\n    repository: acme/app\n"
+			case "missing primary repository":
+				files[0]["content"] = configurationManifest + "repositories:\n  binding:\n    integration_name: GitHub\n"
+			case "missing repository access", "invalid repository access", "invalid repository enabled", "unknown repository field":
+				repositories := "repositories:\n  binding:\n    integration_name: GitHub\n  primary:\n    repository: acme/app\n  additional:\n    - repository: acme/docs\n"
+				switch scenario {
+				case "invalid repository access":
+					repositories += "      access: admin\n"
+				case "invalid repository enabled":
+					repositories += "      access: read\n      enabled: sometimes\n"
+				case "unknown repository field":
+					repositories += "      access: read\n      credentials: secret\n"
+				}
+				files[0]["content"] = configurationManifest + repositories
 			case "stage kind":
 				files[0]["content"] = strings.Replace(configurationManifest, "name: Implement", "name: Implement\n    kind: phase", 1)
 			case "zero concurrency":
@@ -234,14 +253,14 @@ func TestApplyConfigurationSubmitsCapturedPlanInput(t *testing.T) {
 		case "/api/v1/factories/example/configuration:plan":
 			planned = body
 			require.NoError(t, os.WriteFile(path, []byte("changed after preview"), 0600))
-			_, _ = fmt.Fprint(w, `{"coverage":"All stages and automations","baseStateToken":"preview-token","changes":[{"resource":"implementation/implement","fieldPath":"with.additional_instructions","previousValue":"old","requestedValue":"Follow AGENTS.md."}]}`)
+			_, _ = fmt.Fprint(w, `{"coverage":"Repositories, stages, and automations","baseStateToken":"preview-token","changes":[{"resource":"implementation/implement","fieldPath":"with.additional_instructions","previousValue":"old","requestedValue":"Follow AGENTS.md."}]}`)
 		case "/api/v1/factories/example/configuration:apply":
 			assert.Equal(t, "preview-token", body["baseStateToken"])
 			assert.Equal(t, planned["bundle"], body["bundle"])
 			bundle := body["bundle"].(map[string]any)
 			files := bundle["files"].([]any)
 			assert.Equal(t, configurationManifest, files[0].(map[string]any)["content"])
-			_, _ = fmt.Fprint(w, `{"coverage":"All stages and automations","changed":true}`)
+			_, _ = fmt.Fprint(w, `{"coverage":"Repositories, stages, and automations","changed":true}`)
 		default:
 			t.Errorf("unexpected API call: %s", r.URL)
 			http.NotFound(w, r)
@@ -255,7 +274,19 @@ func TestApplyConfigurationSubmitsCapturedPlanInput(t *testing.T) {
 }
 
 func TestConfigurationRoundTripsCustomFilesAcrossStages(t *testing.T) {
-	manifest := configurationManifest + `  - key: custom-review
+	manifest := strings.Replace(configurationManifest, `        with:
+          additional_instructions: Follow AGENTS.md.
+`, `        binding:
+          integration_id: repository-connection
+          resource_id: repository-resource
+        with:
+          agents:
+            implementation-agent-no-issue:
+              execution_timeout_seconds: 0
+              skip_setup_commands: false
+          template:
+            draft_pull_requests: false
+`, 1) + `  - key: custom-review
     name: Review changes
     automations:
       - id: review
@@ -263,10 +294,65 @@ func TestConfigurationRoundTripsCustomFilesAcrossStages(t *testing.T) {
         uses: automations/review.yaml
   - key: verify
     name: Verify
-    automations: []
+    automations:
+      - id: confidence
+        name: Merge confidence
+        uses: "@superplane/merge-confidence"
+        with:
+          template:
+            enabled_checks: []
+            publish_results: false
+      - id: review
+        name: Review request
+        uses: "@superplane/review-request"
+        with:
+          template:
+            merge_confidence:
+              stage: verify
+              automation: confidence
+            fallback_reviewer: ""
+      - id: discussion
+        name: Pull request discussion
+        uses: "@superplane/pr-discussion"
+        with:
+          pr_feedback:
+            mention: ""
+            allowed_bots: []
+  - key: backlog
+    name: Backlog
+    automations:
+      - id: issues
+        name: GitHub issues
+        uses: "@superplane/intake/github-issues"
+        with:
+          intake:
+            confidence_pct: 0
+            labels: []
+            new_issues: false
+      - id: linear
+        name: Linear issues
+        uses: "@superplane/intake/linear-issues"
+        binding:
+          integration_name: "Engineering Linear"
+          team_id: engineering
   - key: done
     name: Done
     automations: []
+repositories:
+  binding:
+    integration_name: "Engineering GitHub"
+  primary:
+    repository: acme/application
+    ref: main
+  backlog_repository: acme/backlog
+  additional:
+    - repository: acme/library
+      access: write
+    - repository: acme/docs
+      ref: stable
+      access: read
+      enabled: false
+      provider: github
 `
 	source := "apiVersion: v2\nkind: Automation\nname: Review changes\ntriggers:\n  - use: manual\nsteps:\n  - name: Review\n    prompt: Review the changes.\n"
 	output := t.TempDir()
@@ -286,14 +372,15 @@ func TestConfigurationRoundTripsCustomFilesAcrossStages(t *testing.T) {
 			planned = body["bundle"].(map[string]any)
 			files := planned["files"].([]any)
 			require.Len(t, files, 2)
+			assert.Equal(t, manifest, files[0].(map[string]any)["content"])
 			assert.Equal(t, ".superplane/automations/review.yaml", files[1].(map[string]any)["path"])
 			assert.Equal(t, source, files[1].(map[string]any)["content"])
 			require.NoError(t, os.WriteFile(filepath.Join(output, ".superplane", "automations", "review.yaml"), []byte("changed after preview"), 0600))
-			_, _ = fmt.Fprint(w, `{"coverage":"All stages and automations","baseStateToken":"preview-token","changes":[{"resource":"custom-review/review","fieldPath":"steps","previousValue":"old","requestedValue":"new"}]}`)
+			_, _ = fmt.Fprint(w, `{"coverage":"Repositories, stages, and automations","baseStateToken":"preview-token","changes":[{"resource":"custom-review/review","fieldPath":"steps","previousValue":"old","requestedValue":"new"}]}`)
 			return
 		}
 		assert.Equal(t, planned, body["bundle"])
-		_, _ = fmt.Fprint(w, `{"coverage":"All stages and automations","changed":true}`)
+		_, _ = fmt.Fprint(w, `{"coverage":"Repositories, stages, and automations","changed":true}`)
 	})
 	root.SetArgs([]string{"export", "--workspace", "example", "--output-dir", output})
 	require.NoError(t, root.Execute())
@@ -392,7 +479,7 @@ func TestConfigurationPlanAndApplyStopBeforePublishing(t *testing.T) {
 				calls++
 				assert.Equal(t, "/api/v1/factories/example/configuration:plan", r.URL.Path)
 				w.Header().Set("Content-Type", "application/json")
-				response := map[string]any{"coverage": "All stages and automations", "baseStateToken": "token"}
+				response := map[string]any{"coverage": "Repositories, stages, and automations", "baseStateToken": "token"}
 				if scenario != "unchanged" {
 					response["changes"] = []map[string]string{{"resource": "implementation/implement", "fieldPath": "with.additional_instructions", "previousValue": "old", "requestedValue": "new"}}
 				}
@@ -453,7 +540,7 @@ func TestConfigurationPlanReadsManifestFromCurrentDirectory(t *testing.T) {
 				require.Len(t, files, 1)
 				assert.Equal(t, configurationManifest, files[0].(map[string]any)["content"])
 				w.Header().Set("Content-Type", "application/json")
-				_, _ = fmt.Fprint(w, `{"coverage":"All stages and automations"}`)
+				_, _ = fmt.Fprint(w, `{"coverage":"Repositories, stages, and automations"}`)
 			})
 			root.SetArgs(args)
 			err := root.Execute()

@@ -92,7 +92,7 @@ func TestSelectFactoryVCSProviderRepositoryFromPublicAppRequiresLinkedAccount(t 
 	})
 	code, _, ok := grpcerrors.HandlerStatus(err)
 	assert.True(t, ok)
-	assert.Equal(t, codes.PermissionDenied, code)
+	assert.Equal(t, codes.FailedPrecondition, code)
 }
 
 func saveInstallationGitHubApp(t *testing.T) {
