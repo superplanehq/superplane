@@ -1590,7 +1590,7 @@ func selectCustomAutomationAgent(nodes []models.Node) *models.Node {
 	}
 	for i := range nodes {
 		node := &nodes[i]
-		if isFactoryAgentHarness(node.ComponentName()) && node.ID != customStageWebhookRunnerID {
+		if isFactoryAgentHarness(node.ComponentName()) && !customStageWebhookPart(*node) {
 			return node
 		}
 	}
