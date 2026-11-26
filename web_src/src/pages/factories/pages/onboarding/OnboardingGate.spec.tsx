@@ -13,10 +13,10 @@ const FACTORY_KEY = "PAY";
 const ROUTE_SEGMENT = "pay-k7m2xqab";
 const BARE_SETUP_PATH = `/org-1/workspaces/${FACTORY_KEY}/setup`;
 const BARE_OVERVIEW_PATH = `/org-1/workspaces/${FACTORY_KEY}/overview`;
-const BARE_BOARD_PATH = `/org-1/workspaces/${FACTORY_KEY}/lines/line-plan`;
+const BARE_BOARD_PATH = `/org-1/workspaces/${FACTORY_KEY}`;
 const SETUP_PATH = `/org-1/workspaces/${ROUTE_SEGMENT}/setup`;
 const OVERVIEW_PATH = `/org-1/workspaces/${ROUTE_SEGMENT}/overview`;
-const BOARD_PATH = `/org-1/workspaces/${ROUTE_SEGMENT}/lines/line-plan`;
+const BOARD_PATH = `/org-1/workspaces/${ROUTE_SEGMENT}`;
 const GITHUB_SETUP_PATH = `/org-1/workspaces/${FACTORY_KEY}/settings/organization/integrations/github/setup`;
 const GITHUB_DETAIL_PATH = `/org-1/workspaces/${FACTORY_KEY}/settings/organization/integrations/int-ghe`;
 
@@ -110,7 +110,7 @@ function CompletionHarness() {
         <Route path="/:organizationId/workspaces/:factoryKey" element={<Layout />}>
           <Route element={<OnboardingGate />}>
             <Route path="setup" element={<CurrentPath />} />
-            <Route path="lines/:lineId" element={<CurrentPath />} />
+            <Route index element={<CurrentPath />} />
           </Route>
         </Route>
       </Routes>
@@ -128,7 +128,7 @@ function renderRoute(path: string) {
             <Route path="overview" element={<CurrentPath />} />
             <Route path="setup" element={<CurrentPath />} />
             <Route path="lines" element={<CurrentPath />} />
-            <Route path="lines/:lineId" element={<CurrentPath />} />
+            <Route index element={<CurrentPath />} />
             <Route path="settings/organization/integrations/:integrationName/setup" element={<CurrentPath />} />
             <Route path="settings/organization/integrations/:integrationId" element={<CurrentPath />} />
           </Route>

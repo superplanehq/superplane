@@ -16,7 +16,6 @@ import {
   factoryHomePath,
   factoryRouteSegment,
   factorySettingsWorkspaceGeneralPath,
-  firstFactoryLineId,
 } from "../../lib/factoryPagePaths";
 import { clearLastVisitedFactory } from "../../lib/lastVisitedFactory";
 import { FactorySettingsCard, FactorySettingsPageFrame } from "../settings/FactorySettingsCard";
@@ -147,7 +146,7 @@ function WorkspaceRow({
 }) {
   const name = factory.name?.trim() || "Workspace";
   const factoryKey = factoryRouteSegment(factory);
-  const homeHref = factoryKey ? factoryHomePath(organizationId, factoryKey, firstFactoryLineId(factory)) : undefined;
+  const homeHref = factoryKey ? factoryHomePath(organizationId, factoryKey) : undefined;
   const settingsHref = factoryKey ? factorySettingsWorkspaceGeneralPath(organizationId, factoryKey) : undefined;
 
   return (

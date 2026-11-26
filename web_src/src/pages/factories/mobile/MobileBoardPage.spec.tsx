@@ -297,7 +297,7 @@ describe("MobileBoardPage", () => {
     await user.click(screen.getByRole("link", { name: /GitHub issues/i }));
 
     expect(screen.getByTestId("mobile-test-location")).toHaveTextContent(
-      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}?intake=1&intakeId=${GITHUB_ISSUES_INTAKE_ID}`,
+      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}?intake=1&intakeId=${GITHUB_ISSUES_INTAKE_ID}`,
     );
     expect(screen.getByTestId("intake-source-settings")).toHaveTextContent(GITHUB_ISSUES_INTAKE_ID);
     expect(screen.queryByRole("tablist", { name: "Board columns" })).not.toBeInTheDocument();
@@ -355,7 +355,7 @@ describe("MobileBoardPage", () => {
     await user.click(await screen.findByTestId(`mobile-board-line-${REFUND_LINE_HOTFIX_ID}`));
 
     expect(screen.getByTestId("mobile-test-location")).toHaveTextContent(
-      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_HOTFIX_ID}`,
+      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}`,
     );
     expect(screen.getByTestId("mobile-board-line-switcher")).toHaveTextContent("Hotfix");
   });

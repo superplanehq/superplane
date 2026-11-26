@@ -431,8 +431,7 @@ describe("WorkOrderCard scores", () => {
             entry={draft}
             organizationId={organizationId}
             factoryKey={factoryKey}
-            factoryLines={[{ id: "line-a", name: "hotfix" }]}
-            canDispatch
+                        canDispatch
             canAssign
             dispatchingOrderIds={new Set()}
             isAssigneesSaving={false}
@@ -481,8 +480,7 @@ describe("WorkOrderCard scores", () => {
             entry={draft}
             organizationId={organizationId}
             factoryKey={factoryKey}
-            factoryLines={[{ id: "line-a", name: "hotfix" }]}
-            canDispatch
+                        canDispatch
             canAssign
             dispatchingOrderIds={new Set()}
             isAssigneesSaving={false}

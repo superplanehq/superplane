@@ -3,7 +3,6 @@ import { refundLineCanvasFixture } from "../../../__fixtures__/factoryOwnedCanva
 import {
   ACME_ONBOARDING_FACTORY_ID,
   ACME_ONBOARDING_FACTORY_KEY,
-  ACME_ONBOARDING_LINE_ID,
 } from "../../../__fixtures__/factoryPageIds";
 import { GITHUB_ISSUES_INTAKE_APP } from "../../../__fixtures__/factoryPageResponses";
 import { lineMetricsFactoriesFixture } from "../../../__fixtures__/lineMetricsFactoriesFixture";
@@ -17,7 +16,7 @@ export function FirstRunBoardExit() {
   return (
     <div data-testid="first-run-board">
       <FactoriesHarness
-        pathSuffix={`workspaces/${ACME_ONBOARDING_FACTORY_KEY}/lines/${ACME_ONBOARDING_LINE_ID}`}
+        pathSuffix={`workspaces/${ACME_ONBOARDING_FACTORY_KEY}`}
         factoriesFixture={lineMetricsFactoriesFixture}
         appFixture={refundLineCanvasFixture(GITHUB_ISSUES_INTAKE_APP, ACME_ONBOARDING_FACTORY_ID)}
         enableOnboarding={false}

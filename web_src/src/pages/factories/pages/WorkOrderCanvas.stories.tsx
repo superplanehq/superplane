@@ -30,7 +30,7 @@ export const ConfigurePhase: Story = {
     return (
       <FactoriesHarness
         enableOnboarding={false}
-        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}/phases/${phase}/configure`}
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/line/phases/${phase}/configure`}
         factoriesFixture={defaultFactoriesFixture}
       />
     );

@@ -426,7 +426,7 @@ describe("columnAutomationOpenPath", () => {
         },
         nav,
       ),
-    ).toBe(factoryColumnAutomationViewPath("org-1", "RF", "line-plan", "app-refund-implementer"));
+    ).toBe(factoryColumnAutomationViewPath("org-1", "RF", "app-refund-implementer"));
   });
 
   const analysisAutomation = {
@@ -491,7 +491,7 @@ describe("columnAutomationOpenPath", () => {
         },
         nav,
       ),
-    ).toBe(factoryPRFeedbackPath("org-1", "RF", "line-plan", undefined, "handler-checks"));
+    ).toBe(factoryPRFeedbackPath("org-1", "RF", undefined, "handler-checks"));
   });
 });
 
@@ -504,7 +504,7 @@ it("keeps a renamed scheduled intake visible and opens its saved automation", ()
   expect(rows).toHaveLength(1);
   expect(rows[0]).toMatchObject({ name: "Review documentation", trigger: "On schedule" });
   expect(columnAutomationOpenPath(rows[0], { organizationId: "org", factoryKey: "workspace" })).toBe(
-    factoryColumnAutomationViewPath("org", "workspace", undefined, "scheduled-app"),
+    factoryColumnAutomationViewPath("org", "workspace", "scheduled-app"),
   );
 });
 
@@ -530,7 +530,7 @@ it("keeps a renamed Review request visible without discovery and avoids a duplic
     name: "Request engineering review",
   });
   expect(columnAutomationOpenPath(rows[0], { organizationId: "org", factoryKey: "workspace" })).toBe(
-    factoryColumnAutomationViewPath("org", "workspace", undefined, "review-request-app"),
+    factoryColumnAutomationViewPath("org", "workspace", "review-request-app"),
   );
   expect(catalogForColumn("verify").some((entry) => entry.id === "review-request")).toBe(false);
 });

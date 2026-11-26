@@ -45,7 +45,7 @@ export function createMobileBoardRenderer(openCreateWorkOrder: () => void, Locat
               initialEntries={[
                 more
                   ? `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/more?lineId=${REFUND_LINE_PLAN_ID}`
-                  : `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}${search}`,
+                  : `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}${search}`,
               ]}
             >
               <FactoriesLayoutContext.Provider
@@ -60,7 +60,7 @@ export function createMobileBoardRenderer(openCreateWorkOrder: () => void, Locat
                 }}
               >
                 <Routes>
-                  <Route path="/org-1/workspaces/:factoryKey/lines/:lineId" element={<MobileBoardPage />} />
+                  <Route path="/org-1/workspaces/:factoryKey" element={<MobileBoardPage />} />
                   <Route path="/org-1/workspaces/:factoryKey/more" element={<MobileMorePage />} />
                   <Route path="/org-1/workspaces/:factoryKey/task/:orderNumber" element={<div>Task page</div>} />
                 </Routes>

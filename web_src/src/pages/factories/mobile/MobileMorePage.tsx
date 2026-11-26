@@ -222,7 +222,7 @@ function MoreLink({ href, icon, children }: { href: string; icon: ReactNode; chi
 function MobileBoardOptions() {
   const { organizationId, factoryId, routeSegment, factory } = useFactoriesLayout();
   const { search } = useLocation();
-  const { line, lineId } = useMobileBoardOptionLine(factory?.lines, workOrderBoardLineIdFromSearch(search));
+  const { line } = useMobileBoardOptionLine(factory?.lines, workOrderBoardLineIdFromSearch(search));
   const intakes = useFactoryIntakes(organizationId, factoryId);
   const handlers = useFactoryPRFeedbackHandlers(organizationId, factoryId);
   const automations = useFactoryAutomations(organizationId, factoryId);
@@ -274,7 +274,6 @@ function MobileBoardOptions() {
         columns={columns}
         organizationId={organizationId}
         factoryKey={routeSegment}
-        lineId={lineId}
       />
     </section>
   );
@@ -313,12 +312,10 @@ function MobileBoardOptionColumnSections({
   columns,
   organizationId,
   factoryKey,
-  lineId,
 }: {
   columns: Array<{ key: ColumnKey; title: string; automations: ColumnAutomation[] }>;
   organizationId: string;
   factoryKey: string;
-  lineId: string | undefined;
 }) {
   return (
     <>
@@ -336,7 +333,6 @@ function MobileBoardOptionColumnSections({
                   href={columnAutomationOpenPath(automation, {
                     organizationId,
                     factoryKey,
-                    lineId,
                   })}
                 />
               ))

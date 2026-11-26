@@ -39,15 +39,17 @@ export function firstFactoryLineName(
   return factory?.lines?.find((line) => Boolean(line.name?.trim()))?.name?.trim();
 }
 
-/**
- * Workspace home: the first line board when a line id is present.
- * Without a line id, the workspace index — which redirects to that board.
- */
-export function factoryHomePath(organizationId: string, factoryKey: string, lineId?: string | null) {
-  if (lineId) {
-    return factoryLineDetailPath(organizationId, factoryKey, lineId);
-  }
+/** Workspace home. The line board is the workspace index, so it has no line id in the path. */
+export function factoryHomePath(organizationId: string, factoryKey: string) {
   return factoryDetailPath(organizationId, factoryKey);
+}
+
+/**
+ * Public board entry for guests and members without work-order access. The
+ * public board API keys the board on a line id, so this URL keeps the id.
+ */
+export function factoryPublicBoardPath(organizationId: string, factoryKey: string, lineId: string) {
+  return `${factoryDetailPath(organizationId, factoryKey)}/lines/${lineId}`;
 }
 
 const WORKSPACE_PAGES_TO_KEEP = ["/more", "/settings", "/velocity", "/agent", "/overview", "/missions", "/wiki"];
@@ -74,7 +76,7 @@ export function pathAfterWorkspaceSwitch({
   pathname: string;
   organizationId: string;
   currentFactoryKey: string;
-  nextFactory: { key?: string; urlId?: string; lines?: Array<{ id?: string }> | null };
+  nextFactory: { key?: string; urlId?: string };
 }): string {
   const nextSegment = factoryRouteSegment(nextFactory);
   if (!nextSegment) {
@@ -88,7 +90,7 @@ export function pathAfterWorkspaceSwitch({
     return replaceFactoryKeySegment(pathname, organizationId, currentKeySegment, nextSegment);
   }
 
-  return factoryHomePath(organizationId, nextSegment, firstFactoryLineId(nextFactory));
+  return factoryHomePath(organizationId, nextSegment);
 }
 
 /** Opens the line board with the Intake drawer beside the columns. */
@@ -104,11 +106,10 @@ export const INTAKE_SETTINGS_SEARCH_PARAM = "settings";
 export function factoryIntakePath(
   organizationId: string,
   factoryKey: string,
-  lineId?: string | null,
   intakeId?: string,
   settingsTab?: string,
 ) {
-  const path = `${factoryHomePath(organizationId, factoryKey, lineId)}?${INTAKE_SEARCH_PARAM}=1`;
+  const path = `${factoryHomePath(organizationId, factoryKey)}?${INTAKE_SEARCH_PARAM}=1`;
   const intakeQuery = intakeId ? `&${INTAKE_ID_SEARCH_PARAM}=${encodeURIComponent(intakeId)}` : "";
   const settingsQuery = settingsTab ? `&${INTAKE_SETTINGS_SEARCH_PARAM}=${encodeURIComponent(settingsTab)}` : "";
   return `${path}${intakeQuery}${settingsQuery}`;
@@ -138,10 +139,9 @@ export const JIRA_INTAKE_INTEGRATION_SEARCH_PARAM = "jiraIntegrationId";
 export function factoryJiraIntakeSetupPath(
   organizationId: string,
   factoryKey: string,
-  lineId: string,
   options?: { integrationId?: string },
 ) {
-  const path = `${factoryLineDetailPath(organizationId, factoryKey, lineId)}/setup/jira`;
+  const path = `${factoryLinePath(organizationId, factoryKey)}/setup/jira`;
   const integrationId = options?.integrationId?.trim();
   if (!integrationId) {
     return path;
@@ -169,7 +169,6 @@ export const PR_FEEDBACK_HANDLER_SEARCH_PARAM = "prFeedbackHandler";
 export function factoryPRFeedbackPath(
   organizationId: string,
   factoryKey: string,
-  lineId?: string | null,
   settingsTab?: string,
   handlerId?: string,
 ) {
@@ -181,7 +180,7 @@ export function factoryPRFeedbackPath(
   if (settingsTab) {
     params.set(PR_FEEDBACK_SETTINGS_SEARCH_PARAM, settingsTab);
   }
-  return `${factoryHomePath(organizationId, factoryKey, lineId)}?${params.toString()}`;
+  return `${factoryHomePath(organizationId, factoryKey)}?${params.toString()}`;
 }
 
 export function isPRFeedbackSearchOpen(search: string): boolean {
@@ -203,18 +202,13 @@ export const PLANNING_SEARCH_PARAM = "planning";
 /** Opens Planning settings on a tab: general, agent, or automation. */
 export const PLANNING_SETTINGS_SEARCH_PARAM = "planningSettings";
 
-export function factoryPlanningPath(
-  organizationId: string,
-  factoryKey: string,
-  lineId?: string | null,
-  settingsTab?: string,
-) {
+export function factoryPlanningPath(organizationId: string, factoryKey: string, settingsTab?: string) {
   const params = new URLSearchParams();
   params.set(PLANNING_SEARCH_PARAM, "1");
   if (settingsTab) {
     params.set(PLANNING_SETTINGS_SEARCH_PARAM, settingsTab);
   }
-  return `${factoryHomePath(organizationId, factoryKey, lineId)}?${params.toString()}`;
+  return `${factoryHomePath(organizationId, factoryKey)}?${params.toString()}`;
 }
 
 export function isPlanningSearchOpen(search: string): boolean {
@@ -230,15 +224,10 @@ export function planningSettingsTabFromSearch(search: string): string | null {
 /** Opens the per-column Automations drawer. Value is a column key. */
 export const COLUMN_AUTOMATIONS_SEARCH_PARAM = "automations";
 
-export function factoryColumnAutomationsPath(
-  organizationId: string,
-  factoryKey: string,
-  lineId: string | null | undefined,
-  columnKey: string,
-) {
+export function factoryColumnAutomationsPath(organizationId: string, factoryKey: string, columnKey: string) {
   const params = new URLSearchParams();
   params.set(COLUMN_AUTOMATIONS_SEARCH_PARAM, columnKey);
-  return `${factoryHomePath(organizationId, factoryKey, lineId)}?${params.toString()}`;
+  return `${factoryHomePath(organizationId, factoryKey)}?${params.toString()}`;
 }
 
 export function columnAutomationsKeyFromSearch(search: string): string | null {
@@ -249,15 +238,10 @@ export function columnAutomationsKeyFromSearch(search: string): string | null {
 /** Opens the column-automation view popup on the line board. Value is the canvas id. */
 export const COLUMN_AUTOMATION_VIEW_SEARCH_PARAM = "automationView";
 
-export function factoryColumnAutomationViewPath(
-  organizationId: string,
-  factoryKey: string,
-  lineId: string | null | undefined,
-  canvasId: string,
-) {
+export function factoryColumnAutomationViewPath(organizationId: string, factoryKey: string, canvasId: string) {
   const params = new URLSearchParams();
   params.set(COLUMN_AUTOMATION_VIEW_SEARCH_PARAM, canvasId);
-  return `${factoryHomePath(organizationId, factoryKey, lineId)}?${params.toString()}`;
+  return `${factoryHomePath(organizationId, factoryKey)}?${params.toString()}`;
 }
 
 export function columnAutomationViewCanvasIdFromSearch(search: string): string | null {
@@ -313,10 +297,9 @@ export function workOrderOpenPath(
   organizationId: string,
   factoryKey: string,
   orderNumber: string | number | null | undefined,
-  fallbackLineId?: string | null,
 ) {
   if (orderNumber === undefined || orderNumber === null || String(orderNumber).trim() === "") {
-    return factoryHomePath(organizationId, factoryKey, fallbackLineId);
+    return factoryHomePath(organizationId, factoryKey);
   }
   return workOrderDetailPath(organizationId, factoryKey, orderNumber);
 }
@@ -330,32 +313,27 @@ export function legacyWorkOrderDetailPath(organizationId: string, factoryKey: st
   return `${factoryDetailPath(organizationId, factoryKey)}/work-orders/${orderId}`;
 }
 
-export function linesPath(organizationId: string, factoryKey: string) {
-  return `${factoryDetailPath(organizationId, factoryKey)}/lines`;
+/**
+ * Line pages for the workspace's one line. The line board is the workspace
+ * index, so these pages need no line id in the path.
+ */
+export function factoryLinePath(organizationId: string, factoryKey: string) {
+  return `${factoryDetailPath(organizationId, factoryKey)}/line`;
 }
 
 export function createFactoryLinePath(organizationId: string, factoryKey: string) {
-  return `${linesPath(organizationId, factoryKey)}/new`;
+  return `${factoryLinePath(organizationId, factoryKey)}/new`;
 }
 
-export function factoryLineDetailPath(organizationId: string, factoryKey: string, lineId: string) {
-  return `${linesPath(organizationId, factoryKey)}/${lineId}`;
-}
-
-export function editFactoryLinePath(organizationId: string, factoryKey: string, lineId: string) {
-  return `${linesPath(organizationId, factoryKey)}/${lineId}/edit`;
+export function editFactoryLinePath(organizationId: string, factoryKey: string) {
+  return `${factoryLinePath(organizationId, factoryKey)}/edit`;
 }
 
 export type PRFeedbackSetupKind = "comments" | "checks";
 
 /** Dedicated setup page for the next-steps banner CTA (comments or checks wizard). */
-export function factoryPRFeedbackSetupPath(
-  organizationId: string,
-  factoryKey: string,
-  lineId: string,
-  kind: PRFeedbackSetupKind,
-) {
-  return `${factoryLineDetailPath(organizationId, factoryKey, lineId)}/setup/${kind}`;
+export function factoryPRFeedbackSetupPath(organizationId: string, factoryKey: string, kind: PRFeedbackSetupKind) {
+  return `${factoryLinePath(organizationId, factoryKey)}/setup/${kind}`;
 }
 
 export function prFeedbackSetupKindFromSourceId(sourceId: "discussion" | "checks"): PRFeedbackSetupKind {
@@ -363,23 +341,23 @@ export function prFeedbackSetupKindFromSourceId(sourceId: "discussion" | "checks
 }
 
 /** Dedicated setup page for the Verify risk score automation. */
-export function factoryRiskScoreSetupPath(organizationId: string, factoryKey: string, lineId: string) {
-  return `${factoryLineDetailPath(organizationId, factoryKey, lineId)}/setup/risk-score`;
+export function factoryRiskScoreSetupPath(organizationId: string, factoryKey: string) {
+  return `${factoryLinePath(organizationId, factoryKey)}/setup/risk-score`;
 }
 
 /** Dedicated setup page for GitHub issue intake. */
-export function factoryGitHubIntakeSetupPath(organizationId: string, factoryKey: string, lineId: string) {
-  return `${factoryLineDetailPath(organizationId, factoryKey, lineId)}/setup/github`;
+export function factoryGitHubIntakeSetupPath(organizationId: string, factoryKey: string) {
+  return `${factoryLinePath(organizationId, factoryKey)}/setup/github`;
 }
 
 /** Dedicated setup page for Sentry exception intake. */
-export function factorySentryIntakeSetupPath(organizationId: string, factoryKey: string, lineId: string) {
-  return `${factoryLineDetailPath(organizationId, factoryKey, lineId)}/setup/sentry`;
+export function factorySentryIntakeSetupPath(organizationId: string, factoryKey: string) {
+  return `${factoryLinePath(organizationId, factoryKey)}/setup/sentry`;
 }
 
 /** Dedicated setup page for Datadog Error Tracking intake. */
-export function factoryDatadogIntakeSetupPath(organizationId: string, factoryKey: string, lineId: string) {
-  return `${factoryLineDetailPath(organizationId, factoryKey, lineId)}/setup/datadog`;
+export function factoryDatadogIntakeSetupPath(organizationId: string, factoryKey: string) {
+  return `${factoryLinePath(organizationId, factoryKey)}/setup/datadog`;
 }
 
 /** Connection created in this Linear OAuth round trip. The Linear callback appends it. */
@@ -389,10 +367,9 @@ export const LINEAR_INTAKE_INTEGRATION_SEARCH_PARAM = "linearIntegrationId";
 export function factoryLinearIntakeSetupPath(
   organizationId: string,
   factoryKey: string,
-  lineId: string,
   options?: { integrationId?: string },
 ) {
-  const path = `${factoryLineDetailPath(organizationId, factoryKey, lineId)}/setup/linear`;
+  const path = `${factoryLinePath(organizationId, factoryKey)}/setup/linear`;
   const integrationId = options?.integrationId?.trim();
   if (!integrationId) {
     return path;
@@ -408,8 +385,8 @@ export function linearIntakeIntegrationIdFromSearch(search: string): string {
 }
 
 /** Dedicated setup page for Dependabot alert intake. */
-export function factoryDependabotIntakeSetupPath(organizationId: string, factoryKey: string, lineId: string) {
-  return `${factoryLineDetailPath(organizationId, factoryKey, lineId)}/setup/dependabot`;
+export function factoryDependabotIntakeSetupPath(organizationId: string, factoryKey: string) {
+  return `${factoryLinePath(organizationId, factoryKey)}/setup/dependabot`;
 }
 
 export function automationsPath(organizationId: string, factoryKey: string) {
@@ -648,7 +625,6 @@ export function factoryAgentSkillEditorPath(organizationId: string, factoryKey: 
   return `${factoryAgentPath(organizationId, factoryKey)}/skills/${resourceId}`;
 }
 
-export function factoryMorePath(organizationId: string, factoryKey: string, lineId?: string) {
-  const path = `${factoryDetailPath(organizationId, factoryKey)}/more`;
-  return lineId ? `${path}?lineId=${encodeURIComponent(lineId)}` : path;
+export function factoryMorePath(organizationId: string, factoryKey: string) {
+  return `${factoryDetailPath(organizationId, factoryKey)}/more`;
 }

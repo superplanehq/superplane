@@ -318,9 +318,8 @@ describe("custom automation settings", () => {
       columnAutomationOpenPath(automation, {
         organizationId: "org",
         factoryKey: "workspace",
-        lineId: "line",
       }),
-    ).toBe("/org/workspaces/workspace/lines/line?customAutomation=review-1");
+    ).toBe("/org/workspaces/workspace?customAutomation=review-1");
   });
 
   it("reads the setup query and accepts the previous name", () => {

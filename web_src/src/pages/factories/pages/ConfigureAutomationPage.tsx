@@ -32,9 +32,7 @@ export function ConfigureAutomationPage() {
     organizationId && factoryId
       ? isStandalone
         ? `/${organizationId}/workspaces/${factoryId}/automations`
-        : lineId
-          ? `/${organizationId}/workspaces/${factoryId}/lines/${lineId}`
-          : `/${organizationId}/workspaces/${factoryId}`
+        : `/${organizationId}/workspaces/${factoryId}`
       : isStandalone
         ? "/automations"
         : "/";

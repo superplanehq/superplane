@@ -103,10 +103,10 @@ describe("Implement run details hydration", () => {
     try {
       render(
         <QueryClientProvider client={client}>
-          <MemoryRouter initialEntries={["/org/workspaces/sp-abcd/lines/line-one"]}>
+          <MemoryRouter initialEntries={["/org/workspaces/sp-abcd"]}>
             <Routes>
               <Route
-                path="/:organizationId/workspaces/:factoryKey/lines/:lineId"
+                path="/:organizationId/workspaces/:factoryKey"
                 element={
                   <FactoryAutomationRunHistory
                     canvasId="canvas"

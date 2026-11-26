@@ -11,7 +11,7 @@ import {
   REFUND_LINE_HOTFIX_ID,
 } from "../__fixtures__/factoryPageResponses";
 import { FactoriesLayoutContext, type ResolvedFactoriesLayout } from "../layout/factoriesLayoutContext";
-import { factoryHomePath, factoryLineDetailPath, firstFactoryLineId } from "../lib/factoryPagePaths";
+import { factoryHomePath } from "../lib/factoryPagePaths";
 import { DependabotIntakeSetupPage } from "./DependabotIntakeSetupPage";
 
 let canUpdate = true;
@@ -74,8 +74,7 @@ function renderSetup(
 }
 
 describe("DependabotIntakeSetupPage", () => {
-  const boardHref = factoryHomePath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT, firstFactoryLineId(REFUND_FACTORY));
-  const lineHref = factoryLineDetailPath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT, REFUND_LINE_HOTFIX_ID);
+  const boardHref = factoryHomePath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT);
 
   beforeEach(() => {
     canUpdate = true;
@@ -131,7 +130,7 @@ describe("DependabotIntakeSetupPage", () => {
 
     await user.click(screen.getByTestId("first-run-back"));
 
-    expect(screen.getByTestId("dependabot-setup-location").textContent).toBe(lineHref);
+    expect(screen.getByTestId("dependabot-setup-location").textContent).toBe(boardHref);
   });
 
   it("returns to the workspace home when unloaded setup is closed", async () => {
@@ -152,6 +151,6 @@ describe("DependabotIntakeSetupPage", () => {
     await user.click(screen.getByTestId("dependabot-setup-finish"));
     await user.click(await screen.findByRole("button", { name: "Turn on Dependabot intake" }));
 
-    expect(screen.getByTestId("dependabot-setup-location").textContent).toBe(lineHref);
+    expect(screen.getByTestId("dependabot-setup-location").textContent).toBe(boardHref);
   });
 });

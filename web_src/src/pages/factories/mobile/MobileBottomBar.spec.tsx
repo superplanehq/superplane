@@ -74,7 +74,7 @@ describe("MobileBottomBar", () => {
 
   it("keeps the current line when Board is opened again", async () => {
     const user = userEvent.setup();
-    const hotfixBoard = `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_HOTFIX_ID}`;
+    const hotfixBoard = `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}`;
     renderBar(hotfixBoard);
 
     expect(screen.getByTestId("mobile-tab-board")).toHaveAttribute("href", hotfixBoard);
@@ -92,7 +92,7 @@ describe("MobileBottomBar", () => {
 
     expect(screen.getByTestId("mobile-tab-board")).toHaveAttribute(
       "href",
-      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_HOTFIX_ID}`,
+      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}`,
     );
   });
 
@@ -101,7 +101,7 @@ describe("MobileBottomBar", () => {
 
     expect(screen.getByTestId("mobile-tab-board")).toHaveAttribute(
       "href",
-      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}`,
+      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}`,
     );
   });
 
