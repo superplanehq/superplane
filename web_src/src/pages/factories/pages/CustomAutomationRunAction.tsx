@@ -41,7 +41,7 @@ export function CustomAutomationRunAction({
         type: "error",
         message: getApiErrorMessage(
           error,
-          "SuperPlane could not start the automation. Confirm that the task has an open pull request, then try again.",
+          "SuperPlane could not start the automation. Confirm that the task is in the required column, then try again.",
         ),
       });
     }

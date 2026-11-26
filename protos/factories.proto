@@ -2615,6 +2615,9 @@ message WorkOrderExecutionStep {
   string name = 1;
   int32 step_index = 2;
   string stage_key = 3;
+  string app_id = 4;
+  // Captured manual eligibility. Historical steps remain automatic.
+  bool manual_start = 5;
 }
 
 message DescribeWorkOrderRequest {
