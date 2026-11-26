@@ -2,7 +2,11 @@ import { Navigate, Route } from "react-router";
 
 import { RequireAnyPermission, RequirePermission } from "@/components/PermissionGate";
 import { RequireExperimentalFeature } from "@/components/RequireExperimentalFeature";
-import { FEATURE_MODEL_STATUS, FEATURE_SUPERPLANE_MCP_SERVER } from "@/lib/experimentalFeatures";
+import {
+  FEATURE_MODEL_STATUS,
+  FEATURE_SUPERPLANE_MCP_SERVER,
+  WORKSPACE_WEBHOOK_FEATURES,
+} from "@/lib/experimentalFeatures";
 import {
   FactorySettingsAccountNotificationsPage,
   FactorySettingsAccountProfilePage,
@@ -160,7 +164,9 @@ export const factorySettingsSectionRoutes = [
     path="workspace/webhooks"
     element={
       <RequirePermission resource="factories" action="read">
-        <FactorySettingsWebhooksPage />
+        <RequireExperimentalFeature anyOf={WORKSPACE_WEBHOOK_FEATURES}>
+          <FactorySettingsWebhooksPage />
+        </RequireExperimentalFeature>
       </RequirePermission>
     }
   />,
