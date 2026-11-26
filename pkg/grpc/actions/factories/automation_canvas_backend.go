@@ -173,8 +173,9 @@ func (b CanvasAutomationBackend) compile(
 			return nil, nil, source.Diagnostic("triggers", grpcerrors.StatusMessage(err))
 		}
 	}
-	if live != nil && !settings.hasWebhookTrigger() && legacyCustomStageGraph(&models.Canvas{ColumnKey: &placement.Stage}, live) {
-		nodes, edges := editLegacyCustomStageGraph(live, settings)
+	legacy := live != nil && legacyCustomStageGraph(&models.Canvas{ColumnKey: &placement.Stage}, live)
+	if legacy && !settings.hasWebhookTrigger() {
+		nodes, edges := editLegacyCustomStageGraph(customStageCore(live), settings)
 		return nodes, edges, nil
 	}
 	graph, err := buildCustomAutomationCanvas(tx, factory, strings.TrimSpace(source.Name), settings)
@@ -213,6 +214,9 @@ func (b CanvasAutomationBackend) compile(
 				return nil, nil, source.Diagnostic("agent", "SuperPlane cannot apply this agent configuration. Check the agent and its steps.")
 			}
 		}
+	}
+	if legacy {
+		nodes, edges = editCustomStageGraph(live, settings, nodes, edges)
 	}
 	return nodes, edges, nil
 }

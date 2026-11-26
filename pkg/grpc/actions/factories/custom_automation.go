@@ -271,8 +271,8 @@ func UpdateFactoryCustomAutomation(
 		if err != nil {
 			return err
 		}
-		if !settings.hasWebhookTrigger() && legacyCustomStageGraph(canvas, live) {
-			nodes, edges = editLegacyCustomStageGraph(live, settings)
+		if legacyCustomStageGraph(canvas, live) {
+			nodes, edges = editCustomStageGraph(live, settings, nodes, edges)
 		}
 
 		if err := canvases.PublishGeneratedCanvasNodes(
