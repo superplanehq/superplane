@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeAll, describe, expect, it } from "bun:test";
 
 import { client } from "@/api-client/client.gen";
@@ -235,6 +235,66 @@ describe("WorkOrdersPage broken integrations banner", () => {
 
     expect(await screen.findByTestId("broken-integrations-banner", {}, { timeout: 8000 })).toBeInTheDocument();
   }, 10000);
+});
+
+describe("Workspace webhook warning", () => {
+  it.each(["lines", "work-orders", "work-orders/wo-open-refunds"])(
+    "shows one webhook warning on %s without an issues intake",
+    async (page) => {
+      render(
+        <FactoriesHarness
+          mode="app"
+          pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/${page}`}
+          factoriesFixture={{ ...defaultFactoriesFixture, intakesByFactoryId: {} }}
+          orgIntegrations={[
+            {
+              metadata: { id: "gh-1", name: "github-main", integrationName: "github" },
+              status: {
+                state: "ready",
+                webhookFailures: [
+                  {
+                    id: "issues-hook",
+                    state: "failed",
+                    repositories: ["acme/api"],
+                    events: ["issues"],
+                    limitEvent: "issues",
+                    message: "GitHub allows 20 webhooks for the issues event in each repository.",
+                  },
+                  {
+                    id: "hook-1",
+                    state: "failed",
+                    repositories: ["acme/api"],
+                    events: ["pull_request", "pull_request_review", "issue_comment"],
+                    message: "Webhook setup failed.",
+                  },
+                ],
+              },
+            },
+          ]}
+        />,
+      );
+      if (page === "lines") {
+        const banner = await screen.findByTestId("webhook-failures-notice", {}, { timeout: 8000 });
+        expect(screen.queryByTestId("broken-integrations-banner")).not.toBeInTheDocument();
+        expect(within(banner).getByRole("button", { name: "Try again" })).toBeEnabled();
+        expect(within(banner).getByRole("heading", { level: 3, name: "acme/api" })).toBeVisible();
+        expect(within(banner).getByRole("link", { name: "Open acme/api webhooks" })).toHaveAttribute(
+          "href",
+          "https://github.com/acme/api/settings/hooks",
+        );
+        fireEvent.click(within(banner).getByRole("button", { name: "Try again" }));
+        await waitFor(() => expect(screen.queryByTestId("webhook-failures-notice")).not.toBeInTheDocument());
+        return;
+      }
+      const banner = await screen.findByTestId("broken-integrations-banner", {}, { timeout: 8000 });
+      expect(screen.getAllByTestId("broken-integrations-banner")).toHaveLength(1);
+      expect(within(banner).getByRole("link", { name: "Fix webhooks" })).toHaveAttribute(
+        "href",
+        `${factorySettingsSectionPath(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_ROUTE_SEGMENT, "organization", "integrations")}/gh-1`,
+      );
+    },
+    10000,
+  );
 });
 
 describe("WorkOrdersPage attached pull request", () => {

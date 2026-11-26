@@ -11,7 +11,7 @@ import { findBrokenIntegrations } from "./brokenIntegrations";
  * these integrations fail silently otherwise, so this gives operators a
  * workspace-level signal and a link to the repair step.
  */
-export function useBrokenIntegrationsBanner(organizationId: string, factoryKey: string) {
+export function useBrokenIntegrationsBanner(organizationId: string, factoryKey: string, webhookFailuresInPage = false) {
   const { canAct } = usePermissions();
   const canReadIntegrations = canAct("integrations", "read");
   const { data: integrations = [] } = useConnectedIntegrations(organizationId, { enabled: canReadIntegrations });
@@ -20,7 +20,11 @@ export function useBrokenIntegrationsBanner(organizationId: string, factoryKey: 
     return undefined;
   }
 
-  const broken = findBrokenIntegrations(integrations);
+  // The board lists every webhook failure beside its retry action.
+  const broken = findBrokenIntegrations(integrations).filter(
+    (integration) =>
+      !webhookFailuresInPage || integration.reason !== "webhook" || integration.integrationName !== "github",
+  );
   if (broken.length === 0) {
     return undefined;
   }

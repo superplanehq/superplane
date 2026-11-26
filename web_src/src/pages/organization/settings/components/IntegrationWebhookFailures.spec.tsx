@@ -1,3 +1,5 @@
+import { MemoryRouter } from "react-router";
+import { useBrokenIntegrationsBanner } from "@/pages/factories/lib/useBrokenIntegrationsBanner";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "bun:test";
@@ -79,6 +81,7 @@ beforeEach(() => {
         integration.status!.webhookSetups![0].state = "pending";
         return Response.json({});
       }
+      if (request.url.endsWith("/integrations")) return Response.json({ integrations: [integration] });
       return Response.json({ integration });
     },
   });
@@ -91,16 +94,24 @@ afterEach(() => {
 });
 
 function Details() {
+  const banner = useBrokenIntegrationsBanner("org-1", "workspace-1");
   const { data } = useIntegration("org-1", "integration-1");
   useFactoryIntakes("org-1", "factory-1");
-  return data ? <IntegrationWebhookFailures organizationId="org-1" integration={data} /> : null;
+  return (
+    <>
+      {banner}
+      {data ? <IntegrationWebhookFailures organizationId="org-1" integration={data} /> : null}
+    </>
+  );
 }
 
 function renderDetails() {
   render(
     <QueryClientProvider client={queryClient}>
       <WebhookSetupListener organizationId="org-1" />
-      <Details />
+      <MemoryRouter>
+        <Details />
+      </MemoryRouter>
     </QueryClientProvider>,
   );
 }
@@ -120,6 +131,7 @@ it("identifies hooks for the limited event and follows a retry through setup com
 
   fireEvent.click(screen.getByRole("button", { name: "Try again" }));
   await waitFor(() => expect(screen.getByRole("button", { name: "Trying again" })).toBeDisabled());
+  expect(screen.getByTestId("broken-integrations-banner")).toBeVisible();
   expect(
     requests.filter((request) => request.method === "POST").map((request) => new URL(request.url).pathname),
   ).toEqual(["/api/v1/organizations/org-1/integrations/integration-1/webhooks/hook-1/retry"]);
@@ -135,6 +147,7 @@ it("identifies hooks for the limited event and follows a retry through setup com
     socket?.onmessage?.(new MessageEvent("message", { data: JSON.stringify({ event: "webhook_setup_changed" }) }));
   });
   await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
+  await waitFor(() => expect(screen.queryByTestId("broken-integrations-banner")).not.toBeInTheDocument());
   await waitFor(() =>
     expect(queryClient.getQueryData(intakeKey)).toEqual([{ id: "intake-1", webhookSetupState: "ready" }]),
   );
@@ -148,11 +161,14 @@ it("keeps the repair available if the retry request fails", async () => {
   fireEvent.click(await screen.findByRole("button", { name: "Try again" }));
   await screen.findByText("SuperPlane could not retry webhook setup. Try again.");
   expect(screen.getByRole("button", { name: "Try again" })).toBeEnabled();
+  expect(screen.getByTestId("broken-integrations-banner")).toBeVisible();
 });
 
 it("does not let a reader retry webhook setup", async () => {
   canUpdate = false;
   renderDetails();
   expect(await screen.findByRole("button", { name: "Try again" })).toBeDisabled();
+  expect(screen.getByTestId("broken-integrations-banner")).toBeVisible();
+  expect(screen.queryByRole("link", { name: "Fix webhooks" })).not.toBeInTheDocument();
   expect(requests.some((request) => request.method === "POST")).toBe(false);
 });
