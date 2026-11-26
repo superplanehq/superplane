@@ -35,9 +35,10 @@ func TestResetBuiltInAutomationPreservesImplementationSettings(t *testing.T) {
 		max          int
 		instructions string
 		canvas       *models.Canvas
+		draft        bool
 	}{
-		{provider: models.ProviderGitHub, max: 7, instructions: "Avoid new dependencies. Include API examples in pull requests."},
-		{provider: models.ProviderBitbucket, max: 9, instructions: "Document {{ example }} in the pull request."},
+		{provider: models.ProviderGitHub, max: 7, instructions: "Avoid new dependencies. Include API examples in pull requests.", draft: true},
+		{provider: models.ProviderBitbucket, max: 9, instructions: "Document {{ example }} in the pull request.", draft: true},
 		{provider: models.ProviderGitHub, max: 3, instructions: ""},
 	}
 	for i := range cases {
@@ -55,7 +56,7 @@ func TestResetBuiltInAutomationPreservesImplementationSettings(t *testing.T) {
 			agent.Configuration["disabledAgentResourceTools"] = map[string]any{"github-resource": []any{"delete_issue"}}
 			agent.Configuration["enabledAgentResourceTools"] = map[string]any{"github-resource": []any{"get_issue"}}
 			implementationStep(t, agent, "Implementation")["prompt"] = "Retired implementation prompt"
-			setResetTestDraftPullRequests(t, doc, true)
+			setResetTestDraftPullRequests(t, doc, tc.draft)
 		})
 	}
 	require.NoError(t, resetTestOrganization(t, r))
@@ -75,7 +76,7 @@ func TestResetBuiltInAutomationPreservesImplementationSettings(t *testing.T) {
 			require.NotNil(t, agent.Concurrency)
 			assert.Equal(t, tc.max, agent.Concurrency.EffectiveMax())
 			assert.Equal(t, "team", agent.Concurrency.Key)
-			assert.True(t, resetTestDraftPullRequests(t, version.Nodes))
+			assert.Equal(t, tc.draft, resetTestDraftPullRequests(t, version.Nodes))
 			assert.NotContains(t, liveCanvasJSON(t, tc.canvas), "retired implementation prompt")
 		})
 	}
@@ -170,7 +171,7 @@ func TestResetReviewRequestPreservesFallbackAndAgentSettings(t *testing.T) {
 		t.Run("fallback="+fallback, func(t *testing.T) {
 			instructions := ""
 			if fallback != "" {
-				instructions = "Prefer the security owner. Keep {{ example }} literal."
+				instructions = "Publish a detailed explanation of each reviewer. Keep {{ example }} literal."
 			}
 			r, factory := resetTestFactory(t)
 			integration, err := models.CreateIntegration(uuid.New(), r.Organization.ID, "github", "workspace-github", nil)
@@ -197,7 +198,7 @@ func TestResetReviewRequestPreservesFallbackAndAgentSettings(t *testing.T) {
 				agent.Configuration["reviewFindingsComment"] = fallback != ""
 				agent.Configuration["reviewFindingsBodyActivationGeneration"] = 4
 				agent.Configuration["reviewFindingsCommentActivationGeneration"] = 3
-				agent.Configuration["additionalInstructions"] = "Prefer the security owner. Keep {{ example }} literal."
+				agent.Configuration["additionalInstructions"] = "Publish a detailed explanation of each reviewer. Keep {{ example }} literal."
 				agent.Configuration["model"] = models.FormatHostedLLMModelKey(models.UsageProviderOpenRouter, "anthropic/claude-sonnet-4-6")
 				agent.Configuration["thinkingLevel"] = "low"
 				agent.Configuration["executionTimeoutSeconds"] = 0
@@ -230,6 +231,11 @@ func TestResetReviewRequestPreservesFallbackAndAgentSettings(t *testing.T) {
 			prompt := steps[1].(map[string]any)["prompt"].(string)
 			// The managed policy must replace an installed prompt during reset.
 			require.Contains(t, prompt, "Select a contributor to this pull request only when no eligible non-contributor is available.")
+			require.Contains(t, prompt, "publicationSummary")
+			require.Contains(t, prompt, "publicationReason")
+			if instructions != "" {
+				require.NotContains(t, prompt, instructions, "saved user instructions stay separate from the managed prompt")
+			}
 			require.Equal(t, fallback, agent.Configuration["fallbackReviewer"])
 			require.Equal(t, fallback != "", agent.Configuration["publishPRCheck"])
 			require.EqualValues(t, 7, agent.Configuration["prCheckActivationGeneration"])
@@ -246,6 +252,8 @@ func TestResetReviewRequestPreservesFallbackAndAgentSettings(t *testing.T) {
 			require.NotNil(t, mandatory.IntegrationID)
 			require.Equal(t, integration.ID.String(), *mandatory.IntegrationID)
 			body, comment := findIntakeNode(version.Nodes, reviewFindingsBodyNodeID), findIntakeNode(version.Nodes, reviewFindingsCommentNode)
+			require.Contains(t, body.Configuration["body"], "publicationSummary")
+			require.Equal(t, body.Configuration["body"], comment.Configuration["body"])
 			require.Equal(t, false, body.Configuration["enabled"])
 			require.EqualValues(t, 4, body.Configuration["activationGeneration"])
 			require.Equal(t, fallback != "", comment.Configuration["enabled"])
@@ -284,6 +292,7 @@ func TestInstallationResetReviewRequestSetupCommands(t *testing.T) {
 				findYAMLNode(t, doc, reviewRequestTriggerNodeID).Configuration["app"] = source.ID.String()
 				config := findYAMLNode(t, doc, reviewRequestAgentNodeID).Configuration
 				delete(config, "skipSetupCommands")
+				config["skipRepositoryCheckout"] = true
 				if tc.saved != nil {
 					config["skipSetupCommands"] = tc.saved
 				}
@@ -296,6 +305,7 @@ func TestInstallationResetReviewRequestSetupCommands(t *testing.T) {
 			agent := findIntakeNode(resetTestLiveVersion(t, canvas).Nodes, reviewRequestAgentNodeID)
 			require.NotNil(t, agent)
 			require.Equal(t, tc.expected, agent.Configuration["skipSetupCommands"])
+			require.Equal(t, true, agent.Configuration["skipRepositoryCheckout"])
 		})
 	}
 }
@@ -362,7 +372,12 @@ func TestResetBuiltInVerificationSettings(t *testing.T) {
 							risk["name"] = "Risk approval"
 							risk["prompt"] = strings.ReplaceAll(risk["prompt"].(string), defaultRiskScoreRules, "Escalation = 5 (critical).") + "\nRetired system instruction"
 							custom := map[string]any{"name": "Release policy", "type": "prompt", "prompt": "Merge check: custom-1.\nCheck the release policy."}
-							node.Configuration["steps"] = []any{risk, custom}
+							drift := map[string]any{"name": "Drift from Specification", "type": "prompt", "prompt": "Merge check: drift.\nRetired system instruction"}
+							steps := []any{risk, drift}
+							if provider == models.ProviderBitbucket {
+								steps = append(steps, map[string]any{"name": "Correctness", "type": "prompt", "prompt": "Merge check: correctness."})
+							}
+							node.Configuration["steps"] = append(steps, custom)
 						}
 					}
 				})
@@ -409,12 +424,16 @@ func TestResetBuiltInVerificationSettings(t *testing.T) {
 					assert.EqualValues(t, 2400, node.Configuration["executionTimeoutSeconds"])
 					if templateID == "risk-score" {
 						steps := node.Configuration["steps"].([]any)
-						require.Len(t, steps, 2)
+						require.Len(t, steps, 3)
 						assert.Equal(t, "Risk approval", steps[0].(map[string]any)["name"])
 						prompt := steps[0].(map[string]any)["prompt"].(string)
 						assert.Contains(t, prompt, "Escalation = 5 (critical).")
 						assert.NotContains(t, prompt, "Retired system instruction")
-						assert.Equal(t, "Merge check: custom-1.\nCheck the release policy.", steps[1].(map[string]any)["prompt"])
+						correctness := steps[1].(map[string]any)
+						assert.Equal(t, "Correctness", correctness["name"])
+						assert.Equal(t, "correctness", mergeconfidence.MergeCheckID(correctness["prompt"].(string)))
+						assert.NotContains(t, correctness["prompt"], "Retired system instruction")
+						assert.Equal(t, "Merge check: custom-1.\nCheck the release policy.", steps[2].(map[string]any)["prompt"])
 					}
 				}
 			})
@@ -436,7 +455,11 @@ func TestResetScheduledIntakeKeepsScheduleAndUserPrompt(t *testing.T) {
 				agent.Configuration["executionTimeoutSeconds"] = 600
 				implementationStep(t, agent, "Propose a task")["prompt"] = "Find accessibility defects." + scheduledIntakeOutputInstructions
 			})
+			require.NoError(t, canvas.SetDisplayColumn(database.DB(t.Context()), "done"))
 			require.NoError(t, resetTestOrganization(t, r))
+			reloaded, err := models.FindCanvasInTransaction(database.DB(t.Context()), r.Organization.ID, canvas.ID)
+			require.NoError(t, err)
+			assert.Equal(t, "done", reloaded.DisplayColumnKey)
 			version := resetTestLiveVersion(t, canvas)
 			assert.Equal(t, r.User.String(), findIntakeNode(version.Nodes, "create-task").Configuration["defaultOwnerId"])
 			restored, err := materializeNonIntakeFactoryAppDefaults(database.DB(t.Context()), factory, canvas, version, nil)
@@ -495,6 +518,7 @@ func TestResetIntakePreservesGeneralSettings(t *testing.T) {
 		{source: models.FactoryIntakeSourceDatadog},
 		{source: models.FactoryIntakeSourceLinearIssues},
 		{source: models.FactoryIntakeSourcePagerDutyIncidents},
+		{source: models.FactoryIntakeSourceWebhook},
 	}
 	for _, tc := range cases {
 		source := tc.source
@@ -543,6 +567,10 @@ func TestResetIntakePreservesGeneralSettings(t *testing.T) {
 				settings.LinearProjectIDs = []string{"project-one"}
 				settings.LinearIncludeNoProject = false
 				settings.LinearLabels = []string{"bug"}
+			case models.FactoryIntakeSourceWebhook:
+				settings.WebhookTitlePath = "issue.summary"
+				settings.WebhookDescriptionPath = ""
+				settings.WebhookLinkPath = "issue.links.html"
 			}
 			binding := &intakeBinding{Configuration: map[string]any{"repository": "acme/app", "project": "APP"}}
 			var sentryIntegrationID string

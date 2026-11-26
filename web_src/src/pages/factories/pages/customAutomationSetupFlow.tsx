@@ -1,57 +1,72 @@
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { ArrowDown, ArrowUp, MessageSquareText, Plus, Terminal, Trash2, Zap } from "lucide-react";
-import type { ReactNode } from "react";
+import { GripVertical, MessageSquareText, Plus, Terminal, Trash2, Zap } from "lucide-react";
+import type { MouseEvent, MutableRefObject, ReactNode } from "react";
 
-import {
-  customAutomationColumnLabel,
-  type CustomAutomationColumn,
-  type CustomAutomationTrigger,
-} from "../lib/customAutomation";
+import { type CustomAutomationColumn, type CustomAutomationTrigger } from "../lib/customAutomation";
 import { mergeCheckPromptBody } from "./mergeConfidenceSteps";
 import type { PlanningReviewStep, PlanningReviewStepKind } from "./planningReviewMockup";
+import { useCustomAutomationStageLabel } from "./useCustomAutomationStageLabel";
 
 export function AutomationFlow({
   columnKey = "verify",
+  asCode = false,
   triggers,
+  runsOnTask,
   steps,
   selectedStep,
   onSelectTrigger,
   onSelectStep,
-  onMoveStep,
+  onStartDrag,
+  rowRefs,
   onRemoveStep,
   onAddStep,
 }: {
   columnKey?: CustomAutomationColumn;
+  asCode?: boolean;
   triggers: CustomAutomationTrigger[];
+  runsOnTask: boolean;
   steps: PlanningReviewStep[];
   selectedStep: number | null;
   onSelectTrigger: () => void;
   onSelectStep: (index: number) => void;
-  onMoveStep: (index: number, offset: -1 | 1) => void;
+  onStartDrag: (event: MouseEvent, index: number) => void;
+  rowRefs: MutableRefObject<Array<HTMLDivElement | null>>;
   onRemoveStep: (index: number) => void;
   onAddStep: () => void;
 }) {
+  const stageLabel = useCustomAutomationStageLabel(columnKey);
   return (
     <aside className="relative min-h-0 w-[42%] shrink-0 overflow-y-auto border-r border-border bg-muted/20">
       <div className="absolute inset-0 bg-[radial-gradient(circle,var(--border)_1px,transparent_1px)] [background-size:18px_18px] opacity-50" />
       <div className="relative mx-auto flex w-full max-w-lg flex-col items-center px-8 py-10">
         <FlowCard selected={selectedStep === null} onClick={onSelectTrigger}>
           <FlowBadge kind="trigger" />
-          <p className="mt-3 text-sm font-semibold text-foreground">{sidebarTriggerTitle(triggers, columnKey)}</p>
-          <p className="mt-1 text-xs text-muted-foreground">{sidebarTriggerDescription(triggers, columnKey)}</p>
+          <p className="mt-3 text-sm font-semibold text-foreground">
+            {sidebarTriggerTitle(triggers, columnKey, stageLabel)}
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {sidebarTriggerDescription(triggers, columnKey, runsOnTask, stageLabel)}
+          </p>
         </FlowCard>
         {steps.map((step, index) => (
-          <div className="flex w-full flex-col items-center" key={index}>
+          <div
+            className="flex w-full flex-col items-center"
+            key={index}
+            data-testid="custom-automation-step-row"
+            ref={(element) => {
+              rowRefs.current[index] = element;
+            }}
+          >
             <FlowConnector />
             <FlowCard
               selected={selectedStep === index}
               onClick={() => onSelectStep(index)}
               actions={
                 <StepCardActions
-                  position={index}
+                  label={step.name || `Step ${index + 1}`}
                   stepCount={steps.length}
-                  onMove={(offset) => onMoveStep(index, offset)}
+                  onStartDrag={(event) => onStartDrag(event, index)}
                   onRemove={() => onRemoveStep(index)}
                 />
               }
@@ -59,7 +74,11 @@ export function AutomationFlow({
               <FlowBadge kind={step.type} />
               <p className="mt-3 truncate text-sm font-semibold text-foreground">{step.name || `Step ${index + 1}`}</p>
               <p className="mt-1 truncate text-xs text-muted-foreground">
-                {step.type === "prompt" ? mergeCheckPromptBody(step.prompt) : step.command || "No commands yet."}
+                {step.type === "prompt"
+                  ? asCode
+                    ? step.prompt
+                    : mergeCheckPromptBody(step.prompt)
+                  : step.command || "No commands yet."}
               </p>
             </FlowCard>
           </div>
@@ -108,6 +127,7 @@ function FlowCard({
       <button
         type="button"
         onClick={onClick}
+        aria-pressed={selected}
         className={cn(
           "w-full rounded-xl border bg-card px-4 py-4 text-left shadow-sm transition-colors hover:border-foreground/30",
           selected ? "border-primary ring-2 ring-primary/15" : "border-border",
@@ -125,40 +145,31 @@ function FlowCard({
 }
 
 function StepCardActions({
-  position,
+  label,
   stepCount,
-  onMove,
+  onStartDrag,
   onRemove,
 }: {
-  position: number;
+  label: string;
   stepCount: number;
-  onMove: (offset: -1 | 1) => void;
+  onStartDrag: (event: MouseEvent) => void;
   onRemove: () => void;
 }) {
   return (
     <>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon-xs"
-        className="size-6 text-muted-foreground/60 hover:bg-muted hover:text-foreground"
-        aria-label="Move step up"
-        disabled={position === 0}
-        onClick={() => onMove(-1)}
-      >
-        <ArrowUp className="size-3.5" aria-hidden />
-      </Button>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon-xs"
-        className="size-6 text-muted-foreground/60 hover:bg-muted hover:text-foreground"
-        aria-label="Move step down"
-        disabled={position === stepCount - 1}
-        onClick={() => onMove(1)}
-      >
-        <ArrowDown className="size-3.5" aria-hidden />
-      </Button>
+      {stepCount > 1 ? (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-xs"
+          className="size-6 cursor-grab text-muted-foreground/60 hover:bg-muted hover:text-foreground active:cursor-grabbing"
+          aria-label={`Reorder ${label}`}
+          onMouseDown={onStartDrag}
+          onClick={(event) => event.stopPropagation()}
+        >
+          <GripVertical className="size-3.5" aria-hidden />
+        </Button>
+      ) : null}
       <Button
         type="button"
         variant="ghost"
@@ -173,23 +184,32 @@ function StepCardActions({
   );
 }
 
-function sidebarTriggerTitle(triggers: CustomAutomationTrigger[], columnKey: CustomAutomationColumn): string {
+function sidebarTriggerTitle(
+  triggers: CustomAutomationTrigger[],
+  columnKey: CustomAutomationColumn,
+  stageLabel: string,
+): string {
   const trigger = triggers[0];
   if (!trigger || triggers.length > 1) {
     return "Triggers";
   }
-  return triggerTitle(trigger.mode, columnKey);
+  return triggerTitle(trigger.mode, columnKey, stageLabel);
 }
 
-function sidebarTriggerDescription(triggers: CustomAutomationTrigger[], columnKey: CustomAutomationColumn): string {
+function sidebarTriggerDescription(
+  triggers: CustomAutomationTrigger[],
+  columnKey: CustomAutomationColumn,
+  runsOnTask: boolean,
+  stageLabel: string,
+): string {
   const trigger = triggers[0];
   if (!trigger) {
     return "Add a trigger.";
   }
   if (triggers.length === 1) {
-    return triggerDescription(trigger.mode, columnKey);
+    return triggerDescription(trigger.mode, columnKey, runsOnTask, stageLabel);
   }
-  const titles = triggers.map((item) => triggerTitle(item.mode, columnKey));
+  const titles = triggers.map((item) => triggerTitle(item.mode, columnKey, stageLabel));
   const titlesRepeat = new Set(titles).size !== titles.length;
   return triggers
     .map((item, index) =>
@@ -200,26 +220,39 @@ function sidebarTriggerDescription(triggers: CustomAutomationTrigger[], columnKe
     .join(", ");
 }
 
-function triggerTitle(mode: CustomAutomationTrigger["mode"], columnKey: CustomAutomationColumn): string {
+function triggerTitle(
+  mode: CustomAutomationTrigger["mode"],
+  columnKey: CustomAutomationColumn,
+  stageLabel: string,
+): string {
   if (mode === "scheduled") return "Schedule";
+  if (mode === "webhook") return "Webhook";
+  if (mode === "leave") return `When a task leaves ${stageLabel}`;
   if (mode === "automatic") {
-    return columnKey === "verify"
-      ? "Every pull request commit"
-      : `When a task enters ${customAutomationColumnLabel(columnKey)}`;
+    return columnKey === "verify" ? "Every pull request commit" : `When a task enters ${stageLabel}`;
   }
   return "Manual";
 }
 
-function triggerDescription(mode: CustomAutomationTrigger["mode"], columnKey: CustomAutomationColumn): string {
+function triggerDescription(
+  mode: CustomAutomationTrigger["mode"],
+  columnKey: CustomAutomationColumn,
+  runsOnTask: boolean,
+  stageLabel: string,
+): string {
   if (mode === "scheduled") {
     return columnKey === "backlog" ? "Run automation on a schedule." : "Runs on the repository default branch.";
+  }
+  if (mode === "webhook") return "Runs when a webhook receives a request.";
+  if (mode === "leave") {
+    return `Runs when a task leaves ${stageLabel}.`;
   }
   if (mode === "automatic") {
     return columnKey === "verify"
       ? "Runs for every new pull request commit."
-      : `Runs when a task enters ${customAutomationColumnLabel(columnKey)}.`;
+      : `Runs when a task enters ${stageLabel}.`;
   }
-  return "Runs when you start it from a task.";
+  return runsOnTask ? "Runs when you start it from a task." : "Runs when you start it from the column.";
 }
 
 function FlowConnector() {

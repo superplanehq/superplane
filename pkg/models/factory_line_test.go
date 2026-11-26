@@ -3,6 +3,7 @@ package models_test
 import (
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -30,6 +31,151 @@ func Test__FactoryLine__ColumnColors__DefaultsToScreenshotColors(t *testing.T) {
 	reloaded, err := factory.FindLine(db, line.ID)
 	require.NoError(t, err)
 	assert.Equal(t, expected, reloaded.ColumnColorsValue())
+}
+
+func Test__FactoryLine__Stages__DefaultAndRoundTrip(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	app, entry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "Implement", "start")
+	line, err := factory.CreateLine(db, "ship", []models.FactoryLineStep{{
+		Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entry,
+	}})
+	require.NoError(t, err)
+
+	require.Len(t, line.StagesValue(), 4)
+	assert.Equal(t, []string{"backlog", "phase", "phase", "done"}, []string{
+		line.StagesValue()[0].Kind,
+		line.StagesValue()[1].Kind,
+		line.StagesValue()[2].Kind,
+		line.StagesValue()[3].Kind,
+	})
+	assert.Contains(t, line.StagesValue()[1].Name, "Implement")
+	assert.Equal(t, 0, *line.StagesValue()[1].StepIndex)
+	assert.Equal(t, []bool{true, true, false, true}, []bool{
+		line.StagesValue()[0].AutoAdvanceEnabled(),
+		line.StagesValue()[1].AutoAdvanceEnabled(),
+		line.StagesValue()[2].AutoAdvanceEnabled(),
+		line.StagesValue()[3].AutoAdvanceEnabled(),
+	})
+
+	reloaded, err := factory.FindLine(db, line.ID)
+	require.NoError(t, err)
+	assert.Equal(t, line.StagesValue(), reloaded.StagesValue())
+	assert.True(t, (models.FactoryLineStage{Kind: models.FactoryLineStagePhase, Key: "verify"}).AutoAdvanceEnabled())
+}
+
+func Test__FactoryLine__Update__ReconcilesPhasesAndKeepsCustomStages(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	first, firstEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "Implement", "start-one")
+	second, secondEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "Release", "start-two")
+	steps := []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: first.ID, Entrypoint: firstEntry},
+		{Type: models.FactoryLineStepTypeRunApp, AppID: second.ID, Entrypoint: secondEntry},
+	}
+	line, err := factory.CreateLine(db, "ship", steps)
+	require.NoError(t, err)
+	autoAdvance := false
+	custom := models.FactoryLineStage{
+		ID: uuid.New(), Key: "custom-qa", Name: "QA", Kind: models.FactoryLineStagePhase, AutoAdvance: &autoAdvance,
+	}
+	stages := append([]models.FactoryLineStage{}, line.StagesValue()[:2]...)
+	stages = append(stages, custom)
+	stages = append(stages, line.StagesValue()[2:]...)
+	require.NoError(t, line.UpdateConfiguration(db, nil, nil, nil, stages))
+	require.NoError(t, line.Update(db, nil, nil, map[string]string{"phase-1": "purple", "custom-qa": "teal"}))
+
+	require.NoError(t, line.Update(db, nil, steps[:1], nil))
+
+	assert.Equal(t, []string{"backlog", "phase-0", "custom-qa", "verify", "done"}, []string{
+		line.StagesValue()[0].Key,
+		line.StagesValue()[1].Key,
+		line.StagesValue()[2].Key,
+		line.StagesValue()[3].Key,
+		line.StagesValue()[4].Key,
+	})
+	assert.Equal(t, custom.ID, line.StagesValue()[2].ID)
+	assert.False(t, line.StagesValue()[2].AutoAdvanceEnabled())
+	assert.Equal(t, map[string]string{"custom-qa": "teal"}, line.ColumnColorsValue())
+}
+
+func Test__FactoryLine__Update__InsertsNewPhaseBeforeVerify(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	app, entry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "Implement", "start-one")
+	line, err := factory.CreateLine(db, "ship", nil)
+	require.NoError(t, err)
+	custom := models.FactoryLineStage{ID: uuid.New(), Key: "custom-qa", Name: "QA", Kind: models.FactoryLineStagePhase}
+	stages := line.StagesValue()
+	stages = append(stages[:len(stages)-1], custom, stages[len(stages)-1])
+	require.NoError(t, line.UpdateConfiguration(db, nil, nil, nil, stages))
+
+	require.NoError(t, line.Update(db, nil, []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entry},
+	}, nil))
+
+	keys := make([]string, 0, len(line.StagesValue()))
+	for _, stage := range line.StagesValue() {
+		keys = append(keys, stage.Key)
+	}
+	assert.Equal(t, []string{"backlog", "phase-0", "verify", "custom-qa", "done"}, keys)
+}
+
+func Test__FactoryLine__Update__KeepsOptionalStagesRemoved(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	app, entry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "Implement", "start")
+	steps := []models.FactoryLineStep{{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entry}}
+	line, err := factory.CreateLine(db, "ship", steps)
+	require.NoError(t, err)
+	require.NoError(t, line.UpdateConfiguration(db, nil, nil, nil, []models.FactoryLineStage{
+		line.StagesValue()[0],
+		line.StagesValue()[len(line.StagesValue())-1],
+	}))
+
+	require.NoError(t, line.Update(db, nil, steps, nil))
+
+	assert.Equal(t, []string{"backlog", "done"}, []string{line.StagesValue()[0].Key, line.StagesValue()[1].Key})
+}
+
+func Test__FactoryLine__Update__KeepsConfiguredStageOrder(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	first, firstEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "Implement", "start-one")
+	second, secondEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "Release", "start-two")
+	steps := []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: first.ID, Entrypoint: firstEntry},
+		{Type: models.FactoryLineStepTypeRunApp, AppID: second.ID, Entrypoint: secondEntry},
+	}
+	line, err := factory.CreateLine(db, "ship", steps)
+	require.NoError(t, err)
+	stages := line.StagesValue()
+	reordered := []models.FactoryLineStage{stages[0], stages[3], stages[2], stages[1], stages[4]}
+	require.NoError(t, line.UpdateConfiguration(db, nil, nil, nil, reordered))
+
+	require.NoError(t, line.Update(db, nil, steps[:1], nil))
+
+	assert.Equal(t, []string{"backlog", "verify", "phase-0", "done"}, []string{
+		line.StagesValue()[0].Key,
+		line.StagesValue()[1].Key,
+		line.StagesValue()[2].Key,
+		line.StagesValue()[3].Key,
+	})
 }
 
 func Test__FactoryLine__Update__PersistsColumnColors(t *testing.T) {

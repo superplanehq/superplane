@@ -1,4 +1,5 @@
 import type { FactoriesWorkOrderEvent } from "@/api-client";
+import { formatCheckScore, workOrderCheckDisplayName } from "../../../lib/workOrderChecks";
 import type { SplitRunPhase } from "../splitRunMocks";
 import type { ConsoleAutomation } from "./automationsViewModel";
 
@@ -131,7 +132,8 @@ function checkRow(
   if (!check) {
     return undefined;
   }
-  const name = text(check.name) || text(check.key) || "check";
+  const key = text(check.key);
+  const name = workOrderCheckDisplayName({ key, name: text(check.name) }) || key || "check";
   const score = checkScoreText(check);
   const summary = text(check.summary);
   return {
@@ -156,7 +158,8 @@ function checkScoreText(check: Record<string, unknown>): string {
     return `${check.score}%`;
   }
   if (typeof check.maxScore === "number" && check.maxScore > 0) {
-    return `${check.score}/${check.maxScore}`;
+    const { value, scale } = formatCheckScore({ key: text(check.key), score: check.score, maxScore: check.maxScore });
+    return value + scale;
   }
   return String(check.score);
 }

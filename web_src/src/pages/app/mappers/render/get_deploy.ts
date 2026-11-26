@@ -57,6 +57,37 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   return metadata;
 }
 
+function getOptionalDeploymentDetails(result: GetDeployOutput | undefined): Record<string, string> {
+  if (!result) {
+    return {};
+  }
+
+  const details: Record<string, string> = {};
+
+  if (result.rollbackToDeployId) {
+    details["Rollback To"] = result.rollbackToDeployId;
+  }
+
+  if (result.commit?.id) {
+    details["Commit ID"] = result.commit.id;
+  }
+  if (result.commit?.message) {
+    details["Commit Message"] = result.commit.message;
+  }
+  if (result.image?.ref) {
+    details["Image Ref"] = result.image.ref;
+  }
+  if (result.image?.sha) {
+    details["Image SHA"] = result.image.sha;
+  }
+
+  if (result.updatedAt) {
+    details["Updated At"] = formatTimestamp(result.updatedAt);
+  }
+
+  return details;
+}
+
 export const getDeployMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     const base = baseProps(context.nodes, context.node, context.componentDefinition, context.lastExecutions);
@@ -83,26 +114,7 @@ export const getDeployMapper: ComponentBaseMapper = {
       "Finished At": formatTimestamp(result?.finishedAt),
     };
 
-    if (result?.rollbackToDeployId) {
-      details["Rollback To"] = result.rollbackToDeployId;
-    }
-
-    if (result?.commit?.id) {
-      details["Commit ID"] = result.commit.id;
-    }
-    if (result?.commit?.message) {
-      details["Commit Message"] = result.commit.message;
-    }
-    if (result?.image?.ref) {
-      details["Image Ref"] = result.image.ref;
-    }
-    if (result?.image?.sha) {
-      details["Image SHA"] = result.image.sha;
-    }
-
-    if (result?.updatedAt) {
-      details["Updated At"] = formatTimestamp(result.updatedAt);
-    }
+    Object.assign(details, getOptionalDeploymentDetails(result));
 
     return details;
   },

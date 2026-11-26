@@ -122,21 +122,17 @@ export const getLastMentionMapper: ComponentBaseMapper = {
     const outputs = context.execution.outputs as
       | { found?: OutputPayload[]; notFound?: OutputPayload[]; default?: OutputPayload[] }
       | undefined;
-    const data =
-      (outputs?.found?.[0]?.data as MentionPayload | undefined) ??
-      (outputs?.notFound?.[0]?.data as MentionPayload | undefined) ??
-      (outputs?.default?.[0]?.data as MentionPayload | undefined);
-    const found = Boolean(outputs?.found?.length || data?.mention?.id);
+    const data = getMentionPayload(outputs);
+    const mention = data?.mention;
+    const found = Boolean(outputs?.found?.length || mention?.id);
 
     return {
       "Channel ID": stringOrDash(data?.channel_id),
       Result: found ? "Found" : "Not Found",
-      "Mention ID": stringOrDash(data?.mention?.id),
-      Author: data?.mention?.author?.username
-        ? `@${data.mention.author.username}`
-        : stringOrDash(data?.mention?.author?.id),
-      Content: stringOrDash(data?.mention?.content),
-      Timestamp: stringOrDash(data?.mention?.timestamp),
+      "Mention ID": stringOrDash(mention?.id),
+      Author: formatMentionAuthor(mention?.author),
+      Content: stringOrDash(mention?.content),
+      Timestamp: stringOrDash(mention?.timestamp),
     };
   },
 
@@ -145,6 +141,24 @@ export const getLastMentionMapper: ComponentBaseMapper = {
     return renderTimeAgo(new Date(context.execution.createdAt));
   },
 };
+
+function getMentionPayload(
+  outputs: { found?: OutputPayload[]; notFound?: OutputPayload[]; default?: OutputPayload[] } | undefined,
+): MentionPayload | undefined {
+  return (
+    (outputs?.found?.[0]?.data as MentionPayload | undefined) ??
+    (outputs?.notFound?.[0]?.data as MentionPayload | undefined) ??
+    (outputs?.default?.[0]?.data as MentionPayload | undefined)
+  );
+}
+
+function formatMentionAuthor(author: NonNullable<MentionPayload["mention"]>["author"]): string {
+  if (author?.username) {
+    return `@${author.username}`;
+  }
+
+  return stringOrDash(author?.id);
+}
 
 function getLastMentionMetadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];

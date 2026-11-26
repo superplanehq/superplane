@@ -236,6 +236,15 @@ func (c *FactoryContext) CreateWorkOrder(params core.WorkOrderParams) (*core.Wor
 		return nil, false, nil
 	}
 
+	params.OriginURL = models.NormalizeWorkOrderOriginURL(params.OriginURL)
+	skip, err = c.skipDuplicateOriginWorkOrder(f, params.OriginURL)
+	if err != nil {
+		return nil, false, err
+	}
+	if skip {
+		return nil, false, nil
+	}
+
 	sourceRunID := c.execution.RunID
 	order, err := c.createFactoryWorkOrder(f, params, sourceRunID)
 	if err != nil {
@@ -395,6 +404,32 @@ func (c *FactoryContext) skipDuplicateGitHubIssueWorkOrder(factoryModel *models.
 	return true, nil
 }
 
+// skipDuplicateOriginWorkOrder skips a task whose configured source link
+// already belongs to a task of this factory, in any state.
+func (c *FactoryContext) skipDuplicateOriginWorkOrder(factoryModel *models.Factory, originURL string) (bool, error) {
+	if originURL == "" || c.execution == nil {
+		return false, nil
+	}
+	if err := factoryModel.LockWorkOrderOriginURL(c.tx, originURL); err != nil {
+		return false, err
+	}
+	order, err := factoryModel.FindWorkOrderByOriginURL(c.tx, originURL)
+	if err != nil || order == nil {
+		return false, err
+	}
+
+	metadata := maps.Clone(c.execution.Metadata.Data())
+	if metadata == nil {
+		metadata = map[string]any{}
+	}
+	metadata[models.CanvasNodeExecutionExistingTaskIDKey] = order.ID.String()
+	if err := NewExecutionMetadataContext(c.tx, c.execution).Set(metadata); err != nil {
+		return false, fmt.Errorf("record existing task: %w", err)
+	}
+	log.Infof("skipping task for %s: a task with the same link already exists", originURL)
+	return true, nil
+}
+
 // mergeDependabotWorkOrder adds a Dependabot alert to the factory's open task
 // for the same package instead of opening a second task. GitHub raises one
 // alert per advisory per manifest, and one dependency update fixes them all.
@@ -449,8 +484,12 @@ func (c *FactoryContext) createFactoryWorkOrder(
 	params core.WorkOrderParams,
 	sourceRunID uuid.UUID,
 ) (*models.FactoryWorkOrder, error) {
+	origin := c.originFromSourceRun(sourceRunID)
+	if params.OriginURL != "" {
+		origin = &models.WorkOrderOrigin{URL: params.OriginURL, Label: models.OriginLabelFromURL(params.OriginURL)}
+	}
 	if factoryModel.OnboardingConfigValue().CodexSubscription {
-		order, err := factoryModel.CreateIntakeWorkOrder(c.tx, params.Title, params.Description, sourceRunID, c.originFromSourceRun(sourceRunID))
+		order, err := factoryModel.CreateIntakeWorkOrder(c.tx, params.Title, params.Description, sourceRunID, origin)
 		if !errors.Is(err, models.ErrSubscriptionOwnerRequired) {
 			return order, err
 		}
@@ -477,7 +516,7 @@ func (c *FactoryContext) createFactoryWorkOrder(
 			}
 		}
 	}
-	if origin := c.originFromSourceRun(sourceRunID); origin != nil {
+	if origin != nil {
 		return factoryModel.CreateWorkOrderWithOrigin(
 			c.tx,
 			params.Title,
@@ -553,7 +592,12 @@ func (c *FactoryContext) recordDatadogWebhookTask(order *models.FactoryWorkOrder
 }
 
 func (c *FactoryContext) originFromSourceRun(sourceRunID uuid.UUID) *models.WorkOrderOrigin {
-	if _, err := models.FindFactoryIntakeByCanvasID(c.tx, c.canvas.ID); err != nil {
+	intake, err := models.FindFactoryIntakeByCanvasID(c.tx, c.canvas.ID)
+	if err != nil {
+		return nil
+	}
+	// A webhook body is free-form, so only the configured link is an origin.
+	if intake.Source == models.FactoryIntakeSourceWebhook {
 		return nil
 	}
 
@@ -718,6 +762,7 @@ func (c *FactoryContext) UpdateWorkOrderStatus(params core.UpdateWorkOrderStatus
 		}
 		result = pullRequestResult
 	}
+	leftColumn, leftErr := models.WorkOrderBoardColumn(c.tx, order)
 	changed, err := order.UpdateStatus(c.tx, models.FactoryWorkOrderStatusUpdate{
 		ToState:         params.State,
 		Result:          result,
@@ -737,6 +782,7 @@ func (c *FactoryContext) UpdateWorkOrderStatus(params core.UpdateWorkOrderStatus
 	if !changed {
 		return workOrderToCore(order), false, nil
 	}
+	c.emitColumnLeave(order, leftColumn, leftErr)
 	if order.State == models.FactoryWorkOrderStateClosed {
 		factoryModel, findErr := models.FindFactory(c.tx, order.OrganizationID, order.FactoryID)
 		if findErr != nil {
@@ -764,6 +810,39 @@ func (c *FactoryContext) UpdateWorkOrderStatus(params core.UpdateWorkOrderStatus
 	})
 	c.captureAutomationClose(order)
 	return workOrderToCore(order), true, nil
+}
+
+func (c *FactoryContext) emitColumnLeave(order *models.FactoryWorkOrder, leftColumn string, leftErr error) {
+	if leftErr != nil {
+		log.WithError(leftErr).Warnf("failed to read the column for task %s", order.ID)
+		return
+	}
+	if leftColumn == "" {
+		return
+	}
+	next, err := models.WorkOrderBoardColumn(c.tx, order)
+	if err != nil || next == leftColumn {
+		if err != nil {
+			log.WithError(err).Warnf("failed to read the column for task %s", order.ID)
+		}
+		return
+	}
+	factoryModel, err := models.FindFactory(c.tx, order.OrganizationID, order.FactoryID)
+	if err != nil {
+		log.WithError(err).Warnf("failed to load factory for leave automation on task %s", order.ID)
+		return
+	}
+	events, err := EmitColumnLeaveCustomAutomations(
+		c.tx, factoryModel, order, leftColumn,
+		ColumnLeaveDedupKey(order.ID, leftColumn, order.UpdatedAt.UTC().Format(time.RFC3339Nano)),
+	)
+	if err != nil {
+		log.WithError(err).Warnf("failed to start %s leave automation for task %s", leftColumn, order.ID)
+		return
+	}
+	if c.onNewEvents != nil {
+		c.onNewEvents(events)
+	}
 }
 
 func (c *FactoryContext) captureAutomationClose(order *models.FactoryWorkOrder) {

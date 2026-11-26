@@ -33,6 +33,39 @@ beforeEach(() => {
   describeIntegration.mockResolvedValue({ data: { integration: { metadata: { name: "workspace-vcs" } } } });
 });
 
+describe("add custom stage automation", () => {
+  it("opens shared configuration with the custom stage and return line", () => {
+    const { result } = renderHook(
+      () => ({
+        automation: useAddColumnAutomation({
+          organizationId: "org",
+          factoryId: "factory",
+          factoryKey: "workspace",
+          lineId: "line",
+          appRepository: "acme/app",
+          backlogRepository: "acme/app",
+          defaultBranch: "main",
+          githubIntegrationId: "vcs-integration",
+          automationsFor: () => [],
+        }),
+        location: useLocation(),
+      }),
+      {
+        wrapper: ({ children }: { children: ReactNode }) => (
+          <QueryClientProvider client={new QueryClient()}>
+            <MemoryRouter>{children}</MemoryRouter>
+          </QueryClientProvider>
+        ),
+      },
+    );
+
+    act(() => result.current.automation.openPicker("custom-stage-id", "Deploy to prod"));
+    expect(result.current.location.pathname).toBe("/org/workspaces/workspace/lines/line");
+    expect(result.current.location.search).toBe("?customAutomation=new&automationColumn=custom-stage-id");
+    expect(result.current.automation.pickerOpen).toBe(false);
+  });
+});
+
 describe("add pull request closure", () => {
   for (const provider of ["github", "bitbucket"]) {
     it(`installs with ${provider} and stays on the board`, async () => {

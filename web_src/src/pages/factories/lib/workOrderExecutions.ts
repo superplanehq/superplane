@@ -31,6 +31,7 @@ export function queueItemToStepRow(item: FactoriesWorkOrderQueueItem): WorkOrder
     // run shape so board-column matching and card links treat queued rows
     // like execution rows.
     run: item.appId ? { appId: item.appId } : undefined,
+    stageKey: item.stageKey,
     queuePosition: item.position ?? 0,
   };
 }

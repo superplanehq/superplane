@@ -199,9 +199,10 @@ func serializeFactoryAutomations(canvases []models.Canvas) []*pb.Factory_Automat
 
 func serializeFactoryAutomation(canvas models.Canvas) *pb.Factory_Automation {
 	automation := &pb.Factory_Automation{
-		Id:          canvas.ID.String(),
-		Name:        canvas.Name,
-		Description: canvas.Description,
+		Id:               canvas.ID.String(),
+		Name:             canvas.Name,
+		Description:      canvas.Description,
+		DisplayColumnKey: canvas.DisplayColumnKey,
 	}
 	if canvas.ColumnKey != nil {
 		automation.ColumnKey = *canvas.ColumnKey
@@ -341,6 +342,8 @@ func serializeFactoryIntakeSource(source string) pb.FactoryIntake_Source {
 		return pb.FactoryIntake_SOURCE_DATADOG
 	case models.FactoryIntakeSourceLinearIssues:
 		return pb.FactoryIntake_SOURCE_LINEAR_ISSUES
+	case models.FactoryIntakeSourceWebhook:
+		return pb.FactoryIntake_SOURCE_WEBHOOK
 	default:
 		return pb.FactoryIntake_SOURCE_UNSPECIFIED
 	}
@@ -364,6 +367,8 @@ func parseFactoryIntakeSource(source pb.FactoryIntake_Source) (string, error) {
 		return models.FactoryIntakeSourceDatadog, nil
 	case pb.FactoryIntake_SOURCE_LINEAR_ISSUES:
 		return models.FactoryIntakeSourceLinearIssues, nil
+	case pb.FactoryIntake_SOURCE_WEBHOOK:
+		return models.FactoryIntakeSourceWebhook, nil
 	default:
 		return "", invalidArgument("intake source is required")
 	}
@@ -475,6 +480,40 @@ func serializeFactoryLine(line *models.FactoryLine) *pb.FactoryLine {
 		CreatedAt:    timestamppb.New(line.CreatedAt),
 		UpdatedAt:    timestamppb.New(line.UpdatedAt),
 		ColumnColors: line.ColumnColorsValue(),
+		Stages:       serializeFactoryLineStages(line.StagesValue()),
+	}
+}
+
+func serializeFactoryLineStages(stages []models.FactoryLineStage) []*pb.FactoryLine_Stage {
+	result := make([]*pb.FactoryLine_Stage, len(stages))
+	for index, stage := range stages {
+		result[index] = &pb.FactoryLine_Stage{
+			Id:              stage.ID.String(),
+			Key:             stage.Key,
+			Name:            stage.Name,
+			Kind:            serializeFactoryLineStageKind(stage.Kind),
+			AgentDisplayKey: stage.AgentDisplayKey,
+		}
+		autoAdvance := stage.AutoAdvanceEnabled()
+		result[index].AutoAdvance = &autoAdvance
+		if stage.StepIndex != nil {
+			stepIndex := int32(*stage.StepIndex)
+			result[index].StepIndex = &stepIndex
+		}
+	}
+	return result
+}
+
+func serializeFactoryLineStageKind(kind string) pb.FactoryLine_StageKind {
+	switch kind {
+	case models.FactoryLineStageBacklog:
+		return pb.FactoryLine_STAGE_KIND_BACKLOG
+	case models.FactoryLineStagePhase:
+		return pb.FactoryLine_STAGE_KIND_PHASE
+	case models.FactoryLineStageDone:
+		return pb.FactoryLine_STAGE_KIND_DONE
+	default:
+		return pb.FactoryLine_STAGE_KIND_UNSPECIFIED
 	}
 }
 
@@ -782,13 +821,15 @@ func serializeWorkOrderLineDispatch(
 			Id:   dispatch.LineID.String(),
 			Name: dispatch.LineName,
 		},
-		Steps:          serializeExecutionSteps(dispatch.Steps, dispatch.Executions),
-		State:          serializeLineDispatchState(dispatch.State),
-		Result:         serializeLineDispatchResult(dispatch.Result),
-		CreatedAt:      timestamppb.New(dispatch.CreatedAt),
-		StepExecutions: serializeWorkOrderExecutions(dispatch.Executions, modelsByExecution),
-		Model:          dispatch.Model,
-		ThinkingLevel:  dispatch.ThinkingLevel,
+		Steps:           serializeExecutionSteps(dispatch.Steps, dispatch.Executions),
+		Stages:          serializeFactoryLineStages(dispatch.StagesValue()),
+		State:           serializeLineDispatchState(dispatch.State),
+		Result:          serializeLineDispatchResult(dispatch.Result),
+		CreatedAt:       timestamppb.New(dispatch.CreatedAt),
+		StepExecutions:  serializeWorkOrderExecutions(dispatch.Executions, dispatch.Steps, modelsByExecution),
+		Model:           dispatch.Model,
+		ThinkingLevel:   dispatch.ThinkingLevel,
+		CurrentStageKey: dispatch.CurrentStageKey,
 	}
 	if dispatch.FinishedAt != nil {
 		item.FinishedAt = timestamppb.New(*dispatch.FinishedAt)
@@ -809,9 +850,11 @@ func serializeWorkOrderQueueItem(
 		StepIndex: int32(item.StepIndex),
 		Position:  int32(item.Position),
 		CreatedAt: timestamppb.New(item.CreatedAt),
+		AppId:     item.AppID.String(),
+		StageKey:  item.StageKey,
 	}
-	if item.StepIndex >= 0 && item.StepIndex < len(steps) {
-		result.AppId = steps[item.StepIndex].AppID.String()
+	if result.StageKey == "" && item.StepIndex >= 0 && item.StepIndex < len(steps) {
+		result.StageKey = steps[item.StepIndex].StageKey
 	}
 	return result
 }
@@ -842,11 +885,16 @@ func serializeLineDispatchResult(result string) pb.WorkOrderLineDispatch_Result 
 
 func serializeWorkOrderExecutions(
 	executions []models.FactoryWorkOrderExecutionRecord,
+	steps []models.FactoryLineStep,
 	modelsByExecution map[uuid.UUID][]string,
 ) []*pb.WorkOrderExecution {
 	result := make([]*pb.WorkOrderExecution, 0, len(executions))
 	for _, execution := range executions {
-		result = append(result, serializeWorkOrderExecution(execution, modelsByExecution[execution.ID]))
+		item := serializeWorkOrderExecution(execution, modelsByExecution[execution.ID])
+		if execution.StepIndex >= 0 && execution.StepIndex < len(steps) {
+			item.StageKey = steps[execution.StepIndex].StageKey
+		}
+		result = append(result, item)
 	}
 	return result
 }
@@ -905,9 +953,14 @@ func serializeExecutionSteps(
 
 	result := make([]*pb.WorkOrderExecutionStep, len(steps))
 	for i := range steps {
+		name := nameByIndex[i]
+		if name == "" {
+			name = steps[i].StageName
+		}
 		result[i] = &pb.WorkOrderExecutionStep{
-			Name:      nameByIndex[i],
+			Name:      name,
 			StepIndex: int32(i),
+			StageKey:  steps[i].StageKey,
 		}
 	}
 	return result

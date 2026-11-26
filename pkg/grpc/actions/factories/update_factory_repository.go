@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	factorycomponent "github.com/superplanehq/superplane/pkg/components/factory"
 	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
@@ -380,11 +381,13 @@ func reconcileFactoryRepository(
 				changed = replaceLegacyCheckoutBaseToken(nodes, managedRunnerNodeIDs) || changed
 			}
 		}
-		if models.FactoryAppTemplateID(nodes) == models.FactoryAppTemplateCustomAutomationID {
+		isCustomAutomation := models.FactoryAppTemplateID(nodes) == models.FactoryAppTemplateCustomAutomationID
+		if isCustomAutomation {
 			changed = replaceWorkspaceCheckoutTarget(nodes, config.EffectiveVCSProvider(), previousAppRepository, repository, previousDefaultBranch, nextBranch, previousGitHubHost, nextGitHubHost) || changed
 		}
-		if models.FactoryAppTemplateID(nodes) == models.FactoryAppTemplateCustomAutomationID &&
-			slices.ContainsFunc(nodes, func(node models.Node) bool { return node.ComponentName() == "schedule" }) {
+		if isCustomAutomation && slices.ContainsFunc(nodes, func(node models.Node) bool {
+			return node.ComponentName() == "schedule" || node.ComponentName() == factorycomponent.OnWebhookTriggerName
+		}) {
 			for i := range nodes {
 				if !isFactoryAgentHarness(nodes[i].ComponentName()) {
 					continue
@@ -449,6 +452,15 @@ func reconcileFactoryRepository(
 			},
 		); err != nil {
 			return fmt.Errorf("publish %q repository update: %w", canvas.Name, err)
+		}
+		if isCustomAutomation {
+			published, err := models.FindLiveCanvasVersionInTransaction(tx, canvas.ID)
+			if err != nil {
+				return err
+			}
+			if err := models.RefreshAutomationArtifactRevision(tx, canvas.OrganizationID, canvas.ID.String(), liveVersion.ID.String(), published.ID.String()); err != nil {
+				return err
+			}
 		}
 	}
 

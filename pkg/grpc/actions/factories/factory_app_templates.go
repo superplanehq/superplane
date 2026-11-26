@@ -31,7 +31,7 @@ var installParamPattern = regexp.MustCompile(`\{\{\s*install_params\.(\w+)\s*\}\
 const defaultRiskScoreRules = "Documentation only = 1 (very_low). Tests only = 2 (low). User interface changes = 2 (low). Additive database changes = 3 (medium). Dependency updates = 3 (medium). API behavior changes = 3 (medium). Authorization changes = 4 (high). Authentication changes = 4 (high). Data deletion or migration = 4 (high). Infrastructure changes = 4 (high). Billing and payment changes = 5 (critical). Secrets and credentials = 5 (critical)."
 
 // defaultMergeConfidenceChecks is every check, in prompt order. "none" turns them all off.
-const defaultMergeConfidenceChecks = "risk, performance, security, drift, reversibility"
+const defaultMergeConfidenceChecks = "risk, performance, security, correctness, reversibility"
 
 //go:embed templates/github/*.yaml templates/bitbucket/*.yaml
 var factoryTemplateFiles embed.FS
@@ -336,6 +336,8 @@ func filterDisabledMergeChecks(canvas *yaml.Canvas, enabled string) {
 			}
 		}
 	}
+	// Older setup clients select Correctness with the drift install parameter.
+	allowed["correctness"] = allowed["correctness"] || allowed["drift"]
 	for i := range canvas.Spec.Nodes {
 		node := &canvas.Spec.Nodes[i]
 		if node.ID != "assess-risk" {
@@ -667,7 +669,7 @@ func deriveFactoryTemplateInput(
 		if integrationType != "" && node.IntegrationID != nil {
 			integrationID, err := uuid.Parse(*node.IntegrationID)
 			if err == nil {
-				integration, findErr := models.FindIntegrationInTransaction(tx, canvas.OrganizationID, integrationID)
+				integration, findErr := factoryAutomationIntegrationByID(tx, canvas.OrganizationID, integrationID)
 				if findErr == nil {
 					input.integrations[integrationType] = factoryTemplateIntegration{
 						id:   integration.ID.String(),
@@ -677,7 +679,7 @@ func deriveFactoryTemplateInput(
 			}
 		}
 		for _, name := range factoryIntegrationNames(node.Configuration) {
-			integration, err := models.FindIntegrationByName(tx, canvas.OrganizationID, name)
+			integration, err := factoryAutomationIntegrationByName(tx, canvas.OrganizationID, name)
 			if err != nil {
 				continue
 			}
@@ -856,7 +858,7 @@ func materializeIntakeDefaults(
 	if trigger.IntegrationID != nil {
 		integrationID, parseErr := uuid.Parse(*trigger.IntegrationID)
 		if parseErr == nil {
-			integration, findErr := models.FindIntegrationInTransaction(tx, canvas.OrganizationID, integrationID)
+			integration, findErr := factoryAutomationIntegrationByID(tx, canvas.OrganizationID, integrationID)
 			if findErr == nil {
 				binding.Integration = &yaml.IntegrationRef{ID: integration.ID.String(), Name: integration.InstallationName}
 			}
@@ -891,6 +893,9 @@ func materializeIntakeDefaults(
 			node := &defaults.Spec.Nodes[i]
 			if node.ID == intakeFilterNodeID {
 				node.Configuration["expression"] = intakeFilterExpressionFor(intake.Source, settings)
+			}
+			if node.ID == intakeCreateNodeID && intake.Source == models.FactoryIntakeSourceWebhook {
+				maps.Copy(node.Configuration, webhookIntakeCreateConfiguration(settings))
 			}
 			if node.ID == intakeTriggerNodeID {
 				if intake.Source == models.FactoryIntakeSourceGitHubIssues {
@@ -1126,6 +1131,16 @@ func materializeNonIntakeFactoryAppDefaults(
 	if handler != nil && handler.FactoryID == factory.ID {
 		return materializePRFeedbackDefaults(tx, factory, canvas, version, handler, savedSettings)
 	}
+	return materializeFactoryAppGraphDefaults(tx, factory, canvas, version, savedSettings)
+}
+
+func materializeFactoryAppGraphDefaults(
+	tx *gorm.DB,
+	factory *models.Factory,
+	canvas *models.Canvas,
+	version *models.CanvasVersion,
+	savedSettings *factoryAutomationSettings,
+) (*materializedFactoryTemplate, error) {
 	// A custom automation can start from a task. That trigger is not the
 	// built-in Backlog app, so reset must leave the canvas unchanged.
 	if models.FactoryAppTemplateID(version.Nodes) == models.FactoryAppTemplateCustomAutomationID {

@@ -323,8 +323,9 @@ func TestAllowedClaudeToolsAddsArtifactToolsOutsidePlanning(t *testing.T) {
 }
 
 func TestFormatStreamJsonLinesRedactsSecretsAndSummarizesImages(t *testing.T) {
-	token := "github-token-for-claude-redaction"
-	t.Setenv("GITHUB_TOKEN", token)
+	token := "z7!"
+	t.Setenv("FIGMA_ACCESS", token)
+	t.Setenv("SUPERPLANE_SECRET_ENV_NAMES", `["FIGMA_ACCESS"]`)
 	image := strings.Repeat("a", 2048)
 	output := runClaudeFormatter(t, []string{
 		fmt.Sprintf(`{"type":"assistant","message":{"content":[{"type":"text","text":%q},{"type":"thinking","thinking":%q},{"type":"tool_use","id":"toolu_a","name":"Bash","input":{"command":%q}}]}}`, token, token, "git remote set-url origin https://x-access-token:"+token+"@github.com/acme/app.git"),

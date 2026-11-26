@@ -1,11 +1,10 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 import { experimentalFeaturesKeys } from "@/hooks/useExperimentalFeatures";
 import type { SuperplaneComponentsNode } from "@/api-client";
 import { MergeConfidenceConfiguration } from "./MergeConfidenceConfiguration";
-import { MERGE_CONFIDENCE_CHECKS } from "./mergeConfidenceChecks";
 import type { PlanningReviewStep } from "./planningReviewMockup";
 import type { NodeConfigurationUpdate } from "./nodeConfigurationCanvas";
 
@@ -31,7 +30,7 @@ vi.mock("@/hooks/useComponentData", () => ({
     isLoading: false,
   }),
 }));
-const steps: PlanningReviewStep[] = MERGE_CONFIDENCE_CHECKS.map((id) => ({
+const steps: PlanningReviewStep[] = ["risk", "performance", "security", "correctness", "reversibility"].map((id) => ({
   name: id,
   type: "prompt",
   prompt: `Merge check: ${id}.\nSaved ${id} rules.`,
@@ -123,9 +122,11 @@ describe("Merge confidence configuration", () => {
       fireEvent.click(toggle);
       expect(toggle).toBeDisabled();
       expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
-      if (access === "unavailable") failCheck(new Error("GitHub unavailable"));
-      else finishCheck([{ id: access, name: "Accept the new GitHub App permissions, then try again." }]);
-      await waitFor(() => expect(toggle).not.toBeDisabled());
+      await act(async () => {
+        if (access === "unavailable") failCheck(new Error("GitHub unavailable"));
+        else finishCheck([{ id: access, name: "Accept the new GitHub App permissions, then try again." }]);
+      });
+      expect(toggle).not.toBeDisabled();
       if (access !== "granted") {
         expect(toggle).not.toBeChecked();
         expect(screen.getByRole("alert")).toHaveTextContent(
@@ -133,8 +134,8 @@ describe("Merge confidence configuration", () => {
         );
         expect(onSave).not.toHaveBeenCalled();
         checkPermissions.mockResolvedValue([{ id: "granted" }]);
-        fireEvent.click(toggle);
-        await waitFor(() => expect(toggle).toBeChecked());
+        await act(async () => fireEvent.click(toggle));
+        expect(toggle).toBeChecked();
       }
       expect(toggle).toBeChecked();
       fireEvent.click(screen.getByRole("button", { name: "Save" }));
@@ -350,13 +351,19 @@ describe("Merge confidence configuration", () => {
   });
 
   it("saves runner options without rewriting stored prompts and retries a failed save", async () => {
-    const stored = [steps[2], custom, { name: "Setup", type: "bash" as const, command: "git status" }, steps[0]];
+    const drift = {
+      name: "Drift from Specification",
+      type: "prompt" as const,
+      prompt: "Merge check: drift.\nSaved rules.",
+    };
+    const stored = [steps[2], custom, { name: "Setup", type: "bash" as const, command: "git status" }, steps[0], drift];
     let rejectSave = (_error: Error) => {};
     const pending = new Promise<void>((_resolve, reject) => {
       rejectSave = reject;
     });
     const onSave = vi.fn().mockReturnValueOnce(pending).mockResolvedValue(undefined);
     const { onClose } = renderSettings(stored, onSave);
+    expect(screen.getByRole("switch", { name: "Correctness" })).toBeChecked();
     fireEvent.change(screen.getByDisplayValue("sonnet"), { target: { value: "opus" } });
     const concurrency = screen.getByRole("spinbutton", { name: "Maximum simultaneous runs" });
     fireEvent.change(concurrency, { target: { value: "3" } });
@@ -391,7 +398,7 @@ describe("Merge confidence configuration", () => {
     expect(screen.getByRole("switch", { name: "Blast radius" })).toBeChecked();
     expect(screen.getByRole("switch", { name: "Security" })).toBeChecked();
     expect(screen.getByRole("switch", { name: "Performance" })).not.toBeChecked();
-    expect(screen.getByRole("switch", { name: "Drift from Specification" })).not.toBeChecked();
+    expect(screen.getByRole("switch", { name: "Correctness" })).not.toBeChecked();
     expect(screen.getByRole("switch", { name: "Reversibility" })).not.toBeChecked();
 
     fireEvent.change(screen.getByDisplayValue("sonnet"), { target: { value: "opus" } });
@@ -448,15 +455,15 @@ describe("Merge confidence configuration", () => {
     expect(onClose).toHaveBeenCalled();
   });
 
-  it("loads and inserts a newly enabled default in canonical order", async () => {
-    const security: PlanningReviewStep = {
-      name: "Default Security",
+  it("loads and inserts the newly enabled Correctness default in canonical order", async () => {
+    const correctness: PlanningReviewStep = {
+      name: "Default Correctness",
       type: "prompt",
-      prompt: "Merge check: security.\nBundled rules.",
+      prompt: "Merge check: correctness.\nBundled rules.",
     };
-    loadDefaults.mockResolvedValue([security]);
-    const { onSave } = renderSettings(steps.filter((step) => step.name !== "security"));
-    fireEvent.click(screen.getByRole("switch", { name: "Security" }));
+    loadDefaults.mockResolvedValue([correctness]);
+    const { onSave } = renderSettings(steps.filter((step) => step.name !== "correctness"));
+    fireEvent.click(screen.getByRole("switch", { name: "Correctness" }));
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
     expect(loadDefaults).toHaveBeenCalledWith({
@@ -467,7 +474,7 @@ describe("Merge confidence configuration", () => {
     });
     expect(onSave).toHaveBeenCalledWith(
       expect.objectContaining({
-        configuration: expect.objectContaining({ steps: [steps[0], steps[1], security, steps[3], steps[4]] }),
+        configuration: expect.objectContaining({ steps: [steps[0], steps[1], steps[2], correctness, steps[4]] }),
       }),
     );
   });

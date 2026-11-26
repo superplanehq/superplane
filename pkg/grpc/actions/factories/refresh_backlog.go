@@ -247,7 +247,7 @@ func archiveDraftWorkOrderIfCurrent(
 		productanalytics.StableEventID(productanalytics.EventFactoryTaskArchived, orderID.String(), models.FactoryWorkOrderResultArchived),
 		productanalytics.Properties{"archive_source": "backlog_refresh"})
 
-	publishWorkOrderClosed(
+	PublishWorkOrderClosed(
 		db,
 		orgID,
 		factory,
@@ -256,6 +256,7 @@ func archiveDraftWorkOrderIfCurrent(
 		models.FactoryWorkOrderStateDraft,
 		models.FactoryWorkOrderResultArchived,
 		false,
+		models.CanvasColumnKeyBacklog,
 	)
 	return true, false
 }

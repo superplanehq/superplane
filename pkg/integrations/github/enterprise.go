@@ -33,7 +33,6 @@ type gitHubMetaResponse struct {
 
 var (
 	gitHubEnterprise             enterprise.GitHubEnterprise
-	orgHasGitHubEnterprise       = githubEnterpriseEnabled
 	orgHasGitHubEnterpriseServer = githubEnterpriseServerEnabled
 	probeGitHubHost              = ProbeGitHubHost
 )
@@ -58,19 +57,6 @@ func setupDB(httpCtx core.HTTPContext) *gorm.DB {
 	return database.Conn()
 }
 
-func githubEnterpriseEnabled(tx *gorm.DB, orgID uuid.UUID) bool {
-	ok, err := models.OrganizationHasExperimentalFeatures(tx, orgID, features.FeatureGitHubEnterprise)
-	return err == nil && ok
-}
-
-func githubEnterpriseEnabledForOrg(tx *gorm.DB, orgID string) bool {
-	id, err := uuid.Parse(orgID)
-	if err != nil {
-		return false
-	}
-	return orgHasGitHubEnterprise(tx, id)
-}
-
 func authorizeGitHubEnterpriseHost(ctx context.Context, tx *gorm.DB, orgID uuid.UUID, host common.Host) error {
 	if host.IsDotCom() {
 		return nil
@@ -79,8 +65,6 @@ func authorizeGitHubEnterpriseHost(ctx context.Context, tx *gorm.DB, orgID uuid.
 		if !orgHasGitHubEnterpriseServer(tx, orgID) {
 			return grpcerrors.FailedPrecondition(errors.New("GitHub Enterprise Server is not available"), "GitHub Enterprise Server is not available")
 		}
-	} else if !orgHasGitHubEnterprise(tx, orgID) {
-		return grpcerrors.FailedPrecondition(errors.New(gitHubEnterpriseUnavailable), gitHubEnterpriseUnavailable)
 	}
 	impl := gitHubEnterprise
 	if impl == nil {
@@ -137,12 +121,6 @@ func withGitHubEnterpriseForTest(impl enterprise.GitHubEnterprise) func() {
 // WithGitHubEnterpriseForTest replaces the GitHub Enterprise capability.
 func WithGitHubEnterpriseForTest(impl enterprise.GitHubEnterprise) func() {
 	return withGitHubEnterpriseForTest(impl)
-}
-
-func withGitHubEnterpriseFlagForTest(fn func(uuid.UUID) bool) func() {
-	previous := orgHasGitHubEnterprise
-	orgHasGitHubEnterprise = func(_ *gorm.DB, orgID uuid.UUID) bool { return fn(orgID) }
-	return func() { orgHasGitHubEnterprise = previous }
 }
 
 func withGitHubEnterpriseServerForTest(fn func(uuid.UUID) bool) func() {

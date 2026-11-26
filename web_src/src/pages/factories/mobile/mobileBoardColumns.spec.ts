@@ -43,6 +43,34 @@ describe("buildMobileBoardColumns", () => {
     }
   });
 
+  it("renders saved custom stages in the line stage order", () => {
+    const columns = buildMobileBoardColumns(
+      {
+        ...PLAN_LINE,
+        stages: [
+          { id: "backlog", key: "backlog", name: "Incoming", kind: "STAGE_KIND_BACKLOG" },
+          { id: "phase-0", key: "phase-0", name: "Build", kind: "STAGE_KIND_PHASE", stepIndex: 0 },
+          { id: "custom", key: "custom-qa", name: "QA", kind: "STAGE_KIND_PHASE" },
+          { id: "phase-1", key: "phase-1", name: "Release", kind: "STAGE_KIND_PHASE", stepIndex: 1 },
+          { id: "verify", key: "verify", name: "Check", kind: "STAGE_KIND_PHASE", autoAdvance: false },
+          { id: "done", key: "done", name: "Shipped", kind: "STAGE_KIND_DONE" },
+        ],
+      },
+      [],
+      REFUND_FACTORY_APPS,
+    );
+
+    expect(columns.map((column) => [column.key, column.title])).toEqual([
+      ["backlog", "Incoming"],
+      ["phase-0", "Build"],
+      ["custom-qa", "QA"],
+      ["phase-1", "Release"],
+      ["verify", "Check"],
+      ["done", "Shipped"],
+    ]);
+    expect(columns[2].emptyDescription).toBe("No tasks in this stage.");
+  });
+
   it("assigns the server total to Backlog and Done", () => {
     const columns = buildMobileBoardColumns(PLAN_LINE, [BACKLOG_DRAFT, DONE_ORDER], REFUND_FACTORY_APPS, {
       backlog: 40,

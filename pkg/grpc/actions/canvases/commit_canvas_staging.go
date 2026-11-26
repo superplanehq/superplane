@@ -40,38 +40,34 @@ func CommitCanvasStaging(
 	}
 
 	userID := uuid.MustParse(user)
-	stagedFiles, err := models.ListStagedFilesForUser(db, canvas.ID, userID)
-	if err != nil {
-		return nil, grpcerrors.Internal(err, "failed to load staging")
-	}
-
-	if len(stagedFiles) == 0 {
-		return nil, grpcerrors.FailedPrecondition(nil, "no staged changes to commit")
-	}
-
-	//
-	// Verify if staged files are for the live version.
-	// Staged files for stale versions cannot be committed.
-	//
-	if err := ensureNotStaleStaging(db, canvas, stagedFiles); err != nil {
-		return nil, err
-	}
-
-	specOps := stagedSpecOperations(stagedFiles)
-	if len(specOps) == 0 {
-		return nil, grpcerrors.FailedPrecondition(nil, "no staged changes to commit")
-	}
-
 	var newLiveVersion *models.CanvasVersion
 	var publishResult changesets.CanvasPublishResult
-	err = db.Transaction(func(tx *gorm.DB) error {
-		liveVersion, err := models.FindLiveCanvasVersionInTransaction(tx, canvas.ID)
+	err := db.Transaction(func(tx *gorm.DB) error {
+		locked, err := lockEditableCanvas(tx, canvas)
+		if err != nil {
+			return err
+		}
+
+		stagedFiles, err := models.ListStagedFilesForUser(tx, locked.ID, userID)
+		if err != nil {
+			return grpcerrors.Internal(err, "failed to load staging")
+		}
+		if len(stagedFiles) == 0 {
+			return grpcerrors.FailedPrecondition(nil, "no staged changes to commit")
+		}
+
+		liveVersion, err := models.FindLiveCanvasVersionInTransaction(tx, locked.ID)
 		if err != nil {
 			return grpcerrors.Internal(err, "failed to load live version")
 		}
 
-		if err := ensureNotStaleStaging(tx, canvas, stagedFiles); err != nil {
-			return err
+		if findStagingBaseVersionID(stagedFiles) != liveVersion.ID {
+			return grpcerrors.FailedPrecondition(nil, "stale staging cannot be committed")
+		}
+
+		specOps := stagedSpecOperations(stagedFiles)
+		if len(specOps) == 0 {
+			return grpcerrors.FailedPrecondition(nil, "no staged changes to commit")
 		}
 
 		//
@@ -82,7 +78,7 @@ func CommitCanvasStaging(
 			tx,
 			registry,
 			canvas.OrganizationID.String(),
-			canvas,
+			locked,
 			liveVersion,
 			specOps,
 			userID,
@@ -100,7 +96,7 @@ func CommitCanvasStaging(
 		publishResult, err = publishCanvasVersionInTransaction(
 			ctx,
 			tx,
-			canvas,
+			locked,
 			liveVersion,
 			nextVersion,
 			changesets.CanvasPublisherOptions{
@@ -119,7 +115,7 @@ func CommitCanvasStaging(
 		//
 		// Remove staged files for user.
 		//
-		err = models.DiscardStagedFilesForUser(tx, canvas.ID, userID, nil)
+		err = models.DiscardStagedFilesForUser(tx, locked.ID, userID, nil)
 		if err != nil {
 			return err
 		}
@@ -289,18 +285,4 @@ func injectMetadataIntoNodes(versionNodes []models.Node, proposedNodes []models.
 	}
 
 	return result
-}
-
-func ensureNotStaleStaging(db *gorm.DB, canvas *models.Canvas, stagedFiles []models.WorkflowStagedFile) error {
-	liveVersion, err := models.FindLiveCanvasVersionInTransaction(db, canvas.ID)
-	if err != nil {
-		return grpcerrors.Internal(err, "failed to load live version")
-	}
-
-	baseVersionID := findStagingBaseVersionID(stagedFiles)
-	if baseVersionID != liveVersion.ID {
-		return grpcerrors.FailedPrecondition(nil, "stale staging cannot be committed")
-	}
-
-	return nil
 }

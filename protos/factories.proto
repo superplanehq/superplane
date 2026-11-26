@@ -28,6 +28,41 @@ option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
 };
 
 service Factories {
+  rpc ExportFactoryConfiguration(ExportFactoryConfigurationRequest) returns (ExportFactoryConfigurationResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/configuration"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Export all stages and automations";
+      description: "Exports all stages and their automations for the selected workspace line. Applying this configuration deletes omitted automations except required phase runners. Accepts a workspace key or UUID.";
+      tags: "Factory";
+    };
+  }
+
+  rpc PlanFactoryConfiguration(PlanFactoryConfigurationRequest) returns (PlanFactoryConfigurationResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/configuration:plan"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Plan stage and automation configuration";
+      description: "Validates all stages and automations for the selected workspace line and compares them with live state without writes. The plan includes deletion of omitted automations except required phase runners.";
+      tags: "Factory";
+    };
+  }
+
+  rpc ApplyFactoryConfiguration(ApplyFactoryConfigurationRequest) returns (ApplyFactoryConfigurationResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/configuration:apply"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Apply stage and automation configuration";
+      description: "Applies all stages and automations for the selected workspace line if its base-state token still matches live state. Deletes omitted automations except required phase runners.";
+      tags: "Factory";
+    };
+  }
+
   rpc ListFactories(ListFactoriesRequest) returns (ListFactoriesResponse) {
     option (google.api.http) = {
       get: "/api/v1/factories"
@@ -952,6 +987,64 @@ service Factories {
     };
   }
 
+  rpc ListFactoryWebhooks(ListFactoryWebhooksRequest) returns (ListFactoryWebhooksResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/webhooks"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List workspace webhooks";
+      description: "Returns the webhooks that automations in this workspace can use as triggers.";
+      tags: "Factory";
+    };
+  }
+
+  rpc CreateFactoryWebhook(CreateFactoryWebhookRequest) returns (CreateFactoryWebhookResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/webhooks"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create a workspace webhook";
+      description: "Creates a webhook and returns its secret. The secret is not returned again.";
+      tags: "Factory";
+    };
+  }
+
+  rpc UpdateFactoryWebhook(UpdateFactoryWebhookRequest) returns (UpdateFactoryWebhookResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/factories/{factory_id}/webhooks/{webhook_id}"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update a workspace webhook";
+      description: "Updates the name and authentication of a webhook. The secret does not change.";
+      tags: "Factory";
+    };
+  }
+
+  rpc DeleteFactoryWebhook(DeleteFactoryWebhookRequest) returns (DeleteFactoryWebhookResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/factories/{factory_id}/webhooks/{webhook_id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Delete a workspace webhook";
+      description: "Deletes a webhook that no automation uses.";
+      tags: "Factory";
+    };
+  }
+
+  rpc RegenerateFactoryWebhookSecret(RegenerateFactoryWebhookSecretRequest) returns (RegenerateFactoryWebhookSecretResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/webhooks/{webhook_id}/secret"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Regenerate a workspace webhook secret";
+      description: "Replaces the webhook secret and returns the new one. The old secret stops working.";
+      tags: "Factory";
+    };
+  }
+
   rpc DescribePlanningSession(DescribePlanningSessionRequest) returns (DescribePlanningSessionResponse) {
     option (google.api.http) = {
       get: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}"
@@ -1288,6 +1381,8 @@ message Factory {
     // predates template metadata. Empty for a custom automation.
     // The id does not change when the canvas name changes.
     string template_id = 7;
+    // Optional board placement. Does not change execution membership.
+    string display_column_key = 8;
   }
 
   string id = 1;
@@ -1323,6 +1418,41 @@ message FactoryPlanning {
 }
 
 message FactoryLine {
+  enum StageKind {
+    STAGE_KIND_UNSPECIFIED = 0;
+    STAGE_KIND_BACKLOG = 1;
+    STAGE_KIND_PHASE = 2;
+    STAGE_KIND_DONE = 3;
+  }
+
+  message Stage {
+    string id = 1;
+    string key = 2;
+    string name = 3;
+    StageKind kind = 4;
+    optional int32 step_index = 5;
+    // Display override for the agent occurrence at this stage.
+    string agent_display_key = 6;
+    // Whether a task moves to the next stage after all synchronous
+    // automations pass. Unset defaults to true. Verify starts with false.
+    optional bool auto_advance = 7;
+  }
+
+  message AutomationMove {
+    string automation_id = 1;
+    // canvas, intake, feedback, or agent-step.
+    string type = 2;
+    string source_key = 3;
+    string destination_key = 4;
+    // Identifies the original phase for an agent-step occurrence.
+    string execution_key = 5;
+  }
+
+  message StageConfiguration {
+    repeated Stage stages = 1;
+    repeated AutomationMove automation_moves = 2;
+  }
+
   message Step {
     string type = 1;
     optional AppStep app = 2;
@@ -1348,6 +1478,7 @@ message FactoryLine {
   // index>", "verify", "done"). Value is a color id. Missing keys use the
   // default color.
   map<string, string> column_colors = 7;
+  repeated Stage stages = 8;
 }
 
 message CreateFactoryLineRequest {
@@ -1368,6 +1499,8 @@ message UpdateFactoryLineRequest {
   // Full replacement of the board column colors. Absent means "do not
   // change"; present (including an empty map) replaces the stored map.
   map<string, string> column_colors = 5;
+  // Full ordered stage configuration. Absent means "do not change".
+  optional FactoryLine.StageConfiguration stage_configuration = 6;
 }
 
 message UpdateFactoryLineResponse {
@@ -1406,6 +1539,8 @@ message FactoryCustomAutomation {
     START_MODE_MANUAL = 1;
     START_MODE_AUTOMATIC = 2;
     START_MODE_SCHEDULED = 3;
+    START_MODE_ON_LEAVE = 4;
+    START_MODE_WEBHOOK = 5;
   }
 
   message Step {
@@ -1431,6 +1566,8 @@ message FactoryCustomAutomation {
   message StartTrigger {
     StartMode start_mode = 1;
     Schedule schedule = 2;
+    // ID of a workspace webhook. Set only for START_MODE_WEBHOOK.
+    string webhook_id = 3;
   }
 
   message Settings {
@@ -1441,6 +1578,10 @@ message FactoryCustomAutomation {
     int32 execution_timeout_seconds = 5;
     Schedule schedule = 6;
     repeated StartTrigger triggers = 7;
+    // Absent on automations saved before this choice. True runs on a task.
+    optional bool runs_on_task = 8;
+    optional bool skip_setup_commands = 9;
+    optional bool skip_repository_checkout = 10;
   }
 
   Factory.Automation automation = 1;
@@ -1473,6 +1614,8 @@ message UpdateFactoryCustomAutomationRequest {
   string automation_id = 2;
   string name = 3;
   FactoryCustomAutomation.Settings settings = 4;
+  // Use the version verified for editing when opening the fallback form.
+  string expected_live_version_id = 5;
 }
 
 message UpdateFactoryCustomAutomationResponse {
@@ -1559,6 +1702,7 @@ message FactoryIntake {
     SOURCE_DEPENDABOT_ALERTS = 6;
     SOURCE_DATADOG = 7;
     SOURCE_LINEAR_ISSUES = 8;
+    SOURCE_WEBHOOK = 9;
   }
 
   enum InitialImportStatus {
@@ -1670,6 +1814,16 @@ message FactoryIntake {
     // linear_project_ids is not empty. Omitted means true.
     // Linear issue intakes only.
     optional bool linear_include_issues_without_project = 26;
+    // Dot path in the JSON request body for the task title. Omitted updates
+    // preserve the path. Webhook intakes only.
+    optional string webhook_title_path = 27;
+    // Dot path in the JSON request body for the task description.
+    // Webhook intakes only.
+    optional string webhook_description_path = 28;
+    // Dot path in the JSON request body for the link to the source item.
+    // A request whose link matches a task creates no task. Empty turns off
+    // the link. Webhook intakes only.
+    optional string webhook_link_path = 29;
   }
 
   string id = 1;
@@ -2382,6 +2536,12 @@ message WorkOrderLineDispatch {
   // Thinking chosen at Start. Empty means Auto: each runner keeps the
   // thinking level stored on the live automation canvas.
   string thinking_level = 11;
+  // Ordered stage snapshot used by task history. It stays stable when the
+  // line is edited after this dispatch starts.
+  repeated FactoryLine.Stage stages = 12;
+  // Stage that currently owns the task, or the terminal stage where this
+  // dispatch stopped. Empty on historical dispatches created before this field.
+  string current_stage_key = 13;
 }
 
 // WorkOrderQueueItem is a line dispatch waiting for admission into a step
@@ -2401,6 +2561,7 @@ message WorkOrderQueueItem {
   // snapshot. Lets the UI place the queued work order on the correct
   // board column even after a line edit moved the step.
   string app_id = 6;
+  string stage_key = 7;
 }
 
 message WorkOrderExecution {
@@ -2449,11 +2610,13 @@ message WorkOrderExecution {
   // hosted credit failures: no_hosted_credit,
   // hosted_subscription_required, payment_past_due, or workspace_budget_empty.
   string failure_reason = 14;
+  string stage_key = 15;
 }
 
 message WorkOrderExecutionStep {
   string name = 1;
   int32 step_index = 2;
+  string stage_key = 3;
 }
 
 message DescribeWorkOrderRequest {
@@ -3555,6 +3718,71 @@ message RevokeFactoryMCPClientRequest {
 
 message RevokeFactoryMCPClientResponse {}
 
+message FactoryWebhook {
+  enum Authentication {
+    AUTHENTICATION_UNSPECIFIED = 0;
+    AUTHENTICATION_BEARER = 1;
+    AUTHENTICATION_SIGNATURE = 2;
+    AUTHENTICATION_HEADER_TOKEN = 3;
+  }
+
+  string id = 1;
+  string name = 2;
+  string url = 3;
+  Authentication authentication = 4;
+  string header_name = 5;
+  int32 automation_count = 6;
+  google.protobuf.Timestamp created_at = 7;
+}
+
+message ListFactoryWebhooksRequest {
+  string factory_id = 1;
+}
+
+message ListFactoryWebhooksResponse {
+  repeated FactoryWebhook webhooks = 1;
+}
+
+message CreateFactoryWebhookRequest {
+  string factory_id = 1;
+  string name = 2;
+  FactoryWebhook.Authentication authentication = 3;
+  string header_name = 4;
+}
+
+message CreateFactoryWebhookResponse {
+  FactoryWebhook webhook = 1;
+  string secret = 2;
+}
+
+message UpdateFactoryWebhookRequest {
+  string factory_id = 1;
+  string webhook_id = 2;
+  string name = 3;
+  FactoryWebhook.Authentication authentication = 4;
+  string header_name = 5;
+}
+
+message UpdateFactoryWebhookResponse {
+  FactoryWebhook webhook = 1;
+}
+
+message DeleteFactoryWebhookRequest {
+  string factory_id = 1;
+  string webhook_id = 2;
+}
+
+message DeleteFactoryWebhookResponse {}
+
+message RegenerateFactoryWebhookSecretRequest {
+  string factory_id = 1;
+  string webhook_id = 2;
+}
+
+message RegenerateFactoryWebhookSecretResponse {
+  string secret = 1;
+}
+
 message PendingHandOff {
   string line_id = 1;
   string column = 2;
@@ -3668,4 +3896,65 @@ message ImportFactoryPullRequestRequest {
 message ImportFactoryPullRequestResponse {
   WorkOrder order = 1;
   bool created = 2;
+}
+
+// This bundle covers all existing stages and their automations. It is not a workspace backup.
+message FactoryConfigurationBundle {
+  string manifest_path = 1;
+  repeated FactoryConfigurationFile files = 2;
+}
+
+message FactoryConfigurationFile {
+  string path = 1;
+  string content = 2;
+}
+
+message FactoryConfigurationChange {
+  string resource = 1;
+  string field_path = 2;
+  string previous_value = 3;
+  string requested_value = 4;
+}
+
+message FactoryConfigurationDiagnostic {
+  string path = 1;
+  string field = 2;
+  string message = 3;
+}
+
+message ExportFactoryConfigurationRequest {
+  string factory_id = 1;
+  string line_id = 2;
+}
+
+message ExportFactoryConfigurationResponse {
+  FactoryConfigurationBundle bundle = 1;
+  string coverage = 2;
+}
+
+message PlanFactoryConfigurationRequest {
+  string factory_id = 1;
+  string line_id = 2;
+  FactoryConfigurationBundle bundle = 3;
+}
+
+message PlanFactoryConfigurationResponse {
+  repeated FactoryConfigurationChange changes = 1;
+  repeated FactoryConfigurationDiagnostic diagnostics = 2;
+  // Opaque token for this live state and normalized desired configuration.
+  string base_state_token = 3;
+  string coverage = 4;
+}
+
+message ApplyFactoryConfigurationRequest {
+  string factory_id = 1;
+  string line_id = 2;
+  FactoryConfigurationBundle bundle = 3;
+  string base_state_token = 4;
+}
+
+message ApplyFactoryConfigurationResponse {
+  bool changed = 1;
+  repeated FactoryConfigurationChange changes = 2;
+  string coverage = 3;
 }

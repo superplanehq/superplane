@@ -6,8 +6,51 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 )
 
+const (
+	AutomationsPath        = "/api/v2/automations"
+	AutomationPath         = AutomationsPath + "/{id}"
+	ValidateAutomationPath = AutomationsPath + ":validate"
+)
+
 func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 	return map[HTTPRoute]AuthorizationRule{
+		{Method: "GET", Pattern: "/api/v1/factories/{factory_id}/configuration"}: {
+			Resource: "factories", Action: "read", DomainType: models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureFactoryAsCode},
+		},
+		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/configuration:plan"}: {
+			Resource: "factories", Action: "update", DomainType: models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureFactoryAsCode},
+		},
+		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/configuration:apply"}: {
+			Resource: "factories", Action: "update", DomainType: models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureFactoryAsCode},
+		},
+		{Method: "GET", Pattern: AutomationsPath}: {
+			Resource: "factories", Action: "read", DomainType: models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories},
+		},
+		{Method: "GET", Pattern: AutomationPath}: {
+			Resource: "factories", Action: "read", DomainType: models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories},
+		},
+		{Method: "POST", Pattern: ValidateAutomationPath}: {
+			Resource: "factories", Action: "update", DomainType: models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories},
+		},
+		{Method: "POST", Pattern: AutomationsPath}: {
+			Resource: "factories", Action: "update", DomainType: models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories},
+		},
+		{Method: "PUT", Pattern: AutomationPath}: {
+			Resource: "factories", Action: "update", DomainType: models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories},
+		},
+		{Method: "DELETE", Pattern: AutomationPath}: {
+			Resource: "factories", Action: "update", DomainType: models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories},
+		},
+
 		{Method: "GET", Pattern: "/api/v1/organizations/{id}/fleets/{fleet_id}/tasks"}:               {Resource: "org", Action: "read", DomainType: models.DomainTypeOrganization},
 		{Method: "GET", Pattern: "/api/v1/organizations/{id}/fleets"}:                                {Resource: "org", Action: "read", DomainType: models.DomainTypeOrganization},
 		{Method: "POST", Pattern: "/api/v1/organizations/{id}/fleets"}:                               {Resource: "org", Action: "update", DomainType: models.DomainTypeOrganization},
@@ -83,6 +126,41 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			Action:                       "update",
 			DomainType:                   models.DomainTypeOrganization,
 			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureSuperPlaneMCPServer},
+		},
+		{Method: "GET", Pattern: "/api/v1/factories/{factory_id}/webhooks"}: {
+			Resource:                        "factories",
+			Action:                          "read",
+			DomainType:                      models.DomainTypeOrganization,
+			RequiredExperimentalFeatures:    []string{features.FeatureFactories},
+			RequiredAnyExperimentalFeatures: []string{features.FeatureFactoryAsCode, features.FeatureFactoryWebhookIntake},
+		},
+		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/webhooks"}: {
+			Resource:                        "factories",
+			Action:                          "update",
+			DomainType:                      models.DomainTypeOrganization,
+			RequiredExperimentalFeatures:    []string{features.FeatureFactories},
+			RequiredAnyExperimentalFeatures: []string{features.FeatureFactoryAsCode, features.FeatureFactoryWebhookIntake},
+		},
+		{Method: "PATCH", Pattern: "/api/v1/factories/{factory_id}/webhooks/{webhook_id}"}: {
+			Resource:                        "factories",
+			Action:                          "update",
+			DomainType:                      models.DomainTypeOrganization,
+			RequiredExperimentalFeatures:    []string{features.FeatureFactories},
+			RequiredAnyExperimentalFeatures: []string{features.FeatureFactoryAsCode, features.FeatureFactoryWebhookIntake},
+		},
+		{Method: "DELETE", Pattern: "/api/v1/factories/{factory_id}/webhooks/{webhook_id}"}: {
+			Resource:                        "factories",
+			Action:                          "update",
+			DomainType:                      models.DomainTypeOrganization,
+			RequiredExperimentalFeatures:    []string{features.FeatureFactories},
+			RequiredAnyExperimentalFeatures: []string{features.FeatureFactoryAsCode, features.FeatureFactoryWebhookIntake},
+		},
+		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/webhooks/{webhook_id}/secret"}: {
+			Resource:                        "factories",
+			Action:                          "update",
+			DomainType:                      models.DomainTypeOrganization,
+			RequiredExperimentalFeatures:    []string{features.FeatureFactories},
+			RequiredAnyExperimentalFeatures: []string{features.FeatureFactoryAsCode, features.FeatureFactoryWebhookIntake},
 		},
 		{Method: "DELETE", Pattern: "/api/v1/groups/{group_name}"}: {
 			Resource:   "groups",
@@ -298,11 +376,11 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 		},
 		{Method: "GET", Pattern: "/api/v1/factories/{factory_id}/pull-request-imports/candidates"}: {
 			Resource: "work_orders", Action: "read", DomainType: models.DomainTypeOrganization,
-			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureFactoryPullRequestImport},
+			RequiredExperimentalFeatures: []string{features.FeatureFactories},
 		},
 		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/pull-request-imports"}: {
 			Resource: "work_orders", Action: "create", RequiredActions: []string{"update"}, DomainType: models.DomainTypeOrganization,
-			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureFactoryPullRequestImport},
+			RequiredExperimentalFeatures: []string{features.FeatureFactories},
 		},
 
 		{Method: "GET", Pattern: "/api/v1/factories/{factory_id}/intakes/{intake_id}/items"}: {

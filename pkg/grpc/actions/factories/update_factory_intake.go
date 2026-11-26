@@ -127,6 +127,13 @@ func resolveUpdatedIntakeBinding(
 	if req.IntegrationId == nil && req.ResourceId == nil {
 		return nil, nil
 	}
+	if intake.Source == models.FactoryIntakeSourceWebhook {
+		binding, err := resolveWebhookIntakeBinding(db, factory, req.GetResourceId())
+		if err != nil {
+			return nil, factoryErrorToStatus(err, "failed to update factory intake")
+		}
+		return binding, nil
+	}
 	if req.IntegrationId == nil || req.ResourceId == nil {
 		return nil, factoryErrorToStatus(
 			invalidArgument("intake integration and project are required"),
@@ -371,6 +378,10 @@ func applyIntakeSettingsToGraph(
 	if source == models.FactoryIntakeSourceGitHubIssues {
 		updated = deriveGitHubIssueListening(updated)
 	}
+	if source == models.FactoryIntakeSourceWebhook {
+		nodes, err := applyWebhookIntakeSettingsToGraph(graph, updated, nodes)
+		return nodes, edges, err
+	}
 	if source == models.FactoryIntakeSourceLinearIssues && !linearIntakeHasScope(updated) {
 		return nil, nil, invalidArgument("a Linear team is required")
 	}
@@ -451,6 +462,21 @@ func applyIntakeBindingToGraph(
 ) ([]models.Node, error) {
 	if graph.TriggerNodeID == "" {
 		return nil, invalidArgument("intake automation has no trigger to update")
+	}
+
+	if binding.integrationRef() == nil {
+		for i := range nodes {
+			if nodes[i].ID != graph.TriggerNodeID {
+				continue
+			}
+			configuration := maps.Clone(nodes[i].Configuration)
+			if configuration == nil {
+				configuration = map[string]any{}
+			}
+			maps.Copy(configuration, binding.configuration())
+			nodes[i].Configuration = configuration
+		}
+		return nodes, nil
 	}
 
 	boundID := binding.integrationRef().ID

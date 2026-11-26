@@ -1,6 +1,7 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { useByokRunnerModelDefault } from "@/hooks/useByokRunnerModelDefault";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useFactoryAgentResources } from "@/hooks/useFactoryAgentResources";
@@ -38,9 +39,11 @@ export function PlanningReviewForm({
   showResources = true,
   showConcurrency = true,
   showSteps = true,
+  showModel = true,
   modelLabel,
   modelDescription,
   modelOnly = false,
+  applyModelDefault = true,
   appearance = "card",
   view = "full",
   onRestoreDefaultPrompt,
@@ -59,9 +62,11 @@ export function PlanningReviewForm({
   showResources?: boolean;
   showConcurrency?: boolean;
   showSteps?: boolean;
+  showModel?: boolean;
   modelLabel?: string;
   modelDescription?: string;
   modelOnly?: boolean;
+  applyModelDefault?: boolean;
   /** `fields` matches the pull request step. `card` is the GitHub agent settings. */
   appearance?: "card" | "fields";
   view?: "full" | "implementation" | "planning" | "pr-feedback";
@@ -94,9 +99,11 @@ export function PlanningReviewForm({
           showResources={showResources}
           showConcurrency={showConcurrency}
           showSteps={showSteps}
+          showModel={showModel}
           modelLabel={modelLabel}
           modelDescription={modelDescription}
           modelOnly={modelOnly}
+          applyModelDefault={applyModelDefault}
           onRestoreDefaultPrompt={onRestoreDefaultPrompt}
           restoreDefaultPromptDisabled={restoreDefaultPromptDisabled}
           restoreError={restoreError}
@@ -121,9 +128,11 @@ function AgentPanel({
   showResources,
   showConcurrency,
   showSteps,
+  showModel,
   modelLabel,
   modelDescription,
   modelOnly,
+  applyModelDefault,
   onRestoreDefaultPrompt,
   restoreDefaultPromptDisabled,
   restoreError,
@@ -142,9 +151,11 @@ function AgentPanel({
   showResources: boolean;
   showConcurrency: boolean;
   showSteps: boolean;
+  showModel: boolean;
   modelLabel?: string;
   modelDescription?: string;
   modelOnly: boolean;
+  applyModelDefault: boolean;
   onRestoreDefaultPrompt?: () => void;
   restoreDefaultPromptDisabled: boolean;
   restoreError?: string;
@@ -186,6 +197,7 @@ function AgentPanel({
   const credentials = component.configuration.credentials as { source?: string } | undefined;
   const byokModelDefault = useByokRunnerModelDefault({
     enabled:
+      applyModelDefault &&
       credentials?.source !== "subscription" &&
       modelUsedField?.type === "hosted-model" &&
       modelProvider !== "" &&
@@ -201,7 +213,7 @@ function AgentPanel({
   onChangeRef.current = onChange;
 
   useEffect(() => {
-    if (!byokModelDefault) {
+    if (!applyModelDefault || !byokModelDefault) {
       return;
     }
     const current = componentRef.current;
@@ -209,34 +221,35 @@ function AgentPanel({
       ...current,
       configuration: { ...current.configuration, model: byokModelDefault },
     });
-  }, [byokModelDefault]);
+  }, [applyModelDefault, byokModelDefault]);
 
-  const modelControl = modelUsedField ? (
-    <ConfigurationFieldRenderer
-      field={view !== "full" ? { ...modelUsedField, label: "Default model" } : modelUsedField}
-      hideLabel={appearance === "fields"}
-      triggerClassName={
-        view !== "full" ? "h-8 w-full shadow-none" : appearance === "fields" ? FLAT_FIELD_CONTROL : undefined
-      }
-      value={byokModelDefault ?? component.configuration.model}
-      onChange={(value) => setConfigurationField("model", value)}
-      onValuesChange={(patch) => {
-        const configuration = { ...component.configuration, ...patch };
-        if (!patch.thinkingLevel) {
-          delete configuration.thinkingLevel;
+  const modelControl =
+    showModel && modelUsedField && (!modelOnly || modelUsedField.type === "hosted-model") ? (
+      <ConfigurationFieldRenderer
+        field={view !== "full" ? { ...modelUsedField, label: "Default model" } : modelUsedField}
+        hideLabel={appearance === "fields"}
+        triggerClassName={
+          view !== "full" ? "h-8 w-full shadow-none" : appearance === "fields" ? FLAT_FIELD_CONTROL : undefined
         }
-        onChange({ ...component, configuration });
-      }}
-      allValues={component.configuration}
-      organizationId={organizationId}
-      factoryId={factoryId}
-      allowExpressions={view === "full"}
-      autocompleteExampleObj={EXPRESSION_CONTEXT}
-      fieldPath="model"
-      readOnly={disabled}
-      modelOnly={modelOnly}
-    />
-  ) : null;
+        value={(applyModelDefault ? byokModelDefault : undefined) ?? component.configuration.model}
+        onChange={(value) => setConfigurationField("model", value)}
+        onValuesChange={(patch) => {
+          const configuration = { ...component.configuration, ...patch };
+          if (!patch.thinkingLevel) {
+            delete configuration.thinkingLevel;
+          }
+          onChange({ ...component, configuration });
+        }}
+        allValues={component.configuration}
+        organizationId={organizationId}
+        factoryId={factoryId}
+        allowExpressions={view === "full"}
+        autocompleteExampleObj={EXPRESSION_CONTEXT}
+        fieldPath="model"
+        readOnly={disabled}
+        modelOnly={modelOnly}
+      />
+    ) : null;
 
   const concurrencyControl = (
     <Input
@@ -318,6 +331,34 @@ function AgentPanel({
             {modelControl}
           </div>
         ) : null}
+        <div className={appearance === "card" ? "col-span-2 flex flex-col gap-4" : "flex flex-col gap-8"}>
+          <ImplementSettingRow
+            label="Skip repository checkout"
+            description="Do not check out the repository."
+            htmlFor={`skip-repository-checkout-${component.id}`}
+          >
+            <Switch
+              id={`skip-repository-checkout-${component.id}`}
+              aria-describedby={`skip-repository-checkout-${component.id}-help`}
+              checked={component.configuration.skipRepositoryCheckout === true}
+              disabled={disabled}
+              onCheckedChange={(checked) => setConfigurationField("skipRepositoryCheckout", checked)}
+            />
+          </ImplementSettingRow>
+          <ImplementSettingRow
+            label="Skip setup commands"
+            description="Do not run workspace setup commands."
+            htmlFor={`skip-setup-commands-${component.id}`}
+          >
+            <Switch
+              id={`skip-setup-commands-${component.id}`}
+              aria-describedby={`skip-setup-commands-${component.id}-help`}
+              checked={component.configuration.skipSetupCommands === true}
+              disabled={disabled}
+              onCheckedChange={(checked) => setConfigurationField("skipSetupCommands", checked)}
+            />
+          </ImplementSettingRow>
+        </div>
       </section>
       {view === "full" && showSteps ? beforeSteps : null}
       {view === "full" && showSteps ? (

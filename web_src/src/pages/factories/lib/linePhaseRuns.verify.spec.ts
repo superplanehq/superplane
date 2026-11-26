@@ -66,6 +66,56 @@ describe("collectLineVerifyOrders", () => {
 
     expect(verify.map((entry) => entry.id)).toEqual(["wo-wait"]);
     expect(visibleLineStageColumns(board, verify).flatMap((column) => column.runs)).toEqual([]);
+    expect(
+      visibleLineStageColumns(board, verify, false)
+        .flatMap((column) => column.runs)
+        .map((run) => run.workOrderId),
+    ).toEqual(["wo-wait"]);
+  });
+
+  it("keeps a passed task on the last stage when that stage stops it", () => {
+    const stopped = order("wo-stopped", "Stopped on demo", [
+      {
+        id: "e-last",
+        line: { id: "line-1", name: "poc" },
+        step: "demo",
+        stepIndex: 2,
+        stageKey: "phase-2",
+        state: "STATE_FINISHED",
+        result: "RESULT_PASSED",
+        createdAt: "2026-08-11T12:00:00.000Z",
+      },
+    ]);
+    stopped.lineDispatches![0]!.currentStageKey = "phase-2";
+    stopped.lineDispatches![0]!.state = "STATE_FINISHED";
+
+    const board = buildLinePhaseBoard(LINE, [stopped], APPS);
+
+    expect(collectLineVerifyOrders(board, [stopped], LINE)).toEqual([]);
+    expect(board.flatMap((column) => column.runs).map((run) => run.workOrderId)).toEqual(["wo-stopped"]);
+  });
+
+  it("uses the dispatch current stage when an empty Verify stage owns the task", () => {
+    const waiting = order("wo-current-verify", "Waiting review", [
+      {
+        id: "e-first",
+        line: { id: "line-1", name: "poc" },
+        step: "plan",
+        stepIndex: 0,
+        stageKey: "phase-0",
+        state: "STATE_FINISHED",
+        result: "RESULT_PASSED",
+        createdAt: "2026-08-11T12:00:00.000Z",
+      },
+    ]);
+    waiting.lineDispatches![0]!.currentStageKey = "verify";
+    waiting.lineDispatches![0]!.state = "STATE_FINISHED";
+
+    const board = buildLinePhaseBoard(LINE, [waiting], APPS);
+    const verify = collectLineVerifyOrders(board, [waiting], LINE);
+
+    expect(verify.map((entry) => entry.id)).toEqual(["wo-current-verify"]);
+    expect(board.flatMap((column) => column.runs)).toEqual([]);
   });
 
   it("keeps a failed last stage on the stage column", () => {
@@ -108,6 +158,83 @@ describe("collectLineVerifyOrders", () => {
 
     const board = buildLinePhaseBoard(LINE, [closed], APPS);
     expect(collectLineVerifyOrders(board, [closed])).toEqual([]);
+  });
+
+  describe("when a custom stage is the last line stage", () => {
+    const CUSTOM_KEY = "custom-docs";
+    const CUSTOM_LAST_LINE: FactoriesFactoryLine = {
+      id: "line-1",
+      name: "poc",
+      steps: [{ app: { app: "app-plan" } }, { app: { app: "app-docs" } }],
+      stages: [
+        { id: "backlog", key: "backlog", name: "Backlog", kind: "STAGE_KIND_BACKLOG" },
+        { id: "phase-0", key: "phase-0", name: "Plan", kind: "STAGE_KIND_PHASE", stepIndex: 0 },
+        { id: "docs", key: CUSTOM_KEY, name: "Update docs", kind: "STAGE_KIND_PHASE" },
+        { id: "verify", key: "verify", name: "Verify", kind: "STAGE_KIND_PHASE", autoAdvance: false },
+        { id: "done", key: "done", name: "Done", kind: "STAGE_KIND_DONE" },
+      ],
+    };
+
+    function orderWithCustomStage(id: string, customStep: Partial<TestExecution>): FactoriesWorkOrder {
+      return order(id, id, [
+        {
+          id: `${id}-plan`,
+          line: { id: "line-1", name: "poc" },
+          step: "plan",
+          stepIndex: 0,
+          stageKey: "phase-0",
+          state: "STATE_FINISHED",
+          result: "RESULT_PASSED",
+          createdAt: "2026-08-11T12:00:00.000Z",
+        },
+        {
+          id: `${id}-docs`,
+          line: { id: "line-1", name: "poc" },
+          step: "Update Docs",
+          stepIndex: 1,
+          stageKey: CUSTOM_KEY,
+          createdAt: "2026-08-11T12:10:00.000Z",
+          ...customStep,
+        },
+      ]);
+    }
+
+    it("moves a waiting order that passed the custom stage into Verify", () => {
+      const waiting = orderWithCustomStage("wo-docs-passed", { state: "STATE_FINISHED", result: "RESULT_PASSED" });
+      const board = buildLinePhaseBoard(CUSTOM_LAST_LINE, [waiting], APPS);
+
+      const verify = collectLineVerifyOrders(board, [waiting], CUSTOM_LAST_LINE);
+
+      expect(verify.map((entry) => entry.id)).toEqual(["wo-docs-passed"]);
+    });
+
+    it("moves a waiting order to Verify when the custom stage has no automation", () => {
+      const waiting = order("wo-plan-passed", "wo-plan-passed", [
+        {
+          id: "wo-plan-passed-plan",
+          line: { id: "line-1", name: "poc" },
+          step: "plan",
+          stepIndex: 0,
+          stageKey: "phase-0",
+          state: "STATE_FINISHED",
+          result: "RESULT_PASSED",
+          createdAt: "2026-08-11T12:00:00.000Z",
+        },
+      ]);
+      const line = { ...CUSTOM_LAST_LINE, steps: [{ app: { app: "app-plan" } }] };
+      const board = buildLinePhaseBoard(line, [waiting], APPS);
+
+      const verify = collectLineVerifyOrders(board, [waiting], line);
+
+      expect(verify.map((entry) => entry.id)).toEqual(["wo-plan-passed"]);
+    });
+
+    it("keeps a running custom stage off Verify", () => {
+      const running = orderWithCustomStage("wo-docs-running", { state: "STATE_STARTED" });
+      const board = buildLinePhaseBoard(CUSTOM_LAST_LINE, [running], APPS);
+
+      expect(collectLineVerifyOrders(board, [running], CUSTOM_LAST_LINE)).toEqual([]);
+    });
   });
 
   it("keeps a task in its source-list place when updated_at changes", () => {

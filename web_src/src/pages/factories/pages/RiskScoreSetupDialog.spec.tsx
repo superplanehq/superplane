@@ -49,19 +49,18 @@ describe("RiskScoreSetupDialog", () => {
     mocks.showSuccessToast.mockReset();
   });
 
-  it("lists the four checks and previews them on the task", async () => {
+  it("lists the built-in checks and previews them on the task", async () => {
     const user = userEvent.setup();
     renderDialog();
 
     expect(screen.getByRole("heading", { name: RISK_SCORE_SETUP_COPY.title })).toBeInTheDocument();
-    expect(screen.getByTestId("merge-confidence-setup-check-risk")).toHaveTextContent("Blast radius");
-    expect(screen.getByTestId("merge-confidence-setup-check-performance")).toHaveTextContent("Performance");
-    expect(screen.getByTestId("merge-confidence-setup-check-security")).toHaveTextContent("Security");
-    expect(screen.getByTestId("merge-confidence-setup-check-drift")).toHaveTextContent("Drift from Specification");
-    expect(screen.getByTestId("merge-confidence-setup-check-reversibility")).toHaveTextContent("Reversibility");
+    const switches = screen.getAllByRole("switch");
+    const labels = ["Correctness", "Performance", "Security", "Blast radius", "Reversibility"];
+    expect(switches).toHaveLength(labels.length);
+    labels.forEach((label, index) => expect(switches[index]).toHaveAccessibleName(label));
     expect(screen.queryByTestId("risk-score-setup-categories")).not.toBeInTheDocument();
     expect(screen.getByTestId("risk-score-setup-preview-card")).toHaveTextContent("Low risk");
-    expect(screen.getByTestId("risk-score-setup-preview-card")).toHaveTextContent("On task");
+    expect(screen.getByTestId("risk-score-setup-preview-card")).toHaveTextContent(/Correctness\s*5\/5\s*Pass/);
 
     await user.click(screen.getByRole("switch", { name: "Performance" }));
     expect(screen.getByTestId("risk-score-setup-preview-card")).not.toHaveTextContent("Performance");

@@ -43,6 +43,10 @@ func webhookCallbackURL(baseURL, webhookID string) string {
 	return fmt.Sprintf("%s/api/v1/webhooks/%s", strings.TrimRight(strings.TrimSpace(baseURL), "/"), webhookID)
 }
 
+func WebhookCallbackURL(baseURL, webhookID string) string {
+	return webhookCallbackURL(baseURL, webhookID)
+}
+
 func (c *WebhookContext) CallbackHasActiveNodes(webhookID string) (bool, error) {
 	id, err := uuid.Parse(webhookID)
 	if err != nil {

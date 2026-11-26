@@ -1,7 +1,8 @@
 import type { FactoriesWorkOrder } from "@/api-client";
 
 import { CUSTOM_CATALOG_ID, EVENT_CUSTOM_ENTRY } from "./columnAutomationCatalog";
-import type { ColumnAutomation, ColumnKey } from "./columnAutomations";
+import type { ColumnAutomation } from "./columnAutomations";
+import type { ColumnKey } from "./columnKeys";
 import { CUSTOM_AUTOMATION_TEMPLATE_ID, type CustomAutomationMode } from "./customAutomation";
 import { customAutomationColumnAutomation } from "./customAutomationColumnAutomation";
 import type { LinePhaseColumn } from "./linePhaseRuns";
@@ -10,16 +11,18 @@ export type ColumnAutomationApp = {
   id?: string;
   name?: string;
   columnKey?: string;
+  displayColumnKey?: string;
   templateId?: string;
   customAutomationMode?: CustomAutomationMode;
   customAutomationIcon?: string;
   customAutomationCronExpression?: string;
   customAutomationTriggers?: Array<{ mode: CustomAutomationMode; cronExpression?: string }>;
+  customAutomationRunsOnTask?: boolean;
 };
 
 export function customColumnAutomations(
   apps: ColumnAutomationApp[],
-  columnKey: "backlog" | "implement" | "verify" | "done",
+  columnKey: string,
   workOrders: FactoriesWorkOrder[],
   skipIds: Set<string>,
   runningCountForApp: (appId: string | undefined, orders: FactoriesWorkOrder[]) => number,
@@ -47,6 +50,7 @@ export function customColumnAutomations(
         runningCount: runningCountForApp(id, workOrders),
         catalogId: columnKey === "backlog" ? "scheduled-intake" : CUSTOM_CATALOG_ID,
         canvasId: id,
+        columnKey,
       },
     ];
   });

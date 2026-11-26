@@ -27,7 +27,11 @@ describe("resolvePageObservability", () => {
   it("maps admin routes", () => {
     expect(resolvePageObservability("/admin")).toEqual({ pageKey: "adminOrganizations", attributes: {} });
     expect(resolvePageObservability("/admin/accounts")).toEqual({ pageKey: "adminAccounts", attributes: {} });
+    expect(resolvePageObservability("/admin/settings")).toEqual({ pageKey: "adminSettings", attributes: {} });
     expect(resolvePageObservability("/admin/price-books")).toEqual({ pageKey: "adminPriceBooks", attributes: {} });
+    expect(resolvePageObservability("/admin/runner-tasks")).toEqual({ pageKey: "adminRunnerTasks", attributes: {} });
+    expect(resolvePageObservability("/admin/unknown")).toEqual({ pageKey: "adminOrganizations", attributes: {} });
+    expect(resolvePageObservability("/admin/organizations")).toEqual({ pageKey: "adminOrganizations", attributes: {} });
     expect(resolvePageObservability("/admin/organizations/org-1")).toEqual({
       pageKey: "adminOrganizationDetail",
       attributes: { organization_id: "org-1" },
@@ -55,6 +59,41 @@ describe("resolvePageObservability", () => {
       pageKey: "canvas",
       attributes: { organization_id: "org-1", canvas_id: "canvas-1" },
     });
+    expect(resolvePageObservability("/org-1/canvases/canvas-1/settings")).toEqual({
+      pageKey: "canvasSettings",
+      attributes: { organization_id: "org-1", canvas_id: "canvas-1" },
+    });
+    expect(resolvePageObservability("/org-1/apps/new/settings")).toEqual({
+      pageKey: "newApp",
+      attributes: { organization_id: "org-1" },
+    });
+    expect(resolvePageObservability("/org-1/canvases/new")).toEqual({
+      pageKey: "canvas",
+      attributes: { organization_id: "org-1", canvas_id: "new" },
+    });
+  });
+
+  it("returns null for missing canvas IDs and unrecognized organization routes", () => {
+    expect(resolvePageObservability("/org-1/apps")).toBeNull();
+    expect(resolvePageObservability("/org-1/canvases")).toBeNull();
+    expect(resolvePageObservability("/org-1/unknown")).toBeNull();
+  });
+
+  it("ignores empty and trailing segments in admin and canvas routes", () => {
+    expect(resolvePageObservability("//admin//organizations//org-1/ignored/trailing/")).toEqual({
+      pageKey: "adminOrganizationDetail",
+      attributes: { organization_id: "org-1" },
+    });
+    for (const route of ["apps", "canvases"]) {
+      expect(resolvePageObservability(`/org-1/${route}/canvas-1/ignored/trailing/`)).toEqual({
+        pageKey: "canvas",
+        attributes: { organization_id: "org-1", canvas_id: "canvas-1" },
+      });
+      expect(resolvePageObservability(`/org-1/${route}/canvas-1/settings/ignored/trailing/`)).toEqual({
+        pageKey: "canvasSettings",
+        attributes: { organization_id: "org-1", canvas_id: "canvas-1" },
+      });
+    }
   });
 
   it("maps settings routes", () => {
@@ -73,6 +112,48 @@ describe("resolvePageObservability", () => {
     expect(resolvePageObservability("/org-1/settings/notifications")).toEqual({
       pageKey: "settingsNotifications",
       attributes: { organization_id: "org-1" },
+    });
+    for (const [section, pageKey] of [
+      ["members", "settingsMembers"],
+      ["create-group", "settingsCreateGroup"],
+      ["roles", "settingsRoles"],
+      ["profile", "settingsProfile"],
+      ["billing", "settingsUsage"],
+      ["general/ignored/trailing", "settingsGeneral"],
+      ["unknown", "settingsUnknown"],
+      ["toString", "settingsUnknown"],
+      ["groups", "settingsGroups"],
+      ["groups/admins", "settingsGroups"],
+      ["groups/admins/unknown", "settingsGroups"],
+      ["create-role", "settingsCreateRole"],
+      ["integrations", "settingsIntegrations"],
+      ["secrets", "settingsSecrets"],
+      ["api-keys", "settingsAPIKeys"],
+    ]) {
+      expect(resolvePageObservability(`/org-1/settings/${section}`)).toEqual({
+        pageKey,
+        attributes: { organization_id: "org-1" },
+      });
+    }
+    expect(resolvePageObservability("/org-1/settings")).toEqual({
+      pageKey: "settingsGeneral",
+      attributes: { organization_id: "org-1" },
+    });
+    expect(resolvePageObservability("/org-1/settings/create-role/operator")).toEqual({
+      pageKey: "settingsCreateRole",
+      attributes: { organization_id: "org-1", role_name: "operator" },
+    });
+    expect(resolvePageObservability("/org-1/settings/integrations/int-9")).toEqual({
+      pageKey: "settingsIntegrationDetail",
+      attributes: { organization_id: "org-1", integration_id: "int-9" },
+    });
+    expect(resolvePageObservability("/org-1/settings/secrets/secret-1")).toEqual({
+      pageKey: "settingsSecretDetail",
+      attributes: { organization_id: "org-1", secret_id: "secret-1" },
+    });
+    expect(resolvePageObservability("/org-1/settings/api-keys/key-1")).toEqual({
+      pageKey: "settingsAPIKeyDetail",
+      attributes: { organization_id: "org-1", api_key_id: "key-1" },
     });
   });
 

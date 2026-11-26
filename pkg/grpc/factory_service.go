@@ -41,6 +41,21 @@ func (s *FactoryService) ListFactories(ctx context.Context, req *pb.ListFactorie
 	return actions.ListFactories(ctx, organizationID)
 }
 
+func (s *FactoryService) ExportFactoryConfiguration(ctx context.Context, req *pb.ExportFactoryConfigurationRequest) (*pb.ExportFactoryConfigurationResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.ExportFactoryConfiguration(ctx, organizationID, req)
+}
+
+func (s *FactoryService) PlanFactoryConfiguration(ctx context.Context, req *pb.PlanFactoryConfigurationRequest) (*pb.PlanFactoryConfigurationResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.PlanFactoryConfiguration(ctx, s.intakeDeps, organizationID, req)
+}
+
+func (s *FactoryService) ApplyFactoryConfiguration(ctx context.Context, req *pb.ApplyFactoryConfigurationRequest) (*pb.ApplyFactoryConfigurationResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.ApplyFactoryConfiguration(ctx, s.intakeDeps, organizationID, req)
+}
+
 func (s *FactoryService) CreateFactory(ctx context.Context, req *pb.CreateFactoryRequest) (*pb.CreateFactoryResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.CreateFactory(ctx, organizationID, req)
@@ -118,7 +133,7 @@ func (s *FactoryService) CreateFactoryLine(ctx context.Context, req *pb.CreateFa
 
 func (s *FactoryService) UpdateFactoryLine(ctx context.Context, req *pb.UpdateFactoryLineRequest) (*pb.UpdateFactoryLineResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return actions.UpdateFactoryLine(ctx, organizationID, req)
+	return actions.UpdateFactoryLine(ctx, s.intakeDeps, organizationID, req)
 }
 
 func (s *FactoryService) ListFactoryAutomations(ctx context.Context, req *pb.ListFactoryAutomationsRequest) (*pb.ListFactoryAutomationsResponse, error) {
@@ -473,6 +488,31 @@ func (s *FactoryService) ListFactoryMCPClients(ctx context.Context, req *pb.List
 func (s *FactoryService) RevokeFactoryMCPClient(ctx context.Context, req *pb.RevokeFactoryMCPClientRequest) (*pb.RevokeFactoryMCPClientResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.RevokeFactoryMCPClient(ctx, organizationID, req)
+}
+
+func (s *FactoryService) ListFactoryWebhooks(ctx context.Context, req *pb.ListFactoryWebhooksRequest) (*pb.ListFactoryWebhooksResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.ListFactoryWebhooks(ctx, s.intakeDeps, organizationID, req)
+}
+
+func (s *FactoryService) CreateFactoryWebhook(ctx context.Context, req *pb.CreateFactoryWebhookRequest) (*pb.CreateFactoryWebhookResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.CreateFactoryWebhook(ctx, s.intakeDeps, organizationID, req)
+}
+
+func (s *FactoryService) UpdateFactoryWebhook(ctx context.Context, req *pb.UpdateFactoryWebhookRequest) (*pb.UpdateFactoryWebhookResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.UpdateFactoryWebhook(ctx, s.intakeDeps, organizationID, req)
+}
+
+func (s *FactoryService) DeleteFactoryWebhook(ctx context.Context, req *pb.DeleteFactoryWebhookRequest) (*pb.DeleteFactoryWebhookResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.DeleteFactoryWebhook(ctx, organizationID, req)
+}
+
+func (s *FactoryService) RegenerateFactoryWebhookSecret(ctx context.Context, req *pb.RegenerateFactoryWebhookSecretRequest) (*pb.RegenerateFactoryWebhookSecretResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.RegenerateFactoryWebhookSecret(ctx, s.intakeDeps, organizationID, req)
 }
 
 func (s *FactoryService) ListFactoryOwnerEligibility(ctx context.Context, req *pb.ListFactoryOwnerEligibilityRequest) (*pb.ListFactoryOwnerEligibilityResponse, error) {

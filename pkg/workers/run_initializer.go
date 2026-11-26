@@ -340,7 +340,8 @@ func (w *RunInitializer) markFactoryWorkOrderExecutionRunning(tx *gorm.DB, runID
 
 // finishFactoryWorkOrderExecutionForRun marks the step execution finished
 // and — since it's only ever called with a terminal (non-passed) result,
-// from failRun — also finishes the parent line dispatch, matching the
+// from failRun — also finishes the parent line dispatch when no other
+// step work is open, matching the
 // finishing run_finalizer.executeNextFactoryLineStep does for the normal
 // advancement path. Without this, a run that fails before it ever starts
 // would leave its traversal stuck `active` forever.
@@ -371,14 +372,36 @@ func (w *RunInitializer) finishFactoryWorkOrderExecutionForRun(tx *gorm.DB, runI
 		return nil, err
 	}
 
-	dispatch, err := models.FindWorkOrderLineDispatch(tx, execution.LineDispatchID)
+	snapshot, err := models.FindWorkOrderLineDispatch(tx, execution.LineDispatchID)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := dispatch.Finish(tx, result); err != nil {
-		return nil, err
+	var admitted []*models.FactoryLineStepResult
+	if execution.StepIndex >= 0 && execution.StepIndex < len(snapshot.Steps) {
+		step := snapshot.Steps[execution.StepIndex]
+		admitted, err = models.AdmitQueuedForStep(tx, execution.LineID, step.AppID, step.StageKey)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	return models.AdmitQueuedForStep(tx, execution.LineID, execution.StepIndex)
+	// Admit before locking the dispatch, matching the finalizer's lock order.
+	// Sibling automations in a custom stage can still be open; the finalizer
+	// finishes the dispatch with the stage result when the last one ends.
+	dispatch, err := models.LockWorkOrderLineDispatch(tx, execution.LineDispatchID)
+	if err != nil {
+		return nil, err
+	}
+	if current := dispatch.CurrentStageKey; current != "" && current != dispatch.StepStageKey(execution.StepIndex) {
+		return admitted, nil
+	}
+	openWork, err := dispatch.HasOpenWork(tx)
+	if err != nil {
+		return nil, err
+	}
+	if openWork {
+		return admitted, nil
+	}
+	return admitted, dispatch.Finish(tx, result)
 }

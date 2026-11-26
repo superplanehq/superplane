@@ -6,14 +6,23 @@ import { catalogForColumn } from "../lib/columnAutomations";
 import { AddColumnAutomationPicker } from "./AddColumnAutomationPicker";
 
 describe("AddColumnAutomationPicker", () => {
-  it("offers the catalog for the column", () => {
+  it("uses a contextual title when supplied", () => {
     render(
       <AddColumnAutomationPicker
         open
+        title="Add an automation for Deploy to prod"
         onClose={vi.fn()}
         onSelect={vi.fn()}
-        catalog={catalogForColumn("verify", { allowCustom: true })}
+        catalog={catalogForColumn("custom-stage-id")}
       />,
+    );
+
+    expect(screen.getByRole("heading", { name: "Add an automation for Deploy to prod" })).toBeInTheDocument();
+  });
+
+  it("offers the catalog for the column", () => {
+    render(
+      <AddColumnAutomationPicker open onClose={vi.fn()} onSelect={vi.fn()} catalog={catalogForColumn("verify")} />,
     );
 
     expect(screen.getByRole("heading", { name: "Add automation" })).toBeInTheDocument();
@@ -23,7 +32,7 @@ describe("AddColumnAutomationPicker", () => {
     expect(screen.getByTestId("add-column-automation-template-checks")).toHaveTextContent("Pull request checks");
     expect(screen.getByTestId("add-column-automation-template-risk-score")).toHaveTextContent("Merge confidence");
     expect(screen.getByTestId("add-column-automation-template-risk-score")).toHaveTextContent(
-      "Score risk, performance, security, and drift on a pull request.",
+      "Review a pull request for correctness, performance, security, blast radius, and reversibility.",
     );
     expect(screen.getByTestId("add-column-automation-template-visual-evidence")).toHaveTextContent("Visual Evidence");
     expect(screen.getByTestId("add-column-automation-template-visual-evidence")).toHaveTextContent(
@@ -53,5 +62,21 @@ describe("AddColumnAutomationPicker", () => {
     await user.click(discussion);
     expect(onSelect).not.toHaveBeenCalled();
     expect(screen.getByTestId("add-column-automation-template-checks")).toBeEnabled();
+  });
+
+  it("keeps unavailable options visible", () => {
+    render(
+      <AddColumnAutomationPicker
+        open
+        onClose={vi.fn()}
+        onSelect={vi.fn()}
+        catalog={catalogForColumn("verify")}
+        unavailableReasons={{ checks: "Available in Verify." }}
+      />,
+    );
+
+    const checks = screen.getByTestId("add-column-automation-template-checks");
+    expect(checks).toBeDisabled();
+    expect(checks).toHaveTextContent("Available in Verify.");
   });
 });

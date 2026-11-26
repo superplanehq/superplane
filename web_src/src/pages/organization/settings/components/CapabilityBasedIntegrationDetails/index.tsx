@@ -117,16 +117,12 @@ export function CapabilityBasedIntegrationDetails({
           saveProperty={saveProperty}
           saveSecret={saveSecret}
           isSavingProperty={(propertyName) =>
-            Boolean(
-              integrationMutations.updatePropertyMutation.isPending &&
-                integrationMutations.updatePropertyMutation.variables?.propertyName === propertyName,
-            )
+            integrationMutations.updatePropertyMutation.isPending &&
+            integrationMutations.updatePropertyMutation.variables?.propertyName === propertyName
           }
           isSavingSecret={(secretName) =>
-            Boolean(
-              integrationMutations.updateSecretMutation.isPending &&
-                integrationMutations.updateSecretMutation.variables?.secretName === secretName,
-            )
+            integrationMutations.updateSecretMutation.isPending &&
+            integrationMutations.updateSecretMutation.variables?.secretName === secretName
           }
           onApplyCapabilityChanges={handleCapabilitiesSubmit}
         />

@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { factoryVCSProvider } from "@/pages/home/factories";
 import { factoryAppsKey, useCreateFactoryAutomation } from "@/hooks/useFactoryData";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
-import { FEATURE_FACTORY_CUSTOM_AUTOMATIONS, FEATURE_FACTORY_REVIEW_REQUEST } from "@/lib/experimentalFeatures";
+import { FEATURE_FACTORY_REVIEW_REQUEST } from "@/lib/experimentalFeatures";
 import { showErrorToast } from "@/lib/toast";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { useInstallFactory } from "@/pages/home/useInstallFactory";
@@ -13,6 +13,7 @@ import { useNavigate } from "react-router";
 import {
   catalogForColumn,
   onlyCustomCatalogRemains,
+  pickerCatalogForColumn,
   takenCatalogIds,
   type ColumnAutomation,
   type ColumnAutomationCatalogEntry,
@@ -25,6 +26,7 @@ import {
   prFeedbackSetupKindFromSourceId,
 } from "../lib/factoryPagePaths";
 import { factoryCustomAutomationSetupPath } from "../lib/customAutomationPaths";
+import type { CustomAutomationColumn } from "../lib/customAutomation";
 
 export function useAddColumnAutomation(args: {
   organizationId: string;
@@ -39,28 +41,38 @@ export function useAddColumnAutomation(args: {
   automationsFor: (key: ColumnKey) => ColumnAutomation[];
 }) {
   const [column, setColumn] = useState<ColumnKey | null>(null);
+  const [columnTitle, setColumnTitle] = useState("");
   const [naming, setNaming] = useState(false);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const createAutomation = useCreateFactoryAutomation(args.organizationId, args.factoryId);
   const { installFactory, isInstalling } = useInstallFactory({ organizationId: args.organizationId });
   const experimentalFeatures = useExperimentalFeature(args.organizationId);
-  const allowCustom = experimentalFeatures.has(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
   const allowReviewRequest = experimentalFeatures.has(FEATURE_FACTORY_REVIEW_REQUEST);
-  const catalogOptions = { allowCustom, allowReviewRequest, vcsProvider: args.vcsProvider };
+  const catalogOptions = { allowReviewRequest, vcsProvider: args.vcsProvider };
 
-  const catalog = column ? catalogForColumn(column, catalogOptions) : [];
-  const takenIds = column ? takenCatalogIds(args.automationsFor(column), catalog) : [];
+  const pickerCatalog = column
+    ? pickerCatalogForColumn(column, catalogOptions)
+    : { catalog: [], unavailableReasons: {} };
+  const catalog = pickerCatalog.catalog;
+  const takenIds = column
+    ? takenCatalogIds(
+        ["backlog", "phase-0", "verify", "done", column].flatMap((key) => args.automationsFor(key as ColumnKey)),
+        catalog,
+      )
+    : [];
 
   const closePicker = () => {
     setColumn(null);
+    setColumnTitle("");
     setNaming(false);
   };
 
-  const openPicker = (key: ColumnKey) => {
+  const openPicker = (key: ColumnKey, title = "") => {
     const nextCatalog = catalogForColumn(key, catalogOptions);
     const nextTaken = takenCatalogIds(args.automationsFor(key), nextCatalog);
     const setupColumn = customAutomationSetupColumn(key);
+    const customStage = key.startsWith("custom-");
     if (setupColumn !== null && onlyCustomCatalogRemains(nextCatalog, nextTaken) && args.lineId) {
       navigate(
         factoryCustomAutomationSetupPath(args.organizationId, args.factoryKey, args.lineId, undefined, setupColumn),
@@ -68,14 +80,20 @@ export function useAddColumnAutomation(args: {
       return;
     }
     setColumn(key);
-    setNaming(onlyCustomCatalogRemains(nextCatalog, nextTaken));
+    setColumnTitle(title);
+    setNaming(!customStage && onlyCustomCatalogRemains(nextCatalog, nextTaken));
   };
 
   const onSelect = async (entry: ColumnAutomationCatalogEntry) => {
-    if (!column) {
+    if (!column || pickerCatalog.unavailableReasons[entry.id]) {
       return;
     }
-    if (entry.kind === "pr-discussion" || entry.kind === "pr-checks" || entry.kind === "custom-verification") {
+    if (
+      entry.kind === "pr-discussion" ||
+      entry.kind === "pr-checks" ||
+      entry.kind === "custom-verification" ||
+      (entry.kind === "custom" && column.startsWith("custom-"))
+    ) {
       openFocusedVerifySetup(entry, column, args, navigate, closePicker);
       return;
     }
@@ -100,10 +118,7 @@ export function useAddColumnAutomation(args: {
       }
       return;
     }
-    if (entry.kind !== "custom") {
-      return;
-    }
-    setNaming(true);
+    if (entry.kind === "custom") setNaming(true);
   };
 
   const createNamed = async (name: string) => {
@@ -121,14 +136,15 @@ export function useAddColumnAutomation(args: {
   };
 
   return {
-    allowCustom,
     pickerColumn: column,
+    pickerTitle: columnTitle ? `Add an automation for ${columnTitle}` : undefined,
     pickerOpen: column !== null && !naming,
     naming,
     openPicker,
     closePicker,
     catalog,
     takenIds,
+    unavailableReasons: pickerCatalog.unavailableReasons,
     onSelect,
     createNamed,
     isPending: createAutomation.isPending || isInstalling,
@@ -153,7 +169,8 @@ function githubVerifyTemplate(
   };
 }
 
-function customAutomationSetupColumn(key: ColumnKey): "implement" | "verify" | "done" | undefined | null {
+function customAutomationSetupColumn(key: ColumnKey): CustomAutomationColumn | undefined | null {
+  if (key.startsWith("custom-")) return key as CustomAutomationColumn;
   if (key === "verify") return undefined;
   if (key === "done") return "done";
   if (key === "phase-0") return "implement";
@@ -184,7 +201,7 @@ function focusedVerifySetupPath(
   if (!args.lineId) {
     return undefined;
   }
-  if (entry.kind === "custom-verification") {
+  if (entry.kind === "custom-verification" || entry.kind === "custom") {
     const setupColumn = customAutomationSetupColumn(column);
     return factoryCustomAutomationSetupPath(
       args.organizationId,
@@ -278,7 +295,10 @@ async function createCustomAutomation(input: {
 }) {
   const automation = await input.mutateAsync({
     name: input.name,
-    columnKey: input.column === "verify" || input.column === "done" ? input.column : undefined,
+    columnKey:
+      input.column === "verify" || input.column === "done" || input.column.startsWith("custom-")
+        ? input.column
+        : undefined,
   });
   input.close();
   if (!automation.id) {

@@ -3,12 +3,8 @@ import githubIcon from "@/assets/icons/integrations/github.svg";
 
 import { LINE_INTAKE_SOURCES } from "../pages/lineIntakeModel";
 import { availablePRFeedbackSources } from "../pages/prFeedbackSettingsModel";
-import type {
-  ColumnAutomation,
-  ColumnAutomationCatalogEntry,
-  ColumnAutomationKind,
-  ColumnKey,
-} from "./columnAutomations";
+import type { ColumnAutomation, ColumnAutomationCatalogEntry, ColumnAutomationKind } from "./columnAutomations";
+import type { ColumnKey } from "./columnKeys";
 
 export const ANALYSIS_CATALOG_ID = "analysis";
 export const AGENT_STEP_CATALOG_ID = "agent-step";
@@ -83,7 +79,7 @@ export const RISK_SCORE_ENTRY: ColumnAutomationCatalogEntry = {
   id: RISK_SCORE_CATALOG_ID,
   kind: "risk-score",
   name: "Merge confidence",
-  description: "Score risk, performance, security, and drift on a pull request.",
+  description: "Review a pull request for correctness, performance, security, blast radius, and reversibility.",
   trigger: "On pull request opened or updated",
   action: "Score merge confidence",
   iconSrc: "",
@@ -129,9 +125,11 @@ export const PR_CLOSURE_ENTRY: ColumnAutomationCatalogEntry = {
 
 export function catalogForColumn(
   key: ColumnKey,
-  options?: { allowCustom?: boolean; allowReviewRequest?: boolean; vcsProvider?: string },
+  options?: { allowReviewRequest?: boolean; vcsProvider?: string },
 ): ColumnAutomationCatalogEntry[] {
-  const allowCustom = options?.allowCustom === true;
+  if (key.startsWith("custom-")) {
+    return [CUSTOM_ENTRY];
+  }
   if (key === "backlog") {
     return [
       ...LINE_INTAKE_SOURCES.map((source) => ({
@@ -167,7 +165,7 @@ export function catalogForColumn(
       RISK_SCORE_ENTRY,
       ...(reviewRequestAvailable(options) ? [REVIEW_REQUEST_ENTRY] : []),
       ...(options?.vcsProvider === "bitbucket" ? [] : [VISUAL_EVIDENCE_ENTRY]),
-      ...(allowCustom ? [CUSTOM_AUTOMATION_ENTRY] : []),
+      CUSTOM_AUTOMATION_ENTRY,
     ];
   }
   if (key === "done") {
@@ -175,16 +173,49 @@ export function catalogForColumn(
       options?.vcsProvider === "bitbucket"
         ? { ...PR_CLOSURE_ENTRY, iconSrc: bitbucketIcon, iconAlt: "Bitbucket" }
         : PR_CLOSURE_ENTRY;
-    return allowCustom ? [closureEntry, CUSTOM_AUTOMATION_ENTRY] : [closureEntry];
+    return [closureEntry, CUSTOM_AUTOMATION_ENTRY];
   }
-  return phaseCatalog(key, allowCustom);
+  return phaseCatalog(key);
 }
 
-function phaseCatalog(key: ColumnKey, allowCustom: boolean): ColumnAutomationCatalogEntry[] {
+export function pickerCatalogForColumn(
+  key: ColumnKey,
+  options?: { allowReviewRequest?: boolean; vcsProvider?: string },
+): { catalog: ColumnAutomationCatalogEntry[]; unavailableReasons: Record<string, string> } {
+  const available = catalogForColumn(key, options);
+  const groups = [
+    { label: "Backlog", catalog: [ANALYSIS_ENTRY] },
+    { label: "an app stage", catalog: phaseCatalog("phase-1") },
+    { label: "Verify", catalog: catalogForColumn("verify", options) },
+    { label: "Done", catalog: catalogForColumn("done", options) },
+  ];
+  const seen = new Set<string>();
+  let hasCustomBuilder = false;
+  const catalog = [...available, ...groups.flatMap((group) => group.catalog)].filter((entry) => {
+    if (entry.kind === "custom" || entry.kind === "custom-verification") {
+      if (hasCustomBuilder) return false;
+      hasCustomBuilder = true;
+    }
+    if (seen.has(entry.id)) return false;
+    seen.add(entry.id);
+    return true;
+  });
+  const availableIds = new Set(available.map((entry) => entry.id));
+  const unavailableReasons = Object.fromEntries(
+    catalog.flatMap((entry) => {
+      if (availableIds.has(entry.id)) return [];
+      const group = groups.find((candidate) => candidate.catalog.some((item) => item.id === entry.id));
+      return group ? [[entry.id, `Available in ${group.label}.`]] : [];
+    }),
+  );
+  return { catalog, unavailableReasons };
+}
+
+function phaseCatalog(key: ColumnKey): ColumnAutomationCatalogEntry[] {
   if (key === "phase-0") {
-    return allowCustom ? [CUSTOM_AUTOMATION_ENTRY] : [AGENT_STEP_ENTRY];
+    return [CUSTOM_AUTOMATION_ENTRY];
   }
-  return allowCustom ? [AGENT_STEP_ENTRY, CUSTOM_ENTRY] : [AGENT_STEP_ENTRY];
+  return [AGENT_STEP_ENTRY, CUSTOM_ENTRY];
 }
 
 function reviewRequestAvailable(options: { allowReviewRequest?: boolean; vcsProvider?: string } | undefined) {

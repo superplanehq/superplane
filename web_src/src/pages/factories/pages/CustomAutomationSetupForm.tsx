@@ -1,9 +1,15 @@
 import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { CircleAlert } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { reorderListItems } from "@/lib/reorderListItems";
+import { useListFieldDragReorder } from "@/ui/configurationFieldRenderer/useListFieldDragReorder";
 
-import { type CustomAutomationColumn, type CustomAutomationTrigger } from "../lib/customAutomation";
+import {
+  customAutomationTriggersForRun,
+  type CustomAutomationColumn,
+  type CustomAutomationTrigger,
+} from "../lib/customAutomation";
 import { AutomationFlow } from "./customAutomationSetupFlow";
 import { StepEditor } from "./customAutomationStepEditor";
 import { TriggerEditor } from "./CustomAutomationTriggerEditor";
@@ -13,6 +19,7 @@ type CustomAutomationSetupFormProps = {
   name: string;
   icon: string;
   triggers: CustomAutomationTrigger[];
+  runsOnTask?: boolean;
   columnKey?: CustomAutomationColumn;
   draft: PlanningReviewDraft;
   organizationId: string;
@@ -21,9 +28,12 @@ type CustomAutomationSetupFormProps = {
   saving: boolean;
   deleting: boolean;
   error: string;
+  asCode?: boolean;
+  showModel?: boolean;
   onNameChange: (name: string) => void;
   onIconChange: (icon: string) => void;
   onTriggersChange: (triggers: CustomAutomationTrigger[]) => void;
+  onRunsOnTaskChange: (runsOnTask: boolean) => void;
   onDraftChange: (draft: PlanningReviewDraft) => void;
   onSave: () => void;
   onDelete?: () => void;
@@ -35,6 +45,7 @@ export function CustomAutomationSetupForm(props: CustomAutomationSetupFormProps)
     name,
     icon,
     triggers,
+    runsOnTask,
     columnKey = "verify",
     draft,
     organizationId,
@@ -43,39 +54,57 @@ export function CustomAutomationSetupForm(props: CustomAutomationSetupFormProps)
     saving,
     deleting,
     error,
+    asCode,
+    showModel,
     onNameChange,
     onIconChange,
     onTriggersChange,
+    onRunsOnTaskChange,
     onDraftChange,
     onSave,
     onDelete,
     onClose,
   } = props;
   const [selectedStep, setSelectedStep] = useState<number | null>(null);
-  const [confirmDelete, setConfirmDelete] = useState(false);
   const component = draft.components[0];
   const steps = (component?.configuration.steps as PlanningReviewStep[] | undefined) ?? [];
   const activeStep = selectedStep === null ? undefined : steps[selectedStep];
-  const { updateStep, addStep, removeStepAt, moveStepAt } = useStepList(
+  const { updateStep, addStep, removeStepAt, moveStepAt, reorderSteps } = useStepList(
     draft,
     component,
     selectedStep,
     setSelectedStep,
     onDraftChange,
   );
+  const rowRefs = useRef<Array<HTMLDivElement | null>>([]);
+  const [, setOpenItem] = useState("");
+  const { renderedItems, startDrag } = useListFieldDragReorder({
+    items: steps,
+    allowReorder: true,
+    useAccordion: false,
+    onChange: (next) => reorderSteps(next as PlanningReviewStep[]),
+    setOpenItem,
+    rowRefs,
+  });
+  const renderedSteps = renderedItems as PlanningReviewStep[];
+  // Preview positions change, but the editor continues to use the selected draft object.
+  const previewSelection = activeStep ? renderedSteps.indexOf(activeStep) : null;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid="custom-automation-setup">
-      <div className="flex min-h-0 flex-1">
+      <div className="flex min-h-0 flex-1" inert={saving || deleting}>
         <AutomationFlow
           columnKey={columnKey}
-          triggers={triggers}
-          steps={steps}
-          selectedStep={selectedStep}
+          asCode={asCode}
+          triggers={customAutomationTriggersForRun(triggers, runsOnTask)}
+          runsOnTask={runsOnTask !== false}
+          steps={renderedSteps}
+          selectedStep={previewSelection}
+          rowRefs={rowRefs}
           onSelectTrigger={() => setSelectedStep(null)}
-          onSelectStep={setSelectedStep}
-          onMoveStep={moveStepAt}
-          onRemoveStep={removeStepAt}
+          onSelectStep={(index) => setSelectedStep(steps.indexOf(renderedSteps[index]))}
+          onStartDrag={(event, index) => startDrag(event, index, "")}
+          onRemoveStep={(index) => removeStepAt(steps.indexOf(renderedSteps[index]))}
           onAddStep={addStep}
         />
         <div className="min-h-0 min-w-0 flex-1 overflow-y-auto bg-background">
@@ -88,14 +117,18 @@ export function CustomAutomationSetupForm(props: CustomAutomationSetupFormProps)
               onMove={(offset) => selectedStep !== null && moveStepAt(selectedStep, offset)}
               onRemove={() => selectedStep !== null && removeStepAt(selectedStep)}
               organizationId={organizationId}
+              asCode={asCode}
             />
           ) : (
             <TriggerEditor
               columnKey={columnKey}
+              showModel={showModel}
               name={name}
               icon={icon}
               triggers={triggers}
+              runsOnTask={runsOnTask}
               onTriggersChange={onTriggersChange}
+              onRunsOnTaskChange={onRunsOnTaskChange}
               draft={draft}
               organizationId={organizationId}
               factoryId={factoryId}
@@ -107,12 +140,10 @@ export function CustomAutomationSetupForm(props: CustomAutomationSetupFormProps)
           )}
         </div>
       </div>
-      <SetupFormFooter
+      <CustomAutomationSetupFooter
         error={error}
         saving={saving}
         deleting={deleting}
-        confirmDelete={confirmDelete}
-        onConfirmDeleteChange={setConfirmDelete}
         onSave={onSave}
         onDelete={onDelete}
         onClose={onClose}
@@ -138,7 +169,15 @@ function useStepList(
       ),
     });
   };
+  const reorderSteps = (nextSteps: PlanningReviewStep[]) => {
+    if (nextSteps.every((step, index) => step === steps[index])) return;
+    updateSteps(nextSteps);
+    if (selectedStep !== null) {
+      setSelectedStep(nextSteps.indexOf(steps[selectedStep]));
+    }
+  };
   return {
+    reorderSteps,
     updateStep: (nextStep: PlanningReviewStep) => {
       if (selectedStep === null) return;
       updateSteps(steps.map((step, index) => (index === selectedStep ? nextStep : step)));
@@ -156,26 +195,15 @@ function useStepList(
       }
     },
     moveStepAt: (position: number, offset: -1 | 1) => {
-      const destination = position + offset;
-      if (destination < 0 || destination >= steps.length) return;
-      const nextSteps = [...steps];
-      [nextSteps[position], nextSteps[destination]] = [nextSteps[destination], nextSteps[position]];
-      updateSteps(nextSteps);
-      if (selectedStep === position) {
-        setSelectedStep(destination);
-      } else if (selectedStep === destination) {
-        setSelectedStep(position);
-      }
+      reorderSteps(reorderListItems(steps, position, position + offset));
     },
   };
 }
 
-function SetupFormFooter({
+export function CustomAutomationSetupFooter({
   error,
   saving,
   deleting,
-  confirmDelete,
-  onConfirmDeleteChange,
   onSave,
   onDelete,
   onClose,
@@ -183,12 +211,11 @@ function SetupFormFooter({
   error: string;
   saving: boolean;
   deleting: boolean;
-  confirmDelete: boolean;
-  onConfirmDeleteChange: (value: boolean) => void;
   onSave: () => void;
   onDelete?: () => void;
   onClose: () => void;
 }) {
+  const [confirmDelete, setConfirmDelete] = useState(false);
   return (
     <footer className="flex shrink-0 flex-col gap-3 border-t border-border bg-popover px-6 py-4">
       {error ? (
@@ -197,7 +224,7 @@ function SetupFormFooter({
           role="alert"
         >
           <CircleAlert className="size-4 shrink-0" aria-hidden />
-          <p>{error}</p>
+          <p className="whitespace-pre-line">{error}</p>
         </div>
       ) : null}
       <div className="flex w-full items-center justify-between gap-3">
@@ -211,7 +238,7 @@ function SetupFormFooter({
                   variant="outline"
                   size="sm"
                   disabled={deleting}
-                  onClick={() => onConfirmDeleteChange(false)}
+                  onClick={() => setConfirmDelete(false)}
                 >
                   Keep
                 </Button>
@@ -227,13 +254,7 @@ function SetupFormFooter({
                 </LoadingButton>
               </div>
             ) : (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                disabled={saving}
-                onClick={() => onConfirmDeleteChange(true)}
-              >
+              <Button type="button" variant="ghost" size="sm" disabled={saving} onClick={() => setConfirmDelete(true)}>
                 Delete
               </Button>
             )

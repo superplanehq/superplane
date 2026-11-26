@@ -520,7 +520,8 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 		orgAuthMiddleware(http.HandlerFunc(s.handleSubmitFeedback)),
 	).Methods(http.MethodPost)
 
-	protectedGRPCHandler := orgAuthMiddleware(s.grpcGatewayHandler(grpcGatewayMux))
+	protectedGRPCHandler := orgAuthMiddleware(s.organizationGatewayHandler(grpcGatewayMux))
+	s.registerAutomationRoutes(orgAuthMiddleware, authorizer)
 
 	accountAuthMiddleware := middleware.AccountAuthMiddleware(s.jwt)
 	protectedAccountGRPCHandler := accountAuthMiddleware(s.grpcGatewayAccountHandler(grpcGatewayMux))
@@ -558,7 +559,7 @@ func headersMatcher(key string) (string, bool) {
 	}
 }
 
-func (s *Server) grpcGatewayHandler(grpcGatewayMux *runtime.ServeMux) http.HandlerFunc {
+func (s *Server) organizationGatewayHandler(gateway http.Handler) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		user, ok := middleware.GetUserFromContext(r.Context())
 		if !ok {
@@ -601,7 +602,7 @@ func (s *Server) grpcGatewayHandler(grpcGatewayMux *runtime.ServeMux) http.Handl
 			r2.Header.Set("x-Token-Scopes", string(scopes))
 		}
 
-		middleware.TraceGatewayServe(r.Context(), w, grpcGatewayMux, r2.WithContext(r.Context()))
+		middleware.TraceGatewayServe(r.Context(), w, gateway, r2.WithContext(r.Context()))
 	})
 }
 
@@ -2082,10 +2083,23 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if webhook.IsManaged() {
+		if code, err := s.authenticateFactoryWebhook(r.Context(), webhook, r.Header, body); err != nil {
+			track.complete(r.Context(), code, 0)
+			http.Error(w, err.Error(), code)
+			return
+		}
+	}
+
 	nodes, err := models.FindActiveWebhookNodes(webhookID)
 	if err != nil {
 		track.complete(r.Context(), http.StatusNotFound, 0)
 		http.Error(w, "webhook not found", http.StatusNotFound)
+		return
+	}
+	if webhook.IsManaged() && len(nodes) == 0 {
+		track.complete(r.Context(), http.StatusAccepted, 0)
+		w.WriteHeader(http.StatusAccepted)
 		return
 	}
 

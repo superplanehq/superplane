@@ -6,11 +6,12 @@ import linearIcon from "@/assets/icons/integrations/linear.svg";
 import notionIcon from "@/assets/icons/integrations/notion.svg";
 import productiveIcon from "@/assets/icons/integrations/productive.svg";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
+import webhookIcon from "@/assets/icons/webhook.svg";
 import {
-  FEATURE_FACTORY_CUSTOM_AUTOMATIONS,
   FEATURE_FACTORY_DATADOG_INTAKE,
   FEATURE_FACTORY_PRODUCTIVE_INTAKE,
   FEATURE_FACTORY_SCHEDULED_INTAKE,
+  FEATURE_FACTORY_WEBHOOK_INTAKE,
 } from "@/lib/experimentalFeatures";
 
 export interface AddIntakeTemplate {
@@ -43,7 +44,6 @@ export const ADD_INTAKE_TEMPLATES: AddIntakeTemplate[] = [
     iconName: "sparkles",
     name: "Build your own",
     description: "Run prompt and Bash steps, or create tasks on a schedule.",
-    featureId: FEATURE_FACTORY_CUSTOM_AUTOMATIONS,
   },
   {
     id: "scheduled-intake",
@@ -97,6 +97,13 @@ export const ADD_INTAKE_TEMPLATES: AddIntakeTemplate[] = [
     iconSrc: linearIcon,
   },
   {
+    id: "webhook",
+    name: "Webhook",
+    description: "Creates tasks from requests that other tools send.",
+    iconSrc: webhookIcon,
+    featureId: FEATURE_FACTORY_WEBHOOK_INTAKE,
+  },
+  {
     id: "notion",
     name: "Notion",
     description: "Creates tasks from Notion pages.",
@@ -123,6 +130,7 @@ export function addIntakeTemplatesForOrg(
   return ADD_INTAKE_TEMPLATES.filter(
     (template) =>
       (template.id !== "scheduled-intake" || hasFeature(FEATURE_FACTORY_SCHEDULED_INTAKE)) &&
+      (template.id !== "webhook" || hasFeature(FEATURE_FACTORY_WEBHOOK_INTAKE)) &&
       (!options?.hideDependabot || template.id !== "dependabot-alerts"),
   ).map((template) => (isAddIntakeSoon(template, hasFeature) ? { ...template, soon: true } : template));
 }

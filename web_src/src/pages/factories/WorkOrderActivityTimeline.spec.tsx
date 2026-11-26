@@ -109,3 +109,14 @@ describe("WorkOrderActivityTimeline owner assignment", () => {
     expect(screen.queryByText("Ignored reason.")).not.toBeInTheDocument();
   });
 });
+
+it("shows an improvement in Correctness across historical check reports", () => {
+  const { container } = renderTimeline(undefined, [
+    {
+      type: "order.check.reported",
+      timestamp: "2026-08-01T12:00:00.000Z",
+      event: { check: { key: "drift-review", name: "Drift", previousScore: 4, score: 1, maxScore: 5 } },
+    },
+  ]);
+  expect(container).toHaveTextContent("re-scored Correctness: 2 → 5/5");
+});

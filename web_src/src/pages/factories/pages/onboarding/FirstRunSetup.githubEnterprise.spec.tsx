@@ -91,7 +91,7 @@ vi.mock("@/hooks/useAccountOrganizations", () => ({
 }));
 
 vi.mock("@/hooks/useExperimentalFeature", () => ({
-  useExperimentalFeature: () => ({ has: () => true, isLoading: false, organizationReady: true }),
+  useExperimentalFeature: () => ({ has: () => false, isLoading: false, organizationReady: true }),
 }));
 
 vi.mock("@/contexts/usePermissions", () => ({
@@ -130,10 +130,12 @@ function pageModel(setup: OnboardingSetupApi, overrides: Partial<OnboardingPageM
     bringYourOwnKey: false,
     bringYourOwnKeyLoading: false,
     customProvider: false,
+    subscription: { offered: false, ready: false, connect: vi.fn() },
     agentCredentialChoice: null,
     setAgentCredentialChoice: vi.fn(),
     agentLoading: false,
     agentModelPicker: undefined,
+    agentProviderId: undefined,
     openSection: "vcs",
     setOpenSection: vi.fn(),
     requestConnect: vi.fn(),
@@ -206,6 +208,9 @@ describe("FirstRunSetup GitHub Enterprise Cloud", () => {
     await user.click(screen.getByTestId("first-run-get-started"));
     const option = screen.getByTestId("first-run-host-github-enterprise");
     expect(within(option).getByRole("button")).toBeDisabled();
+    expect(within(option).getByTestId("connect-option-badge")).toBeVisible();
+    await user.click(within(option).getByRole("button"));
+    expect(screen.queryByTestId("first-run-github-enterprise-host")).not.toBeInTheDocument();
   });
 
   it("clears a github.com repository when switching to Enterprise", async () => {

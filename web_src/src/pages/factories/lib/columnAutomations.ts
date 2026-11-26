@@ -22,20 +22,19 @@ import {
   prFeedbackSentence,
 } from "./columnAutomationCatalog";
 import { customColumnAutomations, firstPhaseAutomations, type ColumnAutomationApp } from "./customColumnAutomations";
-import {
-  factoryColumnAutomationViewPath,
-  factoryIntakePath,
-  factoryPlanningPath,
-  factoryPRFeedbackPath,
-} from "./factoryPagePaths";
-import { factoryCustomAutomationSetupPath } from "./customAutomationPaths";
+export { columnAutomationOpenPath } from "./columnAutomationPaths";
+import { phaseIndexFromColumnKey, type ColumnKey } from "./columnKeys";
 import { isActiveWorkOrderExecution } from "./workOrderExecutions";
 import { findBacklogAutomationApp, findClosureAutomationApp, type LinePhaseColumn } from "./linePhaseRuns";
 
-export { catalogForColumn, onlyCustomCatalogRemains, takenCatalogIds } from "./columnAutomationCatalog";
+export {
+  catalogForColumn,
+  onlyCustomCatalogRemains,
+  pickerCatalogForColumn,
+  takenCatalogIds,
+} from "./columnAutomationCatalog";
 export { COLUMN_AUTOMATIONS_COPY } from "./columnAutomationsCopy";
-
-export type ColumnKey = "backlog" | `phase-${number}` | "verify" | "done";
+export { isColumnKey, phaseIndexFromColumnKey, type ColumnKey } from "./columnKeys";
 
 export type ColumnAutomationKind =
   | "intake"
@@ -65,7 +64,11 @@ export type ColumnAutomation = {
   runningCount: number;
   catalogId: string;
   canvasId?: string;
-  /** Backlog schedule job. A person can start it before a task exists. */
+  columnKey?: string;
+  displayColumnKey?: string;
+  executionKey?: string;
+  taskStageTargets?: string[];
+  /** Backlog run with no task. A person can start it from the column. */
   canRunNow?: boolean;
   activity?: ColumnAutomationActivity;
 };
@@ -92,23 +95,6 @@ export type ColumnAutomationsInput = {
   planningEnabled?: boolean;
   vcsProvider?: string;
 };
-
-const PHASE_KEY_PATTERN = /^phase-(\d+)$/;
-
-export function isColumnKey(value: string | null | undefined): value is ColumnKey {
-  if (!value) {
-    return false;
-  }
-  return value === "backlog" || value === "verify" || value === "done" || PHASE_KEY_PATTERN.test(value);
-}
-
-export function phaseIndexFromColumnKey(key: ColumnKey): number | undefined {
-  const match = PHASE_KEY_PATTERN.exec(key);
-  if (!match) {
-    return undefined;
-  }
-  return Number.parseInt(match[1] ?? "", 10);
-}
 
 export function columnTitleForKey(key: ColumnKey, columns: LinePhaseColumn[] = []): string {
   if (key === "backlog") {
@@ -143,8 +129,19 @@ export function columnAutomationsNeedRepair(automations: ColumnAutomation[]): bo
 
 export function buildColumnAutomations(key: ColumnKey, input: ColumnAutomationsInput): ColumnAutomation[] {
   const workOrders = input.workOrders ?? [];
-  const automations = automationsForColumn(key, input, workOrders);
-  return automations.map((automation) => attachAutomationActivity(automation, workOrders));
+  const automations = key.startsWith("custom-")
+    ? customColumnAutomations(input.apps ?? [], key, workOrders, new Set(), runningCountForApp)
+    : automationsForColumn(key, input, workOrders);
+  return automations.map((automation) => ({
+    ...automation,
+    activity: buildColumnAutomationActivity({
+      canvasId: automation.canvasId,
+      workOrders,
+      runningCount: automation.runningCount,
+    }),
+    executionKey: key,
+    displayColumnKey: input.apps?.find((app) => app.id === automation.canvasId)?.displayColumnKey,
+  }));
 }
 
 function automationsForColumn(
@@ -182,17 +179,6 @@ function automationsForColumn(
     return [...closure, ...customColumnAutomations(input.apps ?? [], "done", workOrders, skip, runningCountForApp)];
   }
   return firstPhaseAutomations(key, input, workOrders, agentStepAutomation, runningCountForApp);
-}
-
-function attachAutomationActivity(automation: ColumnAutomation, workOrders: FactoriesWorkOrder[]): ColumnAutomation {
-  return {
-    ...automation,
-    activity: buildColumnAutomationActivity({
-      canvasId: automation.canvasId,
-      workOrders,
-      runningCount: automation.runningCount,
-    }),
-  };
 }
 
 function intakeAutomations(intakes: FactoriesFactoryIntake[], workOrders: FactoriesWorkOrder[]): ColumnAutomation[] {
@@ -285,11 +271,12 @@ function prFeedbackAutomations(
   });
 }
 
-function isRiskScoreApp(app: { name?: string; columnKey?: string }): boolean {
+function isRiskScoreApp(app: ColumnAutomationApp): boolean {
   if (app.columnKey !== "verify") {
     return false;
   }
   const name = app.name?.trim() ?? "";
+  if (app.templateId) return app.templateId === "risk-score";
   return (
     name === RISK_SCORE_ENTRY.name ||
     name === "Risk score" ||
@@ -298,11 +285,12 @@ function isRiskScoreApp(app: { name?: string; columnKey?: string }): boolean {
   );
 }
 
-function isVisualEvidenceApp(app: { name?: string; columnKey?: string }): boolean {
+function isVisualEvidenceApp(app: ColumnAutomationApp): boolean {
   if (app.columnKey !== "verify") {
     return false;
   }
   const name = app.name?.trim() ?? "";
+  if (app.templateId) return app.templateId === "visual-evidence";
   return name === VISUAL_EVIDENCE_ENTRY.name || /^Visual Evidence \(\d+\)$/.test(name);
 }
 
@@ -455,32 +443,6 @@ export function runningCountForApp(appId: string | undefined, workOrders: Factor
     }
   }
   return count;
-}
-
-/**
- * Path for an existing column automation. Opens the popup on the first tab.
- * Task analysis opens Planning settings.
- */
-export function columnAutomationOpenPath(
-  automation: ColumnAutomation,
-  args: { organizationId: string; factoryKey: string; lineId?: string },
-): string | undefined {
-  if (automation.kind === "intake") {
-    return factoryIntakePath(args.organizationId, args.factoryKey, args.lineId, automation.id);
-  }
-  if (automation.kind === "pr-discussion" || automation.kind === "pr-checks") {
-    return factoryPRFeedbackPath(args.organizationId, args.factoryKey, args.lineId, undefined, automation.id);
-  }
-  if (automation.kind === "analysis") {
-    return factoryPlanningPath(args.organizationId, args.factoryKey, args.lineId);
-  }
-  if (automation.kind === "custom-verification" && automation.canvasId && args.lineId) {
-    return factoryCustomAutomationSetupPath(args.organizationId, args.factoryKey, args.lineId, automation.canvasId);
-  }
-  if (!automation.canvasId) {
-    return undefined;
-  }
-  return factoryColumnAutomationViewPath(args.organizationId, args.factoryKey, args.lineId, automation.canvasId);
 }
 
 export type ColumnAutomationViewTab = "general" | "agent" | "automation" | "runs";
