@@ -153,6 +153,9 @@ func (l *FactoryLine) ExecutionPlan(tx *gorm.DB) ([]FactoryLineStep, error) {
 		}
 		if stage.StepIndex == nil {
 			for _, canvas := range canvasesByStage[stage.Key] {
+				if customStageAutomationIsManual(specs[canvas.ID].Nodes) {
+					continue
+				}
 				entrypoint, err := customStageEntrypoint(canvas, specs[canvas.ID])
 				if err != nil {
 					return nil, err
@@ -173,6 +176,18 @@ func (l *FactoryLine) ExecutionPlan(tx *gorm.DB) ([]FactoryLineStep, error) {
 		return nil, ErrFactoryLineHasNoSteps
 	}
 	return steps, nil
+}
+
+// Graphs without mode metadata stay automatic.
+func customStageAutomationIsManual(nodes []Node) bool {
+	for _, node := range nodes {
+		if node.ComponentName() != onRunTriggerName {
+			continue
+		}
+		template, _ := node.Metadata[FactoryAppTemplateMetadataKey].(map[string]any)
+		return template["startMode"] == "manual"
+	}
+	return false
 }
 
 func customStageEntrypoint(canvas Canvas, spec LiveCanvasSpec) (string, error) {

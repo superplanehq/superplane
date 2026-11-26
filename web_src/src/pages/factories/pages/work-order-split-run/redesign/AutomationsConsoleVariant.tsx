@@ -440,6 +440,7 @@ function eligibleColumnAutomations(
   return automations.filter((automation) => {
     const savedColumn = automation.columnKey ?? "verify";
     if (savedColumn !== columnId) return false;
+    if (savedColumn.startsWith("custom-")) return fixture.currentStageKey === savedColumn;
     if (savedColumn === "backlog") return fixture.footer.kind === "draft";
     if (savedColumn === "implement") {
       return (

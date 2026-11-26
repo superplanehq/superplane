@@ -91,6 +91,12 @@ func Test__FactoryLine__Dispatch__StartsCustomStageBeforeLineStep(t *testing.T) 
 	second, secondEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "Test", "test")
 	require.NoError(t, first.SetColumnKey(db, customStage.Key))
 	require.NoError(t, second.SetColumnKey(db, customStage.Key))
+	manual, manualEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "Manual QA", "manual")
+	require.NoError(t, manual.SetColumnKey(db, customStage.Key))
+	manualVersion, err := models.FindLiveCanvasVersionInTransaction(db, manual.ID)
+	require.NoError(t, err)
+	manualVersion.Nodes[0].Metadata = map[string]any{models.FactoryAppTemplateMetadataKey: map[string]any{"startMode": "manual"}}
+	require.NoError(t, db.Save(manualVersion).Error)
 
 	var dispatch *models.FactoryWorkOrderLineDispatch
 	var results []*models.FactoryLineStepResult
@@ -114,6 +120,9 @@ func Test__FactoryLine__Dispatch__StartsCustomStageBeforeLineStep(t *testing.T) 
 	assert.Equal(t, firstEntry, results[0].Run.NodeID)
 	assert.Equal(t, secondEntry, results[1].Run.NodeID)
 	assert.Equal(t, []int{0, 1}, []int{results[0].Execution.StepIndex, results[1].Execution.StepIndex})
+	var manualRuns int64
+	require.NoError(t, db.Model(&models.CanvasRun{}).Where("workflow_id = ? AND node_id = ?", manual.ID, manualEntry).Count(&manualRuns).Error)
+	require.Zero(t, manualRuns)
 }
 
 func Test__FactoryLine__DispatchStage__EmptyFirstStageUsesAutoAdvance(t *testing.T) {
@@ -147,6 +156,12 @@ func Test__FactoryLine__DispatchStage__EmptyFirstStageUsesAutoAdvance(t *testing
 			}
 			stages := append([]models.FactoryLineStage{line.StagesValue()[0], qa}, line.StagesValue()[1:]...)
 			require.NoError(t, line.UpdateConfiguration(db, nil, nil, nil, stages))
+			manual, _ := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "Manual QA", "manual")
+			require.NoError(t, manual.SetColumnKey(db, qa.Key))
+			version, err := models.FindLiveCanvasVersionInTransaction(db, manual.ID)
+			require.NoError(t, err)
+			version.Nodes[0].Metadata = map[string]any{models.FactoryAppTemplateMetadataKey: map[string]any{"startMode": "manual"}}
+			require.NoError(t, db.Save(version).Error)
 			if test.rerun {
 				require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
 					_, _, dispatchErr := line.DispatchStage(tx, order)

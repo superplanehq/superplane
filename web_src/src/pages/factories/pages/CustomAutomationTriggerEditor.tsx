@@ -98,7 +98,7 @@ export function TriggerEditor({
       <section className="flex flex-col gap-4">
         <div className="flex flex-col gap-1.5">
           <h3 className="text-base font-semibold text-foreground">Triggers</h3>
-          <TriggerContext columnKey={columnKey} runsOnTask={runsOnTask} onRunsOnTaskChange={onRunsOnTaskChange} />
+          <TriggerContext {...{ columnKey, triggers, onTriggersChange, runsOnTask, onRunsOnTaskChange }} />
         </div>
         {visibleTriggers.map((trigger) => (
           <TriggerCard
@@ -263,16 +263,34 @@ function TriggerCard({
 /** Chooses which triggers this automation can run. The choice is saved. */
 function TriggerContext({
   columnKey,
+  triggers,
+  onTriggersChange,
   runsOnTask,
   onRunsOnTaskChange,
 }: {
   columnKey: CustomAutomationColumn;
+  triggers: CustomAutomationTrigger[];
+  onTriggersChange: (triggers: CustomAutomationTrigger[]) => void;
   runsOnTask?: boolean;
   onRunsOnTaskChange: (runsOnTask: boolean) => void;
 }) {
   if (columnKey.startsWith("custom-")) {
     return (
-      <p className="text-xs text-muted-foreground">The line starts this automation when a task enters the stage.</p>
+      <div className="flex flex-col gap-2">
+        <p className="text-xs text-muted-foreground">This automation runs on a task in this stage.</p>
+        <SegmentedNav
+          ariaLabel="Trigger"
+          size="xs"
+          value={triggers[0]?.mode ?? "automatic"}
+          onValueChange={(value) =>
+            onTriggersChange([newCustomAutomationTrigger(value === "manual" ? "manual" : "automatic")])
+          }
+          options={[
+            { value: "automatic", label: "Automatic stage entry" },
+            { value: "manual", label: "Manual" },
+          ]}
+        />
+      </div>
     );
   }
   return (
