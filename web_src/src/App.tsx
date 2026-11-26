@@ -17,6 +17,7 @@ import { FEATURE_FACTORIES } from "./lib/experimentalFeatures";
 import { usePersistOrganizationLastLocation } from "./hooks/usePersistOrganizationLastLocation";
 import { useIdentifyOrganizationGroup } from "./hooks/useIdentifyOrganizationGroup";
 import { UserNotificationsListener } from "./hooks/useUserNotificationsWebsocket";
+import { WebhookSetupListener } from "./hooks/useWebhookSetupWebsocket";
 import { resolveOrganizationUidRedirect } from "./lib/organizationPath";
 import { isReservedAppPathSegment } from "./lib/reservedAppPaths";
 import { useConsumeIntegrationSetupReturnOnArrival } from "./hooks/useConsumeIntegrationSetupReturnOnArrival";
@@ -456,6 +457,7 @@ export function OrganizationScope() {
   return (
     <PermissionsProvider>
       <UserNotificationsListener organizationId={resolvedId} />
+      <WebhookSetupListener organizationId={resolvedId} />
       <Outlet />
     </PermissionsProvider>
   );

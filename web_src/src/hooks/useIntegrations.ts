@@ -12,6 +12,7 @@ import {
   organizationsUpdateIntegrationSecret,
   organizationsUpdateIntegrationProperty,
   organizationsUpdateIntegrationCapabilities,
+  organizationsRetryIntegrationWebhook,
 } from "@/api-client/sdk.gen";
 import type {
   IntegrationCapabilityState,
@@ -114,6 +115,45 @@ export const useIntegration = (organizationId: string, integrationId: string) =>
     enabled: !!organizationId && !!integrationId,
   });
 };
+
+export function useRetryIntegrationWebhook(organizationId: string, integrationId: string, webhookId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      organizationsRetryIntegrationWebhook(
+        withOrganizationHeader({
+          organizationId,
+          path: { id: organizationId, integrationId, webhookId },
+          body: {},
+          throwOnError: true,
+        }),
+      ),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: integrationKeys.connected(organizationId) }),
+  });
+}
+
+export function useRetryIntegrationWebhooks(organizationId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (webhooks: { integrationId: string; webhookId: string }[]) => {
+      const results = await Promise.allSettled(
+        webhooks.map(({ integrationId, webhookId }) =>
+          organizationsRetryIntegrationWebhook(
+            withOrganizationHeader({
+              organizationId,
+              path: { id: organizationId, integrationId, webhookId },
+              body: {},
+              throwOnError: true,
+            }),
+          ),
+        ),
+      );
+      const failure = results.find((result) => result.status === "rejected");
+      if (failure) throw failure.reason;
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: integrationKeys.connected(organizationId) }),
+  });
+}
 
 /**
  * Reads the default branch a repository reports. Missing inputs and an empty
