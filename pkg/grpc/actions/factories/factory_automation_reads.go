@@ -3,6 +3,7 @@ package factories
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"maps"
 
 	"github.com/google/uuid"
@@ -150,4 +151,18 @@ func factoryAutomationPolicy[T any](tx *gorm.DB, factory *models.Factory, operat
 		reads.policies[key] = result
 	}
 	return result, err
+}
+
+func factoryAutomationVCSBinding(tx *gorm.DB, factory *models.Factory, integrationID uuid.UUID) (*models.VCSProviderIntegrationBinding, error) {
+	binding, err := factoryAutomationPolicy(tx, factory, "vcs-binding", []any{integrationID}, func() (*models.VCSProviderIntegrationBinding, error) {
+		binding, err := models.FindVCSProviderIntegrationBinding(tx, integrationID)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return binding, err
+	})
+	if err == nil && binding == nil {
+		return nil, gorm.ErrRecordNotFound
+	}
+	return binding, err
 }

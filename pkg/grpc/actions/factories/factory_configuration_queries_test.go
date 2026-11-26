@@ -3,6 +3,7 @@ package factories
 import (
 	"context"
 	"fmt"
+	"maps"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -342,6 +343,51 @@ func TestFactoryConfigurationBatchesSharedReads(t *testing.T) {
 					}
 				})
 			}
+		})
+	}
+}
+
+func TestFactoryConfigurationSharesRepositoryAuthorizationReads(t *testing.T) {
+	for _, hosted := range []bool{false, true} {
+		t.Run(fmt.Sprintf("hosted=%t", hosted), func(t *testing.T) {
+			var f configurationFixture
+			if hosted {
+				f = organizationKeyConfigurationFixture(t)
+			} else {
+				f = newConfigurationFixture(t)
+			}
+			db := database.DB(t.Context())
+			queries := map[string]int{}
+			const callback = "test:configuration_repository_queries"
+			require.NoError(t, db.Callback().Query().After("gorm:query").Register(callback, func(tx *gorm.DB) {
+				switch tx.Statement.Table {
+				case "vcs_provider_integration_bindings", "users", "vcs_provider_repositories", "repository":
+					queries[tx.Statement.Table]++
+				}
+			}))
+			t.Cleanup(func() { require.NoError(t, db.Callback().Query().Remove(callback)) })
+			measure := func() map[string]int {
+				bundle := f.export(t)
+				clear(queries)
+				planned := f.plan(t, bundle)
+				require.Empty(t, planned.Diagnostics)
+				require.Empty(t, planned.Changes)
+				counts := maps.Clone(queries)
+				clear(queries)
+				result, err := f.apply(bundle, planned.BaseStateToken)
+				require.NoError(t, err)
+				require.False(t, result.Changed)
+				for table, count := range queries {
+					counts["apply:"+table] = count
+				}
+				return counts
+			}
+			single := measure()
+			require.Positive(t, single["vcs_provider_integration_bindings"])
+			for range 4 {
+				resetTestTemplate(t, f.r, f.factory, "risk-score", models.ProviderGitHub, func(*yaml.Canvas) {})
+			}
+			require.Equal(t, single, measure(), "shared repository reads must not grow with unchanged built-ins")
 		})
 	}
 }

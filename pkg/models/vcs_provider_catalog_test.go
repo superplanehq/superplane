@@ -943,3 +943,61 @@ func TestEnqueueStaleVCSProviderRepositorySyncsQueuesOldestFirst(t *testing.T) {
 func int64Pointer(value int64) *int64 {
 	return &value
 }
+
+func TestVCSProviderBindingSyncRetainsOnlyAuthorizedContextRepositories(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	db := database.DB(t.Context())
+	organization, err := CreateOrganization("Context "+uuid.NewString(), "")
+	require.NoError(t, err)
+	other, err := CreateOrganization("Other "+uuid.NewString(), "")
+	require.NoError(t, err)
+	require.NoError(t, UpsertVCSProviderInstallation(db, &VCSProviderInstallation{Provider: ProviderGitHub, InstallationID: 101}))
+	integration, err := FindOrCreateVCSProviderBinding(db, organization.ID, ProviderGitHub, 101, "acme")
+	require.NoError(t, err)
+	entries := []struct {
+		name         string
+		organization uuid.UUID
+		provider     string
+		access       string
+		granted      bool
+		enabled      bool
+		deleted      bool
+	}{
+		{"read", organization.ID, ProviderGitHub, FactoryContextRepoAccessRead, true, true, false},
+		{"write", organization.ID, ProviderGitHub, FactoryContextRepoAccessWrite, true, true, false},
+		{"disabled", organization.ID, "", FactoryContextRepoAccessRead, true, false, false},
+		{"ungranted", organization.ID, ProviderGitHub, FactoryContextRepoAccessRead, false, true, false},
+		{"deleted", organization.ID, ProviderGitHub, FactoryContextRepoAccessRead, true, true, true},
+		{"foreign", other.ID, ProviderGitHub, FactoryContextRepoAccessRead, true, true, false},
+		{"other-provider", organization.ID, ProviderBitbucket, FactoryContextRepoAccessRead, true, true, false},
+	}
+	repositories := make([]VCSProviderRepository, len(entries))
+	for i, entry := range entries {
+		repositories[i] = VCSProviderRepository{RepositoryID: int64(201 + i), FullName: "acme/" + entry.name}
+	}
+	require.NoError(t, ReplaceVCSProviderRepositories(db, ProviderGitHub, 101, repositories))
+	for i, entry := range entries {
+		factory, err := CreateFactory(db, entry.organization, entry.name, "", "")
+		require.NoError(t, err)
+		connection := integration.ID.String()
+		require.NoError(t, factory.UpdateOnboarding(db, FactoryOnboardingPatch{VCSIntegrationID: &connection}))
+		_, err = factory.CreateAgentResource(db, FactoryAgentResourceKindContextRepo, entry.name, entry.enabled, FactoryAgentResourceConfig{
+			Repository: repositories[i].FullName, VCSProvider: entry.provider, Access: entry.access,
+		})
+		require.NoError(t, err)
+		if entry.granted {
+			require.NoError(t, GrantVCSProviderBindingRepository(db, integration.ID, ProviderGitHub, repositories[i].RepositoryID))
+		}
+		if entry.deleted {
+			require.NoError(t, db.Model(factory).Update("deleted_at", time.Now()).Error)
+		}
+	}
+	require.NoError(t, SyncVCSProviderBindingRepositories(db, integration.ID, ProviderGitHub))
+	grants, err := ListVCSProviderBindingRepositories(db, integration.ID)
+	require.NoError(t, err)
+	ids := make([]int64, len(grants))
+	for i, grant := range grants {
+		ids[i] = grant.RepositoryID
+	}
+	require.ElementsMatch(t, []int64{201, 202, 203}, ids)
+}

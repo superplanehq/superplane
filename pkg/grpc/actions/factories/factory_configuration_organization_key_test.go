@@ -93,6 +93,9 @@ func TestFactoryConfigurationOrganizationKeySelectsGrantedRepositories(t *testin
 	require.NoError(t, err)
 	require.Len(t, resources, 1)
 	require.Equal(t, "acme/docs", resources[0].Config.Data().Repository)
+	roundTrip := f.plan(t, f.export(t))
+	require.Empty(t, roundTrip.Diagnostics, "apply must retain grants for saved additional repositories")
+	require.Empty(t, roundTrip.Changes)
 }
 
 func TestFactoryConfigurationOrganizationKeyRejectsUnavailableGrants(t *testing.T) {

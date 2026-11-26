@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/githubapp"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -353,14 +354,16 @@ func authorizeConfigurationPrimaryRepository(ctx context.Context, tx *gorm.DB, f
 		}
 		return 0, "", validateBitbucketTokenRepository(integration, repository)
 	}
-	binding, err := models.FindVCSProviderIntegrationBinding(tx, integration.ID)
+	binding, err := factoryAutomationVCSBinding(tx, factory, integration.ID)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return 0, "", nil
 	}
 	if err != nil {
 		return 0, "", err
 	}
-	catalog, err := findGitHubCatalogRepositoryByName(ctx, tx, factory.OrganizationID.String(), repository, integration.ID)
+	catalog, err := factoryAutomationPolicy(tx, factory, "configuration-repository-access", []any{integration.ID, repository, versionOwnerID(ctx), githubapp.AccountConnectionRequired(ctx)}, func() (*models.AccessibleVCSProviderRepository, error) {
+		return findGitHubCatalogRepositoryByName(ctx, tx, factory.OrganizationID.String(), repository, integration.ID)
+	})
 	if err != nil {
 		return 0, "", err
 	}

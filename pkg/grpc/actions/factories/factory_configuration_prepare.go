@@ -459,7 +459,7 @@ func resolveConfigurationBuiltInBinding(tx *gorm.DB, factory *models.Factory, te
 	}
 	// Hosted GitHub selections use the catalog and caller authorization, not a stale resource cache.
 	if integration.AppName == models.ProviderGitHub {
-		if _, err := models.FindVCSProviderIntegrationBinding(tx, integration.ID); err == nil {
+		if _, err := factoryAutomationVCSBinding(tx, factory, integration.ID); err == nil {
 			return binding, integration, nil
 		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return binding, nil, err

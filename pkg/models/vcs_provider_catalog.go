@@ -1633,7 +1633,8 @@ func LockOrganizationVCSProviderBindingRepositories(tx *gorm.DB, organizationID 
 }
 
 // SyncVCSProviderBindingRepositories limits a binding to workspace selections
-// and existing grants needed by explicitly bound automations. The transaction
+// and existing grants needed by saved context repositories and explicitly
+// bound automations. The transaction
 // lock prevents concurrent workspace updates from replacing each other's grants.
 func SyncVCSProviderBindingRepositories(tx *gorm.DB, integrationID uuid.UUID, provider string) error {
 	provider, err := normalizeVCSProvider(provider)
@@ -1678,6 +1679,14 @@ func SyncVCSProviderBindingRepositories(tx *gorm.DB, integrationID uuid.UUID, pr
 			return err
 		}
 		for _, repositoryID := range retained {
+			selected[repositoryID] = struct{}{}
+		}
+
+		contextRepositories, err := binding.retainedContextRepositoryIDs(tx)
+		if err != nil {
+			return err
+		}
+		for _, repositoryID := range contextRepositories {
 			selected[repositoryID] = struct{}{}
 		}
 
@@ -1834,6 +1843,22 @@ func (b *VCSProviderIntegrationBinding) retainedAutomationRepositoryIDs(tx *gorm
 		Where("LOWER(COALESCE(NULLIF(automation.binding ->> 'integration_id', ''), factory.onboarding_config ->> 'vcs_integration_id')) = access.integration_id::text").
 		Where("access.integration_id = ? AND access.provider = ? AND automation.organization_id = ?", b.IntegrationID, b.Provider, b.OrganizationID).
 		Where("canvas.deleted_at IS NULL AND factory.deleted_at IS NULL").
+		Pluck("access.repository_id", &repositoryIDs).Error
+	return repositoryIDs, err
+}
+
+// Disabled repositories remain in exported YAML and still require authorization.
+func (b *VCSProviderIntegrationBinding) retainedContextRepositoryIDs(tx *gorm.DB) ([]int64, error) {
+	var repositoryIDs []int64
+	err := tx.Table("vcs_provider_integration_repositories AS access").
+		Select("DISTINCT access.repository_id").
+		Joins("JOIN vcs_provider_repositories AS repository ON repository.provider = access.provider AND repository.repository_id = access.repository_id AND repository.installation_id = ?", b.InstallationID).
+		Joins("JOIN factory_agent_resources AS resource ON LOWER(BTRIM(resource.config ->> 'repository')) = LOWER(repository.full_name)").
+		Joins("JOIN factories AS factory ON factory.id = resource.factory_id AND factory.organization_id = resource.organization_id").
+		Where("factory.onboarding_config ->> 'vcs_integration_id' = ?", b.IntegrationID.String()).
+		Where("access.integration_id = ? AND access.provider = ? AND resource.organization_id = ?", b.IntegrationID, b.Provider, b.OrganizationID).
+		Where("resource.kind = ? AND COALESCE(NULLIF(LOWER(BTRIM(resource.config ->> 'vcsProvider')), ''), ?) = ?", FactoryAgentResourceKindContextRepo, ProviderGitHub, b.Provider).
+		Where("factory.deleted_at IS NULL").
 		Pluck("access.repository_id", &repositoryIDs).Error
 	return repositoryIDs, err
 }
