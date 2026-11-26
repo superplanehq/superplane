@@ -136,6 +136,13 @@ describe("Intake run evidence", () => {
       key: "APP-12",
     },
     {
+      sourceId: "sentry-exceptions",
+      data: {
+        issue: { id: "12", title: "Checkout error", permalink: "https://sentry.io/issues/12" },
+      },
+      key: "12",
+    },
+    {
       sourceId: "linear-issues",
       data: {
         action: "create",

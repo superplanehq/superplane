@@ -11,10 +11,8 @@ export function intakeRunSource(
       return githubSource(payload, false);
     case "dependabot-alerts":
       return githubSource(payload, true);
-    case "sentry-exceptions": {
-      const issue = record(record(payload.data).issue ?? payload.issue);
-      return source(text(issue.shortId, issue.id) || "Sentry issue", issue.title, issue.permalink);
-    }
+    case "sentry-exceptions":
+      return sentrySource(payload);
     case "linear-issues": {
       const issue = record(payload.data);
       return source(text(issue.identifier) || "Linear issue", issue.title, text(payload.url, issue.url));
@@ -43,6 +41,11 @@ export function intakeRunSource(
     case "scheduled-intake":
       return { reference: "Schedule", title: "Scheduled review" };
   }
+}
+
+function sentrySource(payload: Record<string, unknown>): AutomationRun["source"] {
+  const issue = record(record(payload.data).issue ?? payload.issue);
+  return source(text(issue.shortId, issue.id) || "Sentry issue", issue.title, issue.permalink);
 }
 
 function productiveSource(payload: Record<string, unknown>): AutomationRun["source"] {
