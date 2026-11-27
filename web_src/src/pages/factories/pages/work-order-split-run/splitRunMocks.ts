@@ -859,7 +859,11 @@ function phasesForOrder(
 /** Runs with no task, such as webhook runs, that attached to the task while it waited in their stage. */
 function attachedRunPhases(order: FactoriesWorkOrder, apiChecks?: FactoriesWorkOrderCheck[]): SplitRunPhase[] {
   const runs = order.attachedRuns ?? [];
-  return runs.map((execution) => executionToPhase(order, execution, apiChecks, false, runs));
+  // No step index: line-step retry would restart the task line, not this run.
+  return runs.map((execution) => ({
+    ...executionToPhase(order, execution, apiChecks, false, runs),
+    stepIndex: undefined,
+  }));
 }
 
 export const SPLIT_RUN_CLOSURE_PHASE_ID = "done-closure";

@@ -700,6 +700,7 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(phase).toEqual(
       expect.objectContaining({ columnKey: "custom-approval", appId: "app-gate", componentName: "Approval gate" }),
     );
+    expect(phase?.stepIndex).toBeUndefined();
   });
 
   it("keeps runs from earlier dispatches as history phases", () => {

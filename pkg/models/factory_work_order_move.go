@@ -177,6 +177,14 @@ func (o *FactoryWorkOrder) lockWaitingLineDispatch(tx *gorm.DB, stageKey string)
 	if !o.IsOpen() || dispatch.State != FactoryWorkOrderLineDispatchStateFinished || dispatch.Result != CanvasRunResultPassed || dispatch.CurrentStageKey != stageKey {
 		return nil, ErrFactoryTaskNotWaiting
 	}
+	// A restart can add a newer traversal before the locks above.
+	current, err := o.LatestLineDispatch(tx)
+	if err != nil {
+		return nil, err
+	}
+	if current.ID != dispatch.ID {
+		return nil, ErrFactoryTaskNotWaiting
+	}
 	open, err := dispatch.HasOpenWork(tx)
 	if err != nil {
 		return nil, err
