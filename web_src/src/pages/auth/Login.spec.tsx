@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
@@ -69,6 +69,11 @@ describe("getSignupUnavailableReason", () => {
 });
 
 describe("Login automatic magic-code signup", () => {
+  afterEach(() => {
+    delete window.THREE;
+    delete window.SuperplaneArt;
+  });
+
   beforeEach(() => {
     authConfig.providers = [];
     authConfig.passwordLoginEnabled = false;
@@ -79,7 +84,10 @@ describe("Login automatic magic-code signup", () => {
     vi.restoreAllMocks();
   });
 
-  it("continues directly to code entry for an unknown email", async () => {
+  it("keeps static artwork and email login usable when animated artwork cannot mount", async () => {
+    const mount = vi.fn(() => null);
+    window.THREE = {};
+    window.SuperplaneArt = { mount };
     const user = userEvent.setup();
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
@@ -99,7 +107,12 @@ describe("Login automatic magic-code signup", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    renderLogin();
+    const view = renderLogin();
+
+    await waitFor(() => expect(mount).toHaveBeenCalledTimes(1));
+    const fallback = view.container.querySelector(".brand-arrow-fallback");
+    expect(fallback).toBeVisible();
+    expect(screen.getByTestId("first-run-art-canvas")).toBeEmptyDOMElement();
 
     await screen.findByRole("button", { name: "Continue with email" });
     await user.type(screen.getByPlaceholderText("you@example.com"), "new@example.com");

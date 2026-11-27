@@ -525,6 +525,26 @@ function mount(target, options){
     }, 100);
     return null;
   }
+  // Acquire the renderer's context before allocations or DOM changes so unavailable
+  // graphics leave the host's static artwork intact. Match three.js r128 defaults.
+  var canvas = document.createElement('canvas');
+  var contextAttributes = {
+    alpha:false, depth:true, stencil:true, antialias:true,
+    premultipliedAlpha:true, preserveDrawingBuffer:false,
+    powerPreference:'default', failIfMajorPerformanceCaveat:false
+  };
+  var contextNames = ['webgl2', 'webgl', 'experimental-webgl'];
+  var context = null;
+  try{
+    for(var contextIndex=0;contextIndex<contextNames.length;contextIndex++){
+      context = canvas.getContext(contextNames[contextIndex], contextAttributes);
+      if(context) break;
+    }
+  }catch(error){
+    return null;
+  }
+  if(!context) return null;
+
   ensureSharedResources();
 
   // options.bgColor / options.arrowColor / options.arrowAccentColor let a single
@@ -883,14 +903,13 @@ function mount(target, options){
   var canvasWrap = document.createElement('div');
   canvasWrap.style.cssText = 'flex:1 1 auto;position:relative;background:#0b0b0c;min-width:0;height:100%;';
   root.appendChild(canvasWrap);
-  var canvas = document.createElement('canvas');
   canvas.style.cssText = 'display:block;width:100%;height:100%;';
   canvasWrap.appendChild(canvas);
 
   /* ======================================================================
      THREE SETUP (scoped to this instance)
   ====================================================================== */
-  var renderer = new THREE.WebGLRenderer({canvas:canvas, antialias:true});
+  var renderer = new THREE.WebGLRenderer({canvas:canvas, context:context, antialias:true});
   renderer.setPixelRatio(Math.min(global.devicePixelRatio||1, 2));
   renderer.setClearColor(effectiveBgColor, 1);
 
