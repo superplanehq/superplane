@@ -520,19 +520,40 @@ func createClaudeImplementationCanvas(t *testing.T, r *support.ResourceRegistry,
 	return canvas
 }
 
+func TestInstanceSuperPlaneDefaultRestoresHostedConfiguration(t *testing.T) {
+	support.Setup(t)
+	db := database.DB(t.Context())
+	previous, err := models.GetInstallationLLMSettings(db)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, database.Conn().Model(previous).Updates(map[string]any{
+			"default_hosted_provider": previous.DefaultHostedProvider,
+			"default_hosted_model":    previous.DefaultHostedModel,
+		}).Error)
+	})
+	provider, model := models.UsageProviderOpenRouter, "original-model"
+	seedHostedModels(t, db, provider, model)
+	_, err = models.UpdateInstallationLLMSettings(db, models.InstallationLLMSettings{
+		DefaultHostedProvider: &provider,
+		DefaultHostedModel:    &model,
+	})
+	require.NoError(t, err)
+
+	t.Run("temporary default", enableInstanceSuperPlaneDefault)
+
+	actual, err := models.GetInstallationDefaultHostedLLMModel(db)
+	require.NoError(t, err)
+	assert.Equal(t, models.DefaultHostedLLMModel{Provider: provider, Model: model}, actual)
+	require.NoError(t, models.AssertDefaultHostedLLMModelAllowed(db, actual))
+}
+
 func enableInstanceSuperPlaneDefault(t *testing.T) {
 	t.Helper()
 	db := database.DB(t.Context())
 	previous, err := models.GetInstallationLLMSettings(db)
 	require.NoError(t, err)
 
-	_, err = models.UpsertHostedLLMProvider(db, models.HostedLLMProvider{
-		Provider:      models.UsageProviderOpenRouter,
-		Enabled:       true,
-		APIKey:        []byte("encrypted"),
-		AllowedModels: datatypes.JSONSlice[string]{"x-ai/grok-4.6"},
-	})
-	require.NoError(t, err)
+	seedHostedModels(t, db, models.UsageProviderOpenRouter, "x-ai/grok-4.6")
 
 	provider := models.UsageProviderOpenRouter
 	model := "x-ai/grok-4.6"
@@ -544,9 +565,11 @@ func enableInstanceSuperPlaneDefault(t *testing.T) {
 
 	t.Cleanup(func() {
 		conn := database.Conn()
-		_, err := models.UpdateInstallationLLMSettings(conn, *previous)
-		require.NoError(t, err)
-		_ = conn.Where("provider = ?", models.UsageProviderOpenRouter).Delete(&models.HostedLLMProvider{})
+		// Restore saved settings even when earlier fixtures left a stale allowlist.
+		require.NoError(t, conn.Model(previous).Updates(map[string]any{
+			"default_hosted_provider": previous.DefaultHostedProvider,
+			"default_hosted_model":    previous.DefaultHostedModel,
+		}).Error)
 	})
 }
 

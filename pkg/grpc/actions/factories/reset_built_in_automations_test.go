@@ -301,3 +301,34 @@ func liveCanvasJSON(t *testing.T, canvas *models.Canvas) string {
 	require.NoError(t, err)
 	return strings.ToLower(string(encoded))
 }
+
+func TestBulkResetBatchesOwnershipReads(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory := factoryForOrganization(t, r.Organization.ID)
+	deps := testIntakeDependencies(r)
+	queries := 0
+	callback := "test:bulk_reset_ownership"
+	require.NoError(t, db.Callback().Query().After("gorm:query").Register(callback, func(tx *gorm.DB) {
+		if tx.Statement.Table == "factory_configuration_automations" {
+			queries++
+		}
+	}))
+	t.Cleanup(func() { require.NoError(t, db.Callback().Query().Remove(callback)) })
+
+	total := 0
+	for _, added := range []int{1, 4} {
+		for range added {
+			installFactoryTemplate(t, r, r.Organization.ID, factory.ID, lineImplementationTemplateID, models.ProviderGitHub, nil)
+			total++
+		}
+		queries = 0
+		require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+			result, err := resetOrganizationBuiltInAutomationsInTransaction(t.Context(), tx, r.Organization.ID, "", deps)
+			require.NoError(t, err)
+			require.Equal(t, total, result.Reset)
+			return nil
+		}))
+		assert.Equal(t, 1, queries, "ownership reads must not grow with template canvas count")
+	}
+}

@@ -6,6 +6,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/automationspec"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
+	"strings"
 )
 
 type factoryConfigurationValidationInputs struct {
@@ -26,7 +27,7 @@ func loadFactoryConfigurationValidationInputs(tx *gorm.DB, target *factoryConfig
 		}
 		for _, automation := range stage.Automations {
 			current := automation.current
-			if current == nil {
+			if current == nil && !strings.HasPrefix(automation.Uses, "@superplane/") {
 				sourceIDs = append(sourceIDs, configurationAutomationSourceID(target.factory.ID, configurationStagePlacement(live), automation.ID))
 			}
 			if current != nil && (current.templateID != "" || !factoryConfigurationAutomationContentChanged(current, automation, manifest)) {

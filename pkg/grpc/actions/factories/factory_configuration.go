@@ -158,10 +158,80 @@ func ApplyFactoryConfiguration(ctx context.Context, deps IntakeDependencies, org
 				notifications = append(notifications, notify)
 			}
 		}
+		references := map[string]string{}
+		for _, stage := range manifest.Stages {
+			live := byKey[stage.Key]
+			for _, automation := range stage.Automations {
+				if automation.prepared == nil {
+					continue
+				}
+				current := automation.current
+				id := uuid.New()
+				if current != nil {
+					id = current.canvas.ID
+				} else {
+					_, err := canvases.CreateCanvasWithIDInTransaction(ctx, tx, id, deps.Registry, deps.Encryptor, deps.AuthService, deps.WebhookBaseURL, orgID, automation.Name, automation.prepared.Description, &target.factory.ID, nil, nil)
+					if err != nil {
+						return err
+					}
+					canvas, err := models.FindCanvasInTransaction(tx, orgID, id)
+					if err != nil {
+						return err
+					}
+					if err := canvas.SetColumnKey(tx, configurationStagePlacement(live)); err != nil {
+						return err
+					}
+				}
+				// Save identities before resolving automation dependencies.
+				if configurationShouldSaveOwnership(current, automation) || current != nil && configurationNeedsStableIdentity(stage, automation, current) {
+					if err := saveFactoryConfigurationOwnership(tx, target, live, automation, id); err != nil {
+						return err
+					}
+				}
+				references[configurationManifestReference(stage.Key, automation.ID)] = id.String()
+			}
+		}
+		type pendingReview struct {
+			automation factoryConfigurationAutomation
+			current    *factoryConfigurationAutomationTarget
+			id         uuid.UUID
+		}
+		var reviews []pendingReview
 		for _, stage := range manifest.Stages {
 			live := byKey[stage.Key]
 			for _, automation := range stage.Automations {
 				current := automation.current
+				if automation.prepared != nil {
+					if current != nil && (seen[current.canvas.ID] || !factoryConfigurationAutomationChanged(current, automation, manifest)) {
+						continue
+					}
+					id, err := uuid.Parse(references[configurationManifestReference(stage.Key, automation.ID)])
+					if err != nil {
+						return err
+					}
+					if current != nil {
+						seen[current.canvas.ID] = true
+					}
+					if current != nil && equalCanvasJSON(current.settings, automation.With) && current.binding == automation.prepared.Binding && !factoryConfigurationReviewSourceChanged(current, automation) && (!factoryConfigurationBindingChanged(current, automation) || !configurationHasVCSListener(current)) {
+						if current.canvas.Name != automation.Name {
+							if err := renameFactoryConfigurationAutomation(tx, target.factory, current, automation, manifest); err != nil {
+								return err
+							}
+						}
+						notifications = append(notifications, func() { canvases.PublishCanvasUpdated(current.canvas) })
+						continue
+					}
+					if automation.prepared.TemplateID == reviewRequestTemplateID {
+						reviews = append(reviews, pendingReview{automation, current, id})
+						continue
+					}
+					notify, err := publishFactoryConfigurationBuiltIn(ctx, tx, deps, target, automation, current, id, actor, references)
+					if err != nil {
+						return err
+					}
+					notifications = append(notifications, notify)
+					continue
+				}
 				if current == nil {
 					source := manifest.Sources[configurationAutomationPath(automation.Uses)]
 					notify, err := createFactoryConfigurationCustom(ctx, tx, deps, target, configurationStagePlacement(live), automation.ID, source, actor)
@@ -182,20 +252,7 @@ func ApplyFactoryConfiguration(ctx context.Context, deps IntakeDependencies, org
 					notifications = append(notifications, func() { canvases.PublishCanvasUpdated(current.canvas) })
 					continue
 				}
-				if current.templateID != "" {
-					nodes, edges, err := copyFactoryConfigurationBuiltIn(current.version, current.defaults, current.templateID, automation.With)
-					if err != nil {
-						return err
-					}
-					if err := canvases.PublishGeneratedCanvasNodes(ctx, tx, current.canvas, actor, "Update stage automation settings", nodes, edges, intakePublisherOptions(deps, orgID)); err != nil {
-						return err
-					}
-					if err := canvases.UpdateCanvasInTransaction(tx, current.canvas, &automation.Name, nil); err != nil {
-						return err
-					}
-					notifications = append(notifications, func() { canvases.PublishCanvasUpdated(current.canvas) })
-					continue
-				}
+
 				source := manifest.Sources[configurationAutomationPath(automation.Uses)]
 				notify, err := applyFactoryConfigurationCustom(ctx, tx, deps, target, current, source, actor)
 				if err != nil {
@@ -203,6 +260,13 @@ func ApplyFactoryConfiguration(ctx context.Context, deps IntakeDependencies, org
 				}
 				notifications = append(notifications, notify)
 			}
+		}
+		for _, review := range reviews {
+			notify, err := publishFactoryConfigurationBuiltIn(ctx, tx, deps, target, review.automation, review.current, review.id, actor, references)
+			if err != nil {
+				return err
+			}
+			notifications = append(notifications, notify)
 		}
 		response.Changed = true
 		return nil

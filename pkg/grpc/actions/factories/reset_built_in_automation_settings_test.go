@@ -473,6 +473,10 @@ func TestResetScheduledIntakeKeepsScheduleAndUserPrompt(t *testing.T) {
 	for _, provider := range []string{models.ProviderGitHub, models.ProviderBitbucket} {
 		t.Run(provider, func(t *testing.T) {
 			r, factory := resetTestFactory(t)
+			prompt := "Find accessibility defects."
+			if provider == models.ProviderBitbucket {
+				prompt = ""
+			}
 			repository := "acme/app"
 			require.NoError(t, factory.UpdateOnboarding(database.DB(t.Context()), models.FactoryOnboardingPatch{AppRepository: &repository, VCSProvider: &provider}))
 			canvas := resetTestTemplate(t, r, factory, scheduledIntakeTemplateID, provider, func(doc *yaml.Canvas) {
@@ -481,7 +485,7 @@ func TestResetScheduledIntakeKeepsScheduleAndUserPrompt(t *testing.T) {
 				findYAMLNode(t, doc, "create-task").Configuration["defaultOwnerId"] = r.User.String()
 				agent := findYAMLNode(t, doc, "scheduled-agent")
 				agent.Configuration["executionTimeoutSeconds"] = 600
-				implementationStep(t, agent, "Propose a task")["prompt"] = "Find accessibility defects." + scheduledIntakeOutputInstructions
+				implementationStep(t, agent, "Propose a task")["prompt"] = prompt + scheduledIntakeOutputInstructions
 			})
 			require.NoError(t, canvas.SetDisplayColumn(database.DB(t.Context()), "done"))
 			require.NoError(t, resetTestOrganization(t, r))
@@ -502,7 +506,7 @@ func TestResetScheduledIntakeKeepsScheduleAndUserPrompt(t *testing.T) {
 			agent := findIntakeNode(version.Nodes, "scheduled-agent")
 			assert.EqualValues(t, 600, agent.Configuration["executionTimeoutSeconds"])
 			steps := agent.Configuration["steps"].([]any)
-			assert.Equal(t, "Find accessibility defects."+scheduledIntakeOutputInstructions, steps[1].(map[string]any)["prompt"])
+			assert.Equal(t, prompt+scheduledIntakeOutputInstructions, steps[1].(map[string]any)["prompt"])
 		})
 	}
 }
@@ -636,11 +640,13 @@ func TestResetIntakePreservesGeneralSettings(t *testing.T) {
 			if source == models.FactoryIntakeSourceGitHubIssues || source == models.FactoryIntakeSourceSentryExceptions {
 				paused = &tc.paused
 			}
+			settings.ConfidencePct = 23
 			updated, err := UpdateFactoryIntake(ctx, IntakeDependencies{Registry: r.Registry, Encryptor: r.Encryptor, AuthService: r.AuthService, WebhookBaseURL: "http://localhost:8000"}, r.Organization.ID.String(), &pb.UpdateFactoryIntakeRequest{
 				FactoryId: factory.ID.String(), IntakeId: intake.ID.String(), Settings: serializeIntakeSettings(source, settings), Paused: paused,
 			})
 			require.NoError(t, err)
 			assert.Equal(t, tc.paused, updated.Intake.GetPaused())
+			assert.EqualValues(t, 23, updated.Intake.Settings.GetConfidencePct())
 			if source == models.FactoryIntakeSourceSentryExceptions {
 				version := resetTestLiveVersion(t, canvas)
 				assert.Nil(t, findIntakeNode(version.Nodes, intakeSentryEventHasStackNodeID), "settings updates preserve saved workflows")
