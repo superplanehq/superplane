@@ -343,21 +343,7 @@ export function prepareSidebarData({
   const queueItems = nodeQueueItemsMap[node.id!] || [];
   const events = nodeEventsMap[node.id!] || [];
 
-  // Get metadata based on node type
-  const componentMetadata = node.type === "TYPE_ACTION" ? components.find((c) => c.name === node.component) : undefined;
-  const triggerMetadata = node.type === "TYPE_TRIGGER" ? triggers.find((t) => t.name === node.component) : undefined;
-
-  const nodeTitle = componentMetadata?.label || triggerMetadata?.label || node.name || "Unknown";
-  let iconSlug = "boxes";
-  let color = "indigo";
-
-  if (componentMetadata) {
-    iconSlug = componentMetadata.icon || iconSlug;
-    color = componentMetadata.color || color;
-  } else if (triggerMetadata) {
-    iconSlug = triggerMetadata.icon || iconSlug;
-    color = triggerMetadata.color || color;
-  }
+  const { title, iconSlug, color } = getSidebarNodePresentation(node, components, triggers);
 
   const latestEvents =
     node.type === "TYPE_TRIGGER"
@@ -371,7 +357,7 @@ export function prepareSidebarData({
   return {
     latestEvents,
     nextInQueueEvents,
-    title: nodeTitle,
+    title,
     iconSlug,
     iconColor: getColorClass(color),
     totalInHistoryCount: totalHistoryCount ? totalHistoryCount : 0,
@@ -379,6 +365,29 @@ export function prepareSidebarData({
     hideQueueEvents,
     isComposite: false,
   };
+}
+
+function getSidebarNodePresentation(
+  node: ComponentsNode,
+  components: ActionsAction[],
+  triggers: TriggersTrigger[],
+): { title: string; iconSlug: string; color: string } {
+  const componentMetadata = node.type === "TYPE_ACTION" ? components.find((c) => c.name === node.component) : undefined;
+  const triggerMetadata = node.type === "TYPE_TRIGGER" ? triggers.find((t) => t.name === node.component) : undefined;
+
+  const title = componentMetadata?.label || triggerMetadata?.label || node.name || "Unknown";
+  let iconSlug = "boxes";
+  let color = "indigo";
+
+  if (componentMetadata) {
+    iconSlug = componentMetadata.icon || iconSlug;
+    color = componentMetadata.color || color;
+  } else if (triggerMetadata) {
+    iconSlug = triggerMetadata.icon || iconSlug;
+    color = triggerMetadata.color || color;
+  }
+
+  return { title, iconSlug, color };
 }
 
 function readErrorField(error: unknown, key: string): unknown {

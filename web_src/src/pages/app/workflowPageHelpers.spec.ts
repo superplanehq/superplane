@@ -5,16 +5,184 @@ import {
   isValidRunId,
   isNotFoundError,
   prepareCanvasLogNodes,
+  prepareSidebarData,
   shouldClearRunDetailNode,
   shouldClearStaleRunUrl,
   shouldRequestInitialRunFit,
   withDerivedNodeWarnings,
 } from "./workflowPageHelpers";
 import { makeComponentsNode, makeEdge } from "@/test/factories";
-import type { ActionsAction } from "@/api-client";
+import type {
+  ActionsAction,
+  CanvasesCanvasEvent,
+  CanvasesCanvasNodeExecution,
+  CanvasesCanvasNodeQueueItem,
+  TriggersTrigger,
+} from "@/api-client";
 import { mapCanvasNodesToLogEntries } from "./utils";
 
 const validRunId = "550e8400-e29b-41d4-a716-446655440000";
+
+describe("prepareSidebarData", () => {
+  for (const type of ["TYPE_ACTION", "TYPE_TRIGGER"] as const) {
+    const definition: ActionsAction & TriggersTrigger = {
+      name: "sidebar.component",
+      label: "Definition label",
+      icon: "activity",
+      color: "green",
+    };
+    const conflictingDefinition: ActionsAction & TriggersTrigger = {
+      ...definition,
+      label: "Wrong definition",
+      icon: "bell",
+      color: "red",
+    };
+    const cases: {
+      description: string;
+      metadata?: ActionsAction & TriggersTrigger;
+      nodeName?: string;
+      title: string;
+      iconSlug: string;
+      iconColor: string;
+    }[] = [
+      {
+        description: "uses the first matching definition instead of the node name",
+        metadata: definition,
+        nodeName: "Node name",
+        title: "Definition label",
+        iconSlug: "activity",
+        iconColor: "text-green-600 dark:text-green-400",
+      },
+      {
+        description: "falls back from an empty label to the node name",
+        metadata: { ...definition, label: "" },
+        nodeName: "Node name",
+        title: "Node name",
+        iconSlug: "activity",
+        iconColor: "text-green-600 dark:text-green-400",
+      },
+      {
+        description: "defaults empty icon and color values",
+        metadata: { ...definition, icon: "", color: "" },
+        nodeName: "Node name",
+        title: "Definition label",
+        iconSlug: "boxes",
+        iconColor: "text-indigo-600 dark:text-indigo-400",
+      },
+      {
+        description: "defaults missing metadata fields",
+        metadata: { name: definition.name },
+        nodeName: "Node name",
+        title: "Node name",
+        iconSlug: "boxes",
+        iconColor: "text-indigo-600 dark:text-indigo-400",
+      },
+      {
+        description: "uses the node name when only the opposite catalog matches",
+        nodeName: "Node name",
+        title: "Node name",
+        iconSlug: "boxes",
+        iconColor: "text-indigo-600 dark:text-indigo-400",
+      },
+      {
+        description: "defaults missing definitions and empty node names",
+        nodeName: "",
+        title: "Unknown",
+        iconSlug: "boxes",
+        iconColor: "text-indigo-600 dark:text-indigo-400",
+      },
+      {
+        description: "defaults empty labels and missing node names",
+        metadata: { name: definition.name, label: "" },
+        title: "Unknown",
+        iconSlug: "boxes",
+        iconColor: "text-indigo-600 dark:text-indigo-400",
+      },
+    ];
+
+    it.each(cases)(`${type}: $description`, ({ metadata, nodeName, title, iconSlug, iconColor }) => {
+      const node = makeComponentsNode({ type, component: definition.name, name: nodeName });
+      const matchingCatalog = [
+        { ...conflictingDefinition, name: "unrelated.component" },
+        ...(metadata ? [metadata] : []),
+        ...(metadata ? [conflictingDefinition] : []),
+      ];
+      const sidebar = prepareSidebarData({
+        node,
+        nodes: [node],
+        components: type === "TYPE_ACTION" ? matchingCatalog : [conflictingDefinition],
+        triggers: type === "TYPE_TRIGGER" ? matchingCatalog : [conflictingDefinition],
+        nodeExecutionsMap: {},
+        nodeQueueItemsMap: {},
+        nodeEventsMap: {},
+      });
+
+      expect(sidebar).toMatchObject({
+        title,
+        iconSlug,
+        iconColor,
+        latestEvents: [],
+        nextInQueueEvents: [],
+        totalInHistoryCount: 0,
+        totalInQueueCount: 0,
+        hideQueueEvents: type === "TYPE_TRIGGER",
+        isComposite: false,
+      });
+    });
+  }
+
+  it.each(["TYPE_ACTION", "TYPE_TRIGGER"] as const)(
+    "%s: assembles limited history and queue with supplied counts",
+    (type) => {
+      const node = makeComponentsNode({ type });
+      const createdAt = new Date().toISOString();
+      const events: CanvasesCanvasEvent[] = Array.from({ length: 6 }, (_, index) => ({
+        id: `event-${index}`,
+        nodeId: node.id,
+        createdAt,
+      }));
+      const executions: CanvasesCanvasNodeExecution[] = Array.from({ length: 6 }, (_, index) => ({
+        id: `execution-${index}`,
+        nodeId: node.id,
+        createdAt,
+        state: "STATE_FINISHED",
+        result: "RESULT_PASSED",
+      }));
+      const queueItems: CanvasesCanvasNodeQueueItem[] = Array.from({ length: 6 }, (_, index) => ({
+        id: `queue-${index}`,
+        createdAt,
+      }));
+      const sidebar = prepareSidebarData({
+        node,
+        nodes: [node],
+        components: [],
+        triggers: [],
+        nodeExecutionsMap: { [node.id!]: executions },
+        nodeQueueItemsMap: { [node.id!]: queueItems },
+        nodeEventsMap: { [node.id!]: events },
+        totalHistoryCount: 23,
+        totalQueueCount: 12,
+      });
+
+      const historyPrefix = type === "TYPE_TRIGGER" ? "event" : "execution";
+      expect(sidebar.latestEvents.map((event) => event.id)).toEqual(
+        Array.from({ length: 5 }, (_, index) => `${historyPrefix}-${index}`),
+      );
+      expect(
+        sidebar.latestEvents.every((event) => event.kind === (type === "TYPE_TRIGGER" ? "trigger" : "execution")),
+      ).toBe(true);
+      expect(
+        sidebar.nextInQueueEvents.map((event) => ({ id: event.id, kind: event.kind, state: event.state })),
+      ).toEqual(Array.from({ length: 5 }, (_, index) => ({ id: `queue-${index}`, kind: "queue", state: "queued" })));
+      expect(sidebar).toMatchObject({
+        totalInHistoryCount: 23,
+        totalInQueueCount: 12,
+        hideQueueEvents: type === "TYPE_TRIGGER",
+        isComposite: false,
+      });
+    },
+  );
+});
 
 describe("isNotFoundError", () => {
   it.each([
