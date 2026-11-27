@@ -525,6 +525,11 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			Action:     "read",
 			DomainType: models.DomainTypeOrganization,
 		},
+		{Method: "POST", Pattern: "/api/v1/organizations/{id}/integrations/{integration_id}/webhooks/{webhook_id}/retry"}: {
+			Resource:   "integrations",
+			Action:     "update",
+			DomainType: models.DomainTypeOrganization,
+		},
 		{Method: "GET", Pattern: "/api/v1/organizations/{id}/workspace-usage"}: {
 			Resource:   "org",
 			Action:     "read",

@@ -1,5 +1,5 @@
-import { factoryLineDetailPath } from "./factoryPagePaths";
 import type { CustomAutomationColumn } from "./customAutomation";
+import { factoryHomePath } from "./factoryPagePaths";
 
 const CUSTOM_AUTOMATION_PARAM = "customAutomation";
 const LEGACY_CUSTOM_AUTOMATION_PARAM = "customVerification";
@@ -8,7 +8,6 @@ const NEW_CUSTOM_AUTOMATION = "new";
 export function factoryCustomAutomationSetupPath(
   organizationId: string,
   factoryKey: string,
-  lineId: string,
   automationId?: string,
   columnKey?: CustomAutomationColumn,
 ) {
@@ -16,14 +15,13 @@ export function factoryCustomAutomationSetupPath(
     [CUSTOM_AUTOMATION_PARAM]: automationId?.trim() || NEW_CUSTOM_AUTOMATION,
   });
   if (columnKey) params.set("automationColumn", columnKey);
-  return `${factoryLineDetailPath(organizationId, factoryKey, lineId)}?${params.toString()}`;
+  return `${factoryHomePath(organizationId, factoryKey)}?${params.toString()}`;
 }
 
 /** Open the automation modal on one run. */
 export function factoryCustomAutomationRunPath(
   organizationId: string,
   factoryKey: string,
-  lineId: string,
   automationId: string,
   runId: string,
 ) {
@@ -33,7 +31,7 @@ export function factoryCustomAutomationRunPath(
     automationTab: "runs",
     automationRun: runId,
   });
-  return `${factoryLineDetailPath(organizationId, factoryKey, lineId)}?${params.toString()}`;
+  return `${factoryHomePath(organizationId, factoryKey)}?${params.toString()}`;
 }
 
 export function customAutomationIdFromSearch(search: string): string | null | undefined {

@@ -9,10 +9,10 @@ import { useFactoryAutomations } from "@/hooks/useFactoryData";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { ArrowLeft } from "lucide-react";
 import { useMemo } from "react";
-import { Navigate, useParams } from "react-router";
+import { Navigate } from "react-router";
 import { FactoryLineForm } from "../FactoryLineForm";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
-import { factoryHomePath, factoryLineDetailPath, firstFactoryLineId } from "../lib/factoryPagePaths";
+import { factoryHomePath, firstFactoryLineId } from "../lib/factoryPagePaths";
 import { useFactoryLineEditActions } from "../useFactoryLineEditActions";
 import {
   factoryCardClassName,
@@ -21,12 +21,12 @@ import {
 } from "./factoryPageLayoutStyles";
 import { cn } from "@/lib/utils";
 
-export function FactoryLineEditPage() {
+/** Edits the workspace's one line, or creates a line when `isCreate` is set. */
+export function FactoryLineEditPage({ isCreate = false }: { isCreate?: boolean }) {
   const { organizationId, factoryId, routeSegment, factory } = useFactoriesLayout();
   const { canAct } = usePermissions();
-  const { lineId } = useParams<{ lineId?: string }>();
+  const lineId = firstFactoryLineId(factory);
 
-  const isCreate = !lineId;
   const canUpdate = canAct("factories", "update");
 
   const { data: factoryApps = [], isLoading: appsLoading } = useFactoryAutomations(organizationId, factoryId);
@@ -38,8 +38,8 @@ export function FactoryLineEditPage() {
     return factory?.lines?.find((entry) => entry.id === lineId) ?? null;
   }, [factory?.lines, isCreate, lineId]);
 
-  const boardHref = factoryHomePath(organizationId, routeSegment, firstFactoryLineId(factory));
-  const returnHref = line?.id ? factoryLineDetailPath(organizationId, routeSegment, line.id) : boardHref;
+  const boardHref = factoryHomePath(organizationId, routeSegment);
+  const returnHref = boardHref;
   const actions = useFactoryLineEditActions(organizationId, factoryId, returnHref, isCreate, lineId);
 
   const pageTitleBase = resolvePageTitleBase(isCreate, line?.name);

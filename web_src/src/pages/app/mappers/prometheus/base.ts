@@ -72,26 +72,12 @@ export function buildBaseProps(
 }
 
 export function getDetailsForAlert(alert: PrometheusAlertPayload): Record<string, string> {
-  const details: Record<string, string> = {};
-
-  details["Alert Name"] = alert?.labels?.alertname || "-";
-  details["State"] = alert?.status || "-";
-
-  if (alert?.labels?.instance) {
-    details["Instance"] = alert.labels.instance;
-  }
-
-  if (alert?.labels?.job) {
-    details["Job"] = alert.labels.job;
-  }
-
-  if (alert?.annotations?.summary) {
-    details["Summary"] = alert.annotations.summary;
-  }
-
-  if (alert?.annotations?.description) {
-    details["Description"] = alert.annotations.description;
-  }
+  const [beforeTimestamps, afterTimestamps] = getOptionalAlertDetails(alert);
+  const details: Record<string, string> = {
+    "Alert Name": alert?.labels?.alertname || "-",
+    State: alert?.status || "-",
+    ...beforeTimestamps,
+  };
 
   if (alert?.startsAt) {
     details["Starts At"] = new Date(alert.startsAt).toLocaleString();
@@ -101,23 +87,37 @@ export function getDetailsForAlert(alert: PrometheusAlertPayload): Record<string
     details["Ends At"] = new Date(alert.endsAt).toLocaleString();
   }
 
-  if (alert?.value) {
-    details["Value"] = alert.value;
-  }
+  return { ...details, ...afterTimestamps };
+}
 
-  if (alert?.generatorURL) {
-    details["Generator URL"] = alert.generatorURL;
-  }
+function getOptionalAlertDetails(alert: PrometheusAlertPayload): Record<string, string>[] {
+  const labels = alert?.labels;
+  const annotations = alert?.annotations;
+  // Keep optional fields in their display order around the timestamps.
+  const fieldGroups: Array<Array<[string, string | undefined]>> = [
+    [
+      ["Instance", labels?.instance],
+      ["Job", labels?.job],
+      ["Summary", annotations?.summary],
+      ["Description", annotations?.description],
+    ],
+    [
+      ["Value", alert?.value],
+      ["Generator URL", alert?.generatorURL],
+      ["Fingerprint", alert?.fingerprint],
+      ["Alertmanager URL", alert?.externalURL],
+    ],
+  ];
 
-  if (alert?.fingerprint) {
-    details["Fingerprint"] = alert.fingerprint;
-  }
-
-  if (alert?.externalURL) {
-    details["Alertmanager URL"] = alert.externalURL;
-  }
-
-  return details;
+  return fieldGroups.map((fields) => {
+    const details: Record<string, string> = {};
+    for (const [label, value] of fields) {
+      if (value) {
+        details[label] = value;
+      }
+    }
+    return details;
+  });
 }
 
 function getMetadata(node: NodeInfo): MetadataItem[] {

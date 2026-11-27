@@ -3,6 +3,8 @@ package workers
 import (
 	"context"
 	"errors"
+	"maps"
+	"slices"
 	"time"
 
 	"golang.org/x/sync/semaphore"
@@ -12,6 +14,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -44,7 +47,7 @@ func NewWebhookProvisioner(baseURL string, encryptor crypto.Encryptor, registry 
 func (w *WebhookProvisioner) Start(ctx context.Context) {
 	// On startup, reset any webhooks stuck in "provisioning" state
 	// from a previous crash back to "pending" so they get retried.
-	if count, err := models.ResetStuckProvisioningWebhooks(); err != nil {
+	if count, err := models.ResetStuckProvisioningWebhooks(database.DB(ctx), slices.Collect(maps.Keys(w.registry.Integrations))); err != nil {
 		w.logger.Errorf("Error resetting stuck provisioning webhooks: %v", err)
 	} else if count > 0 {
 		w.logger.Infof("Reset %d stuck provisioning webhook(s) back to pending", count)
@@ -60,7 +63,7 @@ func (w *WebhookProvisioner) Start(ctx context.Context) {
 		case <-ticker.C:
 			tickStart := time.Now()
 
-			webhooks, err := models.ListPendingWebhooks()
+			webhooks, err := models.ListPendingWebhooks(database.DB(ctx), slices.Collect(maps.Keys(w.registry.Integrations)))
 			if err != nil {
 				w.logger.Errorf("Error finding workflow nodes ready to be processed: %v", err)
 			}
@@ -122,7 +125,7 @@ func (w *WebhookProvisioner) handleNonIntegrationWebhook(logger *log.Entry, webh
 		)
 	}()
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
-		r, err := models.LockWebhook(tx, webhook.ID)
+		r, err := models.LockWebhook(tx, webhook.ID, slices.Collect(maps.Keys(w.registry.Integrations)))
 		if err != nil {
 			return err
 		}
@@ -189,7 +192,10 @@ func (w *WebhookProvisioner) handleIntegrationWebhook(logger *log.Entry, webhook
 	//
 	// Phase 2: Run handler.Setup() outside any transaction
 	//
-	metadata, appName, setupErr := w.runIntegrationSetup(logger, lockedWebhook)
+	metadata, instance, setupErr := w.runIntegrationSetup(logger, lockedWebhook)
+	if instance != nil {
+		appName = instance.AppName
+	}
 
 	//
 	// Phase 3: Finalize state based on the result
@@ -199,10 +205,13 @@ func (w *WebhookProvisioner) handleIntegrationWebhook(logger *log.Entry, webhook
 		outcome = executorOutcomeFailed
 		reason = webhookProvisionerReasonSetupError
 
+		terminal := lockedWebhook.HasExceededRetries()
 		err := w.handleProvisioningError(logger, lockedWebhook, setupErr)
 		if err != nil {
 			logger.Errorf("Error handling provisioning error for webhook: %v", err)
 			reason = executorReasonInternal
+		} else if terminal && instance != nil {
+			publishWebhookSetupChanged(logger, instance)
 		}
 
 		return err
@@ -214,6 +223,7 @@ func (w *WebhookProvisioner) handleIntegrationWebhook(logger *log.Entry, webhook
 		reason = executorReasonInternal
 		return err
 	}
+	publishWebhookSetupChanged(logger, instance)
 
 	return nil
 }
@@ -225,7 +235,7 @@ func (w *WebhookProvisioner) lockAndMarkProvisioning(webhook models.Webhook) (*m
 	var locked *models.Webhook
 
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
-		r, err := models.LockWebhook(tx, webhook.ID)
+		r, err := models.LockWebhook(tx, webhook.ID, slices.Collect(maps.Keys(w.registry.Integrations)))
 		if err != nil {
 			return err
 		}
@@ -251,17 +261,20 @@ func (w *WebhookProvisioner) lockAndMarkProvisioning(webhook models.Webhook) (*m
 
 // runIntegrationSetup calls the external webhook handler outside any
 // DB transaction so the connection is released back to the pool.
-func (w *WebhookProvisioner) runIntegrationSetup(logger *log.Entry, webhook *models.Webhook) (any, string, error) {
+func (w *WebhookProvisioner) runIntegrationSetup(logger *log.Entry, webhook *models.Webhook) (any, *models.Integration, error) {
 	db := database.Conn()
 
 	instance, err := models.FindUnscopedIntegrationInTransaction(db, *webhook.AppInstallationID)
 	if err != nil {
-		return nil, "", err
+		return nil, nil, err
+	}
+	if webhook.RetryCount == 0 {
+		publishWebhookSetupChanged(logger, instance)
 	}
 
 	handler, err := w.registry.GetWebhookHandler(instance.AppName)
 	if err != nil {
-		return nil, "", err
+		return nil, instance, err
 	}
 
 	logging.WithIntegration(logger, *instance).
@@ -288,7 +301,13 @@ func (w *WebhookProvisioner) runIntegrationSetup(logger *log.Entry, webhook *mod
 		}
 	}
 
-	return metadata, instance.AppName, err
+	return metadata, instance, err
+}
+
+func publishWebhookSetupChanged(logger *log.Entry, instance *models.Integration) {
+	if err := messages.PublishWebhookSetupChanged(instance.OrganizationID); err != nil {
+		logger.WithError(err).Warn("Could not publish webhook setup update")
+	}
 }
 
 func (w *WebhookProvisioner) markReady(webhook *models.Webhook, metadata any) error {

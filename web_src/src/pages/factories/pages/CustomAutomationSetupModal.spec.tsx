@@ -91,11 +91,10 @@ function renderModal(
 ) {
   const onClose = vi.fn();
   render(
-    <MemoryRouter initialEntries={[`/org/workspaces/sp/lines/line${search}`]}>
+    <MemoryRouter initialEntries={[`/org/workspaces/sp${search}`]}>
       <BrowserControls />
       <AutomationModalProviders>
         <CustomAutomationSetupModal
-          lineId="line"
           automationId={automationId}
           columnKey={columnKey}
           yamlEnabled={yamlEnabled}
@@ -506,7 +505,7 @@ steps:
     function Board() {
       const { search } = useLocation();
       return search ? (
-        <CustomAutomationSetupModal lineId="line" automationId="custom-1" yamlEnabled onClose={() => {}} />
+        <CustomAutomationSetupModal automationId="custom-1" yamlEnabled onClose={() => {}} />
       ) : (
         <Link to="?customAutomation=custom-1">Open automation</Link>
       );

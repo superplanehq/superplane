@@ -117,7 +117,7 @@ describe("createFixtureFetch canvas detail", () => {
 describe("createFixtureFetch integrations", () => {
   it("defaults githubAppConfigured to true", async () => {
     const response = await fetchFixture("/api/v1/integrations");
-    await expect(response.json()).resolves.toMatchObject({ githubAppConfigured: true });
+    await expect(response.json()).resolves.toMatchObject({ githubAppConfigured: true, integrations: [] });
   });
 
   it("keeps an explicit githubAppConfigured false from the fixture", async () => {

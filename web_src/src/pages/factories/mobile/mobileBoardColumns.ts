@@ -79,7 +79,7 @@ export function buildMobileBoardColumns(
     },
     ...stageColumns.map(
       (column): MobileBoardColumn => ({
-        key: `phase-${column.stepIndex}`,
+        key: (column.stageKey ?? `phase-${column.stepIndex}`) as ColumnKey,
         title: column.stepName,
         cards: column.runs.map((run) => ({ key: run.executionId, order: run.order })),
         paging: "open",

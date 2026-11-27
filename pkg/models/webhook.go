@@ -103,6 +103,17 @@ type WebhookResource struct {
 	Name string `json:"name"`
 }
 
+func (w *Webhook) SetupError() string {
+	metadata, _ := w.Metadata.Data().(map[string]any)
+	reason, _ := metadata["setupError"].(string)
+	return strings.TrimSpace(reason)
+}
+
+func (w *Webhook) HasSetupFailure() bool {
+	return w.State == WebhookStateFailed ||
+		((w.State == WebhookStatePending || w.State == WebhookStateProvisioning) && w.SetupError() != "")
+}
+
 func (w *Webhook) Ready(tx *gorm.DB) error {
 	return tx.Model(w).
 		Update("state", WebhookStateReady).
@@ -165,6 +176,45 @@ func (w *Webhook) Fail(tx *gorm.DB, reason string) error {
 
 func (w *Webhook) HasExceededRetries() bool {
 	return w.RetryCount >= w.MaxRetries
+}
+
+// RetrySetup only requeues failures. Repeated clicks cannot restart an active
+// setup or create another remote hook after setup succeeds.
+func (w *Webhook) RetrySetup(tx *gorm.DB) error {
+	if w == nil || w.ID == uuid.Nil {
+		return fmt.Errorf("missing webhook id")
+	}
+	return tx.Model(w).Where("state = ?", WebhookStateFailed).Updates(map[string]any{
+		"state": WebhookStatePending, "retry_count": 0, "updated_at": time.Now(),
+		// Older failures have no saved error. Keep their warning visible during retry.
+		"metadata": gorm.Expr(
+			"CASE WHEN jsonb_typeof(metadata) = 'object' THEN metadata ELSE '{}'::jsonb END || "+
+				"jsonb_build_object('setupError', COALESCE(NULLIF(metadata->>'setupError', ''), ?))",
+			"Webhook setup failed",
+		),
+	}).Error
+}
+
+func FindIntegrationWebhook(tx *gorm.DB, integrationID, webhookID uuid.UUID) (*Webhook, error) {
+	var hook Webhook
+	err := tx.Where("app_installation_id = ? AND id = ?", integrationID, webhookID).First(&hook).Error
+	return &hook, err
+}
+
+// Keep a failed subscription visible during its retry until setup succeeds.
+func ListIntegrationWebhookFailures(tx *gorm.DB, integrationIDs []uuid.UUID) ([]Webhook, error) {
+	var hooks []Webhook
+	if len(integrationIDs) == 0 {
+		return hooks, nil
+	}
+	err := tx.Where("app_installation_id IN ?", integrationIDs).
+		Where("state = ? OR (state IN ? AND metadata->>'setupError' <> '')", WebhookStateFailed, []string{WebhookStatePending, WebhookStateProvisioning}).
+		Order("created_at, id").Find(&hooks).Error
+	return hooks, err
+}
+
+func (w *Webhook) HardDelete(tx *gorm.DB) error {
+	return tx.Unscoped().Delete(w).Error
 }
 
 // UpdateConfiguration stores a new configuration and leaves the state unchanged.
@@ -403,9 +453,9 @@ func ListBitbucketForgeWebhooks(tx *gorm.DB, installationID, repositoryUUID stri
 	return webhooks, err
 }
 
-func ListPendingWebhooks() ([]Webhook, error) {
+func ListPendingWebhooks(tx *gorm.DB, integrationNames []string) ([]Webhook, error) {
 	var webhooks []Webhook
-	err := database.Conn().
+	err := withRegisteredWebhookIntegration(tx, integrationNames).
 		Where("state = ?", WebhookStatePending).
 		Find(&webhooks).
 		Error
@@ -431,10 +481,10 @@ func ListDeletedWebhooks() ([]Webhook, error) {
 	return webhooks, nil
 }
 
-func LockWebhook(tx *gorm.DB, ID uuid.UUID) (*Webhook, error) {
+func LockWebhook(tx *gorm.DB, ID uuid.UUID, integrationNames []string) (*Webhook, error) {
 	var webhook Webhook
 
-	err := tx.Unscoped().
+	err := withRegisteredWebhookIntegration(tx, integrationNames).
 		Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
 		Where("id = ?", ID).
 		Where("state = ?", WebhookStatePending).
@@ -471,8 +521,8 @@ func LockDeletedWebhook(tx *gorm.DB, ID uuid.UUID) (*Webhook, error) {
 // ResetStuckProvisioningWebhooks resets webhooks that have been stuck in
 // "provisioning" state back to "pending". This handles the edge case where
 // the process crashes during the external API call (Phase 2).
-func ResetStuckProvisioningWebhooks() (int64, error) {
-	result := database.Conn().
+func ResetStuckProvisioningWebhooks(tx *gorm.DB, integrationNames []string) (int64, error) {
+	result := withRegisteredWebhookIntegration(tx, integrationNames).
 		Model(&Webhook{}).
 		Where("state = ?", WebhookStateProvisioning).
 		Updates(map[string]any{
@@ -481,6 +531,10 @@ func ResetStuckProvisioningWebhooks() (int64, error) {
 		})
 
 	return result.RowsAffected, result.Error
+}
+
+func withRegisteredWebhookIntegration(tx *gorm.DB, integrationNames []string) *gorm.DB {
+	return tx.Where("app_installation_id IS NULL OR app_installation_id IN (?)", registeredIntegrationIDs(tx, integrationNames))
 }
 
 func mapWebhookNameError(err error) error {

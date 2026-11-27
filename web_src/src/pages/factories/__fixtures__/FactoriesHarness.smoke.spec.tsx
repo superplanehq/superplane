@@ -11,7 +11,6 @@ import { REFUND_IMPLEMENTER_APP, refundLineCanvasFixture } from "./factoryOwnedC
 import {
   ACME_ONBOARDING_FACTORY_ID,
   ACME_ONBOARDING_FACTORY_KEY,
-  ACME_ONBOARDING_LINE_ID,
   FACTORIES_ORGANIZATION_ID,
   LINE_RUN_IMPLEMENT_FAILED_ID,
   PRIMARY_FACTORY_ID,
@@ -378,12 +377,8 @@ describe("FactoriesHarness Acme onboarding", () => {
 
   it("opens Acme onboarding from the switcher with an empty line board", async () => {
     const user = userEvent.setup();
-    const planLineId = REFUND_FACTORY_LINES[0]?.id;
     render(
-      <FactoriesHarness
-        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${planLineId}`}
-        factoriesFixture={defaultFactoriesFixture}
-      />,
+      <FactoriesHarness pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}`} factoriesFixture={defaultFactoriesFixture} />,
     );
 
     await user.click(await screen.findByTestId("factories-workspace-switch", {}, { timeout: 8000 }));
@@ -413,7 +408,7 @@ describe("FactoriesHarness Acme onboarding", () => {
     const user = userEvent.setup();
     render(
       <FactoriesHarness
-        pathSuffix={`workspaces/${ACME_ONBOARDING_FACTORY_KEY}/lines/${ACME_ONBOARDING_LINE_ID}`}
+        pathSuffix={`workspaces/${ACME_ONBOARDING_FACTORY_KEY}`}
         factoriesFixture={lineMetricsFactoriesFixture}
         enableOnboarding={false}
       />,

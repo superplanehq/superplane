@@ -9,8 +9,7 @@ import type {
 } from "@/api-client";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
-import { factoryHomePath, firstFactoryLineId } from "./lib/factoryPagePaths";
-import { latestDispatchForLine } from "./lib/workOrderNumberResolution";
+import { factoryHomePath } from "./lib/factoryPagePaths";
 import { getWorkOrderDisplayKey, type WorkOrderDisplayStatus } from "./lib/workOrderProgress";
 import { factoryContentBodyClassName } from "./pages/factoryPageLayoutStyles";
 import { WorkOrderActivityTimeline } from "./WorkOrderActivityTimeline";
@@ -371,6 +370,5 @@ function WorkOrderStatusNotesSection({
 function workOrderBoardBackHref(
   props: Pick<WorkOrderDetailLoadedViewProps, "organizationId" | "factoryKey" | "order" | "factoryLines">,
 ) {
-  const lineId = latestDispatchForLine(props.order)?.line?.id ?? firstFactoryLineId({ lines: props.factoryLines });
-  return factoryHomePath(props.organizationId, props.factoryKey, lineId);
+  return factoryHomePath(props.organizationId, props.factoryKey);
 }

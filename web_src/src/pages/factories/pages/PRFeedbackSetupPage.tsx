@@ -1,9 +1,9 @@
 import { usePermissions } from "@/contexts/usePermissions";
 import { usePageTitle } from "@/hooks/usePageTitle";
-import { Navigate, useNavigate, useParams } from "react-router";
+import { Navigate, useNavigate } from "react-router";
 
 import { useFactoriesLayout, type ResolvedFactoriesLayout } from "../layout/factoriesLayoutContext";
-import { factoryHomePath, factoryLineDetailPath, firstFactoryLineId } from "../lib/factoryPagePaths";
+import { factoryHomePath, firstFactoryLineId } from "../lib/factoryPagePaths";
 import { ChecksPRFeedbackSetupDialog } from "./ChecksPRFeedbackSetupDialog";
 import { DiscussionPRFeedbackSetupDialog } from "./DiscussionPRFeedbackSetupDialog";
 import { PR_FEEDBACK_SETTINGS_COPY, prFeedbackSourceById, type PRFeedbackSource } from "./prFeedbackSettingsModel";
@@ -19,9 +19,13 @@ export function ChecksPRFeedbackSetupPage() {
 function PRFeedbackSetupPage({ kind }: { kind: "comments" | "checks" }) {
   const layout = useFactoriesLayout();
   const { canAct } = usePermissions();
-  const { lineId } = useParams<{ lineId?: string }>();
   const navigate = useNavigate();
-  const model = resolvePRFeedbackSetupModel(kind, layout, canAct("factories", "update"), lineId);
+  const model = resolvePRFeedbackSetupModel(
+    kind,
+    layout,
+    canAct("factories", "update"),
+    firstFactoryLineId(layout.factory),
+  );
 
   usePageTitle(model.titleParts);
 
@@ -59,9 +63,9 @@ function resolvePRFeedbackSetupModel(
 } {
   const { organizationId, factoryId, routeSegment, factory } = layout;
   const bindings = factoryPRFeedbackSetupBindings(factory);
-  const boardHref = factoryHomePath(organizationId, routeSegment, firstFactoryLineId(factory));
+  const boardHref = factoryHomePath(organizationId, routeSegment);
   const line = bindings.lines.find((entry) => entry.id === lineId);
-  const returnHref = line?.id ? factoryLineDetailPath(organizationId, routeSegment, line.id) : boardHref;
+  const returnHref = boardHref;
   const source = prFeedbackSourceById(kind === "checks" ? "checks" : "discussion", bindings.vcsProvider);
   const titleParts = [prFeedbackSetupPageTitle(kind), bindings.workspaceName];
   const redirectTo = prFeedbackSetupRedirect({

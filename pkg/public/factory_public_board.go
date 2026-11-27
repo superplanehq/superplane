@@ -321,7 +321,12 @@ func assemblePublicBoard(
 	}
 
 	avatars := assigneeAvatarURLs(orders)
-	steps := []models.FactoryLineStep(line.Steps)
+	steps := append([]models.FactoryLineStep{}, line.Steps...)
+	for _, stage := range line.StagesValue() {
+		if stage.StepIndex != nil && *stage.StepIndex >= 0 && *stage.StepIndex < len(steps) {
+			steps[*stage.StepIndex].StageKey = stage.Key
+		}
+	}
 	columns := []publicColumn{{
 		Key:         "backlog",
 		Title:       "Backlog",
@@ -334,6 +339,9 @@ func assemblePublicBoard(
 			continue
 		}
 		key := "phase-" + strconv.Itoa(index)
+		if step.StageKey != "" {
+			key = step.StageKey
+		}
 		title := strings.TrimSpace(names[step.AppID])
 		if title == "" {
 			title = "Step"
@@ -461,6 +469,14 @@ func publicCardColumn(
 	if dispatch == nil {
 		return "backlog"
 	}
+	if dispatch.CurrentStageKey != "" {
+		for index, step := range steps {
+			if step.StageKey == dispatch.CurrentStageKey {
+				return phaseOrDone(index, steps, names, columnKey)
+			}
+		}
+		return dispatch.CurrentStageKey
+	}
 	if dispatch.QueueItem != nil {
 		return phaseOrDone(dispatch.QueueItem.StepIndex, steps, names, columnKey)
 	}
@@ -486,6 +502,9 @@ func phaseOrDone(stepIndex int, steps []models.FactoryLineStep, names map[uuid.U
 	step := steps[stepIndex]
 	if isDoneStep(names[step.AppID], columnKey[step.AppID]) {
 		return "done"
+	}
+	if step.StageKey != "" {
+		return step.StageKey
 	}
 	return "phase-" + strconv.Itoa(stepIndex)
 }
@@ -966,8 +985,6 @@ func intakeSourceName(source string) string {
 		return "Sentry exceptions"
 	case models.FactoryIntakeSourcePagerDutyIncidents:
 		return "PagerDuty incidents"
-	case models.FactoryIntakeSourceProductiveTasks:
-		return "Productive tasks"
 	case models.FactoryIntakeSourceJiraIssues:
 		return "Jira issues"
 	case models.FactoryIntakeSourceDependabotAlerts:
@@ -988,7 +1005,6 @@ const (
 	publicIconSentry     = "sentry"
 	publicIconJira       = "jira"
 	publicIconPagerDuty  = "pagerduty"
-	publicIconProductive = "productive"
 	publicIconDatadog    = "datadog"
 )
 
@@ -1011,8 +1027,6 @@ func intakeIcon(source string) string {
 		return publicIconJira
 	case models.FactoryIntakeSourcePagerDutyIncidents:
 		return publicIconPagerDuty
-	case models.FactoryIntakeSourceProductiveTasks:
-		return publicIconProductive
 	case models.FactoryIntakeSourceDatadog:
 		return publicIconDatadog
 	default:

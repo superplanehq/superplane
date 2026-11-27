@@ -101,7 +101,6 @@ export const Sentry: Story = { args: { sourceId: "sentry-exceptions" } };
 export const Dependabot: Story = { args: { sourceId: "dependabot-alerts" } };
 export const Linear: Story = { args: { sourceId: "linear-issues" } };
 export const Jira: Story = { args: { sourceId: "jira-issues" } };
-export const Productive: Story = { args: { sourceId: "productive-tasks" } };
 export const Datadog: Story = { args: { sourceId: "datadog" } };
 export const PagerDuty: Story = {
   name: "PagerDuty",

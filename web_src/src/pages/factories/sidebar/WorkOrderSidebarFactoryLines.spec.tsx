@@ -39,7 +39,7 @@ describe("WorkOrderSidebarFactoryLines", () => {
     renderSidebar();
 
     const link = screen.getByRole("link", { name: "View Refund Line" });
-    expect(link).toHaveAttribute("href", "/org/workspaces/factory/lines/line-1");
+    expect(link).toHaveAttribute("href", "/org/workspaces/factory");
   });
 
   it("does not render a link for a run without a resolved line id", () => {

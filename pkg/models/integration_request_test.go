@@ -33,7 +33,7 @@ func Test__LeaseIntegrationRequest(t *testing.T) {
 		request := newDueRequest(t)
 
 		before := time.Now()
-		leased, err := LeaseIntegrationRequest(database.Conn(), request.ID, lease)
+		leased, err := LeaseIntegrationRequest(database.Conn(), request.ID, lease, []string{"dummy"})
 		require.NoError(t, err)
 
 		//
@@ -43,7 +43,7 @@ func Test__LeaseIntegrationRequest(t *testing.T) {
 		assert.True(t, leased.RunAt.After(before.Add(lease-time.Minute)),
 			"expected run_at to be pushed ~lease into the future")
 
-		listed, err := ListIntegrationRequests()
+		listed, err := ListIntegrationRequests(database.Conn(), []string{"dummy"})
 		require.NoError(t, err)
 		assert.Empty(t, listed, "a leased request must not be listed as due")
 	})
@@ -51,10 +51,10 @@ func Test__LeaseIntegrationRequest(t *testing.T) {
 	t.Run("a second lease attempt while leased returns not found", func(t *testing.T) {
 		request := newDueRequest(t)
 
-		_, err := LeaseIntegrationRequest(database.Conn(), request.ID, lease)
+		_, err := LeaseIntegrationRequest(database.Conn(), request.ID, lease, []string{"dummy"})
 		require.NoError(t, err)
 
-		_, err = LeaseIntegrationRequest(database.Conn(), request.ID, lease)
+		_, err = LeaseIntegrationRequest(database.Conn(), request.ID, lease, []string{"dummy"})
 		assert.ErrorIs(t, err, gorm.ErrRecordNotFound,
 			"a request that is already leased (future run_at) must not be leased again")
 	})
@@ -84,13 +84,53 @@ func Test__LeaseIntegrationRequest(t *testing.T) {
 		}
 		require.NoError(t, database.Conn().Create(expired).Error)
 
-		listed, err := ListIntegrationRequests()
+		listed, err := ListIntegrationRequests(database.Conn(), []string{"dummy"})
 		require.NoError(t, err)
 		require.Len(t, listed, 1, "an expired lease must be listed as due again")
 		assert.Equal(t, expired.ID, listed[0].ID)
 
-		leased, err := LeaseIntegrationRequest(database.Conn(), expired.ID, lease)
+		leased, err := LeaseIntegrationRequest(database.Conn(), expired.ID, lease, []string{"dummy"})
 		require.NoError(t, err, "an expired lease must be re-leasable")
 		assert.True(t, leased.RunAt.After(now), "re-leasing pushes run_at into the future again")
 	})
+}
+
+func Test__ListIntegrationRequests__ExcludesUnsupportedIntegrations(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	organization, err := CreateOrganization("org-"+uuid.NewString(), "")
+	require.NoError(t, err)
+
+	var eligibleID uuid.UUID
+	var unsupported []IntegrationRequest
+	for _, provider := range []string{"dummy", "productive"} {
+		integration, err := CreateIntegration(uuid.New(), organization.ID, provider, uuid.NewString(), nil)
+		require.NoError(t, err)
+		runAt := time.Now().Add(-time.Minute)
+		require.NoError(t, integration.CreateSyncRequest(database.Conn(), &runAt))
+		request, err := FindPendingRequestForIntegration(database.Conn(), integration.ID)
+		require.NoError(t, err)
+		if provider == "dummy" {
+			eligibleID = request.ID
+			continue
+		}
+		require.NoError(t, integration.CreateActionRequest(database.Conn(), "refresh", nil, &runAt))
+		var requests []IntegrationRequest
+		require.NoError(t, database.Conn().Where("app_installation_id = ?", integration.ID).Find(&requests).Error)
+		unsupported = append(unsupported, requests...)
+	}
+
+	listed, err := ListIntegrationRequests(database.Conn(), []string{"dummy"})
+	require.NoError(t, err)
+	require.Len(t, listed, 1)
+	assert.Equal(t, eligibleID, listed[0].ID)
+	listed, err = ListIntegrationRequests(database.Conn(), nil)
+	require.NoError(t, err)
+	assert.Empty(t, listed)
+	for _, request := range unsupported {
+		_, err := LeaseIntegrationRequest(database.Conn(), request.ID, 5*time.Minute, []string{"dummy"})
+		assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
+		var stored IntegrationRequest
+		require.NoError(t, database.Conn().First(&stored, request.ID).Error)
+		assert.Equal(t, request, stored)
+	}
 }

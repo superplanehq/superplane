@@ -171,9 +171,10 @@ const COMMANDS = [
   },
   {
     words: ["task", "move"],
-    usage: "superplane task move --column COLUMN",
-    flags: ["column"],
-    required: ["column"],
+    usage: "superplane task move (--column COLUMN | --next)",
+    flags: ["column", "next"],
+    boolean: ["next"],
+    tool: "move_task",
   },
 ];
 

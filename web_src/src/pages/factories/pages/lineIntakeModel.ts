@@ -11,7 +11,6 @@ import githubIcon from "@/assets/icons/integrations/github.svg";
 import jiraIcon from "@/assets/icons/integrations/jira.svg";
 import linearIcon from "@/assets/icons/integrations/linear.svg";
 import pagerdutyIcon from "@/assets/icons/integrations/pagerduty.svg";
-import productiveIcon from "@/assets/icons/integrations/productive.svg";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
 import webhookIcon from "@/assets/icons/webhook.svg";
 import { getUserInitials } from "@/lib/orgUserDisplay";
@@ -59,7 +58,6 @@ export type LineIntakeSourceId =
   | "jira-issues"
   | "sentry-exceptions"
   | "pagerduty-incidents"
-  | "productive-tasks"
   | "datadog"
   | "linear-issues"
   | "webhook";
@@ -196,26 +194,6 @@ export const LINE_INTAKE_SOURCES: LineIntakeSource[] = [
     },
   },
   {
-    id: "productive-tasks",
-    name: "Productive tasks",
-    description: "Create tasks from Productive tasks.",
-    iconSrc: productiveIcon,
-    iconAlt: "Productive",
-    tabLabel: "Productive",
-    listen: {
-      kind: "webhook",
-      label: "On Productive task",
-    },
-    evaluate: {
-      label: "Create a task",
-      rule: "A matching Productive task becomes a task in Backlog. SuperPlane scores it there.",
-    },
-    accept: {
-      destination: "backlog",
-      label: "Create a task in Backlog",
-    },
-  },
-  {
     id: "datadog",
     name: "Datadog errors",
     description: "Creates tasks from Datadog Error Tracking alerts.",
@@ -319,6 +297,7 @@ export interface ConfiguredLineIntakeSource {
   health?: FactoryIntakeHealth;
   /** What the user can do when the intake cannot receive items. */
   healthMessage?: string;
+  webhookSetupState?: string;
   /** Live trigger connection. Empty when the intake is unbound. */
   integrationId?: string;
   /** Live trigger resource, such as a Jira project key. */
@@ -331,7 +310,6 @@ const LINE_INTAKE_SOURCE_ID_BY_API_SOURCE: Record<string, LineIntakeSourceId> = 
   SOURCE_JIRA_ISSUES: "jira-issues",
   SOURCE_SENTRY_EXCEPTIONS: "sentry-exceptions",
   SOURCE_PAGERDUTY_INCIDENTS: "pagerduty-incidents",
-  SOURCE_PRODUCTIVE_TASKS: "productive-tasks",
   SOURCE_DATADOG: "datadog",
   SOURCE_LINEAR_ISSUES: "linear-issues",
   SOURCE_WEBHOOK: "webhook",
@@ -343,7 +321,6 @@ const API_SOURCE_BY_LINE_INTAKE_SOURCE_ID: Record<LineIntakeSourceId, FactoriesF
   "jira-issues": "SOURCE_JIRA_ISSUES",
   "sentry-exceptions": "SOURCE_SENTRY_EXCEPTIONS",
   "pagerduty-incidents": "SOURCE_PAGERDUTY_INCIDENTS",
-  "productive-tasks": "SOURCE_PRODUCTIVE_TASKS",
   datadog: "SOURCE_DATADOG",
   "linear-issues": "SOURCE_LINEAR_ISSUES",
   webhook: "SOURCE_WEBHOOK",
@@ -397,6 +374,7 @@ export function intakeSourcesFromFactoryIntakes(intakes: FactoriesFactoryIntake[
         source: { ...source, name },
         health: intake.health,
         healthMessage: intake.healthMessage?.trim() || undefined,
+        webhookSetupState: intake.webhookSetupState,
         integrationId: textFields.integrationId,
         resourceId: textFields.resourceId,
       },

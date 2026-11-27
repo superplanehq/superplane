@@ -1,8 +1,4 @@
-import {
-  FactoryMoreRouteSwitch,
-  FactoryWorkspaceLayoutSwitch,
-  LineBoardRouteSwitch,
-} from "../factories/mobile/MobileShellSwitch";
+import { FactoryMoreRouteSwitch, FactoryWorkspaceLayoutSwitch } from "../factories/mobile/MobileShellSwitch";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useContext, useEffect, useState, type ComponentType, type ReactNode } from "react";
 import { MemoryRouter, Navigate, Outlet, Route, Routes, useParams } from "react-router";
@@ -26,14 +22,13 @@ import {
   GitHubIntakeSetupPage,
   JiraIntakeSetupPage,
   LinearIntakeSetupPage,
-  ProductiveIntakeSetupPage,
   RiskScoreSetupPage,
   SentryIntakeSetupPage,
   FactoriesIndexPage,
   FactoryAppCanvasPage,
   FactoryAutomationRunPage,
   FactoryAppSplitRunPage,
-  FactoryHomeRedirect,
+  FactoryBoardIndex,
   LegacyFactoryAppRedirect,
   LegacyFactoryAppSplitRunRedirect,
   FactoryLineEditPage,
@@ -50,7 +45,7 @@ import {
   WorkOrdersPage,
 } from "@/pages/factories";
 import type { FactoriesFixture } from "@/pages/factories/__fixtures__/handlers";
-import { createFactoryLinePath, editFactoryLinePath } from "@/pages/factories/lib/factoryPagePaths";
+import { createFactoryLinePath } from "@/pages/factories/lib/factoryPagePaths";
 import {
   LegacyFactoryOrganizationSettingsRedirect,
   LegacyFactorySettingsRedirect,
@@ -60,6 +55,7 @@ import { agentSectionRoute } from "@/pages/factories/pages/settings/agentSection
 import { factorySettingsSectionRoutes } from "@/pages/factories/pages/settings/factorySettingsSectionRoutes";
 import { MissionDetailPage } from "@/pages/factories/pages/missions/MissionDetailPage";
 import { ConfigureAutomationPage } from "@/pages/factories/pages/ConfigureAutomationPage";
+import { FactoryLineAccessGate } from "@/pages/factories/pages/FactoryLineAccessGate";
 import { OnboardingGate } from "@/pages/factories/pages/onboarding/OnboardingGate";
 import { OrganizationSettingsWorkspaceUsagePage } from "@/pages/factories/pages/organizationSettings/OrganizationSettingsWorkspaceUsagePage";
 import { HomePage } from "@/pages/home";
@@ -194,18 +190,6 @@ function HarnessLegacyAutomationsNewLineRedirect() {
   return <Navigate to={createFactoryLinePath(organizationId, factoryKey)} replace />;
 }
 
-function HarnessLegacyAutomationsLineEditRedirect() {
-  const { organizationId, factoryKey, lineId } = useParams<{
-    organizationId: string;
-    factoryKey: string;
-    lineId: string;
-  }>();
-  if (!organizationId || !factoryKey || !lineId) {
-    return <Navigate to="/" replace />;
-  }
-  return <Navigate to={editFactoryLinePath(organizationId, factoryKey, lineId)} replace />;
-}
-
 function OptionalOnboardingGate({ enabled }: { enabled: boolean }) {
   if (!enabled) {
     return <Outlet />;
@@ -279,9 +263,10 @@ function OrgWorkspaceRoutes({ pageOverrides }: { pageOverrides?: OrgWorkspacePag
         <Route path="workspaces">
           <Route index element={factoryRoute(<FactoriesIndexPage />)} />
           <Route path="new" element={factoryRoute(<NewWorkspacePage />)} />
+          <Route path=":factoryKey/lines/:lineId" element={<FactoryLineAccessGate />} />
           <Route path=":factoryKey" element={factoryRoute(<FactoryWorkspaceLayoutSwitch />)}>
             <Route element={<OptionalOnboardingGate enabled={onboardingEnabled} />}>
-              <Route index element={<FactoryHomeRedirect />} />
+              <Route index element={<FactoryBoardIndex />} />
               {OnboardingRoutePage ? <Route path="setup" element={<OnboardingRoutePage />} /> : null}
               <Route path="overview" element={<OverviewRoutePage />} />
               <Route path="missions" element={<MissionsPage />} />
@@ -299,28 +284,24 @@ function OrgWorkspaceRoutes({ pageOverrides }: { pageOverrides?: OrgWorkspacePag
               {/* Back-compat for bookmarks made before `work-order(s)` was renamed to `task(s)`. */}
               <Route path="work-orders/*" element={<LegacyWorkOrdersRedirect />} />
               <Route path="work-order/:orderNumber" element={<LegacyWorkOrderPermalinkRedirect />} />
-              <Route path="lines">
-                <Route index element={<FactoryHomeRedirect />} />
-                <Route path="new" element={<FactoryLineEditPage />} />
-                <Route path=":lineId" element={<LineBoardRouteSwitch />} />
-                <Route path=":lineId/edit" element={<FactoryLineEditPage />} />
-                <Route path=":lineId/setup/comments" element={<DiscussionPRFeedbackSetupPage />} />
-                <Route path=":lineId/setup/checks" element={<ChecksPRFeedbackSetupPage />} />
-                <Route path=":lineId/setup/risk-score" element={<RiskScoreSetupPage />} />
-                <Route path=":lineId/setup/github" element={<GitHubIntakeSetupPage />} />
-                <Route path=":lineId/setup/sentry" element={<SentryIntakeSetupPage />} />
-                <Route path=":lineId/setup/datadog" element={<DatadogIntakeSetupPage />} />
-                <Route path=":lineId/setup/dependabot" element={<DependabotIntakeSetupPage />} />
-                <Route path=":lineId/setup/jira" element={<JiraIntakeSetupPage />} />
-                <Route path=":lineId/setup/linear" element={<LinearIntakeSetupPage />} />
-                <Route path=":lineId/setup/productive" element={<ProductiveIntakeSetupPage />} />
+              <Route path="line">
+                <Route path="new" element={<FactoryLineEditPage isCreate />} />
+                <Route path="edit" element={<FactoryLineEditPage />} />
+                <Route path="setup/comments" element={<DiscussionPRFeedbackSetupPage />} />
+                <Route path="setup/checks" element={<ChecksPRFeedbackSetupPage />} />
+                <Route path="setup/risk-score" element={<RiskScoreSetupPage />} />
+                <Route path="setup/github" element={<GitHubIntakeSetupPage />} />
+                <Route path="setup/sentry" element={<SentryIntakeSetupPage />} />
+                <Route path="setup/datadog" element={<DatadogIntakeSetupPage />} />
+                <Route path="setup/dependabot" element={<DependabotIntakeSetupPage />} />
+                <Route path="setup/jira" element={<JiraIntakeSetupPage />} />
+                <Route path="setup/linear" element={<LinearIntakeSetupPage />} />
                 {/* Storybook design preview: factory WorkOrderCanvas node chrome */}
-                <Route path=":lineId/phases/:phaseId/configure" element={<ConfigureAutomationPage />} />
+                <Route path="phases/:phaseId/configure" element={<ConfigureAutomationPage />} />
               </Route>
               <Route path="automations">
                 <Route index element={<AutomationsPage />} />
                 <Route path="new" element={<HarnessLegacyAutomationsNewLineRedirect />} />
-                <Route path=":lineId/edit" element={<HarnessLegacyAutomationsLineEditRedirect />} />
                 <Route path=":appId" element={<FactoryAppCanvasPage />} />
                 <Route path=":appId/runs/:runId?" element={<FactoryAutomationRunPage />} />
                 <Route path=":appId/split-run" element={<FactoryAppSplitRunPage />} />

@@ -70,7 +70,7 @@ function ListRow({
   onAssigneesSave,
 }: WorkOrdersListViewProps & { entry: WorkOrderListEntry }) {
   const meta = getWorkOrderDisplayStatusMeta(entry.displayStatus);
-  const href = workOrderOpenPath(organizationId, factoryKey, entry.order.number, factoryLines[0]?.id);
+  const href = workOrderOpenPath(organizationId, factoryKey, entry.order.number);
   const timeLabel = entry.updatedAtMs > 0 ? formatTimeAgo(new Date(entry.updatedAtMs)) : "—";
   return (
     <article

@@ -949,6 +949,22 @@ func (r *CanvasRun) RequestCancellation(tx *gorm.DB, cancelledBy *uuid.UUID) (*R
 	return r.requestTermination(tx, cancelledBy, "")
 }
 
+func (c *Canvas) RequestUnfinishedRunCancellation(tx *gorm.DB, cancelledBy *uuid.UUID) ([]*RunCancellationResult, error) {
+	var runs []CanvasRun
+	if err := tx.Where("workflow_id = ? AND state <> ?", c.ID, CanvasRunStateFinished).Order("id").Find(&runs).Error; err != nil {
+		return nil, err
+	}
+	results := make([]*RunCancellationResult, 0, len(runs))
+	for i := range runs {
+		result, err := runs[i].RequestCancellation(tx, cancelledBy)
+		if err != nil {
+			return nil, err
+		}
+		results = append(results, result)
+	}
+	return results, nil
+}
+
 // RequestCancellationBatch uses the normal lifecycle for one run. Organization
 // cancellation scans every run (including descendants) independently, avoiding
 // an unbounded recursive traversal while holding the organization lock.

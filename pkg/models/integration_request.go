@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/superplanehq/superplane/pkg/database"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -66,13 +65,14 @@ type IntegrationInvokeAction struct {
 // lists due pending requests, so the leased request drops out until either it is
 // completed or the lease expires - at which point it becomes due again and is
 // retried automatically, with no separate state or reset mechanism.
-func LeaseIntegrationRequest(tx *gorm.DB, id uuid.UUID, lease time.Duration) (*IntegrationRequest, error) {
+func LeaseIntegrationRequest(tx *gorm.DB, id uuid.UUID, lease time.Duration, integrationNames []string) (*IntegrationRequest, error) {
 	var request IntegrationRequest
 
 	now := time.Now()
 	err := tx.
 		Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
 		Where("id = ?", id).
+		Where("app_installation_id IN (?)", registeredIntegrationIDs(tx, integrationNames)).
 		Where("state = ?", IntegrationRequestStatePending).
 		Where("run_at <= ?", now).
 		First(&request).
@@ -95,15 +95,14 @@ func LeaseIntegrationRequest(tx *gorm.DB, id uuid.UUID, lease time.Duration) (*I
 	return &request, nil
 }
 
-func ListIntegrationRequests() ([]IntegrationRequest, error) {
+func ListIntegrationRequests(tx *gorm.DB, integrationNames []string) ([]IntegrationRequest, error) {
 	var requests []IntegrationRequest
 
 	now := time.Now()
-	err := database.Conn().
-		Joins("JOIN app_installations ON app_installation_requests.app_installation_id = app_installations.id").
+	err := tx.
+		Where("app_installation_id IN (?)", registeredIntegrationIDs(tx, integrationNames)).
 		Where("app_installation_requests.state = ?", IntegrationRequestStatePending).
 		Where("app_installation_requests.run_at <= ?", now).
-		Where("app_installations.deleted_at IS NULL").
 		Find(&requests).
 		Error
 	if err != nil {

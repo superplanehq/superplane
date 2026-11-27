@@ -4,7 +4,6 @@ import dependabotIcon from "@/assets/icons/integrations/dependabot.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import jiraIcon from "@/assets/icons/integrations/jira.svg";
 import pagerdutyIcon from "@/assets/icons/integrations/pagerduty.svg";
-import productiveIcon from "@/assets/icons/integrations/productive.svg";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
 
 import type { FactoriesFactoryPullRequest, FactoriesWorkOrder } from "@/api-client";
@@ -94,7 +93,6 @@ const PUBLIC_AUTOMATION_ICONS: Record<string, { src: string; alt: string }> = {
   sentry: { src: sentryIcon, alt: "Sentry" },
   jira: { src: jiraIcon, alt: "Jira" },
   pagerduty: { src: pagerdutyIcon, alt: "PagerDuty" },
-  productive: { src: productiveIcon, alt: "Productive" },
   datadog: { src: datadogIcon, alt: "Datadog" },
 };
 

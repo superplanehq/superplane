@@ -15,13 +15,8 @@ export function boardColumnKeyFromSearch(search: string): string | null {
  * Line board path with the mobile column in view. Without a column key the
  * path is the same as `factoryHomePath`.
  */
-export function factoryHomeColumnPath(
-  organizationId: string,
-  factoryKey: string,
-  lineId: string,
-  columnKey?: string | null,
-) {
-  const path = factoryHomePath(organizationId, factoryKey, lineId);
+export function factoryHomeColumnPath(organizationId: string, factoryKey: string, columnKey?: string | null) {
+  const path = factoryHomePath(organizationId, factoryKey);
   if (!columnKey) {
     return path;
   }
