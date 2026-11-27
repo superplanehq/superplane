@@ -244,7 +244,10 @@ func (s *OrganizationService) CreateHostedCreditCheckout(
 	req *pb.CreateHostedCreditCheckoutRequest,
 ) (*pb.CreateHostedCreditCheckoutResponse, error) {
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
-	accountID, _ := accountIDFromContext(ctx)
+	accountID, err := accountIDFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
 	return s.billing.CreateHostedCreditCheckout(ctx, orgID, req, accountID, s.baseURL)
 }
 
@@ -283,13 +286,19 @@ func (s *OrganizationService) CreateBusinessCheckout(
 
 func (s *OrganizationService) SelectBillingPlan(ctx context.Context, req *pb.SelectBillingPlanRequest) (*pb.CreateBusinessCheckoutResponse, error) {
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
-	accountID, _ := accountIDFromContext(ctx)
+	accountID, err := accountIDFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
 	return s.billing.SelectBillingPlan(ctx, orgID, req, accountID, s.baseURL)
 }
 
 func (s *OrganizationService) CreatePaymentMethodSession(ctx context.Context, req *pb.CreatePaymentMethodSessionRequest) (*pb.CreateBillingPortalSessionResponse, error) {
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
-	accountID, _ := accountIDFromContext(ctx)
+	accountID, err := accountIDFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
 	return s.billing.CreatePaymentMethodSession(ctx, orgID, req, accountID)
 }
 
