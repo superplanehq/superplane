@@ -12,22 +12,52 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+type configurationManifestConnection struct {
+	IntegrationID   *string `yaml:"integration_id"`
+	IntegrationName *string `yaml:"integration_name"`
+}
+
+type configurationManifestRepository struct {
+	Repository string `yaml:"repository"`
+	Ref        string `yaml:"ref"`
+}
+
+type configurationManifestRepositories struct {
+	Binding           *configurationManifestConnection `yaml:"binding"`
+	Primary           *configurationManifestRepository `yaml:"primary"`
+	BacklogRepository string                           `yaml:"backlog_repository"`
+	Additional        []struct {
+		Repository string `yaml:"repository"`
+		Ref        string `yaml:"ref"`
+		Access     string `yaml:"access"`
+		Enabled    *bool  `yaml:"enabled"`
+		Provider   string `yaml:"provider"`
+	} `yaml:"additional"`
+}
+
 // The server validates live stage kinds, built-in aliases, and settings.
 // The CLI validates bundle structure before reading references or replacing local files.
 func configurationManifestReferences(content string) ([]string, error) {
 	var manifest struct {
-		APIVersion string `yaml:"apiVersion"`
-		Kind       string `yaml:"kind"`
-		Name       string `yaml:"name"`
-		Stages     []struct {
+		APIVersion   string                             `yaml:"apiVersion"`
+		Kind         string                             `yaml:"kind"`
+		Name         string                             `yaml:"name"`
+		Repositories *configurationManifestRepositories `yaml:"repositories"`
+		Stages       []struct {
 			Key            string `yaml:"key"`
 			Name           string `yaml:"name"`
 			Run            string `yaml:"run"`
 			MaxParallelism *int   `yaml:"max_parallelism"`
 			Automations    []struct {
-				ID   string         `yaml:"id"`
-				Name string         `yaml:"name"`
-				Uses string         `yaml:"uses"`
+				ID      string `yaml:"id"`
+				Name    string `yaml:"name"`
+				Uses    string `yaml:"uses"`
+				Binding *struct {
+					IntegrationID   *string `yaml:"integration_id"`
+					IntegrationName *string `yaml:"integration_name"`
+					ResourceID      string  `yaml:"resource_id"`
+					TeamID          string  `yaml:"team_id"`
+				} `yaml:"binding"`
 				With map[string]any `yaml:"with"`
 			} `yaml:"automations"`
 		} `yaml:"stages"`
@@ -51,6 +81,22 @@ func configurationManifestReferences(content string) ([]string, error) {
 	if manifest.APIVersion != "v2" || manifest.Kind != "Factory" || strings.TrimSpace(manifest.Name) == "" || len(manifest.Stages) == 0 {
 		return nil, fmt.Errorf("invalid Factory manifest: expected a named v2 Factory with stages")
 	}
+	if repositories := manifest.Repositories; repositories != nil {
+		if repositories.Binding == nil || repositories.Binding.IntegrationID == nil && repositories.Binding.IntegrationName == nil {
+			return nil, fmt.Errorf("invalid Factory manifest: repositories.binding requires an integration_name or integration_id")
+		}
+		if err := validateConfigurationConnection(repositories.Binding.IntegrationID, repositories.Binding.IntegrationName); err != nil {
+			return nil, fmt.Errorf("invalid Factory manifest: repositories.binding: %w", err)
+		}
+		if repositories.Primary == nil || strings.TrimSpace(repositories.Primary.Repository) == "" {
+			return nil, fmt.Errorf("invalid Factory manifest: repositories.primary.repository is required")
+		}
+		for index, repository := range repositories.Additional {
+			if strings.TrimSpace(repository.Repository) == "" || repository.Access != "read" && repository.Access != "write" {
+				return nil, fmt.Errorf("invalid Factory manifest: repositories.additional[%d] requires a repository and access of read or write", index)
+			}
+		}
+	}
 	var references []string
 	seenReferences := map[string]bool{}
 	seenStages := map[string]bool{}
@@ -68,6 +114,11 @@ func configurationManifestReferences(content string) ([]string, error) {
 				return nil, fmt.Errorf("invalid Factory manifest: automations require unique IDs and uses")
 			}
 			seenAutomations[automation.ID] = true
+			if binding := automation.Binding; binding != nil {
+				if err := validateConfigurationConnection(binding.IntegrationID, binding.IntegrationName); err != nil {
+					return nil, fmt.Errorf("invalid Factory manifest: automation %q binding: %w", automation.ID, err)
+				}
+			}
 			if strings.HasPrefix(automation.Uses, "@superplane/") {
 				continue
 			}
@@ -84,6 +135,16 @@ func configurationManifestReferences(content string) ([]string, error) {
 		}
 	}
 	return references, nil
+}
+
+func validateConfigurationConnection(id, name *string) error {
+	if id != nil && name != nil {
+		return fmt.Errorf("use either integration_name or integration_id")
+	}
+	if id != nil && strings.TrimSpace(*id) == "" || name != nil && strings.TrimSpace(*name) == "" {
+		return fmt.Errorf("use a nonempty integration_name or integration_id")
+	}
+	return nil
 }
 
 func configurationYAMLHasAlias(node *yaml.Node) bool {

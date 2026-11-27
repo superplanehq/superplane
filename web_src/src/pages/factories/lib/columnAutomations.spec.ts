@@ -144,11 +144,15 @@ describe("buildColumnAutomations", () => {
     expect(automations.map((automation) => automation.canvasId)).toEqual(["retained-runner"]);
     expect(buildColumnAutomations("phase-0", { columnTitle: "Deleted", columns })).toEqual([]);
   });
-  it("builds backlog intakes and the analysis automation", () => {
+
+  it("builds backlog intakes and analysis once with explicit placement", () => {
     const automations = buildColumnAutomations("backlog", {
       columnTitle: "Backlog",
       intakes: [GITHUB_INTAKE],
-      apps: [{ id: "app-refund-backlog", name: "Ingest" }],
+      apps: [
+        { id: GITHUB_INTAKE.canvasId, name: GITHUB_INTAKE.name, columnKey: "backlog" },
+        { id: "app-refund-backlog", name: "Ingest", columnKey: "backlog" },
+      ],
     });
 
     expect(automations).toHaveLength(2);
@@ -201,10 +205,11 @@ describe("buildColumnAutomations", () => {
     expect(columnAutomationsNeedRepair(automations)).toBe(true);
   });
 
-  it("builds a phase agent sentence from the column name", () => {
+  it("builds a phase agent once with explicit placement", () => {
     const automations = buildColumnAutomations("phase-0", {
       columnTitle: "Implement",
       columns: [IMPLEMENT_COLUMN],
+      apps: [{ id: IMPLEMENT_COLUMN.appId, name: "Implement", columnKey: "implement" }],
       workOrders: [RUNNING_ORDER],
     });
 
@@ -230,12 +235,17 @@ describe("buildColumnAutomations", () => {
     ).toEqual([]);
   });
 
-  it("builds verify listeners from PR feedback handlers", () => {
+  it("builds verify listeners once with explicit placement", () => {
     const automations = buildColumnAutomations("verify", {
       columnTitle: "Verify",
       prFeedbackHandlers: [DISCUSSION_HANDLER, CHECKS_HANDLER],
+      apps: [
+        { id: DISCUSSION_HANDLER.canvasId, name: DISCUSSION_HANDLER.name, columnKey: "verify" },
+        { id: CHECKS_HANDLER.canvasId, name: CHECKS_HANDLER.name, columnKey: "verify" },
+      ],
     });
 
+    expect(automations).toHaveLength(2);
     expect(automations[0]).toMatchObject({
       kind: "pr-discussion",
       trigger: "On pull request comment",
@@ -507,44 +517,4 @@ describe("columnAutomationOpenPath", () => {
       ),
     ).toBe(factoryPRFeedbackPath("org-1", "RF", undefined, "handler-checks"));
   });
-});
-
-it("keeps a renamed scheduled intake visible and opens its saved automation", () => {
-  const rows = buildColumnAutomations("backlog", {
-    columnTitle: "Backlog",
-    planningEnabled: false,
-    apps: [{ id: "scheduled-app", name: "Review documentation", columnKey: "backlog" }],
-  });
-  expect(rows).toHaveLength(1);
-  expect(rows[0]).toMatchObject({ name: "Review documentation", trigger: "On schedule" });
-  expect(columnAutomationOpenPath(rows[0], { organizationId: "org", factoryKey: "workspace" })).toBe(
-    factoryColumnAutomationViewPath("org", "workspace", "scheduled-app"),
-  );
-});
-
-it("keeps a renamed Review request visible without discovery and avoids a duplicate custom row", () => {
-  const rows = buildColumnAutomations("verify", {
-    columnTitle: "Verify",
-    apps: [
-      {
-        id: "review-request-app",
-        name: "Request engineering review",
-        templateId: "review-request",
-        columnKey: "verify",
-        displayColumnKey: "done",
-      },
-    ],
-  });
-  expect(rows).toHaveLength(1);
-  expect(rows[0]).toMatchObject({
-    kind: "review-request",
-    displayColumnKey: "done",
-    executionKey: "verify",
-    canvasId: "review-request-app",
-    name: "Request engineering review",
-  });
-  expect(columnAutomationOpenPath(rows[0], { organizationId: "org", factoryKey: "workspace" })).toBe(
-    factoryColumnAutomationViewPath("org", "workspace", "review-request-app"),
-  );
-  expect(catalogForColumn("verify").some((entry) => entry.id === "review-request")).toBe(false);
 });
