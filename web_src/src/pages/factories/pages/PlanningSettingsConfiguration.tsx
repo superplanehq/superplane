@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { ColumnAutomationFooterAction } from "./columnAutomationFooterSlot";
 import { AgentAdditionalInstructions } from "./AgentAdditionalInstructions";
 import { PlanningReviewForm } from "./PlanningReviewForm";
 import type { PlanningReviewAgentSlot } from "./PlanningReviewEditor";
@@ -100,7 +101,7 @@ export function PlanningSettingsFooter({
   testId?: string;
 }) {
   return (
-    <footer className="flex shrink-0 items-center justify-end gap-3 border-t border-border px-5 py-3">
+    <ColumnAutomationFooterAction>
       {error ? (
         <p className="workspace-body-text mr-auto text-destructive" role="alert">
           {error}
@@ -109,6 +110,6 @@ export function PlanningSettingsFooter({
       <Button type="button" disabled={disabled} onClick={onSave} data-testid={testId}>
         {saving ? PLANNING_SETTINGS_COPY.saving : PLANNING_SETTINGS_COPY.save}
       </Button>
-    </footer>
+    </ColumnAutomationFooterAction>
   );
 }

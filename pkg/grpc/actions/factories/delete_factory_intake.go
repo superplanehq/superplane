@@ -21,8 +21,14 @@ func DeleteFactoryIntake(ctx context.Context, organizationID string, req *pb.Del
 		return nil, factoryErrorToStatus(err, "failed to delete factory intake")
 	}
 
+	var deletedCanvas *models.Canvas
+	var cancellations []*models.RunCancellationResult
 	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
 		factory, err := findFactory(tx, orgID, req.GetFactoryId())
+		if err != nil {
+			return err
+		}
+		factory, err = models.LockAutomationFactory(tx, orgID, factory.ID)
 		if err != nil {
 			return err
 		}
@@ -43,11 +49,14 @@ func DeleteFactoryIntake(ctx context.Context, organizationID string, req *pb.Del
 			return err
 		}
 
-		return canvas.SoftDeleteInTransaction(tx)
+		deletedCanvas = canvas
+		cancellations, err = deleteInstalledAutomation(tx, factory, canvas)
+		return err
 	})
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to delete factory intake")
 	}
+	publishDeletedAutomation(deletedCanvas, cancellations)
 
 	return &pb.DeleteFactoryIntakeResponse{}, nil
 }

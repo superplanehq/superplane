@@ -45,6 +45,7 @@ export function useFactoryPRFeedbackHandlers(organizationId: string, factoryId: 
 }
 
 function invalidatePRFeedbackQueries(queryClient: QueryClient, organizationId: string, factoryId: string) {
+  void queryClient.invalidateQueries({ queryKey: factoryQueryKeys.detail(organizationId, factoryId) });
   void queryClient.invalidateQueries({ queryKey: factoryPRFeedbackHandlersKey(organizationId, factoryId) });
   void queryClient.invalidateQueries({ queryKey: factoryAppsKey(organizationId, factoryId) });
   void queryClient.invalidateQueries({ queryKey: factoryQueryKeys.workOrders(organizationId, factoryId) });
