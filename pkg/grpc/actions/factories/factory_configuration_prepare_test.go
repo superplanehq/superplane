@@ -188,7 +188,6 @@ func TestFactoryConfigurationInstallsSupportedCatalogEntries(t *testing.T) {
 
 func TestFactoryConfigurationPreservesInstalledWebhookIntake(t *testing.T) {
 	f := newConfigurationFixture(t)
-	require.NoError(t, models.EnableExperimentalFeature(f.r.Organization.ID, features.FeatureFactoryWebhookIntake))
 	deps := testIntakeDependencies(f.r)
 	webhook, err := CreateFactoryWebhook(f.ctx, deps, f.r.Organization.ID.String(), &pb.CreateFactoryWebhookRequest{
 		FactoryId: f.factory.ID.String(), Name: "Tracker", Authentication: pb.FactoryWebhook_AUTHENTICATION_BEARER,

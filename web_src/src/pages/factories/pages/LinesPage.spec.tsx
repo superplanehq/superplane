@@ -19,7 +19,6 @@ import {
   FEATURE_FACTORY_AS_CODE,
   FEATURE_FACTORY_DATADOG_INTAKE,
   FEATURE_FACTORY_SCHEDULED_INTAKE,
-  FEATURE_FACTORY_WEBHOOK_INTAKE,
   FEATURE_WORKSPACE_SKILLS,
 } from "@/lib/experimentalFeatures";
 import { unmockedSrc } from "@/test/unmockedModule";
@@ -1988,19 +1987,7 @@ describe("LinesPage board extras", () => {
     expect(screen.getByTestId("line-intake-source-intake-triage")).toHaveTextContent("Listening to Triage issues");
   });
 
-  it("hides webhook intake when the organization feature is off", async () => {
-    const user = userEvent.setup();
-    renderLinesBoard();
-
-    await user.click(screen.getByTestId("lines-backlog-menu"));
-    await user.click(screen.getByTestId("lines-backlog-menu-add-intake"));
-
-    expect(screen.getByTestId("add-intake-template-github-issues")).toBeInTheDocument();
-    expect(screen.queryByTestId("add-intake-template-webhook")).not.toBeInTheDocument();
-  });
-
-  it("opens webhook intake setup in a modal on the board", async () => {
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_WEBHOOK_INTAKE);
+  it("opens webhook intake setup without optional features in a modal on the board", async () => {
     const user = userEvent.setup();
     renderLinesBoard();
     const location = screen.getByTestId("lines-test-location").textContent;

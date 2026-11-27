@@ -11,7 +11,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/encryption"
-	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
@@ -177,24 +176,11 @@ func factoryForWebhooks(db *gorm.DB, organizationID, factoryRef string) (uuid.UU
 	if err != nil {
 		return uuid.Nil, nil, err
 	}
-	organization, err := models.FindOrganizationByIDInTransaction(db, orgID.String())
-	if err != nil {
-		return uuid.Nil, nil, err
-	}
-	if !workspaceWebhooksEnabled(organization) {
-		return uuid.Nil, nil, grpcerrors.FailedPrecondition(nil, "Webhooks are not enabled for this organization.")
-	}
 	factory, err := findFactory(db, orgID, factoryRef)
 	if err != nil {
 		return uuid.Nil, nil, err
 	}
 	return orgID, factory, nil
-}
-
-// Custom automation triggers and webhook intakes both listen on workspace webhooks.
-func workspaceWebhooksEnabled(organization *models.Organization) bool {
-	return organization.HasExperimentalFeature(features.FeatureFactoryAsCode) ||
-		organization.HasExperimentalFeature(features.FeatureFactoryWebhookIntake)
 }
 
 func findFactoryWebhook(tx *gorm.DB, orgID, factoryID uuid.UUID, raw string) (*models.Webhook, error) {

@@ -7,8 +7,6 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/superplanehq/superplane/pkg/features"
-	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
 )
@@ -26,17 +24,6 @@ var (
 	webhookIntakeBodyPathPattern    = regexp.MustCompile(`root\(\)\.data\.body((?:\?\.\["[A-Za-z0-9_-]+"\])+)`)
 	webhookIntakeSegmentPattern     = regexp.MustCompile(`\?\.\["([A-Za-z0-9_-]+)"\]`)
 )
-
-func requireWebhookIntake(db *gorm.DB, orgID uuid.UUID) error {
-	org, err := models.FindOrganizationByIDInTransaction(db, orgID.String())
-	if err != nil {
-		return err
-	}
-	if !org.HasExperimentalFeature(features.FeatureFactoryWebhookIntake) {
-		return grpcerrors.FailedPrecondition(nil, "Webhook intake is not enabled for this organization.")
-	}
-	return nil
-}
 
 func defaultWebhookIntakeSettings() intakeSettings {
 	settings := defaultIntakeSettings()

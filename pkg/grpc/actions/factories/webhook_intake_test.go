@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 	factorycomponent "github.com/superplanehq/superplane/pkg/components/factory"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
@@ -80,11 +79,6 @@ func TestWebhookIntakeCreatesTasksFromRequests(t *testing.T) {
 	db := database.DB(t.Context())
 	factory := seedHandOffFactory(t, r, db)
 	ctx, deps, orgID := onboardingContext(r), onboardingDeps(r), r.Organization.ID.String()
-	_, err := CreateFactoryIntake(ctx, deps, orgID, &pb.CreateFactoryIntakeRequest{
-		FactoryId: factory.ID.String(), Source: pb.FactoryIntake_SOURCE_WEBHOOK, ResourceId: uuid.NewString(),
-	})
-	requireStatusCode(t, err, codes.FailedPrecondition)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryWebhookIntake))
 
 	newWebhook := func(name string) string {
 		created, err := CreateFactoryWebhook(ctx, deps, orgID, &pb.CreateFactoryWebhookRequest{
@@ -95,8 +89,25 @@ func TestWebhookIntakeCreatesTasksFromRequests(t *testing.T) {
 	}
 	webhookID := newWebhook("Tracker")
 
-	_, err = CreateFactoryIntake(ctx, deps, orgID, &pb.CreateFactoryIntakeRequest{
+	_, err := CreateFactoryIntake(ctx, deps, orgID, &pb.CreateFactoryIntakeRequest{
 		FactoryId: factory.ID.String(), Source: pb.FactoryIntake_SOURCE_WEBHOOK, ResourceId: uuid.NewString(),
+	})
+	requireStatusCode(t, err, codes.InvalidArgument)
+
+	otherFactory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	otherWebhook, err := CreateFactoryWebhook(ctx, deps, orgID, &pb.CreateFactoryWebhookRequest{
+		FactoryId: otherFactory.ID.String(), Name: "Other workspace", Authentication: pb.FactoryWebhook_AUTHENTICATION_BEARER,
+	})
+	require.NoError(t, err)
+	_, err = CreateFactoryIntake(ctx, deps, orgID, &pb.CreateFactoryIntakeRequest{
+		FactoryId: factory.ID.String(), Source: pb.FactoryIntake_SOURCE_WEBHOOK, ResourceId: otherWebhook.GetWebhook().GetId(),
+	})
+	requireStatusCode(t, err, codes.InvalidArgument)
+
+	_, err = CreateFactoryIntake(ctx, deps, orgID, &pb.CreateFactoryIntakeRequest{
+		FactoryId: factory.ID.String(), Source: pb.FactoryIntake_SOURCE_WEBHOOK, ResourceId: webhookID,
+		Settings: &pb.FactoryIntake_Settings{WebhookTitlePath: proto.String("issue..summary")},
 	})
 	requireStatusCode(t, err, codes.InvalidArgument)
 
