@@ -1,3 +1,4 @@
+import { integrationKeys } from "./useIntegrations";
 import { useCallback, useEffect, useRef } from "react";
 import { useWebSocket } from "@/lib/reactUseWebsocket";
 import { useQueryClient, type InfiniteData, type QueryClient } from "@tanstack/react-query";
@@ -128,6 +129,8 @@ export function useCanvasWebsocket({
       if (!canvasMessage.canvasId || canvasMessage.canvasId !== canvasId) {
         return;
       }
+
+      void queryClient.invalidateQueries({ queryKey: integrationKeys.workspaces(organizationId) });
 
       const shouldInvalidateLifecycleQueries =
         onCanvasLifecycleEvent?.(canvasMessage as CanvasWebsocketPayload, eventName) !== false;

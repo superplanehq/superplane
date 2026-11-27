@@ -81,7 +81,21 @@ beforeEach(() => {
         integration.status!.webhookSetups![0].state = "pending";
         return Response.json({});
       }
-      if (request.url.endsWith("/integrations")) return Response.json({ integrations: [integration] });
+      const url = new URL(request.url);
+      if (url.pathname.endsWith("/integrations")) {
+        const workspaceConnections = url.searchParams.get("factoryId") === "factory-1";
+        return Response.json({
+          integrations: workspaceConnections
+            ? [integration]
+            : [
+                integration,
+                {
+                  metadata: { id: "unused-jira", name: "Old Jira", integrationName: "jira" },
+                  status: { state: "error", stateDescription: "Failed to refresh token" },
+                },
+              ],
+        });
+      }
       return Response.json({ integration });
     },
   });
@@ -94,7 +108,7 @@ afterEach(() => {
 });
 
 function Details() {
-  const banner = useBrokenIntegrationsBanner("org-1", "workspace-1");
+  const banner = useBrokenIntegrationsBanner("org-1", "factory-1", "workspace-1");
   const { data } = useIntegration("org-1", "integration-1");
   useFactoryIntakes("org-1", "factory-1");
   return (
@@ -132,6 +146,7 @@ it("identifies hooks for the limited event and follows a retry through setup com
   fireEvent.click(screen.getByRole("button", { name: "Try again" }));
   await waitFor(() => expect(screen.getByRole("button", { name: "Trying again" })).toBeDisabled());
   expect(screen.getByTestId("broken-integrations-banner")).toBeVisible();
+  expect(screen.getAllByTestId("broken-integration-row")).toHaveLength(1);
   expect(
     requests.filter((request) => request.method === "POST").map((request) => new URL(request.url).pathname),
   ).toEqual(["/api/v1/organizations/org-1/integrations/integration-1/webhooks/hook-1/retry"]);

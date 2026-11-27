@@ -1034,6 +1034,7 @@ export function useCreateFactoryAutomation(organizationId: string, factoryId: st
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: factoryAppsKey(organizationId, factoryId) });
+      void queryClient.invalidateQueries({ queryKey: integrationKeys.workspace(organizationId, factoryId) });
       void queryClient.invalidateQueries({ queryKey: factoryDetailKey(organizationId, factoryId) });
     },
   });
@@ -1053,6 +1054,7 @@ export function useDeleteFactoryAutomation(organizationId: string, factoryId: st
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: factoryAppsKey(organizationId, factoryId) });
+      void queryClient.invalidateQueries({ queryKey: integrationKeys.workspace(organizationId, factoryId) });
       void queryClient.invalidateQueries({ queryKey: factoryDetailKey(organizationId, factoryId) });
     },
   });
@@ -1114,6 +1116,7 @@ export function useUpdateFactoryLine(organizationId: string, factoryId: string) 
     },
     onSuccess: (line, input) => {
       if (input.stageConfiguration) {
+        void queryClient.invalidateQueries({ queryKey: integrationKeys.workspace(organizationId, factoryId) });
         void queryClient.invalidateQueries({ queryKey: factoryAppsKey(organizationId, factoryId) });
         void queryClient.invalidateQueries({
           queryKey: ["factories", organizationId, factoryId, "custom-automations"],

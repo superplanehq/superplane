@@ -866,7 +866,7 @@ export function LinesPage() {
             }
           />
           <SubscriptionIntakeOwnerRecovery />
-          <WebhookFailuresNotice organizationId={organizationId} />
+          <WebhookFailuresNotice organizationId={organizationId} factoryId={factoryId} />
           {configuredIntakes
             .filter(
               (intake) =>
