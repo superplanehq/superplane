@@ -6,21 +6,29 @@ import { factorySettingsSectionPath } from "./factoryPagePaths";
 import { findBrokenIntegrations } from "./brokenIntegrations";
 
 /**
- * Surfaces organization integrations that broke after setup (an error
+ * Surfaces workspace integrations that broke after setup (an error
  * state) or were left half-configured (stuck pending). Runs that depend on
  * these integrations fail silently otherwise, so this gives operators a
  * workspace-level signal and a link to the repair step.
  */
-export function useBrokenIntegrationsBanner(organizationId: string, factoryKey: string, webhookFailuresInPage = false) {
+export function useBrokenIntegrationsBanner(
+  organizationId: string,
+  factoryId: string,
+  factoryKey: string,
+  webhookFailuresInPage = false,
+) {
   const { canAct } = usePermissions();
   const canReadIntegrations = canAct("integrations", "read");
-  const { data: integrations = [] } = useConnectedIntegrations(organizationId, { enabled: canReadIntegrations });
+  const { data: integrations = [] } = useConnectedIntegrations(organizationId, {
+    enabled: canReadIntegrations,
+    factoryId,
+  });
 
   if (!canReadIntegrations) {
     return undefined;
   }
 
-  // The board lists every webhook failure beside its retry action.
+  // The board lists relevant GitHub webhook failures beside its retry action.
   const broken = findBrokenIntegrations(integrations).filter(
     (integration) =>
       !webhookFailuresInPage || integration.reason !== "webhook" || integration.integrationName !== "github",

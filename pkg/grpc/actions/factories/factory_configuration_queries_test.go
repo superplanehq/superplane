@@ -31,7 +31,7 @@ type configurationQueryCountKey struct{}
 
 func countConfigurationQueries(ctx context.Context, run func(context.Context)) configurationQueryCounts {
 	counts := configurationQueryCounters{}
-	for _, category := range []string{"sources", "versions", "metadata", "integrations", "policy", "secrets", "locks"} {
+	for _, category := range []string{"sources", "versions", "metadata", "ownership", "integrations", "policy", "secrets", "locks"} {
 		counts[category] = &atomic.Int64{}
 	}
 	run(context.WithValue(ctx, configurationQueryCountKey{}, counts))
@@ -61,6 +61,8 @@ func TestFactoryConfigurationBatchesSharedReads(t *testing.T) {
 			counts["versions"].Add(1)
 		case "factory_intakes", "factory_pr_feedback_handlers", "factory_lines":
 			counts["metadata"].Add(1)
+		case "factory_configuration_automations":
+			counts["ownership"].Add(1)
 		case "app_installations":
 			counts["integrations"].Add(1)
 		case "hosted_llm_providers", "installation_llm_settings", "organization_byok_model_allowlists", "organization_hosted_model_allowlists", "factory_llm_model_allowlists", "factory_codex_connections":
@@ -191,6 +193,20 @@ func TestFactoryConfigurationBatchesSharedReads(t *testing.T) {
 						})
 					}
 				}
+				desired := export(f.ctx)
+				editConfigurationManifest(t, desired, func(manifest *factoryConfigurationManifest) {
+					for i := range manifest.Stages {
+						if manifest.Stages[i].Key == "backlog" {
+							manifest.Stages[i].Automations = append(manifest.Stages[i].Automations, factoryConfigurationAutomation{
+								ID: "planned-analysis", Name: "Planned analysis", Uses: "@superplane/task-analysis",
+							})
+						}
+					}
+				})
+				counts["one built-in addition plan"] = countConfigurationQueries(f.ctx, func(ctx context.Context) {
+					planned := plan(ctx, desired)
+					require.Len(t, planned.Changes, 1)
+				})
 				return counts
 			}
 			single := measure()
@@ -204,7 +220,7 @@ func TestFactoryConfigurationBatchesSharedReads(t *testing.T) {
 			for operation, expected := range single {
 				t.Run(operation, func(t *testing.T) {
 					t.Logf("one custom automation: %v; five custom automations: %v", expected, many[operation])
-					for _, category := range []string{"sources", "versions", "metadata", "integrations"} {
+					for _, category := range []string{"sources", "versions", "metadata", "ownership", "integrations"} {
 						require.Positive(t, expected[category], "%s reads must be observed", category)
 					}
 					if operation == "changed plan" {

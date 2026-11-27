@@ -1,6 +1,7 @@
 package factories
 
 import (
+	"encoding/json"
 	"math"
 	"strconv"
 	"strings"
@@ -14,6 +15,7 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/pkg/triggers/schedule"
 	"github.com/superplanehq/superplane/pkg/yaml"
+	goyaml "gopkg.in/yaml.v3"
 	"gorm.io/gorm"
 )
 
@@ -72,6 +74,9 @@ func scheduledIntakeCanvas(db *gorm.DB, factory *models.Factory, name string, pa
 		integrations: map[string]factoryTemplateIntegration{provider: {name: resolveVCSInstallationName(db, factory)}},
 		agent:        factoryTemplateAgentFromIntake(agent),
 	}
+	if _, present := params["prompt"]; !present {
+		delete(input.installParams, "prompt")
+	}
 	result, err := materializeFactoryTemplate(scheduledIntakeTemplateID, provider, input)
 	if err != nil {
 		return nil, err
@@ -89,8 +94,8 @@ func configureScheduledIntake(canvas *yaml.Canvas, provider string, params map[s
 		return invalidArgument("repository is required for scheduled intake")
 	}
 	repoURL := scheduledIntakeRepoURL(provider, repository, params["githubHost"])
-	prompt := strings.TrimSpace(params["prompt"])
-	if prompt == "" {
+	prompt, specified := params["prompt"]
+	if !specified {
 		prompt = scheduledIntakeDefaultPrompt
 	}
 	for i := range canvas.Spec.Nodes {
@@ -221,4 +226,29 @@ func scheduledIntakePromptFromSteps(raw any) string {
 		return strings.TrimSuffix(strings.TrimRight(prompt, "\r\n"), scheduledIntakeOutputInstructions)
 	}
 	return ""
+}
+
+// Quote leading newlines because yaml.v3 emits an invalid nested block scalar
+// for an empty proposal prompt followed by the managed output instructions.
+func marshalScheduledIntakeCanvas(canvas *yaml.Canvas) ([]byte, error) {
+	encoded, err := json.Marshal(canvas)
+	if err != nil {
+		return nil, err
+	}
+	var document goyaml.Node
+	if err := goyaml.Unmarshal(encoded, &document); err != nil {
+		return nil, err
+	}
+	var quote func(*goyaml.Node)
+	quote = func(node *goyaml.Node) {
+		node.Style = 0
+		if node.Kind == goyaml.ScalarNode && node.Tag == "!!str" && strings.HasPrefix(node.Value, "\n") {
+			node.Style = goyaml.DoubleQuotedStyle
+		}
+		for _, child := range node.Content {
+			quote(child)
+		}
+	}
+	quote(&document)
+	return goyaml.Marshal(&document)
 }

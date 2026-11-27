@@ -18,6 +18,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/test/support"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -27,10 +28,12 @@ func TestReconcileFactoryRepositoryPublishesManagedRunnerCredentials(t *testing.
 		provider             string
 		runnerID             string
 		repositoryExpression string
+		pinnedBinding        bool
 	}{
-		{"line-implementation", models.ProviderBitbucket, implementationAgentNodeID, orderRepositoryExpression},
-		{"risk-score", models.ProviderGitHub, "assess-risk", "new-workspace/api"},
-		{"visual-evidence", models.ProviderGitHub, "capture-visual-evidence", "new-workspace/api"},
+		{"line-implementation", models.ProviderBitbucket, implementationAgentNodeID, orderRepositoryExpression, false},
+		{"risk-score", models.ProviderGitHub, "assess-risk", "new-workspace/api", false},
+		{"visual-evidence", models.ProviderGitHub, "capture-visual-evidence", "new-workspace/api", false},
+		{"risk-score", models.ProviderGitHub, "assess-risk", "old-workspace/api", true},
 	} {
 		t.Run(testCase.templateID, func(t *testing.T) {
 			r := support.Setup(t)
@@ -49,6 +52,16 @@ func TestReconcileFactoryRepositoryPublishesManagedRunnerCredentials(t *testing.
 				AppRepository: &repository, BacklogRepository: &repository, DefaultBranch: &branch,
 			}))
 			canvas := support.CreateFactoryCanvas(t, r, factory.ID, "Implement")
+			if testCase.pinnedBinding {
+				line, err := factory.CreateLine(db, "Delivery", nil)
+				require.NoError(t, err)
+				owner := models.FactoryConfigurationAutomation{
+					OrganizationID: r.Organization.ID, FactoryID: factory.ID, LineID: line.ID,
+					StageKey: "verify", ManifestID: "risk", CanvasID: canvas.ID,
+					Binding: datatypes.JSONMap{"resource_id": "old-workspace/api", "integration_id": previousID},
+				}
+				require.NoError(t, owner.Save(db))
+			}
 			nodes := []models.Node{
 				{
 					ID: "find-pr", Name: "Find Pull Request", Type: models.NodeTypeComponent,
@@ -104,10 +117,14 @@ func TestReconcileFactoryRepositoryPublishesManagedRunnerCredentials(t *testing.
 			require.NotNil(t, findPR)
 			require.NotNil(t, managedRunner)
 			require.NotNil(t, custom)
-			assert.Equal(t, selectedID, *findPR.IntegrationID)
+			expectedIntegrationID, expectedIntegrationName := selectedID, selectedName
+			if testCase.pinnedBinding {
+				expectedIntegrationID, expectedIntegrationName = previousID, previousName
+			}
+			assert.Equal(t, expectedIntegrationID, *findPR.IntegrationID)
 			assert.Equal(t, testCase.repositoryExpression, findPR.Configuration["repository"])
 			assert.Equal(t, []any{
-				map[string]any{"source": "integration", "integration": map[string]any{"name": selectedName}},
+				map[string]any{"source": "integration", "integration": map[string]any{"name": expectedIntegrationName}},
 				map[string]any{"source": "integration", "integration": map[string]any{"name": unrelatedName}},
 			}, managedRunner.Configuration["environmentFrom"])
 			assert.Equal(t, "echo "+previousName, managedRunner.Configuration["script"])
@@ -443,6 +460,54 @@ func TestReconcileFactoryRepositoryRewritesGitHubEnterpriseCheckoutURLs(t *testi
 		assert.Equal(t, nextRepo, checkoutEnvironmentValue(t, version.Nodes[0], "REPO"))
 		assert.Equal(t, nextURL, checkoutEnvironmentValue(t, version.Nodes[0], "REPO_URL"))
 		assert.NotContains(t, checkoutEnvironmentValue(t, version.Nodes[0], "REPO_URL"), "github.com")
+	}
+}
+
+func TestReconcileFactoryRepositoryPreservesPinnedCheckoutTargets(t *testing.T) {
+	for _, templateID := range []string{scheduledIntakeTemplateID, models.FactoryAppTemplateCustomAutomationID} {
+		for _, repository := range []string{"acme/old", "acme/new"} {
+			t.Run(templateID+"/"+repository, func(t *testing.T) {
+				r := support.Setup(t)
+				db := database.DB(t.Context())
+				integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, models.ProviderGitHub)
+				factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+				require.NoError(t, err)
+				provider, branch := models.ProviderGitHub, "develop"
+				require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
+					VCSProvider: &provider, VCSIntegrationID: &integrationID,
+					AppRepository: &repository, BacklogRepository: &repository, DefaultBranch: &branch,
+				}))
+				canvas := support.CreateFactoryCanvas(t, r, factory.ID, "Pinned automation")
+				line, err := factory.CreateLine(db, "Delivery", nil)
+				require.NoError(t, err)
+				owner := models.FactoryConfigurationAutomation{
+					OrganizationID: r.Organization.ID, FactoryID: factory.ID, LineID: line.ID,
+					StageKey: "plan", ManifestID: "pinned", CanvasID: canvas.ID,
+					Binding: datatypes.JSONMap{"resource_id": "acme/old"},
+				}
+				require.NoError(t, owner.Save(db))
+				deps := IntakeDependencies{Registry: r.Registry, Encryptor: r.Encryptor, AuthService: r.AuthService, WebhookBaseURL: "http://localhost:8000"}
+				const repoURL = "https://github.com/acme/old.git"
+				require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+					return canvases.PublishGeneratedCanvasNodes(t.Context(), tx, canvas, r.User, "Install pinned automation", []models.Node{
+						checkoutTemplateNode("scheduled-agent", templateID, "acme/old", repoURL, "main"),
+					}, nil, changesets.CanvasPublisherOptions{
+						Registry: r.Registry, OrgID: r.Organization.ID, Encryptor: r.Encryptor,
+						AuthService: r.AuthService, WebhookBaseURL: deps.WebhookBaseURL,
+					})
+				}))
+				require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+					return reconcileFactoryRepository(t.Context(), tx, deps, factory, r.User,
+						integrationID, integrationID, "acme/old", "acme/old", "main", repository, true)
+				}))
+				live, err := models.FindLiveCanvasVersionInTransaction(db, canvas.ID)
+				require.NoError(t, err)
+				require.Len(t, live.Nodes, 1)
+				assert.Equal(t, "main", checkoutEnvironmentValue(t, live.Nodes[0], "BASE"))
+				assert.Equal(t, "acme/old", checkoutEnvironmentValue(t, live.Nodes[0], "REPO"))
+				assert.Equal(t, repoURL, checkoutEnvironmentValue(t, live.Nodes[0], "REPO_URL"))
+			})
+		}
 	}
 }
 

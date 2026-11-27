@@ -1,3 +1,4 @@
+import { integrationKeys } from "./useIntegrations";
 import { useCodexActionGuard } from "@/pages/factories/codex/codexActionContext";
 import {
   factoriesCreateFactoryIntake,
@@ -171,6 +172,7 @@ export function useCreateFactoryIntake(organizationId: string, factoryId: string
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: factoryIntakesKey(organizationId, factoryId) });
       void queryClient.invalidateQueries({ queryKey: factoryAppsKey(organizationId, factoryId) });
+      void queryClient.invalidateQueries({ queryKey: integrationKeys.workspace(organizationId, factoryId) });
       // A new intake seeds the newest items of its source, so the Backlog
       // already holds tasks the cached list does not know about.
       void queryClient.invalidateQueries({ queryKey: factoryQueryKeys.workOrders(organizationId, factoryId) });
@@ -197,6 +199,7 @@ export function useDeleteFactoryIntake(organizationId: string, factoryId: string
       void queryClient.invalidateQueries({ queryKey: factoryQueryKeys.detail(organizationId, factoryId) });
       void queryClient.invalidateQueries({ queryKey: factoryIntakesKey(organizationId, factoryId) });
       void queryClient.invalidateQueries({ queryKey: factoryAppsKey(organizationId, factoryId) });
+      void queryClient.invalidateQueries({ queryKey: integrationKeys.workspace(organizationId, factoryId) });
       void queryClient.invalidateQueries({ queryKey: factoryQueryKeys.workOrders(organizationId, factoryId) });
       void queryClient.invalidateQueries({
         queryKey: factoryQueryKeys.workOrdersPagePrefix(organizationId, factoryId),
@@ -248,6 +251,7 @@ export function useUpdateFactoryIntake(organizationId: string, factoryId: string
       );
       void queryClient.invalidateQueries({ queryKey: factoryIntakesKey(organizationId, factoryId) });
       void queryClient.invalidateQueries({ queryKey: factoryAppsKey(organizationId, factoryId) });
+      void queryClient.invalidateQueries({ queryKey: integrationKeys.workspace(organizationId, factoryId) });
       void queryClient.invalidateQueries({
         queryKey: factoryIntakeQueryKeys.runs(organizationId, factoryId, variables.intakeId),
       });

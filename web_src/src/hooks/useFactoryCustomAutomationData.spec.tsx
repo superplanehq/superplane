@@ -4,13 +4,21 @@ import { type ReactNode } from "react";
 import { describe, expect, it, vi } from "bun:test";
 
 const runAutomation = vi.fn();
+const createAutomation = vi.fn();
+const updateAutomation = vi.fn();
 
 vi.mock("@/api-client", () => ({
   factoriesRunFactoryCustomAutomation: runAutomation,
+  factoriesCreateFactoryCustomAutomation: createAutomation,
+  factoriesUpdateFactoryCustomAutomation: updateAutomation,
 }));
 
 import { factoryQueryKeys } from "./useFactoryData";
-import { useRunFactoryCustomAutomation } from "./useFactoryCustomAutomationData";
+import {
+  useCreateFactoryCustomAutomation,
+  useUpdateFactoryCustomAutomation,
+  useRunFactoryCustomAutomation,
+} from "./useFactoryCustomAutomationData";
 
 describe("useRunFactoryCustomAutomation", () => {
   it.each([{ runId: "run-1" }, { queueItemId: "queue-1" }])(
@@ -50,3 +58,26 @@ describe("useRunFactoryCustomAutomation", () => {
     );
   });
 });
+
+for (const change of ["create", "update"] as const) {
+  it(`refreshes workspace warnings after custom automation ${change}`, async () => {
+    const client = new QueryClient();
+    const key = ["integrations", "connected", "org-1", "workspace", "factory-1"];
+    client.setQueryData(key, [{ metadata: { id: "jira-1" } }]);
+    createAutomation.mockResolvedValue({ data: { customAutomation: { id: "app-1" } } });
+    updateAutomation.mockResolvedValue({ data: { customAutomation: { id: "app-1" } } });
+    const { result } = renderHook(
+      () => ({
+        create: useCreateFactoryCustomAutomation("org-1", "factory-1"),
+        update: useUpdateFactoryCustomAutomation("org-1", "factory-1", "app-1"),
+      }),
+      {
+        wrapper: ({ children }: { children: ReactNode }) => (
+          <QueryClientProvider client={client}>{children}</QueryClientProvider>
+        ),
+      },
+    );
+    await result.current[change].mutateAsync({ name: "App", settings: {} });
+    expect(client.getQueryState(key)?.isInvalidated).toBe(true);
+  });
+}
