@@ -205,7 +205,7 @@ skip_setup_commands: true
   );
 });
 
-it("selects Schedule, recovers from a save error, and reopens the saved schedule without changing steps", async () => {
+it("removes the sole Manual trigger, requires a replacement, and reopens the saved schedule without changing settings", async () => {
   const user = userEvent.setup();
   saveAutomation.mockRejectedValueOnce(new Error("Schedule has no future run."));
   saveAutomation.mockResolvedValueOnce({});
@@ -221,10 +221,14 @@ it("selects Schedule, recovers from a save error, and reopens the saved schedule
   await user.click(skipSetup);
   await user.click(skipCheckout);
   expect(saveAutomation).not.toHaveBeenCalled();
+  await user.click(screen.getByRole("button", { name: "Remove Manual" }));
+  expect(screen.getByText("Add a trigger.")).toBeVisible();
+  await user.click(screen.getByRole("button", { name: "Save" }));
+  expect(screen.getByRole("alert")).toHaveTextContent("Add at least one trigger.");
+  expect(saveAutomation).not.toHaveBeenCalled();
   await user.click(screen.getByRole("tab", { name: "with no task" }));
   await user.click(screen.getByRole("button", { name: "Add trigger" }));
   await user.click(screen.getByRole("menuitem", { name: /Schedule/ }));
-  await user.click(screen.getByRole("button", { name: "Remove Manual" }));
   expect(screen.getByLabelText("Cron expression")).toHaveValue("0 9 * * *");
   fireEvent.change(screen.getByLabelText("Cron expression"), { target: { value: "0 9 31 2 *" } });
   await user.click(screen.getByRole("combobox", { name: "Timezone" }));
@@ -241,6 +245,7 @@ it("selects Schedule, recovers from a save error, and reopens the saved schedule
   expect(saved.settings.skipSetupCommands).toBe(true);
   expect(saved.settings.skipRepositoryCheckout).toBe(true);
   expect(saved.settings.steps).toEqual(automation.settings!.steps);
+  expect(saved.settings.agent).toMatchObject(automation.settings!.agent!);
   view.unmount();
   automation = { automation: automation.automation, settings: saved.settings };
   render(<Editor />);
@@ -449,28 +454,44 @@ it("replaces custom-stage entry with Manual and reopens the saved trigger", asyn
     render(<Editor columnKey="custom-qa" />);
     expect(screen.getByRole("button", { name: /^Trigger Manual/ })).toBeInTheDocument();
     expect(screen.queryByText(/When a task enters/)).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Remove Manual" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Remove Manual" })).toBeEnabled();
   } finally {
     automation = previous;
   }
 });
 
-it("saves custom-stage Manual through the source-backed visual editor", async () => {
+it("keeps the sole source-backed trigger removed in YAML until a replacement is saved", async () => {
   const source = `apiVersion: v2
 kind: Automation
 name: Update Docs
 runs_on_task: true
+agent: {harness: codex, model: gpt-5}
+skip_setup_commands: true
+timeout_seconds: 600
 triggers: [{use: task_enters_stage}]
 steps: [{name: Review, prompt: Review the changes.}]
 `;
   const save = vi.fn();
   const user = userEvent.setup();
   const view = render(<SourceEditor source={source} stage="custom-qa" save={save} />);
+  await user.click(screen.getByRole("button", { name: /Remove When a task enters/ }));
+  expect(screen.getByText("Add a trigger.")).toBeVisible();
+  await user.click(screen.getByRole("button", { name: "Save" }));
+  expect(screen.getByRole("alert")).toHaveTextContent("Add at least one trigger.");
+  expect(save).not.toHaveBeenCalled();
+  await user.click(screen.getByRole("button", { name: "Edit YAML" }));
+  expect(load(screen.getByLabelText<HTMLTextAreaElement>("Automation YAML").value)).toEqual({
+    ...(load(source) as object),
+    triggers: [],
+  });
+  await user.click(screen.getByRole("button", { name: "Save" }));
+  expect(save).not.toHaveBeenCalled();
+  await user.click(screen.getByRole("button", { name: "Open visual editor" }));
   await user.click(screen.getByRole("button", { name: "Add trigger" }));
   await user.click(screen.getByRole("menuitem", { name: /Manual/ }));
-  await user.click(screen.getByRole("button", { name: /Remove When a task enters/ }));
   await user.click(screen.getByRole("button", { name: "Save" }));
-  expect(save).toHaveBeenCalledWith(expect.objectContaining({ triggers: [{ use: "manual" }], runs_on_task: true }));
+  expect(save).toHaveBeenCalledTimes(1);
+  expect(save).toHaveBeenCalledWith({ ...(load(source) as object), triggers: [{ use: "manual" }] });
   view.unmount();
   render(<SourceEditor source={source.replace("task_enters_stage", "manual")} stage="custom-qa" save={save} />);
   expect(screen.getByRole("button", { name: /^Trigger Manual/ })).toBeInTheDocument();

@@ -83,6 +83,10 @@ export function useCustomAutomationSetupPage(args: {
 
   const save = async () => {
     const activeTriggers = customAutomationTriggersForRun(triggers, runContext);
+    if (activeTriggers.length === 0) {
+      setSaveError("Add at least one trigger.");
+      return false;
+    }
     const invalidSchedule = activeTriggers.some(
       (trigger) =>
         trigger.mode === "scheduled" &&

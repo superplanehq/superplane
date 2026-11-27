@@ -1,4 +1,5 @@
 import { load } from "js-yaml";
+import { Button } from "@/components/ui/button";
 import { useCustomAutomationSourceDraft } from "@/hooks/useCustomAutomationSourceDraft";
 import { CustomAutomationSourceEditor } from "./CustomAutomationSourceEditor";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
@@ -60,15 +61,20 @@ export function SourceEditor({
 }) {
   const draft = useCustomAutomationSourceDraft(source, stage);
   return (
-    <CustomAutomationSourceEditor
-      model={draft}
-      automationId={automationId}
-      stage={stage}
-      saving={false}
-      deleting={false}
-      error=""
-      onSave={() => save(load(draft.source))}
-      onClose={() => {}}
-    />
+    <>
+      <Button onClick={draft.isYamlOpen ? draft.openVisualEditor : draft.openYaml}>
+        {draft.isYamlOpen ? "Open visual editor" : "Edit YAML"}
+      </Button>
+      <CustomAutomationSourceEditor
+        model={draft}
+        automationId={automationId}
+        stage={stage}
+        saving={false}
+        deleting={false}
+        error=""
+        onSave={() => save(load(draft.source))}
+        onClose={() => {}}
+      />
+    </>
   );
 }

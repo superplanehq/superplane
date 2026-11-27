@@ -247,18 +247,16 @@ function TriggerCard({
             <TriggerOption mode={trigger.mode} columnKey={columnKey} runsOnTask={runsOnTask} />
           </div>
         )}
-        {triggers.length > 1 ? (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            className="text-muted-foreground hover:text-destructive"
-            aria-label={removeTriggerLabel(triggers, trigger, columnKey, stageLabel)}
-            onClick={onRemove}
-          >
-            <Trash2 className="size-4" aria-hidden />
-          </Button>
-        ) : null}
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          className="text-muted-foreground hover:text-destructive"
+          aria-label={removeTriggerLabel(triggers, trigger, columnKey, stageLabel)}
+          onClick={onRemove}
+        >
+          <Trash2 className="size-4" aria-hidden />
+        </Button>
       </div>
       {configurable && expanded ? (
         <div className="border-t border-border px-4 py-4">

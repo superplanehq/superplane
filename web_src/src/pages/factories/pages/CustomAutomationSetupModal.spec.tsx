@@ -250,7 +250,7 @@ describe("custom automation configuration run history", () => {
     const onClose = renderModal("?customAutomation=custom-1", "custom-1", "custom-qa");
     expect(screen.getByRole("button", { name: "Add trigger" })).toBeEnabled();
     expect(screen.queryByTestId("custom-automation-runs-on-task")).toBeNull();
-    expect(screen.queryByRole("button", { name: /Remove When a task enters/ })).toBeNull();
+    expect(screen.getByRole("button", { name: /Remove When a task enters/ })).toBeEnabled();
     await userEvent.setup().click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
     expect(hooks.update).toHaveBeenCalledWith(
@@ -277,20 +277,14 @@ describe("custom automation YAML draft", () => {
 apiVersion: v2
 kind: Automation
 name: Preview
-agent:
-  harness: codex
-  model: gpt-5
-  credentials: {source: integration, name: code-review}
+agent: {harness: codex, model: gpt-5, credentials: {source: integration, name: code-review}}
 skip_setup_commands: true
 skip_repository_checkout: true
-triggers:
-  - use: task_enters_stage
+triggers: [{use: task_enters_stage}]
 steps:
   - name: Print marker
     bash: echo original
-  - name: Review
-    working_directory: repo
-    prompt: Review the preview.
+  - {name: Review, working_directory: repo, prompt: Review the preview.}
 `;
   const savedAutomation = {
     id: "custom-1",
@@ -446,6 +440,12 @@ steps:
     expect(runs.getAllByRole("tab")).toHaveLength(2);
     expect(runs.getByRole("tab", { name: "on a task", selected: true })).toBeVisible();
     await user.click(runs.getByRole("tab", { name: "with no task" }));
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    expect(screen.getByRole("alert")).toHaveTextContent("Add at least one trigger.");
+    expect(onClose).not.toHaveBeenCalled();
+    expect(fetch).toHaveBeenCalledTimes(1);
+    await user.click(screen.getByRole("button", { name: "Add trigger" }));
+    await user.click(screen.getByRole("menuitem", { name: /Manual/ }));
     await user.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
