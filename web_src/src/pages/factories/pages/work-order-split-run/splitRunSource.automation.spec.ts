@@ -3,6 +3,7 @@ import { describe, expect, it } from "bun:test";
 import superplaneMark from "@/assets/superplane-mark.svg";
 
 import { DRAFT_WORK_ORDER } from "../../__fixtures__/factoryPageResponses";
+import { CUSTOM_AUTOMATION_TEMPLATE_ID } from "../../lib/customAutomation";
 import { splitRunSourceForOrder } from "./splitRunSource";
 
 describe("splitRunSourceForOrder automations", () => {
@@ -34,6 +35,29 @@ describe("splitRunSourceForOrder automations", () => {
         createdBy: { automation: { appId: "app-issue-intake", appName: "Issue intake" } },
       }),
     ).toEqual(expect.objectContaining({ kind: "intake", name: "GitHub issues" }));
+  });
+
+  it("names a custom automation after itself even when its name says intake", () => {
+    expect(
+      splitRunSourceForOrder({
+        ...DRAFT_WORK_ORDER,
+        origin: undefined,
+        createdBy: {
+          automation: { appId: "app-alerts", appName: "Alert intake", templateId: CUSTOM_AUTOMATION_TEMPLATE_ID },
+        },
+      }),
+    ).toEqual(expect.objectContaining({ kind: "automation", name: "Alert intake" }));
+  });
+
+  it("shows a custom automation link on an unknown host as a webhook, not a GitHub issue", () => {
+    const automation = { appId: "app-requests", appName: "Request intake", templateId: CUSTOM_AUTOMATION_TEMPLATE_ID };
+    const order = { ...DRAFT_WORK_ORDER, createdBy: { automation } };
+    expect(
+      splitRunSourceForOrder({ ...order, origin: { url: "https://requests.example.com/REQ-1", label: "REQ-1" } }),
+    ).toEqual(expect.objectContaining({ kind: "intake", name: "Webhook", ticket: expect.objectContaining({ label: "REQ-1" }) }));
+    expect(
+      splitRunSourceForOrder({ ...order, origin: { url: "https://github.com/acme/app/issues/7", label: "" } }),
+    ).toEqual(expect.objectContaining({ name: "GitHub issues" }));
   });
 
   it("links a task to its creating run and automation", () => {

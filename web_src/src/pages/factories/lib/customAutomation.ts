@@ -115,6 +115,16 @@ export function customAutomationRunsOnTask(
   return true;
 }
 
+/** A custom stage runs on a task. Its webhook triggers run with no task, so the automation keeps both. */
+export function customAutomationRunContext(
+  columnKey: CustomAutomationColumn,
+  triggers: Array<{ mode: CustomAutomationMode }>,
+  runsOnTask: boolean | undefined,
+): boolean | undefined {
+  if (columnKey.startsWith("custom-") && triggers.some((trigger) => trigger.mode === "webhook")) return undefined;
+  return runsOnTask;
+}
+
 export function customAutomationTriggersForRun(
   triggers: CustomAutomationTrigger[],
   runsOnTask: boolean | undefined,
@@ -221,7 +231,10 @@ export function customAutomationModeCopy(
     };
   }
   if (mode === "webhook") {
-    return { trigger: "When a webhook receives a request", action: "Creates a task" };
+    return {
+      trigger: "When a webhook receives a request",
+      action: columnKey === "backlog" ? "Creates a task" : "Run automation with the request body",
+    };
   }
   if (mode === "leave") {
     return {
@@ -385,7 +398,7 @@ export function customAutomationSettingsForTriggers(
   triggers: CustomAutomationTrigger[],
   draft: PlanningReviewDraft,
   icon = DEFAULT_CUSTOM_AUTOMATION_ICON,
-  runsOnTask = true,
+  runsOnTask?: boolean,
 ): FactoriesFactoryCustomAutomationSettings {
   const active = customAutomationTriggersForRun(triggers, runsOnTask);
   const current = active.length > 0 ? active : [newCustomAutomationTrigger()];
