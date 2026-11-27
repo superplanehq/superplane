@@ -25,6 +25,21 @@ func factoryConfigurationSavedBinding(tx *gorm.DB, canvas *models.Canvas) (map[s
 	return owner.Binding, nil
 }
 
+func factoryConfigurationSavedBindings(tx *gorm.DB, factory *models.Factory) (map[uuid.UUID]map[string]any, error) {
+	owners, err := models.ListFactoryConfigurationAutomations(tx, factory.OrganizationID, factory.ID, uuid.Nil)
+	if err != nil {
+		return nil, err
+	}
+	bindings := make(map[uuid.UUID]map[string]any, len(owners))
+	for _, owner := range owners {
+		// Keep the first owner in the same order as the single-canvas lookup.
+		if _, exists := bindings[owner.CanvasID]; !exists {
+			bindings[owner.CanvasID] = owner.Binding
+		}
+	}
+	return bindings, nil
+}
+
 func preserveFactoryConfigurationPRFeedbackBinding(tx *gorm.DB, canvas *models.Canvas, request *prFeedbackBuildRequest) error {
 	binding, err := factoryConfigurationSavedBinding(tx, canvas)
 	if err != nil {

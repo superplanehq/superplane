@@ -343,13 +343,14 @@ func reconcileFactoryRepository(
 	for _, handler := range handlers {
 		handlerCanvasIDs[handler.CanvasID] = struct{}{}
 	}
+	bindings, err := factoryConfigurationSavedBindings(tx, factory)
+	if err != nil {
+		return err
+	}
 
 	for i := range canvasesForFactory {
 		canvas := &canvasesForFactory[i]
-		binding, err := factoryConfigurationSavedBinding(tx, canvas)
-		if err != nil {
-			return err
-		}
+		binding := bindings[canvas.ID]
 		_, pinnedRepository := binding["resource_id"]
 		_, pinnedIntegration := binding["integration_id"]
 		previousApp, previousBacklog := previousAppRepository, previousBacklogRepository
