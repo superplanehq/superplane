@@ -160,6 +160,20 @@ export function IntakeSourceSettingsPopup({
           onClose={onClose}
         />
       )}
+      {history.tab !== "general" && canEdit && onDelete ? (
+        <IntakeSourceSettingsFooter
+          sourceId={sourceId}
+          draft={draft}
+          getDraft={getDraft}
+          canEdit={canEdit}
+          deletePending={deletePending}
+          deleteError={deleteError}
+          onDelete={onDelete}
+          onSave={onSave}
+          onClose={onClose}
+          historyOnly
+        />
+      ) : null}
     </>
   );
 

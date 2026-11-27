@@ -248,6 +248,7 @@ describe("custom automation configuration run history", () => {
       data: { ...automation, settings: { ...automation.settings, startMode: "START_MODE_AUTOMATIC" } },
     });
     const onClose = renderModal("?customAutomation=custom-1", "custom-1", "custom-qa");
+    expect(screen.getByRole("button", { name: "Add trigger" })).toBeEnabled();
     expect(screen.queryByTestId("custom-automation-runs-on-task")).toBeNull();
     expect(screen.queryByRole("button", { name: /Remove When a task enters/ })).toBeNull();
     await userEvent.setup().click(screen.getByRole("button", { name: "Save" }));

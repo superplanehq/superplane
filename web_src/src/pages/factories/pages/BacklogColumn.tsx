@@ -59,6 +59,7 @@ export type BacklogColumnProps = {
   intakePanel?: BacklogIntakePanel;
   /** Opens the Add intake picker from the overflow menu. Hidden when unset. */
   onAddIntake?: () => void;
+  onAddAutomation?: () => void;
   /** Column automations for the header icons. Hidden when unset. */
   automations?: ColumnAutomation[];
   /** Rows the automation subheader reserves. Hidden when unset. */
@@ -105,6 +106,7 @@ export function BacklogColumn({
   creditFailureLabels,
   intakePanel,
   onAddIntake,
+  onAddAutomation,
   automations,
   automationRowCount,
   onAutomationRowAction,
@@ -125,12 +127,7 @@ export function BacklogColumn({
   const intakesQuery = useFactoryIntakes(organizationId, factoryId);
   const refreshBacklog = useRefreshBacklog(organizationId, factoryId);
   const onRefreshBacklog = () => void runBacklogRefresh(refreshBacklog.mutateAsync);
-  const createPopover = backlogCreatePopoverProps({
-    canAdd,
-    atCapacity,
-    createMenu,
-    onCreateWorkOrder,
-  });
+  const createPopover = backlogCreatePopoverProps({ canAdd, atCapacity, createMenu, onCreateWorkOrder });
 
   return (
     <>
@@ -157,6 +154,7 @@ export function BacklogColumn({
             onAutomationRowAction={onAutomationRowAction}
             onOpenSettings={onOpenSettings}
             onAddIntake={onAddIntake}
+            onAddAutomation={onAddAutomation}
             onRefreshBacklog={canRefreshBacklog(intakesQuery.data, canUpdateWorkOrders) ? onRefreshBacklog : undefined}
             refreshBacklogPending={refreshBacklog.isPending}
             colorId={colorId}
@@ -211,6 +209,7 @@ function BacklogColumnHeaderActions({
   onAutomationRowAction,
   onOpenSettings,
   onAddIntake,
+  onAddAutomation,
   onRefreshBacklog,
   refreshBacklogPending,
   colorId,
@@ -223,6 +222,7 @@ function BacklogColumnHeaderActions({
   | "onAutomationRowAction"
   | "onOpenSettings"
   | "onAddIntake"
+  | "onAddAutomation"
   | "colorId"
   | "onColorChange"
 > & {
@@ -250,6 +250,7 @@ function BacklogColumnHeaderActions({
         testId="lines-backlog-menu"
         onEdit={onOpenSettings}
         onAddIntake={onAddIntake}
+        onAddAutomation={onAddAutomation}
         onRefreshBacklog={onRefreshBacklog}
         refreshBacklogPending={refreshBacklogPending}
         colorId={colorId}

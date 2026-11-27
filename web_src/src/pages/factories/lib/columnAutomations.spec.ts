@@ -385,15 +385,15 @@ describe("catalogForColumn", () => {
     expect(catalogForColumn("done").map((entry) => entry.id)).toEqual(["pr-closure", "custom-verification"]);
   });
 
-  it("keeps phase catalog entries available after one agent exists", () => {
+  it("marks the agent as taken when the target stage already has one", () => {
     const catalog = catalogForColumn("phase-0");
     const automations = buildColumnAutomations("phase-0", {
       columnTitle: "Implement",
       columns: [IMPLEMENT_COLUMN],
     });
 
-    expect(takenCatalogIds(automations, catalog)).toEqual([]);
-    expect(catalog.map((entry) => entry.id)).toEqual(["custom-verification"]);
+    expect(takenCatalogIds(automations, catalog)).toEqual(["agent-step"]);
+    expect(catalog.map((entry) => entry.id)).toEqual(["agent-step", "custom-verification"]);
   });
 });
 

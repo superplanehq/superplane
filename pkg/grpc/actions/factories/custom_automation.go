@@ -338,6 +338,11 @@ func (settings *customAutomationSettings) hasWebhookTrigger() bool {
 	return settings.hasTrigger(pb.FactoryCustomAutomation_START_MODE_WEBHOOK)
 }
 
+// A custom stage line step starts from a Manual or task_enters_stage trigger.
+func (settings *customAutomationSettings) hasLineTrigger() bool {
+	return settings.hasTrigger(pb.FactoryCustomAutomation_START_MODE_AUTOMATIC) || settings.hasTrigger(pb.FactoryCustomAutomation_START_MODE_MANUAL)
+}
+
 func (settings *customAutomationSettings) hasTrigger(mode pb.FactoryCustomAutomation_StartMode) bool {
 	return slices.ContainsFunc(settings.Triggers, func(trigger customAutomationTrigger) bool {
 		return trigger.Mode == mode
@@ -1541,7 +1546,7 @@ func decodeCustomAutomationTriggers(nodes []models.Node) ([]decodedCustomAutomat
 		}
 		template, _ := node.Metadata[models.FactoryAppTemplateMetadataKey].(map[string]any)
 		mode, _ := template["startMode"].(string)
-		if node.ComponentName() == "onRun" {
+		if node.ComponentName() == "onRun" && mode == "" {
 			mode = "automatic"
 		}
 		if node.ComponentName() == factorycomponent.OnWebhookTriggerName {

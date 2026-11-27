@@ -43,9 +43,9 @@ func buildCustomStageAutomationCanvas(tx *gorm.DB, factory *models.Factory, name
 		Metadata:   &yaml.CanvasMetadata{Name: name, Description: "Run ordered prompt and Bash automation steps."},
 		Spec:       &yaml.CanvasSpec{},
 	}
-	if settings.hasTrigger(pb.FactoryCustomAutomation_START_MODE_AUTOMATIC) {
+	if settings.hasLineTrigger() {
 		metadata := customAutomationNodeMetadata(provider, settings.Icon, settings.RunsOnTask, func(template map[string]any) {
-			template["startMode"] = "automatic"
+			applyCustomStageTriggerMetadata(template, settings)
 		})
 		doc.Spec.Nodes = []yaml.Node{{
 			ID: "on-run", Name: "On Run", Type: yaml.NodeTypeTrigger, Component: "onRun", Configuration: map[string]any{}, Metadata: metadata,
@@ -78,8 +78,8 @@ func buildCustomStageAutomationCanvas(tx *gorm.DB, factory *models.Factory, name
 		doc.Spec.Edges = append(doc.Spec.Edges, yaml.Edge{SourceID: node.ID, TargetID: customStageWebhookRunnerID, Channel: "default"})
 	}
 	doc.Metadata.Description = "Run prompt and Bash steps when a webhook receives a request."
-	if settings.hasTrigger(pb.FactoryCustomAutomation_START_MODE_AUTOMATIC) {
-		doc.Metadata.Description = "Run prompt and Bash steps when a task enters the stage or a webhook receives a request."
+	if settings.hasLineTrigger() {
+		doc.Metadata.Description = "Run prompt and Bash steps on a task in the stage or when a webhook receives a request."
 	}
 	return doc, nil
 }
@@ -90,15 +90,38 @@ func validateCustomStageTriggers(settings *customAutomationSettings) error {
 		switch trigger.Mode {
 		case pb.FactoryCustomAutomation_START_MODE_AUTOMATIC:
 			automatic++
-		case pb.FactoryCustomAutomation_START_MODE_WEBHOOK:
+		case pb.FactoryCustomAutomation_START_MODE_MANUAL, pb.FactoryCustomAutomation_START_MODE_WEBHOOK:
 		default:
-			automatic = 2
+			return invalidArgument("Custom stage automations support only Manual, task_enters_stage, and webhook triggers.")
 		}
 	}
 	if automatic > 1 || len(settings.Triggers) == 0 || settings.runsWithoutTask() {
-		return invalidArgument("Custom stage automations start when a task enters the stage or when a webhook receives a request. Use one task_enters_stage trigger, webhook triggers, or both.")
+		return invalidArgument("Custom stage automations need a Manual trigger, one task_enters_stage trigger, or a webhook trigger.")
 	}
 	return nil
+}
+
+// The on-run trigger holds only the task triggers. Webhook triggers have
+// their own nodes.
+func applyCustomStageTriggerMetadata(template map[string]any, settings *customAutomationSettings) {
+	kinds := make([]any, 0, len(settings.Triggers))
+	for _, trigger := range settings.Triggers {
+		if trigger.Mode != pb.FactoryCustomAutomation_START_MODE_WEBHOOK {
+			kinds = append(kinds, customAutomationStartModeName(trigger.Mode))
+		}
+	}
+	mode := settings.StartMode
+	if mode == pb.FactoryCustomAutomation_START_MODE_WEBHOOK || mode == pb.FactoryCustomAutomation_START_MODE_UNSPECIFIED {
+		mode = pb.FactoryCustomAutomation_START_MODE_MANUAL
+		if settings.hasTrigger(pb.FactoryCustomAutomation_START_MODE_AUTOMATIC) {
+			mode = pb.FactoryCustomAutomation_START_MODE_AUTOMATIC
+		}
+	}
+	template["startMode"] = customAutomationStartModeName(mode)
+	template["triggerKinds"] = kinds
+	if settings.RunsOnTask != nil {
+		template["runsOnTask"] = *settings.RunsOnTask
+	}
 }
 
 // The line owns the task trigger and its runner. Webhook triggers and their
@@ -134,6 +157,19 @@ func editLegacyCustomStageGraph(version *models.CanvasVersion, settings *customA
 	edges := append([]models.Edge(nil), version.Edges...)
 	for i := range nodes {
 		node := &nodes[i]
+		if node.ComponentName() == "onRun" {
+			node.Metadata = maps.Clone(node.Metadata)
+			if node.Metadata == nil {
+				node.Metadata = map[string]any{}
+			}
+			template, _ := node.Metadata[models.FactoryAppTemplateMetadataKey].(map[string]any)
+			template = maps.Clone(template)
+			if template == nil {
+				template = map[string]any{}
+			}
+			applyCustomStageTriggerMetadata(template, settings)
+			node.Metadata[models.FactoryAppTemplateMetadataKey] = template
+		}
 		if !isFactoryAgentHarness(node.ComponentName()) {
 			continue
 		}
@@ -190,7 +226,7 @@ func editCustomStageRunner(node *models.Node, baseID string, settings *customAut
 func editCustomStageGraph(live *models.CanvasVersion, settings *customAutomationSettings, built []models.Node, builtEdges []models.Edge) ([]models.Node, []models.Edge) {
 	var nodes []models.Node
 	var edges []models.Edge
-	if settings.hasTrigger(pb.FactoryCustomAutomation_START_MODE_AUTOMATIC) {
+	if settings.hasLineTrigger() {
 		core := customStageCore(live)
 		if len(core.Nodes) == 0 {
 			core = customStageCore(&models.CanvasVersion{Nodes: built, Edges: builtEdges})

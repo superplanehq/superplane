@@ -247,6 +247,9 @@ func (l *FactoryWorkOrderLineDispatch) StartStage(
 
 	results := make([]*FactoryLineStepResult, 0, 2)
 	for index := stepIndex; index < len(steps) && steps[index].StageKey == stageKey; index++ {
+		if steps[index].StartMode == "manual" {
+			continue
+		}
 		result, err := l.EnqueueOrStartStep(tx, order, index)
 		if err != nil {
 			return nil, err
@@ -764,6 +767,9 @@ func (o *FactoryWorkOrder) RetryLineStep(tx *gorm.DB, line *FactoryLine, stepInd
 		if startErr != nil {
 			return nil, nil, startErr
 		}
+		if len(results) == 0 {
+			return nil, started, nil
+		}
 		return results[0], append(started, lineStepExecutionResults(results...)...), nil
 	}
 
@@ -920,6 +926,62 @@ func (o *FactoryWorkOrder) FindActiveLineDispatch(tx *gorm.DB) (*FactoryWorkOrde
 	}
 
 	return &dispatch, nil
+}
+
+// StartCustomStageAutomation admits required work on the captured traversal.
+// The line lock serializes admission; the dispatch lock serializes completion.
+func (o *FactoryWorkOrder) StartCustomStageAutomation(tx *gorm.DB, appID uuid.UUID, stageKey string) (*FactoryLineStepResult, error) {
+	if !o.IsOpen() {
+		return nil, errors.New("the task is not in this custom stage")
+	}
+	var dispatch FactoryWorkOrderLineDispatch
+	if err := tx.Where("work_order_id = ?", o.ID).Order("created_at DESC").Order("id DESC").First(&dispatch).Error; err != nil {
+		return nil, err
+	}
+	if _, err := lockFactoryLineForStepAdmission(tx, dispatch.LineID); err != nil {
+		return nil, err
+	}
+	locked, err := LockWorkOrderLineDispatch(tx, dispatch.ID)
+	if err != nil {
+		return nil, err
+	}
+	if locked.CurrentStageKey != stageKey {
+		return nil, errors.New("the task is not in this custom stage")
+	}
+	for index, step := range locked.Steps {
+		if step.AppID != appID || step.StageKey != stageKey {
+			continue
+		}
+		if step.StartMode != "manual" && !step.ManualStart {
+			return nil, errors.New("this stage automation does not use manual start")
+		}
+		if err := o.RequireExecutionOwner(tx, true); err != nil {
+			return nil, err
+		}
+		if err := o.ValidateSubscriptionCanvasModels(tx, appID, locked.Model); err != nil {
+			return nil, err
+		}
+		var queued int64
+		if err := tx.Model(&FactoryWorkOrderQueueItem{}).Where("line_dispatch_id = ? AND step_index = ?", locked.ID, index).Count(&queued).Error; err != nil {
+			return nil, err
+		}
+		if queued > 0 {
+			return nil, errors.New("this automation is already queued")
+		}
+		var latest FactoryWorkOrderExecution
+		err := tx.Where("line_dispatch_id = ? AND step_index = ?", locked.ID, index).Order("created_at DESC").Order("id DESC").First(&latest).Error
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, err
+		}
+		if err == nil && (latest.Status != FactoryWorkOrderExecutionStatusFinished || latest.Result == CanvasRunResultPassed) {
+			return nil, errors.New("this automation is already started or passed")
+		}
+		if err := locked.Reactivate(tx); err != nil {
+			return nil, err
+		}
+		return locked.EnqueueOrStartStep(tx, o, index)
+	}
+	return nil, errors.New("this automation is not required in the current dispatch")
 }
 
 // ensureNoActiveLineDispatch returns ErrFactoryWorkOrderLineDispatchActive

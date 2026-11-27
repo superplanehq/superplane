@@ -14,6 +14,83 @@ const manualCustomAutomations = [
 ];
 
 describe("AutomationsConsoleVariant manual actions", () => {
+  it.each([undefined, "RESULT_PASSED", "RESULT_FAILED"] as const)(
+    "uses the current dispatch after a manual-stage restart: %s",
+    (currentResult) => {
+      const previous = BOARD_IMPLEMENT_NOTIFY_ORDER.lineDispatches![0];
+      const execution = {
+        ...previous.stepExecutions![0],
+        stageKey: "custom-qa",
+        step: "QA",
+        run: { id: "old-run", appId: "qa-manual", appName: "Update Docs" },
+      };
+      const fixture = splitRunFixtureForWorkOrder(
+        {
+          ...BOARD_IMPLEMENT_NOTIFY_ORDER,
+          id: "restarted-manual-task",
+          lineDispatches: [
+            { ...previous, id: "old-dispatch", state: "STATE_FINISHED", stepExecutions: [execution] },
+            {
+              ...previous,
+              id: "current-dispatch",
+              currentStageKey: "custom-qa",
+              steps: [{ appId: "qa-manual", name: "QA", stageKey: "custom-qa", manualStart: true }],
+              stepExecutions: currentResult
+                ? [
+                    {
+                      ...execution,
+                      id: "current-execution",
+                      result: currentResult,
+                      run: { ...execution.run, id: "current-run" },
+                    },
+                  ]
+                : [],
+            },
+          ],
+        },
+        {
+          demoArtifacts: false,
+          lineStages: [{ key: "custom-qa", name: "QA", kind: "STAGE_KIND_PHASE" }],
+        },
+      );
+      renderConsole(fixture, {
+        organizationId: "org-1",
+        factoryId: "factory-1",
+        orderId: "restarted-manual-task",
+        canStopRun: true,
+        manualCustomAutomations: [{ id: "qa-manual", name: "Update Docs", columnKey: "custom-qa" }],
+      });
+
+      const action = within(screen.getByTestId("redesign-console-column-custom-qa")).queryByRole("button", {
+        name: /Run/,
+      });
+      if (currentResult === "RESULT_PASSED") expect(action).toBeNull();
+      else expect(action).toBeEnabled();
+    },
+  );
+
+  it.each(["custom-qa", "phase-0"])(
+    "offers unstarted custom work only in its matching stage: %s",
+    (currentStageKey) => {
+      const fixture = splitRunFixtureForWorkOrder(BOARD_IMPLEMENT_NOTIFY_ORDER, { demoArtifacts: false });
+      fixture.currentStageKey = currentStageKey;
+      fixture.manualStageAppIds = ["qa-manual"];
+      fixture.stageColumns = [{ id: "custom-qa", title: "QA" }, ...(fixture.stageColumns ?? [])];
+      renderConsole(fixture, {
+        organizationId: "org-1",
+        factoryId: "factory-1",
+        orderId: BOARD_IMPLEMENT_NOTIFY_ORDER.id,
+        canStopRun: true,
+        manualCustomAutomations: [{ id: "qa-manual", name: "Update Docs", columnKey: "custom-qa" }],
+      });
+      const action = within(screen.getByTestId("redesign-console-column-custom-qa")).queryByRole("button", {
+        name: /Run/,
+      });
+      if (currentStageKey === "custom-qa") expect(action).toBeEnabled();
+      else expect(action).toBeNull();
+    },
+  );
+
   it("offers only Backlog manual actions for a Backlog task", () => {
     renderConsole(splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER, { demoArtifacts: false }), {
       organizationId: "org-1",

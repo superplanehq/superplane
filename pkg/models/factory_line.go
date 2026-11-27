@@ -43,6 +43,9 @@ type FactoryLineStep struct {
 	StageKey   string    `json:"stage_key,omitempty"`
 	StageName  string    `json:"stage_name,omitempty"`
 	StageKind  string    `json:"stage_kind,omitempty"`
+	// Empty mode in historical snapshots means automatic admission.
+	StartMode   string `json:"start_mode,omitempty"`
+	ManualStart bool   `json:"manual_start,omitempty"`
 	// MaxParallelism caps the step's in-flight runs across all work
 	// orders on the line. Unset means the default of 10; there is no
 	// unbounded setting.
@@ -162,12 +165,14 @@ func (l *FactoryLine) ExecutionPlan(tx *gorm.DB) ([]FactoryLineStep, error) {
 					continue
 				}
 				steps = append(steps, FactoryLineStep{
-					Type:       FactoryLineStepTypeRunApp,
-					AppID:      canvas.ID,
-					Entrypoint: entrypoint,
-					StageKey:   stage.Key,
-					StageName:  stage.Name,
-					StageKind:  stage.Kind,
+					Type:        FactoryLineStepTypeRunApp,
+					AppID:       canvas.ID,
+					Entrypoint:  entrypoint,
+					StageKey:    stage.Key,
+					StageName:   stage.Name,
+					StageKind:   stage.Kind,
+					StartMode:   customStageStartMode(specs[canvas.ID], entrypoint),
+					ManualStart: customStageAllowsManualStart(specs[canvas.ID], entrypoint),
 				})
 			}
 		}
@@ -685,6 +690,44 @@ func (l *FactoryLine) RemoveDeletedAutomationBindings(tx *gorm.DB, next []Factor
 		}
 	}
 	return currentSteps, nil
+}
+
+func customStageStartMode(spec LiveCanvasSpec, entrypoint string) string {
+	for _, node := range spec.Nodes {
+		if node.ID != entrypoint {
+			continue
+		}
+		template, _ := node.Metadata[FactoryAppTemplateMetadataKey].(map[string]any)
+		kinds, _ := template["triggerKinds"].([]any)
+		for _, kind := range kinds {
+			if kind == "automatic" {
+				return "automatic"
+			}
+		}
+		if template["startMode"] == "manual" {
+			return "manual"
+		}
+	}
+	return "automatic"
+}
+
+func customStageAllowsManualStart(spec LiveCanvasSpec, entrypoint string) bool {
+	for _, node := range spec.Nodes {
+		if node.ID != entrypoint {
+			continue
+		}
+		template, _ := node.Metadata[FactoryAppTemplateMetadataKey].(map[string]any)
+		if template["startMode"] == "manual" {
+			return true
+		}
+		kinds, _ := template["triggerKinds"].([]any)
+		for _, kind := range kinds {
+			if kind == "manual" {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (f *Factory) findLine(tx *gorm.DB, lineID uuid.UUID) (*FactoryLine, error) {

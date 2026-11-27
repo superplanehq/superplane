@@ -336,6 +336,18 @@ func TestCustomStageWebhookRunsWithoutTask(t *testing.T) {
 	steps, err := line.ExecutionPlan(db)
 	require.NoError(t, err)
 	assert.True(t, slices.ContainsFunc(steps, func(step models.FactoryLineStep) bool { return step.AppID == canvasID }))
+
+	_, err = service.Update(ctx, r.Organization.ID, canvasID, r.User, strings.Replace(source, "use: task_enters_stage", "use: manual", 1))
+	require.NoError(t, err, "a custom stage can combine Manual and webhook triggers")
+	steps, err = line.ExecutionPlan(db)
+	require.NoError(t, err)
+	assert.True(t, slices.ContainsFunc(steps, func(step models.FactoryLineStep) bool {
+		return step.AppID == canvasID && (step.ManualStart || step.StartMode == "manual")
+	}), "Manual keeps a line step that waits for a person")
+	read, err = service.Read(ctx, r.Organization.ID, canvasID)
+	require.NoError(t, err)
+	assert.Contains(t, read.YAML, "use: manual")
+	assert.Contains(t, read.YAML, "webhook_id: "+webhookID)
 }
 
 func requireStatusCode(t *testing.T, err error, expected codes.Code) {

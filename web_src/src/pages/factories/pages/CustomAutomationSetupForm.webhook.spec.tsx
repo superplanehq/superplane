@@ -123,7 +123,7 @@ it("saves a webhook next to the line trigger on a custom stage", async () => {
   render(<Editor columnKey="custom-qa" />);
   expect(screen.queryByRole("button", { name: /Remove When a task enters/ })).not.toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "Add trigger" }));
-  expect(screen.getAllByRole("menuitem")).toHaveLength(2);
+  expect(screen.getAllByRole("menuitem")).toHaveLength(3);
   await user.click(screen.getByRole("menuitem", { name: /Webhook/ }));
   await selectWebhook(user);
   await user.click(screen.getByRole("button", { name: "Save" }));

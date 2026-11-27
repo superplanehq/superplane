@@ -249,6 +249,9 @@ export interface SplitRunFixture {
   lineStatus: SplitRunPhaseStatus;
   /** Verify eligibility remains independent of the review strip. */
   canRunVerifyCustomAutomation?: boolean;
+  currentStageKey?: string;
+  manualStageAppIds?: string[];
+  queuedStageAppId?: string;
   currentPhaseId: SplitRunPhaseId;
   /** When set, the popup opens this phase even if it already passed. */
   openPhaseId?: SplitRunPhaseId | null;
@@ -551,6 +554,9 @@ function mappedWorkOrderFixture(order: FactoriesWorkOrder, options?: SplitRunFix
       visibleDispatchForLine(order, options?.lineId)?.line?.name ||
       SPLIT_RUN_RUNNING.lineName,
     currentStepIndex: current?.stepIndex ?? 0,
+    currentStageKey: order.state === "STATE_OPEN" ? visibleDispatch?.currentStageKey : undefined,
+    manualStageAppIds: visibleDispatch?.steps?.flatMap((step) => (step.manualStart && step.appId ? [step.appId] : [])),
+    queuedStageAppId: visibleDispatch?.queueItem?.appId,
     lineStatus: lineStatusForDisplay(displayStatus),
     canRunVerifyCustomAutomation:
       displayStatus === "waiting" &&
