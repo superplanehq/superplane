@@ -2,6 +2,7 @@ package factories
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"strings"
 	"testing"
@@ -1387,43 +1388,72 @@ func TestCustomAutomationWithoutTaskStartsFromTheColumn(t *testing.T) {
 	assert.ErrorContains(t, err, "schedule runs with no task")
 
 	runsOnTask = false
-	created, err := CreateFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &pb.CreateFactoryCustomAutomationRequest{
-		FactoryId: factory.ID.String(),
-		Name:      "Column run",
-		ColumnKey: "backlog",
-		Settings: &pb.FactoryCustomAutomation_Settings{
-			RunsOnTask: &runsOnTask,
-			StartMode:  pb.FactoryCustomAutomation_START_MODE_MANUAL,
-			Agent:      agent,
-			Steps:      steps,
-		},
-	})
-	require.NoError(t, err)
-	assert.False(t, created.GetCustomAutomation().GetSettings().GetRunsOnTask())
-	require.NotNil(t, created.GetCustomAutomation().GetSettings().RunsOnTask)
+	for _, tc := range []struct {
+		column string
+		mixed  bool
+	}{{"backlog", false}, {"verify", false}, {"verify", true}} {
+		t.Run(fmt.Sprintf("%s/mixed=%t", tc.column, tc.mixed), func(t *testing.T) {
+			column := tc.column
+			triggers := []*pb.FactoryCustomAutomation_StartTrigger{{StartMode: pb.FactoryCustomAutomation_START_MODE_MANUAL}}
+			if tc.mixed {
+				triggers = append(triggers, &pb.FactoryCustomAutomation_StartTrigger{StartMode: pb.FactoryCustomAutomation_START_MODE_SCHEDULED, Schedule: &pb.FactoryCustomAutomation_Schedule{CronExpression: "0 9 * * *"}})
+			}
+			created, err := CreateFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &pb.CreateFactoryCustomAutomationRequest{
+				FactoryId: factory.ID.String(),
+				Name:      "Column run",
+				ColumnKey: column,
+				Settings: &pb.FactoryCustomAutomation_Settings{
+					RunsOnTask: &runsOnTask,
+					StartMode:  pb.FactoryCustomAutomation_START_MODE_MANUAL,
+					Triggers:   triggers,
+					Agent:      agent,
+					Steps:      steps,
+				},
+			})
+			require.NoError(t, err)
+			assert.False(t, created.GetCustomAutomation().GetSettings().GetRunsOnTask())
+			require.NotNil(t, created.GetCustomAutomation().GetSettings().RunsOnTask)
 
-	canvas, err := models.FindCanvasInTransaction(db, r.Organization.ID, uuid.MustParse(created.GetCustomAutomation().GetAutomation().GetId()))
-	require.NoError(t, err)
-	version, err := models.FindLiveCanvasVersionByCanvasInTransaction(db, canvas)
-	require.NoError(t, err)
-	trigger := customAutomationNode([]models.Node(version.Nodes), customAutomationColumnStartID)
-	require.NotNil(t, trigger)
-	assert.Equal(t, "start", trigger.ComponentName())
-	assert.Nil(t, customAutomationNode([]models.Node(version.Nodes), customAutomationTaskTriggerID))
+			canvas, err := models.FindCanvasInTransaction(db, r.Organization.ID, uuid.MustParse(created.GetCustomAutomation().GetAutomation().GetId()))
+			require.NoError(t, err)
+			version, err := models.FindLiveCanvasVersionByCanvasInTransaction(db, canvas)
+			require.NoError(t, err)
+			trigger := customAutomationNode([]models.Node(version.Nodes), customAutomationColumnStartID)
+			require.NotNil(t, trigger)
+			assert.Equal(t, "start", trigger.ComponentName())
+			assert.Nil(t, customAutomationNode([]models.Node(version.Nodes), customAutomationTaskTriggerID))
 
-	order, err := factory.CreateWorkOrder(db, "Inspect this task", "", &r.User, nil, nil)
-	require.NoError(t, err)
-	_, err = RunFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &pb.RunFactoryCustomAutomationRequest{
-		FactoryId: factory.ID.String(), AutomationId: canvas.ID.String(), WorkOrderId: order.ID.String(),
-	})
-	require.Error(t, err)
-	assert.ErrorContains(t, err, "does not use manual start")
+			order, err := factory.CreateWorkOrder(db, "Inspect this task", "", &r.User, nil, nil)
+			require.NoError(t, err)
+			_, err = RunFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &pb.RunFactoryCustomAutomationRequest{
+				FactoryId: factory.ID.String(), AutomationId: canvas.ID.String(), WorkOrderId: order.ID.String(),
+			})
+			require.Error(t, err)
+			assert.ErrorContains(t, err, "does not use manual start")
 
-	started, err := RunFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &pb.RunFactoryCustomAutomationRequest{
-		FactoryId: factory.ID.String(), AutomationId: canvas.ID.String(),
-	})
-	require.NoError(t, err)
-	require.NotEmpty(t, started.GetRunId())
+			started, err := RunFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &pb.RunFactoryCustomAutomationRequest{
+				FactoryId: factory.ID.String(), AutomationId: canvas.ID.String(),
+			})
+			require.NoError(t, err)
+			require.NotEmpty(t, started.GetRunId())
+			run, err := models.FindCanvasRunInTransaction(db, canvas.ID, uuid.MustParse(started.GetRunId()))
+			require.NoError(t, err)
+			assert.Equal(t, canvas.ID, run.WorkflowID)
+			if tc.mixed {
+				return
+			}
+			onTask := true
+			taskAutomation, err := CreateFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &pb.CreateFactoryCustomAutomationRequest{
+				FactoryId: factory.ID.String(), Name: "Task run", ColumnKey: column,
+				Settings: &pb.FactoryCustomAutomation_Settings{RunsOnTask: &onTask, StartMode: pb.FactoryCustomAutomation_START_MODE_MANUAL, Agent: agent, Steps: steps},
+			})
+			require.NoError(t, err)
+			_, err = RunFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &pb.RunFactoryCustomAutomationRequest{
+				FactoryId: factory.ID.String(), AutomationId: taskAutomation.GetCustomAutomation().GetAutomation().GetId(),
+			})
+			require.ErrorContains(t, err, "starts from a task")
+		})
+	}
 }
 
 func TestColumnLeaveAutomationListensForTheTaskOnEveryColumn(t *testing.T) {

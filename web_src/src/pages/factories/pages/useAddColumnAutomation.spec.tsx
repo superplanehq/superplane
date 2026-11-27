@@ -245,6 +245,81 @@ describe("add visual evidence", () => {
 });
 
 describe("add custom automation", () => {
+  it("creates a distinct named automation in an alternate app stage", async () => {
+    const entry = catalogForColumn("phase-1").find((item) => !item.unique)!;
+    const { result } = renderHook(
+      () => ({
+        automation: useAddColumnAutomation({
+          organizationId: "org",
+          factoryId: "factory",
+          factoryKey: "workspace",
+          lineId: "line",
+          appRepository: "acme/app",
+          backlogRepository: "acme/app",
+          defaultBranch: "main",
+          githubIntegrationId: "vcs-integration",
+          automationsFor: () => [catalogEntryToAutomation(entry, "Stage", "existing")],
+        }),
+        location: useLocation(),
+      }),
+      {
+        wrapper: ({ children }: { children: ReactNode }) => (
+          <QueryClientProvider client={new QueryClient()}>
+            <MemoryRouter>{children}</MemoryRouter>
+          </QueryClientProvider>
+        ),
+      },
+    );
+    act(() => result.current.automation.openPicker("phase-1"));
+    await act(async () => result.current.automation.onSelect(entry));
+    expect(result.current.automation.naming).toBe(true);
+    createAutomation.mockResolvedValue({ id: "second-custom" });
+    await act(async () => result.current.automation.createNamed("Second automation"));
+    expect(createAutomation).toHaveBeenCalledWith({ name: "Second automation", columnKey: undefined });
+    expect(result.current.location.pathname).toContain("second-custom");
+  });
+
+  it.each(["backlog", "phase-0", "verify", "done", "custom-stage-id"] as const)(
+    "starts fresh shared setup with an existing custom automation in %s",
+    async (column) => {
+      const custom = catalogForColumn("verify").find((entry) => !entry.unique)!;
+      const { result } = renderHook(
+        () => ({
+          automation: useAddColumnAutomation({
+            organizationId: "org",
+            factoryId: "factory",
+            factoryKey: "workspace",
+            lineId: "line",
+            appRepository: "acme/app",
+            backlogRepository: "acme/app",
+            defaultBranch: "main",
+            githubIntegrationId: "vcs-integration",
+            automationsFor: (key) => (key === column ? [catalogEntryToAutomation(custom, column, "existing")] : []),
+          }),
+          location: useLocation(),
+        }),
+        {
+          wrapper: ({ children }: { children: ReactNode }) => (
+            <QueryClientProvider client={new QueryClient()}>
+              <MemoryRouter>{children}</MemoryRouter>
+            </QueryClientProvider>
+          ),
+        },
+      );
+      act(() => result.current.automation.openPicker(column));
+      if (result.current.automation.pickerOpen) {
+        const entry = result.current.automation.catalog.find((item) => !item.unique)!;
+        await act(async () => result.current.automation.onSelect(entry));
+      }
+      const params = new URLSearchParams(result.current.location.search);
+      expect(params.get("customAutomation")).toBe("new");
+      expect(params.get("automationColumn")).toBe(
+        column === "verify" ? null : column === "phase-0" ? "implement" : column,
+      );
+      expect(createAutomation).not.toHaveBeenCalled();
+    },
+  );
+
   it("opens the focused Verify setup route", async () => {
     const { result } = renderHook(
       () => ({

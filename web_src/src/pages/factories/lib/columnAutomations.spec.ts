@@ -378,7 +378,11 @@ describe("catalogForColumn", () => {
     });
 
     expect(takenCatalogIds(automations, catalog)).toEqual(["github-issues", "analysis"]);
-    expect(catalog.map((entry) => entry.id)).toEqual([...LINE_INTAKE_SOURCES.map((source) => source.id), "analysis"]);
+    expect(catalog.map((entry) => entry.id)).toEqual([
+      ...LINE_INTAKE_SOURCES.map((source) => source.id),
+      "analysis",
+      "custom",
+    ]);
   });
 
   it("offers custom automation in Verify by default", () => {
