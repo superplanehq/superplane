@@ -200,6 +200,14 @@ func TestCustomAutomationCustomStageFormRoundTrip(t *testing.T) {
 				}
 			}
 			require.Equal(t, 1, gateCount)
+			for _, mode := range []pb.FactoryCustomAutomation_StartMode{pb.FactoryCustomAutomation_START_MODE_MANUAL, pb.FactoryCustomAutomation_START_MODE_AUTOMATIC} {
+				settings.StartMode = mode
+				updated, err = UpdateFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), &pb.UpdateFactoryCustomAutomationRequest{FactoryId: factory.ID.String(), AutomationId: id, Name: "QA automation", Settings: settings})
+				require.NoError(t, err)
+				require.Equal(t, mode, updated.GetCustomAutomation().GetSettings().GetStartMode())
+				require.Equal(t, stage.Key, updated.GetCustomAutomation().GetAutomation().GetColumnKey())
+				require.True(t, proto.Equal(settings.Agent, updated.GetCustomAutomation().GetSettings().GetAgent()))
+			}
 			if !test.withVCS {
 				request.ColumnKey = models.CanvasColumnKeyVerify
 				_, err = CreateFactoryCustomAutomation(ctx, deps, r.Organization.ID.String(), request)

@@ -27,6 +27,34 @@ import (
 	"gorm.io/datatypes"
 )
 
+func TestResetBuiltInAutomationPreservesTaskAnalysisRemoval(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	ctx := authentication.SetUserIdInMetadata(t.Context(), r.User.String())
+	deps := IntakeDependencies{Registry: r.Registry, Encryptor: r.Encryptor, AuthService: r.AuthService, WebhookBaseURL: "http://localhost:8000"}
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	_, err = CreateFactoryIntake(ctx, deps, r.Organization.ID.String(), &pb.CreateFactoryIntakeRequest{FactoryId: factory.ID.String(), Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES})
+	require.NoError(t, err)
+	planner := liveBacklogCanvas(t, factory)
+	_, err = DeleteFactoryAutomation(ctx, r.Organization.ID.String(), &pb.DeleteFactoryAutomationRequest{FactoryId: factory.ID.String(), AutomationId: planner.ID.String()})
+	require.NoError(t, err)
+	require.NoError(t, resetTestOrganization(t, r))
+	has, err := factoryHasOnWorkOrderCanvas(db, factory)
+	require.NoError(t, err)
+	assert.False(t, has)
+	intakes, err := factory.ListIntakes(db)
+	require.NoError(t, err)
+	require.Len(t, intakes, 1)
+	restored, err := CreateFactoryAutomation(ctx, deps, r.Organization.ID.String(), &pb.CreateFactoryAutomationRequest{FactoryId: factory.ID.String(), TemplateId: models.FactoryAppTemplateBacklogID})
+	require.NoError(t, err)
+	require.NoError(t, resetTestOrganization(t, r))
+	has, err = factoryHasOnWorkOrderCanvas(db, factory)
+	require.NoError(t, err)
+	assert.True(t, has)
+	assert.NotEqual(t, planner.ID.String(), restored.GetAutomation().GetId())
+}
+
 func TestResetBuiltInAutomationPreservesImplementationSettings(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())

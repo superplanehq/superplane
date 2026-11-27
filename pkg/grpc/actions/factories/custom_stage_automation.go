@@ -43,7 +43,7 @@ func buildCustomStageAutomationCanvas(tx *gorm.DB, factory *models.Factory, name
 		Spec:       &yaml.CanvasSpec{},
 	}
 	metadata := customAutomationNodeMetadata(provider, settings.Icon, settings.RunsOnTask, func(template map[string]any) {
-		template["startMode"] = "automatic"
+		applyCustomStageTriggerMetadata(template, settings)
 	})
 	doc.Spec.Nodes = []yaml.Node{{
 		ID: "on-run", Name: "On Run", Type: yaml.NodeTypeTrigger, Component: "onRun", Configuration: map[string]any{}, Metadata: metadata,
@@ -58,10 +58,27 @@ func buildCustomStageAutomationCanvas(tx *gorm.DB, factory *models.Factory, name
 }
 
 func validateCustomStageTriggers(settings *customAutomationSettings) error {
-	if len(settings.Triggers) != 1 || settings.StartMode != pb.FactoryCustomAutomation_START_MODE_AUTOMATIC || settings.runsWithoutTask() {
-		return invalidArgument("Custom stage automations run on a task when it enters the stage. Keep one task_enters_stage trigger.")
+	if len(settings.Triggers) == 0 || settings.runsWithoutTask() {
+		return invalidArgument("Custom stage automations require a task and a Manual or task_enters_stage trigger.")
+	}
+	for _, trigger := range settings.Triggers {
+		if trigger.Mode != pb.FactoryCustomAutomation_START_MODE_AUTOMATIC && trigger.Mode != pb.FactoryCustomAutomation_START_MODE_MANUAL {
+			return invalidArgument("Custom stage automations support only Manual and task_enters_stage triggers.")
+		}
 	}
 	return nil
+}
+
+func applyCustomStageTriggerMetadata(template map[string]any, settings *customAutomationSettings) {
+	template["startMode"] = customAutomationStartModeName(settings.StartMode)
+	kinds := make([]any, 0, len(settings.Triggers))
+	for _, trigger := range settings.Triggers {
+		kinds = append(kinds, customAutomationStartModeName(trigger.Mode))
+	}
+	template["triggerKinds"] = kinds
+	if settings.RunsOnTask != nil {
+		template["runsOnTask"] = *settings.RunsOnTask
+	}
 }
 
 func legacyCustomStageGraph(canvas *models.Canvas, version *models.CanvasVersion) bool {
@@ -86,6 +103,19 @@ func editLegacyCustomStageGraph(version *models.CanvasVersion, settings *customA
 	edges := append([]models.Edge(nil), version.Edges...)
 	for i := range nodes {
 		node := &nodes[i]
+		if node.ComponentName() == "onRun" {
+			node.Metadata = maps.Clone(node.Metadata)
+			if node.Metadata == nil {
+				node.Metadata = map[string]any{}
+			}
+			template, _ := node.Metadata[models.FactoryAppTemplateMetadataKey].(map[string]any)
+			template = maps.Clone(template)
+			if template == nil {
+				template = map[string]any{}
+			}
+			applyCustomStageTriggerMetadata(template, settings)
+			node.Metadata[models.FactoryAppTemplateMetadataKey] = template
+		}
 		if !isFactoryAgentHarness(node.ComponentName()) {
 			continue
 		}

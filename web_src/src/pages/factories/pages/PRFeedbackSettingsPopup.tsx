@@ -152,6 +152,20 @@ export function PRFeedbackSettingsPopup({
           onClose={onClose}
         />
       )}
+      {tab === "runs" && onDelete ? (
+        <PRFeedbackSettingsFooter
+          draft={draft}
+          confirmDelete={confirmDelete}
+          deletePending={deletePending}
+          saveError={saveError}
+          onDelete={onDelete}
+          onConfirmDelete={setConfirmDelete}
+          onSave={save}
+          saveDisabled
+          historyOnly
+          onClose={onClose}
+        />
+      ) : null}
     </PopupShell>
   );
 }

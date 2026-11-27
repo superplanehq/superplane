@@ -7,7 +7,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/components/factory"
-	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/yaml"
@@ -34,16 +33,26 @@ func ensureBacklogCanvas(
 	tx *gorm.DB,
 	factoryModel *models.Factory,
 ) error {
-	has, err := factoryHasOnWorkOrderCanvas(tx, factoryModel)
-	if err != nil {
-		return err
-	}
-	if has {
-		return nil
-	}
+	return tx.Transaction(func(tx *gorm.DB) error {
+		// Serialize automatic creation with deletion and explicit installation.
+		factoryModel, err := models.LockAutomationFactory(tx, factoryModel.OrganizationID, factoryModel.ID)
+		if err != nil {
+			return err
+		}
+		if factoryModel.OnboardingConfigValue().BacklogAutomationRemoved {
+			return nil
+		}
+		has, err := factoryHasOnWorkOrderCanvas(tx, factoryModel)
+		if err != nil {
+			return err
+		}
+		if has {
+			return nil
+		}
 
-	_, err = createBacklogCanvas(ctx, deps, factoryModel)
-	return err
+		_, err = createBacklogCanvas(ctx, deps, tx, factoryModel)
+		return err
+	})
 }
 
 func factoryHasOnWorkOrderCanvas(tx *gorm.DB, factoryModel *models.Factory) (bool, error) {
@@ -92,9 +101,9 @@ func onWorkOrderNodeIDFromSpec(spec models.LiveCanvasSpec) string {
 func createBacklogCanvas(
 	ctx context.Context,
 	deps IntakeDependencies,
+	db *gorm.DB,
 	factoryModel *models.Factory,
 ) (uuid.UUID, error) {
-	db := database.DB(ctx)
 	name, err := models.AvailableCanvasName(db, factoryModel.OrganizationID, &factoryModel.ID, backlogDefaultName)
 	if err != nil {
 		return uuid.Nil, factoryErrorToStatus(err, "failed to create Backlog automation")
@@ -112,8 +121,9 @@ func createBacklogCanvas(
 		return uuid.Nil, factoryErrorToStatus(err, "failed to build Backlog automation")
 	}
 
-	response, err := canvases.CreateCanvas(
+	response, err := canvases.CreateCanvasInTransaction(
 		ctx,
+		db,
 		deps.Registry,
 		deps.Encryptor,
 		deps.AuthService,
@@ -133,7 +143,7 @@ func createBacklogCanvas(
 	if err != nil {
 		return uuid.Nil, factoryErrorToStatus(err, "failed to create Backlog automation")
 	}
-	if err := database.DB(ctx).Transaction(func(tx *gorm.DB) error {
+	if err := db.Transaction(func(tx *gorm.DB) error {
 		canvasModel, err := models.FindCanvasInTransaction(tx, factoryModel.OrganizationID, canvasID)
 		if err != nil {
 			return err

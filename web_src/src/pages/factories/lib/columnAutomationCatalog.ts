@@ -36,7 +36,7 @@ export const AGENT_STEP_ENTRY: ColumnAutomationCatalogEntry = {
   action: "Run the agent",
   iconSrc: "",
   iconAlt: "",
-  unique: false,
+  unique: true,
 };
 
 export const CUSTOM_ENTRY: ColumnAutomationCatalogEntry = {
@@ -213,7 +213,7 @@ export function pickerCatalogForColumn(
 
 function phaseCatalog(key: ColumnKey): ColumnAutomationCatalogEntry[] {
   if (key === "phase-0") {
-    return [CUSTOM_AUTOMATION_ENTRY];
+    return [AGENT_STEP_ENTRY, CUSTOM_AUTOMATION_ENTRY];
   }
   return [AGENT_STEP_ENTRY, CUSTOM_ENTRY];
 }
