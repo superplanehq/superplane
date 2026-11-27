@@ -161,7 +161,15 @@ func (t *OnErrorTrackingAlert) Setup(ctx core.TriggerContext) error {
 		return err
 	}
 
-	return ctx.Metadata.Set(metadata)
+	// Preserve the factory template and intake settings stored with the trigger.
+	values := map[string]any{}
+	if err := mapstructure.Decode(ctx.Metadata.Get(), &values); err != nil {
+		return fmt.Errorf("failed to decode metadata: %w", err)
+	}
+	values["subscriptionId"] = metadata.SubscriptionID
+	values["monitorId"] = metadata.MonitorID
+	values["monitorService"] = metadata.MonitorService
+	return ctx.Metadata.Set(values)
 }
 
 func (t *OnErrorTrackingAlert) Hooks() []core.Hook {
