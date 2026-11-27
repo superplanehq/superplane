@@ -118,6 +118,21 @@ div.monaco-editor .view-overlays .current-line {
   background-color: transparent !important;
 }
 
+/* Bash editors use the surrounding form surface instead of the global Monaco surface. */
+.planning-review-code-editor .monaco-editor,
+.dark .planning-review-code-editor .monaco-editor {
+  --vscode-editor-background: var(--card);
+  --vscode-editorGutter-background: var(--card);
+  --vscode-editor-foreground: var(--card-foreground);
+}
+
+.planning-review-code-editor .monaco-editor .margin,
+.planning-review-code-editor .monaco-editor .monaco-editor-background,
+.dark .planning-review-code-editor .monaco-editor .margin,
+.dark .planning-review-code-editor .monaco-editor .monaco-editor-background {
+  background-color: var(--card) !important;
+}
+
 .planning-review-code-editor .workbench-hover {
   pointer-events: none;
 }
