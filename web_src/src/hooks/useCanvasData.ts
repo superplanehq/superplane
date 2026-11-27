@@ -1,3 +1,4 @@
+import { integrationKeys } from "./useIntegrations";
 import { useRef } from "react";
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery, useQueries } from "@tanstack/react-query";
 import type { InfiniteData, QueryClient } from "@tanstack/react-query";
@@ -692,6 +693,7 @@ export const useDeleteCanvas = (organizationId: string) => {
       );
     },
     onSuccess: (_, canvasId) => {
+      void queryClient.invalidateQueries({ queryKey: integrationKeys.workspaces(organizationId) });
       // Ensure it's removed (in case it wasn't already)
       queryClient.removeQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
       // Invalidate the list to refresh the canvas list

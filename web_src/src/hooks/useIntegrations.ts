@@ -27,8 +27,9 @@ export const integrationKeys = {
   all: ["integrations"] as const,
   available: (organizationId?: string) => [...integrationKeys.all, "available", organizationId ?? ""] as const,
   connected: (organizationId: string) => [...integrationKeys.all, "connected", organizationId] as const,
+  workspaces: (organizationId: string) => [...integrationKeys.connected(organizationId), "workspace"] as const,
   workspace: (organizationId: string, factoryId: string) =>
-    [...integrationKeys.connected(organizationId), "workspace", factoryId] as const,
+    [...integrationKeys.workspaces(organizationId), factoryId] as const,
   integration: (organizationId: string, integrationId: string) =>
     [...integrationKeys.connected(organizationId), integrationId] as const,
   resources: (

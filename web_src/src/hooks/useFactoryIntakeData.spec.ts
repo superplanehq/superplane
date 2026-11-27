@@ -3,16 +3,26 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { createElement, type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 
-const { factoriesCreateFactoryIntake, factoriesListFactoryIntakeRuns, factoriesRefreshBacklog, useCanvasWebsocket } =
-  vi.hoisted(() => ({
-    factoriesCreateFactoryIntake: vi.fn(),
-    factoriesListFactoryIntakeRuns: vi.fn(),
-    factoriesRefreshBacklog: vi.fn(),
-    useCanvasWebsocket: vi.fn(),
-  }));
+const {
+  factoriesCreateFactoryIntake,
+  factoriesDeleteFactoryIntake,
+  factoriesUpdateFactoryIntake,
+  factoriesListFactoryIntakeRuns,
+  factoriesRefreshBacklog,
+  useCanvasWebsocket,
+} = vi.hoisted(() => ({
+  factoriesCreateFactoryIntake: vi.fn(),
+  factoriesDeleteFactoryIntake: vi.fn(),
+  factoriesUpdateFactoryIntake: vi.fn(),
+  factoriesListFactoryIntakeRuns: vi.fn(),
+  factoriesRefreshBacklog: vi.fn(),
+  useCanvasWebsocket: vi.fn(),
+}));
 
 vi.mock("@/api-client", () => ({
   factoriesCreateFactoryIntake,
+  factoriesDeleteFactoryIntake,
+  factoriesUpdateFactoryIntake,
   factoriesListFactoryIntakeRuns,
   factoriesRefreshBacklog,
 }));
@@ -25,6 +35,8 @@ import { factoryQueryKeys } from "./useFactoryData";
 import {
   factoryIntakeRunsKey,
   useCreateFactoryIntake,
+  useDeleteFactoryIntake,
+  useUpdateFactoryIntake,
   useFactoryIntakeRuns,
   useFactoryIntakeRunsWebsocket,
   useRefreshBacklog,
@@ -142,4 +154,37 @@ describe("useRefreshBacklog", () => {
       });
     });
   });
+});
+
+// Binding changes must refresh the workspace warnings even while their cache is fresh.
+describe("workspace integrations after intake changes", () => {
+  for (const change of ["create", "update", "delete"] as const) {
+    it(`invalidates only this workspace after intake ${change}`, async () => {
+      const queryClient = new QueryClient();
+      const workspaceKey = ["integrations", "connected", ORGANIZATION_ID, "workspace", FACTORY_ID];
+      const otherKey = ["integrations", "connected", ORGANIZATION_ID, "workspace", "other-factory"];
+      queryClient.setQueryData(workspaceKey, [{ metadata: { id: "jira-1" } }]);
+      queryClient.setQueryData(otherKey, []);
+      factoriesDeleteFactoryIntake.mockResolvedValue({});
+      factoriesUpdateFactoryIntake.mockResolvedValue({ data: { intake: { id: "intake-1" } } });
+      const { result } = renderHook(
+        () => ({
+          create: useCreateFactoryIntake(ORGANIZATION_ID, FACTORY_ID),
+          update: useUpdateFactoryIntake(ORGANIZATION_ID, FACTORY_ID),
+          delete: useDeleteFactoryIntake(ORGANIZATION_ID, FACTORY_ID),
+        }),
+        { wrapper: createWrapper(queryClient) },
+      );
+
+      await act(async () => {
+        if (change === "create") await result.current.create.mutateAsync({ source: "SOURCE_JIRA_ISSUES" });
+        if (change === "update")
+          await result.current.update.mutateAsync({ intakeId: "intake-1", integrationId: "jira-2" });
+        if (change === "delete") await result.current.delete.mutateAsync("intake-1");
+      });
+
+      expect(queryClient.getQueryState(workspaceKey)?.isInvalidated).toBe(true);
+      expect(queryClient.getQueryState(otherKey)?.isInvalidated).toBe(false);
+    });
+  }
 });

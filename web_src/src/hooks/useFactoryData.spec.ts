@@ -6,11 +6,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import { clearBacklogAnalysisPending, pendingBacklogAnalysisIds } from "@/pages/factories/lib/backlogAnalysis";
 
 const {
+  factoriesCreateFactoryAutomation,
+  factoriesDeleteFactoryAutomation,
   factoriesCreateWorkOrder,
   factoriesSelectFactoryVcsProviderRepository,
   factoriesUpdateFactoryLine,
   organizationsListIntegrations,
 } = vi.hoisted(() => ({
+  factoriesCreateFactoryAutomation: vi.fn(),
+  factoriesDeleteFactoryAutomation: vi.fn(),
   factoriesCreateWorkOrder: vi.fn(),
   factoriesSelectFactoryVcsProviderRepository: vi.fn(),
   factoriesUpdateFactoryLine: vi.fn(),
@@ -18,6 +22,8 @@ const {
 }));
 
 vi.mock("@/api-client", () => ({
+  factoriesCreateFactoryAutomation,
+  factoriesDeleteFactoryAutomation,
   factoriesCreateWorkOrder,
   factoriesSelectFactoryVcsProviderRepository,
   factoriesUpdateFactoryLine,
@@ -27,6 +33,8 @@ vi.mock("@/api-client", () => ({
 import {
   factoryQueryKeys,
   mergeFactoryBoardWorkOrders,
+  useCreateFactoryAutomation,
+  useDeleteFactoryAutomation,
   useCreateWorkOrder,
   useSelectFactoryVcsProviderRepository,
   useUpdateFactoryLine,
@@ -44,6 +52,7 @@ describe("useUpdateFactoryLine", () => {
   it("refreshes automation, feedback, and line data after a saved deletion without moves", async () => {
     const queryClient = new QueryClient();
     const keys = [
+      ["integrations", "connected", "org-1", "workspace", "factory-1"],
       factoryQueryKeys.apps("org-1", "factory-1"),
       ["factories", "org-1", "factory-1", "custom-automations"],
       ["factories", "org-1", "factory-1", "pr-feedback-handlers"],
@@ -212,3 +221,25 @@ describe("useCreateWorkOrder", () => {
     expectListAndRunInvalidation(invalidateSpy);
   });
 });
+
+for (const change of ["create", "delete"] as const) {
+  it(`refreshes workspace warnings after automation ${change}`, async () => {
+    const queryClient = new QueryClient();
+    const key = ["integrations", "connected", "org-1", "workspace", "factory-1"];
+    queryClient.setQueryData(key, [{ metadata: { id: "jira-1" } }]);
+    factoriesCreateFactoryAutomation.mockResolvedValue({ data: { automation: { id: "app-1" } } });
+    factoriesDeleteFactoryAutomation.mockResolvedValue({});
+    const { result } = renderHook(
+      () => ({
+        create: useCreateFactoryAutomation("org-1", "factory-1"),
+        delete: useDeleteFactoryAutomation("org-1", "factory-1"),
+      }),
+      { wrapper: createWrapper(queryClient) },
+    );
+    await act(async () => {
+      if (change === "create") await result.current.create.mutateAsync({ templateId: "template-1" });
+      if (change === "delete") await result.current.delete.mutateAsync("app-1");
+    });
+    expect(queryClient.getQueryState(key)?.isInvalidated).toBe(true);
+  });
+}

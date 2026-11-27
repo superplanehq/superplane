@@ -1,3 +1,4 @@
+import { integrationKeys } from "./useIntegrations";
 import {
   factoriesCreateFactoryCustomAutomation,
   factoriesDescribeFactoryCustomAutomation,
@@ -89,6 +90,7 @@ export function useCreateFactoryCustomAutomation(organizationId: string, factory
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: factoryAppsKey(organizationId, factoryId) });
+      void queryClient.invalidateQueries({ queryKey: integrationKeys.workspace(organizationId, factoryId) });
     },
   });
 }
@@ -112,6 +114,7 @@ export function useUpdateFactoryCustomAutomation(organizationId: string, factory
     onSuccess: (automation) => {
       queryClient.setQueryData(factoryCustomAutomationKey(organizationId, factoryId, automationId), automation);
       void queryClient.invalidateQueries({ queryKey: factoryAppsKey(organizationId, factoryId) });
+      void queryClient.invalidateQueries({ queryKey: integrationKeys.workspace(organizationId, factoryId) });
     },
   });
 }
