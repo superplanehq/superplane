@@ -2390,6 +2390,9 @@ message WorkOrder {
   bool auto_started = 30;
   // Timestamp of the first start. Empty before the task starts.
   google.protobuf.Timestamp started_at = 31;
+  // Runs with no task, such as webhook runs, that attached to this task
+  // while it waited in a stage.
+  repeated WorkOrderExecution attached_runs = 32;
 }
 
 // WorkOrderSummary is the list row for a work order.
@@ -2783,6 +2786,9 @@ message AutomationRef {
   string node_name = 2;
   string app_id = 3;
   string app_name = 4;
+  // Factory template of the app, for example custom-verification for a
+  // custom automation. Empty when unknown.
+  string template_id = 5;
 }
 
 message ListWorkOrderArtifactsRequest {

@@ -136,14 +136,17 @@ type WorkOrderStatusUpdated struct {
 // don't retro-edit history. `StepIndex` is a pointer so consumers can
 // distinguish "no line context" from a legitimate index of 0.
 type AutomationRef struct {
-	NodeID    string    `json:"nodeId,omitempty"`
-	NodeName  string    `json:"nodeName,omitempty"`
-	AppID     uuid.UUID `json:"appId,omitempty"`
-	AppName   string    `json:"appName,omitempty"`
-	LineID    uuid.UUID `json:"lineId,omitempty"`
-	LineName  string    `json:"lineName,omitempty"`
-	StepIndex *int      `json:"stepIndex,omitempty"`
-	StepName  string    `json:"stepName,omitempty"`
+	NodeID   string    `json:"nodeId,omitempty"`
+	NodeName string    `json:"nodeName,omitempty"`
+	AppID    uuid.UUID `json:"appId,omitempty"`
+	AppName  string    `json:"appName,omitempty"`
+	// TemplateID is the factory template of the app, for example
+	// custom-verification for a custom automation.
+	TemplateID string    `json:"templateId,omitempty"`
+	LineID     uuid.UUID `json:"lineId,omitempty"`
+	LineName   string    `json:"lineName,omitempty"`
+	StepIndex  *int      `json:"stepIndex,omitempty"`
+	StepName   string    `json:"stepName,omitempty"`
 }
 
 type WorkOrderCommentAuthor struct {
