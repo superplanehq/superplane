@@ -64,3 +64,7 @@ func (c *PublicationContext) OwnerStatus(canvasID uuid.UUID, nodeID string) (cor
 func (c *PublicationContext) NodeSnapshot(canvasID uuid.UUID, nodeID string, attempt uuid.UUID) (*core.PublicationNode, error) {
 	return models.FindPublicationNode(c.tx, c.organizationID, c.integrationID, canvasID, nodeID, attempt)
 }
+
+func (c *PublicationContext) IndependentStore() core.PublicationStore {
+	return &PublicationContext{tx: database.DB(c.tx.Statement.Context), organizationID: c.organizationID, integrationID: c.integrationID, execution: c.execution}
+}
