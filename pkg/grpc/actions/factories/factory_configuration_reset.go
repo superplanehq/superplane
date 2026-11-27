@@ -11,9 +11,15 @@ import (
 	"gorm.io/gorm"
 )
 
+type factoryConfigurationSavedBindingsKey struct{}
+
 func factoryConfigurationSavedBinding(tx *gorm.DB, canvas *models.Canvas) (map[string]any, error) {
 	if tx == nil {
 		return nil, nil
+	}
+	if bindings, ok := tx.Statement.Context.Value(factoryConfigurationSavedBindingsKey{}).(map[uuid.UUID]map[string]any); ok {
+		// Bulk reset supplies a complete snapshot, including canvases without owners.
+		return bindings[canvas.ID], nil
 	}
 	owner, err := models.FindFactoryConfigurationAutomationByCanvas(tx, canvas.ID)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
