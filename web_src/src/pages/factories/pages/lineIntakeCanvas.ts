@@ -75,6 +75,26 @@ const INTAKE_CANVAS_BY_SOURCE: Record<LineIntakeSourceId, IntakeCanvasSpec> = {
   },
 };
 
+function sentryRequestNode(id: string, name: string, url: string, y: number): ComponentsNode {
+  return {
+    id,
+    name,
+    type: "TYPE_ACTION",
+    component: "http",
+    configuration: {
+      method: "GET",
+      redactSensitiveHeaders: true,
+      url,
+      authorization: {
+        type: "integration_bearer",
+        integration: { name: "Sentry" },
+        integrationKey: "SENTRY_AUTH_TOKEN",
+      },
+    },
+    position: { x: 160, y },
+  };
+}
+
 export function intakeCanvasForSource(source: LineIntakeSource): SplitRunCanvasModel {
   const spec = INTAKE_CANVAS_BY_SOURCE[source.id];
   const triggerId = `${source.id}-trigger`;
@@ -104,40 +124,8 @@ export function intakeCanvasForSource(source: LineIntakeSource): SplitRunCanvasM
             configuration: { expression: "true" },
             position: { x: 160, y: 260 },
           },
-          {
-            id: issueRequestId,
-            name: "Get Sentry Issue",
-            type: "TYPE_ACTION",
-            component: "http",
-            configuration: {
-              method: "GET",
-              redactSensitiveHeaders: true,
-              url: "{{ root().data.issueApiUrl }}",
-              authorization: {
-                type: "integration_bearer",
-                integration: { name: "Sentry" },
-                integrationKey: "SENTRY_AUTH_TOKEN",
-              },
-            },
-            position: { x: 160, y: 440 },
-          },
-          {
-            id: eventRequestId,
-            name: "Get Sentry Event",
-            type: "TYPE_ACTION",
-            component: "http",
-            configuration: {
-              method: "GET",
-              redactSensitiveHeaders: true,
-              url: "{{ root().data.issueApiUrl }}events/latest/",
-              authorization: {
-                type: "integration_bearer",
-                integration: { name: "Sentry" },
-                integrationKey: "SENTRY_AUTH_TOKEN",
-              },
-            },
-            position: { x: 160, y: 620 },
-          },
+          sentryRequestNode(issueRequestId, "Get Sentry Issue", "{{ root().data.issueApiUrl }}", 440),
+          sentryRequestNode(eventRequestId, "Get Sentry Event", "{{ root().data.issueApiUrl }}events/latest/", 620),
           {
             id: eventHasStackId,
             name: "Latest event has a stack?",
@@ -146,23 +134,12 @@ export function intakeCanvasForSource(source: LineIntakeSource): SplitRunCanvasM
             configuration: { expression: 'sentryEventHasStack($["Get Sentry Event"].data?.body)' },
             position: { x: 160, y: 800 },
           },
-          {
-            id: recommendedEventRequestId,
-            name: "Get Recommended Sentry Event",
-            type: "TYPE_ACTION",
-            component: "http",
-            configuration: {
-              method: "GET",
-              redactSensitiveHeaders: true,
-              url: "{{ root().data.issueApiUrl }}events/recommended/",
-              authorization: {
-                type: "integration_bearer",
-                integration: { name: "Sentry" },
-                integrationKey: "SENTRY_AUTH_TOKEN",
-              },
-            },
-            position: { x: 160, y: 980 },
-          },
+          sentryRequestNode(
+            recommendedEventRequestId,
+            "Get Recommended Sentry Event",
+            "{{ root().data.issueApiUrl }}events/recommended/",
+            980,
+          ),
         ] satisfies ComponentsNode[])
       : []),
     {
