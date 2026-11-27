@@ -27,6 +27,26 @@ function scoreField(input, name) {
   return { score, summary };
 }
 
+const PLAN_ARGUMENTS = ["scores", "spec", "survey"];
+
+// A model can send the specification under another name, for example "plan"
+// or "specification". Without this check, the call publishes only the
+// scores, reports success, and the plan is lost.
+function rejectUnknownArguments(input) {
+  const unknown = Object.keys(input || {}).filter((key) => !PLAN_ARGUMENTS.includes(key));
+  if (unknown.length === 0) return;
+  throw new Error(
+    `unknown argument: ${unknown.join(", ")}. propose_plan takes only scores, spec, and survey; ` +
+      "pass the specification markdown as spec",
+  );
+}
+
+function specMarkdown(value) {
+  if (value === undefined || value === null) return "";
+  if (typeof value !== "string") throw new Error("spec must be the specification markdown as a string");
+  return unwrapMarkdown(value);
+}
+
 function unwrapMarkdown(value) {
   const text = String(value || "").trim();
   if (!text.startsWith('"')) return text;
@@ -49,6 +69,7 @@ function writeSpecOutput(spec, env) {
 }
 
 async function proposePlan(input, client) {
+  rejectUnknownArguments(input);
   const body = {};
   if (input && input.scores) {
     body.scores = {
@@ -57,7 +78,7 @@ async function proposePlan(input, client) {
       verifiability: scoreField(input.scores, "verifiability"),
     };
   }
-  const spec = unwrapMarkdown(input && input.spec);
+  const spec = specMarkdown(input && input.spec);
   if (spec) body.spec = spec;
   const questions = surveyQuestions(input && input.survey);
   if (questions.length > 0) body.survey = { questions };
@@ -115,6 +136,7 @@ const PROPOSE_PLAN = {
           required: ["questions"],
         },
       },
+      additionalProperties: false,
     },
   },
   handler: proposePlan,
