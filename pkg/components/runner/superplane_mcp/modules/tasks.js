@@ -66,18 +66,21 @@ async function closeTask(input, client) {
 }
 
 async function moveTask(input, client) {
-  const column = input && input.column;
+  const stage = input && input.stage;
   const next = input && input.next;
+  const previous = input && input.previous;
   const task = input && input.task;
+  const chosen = [stage, next, previous].filter((value) => value !== undefined).length;
   if (
-    (column !== undefined && (typeof column !== "string" || !column.trim())) ||
+    chosen !== 1 ||
+    (stage !== undefined && (typeof stage !== "string" || !stage.trim())) ||
     (next !== undefined && next !== true) ||
-    (column !== undefined) === (next === true)
+    (previous !== undefined && previous !== true)
   ) {
-    throw new Error("Pass exactly one of column or next: true");
+    throw new Error("Pass exactly one of stage, next: true, or previous: true");
   }
   if (task !== undefined && (typeof task !== "string" || !task.trim())) throw new Error("task must be a task id or key");
-  const body = column !== undefined ? { column: column.trim() } : { next: true };
+  const body = stage !== undefined ? { stage: stage.trim() } : next ? { next: true } : { previous: true };
   if (task !== undefined) body.task = task.trim();
   return client.request("POST", "/api/v1/runner/task/move", body);
 }
@@ -86,7 +89,7 @@ const MOVE_TASK = {
   definition: {
     name: "move_task",
     description:
-      "Move an open task immediately to a stage on its recorded line. Pass exactly one of column or next: true. column is a stable stage key, including custom stages, Backlog, and Done. next follows the recorded stage order. A task run moves its own task: omit task. Unfinished source work is replaced. A run with no task, such as a webhook run, must pass task. It can move only a task that waits in the stage of this automation after the stage work passed. Destination work starts or queues under existing limits. Returns task identity, from_column, column, and state. Current-stage movement is unchanged. Planning runs, tasks without a line, stale runs, and closed or archived tasks cannot move. A missing successor fails.",
+      "Move an open task immediately to a stage on its recorded line. Pass exactly one of stage, next: true, or previous: true. stage is a stage key or name, for example Done, Backlog, or a custom stage name. next and previous follow the recorded stage order. get_task shows the current, next, and previous stage. A task run moves its own task: omit task. Unfinished source work is replaced. A run with no task, such as a webhook run, must pass task. It can move only a task that waits in the stage of this automation after the stage work passed. Destination work starts or queues under existing limits. Returns task identity, from_stage, stage, and state. Moving to the current stage changes nothing. Planning runs, tasks without a line, stale runs, and closed or archived tasks cannot move. A missing stage fails.",
     inputSchema: {
       type: "object",
       properties: {
@@ -95,12 +98,14 @@ const MOVE_TASK = {
           minLength: 1,
           description: "Task id, number, or key, for example SP-42. Required for a run with no task. Use get_task to find it.",
         },
-        column: { type: "string", minLength: 1, description: "Stable stage key on this task's recorded line." },
+        stage: { type: "string", minLength: 1, description: "Stage key or name on this task's recorded line, for example Done." },
         next: { type: "boolean", const: true, description: "Move to the next stage in recorded line order." },
+        previous: { type: "boolean", const: true, description: "Move to the previous stage in recorded line order." },
       },
       oneOf: [
-        { required: ["column"], not: { required: ["next"] } },
-        { required: ["next"], not: { required: ["column"] } },
+        { required: ["stage"], not: { anyOf: [{ required: ["next"] }, { required: ["previous"] }] } },
+        { required: ["next"], not: { anyOf: [{ required: ["stage"] }, { required: ["previous"] }] } },
+        { required: ["previous"], not: { anyOf: [{ required: ["stage"] }, { required: ["next"] }] } },
       ],
       additionalProperties: false,
     },
@@ -118,7 +123,7 @@ const ATTACH_TASK = {
   definition: {
     name: "attach_task",
     description:
-      "Attach this run to a task so the task timeline shows the run in the stage of this automation. Only a run with no task, such as a webhook run, can attach. The task must wait in the stage of this automation after the stage work passed. Attach before move_task. Attaching the same task again has no effect. Returns task identity and column.",
+      "Attach this run to a task so the task timeline shows the run in the stage of this automation. Only a run with no task, such as a webhook run, can attach. The task must wait in the stage of this automation after the stage work passed. Attach before move_task. Attaching the same task again has no effect. Returns the task like get_task, with stage, next_stage, and previous_stage.",
     inputSchema: {
       type: "object",
       properties: {
@@ -262,7 +267,7 @@ const GET_TASK = {
   definition: {
     name: "get_task",
     description:
-      "Find one task in this workspace. Pass exactly one selector: task (id, number, or key such as SP-42), pull_request (the pull request URL), number with an optional repository (owner/name), or commit (a commit SHA of a pull request of the task). Returns id, key, title, description, state, url, origin, column (the board column of the task), and pull_requests with repository, number, url, state, and head_sha. A selector that matches more than one task fails and lists the task keys. Pass repository, or use a more exact selector.",
+      "Find one task in this workspace. Pass exactly one selector: task (id, number, or key such as SP-42), pull_request (the pull request URL), number with an optional repository (owner/name), or commit (a commit SHA of a pull request of the task). Returns id, key, title, description, state, url, origin, stage (the current stage key and name), next_stage and previous_stage on the recorded line when the task is open, and pull_requests with repository, number, url, state, and head_sha. A selector that matches more than one task fails and lists the task keys. Pass repository, or use a more exact selector.",
     inputSchema: {
       type: "object",
       properties: {

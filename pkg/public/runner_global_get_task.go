@@ -17,9 +17,23 @@ import (
 
 type runnerTaskDetailView struct {
 	runnerTaskView
-	Description  string                        `json:"description"`
-	Column       string                        `json:"column,omitempty"`
-	PullRequests []runnerTaskPullRequestDetail `json:"pull_requests"`
+	Description   string                        `json:"description"`
+	Stage         *runnerStageView              `json:"stage,omitempty"`
+	NextStage     *runnerStageView              `json:"next_stage,omitempty"`
+	PreviousStage *runnerStageView              `json:"previous_stage,omitempty"`
+	PullRequests  []runnerTaskPullRequestDetail `json:"pull_requests"`
+}
+
+type runnerStageView struct {
+	Key  string `json:"key"`
+	Name string `json:"name,omitempty"`
+}
+
+func runnerStage(stage models.FactoryLineStage, found bool) *runnerStageView {
+	if !found {
+		return nil
+	}
+	return &runnerStageView{Key: stage.Key, Name: stage.Name}
 }
 
 type runnerTaskPullRequestDetail struct {
@@ -145,9 +159,12 @@ func runnerPullRequestTask(tx *gorm.DB, factoryModel *models.Factory, pullReques
 
 func (s *Server) runnerTaskDetail(tx *gorm.DB, factoryModel *models.Factory, order *models.FactoryWorkOrder) (runnerTaskDetailView, error) {
 	view := runnerTaskDetailView{runnerTaskView: runnerTaskViewFrom(s.BaseURL, factoryModel, order), Description: order.Description}
-	column, err := models.WorkOrderBoardColumn(tx, order)
+	boardStage, err := models.WorkOrderBoardColumn(tx, order)
 	if err != nil {
 		return view, err
+	}
+	if boardStage != "" {
+		view.Stage = &runnerStageView{Key: boardStage}
 	}
 	if order.IsOpen() {
 		dispatch, err := order.LatestLineDispatch(tx)
@@ -155,10 +172,15 @@ func (s *Server) runnerTaskDetail(tx *gorm.DB, factoryModel *models.Factory, ord
 			return view, err
 		}
 		if dispatch != nil && dispatch.CurrentStageKey != "" {
-			column = dispatch.CurrentStageKey
+			key := dispatch.CurrentStageKey
+			view.Stage = runnerStage(dispatch.StageByKey(key))
+			if view.Stage == nil {
+				view.Stage = &runnerStageView{Key: key}
+			}
+			view.NextStage = runnerStage(dispatch.NextStageAfter(key))
+			view.PreviousStage = runnerStage(dispatch.PreviousStageBefore(key))
 		}
 	}
-	view.Column = column
 	pullRequests, err := factoryactions.ListTaskPullRequests(tx, order)
 	if err != nil {
 		return view, err

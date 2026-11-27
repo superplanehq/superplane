@@ -24,20 +24,23 @@ func (s *Server) handleRunnerMoveTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var request struct {
-		Task   *string `json:"task"`
-		Column *string `json:"column"`
-		Next   *bool   `json:"next"`
+		Task     *string `json:"task"`
+		Stage    *string `json:"stage"`
+		Column   *string `json:"column"`
+		Next     *bool   `json:"next"`
+		Previous *bool   `json:"previous"`
 	}
 	if err := decodeRunnerJSON(w, r, &request, runnerTaskMutationBodyMaxBytes); err != nil {
 		return
 	}
-	if (request.Column == nil) == (request.Next == nil) || (request.Next != nil && !*request.Next) || (request.Column != nil && strings.TrimSpace(*request.Column) == "") {
-		http.Error(w, "Pass exactly one of column or next: true", http.StatusBadRequest)
-		return
+	// column is the earlier name of stage.
+	if request.Stage == nil {
+		request.Stage = request.Column
 	}
-	column := ""
-	if request.Column != nil {
-		column = strings.TrimSpace(*request.Column)
+	to, ok := runnerMoveDestination(request.Stage, request.Next, request.Previous)
+	if !ok {
+		http.Error(w, "Pass exactly one of stage, next: true, or previous: true", http.StatusBadRequest)
+		return
 	}
 	db := database.DB(r.Context())
 	var target *taskOwnerTarget
@@ -58,19 +61,19 @@ func (s *Server) handleRunnerMoveTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	fromState := target.order.State
-	var leftColumn string
+	var leftStage string
 	var backlogEvents []models.CanvasEvent
 	var result *models.FactoryTaskMoveResult
 	err := db.Transaction(func(tx *gorm.DB) error {
 		var err error
-		leftColumn, err = models.WorkOrderBoardColumn(tx, target.order)
+		leftStage, err = models.WorkOrderBoardColumn(tx, target.order)
 		if err != nil {
 			return err
 		}
 		if waitingStage != "" {
-			result, err = target.order.MoveWaitingFromRun(tx, target.canvasRunID, waitingStage, column, request.Next != nil)
+			result, err = target.order.MoveWaitingFromRun(tx, target.canvasRunID, waitingStage, to)
 		} else {
-			result, err = target.order.MoveFromRun(tx, target.canvasRunID, column, request.Next != nil)
+			result, err = target.order.MoveFromRun(tx, target.canvasRunID, to)
 		}
 		if err != nil {
 			return err
@@ -89,7 +92,7 @@ func (s *Server) handleRunnerMoveTask(w http.ResponseWriter, r *http.Request) {
 			return err
 		}
 		for _, step := range dispatch.Steps {
-			if step.StageKey != result.Column {
+			if step.StageKey != result.Stage {
 				continue
 			}
 			blocked, err := factoryactions.ImplementStepBlockedByMissingBranch(tx, target.factory, target.order, step.AppID)
@@ -143,8 +146,8 @@ func (s *Server) handleRunnerMoveTask(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		}
-		left := leftColumn
-		for _, entered := range result.EnteredColumns {
+		left := leftStage
+		for _, entered := range result.EnteredStages {
 			if err := factoryactions.StartColumnLeaveCustomAutomations(db, target.factory, target.order, left, target.canvasRunID.String()); err != nil {
 				log.WithError(err).Warn("Failed to start stage leave automation")
 			}
@@ -163,10 +166,10 @@ func (s *Server) handleRunnerMoveTask(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = writeJSON(w, http.StatusOK, struct {
 		runnerTaskView
-		FromColumn string `json:"from_column"`
-		Column     string `json:"column"`
-		Changed    bool   `json:"changed"`
-	}{runnerTaskViewFrom(s.BaseURL, target.factory, target.order), result.FromColumn, result.Column, result.Changed})
+		FromStage string `json:"from_stage"`
+		Stage     string `json:"stage"`
+		Changed   bool   `json:"changed"`
+	}{runnerTaskViewFrom(s.BaseURL, target.factory, target.order), result.FromStage, result.Stage, result.Changed})
 }
 
 // handleRunnerAttachTask links a run with no task to a task that waits in the
@@ -186,7 +189,8 @@ func (s *Server) handleRunnerAttachTask(w http.ResponseWriter, r *http.Request) 
 	if !ok {
 		return
 	}
-	err := database.DB(r.Context()).Transaction(func(tx *gorm.DB) error {
+	db := database.DB(r.Context())
+	err := db.Transaction(func(tx *gorm.DB) error {
 		return target.order.AttachWaitingRun(tx, target.canvasRunID, stage)
 	})
 	if err != nil {
@@ -202,10 +206,30 @@ func (s *Server) handleRunnerAttachTask(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	publishRunnerTaskUpdate(target.factory, target.order, factoryevents.EventTypeOrderUpdated)
-	_ = writeJSON(w, http.StatusOK, struct {
-		runnerTaskView
-		Column string `json:"column"`
-	}{runnerTaskViewFrom(s.BaseURL, target.factory, target.order), stage})
+	view, err := s.runnerTaskDetail(db, target.factory, target.order)
+	if err != nil {
+		writeRunnerTaskError(w, err)
+		return
+	}
+	_ = writeJSON(w, http.StatusOK, view)
+}
+
+// runnerMoveDestination accepts exactly one of stage, next: true, or previous: true.
+func runnerMoveDestination(stage *string, next, previous *bool) (models.FactoryTaskMoveTo, bool) {
+	to := models.FactoryTaskMoveTo{Next: next != nil && *next, Previous: previous != nil && *previous}
+	if stage != nil {
+		to.Stage = strings.TrimSpace(*stage)
+	}
+	chosen := 0
+	for _, set := range []bool{stage != nil, next != nil, previous != nil} {
+		if set {
+			chosen++
+		}
+	}
+	if chosen != 1 || (next != nil && !to.Next) || (previous != nil && !to.Previous) || (stage != nil && to.Stage == "") {
+		return to, false
+	}
+	return to, true
 }
 
 // A run with no task, such as a webhook run, can move only a task that waits

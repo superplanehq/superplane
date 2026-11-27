@@ -47,7 +47,7 @@ When this run already has a task, or when there is no task to create, do not cal
 // The payload is inserted once. Expressions inside the payload do not run.
 const webhookPayloadInstructions = `
 
-{{ root().data?.body != nil ? "A webhook started this run. This run has no task. To find a task from the request, run superplane task get with --task, --pull-request, --number, or --commit. To show this run on the timeline of a task that waits in this stage, run superplane task attach --task. To move that task, run superplane task move --task with --next or --column. The JSON request body is:\n\n" + toJSON(root().data.body) : "" }}`
+{{ root().data?.body != nil ? "A webhook started this run. This run has no task. To find a task from the request, run superplane task get with --task, --pull-request, --number, or --commit. It shows the stage of the task and the next and previous stages. To show this run on the timeline of a task that waits in this stage, run superplane task attach --task. To move that task, run superplane task move --task with --next, --previous, or --stage (a stage name such as Done). The JSON request body is:\n\n" + toJSON(root().data.body) : "" }}`
 
 // Saved prompts can still end with the earlier payload text.
 const legacyWebhookPayloadInstructions = `

@@ -283,7 +283,7 @@ test("superplane task artifact add is not a command", () => {
 });
 
 test("task move rejects missing and contradictory destinations before a request", async () => {
-  for (const argv of [["task", "move"], ["task", "move", "--next", "--column", "done"], ["task", "move", "--column"]]) {
+  for (const argv of [["task", "move"], ["task", "move", "--next", "--stage", "done"], ["task", "move", "--next", "--previous"], ["task", "move", "--stage"]]) {
     let stderr = "";
     const code = await main(
       argv,
@@ -295,18 +295,20 @@ test("task move rejects missing and contradictory destinations before a request"
       { write: (chunk) => { stderr += chunk; } },
     );
     assert.equal(code, 1, argv.join(" "));
-    assert.match(stderr, /column|next/);
+    assert.match(stderr, /stage|next/);
   }
 });
 
 test("task move sends both modes through the runner API and prints the result", async () => {
   for (const [flags, body] of [
-    [["--column", "custom-review"], {column: "custom-review"}],
+    [["--stage", "custom-review"], {stage: "custom-review"}],
+    [["--column", "custom-review"], {stage: "custom-review"}],
+    [["--previous"], {previous: true}],
     [["--next"], {next: true}],
     [["--task", "SP-42", "--next"], {next: true, task: "SP-42"}],
   ]) {
     let stdout = "";
-    const result = {id: "task-1", from_column: "implement", column: "custom-review", state: "open"};
+    const result = {id: "task-1", from_stage: "implement", stage: "custom-review", state: "open"};
     const code = await main(["task", "move", ...flags], env, async (url, options) => {
       assert.equal(url, "https://app.example/api/v1/runner/task/move");
       assert.equal(options.method, "POST");
@@ -356,10 +358,10 @@ test("task attach sends the task through the runner API", async () => {
   const code = await main(["task", "attach", "--task", "SP-42"], env, async (url, options) => {
     assert.equal(url, "https://app.example/api/v1/runner/task/attach");
     assert.deepEqual(JSON.parse(options.body), {task: "SP-42"});
-    return {ok: true, status: 200, text: async () => '{"column":"custom-wait"}'};
+    return {ok: true, status: 200, text: async () => '{"stage":{"key":"custom-wait"}}'};
   }, {write: chunk => {stdout += chunk;}}, {write() {}});
   assert.equal(code, 0);
-  assert.deepEqual(JSON.parse(stdout), {column: "custom-wait"});
+  assert.deepEqual(JSON.parse(stdout), {stage: {key: "custom-wait"}});
 });
 
 test("each global tool command calls that tool", async () => {

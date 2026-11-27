@@ -61,21 +61,21 @@ func TestRunnerMoveTaskFromWebhookRunMovesOnlyTasksWaitingInItsStage(t *testing.
 	key := factory.WorkOrderKey(order.Number)
 	token := noTaskRunnerToken(t, order, "custom-wait")
 
-	rec := runnerRequest(t, server, http.MethodPost, token, "/api/v1/runner/task/move", `{"task":"`+key+`","column":"custom-review"}`)
+	rec := runnerRequest(t, server, http.MethodPost, token, "/api/v1/runner/task/move", `{"task":"`+key+`","stage":"custom-review"}`)
 	assert.Equal(t, http.StatusConflict, rec.Code, "a running stage is not waiting: %s", rec.Body.String())
 
 	waitInStage(t, dispatch, "custom-wait")
-	rec = runnerRequest(t, server, http.MethodPost, token, "/api/v1/runner/task/move", `{"column":"custom-review"}`)
+	rec = runnerRequest(t, server, http.MethodPost, token, "/api/v1/runner/task/move", `{"stage":"custom-review"}`)
 	assert.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
 	other := noTaskRunnerToken(t, order, "custom-review")
-	rec = runnerRequest(t, server, http.MethodPost, other, "/api/v1/runner/task/move", `{"task":"`+key+`","column":"custom-review"}`)
+	rec = runnerRequest(t, server, http.MethodPost, other, "/api/v1/runner/task/move", `{"task":"`+key+`","stage":"custom-review"}`)
 	assert.Equal(t, http.StatusConflict, rec.Code, "another stage cannot move the task: %s", rec.Body.String())
 	stranger, err := factory.CreateWorkOrder(db, "Other task", "", nil, nil, nil)
 	require.NoError(t, err)
 	rec = runnerRequest(t, server, http.MethodPost, taskToken, "/api/v1/runner/task/move", `{"task":"`+stranger.ID.String()+`","next":true}`)
 	assert.Equal(t, http.StatusBadRequest, rec.Code, "a task run cannot move another task: %s", rec.Body.String())
 
-	rec = runnerRequest(t, server, http.MethodPost, token, "/api/v1/runner/task/move", `{"task":"`+key+`","column":"custom-review"}`)
+	rec = runnerRequest(t, server, http.MethodPost, token, "/api/v1/runner/task/move", `{"task":"`+key+`","stage":"custom-review"}`)
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 	require.NoError(t, db.First(dispatch, "id = ?", dispatch.ID).Error)
 	assert.True(t, dispatch.IsActive())
@@ -106,6 +106,9 @@ func TestRunnerAttachTaskLinksWebhookRunToWaitingTask(t *testing.T) {
 		rec = runnerRequest(t, server, http.MethodPost, token, "/api/v1/runner/task/attach", body)
 		require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 	}
+	var task runnerTaskDetailView
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &task))
+	assert.Equal(t, "custom-wait", task.Stage.Key)
 
 	attached, err := models.ListWorkOrderAttachedRuns(db, order.ID)
 	require.NoError(t, err)
@@ -143,7 +146,9 @@ func TestRunnerGetTaskFindsTaskByReference(t *testing.T) {
 		var task runnerTaskDetailView
 		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &task))
 		assert.Equal(t, key, task.Key, query)
-		assert.Equal(t, "custom-wait", task.Column, query)
+		assert.Equal(t, &runnerStageView{Key: "custom-wait", Name: "Awaiting approval"}, task.Stage, query)
+		assert.Equal(t, &runnerStageView{Key: "done", Name: "Done"}, task.NextStage, query)
+		assert.Equal(t, &runnerStageView{Key: "custom-review", Name: "Review"}, task.PreviousStage, query)
 		require.Len(t, task.PullRequests, 1, query)
 		assert.Equal(t, int64(42), task.PullRequests[0].Number)
 		assert.Equal(t, sha, task.PullRequests[0].HeadSHA)

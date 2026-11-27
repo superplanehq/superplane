@@ -178,9 +178,10 @@ const COMMANDS = [
   },
   {
     words: ["task", "move"],
-    usage: "superplane task move [--task TASK] (--column COLUMN | --next)",
-    flags: ["task", "column", "next"],
-    boolean: ["next"],
+    usage: "superplane task move [--task TASK] (--stage STAGE | --next | --previous)",
+    flags: ["task", "stage", "column", "next", "previous"],
+    boolean: ["next", "previous"],
+    alias: { column: "stage" },
     tool: "move_task",
   },
   {
