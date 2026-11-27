@@ -23,9 +23,6 @@ type Provider interface {
 	ListMergedPullRequests(ctx context.Context, repository string, from, to time.Time) ([]MergedPullRequest, error)
 	// ReadMergeability reads merge status for one open pull request.
 	ReadMergeability(ctx context.Context, pullRequest *models.FactoryPullRequest) (Mergeability, error)
-	// MergePullRequest merges one open pull request.
-	// method is the GitHub merge method name: squash, merge, or rebase.
-	MergePullRequest(ctx context.Context, pullRequest *models.FactoryPullRequest, method, expectedSHA string) error
 	// ClosePullRequest declines one open pull request.
 	ClosePullRequest(ctx context.Context, ref PullRequestRef) error
 }
@@ -79,10 +76,6 @@ func (Unsupported) ListMergedPullRequests(context.Context, string, time.Time, ti
 
 func (Unsupported) ReadMergeability(context.Context, *models.FactoryPullRequest) (Mergeability, error) {
 	return Mergeability{}, ErrNotSupported
-}
-
-func (Unsupported) MergePullRequest(context.Context, *models.FactoryPullRequest, string, string) error {
-	return ErrNotSupported
 }
 
 func (Unsupported) ClosePullRequest(context.Context, PullRequestRef) error {

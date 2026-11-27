@@ -34,7 +34,7 @@ export default meta;
 
 type Story = StoryObj;
 
-/** Each story gets its own cache, so the merge story does not leak merge controls into the others. */
+/** Each story gets its own cache to keep pull request status independent. */
 function StoryQueryClient({ children }: { children: ReactNode }) {
   const [client] = useState(() => new QueryClient({ defaultOptions: { queries: { retry: false } } }));
   return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
@@ -130,8 +130,6 @@ function ReviewNote({
         pullRequests={pullRequests}
         organizationId="org-1"
         factoryId="factory-1"
-        orderId="wo-1"
-        canAct
         stacked={false}
         continueFixes={continueFixes}
         actionBusy={false}
@@ -237,8 +235,8 @@ export const FixesPaused: Story = {
   ),
 };
 
-export const MergeActions: Story = {
-  name: "Merge enabled — one ready, one blocked",
+export const PullRequestStatus: Story = {
+  name: "Status enabled — one ready, one blocked",
   parameters: {
     msw: {
       handlers: [

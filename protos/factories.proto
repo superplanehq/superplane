@@ -489,21 +489,7 @@ service Factories {
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Describe factory pull request mergeability";
-      description: "Returns whether a tracked factory pull request can merge from SuperPlane";
-      tags: "Factory";
-    };
-  }
-
-  rpc MergeFactoryPullRequest(
-    MergeFactoryPullRequestRequest
-  ) returns (MergeFactoryPullRequestResponse) {
-    option (google.api.http) = {
-      post: "/api/v1/factories/{factory_id}/prs/{pr_id}/merge"
-      body: "*"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Merge factory pull request";
-      description: "Merges a tracked GitHub pull request with a method the repository allows";
+      description: "Returns the merge status of a tracked factory pull request";
       tags: "Factory";
     };
   }
@@ -2182,17 +2168,6 @@ message DescribeFactoryPullRequestMergeabilityRequest {
 
 message DescribeFactoryPullRequestMergeabilityResponse {
   FactoryPullRequestMergeability mergeability = 1;
-}
-
-message MergeFactoryPullRequestRequest {
-  string factory_id = 1;
-  string pr_id = 2;
-  FactoryPullRequestMergeability.MergeMethod merge_method = 3;
-  string expected_head_sha = 4;
-}
-
-message MergeFactoryPullRequestResponse {
-  FactoryPullRequest pull_request = 1;
 }
 
 message ContinueFactoryPullRequestFixesRequest {

@@ -7,13 +7,10 @@ import type { FactoriesFactoryPullRequest, FactoriesFactoryPullRequestMergeabili
 import { TooltipProvider } from "@/components/ui/tooltip";
 
 const mergeability = { current: undefined as FactoriesFactoryPullRequestMergeability | undefined };
-const mergePending = { current: false };
-const mergeMutate = vi.fn();
 const experimentalFeatureHas = { current: (_id: string) => true };
 
-vi.mock("@/hooks/useFactoryPullRequestMerge", () => ({
+vi.mock("@/hooks/useFactoryPullRequestMergeability", () => ({
   useFactoryPullRequestMergeability: () => ({ data: mergeability.current }),
-  useMergeFactoryPullRequest: () => ({ mutate: mergeMutate, isPending: mergePending.current }),
 }));
 
 vi.mock("@/hooks/useExperimentalFeature", () => ({
@@ -67,8 +64,6 @@ beforeAll(() => {
 });
 
 beforeEach(() => {
-  mergeMutate.mockReset();
-  mergePending.current = false;
   experimentalFeatureHas.current = () => true;
   mergeability.current = {
     canMerge: true,
@@ -87,8 +82,6 @@ function renderNote(props: Partial<Parameters<typeof SplitRunAttentionNote>[0]> 
           actions={ACTIONS}
           organizationId="org-1"
           factoryId="factory-1"
-          orderId="wo-1"
-          canAct
           {...props}
         />
       </TooltipProvider>
@@ -193,7 +186,7 @@ describe("SplitRunAttentionNote for a pull request", () => {
     expect(note).toHaveTextContent("You can review it now.");
   });
 
-  it("reports unavailable merge status and keeps merge disabled", () => {
+  it("reports unavailable merge status and keeps the review link", () => {
     mergeability.current = {
       canMerge: false,
       blockedReason: "BLOCKED_REASON_UNAVAILABLE",
@@ -204,8 +197,7 @@ describe("SplitRunAttentionNote for a pull request", () => {
     const note = screen.getByTestId("split-run-attention-note");
     expect(within(note).getByRole("heading", { name: "Merge status is unavailable right now." })).toBeInTheDocument();
     expect(note).toHaveTextContent("This task closes when the pull request is merged or closed.");
-    expect(screen.getByTestId("split-run-merge-button")).toBeDisabled();
-    expect(screen.getByTestId("split-run-merge-method")).toBeDisabled();
+    expect(screen.getByRole("link", { name: "Review PR #6812" })).toBeInTheDocument();
   });
 
   it("says a check failed when a pull request check fails", () => {
@@ -223,7 +215,7 @@ describe("SplitRunAttentionNote for a pull request", () => {
     expect(note).toHaveTextContent("Review the failed check on the pull request.");
   });
 
-  it("keeps the ready headline when the merge flag is off", () => {
+  it("keeps the ready headline when the status flag is off", () => {
     experimentalFeatureHas.current = () => false;
     mergeability.current = {
       canMerge: false,
@@ -236,189 +228,62 @@ describe("SplitRunAttentionNote for a pull request", () => {
     expect(within(note).getByRole("heading", { name: "The pull request is ready for review" })).toBeInTheDocument();
   });
 
-  it("enables merge when mergeability is true", () => {
-    renderNote({ pullRequests: [GITHUB_PR] });
+  for (const pullRequest of [GITHUB_PR, BITBUCKET_PR]) {
+    for (const presentation of [{}, { compact: true }, { ctaOnly: true }]) {
+      it(`links to ${pullRequest.provider} without merge controls in ${JSON.stringify(presentation)}`, () => {
+        const note = pullRequest.provider === "PROVIDER_BITBUCKET" ? BITBUCKET_PR_NOTE : PR_NOTE;
+        renderNote({ note, pullRequests: [pullRequest], ...presentation });
 
-    const button = screen.getByTestId("split-run-merge-button");
-    expect(button).toBeEnabled();
-    expect(button).toHaveAccessibleName("Merge");
-    expect(screen.queryByTestId("split-run-merge-reason")).not.toBeInTheDocument();
-  });
+        expect(screen.getByRole("link", { name: note.cta!.label })).toHaveAttribute("href", pullRequest.url);
+        expect(screen.queryByRole("button", { name: "Merge" })).not.toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "Merge method" })).not.toBeInTheDocument();
+      });
+    }
+  }
 
-  it("shows Merging and blocks another merge while the request is pending", () => {
-    mergePending.current = true;
-    renderNote({ pullRequests: [GITHUB_PR] });
+  for (const flagEnabled of [true, false]) {
+    for (const pullRequest of [GITHUB_PR, BITBUCKET_PR]) {
+      it(`keeps ${pullRequest.provider} merged confirmation with status flag ${flagEnabled}`, () => {
+        experimentalFeatureHas.current = () => flagEnabled;
+        const note = pullRequest.provider === "PROVIDER_BITBUCKET" ? BITBUCKET_PR_NOTE : PR_NOTE;
+        renderNote({ note, pullRequests: [{ ...pullRequest, state: "STATE_MERGED" }] });
 
-    const button = screen.getByTestId("split-run-merge-button");
-    expect(button).toBeDisabled();
-    expect(button).toHaveAccessibleName("Merging");
-  });
+        expect(screen.getByTestId("split-run-pr-merged")).toHaveTextContent("The pull request is merged.");
+      });
+    }
 
-  it("disables merge and shows the reason on hover when automation is running", async () => {
-    const user = userEvent.setup();
-    mergeability.current = {
-      canMerge: false,
-      blockedReason: "BLOCKED_REASON_ACTIVE_RUN",
-      message: "Automation is still running.",
-      allowedMethods: ["MERGE_METHOD_SQUASH"],
-      headSha: "abc123",
-    };
-    renderNote({ pullRequests: [GITHUB_PR] });
+    it(`keeps multiple-PR blockers gated by status flag ${flagEnabled}`, () => {
+      experimentalFeatureHas.current = () => flagEnabled;
+      mergeability.current = {
+        canMerge: false,
+        blockedReason: "BLOCKED_REASON_CHECKS_UNFINISHED",
+        message: "Checks are still running.",
+      };
+      renderNote({ compact: true, pullRequests: [GITHUB_PR, BITBUCKET_PR] });
 
-    expect(screen.getByTestId("split-run-merge-button")).toBeDisabled();
-    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
-
-    await user.hover(screen.getByTestId("split-run-merge-reason"));
-    expect(await screen.findByRole("tooltip")).toHaveTextContent("Automation is still running.");
-  });
-
-  it("disables merge and shows the reason on hover when checks are still running", async () => {
-    const user = userEvent.setup();
-    mergeability.current = {
-      canMerge: false,
-      blockedReason: "BLOCKED_REASON_CHECKS_UNFINISHED",
-      message: "Checks are still running.",
-      allowedMethods: ["MERGE_METHOD_SQUASH"],
-      headSha: "abc123",
-    };
-    renderNote({ pullRequests: [GITHUB_PR], compact: true });
-
-    expect(screen.getByTestId("split-run-merge-button")).toBeDisabled();
-    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
-
-    await user.hover(screen.getByTestId("split-run-merge-reason"));
-    expect(await screen.findByRole("tooltip")).toHaveTextContent("Checks are still running.");
-  });
-
-  it("lists only allowed merge methods", async () => {
-    const user = userEvent.setup();
-    renderNote({ pullRequests: [GITHUB_PR] });
-
-    await user.click(screen.getByTestId("split-run-merge-method"));
-    const menu = await screen.findByRole("menu");
-    expect(
-      within(menu)
-        .getAllByRole("menuitem")
-        .map((item) => item.textContent),
-    ).toEqual(["✓ Squash and merge", "Create a merge commit"]);
-  });
-
-  it("merges with the method the person picks in the menu", async () => {
-    const user = userEvent.setup();
-    renderNote({ pullRequests: [GITHUB_PR] });
-
-    await user.click(screen.getByTestId("split-run-merge-method"));
-    await user.click(await screen.findByTestId("split-run-merge-method-MERGE_METHOD_MERGE"));
-
-    expect(mergeMutate).toHaveBeenCalledTimes(1);
-    expect(mergeMutate.mock.calls[0]?.[0]).toEqual({
-      pullRequestId: "pr-6812",
-      mergeMethod: "MERGE_METHOD_MERGE",
-      expectedHeadSha: "abc123",
+      expect(screen.getAllByTestId("split-run-pull-request-cta")).toHaveLength(2);
+      expect(screen.queryAllByTestId("split-run-pr-status")).toHaveLength(flagEnabled ? 2 : 0);
     });
-  });
+  }
 
-  it("does not offer merge methods while merge is blocked", () => {
-    mergeability.current = {
-      canMerge: false,
-      blockedReason: "BLOCKED_REASON_CHECK_FAILED",
-      message: "A check failed.",
-      allowedMethods: ["MERGE_METHOD_SQUASH"],
-      headSha: "abc123",
-    };
-    renderNote({ pullRequests: [GITHUB_PR] });
-
-    expect(screen.getByTestId("split-run-merge-method")).toBeDisabled();
-  });
-
-  it("sends the selected method once on click", async () => {
-    const user = userEvent.setup();
-    renderNote({ pullRequests: [GITHUB_PR] });
-
-    await user.click(screen.getByTestId("split-run-merge-button"));
-    expect(mergeMutate).toHaveBeenCalledTimes(1);
-    expect(mergeMutate.mock.calls[0]?.[0]).toEqual({
-      pullRequestId: "pr-6812",
-      mergeMethod: "MERGE_METHOD_SQUASH",
-      expectedHeadSha: "abc123",
-    });
-  });
-
-  it("hides merge for a merged pull request", () => {
-    renderNote({
-      pullRequests: [{ ...GITHUB_PR, state: "STATE_MERGED" }],
-    });
-
-    expect(screen.queryByTestId("split-run-merge-button")).not.toBeInTheDocument();
-    expect(screen.getByTestId("split-run-pr-merged")).toHaveTextContent("The pull request is merged.");
-  });
-
-  it("hides merge when the pull request merge flag is off", () => {
-    experimentalFeatureHas.current = () => false;
-    renderNote({ pullRequests: [GITHUB_PR] });
-
-    expect(screen.queryByTestId("split-run-merge-button")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("split-run-merge-method")).not.toBeInTheDocument();
-  });
-
-  it("shows merged confirmation even when the flag is off", () => {
-    experimentalFeatureHas.current = () => false;
-    renderNote({
-      pullRequests: [{ ...GITHUB_PR, state: "STATE_MERGED" }],
-    });
-
-    expect(screen.getByTestId("split-run-pr-merged")).toHaveTextContent("The pull request is merged.");
-    expect(screen.queryByTestId("split-run-merge-button")).not.toBeInTheDocument();
-  });
-
-  it("shows the merge control for a Bitbucket pull request", () => {
-    renderNote({ note: BITBUCKET_PR_NOTE, pullRequests: [BITBUCKET_PR] });
-
-    const note = screen.getByTestId("split-run-attention-note");
-    expect(note).toHaveAttribute("data-variant", "pull-request");
-    expect(within(note).getByRole("heading", { name: "The pull request is ready for review" })).toBeInTheDocument();
-    expect(screen.getByTestId("split-run-merge-button")).toBeEnabled();
-  });
-
-  it("disables Bitbucket merge and explains the blocker", async () => {
-    const user = userEvent.setup();
+  it("reports Bitbucket conflicts while keeping the provider review link", () => {
     mergeability.current = {
       canMerge: false,
       blockedReason: "BLOCKED_REASON_CONFLICTING",
       message: "The pull request has conflicts.",
-      allowedMethods: ["MERGE_METHOD_SQUASH"],
-      headSha: "abc123",
     };
     renderNote({ note: BITBUCKET_PR_NOTE, pullRequests: [BITBUCKET_PR] });
 
-    const note = screen.getByTestId("split-run-attention-note");
-    expect(within(note).getByRole("heading", { name: "The pull request has conflicts" })).toBeInTheDocument();
-    expect(screen.getByTestId("split-run-merge-button")).toBeDisabled();
-
-    await user.hover(screen.getByTestId("split-run-merge-reason"));
-    expect(await screen.findByRole("tooltip")).toHaveTextContent("The pull request has conflicts.");
+    expect(screen.getByRole("heading", { name: "The pull request has conflicts" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Review PR #7" })).toHaveAttribute("href", BITBUCKET_PR.url);
   });
 
-  it("offers only the branch merge strategies for Bitbucket, never rebase", async () => {
-    const user = userEvent.setup();
-    renderNote({ note: BITBUCKET_PR_NOTE, pullRequests: [BITBUCKET_PR] });
-
-    await user.click(screen.getByTestId("split-run-merge-method"));
-    const menu = await screen.findByRole("menu");
-    expect(
-      within(menu)
-        .getAllByRole("menuitem")
-        .map((item) => item.textContent),
-    ).toEqual(["✓ Squash and merge", "Create a merge commit"]);
-  });
-
-  it("lists each open pull request with its repository when a task has several", async () => {
-    const user = userEvent.setup();
+  it("lists each provider review link without merge controls when a task has several", () => {
     const docsPullRequest: FactoriesFactoryPullRequest = {
       id: "pr-5",
-      provider: "PROVIDER_GITHUB",
+      provider: "PROVIDER_BITBUCKET",
       repository: "acme/docs",
-      url: "https://github.com/acme/docs/pull/5",
+      url: "https://bitbucket.org/acme/docs/pull-requests/5",
       number: "5",
       title: "Add AGENTS.md",
       state: "STATE_OPEN",
@@ -439,11 +304,11 @@ describe("SplitRunAttentionNote for a pull request", () => {
     );
     expect(within(rows[1]!).getByRole("link", { name: "Review acme/docs #5" })).toHaveAttribute(
       "href",
-      "https://github.com/acme/docs/pull/5",
+      "https://bitbucket.org/acme/docs/pull-requests/5",
     );
 
-    await user.click(within(rows[1]!).getByTestId("split-run-merge-button"));
-    expect(mergeMutate.mock.calls[0]?.[0]).toMatchObject({ pullRequestId: "pr-5" });
+    expect(within(note).queryByRole("button", { name: "Merge" })).not.toBeInTheDocument();
+    expect(within(note).queryByRole("button", { name: "Merge method" })).not.toBeInTheDocument();
   });
 
   it("keeps the single review action when only one tracked pull request is open", () => {
@@ -457,18 +322,5 @@ describe("SplitRunAttentionNote for a pull request", () => {
     expect(screen.getByRole("heading", { name: "The pull request is ready for review" })).toBeInTheDocument();
     expect(screen.getByTestId("split-run-pull-request-cta")).toHaveAccessibleName("Review PR #6812");
     expect(screen.queryByTestId("split-run-review-pull-request")).not.toBeInTheDocument();
-  });
-
-  it("merges a Bitbucket pull request with the selected method", async () => {
-    const user = userEvent.setup();
-    renderNote({ note: BITBUCKET_PR_NOTE, pullRequests: [BITBUCKET_PR] });
-
-    await user.click(screen.getByTestId("split-run-merge-button"));
-    expect(mergeMutate).toHaveBeenCalledTimes(1);
-    expect(mergeMutate.mock.calls[0]?.[0]).toEqual({
-      pullRequestId: "pr-7",
-      mergeMethod: "MERGE_METHOD_SQUASH",
-      expectedHeadSha: "abc123",
-    });
   });
 });

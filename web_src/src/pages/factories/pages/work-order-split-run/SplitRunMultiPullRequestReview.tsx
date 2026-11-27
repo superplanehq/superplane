@@ -6,20 +6,18 @@ import { safeExternalUrl } from "@/lib/safeExternalUrl";
 
 import { pullRequestRepositoryLabel } from "../../lib/workOrderPullRequest";
 import { PullRequestConfidence } from "./redesign/consoleCheckRows";
-import { SplitRunPullRequestMergeAction } from "./SplitRunPullRequestMergeAction";
+import { SplitRunPullRequestStatus } from "./SplitRunPullRequestStatus";
 import { multiplePullRequestReviewCopy } from "./splitRunPullRequestReview";
 
 /**
  * A task with pull requests in several repositories: one compact row per
- * pull request, each with its repository, title, and own review and merge
- * actions. Numbers repeat across repositories, so the row names the repository.
+ * pull request, each with its repository, title, status, and review link.
+ * Numbers repeat across repositories, so the row names the repository.
  */
 export function MultiPullRequestReviewNote({
   pullRequests,
   organizationId,
   factoryId,
-  orderId,
-  canAct,
   stacked,
   continueFixes,
   actionBusy,
@@ -27,8 +25,6 @@ export function MultiPullRequestReviewNote({
   pullRequests: FactoriesFactoryPullRequest[];
   organizationId?: string;
   factoryId?: string;
-  orderId?: string;
-  canAct: boolean;
   stacked: boolean;
   continueFixes?: () => void;
   actionBusy: boolean;
@@ -49,13 +45,7 @@ export function MultiPullRequestReviewNote({
       <ul aria-label="Pull requests" className="mt-3 flex flex-col divide-y divide-foreground/10">
         {pullRequests.map((pullRequest, index) => (
           <li key={pullRequest.id ?? pullRequest.url ?? index} className="py-2.5 first:pt-0 last:pb-0">
-            <ReviewPullRequestRow
-              pullRequest={pullRequest}
-              organizationId={organizationId}
-              factoryId={factoryId}
-              orderId={orderId}
-              canAct={canAct}
-            />
+            <ReviewPullRequestRow pullRequest={pullRequest} organizationId={organizationId} factoryId={factoryId} />
           </li>
         ))}
       </ul>
@@ -72,14 +62,10 @@ function ReviewPullRequestRow({
   pullRequest,
   organizationId,
   factoryId,
-  orderId,
-  canAct,
 }: {
   pullRequest: FactoriesFactoryPullRequest;
   organizationId?: string;
   factoryId?: string;
-  orderId?: string;
-  canAct: boolean;
 }) {
   const href = safeExternalUrl(pullRequest.url);
   const label = pullRequestRepositoryLabel(pullRequest);
@@ -106,12 +92,10 @@ function ReviewPullRequestRow({
             </a>
           </Button>
         ) : null}
-        <SplitRunPullRequestMergeAction
+        <SplitRunPullRequestStatus
           organizationId={organizationId}
           factoryId={factoryId}
-          orderId={orderId}
           pullRequest={pullRequest}
-          canAct={canAct}
           compact
         />
       </div>
