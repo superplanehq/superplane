@@ -20,6 +20,7 @@ import {
   type OrgUserDisplayLookup,
 } from "@/lib/orgUserDisplay";
 
+import { CUSTOM_AUTOMATION_TEMPLATE_ID } from "../../lib/customAutomation";
 import { extractArtifactUrl, toArtifactDataRecord } from "../../lib/workOrderArtifact";
 import { reviewCandidateForWorkOrderId } from "../onboarding/first-run/reviewCandidates";
 import { canvasKeyForAutomation } from "./splitRunCanvases";
@@ -186,7 +187,7 @@ function splitRunSourceWithoutRun(order: FactoriesWorkOrder, resolveUser?: OrgUs
     // A link on a host that names no source shows the automation that made the task.
     const source = intakeSourceFromHref(
       originHref,
-      knownIntakeKindFromHref(originHref) ?? (automation ? intakeKindForAutomation(automation) : "github-issues"),
+      knownIntakeKindFromHref(originHref) ?? originIntakeKindForAutomation(automation),
       order.origin?.label?.trim() || sourceTicketLabel(originHref),
     );
     return { ...source, addedBy: addedByForIntakeOrder(order, source.name) };
@@ -292,6 +293,9 @@ function sourceForAutomation(automation: FactoriesAutomationRef): SplitRunSource
 }
 
 function intakeKindForAutomation(automation: FactoriesAutomationRef): SplitRunIntakeKind | undefined {
+  if (automation.templateId === CUSTOM_AUTOMATION_TEMPLATE_ID) {
+    return undefined;
+  }
   const key = canvasKeyForAutomation({ id: automation.appId, name: automation.appName });
   if (key === "sentry") {
     return "sentry-exceptions";
@@ -305,6 +309,18 @@ function intakeKindForAutomation(automation: FactoriesAutomationRef): SplitRunIn
     return hinted;
   }
   return key === "intake" ? "github-issues" : undefined;
+}
+
+/** Source of a task link on a host that names no source. */
+function originIntakeKindForAutomation(automation: FactoriesAutomationRef | undefined): SplitRunIntakeKind | undefined {
+  if (!automation) {
+    return "github-issues";
+  }
+  // A custom automation gets such links from outside, such as a webhook request.
+  if (automation.templateId === CUSTOM_AUTOMATION_TEMPLATE_ID) {
+    return "webhook";
+  }
+  return intakeKindForAutomation(automation);
 }
 
 function intakeSourceFromKind(intakeKind: SplitRunIntakeKind): SplitRunIntakeSource {

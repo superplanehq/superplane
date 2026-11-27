@@ -15,6 +15,7 @@ import {
   customAutomationRunsOnTask,
   customAutomationSettingsForTriggers,
   customAutomationTriggers,
+  customAutomationRunContext,
   customAutomationTriggersForRun,
   DEFAULT_CUSTOM_AUTOMATION_ICON,
   newCustomAutomationTrigger,
@@ -78,9 +79,10 @@ export function useCustomAutomationSetupPage(args: {
   }, [automation]);
 
   const validationError = useMemo(() => validateDraft(name, draft), [draft, name]);
+  const runContext = customAutomationRunContext(columnKey, triggers, runsOnTask);
 
   const save = async () => {
-    const activeTriggers = customAutomationTriggersForRun(triggers, runsOnTask);
+    const activeTriggers = customAutomationTriggersForRun(triggers, runContext);
     const invalidSchedule = activeTriggers.some(
       (trigger) =>
         trigger.mode === "scheduled" &&
@@ -104,7 +106,7 @@ export function useCustomAutomationSetupPage(args: {
     setSaveError("");
     const input = {
       name: name.trim(),
-      settings: customAutomationSettingsForTriggers(triggers, draft, icon, runsOnTask),
+      settings: customAutomationSettingsForTriggers(triggers, draft, icon, runContext),
     };
     try {
       if (args.automationId) {
@@ -127,7 +129,7 @@ export function useCustomAutomationSetupPage(args: {
     setName,
     triggers,
     setTriggers,
-    runsOnTask,
+    runsOnTask: runContext,
     setRunsOnTask,
     icon,
     setIcon,

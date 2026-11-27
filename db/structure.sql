@@ -490,6 +490,7 @@ CREATE TABLE public.factories (
     public_badge_show_cost boolean DEFAULT false NOT NULL,
     public_badge_token text,
     url_id text NOT NULL,
+    vcs_integration_id uuid,
     CONSTRAINT factories_hosted_spend_budget_non_negative CHECK (((hosted_spend_budget_cents IS NULL) OR (hosted_spend_budget_cents >= 0))),
     CONSTRAINT factories_key_format_check CHECK (((key)::text ~ '^[A-Z]{2,5}$'::text)),
     CONSTRAINT factories_url_id_format_check CHECK ((url_id ~ '^[a-z0-9]{8}$'::text))
@@ -889,6 +890,18 @@ CREATE TABLE public.factory_work_order_artifacts (
 CREATE TABLE public.factory_work_order_assignees (
     work_order_id uuid NOT NULL,
     user_id uuid NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: factory_work_order_attached_runs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.factory_work_order_attached_runs (
+    work_order_id uuid NOT NULL,
+    run_id uuid NOT NULL,
+    stage_key text NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
@@ -2957,6 +2970,14 @@ ALTER TABLE ONLY public.factory_work_order_assignees
 
 
 --
+-- Name: factory_work_order_attached_runs factory_work_order_attached_runs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_work_order_attached_runs
+    ADD CONSTRAINT factory_work_order_attached_runs_pkey PRIMARY KEY (work_order_id, run_id);
+
+
+--
 -- Name: factory_work_order_checks factory_work_order_checks_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -4082,6 +4103,13 @@ CREATE INDEX idx_factories_organization_id ON public.factories USING btree (orga
 
 
 --
+-- Name: idx_factories_vcs_integration_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factories_vcs_integration_id ON public.factories USING btree (vcs_integration_id);
+
+
+--
 -- Name: idx_factory_agent_resource_secrets_resource_name; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4341,6 +4369,13 @@ CREATE INDEX idx_factory_work_order_assignees_work_order_created_user ON public.
 
 
 --
+-- Name: idx_factory_work_order_attached_runs_run; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_work_order_attached_runs_run ON public.factory_work_order_attached_runs USING btree (run_id);
+
+
+--
 -- Name: idx_factory_work_order_checks_factory_created; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4485,6 +4520,13 @@ CREATE INDEX idx_factory_work_orders_factory_state ON public.factory_work_orders
 --
 
 CREATE INDEX idx_factory_work_orders_organization_state_result ON public.factory_work_orders USING btree (organization_id, state, result);
+
+
+--
+-- Name: idx_factory_work_orders_origin_url; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_work_orders_origin_url ON public.factory_work_orders USING hash (origin_url) WHERE (origin_url IS NOT NULL);
 
 
 --
@@ -5538,6 +5580,14 @@ ALTER TABLE ONLY public.factories
 
 
 --
+-- Name: factories factories_vcs_integration_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factories
+    ADD CONSTRAINT factories_vcs_integration_id_fkey FOREIGN KEY (vcs_integration_id) REFERENCES public.app_installations(id) ON DELETE SET NULL;
+
+
+--
 -- Name: factory_agent_resource_secrets factory_agent_resource_secrets_resource_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -5887,6 +5937,22 @@ ALTER TABLE ONLY public.factory_work_order_assignees
 
 ALTER TABLE ONLY public.factory_work_order_assignees
     ADD CONSTRAINT factory_work_order_assignees_work_order_id_fkey FOREIGN KEY (work_order_id) REFERENCES public.factory_work_orders(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: factory_work_order_attached_runs factory_work_order_attached_runs_run_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_work_order_attached_runs
+    ADD CONSTRAINT factory_work_order_attached_runs_run_id_fkey FOREIGN KEY (run_id) REFERENCES public.workflow_runs(id) ON DELETE CASCADE;
+
+
+--
+-- Name: factory_work_order_attached_runs factory_work_order_attached_runs_work_order_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_work_order_attached_runs
+    ADD CONSTRAINT factory_work_order_attached_runs_work_order_id_fkey FOREIGN KEY (work_order_id) REFERENCES public.factory_work_orders(id) ON DELETE CASCADE;
 
 
 --
@@ -6881,7 +6947,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261125223556	f
+20261127160046	f
 \.
 
 

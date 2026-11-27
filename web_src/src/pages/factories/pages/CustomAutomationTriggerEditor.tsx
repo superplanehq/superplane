@@ -98,7 +98,12 @@ export function TriggerEditor({
       <section className="flex flex-col gap-4">
         <div className="flex flex-col gap-1.5">
           <h3 className="text-base font-semibold text-foreground">Triggers</h3>
-          <TriggerContext columnKey={columnKey} runsOnTask={runsOnTask} onRunsOnTaskChange={onRunsOnTaskChange} />
+          <TriggerContext
+            columnKey={columnKey}
+            triggers={triggers}
+            runsOnTask={runsOnTask}
+            onRunsOnTaskChange={onRunsOnTaskChange}
+          />
         </div>
         {visibleTriggers.map((trigger) => (
           <TriggerCard
@@ -122,28 +127,13 @@ export function TriggerEditor({
             factoryKey={factoryKey}
           />
         ))}
-        {triggerModes.length > 0 && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button type="button" variant="outline" size="sm" className="w-fit gap-1.5">
-                <Plus className="size-3.5" aria-hidden />
-                Add trigger
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="min-w-72">
-              {triggerModes.map((mode) => (
-                <DropdownMenuItem
-                  key={mode}
-                  className="py-2.5"
-                  disabled={!repeatableTriggerMode(mode) && triggers.some((trigger) => trigger.mode === mode)}
-                  onSelect={() => addTrigger(mode)}
-                >
-                  <TriggerOption mode={mode} columnKey={columnKey} runsOnTask={runsOnTask !== false} />
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
+        <AddTriggerMenu
+          modes={triggerModes}
+          triggers={triggers}
+          columnKey={columnKey}
+          runsOnTask={runsOnTask}
+          onAdd={addTrigger}
+        />
       </section>
       <section className="flex flex-col gap-8">
         <h3 className="text-base font-semibold text-foreground">Agent</h3>
@@ -165,6 +155,44 @@ export function TriggerEditor({
         />
       </section>
     </div>
+  );
+}
+
+function AddTriggerMenu({
+  modes,
+  triggers,
+  columnKey,
+  runsOnTask,
+  onAdd,
+}: {
+  modes: CustomAutomationMode[];
+  triggers: CustomAutomationTrigger[];
+  columnKey: CustomAutomationColumn;
+  runsOnTask?: boolean;
+  onAdd: (mode: CustomAutomationMode) => void;
+}) {
+  if (modes.length === 0) return null;
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button type="button" variant="outline" size="sm" className="w-fit gap-1.5">
+          <Plus className="size-3.5" aria-hidden />
+          Add trigger
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="min-w-72">
+        {modes.map((mode) => (
+          <DropdownMenuItem
+            key={mode}
+            className="py-2.5"
+            disabled={!repeatableTriggerMode(mode) && triggers.some((trigger) => trigger.mode === mode)}
+            onSelect={() => onAdd(mode)}
+          >
+            <TriggerOption mode={mode} columnKey={columnKey} runsOnTask={runsOnTask !== false} />
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -240,6 +268,11 @@ function TriggerCard({
               organizationId={organizationId}
               factoryId={factoryId}
               factoryKey={factoryKey}
+              helper={
+                columnKey === "backlog"
+                  ? "The agent gets the JSON request body and can create a task."
+                  : "The agent gets the JSON request body. The run has no task."
+              }
               webhookId={trigger.webhookId}
               usedWebhookIds={triggers
                 .filter((item) => item.id !== trigger.id && item.mode === "webhook" && item.webhookId)
@@ -263,17 +296,21 @@ function TriggerCard({
 /** Chooses which triggers this automation can run. The choice is saved. */
 function TriggerContext({
   columnKey,
+  triggers,
   runsOnTask,
   onRunsOnTaskChange,
 }: {
   columnKey: CustomAutomationColumn;
+  triggers: CustomAutomationTrigger[];
   runsOnTask?: boolean;
   onRunsOnTaskChange: (runsOnTask: boolean) => void;
 }) {
   if (columnKey.startsWith("custom-")) {
     return (
       <p className="text-xs text-muted-foreground">
-        This automation runs on a task in this stage. Every required automation must pass before the task advances.
+        {triggers.some((trigger) => trigger.mode === "automatic" || trigger.mode === "manual")
+          ? "This automation runs on a task in this stage. Every required automation must pass before the task advances. A webhook can also start it with no task."
+          : "A webhook starts this automation with no task. Tasks wait in this stage only when auto advance is off. A webhook run can move them."}
       </p>
     );
   }
@@ -344,12 +381,12 @@ function AutomationIconPicker({ icon, onChange }: { icon: string; onChange: (ico
   );
 }
 
+/** A custom stage starts from Manual, its line trigger, webhooks, or a mix. Other stages offer every trigger for the run context. */
 function availableTriggerModes(columnKey: CustomAutomationColumn, runsOnTask?: boolean): CustomAutomationMode[] {
-  if (columnKey.startsWith("custom-")) return ["manual", "automatic"];
+  if (columnKey.startsWith("custom-")) return ["manual", "automatic", "webhook"];
   const modes: CustomAutomationMode[] = ["manual"];
   if (runsOnTask !== false) modes.push("automatic", "leave");
-  if (runsOnTask !== true) modes.push("scheduled");
-  if (runsOnTask !== true && columnKey === "backlog") modes.push("webhook");
+  if (runsOnTask !== true) modes.push("scheduled", "webhook");
   return modes;
 }
 

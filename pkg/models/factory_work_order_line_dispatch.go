@@ -72,6 +72,30 @@ func (l *FactoryWorkOrderLineDispatch) StageByKey(key string) (FactoryLineStage,
 	return FactoryLineStage{}, false
 }
 
+// StageByKeyOrName matches a stage key first, then a stage name in any case.
+func (l *FactoryWorkOrderLineDispatch) StageByKeyOrName(value string) (FactoryLineStage, bool) {
+	value = strings.TrimSpace(value)
+	if stage, ok := l.StageByKey(value); ok {
+		return stage, true
+	}
+	for _, stage := range l.StagesValue() {
+		if strings.EqualFold(strings.TrimSpace(stage.Name), value) {
+			return stage, true
+		}
+	}
+	return FactoryLineStage{}, false
+}
+
+func (l *FactoryWorkOrderLineDispatch) PreviousStageBefore(key string) (FactoryLineStage, bool) {
+	stages := l.StagesValue()
+	for index, stage := range stages {
+		if stage.Key == key && index > 0 {
+			return stages[index-1], true
+		}
+	}
+	return FactoryLineStage{}, false
+}
+
 func (l *FactoryWorkOrderLineDispatch) NextStageAfter(key string) (FactoryLineStage, bool) {
 	stages := l.StagesValue()
 	for index, stage := range stages {

@@ -4,6 +4,7 @@ import { MemoryRouter } from "react-router";
 import { expect, it, vi } from "bun:test";
 import type { FactoriesFactoryCustomAutomation } from "@/api-client";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
+import type { CustomAutomationColumn } from "../lib/customAutomation";
 import { CustomAutomationSetupForm } from "./CustomAutomationSetupForm";
 import { useCustomAutomationSetupPage } from "./useCustomAutomationSetupPage";
 
@@ -19,9 +20,10 @@ const automation: FactoriesFactoryCustomAutomation = {
     ],
   },
 };
+let current = automation;
 
 vi.mock("@/hooks/useFactoryCustomAutomationData", () => ({
-  useFactoryCustomAutomation: () => ({ data: automation, isFetchedAfterMount: true }),
+  useFactoryCustomAutomation: () => ({ data: current, isFetchedAfterMount: true }),
   useCreateFactoryCustomAutomation: () => ({ mutateAsync: saveAutomation, isPending: false }),
   useUpdateFactoryCustomAutomation: () => ({ mutateAsync: saveAutomation, isPending: false }),
 }));
@@ -39,12 +41,13 @@ vi.mock("@/hooks/useFactoryWebhooks", () => ({
   }),
 }));
 
-function Editor() {
+function Editor({ columnKey = "backlog" }: { columnKey?: CustomAutomationColumn }) {
   const model = useCustomAutomationSetupPage({
     organizationId: "org",
     factoryId: "factory",
     factoryKey: "workspace",
     automationId: "automation",
+    columnKey,
   });
   return (
     <MemoryRouter>
@@ -54,7 +57,7 @@ function Editor() {
           icon={model.icon}
           triggers={model.triggers}
           runsOnTask={model.runsOnTask}
-          columnKey="backlog"
+          columnKey={columnKey}
           draft={model.draft}
           organizationId="org"
           factoryId="factory"
@@ -75,8 +78,14 @@ function Editor() {
   );
 }
 
+async function selectWebhook(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole("combobox", { name: "Webhook" }));
+  await user.click(screen.getByRole("option", { name: "Jira issues" }));
+}
+
 it("saves a Backlog webhook trigger with the selected webhook", async () => {
   const user = userEvent.setup();
+  current = automation;
   saveAutomation.mockClear();
   saveAutomation.mockResolvedValueOnce({});
   render(<Editor />);
@@ -90,9 +99,9 @@ it("saves a Backlog webhook trigger with the selected webhook", async () => {
   expect(await screen.findByText("Select a webhook for each webhook trigger.")).toBeInTheDocument();
   expect(saveAutomation).not.toHaveBeenCalled();
 
-  await user.click(screen.getByRole("combobox", { name: "Webhook" }));
-  await user.click(screen.getByRole("option", { name: "Jira issues" }));
+  await selectWebhook(user);
   expect(screen.getByText("https://superplane.test/api/v1/webhooks/webhook-1")).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "Manage webhooks" })).toHaveAttribute("target", "_blank");
   await user.click(screen.getByRole("button", { name: "Save" }));
   await waitFor(() => expect(saveAutomation).toHaveBeenCalled());
   const saved = saveAutomation.mock.calls.at(-1)![0];
@@ -101,4 +110,74 @@ it("saves a Backlog webhook trigger with the selected webhook", async () => {
     { startMode: "START_MODE_WEBHOOK", webhookId: "webhook-1" },
   ]);
   expect(saved.settings.runsOnTask).toBe(false);
+});
+
+it("saves a webhook next to the line trigger on a custom stage", async () => {
+  const user = userEvent.setup();
+  current = {
+    automation: { ...automation.automation, columnKey: "custom-qa" },
+    settings: { ...automation.settings, startMode: "START_MODE_AUTOMATIC" },
+  };
+  saveAutomation.mockClear();
+  saveAutomation.mockResolvedValueOnce({});
+  render(<Editor columnKey="custom-qa" />);
+  expect(screen.queryByRole("button", { name: /Remove When a task enters/ })).not.toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Add trigger" }));
+  expect(screen.getAllByRole("menuitem")).toHaveLength(3);
+  await user.click(screen.getByRole("menuitem", { name: /Webhook/ }));
+  await selectWebhook(user);
+  await user.click(screen.getByRole("button", { name: "Save" }));
+  await waitFor(() => expect(saveAutomation).toHaveBeenCalled());
+  const saved = saveAutomation.mock.calls.at(-1)![0];
+  expect(saved.settings.triggers).toEqual([
+    { startMode: "START_MODE_AUTOMATIC" },
+    { startMode: "START_MODE_WEBHOOK", webhookId: "webhook-1" },
+  ]);
+  expect(saved.settings.runsOnTask).toBeUndefined();
+});
+
+it("saves a custom stage automation that only a webhook starts", async () => {
+  const user = userEvent.setup();
+  current = {
+    automation: { ...automation.automation, columnKey: "custom-qa" },
+    settings: { ...automation.settings, startMode: "START_MODE_AUTOMATIC" },
+  };
+  saveAutomation.mockClear();
+  saveAutomation.mockResolvedValueOnce({});
+  render(<Editor columnKey="custom-qa" />);
+  await user.click(screen.getByRole("button", { name: "Add trigger" }));
+  await user.click(screen.getByRole("menuitem", { name: /Webhook/ }));
+  await selectWebhook(user);
+  await user.click(screen.getByRole("button", { name: /Remove When a task enters/ }));
+  await user.click(screen.getByRole("button", { name: "Save" }));
+  await waitFor(() => expect(saveAutomation).toHaveBeenCalled());
+  const saved = saveAutomation.mock.calls.at(-1)![0];
+  expect(saved.settings.triggers).toEqual([{ startMode: "START_MODE_WEBHOOK", webhookId: "webhook-1" }]);
+  expect(saved.settings.runsOnTask).toBeUndefined();
+});
+
+it("saves the line trigger on a task after the webhook is removed from a custom stage", async () => {
+  const user = userEvent.setup();
+  current = {
+    automation: { ...automation.automation, columnKey: "custom-qa" },
+    settings: {
+      ...automation.settings,
+      startMode: "START_MODE_WEBHOOK",
+      runsOnTask: false,
+      triggers: [{ startMode: "START_MODE_WEBHOOK", webhookId: "webhook-1" }],
+    },
+  };
+  saveAutomation.mockClear();
+  saveAutomation.mockResolvedValueOnce({});
+  render(<Editor columnKey="custom-qa" />);
+  await user.click(screen.getByRole("button", { name: "Add trigger" }));
+  await user.click(screen.getByRole("menuitem", { name: /When a task enters/ }));
+  await user.click(screen.getByRole("button", { name: /Remove Webhook/ }));
+  await user.click(screen.getByRole("button", { name: "Save" }));
+  await waitFor(() => expect(saveAutomation).toHaveBeenCalled());
+  const saved = saveAutomation.mock.calls.at(-1)![0];
+  expect(saved.settings).toMatchObject({ startMode: "START_MODE_AUTOMATIC", runsOnTask: true });
+  expect(saved.settings.triggers ?? []).not.toContainEqual(
+    expect.objectContaining({ startMode: "START_MODE_WEBHOOK" }),
+  );
 });
