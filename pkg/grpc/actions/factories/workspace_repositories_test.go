@@ -202,3 +202,41 @@ func nodeWebhookRepositories(t *testing.T, db *gorm.DB, canvasID uuid.UUID, node
 	require.True(t, ok)
 	return webhookConfig["repositories"]
 }
+
+func TestRepositoryRefreshBatchesOwnershipReads(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	deps := testIntakeDependencies(r)
+	queries := 0
+	callback := "test:repository_refresh_ownership"
+	require.NoError(t, db.Callback().Query().After("gorm:query").Register(callback, func(tx *gorm.DB) {
+		if tx.Statement.Table == "factory_configuration_automations" {
+			queries++
+		}
+	}))
+	t.Cleanup(func() { require.NoError(t, db.Callback().Query().Remove(callback)) })
+
+	for _, canvasCount := range []int{1, 4} {
+		for range canvasCount {
+			support.CreateFactoryCanvas(t, r, factory.ID, "Automation")
+		}
+		for _, operation := range []struct {
+			name string
+			run  func(*gorm.DB) error
+		}{
+			{"reconcile", func(tx *gorm.DB) error {
+				return reconcileFactoryRepository(t.Context(), tx, deps, factory, r.User,
+					"", "", "acme/api", "acme/api", "main", "acme/web", false)
+			}},
+			{"republish", func(tx *gorm.DB) error {
+				return republishWorkspaceRepositoryAutomations(t.Context(), tx, deps, factory)
+			}},
+		} {
+			queries = 0
+			require.NoError(t, db.Transaction(operation.run))
+			assert.Equal(t, 1, queries, "%s ownership reads must not grow with canvas count", operation.name)
+		}
+	}
+}

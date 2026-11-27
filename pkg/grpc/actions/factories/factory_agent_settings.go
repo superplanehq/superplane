@@ -21,7 +21,7 @@ var factoryAgentSettingFields = []string{
 	"machineType", "executionTimeoutSeconds", "workingDirectory", "maxTurns",
 	"includeVisualEvidence", "disabledAgentResourceIds", "disabledAgentResourceTools",
 	"enabledAgentResourceTools", "skipSetupCommands", "skipRepositoryCheckout", "environmentFrom",
-	"additionalInstructions",
+	"additionalInstructions", "mergeConfidenceRiskRules",
 	"fallbackReviewer", "publishPRCheck", "prCheckActivationGeneration",
 	"publishReviewFindings", "reviewFindingsBody", "reviewFindingsComment",
 	"reviewFindingsBodyActivationGeneration", "reviewFindingsCommentActivationGeneration",
@@ -70,12 +70,14 @@ func (s *factoryAgentSettings) configure(node yaml.Node) yaml.Node {
 	if node.Component == "runnerCodex" && credentials["source"] == "subscription" {
 		s = s.forCodexSubscription()
 	}
-	if node.Component != s.component {
+	if s.component != "" && node.Component != s.component {
 		for _, field := range []string{"credentials", "model", "maxTurns", "llmProvider", "hostedProvider"} {
 			delete(node.Configuration, field)
 		}
 	}
-	node.Component = s.component
+	if s.component != "" {
+		node.Component = s.component
+	}
 	if node.Configuration == nil {
 		node.Configuration = map[string]any{}
 	}
