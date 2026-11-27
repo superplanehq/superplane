@@ -300,7 +300,11 @@ test("task move rejects missing and contradictory destinations before a request"
 });
 
 test("task move sends both modes through the runner API and prints the result", async () => {
-  for (const [flags, body] of [[["--column", "custom-review"], {column: "custom-review"}], [["--next"], {next: true}]]) {
+  for (const [flags, body] of [
+    [["--column", "custom-review"], {column: "custom-review"}],
+    [["--next"], {next: true}],
+    [["--task", "SP-42", "--next"], {next: true, task: "SP-42"}],
+  ]) {
     let stdout = "";
     const result = {id: "task-1", from_column: "implement", column: "custom-review", state: "open"};
     const code = await main(["task", "move", ...flags], env, async (url, options) => {
@@ -323,6 +327,7 @@ test("task help lists a command for every global tool", async () => {
     "superplane task owner suggest",
     "superplane task owner assign",
     "superplane task list",
+    "superplane task get",
     "superplane task create",
     "superplane task close",
     "superplane task plan",
@@ -339,9 +344,22 @@ test("task help lists a command for every global tool", async () => {
     "superplane task check remove",
     "superplane task pr open",
     "superplane task pr list",
+    "superplane task move",
+    "superplane task attach",
   ]) {
     assert.match(stdout, new RegExp(line));
   }
+});
+
+test("task attach sends the task through the runner API", async () => {
+  let stdout = "";
+  const code = await main(["task", "attach", "--task", "SP-42"], env, async (url, options) => {
+    assert.equal(url, "https://app.example/api/v1/runner/task/attach");
+    assert.deepEqual(JSON.parse(options.body), {task: "SP-42"});
+    return {ok: true, status: 200, text: async () => '{"column":"custom-wait"}'};
+  }, {write: chunk => {stdout += chunk;}}, {write() {}});
+  assert.equal(code, 0);
+  assert.deepEqual(JSON.parse(stdout), {column: "custom-wait"});
 });
 
 test("each global tool command calls that tool", async () => {
@@ -580,4 +598,27 @@ test("task move reports an API error with a nonzero exit code", async () => {
   );
   assert.equal(code, 1);
   assert.match(stderr, /Calling run has no current task stage/);
+});
+
+test("task get sends one selector to the runner API", async () => {
+  for (const [flags, query] of [
+    [["--task", "SP-42"], "task=SP-42"],
+    [["--pull-request", "https://github.com/acme/app/pull/42"], "pull_request=https%3A%2F%2Fgithub.com%2Facme%2Fapp%2Fpull%2F42"],
+    [["--number", "42", "--repository", "acme/app"], "number=42&repository=acme%2Fapp"],
+    [["--commit", "0123abc"], "commit=0123abc"],
+  ]) {
+    let requested = "";
+    const code = await main(["task", "get", ...flags], env, async (url) => {
+      requested = url;
+      return {ok: true, status: 200, text: async () => JSON.stringify({key: "SP-42"})};
+    }, {write() {}}, {write() {}});
+    assert.equal(code, 0, flags.join(" "));
+    assert.equal(requested, `https://app.example/api/v1/runner/task/get?${query}`);
+  }
+  for (const flags of [[], ["--task", "SP-42", "--commit", "0123abc"], ["--repository", "acme/app"]]) {
+    const code = await main(["task", "get", ...flags], env, async () => {
+      throw new Error("fetch must not run");
+    }, {write() {}}, {write() {}});
+    assert.equal(code, 1, flags.join(" "));
+  }
 });

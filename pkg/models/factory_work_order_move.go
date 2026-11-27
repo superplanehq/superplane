@@ -12,6 +12,7 @@ import (
 
 var ErrFactoryTaskMoveInvalid = errors.New("invalid task stage movement")
 var ErrFactoryTaskMoveStale = errors.New("calling run no longer owns the current stage")
+var ErrFactoryTaskNotWaiting = errors.New("task is not waiting in this stage")
 
 type FactoryTaskMoveResult struct {
 	FromColumn     string
@@ -113,9 +114,98 @@ func (o *FactoryWorkOrder) MoveFromRun(tx *gorm.DB, runID uuid.UUID, column stri
 		return nil, err
 	}
 	result.Started = released
+	if err := o.enterMoveDestination(tx, dispatch, stage, runID, result); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// MoveWaitingFromRun moves a task that waits in stageKey after its stage
+// work passed. Runs with no task, such as webhook runs, use it. They can
+// move only tasks that wait in their own stage.
+func (o *FactoryWorkOrder) MoveWaitingFromRun(tx *gorm.DB, runID uuid.UUID, stageKey, column string, next bool) (*FactoryTaskMoveResult, error) {
+	dispatch, err := o.lockWaitingLineDispatch(tx, stageKey)
+	if err != nil {
+		return nil, err
+	}
+	stage, found := dispatch.StageByKey(column)
+	if next {
+		stage, found = dispatch.NextStageAfter(dispatch.CurrentStageKey)
+	}
+	if !found {
+		return nil, fmt.Errorf("%w: destination or successor not found", ErrFactoryTaskMoveInvalid)
+	}
+	result := &FactoryTaskMoveResult{FromColumn: dispatch.CurrentStageKey, Column: stage.Key}
+	if stage.Key == dispatch.CurrentStageKey {
+		return result, nil
+	}
+	if stage.Kind != FactoryLineStageBacklog && stage.Kind != FactoryLineStageDone {
+		if err := o.RequireExecutionOwner(tx, true); err != nil {
+			return nil, err
+		}
+	}
+	if err := dispatch.Reactivate(tx); err != nil {
+		return nil, err
+	}
+	if err := o.enterMoveDestination(tx, dispatch, stage, runID, result); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// lockWaitingLineDispatch locks the task and its latest line traversal. It
+// returns ErrFactoryTaskNotWaiting unless the task waits in stageKey with no
+// open stage work.
+func (o *FactoryWorkOrder) lockWaitingLineDispatch(tx *gorm.DB, stageKey string) (*FactoryWorkOrderLineDispatch, error) {
+	latest, err := o.LatestLineDispatch(tx)
+	if errors.Is(err, ErrFactoryWorkOrderLineDispatchNotFound) {
+		return nil, ErrFactoryTaskNotWaiting
+	}
+	if err != nil {
+		return nil, err
+	}
+	if _, err := lockFactoryLineForStepAdmission(tx, latest.LineID); err != nil {
+		return nil, err
+	}
+	dispatch, err := LockWorkOrderLineDispatch(tx, latest.ID)
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE", Options: "NOWAIT"}).Where("id = ?", o.ID).First(o).Error; err != nil {
+		return nil, err
+	}
+	if !o.IsOpen() || dispatch.State != FactoryWorkOrderLineDispatchStateFinished || dispatch.Result != CanvasRunResultPassed || dispatch.CurrentStageKey != stageKey {
+		return nil, ErrFactoryTaskNotWaiting
+	}
+	open, err := dispatch.HasOpenWork(tx)
+	if err != nil {
+		return nil, err
+	}
+	if open {
+		return nil, ErrFactoryTaskNotWaiting
+	}
+	return dispatch, nil
+}
+
+// LatestLineDispatch returns the newest line traversal of the task. Its
+// current stage is the stage that shows the task on an open task.
+func (o *FactoryWorkOrder) LatestLineDispatch(tx *gorm.DB) (*FactoryWorkOrderLineDispatch, error) {
+	var latest FactoryWorkOrderLineDispatch
+	if err := tx.Where("work_order_id = ?", o.ID).Order("created_at DESC").Order("id DESC").First(&latest).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrFactoryWorkOrderLineDispatchNotFound
+		}
+		return nil, err
+	}
+	return &latest, nil
+}
+
+// enterMoveDestination enters stage and follows empty stages and auto
+// advance, like the finalizer does after a stage passes.
+func (o *FactoryWorkOrder) enterMoveDestination(tx *gorm.DB, dispatch *FactoryWorkOrderLineDispatch, stage FactoryLineStage, runID uuid.UUID, result *FactoryTaskMoveResult) error {
 	for {
 		if err := dispatch.EnterStage(tx, stage.Key); err != nil {
-			return nil, err
+			return err
 		}
 		result.EnteredColumns = append(result.EnteredColumns, stage.Key)
 		if stage.Kind == FactoryLineStageBacklog || stage.Kind == FactoryLineStageDone {
@@ -124,11 +214,11 @@ func (o *FactoryWorkOrder) MoveFromRun(tx *gorm.DB, runID uuid.UUID, column stri
 				state, outcome = FactoryWorkOrderStateClosed, CanvasRunResultPassed
 			}
 			if err := dispatch.Finish(tx, outcome); err != nil {
-				return nil, err
+				return err
 			}
 			_, err := o.UpdateStatus(tx, FactoryWorkOrderStatusUpdate{ToState: state, Result: FactoryWorkOrderResultCompleted, Run: &factory.RunRef{ID: runID}, OnRunsCancelled: func(stops []*RunCancellationResult) { result.Cancellations = append(result.Cancellations, stops...) }})
 			if err != nil {
-				return nil, err
+				return err
 			}
 			break
 		}
@@ -138,26 +228,26 @@ func (o *FactoryWorkOrder) MoveFromRun(tx *gorm.DB, runID uuid.UUID, column stri
 					continue
 				}
 				if err := o.ValidateSubscriptionCanvasModels(tx, step.AppID, dispatch.Model); err != nil {
-					return nil, err
+					return err
 				}
 			}
 			started, err := dispatch.StartStage(tx, o, index)
 			if err != nil {
-				return nil, err
+				return err
 			}
 			result.Started = append(result.Started, started...)
 			break
 		}
 		if !stage.AutoAdvanceEnabled() {
 			if err := dispatch.Finish(tx, CanvasRunResultPassed); err != nil {
-				return nil, err
+				return err
 			}
 			break
 		}
 		successor, ok := dispatch.NextStageAfter(stage.Key)
 		if !ok {
 			if err := dispatch.Finish(tx, CanvasRunResultPassed); err != nil {
-				return nil, err
+				return err
 			}
 			break
 		}
@@ -165,5 +255,5 @@ func (o *FactoryWorkOrder) MoveFromRun(tx *gorm.DB, runID uuid.UUID, column stri
 	}
 	result.Column = dispatch.CurrentStageKey
 	result.Changed = true
-	return result, nil
+	return nil
 }

@@ -158,6 +158,9 @@ func (l *FactoryLine) ExecutionPlan(tx *gorm.DB) ([]FactoryLineStep, error) {
 				if err != nil {
 					return nil, err
 				}
+				if entrypoint == "" {
+					continue
+				}
 				steps = append(steps, FactoryLineStep{
 					Type:       FactoryLineStepTypeRunApp,
 					AppID:      canvas.ID,
@@ -184,7 +187,11 @@ func customStageEntrypoint(canvas Canvas, spec LiveCanvasSpec) (string, error) {
 		}
 	}
 	entrypoint := ""
+	hasWebhook := false
 	for _, node := range spec.Nodes {
+		if node.Ref.Trigger != nil && node.Ref.Trigger.Name == onWebhookTriggerName {
+			hasWebhook = true
+		}
 		if node.Ref.Trigger == nil || node.Ref.Trigger.Name != onRunTriggerName {
 			continue
 		}
@@ -196,7 +203,9 @@ func customStageEntrypoint(canvas Canvas, spec LiveCanvasSpec) (string, error) {
 		}
 		entrypoint = node.ID
 	}
-	if entrypoint == "" {
+	// A webhook-only stage automation adds no step. Tasks wait in the stage
+	// when auto advance is off, and a webhook run moves them.
+	if entrypoint == "" && !hasWebhook {
 		return "", &FactoryLineStageAutomationError{
 			AutomationName: canvas.Name,
 			Reason:         "must have one On Run trigger before this task can start.",
@@ -281,6 +290,7 @@ type FactoryLineStepResult struct {
 }
 
 const onRunTriggerName = "onRun"
+const onWebhookTriggerName = "onWebhook"
 
 func (f *Factory) FindLine(tx *gorm.DB, lineID uuid.UUID) (*FactoryLine, error) {
 	return f.findLine(tx, lineID)

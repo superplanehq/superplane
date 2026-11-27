@@ -196,3 +196,33 @@ test("list_members reads the organization members", async () => {
   assert.equal(calls[0].method, "GET");
   assert.equal(calls[0].url, "https://superplane.example/api/v1/runner/members");
 });
+
+test("get_task sends exactly one selector", async () => {
+  const calls = [];
+  const client = createClient(env, recordingFetch(calls, '{"key":"SP-42"}'));
+  await call("get_task", { number: 42, repository: " acme/app " }, client);
+  assert.equal(calls[0].method, "GET");
+  assert.equal(calls[0].url, "https://superplane.example/api/v1/runner/task/get?number=42&repository=acme%2Fapp");
+  for (const input of [{}, { task: "SP-1", commit: "abc1234" }, { repository: "acme/app" }, { number: 0 }]) {
+    await assert.rejects(() => call("get_task", input, client), /Pass exactly one|positive integer/);
+  }
+  assert.equal(calls.length, 1);
+});
+
+test("move_task passes the task of a run with no task", async () => {
+  const calls = [];
+  const client = createClient(env, recordingFetch(calls, '{"column":"done"}'));
+  await call("move_task", { task: " SP-42 ", next: true }, client);
+  assert.deepEqual(calls[0].body, { next: true, task: "SP-42" });
+  await assert.rejects(() => call("move_task", { task: " ", next: true }, client), /task must be/);
+});
+
+test("attach_task requires a task", async () => {
+  const calls = [];
+  const client = createClient(env, recordingFetch(calls, '{"column":"custom-wait"}'));
+  await call("attach_task", { task: " SP-42 " }, client);
+  assert.equal(calls[0].url, "https://superplane.example/api/v1/runner/task/attach");
+  assert.deepEqual(calls[0].body, { task: "SP-42" });
+  await assert.rejects(() => call("attach_task", {}, client), /task must be/);
+  assert.equal(calls.length, 1);
+});

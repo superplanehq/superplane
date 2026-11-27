@@ -89,6 +89,13 @@ func loadAndSerializeWorkOrder(ctx context.Context, factory *models.Factory, ord
 		return err
 	})
 
+	var attachedRuns []models.FactoryWorkOrderAttachedRunRecord
+	g.Go(func() error {
+		var err error
+		attachedRuns, err = models.ListWorkOrderAttachedRuns(db.WithContext(gctx), order.ID)
+		return err
+	})
+
 	if err := g.Wait(); err != nil {
 		return nil, err
 	}
@@ -134,7 +141,46 @@ func loadAndSerializeWorkOrder(ctx context.Context, factory *models.Factory, ord
 	}
 	serialized.Checks = checks
 	serialized.PlanningSession = planningByOrder[order.ID]
+	serialized.AttachedRuns = serializeAttachedRuns(attachedRuns)
 	return serialized, nil
+}
+
+func serializeAttachedRuns(records []models.FactoryWorkOrderAttachedRunRecord) []*pb.WorkOrderExecution {
+	result := make([]*pb.WorkOrderExecution, 0, len(records))
+	for _, record := range records {
+		item := &pb.WorkOrderExecution{
+			Id:        record.RunID.String(),
+			Step:      record.CanvasName,
+			StepIndex: -1,
+			State:     serializeAttachedRunState(record.RunState),
+			Result:    serializeWorkOrderExecutionResult("", record.RunResult),
+			CreatedAt: timestamppb.New(record.CreatedAt),
+			UpdatedAt: timestamppb.New(record.UpdatedAt),
+			Run:       &pb.WorkOrderExecution_RunRef{Id: record.RunID.String(), AppId: record.CanvasID.String(), AppName: record.CanvasName},
+			StageKey:  record.StageKey,
+		}
+		if record.FinishedAt != nil {
+			item.FinishedAt = timestamppb.New(*record.FinishedAt)
+			item.DurationSeconds = int64(record.FinishedAt.Sub(record.CreatedAt).Seconds())
+		}
+		result = append(result, item)
+	}
+	return result
+}
+
+func serializeAttachedRunState(state string) pb.WorkOrderExecution_State {
+	switch state {
+	case models.CanvasRunStatePending:
+		return pb.WorkOrderExecution_STATE_PENDING
+	case models.CanvasRunStateStarted:
+		return pb.WorkOrderExecution_STATE_STARTED
+	case models.CanvasRunStateCancelling:
+		return pb.WorkOrderExecution_STATE_CANCELLING
+	case models.CanvasRunStateFinished:
+		return pb.WorkOrderExecution_STATE_FINISHED
+	default:
+		return pb.WorkOrderExecution_STATE_UNKNOWN
+	}
 }
 
 func loadAndSerializeWorkOrders(ctx context.Context, factory *models.Factory, orders []models.FactoryWorkOrder) ([]*pb.WorkOrderSummary, error) {
