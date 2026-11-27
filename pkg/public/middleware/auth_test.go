@@ -483,6 +483,21 @@ func TestAccountAuthMiddleware_FreshnessCheck(t *testing.T) {
 		w.WriteHeader(http.StatusNoContent)
 	}))
 
+	t.Run("valid JWT beyond absolute session age is rejected", func(t *testing.T) {
+		now := time.Now()
+		token := mintTestAccountToken(t, signer, r.Account.ID.String(), now,
+			now.Add(-authentication.AccountSessionMaxAge()-time.Hour), time.Hour)
+		_, err := signer.ValidateAndGetClaims(token)
+		require.NoError(t, err)
+
+		req := httptest.NewRequest(http.MethodGet, "/account", nil)
+		req.AddCookie(&http.Cookie{Name: "account_token", Value: token})
+		res := httptest.NewRecorder()
+		handler.ServeHTTP(res, req)
+
+		assert.Equal(t, http.StatusUnauthorized, res.Code)
+	})
+
 	t.Run("token without ses claim is rejected", func(t *testing.T) {
 		legacyToken, err := signer.Generate(r.Account.ID.String(), time.Hour)
 		require.NoError(t, err)
