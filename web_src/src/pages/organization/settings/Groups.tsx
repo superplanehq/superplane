@@ -1,4 +1,4 @@
-import type { GroupsGroup } from "@/api-client";
+import type { GroupsGroup, RolesRole } from "@/api-client";
 import { Timestamp } from "@/components/Timestamp";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router";
@@ -32,6 +32,12 @@ import {
 
 interface GroupsProps {
   organizationId: string;
+}
+
+function getGroupRoleLabel(group: GroupsGroup, roles: RolesRole[], isPending: boolean): string {
+  if (isPending) return "Updating...";
+
+  return roles.find((role) => role?.metadata?.name === group.spec?.role)?.spec?.displayName || "Select Role";
 }
 
 function getGroupSortValue(group: GroupsGroup, key: string | null): string | number {
@@ -278,10 +284,7 @@ export function Groups({ organizationId }: GroupsProps) {
                               )}
                               disabled={updateGroupMutation.isPending || !canUpdateGroups}
                             >
-                              {updateGroupMutation.isPending
-                                ? "Updating..."
-                                : roles.find((r) => r?.metadata?.name === group.spec?.role)?.spec?.displayName ||
-                                  "Select Role"}
+                              {getGroupRoleLabel(group, roles, updateGroupMutation.isPending)}
                               <Icon name="chevron-down" />
                             </button>
                           </DropdownMenuTrigger>
