@@ -55,12 +55,7 @@ export function useAddColumnAutomation(args: {
     ? pickerCatalogForColumn(column, catalogOptions)
     : { catalog: [], unavailableReasons: {} };
   const catalog = pickerCatalog.catalog;
-  const takenIds = column
-    ? takenCatalogIds(
-        ["backlog", "phase-0", "verify", "done", column].flatMap((key) => args.automationsFor(key as ColumnKey)),
-        catalog,
-      )
-    : [];
+  const takenIds = column ? takenCatalogIds(installedPickerAutomations(column, args.automationsFor), catalog) : [];
 
   const closePicker = () => {
     setColumn(null);
@@ -83,7 +78,7 @@ export function useAddColumnAutomation(args: {
   };
 
   const onSelect = async (entry: ColumnAutomationCatalogEntry) => {
-    if (!column || pickerCatalog.unavailableReasons[entry.id]) {
+    if (!column || pickerCatalog.unavailableReasons[entry.id] || takenIds.includes(entry.id)) {
       return;
     }
     if (needsFocusedAutomationSetup(entry, column)) {
@@ -111,6 +106,10 @@ export function useAddColumnAutomation(args: {
       }
       return;
     }
+    if (entry.kind === "analysis" || entry.kind === "agent-step") {
+      await restoreColumnAutomation(entry, column, args.lineId, createAutomation.mutateAsync, closePicker);
+      return;
+    }
     if (entry.kind === "custom") setNaming(true);
   };
 
@@ -135,13 +134,40 @@ export function useAddColumnAutomation(args: {
     naming,
     openPicker,
     closePicker,
-    catalog,
+    catalog: catalog.filter((entry) => column !== "backlog" || entry.kind !== "intake"),
     takenIds,
     unavailableReasons: pickerCatalog.unavailableReasons,
     onSelect,
     createNamed,
     isPending: createAutomation.isPending || isInstalling,
   };
+}
+
+function installedPickerAutomations(column: ColumnKey, automationsFor: (key: ColumnKey) => ColumnAutomation[]) {
+  const keys: ColumnKey[] = ["backlog", "phase-0", "verify", "done", column];
+  // Built-in templates are workspace-wide, but each stage has its own agent slot.
+  return keys.flatMap((key) =>
+    automationsFor(key).filter((automation) => automation.kind !== "agent-step" || key === column),
+  );
+}
+
+async function restoreColumnAutomation(
+  entry: ColumnAutomationCatalogEntry,
+  column: ColumnKey,
+  lineId: string | undefined,
+  create: ReturnType<typeof useCreateFactoryAutomation>["mutateAsync"],
+  close: () => void,
+) {
+  try {
+    await create({
+      name: entry.name,
+      templateId: entry.kind === "analysis" ? "backlog" : "line-implementation",
+      installParams: { lineId: lineId ?? "", stageKey: column },
+    });
+    close();
+  } catch {
+    showErrorToast("Could not add automation. Try again.");
+  }
 }
 
 function needsFocusedAutomationSetup(entry: ColumnAutomationCatalogEntry, column: ColumnKey): boolean {

@@ -15,7 +15,6 @@ import { useState } from "react";
 
 import {
   INTAKE_SETTINGS_COPY,
-  intakeSupportsDelete,
   linearIntakeScopeMissing,
   normalizeIntakeSourceSettings,
   type IntakeSourceSettings,
@@ -38,6 +37,7 @@ type IntakeSourceSettingsFooterProps = {
   onDelete?: () => Promise<void> | void;
   onSave: (next: IntakeSourceSettings) => Promise<void> | void;
   onClose: () => void;
+  historyOnly?: boolean;
 };
 
 export function IntakeSourceSettingsFooter({
@@ -54,6 +54,7 @@ export function IntakeSourceSettingsFooter({
   getDraft,
   onSave,
   onClose,
+  historyOnly = false,
 }: IntakeSourceSettingsFooterProps) {
   const [deleteOpen, setDeleteOpen] = useState(false);
   if (!canEdit) {
@@ -66,7 +67,7 @@ export function IntakeSourceSettingsFooter({
     );
   }
 
-  const deleteControls = intakeSupportsDelete(sourceId);
+  const deleteControls = Boolean(onDelete);
   const linearScopeMissing = sourceId === "linear-issues" && linearIntakeScopeMissing(draft);
   const sentryProjectsMissing = sourceId === "sentry-exceptions" && draft.sentryProjectIds.length === 0;
   const scopeMissing = linearScopeMissing || sentryProjectsMissing;
@@ -95,18 +96,20 @@ export function IntakeSourceSettingsFooter({
             </p>
           ) : null}
         </div>
-        <IntakeSaveButtons
-          sourceId={sourceId}
-          draft={draft}
-          linearLabelsRequired={linearLabelsRequired}
-          linearProjectsRequired={linearProjectsRequired}
-          savePending={savePending}
-          deletePending={deletePending}
-          scopeMissing={scopeMissing}
-          getDraft={getDraft}
-          onSave={onSave}
-          onClose={onClose}
-        />
+        {!historyOnly ? (
+          <IntakeSaveButtons
+            sourceId={sourceId}
+            draft={draft}
+            linearLabelsRequired={linearLabelsRequired}
+            linearProjectsRequired={linearProjectsRequired}
+            savePending={savePending}
+            deletePending={deletePending}
+            scopeMissing={scopeMissing}
+            getDraft={getDraft}
+            onSave={onSave}
+            onClose={onClose}
+          />
+        ) : null}
       </footer>
       {deleteControls ? (
         <IntakeDeleteConfirmDialog

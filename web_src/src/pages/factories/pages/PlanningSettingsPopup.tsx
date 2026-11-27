@@ -1,4 +1,7 @@
 import { FactoryAutomationSettingsTabs } from "./FactoryAutomationSettingsTabs";
+import { useState } from "react";
+import { ColumnAutomationViewFooter } from "./ColumnAutomationViewPopup";
+import { ColumnAutomationFooterSlotProvider } from "./columnAutomationFooterSlot";
 
 import { type PlanningReviewAgentSlot } from "./PlanningReviewEditor";
 import { FactoryAutomationHistory } from "./FactoryAutomationHistory";
@@ -29,6 +32,8 @@ interface PlanningSettingsPopupProps {
   onSave: (next: PlanningDraftSettings) => Promise<void> | void;
   savePending?: boolean;
   saveError?: string;
+  onDelete?: () => Promise<void> | void;
+  deletePending?: boolean;
   canvasId?: string;
   agent?: PlanningReviewAgentSlot;
   onClose: () => void;
@@ -49,12 +54,16 @@ export function PlanningSettingsPopup({
   onSave,
   savePending = false,
   saveError,
+  onDelete,
+  deletePending = false,
   canvasId,
   agent,
   onClose,
   fixed = true,
   initialTab = "general",
 }: PlanningSettingsPopupProps) {
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [footerSlot, setFooterSlot] = useState<HTMLDivElement | null>(null);
   const editor = usePlanningSettingsDraft({ settings, agent, savePending, onSave, onClose });
   const history = useFactoryAutomationNavigation({
     organizationId,
@@ -68,61 +77,72 @@ export function PlanningSettingsPopup({
   const { tab, setTab } = history;
 
   return (
-    <PopupShell testId="planning-settings" canvas fixed={fixed} onDismiss={onClose}>
-      <PopupHeader
-        title={title}
-        onClose={onClose}
-        actions={
-          tab === "general" ? (
-            <PlanningSettingsMenu
-              enabled={editor.draft.enabled}
-              disabled={editor.busy}
-              onEnabledChange={(enabled) => void editor.setPlanningEnabled(enabled)}
-            />
-          ) : undefined
-        }
-      >
-        <FactoryAutomationSettingsTabs
-          tab={tab}
-          onTabChange={setTab}
-          hasAgent={false}
-          generalLabel="Configuration"
-          historyEnabled={history.enabled}
-          label={PLANNING_SETTINGS_COPY.tabsLabel}
-          testId="planning-settings"
-        />
-      </PopupHeader>
-      {tab === "runs" ? (
-        <FactoryAutomationHistory
-          organizationId={history.organizationId}
-          factoryId={history.factoryId}
-          canvasId={canvasId}
-          selectedRunId={history.selectedRunId}
-          onSelectRun={history.setSelectedRunId}
-          loading={automationLoading}
-          error={automationError}
-          onRetry={onRetryAutomation}
-        />
-      ) : (
-        <PlanningSettingsConfiguration
-          draft={editor.draft}
-          lines={lines}
-          agent={agent}
-          agentDraft={editor.agentDraft}
-          onAgentChange={editor.setEditedAgent}
-          onUpdate={editor.update}
-          onRetry={onRetryAutomation}
-          saving={editor.busy}
-        />
-      )}
-      {tab === "general" ? (
-        <PlanningSettingsFooter
-          error={editor.saveError || saveError}
-          saving={editor.busy}
-          disabled={editor.saveDisabled}
-          onSave={() => void editor.save()}
-        />
-      ) : null}
-    </PopupShell>
+    <ColumnAutomationFooterSlotProvider slot={onDelete ? (confirmDelete ? null : footerSlot) : undefined}>
+      <PopupShell testId="planning-settings" canvas fixed={fixed} onDismiss={onClose}>
+        <PopupHeader
+          title={title}
+          onClose={onClose}
+          actions={
+            tab === "general" ? (
+              <PlanningSettingsMenu
+                enabled={editor.draft.enabled}
+                disabled={editor.busy}
+                onEnabledChange={(enabled) => void editor.setPlanningEnabled(enabled)}
+              />
+            ) : undefined
+          }
+        >
+          <FactoryAutomationSettingsTabs
+            tab={tab}
+            onTabChange={setTab}
+            hasAgent={false}
+            generalLabel="Configuration"
+            historyEnabled={history.enabled}
+            label={PLANNING_SETTINGS_COPY.tabsLabel}
+            testId="planning-settings"
+          />
+        </PopupHeader>
+        {tab === "runs" ? (
+          <FactoryAutomationHistory
+            organizationId={history.organizationId}
+            factoryId={history.factoryId}
+            canvasId={canvasId}
+            selectedRunId={history.selectedRunId}
+            onSelectRun={history.setSelectedRunId}
+            loading={automationLoading}
+            error={automationError}
+            onRetry={onRetryAutomation}
+          />
+        ) : (
+          <PlanningSettingsConfiguration
+            draft={editor.draft}
+            lines={lines}
+            agent={agent}
+            agentDraft={editor.agentDraft}
+            onAgentChange={editor.setEditedAgent}
+            onUpdate={editor.update}
+            onRetry={onRetryAutomation}
+            saving={editor.busy}
+          />
+        )}
+        {tab === "general" && !confirmDelete ? (
+          <PlanningSettingsFooter
+            error={editor.saveError || saveError}
+            saving={editor.busy}
+            disabled={editor.saveDisabled}
+            onSave={() => void editor.save()}
+          />
+        ) : null}
+        {onDelete ? (
+          <ColumnAutomationViewFooter
+            confirmDelete={confirmDelete}
+            deletePending={deletePending}
+            onDelete={onDelete}
+            onConfirmDelete={setConfirmDelete}
+            onActionsSlot={setFooterSlot}
+          />
+        ) : null}
+      </PopupShell>
+    </ColumnAutomationFooterSlotProvider>
   );
 }

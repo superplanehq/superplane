@@ -1719,8 +1719,11 @@ func Test__FactoryIntakeActions(t *testing.T) {
 	t.Run("deleting an intake retires its canvas", func(t *testing.T) {
 		factory := newFactory(t)
 		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES})
+		canvasID := uuid.MustParse(intake.GetCanvasId())
+		run, err := models.CreateCanvasRunInTransaction(database.DB(t.Context()), canvasID, intakeTriggerNodeID, models.CanvasRunStateStarted, "")
+		require.NoError(t, err)
 
-		_, err := DeleteFactoryIntake(ctx, orgID, &pb.DeleteFactoryIntakeRequest{
+		_, err = DeleteFactoryIntake(ctx, orgID, &pb.DeleteFactoryIntakeRequest{
 			FactoryId: factory.ID.String(),
 			IntakeId:  intake.GetId(),
 		})
@@ -1732,6 +1735,9 @@ func Test__FactoryIntakeActions(t *testing.T) {
 
 		_, err = models.FindCanvasInTransaction(database.DB(t.Context()), r.Organization.ID, uuid.MustParse(intake.GetCanvasId()))
 		assert.Error(t, err)
+		run, err = models.FindCanvasRunInTransaction(database.DB(t.Context()), canvasID, run.ID)
+		require.NoError(t, err)
+		assert.Equal(t, models.CanvasRunStateCancelling, run.State)
 	})
 
 	t.Run("deleting an intake leaves existing work orders", func(t *testing.T) {

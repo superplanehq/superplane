@@ -196,6 +196,31 @@ describe("LinesPage Done column", () => {
     expect(screen.queryByTestId("lines-column-title-phase-2")).not.toBeInTheDocument();
   });
 
+  it("keeps saved columns and agent installation accessible after the sole agent is deleted", async () => {
+    renderBoard({
+      ...REFUND_FACTORY,
+      lines: [
+        {
+          ...REFUND_FACTORY.lines![0],
+          steps: [],
+          stages: [
+            { id: "backlog", key: "backlog", name: "Backlog", kind: "STAGE_KIND_BACKLOG" },
+            { id: "implement", key: "phase-0", name: "Implement", kind: "STAGE_KIND_PHASE" },
+            { id: "verify", key: "verify", name: "Verify", kind: "STAGE_KIND_PHASE" },
+            { id: "done", key: "done", name: "Done", kind: "STAGE_KIND_DONE" },
+          ],
+        },
+      ],
+    });
+
+    const implement = screen.getByTestId("lines-stage-shell-phase-0");
+    expect(screen.getByTestId("lines-backlog-column")).toBeInTheDocument();
+    expect(screen.getByTestId("lines-verify-column")).toBeInTheDocument();
+    expect(screen.getByTestId("lines-done-column")).toBeInTheDocument();
+    await userEvent.setup().click(within(implement).getByRole("button", { name: /Add automation/ }));
+    expect(screen.getByRole("button", { name: /Run an agent/ })).toBeEnabled();
+  });
+
   it("hides merge confidence on a completed Done card", () => {
     useFactoryWorkOrders.mockReturnValue({
       data: [

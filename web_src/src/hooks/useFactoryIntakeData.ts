@@ -194,6 +194,7 @@ export function useDeleteFactoryIntake(organizationId: string, factoryId: string
       );
     },
     onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: factoryQueryKeys.detail(organizationId, factoryId) });
       void queryClient.invalidateQueries({ queryKey: factoryIntakesKey(organizationId, factoryId) });
       void queryClient.invalidateQueries({ queryKey: factoryAppsKey(organizationId, factoryId) });
       void queryClient.invalidateQueries({ queryKey: factoryQueryKeys.workOrders(organizationId, factoryId) });

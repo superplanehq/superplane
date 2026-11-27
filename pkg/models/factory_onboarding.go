@@ -49,6 +49,7 @@ var factoryOnboardingRepositoryPattern = regexp.MustCompile(`^[^/\s]+/[^/\s]+$`)
 // FactoryOnboardingConfig stores durable wizard choices and provisioned
 // resource IDs. Empty strings mean the field has not been saved yet.
 type FactoryOnboardingConfig struct {
+	BacklogAutomationRemoved   bool   `json:"backlog_automation_removed,omitempty"`
 	InitialOnboardingAttemptID string `json:"initial_onboarding_attempt_id,omitempty"`
 	VCSIntegrationID           string `json:"vcs_integration_id,omitempty"`
 	// VCSProvider is the Git host. Empty means GitHub. Existing rows stay empty.
@@ -251,6 +252,12 @@ func (f *Factory) UpdateOnboarding(tx *gorm.DB, patch FactoryOnboardingPatch) er
 	}
 
 	return f.persistOnboarding(tx, merged, f.OnboardingCompletedAt)
+}
+
+func (f *Factory) SetBacklogAutomationRemoved(tx *gorm.DB, removed bool) error {
+	config := f.OnboardingConfigValue()
+	config.BacklogAutomationRemoved = removed
+	return f.persistOnboarding(tx, config, f.OnboardingCompletedAt)
 }
 
 // CompleteOnboarding merges an optional patch, validates readiness, and sets

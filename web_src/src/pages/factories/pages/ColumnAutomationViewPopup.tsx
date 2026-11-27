@@ -150,7 +150,7 @@ export function ColumnAutomationViewPopup({
   );
 }
 
-function ColumnAutomationViewFooter({
+export function ColumnAutomationViewFooter({
   confirmDelete,
   deletePending,
   onDelete,
@@ -161,8 +161,9 @@ function ColumnAutomationViewFooter({
   deletePending: boolean;
   onDelete: () => Promise<void> | void;
   onConfirmDelete: (next: boolean) => void;
-  onActionsSlot: (slot: HTMLDivElement | null) => void;
+  onActionsSlot?: (slot: HTMLDivElement | null) => void;
 }) {
+  const [deleteError, setDeleteError] = useState<string>();
   return (
     <footer
       className="flex shrink-0 items-center justify-between gap-3 border-t border-border px-5 py-3"
@@ -171,7 +172,7 @@ function ColumnAutomationViewFooter({
       {confirmDelete ? (
         <>
           <p className="workspace-body-text text-destructive" role="alert">
-            {COLUMN_AUTOMATIONS_COPY.confirmDelete}
+            {deleteError || COLUMN_AUTOMATIONS_COPY.confirmDelete}
           </p>
           <div className="flex items-center gap-2">
             <Button type="button" variant="outline" size="sm" onClick={() => onConfirmDelete(false)}>
@@ -182,7 +183,14 @@ function ColumnAutomationViewFooter({
               variant="destructive"
               size="sm"
               disabled={deletePending}
-              onClick={() => void onDelete()}
+              onClick={async () => {
+                setDeleteError(undefined);
+                try {
+                  await onDelete();
+                } catch {
+                  setDeleteError("Could not delete automation. Try again.");
+                }
+              }}
               data-testid="column-automation-view-delete-confirm"
             >
               {deletePending ? COLUMN_AUTOMATIONS_COPY.deletingLabel : COLUMN_AUTOMATIONS_COPY.deleteLabel}
