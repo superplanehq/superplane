@@ -1,6 +1,8 @@
 package models
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
 	"maps"
 	"strings"
@@ -507,6 +509,148 @@ func FindGitHubIntegrationByAppState(tx *gorm.DB, state string) (*Integration, e
 		return nil, err
 	}
 	return &integration, nil
+}
+
+var ErrInvalidGitHubAppCreation = errors.New("invalid GitHub App creation attempt")
+
+const githubAppCreationClaim = "appCreationClaim"
+
+// ClaimGitHubAppCreation consumes state before the manifest code is redeemed.
+func (a *Integration) ClaimGitHubAppCreation(db *gorm.DB, state string) (*Integration, string, error) {
+	claim := uuid.NewString()
+	var current *Integration
+	err := db.Transaction(func(tx *gorm.DB) error {
+		var err error
+		current, err = a.lockPendingGitHubAppCreation(tx)
+		if err != nil {
+			return err
+		}
+		stored := ""
+		if current.IsLegacy() {
+			stored, _ = current.Metadata.Data()["state"].(string)
+		} else {
+			found := false
+			for _, property := range current.Properties {
+				if property.Name == "appState" {
+					if found {
+						return ErrInvalidGitHubAppCreation
+					}
+					found = true
+					stored, _ = property.Value.(string)
+				}
+			}
+		}
+		if state == "" || stored != state {
+			return ErrInvalidGitHubAppCreation
+		}
+		if current.IsLegacy() && current.BrowserAction.Data().FormFields["state"] != state {
+			return ErrInvalidGitHubAppCreation
+		}
+		metadata := maps.Clone(current.Metadata.Data())
+		if metadata == nil {
+			metadata = map[string]any{}
+		}
+		metadata[githubAppCreationClaim] = claim
+		delete(metadata, "state")
+		current.Metadata = datatypes.NewJSONType(metadata)
+		for index := range current.Properties {
+			if current.Properties[index].Name == "appState" {
+				current.Properties[index].Value = ""
+			}
+		}
+		return tx.Save(current).Error
+	})
+	return current, claim, err
+}
+
+// LockClaimedGitHubAppCreation rejects callbacks superseded by a new setup attempt.
+func (a *Integration) LockClaimedGitHubAppCreation(tx *gorm.DB, claim string) (*Integration, error) {
+	current, err := a.lockPendingGitHubAppCreation(tx)
+	if err != nil {
+		return nil, err
+	}
+	if claim == "" || current.Metadata.Data()[githubAppCreationClaim] != claim {
+		return nil, ErrInvalidGitHubAppCreation
+	}
+	if _, exists := current.Metadata.Data()["state"]; exists {
+		return nil, ErrInvalidGitHubAppCreation
+	}
+	found := false
+	for _, property := range current.Properties {
+		if property.Name == "appState" {
+			if found || property.Value != "" {
+				return nil, ErrInvalidGitHubAppCreation
+			}
+			found = true
+		}
+	}
+	if !current.IsLegacy() && !found {
+		return nil, ErrInvalidGitHubAppCreation
+	}
+	return current, nil
+}
+
+func (a *Integration) lockPendingGitHubAppCreation(tx *gorm.DB) (*Integration, error) {
+	var current Integration
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ? AND app_name = ?", a.ID, "github").First(&current).Error; err != nil {
+		return nil, err
+	}
+	if current.State != IntegrationStatePending {
+		return nil, ErrInvalidGitHubAppCreation
+	}
+	var metadata struct {
+		State          string `json:"state"`
+		HostedApp      bool   `json:"hostedApp"`
+		InstallationID string `json:"installationId"`
+		GitHubApp      struct {
+			ID       int64  `json:"id"`
+			Slug     string `json:"slug"`
+			ClientID string `json:"clientId"`
+		} `json:"githubApp"`
+	}
+	encoded, err := json.Marshal(current.Metadata.Data())
+	if err != nil {
+		return nil, ErrInvalidGitHubAppCreation
+	}
+	if err := json.Unmarshal(encoded, &metadata); err != nil {
+		return nil, ErrInvalidGitHubAppCreation
+	}
+	if metadata.HostedApp || metadata.InstallationID != "" || metadata.GitHubApp.ID != 0 || metadata.GitHubApp.Slug != "" || metadata.GitHubApp.ClientID != "" {
+		return nil, ErrInvalidGitHubAppCreation
+	}
+	if current.IsLegacy() {
+		if current.BrowserAction == nil {
+			return nil, ErrInvalidGitHubAppCreation
+		}
+		action := current.BrowserAction.Data()
+		if action.Method != "POST" || action.FormFields["manifest"] == "" {
+			return nil, ErrInvalidGitHubAppCreation
+		}
+	} else {
+		if current.SetupState == nil || current.SetupState.Data().CurrentStep == nil || current.SetupState.Data().CurrentStep.Name != "createApp" {
+			return nil, ErrInvalidGitHubAppCreation
+		}
+	}
+	for _, property := range current.Properties {
+		switch property.Name {
+		case "appID", "appSlug", "appURL", "appClientID", "appInstallationID", "appInstallationURL":
+			return nil, ErrInvalidGitHubAppCreation
+		}
+	}
+	var count int64
+	if err := tx.Model(&IntegrationSecret{}).Where("installation_id = ? AND name IN ?", a.ID, []string{"pem", "clientSecret", "webhookSecret", "appPEM", "appClientSecret", "appWebhookSecret"}).Count(&count).Error; err != nil {
+		return nil, err
+	}
+	if count != 0 {
+		return nil, ErrInvalidGitHubAppCreation
+	}
+	return &current, nil
+}
+
+func (a *Integration) ClearGitHubAppCreationClaim() {
+	metadata := maps.Clone(a.Metadata.Data())
+	delete(metadata, githubAppCreationClaim)
+	a.Metadata = datatypes.NewJSONType(metadata)
 }
 
 // FindJiraIntegrationByOAuthState finds the pending Jira connection that
