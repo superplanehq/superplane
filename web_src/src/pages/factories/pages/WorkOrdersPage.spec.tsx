@@ -238,7 +238,7 @@ describe("WorkOrdersPage broken integrations banner", () => {
 });
 
 describe("Workspace webhook warning", () => {
-  it.each(["lines", "work-orders", "work-orders/wo-open-refunds"])(
+  it.each(["", "work-orders", "work-orders/wo-open-refunds"])(
     "shows one webhook warning on %s without an issues intake",
     async (page) => {
       render(
@@ -273,7 +273,7 @@ describe("Workspace webhook warning", () => {
           ]}
         />,
       );
-      if (page === "lines") {
+      if (page === "") {
         const banner = await screen.findByTestId("webhook-failures-notice", {}, { timeout: 8000 });
         expect(screen.queryByTestId("broken-integrations-banner")).not.toBeInTheDocument();
         expect(within(banner).getByRole("button", { name: "Try again" })).toBeEnabled();

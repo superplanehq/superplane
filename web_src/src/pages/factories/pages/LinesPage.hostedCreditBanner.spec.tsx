@@ -4,11 +4,7 @@ import { beforeAll, describe, expect, it } from "bun:test";
 import { client } from "@/api-client/client.gen";
 
 import { FactoriesHarness } from "../__fixtures__/FactoriesHarness";
-import {
-  defaultFactoriesFixture,
-  PRIMARY_FACTORY_KEY,
-  REFUND_LINE_PLAN_ID,
-} from "../__fixtures__/factoryPageResponses";
+import { defaultFactoriesFixture, PRIMARY_FACTORY_KEY } from "../__fixtures__/factoryPageResponses";
 import {
   BUSINESS_ORGANIZATION_BILLING,
   LAPSED_ORGANIZATION_BILLING,
@@ -30,7 +26,7 @@ describe("LinesPage hosted credit banner", () => {
   it("hides the banner when purchased hosted credit is comfortably above $20", async () => {
     render(
       <FactoriesHarness
-        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`}
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}`}
         factoriesFixture={{
           ...defaultFactoriesFixture,
           organizationWorkspaceUsage: PURCHASED_CREDIT_USAGE_REPORT,
@@ -45,7 +41,7 @@ describe("LinesPage hosted credit banner", () => {
   }, 10000);
 
   it("shows the trial chip next to the line title when welcome credit remains", async () => {
-    render(<FactoriesHarness pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`} />);
+    render(<FactoriesHarness pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}`} />);
 
     const kicker = await screen.findByTestId("hosted-credit-header-kicker", {}, { timeout: 8000 });
     expect(kicker).toHaveTextContent(defaultTrialLabel);
@@ -62,7 +58,7 @@ describe("LinesPage hosted credit banner", () => {
   it("keeps the trial chip next to the line title when welcome credit is spent", async () => {
     render(
       <FactoriesHarness
-        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`}
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}`}
         factoriesFixture={{
           ...defaultFactoriesFixture,
           organizationWorkspaceUsage: SPENT_CREDIT_USAGE_REPORT,
@@ -85,7 +81,7 @@ describe("LinesPage hosted credit banner", () => {
   it("shows a low-credit chip with the remaining balance when purchased credit is at or below $20", async () => {
     render(
       <FactoriesHarness
-        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`}
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}`}
         factoriesFixture={{
           ...defaultFactoriesFixture,
           organizationWorkspaceUsage: LOW_CREDIT_USAGE_REPORT,
@@ -109,7 +105,7 @@ describe("LinesPage hosted credit banner", () => {
   it("shows a no-plan chip next to the line title when the plan is none", async () => {
     render(
       <FactoriesHarness
-        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`}
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}`}
         factoriesFixture={{
           ...defaultFactoriesFixture,
           organizationWorkspaceUsage: LAPSED_TOPUP_USAGE_REPORT,

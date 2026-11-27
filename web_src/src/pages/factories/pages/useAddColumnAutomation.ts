@@ -74,9 +74,7 @@ export function useAddColumnAutomation(args: {
     const setupColumn = customAutomationSetupColumn(key);
     const customStage = key.startsWith("custom-");
     if (setupColumn !== null && onlyCustomCatalogRemains(nextCatalog, nextTaken) && args.lineId) {
-      navigate(
-        factoryCustomAutomationSetupPath(args.organizationId, args.factoryKey, args.lineId, undefined, setupColumn),
-      );
+      navigate(factoryCustomAutomationSetupPath(args.organizationId, args.factoryKey, undefined, setupColumn));
       return;
     }
     setColumn(key);
@@ -88,12 +86,7 @@ export function useAddColumnAutomation(args: {
     if (!column || pickerCatalog.unavailableReasons[entry.id]) {
       return;
     }
-    if (
-      entry.kind === "pr-discussion" ||
-      entry.kind === "pr-checks" ||
-      entry.kind === "custom-verification" ||
-      (entry.kind === "custom" && column.startsWith("custom-"))
-    ) {
+    if (needsFocusedAutomationSetup(entry, column)) {
       openFocusedVerifySetup(entry, column, args, navigate, closePicker);
       return;
     }
@@ -114,7 +107,7 @@ export function useAddColumnAutomation(args: {
     if (entry.kind === "risk-score") {
       closePicker();
       if (args.lineId) {
-        navigate(factoryRiskScoreSetupPath(args.organizationId, args.factoryKey, args.lineId));
+        navigate(factoryRiskScoreSetupPath(args.organizationId, args.factoryKey));
       }
       return;
     }
@@ -149,6 +142,15 @@ export function useAddColumnAutomation(args: {
     createNamed,
     isPending: createAutomation.isPending || isInstalling,
   };
+}
+
+function needsFocusedAutomationSetup(entry: ColumnAutomationCatalogEntry, column: ColumnKey): boolean {
+  return (
+    entry.kind === "pr-discussion" ||
+    entry.kind === "pr-checks" ||
+    entry.kind === "custom-verification" ||
+    (entry.kind === "custom" && column.startsWith("custom-"))
+  );
 }
 
 function githubVerifyTemplate(
@@ -203,20 +205,9 @@ function focusedVerifySetupPath(
   }
   if (entry.kind === "custom-verification" || entry.kind === "custom") {
     const setupColumn = customAutomationSetupColumn(column);
-    return factoryCustomAutomationSetupPath(
-      args.organizationId,
-      args.factoryKey,
-      args.lineId,
-      undefined,
-      setupColumn ?? undefined,
-    );
+    return factoryCustomAutomationSetupPath(args.organizationId, args.factoryKey, undefined, setupColumn ?? undefined);
   }
-  return factoryPRFeedbackSetupPath(
-    args.organizationId,
-    args.factoryKey,
-    args.lineId,
-    prFeedbackSetupKindFromSourceId(sourceId),
-  );
+  return factoryPRFeedbackSetupPath(args.organizationId, args.factoryKey, prFeedbackSetupKindFromSourceId(sourceId));
 }
 
 async function installationName(organizationId: string, integrationId: string): Promise<string> {

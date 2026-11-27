@@ -6,7 +6,7 @@ export {
   FactoryAppCanvasPage,
   FactoryAutomationRunPage,
   FactoryAppSplitRunPage,
-  FactoryHomeRedirect,
+  FactoryBoardIndex,
   FactoryLineEditPage,
   FactorySettingsGeneralPage,
   FactorySettingsLayout,

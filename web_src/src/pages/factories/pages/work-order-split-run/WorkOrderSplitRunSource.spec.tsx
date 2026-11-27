@@ -121,7 +121,7 @@ describe("WorkOrderSplitRunSource", () => {
 
       const link = screen.getByRole("link", { name: "View run" });
       expect(link.getAttribute("href")).toBe(
-        "/org-1/workspaces/sp/lines/line-1?customAutomation=canvas-eslint&automationColumn=backlog&automationTab=runs&automationRun=run-eslint-1",
+        "/org-1/workspaces/sp?customAutomation=canvas-eslint&automationColumn=backlog&automationTab=runs&automationRun=run-eslint-1",
       );
     });
 

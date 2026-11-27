@@ -46,4 +46,3 @@ wrk3.yml
 /api/swagger/*
 !/api/swagger/swagger-ui.html
 server
-/.superplane/
