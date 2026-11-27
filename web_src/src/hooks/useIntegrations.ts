@@ -27,6 +27,8 @@ export const integrationKeys = {
   all: ["integrations"] as const,
   available: (organizationId?: string) => [...integrationKeys.all, "available", organizationId ?? ""] as const,
   connected: (organizationId: string) => [...integrationKeys.all, "connected", organizationId] as const,
+  workspace: (organizationId: string, factoryId: string) =>
+    [...integrationKeys.connected(organizationId), "workspace", factoryId] as const,
   integration: (organizationId: string, integrationId: string) =>
     [...integrationKeys.connected(organizationId), integrationId] as const,
   resources: (
@@ -78,22 +80,30 @@ export const useAvailableIntegrations = (options?: { enabled?: boolean; organiza
   };
 };
 
-// Hook to fetch connected integrations for an organization
-export const useConnectedIntegrations = (organizationId: string, options?: { enabled?: boolean }) => {
+// Fetch organization connections, optionally scoped to workspace usage.
+export const useConnectedIntegrations = (
+  organizationId: string,
+  options?: { enabled?: boolean; factoryId?: string },
+) => {
   return useQuery({
-    queryKey: integrationKeys.connected(organizationId),
+    queryKey:
+      options?.factoryId === undefined
+        ? integrationKeys.connected(organizationId)
+        : integrationKeys.workspace(organizationId, options.factoryId),
     queryFn: async () => {
       const response = await organizationsListIntegrations(
         withOrganizationHeader({
           organizationId,
           path: { id: organizationId },
+          query: { factoryId: options?.factoryId },
         }),
       );
       return response.data?.integrations || [];
     },
     staleTime: 2 * 60 * 1000, // 2 minutes
     gcTime: 5 * 60 * 1000, // 5 minutes
-    enabled: !!organizationId && (options?.enabled ?? true),
+    enabled:
+      !!organizationId && (options?.factoryId === undefined || !!options.factoryId) && (options?.enabled ?? true),
   });
 };
 

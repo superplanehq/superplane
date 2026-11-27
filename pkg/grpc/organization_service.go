@@ -347,7 +347,7 @@ func (s *OrganizationService) AcceptInvitation(ctx context.Context, req *pb.Acce
 
 func (s *OrganizationService) ListIntegrations(ctx context.Context, req *pb.ListIntegrationsRequest) (*pb.ListIntegrationsResponse, error) {
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return organizations.ListIntegrations(ctx, s.registry, orgID)
+	return organizations.ListIntegrations(ctx, s.registry, orgID, req.GetFactoryId())
 }
 
 func (s *OrganizationService) DescribeIntegration(ctx context.Context, req *pb.DescribeIntegrationRequest) (*pb.DescribeIntegrationResponse, error) {
