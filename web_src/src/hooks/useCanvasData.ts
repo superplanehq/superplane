@@ -710,6 +710,22 @@ export type CanvasRunsFilters = {
   includeTask?: boolean;
 };
 
+function buildCanvasRunsQuery(
+  filters: CanvasRunsFilters,
+  cursor: string | undefined,
+  limit: number,
+): CanvasRunsFilters & { limit: number; before?: string } {
+  return {
+    limit,
+    ...(filters.states?.length ? { states: filters.states } : {}),
+    ...(filters.results?.length ? { results: filters.results } : {}),
+    ...(filters.includeTask ? { includeTask: true } : {}),
+    ...(filters.search ? { search: filters.search } : {}),
+    ...(filters.triggerIds?.length ? { triggerIds: filters.triggerIds } : {}),
+    ...(cursor ? { before: cursor } : {}),
+  };
+}
+
 export const useDescribeRun = (canvasId: string, runId: string | null, enabled = true, includeTask = false) => {
   const queryClient = useQueryClient();
 
@@ -775,15 +791,7 @@ export const useInfiniteCanvasRuns = (canvasId: string, filters: CanvasRunsFilte
         withOrganizationHeader({
           path: { canvasId },
           signal,
-          query: {
-            limit,
-            ...(filters.states?.length ? { states: filters.states } : {}),
-            ...(filters.results?.length ? { results: filters.results } : {}),
-            ...(filters.includeTask ? { includeTask: true } : {}),
-            ...(filters.search ? { search: filters.search } : {}),
-            ...(filters.triggerIds?.length ? { triggerIds: filters.triggerIds } : {}),
-            ...(pageParam ? { before: pageParam } : {}),
-          },
+          query: buildCanvasRunsQuery(filters, pageParam, limit),
         }),
       );
       if (pageParam == null) {

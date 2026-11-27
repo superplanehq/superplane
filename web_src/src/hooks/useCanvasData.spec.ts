@@ -109,6 +109,7 @@ describe("useInfiniteCanvasRuns", () => {
       expect.objectContaining({
         path: { canvasId: "canvas-1" },
         query: { limit: 25 },
+        signal: expect.any(AbortSignal),
       }),
     );
     expect(canvasesListRuns).toHaveBeenNthCalledWith(
@@ -135,6 +136,8 @@ describe("useInfiniteCanvasRuns", () => {
         useInfiniteCanvasRuns("canvas-1", {
           states: ["STATE_FINISHED"],
           results: ["RESULT_FAILED", "RESULT_CANCELLED"],
+          search: "deployment",
+          triggerIds: ["trigger-1", "trigger-2"],
         }),
       {
         wrapper: createWrapper(queryClient),
@@ -149,10 +152,36 @@ describe("useInfiniteCanvasRuns", () => {
             limit: 25,
             states: ["STATE_FINISHED"],
             results: ["RESULT_FAILED", "RESULT_CANCELLED"],
+            search: "deployment",
+            triggerIds: ["trigger-1", "trigger-2"],
           },
         }),
       );
     });
+  });
+
+  it("omits empty run filters from the list runs request", async () => {
+    const queryClient = createQueryClient();
+    canvasesListRuns.mockResolvedValueOnce({
+      data: { runs: [], totalCount: 0, hasNextPage: false },
+    });
+
+    renderHook(
+      () =>
+        useInfiniteCanvasRuns("canvas-1", {
+          states: [],
+          results: [],
+          search: "",
+          triggerIds: [],
+          includeTask: false,
+        }),
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    await waitFor(() => {
+      expect(canvasesListRuns).toHaveBeenCalledTimes(1);
+    });
+    expect(canvasesListRuns.mock.calls[0][0].query).toStrictEqual({ limit: 25 });
   });
 
   it("sends includeTask only when the run list asks for task labels", async () => {
