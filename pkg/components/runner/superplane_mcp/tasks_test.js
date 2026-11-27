@@ -53,6 +53,11 @@ test("create_task posts the title", async () => {
   assert.equal(calls[0].method, "POST");
   assert.equal(calls[0].url, "https://superplane.example/api/v1/runner/tasks");
   assert.deepEqual(calls[0].body, { title: "Ship it", description: "Notes" });
+
+  await registry.findTool("create_task").handler({ title: "Ship it", origin: " https://alerts.example/1 " }, client);
+  assert.deepEqual(calls[1].body, { title: "Ship it", description: "", origin: "https://alerts.example/1" });
+  await registry.findTool("get_task").handler({ origin: "https://alerts.example/1" }, client);
+  assert.equal(calls[2].url, "https://superplane.example/api/v1/runner/task/get?origin=https%3A%2F%2Falerts.example%2F1");
 });
 
 test("list_tasks rejects a limit above 100", async () => {

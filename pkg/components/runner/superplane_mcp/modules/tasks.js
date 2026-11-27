@@ -53,7 +53,8 @@ async function createTask(input, client) {
   if (exceedsCodePoints(description, MAX_DESCRIPTION_LENGTH)) {
     throw new Error("description must be at most 20000 characters");
   }
-  return client.request("POST", "/api/v1/runner/tasks", { title, description });
+  const origin = String((input && input.origin) || "").trim();
+  return client.request("POST", "/api/v1/runner/tasks", origin ? { title, description, origin } : { title, description });
 }
 
 async function closeTask(input, client) {
@@ -247,9 +248,10 @@ async function getTask(input, client) {
   const repository = selectorText(input && input.repository);
   const number = selectorText(input && input.number);
   const commit = selectorText(input && input.commit);
-  const selectors = [task, pullRequest, number, commit].filter(Boolean);
+  const origin = selectorText(input && input.origin);
+  const selectors = [task, pullRequest, number, commit, origin].filter(Boolean);
   if (selectors.length !== 1 || (repository && !number)) {
-    throw new Error("Pass exactly one of task, pull_request, number with an optional repository, or commit");
+    throw new Error("Pass exactly one of task, pull_request, number with an optional repository, commit, or origin");
   }
   const params = new URLSearchParams();
   if (task) params.set("task", task);
@@ -260,6 +262,7 @@ async function getTask(input, client) {
     if (repository) params.set("repository", repository);
   }
   if (commit) params.set("commit", commit);
+  if (origin) params.set("origin", origin);
   return client.request("GET", `/api/v1/runner/task/get?${params.toString()}`);
 }
 
@@ -267,7 +270,7 @@ const GET_TASK = {
   definition: {
     name: "get_task",
     description:
-      "Find one task in this workspace. Pass exactly one selector: task (id, number, or key such as SP-42), pull_request (the pull request URL), number with an optional repository (owner/name), or commit (a commit SHA of a pull request of the task). Returns id, key, title, description, state, url, origin, stage (the current stage key and name), next_stage and previous_stage on the recorded line when the task is open, and pull_requests with repository, number, url, state, and head_sha. A selector that matches more than one task fails and lists the task keys. Pass repository, or use a more exact selector.",
+      "Find one task in this workspace. Pass exactly one selector: task (id, number, or key such as SP-42), pull_request (the pull request URL), number with an optional repository (owner/name), commit (a commit SHA of a pull request of the task), or origin (the link passed to create_task, such as an alert URL). origin returns the newest task with that link and prefers a task that is not closed. Returns id, key, title, description, state, url, origin, stage (the current stage key and name), next_stage and previous_stage on the recorded line when the task is open, and pull_requests with repository, number, url, state, and head_sha. A selector that matches more than one task fails and lists the task keys. Pass repository, or use a more exact selector.",
     inputSchema: {
       type: "object",
       properties: {
@@ -276,6 +279,7 @@ const GET_TASK = {
         repository: { type: "string", minLength: 1, description: "Repository as owner/name. Use it with number." },
         number: { type: "integer", minimum: 1, description: "Pull request number." },
         commit: { type: "string", minLength: 7, description: "Commit SHA." },
+        origin: { type: "string", minLength: 1, description: "Origin link of the task, as passed to create_task." },
       },
       additionalProperties: false,
     },
@@ -287,7 +291,7 @@ const CREATE_TASK = {
   definition: {
     name: "create_task",
     description:
-      "Create a draft task in this workspace. The task has no owner. Returns id, key, title, state, and url.",
+      "Create a draft task in this workspace. The task has no owner. Pass origin, the link of the source item such as an alert or issue, to find the task later with get_task. If a task that is not closed already has that origin, it is returned and no task is created. Returns id, key, title, state, url, origin, and created (false when the task already existed).",
     inputSchema: {
       type: "object",
       properties: {
@@ -297,6 +301,7 @@ const CREATE_TASK = {
           maxLength: 20000,
           description: "Task description. Optional. At most 20000 characters.",
         },
+        origin: { type: "string", minLength: 1, description: "Optional http or https link of the source item." },
       },
       required: ["title"],
     },

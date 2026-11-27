@@ -42,7 +42,7 @@ type runnerTaskPullRequestDetail struct {
 }
 
 // handleRunnerGetTask finds one task from a reference in a webhook payload,
-// such as a task key, a pull request, or a commit.
+// such as a task key, a pull request, a commit, or the origin link of the task.
 func (s *Server) handleRunnerGetTask(w http.ResponseWriter, r *http.Request) {
 	scope, ok := s.authenticateRunner(w, r, runneraction.ScopeTasksRead)
 	if !ok {
@@ -54,9 +54,10 @@ func (s *Server) handleRunnerGetTask(w http.ResponseWriter, r *http.Request) {
 	repository := strings.TrimSpace(query.Get("repository"))
 	number := strings.TrimSpace(query.Get("number"))
 	commit := strings.TrimSpace(query.Get("commit"))
-	selectors := slices.DeleteFunc([]string{task, pullRequest, number, commit}, func(value string) bool { return value == "" })
+	origin := strings.TrimSpace(query.Get("origin"))
+	selectors := slices.DeleteFunc([]string{task, pullRequest, number, commit, origin}, func(value string) bool { return value == "" })
 	if len(selectors) != 1 || (repository != "" && number == "") {
-		http.Error(w, "Pass exactly one of task, pull_request, number with an optional repository, or commit", http.StatusBadRequest)
+		http.Error(w, "Pass exactly one of task, pull_request, number with an optional repository, commit, or origin", http.StatusBadRequest)
 		return
 	}
 
@@ -71,6 +72,11 @@ func (s *Server) handleRunnerGetTask(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case task != "":
 		order, err = factoryModel.FindWorkOrderByRef(db, task)
+	case origin != "":
+		order, err = factoryModel.FindLatestWorkOrderByOriginURL(db, origin)
+		if err == nil && order == nil {
+			err = models.ErrFactoryWorkOrderNotFound
+		}
 	case pullRequest != "":
 		var found *models.FactoryPullRequest
 		found, err = factoryModel.FindPullRequest(db, models.FactoryPullRequestLookup{URL: pullRequest})
