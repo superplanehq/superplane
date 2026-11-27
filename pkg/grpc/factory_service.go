@@ -251,11 +251,6 @@ func (s *FactoryService) DescribeFactoryPullRequestMergeability(ctx context.Cont
 	return actions.DescribeFactoryPullRequestMergeability(ctx, s.intakeDeps, organizationID, req)
 }
 
-func (s *FactoryService) MergeFactoryPullRequest(ctx context.Context, req *pb.MergeFactoryPullRequestRequest) (*pb.MergeFactoryPullRequestResponse, error) {
-	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return actions.MergeFactoryPullRequest(ctx, s.intakeDeps, organizationID, req)
-}
-
 func (s *FactoryService) ContinueFactoryPullRequestFixes(ctx context.Context, req *pb.ContinueFactoryPullRequestFixesRequest) (*pb.ContinueFactoryPullRequestFixesResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.ContinueFactoryPullRequestFixes(ctx, organizationID, req)

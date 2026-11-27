@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"slices"
 	"strings"
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
@@ -19,12 +18,9 @@ import (
 )
 
 var (
-	errFactoryPullRequestNotGitHub               = errors.New("only GitHub pull requests can merge from SuperPlane")
+	errFactoryPullRequestProviderMismatch        = errors.New("the pull request provider does not match the workspace Git host")
 	errFactoryPullRequestMissing                 = errors.New("GitHub did not return the pull request")
 	errFactoryPullRequestNotOpen                 = errors.New("the pull request is not open")
-	errFactoryPullRequestNotMergeable            = errors.New("the pull request cannot merge")
-	errFactoryPullRequestMergeMethodNotAllowed   = errors.New("the repository does not allow this merge method")
-	errFactoryPullRequestHeadMoved               = errors.New("the pull request head changed")
 	errFactoryPullRequestMergeabilityUnavailable = errors.New("merge status is unavailable")
 	errFactoryPullRequestMergeabilityTemporary   = errors.New("merge status lookup failed temporarily")
 )
@@ -46,11 +42,10 @@ type factoryPullRequestMergeability struct {
 	AllowedMethods []pb.FactoryPullRequestMergeability_MergeMethod
 	HeadSHA        string
 	PullRequest    *models.FactoryPullRequest
-	Client         factoryGitHubAPI
 	canRetry       bool
 }
 
-func loadFactoryPullRequestForMerge(
+func loadFactoryPullRequestForMergeability(
 	db *gorm.DB,
 	orgID uuid.UUID,
 	factoryID string,
@@ -71,7 +66,7 @@ func loadFactoryPullRequestForMerge(
 		return nil, nil, err
 	}
 	if !strings.EqualFold(pullRequest.Provider, factory.OnboardingConfigValue().EffectiveVCSProvider()) {
-		return nil, nil, errFactoryPullRequestNotGitHub
+		return nil, nil, errFactoryPullRequestProviderMismatch
 	}
 	if pullRequest.State != models.FactoryPullRequestStateOpen {
 		return nil, nil, errFactoryPullRequestNotOpen
@@ -95,7 +90,6 @@ func evaluateFactoryPullRequestMergeability(
 		}
 		return recoverFactoryPullRequestMergeability(ctx, factory, result, fmt.Errorf("create GitHub client: %w", err))
 	}
-	result.Client = client
 
 	active, err := factoryPullRequestHasActiveAutomation(db, factory, pullRequest)
 	if err != nil {
@@ -591,23 +585,6 @@ func allowedMergeMethods(repository *github.Repository) []pb.FactoryPullRequestM
 		methods = append(methods, pb.FactoryPullRequestMergeability_MERGE_METHOD_REBASE)
 	}
 	return methods
-}
-
-func mergeMethodToGitHub(method pb.FactoryPullRequestMergeability_MergeMethod) (string, bool) {
-	switch method {
-	case pb.FactoryPullRequestMergeability_MERGE_METHOD_SQUASH:
-		return "squash", true
-	case pb.FactoryPullRequestMergeability_MERGE_METHOD_MERGE:
-		return "merge", true
-	case pb.FactoryPullRequestMergeability_MERGE_METHOD_REBASE:
-		return "rebase", true
-	default:
-		return "", false
-	}
-}
-
-func mergeMethodAllowed(methods []pb.FactoryPullRequestMergeability_MergeMethod, method pb.FactoryPullRequestMergeability_MergeMethod) bool {
-	return slices.Contains(methods, method)
 }
 
 func (m *factoryPullRequestMergeability) proto() *pb.FactoryPullRequestMergeability {

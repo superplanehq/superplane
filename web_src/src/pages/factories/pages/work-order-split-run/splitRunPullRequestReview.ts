@@ -1,8 +1,4 @@
-import type {
-  FactoriesFactoryPullRequest,
-  FactoriesFactoryPullRequestMergeability,
-  FactoryPullRequestMergeabilityMergeMethod,
-} from "@/api-client";
+import type { FactoriesFactoryPullRequest, FactoriesFactoryPullRequestMergeability } from "@/api-client";
 
 import { selectWorkOrderCardPullRequest } from "../../lib/workOrderCardPullRequest";
 import { pullRequestLabel, pullRequestState } from "../../lib/workOrderPullRequest";
@@ -88,12 +84,8 @@ export function pullRequestForReviewHref(
   return pullRequests?.find((pullRequest) => (pullRequest.url ?? "").replace(/\/$/, "") === normalized);
 }
 
-export function isGitHubPullRequest(pullRequest: FactoriesFactoryPullRequest | undefined): boolean {
-  return (pullRequest?.provider ?? "PROVIDER_GITHUB") === "PROVIDER_GITHUB";
-}
-
-/** Pull requests SuperPlane can merge: GitHub and Bitbucket. */
-export function supportsPullRequestMerge(pullRequest: FactoriesFactoryPullRequest | undefined): boolean {
+/** Pull requests with status support: GitHub and Bitbucket. */
+export function supportsPullRequestStatus(pullRequest: FactoriesFactoryPullRequest | undefined): boolean {
   switch (pullRequest?.provider ?? "PROVIDER_GITHUB") {
     case "PROVIDER_GITHUB":
     case "PROVIDER_BITBUCKET":
@@ -105,24 +97,6 @@ export function supportsPullRequestMerge(pullRequest: FactoriesFactoryPullReques
 
 export function isMergedPullRequest(pullRequest: FactoriesFactoryPullRequest | undefined): boolean {
   return pullRequestState(pullRequest?.state) === "merged";
-}
-
-export type FactoryPullRequestMergeMethodChoice = Exclude<
-  FactoryPullRequestMergeabilityMergeMethod,
-  "MERGE_METHOD_UNSPECIFIED"
->;
-
-const MERGE_METHOD_PREFERENCE: FactoryPullRequestMergeMethodChoice[] = [
-  "MERGE_METHOD_SQUASH",
-  "MERGE_METHOD_MERGE",
-  "MERGE_METHOD_REBASE",
-];
-
-export function defaultMergeMethod(
-  methods: FactoryPullRequestMergeabilityMergeMethod[] | undefined,
-): FactoryPullRequestMergeMethodChoice | undefined {
-  const allowed = new Set(methods ?? []);
-  return MERGE_METHOD_PREFERENCE.find((method) => allowed.has(method));
 }
 
 export interface PullRequestReviewCopy {
@@ -167,14 +141,5 @@ export const PULL_REQUEST_REVIEW_COPY = {
   headline: "The pull request is ready for review",
   closing: "This task closes when the pull request is merged or closed.",
   moreActions: "More actions",
-  merge: "Merge",
-  merging: "Merging",
-  mergeMethod: "Merge method",
   merged: "The pull request is merged.",
-  permission: "You do not have permission to manage this task.",
-  methods: {
-    MERGE_METHOD_SQUASH: "Squash and merge",
-    MERGE_METHOD_MERGE: "Create a merge commit",
-    MERGE_METHOD_REBASE: "Rebase and merge",
-  },
 } as const;

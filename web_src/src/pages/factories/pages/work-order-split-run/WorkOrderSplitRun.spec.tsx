@@ -45,7 +45,6 @@ const mergeability = {
     headSha: string;
   },
 };
-const mergeMutate = vi.fn();
 
 vi.mock("@/hooks/useFactoryData", () => {
   const actual = unmockedSrc<typeof FactoryData>("hooks/useFactoryData");
@@ -64,9 +63,8 @@ vi.mock("@/lib/toast", () => ({
   showErrorToast: vi.fn(),
 }));
 
-vi.mock("@/hooks/useFactoryPullRequestMerge", () => ({
+vi.mock("@/hooks/useFactoryPullRequestMergeability", () => ({
   useFactoryPullRequestMergeability: () => ({ data: mergeability.current }),
-  useMergeFactoryPullRequest: () => ({ mutate: mergeMutate, isPending: false }),
 }));
 
 const useLiveLogStreamMock = vi.fn();
@@ -299,7 +297,6 @@ describe("WorkOrderSplitRunPopup", () => {
     findPlanningSessionMock.mockResolvedValue(null);
     closeMutateAsync.mockReset().mockResolvedValue({});
     vi.mocked(showSuccessToast).mockReset();
-    mergeMutate.mockReset();
     mergeability.current = {
       canMerge: true,
       allowedMethods: ["MERGE_METHOD_SQUASH", "MERGE_METHOD_REBASE"],
@@ -1535,46 +1532,16 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(note).queryByText("Blast radius")).not.toBeInTheDocument();
   });
 
-  it("enables merge on the pull request review strip when mergeability is true", async () => {
-    const user = userEvent.setup();
+  it("keeps provider review available without manual merge on the production review strip", () => {
     renderPopup({ fixture: fixtureWithReviewPullRequest("STATE_OPEN") });
 
     const note = within(screen.getByTestId("redesign-console-summary")).getByTestId("split-run-attention-note");
-    expect(within(note).getByTestId("split-run-merge-button")).toBeEnabled();
-    await user.click(within(note).getByTestId("split-run-merge-method"));
-    const menu = await screen.findByRole("menu");
-    expect(
-      within(menu)
-        .getAllByRole("menuitem")
-        .map((item) => item.textContent),
-    ).toEqual(["✓ Squash and merge", "Rebase and merge"]);
-    await user.keyboard("{Escape}");
-    await user.click(within(note).getByTestId("split-run-merge-button"));
-    expect(mergeMutate).toHaveBeenCalledTimes(1);
-    expect(mergeMutate.mock.calls[0]?.[0]).toEqual({
-      pullRequestId: "pr-open",
-      mergeMethod: "MERGE_METHOD_SQUASH",
-      expectedHeadSha: "abc123",
-    });
-  });
-
-  it("disables merge and shows the reason on hover when automation is running", async () => {
-    const user = userEvent.setup();
-    mergeability.current = {
-      canMerge: false,
-      blockedReason: "BLOCKED_REASON_ACTIVE_RUN",
-      message: "Automation is still running.",
-      allowedMethods: ["MERGE_METHOD_SQUASH"],
-      headSha: "abc123",
-    };
-    renderPopup({ fixture: fixtureWithReviewPullRequest("STATE_OPEN") });
-
-    const note = within(screen.getByTestId("redesign-console-summary")).getByTestId("split-run-attention-note");
-    expect(within(note).getByTestId("split-run-merge-button")).toBeDisabled();
-    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
-
-    await user.hover(within(note).getByTestId("split-run-merge-reason"));
-    expect(await screen.findByRole("tooltip")).toHaveTextContent("Automation is still running.");
+    expect(within(note).getByRole("link", { name: "Review PR #6812" })).toHaveAttribute(
+      "href",
+      "https://github.com/superplanehq/superplane/pull/6812",
+    );
+    expect(within(note).queryByRole("button", { name: "Merge" })).not.toBeInTheDocument();
+    expect(within(note).queryByRole("button", { name: "Merge method" })).not.toBeInTheDocument();
   });
 
   it("lists the reviewed pull request once, on the review strip only", () => {

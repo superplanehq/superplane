@@ -57,9 +57,8 @@ const FeatureFactoryAsCode = "factory-as-code"
 // FeatureWorkspaceSkills gates workspace skill settings, skill APIs, and skill attach.
 const FeatureWorkspaceSkills = "workspace_skills"
 
-// FeatureFactoryPullRequestMerge gates the Mergeable chip on task cards and
-// the Merge button on pull request review until the feature is generally
-// available.
+// FeatureFactoryPullRequestMerge gates pull request status displays and the
+// Mergeable chip on task cards. Keep the existing ID and organization access.
 const FeatureFactoryPullRequestMerge = "factory_pull_request_merge"
 
 // FeatureSuperPlaneMCPServer is released. Every organization can authorize
@@ -97,7 +96,7 @@ var registry = []Feature{
 	{ID: FeatureOrganizationBYOKCustomProvider, Label: "Organization BYOK Custom Provider", Description: "Add a custom model provider with a URL, token, and API type"},
 	{ID: FeatureFactoryAsCode, Label: "Factory as code", Description: "Export, plan, and apply stage and automation configuration from YAML"},
 	{ID: FeatureWorkspaceSkills, Label: "Workspace Skills", Description: "Add skills for workspace agents"},
-	{ID: FeatureFactoryPullRequestMerge, Label: "Pull Request Merge", Description: "Show the Mergeable chip on task cards and the Merge button on pull request review"},
+	{ID: FeatureFactoryPullRequestMerge, Label: "Pull Request Status", Description: "Show pull request status and the Mergeable badge on task cards"},
 	{ID: FeatureSuperPlaneMCPServer, Label: "MCP Server", Description: "Allow Cursor and other MCP clients to connect to workspaces in this organization", Released: released()},
 	{ID: FeatureFactoryStepActions, Label: "Step actions", Description: "Show agent action reasons on the step card"},
 }

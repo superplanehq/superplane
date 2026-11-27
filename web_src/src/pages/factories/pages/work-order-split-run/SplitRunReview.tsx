@@ -227,9 +227,7 @@ export function SplitRunReview({
         startEmphasis={startEmphasis}
         organizationId={organizationId}
         factoryId={factoryId}
-        orderId={orderId}
         pullRequests={pullRequests}
-        canAct={canAct}
         onAction={handleAction}
       >
         {children}

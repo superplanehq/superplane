@@ -3,7 +3,6 @@ package factories
 import (
 	"context"
 	"errors"
-	"slices"
 	"strings"
 	"time"
 
@@ -215,60 +214,6 @@ func bitbucketAllowedMethods(strategies []string) []string {
 		return []string{"SQUASH", "MERGE"}
 	}
 	return allowed
-}
-
-func (b *bitbucketProvider) MergePullRequest(ctx context.Context, pullRequest *models.FactoryPullRequest, method, expectedSHA string) error {
-	if err := b.ensureClient(); err != nil {
-		return err
-	}
-	// Recheck mergeability immediately before merging. Bitbucket has no
-	// head precondition on the merge request, so a push between this read
-	// and the merge can still change the merged commit.
-	fresh, err := b.ReadMergeability(ctx, pullRequest)
-	if err != nil {
-		return err
-	}
-	if !fresh.CanMerge {
-		message := fresh.Message
-		if message == "" {
-			message = errFactoryPullRequestNotMergeable.Error()
-		}
-		return errors.New("bitbucket blocked the merge: " + message)
-	}
-	expectedSHA = strings.TrimSpace(expectedSHA)
-	if expectedSHA == "" || !strings.EqualFold(strings.TrimSpace(fresh.HeadSHA), expectedSHA) {
-		return errFactoryPullRequestHeadMoved
-	}
-	if !slices.Contains(fresh.AllowedMethods, bitbucketMergeMethodName(method)) {
-		return errFactoryPullRequestMergeMethodNotAllowed
-	}
-	merged, err := b.client.MergePullRequest(pullRequest.Repository, pullRequest.Number, bitbucketMergeStrategy(method))
-	if err != nil {
-		return err
-	}
-	if merged == nil || !strings.EqualFold(strings.TrimSpace(merged.State), bitbucketintegration.PullRequestStateMerged) {
-		return errors.New("bitbucket did not confirm the merge")
-	}
-	return nil
-}
-
-// bitbucketMergeStrategy maps a GitHub merge method name to the Bitbucket
-// merge strategy. Only squash and merge commit are offered; anything else
-// falls back to a merge commit after the allowed-methods check rejects it.
-func bitbucketMergeStrategy(method string) string {
-	if strings.EqualFold(strings.TrimSpace(method), "squash") {
-		return "squash"
-	}
-	return "merge_commit"
-}
-
-// bitbucketMergeMethodName maps a GitHub merge method name to the stored
-// Bitbucket method name. Fast-forward is never reported back as rebase.
-func bitbucketMergeMethodName(method string) string {
-	if strings.EqualFold(strings.TrimSpace(method), "squash") {
-		return "SQUASH"
-	}
-	return "MERGE"
 }
 
 func (b *bitbucketProvider) ClosePullRequest(ctx context.Context, ref vcs.PullRequestRef) error {

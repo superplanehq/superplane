@@ -511,48 +511,6 @@ func TestFactoryProductAnalytics(t *testing.T) {
 		assert.Equal(t, r.Account.ID.String(), event.DistinctID)
 	})
 
-	t.Run("in-app merge emits once and a failed merge emits nothing", func(t *testing.T) {
-		recorder.reset()
-		require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryPullRequestMerge))
-		factoryModel := newFactory(t)
-		order, err := factoryModel.CreateWorkOrder(db, "Tracked", "", &r.User, nil, nil)
-		require.NoError(t, err)
-		pullRequest := createMergeTestPullRequest(t, db, order)
-		const headSHA = "abc123def456"
-		combined, checks := successChecks()
-		original := newFactoryGitHubAPI
-		newFactoryGitHubAPI = func(*gorm.DB, IntakeDependencies, *models.Factory) (factoryGitHubAPI, error) {
-			return &fakeFactoryGitHub{
-				pullRequest: mergeableGitHubPullRequest(headSHA),
-				combined:    combined,
-				checkRuns:   checks,
-				repository:  allMethodsRepository(),
-			}, nil
-		}
-		t.Cleanup(func() { newFactoryGitHubAPI = original })
-
-		_, err = MergeFactoryPullRequest(ctx, IntakeDependencies{}, orgID, &pb.MergeFactoryPullRequestRequest{
-			FactoryId:       factoryModel.ID.String(),
-			PrId:            pullRequest.GetId(),
-			MergeMethod:     pb.FactoryPullRequestMergeability_MERGE_METHOD_SQUASH,
-			ExpectedHeadSha: "stale",
-		})
-		require.Error(t, err)
-		assert.Empty(t, recorder.snapshot())
-
-		_, err = MergeFactoryPullRequest(ctx, IntakeDependencies{}, orgID, &pb.MergeFactoryPullRequestRequest{
-			FactoryId:       factoryModel.ID.String(),
-			PrId:            pullRequest.GetId(),
-			MergeMethod:     pb.FactoryPullRequestMergeability_MERGE_METHOD_SQUASH,
-			ExpectedHeadSha: headSHA,
-		})
-		require.NoError(t, err)
-		event := requireNamedEvent(t, recorder, productanalytics.EventFactoryTaskMerged)
-		assert.Equal(t, "superplane", event.Properties["merge_source"])
-		assert.Equal(t, models.ProviderGitHub, event.Properties["provider"])
-		assert.Equal(t, r.Account.ID.String(), event.DistinctID)
-		assertNoRestrictedContent(t, event, "acme/app", "Ready")
-	})
 }
 
 func githubPullRequestPayload(repository string, number int64, merged bool, login string) githubMergeabilityWebhookPayload {

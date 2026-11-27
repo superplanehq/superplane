@@ -4,13 +4,13 @@ import type { ReactNode } from "react";
 import type { FactoriesFactoryPullRequest } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
-import { useFactoryPullRequestMergeability } from "@/hooks/useFactoryPullRequestMerge";
+import { useFactoryPullRequestMergeability } from "@/hooks/useFactoryPullRequestMergeability";
 import { FEATURE_FACTORY_PULL_REQUEST_MERGE } from "@/lib/experimentalFeatures";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 
 import { PullRequestConfidence } from "./redesign/consoleCheckRows";
 import { ContinueFixesButton, MultiPullRequestReviewNote } from "./SplitRunMultiPullRequestReview";
-import { SplitRunPullRequestMergeAction } from "./SplitRunPullRequestMergeAction";
+import { SplitRunPullRequestStatus } from "./SplitRunPullRequestStatus";
 import type { SplitRunDecisionTone, SplitRunFooterAction, SplitRunFooterNote } from "./splitRunFooter";
 import {
   isMergedPullRequest,
@@ -19,7 +19,7 @@ import {
   pullRequestForReviewHref,
   pullRequestReviewCopy,
   pullRequestReviewNote,
-  supportsPullRequestMerge,
+  supportsPullRequestStatus,
   type PullRequestReviewCopy,
   type PullRequestReviewTarget,
 } from "./splitRunPullRequestReview";
@@ -39,8 +39,6 @@ export function SplitRunPullRequestReviewNote({
   trackedPullRequest,
   organizationId,
   factoryId,
-  orderId,
-  canAct = true,
   compact = false,
   stacked = false,
   ctaOnly = false,
@@ -53,8 +51,6 @@ export function SplitRunPullRequestReviewNote({
   trackedPullRequest?: FactoriesFactoryPullRequest;
   organizationId?: string;
   factoryId?: string;
-  orderId?: string;
-  canAct?: boolean;
   /** Resumes paused automatic fixes. Set only while fixes are paused. */
   continueFixes?: () => void;
   actionBusy?: boolean;
@@ -77,8 +73,6 @@ export function SplitRunPullRequestReviewNote({
           trackedPullRequest={trackedPullRequest}
           organizationId={organizationId}
           factoryId={factoryId}
-          orderId={orderId}
-          canAct={canAct}
           continueFixes={continueFixes}
           actionBusy={actionBusy}
         />
@@ -93,8 +87,6 @@ export function SplitRunPullRequestReviewNote({
         trackedPullRequest={trackedPullRequest}
         organizationId={organizationId}
         factoryId={factoryId}
-        orderId={orderId}
-        canAct={canAct}
         copy={copy}
         stacked={stacked}
         continueFixes={continueFixes}
@@ -129,12 +121,10 @@ export function SplitRunPullRequestReviewNote({
               </a>
             </Button>
             <ContinueFixesButton onContinue={continueFixes} disabled={actionBusy} size="lg" />
-            <SplitRunPullRequestMergeAction
+            <SplitRunPullRequestStatus
               organizationId={organizationId}
               factoryId={factoryId}
-              orderId={orderId}
               pullRequest={trackedPullRequest}
-              canAct={canAct}
             />
             <p className="text-[13px] leading-5 text-foreground/70">{copy.closing}</p>
           </div>
@@ -145,9 +135,9 @@ export function SplitRunPullRequestReviewNote({
 }
 
 /**
- * The checks state comes from the merge gate, so the strip can say
+ * The checks state comes from the merge status, so the strip can say
  * "waits for checks" instead of "ready" while checks still run. Without
- * the merge feature the gate is not fetched and the copy stays generic.
+ * the status feature the gate is not fetched and the copy stays generic.
  */
 function usePullRequestReviewCopy(
   organizationId: string | undefined,
@@ -160,7 +150,7 @@ function usePullRequestReviewCopy(
       organizationId &&
       factoryId &&
       pullRequest?.id &&
-      supportsPullRequestMerge(pullRequest) &&
+      supportsPullRequestStatus(pullRequest) &&
       !isMergedPullRequest(pullRequest),
   );
   const mergeability = useFactoryPullRequestMergeability(organizationId ?? "", factoryId ?? "", pullRequest?.id ?? "", {
@@ -175,8 +165,6 @@ function CompactPullRequestReviewNote({
   trackedPullRequest,
   organizationId,
   factoryId,
-  orderId,
-  canAct,
   copy,
   stacked,
   continueFixes,
@@ -187,8 +175,6 @@ function CompactPullRequestReviewNote({
   trackedPullRequest?: FactoriesFactoryPullRequest;
   organizationId?: string;
   factoryId?: string;
-  orderId?: string;
-  canAct: boolean;
   copy: PullRequestReviewCopy;
   stacked: boolean;
   continueFixes?: () => void;
@@ -215,8 +201,6 @@ function CompactPullRequestReviewNote({
             trackedPullRequest={trackedPullRequest}
             organizationId={organizationId}
             factoryId={factoryId}
-            orderId={orderId}
-            canAct={canAct}
             continueFixes={continueFixes}
             actionBusy={actionBusy}
           />
@@ -232,8 +216,6 @@ function ReviewCallToAction({
   trackedPullRequest,
   organizationId,
   factoryId,
-  orderId,
-  canAct,
   continueFixes,
   actionBusy,
 }: {
@@ -242,8 +224,6 @@ function ReviewCallToAction({
   trackedPullRequest?: FactoriesFactoryPullRequest;
   organizationId?: string;
   factoryId?: string;
-  orderId?: string;
-  canAct: boolean;
   continueFixes?: () => void;
   actionBusy: boolean;
 }) {
@@ -256,12 +236,10 @@ function ReviewCallToAction({
         </a>
       </Button>
       <ContinueFixesButton onContinue={continueFixes} disabled={actionBusy} />
-      <SplitRunPullRequestMergeAction
+      <SplitRunPullRequestStatus
         organizationId={organizationId}
         factoryId={factoryId}
-        orderId={orderId}
         pullRequest={trackedPullRequest}
-        canAct={canAct}
         compact
       />
     </div>
@@ -321,9 +299,7 @@ export function WaitingPullRequestReview({
   ctaOnly = false,
   organizationId,
   factoryId,
-  orderId,
   pullRequests,
-  canAct = true,
   onAction,
   children,
 }: {
@@ -339,9 +315,7 @@ export function WaitingPullRequestReview({
   ctaOnly?: boolean;
   organizationId?: string;
   factoryId?: string;
-  orderId?: string;
   pullRequests?: FactoriesFactoryPullRequest[];
-  canAct?: boolean;
   onAction?: (action: SplitRunFooterAction) => void;
   children?: ReactNode;
 }) {
@@ -360,8 +334,6 @@ export function WaitingPullRequestReview({
         pullRequests={openPullRequests}
         organizationId={organizationId}
         factoryId={factoryId}
-        orderId={orderId}
-        canAct={canAct}
         stacked={stacked}
         continueFixes={continueAction ? () => onAction?.(continueAction) : undefined}
         actionBusy={actionBusy}
@@ -375,8 +347,6 @@ export function WaitingPullRequestReview({
       trackedPullRequest={pullRequestForReviewHref(pullRequests, pullRequest.href)}
       organizationId={organizationId}
       factoryId={factoryId}
-      orderId={orderId}
-      canAct={canAct}
       compact={compact}
       stacked={stacked}
       ctaOnly={ctaOnly}

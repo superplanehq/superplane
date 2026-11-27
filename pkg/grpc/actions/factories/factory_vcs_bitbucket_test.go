@@ -2,7 +2,6 @@ package factories
 
 import (
 	"context"
-	"encoding/json"
 	"io"
 	"net/http"
 	"strings"
@@ -14,7 +13,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/factories/vcs"
-	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	bitbucketintegration "github.com/superplanehq/superplane/pkg/integrations/bitbucket"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -42,10 +40,10 @@ func TestDescribeFactoryPullRequestMergeability_BitbucketFactory(t *testing.T) {
 		FactoryId: factory.ID.String(),
 		PrId:      pullRequest.ID.String(),
 	})
-	require.ErrorIs(t, err, errFactoryPullRequestNotGitHub)
+	require.ErrorIs(t, err, errFactoryPullRequestProviderMismatch)
 	_, message, ok := grpcerrors.HandlerStatus(err)
 	require.True(t, ok)
-	assert.Equal(t, "Only pull requests on the workspace Git host can merge from SuperPlane.", message)
+	assert.Equal(t, "The pull request provider must match the workspace Git host.", message)
 }
 
 func TestDescribeFactoryPullRequestMergeability_BitbucketPR(t *testing.T) {
@@ -100,88 +98,6 @@ func TestDescribeFactoryPullRequestMergeability_BitbucketPR(t *testing.T) {
 		pb.FactoryPullRequestMergeability_MERGE_METHOD_SQUASH,
 		pb.FactoryPullRequestMergeability_MERGE_METHOD_MERGE,
 	}, response.GetMergeability().GetAllowedMethods())
-}
-
-func TestMergeFactoryPullRequest_BitbucketFactory(t *testing.T) {
-	r := support.Setup(t)
-	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-	db := database.DB(t.Context())
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryPullRequestMerge))
-
-	factory := bitbucketFactory(t, r)
-	order, err := factory.CreateWorkOrder(db, "Tracked", "", &r.User, nil, nil)
-	require.NoError(t, err)
-	_, err = order.UpdateStatus(db, models.FactoryWorkOrderStatusUpdate{
-		ToState: models.FactoryWorkOrderStateOpen,
-		Actor:   &r.User,
-	})
-	require.NoError(t, err)
-	pullRequest, err := order.CreatePullRequest(db, models.FactoryPullRequestParams{
-		Provider: models.FactoryPullRequestProviderBitbucket,
-		URL:      "https://bitbucket.org/acme/widgets/pull-requests/42",
-		State:    models.FactoryPullRequestStateOpen,
-	})
-	require.NoError(t, err)
-
-	openPR := `{"id": 42, "state": "OPEN", "draft": false, "source": {"branch": {"name": "feat/x"}, "commit": {"hash": "abc123"}}, "destination": {"branch": {"name": "main", "merge_strategies": ["squash", "merge_commit"]}}}`
-	passingChecks := `{"values": [
-		{"type": "pullrequest_state_check", "status": "PASSED", "required": true, "blocking": false},
-		{"type": "current_user_permission_check", "status": "PASSED", "required": true, "blocking": false},
-		{"type": "git_mergeability_check", "status": "PASSED", "required": true, "blocking": false}
-	]}`
-	passingBuilds := `{"values": [{"key": "build-a", "state": "SUCCESSFUL"}]}`
-	httpCtx := &contexts.HTTPContext{
-		ResponsesByPath: map[string][]*http.Response{
-			"/2.0/repositories/acme/widgets/pullrequests/42": {
-				okBitbucketResponse(openPR),
-				okBitbucketResponse(openPR),
-			},
-			"/2.0/repositories/acme/widgets/pullrequests/42/mergeability/checks": {
-				okBitbucketResponse(passingChecks),
-				okBitbucketResponse(passingChecks),
-			},
-			"/2.0/repositories/acme/widgets/commit/abc123/statuses": {
-				okBitbucketResponse(passingBuilds),
-				okBitbucketResponse(passingBuilds),
-			},
-			"/2.0/repositories/acme/widgets/pullrequests/42/merge": {
-				okBitbucketResponse(`{"id": 42, "state": "MERGED"}`),
-			},
-		},
-	}
-	stubClient, err := bitbucketintegration.NewClient(
-		bitbucketintegration.AuthTypeWorkspaceAccessToken,
-		httpCtx,
-		&contexts.IntegrationContext{Configuration: map[string]any{"token": "token"}},
-	)
-	require.NoError(t, err)
-	restore := newFactoryBitbucketAPI
-	newFactoryBitbucketAPI = func(*gorm.DB, IntakeDependencies, *models.Factory) (*bitbucketintegration.Client, error) {
-		return stubClient, nil
-	}
-	t.Cleanup(func() { newFactoryBitbucketAPI = restore })
-
-	resp, err := MergeFactoryPullRequest(ctx, IntakeDependencies{}, r.Organization.ID.String(), &pb.MergeFactoryPullRequestRequest{
-		FactoryId:       factory.ID.String(),
-		PrId:            pullRequest.ID.String(),
-		MergeMethod:     pb.FactoryPullRequestMergeability_MERGE_METHOD_SQUASH,
-		ExpectedHeadSha: "abc123",
-	})
-	require.NoError(t, err)
-	assert.Equal(t, pb.FactoryPullRequest_STATE_MERGED, resp.GetPullRequest().GetState())
-
-	mergeBody := bitbucketMergeRequestBody(t, httpCtx)
-	assert.Equal(t, "squash", mergeBody["merge_strategy"])
-
-	stored, err := factory.FindPullRequest(db, models.FactoryPullRequestLookup{ID: pullRequest.ID})
-	require.NoError(t, err)
-	assert.Equal(t, models.FactoryPullRequestStateMerged, stored.State)
-	require.NotNil(t, stored.MergedAt)
-
-	reloaded, err := factory.FindWorkOrder(db, order.ID)
-	require.NoError(t, err)
-	assert.Equal(t, models.FactoryWorkOrderStateClosed, reloaded.State)
-	assert.Equal(t, models.FactoryWorkOrderResultCompleted, reloaded.Result)
 }
 
 func TestCreateBitbucketChecksHandlerWaitsForBuilds(t *testing.T) {
@@ -540,68 +456,6 @@ func TestUpdateBitbucketDiscussionHandlerRefreshesRunnerCheckout(t *testing.T) {
 	require.Fail(t, "runner node not found")
 }
 
-func TestMergeFactoryPullRequest_BitbucketHeadMoved(t *testing.T) {
-	r := support.Setup(t)
-	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-	db := database.DB(t.Context())
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryPullRequestMerge))
-
-	factory := bitbucketFactory(t, r)
-	order, err := factory.CreateWorkOrder(db, "Tracked", "", &r.User, nil, nil)
-	require.NoError(t, err)
-	_, err = order.UpdateStatus(db, models.FactoryWorkOrderStatusUpdate{
-		ToState: models.FactoryWorkOrderStateOpen,
-		Actor:   &r.User,
-	})
-	require.NoError(t, err)
-	pullRequest, err := order.CreatePullRequest(db, models.FactoryPullRequestParams{
-		Provider: models.FactoryPullRequestProviderBitbucket,
-		URL:      "https://bitbucket.org/acme/widgets/pull-requests/42",
-		State:    models.FactoryPullRequestStateOpen,
-	})
-	require.NoError(t, err)
-
-	httpCtx := &contexts.HTTPContext{
-		Responses: []*http.Response{
-			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(
-				`{"id": 42, "state": "OPEN", "draft": false, "source": {"commit": {"hash": "moved999"}}}`,
-			))},
-			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"values": []}`))},
-			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"values": []}`))},
-		},
-	}
-	stubClient, err := bitbucketintegration.NewClient(
-		bitbucketintegration.AuthTypeWorkspaceAccessToken,
-		httpCtx,
-		&contexts.IntegrationContext{Configuration: map[string]any{"token": "token"}},
-	)
-	require.NoError(t, err)
-	restore := newFactoryBitbucketAPI
-	newFactoryBitbucketAPI = func(*gorm.DB, IntakeDependencies, *models.Factory) (*bitbucketintegration.Client, error) {
-		return stubClient, nil
-	}
-	t.Cleanup(func() { newFactoryBitbucketAPI = restore })
-
-	_, err = MergeFactoryPullRequest(ctx, IntakeDependencies{}, r.Organization.ID.String(), &pb.MergeFactoryPullRequestRequest{
-		FactoryId:       factory.ID.String(),
-		PrId:            pullRequest.ID.String(),
-		MergeMethod:     pb.FactoryPullRequestMergeability_MERGE_METHOD_SQUASH,
-		ExpectedHeadSha: "abc123",
-	})
-	code, message, ok := grpcerrors.HandlerStatus(err)
-	require.True(t, ok)
-	assert.Equal(t, codes.FailedPrecondition, code)
-	assert.Equal(t, "The pull request head changed. Review the pull request and try again.", message)
-	require.Len(t, httpCtx.Requests, 3, "no merge attempt after the head moved")
-	for _, request := range httpCtx.Requests {
-		assert.NotEqual(t, "/2.0/repositories/acme/widgets/pullrequests/42/merge", request.URL.Path)
-	}
-
-	stored, err := factory.FindPullRequest(db, models.FactoryPullRequestLookup{ID: pullRequest.ID})
-	require.NoError(t, err)
-	assert.Equal(t, models.FactoryPullRequestStateOpen, stored.State)
-}
-
 func TestSendWorkOrderToBacklog_BitbucketFactoryDeclines(t *testing.T) {
 
 	r := support.Setup(t)
@@ -883,18 +737,6 @@ func bitbucketOpenPR(hash string) string {
 	return `{"id": 42, "state": "OPEN", "draft": false, "source": {"branch": {"name": "feat/x"}, "commit": {"hash": "` + hash + `"}}, "destination": {"branch": {"name": "main", "merge_strategies": ["squash", "merge_commit"]}}}`
 }
 
-func bitbucketPassingChecks() string {
-	return `{"values": [
-		{"type": "pullrequest_state_check", "status": "PASSED", "required": true, "blocking": false},
-		{"type": "current_user_permission_check", "status": "PASSED", "required": true, "blocking": false},
-		{"type": "git_mergeability_check", "status": "PASSED", "required": true, "blocking": false}
-	]}`
-}
-
-func bitbucketPassingBuilds() string {
-	return `{"values": [{"key": "build-a", "state": "SUCCESSFUL"}]}`
-}
-
 func stubBitbucketMergeAPI(t *testing.T, paths map[string][]*http.Response) *contexts.HTTPContext {
 	t.Helper()
 	httpCtx := &contexts.HTTPContext{ResponsesByPath: paths}
@@ -912,21 +754,7 @@ func stubBitbucketMergeAPI(t *testing.T, paths map[string][]*http.Response) *con
 	return httpCtx
 }
 
-func bitbucketMergeReadyResponses(openPR string, rounds int) map[string][]*http.Response {
-	prs, checks, builds := make([]*http.Response, 0, rounds), make([]*http.Response, 0, rounds), make([]*http.Response, 0, rounds)
-	for range rounds {
-		prs = append(prs, okBitbucketResponse(openPR))
-		checks = append(checks, okBitbucketResponse(bitbucketPassingChecks()))
-		builds = append(builds, okBitbucketResponse(bitbucketPassingBuilds()))
-	}
-	return map[string][]*http.Response{
-		"/2.0/repositories/acme/widgets/pullrequests/42":                     prs,
-		"/2.0/repositories/acme/widgets/pullrequests/42/mergeability/checks": checks,
-		"/2.0/repositories/acme/widgets/commit/abc123/statuses":              builds,
-	}
-}
-
-func openBitbucketMergeOrder(t *testing.T, factory *models.Factory, r *support.ResourceRegistry) (*models.FactoryWorkOrder, *models.FactoryPullRequest) {
+func openBitbucketPullRequestOrder(t *testing.T, factory *models.Factory, r *support.ResourceRegistry) (*models.FactoryWorkOrder, *models.FactoryPullRequest) {
 	t.Helper()
 	db := database.DB(t.Context())
 	order, err := factory.CreateWorkOrder(db, "Tracked", "", &r.User, nil, nil)
@@ -945,143 +773,12 @@ func openBitbucketMergeOrder(t *testing.T, factory *models.Factory, r *support.R
 	return order, pullRequest
 }
 
-func mergeBitbucketPR(
-	ctx context.Context,
-	t *testing.T,
-	orgID string,
-	factory *models.Factory,
-	pullRequest *models.FactoryPullRequest,
-	method pb.FactoryPullRequestMergeability_MergeMethod,
-	sha string,
-) (*pb.MergeFactoryPullRequestResponse, error) {
-	t.Helper()
-	return MergeFactoryPullRequest(ctx, IntakeDependencies{}, orgID, &pb.MergeFactoryPullRequestRequest{
-		FactoryId:       factory.ID.String(),
-		PrId:            pullRequest.ID.String(),
-		MergeMethod:     method,
-		ExpectedHeadSha: sha,
-	})
-}
-
-func bitbucketMergeRequestBody(t *testing.T, httpCtx *contexts.HTTPContext) map[string]any {
-	t.Helper()
-	for _, request := range httpCtx.Requests {
-		if request.Method == http.MethodPost && request.URL.Path == "/2.0/repositories/acme/widgets/pullrequests/42/merge" {
-			body, err := io.ReadAll(request.Body)
-			require.NoError(t, err)
-			var decoded map[string]any
-			require.NoError(t, json.Unmarshal(body, &decoded))
-			return decoded
-		}
-	}
-	t.Fatal("no bitbucket merge request recorded")
-	return nil
-}
-
-func assertNoBitbucketMerge(t *testing.T, httpCtx *contexts.HTTPContext) {
-	t.Helper()
-	for _, request := range httpCtx.Requests {
-		assert.NotEqual(t, "/2.0/repositories/acme/widgets/pullrequests/42/merge", request.URL.Path)
-	}
-}
-
-func TestMergeFactoryPullRequest_BitbucketMergeCommit(t *testing.T) {
+func TestDescribeFactoryPullRequestMergeability_BitbucketUnavailable(t *testing.T) {
 	r := support.Setup(t)
-	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-	db := database.DB(t.Context())
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryPullRequestMerge))
 
 	factory := bitbucketFactory(t, r)
-	order, pullRequest := openBitbucketMergeOrder(t, factory, r)
-	paths := bitbucketMergeReadyResponses(bitbucketOpenPR("abc123"), 2)
-	paths["/2.0/repositories/acme/widgets/pullrequests/42/merge"] = []*http.Response{
-		okBitbucketResponse(`{"id": 42, "state": "MERGED"}`),
-	}
-	httpCtx := stubBitbucketMergeAPI(t, paths)
-
-	resp, err := mergeBitbucketPR(ctx, t, r.Organization.ID.String(), factory, pullRequest, pb.FactoryPullRequestMergeability_MERGE_METHOD_MERGE, "abc123")
-	require.NoError(t, err)
-	assert.Equal(t, pb.FactoryPullRequest_STATE_MERGED, resp.GetPullRequest().GetState())
-	assert.Equal(t, "merge_commit", bitbucketMergeRequestBody(t, httpCtx)["merge_strategy"])
-
-	reloaded, err := factory.FindWorkOrder(db, order.ID)
-	require.NoError(t, err)
-	assert.Equal(t, models.FactoryWorkOrderStateClosed, reloaded.State)
-}
-
-func TestMergeFactoryPullRequest_BitbucketRejectsRebase(t *testing.T) {
-	r := support.Setup(t)
-	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryPullRequestMerge))
-
-	factory := bitbucketFactory(t, r)
-	_, pullRequest := openBitbucketMergeOrder(t, factory, r)
-	httpCtx := stubBitbucketMergeAPI(t, bitbucketMergeReadyResponses(bitbucketOpenPR("abc123"), 1))
-
-	_, err := mergeBitbucketPR(ctx, t, r.Organization.ID.String(), factory, pullRequest, pb.FactoryPullRequestMergeability_MERGE_METHOD_REBASE, "abc123")
-	code, message, ok := grpcerrors.HandlerStatus(err)
-	require.True(t, ok)
-	assert.Equal(t, codes.FailedPrecondition, code)
-	assert.Equal(t, "The repository does not allow this merge method.", message)
-	assertNoBitbucketMerge(t, httpCtx)
-}
-
-func TestMergeFactoryPullRequest_BitbucketBlockedChecks(t *testing.T) {
-	r := support.Setup(t)
-	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-	db := database.DB(t.Context())
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryPullRequestMerge))
-
-	blocked := map[string]string{
-		"conflicts":   `{"values": [{"type": "git_mergeability_check", "status": "FAILED", "required": true, "blocking": true}]}`,
-		"permissions": `{"values": [{"type": "current_user_permission_check", "status": "FAILED", "required": true, "blocking": true}]}`,
-		"checks":      `{"values": [{"type": "standard_merge_check", "status": "FAILED", "required": true, "blocking": true}]}`,
-	}
-	messages := map[string]string{
-		"conflicts":   mergeBlockedConflicting,
-		"permissions": bitbucketMergeBlockedPermission,
-		"checks":      mergeBlockedCheckFailed,
-	}
-
-	for name, checks := range blocked {
-		t.Run(name, func(t *testing.T) {
-			factory := bitbucketFactory(t, r)
-			order, pullRequest := openBitbucketMergeOrder(t, factory, r)
-			httpCtx := stubBitbucketMergeAPI(t, map[string][]*http.Response{
-				"/2.0/repositories/acme/widgets/pullrequests/42": {
-					okBitbucketResponse(bitbucketOpenPR("abc123")),
-				},
-				"/2.0/repositories/acme/widgets/pullrequests/42/mergeability/checks": {
-					okBitbucketResponse(checks),
-				},
-			})
-
-			_, err := mergeBitbucketPR(ctx, t, r.Organization.ID.String(), factory, pullRequest, pb.FactoryPullRequestMergeability_MERGE_METHOD_SQUASH, "abc123")
-			code, message, ok := grpcerrors.HandlerStatus(err)
-			require.True(t, ok)
-			assert.Equal(t, codes.FailedPrecondition, code)
-			assert.Equal(t, messages[name], message)
-			assertNoBitbucketMerge(t, httpCtx)
-
-			stored, err := factory.FindPullRequest(db, models.FactoryPullRequestLookup{ID: pullRequest.ID})
-			require.NoError(t, err)
-			assert.Equal(t, models.FactoryPullRequestStateOpen, stored.State)
-
-			reloaded, err := factory.FindWorkOrder(db, order.ID)
-			require.NoError(t, err)
-			assert.Equal(t, models.FactoryWorkOrderStateOpen, reloaded.State)
-		})
-	}
-}
-
-func TestMergeFactoryPullRequest_BitbucketUnavailable(t *testing.T) {
-	r := support.Setup(t)
-	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryPullRequestMerge))
-
-	factory := bitbucketFactory(t, r)
-	_, pullRequest := openBitbucketMergeOrder(t, factory, r)
-	httpCtx := stubBitbucketMergeAPI(t, map[string][]*http.Response{
+	_, pullRequest := openBitbucketPullRequestOrder(t, factory, r)
+	stubBitbucketMergeAPI(t, map[string][]*http.Response{
 		"/2.0/repositories/acme/widgets/pullrequests/42": {
 			okBitbucketResponse(bitbucketOpenPR("abc123")),
 		},
@@ -1098,125 +795,6 @@ func TestMergeFactoryPullRequest_BitbucketUnavailable(t *testing.T) {
 	assert.False(t, describe.GetMergeability().GetCanMerge())
 	assert.Equal(t, pb.FactoryPullRequestMergeability_BLOCKED_REASON_UNAVAILABLE, describe.GetMergeability().GetBlockedReason())
 
-	_, err = mergeBitbucketPR(ctx, t, r.Organization.ID.String(), factory, pullRequest, pb.FactoryPullRequestMergeability_MERGE_METHOD_SQUASH, "abc123")
-	code, message, ok := grpcerrors.HandlerStatus(err)
-	require.True(t, ok)
-	assert.Equal(t, codes.FailedPrecondition, code)
-	assert.Equal(t, mergeBlockedUnavailable, message)
-	assertNoBitbucketMerge(t, httpCtx)
-}
-
-func TestMergeFactoryPullRequest_BitbucketMissingHead(t *testing.T) {
-	r := support.Setup(t)
-	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryPullRequestMerge))
-
-	factory := bitbucketFactory(t, r)
-	_, pullRequest := openBitbucketMergeOrder(t, factory, r)
-	httpCtx := stubBitbucketMergeAPI(t, map[string][]*http.Response{
-		"/2.0/repositories/acme/widgets/pullrequests/42": {
-			okBitbucketResponse(`{"id": 42, "state": "OPEN", "draft": false, "source": {"branch": {"name": "feat/x"}, "commit": {}}}`),
-		},
-	})
-
-	_, err := mergeBitbucketPR(ctx, t, r.Organization.ID.String(), factory, pullRequest, pb.FactoryPullRequestMergeability_MERGE_METHOD_SQUASH, "abc123")
-	code, _, ok := grpcerrors.HandlerStatus(err)
-	require.True(t, ok)
-	assert.Equal(t, codes.FailedPrecondition, code)
-	assertNoBitbucketMerge(t, httpCtx)
-}
-
-func TestMergeFactoryPullRequest_BitbucketMergeFailureKeepsTaskOpen(t *testing.T) {
-	r := support.Setup(t)
-	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-	db := database.DB(t.Context())
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryPullRequestMerge))
-
-	factory := bitbucketFactory(t, r)
-	order, pullRequest := openBitbucketMergeOrder(t, factory, r)
-	paths := bitbucketMergeReadyResponses(bitbucketOpenPR("abc123"), 3)
-	paths["/2.0/repositories/acme/widgets/pullrequests/42/merge"] = []*http.Response{
-		{StatusCode: http.StatusBadRequest, Body: io.NopCloser(strings.NewReader(`{"error": {"message": "rejected"}}`))},
-	}
-	httpCtx := stubBitbucketMergeAPI(t, paths)
-
-	_, err := mergeBitbucketPR(ctx, t, r.Organization.ID.String(), factory, pullRequest, pb.FactoryPullRequestMergeability_MERGE_METHOD_SQUASH, "abc123")
-	code, _, ok := grpcerrors.HandlerStatus(err)
-	require.True(t, ok)
-	assert.Equal(t, codes.FailedPrecondition, code)
-
-	stored, err := factory.FindPullRequest(db, models.FactoryPullRequestLookup{ID: pullRequest.ID})
-	require.NoError(t, err)
-	assert.Equal(t, models.FactoryPullRequestStateOpen, stored.State)
-
-	reloaded, err := factory.FindWorkOrder(db, order.ID)
-	require.NoError(t, err)
-	assert.Equal(t, models.FactoryWorkOrderStateOpen, reloaded.State)
-
-	prReads := 0
-	for _, request := range httpCtx.Requests {
-		if request.Method == http.MethodGet && request.URL.Path == "/2.0/repositories/acme/widgets/pullrequests/42" {
-			prReads++
-		}
-	}
-	assert.Equal(t, 3, prReads, "a rejected merge refreshes mergeability")
-}
-
-func TestMergeFactoryPullRequest_BitbucketUnconfirmedMergeKeepsTaskOpen(t *testing.T) {
-	r := support.Setup(t)
-	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-	db := database.DB(t.Context())
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryPullRequestMerge))
-
-	factory := bitbucketFactory(t, r)
-	order, pullRequest := openBitbucketMergeOrder(t, factory, r)
-	paths := bitbucketMergeReadyResponses(bitbucketOpenPR("abc123"), 3)
-	paths["/2.0/repositories/acme/widgets/pullrequests/42/merge"] = []*http.Response{
-		okBitbucketResponse(`{"id": 42, "state": "OPEN"}`),
-	}
-	stubBitbucketMergeAPI(t, paths)
-
-	_, err := mergeBitbucketPR(ctx, t, r.Organization.ID.String(), factory, pullRequest, pb.FactoryPullRequestMergeability_MERGE_METHOD_SQUASH, "abc123")
-	code, _, ok := grpcerrors.HandlerStatus(err)
-	require.True(t, ok)
-	assert.Equal(t, codes.FailedPrecondition, code)
-
-	stored, err := factory.FindPullRequest(db, models.FactoryPullRequestLookup{ID: pullRequest.ID})
-	require.NoError(t, err)
-	assert.Equal(t, models.FactoryPullRequestStateOpen, stored.State)
-
-	reloaded, err := factory.FindWorkOrder(db, order.ID)
-	require.NoError(t, err)
-	assert.Equal(t, models.FactoryWorkOrderStateOpen, reloaded.State)
-}
-
-func TestMergeFactoryPullRequest_BitbucketIgnoresCachedBlock(t *testing.T) {
-	r := support.Setup(t)
-	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-	db := database.DB(t.Context())
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryPullRequestMerge))
-
-	factory := bitbucketFactory(t, r)
-	_, pullRequest := openBitbucketMergeOrder(t, factory, r)
-	stored, err := factory.FindPullRequest(db, models.FactoryPullRequestLookup{ID: pullRequest.ID})
-	require.NoError(t, err)
-	require.NoError(t, stored.SetMergeability(db, models.FactoryPullRequestMergeabilitySnapshot{
-		Mergeable:      false,
-		BlockedReason:  "CONFLICTING",
-		BlockedMessage: mergeBlockedConflicting,
-		HeadSHA:        "abc123",
-		AllowedMethods: "SQUASH,MERGE",
-	}))
-
-	paths := bitbucketMergeReadyResponses(bitbucketOpenPR("abc123"), 2)
-	paths["/2.0/repositories/acme/widgets/pullrequests/42/merge"] = []*http.Response{
-		okBitbucketResponse(`{"id": 42, "state": "MERGED"}`),
-	}
-	stubBitbucketMergeAPI(t, paths)
-
-	resp, err := mergeBitbucketPR(ctx, t, r.Organization.ID.String(), factory, pullRequest, pb.FactoryPullRequestMergeability_MERGE_METHOD_SQUASH, "abc123")
-	require.NoError(t, err)
-	assert.Equal(t, pb.FactoryPullRequest_STATE_MERGED, resp.GetPullRequest().GetState())
 }
 
 func TestBitbucketProviderReadMergeability_MissingIntegration(t *testing.T) {
