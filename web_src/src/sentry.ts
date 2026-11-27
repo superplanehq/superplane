@@ -15,6 +15,8 @@ export const IGNORED_CONSOLE_MESSAGES = [
   // Vue Devtools browser extension warns when multiple versions are installed.
   // Our app is React-only; this noise originates from the user's extensions.
   /^Another version of Vue Devtools/,
+  // MetaMask browser-extension console noise from its multichain provider.
+  /^ObjectMultiplex - orphaned data for stream "metamask-multichain-provider"$/,
   // Monaco's gesture tracker logs these when a touch id was not seen at
   // touchstart, then skips that touch. Sentry appends " [object Touch]".
   /^move of an UNKNOWN touch\b/,
