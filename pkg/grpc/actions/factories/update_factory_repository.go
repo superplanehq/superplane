@@ -391,14 +391,16 @@ func reconcileFactoryRepository(
 				managedRunnerNodeIDs["capture-visual-evidence"] = true
 				changed = replaceNodeConfigurationValues(nodes, []configurationReplacement{{from: previousApp, to: repository}}) || changed
 			case scheduledIntakeTemplateID:
-				changed = replaceWorkspaceCheckoutTarget(nodes, config.EffectiveVCSProvider(), previousApp, repository, previousDefaultBranch, nextBranch, previousGitHubHost, nextGitHubHost) || changed
+				if !pinnedRepository {
+					changed = replaceWorkspaceCheckoutTarget(nodes, config.EffectiveVCSProvider(), previousApp, repository, previousDefaultBranch, nextBranch, previousGitHubHost, nextGitHubHost) || changed
+				}
 			}
 			if template.id == "line-implementation" {
 				changed = replaceLegacyCheckoutBaseToken(nodes, managedRunnerNodeIDs) || changed
 			}
 		}
 		isCustomAutomation := models.FactoryAppTemplateID(nodes) == models.FactoryAppTemplateCustomAutomationID
-		if isCustomAutomation {
+		if isCustomAutomation && !pinnedRepository {
 			changed = replaceWorkspaceCheckoutTarget(nodes, config.EffectiveVCSProvider(), previousApp, repository, previousDefaultBranch, nextBranch, previousGitHubHost, nextGitHubHost) || changed
 		}
 		if isCustomAutomation && !pinnedRepository && slices.ContainsFunc(nodes, func(node models.Node) bool {
