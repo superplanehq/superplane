@@ -1307,6 +1307,8 @@ message SetUserOwnerResponse {}
 
 message ListIntegrationsRequest {
   string id = 1;
+  // When set, return only connections and webhook failures used by this workspace.
+  string factory_id = 2;
 }
 
 message ListIntegrationsResponse {

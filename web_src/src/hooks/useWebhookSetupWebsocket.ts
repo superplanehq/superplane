@@ -14,7 +14,8 @@ export function WebhookSetupListener({ organizationId }: { organizationId: strin
   const refresh = useCallback(() => {
     void queryClient.invalidateQueries({
       queryKey: integrationKeys.connected(organizationId),
-      predicate: ({ queryKey }) => queryKey.length <= integrationKeys.integration(organizationId, "").length,
+      predicate: ({ queryKey }) =>
+        queryKey[3] === "workspace" || queryKey.length <= integrationKeys.integration(organizationId, "").length,
     });
     void queryClient.invalidateQueries({
       queryKey: ["factories", organizationId],

@@ -869,6 +869,7 @@ export function LinesPage() {
           <SubscriptionIntakeOwnerRecovery />
           <WebhookFailuresNotice
             organizationId={organizationId}
+            factoryId={factoryId}
             integrationsBasePath={factorySettingsSectionPath(
               organizationId,
               routeSegment,

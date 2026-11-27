@@ -1,3 +1,4 @@
+import { integrationKeys } from "./useIntegrations";
 import {
   factoriesCreateFactoryPrFeedbackHandler,
   factoriesDeleteFactoryPrFeedbackHandler,
@@ -48,6 +49,7 @@ function invalidatePRFeedbackQueries(queryClient: QueryClient, organizationId: s
   void queryClient.invalidateQueries({ queryKey: factoryQueryKeys.detail(organizationId, factoryId) });
   void queryClient.invalidateQueries({ queryKey: factoryPRFeedbackHandlersKey(organizationId, factoryId) });
   void queryClient.invalidateQueries({ queryKey: factoryAppsKey(organizationId, factoryId) });
+  void queryClient.invalidateQueries({ queryKey: integrationKeys.workspace(organizationId, factoryId) });
   void queryClient.invalidateQueries({ queryKey: factoryQueryKeys.workOrders(organizationId, factoryId) });
   void queryClient.invalidateQueries({ queryKey: factoryQueryKeys.workOrdersPagePrefix(organizationId, factoryId) });
 }

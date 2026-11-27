@@ -17,6 +17,7 @@ vi.mock("@/contexts/usePermissions", () => ({
 const originalConfig = client.getConfig();
 let queryClient: QueryClient;
 let integrations: OrganizationsIntegration[];
+let workspaceIntegrations: OrganizationsIntegration[];
 let retryFailsFor: string | undefined;
 let retriedWebhooks: string[];
 
@@ -71,15 +72,31 @@ beforeEach(() => {
       status: { state: "ready", webhookFailures: [{ id: "jira-issues", state: "failed" }] },
     },
   ];
+  workspaceIntegrations = structuredClone(integrations);
+  integrations[0].status!.webhookFailures!.push({
+    id: "orphan",
+    state: "failed",
+    repositories: ["acme/unused"],
+    events: ["issues"],
+  });
+  integrations.push({
+    metadata: { id: "unused-github", name: "Old GitHub", integrationName: "github" },
+    status: { state: "ready", webhookFailures: [{ id: "unused-hook", state: "failed", repositories: ["old/repo"] }] },
+  });
   client.setConfig({
     baseUrl: "http://localhost",
     fetch: async (input) => {
       const request = input instanceof Request ? input : new Request(input);
-      if (request.method === "GET") return Response.json({ integrations });
+      if (request.method === "GET") {
+        const factoryId = new URL(request.url).searchParams.get("factoryId");
+        return Response.json({
+          integrations: factoryId === "factory-1" ? workspaceIntegrations : factoryId ? [] : integrations,
+        });
+      }
       const webhookId = new URL(request.url).pathname.split("/").at(-2) ?? "";
       retriedWebhooks.push(webhookId);
       if (retryFailsFor === webhookId) return Response.json({ message: "Unavailable" }, { status: 503 });
-      const failure = integrations
+      const failure = workspaceIntegrations
         .flatMap((integration) => integration.status?.webhookFailures ?? [])
         .find((webhook) => webhook.id === webhookId);
       if (!failure) return Response.json({ message: "Webhook not found" }, { status: 404 });
@@ -95,12 +112,13 @@ afterEach(() => {
   client.setConfig({ ...originalConfig, fetch: originalConfig.fetch });
 });
 
-function notice() {
+function notice(factoryId = "factory-1") {
   return (
     <QueryClientProvider client={queryClient}>
       <MemoryRouter>
         <WebhookFailuresNotice
           organizationId="org-1"
+          factoryId={factoryId}
           integrationsBasePath="/org-1/workspaces/ENG/settings/organization/integrations"
         />
       </MemoryRouter>
@@ -119,7 +137,7 @@ it("groups GitHub failures without dropping retries and clears the notice when s
     screen.getByText("Pull request reviews, Check runs, Check suites, Commit statuses", { selector: "dd" }),
   ).toBeVisible();
   expect(screen.getAllByText(/GitHub allows 20 webhooks/)).toHaveLength(1);
-  const accessError = integrations[0].status!.webhookFailures![3].message!;
+  const accessError = workspaceIntegrations[0].status!.webhookFailures![3].message!;
   expect(screen.getAllByText(accessError)).toHaveLength(1);
 
   fireEvent.click(screen.getByRole("button", { name: "Try again" }));
@@ -128,7 +146,7 @@ it("groups GitHub failures without dropping retries and clears the notice when s
   expect(retriedWebhooks).toEqual(["issues", "reviews", "reviews-duplicate"]);
   expect(screen.getByText(accessError)).toBeVisible();
 
-  integrations[0].status!.webhookFailures = [];
+  workspaceIntegrations[0].status!.webhookFailures = [];
   await act(async () => {
     await queryClient.invalidateQueries({ queryKey: integrationKeys.connected("org-1") });
   });
@@ -136,8 +154,8 @@ it("groups GitHub failures without dropping retries and clears the notice when s
 });
 
 it("identifies each affected connection and opens its settings without merging shared repositories", async () => {
-  integrations[0].metadata!.name = "puppies-inc";
-  integrations.push(
+  workspaceIntegrations[0].metadata!.name = "puppies-inc";
+  workspaceIntegrations.push(
     {
       metadata: { id: "github-old", name: "puppies-inc-old", integrationName: "github" },
       status: {
@@ -171,6 +189,22 @@ it("identifies each affected connection and opens its settings without merging s
     within(screen.getByRole("alert", { name: "puppies-inc-old (GitHub)" })).getByRole("button", { name: "Try again" }),
   );
   await waitFor(() => expect(retriedWebhooks).toEqual(["old-hook"]));
+});
+
+it("uses workspace failures for display and retry even when organization failures are cached", async () => {
+  queryClient.setQueryData(integrationKeys.connected("org-1"), integrations);
+  const { rerender } = render(notice());
+  await screen.findByRole("alert");
+  expect(screen.queryByRole("heading", { name: "acme/unused" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("heading", { name: "old/repo" })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+  await waitFor(() => expect(retriedWebhooks).toEqual(["issues", "reviews", "reviews-duplicate"]));
+
+  rerender(notice("factory-2"));
+  await waitFor(() => expect(queryClient.getQueryData(integrationKeys.workspace("org-1", "factory-2"))).toEqual([]));
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  rerender(notice(""));
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
 });
 
 it("keeps the remaining failed webhook actionable after a partial retry failure", async () => {

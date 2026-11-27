@@ -8,39 +8,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/ui/alertDialog";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
-import { Ellipsis } from "lucide-react";
 
 import { type SplitConfigDeleteCopy } from "./splitConfigDeleteCopy";
-
-const HEADER_ICON_BUTTON =
-  "flex h-6 w-6 items-center justify-center rounded-full text-foreground hover:bg-slate-950/5 dark:hover:bg-white/10";
-
-export function MergeConfidenceActionsMenu({ label, onDelete }: { label: string; onDelete: () => void }) {
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          className={HEADER_ICON_BUTTON}
-          aria-label="More actions"
-          data-testid="merge-confidence-config-actions"
-        >
-          <Ellipsis className="h-4 w-4" aria-hidden />
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-48">
-        <DropdownMenuItem
-          className="text-destructive focus:text-destructive"
-          onSelect={onDelete}
-          data-testid="merge-confidence-config-delete"
-        >
-          {label}
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
 
 export function MergeConfidenceDeleteDialog({
   open,

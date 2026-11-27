@@ -17,14 +17,16 @@ import {
 /** Keeps webhook failures and their recovery action together above the board. */
 export function WebhookFailuresNotice({
   organizationId,
+  factoryId,
   integrationsBasePath,
 }: {
   organizationId: string;
+  factoryId: string;
   integrationsBasePath: string;
 }) {
   const { canAct } = usePermissions();
   const canRead = canAct("integrations", "read");
-  const { data: integrations = [] } = useConnectedIntegrations(organizationId, { enabled: canRead });
+  const { data: integrations = [] } = useConnectedIntegrations(organizationId, { enabled: canRead, factoryId });
   if (!canRead) return null;
 
   const affectedIntegrations = integrations.filter(
