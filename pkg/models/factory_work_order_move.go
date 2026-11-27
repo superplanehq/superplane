@@ -129,6 +129,9 @@ func (o *FactoryWorkOrder) MoveFromRun(tx *gorm.DB, runID uuid.UUID, to FactoryT
 // work passed. Runs with no task, such as webhook runs, use it. They can
 // move only tasks that wait in their own stage.
 func (o *FactoryWorkOrder) MoveWaitingFromRun(tx *gorm.DB, runID uuid.UUID, stageKey string, to FactoryTaskMoveTo) (*FactoryTaskMoveResult, error) {
+	if err := lockRunningCaller(tx, runID); err != nil {
+		return nil, err
+	}
 	dispatch, err := o.lockWaitingLineDispatch(tx, stageKey)
 	if err != nil {
 		return nil, err
@@ -177,6 +180,19 @@ func (d *FactoryWorkOrderLineDispatch) moveDestination(to FactoryTaskMoveTo) (Fa
 	default:
 		return d.StageByKeyOrName(to.Stage)
 	}
+}
+
+// lockRunningCaller locks the calling run before the line and the task, as
+// finalizers do. A run that finished or is being cancelled loses authority.
+func lockRunningCaller(tx *gorm.DB, runID uuid.UUID) error {
+	var caller CanvasRun
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE", Options: "NOWAIT"}).Where("id = ?", runID).First(&caller).Error; err != nil {
+		return err
+	}
+	if caller.State == CanvasRunStateFinished || caller.State == CanvasRunStateCancelling {
+		return ErrFactoryTaskMoveStale
+	}
+	return nil
 }
 
 // lockWaitingLineDispatch locks the task and its latest line traversal. It

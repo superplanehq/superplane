@@ -201,6 +201,8 @@ func (s *Server) handleRunnerAttachTask(w http.ResponseWriter, r *http.Request) 
 		switch {
 		case errors.Is(err, models.ErrFactoryTaskNotWaiting):
 			http.Error(w, "Task is not waiting in this stage", http.StatusConflict)
+		case errors.Is(err, models.ErrFactoryTaskMoveStale):
+			http.Error(w, "Calling run is not running", http.StatusConflict)
 		case errors.As(err, &pgErr) && (pgErr.Code == "55P03" || pgErr.Code == "40P01"):
 			http.Error(w, "Task stage is changing. Retry the request", http.StatusConflict)
 		default:

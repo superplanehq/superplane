@@ -20,17 +20,19 @@ import (
 // noTaskRunnerToken mints the token of a webhook run of an automation in column.
 func noTaskRunnerToken(t *testing.T, order *models.FactoryWorkOrder, column string) string {
 	t.Helper()
-	return customAutomationRunnerToken(t, order, column, "scheduled", map[string]any{"key": "value"})
+	token, _ := customAutomationRunnerToken(t, order, column, "scheduled", map[string]any{"key": "value"})
+	return token
 }
 
 // manualTaskRunnerToken mints the token of a manual run on order, as the task
 // card starts it. The run is not a line step.
 func manualTaskRunnerToken(t *testing.T, order *models.FactoryWorkOrder, column string) string {
 	t.Helper()
-	return customAutomationRunnerToken(t, order, column, "manual", map[string]any{"data": map[string]any{"workOrder": map[string]any{"id": order.ID.String()}}})
+	token, _ := customAutomationRunnerToken(t, order, column, "manual", map[string]any{"data": map[string]any{"workOrder": map[string]any{"id": order.ID.String()}}})
+	return token
 }
 
-func customAutomationRunnerToken(t *testing.T, order *models.FactoryWorkOrder, column, startMode string, data map[string]any) string {
+func customAutomationRunnerToken(t *testing.T, order *models.FactoryWorkOrder, column, startMode string, data map[string]any) (string, uuid.UUID) {
 	t.Helper()
 	db := database.DB(t.Context())
 	var owner models.Canvas
@@ -51,7 +53,7 @@ func customAutomationRunnerToken(t *testing.T, order *models.FactoryWorkOrder, c
 		OrganizationID: order.OrganizationID.String(), NodeID: "agent", BaseURL: "http://app.test",
 	}, nil, 60))
 	require.NotEmpty(t, token)
-	return token
+	return token, run.ID
 }
 
 // waitInStage leaves the task in stage after its stage work passed, as a
@@ -116,6 +118,27 @@ func TestRunnerMoveTaskFromManualTaskRunMovesItsWaitingTask(t *testing.T) {
 	assert.Equal(t, models.FactoryWorkOrderStateClosed, order.State, "the stage after Awaiting approval is Done")
 }
 
+func TestRunnerStoppedWebhookRunCannotMoveOrAttachTasks(t *testing.T) {
+	server, _, order, dispatch, _ := moveTaskFixture(t)
+	db := database.DB(t.Context())
+	factory, err := models.FindFactory(db, order.OrganizationID, order.FactoryID)
+	require.NoError(t, err)
+	key := factory.WorkOrderKey(order.Number)
+	waitInStage(t, dispatch, "custom-wait")
+
+	for _, state := range []string{models.CanvasRunStateFinished, models.CanvasRunStateCancelling} {
+		token, runID := customAutomationRunnerToken(t, order, "custom-wait", "scheduled", map[string]any{"key": "value"})
+		require.NoError(t, db.Model(&models.CanvasRun{}).Where("id = ?", runID).Update("state", state).Error)
+		rec := runnerRequest(t, server, http.MethodPost, token, "/api/v1/runner/task/move", `{"task":"`+key+`","next":true}`)
+		assert.Equal(t, http.StatusConflict, rec.Code, "a %s run cannot move the task: %s", state, rec.Body.String())
+		rec = runnerRequest(t, server, http.MethodPost, token, "/api/v1/runner/task/attach", `{"task":"`+key+`"}`)
+		assert.Equal(t, http.StatusConflict, rec.Code, "a %s run cannot attach: %s", state, rec.Body.String())
+		assert.Contains(t, rec.Body.String(), "Calling run is not running")
+	}
+	require.NoError(t, db.First(dispatch, "id = ?", dispatch.ID).Error)
+	assert.Equal(t, "custom-wait", dispatch.CurrentStageKey)
+}
+
 func TestRunnerAttachTaskLinksWebhookRunToWaitingTask(t *testing.T) {
 	server, taskToken, order, dispatch, _ := moveTaskFixture(t)
 	db := database.DB(t.Context())
@@ -145,6 +168,10 @@ func TestRunnerAttachTaskLinksWebhookRunToWaitingTask(t *testing.T) {
 	require.Len(t, attached, 1)
 	assert.Equal(t, "custom-wait", attached[0].StageKey)
 	assert.NotEmpty(t, attached[0].CanvasName)
+	notified, err := models.ListWorkOrdersAttachedToRun(db, attached[0].RunID)
+	require.NoError(t, err)
+	require.Len(t, notified, 1, "run updates reach the attached task")
+	assert.Equal(t, order.ID, notified[0].ID)
 }
 
 func TestRunnerGetTaskFindsTaskByReference(t *testing.T) {

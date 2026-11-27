@@ -25,6 +25,9 @@ func (FactoryWorkOrderAttachedRun) TableName() string {
 // AttachWaitingRun links runID to the task. The task must wait in stageKey.
 // It is safe to call again for the same run.
 func (o *FactoryWorkOrder) AttachWaitingRun(tx *gorm.DB, runID uuid.UUID, stageKey string) error {
+	if err := lockRunningCaller(tx, runID); err != nil {
+		return err
+	}
 	if _, err := o.lockWaitingLineDispatch(tx, stageKey); err != nil {
 		return err
 	}
@@ -34,6 +37,15 @@ func (o *FactoryWorkOrder) AttachWaitingRun(tx *gorm.DB, runID uuid.UUID, stageK
 		StageKey:    stageKey,
 		CreatedAt:   time.Now(),
 	}).Error
+}
+
+// ListWorkOrdersAttachedToRun returns the tasks that show runID on their timeline.
+func ListWorkOrdersAttachedToRun(tx *gorm.DB, runID uuid.UUID) ([]FactoryWorkOrder, error) {
+	var orders []FactoryWorkOrder
+	err := tx.Joins("JOIN factory_work_order_attached_runs a ON a.work_order_id = factory_work_orders.id").
+		Where("a.run_id = ?", runID).
+		Find(&orders).Error
+	return orders, err
 }
 
 type FactoryWorkOrderAttachedRunRecord struct {
