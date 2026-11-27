@@ -51,6 +51,7 @@ var factoryConfigurationAgentFields = map[string]string{
 	"execution_timeout_seconds": "executionTimeoutSeconds",
 	"skip_setup_commands":       "skipSetupCommands",
 	"skip_repository_checkout":  "skipRepositoryCheckout",
+	"include_visual_evidence":   "includeVisualEvidence",
 }
 
 func exportFactoryConfigurationBuiltIn(version *models.CanvasVersion, templateID string) (map[string]any, error) {
@@ -73,10 +74,6 @@ func exportFactoryConfigurationBuiltIn(version *models.CanvasVersion, templateID
 			if err := validateFactoryConfigurationAgentField(node, field, value); err != nil {
 				return nil, prefixFactoryConfigurationSettingError("agents."+node.ID+".", err)
 			}
-			if templateID == lineImplementationTemplateID && node.ID == implementationAgentNodeID && field == "additional_instructions" {
-				settings[field] = value
-				continue
-			}
 			fields[field] = value
 		}
 		if len(fields) > 0 {
@@ -88,9 +85,9 @@ func exportFactoryConfigurationBuiltIn(version *models.CanvasVersion, templateID
 		if agent == nil || !isFactoryAgentHarness(agent.ComponentName()) {
 			return nil, fmt.Errorf("the Implement agent is missing or unsupported")
 		}
-		if _, present := settings["additional_instructions"]; !present {
-			settings["additional_instructions"] = ""
-		}
+	}
+	if err := exportFactoryConfigurationPublicSettings(version, templateID, settings); err != nil {
+		return nil, err
 	}
 	if len(agents) > 0 {
 		settings["agents"] = agents
@@ -143,23 +140,10 @@ func copyFactoryConfigurationBuiltIn(version, defaults *models.CanvasVersion, te
 		}
 	}
 	for field := range settings {
-		if field == "agents" || (field == "additional_instructions" && templateID == lineImplementationTemplateID) {
+		if field == "agents" || field == "intake" || field == "pr_feedback" || field == "template" || (field == "additional_instructions" && templateID == lineImplementationTemplateID) {
 			continue
 		}
 		return nil, nil, &factoryConfigurationSettingError{Field: field, Message: "This built-in setting is not supported."}
-	}
-	if templateID == lineImplementationTemplateID {
-		instructions, present := settings["additional_instructions"]
-		if !present {
-			instructions = ""
-		}
-		agent := findIntakeNode(snapshot.Nodes, implementationAgentNodeID)
-		if agent == nil || !isFactoryAgentHarness(agent.ComponentName()) {
-			return nil, nil, fmt.Errorf("the Implement agent is missing or unsupported")
-		}
-		if err := applyFactoryConfigurationAgentField(agent, "additional_instructions", instructions); err != nil {
-			return nil, nil, err
-		}
 	}
 	if rawAgents, present := settings["agents"]; present {
 		agents, ok := rawAgents.(map[string]any)
@@ -176,13 +160,21 @@ func copyFactoryConfigurationBuiltIn(version, defaults *models.CanvasVersion, te
 				return nil, nil, &factoryConfigurationSettingError{Field: "agents." + id, Message: "Use a mapping of supported agent settings."}
 			}
 			for field, value := range fields {
-				if field == "additional_instructions" && templateID == lineImplementationTemplateID && id == implementationAgentNodeID {
-					return nil, nil, &factoryConfigurationSettingError{Field: "agents." + id + "." + field, Message: "Use with.additional_instructions for Implement."}
-				}
 				if err := applyFactoryConfigurationAgentField(agent, field, value); err != nil {
 					return nil, nil, prefixFactoryConfigurationSettingError("agents."+id+".", err)
 				}
 			}
+		}
+	}
+	if instructions, present := settings["additional_instructions"]; templateID == lineImplementationTemplateID && present {
+		agent := findIntakeNode(snapshot.Nodes, implementationAgentNodeID)
+		if agent == nil || !isFactoryAgentHarness(agent.ComponentName()) {
+			return nil, nil, fmt.Errorf("the Implement agent is missing or unsupported")
+		}
+		// Older manifests used this field. Give that explicit update precedence
+		// over an exported agent setting while exports use the canonical location.
+		if err := applyFactoryConfigurationAgentField(agent, "additional_instructions", instructions); err != nil {
+			return nil, nil, err
 		}
 	}
 	return snapshot.Nodes, snapshot.Edges, nil
@@ -204,7 +196,7 @@ func validateFactoryConfigurationAgentField(node *models.Node, field string, val
 		return &factoryConfigurationSettingError{Field: field, Message: "This agent setting is not supported."}
 	}
 	switch field {
-	case "skip_setup_commands", "skip_repository_checkout":
+	case "skip_setup_commands", "skip_repository_checkout", "include_visual_evidence":
 		if _, ok := value.(bool); !ok {
 			return &factoryConfigurationSettingError{Field: field, Message: "Use a boolean value."}
 		}
@@ -302,7 +294,7 @@ func validFactoryConfigurationTimeout(value any) bool {
 
 func factoryConfigurationAgentZero(field string) any {
 	switch field {
-	case "skip_setup_commands", "skip_repository_checkout":
+	case "skip_setup_commands", "skip_repository_checkout", "include_visual_evidence":
 		return false
 	case "execution_timeout_seconds":
 		return 0

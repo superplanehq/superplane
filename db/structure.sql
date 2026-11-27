@@ -585,6 +585,21 @@ CREATE TABLE public.factory_codex_leases (
 
 
 --
+-- Name: factory_configuration_automations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.factory_configuration_automations (
+    organization_id uuid NOT NULL,
+    factory_id uuid NOT NULL,
+    line_id uuid NOT NULL,
+    stage_key text NOT NULL,
+    manifest_id text NOT NULL,
+    canvas_id uuid NOT NULL,
+    binding jsonb DEFAULT '{}'::jsonb NOT NULL
+);
+
+
+--
 -- Name: factory_intakes; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -2806,6 +2821,14 @@ ALTER TABLE ONLY public.factory_codex_leases
 
 
 --
+-- Name: factory_configuration_automations factory_configuration_automations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_configuration_automations
+    ADD CONSTRAINT factory_configuration_automations_pkey PRIMARY KEY (factory_id, line_id, stage_key, manifest_id);
+
+
+--
 -- Name: factory_intakes factory_intakes_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3832,6 +3855,13 @@ CREATE UNIQUE INDEX factory_codex_leases_secret_idx ON public.factory_codex_leas
 --
 
 CREATE INDEX factory_codex_leases_task_idx ON public.factory_codex_leases USING btree (task_id);
+
+
+--
+-- Name: factory_configuration_automations_canvas_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX factory_configuration_automations_canvas_id ON public.factory_configuration_automations USING btree (canvas_id);
 
 
 --
@@ -5572,6 +5602,38 @@ ALTER TABLE ONLY public.factory_codex_leases
 
 
 --
+-- Name: factory_configuration_automations factory_configuration_automations_canvas_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_configuration_automations
+    ADD CONSTRAINT factory_configuration_automations_canvas_id_fkey FOREIGN KEY (canvas_id) REFERENCES public.workflows(id) ON DELETE CASCADE;
+
+
+--
+-- Name: factory_configuration_automations factory_configuration_automations_factory_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_configuration_automations
+    ADD CONSTRAINT factory_configuration_automations_factory_id_fkey FOREIGN KEY (factory_id) REFERENCES public.factories(id) ON DELETE CASCADE;
+
+
+--
+-- Name: factory_configuration_automations factory_configuration_automations_line_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_configuration_automations
+    ADD CONSTRAINT factory_configuration_automations_line_id_fkey FOREIGN KEY (line_id) REFERENCES public.factory_lines(id) ON DELETE CASCADE;
+
+
+--
+-- Name: factory_configuration_automations factory_configuration_automations_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_configuration_automations
+    ADD CONSTRAINT factory_configuration_automations_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
 -- Name: factory_intakes factory_intakes_canvas_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -6819,7 +6881,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261125134933	f
+20261125223556	f
 \.
 
 
