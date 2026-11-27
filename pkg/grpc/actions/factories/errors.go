@@ -173,16 +173,10 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.FailedPrecondition(err, joinedErrorMessage(err, "SuperPlane could not close a previous pull request."))
 	case errors.Is(err, errWorkOrderNotClosedForBacklog):
 		return grpcerrors.FailedPrecondition(err, "Only a closed task can move to the Backlog.")
-	case errors.Is(err, errFactoryPullRequestNotGitHub):
-		return grpcerrors.FailedPrecondition(err, "Only pull requests on the workspace Git host can merge from SuperPlane.")
+	case errors.Is(err, errFactoryPullRequestProviderMismatch):
+		return grpcerrors.FailedPrecondition(err, "The pull request provider must match the workspace Git host.")
 	case errors.Is(err, errFactoryPullRequestNotOpen):
 		return grpcerrors.FailedPrecondition(err, "The pull request is not open.")
-	case errors.Is(err, errFactoryPullRequestNotMergeable):
-		return grpcerrors.FailedPrecondition(err, joinedErrorMessage(err, "The pull request cannot merge."))
-	case errors.Is(err, errFactoryPullRequestMergeMethodNotAllowed):
-		return grpcerrors.FailedPrecondition(err, "The repository does not allow this merge method.")
-	case errors.Is(err, errFactoryPullRequestHeadMoved):
-		return grpcerrors.FailedPrecondition(err, "The pull request head changed. Review the pull request and try again.")
 	case errors.Is(err, models.ErrFactoryPlanningSessionNotFound):
 		return grpcerrors.NotFound(err, "planning session not found")
 	case errors.Is(err, models.ErrFactoryPlanningSessionInvalid):
@@ -275,8 +269,6 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.FailedPrecondition(err, err.Error())
 	case errors.Is(err, errFactoryAutomationReserved):
 		return grpcerrors.FailedPrecondition(err, "This canvas belongs to a factory intake, line, backlog, or PR feedback handler.")
-	case errors.Is(err, errFactoryPullRequestMergeDisabled):
-		return grpcerrors.FailedPrecondition(err, "Pull request merge is not enabled for this organization.")
 	case errors.Is(err, errWorkspaceSkillsDisabled):
 		return grpcerrors.FailedPrecondition(err, "Workspace skills are not enabled for this organization.")
 	case errors.Is(err, errSuperPlaneMCPServerDisabled):
@@ -314,7 +306,6 @@ var errFactoryAutomationReserved = errors.New("factory automation is reserved")
 var errFactoryAgentResourceNotConnected = errors.New("connect this MCP server first")
 var errListMCPTools = errors.New("could not list MCP tools")
 var errMCPConnectionChanged = errors.New("mcp connection changed before tool defaults were saved")
-var errFactoryPullRequestMergeDisabled = errors.New("pull request merge is not enabled")
 var errWorkspaceSkillsDisabled = errors.New("workspace skills are not enabled")
 var errSuperPlaneMCPServerDisabled = errors.New("superplane MCP server is not enabled")
 var errCannotCloseBitbucketPullRequest = errors.New("cannot close a bitbucket pull request")

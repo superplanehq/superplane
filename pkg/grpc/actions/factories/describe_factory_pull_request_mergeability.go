@@ -33,7 +33,7 @@ func DescribeFactoryPullRequestMergeability(
 	}
 
 	db := database.DB(ctx)
-	factory, pullRequest, err := loadFactoryPullRequestForMerge(db, orgID, req.GetFactoryId(), req.GetPrId())
+	factory, pullRequest, err := loadFactoryPullRequestForMergeability(db, orgID, req.GetFactoryId(), req.GetPrId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to describe factory pull request mergeability")
 	}

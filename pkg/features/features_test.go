@@ -81,12 +81,12 @@ func Test__Get(t *testing.T) {
 		assert.Equal(t, Feature{}, feature)
 	})
 
-	t.Run("known id returns pull request merge feature", func(t *testing.T) {
+	t.Run("known id returns pull request status feature", func(t *testing.T) {
 		f, ok := Get(FeatureFactoryPullRequestMerge)
 		assert.True(t, ok)
 		assert.Equal(t, FeatureFactoryPullRequestMerge, f.ID)
-		assert.Equal(t, "Pull Request Merge", f.Label)
-		assert.Equal(t, "Show the Mergeable chip on task cards and the Merge button on pull request review", f.Description)
+		assert.Equal(t, "Pull Request Status", f.Label)
+		assert.Equal(t, "Show pull request status and the Mergeable badge on task cards", f.Description)
 		assert.Nil(t, f.Released)
 	})
 

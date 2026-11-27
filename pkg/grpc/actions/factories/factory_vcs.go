@@ -48,19 +48,7 @@ func (g *githubProvider) ReadMergeability(ctx context.Context, pullRequest *mode
 	if err != nil {
 		return vcs.Mergeability{}, err
 	}
-	g.client = result.Client
 	return mergeabilityToVCS(result), nil
-}
-
-func (g *githubProvider) MergePullRequest(ctx context.Context, pullRequest *models.FactoryPullRequest, method, expectedSHA string) error {
-	if err := g.ensureClient(); err != nil {
-		return err
-	}
-	_, _, err := g.client.MergePullRequest(ctx, pullRequest.Repository, int(pullRequest.Number), "", &github.PullRequestOptions{
-		MergeMethod: method,
-		SHA:         expectedSHA,
-	})
-	return err
 }
 
 func (g *githubProvider) ClosePullRequest(ctx context.Context, ref vcs.PullRequestRef) error {
@@ -94,17 +82,6 @@ func (g *githubProvider) ensureClient() error {
 	return nil
 }
 
-func connectFactoryVCS(provider vcs.Provider) error {
-	switch provider := provider.(type) {
-	case *githubProvider:
-		return provider.ensureClient()
-	case *bitbucketProvider:
-		return provider.ensureClient()
-	default:
-		return nil
-	}
-}
-
 func readFactoryPullRequestMergeability(
 	ctx context.Context,
 	db *gorm.DB,
@@ -116,9 +93,6 @@ func readFactoryPullRequestMergeability(
 		return nil, err
 	}
 	result := mergeabilityFromVCS(pullRequest, read)
-	if github, ok := provider.(*githubProvider); ok {
-		result.Client = github.client
-	}
 	if err := persistFactoryPullRequestMergeability(db, pullRequest, result); err != nil {
 		return nil, err
 	}
