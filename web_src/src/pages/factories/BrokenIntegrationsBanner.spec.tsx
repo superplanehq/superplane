@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "bun:test";
 
@@ -37,21 +37,36 @@ describe("BrokenIntegrationsBanner", () => {
   });
 
   it("names each broken integration, its reason, and links to the repair step", () => {
+    const jiraBroken: BrokenIntegration = {
+      id: "jira-1",
+      name: "Engineering Jira",
+      integrationName: "jira",
+      reason: "error",
+      description: "Reconnect to Jira",
+      actionLabel: "Reconnect",
+    };
+    const oldGitHub = { ...githubBroken, id: "gh-old", name: "github-old" };
     render(
       <MemoryRouter>
         <BrokenIntegrationsBanner
-          integrations={[githubBroken, openaiIncomplete]}
+          integrations={[githubBroken, oldGitHub, openaiIncomplete, jiraBroken]}
           integrationsBasePath="/org/workspaces/RF/settings/organization/integrations"
         />
       </MemoryRouter>,
     );
 
-    expect(screen.getByTestId("broken-integrations-banner")).toHaveTextContent("2 integrations need attention");
     expect(screen.getByTestId("broken-integrations-banner")).toHaveTextContent("App was uninstalled");
-    expect(screen.getByRole("link", { name: "Reinstall app" })).toHaveAttribute(
-      "href",
-      "/org/workspaces/RF/settings/organization/integrations/gh-1",
-    );
+    for (const integration of [githubBroken, oldGitHub, jiraBroken]) {
+      const row = screen.getAllByRole("listitem").find((item) => item.textContent?.includes(integration.name));
+      expect(row).toBeDefined();
+      const connection = within(row!);
+      const provider = integration.integrationName === "jira" ? "Jira" : "GitHub";
+      expect(connection.getByText(`${integration.name} (${provider})`)).toBeVisible();
+      expect(connection.getByRole("link", { name: integration.actionLabel })).toHaveAttribute(
+        "href",
+        `/org/workspaces/RF/settings/organization/integrations/${integration.id}`,
+      );
+    }
     expect(screen.getByRole("link", { name: "Finish setup" })).toHaveAttribute(
       "href",
       "/org/workspaces/RF/settings/organization/integrations/oa-1",
