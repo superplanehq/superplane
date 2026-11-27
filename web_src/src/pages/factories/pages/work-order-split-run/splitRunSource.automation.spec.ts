@@ -54,7 +54,9 @@ describe("splitRunSourceForOrder automations", () => {
     const order = { ...DRAFT_WORK_ORDER, createdBy: { automation } };
     expect(
       splitRunSourceForOrder({ ...order, origin: { url: "https://requests.example.com/REQ-1", label: "REQ-1" } }),
-    ).toEqual(expect.objectContaining({ kind: "intake", name: "Webhook", ticket: expect.objectContaining({ label: "REQ-1" }) }));
+    ).toEqual(
+      expect.objectContaining({ kind: "intake", name: "Webhook", ticket: expect.objectContaining({ label: "REQ-1" }) }),
+    );
     expect(
       splitRunSourceForOrder({ ...order, origin: { url: "https://github.com/acme/app/issues/7", label: "" } }),
     ).toEqual(expect.objectContaining({ name: "GitHub issues" }));
