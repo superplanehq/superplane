@@ -187,7 +187,7 @@ function splitRunSourceWithoutRun(order: FactoriesWorkOrder, resolveUser?: OrgUs
     // A link on a host that names no source shows the automation that made the task.
     const source = intakeSourceFromHref(
       originHref,
-      knownIntakeKindFromHref(originHref) ?? (automation ? intakeKindForAutomation(automation) : "github-issues"),
+      knownIntakeKindFromHref(originHref) ?? originIntakeKindForAutomation(automation),
       order.origin?.label?.trim() || sourceTicketLabel(originHref),
     );
     return { ...source, addedBy: addedByForIntakeOrder(order, source.name) };
@@ -309,6 +309,18 @@ function intakeKindForAutomation(automation: FactoriesAutomationRef): SplitRunIn
     return hinted;
   }
   return key === "intake" ? "github-issues" : undefined;
+}
+
+/** Source of a task link on a host that names no source. */
+function originIntakeKindForAutomation(automation: FactoriesAutomationRef | undefined): SplitRunIntakeKind | undefined {
+  if (!automation) {
+    return "github-issues";
+  }
+  // A custom automation gets such links from outside, such as a webhook request.
+  if (automation.templateId === CUSTOM_AUTOMATION_TEMPLATE_ID) {
+    return "webhook";
+  }
+  return intakeKindForAutomation(automation);
 }
 
 function intakeSourceFromKind(intakeKind: SplitRunIntakeKind): SplitRunIntakeSource {
