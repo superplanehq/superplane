@@ -177,7 +177,7 @@ it("updates the selected role and disables every role trigger until the response
       return updateResponse;
     },
   });
-  renderGroups(groups, roles);
+  renderGroups(structuredClone(groups), roles);
 
   fireEvent.keyDown(screen.getByRole("button", { name: "Viewer" }), { key: "Enter" });
   fireEvent.click(await screen.findByRole("menuitem", { name: "Administrator" }));
