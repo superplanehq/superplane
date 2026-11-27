@@ -311,9 +311,9 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 		// entry here on purpose. They only ever act on the calling user's
 		// own record, so GatewayAuthorizer.AuthorizeHTTP's no-rule-found
 		// path (allow without an org permission check) is the correct
-		// behavior. Authenticated handlers already require a valid session
-		// or personal token before reaching them. Feedback also rejects
-		// API keys in the HTTP handler.
+		// behavior. Token issuance actions enforce credential eligibility:
+		// scoped credentials and API keys cannot issue personal tokens.
+		// Feedback also rejects API keys in the HTTP handler.
 		{Method: "GET", Pattern: "/api/v1/me/notification-settings"}: {
 			Resource:                     "notifications",
 			Action:                       "read",
