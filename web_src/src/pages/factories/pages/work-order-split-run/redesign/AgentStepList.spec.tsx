@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 
 import type { CommandSection } from "@/ui/CanvasPage/RunnerLiveLogDialog/types";
 
@@ -68,6 +68,63 @@ function stepsFromSections(sections: CommandSection[], runStatus: "passed" | "fa
 }
 
 describe("AgentStepMarkers", () => {
+  it("keeps a step without events, output, or live activity static", () => {
+    render(<AgentStepMarkers stage={stageWithStep(stepPlaceholder())} />);
+
+    expect(screen.getByText("Empty")).toBeInTheDocument();
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it.each([
+    { source: "output", output: "Step output", events: [], liveActive: false },
+    {
+      source: "events",
+      events: [{ kind: "note" as const, id: "note-1", text: "Step activity" }],
+      liveActive: false,
+    },
+    { source: "live activity", events: [], liveActive: true },
+  ])("toggles a running row with $source", ({ output, events, liveActive }) => {
+    render(
+      <AgentStepMarkers
+        stage={stageWithStep({ ...stepPlaceholder(), status: "running", output, events })}
+        liveActive={liveActive}
+      />,
+    );
+
+    const trigger = screen.getByRole("button", { name: /^Empty/ });
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
+    fireEvent.click(trigger);
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(trigger);
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it.each([
+    { choice: "automatic close", expandSteps: false, clicks: 0, chosenOpen: true, completedOpen: false },
+    { choice: "user close", expandSteps: false, clicks: 1, chosenOpen: false, completedOpen: false },
+    { choice: "user reopen", expandSteps: false, clicks: 2, chosenOpen: true, completedOpen: true },
+    { choice: "default open", expandSteps: true, clicks: 0, chosenOpen: true, completedOpen: true },
+    { choice: "user close with default open", expandSteps: true, clicks: 1, chosenOpen: false, completedOpen: false },
+  ])("preserves $choice when a running step completes", ({ expandSteps, clicks, chosenOpen, completedOpen }) => {
+    const step: AgentStep = {
+      ...stepPlaceholder(),
+      status: "running",
+      events: [{ kind: "note", id: "note-1", text: "Step activity" }],
+    };
+    const { rerender } = render(<AgentStepMarkers stage={stageWithStep(step)} expandSteps={expandSteps} />);
+    const trigger = screen.getByRole("button", { name: /^Empty/ });
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
+
+    for (let click = 0; click < clicks; click++) {
+      fireEvent.click(trigger);
+    }
+    expect(trigger).toHaveAttribute("aria-expanded", String(chosenOpen));
+
+    rerender(<AgentStepMarkers stage={stageWithStep({ ...step, status: "passed" })} expandSteps={expandSteps} />);
+
+    expect(screen.getByRole("button", { name: /^Empty/ })).toHaveAttribute("aria-expanded", String(completedOpen));
+  });
+
   it.each([
     { status: "cancelled" as const, label: "Stopped", destructive: false },
     { status: "failed" as const, label: "Failed", destructive: true },
