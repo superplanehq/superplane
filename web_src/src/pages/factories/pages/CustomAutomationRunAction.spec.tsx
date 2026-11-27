@@ -17,6 +17,22 @@ beforeEach(() => {
 });
 
 describe("CustomAutomationRunAction", () => {
+  it("confirms queued work without claiming it started", async () => {
+    runAutomation.mockResolvedValue({ queueItemId: "queue-1" });
+    render(
+      <CustomAutomationRunAction
+        organizationId="org-1"
+        factoryId="factory-1"
+        workOrderId="task-1"
+        automations={[{ id: "automation-1", name: "Security review" }]}
+      />,
+    );
+
+    await userEvent.setup().click(screen.getByRole("button", { name: "Run automation" }));
+
+    expect(await screen.findByRole("status")).toHaveTextContent("Security review queued.");
+  });
+
   it("starts the only manual automation and confirms success", async () => {
     const user = userEvent.setup();
     runAutomation.mockResolvedValue({ runId: "run-1" });

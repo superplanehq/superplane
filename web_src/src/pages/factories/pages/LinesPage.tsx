@@ -1245,7 +1245,8 @@ function LineDetail({
   const manualCustomAutomations = useMemo<ManualCustomAutomation[]>(
     () =>
       customAutomationDetails.flatMap(({ automationId, automation }) =>
-        customAutomationAllowsManualStart(automation.settings)
+        customAutomationAllowsManualStart(automation.settings) ||
+        automation.automation?.columnKey?.startsWith("custom-")
           ? [
               {
                 id: automationId,
