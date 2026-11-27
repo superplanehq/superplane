@@ -57,6 +57,15 @@ const incompleteSetup: BrokenIntegration = {
   actionLabel: "Finish setup",
 };
 
+const disconnectedJira: BrokenIntegration = {
+  id: "jira-engineering",
+  name: "Engineering Jira",
+  integrationName: "jira",
+  reason: "error",
+  description: "Reconnect to Jira to receive new issues.",
+  actionLabel: "Reconnect",
+};
+
 /** An uninstalled GitHub App: the next step is to reinstall it. */
 export const GitHubAppUninstalled: Story = {
   name: "GitHub App uninstalled",
@@ -66,7 +75,15 @@ export const GitHubAppUninstalled: Story = {
 /** Several integrations need attention at once, each with its own repair step. */
 export const MultipleIntegrations: Story = {
   name: "Multiple integrations",
-  args: { integrations: [uninstalledGitHubApp, expiredLlmKey, incompleteSetup] },
+  args: {
+    integrations: [
+      uninstalledGitHubApp,
+      { ...uninstalledGitHubApp, id: "gh-old", name: "github-old" },
+      disconnectedJira,
+      expiredLlmKey,
+      incompleteSetup,
+    ],
+  },
 };
 
 /** A read-only viewer sees the problem, but not an action to fix it. */
