@@ -322,7 +322,7 @@ function VisibilitySection({
           <p className="text-[13px] font-medium text-foreground">{isPublic ? "Public" : "Private"}</p>
           <p className="text-[12px] leading-5 text-muted-foreground">
             {isPublic
-              ? "Anyone with the link can open the line board. Tasks, logs, and settings stay private."
+              ? "Anyone with the link can read tasks, descriptions, comments, run summaries, and token totals. Logs, artifacts, spending, and settings stay private."
               : "Only members of this organization can open the line board."}
             {isPublic && publicBoardPath ? (
               <>
@@ -363,7 +363,7 @@ function VisibilitySection({
             </AlertDialogTitle>
             <AlertDialogDescription>
               {nextPublic
-                ? "Anyone with the link can open the line board. Tasks, logs, and settings stay private."
+                ? "Anyone with the link can read tasks, descriptions, comments, run summaries, and token totals. Logs, artifacts, spending, and settings stay private."
                 : "Only members of this organization can open the line board."}
             </AlertDialogDescription>
           </AlertDialogHeader>

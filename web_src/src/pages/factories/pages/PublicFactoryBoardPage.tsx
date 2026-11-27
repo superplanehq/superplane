@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useLocation, useNavigate, useParams } from "react-router";
+import { useLocation, useNavigate, useParams, useSearchParams } from "react-router";
 
 import { Link } from "@/components/Link/link";
 import { PermissionDeniedPage } from "@/components/PermissionDeniedPage";
@@ -21,6 +21,7 @@ import {
   factorySectionHeaderClassName,
   factoryWorkOrdersBodyClassName,
 } from "./factoryPageLayoutStyles";
+import { PublicFactoryTaskDialog } from "./PublicFactoryTaskDialog";
 import { PublicBoardColumnLane } from "./PublicFactoryBoardLane";
 import {
   boardFilterOptions,
@@ -245,6 +246,14 @@ function PublicBoardView({
   narrowed: boolean;
 }) {
   const searchRef = useRef<HTMLInputElement>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const taskNumber = Number(searchParams.get("task"));
+  const selectTask = (number?: number) => {
+    const next = new URLSearchParams(searchParams);
+    if (number) next.set("task", String(number));
+    else next.delete("task");
+    setSearchParams(next);
+  };
   const { view: colorView } = useLineBoardColumnColorViewPreference();
 
   return (
@@ -302,6 +311,7 @@ function PublicBoardView({
                     board={board}
                     automationRowCount={automationRowCount}
                     colorView={colorView}
+                    onOpenTask={selectTask}
                   />
                 </div>
               ))}
@@ -309,6 +319,15 @@ function PublicBoardView({
           </div>
         </div>
       </main>
+      {Number.isSafeInteger(taskNumber) && taskNumber > 0 ? (
+        <PublicFactoryTaskDialog
+          key={`${organizationId}:${factoryKey}:${lineId}:${taskNumber}`}
+          url={`${publicBoardUrl(organizationId, factoryKey, lineId).replace(/\/board$/, "")}/tasks/${taskNumber}`}
+          workspaceKey={board.workspaceKey ?? ""}
+          board={board}
+          onClose={() => selectTask()}
+        />
+      ) : null}
     </div>
   );
 }

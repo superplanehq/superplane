@@ -33,6 +33,7 @@ export interface PublicAutomation {
 }
 
 export interface PublicBoardCard {
+  number?: number;
   id?: string;
   title: string;
   createdAt: string;
