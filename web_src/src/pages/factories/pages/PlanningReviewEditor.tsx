@@ -49,6 +49,7 @@ export type PlanningReviewAgentSlot = {
   factoryId?: string;
   factoryKey?: string;
   automationId?: string;
+  defaultsAvailable?: boolean;
   onSave?: (draft: PlanningReviewDraft) => void | Promise<void>;
 };
 
@@ -61,6 +62,7 @@ export function PlanningReviewEditor({
   factoryId,
   factoryKey,
   automationId,
+  defaultsAvailable = false,
   automationHref,
   isLoading = false,
   showAutomationNote = true,
@@ -73,6 +75,7 @@ export function PlanningReviewEditor({
   factoryId?: string;
   factoryKey?: string;
   automationId?: string;
+  defaultsAvailable?: boolean;
   automationHref?: string;
   isLoading?: boolean;
   showAutomationNote?: boolean;
@@ -86,6 +89,7 @@ export function PlanningReviewEditor({
     organizationId,
     factoryId,
     automationId,
+    defaultsAvailable,
   });
   const saveDisabled = isLoading || isSaving || restore.isRestoring || draft.components.length === 0;
 

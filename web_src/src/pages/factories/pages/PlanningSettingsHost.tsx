@@ -166,6 +166,7 @@ function PlanningSettingsLoaded({
         factoryId,
         factoryKey,
         automationId: canvasId,
+        defaultsAvailable: agent.defaultsAvailable,
         onSave: agent.save,
       }}
       onClose={onClose}
