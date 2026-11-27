@@ -7,19 +7,21 @@ import { useVisibleFactorySettingsNavGroups } from "./useVisibleFactorySettingsN
 import { buildFactorySettingsSearchIndex, searchFactorySettings } from "./settingsSearch";
 
 let modelStatusEnabled = false;
-let webhookFeatures: string[] = [];
+let canReadFactories = true;
 
 vi.mock("@/api-client", () => ({ meListCodexUsage: vi.fn() }));
 vi.mock("@/contexts/usePermissions", () => ({
-  usePermissions: () => ({ hasPermission: () => true, isLoading: false }),
+  usePermissions: () => ({
+    hasPermission: (resource: string, action: string) =>
+      resource !== "factories" || action !== "read" || canReadFactories,
+    isLoading: false,
+  }),
 }));
 vi.mock("@/hooks/useExperimentalFeature", () => ({
   useExperimentalFeature: () => ({
     has: (id: string) => {
       if (id === "model_status") return modelStatusEnabled;
-      if (["factory-as-code", "factory_webhook_intake", "factory_custom_automations"].includes(id)) {
-        return webhookFeatures.includes(id);
-      }
+      if (id === "factory-as-code") return false;
       return true;
     },
     isLoading: false,
@@ -84,18 +86,17 @@ describe("Model status discovery", () => {
 });
 
 describe("Workspace webhook discovery", () => {
-  for (const features of [[], ["factory_custom_automations"], ["factory-as-code"], ["factory_webhook_intake"]]) {
-    it(`gates webhook navigation with ${features.join(", ") || "no features"}`, () => {
-      webhookFeatures = features;
+  for (const permitted of [false, true]) {
+    it(`${permitted ? "shows" : "hides"} webhook navigation by read permission without optional features`, () => {
+      canReadFactories = permitted;
       const view = render(
         <QueryClientProvider client={new QueryClient()}>
           <SettingsNavigation />
         </QueryClientProvider>,
       );
-      const enabled = features.includes("factory-as-code") || features.includes("factory_webhook_intake");
-      expect(screen.queryByRole("link", { name: "Webhooks" }) !== null).toBe(enabled);
+      expect(screen.queryByRole("link", { name: "Webhooks" }) !== null).toBe(permitted);
       view.unmount();
-      webhookFeatures = [];
+      canReadFactories = true;
     });
   }
 });

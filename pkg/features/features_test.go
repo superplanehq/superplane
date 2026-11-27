@@ -36,6 +36,11 @@ func Test__Get(t *testing.T) {
 		assert.False(t, ok)
 	})
 
+	t.Run("retired webhook intake flag is absent", func(t *testing.T) {
+		_, ok := Get("factory_webhook_intake")
+		assert.False(t, ok)
+	})
+
 	t.Run("known id returns factory datadog intake feature", func(t *testing.T) {
 		f, ok := Get(FeatureFactoryDatadogIntake)
 		assert.True(t, ok)

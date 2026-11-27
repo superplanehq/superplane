@@ -28,9 +28,9 @@ func TestFactoryWebhookLifecycle(t *testing.T) {
 	factory := seedHandOffFactory(t, r, db)
 	ctx, deps, orgID := onboardingContext(r), onboardingDeps(r), r.Organization.ID.String()
 
-	_, err := ListFactoryWebhooks(ctx, deps, orgID, &pb.ListFactoryWebhooksRequest{FactoryId: factory.ID.String()})
-	requireStatusCode(t, err, codes.FailedPrecondition)
-	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryAsCode))
+	initial, err := ListFactoryWebhooks(ctx, deps, orgID, &pb.ListFactoryWebhooksRequest{FactoryId: factory.ID.String()})
+	require.NoError(t, err)
+	assert.Empty(t, initial.GetWebhooks())
 
 	created, err := CreateFactoryWebhook(ctx, deps, orgID, &pb.CreateFactoryWebhookRequest{
 		FactoryId: factory.ID.String(), Name: " Jira ", Authentication: pb.FactoryWebhook_AUTHENTICATION_SIGNATURE,
@@ -68,6 +68,9 @@ func TestFactoryWebhookLifecycle(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.NotEqual(t, created.GetSecret(), regenerated.GetSecret())
+
+	_, err = ListFactoryWebhooks(ctx, deps, uuid.NewString(), &pb.ListFactoryWebhooksRequest{FactoryId: factory.ID.String()})
+	requireStatusCode(t, err, codes.NotFound)
 
 	other, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)

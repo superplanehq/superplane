@@ -16,6 +16,8 @@ import { factorySettingsSectionRoutes } from "./factorySettingsSectionRoutes";
 
 const createMutateAsync = vi.fn();
 let webhooks: FactoriesFactoryWebhook[] = [];
+let canRead = true;
+let canUpdate = true;
 
 const JIRA: FactoriesFactoryWebhook = {
   id: "webhook-1",
@@ -28,7 +30,11 @@ const JIRA: FactoriesFactoryWebhook = {
 vi.mock("@/hooks/usePageTitle", () => ({ usePageTitle: vi.fn() }));
 vi.mock("@/lib/toast", () => ({ showSuccessToast: vi.fn(), showErrorToast: vi.fn() }));
 vi.mock("@/contexts/usePermissions", () => ({
-  usePermissions: () => ({ canAct: () => true, hasPermission: () => true, isLoading: false }),
+  usePermissions: () => ({
+    canAct: (_resource: string, action: string) => (action === "read" ? canRead : canUpdate),
+    hasPermission: (_resource: string, action: string) => (action === "read" ? canRead : canUpdate),
+    isLoading: false,
+  }),
 }));
 vi.mock("@/hooks/useFactoryWebhooks", () => {
   const idle = () => ({ mutateAsync: vi.fn(), isPending: false });
@@ -76,26 +82,32 @@ function renderPage(client?: QueryClient) {
 describe("FactorySettingsWebhooksPage", () => {
   beforeEach(() => {
     webhooks = [];
+    canRead = true;
+    canUpdate = true;
     createMutateAsync.mockReset();
   });
 
-  for (const feature of [null, "factory-as-code", "factory_webhook_intake"]) {
-    it(`gates direct webhook settings visits with ${feature ?? "neither feature"}`, () => {
+  for (const permission of ["none", "read", "update"]) {
+    it(`enforces ${permission} permission on direct visits without optional features`, () => {
+      canRead = permission !== "none";
+      canUpdate = permission === "update";
       const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
       client.setQueryData(organizationKeys.details("org-1"), {
-        spec: { enabledExperimentalFeatures: feature ? [feature] : [] },
+        spec: { enabledExperimentalFeatures: [] },
       });
       client.setQueryData(experimentalFeaturesKeys.registry(), {
-        features: [
-          { id: "factory-as-code", released: false },
-          { id: "factory_webhook_intake", released: false },
-        ],
+        features: [{ id: "factory-as-code", released: false }],
       });
       const view = renderPage(client);
-      if (feature) {
-        expect(screen.getByTestId("factory-webhook-create")).toBeEnabled();
+      if (canRead) {
+        expect(screen.getByTestId("factory-webhooks")).toBeInTheDocument();
+        if (canUpdate) {
+          expect(screen.getByTestId("factory-webhook-create")).toBeEnabled();
+        } else {
+          expect(screen.getByTestId("factory-webhook-create")).toBeDisabled();
+        }
       } else {
-        expect(screen.getByText("Organization home")).toBeInTheDocument();
+        expect(screen.getByTestId("permission-denied-page")).toBeInTheDocument();
         expect(screen.queryByTestId("factory-webhooks")).not.toBeInTheDocument();
       }
       view.unmount();

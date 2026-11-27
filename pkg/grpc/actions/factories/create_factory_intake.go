@@ -77,11 +77,6 @@ func CreateFactoryIntake(
 	}
 
 	db := database.DB(ctx)
-	if source == models.FactoryIntakeSourceWebhook {
-		if err := requireWebhookIntake(db, orgID); err != nil {
-			return nil, err
-		}
-	}
 	factory, err := findFactory(db, orgID, req.GetFactoryId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create factory intake")
