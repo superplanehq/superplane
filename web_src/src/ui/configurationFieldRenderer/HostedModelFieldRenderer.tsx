@@ -265,7 +265,7 @@ function ModelThinkingSelect({
   onCommit: (model: string, thinkingLevel: string) => void;
 }) {
   const { unavailable, label: selectedLabel } = modelSelectionLabel(model, options, placeholder);
-  const thinkingLabel = thinkingOptions.find((level) => level.value === thinkingLevel)?.label ?? "Default";
+  const thinkingLabel = thinkingLevelLabel(thinkingLevel, thinkingOptions);
   const modelListTestId = modelFieldTestId(fieldName, "model-list");
   const thinkingTestId = modelFieldTestId(fieldName, "thinking");
 
@@ -276,7 +276,7 @@ function ModelThinkingSelect({
           <Button
             type="button"
             variant="outline"
-            disabled={readOnly || (options.length === 0 && !(modelOnly && committedModel))}
+            disabled={isModelPickerDisabled(readOnly, options.length, modelOnly, committedModel)}
             aria-invalid={(unavailable && unavailableSeverity === "error") || undefined}
             data-testid={modelFieldTestId(fieldName, "model")}
             className={cn(
@@ -336,6 +336,20 @@ function ModelThinkingSelect({
       ) : null}
     </>
   );
+}
+
+function isModelPickerDisabled(
+  readOnly: boolean | undefined,
+  optionCount: number,
+  modelOnly: boolean,
+  committedModel: string,
+): boolean {
+  // A saved model keeps an empty model-only menu available so users can clear it.
+  return Boolean(readOnly || (optionCount === 0 && !(modelOnly && committedModel)));
+}
+
+function thinkingLevelLabel(thinkingLevel: string, thinkingOptions: ReadonlyArray<{ value: string; label: string }>) {
+  return thinkingOptions.find((level) => level.value === thinkingLevel)?.label ?? "Default";
 }
 
 function modelSelectionLabel(model: string, options: Array<{ value: string; label: string }>, placeholder: string) {
