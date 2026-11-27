@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 
+	factorycomponent "github.com/superplanehq/superplane/pkg/components/factory"
 	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
@@ -42,30 +43,77 @@ func buildCustomStageAutomationCanvas(tx *gorm.DB, factory *models.Factory, name
 		Metadata:   &yaml.CanvasMetadata{Name: name, Description: "Run ordered prompt and Bash automation steps."},
 		Spec:       &yaml.CanvasSpec{},
 	}
-	metadata := customAutomationNodeMetadata(provider, settings.Icon, settings.RunsOnTask, func(template map[string]any) {
-		template["startMode"] = "automatic"
-	})
-	doc.Spec.Nodes = []yaml.Node{{
-		ID: "on-run", Name: "On Run", Type: yaml.NodeTypeTrigger, Component: "onRun", Configuration: map[string]any{}, Metadata: metadata,
-	}, customAutomationRunnerNode("stage-run", "Run stage automation", settings,
-		customAutomationRunnerConfiguration(tx, factory, settings, []any{
-			checkoutEnvironmentVar("REPO", "{{ order().repository }}"),
-			checkoutEnvironmentVar("REPO_URL", "{{ order().repository_url }}"),
-			checkoutEnvironmentVar("BASE", "{{ order().default_branch }}"),
-		}), 80)}
-	doc.Spec.Edges = []yaml.Edge{{SourceID: "on-run", TargetID: "stage-run", Channel: "default"}}
+	if settings.hasTrigger(pb.FactoryCustomAutomation_START_MODE_AUTOMATIC) {
+		metadata := customAutomationNodeMetadata(provider, settings.Icon, settings.RunsOnTask, func(template map[string]any) {
+			template["startMode"] = "automatic"
+		})
+		doc.Spec.Nodes = []yaml.Node{{
+			ID: "on-run", Name: "On Run", Type: yaml.NodeTypeTrigger, Component: "onRun", Configuration: map[string]any{}, Metadata: metadata,
+		}, customAutomationRunnerNode(customStageRunnerID, "Run stage automation", settings,
+			customAutomationRunnerConfiguration(tx, factory, settings, []any{
+				checkoutEnvironmentVar("REPO", "{{ order().repository }}"),
+				checkoutEnvironmentVar("REPO_URL", "{{ order().repository_url }}"),
+				checkoutEnvironmentVar("BASE", "{{ order().default_branch }}"),
+			}), 80)}
+		doc.Spec.Edges = []yaml.Edge{{SourceID: "on-run", TargetID: customStageRunnerID, Channel: "default"}}
+	}
+	if !settings.hasWebhookTrigger() {
+		return doc, nil
+	}
+	webhookRunner := customAutomationRunnerNode(customStageWebhookRunnerID, "Run webhook", settings,
+		customAutomationRunnerConfiguration(tx, factory, settings,
+			customAutomationCheckoutEnvironment(factory, pb.FactoryCustomAutomation_START_MODE_SCHEDULED, githubHostForFactory(tx, factory), false),
+		), 480)
+	markNoTaskRunner(&webhookRunner, provider, settings.Icon)
+	appendWebhookPayloadInstructions(webhookRunner.Configuration)
+	doc.Spec.Nodes = append(doc.Spec.Nodes, webhookRunner)
+	offset := 0
+	for _, trigger := range settings.Triggers {
+		if trigger.Mode != pb.FactoryCustomAutomation_START_MODE_WEBHOOK {
+			continue
+		}
+		offset++
+		node := customAutomationWebhookNode(provider, settings, trigger, 80+offset*180)
+		doc.Spec.Nodes = append(doc.Spec.Nodes, node)
+		doc.Spec.Edges = append(doc.Spec.Edges, yaml.Edge{SourceID: node.ID, TargetID: customStageWebhookRunnerID, Channel: "default"})
+	}
+	doc.Metadata.Description = "Run prompt and Bash steps when a webhook receives a request."
+	if settings.hasTrigger(pb.FactoryCustomAutomation_START_MODE_AUTOMATIC) {
+		doc.Metadata.Description = "Run prompt and Bash steps when a task enters the stage or a webhook receives a request."
+	}
 	return doc, nil
 }
 
 func validateCustomStageTriggers(settings *customAutomationSettings) error {
-	if len(settings.Triggers) != 1 || settings.StartMode != pb.FactoryCustomAutomation_START_MODE_AUTOMATIC || settings.runsWithoutTask() {
-		return invalidArgument("Custom stage automations run on a task when it enters the stage. Keep one task_enters_stage trigger.")
+	automatic := 0
+	for _, trigger := range settings.Triggers {
+		switch trigger.Mode {
+		case pb.FactoryCustomAutomation_START_MODE_AUTOMATIC:
+			automatic++
+		case pb.FactoryCustomAutomation_START_MODE_WEBHOOK:
+		default:
+			automatic = 2
+		}
+	}
+	if automatic > 1 || len(settings.Triggers) == 0 || settings.runsWithoutTask() {
+		return invalidArgument("Custom stage automations start when a task enters the stage or when a webhook receives a request. Use one task_enters_stage trigger, webhook triggers, or both.")
 	}
 	return nil
 }
 
+// The line owns the task trigger and its runner. Webhook triggers and their
+// runner are generated, so they do not change the line-owned graph. A
+// webhook-only graph has no line-owned part.
 func legacyCustomStageGraph(canvas *models.Canvas, version *models.CanvasVersion) bool {
-	if canvas.ColumnKey == nil || !strings.HasPrefix(*canvas.ColumnKey, "custom-") || len(version.Nodes) != 2 || len(version.Edges) != 1 {
+	core := customStageCore(version)
+	if canvas.ColumnKey == nil || !strings.HasPrefix(*canvas.ColumnKey, "custom-") {
+		return false
+	}
+	if len(core.Nodes) == 0 && len(core.Edges) == 0 {
+		return savedCustomStageWebhookRunner(version.Nodes) != nil
+	}
+	version = core
+	if len(version.Nodes) != 2 || len(version.Edges) != 1 {
 		return false
 	}
 	var trigger, agent *models.Node
@@ -89,9 +137,8 @@ func editLegacyCustomStageGraph(version *models.CanvasVersion, settings *customA
 		if !isFactoryAgentHarness(node.ComponentName()) {
 			continue
 		}
-		node.Configuration = maps.Clone(node.Configuration)
 		previousID := node.ID
-		node.ID = customStageAgentID(node.ID, node.ComponentName(), settings.Agent.component())
+		editCustomStageRunner(node, customStageRunnerID, settings)
 		if node.ID != previousID {
 			// A provider change retires the old runner identity.
 			for j := range edges {
@@ -100,41 +147,132 @@ func editLegacyCustomStageGraph(version *models.CanvasVersion, settings *customA
 				}
 			}
 		}
-		node.Ref = models.NodeRef{Component: &models.ComponentRef{Name: settings.Agent.component()}}
-		if credentials := settings.Agent.credentials(); credentials != nil && settings.Agent.component() != models.SuperPlaneRunnerComponent {
-			node.Configuration["credentials"] = credentials
+	}
+	return nodes, edges
+}
+
+// Only form-owned fields change. Canvas-owned values, such as extra
+// environment entries and secret sources, stay.
+func editCustomStageRunner(node *models.Node, baseID string, settings *customAutomationSettings) {
+	node.Configuration = maps.Clone(node.Configuration)
+	if node.ComponentName() != settings.Agent.component() {
+		node.ID = baseID + "-" + strings.ToLower(strings.ReplaceAll(settings.Agent.component(), ".", "-"))
+	}
+	node.Ref = models.NodeRef{Component: &models.ComponentRef{Name: settings.Agent.component()}}
+	if credentials := settings.Agent.credentials(); credentials != nil && settings.Agent.component() != models.SuperPlaneRunnerComponent {
+		node.Configuration["credentials"] = credentials
+	} else {
+		delete(node.Configuration, "credentials")
+	}
+	delete(node.Configuration, "llmProvider")
+	settings.Agent.applyLLMProvider(node.Configuration)
+	addCustomStageStepSecrets(node.Configuration, settings.Steps)
+	node.Configuration["steps"] = customAutomationStepConfiguration(settings.Steps)
+	node.Configuration["executionTimeoutSeconds"] = settings.ExecutionTimeoutSeconds
+	if settings.model() != "" {
+		node.Configuration["model"] = settings.model()
+	} else {
+		delete(node.Configuration, "model")
+	}
+	if settings.SkipSetupCommands != nil {
+		node.Configuration["skipSetupCommands"] = *settings.SkipSetupCommands
+	} else {
+		delete(node.Configuration, "skipSetupCommands")
+	}
+	if settings.SkipRepositoryCheckout != nil {
+		node.Configuration["skipRepositoryCheckout"] = *settings.SkipRepositoryCheckout
+	} else {
+		delete(node.Configuration, "skipRepositoryCheckout")
+	}
+}
+
+// Saved runner settings stay. The build supplies only new webhook nodes.
+func editCustomStageGraph(live *models.CanvasVersion, settings *customAutomationSettings, built []models.Node, builtEdges []models.Edge) ([]models.Node, []models.Edge) {
+	var nodes []models.Node
+	var edges []models.Edge
+	if settings.hasTrigger(pb.FactoryCustomAutomation_START_MODE_AUTOMATIC) {
+		core := customStageCore(live)
+		if len(core.Nodes) == 0 {
+			core = customStageCore(&models.CanvasVersion{Nodes: built, Edges: builtEdges})
 		} else {
-			delete(node.Configuration, "credentials")
+			core.Nodes, core.Edges = editLegacyCustomStageGraph(core, settings)
 		}
-		delete(node.Configuration, "llmProvider")
-		settings.Agent.applyLLMProvider(node.Configuration)
-		addCustomStageStepSecrets(node.Configuration, settings.Steps)
-		node.Configuration["steps"] = customAutomationStepConfiguration(settings.Steps)
-		node.Configuration["executionTimeoutSeconds"] = settings.ExecutionTimeoutSeconds
-		if settings.model() != "" {
-			node.Configuration["model"] = settings.model()
-		} else {
-			delete(node.Configuration, "model")
+		nodes, edges = core.Nodes, core.Edges
+	}
+	for i := range nodes {
+		if nodes[i].ComponentName() == "onRun" {
+			setCustomStageRunContext(&nodes[i], settings.RunsOnTask)
 		}
-		if settings.SkipSetupCommands != nil {
-			node.Configuration["skipSetupCommands"] = *settings.SkipSetupCommands
-		} else {
-			delete(node.Configuration, "skipSetupCommands")
+	}
+	runnerID := customStageWebhookRunnerID
+	for _, node := range built {
+		if !customStageWebhookPart(node) {
+			continue
 		}
-		if settings.SkipRepositoryCheckout != nil {
-			node.Configuration["skipRepositoryCheckout"] = *settings.SkipRepositoryCheckout
-		} else {
-			delete(node.Configuration, "skipRepositoryCheckout")
+		if saved := savedCustomStageWebhookRunner(live.Nodes); saved != nil && isFactoryAgentHarness(node.ComponentName()) {
+			node = *saved
+			editCustomStageRunner(&node, customStageWebhookRunnerID, settings)
+			appendWebhookPayloadInstructions(node.Configuration)
+		}
+		if isFactoryAgentHarness(node.ComponentName()) {
+			runnerID = node.ID
+		}
+		nodes = append(nodes, node)
+	}
+	for _, edge := range builtEdges {
+		if edge.TargetID == customStageWebhookRunnerID {
+			edge.TargetID = runnerID
+			edges = append(edges, edge)
 		}
 	}
 	return nodes, edges
 }
 
-func customStageAgentID(id, previousComponent, component string) string {
-	if previousComponent == component {
-		return id
+// A webhook runs with no task, so the line trigger must not keep runsOnTask: true.
+func setCustomStageRunContext(node *models.Node, runsOnTask *bool) {
+	template, ok := node.Metadata[models.FactoryAppTemplateMetadataKey].(map[string]any)
+	if !ok {
+		return
 	}
-	return "stage-run-" + strings.ToLower(strings.ReplaceAll(component, ".", "-"))
+	template = maps.Clone(template)
+	delete(template, "runsOnTask")
+	if runsOnTask != nil {
+		template["runsOnTask"] = *runsOnTask
+	}
+	node.Metadata = maps.Clone(node.Metadata)
+	node.Metadata[models.FactoryAppTemplateMetadataKey] = template
+}
+
+func savedCustomStageWebhookRunner(nodes []models.Node) *models.Node {
+	for i := range nodes {
+		if customStageWebhookPart(nodes[i]) && isFactoryAgentHarness(nodes[i].ComponentName()) {
+			return &nodes[i]
+		}
+	}
+	return nil
+}
+
+func customStageCore(version *models.CanvasVersion) *models.CanvasVersion {
+	core := &models.CanvasVersion{}
+	webhookParts := map[string]bool{}
+	for _, node := range version.Nodes {
+		if customStageWebhookPart(node) {
+			webhookParts[node.ID] = true
+			continue
+		}
+		core.Nodes = append(core.Nodes, node)
+	}
+	for _, edge := range version.Edges {
+		if !webhookParts[edge.SourceID] && !webhookParts[edge.TargetID] {
+			core.Edges = append(core.Edges, edge)
+		}
+	}
+	return core
+}
+
+func customStageWebhookPart(node models.Node) bool {
+	return node.ID == customStageWebhookRunnerID || strings.HasPrefix(node.ID, customStageWebhookRunnerID+"-") ||
+		node.ComponentName() == factorycomponent.OnWebhookTriggerName
 }
 
 func checkCustomStageFormGraph(tx *gorm.DB, factory *models.Factory, canvas *models.Canvas, version *models.CanvasVersion) error {
