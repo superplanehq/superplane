@@ -115,6 +115,11 @@ func Test__DeleteFactoryAutomation(t *testing.T) {
 			AutomationId: backlog.ID.String(),
 		})
 		require.NoError(t, err)
+		// An intake can retain this factory from before deletion commits.
+		require.NoError(t, ensureBacklogCanvas(ctx, deps, database.DB(t.Context()), factory))
+		has, err := factoryHasOnWorkOrderCanvas(database.DB(t.Context()), factory)
+		require.NoError(t, err)
+		require.False(t, has)
 		factory, err = models.FindFactory(database.DB(t.Context()), r.Organization.ID, factory.ID)
 		require.NoError(t, err)
 		branch := "develop"
@@ -123,7 +128,7 @@ func Test__DeleteFactoryAutomation(t *testing.T) {
 			FactoryId: factory.ID.String(), Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES,
 		})
 		require.NoError(t, err)
-		has, err := factoryHasOnWorkOrderCanvas(database.DB(t.Context()), factory)
+		has, err = factoryHasOnWorkOrderCanvas(database.DB(t.Context()), factory)
 		require.NoError(t, err)
 		assert.False(t, has)
 		restored, err := CreateFactoryAutomation(ctx, deps, orgID, &pb.CreateFactoryAutomationRequest{

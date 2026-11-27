@@ -55,12 +55,7 @@ export function useAddColumnAutomation(args: {
     ? pickerCatalogForColumn(column, catalogOptions)
     : { catalog: [], unavailableReasons: {} };
   const catalog = pickerCatalog.catalog;
-  const takenIds = column
-    ? takenCatalogIds(
-        ["backlog", "phase-0", "verify", "done", column].flatMap((key) => args.automationsFor(key as ColumnKey)),
-        catalog,
-      )
-    : [];
+  const takenIds = column ? takenCatalogIds(installedPickerAutomations(column, args.automationsFor), catalog) : [];
 
   const closePicker = () => {
     setColumn(null);
@@ -83,7 +78,7 @@ export function useAddColumnAutomation(args: {
   };
 
   const onSelect = async (entry: ColumnAutomationCatalogEntry) => {
-    if (!column || pickerCatalog.unavailableReasons[entry.id]) {
+    if (!column || pickerCatalog.unavailableReasons[entry.id] || takenIds.includes(entry.id)) {
       return;
     }
     if (
@@ -151,6 +146,14 @@ export function useAddColumnAutomation(args: {
     createNamed,
     isPending: createAutomation.isPending || isInstalling,
   };
+}
+
+function installedPickerAutomations(column: ColumnKey, automationsFor: (key: ColumnKey) => ColumnAutomation[]) {
+  const keys: ColumnKey[] = ["backlog", "phase-0", "verify", "done", column];
+  // Built-in templates are workspace-wide, but each stage has its own agent slot.
+  return keys.flatMap((key) =>
+    automationsFor(key).filter((automation) => automation.kind !== "agent-step" || key === column),
+  );
 }
 
 async function restoreColumnAutomation(

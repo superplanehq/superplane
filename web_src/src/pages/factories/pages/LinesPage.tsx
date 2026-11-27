@@ -1329,7 +1329,7 @@ function LineDetail({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid="lines-detail">
-      {steps.length === 0 && backlogOrders.length === 0 && doneOrders.length === 0 ? (
+      {steps.length === 0 && !line.stages?.length && backlogOrders.length === 0 && doneOrders.length === 0 ? (
         <p className="text-[13px] text-muted-foreground">No phases yet. Edit this line to add app-driven phases.</p>
       ) : (
         <PhaseBoard

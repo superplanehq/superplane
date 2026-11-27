@@ -36,7 +36,7 @@ export const AGENT_STEP_ENTRY: ColumnAutomationCatalogEntry = {
   action: "Run the agent",
   iconSrc: "",
   iconAlt: "",
-  unique: false,
+  unique: true,
 };
 
 export const CUSTOM_ENTRY: ColumnAutomationCatalogEntry = {
