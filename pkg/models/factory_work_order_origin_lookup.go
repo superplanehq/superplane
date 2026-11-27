@@ -50,6 +50,26 @@ func (f *Factory) FindWorkOrderByOriginURL(tx *gorm.DB, originURL string) (*Fact
 	return &order, nil
 }
 
+// FindLatestWorkOrderByOriginURL returns this factory's newest work order
+// whose origin_url is exactly originURL, or nil. A task that is not closed
+// comes before a closed task.
+func (f *Factory) FindLatestWorkOrderByOriginURL(tx *gorm.DB, originURL string) (*FactoryWorkOrder, error) {
+	var order FactoryWorkOrder
+	err := tx.
+		Where("organization_id = ? AND factory_id = ? AND origin_url = ?", f.OrganizationID, f.ID, originURL).
+		Order("state = '" + FactoryWorkOrderStateClosed + "'").
+		Order("created_at DESC").
+		First(&order).
+		Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &order, nil
+}
+
 // ListWorkOrderOriginURLsContaining returns origin URLs of this factory's
 // work orders whose origin_url contains fragment. Matching covers every
 // state. Callers confirm the match; this lookup is a coarse filter.

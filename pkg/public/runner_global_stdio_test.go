@@ -112,7 +112,7 @@ func TestRunnerMoveTaskOverStdio(t *testing.T) {
 	mcp := startGlobalMCP(t, server, token, runner.AppendGlobalMCP(env, nil))
 	moved := mcp.call("move_task", map[string]any{"next": true})
 	assert.Equal(t, order.ID.String(), moved["id"])
-	assert.Equal(t, "custom-review", moved["column"])
+	assert.Equal(t, "custom-review", moved["stage"])
 	require.NoError(t, database.DB(t.Context()).First(dispatch, "id = ?", dispatch.ID).Error)
 	assert.Equal(t, "custom-review", dispatch.CurrentStageKey)
 }

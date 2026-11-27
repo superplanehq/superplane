@@ -18,7 +18,7 @@ func TestAllowedRunnerTools(t *testing.T) {
 func TestFlowTools(t *testing.T) {
 	// The agent tools docs page lists these tools for every run.
 	shared := []string{
-		"list_members", "assign_task_owner", "suggest_task_owner", "list_tasks", "create_task", "close_task",
+		"list_members", "assign_task_owner", "suggest_task_owner", "list_tasks", "get_task", "create_task", "close_task",
 		"list_checks", "add_checks", "remove_checks",
 		"list_artifacts", "get_artifact", "add_artifact", "remove_artifact",
 	}
@@ -30,7 +30,7 @@ func TestFlowTools(t *testing.T) {
 		assert.Equal(t, append(append([]string{}, shared...), extra...), AllowedRunnerTools(ScopesForFlow(flow)), flow)
 	}
 	assert.Empty(t, ScopesForFlow("deploy"))
-	assert.Equal(t, []string{"list_tasks", "create_task"}, AllowedRunnerTools(ScopesForFlow(RunnerFlowSchedule)))
+	assert.Equal(t, []string{"list_tasks", "get_task", "create_task", "move_task", "attach_task"}, AllowedRunnerTools(ScopesForFlow(RunnerFlowSchedule)))
 }
 
 func TestTaskCapabilityScopes(t *testing.T) {

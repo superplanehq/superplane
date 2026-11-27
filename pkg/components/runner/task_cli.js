@@ -41,9 +41,16 @@ const COMMANDS = [
     tool: "list_tasks",
   },
   {
+    words: ["task", "get"],
+    usage: "superplane task get (--task TASK | --pull-request URL | --number N [--repository OWNER/NAME] | --commit SHA | --origin URL)",
+    flags: ["task", "pull-request", "number", "repository", "commit", "origin"],
+    alias: { "pull-request": "pull_request" },
+    tool: "get_task",
+  },
+  {
     words: ["task", "create"],
-    usage: "superplane task create --title TITLE [--description TEXT]",
-    flags: ["title", "description"],
+    usage: "superplane task create --title TITLE [--description TEXT] [--origin URL]",
+    flags: ["title", "description", "origin"],
     required: ["title"],
     tool: "create_task",
   },
@@ -171,10 +178,18 @@ const COMMANDS = [
   },
   {
     words: ["task", "move"],
-    usage: "superplane task move (--column COLUMN | --next)",
-    flags: ["column", "next"],
-    boolean: ["next"],
+    usage: "superplane task move [--task TASK] (--stage STAGE | --next | --previous)",
+    flags: ["task", "stage", "column", "next", "previous"],
+    boolean: ["next", "previous"],
+    alias: { column: "stage" },
     tool: "move_task",
+  },
+  {
+    words: ["task", "attach"],
+    usage: "superplane task attach --task TASK",
+    flags: ["task"],
+    required: ["task"],
+    tool: "attach_task",
   },
 ];
 
