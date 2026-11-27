@@ -155,3 +155,29 @@ it("saves a custom stage automation that only a webhook starts", async () => {
   expect(saved.settings.triggers).toEqual([{ startMode: "START_MODE_WEBHOOK", webhookId: "webhook-1" }]);
   expect(saved.settings.runsOnTask).toBeUndefined();
 });
+
+it("saves the line trigger on a task after the webhook is removed from a custom stage", async () => {
+  const user = userEvent.setup();
+  current = {
+    automation: { ...automation.automation, columnKey: "custom-qa" },
+    settings: {
+      ...automation.settings,
+      startMode: "START_MODE_WEBHOOK",
+      runsOnTask: false,
+      triggers: [{ startMode: "START_MODE_WEBHOOK", webhookId: "webhook-1" }],
+    },
+  };
+  saveAutomation.mockClear();
+  saveAutomation.mockResolvedValueOnce({});
+  render(<Editor columnKey="custom-qa" />);
+  await user.click(screen.getByRole("button", { name: "Add trigger" }));
+  await user.click(screen.getByRole("menuitem", { name: /When a task enters/ }));
+  await user.click(screen.getByRole("button", { name: /Remove Webhook/ }));
+  await user.click(screen.getByRole("button", { name: "Save" }));
+  await waitFor(() => expect(saveAutomation).toHaveBeenCalled());
+  const saved = saveAutomation.mock.calls.at(-1)![0];
+  expect(saved.settings).toMatchObject({ startMode: "START_MODE_AUTOMATIC", runsOnTask: true });
+  expect(saved.settings.triggers ?? []).not.toContainEqual(
+    expect.objectContaining({ startMode: "START_MODE_WEBHOOK" }),
+  );
+});

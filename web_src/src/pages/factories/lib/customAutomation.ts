@@ -115,14 +115,17 @@ export function customAutomationRunsOnTask(
   return true;
 }
 
-/** A custom stage runs on a task. Its webhook triggers run with no task, so the automation keeps both. */
+/**
+ * A custom stage runs on a task. Its webhook triggers run with no task, so the automation keeps both.
+ * A saved webhook-only value must not survive once the webhook is gone.
+ */
 export function customAutomationRunContext(
   columnKey: CustomAutomationColumn,
   triggers: Array<{ mode: CustomAutomationMode }>,
   runsOnTask: boolean | undefined,
 ): boolean | undefined {
-  if (columnKey.startsWith("custom-") && triggers.some((trigger) => trigger.mode === "webhook")) return undefined;
-  return runsOnTask;
+  if (!columnKey.startsWith("custom-")) return runsOnTask;
+  return triggers.some((trigger) => trigger.mode === "webhook") ? undefined : true;
 }
 
 export function customAutomationTriggersForRun(
