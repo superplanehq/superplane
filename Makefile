@@ -401,6 +401,7 @@ check.db.structure:
 	bash ./scripts/verify_db_structure_clean.sh
 
 check.db.migrations:
+	bash ./scripts/verify_branch_migrations_are_latest_test.sh
 	bash ./scripts/verify_no_future_migrations.sh
 	bash ./scripts/verify_branch_migrations_are_latest.sh
 
