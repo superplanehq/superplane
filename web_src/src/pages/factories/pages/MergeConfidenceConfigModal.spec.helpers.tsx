@@ -15,7 +15,7 @@ export function renderModal(
   onDelete: () => void = vi.fn(),
   onSaveNode = vi.fn(),
   graph: IntakeAutomationGraph = confidenceGraph("on-pr-feedback"),
-  options: { initialNodeId?: string; onClose?: () => void } = {},
+  options: { initialNodeId?: string; onClose?: () => void; deletePending?: boolean; deleteError?: string } = {},
 ) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   client.setQueryData(experimentalFeaturesKeys.registry(), {
@@ -26,7 +26,7 @@ export function renderModal(
       spec: { enabledExperimentalFeatures: [] },
     });
   }
-  const element = (nextGraph: IntakeAutomationGraph = graph) => (
+  const element = (nextGraph: IntakeAutomationGraph = graph, deletion = options) => (
     <QueryClientProvider client={client}>
       <MemoryRouter>
         <ThemeProvider>
@@ -38,6 +38,8 @@ export function renderModal(
               onClose={options.onClose ?? vi.fn()}
               onSaveNode={onSaveNode}
               onDelete={onDelete}
+              deletePending={deletion.deletePending}
+              deleteError={deletion.deleteError}
               initialNodeId={options.initialNodeId}
               factoryKey="SUPER"
             />
@@ -47,5 +49,9 @@ export function renderModal(
     </QueryClientProvider>
   );
   const view = render(element());
-  return { ...view, rerenderGraph: (nextGraph: IntakeAutomationGraph) => view.rerender(element(nextGraph)) };
+  return {
+    ...view,
+    rerenderGraph: (nextGraph: IntakeAutomationGraph, deletion = options) =>
+      view.rerender(element(nextGraph, deletion)),
+  };
 }
