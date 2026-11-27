@@ -1,0 +1,23 @@
+apiVersion: v2
+kind: Automation
+name: E2E Pruner
+agent:
+  harness: superplane
+triggers:
+  - use: schedule
+    config:
+      cron: 0 9 * * *
+      utc_offset: 1
+  - use: manual
+steps:
+  - name: New step
+    prompt: |-
+      Review the e2e tests in this repository. If there is any that is referencing a part of the old system that is no longer accessible when the new factories feature flag is enabled, create a task in superplane to delete it.
+
+      Guidelines:
+
+      1/ Never open more than 3 tasks at once.
+      2/ The old system includes the old canvas page, old home page, etc...
+      3/ Never offer to remove a valid, new e2e test that is for the new factories
+      4/ Try to minimize what is being done via a single task
+      5/ Prefix the task title with [E2E Pruner]

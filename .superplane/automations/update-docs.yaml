@@ -1,0 +1,217 @@
+apiVersion: v2
+kind: Automation
+name: Update Docs
+skip_setup_commands: true
+agent:
+  harness: superplane
+triggers:
+  - use: task_enters_stage
+steps:
+  - name: Check if docs need to be updated
+    prompt: |-
+      Keep SuperPlane’s public documentation accurate after application changes.
+
+      Only make a docs PR if a docs update is truly necessary. A strict backend, bug, UI papercut, anything behind a feature flag does not deserve a docs update.
+
+      Read the application pull request already attached to the current SuperPlane task. Determine whether it creates a documentation gap. Update the docs repository and open a pull request only when necessary.
+
+      For every outcome, publish your decision and supporting evidence as a short Markdown artifact on the same task.
+
+      Repositories:
+      - Application: superplanehq/superplane
+      - Documentation: superplanehq/docs
+
+      Scope
+
+      Treat the application repository as read-only.
+      Make changes only in the documentation repository.
+      Do not merge pull requests or publish the documentation site.
+      Do not change the task owner, scores, or state.
+
+      A successful run:
+      - Explains why no documentation update is needed.
+      - Opens or updates one focused documentation pull request.
+      - Or reports a concrete blocker without claiming that documentation is current.
+
+      1. Identify the source application change
+
+      Read the current task’s description, specification, and attached pull requests using the available task tools.
+
+      Select attached pull requests belonging to superplanehq/superplane.
+      Exclude documentation pull requests created by this automation.
+      Never infer a GitHub issue or pull request number from the SuperPlane task number.
+
+      If several application pull requests are attached, assess their combined documentation impact.
+      Do not select one arbitrarily.
+
+      Read each selected pull request’s metadata and complete diff.
+      Resolve and record its base and head commit SHAs.
+      Inspect the application at the assessed head revision, not the latest default branch.
+      Fetch missing history when needed to obtain a complete comparison.
+
+      For an open pull request, assess the proposed behavior without claiming it is released or deployed.
+      For a merged pull request, inspect the change that actually merged.
+      Exclude pull requests closed without merging. Do not document abandoned changes.
+
+      If no application pull request is attached, publish a blocked decision artifact.
+      If all attached application pull requests were closed without merging, publish a no-update decision artifact.
+
+      If a required comparison is unavailable or incomplete, report the blocker.
+
+      2. Understand the behavior change
+
+      Read the diff and enough surrounding implementation, tests, schemas, and configuration to establish the actual behavior.
+
+      Use the task description, specification, and PR discussion to understand intent.
+      Use the implementation as evidence of behavior.
+      If intent and implementation disagree, report the discrepancy instead of documenting intended behavior as implemented.
+
+      Focus on changes that affect what users can do, must configure, or should expect:
+      - UI workflows, labels, settings, and defaults.
+      - Task intake, ownership, planning, execution, verification, and completion.
+      - Integrations, agent tools, CLI commands, APIs, and permissions.
+      - Installation, upgrades, configuration, compatibility, and limitations.
+
+      Distinguish implemented behavior from incomplete work and disabled features.
+      Check feature flags, permissions, plan restrictions, and prerequisites when relevant.
+      Do not claim that a change is deployed merely because it merged.
+
+      Do not document private implementation details unless they change a documented contract or user procedure.
+
+      3. Decide whether documentation needs to change
+
+      Read the docs repository’s AGENTS.md in full and follow applicable contributor instructions.
+      Use src/config/sidebar.mjs to understand the documentation structure.
+      Locate and read relevant existing pages and a similar exemplar.
+
+      For each potentially relevant behavior change, establish:
+      - What changed, supported by application evidence.
+      - What the existing documentation says, or where coverage is missing.
+      - What users need to know or do differently.
+
+      Do not edit merely because a code file changed.
+
+      Examples:
+      - Extracting a helper without changing behavior: no update.
+      - Adding an automation setting: document its purpose, behavior, and prerequisites.
+      - Fixing behavior to match accurate existing documentation: no update.
+      - Changing a CLI flag: update affected commands and examples.
+      - Adding a disabled feature: establish availability and prerequisites before documenting it.
+
+      If existing documentation accurately describes the resulting behavior, do not create a commit or pull request.
+      Publish a no-update decision artifact identifying the relevant pages checked.
+
+      4. Make the smallest complete documentation update
+
+      Follow the docs repository’s writing, structure, and contribution rules.
+      Prefer updating existing pages.
+      Add a page only when the existing structure cannot explain the change clearly.
+      Preserve each page’s purpose and level of detail.
+
+      Update affected instructions, examples, references, and cross-links together.
+      Explain user-visible outcomes, defaults, prerequisites, and important limitations.
+      Verify commands, option names, and configuration keys against the application source.
+      Distinguish runner-provided task commands from the separately installed CLI.
+
+      Do not turn the code diff into a changelog.
+      Do not rewrite unrelated content or expose internal implementation details.
+      Do not invent availability, pricing, guarantees, screenshots, or verification results.
+
+      Keep binary assets out of Git.
+      Do not manually edit public/llms.txt or public/llms-full.txt.
+      Leave previous/ unchanged unless the source change explicitly concerns those historical docs.
+
+      If essential behavior remains unclear, report the uncertainty instead of publishing a guess.
+
+      5. Validate
+
+      Run the checks required by the docs repository, including npm run build.
+      Review the final diff for factual accuracy, scope, links, navigation, and unintended generated changes.
+      Inspect rendered pages when layout or diagrams change.
+
+      Fix problems caused by your changes.
+      If required validation cannot pass, do not publish new commits or open a new pull request.
+      Publish a blocked decision artifact describing the failure and any completed work.
+
+      Before publishing, confirm that the source application PR revisions and states have not changed.
+      If they changed, reassess the current change before continuing.
+      Do not publish documentation based on an outdated revision.
+
+      6. Open or update the documentation pull request
+
+      Check the current task and docs repository for an existing documentation pull request covering the same source application PRs.
+      Do not create a duplicate.
+
+      Update an existing automation-owned branch when appropriate.
+      Do not overwrite another contributor’s work.
+      If a matching documentation PR was already merged, inspect current docs and change only what remains missing.
+      If a matching PR was closed without merging, report that result instead of automatically reopening or replacing it.
+
+      Otherwise, create a branch from the docs default branch.
+      Commit only the intended documentation changes.
+      Follow the docs repository’s commit, sign-off, and pull request conventions.
+
+      Open or update one documentation pull request using the available authorized PR tool.
+      Attach it to the current SuperPlane task.
+
+      The pull request must:
+      - Link the source application PRs.
+      - Explain the documentation gap and resulting correction.
+      - Record the assessed application revisions.
+      - Identify any dependency on an application PR that has not merged.
+
+      Open the docs PR as a draft while any required source application PR remains unmerged.
+
+      Do not merge or publish the docs.
+      After opening or updating the PR, publish the decision artifact and finish.
+
+      7. Publish the decision artifact
+
+      For every outcome, attach a Markdown artifact to the current task using the available artifact tool.
+
+      Title: Documentation update decision
+      Stable key: docs-update-decision
+
+      Use the stable key to replace this automation’s previous decision artifact on subsequent runs.
+
+      Use this structure:
+
+      # Documentation update decision
+
+      **Decision:** No update needed | PR opened | PR updated | Blocked
+
+      ## Reason
+      Explain the decision in two to four sentences.
+      Connect the application behavior to the documentation gap, or explain why existing documentation remains accurate.
+
+      ## Evidence
+      - Source application PR links and assessed revisions.
+      - Relevant application files.
+      - Documentation pages checked or changed.
+
+      ## Validation
+      State which checks passed, failed, or could not run.
+      For a no-update decision, state that no files changed and whether a build was unnecessary.
+
+      ## Pull request
+      Include the documentation PR link when applicable.
+      Identify any source application PR that must merge first.
+      Otherwise omit this section.
+
+      Keep the artifact under 250 words.
+      Provide a concise rationale and observable evidence, not an investigation transcript.
+      Do not include credentials, signed URLs, or sensitive logs.
+
+      If artifact publication fails, report that failure in the final response.
+      Do not claim that an artifact or PR was saved unless the relevant tool confirms success.
+
+      Final response
+
+      Return:
+      - Decision.
+      - One-sentence explanation.
+      - Decision artifact reference, if saved.
+      - Documentation PR URL, when applicable.
+      - Any unresolved blocker.
+
+      Do not repeat the full artifact in the final response.

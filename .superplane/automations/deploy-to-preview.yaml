@@ -1,0 +1,39 @@
+apiVersion: v2
+kind: Automation
+name: Deploy to Preview
+icon: rocket
+runs_on_task: true
+skip_repository_checkout: true
+skip_setup_commands: true
+agent:
+  harness: superplane
+triggers:
+  - use: manual
+steps:
+  - name: Set up SSH keys
+    bash: |-
+      mkdir -p ~/.ssh
+      chmod 700 ~/.ssh
+      printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/id_rsa
+      chmod 600 ~/.ssh/id_rsa
+      printf '%s\n' 'igor.okplane.dev ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICvgqREzIp4HiBRL15e4Kl8sidstwdkrge5zSabzelSu' > ~/.ssh/known_hosts
+      chmod 600 ~/.ssh/known_hosts
+  - name: Checkout
+    bash: |-
+      ssh app@igor.okplane.dev "cd /home/app/superplane && git fetch origin pull/${PR_NUMBER}/head"
+      ssh app@igor.okplane.dev "cd /home/app/superplane && git checkout --detach --force FETCH_HEAD"
+    secrets:
+      - igor.okplane.dev
+  - name: Build docker
+    bash: |
+      ssh app@igor.okplane.dev "cd /home/app/superplane && make dev.up"
+  - name: Run Setup
+    bash: |
+      ssh app@igor.okplane.dev "cd /home/app/superplane && make dev.setup"
+  - name: Start Server
+    bash: ssh app@igor.okplane.dev "cd /home/app/superplane && setsid nohup make dev.server.fg > /home/app/superplane/tmp/dev-server.log 2>&1 < /dev/null &"
+  - name: Health Check
+    bash: curl --retry 60 --retry-delay 5 --retry-all-errors -fsS https://igor.okplane.dev
+  - name: Add Link to Task
+    bash: |
+      superplane task artifact add-link --url "https://igor.okplane.dev" --name "Preview Environment" --key preview-environment
