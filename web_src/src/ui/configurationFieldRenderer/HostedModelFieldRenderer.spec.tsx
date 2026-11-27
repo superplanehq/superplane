@@ -214,6 +214,46 @@ describe("HostedModelFieldRenderer", () => {
     ).toBeInTheDocument();
   });
 
+  it.each([
+    { name: "read-only with options", readOnly: true, modelOnly: false, hasOptions: true },
+    { name: "read-only model-only with no options", readOnly: true, modelOnly: true, hasOptions: false },
+    { name: "model-and-thinking with no options", readOnly: false, modelOnly: false, hasOptions: false },
+  ])("disables a saved model picker: $name", ({ readOnly, modelOnly, hasOptions }) => {
+    mockSelectableModels(hasOptions ? [selectableModel("byok", "anthropic", "claude-sonnet-4-6")] : []);
+    renderField(
+      <HostedModelFieldRenderer
+        field={createField()}
+        value="claude-sonnet-4-6"
+        onChange={vi.fn()}
+        organizationId="org-1"
+        readOnly={readOnly}
+        modelOnly={modelOnly}
+      />,
+    );
+    expect(screen.getByTestId("field-model-hosted-model")).toBeDisabled();
+  });
+
+  it("clears a saved model with no options in model-only mode and preserves thinking", async () => {
+    mockSelectableModels([]);
+    const user = userEvent.setup();
+    const onValuesChange = vi.fn();
+    renderField(
+      <HostedModelFieldRenderer
+        field={createField()}
+        value="claude-sonnet-4-6"
+        onChange={vi.fn()}
+        onValuesChange={onValuesChange}
+        allValues={{ model: "claude-sonnet-4-6", thinkingLevel: "high" }}
+        organizationId="org-1"
+        modelOnly
+      />,
+    );
+    expect(screen.getByTestId("field-model-hosted-model")).toBeEnabled();
+    await user.click(screen.getByTestId("field-model-hosted-model"));
+    await user.click(screen.getByRole("menuitem", { name: "Use default model" }));
+    expect(onValuesChange).toHaveBeenCalledWith({ model: undefined, thinkingLevel: "high" });
+  });
+
   it("waits for the canvas factory before it loads organization BYOK models", () => {
     useCanvasMock.mockReturnValue({ data: undefined, isPending: true });
 
