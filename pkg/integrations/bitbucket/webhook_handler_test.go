@@ -34,7 +34,7 @@ func TestBitbucketWebhookHandlerForgeUsesLocalSubscription(t *testing.T) {
 	assert.Equal(t, http.MethodGet, httpContext.Requests[0].Method)
 	assert.Equal(t, &BitbucketWebhook{RepositoryUUID: "{repo-1}", RepositoryFullName: "acme/widgets"}, metadata)
 	require.NoError(t, handler.Cleanup(ctx))
-	webhook.Configuration = WebhookConfiguration{RepositorySlug: "widgets", EventTypes: []string{"repo:push"}}
+	webhook.Configuration = WebhookConfiguration{RepositorySlug: "widgets", EventTypes: []string{"repo:fork"}}
 	_, err = handler.Setup(ctx)
 	require.ErrorContains(t, err, "does not support event")
 	assert.Len(t, httpContext.Requests, 1)

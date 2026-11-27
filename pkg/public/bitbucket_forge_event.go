@@ -45,10 +45,15 @@ func (s *Server) deliverBitbucketForgeEvent(r *http.Request, installationID stri
 		var normalized map[string]any
 		if bitbucket.IsForgeBuildEvent(event.EventType) {
 			normalized = bitbucket.ForgeBuildStatusPayload(event.Timestamp, event.Repository.UUID, repositoryFullName, event.BuildStatus, event.Actor)
+		} else if event.EventType == "avi:bitbucket:push:repository" {
+			normalized = bitbucket.ForgePushPayload(event.Repository.UUID, repositoryFullName, event.Push, event.Actor)
 		} else {
 			normalized = bitbucket.ForgePullRequestPayload(event.EventType, event.Timestamp, event.Repository.UUID, repositoryFullName, event.PullRequest, event.Actor)
 			if event.Comment != nil {
 				normalized["comment"] = event.Comment
+			}
+			if event.Reviewers != nil {
+				normalized["reviewers"], normalized["timestamp"] = event.Reviewers, event.Timestamp
 			}
 		}
 		payload, err := json.Marshal(normalized)
