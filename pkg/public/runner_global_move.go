@@ -56,6 +56,9 @@ func (s *Server) handleRunnerMoveTask(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
+		if ok && scope.Flow == runneraction.RunnerFlowTask {
+			waitingStage, ok = s.runnerTaskSideRunStage(w, db, scope)
+		}
 	}
 	if !ok {
 		return
@@ -254,13 +257,8 @@ func (s *Server) runnerWaitingTaskTarget(w http.ResponseWriter, r *http.Request,
 		writeRunnerTaskError(w, err)
 		return nil, "", false
 	}
-	canvas, err := models.FindCanvasInTransaction(db, scope.OrganizationID, scope.CanvasID)
-	if err != nil {
-		writeRunnerTaskError(w, err)
-		return nil, "", false
-	}
-	if canvas.ColumnKey == nil || *canvas.ColumnKey == "" {
-		http.Error(w, "This automation has no stage", http.StatusConflict)
+	stage, ok := runnerAutomationStage(w, db, scope)
+	if !ok {
 		return nil, "", false
 	}
 	target, ok := s.openTaskOwnerTarget(w, r, scope.OrganizationID, scope.FactoryID, order.ID)
@@ -269,9 +267,36 @@ func (s *Server) runnerWaitingTaskTarget(w http.ResponseWriter, r *http.Request,
 	}
 	target.canvasID = scope.CanvasID
 	target.canvasRunID = scope.CanvasRunID
-	stage := *canvas.ColumnKey
-	if stage == models.CanvasColumnKeyImplement {
-		stage = "phase-0"
-	}
 	return target, stage, true
+}
+
+// A task run that is not a line step, such as a manual automation, can move
+// its task only while the task waits in the stage of its automation.
+// It returns an empty stage for a line step run.
+func (s *Server) runnerTaskSideRunStage(w http.ResponseWriter, db *gorm.DB, scope *runneraction.RunnerScope) (string, bool) {
+	_, err := models.FindWorkOrderExecutionForRun(db, scope.CanvasRunID)
+	if err == nil {
+		return "", true
+	}
+	if !errors.Is(err, models.ErrFactoryWorkOrderExecutionNotFound) {
+		writeRunnerTaskError(w, err)
+		return "", false
+	}
+	return runnerAutomationStage(w, db, scope)
+}
+
+func runnerAutomationStage(w http.ResponseWriter, db *gorm.DB, scope *runneraction.RunnerScope) (string, bool) {
+	canvas, err := models.FindCanvasInTransaction(db, scope.OrganizationID, scope.CanvasID)
+	if err != nil {
+		writeRunnerTaskError(w, err)
+		return "", false
+	}
+	if canvas.ColumnKey == nil || *canvas.ColumnKey == "" {
+		http.Error(w, "This automation has no stage", http.StatusConflict)
+		return "", false
+	}
+	if *canvas.ColumnKey == models.CanvasColumnKeyImplement {
+		return "phase-0", true
+	}
+	return *canvas.ColumnKey, true
 }
