@@ -490,6 +490,7 @@ CREATE TABLE public.factories (
     public_badge_show_cost boolean DEFAULT false NOT NULL,
     public_badge_token text,
     url_id text NOT NULL,
+    vcs_integration_id uuid,
     CONSTRAINT factories_hosted_spend_budget_non_negative CHECK (((hosted_spend_budget_cents IS NULL) OR (hosted_spend_budget_cents >= 0))),
     CONSTRAINT factories_key_format_check CHECK (((key)::text ~ '^[A-Z]{2,5}$'::text)),
     CONSTRAINT factories_url_id_format_check CHECK ((url_id ~ '^[a-z0-9]{8}$'::text))
@@ -4102,6 +4103,13 @@ CREATE INDEX idx_factories_organization_id ON public.factories USING btree (orga
 
 
 --
+-- Name: idx_factories_vcs_integration_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factories_vcs_integration_id ON public.factories USING btree (vcs_integration_id);
+
+
+--
 -- Name: idx_factory_agent_resource_secrets_resource_name; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -5572,6 +5580,14 @@ ALTER TABLE ONLY public.factories
 
 
 --
+-- Name: factories factories_vcs_integration_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factories
+    ADD CONSTRAINT factories_vcs_integration_id_fkey FOREIGN KEY (vcs_integration_id) REFERENCES public.app_installations(id) ON DELETE SET NULL;
+
+
+--
 -- Name: factory_agent_resource_secrets factory_agent_resource_secrets_resource_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -6931,7 +6947,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261127042130	f
+20261127160046	f
 \.
 
 
