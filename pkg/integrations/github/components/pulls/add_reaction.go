@@ -203,12 +203,12 @@ func (c *AddReaction) Execute(ctx core.ExecutionContext) error {
 	case ReactionTargetIssueComment:
 		reaction, _, err = client.CreateIssueReaction(context.Background(), config.Repository, commentID, config.Content)
 		if err != nil {
-			return fmt.Errorf("failed to create issue reaction: %w", err)
+			return fmt.Errorf("failed to create issue reaction: %w", explainGitHubError(err))
 		}
 	case ReactionTargetReviewComment:
 		reaction, _, err = client.CreateReviewCommentReaction(context.Background(), config.Repository, commentID, config.Content)
 		if err != nil {
-			return fmt.Errorf("failed to create review comment reaction: %w", err)
+			return fmt.Errorf("failed to create review comment reaction: %w", explainGitHubError(err))
 		}
 	}
 
