@@ -92,7 +92,7 @@ func configurationReviewReference(target *factoryConfigurationTarget, canvasID s
 	for _, stage := range target.stages {
 		for _, automation := range stage.automations {
 			if automation.canvas.ID.String() == canvasID && automation.templateID == "risk-score" {
-				return map[string]any{"stage": stage.key, "automation": automation.id}
+				return map[string]any{"stage": stage.stage.ConfigurationID, "automation": automation.id}
 			}
 		}
 	}
@@ -131,7 +131,7 @@ func exportFactoryConfigurationDependencies(target *factoryConfigurationTarget) 
 
 func resolveFactoryConfigurationDependencies(manifest *factoryConfigurationManifest, target *factoryConfigurationTarget) *pb.FactoryConfigurationDiagnostic {
 	type candidate struct{ stage, id, canvas string }
-	candidates := map[string]candidate{}
+	candidates := map[[2]string]candidate{}
 	for _, stage := range manifest.Stages {
 		for _, automation := range stage.Automations {
 			if automation.prepared == nil || automation.prepared.TemplateID != "risk-score" {
@@ -141,7 +141,7 @@ func resolveFactoryConfigurationDependencies(manifest *factoryConfigurationManif
 			if current := automation.current; current != nil {
 				canvas = current.canvas.ID.String()
 			}
-			candidates[stage.Key+"/"+automation.ID] = candidate{stage.Key, automation.ID, canvas}
+			candidates[[2]string{stage.ID, automation.ID}] = candidate{stage.ID, automation.ID, canvas}
 		}
 	}
 	for i := range manifest.Stages {
@@ -164,7 +164,7 @@ func resolveFactoryConfigurationDependencies(manifest *factoryConfigurationManif
 					return configurationDiagnostic(field, "Use explicit stage and automation strings.")
 				}
 				var exists bool
-				selected, exists = candidates[stageKey+"/"+id]
+				selected, exists = candidates[[2]string{stageKey, id}]
 				if !exists {
 					return configurationDiagnostic(field, "Select a Merge confidence automation included in this manifest.")
 				}
@@ -284,23 +284,7 @@ func replaceConfigurationCanvasReferences(nodes []models.Node, replacements map[
 }
 
 func configurationShouldSaveOwnership(current *factoryConfigurationAutomationTarget, desired factoryConfigurationAutomation) bool {
-	return current == nil || current.owned || desired.Binding != nil || current.id != desired.ID
-}
-
-func configurationNeedsStableIdentity(stage factoryConfigurationStage, desired factoryConfigurationAutomation, current *factoryConfigurationAutomationTarget) bool {
-	if current.owned {
-		return false
-	}
-	if current.id != configurationAutomationKey(current) {
-		return true
-	}
-	count := 0
-	for _, entry := range stage.Automations {
-		if entry.Uses == desired.Uses {
-			count++
-		}
-	}
-	return count > 1
+	return current == nil || current.owned || desired.Binding != nil
 }
 
 func saveFactoryConfigurationOwnership(tx *gorm.DB, target *factoryConfigurationTarget, stage *factoryConfigurationStageTarget, desired factoryConfigurationAutomation, canvasID uuid.UUID) error {

@@ -11,11 +11,12 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/superplanehq/superplane/pkg/cli/core"
 	"github.com/superplanehq/superplane/pkg/openapi_client"
+	"github.com/superplanehq/superplane/pkg/workspaceconfig"
 )
 
 const (
-	configurationManifestPath = ".superplane/main.yml"
-	configurationCoverage     = "Repositories, stages, and automations"
+	configurationManifestPath = workspaceconfig.ManifestPath
+	configurationCoverage     = workspaceconfig.Coverage
 )
 
 type configurationTarget struct {
@@ -37,11 +38,13 @@ func (t *configurationTarget) bind(cmd *cobra.Command) {
 type configurationInput struct {
 	configurationTarget
 	file string
+	root string
 }
 
 func (c *configurationInput) bind(cmd *cobra.Command) {
 	c.configurationTarget.bind(cmd)
 	cmd.Flags().StringVarP(&c.file, "file", "f", configurationManifestPath, "Factory manifest file (- for stdin)")
+	cmd.Flags().StringVar(&c.root, "root", "", "bundle root for the manifest and automation files")
 }
 
 func (c configurationInput) readBundle(ctx core.CommandContext) (openapi_client.FactoriesFactoryConfigurationBundle, error) {
@@ -52,45 +55,68 @@ func (c configurationInput) readBundle(ctx core.CommandContext) (openapi_client.
 	if strings.TrimSpace(c.file) == "" {
 		return *bundle, fmt.Errorf("pass -f with a Factory manifest file")
 	}
-	var content []byte
+	manifestPath := configurationManifestPath
+	var content string
+	var directory *os.Root
 	var err error
 	if c.file == "-" {
-		content, err = io.ReadAll(ctx.Cmd.InOrStdin())
+		var input []byte
+		input, err = io.ReadAll(ctx.Cmd.InOrStdin())
+		content = string(input)
 	} else {
-		// #nosec G304 -- the CLI user explicitly selects the manifest file.
-		content, err = os.ReadFile(c.file)
+		manifestFile, absErr := filepath.Abs(c.file)
+		if absErr != nil {
+			return *bundle, absErr
+		}
+		rootPath := filepath.Dir(manifestFile)
+		manifestPath = filepath.Base(manifestFile)
+		if c.root != "" {
+			rootPath, err = filepath.Abs(c.root)
+			if err != nil {
+				return *bundle, err
+			}
+			relative, relErr := filepath.Rel(rootPath, manifestFile)
+			if relErr != nil {
+				return *bundle, fmt.Errorf("resolve manifest inside --root: %w", relErr)
+			}
+			manifestPath, err = workspaceconfig.NormalizePath(filepath.ToSlash(relative))
+			if err != nil {
+				return *bundle, fmt.Errorf("manifest must be inside --root: %w", err)
+			}
+		}
+		manifestPath, err = workspaceconfig.NormalizePath(manifestPath)
+		if err != nil {
+			return *bundle, fmt.Errorf("invalid manifest path: %w", err)
+		}
+		directory, err = openConfigurationInputDirectory(rootPath)
+		if err != nil {
+			return *bundle, fmt.Errorf("open manifest root for %q: %w", c.file, err)
+		}
+		defer directory.Close()
+		content, err = readConfigurationReference(directory, manifestPath)
 	}
 	if err != nil {
-		return *bundle, fmt.Errorf("read Factory manifest: %w", err)
+		return *bundle, fmt.Errorf("read Factory manifest %q: %w", c.file, err)
 	}
-	references, err := configurationManifestReferences(string(content))
+	references, err := configurationManifestReferences(content, manifestPath)
 	if err != nil {
-		return *bundle, err
+		return *bundle, fmt.Errorf("%s: %w", manifestPath, err)
 	}
-	file := openapi_client.NewFactoriesFactoryConfigurationFile()
-	file.SetPath(configurationManifestPath)
-	file.SetContent(string(content))
-	bundle.SetManifestPath(configurationManifestPath)
-	files := []openapi_client.FactoriesFactoryConfigurationFile{*file}
-	if len(references) == 0 {
-		bundle.SetFiles(files)
-		return *bundle, nil
-	}
-	if c.file == "-" {
+	if c.file == "-" && len(references) != 0 {
 		return *bundle, fmt.Errorf("custom automation references require -f with a manifest file path")
 	}
-	directory, err := os.OpenRoot(filepath.Dir(c.file))
-	if err != nil {
-		return *bundle, fmt.Errorf("open manifest directory: %w", err)
-	}
-	defer directory.Close()
+	file := openapi_client.NewFactoriesFactoryConfigurationFile()
+	file.SetPath(manifestPath)
+	file.SetContent(content)
+	bundle.SetManifestPath(manifestPath)
+	files := []openapi_client.FactoriesFactoryConfigurationFile{*file}
 	for _, reference := range references {
 		content, err := readConfigurationReference(directory, reference)
 		if err != nil {
 			return *bundle, fmt.Errorf("read custom automation %q: %w", reference, err)
 		}
 		file := openapi_client.NewFactoriesFactoryConfigurationFile()
-		file.SetPath(".superplane/" + reference)
+		file.SetPath(reference)
 		file.SetContent(content)
 		files = append(files, *file)
 	}
@@ -105,8 +131,8 @@ type configurationPlanCommand struct {
 func newConfigurationPlanCommand(options core.BindOptions) *cobra.Command {
 	command := &configurationPlanCommand{}
 	cmd := &cobra.Command{
-		Use: "plan", Short: "Plan stage and automation changes",
-		Long: "Plan stage and automation changes. Repository settings must match the workspace. Change repositories in workspace settings and export again.", Args: cobra.NoArgs,
+		Use: "plan", Short: "Plan workspace name, stage, and automation changes",
+		Long: "Plan workspace name, stage, and automation changes. Repository settings must match the workspace. Change repositories in workspace settings and export again.", Args: cobra.NoArgs,
 	}
 	command.bind(cmd)
 	core.Bind(cmd, command, options)
@@ -179,8 +205,8 @@ type configurationApplyCommand struct {
 func newConfigurationApplyCommand(options core.BindOptions) *cobra.Command {
 	command := &configurationApplyCommand{}
 	cmd := &cobra.Command{
-		Use: "apply", Short: "Apply stage and automation changes",
-		Long: "Apply stage and automation changes. Repository settings must match the workspace. Change repositories in workspace settings and export again.", Args: cobra.NoArgs,
+		Use: "apply", Short: "Apply workspace name, stage, and automation changes",
+		Long: "Apply workspace name, stage, and automation changes. Repository settings must match the workspace. Change repositories in workspace settings and export again.", Args: cobra.NoArgs,
 	}
 	command.bind(cmd)
 	cmd.Flags().BoolVar(&command.yes, "yes", false, "apply the displayed plan without confirmation")
@@ -231,7 +257,7 @@ func (c *configurationApplyCommand) Execute(ctx core.CommandContext) error {
 	}
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
 		if response.GetChanged() {
-			_, err := fmt.Fprintln(stdout, "Applied stage and automation configuration.")
+			_, err := fmt.Fprintln(stdout, "Applied workspace configuration.")
 			return err
 		}
 		_, err := fmt.Fprintln(stdout, "No changes.")

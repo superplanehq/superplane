@@ -2446,7 +2446,8 @@ CREATE TABLE public.workflows (
     description text DEFAULT ''::text NOT NULL,
     factory_id uuid,
     column_key text,
-    display_column_key text DEFAULT ''::text NOT NULL
+    display_column_key text DEFAULT ''::text NOT NULL,
+    configuration_id text DEFAULT ''::text NOT NULL
 );
 
 
@@ -2761,14 +2762,6 @@ ALTER TABLE ONLY public.email_settings
 
 
 --
--- Name: factories factories_organization_id_name_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.factories
-    ADD CONSTRAINT factories_organization_id_name_key UNIQUE (organization_id, name);
-
-
---
 -- Name: factories factories_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2837,7 +2830,7 @@ ALTER TABLE ONLY public.factory_codex_leases
 --
 
 ALTER TABLE ONLY public.factory_configuration_automations
-    ADD CONSTRAINT factory_configuration_automations_pkey PRIMARY KEY (factory_id, line_id, stage_key, manifest_id);
+    ADD CONSTRAINT factory_configuration_automations_pkey PRIMARY KEY (factory_id, manifest_id);
 
 
 --
@@ -3882,6 +3875,13 @@ CREATE INDEX factory_codex_leases_task_idx ON public.factory_codex_leases USING 
 --
 
 CREATE INDEX factory_configuration_automations_canvas_id ON public.factory_configuration_automations USING btree (canvas_id);
+
+
+--
+-- Name: factory_configuration_automations_canvas_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX factory_configuration_automations_canvas_key ON public.factory_configuration_automations USING btree (factory_id, canvas_id);
 
 
 --
@@ -5387,6 +5387,13 @@ CREATE INDEX vcs_provider_repository_collaborators_user_idx ON public.vcs_provid
 --
 
 CREATE INDEX vcs_provider_repository_sync_jobs_due_idx ON public.vcs_provider_repository_sync_jobs USING btree (provider, priority DESC, run_at) WHERE (locked_at IS NULL);
+
+
+--
+-- Name: workflows_factory_configuration_id_active_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX workflows_factory_configuration_id_active_key ON public.workflows USING btree (factory_id, configuration_id) WHERE ((factory_id IS NOT NULL) AND (deleted_at IS NULL) AND (configuration_id <> ''::text));
 
 
 --
@@ -6931,7 +6938,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261127160046	f
+20261127173610	f
 \.
 
 

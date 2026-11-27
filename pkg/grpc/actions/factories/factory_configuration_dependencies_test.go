@@ -14,28 +14,49 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/protobuf/proto"
 	goyaml "gopkg.in/yaml.v3"
 	"gorm.io/datatypes"
 )
 
 func TestFactoryConfigurationResolvesDependenciesAcrossDeletionAndOverlappingIDs(t *testing.T) {
 	f := configurationCatalogFixture(t)
+	const stageID = "verify/priority"
+	stages := f.line.StagesValue()
+	stages[2].ConfigurationID = stageID
+	require.NoError(t, f.line.UpdateConfiguration(database.DB(t.Context()), nil, nil, nil, stages))
 	review := configurationCatalogEntry(t, f, reviewRequestTemplateID)
 	instructions := "Keep __MANIFEST_AUTOMATION__verify/confidence-extra exactly as written."
 	review.With = map[string]any{
-		"template": map[string]any{"merge_confidence": map[string]any{"stage": "verify", "automation": "confidence-extra"}},
-		"agents":   map[string]any{reviewRequestAgentNodeID: map[string]any{"additional_instructions": instructions}},
+		"template": map[string]any{"merge_confidence": map[string]any{"stage": stageID, "automation": "confidence-extra"}},
+		"agent":    map[string]any{"additional_instructions": instructions},
 	}
-	bundle := configurationCatalogBundle(t, f, review, reviewRequestTemplateID)
+	// The fixture helper selects the default stage ID; keep selection explicit for this authored ID.
+	bundle := f.export(t)
 	editConfigurationManifest(t, bundle, func(manifest *factoryConfigurationManifest) {
 		for i := range manifest.Stages {
-			if manifest.Stages[i].Key == "verify" {
+			if manifest.Stages[i].ID == stageID {
+				manifest.Stages[i].Automations = append(manifest.Stages[i].Automations, review, factoryConfigurationAutomation{ID: "confidence", Name: "Confidence", Uses: "@superplane/merge-confidence"})
+			}
+		}
+	})
+	editConfigurationManifest(t, bundle, func(manifest *factoryConfigurationManifest) {
+		for i := range manifest.Stages {
+			if manifest.Stages[i].ID == stageID {
 				manifest.Stages[i].Automations = append(manifest.Stages[i].Automations, factoryConfigurationAutomation{
 					ID: "confidence-extra", Name: "Extra confidence", Uses: "@superplane/merge-confidence",
 				})
 			}
 		}
 	})
+	invalid := proto.Clone(bundle).(*pb.FactoryConfigurationBundle)
+	editConfigurationManifest(t, invalid, func(manifest *factoryConfigurationManifest) {
+		manifest.Stages[2].Automations[0].With["template"].(map[string]any)["merge_confidence"] = map[string]any{"stage": "verify", "automation": "priority/confidence-extra"}
+	})
+	rejected := f.plan(t, invalid)
+	require.NotEmpty(t, rejected.Diagnostics, "stage and automation IDs must match independently")
+	require.Equal(t, "stages[2].automations[0].with.template.merge_confidence", rejected.Diagnostics[0].Field)
+
 	applyConfigurationBundle(t, f, bundle)
 	source := configurationCanvasByName(t, f, "Extra confidence")
 	consumer := configurationCanvasByName(t, f, review.Name)
@@ -177,7 +198,7 @@ func configurationManifestAutomation(t *testing.T, bundle *pb.FactoryConfigurati
 	var manifest factoryConfigurationManifest
 	require.NoError(t, goyaml.Unmarshal([]byte(bundle.Files[0].Content), &manifest))
 	for _, stage := range manifest.Stages {
-		if stage.Key != stageKey {
+		if stage.ID != stageKey {
 			continue
 		}
 		for _, automation := range stage.Automations {

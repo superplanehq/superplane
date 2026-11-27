@@ -196,7 +196,7 @@ func TestFactoryConfigurationBatchesSharedReads(t *testing.T) {
 				desired := export(f.ctx)
 				editConfigurationManifest(t, desired, func(manifest *factoryConfigurationManifest) {
 					for i := range manifest.Stages {
-						if manifest.Stages[i].Key == "backlog" {
+						if manifest.Stages[i].ID == "backlog" {
 							manifest.Stages[i].Automations = append(manifest.Stages[i].Automations, factoryConfigurationAutomation{
 								ID: "planned-analysis", Name: "Planned analysis", Uses: "@superplane/task-analysis",
 							})
@@ -272,6 +272,7 @@ func TestFactoryConfigurationBatchesSharedReads(t *testing.T) {
 				desired := proto.Clone(saved).(*pb.FactoryConfigurationBundle)
 				var manifest factoryConfigurationManifest
 				require.NoError(t, yamlv3.Unmarshal([]byte(desired.Files[0].Content), &manifest))
+				manifest.ManifestPath = desired.ManifestPath
 				removed := map[string]*models.Canvas{}
 				for i := range manifest.Stages {
 					retained := manifest.Stages[i].Automations[:0]
@@ -282,7 +283,7 @@ func TestFactoryConfigurationBatchesSharedReads(t *testing.T) {
 						}
 						canvas, err := models.FindCanvasByName(db, f.r.Organization.ID, &f.factory.ID, automation.Name)
 						require.NoError(t, err)
-						removed[configurationAutomationPath(automation.Uses)] = canvas
+						removed[manifest.automationPath(automation.Uses)] = canvas
 					}
 					manifest.Stages[i].Automations = retained
 				}

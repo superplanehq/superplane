@@ -525,8 +525,8 @@ func TestReconcileFactoryRepositoryPreservesIndependentCanvasEdit(t *testing.T) 
 	const source = `apiVersion: v2
 kind: Automation
 name: Inspect repository
-runs_on_task: false
-triggers: [{use: manual}]
+run_context: workspace
+triggers: [{uses: manual}]
 steps: [{name: Inspect, bash: pwd}]
 `
 	created, err := service.Create(ctx, automations.Placement{OrganizationID: r.Organization.ID, FactoryID: factory.ID, Stage: models.CanvasColumnKeyDone}, r.User, source)

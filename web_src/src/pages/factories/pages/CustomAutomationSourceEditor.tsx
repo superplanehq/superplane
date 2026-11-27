@@ -15,6 +15,7 @@ import {
 } from "../lib/customAutomation";
 import {
   automationDefinitionCanvas,
+  automationTimeout,
   automationDefinitionSteps,
   automationDefinitionTriggers,
   type AutomationDefinition,
@@ -97,7 +98,7 @@ export function CustomAutomationSourceEditor({
     const runsOnTask = customAutomationRunContext(stage, next, selected);
     const active = customAutomationTriggersForRun(next, runsOnTask);
     model.editCanvas({
-      runs_on_task: runsOnTask,
+      run_context: runsOnTask === undefined ? undefined : runsOnTask ? "task" : "workspace",
       triggers: automationDefinitionTriggers(active.length ? active : [newCustomAutomationTrigger()], stage),
     });
   };
@@ -117,7 +118,7 @@ export function CustomAutomationSourceEditor({
       onIconChange={(icon) => model.editCanvas({ icon })}
       onTriggersChange={(next) => editTriggers(next, visual.runsOnTask)}
       onRunsOnTaskChange={(runsOnTask) => editTriggers(triggers, runsOnTask)}
-      onDraftChange={(next) => model.editCanvas(settingsEdit(visual.draft, next, definition.agent, hosted))}
+      onDraftChange={(next) => model.editCanvas(settingsEdit(visual.draft, next, definition, hosted))}
     />
   );
 }
@@ -125,13 +126,15 @@ export function CustomAutomationSourceEditor({
 function settingsEdit(
   previous: PlanningReviewDraft,
   next: PlanningReviewDraft,
-  agent: AutomationDefinition["agent"],
+  definition: AutomationDefinition,
   hosted?: AutomationHostedModels,
 ): Partial<AutomationDefinition> {
   const before = previous.components[0]?.configuration;
   const after = next.components[0]?.configuration;
   if (!before || !after) return {};
   const patch: Partial<AutomationDefinition> = {};
+  const agent = { ...definition.agent };
+  let agentChanged = false;
   if (after.steps !== before.steps && Array.isArray(after.steps)) {
     patch.steps = automationDefinitionSteps(after.steps as PlanningReviewStep[]);
   }
@@ -139,17 +142,26 @@ function settingsEdit(
     after.executionTimeoutSeconds !== before.executionTimeoutSeconds &&
     typeof after.executionTimeoutSeconds === "number"
   ) {
-    patch.timeout_seconds = after.executionTimeoutSeconds;
+    const timeout = automationTimeout(after.executionTimeoutSeconds);
+    if (definition.timeout !== undefined || definition.agent?.timeout === undefined) patch.timeout = timeout;
+    if (definition.agent?.timeout !== undefined) {
+      agent.timeout = timeout;
+      agentChanged = true;
+    }
   }
   if (after.skipSetupCommands !== before.skipSetupCommands) {
-    patch.skip_setup_commands = after.skipSetupCommands === true;
+    agent.skip_setup_commands = after.skipSetupCommands === true;
+    agentChanged = true;
   }
   if (after.skipRepositoryCheckout !== before.skipRepositoryCheckout) {
-    patch.skip_repository_checkout = after.skipRepositoryCheckout === true;
+    agent.skip_repository_checkout = after.skipRepositoryCheckout === true;
+    agentChanged = true;
   }
   if (after.model !== before.model) {
     const model = hostedModelForYaml(after.model, hosted);
-    patch.agent = model || agent?.harness ? { ...agent, model } : undefined;
+    agent.model = model;
+    agentChanged = true;
   }
+  if (agentChanged) patch.agent = Object.values(agent).some((value) => value !== undefined) ? agent : undefined;
   return patch;
 }

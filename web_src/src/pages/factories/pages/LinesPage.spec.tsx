@@ -932,7 +932,7 @@ describe("LinesPage board stages", () => {
               stage: "custom-qa",
               name: "Check QA",
               revision: 1,
-              yaml: "apiVersion: v2\nkind: Automation\nname: Check QA\ntriggers:\n  - use: task_enters_stage\nsteps:\n  - name: Inspect\n    bash: make lint\n",
+              yaml: "apiVersion: v2\nkind: Automation\nname: Check QA\ntriggers:\n  - uses: task_enters_stage\nsteps:\n  - name: Inspect\n    bash: make lint\n",
             }),
           )
         : undefined;

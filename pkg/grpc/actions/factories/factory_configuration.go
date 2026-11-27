@@ -138,6 +138,9 @@ func ApplyFactoryConfiguration(ctx context.Context, deps IntakeDependencies, org
 		if len(response.Changes) == 0 {
 			return nil
 		}
+		if err := target.factory.Update(tx, &manifest.Name, nil, nil); err != nil {
+			return err
+		}
 		if err := applyFactoryConfigurationStages(tx, target, manifest); err != nil {
 			return err
 		}
@@ -146,7 +149,13 @@ func ApplyFactoryConfiguration(ctx context.Context, deps IntakeDependencies, org
 		for _, stage := range manifest.Stages {
 			live := byKey[stage.Key]
 			for _, current := range live.automations {
-				retained := stage.retained[current.canvas.ID]
+				retained := false
+				for _, desiredStage := range manifest.Stages {
+					if desiredStage.retained[current.canvas.ID] {
+						retained = true
+						break
+					}
+				}
 				if retained || seen[current.canvas.ID] {
 					continue
 				}
@@ -182,8 +191,17 @@ func ApplyFactoryConfiguration(ctx context.Context, deps IntakeDependencies, org
 						return err
 					}
 				}
+				if current == nil {
+					canvas, err := models.FindCanvasInTransaction(tx, orgID, id)
+					if err != nil {
+						return err
+					}
+					if err := canvas.SetConfigurationID(tx, automation.ID); err != nil {
+						return err
+					}
+				}
 				// Save identities before resolving automation dependencies.
-				if configurationShouldSaveOwnership(current, automation) || current != nil && configurationNeedsStableIdentity(stage, automation, current) {
+				if configurationShouldSaveOwnership(current, automation) {
 					if err := saveFactoryConfigurationOwnership(tx, target, live, automation, id); err != nil {
 						return err
 					}
@@ -201,6 +219,11 @@ func ApplyFactoryConfiguration(ctx context.Context, deps IntakeDependencies, org
 			live := byKey[stage.Key]
 			for _, automation := range stage.Automations {
 				current := automation.current
+				if current != nil && current.placement != automation.placement {
+					if err := current.canvas.SetColumnKey(tx, automation.placement); err != nil {
+						return err
+					}
+				}
 				if automation.prepared != nil {
 					if current != nil && (seen[current.canvas.ID] || !factoryConfigurationAutomationChanged(current, automation, manifest)) {
 						continue
@@ -233,7 +256,7 @@ func ApplyFactoryConfiguration(ctx context.Context, deps IntakeDependencies, org
 					continue
 				}
 				if current == nil {
-					source := manifest.Sources[configurationAutomationPath(automation.Uses)]
+					source := manifest.Sources[manifest.automationPath(automation.Uses)]
 					notify, err := createFactoryConfigurationCustom(ctx, tx, deps, target, configurationStagePlacement(live), automation.ID, source, actor)
 					if err != nil {
 						return err
@@ -253,8 +276,8 @@ func ApplyFactoryConfiguration(ctx context.Context, deps IntakeDependencies, org
 					continue
 				}
 
-				source := manifest.Sources[configurationAutomationPath(automation.Uses)]
-				notify, err := applyFactoryConfigurationCustom(ctx, tx, deps, target, current, source, actor)
+				source := manifest.Sources[manifest.automationPath(automation.Uses)]
+				notify, err := applyFactoryConfigurationCustom(ctx, tx, deps, target, current, automation.placement, source, actor)
 				if err != nil {
 					return err
 				}
@@ -290,9 +313,6 @@ func applyFactoryConfigurationStages(tx *gorm.DB, target *factoryConfigurationTa
 		current := byKey[stage.Key].stage
 		current.Name = stage.Name
 		stages = append(stages, current)
-		if current.StepIndex != nil {
-			steps[*current.StepIndex].MaxParallelism = stage.MaxParallelism
-		}
 	}
 	if !factoryConfigurationStagesChanged(target, manifest) && equalCanvasJSON(steps, target.line.Steps) {
 		return nil

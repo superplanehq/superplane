@@ -33,7 +33,7 @@ func TestCanvasAutomationRetainsHostedProviderForDuplicateModelID(t *testing.T) 
 kind: Automation
 name: Inspect task
 agent: {model: sonnet}
-triggers: [{use: manual}]
+triggers: [{uses: manual}]
 steps: [{name: Inspect, prompt: Inspect the changes.}]
 `
 	ctx := onboardingContext(r)

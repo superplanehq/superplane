@@ -25,7 +25,10 @@ func renderFactoryConfigurationCustom(tx *gorm.DB, factory *models.Factory, canv
 		return source, nil
 	}
 	document, err := automationspec.Parse(authored.Source)
-	if err != nil || document.Name != canvas.Name || validateAutomationCanvasPlacement(document, placement) != nil {
+	if err != nil {
+		return automationspec.RestoreStoredAgentSelection(source, authored.Source)
+	}
+	if document.Name != canvas.Name || validateAutomationCanvasPlacement(document, placement) != nil {
 		return source, nil
 	}
 	// The matching revision preserves authored inheritance and comments.
@@ -46,7 +49,7 @@ func validateFactoryConfigurationCustom(ctx context.Context, tx *gorm.DB, deps I
 		if err != nil {
 			return nil, err
 		}
-		if existing != nil {
+		if existing != nil && !target.removed[existing.ID] {
 			return nil, document.Diagnostic("name", "Use a unique automation name in this workspace.")
 		}
 	}
@@ -114,6 +117,13 @@ func createFactoryConfigurationCustom(ctx context.Context, tx *gorm.DB, deps Int
 	if err != nil {
 		return nil, err
 	}
+	canvas, err := models.FindCanvasInTransaction(tx, factory.OrganizationID, id)
+	if err != nil {
+		return nil, err
+	}
+	if err := canvas.SetConfigurationID(tx, manifestID); err != nil {
+		return nil, err
+	}
 	authored := models.AutomationSource{
 		ID:             configurationAutomationSourceID(factory.ID, placement, manifestID),
 		OrganizationID: factory.OrganizationID, FactoryID: factory.ID,
@@ -134,7 +144,7 @@ func renameFactoryConfigurationAutomation(tx *gorm.DB, factory *models.Factory, 
 	if current.templateID != "" {
 		return nil
 	}
-	source := manifest.Sources[configurationAutomationPath(desired.Uses)]
+	source := manifest.Sources[manifest.automationPath(desired.Uses)]
 	document, err := automationspec.Parse(source)
 	if err != nil {
 		return err
@@ -169,9 +179,9 @@ func checkFactoryConfigurationCustomSecrets(document *automationspec.Document, f
 	return nil
 }
 
-func applyFactoryConfigurationCustom(ctx context.Context, tx *gorm.DB, deps IntakeDependencies, target *factoryConfigurationTarget, previous *factoryConfigurationAutomationTarget, source string, actor uuid.UUID) (func(), error) {
+func applyFactoryConfigurationCustom(ctx context.Context, tx *gorm.DB, deps IntakeDependencies, target *factoryConfigurationTarget, previous *factoryConfigurationAutomationTarget, placement, source string, actor uuid.UUID) (func(), error) {
 	factory := target.factory
-	version, placement := previous.version, previous.placement
+	version := previous.version
 	current, err := models.LockCanvasForUpdate(tx, factory.OrganizationID, previous.canvas.ID)
 	if err != nil {
 		return nil, err

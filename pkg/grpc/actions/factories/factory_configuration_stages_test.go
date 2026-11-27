@@ -20,7 +20,8 @@ func TestFactoryConfigurationIncludesEveryStageAndPhase(t *testing.T) {
 	db := database.DB(t.Context())
 	second := resetTestTemplate(t, f.r, f.factory, "line-implementation", models.ProviderGitHub, func(*yaml.Canvas) {})
 	steps := append([]models.FactoryLineStep{}, f.line.Steps...)
-	steps = append(steps, models.FactoryLineStep{Type: models.FactoryLineStepTypeRunApp, AppID: second.ID, Entrypoint: "onrun-implement"})
+	maxParallelism := 3
+	steps = append(steps, models.FactoryLineStep{MaxParallelism: &maxParallelism, Type: models.FactoryLineStepTypeRunApp, AppID: second.ID, Entrypoint: "onrun-implement"})
 	require.NoError(t, f.line.Update(db, nil, steps, nil))
 	stages := f.line.StagesValue()
 	customID := uuid.New()
@@ -59,8 +60,6 @@ func TestFactoryConfigurationIncludesEveryStageAndPhase(t *testing.T) {
 
 	manifest.Stages[2].Name = "Phase"
 	manifest.Stages[2], manifest.Stages[3] = manifest.Stages[3], manifest.Stages[2]
-	maxParallelism := 3
-	manifest.Stages[2].MaxParallelism = &maxParallelism
 	encoded, err := yamlv3.Marshal(manifest)
 	require.NoError(t, err)
 	bundle.Files[0].Content = string(encoded)
@@ -108,17 +107,17 @@ func TestFactoryConfigurationPreservesStageRestrictionsWithoutKinds(t *testing.T
 		field  string
 	}{
 		{"added stage", func(m *factoryConfigurationManifest) {
-			m.Stages = append(m.Stages, factoryConfigurationStage{Key: "new", Name: "New"})
+			m.Stages = append(m.Stages, factoryConfigurationStage{ID: "new", Name: "New"})
 		}, "stages"},
 		{"removed stage", func(m *factoryConfigurationManifest) {
 			m.Stages = m.Stages[1:]
 		}, "stages"},
-		{"unknown key", func(m *factoryConfigurationManifest) {
-			m.Stages[1].Key = "unknown"
-		}, "stages[1].key"},
-		{"duplicate key", func(m *factoryConfigurationManifest) {
-			m.Stages[1].Key = m.Stages[0].Key
-		}, "stages[1].key"},
+		{"unknown ID", func(m *factoryConfigurationManifest) {
+			m.Stages[1].ID = "unknown"
+		}, "stages[1].id"},
+		{"duplicate ID", func(m *factoryConfigurationManifest) {
+			m.Stages[1].ID = m.Stages[0].ID
+		}, "stages[1].id"},
 		{"backlog moved", func(m *factoryConfigurationManifest) {
 			m.Stages[0], m.Stages[1] = m.Stages[1], m.Stages[0]
 		}, "stages[0]"},

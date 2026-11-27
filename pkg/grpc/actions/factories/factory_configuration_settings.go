@@ -422,10 +422,14 @@ func factoryConfigurationMergeChecks(raw any) ([]string, string) {
 
 func validateFactoryConfigurationBuiltInSettingSections(templateID string, settings map[string]any) error {
 	for field, raw := range settings {
-		if field == "additional_instructions" && templateID == lineImplementationTemplateID {
-			continue
+		if field == "agents" {
+			return configurationSettingError(field, "Use agent for the logical agent settings.")
 		}
-		supported := field == "agents" || field == "template" && len(factoryConfigurationTemplateFields(templateID)) > 0 || field == "intake" && strings.HasPrefix(templateID, "intake:") || field == "pr_feedback" && (templateID == prFeedbackChecksTemplateID || templateID == prFeedbackDiscussionTemplateID)
+		if field == "additional_instructions" {
+			return configurationSettingError(field, "Use agent.additional_instructions for agent instructions.")
+		}
+
+		supported := field == "agent" || field == "template" && len(factoryConfigurationTemplateFields(templateID)) > 0 || field == "intake" && strings.HasPrefix(templateID, "intake:") || field == "pr_feedback" && (templateID == prFeedbackChecksTemplateID || templateID == prFeedbackDiscussionTemplateID)
 		if !supported {
 			return configurationSettingError(field, "This setting is not supported by this built-in automation.")
 		}

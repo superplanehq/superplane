@@ -80,7 +80,7 @@ func configurationCatalogBundle(t *testing.T, f configurationFixture, automation
 		stage = "backlog"
 	}
 	for i := range manifest.Stages {
-		if manifest.Stages[i].Key != stage {
+		if manifest.Stages[i].ID != stage {
 			continue
 		}
 		manifest.Stages[i].Automations = append(manifest.Stages[i].Automations, automation)

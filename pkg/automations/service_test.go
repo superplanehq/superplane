@@ -22,7 +22,7 @@ apiVersion: v2
 kind: Automation
 name: Observe
 triggers:
-  - use: manual
+  - uses: manual
 steps:
   - name: Print marker
     bash: echo ready
@@ -175,7 +175,7 @@ func TestServiceCustomStageRequiresFactoryAsCode(t *testing.T) {
 	require.NoError(t, line.UpdateConfiguration(db, nil, nil, nil, stages))
 	service := automations.Service{Backend: backendWithoutCanvases{}}
 	placement := automations.Placement{OrganizationID: r.Organization.ID, FactoryID: factory.ID, Stage: stage.Key}
-	source := strings.Replace(automationSource, "use: manual", "use: task_enters_stage", 1)
+	source := strings.Replace(automationSource, "uses: manual", "uses: task_enters_stage", 1)
 
 	_, err = service.Validate(t.Context(), placement, source)
 	require.ErrorContains(t, err, "Factory as code")

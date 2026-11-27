@@ -108,6 +108,34 @@ func TestCanvasAutomationScheduleEditMatchesForm(t *testing.T) {
 	}
 }
 
+func TestCanvasAutomationReadTranslatesStoredSourceByArtifactIdentity(t *testing.T) {
+	f := newConfigurationLifecycleFixture(t)
+	db := database.DB(t.Context())
+	bundle := f.export(t)
+	addConfigurationLifecycleAutomation(t, bundle, "audit", "Audit")
+	applyConfigurationBundle(t, f, bundle)
+	canvas := configurationCanvasByName(t, f, "Audit")
+	stored, err := models.FindAutomationSourceByArtifact(db, f.r.Organization.ID, canvas.ID.String())
+	require.NoError(t, err)
+	require.NotEqual(t, canvas.ID, stored.ID)
+	stored.Source = strings.Replace(stored.Source, "uses: manual", "use: manual", 1)
+	stored.Source = strings.Replace(stored.Source, "run_context: task", "runs_on_task: true", 1)
+	require.NoError(t, stored.Save(db))
+
+	service := automations.Service{Backend: CanvasAutomationBackend{Deps: testIntakeDependencies(f.r)}}
+	read, err := service.Read(f.ctx, f.r.Organization.ID, stored.ID)
+	require.NoError(t, err)
+	require.Equal(t, stored.ID, read.ID)
+	require.Equal(t, stored.Revision, read.Revision)
+	document, err := automationspec.Parse(read.YAML)
+	require.NoError(t, err)
+	require.Equal(t, automationspec.Manual, document.Triggers[0].Uses)
+	require.Equal(t, stored.Name, document.Name)
+	unchanged, err := models.FindAutomationSource(db, f.r.Organization.ID, stored.ID)
+	require.NoError(t, err)
+	require.Equal(t, stored, unchanged, "reading translates source without rewriting the stored record")
+}
+
 func TestCanvasAutomationCustomStageRoundTripAndAdmission(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
@@ -126,7 +154,7 @@ func TestCanvasAutomationCustomStageRoundTripAndAdmission(t *testing.T) {
 	require.NoError(t, line.UpdateConfiguration(db, nil, nil, nil, stages))
 	service := automations.Service{Backend: CanvasAutomationBackend{Deps: onboardingDeps(r)}}
 	ctx := onboardingContext(r)
-	source := "apiVersion: v2\nkind: Automation\nname: QA check\nruns_on_task: true\ntriggers:\n  - use: task_enters_stage\nsteps:\n  - name: Inspect\n    prompt: Check the changes.\n"
+	source := "apiVersion: v2\nkind: Automation\nname: QA check\nrun_context: task\ntriggers:\n  - uses: task_enters_stage\nsteps:\n  - name: Inspect\n    prompt: Check the changes.\n"
 	placement := automations.Placement{OrganizationID: r.Organization.ID, FactoryID: factory.ID, Stage: stageKey}
 	invalid := placement
 	invalid.Stage = "custom-" + uuid.NewString()
@@ -149,7 +177,7 @@ func TestCanvasAutomationCustomStageRoundTripAndAdmission(t *testing.T) {
 	require.ErrorContains(t, err, "custom stage in this factory")
 	_, err = service.Validate(ctx, placement, strings.Replace(source, "task_enters_stage", "pull_request_updated", 1))
 	require.ErrorContains(t, err, "requires Verify")
-	scheduledSource := "apiVersion: v2\nkind: Automation\nname: Scheduled QA\nruns_on_task: false\ntriggers:\n  - use: schedule\n    config:\n      cron: '0 9 * * *'\nsteps:\n  - name: Inspect\n    prompt: Check the changes.\n"
+	scheduledSource := "apiVersion: v2\nkind: Automation\nname: Scheduled QA\nrun_context: workspace\ntriggers:\n  - uses: schedule\n    config:\n      cron: '0 9 * * *'\nsteps:\n  - name: Inspect\n    prompt: Check the changes.\n"
 	for _, unsupported := range []string{
 		scheduledSource,
 		strings.Replace(source, "task_enters_stage", "task_leaves_stage", 1),
@@ -197,12 +225,42 @@ func TestCanvasAutomationCustomStageRoundTripAndAdmission(t *testing.T) {
 			if id == legacyCanvas.ID {
 				bashSource = strings.Replace(bashSource, "name: QA check", "name: Existing QA", 1)
 			}
-			withSettings := strings.Replace(bashSource, "runs_on_task: true", "runs_on_task: true\nskip_setup_commands: true\nskip_repository_checkout: true", 1)
+			withSettings := strings.Replace(bashSource, "run_context: task", "run_context: task\nagent:\n  additional_instructions: Keep task details.\n  thinking_level: low\n  skip_setup_commands: true\n  skip_repository_checkout: true", 1)
 			withSettings = strings.Replace(withSettings, "bash: make lint", "bash: make lint\n    secrets: [retired-secret, kept-secret]", 1)
 			_, err := service.Update(ctx, r.Organization.ID, id, r.User, withSettings)
 			require.NoError(t, err)
 			version, err := models.FindLiveCanvasVersionInTransaction(db, id)
 			require.NoError(t, err)
+			agent := selectCustomAutomationAgent(version.Nodes)
+			require.NotNil(t, agent)
+			require.Equal(t, "Keep task details.", agent.Configuration["additionalInstructions"])
+			require.Equal(t, "low", agent.Configuration["thinkingLevel"])
+			form, err := DescribeFactoryCustomAutomation(ctx, r.Organization.ID.String(), &pb.DescribeFactoryCustomAutomationRequest{
+				FactoryId: factory.ID.String(), AutomationId: id.String(),
+			})
+			require.NoError(t, err)
+			_, err = UpdateFactoryCustomAutomation(ctx, onboardingDeps(r), r.Organization.ID.String(), &pb.UpdateFactoryCustomAutomationRequest{
+				FactoryId: factory.ID.String(), AutomationId: id.String(),
+				Name: form.GetCustomAutomation().GetAutomation().GetName(), Settings: form.GetCustomAutomation().GetSettings(),
+				ExpectedLiveVersionId: version.ID.String(),
+			})
+			require.NoError(t, err)
+			version, err = models.FindLiveCanvasVersionInTransaction(db, id)
+			require.NoError(t, err)
+			agent = selectCustomAutomationAgent(version.Nodes)
+			require.Equal(t, "Keep task details.", agent.Configuration["additionalInstructions"])
+			require.Equal(t, "low", agent.Configuration["thinkingLevel"])
+			_, err = service.Update(ctx, r.Organization.ID, id, r.User, strings.Replace(withSettings, "thinking_level: low", "thinking_level: obsolete", 1))
+			require.ErrorContains(t, err, "agent.thinking_level")
+			unchanged, err := models.FindLiveCanvasVersionInTransaction(db, id)
+			require.NoError(t, err)
+			require.Equal(t, version.ID, unchanged.ID)
+			emptyInstructions := strings.Replace(withSettings, "additional_instructions: Keep task details.", "additional_instructions: ''", 1)
+			_, err = service.Update(ctx, r.Organization.ID, id, r.User, emptyInstructions)
+			require.NoError(t, err)
+			version, err = models.FindLiveCanvasVersionInTransaction(db, id)
+			require.NoError(t, err)
+			require.Equal(t, "", selectCustomAutomationAgent(version.Nodes).Configuration["additionalInstructions"])
 			for i := range version.Nodes {
 				node := &version.Nodes[i]
 				if node.ID == "stage-run" || node.ID == "existing-agent" {
@@ -221,6 +279,8 @@ func TestCanvasAutomationCustomStageRoundTripAndAdmission(t *testing.T) {
 				}
 				require.NotContains(t, node.Configuration, "skipSetupCommands")
 				require.NotContains(t, node.Configuration, "skipRepositoryCheckout")
+				require.NotContains(t, node.Configuration, "additionalInstructions")
+				require.NotContains(t, node.Configuration, "thinkingLevel")
 				var secrets []string
 				for _, source := range node.Configuration["environmentFrom"].([]any) {
 					entry := source.(map[string]any)
@@ -281,7 +341,7 @@ func TestCanvasAutomationCustomStageRoundTripAndAdmission(t *testing.T) {
 		require.NoError(t, err)
 		read, err := service.Read(ctx, r.Organization.ID, id)
 		require.NoError(t, err)
-		require.Contains(t, read.YAML, "use: manual")
+		require.Contains(t, read.YAML, "uses: manual")
 		require.NotContains(t, read.YAML, "task_enters_stage")
 		after, err := models.FindLiveCanvasVersionInTransaction(db, id)
 		require.NoError(t, err)
@@ -316,7 +376,7 @@ func TestCanvasAutomationCustomStageRoundTripAndAdmission(t *testing.T) {
 	plan, err := line.ExecutionPlan(db)
 	require.NoError(t, err)
 	require.Equal(t, "automatic", plan[0].StartMode)
-	mixedSource := strings.Replace(source, "  - use: task_enters_stage", "  - use: task_enters_stage\n  - use: manual", 1)
+	mixedSource := strings.Replace(source, "  - uses: task_enters_stage", "  - uses: task_enters_stage\n  - uses: manual", 1)
 	_, err = service.Update(ctx, r.Organization.ID, created.ID, r.User, mixedSource)
 	require.NoError(t, err)
 	plan, err = line.ExecutionPlan(db)
@@ -409,10 +469,10 @@ func TestCanvasAutomationLegacyImportProtectsGraphBehavior(t *testing.T) {
 			require.NoError(t, err)
 			doc, err := automationspec.Parse(source)
 			require.NoError(t, err)
-			require.Equal(t, &automationspec.Agent{Model: "sonnet"}, doc.Agent)
+			require.Equal(t, "sonnet", doc.Agent.Model)
 			require.NotNil(t, doc.RunsOnTask)
 			require.Equal(t, tc.runsOnTask, *doc.RunsOnTask)
-			require.Equal(t, tc.use, doc.Triggers[0].Use)
+			require.Equal(t, tc.use, doc.Triggers[0].Uses)
 			require.Len(t, doc.Triggers, len(triggers))
 			require.Equal(t, strings.TrimSpace(prompt), created.GetCustomAutomation().GetSettings().Steps[0].Prompt)
 			wantPrompt := prompt
@@ -421,8 +481,8 @@ func TestCanvasAutomationLegacyImportProtectsGraphBehavior(t *testing.T) {
 			}
 			require.Equal(t, wantPrompt, doc.Steps[0].Prompt)
 			require.Equal(t, "/tmp", doc.Steps[0].WorkingDirectory)
-			require.Equal(t, &skip, doc.SkipSetupCommands)
-			require.Equal(t, &skip, doc.SkipRepositoryCheckout)
+			require.Equal(t, &skip, doc.Agent.SkipSetupCommands)
+			require.Equal(t, &skip, doc.Agent.SkipRepositoryCheckout)
 			version, err := models.FindLiveCanvasVersionInTransaction(db, id)
 			require.NoError(t, err)
 			require.Equal(t, version.ID.String(), legacy.Artifact.Revision)
@@ -470,7 +530,7 @@ func TestCanvasAutomationLegacyImportProtectsGraphBehavior(t *testing.T) {
 			}
 			require.Equal(t, wantPrompt, doc.Steps[0].Prompt)
 			require.Equal(t, int64(2), reopened.Revision)
-			require.Equal(t, tc.use, doc.Triggers[0].Use)
+			require.Equal(t, tc.use, doc.Triggers[0].Uses)
 			require.Len(t, doc.Triggers, len(triggers))
 			if tc.name == "leave" {
 				line, err := factory.CreateLine(db, "Move test", nil)
@@ -556,7 +616,7 @@ func TestCanvasAutomationFollowsFactoryModelSource(t *testing.T) {
 kind: Automation
 name: Inspect task
 triggers:
-  - use: manual
+  - uses: manual
 steps:
   - name: Inspect
     prompt: Inspect the task.
@@ -720,7 +780,7 @@ func TestCanvasAutomationResolvesAllowedDefaultModel(t *testing.T) {
 kind: Automation
 name: Inspect task
 triggers:
-  - use: manual
+  - uses: manual
 steps:
   - name: Inspect
     prompt: Inspect the task.

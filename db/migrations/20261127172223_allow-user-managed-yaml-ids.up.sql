@@ -1,0 +1,1 @@
+ALTER TABLE workflows DROP CONSTRAINT workflows_configuration_id_format;

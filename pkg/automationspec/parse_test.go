@@ -14,7 +14,7 @@ name: Inspect a task
 `
 
 const manualTrigger = `triggers:
-  - use: manual
+  - uses: manual
 `
 
 const bashStep = `steps:
@@ -25,11 +25,11 @@ const bashStep = `steps:
 func TestParseKeepsStepOrderAndText(t *testing.T) {
 	source := definitionHeader + `# Comments are allowed in the source.
 triggers:
-  - use: schedule
+  - uses: schedule
     config:
       cron: "0 9 ? * 1-5"
-      utc_offset: 5.5
-  - use: schedule
+      timezone: "5.5"
+  - uses: schedule
     config:
       cron: "0 30 16 * * 5"
 steps:
@@ -51,7 +51,7 @@ steps:
 		t.Fatalf("unexpected defaults: %+v", document.Definition)
 	}
 	if len(document.Triggers) != 2 || document.Triggers[0].ID != "" || document.Triggers[1].ID != "" ||
-		document.Triggers[0].Config.UTCOffset != 5.5 || document.Triggers[1].Config.UTCOffset != 0 {
+		document.Triggers[0].Config.Timezone != "5.5" || document.Triggers[1].Config.Timezone != "0" {
 		t.Fatalf("unexpected schedules: %+v", document.Triggers)
 	}
 	if len(document.Steps) != 2 || document.Steps[0].Bash != "git status --short\n  # Indentation and the final newline matter.\n" ||
@@ -73,7 +73,7 @@ steps:
 
 func TestParseKeepsWebhookTriggers(t *testing.T) {
 	id := "1f0c3c55-4a8f-4a8e-9a43-2a7d8f6b6f10"
-	document, err := automationspec.Parse(definitionHeader + "triggers:\n  - use: webhook\n    config:\n      webhook_id: " + id + "\n" + bashStep)
+	document, err := automationspec.Parse(definitionHeader + "triggers:\n  - uses: webhook\n    config:\n      webhook_id: " + id + "\n" + bashStep)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,8 +89,8 @@ func TestParseKeepsWebhookTriggers(t *testing.T) {
 	}
 }
 
-func TestParseAcceptsIntegralTimeout(t *testing.T) {
-	document, err := automationspec.Parse(definitionHeader + "timeout_seconds: 900.0\n" + manualTrigger + bashStep)
+func TestParseAcceptsDurationTimeout(t *testing.T) {
+	document, err := automationspec.Parse(definitionHeader + "timeout: 15m\n" + manualTrigger + bashStep)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,7 +100,7 @@ func TestParseAcceptsIntegralTimeout(t *testing.T) {
 }
 
 func TestParseRejectsInvalidDefinitionAtItsSource(t *testing.T) {
-	schedule := "triggers:\n  - use: schedule\n    config:\n      cron: \"0 9 * * *\"\n"
+	schedule := "triggers:\n  - uses: schedule\n    config:\n      cron: \"0 9 * * *\"\n"
 	cases := []struct {
 		name   string
 		source string
@@ -113,16 +113,16 @@ func TestParseRejectsInvalidDefinitionAtItsSource(t *testing.T) {
 		{"missing step name", definitionHeader + manualTrigger + "steps:\n  - bash: pwd\n", "steps[0].name", 7, 5},
 		{"null icon", definitionHeader + "icon: null\n" + manualTrigger + bashStep, "icon", 4, 7},
 		{"wrong version case", strings.Replace(definitionHeader, "v2", "V2", 1) + manualTrigger + bashStep, "apiVersion", 1, 13},
-		{"quoted number", definitionHeader + "timeout_seconds: '900'\n" + manualTrigger + bashStep, "timeout_seconds", 4, 18},
-		{"timeout over integer range", definitionHeader + "timeout_seconds: 18446744073709551615\n" + manualTrigger + bashStep, "timeout_seconds", 4, 18},
-		{"out of range timeout", definitionHeader + "timeout_seconds: 86401\n" + manualTrigger + bashStep, "timeout_seconds", 4, 18},
-		{"generic automatic trigger", definitionHeader + "triggers: [{use: automatic}]\n" + bashStep, "triggers[0].use", 4, 18},
+		{"quoted number", definitionHeader + "timeout: '900'\n" + manualTrigger + bashStep, "timeout", 4, 10},
+		{"timeout over integer range", definitionHeader + "timeout: 18446744073709551615\n" + manualTrigger + bashStep, "timeout", 4, 10},
+		{"out of range timeout", definitionHeader + "timeout: 86401s\n" + manualTrigger + bashStep, "timeout", 4, 10},
+		{"generic automatic trigger", definitionHeader + "triggers: [{uses: automatic}]\n" + bashStep, "triggers[0].uses", 4, 19},
 		{"event configuration", definitionHeader + manualTrigger + "    config: {}\n" + bashStep, "triggers[0].config", 6, 13},
-		{"duplicate event", definitionHeader + manualTrigger + "  - use: manual\n" + bashStep, "triggers[1].use", 6, 10},
-		{"duplicate trigger ID", definitionHeader + "triggers:\n  - {id: same, use: manual}\n  - {id: same, use: task_enters_stage}\n" + bashStep, "triggers[1].id", 6, 10},
+		{"duplicate event", definitionHeader + manualTrigger + "  - uses: manual\n" + bashStep, "triggers[1].uses", 6, 11},
+		{"duplicate trigger ID", definitionHeader + "triggers:\n  - {id: same, uses: manual}\n  - {id: same, uses: task_enters_stage}\n" + bashStep, "triggers[1].id", 6, 10},
 		{"invalid cron", definitionHeader + strings.Replace(schedule, "0 9 * * *", "0 99 * * *", 1) + bashStep, "triggers[0].config.cron", 7, 13},
-		{"out of range offset", definitionHeader + schedule + "      utc_offset: 14.25\n" + bashStep, "triggers[0].config.utc_offset", 8, 19},
-		{"nonfinite offset", definitionHeader + schedule + "      utc_offset: .nan\n" + bashStep, "triggers[0].config.utc_offset", 8, 19},
+		{"out of range offset", definitionHeader + schedule + "      timezone: \"14.25\"\n" + bashStep, "triggers[0].config.timezone", 8, 17},
+		{"nonfinite offset", definitionHeader + schedule + "      timezone: .nan\n" + bashStep, "triggers[0].config.timezone", 8, 17},
 		{"blank bash", definitionHeader + manualTrigger + strings.Replace(bashStep, "git status --short", "\"  \"", 1), "steps[0].bash", 8, 11},
 		{"two step actions", definitionHeader + manualTrigger + bashStep + "    prompt: Summarize changes\n", "steps[0].prompt", 9, 13},
 		{"secrets on prompt", definitionHeader + manualTrigger + "steps:\n  - name: Inspect\n    prompt: Inspect\n    secrets: [TOKEN]\n", "steps[0].secrets", 9, 14},
@@ -132,8 +132,8 @@ func TestParseRejectsInvalidDefinitionAtItsSource(t *testing.T) {
 		{"missing integration name", definitionHeader + manualTrigger + bashStep + "agent: {harness: codex, credentials: {source: integration}}\n", "agent.credentials.name", 9, 38},
 		{"hosted credentials override", definitionHeader + manualTrigger + bashStep + "agent: {harness: superplane, credentials: {source: hosted}}\n", "agent.credentials", 9, 43},
 		{"extra document", definitionHeader + manualTrigger + bashStep + "---\nname: extra\n", "$", 9, 1},
-		{"webhook without ID", definitionHeader + "triggers:\n  - use: webhook\n    config: {cron: \"0 9 * * *\"}\n" + bashStep, "triggers[0].config.webhook_id", 6, 13},
-		{"invalid webhook ID", definitionHeader + "triggers:\n  - use: webhook\n    config: {webhook_id: jira}\n" + bashStep, "triggers[0].config.webhook_id", 6, 26},
+		{"webhook without ID", definitionHeader + "triggers:\n  - uses: webhook\n    config: {cron: \"0 9 * * *\"}\n" + bashStep, "triggers[0].config.webhook_id", 6, 13},
+		{"invalid webhook ID", definitionHeader + "triggers:\n  - uses: webhook\n    config: {webhook_id: jira}\n" + bashStep, "triggers[0].config.webhook_id", 6, 26},
 	}
 	for _, test := range cases {
 		t.Run(test.name, func(t *testing.T) {
@@ -170,7 +170,7 @@ func TestValidateStagePointsAtTheTriggerType(t *testing.T) {
 		{"task_enters_stage", automationspec.Backlog, automationspec.Verify},
 	} {
 		t.Run(test.use, func(t *testing.T) {
-			source := definitionHeader + "triggers:\n  - use: " + test.use + "\n" + bashStep
+			source := definitionHeader + "triggers:\n  - uses: " + test.use + "\n" + bashStep
 			document, err := automationspec.Parse(source)
 			if err != nil {
 				t.Fatal(err)
@@ -180,9 +180,128 @@ func TestValidateStagePointsAtTheTriggerType(t *testing.T) {
 			}
 			err = automationspec.ValidateStage(document, test.invalidStage)
 			var diagnostic *automationspec.Diagnostic
-			if !errors.As(err, &diagnostic) || diagnostic.Path != "triggers[0].use" ||
-				diagnostic.Line != 5 || diagnostic.Column != 10 || !strings.Contains(diagnostic.Message, "Verify") {
+			if !errors.As(err, &diagnostic) || diagnostic.Path != "triggers[0].uses" ||
+				diagnostic.Line != 5 || diagnostic.Column != 11 || !strings.Contains(diagnostic.Message, "Verify") {
 				t.Fatalf("unexpected diagnostic: %v", err)
+			}
+		})
+	}
+}
+
+func TestParsePortableExecutionSettings(t *testing.T) {
+	for _, value := range []struct {
+		text    string
+		seconds int
+	}{{"2h", 7200}, {"90m", 5400}, {"30s", 30}, {"0s", 3600}} {
+		t.Run(value.text, func(t *testing.T) {
+			document, err := automationspec.Parse(definitionHeader + "timeout: " + value.text + "\nagent: {skip_setup_commands: false, skip_repository_checkout: true}\n" + manualTrigger + bashStep)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if document.TimeoutSeconds != value.seconds || document.Agent.SkipSetupCommands == nil || *document.Agent.SkipSetupCommands || document.Agent.SkipRepositoryCheckout == nil || !*document.Agent.SkipRepositoryCheckout {
+				t.Fatalf("execution settings changed: %+v", document.Definition)
+			}
+			encoded, err := automationspec.Encode(document.Definition)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(encoded, "skip_setup_commands: false") || strings.Contains(encoded, "icon:") {
+				t.Fatalf("unexpected generated defaults: %s", encoded)
+			}
+		})
+	}
+	t.Run("agent timeout scope", func(t *testing.T) {
+		document, err := automationspec.Parse(definitionHeader + "agent: {timeout: 120m}\n" + manualTrigger + bashStep)
+		if err != nil {
+			t.Fatal(err)
+		}
+		encoded, err := automationspec.Encode(document.Definition)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Count(encoded, "timeout:") != 1 {
+			t.Fatalf("agent timeout duplicated into automation scope: %s", encoded)
+		}
+		reparsed, err := automationspec.Parse(encoded)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if reparsed.Timeout != "" || reparsed.Agent.Timeout != "2h" || reparsed.TimeoutSeconds != 7200 {
+			t.Fatalf("timeout scope changed: %+v", reparsed.Definition)
+		}
+	})
+	for _, value := range []string{"-1s", "0.5s", "1ns", "25h", "900", "999999999999999999999h"} {
+		t.Run(value, func(t *testing.T) {
+			_, err := automationspec.Parse(definitionHeader + "timeout: " + value + "\n" + manualTrigger + bashStep)
+			var diagnostic *automationspec.Diagnostic
+			if !errors.As(err, &diagnostic) || diagnostic.Path != "timeout" {
+				t.Fatalf("expected timeout diagnostic, got %v", err)
+			}
+		})
+	}
+}
+
+func TestParseRejectsReplacedFields(t *testing.T) {
+	for _, test := range []struct{ source, path, replacement string }{
+		{definitionHeader + "timeout_seconds: 30\n" + manualTrigger + bashStep, "timeout_seconds", "timeout"},
+		{definitionHeader + "runs_on_task: true\n" + manualTrigger + bashStep, "runs_on_task", "run_context"},
+		{definitionHeader + "skip_setup_commands: false\n" + manualTrigger + bashStep, "skip_setup_commands", "agent.skip_setup_commands"},
+		{definitionHeader + "triggers: [{use: manual}]\n" + bashStep, "triggers[0].use", "uses"},
+		{definitionHeader + "triggers: [{uses: schedule, config: {cron: '0 9 * * *', utc_offset: 1}}]\n" + bashStep, "triggers[0].config.utc_offset", "timezone"},
+	} {
+		t.Run(test.path, func(t *testing.T) {
+			_, err := automationspec.Parse(test.source)
+			var diagnostic *automationspec.Diagnostic
+			if !errors.As(err, &diagnostic) || diagnostic.Path != test.path || !strings.Contains(diagnostic.Message, test.replacement) || diagnostic.Line < 1 || diagnostic.Column < 1 {
+				t.Fatalf("expected replacement at %s, got %v", test.path, err)
+			}
+		})
+	}
+}
+
+func TestParseResolvesExecutionContext(t *testing.T) {
+	webhook := "{uses: webhook, config: {webhook_id: 1f0c3c55-4a8f-4a8e-9a43-2a7d8f6b6f10}}"
+	for _, test := range []struct {
+		name, context, triggers, resolved string
+		valid                             bool
+	}{
+		{"schedule and manual", "", "[{uses: schedule, config: {cron: '0 9 * * *', timezone: '-3.5'}}, {uses: manual}]", "workspace", true},
+		{"task event", "", "[{uses: task_enters_stage}]", "dynamic", true},
+		{"webhook", "", "[" + webhook + "]", "workspace", true},
+		{"webhook and task event", "", "[" + webhook + ", {uses: task_enters_stage}]", "dynamic", true},
+		{"webhook and manual", "", "[" + webhook + ", {uses: manual}]", "dynamic", true},
+		{"webhook and workspace manual", "workspace", "[" + webhook + ", {uses: manual}]", "workspace", true},
+		{"manual task", "task", "[{uses: manual}]", "task", true},
+		{"manual workspace", "workspace", "[{uses: manual}]", "workspace", true},
+		{"task schedule", "task", "[{uses: schedule, config: {cron: '0 9 * * *'}}]", "", false},
+		{"task webhook", "task", "[" + webhook + "]", "", false},
+		{"workspace task event", "workspace", "[{uses: task_enters_stage}]", "", false},
+		{"mixed schedule contexts", "", "[{uses: task_enters_stage}, {uses: schedule, config: {cron: '0 9 * * *'}}]", "", false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			source := definitionHeader
+			if test.context != "" {
+				source += "run_context: " + test.context + "\n"
+			}
+			document, err := automationspec.Parse(source + "triggers: " + test.triggers + "\n" + bashStep)
+			if !test.valid {
+				if err == nil {
+					t.Fatal("expected incompatible context diagnostic")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			resolved := "dynamic"
+			if document.RunsOnTask != nil {
+				resolved = "workspace"
+				if *document.RunsOnTask {
+					resolved = "task"
+				}
+			}
+			if resolved != test.resolved {
+				t.Fatalf("execution context = %s, want %s", resolved, test.resolved)
 			}
 		})
 	}

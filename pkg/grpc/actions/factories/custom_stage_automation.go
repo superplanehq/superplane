@@ -95,7 +95,7 @@ func validateCustomStageTriggers(settings *customAutomationSettings) error {
 			return invalidArgument("Custom stage automations support only Manual, task_enters_stage, and webhook triggers.")
 		}
 	}
-	if automatic > 1 || len(settings.Triggers) == 0 || settings.runsWithoutTask() {
+	if automatic > 1 || len(settings.Triggers) == 0 || (settings.hasLineTrigger() && settings.runsWithoutTask()) {
 		return invalidArgument("Custom stage automations need a Manual trigger, one task_enters_stage trigger, or a webhook trigger.")
 	}
 	return nil
@@ -219,6 +219,16 @@ func editCustomStageRunner(node *models.Node, baseID string, settings *customAut
 		node.Configuration["skipRepositoryCheckout"] = *settings.SkipRepositoryCheckout
 	} else {
 		delete(node.Configuration, "skipRepositoryCheckout")
+	}
+	if settings.AdditionalInstructions != nil {
+		node.Configuration["additionalInstructions"] = *settings.AdditionalInstructions
+	} else {
+		delete(node.Configuration, "additionalInstructions")
+	}
+	if settings.ThinkingLevel != "" {
+		node.Configuration["thinkingLevel"] = settings.ThinkingLevel
+	} else {
+		delete(node.Configuration, "thinkingLevel")
 	}
 }
 

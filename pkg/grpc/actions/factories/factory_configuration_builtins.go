@@ -7,6 +7,7 @@ import (
 	"math"
 	"strings"
 
+	"github.com/superplanehq/superplane/pkg/automationspec"
 	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/yaml"
@@ -45,52 +46,105 @@ func factoryConfigurationBuiltInAlias(templateID string) (string, bool) {
 // Only these public options cross the YAML boundary. Credentials, managed
 // prompts, trigger wiring, and other workspace settings remain in the graph.
 var factoryConfigurationAgentFields = map[string]string{
-	"additional_instructions":   "additionalInstructions",
-	"model":                     "model",
-	"thinking_level":            "thinkingLevel",
-	"execution_timeout_seconds": "executionTimeoutSeconds",
-	"skip_setup_commands":       "skipSetupCommands",
-	"skip_repository_checkout":  "skipRepositoryCheckout",
-	"include_visual_evidence":   "includeVisualEvidence",
+	"additional_instructions":  "additionalInstructions",
+	"model":                    "model",
+	"thinking_level":           "thinkingLevel",
+	"timeout":                  "executionTimeoutSeconds",
+	"skip_setup_commands":      "skipSetupCommands",
+	"skip_repository_checkout": "skipRepositoryCheckout",
+	"include_visual_evidence":  "includeVisualEvidence",
+}
+
+// A PR discussion has several execution branches for one logical agent. Other
+// templates have one agent; additional harness nodes require an explicit review.
+func factoryConfigurationLogicalAgents(version *models.CanvasVersion, templateID string) ([]*models.Node, error) {
+	var agents []*models.Node
+	if templateID == prFeedbackDiscussionTemplateID {
+		spec := models.LiveCanvasSpec{Nodes: version.Nodes, Edges: version.Edges}
+		ids := resolvePRFeedbackGraph(spec).discussionRunnerNodeIDs(spec)
+		for i := range version.Nodes {
+			node := &version.Nodes[i]
+			if !isFactoryAgentHarness(node.ComponentName()) {
+				continue
+			}
+			if !ids[node.ID] {
+				return nil, configurationSettingError("agent", "This automation has an agent outside its supported execution branches.")
+			}
+			agents = append(agents, node)
+		}
+	} else {
+		for i := range version.Nodes {
+			if isFactoryAgentHarness(version.Nodes[i].ComponentName()) {
+				agents = append(agents, &version.Nodes[i])
+			}
+		}
+		if len(agents) > 1 {
+			return nil, configurationSettingError("agent", "Multiple distinct agents cannot use one logical agent setting.")
+		}
+	}
+	if len(agents) == 0 && configurationBuiltInNeedsAgent(templateID) {
+		return nil, configurationSettingError("agent", "The built-in automation agent is missing or unsupported.")
+	}
+	return agents, nil
 }
 
 func exportFactoryConfigurationBuiltIn(version *models.CanvasVersion, templateID string) (map[string]any, error) {
 	if _, ok := factoryConfigurationBuiltInAlias(templateID); !ok {
 		return nil, fmt.Errorf("unknown built-in automation %q", templateID)
 	}
+	agents, err := factoryConfigurationLogicalAgents(version, templateID)
+	if err != nil {
+		return nil, err
+	}
 	settings := map[string]any{}
-	agents := map[string]any{}
-	for i := range version.Nodes {
-		node := &version.Nodes[i]
-		if !isFactoryAgentHarness(node.ComponentName()) {
-			continue
-		}
+	var logical map[string]any
+	for _, node := range agents {
 		fields := map[string]any{}
-		for field, configurationKey := range factoryConfigurationAgentFields {
-			value, present := node.Configuration[configurationKey]
+		for field, key := range factoryConfigurationAgentFields {
+			value, present := node.Configuration[key]
 			if !present {
 				continue
 			}
+			if field == "timeout" {
+				if !validFactoryConfigurationTimeout(value) {
+					return nil, configurationSettingError("agent.timeout", "The stored timeout cannot be represented as a whole-second duration within the supported limit.")
+				}
+				value = automationspec.FormatDuration(factoryConfigurationTimeoutSeconds(value))
+			}
 			if err := validateFactoryConfigurationAgentField(node, field, value); err != nil {
-				return nil, prefixFactoryConfigurationSettingError("agents."+node.ID+".", err)
+				return nil, prefixFactoryConfigurationSettingError("agent.", err)
 			}
 			fields[field] = value
 		}
-		if len(fields) > 0 {
-			agents[node.ID] = fields
+		if logical != nil {
+			for field := range factoryConfigurationAgentFields {
+				zero := factoryConfigurationAgentZero(field)
+				if field == "timeout" {
+					zero = "0s"
+				}
+				value, present := fields[field]
+				if !present {
+					value = zero
+				}
+				previous, present := logical[field]
+				if !present {
+					previous = zero
+				}
+				if !equalCanvasJSON(value, previous) {
+					return nil, configurationSettingError("agent."+field, "Execution branches have distinct agent settings. Make their settings equal before export.")
+				}
+			}
 		}
-	}
-	if templateID == lineImplementationTemplateID {
-		agent := findIntakeNode(version.Nodes, implementationAgentNodeID)
-		if agent == nil || !isFactoryAgentHarness(agent.ComponentName()) {
-			return nil, fmt.Errorf("the Implement agent is missing or unsupported")
+
+		if logical == nil {
+			logical = fields
 		}
 	}
 	if err := exportFactoryConfigurationPublicSettings(version, templateID, settings); err != nil {
 		return nil, err
 	}
-	if len(agents) > 0 {
-		settings["agents"] = agents
+	if len(logical) > 0 {
+		settings["agent"] = logical
 	}
 	return settings, nil
 }
@@ -107,12 +161,12 @@ func copyFactoryConfigurationBuiltIn(version, defaults *models.CanvasVersion, te
 	if err := json.Unmarshal(encoded, &snapshot); err != nil {
 		return nil, nil, fmt.Errorf("copy automation: %w", err)
 	}
+	agents, err := factoryConfigurationLogicalAgents(&snapshot, templateID)
+	if err != nil {
+		return nil, nil, err
+	}
 	// Omitted public settings restore defaults without replacing the installed graph.
-	for i := range snapshot.Nodes {
-		node := &snapshot.Nodes[i]
-		if !isFactoryAgentHarness(node.ComponentName()) {
-			continue
-		}
+	for _, node := range agents {
 		baseline := findIntakeNode(defaults.Nodes, node.ID)
 		if baseline == nil {
 			return nil, nil, fmt.Errorf("agent %q has no factory defaults", node.ID)
@@ -140,41 +194,25 @@ func copyFactoryConfigurationBuiltIn(version, defaults *models.CanvasVersion, te
 		}
 	}
 	for field := range settings {
-		if field == "agents" || field == "intake" || field == "pr_feedback" || field == "template" || (field == "additional_instructions" && templateID == lineImplementationTemplateID) {
+		if field == "agent" || field == "intake" || field == "pr_feedback" || field == "template" {
 			continue
 		}
-		return nil, nil, &factoryConfigurationSettingError{Field: field, Message: "This built-in setting is not supported."}
+		return nil, nil, &factoryConfigurationSettingError{Field: field, Message: "This built-in setting is not supported. Use agent for agent options."}
 	}
-	if rawAgents, present := settings["agents"]; present {
-		agents, ok := rawAgents.(map[string]any)
+	if raw, present := settings["agent"]; present {
+		fields, ok := raw.(map[string]any)
 		if !ok {
-			return nil, nil, &factoryConfigurationSettingError{Field: "agents", Message: "Use a mapping of agent node IDs to settings."}
+			return nil, nil, configurationSettingError("agent", "Use a mapping of supported agent settings.")
 		}
-		for id, rawFields := range agents {
-			agent := findIntakeNode(snapshot.Nodes, id)
-			if agent == nil || !isFactoryAgentHarness(agent.ComponentName()) {
-				return nil, nil, &factoryConfigurationSettingError{Field: "agents." + id, Message: "This agent does not exist in the live automation."}
-			}
-			fields, ok := rawFields.(map[string]any)
-			if !ok {
-				return nil, nil, &factoryConfigurationSettingError{Field: "agents." + id, Message: "Use a mapping of supported agent settings."}
-			}
+		if len(agents) == 0 {
+			return nil, nil, configurationSettingError("agent", "This automation has no logical agent.")
+		}
+		for _, agent := range agents {
 			for field, value := range fields {
 				if err := applyFactoryConfigurationAgentField(agent, field, value); err != nil {
-					return nil, nil, prefixFactoryConfigurationSettingError("agents."+id+".", err)
+					return nil, nil, prefixFactoryConfigurationSettingError("agent.", err)
 				}
 			}
-		}
-	}
-	if instructions, present := settings["additional_instructions"]; templateID == lineImplementationTemplateID && present {
-		agent := findIntakeNode(snapshot.Nodes, implementationAgentNodeID)
-		if agent == nil || !isFactoryAgentHarness(agent.ComponentName()) {
-			return nil, nil, fmt.Errorf("the Implement agent is missing or unsupported")
-		}
-		// Older manifests used this field. Give that explicit update precedence
-		// over an exported agent setting while exports use the canonical location.
-		if err := applyFactoryConfigurationAgentField(agent, "additional_instructions", instructions); err != nil {
-			return nil, nil, err
 		}
 	}
 	return snapshot.Nodes, snapshot.Edges, nil
@@ -184,25 +222,34 @@ func applyFactoryConfigurationAgentField(node *models.Node, field string, value 
 	if err := validateFactoryConfigurationAgentField(node, field, value); err != nil {
 		return err
 	}
+	if field == "timeout" {
+		seconds, _ := automationspec.ParseDuration(value.(string))
+		value = seconds
+	}
 	if node.Configuration == nil {
 		node.Configuration = map[string]any{}
 	}
 	node.Configuration[factoryConfigurationAgentFields[field]] = value
+
 	return nil
 }
 
 func validateFactoryConfigurationAgentField(node *models.Node, field string, value any) error {
 	if _, ok := factoryConfigurationAgentFields[field]; !ok {
-		return &factoryConfigurationSettingError{Field: field, Message: "This agent setting is not supported."}
+		return &factoryConfigurationSettingError{Field: field, Message: "This agent setting is not supported. Use timeout for duration values."}
 	}
 	switch field {
 	case "skip_setup_commands", "skip_repository_checkout", "include_visual_evidence":
 		if _, ok := value.(bool); !ok {
 			return &factoryConfigurationSettingError{Field: field, Message: "Use a boolean value."}
 		}
-	case "execution_timeout_seconds":
-		if !validFactoryConfigurationTimeout(value) {
-			return &factoryConfigurationSettingError{Field: field, Message: fmt.Sprintf("Use an integer from 0 through %d.", runner.MaxExecutionTimeoutSecondsRequest)}
+	case "timeout":
+		duration, ok := value.(string)
+		if !ok {
+			return configurationSettingError(field, "Use a duration such as 2h, 90m, or 30s.")
+		}
+		if _, err := automationspec.ParseDuration(duration); err != nil {
+			return configurationSettingError(field, err.Error())
 		}
 	default:
 		text, ok := value.(string)
@@ -231,7 +278,7 @@ func validateFactoryConfigurationBuiltInNodes(tx *gorm.DB, deps IntakeDependenci
 			ID: node.ID, Name: node.Name, Type: yaml.NodeTypeAction,
 			Component: node.ComponentName(), Configuration: node.Configuration,
 		}, deps.Registry); err != nil {
-			return &factoryConfigurationSettingError{Field: "agents." + node.ID, Message: err.Error()}
+			return &factoryConfigurationSettingError{Field: "agent", Message: err.Error()}
 		}
 		config := map[string]any{"credentials": node.Configuration["credentials"], "model": node.Configuration["model"]}
 		if node.Configuration["llmProvider"] == models.UsageProviderCustom {
@@ -258,7 +305,7 @@ func validateFactoryConfigurationBuiltInNodes(tx *gorm.DB, deps IntakeDependenci
 			return model, err
 		})
 		if errors.Is(err, models.ErrSelectableLLMModelNotAllowed) || errors.Is(err, models.ErrSuperPlaneRunnerNoModel) || errors.Is(err, models.ErrSuperPlaneRunnerModelNotAllowed) {
-			return &factoryConfigurationSettingError{Field: "agents." + node.ID + ".model", Message: "Select an available model for the configured agent."}
+			return &factoryConfigurationSettingError{Field: "agent.model", Message: "Select an available model for the configured agent."}
 		}
 		if err != nil {
 			return err
@@ -292,11 +339,26 @@ func validFactoryConfigurationTimeout(value any) bool {
 	return seconds >= 0 && seconds <= runner.MaxExecutionTimeoutSecondsRequest && math.Trunc(seconds) == seconds
 }
 
+func factoryConfigurationTimeoutSeconds(value any) int {
+	switch seconds := value.(type) {
+	case int:
+		return seconds
+	case int64:
+		return int(seconds)
+	case uint64:
+		return int(seconds)
+	case float64:
+		return int(seconds)
+	default:
+		return 0
+	}
+}
+
 func factoryConfigurationAgentZero(field string) any {
 	switch field {
 	case "skip_setup_commands", "skip_repository_checkout", "include_visual_evidence":
 		return false
-	case "execution_timeout_seconds":
+	case "timeout":
 		return 0
 	default:
 		return ""
@@ -309,6 +371,9 @@ func factoryConfigurationOverrides(settings, defaults map[string]any) map[string
 		baselineValue, present := defaults[field]
 		if _, agentField := factoryConfigurationAgentFields[field]; agentField && !present {
 			baselineValue = factoryConfigurationAgentZero(field)
+			if field == "timeout" {
+				baselineValue = "0s"
+			}
 		}
 		if equalCanvasJSON(value, baselineValue) {
 			continue

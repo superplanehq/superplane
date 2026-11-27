@@ -56,7 +56,7 @@ func Test__UpdateFactory(t *testing.T) {
 		assert.Equal(t, newDescription, updated.Description)
 	})
 
-	t.Run("duplicate name -> error", func(t *testing.T) {
+	t.Run("workspaces can share a display name", func(t *testing.T) {
 		existing, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "", "")
 		require.NoError(t, err)
 		target, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "", "")
@@ -66,9 +66,12 @@ func Test__UpdateFactory(t *testing.T) {
 			Id:   target.ID.String(),
 			Name: &existing.Name,
 		})
-		code, _, ok := grpcerrors.HandlerStatus(err)
-		assert.True(t, ok)
-		assert.Equal(t, codes.AlreadyExists, code)
+
+		require.NoError(t, err)
+		updated, err := models.FindFactory(database.DB(t.Context()), r.Organization.ID, target.ID)
+		require.NoError(t, err)
+		assert.Equal(t, existing.Name, updated.Name)
+		assert.Equal(t, target.Key, updated.Key)
 	})
 
 	t.Run("not found -> error", func(t *testing.T) {

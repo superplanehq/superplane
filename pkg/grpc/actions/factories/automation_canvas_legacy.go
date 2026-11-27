@@ -9,6 +9,7 @@ import (
 	"maps"
 	"reflect"
 	"slices"
+	"strconv"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/automations"
@@ -136,15 +137,13 @@ func importAutomationCanvas(tx *gorm.DB, factory *models.Factory, canvas *models
 	settings := saved.GetSettings()
 	definition := automationspec.Definition{
 		Name: canvas.Name, Icon: settings.GetIcon(), TimeoutSeconds: int(settings.GetExecutionTimeoutSeconds()),
-		RunsOnTask:        settings.RunsOnTask,
-		SkipSetupCommands: settings.SkipSetupCommands, SkipRepositoryCheckout: settings.SkipRepositoryCheckout,
 	}
 	definition.Triggers, err = legacyAutomationTriggers(*canvas.ColumnKey, version.Nodes)
 	if err != nil {
 		return "", unrepresentableAutomationCanvas()
 	}
 	hasSchedule := slices.ContainsFunc(definition.Triggers, func(trigger automationspec.Trigger) bool {
-		return trigger.Use == automationspec.Scheduled || trigger.Use == automationspec.Webhook
+		return trigger.Uses == automationspec.Scheduled || trigger.Uses == automationspec.Webhook
 	})
 	if hasSchedule || (*canvas.ColumnKey == models.CanvasColumnKeyBacklog && settings.RunsOnTask != nil && !*settings.RunsOnTask) {
 		stripCustomAutomationBacklogPrompt(settings.Steps)
@@ -154,6 +153,35 @@ func importAutomationCanvas(tx *gorm.DB, factory *models.Factory, canvas *models
 	if err != nil {
 		return "", err
 	}
+	if settings.RunsOnTask != nil {
+		definition.RunContext = "workspace"
+		if *settings.RunsOnTask {
+			definition.RunContext = "task"
+		}
+	} else {
+		hasTaskEvent := slices.ContainsFunc(definition.Triggers, func(trigger automationspec.Trigger) bool {
+			return trigger.Uses == automationspec.TaskEntersStage || trigger.Uses == automationspec.TaskLeavesStage || trigger.Uses == automationspec.PullRequestUpdated
+		})
+		if !hasTaskEvent && !hasSchedule {
+			definition.RunContext = "task"
+			if *canvas.ColumnKey == models.CanvasColumnKeyBacklog && !legacyCustomStageGraph(canvas, version) {
+				// The saved manual graph determines its context, even without metadata.
+				for _, node := range version.Nodes {
+					if node.ComponentName() == "start" {
+						definition.RunContext = "workspace"
+					}
+				}
+			}
+		}
+	}
+	if node := selectCustomAutomationAgent(version.Nodes); node != nil {
+		if value, ok := node.Configuration["additionalInstructions"].(string); ok {
+			definition.Agent.AdditionalInstructions = &value
+		}
+		definition.Agent.ThinkingLevel = configString(node.Configuration, "thinkingLevel")
+	}
+	definition.Agent.SkipSetupCommands = settings.SkipSetupCommands
+	definition.Agent.SkipRepositoryCheckout = settings.SkipRepositoryCheckout
 	for _, step := range settings.GetSteps() {
 		item := automationspec.Step{
 			Name: step.GetName(), Secrets: step.GetSecrets(), WorkingDirectory: step.GetWorkingDirectory(),
@@ -219,7 +247,10 @@ func importAutomationCanvas(tx *gorm.DB, factory *models.Factory, canvas *models
 	if workspace != nil && workspace.Component == agent.Component && reflect.DeepEqual(workspace.Credentials, agent.Credentials) {
 		definition.Agent.Harness = ""
 		definition.Agent.Credentials = nil
-		if definition.Agent.Model == "" {
+		if definition.Agent.Model == workspace.Model || definition.Agent.Model == workspace.model() {
+			definition.Agent.Model = ""
+		}
+		if definition.Agent.Model == "" && definition.Agent.SkipSetupCommands == nil && definition.Agent.SkipRepositoryCheckout == nil && definition.Agent.AdditionalInstructions == nil && definition.Agent.ThinkingLevel == "" && definition.Agent.Timeout == "" {
 			definition.Agent = nil
 		}
 	}
@@ -235,7 +266,7 @@ func legacyAutomationTriggers(stage string, nodes []models.Node) ([]automationsp
 	for _, trigger := range decoded {
 		switch trigger.mode {
 		case pb.FactoryCustomAutomation_START_MODE_MANUAL:
-			result = append(result, automationspec.Trigger{Use: automationspec.Manual})
+			result = append(result, automationspec.Trigger{Uses: automationspec.Manual})
 		case pb.FactoryCustomAutomation_START_MODE_AUTOMATIC:
 			use := automationspec.TaskEntersStage
 			if stage == models.CanvasColumnKeyVerify {
@@ -244,17 +275,17 @@ func legacyAutomationTriggers(stage string, nodes []models.Node) ([]automationsp
 			if customAutomationUsesDispatch(stage) {
 				use = automationspec.Manual
 			}
-			result = append(result, automationspec.Trigger{Use: use})
+			result = append(result, automationspec.Trigger{Uses: use})
 		case pb.FactoryCustomAutomation_START_MODE_ON_LEAVE:
-			result = append(result, automationspec.Trigger{Use: automationspec.TaskLeavesStage})
+			result = append(result, automationspec.Trigger{Uses: automationspec.TaskLeavesStage})
 		case pb.FactoryCustomAutomation_START_MODE_SCHEDULED:
 			result = append(result, automationspec.Trigger{
-				Use:    automationspec.Scheduled,
-				Config: &automationspec.TriggerConfig{Cron: trigger.schedule.GetCronExpression(), UTCOffset: trigger.schedule.GetUtcOffset()},
+				Uses:   automationspec.Scheduled,
+				Config: &automationspec.TriggerConfig{Cron: trigger.schedule.GetCronExpression(), Timezone: strconv.FormatFloat(trigger.schedule.GetUtcOffset(), 'f', -1, 64)},
 			})
 		case pb.FactoryCustomAutomation_START_MODE_WEBHOOK:
 			result = append(result, automationspec.Trigger{
-				Use:    automationspec.Webhook,
+				Uses:   automationspec.Webhook,
 				Config: &automationspec.TriggerConfig{WebhookID: trigger.webhookID},
 			})
 		}
@@ -355,6 +386,10 @@ func executionNode(node models.Node) models.Node {
 	}
 	if template, ok := node.Metadata[models.FactoryAppTemplateMetadataKey].(map[string]any); ok {
 		template = maps.Clone(template)
+		// Task context is the historical default for task and dispatch triggers.
+		if template["runsOnTask"] == true || node.ComponentName() == "start" || node.ComponentName() == "schedule" || template["startMode"] == "webhook" {
+			delete(template, "runsOnTask")
+		}
 		delete(template, "automationTriggerId")
 		if configString(template, "icon") == automationspec.DefaultIcon {
 			delete(template, "icon")

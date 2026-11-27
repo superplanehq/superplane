@@ -5,16 +5,14 @@ import (
 	"fmt"
 	"path"
 	"slices"
-	"strings"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/automationspec"
-	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 )
 
-func configurationAutomationPath(reference string) string {
-	return path.Join(path.Dir(factoryConfigurationManifestPath), reference)
+func (manifest *factoryConfigurationManifest) automationPath(reference string) string {
+	return path.Join(path.Dir(manifest.ManifestPath), reference)
 }
 
 func configurationStagesByKey(target *factoryConfigurationTarget) map[string]*factoryConfigurationStageTarget {
@@ -25,70 +23,49 @@ func configurationStagesByKey(target *factoryConfigurationTarget) map[string]*fa
 	return stages
 }
 
-func configurationAutomationByStableIdentity(stage *factoryConfigurationStageTarget, id string) *factoryConfigurationAutomationTarget {
-	for _, current := range stage.automations {
-		if current.id == id {
-			return current
-		}
-		if current.templateID != "" && id == configurationAutomationKey(current)+"-"+configurationCanvasKey(current.canvas.ID) {
-			return current
-		}
-		if current.canvas.FactoryID != nil && current.sourceID == configurationAutomationSourceID(*current.canvas.FactoryID, configurationStagePlacement(stage), id) {
-			return current
+func resolveFactoryConfigurationIdentities(target *factoryConfigurationTarget, manifest *factoryConfigurationManifest) {
+	byID := map[string]*factoryConfigurationStageTarget{}
+	automations := map[string]*factoryConfigurationAutomationTarget{}
+	for _, stage := range target.stages {
+		byID[stage.stage.ConfigurationID] = stage
+		for _, automation := range stage.automations {
+			automations[automation.id] = automation
 		}
 	}
-	return nil
-}
-
-func resolveFactoryConfigurationIdentities(target *factoryConfigurationTarget, manifest *factoryConfigurationManifest) {
-	byKey := configurationStagesByKey(target)
+	target.removed = map[uuid.UUID]bool{}
+	desiredIDs := map[string]bool{}
+	for _, stage := range manifest.Stages {
+		for _, desired := range stage.Automations {
+			desiredIDs[desired.ID] = true
+		}
+	}
+	for _, stage := range target.stages {
+		for _, current := range stage.automations {
+			if !desiredIDs[current.id] {
+				target.removed[current.canvas.ID] = true
+			}
+		}
+	}
 	for i := range manifest.Stages {
 		stage := &manifest.Stages[i]
 		stage.retained = map[uuid.UUID]bool{}
-		live := byKey[stage.Key]
+		live := byID[stage.ID]
 		if live == nil {
 			continue
 		}
-		claimed := map[*factoryConfigurationAutomationTarget]bool{}
+		stage.Key = live.key
 		for j := range stage.Automations {
-			automation := &stage.Automations[j]
-			automation.current = configurationAutomationByStableIdentity(live, automation.ID)
-			if automation.current != nil {
-				claimed[automation.current] = true
-			}
-		}
-		for j := range stage.Automations {
-			automation := &stage.Automations[j]
-			if automation.current == nil {
-				automation.current = configurationAutomationFallback(live, *automation, claimed)
-			}
-			if automation.current != nil {
-				stage.retained[automation.current.canvas.ID] = true
+			desired := &stage.Automations[j]
+			desired.current = automations[desired.ID]
+			desired.placement = configurationStagePlacement(live)
+			if desired.current != nil {
+				stage.retained[desired.current.canvas.ID] = true
+				if live.runner == desired.current || slices.Contains(live.automations, desired.current) {
+					desired.placement = desired.current.placement
+				}
 			}
 		}
 	}
-}
-
-func configurationAutomationFallback(stage *factoryConfigurationStageTarget, desired factoryConfigurationAutomation, claimed map[*factoryConfigurationAutomationTarget]bool) *factoryConfigurationAutomationTarget {
-	// Keep the historical filename/name priority in live automation order.
-	for _, current := range stage.automations {
-		if claimed[current] {
-			continue
-		}
-		if current.templateID == "" && current.uses == desired.Uses {
-			return current
-		}
-		if current.canvas.Name != desired.Name {
-			continue
-		}
-		if current.templateID != "" && current.uses == desired.Uses {
-			return current
-		}
-		if current.templateID == "" && !strings.HasPrefix(desired.Uses, "@superplane/") {
-			return current
-		}
-	}
-	return nil
 }
 
 func factoryConfigurationStagesChanged(target *factoryConfigurationTarget, manifest *factoryConfigurationManifest) bool {
@@ -105,6 +82,9 @@ func factoryConfigurationAutomationChanged(current *factoryConfigurationAutomati
 }
 
 func factoryConfigurationAutomationContentChanged(current *factoryConfigurationAutomationTarget, desired factoryConfigurationAutomation, manifest *factoryConfigurationManifest) bool {
+	if current.placement != desired.placement {
+		return true
+	}
 	if current.templateID != "" {
 		return !equalCanvasJSON(current.settings, desired.With) || factoryConfigurationBindingChanged(current, desired) || factoryConfigurationReviewSourceChanged(current, desired)
 	}
@@ -112,41 +92,44 @@ func factoryConfigurationAutomationContentChanged(current *factoryConfigurationA
 	if err != nil {
 		return true
 	}
-	requested := manifest.Definitions[configurationAutomationPath(desired.Uses)]
+	requested := manifest.Definitions[manifest.automationPath(desired.Uses)]
 	previous.Definition.Name = requested.Name
 	return !equalCanvasJSON(previous.Definition, requested)
 }
 
 func compareFactoryConfiguration(target *factoryConfigurationTarget, manifest *factoryConfigurationManifest) []*pb.FactoryConfigurationChange {
 	var changes []*pb.FactoryConfigurationChange
+	if manifest.Name != target.factory.Name {
+		changes = append(changes, configurationChange("workspace", "name", target.factory.Name, manifest.Name))
+	}
 	byKey := configurationStagesByKey(target)
 	previousOrder, requestedOrder := []string{}, []string{}
 	for _, stage := range target.stages {
-		previousOrder = append(previousOrder, stage.key)
+		previousOrder = append(previousOrder, stage.stage.ConfigurationID)
 	}
 	for _, stage := range manifest.Stages {
-		requestedOrder = append(requestedOrder, stage.Key)
+		requestedOrder = append(requestedOrder, stage.ID)
 	}
 	if !slices.Equal(previousOrder, requestedOrder) {
 		changes = append(changes, configurationChange("stages", "stages", previousOrder, requestedOrder))
 	}
 	seen := map[string]bool{}
+	allRetained := map[string]bool{}
+	for _, stage := range manifest.Stages {
+		for id := range stage.retained {
+			allRetained[id.String()] = true
+		}
+	}
 	for i, stage := range manifest.Stages {
 		live := byKey[stage.Key]
 		stagePath := fmt.Sprintf("stages[%d]", i)
 		if stage.Name != live.stage.Name {
-			changes = append(changes, configurationChange("stages."+stage.Key, stagePath+".name", live.stage.Name, stage.Name))
-		}
-		if live.stage.StepIndex != nil {
-			previous := configurationMaxParallelism(target.line.Steps[*live.stage.StepIndex].MaxParallelism)
-			if !equalCanvasJSON(previous, stage.MaxParallelism) {
-				changes = append(changes, configurationChange("stages."+stage.Key, stagePath+".max_parallelism", previous, stage.MaxParallelism))
-			}
+			changes = append(changes, configurationChange("stages."+stage.ID, stagePath+".name", live.stage.Name, stage.Name))
 		}
 		retained := map[string]bool{}
 		for j, automation := range stage.Automations {
 			current := automation.current
-			resource := "stages." + stage.Key + ".automations." + automation.ID
+			resource := "stages." + stage.ID + ".automations." + automation.ID
 			if current == nil {
 				changes = append(changes, configurationChange(resource, fmt.Sprintf("%s.automations[%d]", stagePath, j), nil, automation))
 				continue
@@ -156,6 +139,9 @@ func compareFactoryConfiguration(target *factoryConfigurationTarget, manifest *f
 				continue
 			}
 			seen[current.canvas.ID.String()] = true
+			if current.placement != automation.placement {
+				changes = append(changes, configurationChange(resource, fmt.Sprintf("%s.automations[%d].stage", stagePath, j), current.placement, automation.placement))
+			}
 			if current.canvas.Name != automation.Name {
 				changes = append(changes, configurationChange(resource, fmt.Sprintf("%s.automations[%d].name", stagePath, j), current.canvas.Name, automation.Name))
 			}
@@ -174,17 +160,17 @@ func compareFactoryConfiguration(target *factoryConfigurationTarget, manifest *f
 				changes = append(changes, configurationSettingChanges(resource, fmt.Sprintf("%s.automations[%d].with", stagePath, j), current.settings, automation.With)...)
 				continue
 			}
-			filePath := configurationAutomationPath(automation.Uses)
+			filePath := manifest.automationPath(automation.Uses)
 			changes = append(changes, configurationChange(resource, filePath, current.source, manifest.Sources[filePath]))
 		}
 		for _, current := range live.automations {
 			identity := current.canvas.ID.String()
-			if retained[identity] || seen[identity] {
+			if retained[identity] || allRetained[identity] || seen[identity] {
 				continue
 			}
 			seen[identity] = true
 			previous := factoryConfigurationAutomation{ID: current.id, Name: current.canvas.Name, Uses: current.uses, With: current.settings}
-			resource := "stages." + stage.Key + ".automations." + current.id
+			resource := "stages." + stage.ID + ".automations." + current.id
 			changes = append(changes, configurationChange(resource, stagePath+".automations", previous, nil))
 		}
 	}
@@ -229,11 +215,4 @@ func configurationChangeValue(value any) string {
 	}
 	encoded, _ := json.Marshal(value)
 	return string(encoded)
-}
-
-func configurationMaxParallelism(value *int) *int {
-	if value == nil || *value == models.DefaultFactoryLineStepMaxParallelism {
-		return nil
-	}
-	return value
 }

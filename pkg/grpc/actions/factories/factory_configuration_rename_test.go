@@ -202,7 +202,7 @@ func TestFactoryConfigurationRenameRetainsDuplicateBuiltInIdentity(t *testing.T)
 	require.Equal(t, before, configurationResourceCounts(t))
 }
 
-func TestFactoryConfigurationRejectsConflictingSharedAutomationNames(t *testing.T) {
+func TestFactoryConfigurationRenamePreservesRunnerDisplayPlacement(t *testing.T) {
 	f := newConfigurationFixture(t)
 	db := database.DB(t.Context())
 	id := uuid.New()
@@ -220,14 +220,17 @@ func TestFactoryConfigurationRejectsConflictingSharedAutomationNames(t *testing.
 	content, err := yaml.Marshal(manifest)
 	require.NoError(t, err)
 	exported.Bundle.Files[0].Content = string(content)
-	before := configurationResourceCounts(t)
 	plan := f.plan(t, exported.Bundle)
-	require.NotEmpty(t, plan.Diagnostics)
-	require.Contains(t, strings.ToLower(plan.Diagnostics[0].Message), "shared")
-	require.Empty(t, plan.BaseStateToken)
-	_, err = f.apply(exported.Bundle, "invalid")
-	require.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
-	require.Equal(t, before, configurationResourceCounts(t))
+	require.Empty(t, plan.Diagnostics)
+	require.Len(t, plan.Changes, 1)
+	result, err := f.apply(exported.Bundle, plan.BaseStateToken)
+	require.NoError(t, err)
+	require.True(t, result.Changed)
+	current, err := models.FindCanvasInTransaction(db, f.r.Organization.ID, f.canvas.ID)
+	require.NoError(t, err)
+	require.Equal(t, "Renamed phase runner", current.Name)
+	require.Equal(t, shared.Key, *current.ColumnKey)
+
 }
 
 func TestFactoryConfigurationRenamesAndUpdatesAutomationTogether(t *testing.T) {
@@ -239,7 +242,7 @@ func TestFactoryConfigurationRenamesAndUpdatesAutomationTogether(t *testing.T) {
 	const desiredName = "Build the task"
 	const instructions = "Follow the updated repository instructions."
 	automation.Name = desiredName
-	automation.With["additional_instructions"] = instructions
+	automation.With["agent"].(map[string]any)["additional_instructions"] = instructions
 	content, err := yaml.Marshal(manifest)
 	require.NoError(t, err)
 	bundle.Files[0].Content = string(content)

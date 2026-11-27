@@ -44,7 +44,7 @@ func TestFactoryConfigurationInstallsMissingBuiltIns(t *testing.T) {
 	for _, node := range live.Nodes {
 		require.Nil(t, node.ErrorMessage, node.ID)
 	}
-	owners, err := models.ListFactoryConfigurationAutomations(db, f.factory.OrganizationID, f.factory.ID, f.line.ID)
+	owners, err := models.ListFactoryConfigurationAutomations(db, f.factory.OrganizationID, f.factory.ID)
 	require.NoError(t, err)
 	require.Len(t, owners, 1)
 	require.Equal(t, "issues", owners[0].ManifestID)
@@ -134,7 +134,7 @@ func TestFactoryConfigurationRestoresFiveDeletedBuiltIns(t *testing.T) {
 	}
 	for _, entry := range entries {
 		for i := range manifest.Stages {
-			if manifest.Stages[i].Key != entry.stage {
+			if manifest.Stages[i].ID != entry.stage {
 				continue
 			}
 			automation := factoryConfigurationAutomation{ID: entry.id, Name: entry.name, Uses: entry.uses}

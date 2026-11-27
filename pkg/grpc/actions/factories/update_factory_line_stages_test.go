@@ -249,7 +249,7 @@ func TestUpdateFactoryLineStages(t *testing.T) {
 		service := automations.Service{Backend: CanvasAutomationBackend{Deps: deps}}
 		require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryAsCode))
 		for _, origin := range []string{stage.Key, "implement"} {
-			created, err := service.Create(ctx, automations.Placement{OrganizationID: r.Organization.ID, FactoryID: factory.ID, Stage: origin}, r.User, "apiVersion: v2\nkind: Automation\nname: Inspect "+origin+"\ntriggers:\n  - use: task_enters_stage\nsteps:\n  - name: Inspect\n    bash: pwd\n")
+			created, err := service.Create(ctx, automations.Placement{OrganizationID: r.Organization.ID, FactoryID: factory.ID, Stage: origin}, r.User, "apiVersion: v2\nkind: Automation\nname: Inspect "+origin+"\ntriggers:\n  - uses: task_enters_stage\nsteps:\n  - name: Inspect\n    bash: pwd\n")
 			require.NoError(t, err)
 			id := created.ID
 			before, err := models.FindCanvasInTransaction(db, r.Organization.ID, id)

@@ -1,6 +1,8 @@
 package factories
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -28,8 +30,7 @@ func TestFactoryConfigurationRejectsInvalidBuiltInModelWithoutWrites(t *testing.
 				continue
 			}
 			found = true
-			agents := automation.With["agents"].(map[string]any)
-			agent := agents[implementationAgentNodeID].(map[string]any)
+			agent := automation.With["agent"].(map[string]any)
 			agent["model"] = "unknown-model"
 		}
 	}
@@ -40,7 +41,7 @@ func TestFactoryConfigurationRejectsInvalidBuiltInModelWithoutWrites(t *testing.
 	before := configurationResourceCounts(t)
 	plan := f.plan(t, bundle)
 	require.NotEmpty(t, plan.Diagnostics)
-	require.Contains(t, plan.Diagnostics[0].Field, "agents."+implementationAgentNodeID)
+	require.Contains(t, plan.Diagnostics[0].Field, "agent")
 	require.Contains(t, plan.Diagnostics[0].Message, "model")
 	require.Empty(t, plan.BaseStateToken)
 	_, err = f.apply(bundle, "invalid")
@@ -120,7 +121,7 @@ func TestFactoryConfigurationBuiltInModelPolicy(t *testing.T) {
 					automation := &manifest.Stages[i].Automations[j]
 					if automation.Uses == "@superplane/implement" {
 						settings = map[string]any{}
-						automation.With = map[string]any{"agents": map[string]any{implementationAgentNodeID: settings}}
+						automation.With = map[string]any{"agent": settings}
 					}
 				}
 			}
@@ -138,7 +139,7 @@ func TestFactoryConfigurationBuiltInModelPolicy(t *testing.T) {
 				plan := f.plan(t, bundle)
 				if model == "unavailable-model" {
 					require.NotEmpty(t, plan.Diagnostics)
-					require.Contains(t, plan.Diagnostics[0].Field, "agents."+implementationAgentNodeID+".model")
+					require.Contains(t, plan.Diagnostics[0].Field, "agent.model")
 					require.Empty(t, plan.BaseStateToken)
 					_, err = f.apply(bundle, "invalid")
 					require.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
@@ -191,10 +192,10 @@ func TestFactoryConfigurationBuiltInSettingsSurviveReset(t *testing.T) {
 				continue
 			}
 			found = true
-			automation["with"] = map[string]any{"agents": map[string]any{"assess-risk": map[string]any{
-				"additional_instructions": "", "model": "", "thinking_level": "low", "execution_timeout_seconds": 0,
+			automation["with"] = map[string]any{"agent": map[string]any{
+				"additional_instructions": "", "model": "", "thinking_level": "low", "timeout": "2h",
 				"skip_setup_commands": false, "skip_repository_checkout": true,
-			}}}
+			}}
 		}
 	}
 	require.True(t, found, "Verify must export its built-in automation")
@@ -211,7 +212,7 @@ func TestFactoryConfigurationBuiltInSettingsSurviveReset(t *testing.T) {
 	agent := findIntakeNode(current.Nodes, "assess-risk")
 	require.NotNil(t, agent)
 	for field, expected := range map[string]any{
-		"additionalInstructions": "", "model": "", "thinkingLevel": "low", "executionTimeoutSeconds": float64(0),
+		"additionalInstructions": "", "model": "", "thinkingLevel": "low", "executionTimeoutSeconds": float64(7200),
 		"skipSetupCommands": false, "skipRepositoryCheckout": true,
 	} {
 		require.Equal(t, expected, agent.Configuration[field], field)
@@ -226,7 +227,7 @@ func TestFactoryConfigurationBuiltInSettingsSurviveReset(t *testing.T) {
 	require.Equal(t, "", agent.Configuration["additionalInstructions"])
 	require.Equal(t, "", agent.Configuration["model"])
 	require.Equal(t, "low", agent.Configuration["thinkingLevel"])
-	require.EqualValues(t, 0, agent.Configuration["executionTimeoutSeconds"])
+	require.EqualValues(t, 7200, agent.Configuration["executionTimeoutSeconds"])
 	require.Equal(t, false, agent.Configuration["skipSetupCommands"])
 	require.Equal(t, true, agent.Configuration["skipRepositoryCheckout"])
 }
@@ -245,7 +246,7 @@ func TestFactoryConfigurationOmitsDefaultsAndRestoresOmittedOverrides(t *testing
 	require.NotContains(t, bundle.Files[0].Content, "execution_timeout_seconds:")
 	require.NotContains(t, bundle.Files[0].Content, "skip_setup_commands:")
 
-	for _, field := range []string{"additional_instructions", "agents"} {
+	for _, field := range []string{"additional_instructions", "agent"} {
 		var manifest factoryConfigurationManifest
 		require.NoError(t, goyaml.Unmarshal([]byte(bundle.Files[0].Content), &manifest))
 		for i := range manifest.Stages {
@@ -256,8 +257,7 @@ func TestFactoryConfigurationOmitsDefaultsAndRestoresOmittedOverrides(t *testing
 				}
 				if automation.Uses == "@superplane/implement" {
 					if field == "additional_instructions" {
-						agents := automation.With["agents"].(map[string]any)
-						agent := agents[implementationAgentNodeID].(map[string]any)
+						agent := automation.With["agent"].(map[string]any)
 						require.Equal(t, "Original instructions", agent[field])
 						delete(agent, field)
 					} else {
@@ -289,4 +289,95 @@ func TestFactoryConfigurationOmitsDefaultsAndRestoresOmittedOverrides(t *testing
 	result, err := f.apply(bundle, plan.BaseStateToken)
 	require.NoError(t, err)
 	require.False(t, result.Changed)
+}
+
+func TestFactoryConfigurationRejectsRemovedBuiltInAgentFields(t *testing.T) {
+	f := newConfigurationFixture(t)
+	for _, setting := range []map[string]any{
+		{"agents": map[string]any{implementationAgentNodeID: map[string]any{"thinking_level": "high"}}},
+		{"additional_instructions": "Use the new agent field."},
+		{"agent": map[string]any{"execution_timeout_seconds": 7200}},
+		{"agent": map[string]any{"timeout_seconds": 7200}},
+		{"agent": map[string]any{"timeout": "1.5s"}},
+	} {
+		bundle := f.export(t)
+		var manifest factoryConfigurationManifest
+		require.NoError(t, goyaml.Unmarshal([]byte(bundle.Files[0].Content), &manifest))
+		manifest.Stages[1].Automations[0].With = setting
+		content, err := goyaml.Marshal(manifest)
+		require.NoError(t, err)
+		bundle.Files[0].Content = string(content)
+		before := configurationResourceCounts(t)
+		plan := f.plan(t, bundle)
+		require.NotEmpty(t, plan.Diagnostics)
+		require.True(t, strings.HasPrefix(plan.Diagnostics[0].Field, "stages[1].automations[0].with."))
+		require.Empty(t, plan.BaseStateToken)
+		_, err = f.apply(bundle, "invalid")
+		require.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
+		require.Equal(t, before, configurationResourceCounts(t))
+	}
+}
+
+func TestFactoryConfigurationRejectsLossyStoredTimeout(t *testing.T) {
+	for _, value := range []any{nil, 1.5, -1, "7200", 999999999999.0} {
+		t.Run(fmt.Sprint(value), func(t *testing.T) {
+			f := newConfigurationFixture(t)
+			live := resetTestLiveVersion(t, f.canvas)
+			findIntakeNode(live.Nodes, implementationAgentNodeID).Configuration["executionTimeoutSeconds"] = value
+			require.NoError(t, database.DB(t.Context()).Model(live).Update("nodes", datatypes.NewJSONSlice(live.Nodes)).Error)
+			_, err := ExportFactoryConfiguration(f.ctx, f.r.Organization.ID.String(), &pb.ExportFactoryConfigurationRequest{FactoryId: f.factory.ID.String(), LineId: f.line.ID.String()})
+			require.Error(t, err)
+			require.Contains(t, err.Error(), "timeout")
+		})
+	}
+}
+
+func TestFactoryConfigurationLogicalAgentUpdatesEveryDiscussionBranch(t *testing.T) {
+	f := newConfigurationFixture(t)
+	bundle := f.export(t)
+	var manifest factoryConfigurationManifest
+	require.NoError(t, goyaml.Unmarshal([]byte(bundle.Files[0].Content), &manifest))
+	const name = "Handle pull request feedback"
+	manifest.Stages[2].Automations = append(manifest.Stages[2].Automations, factoryConfigurationAutomation{
+		ID: "handle-feedback", Name: name, Uses: "@superplane/pr-discussion",
+		With: map[string]any{"agent": map[string]any{
+			"additional_instructions": "Keep each response focused.", "timeout": "2h", "thinking_level": "high",
+		}},
+	})
+	content, err := goyaml.Marshal(manifest)
+	require.NoError(t, err)
+	bundle.Files[0].Content = string(content)
+	plan := f.plan(t, bundle)
+	require.Empty(t, plan.Diagnostics)
+	_, err = f.apply(bundle, plan.BaseStateToken)
+	require.NoError(t, err)
+	db := database.DB(t.Context())
+	canvas, err := models.FindCanvasByName(db, f.r.Organization.ID, &f.factory.ID, name)
+	require.NoError(t, err)
+	live := resetTestLiveVersion(t, canvas)
+	branches := 0
+	for _, node := range live.Nodes {
+		if !isFactoryAgentHarness(node.ComponentName()) {
+			continue
+		}
+		branches++
+		require.Equal(t, "Keep each response focused.", node.Configuration["additionalInstructions"])
+		require.EqualValues(t, 7200, node.Configuration["executionTimeoutSeconds"])
+		require.Equal(t, "high", node.Configuration["thinkingLevel"])
+	}
+	require.Equal(t, 3, branches)
+	plan = f.plan(t, f.export(t))
+	require.Empty(t, plan.Diagnostics)
+	require.Empty(t, plan.Changes)
+	for i := range live.Nodes {
+		if !isFactoryAgentHarness(live.Nodes[i].ComponentName()) {
+			continue
+		}
+		live.Nodes[i].Configuration["additionalInstructions"] = "Distinct instructions cannot be merged."
+		break
+	}
+	require.NoError(t, db.Model(live).Update("nodes", datatypes.NewJSONSlice(live.Nodes)).Error)
+	_, err = ExportFactoryConfiguration(f.ctx, f.r.Organization.ID.String(), &pb.ExportFactoryConfigurationRequest{FactoryId: f.factory.ID.String(), LineId: f.line.ID.String()})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "distinct")
 }

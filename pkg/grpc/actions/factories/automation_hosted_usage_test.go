@@ -48,7 +48,7 @@ func TestCanvasAutomationHostedModelUsage(t *testing.T) {
 	for name, yamlModel := range map[string]string{"bare ID": model, "legacy key": "hosted::openrouter::" + model} {
 		t.Run(name, func(t *testing.T) {
 			source := "apiVersion: v2\nkind: Automation\nname: Inspect " + name + "\nagent: {model: " + yamlModel + "}\n" +
-				"triggers: [{use: manual}]\nsteps: [{name: Inspect, prompt: Inspect the changes.}]\n"
+				"triggers: [{uses: manual}]\nsteps: [{name: Inspect, prompt: Inspect the changes.}]\n"
 			created, err := service.Create(ctx, placement, r.User, source)
 			require.NoError(t, err)
 			live, err := models.FindLiveCanvasVersionInTransaction(db, created.ID)

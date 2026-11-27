@@ -60,8 +60,8 @@ func (d *Document) validateSchema(value any) error {
 		path, location := d.sourceAt(slices.Concat(segments, []string{strconv.Itoa(issue.Duplicates[1])}))
 		return at(path, location.value, "Enter each value once.")
 	case *kind.MaxContains:
-		// Point at the first repeated event trigger's use field.
-		path, location := d.sourceAt(slices.Concat(segments, []string{strconv.Itoa(issue.Got[issue.Want]), "use"}))
+		// Point at the first repeated event trigger's uses field.
+		path, location := d.sourceAt(slices.Concat(segments, []string{strconv.Itoa(issue.Got[issue.Want]), "uses"}))
 		return at(path, location.value, "Use each event trigger once.")
 	}
 

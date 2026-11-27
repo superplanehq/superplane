@@ -104,10 +104,34 @@ func (s Service) Read(ctx context.Context, organizationID, id uuid.UUID) (Automa
 		if err != nil {
 			return err
 		}
+		if legacy == nil {
+			if _, parseErr := automationspec.Parse(record.Source); parseErr != nil {
+				importer, ok := s.Backend.(LegacyImporter)
+				if !ok {
+					return parseErr
+				}
+				artifactID, err := uuid.Parse(record.ArtifactID)
+				if err != nil {
+					return fmt.Errorf("read automation artifact ID: %w", err)
+				}
+				current, findErr := importer.FindLegacy(ctx, tx, organizationID, artifactID)
+				if findErr != nil {
+					return findErr
+				}
+				legacy = &current
+			}
+		}
 		if legacy != nil {
+			storedSource := record.Source
 			record.Source, err = s.Backend.(LegacyImporter).ImportLegacy(ctx, tx, *legacy)
 			if err != nil {
 				return err
+			}
+			if record.ArtifactRevision == legacy.Artifact.Revision {
+				record.Source, err = automationspec.RestoreStoredAgentSelection(record.Source, storedSource)
+				if err != nil {
+					return err
+				}
 			}
 		}
 		result = fromRecord(record, placement.Stage)

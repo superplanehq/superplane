@@ -143,7 +143,7 @@ func prepareFactoryConfigurationBuiltIn(ctx context.Context, tx *gorm.DB, deps I
 	prepared.DefaultBinding = configurationBuiltInDefaultBinding(target.factory, templateID)
 	agent := resolveIntakeAgent(tx, target.factory)
 	if configurationBuiltInNeedsAgent(templateID) && agent == nil {
-		return nil, configurationPreparationError("with.agents", "Connect a ready workspace agent before you install this automation.")
+		return nil, configurationPreparationError("with.agent", "Connect a ready workspace agent before you install this automation.")
 	}
 	baseline, err := buildConfigurationBuiltInGraph(tx, target.factory, automation.Name, templateID, binding, integration, agent, nil, nil)
 	if err != nil {

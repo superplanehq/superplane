@@ -68,6 +68,9 @@ func Parse(source string) (*Document, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err := document.rejectReplacedFields(); err != nil {
+		return nil, err
+	}
 	if err := document.validateSchema(value); err != nil {
 		return nil, err
 	}

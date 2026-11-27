@@ -109,13 +109,13 @@ func TestFactoryConfigurationPinnedBindingsSurviveResetAndRepositoryRefresh(t *t
 		trigger.Configuration["repository"] = models.WorkspaceRepositoriesExpression
 		trigger.Integration = &yaml.IntegrationRef{ID: pinned}
 	})
-	owner := models.FactoryConfigurationAutomation{OrganizationID: f.r.Organization.ID, FactoryID: f.factory.ID, LineID: f.line.ID, StageKey: "verify", ManifestID: "pinned-risk", CanvasID: risk.ID, Binding: datatypes.JSONMap{"integration_id": pinned, "resource_id": "acme/pinned"}}
+	owner := models.FactoryConfigurationAutomation{OrganizationID: f.r.Organization.ID, FactoryID: f.factory.ID, LineID: f.line.ID, StageKey: "verify", ManifestID: risk.ConfigurationID, CanvasID: risk.ID, Binding: datatypes.JSONMap{"integration_id": pinned, "resource_id": "acme/pinned"}}
 	require.NoError(t, owner.Save(db))
-	// Legacy identities can disagree. Reset must retain the first owner.
+	// A canvas has one workspace-wide ownership record.
 	laterOwner := owner
 	laterOwner.StageKey = "zzz"
 	laterOwner.Binding = datatypes.JSONMap{"integration_id": integration, "resource_id": "acme/later"}
-	require.NoError(t, db.Create(&laterOwner).Error)
+	require.Error(t, db.Create(&laterOwner).Error)
 	repository = "acme/changed"
 	require.NoError(t, f.factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{AppRepository: &repository}))
 	require.NoError(t, resetTestOrganization(t, f.r))

@@ -6,11 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/fs"
-	"math"
 	"path"
 	"slices"
-	"strconv"
 	"strings"
 	"unicode/utf8"
 
@@ -18,16 +15,20 @@ import (
 	"github.com/superplanehq/superplane/pkg/automationspec"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
+	"github.com/superplanehq/superplane/pkg/workspaceconfig"
 	"gopkg.in/yaml.v3"
 	"gorm.io/gorm"
 )
 
 const (
-	factoryConfigurationManifestPath = ".superplane/main.yml"
-	factoryConfigurationCoverage     = "Repositories, stages, and automations"
+	factoryConfigurationManifestPath = workspaceconfig.ManifestPath
+	factoryConfigurationCoverage     = workspaceconfig.Coverage
 )
 
 type factoryConfigurationManifest struct {
+	ManifestPath string `yaml:"-" json:"-"`
+	root         *yaml.Node
+
 	APIVersion   string                               `yaml:"apiVersion"`
 	Kind         string                               `yaml:"kind"`
 	Name         string                               `yaml:"name"`
@@ -38,18 +39,19 @@ type factoryConfigurationManifest struct {
 }
 
 type factoryConfigurationStage struct {
-	retained       map[uuid.UUID]bool               `yaml:"-" json:"-"`
-	Key            string                           `yaml:"key"`
-	Name           string                           `yaml:"name"`
-	Run            string                           `yaml:"run,omitempty"`
-	MaxParallelism *int                             `yaml:"max_parallelism,omitempty"`
-	Automations    []factoryConfigurationAutomation `yaml:"automations"`
+	retained    map[uuid.UUID]bool               `yaml:"-" json:"-"`
+	ID          string                           `yaml:"id"`
+	Key         string                           `yaml:"-" json:"-"`
+	Name        string                           `yaml:"name"`
+	Run         string                           `yaml:"run,omitempty"`
+	Automations []factoryConfigurationAutomation `yaml:"automations"`
 }
 
 type factoryConfigurationAutomation struct {
+	placement         string                                `yaml:"-" json:"-"`
 	current           *factoryConfigurationAutomationTarget `yaml:"-" json:"-"`
 	ID                string                                `yaml:"id"`
-	Name              string                                `yaml:"name"`
+	Name              string                                `yaml:"name,omitempty"`
 	Uses              string                                `yaml:"uses"`
 	Binding           *factoryConfigurationBinding          `yaml:"binding,omitempty"`
 	With              map[string]any                        `yaml:"with,omitempty"`
@@ -66,28 +68,42 @@ type factoryConfigurationBinding struct {
 }
 
 func configurationDiagnostic(field, message string) *pb.FactoryConfigurationDiagnostic {
-	return &pb.FactoryConfigurationDiagnostic{Path: factoryConfigurationManifestPath, Field: field, Message: message}
+	return &pb.FactoryConfigurationDiagnostic{Field: field, Message: message}
 }
 
-func parseFactoryConfigurationBundle(bundle *pb.FactoryConfigurationBundle) (*factoryConfigurationManifest, *pb.FactoryConfigurationDiagnostic) {
-	if bundle.GetManifestPath() != factoryConfigurationManifestPath {
-		return nil, configurationDiagnostic("manifest_path", "The manifest path must be .superplane/main.yml.")
+func parseFactoryConfigurationBundle(bundle *pb.FactoryConfigurationBundle) (manifestResult *factoryConfigurationManifest, diagnosticResult *pb.FactoryConfigurationDiagnostic) {
+	manifestPath, err := workspaceconfig.NormalizePath(bundle.GetManifestPath())
+	if err != nil {
+		diagnostic := configurationDiagnostic("manifest_path", err.Error())
+		diagnostic.Path = bundle.GetManifestPath()
+		if diagnostic.Path == "" {
+			diagnostic.Path = factoryConfigurationManifestPath
+		}
+		return nil, diagnostic
 	}
+	var rootNode *yaml.Node
+	defer func() {
+		if diagnosticResult != nil && diagnosticResult.Path == "" {
+			diagnosticResult.Path = manifestPath
+			addConfigurationDiagnosticLocation(diagnosticResult, rootNode)
+		}
+	}()
 	files := map[string]string{}
 	for _, file := range bundle.GetFiles() {
-		name := file.GetPath()
-		if !fs.ValidPath(name) || !strings.HasPrefix(name, ".superplane/") || strings.ContainsAny(name, "\\:") {
-			return nil, configurationDiagnostic("files", "Use unique relative file paths inside .superplane.")
+		name, err := workspaceconfig.NormalizePath(file.GetPath())
+		if err != nil {
+			return nil, configurationDiagnostic("files", err.Error())
 		}
 		if _, exists := files[name]; exists {
 			return nil, configurationDiagnostic("files", "A file path occurs more than once.")
 		}
 		files[name] = file.GetContent()
 	}
-	content, exists := files[factoryConfigurationManifestPath]
+	content, exists := files[manifestPath]
 	if !exists {
-		return nil, configurationDiagnostic("files", "The bundle must contain .superplane/main.yml.")
+		return nil, configurationDiagnostic("files", "The bundle must contain the selected manifest.")
 	}
+
 	decoder := yaml.NewDecoder(strings.NewReader(content))
 	var document yaml.Node
 	if err := decoder.Decode(&document); err != nil {
@@ -100,6 +116,7 @@ func parseFactoryConfigurationBundle(bundle *pb.FactoryConfigurationBundle) (*fa
 	if len(document.Content) != 1 {
 		return nil, configurationDiagnostic("$", "The manifest must contain a Factory document.")
 	}
+	rootNode = document.Content[0]
 	if diagnostic := validateConfigurationYAML(document.Content[0], ""); diagnostic != nil {
 		return nil, diagnostic
 	}
@@ -122,21 +139,15 @@ func parseFactoryConfigurationBundle(bundle *pb.FactoryConfigurationBundle) (*fa
 	}
 	for i, stage := range root["stages"].Content {
 		stagePath := fmt.Sprintf("stages[%d]", i)
-		fields, diagnostic := configurationFields(stage, stagePath, []string{"key", "name", "run", "max_parallelism", "automations"}, []string{"key", "name", "automations"})
+		fields, diagnostic := configurationFields(stage, stagePath, []string{"id", "name", "run", "automations"}, []string{"id", "name", "automations"})
 		if diagnostic != nil {
 			return nil, diagnostic
 		}
-		for _, field := range []string{"key", "name", "run"} {
+		for _, field := range []string{"id", "name", "run"} {
 			if fields[field] != nil {
 				if diagnostic := configurationStringNode(fields[field], configurationField(stagePath, field)); diagnostic != nil {
 					return nil, diagnostic
 				}
-			}
-		}
-		if node := fields["max_parallelism"]; node != nil {
-			value, err := strconv.Atoi(node.Value)
-			if node.Kind != yaml.ScalarNode || node.Tag != "!!int" || err != nil || value < 1 || value > math.MaxInt32 {
-				return nil, configurationDiagnostic(stagePath+".max_parallelism", "Use an integer from 1 through 2147483647.")
 			}
 		}
 		if fields["automations"].Kind != yaml.SequenceNode {
@@ -144,11 +155,14 @@ func parseFactoryConfigurationBundle(bundle *pb.FactoryConfigurationBundle) (*fa
 		}
 		for j, automation := range fields["automations"].Content {
 			automationPath := fmt.Sprintf("%s.automations[%d]", stagePath, j)
-			fields, diagnostic := configurationFields(automation, automationPath, []string{"id", "name", "uses", "binding", "with"}, []string{"id", "name", "uses"})
+			fields, diagnostic := configurationFields(automation, automationPath, []string{"id", "name", "uses", "binding", "with"}, []string{"id", "uses"})
 			if diagnostic != nil {
 				return nil, diagnostic
 			}
 			for _, field := range []string{"id", "name", "uses"} {
+				if fields[field] == nil {
+					continue
+				}
 				if diagnostic := configurationStringNode(fields[field], automationPath+"."+field); diagnostic != nil {
 					return nil, diagnostic
 				}
@@ -175,19 +189,21 @@ func parseFactoryConfigurationBundle(bundle *pb.FactoryConfigurationBundle) (*fa
 			}
 		}
 	}
+	manifest.ManifestPath = manifestPath
+	manifest.root = document.Content[0]
 	manifest.Sources = map[string]string{}
 	manifest.Definitions = map[string]automationspec.Definition{}
-	referenced := map[string]bool{factoryConfigurationManifestPath: true}
+	referenced := map[string]bool{manifestPath: true}
 	for i, stage := range manifest.Stages {
 		for j, automation := range stage.Automations {
 			if strings.HasPrefix(automation.Uses, "@superplane/") {
 				continue
 			}
-			reference := automation.Uses
-			if !fs.ValidPath(reference) || strings.ContainsAny(reference, "\\:") || reference == "main.yml" || (path.Ext(reference) != ".yaml" && path.Ext(reference) != ".yml") {
-				return nil, configurationDiagnostic(fmt.Sprintf("stages[%d].automations[%d].uses", i, j), "Use a relative YAML path inside the manifest directory.")
+			filePath, err := workspaceconfig.ResolveAutomationPath(manifestPath, automation.Uses)
+			if err != nil {
+				return nil, configurationDiagnostic(fmt.Sprintf("stages[%d].automations[%d].uses", i, j), err.Error())
 			}
-			filePath := path.Join(path.Dir(factoryConfigurationManifestPath), reference)
+
 			source, exists := files[filePath]
 			if !exists {
 				return nil, configurationDiagnostic(fmt.Sprintf("stages[%d].automations[%d].uses", i, j), "The referenced automation file is missing from the bundle.")
@@ -199,6 +215,9 @@ func parseFactoryConfigurationBundle(bundle *pb.FactoryConfigurationBundle) (*fa
 			referenced[filePath] = true
 			manifest.Sources[filePath] = source
 			manifest.Definitions[filePath] = parsed.Definition
+			if manifest.Stages[i].Automations[j].Name == "" {
+				manifest.Stages[i].Automations[j].Name = parsed.Name
+			}
 		}
 	}
 	if len(referenced) != len(files) {
@@ -246,7 +265,7 @@ func configurationFields(node *yaml.Node, field string, allowed, required []stri
 	for i := 0; i < len(node.Content); i += 2 {
 		key, value := node.Content[i], node.Content[i+1]
 		if !slices.Contains(allowed, key.Value) {
-			return nil, configurationDiagnostic(configurationField(field, key.Value), "This field is not supported.")
+			return nil, configurationDiagnostic(configurationField(field, key.Value), configurationRemovedFieldMessage(key.Value))
 		}
 		values[key.Value] = value
 	}
@@ -287,12 +306,9 @@ func configurationSourceDiagnostic(filePath string, err error) *pb.FactoryConfig
 }
 
 func exportFactoryConfigurationManifest(target *factoryConfigurationTarget) factoryConfigurationManifest {
-	manifest := factoryConfigurationManifest{APIVersion: "v2", Kind: "Factory", Name: target.factory.Name, Repositories: target.repositories, Stages: []factoryConfigurationStage{}, Sources: map[string]string{}, Definitions: map[string]automationspec.Definition{}}
+	manifest := factoryConfigurationManifest{ManifestPath: factoryConfigurationManifestPath, APIVersion: "v2", Kind: "Factory", Name: target.factory.Name, Repositories: target.repositories, Stages: []factoryConfigurationStage{}, Sources: map[string]string{}, Definitions: map[string]automationspec.Definition{}}
 	for _, stage := range target.stages {
-		entry := factoryConfigurationStage{Key: stage.key, Name: stage.stage.Name, Run: stage.run, Automations: []factoryConfigurationAutomation{}}
-		if stage.stage.StepIndex != nil {
-			entry.MaxParallelism = configurationMaxParallelism(target.line.Steps[*stage.stage.StepIndex].MaxParallelism)
-		}
+		entry := factoryConfigurationStage{ID: stage.stage.ConfigurationID, Key: stage.key, Name: stage.stage.Name, Run: stage.run, Automations: []factoryConfigurationAutomation{}}
 		for _, automation := range stage.automations {
 			entry.Automations = append(entry.Automations, factoryConfigurationAutomation{ID: automation.id, Name: automation.canvas.Name, Uses: automation.uses, Binding: automation.exportedBinding, With: factoryConfigurationOverrides(automation.settings, automation.defaultSettings)})
 			if automation.templateID == "" {
@@ -309,8 +325,19 @@ func exportFactoryConfigurationManifest(target *factoryConfigurationTarget) fact
 	return manifest
 }
 
-func validateFactoryConfigurationManifest(ctx context.Context, tx *gorm.DB, deps IntakeDependencies, manifest *factoryConfigurationManifest, target *factoryConfigurationTarget) (*pb.FactoryConfigurationDiagnostic, error) {
-	for _, check := range []struct{ field, value, want string }{{"apiVersion", manifest.APIVersion, "v2"}, {"kind", manifest.Kind, "Factory"}, {"name", manifest.Name, target.factory.Name}} {
+func validateFactoryConfigurationManifest(ctx context.Context, tx *gorm.DB, deps IntakeDependencies, manifest *factoryConfigurationManifest, target *factoryConfigurationTarget) (diagnosticResult *pb.FactoryConfigurationDiagnostic, resultError error) {
+	defer func() {
+		if diagnosticResult != nil && diagnosticResult.Path == "" {
+			diagnosticResult.Path = manifest.ManifestPath
+			addConfigurationDiagnosticLocation(diagnosticResult, manifest.root)
+		}
+	}()
+	if strings.TrimSpace(manifest.Name) == "" {
+		return configurationDiagnostic("name", models.ErrFactoryNameRequired.Error()), nil
+	}
+	manifest.Name = strings.TrimSpace(manifest.Name)
+
+	for _, check := range []struct{ field, value, want string }{{"apiVersion", manifest.APIVersion, "v2"}, {"kind", manifest.Kind, "Factory"}} {
 		if check.value != check.want {
 			return configurationDiagnostic(check.field, fmt.Sprintf("This field must match the selected live resource: %q.", check.want)), nil
 		}
@@ -330,23 +357,27 @@ func validateFactoryConfigurationManifest(ctx context.Context, tx *gorm.DB, deps
 	target.validation = validation
 	byKey := map[string]*factoryConfigurationStageTarget{}
 	for _, stage := range target.stages {
-		byKey[stage.key] = stage
+		byKey[stage.stage.ConfigurationID] = stage
 	}
 	seen := map[string]bool{}
 	names := map[string]bool{}
 	desiredByCanvas := map[string]string{}
-	retainedByStage := map[string]map[string]bool{}
+
 	newNames := map[string]bool{}
 	desiredNames := map[string]string{}
 	sourceNames := map[string]string{}
+	ids := map[string]bool{}
 	for i := range manifest.Stages {
 		stage := &manifest.Stages[i]
 		stagePath := fmt.Sprintf("stages[%d]", i)
-		live := byKey[stage.Key]
-		if live == nil || seen[stage.Key] {
-			return configurationDiagnostic(stagePath+".key", "Use each existing stage key exactly once."), nil
+		live := byKey[stage.ID]
+		if live != nil {
+			stage.Key = live.key
 		}
-		seen[stage.Key] = true
+		if live == nil || seen[stage.ID] {
+			return configurationDiagnostic(stagePath+".id", "Use each existing stage ID exactly once."), nil
+		}
+		seen[stage.ID] = true
 		if strings.TrimSpace(stage.Name) == "" || strings.TrimSpace(stage.Name) != stage.Name || utf8.RuneCountInString(stage.Name) > factoryLineStageNameMaxLength || names[strings.ToLower(stage.Name)] {
 			return configurationDiagnostic(stagePath+".name", "Use a unique stage name of 1 through 64 characters without surrounding spaces."), nil
 		}
@@ -354,12 +385,9 @@ func validateFactoryConfigurationManifest(ctx context.Context, tx *gorm.DB, deps
 		if stage.Run != live.run {
 			return configurationDiagnostic(stagePath+".run", "Keep the existing phase runner binding."), nil
 		}
-		if live.stage.StepIndex == nil && stage.MaxParallelism != nil {
-			return configurationDiagnostic(stagePath+".max_parallelism", "Only stages with a runner binding support max_parallelism."), nil
-		}
-		stage.MaxParallelism = configurationMaxParallelism(stage.MaxParallelism)
-		ids, automationNames, retained := map[string]bool{}, map[string]bool{}, map[string]bool{}
-		retainedByStage[stage.Key] = retained
+
+		automationNames, retained := map[string]bool{}, map[string]bool{}
+
 		for j := range stage.Automations {
 			automation := &stage.Automations[j]
 			automationPath := fmt.Sprintf("%s.automations[%d]", stagePath, j)
@@ -372,9 +400,6 @@ func validateFactoryConfigurationManifest(ctx context.Context, tx *gorm.DB, deps
 			}
 			automationNames[automation.Name] = true
 			current := automation.current
-			if current != nil && current.owned && current.id != automation.ID {
-				return configurationDiagnostic(automationPath+".id", "Keep the installed manifest ID when you rename this automation."), nil
-			}
 			identity := "new:" + stage.Key + "." + automation.ID
 			if current != nil {
 				identity = current.canvas.ID.String()
@@ -384,9 +409,14 @@ func validateFactoryConfigurationManifest(ctx context.Context, tx *gorm.DB, deps
 			}
 			desiredNames[automation.Name] = identity
 			if current == nil {
+				for _, canvas := range target.reads.canvases {
+					if canvas.ConfigurationID == automation.ID {
+						return configurationDiagnostic(automationPath+".id", "This automation ID already belongs to another workspace automation."), nil
+					}
+				}
 				for _, existingStage := range target.stages {
 					for _, existing := range existingStage.automations {
-						if existing.canvas.Name == automation.Name {
+						if existing.canvas.Name == automation.Name && !target.removed[existing.canvas.ID] {
 							return configurationDiagnostic(automationPath+".name", "Keep existing automations in their current stages with their existing identities."), nil
 						}
 					}
@@ -412,6 +442,12 @@ func validateFactoryConfigurationManifest(ctx context.Context, tx *gorm.DB, deps
 				}
 				newNames[automation.Name] = true
 			} else {
+				phaseRunner := slices.ContainsFunc(target.stages, func(stage *factoryConfigurationStageTarget) bool {
+					return stage.runner == current
+				})
+				if phaseRunner && live.runner != current {
+					return configurationDiagnostic(automationPath+".id", "Declare a phase runner in a phase that uses it."), nil
+				}
 				identity := current.canvas.ID.String()
 				if retained[identity] {
 					return configurationDiagnostic(automationPath+".id", "Include each automation only once per stage."), nil
@@ -452,7 +488,7 @@ func validateFactoryConfigurationManifest(ctx context.Context, tx *gorm.DB, deps
 				if len(automation.With) != 0 {
 					return configurationDiagnostic(automationPath+".with", "Custom automation settings belong in the referenced Automation file."), nil
 				}
-				filePath := path.Join(path.Dir(factoryConfigurationManifestPath), automation.Uses)
+				filePath := manifest.automationPath(automation.Uses)
 				if previous, exists := sourceNames[filePath]; exists && previous != automation.Name {
 					return configurationDiagnostic(automationPath+".uses", "Use separate YAML files for automations with different names."), nil
 				}
@@ -464,7 +500,7 @@ func validateFactoryConfigurationManifest(ctx context.Context, tx *gorm.DB, deps
 				manifest.Sources[filePath] = source
 				placement := configurationStagePlacement(live)
 				if current != nil {
-					placement = current.placement
+					placement = automation.placement
 				}
 				document, err := validateFactoryConfigurationCustom(ctx, tx, deps, target, current, placement, manifest.Sources[filePath])
 				if err != nil {
@@ -484,16 +520,16 @@ func validateFactoryConfigurationManifest(ctx context.Context, tx *gorm.DB, deps
 				Settings   map[string]any
 				Binding    *factoryConfigurationBinding
 				Definition automationspec.Definition
-			}{automation.Name, automation.With, automation.Binding, manifest.Definitions[path.Join(path.Dir(factoryConfigurationManifestPath), automation.Uses)]})
+			}{automation.Name, automation.With, automation.Binding, manifest.Definitions[manifest.automationPath(automation.Uses)]})
 			if previous, exists := desiredByCanvas[identity]; exists && previous != string(encoded) {
 				return configurationDiagnostic(automationPath, "This shared automation must have the same configuration in every stage."), nil
 			}
 			desiredByCanvas[identity] = string(encoded)
 		}
-		if stage.Run != "" && !slices.ContainsFunc(stage.Automations, func(automation factoryConfigurationAutomation) bool {
-			return automation.ID == stage.Run
-		}) {
-			return configurationDiagnostic(stagePath+".automations", "Keep the automation bound to this phase runner."), nil
+	}
+	for i, stage := range manifest.Stages {
+		if stage.Run != "" && !ids[stage.Run] {
+			return configurationDiagnostic(fmt.Sprintf("stages[%d].run", i), "Include the automation bound to this phase runner."), nil
 		}
 	}
 	if diagnostic := resolveFactoryConfigurationDependencies(manifest, target); diagnostic != nil {
@@ -501,14 +537,14 @@ func validateFactoryConfigurationManifest(ctx context.Context, tx *gorm.DB, deps
 	}
 	checkedRemovals := map[string]bool{}
 	for i, stage := range manifest.Stages {
-		for _, current := range byKey[stage.Key].automations {
+		for _, current := range byKey[stage.ID].automations {
 			identity := current.canvas.ID.String()
-			if retainedByStage[stage.Key][identity] {
+			if stage.retained[current.canvas.ID] {
 				continue
 			}
 			field := fmt.Sprintf("stages[%d].automations", i)
 			if _, retained := desiredByCanvas[identity]; retained {
-				return configurationDiagnostic(field, "Keep shared automations in every existing stage, or remove them from every stage."), nil
+				continue
 			}
 			if checkedRemovals[identity] {
 				continue
@@ -519,11 +555,54 @@ func validateFactoryConfigurationManifest(ctx context.Context, tx *gorm.DB, deps
 			}
 		}
 	}
-	if byKey[manifest.Stages[0].Key].stage.Kind != models.FactoryLineStageBacklog {
+	if byKey[manifest.Stages[0].ID].stage.Kind != models.FactoryLineStageBacklog {
 		return configurationDiagnostic("stages[0]", "Backlog must remain first."), nil
 	}
-	if byKey[manifest.Stages[len(manifest.Stages)-1].Key].stage.Kind != models.FactoryLineStageDone {
+	if byKey[manifest.Stages[len(manifest.Stages)-1].ID].stage.Kind != models.FactoryLineStageDone {
 		return configurationDiagnostic("stages", "Done must remain last."), nil
 	}
 	return nil, nil
+}
+
+func configurationRemovedFieldMessage(field string) string {
+	switch field {
+	case "key":
+		return "Use id instead of key."
+	case "max_parallelism":
+		return "Set concurrency in workspace settings. max_parallelism is not supported in YAML."
+	default:
+		return "This field is not supported."
+	}
+}
+
+func addConfigurationDiagnosticLocation(diagnostic *pb.FactoryConfigurationDiagnostic, root *yaml.Node) {
+	if root == nil {
+		return
+	}
+	segments := strings.FieldsFunc(diagnostic.Field, func(r rune) bool { return r == '.' || r == '[' || r == ']' })
+	node := root
+	for _, segment := range segments {
+		var next *yaml.Node
+		if node.Kind == yaml.MappingNode {
+			for i := 0; i < len(node.Content); i += 2 {
+				if node.Content[i].Value == segment {
+					next = node.Content[i+1]
+					break
+				}
+			}
+		}
+		if node.Kind == yaml.SequenceNode {
+			for i, child := range node.Content {
+				if fmt.Sprint(i) == segment {
+					next = child
+					break
+				}
+			}
+		}
+		if next == nil {
+			break
+		}
+		node = next
+	}
+	diagnostic.Message += fmt.Sprintf(" (line %d, column %d)", node.Line, node.Column)
 }

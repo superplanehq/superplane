@@ -50,7 +50,7 @@ func addConfigurationLifecycleAutomation(t *testing.T, bundle *pb.FactoryConfigu
 	bundle.Files[0].Content = string(content)
 	bundle.Files = append(bundle.Files, &pb.FactoryConfigurationFile{
 		Path:    ".superplane/" + reference,
-		Content: "apiVersion: v2\nkind: Automation\nname: " + name + "\nruns_on_task: true\ntriggers:\n  - use: manual\nsteps:\n  - name: Inspect\n    prompt: Inspect the task.\n",
+		Content: "apiVersion: v2\nkind: Automation\nname: " + name + "\nrun_context: task\ntriggers:\n  - uses: manual\nsteps:\n  - name: Inspect\n    prompt: Inspect the task.\n",
 	})
 }
 

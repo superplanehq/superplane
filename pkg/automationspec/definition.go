@@ -20,22 +20,22 @@ const (
 )
 
 type Definition struct {
-	APIVersion             string    `yaml:"apiVersion" json:"apiVersion"`
-	Kind                   string    `yaml:"kind" json:"kind"`
-	Name                   string    `yaml:"name" json:"name"`
-	Icon                   string    `yaml:"icon,omitempty" json:"icon"`
-	TimeoutSeconds         int       `yaml:"timeout_seconds,omitempty" json:"timeout_seconds"`
-	RunsOnTask             *bool     `yaml:"runs_on_task,omitempty" json:"runs_on_task,omitempty"`
-	SkipRepositoryCheckout *bool     `yaml:"skip_repository_checkout,omitempty" json:"skip_repository_checkout,omitempty"`
-	SkipSetupCommands      *bool     `yaml:"skip_setup_commands,omitempty" json:"skip_setup_commands,omitempty"`
-	Agent                  *Agent    `yaml:"agent,omitempty" json:"agent,omitempty"`
-	Triggers               []Trigger `yaml:"triggers" json:"triggers"`
-	Steps                  []Step    `yaml:"steps" json:"steps"`
+	APIVersion     string    `yaml:"apiVersion" json:"apiVersion"`
+	Kind           string    `yaml:"kind" json:"kind"`
+	Name           string    `yaml:"name" json:"name"`
+	Icon           string    `yaml:"icon,omitempty" json:"icon,omitempty"`
+	Timeout        string    `yaml:"timeout,omitempty" json:"timeout,omitempty"`
+	RunContext     string    `yaml:"run_context,omitempty" json:"run_context,omitempty"`
+	Agent          *Agent    `yaml:"agent,omitempty" json:"agent,omitempty"`
+	Triggers       []Trigger `yaml:"triggers" json:"triggers"`
+	Steps          []Step    `yaml:"steps" json:"steps"`
+	TimeoutSeconds int       `yaml:"-" json:"-"`
+	RunsOnTask     *bool     `yaml:"-" json:"-"`
 }
 
 type Trigger struct {
 	ID     string         `yaml:"id,omitempty" json:"id,omitempty"`
-	Use    TriggerUse     `yaml:"use" json:"use"`
+	Uses   TriggerUse     `yaml:"uses" json:"uses"`
 	Config *TriggerConfig `yaml:"config,omitempty" json:"config,omitempty"`
 }
 
@@ -53,9 +53,9 @@ const (
 // TriggerConfig holds the schedule fields or the webhook ID. The schema
 // allows only the fields for the trigger type.
 type TriggerConfig struct {
-	Cron      string  `yaml:"cron,omitempty" json:"cron,omitempty"`
-	UTCOffset float64 `yaml:"utc_offset,omitempty" json:"utc_offset"`
-	WebhookID string  `yaml:"webhook_id,omitempty" json:"webhook_id,omitempty"`
+	Cron      string `yaml:"cron,omitempty" json:"cron,omitempty"`
+	Timezone  string `yaml:"timezone,omitempty" json:"timezone,omitempty"`
+	WebhookID string `yaml:"webhook_id,omitempty" json:"webhook_id,omitempty"`
 }
 
 type Step struct {
@@ -67,9 +67,14 @@ type Step struct {
 }
 
 type Agent struct {
-	Harness     Harness      `yaml:"harness,omitempty" json:"harness,omitempty"`
-	Model       string       `yaml:"model,omitempty" json:"model,omitempty"`
-	Credentials *Credentials `yaml:"credentials,omitempty" json:"credentials,omitempty"`
+	AdditionalInstructions *string      `yaml:"additional_instructions,omitempty" json:"additional_instructions,omitempty"`
+	ThinkingLevel          string       `yaml:"thinking_level,omitempty" json:"thinking_level,omitempty"`
+	Timeout                string       `yaml:"timeout,omitempty" json:"timeout,omitempty"`
+	Harness                Harness      `yaml:"harness,omitempty" json:"harness,omitempty"`
+	Model                  string       `yaml:"model,omitempty" json:"model,omitempty"`
+	Credentials            *Credentials `yaml:"credentials,omitempty" json:"credentials,omitempty"`
+	SkipRepositoryCheckout *bool        `yaml:"skip_repository_checkout,omitempty" json:"skip_repository_checkout,omitempty"`
+	SkipSetupCommands      *bool        `yaml:"skip_setup_commands,omitempty" json:"skip_setup_commands,omitempty"`
 }
 
 type Harness string
@@ -111,6 +116,12 @@ func Encode(definition Definition) (string, error) {
 	if definition.Kind == "" {
 		definition.Kind = Kind
 	}
+	if definition.Icon == DefaultIcon {
+		definition.Icon = ""
+	}
+	if definition.Timeout == "" && (definition.Agent == nil || definition.Agent.Timeout == "") && definition.TimeoutSeconds != 0 && definition.TimeoutSeconds != DefaultTimeoutSeconds {
+		definition.Timeout = FormatDuration(definition.TimeoutSeconds)
+	}
 	return encodeYAML(definition)
 }
 
@@ -146,14 +157,24 @@ func ReplaceExplicitAgent(source string, agent *Agent) (string, error) {
 	if err := field.value.Decode(&previous); err != nil {
 		return "", err
 	}
+	if previous.Harness == "" && previous.Model == "" && previous.Credentials == nil {
+		return source, nil
+	}
+	next := *agent
+	next.AdditionalInstructions = previous.AdditionalInstructions
+	next.ThinkingLevel = previous.ThinkingLevel
+	next.Timeout = previous.Timeout
+	next.SkipRepositoryCheckout = previous.SkipRepositoryCheckout
+	next.SkipSetupCommands = previous.SkipSetupCommands
+	agent = &next
 	if previous.Harness == "" && previous.Credentials == nil {
 		// Keep a model-only selection independent of the workspace's source.
-		if agent.Model == "" {
+		if agent.Model == "" && previous.SkipRepositoryCheckout == nil && previous.SkipSetupCommands == nil && previous.AdditionalInstructions == nil && previous.ThinkingLevel == "" && previous.Timeout == "" {
 			i := slices.Index(document.Content, field.key)
 			document.Content = slices.Delete(document.Content, i, i+2)
 			return encodeYAML(&root)
 		}
-		agent = &Agent{Model: agent.Model}
+		agent = &Agent{Model: agent.Model, AdditionalInstructions: previous.AdditionalInstructions, ThinkingLevel: previous.ThinkingLevel, Timeout: previous.Timeout, SkipRepositoryCheckout: previous.SkipRepositoryCheckout, SkipSetupCommands: previous.SkipSetupCommands}
 	}
 	if reflect.DeepEqual(&previous, agent) {
 		return source, nil
@@ -162,6 +183,46 @@ func ReplaceExplicitAgent(source string, agent *Agent) (string, error) {
 		return "", err
 	}
 	return encodeYAML(&root)
+}
+
+// RestoreStoredAgentSelection preserves authored choices when stored state needs a fresh export.
+// This reads only agent selection from storage; Parse still rejects replaced input fields.
+func RestoreStoredAgentSelection(generatedSource, storedSource string) (string, error) {
+	var stored yaml.Node
+	if err := yaml.Unmarshal([]byte(storedSource), &stored); err != nil {
+		return "", fmt.Errorf("read stored automation agent: %w", err)
+	}
+	if len(stored.Content) == 0 {
+		return generatedSource, nil
+	}
+	field := mappingProperty(stored.Content[0], "agent")
+	if field.value == nil {
+		return generatedSource, nil
+	}
+	var authored Agent
+	if err := field.value.Decode(&authored); err != nil {
+		return "", fmt.Errorf("read stored automation agent: %w", err)
+	}
+	if authored.Harness == "" && authored.Model == "" && authored.Credentials == nil {
+		return generatedSource, nil
+	}
+	document, err := Parse(generatedSource)
+	if err != nil {
+		return "", err
+	}
+	if document.Agent == nil {
+		document.Agent = &Agent{}
+	}
+	if mappingProperty(field.value, "harness").value != nil {
+		document.Agent.Harness = authored.Harness
+	}
+	if mappingProperty(field.value, "model").value != nil {
+		document.Agent.Model = authored.Model
+	}
+	if mappingProperty(field.value, "credentials").value != nil {
+		document.Agent.Credentials = authored.Credentials
+	}
+	return Encode(document.Definition)
 }
 
 func encodeYAML(value any) (string, error) {
@@ -181,11 +242,11 @@ func encodeYAML(value any) (string, error) {
 
 // ValidateDispatch checks an automation bound to a line's execution plan.
 func ValidateDispatch(document *Document) error {
-	if len(document.Triggers) != 1 || document.Triggers[0].Use != Manual {
+	if len(document.Triggers) != 1 || document.Triggers[0].Uses != Manual {
 		return document.Diagnostic("triggers", "A phase requires exactly one manual trigger.")
 	}
-	if document.RunsOnTask != nil && !*document.RunsOnTask {
-		return document.Diagnostic("runs_on_task", "A phase runs on a task.")
+	if document.RunContext == "workspace" {
+		return document.Diagnostic("run_context", "A phase runs on a task.")
 	}
 	return nil
 }
@@ -199,11 +260,11 @@ func ValidateStage(document *Document, stage Stage) error {
 		}
 	}
 	for index, trigger := range document.Triggers {
-		triggerPath := itemPath("triggers", index) + ".use"
-		if trigger.Use == PullRequestUpdated && stage != Verify {
+		triggerPath := itemPath("triggers", index) + ".uses"
+		if trigger.Uses == PullRequestUpdated && stage != Verify {
 			return document.Diagnostic(triggerPath, "The pull_request_updated trigger requires Verify.")
 		}
-		if trigger.Use == TaskEntersStage && stage == Verify {
+		if trigger.Uses == TaskEntersStage && stage == Verify {
 			return document.Diagnostic(triggerPath, "Use pull_request_updated in Verify, or select Backlog, Implement, or Done.")
 		}
 	}

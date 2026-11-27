@@ -281,10 +281,10 @@ agent:
   harness: codex
   model: gpt-5
   credentials: {source: integration, name: code-review}
-skip_setup_commands: true
-skip_repository_checkout: true
+  skip_setup_commands: true
+  skip_repository_checkout: true
 triggers:
-  - use: task_enters_stage
+  - uses: task_enters_stage
 steps:
   - name: Print marker
     bash: echo original
@@ -395,9 +395,7 @@ steps:
       const projected = (screen.getByLabelText("Automation YAML") as HTMLTextAreaElement).value;
       expect(load(projected)).toMatchObject({
         name: "Board preview",
-        agent: { harness: "codex", model: "gpt-5", credentials: { source: "integration", name: "code-review" } },
-        skip_setup_commands: true,
-        skip_repository_checkout: true,
+        agent: (load(savedYaml) as Record<string, unknown>).agent,
         steps: [{ name: "Print marker" }, { name: "Review changes", working_directory: "repo" }],
       });
       const edited = `# Unsaved comment\n${projected.replace("echo original", "echo edited")}`;
@@ -420,7 +418,7 @@ steps:
     const onClose = renderModal("?customAutomation=custom-1", "custom-1", "backlog", true);
     const user = userEvent.setup();
     await user.click(await screen.findByRole("button", { name: "Edit YAML" }));
-    const invalid = savedYaml.replace("use: task_enters_stage", "use: pull_request_updated");
+    const invalid = savedYaml.replace("uses: task_enters_stage", "uses: pull_request_updated");
     fireEvent.change(screen.getByLabelText("Automation YAML"), { target: { value: invalid } });
     await user.click(screen.getByRole("button", { name: "Open visual editor" }));
     expect(screen.getByRole("alert")).toHaveTextContent("Verify");
@@ -450,9 +448,7 @@ steps:
 
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
     const saved = JSON.parse(String(fetch.mock.calls.at(-1)?.[1]?.body)).yaml;
-    expect(saved).toContain("runs_on_task: false");
-    expect(saved).toContain("use: manual");
-    expect(saved).not.toContain("use: task_enters_stage");
+    expect(load(saved)).toMatchObject({ run_context: "workspace", triggers: [{ uses: "manual" }] });
   });
 
   it("retains a rejected draft and shows the server diagnostic", async () => {

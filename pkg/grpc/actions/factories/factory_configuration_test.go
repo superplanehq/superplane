@@ -47,6 +47,7 @@ func newConfigurationFixture(t *testing.T) configurationFixture {
 		agent.Configuration["thinkingLevel"] = "low"
 		implementationStep(t, agent, "Implementation")["prompt"] = "Keep this installed managed prompt."
 	})
+	require.NoError(t, canvas.SetConfigurationID(database.DB(t.Context()), "implement"))
 	require.NoError(t, canvas.StampFactoryAppTemplateFor(database.DB(t.Context()), "onrun-implement", "line-implementation", 1, models.ProviderGitHub))
 	_, err := models.UpsertCanvasVersionConsoleInTransaction(database.DB(t.Context()), canvas.ID,
 		[]models.ConsolePanel{{ID: "instructions", Type: "markdown", Content: map[string]any{"text": "Preserve this console."}}},
@@ -63,6 +64,7 @@ func newConfigurationFixture(t *testing.T) configurationFixture {
 	for i := range stages {
 		if stages[i].StepIndex != nil {
 			stages[i].Name = phaseName
+			stages[i].ConfigurationID = "implementation"
 		}
 	}
 	require.NoError(t, line.UpdateConfiguration(database.DB(t.Context()), nil, nil, nil, stages))
@@ -189,10 +191,10 @@ func TestFactoryConfigurationRejectsUnsupportedManifestWithoutWrites(t *testing.
 		{"changed runner", "run: implement", "run: other", "stages[1].run"},
 		{"invalid YAML", "apiVersion: v2", "apiVersion: [", "$"},
 		{"unknown field", "kind: Factory", "kind: Factory\nunknown: true", "unknown"},
-		{"null instructions", "additional_instructions: Original instructions", "additional_instructions: null", "stages[1].automations[0].with.agents.implementation-agent-no-issue.additional_instructions"},
-		{"boolean instructions", "additional_instructions: Original instructions", "additional_instructions: true", "stages[1].automations[0].with.agents.implementation-agent-no-issue.additional_instructions"},
-		{"numeric instructions", "additional_instructions: Original instructions", "additional_instructions: 123", "stages[1].automations[0].with.agents.implementation-agent-no-issue.additional_instructions"},
-		{"YAML anchor", "additional_instructions: Original instructions", "additional_instructions: &instructions Original instructions", "stages[1].automations[0].with.agents.implementation-agent-no-issue.additional_instructions"},
+		{"null instructions", "additional_instructions: Original instructions", "additional_instructions: null", "stages[1].automations[0].with.agent.additional_instructions"},
+		{"boolean instructions", "additional_instructions: Original instructions", "additional_instructions: true", "stages[1].automations[0].with.agent.additional_instructions"},
+		{"numeric instructions", "additional_instructions: Original instructions", "additional_instructions: 123", "stages[1].automations[0].with.agent.additional_instructions"},
+		{"YAML anchor", "additional_instructions: Original instructions", "additional_instructions: &instructions Original instructions", "stages[1].automations[0].with.agent.additional_instructions"},
 		{"unsupported alias", "@superplane/implement", "@superplane/planning", "stages[1].automations[0].uses"},
 		{"concurrency without runner", "name: Verify", "name: Verify\n    max_parallelism: 2", "stages[2].max_parallelism"},
 		{"zero concurrency", "run: implement", "run: implement\n    max_parallelism: 0", "stages[1].max_parallelism"},
@@ -241,7 +243,11 @@ func TestFactoryConfigurationRejectsUnsupportedManifestWithoutWrites(t *testing.
 			bundle := tc.change(proto.Clone(exported).(*pb.FactoryConfigurationBundle))
 			plan := f.plan(t, bundle)
 			require.NotEmpty(t, plan.Diagnostics)
-			require.Equal(t, ".superplane/main.yml", plan.Diagnostics[0].Path)
+			expectedPath := factoryConfigurationManifestPath
+			if bundle != nil && bundle.ManifestPath != "" {
+				expectedPath = bundle.ManifestPath
+			}
+			require.Equal(t, expectedPath, plan.Diagnostics[0].Path)
 			require.Equal(t, tc.field, plan.Diagnostics[0].Field)
 			require.Empty(t, plan.BaseStateToken)
 			_, err := f.apply(bundle, "invalid")
@@ -328,19 +334,24 @@ func TestFactoryConfigurationGuardsDoNotWrite(t *testing.T) {
 			case "changed desired input":
 				bundle.Files[0].Content = strings.ReplaceAll(bundle.Files[0].Content, "New instructions", "Other instructions")
 			}
-			if guard == "changed binding" || guard == "different line" {
+			if guard == "changed binding" {
 				fresh := f.plan(t, bundle)
 				require.Empty(t, fresh.Diagnostics, "the target remains supported; only the old token is invalid")
-				if guard == "changed binding" {
-					require.Len(t, fresh.Changes, 2)
-				} else {
-					require.Len(t, fresh.Changes, 1)
-				}
+				require.Len(t, fresh.Changes, 1)
 			}
+			if guard == "different line" {
+				fresh := f.plan(t, bundle)
+				require.NotEmpty(t, fresh.Diagnostics, "another line owns different public stage IDs")
+				require.Equal(t, "stages[0].id", fresh.Diagnostics[0].Field)
+			}
+
 			_, err := f.apply(bundle, plan.BaseStateToken)
 			require.Error(t, err)
-			if guard == "changed binding" || guard == "different line" {
+			if guard == "changed binding" {
 				require.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
+			}
+			if guard == "different line" {
+				require.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
 			}
 			require.Equal(t, count, configurationRevisionCount(t, f.canvas))
 			if guard == "disabled" {

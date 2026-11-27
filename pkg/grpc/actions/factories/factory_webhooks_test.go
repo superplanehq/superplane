@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/automations"
+	"github.com/superplanehq/superplane/pkg/automationspec"
 	factorycomponent "github.com/superplanehq/superplane/pkg/components/factory"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
@@ -289,8 +290,15 @@ func TestCustomStageWebhookRunsWithoutTask(t *testing.T) {
 	read, err := service.Read(ctx, r.Organization.ID, canvasID)
 	require.NoError(t, err)
 	assert.Contains(t, read.YAML, "webhook_id: "+webhookID)
-	assert.NotContains(t, read.YAML, "runs_on_task")
+	assert.NotContains(t, read.YAML, "run_context")
 	source := strings.Replace(read.YAML, "Check the changes.", "Review the changes.", 1)
+	document, err := automationspec.Parse(source)
+	require.NoError(t, err)
+	instructions := "Include webhook details."
+	document.Agent.AdditionalInstructions = &instructions
+	document.Agent.ThinkingLevel = "low"
+	source, err = automationspec.Encode(document.Definition)
+	require.NoError(t, err)
 	_, err = service.Update(ctx, r.Organization.ID, canvasID, r.User, source)
 	require.NoError(t, err)
 
@@ -303,6 +311,8 @@ func TestCustomStageWebhookRunsWithoutTask(t *testing.T) {
 			continue
 		}
 		prompts[node.ID] = node.Configuration["steps"].([]any)[0].(map[string]any)["prompt"].(string)
+		assert.Equal(t, instructions, node.Configuration["additionalInstructions"])
+		assert.Equal(t, "low", node.Configuration["thinkingLevel"])
 		assert.Contains(t, node.Configuration["environment"], saved, "an edit keeps saved values on %s", node.ID)
 		if node.ID == customStageWebhookRunnerID {
 			template := node.Metadata[models.FactoryAppTemplateMetadataKey].(map[string]any)
@@ -313,7 +323,7 @@ func TestCustomStageWebhookRunsWithoutTask(t *testing.T) {
 	assert.Contains(t, prompts[customStageWebhookRunnerID], "Review the changes.")
 	assert.NotContains(t, prompts[customStageRunnerID], "webhook started this run")
 
-	_, err = service.Update(ctx, r.Organization.ID, canvasID, r.User, strings.Replace(source, "  - use: task_enters_stage\n", "", 1))
+	_, err = service.Update(ctx, r.Organization.ID, canvasID, r.User, strings.Replace(source, "  - uses: task_enters_stage\n", "", 1))
 	require.NoError(t, err)
 	version, err = models.FindLiveCanvasVersionInTransaction(db, canvasID)
 	require.NoError(t, err)
@@ -337,7 +347,7 @@ func TestCustomStageWebhookRunsWithoutTask(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, slices.ContainsFunc(steps, func(step models.FactoryLineStep) bool { return step.AppID == canvasID }))
 
-	_, err = service.Update(ctx, r.Organization.ID, canvasID, r.User, strings.Replace(source, "use: task_enters_stage", "use: manual", 1))
+	_, err = service.Update(ctx, r.Organization.ID, canvasID, r.User, strings.Replace(source, "uses: task_enters_stage", "uses: manual", 1))
 	require.NoError(t, err, "a custom stage can combine Manual and webhook triggers")
 	steps, err = line.ExecutionPlan(db)
 	require.NoError(t, err)
@@ -346,7 +356,7 @@ func TestCustomStageWebhookRunsWithoutTask(t *testing.T) {
 	}), "Manual keeps a line step that waits for a person")
 	read, err = service.Read(ctx, r.Organization.ID, canvasID)
 	require.NoError(t, err)
-	assert.Contains(t, read.YAML, "use: manual")
+	assert.Contains(t, read.YAML, "uses: manual")
 	assert.Contains(t, read.YAML, "webhook_id: "+webhookID)
 }
 

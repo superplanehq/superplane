@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/google/uuid"
@@ -305,7 +306,7 @@ func automationCanvasSettings(stage string, source *automationspec.Document, age
 	input := &pb.FactoryCustomAutomation_Settings{}
 	for _, trigger := range source.Triggers {
 		start := &pb.FactoryCustomAutomation_StartTrigger{}
-		switch trigger.Use {
+		switch trigger.Uses {
 		case automationspec.Manual:
 			start.StartMode = pb.FactoryCustomAutomation_START_MODE_MANUAL
 		case automationspec.TaskEntersStage, automationspec.PullRequestUpdated:
@@ -313,9 +314,10 @@ func automationCanvasSettings(stage string, source *automationspec.Document, age
 		case automationspec.TaskLeavesStage:
 			start.StartMode = pb.FactoryCustomAutomation_START_MODE_ON_LEAVE
 		case automationspec.Scheduled:
+			offset, _ := strconv.ParseFloat(trigger.Config.Timezone, 64)
 			start.StartMode = pb.FactoryCustomAutomation_START_MODE_SCHEDULED
 			start.Schedule = &pb.FactoryCustomAutomation_Schedule{
-				CronExpression: trigger.Config.Cron, UtcOffset: trigger.Config.UTCOffset,
+				CronExpression: trigger.Config.Cron, UtcOffset: offset,
 			}
 		case automationspec.Webhook:
 			start.StartMode = pb.FactoryCustomAutomation_START_MODE_WEBHOOK
@@ -327,8 +329,9 @@ func automationCanvasSettings(stage string, source *automationspec.Document, age
 	if err != nil {
 		return nil, source.Diagnostic("triggers", "Check the trigger types and schedule settings.")
 	}
-	if err := validateCustomAutomationRunContext(source.RunsOnTask, triggers); err != nil {
-		return nil, source.Diagnostic("runs_on_task", grpcerrors.StatusMessage(err))
+	runsOnTask := source.RunsOnTask
+	if err := validateCustomAutomationRunContext(runsOnTask, triggers); err != nil {
+		return nil, source.Diagnostic("run_context", grpcerrors.StatusMessage(err))
 	}
 	steps := make([]runner.AgentStep, 0, len(source.Steps))
 	for index, step := range source.Steps {
@@ -346,10 +349,30 @@ func automationCanvasSettings(stage string, source *automationspec.Document, age
 		}
 		steps = append(steps, translated)
 	}
+	var skipSetup, skipCheckout *bool
+	var instructions *string
+	var thinking string
+	if source.Agent != nil {
+		skipSetup = source.Agent.SkipSetupCommands
+		skipCheckout = source.Agent.SkipRepositoryCheckout
+		instructions = source.Agent.AdditionalInstructions
+		thinking = source.Agent.ThinkingLevel
+	}
+	if thinking != "" {
+		normalize := runner.NormalizeThinkingLevel
+		if agent.Component == "runnerCodex" {
+			normalize = runner.NormalizeCodexThinkingLevel
+		}
+		thinking, err = normalize(thinking)
+		if err != nil {
+			return nil, source.Diagnostic("agent.thinking_level", err.Error())
+		}
+	}
 	return &customAutomationSettings{
+		AdditionalInstructions: instructions, ThinkingLevel: thinking,
 		ColumnKey: stage, StartMode: startMode, Agent: agent, Steps: steps, Icon: source.Icon,
 		ExecutionTimeoutSeconds: source.TimeoutSeconds, Schedule: schedule, Triggers: triggers,
-		RunsOnTask:        source.RunsOnTask,
-		SkipSetupCommands: source.SkipSetupCommands, SkipRepositoryCheckout: source.SkipRepositoryCheckout,
+		RunsOnTask:        runsOnTask,
+		SkipSetupCommands: skipSetup, SkipRepositoryCheckout: skipCheckout,
 	}, nil
 }

@@ -247,6 +247,13 @@ func UpdateFactoryCustomAutomation(
 		if err != nil {
 			return err
 		}
+		// The legacy form cannot edit these YAML options, so keep their live values.
+		if agent := selectCustomAutomationAgent(live.Nodes); agent != nil {
+			if instructions, ok := agent.Configuration["additionalInstructions"].(string); ok {
+				settings.AdditionalInstructions = &instructions
+			}
+			settings.ThinkingLevel = configString(agent.Configuration, "thinkingLevel")
+		}
 		if canvas.ColumnKey != nil {
 			settings.ColumnKey = *canvas.ColumnKey
 		}
@@ -317,6 +324,8 @@ type customAutomationTrigger struct {
 }
 
 type customAutomationSettings struct {
+	AdditionalInstructions  *string
+	ThinkingLevel           string
 	ColumnKey               string
 	StartMode               pb.FactoryCustomAutomation_StartMode
 	Agent                   *intakeAgent
@@ -1162,6 +1171,12 @@ func customAutomationRunnerConfiguration(
 	}
 	if settings.SkipRepositoryCheckout != nil {
 		configuration[runner.SkipRepositoryCheckoutField] = *settings.SkipRepositoryCheckout
+	}
+	if settings.AdditionalInstructions != nil {
+		configuration["additionalInstructions"] = *settings.AdditionalInstructions
+	}
+	if settings.ThinkingLevel != "" {
+		configuration["thinkingLevel"] = settings.ThinkingLevel
 	}
 	return configuration
 }

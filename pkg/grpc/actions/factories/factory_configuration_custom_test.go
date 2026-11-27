@@ -36,7 +36,7 @@ func TestFactoryConfigurationCustomDispatchRoundTrip(t *testing.T) {
 kind: Automation
 name: Inspect task
 triggers:
-  - use: manual
+  - uses: manual
 steps:
   - name: Inspect
     prompt: Inspect the task.
@@ -46,7 +46,7 @@ steps:
 				require.NoError(t, err)
 				stage := models.FactoryLineStage{ID: uuid.New(), Key: placement, Name: "QA", Kind: models.FactoryLineStagePhase}
 				require.NoError(t, line.UpdateConfiguration(db, nil, nil, nil, append(line.StagesValue(), stage)))
-				source = strings.Replace(source, "use: manual", "use: task_enters_stage", 1)
+				source = strings.Replace(source, "uses: manual", "uses: task_enters_stage", 1)
 			}
 			document, err := automationspec.Parse(source)
 			require.NoError(t, err)
@@ -92,7 +92,7 @@ steps:
 			require.ErrorContains(t, err, feature)
 			require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, feature))
 			require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
-				_, err := applyFactoryConfigurationCustom(ctx, tx, deps, target, current, edited, r.User)
+				_, err := applyFactoryConfigurationCustom(ctx, tx, deps, target, current, placement, edited, r.User)
 				return err
 			}))
 			live, err = models.FindLiveCanvasVersionInTransaction(db, id)
@@ -107,7 +107,7 @@ steps:
 			require.NoError(t, err)
 			require.Equal(t, live.ID.String(), stored.ArtifactRevision)
 			_, err = validateFactoryConfigurationCustom(ctx, db, deps, target, current, placement,
-				strings.Replace(edited, "use: "+string(document.Triggers[0].Use), "use: task_leaves_stage", 1))
+				strings.Replace(edited, "uses: "+string(document.Triggers[0].Uses), "uses: task_leaves_stage", 1))
 			require.Error(t, err)
 			_, err = validateFactoryConfigurationCustom(ctx, db, deps, target, current, placement,
 				strings.Replace(edited, "prompt: Review the task.", "bash: echo ready\n    secrets: [missing-secret]", 1))
@@ -142,9 +142,9 @@ func TestFactoryConfigurationCustomBundleCoversEveryPlacement(t *testing.T) {
 	placements := []string{"backlog", "implement", "verify", "done", "phase-1", customStage.Key}
 	canvasesByPlacement := make(map[string]*models.Canvas, len(placements))
 	for _, placement := range placements {
-		source := "apiVersion: v2\nkind: Automation\nname: Inspect " + placement + "\nruns_on_task: true\ntriggers:\n  - use: manual\nsteps:\n  - name: Inspect\n    prompt: Inspect the task.\n"
+		source := "apiVersion: v2\nkind: Automation\nname: Inspect " + placement + "\nrun_context: task\ntriggers:\n  - uses: manual\nsteps:\n  - name: Inspect\n    prompt: Inspect the task.\n"
 		if placement == customStage.Key {
-			source = strings.Replace(source, "use: manual", "use: task_enters_stage", 1)
+			source = strings.Replace(source, "uses: manual", "uses: task_enters_stage", 1)
 		}
 		document, err := automationspec.Parse(source)
 		require.NoError(t, err)
@@ -166,6 +166,8 @@ func TestFactoryConfigurationCustomBundleCoversEveryPlacement(t *testing.T) {
 	steps := append([]models.FactoryLineStep{}, f.line.Steps...)
 	steps = append(steps, models.FactoryLineStep{Type: models.FactoryLineStepTypeRunApp, AppID: canvasesByPlacement["phase-1"].ID, Entrypoint: "on-run"})
 	require.NoError(t, f.line.Update(db, nil, steps, nil))
+	// A phase runner can also execute from a board stage without changing its On Run binding.
+	require.NoError(t, canvasesByPlacement["phase-1"].SetColumnKey(db, customStage.Key))
 	exported, err := ExportFactoryConfiguration(f.ctx, f.r.Organization.ID.String(), &pb.ExportFactoryConfigurationRequest{
 		FactoryId: f.factory.ID.String(), LineId: f.line.ID.String(),
 	})
@@ -201,6 +203,10 @@ func TestFactoryConfigurationCustomBundleCoversEveryPlacement(t *testing.T) {
 	after := configurationResourceCounts(t)
 	require.Equal(t, before["workflow_versions"]+int64(len(placements)), after["workflow_versions"])
 	require.Equal(t, before["automations_as_code"]+int64(len(placements)), after["automations_as_code"])
+	phaseRunner, err := models.FindCanvasInTransaction(db, f.r.Organization.ID, canvasesByPlacement["phase-1"].ID)
+	require.NoError(t, err)
+	require.Equal(t, customStage.Key, *phaseRunner.ColumnKey)
+	require.Equal(t, "onRun", findIntakeNode(resetTestLiveVersion(t, phaseRunner).Nodes, "on-run").ComponentName())
 	plan = f.plan(t, bundle)
 	require.Empty(t, plan.Diagnostics)
 	require.Empty(t, plan.Changes)

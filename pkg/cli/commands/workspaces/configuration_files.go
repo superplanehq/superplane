@@ -4,11 +4,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/fs"
 	"os"
-	"path"
+	"path/filepath"
 	"strings"
 
+	"github.com/superplanehq/superplane/pkg/workspaceconfig"
 	"gopkg.in/yaml.v3"
 )
 
@@ -37,18 +37,17 @@ type configurationManifestRepositories struct {
 
 // The server validates live stage kinds, built-in aliases, and settings.
 // The CLI validates bundle structure before reading references or replacing local files.
-func configurationManifestReferences(content string) ([]string, error) {
+func configurationManifestReferences(content, manifestPath string) ([]string, error) {
 	var manifest struct {
 		APIVersion   string                             `yaml:"apiVersion"`
 		Kind         string                             `yaml:"kind"`
 		Name         string                             `yaml:"name"`
 		Repositories *configurationManifestRepositories `yaml:"repositories"`
 		Stages       []struct {
-			Key            string `yaml:"key"`
-			Name           string `yaml:"name"`
-			Run            string `yaml:"run"`
-			MaxParallelism *int   `yaml:"max_parallelism"`
-			Automations    []struct {
+			ID          string `yaml:"id"`
+			Name        string `yaml:"name"`
+			Run         string `yaml:"run"`
+			Automations []struct {
 				ID      string `yaml:"id"`
 				Name    string `yaml:"name"`
 				Uses    string `yaml:"uses"`
@@ -65,7 +64,14 @@ func configurationManifestReferences(content string) ([]string, error) {
 	decoder := yaml.NewDecoder(strings.NewReader(content))
 	decoder.KnownFields(true)
 	if err := decoder.Decode(&manifest); err != nil {
-		return nil, fmt.Errorf("invalid Factory manifest: %w", err)
+		message := err.Error()
+		if strings.Contains(message, "field key not found") {
+			message += "; replace stage key with id"
+		}
+		if strings.Contains(message, "field max_parallelism not found") {
+			message += "; edit stage concurrency in workspace settings"
+		}
+		return nil, fmt.Errorf("invalid Factory manifest: %s", message)
 	}
 	var extra yaml.Node
 	if err := decoder.Decode(&extra); !errors.Is(err, io.EOF) {
@@ -100,15 +106,13 @@ func configurationManifestReferences(content string) ([]string, error) {
 	var references []string
 	seenReferences := map[string]bool{}
 	seenStages := map[string]bool{}
+	seenAutomations := map[string]bool{}
 	for _, stage := range manifest.Stages {
-		if stage.Key == "" || strings.TrimSpace(stage.Name) == "" || seenStages[stage.Key] || stage.Automations == nil {
-			return nil, fmt.Errorf("invalid Factory manifest: stages require unique keys, names, and an automations list")
+		if stage.ID == "" || strings.TrimSpace(stage.Name) == "" || seenStages[stage.ID] || stage.Automations == nil {
+			return nil, fmt.Errorf("invalid Factory manifest: stages require unique IDs, names, and an automations list")
 		}
-		seenStages[stage.Key] = true
-		if stage.MaxParallelism != nil && *stage.MaxParallelism < 1 {
-			return nil, fmt.Errorf("invalid Factory manifest: max_parallelism must be positive")
-		}
-		seenAutomations := map[string]bool{}
+		seenStages[stage.ID] = true
+
 		for _, automation := range stage.Automations {
 			if automation.ID == "" || seenAutomations[automation.ID] || automation.Uses == "" {
 				return nil, fmt.Errorf("invalid Factory manifest: automations require unique IDs and uses")
@@ -122,16 +126,19 @@ func configurationManifestReferences(content string) ([]string, error) {
 			if strings.HasPrefix(automation.Uses, "@superplane/") {
 				continue
 			}
-			if !configurationReferenceAllowed(automation.Uses) {
-				return nil, fmt.Errorf("unsafe custom automation path %q: use a relative YAML path inside the manifest directory", automation.Uses)
+			resolved, err := workspaceconfig.ResolveAutomationPath(manifestPath, automation.Uses)
+			if err != nil {
+				return nil, fmt.Errorf("unsafe custom automation path %q: %w", automation.Uses, err)
 			}
-			if !seenReferences[automation.Uses] {
-				seenReferences[automation.Uses] = true
-				references = append(references, automation.Uses)
+			if !seenReferences[resolved] {
+				seenReferences[resolved] = true
+				references = append(references, resolved)
 			}
 		}
+	}
+	for _, stage := range manifest.Stages {
 		if stage.Run != "" && !seenAutomations[stage.Run] {
-			return nil, fmt.Errorf("invalid Factory manifest: phase run must identify one of its automations")
+			return nil, fmt.Errorf("invalid Factory manifest: phase run must identify a declared workspace automation")
 		}
 	}
 	return references, nil
@@ -159,15 +166,10 @@ func configurationYAMLHasAlias(node *yaml.Node) bool {
 	return false
 }
 
-func configurationReferenceAllowed(reference string) bool {
-	return fs.ValidPath(reference) && reference != "main.yml" &&
-		!strings.ContainsAny(reference, "\\:") &&
-		(path.Ext(reference) == ".yaml" || path.Ext(reference) == ".yml")
-}
-
 func readConfigurationReference(directory *os.Root, reference string) (string, error) {
 	// Root confines reads even if a path changes after these symlink checks.
 	parts := strings.Split(reference, "/")
+	var expected os.FileInfo
 	for index := range parts {
 		info, err := directory.Lstat(strings.Join(parts[:index+1], "/"))
 		if err != nil {
@@ -176,8 +178,11 @@ func readConfigurationReference(directory *os.Root, reference string) (string, e
 		if info.Mode()&os.ModeSymlink != 0 {
 			return "", fmt.Errorf("symbolic links are not supported")
 		}
-		if index == len(parts)-1 && !info.Mode().IsRegular() {
-			return "", fmt.Errorf("the reference must be a regular file")
+		if index == len(parts)-1 {
+			if !info.Mode().IsRegular() {
+				return "", fmt.Errorf("the reference must be a regular file")
+			}
+			expected = info
 		}
 	}
 	file, err := directory.Open(reference)
@@ -185,6 +190,47 @@ func readConfigurationReference(directory *os.Root, reference string) (string, e
 		return "", err
 	}
 	defer file.Close()
+	actual, err := file.Stat()
+	if err != nil {
+		return "", err
+	}
+	if !actual.Mode().IsRegular() || !os.SameFile(expected, actual) {
+		return "", fmt.Errorf("the input changed while opening; use a regular file without symbolic links")
+	}
 	content, err := io.ReadAll(file)
 	return string(content), err
+}
+
+// Walk from the filesystem root so selected directories cannot hide symlinks.
+func openConfigurationInputDirectory(directory string) (*os.Root, error) {
+	absolute, err := filepath.Abs(directory)
+	if err != nil {
+		return nil, err
+	}
+	rootPath := filepath.VolumeName(absolute) + string(filepath.Separator)
+	root, err := os.OpenRoot(rootPath)
+	if err != nil {
+		return nil, err
+	}
+	for _, part := range strings.Split(strings.TrimPrefix(absolute, rootPath), string(filepath.Separator)) {
+		if part == "" {
+			continue
+		}
+		info, err := root.Lstat(part)
+		if err != nil {
+			root.Close()
+			return nil, err
+		}
+		if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+			root.Close()
+			return nil, fmt.Errorf("%s must be a directory without symbolic links", part)
+		}
+		next, err := root.OpenRoot(part)
+		root.Close()
+		if err != nil {
+			return nil, err
+		}
+		root = next
+	}
+	return root, nil
 }

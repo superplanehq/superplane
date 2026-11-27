@@ -33,7 +33,7 @@ func loadFactoryConfigurationValidationInputs(tx *gorm.DB, target *factoryConfig
 			if current != nil && (current.templateID != "" || !factoryConfigurationAutomationContentChanged(current, automation, manifest)) {
 				continue
 			}
-			for _, step := range manifest.Definitions[configurationAutomationPath(automation.Uses)].Steps {
+			for _, step := range manifest.Definitions[manifest.automationPath(automation.Uses)].Steps {
 				secretNames = append(secretNames, step.Secrets...)
 			}
 		}

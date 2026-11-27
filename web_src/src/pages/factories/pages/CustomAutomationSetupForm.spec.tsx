@@ -85,11 +85,24 @@ it.each([
   const yaml = `apiVersion: v2
 kind: Automation
 name: Review
-triggers: [{use: manual}]
+triggers: [{uses: manual}]
 steps: [{name: Review, prompt: Review the changes.}]
 `;
+  const options =
+    source === "subscription"
+      ? {
+          additional_instructions: "",
+          thinking_level: "high",
+          timeout: "2h",
+          skip_setup_commands: false,
+          skip_repository_checkout: true,
+        }
+      : undefined;
   const save = vi.fn();
-  const initial = initialModel ? yaml + "agent: {model: '" + initialModel + "'}\n" : yaml;
+  const initial =
+    initialModel || options
+      ? yaml + "agent: " + JSON.stringify({ ...options, model: initialModel || undefined }) + "\n"
+      : yaml;
   const view = render(<SourceEditor source={initial} save={save} />);
   const user = userEvent.setup();
   const picker = screen.getByTestId("field-model-hosted-model");
@@ -98,13 +111,13 @@ steps: [{name: Review, prompt: Review the changes.}]
   await user.click(screen.getByRole("menuitem", { name: label }));
   expect(picker).toHaveAccessibleName(label);
   await user.click(screen.getByRole("button", { name: "Save" }));
-  expect(save).toHaveBeenLastCalledWith({ ...(load(yaml) as object), agent: { model } });
+  expect(save).toHaveBeenLastCalledWith({ ...(load(yaml) as object), agent: { ...options, model } });
   view.unmount();
-  render(<SourceEditor source={yaml + "agent: {model: '" + model + "'}\n"} save={save} />);
+  render(<SourceEditor source={yaml + "agent: " + JSON.stringify({ ...options, model }) + "\n"} save={save} />);
   await user.click(screen.getByRole("button", { name: label }));
   await user.click(screen.getByRole("menuitem", { name: "Use default model" }));
   await user.click(screen.getByRole("button", { name: "Save" }));
-  expect(save).toHaveBeenLastCalledWith(load(yaml));
+  expect(save).toHaveBeenLastCalledWith({ ...(load(yaml) as object), ...(options ? { agent: options } : {}) });
   onboarding = undefined;
 });
 
@@ -118,7 +131,7 @@ it("keeps the selected provider when two hosted providers offer the same model I
 kind: Automation
 name: Review
 agent: {model: anthropic/claude-test}
-triggers: [{use: manual}]
+triggers: [{uses: manual}]
 steps: [{name: Review, prompt: Review the changes.}]
 `;
   const save = vi.fn();
@@ -145,7 +158,7 @@ it("keeps the saved automation's subscription when the workspace uses hosted mod
 kind: Automation
 name: Review
 agent: {harness: codex, credentials: {source: subscription}}
-triggers: [{use: manual}]
+triggers: [{uses: manual}]
 steps: [{name: Review, prompt: Review the changes.}]
 `;
   const save = vi.fn();
@@ -172,15 +185,18 @@ it("preserves the original schedule when changing run context and editing worksp
 kind: Automation
 name: Daily build
 triggers:
-  - use: schedule
-    config: { cron: "0 9 * * MON-FRI", utc_offset: 5.5 }
-  - use: schedule
+  - uses: schedule
+    config: { cron: "0 9 * * MON-FRI", timezone: "5.5" }
+  - uses: schedule
     id: weekend
-    config: { cron: "0 10 * * SAT", utc_offset: 0 }
+    config: { cron: "0 10 * * SAT", timezone: "0" }
 steps:
   - name: Inspect
     prompt: Review the build.
-skip_setup_commands: true
+agent:
+  skip_setup_commands: true
+  additional_instructions: Keep authored instructions.
+  thinking_level: high
 `;
   const save = vi.fn();
   render(<SourceEditor source={source} save={save} />);
@@ -194,13 +210,17 @@ skip_setup_commands: true
   await user.click(screen.getByRole("button", { name: "Save" }));
   expect(save).toHaveBeenCalledWith(
     expect.objectContaining({
-      runs_on_task: false,
+      run_context: "workspace",
       triggers: [
-        { use: "schedule", config: { cron: "0 9 * * MON-FRI", utc_offset: 5.5 } },
-        { id: "weekend", use: "schedule", config: { cron: "0 10 * * SAT", utc_offset: 0 } },
+        { uses: "schedule", config: { cron: "0 9 * * MON-FRI", timezone: "5.5" } },
+        { id: "weekend", uses: "schedule", config: { cron: "0 10 * * SAT", timezone: "0" } },
       ],
-      skip_setup_commands: false,
-      skip_repository_checkout: true,
+      agent: {
+        skip_setup_commands: false,
+        skip_repository_checkout: true,
+        additional_instructions: "Keep authored instructions.",
+        thinking_level: "high",
+      },
     }),
   );
 });
@@ -459,8 +479,8 @@ it("saves custom-stage Manual through the source-backed visual editor", async ()
   const source = `apiVersion: v2
 kind: Automation
 name: Update Docs
-runs_on_task: true
-triggers: [{use: task_enters_stage}]
+run_context: "task"
+triggers: [{uses: task_enters_stage}]
 steps: [{name: Review, prompt: Review the changes.}]
 `;
   const save = vi.fn();
@@ -470,7 +490,7 @@ steps: [{name: Review, prompt: Review the changes.}]
   await user.click(screen.getByRole("menuitem", { name: /Manual/ }));
   await user.click(screen.getByRole("button", { name: /Remove When a task enters/ }));
   await user.click(screen.getByRole("button", { name: "Save" }));
-  expect(save).toHaveBeenCalledWith(expect.objectContaining({ triggers: [{ use: "manual" }], runs_on_task: true }));
+  expect(save).toHaveBeenCalledWith(expect.objectContaining({ triggers: [{ uses: "manual" }], run_context: "task" }));
   view.unmount();
   render(<SourceEditor source={source.replace("task_enters_stage", "manual")} stage="custom-qa" save={save} />);
   expect(screen.getByRole("button", { name: /^Trigger Manual/ })).toBeInTheDocument();

@@ -13,6 +13,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/superplanehq/superplane/pkg/cli/core"
 	"github.com/superplanehq/superplane/pkg/openapi_client"
+	"github.com/superplanehq/superplane/pkg/workspaceconfig"
 )
 
 type configurationExportCommand struct {
@@ -74,7 +75,8 @@ func validateConfigurationExport(response *openapi_client.FactoriesExportFactory
 	byPath := map[string]openapi_client.FactoriesFactoryConfigurationFile{}
 	for _, file := range bundle.GetFiles() {
 		filePath := file.GetPath()
-		if filePath != configurationManifestPath && (!strings.HasPrefix(filePath, ".superplane/") || !configurationReferenceAllowed(strings.TrimPrefix(filePath, ".superplane/"))) {
+		normalized, err := workspaceconfig.NormalizePath(filePath)
+		if err != nil || normalized != filePath || !strings.HasPrefix(filePath, ".superplane/") {
 			return nil, fmt.Errorf("invalid export response: unsafe file path %q", filePath)
 		}
 		if _, exists := byPath[filePath]; exists || !file.HasContent() {
@@ -86,7 +88,7 @@ func validateConfigurationExport(response *openapi_client.FactoriesExportFactory
 	if !exists {
 		return nil, fmt.Errorf("invalid export response: missing manifest content")
 	}
-	references, err := configurationManifestReferences(manifest.GetContent())
+	references, err := configurationManifestReferences(manifest.GetContent(), configurationManifestPath)
 	if err != nil {
 		return nil, err
 	}
@@ -95,7 +97,7 @@ func validateConfigurationExport(response *openapi_client.FactoriesExportFactory
 	}
 	files := make([]openapi_client.FactoriesFactoryConfigurationFile, 0, len(byPath))
 	for _, reference := range references {
-		file, exists := byPath[".superplane/"+reference]
+		file, exists := byPath[reference]
 		if !exists {
 			return nil, fmt.Errorf("invalid export response: missing custom automation %q", reference)
 		}

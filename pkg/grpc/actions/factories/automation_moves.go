@@ -228,7 +228,7 @@ func (b CanvasAutomationBackend) moveCustomExecution(ctx context.Context, tx *go
 	}
 	hasTask := false
 	for _, trigger := range triggers {
-		switch trigger.Use {
+		switch trigger.Uses {
 		case automationspec.Scheduled, automationspec.Webhook, automationspec.PullRequestUpdated:
 			return false, nil
 		case automationspec.TaskEntersStage, automationspec.TaskLeavesStage:
@@ -282,14 +282,14 @@ func (b CanvasAutomationBackend) moveCustomExecution(ctx context.Context, tx *go
 
 func compatibleTaskAutomationDestination(triggers []automationspec.Trigger, target string) bool {
 	if strings.HasPrefix(target, "custom-") {
-		return len(triggers) == 1 && triggers[0].Use == automationspec.TaskEntersStage
+		return len(triggers) == 1 && triggers[0].Uses == automationspec.TaskEntersStage
 	}
 	switch target {
 	case "implement", "done":
 		return true
 	case "verify":
 		for _, trigger := range triggers {
-			if trigger.Use == automationspec.TaskEntersStage {
+			if trigger.Uses == automationspec.TaskEntersStage {
 				return false
 			}
 		}

@@ -31,12 +31,13 @@ const (
 )
 
 type Canvas struct {
-	ID             uuid.UUID
-	OrganizationID uuid.UUID
-	FactoryID      *uuid.UUID
-	LiveVersionID  *uuid.UUID
-	Name           string
-	Description    string
+	ID              uuid.UUID
+	OrganizationID  uuid.UUID
+	FactoryID       *uuid.UUID
+	LiveVersionID   *uuid.UUID
+	ConfigurationID string
+	Name            string
+	Description     string
 	// ColumnKey is the line-board column this factory event automation is
 	// shown on. Empty when the canvas is not attached to Verify or Done.
 	ColumnKey        *string

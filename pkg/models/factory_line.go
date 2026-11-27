@@ -63,6 +63,7 @@ func (e *FactoryLineStageAutomationError) Error() string {
 
 type FactoryLineStage struct {
 	ID              uuid.UUID `json:"id"`
+	ConfigurationID string    `json:"configuration_id,omitempty"`
 	Key             string    `json:"key"`
 	Name            string    `json:"name"`
 	Kind            string    `json:"kind"`
@@ -380,43 +381,48 @@ func (l *FactoryLine) update(
 	columnColors map[string]string,
 	stages []FactoryLineStage,
 ) error {
-	updates := map[string]any{
-		"updated_at": time.Now(),
-	}
-	if name != nil {
-		updates["name"] = *name
-	}
-	if steps != nil {
-		updates["steps"] = datatypes.JSONSlice[FactoryLineStep](steps)
-		if stages == nil {
-			reconciled, err := l.ReconcileStages(tx, steps)
-			if err != nil {
+	return tx.Transaction(func(tx *gorm.DB) error {
+		updates := map[string]any{
+			"updated_at": time.Now(),
+		}
+		if name != nil {
+			updates["name"] = *name
+		}
+		if steps != nil {
+			updates["steps"] = datatypes.JSONSlice[FactoryLineStep](steps)
+			if stages == nil {
+				reconciled, err := l.ReconcileStages(tx, steps)
+				if err != nil {
+					return err
+				}
+				stages = reconciled
+			}
+		}
+		if columnColors != nil {
+			updates["column_colors"] = datatypes.NewJSONType(columnColors)
+		}
+		if stages != nil {
+			if err := l.assignConfigurationStageIDs(tx, stages); err != nil {
 				return err
 			}
-			stages = reconciled
+			if columnColors == nil {
+				columnColors = l.ColumnColorsValue()
+			}
+			columnColors = RetainFactoryLineStageColors(columnColors, stages)
+			updates["column_colors"] = datatypes.NewJSONType(columnColors)
+			updates["stages"] = datatypes.JSONSlice[FactoryLineStage](stages)
 		}
-	}
-	if columnColors != nil {
-		updates["column_colors"] = datatypes.NewJSONType(columnColors)
-	}
-	if stages != nil {
-		if columnColors == nil {
-			columnColors = l.ColumnColorsValue()
+
+		err := tx.Model(l).Updates(updates).Error
+		if err != nil {
+			return MapFactoryLineNameUniqueConstraintError(err)
 		}
-		columnColors = RetainFactoryLineStageColors(columnColors, stages)
-		updates["column_colors"] = datatypes.NewJSONType(columnColors)
-		updates["stages"] = datatypes.JSONSlice[FactoryLineStage](stages)
-	}
 
-	err := tx.Model(l).Updates(updates).Error
-	if err != nil {
-		return MapFactoryLineNameUniqueConstraintError(err)
-	}
-
-	return tx.
-		Where("id = ?", l.ID).
-		First(l).
-		Error
+		return tx.
+			Where("id = ?", l.ID).
+			First(l).
+			Error
+	})
 }
 
 func RetainFactoryLineStageColors(colors map[string]string, stages []FactoryLineStage) map[string]string {

@@ -51,7 +51,7 @@ func TestAutomationAPIUsesFactoryPermissionsAndFactoryAsCode(t *testing.T) {
 kind: Automation
 name: Inspect revisions
 triggers:
-  - use: pull_request_updated
+  - uses: pull_request_updated
 steps:
   - name: Print marker
     bash: echo ready
@@ -72,7 +72,7 @@ steps:
 	}
 	require.NoError(t, json.Unmarshal(body, &failure))
 	require.Len(t, failure.Diagnostics, 1)
-	require.Equal(t, "triggers[0].use", failure.Diagnostics[0].Path)
+	require.Equal(t, "triggers[0].uses", failure.Diagnostics[0].Path)
 	require.Equal(t, 5, failure.Diagnostics[0].Line)
 	require.Positive(t, failure.Diagnostics[0].Column)
 
@@ -155,10 +155,11 @@ func TestAutomationAPIPublishesInTheSelectedStage(t *testing.T) {
 apiVersion: v2
 kind: Automation
 name: Print a marker
+run_context: task
 agent:
   harness: superplane
 triggers:
-  - use: manual
+  - uses: manual
 steps:
   - name: Marker
     bash: echo first
@@ -229,7 +230,7 @@ steps:
 	}
 	require.NoError(t, json.Unmarshal(listed.Body.Bytes(), &list))
 	require.Equal(t, []automations.Summary{second.Summary}, list.Automations)
-	stageEntry := strings.Replace(source, "use: manual", "use: task_enters_stage", 1)
+	stageEntry := strings.Replace(source, "uses: manual", "uses: task_enters_stage", 1)
 	call(http.MethodPut, path, &automationWriteRequest{YAML: stageEntry}, http.StatusBadRequest)
 	line, err := factory.CreateLine(db, "Ship", []models.FactoryLineStep{{
 		Type: models.FactoryLineStepTypeRunApp, AppID: first.ID, Entrypoint: live.Edges[0].SourceID,
@@ -255,7 +256,7 @@ steps:
 kind: Automation
 name: Review task
 agent: {model: gpt-5.4}
-triggers: [{use: manual}]
+triggers: [{uses: manual}]
 steps: [{name: Review, prompt: Review the changes.}]
 `}
 		body, err := json.Marshal(request)

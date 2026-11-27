@@ -18,6 +18,7 @@ import (
 )
 
 type factoryConfigurationTarget struct {
+	removed      map[uuid.UUID]bool
 	reads        *factoryAutomationReadInputs
 	validation   *factoryConfigurationValidationInputs
 	factory      *models.Factory
@@ -31,6 +32,7 @@ type factoryConfigurationStageTarget struct {
 	stage       models.FactoryLineStage
 	key         string
 	run         string
+	runner      *factoryConfigurationAutomationTarget
 	automations []*factoryConfigurationAutomationTarget
 }
 
@@ -189,7 +191,7 @@ func inspectFactoryConfigurationTarget(tx *gorm.DB, factory *models.Factory, lin
 	if err := validateFactoryLineSystemStages(stages); err != nil {
 		return nil, err
 	}
-	owners, err := models.ListFactoryConfigurationAutomations(tx, factory.OrganizationID, factory.ID, uuid.Nil)
+	owners, err := models.ListFactoryConfigurationAutomations(tx, factory.OrganizationID, factory.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -199,6 +201,9 @@ func inspectFactoryConfigurationTarget(tx *gorm.DB, factory *models.Factory, lin
 		key := stage.Key
 		if key == "phase-0" {
 			key = "implementation"
+		}
+		if stage.ConfigurationID == "" {
+			return nil, unsupportedConfigurationTarget("Assign persisted workspace YAML IDs with the public-ID backfill before export.")
 		}
 		entry := &factoryConfigurationStageTarget{stage: stage, key: key}
 		target.stages = append(target.stages, entry)
@@ -271,6 +276,7 @@ func inspectFactoryConfigurationTarget(tx *gorm.DB, factory *models.Factory, lin
 	if err := loadFactoryConfigurationRepositories(tx, target); err != nil {
 		return nil, err
 	}
+	phaseRunners := map[uuid.UUID]*factoryConfigurationAutomationTarget{}
 	for _, stage := range target.stages {
 		if stage.stage.Kind != models.FactoryLineStagePhase || stage.stage.StepIndex == nil {
 			continue
@@ -284,15 +290,20 @@ func inspectFactoryConfigurationTarget(tx *gorm.DB, factory *models.Factory, lin
 		if step.Type != models.FactoryLineStepTypeRunApp || canvas == nil {
 			return nil, unsupportedConfigurationTarget("A phase must have a workspace automation runner.")
 		}
-		automation, err := inspectConfigurationAutomation(tx, factory, canvas, versions[canvas.ID], metadata[canvas.ID], "phase-"+strconv.Itoa(*index))
-		if err != nil {
-			return nil, err
+		automation := phaseRunners[canvas.ID]
+		if automation == nil {
+			automation, err = inspectConfigurationAutomation(tx, factory, canvas, versions[canvas.ID], metadata[canvas.ID], "phase-"+strconv.Itoa(*index))
+			if err != nil {
+				return nil, err
+			}
+			phaseRunners[canvas.ID] = automation
+			stage.automations = append(stage.automations, automation)
 		}
 		trigger := findIntakeNode(automation.version.Nodes, step.Entrypoint)
 		if trigger == nil || trigger.Type != models.NodeTypeTrigger || trigger.ComponentName() != "onRun" {
 			return nil, unsupportedConfigurationTarget(fmt.Sprintf("Automation %q must use its On Run trigger.", canvas.Name))
 		}
-		stage.automations = append(stage.automations, automation)
+		stage.runner = automation
 	}
 	for i := range canvases {
 		canvas := &canvases[i]
@@ -327,9 +338,14 @@ func inspectFactoryConfigurationTarget(tx *gorm.DB, factory *models.Factory, lin
 		}
 		// A phase runner can also execute in an attached custom stage. Keep
 		// both bindings, while listing the runner only once in its own phase.
-		if slices.ContainsFunc(stage.automations, func(automation *factoryConfigurationAutomationTarget) bool {
-			return automation.canvas.ID == canvas.ID
-		}) {
+		alreadyListed := false
+		for _, existingStage := range target.stages {
+			if slices.ContainsFunc(existingStage.automations, func(automation *factoryConfigurationAutomationTarget) bool { return automation.canvas.ID == canvas.ID }) {
+				alreadyListed = true
+				break
+			}
+		}
+		if alreadyListed {
 			continue
 		}
 		compilerPlacement := placement
@@ -345,7 +361,6 @@ func inspectFactoryConfigurationTarget(tx *gorm.DB, factory *models.Factory, lin
 	customPaths := map[uuid.UUID]string{}
 	usedPaths := map[string]bool{}
 	for _, stage := range target.stages {
-		counts := map[string]int{}
 		for _, automation := range stage.automations {
 			if automation.templateID == "" {
 				reference, exists := customPaths[automation.canvas.ID]
@@ -360,13 +375,13 @@ func inspectFactoryConfigurationTarget(tx *gorm.DB, factory *models.Factory, lin
 				}
 				automation.uses = reference
 			}
-			counts[configurationAutomationKey(automation)]++
 		}
-		for i, automation := range stage.automations {
-			id := configurationAutomationKey(automation)
-			if automation.templateID != "" && counts[id] > 1 {
-				id += "-" + configurationCanvasKey(automation.canvas.ID)
+		for _, automation := range stage.automations {
+			id := automation.canvas.ConfigurationID
+			if id == "" {
+				return nil, unsupportedConfigurationTarget("Assign persisted workspace YAML IDs with the public-ID backfill before export.")
 			}
+
 			for _, owner := range target.ownership {
 				if owner.CanvasID != automation.canvas.ID {
 					continue
@@ -392,10 +407,7 @@ func inspectFactoryConfigurationTarget(tx *gorm.DB, factory *models.Factory, lin
 						automation.binding.TeamID = binding.TeamID
 					}
 				}
-				if owner.LineID == line.ID && owner.StageKey == stage.key {
-					id = owner.ManifestID
-					automation.owned = true
-				}
+				automation.owned = true
 			}
 
 			if strings.HasPrefix(automation.templateID, "intake:") && automation.binding.IntegrationID != "" {
@@ -408,9 +420,11 @@ func inspectFactoryConfigurationTarget(tx *gorm.DB, factory *models.Factory, lin
 			}
 			automation.exportedBinding = portableConfigurationBinding(reads.integrations, automation.exportedBinding)
 			automation.id = id
-			if i == 0 && stage.stage.StepIndex != nil {
-				stage.run = id
-			}
+		}
+	}
+	for _, stage := range target.stages {
+		if stage.runner != nil {
+			stage.run = stage.runner.id
 		}
 	}
 	if err := exportFactoryConfigurationDependencies(target); err != nil {
@@ -480,19 +494,6 @@ func inspectConfigurationAutomation(tx *gorm.DB, factory *models.Factory, canvas
 	}
 
 	return automation, nil
-}
-
-func configurationCanvasKey(canvasID uuid.UUID) string {
-	digest := sha256.Sum256([]byte(canvasID.String()))
-	return hex.EncodeToString(digest[:8])
-}
-
-func configurationAutomationKey(automation *factoryConfigurationAutomationTarget) string {
-	if automation.templateID == "" {
-		// Keep manifest identity stable when the display name and filename change.
-		return configurationCanvasKey(automation.canvas.ID)
-	}
-	return strings.ReplaceAll(strings.TrimPrefix(automation.uses, "@superplane/"), "/", "-")
 }
 
 func unsupportedConfigurationTarget(message string) error {

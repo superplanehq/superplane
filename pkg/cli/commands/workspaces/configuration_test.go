@@ -23,14 +23,15 @@ const configurationManifest = `apiVersion: v2
 kind: Factory
 name: Example workspace
 stages:
-  - key: implementation
+  - id: implementation
     name: Implement
     run: implement
     automations:
       - id: implement
         uses: "@superplane/implement"
         with:
-          additional_instructions: Follow AGENTS.md.
+          agent:
+            additional_instructions: Follow AGENTS.md.
 `
 
 func configurationCLI(t *testing.T, handler http.HandlerFunc) (*cobra.Command, *bytes.Buffer) {
@@ -61,7 +62,7 @@ func writeConfigurationInput(t *testing.T) string {
 
 func exportPayload(content string) map[string]any {
 	return map[string]any{
-		"coverage": "Repositories, stages, and automations",
+		"coverage": "Workspace name, repositories, stages, and automations",
 		"bundle": map[string]any{
 			"manifestPath": ".superplane/main.yml",
 			"files":        []map[string]any{{"path": ".superplane/main.yml", "content": content}},
@@ -114,7 +115,7 @@ func TestExportConfigurationProtectsLocalFiles(t *testing.T) {
 	args := []string{"export", "--workspace", "example", "--output-dir", outputDir}
 	root.SetArgs(args)
 	require.NoError(t, root.Execute())
-	require.Contains(t, stdout.String(), "Repositories, stages, and automations")
+	require.Contains(t, stdout.String(), "Workspace name, repositories, stages, and automations")
 	manifest := filepath.Join(outputDir, ".superplane", "main.yml")
 	actual, err := os.ReadFile(manifest)
 	require.NoError(t, err)
@@ -253,14 +254,14 @@ func TestApplyConfigurationSubmitsCapturedPlanInput(t *testing.T) {
 		case "/api/v1/factories/example/configuration:plan":
 			planned = body
 			require.NoError(t, os.WriteFile(path, []byte("changed after preview"), 0600))
-			_, _ = fmt.Fprint(w, `{"coverage":"Repositories, stages, and automations","baseStateToken":"preview-token","changes":[{"resource":"implementation/implement","fieldPath":"with.additional_instructions","previousValue":"old","requestedValue":"Follow AGENTS.md."}]}`)
+			_, _ = fmt.Fprint(w, `{"coverage":"Workspace name, repositories, stages, and automations","baseStateToken":"preview-token","changes":[{"resource":"implementation/implement","fieldPath":"with.agent.additional_instructions","previousValue":"old","requestedValue":"Follow AGENTS.md."}]}`)
 		case "/api/v1/factories/example/configuration:apply":
 			assert.Equal(t, "preview-token", body["baseStateToken"])
 			assert.Equal(t, planned["bundle"], body["bundle"])
 			bundle := body["bundle"].(map[string]any)
 			files := bundle["files"].([]any)
 			assert.Equal(t, configurationManifest, files[0].(map[string]any)["content"])
-			_, _ = fmt.Fprint(w, `{"coverage":"Repositories, stages, and automations","changed":true}`)
+			_, _ = fmt.Fprint(w, `{"coverage":"Workspace name, repositories, stages, and automations","changed":true}`)
 		default:
 			t.Errorf("unexpected API call: %s", r.URL)
 			http.NotFound(w, r)
@@ -275,24 +276,24 @@ func TestApplyConfigurationSubmitsCapturedPlanInput(t *testing.T) {
 
 func TestConfigurationRoundTripsCustomFilesAcrossStages(t *testing.T) {
 	manifest := strings.Replace(configurationManifest, `        with:
-          additional_instructions: Follow AGENTS.md.
+          agent:
+            additional_instructions: Follow AGENTS.md.
 `, `        binding:
           integration_id: repository-connection
           resource_id: repository-resource
         with:
-          agents:
-            implementation-agent-no-issue:
-              execution_timeout_seconds: 0
-              skip_setup_commands: false
+          agent:
+            timeout: 0s
+            skip_setup_commands: false
           template:
             draft_pull_requests: false
-`, 1) + `  - key: custom-review
+`, 1) + `  - id: custom-review
     name: Review changes
     automations:
       - id: review
         name: Review changes
         uses: automations/review.yaml
-  - key: verify
+  - id: verify
     name: Verify
     automations:
       - id: confidence
@@ -302,7 +303,7 @@ func TestConfigurationRoundTripsCustomFilesAcrossStages(t *testing.T) {
           template:
             enabled_checks: []
             publish_results: false
-      - id: review
+      - id: review-request
         name: Review request
         uses: "@superplane/review-request"
         with:
@@ -318,7 +319,7 @@ func TestConfigurationRoundTripsCustomFilesAcrossStages(t *testing.T) {
           pr_feedback:
             mention: ""
             allowed_bots: []
-  - key: backlog
+  - id: backlog
     name: Backlog
     automations:
       - id: issues
@@ -335,7 +336,7 @@ func TestConfigurationRoundTripsCustomFilesAcrossStages(t *testing.T) {
         binding:
           integration_name: "Engineering Linear"
           team_id: engineering
-  - key: done
+  - id: done
     name: Done
     automations: []
 repositories:
@@ -354,7 +355,7 @@ repositories:
       enabled: false
       provider: github
 `
-	source := "apiVersion: v2\nkind: Automation\nname: Review changes\ntriggers:\n  - use: manual\nsteps:\n  - name: Review\n    prompt: Review the changes.\n"
+	source := "apiVersion: v2\nkind: Automation\nname: Review changes\ntriggers:\n  - uses: manual\nsteps:\n  - name: Review\n    prompt: Review the changes.\n"
 	output := t.TempDir()
 	var planned map[string]any
 	root, _ := configurationCLI(t, func(w http.ResponseWriter, r *http.Request) {
@@ -373,14 +374,14 @@ repositories:
 			files := planned["files"].([]any)
 			require.Len(t, files, 2)
 			assert.Equal(t, manifest, files[0].(map[string]any)["content"])
-			assert.Equal(t, ".superplane/automations/review.yaml", files[1].(map[string]any)["path"])
+			assert.Equal(t, "automations/review.yaml", files[1].(map[string]any)["path"])
 			assert.Equal(t, source, files[1].(map[string]any)["content"])
 			require.NoError(t, os.WriteFile(filepath.Join(output, ".superplane", "automations", "review.yaml"), []byte("changed after preview"), 0600))
-			_, _ = fmt.Fprint(w, `{"coverage":"Repositories, stages, and automations","baseStateToken":"preview-token","changes":[{"resource":"custom-review/review","fieldPath":"steps","previousValue":"old","requestedValue":"new"}]}`)
+			_, _ = fmt.Fprint(w, `{"coverage":"Workspace name, repositories, stages, and automations","baseStateToken":"preview-token","changes":[{"resource":"custom-review/review","fieldPath":"steps","previousValue":"old","requestedValue":"new"}]}`)
 			return
 		}
 		assert.Equal(t, planned, body["bundle"])
-		_, _ = fmt.Fprint(w, `{"coverage":"Repositories, stages, and automations","changed":true}`)
+		_, _ = fmt.Fprint(w, `{"coverage":"Workspace name, repositories, stages, and automations","changed":true}`)
 	})
 	root.SetArgs([]string{"export", "--workspace", "example", "--output-dir", output})
 	require.NoError(t, root.Execute())
@@ -479,9 +480,9 @@ func TestConfigurationPlanAndApplyStopBeforePublishing(t *testing.T) {
 				calls++
 				assert.Equal(t, "/api/v1/factories/example/configuration:plan", r.URL.Path)
 				w.Header().Set("Content-Type", "application/json")
-				response := map[string]any{"coverage": "Repositories, stages, and automations", "baseStateToken": "token"}
+				response := map[string]any{"coverage": "Workspace name, repositories, stages, and automations", "baseStateToken": "token"}
 				if scenario != "unchanged" {
-					response["changes"] = []map[string]string{{"resource": "implementation/implement", "fieldPath": "with.additional_instructions", "previousValue": "old", "requestedValue": "new"}}
+					response["changes"] = []map[string]string{{"resource": "implementation/implement", "fieldPath": "with.agent.additional_instructions", "previousValue": "old", "requestedValue": "new"}}
 				}
 				if scenario == "diagnostics" {
 					response["diagnostics"] = []map[string]string{{"path": ".superplane/main.yml", "field": "stages", "message": "Unsupported stage."}}
@@ -535,12 +536,12 @@ func TestConfigurationPlanReadsManifestFromCurrentDirectory(t *testing.T) {
 				var body map[string]any
 				require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
 				bundle := body["bundle"].(map[string]any)
-				assert.Equal(t, ".superplane/main.yml", bundle["manifestPath"])
+				assert.Equal(t, "main.yml", bundle["manifestPath"])
 				files := bundle["files"].([]any)
 				require.Len(t, files, 1)
 				assert.Equal(t, configurationManifest, files[0].(map[string]any)["content"])
 				w.Header().Set("Content-Type", "application/json")
-				_, _ = fmt.Fprint(w, `{"coverage":"Repositories, stages, and automations"}`)
+				_, _ = fmt.Fprint(w, `{"coverage":"Workspace name, repositories, stages, and automations"}`)
 			})
 			root.SetArgs(args)
 			err := root.Execute()
@@ -550,6 +551,113 @@ func TestConfigurationPlanReadsManifestFromCurrentDirectory(t *testing.T) {
 				return
 			}
 			require.NoError(t, err)
+			assert.Equal(t, 1, calls)
+		})
+	}
+}
+
+// A shared source can serve independent manifests while only selected files reach the API.
+func TestConfigurationPackagesSelectedManifestWithinRoot(t *testing.T) {
+	for _, folder := range []string{".superplane", ".superplane/workspaces"} {
+		t.Run(folder, func(t *testing.T) {
+			directory := t.TempDir()
+			t.Chdir(directory)
+			require.NoError(t, os.MkdirAll(folder, 0755))
+			require.NoError(t, os.MkdirAll(".superplane/automations", 0755))
+			reference := "automations/review.yml"
+			if folder != ".superplane" {
+				reference = "../automations/review.yml"
+			}
+			manifest := strings.Replace(configurationManifest, "\"@superplane/implement\"", reference, 1)
+			manifest = strings.Replace(manifest, "run: implement", "run: second-review", 1)
+			manifest += "  - id: backlog\n    name: Backlog\n    automations:\n      - id: second-review\n        uses: " + strings.Replace(reference, "review.yml", "./review.yml", 1) + "\n"
+			manifest += "  - id: second-phase\n    name: Second phase\n    run: second-review\n    automations: []\n"
+			require.NoError(t, os.WriteFile(filepath.Join(folder, "workspace-1.yml"), []byte(manifest), 0600))
+			require.NoError(t, os.WriteFile(filepath.Join(folder, "workspace-2.yml"), []byte("unrelated manifest"), 0600))
+			source := "apiVersion: v2\nkind: Automation\nname: Shared review\ntriggers:\n  - uses: manual\nsteps:\n  - name: Review\n    bash: echo review\n"
+			require.NoError(t, os.WriteFile(".superplane/automations/review.yml", []byte(source), 0600))
+			calls := 0
+			root, _ := configurationCLI(t, func(w http.ResponseWriter, r *http.Request) {
+				calls++
+				var body map[string]any
+				require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+				bundle := body["bundle"].(map[string]any)
+				assert.Equal(t, folder+"/workspace-1.yml", bundle["manifestPath"])
+				files := bundle["files"].([]any)
+				require.Len(t, files, 2)
+				assert.Equal(t, folder+"/workspace-1.yml", files[0].(map[string]any)["path"])
+				assert.Equal(t, manifest, files[0].(map[string]any)["content"])
+				assert.Equal(t, ".superplane/automations/review.yml", files[1].(map[string]any)["path"])
+				assert.Equal(t, source, files[1].(map[string]any)["content"])
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = fmt.Fprint(w, `{"coverage":"Workspace name, repositories, stages, and automations"}`)
+			})
+			root.SetArgs([]string{"plan", "--workspace", "example", "--root", ".", "-f", folder + "/workspace-1.yml"})
+			require.NoError(t, root.Execute())
+			assert.Equal(t, 1, calls)
+		})
+	}
+}
+
+func TestConfigurationRejectsUnsafeManifestInputs(t *testing.T) {
+	for _, scenario := range []string{"manifest symlink", "parent symlink", "directory", "outside root", "reference directory", "self reference", "old stage key", "stage concurrency", "duplicate automation ID"} {
+		t.Run(scenario, func(t *testing.T) {
+			directory := t.TempDir()
+			manifest := configurationManifest
+			input := filepath.Join(directory, "workspace.yml")
+			args := []string{"plan", "--workspace", "example", "-f", input}
+			switch scenario {
+			case "manifest symlink":
+				target := filepath.Join(t.TempDir(), "workspace.yml")
+				require.NoError(t, os.WriteFile(target, []byte(manifest), 0600))
+				require.NoError(t, os.Symlink(target, input))
+			case "parent symlink":
+				target := t.TempDir()
+				require.NoError(t, os.WriteFile(filepath.Join(target, "workspace.yml"), []byte(manifest), 0600))
+				require.NoError(t, os.Symlink(target, filepath.Join(directory, "linked")))
+				args = []string{"plan", "--workspace", "example", "-f", filepath.Join(directory, "linked", "workspace.yml")}
+			case "directory":
+				require.NoError(t, os.Mkdir(input, 0755))
+			case "outside root":
+				args = append(args, "--root", t.TempDir())
+			case "reference directory":
+				manifest = strings.Replace(manifest, "\"@superplane/implement\"", "automations/review.yml", 1)
+				require.NoError(t, os.MkdirAll(filepath.Join(directory, "automations", "review.yml"), 0755))
+			case "self reference":
+				manifest = strings.Replace(manifest, "\"@superplane/implement\"", "./workspace.yml", 1)
+			case "old stage key":
+				manifest = strings.Replace(manifest, "  - id: implementation", "  - key: implementation", 1)
+			case "stage concurrency":
+				manifest = strings.Replace(manifest, "    run: implement", "    max_parallelism: 20\n    run: implement", 1)
+			case "duplicate automation ID":
+				manifest += "  - id: backlog\n    name: Backlog\n    automations:\n      - id: implement\n        uses: '@superplane/implement'\n"
+			}
+			if scenario != "manifest symlink" && scenario != "parent symlink" && scenario != "directory" {
+				require.NoError(t, os.WriteFile(input, []byte(manifest), 0600))
+			}
+			root, _ := configurationCLI(t, func(w http.ResponseWriter, r *http.Request) { t.Errorf("unsafe input reached API: %s", r.URL) })
+			root.SetArgs(args)
+			require.Error(t, root.Execute())
+		})
+	}
+}
+
+func TestConfigurationReadsStdinAndFilesystemRoot(t *testing.T) {
+	for _, scenario := range []string{"stdin", "filesystem root"} {
+		t.Run(scenario, func(t *testing.T) {
+			args := []string{"plan", "--workspace", "example", "-f", "-"}
+			if scenario == "filesystem root" {
+				args = []string{"plan", "--workspace", "example", "--root", "/", "-f", writeConfigurationInput(t)}
+			}
+			calls := 0
+			root, _ := configurationCLI(t, func(w http.ResponseWriter, r *http.Request) {
+				calls++
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = fmt.Fprint(w, `{"coverage":"Workspace name, repositories, stages, and automations"}`)
+			})
+			root.SetIn(strings.NewReader(configurationManifest))
+			root.SetArgs(args)
+			require.NoError(t, root.Execute())
 			assert.Equal(t, 1, calls)
 		})
 	}
