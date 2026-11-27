@@ -169,6 +169,45 @@ func (s *Server) handleRunnerMoveTask(w http.ResponseWriter, r *http.Request) {
 	}{runnerTaskViewFrom(s.BaseURL, target.factory, target.order), result.FromColumn, result.Column, result.Changed})
 }
 
+// handleRunnerAttachTask links a run with no task to a task that waits in the
+// stage of its automation. The task timeline then shows the run in that stage.
+func (s *Server) handleRunnerAttachTask(w http.ResponseWriter, r *http.Request) {
+	scope, ok := s.authenticateRunner(w, r, runneraction.ScopeTasksAttach)
+	if !ok {
+		return
+	}
+	var request struct {
+		Task *string `json:"task"`
+	}
+	if err := decodeRunnerJSON(w, r, &request, runnerTaskMutationBodyMaxBytes); err != nil {
+		return
+	}
+	target, stage, ok := s.runnerWaitingTaskTarget(w, r, scope, request.Task)
+	if !ok {
+		return
+	}
+	err := database.DB(r.Context()).Transaction(func(tx *gorm.DB) error {
+		return target.order.AttachWaitingRun(tx, target.canvasRunID, stage)
+	})
+	if err != nil {
+		var pgErr *pgconn.PgError
+		switch {
+		case errors.Is(err, models.ErrFactoryTaskNotWaiting):
+			http.Error(w, "Task is not waiting in this stage", http.StatusConflict)
+		case errors.As(err, &pgErr) && (pgErr.Code == "55P03" || pgErr.Code == "40P01"):
+			http.Error(w, "Task stage is changing. Retry the request", http.StatusConflict)
+		default:
+			writeRunnerTaskError(w, err)
+		}
+		return
+	}
+	publishRunnerTaskUpdate(target.factory, target.order, factoryevents.EventTypeOrderUpdated)
+	_ = writeJSON(w, http.StatusOK, struct {
+		runnerTaskView
+		Column string `json:"column"`
+	}{runnerTaskViewFrom(s.BaseURL, target.factory, target.order), stage})
+}
+
 // A run with no task, such as a webhook run, can move only a task that waits
 // in the stage of its own automation.
 func (s *Server) runnerWaitingTaskTarget(w http.ResponseWriter, r *http.Request, scope *runneraction.RunnerScope, ref *string) (*taskOwnerTarget, string, bool) {

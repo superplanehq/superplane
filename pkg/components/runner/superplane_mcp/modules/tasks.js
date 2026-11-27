@@ -108,6 +108,29 @@ const MOVE_TASK = {
   handler: moveTask,
 };
 
+async function attachTask(input, client) {
+  const task = input && input.task;
+  if (typeof task !== "string" || !task.trim()) throw new Error("task must be a task id or key");
+  return client.request("POST", "/api/v1/runner/task/attach", { task: task.trim() });
+}
+
+const ATTACH_TASK = {
+  definition: {
+    name: "attach_task",
+    description:
+      "Attach this run to a task so the task timeline shows the run in the stage of this automation. Only a run with no task, such as a webhook run, can attach. The task must wait in the stage of this automation after the stage work passed. Attach before move_task. Attaching the same task again has no effect. Returns task identity and column.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        task: { type: "string", minLength: 1, description: "Task id, number, or key, for example SP-42. Use get_task to find it." },
+      },
+      required: ["task"],
+      additionalProperties: false,
+    },
+  },
+  handler: attachTask,
+};
+
 function ownerPaths(raw) {
   const values = Array.isArray(raw) ? raw : [];
   return values
@@ -296,5 +319,5 @@ const CLOSE_TASK = {
 };
 
 module.exports = {
-  tools: [ASSIGN_TASK_OWNER, SUGGEST_TASK_OWNER, LIST_TASKS, GET_TASK, CREATE_TASK, CLOSE_TASK, MOVE_TASK],
+  tools: [ASSIGN_TASK_OWNER, SUGGEST_TASK_OWNER, LIST_TASKS, GET_TASK, CREATE_TASK, CLOSE_TASK, MOVE_TASK, ATTACH_TASK],
 };

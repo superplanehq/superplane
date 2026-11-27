@@ -20,6 +20,7 @@ import {
   type OrgUserDisplayLookup,
 } from "@/lib/orgUserDisplay";
 
+import { CUSTOM_AUTOMATION_TEMPLATE_ID } from "../../lib/customAutomation";
 import { extractArtifactUrl, toArtifactDataRecord } from "../../lib/workOrderArtifact";
 import { reviewCandidateForWorkOrderId } from "../onboarding/first-run/reviewCandidates";
 import { canvasKeyForAutomation } from "./splitRunCanvases";
@@ -292,6 +293,9 @@ function sourceForAutomation(automation: FactoriesAutomationRef): SplitRunSource
 }
 
 function intakeKindForAutomation(automation: FactoriesAutomationRef): SplitRunIntakeKind | undefined {
+  if (automation.templateId === CUSTOM_AUTOMATION_TEMPLATE_ID) {
+    return undefined;
+  }
   const key = canvasKeyForAutomation({ id: automation.appId, name: automation.appName });
   if (key === "sentry") {
     return "sentry-exceptions";

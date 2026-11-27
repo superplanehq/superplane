@@ -183,6 +183,13 @@ const COMMANDS = [
     boolean: ["next"],
     tool: "move_task",
   },
+  {
+    words: ["task", "attach"],
+    usage: "superplane task attach --task TASK",
+    flags: ["task"],
+    required: ["task"],
+    tool: "attach_task",
+  },
 ];
 
 function usage() {

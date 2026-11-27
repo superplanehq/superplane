@@ -216,3 +216,13 @@ test("move_task passes the task of a run with no task", async () => {
   assert.deepEqual(calls[0].body, { next: true, task: "SP-42" });
   await assert.rejects(() => call("move_task", { task: " ", next: true }, client), /task must be/);
 });
+
+test("attach_task requires a task", async () => {
+  const calls = [];
+  const client = createClient(env, recordingFetch(calls, '{"column":"custom-wait"}'));
+  await call("attach_task", { task: " SP-42 " }, client);
+  assert.equal(calls[0].url, "https://superplane.example/api/v1/runner/task/attach");
+  assert.deepEqual(calls[0].body, { task: "SP-42" });
+  await assert.rejects(() => call("attach_task", {}, client), /task must be/);
+  assert.equal(calls.length, 1);
+});

@@ -344,9 +344,22 @@ test("task help lists a command for every global tool", async () => {
     "superplane task check remove",
     "superplane task pr open",
     "superplane task pr list",
+    "superplane task move",
+    "superplane task attach",
   ]) {
     assert.match(stdout, new RegExp(line));
   }
+});
+
+test("task attach sends the task through the runner API", async () => {
+  let stdout = "";
+  const code = await main(["task", "attach", "--task", "SP-42"], env, async (url, options) => {
+    assert.equal(url, "https://app.example/api/v1/runner/task/attach");
+    assert.deepEqual(JSON.parse(options.body), {task: "SP-42"});
+    return {ok: true, status: 200, text: async () => '{"column":"custom-wait"}'};
+  }, {write: chunk => {stdout += chunk;}}, {write() {}});
+  assert.equal(code, 0);
+  assert.deepEqual(JSON.parse(stdout), {column: "custom-wait"});
 });
 
 test("each global tool command calls that tool", async () => {

@@ -21,6 +21,7 @@ const (
 	ScopeTasksCreate       RunnerToolScope = "tasks:create"
 	ScopeTasksClose        RunnerToolScope = "tasks:close"
 	ScopeTasksMove         RunnerToolScope = "tasks:move"
+	ScopeTasksAttach       RunnerToolScope = "tasks:attach"
 	ScopeChecksRead        RunnerToolScope = "checks:read"
 	ScopeChecksWrite       RunnerToolScope = "checks:write"
 	ScopeArtifactsRead     RunnerToolScope = "artifacts:read"
@@ -60,6 +61,7 @@ var runnerTools = []RunnerTool{
 	{Name: "open_pull_request", Scope: ScopePullRequestsWrite},
 	{Name: "list_pull_requests", Scope: ScopePullRequestsRead},
 	{Name: "move_task", Scope: ScopeTasksMove},
+	{Name: "attach_task", Scope: ScopeTasksAttach},
 }
 
 // Every flow receives these tools for now. Narrow the list here later.
@@ -83,8 +85,9 @@ var runnerFlowScopes = map[RunnerFlow][]RunnerToolScope{
 	RunnerFlowTask:            withScopes(ScopeTasksMove),
 	RunnerFlowMergeConfidence: withScopes(ScopeMergeChecksWrite, ScopeTasksMove),
 	// A schedule run has no task. It can find and create tasks, and move
-	// tasks that wait in its own stage.
-	RunnerFlowSchedule: {ScopeTasksRead, ScopeTasksCreate, ScopeTasksMove},
+	// tasks that wait in its own stage. It can attach its run to those
+	// tasks, so the task timeline shows the run.
+	RunnerFlowSchedule: {ScopeTasksRead, ScopeTasksCreate, ScopeTasksMove, ScopeTasksAttach},
 }
 
 func withScopes(extra ...RunnerToolScope) []RunnerToolScope {

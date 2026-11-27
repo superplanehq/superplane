@@ -667,6 +667,41 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(fixture.currentPhaseId).toBe(implementPhases[1].id);
   });
 
+  it("puts a webhook run that attached to the task in its stage", () => {
+    const fixture = splitRunFixtureForWorkOrder(
+      order({
+        state: "STATE_OPEN",
+        lineDispatches: [
+          {
+            id: "d-1",
+            line: { id: "line-1", name: "Software delivery" },
+            state: "STATE_FINISHED",
+            currentStageKey: "custom-approval",
+            stages: [{ key: "custom-approval", name: "Awaiting approval" }],
+            stepExecutions: [],
+          },
+        ],
+        attachedRuns: [
+          {
+            id: "run-gate",
+            step: "Approval gate",
+            stepIndex: -1,
+            stageKey: "custom-approval",
+            state: "STATE_FINISHED",
+            result: "RESULT_PASSED",
+            run: { id: "run-gate", appId: "app-gate", appName: "Approval gate" },
+          },
+        ],
+      }),
+      { lineId: "line-1" },
+    );
+
+    const phase = fixture.phases.find((candidate) => candidate.runId === "run-gate");
+    expect(phase).toEqual(
+      expect.objectContaining({ columnKey: "custom-approval", appId: "app-gate", componentName: "Approval gate" }),
+    );
+  });
+
   it("keeps runs from earlier dispatches as history phases", () => {
     const fixture = splitRunFixtureForWorkOrder(
       order({

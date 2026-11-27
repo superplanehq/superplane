@@ -124,6 +124,39 @@ func (o *FactoryWorkOrder) MoveFromRun(tx *gorm.DB, runID uuid.UUID, column stri
 // work passed. Runs with no task, such as webhook runs, use it. They can
 // move only tasks that wait in their own stage.
 func (o *FactoryWorkOrder) MoveWaitingFromRun(tx *gorm.DB, runID uuid.UUID, stageKey, column string, next bool) (*FactoryTaskMoveResult, error) {
+	dispatch, err := o.lockWaitingLineDispatch(tx, stageKey)
+	if err != nil {
+		return nil, err
+	}
+	stage, found := dispatch.StageByKey(column)
+	if next {
+		stage, found = dispatch.NextStageAfter(dispatch.CurrentStageKey)
+	}
+	if !found {
+		return nil, fmt.Errorf("%w: destination or successor not found", ErrFactoryTaskMoveInvalid)
+	}
+	result := &FactoryTaskMoveResult{FromColumn: dispatch.CurrentStageKey, Column: stage.Key}
+	if stage.Key == dispatch.CurrentStageKey {
+		return result, nil
+	}
+	if stage.Kind != FactoryLineStageBacklog && stage.Kind != FactoryLineStageDone {
+		if err := o.RequireExecutionOwner(tx, true); err != nil {
+			return nil, err
+		}
+	}
+	if err := dispatch.Reactivate(tx); err != nil {
+		return nil, err
+	}
+	if err := o.enterMoveDestination(tx, dispatch, stage, runID, result); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// lockWaitingLineDispatch locks the task and its latest line traversal. It
+// returns ErrFactoryTaskNotWaiting unless the task waits in stageKey with no
+// open stage work.
+func (o *FactoryWorkOrder) lockWaitingLineDispatch(tx *gorm.DB, stageKey string) (*FactoryWorkOrderLineDispatch, error) {
 	latest, err := o.LatestLineDispatch(tx)
 	if errors.Is(err, ErrFactoryWorkOrderLineDispatchNotFound) {
 		return nil, ErrFactoryTaskNotWaiting
@@ -151,29 +184,7 @@ func (o *FactoryWorkOrder) MoveWaitingFromRun(tx *gorm.DB, runID uuid.UUID, stag
 	if open {
 		return nil, ErrFactoryTaskNotWaiting
 	}
-	stage, found := dispatch.StageByKey(column)
-	if next {
-		stage, found = dispatch.NextStageAfter(dispatch.CurrentStageKey)
-	}
-	if !found {
-		return nil, fmt.Errorf("%w: destination or successor not found", ErrFactoryTaskMoveInvalid)
-	}
-	result := &FactoryTaskMoveResult{FromColumn: dispatch.CurrentStageKey, Column: stage.Key}
-	if stage.Key == dispatch.CurrentStageKey {
-		return result, nil
-	}
-	if stage.Kind != FactoryLineStageBacklog && stage.Kind != FactoryLineStageDone {
-		if err := o.RequireExecutionOwner(tx, true); err != nil {
-			return nil, err
-		}
-	}
-	if err := dispatch.Reactivate(tx); err != nil {
-		return nil, err
-	}
-	if err := o.enterMoveDestination(tx, dispatch, stage, runID, result); err != nil {
-		return nil, err
-	}
-	return result, nil
+	return dispatch, nil
 }
 
 // LatestLineDispatch returns the newest line traversal of the task. Its

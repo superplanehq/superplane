@@ -86,6 +86,34 @@ func TestRunnerMoveTaskFromWebhookRunMovesOnlyTasksWaitingInItsStage(t *testing.
 	assert.Equal(t, models.FactoryWorkOrderExecutionStatusPending, started[0].Status)
 }
 
+func TestRunnerAttachTaskLinksWebhookRunToWaitingTask(t *testing.T) {
+	server, taskToken, order, dispatch, _ := moveTaskFixture(t)
+	db := database.DB(t.Context())
+	factory, err := models.FindFactory(db, order.OrganizationID, order.FactoryID)
+	require.NoError(t, err)
+	body := `{"task":"` + factory.WorkOrderKey(order.Number) + `"}`
+	token := noTaskRunnerToken(t, order, "custom-wait")
+
+	rec := runnerRequest(t, server, http.MethodPost, token, "/api/v1/runner/task/attach", body)
+	assert.Equal(t, http.StatusConflict, rec.Code, "a running stage is not waiting: %s", rec.Body.String())
+	rec = runnerRequest(t, server, http.MethodPost, taskToken, "/api/v1/runner/task/attach", body)
+	assert.Equal(t, http.StatusForbidden, rec.Code, "a task run cannot attach: %s", rec.Body.String())
+
+	waitInStage(t, dispatch, "custom-wait")
+	rec = runnerRequest(t, server, http.MethodPost, noTaskRunnerToken(t, order, "custom-review"), "/api/v1/runner/task/attach", body)
+	assert.Equal(t, http.StatusConflict, rec.Code, "another stage cannot attach: %s", rec.Body.String())
+	for range 2 {
+		rec = runnerRequest(t, server, http.MethodPost, token, "/api/v1/runner/task/attach", body)
+		require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	}
+
+	attached, err := models.ListWorkOrderAttachedRuns(db, order.ID)
+	require.NoError(t, err)
+	require.Len(t, attached, 1)
+	assert.Equal(t, "custom-wait", attached[0].StageKey)
+	assert.NotEmpty(t, attached[0].CanvasName)
+}
+
 func TestRunnerGetTaskFindsTaskByReference(t *testing.T) {
 	server, _, order, dispatch, _ := moveTaskFixture(t)
 	db := database.DB(t.Context())
