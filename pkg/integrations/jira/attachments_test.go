@@ -90,3 +90,86 @@ func TestClientIssueFilesDownloadsWithOAuth(t *testing.T) {
 	assert.Equal(t, "Bearer "+testAccessToken, httpContext.Requests[1].Header.Get("Authorization"))
 	assert.Contains(t, httpContext.Requests[1].URL.String(), "/rest/api/3/attachment/content/10001")
 }
+
+func TestClientIssueFilesImportsOnlySourceAttachments(t *testing.T) {
+	contentURL := "https://example.atlassian.net/rest/api/3/attachment/content/10001"
+	thumbnailURL := "https://example.atlassian.net/rest/api/3/attachment/thumbnail/10001"
+	foreignURL := "https://example.atlassian.net/rest/api/3/attachment/content/90001"
+	foreignDescription := "[file](" + foreignURL + ")"
+	issueURL := testProxyURL("/rest/api/3/issue/PUBLIC-1")
+	authorizedURL := testProxyURL("/rest/api/3/attachment/content/10001")
+	foreignContentURL := testProxyURL("/rest/api/3/attachment/content/90001")
+
+	for _, tt := range []struct {
+		name        string
+		fields      string
+		description string
+		wantFiles   []IssueFile
+	}{
+		{
+			name:        "empty attachment list",
+			fields:      `{"attachment":[]}`,
+			description: foreignDescription,
+		},
+		{
+			name:        "missing attachment list",
+			fields:      `{}`,
+			description: foreignDescription,
+		},
+		{
+			name:        "attachment without an ID",
+			fields:      `{"attachment":[{"filename":"foreign.pdf","content":"` + foreignURL + `"}]}`,
+			description: foreignDescription,
+		},
+		{
+			name: "authorized content and thumbnail with foreign link",
+			fields: `{"attachment":[{"id":" 10001 ","filename":"notes.pdf","mimeType":"application/pdf",` +
+				`"content":"` + authorizedURL + `","thumbnail":"` + testProxyURL("/rest/api/3/attachment/thumbnail/10001") + `"}]}`,
+			description: foreignDescription + " [notes](" + contentURL + ") ![preview](" + thumbnailURL + ") [notes again](" + contentURL + ")",
+			wantFiles: []IssueFile{{
+				Name:        "notes.pdf",
+				ContentType: "application/pdf",
+				Body:        []byte("authorized-pdf-bytes"),
+				ReplaceURLs: []string{authorizedURL, contentURL, thumbnailURL},
+			}},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			httpContext := &contexts.HTTPContext{ResponsesByPath: map[string][]*http.Response{
+				strings.TrimPrefix(issueURL, "https://api.atlassian.com"): {{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"key":"PUBLIC-1","fields":` + tt.fields + `}`)),
+				}},
+				strings.TrimPrefix(authorizedURL, "https://api.atlassian.com"): {{
+					StatusCode: http.StatusOK,
+					Header:     http.Header{"Content-Type": []string{"application/pdf"}},
+					Body:       io.NopCloser(strings.NewReader("authorized-pdf-bytes")),
+				}},
+				// A successful foreign response proves rejection happens before provider access.
+				strings.TrimPrefix(foreignContentURL, "https://api.atlassian.com"): {{
+					StatusCode: http.StatusOK,
+					Header:     http.Header{"Content-Type": []string{"application/pdf"}},
+					Body:       io.NopCloser(strings.NewReader("private-pdf-bytes")),
+				}},
+			}}
+			client, err := NewClient(httpContext, newAuthorizedIntegration())
+			require.NoError(t, err)
+
+			files, err := client.IssueFiles(t.Context(), "PUBLIC-1", tt.description)
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantFiles, files)
+			requestURLs := make([]string, 0, len(httpContext.Requests))
+			for _, request := range httpContext.Requests {
+				requestURLs = append(requestURLs, request.URL.Scheme+"://"+request.URL.Host+request.URL.Path)
+				assert.Equal(t, "Bearer "+testAccessToken, request.Header.Get("Authorization"))
+			}
+			wantRequestURLs := []string{issueURL}
+			if len(tt.wantFiles) > 0 {
+				wantRequestURLs = append(wantRequestURLs, authorizedURL)
+			}
+			assert.Equal(t, wantRequestURLs, requestURLs)
+			require.NotEmpty(t, httpContext.Requests)
+			assert.Equal(t, "attachment", httpContext.Requests[0].URL.Query().Get("fields"))
+		})
+	}
+}
