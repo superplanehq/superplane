@@ -201,6 +201,7 @@ import {
   factoryPRFeedbackPath,
   factoryPRFeedbackSetupPath,
   factorySentryIntakeSetupPath,
+  factorySettingsSectionPath,
   columnAutomationViewCanvasIdFromSearch,
   firstFactoryLineId,
   workOrderDetailPath,
@@ -866,7 +867,15 @@ export function LinesPage() {
             }
           />
           <SubscriptionIntakeOwnerRecovery />
-          <WebhookFailuresNotice organizationId={organizationId} />
+          <WebhookFailuresNotice
+            organizationId={organizationId}
+            integrationsBasePath={factorySettingsSectionPath(
+              organizationId,
+              routeSegment,
+              "organization",
+              "integrations",
+            )}
+          />
           {configuredIntakes
             .filter(
               (intake) =>

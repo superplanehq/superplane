@@ -2,8 +2,9 @@ import type { OrganizationsIntegration } from "@/api-client";
 import { client } from "@/api-client/client.gen";
 import { integrationKeys } from "@/hooks/useIntegrations";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "bun:test";
+import { MemoryRouter } from "react-router";
 
 import { WebhookFailuresNotice } from "./WebhookFailuresNotice";
 
@@ -97,7 +98,12 @@ afterEach(() => {
 function notice() {
   return (
     <QueryClientProvider client={queryClient}>
-      <WebhookFailuresNotice organizationId="org-1" />
+      <MemoryRouter>
+        <WebhookFailuresNotice
+          organizationId="org-1"
+          integrationsBasePath="/org-1/workspaces/ENG/settings/organization/integrations"
+        />
+      </MemoryRouter>
     </QueryClientProvider>
   );
 }
@@ -105,7 +111,7 @@ function notice() {
 it("groups GitHub failures without dropping retries and clears the notice when setup succeeds", async () => {
   render(notice());
   await screen.findByRole("alert");
-  expect(screen.getAllByRole("heading", { level: 3, name: "acme/api" })).toHaveLength(1);
+  expect(screen.getAllByRole("heading", { name: "acme/api" })).toHaveLength(1);
   expect(screen.getByText("Events at the limit", { selector: "dt" })).toBeVisible();
   expect(screen.getByText("Issues, Pull requests", { selector: "dd" })).toBeVisible();
   expect(screen.getByText("Other affected events", { selector: "dt" })).toBeVisible();
@@ -127,6 +133,44 @@ it("groups GitHub failures without dropping retries and clears the notice when s
     await queryClient.invalidateQueries({ queryKey: integrationKeys.connected("org-1") });
   });
   await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
+});
+
+it("identifies each affected connection and opens its settings without merging shared repositories", async () => {
+  integrations[0].metadata!.name = "puppies-inc";
+  integrations.push(
+    {
+      metadata: { id: "github-old", name: "puppies-inc-old", integrationName: "github" },
+      status: {
+        state: "ready",
+        webhookFailures: [{ id: "old-hook", state: "failed", repositories: ["acme/api", "acme/web"] }],
+      },
+    },
+    { metadata: { id: "github-healthy", name: "healthy", integrationName: "github" }, status: { state: "ready" } },
+  );
+  render(notice());
+
+  for (const [name, id] of [
+    ["puppies-inc", "github-1"],
+    ["puppies-inc-old", "github-old"],
+  ]) {
+    const connection = within(await screen.findByRole("alert", { name: `${name} (GitHub)` }));
+    expect(connection.getByRole("heading", { name: `${name} (GitHub)` })).toBeVisible();
+    expect(connection.getByRole("link", { name: "Open integration settings" })).toHaveAttribute(
+      "href",
+      `/org-1/workspaces/ENG/settings/organization/integrations/${id}`,
+    );
+    expect(connection.getByRole("link", { name: "Open acme/api webhooks" })).toHaveAttribute(
+      "href",
+      "https://github.com/acme/api/settings/hooks",
+    );
+  }
+  expect(screen.getAllByRole("link", { name: "Open integration settings" })).toHaveLength(2);
+  expect(screen.queryByRole("alert", { name: "healthy (GitHub)" })).not.toBeInTheDocument();
+
+  fireEvent.click(
+    within(screen.getByRole("alert", { name: "puppies-inc-old (GitHub)" })).getByRole("button", { name: "Try again" }),
+  );
+  await waitFor(() => expect(retriedWebhooks).toEqual(["old-hook"]));
 });
 
 it("keeps the remaining failed webhook actionable after a partial retry failure", async () => {
@@ -151,10 +195,15 @@ it("allows readers to inspect failures and hides cached failures when read acces
   canUpdate = false;
   const { rerender } = render(notice());
   expect(await screen.findByRole("alert")).toBeVisible();
+  expect(screen.getByRole("link", { name: "Open integration settings" })).toHaveAttribute(
+    "href",
+    "/org-1/workspaces/ENG/settings/organization/integrations/github-1",
+  );
   expect(screen.queryByRole("button", { name: "Try again" })).not.toBeInTheDocument();
   expect(retriedWebhooks).toHaveLength(0);
 
   canRead = false;
   rerender(notice());
   expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  expect(screen.queryByRole("link", { name: "Open integration settings" })).not.toBeInTheDocument();
 });

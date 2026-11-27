@@ -277,7 +277,7 @@ describe("Workspace webhook warning", () => {
         const banner = await screen.findByTestId("webhook-failures-notice", {}, { timeout: 8000 });
         expect(screen.queryByTestId("broken-integrations-banner")).not.toBeInTheDocument();
         expect(within(banner).getByRole("button", { name: "Try again" })).toBeEnabled();
-        expect(within(banner).getByRole("heading", { level: 3, name: "acme/api" })).toBeVisible();
+        expect(within(banner).getByRole("heading", { name: "acme/api" })).toBeVisible();
         expect(within(banner).getByRole("link", { name: "Open acme/api webhooks" })).toHaveAttribute(
           "href",
           "https://github.com/acme/api/settings/hooks",
