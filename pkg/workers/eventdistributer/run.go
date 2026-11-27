@@ -233,10 +233,12 @@ func groupChildRunsByExecutionID(runs []models.CanvasRun) map[string][]models.Ca
 
 func broadcastFactoryWorkOrderForRun(wsHub *ws.Hub, runID uuid.UUID, reason string) {
 	execution, err := models.FindWorkOrderExecutionByRunID(database.Conn(), runID)
+	if errors.Is(err, models.ErrFactoryWorkOrderExecutionNotFound) {
+		broadcastAttachedFactoryWorkOrders(wsHub, runID, reason)
+		return
+	}
 	if err != nil {
-		if !errors.Is(err, models.ErrFactoryWorkOrderExecutionNotFound) {
-			log.WithError(err).Warnf("Failed to look up factory work order execution for run %s", runID)
-		}
+		log.WithError(err).Warnf("Failed to look up factory work order execution for run %s", runID)
 		return
 	}
 
@@ -246,6 +248,24 @@ func broadcastFactoryWorkOrderForRun(wsHub *ws.Hub, runID uuid.UUID, reason stri
 		Reason:    reason,
 	}); err != nil {
 		log.WithError(err).Warnf("Failed to broadcast factory work order update for run %s", runID)
+	}
+}
+
+// A run with no task, such as a webhook run, shows on the tasks it attached to.
+func broadcastAttachedFactoryWorkOrders(wsHub *ws.Hub, runID uuid.UUID, reason string) {
+	orders, err := models.ListWorkOrdersAttachedToRun(database.Conn(), runID)
+	if err != nil {
+		log.WithError(err).Warnf("Failed to look up factory work orders attached to run %s", runID)
+		return
+	}
+	for _, order := range orders {
+		if err := BroadcastFactoryWorkOrderUpdated(wsHub, &factoriespb.FactoryWorkOrderUpdatedMessage{
+			FactoryId: order.FactoryID.String(),
+			OrderId:   order.ID.String(),
+			Reason:    reason,
+		}); err != nil {
+			log.WithError(err).Warnf("Failed to broadcast factory work order update for run %s", runID)
+		}
 	}
 }
 
