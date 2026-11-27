@@ -1893,20 +1893,21 @@ describe("LinesPage board extras", () => {
 
       await user.click(screen.getByTestId(row));
       const popup = screen.getByTestId(templateId ? "merge-confidence-config" : "column-automation-view");
-      expect(within(popup).getByRole("button", { name: "Delete automation" })).toBeVisible();
+      const deleteLabel = templateId ? "Delete" : "Delete automation";
+      expect(within(popup).getByRole("button", { name: deleteLabel })).toBeVisible();
       if (templateId === "pr-closure") {
         expect(within(popup).queryByRole("tab")).not.toBeInTheDocument();
         expect(await within(popup).findByText("No runs yet")).toBeInTheDocument();
       }
       if (templateId === "risk-score") {
         await user.click(within(popup).getByRole("tab", { name: "Runs" }));
-        expect(within(popup).getByRole("button", { name: "Delete automation" })).toBeVisible();
+        expect(within(popup).getByRole("button", { name: deleteLabel })).toBeVisible();
       }
-      await user.click(within(popup).getByRole("button", { name: "Delete automation" }));
+      await user.click(within(popup).getByRole("button", { name: deleteLabel }));
       expect(deleteFactoryAutomationMutateAsync).not.toHaveBeenCalled();
       await user.click(screen.getByRole("button", { name: "Keep automation" }));
       expect(deleteFactoryAutomationMutateAsync).not.toHaveBeenCalled();
-      await user.click(within(popup).getByRole("button", { name: "Delete automation" }));
+      await user.click(within(popup).getByRole("button", { name: deleteLabel }));
       const confirmation = templateId ? screen.getByRole("alertdialog") : popup;
       await user.click(within(confirmation).getByRole("button", { name: "Delete automation" }));
 
@@ -1932,7 +1933,7 @@ describe("LinesPage board extras", () => {
       useFactoryAutomations.mockReturnValue({ data: [{ id, name: id }] });
       renderLinesBoard(factoryColumnAutomationViewPath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT, id));
       const popup = await screen.findByTestId("merge-confidence-config");
-      expect(within(popup).queryByRole("button", { name: "Delete automation" })).not.toBeInTheDocument();
+      expect(within(popup).queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
       expect(deleteFactoryAutomationMutateAsync).not.toHaveBeenCalled();
     },
   );
@@ -1948,7 +1949,7 @@ describe("LinesPage board extras", () => {
     const user = userEvent.setup();
     await user.click(screen.getByTestId("lines-done-automation-rows-row-closure-app-pr-closure"));
     const popup = screen.getByTestId("merge-confidence-config");
-    await user.click(within(popup).getByRole("button", { name: "Delete automation" }));
+    await user.click(within(popup).getByRole("button", { name: "Delete" }));
     await user.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Delete automation" }));
     await waitFor(() => expect(showErrorToast).toHaveBeenCalledWith(deletionError.message));
     expect(screen.getByRole("alertdialog")).toBeInTheDocument();

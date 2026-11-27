@@ -1,5 +1,6 @@
 import type { SuperplaneComponentsNode } from "@/api-client";
 import { Button } from "@/components/ui/button";
+import { ColumnAutomationFooterAction } from "./columnAutomationFooterSlot";
 import { AgentRunnerSettings } from "./AgentRunnerSettings";
 import { ImplementDurationDraftProvider } from "./ImplementDurationDraft";
 import { MergeConfidencePublicationSettings } from "./MergeConfidencePublicationSettings";
@@ -88,7 +89,7 @@ function MergeConfidenceConfigurationView({
             <MergeConfidencePublicationSettings settings={settings} />
           </div>
         </section>
-        <footer className="flex shrink-0 items-center justify-end gap-3 border-t border-border px-5 py-3">
+        <ColumnAutomationFooterAction>
           {saveError ? (
             <p className="workspace-body-text mr-auto text-destructive" role="alert">
               {saveError}
@@ -102,7 +103,7 @@ function MergeConfidenceConfigurationView({
           >
             {saving ? MERGE_CONFIDENCE_SETTINGS_COPY.saving : MERGE_CONFIDENCE_SETTINGS_COPY.save}
           </Button>
-        </footer>
+        </ColumnAutomationFooterAction>
       </div>
     </ImplementDurationDraftProvider>
   );

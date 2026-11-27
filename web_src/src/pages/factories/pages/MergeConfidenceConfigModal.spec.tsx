@@ -484,7 +484,7 @@ describe("MergeConfidenceConfigModal", () => {
     const onDelete = vi.fn();
     const view = renderModal(onDelete, vi.fn(), confidenceGraph(), { deletePending: true });
     const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: "Delete automation" }));
+    await user.click(screen.getByRole("button", { name: "Delete" }));
     const dialog = screen.getByRole("alertdialog");
     await user.click(within(dialog).getByTestId("merge-confidence-config-delete-confirm"));
     expect(within(dialog).getByTestId("merge-confidence-config-delete-confirm")).toBeDisabled();
@@ -555,6 +555,6 @@ describe("MergeConfidenceConfigModal", () => {
 
     expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["Automation"]);
     expect(screen.queryByTestId("merge-confidence-config-tab-runs")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Delete automation" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
   });
 });
