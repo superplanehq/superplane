@@ -2,6 +2,7 @@ package factories
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"time"
 
@@ -73,14 +74,22 @@ func RevokeFactoryMCPClient(
 	}
 
 	err = db.Transaction(func(tx *gorm.DB) error {
+		// Serialize revocation with password changes, consent, and exchanges.
+		_, err := models.LockMCPOAuthAccount(tx, &models.MCPOAuthRefreshToken{}, "id", clientID.String())
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return models.ErrMCPOAuthRefreshNotFound
+		}
+		if err != nil {
+			return err
+		}
 		locked, err := models.FindMCPOAuthRefreshTokenForFactory(tx, orgID, factory.ID, clientID)
 		if err != nil {
 			return err
 		}
-		if err := models.DeleteMCPOAuthRefreshTokensForWorkspaceSet(tx, orgID, locked.UserID, locked.ClientID, locked.WorkspaceIDs()); err != nil {
+		if err := models.DeleteMCPOAuthCodesForWorkspaceSet(tx, orgID, locked.UserID, locked.ClientID, locked.WorkspaceIDs()); err != nil {
 			return err
 		}
-		return models.DeleteMCPOAuthCodesForWorkspaceSet(tx, orgID, locked.UserID, locked.ClientID, locked.WorkspaceIDs())
+		return models.DeleteMCPOAuthRefreshTokensForWorkspaceSet(tx, orgID, locked.UserID, locked.ClientID, locked.WorkspaceIDs())
 	})
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to revoke MCP client")

@@ -111,13 +111,28 @@ func (s *Server) changePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	now := time.Now()
-	err = database.Conn().Transaction(func(tx *gorm.DB) error {
+	wrongPassword := errors.New("current password is incorrect")
+	err = database.DB(r.Context()).Transaction(func(tx *gorm.DB) error {
+		locked, err := models.LockAccount(tx, account.ID)
+		if err != nil {
+			return err
+		}
+		passwordAuth, err := models.FindAccountPasswordAuthByAccountIDInTransaction(tx, account.ID)
+		if err != nil {
+			return err
+		}
+		if !crypto.VerifyPassword(passwordAuth.PasswordHash, req.CurrentPassword) {
+			return wrongPassword
+		}
+		now := time.Now().UTC().Truncate(time.Microsecond)
+		if locked.PasswordChangedAt != nil && !now.After(*locked.PasswordChangedAt) {
+			now = locked.PasswordChangedAt.Add(time.Microsecond)
+		}
 		if err := passwordAuth.UpdatePasswordHashInTransaction(tx, newHash); err != nil {
 			return err
 		}
 
-		if err := account.MarkPasswordChangedInTransaction(tx, now); err != nil {
+		if err := locked.MarkPasswordChangedInTransaction(tx, now); err != nil {
 			return err
 		}
 
@@ -125,10 +140,17 @@ func (s *Server) changePassword(w http.ResponseWriter, r *http.Request) {
 			return err
 		}
 
-		return models.DeleteUserAPITokensForAccount(tx, account.ID)
+		if err := models.DeleteUserAPITokensForAccount(tx, account.ID); err != nil {
+			return err
+		}
+		return models.DeleteMCPOAuthCredentialsForAccount(tx, account.ID)
 	})
 
 	if err != nil {
+		if errors.Is(err, wrongPassword) {
+			http.Error(w, "Current password is incorrect", http.StatusBadRequest)
+			return
+		}
 		log.Errorf("Failed to rotate password for account %s: %v", account.ID, err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
