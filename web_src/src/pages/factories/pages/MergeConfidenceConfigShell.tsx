@@ -16,7 +16,7 @@ import { implementPullRequestDraft, useImplementSettingsDraft } from "./implemen
 import { IMPLEMENT_AGENT_NODE_ID, columnAutomationUsesSplitConfig } from "../lib/columnAutomationHeadline";
 import { COLUMN_AUTOMATIONS_COPY } from "../lib/columnAutomations";
 import { MERGE_CONFIDENCE_CONFIG_COPY } from "./mergeConfidenceCopy";
-import { MergeConfidenceActionsMenu, MergeConfidenceDeleteDialog } from "./MergeConfidenceConfigActions";
+import { MergeConfidenceDeleteDialog } from "./MergeConfidenceConfigActions";
 import { type SplitConfigDeleteCopy } from "./splitConfigDeleteCopy";
 import { NodeConfigPanel } from "./NodeConfigPanel";
 import type { NodeConfigurationSave } from "./nodeConfigurationCanvas";
@@ -101,7 +101,16 @@ function MergeConfidenceConfigContent(props: MergeConfidenceConfigShellProps) {
         onClose={props.onClose}
         actions={
           props.onDelete ? (
-            <MergeConfidenceActionsMenu label={props.deleteCopy.menuLabel} onDelete={props.onConfirmDelete} />
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="text-destructive hover:text-destructive"
+              onClick={props.onConfirmDelete}
+              data-testid="merge-confidence-config-delete"
+            >
+              {props.deleteCopy.menuLabel}
+            </Button>
           ) : null
         }
       >
