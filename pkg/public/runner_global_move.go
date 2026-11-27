@@ -19,11 +19,12 @@ import (
 )
 
 func (s *Server) handleRunnerMoveTask(w http.ResponseWriter, r *http.Request) {
-	target, ok := s.runnerOwnerTarget(runneraction.ScopeTasksMove)(w, r)
+	scope, ok := s.authenticateRunner(w, r, runneraction.ScopeTasksMove)
 	if !ok {
 		return
 	}
 	var request struct {
+		Task   *string `json:"task"`
 		Column *string `json:"column"`
 		Next   *bool   `json:"next"`
 	}
@@ -39,6 +40,23 @@ func (s *Server) handleRunnerMoveTask(w http.ResponseWriter, r *http.Request) {
 		column = strings.TrimSpace(*request.Column)
 	}
 	db := database.DB(r.Context())
+	var target *taskOwnerTarget
+	waitingStage := ""
+	if scope.Flow == runneraction.RunnerFlowSchedule {
+		target, waitingStage, ok = s.runnerWaitingTaskTarget(w, r, scope, request.Task)
+	} else {
+		target, ok = s.runnerTaskTarget(w, r, scope)
+		if ok && request.Task != nil {
+			own, err := target.factory.FindWorkOrderByRef(db, *request.Task)
+			if err != nil || own.ID != target.order.ID {
+				http.Error(w, "A task run can move only its own task. Remove task", http.StatusBadRequest)
+				return
+			}
+		}
+	}
+	if !ok {
+		return
+	}
 	fromState := target.order.State
 	var leftColumn string
 	var backlogEvents []models.CanvasEvent
@@ -49,7 +67,11 @@ func (s *Server) handleRunnerMoveTask(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			return err
 		}
-		result, err = target.order.MoveFromRun(tx, target.canvasRunID, column, request.Next != nil)
+		if waitingStage != "" {
+			result, err = target.order.MoveWaitingFromRun(tx, target.canvasRunID, waitingStage, column, request.Next != nil)
+		} else {
+			result, err = target.order.MoveFromRun(tx, target.canvasRunID, column, request.Next != nil)
+		}
 		if err != nil {
 			return err
 		}
@@ -59,11 +81,10 @@ func (s *Server) handleRunnerMoveTask(w http.ResponseWriter, r *http.Request) {
 		if !result.Changed || !target.order.IsOpen() {
 			return nil
 		}
-		execution, err := models.FindWorkOrderExecutionForRun(tx, target.canvasRunID)
-		if err != nil {
-			return err
+		dispatch, err := target.order.FindActiveLineDispatch(tx)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil
 		}
-		dispatch, err := models.FindWorkOrderLineDispatch(tx, execution.LineDispatchID)
 		if err != nil {
 			return err
 		}
@@ -86,6 +107,8 @@ func (s *Server) handleRunnerMoveTask(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case errors.Is(err, models.ErrFactoryTaskMoveInvalid):
 			http.Error(w, err.Error(), http.StatusBadRequest)
+		case errors.Is(err, models.ErrFactoryTaskNotWaiting):
+			http.Error(w, "Task is not waiting in this stage", http.StatusConflict)
 		case errors.Is(err, models.ErrFactoryTaskMoveStale), errors.Is(err, models.ErrFactoryWorkOrderExecutionNotFound), errors.Is(err, models.ErrFactoryWorkOrderLineDispatchNotFound):
 			http.Error(w, "Calling run has no current task stage", http.StatusConflict)
 		case errors.As(err, &pgErr) && (pgErr.Code == "55P03" || pgErr.Code == "40P01"):
@@ -144,4 +167,87 @@ func (s *Server) handleRunnerMoveTask(w http.ResponseWriter, r *http.Request) {
 		Column     string `json:"column"`
 		Changed    bool   `json:"changed"`
 	}{runnerTaskViewFrom(s.BaseURL, target.factory, target.order), result.FromColumn, result.Column, result.Changed})
+}
+
+// handleRunnerAttachTask links a run with no task to a task that waits in the
+// stage of its automation. The task timeline then shows the run in that stage.
+func (s *Server) handleRunnerAttachTask(w http.ResponseWriter, r *http.Request) {
+	scope, ok := s.authenticateRunner(w, r, runneraction.ScopeTasksAttach)
+	if !ok {
+		return
+	}
+	var request struct {
+		Task *string `json:"task"`
+	}
+	if err := decodeRunnerJSON(w, r, &request, runnerTaskMutationBodyMaxBytes); err != nil {
+		return
+	}
+	target, stage, ok := s.runnerWaitingTaskTarget(w, r, scope, request.Task)
+	if !ok {
+		return
+	}
+	err := database.DB(r.Context()).Transaction(func(tx *gorm.DB) error {
+		return target.order.AttachWaitingRun(tx, target.canvasRunID, stage)
+	})
+	if err != nil {
+		var pgErr *pgconn.PgError
+		switch {
+		case errors.Is(err, models.ErrFactoryTaskNotWaiting):
+			http.Error(w, "Task is not waiting in this stage", http.StatusConflict)
+		case errors.As(err, &pgErr) && (pgErr.Code == "55P03" || pgErr.Code == "40P01"):
+			http.Error(w, "Task stage is changing. Retry the request", http.StatusConflict)
+		default:
+			writeRunnerTaskError(w, err)
+		}
+		return
+	}
+	publishRunnerTaskUpdate(target.factory, target.order, factoryevents.EventTypeOrderUpdated)
+	_ = writeJSON(w, http.StatusOK, struct {
+		runnerTaskView
+		Column string `json:"column"`
+	}{runnerTaskViewFrom(s.BaseURL, target.factory, target.order), stage})
+}
+
+// A run with no task, such as a webhook run, can move only a task that waits
+// in the stage of its own automation.
+func (s *Server) runnerWaitingTaskTarget(w http.ResponseWriter, r *http.Request, scope *runneraction.RunnerScope, ref *string) (*taskOwnerTarget, string, bool) {
+	if ref == nil || strings.TrimSpace(*ref) == "" {
+		http.Error(w, "Pass task. This run has no task", http.StatusBadRequest)
+		return nil, "", false
+	}
+	db := database.DB(r.Context())
+	factory, err := models.FindFactory(db, scope.OrganizationID, scope.FactoryID)
+	if err != nil {
+		writeRunnerTaskError(w, err)
+		return nil, "", false
+	}
+	order, err := factory.FindWorkOrderByRef(db, *ref)
+	if errors.Is(err, models.ErrFactoryWorkOrderNotFound) {
+		http.Error(w, "Task not found", http.StatusNotFound)
+		return nil, "", false
+	}
+	if err != nil {
+		writeRunnerTaskError(w, err)
+		return nil, "", false
+	}
+	canvas, err := models.FindCanvasInTransaction(db, scope.OrganizationID, scope.CanvasID)
+	if err != nil {
+		writeRunnerTaskError(w, err)
+		return nil, "", false
+	}
+	if canvas.ColumnKey == nil || *canvas.ColumnKey == "" {
+		http.Error(w, "This automation has no stage", http.StatusConflict)
+		return nil, "", false
+	}
+	target, ok := s.openTaskOwnerTarget(w, r, scope.OrganizationID, scope.FactoryID, order.ID)
+	if !ok {
+		return nil, "", false
+	}
+	target.canvasID = scope.CanvasID
+	target.canvasRunID = scope.CanvasRunID
+	stage := *canvas.ColumnKey
+	if stage == models.CanvasColumnKeyImplement {
+		stage = "phase-0"
+	}
+	return target, stage, true
 }

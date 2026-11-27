@@ -879,6 +879,18 @@ CREATE TABLE public.factory_work_order_assignees (
 
 
 --
+-- Name: factory_work_order_attached_runs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.factory_work_order_attached_runs (
+    work_order_id uuid NOT NULL,
+    run_id uuid NOT NULL,
+    stage_key text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: factory_work_order_checks; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -2934,6 +2946,14 @@ ALTER TABLE ONLY public.factory_work_order_assignees
 
 
 --
+-- Name: factory_work_order_attached_runs factory_work_order_attached_runs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_work_order_attached_runs
+    ADD CONSTRAINT factory_work_order_attached_runs_pkey PRIMARY KEY (work_order_id, run_id);
+
+
+--
 -- Name: factory_work_order_checks factory_work_order_checks_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -4308,6 +4328,13 @@ CREATE INDEX idx_factory_work_order_assignees_user_id ON public.factory_work_ord
 --
 
 CREATE INDEX idx_factory_work_order_assignees_work_order_created_user ON public.factory_work_order_assignees USING btree (work_order_id, created_at, user_id);
+
+
+--
+-- Name: idx_factory_work_order_attached_runs_run; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_work_order_attached_runs_run ON public.factory_work_order_attached_runs USING btree (run_id);
 
 
 --
@@ -5828,6 +5855,22 @@ ALTER TABLE ONLY public.factory_work_order_assignees
 
 
 --
+-- Name: factory_work_order_attached_runs factory_work_order_attached_runs_run_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_work_order_attached_runs
+    ADD CONSTRAINT factory_work_order_attached_runs_run_id_fkey FOREIGN KEY (run_id) REFERENCES public.workflow_runs(id) ON DELETE CASCADE;
+
+
+--
+-- Name: factory_work_order_attached_runs factory_work_order_attached_runs_work_order_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_work_order_attached_runs
+    ADD CONSTRAINT factory_work_order_attached_runs_work_order_id_fkey FOREIGN KEY (work_order_id) REFERENCES public.factory_work_orders(id) ON DELETE CASCADE;
+
+
+--
 -- Name: factory_work_order_checks factory_work_order_checks_factory_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -6819,7 +6862,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261125134933	f
+20261127030041	f
 \.
 
 

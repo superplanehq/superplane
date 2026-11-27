@@ -128,7 +128,7 @@ func TestScheduleAutomationCreatesATaskWithoutAnExistingTask(t *testing.T) {
 
 	token := runnerTokenFrom(runner.AttachRunnerEnv(ctx, nil, 60))
 	require.NotEmpty(t, token)
-	assert.Equal(t, []string{"list_tasks", "create_task"}, listRunnerTools(t, server, token))
+	assert.Equal(t, []string{"list_tasks", "get_task", "create_task", "move_task", "attach_task"}, listRunnerTools(t, server, token))
 	connection, err := models.CreateCodexConnection(db, r.Organization.ID, r.User, time.Now())
 	require.NoError(t, err)
 	require.NoError(t, db.Model(connection).Updates(map[string]any{
