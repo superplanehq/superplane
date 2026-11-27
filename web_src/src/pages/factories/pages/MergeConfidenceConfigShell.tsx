@@ -5,9 +5,10 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { History, Settings } from "lucide-react";
 import { prepareMergeConfidenceDisplayGraph } from "./mergeConfidenceDisplayGraph";
 import { cn } from "@/lib/utils";
-import type { PointerEvent as ReactPointerEvent, ReactNode, RefObject } from "react";
+import { useState, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject } from "react";
 
 import { FactoryAutomationRunHistory } from "./automationRunHistory/FactoryAutomationRunHistory";
+import { ColumnAutomationFooterSlotProvider } from "./columnAutomationFooterSlot";
 import { ImplementConfiguration } from "./ImplementConfiguration";
 import { MergeConfidenceConfiguration } from "./MergeConfidenceConfiguration";
 import { useMergeConfidenceSettingsDraft } from "./mergeConfidenceSettingsDraft";
@@ -16,7 +17,7 @@ import { implementPullRequestDraft, useImplementSettingsDraft } from "./implemen
 import { IMPLEMENT_AGENT_NODE_ID, columnAutomationUsesSplitConfig } from "../lib/columnAutomationHeadline";
 import { COLUMN_AUTOMATIONS_COPY } from "../lib/columnAutomations";
 import { MERGE_CONFIDENCE_CONFIG_COPY } from "./mergeConfidenceCopy";
-import { MergeConfidenceActionsMenu, MergeConfidenceDeleteDialog } from "./MergeConfidenceConfigActions";
+import { MergeConfidenceDeleteDialog } from "./MergeConfidenceConfigActions";
 import { type SplitConfigDeleteCopy } from "./splitConfigDeleteCopy";
 import { NodeConfigPanel } from "./NodeConfigPanel";
 import type { NodeConfigurationSave } from "./nodeConfigurationCanvas";
@@ -91,20 +92,13 @@ export function MergeConfidenceConfigShell(props: MergeConfidenceConfigShellProp
 }
 
 function MergeConfidenceConfigContent(props: MergeConfidenceConfigShellProps) {
+  const [footerSlot, setFooterSlot] = useState<HTMLDivElement | null>(null);
   const simplifiedImplement = Boolean(props.graph?.specNodes?.some((node) => node.id === IMPLEMENT_AGENT_NODE_ID));
   const simplifiedConfiguration = simplifiedImplement || Boolean(mergeConfidenceSettingsNode(props.graph));
   const showAutomationTab = props.showAutomationTab ?? true;
   return (
-    <>
-      <PopupHeader
-        title={props.title}
-        onClose={props.onClose}
-        actions={
-          props.onDelete ? (
-            <MergeConfidenceActionsMenu label={props.deleteCopy.menuLabel} onDelete={props.onConfirmDelete} />
-          ) : null
-        }
-      >
+    <ColumnAutomationFooterSlotProvider slot={props.onDelete ? footerSlot : undefined}>
+      <PopupHeader title={props.title} onClose={props.onClose}>
         {showAutomationTab ? (
           <SettingsAutomationHeaderRow
             tabs={
@@ -121,6 +115,20 @@ function MergeConfidenceConfigContent(props: MergeConfidenceConfigShellProps) {
       </PopupHeader>
       <MergeConfidenceConfigBody {...configBodyProps(props)} />
       {props.onDelete ? (
+        <footer className="flex shrink-0 items-center justify-between gap-3 border-t border-border px-5 py-3">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={props.onConfirmDelete}
+            data-testid="merge-confidence-config-delete"
+          >
+            Delete
+          </Button>
+          <div ref={setFooterSlot} className="flex items-center gap-3" />
+        </footer>
+      ) : null}
+      {props.onDelete ? (
         <MergeConfidenceDeleteDialog
           open={props.confirmDelete}
           pending={props.deletePending}
@@ -130,7 +138,7 @@ function MergeConfidenceConfigContent(props: MergeConfidenceConfigShellProps) {
           onConfirm={props.onDelete}
         />
       ) : null}
-    </>
+    </ColumnAutomationFooterSlotProvider>
   );
 }
 

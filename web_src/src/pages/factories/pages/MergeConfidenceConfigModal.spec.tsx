@@ -244,7 +244,6 @@ describe("MergeConfidenceConfigModal", () => {
     expect(screen.queryByRole("button", { name: "Fit all components in view" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Errors" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Warnings" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "More actions" })).toBeInTheDocument();
   });
 
   it("selects the requested step when the canvas loads", () => {
@@ -481,18 +480,22 @@ describe("MergeConfidenceConfigModal", () => {
     expect(screen.getByTestId("merge-confidence-config-canvas")).toHaveAttribute("data-selected-run-id", OLDER_RUN_ID);
   });
 
-  it("asks to confirm before it deletes the automation", async () => {
-    const user = userEvent.setup();
+  it("requires confirmation, blocks pending deletion, and retains supplied error feedback", async () => {
     const onDelete = vi.fn();
-    renderModal(onDelete);
-
-    await user.click(screen.getByRole("button", { name: "More actions" }));
-    await user.click(screen.getByRole("menuitem", { name: "Delete automation" }));
-
-    expect(screen.getByRole("alertdialog", { name: "Delete automation" })).toBeInTheDocument();
-    expect(screen.getByText("Delete this automation? This cannot be undone.")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Delete automation" }));
-
+    const view = renderModal(onDelete, vi.fn(), confidenceGraph(), { deletePending: true });
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Delete" }));
+    const dialog = screen.getByRole("alertdialog");
+    await user.click(within(dialog).getByTestId("merge-confidence-config-delete-confirm"));
+    expect(within(dialog).getByTestId("merge-confidence-config-delete-confirm")).toBeDisabled();
+    expect(onDelete).not.toHaveBeenCalled();
+    view.rerenderGraph(confidenceGraph(), {
+      deletePending: false,
+      deleteError: "Could not delete automation. Try again.",
+    });
+    expect(within(dialog).getByText("Could not delete automation. Try again.")).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Delete automation" })).toBeEnabled();
+    await user.click(within(dialog).getByRole("button", { name: "Delete automation" }));
     expect(onDelete).toHaveBeenCalledTimes(1);
   });
 
@@ -552,5 +555,6 @@ describe("MergeConfidenceConfigModal", () => {
 
     expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["Automation"]);
     expect(screen.queryByTestId("merge-confidence-config-tab-runs")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
   });
 });

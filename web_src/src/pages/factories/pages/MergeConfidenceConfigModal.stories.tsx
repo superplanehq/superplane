@@ -100,6 +100,7 @@ const meta = {
     layout: "fullscreen",
     msw: {
       handlers: [
+        http.get("*/api/v1/canvases/merge-confidence/runs", () => HttpResponse.json({ runs: [] })),
         http.get("*/api/v1/organizations/org-1/integrations/github-1/resources", () =>
           HttpResponse.json({ resources: [{ id: "granted", name: "Checks write" }] }),
         ),
@@ -108,6 +109,7 @@ const meta = {
   },
   args: {
     title: "Merge confidence",
+    canvasId: "merge-confidence",
     graph: confidenceGraph(),
     onClose: () => undefined,
     onSaveNode: () => undefined,
@@ -127,6 +129,23 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Configuration: Story = {};
+
+export const PRClosureWithoutRuns: Story = {
+  args: {
+    title: "PR Closure",
+    canvasId: "app-pr-closure",
+    graph: {
+      nodes: [],
+      edges: [],
+      organizationId: "org-1",
+      factoryId: "factory-1",
+      specNodes: [{ id: "on-pr-closed", component: "github.onPullRequest", type: "TYPE_TRIGGER" }],
+    },
+  },
+  parameters: {
+    msw: { handlers: [http.get("*/api/v1/canvases/app-pr-closure/runs", () => HttpResponse.json({ runs: [] }))] },
+  },
+};
 
 export const Saving: Story = { args: { onSaveNode: () => new Promise<void>(() => undefined) } };
 
