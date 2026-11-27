@@ -14,7 +14,7 @@ vi.mock("@/hooks/useOrganizationRunnerFleets", () => ({
 const mockUseOrganizationRunnerFleets = vi.mocked(useOrganizationRunnerFleets);
 const field: ConfigurationField = {
   name: "machineType",
-  label: "Machine type",
+  label: "Runner fleet",
   type: "runner-fleet",
   required: true,
 };
@@ -80,14 +80,14 @@ describe("RunnerFleetFieldRenderer", () => {
     const { rerender } = render(
       <RunnerFleetFieldRenderer field={field} value="" onChange={vi.fn()} organizationId="org-1" />,
     );
-    expect(screen.getByText("Loading machine types...")).toBeInTheDocument();
+    expect(screen.getByText("Loading runner fleets...")).toBeInTheDocument();
 
     mockUseOrganizationRunnerFleets.mockReturnValueOnce({
       isLoading: false,
       isError: true,
     } as unknown as ReturnType<typeof useOrganizationRunnerFleets>);
     rerender(<RunnerFleetFieldRenderer field={field} value="" onChange={vi.fn()} organizationId="org-1" />);
-    expect(screen.getByText("SuperPlane could not load machine types. Try again.")).toBeInTheDocument();
+    expect(screen.getByText("SuperPlane could not load runner fleets. Try again.")).toBeInTheDocument();
 
     mockUseOrganizationRunnerFleets.mockReturnValueOnce({
       data: { fleets: [] },
@@ -95,6 +95,23 @@ describe("RunnerFleetFieldRenderer", () => {
       isError: false,
     } as unknown as ReturnType<typeof useOrganizationRunnerFleets>);
     rerender(<RunnerFleetFieldRenderer field={field} value="" onChange={vi.fn()} organizationId="org-1" />);
-    expect(screen.getByText("No machine types are available.")).toBeInTheDocument();
+    expect(screen.getByText("No runner fleets are available.")).toBeInTheDocument();
+  });
+
+  it("keeps a saved unavailable fleet visible until the user replaces it", () => {
+    const onChange = vi.fn();
+    mockUseOrganizationRunnerFleets.mockReturnValue({
+      data: { fleets: [] },
+      isLoading: false,
+      isError: false,
+    } as unknown as ReturnType<typeof useOrganizationRunnerFleets>);
+
+    render(
+      <RunnerFleetFieldRenderer field={field} value="retired-team-runner" onChange={onChange} organizationId="org-1" />,
+    );
+
+    expect(screen.getByRole("combobox")).toHaveTextContent("retired-team-runner (Unavailable)");
+    expect(screen.getByText("Select an available runner fleet before new work can run.")).toBeInTheDocument();
+    expect(onChange).not.toHaveBeenCalled();
   });
 });
