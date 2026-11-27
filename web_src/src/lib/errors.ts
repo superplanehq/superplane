@@ -9,8 +9,23 @@ export function getApiErrorMessage(error: unknown, fallback = "An error occurred
     getStatusMessage(getNestedError(error)) ??
     getStatusMessage(error) ??
     getNonEmptyString(error instanceof Error ? error.message : null) ??
+    getFirewallBlockMessage(error) ??
     fallback
   );
+}
+
+export const FIREWALL_BLOCKED_MESSAGE =
+  "The SuperPlane firewall blocked this request because some text looks unsafe. Change the text and try again, or contact support.";
+
+// The load balancer firewall answers with a plain 403 HTML page before the
+// request reaches the API. API permission errors are JSON and keep their message.
+function getFirewallBlockMessage(error: unknown): string | null {
+  if (getErrorField(error, "status") !== 403) {
+    return null;
+  }
+
+  const body = error instanceof Error ? error.message : error;
+  return typeof body === "string" && looksLikeHtmlDocument(body.trim()) ? FIREWALL_BLOCKED_MESSAGE : null;
 }
 
 /**
@@ -53,7 +68,7 @@ export async function getResponseErrorMessage(response: Response, fallback = "An
     const parsedBody = JSON.parse(trimmedBody) as unknown;
     return getApiErrorMessage(parsedBody, fallback);
   } catch {
-    return getApiErrorMessage(trimmedBody, fallback);
+    return getApiErrorMessage(Object.assign(new Error(trimmedBody), { status: response.status }), fallback);
   }
 }
 
