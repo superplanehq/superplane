@@ -17,6 +17,12 @@ fi
 exec node "$SUPERPLANE_TASK_DIR/task_cli.js" "$@"
 `
 
+const taskPathScript = `case ":$PATH:" in
+  *":$SUPERPLANE_TASK_DIR/bin:"*) ;;
+  *) PATH="$SUPERPLANE_TASK_DIR/bin:$PATH" ;;
+esac
+`
+
 func AppendTaskArtifactMCP(environment []TaskEnvironmentVariable, files []TaskFile) []TaskFile {
 	if !HasPublishLinks(environment) {
 		return files
@@ -39,5 +45,5 @@ func PublishLinkCommandFile() TaskFile {
 // TaskCommandFiles is the superplane shell command. It calls the same tool
 // handlers as the global runner MCP server.
 func TaskCommandFiles() []TaskFile {
-	return []TaskFile{TaskCLIScriptFile(), PublishLinkCommandFile()}
+	return []TaskFile{TaskCLIScriptFile(), {Path: "task_path.sh", Content: taskPathScript, Mode: "0644"}, PublishLinkCommandFile()}
 }

@@ -18,6 +18,7 @@ import {
   type OrgUserDisplay,
   type OrgUserDisplayLookup,
 } from "@/lib/orgUserDisplay";
+import { CUSTOM_AUTOMATION_TEMPLATE_ID } from "../../lib/customAutomation";
 import { workOrderOwnerDisplay } from "../../lib/workOrderCreator";
 import { latestDispatchForLine } from "../../lib/workOrderNumberResolution";
 import { clockLabel, providerForName } from "./splitRunFormat";
@@ -373,7 +374,8 @@ function draftSourceSentence(order: FactoriesWorkOrder): string {
   const automation = order.createdBy?.automation;
   if (automation) {
     const { componentName } = lineAutomationPresentation({ id: automation.appId, name: automation.appName });
-    return `${componentName} created this task.`;
+    const customName = automation.templateId === CUSTOM_AUTOMATION_TEMPLATE_ID ? automation.appName?.trim() : "";
+    return `${customName || componentName} created this task.`;
   }
   const creator = order.createdBy?.user?.name?.trim();
   if (creator) {
@@ -842,6 +844,7 @@ function phasesForOrder(
       historyRun: true,
     })),
     ...executions.map((execution) => executionToPhase(order, execution, apiChecks, demoArtifacts, executions)),
+    ...attachedRunPhases(order, apiChecks),
     ...phasesForPRFeedbackRuns(prFeedbackRuns, columnApps),
   ];
   return [
@@ -851,6 +854,16 @@ function phasesForOrder(
       canvasRuns: options?.columnAppRuns,
     }),
   ];
+}
+
+/** Runs with no task, such as webhook runs, that attached to the task while it waited in their stage. */
+function attachedRunPhases(order: FactoriesWorkOrder, apiChecks?: FactoriesWorkOrderCheck[]): SplitRunPhase[] {
+  const runs = order.attachedRuns ?? [];
+  // No step index: line-step retry would restart the task line, not this run.
+  return runs.map((execution) => ({
+    ...executionToPhase(order, execution, apiChecks, false, runs),
+    stepIndex: undefined,
+  }));
 }
 
 export const SPLIT_RUN_CLOSURE_PHASE_ID = "done-closure";

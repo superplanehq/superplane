@@ -55,6 +55,23 @@ func TestWrapPromptCommandStopsWhenRepoIsMissing(t *testing.T) {
 	assert.NoFileExists(t, marker)
 }
 
+func TestTaskBinStaysOnPathInLoginShells(t *testing.T) {
+	task := t.TempDir()
+	home := t.TempDir()
+	for _, file := range TaskCommandFiles() {
+		path := filepath.Join(task, file.Path)
+		require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
+		require.NoError(t, os.WriteFile(path, []byte(file.Content), 0o755))
+	}
+	require.NoError(t, os.WriteFile(filepath.Join(home, ".bash_profile"), []byte("PATH=/usr/bin:/bin\n"), 0o644))
+
+	cmd := exec.Command("bash", "--noprofile", "--norc", "-c", WithTaskBinOnPath(`bash -lc 'command -v superplane'`))
+	cmd.Env = []string{"PATH=/usr/bin:/bin", "HOME=" + home, "SUPERPLANE_TASK_DIR=" + task}
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	assert.Equal(t, filepath.Join(task, "bin", "superplane"), strings.TrimSpace(string(out)))
+}
+
 func TestWrapPromptCommandInWorkingDirectoryCopiesSkills(t *testing.T) {
 	t.Parallel()
 
