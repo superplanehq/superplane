@@ -31,17 +31,6 @@ type FactoryTaskMoveTo struct {
 	Previous bool
 }
 
-func (d *FactoryWorkOrderLineDispatch) moveDestination(to FactoryTaskMoveTo) (FactoryLineStage, bool) {
-	switch {
-	case to.Next:
-		return d.NextStageAfter(d.CurrentStageKey)
-	case to.Previous:
-		return d.PreviousStageBefore(d.CurrentStageKey)
-	default:
-		return d.StageByKeyOrName(to.Stage)
-	}
-}
-
 // MoveFromRun replaces open stage work on the calling run's traversal. The
 // caller owns the transaction and publishes its outcomes after commit.
 func (o *FactoryWorkOrder) MoveFromRun(tx *gorm.DB, runID uuid.UUID, to FactoryTaskMoveTo) (*FactoryTaskMoveResult, error) {
@@ -166,6 +155,30 @@ func (o *FactoryWorkOrder) MoveWaitingFromRun(tx *gorm.DB, runID uuid.UUID, stag
 	return result, nil
 }
 
+// LatestLineDispatch returns the newest line traversal of the task. Its
+// current stage is the stage that shows the task on an open task.
+func (o *FactoryWorkOrder) LatestLineDispatch(tx *gorm.DB) (*FactoryWorkOrderLineDispatch, error) {
+	var latest FactoryWorkOrderLineDispatch
+	if err := tx.Where("work_order_id = ?", o.ID).Order("created_at DESC").Order("id DESC").First(&latest).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrFactoryWorkOrderLineDispatchNotFound
+		}
+		return nil, err
+	}
+	return &latest, nil
+}
+
+func (d *FactoryWorkOrderLineDispatch) moveDestination(to FactoryTaskMoveTo) (FactoryLineStage, bool) {
+	switch {
+	case to.Next:
+		return d.NextStageAfter(d.CurrentStageKey)
+	case to.Previous:
+		return d.PreviousStageBefore(d.CurrentStageKey)
+	default:
+		return d.StageByKeyOrName(to.Stage)
+	}
+}
+
 // lockWaitingLineDispatch locks the task and its latest line traversal. It
 // returns ErrFactoryTaskNotWaiting unless the task waits in stageKey with no
 // open stage work.
@@ -206,19 +219,6 @@ func (o *FactoryWorkOrder) lockWaitingLineDispatch(tx *gorm.DB, stageKey string)
 		return nil, ErrFactoryTaskNotWaiting
 	}
 	return dispatch, nil
-}
-
-// LatestLineDispatch returns the newest line traversal of the task. Its
-// current stage is the stage that shows the task on an open task.
-func (o *FactoryWorkOrder) LatestLineDispatch(tx *gorm.DB) (*FactoryWorkOrderLineDispatch, error) {
-	var latest FactoryWorkOrderLineDispatch
-	if err := tx.Where("work_order_id = ?", o.ID).Order("created_at DESC").Order("id DESC").First(&latest).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrFactoryWorkOrderLineDispatchNotFound
-		}
-		return nil, err
-	}
-	return &latest, nil
 }
 
 // enterMoveDestination enters stage and follows empty stages and auto
