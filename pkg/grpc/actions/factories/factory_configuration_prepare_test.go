@@ -135,6 +135,10 @@ func TestFactoryConfigurationInstallsSupportedCatalogEntries(t *testing.T) {
 				for _, node := range live.Nodes {
 					require.Nil(t, node.ErrorMessage, node.Name)
 				}
+				if entry.ID == intakeTemplateID(models.FactoryIntakeSourceDatadog) {
+					require.Equal(t, requests, configurationCatalogHTTPRequestCount(f), "apply must defer monitor HTTP until after commit")
+					configurationRunDatadogMonitorHook(t, f, canvas)
+				}
 				configurationAssertCatalogSupportingRecords(t, f, canvas, entry.ID)
 				resources := configurationResourceCounts(t)
 				revision := configurationRevisionCount(t, canvas)
@@ -291,6 +295,9 @@ func configurationAssertCatalogBindingChange(t *testing.T, f configurationFixtur
 	require.NoError(t, err)
 	require.True(t, retired.DeletedAt.Valid)
 	require.Equal(t, previous.AppInstallationID, retired.AppInstallationID)
+	if source == models.FactoryIntakeSourceDatadog {
+		configurationRunDatadogMonitorHook(t, f, canvas)
+	}
 	current, err := models.FindCanvasNode(db, canvas.ID, graph.TriggerNodeID)
 	require.NoError(t, err)
 	require.Equal(t, uuid.MustParse(binding.IntegrationID), *current.AppInstallationID)
@@ -577,6 +584,11 @@ func (trigger configurationCatalogTrigger) Setup(ctx core.TriggerContext) error 
 	return trigger.Trigger.Setup(ctx)
 }
 
+func (trigger configurationCatalogTrigger) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
+	ctx.HTTP = trigger.http
+	return trigger.Trigger.HandleHook(ctx)
+}
+
 type configurationCatalogHTTP struct {
 	requests int
 	monitor  map[string]any
@@ -758,4 +770,29 @@ func configurationCatalogHTTPRequestCount(f configurationFixture) int {
 		}
 	}
 	return requests
+}
+
+// Execute the committed request through the trigger with real persisted contexts.
+func configurationRunDatadogMonitorHook(t *testing.T, f configurationFixture, canvas *models.Canvas) {
+	t.Helper()
+	db := database.DB(t.Context())
+	live := resetTestLiveVersion(t, canvas)
+	graph := resolveIntakeGraph(models.FactoryIntakeSourceDatadog, models.LiveCanvasSpec{Nodes: live.Nodes, Edges: live.Edges})
+	node, err := models.FindCanvasNode(db, canvas.ID, graph.TriggerNodeID)
+	require.NoError(t, err)
+	var request models.CanvasNodeRequest
+	require.NoError(t, db.Where("workflow_id = ? AND node_id = ? AND state = ?", canvas.ID, node.NodeID, models.NodeExecutionRequestStatePending).First(&request).Error)
+	require.Equal(t, "reconcileMonitor", request.Spec.Data().InvokeAction.ActionName)
+	integration, err := models.FindIntegrationInTransaction(db, f.r.Organization.ID, *node.AppInstallationID)
+	require.NoError(t, err)
+	deps := testIntakeDependencies(f.r)
+	trigger, err := deps.Registry.GetTrigger(node.ComponentName())
+	require.NoError(t, err)
+	_, err = trigger.HandleHook(core.TriggerHookContext{
+		Name: request.Spec.Data().InvokeAction.ActionName, Configuration: node.Configuration.Data(),
+		HTTP: deps.Registry.HTTPContextInTransaction(db), Metadata: contexts.NewNodeMetadataContext(db, node),
+		Integration: contexts.NewIntegrationContext(db, node, integration, f.r.Encryptor, deps.Registry, nil),
+	})
+	require.NoError(t, err)
+	require.NoError(t, request.Complete(db))
 }

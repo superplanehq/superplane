@@ -21,17 +21,37 @@ const (
 	intakeMonitorMessage = "A new error tracking issue was detected.\n\n@webhook-superplane"
 )
 
-func Test__OnErrorTrackingAlert__Setup__CreatesMonitor(t *testing.T) {
+func Test__OnErrorTrackingAlert__Setup__DefersMonitorRequests(t *testing.T) {
+	httpContext := &contexts.HTTPContext{Responses: []*http.Response{
+		jsonResponse(http.StatusOK, `{"monitors":[]}`),
+		jsonResponse(http.StatusOK, monitorJSON(42, "SuperPlane checkout", checkoutMonitorQuery, intakeMonitorMessage, 0, false)),
+	}}
+	requests := &contexts.RequestContext{}
+	metadata := &contexts.MetadataContext{Metadata: map[string]any{"intakeConfidencePct": 37}}
+	integration := datadogIntegration()
+	err := (&OnErrorTrackingAlert{}).Setup(core.TriggerContext{
+		Configuration: map[string]any{"service": "checkout"},
+		HTTP:          httpContext, Requests: requests, Metadata: metadata, Integration: integration,
+	})
+	require.NoError(t, err)
+	require.Empty(t, httpContext.Requests, "publishing must not wait for Datadog")
+	require.Equal(t, "reconcileMonitor", requests.Action)
+	require.Len(t, integration.Subscriptions, 1)
+	require.NotEmpty(t, savedErrorTrackingAlertMetadata(t, metadata).SubscriptionID)
+}
+
+func Test__OnErrorTrackingAlert__ReconcileMonitor__CreatesMonitor(t *testing.T) {
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{
 			jsonResponse(http.StatusOK, `{"monitors":[]}`),
 			jsonResponse(http.StatusOK, monitorJSON(42, "SuperPlane checkout", checkoutMonitorQuery, intakeMonitorMessage, 0, false)),
 		},
 	}
-	metadata := &contexts.MetadataContext{Metadata: map[string]any{"intakeConfidencePct": 37, "factoryTemplate": map[string]any{"id": "intake:datadog", "version": 1}}}
+	metadata := &contexts.MetadataContext{Metadata: map[string]any{"subscriptionId": "existing-subscription", "intakeConfidencePct": 37, "factoryTemplate": map[string]any{"id": "intake:datadog", "version": 1}}}
 	integration := datadogIntegration()
 
-	err := (&OnErrorTrackingAlert{}).Setup(core.TriggerContext{
+	_, err := (&OnErrorTrackingAlert{}).HandleHook(core.TriggerHookContext{
+		Name:          "reconcileMonitor",
 		Configuration: map[string]any{"service": "checkout"},
 		HTTP:          httpContext,
 		Integration:   integration,
@@ -39,7 +59,6 @@ func Test__OnErrorTrackingAlert__Setup__CreatesMonitor(t *testing.T) {
 	})
 
 	require.NoError(t, err)
-	require.Len(t, integration.Subscriptions, 1)
 	saved := savedErrorTrackingAlertMetadata(t, metadata)
 	assert.Equal(t, "42", saved.MonitorID)
 	assert.Equal(t, "checkout", saved.MonitorService)
@@ -64,7 +83,7 @@ func Test__OnErrorTrackingAlert__Setup__CreatesMonitor(t *testing.T) {
 	assert.Empty(t, requestsWithMethod(httpContext, http.MethodDelete))
 }
 
-func Test__OnErrorTrackingAlert__Setup__SkipsWriteWhenMonitorMatches(t *testing.T) {
+func Test__OnErrorTrackingAlert__ReconcileMonitor__SkipsWriteWhenMonitorMatches(t *testing.T) {
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{
 			jsonResponse(http.StatusOK, monitorJSON(42, "SuperPlane checkout", checkoutMonitorQuery, intakeMonitorMessage, 0, false)),
@@ -78,7 +97,8 @@ func Test__OnErrorTrackingAlert__Setup__SkipsWriteWhenMonitorMatches(t *testing.
 		},
 	}
 
-	err := (&OnErrorTrackingAlert{}).Setup(core.TriggerContext{
+	_, err := (&OnErrorTrackingAlert{}).HandleHook(core.TriggerHookContext{
+		Name:          "reconcileMonitor",
 		Configuration: map[string]any{"service": "checkout"},
 		HTTP:          httpContext,
 		Integration:   datadogIntegration(),
@@ -98,7 +118,7 @@ func Test__OnErrorTrackingAlert__Setup__SkipsWriteWhenMonitorMatches(t *testing.
 	assert.Equal(t, "checkout", saved.MonitorService)
 }
 
-func Test__OnErrorTrackingAlert__Setup__ServiceChangeDeletesUnusedMonitor(t *testing.T) {
+func Test__OnErrorTrackingAlert__ReconcileMonitor__ServiceChangeDeletesUnusedMonitor(t *testing.T) {
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{
 			jsonResponse(http.StatusOK, `{"monitors":[]}`),
@@ -116,7 +136,8 @@ func Test__OnErrorTrackingAlert__Setup__ServiceChangeDeletesUnusedMonitor(t *tes
 		},
 	}
 
-	err := (&OnErrorTrackingAlert{}).Setup(core.TriggerContext{
+	_, err := (&OnErrorTrackingAlert{}).HandleHook(core.TriggerHookContext{
+		Name:          "reconcileMonitor",
 		Configuration: map[string]any{"service": "billing"},
 		HTTP:          httpContext,
 		Integration:   integration,
@@ -133,7 +154,7 @@ func Test__OnErrorTrackingAlert__Setup__ServiceChangeDeletesUnusedMonitor(t *tes
 	assert.Equal(t, "billing", saved.MonitorService)
 }
 
-func Test__OnErrorTrackingAlert__Setup__ServiceChangeKeepsSharedMonitor(t *testing.T) {
+func Test__OnErrorTrackingAlert__ReconcileMonitor__ServiceChangeKeepsSharedMonitor(t *testing.T) {
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{
 			jsonResponse(http.StatusOK, `{"monitors":[]}`),
@@ -151,7 +172,8 @@ func Test__OnErrorTrackingAlert__Setup__ServiceChangeKeepsSharedMonitor(t *testi
 		},
 	}
 
-	err := (&OnErrorTrackingAlert{}).Setup(core.TriggerContext{
+	_, err := (&OnErrorTrackingAlert{}).HandleHook(core.TriggerHookContext{
+		Name:          "reconcileMonitor",
 		Configuration: map[string]any{"service": "billing"},
 		HTTP:          httpContext,
 		Integration:   integration,
@@ -165,7 +187,7 @@ func Test__OnErrorTrackingAlert__Setup__ServiceChangeKeepsSharedMonitor(t *testi
 	assert.Equal(t, "billing", saved.MonitorService)
 }
 
-func Test__OnErrorTrackingAlert__Setup__LeavesCustomWebhookMonitor(t *testing.T) {
+func Test__OnErrorTrackingAlert__ReconcileMonitor__LeavesCustomWebhookMonitor(t *testing.T) {
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{
 			jsonResponse(http.StatusOK, `{"monitors":[{"id":125,"name":"SuperPlane checkout"}]}`),
@@ -175,7 +197,8 @@ func Test__OnErrorTrackingAlert__Setup__LeavesCustomWebhookMonitor(t *testing.T)
 	}
 	metadata := &contexts.MetadataContext{}
 
-	err := (&OnErrorTrackingAlert{}).Setup(core.TriggerContext{
+	_, err := (&OnErrorTrackingAlert{}).HandleHook(core.TriggerHookContext{
+		Name:          "reconcileMonitor",
 		Configuration: map[string]any{"service": "checkout"},
 		HTTP:          httpContext,
 		Integration:   datadogIntegration(),
@@ -192,7 +215,7 @@ func Test__OnErrorTrackingAlert__Setup__LeavesCustomWebhookMonitor(t *testing.T)
 	assert.Equal(t, "checkout", saved.MonitorService)
 }
 
-func Test__OnErrorTrackingAlert__Setup__LeavesAnotherConnectionsMonitor(t *testing.T) {
+func Test__OnErrorTrackingAlert__ReconcileMonitor__LeavesAnotherConnectionsMonitor(t *testing.T) {
 	otherTag := intakeOwnerTag("11111111-1111-1111-1111-111111111111")
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{
@@ -204,7 +227,8 @@ func Test__OnErrorTrackingAlert__Setup__LeavesAnotherConnectionsMonitor(t *testi
 	metadata := &contexts.MetadataContext{}
 	integration := datadogIntegration()
 
-	err := (&OnErrorTrackingAlert{}).Setup(core.TriggerContext{
+	_, err := (&OnErrorTrackingAlert{}).HandleHook(core.TriggerHookContext{
+		Name:          "reconcileMonitor",
 		Configuration: map[string]any{"service": "checkout"},
 		HTTP:          httpContext,
 		Integration:   integration,
@@ -219,7 +243,7 @@ func Test__OnErrorTrackingAlert__Setup__LeavesAnotherConnectionsMonitor(t *testi
 	assert.Equal(t, []string{intakeOwnerTag(integration.ID().String())}, readMonitorBody(t, post).Tags)
 }
 
-func Test__OnErrorTrackingAlert__Setup__MissingMonitorsWrite(t *testing.T) {
+func Test__OnErrorTrackingAlert__ReconcileMonitor__MissingMonitorsWrite(t *testing.T) {
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{
 			jsonResponse(http.StatusForbidden, `{"errors":["Forbidden"]}`),
@@ -227,7 +251,8 @@ func Test__OnErrorTrackingAlert__Setup__MissingMonitorsWrite(t *testing.T) {
 	}
 	metadata := &contexts.MetadataContext{}
 
-	err := (&OnErrorTrackingAlert{}).Setup(core.TriggerContext{
+	_, err := (&OnErrorTrackingAlert{}).HandleHook(core.TriggerHookContext{
+		Name:          "reconcileMonitor",
 		Configuration: map[string]any{"service": "checkout"},
 		HTTP:          httpContext,
 		Integration:   datadogIntegration(),

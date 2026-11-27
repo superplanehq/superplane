@@ -116,6 +116,10 @@ func prepareFactoryConfigurationBuiltIn(ctx context.Context, tx *gorm.DB, deps I
 		}
 	}
 	prepared := &preparedFactoryConfigurationBuiltIn{TemplateID: templateID, ExplicitBinding: automation.Binding}
+	// An export can display a resolved connection without requesting a pin.
+	if automation.current != nil && configurationBindingIntentEqual(automation.current, automation.Binding) {
+		prepared.ExplicitBinding = automation.current.explicitBinding
+	}
 	selection, selectionField, err := configurationBuiltInSettingsBinding(templateID, automation)
 	if err != nil {
 		return nil, err

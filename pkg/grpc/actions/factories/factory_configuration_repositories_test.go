@@ -214,6 +214,14 @@ func TestFactoryConfigurationRemovesIntakeConnectionPin(t *testing.T) {
 	plan = f.plan(t, f.export(t))
 	require.Empty(t, plan.Diagnostics)
 	require.Empty(t, plan.Changes, "exporting the selected connection must not introduce a pin")
+	bundle = f.export(t)
+	editConfigurationManifest(t, bundle, func(manifest *factoryConfigurationManifest) {
+		manifest.Stages[1].Name = "Updated implementation"
+	})
+	applyConfigurationBundle(t, f, bundle)
+	owner, err = models.FindFactoryConfigurationAutomationByCanvas(db, canvas.ID)
+	require.NoError(t, err)
+	require.NotContains(t, owner.Binding, "integration_id", "an unrelated apply must preserve the unpinned connection")
 	newConnection := createReadyOnboardingIntegration(t, f.factory.OrganizationID, models.ProviderGitHub)
 	require.NoError(t, f.factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSIntegrationID: &newConnection}))
 	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
