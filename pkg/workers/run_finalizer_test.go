@@ -1193,13 +1193,13 @@ func Test__RunFinalizer__MovedExecutionCannotAdvanceAfterReturningToSourceStage(
 	var moved *models.FactoryTaskMoveResult
 	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
 		var err error
-		moved, err = order.MoveFromRun(tx, original.Run.ID, "phase-1", false)
+		moved, err = order.MoveFromRun(tx, original.Run.ID, models.FactoryTaskMoveTo{Stage: "phase-1"})
 		return err
 	}))
 	require.Len(t, moved.Started, 1)
 	destination := moved.Started[0]
 	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
-		_, err := order.MoveFromRun(tx, destination.Run.ID, "phase-0", false)
+		_, err := order.MoveFromRun(tx, destination.Run.ID, models.FactoryTaskMoveTo{Stage: "phase-0"})
 		return err
 	}))
 	finishPassedRun(t, original.Run)

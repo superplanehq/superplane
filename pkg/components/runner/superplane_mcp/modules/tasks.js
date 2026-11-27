@@ -53,7 +53,8 @@ async function createTask(input, client) {
   if (exceedsCodePoints(description, MAX_DESCRIPTION_LENGTH)) {
     throw new Error("description must be at most 20000 characters");
   }
-  return client.request("POST", "/api/v1/runner/tasks", { title, description });
+  const origin = String((input && input.origin) || "").trim();
+  return client.request("POST", "/api/v1/runner/tasks", origin ? { title, description, origin } : { title, description });
 }
 
 async function closeTask(input, client) {
@@ -66,37 +67,74 @@ async function closeTask(input, client) {
 }
 
 async function moveTask(input, client) {
-  const column = input && input.column;
+  const stage = input && input.stage;
   const next = input && input.next;
+  const previous = input && input.previous;
+  const task = input && input.task;
+  const chosen = [stage, next, previous].filter((value) => value !== undefined).length;
   if (
-    (column !== undefined && (typeof column !== "string" || !column.trim())) ||
+    chosen !== 1 ||
+    (stage !== undefined && (typeof stage !== "string" || !stage.trim())) ||
     (next !== undefined && next !== true) ||
-    (column !== undefined) === (next === true)
+    (previous !== undefined && previous !== true)
   ) {
-    throw new Error("Pass exactly one of column or next: true");
+    throw new Error("Pass exactly one of stage, next: true, or previous: true");
   }
-  return client.request("POST", "/api/v1/runner/task/move", column !== undefined ? { column: column.trim() } : { next: true });
+  if (task !== undefined && (typeof task !== "string" || !task.trim())) throw new Error("task must be a task id or key");
+  const body = stage !== undefined ? { stage: stage.trim() } : next ? { next: true } : { previous: true };
+  if (task !== undefined) body.task = task.trim();
+  return client.request("POST", "/api/v1/runner/task/move", body);
 }
 
 const MOVE_TASK = {
   definition: {
     name: "move_task",
     description:
-      "Move this run's open task immediately to a stage on its recorded line. Pass exactly one of column or next: true. column is a stable stage key, including custom stages, Backlog, and Done. next follows the recorded stage order. Unfinished source work is replaced. Destination work starts or queues under existing limits. Returns task identity, from_column, column, and state. Current-stage movement is unchanged. Planning runs, tasks without a line, stale runs, and closed or archived tasks cannot move. A missing successor fails.",
+      "Move an open task immediately to a stage on its recorded line. Pass exactly one of stage, next: true, or previous: true. stage is a stage key or name, for example Done, Backlog, or a custom stage name. next and previous follow the recorded stage order. get_task shows the current, next, and previous stage. A task run moves its own task: omit task. Unfinished source work is replaced. A run with no task, such as a webhook run, must pass task. It can move only a task that waits in the stage of this automation after the stage work passed. Destination work starts or queues under existing limits. Returns task identity, from_stage, stage, and state. Moving to the current stage changes nothing. Planning runs, tasks without a line, stale runs, and closed or archived tasks cannot move. A missing stage fails.",
     inputSchema: {
       type: "object",
       properties: {
-        column: { type: "string", minLength: 1, description: "Stable stage key on this task's recorded line." },
+        task: {
+          type: "string",
+          minLength: 1,
+          description: "Task id, number, or key, for example SP-42. Required for a run with no task. Use get_task to find it.",
+        },
+        stage: { type: "string", minLength: 1, description: "Stage key or name on this task's recorded line, for example Done." },
         next: { type: "boolean", const: true, description: "Move to the next stage in recorded line order." },
+        previous: { type: "boolean", const: true, description: "Move to the previous stage in recorded line order." },
       },
       oneOf: [
-        { required: ["column"], not: { required: ["next"] } },
-        { required: ["next"], not: { required: ["column"] } },
+        { required: ["stage"], not: { anyOf: [{ required: ["next"] }, { required: ["previous"] }] } },
+        { required: ["next"], not: { anyOf: [{ required: ["stage"] }, { required: ["previous"] }] } },
+        { required: ["previous"], not: { anyOf: [{ required: ["stage"] }, { required: ["next"] }] } },
       ],
       additionalProperties: false,
     },
   },
   handler: moveTask,
+};
+
+async function attachTask(input, client) {
+  const task = input && input.task;
+  if (typeof task !== "string" || !task.trim()) throw new Error("task must be a task id or key");
+  return client.request("POST", "/api/v1/runner/task/attach", { task: task.trim() });
+}
+
+const ATTACH_TASK = {
+  definition: {
+    name: "attach_task",
+    description:
+      "Attach this run to a task so the task timeline shows the run in the stage of this automation. Only a run with no task, such as a webhook run, can attach. The task must wait in the stage of this automation after the stage work passed. Attach before move_task. Attaching the same task again has no effect. Returns the task like get_task, with stage, next_stage, and previous_stage.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        task: { type: "string", minLength: 1, description: "Task id, number, or key, for example SP-42. Use get_task to find it." },
+      },
+      required: ["task"],
+      additionalProperties: false,
+    },
+  },
+  handler: attachTask,
 };
 
 function ownerPaths(raw) {
@@ -200,11 +238,60 @@ const LIST_TASKS = {
   handler: listTasks,
 };
 
+function selectorText(value) {
+  return value == null ? "" : String(value).trim();
+}
+
+async function getTask(input, client) {
+  const task = selectorText(input && input.task);
+  const pullRequest = selectorText(input && input.pull_request);
+  const repository = selectorText(input && input.repository);
+  const number = selectorText(input && input.number);
+  const commit = selectorText(input && input.commit);
+  const origin = selectorText(input && input.origin);
+  const selectors = [task, pullRequest, number, commit, origin].filter(Boolean);
+  if (selectors.length !== 1 || (repository && !number)) {
+    throw new Error("Pass exactly one of task, pull_request, number with an optional repository, commit, or origin");
+  }
+  const params = new URLSearchParams();
+  if (task) params.set("task", task);
+  if (pullRequest) params.set("pull_request", pullRequest);
+  if (number) {
+    if (!/^[1-9][0-9]*$/.test(number)) throw new Error("number must be a positive integer");
+    params.set("number", number);
+    if (repository) params.set("repository", repository);
+  }
+  if (commit) params.set("commit", commit);
+  if (origin) params.set("origin", origin);
+  return client.request("GET", `/api/v1/runner/task/get?${params.toString()}`);
+}
+
+const GET_TASK = {
+  definition: {
+    name: "get_task",
+    description:
+      "Find one task in this workspace. Pass exactly one selector: task (id, number, or key such as SP-42), pull_request (the pull request URL), number with an optional repository (owner/name), commit (a commit SHA of a pull request of the task), or origin (the link passed to create_task, such as an alert URL). origin returns the newest task with that link and prefers a task that is not closed. Returns id, key, title, description, state, url, origin, stage (the current stage key and name), next_stage and previous_stage on the recorded line when the task is open, and pull_requests with repository, number, url, state, and head_sha. A selector that matches more than one task fails and lists the task keys. Pass repository, or use a more exact selector.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        task: { type: "string", minLength: 1, description: "Task id, number, or key." },
+        pull_request: { type: "string", minLength: 1, description: "Pull request URL." },
+        repository: { type: "string", minLength: 1, description: "Repository as owner/name. Use it with number." },
+        number: { type: "integer", minimum: 1, description: "Pull request number." },
+        commit: { type: "string", minLength: 7, description: "Commit SHA." },
+        origin: { type: "string", minLength: 1, description: "Origin link of the task, as passed to create_task." },
+      },
+      additionalProperties: false,
+    },
+  },
+  handler: getTask,
+};
+
 const CREATE_TASK = {
   definition: {
     name: "create_task",
     description:
-      "Create a draft task in this workspace. The task has no owner. Returns id, key, title, state, and url.",
+      "Create a draft task in this workspace. The task has no owner. Pass origin, the link of the source item such as an alert or issue, to find the task later with get_task. If a task that is not closed already has that origin, it is returned and no task is created. Returns id, key, title, state, url, origin, and created (false when the task already existed).",
     inputSchema: {
       type: "object",
       properties: {
@@ -214,6 +301,7 @@ const CREATE_TASK = {
           maxLength: 20000,
           description: "Task description. Optional. At most 20000 characters.",
         },
+        origin: { type: "string", minLength: 1, description: "Optional http or https link of the source item." },
       },
       required: ["title"],
     },
@@ -241,5 +329,5 @@ const CLOSE_TASK = {
 };
 
 module.exports = {
-  tools: [ASSIGN_TASK_OWNER, SUGGEST_TASK_OWNER, LIST_TASKS, CREATE_TASK, CLOSE_TASK, MOVE_TASK],
+  tools: [ASSIGN_TASK_OWNER, SUGGEST_TASK_OWNER, LIST_TASKS, GET_TASK, CREATE_TASK, CLOSE_TASK, MOVE_TASK, ATTACH_TASK],
 };

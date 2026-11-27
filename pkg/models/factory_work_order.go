@@ -316,7 +316,8 @@ func ResolveFactoryWorkOrderCreatorAutomations(
 			AppID:  run.WorkflowID,
 			NodeID: run.NodeID,
 		}
-		ref.AppName = canvasesByID[run.WorkflowID]
+		ref.AppName = canvasesByID[run.WorkflowID].Name
+		ref.TemplateID = canvasesByID[run.WorkflowID].TemplateID
 		ref.NodeName = nodesByKey[creatorAutomationNodeKey{CanvasID: run.WorkflowID, NodeID: run.NodeID}]
 
 		for _, orderID := range orderIDsByRunID[run.ID] {
@@ -1036,15 +1037,28 @@ func collectCreatorAutomationKeys(runs []CanvasRun) ([]uuid.UUID, []creatorAutom
 	return canvasIDs, nodeKeys
 }
 
-func loadCreatorAutomationCanvases(tx *gorm.DB, canvasIDs []uuid.UUID) (map[uuid.UUID]string, error) {
+type creatorAutomationCanvas struct {
+	Name       string
+	TemplateID string
+}
+
+func loadCreatorAutomationCanvases(tx *gorm.DB, canvasIDs []uuid.UUID) (map[uuid.UUID]creatorAutomationCanvas, error) {
 	var canvases []Canvas
 	if err := tx.Unscoped().Where("id IN ?", canvasIDs).Find(&canvases).Error; err != nil {
 		return nil, err
 	}
+	versions, err := FindLiveCanvasVersions(tx, canvases)
+	if err != nil {
+		return nil, err
+	}
 
-	result := make(map[uuid.UUID]string, len(canvases))
+	result := make(map[uuid.UUID]creatorAutomationCanvas, len(canvases))
 	for i := range canvases {
-		result[canvases[i].ID] = canvases[i].Name
+		canvas := creatorAutomationCanvas{Name: canvases[i].Name}
+		if version := versions[canvases[i].ID]; version != nil {
+			canvas.TemplateID = FactoryAppTemplateID(version.Nodes)
+		}
+		result[canvases[i].ID] = canvas
 	}
 	return result, nil
 }

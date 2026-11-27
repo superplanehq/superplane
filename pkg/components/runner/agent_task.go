@@ -105,8 +105,11 @@ func ApplyIntegrationUsage(prompt, usage string) string {
 	return usage + "\n\n" + prompt
 }
 
+// Agents often run commands in "bash -lc", which resets PATH from the profile.
+// Bash reads BASH_ENV after the profile, so task_path.sh puts bin back.
 func WithTaskBinOnPath(command string) string {
 	return `export PATH="$SUPERPLANE_TASK_DIR/bin:$PATH"
+if [ -f "$SUPERPLANE_TASK_DIR/task_path.sh" ]; then export BASH_ENV="$SUPERPLANE_TASK_DIR/task_path.sh"; fi
 ` + command
 }
 
