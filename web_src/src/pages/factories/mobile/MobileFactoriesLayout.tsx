@@ -102,7 +102,7 @@ function MobileFactoryShell({
   const { data: describedFactory, error: factoryError } = useFactory(organizationId, factoryId);
   const factory = describedFactory ?? factories.find((item) => item.id === factoryId) ?? null;
   const routeSegment = factoryRouteSegment(factory) || factoryKey;
-  const brokenIntegrationsBanner = useBrokenIntegrationsBanner(organizationId, routeSegment);
+  const brokenIntegrationsBanner = useBrokenIntegrationsBanner(organizationId, factoryId, routeSegment);
   const canCreateWorkOrder = canAct("work_orders", "create");
 
   useEffect(() => {

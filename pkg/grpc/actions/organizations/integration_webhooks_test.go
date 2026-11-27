@@ -53,7 +53,7 @@ func TestIntegrationWebhookFailureRecovery(t *testing.T) {
 	require.NoError(t, err)
 	require.NotContains(t, string(encoded), "must-not-be-returned")
 
-	listed, err := ListIntegrations(ctx, r.Registry, r.Organization.ID.String())
+	listed, err := ListIntegrations(ctx, r.Registry, r.Organization.ID.String(), "")
 	require.NoError(t, err)
 	require.Len(t, listed.Integrations, 1)
 	require.Len(t, listed.Integrations[0].Status.WebhookFailures, 1)
@@ -137,7 +137,7 @@ func TestRetryLegacyWebhookKeepsFailureVisibleUntilReady(t *testing.T) {
 				require.NoError(t, err)
 				require.Len(t, described.Integration.Status.WebhookFailures, 1, "keep the settings warning until setup succeeds")
 				require.Equal(t, state, described.Integration.Status.WebhookFailures[0].State)
-				listed, err := ListIntegrations(ctx, r.Registry, r.Organization.ID.String())
+				listed, err := ListIntegrations(ctx, r.Registry, r.Organization.ID.String(), "")
 				require.NoError(t, err)
 				require.Len(t, listed.Integrations[0].Status.WebhookFailures, 1, "keep the workspace warning until setup succeeds")
 			}
