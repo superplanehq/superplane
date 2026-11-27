@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { logoDarkInvertClass } from "@/lib/logoDarkMode";
 import { cn } from "@/lib/utils";
+import { SimpleTooltip } from "@/ui/componentSidebar/SimpleTooltip";
 import { Camera, Sparkles, Workflow } from "lucide-react";
 
 import { COLUMN_AUTOMATIONS_COPY, type ColumnAutomationCatalogEntry } from "../lib/columnAutomations";
@@ -47,27 +48,43 @@ export function AddColumnAutomationPicker({
           data-testid="add-column-automation-templates"
         >
           {catalog.map((entry) => {
-            const taken = takenIds.includes(entry.id);
+            const taken = entry.unique && takenIds.includes(entry.id);
             const unavailableReason = unavailableReasons[entry.id];
             const disabled = taken || Boolean(unavailableReason);
+            const card = (
+              <Button
+                type="button"
+                variant="ghost"
+                disabled={disabled}
+                onClick={() => onSelect(entry)}
+                data-testid={`add-column-automation-template-${entry.id}`}
+                className="h-full min-h-24 w-full flex-col items-start justify-start gap-1 whitespace-normal rounded-lg border border-border bg-card px-3 py-2.5 text-left font-normal shadow-sm hover:border-foreground/20 hover:bg-accent/40 disabled:opacity-60 dark:text-foreground dark:hover:bg-accent/40"
+              >
+                <CatalogGlyph entry={entry} />
+                <span className="text-[13px] font-medium tracking-[-0.01em] leading-5 text-foreground">
+                  {entry.name}
+                </span>
+                <span className="workspace-body-text text-muted-foreground">
+                  {taken ? COLUMN_AUTOMATIONS_COPY.sourceTaken : (unavailableReason ?? entry.description)}
+                </span>
+              </Button>
+            );
             return (
               <li key={entry.id}>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  disabled={disabled}
-                  onClick={() => onSelect(entry)}
-                  data-testid={`add-column-automation-template-${entry.id}`}
-                  className="h-full min-h-24 w-full flex-col items-start justify-start gap-1 whitespace-normal rounded-lg border border-border bg-card px-3 py-2.5 text-left font-normal shadow-sm hover:border-foreground/20 hover:bg-accent/40 disabled:opacity-60 dark:text-foreground dark:hover:bg-accent/40"
-                >
-                  <CatalogGlyph entry={entry} />
-                  <span className="text-[13px] font-medium tracking-[-0.01em] leading-5 text-foreground">
-                    {entry.name}
-                  </span>
-                  <span className="workspace-body-text text-muted-foreground">
-                    {taken ? COLUMN_AUTOMATIONS_COPY.sourceTaken : (unavailableReason ?? entry.description)}
-                  </span>
-                </Button>
+                {taken ? (
+                  <SimpleTooltip content={<span role="tooltip">{COLUMN_AUTOMATIONS_COPY.sourceTaken}</span>}>
+                    <div
+                      role="group"
+                      aria-label={entry.name}
+                      tabIndex={0}
+                      className="h-full rounded-lg focus-visible:outline focus-visible:outline-ring"
+                    >
+                      {card}
+                    </div>
+                  </SimpleTooltip>
+                ) : (
+                  card
+                )}
               </li>
             );
           })}

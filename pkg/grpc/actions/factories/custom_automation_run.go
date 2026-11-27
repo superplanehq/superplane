@@ -40,7 +40,7 @@ func RunFactoryCustomAutomation(
 		return nil, factoryErrorToStatus(err, "failed to run custom automation")
 	}
 	if strings.TrimSpace(req.GetWorkOrderId()) == "" {
-		return startScheduledCustomAutomation(db, canvas)
+		return startColumnCustomAutomation(db, canvas)
 	}
 	order, err := findWorkOrder(db, factory, req.GetWorkOrderId())
 	if err != nil {
@@ -170,10 +170,9 @@ func StartColumnLeaveCustomAutomations(
 	return nil
 }
 
-// startScheduledCustomAutomation starts the schedule chain. That chain creates a
-// task from the prompt result, so it does not need a task to already exist.
-func startScheduledCustomAutomation(db *gorm.DB, canvas *models.Canvas) (*pb.RunFactoryCustomAutomationResponse, error) {
-	if canvas.ColumnKey == nil || *canvas.ColumnKey != models.CanvasColumnKeyBacklog {
+// startColumnCustomAutomation runs a no-task manual trigger or a Backlog schedule.
+func startColumnCustomAutomation(db *gorm.DB, canvas *models.Canvas) (*pb.RunFactoryCustomAutomationResponse, error) {
+	if canvas.ColumnKey == nil || (*canvas.ColumnKey != models.CanvasColumnKeyBacklog && *canvas.ColumnKey != models.CanvasColumnKeyVerify) {
 		return nil, factoryErrorToStatus(invalidArgument("This automation starts from a task."), "failed to run custom automation")
 	}
 	version, err := models.FindLiveCanvasVersionByCanvasInTransaction(db, canvas)
@@ -184,7 +183,7 @@ func startScheduledCustomAutomation(db *gorm.DB, canvas *models.Canvas) (*pb.Run
 		return emitColumnCustomAutomation(db, canvas, startID)
 	}
 	scheduleID := scheduledCustomAutomationTriggerID(version)
-	if scheduleID == "" {
+	if *canvas.ColumnKey != models.CanvasColumnKeyBacklog || scheduleID == "" {
 		return nil, factoryErrorToStatus(invalidArgument("This automation starts from a task."), "failed to run custom automation")
 	}
 	trigger, err := models.FindCanvasNode(db, canvas.ID, scheduleID)
@@ -217,8 +216,17 @@ func columnStartTriggerID(version *models.CanvasVersion) string {
 		return ""
 	}
 	for _, node := range version.Nodes {
-		if node.Type == models.NodeTypeTrigger && node.ComponentName() == "start" {
-			return node.ID
+		if node.Type != models.NodeTypeTrigger || node.ComponentName() != "start" {
+			continue
+		}
+		template, _ := node.Metadata[models.FactoryAppTemplateMetadataKey].(map[string]any)
+		if template["runsOnTask"] != false || !triggerMetadataHasMode(template, "manual") {
+			continue
+		}
+		for _, edge := range version.Edges {
+			if edge.SourceID == node.ID {
+				return node.ID
+			}
 		}
 	}
 	return ""

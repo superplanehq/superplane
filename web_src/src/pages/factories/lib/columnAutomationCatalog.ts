@@ -144,6 +144,7 @@ export function catalogForColumn(
         unique: true,
       })),
       ANALYSIS_ENTRY,
+      EVENT_CUSTOM_ENTRY,
     ];
   }
   if (key === "verify") {

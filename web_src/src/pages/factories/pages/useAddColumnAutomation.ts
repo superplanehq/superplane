@@ -175,7 +175,7 @@ function needsFocusedAutomationSetup(entry: ColumnAutomationCatalogEntry, column
     entry.kind === "pr-discussion" ||
     entry.kind === "pr-checks" ||
     entry.kind === "custom-verification" ||
-    (entry.kind === "custom" && column.startsWith("custom-"))
+    (entry.kind === "custom" && (column === "backlog" || column.startsWith("custom-")))
   );
 }
 
@@ -198,6 +198,7 @@ function githubVerifyTemplate(
 }
 
 function customAutomationSetupColumn(key: ColumnKey): CustomAutomationColumn | undefined | null {
+  if (key === "backlog") return "backlog";
   if (key.startsWith("custom-")) return key as CustomAutomationColumn;
   if (key === "verify") return undefined;
   if (key === "done") return "done";

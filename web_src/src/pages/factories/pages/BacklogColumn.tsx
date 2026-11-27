@@ -1,5 +1,5 @@
 import type { FactoriesWorkOrder } from "@/api-client";
-import { useBacklogScheduleRun } from "@/hooks/useBacklogScheduleRun";
+import { useColumnAutomationRun } from "@/hooks/useColumnAutomationRun";
 import {
   useColumnAutomationCollapsePreference,
   type ColumnAutomationDisclosureState,
@@ -123,7 +123,7 @@ export function BacklogColumn({
   const createMenu = useBacklogCreateMenu(organizationId, factoryId, onOpenWorkOrder);
   const { canAct } = usePermissions();
   const canUpdateWorkOrders = canAct("work_orders", "update");
-  const scheduleRun = useBacklogScheduleRun(organizationId, factoryId, factoryKey, lineId);
+  const scheduleRun = useColumnAutomationRun(organizationId, factoryId, factoryKey, lineId);
   const intakesQuery = useFactoryIntakes(organizationId, factoryId);
   const refreshBacklog = useRefreshBacklog(organizationId, factoryId);
   const onRefreshBacklog = () => void runBacklogRefresh(refreshBacklog.mutateAsync);
