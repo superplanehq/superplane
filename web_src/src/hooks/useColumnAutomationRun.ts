@@ -5,8 +5,9 @@ import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
 import { factoryCustomAutomationRunPath } from "@/pages/factories/lib/customAutomationPaths";
 import type { ColumnAutomation } from "@/pages/factories/lib/columnAutomations";
+import { customAutomationColumn } from "@/pages/factories/lib/customAutomation";
 
-export function useBacklogScheduleRun(organizationId: string, factoryId: string, factoryKey: string, lineId?: string) {
+export function useColumnAutomationRun(organizationId: string, factoryId: string, factoryKey: string, lineId?: string) {
   const navigate = useNavigate();
   const runAutomation = useRunFactoryCustomAutomation(organizationId, factoryId);
   const [runningAutomationId, setRunningAutomationId] = useState<string>();
@@ -18,7 +19,15 @@ export function useBacklogScheduleRun(organizationId: string, factoryId: string,
     try {
       const started = await runAutomation.mutateAsync({ automationId: automation.canvasId, workOrderId: "" });
       if (started.runId)
-        navigate(factoryCustomAutomationRunPath(organizationId, factoryKey, automation.canvasId, started.runId));
+        navigate(
+          factoryCustomAutomationRunPath(
+            organizationId,
+            factoryKey,
+            automation.canvasId,
+            started.runId,
+            customAutomationColumn(automation.columnKey ?? "backlog"),
+          ),
+        );
     } catch (error) {
       showErrorToast(getApiErrorMessage(error, "SuperPlane could not start the automation."));
     } finally {

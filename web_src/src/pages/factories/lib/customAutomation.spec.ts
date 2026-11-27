@@ -319,7 +319,7 @@ describe("custom automation settings", () => {
         organizationId: "org",
         factoryKey: "workspace",
       }),
-    ).toBe("/org/workspaces/workspace?customAutomation=review-1");
+    ).toBe("/org/workspaces/workspace?customAutomation=review-1&automationColumn=verify");
   });
 
   it("reads the setup query and accepts the previous name", () => {

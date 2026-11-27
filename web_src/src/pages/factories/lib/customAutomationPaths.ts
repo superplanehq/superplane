@@ -24,10 +24,11 @@ export function factoryCustomAutomationRunPath(
   factoryKey: string,
   automationId: string,
   runId: string,
+  columnKey: CustomAutomationColumn = "backlog",
 ) {
   const params = new URLSearchParams({
     [CUSTOM_AUTOMATION_PARAM]: automationId,
-    automationColumn: "backlog",
+    automationColumn: columnKey,
     automationTab: "runs",
     automationRun: runId,
   });

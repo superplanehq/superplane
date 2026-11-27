@@ -97,7 +97,7 @@ import {
   workspaceNextSteps,
 } from "./workspaceNextStepCatalog";
 import { BacklogColumn, type BacklogIntakePanel } from "./BacklogColumn";
-import { useBacklogScheduleRun } from "@/hooks/useBacklogScheduleRun";
+import { useColumnAutomationRun } from "@/hooks/useColumnAutomationRun";
 import { AutomationRowContext } from "./AutomationRowContext";
 import { cardMove, savedCardStage, supportsCard, type AutomationMove } from "../lib/automationPlacement";
 
@@ -1738,7 +1738,7 @@ function PhaseBoard({
   const stageElements = useRef(new Map<string, HTMLDivElement>());
   const updateLine = useUpdateFactoryLine(organizationId, factoryId);
   const lineId = line.id;
-  const scheduleRun = useBacklogScheduleRun(organizationId, factoryId, factoryKey, lineId);
+  const scheduleRun = useColumnAutomationRun(organizationId, factoryId, factoryKey, lineId);
   const { canAct } = usePermissions();
 
   // The line query is the source of truth for persisted colors. Resync when

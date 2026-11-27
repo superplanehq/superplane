@@ -8,6 +8,7 @@ import githubIcon from "@/assets/icons/integrations/github.svg";
 import { ComponentStoryShell } from "../__fixtures__/ComponentStoryShell";
 import { withFactoriesTheme } from "../__fixtures__/factoriesStoryTheme";
 import type { ColumnAutomation } from "../lib/columnAutomations";
+import { customAutomationColumnAutomation } from "../lib/customAutomationColumnAutomation";
 import { WorkOrderBoardLane, WorkOrderKanbanBoard } from "../workOrders/WorkOrderBoardChrome";
 import { ColumnAutomationRows } from "./ColumnAutomationRows";
 import { AutomationRowContext } from "./AutomationRowContext";
@@ -215,14 +216,17 @@ export const ScheduleControls: Story = {
   render: function ScheduleControlsStory() {
     const [pending, setPending] = useState(false);
     const [status, setStatus] = useState("");
-    const automation: ColumnAutomation = {
-      ...VERIFY,
-      id: "scheduled-review",
-      canvasId: "scheduled-review",
-      name: "Scheduled repository review",
-      trigger: "On schedule",
-      canRunNow: true,
-    };
+    const automation = customAutomationColumnAutomation(
+      {
+        id: "scheduled-review",
+        name: "Scheduled repository review",
+        columnKey: "verify",
+        customAutomationMode: "manual",
+        customAutomationRunsOnTask: false,
+      },
+      [],
+      () => 0,
+    )!;
     return (
       <div className="max-w-sm space-y-4 rounded-lg bg-muted p-4">
         <h2 className="text-sm font-semibold">Verify automations</h2>
