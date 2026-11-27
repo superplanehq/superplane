@@ -36,6 +36,7 @@ const (
 type runnerCreateTaskRequest struct {
 	Title       string `json:"title"`
 	Description string `json:"description"`
+	Origin      string `json:"origin"`
 }
 
 type runnerCloseTaskRequest struct {
@@ -128,6 +129,15 @@ func (s *Server) handleRunnerCreateTask(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	origin := ""
+	if strings.TrimSpace(request.Origin) != "" {
+		origin = models.NormalizeWorkOrderOriginURL(request.Origin)
+		if origin == "" {
+			http.Error(w, "origin must be an http or https URL", http.StatusBadRequest)
+			return
+		}
+	}
+
 	db := database.DB(r.Context())
 	factoryModel, err := models.FindFactory(db, scope.OrganizationID, scope.FactoryID)
 	if err != nil {
@@ -139,7 +149,21 @@ func (s *Server) handleRunnerCreateTask(w http.ResponseWriter, r *http.Request) 
 	// show the run that created it.
 	sourceRunID := scope.CanvasRunID
 	var order *models.FactoryWorkOrder
+	existed := false
 	err = db.Transaction(func(tx *gorm.DB) error {
+		if origin != "" {
+			if err := factoryModel.LockWorkOrderOriginURL(tx, origin); err != nil {
+				return err
+			}
+			existing, err := factoryModel.FindLatestWorkOrderByOriginURL(tx, origin)
+			if err != nil {
+				return err
+			}
+			if existing != nil && existing.State != models.FactoryWorkOrderStateClosed {
+				order, existed = existing, true
+				return nil
+			}
+		}
 		var assignees []uuid.UUID
 		config := factoryModel.OnboardingConfigValue()
 		if config.CodexSubscription {
@@ -153,7 +177,13 @@ func (s *Server) handleRunnerCreateTask(w http.ResponseWriter, r *http.Request) 
 			}
 			assignees = []uuid.UUID{ownerID}
 		}
-		created, createErr := factoryModel.CreateWorkOrder(tx, title, description, nil, assignees, &sourceRunID)
+		var created *models.FactoryWorkOrder
+		var createErr error
+		if origin != "" {
+			created, createErr = factoryModel.CreateWorkOrderWithOrigin(tx, title, description, nil, assignees, &sourceRunID, models.WorkOrderOrigin{URL: origin})
+		} else {
+			created, createErr = factoryModel.CreateWorkOrder(tx, title, description, nil, assignees, &sourceRunID)
+		}
 		if createErr != nil {
 			return createErr
 		}
@@ -164,10 +194,20 @@ func (s *Server) handleRunnerCreateTask(w http.ResponseWriter, r *http.Request) 
 		writeRunnerTaskError(w, err)
 		return
 	}
+	if existed {
+		_ = writeJSON(w, http.StatusOK, runnerCreateTaskView{runnerTaskViewFrom(s.BaseURL, factoryModel, order), false})
+		return
+	}
 
 	workersctx.EmitWorkOrderCreated(db, factoryModel, order)
 	publishRunnerTaskUpdate(factoryModel, order, factoryevents.EventTypeOrderStatusUpdated)
-	_ = writeJSON(w, http.StatusCreated, runnerTaskViewFrom(s.BaseURL, factoryModel, order))
+	_ = writeJSON(w, http.StatusCreated, runnerCreateTaskView{runnerTaskViewFrom(s.BaseURL, factoryModel, order), true})
+}
+
+// Created is false when a task that is not closed already had the origin.
+type runnerCreateTaskView struct {
+	runnerTaskView
+	Created bool `json:"created"`
 }
 
 func (s *Server) handleRunnerCloseTask(w http.ResponseWriter, r *http.Request) {

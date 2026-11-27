@@ -41,11 +41,11 @@ func moveTaskFixture(t *testing.T) (*Server, string, *models.FactoryWorkOrder, *
 	one := 1
 	dispatch.Steps[2].MaxParallelism = &one
 	dispatch.Stages = datatypes.NewJSONSlice([]models.FactoryLineStage{
-		{Key: "backlog", Kind: models.FactoryLineStageBacklog},
-		{Key: "implement", Kind: models.FactoryLineStagePhase},
-		{Key: "custom-review", Kind: models.FactoryLineStagePhase},
-		{Key: "custom-wait", Kind: models.FactoryLineStagePhase, AutoAdvance: &no},
-		{Key: "done", Kind: models.FactoryLineStageDone},
+		{Key: "backlog", Name: "Backlog", Kind: models.FactoryLineStageBacklog},
+		{Key: "implement", Name: "Implement", Kind: models.FactoryLineStagePhase},
+		{Key: "custom-review", Name: "Review", Kind: models.FactoryLineStagePhase},
+		{Key: "custom-wait", Name: "Awaiting approval", Kind: models.FactoryLineStagePhase, AutoAdvance: &no},
+		{Key: "done", Name: "Done", Kind: models.FactoryLineStageDone},
 	})
 	require.NoError(t, db.Save(dispatch).Error)
 	require.NoError(t, dispatch.EnterStage(db, "implement"))
@@ -53,7 +53,7 @@ func moveTaskFixture(t *testing.T) (*Server, string, *models.FactoryWorkOrder, *
 }
 
 func TestRunnerMoveTaskReplacesSourceWorkAndRejectsSupersededCallers(t *testing.T) {
-	for _, body := range []string{`{"next":true}`, `{"column":"custom-review"}`} {
+	for _, body := range []string{`{"next":true}`, `{"stage":"custom-review"}`} {
 		t.Run(body, func(t *testing.T) {
 			server, token, order, dispatch, ctx := moveTaskFixture(t)
 			db := database.DB(t.Context())
@@ -64,14 +64,14 @@ func TestRunnerMoveTaskReplacesSourceWorkAndRejectsSupersededCallers(t *testing.
 			rec := runnerRequest(t, server, http.MethodPost, token, "/api/v1/runner/task/move", body)
 			require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 			var moved struct {
-				ID, State, Column string
-				FromColumn        string `json:"from_column"`
+				ID, State, Stage string
+				FromStage        string `json:"from_stage"`
 			}
 			require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &moved))
 			assert.Equal(t, order.ID.String(), moved.ID)
 			assert.Equal(t, "open", moved.State)
-			assert.Equal(t, "implement", moved.FromColumn)
-			assert.Equal(t, "custom-review", moved.Column)
+			assert.Equal(t, "implement", moved.FromStage)
+			assert.Equal(t, "custom-review", moved.Stage)
 			run, err := models.FindUnscopedCanvasRun(db, sibling.Run.ID)
 			require.NoError(t, err)
 			assert.Equal(t, models.CanvasRunStateCancelling, run.State)
@@ -97,16 +97,19 @@ func TestRunnerMoveTaskReplacesSourceWorkAndRejectsSupersededCallers(t *testing.
 
 func TestRunnerMoveTaskValidationAndLifecycle(t *testing.T) {
 	for _, tc := range []struct {
-		body, state, column string
-		status              int
+		body, state, stage string
+		status             int
 	}{
 		{`{}`, "open", "implement", http.StatusBadRequest},
-		{`{"column":"done","next":true}`, "open", "implement", http.StatusBadRequest},
+		{`{"stage":"done","next":true}`, "open", "implement", http.StatusBadRequest},
+		{`{"previous":true,"next":true}`, "open", "implement", http.StatusBadRequest},
 		{`{"next":false}`, "open", "implement", http.StatusBadRequest},
-		{`{"column":"unknown"}`, "open", "implement", http.StatusBadRequest},
-		{`{"column":"implement"}`, "open", "implement", http.StatusOK},
-		{`{"column":"backlog"}`, "draft", "backlog", http.StatusOK},
-		{`{"column":"done"}`, "closed", "done", http.StatusOK},
+		{`{"stage":"unknown"}`, "open", "implement", http.StatusBadRequest},
+		{`{"stage":"implement"}`, "open", "implement", http.StatusOK},
+		{`{"stage":"backlog"}`, "draft", "backlog", http.StatusOK},
+		{`{"previous":true}`, "draft", "backlog", http.StatusOK},
+		{`{"stage":"done"}`, "closed", "done", http.StatusOK},
+		{`{"stage":" awaiting APPROVAL "}`, "open", "custom-wait", http.StatusOK},
 		{`{"column":"custom-wait"}`, "open", "custom-wait", http.StatusOK},
 	} {
 		t.Run(tc.body, func(t *testing.T) {
@@ -117,8 +120,8 @@ func TestRunnerMoveTaskValidationAndLifecycle(t *testing.T) {
 			require.NoError(t, db.First(order, "id = ?", order.ID).Error)
 			require.NoError(t, db.First(dispatch, "id = ?", dispatch.ID).Error)
 			assert.Equal(t, tc.state, order.State)
-			assert.Equal(t, tc.column, dispatch.CurrentStageKey)
-			if tc.column == "implement" {
+			assert.Equal(t, tc.stage, dispatch.CurrentStageKey)
+			if tc.stage == "implement" {
 				execution, err := models.FindWorkOrderExecutionByRunID(db, ctx.RunID)
 				require.NoError(t, err)
 				assert.Equal(t, models.FactoryWorkOrderExecutionStatusRunning, execution.Status)
@@ -182,7 +185,7 @@ func TestRunnerMoveTaskStartsLeaveAndDestinationAutomations(t *testing.T) {
 				require.NoError(t, db.Model(canvas).Updates(map[string]any{"factory_id": order.FactoryID, "column_key": automation.column}).Error)
 				automations = append(automations, canvas)
 			}
-			rec := runnerRequest(t, server, http.MethodPost, token, "/api/v1/runner/task/move", `{"column":"`+destination+`"}`)
+			rec := runnerRequest(t, server, http.MethodPost, token, "/api/v1/runner/task/move", `{"stage":"`+destination+`"}`)
 			require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 			for _, canvas := range automations {
 				var events []models.CanvasEvent
@@ -271,7 +274,7 @@ func TestRunnerMoveTaskRejectsClosedTasksAndFollowsEmptyStagePolicy(t *testing.T
 	yes := true
 	dispatch.Stages[3].AutoAdvance = &yes
 	require.NoError(t, db.Save(dispatch).Error)
-	rec := runnerRequest(t, server, http.MethodPost, token, "/api/v1/runner/task/move", `{"column":"custom-wait"}`)
+	rec := runnerRequest(t, server, http.MethodPost, token, "/api/v1/runner/task/move", `{"stage":"custom-wait"}`)
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 	require.NoError(t, db.First(order, "id = ?", order.ID).Error)
 	assert.Equal(t, models.FactoryWorkOrderStateClosed, order.State)
