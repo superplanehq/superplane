@@ -1,6 +1,7 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeAll, describe, expect, it, vi } from "bun:test";
+import { toast } from "sonner";
 
 import { client } from "@/api-client/client.gen";
 import { FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
@@ -41,6 +42,7 @@ describe("FactorySettingsMCPPage catalog", () => {
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
 
@@ -361,6 +363,61 @@ describe("FactorySettingsMCPPage catalog", () => {
     await waitFor(() => {
       expect(assign).toHaveBeenCalledWith("https://auth.example.com/authorize?client_id=storybook");
     });
+  }, 10000);
+
+  it("keeps failed catalog sign-in open and reuses the connection on retry", async () => {
+    const assign = vi.fn();
+    stubLocationAssign(assign);
+    const errorToast = vi.spyOn(toast, "error");
+    const user = userEvent.setup();
+    render(
+      <FactoriesHarness
+        pathSuffix={`${agentPath}?dialog=add`}
+        factoriesFixture={emptyAgentResourcesFixture()}
+        experimentalFeatures={agentPageFeatures}
+      />,
+    );
+
+    await screen.findByTestId("mcp-add-picker", {}, { timeout: 8000 });
+    await user.click(screen.getByTestId("mcp-catalog-linear"));
+    const signIn = await screen.findByTestId("mcp-catalog-setup-sign-in");
+    const fixtureFetch = window.fetch;
+    const startPaths: string[] = [];
+    let creations = 0;
+    const registrationFailure = "invalid argument\ndynamic client registration failed: HTTP 403: Forbidden";
+    vi.stubGlobal("fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
+      const request = new Request(input, init);
+      const path = new URL(request.url).pathname;
+      if (request.method === "POST" && path.endsWith("/agent-resources")) {
+        creations += 1;
+      }
+      if (request.method === "POST" && path.endsWith("/oauth:start")) {
+        startPaths.push(path);
+        if (startPaths.length === 1) {
+          return Response.json({ code: 3, message: registrationFailure }, { status: 400 });
+        }
+      }
+      return fixtureFetch(input, init);
+    });
+
+    await user.click(signIn);
+
+    await waitFor(() => expect(errorToast).toHaveBeenCalledTimes(1));
+    expect(errorToast).toHaveBeenCalledWith(registrationFailure);
+    expect(screen.getByTestId("mcp-catalog-setup-dialog")).toBeVisible();
+    expect(assign).not.toHaveBeenCalled();
+    await waitFor(() => expect(signIn).toBeEnabled());
+
+    await user.click(signIn);
+
+    await waitFor(() => {
+      expect(assign).toHaveBeenCalledWith("https://auth.example.com/authorize?client_id=storybook");
+    });
+    expect(screen.queryByTestId("mcp-catalog-setup-dialog")).not.toBeInTheDocument();
+    expect(creations).toBe(1);
+    expect(startPaths).toHaveLength(2);
+    expect(startPaths[1]).toBe(startPaths[0]);
+    expect(errorToast).toHaveBeenCalledTimes(1);
   }, 10000);
 
   it("opens Add custom without catalog instructions", async () => {
