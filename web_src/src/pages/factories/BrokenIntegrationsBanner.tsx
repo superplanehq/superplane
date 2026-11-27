@@ -63,7 +63,9 @@ export function BrokenIntegrationsBanner({
               <div className="flex min-w-0 items-center gap-2">
                 <IntegrationIcon integrationName={integration.integrationName} className="h-4 w-4 shrink-0" />
                 <div className="min-w-0">
-                  <p className="truncate font-medium leading-tight">{displayName || integration.integrationName}</p>
+                  <p className="break-words font-medium leading-tight">
+                    {integration.name} ({displayName || integration.integrationName})
+                  </p>
                   {integration.description ? (
                     <p className="truncate text-xs text-amber-800/80 dark:text-amber-200/70">
                       {integration.description}
