@@ -85,8 +85,9 @@ Stage IDs are unique within the workspace. Automation IDs are unique across
 all stages. Stage and automation IDs use separate namespaces. Two instances
 of one built-in template need different automation IDs.
 
-SuperPlane assigns each resource a public ID once and persists it. Export
-reads these mappings without changing them. Display-name changes, manifest
+On first export, SuperPlane assigns and saves missing public IDs for the
+selected line's stages and workspace automations. Existing workspaces keep
+their data until export. Later exports reuse saved IDs. Display-name changes, manifest
 moves, and source-file moves preserve IDs and existing destination records.
 Copying a manifest into another workspace creates independent records with the
 same public IDs. The target must have the required existing stages.
@@ -183,9 +184,9 @@ under `agent`. Move built-in instructions, thinking level, and timeout under
 `with.agent`. Removed fields such as stage `key`, `max_parallelism`, trigger
 `use`, `utc_offset`, `runs_on_task`, and `with.agents` fail validation.
 
-Before rollout, pause API and worker processes that create or change workspace
-configuration. Apply the database migrations. Deploy the updated API and workers
-before resuming those writes. Older processes do not assign public IDs.
-Concurrent writes during this gap can leave records without public IDs.
+Apply the schema migration before deploying the updated API and workers.
+The migration does not assign IDs or rewrite existing stages. Export saves
+missing IDs in one transaction. A failed export does not save partial changes.
+Export the destination before planning or applying YAML that manages existing resources.
 Existing records and execution settings remain in place.
 GitHub synchronization and stage creation or removal are separate work.

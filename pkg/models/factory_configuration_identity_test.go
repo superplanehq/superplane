@@ -33,9 +33,8 @@ func TestFactoryConfigurationIDsPersistAcrossRenamesAndLineUpdates(t *testing.T)
 	}
 	first := create("Review Task")
 	second := create("Review-Task")
-	require.Equal(t, "review-task", first.ConfigurationID)
-	require.Equal(t, "review-task-2", second.ConfigurationID)
-	require.NotEqual(t, first.ConfigurationID, second.ConfigurationID)
+	require.Empty(t, first.ConfigurationID)
+	require.Empty(t, second.ConfigurationID)
 	const id = "review-task"
 	require.NoError(t, first.SetConfigurationID(db, id))
 	require.Error(t, second.SetConfigurationID(db, id))
@@ -47,8 +46,12 @@ func TestFactoryConfigurationIDsPersistAcrossRenamesAndLineUpdates(t *testing.T)
 	line, err := factory.CreateLine(db, "Delivery", []models.FactoryLineStep{{Type: models.FactoryLineStepTypeRunApp, AppID: first.ID, Entrypoint: "manual"}})
 	require.NoError(t, err)
 	stages := line.StagesValue()
-	retained := stages[1].ConfigurationID
-	require.NotEmpty(t, retained)
+	for _, stage := range stages {
+		require.Empty(t, stage.ConfigurationID)
+	}
+	const retained = "implementation"
+	stages[1].ConfigurationID = retained
+	require.NoError(t, line.UpdateConfiguration(db, nil, nil, nil, stages))
 	stages[1].Name = "Renamed phase"
 	// UI callers know the stage UUID and internal key, not its YAML identity.
 	stages[1].ConfigurationID = ""
@@ -56,23 +59,13 @@ func TestFactoryConfigurationIDsPersistAcrossRenamesAndLineUpdates(t *testing.T)
 	stages = append(stages[:len(stages)-1], custom, stages[len(stages)-1])
 	require.NoError(t, line.UpdateConfiguration(db, nil, nil, nil, stages))
 	require.Equal(t, retained, line.StagesValue()[1].ConfigurationID)
-	ids := map[string]bool{}
-	for _, stage := range line.Stages {
-		require.NotEmpty(t, stage.ConfigurationID)
-		require.False(t, ids[stage.ConfigurationID])
-		ids[stage.ConfigurationID] = true
-	}
-	// Raw creation also stores stages once, even when another line shares its runner.
+	require.Empty(t, line.Stages[len(line.Stages)-2].ConfigurationID, "UI edits do not assign YAML IDs")
 	other := &models.FactoryLine{
 		ID: uuid.New(), OrganizationID: r.Organization.ID, FactoryID: factory.ID,
 		Name: "Alternate delivery", Steps: line.Steps,
 	}
 	require.NoError(t, db.Create(other).Error)
-	require.Len(t, other.Stages, 4)
-	for _, stage := range other.Stages {
-		require.NotEmpty(t, stage.ConfigurationID)
-		require.False(t, ids[stage.ConfigurationID], "stage IDs are unique across workspace lines")
-	}
+	require.Empty(t, other.Stages, "raw creation retains the existing stage behavior")
 	current, err = models.FindCanvasInTransaction(db, r.Organization.ID, first.ID)
 	require.NoError(t, err)
 	require.Equal(t, id, current.ConfigurationID)

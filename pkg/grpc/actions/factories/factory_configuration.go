@@ -25,7 +25,7 @@ func ExportFactoryConfiguration(ctx context.Context, organizationID string, req 
 	}
 	var response *pb.ExportFactoryConfigurationResponse
 	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
-		target, err := loadFactoryConfigurationTarget(tx, orgID, req.GetFactoryId(), req.GetLineId())
+		target, err := prepareFactoryConfigurationExport(tx, orgID, req.GetFactoryId(), req.GetLineId())
 		if err != nil {
 			return err
 		}
@@ -50,7 +50,7 @@ func ExportFactoryConfiguration(ctx context.Context, organizationID string, req 
 		}
 		response = &pb.ExportFactoryConfigurationResponse{Coverage: factoryConfigurationCoverage, Bundle: &pb.FactoryConfigurationBundle{ManifestPath: factoryConfigurationManifestPath, Files: files}}
 		return nil
-	}, &sql.TxOptions{ReadOnly: true, Isolation: sql.LevelRepeatableRead})
+	}, &sql.TxOptions{Isolation: sql.LevelRepeatableRead})
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "Failed to export stage configuration.")
 	}

@@ -111,11 +111,14 @@ func TestFactoryConfigurationPinnedBindingsSurviveResetAndRepositoryRefresh(t *t
 	})
 	owner := models.FactoryConfigurationAutomation{OrganizationID: f.r.Organization.ID, FactoryID: f.factory.ID, LineID: f.line.ID, StageKey: "verify", ManifestID: risk.ConfigurationID, CanvasID: risk.ID, Binding: datatypes.JSONMap{"integration_id": pinned, "resource_id": "acme/pinned"}}
 	require.NoError(t, owner.Save(db))
-	// A canvas has one workspace-wide ownership record.
+	// Saving a moved automation replaces its earlier ownership record.
 	laterOwner := owner
 	laterOwner.StageKey = "zzz"
-	laterOwner.Binding = datatypes.JSONMap{"integration_id": integration, "resource_id": "acme/later"}
-	require.Error(t, db.Create(&laterOwner).Error)
+	require.NoError(t, laterOwner.Save(db))
+	owners, err := models.ListFactoryConfigurationAutomations(db, f.r.Organization.ID, f.factory.ID)
+	require.NoError(t, err)
+	require.Len(t, owners, 1)
+	require.Equal(t, "zzz", owners[0].StageKey)
 	repository = "acme/changed"
 	require.NoError(t, f.factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{AppRepository: &repository}))
 	require.NoError(t, resetTestOrganization(t, f.r))

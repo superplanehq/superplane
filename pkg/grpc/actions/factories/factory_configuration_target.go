@@ -117,6 +117,38 @@ func loadFactoryConfigurationTarget(tx *gorm.DB, orgID uuid.UUID, factoryRef, li
 	return inspectFactoryConfigurationTarget(tx, factory, line, canvases, lines)
 }
 
+func prepareFactoryConfigurationExport(tx *gorm.DB, orgID uuid.UUID, factoryRef, lineRef string) (*factoryConfigurationTarget, error) {
+	if err := requireFactoryAsCode(tx, orgID); err != nil {
+		return nil, err
+	}
+	factory, err := findFactory(tx, orgID, factoryRef)
+	if err != nil {
+		return nil, err
+	}
+	if err := factory.LockForUpdate(tx); err != nil {
+		return nil, err
+	}
+	lines, err := factory.ListLines(tx)
+	if err != nil {
+		return nil, err
+	}
+	lineID, err := resolveConfigurationLineID(factory, lines, lineRef)
+	if err != nil {
+		return nil, err
+	}
+	line, err := factory.FindLineForUpdate(tx, lineID)
+	if err != nil {
+		return nil, err
+	}
+	if err := line.AssignConfigurationIDs(tx); err != nil {
+		return nil, err
+	}
+	if err := factory.AssignConfigurationAutomationIDs(tx); err != nil {
+		return nil, err
+	}
+	return lockFactoryConfigurationTarget(tx, orgID, factoryRef, lineRef)
+}
+
 func lockFactoryConfigurationTarget(tx *gorm.DB, orgID uuid.UUID, factoryRef, lineRef string) (*factoryConfigurationTarget, error) {
 	factory, err := findFactory(tx, orgID, factoryRef)
 	if err != nil {
@@ -203,7 +235,7 @@ func inspectFactoryConfigurationTarget(tx *gorm.DB, factory *models.Factory, lin
 			key = "implementation"
 		}
 		if stage.ConfigurationID == "" {
-			return nil, unsupportedConfigurationTarget("Assign persisted workspace YAML IDs with the public-ID backfill before export.")
+			return nil, unsupportedConfigurationTarget("Export this workspace before planning or applying YAML to assign missing public IDs.")
 		}
 		entry := &factoryConfigurationStageTarget{stage: stage, key: key}
 		target.stages = append(target.stages, entry)
@@ -379,7 +411,7 @@ func inspectFactoryConfigurationTarget(tx *gorm.DB, factory *models.Factory, lin
 		for _, automation := range stage.automations {
 			id := automation.canvas.ConfigurationID
 			if id == "" {
-				return nil, unsupportedConfigurationTarget("Assign persisted workspace YAML IDs with the public-ID backfill before export.")
+				return nil, unsupportedConfigurationTarget("Export this workspace before planning or applying YAML to assign missing public IDs.")
 			}
 
 			for _, owner := range target.ownership {

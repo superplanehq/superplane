@@ -10,8 +10,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 )
 
-func TestWorkspacePublicIDsMigrationPreservesSwappedOwnership(t *testing.T) {
-	migration, err := os.ReadFile("../../db/migrations/20261127171730_workspace-yaml-public-ids.up.sql")
+func TestWorkspacePublicIDsMigrationPreservesExistingRecords(t *testing.T) {
+	migration, err := os.ReadFile("../../db/migrations/20261127200309_assign-workspace-yaml-ids-on-export.up.sql")
 	require.NoError(t, err)
 	tx := database.DB(t.Context()).Begin()
 	require.NoError(t, tx.Error)
@@ -46,7 +46,7 @@ func TestWorkspacePublicIDsMigrationPreservesSwappedOwnership(t *testing.T) {
 	require.NoError(t, tx.Exec("INSERT INTO factory_lines VALUES (?, ?, '[]', ?)", lineID, factoryID, now).Error)
 	require.NoError(t, tx.Exec(`INSERT INTO workflows (id, factory_id, name, created_at) VALUES
 		(?, ?, 'Review Task', ?), (?, ?, 'Review-Task', ?)`, first, factoryID, now.Add(-time.Minute), second, factoryID, now).Error)
-	// Name-based adoption swaps these two valid, line-scoped public IDs.
+	// Existing mappings stay in place until export adopts workspace-wide IDs.
 	require.NoError(t, tx.Exec(`INSERT INTO factory_configuration_automations VALUES
 		(?, ?, ?, 'verify', 'review-task-2', ?, '{"integration_id":"first-connection"}'),
 		(?, ?, ?, 'verify', 'review-task', ?, '{"integration_id":"second-connection"}')`,
@@ -64,11 +64,14 @@ func TestWorkspacePublicIDsMigrationPreservesSwappedOwnership(t *testing.T) {
 		ORDER BY canvas.created_at`).Scan(&assignments).Error)
 	require.Len(t, assignments, 2)
 	require.Equal(t, first, assignments[0].CanvasID)
-	require.Equal(t, "review-task", assignments[0].PublicID)
-	require.Equal(t, "review-task", assignments[0].ManifestID)
+	require.Empty(t, assignments[0].PublicID)
+	require.Equal(t, "review-task-2", assignments[0].ManifestID)
 	require.JSONEq(t, `{"integration_id":"first-connection"}`, assignments[0].Binding)
 	require.Equal(t, second, assignments[1].CanvasID)
-	require.Equal(t, "review-task-2", assignments[1].PublicID)
-	require.Equal(t, "review-task-2", assignments[1].ManifestID)
+	require.Empty(t, assignments[1].PublicID)
+	require.Equal(t, "review-task", assignments[1].ManifestID)
 	require.JSONEq(t, `{"integration_id":"second-connection"}`, assignments[1].Binding)
+	var stages string
+	require.NoError(t, tx.Raw("SELECT stages::text FROM factory_lines WHERE id = ?", lineID).Scan(&stages).Error)
+	require.JSONEq(t, "[]", stages)
 }

@@ -402,7 +402,7 @@ func (l *FactoryLine) update(
 			updates["column_colors"] = datatypes.NewJSONType(columnColors)
 		}
 		if stages != nil {
-			if err := l.assignConfigurationStageIDs(tx, stages); err != nil {
+			if err := l.retainConfigurationStageIDs(tx, stages); err != nil {
 				return err
 			}
 			if columnColors == nil {

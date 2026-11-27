@@ -70,6 +70,7 @@ func newConfigurationFixture(t *testing.T) configurationFixture {
 	require.NoError(t, line.UpdateConfiguration(database.DB(t.Context()), nil, nil, nil, stages))
 	fixture := configurationFixture{r: r, factory: factory, line: line, canvas: canvas, ctx: authentication.SetUserIdInMetadata(t.Context(), r.User.String())}
 	configureConfigurationCatalogIntegration(t, fixture, vcsID, models.ProviderGitHub)
+	fixture.export(t)
 	return fixture
 }
 
@@ -79,6 +80,9 @@ func (f configurationFixture) export(t *testing.T) *pb.FactoryConfigurationBundl
 		FactoryId: f.factory.Key, LineId: f.line.ID.String(),
 	})
 	require.NoError(t, err)
+	line, err := f.factory.FindLine(database.DB(t.Context()), f.line.ID)
+	require.NoError(t, err)
+	*f.line = *line
 	require.Equal(t, factoryConfigurationCoverage, response.Coverage)
 	require.Equal(t, ".superplane/main.yml", response.Bundle.ManifestPath)
 	require.Len(t, response.Bundle.Files, 1)
@@ -331,6 +335,7 @@ func TestFactoryConfigurationGuardsDoNotWrite(t *testing.T) {
 				}
 				require.NoError(t, line.UpdateConfiguration(db, nil, nil, nil, stages))
 				f.line = line
+				f.export(t)
 			case "changed desired input":
 				bundle.Files[0].Content = strings.ReplaceAll(bundle.Files[0].Content, "New instructions", "Other instructions")
 			}

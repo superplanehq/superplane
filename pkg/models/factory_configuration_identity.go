@@ -9,30 +9,6 @@ import (
 	"gorm.io/gorm"
 )
 
-// BeforeCreate assigns a public identity once, before a factory automation exists.
-func (c *Canvas) BeforeCreate(tx *gorm.DB) error {
-	if c.FactoryID == nil {
-		return nil
-	}
-	factory := &Factory{ID: *c.FactoryID, OrganizationID: c.OrganizationID}
-	if err := factory.LockForUpdate(tx); err != nil {
-		return err
-	}
-	if c.ConfigurationID != "" {
-		return validateConfigurationID(c.ConfigurationID)
-	}
-	var ids []string
-	if err := tx.Model(&Canvas{}).Where("factory_id = ?", *c.FactoryID).Pluck("configuration_id", &ids).Error; err != nil {
-		return err
-	}
-	taken := make(map[string]bool, len(ids))
-	for _, id := range ids {
-		taken[id] = true
-	}
-	c.ConfigurationID = availableConfigurationID(c.Name, taken)
-	return nil
-}
-
 func (c *Canvas) SetConfigurationID(tx *gorm.DB, id string) error {
 	if err := validateConfigurationID(id); err != nil {
 		return err
@@ -47,23 +23,99 @@ func (c *Canvas) SetConfigurationID(tx *gorm.DB, id string) error {
 	return nil
 }
 
-func (l *FactoryLine) BeforeCreate(tx *gorm.DB) error {
-	stages := l.StagesValue()
-	if len(stages) == 0 {
-		var err error
-		stages, err = defaultFactoryLineStages(tx, l.Steps)
-		if err != nil {
-			return err
-		}
-	}
-	if err := l.assignConfigurationStageIDs(tx, stages); err != nil {
+// AssignConfigurationIDs persists missing IDs for this line during YAML export.
+// The caller holds the workspace lock and commits the complete export atomically.
+func (l *FactoryLine) AssignConfigurationIDs(tx *gorm.DB) error {
+	stages, err := l.executionStages(tx)
+	if err != nil {
 		return err
 	}
+	if err := l.retainConfigurationStageIDs(tx, stages); err != nil {
+		return err
+	}
+	var ids []string
+	if err := tx.Raw(`SELECT stage->>'configuration_id'
+		FROM factory_lines line, jsonb_array_elements(line.stages) stage
+		WHERE line.factory_id = ? AND stage->>'configuration_id' IS NOT NULL`, l.FactoryID).Scan(&ids).Error; err != nil {
+		return err
+	}
+	taken := make(map[string]bool, len(ids)+len(stages))
+	for _, id := range ids {
+		taken[id] = true
+	}
+	for _, stage := range stages {
+		taken[stage.ConfigurationID] = true
+	}
+	changed := len(l.Stages) == 0
+	for i := range stages {
+		if stages[i].ConfigurationID == "" {
+			stages[i].ConfigurationID = availableConfigurationID(stages[i].Name, taken)
+			taken[stages[i].ConfigurationID] = true
+			changed = true
+		}
+	}
+	if !changed {
+		return nil
+	}
 	l.Stages = datatypes.JSONSlice[FactoryLineStage](stages)
-	return nil
+	return tx.Model(l).UpdateColumn("stages", l.Stages).Error
 }
 
-func (l *FactoryLine) assignConfigurationStageIDs(tx *gorm.DB, stages []FactoryLineStage) error {
+// AssignConfigurationAutomationIDs adopts existing automations without publishing new revisions.
+// The caller holds the workspace lock in the export transaction.
+func (f *Factory) AssignConfigurationAutomationIDs(tx *gorm.DB) error {
+	canvases, err := f.ListCanvases(tx)
+	if err != nil {
+		return err
+	}
+	taken := make(map[string]bool, len(canvases))
+	for _, canvas := range canvases {
+		taken[canvas.ConfigurationID] = true
+	}
+	byCanvas := make(map[uuid.UUID]string, len(canvases))
+	for i := range canvases {
+		canvas := &canvases[i]
+		if canvas.ConfigurationID == "" {
+			canvas.ConfigurationID = availableConfigurationID(canvas.Name, taken)
+			if err := tx.Model(canvas).UpdateColumn("configuration_id", canvas.ConfigurationID).Error; err != nil {
+				return err
+			}
+			taken[canvas.ConfigurationID] = true
+		}
+		byCanvas[canvas.ID] = canvas.ConfigurationID
+	}
+	owners, err := ListFactoryConfigurationAutomations(tx, f.OrganizationID, f.ID)
+	if err != nil {
+		return err
+	}
+	adopted := make([]FactoryConfigurationAutomation, 0, len(owners))
+	seen := make(map[uuid.UUID]bool, len(owners))
+	changed := false
+	for _, owner := range owners {
+		id := byCanvas[owner.CanvasID]
+		if id == "" {
+			id = owner.ManifestID
+		}
+		if seen[owner.CanvasID] {
+			changed = true
+			continue
+		}
+		seen[owner.CanvasID] = true
+		changed = changed || owner.ManifestID != id
+		owner.ManifestID = id
+		adopted = append(adopted, owner)
+	}
+	if !changed {
+		return nil
+	}
+	// Replace the complete set so swapped legacy IDs cannot overwrite bindings.
+	if err := tx.Where("factory_id = ?", f.ID).Delete(&FactoryConfigurationAutomation{}).Error; err != nil {
+		return err
+	}
+	return tx.Create(&adopted).Error
+}
+
+func (l *FactoryLine) retainConfigurationStageIDs(tx *gorm.DB, stages []FactoryLineStage) error {
 	factory := &Factory{ID: l.FactoryID, OrganizationID: l.OrganizationID}
 	if err := factory.LockForUpdate(tx); err != nil {
 		return err
@@ -103,14 +155,6 @@ func (l *FactoryLine) assignConfigurationStageIDs(tx *gorm.DB, stages []FactoryL
 		if taken[stage.ConfigurationID] {
 			return fmt.Errorf("stage ID %q is already used in this workspace", stage.ConfigurationID)
 		}
-		taken[stage.ConfigurationID] = true
-	}
-	for i := range stages {
-		stage := &stages[i]
-		if stage.ConfigurationID != "" {
-			continue
-		}
-		stage.ConfigurationID = availableConfigurationID(stage.Name, taken)
 		taken[stage.ConfigurationID] = true
 	}
 	return nil

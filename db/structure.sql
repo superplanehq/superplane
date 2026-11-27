@@ -2830,7 +2830,7 @@ ALTER TABLE ONLY public.factory_codex_leases
 --
 
 ALTER TABLE ONLY public.factory_configuration_automations
-    ADD CONSTRAINT factory_configuration_automations_pkey PRIMARY KEY (factory_id, manifest_id);
+    ADD CONSTRAINT factory_configuration_automations_pkey PRIMARY KEY (factory_id, line_id, stage_key, manifest_id);
 
 
 --
@@ -3875,13 +3875,6 @@ CREATE INDEX factory_codex_leases_task_idx ON public.factory_codex_leases USING 
 --
 
 CREATE INDEX factory_configuration_automations_canvas_id ON public.factory_configuration_automations USING btree (canvas_id);
-
-
---
--- Name: factory_configuration_automations_canvas_key; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX factory_configuration_automations_canvas_key ON public.factory_configuration_automations USING btree (factory_id, canvas_id);
 
 
 --
@@ -6938,7 +6931,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261127173610	f
+20261127200309	f
 \.
 
 
