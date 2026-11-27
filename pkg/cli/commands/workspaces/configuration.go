@@ -15,7 +15,7 @@ import (
 
 const (
 	configurationManifestPath = ".superplane/main.yml"
-	configurationCoverage     = "All stages and automations"
+	configurationCoverage     = "Repositories, stages, and automations"
 )
 
 type configurationTarget struct {
@@ -105,7 +105,8 @@ type configurationPlanCommand struct {
 func newConfigurationPlanCommand(options core.BindOptions) *cobra.Command {
 	command := &configurationPlanCommand{}
 	cmd := &cobra.Command{
-		Use: "plan", Short: "Plan stage and automation changes", Args: cobra.NoArgs,
+		Use: "plan", Short: "Plan stage and automation changes",
+		Long: "Plan stage and automation changes. Repository settings must match the workspace. Change repositories in workspace settings and export again.", Args: cobra.NoArgs,
 	}
 	command.bind(cmd)
 	core.Bind(cmd, command, options)
@@ -178,7 +179,8 @@ type configurationApplyCommand struct {
 func newConfigurationApplyCommand(options core.BindOptions) *cobra.Command {
 	command := &configurationApplyCommand{}
 	cmd := &cobra.Command{
-		Use: "apply", Short: "Apply stage and automation changes", Args: cobra.NoArgs,
+		Use: "apply", Short: "Apply stage and automation changes",
+		Long: "Apply stage and automation changes. Repository settings must match the workspace. Change repositories in workspace settings and export again.", Args: cobra.NoArgs,
 	}
 	command.bind(cmd)
 	cmd.Flags().BoolVar(&command.yes, "yes", false, "apply the displayed plan without confirmation")
