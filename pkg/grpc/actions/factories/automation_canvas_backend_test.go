@@ -157,7 +157,7 @@ func TestCanvasAutomationCustomStageRoundTripAndAdmission(t *testing.T) {
 		strings.Replace(source, "  - use: task_enters_stage", "  - use: task_enters_stage\n  - use: manual", 1),
 	} {
 		_, err := service.Create(ctx, placement, r.User, unsupported)
-		require.ErrorContains(t, err, "Keep one task_enters_stage trigger")
+		require.ErrorContains(t, err, "Use one task_enters_stage trigger, webhook triggers, or both")
 	}
 	legacyCanvas, _ := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "Existing QA", "existing-start")
 	require.NoError(t, legacyCanvas.SetColumnKey(db, stageKey))

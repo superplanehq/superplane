@@ -146,7 +146,7 @@ func importAutomationCanvas(tx *gorm.DB, factory *models.Factory, canvas *models
 	hasSchedule := slices.ContainsFunc(definition.Triggers, func(trigger automationspec.Trigger) bool {
 		return trigger.Use == automationspec.Scheduled || trigger.Use == automationspec.Webhook
 	})
-	if *canvas.ColumnKey == models.CanvasColumnKeyBacklog && ((settings.RunsOnTask != nil && !*settings.RunsOnTask) || hasSchedule) {
+	if hasSchedule || (*canvas.ColumnKey == models.CanvasColumnKeyBacklog && settings.RunsOnTask != nil && !*settings.RunsOnTask) {
 		stripCustomAutomationBacklogPrompt(settings.Steps)
 	}
 	agent := intakeAgentFromCanvasNodes(version.Nodes)
