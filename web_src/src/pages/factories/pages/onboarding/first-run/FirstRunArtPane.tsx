@@ -31,8 +31,7 @@ export function FirstRunArtPane({
 
     const mount = () => {
       if (cancelled) return;
-      const handle = mountOnboardingArt(canvas, scene);
-      if (handle) handleRef.current = handle;
+      handleRef.current = mountOnboardingArt(canvas, scene);
     };
 
     const sync = async () => {
