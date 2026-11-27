@@ -213,7 +213,7 @@ export function pickerCatalogForColumn(
 
 function phaseCatalog(key: ColumnKey): ColumnAutomationCatalogEntry[] {
   if (key === "phase-0") {
-    return [CUSTOM_AUTOMATION_ENTRY];
+    return [AGENT_STEP_ENTRY, CUSTOM_AUTOMATION_ENTRY];
   }
   return [AGENT_STEP_ENTRY, CUSTOM_ENTRY];
 }

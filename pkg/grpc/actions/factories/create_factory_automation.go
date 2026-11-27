@@ -30,7 +30,7 @@ func CreateFactoryAutomation(
 		return nil, factoryErrorToStatus(err, "failed to create factory automation")
 	}
 	templateID := strings.TrimSpace(req.GetTemplateId())
-	if templateID != "" && templateID != scheduledIntakeTemplateID {
+	if templateID != "" && templateID != scheduledIntakeTemplateID && templateID != models.FactoryAppTemplateBacklogID && templateID != "line-implementation" {
 		return nil, factoryErrorToStatus(invalidArgument("unknown factory automation template"), "failed to create factory automation")
 	}
 	if templateID == scheduledIntakeTemplateID {
@@ -55,6 +55,9 @@ func CreateFactoryAutomation(
 		return nil, factoryErrorToStatus(err, "failed to create factory automation")
 	}
 	factoryID := factory.ID
+	if templateID == models.FactoryAppTemplateBacklogID || templateID == "line-implementation" {
+		return restoreFactoryAutomation(ctx, deps, factory, req)
+	}
 	if customStageColumn {
 		lines, listErr := factory.ListLines(db)
 		if listErr != nil {

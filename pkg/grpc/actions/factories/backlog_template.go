@@ -34,6 +34,9 @@ func ensureBacklogCanvas(
 	tx *gorm.DB,
 	factoryModel *models.Factory,
 ) error {
+	if factoryModel.OnboardingConfigValue().BacklogAutomationRemoved {
+		return nil
+	}
 	has, err := factoryHasOnWorkOrderCanvas(tx, factoryModel)
 	if err != nil {
 		return err

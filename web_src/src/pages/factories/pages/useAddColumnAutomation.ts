@@ -116,6 +116,10 @@ export function useAddColumnAutomation(args: {
       }
       return;
     }
+    if (entry.kind === "analysis" || entry.kind === "agent-step") {
+      await restoreColumnAutomation(entry, column, args.lineId, createAutomation.mutateAsync, closePicker);
+      return;
+    }
     if (entry.kind === "custom") setNaming(true);
   };
 
@@ -140,13 +144,32 @@ export function useAddColumnAutomation(args: {
     naming,
     openPicker,
     closePicker,
-    catalog,
+    catalog: catalog.filter((entry) => column !== "backlog" || entry.kind !== "intake"),
     takenIds,
     unavailableReasons: pickerCatalog.unavailableReasons,
     onSelect,
     createNamed,
     isPending: createAutomation.isPending || isInstalling,
   };
+}
+
+async function restoreColumnAutomation(
+  entry: ColumnAutomationCatalogEntry,
+  column: ColumnKey,
+  lineId: string | undefined,
+  create: ReturnType<typeof useCreateFactoryAutomation>["mutateAsync"],
+  close: () => void,
+) {
+  try {
+    await create({
+      name: entry.name,
+      templateId: entry.kind === "analysis" ? "backlog" : "line-implementation",
+      installParams: { lineId: lineId ?? "", stageKey: column },
+    });
+    close();
+  } catch {
+    showErrorToast("Could not add automation. Try again.");
+  }
 }
 
 function githubVerifyTemplate(

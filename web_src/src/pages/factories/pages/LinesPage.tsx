@@ -717,13 +717,9 @@ export function LinesPage() {
   };
 
   const viewedAutomation = factoryApps.find((app) => app.id === automationViewCanvasId);
-  const canDeleteViewedCustom =
-    canUpdate &&
-    (viewedAutomation?.columnKey === "backlog" ||
-      viewedAutomation?.columnKey === "verify" ||
-      viewedAutomation?.columnKey === "done");
+  const canDeleteViewedAutomation = canUpdate && Boolean(viewedAutomation?.id);
   const closeAutomationView = () => navigate(factoryHomePath(organizationId, routeSegment));
-  const deleteViewedCustomAutomation = async () => {
+  const deleteViewedAutomation = async () => {
     if (!automationViewCanvasId) {
       return;
     }
@@ -807,7 +803,7 @@ export function LinesPage() {
           columnKey={viewedAutomation?.columnKey}
           title={viewedAutomation?.name?.trim() || "Automation"}
           onClose={closeAutomationView}
-          onDelete={canDeleteViewedCustom ? deleteViewedCustomAutomation : undefined}
+          onDelete={canDeleteViewedAutomation ? deleteViewedAutomation : undefined}
           deletePending={deleteAutomation.isPending}
         />
       ) : null}
@@ -2083,6 +2079,7 @@ function PhaseBoard({
           creditFailureLabels={creditFailureLabels}
           intakePanel={intakePanel}
           onAddIntake={onAddIntake}
+          onAddAutomation={onAddStageAutomation ? () => onAddStageAutomation("backlog", backlogTitle) : undefined}
           automations={backlogAutomations}
           automationRowCount={automationRowCount(backlogAutomations)}
           onAutomationRowAction={onAutomationRowAction}

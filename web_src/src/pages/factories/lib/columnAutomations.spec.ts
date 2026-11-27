@@ -393,7 +393,7 @@ describe("catalogForColumn", () => {
     });
 
     expect(takenCatalogIds(automations, catalog)).toEqual([]);
-    expect(catalog.map((entry) => entry.id)).toEqual(["custom-verification"]);
+    expect(catalog.map((entry) => entry.id)).toEqual(["agent-step", "custom-verification"]);
   });
 });
 
