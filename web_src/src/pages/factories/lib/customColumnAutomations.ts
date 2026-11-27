@@ -72,8 +72,6 @@ export function firstPhaseAutomations(
   if (key !== "phase-0") {
     return steps;
   }
-  return [
-    ...steps,
-    ...customColumnAutomations(input.apps ?? [], "implement", workOrders, new Set(), runningCountForApp),
-  ];
+  const skip = new Set(steps.flatMap((automation) => (automation.canvasId ? [automation.canvasId] : [])));
+  return [...steps, ...customColumnAutomations(input.apps ?? [], "implement", workOrders, skip, runningCountForApp)];
 }

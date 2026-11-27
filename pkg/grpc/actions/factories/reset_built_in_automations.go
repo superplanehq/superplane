@@ -163,8 +163,13 @@ func resetOrganizationBuiltInAutomationsInTransaction(
 		if err != nil {
 			return BuiltInAutomationReset{}, err
 		}
+		bindings, err := factoryConfigurationSavedBindings(tx, &factoryList[i])
+		if err != nil {
+			return BuiltInAutomationReset{}, err
+		}
+		factoryTx := tx.WithContext(context.WithValue(tx.Statement.Context, factoryConfigurationSavedBindingsKey{}, bindings))
 		for j := range canvasesForFactory {
-			saved, err := resetBuiltInAutomation(ctx, tx, &factoryList[i], &canvasesForFactory[j], templateID, deps)
+			saved, err := resetBuiltInAutomation(ctx, factoryTx, &factoryList[i], &canvasesForFactory[j], templateID, deps)
 			if err != nil {
 				return BuiltInAutomationReset{}, fmt.Errorf("reset %q in factory %q: %w", canvasesForFactory[j].Name, factoryList[i].Name, err)
 			}
