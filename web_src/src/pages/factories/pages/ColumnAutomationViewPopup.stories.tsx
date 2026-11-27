@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { QueryClient } from "@tanstack/react-query";
+import { http, HttpResponse } from "msw";
 
 import { prepareData } from "@/pages/app/workflowPageHelpers";
 
@@ -75,6 +76,24 @@ export const Empty: Story = {
   args: {
     graph: { nodes: [], edges: [] },
     editHref: undefined,
+  },
+};
+
+export const EmptyRunHistory: Story = {
+  name: "PR Closure without runs",
+  parameters: {
+    msw: { handlers: [http.get("/api/v1/canvases/app-pr-closure/runs", () => HttpResponse.json({ runs: [] }))] },
+  },
+  args: {
+    title: "PR Closure",
+    organizationId: "org-1",
+    factoryId: "factory-1",
+    canvasId: "app-pr-closure",
+    graph: { nodes: [], edges: [] },
+    historyEligible: true,
+    initialTab: "runs",
+    editHref: undefined,
+    onDelete: () => undefined,
   },
 };
 

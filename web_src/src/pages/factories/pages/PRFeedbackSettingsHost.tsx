@@ -7,7 +7,6 @@ import {
 } from "@/hooks/useFactoryPRFeedbackData";
 import { useIntegrationResources } from "@/hooks/useIntegrations";
 import { getApiErrorMessage } from "@/lib/errors";
-import { showErrorToast } from "@/lib/toast";
 import { factoryVCSProvider } from "@/pages/home/factories";
 import { useState } from "react";
 import { useNavigate } from "react-router";
@@ -225,7 +224,8 @@ function PRFeedbackSettingsLoaded({
                 await deleteHandler.mutateAsync(handlerId);
                 onClose();
               } catch (error) {
-                showErrorToast(getApiErrorMessage(error, PR_FEEDBACK_SETTINGS_COPY.saveError));
+                setSaveError(getApiErrorMessage(error, "Could not delete automation. Try again."));
+                throw error;
               }
             }
           : undefined

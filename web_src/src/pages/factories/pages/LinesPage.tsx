@@ -717,13 +717,9 @@ export function LinesPage() {
   };
 
   const viewedAutomation = factoryApps.find((app) => app.id === automationViewCanvasId);
-  const canDeleteViewedCustom =
-    canUpdate &&
-    (viewedAutomation?.columnKey === "backlog" ||
-      viewedAutomation?.columnKey === "verify" ||
-      viewedAutomation?.columnKey === "done");
+  const canDeleteViewedAutomation = canUpdate && Boolean(viewedAutomation?.id);
   const closeAutomationView = () => navigate(factoryHomePath(organizationId, routeSegment));
-  const deleteViewedCustomAutomation = async () => {
+  const deleteViewedAutomation = async () => {
     if (!automationViewCanvasId) {
       return;
     }
@@ -807,7 +803,7 @@ export function LinesPage() {
           columnKey={viewedAutomation?.columnKey}
           title={viewedAutomation?.name?.trim() || "Automation"}
           onClose={closeAutomationView}
-          onDelete={canDeleteViewedCustom ? deleteViewedCustomAutomation : undefined}
+          onDelete={canDeleteViewedAutomation ? deleteViewedAutomation : undefined}
           deletePending={deleteAutomation.isPending}
         />
       ) : null}
@@ -1333,7 +1329,7 @@ function LineDetail({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid="lines-detail">
-      {steps.length === 0 && backlogOrders.length === 0 && doneOrders.length === 0 ? (
+      {steps.length === 0 && !line.stages?.length && backlogOrders.length === 0 && doneOrders.length === 0 ? (
         <p className="text-[13px] text-muted-foreground">No phases yet. Edit this line to add app-driven phases.</p>
       ) : (
         <PhaseBoard
@@ -2083,6 +2079,7 @@ function PhaseBoard({
           creditFailureLabels={creditFailureLabels}
           intakePanel={intakePanel}
           onAddIntake={onAddIntake}
+          onAddAutomation={onAddStageAutomation ? () => onAddStageAutomation("backlog", backlogTitle) : undefined}
           automations={backlogAutomations}
           automationRowCount={automationRowCount(backlogAutomations)}
           onAutomationRowAction={onAutomationRowAction}

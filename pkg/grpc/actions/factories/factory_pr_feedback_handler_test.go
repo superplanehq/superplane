@@ -419,8 +419,11 @@ func Test__FactoryPRFeedbackHandlerActions(t *testing.T) {
 			AppRepository: &appRepo,
 		}))
 		handler := create(t, factory, &pb.CreateFactoryPRFeedbackHandlerRequest{})
+		canvasID := uuid.MustParse(handler.GetCanvasId())
+		run, err := models.CreateCanvasRunInTransaction(database.DB(t.Context()), canvasID, prFeedbackCommentTriggerNodeID, models.CanvasRunStateStarted, "")
+		require.NoError(t, err)
 
-		_, err := DeleteFactoryPRFeedbackHandler(ctx, orgID, &pb.DeleteFactoryPRFeedbackHandlerRequest{
+		_, err = DeleteFactoryPRFeedbackHandler(ctx, orgID, &pb.DeleteFactoryPRFeedbackHandlerRequest{
 			FactoryId: factory.ID.String(),
 			HandlerId: handler.GetId(),
 		})
@@ -432,6 +435,9 @@ func Test__FactoryPRFeedbackHandlerActions(t *testing.T) {
 
 		_, err = models.FindCanvasInTransaction(database.DB(t.Context()), r.Organization.ID, uuid.MustParse(handler.GetCanvasId()))
 		assert.Error(t, err)
+		run, err = models.FindCanvasRunInTransaction(database.DB(t.Context()), canvasID, run.ID)
+		require.NoError(t, err)
+		assert.Equal(t, models.CanvasRunStateCancelling, run.State)
 	})
 }
 

@@ -25,8 +25,14 @@ func DeleteFactoryPRFeedbackHandler(
 		return nil, factoryErrorToStatus(err, "failed to delete factory PR feedback handler")
 	}
 
+	var deletedCanvas *models.Canvas
+	var cancellations []*models.RunCancellationResult
 	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
 		factory, err := findFactory(tx, orgID, req.GetFactoryId())
+		if err != nil {
+			return err
+		}
+		factory, err = models.LockAutomationFactory(tx, orgID, factory.ID)
 		if err != nil {
 			return err
 		}
@@ -45,11 +51,14 @@ func DeleteFactoryPRFeedbackHandler(
 			return err
 		}
 
-		return canvas.SoftDeleteInTransaction(tx)
+		deletedCanvas = canvas
+		cancellations, err = deleteInstalledAutomation(tx, factory, canvas)
+		return err
 	})
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to delete factory PR feedback handler")
 	}
+	publishDeletedAutomation(deletedCanvas, cancellations)
 
 	return &pb.DeleteFactoryPRFeedbackHandlerResponse{}, nil
 }

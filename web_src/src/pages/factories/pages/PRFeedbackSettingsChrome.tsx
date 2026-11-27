@@ -18,6 +18,7 @@ export function PRFeedbackSettingsFooter({
   onDelete,
   onConfirmDelete,
   onClose,
+  historyOnly = false,
 }: {
   draft: PRFeedbackDraftSettings;
   confirmDelete: boolean;
@@ -29,12 +30,13 @@ export function PRFeedbackSettingsFooter({
   onDelete?: () => Promise<void> | void;
   onConfirmDelete: (next: boolean) => void;
   onClose: () => void;
+  historyOnly?: boolean;
 }) {
   if (confirmDelete) {
     return (
       <footer className="flex shrink-0 items-center justify-between gap-3 border-t border-border px-5 py-3">
         <p className="workspace-body-text text-destructive" role="alert">
-          {PR_FEEDBACK_SETTINGS_COPY.confirmDelete}
+          {saveError || PR_FEEDBACK_SETTINGS_COPY.confirmDelete}
         </p>
         <div className="flex items-center gap-2">
           <Button type="button" variant="outline" size="sm" onClick={() => onConfirmDelete(false)}>
@@ -45,7 +47,13 @@ export function PRFeedbackSettingsFooter({
             variant="destructive"
             size="sm"
             disabled={deletePending}
-            onClick={() => void onDelete?.()}
+            onClick={async () => {
+              try {
+                await onDelete?.();
+              } catch {
+                // The parent supplies the actionable error message.
+              }
+            }}
             data-testid="pr-feedback-settings-delete-confirm"
           >
             {deletePending ? PR_FEEDBACK_SETTINGS_COPY.deleting : PR_FEEDBACK_SETTINGS_COPY.delete}
@@ -74,21 +82,23 @@ export function PRFeedbackSettingsFooter({
       ) : (
         <span />
       )}
-      <Button
-        type="button"
-        disabled={savePending || saveDisabled || !prFeedbackDraftIsValid(draft)}
-        onClick={async () => {
-          try {
-            await onSave(normalizePRFeedbackDraft(draft));
-            onClose();
-          } catch {
-            // The parent supplies the actionable error message.
-          }
-        }}
-        data-testid="pr-feedback-settings-save"
-      >
-        {savePending ? PR_FEEDBACK_SETTINGS_COPY.saving : PR_FEEDBACK_SETTINGS_COPY.save}
-      </Button>
+      {!historyOnly ? (
+        <Button
+          type="button"
+          disabled={savePending || saveDisabled || !prFeedbackDraftIsValid(draft)}
+          onClick={async () => {
+            try {
+              await onSave(normalizePRFeedbackDraft(draft));
+              onClose();
+            } catch {
+              // The parent supplies the actionable error message.
+            }
+          }}
+          data-testid="pr-feedback-settings-save"
+        >
+          {savePending ? PR_FEEDBACK_SETTINGS_COPY.saving : PR_FEEDBACK_SETTINGS_COPY.save}
+        </Button>
+      ) : null}
     </footer>
   );
 }
