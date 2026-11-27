@@ -11,10 +11,10 @@ import {
 } from "../lib/webhookFailureGroups";
 
 /** Keeps webhook failures and their recovery action together above the board. */
-export function WebhookFailuresNotice({ organizationId }: { organizationId: string }) {
+export function WebhookFailuresNotice({ organizationId, factoryId }: { organizationId: string; factoryId: string }) {
   const { canAct } = usePermissions();
   const canRead = canAct("integrations", "read");
-  const { data: integrations = [] } = useConnectedIntegrations(organizationId, { enabled: canRead });
+  const { data: integrations = [] } = useConnectedIntegrations(organizationId, { enabled: canRead, factoryId });
   const retry = useRetryIntegrationWebhooks(organizationId);
   const failures = integrations
     .filter((integration) => integration.metadata?.integrationName === "github")

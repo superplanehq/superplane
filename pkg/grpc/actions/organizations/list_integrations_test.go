@@ -20,7 +20,7 @@ func Test__ListIntegrations(t *testing.T) {
 	baseURL := "http://localhost"
 
 	t.Run("no integrations -> returns empty list", func(t *testing.T) {
-		response, err := ListIntegrations(ctx, r.Registry, r.Organization.ID.String())
+		response, err := ListIntegrations(ctx, r.Registry, r.Organization.ID.String(), "")
 		require.NoError(t, err)
 		require.NotNil(t, response)
 		assert.Empty(t, response.Integrations)
@@ -51,7 +51,7 @@ func Test__ListIntegrations(t *testing.T) {
 		//
 		// List integrations
 		//
-		response, err := ListIntegrations(ctx, r.Registry, r.Organization.ID.String())
+		response, err := ListIntegrations(ctx, r.Registry, r.Organization.ID.String(), "")
 		require.NoError(t, err)
 		require.NotNil(t, response)
 		require.Len(t, response.Integrations, 1)
@@ -89,7 +89,7 @@ func Test__ListIntegrations(t *testing.T) {
 		//
 		// List integrations - should include the one we just created
 		//
-		response, err := ListIntegrations(ctx, r.Registry, r.Organization.ID.String())
+		response, err := ListIntegrations(ctx, r.Registry, r.Organization.ID.String(), "")
 		require.NoError(t, err)
 		require.NotNil(t, response)
 
@@ -113,7 +113,7 @@ func Test__ListIntegrations(t *testing.T) {
 		//
 		// List integrations for the new organization
 		//
-		response, err := ListIntegrations(ctx, r.Registry, org2.ID.String())
+		response, err := ListIntegrations(ctx, r.Registry, org2.ID.String(), "")
 		require.NoError(t, err)
 		require.NotNil(t, response)
 		assert.Empty(t, response.Integrations)
