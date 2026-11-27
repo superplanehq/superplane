@@ -5,10 +5,8 @@ interface SentryWindow extends Window {
   SUPERPLANE_SENTRY_ENVIRONMENT?: string;
 }
 
-// Console messages emitted by third parties (our telemetry SDK, browser
-// extensions, the code editor) that captureConsoleIntegration would otherwise
-// forward to Sentry as application errors. These are not bugs in our code, so
-// we drop them.
+// Known console noise that captureConsoleIntegration would otherwise forward
+// to Sentry as application errors.
 export const IGNORED_CONSOLE_MESSAGES = [
   // Dash0 Web SDK logs export failures to the console.
   /^(Failed to send telemetry to|Error sending telemetry to|Failed to fetch)/,
@@ -19,9 +17,12 @@ export const IGNORED_CONSOLE_MESSAGES = [
   // touchstart, then skips that touch. Sentry appends " [object Touch]".
   /^move of an UNKNOWN touch\b/,
   /^end of an UNKNOWN touch\b/,
+  // PRODUCTION-BG is a caught stylesheet-access console diagnostic with no
+  // exception stack. Its source is unknown; ignore only this exact diagnostic.
+  /^Cannot get CSS styles from text's parentNode\. Error: SecurityError: CSSStyleSheet\.cssRules getter: Not allowed to access cross-origin stylesheet(?: \[object Text\])?$/,
 ];
 
-// True when a console message matches a known third-party pattern we ignore.
+// True when a console message matches a known noise pattern we ignore.
 export function isIgnoredConsoleMessage(message: unknown): boolean {
   return typeof message === "string" && IGNORED_CONSOLE_MESSAGES.some((pattern) => pattern.test(message));
 }
@@ -168,6 +169,14 @@ export function filterSentryEvent(event: Sentry.ErrorEvent): Sentry.ErrorEvent |
   return normalizeSentryFingerprint(event);
 }
 
+export function filterSentryBreadcrumb(breadcrumb: Sentry.Breadcrumb): Sentry.Breadcrumb | null {
+  if (breadcrumb.category === "console" && isIgnoredConsoleMessage(breadcrumb.message)) {
+    return null;
+  }
+
+  return breadcrumb;
+}
+
 let dsn: string | undefined;
 let environment: string | undefined;
 
@@ -183,13 +192,7 @@ if (dsn) {
     environment,
     ignoreErrors: IGNORED_CONSOLE_MESSAGES,
     beforeSend: filterSentryEvent,
-    beforeBreadcrumb(breadcrumb) {
-      if (breadcrumb.category === "console" && isIgnoredConsoleMessage(breadcrumb.message)) {
-        return null;
-      }
-
-      return breadcrumb;
-    },
+    beforeBreadcrumb: filterSentryBreadcrumb,
     integrations: [
       Sentry.captureConsoleIntegration({
         levels: ["warn", "error"],
