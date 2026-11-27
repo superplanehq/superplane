@@ -189,7 +189,7 @@ func (w *CanvasCleanupWorker) cleanCanvasRuns(db *gorm.DB, canvas models.Canvas)
 		})
 		if err != nil {
 			logger.Errorf("Error cleaning run: %v", err)
-			return deleted, err
+			continue
 		}
 
 		if summary != nil {

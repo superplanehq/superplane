@@ -112,7 +112,7 @@ func (w *EventRetentionWorker) cleanRuns(referenceTime time.Time, limit int) (in
 
 		if err != nil {
 			logger.Errorf("Error deleting run: %v", err)
-			return deleted, err
+			continue
 		}
 
 		if summary != nil {
