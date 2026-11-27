@@ -168,6 +168,15 @@ func Tools() []Tool {
 			},
 		},
 		{
+			Name:        "archive_task",
+			Description: "Archive a draft or open task and request cancellation of its runs. Archived tasks stay hidden from normal listings. Already archived tasks remain archived. Already closed tasks with another result cannot be archived.",
+			InputSchema: map[string]any{
+				"type":       "object",
+				"properties": map[string]any{"task": map[string]any{"type": "string", "description": "Task id, number, or key."}},
+				"required":   []string{"task"},
+			},
+		},
+		{
 			Name:        "assign_task",
 			Description: "Set or clear the owner of an existing task. assignee is an email, a GitHub login, or a user id. Set unassign to true to clear every owner. Set one of those values, not both.",
 			InputSchema: map[string]any{
@@ -253,6 +262,8 @@ func (rt *Runtime) CallTool(ctx context.Context, claims *AccessClaims, name stri
 		return rt.handOffTask(ctx, claims, args)
 	case "assign_task":
 		return rt.assignTask(ctx, claims, args)
+	case "archive_task":
+		return rt.archiveTask(ctx, claims, args)
 	case "list_members":
 		logging.AddRequestLogFields(ctx, log.Fields{"object": "member"})
 		return rt.listMembers(ctx, claims, args)
@@ -609,6 +620,43 @@ func (rt *Runtime) handOffTask(ctx context.Context, claims *AccessClaims, args m
 		payload["pull_request_urls"] = result.PullRequestURLs
 	}
 	return TextResult(mustJSON(payload)), nil
+}
+
+func (rt *Runtime) archiveTask(ctx context.Context, claims *AccessClaims, args map[string]any) (ToolResult, error) {
+	factory, err := rt.beginWorkspaceCall(ctx, claims, args, "work_orders:update")
+	if err != nil {
+		return ToolResult{}, err
+	}
+	task, err := stringArg(args, "task")
+	if err != nil {
+		return ToolResult{}, err
+	}
+	resp, err := factories.CloseWorkOrder(toolContext(ctx, claims), claims.OrgID.String(), &pb.CloseWorkOrderRequest{
+		FactoryId: factory.ID.String(),
+		OrderId:   task,
+		Result:    pb.WorkOrder_RESULT_ARCHIVED,
+	})
+	if err != nil {
+		return ToolResult{}, actionError(err)
+	}
+	order := resp.GetOrder()
+	logging.AddRequestLogFields(ctx, log.Fields{
+		"object":    "task",
+		"object_id": order.GetId(),
+	})
+	if order.GetState() != pb.WorkOrder_STATE_CLOSED || order.GetResult() != pb.WorkOrder_RESULT_ARCHIVED {
+		return ToolResult{}, ToolError("This task remains closed with its existing result. It was not archived.")
+	}
+	links := newTaskLinks(rt.BaseURL, factory)
+	return TextResult(mustJSON(map[string]any{
+		"id":       order.GetId(),
+		"key":      order.GetKey(),
+		"title":    order.GetTitle(),
+		"state":    protoStateName(order.GetState()),
+		"result":   "archived",
+		"archived": true,
+		"url":      links.url(order.GetNumber()),
+	})), nil
 }
 
 func (rt *Runtime) assignTask(ctx context.Context, claims *AccessClaims, args map[string]any) (ToolResult, error) {
