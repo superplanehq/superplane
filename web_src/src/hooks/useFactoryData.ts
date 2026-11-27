@@ -1034,6 +1034,7 @@ export function useCreateFactoryAutomation(organizationId: string, factoryId: st
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: factoryAppsKey(organizationId, factoryId) });
+      void queryClient.invalidateQueries({ queryKey: factoryDetailKey(organizationId, factoryId) });
     },
   });
 }
@@ -1052,6 +1053,7 @@ export function useDeleteFactoryAutomation(organizationId: string, factoryId: st
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: factoryAppsKey(organizationId, factoryId) });
+      void queryClient.invalidateQueries({ queryKey: factoryDetailKey(organizationId, factoryId) });
     },
   });
 }

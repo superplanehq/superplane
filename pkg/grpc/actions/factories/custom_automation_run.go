@@ -46,6 +46,9 @@ func RunFactoryCustomAutomation(
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to run custom automation")
 	}
+	if canvas.ColumnKey != nil && strings.HasPrefix(*canvas.ColumnKey, "custom-") {
+		return startCustomStageAutomation(db, factory, canvas, order)
+	}
 	version, err := models.FindLiveCanvasVersionByCanvasInTransaction(db, canvas)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to run custom automation")
@@ -281,6 +284,9 @@ func startCustomAutomation(
 	if canvas.ColumnKey != nil {
 		column = *canvas.ColumnKey
 	}
+	if strings.HasPrefix(column, "custom-") {
+		return nil, grpcFailedPrecondition("Start this automation through the task stage action.")
+	}
 	if column == models.CanvasColumnKeyBacklog {
 		event, err := contexts.StartBacklogCustomAutomation(db, factory, canvas, order, automatic)
 		if err != nil || event == nil {
@@ -361,6 +367,33 @@ func startCustomAutomation(
 		return nil, err
 	}
 	return events, nil
+}
+
+func startCustomStageAutomation(db *gorm.DB, factory *models.Factory, canvas *models.Canvas, order *models.FactoryWorkOrder) (*pb.RunFactoryCustomAutomationResponse, error) {
+	var result *models.FactoryLineStepResult
+	err := db.Transaction(func(tx *gorm.DB) error {
+		if err := models.LockFactoryWorkOrder(tx, order.ID); err != nil {
+			return err
+		}
+		current, err := factory.FindWorkOrder(tx, order.ID)
+		if err != nil {
+			return err
+		}
+		result, err = current.StartCustomStageAutomation(tx, canvas.ID, *canvas.ColumnKey)
+		return err
+	})
+	if err != nil {
+		return nil, factoryErrorToStatus(grpcFailedPrecondition(err.Error()), "failed to run custom automation")
+	}
+	publishDispatchedWorkOrder(log.WithField("order_id", order.ID), factory.OrganizationID, factory.ID, order, nil, order.State, []*models.FactoryLineStepResult{result})
+	response := &pb.RunFactoryCustomAutomationResponse{}
+	if result != nil && result.Run != nil {
+		response.RunId = result.Run.ID.String()
+	}
+	if result != nil && result.QueueItem != nil {
+		response.QueueItemId = result.QueueItem.ID.String()
+	}
+	return response, nil
 }
 
 type customAutomationStart struct {

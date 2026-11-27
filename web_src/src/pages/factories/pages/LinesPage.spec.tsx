@@ -1725,7 +1725,7 @@ describe("LinesPage board extras", () => {
     await resetLinesBoardMocks();
   });
 
-  it("hides Add automation on Backlog and shows it on Verify and Done", async () => {
+  it("offers Add automation on Backlog, Verify, and Done", async () => {
     useFactoryPRFeedbackHandlers.mockReturnValue({
       data: [{ id: "handler-discussion", source: "SOURCE_PULL_REQUEST_DISCUSSION", healthy: true }],
       isPending: false,
@@ -1734,7 +1734,7 @@ describe("LinesPage board extras", () => {
     renderLinesBoard();
 
     await user.click(screen.getByTestId("lines-backlog-menu"));
-    expect(screen.queryByRole("menuitem", { name: "Add automation" })).not.toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Add automation" })).toBeInTheDocument();
     await user.keyboard("{Escape}");
 
     await user.click(screen.getByTestId("lines-verify-menu"));
@@ -1845,22 +1845,57 @@ describe("LinesPage board extras", () => {
     expect(screen.queryByLabelText("What should the agent look for?")).not.toBeInTheDocument();
   });
 
-  it("deletes a custom Verify automation from the view modal", async () => {
+  it.each([
+    {
+      id: "app-create-env",
+      name: "Create env",
+      columnKey: "verify",
+      row: "lines-verify-automation-rows-row-custom-app-create-env",
+    },
+    {
+      id: "app-pr-closure",
+      name: "PR Closure",
+      columnKey: undefined,
+      row: "lines-done-automation-rows-row-closure-app-pr-closure",
+    },
+  ])("deletes $name from the view modal", async ({ id, name, columnKey, row }) => {
     useFactoryAutomations.mockReturnValue({
-      data: [{ id: "app-create-env", name: "Create env", columnKey: "verify" }],
+      data: [{ id, name, columnKey }],
     });
-    deleteFactoryAutomationMutateAsync.mockResolvedValueOnce(undefined);
+    deleteFactoryAutomationMutateAsync.mockImplementationOnce(async () => {
+      useFactoryAutomations.mockReturnValue({ data: [] });
+    });
     const user = userEvent.setup();
     renderLinesBoard();
 
-    await user.click(screen.getByTestId("lines-verify-automation-rows-row-custom-app-create-env"));
+    await user.click(screen.getByTestId(row));
     expect(screen.getByTestId("column-automation-view")).toBeInTheDocument();
     await user.click(screen.getByTestId("column-automation-view-delete"));
     await user.click(screen.getByTestId("column-automation-view-delete-confirm"));
 
     await waitFor(() => {
-      expect(deleteFactoryAutomationMutateAsync).toHaveBeenCalledWith("app-create-env");
+      expect(deleteFactoryAutomationMutateAsync).toHaveBeenCalledWith(id);
     });
+    if (id === "app-pr-closure") {
+      await user.click(screen.getByTestId("lines-done-menu"));
+      await user.click(screen.getByTestId("lines-done-menu-add-automation"));
+      expect(screen.getByTestId("add-column-automation-template-pr-closure")).toBeEnabled();
+    }
+  });
+
+  it("readds task analysis through the Backlog automation picker", async () => {
+    createFactoryAutomationMutateAsync.mockResolvedValueOnce({ id: "new-analysis" });
+    const user = userEvent.setup();
+    renderLinesBoard();
+    await user.click(screen.getByTestId("lines-backlog-menu"));
+    await user.click(screen.getByTestId("lines-backlog-menu-add-automation"));
+    await user.click(screen.getByTestId("add-column-automation-template-analysis"));
+    await waitFor(() =>
+      expect(createFactoryAutomationMutateAsync).toHaveBeenCalledWith(
+        expect.objectContaining({ templateId: "backlog" }),
+      ),
+    );
+    expect(screen.queryByTestId("add-column-automation-picker")).not.toBeInTheDocument();
   });
 
   it("lists two intakes on the same source", () => {
