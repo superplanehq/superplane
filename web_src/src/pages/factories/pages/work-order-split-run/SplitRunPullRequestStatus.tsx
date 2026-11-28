@@ -1,4 +1,4 @@
-import type { FactoriesFactoryPullRequest } from "@/api-client";
+import type { FactoriesFactoryPullRequest, FactoriesFactoryPullRequestMergeability } from "@/api-client";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useFactoryPullRequestMergeability } from "@/hooks/useFactoryPullRequestMergeability";
 import { FEATURE_FACTORY_PULL_REQUEST_MERGE } from "@/lib/experimentalFeatures";
@@ -23,10 +23,7 @@ export function SplitRunPullRequestStatus({
   const mergeability = useFactoryPullRequestMergeability(organizationId ?? "", factoryId ?? "", pullRequest?.id ?? "", {
     enabled,
   });
-  let message = enabled && !mergeability.data?.canMerge ? mergeability.data?.message : undefined;
-  if (merged) {
-    message = PULL_REQUEST_REVIEW_COPY.merged;
-  }
+  const message = selectPullRequestStatusMessage(enabled, merged, mergeability.data);
   if (!message) {
     return null;
   }
@@ -38,4 +35,15 @@ export function SplitRunPullRequestStatus({
       {message}
     </p>
   );
+}
+
+function selectPullRequestStatusMessage(
+  enabled: boolean,
+  merged: boolean,
+  mergeability: FactoriesFactoryPullRequestMergeability | undefined,
+): string | undefined {
+  if (merged) {
+    return PULL_REQUEST_REVIEW_COPY.merged;
+  }
+  return enabled && !mergeability?.canMerge ? mergeability?.message : undefined;
 }
