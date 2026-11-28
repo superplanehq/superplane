@@ -891,18 +891,31 @@ func TestFactoryContext_UpdateWorkOrderStatus_StageAutomationHandlesMerge(t *tes
 		"pullRequest":  &core.PullRequest{ID: pullRequest.ID.String(), WorkOrderID: order.ID.String()},
 	}
 	emitMerge := func(column string) {
-		node := createStageMergeTrigger(t, r, factory.ID, column)
+		node := createStageMergeTrigger(t, r, factory.ID, column, models.FactoryPullRequestProviderGitHub)
 		_, created, err := CreateFactoryPullRequestEvent(database.Conn(), node, "github.pullRequest", mergeEvent)
 		require.NoError(t, err)
 		require.True(t, created)
 	}
 
 	emitMerge(models.CanvasColumnKeyVerify)
-	handedOff, err := order.PullRequestMergeHandedOff(database.Conn())
+	handedOff, err := order.PullRequestMergeHandedOff(database.Conn(), pullRequest.ID)
 	require.NoError(t, err)
 	assert.False(t, handedOff, "an automation in another stage does not take over the task")
 
 	emitMerge(models.CanvasColumnKeyImplement)
+	dispatches, err := models.ListWorkOrderLineDispatchesByWorkOrderIDs(database.Conn(), []uuid.UUID{order.ID})
+	require.NoError(t, err)
+	require.Len(t, dispatches[order.ID], 1)
+	require.NoError(t, dispatches[order.ID][0].EnterStage(database.Conn(), "custom-after-merge"))
+	current, err := factory.FindWorkOrder(database.Conn(), order.ID)
+	require.NoError(t, err)
+	stage, err := current.CurrentStageKey(database.Conn())
+	require.NoError(t, err)
+	assert.Equal(t, "custom-after-merge", stage)
+	closureCanvas, closureExecution, _ := setupFactoryAppExecutionWithPayload(t, r, factory.ID, map[string]any{
+		"type": "github.pullRequest", "data": mergeEvent,
+	})
+	ctx = NewFactoryContext(database.Conn(), closureCanvas, closureExecution)
 	closeWhenDone := core.UpdateWorkOrderStatusParams{
 		OrderID: order.ID.String(), State: models.FactoryWorkOrderStateClosed,
 		Result: models.FactoryWorkOrderResultCompleted, WhenAllPullRequestsDone: true,
@@ -920,12 +933,67 @@ func TestFactoryContext_UpdateWorkOrderStatus_StageAutomationHandlesMerge(t *tes
 	assert.Equal(t, models.FactoryWorkOrderResultPRClosed, updated.Result)
 }
 
-func createStageMergeTrigger(t *testing.T, r *support.ResourceRegistry, factoryID uuid.UUID, column string) *models.CanvasNode {
+func TestFactoryContext_UpdateWorkOrderStatus_EarlierMergeHandoffDoesNotBlockClosure(t *testing.T) {
+	for _, provider := range []string{models.FactoryPullRequestProviderGitHub, models.FactoryPullRequestProviderBitbucket} {
+		for _, finalState := range []string{models.FactoryPullRequestStateMerged, models.FactoryPullRequestStateClosed} {
+			t.Run(provider+"/"+finalState, func(t *testing.T) {
+				r := support.Setup(t)
+				defer r.Close()
+				factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+				require.NoError(t, err)
+				order, err := factory.CreateWorkOrder(database.Conn(), "Multi-repo merge handoff", "", &r.User, nil, nil)
+				require.NoError(t, err)
+				_, err = order.UpdateStatus(database.Conn(), models.FactoryWorkOrderStatusUpdate{ToState: models.FactoryWorkOrderStateOpen})
+				require.NoError(t, err)
+				api, err := order.CreatePullRequest(database.Conn(), multiRepoPullRequestParams(provider, "acme/api", 1, models.FactoryPullRequestStateMerged))
+				require.NoError(t, err)
+				web, err := order.CreatePullRequest(database.Conn(), multiRepoPullRequestParams(provider, "acme/web", 2, models.FactoryPullRequestStateOpen))
+				require.NoError(t, err)
+				trigger := createStageMergeTrigger(t, r, factory.ID, models.CanvasColumnKeyImplement, provider)
+				payload := map[string]any{
+					"action": "closed", "pull_request": map[string]any{"merged": true},
+					"pullRequest": &core.PullRequest{ID: api.ID.String(), WorkOrderID: order.ID.String()},
+				}
+				payloadType := provider + ".pullRequest"
+				if provider == models.FactoryPullRequestProviderBitbucket {
+					payload["action"] = "merged"
+				}
+				_, created, err := CreateFactoryPullRequestEvent(database.Conn(), trigger, payloadType, payload)
+				require.NoError(t, err)
+				require.True(t, created)
+				closeWhenDone := core.UpdateWorkOrderStatusParams{
+					OrderID: order.ID.String(), State: models.FactoryWorkOrderStateClosed,
+					Result: models.FactoryWorkOrderResultCompleted, WhenAllPullRequestsDone: true,
+				}
+				canvas, execution, _ := setupFactoryAppExecutionWithPayload(t, r, factory.ID, map[string]any{"type": payloadType, "data": payload})
+				updated, changed, err := NewFactoryContext(database.Conn(), canvas, execution).UpdateWorkOrderStatus(closeWhenDone)
+				require.NoError(t, err)
+				assert.False(t, changed, "the second pull request is still open")
+				assert.Equal(t, models.FactoryWorkOrderStateOpen, updated.State)
+
+				require.NoError(t, web.Update(database.Conn(), models.FactoryPullRequestPatch{State: &finalState}))
+				payload["pullRequest"] = &core.PullRequest{ID: web.ID.String(), WorkOrderID: order.ID.String()}
+				if finalState == models.FactoryPullRequestStateClosed {
+					payload["action"] = "closed"
+					payload["pull_request"] = map[string]any{"merged": false}
+				}
+				canvas, execution, _ = setupFactoryAppExecutionWithPayload(t, r, factory.ID, map[string]any{"type": payloadType, "data": payload})
+				updated, changed, err = NewFactoryContext(database.Conn(), canvas, execution).UpdateWorkOrderStatus(closeWhenDone)
+				require.NoError(t, err)
+				assert.True(t, changed, "an earlier handoff must not block closure for another pull request")
+				assert.Equal(t, models.FactoryWorkOrderStateClosed, updated.State)
+				assert.Equal(t, models.FactoryWorkOrderResultCompleted, updated.Result)
+			})
+		}
+	}
+}
+
+func createStageMergeTrigger(t *testing.T, r *support.ResourceRegistry, factoryID uuid.UUID, column, provider string) *models.CanvasNode {
 	metadata := models.FactoryAppTemplateMetadata(models.FactoryAppTemplateCustomAutomationID, 1)
 	metadata[models.FactoryAppTemplateMetadataKey].(map[string]any)["startMode"] = models.CustomAutomationIntegrationStartMode
 	automation, nodes := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{{
 		NodeID: "integration-merge", Name: "Integration event", Type: models.NodeTypeTrigger,
-		Ref:           datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "github.onPullRequest"}}),
+		Ref:           datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: provider + ".onPullRequest"}}),
 		Configuration: datatypes.NewJSONType(map[string]any{"repository": "acme/api", "actions": []any{"closed"}}),
 		Metadata:      datatypes.NewJSONType(metadata),
 	}}, nil)

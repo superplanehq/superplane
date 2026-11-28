@@ -28,11 +28,11 @@ func (o *FactoryWorkOrder) CurrentStageKey(tx *gorm.DB) (string, error) {
 }
 
 // PullRequestMergeHandedOff reports whether a stage automation took over the
-// move of the task after one of its pull requests merged.
-func (o *FactoryWorkOrder) PullRequestMergeHandedOff(tx *gorm.DB) (bool, error) {
+// move of the task after the specified pull request merged.
+func (o *FactoryWorkOrder) PullRequestMergeHandedOff(tx *gorm.DB, pullRequestID uuid.UUID) (bool, error) {
 	var count int64
 	err := tx.Model(&FactoryPullRequest{}).
-		Where("work_order_id = ? AND state = ? AND merge_handoff_canvas_id IS NOT NULL", o.ID, FactoryPullRequestStateMerged).
+		Where("id = ? AND work_order_id = ? AND state = ? AND merge_handoff_canvas_id IS NOT NULL", pullRequestID, o.ID, FactoryPullRequestStateMerged).
 		Count(&count).Error
 	return count > 0, err
 }

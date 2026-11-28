@@ -117,3 +117,29 @@ func pullRequestMergedPayload(payloadType string, data map[string]any) bool {
 	}
 	return false
 }
+
+func (c *FactoryContext) pullRequestMergeHandedOff(order *models.FactoryWorkOrder) (bool, error) {
+	if c.execution == nil {
+		return false, nil
+	}
+	event, err := models.FindRootEventForRun(c.tx, c.execution.RunID)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	payload, _ := event.Data.Data().(map[string]any)
+	payloadType, _ := payload["type"].(string)
+	data, _ := payload["data"].(map[string]any)
+	if !pullRequestMergedPayload(payloadType, data) {
+		return false, nil
+	}
+	pullRequest, _ := data["pullRequest"].(map[string]any)
+	id, _ := pullRequest["id"].(string)
+	pullRequestID, err := uuid.Parse(id)
+	if err != nil {
+		return false, nil
+	}
+	return order.PullRequestMergeHandedOff(c.tx, pullRequestID)
+}
