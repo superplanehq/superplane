@@ -1,11 +1,14 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { http, HttpResponse } from "msw";
+import { useState, type ReactNode } from "react";
+
+import type { FactoriesFactoryPullRequestMergeability } from "@/api-client";
 
 import { ComponentStoryShell } from "../../__fixtures__/ComponentStoryShell";
 import { withFactoriesTheme } from "../../__fixtures__/factoriesStoryTheme";
 import { OPEN_WORK_ORDER } from "../../__fixtures__/factoryPageResponses";
 import { SplitRunAttentionNote } from "./SplitRunAttentionNote";
-import { SplitRunPullRequestMergeControls } from "./SplitRunPullRequestMergeAction";
 import { splitRunFixtureForWorkOrder } from "./splitRunMocks";
 
 const meta = {
@@ -16,10 +19,12 @@ const meta = {
   },
   decorators: [
     withFactoriesTheme,
-    (Story) => (
-      <ComponentStoryShell className="min-h-svh bg-muted/30 p-6">
-        <Story />
-      </ComponentStoryShell>
+    (Story, context) => (
+      <StoryQueryClient key={context.id}>
+        <ComponentStoryShell className="min-h-svh bg-muted/30 p-6">
+          <Story />
+        </ComponentStoryShell>
+      </StoryQueryClient>
     ),
   ],
 } satisfies Meta;
@@ -27,6 +32,11 @@ const meta = {
 export default meta;
 
 type Story = StoryObj;
+
+function StoryQueryClient({ children }: { children: ReactNode }) {
+  const [client] = useState(() => new QueryClient({ defaultOptions: { queries: { retry: false } } }));
+  return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+}
 
 function PopupShell({ children }: { children: React.ReactNode }) {
   return (
@@ -64,9 +74,8 @@ export const ReadOnly: Story = {
   ),
 };
 
-export const MergeUnavailable: Story = {
-  name: "Merge status is unavailable",
-  parameters: {
+function statusParameters(mergeability: FactoriesFactoryPullRequestMergeability) {
+  return {
     msw: {
       handlers: [
         http.get("*/account/experimental-features", () =>
@@ -75,18 +84,19 @@ export const MergeUnavailable: Story = {
         http.get("*/api/v1/organizations/org-1", () =>
           HttpResponse.json({ organization: { metadata: { id: "org-1" } } }),
         ),
-        http.get("*/api/v1/factories/factory-1/prs/pr-6812/mergeability", () =>
-          HttpResponse.json({
-            mergeability: {
-              canMerge: false,
-              blockedReason: "BLOCKED_REASON_UNAVAILABLE",
-              message: "Merge status is unavailable right now.",
-            },
-          }),
-        ),
+        http.get("*/api/v1/factories/factory-1/prs/pr-6812/mergeability", () => HttpResponse.json({ mergeability })),
       ],
     },
-  },
+  };
+}
+
+export const MergeUnavailable: Story = {
+  name: "Merge status is unavailable",
+  parameters: statusParameters({
+    canMerge: false,
+    blockedReason: "BLOCKED_REASON_UNAVAILABLE",
+    message: "Merge status is unavailable right now.",
+  }),
   render: () => (
     <div className="max-w-[750px] overflow-hidden rounded-lg border border-border bg-background">
       <SplitRunAttentionNote
@@ -97,7 +107,6 @@ export const MergeUnavailable: Story = {
         }}
         organizationId="org-1"
         factoryId="factory-1"
-        orderId="wo-1"
         pullRequests={[
           {
             id: "pr-6812",
@@ -112,52 +121,28 @@ export const MergeUnavailable: Story = {
   ),
 };
 
-export const MergeReady: Story = {
-  name: "Merge is ready",
-  render: () => (
-    <PopupShell>
-      <div className="border-t border-[color:var(--status-completed-border)] bg-[color:var(--status-completed-bg)] px-5 py-5">
-        <h3 className="text-[18px] font-semibold">The pull request is ready for review</h3>
-        <div className="mt-4 flex flex-wrap items-center gap-4">
-          <SplitRunPullRequestMergeControls
-            mergeability={{
-              canMerge: true,
-              allowedMethods: ["MERGE_METHOD_SQUASH", "MERGE_METHOD_MERGE"],
-              headSha: "abc123",
-            }}
-            merging={false}
-            canAct
-            compact={false}
-            onMerge={() => {}}
-          />
-        </div>
-      </div>
-    </PopupShell>
-  ),
+export const StatusReady: Story = {
+  ...MergeUnavailable,
+  name: "Status enabled — ready for provider review",
+  parameters: statusParameters({ canMerge: true }),
 };
 
-export const MergeBlocked: Story = {
-  name: "Merge is blocked",
-  render: () => (
-    <PopupShell>
-      <div className="border-t border-[color:var(--status-completed-border)] bg-[color:var(--status-completed-bg)] px-5 py-5">
-        <h3 className="text-[18px] font-semibold">The pull request is ready for review</h3>
-        <div className="mt-4 flex flex-wrap items-center gap-4">
-          <SplitRunPullRequestMergeControls
-            mergeability={{
-              canMerge: false,
-              blockedReason: "BLOCKED_REASON_CHECKS_UNFINISHED",
-              message: "Checks are still running.",
-              allowedMethods: ["MERGE_METHOD_SQUASH"],
-              headSha: "abc123",
-            }}
-            merging={false}
-            canAct
-            compact={false}
-            onMerge={() => {}}
-          />
-        </div>
-      </div>
-    </PopupShell>
-  ),
+export const ChecksRunning: Story = {
+  ...MergeUnavailable,
+  name: "Status enabled — checks running",
+  parameters: statusParameters({
+    canMerge: false,
+    blockedReason: "BLOCKED_REASON_CHECKS_UNFINISHED",
+    message: "Checks are still running.",
+  }),
+};
+
+export const Conflicts: Story = {
+  ...MergeUnavailable,
+  name: "Status enabled — conflicts",
+  parameters: statusParameters({
+    canMerge: false,
+    blockedReason: "BLOCKED_REASON_CONFLICTING",
+    message: "The pull request has conflicts.",
+  }),
 };

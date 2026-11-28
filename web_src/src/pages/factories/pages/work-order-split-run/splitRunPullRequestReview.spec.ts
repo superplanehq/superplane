@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { defaultMergeMethod, pullRequestReviewNote, supportsPullRequestMerge } from "./splitRunPullRequestReview";
+import { pullRequestReviewNote, supportsPullRequestStatus } from "./splitRunPullRequestReview";
 
 describe("pullRequestReviewNote", () => {
   it("recognizes a note whose call to action opens a GitHub pull request", () => {
@@ -62,22 +62,14 @@ describe("pullRequestReviewNote", () => {
   });
 });
 
-describe("defaultMergeMethod", () => {
-  it("prefers squash, then a merge commit, then rebase", () => {
-    expect(defaultMergeMethod(["MERGE_METHOD_REBASE", "MERGE_METHOD_SQUASH"])).toBe("MERGE_METHOD_SQUASH");
-    expect(defaultMergeMethod(["MERGE_METHOD_REBASE", "MERGE_METHOD_MERGE"])).toBe("MERGE_METHOD_MERGE");
-    expect(defaultMergeMethod(["MERGE_METHOD_REBASE"])).toBe("MERGE_METHOD_REBASE");
-  });
-});
-
-describe("supportsPullRequestMerge", () => {
+describe("supportsPullRequestStatus", () => {
   it("supports GitHub and Bitbucket pull requests", () => {
-    expect(supportsPullRequestMerge({ provider: "PROVIDER_GITHUB" })).toBe(true);
-    expect(supportsPullRequestMerge({ provider: "PROVIDER_BITBUCKET" })).toBe(true);
-    expect(supportsPullRequestMerge(undefined)).toBe(true);
+    expect(supportsPullRequestStatus({ provider: "PROVIDER_GITHUB" })).toBe(true);
+    expect(supportsPullRequestStatus({ provider: "PROVIDER_BITBUCKET" })).toBe(true);
+    expect(supportsPullRequestStatus(undefined)).toBe(true);
   });
 
   it("rejects other providers", () => {
-    expect(supportsPullRequestMerge({ provider: "PROVIDER_UNSPECIFIED" })).toBe(false);
+    expect(supportsPullRequestStatus({ provider: "PROVIDER_UNSPECIFIED" })).toBe(false);
   });
 });

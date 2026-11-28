@@ -103,9 +103,7 @@ export function SplitRunAttentionNote({
   startEmphasis = "filled",
   organizationId,
   factoryId,
-  orderId,
   pullRequests,
-  canAct = true,
   onAction,
   children,
 }: {
@@ -128,9 +126,7 @@ export function SplitRunAttentionNote({
   startEmphasis?: StartEmphasis;
   organizationId?: string;
   factoryId?: string;
-  orderId?: string;
   pullRequests?: FactoriesFactoryPullRequest[];
-  canAct?: boolean;
   onAction?: (action: SplitRunFooterAction) => void;
   children?: ReactNode;
 }) {
@@ -145,9 +141,7 @@ export function SplitRunAttentionNote({
     ctaOnly,
     organizationId,
     factoryId,
-    orderId,
     pullRequests,
-    canAct,
     onAction,
     children,
   });

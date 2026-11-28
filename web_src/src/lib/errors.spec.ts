@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { getApiErrorMessage, getApiErrorReason, getResponseErrorMessage } from "@/lib/errors";
+import { FIREWALL_BLOCKED_MESSAGE, getApiErrorMessage, getApiErrorReason, getResponseErrorMessage } from "@/lib/errors";
 
 describe("errors", () => {
   it("extracts nested api error messages", () => {
@@ -85,6 +85,27 @@ describe("errors", () => {
     );
 
     await expect(getResponseErrorMessage(response, "fallback")).resolves.toBe("fallback");
+  });
+
+  it("explains a firewall block when a 403 response is an HTML page", async () => {
+    const firewallPage =
+      '<!doctype html><meta charset="utf-8"><meta name=viewport content="width=device-width, initial-scale=1"><title>403</title>403 Forbidden';
+
+    expect(getApiErrorMessage(Object.assign(new Error(firewallPage), { status: 403 }), "fallback")).toBe(
+      FIREWALL_BLOCKED_MESSAGE,
+    );
+    await expect(
+      getResponseErrorMessage(
+        new Response(firewallPage, { status: 403, headers: { "Content-Type": "text/html" } }),
+        "fallback",
+      ),
+    ).resolves.toBe(FIREWALL_BLOCKED_MESSAGE);
+  });
+
+  it("keeps the API message for a JSON permission error", () => {
+    expect(getApiErrorMessage(Object.assign(new Error("permission denied"), { status: 403 }), "fallback")).toBe(
+      "permission denied",
+    );
   });
 
   it("falls back when the response body is empty", async () => {

@@ -1,5 +1,6 @@
 import type { SuperplaneComponentsNode } from "@/api-client";
 import { Button } from "@/components/ui/button";
+import { ColumnAutomationFooterAction } from "./columnAutomationFooterSlot";
 import { Switch } from "@/components/ui/switch";
 import { useId } from "react";
 
@@ -212,7 +213,7 @@ function ImplementSettingsFooter({
   onSave: () => void;
 }) {
   return (
-    <footer className="flex shrink-0 items-center justify-end gap-3 border-t border-border px-5 py-3">
+    <ColumnAutomationFooterAction>
       {saveError ? (
         <p className="workspace-body-text mr-auto text-destructive" role="alert">
           {saveError}
@@ -221,7 +222,7 @@ function ImplementSettingsFooter({
       <Button type="button" disabled={disabled} onClick={onSave} data-testid="implement-settings-save">
         {saving ? "Saving" : "Save"}
       </Button>
-    </footer>
+    </ColumnAutomationFooterAction>
   );
 }
 

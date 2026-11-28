@@ -4,6 +4,7 @@ import { createElement, type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 
 const {
+  canvasesDeleteCanvas,
   canvasesListRuns,
   canvasesDescribeRun,
   canvasesPutCanvasStaging,
@@ -13,6 +14,7 @@ const {
   canvasesListCanvasVersions,
   canvasesGetCanvasStaging,
 } = vi.hoisted(() => ({
+  canvasesDeleteCanvas: vi.fn(),
   canvasesListRuns: vi.fn(),
   canvasesDescribeRun: vi.fn(),
   canvasesPutCanvasStaging: vi.fn(),
@@ -24,6 +26,7 @@ const {
 }));
 
 vi.mock("../api-client/sdk.gen", () => ({
+  canvasesDeleteCanvas,
   canvasesListRuns,
   canvasesDescribeRun,
   canvasesPutCanvasStaging,
@@ -34,7 +37,13 @@ vi.mock("../api-client/sdk.gen", () => ({
   canvasesGetCanvasStaging,
 }));
 
-import { canvasKeys, useDescribeRun, useInfiniteCanvasRuns, useUpdateCanvasConsole } from "@/hooks/useCanvasData";
+import {
+  canvasKeys,
+  useDeleteCanvas,
+  useDescribeRun,
+  useInfiniteCanvasRuns,
+  useUpdateCanvasConsole,
+} from "@/hooks/useCanvasData";
 
 describe("canvasKeys.nodeExecution", () => {
   it("omits a trailing undefined when limit is not provided", () => {
@@ -426,4 +435,19 @@ describe("useUpdateCanvasConsole", () => {
       panels: [{ id: "panel-1", type: "markdown", content: { title: "Before" } }],
     });
   });
+});
+
+it("refreshes workspace warnings after deleting an app canvas", async () => {
+  const queryClient = new QueryClient();
+  const key = ["integrations", "connected", "org-1", "workspace", "factory-1"];
+  queryClient.setQueryData(key, [{ metadata: { id: "jira-1" } }]);
+  canvasesDeleteCanvas.mockResolvedValue({});
+  const { result } = renderHook(() => useDeleteCanvas("org-1"), {
+    wrapper: ({ children }: { children: ReactNode }) =>
+      createElement(QueryClientProvider, { client: queryClient }, children),
+  });
+  await act(async () => {
+    await result.current.mutateAsync("canvas-1");
+  });
+  expect(queryClient.getQueryState(key)?.isInvalidated).toBe(true);
 });

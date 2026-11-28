@@ -585,6 +585,21 @@ CREATE TABLE public.factory_codex_leases (
 
 
 --
+-- Name: factory_configuration_automations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.factory_configuration_automations (
+    organization_id uuid NOT NULL,
+    factory_id uuid NOT NULL,
+    line_id uuid NOT NULL,
+    stage_key text NOT NULL,
+    manifest_id text NOT NULL,
+    canvas_id uuid NOT NULL,
+    binding jsonb DEFAULT '{}'::jsonb NOT NULL
+);
+
+
+--
 -- Name: factory_intakes; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -874,6 +889,18 @@ CREATE TABLE public.factory_work_order_artifacts (
 CREATE TABLE public.factory_work_order_assignees (
     work_order_id uuid NOT NULL,
     user_id uuid NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: factory_work_order_attached_runs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.factory_work_order_attached_runs (
+    work_order_id uuid NOT NULL,
+    run_id uuid NOT NULL,
+    stage_key text NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
@@ -2929,6 +2956,14 @@ ALTER TABLE ONLY public.factory_codex_leases
 
 
 --
+-- Name: factory_configuration_automations factory_configuration_automations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_configuration_automations
+    ADD CONSTRAINT factory_configuration_automations_pkey PRIMARY KEY (factory_id, line_id, stage_key, manifest_id);
+
+
+--
 -- Name: factory_intakes factory_intakes_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3054,6 +3089,14 @@ ALTER TABLE ONLY public.factory_work_order_artifacts
 
 ALTER TABLE ONLY public.factory_work_order_assignees
     ADD CONSTRAINT factory_work_order_assignees_pkey PRIMARY KEY (work_order_id, user_id);
+
+
+--
+-- Name: factory_work_order_attached_runs factory_work_order_attached_runs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_work_order_attached_runs
+    ADD CONSTRAINT factory_work_order_attached_runs_pkey PRIMARY KEY (work_order_id, run_id);
 
 
 --
@@ -4014,6 +4057,13 @@ CREATE INDEX factory_codex_leases_task_idx ON public.factory_codex_leases USING 
 
 
 --
+-- Name: factory_configuration_automations_canvas_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX factory_configuration_automations_canvas_id ON public.factory_configuration_automations USING btree (canvas_id);
+
+
+--
 -- Name: factory_work_orders_factory_id_number_key; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4490,6 +4540,13 @@ CREATE INDEX idx_factory_work_order_assignees_work_order_created_user ON public.
 
 
 --
+-- Name: idx_factory_work_order_attached_runs_run; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_work_order_attached_runs_run ON public.factory_work_order_attached_runs USING btree (run_id);
+
+
+--
 -- Name: idx_factory_work_order_checks_factory_created; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4634,6 +4691,13 @@ CREATE INDEX idx_factory_work_orders_factory_state ON public.factory_work_orders
 --
 
 CREATE INDEX idx_factory_work_orders_organization_state_result ON public.factory_work_orders USING btree (organization_id, state, result);
+
+
+--
+-- Name: idx_factory_work_orders_origin_url; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_work_orders_origin_url ON public.factory_work_orders USING hash (origin_url) WHERE (origin_url IS NOT NULL);
 
 
 --
@@ -5849,6 +5913,38 @@ ALTER TABLE ONLY public.factory_codex_leases
 
 
 --
+-- Name: factory_configuration_automations factory_configuration_automations_canvas_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_configuration_automations
+    ADD CONSTRAINT factory_configuration_automations_canvas_id_fkey FOREIGN KEY (canvas_id) REFERENCES public.workflows(id) ON DELETE CASCADE;
+
+
+--
+-- Name: factory_configuration_automations factory_configuration_automations_factory_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_configuration_automations
+    ADD CONSTRAINT factory_configuration_automations_factory_id_fkey FOREIGN KEY (factory_id) REFERENCES public.factories(id) ON DELETE CASCADE;
+
+
+--
+-- Name: factory_configuration_automations factory_configuration_automations_line_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_configuration_automations
+    ADD CONSTRAINT factory_configuration_automations_line_id_fkey FOREIGN KEY (line_id) REFERENCES public.factory_lines(id) ON DELETE CASCADE;
+
+
+--
+-- Name: factory_configuration_automations factory_configuration_automations_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_configuration_automations
+    ADD CONSTRAINT factory_configuration_automations_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
 -- Name: factory_intakes factory_intakes_canvas_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -6102,6 +6198,22 @@ ALTER TABLE ONLY public.factory_work_order_assignees
 
 ALTER TABLE ONLY public.factory_work_order_assignees
     ADD CONSTRAINT factory_work_order_assignees_work_order_id_fkey FOREIGN KEY (work_order_id) REFERENCES public.factory_work_orders(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: factory_work_order_attached_runs factory_work_order_attached_runs_run_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_work_order_attached_runs
+    ADD CONSTRAINT factory_work_order_attached_runs_run_id_fkey FOREIGN KEY (run_id) REFERENCES public.workflow_runs(id) ON DELETE CASCADE;
+
+
+--
+-- Name: factory_work_order_attached_runs factory_work_order_attached_runs_work_order_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_work_order_attached_runs
+    ADD CONSTRAINT factory_work_order_attached_runs_work_order_id_fkey FOREIGN KEY (work_order_id) REFERENCES public.factory_work_orders(id) ON DELETE CASCADE;
 
 
 --
@@ -7208,7 +7320,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261125230138	f
+20261127160046	f
 \.
 
 

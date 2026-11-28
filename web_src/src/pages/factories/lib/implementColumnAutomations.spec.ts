@@ -14,7 +14,7 @@ const IMPLEMENT_COLUMN: LinePhaseColumn = {
 
 describe("Implement and Done custom automations", () => {
   it("offers a custom automation on Implement and a blank canvas on later phases", () => {
-    expect(catalogForColumn("phase-0").map((entry) => entry.id)).toEqual(["custom-verification"]);
+    expect(catalogForColumn("phase-0").map((entry) => entry.id)).toEqual(["agent-step", "custom-verification"]);
     expect(catalogForColumn("phase-1").map((entry) => entry.id)).toEqual(["agent-step", "custom"]);
   });
 

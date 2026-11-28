@@ -52,7 +52,6 @@ type factoryGitHubAPI interface {
 	ListCheckRunsForRef(ctx context.Context, repository string, ref string, opts *github.ListCheckRunsOptions) (*github.ListCheckRunsResults, *github.Response, error)
 	EditPullRequest(ctx context.Context, repository string, pullNumber int, pullRequest *github.PullRequest) (*github.PullRequest, *github.Response, error)
 	FindRepository(repository string) (*github.Repository, error)
-	MergePullRequest(ctx context.Context, repository string, pullNumber int, commitMessage string, options *github.PullRequestOptions) (*github.PullRequestMergeResult, *github.Response, error)
 }
 
 var newFactoryGitHubAPI = githubClientForFactory

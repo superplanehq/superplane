@@ -489,21 +489,7 @@ service Factories {
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Describe factory pull request mergeability";
-      description: "Returns whether a tracked factory pull request can merge from SuperPlane";
-      tags: "Factory";
-    };
-  }
-
-  rpc MergeFactoryPullRequest(
-    MergeFactoryPullRequestRequest
-  ) returns (MergeFactoryPullRequestResponse) {
-    option (google.api.http) = {
-      post: "/api/v1/factories/{factory_id}/prs/{pr_id}/merge"
-      body: "*"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Merge factory pull request";
-      description: "Merges a tracked GitHub pull request with a method the repository allows";
+      description: "Returns the merge status of a tracked factory pull request";
       tags: "Factory";
     };
   }
@@ -1631,6 +1617,7 @@ message RunFactoryCustomAutomationRequest {
 message RunFactoryCustomAutomationResponse {
   string run_id = 1;
   string event_id = 2;
+  string queue_item_id = 3;
 }
 
 message PreviewFactoryScheduleRequest {
@@ -2183,17 +2170,6 @@ message DescribeFactoryPullRequestMergeabilityResponse {
   FactoryPullRequestMergeability mergeability = 1;
 }
 
-message MergeFactoryPullRequestRequest {
-  string factory_id = 1;
-  string pr_id = 2;
-  FactoryPullRequestMergeability.MergeMethod merge_method = 3;
-  string expected_head_sha = 4;
-}
-
-message MergeFactoryPullRequestResponse {
-  FactoryPullRequest pull_request = 1;
-}
-
 message ContinueFactoryPullRequestFixesRequest {
   string factory_id = 1;
   string pr_id = 2;
@@ -2389,6 +2365,9 @@ message WorkOrder {
   bool auto_started = 30;
   // Timestamp of the first start. Empty before the task starts.
   google.protobuf.Timestamp started_at = 31;
+  // Runs with no task, such as webhook runs, that attached to this task
+  // while it waited in a stage.
+  repeated WorkOrderExecution attached_runs = 32;
 }
 
 // WorkOrderSummary is the list row for a work order.
@@ -2610,6 +2589,9 @@ message WorkOrderExecutionStep {
   string name = 1;
   int32 step_index = 2;
   string stage_key = 3;
+  string app_id = 4;
+  // Captured manual eligibility. Historical steps remain automatic.
+  bool manual_start = 5;
 }
 
 message DescribeWorkOrderRequest {
@@ -2779,6 +2761,9 @@ message AutomationRef {
   string node_name = 2;
   string app_id = 3;
   string app_name = 4;
+  // Factory template of the app, for example custom-verification for a
+  // custom automation. Empty when unknown.
+  string template_id = 5;
 }
 
 message ListWorkOrderArtifactsRequest {

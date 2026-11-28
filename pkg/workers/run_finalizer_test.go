@@ -1,6 +1,7 @@
 package workers
 
 import (
+	"fmt"
 	"slices"
 	"testing"
 	"time"
@@ -608,72 +609,94 @@ func Test__RunFinalizer__ExecuteNextFactoryLineStep(t *testing.T) {
 }
 
 func Test__RunFinalizer__WaitsForEveryCustomStageAutomation(t *testing.T) {
-	r := support.Setup(t)
-	defer r.Close()
-	db := database.Conn()
+	for _, manual := range []bool{false, true} {
+		t.Run(fmt.Sprintf("manual=%t", manual), func(t *testing.T) {
+			r := support.Setup(t)
+			defer r.Close()
+			db := database.Conn()
 
-	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
-	require.NoError(t, err)
-	order, err := factory.CreateWorkOrder(db, "Ship feature", "", &r.User, nil, nil)
-	require.NoError(t, err)
-	dispatchWorkOrderForTest(t, order)
+			factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+			require.NoError(t, err)
+			order, err := factory.CreateWorkOrder(db, "Ship feature", "", &r.User, nil, nil)
+			require.NoError(t, err)
+			dispatchWorkOrderForTest(t, order)
 
-	implement, implementEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "implement", "start")
-	first, _ := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "lint", "start")
-	second, _ := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "test", "start")
-	line, err := factory.CreateLine(db, "ship", []models.FactoryLineStep{{
-		Type: models.FactoryLineStepTypeRunApp, AppID: implement.ID, Entrypoint: implementEntry,
-	}})
-	require.NoError(t, err)
+			implement, implementEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "implement", "start")
+			first, _ := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "lint", "start")
+			second, _ := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "test", "start")
+			line, err := factory.CreateLine(db, "ship", []models.FactoryLineStep{{
+				Type: models.FactoryLineStepTypeRunApp, AppID: implement.ID, Entrypoint: implementEntry,
+			}})
+			require.NoError(t, err)
 
-	stageID := uuid.New()
-	stageKey := "custom-" + stageID.String()
-	stages := line.StagesValue()
-	stages = append(stages[:1], append([]models.FactoryLineStage{{
-		ID: stageID, Key: stageKey, Name: "QA", Kind: models.FactoryLineStagePhase,
-	}}, stages[1:]...)...)
-	require.NoError(t, line.UpdateConfiguration(db, nil, nil, nil, stages))
-	require.NoError(t, first.SetColumnKey(db, stageKey))
-	require.NoError(t, second.SetColumnKey(db, stageKey))
-	eventDriven := support.CreateFactoryCanvas(t, r, factory.ID, "External check")
-	require.NoError(t, eventDriven.SetColumnKey(db, models.CanvasColumnKeyVerify))
-	require.NoError(t, eventDriven.SetDisplayColumn(db, stageKey))
+			stageID := uuid.New()
+			stageKey := "custom-" + stageID.String()
+			stages := line.StagesValue()
+			stages = append(stages[:1], append([]models.FactoryLineStage{{
+				ID: stageID, Key: stageKey, Name: "QA", Kind: models.FactoryLineStagePhase,
+			}}, stages[1:]...)...)
+			require.NoError(t, line.UpdateConfiguration(db, nil, nil, nil, stages))
+			require.NoError(t, first.SetColumnKey(db, stageKey))
+			require.NoError(t, second.SetColumnKey(db, stageKey))
+			if manual {
+				version, err := models.FindLiveCanvasVersionInTransaction(db, second.ID)
+				require.NoError(t, err)
+				version.Nodes[0].Metadata = map[string]any{models.FactoryAppTemplateMetadataKey: map[string]any{"startMode": "manual"}}
+				require.NoError(t, db.Save(version).Error)
+			}
+			eventDriven := support.CreateFactoryCanvas(t, r, factory.ID, "External check")
+			require.NoError(t, eventDriven.SetColumnKey(db, models.CanvasColumnKeyVerify))
+			require.NoError(t, eventDriven.SetDisplayColumn(db, stageKey))
 
-	var customRuns []*models.FactoryLineStepResult
-	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
-		_, customRuns, err = line.DispatchStage(tx, order)
-		return err
-	}))
-	require.Len(t, customRuns, 2)
+			var customRuns []*models.FactoryLineStepResult
+			require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+				_, customRuns, err = line.DispatchStage(tx, order)
+				return err
+			}))
+			if manual {
+				require.Len(t, customRuns, 1)
+			} else {
+				require.Len(t, customRuns, 2)
+			}
 
-	amqpURL, _ := config.RabbitMQURL()
-	finalizer := NewRunFinalizer(amqpURL, r.Registry)
-	finish := func(result *models.FactoryLineStepResult) []factoryLinePendingRun {
-		t.Helper()
-		now := time.Now()
-		require.NoError(t, db.Model(result.Run).Updates(map[string]any{
-			"state": models.CanvasRunStateFinished, "result": models.CanvasRunResultPassed,
-			"updated_at": &now, "finished_at": &now,
-		}).Error)
-		var pending []factoryLinePendingRun
-		require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
-			pending, _, err = finalizer.executeNextFactoryLineStep(tx, result.Run.ID)
-			return err
-		}))
-		return pending
+			amqpURL, _ := config.RabbitMQURL()
+			finalizer := NewRunFinalizer(amqpURL, r.Registry)
+			finish := func(result *models.FactoryLineStepResult) []factoryLinePendingRun {
+				t.Helper()
+				now := time.Now()
+				require.NoError(t, db.Model(result.Run).Updates(map[string]any{
+					"state": models.CanvasRunStateFinished, "result": models.CanvasRunResultPassed,
+					"updated_at": &now, "finished_at": &now,
+				}).Error)
+				var pending []factoryLinePendingRun
+				require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+					pending, _, err = finalizer.executeNextFactoryLineStep(tx, result.Run.ID)
+					return err
+				}))
+				return pending
+			}
+
+			assert.Empty(t, finish(customRuns[0]), "the stage waits for its other automation")
+			reloaded, err := models.FindWorkOrderLineDispatch(db, customRuns[0].Execution.LineDispatchID)
+			require.NoError(t, err)
+			assert.Equal(t, stageKey, reloaded.CurrentStageKey)
+			if manual {
+				var manualRun *models.FactoryLineStepResult
+				require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+					manualRun, err = order.StartCustomStageAutomation(tx, second.ID, stageKey)
+					return err
+				}))
+				customRuns = append(customRuns, manualRun)
+			}
+			pending := finish(customRuns[1])
+			require.Len(t, pending, 1)
+			assert.Equal(t, implement.ID, pending[0].workflowID)
+			reloaded, err = models.FindWorkOrderLineDispatch(db, customRuns[0].Execution.LineDispatchID)
+			require.NoError(t, err)
+			assert.Equal(t, "phase-0", reloaded.CurrentStageKey)
+			assert.Empty(t, finish(customRuns[1]), "a repeated completion does not start the next stage twice")
+		})
 	}
-
-	assert.Empty(t, finish(customRuns[0]), "the stage waits for its other automation")
-	reloaded, err := models.FindWorkOrderLineDispatch(db, customRuns[0].Execution.LineDispatchID)
-	require.NoError(t, err)
-	assert.Equal(t, stageKey, reloaded.CurrentStageKey)
-	pending := finish(customRuns[1])
-	require.Len(t, pending, 1)
-	assert.Equal(t, implement.ID, pending[0].workflowID)
-	reloaded, err = models.FindWorkOrderLineDispatch(db, customRuns[0].Execution.LineDispatchID)
-	require.NoError(t, err)
-	assert.Equal(t, "phase-0", reloaded.CurrentStageKey)
-	assert.Empty(t, finish(customRuns[1]), "a repeated completion does not start the next stage twice")
 }
 
 func Test__RunFinalizer__DoesNotAdvanceFailedCustomStage(t *testing.T) {
@@ -1170,13 +1193,13 @@ func Test__RunFinalizer__MovedExecutionCannotAdvanceAfterReturningToSourceStage(
 	var moved *models.FactoryTaskMoveResult
 	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
 		var err error
-		moved, err = order.MoveFromRun(tx, original.Run.ID, "phase-1", false)
+		moved, err = order.MoveFromRun(tx, original.Run.ID, models.FactoryTaskMoveTo{Stage: "phase-1"})
 		return err
 	}))
 	require.Len(t, moved.Started, 1)
 	destination := moved.Started[0]
 	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
-		_, err := order.MoveFromRun(tx, destination.Run.ID, "phase-0", false)
+		_, err := order.MoveFromRun(tx, destination.Run.ID, models.FactoryTaskMoveTo{Stage: "phase-0"})
 		return err
 	}))
 	finishPassedRun(t, original.Run)

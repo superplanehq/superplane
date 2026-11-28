@@ -89,7 +89,7 @@ func Test__ListIntegrations__GitHubAppInstallationLink(t *testing.T) {
 
 func findListedIntegration(ctx context.Context, t *testing.T, r *support.ResourceRegistry, integrationID string) *pb.Integration {
 	t.Helper()
-	response, err := ListIntegrations(ctx, r.Registry, r.Organization.ID.String())
+	response, err := ListIntegrations(ctx, r.Registry, r.Organization.ID.String(), "")
 	require.NoError(t, err)
 	for _, integration := range response.Integrations {
 		if integration.Metadata.Id == integrationID {

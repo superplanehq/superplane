@@ -760,10 +760,11 @@ func serializeAutomationRef(ref *factory.AutomationRef) *pb.AutomationRef {
 		return nil
 	}
 	return &pb.AutomationRef{
-		NodeId:   ref.NodeID,
-		NodeName: ref.NodeName,
-		AppId:    ref.AppID.String(),
-		AppName:  ref.AppName,
+		NodeId:     ref.NodeID,
+		NodeName:   ref.NodeName,
+		AppId:      ref.AppID.String(),
+		AppName:    ref.AppName,
+		TemplateId: ref.TemplateID,
 	}
 }
 
@@ -954,9 +955,11 @@ func serializeExecutionSteps(
 			name = steps[i].StageName
 		}
 		result[i] = &pb.WorkOrderExecutionStep{
-			Name:      name,
-			StepIndex: int32(i),
-			StageKey:  steps[i].StageKey,
+			Name:        name,
+			StepIndex:   int32(i),
+			StageKey:    steps[i].StageKey,
+			AppId:       steps[i].AppID.String(),
+			ManualStart: steps[i].ManualStart || steps[i].StartMode == "manual",
 		}
 	}
 	return result

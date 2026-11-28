@@ -97,7 +97,7 @@ import {
   workspaceNextSteps,
 } from "./workspaceNextStepCatalog";
 import { BacklogColumn, type BacklogIntakePanel } from "./BacklogColumn";
-import { useBacklogScheduleRun } from "@/hooks/useBacklogScheduleRun";
+import { useColumnAutomationRun } from "@/hooks/useColumnAutomationRun";
 import { AutomationRowContext } from "./AutomationRowContext";
 import { cardMove, savedCardStage, supportsCard, type AutomationMove } from "../lib/automationPlacement";
 
@@ -201,6 +201,7 @@ import {
   factoryPRFeedbackPath,
   factoryPRFeedbackSetupPath,
   factorySentryIntakeSetupPath,
+  factorySettingsSectionPath,
   columnAutomationViewCanvasIdFromSearch,
   firstFactoryLineId,
   workOrderDetailPath,
@@ -717,13 +718,9 @@ export function LinesPage() {
   };
 
   const viewedAutomation = factoryApps.find((app) => app.id === automationViewCanvasId);
-  const canDeleteViewedCustom =
-    canUpdate &&
-    (viewedAutomation?.columnKey === "backlog" ||
-      viewedAutomation?.columnKey === "verify" ||
-      viewedAutomation?.columnKey === "done");
+  const canDeleteViewedAutomation = canUpdate && Boolean(viewedAutomation?.id);
   const closeAutomationView = () => navigate(factoryHomePath(organizationId, routeSegment));
-  const deleteViewedCustomAutomation = async () => {
+  const deleteViewedAutomation = async () => {
     if (!automationViewCanvasId) {
       return;
     }
@@ -807,7 +804,7 @@ export function LinesPage() {
           columnKey={viewedAutomation?.columnKey}
           title={viewedAutomation?.name?.trim() || "Automation"}
           onClose={closeAutomationView}
-          onDelete={canDeleteViewedCustom ? deleteViewedCustomAutomation : undefined}
+          onDelete={canDeleteViewedAutomation ? deleteViewedAutomation : undefined}
           deletePending={deleteAutomation.isPending}
         />
       ) : null}
@@ -870,7 +867,16 @@ export function LinesPage() {
             }
           />
           <SubscriptionIntakeOwnerRecovery />
-          <WebhookFailuresNotice organizationId={organizationId} />
+          <WebhookFailuresNotice
+            organizationId={organizationId}
+            factoryId={factoryId}
+            integrationsBasePath={factorySettingsSectionPath(
+              organizationId,
+              routeSegment,
+              "organization",
+              "integrations",
+            )}
+          />
           {configuredIntakes
             .filter(
               (intake) =>
@@ -1245,7 +1251,8 @@ function LineDetail({
   const manualCustomAutomations = useMemo<ManualCustomAutomation[]>(
     () =>
       customAutomationDetails.flatMap(({ automationId, automation }) =>
-        customAutomationAllowsManualStart(automation.settings)
+        customAutomationAllowsManualStart(automation.settings) ||
+        automation.automation?.columnKey?.startsWith("custom-")
           ? [
               {
                 id: automationId,
@@ -1333,7 +1340,7 @@ function LineDetail({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid="lines-detail">
-      {steps.length === 0 && backlogOrders.length === 0 && doneOrders.length === 0 ? (
+      {steps.length === 0 && !line.stages?.length && backlogOrders.length === 0 && doneOrders.length === 0 ? (
         <p className="text-[13px] text-muted-foreground">No phases yet. Edit this line to add app-driven phases.</p>
       ) : (
         <PhaseBoard
@@ -1731,7 +1738,7 @@ function PhaseBoard({
   const stageElements = useRef(new Map<string, HTMLDivElement>());
   const updateLine = useUpdateFactoryLine(organizationId, factoryId);
   const lineId = line.id;
-  const scheduleRun = useBacklogScheduleRun(organizationId, factoryId, factoryKey, lineId);
+  const scheduleRun = useColumnAutomationRun(organizationId, factoryId, factoryKey, lineId);
   const { canAct } = usePermissions();
 
   // The line query is the source of truth for persisted colors. Resync when
@@ -2083,6 +2090,7 @@ function PhaseBoard({
           creditFailureLabels={creditFailureLabels}
           intakePanel={intakePanel}
           onAddIntake={onAddIntake}
+          onAddAutomation={onAddStageAutomation ? () => onAddStageAutomation("backlog", backlogTitle) : undefined}
           automations={backlogAutomations}
           automationRowCount={automationRowCount(backlogAutomations)}
           onAutomationRowAction={onAutomationRowAction}

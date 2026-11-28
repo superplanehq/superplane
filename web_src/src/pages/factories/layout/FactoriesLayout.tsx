@@ -151,6 +151,7 @@ function FactoriesLayoutContent({
   const taskRoute = useMatch("/:organizationId/workspaces/:factoryKey/task/:orderNumber");
   const brokenIntegrationsBanner = useBrokenIntegrationsBanner(
     organizationId,
+    factoryId,
     routeSegment,
     Boolean(boardRoute || legacyBoardRoute || taskRoute),
   );

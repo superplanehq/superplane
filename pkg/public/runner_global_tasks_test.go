@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -128,7 +129,7 @@ func TestScheduleAutomationCreatesATaskWithoutAnExistingTask(t *testing.T) {
 
 	token := runnerTokenFrom(runner.AttachRunnerEnv(ctx, nil, 60))
 	require.NotEmpty(t, token)
-	assert.Equal(t, []string{"list_tasks", "create_task"}, listRunnerTools(t, server, token))
+	assert.Equal(t, []string{"list_tasks", "get_task", "create_task", "move_task", "attach_task"}, listRunnerTools(t, server, token))
 	connection, err := models.CreateCodexConnection(db, r.Organization.ID, r.User, time.Now())
 	require.NoError(t, err)
 	require.NoError(t, db.Model(connection).Updates(map[string]any{
@@ -249,6 +250,45 @@ func TestRunnerCreatesADraftTaskWithoutAnOwner(t *testing.T) {
 
 	rec = runnerRequest(t, server, http.MethodPost, token, "/api/v1/runner/tasks", `{"title":"ok","description":"`+strings.Repeat("b", 128*1024)+`"}`)
 	assert.Equal(t, http.StatusRequestEntityTooLarge, rec.Code, rec.Body.String())
+}
+
+func TestRunnerFindsAndReusesATaskByOrigin(t *testing.T) {
+	r := support.Setup(t)
+	t.Setenv("JWT_SECRET", "test")
+	ctx, factory, _ := mustTaskLinkedAgentRun(t, r)
+	server := newRunnerArtifactTestServer(t, r, jwt.NewSigner("test"))
+	token := runnerTokenFrom(runner.AttachRunnerEnv(ctx, nil, 60))
+	origin := "https://app.datadoghq.com/monitors/ALERT-1"
+	body := `{"title":"Fix latency","origin":"` + origin + `"}`
+
+	rec := runnerRequest(t, server, http.MethodPost, token, "/api/v1/runner/tasks", body)
+	require.Equal(t, http.StatusCreated, rec.Code, rec.Body.String())
+	first := decodeRunnerTask(t, rec.Body.Bytes())
+	rec = runnerRequest(t, server, http.MethodPost, token, "/api/v1/runner/tasks", body)
+	require.Equal(t, http.StatusOK, rec.Code, "an open task with the origin is reused: %s", rec.Body.String())
+	assert.Equal(t, first.ID, decodeRunnerTask(t, rec.Body.Bytes()).ID)
+	assert.Contains(t, rec.Body.String(), `"created":false`)
+
+	rec = runnerRequest(t, server, http.MethodGet, token, "/api/v1/runner/task/get?origin="+url.QueryEscape(origin), "")
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	assert.Equal(t, first.ID, decodeRunnerTask(t, rec.Body.Bytes()).ID)
+
+	db := database.DB(t.Context())
+	order, err := factory.FindWorkOrder(db, uuid.MustParse(first.ID))
+	require.NoError(t, err)
+	_, err = order.UpdateStatus(db, models.FactoryWorkOrderStatusUpdate{ToState: models.FactoryWorkOrderStateClosed, Result: models.FactoryWorkOrderResultRejected})
+	require.NoError(t, err)
+	rec = runnerRequest(t, server, http.MethodPost, token, "/api/v1/runner/tasks", body)
+	require.Equal(t, http.StatusCreated, rec.Code, "a closed task does not block a new one: %s", rec.Body.String())
+	second := decodeRunnerTask(t, rec.Body.Bytes())
+	assert.NotEqual(t, first.ID, second.ID)
+	rec = runnerRequest(t, server, http.MethodGet, token, "/api/v1/runner/task/get?origin="+url.QueryEscape(origin), "")
+	assert.Equal(t, second.ID, decodeRunnerTask(t, rec.Body.Bytes()).ID, "the open task comes first")
+
+	rec = runnerRequest(t, server, http.MethodPost, token, "/api/v1/runner/tasks", `{"title":"x","origin":"not a link"}`)
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	rec = runnerRequest(t, server, http.MethodGet, token, "/api/v1/runner/task/get?origin="+url.QueryEscape("https://example.com/none"), "")
+	assert.Equal(t, http.StatusNotFound, rec.Code)
 }
 
 func TestRunnerClosesThisTaskOnce(t *testing.T) {

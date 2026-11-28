@@ -40,11 +40,14 @@ func RunFactoryCustomAutomation(
 		return nil, factoryErrorToStatus(err, "failed to run custom automation")
 	}
 	if strings.TrimSpace(req.GetWorkOrderId()) == "" {
-		return startScheduledCustomAutomation(db, canvas)
+		return startColumnCustomAutomation(db, canvas)
 	}
 	order, err := findWorkOrder(db, factory, req.GetWorkOrderId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to run custom automation")
+	}
+	if canvas.ColumnKey != nil && strings.HasPrefix(*canvas.ColumnKey, "custom-") {
+		return startCustomStageAutomation(db, factory, canvas, order)
 	}
 	version, err := models.FindLiveCanvasVersionByCanvasInTransaction(db, canvas)
 	if err != nil {
@@ -167,10 +170,9 @@ func StartColumnLeaveCustomAutomations(
 	return nil
 }
 
-// startScheduledCustomAutomation starts the schedule chain. That chain creates a
-// task from the prompt result, so it does not need a task to already exist.
-func startScheduledCustomAutomation(db *gorm.DB, canvas *models.Canvas) (*pb.RunFactoryCustomAutomationResponse, error) {
-	if canvas.ColumnKey == nil || *canvas.ColumnKey != models.CanvasColumnKeyBacklog {
+// startColumnCustomAutomation runs a no-task manual trigger or a Backlog schedule.
+func startColumnCustomAutomation(db *gorm.DB, canvas *models.Canvas) (*pb.RunFactoryCustomAutomationResponse, error) {
+	if canvas.ColumnKey == nil || (*canvas.ColumnKey != models.CanvasColumnKeyBacklog && *canvas.ColumnKey != models.CanvasColumnKeyVerify) {
 		return nil, factoryErrorToStatus(invalidArgument("This automation starts from a task."), "failed to run custom automation")
 	}
 	version, err := models.FindLiveCanvasVersionByCanvasInTransaction(db, canvas)
@@ -181,7 +183,7 @@ func startScheduledCustomAutomation(db *gorm.DB, canvas *models.Canvas) (*pb.Run
 		return emitColumnCustomAutomation(db, canvas, startID)
 	}
 	scheduleID := scheduledCustomAutomationTriggerID(version)
-	if scheduleID == "" {
+	if *canvas.ColumnKey != models.CanvasColumnKeyBacklog || scheduleID == "" {
 		return nil, factoryErrorToStatus(invalidArgument("This automation starts from a task."), "failed to run custom automation")
 	}
 	trigger, err := models.FindCanvasNode(db, canvas.ID, scheduleID)
@@ -214,8 +216,17 @@ func columnStartTriggerID(version *models.CanvasVersion) string {
 		return ""
 	}
 	for _, node := range version.Nodes {
-		if node.Type == models.NodeTypeTrigger && node.ComponentName() == "start" {
-			return node.ID
+		if node.Type != models.NodeTypeTrigger || node.ComponentName() != "start" {
+			continue
+		}
+		template, _ := node.Metadata[models.FactoryAppTemplateMetadataKey].(map[string]any)
+		if template["runsOnTask"] != false || !triggerMetadataHasMode(template, "manual") {
+			continue
+		}
+		for _, edge := range version.Edges {
+			if edge.SourceID == node.ID {
+				return node.ID
+			}
 		}
 	}
 	return ""
@@ -280,6 +291,9 @@ func startCustomAutomation(
 	column := ""
 	if canvas.ColumnKey != nil {
 		column = *canvas.ColumnKey
+	}
+	if strings.HasPrefix(column, "custom-") {
+		return nil, grpcFailedPrecondition("Start this automation through the task stage action.")
 	}
 	if column == models.CanvasColumnKeyBacklog {
 		event, err := contexts.StartBacklogCustomAutomation(db, factory, canvas, order, automatic)
@@ -361,6 +375,33 @@ func startCustomAutomation(
 		return nil, err
 	}
 	return events, nil
+}
+
+func startCustomStageAutomation(db *gorm.DB, factory *models.Factory, canvas *models.Canvas, order *models.FactoryWorkOrder) (*pb.RunFactoryCustomAutomationResponse, error) {
+	var result *models.FactoryLineStepResult
+	err := db.Transaction(func(tx *gorm.DB) error {
+		if err := models.LockFactoryWorkOrder(tx, order.ID); err != nil {
+			return err
+		}
+		current, err := factory.FindWorkOrder(tx, order.ID)
+		if err != nil {
+			return err
+		}
+		result, err = current.StartCustomStageAutomation(tx, canvas.ID, *canvas.ColumnKey)
+		return err
+	})
+	if err != nil {
+		return nil, factoryErrorToStatus(grpcFailedPrecondition(err.Error()), "failed to run custom automation")
+	}
+	publishDispatchedWorkOrder(log.WithField("order_id", order.ID), factory.OrganizationID, factory.ID, order, nil, order.State, []*models.FactoryLineStepResult{result})
+	response := &pb.RunFactoryCustomAutomationResponse{}
+	if result != nil && result.Run != nil {
+		response.RunId = result.Run.ID.String()
+	}
+	if result != nil && result.QueueItem != nil {
+		response.QueueItemId = result.QueueItem.ID.String()
+	}
+	return response, nil
 }
 
 type customAutomationStart struct {

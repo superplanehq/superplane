@@ -7,8 +7,8 @@ import type { useCustomAutomationSourceDraft } from "@/hooks/useCustomAutomation
 import { useSelectableLLMModels } from "@/hooks/useSelectableLLMModels";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import {
+  customAutomationRunContext,
   customAutomationTriggersForRun,
-  newCustomAutomationTrigger,
   type CustomAutomationColumn,
   type CustomAutomationTrigger,
 } from "../lib/customAutomation";
@@ -54,6 +54,7 @@ export function CustomAutomationSourceEditor({
     live.isFetchedAfterMount && !live.isError ? live.data?.settings?.agent : undefined,
   );
   const [formTriggers, setFormTriggers] = useState<CustomAutomationTrigger[]>();
+  const [saveError, setSaveError] = useState("");
 
   const isHosted = agent?.component === "runnerSuperPlane";
   const { data: hostedModels } = useSelectableLLMModels(organizationId, {
@@ -63,7 +64,15 @@ export function CustomAutomationSourceEditor({
   });
   const hosted = isHosted ? { models: hostedModels ?? [], savedKey: agent.model } : undefined;
 
-  const form = { saving, deleting, onSave, onDelete, onClose };
+  const save = () => {
+    if (definition?.triggers.length === 0) {
+      setSaveError("Add at least one trigger.");
+      return;
+    }
+    setSaveError("");
+    onSave();
+  };
+  const form = { saving, deleting, onSave: save, onDelete, onClose };
   if (model.isYamlOpen || !definition) {
     return (
       <>
@@ -74,6 +83,7 @@ export function CustomAutomationSourceEditor({
             value={model.source}
             onChange={(event) => {
               setFormTriggers(undefined);
+              setSaveError("");
               model.editYaml(event.target.value);
             }}
             readOnly={saving || deleting}
@@ -82,7 +92,7 @@ export function CustomAutomationSourceEditor({
             className="min-h-0 flex-1 resize-none font-mono"
           />
         </div>
-        <CustomAutomationSetupFooter {...form} error={error || model.problem} />
+        <CustomAutomationSetupFooter {...form} error={saveError || error || model.problem} />
       </>
     );
   }
@@ -90,13 +100,14 @@ export function CustomAutomationSourceEditor({
   const visual = automationDefinitionCanvas(definition, agent, customProvider, hosted);
   const triggers = formTriggers ?? visual.triggers;
 
-  const editTriggers = (next: CustomAutomationTrigger[], runsOnTask?: boolean) => {
+  const editTriggers = (next: CustomAutomationTrigger[], selected?: boolean) => {
     // Keep hidden triggers in the form draft when switching between task and column runs.
     setFormTriggers(next);
+    const runsOnTask = customAutomationRunContext(stage, next, selected);
     const active = customAutomationTriggersForRun(next, runsOnTask);
     model.editCanvas({
       runs_on_task: runsOnTask,
-      triggers: automationDefinitionTriggers(active.length ? active : [newCustomAutomationTrigger()], stage),
+      triggers: automationDefinitionTriggers(active, stage),
     });
   };
   return (
@@ -110,7 +121,7 @@ export function CustomAutomationSourceEditor({
       factoryKey={routeSegment}
       columnKey={stage}
       asCode
-      error={error}
+      error={saveError || error}
       onNameChange={(name) => model.editCanvas({ name })}
       onIconChange={(icon) => model.editCanvas({ icon })}
       onTriggersChange={(next) => editTriggers(next, visual.runsOnTask)}

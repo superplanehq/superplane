@@ -69,7 +69,13 @@ import type { FactoryPreviewFlags } from "./factoryPreviewFlagsContext";
 import { lineBoardColumnLaneProps } from "./lineBoardColumnColors";
 import { LinesBoardSpecHarness } from "./linesPageSpecRender";
 import { ADD_INTAKE_COPY } from "./lineIntakeModel";
-import { canvasQuery, canvasWithoutAgent, implementerCanvas } from "./linesPageCanvasFixtures";
+import {
+  canvasQuery,
+  canvasWithoutAgent,
+  closureCanvas,
+  implementerCanvas,
+  mergeConfidenceCanvas,
+} from "./linesPageCanvasFixtures";
 import { REVIEW_CANDIDATE_WORK_ORDERS } from "./onboarding/first-run/reviewCandidates";
 
 function withBoardChecks(orders: FactoriesWorkOrder[]): FactoriesWorkOrderSummary[] {
@@ -377,6 +383,8 @@ async function resetLinesBoardMocks() {
     if (canvasId === "app-refund-implementer") {
       return canvasQuery(implementerCanvas);
     }
+    if (canvasId === "app-pr-closure") return canvasQuery(closureCanvas);
+    if (canvasId === "app-risk-score") return canvasQuery(mergeConfidenceCanvas);
     return canvasQuery(canvasWithoutAgent);
   });
   updateCanvasVersionMutateAsync.mockReset().mockResolvedValue({});
@@ -1725,7 +1733,7 @@ describe("LinesPage board extras", () => {
     await resetLinesBoardMocks();
   });
 
-  it("hides Add automation on Backlog and shows it on Verify and Done", async () => {
+  it("offers Add automation on Backlog, Verify, and Done", async () => {
     useFactoryPRFeedbackHandlers.mockReturnValue({
       data: [{ id: "handler-discussion", source: "SOURCE_PULL_REQUEST_DISCUSSION", healthy: true }],
       isPending: false,
@@ -1734,7 +1742,7 @@ describe("LinesPage board extras", () => {
     renderLinesBoard();
 
     await user.click(screen.getByTestId("lines-backlog-menu"));
-    expect(screen.queryByRole("menuitem", { name: "Add automation" })).not.toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Add automation" })).toBeInTheDocument();
     await user.keyboard("{Escape}");
 
     await user.click(screen.getByTestId("lines-verify-menu"));
@@ -1845,22 +1853,124 @@ describe("LinesPage board extras", () => {
     expect(screen.queryByLabelText("What should the agent look for?")).not.toBeInTheDocument();
   });
 
-  it("deletes a custom Verify automation from the view modal", async () => {
-    useFactoryAutomations.mockReturnValue({
-      data: [{ id: "app-create-env", name: "Create env", columnKey: "verify" }],
+  it.each([
+    {
+      id: "app-create-env",
+      name: "Create env",
+      columnKey: "verify",
+      row: "lines-verify-automation-rows-row-custom-app-create-env",
+      templateId: undefined,
+    },
+    {
+      id: "app-pr-closure",
+      name: "PR Closure",
+      columnKey: undefined,
+      row: "lines-done-automation-rows-row-closure-app-pr-closure",
+      templateId: "pr-closure",
+    },
+    {
+      id: "app-risk-score",
+      name: "Merge confidence",
+      columnKey: "verify",
+      row: "lines-verify-automation-rows-row-risk-score-app-risk-score",
+      templateId: "risk-score",
+    },
+  ])("deletes $name from the view modal", async ({ id, name, columnKey, row, templateId }) => {
+    const listRuns = vi.spyOn(apiClient, "canvasesListRuns").mockResolvedValue({
+      data: { runs: [] },
+      request: new Request("http://localhost/runs"),
+      response: new Response(),
     });
-    deleteFactoryAutomationMutateAsync.mockResolvedValueOnce(undefined);
+    try {
+      useFactoryAutomations.mockReturnValue({
+        data: [{ id, name, columnKey, templateId }],
+      });
+      deleteFactoryAutomationMutateAsync.mockImplementationOnce(async () => {
+        useFactoryAutomations.mockReturnValue({ data: [] });
+      });
+      const user = userEvent.setup();
+      renderLinesBoard();
+
+      await user.click(screen.getByTestId(row));
+      const popup = screen.getByTestId(templateId ? "merge-confidence-config" : "column-automation-view");
+      const deleteLabel = templateId ? "Delete" : "Delete automation";
+      expect(within(popup).getByRole("button", { name: deleteLabel })).toBeVisible();
+      if (templateId === "pr-closure") {
+        expect(within(popup).queryByRole("tab")).not.toBeInTheDocument();
+        expect(await within(popup).findByText("No runs yet")).toBeInTheDocument();
+      }
+      if (templateId === "risk-score") {
+        await user.click(within(popup).getByRole("tab", { name: "Runs" }));
+        expect(within(popup).getByRole("button", { name: deleteLabel })).toBeVisible();
+      }
+      await user.click(within(popup).getByRole("button", { name: deleteLabel }));
+      expect(deleteFactoryAutomationMutateAsync).not.toHaveBeenCalled();
+      await user.click(screen.getByRole("button", { name: "Keep automation" }));
+      expect(deleteFactoryAutomationMutateAsync).not.toHaveBeenCalled();
+      await user.click(within(popup).getByRole("button", { name: deleteLabel }));
+      const confirmation = templateId ? screen.getByRole("alertdialog") : popup;
+      await user.click(within(confirmation).getByRole("button", { name: "Delete automation" }));
+
+      await waitFor(() => {
+        expect(deleteFactoryAutomationMutateAsync).toHaveBeenCalledWith(id);
+        expect(deleteFactoryAutomationMutateAsync).toHaveBeenCalledTimes(1);
+        expect(popup).not.toBeInTheDocument();
+      });
+      if (id === "app-pr-closure") {
+        await user.click(screen.getByTestId("lines-done-menu"));
+        await user.click(screen.getByTestId("lines-done-menu-add-automation"));
+        expect(screen.getByTestId("add-column-automation-template-pr-closure")).toBeEnabled();
+      }
+    } finally {
+      listRuns.mockRestore();
+    }
+  });
+
+  it.each(["app-pr-closure", "app-risk-score"])(
+    "hides deletion without workspace update permission for %s",
+    async (id) => {
+      permissions.canUpdateFactories = false;
+      useFactoryAutomations.mockReturnValue({ data: [{ id, name: id }] });
+      renderLinesBoard(factoryColumnAutomationViewPath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT, id));
+      const popup = await screen.findByTestId("merge-confidence-config");
+      expect(within(popup).queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
+      expect(deleteFactoryAutomationMutateAsync).not.toHaveBeenCalled();
+    },
+  );
+
+  it("keeps PR Closure available when deletion fails", async () => {
+    const { showErrorToast } = await import("@/lib/toast");
+    const deletionError = new Error("Deletion unavailable");
+    deleteFactoryAutomationMutateAsync.mockRejectedValueOnce(deletionError);
+    useFactoryAutomations.mockReturnValue({
+      data: [{ id: "app-pr-closure", name: "PR Closure", templateId: "pr-closure" }],
+    });
+    renderLinesBoard();
+    const user = userEvent.setup();
+    await user.click(screen.getByTestId("lines-done-automation-rows-row-closure-app-pr-closure"));
+    const popup = screen.getByTestId("merge-confidence-config");
+    await user.click(within(popup).getByRole("button", { name: "Delete" }));
+    await user.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Delete automation" }));
+    await waitFor(() => expect(showErrorToast).toHaveBeenCalledWith(deletionError.message));
+    expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Keep automation" }));
+    expect(popup).toBeInTheDocument();
+    expect(screen.getByTestId("lines-done-automation-rows-row-closure-app-pr-closure")).toBeInTheDocument();
+  });
+
+  it("readds task analysis through the Backlog automation picker", async () => {
+    createFactoryAutomationMutateAsync.mockResolvedValueOnce({ id: "new-analysis" });
     const user = userEvent.setup();
     renderLinesBoard();
-
-    await user.click(screen.getByTestId("lines-verify-automation-rows-row-custom-app-create-env"));
-    expect(screen.getByTestId("column-automation-view")).toBeInTheDocument();
-    await user.click(screen.getByTestId("column-automation-view-delete"));
-    await user.click(screen.getByTestId("column-automation-view-delete-confirm"));
-
-    await waitFor(() => {
-      expect(deleteFactoryAutomationMutateAsync).toHaveBeenCalledWith("app-create-env");
-    });
+    await user.click(screen.getByTestId("lines-backlog-menu"));
+    await user.click(screen.getByTestId("lines-backlog-menu-add-automation"));
+    await user.click(screen.getByTestId("add-column-automation-template-analysis"));
+    await waitFor(() =>
+      expect(createFactoryAutomationMutateAsync).toHaveBeenCalledWith(
+        expect.objectContaining({ templateId: "backlog" }),
+      ),
+    );
+    expect(screen.queryByTestId("add-column-automation-picker")).not.toBeInTheDocument();
   });
 
   it("lists two intakes on the same source", () => {

@@ -33,8 +33,6 @@ export function customAutomationColumnAutomation(
   const hasSchedule =
     listed.some((trigger) => trigger.mode === "scheduled") || app.customAutomationMode === "scheduled";
   const primary = primaryCustomAutomationMode(app.customAutomationMode, listed);
-  // Only a request to the webhook starts a webhook-only automation.
-  const webhookOnly = primary === "webhook" && !listed.some((trigger) => trigger.mode === "manual");
   const copy = customAutomationModeCopy(primary, columnKey);
   const trigger = customAutomationTriggerSummary(app, listed, columnKey, copy.trigger);
   return {
@@ -51,12 +49,22 @@ export function customAutomationColumnAutomation(
     runningCount: runningCountForApp(id, workOrders),
     catalogId: CUSTOM_AUTOMATION_CATALOG_ID,
     canvasId: id,
-    columnKey: columnKey.startsWith("custom-") ? columnKey : undefined,
+    columnKey,
     canRunNow:
-      columnKey === "backlog" && (hasSchedule || (app.customAutomationRunsOnTask === false && !webhookOnly))
-        ? true
-        : undefined,
+      (columnKey === "backlog" && hasSchedule) || canRunManuallyFromColumn(columnKey, app, listed) ? true : undefined,
   };
+}
+
+function canRunManuallyFromColumn(
+  column: CustomAutomationColumn,
+  app: { customAutomationRunsOnTask?: boolean; customAutomationMode?: CustomAutomationMode },
+  triggers: Array<{ mode: CustomAutomationMode }>,
+): boolean {
+  if (column !== "backlog" && column !== "verify") return false;
+  if (app.customAutomationRunsOnTask !== false) return false;
+  return triggers.length > 0
+    ? triggers.some((trigger) => trigger.mode === "manual")
+    : (app.customAutomationMode ?? "manual") === "manual";
 }
 
 function customAutomationTaskStageTargets(

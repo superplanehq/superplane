@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "bun:test";
 
@@ -59,6 +59,15 @@ describe("AddColumnAutomationPicker", () => {
     const discussion = screen.getByTestId("add-column-automation-template-discussion");
     expect(discussion).toBeDisabled();
     expect(discussion).toHaveTextContent("This automation is already configured.");
+    const explanation = screen.getByRole("group", { name: "Pull request discussion" });
+    await user.hover(explanation);
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("This automation is already configured.");
+    await user.hover(screen.getByTestId("add-column-automation-template-checks"));
+    screen.getByTestId("add-column-automation-template-checks").focus();
+    await waitFor(() => expect(screen.queryByRole("tooltip")).not.toBeInTheDocument());
+    await user.tab({ shift: true });
+    expect(explanation).toHaveFocus();
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("This automation is already configured.");
     await user.click(discussion);
     expect(onSelect).not.toHaveBeenCalled();
     expect(screen.getByTestId("add-column-automation-template-checks")).toBeEnabled();

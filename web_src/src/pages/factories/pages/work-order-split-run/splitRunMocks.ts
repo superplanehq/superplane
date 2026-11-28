@@ -18,6 +18,7 @@ import {
   type OrgUserDisplay,
   type OrgUserDisplayLookup,
 } from "@/lib/orgUserDisplay";
+import { CUSTOM_AUTOMATION_TEMPLATE_ID } from "../../lib/customAutomation";
 import { workOrderOwnerDisplay } from "../../lib/workOrderCreator";
 import { latestDispatchForLine } from "../../lib/workOrderNumberResolution";
 import { clockLabel, providerForName } from "./splitRunFormat";
@@ -248,6 +249,9 @@ export interface SplitRunFixture {
   lineStatus: SplitRunPhaseStatus;
   /** Verify eligibility remains independent of the review strip. */
   canRunVerifyCustomAutomation?: boolean;
+  currentStageKey?: string;
+  manualStageAppIds?: string[];
+  queuedStageAppId?: string;
   currentPhaseId: SplitRunPhaseId;
   /** When set, the popup opens this phase even if it already passed. */
   openPhaseId?: SplitRunPhaseId | null;
@@ -373,7 +377,8 @@ function draftSourceSentence(order: FactoriesWorkOrder): string {
   const automation = order.createdBy?.automation;
   if (automation) {
     const { componentName } = lineAutomationPresentation({ id: automation.appId, name: automation.appName });
-    return `${componentName} created this task.`;
+    const customName = automation.templateId === CUSTOM_AUTOMATION_TEMPLATE_ID ? automation.appName?.trim() : "";
+    return `${customName || componentName} created this task.`;
   }
   const creator = order.createdBy?.user?.name?.trim();
   if (creator) {
@@ -549,6 +554,9 @@ function mappedWorkOrderFixture(order: FactoriesWorkOrder, options?: SplitRunFix
       visibleDispatchForLine(order, options?.lineId)?.line?.name ||
       SPLIT_RUN_RUNNING.lineName,
     currentStepIndex: current?.stepIndex ?? 0,
+    currentStageKey: order.state === "STATE_OPEN" ? visibleDispatch?.currentStageKey : undefined,
+    manualStageAppIds: visibleDispatch?.steps?.flatMap((step) => (step.manualStart && step.appId ? [step.appId] : [])),
+    queuedStageAppId: visibleDispatch?.queueItem?.appId,
     lineStatus: lineStatusForDisplay(displayStatus),
     canRunVerifyCustomAutomation:
       displayStatus === "waiting" &&
@@ -842,6 +850,7 @@ function phasesForOrder(
       historyRun: true,
     })),
     ...executions.map((execution) => executionToPhase(order, execution, apiChecks, demoArtifacts, executions)),
+    ...attachedRunPhases(order, apiChecks),
     ...phasesForPRFeedbackRuns(prFeedbackRuns, columnApps),
   ];
   return [
@@ -851,6 +860,16 @@ function phasesForOrder(
       canvasRuns: options?.columnAppRuns,
     }),
   ];
+}
+
+/** Runs with no task, such as webhook runs, that attached to the task while it waited in their stage. */
+function attachedRunPhases(order: FactoriesWorkOrder, apiChecks?: FactoriesWorkOrderCheck[]): SplitRunPhase[] {
+  const runs = order.attachedRuns ?? [];
+  // No step index: line-step retry would restart the task line, not this run.
+  return runs.map((execution) => ({
+    ...executionToPhase(order, execution, apiChecks, false, runs),
+    stepIndex: undefined,
+  }));
 }
 
 export const SPLIT_RUN_CLOSURE_PHASE_ID = "done-closure";
