@@ -819,6 +819,7 @@ CREATE TABLE public.factory_pull_requests (
     mergeable_head_sha text DEFAULT ''::text NOT NULL,
     mergeable_allowed_methods text DEFAULT ''::text NOT NULL,
     draft_state_updated_at timestamp with time zone,
+    merge_handoff_canvas_id uuid,
     CONSTRAINT factory_pull_requests_number_positive CHECK ((number > 0)),
     CONSTRAINT factory_pull_requests_state_valid CHECK ((state = ANY (ARRAY['open'::text, 'draft'::text, 'closed'::text, 'merged'::text])))
 );
@@ -6931,7 +6932,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261127160046	f
+20261128003531	f
 \.
 
 

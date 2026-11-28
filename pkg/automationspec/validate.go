@@ -35,6 +35,18 @@ func (d *Document) validateSemantics() error {
 			webhooks[id.String()] = true
 			continue
 		}
+		if trigger.Use == IntegrationEvent {
+			if trigger.Config == nil {
+				trigger.Config = &TriggerConfig{}
+			}
+			if _, err := uuid.Parse(trigger.Config.IntegrationID); err != nil {
+				return d.Diagnostic(triggerPath+".config.integration_id", "Enter the ID of an integration that is connected to the organization.")
+			}
+			if !strings.Contains(trigger.Config.Trigger, ".") {
+				return d.Diagnostic(triggerPath+".config.trigger", "Enter a trigger name, for example github.onPullRequest.")
+			}
+			continue
+		}
 		if trigger.Config != nil {
 			cron := strings.TrimSpace(trigger.Config.Cron)
 			offset := strconv.FormatFloat(trigger.Config.UTCOffset, 'f', -1, 64)

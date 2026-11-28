@@ -1527,6 +1527,7 @@ message FactoryCustomAutomation {
     START_MODE_SCHEDULED = 3;
     START_MODE_ON_LEAVE = 4;
     START_MODE_WEBHOOK = 5;
+    START_MODE_INTEGRATION = 6;
   }
 
   message Step {
@@ -1554,6 +1555,15 @@ message FactoryCustomAutomation {
     Schedule schedule = 2;
     // ID of a workspace webhook. Set only for START_MODE_WEBHOOK.
     string webhook_id = 3;
+    // Set only for START_MODE_INTEGRATION.
+    IntegrationTrigger integration = 4;
+  }
+
+  message IntegrationTrigger {
+    string integration_id = 1;
+    // Registered trigger name, for example github.onPullRequest.
+    string trigger = 2;
+    google.protobuf.Struct configuration = 3;
   }
 
   message Settings {

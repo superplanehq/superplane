@@ -89,6 +89,27 @@ func TestParseKeepsWebhookTriggers(t *testing.T) {
 	}
 }
 
+func TestParseKeepsIntegrationTriggers(t *testing.T) {
+	id := "1f0c3c55-4a8f-4a8e-9a43-2a7d8f6b6f10"
+	source := definitionHeader + "triggers:\n  - use: integration\n    config:\n      integration_id: " + id +
+		"\n      trigger: github.onPullRequest\n      configuration:\n        repository: acme/app\n        actions: [closed]\n" + bashStep
+	document, err := automationspec.Parse(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	config := document.Triggers[0].Config
+	if config.IntegrationID != id || config.Trigger != "github.onPullRequest" || config.Configuration["repository"] != "acme/app" {
+		t.Fatalf("unexpected integration trigger: %+v", config)
+	}
+	normalized, err := automationspec.Encode(document.Definition)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := automationspec.Parse(normalized); err != nil || !strings.Contains(normalized, "- closed") {
+		t.Fatalf("normalized integration trigger did not parse: %v\n%s", err, normalized)
+	}
+}
+
 func TestParseAcceptsIntegralTimeout(t *testing.T) {
 	document, err := automationspec.Parse(definitionHeader + "timeout_seconds: 900.0\n" + manualTrigger + bashStep)
 	if err != nil {
@@ -134,6 +155,8 @@ func TestParseRejectsInvalidDefinitionAtItsSource(t *testing.T) {
 		{"extra document", definitionHeader + manualTrigger + bashStep + "---\nname: extra\n", "$", 9, 1},
 		{"webhook without ID", definitionHeader + "triggers:\n  - use: webhook\n    config: {cron: \"0 9 * * *\"}\n" + bashStep, "triggers[0].config.webhook_id", 6, 13},
 		{"invalid webhook ID", definitionHeader + "triggers:\n  - use: webhook\n    config: {webhook_id: jira}\n" + bashStep, "triggers[0].config.webhook_id", 6, 26},
+		{"integration without trigger", definitionHeader + "triggers:\n  - use: integration\n    config: {integration_id: 1f0c3c55-4a8f-4a8e-9a43-2a7d8f6b6f10}\n" + bashStep, "triggers[0].config.trigger", 6, 13},
+		{"invalid integration ID", definitionHeader + "triggers:\n  - use: integration\n    config: {integration_id: github, trigger: github.onPullRequest}\n" + bashStep, "triggers[0].config.integration_id", 6, 30},
 	}
 	for _, test := range cases {
 		t.Run(test.name, func(t *testing.T) {

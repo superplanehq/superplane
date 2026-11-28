@@ -11,7 +11,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authentication"
-	factorycomponent "github.com/superplanehq/superplane/pkg/components/factory"
 	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
@@ -404,7 +403,7 @@ func reconcileFactoryRepository(
 			changed = replaceWorkspaceCheckoutTarget(nodes, config.EffectiveVCSProvider(), previousApp, repository, previousDefaultBranch, nextBranch, previousGitHubHost, nextGitHubHost) || changed
 		}
 		if isCustomAutomation && !pinnedRepository && slices.ContainsFunc(nodes, func(node models.Node) bool {
-			return node.ComponentName() == "schedule" || node.ComponentName() == factorycomponent.OnWebhookTriggerName
+			return node.ComponentName() == "schedule" || isCustomAutomationEventTriggerNode(node)
 		}) {
 			for i := range nodes {
 				if !isFactoryAgentHarness(nodes[i].ComponentName()) {

@@ -114,6 +114,9 @@ func CreateFactoryCustomAutomation(
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to build custom automation")
 	}
+	if err := checkCustomAutomationIntegrationNodes(nodes); err != nil {
+		return nil, factoryErrorToStatus(err, "failed to create custom automation")
+	}
 	created, err := canvases.CreateCanvas(
 		ctx,
 		deps.Registry,
@@ -276,6 +279,9 @@ func UpdateFactoryCustomAutomation(
 		if err != nil {
 			return err
 		}
+		if err := checkCustomAutomationIntegrationNodes(nodes); err != nil {
+			return err
+		}
 		if legacyCustomStageGraph(canvas, live) {
 			nodes, edges = editCustomStageGraph(live, settings, nodes, edges)
 		}
@@ -310,10 +316,11 @@ func UpdateFactoryCustomAutomation(
 }
 
 type customAutomationTrigger struct {
-	Index     int
-	Mode      pb.FactoryCustomAutomation_StartMode
-	Schedule  *pb.FactoryCustomAutomation_Schedule
-	WebhookID string
+	Index       int
+	Mode        pb.FactoryCustomAutomation_StartMode
+	Schedule    *pb.FactoryCustomAutomation_Schedule
+	WebhookID   string
+	Integration *pb.FactoryCustomAutomation_IntegrationTrigger
 }
 
 type customAutomationSettings struct {
@@ -336,6 +343,15 @@ func (settings *customAutomationSettings) runsWithoutTask() bool {
 
 func (settings *customAutomationSettings) hasWebhookTrigger() bool {
 	return settings.hasTrigger(pb.FactoryCustomAutomation_START_MODE_WEBHOOK)
+}
+
+// Webhook and integration triggers start runs with no task.
+func (settings *customAutomationSettings) hasEventTrigger() bool {
+	return settings.hasWebhookTrigger() || settings.hasTrigger(pb.FactoryCustomAutomation_START_MODE_INTEGRATION)
+}
+
+func customAutomationEventTriggerMode(mode pb.FactoryCustomAutomation_StartMode) bool {
+	return mode == pb.FactoryCustomAutomation_START_MODE_WEBHOOK || mode == pb.FactoryCustomAutomation_START_MODE_INTEGRATION
 }
 
 // A custom stage line step starts from a Manual or task_enters_stage trigger.
@@ -460,6 +476,9 @@ func validateCustomAutomationRunContext(runsOnTask *bool, triggers []customAutom
 		if *runsOnTask && trigger.Mode == pb.FactoryCustomAutomation_START_MODE_WEBHOOK {
 			return invalidArgument("A webhook runs with no task.")
 		}
+		if *runsOnTask && trigger.Mode == pb.FactoryCustomAutomation_START_MODE_INTEGRATION {
+			return invalidArgument("An integration event runs with no task.")
+		}
 		if !*runsOnTask && (trigger.Mode == pb.FactoryCustomAutomation_START_MODE_AUTOMATIC ||
 			trigger.Mode == pb.FactoryCustomAutomation_START_MODE_ON_LEAVE) {
 			return invalidArgument("This trigger runs on a task.")
@@ -518,12 +537,14 @@ func parseCustomAutomationTriggers(
 	var onlySchedule *pb.FactoryCustomAutomation_Schedule
 	scheduledCount := 0
 	webhooks := map[string]bool{}
+	integrations := map[string]bool{}
 	hasAutomatic := false
 	hasLeave := false
 	hasManual := false
 	for index, trigger := range input.GetTriggers() {
 		mode := trigger.GetStartMode()
 		var schedule *pb.FactoryCustomAutomation_Schedule
+		var integration *pb.FactoryCustomAutomation_IntegrationTrigger
 		webhookID := ""
 		switch mode {
 		case pb.FactoryCustomAutomation_START_MODE_MANUAL:
@@ -553,10 +574,20 @@ func parseCustomAutomationTriggers(
 				return nil, 0, nil, invalidArgument("Choose each webhook once.")
 			}
 			webhooks[webhookID] = true
+		case pb.FactoryCustomAutomation_START_MODE_INTEGRATION:
+			parsed, key, err := parseCustomAutomationIntegrationTrigger(trigger.GetIntegration())
+			if err != nil {
+				return nil, 0, nil, err
+			}
+			if integrations[key] {
+				return nil, 0, nil, invalidArgument("Choose each integration event once.")
+			}
+			integrations[key] = true
+			integration = parsed
 		default:
-			return nil, 0, nil, invalidArgument("Choose Manual, Automatic, Schedule, Webhook, or When a task leaves the column.")
+			return nil, 0, nil, invalidArgument("Choose Manual, Automatic, Schedule, Webhook, Integration event, or When a task leaves the column.")
 		}
-		triggers = append(triggers, customAutomationTrigger{Index: index, Mode: mode, Schedule: schedule, WebhookID: webhookID})
+		triggers = append(triggers, customAutomationTrigger{Index: index, Mode: mode, Schedule: schedule, WebhookID: webhookID, Integration: integration})
 	}
 	if manualCount > 1 || automaticCount > 1 || leaveCount > 1 {
 		return nil, 0, nil, invalidArgument("Choose each event trigger once.")
@@ -570,6 +601,8 @@ func parseCustomAutomationTriggers(
 		startMode = pb.FactoryCustomAutomation_START_MODE_SCHEDULED
 	} else if len(webhooks) > 0 {
 		startMode = pb.FactoryCustomAutomation_START_MODE_WEBHOOK
+	} else if len(integrations) > 0 {
+		startMode = pb.FactoryCustomAutomation_START_MODE_INTEGRATION
 	} else if !hasManual {
 		startMode = pb.FactoryCustomAutomation_START_MODE_UNSPECIFIED
 	}
@@ -682,7 +715,7 @@ func buildCustomAutomationCanvas(
 	if workspaceScope {
 		repository = models.WorkspaceRepositoriesExpression
 	}
-	if len(settings.Triggers) > 1 || settings.hasWebhookTrigger() {
+	if len(settings.Triggers) > 1 || settings.hasEventTrigger() {
 		return buildMultiTriggerCustomAutomationCanvas(tx, factory, name, settings, repository, integrationID, provider, workspaceScope)
 	}
 	mode := customAutomationStartModeName(settings.StartMode)
@@ -877,6 +910,7 @@ func buildMultiTriggerCustomAutomationCanvas(
 	var taskIndexes []any
 	var schedules []customAutomationTrigger
 	var webhooks []customAutomationTrigger
+	var integrations []customAutomationTrigger
 	var columnManual []customAutomationTrigger
 	var verifyLeaves []customAutomationTrigger
 	for _, trigger := range settings.Triggers {
@@ -900,12 +934,14 @@ func buildMultiTriggerCustomAutomationCanvas(
 			taskIndexes = append(taskIndexes, trigger.Index)
 		case pb.FactoryCustomAutomation_START_MODE_WEBHOOK:
 			webhooks = append(webhooks, trigger)
+		case pb.FactoryCustomAutomation_START_MODE_INTEGRATION:
+			integrations = append(integrations, trigger)
 		default:
 			schedules = append(schedules, trigger)
 		}
 	}
 	hasTask := len(taskKinds) > 0
-	noTask := len(schedules) > 0 || len(webhooks) > 0
+	noTask := len(schedules) > 0 || len(webhooks) > 0 || len(integrations) > 0
 	hasAutomatic := false
 	hasManual := false
 	for _, kind := range taskKinds {
@@ -1006,6 +1042,11 @@ func buildMultiTriggerCustomAutomationCanvas(
 			nodes = append(nodes, node)
 			edges = append(edges, yaml.Edge{SourceID: node.ID, TargetID: scheduleRunnerID, Channel: "default"})
 		}
+		for offset, integration := range integrations {
+			node := customAutomationIntegrationNode(provider, settings, integration, 240+(len(schedules)+len(webhooks)+offset+1)*180)
+			nodes = append(nodes, node)
+			edges = append(edges, yaml.Edge{SourceID: node.ID, TargetID: scheduleRunnerID, Channel: "default"})
+		}
 		for _, manual := range columnManual {
 			nodes = append(nodes, yaml.Node{
 				ID:            customAutomationColumnStartID,
@@ -1099,9 +1140,11 @@ func buildMultiTriggerCustomAutomationCanvas(
 			if len(webhooks) > 0 {
 				appendWebhookPayloadInstructions(doc.Spec.Nodes[i].Configuration)
 				doc.Metadata.Description = "Run prompt and Bash steps when a webhook receives a request."
-				if backlog {
-					doc.Metadata.Description += " The agent creates a task."
-				}
+			} else if len(integrations) > 0 {
+				doc.Metadata.Description = "Run prompt and Bash steps when an integration sends an event."
+			}
+			if backlog && len(webhooks)+len(integrations) > 0 {
+				doc.Metadata.Description += " The agent creates a task."
 			}
 			break
 		}
@@ -1531,10 +1574,11 @@ func preserveCustomAutomationPRTriggerIdentity(previous *models.Node, doc *yaml.
 }
 
 type decodedCustomAutomationTrigger struct {
-	index     int
-	mode      pb.FactoryCustomAutomation_StartMode
-	schedule  *pb.FactoryCustomAutomation_Schedule
-	webhookID string
+	index       int
+	mode        pb.FactoryCustomAutomation_StartMode
+	schedule    *pb.FactoryCustomAutomation_Schedule
+	webhookID   string
+	integration *pb.FactoryCustomAutomation_IntegrationTrigger
 }
 
 func decodeCustomAutomationTriggers(nodes []models.Node) ([]decodedCustomAutomationTrigger, error) {
@@ -1554,6 +1598,18 @@ func decodeCustomAutomationTriggers(nodes []models.Node) ([]decodedCustomAutomat
 				index:     configInt(template, "triggerIndex"),
 				mode:      pb.FactoryCustomAutomation_START_MODE_WEBHOOK,
 				webhookID: configString(node.Configuration, "webhook"),
+			})
+			continue
+		}
+		if mode == customAutomationIntegrationMode {
+			integration, err := decodeCustomAutomationIntegrationTrigger(*node)
+			if err != nil {
+				return nil, fmt.Errorf("decode integration trigger: %w", err)
+			}
+			decoded = append(decoded, decodedCustomAutomationTrigger{
+				index:       configInt(template, "triggerIndex"),
+				mode:        pb.FactoryCustomAutomation_START_MODE_INTEGRATION,
+				integration: integration,
 			})
 			continue
 		}
@@ -1720,7 +1776,7 @@ func readCustomAutomationVersion(
 	if skipCheckout, ok := agent.Configuration[runner.SkipRepositoryCheckoutField].(bool); ok {
 		settings.SkipRepositoryCheckout = &skipCheckout
 	}
-	if len(triggers) == 1 && triggers[0].mode != pb.FactoryCustomAutomation_START_MODE_WEBHOOK {
+	if len(triggers) == 1 && !customAutomationEventTriggerMode(triggers[0].mode) {
 		settings.StartMode = triggers[0].mode
 		settings.Schedule = triggers[0].schedule
 	} else {
@@ -1729,12 +1785,12 @@ func readCustomAutomationVersion(
 		scheduled := 0
 		for _, trigger := range triggers {
 			settings.Triggers = append(settings.Triggers, &pb.FactoryCustomAutomation_StartTrigger{
-				StartMode: trigger.mode, Schedule: trigger.schedule, WebhookId: trigger.webhookID,
+				StartMode: trigger.mode, Schedule: trigger.schedule, WebhookId: trigger.webhookID, Integration: trigger.integration,
 			})
 			switch trigger.mode {
-			case pb.FactoryCustomAutomation_START_MODE_WEBHOOK:
+			case pb.FactoryCustomAutomation_START_MODE_WEBHOOK, pb.FactoryCustomAutomation_START_MODE_INTEGRATION:
 				if settings.StartMode == pb.FactoryCustomAutomation_START_MODE_MANUAL {
-					settings.StartMode = pb.FactoryCustomAutomation_START_MODE_WEBHOOK
+					settings.StartMode = trigger.mode
 				}
 			case pb.FactoryCustomAutomation_START_MODE_AUTOMATIC:
 				settings.StartMode = pb.FactoryCustomAutomation_START_MODE_AUTOMATIC
@@ -1855,6 +1911,8 @@ func customAutomationStartModeName(mode pb.FactoryCustomAutomation_StartMode) st
 		return "leave"
 	case pb.FactoryCustomAutomation_START_MODE_WEBHOOK:
 		return "webhook"
+	case pb.FactoryCustomAutomation_START_MODE_INTEGRATION:
+		return customAutomationIntegrationMode
 	default:
 		return "manual"
 	}
@@ -1866,6 +1924,8 @@ func customAutomationStartMode(mode string) pb.FactoryCustomAutomation_StartMode
 		return pb.FactoryCustomAutomation_START_MODE_SCHEDULED
 	case "webhook":
 		return pb.FactoryCustomAutomation_START_MODE_WEBHOOK
+	case customAutomationIntegrationMode:
+		return pb.FactoryCustomAutomation_START_MODE_INTEGRATION
 	case "automatic":
 		return pb.FactoryCustomAutomation_START_MODE_AUTOMATIC
 	case "leave":

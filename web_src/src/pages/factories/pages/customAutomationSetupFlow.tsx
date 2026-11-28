@@ -3,7 +3,11 @@ import { cn } from "@/lib/utils";
 import { GripVertical, MessageSquareText, Plus, Terminal, Trash2, Zap } from "lucide-react";
 import type { MouseEvent, MutableRefObject, ReactNode } from "react";
 
-import { type CustomAutomationColumn, type CustomAutomationTrigger } from "../lib/customAutomation";
+import {
+  customAutomationTriggerTitle as triggerTitle,
+  type CustomAutomationColumn,
+  type CustomAutomationTrigger,
+} from "../lib/customAutomation";
 import { mergeCheckPromptBody } from "./mergeConfidenceSteps";
 import type { PlanningReviewStep, PlanningReviewStepKind } from "./planningReviewMockup";
 import { useCustomAutomationStageLabel } from "./useCustomAutomationStageLabel";
@@ -220,20 +224,6 @@ function sidebarTriggerDescription(
     .join(", ");
 }
 
-function triggerTitle(
-  mode: CustomAutomationTrigger["mode"],
-  columnKey: CustomAutomationColumn,
-  stageLabel: string,
-): string {
-  if (mode === "scheduled") return "Schedule";
-  if (mode === "webhook") return "Webhook";
-  if (mode === "leave") return `When a task leaves ${stageLabel}`;
-  if (mode === "automatic") {
-    return columnKey === "verify" ? "Every pull request commit" : `When a task enters ${stageLabel}`;
-  }
-  return "Manual";
-}
-
 function triggerDescription(
   mode: CustomAutomationTrigger["mode"],
   columnKey: CustomAutomationColumn,
@@ -244,6 +234,7 @@ function triggerDescription(
     return columnKey === "backlog" ? "Run automation on a schedule." : "Runs on the repository default branch.";
   }
   if (mode === "webhook") return "Runs when a webhook receives a request.";
+  if (mode === "integration") return "Runs when an integration sends an event.";
   if (mode === "leave") {
     return `Runs when a task leaves ${stageLabel}.`;
   }

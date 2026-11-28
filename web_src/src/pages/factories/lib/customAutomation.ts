@@ -6,20 +6,81 @@ import type {
   OrganizationsIntegration,
   FactoryCustomAutomationStartTrigger,
   FactoryCustomAutomationStartMode,
+  FactoryCustomAutomationIntegrationTrigger,
 } from "@/api-client";
 
 import type { PlanningReviewDraft, PlanningReviewStep } from "../pages/planningReviewMockup";
 
 export const CUSTOM_AUTOMATION_TEMPLATE_ID = "custom-verification";
 
-export type CustomAutomationMode = "manual" | "automatic" | "scheduled" | "leave" | "webhook";
+export type CustomAutomationMode = "manual" | "automatic" | "scheduled" | "leave" | "webhook" | "integration";
 const CUSTOM_AUTOMATION_START_MODES: Record<CustomAutomationMode, FactoryCustomAutomationStartMode> = {
   manual: "START_MODE_MANUAL",
   automatic: "START_MODE_AUTOMATIC",
   scheduled: "START_MODE_SCHEDULED",
   leave: "START_MODE_ON_LEAVE",
   webhook: "START_MODE_WEBHOOK",
+  integration: "START_MODE_INTEGRATION",
 };
+
+const MERGE_ACTIONS: Record<string, string> = { "github.onPullRequest": "closed", "bitbucket.onPullRequest": "merged" };
+
+/**
+ * An integration trigger that listens for merged pull requests takes over the move on merge.
+ * The backend then keeps PR Closure from closing tasks in this stage.
+ */
+export function customAutomationListensForMerge(integration: FactoryCustomAutomationIntegrationTrigger): boolean {
+  const action = MERGE_ACTIONS[integration.trigger ?? ""];
+  const { actions, onlyFactoryPullRequests } = integration.configuration ?? {};
+  // Only factory pull request events carry the task that the automation moves.
+  return !!action && onlyFactoryPullRequests === true && Array.isArray(actions) && actions.includes(action);
+}
+
+const MERGE_CHECKS: Record<string, string> = {
+  "github.onPullRequest": "{{ root().data.pull_request.merged }}",
+  "bitbucket.onPullRequest": '{{ root().data.action == "merged" }}',
+};
+
+/** A Bash step that moves the task of a merged pull request to the next stage. */
+export function customAutomationMergeStep(integration: FactoryCustomAutomationIntegrationTrigger): PlanningReviewStep {
+  const merged = MERGE_CHECKS[integration.trigger ?? ""] ?? "true";
+  return {
+    name: "Move the task on merge",
+    type: "bash",
+    command: [
+      `if [ "${merged}" != "true" ]; then`,
+      '  echo "The pull request is not merged."',
+      "  exit 0",
+      "fi",
+      'superplane task move --task "{{ root().data.workOrder.key }}" --next',
+    ].join("\n"),
+  };
+}
+
+/**
+ * Adds the merge step when a trigger starts to listen for merges and the automation has no steps yet.
+ * Existing steps stay unchanged.
+ */
+export function withCustomAutomationMergeStep(
+  draft: PlanningReviewDraft,
+  triggers: CustomAutomationTrigger[],
+): PlanningReviewDraft {
+  const component = draft.components[0];
+  const steps = component?.configuration.steps;
+  if (!component || (Array.isArray(steps) && steps.length > 0)) return draft;
+  const merge = triggers.find(
+    (trigger) =>
+      trigger.mode === "integration" && trigger.integration && customAutomationListensForMerge(trigger.integration),
+  );
+  if (!merge?.integration) return draft;
+  const configuration = { ...component.configuration, steps: [customAutomationMergeStep(merge.integration)] };
+  return { ...draft, components: [{ ...component, configuration }, ...draft.components.slice(1)] };
+}
+
+/** Webhook and integration triggers start on an outside event and carry their own source settings. */
+export function isCustomAutomationEventMode(mode: CustomAutomationMode): boolean {
+  return mode === "webhook" || mode === "integration";
+}
 export type CustomAutomationSchedule = { cronExpression: string; utcOffset: number };
 export type CustomAutomationColumn = "backlog" | "implement" | "verify" | "done" | `custom-${string}`;
 
@@ -55,6 +116,7 @@ export type CustomAutomationTrigger = {
   mode: CustomAutomationMode;
   schedule: CustomAutomationSchedule;
   webhookId?: string;
+  integration?: FactoryCustomAutomationIntegrationTrigger;
 };
 
 export function newCustomAutomationTrigger(
@@ -68,8 +130,8 @@ export function newCustomAutomationTrigger(
 export function customAutomationTriggers(automation?: FactoriesFactoryCustomAutomation): CustomAutomationTrigger[] {
   const saved = automation?.settings?.triggers;
   if (saved && saved.length > 0) {
-    return saved.map((trigger) =>
-      newCustomAutomationTrigger(
+    return saved.map((trigger) => ({
+      ...newCustomAutomationTrigger(
         customAutomationMode(trigger.startMode),
         trigger.startMode === "START_MODE_SCHEDULED"
           ? {
@@ -79,7 +141,8 @@ export function customAutomationTriggers(automation?: FactoriesFactoryCustomAuto
           : customAutomationSchedule(),
         trigger.webhookId,
       ),
-    );
+      ...(trigger.integration ? { integration: trigger.integration } : {}),
+    }));
   }
   return [
     newCustomAutomationTrigger(
@@ -116,8 +179,8 @@ export function customAutomationRunsOnTask(
 }
 
 /**
- * A custom stage runs on a task. Its webhook triggers run with no task, so the automation keeps both.
- * A saved webhook-only value must not survive once the webhook is gone.
+ * A custom stage runs on a task. Its event triggers run with no task, so the automation keeps both.
+ * A saved event-only value must not survive once the event trigger is gone.
  */
 export function customAutomationRunContext(
   columnKey: CustomAutomationColumn,
@@ -125,7 +188,7 @@ export function customAutomationRunContext(
   runsOnTask: boolean | undefined,
 ): boolean | undefined {
   if (!columnKey.startsWith("custom-")) return runsOnTask;
-  return triggers.some((trigger) => trigger.mode === "webhook") ? undefined : true;
+  return triggers.some((trigger) => isCustomAutomationEventMode(trigger.mode)) ? undefined : true;
 }
 
 export function customAutomationTriggersForRun(
@@ -140,7 +203,7 @@ export function customAutomationTriggersForRun(
 }
 
 function runsWithoutTask(mode: CustomAutomationMode): boolean {
-  return mode === "scheduled" || mode === "webhook";
+  return mode === "scheduled" || isCustomAutomationEventMode(mode);
 }
 
 export function customAutomationSchedule(automation?: FactoriesFactoryCustomAutomation): CustomAutomationSchedule {
@@ -217,7 +280,23 @@ export function customAutomationMode(value: FactoryCustomAutomationStartMode | u
   if (value === "START_MODE_SCHEDULED") return "scheduled";
   if (value === "START_MODE_ON_LEAVE") return "leave";
   if (value === "START_MODE_WEBHOOK") return "webhook";
+  if (value === "START_MODE_INTEGRATION") return "integration";
   return value === "START_MODE_AUTOMATIC" ? "automatic" : "manual";
+}
+
+export function customAutomationTriggerTitle(
+  mode: CustomAutomationMode,
+  columnKey: CustomAutomationColumn,
+  stageLabel = customAutomationColumnLabel(columnKey),
+): string {
+  if (mode === "scheduled") return "Schedule";
+  if (mode === "webhook") return "Webhook";
+  if (mode === "integration") return "Integration event";
+  if (mode === "leave") return `When a task leaves ${stageLabel}`;
+  if (mode === "automatic") {
+    return columnKey === "verify" ? "Every pull request commit" : `When a task enters ${stageLabel}`;
+  }
+  return "Manual";
 }
 
 export function customAutomationModeCopy(
@@ -237,6 +316,12 @@ export function customAutomationModeCopy(
     return {
       trigger: "When a webhook receives a request",
       action: columnKey === "backlog" ? "Creates a task" : "Run automation with the request body",
+    };
+  }
+  if (mode === "integration") {
+    return {
+      trigger: "When an integration sends an event",
+      action: columnKey === "backlog" ? "Creates a task" : "Run automation with the event data",
     };
   }
   if (mode === "leave") {
@@ -414,11 +499,13 @@ export function customAutomationSettingsForTriggers(
         ? "scheduled"
         : current.some((trigger) => trigger.mode === "webhook")
           ? "webhook"
-          : "manual";
+          : current.some((trigger) => trigger.mode === "integration")
+            ? "integration"
+            : "manual";
   const settings = customAutomationSettings(primary, draft, icon, scheduled[0]?.schedule);
-  // A webhook trigger carries its webhook ID, so it always uses the trigger list.
+  // An event trigger carries its source settings, so it always uses the trigger list.
   const chosen =
-    current.length === 1 && current[0]!.mode !== "webhook"
+    current.length === 1 && !isCustomAutomationEventMode(current[0]!.mode)
       ? customAutomationSettings(current[0]!.mode, draft, icon, current[0]!.schedule)
       : {
           ...settings,
@@ -433,6 +520,7 @@ function triggerToApi(trigger: CustomAutomationTrigger): FactoryCustomAutomation
     startMode: CUSTOM_AUTOMATION_START_MODES[trigger.mode],
     schedule: trigger.mode === "scheduled" ? trigger.schedule : undefined,
     ...(trigger.mode === "webhook" ? { webhookId: trigger.webhookId ?? "" } : {}),
+    ...(trigger.mode === "integration" ? { integration: trigger.integration ?? {} } : {}),
   };
 }
 

@@ -869,6 +869,72 @@ func testUpdateWorkOrderStatusWhenAllPullRequestsDone(t *testing.T, provider str
 	assert.Equal(t, models.FactoryWorkOrderResultCompleted, updated.Result, "one merged pull request completes the task")
 }
 
+func TestFactoryContext_UpdateWorkOrderStatus_StageAutomationHandlesMerge(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	canvas, nodeExecution, run := setupFactoryAppExecution(t, r, factory.ID)
+	order, err := factory.CreateWorkOrder(database.Conn(), "Move on merge", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	linkRunToWorkOrder(t, r, factory, order.ID, run.ID)
+	ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+	_, _, err = ctx.UpdateWorkOrderStatus(core.UpdateWorkOrderStatusParams{OrderID: order.ID.String(), State: models.FactoryWorkOrderStateOpen})
+	require.NoError(t, err)
+
+	pullRequest, err := order.CreatePullRequest(database.Conn(), multiRepoPullRequestParams(models.FactoryPullRequestProviderGitHub, "acme/api", 1, models.FactoryPullRequestStateMerged))
+	require.NoError(t, err)
+	mergeEvent := map[string]any{
+		"action":       "closed",
+		"pull_request": map[string]any{"merged": true},
+		"pullRequest":  &core.PullRequest{ID: pullRequest.ID.String(), WorkOrderID: order.ID.String()},
+	}
+	emitMerge := func(column string) {
+		node := createStageMergeTrigger(t, r, factory.ID, column)
+		_, created, err := CreateFactoryPullRequestEvent(database.Conn(), node, "github.pullRequest", mergeEvent)
+		require.NoError(t, err)
+		require.True(t, created)
+	}
+
+	emitMerge(models.CanvasColumnKeyVerify)
+	handedOff, err := order.PullRequestMergeHandedOff(database.Conn())
+	require.NoError(t, err)
+	assert.False(t, handedOff, "an automation in another stage does not take over the task")
+
+	emitMerge(models.CanvasColumnKeyImplement)
+	closeWhenDone := core.UpdateWorkOrderStatusParams{
+		OrderID: order.ID.String(), State: models.FactoryWorkOrderStateClosed,
+		Result: models.FactoryWorkOrderResultCompleted, WhenAllPullRequestsDone: true,
+	}
+	updated, changed, err := ctx.UpdateWorkOrderStatus(closeWhenDone)
+	require.NoError(t, err)
+	assert.False(t, changed, "the stage automation moves a merged task")
+	assert.Equal(t, models.FactoryWorkOrderStateOpen, updated.State)
+
+	closedState := models.FactoryPullRequestStateClosed
+	require.NoError(t, pullRequest.Update(database.Conn(), models.FactoryPullRequestPatch{State: &closedState}))
+	updated, changed, err = ctx.UpdateWorkOrderStatus(closeWhenDone)
+	require.NoError(t, err)
+	assert.True(t, changed, "PR Closure still closes a task whose pull request closed without a merge")
+	assert.Equal(t, models.FactoryWorkOrderResultPRClosed, updated.Result)
+}
+
+func createStageMergeTrigger(t *testing.T, r *support.ResourceRegistry, factoryID uuid.UUID, column string) *models.CanvasNode {
+	metadata := models.FactoryAppTemplateMetadata(models.FactoryAppTemplateCustomAutomationID, 1)
+	metadata[models.FactoryAppTemplateMetadataKey].(map[string]any)["startMode"] = models.CustomAutomationIntegrationStartMode
+	automation, nodes := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{{
+		NodeID: "integration-merge", Name: "Integration event", Type: models.NodeTypeTrigger,
+		Ref:           datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "github.onPullRequest"}}),
+		Configuration: datatypes.NewJSONType(map[string]any{"repository": "acme/api", "actions": []any{"closed"}}),
+		Metadata:      datatypes.NewJSONType(metadata),
+	}}, nil)
+	require.NoError(t, database.Conn().Model(automation).Updates(map[string]any{
+		"factory_id": factoryID, "column_key": column,
+	}).Error)
+	return &nodes[0]
+}
+
 func TestFactoryContext_UpdateWorkOrderStatus_ExplicitCloseDoesNotWaitForPullRequests(t *testing.T) {
 	for _, provider := range []string{models.FactoryPullRequestProviderGitHub, models.FactoryPullRequestProviderBitbucket} {
 		t.Run(provider, func(t *testing.T) { testUpdateWorkOrderStatusExplicitClose(t, provider) })
