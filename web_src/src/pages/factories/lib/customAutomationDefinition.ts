@@ -21,7 +21,13 @@ type AutomationAgent = {
 type AutomationTrigger =
   | { id?: string; use: "manual" | "task_enters_stage" | "task_leaves_stage" | "pull_request_updated" }
   | { id?: string; use: "schedule"; config: { cron: string; utc_offset?: number } }
-  | { id?: string; use: "webhook"; config: { webhook_id: string } };
+  | { id?: string; use: "webhook"; config: { webhook_id: string } }
+  | { id?: string; use: "integration"; config: AutomationIntegrationConfig };
+type AutomationIntegrationConfig = {
+  integration_id: string;
+  trigger: string;
+  configuration?: Record<string, unknown>;
+};
 type AutomationStep = {
   name: string;
   bash?: string;
@@ -107,6 +113,9 @@ export function parseAutomationForCanvas(source: string, stage: CustomAutomation
   if (runsOnTask === true && triggers.some(({ use }) => use === "webhook")) {
     problem("runs_on_task", "A webhook runs with no task.");
   }
+  if (runsOnTask === true && triggers.some(({ use }) => use === "integration")) {
+    problem("runs_on_task", "An integration event runs with no task.");
+  }
   if (
     runsOnTask === false &&
     triggers.some(
@@ -148,6 +157,8 @@ function parseTrigger(value: unknown, path: string, stage: CustomAutomationColum
       return parseScheduleTrigger(trigger.config, id, path);
     case "webhook":
       return parseWebhookTrigger(trigger.config, id, path);
+    case "integration":
+      return parseIntegrationTrigger(trigger.config, id, path);
     case "pull_request_updated":
       if (stage !== "verify") problem(`${path}.use`, "This trigger requires Verify.");
       break;
@@ -160,7 +171,8 @@ function parseTrigger(value: unknown, path: string, stage: CustomAutomationColum
     default:
       problem(`${path}.use`, "Choose a supported trigger.");
   }
-  if (trigger.config !== undefined) problem(`${path}.config`, "Only schedule and webhook accept a configuration.");
+  if (trigger.config !== undefined)
+    problem(`${path}.config`, "Only schedule, webhook, and integration accept a configuration.");
   return { id, use: trigger.use };
 }
 
@@ -182,6 +194,26 @@ function parseWebhookTrigger(value: unknown, id: string | undefined, path: strin
   return { id, use: "webhook", config: { webhook_id: singleLine(config.webhook_id, `${path}.config.webhook_id`) } };
 }
 
+function parseIntegrationTrigger(value: unknown, id: string | undefined, path: string): AutomationTrigger {
+  const config = mapping(value, `${path}.config`, ["integration_id", "trigger", "configuration"]);
+  const { configuration } = config;
+  if (
+    configuration !== undefined &&
+    (!configuration || typeof configuration !== "object" || Array.isArray(configuration))
+  ) {
+    problem(`${path}.config.configuration`, "Enter a mapping.");
+  }
+  return {
+    id,
+    use: "integration",
+    config: {
+      integration_id: singleLine(config.integration_id, `${path}.config.integration_id`),
+      trigger: singleLine(config.trigger, `${path}.config.trigger`),
+      ...(configuration ? { configuration: configuration as Record<string, unknown> } : {}),
+    },
+  };
+}
+
 function validateTriggerIdentities(triggers: AutomationTrigger[]) {
   const ids = new Set<string>();
   const events = new Set<string>();
@@ -192,7 +224,7 @@ function validateTriggerIdentities(triggers: AutomationTrigger[]) {
     if (trigger.use === "webhook") {
       if (webhooks.has(trigger.config.webhook_id)) problem(`${path}.config.webhook_id`, "Use each webhook once.");
       webhooks.add(trigger.config.webhook_id);
-    } else if (use !== "schedule") {
+    } else if (use !== "schedule" && use !== "integration") {
       if (events.has(use)) problem(`${path}.use`, "Use this trigger once.");
       events.add(use);
     }
@@ -325,7 +357,7 @@ export function automationDefinitionCanvas(
 
 function automationDefinitionRunContext(definition: AutomationDefinition): boolean | undefined {
   if (definition.runs_on_task !== undefined) return definition.runs_on_task;
-  const withNoTask = ({ use }: AutomationTrigger) => use === "schedule" || use === "webhook";
+  const withNoTask = ({ use }: AutomationTrigger) => use === "schedule" || use === "webhook" || use === "integration";
   if (!definition.triggers.some(withNoTask)) return true;
   if (definition.triggers.every(withNoTask)) return false;
   // Keep both task and schedule triggers when the YAML already combines them.
@@ -339,8 +371,8 @@ function canvasTrigger(trigger: AutomationTrigger, index: number): CustomAutomat
     mode:
       trigger.use === "schedule"
         ? "scheduled"
-        : trigger.use === "webhook"
-          ? "webhook"
+        : trigger.use === "webhook" || trigger.use === "integration"
+          ? trigger.use
           : trigger.use === "manual"
             ? "manual"
             : trigger.use === "task_leaves_stage"
@@ -351,6 +383,15 @@ function canvasTrigger(trigger: AutomationTrigger, index: number): CustomAutomat
         ? { cronExpression: trigger.config.cron, utcOffset: trigger.config.utc_offset ?? 0 }
         : customAutomationSchedule(),
     ...(trigger.use === "webhook" ? { webhookId: trigger.config.webhook_id } : {}),
+    ...(trigger.use === "integration"
+      ? {
+          integration: {
+            integrationId: trigger.config.integration_id,
+            trigger: trigger.config.trigger,
+            configuration: trigger.config.configuration ?? {},
+          },
+        }
+      : {}),
   };
 }
 
@@ -358,8 +399,20 @@ export function automationDefinitionTriggers(
   triggers: CustomAutomationTrigger[],
   stage: CustomAutomationColumn,
 ): AutomationTrigger[] {
-  return triggers.map(({ publicId, mode, schedule, webhookId }) => {
+  return triggers.map(({ publicId, mode, schedule, webhookId, integration }) => {
     if (mode === "webhook") return { id: publicId, use: "webhook", config: { webhook_id: webhookId ?? "" } };
+    if (mode === "integration") {
+      const configuration = integration?.configuration ?? {};
+      return {
+        id: publicId,
+        use: "integration",
+        config: {
+          integration_id: integration?.integrationId ?? "",
+          trigger: integration?.trigger ?? "",
+          ...(Object.keys(configuration).length > 0 ? { configuration } : {}),
+        },
+      };
+    }
     if (mode === "scheduled") {
       return {
         id: publicId,

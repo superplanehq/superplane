@@ -49,7 +49,7 @@
           "$ref": "#/$defs/nonblank",
           "description": "Use a unique ID within the automation."
         },
-        "use": { "enum": ["manual", "task_enters_stage", "task_leaves_stage", "pull_request_updated", "schedule", "webhook"] },
+        "use": { "enum": ["manual", "task_enters_stage", "task_leaves_stage", "pull_request_updated", "schedule", "webhook", "integration"] },
         "config": true
       },
       "if": { "$ref": "#/$defs/isSchedule" },
@@ -57,11 +57,32 @@
       "else": {
         "if": { "$ref": "#/$defs/isWebhook" },
         "then": { "required": ["config"], "properties": { "config": { "$ref": "#/$defs/webhook" } } },
-        "else": { "properties": { "config": false } }
+        "else": {
+          "if": { "$ref": "#/$defs/isIntegration" },
+          "then": { "required": ["config"], "properties": { "config": { "$ref": "#/$defs/integration" } } },
+          "else": { "properties": { "config": false } }
+        }
       }
     },
     "isSchedule": { "type": "object", "properties": { "use": { "const": "schedule" } }, "required": ["use"] },
     "isWebhook": { "type": "object", "properties": { "use": { "const": "webhook" } }, "required": ["use"] },
+    "isIntegration": { "type": "object", "properties": { "use": { "const": "integration" } }, "required": ["use"] },
+    "integration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["integration_id", "trigger"],
+      "properties": {
+        "integration_id": {
+          "$ref": "#/$defs/nonblank",
+          "description": "Use the ID of an integration that is connected to the organization."
+        },
+        "trigger": {
+          "$ref": "#/$defs/nonblank",
+          "description": "Use the name of a trigger from the integration, for example github.onPullRequest."
+        },
+        "configuration": { "type": "object", "description": "Use the settings of the integration trigger." }
+      }
+    },
     "webhook": {
       "type": "object",
       "additionalProperties": false,
