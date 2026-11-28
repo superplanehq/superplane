@@ -57,6 +57,10 @@ export const setupApiInterceptor = (): void => {
     }
 
     if (response.status === 401) {
+      if (redirectForSso(response)) {
+        throw new Error("SSO required");
+      }
+
       if (skipUnauthorizedRedirect(input)) {
         return response;
       }
@@ -78,6 +82,21 @@ function requestURL(input: RequestInfo | URL): string {
 
 function requestPath(input: RequestInfo | URL): string {
   return new URL(requestURL(input), "http://localhost").pathname;
+}
+
+function redirectForSso(response: Response): boolean {
+  const ssoStart = response.headers.get("X-SuperPlane-SSO-Start");
+  if (!ssoStart) {
+    return false;
+  }
+  if (window.location.pathname.startsWith("/auth/sso/")) {
+    return true;
+  }
+  const redirectTarget = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+  const start = new URL(ssoStart, window.location.origin);
+  start.searchParams.set("redirect", redirectTarget);
+  window.location.href = `${start.pathname}${start.search}`;
+  return true;
 }
 
 function requestMethod(input: RequestInfo | URL, init?: RequestInit): string {

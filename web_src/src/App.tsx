@@ -40,6 +40,7 @@ import { RequirePermission } from "./components/PermissionGate";
 import { agentSectionRoute } from "./pages/factories/pages/settings/agentSectionRoutes";
 import { isFactoryAppConfigureMode } from "./pages/factories/lib/factoryAppCanvasCopy";
 import { Login } from "./pages/auth/Login";
+import { OrganizationSsoLogin } from "./pages/auth/sso/OrganizationSsoLogin";
 import { OrganizationOnboardingRedirect } from "./pages/auth/OrganizationOnboardingRedirect";
 import OwnerSetup from "./pages/auth/OwnerSetup";
 import { RootOrganizationRedirect } from "./pages/auth/RootOrganizationRedirect";
@@ -285,6 +286,7 @@ function AppRouter() {
             <GlobalCommandPalette />
             <Routes>
               <Route path="login" element={<Login />} />
+              <Route path="login/sso/:slug" element={<OrganizationSsoLogin />} />
               <Route path="signup" element={<Login mode="signup" />} />
               <Route path="welcome" element={withAuthOnly(WelcomeRedirect)} />
               <Route path="onboarding" element={withAuthOnly(OrganizationOnboardingRoute)} />

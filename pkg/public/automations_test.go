@@ -280,7 +280,7 @@ func automationAPITestServer(t *testing.T, resources *support.ResourceRegistry) 
 	signer := jwt.NewSigner("test-automation-api")
 	oidcProvider := support.NewOIDCProvider()
 	server, err := NewServer(resources.Encryptor, resources.Registry, signer, oidcProvider,
-		"", "http://localhost", "http://localhost", "test", "/app/templates", resources.AuthService, false)
+		"", "http://localhost", "http://localhost", "test", "/app/templates", resources.AuthService, false, nil)
 	require.NoError(t, err)
 	registerTestGRPCGateway(t, server, resources.AuthService, resources.Registry, resources.Encryptor, oidcProvider)
 	server.RegisterWebRoutes("")

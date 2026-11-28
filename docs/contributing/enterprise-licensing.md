@@ -93,6 +93,7 @@ The Enterprise features are:
 | `custom_roles`      | Create or update a custom role. Assign a custom role.                                                                        |
 | `groups`            | Create or update a group. Add a user to a group.                                                                             |
 | `github_enterprise` | Create or configure a GitHub integration with a host other than github.com. Create or install a private GitHub App on that host. |
+| `sso`               | Create or change an SSO connection. Activate the connection. Add or verify a domain. Create a SCIM token. Create a member through just-in-time sign-in. Create or reactivate a member through SCIM. |
 
 GitHub Enterprise Cloud requires only the license and an organization grant.
 github.com connections do not require this entitlement.
