@@ -347,6 +347,54 @@ func TestConnectionAndDomainRules(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestClientSecretChangeClearsTheTestResult(t *testing.T) {
+	f := newFlow(t)
+	f.verifyExample()
+
+	t.Run("draft connection refuses activation after a new secret", func(t *testing.T) {
+		conn := f.put(connectionInput(false))
+		f.markTested(conn)
+		input := connectionInput(false)
+		input.ClientSecret = "secret-2"
+		saved := f.put(input)
+		require.Nil(t, saved.LastTestedAt)
+		require.Empty(t, saved.LastTestResult)
+		require.Equal(t, models.SSOStatusDraft, saved.Status)
+		_, err := f.service.ActivateConnection(f.ctx(), f.r.Organization.ID)
+		require.ErrorContains(t, err, "Test the connection before you activate it.")
+	})
+
+	t.Run("active connection stays active and clears the test result", func(t *testing.T) {
+		input := connectionInput(false)
+		input.ClientSecret = "secret-1"
+		conn := f.put(input)
+		f.markTested(conn)
+		activated, err := f.service.ActivateConnection(f.ctx(), f.r.Organization.ID)
+		require.NoError(t, err)
+		require.Equal(t, models.SSOStatusActive, activated.Status)
+		input.ClientSecret = "secret-2"
+		saved := f.put(input)
+		require.Equal(t, models.SSOStatusActive, saved.Status)
+		require.Nil(t, saved.LastTestedAt)
+		require.Empty(t, saved.LastTestResult)
+	})
+
+	t.Run("the same secret or an empty secret keeps the test result", func(t *testing.T) {
+		input := connectionInput(false)
+		input.ClientSecret = "secret-1"
+		conn := f.put(input)
+		f.markTested(conn)
+		saved := f.put(input)
+		require.NotNil(t, saved.LastTestedAt)
+		require.NotEmpty(t, saved.LastTestResult)
+		input.ClientSecret = ""
+		saved = f.put(input)
+		require.NotNil(t, saved.LastTestedAt)
+		require.NotEmpty(t, saved.LastTestResult)
+		require.Equal(t, models.SSOStatusActive, saved.Status)
+	})
+}
+
 func TestDomainHeldByAnotherOrganization(t *testing.T) {
 	f := newFlow(t)
 	created, err := f.service.CreateDomain(f.ctx(), f.r.Organization.ID, f.r.Account.ID, "owned.example")

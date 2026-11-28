@@ -347,6 +347,11 @@ function ActivationRows({
         detail={
           <>
             {result ? <p className="text-[12px] leading-5 text-muted-foreground">{result}</p> : null}
+            {!result && !missingCredentials && model.connection?.status === "STATUS_ACTIVE" ? (
+              <p className="text-[12px] leading-5 text-muted-foreground">
+                This connection has no current test result. Test the connection again.
+              </p>
+            ) : null}
             {testFailure ? <p className="text-[12px] leading-5 text-muted-foreground">{testFailure}</p> : null}
             {missingCredentials ? (
               <p className="text-[12px] leading-5 text-muted-foreground">

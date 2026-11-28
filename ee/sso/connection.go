@@ -69,6 +69,7 @@ func (s *Service) PutConnection(ctx context.Context, orgID, accountID uuid.UUID,
 				return invalid("The client ID is required.")
 			}
 		}
+		storedSecret := append([]byte(nil), conn.ClientSecret...)
 		if err := s.applyInput(ctx, conn, normalized); err != nil {
 			return err
 		}
@@ -90,12 +91,16 @@ func (s *Service) PutConnection(ctx context.Context, orgID, accountID uuid.UUID,
 				return precondition("Delete this connection and create a new one before you change the subject claim.")
 			}
 		}
-		if previous.Issuer != next.Issuer || previous.ClientID != next.ClientID || previous.SubjectClaim != next.SubjectClaim {
+		identityChanged := previous.Issuer != next.Issuer || previous.ClientID != next.ClientID || previous.SubjectClaim != next.SubjectClaim
+		secretChanged := existing != nil && s.clientSecretChanged(ctx, storedSecret, normalized.ClientSecret)
+		if identityChanged || secretChanged {
 			conn.LastTestedAt = nil
 			conn.LastTestResult = nil
-			if conn.Status == models.SSOStatusActive {
-				conn.Status = models.SSOStatusDraft
-			}
+		}
+		// A new secret on an active connection does not stop sign-in.
+		// The issuer, client ID, and subject claim still return it to draft.
+		if identityChanged && conn.Status == models.SSOStatusActive {
+			conn.Status = models.SSOStatusDraft
 		}
 		if !conn.IDPLogoutEnabled {
 			if err := conn.ClearIdentityIDTokens(tx); err != nil {
@@ -279,6 +284,21 @@ func (s *Service) applyInput(ctx context.Context, conn *models.SSOConnection, in
 	}
 	conn.ClientSecret = encrypted
 	return nil
+}
+
+func (s *Service) clientSecretChanged(ctx context.Context, stored []byte, next string) bool {
+	secret := strings.TrimSpace(next)
+	if secret == "" {
+		return false
+	}
+	if len(stored) == 0 || s.Encryptor == nil {
+		return true
+	}
+	plain, err := s.Encryptor.Decrypt(ctx, stored, []byte(models.SSOClientSecretAssociatedData))
+	if err != nil {
+		return true
+	}
+	return string(plain) != secret
 }
 
 func requireProviderCredentials(conn *models.SSOConnection) error {

@@ -293,6 +293,18 @@ describe("SsoSettingsView", () => {
     expect(calls.onSave).toHaveBeenCalledWith(expect.objectContaining({ enforcement: "ENFORCEMENT_REQUIRED" }));
   });
 
+  it("asks for a new test when an active connection has no test result", () => {
+    renderSettings({
+      licensed: true,
+      domains: [verifiedDomain],
+      tokens: [],
+      connection: { ...draftConnection, status: "STATUS_ACTIVE" },
+    });
+    expect(
+      screen.getByText("This connection has no current test result. Test the connection again."),
+    ).toBeInTheDocument();
+  });
+
   it("shows the SCIM token once", () => {
     renderSettings({
       licensed: true,
