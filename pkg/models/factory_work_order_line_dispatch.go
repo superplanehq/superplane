@@ -548,15 +548,16 @@ func (l *FactoryWorkOrderLineDispatch) Finish(tx *gorm.DB, result string) error 
 // releases its parallelism slots and waiters move in. The caller must
 // publish those runs after commit.
 func (o *FactoryWorkOrder) AbandonActiveLineDispatch(tx *gorm.DB) ([]*FactoryLineStepResult, error) {
-	if err := o.dropQueuedLineWork(tx); err != nil {
-		return nil, err
-	}
-
 	dispatch, err := o.FindActiveLineDispatch(tx)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, nil
+			return nil, o.dropQueuedLineWork(tx)
 		}
+		return nil, err
+	}
+
+	// Queue cleanup can finish the dispatch while sibling executions still run.
+	if err := o.dropQueuedLineWork(tx); err != nil {
 		return nil, err
 	}
 

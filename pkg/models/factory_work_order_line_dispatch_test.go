@@ -528,9 +528,11 @@ func Test__FactoryWorkOrder__AbandonActiveLineDispatch__FreesTheStepSlot(t *test
 	require.NoError(t, err)
 
 	app, entrypoint := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "plan", "start-plan")
+	secondApp, secondEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "test", "start-test")
 	limit := 1
 	line, err := factory.CreateLine(db, "ship", []models.FactoryLineStep{
 		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entrypoint, MaxParallelism: &limit},
+		{Type: models.FactoryLineStepTypeRunApp, AppID: secondApp.ID, Entrypoint: secondEntry, MaxParallelism: &limit},
 	})
 	require.NoError(t, err)
 
@@ -543,14 +545,30 @@ func Test__FactoryWorkOrder__AbandonActiveLineDispatch__FreesTheStepSlot(t *test
 	_, err = queued.UpdateStatus(db, models.FactoryWorkOrderStatusUpdate{ToState: models.FactoryWorkOrderStateOpen})
 	require.NoError(t, err)
 
+	blocker, err := factory.CreateWorkOrder(db, "Block second step", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		_, _, dispatchErr := line.DispatchFrom(tx, blocker, 1)
+		return dispatchErr
+	}))
+
+	var runningDispatch *models.FactoryWorkOrderLineDispatch
 	var inFlight *models.FactoryWorkOrderExecution
 	var queuedDispatch *models.FactoryWorkOrderLineDispatch
 	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
-		_, result, dispatchErr := line.Dispatch(tx, running)
+		dispatch, result, dispatchErr := line.Dispatch(tx, running)
 		if dispatchErr != nil {
 			return dispatchErr
 		}
+		runningDispatch = dispatch
 		inFlight = result.Execution
+		sibling, queueErr := dispatch.EnqueueOrStartStep(tx, running, 1)
+		if queueErr != nil {
+			return queueErr
+		}
+		if sibling.QueueItem == nil {
+			return fmt.Errorf("expected the second step to wait for its slot")
+		}
 
 		var queuedErr error
 		var queuedResult *models.FactoryLineStepResult
@@ -581,6 +599,13 @@ func Test__FactoryWorkOrder__AbandonActiveLineDispatch__FreesTheStepSlot(t *test
 	require.NoError(t, err)
 	_, stillQueued := byDispatch[queuedDispatch.ID]
 	assert.False(t, stillQueued, "the freed slot must admit the waiting dispatch")
+
+	abandoned, err := models.FindWorkOrderLineDispatch(db, runningDispatch.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasRunResultCancelled, abandoned.Result)
+	byDispatch, err = models.ListFactoryWorkOrderQueueItemsByLineDispatchIDs(db, []uuid.UUID{runningDispatch.ID})
+	require.NoError(t, err)
+	assert.Empty(t, byDispatch, "abandon must remove queued siblings")
 
 	var admittedRun *models.CanvasRun
 	for _, result := range started {

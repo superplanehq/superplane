@@ -131,8 +131,20 @@ export function collectCustomStageRuns(
     const executions = dispatchStepRows(pickMostRecentDispatch(dispatches));
     const current = pickCurrentLineExecution(executions);
     if (!current || current.stageKey !== stageKey) continue;
-    const stageExecutions = executions.filter((execution) => execution.stageKey === stageKey);
-    const failed = stageExecutions.filter(
+    const latestByStep = new Map<number | undefined, WorkOrderStepRow>();
+    for (const execution of executions.filter((execution) => execution.stageKey === stageKey)) {
+      const latest = latestByStep.get(execution.stepIndex);
+      const attemptTime = Date.parse(execution.createdAt ?? "") || 0;
+      const latestTime = Date.parse(latest?.createdAt ?? "") || 0;
+      if (
+        !latest ||
+        attemptTime > latestTime ||
+        (attemptTime === latestTime && (execution.id ?? "") > (latest.id ?? ""))
+      ) {
+        latestByStep.set(execution.stepIndex, execution);
+      }
+    }
+    const failed = [...latestByStep.values()].filter(
       (execution) =>
         execution.state === "STATE_FINISHED" &&
         execution.result !== "RESULT_PASSED" &&

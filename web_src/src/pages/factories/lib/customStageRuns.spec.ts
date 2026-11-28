@@ -61,6 +61,49 @@ describe("collectCustomStageRuns", () => {
     expect(collectCustomStageRuns("line-1", "custom-qa", [task])[0]?.execution.id).toBe("execution-failed");
   });
 
+  it.each(["STATE_STARTED", "STATE_FINISHED"] as const)(
+    "ignores a failed attempt after its retry is %s while a sibling runs",
+    (retryState) => {
+      const now = Date.now();
+      const task: FactoriesWorkOrder = {
+        id: "wo-retry",
+        state: "STATE_OPEN",
+        lineDispatches: [
+          {
+            line: { id: "line-1" },
+            stepExecutions: [
+              {
+                id: "retry",
+                stepIndex: 0,
+                stageKey: "custom-qa",
+                state: retryState,
+                result: retryState === "STATE_FINISHED" ? "RESULT_PASSED" : "RESULT_UNKNOWN",
+                createdAt: new Date(now).toISOString(),
+              },
+              {
+                id: "old-failure",
+                stepIndex: 0,
+                stageKey: "custom-qa",
+                state: "STATE_FINISHED",
+                result: "RESULT_FAILED",
+                createdAt: new Date(now - 1000).toISOString(),
+              },
+              {
+                id: "sibling-running",
+                stepIndex: 1,
+                stageKey: "custom-qa",
+                state: "STATE_STARTED",
+                createdAt: new Date(now - 1000).toISOString(),
+              },
+            ],
+          },
+        ],
+      };
+
+      expect(collectCustomStageRuns("line-1", "custom-qa", [task])[0]?.execution.id).toBe("sibling-running");
+    },
+  );
+
   it("does not leave the task in its previous phase lane", () => {
     const task: FactoriesWorkOrder = {
       id: "wo-moving",
