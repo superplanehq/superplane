@@ -6,7 +6,6 @@ import (
 	"slices"
 	"strings"
 
-	factorycomponent "github.com/superplanehq/superplane/pkg/components/factory"
 	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
@@ -57,7 +56,7 @@ func buildCustomStageAutomationCanvas(tx *gorm.DB, factory *models.Factory, name
 			}), 80)}
 		doc.Spec.Edges = []yaml.Edge{{SourceID: "on-run", TargetID: customStageRunnerID, Channel: "default"}}
 	}
-	if !settings.hasWebhookTrigger() {
+	if !settings.hasEventTrigger() {
 		return doc, nil
 	}
 	webhookRunner := customAutomationRunnerNode(customStageWebhookRunnerID, "Run webhook", settings,
@@ -65,21 +64,30 @@ func buildCustomStageAutomationCanvas(tx *gorm.DB, factory *models.Factory, name
 			customAutomationCheckoutEnvironment(factory, pb.FactoryCustomAutomation_START_MODE_SCHEDULED, githubHostForFactory(tx, factory), false),
 		), 480)
 	markNoTaskRunner(&webhookRunner, provider, settings.Icon)
-	appendWebhookPayloadInstructions(webhookRunner.Configuration)
+	if settings.hasWebhookTrigger() {
+		appendWebhookPayloadInstructions(webhookRunner.Configuration)
+	}
 	doc.Spec.Nodes = append(doc.Spec.Nodes, webhookRunner)
 	offset := 0
 	for _, trigger := range settings.Triggers {
-		if trigger.Mode != pb.FactoryCustomAutomation_START_MODE_WEBHOOK {
+		if !customAutomationEventTriggerMode(trigger.Mode) {
 			continue
 		}
 		offset++
 		node := customAutomationWebhookNode(provider, settings, trigger, 80+offset*180)
+		if trigger.Mode == pb.FactoryCustomAutomation_START_MODE_INTEGRATION {
+			node = customAutomationIntegrationNode(provider, settings, trigger, 80+offset*180)
+		}
 		doc.Spec.Nodes = append(doc.Spec.Nodes, node)
 		doc.Spec.Edges = append(doc.Spec.Edges, yaml.Edge{SourceID: node.ID, TargetID: customStageWebhookRunnerID, Channel: "default"})
 	}
-	doc.Metadata.Description = "Run prompt and Bash steps when a webhook receives a request."
+	event := "a webhook receives a request"
+	if !settings.hasWebhookTrigger() {
+		event = "an integration sends an event"
+	}
+	doc.Metadata.Description = "Run prompt and Bash steps when " + event + "."
 	if settings.hasLineTrigger() {
-		doc.Metadata.Description = "Run prompt and Bash steps on a task in the stage or when a webhook receives a request."
+		doc.Metadata.Description = "Run prompt and Bash steps on a task in the stage or when " + event + "."
 	}
 	return doc, nil
 }
@@ -90,13 +98,13 @@ func validateCustomStageTriggers(settings *customAutomationSettings) error {
 		switch trigger.Mode {
 		case pb.FactoryCustomAutomation_START_MODE_AUTOMATIC:
 			automatic++
-		case pb.FactoryCustomAutomation_START_MODE_MANUAL, pb.FactoryCustomAutomation_START_MODE_WEBHOOK:
+		case pb.FactoryCustomAutomation_START_MODE_MANUAL, pb.FactoryCustomAutomation_START_MODE_WEBHOOK, pb.FactoryCustomAutomation_START_MODE_INTEGRATION:
 		default:
-			return invalidArgument("Custom stage automations support only Manual, task_enters_stage, and webhook triggers.")
+			return invalidArgument("Custom stage automations support only Manual, task_enters_stage, webhook, and integration triggers.")
 		}
 	}
 	if automatic > 1 || len(settings.Triggers) == 0 || settings.runsWithoutTask() {
-		return invalidArgument("Custom stage automations need a Manual trigger, one task_enters_stage trigger, or a webhook trigger.")
+		return invalidArgument("Custom stage automations need a Manual trigger, one task_enters_stage trigger, a webhook trigger, or an integration trigger.")
 	}
 	return nil
 }
@@ -106,12 +114,12 @@ func validateCustomStageTriggers(settings *customAutomationSettings) error {
 func applyCustomStageTriggerMetadata(template map[string]any, settings *customAutomationSettings) {
 	kinds := make([]any, 0, len(settings.Triggers))
 	for _, trigger := range settings.Triggers {
-		if trigger.Mode != pb.FactoryCustomAutomation_START_MODE_WEBHOOK {
+		if !customAutomationEventTriggerMode(trigger.Mode) {
 			kinds = append(kinds, customAutomationStartModeName(trigger.Mode))
 		}
 	}
 	mode := settings.StartMode
-	if mode == pb.FactoryCustomAutomation_START_MODE_WEBHOOK || mode == pb.FactoryCustomAutomation_START_MODE_UNSPECIFIED {
+	if customAutomationEventTriggerMode(mode) || mode == pb.FactoryCustomAutomation_START_MODE_UNSPECIFIED {
 		mode = pb.FactoryCustomAutomation_START_MODE_MANUAL
 		if settings.hasTrigger(pb.FactoryCustomAutomation_START_MODE_AUTOMATIC) {
 			mode = pb.FactoryCustomAutomation_START_MODE_AUTOMATIC
@@ -308,7 +316,7 @@ func customStageCore(version *models.CanvasVersion) *models.CanvasVersion {
 
 func customStageWebhookPart(node models.Node) bool {
 	return node.ID == customStageWebhookRunnerID || strings.HasPrefix(node.ID, customStageWebhookRunnerID+"-") ||
-		node.ComponentName() == factorycomponent.OnWebhookTriggerName
+		isCustomAutomationEventTriggerNode(node)
 }
 
 func checkCustomStageFormGraph(tx *gorm.DB, factory *models.Factory, canvas *models.Canvas, version *models.CanvasVersion) error {

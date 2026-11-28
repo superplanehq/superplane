@@ -19,6 +19,7 @@ import {
   customAutomationTriggersForRun,
   DEFAULT_CUSTOM_AUTOMATION_ICON,
   newCustomAutomationTrigger,
+  withCustomAutomationMergeStep,
   type CustomAutomationColumn,
   type CustomAutomationTrigger,
 } from "../lib/customAutomation";
@@ -82,25 +83,9 @@ export function useCustomAutomationSetupPage(args: {
   const runContext = customAutomationRunContext(columnKey, triggers, runsOnTask);
 
   const save = async () => {
-    const activeTriggers = customAutomationTriggersForRun(triggers, runContext);
-    if (activeTriggers.length === 0) {
-      setSaveError("Add at least one trigger.");
-      return false;
-    }
-    const invalidSchedule = activeTriggers.some(
-      (trigger) =>
-        trigger.mode === "scheduled" &&
-        (!trigger.schedule.cronExpression.trim() ||
-          !Number.isFinite(trigger.schedule.utcOffset) ||
-          trigger.schedule.utcOffset < -12 ||
-          trigger.schedule.utcOffset > 14),
-    );
-    if (invalidSchedule) {
-      setSaveError("Enter a cron expression and choose a timezone.");
-      return false;
-    }
-    if (activeTriggers.some((trigger) => trigger.mode === "webhook" && !trigger.webhookId)) {
-      setSaveError("Select a webhook for each webhook trigger.");
+    const triggerError = validateTriggers(customAutomationTriggersForRun(triggers, runContext));
+    if (triggerError) {
+      setSaveError(triggerError);
       return false;
     }
     if (validationError) {
@@ -132,7 +117,10 @@ export function useCustomAutomationSetupPage(args: {
     name,
     setName,
     triggers,
-    setTriggers,
+    setTriggers: (next: CustomAutomationTrigger[]) => {
+      setTriggers(next);
+      setDraft((current) => withCustomAutomationMergeStep(current, next));
+    },
     runsOnTask: runContext,
     setRunsOnTask,
     icon,
@@ -172,6 +160,27 @@ function saveFallback(editing: boolean): string {
   return editing
     ? "SuperPlane could not save the automation. Try again."
     : "SuperPlane could not create the automation. Try again.";
+}
+
+function validateTriggers(triggers: CustomAutomationTrigger[]): string {
+  if (triggers.length === 0) return "Add at least one trigger.";
+  const invalidSchedule = triggers.some(
+    (trigger) =>
+      trigger.mode === "scheduled" &&
+      (!trigger.schedule.cronExpression.trim() ||
+        !Number.isFinite(trigger.schedule.utcOffset) ||
+        trigger.schedule.utcOffset < -12 ||
+        trigger.schedule.utcOffset > 14),
+  );
+  if (invalidSchedule) return "Enter a cron expression and choose a timezone.";
+  if (triggers.some((trigger) => trigger.mode === "webhook" && !trigger.webhookId)) {
+    return "Select a webhook for each webhook trigger.";
+  }
+  const incompleteIntegration = triggers.some(
+    (trigger) =>
+      trigger.mode === "integration" && (!trigger.integration?.integrationId || !trigger.integration.trigger),
+  );
+  return incompleteIntegration ? "Select an integration and an event for each integration trigger." : "";
 }
 
 function validateDraft(name: string, draft: PlanningReviewDraft): string {

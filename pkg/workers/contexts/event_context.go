@@ -85,6 +85,15 @@ func (s *EventContext) emit(payloadType string, payload any, dedupKey string) er
 	return nil
 }
 
+func isCustomAutomationIntegrationTrigger(node *models.CanvasNode) bool {
+	if node == nil || node.Type != models.NodeTypeTrigger {
+		return false
+	}
+	template, _ := node.Metadata.Data()[models.FactoryAppTemplateMetadataKey].(map[string]any)
+	startMode, _ := template["startMode"].(string)
+	return startMode == models.CustomAutomationIntegrationStartMode
+}
+
 func customAutomationWebhookPolicy(tx *gorm.DB, node *models.CanvasNode, payloadType string, payload any) (string, bool) {
 	if node == nil || node.Type != models.NodeTypeTrigger ||
 		(payloadType != "github.pullRequest" && payloadType != "bitbucket.pullRequest") {
@@ -94,7 +103,8 @@ func customAutomationWebhookPolicy(tx *gorm.DB, node *models.CanvasNode, payload
 	template, _ := node.Metadata.Data()[models.FactoryAppTemplateMetadataKey].(map[string]any)
 	templateID, _ := template["id"].(string)
 	startMode, _ := template["startMode"].(string)
-	if templateID != models.FactoryAppTemplateCustomAutomationID {
+	// An integration trigger receives every event that its own configuration accepts.
+	if templateID != models.FactoryAppTemplateCustomAutomationID || startMode == models.CustomAutomationIntegrationStartMode {
 		return "", false
 	}
 	if startMode != "automatic" {

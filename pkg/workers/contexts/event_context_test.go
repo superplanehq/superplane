@@ -115,4 +115,21 @@ func Test__EventContext__Emit(t *testing.T) {
 		require.NoError(t, ctx.Emit("test.payload", map[string]any{"n": 1}))
 		support.VerifyCanvasEventsCount(t, canvas.ID, 0)
 	})
+
+	t.Run("custom automation pull request events start only automatic and integration triggers", func(t *testing.T) {
+		for startMode, emitted := range map[string]int{"manual": 0, models.CustomAutomationIntegrationStartMode: 1} {
+			metadata := models.FactoryAppTemplateMetadata(models.FactoryAppTemplateCustomAutomationID, 1)
+			metadata[models.FactoryAppTemplateMetadataKey].(map[string]any)["startMode"] = startMode
+			canvas, nodes := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{{
+				NodeID: triggerNodeID, Name: triggerNodeID, Type: models.NodeTypeTrigger,
+				Ref:           datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "github.onPullRequest"}}),
+				Configuration: datatypes.NewJSONType(map[string]any{}),
+				Metadata:      datatypes.NewJSONType(metadata),
+			}}, nil)
+
+			ctx := NewEventContext(database.Conn(), &nodes[0], nil, nil)
+			require.NoError(t, ctx.Emit("github.pullRequest", map[string]any{"action": "closed"}))
+			support.VerifyCanvasEventsCount(t, canvas.ID, emitted)
+		}
+	})
 }

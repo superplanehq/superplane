@@ -47,7 +47,8 @@ func CreateFactoryPullRequestEvent(tx *gorm.DB, node *models.CanvasNode, payload
 		switch {
 		case key != "":
 			created, err = node.CreateDeduplicatedRootEvent(tx, event, key)
-		case (payloadType == "github.pullRequest" || payloadType == "bitbucket.pullRequest") && node.Type == models.NodeTypeTrigger && node.ComponentName() == strings.TrimSuffix(payloadType, ".pullRequest")+".onPullRequest":
+		case (payloadType == "github.pullRequest" || payloadType == "bitbucket.pullRequest") && node.Type == models.NodeTypeTrigger && node.ComponentName() == strings.TrimSuffix(payloadType, ".pullRequest")+".onPullRequest" &&
+			!isCustomAutomationIntegrationTrigger(node):
 			created, err = node.CreatePullRequestChecksEvent(tx, event)
 		default:
 			created, err = true, tx.Create(event).Error

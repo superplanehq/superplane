@@ -144,7 +144,7 @@ func importAutomationCanvas(tx *gorm.DB, factory *models.Factory, canvas *models
 		return "", unrepresentableAutomationCanvas()
 	}
 	hasSchedule := slices.ContainsFunc(definition.Triggers, func(trigger automationspec.Trigger) bool {
-		return trigger.Use == automationspec.Scheduled || trigger.Use == automationspec.Webhook
+		return trigger.Use == automationspec.Scheduled || trigger.Use == automationspec.Webhook || trigger.Use == automationspec.IntegrationEvent
 	})
 	if hasSchedule || (*canvas.ColumnKey == models.CanvasColumnKeyBacklog && settings.RunsOnTask != nil && !*settings.RunsOnTask) {
 		stripCustomAutomationBacklogPrompt(settings.Steps)
@@ -257,6 +257,15 @@ func legacyAutomationTriggers(stage string, nodes []models.Node) ([]automationsp
 				Use:    automationspec.Webhook,
 				Config: &automationspec.TriggerConfig{WebhookID: trigger.webhookID},
 			})
+		case pb.FactoryCustomAutomation_START_MODE_INTEGRATION:
+			result = append(result, automationspec.Trigger{
+				Use: automationspec.IntegrationEvent,
+				Config: &automationspec.TriggerConfig{
+					IntegrationID: trigger.integration.GetIntegrationId(),
+					Trigger:       trigger.integration.GetTrigger(),
+					Configuration: trigger.integration.GetConfiguration().AsMap(),
+				},
+			})
 		}
 	}
 	return result, nil
@@ -306,6 +315,9 @@ func equalAutomationExecutionGraph(live *models.CanvasVersion, expected *yaml.Ca
 }
 
 func generatedTriggerKey(node models.Node) string {
+	if isCustomAutomationIntegrationNode(node) {
+		return ""
+	}
 	switch node.ComponentName() {
 	case "schedule":
 		template, _ := node.Metadata[models.FactoryAppTemplateMetadataKey].(map[string]any)

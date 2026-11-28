@@ -439,7 +439,7 @@ it("replaces custom-stage entry with Manual and reopens the saved trigger", asyn
   try {
     const view = render(<Editor columnKey="custom-qa" />);
     await user.click(screen.getByRole("button", { name: "Add trigger" }));
-    expect(screen.getAllByRole("menuitem")).toHaveLength(3);
+    expect(screen.getAllByRole("menuitem")).toHaveLength(4);
     await user.click(screen.getByRole("menuitem", { name: /Manual/ }));
     await user.click(screen.getByRole("button", { name: /Remove When a task enters/ }));
     await user.click(screen.getByRole("button", { name: "Save" }));

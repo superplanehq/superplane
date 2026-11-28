@@ -718,6 +718,15 @@ func (c *FactoryContext) UpdateWorkOrderStatus(params core.UpdateWorkOrderStatus
 		if !done {
 			return workOrderToCore(order), false, nil
 		}
+		if pullRequestResult == models.FactoryWorkOrderResultCompleted {
+			handled, err := order.StageHandlesPullRequestMerge(c.tx)
+			if err != nil {
+				return nil, false, err
+			}
+			if handled {
+				return workOrderToCore(order), false, nil
+			}
+		}
 		result = pullRequestResult
 	}
 	leftColumn, leftErr := models.WorkOrderBoardColumn(c.tx, order)
