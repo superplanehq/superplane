@@ -158,3 +158,42 @@ describe("webhook trigger conversion", () => {
     expect(() => parseAutomationForCanvas(automationDefinitionYaml(definition), stage)).toThrow(path);
   });
 });
+
+describe("integration trigger conversion", () => {
+  const integrationDefinition = (): AutomationDefinition => ({
+    ...newAutomationDefinition("verify"),
+    triggers: [
+      {
+        id: "merge",
+        use: "integration",
+        config: {
+          integration_id: "github-1",
+          trigger: "github.onPullRequest",
+          configuration: { repository: "acme/app", actions: ["closed"] },
+        },
+      },
+    ],
+  });
+
+  it("preserves the integration, event, and settings and runs with no task", () => {
+    const definition = integrationDefinition();
+    const visual = automationDefinitionCanvas(parseAutomationForCanvas(automationDefinitionYaml(definition), "verify"));
+    expect(visual.runsOnTask).toBe(false);
+    expect(visual.triggers[0]).toEqual(
+      expect.objectContaining({
+        mode: "integration",
+        integration: {
+          integrationId: "github-1",
+          trigger: "github.onPullRequest",
+          configuration: { repository: "acme/app", actions: ["closed"] },
+        },
+      }),
+    );
+    expect(automationDefinitionTriggers(visual.triggers, "verify")).toEqual(definition.triggers);
+  });
+
+  it("rejects an integration trigger that runs on a task", () => {
+    const source = automationDefinitionYaml({ ...integrationDefinition(), runs_on_task: true });
+    expect(() => parseAutomationForCanvas(source, "verify")).toThrow("runs_on_task");
+  });
+});

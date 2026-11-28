@@ -10,6 +10,7 @@ import {
   GitCommitHorizontal,
   LogOut,
   MousePointerClick,
+  Plug,
   Plus,
   Trash2,
   Webhook,
@@ -18,13 +19,14 @@ import { useState } from "react";
 
 import {
   AUTOMATION_ICONS,
-  customAutomationColumnLabel,
   customAutomationTriggersForRun,
+  customAutomationTriggerTitle as triggerTitle,
   newCustomAutomationTrigger,
   type CustomAutomationColumn,
   type CustomAutomationMode,
   type CustomAutomationTrigger,
 } from "../lib/customAutomation";
+import { CustomAutomationIntegrationTriggerFields } from "./CustomAutomationIntegrationTriggerFields";
 import { CustomAutomationScheduleFields } from "./CustomAutomationScheduleFields";
 import { CustomAutomationWebhookFields } from "./CustomAutomationWebhookFields";
 import { PlanningReviewForm } from "./PlanningReviewForm";
@@ -122,6 +124,7 @@ export function TriggerEditor({
             }}
             onScheduleChange={(schedule) => updateTrigger(trigger.id, { ...trigger, schedule })}
             onWebhookChange={(webhookId) => updateTrigger(trigger.id, { ...trigger, webhookId })}
+            onIntegrationChange={(integration) => updateTrigger(trigger.id, { ...trigger, integration })}
             organizationId={organizationId}
             factoryId={factoryId}
             factoryKey={factoryKey}
@@ -206,6 +209,7 @@ function TriggerCard({
   onRemove,
   onScheduleChange,
   onWebhookChange,
+  onIntegrationChange,
   organizationId,
   factoryId,
   factoryKey,
@@ -219,6 +223,7 @@ function TriggerCard({
   onRemove: () => void;
   onScheduleChange: (schedule: CustomAutomationTrigger["schedule"]) => void;
   onWebhookChange: (webhookId: string) => void;
+  onIntegrationChange: (integration: CustomAutomationTrigger["integration"]) => void;
   organizationId: string;
   factoryId: string;
   factoryKey: string;
@@ -277,6 +282,14 @@ function TriggerCard({
                 .map((item) => item.webhookId!)}
               onChange={onWebhookChange}
             />
+          ) : trigger.mode === "integration" ? (
+            <CustomAutomationIntegrationTriggerFields
+              idPrefix={trigger.id}
+              organizationId={organizationId}
+              factoryId={factoryId}
+              value={trigger.integration}
+              onChange={onIntegrationChange}
+            />
           ) : (
             <CustomAutomationScheduleFields
               embedded
@@ -307,8 +320,8 @@ function TriggerContext({
     return (
       <p className="text-xs text-muted-foreground">
         {triggers.some((trigger) => trigger.mode === "automatic" || trigger.mode === "manual")
-          ? "This automation runs on a task in this stage. Every required automation must pass before the task advances. A webhook can also start it with no task."
-          : "A webhook starts this automation with no task. Tasks wait in this stage only when auto advance is off. A webhook run can move them."}
+          ? "This automation runs on a task in this stage. Every required automation must pass before the task advances. A webhook or an integration event can also start it with no task."
+          : "A webhook or an integration event starts this automation with no task. Tasks wait in this stage only when auto advance is off. An event run can move them."}
       </p>
     );
   }
@@ -379,18 +392,18 @@ function AutomationIconPicker({ icon, onChange }: { icon: string; onChange: (ico
   );
 }
 
-/** A custom stage starts from Manual, its line trigger, webhooks, or a mix. Other stages offer every trigger for the run context. */
+/** A custom stage starts from Manual, its line trigger, outside events, or a mix. Other stages offer every trigger for the run context. */
 function availableTriggerModes(columnKey: CustomAutomationColumn, runsOnTask?: boolean): CustomAutomationMode[] {
-  if (columnKey.startsWith("custom-")) return ["manual", "automatic", "webhook"];
+  if (columnKey.startsWith("custom-")) return ["manual", "automatic", "webhook", "integration"];
   const modes: CustomAutomationMode[] = ["manual"];
   if (runsOnTask !== false) modes.push("automatic", "leave");
-  if (runsOnTask !== true) modes.push("scheduled", "webhook");
+  if (runsOnTask !== true) modes.push("scheduled", "webhook", "integration");
   return modes;
 }
 
-/** Schedules and webhooks can repeat with different settings. Event triggers cannot. */
+/** Schedules, webhooks, and integration events can repeat with different settings. Task triggers cannot. */
 function repeatableTriggerMode(mode: CustomAutomationMode): boolean {
-  return mode === "scheduled" || mode === "webhook";
+  return mode === "scheduled" || mode === "webhook" || mode === "integration";
 }
 
 function removeTriggerLabel(
@@ -405,20 +418,6 @@ function removeTriggerLabel(
     return `Remove ${title}`;
   }
   return `Remove ${title} ${sameType.findIndex((item) => item.id === trigger.id) + 1}`;
-}
-
-function triggerTitle(
-  mode: CustomAutomationMode,
-  columnKey: CustomAutomationColumn,
-  stageLabel = customAutomationColumnLabel(columnKey),
-): string {
-  if (mode === "scheduled") return "Schedule";
-  if (mode === "webhook") return "Webhook";
-  if (mode === "leave") return `When a task leaves ${stageLabel}`;
-  if (mode === "automatic") {
-    return columnKey === "verify" ? "Every pull request commit" : `When a task enters ${stageLabel}`;
-  }
-  return "Manual";
 }
 
 function TriggerOption({
@@ -437,11 +436,13 @@ function TriggerOption({
       ? AlarmClock
       : mode === "webhook"
         ? Webhook
-        : mode === "leave"
-          ? LogOut
-          : automatic
-            ? GitCommitHorizontal
-            : MousePointerClick;
+        : mode === "integration"
+          ? Plug
+          : mode === "leave"
+            ? LogOut
+            : automatic
+              ? GitCommitHorizontal
+              : MousePointerClick;
   return (
     <span className="flex min-w-0 items-center gap-3 text-left">
       <span
@@ -459,19 +460,21 @@ function TriggerOption({
         <span className="text-xs font-normal text-muted-foreground">
           {mode === "webhook"
             ? "Runs when a webhook receives a request."
-            : mode === "scheduled"
-              ? columnKey === "backlog"
-                ? "Run automation on a schedule."
-                : "Runs on the repository default branch."
-              : mode === "leave"
-                ? `Runs when a task leaves ${stageLabel}.`
-                : automatic
-                  ? columnKey === "verify"
-                    ? "Runs after each new commit."
-                    : `Runs when a task enters ${stageLabel}.`
-                  : runsOnTask
-                    ? "A person starts each run from a task."
-                    : "A person starts each run from the column."}
+            : mode === "integration"
+              ? "Runs when an integration sends an event, for example a merged pull request."
+              : mode === "scheduled"
+                ? columnKey === "backlog"
+                  ? "Run automation on a schedule."
+                  : "Runs on the repository default branch."
+                : mode === "leave"
+                  ? `Runs when a task leaves ${stageLabel}.`
+                  : automatic
+                    ? columnKey === "verify"
+                      ? "Runs after each new commit."
+                      : `Runs when a task enters ${stageLabel}.`
+                    : runsOnTask
+                      ? "A person starts each run from a task."
+                      : "A person starts each run from the column."}
         </span>
       </span>
     </span>

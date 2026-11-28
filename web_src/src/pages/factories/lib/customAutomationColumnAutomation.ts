@@ -94,6 +94,9 @@ function primaryCustomAutomationMode(
   if (listed.some((trigger) => trigger.mode === "webhook")) {
     return "webhook";
   }
+  if (listed.some((trigger) => trigger.mode === "integration")) {
+    return "integration";
+  }
   return saved ?? "manual";
 }
 

@@ -48,14 +48,18 @@ const (
 	PullRequestUpdated TriggerUse = "pull_request_updated"
 	Scheduled          TriggerUse = "schedule"
 	Webhook            TriggerUse = "webhook"
+	IntegrationEvent   TriggerUse = "integration"
 )
 
-// TriggerConfig holds the schedule fields or the webhook ID. The schema
-// allows only the fields for the trigger type.
+// TriggerConfig holds the schedule fields, the webhook ID, or the integration
+// trigger. The schema allows only the fields for the trigger type.
 type TriggerConfig struct {
-	Cron      string  `yaml:"cron,omitempty" json:"cron,omitempty"`
-	UTCOffset float64 `yaml:"utc_offset,omitempty" json:"utc_offset"`
-	WebhookID string  `yaml:"webhook_id,omitempty" json:"webhook_id,omitempty"`
+	Cron          string         `yaml:"cron,omitempty" json:"cron,omitempty"`
+	UTCOffset     float64        `yaml:"utc_offset,omitempty" json:"utc_offset"`
+	WebhookID     string         `yaml:"webhook_id,omitempty" json:"webhook_id,omitempty"`
+	IntegrationID string         `yaml:"integration_id,omitempty" json:"integration_id,omitempty"`
+	Trigger       string         `yaml:"trigger,omitempty" json:"trigger,omitempty"`
+	Configuration map[string]any `yaml:"configuration,omitempty" json:"configuration,omitempty"`
 }
 
 type Step struct {

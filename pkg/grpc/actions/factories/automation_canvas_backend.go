@@ -17,6 +17,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/protobuf/types/known/structpb"
 	"gorm.io/gorm"
 )
 
@@ -174,7 +175,7 @@ func (b CanvasAutomationBackend) compile(
 		}
 	}
 	legacy := live != nil && legacyCustomStageGraph(&models.Canvas{ColumnKey: &placement.Stage}, live)
-	if legacy && !settings.hasWebhookTrigger() && len(customStageCore(live).Nodes) > 0 {
+	if legacy && !settings.hasEventTrigger() && len(customStageCore(live).Nodes) > 0 {
 		nodes, edges := editLegacyCustomStageGraph(customStageCore(live), settings)
 		return nodes, edges, nil
 	}
@@ -285,6 +286,9 @@ func checkAutomationCanvasNodes(source *automationspec.Document, nodes []models.
 		case node.ComponentName() == "schedule":
 			template, _ := node.Metadata[models.FactoryAppTemplateMetadataKey].(map[string]any)
 			return source.Diagnostic(fmt.Sprintf("triggers[%d].config.cron", configInt(template, "triggerIndex")), "SuperPlane cannot activate this schedule. Check the cron expression and UTC offset.")
+		case isCustomAutomationIntegrationNode(*node):
+			template, _ := node.Metadata[models.FactoryAppTemplateMetadataKey].(map[string]any)
+			return source.Diagnostic(fmt.Sprintf("triggers[%d].config", configInt(template, "triggerIndex")), "Check the integration trigger settings: "+*node.ErrorMessage)
 		case node.Type == models.NodeTypeTrigger:
 			return source.Diagnostic("triggers", "SuperPlane cannot activate this trigger. Check the factory repository connection.")
 		default:
@@ -320,6 +324,15 @@ func automationCanvasSettings(stage string, source *automationspec.Document, age
 		case automationspec.Webhook:
 			start.StartMode = pb.FactoryCustomAutomation_START_MODE_WEBHOOK
 			start.WebhookId = trigger.Config.WebhookID
+		case automationspec.IntegrationEvent:
+			configuration, err := structpb.NewStruct(trigger.Config.Configuration)
+			if err != nil {
+				return nil, source.Diagnostic("triggers", "Check the integration trigger configuration.")
+			}
+			start.StartMode = pb.FactoryCustomAutomation_START_MODE_INTEGRATION
+			start.Integration = &pb.FactoryCustomAutomation_IntegrationTrigger{
+				IntegrationId: trigger.Config.IntegrationID, Trigger: trigger.Config.Trigger, Configuration: configuration,
+			}
 		}
 		input.Triggers = append(input.Triggers, start)
 	}
