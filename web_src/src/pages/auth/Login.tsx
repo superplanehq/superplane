@@ -317,7 +317,7 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
     email: string;
     resume: () => void;
   } | null>(null);
-  const skipSso = useRef(false);
+  const skippedSsoEmail = useRef("");
 
   const [searchParams] = useSearchParams();
   const { account, loading: accountLoading } = useAccount();
@@ -497,8 +497,21 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
   const showAuthMethods = !configLoading && !isSignupDisabledReturn;
   const logoutHref = redirectQuery ? `/logout${redirectQuery}` : "/logout";
 
+  const normalizedLoginEmail = (email: string) => email.trim().toLowerCase();
+  const ssoBypassed = (email: string) => {
+    const normalized = normalizedLoginEmail(email);
+    return normalized !== "" && skippedSsoEmail.current === normalized;
+  };
+  const clearOrganizationSsoChoice = () => {
+    setSsoPrompt(null);
+    skippedSsoEmail.current = "";
+  };
+  const rememberSsoBypass = (email: string) => {
+    skippedSsoEmail.current = normalizedLoginEmail(email);
+  };
+
   const requestMagicCode = async (signup: boolean) => {
-    if (!skipSso.current) {
+    if (!ssoBypassed(magicCodeEmail)) {
       const decision = await resolveEmailFirstSso({
         email: magicCodeEmail,
         signup,
@@ -510,7 +523,7 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
           required: decision.required,
           email: magicCodeEmail,
           resume: () => {
-            skipSso.current = true;
+            rememberSsoBypass(magicCodeEmail);
             void requestMagicCode(signup).catch(() => {
               setFormError("Network error occurred");
               setSubmitLoading(false);
@@ -521,7 +534,6 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
         return;
       }
     }
-    skipSso.current = false;
 
     const response = await fetch("/auth/magic-code/request", {
       method: "POST",
@@ -646,7 +658,7 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
   };
 
   const promptForOrganizationSso = async (event: React.FormEvent) => {
-    if (skipSso.current) {
+    if (ssoBypassed(loginEmail)) {
       return false;
     }
     const decision = await resolveEmailFirstSso({
@@ -662,7 +674,7 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
       required: decision.required,
       email: loginEmail.trim(),
       resume: () => {
-        skipSso.current = true;
+        rememberSsoBypass(loginEmail);
         void handleLoginSubmit(event);
       },
     });
@@ -685,7 +697,6 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
       if (await promptForOrganizationSso(e)) {
         return;
       }
-      skipSso.current = false;
 
       const formData = new URLSearchParams();
       formData.append("email", loginEmail.trim());
@@ -859,7 +870,10 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
               required
               autoComplete="email"
               value={magicCodeEmail}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setMagicCodeEmail(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                setMagicCodeEmail(e.target.value);
+                clearOrganizationSsoChoice();
+              }}
             />
           </div>
 
@@ -917,7 +931,10 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
               required
               autoComplete="email"
               value={loginEmail}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setLoginEmail(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                setLoginEmail(e.target.value);
+                clearOrganizationSsoChoice();
+              }}
             />
           </div>
 
