@@ -92,7 +92,7 @@ function redirectForSso(response: Response): boolean {
   if (window.location.pathname.startsWith("/auth/sso/")) {
     return true;
   }
-  const redirectTarget = `${window.location.pathname}${window.location.search}`;
+  const redirectTarget = `${window.location.pathname}${window.location.search}${window.location.hash}`;
   const start = new URL(ssoStart, window.location.origin);
   start.searchParams.set("redirect", redirectTarget);
   window.location.href = `${start.pathname}${start.search}`;

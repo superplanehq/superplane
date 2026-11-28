@@ -556,6 +556,10 @@ func TestGetRedirectURL(t *testing.T) {
 	})
 }
 
+func TestIsValidRedirectURLKeepsAFragment(t *testing.T) {
+	assert.True(t, IsValidRedirectURL("/x?y=1#z"))
+}
+
 func TestGetSignupDisabledRedirectURL(t *testing.T) {
 	t.Run("should redirect to login with an auth error and provider", func(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/auth/google/callback", nil)

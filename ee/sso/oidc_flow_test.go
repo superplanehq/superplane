@@ -142,6 +142,25 @@ func TestOIDCSignIn(t *testing.T) {
 		require.NotEmpty(t, response.Result().Cookies())
 	})
 
+	t.Run("keeps the return fragment", func(t *testing.T) {
+		target := "/x?y=1#z"
+		start := httptest.NewRequest(http.MethodGet, "/auth/sso/"+conn.ID.String()+"/start?redirect="+url.QueryEscape(target), nil)
+		started := httptest.NewRecorder()
+		f.service.AuthHandler().ServeHTTP(started, start)
+		require.Equal(t, http.StatusFound, started.Code, started.Header().Get("Location"))
+		location, err := url.Parse(started.Header().Get("Location"))
+		require.NoError(t, err)
+		fake.nonce = location.Query().Get("nonce")
+		callback := httptest.NewRequest(http.MethodGet, "/auth/sso/"+conn.ID.String()+"/callback?code=code-1&state="+url.QueryEscape(location.Query().Get("state")), nil)
+		for _, cookie := range started.Result().Cookies() {
+			callback.AddCookie(cookie)
+		}
+		response := httptest.NewRecorder()
+		f.service.AuthHandler().ServeHTTP(response, callback)
+		require.Equal(t, http.StatusFound, response.Code)
+		require.Equal(t, target, response.Header().Get("Location"))
+	})
+
 	t.Run("wrong state", func(t *testing.T) {
 		response := f.callback(t, conn, fake, callbackOptions{state: "wrong-state"})
 		require.Contains(t, response.Header().Get("Location"), "auth_error=sso_failed")
