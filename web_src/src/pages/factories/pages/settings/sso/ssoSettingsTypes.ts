@@ -108,7 +108,12 @@ export type SsoDraft = {
   ask: (title: string, body: string, actionLabel: string, run: () => void) => void;
   requestRequired: () => void;
   createConnection: () => void;
-  saveProvider: () => void;
+  saveIdentity: () => void;
+  saveCredentials: () => void;
+  resetIdentity: () => void;
+  resetCredentials: () => void;
+  resetProvisioning: () => void;
+  resetPolicy: () => void;
   saveProvisioning: () => void;
   savePolicy: () => void;
 };

@@ -48,6 +48,7 @@ function PolicyFields({ model, draft }: { model: SsoSettingsModel; draft: SsoDra
         disabled={!draft.canChange || !draft.policyDirty}
         busy={Boolean(model.busy)}
         onClick={draft.savePolicy}
+        onCancel={draft.resetPolicy}
         testId="sso-policy-save"
       />
     </div>

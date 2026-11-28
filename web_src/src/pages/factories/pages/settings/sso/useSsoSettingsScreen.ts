@@ -152,7 +152,9 @@ function ssoActions(data: SettingsData, feedback: SettingsFeedback): SsoSettings
       data.save.mutate(input, {
         onError: fail,
         onSuccess: () => {
-          feedback.setSecretEpoch((current) => current + 1);
+          if (input.clientSecret) {
+            feedback.setSecretEpoch((current) => current + 1);
+          }
           showSuccessToast("Connection saved.");
         },
       });

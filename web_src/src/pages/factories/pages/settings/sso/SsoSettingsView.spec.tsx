@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "bun:test";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { TooltipProvider } from "@/ui/tooltip";
@@ -111,6 +111,35 @@ describe("SsoSettingsView", () => {
     );
     expect(screen.getByTestId("sso-identity-save")).toBeDisabled();
     expect(screen.getByTestId("sso-policy-save")).toBeDisabled();
+  });
+
+  it("does not send unsaved credentials when the identity card is saved", async () => {
+    const user = userEvent.setup();
+    const calls = renderSettings({ licensed: true, domains: [], tokens: [], connection: draftConnection });
+    await user.clear(screen.getByLabelText("Display name"));
+    await user.type(screen.getByLabelText("Display name"), "Company Okta");
+    await user.clear(screen.getByLabelText("Issuer URL"));
+    await user.type(screen.getByLabelText("Issuer URL"), "https://typed.okta.com");
+    await user.clear(screen.getByLabelText("Client ID"));
+    await user.type(screen.getByLabelText("Client ID"), "typed-client");
+    await user.type(screen.getByLabelText("Client secret"), "typed-secret");
+    await user.click(screen.getByTestId("sso-identity-save"));
+
+    expect(calls.onSave).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        displayName: "Company Okta",
+        clientSecret: "",
+        issuer: "https://example.okta.com",
+        clientId: "client-1",
+      }),
+    );
+    expect(screen.getByLabelText("Client secret")).toHaveValue("typed-secret");
+    expect(screen.getByLabelText("Issuer URL")).toHaveValue("https://typed.okta.com");
+
+    await user.click(within(screen.getByTestId("sso-provider")).getByRole("button", { name: "Cancel" }));
+    expect(screen.getByLabelText("Display name")).toHaveValue("Okta");
+    expect(screen.getByLabelText("Client secret")).toHaveValue("typed-secret");
+    expect(screen.getByLabelText("Issuer URL")).toHaveValue("https://typed.okta.com");
   });
 
   it("shows the locked state when the license is absent and no connection exists", () => {

@@ -171,7 +171,8 @@ export function ProviderCard({ model, draft }: { model: SsoSettingsModel; draft:
             permitted={draft.permitted}
             disabled={!draft.canChange || !draft.identityDirty}
             busy={Boolean(model.busy)}
-            onClick={draft.saveProvider}
+            onClick={draft.saveIdentity}
+            onCancel={draft.resetIdentity}
             testId="sso-identity-save"
           />
         ) : (
@@ -232,7 +233,8 @@ export function ProviderValuesCard({ model, draft }: { model: SsoSettingsModel; 
           permitted={draft.permitted}
           disabled={!draft.canChange || !draft.credentialsDirty}
           busy={Boolean(model.busy)}
-          onClick={draft.saveProvider}
+          onClick={draft.saveCredentials}
+          onCancel={draft.resetCredentials}
           testId="sso-provider-save"
         />
       </div>

@@ -1,6 +1,7 @@
 import { useId, type ReactNode } from "react";
 
 import { PermissionTooltip } from "@/components/PermissionGate";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LoadingButton } from "@/components/ui/loading-button";
@@ -129,6 +130,7 @@ export function CardSave({
   disabled,
   busy,
   onClick,
+  onCancel,
   label = "Save",
   testId,
 }: {
@@ -136,21 +138,29 @@ export function CardSave({
   disabled: boolean;
   busy: boolean;
   onClick: () => void;
+  onCancel?: () => void;
   label?: string;
   testId?: string;
 }) {
   return (
     <PermissionTooltip allowed={permitted} message={permissionMessage}>
-      <LoadingButton
-        type="button"
-        disabled={disabled}
-        loading={busy}
-        loadingText="Saving..."
-        onClick={onClick}
-        data-testid={testId}
-      >
-        {label}
-      </LoadingButton>
+      <div className="flex items-center gap-2">
+        {onCancel && !disabled ? (
+          <Button type="button" variant="outline" disabled={busy} onClick={onCancel}>
+            Cancel
+          </Button>
+        ) : null}
+        <LoadingButton
+          type="button"
+          disabled={disabled}
+          loading={busy}
+          loadingText="Saving..."
+          onClick={onClick}
+          data-testid={testId}
+        >
+          {label}
+        </LoadingButton>
+      </div>
     </PermissionTooltip>
   );
 }

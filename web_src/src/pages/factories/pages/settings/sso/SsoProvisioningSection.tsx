@@ -44,6 +44,7 @@ function ProvisioningFields({ model, draft }: { model: SsoSettingsModel; draft: 
         disabled={!draft.canChange || !draft.provisioningDirty}
         busy={Boolean(model.busy)}
         onClick={draft.saveProvisioning}
+        onCancel={draft.resetProvisioning}
         testId="sso-provisioning-save"
       />
     </div>

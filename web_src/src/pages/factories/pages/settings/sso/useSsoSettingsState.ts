@@ -45,7 +45,8 @@ export function useSsoSettingsState(model: SsoSettingsModel, actions: SsoSetting
       ssoConnectionInput({ ...form, issuer: "", clientId: "", clientSecret: "" }, form.enforcement, seconds),
     );
   };
-  const saveProvider = () => saveCard(actions, connection, form, "provider");
+  const saveIdentity = () => saveCard(actions, connection, form, "identity");
+  const saveCredentials = () => saveCard(actions, connection, form, "credentials");
   const saveProvisioning = () => saveCard(actions, connection, form, "provisioning");
   const savePolicy = () => {
     const seconds = sessionAgeSeconds(form.sessionHours);
@@ -55,6 +56,35 @@ export function useSsoSettingsState(model: SsoSettingsModel, actions: SsoSetting
     }
     setSessionError(null);
     saveCard(actions, connection, form, "policy", seconds);
+  };
+  const resetIdentity = () => {
+    const base = initialForm(connection);
+    setForm((current) => ({ ...current, displayName: base.displayName, preset: base.preset }));
+  };
+  const resetCredentials = () => {
+    const base = initialForm(connection);
+    setForm((current) => ({
+      ...current,
+      issuer: base.issuer,
+      clientId: base.clientId,
+      clientSecret: "",
+      ...claimFields(connection),
+    }));
+  };
+  const resetProvisioning = () => {
+    const base = initialForm(connection);
+    setForm((current) => ({ ...current, jitEnabled: base.jitEnabled, defaultRole: base.defaultRole }));
+  };
+  const resetPolicy = () => {
+    const base = initialForm(connection);
+    setSessionError(null);
+    setForm((current) => ({
+      ...current,
+      enforcement: base.enforcement,
+      ownerBypass: base.ownerBypass,
+      sessionHours: base.sessionHours,
+      idpLogout: base.idpLogout,
+    }));
   };
   useEffect(() => {
     const previous = previousConnection.current;
@@ -83,7 +113,12 @@ export function useSsoSettingsState(model: SsoSettingsModel, actions: SsoSetting
     ask,
     requestRequired,
     createConnection,
-    saveProvider,
+    saveIdentity,
+    saveCredentials,
+    resetIdentity,
+    resetCredentials,
+    resetProvisioning,
+    resetPolicy,
     saveProvisioning,
     savePolicy,
   };
@@ -179,7 +214,7 @@ function formSetters(setForm: Dispatch<SetStateAction<SsoForm>>) {
   };
 }
 
-type CardKind = "provider" | "provisioning" | "policy";
+type CardKind = "identity" | "credentials" | "provisioning" | "policy";
 
 function saveCard(
   actions: SsoSettingsActions,
@@ -191,13 +226,14 @@ function saveCard(
   const base = initialForm(connection);
   const seconds = policySeconds ?? connection?.maxSessionAgeSeconds ?? 86400;
   const next = { ...base };
-  if (kind === "provider") {
+  if (kind === "identity") {
     next.displayName = form.displayName;
     next.preset = form.preset;
+  }
+  if (kind === "credentials") {
     next.issuer = form.issuer;
     next.clientId = form.clientId;
     next.clientSecret = form.clientSecret;
-    next.loadedPreset = form.loadedPreset;
     next.scopes = form.scopes;
     next.subjectClaim = form.subjectClaim;
     next.emailClaim = form.emailClaim;
