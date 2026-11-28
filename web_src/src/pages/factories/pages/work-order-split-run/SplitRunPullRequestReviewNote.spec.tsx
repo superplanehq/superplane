@@ -22,6 +22,7 @@ vi.mock("@/hooks/useExperimentalFeature", () => ({
 }));
 
 import { SplitRunAttentionNote } from "./SplitRunAttentionNote";
+import { SplitRunPullRequestStatus } from "./SplitRunPullRequestStatus";
 import type { SplitRunFooterAction, SplitRunFooterNote } from "./splitRunFooter";
 
 const PR_NOTE: SplitRunFooterNote = {
@@ -245,10 +246,12 @@ describe("SplitRunAttentionNote for a pull request", () => {
     for (const pullRequest of [GITHUB_PR, BITBUCKET_PR]) {
       it(`keeps ${pullRequest.provider} merged confirmation with status flag ${flagEnabled}`, () => {
         experimentalFeatureHas.current = () => flagEnabled;
+        mergeability.current = { canMerge: false, message: "Checks are still running." };
         const note = pullRequest.provider === "PROVIDER_BITBUCKET" ? BITBUCKET_PR_NOTE : PR_NOTE;
         renderNote({ note, pullRequests: [{ ...pullRequest, state: "STATE_MERGED" }] });
 
-        expect(screen.getByTestId("split-run-pr-merged")).toHaveTextContent("The pull request is merged.");
+        expect(screen.getByTestId("split-run-pr-merged").textContent).toBe("The pull request is merged.");
+        expect(screen.queryByTestId("split-run-pr-status")).not.toBeInTheDocument();
       });
     }
 
@@ -263,6 +266,9 @@ describe("SplitRunAttentionNote for a pull request", () => {
 
       expect(screen.getAllByTestId("split-run-pull-request-cta")).toHaveLength(2);
       expect(screen.queryAllByTestId("split-run-pr-status")).toHaveLength(flagEnabled ? 2 : 0);
+      for (const status of screen.queryAllByTestId("split-run-pr-status")) {
+        expect(status.textContent).toBe("Checks are still running.");
+      }
     });
   }
 
@@ -323,4 +329,35 @@ describe("SplitRunAttentionNote for a pull request", () => {
     expect(screen.getByTestId("split-run-pull-request-cta")).toHaveAccessibleName("Review PR #6812");
     expect(screen.queryByTestId("split-run-review-pull-request")).not.toBeInTheDocument();
   });
+});
+
+describe("SplitRunPullRequestStatus message selection", () => {
+  const cases: {
+    name: string;
+    data: FactoriesFactoryPullRequestMergeability | undefined;
+    expectedMessage?: string;
+  }[] = [
+    { name: "hides a server message when mergeable", data: { canMerge: true, message: "Ready to merge." } },
+    { name: "hides status with missing data", data: undefined },
+    { name: "hides status with a missing message", data: { canMerge: false } },
+    { name: "hides status with an empty message", data: { canMerge: false, message: "" } },
+    {
+      name: "shows a server message when canMerge is omitted",
+      data: { message: "Merge status is unavailable right now." },
+      expectedMessage: "Merge status is unavailable right now.",
+    },
+  ];
+
+  for (const { name, data, expectedMessage } of cases) {
+    it(name, () => {
+      mergeability.current = data;
+      render(<SplitRunPullRequestStatus organizationId="org-1" factoryId="factory-1" pullRequest={GITHUB_PR} />);
+
+      if (expectedMessage) {
+        expect(screen.getByTestId("split-run-pr-status").textContent).toBe(expectedMessage);
+        return;
+      }
+      expect(screen.queryByTestId("split-run-pr-status")).not.toBeInTheDocument();
+    });
+  }
 });
