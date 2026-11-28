@@ -4,24 +4,19 @@ import userEvent from "@testing-library/user-event";
 import { expect, it, vi } from "bun:test";
 import type { FactoriesFactoryCustomAutomation, FactoriesFactoryOnboarding } from "@/api-client";
 import type { SelectableLLMSourceID } from "@/lib/selectableLLMModels";
+import type { useFactoryCustomAutomation } from "@/hooks/useFactoryCustomAutomationData";
 import { Editor, SourceEditor } from "./customAutomationEditorTestSupport";
+import { reviewSource, reviewAutomation, savedHostedAutomation } from "./customAutomationEditorFixtures";
 
 const saveAutomation = vi.fn();
+let liveQuery: Partial<
+  Pick<ReturnType<typeof useFactoryCustomAutomation>, "data" | "isFetchedAfterMount" | "isError" | "isFetching">
+> = {};
 let sharedHostedId = false;
-let automation: FactoriesFactoryCustomAutomation = {
-  automation: { id: "automation", name: "Repository review" },
-  settings: {
-    startMode: "START_MODE_MANUAL",
-    agent: { component: "runnerClaudeCode" },
-    steps: [
-      { name: "Lint", type: "TYPE_BASH", command: "make lint", workingDirectory: "repo", secrets: ["deploy"] },
-      { name: "Review", type: "TYPE_PROMPT", prompt: "Review the repository.", workingDirectory: "repo" },
-    ],
-  },
-};
+let automation: FactoriesFactoryCustomAutomation = reviewAutomation;
 
 vi.mock("@/hooks/useFactoryCustomAutomationData", () => ({
-  useFactoryCustomAutomation: () => ({ data: automation, isFetchedAfterMount: true }),
+  useFactoryCustomAutomation: () => ({ data: automation, isFetchedAfterMount: true, isError: false, ...liveQuery }),
   useCreateFactoryCustomAutomation: () => ({ mutateAsync: saveAutomation, isPending: false }),
   useUpdateFactoryCustomAutomation: () => ({ mutateAsync: saveAutomation, isPending: false }),
 }));
@@ -82,12 +77,7 @@ it.each([
   { source: "subscription", initialModel: "", model: "subscription-model", label: "subscription-model" },
 ] as const)("saves and clears a $source model from '$initialModel'", async ({ source, initialModel, model, label }) => {
   onboarding = source === "hosted" ? { agentHarness: "AGENT_HARNESS_SUPERPLANE" } : { codexSubscription: true };
-  const yaml = `apiVersion: v2
-kind: Automation
-name: Review
-triggers: [{use: manual}]
-steps: [{name: Review, prompt: Review the changes.}]
-`;
+  const yaml = reviewSource;
   const save = vi.fn();
   const initial = initialModel ? yaml + "agent: {model: '" + initialModel + "'}\n" : yaml;
   const view = render(<SourceEditor source={initial} save={save} />);
@@ -108,19 +98,39 @@ steps: [{name: Review, prompt: Review the changes.}]
   onboarding = undefined;
 });
 
+it.each([
+  { state: "initial loading", query: { data: undefined, isFetchedAfterMount: false, isFetching: true }, ready: false },
+  { state: "stale cached data", query: { data: savedHostedAutomation, isFetchedAfterMount: false }, ready: false },
+  { state: "query error with cached data", query: { data: savedHostedAutomation, isError: true }, ready: false },
+  { state: "missing data", query: { data: undefined }, ready: false },
+  { state: "missing settings", query: { data: {} }, ready: false },
+  { state: "missing agent", query: { data: { settings: {} } }, ready: false },
+  { state: "successful fetch after mount", query: { data: savedHostedAutomation }, ready: true },
+  { state: "background fetch after success", query: { data: savedHostedAutomation, isFetching: true }, ready: true },
+])("uses the saved agent only when ready: $state", ({ query, ready }) => {
+  const previous = [liveQuery, onboarding, sharedHostedId] as const;
+  liveQuery = query;
+  onboarding = { agentHarness: "AGENT_HARNESS_SUPERPLANE" };
+  sharedHostedId = true;
+  const yaml = reviewSource + "agent: {model: anthropic/claude-test}\n";
+  try {
+    render(<SourceEditor source={yaml} save={vi.fn()} automationId="saved" />);
+    const picker = screen.queryByTestId("field-model-hosted-model");
+    if (!ready) {
+      expect(picker).not.toBeInTheDocument();
+      return;
+    }
+    expect(picker).toHaveAccessibleName("openai/anthropic/claude-test");
+  } finally {
+    [liveQuery, onboarding, sharedHostedId] = previous;
+  }
+});
+
 it("keeps the selected provider when two hosted providers offer the same model ID", async () => {
   const previous = automation;
   sharedHostedId = true;
-  automation = {
-    settings: { agent: { component: "runnerSuperPlane", model: "hosted::openai::anthropic/claude-test" } },
-  };
-  const yaml = `apiVersion: v2
-kind: Automation
-name: Review
-agent: {model: anthropic/claude-test}
-triggers: [{use: manual}]
-steps: [{name: Review, prompt: Review the changes.}]
-`;
+  automation = savedHostedAutomation;
+  const yaml = reviewSource + "agent: {model: anthropic/claude-test}\n";
   const save = vi.fn();
   try {
     render(<SourceEditor source={yaml} save={save} automationId="saved" />);
@@ -141,13 +151,7 @@ it("keeps the saved automation's subscription when the workspace uses hosted mod
   onboarding = { agentHarness: "AGENT_HARNESS_SUPERPLANE" };
   const previous = automation;
   automation = { settings: { agent: { component: "runnerCodex", credentialSource: "subscription" } } };
-  const yaml = `apiVersion: v2
-kind: Automation
-name: Review
-agent: {harness: codex, credentials: {source: subscription}}
-triggers: [{use: manual}]
-steps: [{name: Review, prompt: Review the changes.}]
-`;
+  const yaml = reviewSource + "agent: {harness: codex, credentials: {source: subscription}}\n";
   const save = vi.fn();
   render(<SourceEditor source={yaml} save={save} automationId="saved" />);
   const user = userEvent.setup();

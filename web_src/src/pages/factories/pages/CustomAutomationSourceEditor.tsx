@@ -51,7 +51,7 @@ export function CustomAutomationSourceEditor({
     organizationId,
     factory?.onboarding,
     automationId,
-    live.isFetchedAfterMount && !live.isError ? live.data?.settings?.agent : undefined,
+    savedAgentAfterMount(live),
   );
   const [formTriggers, setFormTriggers] = useState<CustomAutomationTrigger[]>();
   const [saveError, setSaveError] = useState("");
@@ -129,6 +129,13 @@ export function CustomAutomationSourceEditor({
       onDraftChange={(next) => model.editCanvas(settingsEdit(visual.draft, next, definition.agent, hosted))}
     />
   );
+}
+
+function savedAgentAfterMount(
+  live: Pick<ReturnType<typeof useFactoryCustomAutomation>, "isFetchedAfterMount" | "isError" | "data">,
+) {
+  if (!live.isFetchedAfterMount || live.isError) return undefined;
+  return live.data?.settings?.agent;
 }
 
 function settingsEdit(
