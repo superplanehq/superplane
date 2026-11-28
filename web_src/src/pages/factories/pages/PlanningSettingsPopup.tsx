@@ -41,6 +41,20 @@ interface PlanningSettingsPopupProps {
   initialTab?: PlanningSettingsTab;
 }
 
+function resolvePlanningFooterSlot(
+  onDelete: PlanningSettingsPopupProps["onDelete"],
+  confirmDelete: boolean,
+  footerSlot: HTMLDivElement | null,
+): HTMLDivElement | null | undefined {
+  if (!onDelete) {
+    return undefined;
+  }
+  if (confirmDelete) {
+    return null;
+  }
+  return footerSlot;
+}
+
 export function PlanningSettingsPopup({
   organizationId,
   factoryId,
@@ -77,7 +91,7 @@ export function PlanningSettingsPopup({
   const { tab, setTab } = history;
 
   return (
-    <ColumnAutomationFooterSlotProvider slot={onDelete ? (confirmDelete ? null : footerSlot) : undefined}>
+    <ColumnAutomationFooterSlotProvider slot={resolvePlanningFooterSlot(onDelete, confirmDelete, footerSlot)}>
       <PopupShell testId="planning-settings" canvas fixed={fixed} onDismiss={onClose}>
         <PopupHeader
           title={title}

@@ -49,6 +49,7 @@ function renderPopup(
     agent?: boolean | Partial<PlanningReviewAgentSlot>;
     lines?: PlanningAutoStartLine[];
     onRetry?: () => void;
+    onDelete?: () => Promise<void> | void;
     initialPath?: string;
   } = {},
 ) {
@@ -64,6 +65,7 @@ function renderPopup(
               settings={storedSettings}
               lines={options.lines}
               onSave={onSave}
+              onDelete={options.onDelete}
               onClose={onClose}
               onRetryAutomation={options.onRetry}
               fixed={false}
@@ -91,6 +93,41 @@ describe("PlanningSettingsPopup", () => {
       isLoading: false,
       isError: false,
     } as unknown as ReturnType<typeof useFactoryAgentResources>);
+  });
+
+  it("puts Save in an independent footer when deletion is unavailable", () => {
+    renderPopup();
+
+    const footers = screen.getByTestId("planning-settings").querySelectorAll("footer");
+    expect(footers).toHaveLength(1);
+    expect(within(footers[0]).getByTestId("planning-settings-save")).toBeInTheDocument();
+    expect(screen.queryByTestId("column-automation-view-footer")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("column-automation-view-delete")).not.toBeInTheDocument();
+  });
+
+  it("puts Save and Delete in one shared footer when deletion is available", () => {
+    renderPopup(vi.fn(), DEFAULT_PLANNING_SETTINGS, { onDelete: vi.fn() });
+
+    const footer = screen.getByTestId("column-automation-view-footer");
+    expect(within(footer).getByTestId("planning-settings-save")).toBeInTheDocument();
+    expect(within(footer).getByTestId("column-automation-view-delete")).toBeInTheDocument();
+    expect(screen.getByTestId("planning-settings").querySelectorAll("footer")).toHaveLength(1);
+  });
+
+  it("hides Save during delete confirmation and restores it when confirmation is cancelled", async () => {
+    const user = userEvent.setup();
+    const onDelete = vi.fn();
+    renderPopup(vi.fn(), DEFAULT_PLANNING_SETTINGS, { onDelete });
+
+    await user.click(screen.getByTestId("column-automation-view-delete"));
+    const footer = screen.getByTestId("column-automation-view-footer");
+    expect(within(footer).getByTestId("column-automation-view-delete-confirm")).toBeInTheDocument();
+    expect(screen.queryByTestId("planning-settings-save")).not.toBeInTheDocument();
+
+    await user.click(within(footer).getByRole("button", { name: "Keep automation" }));
+    expect(within(footer).getByTestId("planning-settings-save")).toBeInTheDocument();
+    expect(screen.queryByTestId("column-automation-view-delete-confirm")).not.toBeInTheDocument();
+    expect(onDelete).not.toHaveBeenCalled();
   });
 
   it("saves Planning and keeps stored score flags", async () => {
