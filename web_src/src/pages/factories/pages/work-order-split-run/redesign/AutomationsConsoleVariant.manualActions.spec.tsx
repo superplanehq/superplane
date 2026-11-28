@@ -69,12 +69,20 @@ describe("AutomationsConsoleVariant manual actions", () => {
     },
   );
 
-  it.each(["custom-qa", "phase-0"])(
-    "offers unstarted custom work only in its matching stage: %s",
-    (currentStageKey) => {
+  it.each([
+    ["custom-qa", ["qa-manual"], undefined, true],
+    ["phase-0", ["qa-manual"], undefined, false],
+    ["custom-qa", undefined, undefined, false],
+    ["custom-qa", ["other-app"], undefined, false],
+    ["custom-qa", ["qa-manual"], "qa-manual", false],
+    ["custom-qa", ["qa-manual"], "other-app", true],
+  ] as const)(
+    "checks custom-stage manual membership and queue: %s, %s, %s",
+    (currentStageKey, manualStageAppIds, queuedStageAppId, eligible) => {
       const fixture = splitRunFixtureForWorkOrder(BOARD_IMPLEMENT_NOTIFY_ORDER, { demoArtifacts: false });
       fixture.currentStageKey = currentStageKey;
-      fixture.manualStageAppIds = ["qa-manual"];
+      fixture.manualStageAppIds = manualStageAppIds ? [...manualStageAppIds] : undefined;
+      fixture.queuedStageAppId = queuedStageAppId;
       fixture.stageColumns = [{ id: "custom-qa", title: "QA" }, ...(fixture.stageColumns ?? [])];
       renderConsole(fixture, {
         organizationId: "org-1",
@@ -86,7 +94,80 @@ describe("AutomationsConsoleVariant manual actions", () => {
       const action = within(screen.getByTestId("redesign-console-column-custom-qa")).queryByRole("button", {
         name: /Run/,
       });
-      if (currentStageKey === "custom-qa") expect(action).toBeEnabled();
+      if (eligible) expect(action).toBeEnabled();
+      else expect(action).toBeNull();
+    },
+  );
+
+  it.each(["failed", "cancelled", "passed", "running", "pending", "waiting"] as const)(
+    "uses the latest matching non-history phase for custom-stage retries: %s",
+    (status) => {
+      const fixture = splitRunFixtureForWorkOrder(BOARD_IMPLEMENT_NOTIFY_ORDER, { demoArtifacts: false });
+      fixture.currentStageKey = "custom-qa";
+      fixture.manualStageAppIds = ["qa-manual"];
+      fixture.stageColumns = [{ id: "custom-qa", title: "QA" }, ...(fixture.stageColumns ?? [])];
+      const phase = {
+        ...fixture.phases[0],
+        appId: "qa-manual",
+        columnKey: "custom-qa",
+        historyRun: false,
+        componentName: "Update Docs",
+        artifacts: [],
+        stream: [],
+        canvasSteps: [],
+      };
+      const now = Date.now();
+      fixture.phases = [
+        {
+          ...phase,
+          id: "earlier-match",
+          status: status === "failed" || status === "cancelled" ? "passed" : "failed",
+          startedAt: new Date(now).toISOString(),
+        },
+        { ...phase, id: "latest-match", status, startedAt: new Date(now - 1000).toISOString() },
+        { ...phase, id: "history", status: "passed", historyRun: true },
+        { ...phase, id: "other-app", status: "passed", appId: "other-app", componentName: "Other automation" },
+        { ...phase, id: "other-column", status: "passed", columnKey: "verify" },
+      ];
+      const originalPhases = [...fixture.phases];
+      renderConsole(fixture, {
+        organizationId: "org-1",
+        factoryId: "factory-1",
+        orderId: BOARD_IMPLEMENT_NOTIFY_ORDER.id,
+        canStopRun: true,
+        manualCustomAutomations: [{ id: "qa-manual", name: "Update Docs", columnKey: "custom-qa" }],
+      });
+      const action = within(screen.getByTestId("redesign-console-column-custom-qa")).queryByRole("button", {
+        name: /Run/,
+      });
+      if (status === "failed" || status === "cancelled") expect(action).toBeEnabled();
+      else expect(action).toBeNull();
+      expect(fixture.phases).toEqual(originalPhases);
+    },
+  );
+
+  it.each([
+    [0, false, "running", true],
+    [0, false, "waiting", true],
+    [1, false, "running", false],
+    [0, true, "running", false],
+    [0, false, "passed", false],
+  ] as const)(
+    "checks Implement manual eligibility: step %s, Verify %s, line %s",
+    (currentStepIndex, canRunVerifyCustomAutomation, lineStatus, eligible) => {
+      const fixture = splitRunFixtureForWorkOrder(BOARD_IMPLEMENT_NOTIFY_ORDER, { demoArtifacts: false });
+      Object.assign(fixture, { currentStepIndex, canRunVerifyCustomAutomation, lineStatus });
+      renderConsole(fixture, {
+        organizationId: "org-1",
+        factoryId: "factory-1",
+        orderId: BOARD_IMPLEMENT_NOTIFY_ORDER.id,
+        canStopRun: true,
+        manualCustomAutomations: [{ id: "implement-custom", name: "Inspect implementation", columnKey: "implement" }],
+      });
+      const action = within(screen.getByTestId("redesign-console-column-implement")).queryByRole("button", {
+        name: /Run/,
+      });
+      if (eligible) expect(action).toBeEnabled();
       else expect(action).toBeNull();
     },
   );
