@@ -2,15 +2,19 @@ package sso
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/licensing"
 	"github.com/superplanehq/superplane/pkg/models"
+	"gorm.io/gorm"
 )
 
 func TestSCIMUsers(t *testing.T) {
@@ -95,6 +99,24 @@ func TestSCIMUsers(t *testing.T) {
 		require.NoError(t, err)
 	})
 
+	t.Run("rolls back deactivation when membership removal fails", func(t *testing.T) {
+		previous := f.service.Auth
+		f.service.Auth = failingSCIMMembershipRemoval{Authorization: previous}
+		t.Cleanup(func() { f.service.Auth = previous })
+
+		patch := `{"Operations":[{"op":"replace","value":{"active":false}}]}`
+		response := f.scim(http.MethodPatch, conn, secret, "/Users/"+userID, patch)
+		require.NotEqual(t, http.StatusOK, response.Code)
+
+		identityID, err := uuid.Parse(userID)
+		require.NoError(t, err)
+		identity, err := models.FindSSOIdentityByID(database.Conn(), conn.ID, identityID)
+		require.NoError(t, err)
+		require.True(t, identity.Active)
+		_, err = models.FindActiveUserByEmailInTransaction(database.Conn(), f.r.Organization.ID.String(), "ada@example.com")
+		require.NoError(t, err)
+	})
+
 	t.Run("keeps the last owner", func(t *testing.T) {
 		body := `{"userName":"owner@example.com","active":true,"emails":[{"value":"owner@example.com","primary":true}]}`
 		created := f.scim(http.MethodPost, conn, secret, "/Users", body)
@@ -115,6 +137,17 @@ func TestSCIMUsers(t *testing.T) {
 		require.Equal(t, http.StatusForbidden, response.Code)
 		require.Contains(t, response.Body.String(), "SSO is not licensed for this organization")
 	})
+}
+
+type failingSCIMMembershipRemoval struct {
+	authorization.Authorization
+}
+
+func (a failingSCIMMembershipRemoval) RemoveUserFromOrganizationInTransaction(tx *gorm.DB, userID, orgID string) error {
+	if err := a.Authorization.RemoveUserFromOrganizationInTransaction(tx, userID, orgID); err != nil {
+		return err
+	}
+	return errors.New("grant removal interrupted")
 }
 
 func (f *flow) scim(method string, conn *models.SSOConnection, secret, path, body string) *httptest.ResponseRecorder {

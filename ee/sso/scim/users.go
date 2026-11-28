@@ -17,13 +17,12 @@ import (
 	"github.com/superplanehq/superplane/ee/sso/core"
 	"github.com/superplanehq/superplane/pkg/billing"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/organizations"
-	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/licensing"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/utils"
-	"google.golang.org/grpc/codes"
 	"gorm.io/gorm"
 )
 
@@ -157,7 +156,8 @@ func (h *Handler) createUser(w http.ResponseWriter, r *http.Request, conn *model
 		}
 	}
 	var created *models.SSOIdentity
-	var deactivateExisting *models.SSOIdentity
+	var removal membershipRemoval
+	var deactivated bool
 	err = database.DB(r.Context()).Transaction(func(tx *gorm.DB) error {
 		account, err := h.pipeline.AccountForEmail(tx, conn, email, name)
 		if err != nil {
@@ -211,8 +211,12 @@ func (h *Handler) createUser(w http.ResponseWriter, r *http.Request, conn *model
 			if err := identity.Save(tx); err != nil {
 				return err
 			}
+			removal, err = h.removeMemberships(tx, conn, identity, account)
+			if err != nil {
+				return err
+			}
 			created = identity
-			deactivateExisting = identity
+			deactivated = true
 			return nil
 		}
 		identity.Active = true
@@ -229,11 +233,9 @@ func (h *Handler) createUser(w http.ResponseWriter, r *http.Request, conn *model
 		writeMapped(w, r, err)
 		return
 	}
-	if deactivateExisting != nil {
-		if err := h.finishDeactivation(r, conn, deactivateExisting); err != nil {
-			writeMapped(w, r, err)
-			return
-		}
+	if deactivated {
+		h.publishMembershipRemoval(r, conn, removal)
+		logDeactivation(r, conn, removal.keptOwner)
 	}
 	logging.AddRequestLogFields(r.Context(), map[string]any{
 		"action": "scim_user_create", "object": "sso_identity", "outcome": "success",
@@ -374,21 +376,96 @@ func (h *Handler) applyChange(w http.ResponseWriter, r *http.Request, conn *mode
 
 func (h *Handler) deactivate(r *http.Request, conn *models.SSOConnection, identity *models.SSOIdentity) error {
 	now := h.now()
-	if err := h.saveLockedProfile(r, identity, func(tx *gorm.DB, locked *models.SSOIdentity) error {
+	var removal membershipRemoval
+	err := database.DB(r.Context()).Transaction(func(tx *gorm.DB) error {
+		// Same lock order as reactivation: account, identity, organization.
+		account, err := models.LockAccount(tx, identity.AccountID)
+		if err != nil {
+			return err
+		}
+		locked, err := models.LockSSOIdentity(tx, identity.ConnectionID, identity.ID)
+		if err != nil {
+			return err
+		}
+		copySCIMProfile(locked, identity)
 		locked.Active = false
 		locked.SessionsRevokedAt = &now
-		return locked.RevokeIDPSessions(tx, now)
-	}); err != nil {
-		return err
-	}
-	return h.finishDeactivation(r, conn, identity)
-}
-
-func (h *Handler) finishDeactivation(r *http.Request, conn *models.SSOConnection, identity *models.SSOIdentity) error {
-	keptOwner, err := h.removeMembership(r, conn, identity)
+		if err := locked.RevokeIDPSessions(tx, now); err != nil {
+			return err
+		}
+		if err := locked.Save(tx); err != nil {
+			return err
+		}
+		removal, err = h.removeMemberships(tx, conn, locked, account)
+		if err != nil {
+			return err
+		}
+		*identity = *locked
+		return nil
+	})
 	if err != nil {
 		return err
 	}
+	h.publishMembershipRemoval(r, conn, removal)
+	logDeactivation(r, conn, removal.keptOwner)
+	return nil
+}
+
+type membershipRemoval struct {
+	keptOwner bool
+	removed   bool
+	alerts    billing.CapacityAlerts
+}
+
+func (h *Handler) removeMemberships(tx *gorm.DB, conn *models.SSOConnection, identity *models.SSOIdentity, account *models.Account) (membershipRemoval, error) {
+	ids := []string{}
+	if identity.UserID != nil {
+		ids = append(ids, identity.UserID.String())
+	}
+	if account != nil {
+		user, err := models.FindActiveUserByEmailInTransaction(tx, conn.OrganizationID.String(), account.Email)
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			return membershipRemoval{}, err
+		}
+		if err == nil {
+			id := user.ID.String()
+			if !slices.Contains(ids, id) {
+				ids = append(ids, id)
+			}
+		}
+	}
+	result := membershipRemoval{}
+	for _, id := range ids {
+		alert, err := organizations.RemoveUserInTransaction(tx, h.pipeline.Auth, conn.OrganizationID, id)
+		if err == nil {
+			result.removed = true
+			result.alerts = append(result.alerts, alert)
+			continue
+		}
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			continue
+		}
+		if errors.Is(err, models.ErrLastOrganizationOwner) {
+			result.keptOwner = true
+			return result, nil
+		}
+		return membershipRemoval{}, err
+	}
+	return result, nil
+}
+
+func (h *Handler) publishMembershipRemoval(r *http.Request, conn *models.SSOConnection, removal membershipRemoval) {
+	if !removal.removed {
+		removal.alerts.Emit()
+		return
+	}
+	if err := messages.PublishOrganizationCodexConnectionUpdated(database.DB(r.Context()), conn.OrganizationID); err != nil {
+		log.WithError(err).Warn("Failed to publish Codex member removal")
+	}
+	removal.alerts.Emit()
+}
+
+func logDeactivation(r *http.Request, conn *models.SSOConnection, keptOwner bool) {
 	fields := map[string]any{
 		"action": "scim_user_deactivate", "object": "sso_identity", "outcome": "success",
 		"sso_connection_id": conn.ID.String(), "organization_id": conn.OrganizationID.String(),
@@ -398,38 +475,6 @@ func (h *Handler) finishDeactivation(r *http.Request, conn *models.SSOConnection
 		log.WithField("organization_id", conn.OrganizationID.String()).Warn("SCIM deactivation kept the last organization owner")
 	}
 	logging.AddRequestLogFields(r.Context(), fields)
-	return nil
-}
-
-func (h *Handler) removeMembership(r *http.Request, conn *models.SSOConnection, identity *models.SSOIdentity) (bool, error) {
-	ids := []string{}
-	if identity.UserID != nil {
-		ids = append(ids, identity.UserID.String())
-	}
-	if account, err := models.FindAccountByID(identity.AccountID.String()); err == nil {
-		if user, err := models.FindActiveUserByEmail(conn.OrganizationID.String(), account.Email); err == nil {
-			id := user.ID.String()
-			if !slices.Contains(ids, id) {
-				ids = append(ids, id)
-			}
-		}
-	}
-	for _, id := range ids {
-		_, err := organizations.RemoveUser(r.Context(), h.pipeline.Auth, conn.OrganizationID.String(), id)
-		if err == nil || errors.Is(err, gorm.ErrRecordNotFound) || grpcNotFound(err) {
-			continue
-		}
-		if errors.Is(err, models.ErrLastOrganizationOwner) {
-			return true, nil
-		}
-		return false, err
-	}
-	return false, nil
-}
-
-func grpcNotFound(err error) bool {
-	code, _, ok := grpcerrors.HandlerStatus(err)
-	return ok && code == codes.NotFound
 }
 
 func (h *Handler) reactivate(r *http.Request, conn *models.SSOConnection, identity *models.SSOIdentity) error {
