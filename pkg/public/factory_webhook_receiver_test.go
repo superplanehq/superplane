@@ -23,7 +23,7 @@ func Test__HandleWebhook_FactoryWebhookAuthenticatesOnceForEveryListener(t *test
 
 	server, err := NewServer(
 		r.Encryptor, r.Registry, jwt.NewSigner("test"), support.NewOIDCProvider(), "",
-		"http://localhost", "http://localhost", "test", "/app/templates", r.AuthService, false,
+		"http://localhost", "http://localhost", "test", "/app/templates", r.AuthService, false, nil,
 	)
 	require.NoError(t, err)
 

@@ -25,40 +25,9 @@ func RemoveUser(ctx context.Context, authService authorization.Authorization, or
 
 	var capacity billing.CapacityAlert
 	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
-		// Serialize with invitation acceptance, which takes the same lock.
-		if _, err := models.LockOrganization(tx, orgUUID); err != nil {
-			return err
-		}
-
-		user, err := models.FindActiveUserByIDInTransaction(tx, orgID, userID)
-		if err != nil {
-			return err
-		}
-
-		if user.IsOwner {
-			if err := models.RefuseIfLastOrganizationOwner(tx, orgUUID, user.ID); err != nil {
-				return err
-			}
-		}
-
-		// Operator invitations grant no member management, so they stay valid.
-		if err := models.CancelPendingOrganizationInvitationsByInviter(tx, orgUUID, user.ID, models.RoleOrgOperator); err != nil {
-			return err
-		}
-
-		// Group memberships are separate from direct roles. Both must go,
-		// or a later invitation restores the old authority.
-		if err := authService.RemoveUserFromOrganizationInTransaction(tx, user.ID.String(), orgID); err != nil {
-			log.Errorf("Error removing organization grants for %s: %v", user.ID.String(), err)
-			return grpcerrors.Internal(err, "error removing role")
-		}
-
-		if err := user.SoftDelete(tx, time.Now(), ""); err != nil {
-			return err
-		}
-
-		capacity, err = billing.RecheckSeatCapacity(tx, orgUUID, "removal")
-		return err
+		var txErr error
+		capacity, txErr = RemoveUserInTransaction(tx, authService, orgUUID, userID)
+		return txErr
 	})
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -81,4 +50,42 @@ func RemoveUser(ctx context.Context, authService authorization.Authorization, or
 	// The freed seat stays paid and reusable. Removal never changes the
 	// Polar seat count, so it needs no billing service.
 	return &pb.RemoveUserResponse{}, nil
+}
+
+// RemoveUserInTransaction removes one member on the caller's transaction.
+// The caller publishes the Codex update and emits the capacity alert after commit.
+func RemoveUserInTransaction(tx *gorm.DB, authService authorization.Authorization, orgUUID uuid.UUID, userID string) (billing.CapacityAlert, error) {
+	// Serialize with invitation acceptance, which takes the same lock.
+	if _, err := models.LockOrganization(tx, orgUUID); err != nil {
+		return nil, err
+	}
+
+	user, err := models.FindActiveUserByIDInTransaction(tx, orgUUID.String(), userID)
+	if err != nil {
+		return nil, err
+	}
+
+	if user.IsOwner {
+		if err := models.RefuseIfLastOrganizationOwner(tx, orgUUID, user.ID); err != nil {
+			return nil, err
+		}
+	}
+
+	// Operator invitations grant no member management, so they stay valid.
+	if err := models.CancelPendingOrganizationInvitationsByInviter(tx, orgUUID, user.ID, models.RoleOrgOperator); err != nil {
+		return nil, err
+	}
+
+	// Group memberships are separate from direct roles. Both must go,
+	// or a later invitation restores the old authority.
+	if err := authService.RemoveUserFromOrganizationInTransaction(tx, user.ID.String(), orgUUID.String()); err != nil {
+		log.Errorf("Error removing organization grants for %s: %v", user.ID.String(), err)
+		return nil, grpcerrors.Internal(err, "error removing role")
+	}
+
+	if err := user.SoftDelete(tx, time.Now(), ""); err != nil {
+		return nil, err
+	}
+
+	return billing.RecheckSeatCapacity(tx, orgUUID, "removal")
 }
