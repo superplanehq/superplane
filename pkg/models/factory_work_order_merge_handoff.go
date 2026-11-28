@@ -1,7 +1,6 @@
 package models
 
 import (
-	"slices"
 	"strings"
 
 	"github.com/google/uuid"
@@ -12,46 +11,9 @@ import (
 // the user chose from a connected integration.
 const CustomAutomationIntegrationStartMode = "integration"
 
-// StageHandlesPullRequestMerge reports whether a custom automation in the
-// current stage of the task listens for merged pull requests. That automation
-// moves the task, so PR Closure must not close the task on a merge.
-func (o *FactoryWorkOrder) StageHandlesPullRequestMerge(tx *gorm.DB) (bool, error) {
-	stage, err := o.currentStageKey(tx)
-	if err != nil || stage == "" {
-		return false, err
-	}
-	factory, err := FindFactory(tx, o.OrganizationID, o.FactoryID)
-	if err != nil {
-		return false, err
-	}
-	canvases, err := factory.ListCanvases(tx)
-	if err != nil {
-		return false, err
-	}
-	ids := make([]uuid.UUID, 0, len(canvases))
-	for i := range canvases {
-		if canvases[i].LiveVersionID != nil && canvases[i].ColumnKey != nil && *canvases[i].ColumnKey == stage {
-			ids = append(ids, canvases[i].ID)
-		}
-	}
-	specs, err := FindLiveCanvasSpecsByCanvasIDs(tx, ids)
-	if err != nil {
-		return false, err
-	}
-	for _, spec := range specs {
-		if FactoryAppTemplateID(spec.Nodes) != FactoryAppTemplateCustomAutomationID {
-			continue
-		}
-		if slices.ContainsFunc(spec.Nodes, nodeListensForPullRequestMerge) {
-			return true, nil
-		}
-	}
-	return false, nil
-}
-
-// currentStageKey is the board column of the task, or the custom stage that
+// CurrentStageKey is the board column of the task, or the custom stage that
 // its latest dispatch is in. The board column shows custom stages as Implement.
-func (o *FactoryWorkOrder) currentStageKey(tx *gorm.DB) (string, error) {
+func (o *FactoryWorkOrder) CurrentStageKey(tx *gorm.DB) (string, error) {
 	if o.State == FactoryWorkOrderStateOpen {
 		grouped, err := ListWorkOrderLineDispatchesByWorkOrderIDs(tx, []uuid.UUID{o.ID})
 		if err != nil {
@@ -65,17 +27,20 @@ func (o *FactoryWorkOrder) currentStageKey(tx *gorm.DB) (string, error) {
 	return WorkOrderBoardColumn(tx, o)
 }
 
-func nodeListensForPullRequestMerge(node Node) bool {
-	template, _ := node.Metadata[FactoryAppTemplateMetadataKey].(map[string]any)
-	if mode, _ := template["startMode"].(string); node.Type != NodeTypeTrigger || mode != CustomAutomationIntegrationStartMode {
-		return false
-	}
-	actions, _ := node.Configuration["actions"].([]any)
-	switch node.ComponentName() {
-	case "github.onPullRequest":
-		return slices.Contains(actions, any("closed"))
-	case "bitbucket.onPullRequest":
-		return slices.Contains(actions, any("merged"))
-	}
-	return false
+// PullRequestMergeHandedOff reports whether a stage automation took over the
+// move of the task after one of its pull requests merged.
+func (o *FactoryWorkOrder) PullRequestMergeHandedOff(tx *gorm.DB) (bool, error) {
+	var count int64
+	err := tx.Model(&FactoryPullRequest{}).
+		Where("work_order_id = ? AND state = ? AND merge_handoff_canvas_id IS NOT NULL", o.ID, FactoryPullRequestStateMerged).
+		Count(&count).Error
+	return count > 0, err
+}
+
+// RecordPullRequestMergeHandoff marks a merged pull request of the task as
+// handled by the stage automation in canvasID.
+func (o *FactoryWorkOrder) RecordPullRequestMergeHandoff(tx *gorm.DB, pullRequestID, canvasID uuid.UUID) error {
+	return tx.Model(&FactoryPullRequest{}).
+		Where("id = ? AND work_order_id = ?", pullRequestID, o.ID).
+		Update("merge_handoff_canvas_id", canvasID).Error
 }

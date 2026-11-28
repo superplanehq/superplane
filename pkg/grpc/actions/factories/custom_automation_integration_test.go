@@ -18,7 +18,7 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
-func TestIntegrationTriggerAutomationMovesTasksOnMerge(t *testing.T) {
+func TestIntegrationTriggerAutomationSettings(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 	factory := seedHandOffFactory(t, r, db)
@@ -71,11 +71,6 @@ func TestIntegrationTriggerAutomationMovesTasksOnMerge(t *testing.T) {
 	assert.Equal(t, "github.onPullRequest", trigger.ComponentName())
 	require.NotNil(t, trigger.IntegrationID)
 	assert.Equal(t, githubID, *trigger.IntegrationID)
-	order, err := factory.CreateWorkOrder(db, "Ship it", "", &r.User, nil, nil)
-	require.NoError(t, err)
-	handled, err := order.StageHandlesPullRequestMerge(db)
-	require.NoError(t, err)
-	assert.True(t, handled, "PR Closure leaves a merged task to the stage automation")
 
 	service := automations.Service{Backend: CanvasAutomationBackend{Deps: deps}}
 	read, err := service.Read(ctx, r.Organization.ID, canvasID)
@@ -86,13 +81,11 @@ func TestIntegrationTriggerAutomationMovesTasksOnMerge(t *testing.T) {
 	assert.Contains(t, read.YAML, "- closed")
 
 	settings.Triggers = []*pb.FactoryCustomAutomation_StartTrigger{pullRequestTrigger("opened")}
-	_, err = UpdateFactoryCustomAutomation(ctx, deps, orgID, &pb.UpdateFactoryCustomAutomationRequest{
+	updated, err := UpdateFactoryCustomAutomation(ctx, deps, orgID, &pb.UpdateFactoryCustomAutomationRequest{
 		FactoryId: factory.ID.String(), AutomationId: canvasID.String(), Name: "Move on merge", Settings: settings,
 	})
 	require.NoError(t, err)
-	handled, err = order.StageHandlesPullRequestMerge(db)
-	require.NoError(t, err)
-	assert.False(t, handled, "a trigger without merges does not stop PR Closure")
+	assert.True(t, proto.Equal(settings, updated.GetCustomAutomation().GetSettings()), "the changed event reads back")
 
 	for name, change := range map[string]func(*pb.FactoryCustomAutomation_Settings){
 		"no integration": func(s *pb.FactoryCustomAutomation_Settings) { s.Triggers[0].Integration.IntegrationId = "" },

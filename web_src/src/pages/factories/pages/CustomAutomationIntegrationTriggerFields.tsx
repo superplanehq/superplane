@@ -13,6 +13,15 @@ import { customAutomationListensForMerge } from "../lib/customAutomation";
 
 type IntegrationOption = { connection: OrganizationsIntegration; triggers: IntegrationsCapabilityDefinition[] };
 
+/** Factory pull request events carry the task, so a stage automation starts with them on. */
+function eventDefaults(trigger: IntegrationsCapabilityDefinition): Record<string, unknown> {
+  const defaults = parseDefaultValues(trigger.configuration ?? []);
+  if (trigger.configuration?.some((field) => field.name === "onlyFactoryPullRequests")) {
+    defaults.onlyFactoryPullRequests = true;
+  }
+  return defaults;
+}
+
 export function CustomAutomationIntegrationTriggerFields({
   idPrefix,
   organizationId,
@@ -62,9 +71,7 @@ export function CustomAutomationIntegrationTriggerFields({
           idPrefix={idPrefix}
           triggers={selected.triggers}
           selected={trigger}
-          onSelect={(next) =>
-            onChange({ ...value, trigger: next.name, configuration: parseDefaultValues(next.configuration ?? []) })
-          }
+          onSelect={(next) => onChange({ ...value, trigger: next.name, configuration: eventDefaults(next) })}
         />
       ) : null}
       {trigger?.configuration?.map((field) => (

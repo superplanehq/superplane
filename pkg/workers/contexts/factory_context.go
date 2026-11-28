@@ -719,7 +719,7 @@ func (c *FactoryContext) UpdateWorkOrderStatus(params core.UpdateWorkOrderStatus
 			return workOrderToCore(order), false, nil
 		}
 		if pullRequestResult == models.FactoryWorkOrderResultCompleted {
-			handled, err := order.StageHandlesPullRequestMerge(c.tx)
+			handled, err := order.PullRequestMergeHandedOff(c.tx)
 			if err != nil {
 				return nil, false, err
 			}

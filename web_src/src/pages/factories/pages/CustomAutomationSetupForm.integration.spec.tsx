@@ -51,6 +51,12 @@ vi.mock("@/hooks/useIntegrations", () => ({
                 defaultValue: '["closed"]',
                 typeOptions: { multiSelect: { options: [{ label: "Closed", value: "closed" }] } },
               },
+              {
+                name: "onlyFactoryPullRequests",
+                label: "Only factory pull requests",
+                type: "boolean",
+                defaultValue: "false",
+              },
             ],
           },
         ],
@@ -119,7 +125,11 @@ it("saves a merge integration trigger with a step that moves the task", async ()
   const saved = saveAutomation.mock.calls.at(-1)![0];
   expect(saved.settings.triggers).toContainEqual({
     startMode: "START_MODE_INTEGRATION",
-    integration: { integrationId: "github-1", trigger: "github.onPullRequest", configuration: { actions: ["closed"] } },
+    integration: {
+      integrationId: "github-1",
+      trigger: "github.onPullRequest",
+      configuration: { actions: ["closed"], onlyFactoryPullRequests: true },
+    },
   });
   expect(saved.settings.steps).toHaveLength(1);
   expect(saved.settings.steps[0]).toMatchObject({ type: "TYPE_BASH" });

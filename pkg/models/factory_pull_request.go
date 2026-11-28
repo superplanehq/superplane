@@ -102,8 +102,11 @@ type FactoryPullRequest struct {
 	MergeBlockedMessage     string
 	MergeableHeadSHA        string
 	MergeableAllowedMethods string
-	CreatedAt               time.Time
-	UpdatedAt               time.Time
+	// MergeHandoffCanvasID is the stage automation that moves the task after
+	// this pull request merged. PR Closure then leaves the task open.
+	MergeHandoffCanvasID *uuid.UUID
+	CreatedAt            time.Time
+	UpdatedAt            time.Time
 }
 
 type FactoryPullRequestRun struct {

@@ -31,8 +31,9 @@ const MERGE_ACTIONS: Record<string, string> = { "github.onPullRequest": "closed"
  */
 export function customAutomationListensForMerge(integration: FactoryCustomAutomationIntegrationTrigger): boolean {
   const action = MERGE_ACTIONS[integration.trigger ?? ""];
-  const actions = integration.configuration?.actions;
-  return !!action && Array.isArray(actions) && actions.includes(action);
+  const { actions, onlyFactoryPullRequests } = integration.configuration ?? {};
+  // Only factory pull request events carry the task that the automation moves.
+  return !!action && onlyFactoryPullRequests === true && Array.isArray(actions) && actions.includes(action);
 }
 
 const MERGE_CHECKS: Record<string, string> = {

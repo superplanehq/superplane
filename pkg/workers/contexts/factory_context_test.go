@@ -883,20 +883,26 @@ func TestFactoryContext_UpdateWorkOrderStatus_StageAutomationHandlesMerge(t *tes
 	_, _, err = ctx.UpdateWorkOrderStatus(core.UpdateWorkOrderStatusParams{OrderID: order.ID.String(), State: models.FactoryWorkOrderStateOpen})
 	require.NoError(t, err)
 
-	metadata := models.FactoryAppTemplateMetadata(models.FactoryAppTemplateCustomAutomationID, 1)
-	metadata[models.FactoryAppTemplateMetadataKey].(map[string]any)["startMode"] = models.CustomAutomationIntegrationStartMode
-	automation, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{{
-		NodeID: "integration-merge", Name: "Integration event", Type: models.NodeTypeTrigger,
-		Ref:           datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "github.onPullRequest"}}),
-		Configuration: datatypes.NewJSONType(map[string]any{"repository": "acme/api", "actions": []any{"closed"}}),
-		Metadata:      datatypes.NewJSONType(metadata),
-	}}, nil)
-	require.NoError(t, database.Conn().Model(automation).Updates(map[string]any{
-		"factory_id": factory.ID, "column_key": models.CanvasColumnKeyImplement,
-	}).Error)
-
 	pullRequest, err := order.CreatePullRequest(database.Conn(), multiRepoPullRequestParams(models.FactoryPullRequestProviderGitHub, "acme/api", 1, models.FactoryPullRequestStateMerged))
 	require.NoError(t, err)
+	mergeEvent := map[string]any{
+		"action":       "closed",
+		"pull_request": map[string]any{"merged": true},
+		"pullRequest":  &core.PullRequest{ID: pullRequest.ID.String(), WorkOrderID: order.ID.String()},
+	}
+	emitMerge := func(column string) {
+		node := createStageMergeTrigger(t, r, factory.ID, column)
+		_, created, err := CreateFactoryPullRequestEvent(database.Conn(), node, "github.pullRequest", mergeEvent)
+		require.NoError(t, err)
+		require.True(t, created)
+	}
+
+	emitMerge(models.CanvasColumnKeyVerify)
+	handedOff, err := order.PullRequestMergeHandedOff(database.Conn())
+	require.NoError(t, err)
+	assert.False(t, handedOff, "an automation in another stage does not take over the task")
+
+	emitMerge(models.CanvasColumnKeyImplement)
 	closeWhenDone := core.UpdateWorkOrderStatusParams{
 		OrderID: order.ID.String(), State: models.FactoryWorkOrderStateClosed,
 		Result: models.FactoryWorkOrderResultCompleted, WhenAllPullRequestsDone: true,
@@ -912,6 +918,21 @@ func TestFactoryContext_UpdateWorkOrderStatus_StageAutomationHandlesMerge(t *tes
 	require.NoError(t, err)
 	assert.True(t, changed, "PR Closure still closes a task whose pull request closed without a merge")
 	assert.Equal(t, models.FactoryWorkOrderResultPRClosed, updated.Result)
+}
+
+func createStageMergeTrigger(t *testing.T, r *support.ResourceRegistry, factoryID uuid.UUID, column string) *models.CanvasNode {
+	metadata := models.FactoryAppTemplateMetadata(models.FactoryAppTemplateCustomAutomationID, 1)
+	metadata[models.FactoryAppTemplateMetadataKey].(map[string]any)["startMode"] = models.CustomAutomationIntegrationStartMode
+	automation, nodes := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{{
+		NodeID: "integration-merge", Name: "Integration event", Type: models.NodeTypeTrigger,
+		Ref:           datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "github.onPullRequest"}}),
+		Configuration: datatypes.NewJSONType(map[string]any{"repository": "acme/api", "actions": []any{"closed"}}),
+		Metadata:      datatypes.NewJSONType(metadata),
+	}}, nil)
+	require.NoError(t, database.Conn().Model(automation).Updates(map[string]any{
+		"factory_id": factoryID, "column_key": column,
+	}).Error)
+	return &nodes[0]
 }
 
 func TestFactoryContext_UpdateWorkOrderStatus_ExplicitCloseDoesNotWaitForPullRequests(t *testing.T) {
