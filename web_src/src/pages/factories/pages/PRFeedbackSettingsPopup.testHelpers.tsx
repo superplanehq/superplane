@@ -10,7 +10,7 @@ import { prepareData } from "@/pages/app/workflowPageHelpers";
 import { TooltipProvider } from "@/ui/tooltip";
 
 import { PRFeedbackSettingsPopup } from "./PRFeedbackSettingsPopup";
-import { PLANNING_REVIEW_DRAFT } from "./planningReviewMockup";
+import { PLANNING_REVIEW_DRAFT, type PlanningReviewDraft } from "./planningReviewMockup";
 import type { PRFeedbackDraftSettings, PRFeedbackSettingsTab } from "./prFeedbackSettingsModel";
 import type { IntakeAutomationGraph } from "./useIntakeAutomationCanvas";
 
@@ -164,42 +164,59 @@ export function renderAgentSettingsPopup(
     initialTab = "general",
     withAgent = true,
     agentLoading = false,
+    agentDraft = PLANNING_REVIEW_DRAFT,
     probe,
   }: {
     initialPath?: string;
     initialTab?: PRFeedbackSettingsTab;
     withAgent?: boolean;
     agentLoading?: boolean;
+    agentDraft?: PlanningReviewDraft | null;
     probe?: ReactNode;
   } = {},
 ) {
   const onAgentSave = vi.fn<(draft: typeof PLANNING_REVIEW_DRAFT) => Promise<void>>(async () => {});
   const onSave = vi.fn();
   const onClose = vi.fn();
-  render(
-    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <MemoryRouter initialEntries={[initialPath]}>
-        <PRFeedbackSettingsPopup
-          settings={settings}
-          automationGraph={automationGraph}
-          agent={
-            withAgent
-              ? {
-                  draft: agentLoading ? undefined : PLANNING_REVIEW_DRAFT,
-                  isLoading: agentLoading,
-                  organizationId: "org-1",
-                  onSave: onAgentSave,
-                }
-              : undefined
-          }
-          onSave={onSave}
-          onClose={onClose}
-          initialTab={initialTab}
-          fixed={false}
-        />
-        {probe}
-      </MemoryRouter>
-    </QueryClientProvider>,
+  const popup = (
+    nextSettings: PRFeedbackDraftSettings,
+    nextAgentDraft: PlanningReviewDraft | null,
+    nextAgentLoading: boolean,
+  ) => (
+    <PRFeedbackSettingsPopup
+      settings={nextSettings}
+      automationGraph={automationGraph}
+      agent={
+        withAgent
+          ? {
+              draft: nextAgentDraft ?? undefined,
+              isLoading: nextAgentLoading,
+              organizationId: "org-1",
+              onSave: onAgentSave,
+            }
+          : undefined
+      }
+      onSave={onSave}
+      onClose={onClose}
+      initialTab={initialTab}
+      fixed={false}
+    />
   );
-  return { onAgentSave, onSave, onClose };
+  const { rerender } = render(popup(settings, agentDraft, agentLoading), {
+    wrapper: ({ children }) => (
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MemoryRouter initialEntries={[initialPath]}>
+          {children}
+          {probe}
+        </MemoryRouter>
+      </QueryClientProvider>
+    ),
+  });
+  return {
+    onAgentSave,
+    onSave,
+    onClose,
+    rerender: (nextSettings = settings, nextAgentDraft = agentDraft, nextAgentLoading = agentLoading) =>
+      rerender(popup(nextSettings, nextAgentDraft, nextAgentLoading)),
+  };
 }

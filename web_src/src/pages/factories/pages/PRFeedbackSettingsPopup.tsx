@@ -60,13 +60,13 @@ export function PRFeedbackSettingsPopup({
   fixed = true,
   initialTab = "general",
 }: PRFeedbackSettingsPopupProps) {
-  const [draft, setDraft] = useState(settings);
+  const { draft, update, editedAgent, setEditedAgent, agentDraft, agentUnavailable } = usePRFeedbackDraft(
+    settings,
+    agent,
+  );
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [editedAgent, setEditedAgent] = useState<PlanningReviewDraft>();
   const [saving, setSaving] = useState(false);
   const [localSaveError, setLocalSaveError] = useState<string>();
-  const agentDraft = editedAgent ?? agent?.draft;
-  const agentUnavailable = Boolean(agent && (agent.isLoading || !agentDraft?.components.length));
   const busy = saving || savePending;
 
   const save = async (next: PRFeedbackDraftSettings) => {
@@ -96,17 +96,6 @@ export function PRFeedbackSettingsPopup({
     hasAgent: false,
   });
   const { tab, setTab } = history;
-  const settingsKey = JSON.stringify(settings);
-  const syncedSettingsKey = useRef(settingsKey);
-  useEffect(() => {
-    if (syncedSettingsKey.current === settingsKey) return;
-    syncedSettingsKey.current = settingsKey;
-    setDraft(settings);
-  }, [settings, settingsKey]);
-
-  function update<K extends keyof PRFeedbackDraftSettings>(key: K, value: PRFeedbackDraftSettings[K]) {
-    setDraft((current) => ({ ...current, [key]: value }));
-  }
 
   return (
     <PopupShell testId="pr-feedback-settings" canvas fixed={fixed} onDismiss={onClose}>
@@ -145,7 +134,7 @@ export function PRFeedbackSettingsPopup({
           savePending={busy}
           deletePending={deletePending}
           saveError={localSaveError || saveError}
-          onUpdate={(key, value) => update(key, value)}
+          onUpdate={update}
           onSave={save}
           onDelete={onDelete}
           onConfirmDelete={(next) => setConfirmDelete(next)}
@@ -168,6 +157,27 @@ export function PRFeedbackSettingsPopup({
       ) : null}
     </PopupShell>
   );
+}
+
+function usePRFeedbackDraft(settings: PRFeedbackDraftSettings, agent?: PlanningReviewAgentSlot) {
+  const [draft, setDraft] = useState(settings);
+  const [editedAgent, setEditedAgent] = useState<PlanningReviewDraft>();
+  const settingsKey = JSON.stringify(settings);
+  const syncedSettingsKey = useRef(settingsKey);
+  useEffect(() => {
+    if (syncedSettingsKey.current === settingsKey) return;
+    syncedSettingsKey.current = settingsKey;
+    setDraft(settings);
+  }, [settings, settingsKey]);
+
+  const agentDraft = editedAgent ?? agent?.draft;
+  const agentUnavailable = Boolean(agent && (agent.isLoading || !agentDraft?.components.length));
+
+  function update<K extends keyof PRFeedbackDraftSettings>(key: K, value: PRFeedbackDraftSettings[K]) {
+    setDraft((current) => ({ ...current, [key]: value }));
+  }
+
+  return { draft, update, editedAgent, setEditedAgent, agentDraft, agentUnavailable };
 }
 
 function PRFeedbackGeneralTab({

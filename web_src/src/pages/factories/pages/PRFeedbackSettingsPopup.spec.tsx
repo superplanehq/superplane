@@ -18,6 +18,7 @@ import {
   renderAutomationPopup,
   renderChecksPopup,
 } from "./PRFeedbackSettingsPopup.testHelpers";
+import { PLANNING_REVIEW_DRAFT } from "./planningReviewMockup";
 
 Element.prototype.scrollIntoView ??= () => undefined;
 
@@ -426,6 +427,67 @@ describe("PRFeedbackSettingsPopup model settings", () => {
     ["checks", checksDraft({ checkNames: ["lint"] })],
   ] as const;
 
+  it.each([false, true])(
+    "synchronizes saved settings only when their contents change (changed=%s)",
+    async (changed) => {
+      const user = userEvent.setup();
+      const settings = checksDraft({ checkNames: ["lint"] });
+      const { rerender, onSave } = renderAgentSettingsPopup(settings);
+      const attempts = screen.getByLabelText("Maximum automatic fix attempts");
+      await user.clear(attempts);
+      await user.type(attempts, "5");
+
+      const nextSettings = { ...settings, maximumAttempts: changed ? 7 : settings.maximumAttempts };
+      rerender(nextSettings);
+
+      expect(attempts).toHaveValue(changed ? 7 : 5);
+      await user.click(screen.getByTestId("pr-feedback-settings-save"));
+      expect(onSave).toHaveBeenCalledWith({ ...nextSettings, maximumAttempts: changed ? 7 : 5 });
+    },
+  );
+
+  it("uses incoming agent drafts until the model is edited", async () => {
+    const user = userEvent.setup();
+    const settings = discussionDraft();
+    const { rerender, onAgentSave } = renderAgentSettingsPopup(settings);
+    const incomingAgent = {
+      ...PLANNING_REVIEW_DRAFT,
+      components: PLANNING_REVIEW_DRAFT.components.map((component) => ({
+        ...component,
+        configuration: { ...component.configuration, model: "opus" },
+      })),
+    };
+    rerender(settings, incomingAgent);
+    expect(screen.getByRole("combobox")).toHaveTextContent("Claude Opus");
+
+    await user.click(screen.getByRole("combobox"));
+    await user.click(screen.getByRole("option", { name: "Claude Sonnet" }));
+    rerender({ ...settings, maximumAttempts: 7 }, incomingAgent);
+    expect(screen.getByRole("combobox")).toHaveTextContent("Claude Sonnet");
+
+    rerender(settings, incomingAgent, true);
+    expect(screen.getByTestId("pr-feedback-settings-save")).toBeDisabled();
+    rerender(settings, incomingAgent, false);
+    await user.click(screen.getByTestId("pr-feedback-settings-save"));
+    expect(onAgentSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        components: [expect.objectContaining({ configuration: expect.objectContaining({ model: "sonnet" }) })],
+      }),
+    );
+  });
+
+  it.each([null, { ...PLANNING_REVIEW_DRAFT, components: [] }])(
+    "disables Save when the supplied agent has no components (%j)",
+    (agentDraft) => {
+      const settings = discussionDraft();
+      const { rerender } = renderAgentSettingsPopup(settings, { agentDraft });
+      expect(screen.getByTestId("pr-feedback-settings-save")).toBeDisabled();
+
+      rerender(settings, PLANNING_REVIEW_DRAFT);
+      expect(screen.getByTestId("pr-feedback-settings-save")).toBeEnabled();
+    },
+  );
+
   it.each(sources)("shows the model picker in General for %s", (_source, settings) => {
     renderAgentSettingsPopup(settings);
 
@@ -480,7 +542,7 @@ describe("PRFeedbackSettingsPopup model settings", () => {
   });
 
   it("disables Save while the agent settings load", () => {
-    renderAgentSettingsPopup(checksDraft(), { agentLoading: true });
+    renderAgentSettingsPopup(checksDraft({ checkNames: ["lint"] }), { agentLoading: true });
 
     expect(screen.getByTestId("pr-feedback-settings-save")).toBeDisabled();
     expect(screen.getByRole("status")).toHaveTextContent("Loading");
